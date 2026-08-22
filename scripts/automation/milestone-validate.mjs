@@ -49,10 +49,19 @@ for (const p of ms.packages) {
   }
 }
 
+// Manifest hygiene: supersededBy must be an array. A truthy-but-empty value
+// (e.g. [] being treated as present) would silently disable coverage
+// accounting below, so fail loudly on the malformed shape.
+for (const r of manifest.requirements) {
+  if (!Array.isArray(r.supersededBy))
+    errs.push(`manifest requirement ${r.id}: supersededBy must be an array`);
+}
+
 // Every manifest requirement assigned to this milestone must be covered by
-// exactly one package — no gaps, no double-assignment.
+// exactly one package — no gaps, no double-assignment. Only requirements with
+// a non-empty supersededBy list are excluded from the coverage obligation.
 const groupReqs = manifest.requirements
-  .filter((r) => r.dependencyGroup === ms.milestoneId && !r.supersededBy)
+  .filter((r) => r.dependencyGroup === ms.milestoneId && (r.supersededBy ?? []).length === 0)
   .map((r) => r.id);
 const assigned = new Map();
 for (const p of ms.packages)

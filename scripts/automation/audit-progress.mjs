@@ -52,8 +52,23 @@ function computeScope() {
   }
   const manifest = loadManifest();
   const isFinal = ms.milestoneId === 'G7';
+  // supersededBy must be an array; a truthy-but-empty value would silently
+  // shrink the audit scope to nothing, so fail loudly on the malformed shape.
+  for (const r of manifest.requirements) {
+    if (!Array.isArray(r.supersededBy)) {
+      console.error(
+        JSON.stringify({
+          error: `manifest requirement ${r.id}: supersededBy must be an array`,
+        }),
+      );
+      process.exit(2);
+    }
+  }
   const required = manifest.requirements
-    .filter((r) => !r.supersededBy && (isFinal || r.dependencyGroup === ms.milestoneId))
+    .filter(
+      (r) =>
+        (r.supersededBy ?? []).length === 0 && (isFinal || r.dependencyGroup === ms.milestoneId),
+    )
     .map((r) => r.id)
     .sort();
   return { milestoneId: ms.milestoneId, isFinal, required };

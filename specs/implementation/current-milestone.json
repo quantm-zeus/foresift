@@ -1,0 +1,325 @@
+{
+  "schemaVersion": "1.0.0",
+  "milestoneId": "G0",
+  "status": "ACTIVE",
+  "plannedAt": "2026-08-22",
+  "description": "Data Truth, Capability, Security, Collector, Cost and Traceability Foundation decomposed into eight outcome-oriented work packages. Every requirement whose dependencyGroup is G0 in docs/spec/crypto_intelligence_agent_gateway_PRD_FINAL_v6.0.requirements.json is assigned to exactly one package. Foundation milestone: the concurrency policy permits at most one coding package in flight, so every package is conservatively parallelizable=false and writeScope overlap between packages is safe. Plan-level decisions recorded at review repair: (1) G0 delivers FR-DR-001/002 through packages/persistence/** (the manifest owner); their packages/workflow-runtime/** and packages/release-conformance/** implementation mappings are reconciled by g0-traceability-conformance, the only legal writer of manifest-derived mappings, at milestone convergence. (2) All docs/generated/<family>-surfaces.json artifacts are generated centrally by g0-traceability-conformance at milestone convergence; per-family telemetry/<family>.* definitions are owned where each family is implemented.",
+  "packages": [
+    {
+      "id": "g0-contracts-data-truth",
+      "objective": "Establish the canonical data-truth foundation: versioned chain/asset/pool/launch/migration identity, immutable observations with revisions, point-in-time available_at replay with no-backdating, field-level quality codes, online/offline feature consistency, source lineage and independence groups, and tiered backup/PITR durability with separately protected encryption keys and recovery credentials over the shared persistence, object-store, and schema layers. This package also lands glob-driven root tsconfig/eslint/package/workspace configuration that picks up every later G0 package path automatically so subsequent packages need zero root-config edits. FR-DR recovery orchestration is delivered in G0 through packages/persistence/** (the manifest-declared owner); its workflow-runtime and release-conformance implementation mappings are reconciled by g0-traceability-conformance at milestone convergence.",
+      "requirementIds": [
+        "FR-DATA-001",
+        "FR-DATA-002",
+        "FR-DATA-003",
+        "FR-DATA-004",
+        "FR-DATA-005",
+        "FR-DATA-006",
+        "FR-DR-001",
+        "FR-DR-002"
+      ],
+      "dependencies": [],
+      "risk": "CRITICAL",
+      "parallelizable": false,
+      "writeScopes": [
+        "package.json",
+        "pnpm-workspace.yaml",
+        "tsconfig.json",
+        "tsconfig.base.json",
+        "eslint.config.js",
+        "packages/shared-schemas/**",
+        "packages/domain/**",
+        "packages/persistence/**",
+        "packages/evidence/**",
+        "packages/object-store/**",
+        "migrations/g0_data_*.sql",
+        "migrations/g0_dr_*.sql",
+        "tests/fixtures/data/**",
+        "tests/fixtures/dr/**",
+        "tests/acceptance/**",
+        "tests/negative/**",
+        "telemetry/data.*",
+        "telemetry/dr.*"
+      ],
+      "verificationCommands": [
+        "test -d packages/shared-schemas && pnpm --filter @foresift/shared-schemas test",
+        "test -d packages/persistence && pnpm --filter @foresift/persistence test",
+        "test -d packages/evidence && pnpm --filter @foresift/evidence test",
+        "test -d packages/object-store && pnpm --filter @foresift/object-store test"
+      ],
+      "status": "PENDING"
+    },
+    {
+      "id": "g0-security-perimeter",
+      "objective": "Stand up the permanent read-only security perimeter: append-only hash-chained audit chain with continuous verification, phishing-resistant step-up authentication primitives, deny-by-default egress/SSRF controls with rebinding tests, untrusted-content isolation, secrets and supply-chain policy, Alpha Lab import gating (approved non-executable schemas only, signature/hash/producer-trust verification, quarantine and content scanning, no direct policy activation), tenant-isolation and abuse-control primitives, incident process, and automated static/runtime proofs that no trading, custody, wallet-signing, private-key, or transaction-submission capability exists anywhere in the codebase.",
+      "requirementIds": [
+        "FR-SEC-001",
+        "FR-SEC-002",
+        "FR-SEC-003",
+        "FR-SEC-004",
+        "FR-SEC-005",
+        "FR-SEC-006",
+        "FR-SEC-007",
+        "FR-SEC-008",
+        "FR-SEC-009",
+        "FR-SEC-010",
+        "FR-SEC-011",
+        "FR-SEC-012"
+      ],
+      "dependencies": ["g0-contracts-data-truth"],
+      "risk": "CRITICAL",
+      "parallelizable": false,
+      "writeScopes": [
+        "packages/security/**",
+        "packages/tenant-isolation/**",
+        "packages/shared-schemas/**",
+        "scripts/scan-prohibited-capabilities/**",
+        "migrations/g0_sec_*.sql",
+        "tests/fixtures/sec/**",
+        "tests/acceptance/**",
+        "tests/negative/**",
+        "telemetry/sec.*",
+        "docs/runbooks/**"
+      ],
+      "verificationCommands": [
+        "test -d packages/security && pnpm --filter @foresift/security test",
+        "test -d packages/tenant-isolation && pnpm --filter @foresift/tenant-isolation test",
+        "node scripts/scan-prohibited-capabilities/cli.mjs"
+      ],
+      "status": "PENDING"
+    },
+    {
+      "id": "g0-tool-core",
+      "objective": "Implement the Shared Tool Core: a central versioned tool registry driving the exact authenticate-authorize-validate-cache-single-flight-quota-reserve-execute-audit pipeline with provenance, event-time, quality, and evidence envelopes; narrow actor/tool profiles; cache and cross-mode single-flight semantics; atomic quota reservation/commit/release; license-policy enforcement; and permanent prohibited-financial enforcement. The quota reservation/commit/release stage and the license-policy source land as stable extension-point interfaces (contracts plus dependency-injection seams) so later packages implement cost and quota semantics entirely outside packages/tool-core/** without editing it.",
+      "requirementIds": [
+        "FR-CORE-001",
+        "FR-CORE-002",
+        "FR-CORE-003",
+        "FR-CORE-004",
+        "FR-CORE-005",
+        "FR-CORE-006",
+        "FR-CORE-007",
+        "FR-CORE-008"
+      ],
+      "dependencies": ["g0-contracts-data-truth", "g0-security-perimeter"],
+      "risk": "HIGH",
+      "parallelizable": false,
+      "writeScopes": [
+        "packages/tool-core/**",
+        "packages/domain/**",
+        "packages/shared-schemas/**",
+        "migrations/g0_core_*.sql",
+        "tests/fixtures/core/**",
+        "tests/acceptance/**",
+        "tests/negative/**",
+        "telemetry/core.*"
+      ],
+      "verificationCommands": [
+        "test -d packages/domain && pnpm --filter @foresift/domain test",
+        "test -d packages/tool-core && pnpm --filter @foresift/tool-core test"
+      ],
+      "status": "PENDING"
+    },
+    {
+      "id": "g0-provider-lifecycle",
+      "objective": "Deliver provider operation lifecycle truth: stateful lifecycle (DISCOVERED through REMOVED) with documentation/pricing/rights verification TTLs that fail closed, deprecation rules for new implementations, audited read-only adapters bound to exact egress allowlists (GMGN strictly query-only, Helius supported raw/history operations), quarantine of responses carrying transaction payloads or key material, rights-change fail-closed handling, and source fingerprints for empirical dependence analysis.",
+      "requirementIds": [
+        "FR-PROV-001",
+        "FR-PROV-002",
+        "FR-PROV-003",
+        "FR-PROV-004",
+        "FR-PROV-005",
+        "FR-PROV-006",
+        "FR-PROV-007",
+        "FR-PROV-008",
+        "FR-PROV-009",
+        "FR-PROV-010"
+      ],
+      "dependencies": ["g0-contracts-data-truth", "g0-security-perimeter"],
+      "risk": "HIGH",
+      "parallelizable": false,
+      "writeScopes": [
+        "packages/provider-lifecycle/**",
+        "packages/providers/**",
+        "packages/shared-schemas/**",
+        "migrations/g0_prov_*.sql",
+        "tests/fixtures/prov/**",
+        "tests/acceptance/**",
+        "tests/negative/**",
+        "telemetry/prov.*",
+        "docs/provider-rights/**"
+      ],
+      "verificationCommands": [
+        "test -d packages/provider-lifecycle && pnpm --filter @foresift/provider-lifecycle test",
+        "test -d packages/providers && pnpm --filter @foresift/providers test"
+      ],
+      "status": "PENDING"
+    },
+    {
+      "id": "g0-cost-capacity",
+      "objective": "Operate the free-first cost, quota, and sustainable-capacity control plane: declared cost classes, quota units, reset policies, and STRICT_FREE permission for every provider operation; STRICT_FREE blocking of paid, unknown-cost, and fallback operations with audited denials; protected reserves; degrade-breadth/depth-before-protected-quota; batch coalescing and exact-cache/single-flight ahead of reservation; verified-plan cost forecasts; separately activated paid-provider mode; and independently capped scheduler/workflow/database/object-store/notification/model resource budgets with data-provider STRICT_FREE independent from any configured BYOK model budget. Cost and quota semantics implement the tool-core extension-point interfaces without editing packages/tool-core/**.",
+      "requirementIds": [
+        "FR-COST-001",
+        "FR-COST-002",
+        "FR-COST-003",
+        "FR-COST-004",
+        "FR-COST-005",
+        "FR-COST-006",
+        "FR-COST-007",
+        "FR-COST-008",
+        "FR-COST-009",
+        "FR-COST-010"
+      ],
+      "dependencies": ["g0-tool-core", "g0-provider-lifecycle"],
+      "risk": "HIGH",
+      "parallelizable": false,
+      "writeScopes": [
+        "packages/cost-router/**",
+        "packages/capacity-planner/**",
+        "packages/quota-forecast/**",
+        "packages/shared-schemas/**",
+        "migrations/g0_cost_*.sql",
+        "tests/fixtures/cost/**",
+        "tests/acceptance/**",
+        "tests/negative/**",
+        "telemetry/cost.*"
+      ],
+      "verificationCommands": [
+        "test -d packages/cost-router && pnpm --filter @foresift/cost-router test",
+        "test -d packages/capacity-planner && pnpm --filter @foresift/capacity-planner test",
+        "test -d packages/quota-forecast && pnpm --filter @foresift/quota-forecast test"
+      ],
+      "status": "PENDING"
+    },
+    {
+      "id": "g0-first-party-observation",
+      "objective": "Provide bounded first-party observation: the versioned allowlisted Solana collector and protocol registry (Pump bonding curve/PumpSwap, Raydium AMM v4/CPMM/CLMM/Stable AMM/LaunchLab, Orca Whirlpools, Meteora DLMM/DAMM v1-v2/DBC, Jupiter route observation) with durable monotonic checkpoints, gap detection and non-backdating backfill, reorg-safe immutable revisions, decode-drift incident pausing, deterministic bounded failover, Sustainable Capacity Contract ceilings, health and first-seen timing metrics, and zero signing/wallet capability; plus the point-in-time discovery-universe registry making free aggregate discovery the default broad-universe path, with complete first-seen attribution, finite batch-oriented monitoring, and deterministic versioned candidate promotion. External collector access flows through the security perimeter's egress controls and audited read-only adapter layer.",
+      "requirementIds": [
+        "FR-COL-001",
+        "FR-COL-002",
+        "FR-COL-003",
+        "FR-COL-004",
+        "FR-COL-005",
+        "FR-COL-006",
+        "FR-COL-007",
+        "FR-COL-008",
+        "FR-COL-009",
+        "FR-COL-010",
+        "FR-COL-011",
+        "FR-COL-012",
+        "FR-DISC-001",
+        "FR-DISC-002",
+        "FR-DISC-003",
+        "FR-DISC-004",
+        "FR-DISC-005"
+      ],
+      "dependencies": [
+        "g0-contracts-data-truth",
+        "g0-security-perimeter",
+        "g0-provider-lifecycle",
+        "g0-cost-capacity"
+      ],
+      "risk": "HIGH",
+      "parallelizable": false,
+      "writeScopes": [
+        "apps/collector/**",
+        "packages/collector-core/**",
+        "packages/collector-solana/**",
+        "packages/collector-checkpoints/**",
+        "packages/collector-gap-recovery/**",
+        "packages/program-decoders/**",
+        "packages/discovery-universe/**",
+        "packages/cheap-monitor/**",
+        "packages/shared-schemas/**",
+        "migrations/g0_col_*.sql",
+        "migrations/g0_disc_*.sql",
+        "tests/fixtures/col/**",
+        "tests/fixtures/disc/**",
+        "tests/acceptance/**",
+        "tests/negative/**",
+        "telemetry/col.*",
+        "telemetry/disc.*"
+      ],
+      "verificationCommands": [
+        "test -d packages/collector-core && pnpm --filter @foresift/collector-core test",
+        "test -d packages/collector-solana && pnpm --filter @foresift/collector-solana test",
+        "test -d packages/program-decoders && pnpm --filter @foresift/program-decoders test",
+        "test -d packages/discovery-universe && pnpm --filter @foresift/discovery-universe test",
+        "test -d packages/cheap-monitor && pnpm --filter @foresift/cheap-monitor test"
+      ],
+      "status": "PENDING"
+    },
+    {
+      "id": "g0-mcp-surface",
+      "objective": "Expose the MCP Streamable HTTP surface: tools, resources, and prompts served from the Shared Tool Core registry with structured output and pagination; per-client authentication, profiles, quotas, and revocation plus personal bearer mode; exact scheme-host-port Origin allowlist rejection (HTTP 403) before session creation or any side effect; mutually tested transport protocol versions, content types, session identifiers, resumable-event ownership, message size limits, and per-client rate/concurrency limits; and authorization re-evaluated on every call and resource fetch - strictly read-only with no trading, custody, or signing capability exposed to any client.",
+      "requirementIds": [
+        "FR-MCP-001",
+        "FR-MCP-002",
+        "FR-MCP-003",
+        "FR-MCP-004",
+        "FR-MCP-005",
+        "FR-MCP-008",
+        "FR-MCP-009",
+        "FR-MCP-010"
+      ],
+      "dependencies": ["g0-tool-core", "g0-security-perimeter", "g0-cost-capacity"],
+      "risk": "HIGH",
+      "parallelizable": false,
+      "writeScopes": [
+        "apps/api/src/mcp/**",
+        "apps/api/src/auth/**",
+        "packages/tool-core/**",
+        "packages/shared-schemas/**",
+        "migrations/g0_mcp_*.sql",
+        "tests/fixtures/mcp/**",
+        "tests/acceptance/**",
+        "tests/negative/**",
+        "telemetry/mcp.*"
+      ],
+      "verificationCommands": ["test -d apps/api && pnpm --filter @foresift/api test"],
+      "status": "PENDING"
+    },
+    {
+      "id": "g0-traceability-conformance",
+      "objective": "Close the milestone with release-blocking traceability: the machine-readable requirement manifest kept authoritative and integrity-checked, globally unique and stable requirement/acceptance/invariant/artifact IDs with explicit supersession links, CI conformance that fails on unmapped normative items, orphaned code paths, or implementations outside their dependency gate, signed and hashed evidence artifacts for manual/legal/rights/approval gates, per-decision requirement/policy/model/tool/version traceability, and reproducible release reports with document, manifest, migration, SBOM hashes, conformance results, activation state, and rollback target. This package is also the central generator of all docs/generated/<family>-surfaces.json surface mappings and reconciles telemetry/surface mapping ownership across the milestone at convergence.",
+      "requirementIds": [
+        "FR-TRACE-001",
+        "FR-TRACE-002",
+        "FR-TRACE-003",
+        "FR-TRACE-004",
+        "FR-TRACE-005",
+        "FR-TRACE-006"
+      ],
+      "dependencies": [
+        "g0-contracts-data-truth",
+        "g0-security-perimeter",
+        "g0-tool-core",
+        "g0-provider-lifecycle",
+        "g0-cost-capacity",
+        "g0-first-party-observation",
+        "g0-mcp-surface"
+      ],
+      "risk": "HIGH",
+      "parallelizable": false,
+      "writeScopes": [
+        "packages/requirement-manifest/**",
+        "packages/release-conformance/**",
+        "packages/shared-schemas/**",
+        "scripts/generate-requirement-manifest/**",
+        "scripts/verify-release-conformance/**",
+        "docs/generated/**",
+        "migrations/g0_trace_*.sql",
+        "tests/fixtures/trace/**",
+        "tests/acceptance/**",
+        "tests/negative/**",
+        "telemetry/**"
+      ],
+      "verificationCommands": [
+        "test -d packages/requirement-manifest && pnpm --filter @foresift/requirement-manifest test",
+        "test -d packages/release-conformance && pnpm --filter @foresift/release-conformance test",
+        "pnpm spec:verify"
+      ],
+      "status": "PENDING"
+    }
+  ]
+}

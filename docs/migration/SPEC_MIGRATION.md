@@ -107,8 +107,8 @@ enforces, on every run:
 11. API route and persistence-entity uniqueness within the PRD's normative sections;
 12. no unresolved placeholders (`{{...}}`, `<TBD>`) in the PRD;
 13. no accidental `chainsieve`/`chain-sieve`/`chain_sieve` branding outside the
-    migration-provenance allowlist (`docs/migration/**` in full, plus the single
-    source-repository provenance pointer in `README.md`).
+    provenance allowlist (`docs/migration/**` and `docs/setup/**` in full, plus the
+    single source-repository provenance pointer in `README.md`).
 
 ### Normalized-hash provenance note (honest limitation)
 

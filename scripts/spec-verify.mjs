@@ -21,10 +21,14 @@ const MANIFEST_FILE = 'crypto_intelligence_agent_gateway_PRD_FINAL_v6.0.requirem
 const AUDIT_FILE = 'crypto_intelligence_agent_gateway_PRD_FINAL_v6.0.audit.json';
 const SUMS_FILE = 'SHA256SUMS';
 
-// Paths where historical legacy-project references are allowed (migration
-// provenance only): the full migration record, and the README's single required
-// pointer to the specification source repository and commit.
-const BRANDING_ALLOWLIST = [join('.', 'docs/migration'), join('.', 'README.md')];
+// Paths where historical legacy-project references are allowed (migration and
+// setup provenance only): the migration record and bootstrap report directories,
+// plus the README's single required pointer to the specification source repository.
+const BRANDING_ALLOWLIST = [
+  join('.', 'docs/migration'),
+  join('.', 'docs/setup'),
+  join('.', 'README.md'),
+];
 // Built indirectly so this file does not itself contain the legacy brand literal
 // and can keep scanning every other repository file under one allowlist rule.
 const BRAND_PATTERN = new RegExp('chain[-_ ]?sieve', 'i');

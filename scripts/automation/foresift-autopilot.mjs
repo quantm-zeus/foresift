@@ -52,15 +52,21 @@ function sh(cmd, opts = {}) {
 }
 function archonJson(args) {
   const r = spawnSync(`archon ${args}`, { shell: true, cwd: REPO, encoding: 'utf8' });
-  // --json mode emits exactly one JSON line on stdout (warnings go to stderr).
-  const line = (r.stdout ?? '')
+  const out = (r.stdout ?? '').trim();
+  // Real CLI emits a single pretty-printed JSON document; tolerate stray log
+  // lines by falling back to a scan for embedded JSON lines.
+  try {
+    return JSON.parse(out);
+  } catch {}
+  const line = out
     .split('\n')
     .map((s) => s.trim())
-    .filter((s) => s.startsWith('{') || s.startsWith('['));
+    .filter((s) => s.startsWith('{') || s.startsWith('['))
+    .pop();
   try {
-    return JSON.parse(line[line.length - 1] ?? r.stdout);
+    return JSON.parse(line);
   } catch {
-    return { _unparsed: r.stdout, _stderr: r.stderr, _status: r.status };
+    return { _unparsed: out, _stderr: r.stderr, _status: r.status };
   }
 }
 
@@ -283,7 +289,8 @@ function actOnEntry(st, entry) {
     return true;
   }
   if (status === 'failed' || status === 'paused') {
-    const errText = `${get?.error ?? ''} ${get?.lastError ?? ''}`.trim();
+    const errText =
+      `${get?.error ?? ''} ${get?.lastError ?? ''} ${get?.metadata?.error ?? ''}`.trim();
     if (errText) entry.failureClass = classifyFailure(errText);
     else entry.failureClass = entry.failureClass ?? 'UNKNOWN';
     return attemptResume(st, entry, `${status}: ${errText.slice(0, 200)}`);
@@ -299,7 +306,7 @@ async function actOnPendingAction(st, entry) {
     entry.abandonedBeforeRestart = false;
     const ack = launchDetached(entry.workflow, entry.branch, entry.message);
     record(st, 'fresh_restart_launched', { branch: entry.branch, ack: sanitizeAck(ack) });
-    const newId = extractRunId(ack);
+    const newId = resolveRunId(ack, entry.workflow, entry.message);
     if (newId) Object.assign(entry, { runId: newId, startedAt: now() });
     return;
   }
@@ -317,6 +324,39 @@ async function actOnPendingAction(st, entry) {
 function extractRunId(ack) {
   return ack?.runId ?? ack?.run_id ?? ack?.id ?? ack?.run?.id ?? null;
 }
+
+// `archon workflow run --detach` acknowledges with a conversationId but no run
+// id; the durable record is the runs table, queryable via structured JSON.
+// The launch message doubles as the correlation key (package id / fixed
+// milestone message), so pick the newest matching run.
+function discoverRunId(workflow, message) {
+  const list = archonJson('workflow runs --json --limit 20');
+  const runs = Array.isArray(list) ? list : (list?.runs ?? []);
+  const parseTs = (v0) => {
+    if (typeof v0 === 'number') return v0; // epoch ms
+    let v = String(v0 ?? '')
+      .trim()
+      .replace(' ', 'T');
+    if (!/([zZ]|[+-]\d\d:?\d\d)$/.test(v)) v += 'Z';
+    const t = Date.parse(v);
+    return Number.isNaN(t) ? 0 : t;
+  };
+  const match = runs
+    .filter(
+      (r) =>
+        r.workflow_name === workflow &&
+        r.user_message === message &&
+        parseTs(r.started_at) >= now() - 24 * 60 * 60_000,
+    )
+    .sort((a, b) => parseTs(b.started_at) - parseTs(a.started_at))[0];
+  return match?.id ?? null;
+}
+
+/** Resolve a run id from a detach ack, falling back to runs-table discovery. */
+function resolveRunId(ack, workflow, message) {
+  return extractRunId(ack) ?? discoverRunId(workflow, message);
+}
+
 function sanitizeAck(a) {
   return JSON.parse(
     JSON.stringify(a ?? {}, (_, v) => (typeof v === 'string' ? v.slice(0, 160) : v)),
@@ -343,14 +383,23 @@ function selectAndLaunch(st) {
       'foresift/milestone-planning',
       'plan-or-audit-current-milestone',
     );
-    const runId = extractRunId(ack);
-    record(st, 'milestone_control_launched', { ack: sanitizeAck(ack) });
+    const runId = resolveRunId(
+      ack,
+      'foresift-milestone-control',
+      'plan-or-audit-current-milestone',
+    );
+    record(st, 'milestone_control_launched', {
+      ack: sanitizeAck(ack),
+      runId,
+      discovery: extractRunId(ack) ? 'ack' : 'runs-table',
+    });
     if (runId)
       trackRun(st, 'milestone', {
         kind: 'milestone',
         workflow: 'foresift-milestone-control',
         runId,
         branch: 'foresift/milestone-planning',
+        message: 'plan-or-audit-current-milestone',
         startedAt: now(),
         resumeCount: 0,
         restartCount: 0,
@@ -374,8 +423,14 @@ function selectAndLaunch(st) {
     if (!verdict.ok) continue;
     const branch = `foresift/${cand.id}`;
     const ack = launchDetached('foresift-work-package', branch, cand.id);
-    const runId = extractRunId(ack);
-    record(st, 'work_package_launched', { packageId: cand.id, branch, ack: sanitizeAck(ack) });
+    const runId = resolveRunId(ack, 'foresift-work-package', cand.id);
+    record(st, 'work_package_launched', {
+      packageId: cand.id,
+      branch,
+      ack: sanitizeAck(ack),
+      runId,
+      discovery: extractRunId(ack) ? 'ack' : 'runs-table',
+    });
     setPackageStatus(ms, cand.id, 'RUNNING');
     if (runId)
       trackRun(st, 'package', {

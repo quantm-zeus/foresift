@@ -41,9 +41,13 @@ case "$cmd/$sub" in
   workflow/run)
     n=$(($(cat "${FAKE_RUNSEQ:?}" 2>/dev/null || echo 0) + 1))
     echo "$n" >"$FAKE_RUNSEQ"
-    rid="run-$n"; br=""; prev=""
-    for a in "$@"; do [ "$prev" = "--branch" ] && br="$a"; prev="$a"; done
-    echo "LAUNCH rid=$rid workflow=$arg branch=$br" >>"${FAKE_LAUNCHES:?}"
+    rid="run-$n"; br=""; ms=""; prev=""
+    for a in "$@"; do
+      [ "$prev" = "--branch" ] && br="$a"
+      [ "$prev" = "--json" ] && ms="$a"
+      prev="$a"
+    done
+    echo "LAUNCH rid=$rid workflow=$arg branch=$br msg=$ms" >>"${FAKE_LAUNCHES:?}"
     printf '{"runId":"%s","status":"started"}\n' "$rid"
     ;;
   workflow/get)
@@ -56,6 +60,25 @@ case "$cmd/$sub" in
     else
       printf '{"runId":"%s","status":"%s","updatedAt":%s}\n' "$arg" "$st" "$ts"
     fi
+    ;;
+  workflow/runs)
+    printf '{"runs":['
+    if [ -f "$FAKE_LAUNCHES" ]; then
+      tac "$FAKE_LAUNCHES" | awk -v dflt="${DEFAULT_STATUS:-running}" '
+        FNR > 1 { printf "," }
+        {
+          rid = ""; wf = ""; ms = "";
+          for (i = 1; i <= NF; i++) {
+            if ($i ~ /^rid=/)           rid = substr($i, 5)
+            else if ($i ~ /^workflow=/) wf = substr($i, 10)
+            else if ($i ~ /^msg=/)      ms = substr($i, 5)
+          }
+          key = rid; gsub(/-/, "_", key)
+          st = ENVIRON["STATUS_" key]; if (st == "") st = dflt
+          printf "{\"id\":\"%s\",\"workflow_name\":\"%s\",\"user_message\":\"%s\",\"status\":\"%s\",\"started_at\":%d}", rid, wf, ms, st, systime() * 1000
+        }' "$FAKE_LAUNCHES"
+    fi
+    printf ']}\n'
     ;;
   workflow/resume)
     echo "RESUME $arg" >>"$FAKE_LAUNCHES"

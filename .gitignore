@@ -1,0 +1,25 @@
+# Dependencies
+node_modules/
+
+# Build outputs
+dist/
+build/
+*.tsbuildinfo
+
+# Test / coverage
+coverage/
+.vitest/
+
+# Environment and secrets — never commit real credentials
+.env
+.env.*
+!.env.example
+
+# Logs and OS artifacts
+*.log
+.DS_Store
+
+# Editor state
+.idea/
+.vscode/*
+!.vscode/extensions.json

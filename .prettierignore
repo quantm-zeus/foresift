@@ -1,0 +1,14 @@
+# Normative artifacts must remain byte-for-byte identical to their recorded hashes.
+docs/spec/
+
+# Generated/vendor trees
+pnpm-lock.yaml
+node_modules/
+dist/
+coverage/
+.specify/
+.claude/
+.archon/
+
+# Archon-managed agent skills (third-party managed content)
+.agents/

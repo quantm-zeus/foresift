@@ -45,6 +45,15 @@ ssh -L 3090:127.0.0.1:3090 <user>@<vps>
 durable truth lives in git (`specs/implementation/`) and Archon's own records.
 Delete the directory only while the autopilot service is stopped.
 
+## Restart safety
+
+`foresift-autopilot.service` sets `KillMode=process`: stopping or restarting
+the unit never kills in-flight detached workflow runs (they are children of
+the service's cgroup, so the default kill mode would orphan them as stuck
+"running" rows). The next supervisor instance re-adopts tracked runs from the
+runtime state file. The dashboard unit intentionally keeps the default kill
+mode — it owns nothing worth preserving across a restart.
+
 ## Recovery policy (automatic)
 
 - Transient failures (timeouts, 429/5xx, connection resets): up to 3

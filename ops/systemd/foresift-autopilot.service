@@ -26,6 +26,12 @@ WorkingDirectory=%h/foresift
 ExecStart=/home/minhquan_eth/.nvm/versions/node/v24.19.0/bin/node /home/minhquan_eth/foresift/scripts/automation/foresift-autopilot.mjs
 Restart=on-failure
 RestartSec=30
+# Detached Archon workflow runs are children of this service's cgroup. The
+# default KillMode=control-group would SIGTERM them on every stop/restart,
+# orphaning their run rows as stuck "running". KillMode=process keeps them
+# alive across supervisor restarts; the next supervisor instance re-adopts
+# them from the runtime state file and the Archon runs table.
+KillMode=process
 Environment=PATH=/home/minhquan_eth/.nvm/versions/node/v24.19.0/bin:/home/minhquan_eth/.local/bin:/usr/local/bin:/usr/bin:/bin
 Environment=HOME=/home/minhquan_eth
 

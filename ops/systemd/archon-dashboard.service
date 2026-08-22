@@ -23,6 +23,9 @@ WorkingDirectory=%h/foresift
 ExecStart=/home/minhquan_eth/.local/bin/archon serve
 Restart=on-failure
 RestartSec=30
+# Loopback-only: operator access via SSH tunnel (ssh -L 3090:127.0.0.1:3090).
+Environment=HOST=127.0.0.1
+Environment=PORT=3090
 Environment=PATH=/home/minhquan_eth/.nvm/versions/node/v24.19.0/bin:/home/minhquan_eth/.local/bin:/usr/local/bin:/usr/bin:/bin
 
 [Install]

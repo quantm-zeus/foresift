@@ -1,0 +1,47 @@
+name: foresift-smoke-resume
+description: |
+  Deterministic Foresift recovery smoke test — no AI, no provider spend, no
+  product code. Proves Archon resume semantics: node A succeeds, node B
+  intentionally fails on its FIRST attempt only (attempt counter in
+  ${SMOKE_DIR:-/tmp/foresift-smoke}), the workflow fails, and a subsequent
+  `archon workflow resume <run-id>` skips the already-completed node A (its log
+  gains no second line), lets node B succeed on attempt 2, then node C completes.
+
+  Used before enabling the autopilot and after any Archon version upgrade:
+
+    rm -rf /tmp/foresift-smoke
+    archon workflow run foresift-smoke-resume --branch foresift/smoke-resume   # expect failed
+    archon workflow resume <run-id>                                            # expect completed
+
+  NOT for: anything product-related.
+tags: [foresift, smoke]
+
+nodes:
+  - id: node-a
+    bash: |
+      set -euo pipefail
+      S="${SMOKE_DIR:-/tmp/foresift-smoke}"
+      mkdir -p "$S"
+      echo "A $(date -u +%Y-%m-%dT%H:%M:%SZ)" >> "$S/a.log"
+      echo "node-a-ok"
+
+  - id: node-b-fail-once
+    bash: |
+      set -euo pipefail
+      S="${SMOKE_DIR:-/tmp/foresift-smoke}"
+      mkdir -p "$S"
+      N=$(cat "$S/b-attempts" 2>/dev/null || echo 0)
+      N=$((N+1))
+      echo "$N" > "$S/b-attempts"
+      if [ "$N" -le 1 ]; then
+        echo "intentional first failure of node-b (attempt $N)"
+        exit 1
+      fi
+      echo "node-b-ok-after-$N-attempts"
+    depends_on: [node-a]
+
+  - id: node-c
+    bash: |
+      set -euo pipefail
+      echo "node-c-ok"
+    depends_on: [node-b-fail-once]

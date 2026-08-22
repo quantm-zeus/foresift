@@ -1,0 +1,119 @@
+name: foresift-milestone-control
+description: |
+  Foresift milestone lifecycle control. Two modes, selected deterministically by
+  preflight state inspection (never by AI):
+
+  Mode A — plan the next milestone (when no current milestone is planned):
+  read the authoritative PRD + requirement manifest, decompose the first eligible
+  dependency group into 2-8 outcome-oriented work packages, run an independent
+  fresh-context planning review, validate the plan deterministically, and land it
+  through a normal PR (CI + machine squash merge).
+
+  Mode B — audit/close a fully-proven milestone:
+  run full repository verification, launch a fresh-context independent milestone
+  auditor against every requirement of the milestone; gaps become narrowly scoped
+  remediation packages in the SAME milestone (landed via PR). If no gaps exist,
+  archive the milestone as PROVEN to history/ and generate/plan nothing further
+  here (the autopilot immediately re-invokes this workflow in Mode A) — except at
+  the final milestone G7, where a final product-wide audit replaces planning.
+
+  Invoke via the autopilot supervisor. NOT for implementing a work package (use
+  foresift-work-package).
+
+provider: claude
+effort: high
+tags: [foresift, autonomous]
+
+nodes:
+  # ── MODE SELECTION + REPOSITORY VERIFICATION (deterministic) ───────────────
+  - id: mode-select
+    bash: |
+      set -euo pipefail
+      node scripts/automation/milestone-mode.mjs > "$ARTIFACTS_DIR/mode.json"
+      cat "$ARTIFACTS_DIR/mode.json"
+    timeout: 120000
+
+  - id: stop-noop
+    cancel: "Milestone-control invoked but there is nothing to plan or audit."
+    depends_on: [mode-select]
+    when: "$mode-select.output.mode == 'NONE'"
+
+  # ── MODE A: DECOMPOSE NEXT MILESTONE ────────────────────────────────────────
+  - id: plan-milestone
+    command: foresift-mc-plan
+    depends_on: [mode-select]
+    when: "$mode-select.output.mode == 'PLAN'"
+    context: fresh
+    idle_timeout: 900000
+    effort: high
+
+  - id: plan-review
+    command: foresift-mc-plan-review
+    depends_on: [plan-milestone]
+    context: fresh
+    idle_timeout: 900000
+
+  # Apply CRITICAL/HIGH review findings to the draft plan (max 2 repair passes).
+  - id: plan-fix-loop
+    depends_on: [plan-review]
+    idle_timeout: 900000
+    loop_group:
+      max_iterations: 2
+      fresh_context: true
+      until: PLAN_READY
+      nodes:
+        - id: plan-fix
+          command: foresift-mc-plan-fix
+          effort: high
+        - id: plan-judge
+          prompt: |
+            You are reviewing a Foresift milestone decomposition plan for final
+            readiness. The draft lives at specs/implementation/current-milestone.json;
+            the independent reviewer's findings and the planner's response are:
+
+            Reviewer findings:
+            $plan-review.output
+
+            Planner response (most recent repair pass):
+            $LOOP_PREV.plan-fix.output
+
+            Verify every CRITICAL/HIGH finding was addressed and the plan still
+            covers its milestone's requirements exactly once. If ready for
+            deterministic validation end with EXACTLY:
+            <promise>PLAN_READY</promise>
+            Otherwise list remaining problems and end with EXACTLY:
+            <promise>PLAN_NOT_READY</promise>
+          depends_on: [plan-fix]
+          model: large
+          allowed_tools: [Read, Glob, Grep]
+
+  - id: plan-validate
+    bash: |
+      set -euo pipefail
+      node scripts/automation/milestone-validate.mjs --expect-next
+    depends_on: [plan-fix-loop]
+    timeout: 120000
+
+  # ── MODE B: INDEPENDENT MILESTONE AUDIT ─────────────────────────────────────
+  - id: verify-repo
+    bash: |
+      set -euo pipefail
+      pnpm foresift:gate -- --milestone
+    depends_on: [mode-select]
+    when: "$mode-select.output.mode == 'AUDIT'"
+    timeout: 1800000
+
+  - id: audit-milestone
+    command: foresift-mc-audit
+    depends_on: [verify-repo]
+    context: fresh
+    idle_timeout: 1800000
+    effort: high
+
+  # ── SHARED LANDING: branch, commit, PR, exact-head CI, merge ────────────────
+  - id: land-planning-pr
+    command: foresift-mc-land
+    depends_on: [plan-validate, audit-milestone]
+    trigger_rule: none_failed_min_one_success
+    context: fresh
+    idle_timeout: 1800000

@@ -7,6 +7,11 @@
 #   S3  fatal failures pause immediately (no retry hammering)
 #   S4  CRITICAL packages never co-run; post-foundation concurrency cap of 2
 #   S5  cancelled runs requeue the package; stale runs are abandoned + restarted
+#   S6  opaque detach acks -> runs-table discovery, no duplicates, PENDING until durable id
+#   S7  milestone-control launches always tracked; discovery; no duplicate launches
+#   S8  undiscoverable launch fails closed (PAUSED_FATAL), never relaunched
+#   S9  corrupt/invalid implementation state fails closed before any launch
+#   S10 unparsable activity timestamps are diagnostics, never abandons
 #
 # No network, no AI spend, no writes outside a mktemp sandbox, no access to the
 # real Archon database. Run via `pnpm autopilot:selftest`.
@@ -59,10 +64,18 @@ case "$cmd/$sub" in
     st="${!k:-${DEFAULT_STATUS:-running}}"
     er="${!e:-}"
     ts="${UPDATED_AT_MS:-$(date +%s)000}"
-    if [ -n "$er" ]; then
-      printf '{"runId":"%s","status":"%s","updatedAt":%s,"error":"%s"}\n' "$arg" "$st" "$ts" "$er"
+    # Real Archon CLI emits snake_case started_at / last_activity_at (the latter
+    # as "YYYY-MM-DD HH:MM:SS" strings); the ms-number form below is one of the
+    # formats the supervisor's normalizeTimestampMs accepts.
+    if [ "${LAST_ACTIVITY_GARBAGE:-}" = "1" ]; then
+      la='"last_activity_at":"not-a-timestamp","started_at":null'
     else
-      printf '{"runId":"%s","status":"%s","updatedAt":%s}\n' "$arg" "$st" "$ts"
+      la="\"last_activity_at\":${ts},\"started_at\":${ts}"
+    fi
+    if [ -n "$er" ]; then
+      printf '{"runId":"%s","status":"%s",%s,"error":"%s"}\n' "$arg" "$st" "$la" "$er"
+    else
+      printf '{"runId":"%s","status":"%s",%s}\n' "$arg" "$st" "$la"
     fi
     ;;
   workflow/runs)
@@ -368,6 +381,7 @@ SCEN
 tick
 assert_eq "launch happened despite opaque ack" "$(launch_count)" "1"
 assert_match "entry awaits discovery" "$(state)" '"awaitingDiscovery": true'
+assert_eq "package stays PENDING until a durable run id exists" "$(pkg_field d-alpha status)" "PENDING"
 tick
 assert_eq "undiscovered run is NOT relaunched" "$(launch_count)" "1"
 fast_forward_resumes
@@ -375,7 +389,106 @@ tick
 assert_match "run id recovered from runs table" "$(state)" 'run_id_discovered'
 STATE_RUNID="$(node -e 'const s=JSON.parse(require("fs").readFileSync(process.env.FORESIFT_AUTOPILOT_STATE_DIR+"/autopilot-state.json","utf8"));console.log(s.activeRuns[0].runId)')"
 assert_eq "tracked run matches stub registry" "$STATE_RUNID" "run-1"
+assert_eq "discovery flips package to RUNNING" "$(pkg_field d-alpha status)" "RUNNING"
 assert_eq "still exactly one run end-to-end" "$(launch_count)" "1"
+
+# ── S7: milestone-control launches are always tracked, never duplicated ──────
+echo "S7: milestone-control tracked without ack id; discovery; no duplicate launch"
+new_sandbox s7
+roadmap_fixture G0   # no current-milestone.json → milestone-control is due
+cat >>"$FAKE_SCENARIO" <<'SCEN'
+NO_ACK_ID="1"
+RUNS_LAG="2"
+SCEN
+tick
+assert_eq "milestone-control launched exactly once" "$(launch_count)" "1"
+MS_TRACKED="$(node -e 'const s=JSON.parse(require("fs").readFileSync(process.env.FORESIFT_AUTOPILOT_STATE_DIR+"/autopilot-state.json","utf8"));console.log(s.milestoneRuns.length)')"
+assert_eq "milestone launch tracked even without a run id" "$MS_TRACKED" "1"
+assert_match "milestone entry awaits discovery" "$(state)" '"awaitingDiscovery": true'
+tick
+assert_eq "undiscovered milestone run is NOT relaunched" "$(launch_count)" "1"
+fast_forward_resumes
+tick
+assert_match "milestone run id discovered from runs table" "$(state)" 'run_id_discovered'
+assert_eq "still exactly one milestone launch" "$(launch_count)" "1"
+printf 'STATUS_run_1="completed"\n' >>"$FAKE_SCENARIO"
+tick
+assert_match "milestone completion recorded" "$(state)" 'milestone_workflow_completed'
+
+# ── S8: undiscoverable launch fails closed instead of double-launching ───────
+echo "S8: discovery exhaustion -> PAUSED_FATAL, package never RUNNING"
+new_sandbox s8
+roadmap_fixture G0
+milestone_fixture "G0" \
+  "$(pkg_json u-alpha "" HIGH true)" \
+  "$(pkg_json u-beta "" MEDIUM true)"
+cat >>"$FAKE_SCENARIO" <<'SCEN'
+NO_ACK_ID="1"
+RUNS_LAG="9999"
+SCEN
+tick
+assert_eq "launch issued exactly once" "$(launch_count)" "1"
+PAUSED=false
+for _ in $(seq 1 12); do
+  fast_forward_resumes
+  tick
+  if node -e 'const s=JSON.parse(require("fs").readFileSync(process.argv[1],"utf8"));process.exit(s.pausedFatal?0:1)' \
+    "$FORESIFT_AUTOPILOT_STATE_DIR/autopilot-state.json"; then PAUSED=true; break; fi
+done
+assert_eq "discovery exhaustion pauses fatally (bounded loop terminates)" "$PAUSED" "true"
+assert_eq "untrackable workflow was NEVER relaunched" "$(launch_count)" "1"
+assert_eq "package stays PENDING (never RUNNING without a durable run id)" "$(pkg_field u-alpha status)" "PENDING"
+FATAL_REASON="$(node -e 'const s=JSON.parse(require("fs").readFileSync(process.argv[1],"utf8"));console.log(s.pausedFatal&&s.pausedFatal.reason||"")' \
+  "$FORESIFT_AUTOPILOT_STATE_DIR/autopilot-state.json")"
+assert_match "fatal reason explains the run-id problem" "$FATAL_REASON" "durable Archon run id"
+
+# ── S9: corrupt implementation state fails closed before any launch ──────────
+echo "S9: corrupt current-milestone.json / roadmap fail closed"
+new_sandbox s9
+roadmap_fixture G0
+printf '{ this is not valid json' >"$FORESIFT_AUTOPILOT_REPO/specs/implementation/current-milestone.json"
+tick
+assert_match "corrupt milestone JSON pauses fatally" "$(state)" 'paused_fatal_corrupt_state'
+assert_eq "zero launches against corrupt state" "$(launch_count)" "0"
+STATUS_OUT="$(node "$ROOT/scripts/automation/foresift-autopilot.mjs" --status)"
+assert_match "--status flags invalid implementation state" "$STATUS_OUT" "INVALID"
+
+new_sandbox s9b
+roadmap_fixture G0
+milestone_fixture "G0" "$(pkg_json v-alpha "" HIGH true)"
+node -e '
+const fs = require("fs");
+const f = process.env.FORESIFT_AUTOPILOT_REPO + "/specs/implementation/current-milestone.json";
+const ms = JSON.parse(fs.readFileSync(f, "utf8"));
+ms.packages[0].status = "BOGUS";
+fs.writeFileSync(f, JSON.stringify(ms, null, 2));
+'
+tick
+assert_match "schema-invalid milestone pauses fatally (no silent re-plan)" "$(state)" 'paused_fatal_corrupt_state'
+assert_eq "still zero launches" "$(launch_count)" "0"
+
+new_sandbox s9c
+roadmap_fixture G0
+printf '{"broken": true' >"$FORESIFT_AUTOPILOT_REPO/specs/implementation/roadmap.json"
+milestone_fixture "G0" "$(pkg_json r-alpha "" HIGH true)"
+tick
+assert_match "corrupt roadmap pauses fatally" "$(state)" 'paused_fatal_corrupt_state'
+assert_eq "roadmap corruption also blocks launches" "$(launch_count)" "0"
+
+# ── S10: unparsable activity timestamps are diagnostics, never abandons ──────
+echo "S10: garbage remote timestamps keep a possibly-healthy run alive"
+new_sandbox s10
+roadmap_fixture G0
+milestone_fixture "G0" \
+  "$(pkg_json w-alpha "" HIGH true)" \
+  "$(pkg_json w-beta "" MEDIUM true)"
+tick
+printf 'LAST_ACTIVITY_GARBAGE="1"\n' >>"$FAKE_SCENARIO"
+backdate_entry
+tick
+assert_eq "garbage timestamps do NOT abandon the run" "$(grep -c '^ABANDON' "$FAKE_LAUNCHES" 2>/dev/null || true)" "0"
+assert_match "one-time diagnostic recorded" "$(state)" 'run_activity_timestamp_unparsable'
+assert_eq "healthy run still tracked, not relaunched" "$(launch_count)" "1"
 
 echo
 echo "selftest result: PASS=$PASS FAIL=$FAIL"

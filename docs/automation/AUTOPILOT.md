@@ -5,17 +5,46 @@ VPS: the Archon dashboard (`archon serve`) and the Foresift autopilot (a thin
 supervisory loop over the `archon` CLI). Architecture rationale:
 `docs/adr/0001-autonomous-control-plane-architecture.md`.
 
+> **Hardening note (2026-08-22):** the continuation-loop hardening pass made
+> every long workflow stage a bounded fresh-context loop under a deterministic
+> `until_bash` completion guard, fixed detached run-ID discovery (no duplicate
+> launches, no `PENDING→RUNNING` without a durable Archon run id), normalized
+> all timestamp handling, and made corrupt implementation state fail closed.
+> See `docs/setup/BOOTSTRAP_REPORT.md` for the historical setup narrative vs
+> current state.
+
 ## What it does
 
 1. Plans the current milestone from the authoritative PRD manifest via
-   `foresift-milestone-control` (independent planning review + deterministic
-   validation + PR).
+   `foresift-milestone-control` (bounded planning loop → independent planning
+   review → bounded CRITICAL/HIGH fix loop → deterministic validation loop →
+   PR). Audits fully-proven milestones inside a bounded audit loop driven by a
+   durable `$ARTIFACTS_DIR/milestone-audit-progress.json`, so audits survive
+   any number of Claude turn boundaries.
 2. Implements one work package at a time (two max post-foundation, never
    CRITICAL-parallel, never scope-overlapping) via `foresift-work-package`:
-   Spec Kit plan → implement → deterministic gate → PR → independent review →
-   bounded convergence → deterministic gate → CI → squash merge.
+   bounded Spec Kit plan loop → bounded implementation loop → deterministic
+   gate with bounded repair loop → PR → independent review (CRITICAL/HIGH
+   block progression) → bounded convergence loop → deterministic gate → CI →
+   squash merge. Loop bounds: planning 4 iterations, implementation 12,
+   gate repair 4; each iteration gets a fresh context and continues persisted
+   work from disk/git — never conversational memory.
 3. Marks packages PROVEN only when their PR is actually merged; audits each
    milestone independently before declaring it proven.
+
+## Continuation without humans
+
+A Claude turn ending cleanly is NOT stage completion. Long stages run as
+Archon `loop_group`s whose completion is decided ONLY by a deterministic
+`until_bash` guard (the `until` text signals are sentinels agents are
+instructed never to emit). When a guard fails, Archon automatically starts
+another iteration — nobody types "continue". Two smoke workflows prove this
+continuously after any upgrade:
+
+| Smoke test                  | Property proved                                                                               |
+| --------------------------- | --------------------------------------------------------------------------------------------- |
+| `foresift-smoke-clean-turn` | iteration 1 exits cleanly incomplete → iteration 2 auto-starts from disk state → guard passes |
+| `foresift-smoke-resume`     | process failure mid-run → `workflow resume` skips completed nodes and finishes                |
 
 ## Commands
 
@@ -28,6 +57,12 @@ supervisory loop over the `archon` CLI). Architecture rationale:
 | Supervisor logs                       | `journalctl --user -u foresift-autopilot.service -f`                                 |
 | Dashboard logs                        | `journalctl --user -u archon-dashboard.service -f`                                   |
 | Pause after fatal error is cleared by | `node scripts/automation/foresift-autopilot.mjs --clear-fatal` then restart the unit |
+
+`pnpm autopilot:status` reports, per tracked run: durable run id (or
+`discovering-run-id`), Archon status, current DAG node and loop iteration
+(parsed from Archon's structured JSONL event log), resume/restart counts, and
+idle minutes; plus roadmap/milestone progress, PAUSED_FATAL reason when set,
+and the next eligible package.
 
 ## Archon Web UI
 
@@ -44,6 +79,13 @@ ssh -L 3090:127.0.0.1:3090 <user>@<vps>
 (`autopilot-state.json`, lock). It contains no secrets and nothing durable —
 durable truth lives in git (`specs/implementation/`) and Archon's own records.
 Delete the directory only while the autopilot service is stopped.
+
+Launch bookkeeping is crash-safe: a detached launch whose ack carries no run
+id is tracked immediately as `awaitingDiscovery` and reconciled against the
+runs table (bounded retries); exhaustion pauses fatally instead of risking a
+duplicate launch. A package's status only ever becomes RUNNING once its run id
+is durably known. Corrupt `specs/implementation/*.json` pauses the supervisor
+(`PAUSED_FATAL`) rather than re-planning over damaged state.
 
 ## Restart safety
 
@@ -64,6 +106,10 @@ mode — it owns nothing worth preserving across a restart.
 - Stale runs (>90 min without activity): abandoned via `archon workflow
 abandon`, then relaunched on the same branch. The supervisor never touches
   Archon's database directly.
+- Unparsable activity timestamps: one-time diagnostic event; the run is kept
+  alive (never abandoned on bad data).
+- Undiscoverable launches (no run id after bounded discovery): PAUSED_FATAL —
+  fail closed, never a blind relaunch.
 
 ## Upgrade policy
 
@@ -71,10 +117,12 @@ After upgrading Archon, Claude Code, or Node:
 
 ```
 archon validate workflows
-rm -rf /tmp/foresift-smoke
-archon workflow run foresift-smoke-resume          # expect failed
-archon workflow resume <run-id>                    # expect completed
 pnpm autopilot:selftest
+rm -rf /tmp/foresift-smoke-clean
+archon workflow run foresift-smoke-clean-turn       # expect completed (>=2 iterations)
+rm -rf /tmp/foresift-smoke-resume && archon workflow run foresift-smoke-resume
+archon workflow get <run-id> --json                 # expect failed (attempt 1)...
+archon workflow resume <run-id>                     # ...then completed
 ```
 
 Only then restart the services.

@@ -2,6 +2,28 @@
 
 Date: 2026-08-22 · Executed autonomously via Claude Code CLI.
 
+> **Historical vs current state.** Everything below the line
+> "Part 1 — historical record" is the point-in-time narrative of the original
+> bootstrap (some details were since superseded). For what is true NOW, read
+> this section first.
+
+## Current state (2026-08-22, post-hardening)
+
+| Aspect                    | State now                                                                                                                                                                                                                                                                                                                                                            |
+| ------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Control plane             | Operational. Autonomous development control plane landed via PRs #1–#4 (supervisor, workflows, gates, restart-safe systemd units).                                                                                                                                                                                                                                   |
+| Continuation loops        | All long workflow stages are bounded fresh-context loops under deterministic `until_bash` guards; proven live by `foresift-smoke-clean-turn` and `foresift-smoke-resume`.                                                                                                                                                                                            |
+| Supervisor hardening      | Detached run-ID discovery is bounded + fail-closed (no duplicate launches; `PENDING→RUNNING` only with a durable run id); timestamps normalized (`normalizeTimestampMs`); corrupt implementation state → PAUSED_FATAL, never silent re-plan; unparsable activity timestamps are diagnostics, never abandons. Selftest covers S1–S10 hermetically.                    |
+| Constitution              | `.specify/memory/constitution.md` v1.0.0 ratified 2026-08-22 — subordinate to the PRD, 18 binding principles incl. the permanent read-only boundary.                                                                                                                                                                                                                 |
+| Product implementation    | Still none — G0 planning/implementation had not started at last update of this section; check `pnpm autopilot:status` and `specs/implementation/**` for live truth.                                                                                                                                                                                                  |
+| Dashboard                 | Archon dashboard binds loopback-only (`127.0.0.1:3090`). Public HTTPS auth-proxy deployment was attempted 2026-08-22 but is **PAUSED**: the VM service account lacks compute scopes to promote IP `34.87.12.208` to static or manage firewall rules. Exact blocker + command recorded in the hardening PR description. SSH tunnel remains the supported access path. |
+| CI / branch protection    | See Part 1 status below; billing/protection limitations unchanged unless the account has since been upgraded.                                                                                                                                                                                                                                                        |
+| Known-limitation #5 below | Superseded: `.archon/mcp/ntfy.json` now exists as an explicit empty `{}` config so bundled-workflow validation passes without configuring any notification MCP.                                                                                                                                                                                                      |
+
+---
+
+## Part 1 — historical record (bootstrap day)
+
 ## Status
 
 **Bootstrap complete.** The repository contains the authoritative product specification,
@@ -145,6 +167,7 @@ prohibited (definition preserved in this report's Git history).
 4. TypeScript pinned to 5.9.3 pending typescript-eslint support for TS ≥ 6.
 5. Archon's bundled `archon-smart-pr-review` workflow expects an optional
    `.archon/mcp/ntfy.json` (notification MCP) that is intentionally not configured.
+   _(Superseded 2026-08-22: the file now exists as an explicit empty `{}` config.)_
 
 ## Recommended next action
 
@@ -154,3 +177,6 @@ prohibited (definition preserved in this report's Git history).
    described above.
 3. Begin G0 planning: use Spec Kit `/speckit-constitution`, then plan the first
    dependency-group work packages strictly under the authority of `docs/spec/`.
+   _(Superseded 2026-08-22: G0 planning is now driven autonomously by the
+   autopilot via `foresift-milestone-control`; see "Current state" above and
+   docs/automation/AUTOPILOT.md.)_

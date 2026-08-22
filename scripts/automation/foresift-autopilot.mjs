@@ -42,6 +42,9 @@ const BACKOFF_CAP_MS = 15 * 60_000;
 // A "running" Archon row proves nothing about liveness; if a run shows no
 // activity for this long we treat it as orphaned (§17).
 const STALE_RUN_MS = 90 * 60_000;
+// Detach acks carry no run id; discovery polls the runs table this often/at most.
+const DISCOVERY_RETRY_MS = 30_000;
+const DISCOVERY_LIMIT = 5;
 
 const now = () => Date.now();
 const log = (...m) => console.log(new Date().toISOString(), '[autopilot]', ...m);
@@ -301,13 +304,36 @@ function actOnEntry(st, entry) {
 async function actOnPendingAction(st, entry) {
   if (!entry.nextAttemptAt || now() < entry.nextAttemptAt) return;
   entry.nextAttemptAt = null;
+  if (entry.awaitingDiscovery) {
+    // Detach ack carried no run id: keep polling the runs table instead of
+    // launching anything new (a blind relaunch here would double-run).
+    const id = discoverRunId(entry.workflow, entry.message);
+    if (id) {
+      entry.awaitingDiscovery = false;
+      entry.runId = id;
+      record(st, 'run_id_discovered', { runId: id });
+    } else if (++entry.discoveryAttempts > DISCOVERY_LIMIT) {
+      entry.awaitingDiscovery = false;
+      entry.done = true;
+      record(st, 'launch_unconfirmed_giving_up', { branch: entry.branch });
+      if (entry.kind === 'package') {
+        const ms = loadCurrentMilestone(REPO);
+        if (ms && findPackage(ms, entry.packageId)?.status === 'RUNNING')
+          setPackageStatus(ms, entry.packageId, 'PENDING');
+      }
+    } else {
+      entry.nextAttemptAt = now() + DISCOVERY_RETRY_MS;
+    }
+    return;
+  }
   if (entry.runId === null || entry.abandonedBeforeRestart) {
     // Fresh restart against the SAME branch so existing work persists.
     entry.abandonedBeforeRestart = false;
     const ack = launchDetached(entry.workflow, entry.branch, entry.message);
     record(st, 'fresh_restart_launched', { branch: entry.branch, ack: sanitizeAck(ack) });
     const newId = resolveRunId(ack, entry.workflow, entry.message);
-    if (newId) Object.assign(entry, { runId: newId, startedAt: now() });
+    Object.assign(entry, { runId: newId, awaitingDiscovery: !newId, discoveryAttempts: 0 });
+    if (newId) entry.startedAt = now();
     return;
   }
   // Normal resume: reuse recorded working path/worktree, skip completed nodes.
@@ -432,18 +458,19 @@ function selectAndLaunch(st) {
       discovery: extractRunId(ack) ? 'ack' : 'runs-table',
     });
     setPackageStatus(ms, cand.id, 'RUNNING');
-    if (runId)
-      trackRun(st, 'package', {
-        kind: 'package',
-        workflow: 'foresift-work-package',
-        runId,
-        packageId: cand.id,
-        branch,
-        message: cand.id,
-        startedAt: now(),
-        resumeCount: 0,
-        restartCount: 0,
-      });
+    trackRun(st, 'package', {
+      kind: 'package',
+      workflow: 'foresift-work-package',
+      runId,
+      packageId: cand.id,
+      branch,
+      message: cand.id,
+      startedAt: now(),
+      resumeCount: 0,
+      restartCount: 0,
+      awaitingDiscovery: !runId,
+      discoveryAttempts: 0,
+    });
     running.push(cand);
   }
   return true;

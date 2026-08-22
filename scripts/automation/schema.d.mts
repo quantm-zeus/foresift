@@ -1,0 +1,64 @@
+// Type declarations for the pure control-plane state model (schema.mjs).
+export interface RoadmapPolicy {
+  foundationMilestones: string[];
+  maxParallelCodingPackagesFoundation: number;
+  maxParallelCodingPackages: number;
+  serialWhenRisk?: string[];
+}
+
+export interface RoadmapMilestone {
+  id: string;
+  name: string;
+  dependsOn?: string[];
+  status: string;
+}
+
+export interface Roadmap {
+  schemaVersion: string;
+  policy: RoadmapPolicy;
+  currentMilestoneId: string | null;
+  milestones: RoadmapMilestone[];
+}
+
+export interface WorkPackage {
+  id: string;
+  objective: string;
+  requirementIds: string[];
+  dependencies?: string[];
+  risk: string;
+  parallelizable: boolean;
+  writeScopes: string[];
+  verificationCommands: string[];
+  status: string;
+}
+
+export interface MilestoneState {
+  schemaVersion: string;
+  milestoneId: string;
+  status: string;
+  packages: WorkPackage[];
+  plannedAt?: string;
+}
+
+export declare const PACKAGE_STATUSES: string[];
+export declare const MILESTONE_STATUSES: string[];
+export declare const RISKS: string[];
+export declare function repoRoot(): string;
+export declare function implementationDir(root?: string): string;
+export declare function loadJson(path: string): unknown;
+export declare function loadRoadmap(root?: string): Roadmap;
+export declare function loadCurrentMilestone(root?: string): MilestoneState | null;
+export declare function validateRoadmap(rm: Roadmap): string[];
+export declare function validateMilestoneState(ms: MilestoneState): string[];
+export declare function classifyFailure(message?: string): 'TRANSIENT' | 'FATAL' | 'UNKNOWN';
+export declare function findPackage(ms: MilestoneState, packageId: string): WorkPackage | null;
+export declare function packageEligible(
+  ms: MilestoneState,
+  pkg: WorkPackage | null,
+): { eligible: boolean; reason: string };
+export declare function canStartPackage(
+  roadmap: Roadmap,
+  ms: MilestoneState,
+  candidate: WorkPackage,
+  runningPackages: WorkPackage[],
+): { ok: boolean; reason: string };

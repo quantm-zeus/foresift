@@ -273,3 +273,114 @@ describe('run observability', () => {
     expect(runObservability('no-such-run-id-anywhere')).toBeNull();
   });
 });
+
+describe('milestone mode selection', () => {
+  const runMode = async (fixture: string): Promise<{ mode: string; resumingDraft?: boolean }> => {
+    const { execFileSync } = await import('node:child_process');
+    const path = await import('node:path');
+    const out = execFileSync(
+      'node',
+      [path.join(__dirname, '..', '..', 'scripts', 'automation', 'milestone-mode.mjs')],
+      { env: { ...process.env, FORESIFT_REPO_ROOT: fixture }, encoding: 'utf8' },
+    );
+    return JSON.parse(out);
+  };
+
+  const makeFixture = async (pkgStatus: string, commitMilestone: boolean): Promise<string> => {
+    const fs = await import('node:fs');
+    const os = await import('node:os');
+    const path = await import('node:path');
+    const { execFileSync } = await import('node:child_process');
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'foresift-mode-'));
+    execFileSync('git', ['init', '-q', dir]);
+    execFileSync('git', ['-C', dir, 'config', 'user.email', 't@t'], { stdio: 'ignore' });
+    execFileSync('git', ['-C', dir, 'config', 'user.name', 't'], { stdio: 'ignore' });
+    fs.mkdirSync(path.join(dir, 'specs', 'implementation'), { recursive: true });
+    fs.writeFileSync(
+      path.join(dir, 'specs', 'implementation', 'roadmap.json'),
+      JSON.stringify({
+        schemaVersion: '1.0.0',
+        policy: {},
+        currentMilestoneId: 'G0',
+        milestones: [{ id: 'G0', name: 'g0', dependsOn: [], status: 'ACTIVE' }],
+      }),
+    );
+    fs.writeFileSync(
+      path.join(dir, 'specs', 'implementation', 'current-milestone.json'),
+      JSON.stringify({
+        schemaVersion: '1.0.0',
+        milestoneId: 'G0',
+        status: 'ACTIVE',
+        packages: ['a', 'b'].map((n) => ({
+          id: `g0-${n}`,
+          objective: 'an outcome-oriented objective sentence',
+          requirementIds: [`FR-CORE-00${n === 'a' ? 1 : 2}`],
+          dependencies: [],
+          risk: 'HIGH',
+          parallelizable: true,
+          writeScopes: [`packages/${n}/**`],
+          verificationCommands: ['pnpm test'],
+          status: pkgStatus,
+        })),
+      }),
+    );
+    execFileSync('git', ['-C', dir, 'add', 'specs/implementation/roadmap.json']);
+    execFileSync('git', ['-C', dir, 'commit', '-qm', 'roadmap']);
+    if (commitMilestone) {
+      execFileSync('git', ['-C', dir, 'add', 'specs/implementation/current-milestone.json']);
+      execFileSync('git', ['-C', dir, 'commit', '-qm', 'milestone']);
+    }
+    return dir;
+  };
+
+  it('resumes PLAN for an uncommitted (unlanded) draft milestone', async () => {
+    const fs = await import('node:fs');
+    const dir = await makeFixture('PENDING', false);
+    try {
+      expect(await runMode(dir)).toEqual({
+        mode: 'PLAN',
+        milestoneId: 'G0',
+        isFinal: false,
+        resumingDraft: true,
+      });
+    } finally {
+      fs.rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it('resumes PLAN for a locally modified tracked milestone file (draft edits)', async () => {
+    const fs = await import('node:fs');
+    const path = await import('node:path');
+    const dir = await makeFixture('PROVEN', true);
+    try {
+      // flip one package back — local modification ⇒ unlanded draft
+      const f = path.join(dir, 'specs', 'implementation', 'current-milestone.json');
+      const ms = JSON.parse(fs.readFileSync(f, 'utf8'));
+      ms.packages[0].status = 'PENDING';
+      fs.writeFileSync(f, JSON.stringify(ms));
+      expect((await runMode(dir)).mode).toBe('PLAN');
+    } finally {
+      fs.rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it('returns NONE for a committed-clean milestone with packages in flight', async () => {
+    const fs = await import('node:fs');
+    const dir = await makeFixture('RUNNING', true);
+    try {
+      expect(await runMode(dir)).toEqual({ mode: 'NONE', milestoneId: 'G0', isFinal: false });
+    } finally {
+      fs.rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it('returns AUDIT once every package of the committed milestone is PROVEN', async () => {
+    const fs = await import('node:fs');
+    const dir = await makeFixture('PROVEN', true);
+    try {
+      expect(await runMode(dir)).toEqual({ mode: 'AUDIT', milestoneId: 'G0', isFinal: false });
+    } finally {
+      fs.rmSync(dir, { recursive: true, force: true });
+    }
+  });
+});

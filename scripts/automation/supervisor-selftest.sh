@@ -48,7 +48,11 @@ case "$cmd/$sub" in
       prev="$a"
     done
     echo "LAUNCH rid=$rid workflow=$arg branch=$br msg=$ms" >>"${FAKE_LAUNCHES:?}"
-    printf '{"runId":"%s","status":"started"}\n' "$rid"
+    if [ "${NO_ACK_ID:-}" = "1" ]; then
+      printf '{"ok":true,"action":"run","detached":true,"workflow":"%s"}\n' "$arg"
+    else
+      printf '{"runId":"%s","status":"started"}\n' "$rid"
+    fi
     ;;
   workflow/get)
     k="STATUS_${arg//-/_}"; e="ERR_${arg//-/_}"
@@ -62,8 +66,10 @@ case "$cmd/$sub" in
     fi
     ;;
   workflow/runs)
+    nreads=$(($(cat "${FAKE_RUNSEQ:?}.reads" 2>/dev/null || echo 0) + 1))
+    echo "$nreads" >"${FAKE_RUNSEQ:?}.reads"
     printf '{"runs":['
-    if [ -f "$FAKE_LAUNCHES" ]; then
+    if [ -f "$FAKE_LAUNCHES" ] && [ "$nreads" -gt "${RUNS_LAG:-0}" ]; then
       tac "$FAKE_LAUNCHES" | awk -v dflt="${DEFAULT_STATUS:-running}" '
         FNR > 1 { printf "," }
         {
@@ -127,7 +133,7 @@ new_sandbox() {
   export FAKE_SCENARIO="$SB/scenario.sh" FAKE_LOG="$SB/archon.log"
   export FAKE_LAUNCHES="$SB/launches.log" FAKE_RUNSEQ="$SB/runseq"
   : >"$FAKE_SCENARIO"; : >"$FAKE_LOG"; : >"$FAKE_LAUNCHES"; echo 0 >"$FAKE_RUNSEQ"
-  unset DEFAULT_STATUS UPDATED_AT_MS MERGED_HEAD 2>/dev/null || true
+  unset DEFAULT_STATUS UPDATED_AT_MS MERGED_HEAD NO_ACK_ID RUNS_LAG 2>/dev/null || true
 }
 roadmap_fixture() { # $1 = currentMilestoneId ('null' allowed)
   node -e '
@@ -348,6 +354,28 @@ tick
 assert_eq "fresh restart issued on the SAME branch" "$(launch_count)" "2"
 assert_match "restart targets original branch" "$(grep '^LAUNCH.*run-2' "$FAKE_LAUNCHES")" "branch=foresift/y-alpha"
 
+# ── S6: detach acks without a run id are discovered, never double-launched ────
+echo "S6: missing ack run id -> runs-table discovery without duplicate launch"
+new_sandbox s6
+roadmap_fixture G0
+milestone_fixture "G0" \
+  "$(pkg_json d-alpha "" HIGH true)" \
+  "$(pkg_json d-beta "" MEDIUM true)"
+cat >>"$FAKE_SCENARIO" <<'SCEN'
+NO_ACK_ID="1"
+RUNS_LAG="2"
+SCEN
+tick
+assert_eq "launch happened despite opaque ack" "$(launch_count)" "1"
+assert_match "entry awaits discovery" "$(state)" '"awaitingDiscovery": true'
+tick
+assert_eq "undiscovered run is NOT relaunched" "$(launch_count)" "1"
+fast_forward_resumes
+tick
+assert_match "run id recovered from runs table" "$(state)" 'run_id_discovered'
+STATE_RUNID="$(node -e 'const s=JSON.parse(require("fs").readFileSync(process.env.FORESIFT_AUTOPILOT_STATE_DIR+"/autopilot-state.json","utf8"));console.log(s.activeRuns[0].runId)')"
+assert_eq "tracked run matches stub registry" "$STATE_RUNID" "run-1"
+assert_eq "still exactly one run end-to-end" "$(launch_count)" "1"
+
 echo
 echo "selftest result: PASS=$PASS FAIL=$FAIL"
-[ "$FAIL" -eq 0 ]

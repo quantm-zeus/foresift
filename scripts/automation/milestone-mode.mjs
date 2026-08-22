@@ -19,11 +19,34 @@ if (rmErrs.length) {
   process.exit(1);
 }
 
-const ms = loadCurrentMilestone();
-const msErrs = ms ? validateMilestoneState(ms) : ['missing'];
+let ms;
+let msErrs;
+try {
+  ms = loadCurrentMilestone();
+} catch (err) {
+  console.error(
+    JSON.stringify({
+      error: 'corrupt implementation state',
+      detail: String(err?.message ?? err),
+      failClosed: true,
+    }),
+  );
+  process.exit(1);
+}
+msErrs = ms ? validateMilestoneState(ms) : ['missing'];
 
-if (!ms || msErrs.length > 0) {
-  // Plan (or re-plan) the first eligible milestone per the dependency DAG.
+if (ms && msErrs.length > 0) {
+  // CORRUPT STATE FAILS CLOSED: current-milestone.json exists but does not
+  // validate. Never silently re-plan over possibly-corrupt implementation
+  // state — surface the error so the supervisor pauses fatally instead.
+  console.error(
+    JSON.stringify({ error: 'corrupt implementation state', errors: msErrs, failClosed: true }),
+  );
+  process.exit(1);
+}
+
+if (!ms) {
+  // Plan the first eligible milestone per the dependency DAG.
   const byId = Object.fromEntries(roadmap.milestones.map((m) => [m.id, m]));
   const eligible = roadmap.milestones.filter(
     (m) => m.status !== 'PROVEN' && (m.dependsOn ?? []).every((d) => byId[d]?.status === 'PROVEN'),
@@ -39,18 +62,18 @@ if (!ms || msErrs.length > 0) {
       mode: 'PLAN',
       milestoneId: eligible[0].id,
       isFinal: eligible[0].id === FINAL_MILESTONE_ID,
-      replan: Boolean(ms),
     }),
   );
   process.exit(0);
 }
 
 if (ms.packages.every((p) => p.status === 'PROVEN')) {
+  const isFinal = ms.milestoneId === FINAL_MILESTONE_ID;
   console.log(
     JSON.stringify({
-      mode: 'AUDIT',
+      mode: isFinal ? 'AUDIT_FINAL' : 'AUDIT',
       milestoneId: ms.milestoneId,
-      isFinal: ms.milestoneId === FINAL_MILESTONE_ID,
+      isFinal,
     }),
   );
   process.exit(0);

@@ -1,0 +1,88 @@
+name: foresift-smoke-clean-turn
+description: |
+  Deterministic Foresift CLEAN-TURN CONTINUATION smoke test — no AI, no provider
+  spend, no product code. Proves the core autonomous-continuation property:
+
+    logical stage -> iteration 1 makes persistent progress and exits cleanly
+                  -> deterministic completion guard FAILS
+                  -> NO human input: Archon automatically starts iteration 2
+                  -> iteration 2 reads the progress persisted by iteration 1,
+                     finishes the remaining work
+                  -> deterministic completion guard PASSES
+                  -> downstream node executes
+
+  This specifically proves the "Claude finished its turn but the work is not
+  done" case is handled without anyone typing "continue". It is deliberately
+  separate from process-failure resume testing (foresift-smoke-resume).
+
+  Run before enabling the autopilot and after any Archon version upgrade:
+
+    rm -rf /tmp/foresift-smoke-clean
+    archon workflow run foresift-smoke-clean-turn --detach --branch foresift/smoke-clean-turn
+    archon workflow get <run-id> --json    # expect status completed
+
+  NOT for: anything product-related.
+tags: [foresift, smoke]
+
+nodes:
+  - id: init
+    bash: |
+      set -euo pipefail
+      S="${SMOKE_DIR:-/tmp/foresift-smoke-clean}"
+      rm -rf "$S"
+      mkdir -p "$S"
+      echo 0 > "$S/iterations"
+      echo "smoke-init-ok"
+
+  - id: continue-loop
+    depends_on: [init]
+    idle_timeout: 300000
+    loop_group:
+      max_iterations: 5
+      fresh_context: true
+      # Completion signal sentinels are NEVER emitted here: the deterministic
+      # until_bash guard below is the ONLY way this loop finishes early.
+      until: CLEAN_TURN_LOOP_TEXT_SIGNAL_NEVER_EMIT_c7d44e
+      until_bash: |
+        set -euo pipefail
+        S="${SMOKE_DIR:-/tmp/foresift-smoke-clean}"
+        grep -q '"done":true' "$S/state.json"
+      nodes:
+        - id: iterate
+          bash: |
+            set -euo pipefail
+            S="${SMOKE_DIR:-/tmp/foresift-smoke-clean}"
+            N=$(($(cat "$S/iterations") + 1))
+            echo "$N" > "$S/iterations"
+            if [ "$N" -le 1 ]; then
+              # Iteration 1 — models a Claude turn that ends CLEANLY while the
+              # logical stage is still incomplete: persists progress, exits 0,
+              # does NOT satisfy the completion condition.
+              printf '{"done":false,"progress":"phase-1-complete"}\n' > "$S/state.json"
+              echo "iteration-1-made-persistent-progress-and-exited-cleanly"
+            else
+              # Iteration N>1 — a fresh context resumes purely from persisted
+              # disk state (never conversational memory) and finishes the work.
+              grep -q '"phase-1-complete"' "$S/state.json" || {
+                echo "persisted progress from iteration 1 was lost"; exit 1;
+              }
+              printf '{"done":true,"progress":"finished-by-iteration-%s"}\n' "$N" > "$S/state.json"
+              echo "iteration-$N-read-state-and-finished"
+            fi
+
+  - id: verify
+    depends_on: [continue-loop]
+    bash: |
+      set -euo pipefail
+      S="${SMOKE_DIR:-/tmp/foresift-smoke-clean}"
+      N=$(cat "$S/iterations")
+      DONE=$(grep -c '"done":true' "$S/state.json" || true)
+      if [ "${N:-0}" -lt 2 ]; then
+        echo "FAIL: expected >=2 loop iterations (a clean exit must not satisfy the guard); got ${N:-0}"
+        exit 1
+      fi
+      if [ "${DONE:-0}" -ne 1 ]; then
+        echo "FAIL: persisted state should record completion exactly once"
+        exit 1
+      fi
+      echo "CLEAN-TURN CONTINUATION PROVEN: iteration 1 exited cleanly incomplete, iteration $N auto-started, resumed persisted state, finished; guard passed; downstream node ran."

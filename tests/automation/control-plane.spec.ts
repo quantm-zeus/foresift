@@ -193,3 +193,83 @@ describe('failure classification', () => {
     expect(classifyFailure('exit code 7 while running tests')).toBe('UNKNOWN');
   });
 });
+
+describe('timestamp normalization', () => {
+  // Imported late so the block above stays grouped by existing concern.
+  it('parses epoch-ms numbers, second-epoch numbers, numeric strings, and ISO forms', async () => {
+    const { normalizeTimestampMs } =
+      await import('../../scripts/automation/foresift-autopilot.mjs');
+    const iso = Date.parse('2026-08-22T17:19:04Z');
+    expect(normalizeTimestampMs(iso)).toBe(iso); // epoch-ms passthrough
+    expect(normalizeTimestampMs(1_000_000_000)).toBe(1_000_000_000_000); // seconds heuristic (< 1e11)
+    expect(normalizeTimestampMs(1_000_000_000_000)).toBe(1_000_000_000_000); // already ms
+    expect(normalizeTimestampMs('1755878344000')).toBe(1_755_878_344_000); // numeric string ms
+    expect(normalizeTimestampMs('2026-08-22 17:19:04')).toBe(iso); // real CLI form (space, no TZ)
+    expect(normalizeTimestampMs('2026-08-22T17:19:04+07:00')).toBe(
+      Date.parse('2026-08-22T10:19:04Z'),
+    ); // offset honored
+    expect(normalizeTimestampMs('2026-08-22T17:19:04')).toBe(iso); // missing TZ ⇒ UTC
+  });
+
+  it('returns null for unparsable input instead of NaN or an epoch guess', async () => {
+    const { normalizeTimestampMs } =
+      await import('../../scripts/automation/foresift-autopilot.mjs');
+    expect(normalizeTimestampMs('not-a-timestamp')).toBeNull();
+    expect(normalizeTimestampMs('')).toBeNull();
+    expect(normalizeTimestampMs('   ')).toBeNull();
+    expect(normalizeTimestampMs(null)).toBeNull();
+    expect(normalizeTimestampMs(undefined)).toBeNull();
+    expect(normalizeTimestampMs(Number.NaN)).toBeNull();
+    expect(normalizeTimestampMs({})).toBeNull();
+  });
+});
+
+describe('run observability', () => {
+  it('derives the open DAG node and loop iteration from a structured JSONL run log', async () => {
+    const fs = await import('node:fs');
+    const os = await import('node:os');
+    const path = await import('node:path');
+    const { runObservability } = await import('../../scripts/automation/foresift-autopilot.mjs');
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'foresift-obs-'));
+    const logs = path.join(dir, '.archon', 'workspaces', 'owner', 'repo', 'logs');
+    fs.mkdirSync(logs, { recursive: true });
+    const runId = 'obs-run-1';
+    fs.writeFileSync(
+      path.join(logs, `${runId}.jsonl`),
+      [
+        { type: 'workflow_start', ts: '2026-08-22T18:00:00.000Z' },
+        { type: 'node_start', step: 'init', ts: '2026-08-22T18:00:01.000Z' },
+        { type: 'node_complete', step: 'init', ts: '2026-08-22T18:00:02.000Z' },
+        { type: 'node_start', step: 'iterate', ts: '2026-08-22T18:00:03.000Z' },
+        { type: 'node_complete', step: 'iterate', ts: '2026-08-22T18:05:03.000Z' },
+        { type: 'node_start', step: 'iterate', ts: '2026-08-22T18:05:04.000Z' },
+      ]
+        .map((e) => JSON.stringify(e))
+        .join('\n'),
+    );
+    const prevHome = process.env.HOME;
+    process.env.HOME = dir;
+    try {
+      const obs = (
+        runObservability as (id: string) => {
+          currentNode: string | null;
+          iteration: number | null;
+          lastEventAt: number | null;
+        }
+      )(runId);
+      expect(obs.currentNode).toBe('iterate');
+      expect(obs.iteration).toBe(2); // two node_start events for the loop body
+      expect(obs.lastEventAt).toBe(Date.parse('2026-08-22T18:05:04.000Z'));
+    } finally {
+      if (prevHome === undefined) delete process.env.HOME;
+      else process.env.HOME = prevHome;
+      fs.rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it('never throws on unknown runs or malformed logs — observability is advisory', async () => {
+    const { runObservability } = await import('../../scripts/automation/foresift-autopilot.mjs');
+    expect(runObservability(null as unknown as string)).toBeNull();
+    expect(runObservability('no-such-run-id-anywhere')).toBeNull();
+  });
+});

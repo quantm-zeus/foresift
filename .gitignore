@@ -23,3 +23,6 @@ coverage/
 .idea/
 .vscode/*
 !.vscode/extensions.json
+
+# Archon dry-run scratch
+.archon/dry-run/

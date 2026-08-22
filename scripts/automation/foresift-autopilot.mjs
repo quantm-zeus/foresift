@@ -14,8 +14,17 @@
 //   node scripts/automation/foresift-autopilot.mjs --clear-fatal
 
 import { spawnSync } from 'node:child_process';
-import { existsSync, mkdirSync, readFileSync, writeFileSync, unlinkSync } from 'node:fs';
-import { join } from 'node:path';
+import {
+  existsSync,
+  mkdirSync,
+  readFileSync,
+  readdirSync,
+  writeFileSync,
+  unlinkSync,
+} from 'node:fs';
+import { homedir } from 'node:os';
+import { join, resolve } from 'node:path';
+import { pathToFileURL } from 'node:url';
 import {
   loadRoadmap,
   loadCurrentMilestone,
@@ -48,6 +57,30 @@ const DISCOVERY_LIMIT = 5;
 
 const now = () => Date.now();
 const log = (...m) => console.log(new Date().toISOString(), '[autopilot]', ...m);
+
+/**
+ * Normalize an Archon timestamp to epoch milliseconds.
+ * Supports epoch-ms numbers, other numeric epochs (heuristic: < 1e11 ⇒ seconds),
+ * numeric strings, and ISO strings ("2026-08-22 17:19:04", "…T…Z", offset forms;
+ * missing timezone ⇒ UTC). Returns null when unparsable — callers must treat
+ * unknown timestamps as "no opinion", never as "abandon the run".
+ */
+export function normalizeTimestampMs(v0) {
+  if (v0 === null || v0 === undefined) return null;
+  if (typeof v0 === 'number' && Number.isFinite(v0)) {
+    return v0 < 1e11 ? Math.round(v0 * 1000) : Math.round(v0);
+  }
+  let v = String(v0).trim();
+  if (!v) return null;
+  if (/^-?\d+(\.\d+)?$/.test(v)) {
+    const n = Number(v);
+    return n < 1e11 ? Math.round(n * 1000) : Math.round(n);
+  }
+  v = v.replace(' ', 'T');
+  if (!/(?:[zZ]|[+-]\d\d:?\d\d)$/.test(v)) v += 'Z';
+  const t = Date.parse(v);
+  return Number.isNaN(t) ? null : t;
+}
 
 function sh(cmd, opts = {}) {
   const r = spawnSync(cmd, { shell: true, cwd: REPO, encoding: 'utf8', ...opts });
@@ -264,8 +297,32 @@ function actOnEntry(st, entry) {
   entry.lastSeenAt = now();
   if (status === 'completed') return finalizeCompletedRun(st, entry);
   if (status === 'running' || status === 'pending') {
-    const activityMs = now() - (get?.updatedAt ?? get?.startedAt ?? entry.startedAt);
-    if (activityMs > STALE_RUN_MS) {
+    // Prefer Archon's own last-activity fields (snake_case in the real CLI),
+    // normalized. A present-but-unparsable timestamp is "no opinion": record a
+    // one-time diagnostic and keep waiting — never abandon a possibly-healthy
+    // run because its timestamps are bad. Only ABSENT remote fields fall back
+    // to supervisor-local bookkeeping.
+    const rawRemote = get?.last_activity_at ?? get?.started_at;
+    let lastActivity;
+    if (rawRemote === undefined || rawRemote === null || rawRemote === '') {
+      lastActivity = normalizeTimestampMs(entry.startedAt);
+    } else {
+      lastActivity = normalizeTimestampMs(rawRemote);
+      if (lastActivity === null) {
+        if (!entry.activityTsUnparsable) {
+          entry.activityTsUnparsable = true;
+          record(st, 'run_activity_timestamp_unparsable', {
+            runId: entry.runId,
+            raw: String(rawRemote).slice(0, 60),
+          });
+        }
+        return false;
+      }
+    }
+    if (lastActivity === null) return false; // no opinion either way — keep waiting
+    entry.activityTsUnparsable = false;
+    const activityMs = now() - lastActivity;
+    if (Number.isNaN(activityMs) || activityMs > STALE_RUN_MS) {
       // Orphaned: preserve worktree/git state; use supported lifecycle ops only.
       archonJson(`workflow abandon ${entry.runId} --json`);
       entry.failureClass = 'UNKNOWN';
@@ -284,9 +341,16 @@ function actOnEntry(st, entry) {
     // Cancelled runs are not resumable; release the package back to PENDING so
     // the next tick re-selects it against fresh state.
     if (entry.kind === 'package') {
-      const ms = loadCurrentMilestone(REPO);
-      if (ms && findPackage(ms, entry.packageId)?.status === 'RUNNING')
-        setPackageStatus(ms, entry.packageId, 'PENDING');
+      try {
+        const ms = loadCurrentMilestone(REPO);
+        if (ms && findPackage(ms, entry.packageId)?.status === 'RUNNING')
+          setPackageStatus(ms, entry.packageId, 'PENDING');
+      } catch (err) {
+        record(st, 'requeue_status_flip_failed', {
+          packageId: entry.packageId,
+          error: String(err?.message ?? err).slice(0, 200),
+        });
+      }
     }
     record(st, 'run_cancelled_requeued', { runId: entry.runId, branch: entry.branch });
     return true;
@@ -311,16 +375,35 @@ async function actOnPendingAction(st, entry) {
     if (id) {
       entry.awaitingDiscovery = false;
       entry.runId = id;
+      if (entry.kind === 'package') {
+        // Durable Archon association established — only NOW may the package
+        // move PENDING→RUNNING. Until this point the package was never RUNNING.
+        try {
+          const ms = loadCurrentMilestone(REPO);
+          if (ms && findPackage(ms, entry.packageId)?.status === 'PENDING')
+            setPackageStatus(ms, entry.packageId, 'RUNNING');
+        } catch (err) {
+          record(st, 'discovery_status_flip_failed', {
+            packageId: entry.packageId,
+            error: String(err?.message ?? err).slice(0, 200),
+          });
+        }
+      }
       record(st, 'run_id_discovered', { runId: id });
     } else if (++entry.discoveryAttempts > DISCOVERY_LIMIT) {
+      // Discovery exhausted: the workflow may or may not be running, but it is
+      // untrackable. Fail closed — pause for an operator instead of risking
+      // duplicate launches against an invisible run. Package status stays
+      // PENDING (RUNNING is only ever set once a durable run id exists).
       entry.awaitingDiscovery = false;
       entry.done = true;
       record(st, 'launch_unconfirmed_giving_up', { branch: entry.branch });
-      if (entry.kind === 'package') {
-        const ms = loadCurrentMilestone(REPO);
-        if (ms && findPackage(ms, entry.packageId)?.status === 'RUNNING')
-          setPackageStatus(ms, entry.packageId, 'PENDING');
-      }
+      st.pausedFatal = {
+        reason: `detached launch for ${entry.branch} could not be associated with a durable Archon run id after ${DISCOVERY_LIMIT} discovery attempts; operator must verify 'archon workflow runs' then run --clear-fatal`,
+        runId: null,
+        since: now(),
+      };
+      record(st, 'paused_fatal', { reason: st.pausedFatal.reason });
     } else {
       entry.nextAttemptAt = now() + DISCOVERY_RETRY_MS;
     }
@@ -358,23 +441,11 @@ function extractRunId(ack) {
 function discoverRunId(workflow, message) {
   const list = archonJson('workflow runs --json --limit 20');
   const runs = Array.isArray(list) ? list : (list?.runs ?? []);
-  const parseTs = (v0) => {
-    if (typeof v0 === 'number') return v0; // epoch ms
-    let v = String(v0 ?? '')
-      .trim()
-      .replace(' ', 'T');
-    if (!/([zZ]|[+-]\d\d:?\d\d)$/.test(v)) v += 'Z';
-    const t = Date.parse(v);
-    return Number.isNaN(t) ? 0 : t;
-  };
+  const tsOf = (r) => normalizeTimestampMs(r.started_at) ?? 0;
+  const cutoff = now() - 24 * 60 * 60_000;
   const match = runs
-    .filter(
-      (r) =>
-        r.workflow_name === workflow &&
-        r.user_message === message &&
-        parseTs(r.started_at) >= now() - 24 * 60 * 60_000,
-    )
-    .sort((a, b) => parseTs(b.started_at) - parseTs(a.started_at))[0];
+    .filter((r) => r.workflow_name === workflow && r.user_message === message && tsOf(r) >= cutoff)
+    .sort((a, b) => tsOf(b) - tsOf(a))[0];
   return match?.id ?? null;
 }
 
@@ -390,51 +461,73 @@ function sanitizeAck(a) {
 }
 
 // ── selection ────────────────────────────────────────────────────────────────
+function pauseFatalCorrupt(st, what, errors) {
+  st.pausedFatal = {
+    reason: `corrupt implementation state in ${what} — fail closed, operator must inspect and repair; use --clear-fatal after fixing`,
+    detail: String(errors).slice(0, 400),
+    since: now(),
+  };
+  record(st, 'paused_fatal_corrupt_state', { what, errors });
+}
+
 function selectAndLaunch(st) {
-  const roadmap = loadRoadmap(REPO);
+  // Corrupt roadmap/milestone JSON must fail closed (PAUSED_FATAL), never
+  // crash-loop the tick or silently re-plan over damaged state.
+  let roadmap;
+  let ms;
+  try {
+    roadmap = loadRoadmap(REPO);
+    ms = loadCurrentMilestone(REPO);
+  } catch (err) {
+    pauseFatalCorrupt(st, 'specs/implementation/*.json', err?.message ?? err);
+    return false;
+  }
   const rmErrs = validateRoadmap(roadmap);
   if (rmErrs.length) {
-    record(st, 'invalid_roadmap', { errors: rmErrs });
+    pauseFatalCorrupt(st, 'specs/implementation/roadmap.json', rmErrs.join('; '));
     return false;
   }
 
   // Milestone-control due? (nothing planned, or planned milestone fully proven)
-  let ms = loadCurrentMilestone(REPO);
-  const msErrs = ms ? validateMilestoneState(ms) : ['missing'];
-  const milestoneDue = !ms || msErrs.length > 0 || ms.packages.every((p) => p.status === 'PROVEN');
+  let msErrs = ms ? validateMilestoneState(ms) : ['missing'];
+  if (ms && msErrs.length > 0) {
+    // CORRUPT STATE FAILS CLOSED: current-milestone.json exists but does not
+    // validate. Never silently re-plan over possibly-corrupt implementation
+    // state.
+    pauseFatalCorrupt(st, 'specs/implementation/current-milestone.json', msErrs.join('; '));
+    return false;
+  }
+  const milestoneDue = !ms || ms.packages.every((p) => p.status === 'PROVEN');
   if (milestoneDue) {
     if (st.milestoneRuns.length > 0 || st.pausedFatal) return false;
+    const message = 'plan-or-audit-current-milestone';
     const ack = launchDetached(
       'foresift-milestone-control',
       'foresift/milestone-planning',
-      'plan-or-audit-current-milestone',
+      message,
     );
-    const runId = resolveRunId(
-      ack,
-      'foresift-milestone-control',
-      'plan-or-audit-current-milestone',
-    );
+    const runId = resolveRunId(ack, 'foresift-milestone-control', message);
     record(st, 'milestone_control_launched', {
       ack: sanitizeAck(ack),
       runId,
       discovery: extractRunId(ack) ? 'ack' : 'runs-table',
     });
-    if (runId)
-      trackRun(st, 'milestone', {
-        kind: 'milestone',
-        workflow: 'foresift-milestone-control',
-        runId,
-        branch: 'foresift/milestone-planning',
-        message: 'plan-or-audit-current-milestone',
-        startedAt: now(),
-        resumeCount: 0,
-        restartCount: 0,
-      });
+    // ALWAYS track the launch — including when the detach ack carried no run
+    // id. An untracked launch would be re-launched next tick (duplicate
+    // milestone workflows). The awaitingDiscovery machinery reconciles it.
+    trackRun(st, 'milestone', {
+      kind: 'milestone',
+      workflow: 'foresift-milestone-control',
+      runId,
+      branch: 'foresift/milestone-planning',
+      message,
+      startedAt: now(),
+      resumeCount: 0,
+      restartCount: 0,
+      awaitingDiscovery: !runId,
+      discoveryAttempts: 0,
+    });
     return true;
-  }
-  if (msErrs.length > 0 && msErrs[0] !== 'missing') {
-    record(st, 'invalid_milestone_state', { errors: msErrs });
-    return false;
   }
 
   // Work-package selection under the concurrency policy.
@@ -443,6 +536,10 @@ function selectAndLaunch(st) {
     (a, b) => (a.dependencies?.length ?? 0) - (b.dependencies?.length ?? 0),
   );
   for (const cand of ordered) {
+    // Never re-select a package that already has a tracked active launch
+    // (covers the window where its run id is still being discovered and its
+    // status is therefore still PENDING).
+    if (st.activeRuns.some((r) => r.packageId === cand.id && !r.done)) continue;
     const elig = packageEligible(ms, cand);
     if (!elig.eligible) continue;
     const verdict = canStartPackage(roadmap, ms, cand, running);
@@ -457,7 +554,6 @@ function selectAndLaunch(st) {
       runId,
       discovery: extractRunId(ack) ? 'ack' : 'runs-table',
     });
-    setPackageStatus(ms, cand.id, 'RUNNING');
     trackRun(st, 'package', {
       kind: 'package',
       workflow: 'foresift-work-package',
@@ -471,22 +567,157 @@ function selectAndLaunch(st) {
       awaitingDiscovery: !runId,
       discoveryAttempts: 0,
     });
+    if (runId) {
+      // Durable run id already in hand → RUNNING now; otherwise it is flipped
+      // by actOnPendingAction at discovery time. PENDING→RUNNING never happens
+      // without a durable Archon run association.
+      setPackageStatus(ms, cand.id, 'RUNNING');
+    }
     running.push(cand);
   }
   return true;
 }
 
 // ── status ───────────────────────────────────────────────────────────────────
+/**
+ * Best-effort live observability for a run, read from Archon's structured
+ * JSONL event log (~/.archon/workspaces/<owner>/<repo>/logs/<runId>.jsonl):
+ * the currently open DAG node, its loop-iteration count (node_start events),
+ * and the last event timestamp. Must NEVER throw — observability is advisory.
+ */
+export function runObservability(runId) {
+  if (!runId || typeof runId !== 'string') return null;
+  try {
+    const wsRoot = join(process.env.HOME ?? homedir(), '.archon', 'workspaces');
+    if (!existsSync(wsRoot)) return null;
+    let file = null;
+    search: for (const owner of readdirSync(wsRoot)) {
+      let repos = [];
+      try {
+        repos = readdirSync(join(wsRoot, owner));
+      } catch {
+        continue;
+      }
+      for (const repo of repos) {
+        const candidate = join(wsRoot, owner, repo, 'logs', `${runId}.jsonl`);
+        if (existsSync(candidate)) {
+          file = candidate;
+          break search;
+        }
+      }
+    }
+    if (!file) return null;
+    const startsByNode = new Map();
+    const openNodes = [];
+    let lastEventMs = null;
+    for (const line of readFileSync(file, 'utf8').split('\n')) {
+      if (!line.trim()) continue;
+      let e;
+      try {
+        e = JSON.parse(line);
+      } catch {
+        continue;
+      }
+      lastEventMs = normalizeTimestampMs(e.ts) ?? lastEventMs;
+      const step = typeof e.step === 'string' ? e.step : null;
+      if (!step) continue;
+      if (e.type === 'node_start') {
+        startsByNode.set(step, (startsByNode.get(step) ?? 0) + 1);
+        if (!openNodes.includes(step)) openNodes.push(step);
+      } else if (
+        e.type === 'node_complete' ||
+        e.type === 'node_error' ||
+        e.type === 'node_skipped'
+      ) {
+        const i = openNodes.indexOf(step);
+        if (i >= 0) openNodes.splice(i, 1);
+      }
+    }
+    const current = openNodes[openNodes.length - 1] ?? null;
+    return {
+      currentNode: current,
+      iteration: current ? (startsByNode.get(current) ?? null) : null,
+      nodeStarts: Object.fromEntries(startsByNode),
+      lastEventAt: lastEventMs,
+    };
+  } catch {
+    return null;
+  }
+}
+
+function describeRun(entry) {
+  const parts = [
+    `run ${entry.runId ?? '(awaiting discovery)'}`,
+    `status=${entry.lastSeenStatus ?? '?'}`,
+  ];
+  if (entry.awaitingDiscovery) parts.push('discovering-run-id');
+  else if (!entry.runId && !entry.done) parts.push('restart-scheduled');
+  const obs = runObservability(entry.runId);
+  if (obs?.currentNode) {
+    parts.push(`node=${obs.currentNode}`);
+    if (obs.iteration != null) parts.push(`iter=${obs.iteration}`);
+  }
+  parts.push(`resumes=${entry.resumeCount ?? 0}`, `restarts=${entry.restartCount ?? 0}`);
+  const activityMs =
+    entry.lastSeenStatus === 'running'
+      ? now() - (normalizeTimestampMs(obs?.lastEventAt) ?? entry.lastSeenAt ?? entry.startedAt)
+      : null;
+  if (activityMs != null && Number.isFinite(activityMs))
+    parts.push(`idle=${Math.max(0, Math.round(activityMs / 60000))}m`);
+  return parts.join(' · ');
+}
+
+function nextEligiblePackage(roadmap, ms) {
+  if (!ms) return null;
+  const running = [];
+  const ordered = [...ms.packages].sort(
+    (a, b) => (a.dependencies?.length ?? 0) - (b.dependencies?.length ?? 0),
+  );
+  for (const cand of ordered) {
+    const elig = packageEligible(ms, cand);
+    if (!elig.eligible) continue;
+    const verdict = canStartPackage(roadmap, ms, cand, running);
+    if (!verdict.ok) continue;
+    return { id: cand.id, blockedBy: null };
+  }
+  // Nothing startable right now: name the first blocker for the operator.
+  const notProven = ordered.find(
+    (cand) =>
+      cand.status !== 'PROVEN' &&
+      (cand.dependencies ?? []).some((d) => findPackage(ms, d)?.status !== 'PROVEN'),
+  );
+  return {
+    id: null,
+    blockedBy: notProven
+      ? `${notProven.id} (deps unproven)`
+      : 'concurrency policy or gate in progress',
+  };
+}
+
 export function buildStatus() {
-  const roadmap = loadRoadmap(REPO);
-  const ms = loadCurrentMilestone(REPO);
+  let roadmap = null;
+  let ms = null;
+  let corrupt = null;
+  try {
+    roadmap = loadRoadmap(REPO);
+    ms = loadCurrentMilestone(REPO);
+  } catch (err) {
+    corrupt = String(err?.message ?? err).slice(0, 300);
+  }
+  const rmErrs = roadmap ? validateRoadmap(roadmap) : ['unreadable'];
+  const msErrs = ms ? validateMilestoneState(ms) : [];
   const st = loadState();
   const lines = [];
   lines.push(`FORESIFT AUTOPILOT STATUS — ${new Date().toISOString()}`);
   if (st.pausedFatal) lines.push(`⛔ PAUSED_FATAL: ${st.pausedFatal.reason}`);
-  lines.push(
-    `roadmap: ${roadmap.milestones.filter((m) => m.status === 'PROVEN').length}/${roadmap.milestones.length} milestones proven`,
-  );
+  if (corrupt || rmErrs.length > 0 || msErrs.length > 0)
+    lines.push(
+      `⚠ implementation state INVALID${corrupt ? ` (${corrupt})` : ''}${rmErrs.length ? ` · roadmap: ${rmErrs.join('; ')}` : ''}${msErrs.length ? ` · milestone: ${msErrs.join('; ')}` : ''}`,
+    );
+  if (roadmap)
+    lines.push(
+      `roadmap: ${roadmap.milestones.filter((m) => m.status === 'PROVEN').length}/${roadmap.milestones.length} milestones proven`,
+    );
   if (!ms) {
     lines.push(
       'current milestone: none planned yet (foresift-milestone-control will plan the first)',
@@ -496,17 +727,26 @@ export function buildStatus() {
       `current milestone: ${ms.milestoneId} — ${ms.packages.filter((p) => p.status === 'PROVEN').length}/${ms.packages.length} packages proven`,
     );
     for (const p of ms.packages) {
-      const run = st.activeRuns.find((r) => r.packageId === p.id);
-      const runInfo = run
-        ? ` · run ${run.runId ?? '(restarting)'} status=${run.lastSeenStatus ?? '?'} resumes=${run.resumeCount} restarts=${run.restartCount}`
-        : '';
+      const run = st.activeRuns.find((r) => r.packageId === p.id && !r.done);
+      const runInfo = run ? `\n      ↳ ${describeRun(run)}` : '';
       lines.push(
         `  • ${p.id.padEnd(28)} ${p.status.padEnd(9)} risk=${p.risk.padEnd(8)} deps=[${(p.dependencies ?? []).join(',')}]${runInfo}`,
       );
     }
+    if (!st.pausedFatal && roadmap && !corrupt && rmErrs.length === 0) {
+      try {
+        const next = nextEligiblePackage(roadmap, ms);
+        lines.push(
+          next?.id
+            ? `next eligible package: ${next.id}`
+            : `no package currently eligible (${next?.blockedBy ?? 'unknown'})`,
+        );
+      } catch {
+        /* advisory only */
+      }
+    }
   }
-  for (const m of st.milestoneRuns ?? [])
-    lines.push(`milestone-control run ${m.runId} status=${m.lastSeenStatus ?? '?'}`);
+  for (const m of st.milestoneRuns ?? []) lines.push(`milestone-control: ${describeRun(m)}`);
   lines.push(`runtime state: ${STATE_FILE}`);
   return lines.join('\n');
 }
@@ -567,10 +807,21 @@ async function main() {
   } while (!once);
 }
 
-main().then(
-  () => process.exit(0),
-  (e) => {
-    console.error(e);
-    process.exit(1);
-  },
-);
+// CLI-entry guard: importing this module (tests, tooling) must never boot the
+// supervisory loop — only direct `node foresift-autopilot.mjs` invocations do.
+const invokedDirectly = (() => {
+  try {
+    return import.meta.url === pathToFileURL(resolve(process.argv[1] ?? '')).href;
+  } catch {
+    return false;
+  }
+})();
+if (invokedDirectly) {
+  main().then(
+    () => process.exit(0),
+    (e) => {
+      console.error(e);
+      process.exit(1);
+    },
+  );
+}

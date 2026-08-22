@@ -1,0 +1,29 @@
+# Archon Web UI — long-running user service (loopback-only access).
+#
+# Install:
+#   mkdir -p ~/.config/systemd/user
+#   cp ops/systemd/archon-dashboard.service ~/.config/systemd/user/
+#   systemctl --user daemon-reload
+#   systemctl --user enable --now archon-dashboard.service
+#
+# Operator access from a laptop (UI is bound to loopback only):
+#   ssh -L 3090:127.0.0.1:3090 <user>@<vps>
+#   then open http://127.0.0.1:3090 locally.
+#
+# Logs: journalctl --user -u archon-dashboard.service -f
+
+[Unit]
+Description=Archon dashboard (Foresift autonomous development control plane)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=%h/foresift
+ExecStart=/home/minhquan_eth/.local/bin/archon serve
+Restart=on-failure
+RestartSec=30
+Environment=PATH=/home/minhquan_eth/.nvm/versions/node/v24.19.0/bin:/home/minhquan_eth/.local/bin:/usr/local/bin:/usr/bin:/bin
+
+[Install]
+WantedBy=default.target

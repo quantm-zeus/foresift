@@ -1,0 +1,127 @@
+name: foresift-work-package
+description: |
+  Foresift autonomous implementation of exactly ONE work package from the current
+  milestone (specs/implementation/current-milestone.json). Invoke as:
+
+    archon workflow run foresift-work-package --branch foresift/<package-id> "<package-id>"
+
+  Pipeline: deterministic preflight -> Spec Kit scoped plan/tasks/analyze ->
+  fresh-context implementation -> deterministic package gate -> PR ->
+  comprehensive independent review (bundled archon-review-block: 5 parallel
+  review agents + automatic CRITICAL/HIGH fixes) -> Spec Kit convergence loop
+  (bounded) -> final deterministic gate -> exact-head CI wait -> machine squash
+  merge. No human approval gate. Additive commits only; never amend/rebase/force.
+
+  NOT for: planning or auditing milestones (use foresift-milestone-control),
+  ad-hoc fixes (use archon-assist), or implementing anything outside the
+  selected package.
+
+provider: claude
+effort: high
+tags: [foresift, autonomous]
+
+nodes:
+  # ── PHASE 0: DETERMINISTIC PREFLIGHT (fail closed before any AI spend) ─────
+  - id: preflight
+    bash: |
+      set -euo pipefail
+      node scripts/automation/preflight.mjs --package "$ARGUMENTS" --branch "$(git rev-parse --abbrev-ref HEAD)"
+    timeout: 600000
+    retry:
+      max_attempts: 2
+      delay_ms: 10000
+      on_error: transient
+
+  # ── PHASE 1: SCOPED SPEC KIT PLANNING (fresh context) ──────────────────────
+  - id: scoped-plan
+    command: foresift-wp-plan
+    depends_on: [preflight]
+    context: fresh
+    idle_timeout: 900000
+    effort: high
+
+  # ── PHASE 2: IMPLEMENTATION (fresh context, additive commits) ──────────────
+  - id: implement
+    command: foresift-wp-implement
+    depends_on: [scoped-plan]
+    context: fresh
+    idle_timeout: 900000
+    effort: high
+
+  # ── PHASE 3: DETERMINISTIC PACKAGE GATE (AI is never the authority) ────────
+  - id: gate
+    bash: |
+      set -euo pipefail
+      pnpm foresift:gate -- --package "$ARGUMENTS"
+    depends_on: [implement]
+    timeout: 1800000
+
+  # ── PHASE 4: PULL REQUEST ──────────────────────────────────────────────────
+  - id: create-pr
+    command: foresift-wp-create-pr
+    depends_on: [gate]
+    context: fresh
+
+  # ── PHASE 5: COMPREHENSIVE INDEPENDENT REVIEW + AUTO-FIX ───────────────────
+  # Bundled 9-node review sub-DAG: verify-pr-base -> scope -> sync ->
+  # 5 parallel fresh-context review agents -> synthesize (posts PR comment) ->
+  # implement CRITICAL/HIGH fixes. Not reimplemented here.
+  - id: review
+    include: archon-review-block
+    depends_on: [create-pr]
+
+  # ── PHASE 6: SPEC KIT CONVERGENCE LOOP (bounded, fresh contexts) ───────────
+  # Each iteration: converge against spec/plan/tasks -> deterministic gate
+  # (captured, non-failing) -> independent judge. The judge may only signal
+  # CONVERGED when the gate reported success AND no required work remains.
+  # Hard limit of 4 iterations. The authoritative check is re-run
+  # deterministically by the final gate in the next phase regardless.
+  - id: convergence
+    depends_on: [review]
+    idle_timeout: 900000
+    loop_group:
+      max_iterations: 4
+      fresh_context: true
+      until: CONVERGED
+      nodes:
+        - id: converge
+          command: foresift-wp-converge
+          effort: high
+          idle_timeout: 900000
+        - id: gate-iter
+          bash: |
+            set +e
+            pnpm foresift:gate -- --package "$ARGUMENTS"
+            echo "GATE_EXIT=$?"
+          depends_on: [converge]
+          timeout: 1800000
+        - id: judge
+          prompt: |
+            You are the independent convergence judge for Foresift work package
+            "$ARGUMENTS". You have read-only intent: verify claims, never fix code.
+
+            Convergence agent report (most recent iteration):
+            $converge.output
+
+            Deterministic package gate transcript ("GATE_EXIT=0" means every
+            check passed; anything else is a failure):
+            $gate-iter.output
+
+            Verify against specs/implementation/current-milestone.json (package
+            "$ARGUMENTS"), its Spec Kit artifacts under specs/<package-id>/, and
+            the actual code: every listed requirement implemented with tests, no
+            known missing acceptance criterion, and GATE_EXIT=0.
+
+            End your reply with EXACTLY one of:
+            <promise>CONVERGED</promise>   — only if the gate passed AND nothing required is missing
+            <promise>NOT_CONVERGED</promise> — otherwise; precede it with a short list of what is missing
+          depends_on: [gate-iter]
+          model: large
+          allowed_tools: [Read, Glob, Grep]
+
+  # ── PHASE 7: FINAL DETERMINISTIC GATE + EXACT-HEAD CI + MERGE ──────────────
+  - id: ci-merge
+    command: foresift-wp-ci-merge
+    depends_on: [convergence]
+    context: fresh
+    idle_timeout: 1800000

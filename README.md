@@ -89,3 +89,11 @@ GitHub Actions runs the same gate on every push to `main` and every pull request
 Foresift will never include trading execution, custody, wallet signing, private-key
 handling, or transaction submission. The PRD's prohibited-capability policy
 (`READ_ONLY_NO_TRADING_CUSTODY_SIGNING`) is a permanent constraint of this project.
+
+## Autonomous development
+
+Foresift develops itself: the authoritative PRD flows through GitHub Spec Kit
+and Archon into work packages that are implemented, independently reviewed,
+deterministically verified, and squash-merged without human approval. See
+`docs/automation/AUTOPILOT.md` (operations), `specs/implementation/`
+(version-controlled planning state), and `docs/adr/0001-autonomous-control-plane-architecture.md`.

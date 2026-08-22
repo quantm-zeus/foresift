@@ -1,0 +1,72 @@
+{
+  "schemaVersion": "1.0.0",
+  "description": "Foresift implementation roadmap. Milestone skeleton derived deterministically from the authoritative PRD requirement manifest dependency groups (G0-G7). Work packages are NOT planned here: each milestone is decomposed into 2-8 work packages by the foresift-milestone-control workflow only when the milestone starts, and recorded in current-milestone.json.",
+  "derivedFrom": "docs/spec/crypto_intelligence_agent_gateway_PRD_FINAL_v6.0.requirements.json",
+  "generatedAt": "2026-08-22",
+  "policy": {
+    "foundationMilestones": ["G0"],
+    "maxParallelCodingPackagesFoundation": 1,
+    "maxParallelCodingPackages": 2,
+    "serialWhenRisk": ["CRITICAL"],
+    "concurrentRequiresAllOf": [
+      "both packages parallelizable",
+      "no dependency relationship (direct or transitive)",
+      "writeScopes do not overlap",
+      "neither package is CRITICAL",
+      "neither modifies root/shared architecture surfaces"
+    ]
+  },
+  "currentMilestoneId": null,
+  "milestones": [
+    {
+      "id": "G0",
+      "name": "Data Truth, Capability, Security, Collector, Cost and Traceability Foundation",
+      "dependsOn": [],
+      "status": "PLANNED"
+    },
+    {
+      "id": "G1",
+      "name": "Deterministic Signal, Execution, Outcome and Objective Foundation",
+      "dependsOn": ["G0"],
+      "status": "PLANNED"
+    },
+    {
+      "id": "G2",
+      "name": "Durable Operations, Alerts, Recovery and Admin Control",
+      "dependsOn": ["G0", "G1"],
+      "status": "PLANNED"
+    },
+    {
+      "id": "G3",
+      "name": "Agent Runtime and Workbench",
+      "dependsOn": ["G0", "G1", "G2"],
+      "status": "PLANNED"
+    },
+    {
+      "id": "G4",
+      "name": "Thesis, Decay, Capability-Aware Context and Diagnostics",
+      "dependsOn": ["G0", "G1", "G2", "G3"],
+      "status": "PLANNED"
+    },
+    {
+      "id": "G5",
+      "name": "Wallet, Social, Narrative, Flow, Regime and Liquidity Intelligence",
+      "dependsOn": ["G0", "G1", "G2", "G3", "G4"],
+      "status": "PLANNED"
+    },
+    {
+      "id": "G6",
+      "name": "Advanced Evaluation, Patterns, Novelty, Hazards and Public Compatibility",
+      "dependsOn": ["G0", "G1", "G2", "G3", "G4", "G5"],
+      "status": "PLANNED"
+    },
+    {
+      "id": "G7",
+      "name": "Adaptive Allocation, Portfolio, Adversarial and Alpha Governance",
+      "dependsOn": ["G0", "G1", "G2", "G3", "G4", "G5", "G6"],
+      "status": "PLANNED"
+    }
+  ],
+  "finalAuditRequired": true,
+  "completionCondition": "All PRD requirements (397) and acceptance criteria (204) accounted for as PROVEN or explicitly superseded per the manifest; final product-wide audit passes."
+}

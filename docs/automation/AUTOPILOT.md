@@ -73,6 +73,18 @@ ssh -L 3090:127.0.0.1:3090 <user>@<vps>
 # then open http://127.0.0.1:3090
 ```
 
+### Publishing over public HTTPS (paused as of 2026-08-22)
+
+The sanctioned path is `ops/dashboard/deploy-public-dashboard.sh`: Caddy TLS edge
+(Let's Encrypt shortlived IP certificate via certbot ≥5.4 `--ip-address`
+webroot flow) + `basic_auth` (Argon2id; plaintext password lives only in
+`~/.local/state/foresift/dashboard-credentials`, mode 0600) reverse-proxying to
+loopback-only `:3090`. It is idempotent and fails closed until BOTH GCP
+prerequisites exist: the external IP reserved as static and inbound tcp/80
+open (ACME HTTP-01). Both currently require an identity with compute.admin;
+exact commands are printed by the script and recorded in the bootstrap report.
+Raw `:3090` must never be exposed.
+
 ## Runtime state
 
 `~/.local/state/foresift/` holds the supervisor's runtime bookkeeping

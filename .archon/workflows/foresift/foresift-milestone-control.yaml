@@ -25,6 +25,15 @@ description: |
   sentinels agents are instructed NEVER to emit). Loop exhaustion fails the
   stage; recovery belongs to the autopilot supervisor.
 
+  ARCHON v0.9.0 LOOP SEMANTICS this layout relies on (verified empirically):
+    - every loop iteration runs its FULL body before the guard is evaluated;
+    - `when:` inside a loop body CANNOT see same-iteration sibling outputs, so
+      conditional AI gating is done by TOP-LEVEL status nodes routing around
+      whole loops, and loop bodies run unconditionally (repair -> re-check);
+    - prompt interpolation CAN read top-level and same-iteration siblings;
+    - `trigger_rule` supports all_success | one_success |
+      none_failed_min_one_success | all_done.
+
   Invoke via the autopilot supervisor. NOT for implementing a work package (use
   foresift-work-package).
 
@@ -47,15 +56,33 @@ nodes:
     depends_on: [mode-select]
     when: "$mode-select.output.mode == 'NONE'"
 
-  # ── MODE A: DECOMPOSE NEXT MILESTONE (bounded continuation loop) ────────────
-  # Each iteration inspects partial specs/implementation/** state and prior
-  # artifacts, then continues (never regenerates) correct completed sections.
-  # Completion: deterministic milestone validation passes AND the rationale
-  # artifact exists. The `until` sentinel below must NEVER be emitted by an
-  # agent — the validator is the only completion authority.
-  - id: plan-milestone
+  # ── MODE A ROUTER: deterministic planning-completeness check ────────────────
+  # Top-level (loop-external) deterministic status: the ONLY thing allowed to
+  # decide whether the bounded planning loop must run. Runs once per workflow.
+  - id: mc-plan-status
     depends_on: [mode-select]
     when: "$mode-select.output.mode == 'PLAN'"
+    bash: |
+      set +e
+      mkdir -p "$ARTIFACTS_DIR"
+      node scripts/automation/milestone-validate.mjs --expect-next \
+        > "$ARTIFACTS_DIR/plan-completeness.json" 2>&1
+      if [ $? -eq 0 ] && [ -s "$ARTIFACTS_DIR/milestone-plan-rationale.md" ]; then
+        echo "MC_PLAN_COMPLETE"
+      else
+        echo "MC_PLAN_INCOMPLETE"
+      fi
+
+  # ── MODE A: DECOMPOSE NEXT MILESTONE (bounded continuation loop) ────────────
+  # Entered only when the router says the draft is incomplete. Each iteration
+  # inspects partial specs/implementation/** state and prior artifacts, then
+  # CONTINUES (never regenerates) correct completed sections; the trailing
+  # re-check refreshes the guard input. Completion is decided SOLELY by the
+  # deterministic validator + rationale existence in until_bash — never by an
+  # agent promise. The `until` sentinel below must NEVER be emitted by an agent.
+  - id: plan-milestone
+    depends_on: [mc-plan-status]
+    when: "$mc-plan-status.output == 'MC_PLAN_INCOMPLETE'"
     idle_timeout: 1800000
     loop_group:
       max_iterations: 4
@@ -66,29 +93,32 @@ nodes:
         node scripts/automation/milestone-validate.mjs --expect-next > /dev/null
         test -s "$ARTIFACTS_DIR/milestone-plan-rationale.md"
       nodes:
-        - id: plan-status
+        - id: plan-iterate
+          command: foresift-mc-plan
+          effort: high
+          idle_timeout: 1800000
+        - id: plan-recheck
           bash: |
             set +e
             node scripts/automation/milestone-validate.mjs --expect-next \
               > "$ARTIFACTS_DIR/plan-completeness.json" 2>&1
-            if [ $? -eq 0 ] && [ -s "$ARTIFACTS_DIR/milestone-plan-rationale.md" ]; then
-              echo "PLAN_DRAFT_COMPLETE"
-            else
-              echo "PLAN_DRAFT_INCOMPLETE"
-            fi
-        - id: plan-iterate
-          command: foresift-mc-plan
-          when: "$plan-status.output == 'PLAN_DRAFT_INCOMPLETE'"
-          effort: high
-          idle_timeout: 1800000
+            echo "PLAN_RECHECK_EXIT=$?"
 
+  # ── MODE A: INDEPENDENT PLANNING REVIEW ─────────────────────────────────────
+  # Ordered strictly after the planning loop via the plan-milestone edge; the
+  # mc-plan-status edge guarantees ≥1 success even when the loop was legitimately
+  # skipped (draft already complete at entry). A FAILED loop (exhaustion) keeps
+  # this node skipped via none_failed_min_one_success — recovery belongs to the
+  # supervisor, never to a review of a broken draft.
   - id: plan-review
     command: foresift-mc-plan-review
-    depends_on: [plan-milestone]
+    depends_on: [mc-plan-status, plan-milestone]
+    trigger_rule: none_failed_min_one_success
     context: fresh
     idle_timeout: 1800000
 
-  # Apply CRITICAL/HIGH review findings to the draft plan (max 2 repair passes).
+  # Apply CRITICAL/HIGH review findings to the draft plan (max 2 repair passes,
+  # independent fresh-context judge per pass).
   - id: plan-fix-loop
     depends_on: [plan-review]
     idle_timeout: 1800000
@@ -122,13 +152,32 @@ nodes:
           model: large
           allowed_tools: [Read, Glob, Grep]
 
-  # ── DETERMINISTIC PLAN VALIDATION LOOP ──────────────────────────────────────
-  # The milestone validator is the sole completion authority. If validation
-  # fails, a bounded repair loop applies exactly the reported errors and
-  # re-validates — validation failure can never strand the stage (the repair
-  # path stays open until the guard passes or iterations exhaust).
-  - id: plan-validate
+  # ── MODE A ROUTER: deterministic plan-validation status ─────────────────────
+  # Captured, non-failing check that routes around the validation repair loop.
+  - id: validate-status
     depends_on: [plan-fix-loop]
+    bash: |
+      set +e
+      mkdir -p "$ARTIFACTS_DIR"
+      node scripts/automation/milestone-validate.mjs --expect-next \
+        > "$ARTIFACTS_DIR/plan-validate-report.json" 2>&1
+      if [ $? -eq 0 ] && [ -s "$ARTIFACTS_DIR/milestone-plan-rationale.md" ]; then
+        echo "PLAN_VALID"
+      else
+        echo "PLAN_INVALID"
+        cat "$ARTIFACTS_DIR/plan-validate-report.json"
+      fi
+
+  # ── DETERMINISTIC PLAN VALIDATION REPAIR LOOP ────────────────────────────────
+  # The milestone validator is the sole completion authority. Entered only when
+  # the router reports PLAN_INVALID; each iteration applies exactly the reported
+  # errors (unconditional body) then re-validates (trailing re-check), while
+  # until_bash re-checks authoritatively. Validation failure can never strand
+  # the stage: the repair path stays open until the guard passes or iterations
+  # exhaust into supervisor recovery.
+  - id: plan-validate
+    depends_on: [validate-status]
+    when: "$validate-status.output == 'PLAN_INVALID'"
     idle_timeout: 1800000
     loop_group:
       max_iterations: 4
@@ -139,23 +188,16 @@ nodes:
         node scripts/automation/milestone-validate.mjs --expect-next > /dev/null
         test -s "$ARTIFACTS_DIR/milestone-plan-rationale.md"
       nodes:
-        - id: plan-validate-check
+        - id: plan-validate-fix
+          command: foresift-mc-plan-validate-fix
+          effort: high
+          idle_timeout: 1800000
+        - id: validate-recheck
           bash: |
             set +e
             node scripts/automation/milestone-validate.mjs --expect-next \
               > "$ARTIFACTS_DIR/plan-validate-report.json" 2>&1
-            code=$?
-            if [ "$code" -eq 0 ]; then
-              echo "PLAN_VALID"
-            else
-              echo "PLAN_INVALID (details in $ARTIFACTS_DIR/plan-validate-report.json)"
-              cat "$ARTIFACTS_DIR/plan-validate-report.json"
-            fi
-        - id: plan-validate-repair
-          command: foresift-mc-plan-validate-fix
-          when: "$plan-validate-check.output != 'PLAN_VALID'"
-          effort: high
-          idle_timeout: 1800000
+            echo "VALIDATE_RECHECK_EXIT=$?"
 
   # ── MODE B: INDEPENDENT MILESTONE AUDIT (bounded continuation loops) ────────
   - id: verify-repo
@@ -219,9 +261,14 @@ nodes:
     effort: high
 
   # ── SHARED LANDING: branch, commit, PR, exact-head CI, merge ────────────────
+  # Reaches here from EITHER mode: PLAN via the validation path, AUDIT via the
+  # audit path. validate-status (always completing in PLAN) plus audit-conclude
+  # (always completing in AUDIT) guarantee ≥1 non-failed success on the healthy
+  # path of each mode; any upstream FAILURE keeps this node skipped so the
+  # supervisor recovers instead of landing a broken state.
   - id: land-planning-pr
     command: foresift-mc-land
-    depends_on: [plan-validate, audit-conclude]
+    depends_on: [validate-status, plan-validate, audit-conclude]
     trigger_rule: none_failed_min_one_success
     context: fresh
     idle_timeout: 1800000

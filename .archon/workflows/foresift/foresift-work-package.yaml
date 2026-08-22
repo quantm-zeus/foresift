@@ -20,6 +20,13 @@ description: |
   agents are instructed NEVER to emit). Loop exhaustion fails the stage;
   recovery belongs to the autopilot supervisor.
 
+  ARCHON v0.9.0 LOOP SEMANTICS this layout relies on (verified empirically):
+    - every loop iteration runs its FULL body before the guard is evaluated;
+    - `when:` inside a loop body CANNOT see same-iteration sibling outputs, so
+      conditional AI gating is done by TOP-LEVEL status nodes routing around
+      whole loops, and loop bodies run unconditionally (repair -> re-check);
+    - prompt interpolation CAN read top-level and same-iteration siblings.
+
   NOT for: planning or auditing milestones (use foresift-milestone-control),
   ad-hoc fixes (use archon-assist), or implementing anything outside the
   selected package.
@@ -40,13 +47,25 @@ nodes:
       delay_ms: 10000
       on_error: transient
 
-  # ── PHASE 1: SCOPED SPEC KIT PLANNING (bounded continuation loop) ───────────
-  # Each iteration inspects existing partial specs/<id>/ and prior artifacts and
-  # CONTINUES them (never regenerates correct sections). Completion is decided
-  # solely by the deterministic planning-completeness validator; the `until`
-  # sentinel must NEVER be emitted by an agent.
-  - id: scoped-plan
+  # ── PHASE 1 ROUTER: deterministic planning-completeness check ───────────────
+  - id: plan-status
     depends_on: [preflight]
+    bash: |
+      set +e
+      mkdir -p "$ARTIFACTS_DIR"
+      node scripts/automation/package-plan-complete.mjs --package "$ARGUMENTS" \
+        > "$ARTIFACTS_DIR/plan-completeness.json" 2>&1
+      if [ $? -eq 0 ]; then echo "WP_PLAN_COMPLETE"; else echo "WP_PLAN_INCOMPLETE"; fi
+
+  # ── PHASE 1: SCOPED SPEC KIT PLANNING (bounded continuation loop) ────────────
+  # Runs only when the deterministic router says planning is incomplete. Each
+  # iteration inspects existing partial specs/<id>/ and prior artifacts and
+  # CONTINUES them (never regenerates correct sections); the re-check refreshes
+  # the guard input. Completion is decided solely by the deterministic
+  # validator; the `until` sentinel must NEVER be emitted by an agent.
+  - id: scoped-plan
+    depends_on: [plan-status]
+    when: "$plan-status.output == 'WP_PLAN_INCOMPLETE'"
     idle_timeout: 1800000
     loop_group:
       max_iterations: 4
@@ -56,17 +75,27 @@ nodes:
         set -euo pipefail
         node scripts/automation/package-plan-complete.mjs --package "$ARGUMENTS" > /dev/null
       nodes:
-        - id: plan-status
+        - id: scoped-plan-iterate
+          command: foresift-wp-plan
+          effort: high
+          idle_timeout: 1800000
+        - id: plan-recheck
           bash: |
             set +e
             node scripts/automation/package-plan-complete.mjs --package "$ARGUMENTS" \
               > "$ARTIFACTS_DIR/plan-completeness.json" 2>&1
-            if [ $? -eq 0 ]; then echo "PLAN_COMPLETE"; else echo "PLAN_INCOMPLETE"; fi
-        - id: scoped-plan-iterate
-          command: foresift-wp-plan
-          when: "$plan-status.output == 'PLAN_INCOMPLETE'"
-          effort: high
-          idle_timeout: 1800000
+            echo "PLAN_RECHECK_EXIT=$?"
+
+  # ── PHASE 2 ROUTER: deterministic implementation-completeness check ─────────
+  - id: impl-status
+    depends_on: [scoped-plan]
+    trigger_rule: one_success   # scoped-plan may legitimately be skipped (already complete)
+    bash: |
+      set +e
+      mkdir -p "$ARTIFACTS_DIR"
+      node scripts/automation/package-implement-complete.mjs --package "$ARGUMENTS" \
+        > "$ARTIFACTS_DIR/implement-completeness.json" 2>&1
+      if [ $? -eq 0 ]; then echo "IMPLEMENT_COMPLETE"; else echo "IMPLEMENT_INCOMPLETE"; fi
 
   # ── PHASE 2: IMPLEMENTATION (bounded continuation loop, additive commits) ───
   # Each iteration: read current tasks/implementation state, implement the next
@@ -74,9 +103,10 @@ nodes:
   # leave useful partial work persisted for the next iteration. A clean Claude
   # exit with tasks remaining simply starts another iteration — no human
   # "continue" ever needed. Completion is decided solely by the deterministic
-  # implementation guard; heavy verification stays in the downstream gate.
+  # guard; heavy verification stays in the downstream gate.
   - id: implement
-    depends_on: [scoped-plan]
+    depends_on: [impl-status]
+    when: "$impl-status.output == 'IMPLEMENT_INCOMPLETE'"
     idle_timeout: 1800000
     loop_group:
       max_iterations: 12
@@ -86,27 +116,44 @@ nodes:
         set -euo pipefail
         node scripts/automation/package-implement-complete.mjs --package "$ARGUMENTS" > /dev/null
       nodes:
-        - id: impl-status
-          bash: |
-            set +e
-            mkdir -p "$ARTIFACTS_DIR"
-            node scripts/automation/package-implement-complete.mjs --package "$ARGUMENTS" \
-              > "$ARTIFACTS_DIR/implement-completeness.json" 2>&1
-            if [ $? -eq 0 ]; then echo "IMPLEMENT_COMPLETE"; else echo "IMPLEMENT_INCOMPLETE"; fi
         - id: implement-iterate
           command: foresift-wp-implement
-          when: "$impl-status.output == 'IMPLEMENT_INCOMPLETE'"
           effort: high
           idle_timeout: 1800000
+        - id: impl-recheck
+          bash: |
+            set +e
+            node scripts/automation/package-implement-complete.mjs --package "$ARGUMENTS" \
+              > "$ARTIFACTS_DIR/implement-completeness.json" 2>&1
+            echo "IMPL_RECHECK_EXIT=$?"
 
   # ── PHASE 3: DETERMINISTIC PACKAGE GATE + BOUNDED REPAIR LOOP ────────────────
   # The gate is the authority (AI is never the authority). The captured,
-  # non-failing gate-run node records pass/fail; a failed gate triggers an AI
-  # repair iteration and re-gate instead of stranding the workflow — so a
+  # non-failing router records pass/fail once; only a FAILED gate opens the
+  # bounded repair loop, whose body repairs and RE-RUNS the gate — so a
   # completed implementation stage can always be repaired until the gate passes
   # (or repair iterations exhaust and recovery escalates).
-  - id: gate
+  - id: gate-router
     depends_on: [implement]
+    trigger_rule: one_success   # implement may legitimately be skipped (already complete)
+    idle_timeout: 1800000
+    bash: |
+      set +e
+      mkdir -p "$ARTIFACTS_DIR"
+      pnpm foresift:gate -- --package "$ARGUMENTS" >"$ARTIFACTS_DIR/gate-log.txt" 2>&1
+      code=$?
+      if [ "$code" -eq 0 ]; then
+        printf '{"passed":true,"exitCode":0}\n' >"$ARTIFACTS_DIR/gate-result.json"
+        echo "GATE_PASSED"
+      else
+        printf '{"passed":false,"exitCode":%d}\n' "$code" >"$ARTIFACTS_DIR/gate-result.json"
+        echo "GATE_FAILED"
+      fi
+    timeout: 1800000
+
+  - id: gate-repair-loop
+    depends_on: [gate-router]
+    when: "$gate-router.output == 'GATE_FAILED'"
     idle_timeout: 1800000
     loop_group:
       max_iterations: 4
@@ -116,7 +163,11 @@ nodes:
         set -euo pipefail
         node -e 'const fs=require("fs");const f=process.env.ARTIFACTS_DIR+"/gate-result.json";if(!fs.existsSync(f))process.exit(1);const r=JSON.parse(fs.readFileSync(f,"utf8"));process.exit(r.passed===true?0:1)'
       nodes:
-        - id: gate-run
+        - id: gate-repair
+          command: foresift-wp-gate-repair
+          effort: high
+          idle_timeout: 1800000
+        - id: gate-rerun
           bash: |
             set +e
             pnpm foresift:gate -- --package "$ARGUMENTS" >"$ARTIFACTS_DIR/gate-log.txt" 2>&1
@@ -129,16 +180,12 @@ nodes:
               echo "GATE_FAILED"
             fi
           timeout: 1800000
-        - id: gate-repair
-          command: foresift-wp-gate-repair
-          when: "$gate-run.output == 'GATE_FAILED'"
-          effort: high
-          idle_timeout: 1800000
 
   # ── PHASE 4: PULL REQUEST ──────────────────────────────────────────────────
   - id: create-pr
     command: foresift-wp-create-pr
-    depends_on: [gate]
+    depends_on: [gate-router, gate-repair-loop]
+    trigger_rule: none_failed_min_one_success   # gate-router always completes; repair loop may be skipped
     context: fresh
 
   # ── PHASE 5: COMPREHENSIVE INDEPENDENT REVIEW + AUTO-FIX ───────────────────
@@ -151,10 +198,11 @@ nodes:
 
   # ── PHASE 6: SPEC KIT CONVERGENCE LOOP (bounded, fresh contexts) ───────────
   # Each iteration: converge against spec/plan/tasks -> deterministic gate
-  # (captured, non-failing) -> independent judge. The judge may only signal
-  # CONVERGED when the gate reported success AND no required work remains.
-  # Hard limit of 4 iterations. The authoritative check is re-run
-  # deterministically by the final phase regardless.
+  # (captured, non-failing) -> independent judge. Same-iteration prompt refs
+  # ($converge.output / $gate-iter.output) are verified Archon v0.9.0 behavior.
+  # The judge may only signal CONVERGED when the gate reported success AND no
+  # required work remains. Hard limit of 4 iterations. The authoritative check
+  # is re-run deterministically by the final phase regardless.
   - id: convergence
     depends_on: [review]
     idle_timeout: 1800000

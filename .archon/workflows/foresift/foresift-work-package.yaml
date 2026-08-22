@@ -25,6 +25,8 @@ description: |
     - `when:` inside a loop body CANNOT see same-iteration sibling outputs, so
       conditional AI gating is done by TOP-LEVEL status nodes routing around
       whole loops, and loop bodies run unconditionally (repair -> re-check);
+    - loop-body siblings WITHOUT an explicit depends_on edge run CONCURRENTLY,
+      so AI->recheck pairs are always serialized with depends_on;
     - prompt interpolation CAN read top-level and same-iteration siblings.
 
   NOT for: planning or auditing milestones (use foresift-milestone-control),
@@ -80,6 +82,7 @@ nodes:
           effort: high
           idle_timeout: 1800000
         - id: plan-recheck
+          depends_on: [scoped-plan-iterate]   # siblings without an edge run concurrently
           bash: |
             set +e
             node scripts/automation/package-plan-complete.mjs --package "$ARGUMENTS" \
@@ -121,6 +124,7 @@ nodes:
           effort: high
           idle_timeout: 1800000
         - id: impl-recheck
+          depends_on: [implement-iterate]   # siblings without an edge run concurrently
           bash: |
             set +e
             node scripts/automation/package-implement-complete.mjs --package "$ARGUMENTS" \
@@ -168,6 +172,7 @@ nodes:
           effort: high
           idle_timeout: 1800000
         - id: gate-rerun
+          depends_on: [gate-repair]   # serialize: rerun must observe post-repair state (feeds until_bash)
           bash: |
             set +e
             pnpm foresift:gate -- --package "$ARGUMENTS" >"$ARTIFACTS_DIR/gate-log.txt" 2>&1

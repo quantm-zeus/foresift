@@ -63,7 +63,14 @@ continuously after any upgrade:
 `discovering-run-id`), Archon status, current DAG node and loop iteration
 (parsed from Archon's structured JSONL event log), resume/restart counts, and
 idle minutes; plus roadmap/milestone progress, PAUSED_FATAL reason when set,
-and the next eligible package.
+and the next eligible package. Each package line also prints its deterministic
+throughput profile (`LEGACY` for g0-contracts-data-truth, `OPTIMIZED` for every
+other package — see [ADR 0006](../adr/0006-throughput-profiles-proven-dedupe-attestation.md)).
+For OPTIMIZED packages with an active run, status additionally reads the run's
+durable implementation checkpoint (`implementation-checkpoint.json` in the
+Archon artifacts workspace) and shows the current slice and task counters —
+labeled INVALID with reasons whenever HEAD or any hashed source file no longer
+matches, because the checkpoint is cache/index only, never an authority.
 
 ## Archon Web UI
 

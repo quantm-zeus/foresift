@@ -17,6 +17,8 @@ import {
   validateMilestoneState,
   findPackage,
 } from './schema.mjs';
+import { throughputProfile } from './work-package-throughput-profile.mjs';
+import { classifyCommand } from './verify-dedupe.mjs';
 
 function parseArgs(argv) {
   const args = { _: [] };
@@ -101,9 +103,35 @@ if (pkg.risk === 'CRITICAL' || pkg.risk === 'HIGH') {
 }
 
 // Package-specific deterministic verification from version-controlled metadata.
+//
+// LEGACY profile (g0-contracts-data-truth): every command executes exactly as
+// before — this path is behaviorally frozen.
+//
+// OPTIMIZED profile: proven-only dedupe. The `pnpm test` above ran the ROOT
+// vitest suite, which includes every default-include test file repo-wide; a
+// per-package filtered rerun is skipped ONLY when classifyCommand proves it
+// re-executes nothing but those already-covered files (plain `vitest run`
+// script, no local config). Absence of proof ⇒ the command runs.
+const profile = throughputProfile(pkg.id);
+if (profile === 'LEGACY') console.log('(LEGACY profile — dedupe disabled, every check executes)');
+let skippedDuplicates = 0;
 for (const cmd of pkg.verificationCommands) {
   if (/^\s*pnpm (verify|spec:verify)\s*$/.test(cmd)) continue; // already covered above
+  if (profile === 'OPTIMIZED') {
+    const verdict = classifyCommand(cmd, process.cwd());
+    if (verdict.class === 'DUPLICATE_COVERED_BY_FULL_SUITE') {
+      console.log(`\n═══ GATE ▸ duplicate skipped (PROVEN: ${verdict.reason})\n═══ $ ${cmd}`);
+      skippedDuplicates++;
+      continue;
+    }
+    if (verdict.class === 'UNIQUE_MANDATORY' && !/^\s*test -d /.test(cmd))
+      console.log(`(unique-mandatory: ${verdict.reason})`);
+  }
   run(cmd, `package check`);
 }
+if (skippedDuplicates > 0)
+  console.log(
+    `\n▸ ${skippedDuplicates} package check(s) skipped as PROVEN duplicates of the full suite (${profile} profile).`,
+  );
 
 console.log(`\n✅ PACKAGE GATE PASSED — ${pkg.id}`);

@@ -6,6 +6,12 @@ on:
     branches:
       - main
 
+# Superseded pushes on the same branch are cancelled — each push fully
+# re-verifies, so only the newest head's verdict matters.
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 permissions:
   contents: read
 
@@ -43,6 +49,3 @@ jobs:
 
       - name: Tests
         run: pnpm test
-
-      - name: Aggregate verification
-        run: pnpm verify

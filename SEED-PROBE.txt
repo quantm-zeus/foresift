@@ -1,0 +1,1 @@
+seeded-marker-v1: adoption must carry THIS file into the archon run worktree

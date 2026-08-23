@@ -54,13 +54,35 @@ they assert — recovery identity retention and re-adoption — are unchanged).
 
 ## Post-merge activation record (§28)
 
-Filled after merge on the main checkout:
+Executed 2026-08-23T10:58–11:12Z on the main product checkout:
 
-- [ ] main pulled to the merge commit on the product checkout
-- [ ] `pnpm autopilot:selftest` green on main checkout
-- [ ] smoke run: `archon workflow run foresift-smoke-throughput --detach …`
-      completed; all four PROOF lines present in its log
-- [ ] `pnpm autopilot:status` shows g0-contracts-data-truth profile=LEGACY and
-      every other package profile=OPTIMIZED
-- [ ] NO manual launch of g0-security-perimeter (its turn comes from the
-      supervisor when G0 finishes)
+- [x] main pulled to the merge commit on the product checkout — `002687b`
+      (#18), then `bcb2e23` (#19, checkpoint fix found by this activation)
+- [x] `pnpm autopilot:selftest` green on main checkout — **PASS=106 FAIL=0**
+- [x] smoke run completed: `d02dbcb811c36f615a6d067f32967123` — status
+      `completed`, loop iterations **2** (tamper → guard fails → auto-iteration
+      → rebuild → guard passes), `guard-last.json` = `{"valid":true}`,
+      full-gate `--check` failed closed (its verify node passed only because
+      the tool exited nonzero), dedupe classifier emitted 23
+      `UNIQUE_MANDATORY` verdicts over real milestone metadata. (Node echo
+      lines are not embedded in Archon JSONL events; proofs verified from the
+      run's durable sandbox artifacts + event log.)
+- [x] `pnpm autopilot:status` shows `g0-contracts-data-truth profile=LEGACY`
+      and every other package `profile=OPTIMIZED`
+- [x] NO manual launch of g0-security-perimeter — it remains PENDING with
+      `deps unproven`; its launch belongs to the supervisor when G0 proves
+
+### Defects the activation itself caught (and where fixed)
+
+1. **Checkpoint sources absent at build could never validate** — run
+   `1aceff13` failed at iterate-1: `buildCheckpoint` records optional sources
+   (`plan.md`, `plan-context.md`) with `sha256: null` when absent, and
+   `validateCheckpoint` reported "no longer exists" forever. Fixed in PR #19
+   (`bcb2e23`): absent-at-build + still-absent ⇒ valid; absent-at-build +
+   appeared-since ⇒ invalid. Regression tests added (60/60).
+2. **Archon task worktrees pin their creation-time main** — rerun `e4e26088`
+   reused the `task-foresift-smoke-throughput` worktree still at `002687b`,
+   so it executed the pre-fix script. The smoke workspace was fast-forwarded
+   (`--ff-only`) to `bcb2e23` and the third run completed. Operational rule:
+   after merging control-plane fixes, refresh a task worktree before re-running
+   a smoke on the same branch.

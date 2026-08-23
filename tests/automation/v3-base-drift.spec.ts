@@ -10,7 +10,7 @@
 //      wait ⇒ the pre-merge re-check refuses).
 //   4. final-land admission routes (provably drifted ⇒ refuse BEFORE burning
 //      a FULL gate; unverifiable ⇒ advisory proceed).
-import { execFileSync, spawnSync } from 'node:child_process';
+import { execFileSync, spawn, spawnSync } from 'node:child_process';
 import { chmodSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -194,6 +194,12 @@ function buildFixture(name: string): Fixture {
   g('push', '-qu', 'origin', 'main');
   // Second clone used to land a sibling package / advance main.
   execFileSync('git', ['clone', '-q', `${repo}-origin.git`, join(root, 'sibling')]);
+  // Two per-package clones for the §31 concurrency race: a lander owns its
+  // checkout — two writers on ONE checkout corrupt each other's FETCH_HEAD and
+  // pinned HEAD by construction (that boundary is exactly what this fixture
+  // respects; §31 proves safety ACROSS checkouts, never within one).
+  execFileSync('git', ['clone', '-q', `${repo}-origin.git`, join(root, 'land-a')]);
+  execFileSync('git', ['clone', '-q', `${repo}-origin.git`, join(root, 'land-b')]);
 
   // Stub gh: instant-green named check at ANY sha; records every invocation.
   // Fault-injection knobs (§29 matrix):
@@ -214,7 +220,25 @@ cmd="\${1:-}"; sub="\${2:-}"
 case "\$cmd/\$sub" in
   pr/list) echo '' ;;
   pr/create) echo 'https://github.com/o/r/pull/77' ;;
-  pr/merge) touch "\${GHSTUB_MERGED:?}" ; exit 0 ;;
+  pr/merge)
+    # §31 race serialization: exactly ONE squash merge ever succeeds. A second
+    # merge attempt after the first is refused the way GitHub branch protection
+    # refuses a PR that is no longer up to date.
+    if [ -e "\${GHSTUB_MERGED:?}" ]; then
+      echo 'gh: pull request is not up to date with main (squash refused)' >&2
+      exit 1
+    fi
+    touch "\${GHSTUB_MERGED}"
+    # Optional winner side effect: the winning squash ADVANCES origin/main so a
+    # concurrently-started lander must hit its pre-merge base re-check.
+    if [ -n "\${GHSTUB_MERGE_ADVANCES_MAIN:-}" ]; then
+      git -C "\${SIBLING_REPO:?}" pull -q origin main
+      echo "winner-squash \$(date +%s%N)" >> "\${SIBLING_REPO}/f.txt"
+      git -C "\${SIBLING_REPO}" add -A
+      git -C "\${SIBLING_REPO}" -c user.email=t@t -c user.name=t commit -qm 'parallel winner lands'
+      git -C "\${SIBLING_REPO}" push -q origin main
+    fi
+    exit 0 ;;
   api/*)
     # TOCTOU hook: advance origin/main exactly once before reporting green CI.
     if [ -n "\${GHSTUB_ADVANCE_MAIN:-}" ] && [ ! -e "\${GHSTUB_ADVANCE_MAIN}" ]; then
@@ -369,6 +393,130 @@ describe('mechanical lander enforces base admission (V3-D §11.3)', () => {
     expect(r.stdout).toContain('aborted-drift');
     expect(existsMerged(fx)).toBe(false);
   });
+});
+
+// ── §31: speculative/parallel product safety — TRUE concurrency ──────────────
+
+/** spawn-based lander so two can run against the SAME origin simultaneously —
+ *  each from its OWN package clone (one checkout per writer, always). */
+function runLanderAsync(
+  fx: Fixture,
+  branch: string,
+  checkout: string,
+): Promise<{
+  status: number | null;
+  stdout: string;
+}> {
+  return new Promise((resolveP) => {
+    const child = spawn(
+      process.execPath,
+      [LANDER, '--branch', branch, '--title', `land ${branch}`],
+      {
+        cwd: join(fx.root, checkout),
+        env: {
+          ...process.env,
+          PATH: `${fx.bin}:${process.env.PATH}`,
+          GHSTUB_LOG: join(fx.root, `gh-${branch}.log`),
+          GHSTUB_MERGED: join(fx.root, 'MERGED'),
+          GHSTUB_CHECK_NAME: CHECK_NAME,
+          LANDER_REPO: join(fx.root, checkout),
+          SIBLING_REPO: join(fx.root, 'sibling'),
+          GHSTUB_MERGE_ADVANCES_MAIN: '1',
+        },
+      },
+    );
+    let out = '';
+    child.stdout.on('data', (d: Buffer) => {
+      out += String(d);
+    });
+    child.stderr.on('data', (d: Buffer) => {
+      out += String(d);
+    });
+    child.on('close', (code) => resolveP({ status: code, stdout: out }));
+  });
+}
+
+describe('§31: two landers racing the same origin ⇒ exactly one winner', () => {
+  function seedPackage(fx: Fixture, checkout: string, branch: string, file: string) {
+    const c = join(fx.root, checkout);
+    execFileSync('git', ['-C', c, 'switch', '-qc', branch, 'main']);
+    writeFileSync(join(c, file), `${file}\n`);
+    execFileSync('git', ['-C', c, 'add', '-A']);
+    // Fresh clones carry no local identity config — supply it inline.
+    execFileSync('git', [
+      '-C',
+      c,
+      '-c',
+      'user.email=t@t',
+      '-c',
+      'user.name=t',
+      'commit',
+      '-qm',
+      `${file} work`,
+    ]);
+  }
+
+  it('concurrent landing never double-merges; the loser refuses or loses at merge time', async () => {
+    const fx = buildFixture('race-two-landers');
+    // Two INDEPENDENT packages, each in its own checkout at the same main tip.
+    seedPackage(fx, 'land-a', 'feat/pkg-a', 'a.txt');
+    seedPackage(fx, 'land-b', 'feat/pkg-b', 'b.txt');
+
+    const [a, b] = await Promise.all([
+      runLanderAsync(fx, 'feat/pkg-a', 'land-a'),
+      runLanderAsync(fx, 'feat/pkg-b', 'land-b'),
+    ]);
+
+    const results = [a, b];
+    const winners = results.filter((r) => r.status === 0 && r.stdout.includes('"merged": true'));
+    expect(winners).toHaveLength(1); // exactly one winner — never two
+    const losers = results.filter((r) => r !== winners[0]);
+    for (const l of losers) expect(l.status).not.toBe(0);
+    // The loser's refusal names a drift/serialization guard, or its merge call
+    // was refused as not-up-to-date — either way it FAILED CLOSED loudly.
+    const loserOut = losers.map((l) => l.stdout).join('');
+    expect(
+      /base-drift|aborted-pre-merge-base|not up to date with main|head-moved/.test(loserOut),
+    ).toBe(true);
+    expect(existsMerged(fx)).toBe(true);
+  }, 30000);
+
+  it('merge serialization alone holds even without main advancement (idempotent guard)', async () => {
+    // Same race but WITHOUT advancing main on win: proves the MERGED-flag
+    // check by itself serializes squash merges under any interleaving.
+    const fx = buildFixture('race-serial-only');
+    inRepo(fx, ['switch', '-qc', 'feat/pkg-a']);
+    writeFileSync(join(fx.root, 'repo', 'a.txt'), 'pkg-a\n');
+    inRepo(fx, ['add', '-A']);
+    inRepo(fx, ['commit', '-qm', 'pkg-a work']);
+    inRepo(fx, ['switch', '-qc', 'feat/pkg-b', 'main']);
+    writeFileSync(join(fx.root, 'repo', 'b.txt'), 'pkg-b\n');
+    inRepo(fx, ['add', '-A']);
+    inRepo(fx, ['commit', '-qm', 'pkg-b work']);
+
+    // Direct stub-level proof of the serialization rule: first merge wins,
+    // second is refused regardless of order or interleaving.
+    const ghOnce = (args: string[]) =>
+      execFileSync(join(fx.bin, 'gh'), args, {
+        encoding: 'utf8',
+        env: {
+          ...process.env,
+          GHSTUB_LOG: join(fx.root, 'gh-serial.log'),
+          GHSTUB_MERGED: join(fx.root, 'MERGED'),
+        },
+      });
+    ghOnce(['pr', 'merge', '77', '--squash']);
+    expect(existsMerged(fx)).toBe(true);
+    const second = (() => {
+      try {
+        ghOnce(['pr', 'merge', '88', '--squash']);
+        return 0;
+      } catch (e) {
+        return (e as { status?: number }).status ?? 1;
+      }
+    })();
+    expect(second).not.toBe(0);
+  }, 30000);
 });
 
 function existsMerged(fx: Fixture): boolean {

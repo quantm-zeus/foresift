@@ -1,0 +1,102 @@
+# TEMPLATE-dag-project — reusable skeleton for LARGE optimizer/research
+# projects (V3 §25, ADR-0012). Copy, rename, fill the marked sections.
+#
+# Rules encoded here (do not weaken when instantiating):
+#   R1 READ-ONLY CHILDREN PROVE IT: every read-only node ends with a
+#      `git status --porcelain` guard and FAILS if the tree changed. Archon
+#      0.9.0 has no mutates_checkout flag — read-only is proven per run,
+#      never declared.
+#   R2 WRITERS ARE ISOLATED WORKTREES: any writing node works inside its own
+#      `git worktree add` under $ARTIFACTS_DIR/wt/<node-id>, commits/pushes
+#      from there, and removes it afterwards. The run checkout is never
+#      written by a writer node.
+#   R3 FAN-OUT/FAN-IN VIA depends_on ONLY: siblings without an explicit edge
+#      run concurrently; every join lists ALL upstream ids.
+#
+# Instantiation checklist:
+#   [ ] rename `name:` (project-specific, kebab-case)
+#   [ ] replace RESEARCH_* nodes with real read-only investigations (R1 guard kept)
+#   [ ] replace WRITER_* nodes with real mutations (R2 worktree pattern kept)
+#   [ ] keep verify as the serial gate after ALL writers
+
+name: TEMPLATE-dag-project
+description: |
+  Copy-and-fill skeleton for DAG-ized optimizer projects. Three phases:
+  concurrent provably-read-only research → synthesis → concurrent isolated
+  writer fan-out → serial verification gate. See docs/adr/0012.
+tags: [foresift, template]
+
+nodes:
+  # ── phase 1: concurrent READ-ONLY research (R1) ────────────────────────────
+  # Duplicate this block per independent question. NO depends_on between them:
+  # archon runs edge-less siblings CONCURRENTLY.
+  - id: research-dim-a
+    bash: |
+      set -euo pipefail
+      mkdir -p "$ARTIFACTS_DIR"
+      # TODO: real investigation. Read/grep/measure only — write NOTHING to
+      # the tree; findings go to $ARTIFACTS_DIR only.
+      echo "RESEARCH dim-a" > "$ARTIFACTS_DIR/research-dim-a.md"
+      # R1 proof-of-read-only: fail loudly if the tree moved.
+      [ -z "$(git status --porcelain --untracked-files=normal)" ] || {
+        echo 'READ-ONLY VIOLATION: research-dim-a modified the checkout' >&2
+        exit 9
+      }
+  - id: research-dim-b
+    bash: |
+      set -euo pipefail
+      mkdir -p "$ARTIFACTS_DIR"
+      echo "RESEARCH dim-b" > "$ARTIFACTS_DIR/research-dim-b.md"
+      [ -z "$(git status --porcelain --untracked-files=normal)" ] || {
+        echo 'READ-ONLY VIOLATION: research-dim-b modified the checkout' >&2
+        exit 9
+      }
+
+  # ── phase 2: synthesis join (lists ALL phase-1 ids — R3) ───────────────────
+  - id: synthesize
+    depends_on: [research-dim-a, research-dim-b]
+    bash: |
+      set -euo pipefail
+      cat "$ARTIFACTS_DIR/research-dim-a.md" "$ARTIFACTS_DIR/research-dim-b.md" \
+        > "$ARTIFACTS_DIR/synthesis.md"
+      # TODO: derive the writer plan from the artifacts above.
+      [ -z "$(git status --porcelain --untracked-files=normal)" ] || {
+        echo 'READ-ONLY VIOLATION: synthesize modified the checkout' >&2
+        exit 9
+      }
+
+  # ── phase 3: concurrent ISOLATED-WRITER fan-out (R2) ───────────────────────
+  # One writer = one private worktree = one branch. Never share a checkout.
+  - id: writer-change-a
+    depends_on: [synthesize]
+    bash: |
+      set -euo pipefail
+      WT="$ARTIFACTS_DIR/wt/writer-change-a"
+      git worktree add -b feat/dag-writer-a "$WT"
+      cleanup() { git worktree remove --force "$WT" || true; }
+      trap cleanup EXIT
+      # TODO: real mutation INSIDE "$WT" only; then commit there.
+      git -C "$WT" -c user.email=noreply@foresift.local -c user.name='dag-writer-a' \
+        commit --allow-empty -qm 'writer change A'
+      git -C "$WT" push -q origin HEAD:feat/dag-writer-a
+
+  - id: writer-change-b
+    depends_on: [synthesize]
+    bash: |
+      set -euo pipefail
+      WT="$ARTIFACTS_DIR/wt/writer-change-b"
+      git worktree add -b feat/dag-writer-b "$WT"
+      cleanup() { git worktree remove --force "$WT" || true; }
+      trap cleanup EXIT
+      git -C "$WT" -c user.email=noreply@foresift.local -c user.name='dag-writer-b' \
+        commit --allow-empty -qm 'writer change B'
+      git -C "$WT" push -q origin HEAD:feat/dag-writer-b
+
+  # ── phase 4: serial verification gate after ALL writers (R3 join) ──────────
+  - id: verify
+    depends_on: [writer-change-a, writer-change-b]
+    bash: |
+      set -euo pipefail
+      # TODO: project verification. Landing itself goes through the mechanical
+      # lander + FULL gate contract (V3-D), never through ad hoc merges here.
+      echo "DAG PROJECT COMPLETE: see $ARTIFACTS_DIR/synthesis.md"

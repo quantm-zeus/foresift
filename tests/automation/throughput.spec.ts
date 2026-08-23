@@ -125,16 +125,39 @@ describe('14. durable implementation checkpoint', () => {
     expect(verdict.reasons.join(' | ')).toMatch(/source 's' changed/);
   });
 
-  it('NEGATIVE: wrong schema and vanished files are both rejected', () => {
+  it('NEGATIVE: wrong schema is rejected; present-at-build sources may not vanish', () => {
     expect(validateCheckpoint({ schema: 'other' }).valid).toBe(false);
+    const ghost = write('cp/vanished.md', 'here at build time\n');
     const cp = buildCheckpoint({
       packageId: 'p',
       headSha: 'h',
       tasks: { completed: 0, total: 0, remaining: 0 },
       slice: {},
-      sources: { ghost: join(fx, 'vanished.md') },
+      sources: { ghost },
     });
+    rmSync(ghost);
     expect(validateCheckpoint(cp).reasons.join(' ')).toMatch(/no longer exists/);
+  });
+
+  it('sources absent at build stay valid while absent and invalidate when they appear', () => {
+    // Optional plan artifacts are recorded with a null hash when they do not
+    // exist yet. Still-absent means nothing drifted; appearing later means the
+    // cached context never saw a file now sitting at a tracked path.
+    const absent = write('cp/placeholder-not-created-yet', 'x');
+    rmSync(absent);
+    const cp = buildCheckpoint({
+      packageId: 'p',
+      headSha: 'h',
+      tasks: { completed: 0, total: 0, remaining: 0 },
+      slice: {},
+      sources: { plan: absent },
+    });
+    expect(cp.sourceHashes.plan?.sha256).toBeNull();
+    expect(validateCheckpoint(cp)).toEqual({ valid: true, reasons: [] });
+    write('cp/placeholder-not-created-yet', 'appeared after build\n');
+    const verdict = validateCheckpoint(cp);
+    expect(verdict.valid).toBe(false);
+    expect(verdict.reasons.join(' ')).toMatch(/source 'plan' appeared since checkpoint/);
   });
 
   it('buildCheckpoint requires the identity fields it cannot derive', () => {

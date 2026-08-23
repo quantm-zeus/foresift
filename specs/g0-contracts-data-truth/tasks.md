@@ -60,13 +60,13 @@ exist for every acceptance criterion listed in spec.md §3.
 
 ## Phase 3 — Shared schemas (manifest schemaRefs)
 
-- [ ] T012 Add zod dependency; implement `packages/shared-schemas/src/data.ts`
+- [x] T012 Add zod dependency; implement `packages/shared-schemas/src/data.ts`
       mirroring identity, observation/revision, backfill-receipt, quality, source,
       feature, acquisition, checkpoint schemas; export versioned schema registry.
       Traces: FR-DATA-001, FR-DATA-002, FR-DATA-005, FR-DATA-006.
-- [ ] T013 Implement `packages/shared-schemas/src/dr.ts`: recovery-tier, backup-policy,
+- [x] T013 Implement `packages/shared-schemas/src/dr.ts`: recovery-tier, backup-policy,
       backup-run, restore-drill, recovery-health-state schemas. Traces: FR-DR-001, FR-DR-002.
-- [ ] T014 Schema round-trip tests: every domain fixture validates against its schema;
+- [x] T014 Schema round-trip tests: every domain fixture validates against its schema;
       negative fixtures (bad provenance class, missing quality code on nullable field,
       unknown acquisition state) fail validation. Traces: FR-DATA-002, FR-DATA-005, FR-DR-002.
 

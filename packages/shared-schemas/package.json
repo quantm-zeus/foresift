@@ -14,6 +14,7 @@
     "test": "vitest run"
   },
   "dependencies": {
+    "@foresift/domain": "workspace:*",
     "zod": "^3.25.76"
   },
   "devDependencies": {

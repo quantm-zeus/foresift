@@ -27,7 +27,16 @@ description: |
       whole loops, and loop bodies run unconditionally (repair -> re-check);
     - loop-body siblings WITHOUT an explicit depends_on edge run CONCURRENTLY,
       so AI->recheck pairs are always serialized with depends_on;
-    - prompt interpolation CAN read top-level and same-iteration siblings.
+    - prompt interpolation CAN read top-level and same-iteration siblings;
+    - until_bash guards get NO ARTIFACTS_DIR environment variable: only
+      BARE-FORM `$VAR` references ($ARTIFACTS_DIR/$WORKFLOW_ID/$STATE_DIR/
+      $BASE_BRANCH/$DOCS_DIR) are TEXTUALLY SUBSTITUTED into the command
+      string before execution — `${ARTIFACTS_DIR}` brace form and env reads
+      (process.env.ARTIFACTS_DIR) do NOT work inside guards, while regular
+      workflow bash nodes receive ARTIFACTS_DIR as a real env var. Guards
+      therefore pass artifact paths as arguments: `--artifacts-dir "$ARTIFACTS_DIR"`.
+      This exact gap silently exhausted scoped-plan 4x on 2026-08-22/23 while
+      plan-recheck bash nodes exited 0 (ADR 0004).
 
   NOT for: planning or auditing milestones (use foresift-milestone-control),
   ad-hoc fixes (use archon-assist), or implementing anything outside the
@@ -75,7 +84,13 @@ nodes:
       until: WP_PLAN_LOOP_TEXT_SIGNAL_NEVER_EMIT_b81cf2
       until_bash: |
         set -euo pipefail
-        node scripts/automation/package-plan-complete.mjs --package "$ARGUMENTS" > /dev/null
+        # Archon v0.9.0 exports NO ARTIFACTS_DIR env var into until_bash; bare
+        # $ARTIFACTS_DIR here is TEXTUALLY SUBSTITUTED by archon before execution
+        # (probe-verified; ${ARTIFACTS_DIR} brace form would NOT substitute).
+        # The validator's verdict JSON is captured on every evaluation so a
+        # failing guard leaves a forensic trail instead of a silent false.
+        node scripts/automation/package-plan-complete.mjs --package "$ARGUMENTS" \
+          --artifacts-dir "$ARTIFACTS_DIR" > "$ARTIFACTS_DIR/scoped-plan-guard-last.json"
       nodes:
         - id: scoped-plan-iterate
           command: foresift-wp-plan
@@ -117,7 +132,10 @@ nodes:
       until: WP_IMPL_LOOP_TEXT_SIGNAL_NEVER_EMIT_e47a09
       until_bash: |
         set -euo pipefail
-        node scripts/automation/package-implement-complete.mjs --package "$ARGUMENTS" > /dev/null
+        # Verdict captured on every evaluation for forensics (see scoped-plan guard).
+        # This validator needs no artifacts dir: it inspects repo files only.
+        node scripts/automation/package-implement-complete.mjs --package "$ARGUMENTS" \
+          > "$ARTIFACTS_DIR/implement-guard-last.json"
       nodes:
         - id: implement-iterate
           command: foresift-wp-implement
@@ -165,7 +183,11 @@ nodes:
       until: GATE_LOOP_TEXT_SIGNAL_NEVER_EMIT_f04d67
       until_bash: |
         set -euo pipefail
-        node -e 'const fs=require("fs");const f=process.env.ARTIFACTS_DIR+"/gate-result.json";if(!fs.existsSync(f))process.exit(1);const r=JSON.parse(fs.readFileSync(f,"utf8"));process.exit(r.passed===true?0:1)'
+        # The artifacts dir reaches this guard as argv[1] via archon's bare-form
+        # $ARTIFACTS_DIR textual substitution — process.env.ARTIFACTS_DIR is NOT
+        # exported into until_bash (probe-verified; reading it here yields
+        # "undefined" and the guard would fail forever).
+        node -e 'const fs=require("fs");const f=process.argv[1]+"/gate-result.json";if(!fs.existsSync(f))process.exit(1);const r=JSON.parse(fs.readFileSync(f,"utf8"));process.exit(r.passed===true?0:1)' "$ARTIFACTS_DIR"
       nodes:
         - id: gate-repair
           command: foresift-wp-gate-repair

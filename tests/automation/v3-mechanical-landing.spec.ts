@@ -314,6 +314,7 @@ describe('runFinalLand — deterministic landing routes (§23 items 36–37)', (
       runFinalLand(
         { ...baseArgs, artifactsDir: art },
         {
+          admission: () => ({ ok: true, advisory: true }),
           gateCheck: () => ({ status: 0 }),
           gateRun: () => {
             gateRuns++;
@@ -344,6 +345,7 @@ describe('runFinalLand — deterministic landing routes (§23 items 36–37)', (
     const r = runFinalLand(
       { ...baseArgs, artifactsDir: art },
       {
+        admission: () => ({ ok: true, advisory: true }),
         gateCheck: () => {
           checks++;
           return { status: 1 };
@@ -370,6 +372,7 @@ describe('runFinalLand — deterministic landing routes (§23 items 36–37)', (
     const r = runFinalLand(
       { ...baseArgs, artifactsDir: art },
       {
+        admission: () => ({ ok: true, advisory: true }),
         gateCheck: () => ({ status: 1 }),
         gateRun: () => ({ status: 1 }),
         lander: () => {
@@ -393,6 +396,7 @@ describe('runFinalLand — deterministic landing routes (§23 items 36–37)', (
     runFinalLand(
       { ...baseArgs, artifactsDir: art },
       {
+        admission: () => ({ ok: true, advisory: true }),
         gateCheck: () => ({ status: 0 }),
         lander: () => ({
           status: 1,
@@ -414,6 +418,7 @@ describe('runFinalLand — deterministic landing routes (§23 items 36–37)', (
     runFinalLand(
       { ...baseArgs, artifactsDir: art },
       {
+        admission: () => ({ ok: true, advisory: true }),
         gateCheck: () => ({ status: 0 }),
         lander: () => ({ status: 1, stdout: 'kaboom' }),
         now: () => '2026-08-23T00:00:00Z',
@@ -438,6 +443,7 @@ describe('runFinalLand — deterministic landing routes (§23 items 36–37)', (
     runFinalLand(
       { ...baseArgs, artifactsDir: art },
       {
+        admission: () => ({ ok: true, advisory: true }),
         gateCheck: () => ({ status: 0 }),
         lander: () => ({ status: 0, stdout: '{}' }),
         now: () => 't',

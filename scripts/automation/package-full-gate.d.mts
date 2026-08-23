@@ -23,6 +23,8 @@ export declare function parseFullGateResult(raw: unknown): FullGateResult | null
 export interface AttestationIdentity {
   schema: 'foresift/full-gate-attestation@1';
   headSha: string;
+  /** V3-D §11: origin/main tip (local remote-tracking view) at gate time. */
+  baseMainSha: string | null;
   packageId: string;
   risk: string;
   profile: 'LEGACY' | 'OPTIMIZED';
@@ -35,6 +37,8 @@ export interface AttestationIdentity {
 export declare function attestationIdentity(opts: {
   packageId: string;
   repoRoot?: string;
+  /** V3-D §11 test hook: resolve the origin/main base sha without network. */
+  resolveBaseMain?: () => string | null;
 }): AttestationIdentity;
 export declare function attestationDrift(
   attested: unknown,

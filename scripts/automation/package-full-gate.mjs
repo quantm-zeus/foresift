@@ -93,17 +93,31 @@ function toolchainVersions(repoRoot) {
  * The full relevant identity of a FULL-gate execution (§15). Everything that
  * could change what "the FULL gate passed at HEAD" means rides in here.
  */
-export function attestationIdentity({ packageId, repoRoot }) {
+export function attestationIdentity({ packageId, repoRoot, resolveBaseMain } = {}) {
   const ms = loadCurrentMilestone();
   const pkg = findPackage(ms, packageId);
   if (!pkg) throw new Error(`package '${packageId}' not found in current milestone`);
-  const headSha = execFileSync('git', ['rev-parse', 'HEAD'], {
-    cwd: repoRoot,
-    encoding: 'utf8',
-  }).trim();
+  const git = (args) => execFileSync('git', args, { cwd: repoRoot, encoding: 'utf8' }).trim();
+  const headSha = git(['rev-parse', 'HEAD']);
+  // V3-D §11: the origin/main tip this gate ran against (the LOCAL
+  // remote-tracking ref — never guessed). A landing that reuses evidence
+  // against a DIFFERENT main is stale-base evidence; the drift comparison
+  // below invalidates reuse once main moved. No network here by design: the
+  // landing path (final-land admission / lander) fetches BEFORE any --check
+  // recomputation, so the ref is fresh exactly where the verdict matters.
+  // Injectable for hermetic fixtures; null when the ref does not exist.
+  const baseMainShaOrNull = () => {
+    if (resolveBaseMain) return resolveBaseMain();
+    try {
+      return git(['rev-parse', '--verify', 'refs/remotes/origin/main']);
+    } catch {
+      return null;
+    }
+  };
   return {
     schema: 'foresift/full-gate-attestation@1',
     headSha,
+    baseMainSha: baseMainShaOrNull(),
     packageId,
     risk: pkg.risk,
     profile: throughputProfile(packageId),
@@ -149,6 +163,8 @@ export function attestationDrift(attested, current) {
     if (JSON.stringify(a) !== JSON.stringify(c)) drift.push(path);
   };
   cmp('headSha', attested.headSha, current.headSha);
+  // V3-D §11: evidence gathered against a moved main is stale-base evidence.
+  cmp('baseMainSha', attested.baseMainSha, current.baseMainSha);
   cmp('packageId', attested.packageId, current.packageId);
   cmp('risk', attested.risk, current.risk);
   cmp('pnpmLockHash', attested.pnpmLockHash, current.pnpmLockHash);

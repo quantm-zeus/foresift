@@ -1,0 +1,22 @@
+{
+  "name": "@foresift/shared-schemas",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Versioned Zod schemas mirroring the Foresift domain contracts (manifest schemaRefs for data and DR families).",
+  "exports": {
+    ".": {
+      "types": "./src/index.ts",
+      "default": "./src/index.ts"
+    }
+  },
+  "scripts": {
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "zod": "^3.25.76"
+  },
+  "devDependencies": {
+    "vitest": "4.1.11"
+  }
+}

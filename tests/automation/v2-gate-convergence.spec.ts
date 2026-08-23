@@ -1,175 +1,28 @@
 // V2 second-pass regression coverage for PR C2 (task spec §8–§12, §23 items
 // 20–32): structured FULL-gate result manifests, attestation-on-PASS-only,
 // targeted post-failure verification planning, and the fail-closed convergence
-// router. Two gate executions below are REAL end-to-end runs against this
-// repository's actual state: the milestone gate is deterministically GREEN
-// here (repo-wide checks only), while any package gate is deterministically
-// RED at its package checks (product packages/* do not exist yet) — both
-// directions of the manifest writer are therefore exercised against reality.
+// router.
+//
+// This file holds the PURE decision/planner/parser matrices (unit tier — runs
+// in milliseconds). The REAL end-to-end executions (two real gates, targeted
+// executor CLI, router CLI, collector fixtures) live in the *-e2e-*.spec.ts
+// integration files so they run concurrently and stay out of fast loops.
 
-import { execFileSync } from 'node:child_process';
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync, readFileSync, existsSync } from 'node:fs';
-import { tmpdir } from 'node:os';
-import { join } from 'node:path';
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import {
-  GATE_RESULT_FILE,
-  attestationIdentity,
-  parseFullGateResult,
-} from '../../scripts/automation/package-full-gate.mjs';
+import { describe, expect, it } from 'vitest';
+import { parseFullGateResult } from '../../scripts/automation/package-full-gate.mjs';
 import {
   extractFailingTestFiles,
   planTargetedChecks,
 } from '../../scripts/automation/package-targeted-verify.mjs';
-import { collectReviewOutcome } from '../../scripts/automation/review-outcome-collector.mjs';
 import {
   DECISION_NOT_REQUIRED,
   DECISION_REQUIRED,
   decideConvergence,
   parseReviewVerdict,
 } from '../../scripts/automation/convergence-router.mjs';
+import { manifestFixture, verdictFixture } from '../helpers/v2-fixtures.js';
 
-const SCRIPTS = join(import.meta.dirname, '..', '..', 'scripts', 'automation');
-const REPO = process.cwd();
-
-// The two REAL-gate tests below spawn foresift:gate, whose `pnpm test` stage
-// re-runs THIS very file. The env sentinel marks that nested execution so the
-// recursion terminates after exactly one level (the nested run skips the
-// spawners; everything else still runs against reality).
-const GATE_E2E_NESTED = 'FORESIFT_GATE_E2E_NESTED';
-const itE2e = (name: string, fn: () => void, timeout?: number) => {
-  if (process.env[GATE_E2E_NESTED] === '1') return; // nested run — see comment above
-  it(name, fn, timeout);
-};
-
-let fx: string;
-beforeAll(() => {
-  fx = mkdtempSync(join(tmpdir(), 'foresift-v2-c2-'));
-});
-afterAll(() => {
-  rmSync(fx, { recursive: true, force: true });
-});
-
-const art = (name: string) => {
-  const d = join(fx, name);
-  mkdirSync(d, { recursive: true });
-  return d;
-};
-
-const manifestFixture = (over: Record<string, unknown> = {}) => ({
-  schema: 'foresift/full-gate-result@1',
-  packageId: 'p',
-  passed: false,
-  exitCode: 1,
-  failedCategories: [],
-  checks: [
-    {
-      label: 'authoritative spec integrity',
-      category: 'SPEC',
-      command: 'pnpm spec:verify',
-      status: 'PASS',
-    },
-    { label: 'formatting', category: 'FORMAT', command: 'pnpm format:check', status: 'PASS' },
-    { label: 'lint', category: 'LINT', command: 'pnpm lint', status: 'PASS' },
-    { label: 'TypeScript', category: 'TYPECHECK', command: 'pnpm typecheck', status: 'PASS' },
-    { label: 'full test suite', category: 'TESTS', command: 'pnpm test', status: 'PASS' },
-    {
-      label: 'package check',
-      category: 'PACKAGE',
-      command: 'pnpm --filter x test',
-      status: 'FAIL',
-    },
-  ],
-  timestamp: '2026-08-23T00:00:00.000Z',
-  ...over,
-});
-
-const verdictFixture = (over: Record<string, unknown> = {}) => ({
-  schema: 'foresift/review-verdict@1',
-  valid: true,
-  prNumber: 42,
-  prUrl: 'https://github.com/x/y/pull/42',
-  reviewDecision: 'APPROVED',
-  unresolvedThreads: 0,
-  headAtReviewStart: 'a'.repeat(40),
-  headAfterReview: 'a'.repeat(40),
-  collectedAt: '2026-08-23T00:00:00.000Z',
-  reasons: [],
-  ...over,
-});
-
-// ── §9: structured FULL-gate result manifests (REAL gate executions) ─────────
-describe('V2 structured gate manifest (spec §9)', () => {
-  itE2e(
-    'GREEN path: milestone gate passes and writes an all-PASS manifest with every category',
-    () => {
-      const dir = art('gate-green');
-      execFileSync(
-        'node',
-        [
-          join(SCRIPTS, 'foresift-gate.mjs'),
-          '--milestone',
-          '--result-file',
-          join(dir, GATE_RESULT_FILE),
-        ],
-        { encoding: 'utf8', cwd: REPO, env: { ...process.env, [GATE_E2E_NESTED]: '1' } },
-      );
-      const m = parseFullGateResult(readFileSync(join(dir, GATE_RESULT_FILE), 'utf8'));
-      expect(m).not.toBeNull();
-      expect(m?.passed).toBe(true);
-      expect(m?.failedCategories).toEqual([]);
-      const cats = m?.checks.map((c) => c.category);
-      expect(cats).toEqual(['SPEC', 'FORMAT', 'LINT', 'TYPECHECK', 'TESTS']);
-      for (const c of m?.checks ?? []) expect(c.status).toBe('PASS');
-    },
-    240_000,
-  );
-
-  itE2e(
-    'RED path: package gate fails at its package checks with a structured manifest and NO attestation',
-    () => {
-      const dir = art('gate-red');
-      let code = 0;
-      try {
-        execFileSync(
-          'node',
-          [
-            join(SCRIPTS, 'foresift-gate.mjs'),
-            '--package',
-            'g0-tool-core',
-            '--result-file',
-            join(dir, GATE_RESULT_FILE),
-          ],
-          {
-            encoding: 'utf8',
-            cwd: REPO,
-            stdio: 'pipe',
-            env: { ...process.env, [GATE_E2E_NESTED]: '1' },
-          },
-        );
-      } catch (e) {
-        code = (e as { status?: number }).status ?? -1;
-      }
-      expect(code).not.toBe(0); // product packages/* do not exist yet ⇒ deterministic red
-      const m = parseFullGateResult(readFileSync(join(dir, GATE_RESULT_FILE), 'utf8'));
-      expect(m?.passed).toBe(false);
-      expect(m?.exitCode).toBe(code);
-      expect(m?.failedCategories).toEqual(['PACKAGE']);
-      // Gate stops at the FIRST failing package check (packages/domain is absent).
-      const pkgRow = m?.checks.find((c) => c.status === 'FAIL');
-      expect(pkgRow?.category).toBe('PACKAGE');
-      expect(pkgRow?.command).toMatch(
-        /test -d packages\/domain && pnpm --filter @foresift\/domain test/,
-      );
-      // Every pre-package stage ran green before the deterministic red.
-      for (const c of m?.checks ?? []) {
-        if (c.category !== 'PACKAGE') expect(c.status).toBe('PASS');
-      }
-      expect(existsSync(join(dir, 'full-gate-attestation.json'))).toBe(false);
-    },
-    240_000,
-  );
-
+describe('V2 structured gate manifest parsing (spec §9)', () => {
   it('parseFullGateResult rejects malformed/wrong-schema/shape-broken evidence (fail-closed)', () => {
     expect(parseFullGateResult('not json')).toBeNull();
     expect(parseFullGateResult('{}')).toBeNull();
@@ -324,124 +177,6 @@ describe('V2 targeted verification planning (spec §10)', () => {
     );
     expect(files).toEqual(['tests/a.spec.ts']);
   });
-
-  it('END-TO-END: executor runs ONLY the planned check and records a green verdict file', () => {
-    const dir = art('targeted-green');
-    writeFileSync(
-      join(dir, GATE_RESULT_FILE),
-      JSON.stringify(
-        manifestFixture({
-          failedCategories: ['TYPECHECK'],
-          checks: [
-            {
-              label: 'TypeScript',
-              category: 'TYPECHECK',
-              command: 'pnpm typecheck',
-              status: 'FAIL',
-            },
-            { label: 'full test suite', category: 'TESTS', command: 'pnpm test', status: 'PASS' },
-          ],
-        }),
-      ),
-    );
-    const r = (() => {
-      try {
-        return {
-          status: 0,
-          out: execFileSync(
-            'node',
-            [
-              join(SCRIPTS, 'package-targeted-verify.mjs'),
-              '--manifest',
-              join(dir, GATE_RESULT_FILE),
-              '--artifacts-dir',
-              dir,
-            ],
-            { encoding: 'utf8', cwd: REPO, stdio: 'pipe' },
-          ),
-        };
-      } catch (e) {
-        return { status: (e as { status?: number }).status ?? -1, out: '' };
-      }
-    })();
-    expect(r.status).toBe(0);
-    const rec = JSON.parse(readFileSync(join(dir, 'targeted-verify-result.json'), 'utf8'));
-    expect(rec.schema).toBe('foresift/targeted-verify@1');
-    expect(rec.mode).toBe('TARGETED');
-    expect(rec.allGreen).toBe(true);
-    expect(rec.checks.map((c: { command: string }) => c.command)).toEqual(['pnpm typecheck']);
-  });
-
-  it('END-TO-END: executor re-runs real red package commands and reports red (exit 1)', () => {
-    const dir = art('targeted-red');
-    const cmd = 'test -d packages/tool-core && pnpm --filter @foresift/tool-core test';
-    writeFileSync(
-      join(dir, GATE_RESULT_FILE),
-      JSON.stringify(
-        manifestFixture({
-          packageId: 'g0-tool-core',
-          failedCategories: ['PACKAGE'],
-          checks: [{ label: 'package check', category: 'PACKAGE', command: cmd, status: 'FAIL' }],
-        }),
-      ),
-    );
-    let code = 0;
-    try {
-      execFileSync(
-        'node',
-        [
-          join(SCRIPTS, 'package-targeted-verify.mjs'),
-          '--manifest',
-          join(dir, GATE_RESULT_FILE),
-          '--artifacts-dir',
-          dir,
-        ],
-        { encoding: 'utf8', cwd: REPO, stdio: 'pipe' },
-      );
-    } catch (e) {
-      code = (e as { status?: number }).status ?? -1;
-    }
-    expect(code).toBe(1);
-    const rec = JSON.parse(readFileSync(join(dir, 'targeted-verify-result.json'), 'utf8'));
-    expect(rec.allGreen).toBe(false);
-    expect(rec.checks[0]?.command).toBe(cmd);
-  });
-
-  it('END-TO-END: ambiguous evidence escalates (exit 3) without running any check', () => {
-    const dir = art('targeted-escalated');
-    writeFileSync(
-      join(dir, GATE_RESULT_FILE),
-      JSON.stringify(
-        manifestFixture({
-          failedCategories: ['LINT', 'TESTS'],
-          checks: [
-            { label: 'lint', category: 'LINT', command: 'pnpm lint', status: 'FAIL' },
-            { label: 'full test suite', category: 'TESTS', command: 'pnpm test', status: 'FAIL' },
-          ],
-        }),
-      ),
-    );
-    let code = 0;
-    try {
-      execFileSync(
-        'node',
-        [
-          join(SCRIPTS, 'package-targeted-verify.mjs'),
-          '--manifest',
-          join(dir, GATE_RESULT_FILE),
-          '--artifacts-dir',
-          dir,
-        ],
-        { encoding: 'utf8', cwd: REPO, stdio: 'pipe' },
-      );
-    } catch (e) {
-      code = (e as { status?: number }).status ?? -1;
-    }
-    expect(code).toBe(3);
-    const rec = JSON.parse(readFileSync(join(dir, 'targeted-verify-result.json'), 'utf8'));
-    expect(rec.mode).toBe('ESCALATE_FULL');
-    expect(rec.checks).toEqual([]);
-  });
 });
 
 // ── §11: deterministic convergence routing ────────────────────────────────────
@@ -520,100 +255,5 @@ describe('V2 convergence router decision core (spec §11)', () => {
     expect(parseReviewVerdict('{}')).toBeNull();
     expect(parseReviewVerdict(JSON.stringify(verdictFixture({ schema: 'x@1' })))).toBeNull();
     expect(parseReviewVerdict(JSON.stringify(verdictFixture()))).not.toBeNull();
-  });
-
-  it('END-TO-END CLI: perfect review+attestation evidence but incomplete implementation ⇒ REQUIRED citing only completeness', () => {
-    const dir = art('router-cli');
-    const id = attestationIdentity({ packageId: 'g0-tool-core', repoRoot: REPO });
-    writeFileSync(
-      join(dir, 'review-verdict.json'),
-      JSON.stringify(
-        verdictFixture({
-          headAtReviewStart: id.headSha,
-          headAfterReview: id.headSha,
-        }),
-      ),
-    );
-    writeFileSync(
-      join(dir, 'full-gate-attestation.json'),
-      JSON.stringify({
-        ...structuredClone(id),
-        result: 'PASS',
-        timestamp: '2026-08-23T00:00:00.000Z',
-      }),
-    );
-    let code = 0;
-    let out = '';
-    try {
-      out = execFileSync(
-        'node',
-        [
-          join(SCRIPTS, 'convergence-router.mjs'),
-          '--package',
-          'g0-tool-core',
-          '--artifacts-dir',
-          dir,
-          '--repo-root',
-          REPO,
-        ],
-        { encoding: 'utf8', cwd: REPO, stdio: 'pipe' },
-      );
-    } catch (e) {
-      code = (e as { status?: number; stdout?: string }).status ?? -1;
-      out = (e as { stdout?: string }).stdout ?? '';
-    }
-    void out;
-    expect(code).toBe(1); // specs/g0-tool-core does not exist ⇒ genuinely incomplete
-    const decision = JSON.parse(readFileSync(join(dir, 'convergence-decision.json'), 'utf8'));
-    expect(decision.decision).toBe(DECISION_REQUIRED);
-    expect(decision.currentHead).toMatch(/^[0-9a-f]{40}$/);
-    expect(decision.reasons).toHaveLength(1);
-    expect(decision.reasons[0]).toMatch(/implementation-completeness/);
-  });
-});
-
-// ── review-outcome collector: never crashes, degrades to invalid ─────────────
-describe('V2 review-outcome collector degradation (spec §11)', () => {
-  it('missing snapshot/pr-number ⇒ invalid verdict with reasons, no throw', () => {
-    const dir = art('collector-empty');
-    const repo = join(fx, 'collector-repo');
-    mkdirSync(repo, { recursive: true });
-    const v = collectReviewOutcome({ artifactsDir: dir, repoRoot: repo });
-    expect(v.valid).toBe(false);
-    expect(v.prNumber).toBeNull();
-    expect(v.reviewDecision).toBeNull();
-    expect(v.reasons.join(' ')).toMatch(/snapshot missing/);
-    expect(v.reasons.join(' ')).toMatch(/\.pr-number artifact missing/);
-  });
-
-  it('valid local evidence with unreachable GitHub stays invalid-but-informative (fail-closed)', () => {
-    const dir = art('collector-nogh');
-    const repo = join(fx, 'collector-repo2');
-    mkdirSync(repo, { recursive: true });
-    execFileSync('git', ['init', '-q', '--initial-branch=main', repo]);
-    execFileSync('git', [
-      '-C',
-      repo,
-      '-c',
-      'user.email=t@t',
-      '-c',
-      'user.name=t',
-      'commit',
-      '-q',
-      '--allow-empty',
-      '-m',
-      'base',
-    ]);
-    writeFileSync(
-      join(dir, '.review-head-snapshot.json'),
-      JSON.stringify({ headSha: 'c'.repeat(40) }),
-    );
-    writeFileSync(join(dir, '.pr-number'), '424242\n');
-    const v = collectReviewOutcome({ artifactsDir: dir, repoRoot: repo });
-    expect(v.headAfterReview).toMatch(/^[0-9a-f]{40}$/);
-    expect(v.prNumber).toBe(424242);
-    // No real PR #424242 exists ⇒ GitHub evidence unobtainable ⇒ invalid.
-    expect(v.valid).toBe(false);
-    expect(v.reasons.join(' ')).toMatch(/gh pr view failed|reviewDecision/);
   });
 });

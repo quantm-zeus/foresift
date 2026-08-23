@@ -94,6 +94,42 @@ you changed `pnpm-lock.yaml` or imports fail with missing-module errors that
 are not your own bug. Otherwise NEVER invoke install commands — they are pure
 waste inside the loop.
 
+## Test obligations: write only what is NOT already proven (C2.5)
+
+Before writing any test, answer ONE question: **what behavioral obligation is
+not already evidenced?** Derive: behavior → requirement IDs → existing test
+evidence → missing evidence ONLY. Reuse existing evidence for shared
+invariants; never write a second semantically equivalent test because another
+task references the same behavior.
+
+Per behavior class:
+
+- **CRITICAL**: positive path + important failure path (+ boundary/security
+  invariant where relevant).
+- **HIGH**: positive path + one meaningful failure path.
+- **Pure mapper/parser/classifier**: table-driven boundary matrix (`it.each`),
+  not per-case bespoke bodies.
+- **Already-covered invariant**: REUSE the existing test as evidence — no new
+  test.
+- **Bug fix**: regression reproducing the bug + fix proof.
+- **Security boundary / fail-closed direction**: explicit negative tests are
+  mandatory; never consolidate them away.
+
+Inner loop during authoring (do NOT run `pnpm test` per edit):
+
+1. run the EXACT file/names first: `pnpm exec vitest run --project <tier>
+   tests/<file>.spec.ts -t "<name>"`;
+2. then the affected project (`pnpm test:unit`, or `pnpm test:integration`
+   when you touched an e2e file);
+3. then FAST at the slice boundary (step 1 of the slice order above);
+4. FULL suite only via the gate — never inside your authoring loop.
+
+Tier placement: pure decision/planner/parser matrices live in unit-tier spec
+files; anything spawning real processes (gates, CLIs, git fixtures) belongs in
+an `*e2e*.spec.ts` integration file so it runs concurrently and stays out of
+fast loops.
+
+
 ## Scope & honesty
 
 Implement ONLY this package's scope (objective, requirementIds, writeScopes).

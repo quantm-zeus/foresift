@@ -3,7 +3,6 @@
 // changesets, and impact-aware FAST classification. Every behavioral claim is
 // tested positively AND negatively; fail-closed direction is asserted explicitly.
 
-import { execFileSync } from 'node:child_process';
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync, readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -28,6 +27,7 @@ import {
   planFastChecks,
 } from '../../scripts/automation/fast-impact.mjs';
 import { resolveFastBase } from '../../scripts/automation/package-fast-verify.mjs';
+import { gitFixture as factoryGitFixture } from '../helpers/git-fixture.js';
 
 let fx: string;
 beforeAll(() => {
@@ -44,37 +44,9 @@ const write = (rel: string, content: string) => {
   return p;
 };
 
-/** Real git fixture repo with one base commit; returns helper object. */
-function gitFixture(name: string) {
-  const root = join(fx, name);
-  mkdirSync(root, { recursive: true });
-  const g = (args: string[]) => execFileSync('git', args, { cwd: root, encoding: 'utf8' });
-  g(['init', '-q', '--initial-branch=main', '.']);
-  g(['config', 'user.email', 't@t']);
-  g(['config', 'user.name', 't']);
-  // Bare "origin" so merge-base(HEAD, origin/main) resolution is exercisable.
-  execFileSync('git', ['init', '-q', '--bare', '--initial-branch=main', `${root}-origin.git`]);
-  g(['remote', 'add', 'origin', `${root}-origin.git`]);
-  writeFileSync(join(root, 'base.txt'), 'base\n');
-  g(['add', '.']);
-  g(['commit', '-qm', 'base']);
-  g(['push', '-q', 'origin', 'main:main']);
-  return {
-    root,
-    g,
-    baseSha: () => g(['rev-parse', 'HEAD']).trim(),
-    writeFile: (rel: string, content: string) => {
-      const p = join(root, rel);
-      mkdirSync(join(p, '..'), { recursive: true });
-      writeFileSync(p, content);
-    },
-    rm: (rel: string) => rmSync(join(root, rel)),
-    commitAll: (msg: string) => {
-      g(['add', '-A']);
-      g(['commit', '-qm', msg]);
-    },
-  };
-}
+/** Real git fixture repo with one base commit — zero git spawns per call
+ *  (seeded-template copy from tests/helpers/git-fixture.ts, C2.5 §5). */
+const gitFixture = factoryGitFixture;
 
 // ── §23 item 1: finalized checkpoint survives the immediately following turn ──
 describe('V2 checkpoint finalization order (spec §4)', () => {

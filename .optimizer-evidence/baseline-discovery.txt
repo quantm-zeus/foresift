@@ -1,0 +1,10 @@
+.claude/worktrees/foresift-throughput/tests/automation/control-plane.spec.ts
+.claude/worktrees/foresift-throughput/tests/automation/throughput.spec.ts
+.claude/worktrees/foresift-throughput/tests/automation/until-bash-guards.spec.ts
+.claude/worktrees/foresift-throughput/tests/spec-verify.spec.ts
+tests/automation/control-plane.spec.ts
+tests/automation/throughput.spec.ts
+tests/automation/until-bash-guards.spec.ts
+tests/automation/v2-gate-convergence.spec.ts
+tests/automation/v2-throughput.spec.ts
+tests/spec-verify.spec.ts

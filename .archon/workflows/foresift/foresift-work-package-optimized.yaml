@@ -39,6 +39,14 @@ description: |
 
     archon workflow run foresift-work-package-optimized --branch foresift/<package-id> "<package-id>"
 
+  Generation-aware invocation (V3 §6/§8; the supervisor does this): at execution
+  generation >= 1 the message carries the suffix and the launch names the
+  generation branch — `"<package-id>@g<N>"` with `--branch foresift/<package-id>-g<N>`.
+  The first node (generation-adoption) then ADOPTS a salvage-seeded branch of
+  that name from origin (probe-proven: archon itself starts every run worktree
+  fresh at main and would otherwise ignore the seed); script call sites consume
+  `${ARGUMENTS%%@g*}` so the bare package id reaches milestone-state lookups.
+
   ARCHON v0.9.0 LOOP SEMANTICS this layout relies on (verified empirically):
     - every loop iteration runs its FULL body before the guard is evaluated;
     - `when:` inside a loop body CANNOT see same-iteration sibling outputs, so
@@ -66,11 +74,24 @@ effort: high
 tags: [foresift, autonomous]
 
 nodes:
-  # ── PHASE 0: DETERMINISTIC PREFLIGHT (fail closed before any AI spend) ─────
-  - id: preflight
+  # ── PHASE 0A: SEEDED-GENERATION ADOPTION (before any other work) ────────────
+  # Probe-proven archon behavior (foresift-smoke-gen-adoption): run worktrees
+  # start FRESH at main's tip and never consult a pushed branch of the launch
+  # name. This node adopts a salvage-seeded foresift/<id>-g<N> (message
+  # `<id>@g<N>`) into the execution BEFORE any AI spend; generation-0 messages
+  # no-op. Fail-closed on stale seeds, unverifiable ancestry, or dirty trees.
+  - id: generation-adoption
     bash: |
       set -euo pipefail
-      node scripts/automation/preflight.mjs --package "$ARGUMENTS" --branch "$(git rev-parse --abbrev-ref HEAD)"
+      node scripts/automation/adopt-generation-branch.mjs --message "$ARGUMENTS"
+    timeout: 120000
+
+  # ── PHASE 0: DETERMINISTIC PREFLIGHT (fail closed before any AI spend) ─────
+  - id: preflight
+    depends_on: [generation-adoption]
+    bash: |
+      set -euo pipefail
+      node scripts/automation/preflight.mjs --package "${ARGUMENTS%%@g*}" --branch "$(git rev-parse --abbrev-ref HEAD)"
     timeout: 600000
     retry:
       max_attempts: 2
@@ -83,7 +104,7 @@ nodes:
     bash: |
       set +e
       mkdir -p "$ARTIFACTS_DIR"
-      node scripts/automation/package-plan-complete.mjs --package "$ARGUMENTS" \
+      node scripts/automation/package-plan-complete.mjs --package "${ARGUMENTS%%@g*}" \
         > "$ARTIFACTS_DIR/plan-completeness.json" 2>&1
       if [ $? -eq 0 ]; then echo "WP_PLAN_COMPLETE"; else echo "WP_PLAN_INCOMPLETE"; fi
 
@@ -108,7 +129,7 @@ nodes:
         # (probe-verified; ${ARTIFACTS_DIR} brace form would NOT substitute).
         # The validator's verdict JSON is captured on every evaluation so a
         # failing guard leaves a forensic trail instead of a silent false.
-        node scripts/automation/package-plan-complete.mjs --package "$ARGUMENTS" \
+        node scripts/automation/package-plan-complete.mjs --package "${ARGUMENTS%%@g*}" \
           --artifacts-dir "$ARTIFACTS_DIR" > "$ARTIFACTS_DIR/scoped-plan-guard-last.json"
       nodes:
         - id: scoped-plan-iterate
@@ -119,7 +140,7 @@ nodes:
           depends_on: [scoped-plan-iterate]   # siblings without an edge run concurrently
           bash: |
             set +e
-            node scripts/automation/package-plan-complete.mjs --package "$ARGUMENTS" \
+            node scripts/automation/package-plan-complete.mjs --package "${ARGUMENTS%%@g*}" \
               > "$ARTIFACTS_DIR/plan-completeness.json" 2>&1
             echo "PLAN_RECHECK_EXIT=$?"
 
@@ -130,7 +151,7 @@ nodes:
     bash: |
       set +e
       mkdir -p "$ARTIFACTS_DIR"
-      node scripts/automation/package-implement-complete.mjs --package "$ARGUMENTS" \
+      node scripts/automation/package-implement-complete.mjs --package "${ARGUMENTS%%@g*}" \
         > "$ARTIFACTS_DIR/implement-completeness.json" 2>&1
       if [ $? -eq 0 ]; then echo "IMPLEMENT_COMPLETE"; else echo "IMPLEMENT_INCOMPLETE"; fi
 
@@ -153,7 +174,7 @@ nodes:
         set -euo pipefail
         # Verdict captured on every evaluation for forensics (see scoped-plan guard).
         # This validator needs no artifacts dir: it inspects repo files only.
-        node scripts/automation/package-implement-complete.mjs --package "$ARGUMENTS" \
+        node scripts/automation/package-implement-complete.mjs --package "${ARGUMENTS%%@g*}" \
           > "$ARTIFACTS_DIR/implement-guard-last.json"
       nodes:
         - id: implement-iterate
@@ -164,7 +185,7 @@ nodes:
           depends_on: [implement-iterate]   # siblings without an edge run concurrently
           bash: |
             set +e
-            node scripts/automation/package-implement-complete.mjs --package "$ARGUMENTS" \
+            node scripts/automation/package-implement-complete.mjs --package "${ARGUMENTS%%@g*}" \
               > "$ARTIFACTS_DIR/implement-completeness.json" 2>&1
             echo "IMPL_RECHECK_EXIT=$?"
 
@@ -183,13 +204,13 @@ nodes:
     bash: |
       set +e
       mkdir -p "$ARTIFACTS_DIR"
-      if node scripts/automation/package-full-gate.mjs --check --package "$ARGUMENTS" \
+      if node scripts/automation/package-full-gate.mjs --check --package "${ARGUMENTS%%@g*}" \
            --artifacts-dir "$ARTIFACTS_DIR" >/dev/null 2>&1; then
         printf '{"passed":true,"exitCode":0,"attestationReuse":true}\n' >"$ARTIFACTS_DIR/gate-result.json"
         echo "GATE_PASSED_ATTESTATION_REUSE"
         exit 0
       fi
-      node scripts/automation/package-full-gate.mjs --run --package "$ARGUMENTS" \
+      node scripts/automation/package-full-gate.mjs --run --package "${ARGUMENTS%%@g*}" \
         --artifacts-dir "$ARTIFACTS_DIR" >"$ARTIFACTS_DIR/gate-log.txt" 2>&1
       code=$?
       if [ "$code" -eq 0 ]; then
@@ -249,13 +270,13 @@ nodes:
             fi
             # Targeted green OR escalated evidence ⇒ establish exact-head FULL evidence,
             # reusing a still-valid attestation instead of re-executing the gate.
-            if node scripts/automation/package-full-gate.mjs --check --package "$ARGUMENTS" \
+            if node scripts/automation/package-full-gate.mjs --check --package "${ARGUMENTS%%@g*}" \
                  --artifacts-dir "$ARTIFACTS_DIR" >/dev/null 2>&1; then
               printf '{"passed":true,"exitCode":0,"attestationReuse":true}\n' >"$ARTIFACTS_DIR/gate-result.json"
               echo "ATTESTATION_REUSE"
               exit 0
             fi
-            node scripts/automation/package-full-gate.mjs --run --package "$ARGUMENTS" \
+            node scripts/automation/package-full-gate.mjs --run --package "${ARGUMENTS%%@g*}" \
               --artifacts-dir "$ARTIFACTS_DIR" >"$ARTIFACTS_DIR/gate-log.txt" 2>&1
             code=$?
             if [ "$code" -eq 0 ]; then
@@ -277,7 +298,7 @@ nodes:
     bash: |
       set -euo pipefail
       node scripts/automation/package-create-pr.mjs \
-        --package "$ARGUMENTS" \
+        --package "${ARGUMENTS%%@g*}" \
         --branch "$(git rev-parse --abbrev-ref HEAD)" \
         --artifacts-dir "$ARTIFACTS_DIR"
 
@@ -300,7 +321,7 @@ nodes:
       # authority). Always exits 0 — degradation is recorded inside the packet,
       # never blocks review.
       node scripts/automation/review-packet.mjs \
-        --package "$ARGUMENTS" \
+        --package "${ARGUMENTS%%@g*}" \
         --artifacts-dir "$ARTIFACTS_DIR"
       echo "REVIEW_PACKET_WRITTEN"
 
@@ -331,7 +352,7 @@ nodes:
     bash: |
       set +e
       mkdir -p "$ARTIFACTS_DIR"
-      node scripts/automation/convergence-router.mjs --package "$ARGUMENTS" \
+      node scripts/automation/convergence-router.mjs --package "${ARGUMENTS%%@g*}" \
         --artifacts-dir "$ARTIFACTS_DIR" >"$ARTIFACTS_DIR/router-log.txt" 2>&1
       code=$?
       if [ "$code" -eq 0 ]; then echo "CONVERGENCE_NOT_REQUIRED"; else echo "CONVERGENCE_REQUIRED"; fi
@@ -385,13 +406,13 @@ nodes:
               echo "SKIP_TARGETED_RED"   # still red ⇒ next converge iteration; no FULL spend
               exit 0
             fi
-            if node scripts/automation/package-full-gate.mjs --check --package "$ARGUMENTS" \
+            if node scripts/automation/package-full-gate.mjs --check --package "${ARGUMENTS%%@g*}" \
                  --artifacts-dir "$ARTIFACTS_DIR" >/dev/null 2>&1; then
               printf '{"passed":true,"exitCode":0,"attestationReuse":true}\n' >"$ARTIFACTS_DIR/gate-result.json"
               echo "ATTESTATION_REUSE"
               exit 0
             fi
-            node scripts/automation/package-full-gate.mjs --run --package "$ARGUMENTS" \
+            node scripts/automation/package-full-gate.mjs --run --package "${ARGUMENTS%%@g*}" \
               --artifacts-dir "$ARTIFACTS_DIR" >"$ARTIFACTS_DIR/gate-log.txt" 2>&1
             code=$?
             if [ "$code" -eq 0 ]; then
@@ -445,7 +466,7 @@ nodes:
     bash: |
       set +e
       node scripts/automation/package-final-land.mjs \
-        --package "$ARGUMENTS" \
+        --package "${ARGUMENTS%%@g*}" \
         --branch "$(git rev-parse --abbrev-ref HEAD)" \
         --artifacts-dir "$ARTIFACTS_DIR" \
         >"$ARTIFACTS_DIR/final-land-log.txt" 2>&1

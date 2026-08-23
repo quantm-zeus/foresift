@@ -1,0 +1,51 @@
+name: foresift-smoke-gen-adoption
+description: |
+  Deterministic, ZERO-AI proof of the seeded-generation adoption path (V3
+  override §11–15). Probe-proven background (2026-08-23): `archon workflow run
+  --branch <b>` creates every run worktree FRESH at main's tip on a new
+  archon/task-* branch and NEVER consults a pushed branch of that name — so a
+  salvage-seeded foresift/<id>-g<N> would be silently invisible to execution.
+
+  This workflow proves the bridge end-to-end through REAL archon machinery:
+
+    1. Seed: push a branch named foresift/<arg>-g1 off current main containing
+       SEED-PROBE.txt (marker content mentioning seeded-marker).
+    2. Launch:
+         archon workflow run foresift-smoke-gen-adoption --detach \
+           --branch foresift/<arg>-g1 "<arg>@g1"
+    3. PASS requires: the adoption node reports adopted:true AND the marker
+       file exists in the RUN worktree on the renamed generation branch —
+       i.e. the fresh main-pinned worktree physically carries the seed.
+
+  Run before enabling the autopilot for any generation >= 1 launch and after
+  any Archon version upgrade (adoption depends on worktree-derivation behavior).
+
+  NOT for: anything product-related.
+tags: [foresift, smoke]
+
+nodes:
+  - id: adopt
+    bash: |
+      set -euo pipefail
+      mkdir -p "$ARTIFACTS_DIR"
+      node scripts/automation/adopt-generation-branch.mjs --message "$ARGUMENTS" \
+        | tee "$ARTIFACTS_DIR/adoption-verdict.json"
+      grep -q '"adopted": true' "$ARTIFACTS_DIR/adoption-verdict.json"
+
+  - id: verify-seed
+    depends_on: [adopt]
+    bash: |
+      set -euo pipefail
+      test -f SEED-PROBE.txt || {
+        echo "SEED MARKER MISSING — worktree did not adopt the seeded branch" >&2
+        exit 1
+      }
+      grep -q 'seeded-marker' SEED-PROBE.txt
+      BRANCH="$(git rev-parse --abbrev-ref HEAD)"
+      PKG="${ARGUMENTS%%@g*}"; GEN="${ARGUMENTS##*@g}"
+      EXPECTED="foresift/${PKG}-g${GEN}"
+      [ "$BRANCH" = "$EXPECTED" ] || {
+        echo "execution branch '$BRANCH' ≠ expected generation branch '$EXPECTED'" >&2
+        exit 1
+      }
+      echo "SEEDED-GENERATION ADOPTION PROVEN: worktree on $BRANCH at $(git rev-parse --short HEAD) carrying the seed marker"

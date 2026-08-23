@@ -25,6 +25,7 @@ import {
   workPackageWorkflowFor,
 } from '../../scripts/automation/package-generations.mjs';
 import { validateMilestoneState } from '../../scripts/automation/schema.mjs';
+import { adoptGenerationBranch } from '../../scripts/automation/adopt-generation-branch.mjs';
 import {
   buildSalvageInventory,
   classifyPath,
@@ -151,6 +152,13 @@ describe('classifyPath', () => {
     expect(classifyPath('.github/workflows/ci.yml', PKG)).toBe('OBSOLETE_CONTROL_PLANE');
     expect(classifyPath('tests/automation/old.spec.ts', PKG)).toBe('OBSOLETE_CONTROL_PLANE');
     expect(classifyPath('random/new-path.txt', PKG)).toBe('UNKNOWN');
+  });
+
+  it('product test fixtures are salvage targets, not UNKNOWN (PR #22 inventory gap)', () => {
+    // The real g0-contracts-data-truth salvage carried truth-vector fixtures
+    // referenced by salvaged tests; tests/fixtures/ is pure product data.
+    expect(classifyPath('tests/fixtures/data/identity-vectors.json', PKG)).toBe('REUSE_AS_IS');
+    expect(classifyPath('tests/fixtures/dr/recovery-tier-vectors.json', PKG)).toBe('REUSE_AS_IS');
   });
 
   it("another package's specs are not this package's authority", () => {
@@ -663,3 +671,78 @@ describe('cross-generation recover refusal', () => {
 function invSummary(path: string) {
   return (JSON.parse(readFileSync(path, 'utf8')) as { summary: unknown }).summary;
 }
+
+// ── seeded-generation adoption (probe-proven archon gap; override §§11–15) ──
+describe('adoptGenerationBranch', () => {
+  const PKG_A = 'pk';
+  const MSG_G1 = `${PKG_A}@g1`;
+  const SEED_BRANCH = `foresift/${PKG_A}-g1`;
+
+  /** Push a salvage-style seed branch off the fixture's main tip. */
+  function seedBranch(fx: ReturnType<typeof gitFixture>, marker: string): string {
+    fx.g(['switch', '-qc', SEED_BRANCH]);
+    fx.writeFile('SEED-PROBE.txt', `${marker}\n`);
+    fx.commitAll('seed product work');
+    const sha = fx.g(['rev-parse', 'HEAD']).trim();
+    fx.g(['push', '-q', 'origin', `${SEED_BRANCH}:${SEED_BRANCH}`]);
+    fx.g(['switch', '-q', 'main']);
+    return sha;
+  }
+
+  it('generation-0 messages no-op (legacy lane untouched)', () => {
+    const fx = gitFixture('adopt-gen0');
+    const v = adoptGenerationBranch({ message: PKG_A, repoRoot: fx.root });
+    expect(v.mode).toBe('LEGACY_GEN0');
+    expect(v.adopted).toBe(false);
+  });
+
+  it('no seed on origin ⇒ legitimate fresh start from main', () => {
+    const fx = gitFixture('adopt-fresh');
+    const v = adoptGenerationBranch({ message: MSG_G1, repoRoot: fx.root });
+    expect(v.mode).toBe('FRESH_FROM_MAIN');
+    expect(v.adopted).toBe(false);
+    expect(v.branch).toBe(SEED_BRANCH);
+  });
+
+  it('seed present ⇒ ADOPTED: execution branch renamed to the generation branch carrying seed content', () => {
+    const fx = gitFixture('adopt-happy');
+    const seedSha = seedBranch(fx, 'seeded-marker-v1');
+    const v = adoptGenerationBranch({ message: MSG_G1, repoRoot: fx.root });
+    expect(v.adopted).toBe(true);
+    expect(v.mode).toBe('ADOPTED_SEED');
+    expect(v.branch).toBe(SEED_BRANCH);
+    expect(v.head).toBe(seedSha);
+    expect(fx.g(['rev-parse', '--abbrev-ref', 'HEAD']).trim()).toBe(SEED_BRANCH);
+    expect(fx.g(['rev-parse', 'HEAD']).trim()).toBe(seedSha);
+    expect(readFileSync(join(fx.root, 'SEED-PROBE.txt'), 'utf8')).toMatch(/seeded-marker-v1/);
+  });
+
+  it('stale seed (main advanced past it) ⇒ fail-closed refusal naming reconciliation', () => {
+    const fx = gitFixture('adopt-stale');
+    seedBranch(fx, 'stale-marker');
+    // Parallel landing: main moves AFTER the seed was cut.
+    fx.writeFile('post-seed.txt', 'newer world\n');
+    fx.commitAll('sibling lands first');
+    fx.g(['push', '-q', 'origin', 'main:main']);
+    const v = adoptGenerationBranch({ message: MSG_G1, repoRoot: fx.root });
+    expect(v.mode).toBe('REFUSED');
+    if (v.mode === 'REFUSED')
+      expect(v.detail).toMatch(/does not contain current origin\/main|reconcile/i);
+    expect(fx.g(['rev-parse', '--abbrev-ref', 'HEAD']).trim()).toBe('main'); // untouched
+  });
+
+  it('dirty worktree ⇒ refusal even with a valid seed (never clobber work)', () => {
+    const fx = gitFixture('adopt-dirty');
+    seedBranch(fx, 'valid-marker');
+    fx.writeFile('uncommitted.txt', 'in flight\n');
+    const v = adoptGenerationBranch({ message: MSG_G1, repoRoot: fx.root });
+    expect(v.mode).toBe('REFUSED');
+    if (v.mode === 'REFUSED') expect(v.detail).toMatch(/dirty/i);
+  });
+
+  it('unparseable launch message ⇒ refusal', () => {
+    const fx = gitFixture('adopt-badmsg');
+    const v = adoptGenerationBranch({ message: '', repoRoot: fx.root });
+    expect(v.mode).toBe('REFUSED');
+  });
+});

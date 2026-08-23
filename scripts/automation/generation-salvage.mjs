@@ -55,6 +55,7 @@ export const PRODUCT_PREFIXES = [
   'tests/integration/',
   'tests/unit/',
   'tests/e2e/',
+  'tests/fixtures/',
   'telemetry/',
 ];
 

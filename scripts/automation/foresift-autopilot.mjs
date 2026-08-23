@@ -1596,11 +1596,17 @@ function seedSalvageGeneration({ packageId, toGeneration, manifest, runInstall =
  *        [--reason "<text>"] [--salvage-manifest <file>]
  *
  * Crash safety: an intent record naming the exact target generation is written
- * BEFORE any mutation; every step below is idempotent, so a rerun after a
- * crash converges on the same receipt. The generation is derived from
- * milestone state plus the recorded intent — never incremented twice. A second
- * identical invocation finds the completed receipt and exits 0 without
- * creating another generation.
+ * BEFORE any mutation, and every crash window converges (V3 §30 matrix):
+ *   · crash BEFORE the generation persist  → rerun recomputes the same target,
+ *     finds the matching intent, and adopts it (never re-increments);
+ *   · crash AFTER the persist, BEFORE the receipt → the intent's target now
+ *     EQUALS the milestone generation; the flow resumes at that generation and
+ *     finishes the interrupted paperwork (refused instead if that generation
+ *     already shows launch evidence — history must never be backfilled);
+ *   · crash AFTER the receipt write → the target-generation receipt replays
+ *     and consumes any surviving intent.
+ * A second identical invocation after completion replays the receipt and exits
+ * 0 without creating another generation.
  */
 async function cmdRestartPackage(packageId, opts = {}) {
   const reason = String(opts.reason ?? 'unspecified').slice(0, 300);
@@ -1621,8 +1627,40 @@ async function cmdRestartPackage(packageId, opts = {}) {
   const pkg = findPackage(ms, packageId);
   if (!pkg) return fail(`no work package '${packageId}' in the current milestone`);
   const fromGeneration = packageGeneration(pkg);
-  const toGeneration = fromGeneration + 1;
   const st = loadState();
+  const intentFile = join(STATE_DIR, `restart-intent-${packageId}.json`);
+
+  // Crash recovery: adopt the recorded intent verbatim (never re-increment).
+  let intent = null;
+  try {
+    const raw = JSON.parse(readFileSync(intentFile, 'utf8'));
+    if (raw?.schema === RESTART_INTENT_SCHEMA && raw.packageId === packageId) intent = raw;
+  } catch {
+    /* none yet */
+  }
+
+  // Resolve the target generation. Default: one past the current. V3 §30 Case
+  // C — an intent whose TARGET equals the generation the milestone ALREADY
+  // carries (and whose origin is exactly one behind it) proves the
+  // generation-bump persist completed before the crash: finish THAT generation
+  // instead of computing a fresh bump. Any other intent shape is an anomaly;
+  // its refusal stays deferred to the safety-refusal section below so the
+  // refusal priority (live-run first) is preserved.
+  let toGeneration = fromGeneration + 1;
+  let intentAnomaly = null;
+  if (
+    intent &&
+    !(intent.toGeneration === toGeneration && intent.fromGeneration === fromGeneration) &&
+    !(intent.toGeneration === fromGeneration && intent.fromGeneration === fromGeneration - 1)
+  ) {
+    intentAnomaly = `stale intent targets generation ${intent.toGeneration} but milestone state implies ${toGeneration}; inspect ${intentFile} and ${STATE_FILE}`;
+  } else if (
+    intent &&
+    intent.toGeneration === fromGeneration &&
+    intent.fromGeneration === fromGeneration - 1
+  ) {
+    toGeneration = fromGeneration; // interrupted flow resumes at the persisted generation
+  }
 
   // Fail closed on an explicitly provided salvage manifest BEFORE touching
   // anything: an unreadable or foreign-schema manifest must abort the restart,
@@ -1647,12 +1685,18 @@ async function cmdRestartPackage(packageId, opts = {}) {
 
   // Idempotency: a completed receipt for THIS target generation ends the flow
   // (covers the crash window between receipt write and intent deletion).
+  const receiptFile = join(RECEIPTS_DIR, `${packageId}-g${toGeneration}.json`);
   const replay = (receipt, why) => {
     console.log(JSON.stringify(receipt, null, 2));
+    // Consume any surviving restart intent: replaying a COMPLETED restart must
+    // not leave an intent on disk whose toGeneration no longer matches what a
+    // FUTURE genuine restart will compute (it would refuse them all).
+    try {
+      unlinkSync(intentFile);
+    } catch {}
     log('fresh_restart_receipt_replayed', { packageId, toGeneration: receipt.toGeneration, why });
     return 0;
   };
-  const receiptFile = join(RECEIPTS_DIR, `${packageId}-g${toGeneration}.json`);
   try {
     const existing = JSON.parse(readFileSync(receiptFile, 'utf8'));
     if (existing?.schema === RESTART_RECEIPT_SCHEMA && existing?.toGeneration === toGeneration)
@@ -1680,24 +1724,32 @@ async function cmdRestartPackage(packageId, opts = {}) {
       `current-generation run(s) still live: ${liveCurrent.map((r) => r.id).join(', ')} — abandon them first`,
     );
 
-  // Crash recovery: adopt the recorded intent verbatim (never re-increment).
-  const intentFile = join(STATE_DIR, `restart-intent-${packageId}.json`);
-  let intent = null;
-  try {
-    const raw = JSON.parse(readFileSync(intentFile, 'utf8'));
-    if (raw?.schema === RESTART_INTENT_SCHEMA && raw.packageId === packageId) intent = raw;
-  } catch {
-    /* none yet */
+  if (intentAnomaly) {
+    // An anomaly on disk must surface as a refusal, not be masked by a
+    // friendly no-op. This check deliberately precedes the duplicate-invocation
+    // replay below.
+    return fail(intentAnomaly);
   }
-  if (intent && intent.toGeneration !== toGeneration) {
-    // Intent targets a DIFFERENT generation than milestone state implies —
-    // either a stale intent from an aborted attempt at an older generation, or
-    // milestone state moved backwards. Fail closed; never guess. This check
-    // deliberately precedes the duplicate-invocation replay below: an anomaly
-    // on disk must surface as a refusal, not be masked by a friendly no-op.
-    return fail(
-      `stale intent targets generation ${intent.toGeneration} but milestone state implies ${toGeneration}; inspect ${intentFile} and ${STATE_FILE}`,
-    );
+  if (intent && toGeneration === fromGeneration && fromGeneration > 0) {
+    // Case-C resume, but the "interrupted" generation already EXECUTED — its
+    // receipt is missing while launch evidence exists. That combination means
+    // history diverged from the paperwork; backfilling a completion receipt
+    // would launder an unrecorded lifecycle. Refuse for operator inspection.
+    const launchedTarget =
+      (st.history ?? []).some(
+        (h) =>
+          h.event === 'work_package_launched' &&
+          h.packageId === packageId &&
+          Number(h.generation ?? -1) >= fromGeneration,
+      ) ||
+      [...(st.activeRuns ?? []), ...(st.milestoneRuns ?? [])].some((e) => {
+        const p = parseGenerationMessage(e.message ?? '');
+        return p?.packageId === packageId && p.generation >= fromGeneration;
+      });
+    if (launchedTarget)
+      return fail(
+        `generation ${fromGeneration} shows launch evidence but its restart receipt is missing — refusing to backfill a completed generation; inspect ${RECEIPTS_DIR} and ${STATE_FILE}`,
+      );
   }
 
   // §7 hard rule: the second identical invocation cannot create generation 2.
@@ -1810,13 +1862,16 @@ async function cmdRestartPackage(packageId, opts = {}) {
   }
 
   // Receipt (atomic) — includes salvage provenance when a manifest was given.
+  // A Case-C resume records the ORIGINAL interrupted transition (intent
+  // origin → persisted generation), which is the restart this paperwork backs.
+  const transitionFrom = intent ? intent.fromGeneration : fromGeneration;
   const receipt = {
     schema: RESTART_RECEIPT_SCHEMA,
     packageId,
-    retiredGeneration: fromGeneration,
+    retiredGeneration: transitionFrom,
     toGeneration,
     reason,
-    retiredBranch: generationBranch(packageId, fromGeneration),
+    retiredBranch: generationBranch(packageId, transitionFrom),
     generationBranch: generationBranch(packageId, toGeneration),
     retiredRunIds: retiredRuns.map((r) => r.runId),
     retiredRuns,

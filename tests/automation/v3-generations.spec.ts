@@ -11,11 +11,19 @@
 //      fail-closed refusals (tracked live run, live current-generation row,
 //      stale intent, bad manifest).
 import { spawnSync } from 'node:child_process';
-import { chmodSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import {
+  chmodSync,
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import {
   generationBranch,
   generationMessage,
@@ -635,6 +643,156 @@ describe('--restart-package CLI flows', () => {
     expect(receipt.generationBranch).toBe(`foresift/${PKG}-g2`);
     const alpha = readMs(sb).packages.find((p: { id: string }) => p.id === PKG);
     expect(alpha.generation).toBe(2);
+  });
+});
+
+// ── §30 restart race matrix: crash windows and concurrent-invocation faults ──
+describe('§30 restart race matrix', () => {
+  let sb: Sandbox;
+  let raceN = 0;
+  beforeEach(() => {
+    // Unique fixture name per test: fixtures are private copies of a read-only
+    // template, and re-copying onto an existing .git/objects tree hits EACCES.
+    sb = restartSandbox(`restart-races-${++raceN}`);
+    writeFileSync(
+      join(sb.stateDir, 'autopilot-state.json'),
+      JSON.stringify({ activeRuns: [], milestoneRuns: [], pausedFatal: null, history: [] }),
+    );
+  });
+
+  /** Point the milestone at an arbitrary generation for a package. */
+  const setGeneration = (gen: number) => {
+    const f = join(sb.fx.root, 'specs', 'implementation', 'current-milestone.json');
+    const ms = JSON.parse(readFileSync(f, 'utf8'));
+    ms.packages.find((p: { id: string }) => p.id === PKG).generation = gen;
+    writeFileSync(f, `${JSON.stringify(ms, null, 2)}\n`);
+  };
+  const pkgGeneration = () =>
+    readMs(sb).packages.find((p: { id: string }) => p.id === PKG).generation;
+  const writeIntent = (from: number, to: number) =>
+    writeFileSync(
+      join(sb.stateDir, `restart-intent-${PKG}.json`),
+      JSON.stringify({
+        schema: 'foresift/restart-intent@1',
+        packageId: PKG,
+        fromGeneration: from,
+        toGeneration: to,
+        reason: 'crash-window fixture',
+        startedAt: '2026-08-23T00:00:00Z',
+      }),
+    );
+  const intentPath = () => join(sb.stateDir, `restart-intent-${PKG}.json`);
+
+  it('Case A: a live lock holder refuses the restart with exit 3 and mutates nothing', () => {
+    writeFileSync(join(sb.stateDir, 'autopilot.lock'), `${process.pid}\n`); // THIS test process is alive
+    const before = readMs(sb);
+    const r = runRestartCli(sb, ['--restart-package', PKG, '--fresh-generation']);
+    expect(r.status).toBe(3);
+    expect(r.stderr).toMatch(/holds the lock/);
+    expect(readMs(sb)).toEqual(before);
+    expect(existsSync(intentPath())).toBe(false); // no intent written behind the lock
+  });
+
+  it('Case C: crash AFTER the persist, BEFORE the receipt ⇒ resumes at the persisted generation, never re-increments', () => {
+    // The interrupted attempt already bumped milestone state to g1…
+    setGeneration(1);
+    // …and its intent survived on disk targeting exactly that transition.
+    writeIntent(0, 1);
+    const r = runRestartCli(sb, ['--restart-package', PKG, '--fresh-generation']);
+    expect(r.status).toBe(0);
+    const receipt = JSON.parse(r.stdout.trim());
+    // The paperwork records the ORIGINAL transition 0→1, not a fresh 1→2.
+    expect(receipt.retiredGeneration).toBe(0);
+    expect(receipt.toGeneration).toBe(1);
+    expect(receipt.generationBranch).toBe(`foresift/${PKG}-g1`);
+    expect(pkgGeneration()).toBe(1); // no double bump
+    expect(existsSync(intentPath())).toBe(false); // intent consumed
+    // The receipt landed under the PERSISTED generation's name.
+    expect(existsSync(join(sb.stateDir, 'receipts', `${PKG}-g1.json`))).toBe(true);
+  });
+
+  it('Case C guard: launch evidence for the persisted generation refuses receipt backfill', () => {
+    setGeneration(1);
+    writeIntent(0, 1);
+    writeFileSync(
+      join(sb.stateDir, 'autopilot-state.json'),
+      JSON.stringify({
+        activeRuns: [],
+        milestoneRuns: [],
+        pausedFatal: null,
+        history: [{ ts: 't', event: 'work_package_launched', packageId: PKG, generation: 1 }],
+      }),
+    );
+    const r = runRestartCli(sb, ['--restart-package', PKG, '--fresh-generation']);
+    expect(r.status).toBe(1);
+    expect(r.stderr).toMatch(/refusing to backfill a completed generation/);
+    expect(pkgGeneration()).toBe(1); // untouched
+  });
+
+  it('Case E: crash between receipt write and intent deletion ⇒ replay consumes the stale intent', () => {
+    // Simulate the exact window: completion receipt exists, intent not yet removed.
+    mkdirSync(join(sb.stateDir, 'receipts'), { recursive: true });
+    const priorReceipt = {
+      schema: 'foresift/restart-receipt@1',
+      packageId: PKG,
+      retiredGeneration: 0,
+      toGeneration: 1,
+      reason: 'original completed restart whose intent deletion crashed',
+    };
+    writeFileSync(join(sb.stateDir, 'receipts', `${PKG}-g1.json`), JSON.stringify(priorReceipt));
+    writeIntent(0, 1);
+    const before = readMs(sb);
+    const r = runRestartCli(sb, ['--restart-package', PKG, '--fresh-generation']);
+    expect(r.status).toBe(0);
+    expect(JSON.parse(r.stdout.trim())).toEqual(priorReceipt); // replayed verbatim
+    expect(existsSync(intentPath())).toBe(false); // THE FIX: intent consumed on replay
+    expect(readMs(sb)).toEqual(before); // replay mutates nothing
+    // A subsequent GENUINE restart is no longer blocked by the leftover intent.
+    // The window-E premise is that the original persist DID land, so the
+    // milestone carries generation 1 here.
+    setGeneration(1);
+    const next = runRestartCli(sb, [
+      '--restart-package',
+      PKG,
+      '--fresh-generation',
+      '--confirm-new-generation',
+    ]);
+    expect(next.status).toBe(0);
+    expect(JSON.parse(next.stdout.trim()).toGeneration).toBe(2);
+  });
+
+  it('Case J1: an unreadable salvage manifest refuses BEFORE mutating anything', () => {
+    const garbage = join(scratch, 'garbage-manifest.json');
+    writeFileSync(garbage, 'NOT JSON {{{');
+    const before = readMs(sb);
+    const r = runRestartCli(sb, [
+      '--restart-package',
+      PKG,
+      '--fresh-generation',
+      '--salvage-manifest',
+      garbage,
+    ]);
+    expect(r.status).toBe(1);
+    expect(r.stderr).toMatch(/unreadable/);
+    expect(readMs(sb)).toEqual(before);
+    expect(existsSync(intentPath())).toBe(false);
+  });
+
+  it('Case J2: a manifest naming ANOTHER package refuses with the mismatch named', () => {
+    const foreign = join(scratch, 'foreign-manifest.json');
+    writeFileSync(
+      foreign,
+      JSON.stringify({ schema: 'foresift/salvage-manifest@1', packageId: 'pkg-beta' }),
+    );
+    const r = runRestartCli(sb, [
+      '--restart-package',
+      PKG,
+      '--fresh-generation',
+      '--salvage-manifest',
+      foreign,
+    ]);
+    expect(r.status).toBe(1);
+    expect(r.stderr).toMatch(/is for package pkg-beta, not/);
   });
 });
 

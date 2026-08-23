@@ -324,6 +324,20 @@ nodes:
         --package "${ARGUMENTS%%@g*}" \
         --artifacts-dir "$ARTIFACTS_DIR"
       echo "REVIEW_PACKET_WRITTEN"
+      # V3-C §12: the bundled review agents never read $ARTIFACTS_DIR, so the
+      # packet is delivered INTO the review surface — posted on the PR it
+      # describes. Best-effort by design: an accelerator must never block
+      # review (failures logged, node stays green).
+      if [ -f "$ARTIFACTS_DIR/.pr-number" ] && [ -f "$ARTIFACTS_DIR/review-packet.md" ]; then
+        PR_NUM="$(cat "$ARTIFACTS_DIR/.pr-number")"
+        if gh pr comment "$PR_NUM" --body-file "$ARTIFACTS_DIR/review-packet.md" >/dev/null 2>&1; then
+          echo "REVIEW_PACKET_POSTED_PR=${PR_NUM}"
+        else
+          echo "REVIEW_PACKET_POST_FAILED (non-blocking; packet remains in artifacts)"
+        fi
+      else
+        echo "REVIEW_PACKET_POST_SKIPPED (no PR yet or no markdown twin)"
+      fi
 
   - id: review
     include: archon-review-block

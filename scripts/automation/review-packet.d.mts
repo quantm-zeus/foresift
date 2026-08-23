@@ -1,5 +1,6 @@
 export declare const REVIEW_PACKET_SCHEMA: 'foresift/review-packet@1';
 export declare const REVIEW_PACKET_FILE: 'review-packet.json';
+export declare const REVIEW_PACKET_MD_FILE: 'review-packet.md';
 export declare const PERMANENT_BOUNDARIES: string;
 
 export declare interface ReviewPacket {
@@ -58,3 +59,6 @@ export declare function aggregateFindings(findings: ReviewFinding[]): {
   aggregated: Array<ReviewFinding & { occurrences: number }>;
   exactDuplicatesMerged: number;
 };
+
+/** V3-C §12: byte-deterministic markdown twin so reviewers consume the packet. */
+export declare function renderReviewPacketMarkdown(packet: ReviewPacket): string;

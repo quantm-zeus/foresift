@@ -255,6 +255,84 @@ export function aggregateFindings(findings) {
   return { aggregated: order.map((k) => byKey.get(k)), exactDuplicatesMerged };
 }
 
+export const REVIEW_PACKET_MD_FILE = 'review-packet.md';
+
+/**
+ * V3-C §12 — deterministic markdown rendering so the packet is CONSUMED by
+ * reviewers instead of merely existing in $ARTIFACTS_DIR (the bundled
+ * archon-review-block agents never read artifacts; log-verified 2026-08-23).
+ * The workflow posts this to the PR right after the packet is built, putting
+ * machine-derived context directly into the review surface.
+ *
+ * Byte-deterministic for a given packet (no timestamps): freshness is exactly
+ * reviewedHeadSha + headTreeHash. Degradation is surfaced HONESTLY at the top
+ * — an accelerator that pretends to be healthy would be a lie.
+ */
+export function renderReviewPacketMarkdown(packet) {
+  const line = (s) => `- ${s}`;
+  const parts = [];
+  parts.push(
+    `## 🔎 Review packet — ${packet.packageId} ${packet.valid ? '' : '⚠️ DEGRADED'}`,
+    '',
+    `Machine-derived context for reviewers (\`${REVIEW_PACKET_SCHEMA}\`).`,
+    'This packet is an accelerator, never authority: verify every claim against the diff itself.',
+    '',
+  );
+  if (!packet.valid && Array.isArray(packet.reasons) && packet.reasons.length > 0) {
+    parts.push('### Degraded inputs (treat as absent)', '');
+    for (const r of packet.reasons) parts.push(line(`⚠️ ${r}`));
+    parts.push('');
+  }
+  parts.push(
+    '### Identity',
+    '',
+    line(`Reviewed HEAD: \`${packet.reviewedHeadSha ?? 'unknown'}\``),
+    line(`Tree hash: \`${packet.headTreeHash ?? 'unknown'}\``),
+    line(`Base: \`${packet.baseRef ?? 'unknown'}\` (${packet.baseSource ?? 'unresolved'})`),
+    line(`Risk: ${packet.risk ?? 'unknown'}`),
+    line(
+      `Write scopes: ${
+        Array.isArray(packet.writeScopes) && packet.writeScopes.length
+          ? packet.writeScopes.map((s) => `\`${s}\``).join(', ')
+          : 'none recorded'
+      }`,
+    ),
+    '',
+  );
+  const files = Array.isArray(packet.filesChanged) ? packet.filesChanged : [];
+  parts.push(`### Changed files (${files.length})`, '');
+  for (const f of files.slice(0, 200)) parts.push(line(`\`${f.status ?? 'M'}\` \`${f.path}\``));
+  if (files.length > 200) parts.push(line(`… ${files.length - 200} more (see review-packet.json)`));
+  parts.push('');
+  const tests = Array.isArray(packet.testsAddedOrChanged) ? packet.testsAddedOrChanged : [];
+  parts.push(`### Tests touched (${tests.length})`, '');
+  for (const t of tests.slice(0, 100)) parts.push(line(`\`${t}\``));
+  if (tests.length > 100) parts.push(line(`… ${tests.length - 100} more`));
+  parts.push('');
+  parts.push('### FULL-gate evidence', '');
+  const gate = packet.fullGateEvidence;
+  parts.push(
+    gate?.present
+      ? line(
+          `FULL gate ${gate.passed ? 'PASSED' : `FAILED (${(gate.failedCategories ?? []).join(', ')})`}`,
+        )
+      : line('none at build time (gate had not run yet)'),
+  );
+  const att = packet.attestationEvidence;
+  parts.push(
+    att?.present
+      ? line(`Attestation: ${att.result ?? 'unknown'} at \`${att.headSha ?? 'unknown'}\``)
+      : line('no attestation at build time'),
+  );
+  parts.push('');
+  parts.push('### Permanent product boundary', '', packet.permanentBoundaries ?? '', '');
+  const issues = Array.isArray(packet.knownUnresolvedIssues) ? packet.knownUnresolvedIssues : [];
+  parts.push(`### Known unresolved issues (${issues.length})`, '');
+  for (const i of issues) parts.push(line(i));
+  parts.push('');
+  return parts.join('\n');
+}
+
 const invokedDirectly = process.argv[1]?.endsWith('review-packet.mjs');
 if (invokedDirectly) {
   const argv = process.argv.slice(2);
@@ -290,6 +368,8 @@ if (invokedDirectly) {
     artifactsDir: a.artifactsDir,
   });
   writeFileSync(join(a.artifactsDir, REVIEW_PACKET_FILE), `${JSON.stringify(packet, null, 2)}\n`);
+  // V3-C §12: markdown twin for PR consumption (gh pr comment node).
+  writeFileSync(join(a.artifactsDir, REVIEW_PACKET_MD_FILE), renderReviewPacketMarkdown(packet));
   console.log(`REVIEW_PACKET_VALID=${packet.valid}`);
   console.log(`REVIEW_PACKET_HEAD=${packet.reviewedHeadSha ?? 'unknown'}`);
   console.log(`REVIEW_PACKET_FILES=${packet.filesChanged.length}`);

@@ -64,26 +64,26 @@ surfaces; no network egress anywhere in this package.
 
 _GATE: must pass before implementation. Re-checked after design._
 
-| Principle                             | Verdict | Evidence                                                                                                                                 |
-| ------------------------------------- | ------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
+| Principle                             | Verdict | Evidence                                                                                                                                        |
+| ------------------------------------- | ------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
 | I Product-Contract Authority          | PASS    | Every task cites FR-DATA-001 through FR-DATA-006 and FR-DR-001/FR-DR-002 or their ACs; `docs/spec/**` untouched; spec.md is marked subordinate. |
-| II Greenfield Architecture            | PASS    | Designed from PRD §§11/13/14/30/34/45 + Appendix D ADRs; predecessor not consulted.                                                      |
-| III Modular-Monolith-First Simplicity | PASS    | Five cohesive packages inside declared writeScopes; no brokers/services; PGlite is a test engine, not runtime infrastructure.            |
-| IV Read-Only Product Boundary         | PASS    | No execution/custody/signing/key-handling capability; key _material references_ only, never key material; negative tests assert absence. |
-| V Point-in-Time Correctness           | PASS    | Replay boundary enforced in storage contract and query layer (AC-020).                                                                   |
-| VI Event-Time / Earliest-Availability | PASS    | `event_at` preserved, `available_at` = earliest proven availability (ADR-049), backfill receipts carry availability proofs.              |
-| VII Provenance & Evidence             | PASS    | Availability-provenance classes, source lineage records, content hashes on all artifacts.                                                |
-| VIII Fail-Closed Integrations         | PASS    | Unknown provenance class, missing quality code, unverified restore → refuse; no silent defaults.                                         |
-| IX Provider/Capability Abstraction    | PASS    | Object store and clock behind internal interfaces; no vendor SDK in domain/persistence logic.                                            |
-| X Requirement Traceability            | PASS    | tasks.md maps each task to requirement IDs; validator-enforced.                                                                          |
-| XI Deterministic Verification         | PASS    | PGlite keeps migration/repository/drill tests hermetic; gates run identically locally and in CI.                                         |
-| XII Positive AND Failure-Path Testing | PASS    | All 22 assigned ACs get acceptance + negative specs per manifest testRefs.                                                               |
-| XIII Replay/Recovery/Idempotency      | PASS    | Fenced checkpoints, idempotent canonical-event constraints, replay-safe drill harness.                                                   |
-| XIV Durable Resumable Operations      | PASS    | Migration state persisted in `_foresift_schema_migrations`; drill state on disk; no conversational-only state.                           |
-| XV Security & Least Privilege         | PASS    | No secrets in code/tests/artifacts; `.env.example` placeholders only if needed; key separation enforced by policy tests.                 |
-| XVI Autonomous-Agent Governance       | PASS    | Material decisions recorded as proposed ADR texts (§8); scope respected; out-of-scope gaps routed to notes file.                         |
-| XVII Additive Git History             | PASS    | Work lands via PR from this branch; no amend/rebase/force.                                                                               |
-| XVIII No AI Claim Is Completion       | PASS    | Completion decided by `package-plan-complete.mjs` now and by `pnpm verify`/CI later.                                                     |
+| II Greenfield Architecture            | PASS    | Designed from PRD §§11/13/14/30/34/45 + Appendix D ADRs; predecessor not consulted.                                                             |
+| III Modular-Monolith-First Simplicity | PASS    | Five cohesive packages inside declared writeScopes; no brokers/services; PGlite is a test engine, not runtime infrastructure.                   |
+| IV Read-Only Product Boundary         | PASS    | No execution/custody/signing/key-handling capability; key _material references_ only, never key material; negative tests assert absence.        |
+| V Point-in-Time Correctness           | PASS    | Replay boundary enforced in storage contract and query layer (AC-020).                                                                          |
+| VI Event-Time / Earliest-Availability | PASS    | `event_at` preserved, `available_at` = earliest proven availability (ADR-049), backfill receipts carry availability proofs.                     |
+| VII Provenance & Evidence             | PASS    | Availability-provenance classes, source lineage records, content hashes on all artifacts.                                                       |
+| VIII Fail-Closed Integrations         | PASS    | Unknown provenance class, missing quality code, unverified restore → refuse; no silent defaults.                                                |
+| IX Provider/Capability Abstraction    | PASS    | Object store and clock behind internal interfaces; no vendor SDK in domain/persistence logic.                                                   |
+| X Requirement Traceability            | PASS    | tasks.md maps each task to requirement IDs; validator-enforced.                                                                                 |
+| XI Deterministic Verification         | PASS    | PGlite keeps migration/repository/drill tests hermetic; gates run identically locally and in CI.                                                |
+| XII Positive AND Failure-Path Testing | PASS    | All 22 assigned ACs get acceptance + negative specs per manifest testRefs.                                                                      |
+| XIII Replay/Recovery/Idempotency      | PASS    | Fenced checkpoints, idempotent canonical-event constraints, replay-safe drill harness.                                                          |
+| XIV Durable Resumable Operations      | PASS    | Migration state persisted in `_foresift_schema_migrations`; drill state on disk; no conversational-only state.                                  |
+| XV Security & Least Privilege         | PASS    | No secrets in code/tests/artifacts; `.env.example` placeholders only if needed; key separation enforced by policy tests.                        |
+| XVI Autonomous-Agent Governance       | PASS    | Material decisions recorded as proposed ADR texts (§8); scope respected; out-of-scope gaps routed to notes file.                                |
+| XVII Additive Git History             | PASS    | Work lands via PR from this branch; no amend/rebase/force.                                                                                      |
+| XVIII No AI Claim Is Completion       | PASS    | Completion decided by `package-plan-complete.mjs` now and by `pnpm verify`/CI later.                                                            |
 
 ## Project Structure
 

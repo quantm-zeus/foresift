@@ -237,7 +237,7 @@ exist for every acceptance criterion listed in spec.md §3.
       with budget assertions; harness fails under artificial over-budget delay. Traces:
       FR-DATA-001, FR-DATA-003, FR-DR-001 (internal-overhead benchmark substrate of
       AC-060 per spec §3.2).
-- [ ] T059 AC-061 pair: explicit partial/insufficient output states rendered from
+- [x] T059 AC-061 pair: explicit partial/insufficient output states rendered from
       quality/acquisition/degradation vocabularies; unsafe automated-alert success
       fabrication impossible. Traces: FR-DATA-005, FR-DR-001 (explicit-degraded-output
       substrate of AC-061 per spec §3.2).

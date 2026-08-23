@@ -230,7 +230,7 @@ exist for every acceptance criterion listed in spec.md §3.
 - [x] T056 AC-245 pair + AC-246 pair + AC-247 pair: dependence-edge credit reduction,
       lineage collapse removing duplicated credit, retrospective estimate cannot alter
       frozen counts. Traces: FR-DATA-006.
-- [ ] T057 AC-248 pair + AC-249 pair: immutable matured-count projections reported
+- [x] T057 AC-248 pair + AC-249 pair: immutable matured-count projections reported
       honestly below thresholds; availability-backdating placebo leaves replay unchanged.
       Traces: FR-DATA-003, FR-DATA-004.
 - [ ] T058 AC-060 pair: persistence benchmark fixtures (identity lookup, replay read)

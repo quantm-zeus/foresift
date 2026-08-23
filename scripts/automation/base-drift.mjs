@@ -67,3 +67,20 @@ export function isAncestorSha(runGit, ancestorSha, descendantSha) {
     return e?.status === 1 ? false : null;
   }
 }
+
+/**
+ * True when this checkout's history is truncated (shallow clone / fetch-depth=1).
+ * A shallow checkout makes a "false" from isAncestorSha MEANINGLESS: the
+ * ancestor commit simply is not present locally. Returns null when git cannot
+ * answer.
+ */
+export function isShallowCheckout(runGit) {
+  try {
+    const out = String(runGit('rev-parse', '--is-shallow-repository')).trim();
+    if (out === 'true') return true;
+    if (out === 'false') return false;
+    return null;
+  } catch {
+    return null;
+  }
+}

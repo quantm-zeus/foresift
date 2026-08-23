@@ -18,3 +18,7 @@ export declare function isAncestorSha(
   ancestorSha: string,
   descendantSha: string,
 ): boolean | null;
+
+/** True when the checkout's history is truncated; a "false" ancestry answer
+ *  from such a checkout is meaningless. null = git could not answer. */
+export declare function isShallowCheckout(runGit: (...args: string[]) => unknown): boolean | null;

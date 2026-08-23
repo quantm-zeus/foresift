@@ -74,12 +74,18 @@ export function assessFinalLandAdmission(branch, cwd = process.cwd()) {
     if (!mainSha || !head) return { ok: true, advisory: true };
     const anc = run(['merge-base', '--is-ancestor', mainSha, head]);
     if (anc.status === 0) return { ok: true };
-    if (anc.status === 1)
-      return {
-        ok: false,
-        reason: 'base-drift',
-        detail: `origin/main (${mainSha.slice(0, 10)}) is not contained in ${branch} head (${head.slice(0, 10)})`,
-      };
+    if (anc.status === 1) {
+      // A shallow checkout's "false" is meaningless (the base commit is not
+      // even present locally) — advisory only; the lander refuses fail-closed.
+      const shallow = run(['rev-parse', '--is-shallow-repository']).stdout?.trim() === 'true';
+      if (!shallow)
+        return {
+          ok: false,
+          reason: 'base-drift',
+          detail: `origin/main (${mainSha.slice(0, 10)}) is not contained in ${branch} head (${head.slice(0, 10)})`,
+        };
+      return { ok: true, advisory: true };
+    }
     return { ok: true, advisory: true }; // unverifiable ⇒ defer to the lander
   } catch {
     return { ok: true, advisory: true };

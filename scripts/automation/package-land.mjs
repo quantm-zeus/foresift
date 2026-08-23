@@ -28,7 +28,12 @@
 
 import { execFileSync } from 'node:child_process';
 import { existsSync } from 'node:fs';
-import { landingAdmission, isAncestorSha } from './base-drift.mjs';
+import {
+  landingAdmission,
+  isAncestorSha,
+  isShallowCheckout,
+  BASE_DRIFT_REASON,
+} from './base-drift.mjs';
 
 const DEFAULT_CHECK = 'Verify (spec, format, lint, types, tests)';
 
@@ -103,7 +108,9 @@ function main() {
 
   // 2. BASE ADMISSION before any push (V3-D §11): refuse branches that do not
   // carry current origin/main — they would land code never validated against
-  // the world it joins after a sibling's parallel landing.
+  // the world it joins after a sibling's parallel landing. A SHALLOW checkout
+  // cannot answer the ancestry question at all, so it refuses fail-closed
+  // rather than guessing.
   const gitArgs = (...args) => sh('git', args);
   const admitBase = () => {
     let verdict;
@@ -113,6 +120,16 @@ function main() {
       const head = sh('git', ['rev-parse', 'HEAD']);
       const contains = isAncestorSha(gitArgs, mainSha, head);
       if (contains === null) throw new Error('merge-base unverifiable');
+      if (!contains && isShallowCheckout(gitArgs)) {
+        // The "false" is untrustworthy here — the base commit may simply be
+        // absent from a truncated history. Landing needs a full checkout.
+        return {
+          ok: false,
+          reason: BASE_DRIFT_REASON,
+          detail:
+            'shallow checkout cannot prove base containment — run the lander from a full clone/worktree',
+        };
+      }
       verdict = landingAdmission({
         currentMainResolved: true,
         branchContainsCurrentMain: contains,

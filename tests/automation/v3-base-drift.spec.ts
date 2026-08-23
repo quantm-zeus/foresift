@@ -19,6 +19,7 @@ import {
   BASE_DRIFT_REASON,
   landingAdmission,
   isAncestorSha,
+  isShallowCheckout,
 } from '../../scripts/automation/base-drift.mjs';
 import {
   attestationDrift,
@@ -69,11 +70,12 @@ describe('landingAdmission (pure)', () => {
   });
 });
 
+/** execFileSync-style failure carrying the child's exit status. */
+function gitError(status: number): Error & { status: number } {
+  return Object.assign(new Error(`exit ${status}`), { status });
+}
+
 describe('isAncestorSha', () => {
-  /** execFileSync-style failure carrying the child's exit status. */
-  function gitError(status: number): Error & { status: number } {
-    return Object.assign(new Error(`exit ${status}`), { status });
-  }
   it('true on exit 0, false on exit 1 (a real answer), null otherwise', () => {
     expect(isAncestorSha(() => '', 'a', 'b')).toBe(true);
     expect(
@@ -94,6 +96,40 @@ describe('isAncestorSha', () => {
         'b',
       ),
     ).toBeNull();
+  });
+});
+
+describe('isShallowCheckout', () => {
+  it('true/false/null map straight through; git failure is unverifiable', () => {
+    expect(isShallowCheckout(() => 'true\n')).toBe(true);
+    expect(isShallowCheckout(() => 'false\n')).toBe(false);
+    expect(isShallowCheckout(() => 'garbage')).toBeNull();
+    expect(
+      isShallowCheckout(() => {
+        throw gitError(128);
+      }),
+    ).toBeNull();
+  });
+
+  it('a real shallow clone reports true; a full fixture repo reports false', () => {
+    const fx = buildFixture('shallow-probe');
+    expect(isShallowCheckout((...args: string[]) => inRepo(fx, args).trim())).toBe(false);
+    // depth-1 fetch truncates history — the CI failure mode that motivated
+    // shallow awareness (a "not-ancestor" answer there is meaningless).
+    // file:// forces the smart transport (local-path clones ignore --depth).
+    const shallowDir = tmp('shallow');
+    execFileSync('git', [
+      'clone',
+      '-q',
+      '--depth',
+      '1',
+      `file://${join(fx.root, 'repo')}-origin.git`,
+      shallowDir,
+    ]);
+    const g = (...args: string[]) =>
+      execFileSync('git', args, { cwd: shallowDir, encoding: 'utf8' }).trim();
+    expect(isShallowCheckout(g)).toBe(true);
+    expect(g('rev-parse', '--is-shallow-repository')).toBe('true');
   });
 });
 

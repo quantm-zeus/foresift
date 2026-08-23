@@ -29,6 +29,18 @@ export function runFinalLand(
       status: number | null;
       stdout?: string;
     };
+    admission?: (branch: string) => AdmissionVerdict;
     now?: () => string;
   },
 ): { ok: boolean; usage?: boolean };
+
+/** V3-D §11 base-drift admission probe. Advisory when the environment cannot
+ *  prove anything (no remote/offline): the mechanical lander stays the
+ *  authoritative fail-closed enforcement point. */
+export interface AdmissionVerdict {
+  ok: boolean;
+  advisory?: boolean;
+  reason?: string;
+  detail?: string;
+}
+export declare function assessFinalLandAdmission(branch: string, cwd?: string): AdmissionVerdict;

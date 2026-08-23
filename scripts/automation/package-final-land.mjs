@@ -58,11 +58,41 @@ function parseArgs(argv) {
 }
 
 /**
+ * V3-D §11 advisory admission BEFORE any gate work: if origin/main has
+ * provably moved past what the branch carries, landing is doomed (the lander
+ * will refuse) and a fresh FULL run would be wasted — refuse now with
+ * 'base-drift'. Unverifiable environments (fixtures, no remote) proceed
+ * ADVISORY-OK: the mechanical lander remains the authoritative, fail-closed
+ * enforcement point.
+ */
+export function assessFinalLandAdmission(branch, cwd = process.cwd()) {
+  const run = (args, opts = {}) => spawnSync('git', args, { encoding: 'utf8', cwd, ...opts });
+  try {
+    if (run(['fetch', 'origin', 'main']).status !== 0) return { ok: true, advisory: true };
+    const mainSha = run(['rev-parse', 'FETCH_HEAD']).stdout?.trim();
+    const head = run(['rev-parse', 'HEAD']).stdout?.trim();
+    if (!mainSha || !head) return { ok: true, advisory: true };
+    const anc = run(['merge-base', '--is-ancestor', mainSha, head]);
+    if (anc.status === 0) return { ok: true };
+    if (anc.status === 1)
+      return {
+        ok: false,
+        reason: 'base-drift',
+        detail: `origin/main (${mainSha.slice(0, 10)}) is not contained in ${branch} head (${head.slice(0, 10)})`,
+      };
+    return { ok: true, advisory: true }; // unverifiable ⇒ defer to the lander
+  } catch {
+    return { ok: true, advisory: true };
+  }
+}
+
+/**
  * Pure-ish core with injectable process runners so tests can prove every
  * route without executing gates, git, or gh. deps:
  *   gateCheck({packageId, artifactsDir}) → {status}
  *   gateRun({packageId, artifactsDir})   → {status}   (FULL execution)
  *   lander({branch,title,bodyFile,deadlineS}) → {status, stdout}
+ *   admission() → {ok, reason?, detail?}              (V3-D base-drift probe)
  */
 export function runFinalLand(a, deps = {}) {
   const {
@@ -93,6 +123,8 @@ export function runFinalLand(a, deps = {}) {
         ],
         { encoding: 'utf8', maxBuffer: 256 * 1024 * 1024 },
       ),
+    admission = (branch) =>
+      assessFinalLandAdmission(branch, a.repoRoot ? resolve(a.repoRoot) : process.cwd()),
     now = () => new Date().toISOString(),
   } = deps;
 
@@ -130,6 +162,19 @@ export function runFinalLand(a, deps = {}) {
     }
     return result;
   };
+
+  // ── 0. base-drift admission (V3-D §11): never burn a FULL gate on a branch
+  // that provably no longer carries current origin/main.
+  const adm = admission(a.branch);
+  if (!adm.ok) {
+    console.error(`LAND ▸ ${adm.reason}: ${adm.detail}`);
+    record(false, adm.reason ?? 'base-drift', {
+      gateMode: 'ADMISSION_REFUSED',
+      detail: adm.detail,
+    });
+    process.exitCode = 4;
+    return { ok: false };
+  }
 
   // ── 1. exact-head FULL-gate evidence (reuse-first; at most ONE fresh FULL) ──
   let gateMode = 'ATTESTATION_REUSE';

@@ -6,22 +6,29 @@
 //
 // Mechanical contract:
 //   1. refuse on dirty TRACKED tree (untracked evidence dirs don't block)
-//   2. push branch (idempotent when already current)
-//   3. discover an OPEN PR for the branch or create exactly one
-//   4. pin the LOCAL HEAD sha; wait for the named check AT THAT SHA
+//   2. BASE ADMISSION (V3-D §11): the branch must CARRY current origin/main
+//      (`merge-base --is-ancestor`); a sibling landing meanwhile ⇒ refuse
+//      'base-drift' BEFORE any push — never land code validated against an
+//      older world
+//   3. push branch (idempotent when already current)
+//   4. discover an OPEN PR for the branch or create exactly one
+//   5. pin the LOCAL HEAD sha; wait for the named check AT THAT SHA
 //      (never "latest run": a later push invalidates everything)
-//   5. red CI ⇒ exit 1 with the failure names. NEVER bypassed, NEVER retried
+//   6. red CI ⇒ exit 1 with the failure names. NEVER bypassed, NEVER retried
 //      into greenness — the only repair is new commits producing a NEW head
-//   6. zero check-runs at the pinned head ⇒ diagnose-and-fail-fast when the
+//   7. zero check-runs at the pinned head ⇒ diagnose-and-fail-fast when the
 //      merge ref conflicts with main (the silent-CI squash-base trap);
 //      otherwise bounded patience, then fail with the same hint
-//   7. immediately before merging: re-confirm origin branch == pinned sha,
-//      then squash-merge. Any drift ⇒ abort, never merge a moving target
+//   8. immediately before merging: RE-RUN base admission (closes the window
+//      where a sibling merged while CI ran), re-confirm origin branch ==
+//      pinned sha, then squash-merge. Any drift ⇒ abort, never merge a
+//      moving target
 //
 // Exit codes: 0 merged · 1 refused/failed (with reason) · 2 usage error.
 
 import { execFileSync } from 'node:child_process';
 import { existsSync } from 'node:fs';
+import { landingAdmission, isAncestorSha } from './base-drift.mjs';
 
 const DEFAULT_CHECK = 'Verify (spec, format, lint, types, tests)';
 
@@ -94,11 +101,50 @@ function main() {
     process.exit(1);
   }
 
-  // 2. Push (idempotent).
+  // 2. BASE ADMISSION before any push (V3-D §11): refuse branches that do not
+  // carry current origin/main — they would land code never validated against
+  // the world it joins after a sibling's parallel landing.
+  const gitArgs = (...args) => sh('git', args);
+  const admitBase = () => {
+    let verdict;
+    try {
+      sh('git', ['fetch', 'origin', 'main']);
+      const mainSha = sh('git', ['rev-parse', 'FETCH_HEAD']);
+      const head = sh('git', ['rev-parse', 'HEAD']);
+      const contains = isAncestorSha(gitArgs, mainSha, head);
+      if (contains === null) throw new Error('merge-base unverifiable');
+      verdict = landingAdmission({
+        currentMainResolved: true,
+        branchContainsCurrentMain: contains,
+      });
+    } catch (e) {
+      verdict = landingAdmission({ currentMainResolved: false });
+      verdict.detail = `${verdict.detail} (${String(e?.message ?? e).split('\n')[0]})`;
+    }
+    return verdict;
+  };
+  const refuseBase = (verdict, at) => {
+    step(`aborted-${at}`, `${verdict.reason}: ${verdict.detail}`);
+    console.log(
+      JSON.stringify(
+        { merged: false, reason: verdict.reason, detail: verdict.detail, trace },
+        null,
+        2,
+      ),
+    );
+    process.exit(1);
+  };
+  {
+    const v = admitBase();
+    if (!v.ok) refuseBase(v, 'base-admission');
+  }
+  step('base-admitted', 'branch carries current origin/main');
+
+  // 3. Push (idempotent).
   sh('git', ['push', '-u', 'origin', a.branch]);
   step('pushed', a.branch);
 
-  // 3. Discover or create the PR.
+  // 4. Discover or create the PR.
   let prNum = null;
   try {
     const listed = sh('gh', [
@@ -130,7 +176,7 @@ function main() {
   }
   step('pr-ready', `#${prNum}`);
 
-  // 4. Pin the head; wait for the check AT THAT SHA.
+  // 5. Pin the head; wait for the check AT THAT SHA.
   const pinSha = sh('git', ['rev-parse', 'HEAD']);
   step('head-pinned', pinSha);
 
@@ -226,7 +272,12 @@ function main() {
     process.exit(1);
   }
 
-  // 7. Final drift guard + squash merge.
+  // 7. Final drift guard + squash merge. Base admission RE-RUNS here to close
+  // the TOCTOU window: a sibling package may have merged while CI ran.
+  {
+    const v = admitBase();
+    if (!v.ok) refuseBase(v, 'pre-merge-base');
+  }
   sh('git', ['fetch', 'origin', a.branch]);
   const remoteSha = sh('git', ['rev-parse', 'origin/' + a.branch]);
   if (remoteSha !== pinSha) {

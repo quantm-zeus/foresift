@@ -1,9 +1,9 @@
 /**
  * AC-262 acceptance (positive) — task T061.
  * Traces: FR-DR-001, FR-DR-002.
- * AC text (manifest §39.25): "A recovery tier violation degrades the
- * affected capability machine-readably while preserving deterministic risk
- * monitoring, and blocks active opportunity mode until repaired."
+ * AC text (manifest §39.25, verbatim): "Failure to meet a recovery tier
+ * automatically degrades the affected capability and prevents confirmed
+ * opportunity alerts while preserving safe deterministic risk monitoring."
  *
  * A scripted RPO miss produces a durable incident and a persisted DEGRADED
  * health row whose flags are the machine-readable contract: confirmed
@@ -106,7 +106,10 @@ describe('AC-262: tier violations degrade machine-readably, then repair to HEALT
     ).rows[0]?.incident_id;
     expect(incidentId).not.toBeNull();
 
-    // Repair: the incident closes, then the re-verified evaluation records HEALTHY.
+    // Repair: the incident closes; then a post-repair HEALTHY state row is
+    // RECORDED explicitly via recordRecoveryHealthState — this suite proves
+    // the durable record shape, not automatic re-evaluation (the production
+    // drill loop performs re-evaluation).
     await resolveIncident(tdb.engine, {
       incidentId: incidentId!,
       resolvedAt: at(150),

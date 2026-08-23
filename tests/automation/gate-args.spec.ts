@@ -4,12 +4,15 @@ import { describe, expect, it } from 'vitest';
 import { parseGateArgs } from '../../scripts/automation/schema.mjs';
 
 // Regression coverage for the live package-gate failure of 2026-08-23: the
-// gate-router invokes `pnpm foresift:gate -- --package <id>` (the documented
-// form in AUTOPILOT.md and foresift-work-package.yaml). pnpm v11 forwards the
-// bare `--` separator verbatim into the shell command, and node passes it
-// through to process.argv when running a script file — so the gate's parser
-// counted the separator as an unexpected positional and failed closed with a
-// usage error (exit 2) BEFORE any verification check ran.
+// gate-router then invoked `pnpm foresift:gate -- --package <id>`; pnpm v11
+// forwarded the bare `--` separator verbatim into the shell command, and node
+// passed it through to process.argv — so the gate's parser counted the
+// separator as an unexpected positional and failed closed with a usage error
+// (exit 2) BEFORE any verification check ran. ADR-0007 normalized the call
+// sites to the separator-free form (`pnpm foresift:gate --package <id>`, the
+// form now documented in AUTOPILOT.md and the workflow YAML); the parser
+// retains tolerance for a forwarded separator so any stale caller still
+// reaches verification instead of a usage error.
 
 const GATE = join(import.meta.dirname, '../../scripts/automation/foresift-gate.mjs');
 

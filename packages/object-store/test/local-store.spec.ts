@@ -102,6 +102,34 @@ describe('tamper detection fails explicitly (T041)', () => {
     );
   });
 
+  it('refuses malformed content hashes instead of deriving a path from them', async () => {
+    // A non-hash string must never reach filesystem path derivation.
+    for (const hostile of ['sha256:../../etc', 'sha256:' + 'G'.repeat(64), 'objects']) {
+      await expect(store.versions(hostile)).rejects.toThrow(/malformed content hash/);
+    }
+  });
+
+  it('reads a metadata-scoped miss as absent, never as another identity’s version', async () => {
+    const bytes = new TextEncoder().encode('identity-scoped-lookup');
+    const stored = await store.put({
+      artifactId: 'art-10',
+      bytes,
+      metadata: { ...META, rightsRef: 'license:scoped' },
+    });
+    // Same bytes, same address, but a DIFFERENT protection identity on disk;
+    // looking up with an unrelated rights ref must not hand that version back.
+    const miss = await store.get({
+      contentHash: stored.contentHash,
+      metadata: { ...META, rightsRef: 'license:other-party' },
+    });
+    expect(miss).toBeNull();
+    const hit = await store.get({
+      contentHash: stored.contentHash,
+      metadata: { ...META, rightsRef: 'license:scoped' },
+    });
+    expect(hit?.stored.artifactId).toBe('art-10');
+  });
+
   it('reports HASH_MISMATCH when stored bytes are tampered on disk', async () => {
     const bytes = new TextEncoder().encode('untampered-original');
     const stored = await store.put({ artifactId: 'art-8', bytes, metadata: META });

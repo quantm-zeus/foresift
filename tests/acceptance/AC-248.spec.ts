@@ -54,7 +54,9 @@ async function maturedRetrieval(
     decisionId,
     completedAt,
     state: AcquisitionState.RETURNED,
-    evidenceIds: [bundleId], // must match the frozen bundle's content address key
+    // bundleId joins the decision to the frozen bundle's identity row — it is
+    // NOT the content hash itself; the evidence index refuses conflating them.
+    evidenceIds: [bundleId],
   });
 }
 

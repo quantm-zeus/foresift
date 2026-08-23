@@ -74,8 +74,10 @@ export function visibleAt(record: ReplayVisible, t: UtcTimestamp): boolean {
 }
 
 /**
- * Epoch-millisecond form of the predicate for SQL-layer parity checks and
- * index construction (`WHERE available_at_ms <= :tMs`).
+ * Epoch-millisecond form of the predicate, kept for future SQL-layer parity
+ * checks and index construction (`WHERE available_at_ms <= :tMs`). Currently
+ * unused by shipped SQL — the G0 schema has no `available_at_ms` column;
+ * callers use `visibleAt` over ISO strings.
  */
 export function visibleAtMs(availableAtEpochMs: number, t: UtcTimestamp): boolean {
   return availableAtEpochMs <= toEpochMs(t);

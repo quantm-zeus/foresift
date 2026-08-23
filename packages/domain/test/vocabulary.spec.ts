@@ -16,7 +16,7 @@ import {
 } from '../src/index.ts';
 
 describe('§13.9 quality-code vocabulary (FR-DATA-005)', () => {
-  it('declares the complete 30-code vocabulary with stable spellings', () => {
+  it('declares the complete 31-code vocabulary with stable spellings', () => {
     // The §13.9 list is product law: additions are allowed, renames/removals are not.
     const required = [
       'VALID',

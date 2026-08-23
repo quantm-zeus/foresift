@@ -41,6 +41,13 @@ export interface DatabaseEngine {
   transaction<T>(work: (engine: DatabaseEngine) => Promise<T>): Promise<T>;
 }
 
+/**
+ * Process-wide savepoint sequence: keeps names unique across nesting depths
+ * AND concurrent transactions without reading the wall clock — determinism
+ * requirement of the DR drill harnesses.
+ */
+let savepointSequence = 0;
+
 class TransactionalEngine implements DatabaseEngine {
   readonly engineKind: 'pglite' | 'pg';
   private readonly client: RawSqlClient;
@@ -69,7 +76,7 @@ class TransactionalEngine implements DatabaseEngine {
 
   async transaction<T>(work: (engine: DatabaseEngine) => Promise<T>): Promise<T> {
     if (this.depth > 0) {
-      const savepoint = `foresift_sp_${this.depth}_${Date.now() % 1_000_000}`;
+      const savepoint = `foresift_sp_${this.depth}_${(savepointSequence += 1)}`;
       await this.client.exec(`SAVEPOINT ${savepoint}`);
       try {
         return await work(new TransactionalEngine(this.client, this.engineKind, this.depth + 1));

@@ -9,8 +9,10 @@
  * deterministic time (see drill/rpo.ts).
  */
 import {
+  compareTimestamps,
   ErrorCode,
   ForesiftError,
+  utcTimestamp,
   validateRecoveryTier,
   type RecoveryDataClass as RecoveryDataClassType,
   type RecoveryHealthState,
@@ -200,17 +202,28 @@ export async function resolveIncident(
   engine: DatabaseEngine,
   input: { incidentId: string; resolvedAt: UtcTimestamp },
 ): Promise<void> {
-  const rows = await engine.query<{ resolved_at: string | null }>(
-    'SELECT resolved_at FROM recovery_incidents WHERE incident_id = $1',
+  const rows = await engine.query<{ opened_at: string | Date }>(
+    'SELECT opened_at FROM recovery_incidents WHERE incident_id = $1',
     [input.incidentId],
   );
-  if (rows.rows[0] === undefined) {
+  const row = rows.rows[0];
+  if (row === undefined) {
     throw new ForesiftError(
       ErrorCode.DRILL_INCIDENT_RECORDED,
       `unknown incident ${input.incidentId}`,
       {
         incidentId: input.incidentId,
       },
+    );
+  }
+  // Incidents close only forward in time: a resolution predating the opening
+  // would falsify the durable incident record (review L-23).
+  const openedIso = typeof row.opened_at === 'string' ? row.opened_at : row.opened_at.toISOString();
+  if (compareTimestamps(input.resolvedAt, utcTimestamp(openedIso)) < 0) {
+    throw new ForesiftError(
+      ErrorCode.DRILL_INCIDENT_RECORDED,
+      `incident ${input.incidentId} cannot resolve at ${input.resolvedAt}, before it opened at ${openedIso}`,
+      { incidentId: input.incidentId },
     );
   }
   await engine.query('UPDATE recovery_incidents SET resolved_at = $2 WHERE incident_id = $1', [

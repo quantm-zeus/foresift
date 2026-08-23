@@ -15,6 +15,10 @@ export type RawAmount = bigint & { readonly [brand]: 'RawAmount' };
 /** Decimal string with an explicit scale, e.g. `"12.3450"` at scale 4. */
 export type DecimalString = string & { readonly [brand]: 'DecimalString' };
 
+// Unsigned canonical decimals only: no sign, no leading zeros, no exponent
+// (`renderDecimalString` below CAN emit a leading '-' for negative
+// `(units, scale)` pairs — such output is a render-side convention and must
+// be re-signed/parsed through the raw-integer path, not this pattern).
 const DECIMAL_PATTERN = /^(0|[1-9][0-9]*)(\.[0-9]+)?$/;
 
 /**

@@ -9,6 +9,7 @@
  * registered BLOCKS resumption (fail closed, never a silent pass).
  */
 import type { UtcTimestamp } from '@foresift/domain';
+import { canonicalJson, sha256Text } from '../canonical-json.ts';
 import type { DatabaseEngine } from '../db.ts';
 import { appliedMigrations, discoverMigrations } from '../migrator.ts';
 
@@ -36,7 +37,11 @@ export interface RestoreCheck {
   verify(context: RestoreCheckContext): Promise<Omit<RestoreCheckResult, 'name'>>;
 }
 
-/** Physical object-hash verification port (implemented over ObjectStoreAdapter). */
+/**
+ * Physical object-hash verification port. Implementable over any
+ * ObjectStoreAdapter; today only test-local implementations exist (production
+ * wiring arrives with the object-store deployment milestone).
+ */
 export interface ArtifactHashVerifier {
   /** Verify one artifact's physical bytes match its indexed content hash. */
   verifyArtifact(
@@ -126,20 +131,8 @@ export const crossStoreReferenceCheck: RestoreCheck = {
     if (bundles.rows.length === 0) {
       return { passed: true, detail: 'no evidence bundles to cross-check' };
     }
-    // Lazy import avoided deliberately: hashing helper duplicated minimally
-    // here to keep persistence free of an evidence dependency cycle.
-    const { createHash } = await import('node:crypto');
-    const canonicalJson = (value: unknown): string => {
-      if (value === null || typeof value !== 'object') return JSON.stringify(value) ?? 'null';
-      if (Array.isArray(value)) return `[${value.map((v) => canonicalJson(v)).join(',')}]`;
-      const entries = Object.entries(value as Record<string, unknown>)
-        .filter(([, v]) => v !== undefined)
-        .sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0))
-        .map(([k, v]) => `${JSON.stringify(k)}:${canonicalJson(v)}`);
-      return `{${entries.join(',')}}`;
-    };
     for (const bundle of bundles.rows) {
-      const actual = `sha256:${createHash('sha256').update(canonicalJson(bundle.manifest), 'utf8').digest('hex')}`;
+      const actual = sha256Text(canonicalJson(bundle.manifest));
       if (actual !== bundle.content_hash) {
         return {
           passed: false,
@@ -231,8 +224,10 @@ export interface RestoreDrillReport {
  * Fail-closed ordering:
  *  1. no separately provided credential provider ⇒ BLOCKED, nothing runs;
  *  2. declared-but-unregistered required checks ⇒ BLOCKED;
- *  3. any failed check ⇒ FAILED;
- *  4. only then may the outcome be PASSED.
+ *  3. zero registered verifications with no requirements declared ⇒ BLOCKED
+ *     (`[].every(...)` must never manufacture a PASSED from no evidence);
+ *  4. any failed check ⇒ FAILED;
+ *  5. only then may the outcome be PASSED.
  */
 export async function runRestoreDrill(config: RestoreDrillConfig): Promise<RestoreDrillReport> {
   const { engine, drillId } = config;
@@ -257,8 +252,9 @@ export async function runRestoreDrill(config: RestoreDrillConfig): Promise<Resto
   await config.credentialProvider.unlock();
 
   const checks = config.registeredChecks ?? [];
+  const required = config.requiredChecks ?? [];
   const registeredNames = new Set(checks.map((c) => c.name));
-  const unregistered = (config.requiredChecks ?? []).filter((n) => !registeredNames.has(n));
+  const unregistered = required.filter((n) => !registeredNames.has(n));
   if (unregistered.length > 0) {
     const blocked: RestoreDrillReport = {
       drillId,
@@ -268,6 +264,25 @@ export async function runRestoreDrill(config: RestoreDrillConfig): Promise<Resto
         passed: false,
         detail: 'required check has no registered verifier; resumption refused',
       })),
+      finishedAt: null,
+    };
+    await persistOutcome(engine, blocked, config.startedAt, true);
+    return blocked;
+  }
+
+  if (checks.length === 0) {
+    const blocked: RestoreDrillReport = {
+      drillId,
+      outcome: 'BLOCKED',
+      checks: [
+        {
+          name: 'restore-verification-coverage',
+          passed: false,
+          detail:
+            'no verification checks registered and none required; a restore with zero ' +
+            'verifications cannot demonstrate §34.6 success — resumption refused',
+        },
+      ],
       finishedAt: null,
     };
     await persistOutcome(engine, blocked, config.startedAt, true);

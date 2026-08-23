@@ -111,7 +111,9 @@ async function writeComputedValue(
      DO UPDATE SET decimal_string = EXCLUDED.decimal_string,
        scale = EXCLUDED.scale,
        quality_codes = EXCLUDED.quality_codes,
-       computation_code_version = EXCLUDED.computation_code_version`,
+       computation_code_version = EXCLUDED.computation_code_version,
+       population_kind = EXCLUDED.population_kind,
+       lineage_refs = EXCLUDED.lineage_refs`,
     [
       `fv:${request.definitionId}:${storeClass}:${request.subjectKey}:${request.windowEndInclusive}`,
       request.definitionId,
@@ -163,7 +165,8 @@ export interface ParityResult {
 /**
  * Online/offline parity check (FR-DATA-004). Reads BOTH stored values and
  * compares exactly; a divergence beyond tolerance fails loudly with the diff
- * rather than being silently tolerated.
+ * rather than being silently tolerated. A computation_code_version mismatch
+ * between the two stored values also counts as divergence.
  */
 export async function checkOnlineOfflineParity(
   engine: DatabaseEngine,

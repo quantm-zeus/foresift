@@ -8,9 +8,9 @@
  * (recursively key-sorted canonical JSON), so "originals survive byte-for-byte"
  * is checkable against the row itself, not a narrative.
  */
-import { createHash } from 'node:crypto';
 import { ErrorCode, ForesiftError, type UtcTimestamp } from '@foresift/domain';
 import { availabilityProvenanceClass, qualityCode, utcTimestamp } from '@foresift/domain';
+import { canonicalJson, sha256Text } from '../canonical-json.ts';
 import type { DatabaseEngine } from '../db.ts';
 
 export interface ObservationInput {
@@ -52,20 +52,9 @@ export interface ChainCoordinatesColumns {
   readonly collectorOrProviderCursor?: string | null;
 }
 
-function canonicalJson(value: unknown): string {
-  if (value === null || typeof value !== 'object') return JSON.stringify(value) ?? 'null';
-  if (Array.isArray(value)) {
-    return `[${value.map((v) => canonicalJson(v)).join(',')}]`;
-  }
-  const entries = Object.entries(value as Record<string, unknown>)
-    .filter(([, v]) => v !== undefined)
-    .sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0));
-  return `{${entries.map(([k, v]) => `${JSON.stringify(k)}:${canonicalJson(v)}`).join(',')}}`;
-}
-
 /** Stable content address over the record (sorted-key canonical JSON). */
 export function receiptHashOf(record: Record<string, unknown>): string {
-  return `sha256:${createHash('sha256').update(canonicalJson(record), 'utf8').digest('hex')}`;
+  return sha256Text(canonicalJson(record));
 }
 
 /**

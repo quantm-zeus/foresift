@@ -130,8 +130,9 @@ describe('AC-260: destructive drill meets both declared RPO tiers on fixtures', 
       },
       at(31),
     );
-    // Loss detected at +20; data recovered through +10 (RPO 10 ≤ 15);
-    // service verified at +70 (RTO 50 min within the tier's RTO target).
+    // Loss detected at +20; data recovered through +10 against a last durable
+    // write at +4 (RPO 6 ≤ 15); service verified at +70 (RTO 50 min within
+    // the tier's RTO target).
     const outcome = await evaluateAndRecordDrill({
       engine: restored!,
       clock: fixedClock(at(70)),

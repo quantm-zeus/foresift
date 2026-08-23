@@ -9,6 +9,7 @@
  * exact BigInt arithmetic over raw integer amounts.
  */
 import {
+  compareTimestamps,
   rawAmount,
   sumRaw,
   utcTimestamp,
@@ -31,7 +32,11 @@ export const ROLLING_VOLUME_DEFINITION = {
 export interface FeatureComputationEvent {
   readonly eventAt: UtcTimestamp;
   readonly availableAt: UtcTimestamp;
-  /** Decimal-digit integer amount; absent events are counted as unquantified. */
+  /**
+   * Decimal-digit integer amount. An event with an absent or non-canonical
+   * `rawAmount` still counts toward the window but is tallied under
+   * `unquantifiedEvents` and flagged PARTIAL — never silently dropped.
+   */
   readonly rawAmount?: string | null;
 }
 
@@ -60,8 +65,10 @@ export interface ComputedFeatureValue {
 export function computeRollingVolume(request: FeatureComputationRequest): ComputedFeatureValue {
   const inWindow = request.events.filter(
     (e) =>
-      e.eventAt >= request.windowStartInclusive &&
-      e.eventAt <= request.windowEndInclusive &&
+      // Instant comparison, not lexical — mixed sub-ms precision would shift
+      // the window boundary (review L-2).
+      compareTimestamps(e.eventAt, request.windowStartInclusive) >= 0 &&
+      compareTimestamps(e.eventAt, request.windowEndInclusive) <= 0 &&
       visibleAt({ availableAt: e.availableAt }, request.resolvedAt),
   );
   if (inWindow.length === 0) {

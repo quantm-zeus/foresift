@@ -11,6 +11,7 @@
  */
 import {
   availabilityProvenanceClass,
+  compareTimestamps,
   ErrorCode,
   ForesiftError,
   isHistoricalFetch,
@@ -60,7 +61,9 @@ export function assertNoBackdating(input: {
   if (input.proofMethod === 'LIVE_RECEIPT_REFERENCE' && input.liveReceiptRef !== undefined) {
     return; // independently persisted live receipt proves earlier availability
   }
-  if (input.availableAt < input.retrievedAt) {
+  // Instant comparison, not lexical: mixed sub-ms precision would otherwise
+  // shift the backdating boundary (review L-2).
+  if (compareTimestamps(input.availableAt, input.retrievedAt) < 0) {
     throw new ForesiftError(
       ErrorCode.BACKFILL_BACKDATING_REJECTED,
       `backdating refused: available_at ${input.availableAt} precedes retrieval commit ${input.retrievedAt} without a live receipt`,

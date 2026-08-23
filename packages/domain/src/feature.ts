@@ -55,7 +55,7 @@ export interface FeatureValue {
   readonly subjectKey: string;
   /** Event time the value is about (never ingestion time). */
   readonly eventAt: UtcTimestamp;
-  /** Decimal-string value at `valueScale` fractional digits; absent when null-coded. */
+  /** Decimal-string value at `DecimalValue.scale` fractional digits; absent when null-coded. */
   readonly value?: DecimalValue;
   /** Quality codes explaining any absence/imprecision — null alone is insufficient. */
   readonly qualityCodes: readonly QualityCode[];

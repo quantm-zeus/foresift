@@ -24,6 +24,7 @@ import {
   ALL_AVAILABILITY_PROVENANCE_CLASSES,
   ALL_QUALITY_CODES,
   ChainMappingQuality,
+  compareTimestamps,
   DecimalsResolutionState,
   DependenceLabel,
   CollectionMethod,
@@ -38,7 +39,17 @@ import {
   type AcquisitionState,
   type AvailabilityProvenanceClass,
   type QualityCode,
+  type UtcTimestamp,
 } from '@foresift/domain';
+
+/**
+ * Instant comparison inside refines: the values have already passed
+ * `UtcTimestampSchema`, so the branded view is guaranteed at runtime — this
+ * bridge only closes the Zod-inferred-`string` vs `UtcTimestamp` type gap.
+ */
+function compareStamps(a: string, b: string): number {
+  return compareTimestamps(a as UtcTimestamp, b as UtcTimestamp);
+}
 
 /** Registry version — bumped only on breaking shape changes, never silently. */
 export const DATA_SCHEMA_REGISTRY_VERSION = 1;
@@ -342,10 +353,12 @@ const AvailabilityProofMethodSchema = z.enum([
 /**
  * §13.6 backfill receipt with the exact required fields plus the no-backdating
  * rules encoded structurally:
- * - historical-query provenance classes only;
  * - `available_at >= retrieved_at` unless an independently persisted live
  *   receipt reference proves earlier availability;
  * - event time can never sit after availability.
+ *
+ * Note: availability provenance class is NOT restricted here — receipts may be
+ * validated against any §13.2 class by callers; this schema enforces shape.
  */
 export const BackfillReceiptSchema = z
   .object({
@@ -356,10 +369,12 @@ export const BackfillReceiptSchema = z
     availableAt: UtcTimestampSchema,
     retrospectiveOnly: z.boolean(),
     wouldHaveBeenObservableLive: z.boolean().nullable(),
-    availabilityProof: z.object({
-      method: AvailabilityProofMethodSchema,
-      liveReceiptRef: z.string().min(1).optional(),
-    }),
+    availabilityProof: z
+      .object({
+        method: AvailabilityProofMethodSchema,
+        liveReceiptRef: z.string().min(1).optional(),
+      })
+      .strict(),
   })
   .strict()
   .refine(
@@ -370,10 +385,11 @@ export const BackfillReceiptSchema = z
   )
   .refine(
     (v) =>
-      v.availabilityProof.method === 'LIVE_RECEIPT_REFERENCE' || v.availableAt >= v.retrievedAt,
+      v.availabilityProof.method === 'LIVE_RECEIPT_REFERENCE' ||
+      compareStamps(v.availableAt, v.retrievedAt) >= 0,
     { message: 'available_at precedes retrieval commit without a live receipt (backdating)' },
   )
-  .refine((v) => v.historicalEventAt <= v.availableAt, {
+  .refine((v) => compareStamps(v.historicalEventAt, v.availableAt) <= 0, {
     message: 'historical event time cannot follow its availability',
   });
 
@@ -554,7 +570,9 @@ export const EvidenceAcquisitionDecisionSchema = z
   })
   .refine(
     (v) =>
-      v.completedAt === undefined || v.requestedAt === undefined || v.completedAt >= v.requestedAt,
+      v.completedAt === undefined ||
+      v.requestedAt === undefined ||
+      compareStamps(v.completedAt, v.requestedAt) >= 0,
     {
       message: 'completion cannot precede request',
     },

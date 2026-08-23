@@ -8,7 +8,10 @@
  *
  * Current views resolve the latest valid revision; replay views resolve the
  * latest revision whose available_at is within the boundary. Every replay
- * entrypoint REQUIRES an explicit T — no current-state bypass exists here.
+ * entrypoint REQUIRES an explicit T — no optional-T overload defaults to
+ * "now". The one T-free view is the separately named `currentObservations`
+ * below, which reads global head state by design and is never a replay
+ * default.
  */
 import {
   compareForReplayResolution,

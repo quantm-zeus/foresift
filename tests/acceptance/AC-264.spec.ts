@@ -1,6 +1,7 @@
 /**
  * AC-264 acceptance (positive) — task T062.
- * Traces: FR-DR-001, FR-DR-002.
+ * Traces: FR-DR-006 (primary — retention, deletion, legal hold, location,
+ * encryption, rights, restore access), FR-DR-002 (mechanism).
  * AC text (manifest §39.25): "Backup retention, encryption, location,
  * rights, legal hold, deletion, key access, and restore credentials are
  * validated by policy tests."

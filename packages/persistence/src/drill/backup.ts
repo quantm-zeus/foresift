@@ -43,9 +43,11 @@ const KEY_MATERIAL_PATTERNS: readonly RegExp[] = [
 ];
 
 /**
- * Validate a policy for persistence. Refuses looser-than-declared retention,
- * embedded key material (fail closed on anything that LOOKS like a secret),
- * and non-opaque key references.
+ * Validate a policy for persistence: retention_days must be a positive
+ * integer, key references must stay opaque (`keyref:` form), and any field
+ * carrying embedded key material is refused fail-closed (anything that LOOKS
+ * like a secret). Retention-ceiling comparison against registered tiers is a
+ * deployment-time concern and is not enforced here.
  */
 export function validateBackupPolicy(policy: BackupPolicyRecord): void {
   if (!Number.isInteger(policy.retentionDays) || policy.retentionDays < 1) {
@@ -300,10 +302,11 @@ function hashOf(text: string): string {
 }
 
 /**
- * Deterministically dump every public table: rows canonicalized (sorted
- * columns, lexicographically sorted rows) so identical data yields byte-
- * identical snapshots regardless of insert order or timing. Time is
- * injected (Constitution IX), never read from the wall here.
+ * Deterministically dump every public user table (the `_foresift%` migration
+ * bookkeeping is excluded): rows canonicalized (sorted columns,
+ * lexicographically sorted rows) so identical data yields byte-identical
+ * snapshots regardless of insert order or timing. Time is injected
+ * (Constitution XI/XIII), never read from the wall here.
  */
 export async function captureDeterministicSnapshot(
   engine: DatabaseEngine,

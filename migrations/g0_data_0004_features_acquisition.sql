@@ -82,7 +82,8 @@ CREATE TABLE evidence_acquisition_decisions (
     requested_at                 timestamptz,
     completed_at                 timestamptz,
     assignment_probability       double precision
-        CHECK (assignment_probability IS NULL OR assignment_probability > 0),
+        CHECK (assignment_probability IS NULL
+               OR (assignment_probability > 0 AND assignment_probability < 1)),
     estimated_decision_impact    double precision
         CHECK (estimated_decision_impact IS NULL OR estimated_decision_impact BETWEEN 0 AND 1),
     estimated_information_value  double precision
@@ -122,3 +123,8 @@ CREATE TABLE evidence_bundles (
 CREATE TRIGGER evidence_bundles_immutable
     BEFORE UPDATE OR DELETE ON evidence_bundles
     FOR EACH ROW EXECUTE FUNCTION foresift_refuse_mutation();
+
+-- Row-level triggers do not fire on TRUNCATE; refuse it statement-wise too.
+CREATE TRIGGER evidence_bundles_immutable_truncate
+    BEFORE TRUNCATE ON evidence_bundles
+    FOR EACH STATEMENT EXECUTE FUNCTION foresift_refuse_mutation();

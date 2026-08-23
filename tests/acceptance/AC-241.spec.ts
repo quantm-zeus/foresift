@@ -89,12 +89,15 @@ describe('AC-241: frozen replay differs only via registered components', () => {
   it('changing ONLY the registered boundary moves the view predictably', async () => {
     const early = await resolveEvidenceAt(tdb.engine, { resolvedAt: T('2026-07-01T10:00:00Z') });
     const late = await resolveEvidenceAt(tdb.engine, { resolvedAt: T('2026-07-01T13:00:00Z') });
-    // The delta is exactly the two post-boundary registrations, nothing else.
+    // The delta is exactly the two post-boundary registrations, nothing else —
+    // asserted on BOTH halves: bundles and observations.
     expect(early.bundles.map((b) => b.bundleId)).toEqual(['ac241-bundle']);
+    expect(early.observations.map((o) => o.observationId)).toEqual(['ac241-a']);
     expect(late.bundles.map((b) => b.bundleId).sort()).toEqual([
       'ac241-bundle',
       'ac241-bundle-late',
     ]);
+    expect(late.observations.map((o) => o.observationId).sort()).toEqual(['ac241-a', 'ac241-b']);
     // Same persisted corpus both times; only resolvedAt differed.
     expect(early.resolvedAt).toBe(T('2026-07-01T10:00:00Z'));
     expect(late.resolvedAt).toBe(T('2026-07-01T13:00:00Z'));

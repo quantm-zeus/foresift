@@ -37,8 +37,10 @@ import {
   recordDecimalsObservation,
   registerLaunch,
   registerMigrationEdge,
+  registerSourceIdentity,
   type DatabaseEngine,
 } from '../src/index.ts';
+import { CollectionMethod, type SourceIdentityId } from '@foresift/domain';
 
 const MIGRATIONS_DIR = path.resolve(
   path.dirname(fileURLToPath(import.meta.url)),
@@ -336,5 +338,70 @@ describe('decimals resolution state machine over golden vectors (T023/T024)', ()
     );
     expect(snapshot?.decimals).toBeNull();
     expect(snapshot?.decimalsState).toBe(DecimalsResolutionState.CONFLICTING);
+  });
+
+  it('refuses full cross-check credit when supporting refs share one upstream lineage (INV-008, ADR-0011)', async () => {
+    await ensureChain(engine, 'eip155:1');
+    const sharedLineageAddress = '0x' + '11'.repeat(20);
+    const distinctLineageAddress = '0x' + '22'.repeat(20);
+    await insertRepresentation(engine, {
+      chainId: 'eip155:1',
+      canonicalAddress: sharedLineageAddress,
+    });
+    await insertRepresentation(engine, {
+      chainId: 'eip155:1',
+      canonicalAddress: distinctLineageAddress,
+    });
+
+    // Two brands reselling the SAME upstream lineage collapse to one voice.
+    for (const id of ['src:brand-a:getTokenMeta', 'src:brand-b:getTokenMeta']) {
+      await registerSourceIdentity(engine, {
+        id: id as SourceIdentityId,
+        brandProvider: id,
+        operation: 'getTokenMeta',
+        upstreamLineageKey: 'lineage:shared-aggregator',
+        endpointRegion: 'eu-central',
+        collectionMethod: CollectionMethod.POLLING_API,
+      });
+    }
+    // Control pair on DIFFERENT lineages stays two independent voices.
+    for (const [id, lineage] of [
+      ['src:independent-c:getTokenMeta', 'lineage:c-first-party'],
+      ['src:independent-d:getTokenMeta', 'lineage:d-first-party'],
+    ] as const) {
+      await registerSourceIdentity(engine, {
+        id: id as SourceIdentityId,
+        brandProvider: id,
+        operation: 'getTokenMeta',
+        upstreamLineageKey: lineage,
+        endpointRegion: 'us-east',
+        collectionMethod: CollectionMethod.POLLING_API,
+      });
+    }
+
+    let callNo = 0;
+    const observe = (canonicalAddress: string, sourceRef: string, decimals: number) =>
+      recordDecimalsObservation(engine, {
+        observationId: `obs-indep-${(callNo += 1)}`,
+        chainId: 'eip155:1',
+        canonicalAddress,
+        decimals,
+        observedAt: utcTimestamp('2026-04-01T00:00:00Z'),
+        sourceRef,
+      });
+
+    // Same-lineage supporters: ref count reaches 2 but independence does not.
+    const collapsedA = await observe(sharedLineageAddress, 'src:brand-a:getTokenMeta', 6);
+    expect(collapsedA.state).toBe(DecimalsResolutionState.SOURCED);
+    const collapsedB = await observe(sharedLineageAddress, 'src:brand-b:getTokenMeta', 6);
+    expect(collapsedB.state).toBe(DecimalsResolutionState.SOURCED);
+    expect(collapsedB.decimals).toBe(6);
+    expect(collapsedB.independenceHints).toEqual(['DECIMAL_UNCERTAIN']);
+
+    // Distinct-lineage supporters keep full CROSS_CHECKED credit, no hint.
+    await observe(distinctLineageAddress, 'src:independent-c:getTokenMeta', 8);
+    const crossChecked = await observe(distinctLineageAddress, 'src:independent-d:getTokenMeta', 8);
+    expect(crossChecked.state).toBe(DecimalsResolutionState.CROSS_CHECKED);
+    expect(crossChecked.independenceHints).toBeUndefined();
   });
 });

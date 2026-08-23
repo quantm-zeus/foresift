@@ -4,7 +4,9 @@
  *
  * Where a registered CAIP namespace exists the CAIP-2 form is canonical;
  * otherwise a versioned internal identifier is used and an explicit
- * mapping-quality state is retained. Unknown namespaces fail closed.
+ * mapping-quality state (UNVERIFIED_ASSERTION / INTERNAL_VERSIONED) is
+ * retained. Only namespace DISPATCH refuses unknown namespaces — parsing
+ * itself accepts the generic CAIP-2 shape and marks it unverified.
  */
 import { ErrorCode, ForesiftError } from './errors.ts';
 
@@ -112,6 +114,10 @@ export function chainIdentity(input: {
   if (input.internalIdVersion !== undefined) {
     identity.internalIdVersion = input.internalIdVersion;
   }
+  // Defense-in-depth, not current enforcement (review L-3): the derivation
+  // above cannot produce INTERNAL_VERSIONED without an id version. If that
+  // derivation ever drifts, refuse loudly here rather than minting an
+  // unversioned internal identity.
   if (
     mappingQuality === ChainMappingQuality.INTERNAL_VERSIONED &&
     input.internalIdVersion === undefined

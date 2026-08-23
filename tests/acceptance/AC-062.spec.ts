@@ -128,7 +128,7 @@ describe('AC-062: backup restore meets configured RPO/RTO in a drill', () => {
 
     // 3. Restore: load the snapshot's canonical rows into the clean env.
     const restoredRows = await restoreSnapshotInto(restored, snapshot);
-    expect(restoredRows).toBeGreaterThan(4); // tiers + policy-run rows + workload
+    expect(restoredRows).toBeGreaterThan(4); // tiers + policy rows + workload
 
     // 4. Verify: re-capturing the restored world must be hash-identical to
     // the original backup (byte-for-byte recovery of the fixture workload).

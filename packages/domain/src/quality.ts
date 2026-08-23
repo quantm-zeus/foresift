@@ -79,6 +79,14 @@ const POLICY_BLOCKED_CODES: readonly QualityCode[] = [
   QualityCode.LICENSE_RESTRICTED,
 ];
 
+/**
+ * Deliberate non-acquisition codes: absence because THIS system chose not to
+ * fetch (policy, licensing) or could not justify/afford the fetch (cost,
+ * capacity) — never provider failure or provider-side missingness. Despite
+ * the name, the group is broader than policy and rights alone; cost and
+ * capacity blocks share the same "no acquisition happened by our own
+ * decision" semantics.
+ */
 export function isPolicyOrRightsBlocked(code: QualityCode): boolean {
   return POLICY_BLOCKED_CODES.includes(code);
 }

@@ -7,7 +7,10 @@
 CREATE TABLE probe_assignments (
     decision_id            text PRIMARY KEY REFERENCES evidence_acquisition_decisions(decision_id),
     eligibility_stratum    text NOT NULL,
-    assignment_probability double precision NOT NULL CHECK (assignment_probability > 0),
+    -- Bounds mirror the domain/repo/Zod layers exactly: a probability is in
+    -- (0, 1); certainty (>= 1) is not a randomized assignment.
+    assignment_probability double precision NOT NULL
+        CHECK (assignment_probability > 0 AND assignment_probability < 1),
     -- Provenance of the random seed (algorithm + material reference), never
     -- the raw secret material itself.
     seed_provenance        text NOT NULL,

@@ -84,6 +84,11 @@ CREATE TRIGGER observations_immutable
     BEFORE UPDATE OR DELETE ON observations
     FOR EACH ROW EXECUTE FUNCTION foresift_refuse_mutation();
 
+-- Row-level triggers do not fire on TRUNCATE; refuse it statement-wise too.
+CREATE TRIGGER observations_immutable_truncate
+    BEFORE TRUNCATE ON observations
+    FOR EACH STATEMENT EXECUTE FUNCTION foresift_refuse_mutation();
+
 CREATE TABLE observation_revisions (
     revision_id            text PRIMARY KEY,
     observation_id         text NOT NULL REFERENCES observations(observation_id),
@@ -124,6 +129,10 @@ CREATE TRIGGER observation_revisions_immutable
     BEFORE UPDATE OR DELETE ON observation_revisions
     FOR EACH ROW EXECUTE FUNCTION foresift_refuse_mutation();
 
+CREATE TRIGGER observation_revisions_immutable_truncate
+    BEFORE TRUNCATE ON observation_revisions
+    FOR EACH STATEMENT EXECUTE FUNCTION foresift_refuse_mutation();
+
 -- Reorg/finality compensation: supersedes without rewriting receipt history.
 CREATE TABLE compensating_events (
     compensation_id       text PRIMARY KEY,
@@ -138,6 +147,10 @@ CREATE TABLE compensating_events (
 CREATE TRIGGER compensating_events_immutable
     BEFORE UPDATE OR DELETE ON compensating_events
     FOR EACH ROW EXECUTE FUNCTION foresift_refuse_mutation();
+
+CREATE TRIGGER compensating_events_immutable_truncate
+    BEFORE TRUNCATE ON compensating_events
+    FOR EACH STATEMENT EXECUTE FUNCTION foresift_refuse_mutation();
 
 -- §13.6 backfill receipts: the exact required fields, with the no-backdating
 -- rules encoded structurally.

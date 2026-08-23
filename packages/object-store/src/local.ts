@@ -24,7 +24,21 @@ function sha256Hex(bytes: Uint8Array): string {
   return createHash('sha256').update(bytes).digest('hex');
 }
 
+/** Only a real sha256 content address may reach the filesystem layout. */
+const CONTENT_HASH_PATTERN = /^sha256:[0-9a-f]{64}$/;
+
+/**
+ * Derive the storage directory for one content hash. The hash is validated
+ * against its canonical shape first — this store is dev/test today, but the
+ * layout is imitable, and an unvalidated `sha256:../..` must never be able to
+ * walk out of the root.
+ */
 function dirFor(root: string, contentHash: string): string {
+  if (!CONTENT_HASH_PATTERN.test(contentHash)) {
+    throw new Error(
+      `malformed content hash rejected by object store: ${JSON.stringify(contentHash)}`,
+    );
+  }
   const hex = contentHash.slice('sha256:'.length);
   return path.join(root, 'objects', hex.slice(0, 2), hex);
 }
@@ -94,9 +108,12 @@ export class LocalFilesystemObjectStore implements ObjectStoreAdapter {
     if (lookup.version !== undefined) {
       candidates = candidates.filter((s) => s.version === lookup.version);
     } else if (lookup.metadata !== undefined) {
+      // Metadata-scoped lookups never fall back to another dedup identity:
+      // in a rights-aware store, handing back a differently-protected version
+      // of the same bytes on a miss would silently cross the protection
+      // boundary — no match reads as absent.
       const identity = dedupIdentityOf(lookup.metadata);
-      const matching = candidates.filter((s) => dedupIdentityOf(s.metadata) === identity);
-      candidates = matching.length > 0 ? matching : candidates;
+      candidates = candidates.filter((s) => dedupIdentityOf(s.metadata) === identity);
     }
     if (candidates.length === 0) return null;
     // Newest version WITH an intact blob; a meta sidecar whose bytes vanished

@@ -139,7 +139,7 @@ export async function runPersistenceBenchmark(
   };
 }
 
-// --- Destructive-drill restore loader (T060, AC-062/AC-260/AC-261) ------------
+// --- Destructive-drill restore loader (T060, AC-062/AC-260/AC-263) -----------
 
 /**
  * Physically load a captured deterministic snapshot into a target engine —

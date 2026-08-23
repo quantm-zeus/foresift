@@ -4,6 +4,7 @@
 // and tests require zero root-config edits (see specs/g0-contracts-data-truth
 // tasks T001–T003).
 export * from './db.ts';
+export * from './canonical-json.ts';
 export * from './migrator.ts';
 export * from './repos/identity.ts';
 export * from './repos/observations.ts';

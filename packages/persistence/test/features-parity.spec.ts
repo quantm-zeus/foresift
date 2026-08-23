@@ -215,6 +215,39 @@ describe('online/offline parity (T034, AC-244)', () => {
     expect(parity.withinTolerance).toBe(true);
   });
 
+  it('refreshes population and lineage provenance when an upsert overwrites a value', async () => {
+    const w = WINDOW();
+    // Distinct subject so the rewrite cannot disturb sibling parity tests
+    // that share the default SUBJECT coordinates.
+    const subjectKey = `${SUBJECT}#provenance-rewrite`;
+    const base = {
+      definitionId: DEFINITION,
+      subjectKey,
+      windowStartInclusive: w.start,
+      windowEndInclusive: w.end,
+      resolvedAt: utcTimestamp('2026-01-05T11:30:00Z'),
+    };
+    await writeOnlineRollingVolume(engine, { ...base, populationKind: 'FULL_UNIVERSE' });
+    // Recompute the same coordinates under different provenance inputs.
+    await writeOnlineRollingVolume(engine, {
+      ...base,
+      resolvedAt: utcTimestamp('2026-01-05T12:45:00Z'),
+      populationKind: 'DEEP_RESEARCH_SELECTED',
+    });
+    const row = await engine.query<{
+      population_kind: string;
+      lineage_refs: string[];
+      decimal_string: string | null;
+    }>(
+      `SELECT population_kind, lineage_refs, decimal_string FROM feature_values
+       WHERE definition_id = $1 AND store_class = 'ONLINE' AND subject_key = $2 AND event_at = $3`,
+      [DEFINITION, subjectKey, w.end],
+    );
+    const stored = row.rows[0];
+    expect(stored?.population_kind).toBe('DEEP_RESEARCH_SELECTED');
+    expect(stored?.lineage_refs.some((ref) => ref.includes('2026-01-05T12:45:00Z'))).toBe(true);
+  });
+
   it('fails loudly with the diff when inputs genuinely diverge across the boundary', async () => {
     const w = WINDOW();
     // Online was resolved at 11:30 (sum 390). An offline batch recomputes at

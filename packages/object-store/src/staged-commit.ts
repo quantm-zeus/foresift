@@ -10,11 +10,23 @@
  * advances a stage past an unexplained failure.
  */
 import { createHash } from 'node:crypto';
-import { ErrorCode, ForesiftError, utcTimestamp, type UtcTimestamp } from '@foresift/domain';
+import {
+  type ClockPort,
+  ErrorCode,
+  ForesiftError,
+  utcTimestamp,
+  type UtcTimestamp,
+} from '@foresift/domain';
 import type { DatabaseEngine } from '@foresift/persistence';
 import type { ObjectProtectionMetadata, ObjectStoreAdapter } from './adapter.ts';
 import { dedupIdentityOf } from './adapter.ts';
 import { insertPendingArtifact, transitionStage, type ArtifactIndexRow } from './artifact-index.ts';
+
+/** Wall-clock fallback for callers that inject no clock (Constitution XIII). */
+const wallClock: ClockPort = {
+  now: () => utcTimestamp(new Date().toISOString().replace('.000Z', 'Z')),
+  nowEpochMs: () => Date.now(),
+};
 
 function sha256Hex(bytes: Uint8Array): string {
   return createHash('sha256').update(bytes).digest('hex');
@@ -25,19 +37,26 @@ export interface StagedUploadRequest {
   readonly bytes: Uint8Array;
   readonly metadata: ObjectProtectionMetadata;
   readonly uploadedAt: UtcTimestamp;
+  /**
+   * Injected time source for the stage-transition timestamps. Omitted only by
+   * legacy/dev callers; deterministic paths (drills, tests) MUST supply one.
+   */
+  readonly now?: ClockPort | undefined;
 }
 
 /**
  * Run the full protocol for one artifact: index row (PENDING_UPLOAD), durable
  * put, byte-exact read-back verification, index commit, then AVAILABLE. Any
  * failed step leaves the row stuck at its last honestly-reached stage — the
- * reconciler's problem, not a silent pass.
+ * reconciler's problem, not a silent pass. Transition timestamps come from the
+ * injected clock when supplied (never the wall inside deterministic paths).
  */
 export async function stagedUpload(
   engine: DatabaseEngine,
   store: ObjectStoreAdapter,
   request: StagedUploadRequest,
 ): Promise<ArtifactIndexRow> {
+  const clock = request.now ?? wallClock;
   const contentHash = `sha256:${sha256Hex(request.bytes)}`;
   await insertPendingArtifact(engine, {
     artifactId: request.artifactId,
@@ -72,14 +91,15 @@ export async function stagedUpload(
   let row = await transitionStage(engine, {
     artifactId: request.artifactId,
     reached: 'STORED_HASH_VERIFIED',
-    at: utcTimestamp(new Date().toISOString().replace('.000Z', 'Z')),
+    at: clock.now(),
   });
 
-  // Index commit: the DB row now carries the full protected-metadata view.
+  // Index commit: the DB row now carries the governed protected-metadata
+  // subset (the columns object_artifacts tracks; see adapter metadata).
   row = await transitionStage(engine, {
     artifactId: request.artifactId,
     reached: 'INDEX_COMMITTED',
-    at: utcTimestamp(new Date().toISOString().replace('.000Z', 'Z')),
+    at: clock.now(),
   });
 
   // Both sides verified above; the §14.8 AVAILABLE gate is enforced
@@ -87,7 +107,7 @@ export async function stagedUpload(
   row = await transitionStage(engine, {
     artifactId: request.artifactId,
     reached: 'AVAILABLE',
-    at: utcTimestamp(new Date().toISOString().replace('.000Z', 'Z')),
+    at: clock.now(),
   });
   return row;
 }
@@ -97,7 +117,7 @@ export async function stagedUpload(
 export interface ReconciliationFinding {
   readonly artifactId: string;
   readonly kind:
-    | 'ORPHAN_UPLOAD' // physical put never completed / no DB-side progress
+    | 'ORPHAN_UPLOAD' // PENDING_UPLOAD row still unadvanced past the cutoff
     | 'MISSING_OBJECT' // index says stored, physical store disagrees
     | 'HASH_MISMATCH' // physical bytes no longer match the recorded hash
     | 'RIGHTS_METADATA_MISMATCH' // protection metadata drifted between sides
@@ -201,8 +221,11 @@ export async function reconcileArtifacts(
     }
   }
 
-  // Retention drift against governed expectations: any index row whose
-  // retention class is NOT among the declared expectations has drifted.
+  // Retention-policy allowlist check over INDEX ROWS: when expectations are
+  // declared, every row must carry one of them; a class outside the
+  // declaration is flagged as RETENTION_DRIFT. Unlike rights drift above,
+  // this is NOT a per-version index↔store comparison — physical retention
+  // classes are not diffed against the index here.
   if (input.retentionExpectations !== undefined) {
     const allowed = new Set(input.retentionExpectations.map((e) => e.retentionClass));
     for (const r of rows.rows) {

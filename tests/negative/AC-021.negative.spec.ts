@@ -62,13 +62,13 @@ describe('AC-021 negative: mutation attempts are rejected by triggers', () => {
       tdb.engine.query(
         "UPDATE observation_revisions SET reason = 'REWRITTEN' WHERE revision_id = 'ac21n-rev1'",
       ),
-    ).rejects.toThrow();
+    ).rejects.toThrow(/immutable/);
   });
 
   it('DELETE on observation_revisions is refused', async () => {
     await expect(
       tdb.engine.query("DELETE FROM observation_revisions WHERE revision_id = 'ac21n-rev1'"),
-    ).rejects.toThrow();
+    ).rejects.toThrow(/immutable/);
   });
 
   it('a compensating event cannot be deleted to hide a reorg', async () => {

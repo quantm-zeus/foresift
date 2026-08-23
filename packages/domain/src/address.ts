@@ -149,7 +149,7 @@ function utf8Bytes(input: string): Uint8Array {
 /** Keccak-256 (legacy padding 0x01 — NOT sha3-256), returned as lowercase hex. */
 export function keccak256Hex(message: Uint8Array | string): string {
   const bytes = typeof message === 'string' ? utf8Bytes(message) : message;
-  const rate = 136; // bytes, capacity 512 bits → 256-bit security target
+  const rate = 136; // bytes; 1600-bit permutation producing a 256-bit digest
   const state = new KeccakState();
 
   let offset = 0;

@@ -61,7 +61,12 @@ CREATE TABLE asset_representations (
                           'SOURCED', 'CROSS_CHECKED', 'CONFLICTING')),
     decimals          integer CHECK (decimals BETWEEN 0 AND 36),
     -- Address normalization is chain-specific (§11.2); G0 registers the two
-    -- supported namespaces and refuses every other shape fail-closed.
+    -- supported namespaces and refuses every other shape fail-closed. The
+    -- Solana shape CHECK below is a coarse base58-alphabet/length filter only;
+    -- the authoritative validator is `packages/domain/src/address.ts`, which
+    -- additionally performs full base58 decoding to a 32-byte ed25519 account
+    -- (rejecting e.g. all-'1' strings this CHECK admits). Repository writes go
+    -- through that normalizer first; raw-SQL writers bypass it at their peril.
     CONSTRAINT asset_representations_namespace_supported
         CHECK (split_part(chain_id, ':', 1) IN ('eip155', 'solana')),
     CONSTRAINT asset_representations_evm_address_shape

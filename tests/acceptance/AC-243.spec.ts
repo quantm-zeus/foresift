@@ -17,6 +17,7 @@ import {
   recordAcquisitionDecision,
   recordProbeAssignment,
 } from '@foresift/persistence';
+import { DATA_SCHEMAS } from '@foresift/shared-schemas';
 import { closeTestDatabase, makeTestDatabase, type TestDatabase } from './helpers.ts';
 
 const T = (iso: string): UtcTimestamp => utcTimestamp(iso);
@@ -113,8 +114,42 @@ describe('AC-243: probe metadata completeness with write-before-retrieval orderi
     expect(d?.actual_decision_changed).toBe(true);
   });
 
-  it('the persisted decision validates against the shared schema mirror', () => {
-    void tdb; // schema-level symmetry is proven by the negative suite's refusals
-    expect(true).toBe(true);
+  it('the persisted decision validates against the shared schema mirror', async () => {
+    const rows = await tdb.engine.query<{
+      decision_id: string;
+      candidate_id: string;
+      evidence_family: string;
+      policy_version: string;
+      state: string;
+      requested_at: string | null;
+      completed_at: string | null;
+      assignment_probability: string | null;
+      estimated_decision_impact: string | null;
+      estimated_information_value: string | null;
+      actual_decision_changed: boolean | null;
+      evidence_ids: string[];
+    }>('SELECT * FROM evidence_acquisition_decisions WHERE decision_id = $1', ['ac243-probe']);
+    const r = rows.rows[0];
+    expect(r).toBeDefined();
+    // Row → schema projection: numerics arrive as decimal text; absent as NULL.
+    const num = (v: string | null | undefined): number | undefined =>
+      v === null || v === undefined ? undefined : Number(v);
+    const parsed = DATA_SCHEMAS.EvidenceAcquisitionDecision.parse({
+      id: r?.decision_id,
+      candidateId: r?.candidate_id,
+      evidenceFamily: r?.evidence_family,
+      policyVersion: r?.policy_version,
+      state: r?.state,
+      requestedAt: r?.requested_at ?? undefined,
+      completedAt: r?.completed_at ?? undefined,
+      assignmentProbability: num(r?.assignment_probability),
+      estimatedDecisionImpact: num(r?.estimated_decision_impact),
+      estimatedInformationValue: num(r?.estimated_information_value),
+      actualDecisionChanged: r?.actual_decision_changed ?? undefined,
+      evidenceIds: r?.evidence_ids ?? [],
+    });
+    expect(parsed.assignmentProbability).toBe(0.25);
+    expect(parsed.completedAt).toBeDefined();
+    expect(parsed.evidenceIds).toEqual(['ev/ac243/1']);
   });
 });

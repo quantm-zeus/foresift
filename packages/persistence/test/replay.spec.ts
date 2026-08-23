@@ -158,8 +158,9 @@ describe('current view differs from replay (AC-027)', () => {
     expect(ca?.revisionNo).toBe(2);
   });
 
-  it('every replay entrypoint requires an explicit T', async () => {
-    // Compile-time contract mirrored at runtime: T is not optional.
+  it('every replay entrypoint takes an explicit T (compile-time contract)', async () => {
+    // This suite pins the signature shape; the RUNTIME refusal of a missing/hidden
+    // current-data call is exercised in tests/negative/AC-241.negative.spec.ts.
     const rows = await replayObservations(engine, T('2026-05-01T12:00:00Z'));
     expect(rows.every((r) => r.availableAt <= '2026-05-01T12:00:00Z')).toBe(true);
   });

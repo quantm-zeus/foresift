@@ -270,6 +270,17 @@ evidence|object-store test`); fix findings until green; leave work uncommitted
       for review. Traces: FR-DATA-001, FR-DATA-002, FR-DATA-003, FR-DATA-004,
       FR-DATA-005, FR-DATA-006, FR-DR-001, FR-DR-002.
 
+## Convergence addendum (2026-08-23) — unresolved items carried explicitly
+
+- [ ] T066 Wire `PRECISION_RETAINING_TIMESTAMP_PARSERS` into the production
+      PostgreSQL pool at the moment one is first constructed (node-pg
+      `types.setTypeParser` for OIDs 1114/1184), per the engine contract in
+      ADR-0009. Driver-default parsers truncate sub-millisecond precision on
+      read-back, which silently breaks byte-for-byte receipt-hash round-trips
+      (PR review H-2). No production pool exists inside this package's G0
+      write scope — the requirement stays open until the deployment-facing
+      package constructs its first pool. Traces: FR-DATA-002.
+
 ## Traceability matrix (AC → tasks)
 
 | AC     | Tasks                        |

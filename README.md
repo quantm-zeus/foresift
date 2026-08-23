@@ -82,6 +82,12 @@ apps/               future application surfaces (not yet started)
 .archon/            Archon workflow location for the future autonomous pipeline
 ```
 
+Migration-authoring conventions (ADR-001): scripts are discovered in exact
+lexicographic order and are checksum-immutable once applied — fix forward with
+a new file, never edit an applied script. SQL must run identically on PGlite
+(tests) and PostgreSQL (production), and stays in four-way parity: SQL truth ↔
+Drizzle mirror (`schema-parity.spec.ts`) ↔ Zod schemas ↔ domain vocabularies.
+
 ## Verification
 
 ```bash

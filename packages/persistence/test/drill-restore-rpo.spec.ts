@@ -207,6 +207,28 @@ describe('clean-environment restore verifier (T044, AC-261)', () => {
     expect(blockedCheck?.detail).toContain('no registered verifier');
   });
 
+  it('blocks a zero-verification drill instead of passing vacuously', async () => {
+    // Credentials present, but nothing registered and nothing required:
+    // `[].every(...)` must never manufacture PASSED from zero evidence.
+    const report = await runRestoreDrill({
+      engine,
+      drillId: 'drill-zero-checks',
+      startedAt: at(0),
+      registeredChecks: [],
+      credentialProvider: { providerId: 'keystore-primary', unlock: async () => {} },
+      finishedAt: at(1),
+    });
+    expect(report.outcome).toBe('BLOCKED');
+    expect(report.checks).toHaveLength(1);
+    expect(report.checks[0]?.passed).toBe(false);
+    expect(report.checks[0]?.detail).toContain('zero verifications');
+    const row = await engine.query<{ outcome: string }>(
+      'SELECT outcome FROM restore_drills WHERE drill_id = $1',
+      ['drill-zero-checks'],
+    );
+    expect(row.rows[0]?.outcome).toBe('BLOCKED');
+  });
+
   it('PASSES every owned check on an untampered environment once audit-chain is registered green', async () => {
     const report = await runRestoreDrill({
       ...baseConfig('drill-clean'),
@@ -333,7 +355,7 @@ describe('measured RPO/RTO vs configured tiers (T045, AC-062/260/262)', () => {
     };
     const outcome = await evaluateAndRecordDrill({
       engine,
-      // Scripted timeline injected as the drill clock (Constitution IX).
+      // Scripted timeline injected as the drill clock (Constitution XI/XIII).
       clock: scriptedClock([timeline.restoreCompletedAt]).clock,
       tier: {
         id: 'tier-critical-metadata' as RecoveryTierId,

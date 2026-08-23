@@ -88,7 +88,7 @@ export interface SourceDependenceEdge {
   readonly availableAt: string;
 }
 
-/** Thresholds above which a pair receives reduced independence credit (AC-245). */
+/** Thresholds at or above which a pair receives reduced independence credit (AC-245). */
 export interface DependenceThresholds {
   readonly correlation: number;
   readonly outageOverlap: number;

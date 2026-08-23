@@ -116,7 +116,7 @@ describe('AC-240: symmetric action-time substrate', () => {
     expect(evNonDeliveredArm).toEqual(evDeliveredArm);
   });
 
-  it('a later action time strictly grows the view (anti-monotone substrate)', async () => {
+  it('a later action time strictly grows the view — monotone, as replay resolution requires', async () => {
     const early = await replayObservations(tdb.engine, T('2026-06-10T09:05:00Z'));
     const late = await replayObservations(tdb.engine, T('2026-06-10T09:35:00Z'));
     expect(late.map((r) => r.observationId).sort()).toEqual(['ac240-early', 'ac240-late']);

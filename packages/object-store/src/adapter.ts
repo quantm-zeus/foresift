@@ -69,7 +69,12 @@ export interface ObjectStoreAdapter {
   put(request: PutObjectRequest): Promise<StoredObject>;
   /** Read an object back by hash (+ optional version/metadata identity). */
   get(lookup: ObjectLookup): Promise<{ bytes: Uint8Array; stored: StoredObject } | null>;
-  /** Verify physical presence and byte-exact hash without full transfer cost assumptions. */
+  /**
+   * Verify physical presence and byte-exact hash. No performance contract:
+   * an implementation may read the full object to re-hash it locally
+   * (the reference store does); checksum-offloading backends can improve
+   * on that without changing this interface.
+   */
   verify(lookup: ObjectLookup): Promise<PhysicalVerification>;
   /** All versions of one content-hash identity. */
   versions(contentHash: string): Promise<readonly StoredObject[]>;

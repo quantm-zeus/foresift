@@ -132,6 +132,21 @@ describe('append-only observations with receipt hashes (T025)', () => {
     ).rejects.toThrow();
   });
 
+  it('rejects TRUNCATE on the immutable tables (row triggers do not cover it)', async () => {
+    // observations is additionally protected by FK children, which may refuse
+    // first; child-free immutable tables must reach the trigger itself.
+    await expect(engine.query('TRUNCATE observations')).rejects.toThrow();
+    await expect(engine.query('TRUNCATE observation_revisions')).rejects.toThrow(
+      /observations are immutable/,
+    );
+    await expect(engine.query('TRUNCATE compensating_events')).rejects.toThrow(
+      /observations are immutable/,
+    );
+    await expect(engine.query('TRUNCATE evidence_bundles')).rejects.toThrow(
+      /observations are immutable/,
+    );
+  });
+
   it('refuses null quantities without an explicit quality code (§13.2)', async () => {
     // Same observation shape, but with the quantity fields absent entirely.
     const stripQuantity = (input: ObservationInput): ObservationInput => {

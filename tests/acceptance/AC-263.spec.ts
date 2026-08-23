@@ -1,6 +1,9 @@
 /**
  * AC-263 acceptance (positive) — task T061.
- * Traces: FR-DATA-004, FR-DR-001, FR-DR-002.
+ * Traces: FR-DR-001, FR-DR-002, FR-DR-003 (restore + replay recovery).
+ * Gap/idempotence semantics are governed by invariant INV-009 ("every state
+ * transition and external side effect remains idempotent and fenced"), the
+ * on-point authority for no-skip/no-duplicate replay.
  * AC text (manifest §39.25): "Collector recovery from backup plus live
  * replay neither skips an unmarked gap nor duplicates a canonical event/
  * first-seen record."

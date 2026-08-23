@@ -11,7 +11,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { PGlite } from '@electric-sql/pglite';
-import { ErrorCode, ForesiftError, utcTimestamp } from '@foresift/domain';
+import { fixedClock, ErrorCode, ForesiftError, utcTimestamp } from '@foresift/domain';
 import {
   applyMigrations,
   createEngine,
@@ -75,6 +75,22 @@ describe('staged protocol happy path (T039)', () => {
     expect(row.contentHash).toMatch(/^sha256:[0-9a-f]{64}$/);
   });
 
+  it('stamps every transition from the INJECTED clock, never the wall', async () => {
+    const bytes = new TextEncoder().encode('clock-injected-evidence');
+    const scripted = fixedClock(utcTimestamp('2026-05-05T05:05:05.555Z'));
+    const row = await stagedUpload(engine, store, {
+      artifactId: 'art-clock',
+      bytes,
+      metadata: META,
+      uploadedAt: utcTimestamp('2026-05-05T05:00:00Z'),
+      now: scripted,
+    });
+    expect(row.stage).toBe('AVAILABLE');
+    expect(row.hashVerifiedAt).toBe('2026-05-05T05:05:05.555Z');
+    expect(row.indexCommittedAt).toBe('2026-05-05T05:05:05.555Z');
+    expect(row.availableAt).toBe('2026-05-05T05:05:05.555Z');
+  });
+
   it('refuses stage regression and skips-ahead transitions', async () => {
     const bytes = new TextEncoder().encode('regression-target');
     await insertPendingArtifact(engine, {
@@ -90,7 +106,7 @@ describe('staged protocol happy path (T039)', () => {
       reached: 'STORED_HASH_VERIFIED',
       at: utcTimestamp('2026-03-01T00:01:00Z'),
     });
-    // Backwards is refused…
+    // A same-stage repeat (no forward progress) is refused…
     await expect(
       transitionStage(engine, {
         artifactId: 'art-regress',

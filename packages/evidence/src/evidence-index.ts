@@ -6,23 +6,16 @@
  * different identity. Freezing is one-way — the database trigger refuses any
  * later mutation of a frozen row.
  */
-import { createHash } from 'node:crypto';
 import { ErrorCode, ForesiftError, utcTimestamp, type UtcTimestamp } from '@foresift/domain';
+// Single shared canonicalizer (review L-4): bundle hashes must stay
+// byte-compatible with receipt hashing and restore-drill cross-checks.
+import { canonicalJson, sha256Text } from '@foresift/persistence';
 import type { DatabaseEngine } from '@foresift/persistence';
 
-/** Recursively key-sorted canonical JSON — same discipline as receipt hashing. */
-export function canonicalJson(value: unknown): string {
-  if (value === null || typeof value !== 'object') return JSON.stringify(value) ?? 'null';
-  if (Array.isArray(value)) return `[${value.map((v) => canonicalJson(v)).join(',')}]`;
-  const entries = Object.entries(value as Record<string, unknown>)
-    .filter(([, v]) => v !== undefined)
-    .sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0))
-    .map(([k, v]) => `${JSON.stringify(k)}:${canonicalJson(v)}`);
-  return `{${entries.join(',')}}`;
-}
+export { canonicalJson };
 
 export function manifestContentHash(manifest: unknown): string {
-  return `sha256:${createHash('sha256').update(canonicalJson(manifest), 'utf8').digest('hex')}`;
+  return sha256Text(canonicalJson(manifest));
 }
 
 export interface FreezeBundleInput {

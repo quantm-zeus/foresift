@@ -3,10 +3,11 @@
  * for FR-DR-001 (tiered recovery objectives) and FR-DR-002 (durable backup,
  * restore drills, key separation).
  *
- * Mirrors are by construction: ceilings, classes, and health-state rules come
- * from `@foresift/domain`. Key separation is enforced structurally: a backup
- * policy stores a `keyReference` matching an opaque-reference pattern — never
- * key material.
+ * Mirrors are by construction: data-class and health-state KIND vocabularies
+ * plus the §34.4 RPO ceiling constant come from `@foresift/domain`; the
+ * degradation/health RULES that consume them live in the persistence layer,
+ * not here. Key separation is enforced structurally: a backup policy stores a
+ * `keyReference` matching an opaque-reference pattern — never key material.
  */
 import { z } from 'zod';
 import {
@@ -63,9 +64,11 @@ export const ProtectedAssetSchema = z
   .strict();
 
 /**
- * Backup governance record. `keyReference` is an opaque reference into a
- * separately protected keystore — the pattern refuses anything that looks like
- * embedded material, and rights/legal-hold fields gate deletion upstream.
+ * Backup governance record. `keyReference` accepts only opaque `keyref:`
+ * references into a separately protected keystore — this pattern constrains
+ * SHAPE; scanning artifacts for actual embedded key material is a separate
+ * fail-closed check in the persistence layer, and rights/legal-hold fields
+ * gate deletion upstream.
  */
 export const BackupPolicySchema = z
   .object({

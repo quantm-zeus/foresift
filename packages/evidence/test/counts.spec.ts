@@ -52,9 +52,10 @@ beforeAll(async () => {
     );
   }
 
-  // d1 RETURNED completed 03-20 with {fe-1, fe-2}; d2 RETURNED completed 03-25
-  // with {fe-2, fe-3}; d3 INVALID_RESPONSE completed 03-26 with fe-4 (not
-  // RETURNED → not matured); d4 RETURNED completed AFTER the boundary.
+  // pd-1 RETURNED completed 03-20 with {fe-1, fe-2}; pd-2 RETURNED completed
+  // 03-25 with {fe-2, fe-3}; pd-3 INVALID_RESPONSE completed 03-26 with fe-4
+  // (not RETURNED → not matured). The post-boundary decision case is covered
+  // by the pd-9 scenario further down.
   await engine.query(
     `INSERT INTO evidence_acquisition_decisions
        (decision_id, candidate_id, evidence_family, policy_version, state,

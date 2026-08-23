@@ -30,6 +30,7 @@ import {
   recordTierMeasurement,
   registerProtectedAsset,
   registerRecoveryTier,
+  resolveIncident,
   seedDefaultRecoveryTiers,
   type DatabaseEngine,
 } from '../src/index.ts';
@@ -321,15 +322,34 @@ describe('tier measurements + incidents + health states (§34.9–§34.10)', () 
 
   it('closes incidents only forward in time', async () => {
     const resolvedAt: UtcTimestamp = utcTimestamp('2026-08-21T09:00:00.000Z');
-    await engine.query('UPDATE recovery_incidents SET resolved_at = $2 WHERE incident_id = $1', [
-      'incident-rpo-1',
-      resolvedAt,
-    ]);
+    await resolveIncident(engine, { incidentId: 'incident-rpo-1', resolvedAt });
     const row = await engine.query<{ resolved_at: string | null }>(
       'SELECT resolved_at FROM recovery_incidents WHERE incident_id = $1',
       ['incident-rpo-1'],
     );
     expect(row.rows[0]?.resolved_at).not.toBeNull();
+  });
+
+  it('refuses a resolution timestamp earlier than the incident opened', async () => {
+    // Fresh incident opened at AT; resolution predating it must be refused —
+    // the refusal half of "closes incidents only forward in time" (review L-23).
+    await openIncident(engine, {
+      incidentId: 'incident-close-order',
+      kind: 'RPO_MISSED',
+      reason: 'probe for backward-time refusal',
+      openedAt: AT,
+    });
+    await expect(
+      resolveIncident(engine, {
+        incidentId: 'incident-close-order',
+        resolvedAt: utcTimestamp('2026-08-20T11:59:59.000Z'),
+      }),
+    ).rejects.toThrow(/before it opened/);
+    const row = await engine.query<{ resolved_at: string | null }>(
+      'SELECT resolved_at FROM recovery_incidents WHERE incident_id = $1',
+      ['incident-close-order'],
+    );
+    expect(row.rows[0]?.resolved_at).toBeNull();
   });
 });
 

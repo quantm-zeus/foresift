@@ -1,7 +1,8 @@
 /**
- * Clock port (Constitution IX): time is injected, never read from the wall
- * inside deterministic paths. Production supplies a real clock; tests and
- * drills supply scripted timelines so replay/RPO measurements are exact.
+ * Clock port (Constitution XI/XIII — deterministic verification, replayable
+ * recovery): time is injected, never read from the wall inside deterministic
+ * paths. Production supplies a real clock; tests and drills supply scripted
+ * timelines so replay/RPO measurements are exact.
  */
 import type { UtcTimestamp } from './timestamps.ts';
 

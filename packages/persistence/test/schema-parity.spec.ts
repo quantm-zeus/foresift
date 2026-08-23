@@ -6,7 +6,12 @@
  */
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { PGlite } from '@electric-sql/pglite';
-import { ALL_QUALITY_CODES } from '@foresift/domain';
+import {
+  ALL_ACQUISITION_STATES,
+  ALL_AVAILABILITY_PROVENANCE_CLASSES,
+  ALL_QUALITY_CODES,
+  RecoveryDataClass,
+} from '@foresift/domain';
 import { getTableConfig } from 'drizzle-orm/pg-core';
 import type { PgTable } from 'drizzle-orm/pg-core';
 
@@ -215,5 +220,64 @@ describe('§13.9 quality-code vocabulary parity (SQL truth ↔ domain)', () => {
     };
     await insertWithCodes(['OUTCOME_CENSORED'], 'obs_vocab_ok');
     await expect(insertWithCodes(['OUTCOME_CENSURED'], 'obs_vocab_typo')).rejects.toThrow();
+  });
+
+  it('every enum IN-list CHECK on a mirrored column equals its domain registry (M-5)', async () => {
+    // Each SQL CHECK IN-list over these columns must be byte-equal (as a set)
+    // to its domain vocabulary — mechanical parity that would have caught
+    // C-1-class drift in ANY enum, not just quality codes.
+    const cases: readonly {
+      table: string;
+      column: string;
+      expected: readonly string[];
+    }[] = [
+      {
+        table: 'observations',
+        column: 'availability_provenance',
+        expected: ALL_AVAILABILITY_PROVENANCE_CLASSES,
+      },
+      {
+        table: 'observation_revisions',
+        column: 'availability_provenance',
+        expected: ALL_AVAILABILITY_PROVENANCE_CLASSES,
+      },
+      {
+        table: 'evidence_acquisition_decisions',
+        column: 'state',
+        expected: ALL_ACQUISITION_STATES,
+      },
+      { table: 'recovery_tiers', column: 'data_class', expected: Object.values(RecoveryDataClass) },
+      {
+        table: 'protected_assets',
+        column: 'data_class',
+        expected: Object.values(RecoveryDataClass),
+      },
+    ];
+    for (const c of cases) {
+      const checks = await engine.query<{ def: string }>(
+        `SELECT pg_get_constraintdef(oid) AS def FROM pg_constraint
+         WHERE contype = 'c'
+           AND conrelid::regclass::text = $1
+           AND pg_get_constraintdef(oid) LIKE '%${c.column}%'`,
+        [c.table],
+      );
+      expect(
+        checks.rows.length,
+        `${c.table}.${c.column}: constraint present`,
+      ).toBeGreaterThanOrEqual(1);
+      const listed = new Set<string>();
+      for (const { def } of checks.rows) {
+        for (const m of def.matchAll(/'([A-Z][A-Z_]+)'/g)) {
+          if (m[1] !== undefined) listed.add(m[1]);
+        }
+      }
+      // The IN-list values are a subset of the constraint text; compare only
+      // when this table's own list is complete (skip composite constraints).
+      const fullList = [...listed].sort();
+      expect(fullList.length > 0, `${c.table}.${c.column}: extracted values`).toBe(true);
+      expect([...c.expected].sort(), `${c.table}.${c.column} drifts from domain registry`).toEqual(
+        fullList,
+      );
+    }
   });
 });

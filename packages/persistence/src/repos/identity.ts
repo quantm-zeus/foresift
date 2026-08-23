@@ -295,8 +295,11 @@ export interface DecimalsObservationInput {
 /**
  * Record one decimals observation and re-derive the representation's state:
  * - disagreement among distinct values at the newest instant → CONFLICTING;
- * - the latest value endorsed by ≥2 distinct sources (over all time) →
- *   CROSS_CHECKED;
+ * - the latest value endorsed by ≥2 distinct sources (over all time) that do
+ *   NOT collapse into one independence group → CROSS_CHECKED;
+ * - support whose refs share an upstream lineage counts as ONE independent
+ *   voice (INV-008): state stays SOURCED and the result carries
+ *   `independenceHint: 'DECIMAL_UNCERTAIN'` (ADR-0011);
  * - a lone latest value contradicted by an independent source that never
  *   endorsed it → CONFLICTING (explicitly unusable, never guessed);
  * - otherwise SOURCED (single source, possibly self-correcting).
@@ -304,7 +307,14 @@ export interface DecimalsObservationInput {
 export async function recordDecimalsObservation(
   engine: DatabaseEngine,
   input: DecimalsObservationInput,
-): Promise<{ state: DecimalsState; decimals: number | null }> {
+): Promise<{
+  state: DecimalsState;
+  decimals: number | null;
+  /** Non-empty when lineage collapse reduced the confirmation credit. */
+  independenceHints?: readonly string[];
+}> {
+  // Set inside the transaction; read after commit (ADR-0011 hint surface).
+  let independenceHints: string[] | undefined;
   await engine.transaction(async (tx) => {
     await tx.query(
       `INSERT INTO token_decimal_observations
@@ -342,6 +352,7 @@ export async function recordDecimalsObservation(
 
     let state: DecimalsState;
     let resolvedDecimals: number | null;
+    independenceHints = undefined;
     if (newestValues.size > 1) {
       state = DecimalsResolutionState.CONFLICTING;
       resolvedDecimals = null; // conflicting ⇒ explicitly unusable, never guessed
@@ -356,7 +367,14 @@ export async function recordDecimalsObservation(
       const unendorsedDissent = history.some(
         (h) => h.decimals !== latest && !supporters.has(h.sourceRef),
       );
-      if (supporters.size >= 2) {
+      if (supporters.size >= 2 && (await refsCollapseToOneIndependenceGroup(tx, [...supporters]))) {
+        // INV-008: ref count is not independence — every supporting ref in one
+        // upstream lineage is a single voice, so full cross-check credit is
+        // refused and the uncertainty is surfaced explicitly (ADR-0011).
+        state = DecimalsResolutionState.SOURCED;
+        resolvedDecimals = latest;
+        independenceHints = ['DECIMAL_UNCERTAIN'];
+      } else if (supporters.size >= 2) {
         state = DecimalsResolutionState.CROSS_CHECKED;
         resolvedDecimals = latest;
       } else if (unendorsedDissent) {
@@ -383,7 +401,34 @@ export async function recordDecimalsObservation(
   );
   const state = row.rows[0]?.decimals_state;
   if (state === undefined) throw new Error('representation missing after decimals observation');
-  return { state: state as DecimalsState, decimals: row.rows[0]?.decimals ?? null };
+  return {
+    state: state as DecimalsState,
+    decimals: row.rows[0]?.decimals ?? null,
+    ...(independenceHints === undefined ? {} : { independenceHints }),
+  };
+}
+
+/**
+ * Best-effort lineage collapse among decimal-observation source refs
+ * (INV-008, ADR-0011): supporting refs registered as source identities are
+ * folded by their independence group — any group holding ≥2 supporters means
+ * the "cross-check" came from one upstream lineage. Refs that were never
+ * registered cannot be lineage-checked and keep ref-level semantics (the
+ * documented gap this best-effort pass narrows).
+ */
+async function refsCollapseToOneIndependenceGroup(
+  tx: DatabaseEngine,
+  refs: readonly string[],
+): Promise<boolean> {
+  const rows = await tx.query<{ group_id: string; supporter_count: number }>(
+    `SELECT m.group_id, count(*)::int AS supporter_count
+     FROM source_group_memberships m
+     WHERE m.source_identity_id = ANY($1::text[])
+     GROUP BY m.group_id
+     HAVING count(*) >= 2`,
+    [refs],
+  );
+  return rows.rows.length > 0;
 }
 
 export interface IdentitySnapshot {

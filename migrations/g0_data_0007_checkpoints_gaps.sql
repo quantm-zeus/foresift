@@ -1,7 +1,9 @@
 -- g0_data_0007_checkpoints_gaps.sql
 -- Collector continuity storage contract (§34.7, INV-009, AC-263): persistent
--- per-shard checkpoints with fencing tokens, an explicit gap registry, and the
--- exactly-once canonical event ledger consumed by restore+replay.
+-- per-shard checkpoints with fencing tokens and an explicit gap registry.
+-- The exactly-once canonical event ledger itself is `canonical_event_keys`,
+-- created by g0_data_0005_object_artifact_index.sql; the migration split is
+-- intentional — this file owns checkpoint/gap state only.
 
 CREATE TABLE collector_checkpoints (
     shard_id        text PRIMARY KEY,

@@ -208,9 +208,10 @@ export function classifyFailure(message = '') {
 
 /**
  * Best-effort extraction of a provider-supplied quota reset time from a
- * failure message ("… resets at 2026-08-24T00:00:00Z …", epoch seconds/ms near
- * reset wording). Returns epoch milliseconds or null when the provider gave
- * no usable timing — callers must then apply their own bounded backoff policy.
+ * failure message ("… resets at 2026-08-24T00:00:00Z …"). Only ISO-8601
+ * timestamps are recognized — bare epoch numbers are NOT parsed. Returns epoch
+ * milliseconds or null when the provider gave no usable timing — callers must
+ * then apply their own bounded backoff policy.
  */
 export function extractQuotaResetAt(message = '') {
   const m = String(message);
@@ -282,10 +283,11 @@ function dependsTransitively(ms, fromId, toId) {
 }
 
 /**
- * Concurrency policy (roadmap.policy):
- * - foundation milestones: max 1 concurrent coding package
- * - otherwise max 2; two packages co-run only if every concurrentRequiresAllOf
- *   condition holds between them.
+ * Concurrency policy (roadmap.policy), exactly as machine-checked below:
+ * - foundation milestones: max 1 concurrent coding package;
+ * - otherwise max 2, and a co-run additionally requires BOTH packages
+ *   parallelizable, no CRITICAL member in the pair, no transitive dependency
+ *   between them, and disjoint writeScopes.
  */
 export function canStartPackage(roadmap, ms, candidate, runningPackages) {
   const foundation = roadmap.policy.foundationMilestones.includes(ms.milestoneId);

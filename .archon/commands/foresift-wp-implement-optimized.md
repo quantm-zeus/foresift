@@ -1,5 +1,5 @@
 ---
-description: Implement one work package in bounded slices with durable checkpoints and FAST verification (OPTIMIZED profile)
+description: Implement one work package in bounded slices with durable checkpoints and impact-aware FAST verification (OPTIMIZED profile)
 argument-hint: <package-id>
 ---
 
@@ -23,9 +23,12 @@ deterministic guard and gate.
 
 1. **Checkpoint first** (saves minutes of re-reading):
    `pnpm wp:checkpoint --validate --package $ARGUMENTS --artifacts-dir "$ARTIFACTS_DIR" --head "$(git rev-parse HEAD)"`
-   - exit 0 → the checkpoint is provably current: use its slice, filesTouched,
-     requirementIds and prdReferences to resume EXACTLY where the last turn
-     stopped. Do NOT re-read large contract sections it already summarizes.
+   - exit 0 → the checkpoint is provably current: resume EXACTLY where the last
+     turn stopped using its derived context capsule (`context` block:
+     requirementIds, acceptanceIds, prdReferences, adrReferences, affected test
+     refs, suggested next tasks) plus slice/filesTouched. Do NOT re-read large
+     contract sections it already indexes; open only the specific referenced
+     PRD/ADR/spec-kit locations your current slice actually needs.
    - nonzero → treat as ABSENT: rebuild context from authoritative sources
      below. Never trust an invalid cache.
 2. `git status` and `git diff` — uncommitted work from an earlier turn MUST be
@@ -42,8 +45,9 @@ coherence; persistence beats cleanliness.
 
 1. `CLAUDE.md`; 2. `.specify/memory/constitution.md`; 3. plan artifacts;
 4. `specs/$ARGUMENTS/{spec,plan,tasks}.md`; 5. your package object in
-`specs/implementation/current-milestone.json` (binding scope); 6. PRD sections
-for your requirementIds.
+`specs/implementation/current-milestone.json` (binding scope); 6. ONLY the PRD
+sections your requirementIds name (the checkpoint capsule lists exact
+section/line references — do not sweep the whole PRD).
 
 ## Work in bounded slices
 
@@ -51,20 +55,37 @@ A slice = the next coherent ~8–12 task-chunk targeting 20–45 minutes of work
 ending at a state that is coherent on disk (compiles, focused checks green).
 
 Per file change: just keep editing; do NOT run any check per single file.
-Per slice boundary (in order):
+At each slice boundary, run EXACTLY this order — the order matters because the
+checkpoint hashes tasks.md, its HEAD, and other authoritative sources:
 
-1. **FAST verify** the slice's touched files:
-   `pnpm wp:fast-verify --package $ARGUMENTS --artifacts-dir "$ARTIFACTS_DIR" --file <changed files...>`
-   Red ⇒ fix now, re-run; do not stack slices on red.
-   If you changed nothing verifiable, omit `--file`: the tool escalates to the
-   full suite rather than guessing (that escalation is correct behavior).
-2. **Commit additively**: conventional message (`feat(scope): …`,
-   `test(scope): …`). NEVER amend/rebase published branches/force-push.
-3. **Persist the checkpoint**:
+1. **FAST verify from git evidence** (scope comes from git, not memory):
+   `pnpm wp:fast-verify --package $ARGUMENTS --artifacts-dir "$ARTIFACTS_DIR" --from-git`
+   The tool derives changed files since the last validated checkpoint head
+   (or the branch merge-base), including new/deleted/renamed files and
+   uncommitted edits, classifies their impact, and runs the targeted checks
+   that impact provably requires. Unknown or root-level impact escalates to the
+   FULL suite inside FAST — that escalation is correct behavior; do not fight
+   it. You MAY add hints for files git cannot know about yet:
+   `--file <path>` (hints never replace git evidence). Red ⇒ fix now, re-run;
+   do not stack slices on red.
+2. **Update `specs/$ARGUMENTS/tasks.md`**: mark this slice's completed tasks
+   `- [x]`. Do this BEFORE committing and BEFORE building the checkpoint — the
+   checkpoint records tasks.md content, so it must observe the FINAL tasks.md.
+3. **Persist any required notes**: append deviations to
+   `$ARTIFACTS_DIR/implementation-notes.md` / out-of-scope necessities to
+   `$ARTIFACTS_DIR/out-of-scope-notes.md`.
+4. **Commit ALL coherent slice changes** (code, tests, tasks.md): conventional
+   messages (`feat(scope): …`, `test(scope): …`). NEVER amend/rebase published
+   branches/force-push.
+5. **Build the checkpoint LAST**, against the final committed state:
    `pnpm wp:checkpoint --build --package $ARGUMENTS --artifacts-dir "$ARTIFACTS_DIR" \
       --slice-id <id> --slice-tasks <comma-separated task ids> \
-      --files <comma-separated touched files> [--blocker "<reason>"]`
-   then mark completed tasks `- [x]` in `specs/$ARGUMENTS/tasks.md`.
+      [--slice-base <HEAD sha before this slice>] [--blocker "<reason>"]`
+   Everything else (HEAD, task counts, requirement/acceptance IDs, PRD/ADR
+   references, touched-file scope, previous FAST result) is derived by the tool
+   from authoritative repository state — do not invent or pass those values.
+   A checkpoint built this way validates cleanly at the start of the next turn;
+   any later change to tasks.md/HEAD/authorities correctly invalidates it.
 
 ## Install avoidance
 
@@ -89,8 +110,9 @@ submission. Never weaken verification or product authority to obtain a pass.
 
 ## Before you finish
 
-Leave the last slice coherent: FAST verify + commit + checkpoint written +
-tasks.md updated. Do NOT mark anything PROVEN — statuses are machine-owned.
+Leave the last slice coherent: FAST verify + tasks.md updated + committed +
+checkpoint written LAST. Do NOT mark anything PROVEN — statuses are
+machine-owned.
 
 ## Completion discipline
 

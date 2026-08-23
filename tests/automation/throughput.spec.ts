@@ -20,7 +20,6 @@ import {
   attestationDrift,
   attestationIdentity,
 } from '../../scripts/automation/package-full-gate.mjs';
-import { selectFiles } from '../../scripts/automation/package-fast-verify.mjs';
 import { classifyCommand } from '../../scripts/automation/verify-dedupe.mjs';
 import { throughputProfile } from '../../scripts/automation/work-package-throughput-profile.mjs';
 
@@ -77,18 +76,8 @@ describe('11–12. deterministic throughput profile', () => {
   });
 });
 
-describe('13. FAST-tier touched-file selection', () => {
-  it('keeps existing code files, drops docs/missing, de-duplicates', () => {
-    const a = write('sel/a.ts', 'export {};\n');
-    write('sel/b.md', '# not code\n');
-    expect(selectFiles([a, a, join(fx, 'sel/b.md'), join(fx, 'sel/missing.ts')])).toEqual([a]);
-  });
-
-  it('NEGATIVE: empty selection is empty — caller must escalate, not guess', () => {
-    expect(selectFiles([])).toEqual([]);
-    expect(selectFiles([join(fx, 'does/not/exist.ts')])).toEqual([]);
-  });
-});
+// (The §13 FAST touched-file selection tests were superseded by the impact-
+// aware classifier coverage in v2-throughput.spec.ts — V2 task spec §7.)
 
 describe('14. durable implementation checkpoint', () => {
   it('counts Spec Kit checkboxes and hashes sources at build time', () => {

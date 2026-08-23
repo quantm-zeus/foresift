@@ -11,7 +11,10 @@ description: |
        drives loop iteration (tamper -> auto-iteration -> repair -> pass);
     3. the FULL-gate --check mode FAILS CLOSED when no attestation exists;
     4. the dedupe classifier runs and reports UNIQUE_MANDATORY for unprovable
-       commands (fail-closed direction).
+       commands (fail-closed direction);
+    5. the V2 slice-finalization ORDER contract holds in-runtime: a checkpoint
+       built LAST (after the tasks.md edit + commit) validates cleanly at the
+       next turn, while building BEFORE a tasks.md edit self-invalidates.
 
   Run after any change to the throughput control plane or any Archon upgrade:
 
@@ -123,3 +126,47 @@ nodes:
       }
       node scripts/automation/verify-dedupe.mjs --repo-root . >/dev/null
       echo "PROOF 4 OK: dedupe classifier executed over the real milestone metadata."
+
+  # ── PROOF 5: V2 slice-finalization ORDER contract (V2 task spec §4) ─────────
+  # The checkpoint hashes tasks.md and HEAD, so it must be built LAST at a
+  # slice boundary. 5a proves the correct order survives into the next turn;
+  # 5b proves the defective order (build → then edit tasks.md) is DETECTED as
+  # invalid rather than silently trusted.
+  - id: finalize-order-proof
+    depends_on: [verify-dedupe-fail-closed]
+    bash: |
+      set -euo pipefail
+      S="${SMOKE_DIR:-/tmp/foresift-smoke-throughput}"
+      R="$S/finalize-repo"
+      rm -rf "$R"
+      mkdir -p "$R/specs/pkg" "$R/artifacts"
+      git -C "$R" init -q
+      git -C "$R" config user.email smoke@foresift.invalid
+      git -C "$R" config user.name smoke
+      printf -- '- [ ] T001\n' > "$R/specs/pkg/tasks.md"
+      git -C "$R" add -A
+      git -C "$R" commit -qm base
+      # CORRECT V2 order: tasks.md updated BEFORE commit, checkpoint built LAST.
+      printf -- '- [x] T001\n' > "$R/specs/pkg/tasks.md"
+      git -C "$R" add -A
+      git -C "$R" commit -qm slice-1
+      node scripts/automation/package-checkpoint.mjs --build \
+        --package pkg --artifacts-dir "$R/artifacts" --repo-root "$R" >/dev/null
+      HEAD1=$(git -C "$R" rev-parse HEAD)
+      node scripts/automation/package-checkpoint.mjs --validate \
+        --package pkg --artifacts-dir "$R/artifacts" --head "$HEAD1" >/dev/null
+      echo "PROOF 5a OK: checkpoint built LAST validates cleanly for the next turn."
+      # DEFECTIVE order: build first, THEN mark completion ⇒ must be invalid.
+      printf -- '- [ ] T001\n' > "$R/specs/pkg/tasks.md"
+      git -C "$R" add -A
+      git -C "$R" commit -qm slice-2-start
+      node scripts/automation/package-checkpoint.mjs --build \
+        --package pkg --artifacts-dir "$R/artifacts" --repo-root "$R" >/dev/null
+      printf -- '- [x] T001\n' > "$R/specs/pkg/tasks.md"
+      if node scripts/automation/package-checkpoint.mjs --validate \
+            --package pkg --artifacts-dir "$R/artifacts" \
+            --head "$(git -C "$R" rev-parse HEAD)" >/dev/null 2>&1; then
+        echo "FAIL: checkpoint built before a tasks.md edit must NOT validate"
+        exit 1
+      fi
+      echo "PROOF 5b OK: post-build tasks.md drift invalidates the stale cache."

@@ -10,6 +10,7 @@ import {
   ErrorCode,
   LineageStatus,
   aggregateWithoutDoubleCounting,
+  parseChainId,
   utcTimestamp,
   type MigrationLineageEdge,
   type PoolId,
@@ -22,7 +23,7 @@ import {
   makeTestDatabase,
   seedPool,
   type TestDatabase,
-} from '../acceptance/helpers';
+} from '../acceptance/helpers.ts';
 
 const T = (iso: string): UtcTimestamp => utcTimestamp(iso);
 
@@ -30,15 +31,22 @@ const edge = (
   migrationId: string,
   launchPoolId: PoolId,
   migratedPoolId: PoolId,
-  overrides: Partial<MigrationLineageEdge> = {},
-): MigrationLineageEdge => ({
-  migrationId: migrationId as MigrationLineageEdge['migrationId'],
-  launchPoolId,
-  migratedPoolId,
-  status: LineageStatus.CONFIRMED,
-  migratedAt: T('2026-04-01T12:00:00Z'),
-  ...overrides,
-});
+  // `migratedAt` may be explicitly unset (an edge with no boundary time is a
+  // real refusal case), which exactOptionalPropertyTypes forbids in Partial<>.
+  overrides: Omit<Partial<MigrationLineageEdge>, 'migratedAt'> & {
+    readonly migratedAt?: UtcTimestamp | undefined;
+  } = {},
+): MigrationLineageEdge =>
+  ({
+    migrationId: migrationId as MigrationLineageEdge['migrationId'],
+    launchPoolId,
+    migratedPoolId,
+    status: LineageStatus.CONFIRMED,
+    migratedAt: T('2026-04-01T12:00:00Z'),
+    ...overrides,
+    // Overrides may deliberately unset `migratedAt` (an explicitly boundary-free
+    // edge) — exactly the contract-violating shape the aggregator must refuse.
+  }) as MigrationLineageEdge;
 
 describe('AC-022 negative: naive aggregation diverges and ambiguity is refused', () => {
   const poolA = 'eip155:1:0x0000000000000000000000000000000000ac220' as PoolId;
@@ -62,9 +70,7 @@ describe('AC-022 negative: naive aggregation diverges and ambiguity is refused',
     ]);
 
     const lineageAware = aggregateWithoutDoubleCounting(contributions, lineage);
-    const naiveTotal = [...contributions.values()]
-      .flat()
-      .reduce((acc, s) => acc + s.value, 0n);
+    const naiveTotal = [...contributions.values()].flat().reduce((acc, s) => acc + s.value, 0n);
 
     expect(lineageAware).toBe(2_100n);
     expect(naiveTotal).toBe(3_100n); // demonstrable divergence: +1_000 phantom
@@ -121,12 +127,12 @@ describe('AC-022 negative: storage-level lineage refusals', () => {
       poolAddress: '0x00000000000000000000000000000000000ac226',
     });
     poolA = await insertPool(tdb.engine, {
-      chainId: 'eip155:1',
+      chainId: parseChainId('eip155:1'),
       dexId: 'uniswap-v2',
       poolAddress: '0x0000000000000000000000000000000000c40004',
     });
     poolB = await insertPool(tdb.engine, {
-      chainId: 'eip155:1',
+      chainId: parseChainId('eip155:1'),
       dexId: 'uniswap-v2',
       poolAddress: '0x0000000000000000000000000000000000c50005',
     });

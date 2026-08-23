@@ -9,12 +9,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { ErrorCode, utcTimestamp } from '@foresift/domain';
 import { appendObservation, replayObservations } from '@foresift/persistence';
 import { resolveEvidenceAt } from '@foresift/evidence';
-import {
-  closeTestDatabase,
-  expectForesiftError,
-  makeTestDatabase,
-  seedPool,
-} from '../acceptance/helpers';
+import { expectForesiftError, makeTestDatabase, seedPool } from '../acceptance/helpers.ts';
 
 let tdb: Awaited<ReturnType<typeof makeTestDatabase>>;
 

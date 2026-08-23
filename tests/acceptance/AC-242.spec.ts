@@ -10,18 +10,14 @@
  * missingness, and never contributes as matured evidence.
  */
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import {
-  AcquisitionState,
-  utcTimestamp,
-  type UtcTimestamp,
-} from '@foresift/domain';
+import { AcquisitionState, utcTimestamp, type UtcTimestamp } from '@foresift/domain';
 import {
   maturedEvidenceCountAt,
   recordAcquisitionDecision,
   recordProbeAssignment,
   completeRetrieval,
 } from '@foresift/persistence';
-import { closeTestDatabase, makeTestDatabase, type TestDatabase } from './helpers';
+import { closeTestDatabase, makeTestDatabase, type TestDatabase } from './helpers.ts';
 
 const T = (iso: string): UtcTimestamp => utcTimestamp(iso);
 
@@ -111,7 +107,9 @@ describe('AC-242: NOT_REQUESTED_BY_POLICY storage semantics', () => {
       `SELECT state, COUNT(*)::text AS n FROM evidence_acquisition_decisions
        WHERE candidate_id = 'cand/ac242' GROUP BY state ORDER BY state`,
     );
-    expect(Object.fromEntries(byState.rows.map((r) => [r.state, Number(r.n)]))).toEqual({
+    expect(
+      Object.fromEntries(byState.rows.map((r): [string, number] => [r.state, Number(r.n)])),
+    ).toEqual({
       NOT_REQUESTED_BY_POLICY: 1,
       PROVIDER_UNAVAILABLE: 1,
       RETURNED: 1,

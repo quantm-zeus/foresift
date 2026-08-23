@@ -27,7 +27,7 @@ import {
   insertRepresentation,
   recordDecimalsObservation,
 } from '@foresift/persistence';
-import { closeTestDatabase, makeTestDatabase, type TestDatabase } from './helpers';
+import { closeTestDatabase, makeTestDatabase, type TestDatabase } from './helpers.ts';
 
 const FIXTURES = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../fixtures/data');
 
@@ -97,10 +97,9 @@ describe('AC-023: chain-specific golden fixtures pass end to end', () => {
 
   it('composes every golden CAIP-10 account id', () => {
     for (const v of identityVectors.caip10) {
-      const normalized =
-        v.chainId.startsWith('eip155')
-          ? normalizeEvmAddress(v.address)
-          : normalizeSolanaAddress(v.address);
+      const normalized = v.chainId.startsWith('eip155')
+        ? normalizeEvmAddress(v.address)
+        : normalizeSolanaAddress(v.address);
       expect(caip10(v.chainId as never, normalized)).toBe(v.accountId);
     }
   });

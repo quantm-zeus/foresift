@@ -14,7 +14,9 @@ import {
   FeatureStoreClass,
   supportsPopulationClaim,
   utcTimestamp,
+  type FeatureDefinitionId,
   type FeatureValue,
+  type QualityCode,
   type UtcTimestamp,
 } from '@foresift/domain';
 import {
@@ -24,7 +26,7 @@ import {
   registerFeatureDefinition,
   writeOnlineRollingVolume,
 } from '@foresift/persistence';
-import { closeTestDatabase, makeTestDatabase, seedPool, type TestDatabase } from './helpers';
+import { closeTestDatabase, makeTestDatabase, seedPool, type TestDatabase } from './helpers.ts';
 
 const T = (iso: string): UtcTimestamp => utcTimestamp(iso);
 
@@ -61,7 +63,7 @@ async function loadDomainFeatureValue(
   const r = rows.rows[0];
   if (r === undefined) throw new Error(`no ${storeClass} feature value stored at ${eventAt}`);
   return {
-    definitionId: r.definition_id,
+    definitionId: r.definition_id as FeatureDefinitionId,
     featureVersion: Number(r.feature_version),
     computationCodeVersion: r.computation_code_version,
     subjectKey: r.subject_key,
@@ -74,7 +76,7 @@ async function loadDomainFeatureValue(
     ...(r.decimal_string === null
       ? {}
       : { value: { decimalString: r.decimal_string, scale: Number(r.scale) } }),
-    qualityCodes: r.quality_codes,
+    qualityCodes: r.quality_codes as readonly QualityCode[],
     populationProvenance: { populationKind: r.population_kind, lineageRefs: r.lineage_refs },
     storeClass: r.store_class === 'ONLINE' ? FeatureStoreClass.ONLINE : FeatureStoreClass.OFFLINE,
   };
@@ -163,12 +165,7 @@ describe('AC-244: feature provenance fields are present and enforced', () => {
   });
 
   it('a FULL_UNIVERSE value with lineage supports a full-universe claim', async () => {
-    const value = await loadDomainFeatureValue(
-      'def/ac244',
-      'ONLINE',
-      poolId,
-      WINDOW_END,
-    );
+    const value = await loadDomainFeatureValue('def/ac244', 'ONLINE', poolId, WINDOW_END);
     expect(value.populationProvenance.populationKind).toBe('FULL_UNIVERSE');
     expect(supportsPopulationClaim(value)).toBe(true);
   });
@@ -183,12 +180,7 @@ describe('AC-244: feature provenance fields are present and enforced', () => {
       resolvedAt: T('2026-06-16T01:00:00Z'),
       populationKind: 'DEEP_RESEARCH_SELECTED',
     });
-    const domainValue = await loadDomainFeatureValue(
-      'def/ac244',
-      'ONLINE',
-      poolId,
-      selectedEnd,
-    );
+    const domainValue = await loadDomainFeatureValue('def/ac244', 'ONLINE', poolId, selectedEnd);
     expect(domainValue.populationProvenance.populationKind).toBe('DEEP_RESEARCH_SELECTED');
     // The substrate refuses this record as a full-universe claim support —
     // the lift-claim logic itself belongs to later evaluation packages.

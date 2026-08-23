@@ -12,25 +12,36 @@ import {
   FeatureStoreClass,
   supportsPopulationClaim,
   utcTimestamp,
+  type DecimalValue,
   type FeatureValue,
 } from '@foresift/domain';
 import { DATA_SCHEMAS } from '@foresift/shared-schemas';
 
-const value = (overrides: Partial<FeatureValue> = {}): FeatureValue => ({
-  definitionId: 'def/ac244n' as never,
-  featureVersion: 1,
-  computationCodeVersion: 'rolling-volume/v1',
-  subjectKey: 'pool/ac244n',
-  eventAt: utcTimestamp('2026-06-15T12:00:00Z'),
-  value: { decimalString: '3500', scale: 0 },
-  qualityCodes: [],
-  populationProvenance: {
-    populationKind: 'FULL_UNIVERSE',
-    lineageRefs: ['observations:pool/ac244n'],
-  },
-  storeClass: FeatureStoreClass.ONLINE,
-  ...overrides,
-});
+// `value` may be explicitly unset (an absent value must be explained by a
+// quality code — the refusal case below), which exactOptionalPropertyTypes
+// forbids expressing through Partial<>.
+const value = (
+  overrides: Omit<Partial<FeatureValue>, 'value'> & {
+    readonly value?: DecimalValue | undefined;
+  } = {},
+): FeatureValue =>
+  ({
+    definitionId: 'def/ac244n' as never,
+    featureVersion: 1,
+    computationCodeVersion: 'rolling-volume/v1',
+    subjectKey: 'pool/ac244n',
+    eventAt: utcTimestamp('2026-06-15T12:00:00Z'),
+    value: { decimalString: '3500', scale: 0 },
+    qualityCodes: [],
+    populationProvenance: {
+      populationKind: 'FULL_UNIVERSE',
+      lineageRefs: ['observations:pool/ac244n'],
+    },
+    storeClass: FeatureStoreClass.ONLINE,
+    ...overrides,
+    // Overrides may deliberately unset `value` — the explained-absence case the
+    // schema mirror must accept only with quality codes.
+  }) as FeatureValue;
 
 describe('AC-244 negative: lift claims without valid provenance are refused', () => {
   it('an empty computation code version is a typed refusal', () => {
@@ -66,7 +77,7 @@ describe('AC-244 negative: lift claims without valid provenance are refused', ()
   });
 
   it('the schema mirror refuses a feature value with no population provenance', () => {
-    const broken = value() as Record<string, unknown>;
+    const broken = value() as unknown as Record<string, unknown>;
     delete broken.populationProvenance;
     expect(DATA_SCHEMAS.FeatureValue.safeParse(broken).success).toBe(false);
   });

@@ -18,7 +18,7 @@ import {
   recordProbeAssignment,
 } from '@foresift/persistence';
 import { freezeBundle, projectMaturedCounts } from '@foresift/evidence';
-import { closeTestDatabase, makeTestDatabase, seedPool, type TestDatabase } from './helpers';
+import { closeTestDatabase, makeTestDatabase, seedPool, type TestDatabase } from './helpers.ts';
 
 const T = (iso: string): UtcTimestamp => utcTimestamp(iso);
 
@@ -152,11 +152,7 @@ describe('AC-248: immutable projections reported honestly below thresholds', () 
       manifest: { family: 'swaps', window: '2026-07-01' },
       frozenAt: T('2026-07-01T09:30:00Z'),
     });
-    await maturedRetrieval(
-      'ac248-ret-july',
-      'ac248-bundle-july',
-      T('2026-07-01T10:00:00Z'),
-    );
+    await maturedRetrieval('ac248-ret-july', 'ac248-bundle-july', T('2026-07-01T10:00:00Z'));
     const beforeBoundary = await projectMaturedCounts(tdb.engine, {
       candidateId: 'cand/ac248',
       evidenceFamily: 'swaps',

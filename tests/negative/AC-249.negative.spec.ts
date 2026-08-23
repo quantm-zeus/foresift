@@ -8,15 +8,8 @@
  */
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { utcTimestamp, type UtcTimestamp } from '@foresift/domain';
-import {
-  assertNoBackdating,
-  recordBackfillReceipt,
-} from '@foresift/persistence';
-import {
-  closeTestDatabase,
-  makeTestDatabase,
-  type TestDatabase,
-} from '../acceptance/helpers';
+import { assertNoBackdating, recordBackfillReceipt } from '@foresift/persistence';
+import { closeTestDatabase, makeTestDatabase, type TestDatabase } from '../acceptance/helpers.ts';
 
 const T = (iso: string): UtcTimestamp => utcTimestamp(iso);
 

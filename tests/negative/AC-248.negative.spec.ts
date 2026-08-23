@@ -7,12 +7,7 @@
  * what merely exists now.
  */
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import {
-  AcquisitionState,
-  ErrorCode,
-  utcTimestamp,
-  type UtcTimestamp,
-} from '@foresift/domain';
+import { AcquisitionState, ErrorCode, utcTimestamp, type UtcTimestamp } from '@foresift/domain';
 import {
   completeRetrieval,
   maturedEvidenceCountAt,
@@ -25,7 +20,7 @@ import {
   expectForesiftError,
   makeTestDatabase,
   type TestDatabase,
-} from '../acceptance/helpers';
+} from '../acceptance/helpers.ts';
 
 const T = (iso: string): UtcTimestamp => utcTimestamp(iso);
 

@@ -24,7 +24,7 @@ import {
   recordDependenceEdge,
   registerSourceIdentity,
 } from '@foresift/persistence';
-import { closeTestDatabase, makeTestDatabase, type TestDatabase } from './helpers';
+import { closeTestDatabase, makeTestDatabase, type TestDatabase } from './helpers.ts';
 
 const FIXTURES = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../fixtures/data');
 
@@ -75,13 +75,15 @@ describe('AC-245: reduced independence credit despite distinct provider ids', ()
     // Each threshold dimension alone suffices (any-one-of semantics).
     expect(inputsJustifyReducedIndependence(correlatedInputs())).toBe(true);
     expect(inputsJustifyReducedIndependence(correlatedInputs({ outageOverlap: 0.55 }))).toBe(true);
-    expect(inputsJustifyReducedIndependence(correlatedInputs({ valueErrorTimingCorrelation: -1 }))).toBe(true);
+    expect(
+      inputsJustifyReducedIndependence(correlatedInputs({ valueErrorTimingCorrelation: -1 })),
+    ).toBe(true);
     expect(
       inputsJustifyReducedIndependence(correlatedInputs({ firstSeenLagAgreement: 0.72 })),
     ).toBe(true);
-    expect(inputsJustifyReducedIndependence(correlatedInputs({ fingerprintSimilarity: 0.95 }))).toBe(
-      true,
-    );
+    expect(
+      inputsJustifyReducedIndependence(correlatedInputs({ fingerprintSimilarity: 0.95 })),
+    ).toBe(true);
   });
 
   it('a low-correlation pair across distinct lineages stays independent', () => {

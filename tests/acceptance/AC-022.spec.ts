@@ -13,6 +13,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import {
   LineageStatus,
   aggregateWithoutDoubleCounting,
+  parseChainId,
   utcTimestamp,
   type MigrationLineageEdge,
   type PoolId,
@@ -24,7 +25,7 @@ import {
   registerLaunch,
   registerMigrationEdge,
 } from '@foresift/persistence';
-import { closeTestDatabase, makeTestDatabase, seedPool, type TestDatabase } from './helpers';
+import { closeTestDatabase, makeTestDatabase, seedPool, type TestDatabase } from './helpers.ts';
 
 const T = (iso: string): UtcTimestamp => utcTimestamp(iso);
 
@@ -50,17 +51,17 @@ beforeAll(async () => {
     poolAddress: '0x00000000000000000000000000000000000ac220',
   });
   launchA = await insertPool(engine, {
-    chainId: 'eip155:1',
+    chainId: parseChainId('eip155:1'),
     dexId: 'uniswap-v2',
     poolAddress: '0x0000000000000000000000000000000000a10001',
   });
   migratedB = await insertPool(engine, {
-    chainId: 'eip155:1',
+    chainId: parseChainId('eip155:1'),
     dexId: 'uniswap-v2',
     poolAddress: '0x0000000000000000000000000000000000b20002',
   });
   migratedC = await insertPool(engine, {
-    chainId: 'eip155:1',
+    chainId: parseChainId('eip155:1'),
     dexId: 'uniswap-v2',
     poolAddress: '0x0000000000000000000000000000000000c30003',
   });
@@ -134,9 +135,7 @@ describe('AC-022: asset/pool migration avoids double counting', () => {
     ];
 
     // 1_000 + 1_100 + 1_150 — never 1_000+1_100+1_100+1_150.
-    expect(
-      aggregateWithoutDoubleCounting(contributions, edges),
-    ).toBe(3_250n);
+    expect(aggregateWithoutDoubleCounting(contributions, edges)).toBe(3_250n);
   });
 
   it('boundary equality supersedes (the successor owns the boundary instant)', async () => {

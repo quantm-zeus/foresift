@@ -7,7 +7,7 @@
  */
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { independenceGroupOf, registerSourceIdentity } from '@foresift/persistence';
-import { closeTestDatabase, makeTestDatabase, type TestDatabase } from '../acceptance/helpers';
+import { closeTestDatabase, makeTestDatabase, type TestDatabase } from '../acceptance/helpers.ts';
 
 let tdb: TestDatabase;
 

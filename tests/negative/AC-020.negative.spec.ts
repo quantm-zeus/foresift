@@ -6,12 +6,7 @@
  * never a silent leak.
  */
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import {
-  AcquisitionState,
-  ErrorCode,
-  utcTimestamp,
-  type UtcTimestamp,
-} from '@foresift/domain';
+import { AcquisitionState, ErrorCode, utcTimestamp, type UtcTimestamp } from '@foresift/domain';
 import {
   appendObservation,
   backfillVisibleForReplay,
@@ -26,7 +21,7 @@ import {
   makeTestDatabase,
   seedPool,
   type TestDatabase,
-} from '../acceptance/helpers';
+} from '../acceptance/helpers.ts';
 
 const T = (iso: string): UtcTimestamp => utcTimestamp(iso);
 

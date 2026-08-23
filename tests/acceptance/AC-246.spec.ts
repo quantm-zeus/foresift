@@ -11,8 +11,12 @@
  * promotion gates consume these groups in later packages.
  */
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { independenceGroups, independenceGroupOf, registerSourceIdentity } from '@foresift/persistence';
-import { closeTestDatabase, makeTestDatabase, type TestDatabase } from './helpers';
+import {
+  independenceGroups,
+  independenceGroupOf,
+  registerSourceIdentity,
+} from '@foresift/persistence';
+import { closeTestDatabase, makeTestDatabase, type TestDatabase } from './helpers.ts';
 
 let tdb: TestDatabase;
 

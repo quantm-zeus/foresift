@@ -6,7 +6,7 @@
  * are refused, and an assignment without a recorded decision impact cannot
  * mature — every ordering violation is a typed refusal.
  */
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, it } from 'vitest';
 import { AcquisitionState, ErrorCode, utcTimestamp, type UtcTimestamp } from '@foresift/domain';
 import {
   completeRetrieval,
@@ -18,7 +18,7 @@ import {
   expectForesiftError,
   makeTestDatabase,
   type TestDatabase,
-} from '../acceptance/helpers';
+} from '../acceptance/helpers.ts';
 
 const T = (iso: string): UtcTimestamp => utcTimestamp(iso);
 

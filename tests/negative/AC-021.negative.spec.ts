@@ -8,7 +8,7 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { utcTimestamp, type UtcTimestamp } from '@foresift/domain';
 import { appendObservation, loadObservation } from '@foresift/persistence';
-import { closeTestDatabase, makeTestDatabase, type TestDatabase } from '../acceptance/helpers';
+import { closeTestDatabase, makeTestDatabase, type TestDatabase } from '../acceptance/helpers.ts';
 
 const T = (iso: string): UtcTimestamp => utcTimestamp(iso);
 
@@ -67,9 +67,7 @@ describe('AC-021 negative: mutation attempts are rejected by triggers', () => {
 
   it('DELETE on observation_revisions is refused', async () => {
     await expect(
-      tdb.engine.query(
-        "DELETE FROM observation_revisions WHERE revision_id = 'ac21n-rev1'",
-      ),
+      tdb.engine.query("DELETE FROM observation_revisions WHERE revision_id = 'ac21n-rev1'"),
     ).rejects.toThrow();
   });
 

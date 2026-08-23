@@ -17,7 +17,7 @@ import {
   expectForesiftError,
   makeTestDatabase,
   type TestDatabase,
-} from '../acceptance/helpers';
+} from '../acceptance/helpers.ts';
 
 let tdb: TestDatabase;
 

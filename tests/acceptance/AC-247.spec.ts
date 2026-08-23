@@ -10,7 +10,12 @@
  * its inputs, and late-input estimates carry the diagnostic label.
  */
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { AcquisitionState, DependenceLabel, utcTimestamp, type UtcTimestamp } from '@foresift/domain';
+import {
+  AcquisitionState,
+  DependenceLabel,
+  utcTimestamp,
+  type UtcTimestamp,
+} from '@foresift/domain';
 import {
   classifyInputsAvailability,
   maturedEvidenceCountAt,
@@ -20,7 +25,7 @@ import {
   recordProbeAssignment,
   registerSourceIdentity,
 } from '@foresift/persistence';
-import { closeTestDatabase, makeTestDatabase, type TestDatabase } from './helpers';
+import { closeTestDatabase, makeTestDatabase, type TestDatabase } from './helpers.ts';
 
 const T = (iso: string): UtcTimestamp => utcTimestamp(iso);
 

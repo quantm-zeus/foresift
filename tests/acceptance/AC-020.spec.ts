@@ -18,7 +18,7 @@ import {
   replayObservations,
 } from '@foresift/persistence';
 import { freezeBundle } from '@foresift/evidence';
-import { closeTestDatabase, makeTestDatabase, seedPool, type TestDatabase } from './helpers';
+import { closeTestDatabase, makeTestDatabase, seedPool, type TestDatabase } from './helpers.ts';
 
 const T = (iso: string): UtcTimestamp => utcTimestamp(iso);
 
@@ -100,11 +100,9 @@ afterAll(() => closeTestDatabase(tdb));
 
 describe('AC-020: replay at T excludes available_at > T', () => {
   it('serves only records whose availability is at or before the boundary', async () => {
-    const resolved = await replayObservations(
-      tdb.engine,
-      T('2026-06-01T12:00:00Z'),
-      { subjectPoolId: poolId },
-    );
+    const resolved = await replayObservations(tdb.engine, T('2026-06-01T12:00:00Z'), {
+      subjectPoolId: poolId,
+    });
     const ids = resolved.map((r) => r.observationId).sort();
     expect(ids).toEqual(['ac20-edge', 'ac20-past', 'ac20-rev']);
 

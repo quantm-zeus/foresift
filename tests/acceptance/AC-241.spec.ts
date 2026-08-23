@@ -14,7 +14,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { utcTimestamp, type UtcTimestamp } from '@foresift/domain';
 import { appendObservation, replayObservations } from '@foresift/persistence';
 import { freezeBundle, resolveEvidenceAt } from '@foresift/evidence';
-import { closeTestDatabase, makeTestDatabase, seedPool, type TestDatabase } from './helpers';
+import { closeTestDatabase, makeTestDatabase, seedPool, type TestDatabase } from './helpers.ts';
 
 const T = (iso: string): UtcTimestamp => utcTimestamp(iso);
 

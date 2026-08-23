@@ -6,7 +6,12 @@
  * available-at-the-time.
  */
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { AcquisitionState, DependenceLabel, utcTimestamp, type UtcTimestamp } from '@foresift/domain';
+import {
+  AcquisitionState,
+  DependenceLabel,
+  utcTimestamp,
+  type UtcTimestamp,
+} from '@foresift/domain';
 import {
   classifyInputsAvailability,
   maturedEvidenceCountAt,
@@ -16,11 +21,7 @@ import {
   recordProbeAssignment,
   registerSourceIdentity,
 } from '@foresift/persistence';
-import {
-  closeTestDatabase,
-  makeTestDatabase,
-  type TestDatabase,
-} from '../acceptance/helpers';
+import { closeTestDatabase, makeTestDatabase, type TestDatabase } from '../acceptance/helpers.ts';
 
 const BOUNDARY: UtcTimestamp = utcTimestamp('2026-06-05T00:00:00Z');
 

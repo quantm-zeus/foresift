@@ -63,8 +63,8 @@ describe('AC-240 negative: asymmetric or malformed action-time inputs fail', () 
 
   it('an entry one microsecond before counterfactual delivery is flagged false', () => {
     const cf: UtcTimestamp = utcTimestamp('2026-06-10T09:08:30.000000Z');
-    expect(entryIsNotEarlierThanCounterfactual(utcTimestamp('2026-06-10T09:08:29.999999Z'), cf)).toBe(
-      false,
-    );
+    expect(
+      entryIsNotEarlierThanCounterfactual(utcTimestamp('2026-06-10T09:08:29.999999Z'), cf),
+    ).toBe(false);
   });
 });

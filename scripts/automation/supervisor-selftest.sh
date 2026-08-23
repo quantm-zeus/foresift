@@ -775,5 +775,30 @@ console.log(e.workflow);
 ')"
 assert_eq "tracked entry records the optimized workflow for recovery identity" "$STATE_WF" "foresift-work-package-optimized"
 
+# ── S18: C4 critical-path order drives selection; one tick fills both slots ──
+echo "S18: critical-path ordering + same-tick slot filling"
+new_sandbox s18
+roadmap_fixture G1
+# The two hub packages each unlock a downstream child; the loner unlocks
+# nothing. Hubs are placed AFTER the loner in the file so array order can
+# never explain the selection — only critical-path priority can.
+milestone_fixture "G1" \
+  "$(pkg_json s-loner "" LOW true)" \
+  "$(pkg_json s-hub-b "" HIGH true)" \
+  "$(pkg_json s-d2 s-hub-b MEDIUM true)" \
+  "$(pkg_json s-hub-a "" HIGH true)" \
+  "$(pkg_json s-d1 s-hub-a MEDIUM true)"
+tick
+LAUNCHED_S18="$(launch_workflows)"
+assert_eq "ONE tick fills BOTH post-foundation slots" "$(launch_count)" "2"
+assert_match "hub-a selected despite later array position" "$LAUNCHED_S18" "foresift/s-hub-a"
+assert_match "hub-b selected in the SAME tick" "$LAUNCHED_S18" "foresift/s-hub-b"
+case "$LAUNCHED_S18" in
+  *s-loner*) bad "loner must not outrank critical-path hubs"; FAIL=$((FAIL + 1)) ;;
+  *) ok "dependency-free loner correctly deferred by critical-path order"; PASS=$((PASS + 1)) ;;
+esac
+tick
+assert_eq "third package stays blocked while both slots are busy" "$(launch_count)" "2"
+
 echo
 echo "selftest result: PASS=$PASS FAIL=$FAIL"

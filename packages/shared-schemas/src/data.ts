@@ -369,9 +369,10 @@ export const WatermarkStateSchema = z
   .object({
     provider: z.string().min(1),
     operation: z.string().min(1),
-    collectorShard: z.string().min(1).nullable(),
-    programVersion: z.string().min(1).nullable(),
-    chainId: ChainIdSchema.nullable(),
+    /** Watermark key dimensions are always concrete — never null placeholders. */
+    collectorShard: z.string().min(1),
+    programVersion: z.string().min(1),
+    chainId: ChainIdSchema,
     highestObservedSlot: DigitStringSchema,
     highestContiguousSlot: DigitStringSchema,
     highestFinalizedSlot: DigitStringSchema.nullable(),

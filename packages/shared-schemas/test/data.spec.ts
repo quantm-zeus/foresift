@@ -427,9 +427,9 @@ describe('negative fixtures fail validation (T014)', () => {
       {
         provider: 'p',
         operation: 'op',
-        collectorShard: null,
-        programVersion: null,
-        chainId: null,
+        collectorShard: 'shard-1',
+        programVersion: 'v1',
+        chainId: 'eip155:1',
         highestObservedSlot: '200',
         highestContiguousSlot: '150',
         highestFinalizedSlot: '149',
@@ -438,6 +438,23 @@ describe('negative fixtures fail validation (T014)', () => {
         gapRecoveryStatus: 'NONE',
       },
       'non-contiguous watermark claiming complete coverage (§13.5)',
+    );
+    mustFail(
+      'WatermarkState',
+      {
+        provider: 'p',
+        operation: 'op',
+        collectorShard: null,
+        programVersion: 'v1',
+        chainId: 'eip155:1',
+        highestObservedSlot: '200',
+        highestContiguousSlot: '200',
+        highestFinalizedSlot: '199',
+        oldestOpenGap: null,
+        maximumLatenessSeenMs: 0,
+        gapRecoveryStatus: 'NONE',
+      },
+      'watermark key dimensions are concrete, never null placeholders',
     );
   });
 

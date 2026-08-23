@@ -72,39 +72,39 @@ exist for every acceptance criterion listed in spec.md §3.
 
 ## Phase 4 — Migrations + persistence core
 
-- [ ] T015 Write `migrations/g0_data_0001_identity.sql`: chains, dexes,
+- [x] T015 Write `migrations/g0_data_0001_identity.sql`: chains, dexes,
       asset_representations (unique chain+address), assets + memberships, pools, pairs,
       launches, migrations edges, token_decimal_observations; no unique constraint on
       symbols/names. Traces: FR-DATA-001.
-- [ ] T016 Write `migrations/g0_data_0002_observations_revisions.sql`: append-only
+- [x] T016 Write `migrations/g0_data_0002_observations_revisions.sql`: append-only
       observations (§13.1 timestamps, provenance CHECK, §13.3 chain coordinates,
       confirmation_level, reorg_version) with BEFORE UPDATE/DELETE immutability triggers,
       observation_revisions, compensating events, backfill_receipts (§13.6 fields),
       watermarks (§13.5 fields). Traces: FR-DATA-002, FR-DATA-003.
-- [ ] T017 Write `migrations/g0_data_0003_quality_sources.sql`:
+- [x] T017 Write `migrations/g0_data_0003_quality_sources.sql`:
       observation_field_quality (codes[] vs §13.9 vocabulary), source_identities,
       independence_groups + memberships, source_dependence_edges. Traces:
       FR-DATA-005, FR-DATA-006.
-- [ ] T018 [P] Write `migrations/g0_data_0004_features_acquisition.sql`:
+- [x] T018 [P] Write `migrations/g0_data_0004_features_acquisition.sql`:
       feature_definitions, feature_values (decimal-string values, quality codes,
       code-version + population provenance), evidence_acquisition_decisions with
       write-before-retrieval ordering constraints, evidence_bundles content-addressed.
       Traces: FR-DATA-004, FR-DATA-002, FR-DATA-003.
-- [ ] T019 [P] Write `migrations/g0_data_0005_object_artifact_index.sql` +
+- [x] T019 [P] Write `migrations/g0_data_0005_object_artifact_index.sql` +
       `migrations/g0_dr_0001_recovery_tiers.sql` + `migrations/g0_dr_0002_backup_policy.sql`:
       object_artifacts staged-commit states; recovery_tiers with ≤15/≤60 min/≤24 h
       ceilings; protected_asset_registry; backup_policies (separated key references);
       backup_runs; restore_drills; recovery_health_states; collector_checkpoints with
       fencing tokens; collector_gaps; canonical_event_keys unique constraints.
       Traces: FR-DR-001, FR-DR-002, FR-DATA-002.
-- [ ] T020 Implement `packages/persistence/src/db.ts` (engine port seam) +
+- [x] T020 Implement `packages/persistence/src/db.ts` (engine port seam) +
       `migrator.ts` applying `migrations/g0_(data|dr)_*.sql` in lexicographic order with
       `_foresift_schema_migrations` state; PGlite engine for tests. Traces:
       FR-DATA-001…006, FR-DR-001…002 (foundation for all).
-- [ ] T021 Migration tests: apply to empty database, apply twice without damage,
+- [x] T021 Migration tests: apply to empty database, apply twice without damage,
       failure aborts cleanly leaving recorded state; immutability triggers fire.
       Traces: FR-DATA-002, FR-DR-002.
-- [ ] T022 Drizzle mirror (`generated/schema.ts`) matching SQL truth + parity test
+- [x] T022 Drizzle mirror (`generated/schema.ts`) matching SQL truth + parity test
       enumerating columns/constraints from information_schema against the mirror.
       Traces: FR-DATA-001…006, FR-DR-001…002 (ADR-001 conformance).
 

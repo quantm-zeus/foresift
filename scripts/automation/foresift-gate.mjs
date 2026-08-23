@@ -10,6 +10,7 @@
 // deterministically. Fail-closed on any missing/invalid state.
 
 import { spawnSync } from 'node:child_process';
+import { writeFileSync } from 'node:fs';
 import {
   loadRoadmap,
   loadCurrentMilestone,
@@ -26,12 +27,52 @@ function parseArgs(argv) {
     const a = argv[i];
     if (a === '--package') args.package = argv[++i];
     else if (a === '--milestone') args.milestone = true;
+    else if (a === '--result-file') args.resultFile = argv[++i];
     else if (a !== '--') args._.push(a); // tolerate pnpm's forwarded `--` separator
   }
   return args;
 }
 
-function run(cmd, label) {
+// ── Structured per-check result manifest (task spec §9; V2 second pass) ──────
+// OPT-IN via --result-file: when the flag is absent nothing changes for any
+// existing caller (LEGACY lane included) — no file written, no output shifted.
+// When present, every check is recorded with a stable CATEGORY so the bounded
+// repair loop can plan TARGETED re-verification instead of re-running the
+// whole gate. Written on failure AND on success; also written for pre-check
+// blocks (invalid metadata) so "why did it fail" is always machine-readable.
+const RESULT_SCHEMA = 'foresift/full-gate-result@1';
+const gateChecks = [];
+let gateStartedAt = new Date().toISOString();
+
+function writeGateResult(passed, exitCode) {
+  if (!args.resultFile) return;
+  const failedCategories = [
+    ...new Set(gateChecks.filter((c) => c.status !== 'PASS').map((c) => c.category)),
+  ];
+  try {
+    writeFileSync(
+      args.resultFile,
+      JSON.stringify(
+        {
+          schema: RESULT_SCHEMA,
+          packageId: args.package ?? null,
+          passed,
+          exitCode,
+          failedCategories,
+          checks: gateChecks,
+          startedAt: gateStartedAt,
+          timestamp: new Date().toISOString(),
+        },
+        null,
+        2,
+      ) + '\n',
+    );
+  } catch {
+    // Manifest writing must never change gate behavior or mask a real verdict.
+  }
+}
+
+function run(cmd, label, category) {
   console.log(`\n═══ GATE ▸ ${label}\n═══ $ ${cmd}`);
   const res = spawnSync(cmd, {
     shell: true,
@@ -40,8 +81,11 @@ function run(cmd, label) {
   });
   if (res.status !== 0) {
     console.error(`\n✗ GATE FAILED at "${label}" (exit ${res.status})`);
+    gateChecks.push({ label, category: category ?? 'UNKNOWN', command: cmd, status: 'FAIL' });
+    writeGateResult(false, res.status ?? 1);
     process.exit(res.status ?? 1);
   }
+  gateChecks.push({ label, category: category ?? 'UNKNOWN', command: cmd, status: 'PASS' });
   console.log(`✓ ${label} passed`);
 }
 
@@ -49,11 +93,12 @@ const args = parseArgs(process.argv.slice(2));
 
 if (args.milestone) {
   // Full applicable repository verification — used by milestone audit and as the final gate.
-  run('pnpm spec:verify', 'authoritative spec integrity');
-  run('pnpm format:check', 'formatting');
-  run('pnpm lint', 'lint');
-  run('pnpm typecheck', 'TypeScript');
-  run('pnpm test', 'full test suite');
+  run('pnpm spec:verify', 'authoritative spec integrity', 'SPEC');
+  run('pnpm format:check', 'formatting', 'FORMAT');
+  run('pnpm lint', 'lint', 'LINT');
+  run('pnpm typecheck', 'TypeScript', 'TYPECHECK');
+  run('pnpm test', 'full test suite', 'TESTS');
+  writeGateResult(true, 0);
   console.log('\n✅ MILESTONE GATE PASSED');
   process.exit(0);
 }
@@ -73,6 +118,7 @@ for (const [name, errs] of [
 ]) {
   if (errs.length) {
     console.error(`✗ GATE BLOCKED — invalid ${name}:\n  - ${errs.join('\n  - ')}`);
+    writeGateResult(false, 2);
     process.exit(2);
   }
 }
@@ -81,6 +127,7 @@ if (!pkg) {
   console.error(
     `✗ GATE BLOCKED — package "${args.package}" not in current milestone ${ms.milestoneId}`,
   );
+  writeGateResult(false, 2);
   process.exit(2);
 }
 
@@ -89,17 +136,17 @@ console.log(
 );
 
 // Always enforce authoritative spec integrity first.
-run('pnpm spec:verify', 'authoritative spec integrity');
+run('pnpm spec:verify', 'authoritative spec integrity', 'SPEC');
 
 // CRITICAL/HIGH packages carry the broader repository verification required by the PRD.
 if (pkg.risk === 'CRITICAL' || pkg.risk === 'HIGH') {
-  run('pnpm format:check', 'formatting');
-  run('pnpm lint', 'lint');
-  run('pnpm typecheck', 'TypeScript');
-  run('pnpm test', 'full test suite');
+  run('pnpm format:check', 'formatting', 'FORMAT');
+  run('pnpm lint', 'lint', 'LINT');
+  run('pnpm typecheck', 'TypeScript', 'TYPECHECK');
+  run('pnpm test', 'full test suite', 'TESTS');
 } else {
-  run('pnpm typecheck', 'TypeScript');
-  run('pnpm test', 'test suite');
+  run('pnpm typecheck', 'TypeScript', 'TYPECHECK');
+  run('pnpm test', 'test suite', 'TESTS');
 }
 
 // Package-specific deterministic verification from version-controlled metadata.
@@ -127,11 +174,12 @@ for (const cmd of pkg.verificationCommands) {
     if (verdict.class === 'UNIQUE_MANDATORY' && !/^\s*test -d /.test(cmd))
       console.log(`(unique-mandatory: ${verdict.reason})`);
   }
-  run(cmd, `package check`);
+  run(cmd, `package check`, 'PACKAGE');
 }
 if (skippedDuplicates > 0)
   console.log(
     `\n▸ ${skippedDuplicates} package check(s) skipped as PROVEN duplicates of the full suite (${profile} profile).`,
   );
 
+writeGateResult(true, 0);
 console.log(`\n✅ PACKAGE GATE PASSED — ${pkg.id}`);

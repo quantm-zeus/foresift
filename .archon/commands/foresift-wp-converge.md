@@ -33,6 +33,13 @@ and Spec Kit artifacts are the only memory.
 5. Write a factual convergence report to stdout: what was found missing, what you
    implemented, test evidence, what (if anything) remains.
 
+Verification economics (V2 task spec §12): after your turn the workflow
+re-verifies ONLY what `$ARTIFACTS_DIR/full-gate-result.json` flagged (targeted)
+and then runs the FULL gate ONCE at your final head — its attestation is
+reused by every later stage. Run focused verification while working; do not
+burn time re-running the whole gate yourself, and never leave a locally-red
+targeted check behind for the workflow to rediscover.
+
 Never claim completion of anything you did not verify. Never weaken tests or
 verification to make convergence easier. The permanent product prohibitions
 (trading/custody/signing/private keys/tx submission) apply absolutely.

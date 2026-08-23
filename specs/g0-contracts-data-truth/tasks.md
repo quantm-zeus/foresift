@@ -241,7 +241,7 @@ exist for every acceptance criterion listed in spec.md §3.
       quality/acquisition/degradation vocabularies; unsafe automated-alert success
       fabrication impossible. Traces: FR-DATA-005, FR-DR-001 (explicit-degraded-output
       substrate of AC-061 per spec §3.2).
-- [ ] T060 AC-062 pair + AC-260 pair: destructive drill meets declared tiers on
+- [x] T060 AC-062 pair + AC-260 pair: destructive drill meets declared tiers on
       fixture workloads or blocks opportunity-mode flag; missed-tier creates incident.
       Traces: FR-DR-001, FR-DR-002.
 - [ ] T061 AC-261 pair + AC-262 pair + AC-263 pair: clean-environment verification

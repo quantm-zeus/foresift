@@ -137,3 +137,46 @@ export async function runPersistenceBenchmark(
     replay: result(replayTimes, REPLAY_READ_BUDGET_MS),
   };
 }
+
+// --- Destructive-drill restore loader (T060, AC-062/AC-260/AC-261) ------------
+
+/**
+ * Physically load a captured deterministic snapshot into a target engine —
+ * the "restore" step of the destructive drill. Rows are inserted verbatim
+ * from the canonical row JSON under `session_replication_role = replica`
+ * (a consistent snapshot needs no per-row FK re-validation; integrity is
+ * re-proven afterwards by the drill's checks). Inserts are
+ * `ON CONFLICT DO NOTHING` because migrations seed vocabulary tables that a
+ * snapshot also carries. The `_foresift_schema_migrations` bookkeeping is NOT
+ * part of snapshots; apply migrations to the fresh target first so schema
+ * exists.
+ */
+export async function restoreSnapshotInto(
+  target: DatabaseEngine,
+  snapshot: { readonly bytes: Uint8Array },
+): Promise<number> {
+  const document = JSON.parse(new TextDecoder().decode(snapshot.bytes)) as {
+    tables: Record<string, string[]>;
+  };
+  await target.exec('SET session_replication_role = replica');
+  let restoredRows = 0;
+  try {
+    for (const [table, rowTexts] of Object.entries(document.tables)) {
+      for (const rowText of rowTexts) {
+        const row = JSON.parse(rowText) as Record<string, unknown>;
+        const columns = Object.keys(row);
+        const values = columns.map((c) => row[c]);
+        await target.query(
+          `INSERT INTO "${table}" (${columns.map((c) => `"${c}"`).join(',')})
+           VALUES (${columns.map((_, i) => `$${i + 1}`).join(',')})
+           ON CONFLICT DO NOTHING`,
+          values,
+        );
+        restoredRows += 1;
+      }
+    }
+  } finally {
+    await target.exec('SET session_replication_role = DEFAULT');
+  }
+  return restoredRows;
+}

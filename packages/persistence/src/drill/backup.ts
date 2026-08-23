@@ -288,14 +288,9 @@ function canonicalRowJson(row: CapturedRow): string {
   const keys = Object.keys(row).sort();
   const parts: string[] = [];
   for (const key of keys) {
-    const value = row[key];
-    const rendered =
-      value instanceof Date
-        ? value.toISOString()
-        : typeof value === 'object' && value !== null
-          ? JSON.stringify(value)
-          : JSON.stringify(value);
-    parts.push(`${JSON.stringify(key)}:${rendered}`);
+    // JSON.stringify renders Date values as quoted ISO instants — a bare
+    // toISOString() here would emit invalid JSON into snapshot artifacts.
+    parts.push(`${JSON.stringify(key)}:${JSON.stringify(row[key])}`);
   }
   return `{${parts.join(',')}}`;
 }

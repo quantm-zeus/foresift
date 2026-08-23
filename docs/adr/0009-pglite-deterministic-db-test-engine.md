@@ -32,6 +32,13 @@ requires a documented conformance note and a CI-followup issue.
   byte-stable row rendering for reproducibility of backup artifacts.
 - Nothing in production configuration may point at PGlite; the dependency is
   dev/test-only by package manifest.
+- Production pools are constructed exclusively through
+  `createProductionPgPool(pg, config)` in `packages/persistence/src/db.ts`,
+  which registers the precision-retaining timestamp parsers
+  (`types.setTypeParser`, OIDs 1114/1184) on the driver's registry before the
+  first Pool exists; constructing a node-pg pool outside this factory
+  violates the engine contract and reintroduces silent sub-millisecond
+  truncation on read-back (FR-DATA-002 receipt-hash round-trips).
 
 ## References
 

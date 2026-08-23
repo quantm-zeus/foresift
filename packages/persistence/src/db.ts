@@ -140,3 +140,42 @@ export const PRECISION_RETAINING_TIMESTAMP_PARSERS: Record<number, (value: strin
   1114: parseUtcTimestampText,
   1184: parseUtcTimestampText,
 };
+
+// --- Production pool wiring (ADR-0009 engine contract) ------------------------
+
+/** Structural shape of the node-postgres type-parser registry we program against. */
+export interface PgTypesRegistry {
+  setTypeParser(oid: number, parse: (value: string) => unknown): void;
+}
+
+/** Structural subset of the node-postgres module the sanctioned factory constructs from. */
+export interface PgDriverModule<P> {
+  types: PgTypesRegistry;
+  Pool: new (config?: unknown) => P;
+}
+
+/**
+ * Register `PRECISION_RETAINING_TIMESTAMP_PARSERS` on a node-postgres
+ * `types` registry (OIDs 1114 `timestamp`, 1184 `timestamptz`). The driver
+ * registry is process-global, so once wired every client of that driver
+ * parses precision-retaining; re-registration is idempotent.
+ */
+export function wirePrecisionRetainingTimestampParsers(types: PgTypesRegistry): void {
+  for (const [oidText, parser] of Object.entries(PRECISION_RETAINING_TIMESTAMP_PARSERS)) {
+    types.setTypeParser(Number(oidText), parser);
+  }
+}
+
+/**
+ * The ONLY sanctioned way to obtain a production PostgreSQL pool (ADR-0009
+ * engine contract): the precision-retaining timestamp parsers are registered
+ * on the driver's type registry at the moment of construction, before the
+ * first Pool exists — driver-default parsers round-trip through JS Date and
+ * silently truncate sub-millisecond digits on read-back, which breaks
+ * byte-for-byte receipt-hash round-trips (FR-DATA-002). Config passes
+ * through untouched.
+ */
+export function createProductionPgPool<P>(pg: PgDriverModule<P>, config?: unknown): P {
+  wirePrecisionRetainingTimestampParsers(pg.types);
+  return new pg.Pool(config);
+}

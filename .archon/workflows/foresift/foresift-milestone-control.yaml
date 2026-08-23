@@ -33,6 +33,13 @@ description: |
     - loop-body siblings WITHOUT an explicit depends_on edge run CONCURRENTLY,
       so AI->recheck pairs are always serialized with depends_on;
     - prompt interpolation CAN read top-level and same-iteration siblings;
+    - until_bash guards get NO ARTIFACTS_DIR environment variable: only
+      BARE-FORM `$VAR` references ($ARTIFACTS_DIR/$WORKFLOW_ID/$STATE_DIR/
+      $BASE_BRANCH/$DOCS_DIR) are TEXTUALLY SUBSTITUTED into the command
+      string before execution — `${ARTIFACTS_DIR}` brace form and env reads
+      (process.env.ARTIFACTS_DIR) do NOT work inside guards, while regular
+      workflow bash nodes receive ARTIFACTS_DIR as a real env var. Guards
+      therefore pass artifact paths as arguments: `--artifacts-dir "$ARTIFACTS_DIR"`.
     - `trigger_rule` supports all_success | one_success |
       none_failed_min_one_success | all_done.
 
@@ -227,7 +234,10 @@ nodes:
       until: MC_AUDIT_LOOP_TEXT_SIGNAL_NEVER_EMIT_d92f50
       until_bash: |
         set -euo pipefail
-        node scripts/automation/audit-progress.mjs --check > /dev/null
+        # --artifacts-dir is mandatory inside guards: until_bash gets NO
+        # ARTIFACTS_DIR env var (ADR 0004); bare $ARTIFACTS_DIR is substituted.
+        node scripts/automation/audit-progress.mjs --check \
+          --artifacts-dir "$ARTIFACTS_DIR" > /dev/null
       nodes:
         - id: audit-iterate
           command: foresift-mc-audit
@@ -246,7 +256,10 @@ nodes:
       until: MC_AUDIT_FINAL_LOOP_TEXT_SIGNAL_NEVER_EMIT_a51c33
       until_bash: |
         set -euo pipefail
-        node scripts/automation/audit-progress.mjs --check > /dev/null
+        # --artifacts-dir is mandatory inside guards: until_bash gets NO
+        # ARTIFACTS_DIR env var (ADR 0004); bare $ARTIFACTS_DIR is substituted.
+        node scripts/automation/audit-progress.mjs --check \
+          --artifacts-dir "$ARTIFACTS_DIR" > /dev/null
       nodes:
         - id: audit-iterate-final
           command: foresift-mc-audit

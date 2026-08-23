@@ -21,9 +21,20 @@ import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { repoRoot, loadCurrentMilestone, validateMilestoneState } from './schema.mjs';
 
-const artifactsDir = process.env.ARTIFACTS_DIR ?? '';
+// until_bash guards receive NO ARTIFACTS_DIR environment variable (Archon
+// v0.9.0, probe-verified — see docs/adr/0004-archon-until-bash-artifacts-contract.md):
+// guards must pass --artifacts-dir "$ARTIFACTS_DIR", which archon textually
+// substitutes in bare form. The env var remains the fallback for regular
+// workflow bash nodes, where it IS exported.
+let artifactsDir = process.env.ARTIFACTS_DIR ?? '';
+for (let i = 0; i < process.argv.length - 1; i++) {
+  if (process.argv[i] === '--artifacts-dir') artifactsDir = process.argv[i + 1];
+}
 if (!artifactsDir) {
-  console.error('missing ARTIFACTS_DIR (must run inside an Archon workflow)');
+  console.error(
+    'missing artifacts directory: pass --artifacts-dir "$ARTIFACTS_DIR" ' +
+      '(until_bash guards get no ARTIFACTS_DIR env var) or run inside an Archon bash node',
+  );
   process.exit(2);
 }
 const FILE = join(artifactsDir, 'milestone-audit-progress.json');

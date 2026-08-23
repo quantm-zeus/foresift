@@ -25,10 +25,20 @@ import { repoRoot, loadCurrentMilestone, validateMilestoneState, findPackage } f
 const args = {};
 for (let i = 0; i < process.argv.length - 1; i++) {
   if (process.argv[i] === '--package') args.package = process.argv[i + 1];
+  if (process.argv[i] === '--artifacts-dir') args.artifactsDir = process.argv[i + 1];
 }
-const artifactsDir = process.env.ARTIFACTS_DIR ?? '';
+// until_bash guards receive NO ARTIFACTS_DIR environment variable (Archon
+// v0.9.0, probe-verified — see docs/adr/0004-archon-until-bash-artifacts-contract.md):
+// guards must pass --artifacts-dir "$ARTIFACTS_DIR", which archon textually
+// substitutes in bare form. The env var remains the fallback for regular
+// workflow bash nodes, where it IS exported.
+const artifactsDir = args.artifactsDir ?? process.env.ARTIFACTS_DIR ?? '';
 if (!args.package) fail('missing --package <id>');
-if (!artifactsDir) fail('missing ARTIFACTS_DIR (must run inside an Archon workflow)');
+if (!artifactsDir)
+  fail(
+    'missing artifacts directory: pass --artifacts-dir "$ARTIFACTS_DIR" ' +
+      '(until_bash guards get no ARTIFACTS_DIR env var) or run inside an Archon bash node',
+  );
 
 function fail(msg) {
   console.log(JSON.stringify({ complete: false, errors: [msg] }, null, 2));

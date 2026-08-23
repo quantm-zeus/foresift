@@ -129,7 +129,15 @@ export function validateMilestoneState(ms) {
   return errs;
 }
 
-/** Deterministic failure classification per the recovery policy. */
+/**
+ * Deterministic failure classification per the recovery policy.
+ *
+ * QUOTA_DAILY is matched BEFORE the transient patterns because provider quota
+ * errors usually embed generic rate-limit wording ("Request rejected (429) ·
+ * Rate limit exceeded: free-models-per-day-stealth") — the daily-quota token
+ * is the discriminating evidence, and burning the ordinary transient retry
+ * budget against a once-a-day limit is exactly the defect this separates.
+ */
 export function classifyFailure(message = '') {
   const m = String(message).toLowerCase();
   const fatal = [
@@ -143,6 +151,16 @@ export function classifyFailure(message = '') {
     'credit balance',
     'invalid workflow definition',
     'workflow not found',
+  ];
+  const quotaDaily = [
+    'free-models-per-day',
+    'per-day',
+    'per day',
+    'daily quota',
+    'daily rate limit',
+    'daily limit',
+    'quota exhausted',
+    'quota exceeded',
   ];
   const transient = [
     'timeout',
@@ -162,8 +180,43 @@ export function classifyFailure(message = '') {
     'temporarily unavailable',
   ];
   if (fatal.some((p) => m.includes(p))) return 'FATAL';
+  if (quotaDaily.some((p) => m.includes(p))) return 'QUOTA_DAILY';
   if (transient.some((p) => m.includes(p))) return 'TRANSIENT';
   return 'UNKNOWN';
+}
+
+/**
+ * Best-effort extraction of a provider-supplied quota reset time from a
+ * failure message ("… resets at 2026-08-24T00:00:00Z …", epoch seconds/ms near
+ * reset wording). Returns epoch milliseconds or null when the provider gave
+ * no usable timing — callers must then apply their own bounded backoff policy.
+ */
+export function extractQuotaResetAt(message = '') {
+  const m = String(message);
+  const iso =
+    /\b(20\d{2}-\d{2}-\d{2}[T ]\d{2}:\d{2}(?::\d{2})?(?:\.\d+)?(?:Z|[+-]\d{2}:?\d{2})?)\b/g;
+  const kw = /(reset|resets|renew|renews|retry)\b.{0,40}?/gi;
+  const candidates = [];
+  for (const match of m.matchAll(iso)) candidates.push({ idx: match.index, raw: match[1] });
+  if (candidates.length === 0) return null;
+  // Prefer a candidate that follows reset-ish wording; else the first one.
+  let pick = null;
+  let bestKw = -1;
+  for (const c of candidates) {
+    let lastKw = -1;
+    for (const k of m.matchAll(kw)) {
+      if (k.index <= c.idx && k.index > lastKw) lastKw = k.index;
+    }
+    if (lastKw >= 0 && (pick === null || lastKw > bestKw)) {
+      pick = c;
+      bestKw = lastKw;
+    }
+  }
+  if (!pick) pick = candidates[0];
+  let v = String(pick.raw).trim().replace(' ', 'T');
+  if (!/(?:[zZ]|[+-]\d\d:?\d\d)$/.test(v)) v += 'Z';
+  const t = Date.parse(v);
+  return Number.isNaN(t) ? null : t;
 }
 
 export function findPackage(ms, packageId) {

@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   canStartPackage,
   classifyFailure,
+  extractQuotaResetAt,
   loadRoadmap,
   packageEligible,
   validateMilestoneState,
@@ -191,6 +192,36 @@ describe('failure classification', () => {
     expect(classifyFailure('authentication failed: 401')).toBe('FATAL');
     expect(classifyFailure('credit balance exhausted')).toBe('FATAL');
     expect(classifyFailure('exit code 7 while running tests')).toBe('UNKNOWN');
+  });
+
+  it('classifies daily/provider quota exhaustion separately from burst throttling (QUOTA_DAILY)', () => {
+    // The exact production failure that burned the whole transient budget in ~1h.
+    const liveG0 =
+      "DAG workflow 'foresift-work-package' completed with failures: 'implement': " +
+      "Loop-group node 'implement' failed at iteration 2: 'implement-iterate': Claude API error " +
+      '(rate_limit): API Error: Request rejected (429) · Rate limit exceeded: free-models-per-day-stealth. ';
+    expect(classifyFailure(liveG0)).toBe('QUOTA_DAILY');
+    expect(classifyFailure('daily quota exhausted for this token')).toBe('QUOTA_DAILY');
+    expect(classifyFailure('requests-per-day limit reached')).toBe('QUOTA_DAILY');
+    expect(classifyFailure('quota exceeded on provider')).toBe('QUOTA_DAILY');
+    // Plain burst throttling without daily-quota evidence stays TRANSIENT.
+    expect(classifyFailure('429 too many requests, slow down')).toBe('TRANSIENT');
+    expect(classifyFailure('rate limit exceeded, retry shortly')).toBe('TRANSIENT');
+    // Fatal evidence still wins when both appear.
+    expect(classifyFailure('403 forbidden: quota exhausted')).toBe('FATAL');
+  });
+
+  it('extracts a provider-supplied quota reset time; null when none is given', () => {
+    const reset = extractQuotaResetAt('daily limit hit — resets at 2026-08-24T00:00:00Z');
+    expect(reset).toBe(Date.parse('2026-08-24T00:00:00Z'));
+    // Space-separated timestamps (Archon's format) are handled too.
+    expect(extractQuotaResetAt('quota renews 2026-08-24 03:00')).toBe(
+      Date.parse('2026-08-24T03:00:00Z'),
+    );
+    // The live G0 error carries no reset timing → callers apply bounded backoff.
+    expect(extractQuotaResetAt('Rate limit exceeded: free-models-per-day-stealth.')).toBeNull();
+    expect(extractQuotaResetAt('no timestamps here')).toBeNull();
+    expect(extractQuotaResetAt('reset at not-a-date')).toBeNull();
   });
 });
 

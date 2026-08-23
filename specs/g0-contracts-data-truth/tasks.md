@@ -248,7 +248,7 @@ exist for every acceptance criterion listed in spec.md §3.
       catches tampering; tier violation degrades capability machine-readably; restore+
       replay neither duplicates canonical events nor skips unmarked gaps. Traces:
       FR-DR-002, FR-DR-001.
-- [ ] T062 AC-264 pair: backup governance policy tests (retention/encryption/location/
+- [x] T062 AC-264 pair: backup governance policy tests (retention/encryption/location/
       rights/legal-hold/deletion/key access/restore credentials). Traces: FR-DR-002.
 
 ## Phase 10 — Telemetry catalogs + convergence

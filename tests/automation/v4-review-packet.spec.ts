@@ -14,6 +14,7 @@ import {
   REVIEW_PACKET_SCHEMA,
   aggregateFindings,
   buildReviewPacket,
+  renderReviewPacketMarkdown,
   validateReviewPacket,
 } from '../../scripts/automation/review-packet.mjs';
 import { disposeGitFixtureBase, gitFixture } from '../helpers/git-fixture.js';
@@ -226,5 +227,52 @@ describe('packet artifact round-trip', () => {
     writeFileSync(join(dir, 'review-packet.json'), JSON.stringify(p, null, 2));
     const back = JSON.parse(readFileSync(join(dir, 'review-packet.json'), 'utf8'));
     expect(validateReviewPacket(back, { expectedHead: repo.baseSha() }).valid).toBe(true);
+  });
+});
+
+// ── V3-C §12: markdown twin — reviewers CONSUME the packet ──────────────────
+describe('renderReviewPacketMarkdown (V3-C §12)', () => {
+  it('renders byte-deterministic markdown carrying identity, files, gate evidence', () => {
+    const repo = fixtureRepo('md-det');
+    const p = buildReviewPacket({
+      packageId: 'pkg-a',
+      repoRoot: repo.root,
+      artifactsDir: art('md-det'),
+    });
+    const md = renderReviewPacketMarkdown(p);
+    expect(md).toBe(renderReviewPacketMarkdown(p)); // deterministic
+    expect(md).toContain('## 🔎 Review packet — pkg-a');
+    expect(md).not.toContain('DEGRADED'); // healthy packet never cries wolf
+    expect(md).toContain(`\`${p.reviewedHeadSha}\``);
+    expect(md).toMatch(/READ_ONLY_NO_TRADING_CUSTODY_SIGNING/);
+    expect(md).toMatch(/### Changed files \(\d+\)/);
+    expect(md).toMatch(/none at build time/); // honest: gate had not run yet
+  });
+
+  it('surfaces degradation HONESTLY at the top instead of pretending health', () => {
+    const degraded = {
+      schema: REVIEW_PACKET_SCHEMA,
+      packageId: 'pkg-b',
+      risk: null,
+      writeScopes: [],
+      baseRef: null,
+      baseSource: 'unresolved',
+      reviewedHeadSha: null,
+      headTreeHash: null,
+      diffIdentity: null,
+      filesChanged: [],
+      testsAddedOrChanged: [],
+      fullGateEvidence: { present: false },
+      attestationEvidence: { present: false },
+      permanentBoundaries: 'BOUNDARY',
+      knownUnresolvedIssues: ['unfinished task @tasks.md:12: do the thing'],
+      valid: false,
+      reasons: ['context capsule unavailable: no milestone state'],
+    };
+    const md = renderReviewPacketMarkdown(degraded as never);
+    expect(md).toContain('⚠️ DEGRADED');
+    expect(md).toContain('### Degraded inputs (treat as absent)');
+    expect(md).toContain('context capsule unavailable');
+    expect(md).toContain('unfinished task @tasks.md:12');
   });
 });

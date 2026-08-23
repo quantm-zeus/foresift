@@ -1,8 +1,9 @@
 #!/usr/bin/env node
 // Deterministic Foresift verification gate.
 //
-//   pnpm foresift:gate --package <package-id>   # per-package gate
-//   pnpm foresift:gate --milestone              # full repository verification (milestone audit / final gate)
+//   pnpm foresift:gate --package <package-id>     # per-package gate
+//   pnpm foresift:gate -- --package <package-id>  # same (pnpm forwards the separator)
+//   pnpm foresift:gate --milestone                # full repository verification (milestone audit / final gate)
 //
 // AI agents are never the final authority for verification success: this gate
 // derives package-specific checks from version-controlled metadata
@@ -16,20 +17,10 @@ import {
   validateRoadmap,
   validateMilestoneState,
   findPackage,
+  parseGateArgs,
 } from './schema.mjs';
 import { throughputProfile } from './work-package-throughput-profile.mjs';
 import { classifyCommand } from './verify-dedupe.mjs';
-
-function parseArgs(argv) {
-  const args = { _: [] };
-  for (let i = 0; i < argv.length; i++) {
-    const a = argv[i];
-    if (a === '--package') args.package = argv[++i];
-    else if (a === '--milestone') args.milestone = true;
-    else if (a !== '--') args._.push(a); // tolerate pnpm's forwarded `--` separator
-  }
-  return args;
-}
 
 function run(cmd, label) {
   console.log(`\n═══ GATE ▸ ${label}\n═══ $ ${cmd}`);
@@ -45,7 +36,7 @@ function run(cmd, label) {
   console.log(`✓ ${label} passed`);
 }
 
-const args = parseArgs(process.argv.slice(2));
+const args = parseGateArgs(process.argv.slice(2));
 
 if (args.milestone) {
   // Full applicable repository verification — used by milestone audit and as the final gate.

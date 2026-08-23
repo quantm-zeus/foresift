@@ -55,6 +55,12 @@ export declare function classifyFailure(
 ): 'TRANSIENT' | 'QUOTA_DAILY' | 'FATAL' | 'UNKNOWN';
 /** Best-effort provider quota reset-time extraction from a failure message; null when absent. */
 export declare function extractQuotaResetAt(message?: string): number | null;
+export interface GateArgs {
+  package?: string;
+  milestone?: boolean;
+  _: string[];
+}
+export declare function parseGateArgs(argv: string[]): GateArgs;
 export declare function findPackage(ms: MilestoneState, packageId: string): WorkPackage | null;
 export declare function packageEligible(
   ms: MilestoneState,

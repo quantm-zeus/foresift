@@ -222,7 +222,7 @@ exist for every acceptance criterion listed in spec.md §3.
 - [x] T053 AC-240 pair + AC-241 pair: §13.7 timestamp substrate resolves symmetric
       action-time inputs; frozen replay differs only via registered component; hidden
       current-data call fails replay. Traces: FR-DATA-003.
-- [ ] T054 AC-242 pair + AC-243 pair: acquisition-state vocabulary storage semantics;
+- [x] T054 AC-242 pair + AC-243 pair: acquisition-state vocabulary storage semantics;
       probe metadata completeness + write-before-retrieval ordering. Traces:
       FR-DATA-005, FR-DATA-003.
 - [ ] T055 AC-244 pair: feature provenance fields present; lift claim without valid

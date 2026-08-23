@@ -215,9 +215,9 @@ exist for every acceptance criterion listed in spec.md §3.
       Traces: FR-DATA-003.
 - [x] T050 AC-021 pair: revisions/reorgs preserve originals; mutation attempts
       rejected by triggers. Traces: FR-DATA-002.
-- [ ] T051 AC-022 pair: migration aggregation avoids double counting on fixture;
+- [x] T051 AC-022 pair: migration aggregation avoids double counting on fixture;
       naive aggregation demonstrably diverges. Traces: FR-DATA-001.
-- [ ] T052 AC-023 pair: decimals/address golden fixtures pass; invalid inputs yield
+- [x] T052 AC-023 pair: decimals/address golden fixtures pass; invalid inputs yield
       explicit quality states/refusals. Traces: FR-DATA-001.
 - [ ] T053 AC-240 pair + AC-241 pair: §13.7 timestamp substrate resolves symmetric
       action-time inputs; frozen replay differs only via registered component; hidden

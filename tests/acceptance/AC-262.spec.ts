@@ -12,12 +12,7 @@
  * to HEALTHY through the same vocabulary.
  */
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import {
-  fixedClock,
-  utcTimestamp,
-  type RecoveryTierId,
-  type UtcTimestamp,
-} from '@foresift/domain';
+import { fixedClock, utcTimestamp, type RecoveryTierId, type UtcTimestamp } from '@foresift/domain';
 import {
   evaluateAndRecordDrill,
   recordRecoveryHealthState,

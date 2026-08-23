@@ -12,10 +12,7 @@
  * credentials gating drill execution.
  */
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import {
-  utcTimestamp,
-  type UtcTimestamp,
-} from '@foresift/domain';
+import { utcTimestamp, type UtcTimestamp } from '@foresift/domain';
 import {
   assertLocationAllowed,
   createBackupPolicy,
@@ -26,7 +23,12 @@ import {
   scanForKeyMaterial,
   startBackupRun,
 } from '@foresift/persistence';
-import { closeTestDatabase, makeTestDatabase, MIGRATIONS_DIR, type TestDatabase } from './helpers.ts';
+import {
+  closeTestDatabase,
+  makeTestDatabase,
+  MIGRATIONS_DIR,
+  type TestDatabase,
+} from './helpers.ts';
 
 const T = (iso: string): UtcTimestamp => utcTimestamp(iso);
 const T0 = Date.parse('2026-06-01T12:00:00.000Z');

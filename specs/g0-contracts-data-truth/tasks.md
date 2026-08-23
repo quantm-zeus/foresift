@@ -264,7 +264,7 @@ exist for every acceptance criterion listed in spec.md §3.
       markers; every task above traces only assigned IDs. Traces: FR-DATA-001,
       FR-DATA-002, FR-DATA-003, FR-DATA-004, FR-DATA-005, FR-DATA-006, FR-DR-001,
       FR-DR-002.
-- [ ] T065 Run `pnpm verify` (spec:verify, format, lint, typecheck, tests) and the
+- [x] T065 Run `pnpm verify` (spec:verify, format, lint, typecheck, tests) and the
       package verification commands (`pnpm --filter @foresift/shared-schemas|persistence|
 evidence|object-store test`); fix findings until green; leave work uncommitted
       for review. Traces: FR-DATA-001, FR-DATA-002, FR-DATA-003, FR-DATA-004,

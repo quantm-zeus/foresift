@@ -17,7 +17,12 @@ import {
   scanForKeyMaterial,
   validateBackupPolicy,
 } from '@foresift/persistence';
-import { closeTestDatabase, makeTestDatabase, MIGRATIONS_DIR, type TestDatabase } from '../acceptance/helpers.ts';
+import {
+  closeTestDatabase,
+  makeTestDatabase,
+  MIGRATIONS_DIR,
+  type TestDatabase,
+} from '../acceptance/helpers.ts';
 
 const T = (iso: string): UtcTimestamp => utcTimestamp(iso);
 
@@ -57,7 +62,12 @@ describe('AC-264 negative: loosened governance fails typed validation', () => {
   });
 
   it('blank governance references are refused', () => {
-    for (const field of ['encryptionStatus', 'locationRef', 'rightsRef', 'deletionPolicy'] as const) {
+    for (const field of [
+      'encryptionStatus',
+      'locationRef',
+      'rightsRef',
+      'deletionPolicy',
+    ] as const) {
       expect(() =>
         validateBackupPolicy({ ...VALID, policyId: `p-blank-${field}`, [field]: '   ' }),
       ).toThrow(/BACKUP_POLICY_INVALID/);
@@ -69,7 +79,11 @@ describe('AC-264 negative: loosened governance fails typed validation', () => {
       validateBackupPolicy({ ...VALID, policyId: 'p-rawkey', keyReference: 'a3f9c1d0e7b2' }),
     ).toThrow(/BACKUP_POLICY_INVALID/);
     expect(() =>
-      validateBackupPolicy({ ...VALID, policyId: 'p-pemkey', keyReference: '-----BEGIN PRIVATE KEY-----' }),
+      validateBackupPolicy({
+        ...VALID,
+        policyId: 'p-pemkey',
+        keyReference: '-----BEGIN PRIVATE KEY-----',
+      }),
     ).toThrow(/BACKUP_POLICY_INVALID/);
   });
 
@@ -90,9 +104,9 @@ describe('AC-264 negative: loosened governance fails typed validation', () => {
   });
 
   it('off-allowlist backup locations are refused', () => {
-    expect(() =>
-      assertLocationAllowed('unknown-region-z', ['primary-region-a']),
-    ).toThrow(/BACKUP_POLICY_INVALID/);
+    expect(() => assertLocationAllowed('unknown-region-z', ['primary-region-a'])).toThrow(
+      /BACKUP_POLICY_INVALID/,
+    );
   });
 
   it('key-material scanning flags tampered artifact text', () => {

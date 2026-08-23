@@ -64,10 +64,12 @@ describe('AC-261 negative: tampering and missing prerequisites refuse resumption
     expect(report.checks).toHaveLength(0);
     expect(report.finishedAt).toBeNull();
 
-    const row = await tdb.engine.query<{ credential_provider_present: boolean; finished_at: string | null }>(
-      'SELECT credential_provider_present, finished_at FROM restore_drills WHERE drill_id = $1',
-      ['drill-ac261n-no-credentials'],
-    );
+    const row = await tdb.engine.query<{
+      credential_provider_present: boolean;
+      finished_at: string | null;
+    }>('SELECT credential_provider_present, finished_at FROM restore_drills WHERE drill_id = $1', [
+      'drill-ac261n-no-credentials',
+    ]);
     expect(row.rows[0]?.credential_provider_present).toBe(false);
     expect(row.rows[0]?.finished_at).toBeNull();
   });
@@ -79,10 +81,7 @@ describe('AC-261 negative: tampering and missing prerequisites refuse resumption
       startedAt: T('2026-06-01T10:05:00Z'),
       credentialProvider: { providerId: 'keystore-primary', unlock: async () => {} },
       requiredChecks: ['database-migration-state', 'quota-reservations'],
-      registeredChecks: [
-        migrationStateCheck(MIGRATIONS_DIR),
-        collectorContinuityCheck,
-      ],
+      registeredChecks: [migrationStateCheck(MIGRATIONS_DIR), collectorContinuityCheck],
     });
     expect(report.outcome).toBe('BLOCKED');
     expect(report.checks.map((c) => c.name)).toEqual(['quota-reservations']);

@@ -12,11 +12,7 @@
  */
 import { PGlite } from '@electric-sql/pglite';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import {
-  ErrorCode,
-  utcTimestamp,
-  type UtcTimestamp,
-} from '@foresift/domain';
+import { ErrorCode, utcTimestamp, type UtcTimestamp } from '@foresift/domain';
 import {
   applyMigrations,
   captureDeterministicSnapshot,
@@ -90,7 +86,9 @@ describe('AC-263: restore + replay neither duplicates nor skips unmarked history
     expect(restoredRows).toBeGreaterThanOrEqual(EVENTS.length);
 
     // The restored world holds exactly the pre-backup truth…
-    const keys = await restored.query<{ n: string }>('SELECT count(*) AS n FROM canonical_event_keys');
+    const keys = await restored.query<{ n: string }>(
+      'SELECT count(*) AS n FROM canonical_event_keys',
+    );
     expect(Number(keys.rows[0]?.n)).toBe(EVENTS.length);
 
     // …and live replay re-delivers the same events: storage refuses each

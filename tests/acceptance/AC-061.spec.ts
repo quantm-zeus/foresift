@@ -25,12 +25,7 @@ import {
   recordFieldQuality,
   recordRecoveryHealthState,
 } from '@foresift/persistence';
-import {
-  closeTestDatabase,
-  makeTestDatabase,
-  seedPool,
-  type TestDatabase,
-} from './helpers.ts';
+import { closeTestDatabase, makeTestDatabase, seedPool, type TestDatabase } from './helpers.ts';
 
 const T = (iso: string): UtcTimestamp => utcTimestamp(iso);
 

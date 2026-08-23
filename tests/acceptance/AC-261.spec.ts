@@ -43,7 +43,10 @@ let tdb: TestDatabase;
  * held at the port (production injects an ObjectStoreAdapter-backed one).
  */
 function mapVerifier(bytesById: Map<string, Uint8Array>): {
-  verifyArtifact(artifactId: string, contentHash: string): Promise<{ passed: boolean; detail: string }>;
+  verifyArtifact(
+    artifactId: string,
+    contentHash: string,
+  ): Promise<{ passed: boolean; detail: string }>;
 } {
   return {
     async verifyArtifact(artifactId, contentHash) {

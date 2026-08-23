@@ -2,12 +2,7 @@
   "$schema": "https://foresift.dev/schemas/telemetry-catalog-v1.json",
   "catalog": "data",
   "description": "Data-truth telemetry events for canonical identity, immutable observations/revisions, point-in-time replay, backfill receipts, field-quality flags, acquisition decisions, and source-dependence lineage. Every event carries the instant fields and evidence references its requirement demands; no event ever reports a fabricated success state.",
-  "requirementsCovered": [
-    "FR-DATA-002",
-    "FR-DATA-003",
-    "FR-DATA-005",
-    "FR-DATA-006"
-  ],
+  "requirementsCovered": ["FR-DATA-002", "FR-DATA-003", "FR-DATA-005", "FR-DATA-006"],
   "recoveryDataClass": "CRITICAL_METADATA",
   "events": [
     {
@@ -19,11 +14,21 @@
         { "name": "observationId", "type": "string", "required": true },
         { "name": "subjectPoolId", "type": "string", "required": true },
         { "name": "eventAt", "type": "string<utc-timestamp>", "required": true },
-        { "name": "availableAt", "type": "string<utc-timestamp>", "required": true, "notes": "Replay boundary input (FR-DATA-003)." },
+        {
+          "name": "availableAt",
+          "type": "string<utc-timestamp>",
+          "required": true,
+          "notes": "Replay boundary input (FR-DATA-003)."
+        },
         { "name": "availabilityProvenance", "type": "string(§13.4 vocabulary)", "required": true },
         { "name": "rawAmount", "type": "string|null", "required": true },
         { "name": "decimals", "type": "integer|null", "required": true },
-        { "name": "receiptHash", "type": "string", "required": true, "notes": "Unique content receipt; audit chain anchor." }
+        {
+          "name": "receiptHash",
+          "type": "string",
+          "required": true,
+          "notes": "Unique content receipt; audit chain anchor."
+        }
       ]
     },
     {
@@ -37,7 +42,12 @@
         { "name": "receiptHash", "type": "string", "required": true },
         { "name": "supersededReceiptHash", "type": "string", "required": true },
         { "name": "originalReceiptHash", "type": "string", "required": true },
-        { "name": "availableAt", "type": "string<utc-timestamp>", "required": true, "notes": "The revision is visible to replay only at or after this instant." }
+        {
+          "name": "availableAt",
+          "type": "string<utc-timestamp>",
+          "required": true,
+          "notes": "The revision is visible to replay only at or after this instant."
+        }
       ]
     },
     {
@@ -46,7 +56,12 @@
       "requirementRefs": ["FR-DATA-003"],
       "tier": "REPLAYABLE_RAW_PAYLOADS",
       "fields": [
-        { "name": "asOfInstant", "type": "string<utc-timestamp>", "required": true, "notes": "Explicit T — replay never serves an implicit current state." },
+        {
+          "name": "asOfInstant",
+          "type": "string<utc-timestamp>",
+          "required": true,
+          "notes": "Explicit T — replay never serves an implicit current state."
+        },
         { "name": "resolvedCount", "type": "integer", "required": true },
         { "name": "resolvedViaRevisionCount", "type": "integer", "required": true },
         { "name": "subjectFilter", "type": "string|null", "required": true },
@@ -67,7 +82,11 @@
         { "name": "availableAt", "type": "string<utc-timestamp>", "required": true },
         { "name": "retrospectiveOnly", "type": "boolean", "required": true },
         { "name": "wouldHaveBeenObservableLive", "type": "boolean|null", "required": true },
-        { "name": "availabilityProofMethod", "type": "string(LIVE_RECEIPT_REFERENCE|RECOVERY_FETCH_COMMIT|MANUAL_IMPORT_RECEIPT)", "required": true },
+        {
+          "name": "availabilityProofMethod",
+          "type": "string(LIVE_RECEIPT_REFERENCE|RECOVERY_FETCH_COMMIT|MANUAL_IMPORT_RECEIPT)",
+          "required": true
+        },
         { "name": "liveReceiptRef", "type": "string|null", "required": true }
       ]
     },
@@ -98,7 +117,12 @@
         { "name": "policyVersion", "type": "string", "required": true },
         { "name": "state", "type": "string(§13.8 AcquisitionState vocabulary)", "required": true },
         { "name": "requestedAt", "type": "string<utc-timestamp>", "required": true },
-        { "name": "completedAt", "type": "string<utc-timestamp>|null", "required": true, "notes": "Null for every not-completed state (e.g. PROVIDER_UNAVAILABLE)." }
+        {
+          "name": "completedAt",
+          "type": "string<utc-timestamp>|null",
+          "required": true,
+          "notes": "Null for every not-completed state (e.g. PROVIDER_UNAVAILABLE)."
+        }
       ]
     },
     {
@@ -108,14 +132,23 @@
       "tier": "CRITICAL_METADATA",
       "fields": [
         { "name": "edgeId", "type": "string", "required": true },
-        { "name": "sourceA", "type": "string", "required": true, "notes": "Canonical order enforced: sourceA < sourceB." },
+        {
+          "name": "sourceA",
+          "type": "string",
+          "required": true,
+          "notes": "Canonical order enforced: sourceA < sourceB."
+        },
         { "name": "sourceB", "type": "string", "required": true },
         { "name": "sharedUpstreamLineageKeys", "type": "array<string>", "required": true },
         { "name": "valueErrorTimingCorrelation", "type": "number[-1,1]", "required": true },
         { "name": "outageOverlap", "type": "number[0,1]", "required": true },
         { "name": "firstSeenLagAgreement", "type": "number[0,1]", "required": true },
         { "name": "fingerprintSimilarity", "type": "number[0,1]", "required": true },
-        { "name": "label", "type": "string(AVAILABLE_AT_THE_TIME|DIAGNOSTIC_RETROSPECTIVE)", "required": true },
+        {
+          "name": "label",
+          "type": "string(AVAILABLE_AT_THE_TIME|DIAGNOSTIC_RETROSPECTIVE)",
+          "required": true
+        },
         { "name": "availableAt", "type": "string<utc-timestamp>", "required": true }
       ]
     }

@@ -5,13 +5,13 @@ same box as `.optimizer-evidence/BASELINE.md`. Nothing is extrapolated.
 
 ## Headline comparison
 
-| Metric (FULL authority) | Baseline @aecf711 | After (C2.5) | Δ |
-| --- | --- | --- | --- |
-| `pnpm test` wall (median of ≥3) | 37.5 s (37.9/37.5/37.3) | **29 s** (30/29/29/30/28) | −22% |
-| `pnpm verify` wall | 47.6 s | **39 s** (38, 39) | −18% |
-| git process spawns per FULL run (PATH shim count) | 543 | **375** | −31% |
-| test files collected | 10 (incl. 4 stale worktree files) | 11 (zero stale) | pollution removed |
-| tests executed per FULL run | 180 reported (≈60 were stale-worktree duplicates ⇒ ≈120 real) | **150** (all real) | +25% real evidence |
+| Metric (FULL authority)                           | Baseline @aecf711                                             | After (C2.5)              | Δ                  |
+| ------------------------------------------------- | ------------------------------------------------------------- | ------------------------- | ------------------ |
+| `pnpm test` wall (median of ≥3)                   | 37.5 s (37.9/37.5/37.3)                                       | **29 s** (30/29/29/30/28) | −22%               |
+| `pnpm verify` wall                                | 47.6 s                                                        | **39 s** (38, 39)         | −18%               |
+| git process spawns per FULL run (PATH shim count) | 543                                                           | **375**                   | −31%               |
+| test files collected                              | 10 (incl. 4 stale worktree files)                             | 11 (zero stale)           | pollution removed  |
+| tests executed per FULL run                       | 180 reported (≈60 were stale-worktree duplicates ⇒ ≈120 real) | **150** (all real)        | +25% real evidence |
 
 The baseline "180 tests" included 60 duplicate stale copies from
 `.claude/worktrees/foresift-throughput/**` running OLD specs against CURRENT scripts —
@@ -20,12 +20,12 @@ is a correctness fix, not a coverage reduction.
 
 ## Tier walls (measured individually)
 
-| Tier | Command | Wall | Contents |
-| --- | --- | --- | --- |
-| unit | `pnpm test:unit` | 5 s | 8 files, 146 tests, threads + isolate:false |
-| integration | `pnpm test:integration` | ~25–27 s | 3 files, 4 real executions run CONCURRENTLY |
-| authoring loop (one affected file) | `vitest run tests/automation/v2-throughput.spec.ts` | 2 s | 33 tests |
-| authoring loop (whole unit tier) | `pnpm test:unit` | 5 s | replaces the old 37.5 s inner loop |
+| Tier                               | Command                                             | Wall     | Contents                                    |
+| ---------------------------------- | --------------------------------------------------- | -------- | ------------------------------------------- |
+| unit                               | `pnpm test:unit`                                    | 5 s      | 8 files, 146 tests, threads + isolate:false |
+| integration                        | `pnpm test:integration`                             | ~25–27 s | 3 files, 4 real executions run CONCURRENTLY |
+| authoring loop (one affected file) | `vitest run tests/automation/v2-throughput.spec.ts` | 2 s      | 33 tests                                    |
+| authoring loop (whole unit tier)   | `pnpm test:unit`                                    | 5 s      | replaces the old 37.5 s inner loop          |
 
 Integration tier pays exactly one nested FULL suite per gate E2E (green milestone gate,
 red package gate); the two gate files overlap each other and the targeted-router file,
@@ -54,6 +54,7 @@ After snapshot: this run collected 11 files:
 ```
 
 Intentional deltas only:
+
 1. REMOVED: 4× `.claude/worktrees/foresift-throughput/tests/*` (stale duplicates — hygiene fix).
 2. ADDED: `test-tiers.spec.ts` (meta-guards for tier config + discovery hygiene),
    3 integration files (the split real-execution specs, same behaviors as before),

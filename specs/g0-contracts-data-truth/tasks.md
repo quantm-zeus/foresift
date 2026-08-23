@@ -227,7 +227,7 @@ exist for every acceptance criterion listed in spec.md §3.
       FR-DATA-005, FR-DATA-003.
 - [x] T055 AC-244 pair: feature provenance fields present; lift claim without valid
       provenance refused at substrate level. Traces: FR-DATA-004.
-- [ ] T056 AC-245 pair + AC-246 pair + AC-247 pair: dependence-edge credit reduction,
+- [x] T056 AC-245 pair + AC-246 pair + AC-247 pair: dependence-edge credit reduction,
       lineage collapse removing duplicated credit, retrospective estimate cannot alter
       frozen counts. Traces: FR-DATA-006.
 - [ ] T057 AC-248 pair + AC-249 pair: immutable matured-count projections reported

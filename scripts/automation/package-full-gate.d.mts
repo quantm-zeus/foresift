@@ -7,26 +7,16 @@ export interface AttestationIdentity {
   risk: string;
   profile: 'LEGACY' | 'OPTIMIZED';
   pnpmLockHash: string | null;
-  authorityHashes: {
-    prdManifest: string | null;
-    currentMilestone: string | null;
-    roadmap: string | null;
-  };
-  gateImplementationHashes: {
-    gate: string;
-    schema: string;
-    runner: string;
-  };
+  authorityHashes: Record<string, string | null>;
+  gateImplementationHashes: Record<string, string>;
   toolchain: Record<string, string>;
 }
 
-export declare function attestationIdentity(input: {
+export declare function attestationIdentity(opts: {
   packageId: string;
-  repoRoot: string;
+  repoRoot?: string;
 }): AttestationIdentity;
-
-/** null = identities match (reuse allowed); otherwise the drifted field paths. */
 export declare function attestationDrift(
-  attested: Partial<AttestationIdentity> | Record<string, unknown>,
+  attested: unknown,
   current: AttestationIdentity,
 ): string[] | null;

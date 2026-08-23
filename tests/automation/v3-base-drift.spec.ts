@@ -223,12 +223,14 @@ case "\$cmd/\$sub" in
   pr/merge)
     # §31 race serialization: exactly ONE squash merge ever succeeds. A second
     # merge attempt after the first is refused the way GitHub branch protection
-    # refuses a PR that is no longer up to date.
-    if [ -e "\${GHSTUB_MERGED:?}" ]; then
+    # refuses a PR that is no longer up to date. The claim is ATOMIC (noclobber
+    # O_EXCL create): GitHub arbitrates merges atomically server-side, and a
+    # check-then-touch window here let TWO concurrent landers both win (caught
+    # by the pre-activation race-repeat leg, fixed 2026-08-23).
+    if ! ( set -o noclobber; : > "\${GHSTUB_MERGED:?}" ) 2>/dev/null; then
       echo 'gh: pull request is not up to date with main (squash refused)' >&2
       exit 1
     fi
-    touch "\${GHSTUB_MERGED}"
     # Optional winner side effect: the winning squash ADVANCES origin/main so a
     # concurrently-started lander must hit its pre-merge base re-check.
     if [ -n "\${GHSTUB_MERGE_ADVANCES_MAIN:-}" ]; then

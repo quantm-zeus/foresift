@@ -422,3 +422,34 @@ export const recoveryHealthStates = pgTable('recovery_health_states', {
   evaluatedAt: timestamp('evaluated_at', { withTimezone: true }).notNull(),
   reason: text('reason').notNull(),
 });
+
+// --- g0_data_0007_checkpoints_gaps ------------------------------------------
+
+export const collectorCheckpoints = pgTable('collector_checkpoints', {
+  shardId: text('shard_id').primaryKey(),
+  fencingToken: bigint('fencing_token', { mode: 'number' }).notNull(),
+  cursorPosition: bigint('cursor_position', { mode: 'number' }).notNull(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull(),
+});
+
+export const collectorGaps = pgTable('collector_gaps', {
+  gapId: text('gap_id').primaryKey(),
+  shardId: text('shard_id').notNull(),
+  gapStartSlot: bigint('gap_start_slot', { mode: 'number' }).notNull(),
+  gapEndSlot: bigint('gap_end_slot', { mode: 'number' }).notNull(),
+  reason: text('reason').notNull(),
+  recoveryStatus: text('recovery_status').notNull(),
+  registeredAt: timestamp('registered_at', { withTimezone: true }).notNull(),
+  resolvedAt: timestamp('resolved_at', { withTimezone: true }),
+});
+
+// --- g0_dr_0003_incidents ----------------------------------------------------
+
+export const recoveryIncidents = pgTable('recovery_incidents', {
+  incidentId: text('incident_id').primaryKey(),
+  tierId: text('tier_id'),
+  openedAt: timestamp('opened_at', { withTimezone: true }).notNull(),
+  kind: text('kind').notNull(),
+  reason: text('reason').notNull(),
+  resolvedAt: timestamp('resolved_at', { withTimezone: true }),
+});

@@ -14,7 +14,12 @@ CREATE TABLE backup_policies (
     legal_hold       boolean NOT NULL DEFAULT false,
     deletion_policy  text NOT NULL,
     key_reference    text NOT NULL CHECK (key_reference ~ '^keyref:[A-Za-z0-9._/-]+$'),
-    created_at       timestamptz NOT NULL DEFAULT now()
+    created_at       timestamptz NOT NULL DEFAULT now(),
+    CONSTRAINT backup_policies_nonempty_governance_refs
+        CHECK (length(trim(encryption_status)) > 0
+           AND length(trim(location_ref)) > 0
+           AND length(trim(rights_ref)) > 0
+           AND length(trim(deletion_policy)) > 0)
 );
 
 CREATE TABLE backup_runs (

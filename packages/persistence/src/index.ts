@@ -14,3 +14,8 @@ export * from './repos/sources.ts';
 export * from './feature-computation.ts';
 export * from './repos/features.ts';
 export * from './repos/acquisition.ts';
+export * from './repos/checkpoints.ts';
+export * from './repos/recovery.ts';
+export * from './drill/backup.ts';
+export * from './drill/restore.ts';
+export * from './drill/rpo.ts';

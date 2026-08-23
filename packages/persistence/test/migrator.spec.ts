@@ -25,8 +25,10 @@ describe('migration suite shape (T015–T019, +AC-243 probe assignments)', () =>
       'g0_data_0004_features_acquisition',
       'g0_data_0005_object_artifact_index',
       'g0_data_0006_probe_assignments',
+      'g0_data_0007_checkpoints_gaps',
       'g0_dr_0001_recovery_tiers',
       'g0_dr_0002_backup_policy',
+      'g0_dr_0003_incidents',
     ]);
     for (const m of migrations) {
       expect(m.checksum.startsWith('sha256:')).toBe(true);
@@ -48,9 +50,9 @@ describe('applyMigrations (FR-DATA-001…006, FR-DR-001/002 foundation)', () => 
     await db.close();
   });
 
-  it('applies all eight to an empty database and records state', { timeout: 120_000 }, async () => {
+  it('applies all ten to an empty database and records state', { timeout: 120_000 }, async () => {
     const report = await applyMigrations({ engine, migrationsDir: MIGRATIONS_DIR });
-    expect(report.applied.length).toBe(8);
+    expect(report.applied.length).toBe(10);
     expect(report.skipped).toEqual([]);
 
     const recorded = await appliedMigrations(engine);
@@ -61,15 +63,17 @@ describe('applyMigrations (FR-DATA-001…006, FR-DR-001/002 foundation)', () => 
       'g0_data_0004_features_acquisition',
       'g0_data_0005_object_artifact_index',
       'g0_data_0006_probe_assignments',
+      'g0_data_0007_checkpoints_gaps',
       'g0_dr_0001_recovery_tiers',
       'g0_dr_0002_backup_policy',
+      'g0_dr_0003_incidents',
     ]);
   });
 
   it('applies twice without damage (idempotent)', async () => {
     const second = await applyMigrations({ engine, migrationsDir: MIGRATIONS_DIR });
     expect(second.applied).toEqual([]);
-    expect(second.skipped.length).toBe(8);
+    expect(second.skipped.length).toBe(10);
 
     // The full table set still exists exactly once each.
     const tables = await engine.query<{ table_name: string }>(

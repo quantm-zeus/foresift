@@ -253,7 +253,7 @@ exist for every acceptance criterion listed in spec.md §3.
 
 ## Phase 10 — Telemetry catalogs + convergence
 
-- [ ] T063 Write `telemetry/data.catalog.json` (observation.committed,
+- [x] T063 Write `telemetry/data.catalog.json` (observation.committed,
       revision.created, replay.served, backfill.completed, quality.flagged,
       acquisition.recorded, dependence.edge.updated) and `telemetry/dr.catalog.json`
       (backup.completed, restore.drill.finished, tier.violation.detected,

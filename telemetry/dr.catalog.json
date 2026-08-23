@@ -1,0 +1,80 @@
+{
+  "$schema": "https://foresift.dev/schemas/telemetry-catalog-v1.json",
+  "catalog": "dr",
+  "description": "Disaster-recovery telemetry events for governed backups, clean-environment restore drills, recovery-tier violations, and capability degradation. Degradation events always preserve the deterministic-risk-monitoring allowance; no event may report a tier miss without its durable incident.",
+  "requirementsCovered": [
+    "FR-DR-001",
+    "FR-DR-002"
+  ],
+  "recoveryDataClass": "CRITICAL_METADATA",
+  "events": [
+    {
+      "name": "backup.completed",
+      "description": "A backup run finished under a governed policy, recording artifact references and the policy dimensions that authorized the copy.",
+      "requirementRefs": ["FR-DR-002"],
+      "tier": "CRITICAL_METADATA",
+      "fields": [
+        { "name": "runId", "type": "string", "required": true },
+        { "name": "policyId", "type": "string", "required": true },
+        { "name": "retentionDays", "type": "integer", "required": true },
+        { "name": "encryptionStatus", "type": "string", "required": true },
+        { "name": "locationRef", "type": "string", "required": true, "notes": "Must be in the approved failure-domain allowlist." },
+        { "name": "rightsRef", "type": "string", "required": true },
+        { "name": "legalHold", "type": "boolean", "required": true },
+        { "name": "deletionPolicy", "type": "string", "required": true },
+        { "name": "keyReference", "type": "string", "required": true, "notes": "Opaque keyref: into the separated keystore — never key material." },
+        { "name": "artifactRefs", "type": "array<string>", "required": true, "notes": "Non-empty; each ref names a hash-verified artifact." },
+        { "name": "finishedAt", "type": "string<utc-timestamp>", "required": true }
+      ]
+    },
+    {
+      "name": "restore.drill.finished",
+      "description": "A clean-environment restore drill completed with its full check ledger and credential-presence record; PASSED requires credentials present and a completion instant.",
+      "requirementRefs": ["FR-DR-001", "FR-DR-002"],
+      "tier": "CRITICAL_METADATA",
+      "fields": [
+        { "name": "drillId", "type": "string", "required": true },
+        { "name": "outcome", "type": "string(PASSED|FAILED|BLOCKED)", "required": true },
+        { "name": "checks", "type": "array<{name: string, passed: boolean, detail: string}>", "required": true },
+        { "name": "credentialProviderPresent", "type": "boolean", "required": true },
+        { "name": "startedAt", "type": "string<utc-timestamp>", "required": true },
+        { "name": "finishedAt", "type": "string<utc-timestamp>|null", "required": true }
+      ]
+    },
+    {
+      "name": "tier.violation.detected",
+      "description": "A drill measurement missed its declared RPO/RTO tier; a durable incident was opened and pinned to the measurement.",
+      "requirementRefs": ["FR-DR-001"],
+      "tier": "CRITICAL_METADATA",
+      "fields": [
+        { "name": "measurementId", "type": "string", "required": true },
+        { "name": "tierId", "type": "string", "required": true },
+        { "name": "dataClass", "type": "string(CRITICAL_METADATA|CRITICAL_OBSERVATIONS_CHECKPOINTS|REPLAYABLE_RAW_PAYLOADS)", "required": true },
+        { "name": "capability", "type": "string", "required": true },
+        { "name": "outcome", "type": "string(MISSED_RPO|MISSED_RTO|MISSED_BOTH)", "required": true },
+        { "name": "achievedRpoMinutes", "type": "number", "required": true },
+        { "name": "achievedRtoMinutes", "type": "number", "required": true },
+        { "name": "rpoTargetMinutes", "type": "integer", "required": true },
+        { "name": "rtoTargetMinutes", "type": "integer", "required": true },
+        { "name": "incidentId", "type": "string", "required": true, "notes": "Always set on violation — a miss never records without its incident." },
+        { "name": "evaluatedAt", "type": "string<utc-timestamp>", "required": true }
+      ]
+    },
+    {
+      "name": "degradation.changed",
+      "description": "A capability's machine-readable recovery-health state changed; degraded states block confirmed-opportunity influence while deterministic risk monitoring stays allowed.",
+      "requirementRefs": ["FR-DR-001"],
+      "tier": "CRITICAL_METADATA",
+      "fields": [
+        { "name": "healthStateId", "type": "string", "required": true },
+        { "name": "capability", "type": "string", "required": true },
+        { "name": "kind", "type": "string(HEALTHY|DEGRADED)", "required": true },
+        { "name": "confirmedOpportunityInfluenceBlocked", "type": "boolean", "required": true, "notes": "True whenever DEGRADED." },
+        { "name": "deterministicRiskMonitoringAllowed", "type": "boolean", "required": true, "notes": "Always true while any monitoring capability exists — never suppressed alongside degradation." },
+        { "name": "incidentId", "type": "string|null", "required": true, "notes": "Required for DEGRADED; forbidden for HEALTHY." },
+        { "name": "evaluatedAt", "type": "string<utc-timestamp>", "required": true },
+        { "name": "reason", "type": "string", "required": true }
+      ]
+    }
+  ]
+}

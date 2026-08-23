@@ -1,6 +1,16 @@
-// Package entrypoint — exports are added as this package's modules land.
-// Convention: every Foresift workspace package carries a tsconfig.json that
-// extends ../../tsconfig.base.json and globs src/** + test/**, so new modules
-// and tests require zero root-config edits (see specs/g0-contracts-data-truth
-// tasks T001–T003).
-export {};
+// Package entrypoint — pure TypeScript domain contracts, zero runtime deps.
+export * from './errors.ts';
+export * from './chain.ts';
+export * from './address.ts';
+export * from './quantity.ts';
+export * from './timestamps.ts';
+export * from './availability.ts';
+export * from './quality.ts';
+export * from './acquisition.ts';
+export * from './asset.ts';
+export * from './pool.ts';
+export * from './launch.ts';
+export * from './source.ts';
+export * from './feature.ts';
+export * from './recovery.ts';
+export * from './clock.ts';

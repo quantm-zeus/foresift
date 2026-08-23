@@ -24,6 +24,7 @@ packages require zero root-config edits.
 `exactOptionalPropertyTypes`) on Node.js ≥24.19 — already pinned in root configs.
 
 **Primary Dependencies**:
+
 - `zod` — single runtime-validation schema library for `packages/shared-schemas`
   (proposed ADR-P1 below).
 - `drizzle-orm` — typed access mirroring SQL migrations per ADR-001.
@@ -60,28 +61,28 @@ surfaces; no network egress anywhere in this package.
 
 ## Constitution Check
 
-*GATE: must pass before implementation. Re-checked after design.*
+_GATE: must pass before implementation. Re-checked after design._
 
-| Principle | Verdict | Evidence |
-| --- | --- | --- |
-| I Product-Contract Authority | PASS | Every task cites FR-DATA-001…006 / FR-DR-001…002 or their ACs; `docs/spec/**` untouched; spec.md is marked subordinate. |
-| II Greenfield Architecture | PASS | Designed from PRD §§11/13/14/30/34/45 + Appendix D ADRs; predecessor not consulted. |
-| III Modular-Monolith-First Simplicity | PASS | Five cohesive packages inside declared writeScopes; no brokers/services; PGlite is a test engine, not runtime infrastructure. |
-| IV Read-Only Product Boundary | PASS | No execution/custody/signing/key-handling capability; key *material references* only, never key material; negative tests assert absence. |
-| V Point-in-Time Correctness | PASS | Replay boundary enforced in storage contract and query layer (AC-020). |
-| VI Event-Time / Earliest-Availability | PASS | `event_at` preserved, `available_at` = earliest proven availability (ADR-049), backfill receipts carry availability proofs. |
-| VII Provenance & Evidence | PASS | Availability-provenance classes, source lineage records, content hashes on all artifacts. |
-| VIII Fail-Closed Integrations | PASS | Unknown provenance class, missing quality code, unverified restore → refuse; no silent defaults. |
-| IX Provider/Capability Abstraction | PASS | Object store and clock behind internal interfaces; no vendor SDK in domain/persistence logic. |
-| X Requirement Traceability | PASS | tasks.md maps each task to requirement IDs; validator-enforced. |
-| XI Deterministic Verification | PASS | PGlite keeps migration/repository/drill tests hermetic; gates run identically locally and in CI. |
-| XII Positive AND Failure-Path Testing | PASS | All 22 assigned ACs get acceptance + negative specs per manifest testRefs. |
-| XIII Replay/Recovery/Idempotency | PASS | Fenced checkpoints, idempotent canonical-event constraints, replay-safe drill harness. |
-| XIV Durable Resumable Operations | PASS | Migration state persisted in `_foresift_schema_migrations`; drill state on disk; no conversational-only state. |
-| XV Security & Least Privilege | PASS | No secrets in code/tests/artifacts; `.env.example` placeholders only if needed; key separation enforced by policy tests. |
-| XVI Autonomous-Agent Governance | PASS | Material decisions recorded as proposed ADR texts (§8); scope respected; out-of-scope gaps routed to notes file. |
-| XVII Additive Git History | PASS | Work lands via PR from this branch; no amend/rebase/force. |
-| XVIII No AI Claim Is Completion | PASS | Completion decided by `package-plan-complete.mjs` now and by `pnpm verify`/CI later. |
+| Principle                             | Verdict | Evidence                                                                                                                                 |
+| ------------------------------------- | ------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
+| I Product-Contract Authority          | PASS    | Every task cites FR-DATA-001…006 / FR-DR-001…002 or their ACs; `docs/spec/**` untouched; spec.md is marked subordinate.                  |
+| II Greenfield Architecture            | PASS    | Designed from PRD §§11/13/14/30/34/45 + Appendix D ADRs; predecessor not consulted.                                                      |
+| III Modular-Monolith-First Simplicity | PASS    | Five cohesive packages inside declared writeScopes; no brokers/services; PGlite is a test engine, not runtime infrastructure.            |
+| IV Read-Only Product Boundary         | PASS    | No execution/custody/signing/key-handling capability; key _material references_ only, never key material; negative tests assert absence. |
+| V Point-in-Time Correctness           | PASS    | Replay boundary enforced in storage contract and query layer (AC-020).                                                                   |
+| VI Event-Time / Earliest-Availability | PASS    | `event_at` preserved, `available_at` = earliest proven availability (ADR-049), backfill receipts carry availability proofs.              |
+| VII Provenance & Evidence             | PASS    | Availability-provenance classes, source lineage records, content hashes on all artifacts.                                                |
+| VIII Fail-Closed Integrations         | PASS    | Unknown provenance class, missing quality code, unverified restore → refuse; no silent defaults.                                         |
+| IX Provider/Capability Abstraction    | PASS    | Object store and clock behind internal interfaces; no vendor SDK in domain/persistence logic.                                            |
+| X Requirement Traceability            | PASS    | tasks.md maps each task to requirement IDs; validator-enforced.                                                                          |
+| XI Deterministic Verification         | PASS    | PGlite keeps migration/repository/drill tests hermetic; gates run identically locally and in CI.                                         |
+| XII Positive AND Failure-Path Testing | PASS    | All 22 assigned ACs get acceptance + negative specs per manifest testRefs.                                                               |
+| XIII Replay/Recovery/Idempotency      | PASS    | Fenced checkpoints, idempotent canonical-event constraints, replay-safe drill harness.                                                   |
+| XIV Durable Resumable Operations      | PASS    | Migration state persisted in `_foresift_schema_migrations`; drill state on disk; no conversational-only state.                           |
+| XV Security & Least Privilege         | PASS    | No secrets in code/tests/artifacts; `.env.example` placeholders only if needed; key separation enforced by policy tests.                 |
+| XVI Autonomous-Agent Governance       | PASS    | Material decisions recorded as proposed ADR texts (§8); scope respected; out-of-scope gaps routed to notes file.                         |
+| XVII Additive Git History             | PASS    | Work lands via PR from this branch; no amend/rebase/force.                                                                               |
+| XVIII No AI Claim Is Completion       | PASS    | Completion decided by `package-plan-complete.mjs` now and by `pnpm verify`/CI later.                                                     |
 
 ## Project Structure
 
@@ -198,7 +199,7 @@ Key tables (naming follows §30 catalogue where the section lists the entity):
 - **Sources**: `source_identities` (brand/provider, operation, upstream_lineage_key,
   endpoint_region, collection_method), `independence_groups` +
   `source_group_memberships`, `source_dependence_edges` (pairwise, declared lineage
-  + observed-correlation inputs, diagnostic-vs-available labeling).
+  - observed-correlation inputs, diagnostic-vs-available labeling).
 - **Features/evidence**: `feature_definitions` (versioned), `feature_values`
   (feature version, event time, raw decimal-string value, quality codes,
   computation_code_version, population/lineage provenance, store_class ONLINE),
@@ -230,30 +231,30 @@ repos exercise real constraints/triggers. Clock injection (`ClockPort`) makes
 availability/RPO measurement deterministic. Each AC gets the manifest-declared
 positive spec under `tests/acceptance/` and negative spec under `tests/negative/`.
 
-| AC | Positive proof | Negative/failure proof |
-| --- | --- | --- |
-| AC-020 | Replay at T returns exactly the revisions visible at T across a fixture timeline. | Query attempting to observe `available_at > T` records fails/returns nothing; hidden current-data bypass call fails. |
-| AC-021 | Revision + compensating-reorg timeline preserves original receipt bytes/hashes. | UPDATE/DELETE on immutable tables rejected by triggers; revision that would rewrite history rejected. |
-| AC-022 | Migration-edge fixture aggregation counts liquidity/volume once across launch→pool boundary. | Naive double-count aggregation over same fixture produces mismatch, demonstrating the fixture detects regression. |
-| AC-023 | Golden vectors: EVM checksum/lowercase, Solana base58 validation, CAIP forms, decimals resolution. | Invalid addresses/decimals rejected; conflicting decimals yield explicit quality state, not a guess. |
-| AC-240 | §13.7 timestamp fields persist and resolve symmetrically for delivered/non-delivered arms in fixture. | Non-delivered arm receiving earlier entry than counterfactual delivery is rejected by resolver. |
-| AC-241 | Frozen-candidate replay twice differs nowhere except injected registered-policy component. | Replay harness detecting a current-data read fails closed. |
-| AC-242 | Acquisition record stored as NOT_REQUESTED_BY_POLICY renders exactly that state. | Storing it as RETURNED_EMPTY/PROVIDER_UNAVAILABLE/negative feature violates schema/repository invariant. |
-| AC-243 | Probe record persists stratum/probability/seed/timestamps/fields/impact before retrieval. | Retrieval without prior assignment-probability persistence rejected. |
-| AC-244 | Feature values expose version/code-version/population provenance consumed by selection checks. | Feature row lacking provenance cannot back a lift claim query (substrate-level refusal). |
-| AC-245 | Correlated-pair fixture stores reduced-independence edge despite distinct provider IDs. | Edge asserting independence for correlated pair contradicts stored inputs → rejected. |
-| AC-246 | Independence-group collapse-by-lineage query removes duplicated evidence credit. | Alert-gate-style query relying on collapsed lineage returns insufficient-independent-evidence, not confirmation. |
-| AC-247 | Retrospective estimate inserted post-hoc cannot change replay-resolved historical count. | Mutation attempt on frozen count window rejected; estimate labeled diagnostic. |
-| AC-248 | Immutable, replay-correct matured-count projections served to gate consumers. | Count projection below registered thresholds is reported as failing (substrate honesty). |
-| AC-249 | Availability-backdating placebo fixture: attempted backdate leaves replay results unchanged. | Backdated insert without independent receipt violates no-backdating guard. |
-| AC-060 | Benchmark fixtures measure identity-lookup and replay-read latency; budgets asserted with headroom. | Benchmark harness fails when artificial delay exceeds budget (guard against vacuous pass). |
-| AC-061 | Quality/acquisition/degradation vocabularies render explicit partial/insufficient output states. | Missing required evidence yields suppressed-state record, never fabricated success. |
-| AC-062 | Drill: backup → mutate → restore → measured RPO/RTO within configured tiers. | Tier-violation scenario reports failure and flips health state to degraded. |
-| AC-260 | Destructive drill restores metadata ≤15 min, observations/checkpoints ≤60 min tiers on fixture workloads. | Missed-tier drill blocks confirmed-opportunity influence flag and creates incident record. |
-| AC-261 | Clean-environment verifier validates DB/migration state, object hashes, cross-store refs, checkpoints/gaps. | Tampered object hash / orphan upload / stale checkpoint causes verifier refusal. |
-| AC-262 | Tier violation flips machine-readable degraded-capability state preserving risk-monitoring allowance. | Suppression of safe deterministic risk monitoring along with opportunity alerts fails review assertion. |
-| AC-263 | Restore+replay fixture replays events exactly once against canonical-event keys; gaps stay explicit. | Duplicate first-seen insert rejected; unmarked-gap replay refused until gap registered. |
-| AC-264 | Policy tests validate retention/encryption/location/rights/legal-hold/deletion/key-access/restore credentials. | Backup containing key material, or restore without separated credential provider, fails closed. |
+| AC     | Positive proof                                                                                                 | Negative/failure proof                                                                                               |
+| ------ | -------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------- |
+| AC-020 | Replay at T returns exactly the revisions visible at T across a fixture timeline.                              | Query attempting to observe `available_at > T` records fails/returns nothing; hidden current-data bypass call fails. |
+| AC-021 | Revision + compensating-reorg timeline preserves original receipt bytes/hashes.                                | UPDATE/DELETE on immutable tables rejected by triggers; revision that would rewrite history rejected.                |
+| AC-022 | Migration-edge fixture aggregation counts liquidity/volume once across launch→pool boundary.                   | Naive double-count aggregation over same fixture produces mismatch, demonstrating the fixture detects regression.    |
+| AC-023 | Golden vectors: EVM checksum/lowercase, Solana base58 validation, CAIP forms, decimals resolution.             | Invalid addresses/decimals rejected; conflicting decimals yield explicit quality state, not a guess.                 |
+| AC-240 | §13.7 timestamp fields persist and resolve symmetrically for delivered/non-delivered arms in fixture.          | Non-delivered arm receiving earlier entry than counterfactual delivery is rejected by resolver.                      |
+| AC-241 | Frozen-candidate replay twice differs nowhere except injected registered-policy component.                     | Replay harness detecting a current-data read fails closed.                                                           |
+| AC-242 | Acquisition record stored as NOT_REQUESTED_BY_POLICY renders exactly that state.                               | Storing it as RETURNED_EMPTY/PROVIDER_UNAVAILABLE/negative feature violates schema/repository invariant.             |
+| AC-243 | Probe record persists stratum/probability/seed/timestamps/fields/impact before retrieval.                      | Retrieval without prior assignment-probability persistence rejected.                                                 |
+| AC-244 | Feature values expose version/code-version/population provenance consumed by selection checks.                 | Feature row lacking provenance cannot back a lift claim query (substrate-level refusal).                             |
+| AC-245 | Correlated-pair fixture stores reduced-independence edge despite distinct provider IDs.                        | Edge asserting independence for correlated pair contradicts stored inputs → rejected.                                |
+| AC-246 | Independence-group collapse-by-lineage query removes duplicated evidence credit.                               | Alert-gate-style query relying on collapsed lineage returns insufficient-independent-evidence, not confirmation.     |
+| AC-247 | Retrospective estimate inserted post-hoc cannot change replay-resolved historical count.                       | Mutation attempt on frozen count window rejected; estimate labeled diagnostic.                                       |
+| AC-248 | Immutable, replay-correct matured-count projections served to gate consumers.                                  | Count projection below registered thresholds is reported as failing (substrate honesty).                             |
+| AC-249 | Availability-backdating placebo fixture: attempted backdate leaves replay results unchanged.                   | Backdated insert without independent receipt violates no-backdating guard.                                           |
+| AC-060 | Benchmark fixtures measure identity-lookup and replay-read latency; budgets asserted with headroom.            | Benchmark harness fails when artificial delay exceeds budget (guard against vacuous pass).                           |
+| AC-061 | Quality/acquisition/degradation vocabularies render explicit partial/insufficient output states.               | Missing required evidence yields suppressed-state record, never fabricated success.                                  |
+| AC-062 | Drill: backup → mutate → restore → measured RPO/RTO within configured tiers.                                   | Tier-violation scenario reports failure and flips health state to degraded.                                          |
+| AC-260 | Destructive drill restores metadata ≤15 min, observations/checkpoints ≤60 min tiers on fixture workloads.      | Missed-tier drill blocks confirmed-opportunity influence flag and creates incident record.                           |
+| AC-261 | Clean-environment verifier validates DB/migration state, object hashes, cross-store refs, checkpoints/gaps.    | Tampered object hash / orphan upload / stale checkpoint causes verifier refusal.                                     |
+| AC-262 | Tier violation flips machine-readable degraded-capability state preserving risk-monitoring allowance.          | Suppression of safe deterministic risk monitoring along with opportunity alerts fails review assertion.              |
+| AC-263 | Restore+replay fixture replays events exactly once against canonical-event keys; gaps stay explicit.           | Duplicate first-seen insert rejected; unmarked-gap replay refused until gap registered.                              |
+| AC-264 | Policy tests validate retention/encryption/location/rights/legal-hold/deletion/key-access/restore credentials. | Backup containing key material, or restore without separated credential provider, fails closed.                      |
 
 Additional mandatory suites: migration apply-twice idempotency; immutability
 trigger fuzz; watermark non-contiguity blocking coverage claims; property test
@@ -261,13 +262,13 @@ that replay predicate is anti-monotone in T (earlier T ⊆ later T results).
 
 ## Risks
 
-| Risk | Mitigation |
-| --- | --- |
-| PGlite diverges from real PostgreSQL semantics (triggers, checks, domains). | Migrations restricted to widely-supported core SQL; a documented conformance note per feature used; CI runs same suite; production parity re-verified when a real cluster exists (ops milestone). |
-| Scope creep into evaluation/promotion machinery (AC-240…249 temptation). | Scoped-obligation column in spec.md §3; reviewer-visible non-goals; tasks cite substrate obligations only. |
-| Over-building DR infrastructure outside writeScopes (real PITR clusters, scripts/run-restore-drill CLI). | Interface + tested equivalent mechanism inside `packages/persistence`; production wiring deferred; noted in out-of-scope notes. |
-| Root tsconfig glob loosening breaks typecheck isolation between packages. | Per-package tsconfigs extend base; dependency-boundary enforced by imports of `@foresift/*` workspace links only; lint `no-restricted-imports` guards relative cross-package imports. |
-| Lockfile churn from new devDependencies destabilizing other packages. | Minimal, pinned-range deps (zod, drizzle-orm, pglite, vitest) justified in §9; single lockfile commit within the package PR. |
+| Risk                                                                                                     | Mitigation                                                                                                                                                                                        |
+| -------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| PGlite diverges from real PostgreSQL semantics (triggers, checks, domains).                              | Migrations restricted to widely-supported core SQL; a documented conformance note per feature used; CI runs same suite; production parity re-verified when a real cluster exists (ops milestone). |
+| Scope creep into evaluation/promotion machinery (AC-240…249 temptation).                                 | Scoped-obligation column in spec.md §3; reviewer-visible non-goals; tasks cite substrate obligations only.                                                                                        |
+| Over-building DR infrastructure outside writeScopes (real PITR clusters, scripts/run-restore-drill CLI). | Interface + tested equivalent mechanism inside `packages/persistence`; production wiring deferred; noted in out-of-scope notes.                                                                   |
+| Root tsconfig glob loosening breaks typecheck isolation between packages.                                | Per-package tsconfigs extend base; dependency-boundary enforced by imports of `@foresift/*` workspace links only; lint `no-restricted-imports` guards relative cross-package imports.             |
+| Lockfile churn from new devDependencies destabilizing other packages.                                    | Minimal, pinned-range deps (zod, drizzle-orm, pglite, vitest) justified in §9; single lockfile commit within the package PR.                                                                      |
 
 ## Proposed ADR texts (record under docs/adr/ at implementation time)
 

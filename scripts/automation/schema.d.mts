@@ -51,6 +51,12 @@ export declare function loadCurrentMilestone(root?: string): MilestoneState | nu
 export declare function validateRoadmap(rm: Roadmap): string[];
 export declare function validateMilestoneState(ms: MilestoneState): string[];
 export declare function classifyFailure(message?: string): 'TRANSIENT' | 'FATAL' | 'UNKNOWN';
+export interface GateArgs {
+  package?: string;
+  milestone?: boolean;
+  _: string[];
+}
+export declare function parseGateArgs(argv: string[]): GateArgs;
 export declare function findPackage(ms: MilestoneState, packageId: string): WorkPackage | null;
 export declare function packageEligible(
   ms: MilestoneState,

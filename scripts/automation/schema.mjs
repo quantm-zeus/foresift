@@ -129,6 +129,27 @@ export function validateMilestoneState(ms) {
   return errs;
 }
 
+/**
+ * Parse foresift-gate CLI arguments. Pure so the gate's strict arg contract is
+ * unit-testable without executing verification.
+ *
+ * A bare `--` is an end-of-options separator, not a positional: package
+ * managers forward it verbatim (`pnpm foresift:gate -- --package <id>`), and
+ * node passes it through when running a script file. Any other unrecognized
+ * token stays in `_` so the caller can fail closed on unexpected arguments.
+ */
+export function parseGateArgs(argv) {
+  const args = { _: [] };
+  for (let i = 0; i < argv.length; i++) {
+    const a = argv[i];
+    if (a === '--') continue;
+    if (a === '--package') args.package = argv[++i];
+    else if (a === '--milestone') args.milestone = true;
+    else args._.push(a);
+  }
+  return args;
+}
+
 /** Deterministic failure classification per the recovery policy. */
 export function classifyFailure(message = '') {
   const m = String(message).toLowerCase();

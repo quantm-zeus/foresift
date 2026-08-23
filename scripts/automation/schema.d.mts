@@ -50,7 +50,11 @@ export declare function loadRoadmap(root?: string): Roadmap;
 export declare function loadCurrentMilestone(root?: string): MilestoneState | null;
 export declare function validateRoadmap(rm: Roadmap): string[];
 export declare function validateMilestoneState(ms: MilestoneState): string[];
-export declare function classifyFailure(message?: string): 'TRANSIENT' | 'FATAL' | 'UNKNOWN';
+export declare function classifyFailure(
+  message?: string,
+): 'TRANSIENT' | 'QUOTA_DAILY' | 'FATAL' | 'UNKNOWN';
+/** Best-effort provider quota reset-time extraction from a failure message; null when absent. */
+export declare function extractQuotaResetAt(message?: string): number | null;
 export declare function findPackage(ms: MilestoneState, packageId: string): WorkPackage | null;
 export declare function packageEligible(
   ms: MilestoneState,

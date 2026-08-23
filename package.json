@@ -14,6 +14,7 @@
     "foresift:gate": "node scripts/automation/foresift-gate.mjs",
     "autopilot:status": "node scripts/automation/foresift-autopilot.mjs --status",
     "autopilot:selftest": "bash scripts/automation/supervisor-selftest.sh",
+    "autopilot:recover": "node scripts/automation/foresift-autopilot.mjs --recover-fatal",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "lint": "eslint .",

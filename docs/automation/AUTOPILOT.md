@@ -48,15 +48,16 @@ continuously after any upgrade:
 
 ## Commands
 
-| Task                                  | Command                                                                              |
-| ------------------------------------- | ------------------------------------------------------------------------------------ |
-| Live status (roadmap/milestone/runs)  | `pnpm autopilot:status`                                                              |
-| Supervisor self-test (hermetic)       | `pnpm autopilot:selftest`                                                            |
-| Deterministic package gate            | `pnpm foresift:gate -- --package <id>`                                               |
-| Service status                        | `systemctl --user status foresift-autopilot archon-dashboard`                        |
-| Supervisor logs                       | `journalctl --user -u foresift-autopilot.service -f`                                 |
-| Dashboard logs                        | `journalctl --user -u archon-dashboard.service -f`                                   |
-| Pause after fatal error is cleared by | `node scripts/automation/foresift-autopilot.mjs --clear-fatal` then restart the unit |
+| Task                                  | Command                                                                      |
+| ------------------------------------- | ---------------------------------------------------------------------------- |
+| Live status (roadmap/milestone/runs)  | `pnpm autopilot:status`                                                      |
+| Supervisor self-test (hermetic)       | `pnpm autopilot:selftest`                                                    |
+| Deterministic package gate            | `pnpm foresift:gate -- --package <id>`                                       |
+| Service status                        | `systemctl --user status foresift-autopilot archon-dashboard`                |
+| Supervisor logs                       | `journalctl --user -u foresift-autopilot.service -f`                         |
+| Dashboard logs                        | `journalctl --user -u archon-dashboard.service -f`                           |
+| Recover a PAUSED_FATAL pause          | stop unit → `pnpm autopilot:recover` → start unit (see Recovery policy)      |
+| Clear fatal WITHOUT a recoverable run | `node scripts/automation/foresift-autopilot.mjs --clear-fatal` (fail-closed) |
 
 `pnpm autopilot:status` reports, per tracked run: durable run id (or
 `discovering-run-id`), Archon status, current DAG node and loop iteration
@@ -110,18 +111,56 @@ mode — it owns nothing worth preserving across a restart.
 
 ## Recovery policy (automatic)
 
-- Transient failures (timeouts, 429/5xx, connection resets): up to 3
-  `archon workflow resume` attempts with exponential backoff.
+- Transient failures (timeouts, plain 429/5xx burst throttling, connection
+  resets): up to 3 `archon workflow resume` attempts with exponential backoff.
+- Daily/provider quota exhaustion (`QUOTA_DAILY` — e.g.
+  `free-models-per-day-stealth`, "daily quota", "quota exhausted", or a
+  provider-supplied reset timestamp): NEVER burns the transient budget. The run
+  enters a durable quota pause on its tracked entry and the supervisor probes
+  with widely spaced resumes: base 6 h, doubled per failed probe, capped at
+  24 h, at most 3 automatic probes; a provider reset time is honored when
+  present (clamped to [30 min, 48 h]). Probe-budget exhaustion escalates to an
+  operator-gated PAUSED_FATAL. Rationale: ADR 0005.
 - Unknown failures: 1 resume, then 1 fresh restart on the same branch/worktree.
-- Fatal failures (auth, quota): supervisor enters PAUSED_FATAL immediately and
-  stops issuing commands until an operator clears it.
-- Stale runs (>90 min without activity): abandoned via `archon workflow
-abandon`, then relaunched on the same branch. The supervisor never touches
-  Archon's database directly.
-- Unparsable activity timestamps: one-time diagnostic event; the run is kept
-  alive (never abandoned on bad data).
-- Undiscoverable launches (no run id after bounded discovery): PAUSED_FATAL —
-  fail closed, never a blind relaunch.
+- Fatal failures (auth, invalid workflow, credit balance): supervisor enters
+  PAUSED_FATAL immediately and stops issuing commands.
+- Every pause RETAINS its tracked run entry (marked `paused`) with the full
+  recovery identity — runId, packageId, workflow, branch, message. The
+  supervisor can never settle into `package=RUNNING ∧ activeRuns=[] ∧
+pausedFatal=null`: a tick-time invariant guard re-adopts any untracked live
+  Archon run of a RUNNING package, or converts it into a tracked fatal pause.
+
+## Operator recovery of a fatal pause
+
+```
+systemctl --user stop foresift-autopilot.service                # singleton lock
+node scripts/automation/foresift-autopilot.mjs --recover-fatal  # or: pnpm autopilot:recover
+systemctl --user start foresift-autopilot.service
+```
+
+`--recover-fatal [runId]` deterministically reconciles pausedFatal, run
+bookkeeping, package state, and Archon run identity: it verifies the paused
+run's lifecycle and the milestone package identity, refuses if a duplicate
+running workflow exists, resumes the SAME Archon run (failed/paused runs are
+resumable from completed nodes), and only when Archon refuses does it launch
+exactly ONE fresh continuation on the SAME branch/worktree (persisted work is
+rediscovered from disk/git). Tracking is restored under the same or new durable
+run id, the package stays/becomes RUNNING, and pausedFatal clears atomically —
+all verifications precede any mutation; refusals exit nonzero with state
+untouched. No JSON hand-editing.
+
+`--clear-fatal` remains for pauses with nothing recoverable (e.g. corrupt-state
+pauses after manual repair). It is fail-closed: it REFUSES (exit 1) when
+clearing would orphan a package that is status=RUNNING without a non-paused
+tracked run — use `--recover-fatal` instead.
+
+## Recovering from daily-quota backoff early
+
+A quota-paused package needs no operator action; the supervisor probes on its
+own schedule (visible in `pnpm autopilot:status` as `QUOTA BACKOFF … next
+automatic probe in Xm`). If you know the provider quota has renewed early,
+run the same stop → `--recover-fatal` → start sequence above to resume the same
+run immediately under authoritative tracking.
 
 ## Upgrade policy
 

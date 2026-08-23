@@ -12,6 +12,10 @@
 #   S8  undiscoverable launch fails closed (PAUSED_FATAL), never relaunched
 #   S9  corrupt/invalid implementation state fails closed before any launch
 #   S10 unparsable activity timestamps are diagnostics, never abandons
+#   S11 daily-quota 429 -> durable backoff WITHOUT burning the transient budget
+#   S12 quota probes are bounded (exponential hours-scale) -> operator-gated fatal pause
+#   S13 legacy stranded state (RUNNING, no tracked run) self-heals; live runs re-adopted
+#   S14 --recover-fatal: same-run resume; fail-closed --clear-fatal; single fresh continuation
 #
 # No network, no AI spend, no writes outside a mktemp sandbox, no access to the
 # real Archon database. Run via `pnpm autopilot:selftest`.
@@ -73,9 +77,9 @@ case "$cmd/$sub" in
       la="\"last_activity_at\":${ts},\"started_at\":${ts}"
     fi
     if [ -n "$er" ]; then
-      printf '{"runId":"%s","status":"%s",%s,"error":"%s"}\n' "$arg" "$st" "$la" "$er"
+      printf '{"id":"%s","status":"%s",%s,"error":"%s"}\n' "$arg" "$st" "$la" "$er"
     else
-      printf '{"runId":"%s","status":"%s",%s}\n' "$arg" "$st" "$la"
+      printf '{"id":"%s","status":"%s",%s}\n' "$arg" "$st" "$la"
     fi
     ;;
   workflow/runs)
@@ -101,7 +105,11 @@ case "$cmd/$sub" in
     ;;
   workflow/resume)
     echo "RESUME $arg" >>"$FAKE_LAUNCHES"
-    printf '{"ok":true,"runId":"%s"}\n' "$arg"
+    if [ "${RESUME_REFUSE:-}" = "1" ]; then
+      printf '{"ok":false,"error":"stub: run lifecycle refuses resume"}\n'
+    else
+      printf '{"ok":true,"runId":"%s"}\n' "$arg"
+    fi
     ;;
   workflow/abandon)
     echo "ABANDON $arg" >>"$FAKE_LAUNCHES"
@@ -282,10 +290,51 @@ assert_eq "no fresh relaunch ever happened" "$(launch_count)" "1"
 LOG_BEFORE="$(wc -l <"$FAKE_LOG")"
 tick
 assert_eq "paused supervisor stops issuing commands" "$(wc -l <"$FAKE_LOG")" "$LOG_BEFORE"
-node "$ROOT/scripts/automation/foresift-autopilot.mjs" --clear-fatal >/dev/null
-assert_eq "--clear-fatal releases the pause" \
-  "$(node -e 'const s=JSON.parse(require("fs").readFileSync(process.argv[1],"utf8"));console.log(String(s.pausedFatal===null||s.pausedFatal===undefined))' \
+
+# New contract: exhaustion retains the tracked entry + structured recovery identity.
+assert_match "exhaustion retains a TRACKED paused entry (identity survives)" "$(state)" '"paused": "fatal"'
+IDENTITY="$(node -e '
+const s = JSON.parse(require("fs").readFileSync(process.env.FORESIFT_AUTOPILOT_STATE_DIR + "/autopilot-state.json", "utf8"));
+const e = s.activeRuns.find((x) => x.paused === "fatal");
+console.log([e.runId, e.packageId, e.workflow, e.branch, e.message, String(e.done === undefined)].join(" "));
+')"
+assert_eq "paused entry carries full recovery identity, never done-filtered" \
+  "$IDENTITY" "run-1 t-alpha foresift-work-package foresift/t-alpha t-alpha true"
+PF_KEYS="$(node -e '
+const s = JSON.parse(require("fs").readFileSync(process.env.FORESIFT_AUTOPILOT_STATE_DIR + "/autopilot-state.json", "utf8"));
+console.log(Object.keys(s.pausedFatal).sort().join(","));
+')"
+for k in runId kind packageId workflow branch message; do
+  assert_match "pausedFatal carries structured identity: $k" "$PF_KEYS" "(^|,)$k(,|$)"
+done
+
+# --clear-fatal is fail-closed against orphaning the RUNNING package.
+CLEAR_ALLOWED=true
+node "$ROOT/scripts/automation/foresift-autopilot.mjs" --clear-fatal >/dev/null 2>&1 || CLEAR_ALLOWED=false
+assert_eq "--clear-fatal REFUSES to orphan a RUNNING package" "$CLEAR_ALLOWED" "false"
+assert_eq "refused clear leaves the fatal pause intact (fail-closed, no mutation)" \
+  "$(node -e 'const s=JSON.parse(require("fs").readFileSync(process.argv[1],"utf8"));console.log(String(Boolean(s.pausedFatal)))' \
     "$FORESIFT_AUTOPILOT_STATE_DIR/autopilot-state.json")" "true"
+
+# Supported operator recovery: resume the SAME run under authoritative tracking.
+RESUMES_BEFORE="$(resume_count)"
+node "$ROOT/scripts/automation/foresift-autopilot.mjs" --recover-fatal >/dev/null
+assert_eq "supported recovery resumes the SAME Archon run" "$(resume_count)" "$((RESUMES_BEFORE + 1))"
+assert_eq "recovery clears the fatal pause" \
+  "$(node -e 'const s=JSON.parse(require("fs").readFileSync(process.argv[1],"utf8"));console.log(String(s.pausedFatal===null))' \
+    "$FORESIFT_AUTOPILOT_STATE_DIR/autopilot-state.json")" "true"
+printf 'STATUS_run_1="running"\n' >>"$FAKE_SCENARIO"
+RECOVERED="$(node -e '
+const s = JSON.parse(require("fs").readFileSync(process.env.FORESIFT_AUTOPILOT_STATE_DIR + "/autopilot-state.json", "utf8"));
+const e = s.activeRuns.find((x) => !x.done);
+console.log([e.runId, e.paused ?? "live", e.packageId].join(" "));
+')"
+assert_eq "supervisor tracking restored for same package and run" "$RECOVERED" "run-1 live t-alpha"
+tick
+assert_eq "no duplicate launch after recovery" "$(launch_count)" "1"
+printf 'STATUS_run_1="completed"\nMERGED_HEAD="foresift/t-alpha"\n' >>"$FAKE_SCENARIO"
+tick
+assert_eq "recovered implementation completes persisted work to PROVEN" "$(pkg_field t-alpha status)" "PROVEN"
 
 # ── S3: fatal classification pauses immediately ───────────────────────────────
 echo "S3: fatal failure pauses immediately"
@@ -489,6 +538,147 @@ tick
 assert_eq "garbage timestamps do NOT abandon the run" "$(grep -c '^ABANDON' "$FAKE_LAUNCHES" 2>/dev/null || true)" "0"
 assert_match "one-time diagnostic recorded" "$(state)" 'run_activity_timestamp_unparsable'
 assert_eq "healthy run still tracked, not relaunched" "$(launch_count)" "1"
+
+# ── S11: daily-quota 429 → durable backoff, transient budget untouched ───────
+echo "S11: daily-quota failure enters durable supervisor-owned backoff"
+new_sandbox s11
+roadmap_fixture G0
+milestone_fixture "G0" \
+  "$(pkg_json q-alpha "" HIGH true)" \
+  "$(pkg_json q-beta "" MEDIUM true)"
+tick
+cat >"$FAKE_SCENARIO" <<'SCEN'
+STATUS_run_1="failed"
+ERR_run_1="Claude API error (rate_limit): API Error: Request rejected (429) · Rate limit exceeded: free-models-per-day-stealth."
+SCEN
+tick
+assert_match "quota failure recorded as durable backoff (not a resume)" "$(state)" 'quota_pause_scheduled'
+assert_eq "ordinary transient budget untouched (zero resumes)" "$(resume_count)" "0"
+assert_eq "no PAUSED_FATAL for plain quota exhaustion (tracked pause instead)" \
+  "$(node -e 'const s=JSON.parse(require("fs").readFileSync(process.argv[1],"utf8"));console.log(String(!s.pausedFatal))' \
+    "$FORESIFT_AUTOPILOT_STATE_DIR/autopilot-state.json")" "true"
+IN_HOURS="$(node -e '
+const s = JSON.parse(require("fs").readFileSync(process.env.FORESIFT_AUTOPILOT_STATE_DIR + "/autopilot-state.json", "utf8"));
+console.log(Math.round((s.activeRuns[0].quotaNextProbeAt - Date.now()) / 3600000));
+')"
+assert_eq "first automatic probe scheduled ~6h out, not minutes" "$IN_HOURS" "6"
+LOG_BEFORE="$(wc -l <"$FAKE_LOG")"
+tick
+assert_eq "idle quota pause issues zero commands (no busy-loop)" "$(wc -l <"$FAKE_LOG")" "$LOG_BEFORE"
+STATUS_OUT="$(node "$ROOT/scripts/automation/foresift-autopilot.mjs" --status)"
+assert_match "--status shows the quota backoff with probe budget" "$STATUS_OUT" "QUOTA BACKOFF"
+
+# ── S12: quota probes are bounded; exhaustion escalates to operator-gated fatal ──
+echo "S12: bounded quota probes -> operator-gated PAUSED_FATAL with identity preserved"
+ff_quota() { # pull probe schedule + in-flight window into the past
+  node -e '
+const fs = require("fs");
+const f = process.env.FORESIFT_AUTOPILOT_STATE_DIR + "/autopilot-state.json";
+const st = JSON.parse(fs.readFileSync(f, "utf8"));
+for (const e of [...(st.activeRuns ?? []), ...(st.milestoneRuns ?? [])]) {
+  if (e.quotaNextProbeAt) e.quotaNextProbeAt = Date.now() - 1000;
+  if (e.quotaProbeStartedAt) e.quotaProbeStartedAt = Date.now() - 16 * 60_000;
+}
+fs.writeFileSync(f, JSON.stringify(st, null, 2));
+'
+}
+new_sandbox s12
+roadmap_fixture G0
+milestone_fixture "G0" \
+  "$(pkg_json b-alpha "" HIGH true)" \
+  "$(pkg_json b-beta "" MEDIUM true)"
+tick
+cat >"$FAKE_SCENARIO" <<'SCEN'
+STATUS_run_1="failed"
+ERR_run_1="Rate limit exceeded: free-models-per-day quota exhausted."
+SCEN
+tick # enter quota pause (probes=0)
+for _ in 1 2 3; do
+  ff_quota; tick # due probe resumes the run
+  ff_quota; tick # run re-fails the daily wall -> re-pause with doubled interval
+done
+assert_eq "exactly QUOTA_PROBE_LIMIT automatic probes issued" "$(resume_count)" "3"
+assert_eq "no fresh relaunches against the quota wall" "$(launch_count)" "1"
+ff_quota; tick # one more due probe -> budget exhausted
+assert_match "probe-budget exhaustion escalates to operator-gated pause" "$(state)" 'daily-quota probe budget'
+assert_eq "escalated entry stays TRACKED with branch identity for --recover-fatal" \
+  "$(node -e '
+const s = JSON.parse(require("fs").readFileSync(process.env.FORESIFT_AUTOPILOT_STATE_DIR + "/autopilot-state.json", "utf8"));
+const e = s.activeRuns.find((x) => !x.done);
+console.log([String(Boolean(s.pausedFatal)), e.paused, e.branch, String(e.done === undefined)].join(" "));
+')" "true fatal foresift/b-alpha true"
+
+# ── S13: legacy stranded state self-heals; live untracked runs are adopted ────
+echo "S13: RUNNING-without-tracking can never survive a tick (invariant guard)"
+new_sandbox s13
+roadmap_fixture G0
+milestone_fixture "G0" \
+  "$(pkg_json s-alpha "" HIGH true)" \
+  "$(pkg_json s-beta "" MEDIUM true)"
+node -e '
+const fs = require("fs");
+const f = process.env.FORESIFT_AUTOPILOT_REPO + "/specs/implementation/current-milestone.json";
+const ms = JSON.parse(fs.readFileSync(f, "utf8"));
+ms.packages[0].status = "RUNNING";
+fs.writeFileSync(f, JSON.stringify(ms, null, 2));
+fs.writeFileSync(process.env.FORESIFT_AUTOPILOT_STATE_DIR + "/autopilot-state.json",
+  JSON.stringify({ activeRuns: [], milestoneRuns: [], pausedFatal: null, history: [] }, null, 2));
+' # exact defect state produced by the pre-fix supervisor: RUNNING ∧ activeRuns=[] ∧ pausedFatal=null
+tick
+assert_match "stranded package converted to TRACKED fatal pause" "$(state)" 'was RUNNING with no supervisor-tracked active run'
+assert_eq "healing launches nothing (never a duplicate product run)" "$(launch_count)" "0"
+
+new_sandbox s13b
+roadmap_fixture G0
+milestone_fixture "G0" \
+  "$(pkg_json u2-alpha "" HIGH true)" \
+  "$(pkg_json u2-beta "" MEDIUM true)"
+printf 'DEFAULT_STATUS="running"\n' >"$FAKE_SCENARIO"
+printf 'LAUNCH rid=run-5 workflow=foresift-work-package branch=foresift/u2-alpha msg=u2-alpha\n' >>"$FAKE_LAUNCHES"
+node -e '
+const fs = require("fs");
+const f = process.env.FORESIFT_AUTOPILOT_REPO + "/specs/implementation/current-milestone.json";
+const ms = JSON.parse(fs.readFileSync(f, "utf8"));
+ms.packages[0].status = "RUNNING";
+fs.writeFileSync(f, JSON.stringify(ms, null, 2));
+fs.writeFileSync(process.env.FORESIFT_AUTOPILOT_STATE_DIR + "/autopilot-state.json",
+  JSON.stringify({ activeRuns: [], milestoneRuns: [], pausedFatal: null, history: [] }, null, 2));
+'
+LAUNCHES_BEFORE="$(launch_count)"
+tick
+assert_eq "live Archon run of an untracked RUNNING package is RE-ADOPTED" \
+  "$(node -e '
+const s = JSON.parse(require("fs").readFileSync(process.env.FORESIFT_AUTOPILOT_STATE_DIR + "/autopilot-state.json", "utf8"));
+console.log([s.activeRuns[0]?.runId, String(!s.pausedFatal)].join(" "));
+')" "run-5 true"
+assert_eq "adoption issues no new launch" "$(launch_count)" "$LAUNCHES_BEFORE"
+
+# ── S14: recovery falls back to exactly ONE fresh continuation when resume refused ──
+echo "S14: refused resume -> single fresh continuation on the SAME branch/worktree"
+new_sandbox s14
+roadmap_fixture G0
+milestone_fixture "G0" \
+  "$(pkg_json z-alpha "" HIGH true)" \
+  "$(pkg_json z-beta "" MEDIUM true)"
+tick
+cat >"$FAKE_SCENARIO" <<'SCEN'
+STATUS_run_1="failed"
+ERR_run_1="authentication failed: 401 Unauthorized"
+RESUME_REFUSE="1"
+SCEN
+tick # FATAL class -> immediate operator-gated pause
+LAUNCHES_BEFORE="$(launch_count)"
+node "$ROOT/scripts/automation/foresift-autopilot.mjs" --recover-fatal >/dev/null
+assert_eq "refused resume triggers exactly ONE fresh continuation" "$(launch_count)" "$((LAUNCHES_BEFORE + 1))"
+assert_match "fresh continuation targets the SAME branch" "$(grep '^LAUNCH.*run-2' "$FAKE_LAUNCHES")" "branch=foresift/z-alpha"
+RECOVERED="$(node -e '
+const s = JSON.parse(require("fs").readFileSync(process.env.FORESIFT_AUTOPILOT_STATE_DIR + "/autopilot-state.json", "utf8"));
+const e = s.activeRuns.find((x) => !x.done);
+console.log([e.runId, String(!e.paused), String(!s.pausedFatal)].join(" "));
+')"
+assert_eq "supervisor tracks the fresh continuation authoritatively" "$RECOVERED" "run-2 true true"
+tick
+assert_eq "post-recovery tick is stable (no duplicate launch)" "$(launch_count)" "2"
 
 echo
 echo "selftest result: PASS=$PASS FAIL=$FAIL"

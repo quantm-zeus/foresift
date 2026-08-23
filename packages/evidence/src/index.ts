@@ -4,3 +4,5 @@
 // and tests require zero root-config edits (see specs/g0-contracts-data-truth
 // tasks T001–T003).
 export * from './counts.ts';
+export * from './evidence-index.ts';
+export * from './replay.ts';

@@ -161,17 +161,17 @@ exist for every acceptance criterion listed in spec.md §3.
 
 ## Phase 7 — Object store + evidence index
 
-- [ ] T038 `packages/object-store/src/adapter.ts` + `local.ts`: ObjectStoreAdapter
+- [x] T038 `packages/object-store/src/adapter.ts` + `local.ts`: ObjectStoreAdapter
       interface (content-addressed, rights-aware metadata, encryption status, retention,
       versioning); filesystem implementation for dev/test. Traces: FR-DR-002, FR-DATA-002.
-- [ ] T039 Staged cross-store commit protocol PENDING_UPLOAD → STORED_HASH_VERIFIED
+- [x] T039 Staged cross-store commit protocol PENDING_UPLOAD → STORED_HASH_VERIFIED
       → INDEX_COMMITTED → AVAILABLE with reconciler job for orphan uploads/hash mismatch;
       decision-critical evidence cannot become AVAILABLE until both sides verified.
       Traces: FR-DR-002, FR-DATA-003.
-- [ ] T040 `packages/evidence/src/evidence-index.ts` + `replay.ts`: frozen evidence
+- [x] T040 `packages/evidence/src/evidence-index.ts` + `replay.ts`: frozen evidence
       bundle manifests, replay-boundary resolver over bundles + observations sharing the
       same predicate as repos/replay. Traces: FR-DATA-003, FR-DATA-002.
-- [ ] T041 Negative tests: tampered object hash, rights-metadata-mismatched dedup
+- [x] T041 Negative tests: tampered object hash, rights-metadata-mismatched dedup
       attempt, orphan upload, retention drift → explicit failures, no silent repair.
       Traces: FR-DR-002, FR-DATA-002.
 

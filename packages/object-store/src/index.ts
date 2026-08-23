@@ -3,4 +3,7 @@
 // extends ../../tsconfig.base.json and globs src/** + test/**, so new modules
 // and tests require zero root-config edits (see specs/g0-contracts-data-truth
 // tasks T001–T003).
-export {};
+export * from './adapter.ts';
+export * from './local.ts';
+export * from './artifact-index.ts';
+export * from './staged-commit.ts';

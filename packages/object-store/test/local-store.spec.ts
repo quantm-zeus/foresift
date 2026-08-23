@@ -1,0 +1,131 @@
+/**
+ * LocalFilesystemObjectStore (T038): content addressing, protection-metadata
+ * dedup identity, immutability, and tamper detection (FR-DR-002, FR-DATA-002,
+ * §14.5/§14.7). Negative paths fail explicitly — no silent repair.
+ */
+import { mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import path from 'node:path';
+import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import {
+  dedupIdentityOf,
+  LocalFilesystemObjectStore,
+  type ObjectProtectionMetadata,
+} from '../src/index.ts';
+
+let root: string;
+let store: LocalFilesystemObjectStore;
+
+const META: ObjectProtectionMetadata = {
+  contentType: 'application/json',
+  compression: 'NONE',
+  encryptionStatus: 'SERVER_SIDE_AES256',
+  rightsRef: 'license:provider-x-terms',
+  retentionClass: 'RAW_PROVIDER_PAYLOAD_7D',
+};
+
+beforeAll(async () => {
+  root = await mkdtemp(path.join(tmpdir(), 'foresift-objectstore-'));
+  store = new LocalFilesystemObjectStore(root);
+}, 60_000);
+
+afterAll(async () => {
+  await rm(root, { recursive: true, force: true });
+}, 30_000);
+
+describe('content addressing and dedup identity (T038)', () => {
+  it('stores bytes content-addressed and reads them back byte-exact', async () => {
+    const bytes = new TextEncoder().encode('{"payload":"hello"}');
+    const stored = await store.put({ artifactId: 'art-1', bytes, metadata: META });
+    expect(stored.contentHash).toMatch(/^sha256:[0-9a-f]{64}$/);
+    expect(stored.version).toBe(1);
+
+    const read = await store.get({ contentHash: stored.contentHash });
+    expect(read).not.toBeNull();
+    expect(new TextDecoder().decode(read!.bytes)).toBe('{"payload":"hello"}');
+    expect(read!.stored.metadata.rightsRef).toBe(META.rightsRef);
+  });
+
+  it('dedups identical bytes under identical protected metadata', async () => {
+    const bytes = new TextEncoder().encode('dedup-me');
+    const first = await store.put({ artifactId: 'art-2', bytes, metadata: META });
+    const again = await store.put({ artifactId: 'art-2b', bytes, metadata: META });
+    expect(again.contentHash).toBe(first.contentHash);
+    expect(again.version).toBe(first.version);
+  });
+
+  it('never merges identical bytes that differ in rights/tenant/encryption/retention', async () => {
+    const bytes = new TextEncoder().encode('same-bytes-different-protection');
+    const restricted = await store.put({
+      artifactId: 'art-3',
+      bytes,
+      metadata: { ...META, rightsRef: 'license:restricted-a' },
+    });
+    const open = await store.put({
+      artifactId: 'art-4',
+      bytes,
+      metadata: { ...META, rightsRef: null },
+    });
+    expect(open.contentHash).toBe(restricted.contentHash); // same content address…
+    expect(open.version).toBe(restricted.version + 1); // …but a DISTINCT object
+
+    const byMetadata = await store.get({
+      contentHash: restricted.contentHash,
+      metadata: restricted.metadata,
+    });
+    expect(byMetadata!.stored.metadata.rightsRef).toBe('license:restricted-a');
+    // Protection metadata is part of the identity, not decoration.
+    expect(dedupIdentityOf(restricted.metadata)).not.toEqual(dedupIdentityOf(open.metadata));
+  });
+
+  it('lists all versions of one content-hash identity in order', async () => {
+    const bytes = new TextEncoder().encode('versioned');
+    const v1 = await store.put({ artifactId: 'art-5', bytes, metadata: META });
+    const v2 = await store.put({
+      artifactId: 'art-6',
+      bytes,
+      metadata: { ...META, retentionClass: 'FROZEN_ALERT_EVIDENCE_24MO' },
+    });
+    const versions = await store.versions(v1.contentHash);
+    expect(versions.map((v) => v.version)).toEqual([v1.version, v2.version]);
+    expect(v2.version).toBeGreaterThan(v1.version);
+  });
+});
+
+describe('tamper detection fails explicitly (T041)', () => {
+  it('reports VERIFIED when bytes match and MISSING when absent', async () => {
+    const bytes = new TextEncoder().encode('verify-target');
+    const stored = await store.put({ artifactId: 'art-7', bytes, metadata: META });
+    expect((await store.verify({ contentHash: stored.contentHash })).outcome).toBe('VERIFIED');
+    expect((await store.verify({ contentHash: 'sha256:' + '0'.repeat(64) })).outcome).toBe(
+      'MISSING',
+    );
+  });
+
+  it('reports HASH_MISMATCH when stored bytes are tampered on disk', async () => {
+    const bytes = new TextEncoder().encode('untampered-original');
+    const stored = await store.put({ artifactId: 'art-8', bytes, metadata: META });
+    const hex = stored.contentHash.slice('sha256:'.length);
+    const blobPath = path.join(root, 'objects', hex.slice(0, 2), hex, `v${stored.version}.blob`);
+    await writeFile(blobPath, new TextEncoder().encode('tampered!!!'));
+    const verdict = await store.verify({ contentHash: stored.contentHash });
+    expect(verdict.outcome).toBe('HASH_MISMATCH');
+    if (verdict.outcome === 'HASH_MISMATCH') {
+      expect(verdict.expected).toBe(stored.contentHash);
+      expect(verdict.actual).not.toBe(stored.contentHash);
+    }
+  });
+
+  it('refuses to overwrite an existing immutable blob slot', async () => {
+    // Corrupt the meta sidecar away so dedup misses, then re-put the SAME
+    // bytes: the next version slot must refuse to clobber what exists.
+    const bytes = new TextEncoder().encode('immutable-slot');
+    const stored = await store.put({ artifactId: 'art-9', bytes, metadata: META });
+    const hex = stored.contentHash.slice('sha256:'.length);
+    const dir = path.join(root, 'objects', hex.slice(0, 2), hex);
+    await rm(path.join(dir, `v${stored.version}.meta.json`));
+    await expect(
+      store.put({ artifactId: 'art-9-retry', bytes, metadata: META }),
+    ).rejects.toThrowError(/immutable/);
+  });
+});

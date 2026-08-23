@@ -233,7 +233,7 @@ exist for every acceptance criterion listed in spec.md §3.
 - [x] T057 AC-248 pair + AC-249 pair: immutable matured-count projections reported
       honestly below thresholds; availability-backdating placebo leaves replay unchanged.
       Traces: FR-DATA-003, FR-DATA-004.
-- [ ] T058 AC-060 pair: persistence benchmark fixtures (identity lookup, replay read)
+- [x] T058 AC-060 pair: persistence benchmark fixtures (identity lookup, replay read)
       with budget assertions; harness fails under artificial over-budget delay. Traces:
       FR-DATA-001, FR-DATA-003, FR-DR-001 (internal-overhead benchmark substrate of
       AC-060 per spec §3.2).

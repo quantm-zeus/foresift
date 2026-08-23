@@ -5,16 +5,18 @@
  * (ADR-0006); production remains real PostgreSQL per product ADR-001.
  */
 import path from 'node:path';
+import { performance } from 'node:perf_hooks';
 import { fileURLToPath } from 'node:url';
 import { expect } from 'vitest';
 import { PGlite } from '@electric-sql/pglite';
-import { parseChainId } from '@foresift/domain';
+import { parseChainId, utcTimestamp, type UtcTimestamp } from '@foresift/domain';
 import {
   applyMigrations,
   createEngine,
   ensureChain,
   insertDex,
   insertPool,
+  replayObservations,
   type DatabaseEngine,
 } from '@foresift/persistence';
 
@@ -74,4 +76,64 @@ export async function expectForesiftError(promise: Promise<unknown>, code: strin
     return;
   }
   throw new Error(`expected rejection with ForesiftError ${code}, but the call resolved`);
+}
+
+// --- AC-060 benchmark substrate (T058) ---------------------------------------
+
+/** Generous in-process budgets: CI machines vary; regressions show up as 10x+ deltas. */
+export const IDENTITY_LOOKUP_BUDGET_MS = 250;
+export const REPLAY_READ_BUDGET_MS = 500;
+export const BENCHMARK_ITERATIONS = 20;
+
+export interface BenchmarkResult {
+  readonly iterations: number;
+  /** Worst observed wall-clock duration in ms. */
+  readonly worstMs: number;
+  readonly withinBudget: boolean;
+}
+
+export interface BenchmarkOutcome {
+  readonly identity: BenchmarkResult;
+  readonly replay: BenchmarkResult;
+}
+
+/**
+ * Run the AC-060 fixture benchmark over the two persistence hot paths this
+ * package owns — identity lookup (chain→dex→pool through the repo seam) and a
+ * full replay read at a fixed boundary — and report budget verdicts.
+ */
+export async function runPersistenceBenchmark(
+  engine: DatabaseEngine,
+  input: { chainId: string; dexId: string; poolAddress: string },
+): Promise<BenchmarkOutcome> {
+  const replayAt: UtcTimestamp = utcTimestamp('2026-06-01T10:00:00Z');
+  const identityTimes: number[] = [];
+  const replayTimes: number[] = [];
+
+  for (let i = 0; i < BENCHMARK_ITERATIONS; i += 1) {
+    const idStart = performance.now();
+    await ensureChain(engine, input.chainId);
+    await insertDex(engine, input.chainId, input.dexId);
+    await insertPool(engine, {
+      chainId: parseChainId(input.chainId),
+      dexId: input.dexId,
+      poolAddress: input.poolAddress,
+    });
+    identityTimes.push(performance.now() - idStart);
+
+    const replayStart = performance.now();
+    const resolved = await replayObservations(engine, replayAt);
+    if (resolved.length === 0) throw new Error('benchmark workload must resolve observations');
+    replayTimes.push(performance.now() - replayStart);
+  }
+
+  const result = (times: number[], budget: number): BenchmarkResult => ({
+    iterations: times.length,
+    worstMs: Math.max(...times),
+    withinBudget: Math.max(...times) <= budget,
+  });
+  return {
+    identity: result(identityTimes, IDENTITY_LOOKUP_BUDGET_MS),
+    replay: result(replayTimes, REPLAY_READ_BUDGET_MS),
+  };
 }

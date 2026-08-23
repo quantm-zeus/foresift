@@ -19,9 +19,11 @@ This lane replaces manual `gh` choreography with two deterministic tools
 pnpm wp:full-gate --check --package $ARGUMENTS --artifacts-dir "$ARTIFACTS_DIR"
 ```
 
-- exit 0 → a prior FULL run already passed at EXACTLY this identity (head,
-  lock, authorities, gate code, toolchain). Reuse it; do not re-run.
-- exit 1 → no reusable evidence. Run the gate:
+- exit 0 (the NORMAL case in this lane): the gate phase already ran the FULL
+  gate at exactly this head and wrote its attestation — reuse it; do NOT
+  re-run. A clean package executes exactly ONE local FULL gate end-to-end.
+- exit 1 → no reusable evidence (review/convergence changed the tree without
+  refreshing it). Run the gate:
   `pnpm wp:full-gate --run --package $ARGUMENTS --artifacts-dir "$ARTIFACTS_DIR"`
   Red ⇒ fix forward ONLY if trivial (typos, formatting); otherwise push
   corrections and re-run. If still red after bounded repair, end your reply

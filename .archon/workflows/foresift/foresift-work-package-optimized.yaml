@@ -3,10 +3,26 @@ description: |
   OPTIMIZED-profile variant of foresift-work-package (ADR 0006/0007): the SAME
   proven DAG topology with the implement and ci-merge command bodies swapped for
   the throughput lane — bounded slices, durable implementation checkpoints,
-  FAST verification between slices, FULL-gate attestation reuse, and
-  deterministic mechanical landing. The supervisor selects this workflow ONLY
-  for packages where throughputProfile() == OPTIMIZED (every package EXCEPT
-  g0-contracts-data-truth, which keeps the original DAG byte-for-byte forever).
+  FAST verification between slices, ONE exact-head FULL gate whose attestation
+  is reused everywhere, structured gate manifests driving TARGETED repair, a
+  deterministic convergence router, and mechanical landing. The supervisor
+  selects this workflow ONLY for packages where throughputProfile() == OPTIMIZED
+  (every package EXCEPT g0-contracts-data-truth, which keeps the original DAG
+  byte-for-byte forever).
+
+  V2 second-pass evidence flow (task spec §8–§12):
+    - the initial FULL gate runs ONCE (wp:full-gate --run) and writes BOTH a
+      structured per-check manifest (full-gate-result.json) AND — only on PASS —
+      an exact-head attestation (full-gate-attestation.json);
+    - every later verification point (--check) reuses that attestation while
+      the identity (head, lock, authorities, gate code, toolchain) is
+      unchanged, so a clean package executes exactly ONE local FULL gate;
+    - failed gates are repaired against the structured manifest with TARGETED
+      re-verification between edits; the FULL gate re-runs only once the
+      targeted checks are green (or evidence was unusable ⇒ escalation);
+    - review outcomes are collected deterministically from GitHub's own review
+      state (review-verdict.json); a convergence router decides — fail-closed —
+      whether the convergence stage must run at all.
 
   Foresift autonomous implementation of exactly ONE work package from the current
   milestone (specs/implementation/current-milestone.json). Invoke as:
@@ -142,12 +158,14 @@ nodes:
               > "$ARTIFACTS_DIR/implement-completeness.json" 2>&1
             echo "IMPL_RECHECK_EXIT=$?"
 
-  # ── PHASE 3: DETERMINISTIC PACKAGE GATE + BOUNDED REPAIR LOOP ────────────────
-  # The gate is the authority (AI is never the authority). The captured,
-  # non-failing router records pass/fail once; only a FAILED gate opens the
-  # bounded repair loop, whose body repairs and RE-RUNS the gate — so a
-  # completed implementation stage can always be repaired until the gate passes
-  # (or repair iterations exhaust and recovery escalates).
+  # ── PHASE 3: DETERMINISTIC PACKAGE GATE + BOUNDED TARGETED REPAIR LOOP ──────
+  # The gate is the authority (AI is never the authority). This node runs the
+  # FULL gate via wp:full-gate (attestation runner): on PASS it writes the
+  # exact-head attestation reused by every downstream verification point; on
+  # FAIL it writes NO attestation plus a structured per-check manifest. Only a
+  # FAILED gate opens the bounded repair loop, whose body repairs against the
+  # manifest, re-verifies TARGETED (not full), and runs the FULL gate once more
+  # only when targeted evidence is green or unusable.
   - id: gate-router
     depends_on: [implement]
     trigger_rule: one_success   # implement may legitimately be skipped (already complete)
@@ -155,7 +173,14 @@ nodes:
     bash: |
       set +e
       mkdir -p "$ARTIFACTS_DIR"
-      pnpm foresift:gate --package "$ARGUMENTS" >"$ARTIFACTS_DIR/gate-log.txt" 2>&1
+      if node scripts/automation/package-full-gate.mjs --check --package "$ARGUMENTS" \
+           --artifacts-dir "$ARTIFACTS_DIR" >/dev/null 2>&1; then
+        printf '{"passed":true,"exitCode":0,"attestationReuse":true}\n' >"$ARTIFACTS_DIR/gate-result.json"
+        echo "GATE_PASSED_ATTESTATION_REUSE"
+        exit 0
+      fi
+      node scripts/automation/package-full-gate.mjs --run --package "$ARGUMENTS" \
+        --artifacts-dir "$ARTIFACTS_DIR" >"$ARTIFACTS_DIR/gate-log.txt" 2>&1
       code=$?
       if [ "$code" -eq 0 ]; then
         printf '{"passed":true,"exitCode":0}\n' >"$ARTIFACTS_DIR/gate-result.json"
@@ -186,20 +211,50 @@ nodes:
           command: foresift-wp-gate-repair
           effort: high
           idle_timeout: 1800000
-        - id: gate-rerun
-          depends_on: [gate-repair]   # serialize: rerun must observe post-repair state (feeds until_bash)
+        - id: repair-targeted-recheck
+          depends_on: [gate-repair]   # serialize: recheck must observe post-repair state
           bash: |
             set +e
-            pnpm foresift:gate --package "$ARGUMENTS" >"$ARTIFACTS_DIR/gate-log.txt" 2>&1
+            node scripts/automation/package-targeted-verify.mjs \
+              --manifest "$ARTIFACTS_DIR/full-gate-result.json" \
+              --gate-log "$ARTIFACTS_DIR/gate-log.txt" \
+              --artifacts-dir "$ARTIFACTS_DIR" \
+              >"$ARTIFACTS_DIR/targeted-recheck-log.txt" 2>&1
+            code=$?
+            if [ "$code" -eq 0 ]; then echo "TARGETED_GREEN";
+            elif [ "$code" -eq 3 ]; then echo "TARGETED_ESCALATED";
+            else echo "TARGETED_RED"; fi
+            exit 0   # verdict recorded in targeted-verify-result.json; routing stays in-workflow
+        - id: repair-final-full
+          depends_on: [repair-targeted-recheck]
+          timeout: 1800000
+          bash: |
+            set +e
+            # Route on the PERSISTED targeted verdict (no sibling-output reads in bash).
+            mode=$(node -e 'try{console.log(JSON.parse(require("fs").readFileSync(process.argv[1],"utf8")).mode||"?")}catch{console.log("?")}' "$ARTIFACTS_DIR/targeted-verify-result.json")
+            green=$(node -e 'try{console.log(JSON.parse(require("fs").readFileSync(process.argv[1],"utf8")).allGreen===true?"yes":"no")}catch{console.log("no")}' "$ARTIFACTS_DIR/targeted-verify-result.json")
+            if [ "$mode" = "TARGETED" ] && [ "$green" != "yes" ]; then
+              echo "SKIP_TARGETED_RED"   # still red ⇒ next repair iteration; no FULL spend
+              exit 0
+            fi
+            # Targeted green OR escalated evidence ⇒ establish exact-head FULL evidence,
+            # reusing a still-valid attestation instead of re-executing the gate.
+            if node scripts/automation/package-full-gate.mjs --check --package "$ARGUMENTS" \
+                 --artifacts-dir "$ARTIFACTS_DIR" >/dev/null 2>&1; then
+              printf '{"passed":true,"exitCode":0,"attestationReuse":true}\n' >"$ARTIFACTS_DIR/gate-result.json"
+              echo "ATTESTATION_REUSE"
+              exit 0
+            fi
+            node scripts/automation/package-full-gate.mjs --run --package "$ARGUMENTS" \
+              --artifacts-dir "$ARTIFACTS_DIR" >"$ARTIFACTS_DIR/gate-log.txt" 2>&1
             code=$?
             if [ "$code" -eq 0 ]; then
               printf '{"passed":true,"exitCode":0}\n' >"$ARTIFACTS_DIR/gate-result.json"
-              echo "GATE_PASSED"
+              echo "FINAL_FULL_PASSED"
             else
               printf '{"passed":false,"exitCode":%d}\n' "$code" >"$ARTIFACTS_DIR/gate-result.json"
-              echo "GATE_FAILED"
+              echo "FINAL_FULL_FAILED"
             fi
-          timeout: 1800000
 
   # ── PHASE 4: PULL REQUEST ──────────────────────────────────────────────────
   - id: create-pr
@@ -212,19 +267,64 @@ nodes:
   # Bundled 9-node review sub-DAG: verify-pr-base -> scope -> sync ->
   # 5 parallel fresh-context review agents -> synthesize (posts PR comment) ->
   # implement CRITICAL/HIGH fixes. Not reimplemented here.
+  # A deterministic HEAD snapshot BEFORE the block and a structured GitHub-
+  # state collection AFTER it give the convergence router machine-checkable
+  # evidence of what review did to the tree (V2 task spec §11).
+  - id: pre-review-snapshot
+    depends_on: [create-pr]
+    bash: |
+      set -euo pipefail
+      mkdir -p "$ARTIFACTS_DIR"
+      HEAD_SHA=$(git rev-parse HEAD)
+      printf '{"headSha":"%s"}\n' "$HEAD_SHA" > "$ARTIFACTS_DIR/.review-head-snapshot.json"
+      echo "REVIEW_HEAD_SNAPSHOT=$HEAD_SHA"
+
   - id: review
     include: archon-review-block
-    depends_on: [create-pr]
+    depends_on: [pre-review-snapshot]
 
-  # ── PHASE 6: SPEC KIT CONVERGENCE LOOP (bounded, fresh contexts) ───────────
-  # Each iteration: converge against spec/plan/tasks -> deterministic gate
-  # (captured, non-failing) -> independent judge. Same-iteration prompt refs
-  # ($converge.output / $gate-iter.output) are verified Archon v0.9.0 behavior.
-  # The judge may only signal CONVERGED when the gate reported success AND no
-  # required work remains. Hard limit of 4 iterations. The authoritative check
-  # is re-run deterministically by the final phase regardless.
-  - id: convergence
+  - id: review-outcome
     depends_on: [review]
+    bash: |
+      set +e
+      mkdir -p "$ARTIFACTS_DIR"
+      # The collector NEVER fails this node: any missing/unknown input becomes
+      # verdict.valid=false, which routes CONVERGENCE_REQUIRED downstream.
+      node scripts/automation/review-outcome-collector.mjs \
+        --artifacts-dir "$ARTIFACTS_DIR" \
+        >"$ARTIFACTS_DIR/review-outcome-log.txt" 2>&1
+      echo "REVIEW_OUTCOME_COLLECTED"
+
+  # ── PHASE 6 ROUTER: deterministic convergence decision (fail-closed) ────────
+  # CONVERGENCE_NOT_REQUIRED requires ALL of: APPROVED review verdict, HEAD
+  # unchanged across the whole review window, an exact-head FULL-gate
+  # attestation matching the CURRENT identity, and implementation completeness.
+  # ANY missing/contradictory evidence ⇒ the convergence stage runs (today's
+  # always-run behavior), so this optimization can never skip required work.
+  - id: convergence-router
+    depends_on: [review-outcome]
+    bash: |
+      set +e
+      mkdir -p "$ARTIFACTS_DIR"
+      node scripts/automation/convergence-router.mjs --package "$ARGUMENTS" \
+        --artifacts-dir "$ARTIFACTS_DIR" >"$ARTIFACTS_DIR/router-log.txt" 2>&1
+      code=$?
+      if [ "$code" -eq 0 ]; then echo "CONVERGENCE_NOT_REQUIRED"; else echo "CONVERGENCE_REQUIRED"; fi
+
+  # ── PHASE 6: SPEC KIT CONVERGE LOOP (bounded, fresh contexts; routed) ──────
+  # Runs ONLY when the deterministic router says CONVERGENCE_REQUIRED. Each
+  # iteration: converge against spec/plan/tasks -> TARGETED re-verification of
+  # whatever the structured gate manifest flagged -> one exact-head FULL gate
+  # (reusing valid attestation evidence) -> independent judge over all three
+  # transcripts. Same-iteration prompt refs ($converge.output etc.) are
+  # verified Archon v0.9.0 behavior; bash nodes route on PERSISTED verdict
+  # files instead of sibling outputs. The judge may signal CONVERGED only when
+  # the FULL-gate evidence at the current head is green AND no required work
+  # remains. Hard limit of 4 iterations. The authoritative check is re-run
+  # deterministically by the final phase regardless.
+  - id: convergence
+    depends_on: [convergence-router]
+    when: "$convergence-router.output == 'CONVERGENCE_REQUIRED'"
     idle_timeout: 1800000
     loop_group:
       max_iterations: 4
@@ -235,13 +335,47 @@ nodes:
           command: foresift-wp-converge
           effort: high
           idle_timeout: 1800000
-        - id: gate-iter
+        - id: converge-targeted-recheck
+          depends_on: [converge]   # serialize: recheck must observe post-converge state
           bash: |
             set +e
-            pnpm foresift:gate --package "$ARGUMENTS"
-            echo "GATE_EXIT=$?"
-          depends_on: [converge]
+            node scripts/automation/package-targeted-verify.mjs \
+              --manifest "$ARTIFACTS_DIR/full-gate-result.json" \
+              --gate-log "$ARTIFACTS_DIR/gate-log.txt" \
+              --artifacts-dir "$ARTIFACTS_DIR" \
+              >"$ARTIFACTS_DIR/targeted-recheck-log.txt" 2>&1
+            code=$?
+            if [ "$code" -eq 0 ]; then echo "TARGETED_GREEN";
+            elif [ "$code" -eq 3 ]; then echo "TARGETED_ESCALATED";
+            else echo "TARGETED_RED"; fi
+            exit 0   # verdict recorded in targeted-verify-result.json
+        - id: converge-final-full
+          depends_on: [converge-targeted-recheck]
           timeout: 1800000
+          bash: |
+            set +e
+            mode=$(node -e 'try{console.log(JSON.parse(require("fs").readFileSync(process.argv[1],"utf8")).mode||"?")}catch{console.log("?")}' "$ARTIFACTS_DIR/targeted-verify-result.json")
+            green=$(node -e 'try{console.log(JSON.parse(require("fs").readFileSync(process.argv[1],"utf8")).allGreen===true?"yes":"no")}catch{console.log("no")}' "$ARTIFACTS_DIR/targeted-verify-result.json")
+            if [ "$mode" = "TARGETED" ] && [ "$green" != "yes" ]; then
+              echo "SKIP_TARGETED_RED"   # still red ⇒ next converge iteration; no FULL spend
+              exit 0
+            fi
+            if node scripts/automation/package-full-gate.mjs --check --package "$ARGUMENTS" \
+                 --artifacts-dir "$ARTIFACTS_DIR" >/dev/null 2>&1; then
+              printf '{"passed":true,"exitCode":0,"attestationReuse":true}\n' >"$ARTIFACTS_DIR/gate-result.json"
+              echo "ATTESTATION_REUSE"
+              exit 0
+            fi
+            node scripts/automation/package-full-gate.mjs --run --package "$ARGUMENTS" \
+              --artifacts-dir "$ARTIFACTS_DIR" >"$ARTIFACTS_DIR/gate-log.txt" 2>&1
+            code=$?
+            if [ "$code" -eq 0 ]; then
+              printf '{"passed":true,"exitCode":0}\n' >"$ARTIFACTS_DIR/gate-result.json"
+              echo "FINAL_FULL_PASSED"
+            else
+              printf '{"passed":false,"exitCode":%d}\n' "$code" >"$ARTIFACTS_DIR/gate-result.json"
+              echo "FINAL_FULL_FAILED"
+            fi
         - id: judge
           prompt: |
             You are the independent convergence judge for Foresift work package
@@ -250,25 +384,32 @@ nodes:
             Convergence agent report (most recent iteration):
             $converge.output
 
-            Deterministic package gate transcript ("GATE_EXIT=0" means every
-            check passed; anything else is a failure):
-            $gate-iter.output
+            Targeted re-verification transcript after that report ("✅ TARGETED
+            VERIFICATION GREEN" means the failed checks now pass):
+            $converge-targeted-recheck.output
+
+            Final FULL-gate evidence at the current head. FINAL_FULL_PASSED or
+            ATTESTATION_REUSE means exact-head full verification holds;
+            SKIP_TARGETED_RED means verification is NOT yet established:
+            $converge-final-full.output
 
             Verify against specs/implementation/current-milestone.json (package
             "$ARGUMENTS"), its Spec Kit artifacts under specs/<package-id>/, and
             the actual code: every listed requirement implemented with tests, no
-            known missing acceptance criterion, and GATE_EXIT=0.
+            known missing acceptance criterion, AND exact-head FULL-gate
+            evidence green (FINAL_FULL_PASSED or ATTESTATION_REUSE).
 
             End your reply with EXACTLY one of:
-            <promise>CONVERGED</promise>   — only if the gate passed AND nothing required is missing
+            <promise>CONVERGED</promise>   — only if the FULL-gate evidence is green AND nothing required is missing
             <promise>NOT_CONVERGED</promise> — otherwise; precede it with a short list of what is missing
-          depends_on: [gate-iter]
+          depends_on: [converge-final-full]
           model: large
           allowed_tools: [Read, Glob, Grep]
 
   # ── PHASE 7: FINAL DETERMINISTIC GATE + EXACT-HEAD CI + MERGE ──────────────
   - id: ci-merge
     command: foresift-wp-ci-merge-optimized
-    depends_on: [convergence]
+    depends_on: [convergence-router, convergence]
+    trigger_rule: none_failed_min_one_success   # convergence stage may legitimately be skipped (router: NOT_REQUIRED)
     context: fresh
     idle_timeout: 1800000

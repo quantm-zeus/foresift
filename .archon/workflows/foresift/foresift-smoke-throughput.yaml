@@ -14,7 +14,13 @@ description: |
        commands (fail-closed direction);
     5. the V2 slice-finalization ORDER contract holds in-runtime: a checkpoint
        built LAST (after the tasks.md edit + commit) validates cleanly at the
-       next turn, while building BEFORE a tasks.md edit self-invalidates.
+       next turn, while building BEFORE a tasks.md edit self-invalidates;
+    6. TARGETED verification routes a single-category failure to exactly its
+       own check and escalates ambiguous evidence fail-closed (exit 3);
+    7. the convergence router fails closed to CONVERGENCE_REQUIRED on absent
+       evidence and skips ONLY when every condition provably holds;
+    8. a REAL red package gate writes a structured manifest that the targeted
+       executor consumes end-to-end (re-running the exact recorded command).
 
   Run after any change to the throughput control plane or any Archon upgrade:
 
@@ -170,3 +176,103 @@ nodes:
         exit 1
       fi
       echo "PROOF 5b OK: post-build tasks.md drift invalidates the stale cache."
+
+  # ── PROOF 6: TARGETED verification routes and escalates (V2 task spec §10) ──
+  # 6a: a single-category TYPECHECK failure plans EXACTLY `pnpm typecheck` and
+  #     the executor records a green verdict (exit 0).
+  # 6b: ambiguous evidence (two failed categories) escalates fail-closed with
+  #     exit 3 WITHOUT executing anything.
+  - id: targeted-verify-proof
+    depends_on: [finalize-order-proof]
+    bash: |
+      set -euo pipefail
+      S="${SMOKE_DIR:-/tmp/foresift-smoke-throughput}"
+      T="$S/targeted"; mkdir -p "$T/green" "$T/red"
+      node -e '
+        const fs=require("fs");
+        const m=(checks,extra={})=>JSON.stringify({schema:"foresift/full-gate-result@1",packageId:"p",passed:false,exitCode:1,failedCategories:[],checks,timestamp:new Date().toISOString(),...extra});
+        fs.writeFileSync(process.argv[1],m([{label:"TypeScript",category:"TYPECHECK",command:"pnpm typecheck",status:"FAIL"},{label:"tests",category:"TESTS",command:"pnpm test",status:"PASS"}]));
+        fs.writeFileSync(process.argv[2],m([{label:"lint",category:"LINT",command:"pnpm lint",status:"FAIL"},{label:"tests",category:"TESTS",command:"pnpm test",status:"FAIL"}]));
+      ' "$T/green/full-gate-result.json" "$T/red/full-gate-result.json"
+      node scripts/automation/package-targeted-verify.mjs \
+        --manifest "$T/green/full-gate-result.json" --artifacts-dir "$T/green" >/dev/null
+      node -e 'const r=JSON.parse(require("fs").readFileSync(process.argv[1],"utf8"));if(r.mode!=="TARGETED"||r.allGreen!==true||r.checks.length!==1||r.checks[0].command!=="pnpm typecheck")process.exit(1)' "$T/green/targeted-verify-result.json"
+      echo "PROOF 6a OK: single-category failure re-verified by exactly its own check."
+      set +e
+      node scripts/automation/package-targeted-verify.mjs \
+        --manifest "$T/red/full-gate-result.json" --artifacts-dir "$T/red" >/dev/null 2>&1
+      code=$?
+      set -e
+      if [ "$code" -ne 3 ]; then echo "FAIL: ambiguous evidence must escalate with exit 3; got $code"; exit 1; fi
+      node -e 'const r=JSON.parse(require("fs").readFileSync(process.argv[1],"utf8"));if(r.mode!=="ESCALATE_FULL"||r.checks.length!==0)process.exit(1)' "$T/red/targeted-verify-result.json"
+      echo "PROOF 6b OK: multi-category ambiguity escalates to the FULL gate without execution."
+
+  # ── PROOF 7: convergence router is fail-closed in BOTH directions ────────────
+  # 7a (CLI, real runtime): an artifacts dir with NO evidence ⇒ exit 1
+  #     CONVERGENCE_REQUIRED (skipping convergence can never happen by default).
+  # 7b (decision core): ALL conditions provably satisfied ⇒ CONVERGENCE_NOT_REQUIRED.
+  - id: convergence-router-proof
+    depends_on: [targeted-verify-proof]
+    bash: |
+      set -euo pipefail
+      S="${SMOKE_DIR:-/tmp/foresift-smoke-throughput}"
+      R="$S/router"; mkdir -p "$R/empty-evidence"
+      set +e
+      node scripts/automation/convergence-router.mjs --package g0-tool-core \
+        --artifacts-dir "$R/empty-evidence" >/dev/null 2>&1
+      code=$?
+      set -e
+      if [ "$code" -ne 1 ]; then echo "FAIL: missing evidence must yield REQUIRED (exit 1); got $code"; exit 1; fi
+      grep -q '"decision": "CONVERGENCE_REQUIRED"' "$R/empty-evidence/convergence-decision.json"
+      echo "PROOF 7a OK: router fails closed to CONVERGENCE_REQUIRED on absent evidence."
+      node -e '
+        import("./scripts/automation/convergence-router.mjs").then((m)=>{
+          const head="a".repeat(40);
+          const d=m.decideConvergence({
+            currentHead:head,
+            verdict:{valid:true,reviewDecision:"APPROVED",unresolvedThreads:0,headAtReviewStart:head,headAfterReview:head},
+            attestation:{present:true,drift:null},
+            completeness:{complete:true},
+          });
+          if(d.decision!=="CONVERGENCE_NOT_REQUIRED"||d.reasons.length!==0)process.exit(1);
+          const bad=m.decideConvergence({currentHead:head,verdict:{valid:true,reviewDecision:"CHANGES_REQUESTED",unresolvedThreads:0,headAtReviewStart:head,headAfterReview:head},attestation:{present:true,drift:null},completeness:{complete:true}});
+          if(bad.decision!=="CONVERGENCE_REQUIRED")process.exit(2);
+        }).catch(()=>process.exit(3));
+      '
+      echo "PROOF 7b OK: decision core skips ONLY when every condition holds."
+
+  # ── PROOF 8: REAL failing gate produces a structured manifest inside Archon ──
+  # Runs the actual package gate for g0-tool-core (product packages/* absent ⇒
+  # deterministic red) and proves the manifest is machine-actionable end-to-end:
+  # parseFullGateResult validates it and the targeted executor re-runs the exact
+  # recorded command (red again, exit 1). ~15s, zero AI spend.
+  - id: real-gate-manifest-proof
+    depends_on: [convergence-router-proof]
+    timeout: 600000
+    bash: |
+      set -euo pipefail
+      S="${SMOKE_DIR:-/tmp/foresift-smoke-throughput}"
+      G="$S/realgate"; mkdir -p "$G"
+      set +e
+      node scripts/automation/foresift-gate.mjs --package g0-tool-core \
+        --result-file "$G/full-gate-result.json" >"$G/gate-log.txt" 2>&1
+      code=$?
+      set -e
+      if [ "$code" -eq 0 ]; then echo "FAIL: expected deterministic red for g0-tool-core"; exit 1; fi
+      node -e '
+        const {parseFullGateResult}=await import("./scripts/automation/package-full-gate.mjs");
+        const fs=await import("node:fs");
+        const m=parseFullGateResult(fs.readFileSync(process.argv[1],"utf8"));
+        if(!m||m.passed!==false||JSON.stringify(m.failedCategories)!==JSON.stringify(["PACKAGE"]))process.exit(1);
+        if(!m.checks.some(c=>c.status==="FAIL"&&c.category==="PACKAGE"))process.exit(2);
+      ' "$G/full-gate-result.json"
+      echo "PROOF 8a OK: real red gate wrote a structured PACKAGE-failure manifest."
+      set +e
+      node scripts/automation/package-targeted-verify.mjs \
+        --manifest "$G/full-gate-result.json" --gate-log "$G/gate-log.txt" \
+        --artifacts-dir "$G" >/dev/null 2>&1
+      tcode=$?
+      set -e
+      if [ "$tcode" -ne 1 ]; then echo "FAIL: targeted rerun of a still-red package check must exit 1; got $tcode"; exit 1; fi
+      node -e 'const r=JSON.parse(require("fs").readFileSync(process.argv[1],"utf8"));if(r.allGreen!==false||r.checks[0].command.indexOf("packages/domain")<0)process.exit(1)' "$G/targeted-verify-result.json"
+      echo "PROOF 8b OK: executor re-ran the EXACT recorded package command from the manifest."

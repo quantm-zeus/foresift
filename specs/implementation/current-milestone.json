@@ -66,9 +66,7 @@
         "FR-SEC-011",
         "FR-SEC-012"
       ],
-      "dependencies": [
-        "g0-contracts-data-truth"
-      ],
+      "dependencies": ["g0-contracts-data-truth"],
       "risk": "CRITICAL",
       "parallelizable": false,
       "writeScopes": [
@@ -103,10 +101,7 @@
         "FR-CORE-007",
         "FR-CORE-008"
       ],
-      "dependencies": [
-        "g0-contracts-data-truth",
-        "g0-security-perimeter"
-      ],
+      "dependencies": ["g0-contracts-data-truth", "g0-security-perimeter"],
       "risk": "HIGH",
       "parallelizable": false,
       "writeScopes": [
@@ -140,10 +135,7 @@
         "FR-PROV-009",
         "FR-PROV-010"
       ],
-      "dependencies": [
-        "g0-contracts-data-truth",
-        "g0-security-perimeter"
-      ],
+      "dependencies": ["g0-contracts-data-truth", "g0-security-perimeter"],
       "risk": "HIGH",
       "parallelizable": false,
       "writeScopes": [
@@ -178,10 +170,7 @@
         "FR-COST-009",
         "FR-COST-010"
       ],
-      "dependencies": [
-        "g0-tool-core",
-        "g0-provider-lifecycle"
-      ],
+      "dependencies": ["g0-tool-core", "g0-provider-lifecycle"],
       "risk": "HIGH",
       "parallelizable": false,
       "writeScopes": [

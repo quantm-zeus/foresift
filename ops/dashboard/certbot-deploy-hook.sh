@@ -30,5 +30,9 @@ mv -f "$DEST_DIR/.fullchain.pem.new" "$DEST_DIR/fullchain.pem"
 mv -f "$DEST_DIR/.privkey.pem.new" "$DEST_DIR/privkey.pem"
 
 caddy validate --config /etc/caddy/Caddyfile >/dev/null
-systemctl reload caddy
-logger -t foresift-dashboard "caddy reloaded with renewed dashboard certificate"
+# RESTART, not reload: the edge Caddyfile runs with `admin off`, so there is no
+# admin endpoint for `caddy reload` to talk to — every reload attempt fails.
+# A full restart re-reads the config; sub-second gap is acceptable at a ~3-4
+# day renewal cadence.
+systemctl restart caddy
+logger -t foresift-dashboard "caddy restarted with renewed dashboard certificate"

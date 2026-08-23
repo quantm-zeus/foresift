@@ -1,13 +1,18 @@
 /**
  * Backfill receipts (§13.6, FR-DATA-003) and watermark state (§13.5).
  *
- * No-backdating is enforced twice: structurally by the SQL CHECKs (a receipt
- * whose available_at precedes retrieval commit is refused unless it carries a
- * live-receipt reference) and explicitly at this boundary via
- * `assertNoBackdating`, so callers get a typed refusal before the database.
+ * No-backdating is enforced three ways: structurally by the SQL CHECKs (a
+ * receipt whose available_at precedes retrieval commit is refused unless it
+ * carries a live-receipt reference), explicitly at this boundary via
+ * `assertNoBackdating`, and by verifying that a claimed live-receipt
+ * reference actually matches a persisted observation receipt — refusals are
+ * typed (`BACKFILL_BACKDATING_REJECTED`,
+ * `BACKFILL_AVAILABILITY_PROOF_MISSING`), never prose-only.
  */
 import {
   availabilityProvenanceClass,
+  ErrorCode,
+  ForesiftError,
   isHistoricalFetch,
   utcTimestamp,
   visibleAt,
@@ -46,14 +51,20 @@ export function assertNoBackdating(input: {
       : 'HISTORICAL_QUERY_FETCHED_LATER',
   );
   if (!isHistoricalFetch(cls)) {
-    throw new Error('backfill provenance must be a historical-fetch class');
+    throw new ForesiftError(
+      ErrorCode.CONTRACT_INVARIANT_VIOLATED,
+      'backfill provenance must be a historical-fetch class',
+      { proofMethod: input.proofMethod },
+    );
   }
   if (input.proofMethod === 'LIVE_RECEIPT_REFERENCE' && input.liveReceiptRef !== undefined) {
     return; // independently persisted live receipt proves earlier availability
   }
   if (input.availableAt < input.retrievedAt) {
-    throw new Error(
+    throw new ForesiftError(
+      ErrorCode.BACKFILL_BACKDATING_REJECTED,
       `backdating refused: available_at ${input.availableAt} precedes retrieval commit ${input.retrievedAt} without a live receipt`,
+      { availableAt: input.availableAt, retrievedAt: input.retrievedAt },
     );
   }
 }
@@ -68,26 +79,45 @@ export async function recordBackfillReceipt(
     proofMethod: input.proofMethod,
     ...(input.liveReceiptRef === undefined ? {} : { liveReceiptRef: input.liveReceiptRef }),
   });
-  await engine.query(
-    `INSERT INTO backfill_receipts (
-       backfill_receipt_id, backfill_job_id, backfill_reason,
-       historical_event_at, retrieved_at, available_at,
-       retrospective_only, would_have_been_observable_live,
-       availability_proof_method, live_receipt_ref)
-     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)`,
-    [
-      input.backfillReceiptId,
-      input.backfillJobId,
-      input.backfillReason,
-      input.historicalEventAt,
-      input.retrievedAt,
-      input.availableAt,
-      input.retrospectiveOnly,
-      input.wouldHaveBeenObservableLive ?? null,
-      input.proofMethod,
-      input.liveReceiptRef ?? null,
-    ],
-  );
+  await engine.transaction(async (tx) => {
+    if (input.proofMethod === 'LIVE_RECEIPT_REFERENCE') {
+      // §13.6: the no-backdating exception unlocks only on an INDEPENDENTLY
+      // PERSISTED live receipt — a reference string that matches no stored
+      // observation receipt proves nothing and is refused here, in the same
+      // transaction as the insert.
+      const proof = await tx.query<{ receipt_hash: string }>(
+        'SELECT receipt_hash FROM observations WHERE receipt_hash = $1',
+        [input.liveReceiptRef],
+      );
+      if (proof.rows.length === 0) {
+        throw new ForesiftError(
+          ErrorCode.BACKFILL_AVAILABILITY_PROOF_MISSING,
+          `live-receipt reference does not match any persisted observation receipt`,
+          { backfillReceiptId: input.backfillReceiptId },
+        );
+      }
+    }
+    await tx.query(
+      `INSERT INTO backfill_receipts (
+         backfill_receipt_id, backfill_job_id, backfill_reason,
+         historical_event_at, retrieved_at, available_at,
+         retrospective_only, would_have_been_observable_live,
+         availability_proof_method, live_receipt_ref)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)`,
+      [
+        input.backfillReceiptId,
+        input.backfillJobId,
+        input.backfillReason,
+        input.historicalEventAt,
+        input.retrievedAt,
+        input.availableAt,
+        input.retrospectiveOnly,
+        input.wouldHaveBeenObservableLive ?? null,
+        input.proofMethod,
+        input.liveReceiptRef ?? null,
+      ],
+    );
+  });
 }
 
 /**

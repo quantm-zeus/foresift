@@ -14,6 +14,7 @@ import {
   blockingGapsForShard,
   commitCheckpoint,
   createEngine,
+  PRECISION_RETAINING_TIMESTAMP_PARSERS,
   recordCanonicalEvent,
   registerGap,
   resolveGapStatus,
@@ -33,7 +34,7 @@ let db: PGlite;
 let engine: DatabaseEngine;
 
 beforeAll(async () => {
-  db = new PGlite();
+  db = new PGlite({ parsers: PRECISION_RETAINING_TIMESTAMP_PARSERS });
   engine = createEngine(db, 'pglite');
   await applyMigrations({ engine, migrationsDir: MIGRATIONS_DIR });
 }, 120_000);

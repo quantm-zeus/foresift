@@ -2,7 +2,11 @@
  * Recovery tier repository (T042, FR-DR-001, §34.4): tier registration under
  * the product-law RPO ceilings, the protected-asset registry mapping every
  * table/store this package creates onto its covering tier, and tier
- * measurement recording (§34.10 — measurements are never backdated).
+ * measurement recording. Measurement timestamps are caller-supplied as of
+ * §34.10; this repository records the injected instant verbatim and does NOT
+ * independently validate it against other clocks — backdating prevention for
+ * measurements is a producer-side obligation, enforced by callers that inject
+ * deterministic time (see drill/rpo.ts).
  */
 import {
   ErrorCode,

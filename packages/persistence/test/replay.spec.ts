@@ -15,6 +15,7 @@ import {
   applyMigrations,
   createEngine,
   currentObservations,
+  PRECISION_RETAINING_TIMESTAMP_PARSERS,
   replayObservations,
   type DatabaseEngine,
 } from '../src/index.ts';
@@ -28,7 +29,7 @@ let db: PGlite;
 let engine: DatabaseEngine;
 
 beforeAll(async () => {
-  db = new PGlite();
+  db = new PGlite({ parsers: PRECISION_RETAINING_TIMESTAMP_PARSERS });
   engine = createEngine(db, 'pglite');
   await applyMigrations({ engine, migrationsDir: MIGRATIONS_DIR });
 

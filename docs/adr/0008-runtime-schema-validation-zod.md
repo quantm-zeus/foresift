@@ -1,4 +1,4 @@
-# ADR-0005: Zod is the single approved runtime schema-validation library
+# ADR-0008: Zod is the single approved runtime schema-validation library
 
 - Status: Accepted
 - Date: 2026-08-23

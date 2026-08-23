@@ -3,10 +3,16 @@
  * schemaRefs for FR-DATA-001…006.
  *
  * These schemas are the runtime-validation boundary for records crossing
- * process/store boundaries (stored JSON, API payloads, telemetry). They are
- * mirrors BY CONSTRUCTION: every closed vocabulary and semantic rule is
- * imported from `@foresift/domain`, so a domain change cannot drift from its
- * schema mirror without failing to compile. Unknown keys are rejected
+ * process/store boundaries (stored JSON, API payloads, telemetry). Where a
+ * vocabulary exists in `@foresift/domain` it is imported, not restated —
+ * quality codes, availability provenance classes, acquisition states, chain
+ * mapping qualities, decimals states, equivalence kinds, lineage statuses,
+ * dependence labels, collection methods, and feature-store classes are
+ * compile-linked, so a domain change cannot drift from its schema mirror
+ * without failing to compile. The remaining closed vocabularies below
+ * (compensating-event kinds, availability proof methods, watermark gap
+ * statuses, population kinds, checkpoint/gap statuses) are local literals
+ * kept in parity with SQL truth by tests. Unknown keys are rejected
  * (`.strict()`) — fail-closed extends to record shape.
  *
  * Numeric policy: raw amounts cross boundaries as decimal digit STRINGS
@@ -302,8 +308,15 @@ export const ObservationRevisionSchema = z
     availableAt: UtcTimestampSchema,
     availabilityProvenance: AvailabilityProvenanceClassSchema,
     supersededReceiptHash: z.string().min(1),
+    /** Corrected quantity, or explicit absence — never one half of the pair. */
+    rawAmount: DigitStringSchema.nullable(),
+    decimals: z.number().int().min(0).max(36).nullable(),
+    qualityCodes: QualityCodesSchema,
   })
-  .strict();
+  .strict()
+  .refine((v) => (v.rawAmount === null) === (v.decimals === null), {
+    message: 'quantity pair incomplete: raw amount and decimals must be present or absent together',
+  });
 
 /** Reorg/finality compensation that supersedes without rewriting receipt history. */
 export const CompensatingEventSchema = z
@@ -566,32 +579,53 @@ export const DecisionActionTimestampsSchema = z
   })
   .strict();
 
+/**
+ * Collector continuity records mirroring the SQL truth of
+ * `g0_data_0007_checkpoints_gaps.sql` (§34.7, INV-009): fenced per-shard
+ * checkpoints with bigint-range cursors/tokens as digit strings, and the
+ * explicit gap registry whose resolved statuses require a resolution instant.
+ */
 export const CollectorCheckpointSchema = z
   .object({
-    collectorId: z.string().min(1),
-    cursor: z.string().min(1),
-    fencingToken: z.number().int().min(1),
-    previousFencingToken: z.number().int().min(1).optional(),
-    lastAdvancedAt: UtcTimestampSchema,
+    shardId: z.string().min(1),
+    fencingToken: DigitStringSchema.refine((v) => BigInt(v) >= 1n, {
+      message: 'fencing token must be >= 1',
+    }),
+    cursorPosition: DigitStringSchema.refine((v) => BigInt(v) >= 0n, {
+      message: 'cursor position must be >= 0',
+    }),
+    updatedAt: UtcTimestampSchema,
   })
-  .strict()
-  .refine((v) => v.previousFencingToken === undefined || v.previousFencingToken < v.fencingToken, {
-    message: 'fencing tokens must strictly increase',
-  });
+  .strict();
+
+const GAP_RECOVERY_STATUSES = [
+  'UNRECOVERED',
+  'RECOVERING',
+  'RECOVERED',
+  'DECLARED_UNRECOVERABLE',
+] as const;
 
 export const CollectorGapSchema = z
   .object({
     gapId: z.string().min(1),
-    streamKey: z.string().min(1),
-    startInclusive: DigitStringSchema,
-    endInclusive: DigitStringSchema,
-    recoveryStatus: z.enum(['OPEN', 'RECOVERING', 'RECOVERED', 'ACCEPTED_LOSS']),
+    shardId: z.string().min(1),
+    gapStartSlot: DigitStringSchema,
+    gapEndSlot: DigitStringSchema,
+    reason: z.string().min(1),
+    recoveryStatus: z.enum(GAP_RECOVERY_STATUSES),
     registeredAt: UtcTimestampSchema,
+    resolvedAt: UtcTimestampSchema.nullable(),
   })
   .strict()
-  .refine((v) => BigInt(v.endInclusive) >= BigInt(v.startInclusive), {
+  .refine((v) => BigInt(v.gapEndSlot) >= BigInt(v.gapStartSlot), {
     message: 'gap bounds inverted',
-  });
+  })
+  .refine(
+    (v) =>
+      (v.recoveryStatus !== 'RECOVERED' && v.recoveryStatus !== 'DECLARED_UNRECOVERABLE') ||
+      v.resolvedAt !== null,
+    { message: 'a resolved gap status requires its resolution instant' },
+  );
 
 // ---------------------------------------------------------------------------
 // Versioned registry

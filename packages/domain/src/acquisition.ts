@@ -58,10 +58,7 @@ const RETRIEVAL_FAILED_STATES: readonly AcquisitionState[] = [
 ];
 
 /** States where retrieval completed successfully enough to attach evidence. */
-export const RETRIEVAL_SUCCEEDED_STATES: readonly AcquisitionState[] = [
-  AcquisitionState.REQUESTED,
-  AcquisitionState.RETURNED,
-];
+export const RETRIEVAL_SUCCEEDED_STATES: readonly AcquisitionState[] = [AcquisitionState.RETURNED];
 
 /** True iff the family was never requested by policy (AC-242 semantics). */
 export function acquisitionIsNotRequestedByPolicy(state: AcquisitionState): boolean {

@@ -10,12 +10,13 @@ import { PGlite } from '@electric-sql/pglite';
 import { afterAll, describe, expect, it } from 'vitest';
 import { parseChainId, utcTimestamp } from '@foresift/domain';
 import {
-  applyMigrations,
   appendObservation,
+  applyMigrations,
   createEngine,
   ensureChain,
   insertDex,
   insertPool,
+  PRECISION_RETAINING_TIMESTAMP_PARSERS,
   type DatabaseEngine,
 } from '@foresift/persistence';
 import {
@@ -77,7 +78,7 @@ describe('AC-060 negative: the harness fails under artificial over-budget delay'
     });
 
     // Fresh engine seam wrapped with a 150ms per-call artificial delay.
-    slowDb = new PGlite();
+    slowDb = new PGlite({ parsers: PRECISION_RETAINING_TIMESTAMP_PARSERS });
     const slow = delayEngine(createEngine(slowDb, 'pglite'), 150);
     await applyMigrations({ engine: slow, migrationsDir: MIGRATIONS_DIR });
     await ensureChain(slow, 'eip155:1');
@@ -113,7 +114,7 @@ describe('AC-060 negative: the harness fails under artificial over-budget delay'
   }, 120_000);
 
   it('a single call through the delay wrapper measurably exceeds the delay floor', async () => {
-    const db = new PGlite();
+    const db = new PGlite({ parsers: PRECISION_RETAINING_TIMESTAMP_PARSERS });
     try {
       const slow = delayEngine(createEngine(db, 'pglite'), 150);
       const start = performance.now();

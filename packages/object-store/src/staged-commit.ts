@@ -82,12 +82,12 @@ export async function stagedUpload(
     at: utcTimestamp(new Date().toISOString().replace('.000Z', 'Z')),
   });
 
-  // Both sides verified → decision-critical gate satisfied.
+  // Both sides verified above; the §14.8 AVAILABLE gate is enforced
+  // unconditionally inside transitionStage (and again by the SQL CHECK).
   row = await transitionStage(engine, {
     artifactId: request.artifactId,
     reached: 'AVAILABLE',
     at: utcTimestamp(new Date().toISOString().replace('.000Z', 'Z')),
-    requireBothSidesVerified: true,
   });
   return row;
 }
@@ -182,12 +182,13 @@ export async function reconcileArtifacts(
       });
       continue;
     }
-    // Rights drift: every physical version must carry the SAME rights ref the
-    // index row claims; any divergence is reported, never merged away.
+    // Rights drift: EVERY physical version must carry the SAME rights ref the
+    // index row claims — mixed state (one version correct, another diverged)
+    // is still drift. Any divergence is reported, never merged away.
     const physicalIdentity = versions.map((v) => dedupIdentityOf(v.metadata));
     const rightsDrift =
       physicalIdentity.length > 0 &&
-      !physicalIdentity.some(
+      !physicalIdentity.every(
         (id) =>
           (JSON.parse(id) as { rightsRef: string | null }).rightsRef === (r.rights_ref ?? null),
       );

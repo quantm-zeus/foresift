@@ -116,9 +116,10 @@ describe('AC-023 negative: quantity refusals and explicit conflicting states', (
       throw new Error('expected refusal');
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
-      if (!message.startsWith('expected refusal')) {
-        expect((err as { code?: string }).code).toBe(ErrorCode.QUANTITY_NEGATIVE_UNSUPPORTED);
-      }
+      // Rethrow OUR sentinel first so a non-refusing call can never pass by
+      // skipping the assertion block.
+      if (message.startsWith('expected refusal')) throw err;
+      expect((err as { code?: string }).code).toBe(ErrorCode.QUANTITY_NEGATIVE_UNSUPPORTED);
     }
   });
 

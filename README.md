@@ -4,10 +4,14 @@ Foresift is a **greenfield implementation** of the Crypto Intelligence Agent Gat
 product contract: a read-only, security-bounded crypto intelligence and research
 system specified by its authoritative PRD.
 
-> **Status: bootstrap stage.** This repository currently contains the authoritative
-> product specification, its verification tooling, and the spec-driven development
-> foundation only. **No product functionality is implemented yet** — nothing here
-> should be read as a claim that the product exists or works.
+> **Status: G0 data-truth foundation implemented.** The authoritative product
+> specification and its verification tooling are in place, and the first work
+> package — domain contracts plus the SQL-backed data-truth layer (identity,
+> immutable observations/revisions, replay, backfill/watermarks, collector
+> continuity, object store, recovery drills) — is implemented and CI-gated.
+> See [`specs/g0-contracts-data-truth/spec.md`](specs/g0-contracts-data-truth/spec.md).
+> Later product milestones (collectors, features at scale, decisioning, API)
+> are not implemented yet.
 
 ## Authoritative product specification
 
@@ -61,10 +65,18 @@ Future Autonomous Implementation      .archon/workflows/foresift/README.md
 ```text
 docs/spec/          authoritative product contract (normative — do not hand-edit hashes)
 docs/migration/     migration provenance record
+docs/adr/           architecture decision records
 docs/setup/         bootstrap report
+migrations/         SQL truth: ordered, checksum-immutable G0 migrations
+packages/domain/    §11/§13 vocabularies, timestamps, quantities, typed errors
+packages/persistence/  repositories over the engine port + DR drill machinery
+packages/shared-schemas/  Zod boundary schemas mirroring the domain contracts
+packages/evidence/  evidence index, replay resolution, matured counts
+packages/object-store/  content-addressed rights-aware store + staged commit
 scripts/            deterministic verification tooling
-tests/              repository verification tests
-apps/, packages/    future workspace packages (empty at bootstrap)
+telemetry/          workflow telemetry artifacts (automation substrate)
+tests/              acceptance/negative suites over the manifest ACs
+apps/               future application surfaces (not yet started)
 .specify/           Spec Kit installation
 .claude/            Claude Code skills (Spec Kit + Archon)
 .archon/            Archon workflow location for the future autonomous pipeline

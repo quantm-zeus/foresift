@@ -18,6 +18,7 @@ import {
   createEngine,
   evaluateDeletionRequest,
   getBackupPolicy,
+  PRECISION_RETAINING_TIMESTAMP_PARSERS,
   runRestoreDrill,
   scanForKeyMaterial,
   type BackupPolicyRecord,
@@ -47,7 +48,7 @@ const BASE_POLICY: BackupPolicyRecord = {
 };
 
 beforeAll(async () => {
-  db = new PGlite();
+  db = new PGlite({ parsers: PRECISION_RETAINING_TIMESTAMP_PARSERS });
   engine = createEngine(db, 'pglite');
   await applyMigrations({ engine, migrationsDir: MIGRATIONS_DIR });
 }, 120_000);

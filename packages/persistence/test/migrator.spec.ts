@@ -3,10 +3,11 @@ import { PGlite } from '@electric-sql/pglite';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
-  applyMigrations,
   appliedMigrations,
+  applyMigrations,
   createEngine,
   discoverMigrations,
+  PRECISION_RETAINING_TIMESTAMP_PARSERS,
   type DatabaseEngine,
 } from '../src/index.ts';
 
@@ -42,7 +43,7 @@ describe('applyMigrations (FR-DATA-001…006, FR-DR-001/002 foundation)', () => 
   let engine: DatabaseEngine;
 
   beforeAll(() => {
-    db = new PGlite();
+    db = new PGlite({ parsers: PRECISION_RETAINING_TIMESTAMP_PARSERS });
     engine = createEngine(db, 'pglite');
   });
 
@@ -115,7 +116,7 @@ describe('failure isolation (T021)', () => {
     'a failing script aborts cleanly leaving prior recorded state intact',
     { timeout: 120_000 },
     async () => {
-      const db = new PGlite();
+      const db = new PGlite({ parsers: PRECISION_RETAINING_TIMESTAMP_PARSERS });
       const engine = createEngine(db, 'pglite');
       try {
         const dirBase = path.dirname(fileURLToPath(import.meta.url));

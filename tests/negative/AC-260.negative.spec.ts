@@ -22,6 +22,7 @@ import {
   applyMigrations,
   createEngine,
   evaluateAndRecordDrill,
+  PRECISION_RETAINING_TIMESTAMP_PARSERS,
   registerRecoveryTier,
 } from '@foresift/persistence';
 import {
@@ -40,7 +41,7 @@ let targetDb: PGlite | undefined;
 
 beforeAll(async () => {
   source = await makeTestDatabase();
-  targetDb = new PGlite();
+  targetDb = new PGlite({ parsers: PRECISION_RETAINING_TIMESTAMP_PARSERS });
 });
 
 afterAll(async () => {

@@ -9,7 +9,7 @@
  * is checkable against the row itself, not a narrative.
  */
 import { createHash } from 'node:crypto';
-import type { UtcTimestamp } from '@foresift/domain';
+import { ErrorCode, ForesiftError, type UtcTimestamp } from '@foresift/domain';
 import { availabilityProvenanceClass, qualityCode, utcTimestamp } from '@foresift/domain';
 import type { DatabaseEngine } from '../db.ts';
 
@@ -178,7 +178,13 @@ export async function appendRevision(
       [input.observationId],
     );
     const baseHash = current.rows[0]?.receipt_hash;
-    if (baseHash === undefined) throw new Error(`unknown observation ${input.observationId}`);
+    if (baseHash === undefined) {
+      throw new ForesiftError(
+        ErrorCode.REVISION_SUPERSEDES_UNKNOWN,
+        `cannot revise unknown observation ${input.observationId}`,
+        { observationId: input.observationId },
+      );
+    }
 
     const maxRow = await tx.query<{ max_no: number | null }>(
       `SELECT MAX(revision_no) AS max_no FROM observation_revisions WHERE observation_id = $1`,
@@ -233,7 +239,11 @@ export async function appendCompensatingEvent(
   );
   const originalReceiptHash = current.rows[0]?.receipt_hash;
   if (originalReceiptHash === undefined) {
-    throw new Error(`unknown observation ${input.targetObservationId}`);
+    throw new ForesiftError(
+      ErrorCode.REORG_COMPENSATION_INVALID,
+      `cannot compensate unknown observation ${input.targetObservationId}`,
+      { targetObservationId: input.targetObservationId },
+    );
   }
   await engine.query(
     `INSERT INTO compensating_events

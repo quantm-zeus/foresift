@@ -17,19 +17,20 @@ import {
   type UtcTimestamp,
 } from '@foresift/domain';
 import {
+  appendObservation,
   applyMigrations,
   checkOnlineOfflineParity,
   createEngine,
   ensureChain,
-  appendObservation,
   insertDex,
   insertPool,
   PARITY_TOLERANCE,
+  PRECISION_RETAINING_TIMESTAMP_PARSERS,
   recomputeOfflineRollingVolume,
   registerFeatureDefinition,
-  writeOnlineRollingVolume,
   type DatabaseEngine,
   type ObservationInput,
+  writeOnlineRollingVolume,
 } from '../src/index.ts';
 
 const MIGRATIONS_DIR = path.resolve(
@@ -43,7 +44,7 @@ let db: PGlite;
 let engine: DatabaseEngine;
 
 beforeAll(async () => {
-  db = new PGlite();
+  db = new PGlite({ parsers: PRECISION_RETAINING_TIMESTAMP_PARSERS });
   engine = createEngine(db, 'pglite');
   await applyMigrations({ engine, migrationsDir: MIGRATIONS_DIR });
   await ensureChain(engine, 'eip155:1');

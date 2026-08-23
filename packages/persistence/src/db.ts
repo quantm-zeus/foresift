@@ -2,7 +2,7 @@
  * Engine port seam (ADR-001): repositories speak this narrow interface, never
  * a concrete driver. The deterministic PGlite engine is injected BY THE CALLER
  * — this module holds no static dependency on any driver package, which keeps
- * PGlite strictly test-only (ADR-0006) while production wires a real Pool.
+ * PGlite strictly test-only (ADR-0009) while production wires a real Pool.
  *
  * The seam exposes exactly two execution primitives plus transactions:
  *  - exec   : multi-statement SQL (DDL, migration scripts)
@@ -99,3 +99,37 @@ class TransactionalEngine implements DatabaseEngine {
 export function createEngine(client: RawSqlClient, kind: 'pglite' | 'pg'): DatabaseEngine {
   return new TransactionalEngine(client, kind, 0);
 }
+
+// --- Precision-retaining timestamp reads -------------------------------------
+
+/** PostgreSQL text form of a UTC timestamp: `2026-01-01 12:34:56.123456+00`. */
+const PG_UTC_TIMESTAMP_TEXT = /^(\d{4}-\d{2}-\d{2}) (\d{2}:\d{2}:\d{2})(\.\d+)?\+00$/;
+
+/**
+ * Convert the engine's timestamp text into the §13.1 ISO-8601 UTC shape
+ * WITHOUT discarding fractional digits. Driver defaults parse `timestamptz`
+ * through JS `Date`, which truncates sub-millisecond precision on read-back
+ * and breaks byte-for-byte receipt-hash round-trips; these parsers keep the
+ * exact stored digits and arrive as plain strings instead.
+ */
+function parseUtcTimestampText(value: string): string {
+  const match = PG_UTC_TIMESTAMP_TEXT.exec(value);
+  if (match === null) {
+    // Fail closed: a non-UTC session timezone or exotic value must never be
+    // silently reinterpreted (that is how precision loss shipped historically).
+    throw new Error(`unparseable UTC timestamp from engine: ${JSON.stringify(value)}`);
+  }
+  return `${match[1]}T${match[2]}${match[3] ?? ''}Z`;
+}
+
+/**
+ * Type-parser overrides for engines that accept postgres type-OID parsers
+ * (PGlite `parsers`, node-pg `types.setTypeParser`): OIDs 1114 (`timestamp`)
+ * and 1184 (`timestamptz`) yield normalized ISO strings retaining full
+ * source precision. Every test engine wires these in; a production pool MUST
+ * do the same (ADR-0009's engine contract).
+ */
+export const PRECISION_RETAINING_TIMESTAMP_PARSERS: Record<number, (value: string) => string> = {
+  1114: parseUtcTimestampText,
+  1184: parseUtcTimestampText,
+};

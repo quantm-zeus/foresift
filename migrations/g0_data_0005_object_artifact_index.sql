@@ -3,8 +3,10 @@
 -- event substrate used by restore+replay (AC-263).
 --
 -- Stage machine: PENDING_UPLOAD -> STORED_HASH_VERIFIED -> INDEX_COMMITTED
--- -> AVAILABLE. Timestamp columns record each transition; a row cannot be
--- AVAILABLE until hash verification and index commit both happened.
+-- -> AVAILABLE. Timestamp columns record each transition; SQL enforces two
+-- rules: (1) a transition timestamp may not be recorded before its stage is
+-- reached (stage ordering below), and (2) a row cannot be AVAILABLE unless
+-- hash verification AND index commit both happened (the §14.8 gate).
 
 CREATE TABLE object_artifacts (
     artifact_id        text PRIMARY KEY,
@@ -36,7 +38,15 @@ CREATE TABLE object_artifacts (
             WHEN index_committed_at IS NOT NULL THEN 2
             WHEN hash_verified_at IS NOT NULL THEN 1
             ELSE 0
-        END))
+        END)),
+    -- §14.8 gate, enforced here rather than left to caller discipline:
+    -- decision-critical evidence cannot become AVAILABLE before durable hash
+    -- verification and index commit are both on record.
+    CONSTRAINT object_artifacts_available_requires_verification CHECK (
+        stage <> 'AVAILABLE'
+        OR (hash_verified_at IS NOT NULL
+            AND index_committed_at IS NOT NULL
+            AND available_at IS NOT NULL))
 );
 
 CREATE UNIQUE INDEX object_artifacts_hash_version_idx

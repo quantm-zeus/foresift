@@ -7,7 +7,7 @@
  * rewriting history.
  */
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { utcTimestamp, type UtcTimestamp } from '@foresift/domain';
+import { ErrorCode, utcTimestamp, type UtcTimestamp } from '@foresift/domain';
 import { assertNoBackdating, recordBackfillReceipt } from '@foresift/persistence';
 import { closeTestDatabase, makeTestDatabase, type TestDatabase } from '../acceptance/helpers.ts';
 
@@ -55,7 +55,10 @@ describe('AC-249 negative: backdating is refused', () => {
     ).not.toThrow();
   });
 
-  it('the database refuses a backdating receipt insert', async () => {
+  it('the repository refuses a backdating receipt insert before SQL is reached', async () => {
+    // This route goes through recordBackfillReceipt, whose TS guard fires
+    // first; the independent SQL CHECK refusal is proven separately in
+    // packages/persistence/test/backfill-watermark.spec.ts (raw INSERT).
     await expect(
       recordBackfillReceipt(tdb.engine, {
         backfillReceiptId: 'ac249n-cheat',
@@ -67,7 +70,7 @@ describe('AC-249 negative: backdating is refused', () => {
         retrospectiveOnly: false,
         proofMethod: 'RECOVERY_FETCH_COMMIT',
       }),
-    ).rejects.toThrow();
+    ).rejects.toThrow(ErrorCode.BACKFILL_BACKDATING_REJECTED);
   });
 
   it('no refused row ever landed in the receipts table', async () => {

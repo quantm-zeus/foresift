@@ -5,8 +5,8 @@
  * - checkpoints are fenced: a commit carrying a STALE fencing token is
  *   refused, and cursor regression within one fencing epoch is refused;
  * - advancing a checkpoint across skipped slots is refused until the
- *   discontinuity is REGISTERED as a gap and RECOVERED (unmarked-gap replay
- *   is never legitimate);
+ *   discontinuity is REGISTERED as a gap and RESOLVED (`RECOVERED` or
+ *   `DECLARED_UNRECOVERABLE`; unmarked-gap replay is never legitimate);
  * - canonical event keys make duplicate first-seen/event inserts impossible
  *   at the storage layer — restore+replay re-applies each event exactly once.
  */
@@ -23,8 +23,9 @@ export interface CheckpointCommit {
 
 /**
  * Commit a checkpoint. Same-token commits must be contiguous or covered by
- * recovered gaps; higher tokens acquire the shard (new epoch) and may set any
- * cursor; lower tokens are refused outright.
+ * resolved gaps (RECOVERED or DECLARED_UNRECOVERABLE); higher tokens acquire
+ * the shard (new epoch) and may set any cursor; lower tokens are refused
+ * outright.
  */
 export async function commitCheckpoint(
   engine: DatabaseEngine,
@@ -67,7 +68,8 @@ export async function commitCheckpoint(
       );
     }
     // Unmarked-gap rule: same-epoch advance across skipped slots requires the
-    // whole skipped interval to be covered by RECOVERED gaps.
+    // whole skipped interval to be covered by resolved gaps (RECOVERED or
+    // DECLARED_UNRECOVERABLE — the statuses the SQL query below accepts).
     if (
       storedCursor !== null &&
       input.fencingToken === storedToken &&

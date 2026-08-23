@@ -2,7 +2,7 @@
  * Shared bootstrap for the manifest-declared acceptance/negative suites
  * (T049–T062). Each suite gets a fresh in-process PGlite database with the ten
  * G0 migrations applied — PGlite is the deterministic TEST engine only
- * (ADR-0006); production remains real PostgreSQL per product ADR-001.
+ * (ADR-0009); production remains real PostgreSQL per product ADR-001.
  */
 import path from 'node:path';
 import { performance } from 'node:perf_hooks';
@@ -16,6 +16,7 @@ import {
   ensureChain,
   insertDex,
   insertPool,
+  PRECISION_RETAINING_TIMESTAMP_PARSERS,
   replayObservations,
   type DatabaseEngine,
 } from '@foresift/persistence';
@@ -32,7 +33,7 @@ export interface TestDatabase {
 
 /** Fresh database, all G0 migrations applied. */
 export async function makeTestDatabase(): Promise<TestDatabase> {
-  const db = new PGlite();
+  const db = new PGlite({ parsers: PRECISION_RETAINING_TIMESTAMP_PARSERS });
   const engine = createEngine(db, 'pglite');
   await applyMigrations({ engine, migrationsDir: MIGRATIONS_DIR });
   return { db, engine };

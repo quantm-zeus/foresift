@@ -32,6 +32,7 @@ import {
   failBackupRun,
   migrationStateCheck,
   objectHashCheck,
+  PRECISION_RETAINING_TIMESTAMP_PARSERS,
   registerGap,
   runRestoreDrill,
   seedDefaultRecoveryTiers,
@@ -55,7 +56,7 @@ let storeRoot: string;
 let store: LocalFilesystemObjectStore;
 
 beforeAll(async () => {
-  db = new PGlite();
+  db = new PGlite({ parsers: PRECISION_RETAINING_TIMESTAMP_PARSERS });
   engine = createEngine(db, 'pglite');
   await applyMigrations({ engine, migrationsDir: MIGRATIONS_DIR });
   await seedDefaultRecoveryTiers(engine, at(0));
@@ -68,7 +69,7 @@ afterAll(async () => {
   await fs.rm(storeRoot, { recursive: true, force: true });
 });
 
-describe('deterministic snapshot mechanism (T043, ADR-0007)', () => {
+describe('deterministic snapshot mechanism (T043, ADR-0010)', () => {
   it('yields byte-identical snapshots for identical data regardless of timing', async () => {
     await engine.query(
       'INSERT INTO canonical_event_keys (canonical_key, event_family, first_seen_at) VALUES ($1,$2,$3)',

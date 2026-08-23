@@ -164,6 +164,9 @@ describe('round-trip: domain fixtures validate against their mirrors (T014)', ()
         availableAt: at('2026-01-01T01:00:00Z'),
         availabilityProvenance: 'HISTORICAL_QUERY_FETCHED_LATER',
         supersededReceiptHash: 'sha256:' + '11'.repeat(32),
+        rawAmount: '1234567890123456789',
+        decimals: 18,
+        qualityCodes: [qualityCode('VALID')],
       },
     ],
     [
@@ -255,22 +258,23 @@ describe('round-trip: domain fixtures validate against their mirrors (T014)', ()
     [
       'CollectorCheckpoint',
       {
-        collectorId: 'sol-mainnet-1',
-        cursor: 'slot:210500',
-        fencingToken: 4,
-        previousFencingToken: 3,
-        lastAdvancedAt: at('2026-01-01T00:00:16Z'),
+        shardId: 'sol-mainnet-1',
+        fencingToken: '4',
+        cursorPosition: '210500',
+        updatedAt: at('2026-01-01T00:00:16Z'),
       },
     ],
     [
       'CollectorGap',
       {
         gapId: 'gap_1',
-        streamKey: 'solana:mainnet/spl-transfer',
-        startInclusive: '210501',
-        endInclusive: '210700',
-        recoveryStatus: 'OPEN',
+        shardId: 'sol-mainnet-1',
+        gapStartSlot: '210501',
+        gapEndSlot: '210700',
+        reason: 'collector restart lost slot range',
+        recoveryStatus: 'RECOVERING',
         registeredAt: at('2026-01-01T00:05:00Z'),
+        resolvedAt: null,
       },
     ],
   ];
@@ -463,6 +467,51 @@ describe('negative fixtures fail validation (T014)', () => {
       'QuantityRecord',
       { rawAmount: '1', decimals: 18, approxFloat: 0.1 },
       'no smuggled JS-number approximations',
+    );
+  });
+
+  it('rejects a revision whose quantity pair is half-specified (SQL parity)', () => {
+    mustFail(
+      'ObservationRevision',
+      {
+        observationId: 'obs_0001',
+        revisionNo: 3,
+        reason: 'half a quantity pair is never a correction',
+        availableAt: at('2026-01-01T02:00:00Z'),
+        availabilityProvenance: 'HISTORICAL_QUERY_FETCHED_LATER',
+        supersededReceiptHash: 'sha256:' + '11'.repeat(32),
+        rawAmount: '42',
+        decimals: null,
+        qualityCodes: [],
+      },
+      'raw amount without decimals (observation_revisions_quantity_pair_complete)',
+    );
+  });
+
+  it('rejects collector records that drift from the SQL storage contract', () => {
+    mustFail(
+      'CollectorCheckpoint',
+      {
+        shardId: 'sol-mainnet-1',
+        fencingToken: '0',
+        cursorPosition: '10',
+        updatedAt: at('2026-01-01T00:00:16Z'),
+      },
+      'fencing token below the SQL CHECK floor',
+    );
+    mustFail(
+      'CollectorGap',
+      {
+        gapId: 'gap_bad',
+        shardId: 'sol-mainnet-1',
+        gapStartSlot: '210501',
+        gapEndSlot: '210700',
+        reason: 'resolved without an instant',
+        recoveryStatus: 'RECOVERED',
+        registeredAt: at('2026-01-01T00:05:00Z'),
+        resolvedAt: null,
+      },
+      'resolved status without resolved_at (collector_gaps_resolution_requires_instant)',
     );
   });
 });

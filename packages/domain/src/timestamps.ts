@@ -60,14 +60,26 @@ export function isUtcTimestamp(value: unknown): value is UtcTimestamp {
 /**
  * Epoch milliseconds. Sub-millisecond source precision stays in the original
  * string; ordering below never depends on it.
+ *
+ * Known exception, accepted deliberately: validation admits `second === 60`
+ * (a leap-second assertion), but ECMAScript engines have no representation
+ * for it — `Date.parse('…:60Z')` yields NaN. Such strings therefore pass
+ * `isValidUtcTimestamp` yet throw TIMESTAMP_INVALID here when first ordered.
+ * Producers asserting leap seconds must normalize them (e.g. to `:60.5`-free
+ * `:59.999…Z`-style instants) before handing them to ordering code paths.
  */
 export function toEpochMs(t: UtcTimestamp): number {
   const ms = Date.parse(t);
-  // The strict pattern above guarantees Date.parse succeeds on a compliant engine.
+  // NaN here means a leap-second assertion (see above) or an engine bug —
+  // never silently coerce; fail closed with the typed refusal.
   if (Number.isNaN(ms)) {
-    throw new ForesiftError(ErrorCode.TIMESTAMP_INVALID, 'unparseable despite valid shape', {
-      value: t,
-    });
+    throw new ForesiftError(
+      ErrorCode.TIMESTAMP_INVALID,
+      'unparseable despite valid shape (leap-second assertions are not orderable)',
+      {
+        value: t,
+      },
+    );
   }
   return ms;
 }

@@ -26,8 +26,9 @@ import {
   commitCheckpoint,
   createEngine,
   evaluateAndRecordDrill,
-  registerRecoveryTier,
+  PRECISION_RETAINING_TIMESTAMP_PARSERS,
   recordAcquisitionDecision,
+  registerRecoveryTier,
   seedDefaultRecoveryTiers,
   type DatabaseEngine,
 } from '@foresift/persistence';
@@ -91,7 +92,7 @@ describe('AC-260: destructive drill meets both declared RPO tiers on fixtures', 
     const snapshot = await captureDeterministicSnapshot(source.engine, at(5));
     manifestHash = snapshot.manifestHash;
 
-    restoredDb = new PGlite();
+    restoredDb = new PGlite({ parsers: PRECISION_RETAINING_TIMESTAMP_PARSERS });
     restored = createEngine(restoredDb, 'pglite');
     await applyMigrations({ engine: restored, migrationsDir: MIGRATIONS_DIR });
     // Identical configuration seed as the lost world.

@@ -6,7 +6,13 @@
  * answers. Frozen evidence contributes only when frozen at or before the
  * boundary; observations contribute only the revision visible at T.
  */
-import { utcTimestamp, visibleAt, type UtcTimestamp } from '@foresift/domain';
+import {
+  compareForReplayResolution,
+  compareTimestamps,
+  utcTimestamp,
+  visibleAt,
+  type UtcTimestamp,
+} from '@foresift/domain';
 import type { DatabaseEngine } from '@foresift/persistence';
 
 export interface ResolvedBundle {
@@ -64,20 +70,26 @@ export async function resolveEvidenceAt(
     // THE shared domain predicate, applied exactly as in repos/replay.
     .filter((b) => visibleAt({ availableAt: b.frozenAt }, t));
 
-  // Among versions VISIBLE at T, newest availability wins — the same
-  // resolution rule as repos/replay (visibility first, then max availability).
+  // Among versions VISIBLE at T, the winner resolves through THE shared
+  // comparator exactly as in repos/replay: latest availability first, then
+  // highest revision on equal availability, then stable key — never a raw
+  // string comparison over ISO text.
   const candidateRows = await engine.query<{
     observation_id: string;
     subject_pool_id: string;
+    revision_no: number | null;
     available_at: Date | string;
   }>(`
-    SELECT observation_id, subject_pool_id, available_at FROM observations
+    SELECT observation_id, subject_pool_id, NULL::int AS revision_no, available_at
+      FROM observations
     UNION ALL
-    SELECT r.observation_id, o.subject_pool_id, r.available_at
+    SELECT r.observation_id, o.subject_pool_id, r.revision_no, r.available_at
       FROM observation_revisions r JOIN observations o ON o.observation_id = r.observation_id
-    ORDER BY observation_id, available_at
   `);
-  const latestByObservation = new Map<string, ResolvedObservationRef>();
+  const latestByObservation = new Map<
+    string,
+    { ref: ResolvedObservationRef; orderable: Parameters<typeof compareForReplayResolution>[0] }
+  >();
   for (const row of candidateRows.rows) {
     const availableAt = utcTimestamp(toIso(row.available_at));
     if (!visibleAt({ availableAt }, t)) continue;
@@ -86,15 +98,34 @@ export async function resolveEvidenceAt(
       subjectPoolId: row.subject_pool_id,
       availableAt,
     };
+    const entry = {
+      ref,
+      orderable: {
+        availableAt,
+        ...(row.revision_no !== null ? { revisionNo: row.revision_no } : {}),
+        stableKey:
+          row.revision_no === null
+            ? `base@${row.observation_id}`
+            : `r${row.revision_no}@${row.observation_id}`,
+      },
+    };
     const current = latestByObservation.get(ref.observationId);
-    if (current === undefined || ref.availableAt > current.availableAt) {
-      latestByObservation.set(ref.observationId, ref);
+    if (
+      current === undefined ||
+      compareForReplayResolution(entry.orderable, current.orderable) < 0
+    ) {
+      latestByObservation.set(ref.observationId, entry);
     }
   }
-  const observations = [...latestByObservation.values()].sort(
-    (a, b) =>
-      a.observationId.localeCompare(b.observationId) || a.availableAt.localeCompare(b.availableAt),
-  );
+  // Deterministic read order: by observation, then availability via THE
+  // domain timestamp order (not locale-sensitive string comparison).
+  const observations = [...latestByObservation.values()]
+    .map((e) => e.ref)
+    .sort(
+      (a, b) =>
+        a.observationId.localeCompare(b.observationId) ||
+        compareTimestamps(a.availableAt, b.availableAt),
+    );
 
   return { resolvedAt: t, bundles, observations };
 }

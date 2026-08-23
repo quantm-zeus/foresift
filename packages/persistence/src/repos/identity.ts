@@ -10,6 +10,8 @@
  */
 import {
   DecimalsResolutionState,
+  ErrorCode,
+  ForesiftError,
   LineageStatus,
   assertVerifiedEquivalence,
   chainIdentity,
@@ -72,8 +74,10 @@ async function insertOrVerify(
       const normalized = comparable(values[i]);
       const storedNormalized = comparable(row[col]);
       if (normalized !== storedNormalized) {
-        throw new Error(
+        throw new ForesiftError(
+          ErrorCode.CONTRACT_INVARIANT_VIOLATED,
           `identity conflict on ${table}.${String(col)}: stored ${JSON.stringify(storedNormalized)} != incoming ${JSON.stringify(normalized)}`,
+          { table, column: String(col) },
         );
       }
     }
@@ -248,7 +252,11 @@ export async function registerMigrationEdge(
   edge: MigrationLineageEdge,
 ): Promise<IdentityWriteResult> {
   if (edge.status === LineageStatus.AMBIGUOUS && edge.migratedAt !== undefined) {
-    throw new Error('ambiguous migration edges must not assert a boundary time');
+    throw new ForesiftError(
+      ErrorCode.IDENTITY_MIGRATION_EDGE_AMBIGUOUS,
+      'ambiguous migration edges must not assert a boundary time',
+      { migrationId: edge.migrationId },
+    );
   }
   // Cycle refusal covers existing confirmed edges plus the candidate.
   const existing = await engine.query<{ launch_pool_id: string; migrated_pool_id: string }>(

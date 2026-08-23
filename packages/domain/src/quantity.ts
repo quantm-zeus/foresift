@@ -33,7 +33,20 @@ export interface QuantitySemantics {
 
 /** Validate and brand a non-negative raw integer amount. */
 export function rawAmount(value: bigint | string): RawAmount {
-  const v = typeof value === 'string' ? BigInt(value) : value;
+  let v: bigint;
+  if (typeof value === 'string') {
+    try {
+      v = BigInt(value);
+    } catch {
+      throw new QuantityError(
+        'raw amount must be a decimal digit string',
+        { value },
+        ErrorCode.QUANTITY_DECIMAL_STRING_INVALID,
+      );
+    }
+  } else {
+    v = value;
+  }
   if (v < 0n)
     throw new QuantityError(
       'negative amounts are not quantities',

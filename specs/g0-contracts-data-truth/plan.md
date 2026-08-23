@@ -297,9 +297,9 @@ that replay predicate is anti-monotone in T (earlier T ⊆ later T results).
 1. `pnpm-lock.yaml` — mechanical regeneration from the devDependencies above;
    unavoidable consequence of declaring dependencies in scoped `package.json`
    files; no hand edits.
-2. `docs/adr/0005-runtime-schema-validation-zod.md`,
-   `docs/adr/0006-pglite-deterministic-db-test-engine.md`,
-   `docs/adr/0007-pre-infrastructure-recovery-mechanism.md` — recording ADRs P1–P3
+2. `docs/adr/0008-runtime-schema-validation-zod.md`,
+   `docs/adr/0009-pglite-deterministic-db-test-engine.md`,
+   `docs/adr/0010-pre-infrastructure-recovery-mechanism.md` — recording ADRs P1–P3
    above at implementation time (next free numbers after existing 0001–0004;
    CLAUDE.md mandates ADRs for material decisions; `docs/adr/` is the mandated
    location and is not enumerated in this package's writeScopes).

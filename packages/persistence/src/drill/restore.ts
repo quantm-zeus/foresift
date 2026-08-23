@@ -109,8 +109,11 @@ export function objectHashCheck(verifier: ArtifactHashVerifier): RestoreCheck {
 /**
  * Cross-store references: every frozen evidence bundle's manifest must be
  * readable AND its content hash must still match (index ↔ store agreement).
- * Bundle manifests reference artifact ids/hashes; dangling or mutated
- * references fail the drill.
+ * Scope note: this check proves row-level HASH CONSISTENCY between the
+ * restored index and its manifests. It does not yet look up the artifact ids
+ * a manifest references — dangling references are not detected here.
+ * Referenced-artifact existence belongs in plugin RestoreChecks (e.g. the
+ * ArtifactHashVerifier) until promoted into this built-in check.
  */
 export const crossStoreReferenceCheck: RestoreCheck = {
   name: 'cross-store-references',

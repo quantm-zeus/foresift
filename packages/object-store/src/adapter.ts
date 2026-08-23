@@ -36,7 +36,12 @@ export interface StoredObject {
   readonly artifactId: string;
   /** 'sha256:<64 hex>' of the exact stored bytes. */
   readonly contentHash: string;
-  /** Monotonic version within the same dedup identity, starting at 1. */
+  /**
+   * Monotonic per content hash across ALL dedup identities of those bytes
+   * (v1, v2, … in insertion order): identical bytes under different protected
+   * metadata occupy successive versions under the same hash, so a version
+   * number alone does not imply a particular identity.
+   */
   readonly version: number;
   readonly sizeBytes: number;
   readonly metadata: ObjectProtectionMetadata;

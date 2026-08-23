@@ -6,6 +6,7 @@
  */
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { PGlite } from '@electric-sql/pglite';
+import { ALL_QUALITY_CODES } from '@foresift/domain';
 import { getTableConfig } from 'drizzle-orm/pg-core';
 import type { PgTable } from 'drizzle-orm/pg-core';
 
@@ -19,7 +20,12 @@ function asTable(value: unknown): ReturnType<typeof getTableConfig> | undefined 
 }
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { applyMigrations, createEngine, type DatabaseEngine } from '../src/index.ts';
+import {
+  applyMigrations,
+  createEngine,
+  PRECISION_RETAINING_TIMESTAMP_PARSERS,
+  type DatabaseEngine,
+} from '../src/index.ts';
 import * as mirror from '../src/generated/schema.ts';
 
 const MIGRATIONS_DIR = path.resolve(
@@ -44,7 +50,7 @@ let db: PGlite;
 let engine: DatabaseEngine;
 
 beforeAll(async () => {
-  db = new PGlite();
+  db = new PGlite({ parsers: PRECISION_RETAINING_TIMESTAMP_PARSERS });
   engine = createEngine(db, 'pglite');
   await applyMigrations({ engine, migrationsDir: MIGRATIONS_DIR });
 });
@@ -153,5 +159,61 @@ describe('Drizzle mirror parity with SQL truth (T022, ADR-001)', () => {
       expect(expected, `${config.name} missing PK in SQL`).toBeDefined();
       expect([...mirrorPk].sort(), `${config.name} PK mismatch`).toEqual(expected);
     }
+  });
+});
+
+describe('§13.9 quality-code vocabulary parity (SQL truth ↔ domain)', () => {
+  it('the quality_codes seed table is exactly ALL_QUALITY_CODES', async () => {
+    const rows = await engine.query<{ code: string }>('SELECT code FROM quality_codes');
+    const sqlCodes = rows.rows.map((r) => r.code).sort();
+    expect(sqlCodes).toEqual([...ALL_QUALITY_CODES].sort());
+    expect(sqlCodes.length).toBeGreaterThanOrEqual(30);
+  });
+
+  it('every full `<@` allowlist CHECK is byte-equal to the domain vocabulary', async () => {
+    const checks = await engine.query<{ table_name: string; def: string }>(
+      `SELECT conrelid::regclass::text AS table_name, pg_get_constraintdef(oid) AS def
+       FROM pg_constraint
+       WHERE contype = 'c' AND pg_get_constraintdef(oid) LIKE '%quality_codes <@%'`,
+    );
+    expect(checks.rows.length).toBeGreaterThanOrEqual(3); // observations, revisions, null-quantity rule
+
+    let fullAllowlists = 0;
+    for (const { table_name, def } of checks.rows) {
+      const match = /ARRAY\[([^\]]*)\]/.exec(def);
+      expect(match, `${table_name}: allowlist shape`).not.toBeNull();
+      const codes = [...def.matchAll(/'([A-Z_]+)'/g)].map((m) => m[1]);
+      // Every listed code must exist in the domain vocabulary…
+      for (const code of codes) {
+        expect(
+          ALL_QUALITY_CODES.includes(code as never),
+          `${table_name}: unknown quality code '${code}' in SQL allowlist`,
+        ).toBe(true);
+      }
+      // …and any COMPLETE allowlist must be byte-equal to it (this is the
+      // assertion that would have caught the OUTCOME_CENSURED typo).
+      if (codes.length === ALL_QUALITY_CODES.length) {
+        fullAllowlists += 1;
+        expect([...codes].sort(), `${table_name} full allowlist drifts from domain`).toEqual(
+          [...ALL_QUALITY_CODES].sort(),
+        );
+      }
+    }
+    // observations + observation_revisions + quality_sources + features.
+    expect(fullAllowlists).toBeGreaterThanOrEqual(4);
+  });
+
+  it('admits the real §13.9 outcome codes and refuses the historical typo', async () => {
+    const insertWithCodes = async (codes: string[], id: string): Promise<void> => {
+      await engine.query(
+        `INSERT INTO observations
+           (observation_id, event_at, available_at, availability_provenance,
+            quality_codes, receipt_hash)
+         VALUES ($1, $2, $2, 'PROVIDER_LIVE_RESPONSE', $3::text[], $4)`,
+        [id, '2026-06-13T09:00:00Z', codes, `sha256:${id.padEnd(64, '0').slice(0, 64)}`],
+      );
+    };
+    await insertWithCodes(['OUTCOME_CENSORED'], 'obs_vocab_ok');
+    await expect(insertWithCodes(['OUTCOME_CENSURED'], 'obs_vocab_typo')).rejects.toThrow();
   });
 });

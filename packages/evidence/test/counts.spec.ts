@@ -9,7 +9,12 @@ import { fileURLToPath } from 'node:url';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { PGlite } from '@electric-sql/pglite';
 import { ErrorCode, ForesiftError, utcTimestamp } from '@foresift/domain';
-import { applyMigrations, createEngine, type DatabaseEngine } from '@foresift/persistence';
+import {
+  applyMigrations,
+  createEngine,
+  PRECISION_RETAINING_TIMESTAMP_PARSERS,
+  type DatabaseEngine,
+} from '@foresift/persistence';
 import { projectMaturedCounts } from '../src/index.ts';
 
 const MIGRATIONS_DIR = path.resolve(
@@ -21,7 +26,7 @@ let db: PGlite;
 let engine: DatabaseEngine;
 
 beforeAll(async () => {
-  db = new PGlite();
+  db = new PGlite({ parsers: PRECISION_RETAINING_TIMESTAMP_PARSERS });
   engine = createEngine(db, 'pglite');
   await applyMigrations({ engine, migrationsDir: MIGRATIONS_DIR });
 

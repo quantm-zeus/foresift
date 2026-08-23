@@ -33,6 +33,7 @@ import {
   insertPool,
   insertRepresentation,
   loadRepresentation,
+  PRECISION_RETAINING_TIMESTAMP_PARSERS,
   recordDecimalsObservation,
   registerLaunch,
   registerMigrationEdge,
@@ -84,7 +85,7 @@ async function loadFixture(name: string): Promise<string> {
 }
 
 beforeAll(async () => {
-  db = new PGlite();
+  db = new PGlite({ parsers: PRECISION_RETAINING_TIMESTAMP_PARSERS });
   engine = createEngine(db, 'pglite');
   await applyMigrations({ engine, migrationsDir: MIGRATIONS_DIR });
   vectors = JSON.parse(await loadFixture('identity-vectors.json')) as IdentityVectors;

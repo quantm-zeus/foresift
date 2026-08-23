@@ -19,6 +19,7 @@ import {
   insertDex,
   insertPool,
   loadObservation,
+  PRECISION_RETAINING_TIMESTAMP_PARSERS,
   receiptHashOf,
   type DatabaseEngine,
   type ObservationInput,
@@ -33,7 +34,7 @@ let db: PGlite;
 let engine: DatabaseEngine;
 
 beforeAll(async () => {
-  db = new PGlite();
+  db = new PGlite({ parsers: PRECISION_RETAINING_TIMESTAMP_PARSERS });
   engine = createEngine(db, 'pglite');
   await applyMigrations({ engine, migrationsDir: MIGRATIONS_DIR });
   // The subject pool referenced below must satisfy observations' FK to pools.
@@ -256,5 +257,60 @@ describe('compensating events pin the original receipt hash (T026)', () => {
     await expect(
       engine.query('DELETE FROM compensating_events WHERE compensation_id = $1', ['comp_1']),
     ).rejects.toThrow();
+  });
+});
+
+describe('sub-millisecond precision survives the storage round-trip (FR-DATA-003)', () => {
+  it('reads back exactly the digits that were written, byte-for-byte', async () => {
+    const availableAt = utcTimestamp('2026-06-13T09:00:00.123456Z');
+    const { receiptHash } = await appendObservation(engine, {
+      observationId: 'obs_precision',
+      eventAt: utcTimestamp('2026-06-13T09:00:00.000001Z'),
+      availableAt,
+      availabilityProvenance: 'PROVIDER_LIVE_RESPONSE',
+      // NULL quantity demands an explicit explanatory code (§13.9).
+      qualityCodes: ['MISSING_PROVIDER'],
+    });
+
+    const stored = await loadObservation(engine, 'obs_precision');
+    expect(stored).not.toBeNull();
+    if (stored === null) throw new Error('unreachable');
+    // No truncation to whole milliseconds anywhere on the read path.
+    expect(stored.availableAt).toBe(availableAt);
+    expect(stored.eventAt).toBe('2026-06-13T09:00:00.000001Z');
+
+    // The receipt hash still verifies against the row WITH its sub-ms digits —
+    // the invariant the read path must not break by rewriting timestamps.
+    const recomputed = receiptHashOf({
+      observationId: stored.observationId,
+      subjectPoolId: stored.subjectPoolId,
+      subjectAssetId: stored.subjectAssetId,
+      eventAt: stored.eventAt,
+      availableAt: stored.availableAt,
+      sourceObservedAt: stored.sourceObservedAt,
+      sourcePublishedAt: stored.sourcePublishedAt,
+      authorizedAt: stored.authorizedAt,
+      requestedAt: stored.requestedAt,
+      fetchedAt: stored.fetchedAt,
+      ingestedAt: stored.ingestedAt,
+      finalizedAt: stored.finalizedAt,
+      revisedAt: stored.revisedAt,
+      availabilityProvenance: stored.availabilityProvenance,
+      rawAmount: stored.rawAmount,
+      decimals: stored.decimals,
+      coordinatesChainId: stored.coordinatesChainId,
+      blockNumberOrSlot: stored.blockNumberOrSlot,
+      blockHash: stored.blockHash,
+      parentBlockHashOrParentSlot: stored.parentBlockHashOrParentSlot,
+      transactionHash: stored.transactionHash,
+      transactionIndex: stored.transactionIndex,
+      instructionIndex: stored.instructionIndex,
+      innerInstructionIndex: stored.innerInstructionIndex,
+      confirmationLevel: stored.confirmationLevel,
+      reorgVersion: stored.reorgVersion,
+      collectorOrProviderCursor: stored.collectorOrProviderCursor,
+      qualityCodes: [...stored.qualityCodes],
+    });
+    expect(recomputed).toBe(receiptHash);
   });
 });

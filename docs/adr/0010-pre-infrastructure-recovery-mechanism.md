@@ -1,4 +1,4 @@
-# ADR-0007: recovery mechanism for pre-infrastructure milestones
+# ADR-0010: recovery mechanism for pre-infrastructure milestones
 
 - Status: Accepted
 - Date: 2026-08-23
@@ -20,7 +20,7 @@ later without changing the contract's shape.
 Until production PostgreSQL/object-store infrastructure exists
 (deployment-topology milestone), FR-DR-002's "equivalent tested mechanism"
 is the deterministic snapshot-and-replay restore harness in
-`packages/persistence/drill/`. It measures RPO/RTO against the §34.4 tier
+`packages/persistence/src/drill/`. It measures RPO/RTO against the §34.4 tier
 registry and enforces key-material separation. Production WAL-based PITR
 configuration implements the same interface and inherits the same drill
 verification.
@@ -42,4 +42,4 @@ verification.
 ## References
 
 - FR-DR-001 / FR-DR-002, AC-260…AC-264
-- ADR-0006 (PGlite deterministic snapshot rendering)
+- ADR-0009 (PGlite deterministic snapshot rendering)

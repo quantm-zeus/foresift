@@ -18,6 +18,7 @@ import {
   applyMigrations,
   createEngine,
   evaluateAndRecordDrill,
+  PRECISION_RETAINING_TIMESTAMP_PARSERS,
   recordTierMeasurement,
   registerRecoveryTier,
   seedDefaultRecoveryTiers,
@@ -38,7 +39,7 @@ let targetDb: PGlite | undefined;
 
 beforeAll(async () => {
   source = await makeTestDatabase();
-  targetDb = new PGlite();
+  targetDb = new PGlite({ parsers: PRECISION_RETAINING_TIMESTAMP_PARSERS });
 });
 
 afterAll(async () => {

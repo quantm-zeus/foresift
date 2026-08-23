@@ -11,6 +11,7 @@ import { chainIdentity, utcTimestamp } from '@foresift/domain';
 import {
   appendObservation,
   applyMigrations,
+  assertNullAloneIsInsufficient,
   createEngine,
   ensureChain,
   fieldQualityForObservation,
@@ -18,8 +19,8 @@ import {
   fieldsByQualityState,
   insertDex,
   insertPool,
+  PRECISION_RETAINING_TIMESTAMP_PARSERS,
   recordFieldQuality,
-  assertNullAloneIsInsufficient,
   type DatabaseEngine,
   type ObservationInput,
 } from '../src/index.ts';
@@ -33,7 +34,7 @@ let db: PGlite;
 let engine: DatabaseEngine;
 
 beforeAll(async () => {
-  db = new PGlite();
+  db = new PGlite({ parsers: PRECISION_RETAINING_TIMESTAMP_PARSERS });
   engine = createEngine(db, 'pglite');
   await applyMigrations({ engine, migrationsDir: MIGRATIONS_DIR });
   // observation_field_quality FKs to observations; seed one subject pool.

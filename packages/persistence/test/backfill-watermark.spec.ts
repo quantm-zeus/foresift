@@ -8,15 +8,17 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { PGlite } from '@electric-sql/pglite';
-import { utcTimestamp, visibleAt, type UtcTimestamp } from '@foresift/domain';
+import { ErrorCode, utcTimestamp, visibleAt, type UtcTimestamp } from '@foresift/domain';
 import {
   advanceWatermark,
+  appendObservation,
   applyMigrations,
   assertNoBackdating,
   backfillVisibleForReplay,
   canClaimCompleteCoverage,
   createEngine,
   loadWatermark,
+  PRECISION_RETAINING_TIMESTAMP_PARSERS,
   recordBackfillReceipt,
   type DatabaseEngine,
 } from '../src/index.ts';
@@ -30,7 +32,7 @@ let db: PGlite;
 let engine: DatabaseEngine;
 
 beforeAll(async () => {
-  db = new PGlite();
+  db = new PGlite({ parsers: PRECISION_RETAINING_TIMESTAMP_PARSERS });
   engine = createEngine(db, 'pglite');
   await applyMigrations({ engine, migrationsDir: MIGRATIONS_DIR });
 }, 120_000);
@@ -123,6 +125,16 @@ describe('no-backdating guard (§13.6 rule 5)', () => {
   });
 
   it('persists a live-receipt-backed receipt whose event precedes retrieval', async () => {
+    // §13.6 requires the reference to point at an INDEPENDENTLY PERSISTED
+    // live receipt — so the proof observation is written first and its real
+    // receipt hash is what the backfill receipt cites.
+    const { receiptHash } = await appendObservation(engine, {
+      observationId: 'obs_bf_live_proof',
+      eventAt: T('2026-01-15T00:00:00Z'),
+      availableAt: T('2026-01-15T00:01:00Z'),
+      availabilityProvenance: 'PROVIDER_LIVE_RESPONSE',
+      qualityCodes: ['MISSING_PROVIDER'],
+    });
     await recordBackfillReceipt(engine, {
       backfillReceiptId: 'bf_live',
       backfillJobId: 'job_live',
@@ -133,13 +145,36 @@ describe('no-backdating guard (§13.6 rule 5)', () => {
       retrospectiveOnly: true,
       wouldHaveBeenObservableLive: true,
       proofMethod: 'LIVE_RECEIPT_REFERENCE',
-      liveReceiptRef: 'live/bf_live/receipt.json',
+      liveReceiptRef: receiptHash,
     });
     const stored = await engine.query<{ live_receipt_ref: string | null; available_at: Date }>(
       'SELECT live_receipt_ref, available_at FROM backfill_receipts WHERE backfill_receipt_id = $1',
       ['bf_live'],
     );
-    expect(stored.rows[0]?.live_receipt_ref).toBe('live/bf_live/receipt.json');
+    expect(stored.rows[0]?.live_receipt_ref).toBe(receiptHash);
+  });
+
+  it('refuses a live-receipt reference that matches no persisted receipt', async () => {
+    // A fabricated reference string must not unlock earlier-than-retrieval
+    // availability — the exception exists only when the proof really exists.
+    await expect(
+      recordBackfillReceipt(engine, {
+        backfillReceiptId: 'bf_fabricated',
+        backfillJobId: 'job_fabricated',
+        backfillReason: 'MISSED_LIVE_WINDOW',
+        historicalEventAt: T('2026-01-16T00:00:00Z'),
+        retrievedAt: T('2026-03-01T00:00:00Z'),
+        availableAt: T('2026-01-16T00:05:00Z'),
+        retrospectiveOnly: true,
+        proofMethod: 'LIVE_RECEIPT_REFERENCE',
+        liveReceiptRef: 'sha256:' + 'ef'.repeat(32), // no such receipt anywhere
+      }),
+    ).rejects.toThrow(ErrorCode.BACKFILL_AVAILABILITY_PROOF_MISSING);
+    const leaked = await engine.query<{ n: string }>(
+      'SELECT COUNT(*)::text AS n FROM backfill_receipts WHERE backfill_receipt_id = $1',
+      ['bf_fabricated'],
+    );
+    expect(Number(leaked.rows[0]?.n ?? '0')).toBe(0);
   });
 
   it('replay admission of a backfilled row uses THE shared predicate', () => {

@@ -111,8 +111,6 @@ export async function transitionStage(
     /** The stage being recorded as reached. */
     reached: Exclude<ArtifactStage, 'PENDING_UPLOAD'>;
     at: UtcTimestamp;
-    /** Decision-critical evidence must verify BOTH sides before AVAILABLE. */
-    requireBothSidesVerified?: boolean;
   },
 ): Promise<ArtifactIndexRow> {
   const current = await loadArtifact(engine, input.artifactId);
@@ -130,8 +128,11 @@ export async function transitionStage(
       { artifactId: input.artifactId },
     );
   }
-  // Decision-critical rule (§14.8): AVAILABLE requires both sides verified.
-  if (input.reached === 'AVAILABLE' && input.requireBothSidesVerified === true) {
+  // Decision-critical rule (§14.8), enforced unconditionally — never left to
+  // caller discipline: AVAILABLE requires both sides verified. The SQL CHECK
+  // (`object_artifacts_available_requires_verification`) backstops this same
+  // rule for any writer that bypasses this boundary.
+  if (input.reached === 'AVAILABLE') {
     if (current.hashVerifiedAt === null || current.indexCommittedAt === null) {
       throw new ForesiftError(
         ErrorCode.OBJECT_STAGE_TRANSITION_INVALID,

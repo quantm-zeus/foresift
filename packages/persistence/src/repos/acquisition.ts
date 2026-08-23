@@ -1,12 +1,17 @@
 /**
  * Evidence acquisition repository (§13.8, FR-DATA-003/005, T035/T036).
  *
- * Lifecycle ordering is enforced at this boundary AND structurally in SQL:
+ * Lifecycle ordering is enforced at this boundary AND structurally in SQL,
+ * with per-rule attribution:
  * - randomized probes persist eligibility stratum, nonzero assignment
  *   probability, seed provenance, selection time, requested fields, and the
- *   decision impact BEFORE retrieval completion (AC-243);
- * - retrieval cannot complete without a prior probe assignment;
- * - completion is one-way — completed decisions are never re-opened;
+ *   decision impact BEFORE retrieval completion (AC-243) — enforced at this
+ *   boundary;
+ * - retrieval cannot complete without a prior probe assignment — enforced at
+ *   this boundary;
+ * - completion is one-way — completed decisions are never re-opened; the
+ *   boundary guard refuses re-completion, while frozen counts hold by query
+ *   construction (they are read through replay-resolved windows);
  * - historical evidence counts resolved through a replay boundary are frozen:
  *   later dependence estimates are stored DIAGNOSTIC_RETROSPECTIVE only and
  *   can never alter them (AC-247).

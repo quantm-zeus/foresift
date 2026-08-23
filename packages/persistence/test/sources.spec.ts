@@ -28,6 +28,7 @@ import {
   dependenceEdgesForPair,
   independenceGroupOf,
   independenceGroups,
+  PRECISION_RETAINING_TIMESTAMP_PARSERS,
   recordDependenceEdge,
   registerSourceIdentity,
   type DatabaseEngine,
@@ -62,7 +63,7 @@ let engine: DatabaseEngine;
 const [correlatedPair, independentPair] = FIXTURE.pairs;
 
 beforeAll(async () => {
-  db = new PGlite();
+  db = new PGlite({ parsers: PRECISION_RETAINING_TIMESTAMP_PARSERS });
   engine = createEngine(db, 'pglite');
   await applyMigrations({ engine, migrationsDir: MIGRATIONS_DIR });
   if (correlatedPair === undefined || independentPair === undefined) {

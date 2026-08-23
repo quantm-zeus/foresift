@@ -37,9 +37,10 @@ CREATE TABLE backup_runs (
         CHECK (status <> 'FAILED' OR failure_reason IS NOT NULL)
 );
 
--- Clean-environment restore drills (AC-261): a PASSED outcome structurally
--- requires the separately provided credential provider, completion, and all
--- recorded checks green.
+-- Clean-environment restore drills (AC-261): the DDL structurally requires a
+-- PASSED outcome to carry the separately provided credential provider and
+-- completion; "all recorded checks green" is additionally enforced by the
+-- restore-drill runtime (drill/restore.ts), not by this table.
 CREATE TABLE restore_drills (
     drill_id                    text PRIMARY KEY,
     started_at                  timestamptz NOT NULL,

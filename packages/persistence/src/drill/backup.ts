@@ -1,6 +1,6 @@
 /**
  * Backup governance + deterministic snapshot mechanism (T043, FR-DR-002,
- * §34.5, ADR-0007). This module is the pre-infrastructure equivalent
+ * §34.5, ADR-0010). This module is the pre-infrastructure equivalent
  * mechanism: production PITR/WAL wiring implements the same
  * `SnapshotMechanism` interface and inherits the same drills.
  *
@@ -249,7 +249,7 @@ export async function failBackupRun(
 // ---------------------------------------------------------------------------
 
 /**
- * The pluggable backup mechanism port (ADR-0007). The deterministic dump
+ * The pluggable backup mechanism port (ADR-0010). The deterministic dump
  * implementation below satisfies tests/drills today; production supplies a
  * PITR/WAL-based mechanism implementing the same interface.
  */

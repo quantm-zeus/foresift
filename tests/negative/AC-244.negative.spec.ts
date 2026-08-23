@@ -50,9 +50,9 @@ describe('AC-244 negative: lift claims without valid provenance are refused', ()
       throw new Error('expected refusal');
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
-      if (!message.startsWith('expected refusal')) {
-        expect((err as { code?: string }).code).toBe(ErrorCode.FEATURE_PROVENANCE_INCOMPLETE);
-      }
+      // Sentinel rethrown before asserting: an accepted call must FAIL here.
+      if (message.startsWith('expected refusal')) throw err;
+      expect((err as { code?: string }).code).toBe(ErrorCode.FEATURE_PROVENANCE_INCOMPLETE);
     }
   });
 
@@ -62,9 +62,10 @@ describe('AC-244 negative: lift claims without valid provenance are refused', ()
       throw new Error('expected refusal');
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
-      if (!message.startsWith('expected refusal')) {
-        expect((err as { code?: string }).code).toBe(ErrorCode.FEATURE_PROVENANCE_INCOMPLETE);
-      }
+      // Sentinel rethrown before asserting — this zero-version refusal is
+      // pinned nowhere else, so a vacuous skip here would go unnoticed.
+      if (message.startsWith('expected refusal')) throw err;
+      expect((err as { code?: string }).code).toBe(ErrorCode.FEATURE_PROVENANCE_INCOMPLETE);
     }
   });
 

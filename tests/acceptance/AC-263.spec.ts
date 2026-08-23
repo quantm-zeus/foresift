@@ -15,10 +15,11 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { ErrorCode, utcTimestamp, type UtcTimestamp } from '@foresift/domain';
 import {
   applyMigrations,
+  blockingGapsForShard,
   captureDeterministicSnapshot,
   commitCheckpoint,
   createEngine,
-  blockingGapsForShard,
+  PRECISION_RETAINING_TIMESTAMP_PARSERS,
   recordCanonicalEvent,
   registerGap,
   resolveGapStatus,
@@ -79,7 +80,7 @@ describe('AC-263: restore + replay neither duplicates nor skips unmarked history
   it('replaying applied events after a destructive restore is refused by storage', async () => {
     // Backup → destroy → clean-environment restore.
     const snapshot = await captureDeterministicSnapshot(source.engine, T('2026-06-01T09:00:00Z'));
-    restoredDb = new PGlite();
+    restoredDb = new PGlite({ parsers: PRECISION_RETAINING_TIMESTAMP_PARSERS });
     restored = createEngine(restoredDb, 'pglite');
     await applyMigrations({ engine: restored, migrationsDir: MIGRATIONS_DIR });
     const restoredRows = await restoreSnapshotInto(restored, snapshot);

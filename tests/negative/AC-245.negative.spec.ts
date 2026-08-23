@@ -56,9 +56,10 @@ describe('AC-245 negative: dependence-edge refusals', () => {
         throw new Error(`expected refusal for ${JSON.stringify(bad)}`);
       } catch (err) {
         const message = err instanceof Error ? err.message : String(err);
-        if (!message.startsWith('expected refusal')) {
-          expect((err as { code?: string }).code).toBe(ErrorCode.SOURCE_DEPENDENCE_INPUT_INVALID);
-        }
+        // Rethrow OUR sentinel first so a non-refusing input can never pass
+        // by silently skipping the assertion below.
+        if (message.startsWith('expected refusal')) throw err;
+        expect((err as { code?: string }).code).toBe(ErrorCode.SOURCE_DEPENDENCE_INPUT_INVALID);
       }
     }
   });

@@ -13,8 +13,8 @@ import { PGlite } from '@electric-sql/pglite';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { fixedClock, utcTimestamp, type RecoveryTierId, type UtcTimestamp } from '@foresift/domain';
 import {
-  applyMigrations,
   appendObservation,
+  applyMigrations,
   captureDeterministicSnapshot,
   commitCheckpoint,
   completeBackupRun,
@@ -22,6 +22,7 @@ import {
   createEngine,
   evaluateAndRecordDrill,
   migrationStateCheck,
+  PRECISION_RETAINING_TIMESTAMP_PARSERS,
   recordAcquisitionDecision,
   registerRecoveryTier,
   runRestoreDrill,
@@ -119,7 +120,7 @@ describe('AC-062: backup restore meets configured RPO/RTO in a drill', () => {
     });
 
     // 2. Destroy: the "lost" environment is a brand-new empty database…
-    restoredDb = new PGlite();
+    restoredDb = new PGlite({ parsers: PRECISION_RETAINING_TIMESTAMP_PARSERS });
     restored = createEngine(restoredDb, 'pglite');
     await applyMigrations({ engine: restored, migrationsDir: MIGRATIONS_DIR });
     // Identical configuration seed as the lost world.

@@ -262,11 +262,7 @@
         "FR-MCP-009",
         "FR-MCP-010"
       ],
-      "dependencies": [
-        "g0-tool-core",
-        "g0-security-perimeter",
-        "g0-cost-capacity"
-      ],
+      "dependencies": ["g0-tool-core", "g0-security-perimeter", "g0-cost-capacity"],
       "risk": "HIGH",
       "parallelizable": false,
       "writeScopes": [
@@ -280,9 +276,7 @@
         "tests/negative/**",
         "telemetry/mcp.*"
       ],
-      "verificationCommands": [
-        "test -d apps/api && pnpm --filter @foresift/api test"
-      ],
+      "verificationCommands": ["test -d apps/api && pnpm --filter @foresift/api test"],
       "status": "PENDING"
     },
     {

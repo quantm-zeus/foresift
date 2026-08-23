@@ -196,6 +196,13 @@ function buildFixture(name: string): Fixture {
   execFileSync('git', ['clone', '-q', `${repo}-origin.git`, join(root, 'sibling')]);
 
   // Stub gh: instant-green named check at ANY sha; records every invocation.
+  // Fault-injection knobs (§29 matrix):
+  //   GHSTUB_ADVANCE_MAIN   one-shot: advance origin/main during the CI wait
+  //                         (TOCTOU closure proof)
+  //   GHSTUB_MOVE_BRANCH    one-shot: advance origin/<branch> during the CI
+  //                         wait (head-moved refusal proof)
+  //   GHSTUB_CONCLUSION     fixed check conclusion (default success)
+  //   GHSTUB_EMPTY_RUNS     report zero check-runs (no-check-runs trap proof)
   const bin = join(root, 'bin');
   mkdirSync(bin);
   writeFileSync(
@@ -218,7 +225,19 @@ case "\$cmd/\$sub" in
       git -C "\${SIBLING_REPO}" -c user.email=t@t -c user.name=t commit -qm 'sibling lands first'
       git -C "\${SIBLING_REPO}" push -q origin main
     fi
-    printf '[{"name":"%s","status":"completed","conclusion":"success"}]' "\${GHSTUB_CHECK_NAME:?}"
+    # HEAD-moved hook: a sibling pushes to the SAME feature branch mid-wait.
+    if [ -n "\${GHSTUB_MOVE_BRANCH:-}" ] && [ ! -e "\${GHSTUB_MOVE_BRANCH}" ]; then
+      touch "\${GHSTUB_MOVE_BRANCH}"
+      BRANCH_NAME="\$(git -C "\${LANDER_REPO:?}" rev-parse --abbrev-ref HEAD)"
+      git -C "\${SIBLING_REPO:?}" fetch -q origin "\$BRANCH_NAME"
+      git -C "\${SIBLING_REPO}" checkout -q --detach FETCH_HEAD
+      git -C "\${SIBLING_REPO}" -c user.email=t@t -c user.name=t commit --allow-empty \\
+        -qm 'sibling advances the same branch'
+      git -C "\${SIBLING_REPO}" push -q origin "HEAD:\$BRANCH_NAME"
+    fi
+    if [ -n "\${GHSTUB_EMPTY_RUNS:-}" ]; then printf '[]'; exit 0; fi
+    printf '[{"name":"%s","status":"completed","conclusion":"%s"}]' \\
+      "\${GHSTUB_CHECK_NAME:?}" "\${GHSTUB_CONCLUSION:-success}"
     ;;
   *) echo "stub: unsupported invocation: $*" >&2; exit 1 ;;
 esac
@@ -228,19 +247,38 @@ esac
   return { root, bin };
 }
 
-function runLander(fx: Fixture, extraEnv: Record<string, string> = {}) {
-  return spawnSync(process.execPath, [LANDER, '--branch', 'feat/pkg-a', '--title', 'land pkg-a'], {
-    encoding: 'utf8',
-    cwd: join(fx.root, 'repo'),
-    env: {
-      ...process.env,
-      PATH: `${fx.bin}:${process.env.PATH}`,
-      GHSTUB_LOG: join(fx.root, 'gh.log'),
-      GHSTUB_MERGED: join(fx.root, 'MERGED'),
-      GHSTUB_CHECK_NAME: CHECK_NAME,
-      ...extraEnv,
+function runLander(
+  fx: Fixture,
+  extraEnv: Record<string, string> = {},
+  deadlineS?: number,
+  pollS?: number,
+) {
+  return spawnSync(
+    process.execPath,
+    [
+      LANDER,
+      '--branch',
+      'feat/pkg-a',
+      '--title',
+      'land pkg-a',
+      ...(deadlineS ? ['--deadline-s', String(deadlineS)] : []),
+      ...(pollS ? ['--poll-s', String(pollS)] : []),
+    ],
+    {
+      encoding: 'utf8',
+      cwd: join(fx.root, 'repo'),
+      env: {
+        ...process.env,
+        PATH: `${fx.bin}:${process.env.PATH}`,
+        GHSTUB_LOG: join(fx.root, 'gh.log'),
+        GHSTUB_MERGED: join(fx.root, 'MERGED'),
+        GHSTUB_CHECK_NAME: CHECK_NAME,
+        LANDER_REPO: join(fx.root, 'repo'),
+        SIBLING_REPO: join(fx.root, 'sibling'),
+        ...extraEnv,
+      },
     },
-  });
+  );
 }
 
 const inRepo = (fx: Fixture, args: string[]) =>
@@ -291,11 +329,45 @@ describe('mechanical lander enforces base admission (V3-D §11.3)', () => {
   it('TOCTOU closure: main advances DURING the CI wait ⇒ pre-merge re-check refuses', () => {
     const fx = buildFixture('toctou');
     makeBranch(fx);
-    const r = runLanderWithAdvance(fx);
+    const r = runLander(fx, { GHSTUB_ADVANCE_MAIN: join(fx.root, 'advanced.flag') });
     expect(r.status).toBe(1);
     expect(r.stdout).toContain(`"reason": "${BASE_DRIFT_REASON}"`);
     expect(existsMerged(fx)).toBe(false); // never merged despite green CI
     expect(r.stdout).toContain('aborted-pre-merge-base');
+  });
+
+  it('§29-E21: red CI at the pinned head ⇒ ci-red refusal, never bypassed', () => {
+    const fx = buildFixture('ci-red');
+    makeBranch(fx);
+    const r = runLander(fx, { GHSTUB_CONCLUSION: 'failure' });
+    expect(r.status).toBe(1);
+    expect(r.stdout).toContain('"reason": "ci-red"');
+    expect(r.stdout).toContain(`${CHECK_NAME}:failure`);
+    expect(existsMerged(fx)).toBe(false);
+  });
+
+  it('§29-E22: zero check-runs at pinned head ⇒ no-check-runs diagnose-and-fail-fast', () => {
+    const fx = buildFixture('no-check-runs');
+    makeBranch(fx);
+    // deadline 12s ⇒ diagnose threshold min(deadlineMs/2, 300s) = 6s; with an
+    // explicit 5s poll cadence the diagnostic trips on the third poll (~10s
+    // wall clock), INSIDE the deadline — fail-fast, not timeout.
+    const r = runLander(fx, { GHSTUB_EMPTY_RUNS: '1' }, 12, 5);
+    expect(r.status).toBe(1);
+    expect(r.stdout).toContain('"reason": "no-check-runs"');
+    expect(r.stdout).toMatch(/since-squashed commit|recreate the branch/);
+    expect(r.stdout).not.toContain('"reason": "timeout"');
+    expect(existsMerged(fx)).toBe(false);
+  }, 30000);
+
+  it('§29-E24: origin branch moves DURING the wait ⇒ head-moved abort, never merge a moving target', () => {
+    const fx = buildFixture('head-moved');
+    makeBranch(fx);
+    const r = runLander(fx, { GHSTUB_MOVE_BRANCH: join(fx.root, 'moved.flag') });
+    expect(r.status).toBe(1);
+    expect(r.stdout).toContain('"reason": "head-moved"');
+    expect(r.stdout).toContain('aborted-drift');
+    expect(existsMerged(fx)).toBe(false);
   });
 });
 
@@ -313,12 +385,6 @@ function ghCalls(fx: Fixture): string {
   } catch {
     return '';
   }
-}
-function runLanderWithAdvance(fx: Fixture) {
-  return runLander(fx, {
-    GHSTUB_ADVANCE_MAIN: join(fx.root, 'advanced.flag'),
-    SIBLING_REPO: join(fx.root, 'sibling'),
-  });
 }
 
 // ── 4. final-land admission routes ───────────────────────────────────────────

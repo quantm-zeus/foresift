@@ -20,6 +20,9 @@
 #   S16 ack-ok-but-noop quota probe escalates instead of burning the probe budget
 #   S17 throughput profile selects the workflow variant (LEGACY original DAG,
 #       OPTIMIZED -optimized variant) for launches AND stranded-run adoption
+#   S18 critical-path ordering drives selection; one tick fills both slots
+#   S19 corrupt autopilot-state.json self-heals; live runs re-adopted, no relaunch
+#   S20 singleton lock refuses a second writer (exit 3); stale locks are taken over
 #
 # No network, no AI spend, no writes outside a mktemp sandbox, no access to the
 # real Archon database. Run via `pnpm autopilot:selftest`.
@@ -799,6 +802,57 @@ case "$LAUNCHED_S18" in
 esac
 tick
 assert_eq "third package stays blocked while both slots are busy" "$(launch_count)" "2"
+
+# ── S19: corrupt autopilot-state.json self-heals; live runs re-adopted ───────
+echo "S19: garbage state bytes fall back to the default state WITHOUT double-launching"
+new_sandbox s19
+roadmap_fixture G0
+milestone_fixture "G0" \
+  "$(pkg_json c-alpha "" HIGH true)" \
+  "$(pkg_json c-beta "" MEDIUM true)"
+printf 'DEFAULT_STATUS="running"\n' >"$FAKE_SCENARIO"
+printf 'LAUNCH rid=run-9 workflow=foresift-work-package-optimized branch=foresift/c-alpha msg=c-alpha\n' >>"$FAKE_LAUNCHES"
+node -e '
+const fs = require("fs");
+const f = process.env.FORESIFT_AUTOPILOT_REPO + "/specs/implementation/current-milestone.json";
+const ms = JSON.parse(fs.readFileSync(f, "utf8"));
+ms.packages[0].status = "RUNNING";
+fs.writeFileSync(f, JSON.stringify(ms, null, 2));
+'
+printf 'CORRUPT {{ NOT JSON' >"$FORESIFT_AUTOPILOT_STATE_DIR/autopilot-state.json"
+LAUNCHES_BEFORE="$(launch_count)"
+tick
+assert_eq "unparsable state falls back to default and RE-ADOPTS the live run" \
+  "$(node -e '
+const s = JSON.parse(require("fs").readFileSync(process.env.FORESIFT_AUTOPILOT_STATE_DIR + "/autopilot-state.json", "utf8"));
+console.log([s.activeRuns[0]?.runId, String(!s.pausedFatal)].join(" "));
+')" "run-9 true"
+assert_eq "healing issues no new launch (never a duplicate product run)" \
+  "$(launch_count)" "$LAUNCHES_BEFORE"
+
+# ── S20: singleton lock — live holder refuses, stale holder is taken over ────
+echo "S20: lock exclusivity refuses a second writer; stale locks never wedge the supervisor"
+new_sandbox s20
+roadmap_fixture G0
+milestone_fixture "G0" \
+  "$(pkg_json l-alpha "" HIGH true)" \
+  "$(pkg_json l-beta "" MEDIUM true)"
+printf 'DEFAULT_STATUS="running"\n' >"$FAKE_SCENARIO"
+printf 'LAUNCH rid=run-l1 workflow=foresift-work-package-optimized branch=foresift/l-alpha msg=l-alpha\n' >>"$FAKE_LAUNCHES"
+printf '%s\n' "$$" >"$FORESIFT_AUTOPILOT_STATE_DIR/autopilot.lock" # live pid (this shell)
+LAUNCHES_BEFORE="$(launch_count)"
+set +e
+node "$ROOT/scripts/automation/foresift-autopilot.mjs" --once >"$SB/s20-refused.log" 2>&1
+LOCK_RC=$?
+set -e
+assert_eq "second instance refuses with exit 3 while a live process holds the lock" \
+  "$LOCK_RC" "3"
+assert_match "refusal names the singleton rule" "$(cat "$SB/s20-refused.log")" 'holds the lock'
+assert_eq "refused instance launched nothing" "$(launch_count)" "$LAUNCHES_BEFORE"
+printf '999999\n' >"$FORESIFT_AUTOPILOT_STATE_DIR/autopilot.lock" # dead pid → stale
+tick
+assert_eq "stale lock is taken over; the tick proceeds and launches normally" \
+  "$(launch_count)" "$((LAUNCHES_BEFORE + 1))"
 
 echo
 echo "selftest result: PASS=$PASS FAIL=$FAIL"

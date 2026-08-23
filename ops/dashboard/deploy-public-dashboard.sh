@@ -31,7 +31,16 @@ EXTERNAL_IP="${FORESIFT_DASHBOARD_IP:-34.87.12.208}"
 GCP_PROJECT="${CLOUDSDK_CORE_PROJECT:-project-f4ed0894-e3e1-4820-b08}"
 GCP_REGION="asia-southeast1"
 WEBROOT="/var/www/letsencrypt"
-CREDS_DIR="${HOME}/.local/state/foresift"
+# Under plain sudo $HOME is /root; every operator-scoped artifact (credential
+# file, user-level systemd drop-in) belongs to the INVOKING user's home.
+if [ "$(id -u)" = "0" ] && [ -n "${SUDO_USER:-}" ]; then
+  RUN_HOME="$(getent passwd "${SUDO_USER}" | cut -d: -f6)"
+  RUN_UID="$(id -u "${SUDO_USER}")"
+else
+  RUN_HOME="${HOME}"
+  RUN_UID="$(id -u)"
+fi
+CREDS_DIR="${RUN_HOME}/.local/state/foresift"
 CREDS_FILE="${CREDS_DIR}/dashboard-credentials" # plaintext lives ONLY here, 0600
 BASIC_USER="foresift"
 HOOK_SRC="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/certbot-deploy-hook.sh"
@@ -109,6 +118,9 @@ sudo test -f "/etc/letsencrypt/live/${EXTERNAL_IP}-staging/fullchain.pem" || die
 # ── step 4: credentials — plaintext ONLY in $CREDS_FILE (0600), hash in config ─
 log "step 4/6: dashboard basic-auth credentials"
 mkdir -p "$CREDS_DIR"; chmod 700 "$CREDS_DIR"
+# This script is invoked under sudo, so $CREDS_FILE would otherwise be created
+# root-owned; the credential file belongs to the invoking operator.
+if [ -n "${SUDO_USER:-}" ]; then chown "${SUDO_USER}:" "$CREDS_DIR"; fi
 if [ -f "$CREDS_FILE" ]; then
   log "  reusing existing password in $CREDS_FILE"
   PW="$(sed -n 's/^password=//p' "$CREDS_FILE")"
@@ -121,7 +133,9 @@ else
   umask 022
   log "  generated NEW password -> $CREDS_FILE (mode 0600; plaintext NEVER enters git/config/args)"
 fi
-HASH="$(printf '%s' "$PW" | caddy hash-password 2>/dev/null)" # Argon2id; PW passed via stdin only
+# caddy hash-password reads stdin LINE-based: the trailing newline is mandatory
+# (a newline-less pipe fails with "Error: EOF"). PW still never enters argv.
+HASH="$(printf '%s\n' "$PW" | caddy hash-password 2>/dev/null)" # PW passed via stdin only
 [ -n "$HASH" ] || die "caddy hash-password failed"
 
 # ── step 5: production certificate ────────────────────────────────────────────
@@ -134,8 +148,10 @@ sudo certbot certonly --non-interactive --agree-tos \
 # Renewal hook: executable root:caddy 0750 (certbot exec()s deploy hooks, so
 # the execute bit is mandatory — 0640 would make every renewal silently skip
 # deployment). The hook copies each renewed lineage to the caddy-readable
-# /etc/caddy/certs/foresift store, validates the config, reloads Caddy
+# /etc/caddy/certs/foresift store, validates the config, restarts Caddy
 # (6-day validity ⇒ renewals every ~3-4 days; timer already active).
+# RESTART, not reload: this edge runs with `admin off`, so there is no admin
+# endpoint for `caddy reload` to talk to and every reload attempt fails.
 sudo install -o root -g caddy -m 0750 "$HOOK_SRC" "$HOOK_DST"
 # Deploy hooks fire on RENEWAL only, so trigger it once now for the initial
 # issuance; the final Caddyfile below references the deployed copies.
@@ -149,13 +165,18 @@ sudo tee /etc/caddy/Caddyfile >/dev/null <<EOF
 # Foresift dashboard edge — PRODUCTION.
 # TLS terminates here for the Let's Encrypt shortlived IP certificate;
 # basic_auth gates everything; traffic proxies to loopback-only archon.
+# Port 80 exists for ACME http-01 webroot challenges only; every other
+# plain-HTTP request is redirected to HTTPS.
 {
 	admin off
+	default_sni ${EXTERNAL_IP}
 }
 
 http://:80 {
 	root * ${WEBROOT}
 	file_server
+	@not-acme not path /.well-known/acme-challenge/*
+	redir @not-acme https://{host}{uri} 308
 }
 
 https://${EXTERNAL_IP} {
@@ -167,25 +188,48 @@ https://${EXTERNAL_IP} {
 }
 EOF
 sudo caddy validate --config /etc/caddy/Caddyfile || die "rendered Caddyfile failed validation (check the Argon2id hash rendering)"
-sudo systemctl reload caddy
+# RESTART (not reload): `admin off` means no admin endpoint exists for a
+# `caddy reload` to talk to — every reload attempt fails with ECONNREFUSED.
+sudo systemctl restart caddy
 
 sleep 2
-CODE_NOAUTH="$(curl -sk -o /dev/null -w '%{http_code}' "https://127.0.0.1/" || true)"
+# Browsers and curl send NO SNI for IP-literal URLs (RFC 6066), so probe the
+# public IP exactly as a real client does — NOT https://127.0.0.1/, whose
+# mismatched Host header exercises a different routing path than the public
+# one (with default_sni set it answers 200-empty instead of 401).
+CODE_NOAUTH="$(curl -sk -o /dev/null -w '%{http_code}' "https://${EXTERNAL_IP}/" || true)"
 [ "$CODE_NOAUTH" = "401" ] || die "expected 401 without credentials, got '${CODE_NOAUTH}'"
-CODE_AUTH="$(curl -sk -o /dev/null -w '%{http_code}' -u "${BASIC_USER}:${PW}" "https://127.0.0.1/" || true)"
+CODE_AUTH="$(curl -sk -o /dev/null -w '%{http_code}' -u "${BASIC_USER}:${PW}" "https://${EXTERNAL_IP}/" || true)"
 case "$CODE_AUTH" in 200|30[127]) ;; *) die "expected success with credentials, got '${CODE_AUTH}'" ;; esac
+CODE_REDIRECT="$(curl -s -o /dev/null -w '%{http_code}' "http://${EXTERNAL_IP}/" || true)"
+[ "$CODE_REDIRECT" = "308" ] || die "expected 308 HTTP->HTTPS redirect, got '${CODE_REDIRECT}'"
 
 # Prove renewal automation end-to-end (staging lineage dry-runs the ACME flow).
 sudo certbot renew --dry-run --cert-name "${EXTERNAL_IP}-staging" >/dev/null \
   || die "certbot renew --dry-run failed — auto-renewal is NOT proven"
 
-# WEB_UI_ORIGIN is set ONLY now that public HTTPS actually exists.
-mkdir -p "${HOME}/.config/systemd/user/archon-dashboard.service.d"
-cat >"${HOME}/.config/systemd/user/archon-dashboard.service.d/webui-origin.conf" <<EOF
+# WEB_UI_ORIGIN is set ONLY now that public HTTPS actually exists. The
+# dashboard service is a USER unit of the invoking operator, so this tail must
+# run as that user even when the script itself runs under sudo (root has no
+# session bus for --user units).
+if [ "$(id -u)" = "0" ] && [ -n "${SUDO_USER:-}" ]; then
+  as_operator() {
+    sudo -u "${SUDO_USER}" env HOME="${RUN_HOME}" XDG_RUNTIME_DIR="/run/user/${RUN_UID}" "$@"
+  }
+  as_operator mkdir -p "${RUN_HOME}/.config/systemd/user/archon-dashboard.service.d"
+  as_operator tee "${RUN_HOME}/.config/systemd/user/archon-dashboard.service.d/webui-origin.conf" >/dev/null <<EOF
 [Service]
 Environment=WEB_UI_ORIGIN=https://${EXTERNAL_IP}
 EOF
-systemctl --user daemon-reload
+  as_operator systemctl --user daemon-reload
+else
+  mkdir -p "${HOME}/.config/systemd/user/archon-dashboard.service.d"
+  cat >"${HOME}/.config/systemd/user/archon-dashboard.service.d/webui-origin.conf" <<EOF
+[Service]
+Environment=WEB_UI_ORIGIN=https://${EXTERNAL_IP}
+EOF
+  systemctl --user daemon-reload
+fi
 
 log "DONE — dashboard published at https://${EXTERNAL_IP} (basic_auth user '${BASIC_USER}')"
 log "plaintext password: ${CREDS_FILE} · renewal hook: ${HOOK_DST} · next: systemctl --user restart archon-dashboard"

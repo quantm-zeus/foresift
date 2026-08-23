@@ -96,13 +96,15 @@ Then re-run this script."
 
 # ── step 3: staging certificate (pipeline proof before production) ───────────
 log "step 3/6: staging certificate (shortlived profile, webroot)"
-if [ ! -f "/etc/letsencrypt/live/${EXTERNAL_IP}-staging/fullchain.pem" ]; then
+# /etc/letsencrypt/live is root-only (0700), so every existence probe against
+# it MUST run through sudo — a plain [ -f ... ] would falsely fail.
+if ! sudo test -f "/etc/letsencrypt/live/${EXTERNAL_IP}-staging/fullchain.pem"; then
   sudo certbot certonly --staging --non-interactive --agree-tos \
     --register-unsafely-without-email --preferred-profile shortlived \
     --webroot --webroot-path "$WEBROOT" --ip-address "$EXTERNAL_IP" \
     --cert-name "${EXTERNAL_IP}-staging"
 fi
-[ -f "/etc/letsencrypt/live/${EXTERNAL_IP}-staging/fullchain.pem" ] || die "staging issuance failed — fix the reported problem before production"
+sudo test -f "/etc/letsencrypt/live/${EXTERNAL_IP}-staging/fullchain.pem" || die "staging issuance failed — fix the reported problem before production"
 
 # ── step 4: credentials — plaintext ONLY in $CREDS_FILE (0600), hash in config ─
 log "step 4/6: dashboard basic-auth credentials"
@@ -129,9 +131,17 @@ sudo certbot certonly --non-interactive --agree-tos \
   --webroot --webroot-path "$WEBROOT" --ip-address "$EXTERNAL_IP" \
   --cert-name "${EXTERNAL_IP}"
 
-# Renewal hook: root:caddy 0640, reloads Caddy whenever the shortlived cert
-# renews (6-day validity ⇒ renewals every ~3-4 days; timer already active).
-sudo install -o root -g caddy -m 0640 "$HOOK_SRC" "$HOOK_DST"
+# Renewal hook: executable root:caddy 0750 (certbot exec()s deploy hooks, so
+# the execute bit is mandatory — 0640 would make every renewal silently skip
+# deployment). The hook copies each renewed lineage to the caddy-readable
+# /etc/caddy/certs/foresift store, validates the config, reloads Caddy
+# (6-day validity ⇒ renewals every ~3-4 days; timer already active).
+sudo install -o root -g caddy -m 0750 "$HOOK_SRC" "$HOOK_DST"
+# Deploy hooks fire on RENEWAL only, so trigger it once now for the initial
+# issuance; the final Caddyfile below references the deployed copies.
+sudo env RENEWED_LINEAGE="/etc/letsencrypt/live/${EXTERNAL_IP}" "$HOOK_DST"
+sudo test -s /etc/caddy/certs/foresift/fullchain.pem || die "renewal hook produced no /etc/caddy/certs/foresift/fullchain.pem"
+sudo test -s /etc/caddy/certs/foresift/privkey.pem || die "renewal hook produced no /etc/caddy/certs/foresift/privkey.pem"
 
 # ── step 6: HTTPS edge config + verification ──────────────────────────────────
 log "step 6/6: installing final Caddyfile (HTTPS + basic_auth) and verifying"
@@ -149,7 +159,7 @@ http://:80 {
 }
 
 https://${EXTERNAL_IP} {
-	tls /etc/letsencrypt/live/${EXTERNAL_IP}/fullchain.pem /etc/letsencrypt/live/${EXTERNAL_IP}/privkey.pem
+	tls /etc/caddy/certs/foresift/fullchain.pem /etc/caddy/certs/foresift/privkey.pem
 	basic_auth {
 		${BASIC_USER} ${HASH}
 	}
@@ -170,7 +180,6 @@ sudo certbot renew --dry-run --cert-name "${EXTERNAL_IP}-staging" >/dev/null \
   || die "certbot renew --dry-run failed — auto-renewal is NOT proven"
 
 # WEB_UI_ORIGIN is set ONLY now that public HTTPS actually exists.
-sudo mkdir -p ~/.config/systemctl/user 2>/dev/null || true
 mkdir -p "${HOME}/.config/systemd/user/archon-dashboard.service.d"
 cat >"${HOME}/.config/systemd/user/archon-dashboard.service.d/webui-origin.conf" <<EOF
 [Service]

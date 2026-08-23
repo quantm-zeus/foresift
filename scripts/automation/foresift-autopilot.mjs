@@ -19,6 +19,18 @@
 //   node scripts/automation/foresift-autopilot.mjs --clear-fatal
 //                                                              # fail-closed: refuses when clearing would orphan
 //                                                              # a RUNNING package (use --recover-fatal then)
+//   node scripts/automation/foresift-autopilot.mjs --restart-package <id> \
+//        --fresh-generation [--reason "<text>"] [--salvage-manifest <f>]
+//                                                              # supported fresh-generation restart of ONE package
+//                                                              # (V3 §7): retires the current generation's runs,
+//                                                              # bumps packages[].generation exactly once, resets
+//                                                              # status to PENDING, emits a machine-readable receipt.
+//                                                              # Idempotent; crash-safe via a recorded intent.
+//                                                              # --salvage-manifest <f> additionally SEEDS the new
+//                                                              # foresift/<id>-g<N> branch at final V3 main with the
+//                                                              # salvaged product work (pushed, launcher-pinnable).
+//                                                              # A duplicate re-invocation replays the receipt;
+//                                                              # --confirm-new-generation overrides deliberately.
 
 import { spawnSync } from 'node:child_process';
 import {
@@ -26,11 +38,13 @@ import {
   mkdirSync,
   readFileSync,
   readdirSync,
+  renameSync,
+  rmSync,
   writeFileSync,
   unlinkSync,
 } from 'node:fs';
 import { homedir } from 'node:os';
-import { join, resolve } from 'node:path';
+import { dirname, join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import {
   loadRoadmap,
@@ -45,6 +59,15 @@ import {
 } from './schema.mjs';
 import { CHECKPOINT_FILE, validateCheckpoint } from './package-checkpoint.mjs';
 import { throughputProfile } from './work-package-throughput-profile.mjs';
+import {
+  packageGeneration,
+  generationBranch,
+  generationMessage,
+  parseGenerationMessage,
+  usesOptimizedWorkflow,
+  workPackageWorkflowFor,
+} from './package-generations.mjs';
+import { applySalvage, SALVAGE_MANIFEST_SCHEMA } from './generation-salvage.mjs';
 
 // Overridable for hermetic selftests (sandboxed fixture repo + state dir).
 const REPO = process.env.FORESIFT_AUTOPILOT_REPO ?? join(import.meta.dirname, '..', '..');
@@ -87,7 +110,10 @@ const RESUME_VERIFY_TRIES = 4;
 const RESUME_VERIFY_GAP_MS = 5000;
 
 const now = () => Date.now();
-const log = (...m) => console.log(new Date().toISOString(), '[autopilot]', ...m);
+// All progress logging goes to STDERR: one-shot commands (--restart-package,
+// --status) print machine-readable payloads on stdout, and journald captures
+// both streams for the service, so nothing is lost.
+const log = (...m) => console.error(new Date().toISOString(), '[autopilot]', ...m);
 
 /**
  * Normalize an Archon timestamp to epoch milliseconds.
@@ -243,23 +269,30 @@ async function sleep(ms) {
 
 // ── package state transitions (version-controlled, machine-driven only) ──────
 /**
- * Workflow variant per throughput profile (ADR 0007): LEGACY packages
- * (g0-contracts-data-truth, forever) keep launching the ORIGINAL
- * foresift-work-package DAG; OPTIMIZED packages launch the -optimized
- * variant whose implement/ci-merge commands carry slices, checkpoints,
- * FAST verification, and deterministic landing. Same single orchestrator,
- * deterministic selection, no behavioral drift for the legacy lane.
+ * Workflow variant per EXECUTION GENERATION (V3 ADR-0009) over the historical
+ * throughput profile (ADR 0007): every package at generation >= 1 runs the
+ * single final optimized topology regardless of the legacy profile table;
+ * generation-0 rows keep the historical LEGACY/OPTIMIZED behavior so retired
+ * forensic lanes are unchanged. Same single orchestrator, deterministic
+ * selection, no behavioral drift for the legacy lane.
  */
-function workPackageWorkflow(packageId) {
-  return throughputProfile(packageId) === 'OPTIMIZED'
-    ? 'foresift-work-package-optimized'
-    : 'foresift-work-package';
+function workPackageWorkflow(pkgOrId) {
+  const pkg = typeof pkgOrId === 'string' ? { id: pkgOrId } : pkgOrId;
+  return workPackageWorkflowFor(pkg);
 }
 
-function setPackageStatus(ms, packageId, status) {
-  const pkg = findPackage(ms, packageId);
-  if (!pkg || pkg.status === status) return false;
-  pkg.status = status;
+/** Generation-aware launch identity for a milestone package record. */
+function launchIdentity(p) {
+  const generation = packageGeneration(p);
+  return {
+    generation,
+    branch: generationBranch(p.id, generation),
+    message: generationMessage(p.id, generation),
+    workflow: workPackageWorkflow(p),
+  };
+}
+
+function persistMilestoneState(ms, message) {
   const file = join(REPO, 'specs', 'implementation', 'current-milestone.json');
   writeFileSync(file, JSON.stringify(ms, null, 2) + '\n');
   // Keep supervisor-written state Prettier-clean: these chore commits land
@@ -269,10 +302,14 @@ function setPackageStatus(ms, packageId, status) {
     'npx --no-install prettier --write --log-level silent specs/implementation/current-milestone.json',
   );
   if (!fmt.ok) log('WARN: prettier-format of milestone state skipped (cosmetic only)');
-  commitState(
-    'specs/implementation',
-    `chore(autopilot): ${ms.milestoneId}/${packageId} -> ${status}`,
-  );
+  commitState('specs/implementation', message);
+}
+
+function setPackageStatus(ms, packageId, status) {
+  const pkg = findPackage(ms, packageId);
+  if (!pkg || pkg.status === status) return false;
+  pkg.status = status;
+  persistMilestoneState(ms, `chore(autopilot): ${ms.milestoneId}/${packageId} -> ${status}`);
   return true;
 }
 
@@ -691,9 +728,12 @@ function reconcileStrandedPackages(st) {
   for (const p of ms.packages) {
     if (p.status !== 'RUNNING') continue;
     if (st.activeRuns.some((r) => r.packageId === p.id && !r.done)) continue; // tracked (live run or paused-with-identity) — invariant holds
-    const branch = `foresift/${p.id}`;
-    const wf = workPackageWorkflow(p.id);
-    const row = findRecentRunRow(wf, p.id);
+    // Generation-aware identity: only rows matching the CURRENT generation's
+    // correlation message are adoptable. A retired generation's runs — under
+    // the legacy bare-id message or an older @gN suffix — can never be
+    // re-adopted by a newer generation (V3 §6).
+    const { branch, message, workflow: wf } = launchIdentity(p);
+    const row = findRecentRunRow(wf, message);
     if (row && ['running', 'pending'].includes(String(row.status))) {
       st.activeRuns.push({
         kind: 'package',
@@ -701,7 +741,7 @@ function reconcileStrandedPackages(st) {
         runId: row.id,
         packageId: p.id,
         branch,
-        message: p.id,
+        message,
         startedAt: normalizeTimestampMs(row.started_at) ?? now(),
         resumeCount: 0,
         restartCount: 0,
@@ -717,7 +757,7 @@ function reconcileStrandedPackages(st) {
       runId: row?.id ?? null,
       packageId: p.id,
       branch,
-      message: p.id,
+      message,
       startedAt: now(),
       resumeCount: 0,
       restartCount: 0,
@@ -826,14 +866,14 @@ function selectAndLaunch(st) {
     if (!elig.eligible) continue;
     const verdict = canStartPackage(roadmap, ms, cand, running);
     if (!verdict.ok) continue;
-    const branch = `foresift/${cand.id}`;
-    const wf = workPackageWorkflow(cand.id);
-    const ack = launchDetached(wf, branch, cand.id);
-    const runId = resolveRunId(ack, wf, cand.id);
+    const { generation, branch, message, workflow: wf } = launchIdentity(cand);
+    const ack = launchDetached(wf, branch, message);
+    const runId = resolveRunId(ack, wf, message);
     record(st, 'work_package_launched', {
       packageId: cand.id,
       branch,
       workflow: wf,
+      generation,
       ack: sanitizeAck(ack),
       runId,
       discovery: extractRunId(ack) ? 'ack' : 'runs-table',
@@ -844,7 +884,7 @@ function selectAndLaunch(st) {
       runId,
       packageId: cand.id,
       branch,
-      message: cand.id,
+      message,
       startedAt: now(),
       resumeCount: 0,
       restartCount: 0,
@@ -937,9 +977,12 @@ export function runObservability(runId) {
  * provably current. Must NEVER throw; advisory only. Returns null for LEGACY
  * packages, missing run ids, or absent/unreadable checkpoints.
  */
-export function checkpointObservability(packageId, runId) {
+export function checkpointObservability(pkg, runId) {
   if (!runId || typeof runId !== 'string') return null;
-  if (throughputProfile(packageId) !== 'OPTIMIZED') return null;
+  // Generation-aware routing (V3 §8): a package on the optimized topology at
+  // ANY generation produces checkpoints; the legacy profile table alone no
+  // longer decides.
+  if (!usesOptimizedWorkflow(pkg)) return null;
   try {
     const wsRoot = join(process.env.HOME ?? homedir(), '.archon', 'workspaces');
     if (!existsSync(wsRoot)) return null;
@@ -1085,16 +1128,17 @@ export function buildStatus() {
     for (const p of ms.packages) {
       const run = st.activeRuns.find((r) => r.packageId === p.id && !r.done);
       const runInfo = run ? `\n      ↳ ${describeRun(run)}` : '';
-      const ckpt = run?.runId ? checkpointObservability(p.id, run.runId) : null;
+      const ckpt = run?.runId ? checkpointObservability(p, run.runId) : null;
       const sliceInfo = ckpt
         ? `\n      ↳ checkpoint(${ckpt.valid ? 'valid' : 'INVALID'}): ` +
           `${ckpt.slice ?? 'no slice'} · tasks ${ckpt.completedTasks}/${ckpt.totalTasks} done` +
           (ckpt.valid ? '' : ` — stale: ${ckpt.reasons.join('; ')}`)
-        : throughputProfile(p.id) === 'OPTIMIZED' && run
+        : usesOptimizedWorkflow(p) && run
           ? '\n      ↳ checkpoint: none yet this run'
           : '';
+      const genTag = packageGeneration(p) > 0 ? ` gen=${packageGeneration(p)}` : '';
       lines.push(
-        `  • ${p.id.padEnd(28)} ${p.status.padEnd(9)} risk=${p.risk.padEnd(8)} profile=${throughputProfile(p.id).padEnd(9)} deps=[${(p.dependencies ?? []).join(',')}]${runInfo}${sliceInfo}`,
+        `  • ${p.id.padEnd(28)} ${p.status.padEnd(9)} risk=${p.risk.padEnd(8)} profile=${throughputProfile(p.id).padEnd(9)}${genTag} deps=[${(p.dependencies ?? []).join(',')}]${runInfo}${sliceInfo}`,
       );
     }
     if (!st.pausedFatal && roadmap && !corrupt && rmErrs.length === 0) {
@@ -1116,6 +1160,15 @@ export function buildStatus() {
 }
 
 // ── main loop ────────────────────────────────────────────────────────────────
+function failRestartUsage(why) {
+  console.error(
+    `RESTART REFUSED: ${why}\n` +
+      'usage: node foresift-autopilot.mjs --restart-package <package-id> --fresh-generation [--reason "<text>"] [--salvage-manifest <file>]\n' +
+      '(stop the service unit first — the singleton lock enforces it)',
+  );
+  return 2;
+}
+
 async function tick(st) {
   refreshMain();
   // Reconcile active entries. Paused entries stay tracked (never filtered as
@@ -1220,7 +1273,7 @@ async function cmdRecoverFatal(positionalRunId) {
     runId = gotId;
   }
   const workflow = row?.workflow_name ?? pf.workflow ?? null;
-  const message = row?.user_message ?? pf.message ?? null;
+  let message = row?.user_message ?? pf.message ?? null;
   if (!workflow || !message)
     return fail(
       'paused state carries neither a readable Archon run nor structured workflow/message identity; repair the underlying cause first',
@@ -1235,15 +1288,27 @@ async function cmdRecoverFatal(positionalRunId) {
     } catch (err) {
       return fail(`implementation state unreadable: ${String(err?.message ?? err).slice(0, 200)}`);
     }
-    pkg = findPackage(ms, message);
-    if (!pkg) return fail(`no work package '${message}' in the current milestone`);
-    branch = `foresift/${pkg.id}`;
+    // Paused identity may carry a generation-suffixed correlation message
+    // (`<id>@g<N>`); resolve the package record through the parsed id and
+    // recompute branch/message from the CURRENT milestone generation.
+    const parsed = parseGenerationMessage(message);
+    pkg = findPackage(ms, parsed?.packageId ?? message);
+    if (!pkg)
+      return fail(`no work package '${parsed?.packageId ?? message}' in the current milestone`);
+    const ident = launchIdentity(pkg);
+    branch = ident.branch;
+    if (pf.message && parsed && parsed.generation !== ident.generation)
+      return fail(
+        `paused identity is generation ${parsed.generation} but current milestone generation for ${pkg.id} is ${ident.generation} — use --restart-package --fresh-generation instead of resuming across generations`,
+      );
     if (pf.branch && pf.branch !== branch)
       return fail(`identity mismatch: paused branch ${pf.branch} ≠ expected ${branch}`);
     if (!['RUNNING', 'PENDING'].includes(pkg.status))
       return fail(
         `package ${pkg.id} status is ${pkg.status} (not RUNNING/PENDING) — inspect implementation state manually`,
       );
+    // From here on, recovery acts on the CURRENT generation's correlation key.
+    message = ident.message;
   } else if (!branch) {
     branch = 'foresift/milestone-planning';
   }
@@ -1372,6 +1437,397 @@ async function cmdRecoverFatal(positionalRunId) {
   return 0;
 }
 
+// ── supported operator fresh-restart (V3 §7 / ADR-0009) ─────────────────────
+const RECEIPTS_DIR = join(STATE_DIR, 'receipts');
+const RESTART_RECEIPT_SCHEMA = 'foresift/restart-receipt@1';
+const RESTART_INTENT_SCHEMA = 'foresift/restart-intent@1';
+
+function atomicWriteJson(file, obj) {
+  mkdirSync(dirname(file), { recursive: true });
+  const tmp = `${file}.tmp-${process.pid}`;
+  writeFileSync(tmp, JSON.stringify(obj, null, 2) + '\n');
+  renameSync(tmp, file);
+}
+
+/**
+ * Seed the generation branch with salvaged product work (override §§11–15).
+ *
+ * This is the supported deterministic seed/import step: the restart mechanism
+ * itself materializes `foresift/<id>-g<N>` strictly at final V3 main
+ * (origin/main), transplants verified PRODUCT paths via applySalvage, settles
+ * the lockfile through the package manager, and pushes the branch — so the
+ * Archon launcher can pin the pre-seeded generation branch instead of creating
+ * an unseeded one from main. Never manual git surgery beside a live supervisor.
+ *
+ * The branch lives in a dedicated linked worktree under the state dir; the
+ * product checkout keeps its own branch untouched. Every step adopts prior
+ * partial progress (local branch, pushed branch, registered worktree), and the
+ * worktree is reset hard before each apply attempt — a rerun after a crash
+ * converges on the same applied head.
+ */
+function seedSalvageGeneration({ packageId, toGeneration, manifest, runInstall = true }) {
+  const genBranch = generationBranch(packageId, toGeneration);
+  const fetch = sh('git fetch origin --prune');
+  if (!fetch.ok) throw new Error(`git fetch failed: ${fetch.err.slice(0, 200)}`);
+  const baseSha = sh('git rev-parse origin/main').out;
+  if (!baseSha) throw new Error('origin/main unresolved after fetch');
+
+  const revParse = (ref) => {
+    const r = sh(`git rev-parse --verify --end-of-options ${ref} --`);
+    return r.ok ? r.out : null;
+  };
+  const localSha = revParse(genBranch);
+  const remoteSha = revParse(`origin/${genBranch}`);
+  if (localSha && remoteSha && localSha !== remoteSha)
+    throw new Error(
+      `generation branch ${genBranch} diverged: local ${localSha.slice(0, 10)} vs origin ${remoteSha.slice(0, 10)}`,
+    );
+  const knownSha = localSha ?? remoteSha;
+  if (knownSha) {
+    const anc = sh(`git merge-base --is-ancestor ${baseSha} ${knownSha}`);
+    if (!anc.ok)
+      throw new Error(
+        `existing ${genBranch} (${knownSha.slice(0, 10)}) is not descended from final V3 main ${baseSha.slice(0, 10)}`,
+      );
+  }
+
+  const wtDir = join(STATE_DIR, 'gen-worktrees', `${packageId}-g${toGeneration}`);
+  const registered = sh('git worktree list --porcelain')
+    .out.split('\n')
+    .includes(`worktree ${wtDir}`);
+  if (!registered) {
+    rmSync(wtDir, { recursive: true, force: true }); // stale unregistered debris
+    mkdirSync(dirname(wtDir), { recursive: true });
+    // Syntax: git worktree add [-b|-B <branch>] <path> [commit-ish] — the PATH
+    // always precedes the start-point.
+    const cmd = !knownSha
+      ? `git worktree add -b ${genBranch} ${JSON.stringify(wtDir)} ${baseSha}` // fresh at final V3 main
+      : localSha
+        ? `git worktree add ${JSON.stringify(wtDir)} ${genBranch}` // adopt local branch
+        : `git worktree add -B ${genBranch} ${JSON.stringify(wtDir)} ${knownSha}`; // from pushed tip
+    const add = sh(cmd);
+    if (!add.ok) throw new Error(`git worktree add failed: ${(add.err || add.out).slice(0, 300)}`);
+  }
+  // Deterministic apply attempt: always start from the committed branch tip.
+  const rst = sh(`git -C ${JSON.stringify(wtDir)} reset --hard`);
+  if (!rst.ok) throw new Error(`worktree reset failed: ${rst.err.slice(0, 200)}`);
+  sh(`git -C ${JSON.stringify(wtDir)} clean -fdx`);
+
+  const result = applySalvage({
+    repoRoot: wtDir,
+    manifest,
+    genBranch,
+    baseRef: baseSha,
+    installMode: runInstall ? 'lockfile-only' : 'none',
+  });
+
+  const push = sh(`git -C ${JSON.stringify(wtDir)} push -u origin ${genBranch}`);
+  if (!push.ok)
+    throw new Error(`push of ${genBranch} failed: ${(push.err || push.out).slice(0, 300)}`);
+  log('salvage_generation_seeded', {
+    packageId,
+    toGeneration,
+    branch: genBranch,
+    appliedHead: result.appliedHead,
+  });
+  const s = manifest.summary ?? {};
+  return {
+    appliedHead: result.appliedHead,
+    renames: Object.keys(result.renames ?? {}),
+    manifestReconciliation: result.manifestReconciliation,
+    taskReconstruction: result.taskReconstruction,
+    reusedCommits: s.commitsFullyProduct ?? null,
+    partiallyReusedCommits: s.commitsMixed ?? null,
+    // Everything not carried wholesale (control-plane-only, empty, unknown):
+    rejectedCommits:
+      s.commitsTotal != null
+        ? Math.max(0, s.commitsTotal - (s.commitsFullyProduct ?? 0) - (s.commitsMixed ?? 0))
+        : null,
+  };
+}
+
+/**
+ * Deterministic, idempotent, crash-safe fresh-generation restart of ONE work
+ * package (V3 task spec §7). Never hand-edits state JSON: every mutation goes
+ * through the same formatting/versioned-commit machinery the supervisor uses.
+ *
+ *   node foresift-autopilot.mjs --restart-package <id> --fresh-generation \
+ *        [--reason "<text>"] [--salvage-manifest <file>]
+ *
+ * Crash safety: an intent record naming the exact target generation is written
+ * BEFORE any mutation; every step below is idempotent, so a rerun after a
+ * crash converges on the same receipt. The generation is derived from
+ * milestone state plus the recorded intent — never incremented twice. A second
+ * identical invocation finds the completed receipt and exits 0 without
+ * creating another generation.
+ */
+async function cmdRestartPackage(packageId, opts = {}) {
+  const reason = String(opts.reason ?? 'unspecified').slice(0, 300);
+  const fail = (msg) => {
+    console.error(`RESTART REFUSED: ${msg}`);
+    log('fresh_restart_package_refused', { packageId, why: msg });
+    return 1;
+  };
+  let ms;
+  try {
+    ms = loadCurrentMilestone(REPO);
+  } catch (err) {
+    return fail(`implementation state unreadable: ${String(err?.message ?? err).slice(0, 200)}`);
+  }
+  const errs = validateMilestoneState(ms);
+  if (errs.length > 0)
+    return fail(`implementation state invalid: ${errs.join('; ').slice(0, 300)}`);
+  const pkg = findPackage(ms, packageId);
+  if (!pkg) return fail(`no work package '${packageId}' in the current milestone`);
+  const fromGeneration = packageGeneration(pkg);
+  const toGeneration = fromGeneration + 1;
+  const st = loadState();
+
+  // Fail closed on an explicitly provided salvage manifest BEFORE touching
+  // anything: an unreadable or foreign-schema manifest must abort the restart,
+  // never degrade into a receipt with null provenance.
+  let salvageManifest = null;
+  if (opts.salvageManifestPath) {
+    try {
+      const m = JSON.parse(readFileSync(opts.salvageManifestPath, 'utf8'));
+      if (m?.schema !== SALVAGE_MANIFEST_SCHEMA)
+        return fail(
+          `salvage manifest ${opts.salvageManifestPath} has schema ${String(m?.schema)} ≠ ${SALVAGE_MANIFEST_SCHEMA}`,
+        );
+      if (m.packageId && m.packageId !== packageId)
+        return fail(`salvage manifest is for package ${m.packageId}, not ${packageId}`);
+      salvageManifest = m;
+    } catch (err) {
+      return fail(
+        `salvage manifest ${opts.salvageManifestPath} unreadable: ${String(err?.message ?? err).slice(0, 200)}`,
+      );
+    }
+  }
+
+  // Idempotency: a completed receipt for THIS target generation ends the flow
+  // (covers the crash window between receipt write and intent deletion).
+  const replay = (receipt, why) => {
+    console.log(JSON.stringify(receipt, null, 2));
+    log('fresh_restart_receipt_replayed', { packageId, toGeneration: receipt.toGeneration, why });
+    return 0;
+  };
+  const receiptFile = join(RECEIPTS_DIR, `${packageId}-g${toGeneration}.json`);
+  try {
+    const existing = JSON.parse(readFileSync(receiptFile, 'utf8'));
+    if (existing?.schema === RESTART_RECEIPT_SCHEMA && existing?.toGeneration === toGeneration)
+      return replay(existing, 'target-generation-receipt-exists');
+  } catch {
+    /* no prior receipt — proceed */
+  }
+
+  // A CURRENT-generation live run blocks retirement (§7): resolve it first.
+  // Safety refusals deliberately precede every replay/idempotency path —
+  // something being live must never be papered over by a friendly no-op.
+  const currentMessage = generationMessage(packageId, fromGeneration);
+  const trackedLive = st.activeRuns.find((r) => r.packageId === packageId && !r.done && !r.paused);
+  if (trackedLive)
+    return fail(
+      `a tracked active run (${trackedLive.runId ?? 'awaiting discovery'}) exists for ${packageId}; stop/abandon it first`,
+    );
+  const list = archonJson('workflow runs --json --limit 50');
+  const rows = Array.isArray(list) ? list : (list?.runs ?? []);
+  const liveCurrent = rows.filter(
+    (r) => r.user_message === currentMessage && ['running', 'pending'].includes(String(r.status)),
+  );
+  if (liveCurrent.length > 0)
+    return fail(
+      `current-generation run(s) still live: ${liveCurrent.map((r) => r.id).join(', ')} — abandon them first`,
+    );
+
+  // Crash recovery: adopt the recorded intent verbatim (never re-increment).
+  const intentFile = join(STATE_DIR, `restart-intent-${packageId}.json`);
+  let intent = null;
+  try {
+    const raw = JSON.parse(readFileSync(intentFile, 'utf8'));
+    if (raw?.schema === RESTART_INTENT_SCHEMA && raw.packageId === packageId) intent = raw;
+  } catch {
+    /* none yet */
+  }
+  if (intent && intent.toGeneration !== toGeneration) {
+    // Intent targets a DIFFERENT generation than milestone state implies —
+    // either a stale intent from an aborted attempt at an older generation, or
+    // milestone state moved backwards. Fail closed; never guess. This check
+    // deliberately precedes the duplicate-invocation replay below: an anomaly
+    // on disk must surface as a refusal, not be masked by a friendly no-op.
+    return fail(
+      `stale intent targets generation ${intent.toGeneration} but milestone state implies ${toGeneration}; inspect ${intentFile} and ${STATE_FILE}`,
+    );
+  }
+
+  // §7 hard rule: the second identical invocation cannot create generation 2.
+  // After a completed restart the milestone sits at the NEW generation while
+  // its receipt records the OLD→NEW transition; a naive rerun would compute a
+  // fresh target and double-bump. So when a receipt already exists for the
+  // CURRENT generation AND that generation never launched anything since, this
+  // invocation is a duplicate of an already-completed restart: replay it. A
+  // genuine re-restart after the generation actually executed finds launch
+  // evidence and proceeds; --confirm-new-generation overrides deliberately.
+  if (!intent && fromGeneration > 0 && !opts.confirmNewGeneration) {
+    try {
+      const prior = JSON.parse(
+        readFileSync(join(RECEIPTS_DIR, `${packageId}-g${fromGeneration}.json`), 'utf8'),
+      );
+      if (prior?.schema === RESTART_RECEIPT_SCHEMA && prior?.toGeneration === fromGeneration) {
+        const launchedSince =
+          (st.history ?? []).some(
+            (h) =>
+              h.event === 'work_package_launched' &&
+              h.packageId === packageId &&
+              Number(h.generation ?? -1) >= fromGeneration,
+          ) ||
+          [...(st.activeRuns ?? []), ...(st.milestoneRuns ?? [])].some((e) => {
+            const p = parseGenerationMessage(e.message ?? '');
+            return p?.packageId === packageId && p.generation >= fromGeneration;
+          });
+        if (!launchedSince)
+          return replay(
+            prior,
+            `generation ${fromGeneration} was created but never launched; re-running --restart-package now would be a duplicate`,
+          );
+      }
+    } catch {
+      /* no prior receipt for the current generation */
+    }
+  }
+
+  if (!intent) {
+    intent = {
+      schema: RESTART_INTENT_SCHEMA,
+      packageId,
+      fromGeneration,
+      toGeneration,
+      reason,
+      startedAt: new Date().toISOString(),
+    };
+    if (opts.salvageManifestPath) intent.salvageManifest = opts.salvageManifestPath;
+    atomicWriteJson(intentFile, intent);
+  }
+
+  // Retire every OLDER-generation run row (supported lifecycle, best-effort —
+  // a refused abandon of an already-terminal row cannot block retirement).
+  const retiredRuns = [];
+  for (let g = 0; g <= fromGeneration; g++) {
+    const msg = g === 0 ? packageId : generationMessage(packageId, g);
+    for (const r of rows.filter((x) => x.user_message === msg)) {
+      const ab = ['running', 'pending'].includes(String(r.status))
+        ? archonJson(`workflow abandon ${r.id} --json`)
+        : { ok: true, skipped: true, status: r.status };
+      retiredRuns.push({
+        runId: r.id,
+        generation: g,
+        statusBefore: r.status,
+        response: sanitizeAck(ab),
+      });
+    }
+  }
+
+  // Clear ONLY this package's tracking/pause state (V3 §7).
+  st.activeRuns = st.activeRuns.filter((r) => r.packageId !== packageId);
+  if (
+    st.pausedFatal &&
+    (st.pausedFatal.packageId === packageId ||
+      parseGenerationMessage(st.pausedFatal.message ?? '')?.packageId === packageId)
+  ) {
+    st.pausedFatal = null;
+    record(st, 'fatal_pause_cleared_by_restart', { packageId });
+  }
+
+  // Persist generation + PENDING through the normal versioned-commit path.
+  // setPackageStatus alone would short-circuit when the package is ALREADY
+  // PENDING (the common restart case) and silently drop the generation bump,
+  // so the unconditional writer backs it up.
+  pkg.generation = toGeneration;
+  if (!setPackageStatus(ms, packageId, 'PENDING'))
+    persistMilestoneState(
+      ms,
+      `chore(autopilot): ${ms.milestoneId}/${packageId} -> generation ${toGeneration} (fresh restart)`,
+    );
+  await new Promise((res) => {
+    commitQueue = commitQueue.then(res, res);
+  });
+
+  // Seed the generation branch from salvaged product work (override §11–15).
+  let salvageSeed = null;
+  if (salvageManifest) {
+    try {
+      salvageSeed = seedSalvageGeneration({
+        packageId,
+        toGeneration,
+        manifest: salvageManifest,
+        runInstall: !process.env.FORESIFT_SALVAGE_SKIP_INSTALL,
+      });
+    } catch (err) {
+      return fail(
+        `salvage seed failed (state already advanced; rerun resumes): ${String(err?.message ?? err).slice(0, 400)}`,
+      );
+    }
+  }
+
+  // Receipt (atomic) — includes salvage provenance when a manifest was given.
+  const receipt = {
+    schema: RESTART_RECEIPT_SCHEMA,
+    packageId,
+    retiredGeneration: fromGeneration,
+    toGeneration,
+    reason,
+    retiredBranch: generationBranch(packageId, fromGeneration),
+    generationBranch: generationBranch(packageId, toGeneration),
+    retiredRunIds: retiredRuns.map((r) => r.runId),
+    retiredRuns,
+    finalV3MainHead: sh('git rev-parse origin/main').out || null,
+    timestamp: new Date().toISOString(),
+    ...(salvageSeed
+      ? {
+          sourceSalvagePr: salvageManifest.sourceSalvagePr ?? null,
+          sourceSalvageBranch: salvageManifest.sourceSalvageBranch ?? null,
+          sourceSalvageHead: salvageManifest.sourceSalvageHead ?? null,
+          generationSeedHead: salvageSeed.appliedHead,
+          reusedCommits: salvageSeed.reusedCommits ?? null,
+          partiallyReusedCommits: salvageSeed.partiallyReusedCommits ?? null,
+          rejectedCommits: salvageSeed.rejectedCommits ?? null,
+          reusedTaskCount: salvageSeed.taskReconstruction?.reused ?? null,
+          reopenedTaskCount: salvageSeed.taskReconstruction?.reopened ?? null,
+          remainingTaskCount: salvageSeed.taskReconstruction?.remaining ?? null,
+        }
+      : buildSalvageReceiptFields(opts.salvageManifestPath)),
+  };
+  atomicWriteJson(receiptFile, receipt);
+  try {
+    unlinkSync(intentFile);
+  } catch {}
+  saveState(st);
+  console.log(JSON.stringify(receipt, null, 2));
+  log('fresh_restart_package_complete', { packageId, toGeneration });
+  return 0;
+}
+
+/** Optional salvage-provenance fields for the receipt (override §16). */
+function buildSalvageReceiptFields(manifestPath) {
+  if (!manifestPath) return {};
+  try {
+    const m = JSON.parse(readFileSync(manifestPath, 'utf8'));
+    return {
+      sourceSalvagePr: m.sourceSalvagePr ?? null,
+      sourceSalvageBranch: m.sourceSalvageBranch ?? null,
+      sourceSalvageHead: m.sourceSalvageHead ?? null,
+      generationSeedHead: m.appliedHead ?? m.seedHead ?? null,
+      reusedCommits: m.reusedCommits ?? null,
+      partiallyReusedCommits: m.partiallyReusedCommits ?? null,
+      rejectedCommits: m.rejectedCommits ?? null,
+      reusedTaskCount: m.taskReconstruction?.reused ?? null,
+      reopenedTaskCount: m.taskReconstruction?.reopened ?? null,
+      remainingTaskCount: m.taskReconstruction?.remaining ?? null,
+    };
+  } catch (err) {
+    return { salvageManifestError: String(err?.message ?? err).slice(0, 200) };
+  }
+}
+
 async function main() {
   const argv = process.argv.slice(2);
   if (argv.includes('--status')) {
@@ -1403,6 +1859,35 @@ async function main() {
   if (argv.includes('--recover-fatal')) {
     const positional = argv.filter((a) => !a.startsWith('--'));
     process.exit(await cmdRecoverFatal(positional[0] ?? null));
+  }
+  if (argv.includes('--restart-package')) {
+    if (!argv.includes('--fresh-generation'))
+      process.exit(failRestartUsage('only --fresh-generation restarts are supported (V3 §7)'));
+    // Positional extraction must skip VALUED flags (--reason "<text>",
+    // --salvage-manifest <f>) — their values otherwise masquerade as
+    // positional package ids.
+    const valuedFlags = new Set(['--reason', '--salvage-manifest']);
+    const positional = [];
+    for (let i = 0; i < argv.length; i++) {
+      if (valuedFlags.has(argv[i])) {
+        i++;
+        continue;
+      }
+      if (!argv[i].startsWith('--')) positional.push(argv[i]);
+    }
+    if (positional.length !== 1)
+      process.exit(failRestartUsage('exactly one explicit <package-id> is required'));
+    const optOf = (flag) => {
+      const i = argv.indexOf(flag);
+      return i >= 0 ? argv[i + 1] : undefined;
+    };
+    process.exit(
+      await cmdRestartPackage(positional[0], {
+        reason: optOf('--reason'),
+        salvageManifestPath: optOf('--salvage-manifest'),
+        confirmNewGeneration: argv.includes('--confirm-new-generation'),
+      }),
+    );
   }
   const once = argv.includes('--once');
   const st = loadState();

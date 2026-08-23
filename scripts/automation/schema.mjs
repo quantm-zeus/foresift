@@ -104,6 +104,11 @@ export function validateMilestoneState(ms) {
       push(`package ${p.id}: verificationCommands must be non-empty`);
     if (typeof p.objective !== 'string' || p.objective.trim().length < 10)
       push(`package ${p.id}: objective must be a meaningful sentence`);
+    // V3 §6: durable execution generation. Optional for legacy state; once
+    // present it must be a non-negative integer and is bumped ONLY by the
+    // supported fresh-restart command — never hand-edited.
+    if (p.generation !== undefined && (!Number.isInteger(p.generation) || p.generation < 0))
+      push(`package ${p.id}: generation must be a non-negative integer`);
   }
   for (const p of ms.packages ?? [])
     for (const dep of p.dependencies ?? []) {

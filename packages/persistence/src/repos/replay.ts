@@ -78,9 +78,12 @@ export async function replayObservations(
   t: UtcTimestamp,
   filter?: { subjectPoolId?: string; subjectAssetId?: string },
 ): Promise<readonly ResolvedObservation[]> {
+  // Fail closed on a hidden/invalid boundary BEFORE it reaches SQL — an
+  // undefined t would silently become `<= NULL` (an empty-looking success).
+  const boundary = utcTimestamp(String(t));
   // Candidates: original receipts plus every revision, prefetched with the
   // SQL mirror of the boundary predicate.
-  const params: unknown[] = [t];
+  const params: unknown[] = [boundary];
   let poolClause = '';
   if (filter?.subjectPoolId !== undefined) {
     params.push(filter.subjectPoolId);

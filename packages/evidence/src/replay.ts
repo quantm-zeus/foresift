@@ -42,7 +42,9 @@ export async function resolveEvidenceAt(
   engine: DatabaseEngine,
   input: { resolvedAt: UtcTimestamp },
 ): Promise<ReplayResolution> {
-  const t = input.resolvedAt;
+  // Fail closed on a hidden/invalid boundary before any query runs — an
+  // absent resolvedAt must refuse, never fall back to "now" or empty.
+  const t = utcTimestamp(String(input.resolvedAt));
 
   const bundleRows = await engine.query<{
     bundle_id: string;

@@ -219,7 +219,7 @@ exist for every acceptance criterion listed in spec.md §3.
       naive aggregation demonstrably diverges. Traces: FR-DATA-001.
 - [x] T052 AC-023 pair: decimals/address golden fixtures pass; invalid inputs yield
       explicit quality states/refusals. Traces: FR-DATA-001.
-- [ ] T053 AC-240 pair + AC-241 pair: §13.7 timestamp substrate resolves symmetric
+- [x] T053 AC-240 pair + AC-241 pair: §13.7 timestamp substrate resolves symmetric
       action-time inputs; frozen replay differs only via registered component; hidden
       current-data call fails replay. Traces: FR-DATA-003.
 - [ ] T054 AC-242 pair + AC-243 pair: acquisition-state vocabulary storage semantics;

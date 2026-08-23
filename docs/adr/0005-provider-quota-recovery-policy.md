@@ -62,6 +62,23 @@ same reason — the supervisor would not regain authoritative tracking.
    verifications precede any mutation; refusals exit nonzero without mutating.
    The operator never hand-edits JSON.
 
+   **Amendment (same day, post-merge): resumes are verified, not trusted.**
+   The live recovery of run `b0a82481…` proved Archon 0.9 can ack `workflow
+resume` with ok while changing nothing — no worker process, no log activity,
+   `last_activity_at` frozen hours earlier (the same silent no-op explains why
+   all three pre-fix "resumed" events never restarted the engine either). Every
+   recovery/probe resume is now verified against the run row for a bounded
+   window (~15 s): effective means the row left the terminal state or its
+   activity advanced past the resume moment. A verified no-op is recorded and
+   treated exactly like a refusal: the dead run is retired via the supported
+   `workflow abandon`, then ONE fresh continuation launches on the same
+   branch/worktree. Quota probes use the same verification — a no-op probe
+   escalates to the operator-gated pause instead of silently spending the
+   remaining budget. `--recover-fatal` additionally reconciles tracked quota/
+   fatal pauses that have no global `pausedFatal` (early backoff recovery), and
+   a recovered continuation earns a fresh probe budget plus a 15-minute stale-row
+   shield so bookkeeping lag after recovery cannot be misread as a new quota wall.
+
 5. **`--clear-fatal` is fail-closed.** It refuses (exit 1) when clearing would
    orphan a RUNNING package that has no non-paused tracked run.
 
@@ -78,6 +95,8 @@ activeRuns=[] ∧ pausedFatal=null` cannot survive a tick.
 - Recovery preserves branch, worktree, commits, completed tasks, and Archon
   artifacts by construction; fresh continuations rediscover persisted work from
   disk/git per the existing architecture (no second orchestrator).
-- Regression coverage: selftest scenarios S2 (recovery contract), S11–S14
+- Regression coverage: selftest scenarios S2 (recovery contract), S11–S16
   (quota pause, probe bound + escalation, invariant healing/adoption, refused-
-  resume fallback) and unit tests for classification/reset extraction.
+  resume fallback, verified no-op resume → fresh continuation, no-op probe
+  escalation) and unit tests for classification/reset extraction/resume
+  verification.

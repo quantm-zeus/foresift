@@ -77,6 +77,12 @@ const QUOTA_RESET_MIN_MS = 30 * 60_000;
 const QUOTA_RESET_MAX_MS = 48 * 60 * 60_000;
 // Runs-table window for re-adopting/identifying runs of an untracked RUNNING package.
 const STRANDED_LOOKUP_CUTOFF_MS = 48 * 60 * 60_000;
+// Archon 0.9 can acknowledge `workflow resume` with ok while leaving the run
+// row untouched (observed live: ack ok, no worker process, no log activity,
+// last_activity_at frozen hours earlier). Every resume that matters is
+// therefore VERIFIED against the run row before anyone trusts it.
+const RESUME_VERIFY_TRIES = 4;
+const RESUME_VERIFY_GAP_MS = 5000;
 
 const now = () => Date.now();
 const log = (...m) => console.log(new Date().toISOString(), '[autopilot]', ...m);
@@ -103,6 +109,38 @@ export function normalizeTimestampMs(v0) {
   if (!/(?:[zZ]|[+-]\d\d:?\d\d)$/.test(v)) v += 'Z';
   const t = Date.parse(v);
   return Number.isNaN(t) ? null : t;
+}
+
+function sleepSync(ms) {
+  Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms);
+}
+
+/**
+ * Verify that a `workflow resume` actually restarted the run instead of
+ * silently doing nothing. A resume counts as effective when the run row leaves
+ * the terminal/paused state, or its activity timestamp advances past the
+ * resume moment (engine restarted and re-failed fast — fresh failure
+ * evidence). Polls a bounded window; unreadable polls keep trying rather than
+ * concluding anything. `opts.getRow`/`opts.tries`/`opts.gapMs` exist for unit
+ * tests; production callers use the defaults.
+ */
+export function resumeTookEffect(runId, resumeStartedAt, opts = {}) {
+  const tries = opts.tries ?? RESUME_VERIFY_TRIES;
+  const gapMs = opts.gapMs ?? RESUME_VERIFY_GAP_MS;
+  const getRow = opts.getRow ?? ((id) => archonJson(`workflow get ${id} --json`));
+  for (let i = 0; i < tries; i++) {
+    if (i > 0) sleepSync(gapMs);
+    const get = getRow(runId);
+    const status = get?.status ?? get?.run?.status;
+    if (get?._unparsed !== undefined || !status) continue; // unreadable: no opinion yet
+    if (!['failed', 'paused', 'cancelled'].includes(status)) return true; // running/pending/completed
+    const act = normalizeTimestampMs(get?.last_activity_at ?? get?.started_at);
+    // Fresh failure evidence ⇒ the engine really restarted (tolerance absorbs clock skew).
+    if (act != null && act >= resumeStartedAt - 1500) return true;
+    // Stale terminal row: NOT decisive — the engine may still be spinning up,
+    // so keep polling until the window closes.
+  }
+  return false;
 }
 
 function sh(cmd, opts = {}) {
@@ -483,12 +521,25 @@ function actOnPausedEntry(st, entry) {
     escalatePausedQuota(st, entry, `daily-quota probe budget (${QUOTA_PROBE_LIMIT}) exhausted`);
     return;
   }
+  const resumeStartTs = now();
   const res = archonJson(`workflow resume ${entry.runId} --json`);
   if (res?.ok === false) {
     escalatePausedQuota(st, entry, `quota-probe resume refused: ${res?.error ?? 'unknown'}`);
     return;
   }
   entry.quotaProbes = (entry.quotaProbes ?? 0) + 1;
+  if (!resumeTookEffect(entry.runId, resumeStartTs)) {
+    // Acked ok but the run row never changed: trusting it would silently burn
+    // the whole probe budget against a dead run. Escalate to the operator,
+    // whose --recover-fatal verifies and falls back to one fresh continuation.
+    record(st, 'quota_probe_resume_noop', { runId: entry.runId, probe: entry.quotaProbes });
+    escalatePausedQuota(
+      st,
+      entry,
+      'quota-probe resume acknowledged ok but did not restart the run (run row unchanged)',
+    );
+    return;
+  }
   entry.quotaProbeStartedAt = now();
   entry.paused = null;
   delete entry.quotaNextProbeAt;
@@ -1050,9 +1101,26 @@ function orphanedRunningPackages(st) {
  */
 async function cmdRecoverFatal(positionalRunId) {
   const st = loadState();
-  const pf = st.pausedFatal;
+  let pf = st.pausedFatal;
   if (!pf) {
-    log('no PAUSED_FATAL present — nothing to recover');
+    // Early-recovery form: a TRACKED pause without a global pausedFatal (e.g.
+    // resuming a daily-quota backoff ahead of schedule) reconciles through the
+    // exact same verified flow.
+    const pausedEntry = [...st.activeRuns, ...st.milestoneRuns].find((e) => !e.done && e.paused);
+    if (pausedEntry)
+      pf = {
+        reason: pausedEntry.lastPauseReason ?? `tracked ${pausedEntry.paused} pause`,
+        runId: pausedEntry.runId ?? null,
+        kind: pausedEntry.kind ?? null,
+        packageId: pausedEntry.packageId ?? null,
+        workflow: pausedEntry.workflow ?? null,
+        branch: pausedEntry.branch ?? null,
+        message: pausedEntry.message ?? null,
+        since: null,
+      };
+  }
+  if (!pf) {
+    log('no PAUSED_FATAL or paused tracked entry present — nothing to recover');
     return 0;
   }
   const fail = (msg) => {
@@ -1119,15 +1187,49 @@ async function cmdRecoverFatal(positionalRunId) {
   if (row && ['running', 'pending'].includes(String(row.status))) {
     resumed = true; // alive — re-adopt under supervisor tracking
   } else if (runId && ['failed', 'paused', 'cancelled'].includes(String(row?.status))) {
+    const resumeStartTs = now();
     const res = archonJson(`workflow resume ${runId} --json`);
-    if (res?.ok === false)
+    if (res?.ok === false) {
       record(st, 'operator_recovery_resume_refused', {
         runId,
         response: sanitizeAck(res),
       });
-    else resumed = true;
+    } else if (!resumeTookEffect(runId, resumeStartTs)) {
+      // Acknowledged ok but the run row never moved: Archon accepted the
+      // command without restarting anything (observed live on run b0a82481 —
+      // ack ok, no worker process, last_activity frozen hours earlier).
+      // Trusting the ack would strand recovery again — treat as a refusal.
+      record(st, 'operator_recovery_resume_noop', { runId });
+    } else {
+      resumed = true;
+    }
   }
   if (!resumed) {
+    // Late-wake guard: a slow-starting resumed run must win adoption over a
+    // duplicate launch — never two product workflows for one package.
+    const list3 = archonJson('workflow runs --json --limit 20');
+    const rows3 = Array.isArray(list3) ? list3 : (list3?.runs ?? []);
+    const wokeUp = rows3.find(
+      (r) =>
+        r.workflow_name === workflow &&
+        r.user_message === message &&
+        String(r.status) === 'running',
+    );
+    if (wokeUp) {
+      resumed = true;
+      runId = wokeUp.id;
+      record(st, 'operator_recovery_adopt_late_resume', { runId: wokeUp.id });
+    }
+  }
+  if (!resumed) {
+    // Retire the dead run via the supported lifecycle op (same call the
+    // stale-run policy uses) so it cannot wake behind the fresh continuation.
+    // Best-effort: a refusal here cannot block recovery — the row was already
+    // verified inert.
+    if (runId) {
+      const ab = archonJson(`workflow abandon ${runId} --json`);
+      record(st, 'operator_recovery_retired_dead_run', { runId, response: sanitizeAck(ab) });
+    }
     // ONE fresh continuation on the SAME branch/worktree; prior work persists on
     // disk/git and completed tasks are discovered from there by the workflow.
     const ack = launchDetached(workflow, branch, message);
@@ -1158,10 +1260,16 @@ async function cmdRecoverFatal(positionalRunId) {
   delete entry.done;
   delete entry.paused;
   delete entry.quotaNextProbeAt;
+  delete entry.quotaProbes; // a recovered continuation earns a fresh probe budget
+  delete entry.failureClass; // stale classification must not outlive recovery
   delete entry.lastPauseReason;
   delete entry.abandonedBeforeRestart;
   entry.nextAttemptAt = null;
   entry.operatorRecoveredAt = now();
+  // Shield: straight after operator intervention, a lagging run row (or a
+  // re-failure inside the grace window) must not be misread as a fresh daily
+  // quota wall — the same in-flight window that protects automatic probes.
+  entry.quotaProbeStartedAt = now();
   if (kind === 'package' && pkg.status === 'PENDING') setPackageStatus(ms, pkg.id, 'RUNNING');
   st.pausedFatal = null;
   record(st, 'operator_recovery_complete', {
@@ -1180,7 +1288,7 @@ async function cmdRecoverFatal(positionalRunId) {
     commitQueue = commitQueue.then(res, res);
   });
   log(
-    `recovery complete: ${kind} ${message} tracked again${runId ? ` as run ${runId}` : ' (awaiting run-id discovery)'}; pausedFatal cleared`,
+    `recovery complete: ${kind} ${message} tracked again${runId ? ` as run ${runId}` : ' (awaiting run-id discovery)'}; pause cleared`,
   );
   return 0;
 }

@@ -244,7 +244,7 @@ exist for every acceptance criterion listed in spec.md §3.
 - [x] T060 AC-062 pair + AC-260 pair: destructive drill meets declared tiers on
       fixture workloads or blocks opportunity-mode flag; missed-tier creates incident.
       Traces: FR-DR-001, FR-DR-002.
-- [ ] T061 AC-261 pair + AC-262 pair + AC-263 pair: clean-environment verification
+- [x] T061 AC-261 pair + AC-262 pair + AC-263 pair: clean-environment verification
       catches tampering; tier violation degrades capability machine-readably; restore+
       replay neither duplicates canonical events nor skips unmarked gaps. Traces:
       FR-DR-002, FR-DR-001.

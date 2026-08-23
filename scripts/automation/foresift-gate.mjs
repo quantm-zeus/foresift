@@ -26,7 +26,7 @@ function parseArgs(argv) {
     const a = argv[i];
     if (a === '--package') args.package = argv[++i];
     else if (a === '--milestone') args.milestone = true;
-    else args._.push(a);
+    else if (a !== '--') args._.push(a); // tolerate pnpm's forwarded `--` separator
   }
   return args;
 }
@@ -60,7 +60,7 @@ if (args.milestone) {
 
 if (!args.package || args._.length > 0) {
   console.error(
-    'usage: pnpm foresift:gate -- --package <package-id>   |   pnpm foresift:gate -- --milestone',
+    'usage: pnpm foresift:gate --package <package-id>   |   pnpm foresift:gate --milestone',
   );
   process.exit(2);
 }

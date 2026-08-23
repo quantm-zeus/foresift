@@ -242,6 +242,20 @@ async function sleep(ms) {
 }
 
 // ── package state transitions (version-controlled, machine-driven only) ──────
+/**
+ * Workflow variant per throughput profile (ADR 0007): LEGACY packages
+ * (g0-contracts-data-truth, forever) keep launching the ORIGINAL
+ * foresift-work-package DAG; OPTIMIZED packages launch the -optimized
+ * variant whose implement/ci-merge commands carry slices, checkpoints,
+ * FAST verification, and deterministic landing. Same single orchestrator,
+ * deterministic selection, no behavioral drift for the legacy lane.
+ */
+function workPackageWorkflow(packageId) {
+  return throughputProfile(packageId) === 'OPTIMIZED'
+    ? 'foresift-work-package-optimized'
+    : 'foresift-work-package';
+}
+
 function setPackageStatus(ms, packageId, status) {
   const pkg = findPackage(ms, packageId);
   if (!pkg || pkg.status === status) return false;
@@ -678,7 +692,8 @@ function reconcileStrandedPackages(st) {
     if (p.status !== 'RUNNING') continue;
     if (st.activeRuns.some((r) => r.packageId === p.id && !r.done)) continue; // tracked (live run or paused-with-identity) — invariant holds
     const branch = `foresift/${p.id}`;
-    const row = findRecentRunRow('foresift-work-package', p.id);
+    const wf = workPackageWorkflow(p.id);
+    const row = findRecentRunRow(wf, p.id);
     if (row && ['running', 'pending'].includes(String(row.status))) {
       st.activeRuns.push({
         kind: 'package',
@@ -698,7 +713,7 @@ function reconcileStrandedPackages(st) {
     }
     const entry = {
       kind: 'package',
-      workflow: 'foresift-work-package',
+      workflow: wf,
       runId: row?.id ?? null,
       packageId: p.id,
       branch,
@@ -812,18 +827,20 @@ function selectAndLaunch(st) {
     const verdict = canStartPackage(roadmap, ms, cand, running);
     if (!verdict.ok) continue;
     const branch = `foresift/${cand.id}`;
-    const ack = launchDetached('foresift-work-package', branch, cand.id);
-    const runId = resolveRunId(ack, 'foresift-work-package', cand.id);
+    const wf = workPackageWorkflow(cand.id);
+    const ack = launchDetached(wf, branch, cand.id);
+    const runId = resolveRunId(ack, wf, cand.id);
     record(st, 'work_package_launched', {
       packageId: cand.id,
       branch,
+      workflow: wf,
       ack: sanitizeAck(ack),
       runId,
       discovery: extractRunId(ack) ? 'ack' : 'runs-table',
     });
     trackRun(st, 'package', {
       kind: 'package',
-      workflow: 'foresift-work-package',
+      workflow: wf,
       runId,
       packageId: cand.id,
       branch,

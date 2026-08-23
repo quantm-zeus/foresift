@@ -22,7 +22,14 @@ supervisory loop over the `archon` CLI). Architecture rationale:
    durable `$ARTIFACTS_DIR/milestone-audit-progress.json`, so audits survive
    any number of Claude turn boundaries.
 2. Implements one work package at a time (two max post-foundation, never
-   CRITICAL-parallel, never scope-overlapping) via `foresift-work-package`:
+   CRITICAL-parallel, never scope-overlapping) via a throughput-profile-selected
+   workflow ([ADR 0006](../adr/0006-throughput-profiles-proven-dedupe-attestation.md),
+   [ADR 0007](../adr/0007-workflow-variant-selection-and-gate-invocation-repair.md)):
+   `foresift-work-package` (original DAG) for LEGACY packages —
+   g0-contracts-data-truth, forever — or `foresift-work-package-optimized`
+   (same DAG, implement/ci-merge command bodies swapped for slices, durable
+   checkpoints, FAST verification, attestation reuse, deterministic landing)
+   for every OPTIMIZED package:
    bounded Spec Kit plan loop → bounded implementation loop → deterministic
    gate with bounded repair loop → PR → independent review (CRITICAL/HIGH
    block progression) → bounded convergence loop → deterministic gate → CI →
@@ -41,10 +48,11 @@ instructed never to emit). When a guard fails, Archon automatically starts
 another iteration — nobody types "continue". Two smoke workflows prove this
 continuously after any upgrade:
 
-| Smoke test                  | Property proved                                                                               |
-| --------------------------- | --------------------------------------------------------------------------------------------- |
-| `foresift-smoke-clean-turn` | iteration 1 exits cleanly incomplete → iteration 2 auto-starts from disk state → guard passes |
-| `foresift-smoke-resume`     | process failure mid-run → `workflow resume` skips completed nodes and finishes                |
+| Smoke test                  | Property proved                                                                                                                          |
+| --------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
+| `foresift-smoke-clean-turn` | iteration 1 exits cleanly incomplete → iteration 2 auto-starts from disk state → guard passes                                            |
+| `foresift-smoke-resume`     | process failure mid-run → `workflow resume` skips completed nodes and finishes                                                           |
+| `foresift-smoke-throughput` | checkpoint hash invalidation drives a deterministic loop; full-gate `--check` and dedupe classifier fail closed (bash-only, no AI spend) |
 
 ## Commands
 
@@ -52,7 +60,7 @@ continuously after any upgrade:
 | ------------------------------------- | ---------------------------------------------------------------------------- |
 | Live status (roadmap/milestone/runs)  | `pnpm autopilot:status`                                                      |
 | Supervisor self-test (hermetic)       | `pnpm autopilot:selftest`                                                    |
-| Deterministic package gate            | `pnpm foresift:gate -- --package <id>`                                       |
+| Deterministic package gate            | `pnpm foresift:gate --package <id>`                                          |
 | Service status                        | `systemctl --user status foresift-autopilot archon-dashboard`                |
 | Supervisor logs                       | `journalctl --user -u foresift-autopilot.service -f`                         |
 | Dashboard logs                        | `journalctl --user -u archon-dashboard.service -f`                           |

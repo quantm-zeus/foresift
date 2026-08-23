@@ -18,6 +18,8 @@
 #   S14 --recover-fatal: same-run resume; fail-closed --clear-fatal; single fresh continuation
 #   S15 ack-ok-but-noop resume is VERIFIED and falls back to one fresh continuation
 #   S16 ack-ok-but-noop quota probe escalates instead of burning the probe budget
+#   S17 throughput profile selects the workflow variant (LEGACY original DAG,
+#       OPTIMIZED -optimized variant) for launches AND stranded-run adoption
 #
 # No network, no AI spend, no writes outside a mktemp sandbox, no access to the
 # real Archon database. Run via `pnpm autopilot:selftest`.
@@ -303,7 +305,7 @@ const e = s.activeRuns.find((x) => x.paused === "fatal");
 console.log([e.runId, e.packageId, e.workflow, e.branch, e.message, String(e.done === undefined)].join(" "));
 ')"
 assert_eq "paused entry carries full recovery identity, never done-filtered" \
-  "$IDENTITY" "run-1 t-alpha foresift-work-package foresift/t-alpha t-alpha true"
+  "$IDENTITY" "run-1 t-alpha foresift-work-package-optimized foresift/t-alpha t-alpha true"
 PF_KEYS="$(node -e '
 const s = JSON.parse(require("fs").readFileSync(process.env.FORESIFT_AUTOPILOT_STATE_DIR + "/autopilot-state.json", "utf8"));
 console.log(Object.keys(s.pausedFatal).sort().join(","));
@@ -638,7 +640,7 @@ milestone_fixture "G0" \
   "$(pkg_json u2-alpha "" HIGH true)" \
   "$(pkg_json u2-beta "" MEDIUM true)"
 printf 'DEFAULT_STATUS="running"\n' >"$FAKE_SCENARIO"
-printf 'LAUNCH rid=run-5 workflow=foresift-work-package branch=foresift/u2-alpha msg=u2-alpha\n' >>"$FAKE_LAUNCHES"
+printf 'LAUNCH rid=run-5 workflow=foresift-work-package-optimized branch=foresift/u2-alpha msg=u2-alpha\n' >>"$FAKE_LAUNCHES"
 node -e '
 const fs = require("fs");
 const f = process.env.FORESIFT_AUTOPILOT_REPO + "/specs/implementation/current-milestone.json";
@@ -749,6 +751,29 @@ const e = s.activeRuns.find((x) => !x.done);
 console.log([e.paused, e.branch, String(e.done === undefined)].join(" "));
 ')"
 assert_eq "escalated entry stays TRACKED with branch identity for --recover-fatal" "$RETAINED" "fatal foresift/m-alpha true"
+
+# ── S17: throughput profile selects the workflow variant (ADR 0006/0007) ─────
+launch_wf_names() { grep '^LAUNCH' "$FAKE_LAUNCHES" | sed 's/.*workflow=\([^ ]*\).*/\1/' | tr '\n' ' '; }
+echo "S17: OPTIMIZED packages launch the optimized DAG; LEGACY keeps the original"
+new_sandbox s17
+roadmap_fixture G0
+milestone_fixture "G0" \
+  "$(pkg_json g0-contracts-data-truth "" CRITICAL false)" \
+  "$(pkg_json z-optimized "" HIGH true)"
+tick # G0 serial rule: the CRITICAL dependency-free package runs alone first
+assert_eq "LEGACY package launches the ORIGINAL work-package workflow" \
+  "$(launch_wf_names)" "foresift-work-package "
+printf 'STATUS_run_1="completed"\nMERGED_HEAD="foresift/g0-contracts-data-truth"\n' >>"$FAKE_SCENARIO"
+tick
+tick # g0-contracts-data-truth now PROVEN; next eligible package may start
+assert_eq "OPTIMIZED package launches the OPTIMIZED variant" \
+  "$(launch_wf_names)" "foresift-work-package foresift-work-package-optimized "
+STATE_WF="$(node -e '
+const s = JSON.parse(require("fs").readFileSync(process.env.FORESIFT_AUTOPILOT_STATE_DIR + "/autopilot-state.json", "utf8"));
+const e = s.activeRuns.find((x) => x.packageId === "z-optimized");
+console.log(e.workflow);
+')"
+assert_eq "tracked entry records the optimized workflow for recovery identity" "$STATE_WF" "foresift-work-package-optimized"
 
 echo
 echo "selftest result: PASS=$PASS FAIL=$FAIL"

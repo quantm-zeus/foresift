@@ -1,24 +1,17 @@
-name: foresift-work-package
+name: foresift-work-package-optimized
 description: |
+  OPTIMIZED-profile variant of foresift-work-package (ADR 0006/0007): the SAME
+  proven DAG topology with the implement and ci-merge command bodies swapped for
+  the throughput lane — bounded slices, durable implementation checkpoints,
+  FAST verification between slices, FULL-gate attestation reuse, and
+  deterministic mechanical landing. The supervisor selects this workflow ONLY
+  for packages where throughputProfile() == OPTIMIZED (every package EXCEPT
+  g0-contracts-data-truth, which keeps the original DAG byte-for-byte forever).
+
   Foresift autonomous implementation of exactly ONE work package from the current
   milestone (specs/implementation/current-milestone.json). Invoke as:
 
-    archon workflow run foresift-work-package --branch foresift/<package-id> "<package-id>"
-
-  Pipeline: deterministic preflight -> Spec Kit scoped plan/tasks/analyze inside
-  a BOUNDED CONTINUATION LOOP -> fresh-context implementation continuation loop
-  (each iteration continues persisted partial work; completion decided by
-  deterministic guards, never by AI promises) -> deterministic package gate with
-  bounded repair loop -> PR -> comprehensive independent review (bundled
-  archon-review-block: 5 parallel review agents + automatic CRITICAL/HIGH
-  fixes) -> Spec Kit convergence loop (bounded) -> final deterministic gate ->
-  exact-head CI wait -> machine squash merge. No human approval gate. Additive
-  commits only; never amend/rebase/force.
-
-  A Claude turn ending cleanly is NOT stage completion: long stages loop under
-  deterministic `until_bash` guards (the `until` text signals are sentinels
-  agents are instructed NEVER to emit). Loop exhaustion fails the stage;
-  recovery belongs to the autopilot supervisor.
+    archon workflow run foresift-work-package-optimized --branch foresift/<package-id> "<package-id>"
 
   ARCHON v0.9.0 LOOP SEMANTICS this layout relies on (verified empirically):
     - every loop iteration runs its FULL body before the guard is evaluated;
@@ -138,7 +131,7 @@ nodes:
           > "$ARTIFACTS_DIR/implement-guard-last.json"
       nodes:
         - id: implement-iterate
-          command: foresift-wp-implement
+          command: foresift-wp-implement-optimized
           effort: high
           idle_timeout: 1800000
         - id: impl-recheck
@@ -275,7 +268,7 @@ nodes:
 
   # ── PHASE 7: FINAL DETERMINISTIC GATE + EXACT-HEAD CI + MERGE ──────────────
   - id: ci-merge
-    command: foresift-wp-ci-merge
+    command: foresift-wp-ci-merge-optimized
     depends_on: [convergence]
     context: fresh
     idle_timeout: 1800000

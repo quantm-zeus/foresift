@@ -18,7 +18,7 @@ Create (or update) the package's GitHub pull request.
    - Title: `feat(<package-id>): <objective>` using the objective from
      `specs/implementation/current-milestone.json`.
    - Body must include: the requirement ID list, a summary of the implementation,
-     the deterministic gate evidence (`pnpm foresift:gate -- --package $ARGUMENTS`
+     the deterministic gate evidence (`pnpm foresift:gate --package $ARGUMENTS`
      output tail), links to `specs/$ARGUMENTS/spec.md`, and
      `$ARTIFACTS_DIR/out-of-scope-notes.md` content if present. State plainly that
      this PR was produced autonomously and reviewed by machine gates.

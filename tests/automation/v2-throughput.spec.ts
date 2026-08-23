@@ -3,7 +3,6 @@
 // changesets, and impact-aware FAST classification. Every behavioral claim is
 // tested positively AND negatively; fail-closed direction is asserted explicitly.
 
-import { execFileSync } from 'node:child_process';
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync, readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -27,7 +26,12 @@ import {
   classifyPath,
   planFastChecks,
 } from '../../scripts/automation/fast-impact.mjs';
-import { resolveFastBase } from '../../scripts/automation/package-fast-verify.mjs';
+import {
+  resolveFastBase,
+  runVitestRelatedStep,
+} from '../../scripts/automation/package-fast-verify.mjs';
+import { gitFixture as factoryGitFixture } from '../helpers/git-fixture.js';
+import { REPO } from '../helpers/v2-fixtures.js';
 
 let fx: string;
 beforeAll(() => {
@@ -44,37 +48,9 @@ const write = (rel: string, content: string) => {
   return p;
 };
 
-/** Real git fixture repo with one base commit; returns helper object. */
-function gitFixture(name: string) {
-  const root = join(fx, name);
-  mkdirSync(root, { recursive: true });
-  const g = (args: string[]) => execFileSync('git', args, { cwd: root, encoding: 'utf8' });
-  g(['init', '-q', '--initial-branch=main', '.']);
-  g(['config', 'user.email', 't@t']);
-  g(['config', 'user.name', 't']);
-  // Bare "origin" so merge-base(HEAD, origin/main) resolution is exercisable.
-  execFileSync('git', ['init', '-q', '--bare', '--initial-branch=main', `${root}-origin.git`]);
-  g(['remote', 'add', 'origin', `${root}-origin.git`]);
-  writeFileSync(join(root, 'base.txt'), 'base\n');
-  g(['add', '.']);
-  g(['commit', '-qm', 'base']);
-  g(['push', '-q', 'origin', 'main:main']);
-  return {
-    root,
-    g,
-    baseSha: () => g(['rev-parse', 'HEAD']).trim(),
-    writeFile: (rel: string, content: string) => {
-      const p = join(root, rel);
-      mkdirSync(join(p, '..'), { recursive: true });
-      writeFileSync(p, content);
-    },
-    rm: (rel: string) => rmSync(join(root, rel)),
-    commitAll: (msg: string) => {
-      g(['add', '-A']);
-      g(['commit', '-qm', msg]);
-    },
-  };
-}
+/** Real git fixture repo with one base commit — zero git spawns per call
+ *  (seeded-template copy from tests/helpers/git-fixture.ts, C2.5 §5). */
+const gitFixture = factoryGitFixture;
 
 // ── §23 item 1: finalized checkpoint survives the immediately following turn ──
 describe('V2 checkpoint finalization order (spec §4)', () => {
@@ -478,5 +454,66 @@ describe('V2 deterministic context capsule (spec §5)', () => {
     write('capsule-absent/placeholder', 'appeared\n');
     expect(validateCheckpoint(cp).valid).toBe(false); // appeared ⇒ drift
     expect(sha256File(absent)).not.toBeNull();
+  });
+});
+
+// ── FAST `vitest related` step: absolutize + fail-closed no-match (C2.5) ──────
+// Regression for a measured fail-open hole: bare repo-relative arguments make
+// `vitest related` match NOTHING (exit 0, "No test files found"), and git
+// changesets naturally yield exactly that path shape — FAST would report
+// green while running zero tests. The no-match PASS must escalate instead.
+describe('FAST vitest-related step (C2.5 regression)', () => {
+  const fakeSh = (stdoutTail: string) => {
+    const calls: Array<{ cmd: string; args: string[] }> = [];
+    const sh = (_root: string, cmd: string, args: string[]) => {
+      calls.push({ cmd, args });
+      return { command: [cmd, ...args].join(' '), result: 'PASS' as const, stdoutTail };
+    };
+    return { sh, calls };
+  };
+
+  it('absolutizes changed paths before invoking vitest related (repo-relative matched nothing)', () => {
+    const { sh, calls } = fakeSh('Tests  29 passed (29)');
+    const out = runVitestRelatedStep(
+      { kind: 'vitest-related', files: ['scripts/automation/fast-impact.mjs'] },
+      { repoRoot: REPO, sh },
+    );
+    expect(out.escalateReason).toBeUndefined();
+    expect(out.result?.result).toBe('PASS');
+    expect(calls).toHaveLength(1);
+    expect(calls[0]?.args[0]).toBe('related');
+    // The regression: the argv form `scripts/automation/fast-impact.mjs`
+    // silently selects zero tests; only an absolute path matches.
+    expect(calls[0]?.args[1] ?? '').toMatch(/\/scripts\/automation\/fast-impact\.mjs$/);
+  });
+
+  it.each([
+    ['plain JS/TS', false, 'no-related-tests'],
+    ['database', true, 'database-no-related-tests'],
+  ])('%s slice with no matching tests escalates (%s)', (_kind, database, expectedReason) => {
+    const { sh } = fakeSh('\nNo test files found, exiting with code 0\n');
+    const step: { kind: string; files: string[]; database?: boolean } = {
+      kind: 'vitest-related',
+      files: ['scripts/automation/fast-impact.mjs'],
+    };
+    if (database) step.database = true;
+    const out = runVitestRelatedStep(step as never, { repoRoot: REPO, sh });
+    expect(out.escalateReason).toBe(expectedReason);
+    expect((out.logs ?? []).join(' ')).toMatch(/escalating to full suite/);
+  });
+
+  it('all paths absent ⇒ non-database slices stay silent, database slices escalate fail-closed', () => {
+    const missing = ['definitely/not/present.mjs'];
+    const plain = runVitestRelatedStep(
+      { kind: 'vitest-related', files: [...missing] },
+      { repoRoot: REPO },
+    );
+    expect(plain.escalateReason).toBeUndefined();
+    expect(plain.result).toBeUndefined();
+    const db = runVitestRelatedStep(
+      { kind: 'vitest-related', files: [...missing], database: true },
+      { repoRoot: REPO },
+    );
+    expect(db.escalateReason).toBe('database-deleted');
   });
 });

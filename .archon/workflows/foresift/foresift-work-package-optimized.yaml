@@ -24,6 +24,16 @@ description: |
       state (review-verdict.json); a convergence router decides — fail-closed —
       whether the convergence stage must run at all.
 
+  V2 second-pass mechanical landing (task spec §13–§14): the create-PR step and
+  the clean final landing path invoke ZERO Claude agents. package-create-pr.mjs
+  composes the PR body from milestone metadata + persisted gate evidence and
+  discovers-or-creates exactly one PR; package-final-land.mjs re-establishes
+  exact-head FULL-gate evidence (attestation reuse first), then hands off to
+  the mechanical lander (pinned-head CI wait → squash-merge). The AI command
+  foresift-wp-ci-merge-optimized remains ONLY as a bounded fallback routed by
+  the final-land-router token, and it must END by re-running the mechanical
+  script — never by merging around it.
+
   Foresift autonomous implementation of exactly ONE work package from the current
   milestone (specs/implementation/current-milestone.json). Invoke as:
 
@@ -256,12 +266,20 @@ nodes:
               echo "FINAL_FULL_FAILED"
             fi
 
-  # ── PHASE 4: PULL REQUEST ──────────────────────────────────────────────────
+  # ── PHASE 4: PULL REQUEST (deterministic — zero Claude invocations, §13) ───
+  # package-create-pr.mjs refuses on a dirty tracked tree, pushes the current
+  # branch, composes the body from milestone metadata + persisted gate
+  # evidence, discovers-or-creates exactly ONE PR against main, and persists
+  # .pr-number for the review block and final landing.
   - id: create-pr
-    command: foresift-wp-create-pr
     depends_on: [gate-router, gate-repair-loop]
     trigger_rule: none_failed_min_one_success   # gate-router always completes; repair loop may be skipped
-    context: fresh
+    bash: |
+      set -euo pipefail
+      node scripts/automation/package-create-pr.mjs \
+        --package "$ARGUMENTS" \
+        --branch "$(git rev-parse --abbrev-ref HEAD)" \
+        --artifacts-dir "$ARTIFACTS_DIR"
 
   # ── PHASE 5: COMPREHENSIVE INDEPENDENT REVIEW + AUTO-FIX ───────────────────
   # Bundled 9-node review sub-DAG: verify-pr-base -> scope -> sync ->
@@ -406,10 +424,41 @@ nodes:
           model: large
           allowed_tools: [Read, Glob, Grep]
 
-  # ── PHASE 7: FINAL DETERMINISTIC GATE + EXACT-HEAD CI + MERGE ──────────────
-  - id: ci-merge
-    command: foresift-wp-ci-merge-optimized
+  # ── PHASE 7: MECHANICAL FINAL LANDING + BOUNDED AI FALLBACK (§14) ──────────
+  # The clean path is fully deterministic: package-final-land.mjs re-establishes
+  # exact-head FULL-gate evidence (--check reuse; at most ONE fresh --run),
+  # composes the PR body, and runs the mechanical lander (pinned-head CI wait →
+  # squash-merge), persisting land-result.json on EVERY terminal path. Only a
+  # non-zero exit routes to the bounded AI fallback — which must diagnose,
+  # fix forward with NEW COMMITS, and END by re-running the mechanical script.
+  - id: final-land-router
     depends_on: [convergence-router, convergence]
     trigger_rule: none_failed_min_one_success   # convergence stage may legitimately be skipped (router: NOT_REQUIRED)
+    timeout: 3600000   # includes the exact-head CI wait inside package-land.mjs
+    bash: |
+      set +e
+      node scripts/automation/package-final-land.mjs \
+        --package "$ARGUMENTS" \
+        --branch "$(git rev-parse --abbrev-ref HEAD)" \
+        --artifacts-dir "$ARTIFACTS_DIR" \
+        >"$ARTIFACTS_DIR/final-land-log.txt" 2>&1
+      code=$?
+      cat "$ARTIFACTS_DIR/final-land-log.txt"
+      if [ "$code" -eq 0 ]; then echo "LANDED_MECHANICAL";
+      else echo "LANDING_NEEDS_AI"; fi
+      exit 0   # routing token only; the verdict lives in land-result.json
+
+  - id: ai-landing-fallback
+    command: foresift-wp-ci-merge-optimized
+    when: "$final-land-router.output == 'LANDING_NEEDS_AI'"
+    depends_on: [final-land-router]
     context: fresh
     idle_timeout: 1800000
+
+  - id: landing-verifier
+    depends_on: [final-land-router, ai-landing-fallback]
+    trigger_rule: none_failed_min_one_success   # fallback is legitimately SKIPPED on the clean mechanical path
+    bash: |
+      set -euo pipefail
+      node -e 'const r=JSON.parse(require("fs").readFileSync(process.argv[1],"utf8"));if(r.schema!=="foresift/final-land@1"||r.merged!==true){console.error("NOT LANDED:",JSON.stringify(r));process.exit(3)}' "$ARTIFACTS_DIR/land-result.json"
+      echo "LANDED_VERIFIED"

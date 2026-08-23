@@ -20,7 +20,10 @@ description: |
     7. the convergence router fails closed to CONVERGENCE_REQUIRED on absent
        evidence and skips ONLY when every condition provably holds;
     8. a REAL red package gate writes a structured manifest that the targeted
-       executor consumes end-to-end (re-running the exact recorded command).
+       executor consumes end-to-end (re-running the exact recorded command);
+    9. deterministic PR composition (package-create-pr.mjs --dry-run) derives
+       title/body from milestone metadata + gate evidence with zero AI and
+       zero persistence.
 
   Run after any change to the throughput control plane or any Archon upgrade:
 
@@ -276,3 +279,31 @@ nodes:
       if [ "$tcode" -ne 1 ]; then echo "FAIL: targeted rerun of a still-red package check must exit 1; got $tcode"; exit 1; fi
       node -e 'const r=JSON.parse(require("fs").readFileSync(process.argv[1],"utf8"));if(r.allGreen!==false||r.checks[0].command.indexOf("packages/domain")<0)process.exit(1)' "$G/targeted-verify-result.json"
       echo "PROOF 8b OK: executor re-ran the EXACT recorded package command from the manifest."
+
+  # ── PROOF 9: deterministic PR composition — zero Claude invocations (§13) ───
+  # package-create-pr.mjs --dry-run composes the PR title/body from milestone
+  # metadata + persisted gate evidence and persists NOTHING (no push, no gh,
+  # no .pr-number). Proves the OPTIMIZED create-pr node's tooling end-to-end
+  # without network access. ~1s.
+  - id: create-pr-dryrun-proof
+    depends_on: [real-gate-manifest-proof]
+    timeout: 120000
+    bash: |
+      set -euo pipefail
+      S="${SMOKE_DIR:-/tmp/foresift-smoke-throughput}"
+      P="$S/createpr"; mkdir -p "$P"
+      printf '{"passed":true,"exitCode":0,"failedCategories":[],"checks":[{"label":"t","category":"TESTS","command":"pnpm test","status":"PASS"}],"schema":"foresift/full-gate-result@1","packageId":"g0-tool-core"}\n' \
+        >"$P/full-gate-result.json"
+      node scripts/automation/package-create-pr.mjs \
+        --package g0-tool-core \
+        --branch "foresift/g0-tool-core" \
+        --artifacts-dir "$P" --dry-run >"$P/dry-run.json"
+      node -e '
+        const fs=require("node:fs");
+        const j=JSON.parse(fs.readFileSync(process.argv[1],"utf8"));
+        if(j.dryRun!==true)process.exit(1);
+        if(!/^feat\(g0-tool-core\): /.test(j.title))process.exit(2);
+        for(const s of ["## Objective","## Requirements","## Deterministic verification evidence","**PASSED**"])if(!j.body.includes(s))process.exit(3);
+      ' "$P/dry-run.json"
+      if [ -e "$P/.pr-number" ] || [ -e "$P/pr-body.md" ]; then echo "FAIL: dry-run persisted PR state"; exit 1; fi
+      echo "PROOF 9 OK: deterministic PR composition, zero AI, zero persistence."

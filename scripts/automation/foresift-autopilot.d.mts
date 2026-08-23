@@ -34,3 +34,21 @@ export declare function resumeTookEffect(
   resumeStartedAt: number,
   opts?: ResumeVerifyOptions,
 ): boolean;
+
+/** V3-B §18 adaptive handoff cadence (ms) — see nextPollDelayMs. */
+export declare const POLL_INTERVAL_MS: number;
+export declare const HANDOFF_POLL_MS: number;
+export declare const HANDOFF_FAST_STREAK_MAX: number;
+
+/** Pure handoff-cadence decision: fast-poll right after a tick launched work
+ *  or while run-id discovery is pending, bounded by the fast streak, base
+ *  interval otherwise. Deterministic and total. */
+export interface PollDecision {
+  delayMs: number;
+  fastStreak: number;
+}
+export declare function nextPollDelayMs(opts?: {
+  launched?: number;
+  awaitingDiscovery?: boolean;
+  fastStreak?: number;
+}): PollDecision;

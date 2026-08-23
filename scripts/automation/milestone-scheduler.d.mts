@@ -27,3 +27,8 @@ export declare function selectNextPackage(
   selected: { id: string; score: Record<string, unknown> } | null;
   ranked: Array<{ id: string; score: Record<string, unknown>; startable: boolean; reason: string }>;
 };
+
+/** Critical-path-ordered PENDING candidates (order fixed once per tick). */
+export declare function rankPendingPackages(ms: {
+  packages?: Array<{ id: string; status?: string; risk?: string; dependencies?: string[] }>;
+}): Array<{ id: string; status?: string; risk?: string; dependencies?: string[] }>;

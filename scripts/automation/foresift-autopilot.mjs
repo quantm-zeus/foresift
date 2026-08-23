@@ -58,6 +58,7 @@ import {
   extractQuotaResetAt,
 } from './schema.mjs';
 import { CHECKPOINT_FILE, validateCheckpoint } from './package-checkpoint.mjs';
+import { rankPendingPackages } from './milestone-scheduler.mjs';
 import { throughputProfile } from './work-package-throughput-profile.mjs';
 import {
   packageGeneration,
@@ -76,7 +77,35 @@ const STATE_DIR =
   join(process.env.HOME ?? '', '.local', 'state', 'foresift');
 const STATE_FILE = join(STATE_DIR, 'autopilot-state.json');
 const LOCK_FILE = join(STATE_DIR, 'autopilot.lock');
-const POLL_INTERVAL_MS = 60_000;
+export const POLL_INTERVAL_MS = 60_000;
+// V3-B §18 — adaptive handoff latency. 60s stays the steady-state cadence, but
+// right after a tick LAUNCHED work (or while a tracked entry still awaits run-id
+// discovery) the supervisor drops to a fast handoff cadence so Archon runs are
+// picked up in seconds, not a minute. The fast streak is bounded: a permanently
+// undiscoverable run cannot pin the loop at the fast rate forever — after
+// HANDOFF_FAST_STREAK_MAX consecutive fast polls the loop reverts to the base
+// interval until a quiet tick resets the streak.
+export const HANDOFF_POLL_MS = 10_000;
+export const HANDOFF_FAST_STREAK_MAX = 6;
+
+/**
+ * Pure handoff-cadence decision (V3-B §18). Given whether the last tick
+ * launched anything, whether any tracked entry still awaits run-id discovery,
+ * and the current fast-poll streak, returns the next sleep plus the new
+ * streak. Deterministic and total: same inputs ⇒ same delay.
+ *
+ * @returns {{delayMs: number, fastStreak: number}}
+ */
+export function nextPollDelayMs({ launched = 0, awaitingDiscovery = false, fastStreak = 0 } = {}) {
+  const wantFast = launched > 0 || Boolean(awaitingDiscovery);
+  if (!wantFast) return { delayMs: POLL_INTERVAL_MS, fastStreak: 0 };
+  if (fastStreak >= HANDOFF_FAST_STREAK_MAX) {
+    // Bound reached: hold the base interval (streak clamped) until a quiet
+    // tick resets it — never grow unbounded.
+    return { delayMs: POLL_INTERVAL_MS, fastStreak: HANDOFF_FAST_STREAK_MAX };
+  }
+  return { delayMs: HANDOFF_POLL_MS, fastStreak: fastStreak + 1 };
+}
 const RESUME_LIMIT = 3; // workflow-level automatic resumes per §16
 const FRESH_RESTARTS_LIMIT = 1;
 const BACKOFF_BASE_MS = 60_000;
@@ -792,6 +821,7 @@ function pauseFatalCorrupt(st, what, errors) {
   record(st, 'paused_fatal_corrupt_state', { what, errors });
 }
 
+/** Launches performed by one selection pass (V3-B): drives adaptive handoff polling. */
 function selectAndLaunch(st) {
   // Corrupt roadmap/milestone JSON must fail closed (PAUSED_FATAL), never
   // crash-loop the tick or silently re-plan over damaged state.
@@ -802,12 +832,12 @@ function selectAndLaunch(st) {
     ms = loadCurrentMilestone(REPO);
   } catch (err) {
     pauseFatalCorrupt(st, 'specs/implementation/*.json', err?.message ?? err);
-    return false;
+    return 0;
   }
   const rmErrs = validateRoadmap(roadmap);
   if (rmErrs.length) {
     pauseFatalCorrupt(st, 'specs/implementation/roadmap.json', rmErrs.join('; '));
-    return false;
+    return 0;
   }
 
   // Milestone-control due? (nothing planned, or planned milestone fully proven)
@@ -817,11 +847,11 @@ function selectAndLaunch(st) {
     // validate. Never silently re-plan over possibly-corrupt implementation
     // state.
     pauseFatalCorrupt(st, 'specs/implementation/current-milestone.json', msErrs.join('; '));
-    return false;
+    return 0;
   }
   const milestoneDue = !ms || ms.packages.every((p) => p.status === 'PROVEN');
   if (milestoneDue) {
-    if (st.milestoneRuns.length > 0 || st.pausedFatal) return false;
+    if (st.milestoneRuns.length > 0 || st.pausedFatal) return 0;
     const message = 'plan-or-audit-current-milestone';
     const ack = launchDetached(
       'foresift-milestone-control',
@@ -849,15 +879,19 @@ function selectAndLaunch(st) {
       awaitingDiscovery: !runId,
       discoveryAttempts: 0,
     });
-    return true;
+    return 1;
   }
 
-  // Work-package selection under the concurrency policy.
+  // Work-package selection under the concurrency policy (V3-B): candidate
+  // ORDER comes once per tick from the C4 critical-path scheduler — every
+  // eligibility constraint stays owned by packageEligible + canStartPackage.
+  // The loop re-runs canStartPackage against the LIVE running set each
+  // iteration and pushes each launch into it, so when policy allows N slots a
+  // single tick fills all of them (launch A → re-evaluate against A → launch
+  // B in ONE cycle). Foundation G0 stays capped at 1 by the same policy.
+  let launched = 0;
   const running = st.activeRuns.map((r) => findPackage(ms, r.packageId)).filter(Boolean);
-  const ordered = [...ms.packages].sort(
-    (a, b) => (a.dependencies?.length ?? 0) - (b.dependencies?.length ?? 0),
-  );
-  for (const cand of ordered) {
+  for (const cand of rankPendingPackages(ms)) {
     // Never re-select a package that already has a tracked active launch
     // (covers the window where its run id is still being discovered and its
     // status is therefore still PENDING).
@@ -898,8 +932,9 @@ function selectAndLaunch(st) {
       setPackageStatus(ms, cand.id, 'RUNNING');
     }
     running.push(cand);
+    launched++;
   }
-  return true;
+  return launched;
 }
 
 // ── status ───────────────────────────────────────────────────────────────────
@@ -1169,7 +1204,12 @@ function failRestartUsage(why) {
   return 2;
 }
 
+/**
+ * One supervisory cycle. Returns the number of NEW launches this tick (V3-B):
+ * the caller feeds it into nextPollDelayMs for adaptive handoff latency.
+ */
 async function tick(st) {
+  let launched = 0;
   refreshMain();
   // Reconcile active entries. Paused entries stay tracked (never filtered as
   // done): fatal pauses wait for operator recovery, quota pauses probe on the
@@ -1201,9 +1241,10 @@ async function tick(st) {
     // (adopt its live run, or convert it to a tracked pause), never race a
     // second launch past the limit.
     reconcileStrandedPackages(st);
-    if (!st.pausedFatal) selectAndLaunch(st);
+    if (!st.pausedFatal) launched = selectAndLaunch(st);
   }
   saveState(st);
+  return launched;
 }
 
 // ── supported operator recovery ──────────────────────────────────────────────
@@ -1892,14 +1933,28 @@ async function main() {
   const once = argv.includes('--once');
   const st = loadState();
   record(st, 'supervisor_started', { pid: process.pid });
+  // V3-B §18 adaptive handoff: fast-poll right after launches / during run-id
+  // discovery, base cadence otherwise (see nextPollDelayMs).
+  let fastStreak = 0;
   do {
+    let launched = 0;
     try {
-      await tick(st);
+      launched = await tick(st);
     } catch (err) {
       record(st, 'tick_error', { message: String(err?.message ?? err).slice(0, 300) });
       saveState(st);
     }
-    if (!once) await sleep(POLL_INTERVAL_MS);
+    if (!once) {
+      const next = nextPollDelayMs({
+        launched,
+        awaitingDiscovery: [...st.activeRuns, ...st.milestoneRuns].some(
+          (r) => !r.done && r.awaitingDiscovery,
+        ),
+        fastStreak,
+      });
+      fastStreak = next.fastStreak;
+      await sleep(next.delayMs);
+    }
   } while (!once);
 }
 

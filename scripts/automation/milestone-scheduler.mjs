@@ -116,3 +116,21 @@ export function selectNextPackage(canStart, ms, runningPackages = []) {
     ranked,
   };
 }
+
+/**
+ * Runtime wiring (V3-B): the supervisor's candidate ORDER for one tick.
+ * Returns PENDING packages sorted by critical-path priority — a fixed order
+ * computed once per tick so mid-tick status flips (PENDING→RUNNING after each
+ * launch) cannot reshuffle the remaining candidates. Eligibility is NOT
+ * decided here: the caller still gates every candidate through
+ * packageEligible + canStartPackage against the LIVE running set, which is
+ * what makes same-tick slot filling safe (launch A, re-evaluate against A,
+ * launch B in the same cycle).
+ */
+export function rankPendingPackages(ms) {
+  return (ms?.packages ?? [])
+    .filter((p) => (p.status ?? 'PENDING') === 'PENDING')
+    .map((pkg) => ({ pkg, score: criticalPathScore(ms, pkg) }))
+    .sort((a, b) => compareScores(a.score, b.score))
+    .map((x) => x.pkg);
+}

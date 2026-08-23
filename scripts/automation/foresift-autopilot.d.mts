@@ -19,3 +19,18 @@ export interface AutopilotStatus {
 }
 /** Render the operator status report (also printed by `--status`). */
 export declare function buildStatus(): string;
+
+/** Verify that a `workflow resume` actually restarted a run (row left the
+ *  terminal/paused state, or its activity timestamp advanced past the resume
+ *  moment) instead of silently doing nothing. Polls a bounded window;
+ *  `opts.getRow`/`tries`/`gapMs` are test hooks. */
+export interface ResumeVerifyOptions {
+  tries?: number;
+  gapMs?: number;
+  getRow?: (id: string) => unknown;
+}
+export declare function resumeTookEffect(
+  runId: string,
+  resumeStartedAt: number,
+  opts?: ResumeVerifyOptions,
+): boolean;

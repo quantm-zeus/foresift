@@ -16,6 +16,8 @@
 #   S12 quota probes are bounded (exponential hours-scale) -> operator-gated fatal pause
 #   S13 legacy stranded state (RUNNING, no tracked run) self-heals; live runs re-adopted
 #   S14 --recover-fatal: same-run resume; fail-closed --clear-fatal; single fresh continuation
+#   S15 ack-ok-but-noop resume is VERIFIED and falls back to one fresh continuation
+#   S16 ack-ok-but-noop quota probe escalates instead of burning the probe budget
 #
 # No network, no AI spend, no writes outside a mktemp sandbox, no access to the
 # real Archon database. Run via `pnpm autopilot:selftest`.
@@ -43,7 +45,9 @@ cat >"$SBX/bin/archon" <<'SHIM'
 # ERR_<run_id_underscored>, DEFAULT_STATUS, UPDATED_AT_MS. Appends every
 # invocation to $FAKE_LOG and lifecycle events to $FAKE_LAUNCHES.
 set -u
-[ -f "${FAKE_SCENARIO:-}" ] && . "$FAKE_SCENARIO"
+# Scenario vars must be EXPORTED for awk's ENVIRON lookups (per-run statuses in
+# the runs table); `set -a` covers both the shell-expansion and awk readers.
+[ -f "${FAKE_SCENARIO:-}" ] && { set -a; . "$FAKE_SCENARIO"; set +a; }
 echo "$*" >>"${FAKE_LOG:?}"
 cmd="${1:-}"; sub="${2:-}"; arg="${3:-}"
 case "$cmd/$sub" in
@@ -679,6 +683,72 @@ console.log([e.runId, String(!e.paused), String(!s.pausedFatal)].join(" "));
 assert_eq "supervisor tracks the fresh continuation authoritatively" "$RECOVERED" "run-2 true true"
 tick
 assert_eq "post-recovery tick is stable (no duplicate launch)" "$(launch_count)" "2"
+
+# ── S15: ack-ok-but-noop resume is verified and falls back to ONE fresh continuation ──
+echo "S15: silent no-op resume detected; single fresh continuation follows"
+new_sandbox s15
+roadmap_fixture G0
+milestone_fixture "G0" \
+  "$(pkg_json n-alpha "" HIGH true)" \
+  "$(pkg_json n-beta "" MEDIUM true)"
+tick
+cat >"$FAKE_SCENARIO" <<'SCEN'
+STATUS_run_1="failed"
+ERR_run_1="authentication failed: 401 Unauthorized"
+# The live zombie signature (run b0a82481): the run row exists but its activity
+# froze hours before any recovery attempt — resume acks ok yet nothing restarts.
+UPDATED_AT_MS=$(( $(date +%s) * 1000 - 6 * 3600 * 1000 ))
+SCEN
+tick # fatal class -> operator-gated pause with retained identity
+LAUNCHES_BEFORE="$(launch_count)"
+node "$ROOT/scripts/automation/foresift-autopilot.mjs" --recover-fatal >/dev/null
+assert_match "noop resume recorded before falling back" "$(state)" 'operator_recovery_resume_noop'
+assert_eq "verified noop triggers exactly ONE fresh continuation" "$(launch_count)" "$((LAUNCHES_BEFORE + 1))"
+assert_match "fresh continuation targets the SAME branch" "$(grep '^LAUNCH.*run-2' "$FAKE_LAUNCHES")" "branch=foresift/n-alpha"
+assert_match "dead run retired via supported lifecycle op first" "$(grep '^ABANDON' "$FAKE_LAUNCHES" || true)" "run-1"
+RECOVERED="$(node -e '
+const s = JSON.parse(require("fs").readFileSync(process.env.FORESIFT_AUTOPILOT_STATE_DIR + "/autopilot-state.json", "utf8"));
+const e = s.activeRuns.find((x) => !x.done);
+console.log([e.runId, String(!e.paused), String(!s.pausedFatal)].join(" "));
+')"
+assert_eq "supervisor tracks the fresh continuation authoritatively" "$RECOVERED" "run-2 true true"
+cat >"$FAKE_SCENARIO" <<'SCEN'
+DEFAULT_STATUS="running"
+SCEN
+tick
+assert_eq "post-recovery tick is stable (no duplicate launch)" "$(launch_count)" "$((LAUNCHES_BEFORE + 1))"
+printf 'STATUS_run_2="completed"\nMERGED_HEAD="foresift/n-alpha"\n' >>"$FAKE_SCENARIO"
+tick
+assert_eq "recovered implementation completes persisted work to PROVEN" "$(pkg_field n-alpha status)" "PROVEN"
+
+# ── S16: ack-ok-but-noop quota probe escalates instead of burning the budget ──
+echo "S16: silent no-op quota probe escalates to the operator-gated pause"
+new_sandbox s16
+roadmap_fixture G0
+milestone_fixture "G0" \
+  "$(pkg_json m-alpha "" HIGH true)" \
+  "$(pkg_json m-beta "" MEDIUM true)"
+tick
+cat >"$FAKE_SCENARIO" <<'SCEN'
+STATUS_run_1="failed"
+ERR_run_1="Rate limit exceeded: free-models-per-day quota exhausted."
+UPDATED_AT_MS=$(( $(date +%s) * 1000 - 8 * 3600 * 1000 ))
+SCEN
+tick # enters the durable quota pause
+assert_match "quota pause entered" "$(state)" 'quota_pause_scheduled'
+ff_quota; tick # due probe: resume acks ok, but the frozen row proves nothing restarted
+assert_match "noop probe recorded for the operator trail" "$(state)" 'quota_probe_resume_noop'
+assert_eq "escalation reaches the operator-gated pause" \
+  "$(node -e 'const s=JSON.parse(require("fs").readFileSync(process.argv[1],"utf8"));console.log(String(Boolean(s.pausedFatal)))' \
+    "$FORESIFT_AUTOPILOT_STATE_DIR/autopilot-state.json")" "true"
+assert_eq "exactly ONE probe spent (budget never burned against a dead run)" "$(resume_count)" "1"
+assert_eq "daemon itself issues no fresh relaunch against the dead run" "$(launch_count)" "1"
+RETAINED="$(node -e '
+const s = JSON.parse(require("fs").readFileSync(process.env.FORESIFT_AUTOPILOT_STATE_DIR + "/autopilot-state.json", "utf8"));
+const e = s.activeRuns.find((x) => !x.done);
+console.log([e.paused, e.branch, String(e.done === undefined)].join(" "));
+')"
+assert_eq "escalated entry stays TRACKED with branch identity for --recover-fatal" "$RETAINED" "fatal foresift/m-alpha true"
 
 echo
 echo "selftest result: PASS=$PASS FAIL=$FAIL"

@@ -225,6 +225,86 @@ describe('failure classification', () => {
   });
 });
 
+describe('resume-effect verification', () => {
+  const importFn = async () =>
+    (await import('../../scripts/automation/foresift-autopilot.mjs')).resumeTookEffect;
+  const T0 = Date.parse('2026-08-23T09:00:00Z');
+
+  it('accepts a row that left the terminal state (running/pending/completed)', async () => {
+    const resumeTookEffect = await importFn();
+    for (const status of ['running', 'pending', 'completed']) {
+      expect(
+        resumeTookEffect('r1', T0, { tries: 3, gapMs: 1, getRow: () => ({ id: 'r1', status }) }),
+      ).toBe(true);
+    }
+  });
+
+  it('counts fresh failure activity as effect — the engine restarted and re-failed fast', async () => {
+    const resumeTookEffect = await importFn();
+    expect(
+      resumeTookEffect('r1', T0, {
+        tries: 3,
+        gapMs: 1,
+        getRow: () => ({
+          id: 'r1',
+          status: 'failed',
+          last_activity_at: T0 + 2000, // activity after the resume was issued
+        }),
+      }),
+    ).toBe(true);
+    // Within the small clock-skew tolerance also counts.
+    expect(
+      resumeTookEffect('r1', T0, {
+        tries: 3,
+        gapMs: 1,
+        getRow: () => ({ id: 'r1', status: 'failed', last_activity_at: T0 - 1000 }),
+      }),
+    ).toBe(true);
+  });
+
+  it('rejects the zombie signature: failed row whose activity is frozen from before the resume', async () => {
+    const resumeTookEffect = await importFn();
+    let reads = 0;
+    expect(
+      resumeTookEffect('r1', T0, {
+        tries: 3,
+        gapMs: 1,
+        getRow: () => {
+          reads += 1;
+          return {
+            id: 'r1',
+            status: 'failed',
+            // The exact live G0 defect: ack ok, row unchanged, activity frozen
+            // hours before the resume (last_activity_at 06:32:25 vs resume 08:47).
+            last_activity_at: T0 - 8 * 3600_000,
+          };
+        },
+      }),
+    ).toBe(false);
+    expect(reads).toBe(3); // a stale terminal row keeps polling until the window closes
+  });
+
+  it('keeps polling through unreadable responses instead of concluding either way', async () => {
+    const resumeTookEffect = await importFn();
+    expect(
+      resumeTookEffect('r1', T0, {
+        tries: 3,
+        gapMs: 1,
+        getRow: (i) => (i === 'never' ? null : { _unparsed: 'garbage' }),
+      }),
+    ).toBe(false);
+    // Recovers when a later poll finally becomes readable and healthy.
+    let n = 0;
+    expect(
+      resumeTookEffect('r1', T0, {
+        tries: 4,
+        gapMs: 1,
+        getRow: () => (++n < 3 ? { _unparsed: 'x' } : { id: 'r1', status: 'running' }),
+      }),
+    ).toBe(true);
+  });
+});
+
 describe('timestamp normalization', () => {
   // Imported late so the block above stays grouped by existing concern.
   it('parses epoch-ms numbers, second-epoch numbers, numeric strings, and ISO forms', async () => {

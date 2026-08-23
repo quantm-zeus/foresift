@@ -149,6 +149,24 @@ run id, the package stays/becomes RUNNING, and pausedFatal clears atomically —
 all verifications precede any mutation; refusals exit nonzero with state
 untouched. No JSON hand-editing.
 
+**Every resume is verified, not trusted.** Archon 0.9 can acknowledge
+`workflow resume` with ok while leaving the run row untouched — observed live
+on the G0 run (ack ok, no worker process, no log activity, `last_activity_at`
+frozen hours earlier). After any recovery resume, the command polls the run row
+for a bounded window (~15 s): the row must leave the terminal state, or show
+activity newer than the resume, before the resume counts. A silent no-op is
+recorded (`operator_recovery_resume_noop`) and the single-fresh-continuation
+fallback fires; the dead run is first retired via the supported
+`workflow abandon` so it can never wake behind the fresh continuation. The
+automatic quota probes apply the same verification — a probe whose resume does
+nothing escalates to the operator-gated pause (`quota_probe_resume_noop`)
+instead of silently burning the probe budget.
+
+`--recover-fatal` also covers pauses without a global `pausedFatal`: when a
+tracked entry sits in a quota or fatal pause (e.g. early-resuming a daily-quota
+backoff, or recovering after a no-op probe escalation), the same verified flow
+runs against that entry's identity.
+
 `--clear-fatal` remains for pauses with nothing recoverable (e.g. corrupt-state
 pauses after manual repair). It is fail-closed: it REFUSES (exit 1) when
 clearing would orphan a package that is status=RUNNING without a non-paused

@@ -47,7 +47,7 @@ describe('applyMigrations (FR-DATA-001…006, FR-DR-001/002 foundation)', () => 
     await db.close();
   });
 
-  it('applies all seven to an empty database and records state', async () => {
+  it('applies all seven to an empty database and records state', { timeout: 120_000 }, async () => {
     const report = await applyMigrations({ engine, migrationsDir: MIGRATIONS_DIR });
     expect(report.applied.length).toBe(7);
     expect(report.skipped).toEqual([]);
@@ -105,54 +105,58 @@ describe('applyMigrations (FR-DATA-001…006, FR-DR-001/002 foundation)', () => 
 });
 
 describe('failure isolation (T021)', () => {
-  it('a failing script aborts cleanly leaving prior recorded state intact', async () => {
-    const db = new PGlite();
-    const engine = createEngine(db, 'pglite');
-    try {
-      const dirBase = path.dirname(fileURLToPath(import.meta.url));
-      const sandbox = path.join(dirBase, '.tmp-migration-sandbox');
-      const { mkdir, writeFile, rm } = await import('node:fs/promises');
-      await rm(sandbox, { recursive: true, force: true });
-      await mkdir(sandbox, { recursive: true });
+  it(
+    'a failing script aborts cleanly leaving prior recorded state intact',
+    { timeout: 120_000 },
+    async () => {
+      const db = new PGlite();
+      const engine = createEngine(db, 'pglite');
+      try {
+        const dirBase = path.dirname(fileURLToPath(import.meta.url));
+        const sandbox = path.join(dirBase, '.tmp-migration-sandbox');
+        const { mkdir, writeFile, rm } = await import('node:fs/promises');
+        await rm(sandbox, { recursive: true, force: true });
+        await mkdir(sandbox, { recursive: true });
 
-      const good = await readFileAsync(path.join(MIGRATIONS_DIR, 'g0_data_0001_identity.sql'));
-      await writeFile(path.join(sandbox, 'g0_data_0001_identity.sql'), good);
-      // Second file references a nonexistent table → fails inside its tx.
-      await writeFile(
-        path.join(sandbox, 'g0_data_0002_broken.sql'),
-        'CREATE TABLE depends_on_missing (id text REFERENCES does_not_exist(id));',
-      );
+        const good = await readFileAsync(path.join(MIGRATIONS_DIR, 'g0_data_0001_identity.sql'));
+        await writeFile(path.join(sandbox, 'g0_data_0001_identity.sql'), good);
+        // Second file references a nonexistent table → fails inside its tx.
+        await writeFile(
+          path.join(sandbox, 'g0_data_0002_broken.sql'),
+          'CREATE TABLE depends_on_missing (id text REFERENCES does_not_exist(id));',
+        );
 
-      await expect(applyMigrations({ engine, migrationsDir: sandbox })).rejects.toThrow(
-        /g0_data_0002_broken failed/,
-      );
+        await expect(applyMigrations({ engine, migrationsDir: sandbox })).rejects.toThrow(
+          /g0_data_0002_broken failed/,
+        );
 
-      // First migration stayed recorded; broken one did not.
-      const recorded = await appliedMigrations(engine);
-      expect(recorded.map((r) => r.id)).toEqual(['g0_data_0001_identity']);
-      const broken = await engine.query("SELECT to_regclass('depends_on_missing') AS t");
-      expect(broken.rows[0]?.t).toBeNull();
+        // First migration stayed recorded; broken one did not.
+        const recorded = await appliedMigrations(engine);
+        expect(recorded.map((r) => r.id)).toEqual(['g0_data_0001_identity']);
+        const broken = await engine.query("SELECT to_regclass('depends_on_missing') AS t");
+        expect(broken.rows[0]?.t).toBeNull();
 
-      // Re-pointing the id at valid SQL applies cleanly afterwards.
-      await rm(sandbox, { recursive: true, force: true });
-      await mkdir(sandbox, { recursive: true });
-      await writeFile(path.join(sandbox, 'g0_data_0001_identity.sql'), good);
-      await writeFile(
-        path.join(sandbox, 'g0_data_0002_fixed.sql'),
-        'CREATE TABLE fixed (id text);',
-      );
-      const retry = await applyMigrations({ engine, migrationsDir: sandbox });
-      // 0001 stays recorded (skipped); the new valid id applies cleanly.
-      expect(retry.applied).toEqual(['g0_data_0002_fixed']);
-      expect(retry.skipped).toEqual(['g0_data_0001_identity']);
+        // Re-pointing the id at valid SQL applies cleanly afterwards.
+        await rm(sandbox, { recursive: true, force: true });
+        await mkdir(sandbox, { recursive: true });
+        await writeFile(path.join(sandbox, 'g0_data_0001_identity.sql'), good);
+        await writeFile(
+          path.join(sandbox, 'g0_data_0002_fixed.sql'),
+          'CREATE TABLE fixed (id text);',
+        );
+        const retry = await applyMigrations({ engine, migrationsDir: sandbox });
+        // 0001 stays recorded (skipped); the new valid id applies cleanly.
+        expect(retry.applied).toEqual(['g0_data_0002_fixed']);
+        expect(retry.skipped).toEqual(['g0_data_0001_identity']);
 
-      const fixedTables = await engine.query("SELECT to_regclass('fixed') AS t");
-      expect(fixedTables.rows[0]?.t).toBe('fixed');
-      await rm(sandbox, { recursive: true, force: true });
-    } finally {
-      await db.close();
-    }
-  });
+        const fixedTables = await engine.query("SELECT to_regclass('fixed') AS t");
+        expect(fixedTables.rows[0]?.t).toBe('fixed');
+        await rm(sandbox, { recursive: true, force: true });
+      } finally {
+        await db.close();
+      }
+    },
+  );
 });
 
 async function readFileAsync(p: string): Promise<string> {

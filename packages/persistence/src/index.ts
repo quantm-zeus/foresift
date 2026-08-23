@@ -5,3 +5,7 @@
 // tasks T001–T003).
 export * from './db.ts';
 export * from './migrator.ts';
+export * from './repos/identity.ts';
+export * from './repos/observations.ts';
+export * from './repos/replay.ts';
+export * from './repos/backfill.ts';

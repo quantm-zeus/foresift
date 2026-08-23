@@ -110,24 +110,24 @@ exist for every acceptance criterion listed in spec.md §3.
 
 ## Phase 5 — Repositories: identity, observations, replay
 
-- [ ] T023 `repos/identity.ts`: insert-only identity writes, verified-equivalence
+- [x] T023 `repos/identity.ts`: insert-only identity writes, verified-equivalence
       membership enforcement, decimals sourced→cross-checked→conflicting state machine,
       migration-edge registration with cycle/ambiguity refusal. Traces: FR-DATA-001.
-- [ ] T024 Golden-fixture suite `tests/fixtures/data/` + package integration tests:
+- [x] T024 Golden-fixture suite `tests/fixtures/data/` + package integration tests:
       EVM/Solana address vectors, decimals resolution vectors, CAIP forms. Traces:
       FR-DATA-001.
-- [ ] T025 `repos/observations.ts`: append-only writes, revision chains, reorg
+- [x] T025 `repos/observations.ts`: append-only writes, revision chains, reorg
       compensating events preserving original receipt hashes. Traces: FR-DATA-002.
-- [ ] T026 Revision/reorg timeline fixtures + tests: original observations survive
+- [x] T026 Revision/reorg timeline fixtures + tests: original observations survive
       revisions/reorgs byte-for-byte; current view resolves latest valid revision.
       Traces: FR-DATA-002.
-- [ ] T027 `repos/replay.ts`: point-in-time queries resolving latest revision with
+- [x] T027 `repos/replay.ts`: point-in-time queries resolving latest revision with
       `available_at <= T`; current-view vs replay-view separation; no current-state
       bypass path exposed. Traces: FR-DATA-003.
-- [ ] T028 `repos/backfill.ts`: backfill receipts with availability proof; guard
+- [x] T028 `repos/backfill.ts`: backfill receipts with availability proof; guard
       rejecting historical-query rows whose `available_at` precedes retrieval commit
       unless an independently persisted live receipt exists. Traces: FR-DATA-003.
-- [ ] T029 Watermark store honoring §13.5: non-contiguous watermark refuses
+- [x] T029 Watermark store honoring §13.5: non-contiguous watermark refuses
       complete-coverage claims for the gap interval. Traces: FR-DATA-003, FR-DATA-002.
 
 ## Phase 6 — Quality codes, sources, features, acquisition

@@ -91,6 +91,18 @@ export function validateCheckpoint(cp, expected = {}) {
       `HEAD moved since checkpoint (${cp.headSha?.slice(0, 8)} ≠ ${expected.headSha.slice(0, 8)})`,
     );
   for (const [label, rec] of Object.entries(cp.sourceHashes ?? {})) {
+    if (!rec.path) {
+      reasons.push(`source '${label}' has no recorded path`);
+      continue;
+    }
+    if (rec.sha256 == null) {
+      // Absent at build time (optional sources such as plan artifacts are
+      // recorded with a null hash). Still absent ⇒ nothing drifted; APPEARED
+      // since ⇒ the cached context never saw a file now sitting at a tracked
+      // path, which is drift.
+      if (existsSync(rec.path)) reasons.push(`source '${label}' appeared since checkpoint`);
+      continue;
+    }
     if (!existsSync(rec.path)) {
       reasons.push(`source '${label}' no longer exists`);
       continue;

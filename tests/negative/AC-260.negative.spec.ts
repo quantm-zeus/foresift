@@ -7,6 +7,7 @@
  * mode" arm of the criterion. A looser-than-ceiling tier registration is
  * refused outright (product law).
  */
+import { readFileSync } from 'node:fs';
 import { PGlite } from '@electric-sql/pglite';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import {
@@ -113,18 +114,39 @@ describe('AC-260 negative: missed tiers block opportunity mode and create incide
   });
 
   it('registering a tier looser than the product-law RPO ceiling is refused', async () => {
+    const vectors = JSON.parse(
+      readFileSync(new URL('../fixtures/dr/recovery-tier-vectors.json', import.meta.url), 'utf8'),
+    ) as {
+      registrationVectors: readonly {
+        name: string;
+        dataClass: RecoveryDataClass;
+        rpoTargetMinutes: number;
+        rtoTargetMinutes: number;
+        legal: boolean;
+      }[];
+    };
     const engine = createEngine(targetDb!, 'pglite');
-    await expect(
-      registerRecoveryTier(
+    let index = 0;
+    for (const vector of vectors.registrationVectors) {
+      index += 1;
+      const attempt = registerRecoveryTier(
         engine,
         {
-          id: 'tier-ac260n-illegal' as RecoveryTierId,
-          dataClass: 'CRITICAL_METADATA' as RecoveryDataClass,
-          rpoTargetMinutes: 30, // ceiling for CRITICAL_METADATA is 15
-          rtoTargetMinutes: 60,
+          id: `tier-ac260n-vector-${index}` as RecoveryTierId,
+          dataClass: vector.dataClass,
+          rpoTargetMinutes: vector.rpoTargetMinutes,
+          rtoTargetMinutes: vector.rtoTargetMinutes,
         },
-        at(5),
-      ),
-    ).rejects.toMatchObject({ code: ErrorCode.RECOVERY_TIER_CEILING_EXCEEDED });
+        at(5 + index),
+      );
+      if (vector.legal) {
+        await expect(attempt).resolves.toBeUndefined();
+      } else {
+        await expect(attempt).rejects.toMatchObject({
+          code: ErrorCode.RECOVERY_TIER_CEILING_EXCEEDED,
+        });
+      }
+    }
+    expect(index).toBe(vectors.registrationVectors.length);
   });
 });

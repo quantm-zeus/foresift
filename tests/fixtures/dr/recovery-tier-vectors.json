@@ -1,0 +1,59 @@
+{
+  "$comment": "Recovery-tier registration vectors (FR-DR-001 product law: declared RPO targets may never be looser than the class ceiling — CRITICAL_METADATA 15 min, CRITICAL_OBSERVATIONS_CHECKPOINTS 60 min, REPLAYABLE_RAW_PAYLOADS 1440 min). Legal vectors register; illegal ones must be refused with RECOVERY_TIER_CEILING_EXCEEDED.",
+  "rpoCeilingMinutes": {
+    "CRITICAL_METADATA": 15,
+    "CRITICAL_OBSERVATIONS_CHECKPOINTS": 60,
+    "REPLAYABLE_RAW_PAYLOADS": 1440
+  },
+  "registrationVectors": [
+    {
+      "name": "metadata at the ceiling is legal",
+      "dataClass": "CRITICAL_METADATA",
+      "rpoTargetMinutes": 15,
+      "rtoTargetMinutes": 60,
+      "legal": true
+    },
+    {
+      "name": "metadata tighter than the ceiling is legal",
+      "dataClass": "CRITICAL_METADATA",
+      "rpoTargetMinutes": 10,
+      "rtoTargetMinutes": 45,
+      "legal": true
+    },
+    {
+      "name": "metadata looser than the ceiling is product law violation",
+      "dataClass": "CRITICAL_METADATA",
+      "rpoTargetMinutes": 30,
+      "rtoTargetMinutes": 60,
+      "legal": false
+    },
+    {
+      "name": "observations/checkpoints at the ceiling is legal",
+      "dataClass": "CRITICAL_OBSERVATIONS_CHECKPOINTS",
+      "rpoTargetMinutes": 60,
+      "rtoTargetMinutes": 120,
+      "legal": true
+    },
+    {
+      "name": "observations/checkpoints one minute beyond the ceiling is a violation",
+      "dataClass": "CRITICAL_OBSERVATIONS_CHECKPOINTS",
+      "rpoTargetMinutes": 61,
+      "rtoTargetMinutes": 120,
+      "legal": false
+    },
+    {
+      "name": "raw payloads at the 24-hour ceiling is legal",
+      "dataClass": "REPLAYABLE_RAW_PAYLOADS",
+      "rpoTargetMinutes": 1440,
+      "rtoTargetMinutes": 480,
+      "legal": true
+    },
+    {
+      "name": "raw payloads beyond 24 hours is a violation",
+      "dataClass": "REPLAYABLE_RAW_PAYLOADS",
+      "rpoTargetMinutes": 1441,
+      "rtoTargetMinutes": 480,
+      "legal": false
+    }
+  ]
+}

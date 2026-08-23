@@ -259,7 +259,7 @@ exist for every acceptance criterion listed in spec.md §3.
       (backup.completed, restore.drill.finished, tier.violation.detected,
       degradation.changed): event names, field lists, tier/requirement annotations.
       Traces: FR-DATA-002, FR-DATA-003, FR-DATA-006, FR-DR-001, FR-DR-002.
-- [ ] T064 Cross-artifact consistency sweep: every manifest-declared test ref for the
+- [x] T064 Cross-artifact consistency sweep: every manifest-declared test ref for the
       eight requirements exists as a file; every scoped artifact free of placeholder
       markers; every task above traces only assigned IDs. Traces: FR-DATA-001,
       FR-DATA-002, FR-DATA-003, FR-DATA-004, FR-DATA-005, FR-DATA-006, FR-DR-001,

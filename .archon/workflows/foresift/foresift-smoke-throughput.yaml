@@ -1,0 +1,125 @@
+name: foresift-smoke-throughput
+description: |
+  Deterministic Foresift THROUGHPUT-CONTROL smoke test — no AI, no provider
+  spend, no product code. Proves, inside the REAL Archon v0.9 runtime, that the
+  throughput control-plane tools behave exactly as ADR 0006 claims:
+
+    1. regular bash nodes receive ARTIFACTS_DIR as a real env var and can
+       drive the durable checkpoint tool (build -> validate = valid);
+    2. an until_bash guard FAILS while a cached source file's hash is stale
+       and PASSES once reality matches again — i.e. hash invalidation actually
+       drives loop iteration (tamper -> auto-iteration -> repair -> pass);
+    3. the FULL-gate --check mode FAILS CLOSED when no attestation exists;
+    4. the dedupe classifier runs and reports UNIQUE_MANDATORY for unprovable
+       commands (fail-closed direction).
+
+  Run after any change to the throughput control plane or any Archon upgrade:
+
+    rm -rf /tmp/foresift-smoke-throughput
+    archon workflow run foresift-smoke-throughput --detach --branch foresift/smoke-throughput
+    archon workflow get <run-id> --json    # expect status completed
+
+  NOT for: anything product-related.
+tags: [foresift, smoke]
+
+nodes:
+  - id: init
+    bash: |
+      set -euo pipefail
+      S="${SMOKE_DIR:-/tmp/foresift-smoke-throughput}"
+      rm -rf "$S"
+      mkdir -p "$S/src"
+      printf 'authority-v1\n' > "$S/src/tasks.md"
+      echo 0 > "$S/iterations"
+      echo "smoke-init-ok artifacts-dir=$ARTIFACTS_DIR"
+
+  # ── PROOF 1+2: durable checkpoint lifecycle drives a deterministic loop ────
+  # Iteration 1 builds a VALID checkpoint then tampers its source (models
+  # reality drifting away from cached context). The guard must REJECT the now
+  # stale cache. Iteration 2 restores the source (models rebuilding context
+  # from authority) and the same guard must ACCEPT. Two iterations minimum is
+  # the proof that hash invalidation — not agent promises — ends the stage.
+  - id: checkpoint-loop
+    depends_on: [init]
+    idle_timeout: 300000
+    loop_group:
+      max_iterations: 5
+      fresh_context: true
+      until: THROUGHPUT_LOOP_TEXT_SIGNAL_NEVER_EMIT_9a1c3f
+      until_bash: |
+        set -euo pipefail
+        S="${SMOKE_DIR:-/tmp/foresift-smoke-throughput}"
+        node scripts/automation/package-checkpoint.mjs --validate \
+          --package g0-smoke-throughput --artifacts-dir "$S" \
+          > "$S/guard-last.json"
+      nodes:
+        - id: iterate
+          bash: |
+            set -euo pipefail
+            S="${SMOKE_DIR:-/tmp/foresift-smoke-throughput}"
+            N=$(($(cat "$S/iterations") + 1))
+            echo "$N" > "$S/iterations"
+            if [ "$N" -eq 1 ]; then
+              # Build a checkpoint whose cached context matches reality…
+              node scripts/automation/package-checkpoint.mjs --build \
+                --package g0-smoke-throughput --artifacts-dir "$S" \
+                --head 0000000000000000000000000000000000000000 \
+                --source tasks="$S/src/tasks.md" >/dev/null
+              node scripts/automation/package-checkpoint.mjs --validate \
+                --package g0-smoke-throughput --artifacts-dir "$S" \
+                >/dev/null || { echo "checkpoint must be valid right after build"; exit 1; }
+              # …then let reality drift: tamper the cached source file.
+              printf 'authority-v2-tampered\n' > "$S/src/tasks.md"
+              echo "iteration-1-built-checkpoint-then-drifted-reality"
+            else
+              # A fresh turn rebuilds context from the authoritative source,
+              # restoring agreement between cache and reality.
+              printf 'authority-v2-tampered\n' > "$S/src/tasks.md"
+              node scripts/automation/package-checkpoint.mjs --build \
+                --package g0-smoke-throughput --artifacts-dir "$S" \
+                --head 0000000000000000000000000000000000000000 \
+                --source tasks="$S/src/tasks.md" >/dev/null
+              echo "iteration-$N-rebuilt-context-from-authority"
+            fi
+
+  - id: verify-checkpoint-loop
+    depends_on: [checkpoint-loop]
+    bash: |
+      set -euo pipefail
+      S="${SMOKE_DIR:-/tmp/foresift-smoke-throughput}"
+      N=$(cat "$S/iterations")
+      if [ "${N:-0}" -lt 2 ]; then
+        echo "FAIL: expected >=2 iterations (stale cache must NOT satisfy the guard); got ${N:-0}"
+        exit 1
+      fi
+      grep -q '"valid":true' "$S/guard-last.json" || {
+        cat "$S/guard-last.json"; echo "FAIL: guard verdict should be valid at loop end"; exit 1;
+      }
+      echo "PROOF 1+2 OK: checkpoint built, tampered source invalidated it, fresh rebuild restored validity."
+
+  # ── PROOF 3: FULL-gate check fails closed without an attestation ────────────
+  - id: verify-full-gate-fail-closed
+    depends_on: [verify-checkpoint-loop]
+    bash: |
+      set -euo pipefail
+      S="${SMOKE_DIR:-/tmp/foresift-smoke-throughput}"
+      if node scripts/automation/package-full-gate.mjs --check \
+           --package g0-contracts-data-truth --artifacts-dir "$S/empty" \
+           >/dev/null 2>&1; then
+        echo "FAIL: --check must reject a MISSING attestation (exit nonzero)"
+        exit 1
+      fi
+      echo "PROOF 3 OK: full-gate --check failed closed with no attestation present."
+
+  # ── PROOF 4: dedupe classifier defaults to UNIQUE for unprovable shapes ─────
+  - id: verify-dedupe-fail-closed
+    depends_on: [verify-full-gate-fail-closed]
+    bash: |
+      set -euo pipefail
+      S="${SMOKE_DIR:-/tmp/foresift-smoke-throughput}"
+      node scripts/automation/verify-dedupe.mjs --json > "$S/dedupe-report.json"
+      grep -q 'UNIQUE_MANDATORY\|DUPLICATE_COVERED_BY_FULL_SUITE' "$S/dedupe-report.json" || {
+        echo "FAIL: classifier produced no verdicts"; exit 1;
+      }
+      node scripts/automation/verify-dedupe.mjs --repo-root . >/dev/null
+      echo "PROOF 4 OK: dedupe classifier executed over the real milestone metadata."

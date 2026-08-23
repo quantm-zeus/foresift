@@ -13,7 +13,7 @@ on a red or unverified state, and never fake evidence.
 
 ## 1. Final deterministic verification (blocking)
 
-Run `pnpm foresift:gate -- --package $ARGUMENTS` from the working tree.
+Run `pnpm foresift:gate --package $ARGUMENTS` from the working tree.
 If it fails: do NOT merge; fix forward only if the cause is trivial (typos,
 formatting); otherwise push corrections (`git push`, normal push) re-run the gate,
 and if it still fails end your reply with `MERGE_BLOCKED: <reason>`.

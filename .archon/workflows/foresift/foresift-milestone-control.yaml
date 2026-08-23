@@ -214,7 +214,7 @@ nodes:
   - id: verify-repo
     bash: |
       set -euo pipefail
-      pnpm foresift:gate -- --milestone
+      pnpm foresift:gate --milestone
       # Deterministically seed the durable audit-progress artifact before any
       # auditor iteration runs (scope computed from the authoritative manifest).
       node scripts/automation/audit-progress.mjs --init

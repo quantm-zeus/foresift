@@ -15,8 +15,8 @@ const MIGRATIONS_DIR = path.resolve(
   '../../../migrations',
 );
 
-describe('migration suite shape (T015–T019)', () => {
-  it('discovers exactly the seven G0 scripts in lexicographic order', async () => {
+describe('migration suite shape (T015–T019, +AC-243 probe assignments)', () => {
+  it('discovers exactly the G0 scripts in lexicographic order', async () => {
     const migrations = await discoverMigrations(MIGRATIONS_DIR);
     expect(migrations.map((m) => m.id)).toEqual([
       'g0_data_0001_identity',
@@ -24,6 +24,7 @@ describe('migration suite shape (T015–T019)', () => {
       'g0_data_0003_quality_sources',
       'g0_data_0004_features_acquisition',
       'g0_data_0005_object_artifact_index',
+      'g0_data_0006_probe_assignments',
       'g0_dr_0001_recovery_tiers',
       'g0_dr_0002_backup_policy',
     ]);
@@ -47,9 +48,9 @@ describe('applyMigrations (FR-DATA-001…006, FR-DR-001/002 foundation)', () => 
     await db.close();
   });
 
-  it('applies all seven to an empty database and records state', { timeout: 120_000 }, async () => {
+  it('applies all eight to an empty database and records state', { timeout: 120_000 }, async () => {
     const report = await applyMigrations({ engine, migrationsDir: MIGRATIONS_DIR });
-    expect(report.applied.length).toBe(7);
+    expect(report.applied.length).toBe(8);
     expect(report.skipped).toEqual([]);
 
     const recorded = await appliedMigrations(engine);
@@ -59,6 +60,7 @@ describe('applyMigrations (FR-DATA-001…006, FR-DR-001/002 foundation)', () => 
       'g0_data_0003_quality_sources',
       'g0_data_0004_features_acquisition',
       'g0_data_0005_object_artifact_index',
+      'g0_data_0006_probe_assignments',
       'g0_dr_0001_recovery_tiers',
       'g0_dr_0002_backup_policy',
     ]);
@@ -67,7 +69,7 @@ describe('applyMigrations (FR-DATA-001…006, FR-DR-001/002 foundation)', () => 
   it('applies twice without damage (idempotent)', async () => {
     const second = await applyMigrations({ engine, migrationsDir: MIGRATIONS_DIR });
     expect(second.applied).toEqual([]);
-    expect(second.skipped.length).toBe(7);
+    expect(second.skipped.length).toBe(8);
 
     // The full table set still exists exactly once each.
     const tables = await engine.query<{ table_name: string }>(

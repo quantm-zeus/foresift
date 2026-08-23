@@ -132,29 +132,29 @@ exist for every acceptance criterion listed in spec.md §3.
 
 ## Phase 6 — Quality codes, sources, features, acquisition
 
-- [ ] T030 Field-quality writer/reader enforcing "null alone is insufficient":
+- [x] T030 Field-quality writer/reader enforcing "null alone is insufficient":
       nullable stored field ⇒ ≥1 explicit code; query API filtering by quality state.
       Traces: FR-DATA-005, FR-DR-001 (quality-code substrate of AC-061 per spec §3.2).
-- [ ] T031 `repos/sources.ts`: source identities, independence groups with
+- [x] T031 `repos/sources.ts`: source identities, independence groups with
       collapse-by-upstream-lineage query, dependence edges storing correlation inputs
       with available-at-the-time vs diagnostic labeling. Traces: FR-DATA-006.
-- [ ] T032 Correlated-provider fixture pair + tests: strongly correlated timing/
+- [x] T032 Correlated-provider fixture pair + tests: strongly correlated timing/
       values/outages recorded as reduced-independence edge despite distinct provider ids.
       Traces: FR-DATA-006.
-- [ ] T033 `repos/features.ts`: online feature-value store indexed by subject,
+- [x] T033 `repos/features.ts`: online feature-value store indexed by subject,
       feature version, event time; single shared deterministic computation module used
       by both online writer and offline batch recomputation path. Traces: FR-DATA-004.
-- [ ] T034 Online/offline parity tests: batch recomputation over identical inputs
+- [x] T034 Online/offline parity tests: batch recomputation over identical inputs
       yields identical values within declared tolerance; divergence fails with diff.
       Traces: FR-DATA-004.
-- [ ] T035 `repos/acquisition.ts`: §13.8 records persisting eligibility stratum,
+- [x] T035 `repos/acquisition.ts`: §13.8 records persisting eligibility stratum,
       nonzero assignment probability, seed provenance, selection timestamp, requested
       fields, decision impact BEFORE retrieval completion; retrieval without prior
       assignment rejected. Traces: FR-DATA-003, FR-DATA-005.
-- [ ] T036 Frozen-count resolver: historical evidence counts resolved through replay
+- [x] T036 Frozen-count resolver: historical evidence counts resolved through replay
       boundaries cannot be altered by later dependence estimates; post-hoc estimates are
       stored diagnostic-only. Traces: FR-DATA-006, FR-DATA-003.
-- [ ] T037 Implement `packages/evidence/src/counts.ts`: immutable matured-count
+- [x] T037 Implement `packages/evidence/src/counts.ts`: immutable matured-count
       projections over frozen bundles served only through replay-realizable windows;
       below-threshold honesty (never inflate counts toward promotion gates).
       Traces: FR-DATA-006, FR-DATA-004.

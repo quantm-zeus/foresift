@@ -312,6 +312,18 @@ export const evidenceBundles = pgTable('evidence_bundles', {
   createdAt: timestamp('created_at', { withTimezone: true }).notNull(),
 });
 
+// --- g0_data_0006_probe_assignments -----------------------------------------
+
+export const probeAssignments = pgTable('probe_assignments', {
+  decisionId: text('decision_id').primaryKey(),
+  eligibilityStratum: text('eligibility_stratum').notNull(),
+  assignmentProbability: doublePrecision('assignment_probability').notNull(),
+  seedProvenance: text('seed_provenance').notNull(),
+  selectionAt: timestamp('selection_at', { withTimezone: true }).notNull(),
+  requestedFields: text('requested_fields').array().notNull(),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull(),
+});
+
 // --- g0_data_0005_object_artifact_index ------------------------------------
 
 export const objectArtifacts = pgTable('object_artifacts', {

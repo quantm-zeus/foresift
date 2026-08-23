@@ -1,73 +1,65 @@
 ---
-description: Deterministic FULL-gate attestation, scripted exact-head CI wait, machine squash merge (OPTIMIZED profile)
+description: BOUNDED AI FALLBACK for final landing — diagnose, fix forward, re-run the mechanical script (OPTIMIZED profile)
 argument-hint: <package-id>
 ---
 
-# Foresift work-package final gate → CI → merge — OPTIMIZED lane
+# Foresift work-package landing fallback — OPTIMIZED lane
 
 **Package**: $ARGUMENTS
 **Workflow artifacts**: $ARTIFACTS_DIR
 
-You are the release executor. Determinism and honesty outrank speed: never
-merge on a red or unverified state, never fake evidence, never bypass red CI.
-This lane replaces manual `gh` choreography with two deterministic tools
-(ADR 0006): the FULL-gate attestation runner and the mechanical lander.
+You are running ONLY because the deterministic lander
+(`package-final-land.mjs`) exited non-zero — the `final-land-router` node
+emitted `LANDING_NEEDS_AI`. On the clean path you are never invoked. Your role
+is bounded diagnosis and fix-forward; the merge itself stays mechanical.
 
-## 1. FULL verification with evidence reuse (blocking)
-
-```
-pnpm wp:full-gate --check --package $ARGUMENTS --artifacts-dir "$ARTIFACTS_DIR"
-```
-
-- exit 0 (the NORMAL case in this lane): the gate phase already ran the FULL
-  gate at exactly this head and wrote its attestation — reuse it; do NOT
-  re-run. A clean package executes exactly ONE local FULL gate end-to-end.
-- exit 1 → no reusable evidence (review/convergence changed the tree without
-  refreshing it). Run the gate:
-  `pnpm wp:full-gate --run --package $ARGUMENTS --artifacts-dir "$ARTIFACTS_DIR"`
-  Red ⇒ fix forward ONLY if trivial (typos, formatting); otherwise push
-  corrections and re-run. If still red after bounded repair, end your reply
-  with `MERGE_BLOCKED: <reason>`.
-
-FAST results NEVER substitute here; only `wp:full-gate --run/--check` counts.
-
-## 2. Write the PR body then land mechanically
-
-Write `$ARTIFACTS_DIR/pr-body.md` (what landed, why, evidence). Then run ONE
-command — it pushes, discovers-or-creates the PR, pins HEAD, waits for the
-named check AT THAT SHA, refuses on drift, and squash-merges:
+## 1. Read the mechanical evidence first (blocking)
 
 ```
-pnpm wp:land --branch "foresift/$ARGUMENTS" \
-  --title "<conventional title>" --body-file "$ARTIFACTS_DIR/pr-body.md"
+cat "$ARTIFACTS_DIR/land-result.json"
+cat "$ARTIFACTS_DIR/final-land-log.txt"
 ```
 
-Exit 0 → merged. Read its JSON trace for the PR number and pinned head.
+`land-result.json.reason` classifies the failure:
 
-## 3. Bounded repair on red CI
+- `full-gate-red` — verification failed at this head. Fix ONLY if trivial
+  (typos, formatting); otherwise push corrections as NEW COMMITS and continue
+  to step 3 (the script re-runs the gate itself).
+- `ci-red` — exact-head CI is red. This is NEVER bypassed and NEVER retried
+  into greenness: fetch the failing logs (`gh run view --log-failed`), fix,
+  commit additively (a NEW head — never force-push / amend / rebase).
+- `dirty-tree`, `no-check-runs`, `timeout`, `head-moved`,
+  `body-write-failed`, `lander-exit-*`, or anything unrecognized — NOT
+  repairable by you. End your reply with `MERGE_BLOCKED: <reason>` and let
+  the supervisor's recovery policy own it.
 
-If `wp:land` exits nonzero with reason `ci-red`: fetch failing logs
-(`gh run view --log-failed`), fix, commit additively (a NEW head — never
-force-push), and re-run `wp:land`. Bound: ~3 fix attempts; then end with
-`MERGE_BLOCKED: <reason>`. Reasons `no-check-runs` / `timeout` / `head-moved`
-are NOT repairable by you: report `MERGE_BLOCKED: <reason>` and let the
-supervisor's recovery policy own it.
+## 2. Hard boundaries (unchanged from ADR 0006/0008)
 
-## 4. Billing fallback (ONLY while Actions is billing-blocked)
+- Red CI / red gates are never bypassed, weakened, or waited out.
+- No force-push, no amend, no rebase of published branches.
+- FAST results never substitute for FULL-gate evidence.
+- The billing fallback from earlier revisions is RETIRED here: if CI never
+  started, report `MERGE_BLOCKED: no-check-runs` — a human decides.
 
-Only when `wp:land` reports `no-check-runs` AND the failed run carries the
-documented annotation "The job was not started because recent account payments
-have failed or your spending limit needs to be increased"
-(docs/setup/BOOTSTRAP_REPORT.md), apply ONCE per attempt:
-a) comment on the PR stating exact-head CI was unavailable due to the account
-   billing block (include the failed run URL);
-b) clean-room equivalent:
-   `git clone --no-local . /tmp/foresift-cleanroom-$$ && cd /tmp/foresift-cleanroom-$$ && git checkout <head-sha> && corepack pnpm install --frozen-lockfile && pnpm verify`
-c) merge only if that passed;
-d) note the fallback use in the merge commit body via the PR comment.
-When Actions works, this fallback must NEVER trigger.
+## 3. End by re-running the MECHANICAL script — always
 
-## 5. Report
+Whatever you fixed, do not merge manually. Your final action is:
 
-End your reply with: merged PR URL + merge commit SHA + which path ran
-(normal CI / attestation reuse / documented billing fallback).
+```
+node scripts/automation/package-final-land.mjs \
+  --package "$ARGUMENTS" \
+  --branch "$(git rev-parse --abbrev-ref HEAD)" \
+  --artifacts-dir "$ARTIFACTS_DIR"
+```
+
+It re-establishes exact-head FULL-gate evidence (attestation reuse first),
+re-composes the PR body, and lands mechanically with the pinned-head CI wait.
+Exit 0 ⇒ landed; overwrite `land-result.json` is your verdict record. Exit 4
+again after ~2 fallback attempts ⇒ end your reply with
+`MERGE_BLOCKED: <reason>` — escalating further is not yours to decide.
+
+## 4. Report
+
+End your reply with: what failed mechanically, what you changed (commits),
+the final script exit code, and either the merged PR URL + squash SHA or
+`MERGE_BLOCKED: <reason>`.

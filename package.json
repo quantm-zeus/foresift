@@ -12,6 +12,12 @@
   "scripts": {
     "spec:verify": "node scripts/spec-verify.mjs",
     "foresift:gate": "node scripts/automation/foresift-gate.mjs",
+    "wp:profile": "node scripts/automation/work-package-throughput-profile.mjs",
+    "wp:checkpoint": "node scripts/automation/package-checkpoint.mjs",
+    "wp:fast-verify": "node scripts/automation/package-fast-verify.mjs",
+    "wp:full-gate": "node scripts/automation/package-full-gate.mjs",
+    "wp:land": "node scripts/automation/package-land.mjs",
+    "wp:dedupe-report": "node scripts/automation/verify-dedupe.mjs",
     "autopilot:status": "node scripts/automation/foresift-autopilot.mjs --status",
     "autopilot:selftest": "bash scripts/automation/supervisor-selftest.sh",
     "autopilot:recover": "node scripts/automation/foresift-autopilot.mjs --recover-fatal",

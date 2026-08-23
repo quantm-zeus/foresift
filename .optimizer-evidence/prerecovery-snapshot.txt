@@ -1,0 +1,24 @@
+=== PRE-RECOVERY SNAPSHOT 2026-08-23T08:46:45Z ===
+active
+{
+ "activeRuns": [],
+ "pausedFatal": {
+  "reason": "run b0a82481a8c9da9bf3bb372372f26c1d (g0-contracts-data-truth) exhausted recovery policy: failed: DAG workflow 'foresift-work-package' completed with failures: 'implement': Loop-group node 'implement' failed at iteration 2: 'implement-iterate': Claude API error (rate_limit): API Error: Request rej",
+  "runId": "b0a82481a8c9da9bf3bb372372f26c1d",
+  "since": 1787470136796
+ },
+ "lastEvents": [
+  "paused_fatal",
+  "resumed",
+  "resume_scheduled"
+ ]
+}
+FORESIFT AUTOPILOT STATUS — 2026-08-23T08:46:45.426Z
+⛔ PAUSED_FATAL: run b0a82481a8c9da9bf3bb372372f26c1d (g0-contracts-data-truth) exhausted recovery policy: failed: DAG workflow 'foresift-work-package' completed with failures: 'implement': Loop-group node 'implement' failed at iteration 2: 'implement-iterate': Claude API error (rate_limit): API Error: Request rej
+   recover with: node scripts/automation/foresift-autopilot.mjs --recover-fatal (stop the service unit first)
+roadmap: 0/8 milestones proven
+current milestone: G0 — 0/8 packages proven
+  • g0-contracts-data-truth      RUNNING   risk=CRITICAL deps=[]
+a2016dab55b0ce0517742a82ae72d014be943454
+archon/task-foresift-g0-contracts-data-truth
+ M specs/g0-contracts-data-truth/tasks.md

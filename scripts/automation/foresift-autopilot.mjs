@@ -43,6 +43,8 @@ import {
   classifyFailure,
   extractQuotaResetAt,
 } from './schema.mjs';
+import { CHECKPOINT_FILE, validateCheckpoint } from './package-checkpoint.mjs';
+import { throughputProfile } from './work-package-throughput-profile.mjs';
 
 // Overridable for hermetic selftests (sandboxed fixture repo + state dir).
 const REPO = process.env.FORESIFT_AUTOPILOT_REPO ?? join(import.meta.dirname, '..', '..');
@@ -910,6 +912,58 @@ export function runObservability(runId) {
   }
 }
 
+/**
+ * Best-effort slice/checkpoint observability (OPTIMIZED profile only): read
+ * the run's durable implementation checkpoint from the Archon artifacts
+ * workspace and validate it against the files on disk. The checkpoint is
+ * CACHE/INDEX — this reports what it CLAIMS plus whether that claim is still
+ * provably current. Must NEVER throw; advisory only. Returns null for LEGACY
+ * packages, missing run ids, or absent/unreadable checkpoints.
+ */
+export function checkpointObservability(packageId, runId) {
+  if (!runId || typeof runId !== 'string') return null;
+  if (throughputProfile(packageId) !== 'OPTIMIZED') return null;
+  try {
+    const wsRoot = join(process.env.HOME ?? homedir(), '.archon', 'workspaces');
+    if (!existsSync(wsRoot)) return null;
+    let file = null;
+    search: for (const owner of readdirSync(wsRoot)) {
+      let repos = [];
+      try {
+        repos = readdirSync(join(wsRoot, owner));
+      } catch {
+        continue;
+      }
+      for (const repo of repos) {
+        const candidate = join(wsRoot, owner, repo, 'artifacts', runId, CHECKPOINT_FILE);
+        if (existsSync(candidate)) {
+          file = candidate;
+          break search;
+        }
+      }
+    }
+    if (!file) return null;
+    let cp = null;
+    try {
+      cp = JSON.parse(readFileSync(file, 'utf8'));
+    } catch {
+      return { valid: false, reasons: ['checkpoint unreadable'], file };
+    }
+    const verdict = validateCheckpoint(cp);
+    return {
+      valid: verdict.valid,
+      reasons: verdict.reasons,
+      slice: cp.slice?.id ?? null,
+      completedTasks: cp.completedTasks ?? null,
+      totalTasks: cp.totalTasks ?? null,
+      remainingTasks: cp.remainingTasks ?? null,
+      file,
+    };
+  } catch {
+    return null;
+  }
+}
+
 function describeRun(entry) {
   const parts = [
     `run ${entry.runId ?? '(awaiting discovery)'}`,
@@ -1014,8 +1068,16 @@ export function buildStatus() {
     for (const p of ms.packages) {
       const run = st.activeRuns.find((r) => r.packageId === p.id && !r.done);
       const runInfo = run ? `\n      ↳ ${describeRun(run)}` : '';
+      const ckpt = run?.runId ? checkpointObservability(p.id, run.runId) : null;
+      const sliceInfo = ckpt
+        ? `\n      ↳ checkpoint(${ckpt.valid ? 'valid' : 'INVALID'}): ` +
+          `${ckpt.slice ?? 'no slice'} · tasks ${ckpt.completedTasks}/${ckpt.totalTasks} done` +
+          (ckpt.valid ? '' : ` — stale: ${ckpt.reasons.join('; ')}`)
+        : throughputProfile(p.id) === 'OPTIMIZED' && run
+          ? '\n      ↳ checkpoint: none yet this run'
+          : '';
       lines.push(
-        `  • ${p.id.padEnd(28)} ${p.status.padEnd(9)} risk=${p.risk.padEnd(8)} deps=[${(p.dependencies ?? []).join(',')}]${runInfo}`,
+        `  • ${p.id.padEnd(28)} ${p.status.padEnd(9)} risk=${p.risk.padEnd(8)} profile=${throughputProfile(p.id).padEnd(9)} deps=[${(p.dependencies ?? []).join(',')}]${runInfo}${sliceInfo}`,
       );
     }
     if (!st.pausedFatal && roadmap && !corrupt && rmErrs.length === 0) {

@@ -2,7 +2,8 @@
 
 **Branch**: `archon/task-foresift-g0-contracts-data-truth` | **Date**: 2026-08-22
 **Spec**: `specs/g0-contracts-data-truth/spec.md` (scoped derivative; PRD-subordinate)
-**Input**: Assigned requirements FR-DATA-001…FR-DATA-006, FR-DR-001, FR-DR-002 from
+**Input**: Assigned requirements FR-DATA-001, FR-DATA-002, FR-DATA-003, FR-DATA-004,
+FR-DATA-005, FR-DATA-006, FR-DR-001, FR-DR-002 from
 `specs/implementation/current-milestone.json` (milestone G0, risk CRITICAL).
 
 ## Summary
@@ -65,7 +66,7 @@ _GATE: must pass before implementation. Re-checked after design._
 
 | Principle                             | Verdict | Evidence                                                                                                                                 |
 | ------------------------------------- | ------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
-| I Product-Contract Authority          | PASS    | Every task cites FR-DATA-001…006 / FR-DR-001…002 or their ACs; `docs/spec/**` untouched; spec.md is marked subordinate.                  |
+| I Product-Contract Authority          | PASS    | Every task cites FR-DATA-001 through FR-DATA-006 and FR-DR-001/FR-DR-002 or their ACs; `docs/spec/**` untouched; spec.md is marked subordinate. |
 | II Greenfield Architecture            | PASS    | Designed from PRD §§11/13/14/30/34/45 + Appendix D ADRs; predecessor not consulted.                                                      |
 | III Modular-Monolith-First Simplicity | PASS    | Five cohesive packages inside declared writeScopes; no brokers/services; PGlite is a test engine, not runtime infrastructure.            |
 | IV Read-Only Product Boundary         | PASS    | No execution/custody/signing/key-handling capability; key _material references_ only, never key material; negative tests assert absence. |

@@ -23,6 +23,12 @@
     "verify": "pnpm spec:verify && pnpm format:check && pnpm lint && pnpm typecheck && pnpm test"
   },
   "devDependencies": {
+    "@electric-sql/pglite": "^0.5.6",
+    "@foresift/domain": "workspace:*",
+    "@foresift/evidence": "workspace:*",
+    "@foresift/object-store": "workspace:*",
+    "@foresift/persistence": "workspace:*",
+    "@foresift/shared-schemas": "workspace:*",
     "@types/node": "26.2.0",
     "eslint": "10.9.0",
     "globals": "17.11.0",

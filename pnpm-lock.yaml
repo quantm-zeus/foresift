@@ -8,6 +8,24 @@ importers:
 
   .:
     devDependencies:
+      '@electric-sql/pglite':
+        specifier: ^0.5.6
+        version: 0.5.6
+      '@foresift/domain':
+        specifier: workspace:*
+        version: link:packages/domain
+      '@foresift/evidence':
+        specifier: workspace:*
+        version: link:packages/evidence
+      '@foresift/object-store':
+        specifier: workspace:*
+        version: link:packages/object-store
+      '@foresift/persistence':
+        specifier: workspace:*
+        version: link:packages/persistence
+      '@foresift/shared-schemas':
+        specifier: workspace:*
+        version: link:packages/shared-schemas
       '@types/node':
         specifier: 26.2.0
         version: 26.2.0

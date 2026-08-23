@@ -2,7 +2,8 @@
 
 **Input**: `specs/g0-contracts-data-truth/spec.md`, `specs/g0-contracts-data-truth/plan.md`
 **Traceability rule**: every task cites at least one assigned requirement
-(FR-DATA-001…FR-DATA-006, FR-DR-001, FR-DR-002) or an acceptance criterion of
+(FR-DATA-001, FR-DATA-002, FR-DATA-003, FR-DATA-004, FR-DATA-005, FR-DATA-006,
+FR-DR-001, FR-DR-002) or an acceptance criterion of
 those requirements. Requirement IDs not assigned to this package never appear here.
 
 Format: `- [ ] T### [P?]` — **[P]** = parallelizable with its neighbors (disjoint files).
@@ -14,11 +15,11 @@ exist for every acceptance criterion listed in spec.md §3.
 - [x] T001 Rewrite root `tsconfig.json` to glob-include `packages/*/src/**/*.ts`,
       `packages/*/test/**/*.ts`, and `tests/**/*.ts` (excluding `node_modules`, `dist`)
       so later G0 packages are picked up with zero root edits; add per-package tsconfig
-      convention note in the package scaffolds. Traces: foundation for FR-DATA-001…006.
+      convention note in the package scaffolds. Traces: foundation for FR-DATA-001 through FR-DATA-006.
 - [x] T002 Add a config-shape test (`tests/acceptance/tooling-globs.spec.ts`) asserting
       tsconfig include patterns match a synthetic future package path and that
       eslint flat config + pnpm-workspace globs already cover new package dirs.
-      Traces: foundation for FR-DATA-001…006.
+      Traces: foundation for FR-DATA-001 through FR-DATA-006.
 - [x] T003 Scaffold workspace packages `packages/domain`, `packages/shared-schemas`,
       `packages/persistence`, `packages/evidence`, `packages/object-store`: each with
       `package.json` (`@foresift/<name>`, ESM, `test: vitest run`, devDependency vitest),
@@ -100,13 +101,15 @@ exist for every acceptance criterion listed in spec.md §3.
 - [x] T020 Implement `packages/persistence/src/db.ts` (engine port seam) +
       `migrator.ts` applying `migrations/g0_(data|dr)_*.sql` in lexicographic order with
       `_foresift_schema_migrations` state; PGlite engine for tests. Traces:
-      FR-DATA-001…006, FR-DR-001…002 (foundation for all).
+      FR-DATA-001, FR-DATA-002, FR-DATA-003, FR-DATA-004, FR-DATA-005, FR-DATA-006,
+      FR-DR-001, FR-DR-002 (foundation for all).
 - [x] T021 Migration tests: apply to empty database, apply twice without damage,
       failure aborts cleanly leaving recorded state; immutability triggers fire.
       Traces: FR-DATA-002, FR-DR-002.
 - [x] T022 Drizzle mirror (`generated/schema.ts`) matching SQL truth + parity test
       enumerating columns/constraints from information_schema against the mirror.
-      Traces: FR-DATA-001…006, FR-DR-001…002 (ADR-001 conformance).
+      Traces: FR-DATA-001 through FR-DATA-006 and FR-DR-001/FR-DR-002
+      (ADR-001 conformance).
 
 ## Phase 5 — Repositories: identity, observations, replay
 
@@ -177,40 +180,40 @@ exist for every acceptance criterion listed in spec.md §3.
 
 ## Phase 8 — Recovery tiers, backup, restore drills
 
-- [ ] T042 Recovery-tier registry seeding §34.4 defaults under FR-DR-001 ceilings
+- [x] T042 Recovery-tier registry seeding §34.4 defaults under FR-DR-001 ceilings
       (critical metadata ≤15 min RPO, critical observations/checkpoints ≤60 min, raw
       payloads ≤24 h when rights permit reconstruction) + protected-asset registry
       mapping every table/store created by this package's migrations. Traces: FR-DR-001.
-- [ ] T043 Backup policy records (retention, encryption, location, rights ref,
+- [x] T043 Backup policy records (retention, encryption, location, rights ref,
       legal hold, deletion policy, separated key_reference) + `drill/backup.ts`
       snapshot mechanism interface with deterministic snapshot implementation.
       Traces: FR-DR-002, FR-DR-001.
-- [ ] T044 `drill/restore.ts` clean-environment verifier: database/migration state,
+- [x] T044 `drill/restore.ts` clean-environment verifier: database/migration state,
       object hashes, cross-store references, collector checkpoints/gaps validated before
       resumption is permitted; pluggable check interface so audit-chain, workflow, quota
       verifications attach later. Traces: FR-DR-002.
-- [ ] T045 `drill/rpo.ts`: measured RPO/RTO evaluation against configured tiers;
+- [x] T045 `drill/rpo.ts`: measured RPO/RTO evaluation against configured tiers;
       ClockPort-injected timelines prove ≤15 min / ≤60 min tier measurement; missed-tier
       outcome flips recovery_health_states to degraded incl. confirmed-opportunity-
       influence-blocked flag while preserving risk-monitoring allowance; incident record
       written. Traces: FR-DR-001, FR-DR-002.
-- [ ] T046 Key-separation tests: backup artifacts scanned assert no key material
+- [x] T046 Key-separation tests: backup artifacts scanned assert no key material
       present (key references only); restore refuses to run without separately provided
       credential provider; missing provider fails closed. Traces: FR-DR-002.
-- [ ] T047 Checkpoint/gap storage-contract tests: fenced checkpoint rejects stale
+- [x] T047 Checkpoint/gap storage-contract tests: fenced checkpoint rejects stale
       token commits; restore+replay fixture inserts each canonical event exactly once;
       unmarked-gap replay refused until gap registered explicitly. Traces: FR-DR-002.
-- [ ] T048 Policy-test battery for backup governance: retention windows, encryption
+- [x] T048 Policy-test battery for backup governance: retention windows, encryption
       status, location allowlist, rights references, legal-hold blocking deletion,
       deletion execution, key-access separation, restore credentials — positive and
       violation paths. Traces: FR-DR-002, FR-DR-001.
 
 ## Phase 9 — Manifest-declared acceptance + negative suites
 
-- [ ] T049 `tests/acceptance/AC-020.spec.ts` + `tests/negative/AC-020.negative.spec.ts`:
+- [x] T049 `tests/acceptance/AC-020.spec.ts` + `tests/negative/AC-020.negative.spec.ts`:
       replay at T excludes `available_at > T`; attempted future-evidence read fails.
       Traces: FR-DATA-003.
-- [ ] T050 AC-021 pair: revisions/reorgs preserve originals; mutation attempts
+- [x] T050 AC-021 pair: revisions/reorgs preserve originals; mutation attempts
       rejected by triggers. Traces: FR-DATA-002.
 - [ ] T051 AC-022 pair: migration aggregation avoids double counting on fixture;
       naive aggregation demonstrably diverges. Traces: FR-DATA-001.

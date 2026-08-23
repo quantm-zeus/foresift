@@ -296,6 +296,13 @@ nodes:
       HEAD_SHA=$(git rev-parse HEAD)
       printf '{"headSha":"%s"}\n' "$HEAD_SHA" > "$ARTIFACTS_DIR/.review-head-snapshot.json"
       echo "REVIEW_HEAD_SNAPSHOT=$HEAD_SHA"
+      # C4 §15: deterministic review packet (context accelerator, NOT
+      # authority). Always exits 0 — degradation is recorded inside the packet,
+      # never blocks review.
+      node scripts/automation/review-packet.mjs \
+        --package "$ARGUMENTS" \
+        --artifacts-dir "$ARTIFACTS_DIR"
+      echo "REVIEW_PACKET_WRITTEN"
 
   - id: review
     include: archon-review-block

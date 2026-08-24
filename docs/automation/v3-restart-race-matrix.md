@@ -82,3 +82,20 @@ Defects found and fixed while proving this matrix (2026-08-23, PR for this doc):
   adoption verdict (and any refusal text) is also teed into
   `$ARTIFACTS_DIR/adoption-verdict.json` because detached-run logs do not
   carry bash-node stderr; a blind refusal cost a full diagnosis cycle.
+- **Every merge to main re-staled the generation seed, making adoption refuse
+  forever without manual reconciliation (observed three times live during
+  gen-1 activation, 2026-08-24)** — ADR-0010's currency gate refuses any seed
+  that does not contain current origin/main, but control-plane work lands on
+  main constantly (state chores land directly on main; the third refusal was
+  caused by the defect-#6 fix itself). Hermetic reproduction exposed an even
+  tighter intra-tick face: the supervisor's own PENDING→RUNNING chore commit
+  raced and beat the workflow's currency check within one tick, re-staling a
+  seed reconciled moments earlier. Fixed: the supervisor performs the ADR's
+  own prescribed remediation automatically — every fresh launch merges
+  updated origin/main into the stale seed as a normal merge commit and pushes
+  (`generation_seed_reconciled` audit event), and any state-chore path
+  re-runs the reconciliation BEHIND the chore on the serialized git queue
+  (running inline would read pre-chore origin/main and no-op as 'current').
+  Fail-closed: a merge CONFLICT aborts and leaves the seed stale so
+  adoption's refusal pauses for an operator instead of forcing divergent
+  history together; push failure rolls the worktree back to the pushed tip.

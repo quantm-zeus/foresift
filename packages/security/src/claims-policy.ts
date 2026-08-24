@@ -34,7 +34,8 @@ interface ClaimPattern {
 const CLAIM_PATTERNS: readonly ClaimPattern[] = [
   {
     claimClass: 'GUARANTEED_PROFIT',
-    regex: /\b(guaranteed?\s+(profit|return|gains?|roi)|profit\s+guaranteed|can'?t\s+lose)\b/i,
+    regex:
+      /\b(guaranteed?\s+(profits?|returns?|gains?|roi)|profits?\s+guaranteed|can'?t\s+lose)\b/i,
   },
   {
     claimClass: 'RISK_FREE',

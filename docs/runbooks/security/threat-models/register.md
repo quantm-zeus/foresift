@@ -40,10 +40,10 @@ storage, revocation, expiry, IP/origin/scope constraints).
 - `packages/security/test/mcp-origin-protocol.spec.ts`
 - `packages/security/test/action-gate.spec.ts`
 - `packages/security/test/oauth-credentials.spec.ts`
-- `tests/acceptance/AC-250.spec.ts` **[deferred: g0-security-perimeter Phase H]**
-- `tests/acceptance/AC-251.spec.ts` **[deferred: g0-security-perimeter Phase H]**
-- `tests/negative/AC-250.negative.spec.ts` **[deferred: g0-security-perimeter Phase H]**
-- `tests/negative/AC-251.negative.spec.ts` **[deferred: g0-security-perimeter Phase H]**
+- `tests/acceptance/AC-250.spec.ts`
+- `tests/acceptance/AC-251.spec.ts`
+- `tests/negative/AC-250.negative.spec.ts`
+- `tests/negative/AC-251.negative.spec.ts`
 - HTTP transport wiring suites **[deferred: mcp-surface]**
 
 ### 2. Admin surface
@@ -68,10 +68,10 @@ activation events with immutable approved-set snapshots.
 
 - `packages/security/test/action-gate.spec.ts`
 - `packages/security/test/gate-pause.spec.ts`
-- `tests/acceptance/AC-274.spec.ts` **[deferred: g0-security-perimeter Phase H]**
-- `tests/negative/AC-274.negative.spec.ts` **[deferred: g0-security-perimeter Phase H]**
-- `tests/acceptance/AC-278.spec.ts` **[deferred: g0-security-perimeter Phase H]**
-- `tests/acceptance/AC-279.spec.ts` **[deferred: g0-security-perimeter Phase H]**
+- `tests/acceptance/AC-274.spec.ts`
+- `tests/negative/AC-274.negative.spec.ts`
+- `tests/acceptance/AC-278.spec.ts`
+- `tests/acceptance/AC-279.spec.ts`
 
 ### 3. Webhooks & scheduler/collector callbacks
 
@@ -90,8 +90,8 @@ pinned to configuration source (`SEC_WEBHOOK_ENDPOINT_SOURCE_REFUSED`).
 **Automated suites**:
 
 - `packages/security/test/webhook-abuse.spec.ts`
-- `tests/acceptance/AC-051.spec.ts` **[deferred: g0-security-perimeter Phase H]**
-- `tests/negative/AC-051.negative.spec.ts` **[deferred: g0-security-perimeter Phase H]**
+- `tests/acceptance/AC-051.spec.ts`
+- `tests/negative/AC-051.negative.spec.ts`
 
 ### 4. Providers (external data APIs)
 
@@ -115,10 +115,10 @@ secrets policy keeping classified material out of archives.
 **Automated suites**:
 
 - `packages/security/test/egress.spec.ts`
-- `tests/acceptance/AC-051.spec.ts` **[deferred: g0-security-perimeter Phase H]**
-- `tests/negative/AC-051.negative.spec.ts` **[deferred: g0-security-perimeter Phase H]**
-- `tests/acceptance/AC-257.spec.ts` **[deferred: g0-security-perimeter Phase H]**
-- `tests/negative/AC-257.negative.spec.ts` **[deferred: g0-security-perimeter Phase H]**
+- `tests/acceptance/AC-051.spec.ts`
+- `tests/negative/AC-051.negative.spec.ts`
+- `tests/acceptance/AC-257.spec.ts`
+- `tests/negative/AC-257.negative.spec.ts`
 
 ### 5. Collector (chain events, social text, websites, token metadata)
 
@@ -140,8 +140,8 @@ domain-separated memory-isolation keys.
 **Automated suites**:
 
 - `packages/security/test/untrusted-content.spec.ts`
-- `tests/acceptance/AC-258.spec.ts` **[deferred: g0-security-perimeter Phase H]**
-- `tests/negative/AC-258.negative.spec.ts` **[deferred: g0-security-perimeter Phase H]**
+- `tests/acceptance/AC-258.spec.ts`
+- `tests/negative/AC-258.negative.spec.ts`
 
 ### 6. Model boundary
 
@@ -165,10 +165,10 @@ with threshold+entity redaction before distribution.
 **Automated suites**:
 
 - `packages/security/test/secrets-claims.spec.ts`
-- `tests/acceptance/AC-276.spec.ts` **[deferred: g0-security-perimeter Phase H]**
-- `tests/acceptance/AC-277.spec.ts` **[deferred: g0-security-perimeter Phase H]**
-- `tests/negative/AC-276.negative.spec.ts` **[deferred: g0-security-perimeter Phase H]**
-- `tests/negative/AC-277.negative.spec.ts` **[deferred: g0-security-perimeter Phase H]**
+- `tests/acceptance/AC-276.spec.ts`
+- `tests/acceptance/AC-277.spec.ts`
+- `tests/negative/AC-276.negative.spec.ts`
+- `tests/negative/AC-277.negative.spec.ts`
 
 ### 7. Database
 
@@ -194,8 +194,8 @@ assertions; §35.9 AUDIT_HEALTH_BLOCKED coupling.
 - `packages/security/test/audit-chain.spec.ts`
 - `packages/security/test/schema-parity.spec.ts`
 - `packages/tenant-isolation/test/tenant-isolation.spec.ts`
-- `tests/acceptance/AC-259.spec.ts` **[deferred: g0-security-perimeter Phase H]**
-- `tests/negative/AC-259.negative.spec.ts` **[deferred: g0-security-perimeter Phase H]**
+- `tests/acceptance/AC-259.spec.ts`
+- `tests/negative/AC-259.negative.spec.ts`
 
 ### 8. Object store (artifacts)
 
@@ -218,8 +218,8 @@ scope+rights; import-gate member-path traversal refusals BEFORE rows exist.
 
 - `packages/tenant-isolation/test/tenant-isolation.spec.ts`
 - `packages/security/test/import-gating.spec.ts`
-- `tests/acceptance/AC-252.spec.ts` **[deferred: g0-security-perimeter Phase H]**
-- `tests/negative/AC-252.negative.spec.ts` **[deferred: g0-security-perimeter Phase H]**
+- `tests/acceptance/AC-252.spec.ts`
+- `tests/negative/AC-252.negative.spec.ts`
 
 ### 9. Alpha Lab
 
@@ -243,8 +243,8 @@ secret-class export prohibition toward ALPHA_LAB.
 
 - `packages/security/test/import-gating.spec.ts`
 - `packages/security/test/secrets-claims.spec.ts`
-- `tests/acceptance/AC-052.spec.ts` **[deferred: g0-security-perimeter Phase H]**
-- `tests/negative/AC-052.negative.spec.ts` **[deferred: g0-security-perimeter Phase H]**
+- `tests/acceptance/AC-052.spec.ts`
+- `tests/negative/AC-052.negative.spec.ts`
 
 ### 10. Notifications
 
@@ -293,8 +293,8 @@ queries while isolation is active.
 
 - `packages/security/test/secrets-claims.spec.ts`
 - `packages/tenant-isolation/test/tenant-isolation.spec.ts`
-- `tests/acceptance/AC-275.spec.ts` **[deferred: g0-security-perimeter Phase H]**
-- `tests/negative/AC-275.negative.spec.ts` **[deferred: g0-security-perimeter Phase H]**
+- `tests/acceptance/AC-275.spec.ts`
+- `tests/negative/AC-275.negative.spec.ts`
 
 ---
 
@@ -311,11 +311,11 @@ vocabulary (`SecErrorCode`).
 
 - `scripts/scan-prohibited-capabilities/cli.mjs` (CI gate)
 - `packages/security/test/negative-capability.spec.ts`
-- `tests/acceptance/AC-050.spec.ts` **[deferred: g0-security-perimeter Phase H]**
-- `tests/acceptance/AC-254.spec.ts` **[deferred: g0-security-perimeter Phase H]**
-- `tests/acceptance/AC-255.spec.ts` **[deferred: g0-security-perimeter Phase H]**
-- `tests/acceptance/AC-256.spec.ts` **[deferred: g0-security-perimeter Phase H]**
-- `tests/negative/AC-050.negative.spec.ts` **[deferred: g0-security-perimeter Phase H]**
-- `tests/negative/AC-254.negative.spec.ts` **[deferred: g0-security-perimeter Phase H]**
-- `tests/negative/AC-255.negative.spec.ts` **[deferred: g0-security-perimeter Phase H]**
-- `tests/negative/AC-256.negative.spec.ts` **[deferred: g0-security-perimeter Phase H]**
+- `tests/acceptance/AC-050.spec.ts`
+- `tests/acceptance/AC-254.spec.ts`
+- `tests/acceptance/AC-255.spec.ts`
+- `tests/acceptance/AC-256.spec.ts`
+- `tests/negative/AC-050.negative.spec.ts`
+- `tests/negative/AC-254.negative.spec.ts`
+- `tests/negative/AC-255.negative.spec.ts`
+- `tests/negative/AC-256.negative.spec.ts`

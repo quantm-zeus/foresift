@@ -271,7 +271,7 @@ prohibited capability anywhere outside the inert scanner self-test corpus.
 
 ## Phase H — Fixture corpus and manifest-declared test suites
 
-- [ ] T134 Create `tests/fixtures/sec/`: scanner self-test corpus (one inert
+- [x] T134 Create `tests/fixtures/sec/`: scanner self-test corpus (one inert
       sample per prohibited category that MUST be detected; read-only wallet
       intelligence positive control; GMGN query pair), SSRF attack fixtures,
       injection/Malicious-Markdown/webhook forgery fixtures, import-attack
@@ -279,59 +279,59 @@ prohibited capability anywhere outside the inert scanner self-test corpus.
       signature mismatch). All inert by construction; documented exclusion
       from production scans. Traces: FR-SEC-003, FR-SEC-004, FR-SEC-005,
       FR-SEC-008; AC-050, AC-051, AC-254, AC-255, AC-257, AC-258.
-- [ ] T135 Write acceptance specs `tests/acceptance/AC-050.spec.ts`,
+- [x] T135 Write acceptance specs `tests/acceptance/AC-050.spec.ts`,
       `tests/acceptance/AC-254.spec.ts`, `tests/acceptance/AC-255.spec.ts`,
       `tests/acceptance/AC-256.spec.ts` (scan surfaces green over the tree;
       detection proven per category; GMGN pair; decoder authority).
       Traces: FR-SEC-003.
-- [ ] T136 [P] Write acceptance specs `tests/acceptance/AC-051.spec.ts`,
+- [x] T136 [P] Write acceptance specs `tests/acceptance/AC-051.spec.ts`,
       `tests/acceptance/AC-257.spec.ts`, `tests/acceptance/AC-258.spec.ts`
       (attack batteries pass on clean inputs; every bypass class fails
       closed). Traces: FR-SEC-004, FR-SEC-005.
-- [ ] T137 [P] Write acceptance specs `tests/acceptance/AC-052.spec.ts`,
+- [x] T137 [P] Write acceptance specs `tests/acceptance/AC-052.spec.ts`,
       `tests/acceptance/AC-053.spec.ts` (secret-hygiene flows; credential
       lifecycle). Traces: FR-SEC-007, FR-SEC-001.
-- [ ] T138 [P] Write acceptance specs `tests/acceptance/AC-250.spec.ts`,
+- [x] T138 [P] Write acceptance specs `tests/acceptance/AC-250.spec.ts`,
       `tests/acceptance/AC-251.spec.ts`, `tests/acceptance/AC-252.spec.ts`,
       `tests/acceptance/AC-253.spec.ts` (origin/protocol/resource/OAuth
       primitives admit valid traffic). Traces: FR-SEC-001, FR-SEC-009.
-- [ ] T139 Write acceptance spec `tests/acceptance/AC-259.spec.ts`
+- [x] T139 Write acceptance spec `tests/acceptance/AC-259.spec.ts`
       (append → checkpoint → independent verification green end-to-end on
       PGlite + object store). Traces: FR-SEC-002.
-- [ ] T140 [P] Write acceptance specs `tests/acceptance/AC-274.spec.ts`,
+- [x] T140 [P] Write acceptance specs `tests/acceptance/AC-274.spec.ts`,
       `tests/acceptance/AC-275.spec.ts`, `tests/acceptance/AC-276.spec.ts`,
       `tests/acceptance/AC-277.spec.ts`, `tests/acceptance/AC-278.spec.ts`,
       `tests/acceptance/AC-279.spec.ts` (gate admits complete requests;
       isolation matrix holds; claims/redaction pass compliant outputs;
       pause/rollback semantics correct). Traces: FR-SEC-001, FR-SEC-009,
       FR-SEC-010, FR-SEC-011, FR-SEC-012.
-- [ ] T141 Write negative specs `tests/negative/AC-050.negative.spec.ts`,
+- [x] T141 Write negative specs `tests/negative/AC-050.negative.spec.ts`,
       `tests/negative/AC-254.negative.spec.ts`,
       `tests/negative/AC-255.negative.spec.ts`,
       `tests/negative/AC-256.negative.spec.ts` (each prohibited-category
       fixture DETECTED; tampered inventories refuse; forbidden variants fail
       build/runtime policy). Traces: FR-SEC-003.
-- [ ] T142 [P] Write negative specs `tests/negative/AC-051.negative.spec.ts`,
+- [x] T142 [P] Write negative specs `tests/negative/AC-051.negative.spec.ts`,
       `tests/negative/AC-257.negative.spec.ts`,
       `tests/negative/AC-258.negative.spec.ts` (full SSRF battery incl.
       rebinding/IPv6/encoded/userinfo/mixed-scheme/oversize/slow-stream;
       webhook forgery set; injection-containment mutations attempted and
       refused). Traces: FR-SEC-004, FR-SEC-005.
-- [ ] T143 [P] Write negative specs `tests/negative/AC-052.negative.spec.ts`,
+- [x] T143 [P] Write negative specs `tests/negative/AC-052.negative.spec.ts`,
       `tests/negative/AC-053.negative.spec.ts` (classified material refused
       toward context/log/trace/export/UI; revoked/expired/misused credentials
       refused). Traces: FR-SEC-007, FR-SEC-001.
-- [ ] T144 [P] Write negative specs `tests/negative/AC-250.negative.spec.ts`,
+- [x] T144 [P] Write negative specs `tests/negative/AC-250.negative.spec.ts`,
       `tests/negative/AC-251.negative.spec.ts`,
       `tests/negative/AC-252.negative.spec.ts`,
       `tests/negative/AC-253.negative.spec.ts` (every listed bypass vector
       refused deterministically before processing). Traces: FR-SEC-001,
       FR-SEC-009.
-- [ ] T145 Write negative spec `tests/negative/AC-259.negative.spec.ts`
+- [x] T145 Write negative spec `tests/negative/AC-259.negative.spec.ts`
       (mutation/deletion/insertion/reordering/chain-break each detected;
       checkpoint-vs-object-copy mismatch detected; immutability triggers
       refuse SQL-level tampering). Traces: FR-SEC-002.
-- [ ] T146 [P] Write negative specs `tests/negative/AC-274.negative.spec.ts`
+- [x] T146 [P] Write negative specs `tests/negative/AC-274.negative.spec.ts`
       (each missing/stale dimension separately refused; TOTP-only
       insufficient), `tests/negative/AC-275.negative.spec.ts`
       (eleven-surface cross-tenant matrix),

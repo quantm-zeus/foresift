@@ -118,3 +118,18 @@ Defects found and fixed while proving this matrix (2026-08-23, PR for this doc):
   Before relaunching, the four committed-but-unpushed repair commits from
   the dead run were pushed to the generation branch (fast-forward) so
   adoption's `checkout -B` could not orphan real spend.
+- **Implementation "complete" over an uncommitted tree moved the failure to
+  the LAST node of the chain (live run 8061381a, 2026-08-24)** — the scoped
+  plan told the implement agent to leave ALL changes uncommitted,
+  misattributing the constraint to Constitution XVII (which actually mandates
+  additive git history: commits included). `package-implement-complete.mjs`
+  accepted the verdict (its git checks only rejected detached HEAD), the FULL
+  gate passed on the dirty tree, and `create-pr`'s dirty-tree guard refused —
+  after ~62 minutes of spend, with no earlier node the wiser. Fixed:
+  completion now requires committed coherence (`git status --porcelain
+-uall` empty when every other condition is met; error text names the paths
+  and teaches the remediation). Partial slices keep their designed right to
+  dirty trees across loop iterations. The gate-passed uncommitted state was
+  preserved as commit `0ee8f42` on the generation branch before recovery so
+  the supervisor's residue reset could not destroy verified spend. Machinery
+  is authoritative over AI-authored plan text either way (Constitution XVIII).

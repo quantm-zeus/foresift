@@ -7,6 +7,9 @@
  * never silently resolved.
  */
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { readFileSync } from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import {
   ErrorCode,
   ForesiftError,
@@ -30,16 +33,30 @@ import {
 } from '../acceptance/helpers.ts';
 
 let tdb: TestDatabase;
+let invalidChainIds: string[];
 
 beforeAll(async () => {
   tdb = await makeTestDatabase();
+  // The refusal battery consumes THE golden fixture (same source as the
+  // positive spec) instead of a hand-copied list, so the two suites cannot
+  // drift apart when vectors are added.
+  const fixture = JSON.parse(
+    readFileSync(
+      path.join(
+        path.dirname(fileURLToPath(import.meta.url)),
+        '../fixtures/data/identity-vectors.json',
+      ),
+      'utf8',
+    ),
+  ) as { invalidChainIds: string[] };
+  invalidChainIds = fixture.invalidChainIds;
 });
 
 afterAll(() => closeTestDatabase(tdb));
 
 describe('AC-023 negative: invalid identity inputs yield typed refusals', () => {
   it('refuses malformed chain ids at the domain boundary', () => {
-    for (const bad of ['eip155', 'EIP155:1', 'eip155:', ':', 'eip155:1:extra', 'x:%%']) {
+    for (const bad of invalidChainIds) {
       try {
         parseChainId(bad);
         throw new Error(`expected refusal for ${bad}`);

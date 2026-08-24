@@ -375,3 +375,59 @@ describe('frozen matured counts (T036, AC-247)', () => {
     expect(later).toBe(4); // d_late's fe-4 now matured
   });
 });
+
+describe('completion-vs-request ordering compares instants, not ISO text shape (§13.8)', () => {
+  it('accepts a sub-second-later completion whose text sorts lexically before the request', async () => {
+    // Request stored at second precision; completion 750ms later but written
+    // with a fraction — ".750Z" sorts BEFORE "Z" lexically, so only
+    // chronological ordering is honest here.
+    await recordAcquisitionDecision(engine, {
+      decisionId: 'd_precision_ok',
+      candidateId: 'cand-1',
+      evidenceFamily: 'DEX_TRADES',
+      policyVersion: 'acq-policy/v1',
+      state: AcquisitionState.REQUESTED,
+      requestedAt: utcTimestamp('2026-03-05T00:00:00Z'),
+    });
+    await recordProbeAssignment(engine, {
+      decisionId: 'd_precision_ok',
+      assignment: probe(),
+      estimatedDecisionImpact: 0.1,
+    });
+    await expect(
+      completeRetrieval(engine, {
+        decisionId: 'd_precision_ok',
+        completedAt: utcTimestamp('2026-03-05T00:00:00.750Z'),
+        state: AcquisitionState.RETURNED,
+        evidenceIds: ['ev-precision-ok'],
+      }),
+    ).resolves.toBeUndefined();
+  });
+
+  it('refuses a completion that precedes its request across mixed sub-second precision', async () => {
+    // Request carries .5s; completion is bare-second AT THE SAME SECOND.
+    // Lexically "…00Z" > "…00.5Z", so the old lexical `<` accepted this
+    // backdated completion; chronological comparison refuses it.
+    await recordAcquisitionDecision(engine, {
+      decisionId: 'd_precision_backdated',
+      candidateId: 'cand-1',
+      evidenceFamily: 'DEX_TRADES',
+      policyVersion: 'acq-policy/v1',
+      state: AcquisitionState.REQUESTED,
+      requestedAt: utcTimestamp('2026-03-05T00:00:00.500Z'),
+    });
+    await recordProbeAssignment(engine, {
+      decisionId: 'd_precision_backdated',
+      assignment: probe(),
+      estimatedDecisionImpact: 0.1,
+    });
+    await expect(
+      completeRetrieval(engine, {
+        decisionId: 'd_precision_backdated',
+        completedAt: utcTimestamp('2026-03-05T00:00:00Z'),
+        state: AcquisitionState.RETURNED,
+        evidenceIds: ['ev-precision-backdated'],
+      }),
+    ).rejects.toThrowError(/completion precedes request/);
+  });
+});

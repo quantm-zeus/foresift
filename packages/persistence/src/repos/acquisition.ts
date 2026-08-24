@@ -21,6 +21,7 @@ import {
   ForesiftError,
   ErrorCode,
   acquisitionState,
+  compareTimestamps,
   utcTimestamp,
   type EvidenceAcquisitionDecision,
   type ProbeAssignment,
@@ -234,7 +235,12 @@ export async function completeRetrieval(
         { decisionId: input.decisionId },
       );
     }
-    if (d.requested_at !== null && input.completedAt < utcTimestamp(toIso(d.requested_at))) {
+    // Chronological compare by epoch ms — lexical `<` mis-orders ISO strings
+    // with differing fractional precision (convention: recovery/backfill guards).
+    if (
+      d.requested_at !== null &&
+      compareTimestamps(input.completedAt, utcTimestamp(toIso(d.requested_at))) < 0
+    ) {
       throw new ForesiftError(
         LIFECYCLE_CODE,
         `completion precedes request for ${input.decisionId}`,

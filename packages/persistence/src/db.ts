@@ -1,8 +1,8 @@
 /**
- * Engine port seam (ADR-001): repositories speak this narrow interface, never
+ * Engine port seam (PRD ADR-001): repositories speak this narrow interface, never
  * a concrete driver. The deterministic PGlite engine is injected BY THE CALLER
  * — this module holds no static dependency on any driver package, which keeps
- * PGlite strictly test-only (ADR-0009) while production wires a real Pool.
+ * PGlite strictly test-only (ADR-0014) while production wires a real Pool.
  *
  * The seam exposes exactly two execution primitives plus transactions:
  *  - exec   : multi-statement SQL (DDL, migration scripts)
@@ -134,14 +134,14 @@ function parseUtcTimestampText(value: string): string {
  * (PGlite `parsers`, node-pg `types.setTypeParser`): OIDs 1114 (`timestamp`)
  * and 1184 (`timestamptz`) yield normalized ISO strings retaining full
  * source precision. Every test engine wires these in; a production pool MUST
- * do the same (ADR-0009's engine contract).
+ * do the same (ADR-0014's engine contract).
  */
 export const PRECISION_RETAINING_TIMESTAMP_PARSERS: Record<number, (value: string) => string> = {
   1114: parseUtcTimestampText,
   1184: parseUtcTimestampText,
 };
 
-// --- Production pool wiring (ADR-0009 engine contract) ------------------------
+// --- Production pool wiring (ADR-0014 engine contract) ------------------------
 
 /** Structural shape of the node-postgres type-parser registry we program against. */
 export interface PgTypesRegistry {
@@ -167,7 +167,7 @@ export function wirePrecisionRetainingTimestampParsers(types: PgTypesRegistry): 
 }
 
 /**
- * The ONLY sanctioned way to obtain a production PostgreSQL pool (ADR-0009
+ * The ONLY sanctioned way to obtain a production PostgreSQL pool (ADR-0014
  * engine contract): the precision-retaining timestamp parsers are registered
  * on the driver's type registry at the moment of construction, before the
  * first Pool exists — driver-default parsers round-trip through JS Date and

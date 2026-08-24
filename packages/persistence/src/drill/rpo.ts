@@ -12,6 +12,8 @@
  */
 import {
   degradedHealthState,
+  ErrorCode,
+  ForesiftError,
   type ClockPort,
   type RecoveryTier,
   type TierMeasurement,
@@ -41,7 +43,13 @@ export interface RestoreAttemptTimeline {
   readonly restoreCompletedAt: UtcTimestamp;
 }
 
-/** Compute achieved RPO/RTO minutes from a timeline; classification vs targets is separate. */
+/**
+ * Compute achieved RPO/RTO minutes from a timeline; classification vs targets
+ * is separate. A negative or non-finite delta means the reported timeline is
+ * itself inconsistent (restore completed before it started, recovered data
+ * predating acknowledged durable writes, unparseable instants) — such input
+ * is refused, never clamped into a fabricated healthy score.
+ */
 export function achievedMinutes(timeline: RestoreAttemptTimeline): {
   rpoMinutes: number;
   rtoMinutes: number;
@@ -49,9 +57,28 @@ export function achievedMinutes(timeline: RestoreAttemptTimeline): {
   const rpoMs =
     Date.parse(timeline.dataRecoveredThroughAt) - Date.parse(timeline.lastDurableWriteAt);
   const rtoMs = Date.parse(timeline.restoreCompletedAt) - Date.parse(timeline.restoreStartedAt);
+  if (!Number.isFinite(rpoMs) || !Number.isFinite(rtoMs)) {
+    throw new ForesiftError(
+      ErrorCode.DRILL_TIMELINE_INVALID,
+      'drill timeline contains unparseable instants',
+      {
+        lastDurableWriteAt: timeline.lastDurableWriteAt,
+        restoreStartedAt: timeline.restoreStartedAt,
+        dataRecoveredThroughAt: timeline.dataRecoveredThroughAt,
+        restoreCompletedAt: timeline.restoreCompletedAt,
+      },
+    );
+  }
+  if (rpoMs < 0 || rtoMs < 0) {
+    throw new ForesiftError(
+      ErrorCode.DRILL_TIMELINE_INVALID,
+      'drill timeline deltas must be non-negative (recovered-through may not precede the last durable write; completion may not precede start)',
+      { rpoDeltaMs: rpoMs, rtoDeltaMs: rtoMs },
+    );
+  }
   return {
-    rpoMinutes: Math.max(0, rpoMs) / MS_PER_MINUTE,
-    rtoMinutes: Math.max(0, rtoMs) / MS_PER_MINUTE,
+    rpoMinutes: rpoMs / MS_PER_MINUTE,
+    rtoMinutes: rtoMs / MS_PER_MINUTE,
   };
 }
 

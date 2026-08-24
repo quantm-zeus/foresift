@@ -1,4 +1,4 @@
-# ADR 0011: Decimals CROSS_CHECKED independence is best-effort over registered identities
+# ADR-0016: Decimals CROSS_CHECKED independence is best-effort over registered identities
 
 - Status: Accepted
 - Date: 2026-08-23

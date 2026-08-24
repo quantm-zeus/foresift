@@ -175,19 +175,26 @@ export interface MembershipInput {
 /**
  * Attach a representation to an asset grouping. Equivalence MUST be verified
  * — heuristic merges are refused at this boundary before the CHECK even runs.
+ *
+ * One representation maps to ONE asset grouping (PK `(chain_id,
+ * canonical_address)`), so writes go through insert-or-verify: an identical
+ * re-attach is a no-op reporting `inserted: false`, and re-pointing a
+ * representation at a different asset is refused as a typed identity conflict
+ * — never silently absorbed.
  */
 export async function attachMembership(
   engine: DatabaseEngine,
   input: MembershipInput,
 ): Promise<IdentityWriteResult> {
   assertVerifiedEquivalence(input.verification);
-  await engine.query(
-    `INSERT INTO asset_memberships (asset_id, chain_id, canonical_address, verification)
-     VALUES ($1, $2, $3, $4)
-     ON CONFLICT (chain_id, canonical_address) DO NOTHING`,
+  return insertOrVerify(
+    engine,
+    'asset_memberships',
+    '(chain_id, canonical_address)',
+    ['asset_id', 'chain_id', 'canonical_address', 'verification'],
     [input.assetId, input.chainId, input.canonicalAddress, input.verification],
+    ['chain_id', 'canonical_address'],
   );
-  return { inserted: true };
 }
 
 export async function insertPool(engine: DatabaseEngine, key: PoolKey): Promise<PoolId> {
@@ -299,7 +306,7 @@ export interface DecimalsObservationInput {
  *   NOT collapse into one independence group → CROSS_CHECKED;
  * - support whose refs share an upstream lineage counts as ONE independent
  *   voice (INV-008): state stays SOURCED and the result carries
- *   `independenceHint: 'DECIMAL_UNCERTAIN'` (ADR-0011);
+ *   `independenceHint: 'DECIMAL_UNCERTAIN'` (ADR-0016);
  * - a lone latest value contradicted by an independent source that never
  *   endorsed it → CONFLICTING (explicitly unusable, never guessed);
  * - otherwise SOURCED (single source, possibly self-correcting).
@@ -313,7 +320,7 @@ export async function recordDecimalsObservation(
   /** Non-empty when lineage collapse reduced the confirmation credit. */
   independenceHints?: readonly string[];
 }> {
-  // Set inside the transaction; read after commit (ADR-0011 hint surface).
+  // Set inside the transaction; read after commit (ADR-0016 hint surface).
   let independenceHints: string[] | undefined;
   await engine.transaction(async (tx) => {
     await tx.query(
@@ -370,7 +377,7 @@ export async function recordDecimalsObservation(
       if (supporters.size >= 2 && (await refsCollapseToOneIndependenceGroup(tx, [...supporters]))) {
         // INV-008: ref count is not independence — every supporting ref in one
         // upstream lineage is a single voice, so full cross-check credit is
-        // refused and the uncertainty is surfaced explicitly (ADR-0011).
+        // refused and the uncertainty is surfaced explicitly (ADR-0016).
         state = DecimalsResolutionState.SOURCED;
         resolvedDecimals = latest;
         independenceHints = ['DECIMAL_UNCERTAIN'];
@@ -410,7 +417,7 @@ export async function recordDecimalsObservation(
 
 /**
  * Best-effort lineage collapse among decimal-observation source refs
- * (INV-008, ADR-0011): supporting refs registered as source identities are
+ * (INV-008, ADR-0016): supporting refs registered as source identities are
  * folded by their independence group — any group holding ≥2 supporters means
  * the "cross-check" came from one upstream lineage. Refs that were never
  * registered cannot be lineage-checked and keep ref-level semantics (the

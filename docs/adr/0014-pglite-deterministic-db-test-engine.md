@@ -28,7 +28,7 @@ requires a documented conformance note and a CI-followup issue.
 - Migration authoring treats "runs identically on PGlite and real PostgreSQL"
   as a constraint; features only available on one engine require an explicit
   conformance note before use.
-- Deterministic snapshots and restore drills (ADR-0010) rely on PGlite's
+- Deterministic snapshots and restore drills (ADR-0015) rely on PGlite's
   byte-stable row rendering for reproducibility of backup artifacts.
 - Nothing in production configuration may point at PGlite; the dependency is
   dev/test-only by package manifest.

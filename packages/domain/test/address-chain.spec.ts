@@ -6,6 +6,7 @@ import {
   chainIdentity,
   normalizeEvmAddress,
   normalizeSolanaAddress,
+  keccak256Hex,
   parseChainId,
   renderEip55,
   BASE58_ALPHABET,
@@ -74,6 +75,28 @@ describe('EVM address normalization + EIP-55 rendering (AC-023)', () => {
   it('renders the official EIP-55 checksum vectors exactly', () => {
     for (const [lc, want] of EIP55_VECTORS) {
       expect(renderEip55(normalizeEvmAddress('0x' + lc))).toBe(want);
+    }
+  });
+
+  it('matches independent Keccak-256 reference digests at pad-boundary lengths', () => {
+    // Regression: the final pad byte must MERGE the domain byte (0x01) with
+    // the closing bit (0x80). Overwriting instead of merging diverged from
+    // Keccak for every input length ≡ 135 (mod 136) — a class the 40-byte
+    // EIP-55 vectors above cannot reach. Expected values below were generated
+    // against an independent reference implementation validated on the
+    // published Keccak-256("") and Keccak-256("abc") digests.
+    const KECCAK256_VECTORS: readonly [length: number, hex: string][] = [
+      [0, 'c5d2460186f7233c927e7db2dcc703c0e500b653ca82273b7bfad8045d85a470'],
+      [134, '9b15a71de979234ab809a8015d8ed19b2bf29bc43bb51be59b296471aa0a479f'],
+      [135, '47a414666f08a4658719043e5045638ef1ff99cb09400eff6289e6dc80c0970a'],
+      [136, '91bac0515ccd2811f7b65984a2971e3d6093ccb9fac349b14c048499c2832e81'],
+      [271, '67cd16d4b81d9371024e85c926ca78b79b5ff4447847f21f42678d7adc3a1c8b'],
+      [272, '490d7f50c63ba285913a6e03deb33641fa06e0870a192f253c10fdc8e556e7c8'],
+    ];
+    for (const [length, want] of KECCAK256_VECTORS) {
+      // Deterministic pseudo-message; content is irrelevant, length is the point.
+      const msg = Uint8Array.from({ length }, (_, i) => (i * 7 + 11) % 256);
+      expect(keccak256Hex(msg), `length ${length}`).toBe(want);
     }
   });
 

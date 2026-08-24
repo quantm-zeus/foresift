@@ -141,12 +141,64 @@ describe('replayObservations honors the inclusive availability boundary', () => 
   });
 });
 
+describe('deterministic tie-break on equal availability instants', () => {
+  it('prefers the higher revision when base and revision share an instant', async () => {
+    await appendObservation(engine, {
+      observationId: 'replay_tie_base',
+      eventAt: utcTimestamp('2026-05-01T19:00:00Z'),
+      availableAt: utcTimestamp('2026-05-01T20:00:00Z'),
+      availabilityProvenance: 'PROVIDER_LIVE_RESPONSE',
+      rawAmount: '10',
+      decimals: 2,
+    });
+    // The correction became available AT the same instant as its base.
+    await appendRevision(engine, {
+      revisionId: 'replay_tie_rev',
+      observationId: 'replay_tie_base',
+      reason: 'PROVIDER_CORRECTION',
+      availableAt: utcTimestamp('2026-05-01T20:00:00Z'),
+      availabilityProvenance: 'HISTORICAL_QUERY_FETCHED_LATER',
+      rawAmount: '11',
+      decimals: 2,
+    });
+    const rows = await replayObservations(engine, T('2026-05-01T20:00:01Z'));
+    const tie = rows.find((r) => r.observationId === 'replay_tie_base');
+    expect(tie?.revisionNo).toBe(1);
+    expect(tie?.rawAmount).toBe('11');
+    expect(tie?.isRevision).toBe(true);
+  });
+
+  it('breaks revision-vs-revision ties by highest revision number', async () => {
+    for (const [id, amount] of [
+      ['replay_tie_rev1', '12'],
+      ['replay_tie_rev2', '13'],
+    ] as const) {
+      await appendRevision(engine, {
+        revisionId: id,
+        observationId: 'replay_tie_base',
+        reason: 'PROVIDER_CORRECTION',
+        availableAt: utcTimestamp('2026-05-01T21:00:00Z'),
+        availabilityProvenance: 'HISTORICAL_QUERY_FETCHED_LATER',
+        rawAmount: amount,
+        decimals: 2,
+      });
+    }
+    const rows = await replayObservations(engine, T('2026-05-01T21:00:01Z'));
+    const tie = rows.find((r) => r.observationId === 'replay_tie_base');
+    // Insertion order must not matter — the comparator, not luck, decides.
+    expect(tie?.revisionNo).toBe(3);
+    expect(tie?.revisionId).toBe('replay_tie_rev2');
+    expect(tie?.rawAmount).toBe('13');
+  });
+});
+
 describe('current view differs from replay (AC-027)', () => {
   it('current resolves the global head regardless of any boundary', async () => {
     const current = await currentObservations(engine);
     const a = current.find((r) => r.observationId === 'replay_a');
     expect(a?.revisionNo).toBe(2);
-    expect(current).toHaveLength(3);
+    // replay_a, replay_b, replay_c, and the tie-break fixture below.
+    expect(current).toHaveLength(4);
   });
 
   it('replay at an earlier T disagrees with current — that is the point', async () => {

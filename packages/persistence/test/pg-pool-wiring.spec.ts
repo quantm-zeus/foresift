@@ -1,5 +1,5 @@
 /**
- * Production pool parser wiring (T066, FR-DATA-002, ADR-0009 engine
+ * Production pool parser wiring (T066, FR-DATA-002, ADR-0014 engine
  * contract): the sanctioned `createProductionPgPool` constructor registers
  * `PRECISION_RETAINING_TIMESTAMP_PARSERS` (node-pg `types.setTypeParser`,
  * OIDs 1114/1184) at the moment of pool construction, before any Pool or

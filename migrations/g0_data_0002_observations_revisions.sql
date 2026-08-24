@@ -133,6 +133,25 @@ CREATE TRIGGER observation_revisions_immutable_truncate
     BEFORE TRUNCATE ON observation_revisions
     FOR EACH STATEMENT EXECUTE FUNCTION foresift_refuse_mutation();
 
+-- No-backdating for the correction path (§13.6, FR-DATA-002): a revision may
+-- never claim availability earlier than its immutable anchor observation.
+-- Cross-row logic cannot be a CHECK, so it lives in a BEFORE INSERT trigger —
+-- mirroring how the backfill path's no-backdating rule is structural.
+CREATE FUNCTION foresift_refuse_revision_backdating() RETURNS trigger AS $fn$
+BEGIN
+    IF NEW.available_at < (SELECT available_at FROM observations
+                            WHERE observation_id = NEW.observation_id) THEN
+        RAISE EXCEPTION 'revision available_at backdates the anchor observation'
+            USING ERRCODE = 'restrict_violation';
+    END IF;
+    RETURN NEW;
+END;
+$fn$ LANGUAGE plpgsql;
+
+CREATE TRIGGER observation_revisions_no_backdating
+    BEFORE INSERT ON observation_revisions
+    FOR EACH ROW EXECUTE FUNCTION foresift_refuse_revision_backdating();
+
 -- Reorg/finality compensation: supersedes without rewriting receipt history.
 CREATE TABLE compensating_events (
     compensation_id       text PRIMARY KEY,

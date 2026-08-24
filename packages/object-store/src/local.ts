@@ -47,13 +47,18 @@ async function readMeta(
   dir: string,
   version: number,
 ): Promise<{ stored: StoredObject; identity: string } | null> {
+  let raw: string;
   try {
-    const raw = await readFile(path.join(dir, `v${version}.meta.json`), 'utf8');
-    const parsed = JSON.parse(raw) as { stored: StoredObject; identity: string };
-    return parsed;
-  } catch {
+    raw = await readFile(path.join(dir, `v${version}.meta.json`), 'utf8');
+  } catch (err) {
+    // Absence is the only condition that reads as "no metadata here".
+    // Corruption (unparseable JSON), permission, and wrong-type failures must
+    // surface — swallowing them would fabricate MISSING for bytes that sit
+    // intact on disk and misdirect reconciliation.
+    if ((err as NodeJS.ErrnoException).code !== 'ENOENT') throw err;
     return null;
   }
+  return JSON.parse(raw) as { stored: StoredObject; identity: string };
 }
 
 export class LocalFilesystemObjectStore implements ObjectStoreAdapter {
@@ -145,7 +150,11 @@ export class LocalFilesystemObjectStore implements ObjectStoreAdapter {
     let entries: string[];
     try {
       entries = await readdir(dir);
-    } catch {
+    } catch (err) {
+      // ENOENT alone reads as "object absent"; every other failure (EACCES,
+      // EISDIR, …) is a real fault and must surface, not masquerade as an
+      // empty version list.
+      if ((err as NodeJS.ErrnoException).code !== 'ENOENT') throw err;
       return [];
     }
     const metas: StoredObject[] = [];

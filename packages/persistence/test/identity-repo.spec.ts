@@ -10,6 +10,7 @@ import { PGlite } from '@electric-sql/pglite';
 import {
   ChainMappingQuality,
   DecimalsResolutionState,
+  ErrorCode,
   ForesiftError,
   LineageStatus,
   VerifiedEquivalence,
@@ -29,12 +30,14 @@ import {
   createAsset,
   createEngine,
   ensureChain,
+  insertChain,
   insertDex,
   insertPool,
   insertRepresentation,
   loadRepresentation,
   PRECISION_RETAINING_TIMESTAMP_PARSERS,
   recordDecimalsObservation,
+  recordPair,
   registerLaunch,
   registerMigrationEdge,
   registerSourceIdentity,
@@ -294,6 +297,85 @@ describe('verified-equivalence memberships and pool identity (T023)', () => {
       edge('mig_amb_ok', otherA, otherB, LineageStatus.AMBIGUOUS),
     );
   });
+
+  it('refuses re-pointing a representation between asset groupings; identical re-attach is a no-op', async () => {
+    await createAsset(engine, 'asset_group_a');
+    await createAsset(engine, 'asset_group_b');
+    const rep = vectors.evmAddresses[1];
+    if (rep === undefined) throw new Error('fixture missing');
+    await ensureChain(engine, 'eip155:1');
+    await insertRepresentation(engine, { chainId: 'eip155:1', canonicalAddress: rep.canonical });
+
+    const attach = (assetId: string) =>
+      attachMembership(engine, {
+        assetId,
+        chainId: 'eip155:1',
+        canonicalAddress: rep.canonical,
+        verification: VerifiedEquivalence.BRIDGE_VERIFIED,
+      });
+
+    expect(await attach('asset_group_a')).toEqual({ inserted: true });
+    // One representation maps to ONE grouping — a conflicting re-point is a
+    // typed identity conflict, never silently absorbed.
+    await expect(attach('asset_group_b')).rejects.toMatchObject({
+      code: ErrorCode.CONTRACT_INVARIANT_VIOLATED,
+    });
+    // The original grouping still holds the membership.
+    const stored = await engine.query<{ asset_id: string }>(
+      'SELECT asset_id FROM asset_memberships WHERE canonical_address = $1',
+      [rep.canonical],
+    );
+    expect(stored.rows[0]?.asset_id).toBe('asset_group_a');
+    // An identical re-attach reports honestly as a no-op.
+    expect(await attach('asset_group_a')).toEqual({ inserted: false });
+  });
+});
+
+describe('insert-only identity semantics (insertOrVerify)', () => {
+  it('treats an identical re-registration as a no-op reporting inserted:false', async () => {
+    const identity = chainIdentity({ chainId: 'eip155:9001' });
+    expect(await insertChain(engine, identity)).toEqual({ inserted: true });
+    expect(await insertChain(engine, identity)).toEqual({ inserted: false });
+  });
+
+  it('refuses a conflicting re-registration with a typed error', async () => {
+    const first = chainIdentity({ chainId: 'custom:localnet-9', internalIdVersion: 3 });
+    expect(await insertChain(engine, first)).toEqual({ inserted: true });
+    const conflicting = chainIdentity({ chainId: 'custom:localnet-9', internalIdVersion: 4 });
+    await expect(insertChain(engine, conflicting)).rejects.toMatchObject({
+      code: ErrorCode.CONTRACT_INVARIANT_VIOLATED,
+    });
+  });
+
+  it('compares instants by epoch, not text shape (…00Z vs …00.000Z)', async () => {
+    await insertDex(engine, 'eip155:9001', 'dex_instant');
+    const poolId = await insertPool(engine, {
+      chainId: chainIdentity({ chainId: 'eip155:9001' }).chainId,
+      dexId: 'dex_instant',
+      poolAddress: normalizeAddressForNamespace(
+        'eip155',
+        '0x00000000000000000000000000000000c0ffee09',
+      ),
+    });
+    const launchId = 'launch_instant_equiv';
+    expect(
+      await registerLaunch(engine, {
+        launchId,
+        poolId,
+        launchedAt: utcTimestamp('2026-01-01T00:00:00Z'),
+        sourceRef: 'fixture://identity-repo',
+      }),
+    ).toEqual({ inserted: true });
+    // Same instant in a different ISO spelling must read as the SAME row.
+    await expect(
+      registerLaunch(engine, {
+        launchId,
+        poolId,
+        launchedAt: utcTimestamp('2026-01-01T00:00:00.000Z'),
+        sourceRef: 'fixture://identity-repo',
+      }),
+    ).resolves.toEqual({ inserted: false });
+  });
 });
 
 describe('decimals resolution state machine over golden vectors (T023/T024)', () => {
@@ -340,7 +422,7 @@ describe('decimals resolution state machine over golden vectors (T023/T024)', ()
     expect(snapshot?.decimalsState).toBe(DecimalsResolutionState.CONFLICTING);
   });
 
-  it('refuses full cross-check credit when supporting refs share one upstream lineage (INV-008, ADR-0011)', async () => {
+  it('refuses full cross-check credit when supporting refs share one upstream lineage (INV-008, ADR-0016)', async () => {
     await ensureChain(engine, 'eip155:1');
     const sharedLineageAddress = '0x' + '11'.repeat(20);
     const distinctLineageAddress = '0x' + '22'.repeat(20);
@@ -403,5 +485,48 @@ describe('decimals resolution state machine over golden vectors (T023/T024)', ()
     const crossChecked = await observe(distinctLineageAddress, 'src:independent-d:getTokenMeta', 8);
     expect(crossChecked.state).toBe(DecimalsResolutionState.CROSS_CHECKED);
     expect(crossChecked.independenceHints).toBeUndefined();
+  });
+});
+
+describe('pair identity (T023 substrate, §11.6)', () => {
+  it('records a pair insert-or-verify: identical re-record is a no-op, conflict is typed', async () => {
+    await ensureChain(engine, 'eip155:1');
+    await insertDex(engine, 'eip155:1', 'dex_pairs');
+    const poolId = await insertPool(engine, {
+      chainId: chainIdentity({ chainId: 'eip155:1' }).chainId,
+      dexId: 'dex_pairs',
+      poolAddress: normalizeAddressForNamespace(
+        'eip155',
+        '0x00000000000000000000000000000000c0ffee10',
+      ),
+    });
+    await createAsset(engine, 'asset_pair_base');
+    await createAsset(engine, 'asset_pair_quote');
+
+    const pair = {
+      pairId: 'pair_identity_1',
+      poolId,
+      baseAssetId: 'asset_pair_base',
+      quoteAssetId: 'asset_pair_quote',
+    };
+    expect(await recordPair(engine, pair)).toEqual({ inserted: true });
+    // Identical re-record reads as the same row — never a duplicate.
+    expect(await recordPair(engine, pair)).toEqual({ inserted: false });
+
+    // Re-pointing the same pair_id at different sides is a typed conflict.
+    await createAsset(engine, 'asset_pair_quote_alt');
+    await expect(
+      recordPair(engine, { ...pair, quoteAssetId: 'asset_pair_quote_alt' }),
+    ).rejects.toMatchObject({ code: ErrorCode.CONTRACT_INVARIANT_VIOLATED });
+  });
+
+  it('the pairs_distinct_sides CHECK refuses base == quote at the SQL layer', async () => {
+    await expect(
+      engine.query(
+        `INSERT INTO pairs (pair_id, pool_id, base_asset_id, quote_asset_id)
+         VALUES ('pair_degenerate', $1, 'asset_pair_base', 'asset_pair_base')`,
+        ['eip155:1/dex_pairs/0x00000000000000000000000000000000c0ffee10'],
+      ),
+    ).rejects.toThrow(/distinct_sides|pairs_distinct/i);
   });
 });

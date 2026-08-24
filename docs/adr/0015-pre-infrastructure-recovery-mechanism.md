@@ -42,4 +42,4 @@ verification.
 ## References
 
 - FR-DR-001 / FR-DR-002, AC-260…AC-264
-- ADR-0009 (PGlite deterministic snapshot rendering)
+- ADR-0014 (PGlite deterministic snapshot rendering)

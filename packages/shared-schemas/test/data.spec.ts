@@ -18,7 +18,14 @@ import {
   utcTimestamp,
   type EvidenceAcquisitionDecision,
 } from '@foresift/domain';
-import { DATA_SCHEMAS, DATA_SCHEMA_REGISTRY_VERSION, type DataSchemaName } from '../src/data.ts';
+import {
+  BackfillReceiptSchema,
+  ChainIdSchema,
+  DATA_SCHEMAS,
+  DATA_SCHEMA_REGISTRY_VERSION,
+  DigitStringSchema,
+  type DataSchemaName,
+} from '../src/data.ts';
 
 const at = utcTimestamp;
 const evm = (s: string) => normalizeAddressForNamespace('eip155', s);
@@ -291,6 +298,17 @@ describe('round-trip: domain fixtures validate against their mirrors (T014)', ()
     }
   });
 
+  it('rejects unknown keys on every registered schema (.strict() fail-closed policy)', () => {
+    // One rogue key injected into each round-trip fixture must be refused —
+    // record-shape strictness is declared policy, so a single unstrict object
+    // schema would silently reopen the boundary.
+    for (const [name, fixture] of positives) {
+      const rogue = { ...(fixture as Record<string, unknown>), __rogue_injected__: 1 };
+      const result = DATA_SCHEMAS[name].safeParse(rogue);
+      expect(result.success, `${name}: unknown key must be rejected`).toBe(false);
+    }
+  });
+
   it('parses a Solana representation through its namespace-specific rule', () => {
     const parsed = DATA_SCHEMAS.AssetRepresentation.parse({
       chainId: 'solana:mainnet',
@@ -513,5 +531,96 @@ describe('negative fixtures fail validation (T014)', () => {
       },
       'resolved status without resolved_at (collector_gaps_resolution_requires_instant)',
     );
+  });
+});
+
+describe('building-block refusals (fail-closed boundaries)', () => {
+  it('refuses malformed chain ids without defaulting', () => {
+    const valid = ['eip155:1', 'solana:mainnet', 'custom:localnet-9', 'bip122:000000000019d6689'];
+    for (const good of valid) {
+      expect(ChainIdSchema.safeParse(good).success, `expected accept: ${good}`).toBe(true);
+    }
+    for (const bad of [
+      '', // empty
+      'eip155', // no separator
+      ':1', // namespace below the 3-char CAIP-2 floor
+      'ab:1', // same
+      'EIP155:1', // namespaces are lowercase-only
+      'eip 155:1', // space in namespace
+      'eip155:', // empty reference
+      'eip155:has space', // illegal reference character
+      'eip155:1!', // punctuation is not a reference character
+    ]) {
+      expect(ChainIdSchema.safeParse(bad).success, `expected refusal: ${JSON.stringify(bad)}`).toBe(
+        false,
+      );
+    }
+    // Unknown namespaces parse as chain ids but refuse addresses fail-closed.
+    const unknownNamespace = DATA_SCHEMAS.AssetRepresentation.safeParse({
+      chainId: 'tron:mainnet',
+      canonicalAddress: 'TSomeBase58AddressLookingString123456',
+      decimalsState: DecimalsResolutionState.SOURCED,
+    });
+    expect(unknownNamespace.success).toBe(false);
+  });
+
+  it('refuses non-digit strings wherever raw integers cross the boundary', () => {
+    for (const bad of ['', '-1', '1.5', '1e9', '+5', ' 1', '١٢٣', '0x10', '12a']) {
+      expect(
+        DigitStringSchema.safeParse(bad).success,
+        `expected refusal: ${JSON.stringify(bad)}`,
+      ).toBe(false);
+    }
+    expect(DigitStringSchema.safeParse('0').success).toBe(true);
+    expect(DigitStringSchema.safeParse('123456789012345678901234567890').success).toBe(true);
+  });
+});
+
+describe('BackfillReceipt §13.6 refinements hold per-conjunct', () => {
+  const baseReceipt = {
+    backfillJobId: 'bf_conjunct',
+    backfillReason: 'MISSED_LIVE_WINDOW',
+    historicalEventAt: at('2026-01-01T00:00:00Z'),
+    retrievedAt: at('2026-03-01T09:00:00Z'),
+    availableAt: at('2026-03-01T09:00:01Z'),
+    retrospectiveOnly: true,
+    wouldHaveBeenObservableLive: true,
+    availabilityProof: { method: 'RECOVERY_FETCH_COMMIT' },
+  };
+
+  it('refuses LIVE_RECEIPT_REFERENCE claims that cite no persisted reference', () => {
+    const result = BackfillReceiptSchema.safeParse({
+      ...baseReceipt,
+      availableAt: at('2026-01-01T00:05:00Z'), // earlier than retrieval…
+      availabilityProof: { method: 'LIVE_RECEIPT_REFERENCE' }, // …but no ref
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it('admits earlier-than-retrieval availability ONLY with a live-receipt ref', () => {
+    const result = BackfillReceiptSchema.safeParse({
+      ...baseReceipt,
+      availableAt: at('2026-01-01T00:05:00Z'),
+      availabilityProof: { method: 'LIVE_RECEIPT_REFERENCE', liveReceiptRef: 'obs_live_1/receipt' },
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it('refuses historical event times that follow their own availability', () => {
+    // Isolates the third §13.6 conjunct: even with an honest proof method,
+    // event_at > available_at is structurally impossible provenance.
+    const result = BackfillReceiptSchema.safeParse({
+      ...baseReceipt,
+      historicalEventAt: at('2026-03-02T00:00:00Z'),
+      availableAt: at('2026-03-01T09:00:01Z'),
+    });
+    expect(result.success).toBe(false);
+    // The boundary itself is legal: event AT the availability instant.
+    expect(
+      BackfillReceiptSchema.safeParse({
+        ...baseReceipt,
+        historicalEventAt: at('2026-03-01T09:00:01Z'),
+      }).success,
+    ).toBe(true);
   });
 });

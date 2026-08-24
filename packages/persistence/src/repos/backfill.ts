@@ -169,38 +169,88 @@ export async function advanceWatermark(
   advance: WatermarkAdvance,
 ): Promise<void> {
   const k = advance.key;
-  await engine.query(
-    `INSERT INTO watermarks (
-       provider, operation, collector_shard, program_version, chain_id,
-       highest_observed_slot, highest_contiguous_slot, highest_finalized_slot,
-       oldest_open_gap_start, oldest_open_gap_end,
-       maximum_lateness_seen_ms, gap_recovery_status, updated_at)
-     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12, now())
-     ON CONFLICT (provider, operation, collector_shard, program_version, chain_id)
-     DO UPDATE SET
-       highest_observed_slot = EXCLUDED.highest_observed_slot,
-       highest_contiguous_slot = EXCLUDED.highest_contiguous_slot,
-       highest_finalized_slot = EXCLUDED.highest_finalized_slot,
-       oldest_open_gap_start = EXCLUDED.oldest_open_gap_start,
-       oldest_open_gap_end = EXCLUDED.oldest_open_gap_end,
-       maximum_lateness_seen_ms = GREATEST(watermarks.maximum_lateness_seen_ms, EXCLUDED.maximum_lateness_seen_ms),
-       gap_recovery_status = EXCLUDED.gap_recovery_status,
-       updated_at = now()`,
-    [
-      k.provider,
-      k.operation,
-      k.collectorShard,
-      k.programVersion,
-      k.chainId,
-      slot(advance.highestObservedSlot),
-      slot(advance.highestContiguousSlot),
-      advance.highestFinalizedSlot === undefined ? null : slot(advance.highestFinalizedSlot),
-      advance.oldestOpenGap === undefined ? null : slot(advance.oldestOpenGap.startSlot),
-      advance.oldestOpenGap === undefined ? null : slot(advance.oldestOpenGap.endSlot),
-      advance.maximumLatenessSeenMs ?? 0,
-      advance.gapRecoveryStatus ?? (advance.oldestOpenGap !== undefined ? 'IN_PROGRESS' : 'NONE'),
-    ],
-  );
+  await engine.transaction(async (tx) => {
+    // Monotonicity guard (§13.5): the slot high-water marks are the only
+    // mutable state machine in the data-truth layer with no structural
+    // floor, so regression is refused at this boundary — a lower incoming
+    // value means a stale or rewound writer, and silently rewinding would
+    // corrupt gap/coverage honesty downstream. Gap windows are excluded:
+    // they legitimately open and close as discovery progresses.
+    const stored = await tx.query<{
+      highest_observed_slot: string;
+      highest_contiguous_slot: string;
+      highest_finalized_slot: string | null;
+    }>(
+      `SELECT highest_observed_slot, highest_contiguous_slot, highest_finalized_slot
+       FROM watermarks
+       WHERE provider = $1 AND operation = $2 AND collector_shard = $3
+         AND program_version = $4 AND chain_id = $5
+       FOR UPDATE`,
+      [k.provider, k.operation, k.collectorShard, k.programVersion, k.chainId],
+    );
+    const currentRow = stored.rows[0];
+    if (currentRow !== undefined) {
+      const regressed: string[] = [];
+      if (advance.highestObservedSlot < BigInt(currentRow.highest_observed_slot)) {
+        regressed.push('highest_observed_slot');
+      }
+      if (advance.highestContiguousSlot < BigInt(currentRow.highest_contiguous_slot)) {
+        regressed.push('highest_contiguous_slot');
+      }
+      if (
+        advance.highestFinalizedSlot !== undefined &&
+        currentRow.highest_finalized_slot !== null &&
+        advance.highestFinalizedSlot < BigInt(currentRow.highest_finalized_slot)
+      ) {
+        regressed.push('highest_finalized_slot');
+      }
+      if (regressed.length > 0) {
+        throw new ForesiftError(
+          ErrorCode.WATERMARK_REGRESSION_REJECTED,
+          `watermark advance would regress ${regressed.join(', ')}`,
+          {
+            provider: k.provider,
+            operation: k.operation,
+            collectorShard: k.collectorShard,
+            programVersion: k.programVersion,
+            chainId: k.chainId,
+          },
+        );
+      }
+    }
+    await tx.query(
+      `INSERT INTO watermarks (
+         provider, operation, collector_shard, program_version, chain_id,
+         highest_observed_slot, highest_contiguous_slot, highest_finalized_slot,
+         oldest_open_gap_start, oldest_open_gap_end,
+         maximum_lateness_seen_ms, gap_recovery_status, updated_at)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12, now())
+       ON CONFLICT (provider, operation, collector_shard, program_version, chain_id)
+       DO UPDATE SET
+         highest_observed_slot = EXCLUDED.highest_observed_slot,
+         highest_contiguous_slot = EXCLUDED.highest_contiguous_slot,
+         highest_finalized_slot = EXCLUDED.highest_finalized_slot,
+         oldest_open_gap_start = EXCLUDED.oldest_open_gap_start,
+         oldest_open_gap_end = EXCLUDED.oldest_open_gap_end,
+         maximum_lateness_seen_ms = GREATEST(watermarks.maximum_lateness_seen_ms, EXCLUDED.maximum_lateness_seen_ms),
+         gap_recovery_status = EXCLUDED.gap_recovery_status,
+         updated_at = now()`,
+      [
+        k.provider,
+        k.operation,
+        k.collectorShard,
+        k.programVersion,
+        k.chainId,
+        slot(advance.highestObservedSlot),
+        slot(advance.highestContiguousSlot),
+        advance.highestFinalizedSlot === undefined ? null : slot(advance.highestFinalizedSlot),
+        advance.oldestOpenGap === undefined ? null : slot(advance.oldestOpenGap.startSlot),
+        advance.oldestOpenGap === undefined ? null : slot(advance.oldestOpenGap.endSlot),
+        advance.maximumLatenessSeenMs ?? 0,
+        advance.gapRecoveryStatus ?? (advance.oldestOpenGap !== undefined ? 'IN_PROGRESS' : 'NONE'),
+      ],
+    );
+  });
 }
 
 export interface CoverageClaim {

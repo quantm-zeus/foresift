@@ -156,22 +156,41 @@ export interface RevisionInput {
  * Provider correction: a NEW revision row whose superseded_receipt_hash is the
  * original observation's receipt (the immutable anchor being corrected; chain
  * order is revision_no). Originals never change.
+ *
+ * No-backdating (§13.6): a revision may not claim availability earlier than
+ * its anchor observation — enforced here AND structurally by the
+ * `observation_revisions_no_backdating` trigger, so raw-SQL writers hit the
+ * same refusal.
  */
 export async function appendRevision(
   engine: DatabaseEngine,
   input: RevisionInput,
 ): Promise<{ revisionNo: number; supersededReceiptHash: string }> {
   await engine.transaction(async (tx) => {
-    const current = await tx.query<{ receipt_hash: string }>(
-      `SELECT receipt_hash FROM observations WHERE observation_id = $1`,
+    const current = await tx.query<{ receipt_hash: string; available_at: Date | string }>(
+      `SELECT receipt_hash, available_at FROM observations WHERE observation_id = $1`,
       [input.observationId],
     );
-    const baseHash = current.rows[0]?.receipt_hash;
-    if (baseHash === undefined) {
+    const base = current.rows[0];
+    if (base === undefined) {
       throw new ForesiftError(
         ErrorCode.REVISION_SUPERSEDES_UNKNOWN,
         `cannot revise unknown observation ${input.observationId}`,
         { observationId: input.observationId },
+      );
+    }
+    // Compare chronologically via epoch ms — UtcTimestamp strings may carry
+    // differing fractional precision around the same instant, so lexical `<`
+    // is not order-safe here (the convention used by backfill/feature guards).
+    const anchorAt =
+      typeof base.available_at === 'string'
+        ? Date.parse(base.available_at)
+        : base.available_at.getTime();
+    if (Date.parse(input.availableAt) < anchorAt) {
+      throw new ForesiftError(
+        ErrorCode.REVISION_BACKDATING_REJECTED,
+        'revision available_at backdates the anchor observation',
+        { observationId: input.observationId, availableAt: input.availableAt },
       );
     }
 
@@ -193,7 +212,7 @@ export async function appendRevision(
         input.reason,
         input.availableAt,
         availabilityProvenanceClass(input.availabilityProvenance),
-        baseHash,
+        base.receipt_hash,
         input.rawAmount ?? null,
         input.decimals ?? null,
         (input.qualityCodes ?? []).map((code) => qualityCode(code)),

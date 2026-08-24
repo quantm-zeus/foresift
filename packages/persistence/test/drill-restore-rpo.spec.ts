@@ -15,12 +15,15 @@ import os from 'node:os';
 import fs from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import {
+  ErrorCode,
+  ForesiftError,
   scriptedClock,
   utcTimestamp,
   type RecoveryTierId,
   type UtcTimestamp,
 } from '@foresift/domain';
 import {
+  achievedMinutes,
   applyMigrations,
   captureDeterministicSnapshot,
   collectorContinuityCheck,
@@ -69,7 +72,7 @@ afterAll(async () => {
   await fs.rm(storeRoot, { recursive: true, force: true });
 });
 
-describe('deterministic snapshot mechanism (T043, ADR-0010)', () => {
+describe('deterministic snapshot mechanism (T043, ADR-0015)', () => {
   it('yields byte-identical snapshots for identical data regardless of timing', async () => {
     await engine.query(
       'INSERT INTO canonical_event_keys (canonical_key, event_family, first_seen_at) VALUES ($1,$2,$3)',
@@ -100,6 +103,58 @@ describe('deterministic snapshot mechanism (T043, ADR-0010)', () => {
     const snapshot = await mechanism.capture(at(0));
     expect(mechanism.mechanismKind).toBe('deterministic-dump');
     expect(snapshot.manifestHash.startsWith('sha256:')).toBe(true);
+  });
+
+  it('snapshot bytes restore into a fresh database byte-for-byte (round-trip fidelity)', async () => {
+    await engine.query(
+      'INSERT INTO canonical_event_keys (canonical_key, event_family, first_seen_at) VALUES ($1,$2,$3)',
+      ['snap-roundtrip:1', 'snapshot_roundtrip', at(10)],
+    );
+
+    const original = await captureDeterministicSnapshot(engine, at(20));
+
+    // A genuinely fresh database: same migrations, none of the source rows.
+    const fresh = new PGlite({ parsers: PRECISION_RETAINING_TIMESTAMP_PARSERS });
+    try {
+      const restoredEngine = createEngine(fresh, 'pglite');
+      await applyMigrations({ engine: restoredEngine, migrationsDir: MIGRATIONS_DIR });
+
+      // Re-import exactly what a restore consumer reads from the artifact:
+      // per-table canonical row JSON, replayed as parameterized inserts.
+      const document = JSON.parse(new TextDecoder().decode(original.bytes)) as {
+        tables: Record<string, string[]>;
+      };
+      const tableNames = Object.keys(document.tables);
+      // Destructive restore semantics: migrations seed reference rows
+      // (quality codes, tiers, …) that would collide with the artifact, and
+      // the immutability triggers refuse TRUNCATE by design. A real restore
+      // replays authoritative bytes OVER the migrated schema, bypassing
+      // row-level write guards for the replay session only — the standard
+      // PITR-replay idiom.
+      await restoredEngine.exec('SET session_replication_role = replica');
+      await restoredEngine.exec(`TRUNCATE ${tableNames.map((t) => `"${t}"`).join(', ')} CASCADE`);
+      for (const [table, rowTexts] of Object.entries(document.tables)) {
+        for (const rowText of rowTexts) {
+          const row = JSON.parse(rowText) as Record<string, unknown>;
+          const columns = Object.keys(row);
+          const placeholders = columns.map((_, i) => `$${i + 1}`).join(',');
+          await restoredEngine.query(
+            `INSERT INTO "${table}" (${columns.map((c) => `"${c}"`).join(',')})
+             VALUES (${placeholders})`,
+            columns.map((c) => row[c]),
+          );
+        }
+      }
+
+      // The replayed database must satisfy the normal write guards again.
+      await restoredEngine.exec('RESET session_replication_role');
+
+      const recaptured = await captureDeterministicSnapshot(restoredEngine, at(999));
+      expect(recaptured.manifestHash).toBe(original.manifestHash);
+      expect(Buffer.from(recaptured.bytes).equals(Buffer.from(original.bytes))).toBe(true);
+    } finally {
+      await fresh.close();
+    }
   });
 });
 
@@ -342,6 +397,48 @@ describe('clean-environment restore verifier (T044, AC-261)', () => {
     const continuity = report.checks.find((c) => c.name === 'collector-checkpoints-gaps');
     expect(continuity?.passed).toBe(false);
     expect(continuity?.detail).toContain('shard-drill');
+  });
+});
+
+describe('drill timeline honesty (T045, AC-062): inconsistent timelines are refused', () => {
+  it('computes exact minute deltas for a coherent timeline', () => {
+    const achieved = achievedMinutes({
+      lastDurableWriteAt: utcTimestamp('2026-06-01T11:48:00Z'),
+      restoreStartedAt: utcTimestamp('2026-06-01T12:00:00Z'),
+      dataRecoveredThroughAt: utcTimestamp('2026-06-01T11:51:00Z'),
+      restoreCompletedAt: utcTimestamp('2026-06-01T12:40:00Z'),
+    });
+    expect(achieved.rpoMinutes).toBe(3);
+    expect(achieved.rtoMinutes).toBe(40);
+  });
+
+  it('refuses a timeline whose recovery point precedes the last durable write', () => {
+    // dataRecoveredThroughAt AFTER lastDurableWriteAt is the coherent loss
+    // convention; a NEGATIVE delta means restored state predates acknowledged
+    // writes — clamping that to 0 would score an impossible timeline HEALTHY.
+    expect(() =>
+      achievedMinutes({
+        lastDurableWriteAt: utcTimestamp('2026-06-01T12:00:00Z'),
+        restoreStartedAt: utcTimestamp('2026-06-01T12:05:00Z'),
+        dataRecoveredThroughAt: utcTimestamp('2026-06-01T11:00:00Z'),
+        restoreCompletedAt: utcTimestamp('2026-06-01T12:30:00Z'),
+      }),
+    ).toThrowError(ForesiftError);
+  });
+
+  it('refuses restore completion that precedes its own start', () => {
+    try {
+      achievedMinutes({
+        lastDurableWriteAt: utcTimestamp('2026-06-01T11:00:00Z'),
+        restoreStartedAt: utcTimestamp('2026-06-01T12:00:00Z'),
+        dataRecoveredThroughAt: utcTimestamp('2026-06-01T10:30:00Z'),
+        restoreCompletedAt: utcTimestamp('2026-06-01T11:59:00Z'),
+      });
+      expect.unreachable('negative RTO delta must be refused');
+    } catch (err) {
+      expect(err).toBeInstanceOf(ForesiftError);
+      expect((err as ForesiftError).code).toBe(ErrorCode.DRILL_TIMELINE_INVALID);
+    }
   });
 });
 

@@ -85,4 +85,26 @@ describe('raw-integer quantity policy (FR-DATA-001 §11.5)', () => {
     expect(() => renderDecimalString(1n, 37)).toThrowError(ForesiftError);
     expect(() => tokenQuantityToRaw('1', 37)).toThrowError(ForesiftError);
   });
+
+  it('multiplies by explicit truncation at the declared output scale', () => {
+    // price × size at declared scale: the dropped digits must be TRUNCATED
+    // toward zero (1705/10 → 170), never rounded — a refactor to rounding
+    // would silently re-scale every USD computation while staying green.
+    expect(multiplyDecimalStrings(dec('1.55'), dec('1.1'), 2)).toBe('1.70');
+    expect(multiplyDecimalStrings(dec('0.999'), dec('0.001'), 2)).toBe('0.00');
+    // Output scale above total input scale pads with zeros instead.
+    expect(multiplyDecimalStrings(dec('1.5'), dec('2'), 4)).toBe('3.0000');
+    // The truncation convention is parse-refuse-compatible: rendered output
+    // always parses back losslessly at its own scale.
+    const out = multiplyDecimalStrings(dec('1.55'), dec('1.1'), 2);
+    expect(parseDecimalString(out)).toEqual({ units: 170n, scale: 2 });
+  });
+
+  it('renders negative units with a sign and refuses to parse them back', () => {
+    // Rendering supports signed units (internal deltas); parsing stays
+    // unsigned-canonical — quantities in storage are never negative.
+    expect(renderDecimalString(-1500n, 2)).toBe('-15.00');
+    expect(renderDecimalString(-7n, 0)).toBe('-7');
+    expect(() => parseDecimalString('-15.00')).toThrowError(ForesiftError);
+  });
 });

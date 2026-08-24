@@ -174,11 +174,17 @@ export function keccak256Hex(message: Uint8Array | string): string {
     offset += rate;
   }
 
-  // Final block with keccak pad10*1 (domain byte 0x01).
+  // Final block with keccak pad10*1 (domain byte 0x01). Padding bytes are
+  // XOR-merged into the zeroed block: when only one byte of rate remains,
+  // domain byte and closing bit land on the SAME index and must coalesce to
+  // 0x81 — overwriting would silently diverge from Keccak for input lengths
+  // ≡ 135 (mod 136).
   const last = new Uint8Array(rate);
   last.set(bytes.subarray(offset));
-  last[bytes.length - offset] = 0x01;
-  last[rate - 1] = 0x80;
+  // Both pad indices are provably in range: 0 ≤ remainder < rate after the
+  // absorb loop, and rate ≥ 1.
+  last[bytes.length - offset] = byteAt(last, bytes.length - offset) ^ 0x01;
+  last[rate - 1] = byteAt(last, rate - 1) ^ 0x80;
   absorbBlock(last);
 
   // Digest = first 32 bytes of the interleaved state, each lane little-endian.

@@ -2,7 +2,7 @@
  * Shared bootstrap for the manifest-declared acceptance/negative suites
  * (T049–T062). Each suite gets a fresh in-process PGlite database with the ten
  * G0 migrations applied — PGlite is the deterministic TEST engine only
- * (ADR-0009); production remains real PostgreSQL per product ADR-001.
+ * (ADR-0014); production remains real PostgreSQL per product ADR-001.
  */
 import path from 'node:path';
 import { performance } from 'node:perf_hooks';

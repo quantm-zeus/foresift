@@ -310,3 +310,52 @@ describe('watermarks and complete-coverage honesty (§13.5)', () => {
     ).rejects.toThrow();
   });
 });
+
+describe('watermark slot monotonicity (§13.5)', () => {
+  const MONO_KEY = {
+    provider: 'mono-provider',
+    operation: 'swaps',
+    collectorShard: 'shard-mono',
+    programVersion: '1.0.0',
+    chainId: 'eip155:1',
+  };
+
+  it('advances monotonically and keeps the stored head', async () => {
+    const coherent = {
+      key: MONO_KEY,
+      highestObservedSlot: 500n,
+      highestContiguousSlot: 480n,
+      highestFinalizedSlot: 470n,
+      // §13.5 CHECK: a lagging contiguous head must declare its open gap.
+      oldestOpenGap: { startSlot: 481n, endSlot: 499n },
+    };
+    await advanceWatermark(engine, coherent);
+    const w = await loadWatermark(engine, MONO_KEY);
+    expect(w?.highestObservedSlot).toBe(500n);
+    expect(w?.highestContiguousSlot).toBe(480n);
+    expect(w?.highestFinalizedSlot).toBe(470n);
+
+    // Equal re-advance is not a regression — idempotent writers stay legal.
+    await advanceWatermark(engine, coherent);
+    expect((await loadWatermark(engine, MONO_KEY))?.highestObservedSlot).toBe(500n);
+  });
+
+  it('refuses an advance that would regress any slot high-water mark, leaving stored state intact', async () => {
+    for (const attempt of [
+      // observed regression
+      { highestObservedSlot: 400n, highestContiguousSlot: 480n },
+      // contiguous regression
+      { highestObservedSlot: 500n, highestContiguousSlot: 479n },
+      // finalized regression
+      { highestObservedSlot: 500n, highestContiguousSlot: 480n, highestFinalizedSlot: 469n },
+    ]) {
+      await expect(advanceWatermark(engine, { key: MONO_KEY, ...attempt })).rejects.toMatchObject({
+        code: ErrorCode.WATERMARK_REGRESSION_REJECTED,
+      });
+    }
+    const w = await loadWatermark(engine, MONO_KEY);
+    expect(w?.highestObservedSlot).toBe(500n);
+    expect(w?.highestContiguousSlot).toBe(480n);
+    expect(w?.highestFinalizedSlot).toBe(470n);
+  });
+});

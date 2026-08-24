@@ -156,4 +156,29 @@ describe('tamper detection fails explicitly (T041)', () => {
       store.put({ artifactId: 'art-9-retry', bytes, metadata: META }),
     ).rejects.toThrowError(/immutable/);
   });
+
+  it('surfaces corrupt protection metadata instead of reporting absence', async () => {
+    // Unparseable metadata is CORRUPTION, not absence — it must reject so
+    // reconciliation files a corruption signal rather than fabricating a
+    // MISSING_OBJECT for bytes that sit intact on disk.
+    const bytes = new TextEncoder().encode('corrupt-meta-probe');
+    const stored = await store.put({ artifactId: 'art-corrupt', bytes, metadata: META });
+    const hex = stored.contentHash.slice('sha256:'.length);
+    const metaPath = path.join(
+      root,
+      'objects',
+      hex.slice(0, 2),
+      hex,
+      `v${stored.version}.meta.json`,
+    );
+    await writeFile(metaPath, '{ not json');
+
+    await expect(store.get({ contentHash: stored.contentHash })).rejects.toThrow();
+    await expect(store.versions(stored.contentHash)).rejects.toThrow();
+    await expect(store.verify({ contentHash: stored.contentHash })).rejects.toThrow();
+
+    // Absence itself still reads as absent (the ENOENT path is untouched).
+    expect(await store.get({ contentHash: `sha256:${'ab'.repeat(32)}` })).toBeNull();
+    expect(await store.versions(`sha256:${'cd'.repeat(32)}`)).toEqual([]);
+  });
 });

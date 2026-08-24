@@ -8,7 +8,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { PGlite } from '@electric-sql/pglite';
-import { chainIdentity, utcTimestamp } from '@foresift/domain';
+import { chainIdentity, ErrorCode, utcTimestamp } from '@foresift/domain';
 import {
   appendCompensatingEvent,
   appendObservation,
@@ -235,6 +235,71 @@ describe('revision chains preserve originals byte-for-byte (T026, AC-025)', () =
         availabilityProvenance: 'HISTORICAL_QUERY_FETCHED_LATER',
       }),
     ).rejects.toThrow();
+  });
+
+  it('refuses revision availability earlier than the anchor observation (§13.6)', async () => {
+    // Fresh anchor so this invariant is exercised in isolation of obs_r1's chain.
+    const anchorAvailableAt = utcTimestamp('2026-02-01T12:00:05Z');
+    await appendObservation(engine, {
+      ...baseObservation('obs_no_backdate_anchor'),
+      eventAt: utcTimestamp('2026-02-01T12:00:00Z'),
+      availableAt: anchorAvailableAt,
+    });
+
+    // A correction pipeline writing historical chain-event time as
+    // availability must be refused — otherwise the corrected value would
+    // appear inside historical decision windows it never belonged in.
+    await expect(
+      appendRevision(engine, {
+        revisionId: 'rev_backdated',
+        observationId: 'obs_no_backdate_anchor',
+        reason: 'PROVIDER_CORRECTION',
+        availableAt: utcTimestamp('2026-01-15T00:00:00Z'),
+        availabilityProvenance: 'HISTORICAL_QUERY_FETCHED_LATER',
+      }),
+    ).rejects.toMatchObject({ code: ErrorCode.REVISION_BACKDATING_REJECTED });
+    const leaked = await engine.query<{ n: string }>(
+      `SELECT COUNT(*)::text AS n FROM observation_revisions WHERE revision_id = $1`,
+      ['rev_backdated'],
+    );
+    expect(Number(leaked.rows[0]?.n ?? '0')).toBe(0);
+
+    // The boundary itself is honest: availability AT the anchor instant stands.
+    await expect(
+      appendRevision(engine, {
+        revisionId: 'rev_equal_instant',
+        observationId: 'obs_no_backdate_anchor',
+        reason: 'PROVIDER_CORRECTION',
+        availableAt: anchorAvailableAt,
+        availabilityProvenance: 'HISTORICAL_QUERY_FETCHED_LATER',
+      }),
+    ).resolves.toBeDefined();
+  });
+
+  it('the database trigger independently refuses raw-SQL backdated revisions', async () => {
+    // Bypasses the repository guard entirely — the structural layer must hold
+    // against writers that never route through appendRevision.
+    await expect(
+      engine.query(
+        `INSERT INTO observation_revisions (
+           revision_id, observation_id, revision_no, reason, available_at,
+           availability_provenance, superseded_receipt_hash)
+         VALUES ('rev_raw_backdated', 'obs_no_backdate_anchor', 99, 'PROVIDER_CORRECTION',
+                 '2026-01-10T00:00:00Z', 'HISTORICAL_QUERY_FETCHED_LATER',
+                 'sha256:' || repeat('aa', 32))`,
+      ),
+    ).rejects.toThrow(/backdating|anchor/i);
+    // A non-backdated raw insert passes the same trigger untouched.
+    await expect(
+      engine.query(
+        `INSERT INTO observation_revisions (
+           revision_id, observation_id, revision_no, reason, available_at,
+           availability_provenance, superseded_receipt_hash)
+         VALUES ('rev_raw_ok', 'obs_no_backdate_anchor', 99, 'PROVIDER_CORRECTION',
+                 '2026-03-10T00:00:00Z', 'HISTORICAL_QUERY_FETCHED_LATER',
+                 'sha256:' || repeat('bb', 32))`,
+      ),
+    ).resolves.toBeDefined();
   });
 });
 

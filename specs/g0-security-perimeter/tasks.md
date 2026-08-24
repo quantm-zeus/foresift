@@ -345,7 +345,7 @@ prohibited capability anywhere outside the inert scanner self-test corpus.
 
 ## Phase I — Convergence verification
 
-- [ ] T147 Run the three milestone verification commands declared for this
+- [x] T147 Run the three milestone verification commands declared for this
       package in `specs/implementation/current-milestone.json` (the security
       package suite, the tenant-isolation package suite, and the scan CLI) —
       all green at HEAD. The exact command strings are reproduced in the
@@ -353,21 +353,21 @@ prohibited capability anywhere outside the inert scanner self-test corpus.
       repository root. Traces: FR-SEC-001 through FR-SEC-012 (package-wide
       proof).
 
-- [ ] T148 Run `pnpm verify` (= spec:verify, format:check, lint, typecheck,
+- [x] T148 Run `pnpm verify` (= spec:verify, format:check, lint, typecheck,
       full tests) and require green at HEAD; prove the 40 manifest-declared
       test files exist and pass; confirm migrations apply over the full
       proven migration set. Anything red is classified per governance and
       fixed ONLY within writeScopes (plus the single justified migrator
       change); everything else goes to out-of-scope notes. Traces:
       FR-SEC-001 through FR-SEC-012.
-- [ ] T149 Scope-and-boundary guard: `git status`/`git diff` versus base shows
+- [x] T149 Scope-and-boundary guard: `git status`/`git diff` versus base shows
       changes ONLY inside binding writeScopes plus the justified
       `packages/persistence/src/migrator.ts` pattern extension and mechanical
       lockfile regeneration; grep the delivered tree (excluding the sanctioned
       fixture corpus and these planning artifacts) for prohibited-capability
       patterns with the project's own scanner and require clean. Traces:
       FR-SEC-001 through FR-SEC-012 (INV-001 permanence).
-- [ ] T150 Cross-artifact consistency sweep: scoped artifacts free of template
+- [x] T150 Cross-artifact consistency sweep: scoped artifacts free of template
       placeholders; every task above traces only FR-SEC requirements; work
       committed additively in coherent units so the stage never ends on a
       dirty tracked tree; corrections land as new commits; product source

@@ -52,9 +52,17 @@ export interface StoredObject {
   readonly storedAt: string;
 }
 
-/** Lookup by content hash (and, when given, a specific version of that
- * identity). An omitted `version` returns the newest version of the identity;
- * `metadata` participates in identity resolution exactly as in put(). */
+/**
+ * Lookup by content hash. Resolution PRECEDENCE, not conjunction:
+ * - `version` omitted → newest version of those bytes;
+ * - `metadata` alone → narrows to versions whose dedup identity matches
+ *   exactly as in put(); a miss NEVER falls back to a differently-protected
+ *   version of the same bytes;
+ * - BOTH supplied → `version` wins and `metadata` is ignored (no conjunctive
+ *   check). Identity-safe lookup requires omitting `version`; conjunctive
+ *   version+metadata resolution is deliberately deferred to an explicit
+ *   follow-up decision rather than improvised here.
+ */
 export interface ObjectLookup {
   readonly contentHash: string;
   readonly version?: number | undefined;

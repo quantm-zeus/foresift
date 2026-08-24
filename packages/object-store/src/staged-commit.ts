@@ -9,7 +9,6 @@
  * drift as explicit findings — it never silently repairs, deletes, or
  * advances a stage past an unexplained failure.
  */
-import { createHash } from 'node:crypto';
 import {
   type ClockPort,
   ErrorCode,
@@ -21,16 +20,13 @@ import type { DatabaseEngine } from '@foresift/persistence';
 import type { ObjectProtectionMetadata, ObjectStoreAdapter } from './adapter.ts';
 import { dedupIdentityOf } from './adapter.ts';
 import { insertPendingArtifact, transitionStage, type ArtifactIndexRow } from './artifact-index.ts';
+import { sha256Hex } from './hash.ts';
 
 /** Wall-clock fallback for callers that inject no clock (Constitution XIII). */
 const wallClock: ClockPort = {
   now: () => utcTimestamp(new Date().toISOString().replace('.000Z', 'Z')),
   nowEpochMs: () => Date.now(),
 };
-
-function sha256Hex(bytes: Uint8Array): string {
-  return createHash('sha256').update(bytes).digest('hex');
-}
 
 export interface StagedUploadRequest {
   readonly artifactId: string;

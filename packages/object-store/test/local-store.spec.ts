@@ -90,6 +90,25 @@ describe('content addressing and dedup identity', () => {
     expect(versions.map((v) => v.version)).toEqual([v1.version, v2.version]);
     expect(v2.version).toBeGreaterThan(v1.version);
   });
+
+  it('resolution is precedence-based: a supplied version wins and metadata is ignored (ObjectLookup)', async () => {
+    const bytes = new TextEncoder().encode('precedence-pin');
+    const v1 = await store.put({ artifactId: 'art-5p', bytes, metadata: META });
+    const v2 = await store.put({
+      artifactId: 'art-6p',
+      bytes,
+      metadata: { ...META, retentionClass: 'FROZEN_ALERT_EVIDENCE_24MO' },
+    });
+    // Both supplied: version wins even though the metadata does NOT match
+    // that version's identity — documented precedence, not an identity check.
+    const read = await store.get({
+      contentHash: v2.contentHash,
+      version: v1.version,
+      metadata: { ...META, retentionClass: 'FROZEN_ALERT_EVIDENCE_24MO' },
+    });
+    expect(read?.stored.version).toBe(v1.version);
+    expect(read?.stored.metadata.retentionClass).toBe(META.retentionClass);
+  });
 });
 
 describe('tamper detection fails explicitly', () => {

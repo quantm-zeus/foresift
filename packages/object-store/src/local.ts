@@ -9,7 +9,6 @@
  * The blob bytes are immutable once written; a rewrite that would change
  * existing bytes is refused rather than silently overwritten.
  */
-import { createHash } from 'node:crypto';
 import { mkdir, readFile, readdir, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import {
@@ -20,10 +19,7 @@ import {
   type PutObjectRequest,
   type StoredObject,
 } from './adapter.ts';
-
-function sha256Hex(bytes: Uint8Array): string {
-  return createHash('sha256').update(bytes).digest('hex');
-}
+import { sha256Hex } from './hash.ts';
 
 /** Only a real sha256 content address may reach the filesystem layout. */
 const CONTENT_HASH_PATTERN = /^sha256:[0-9a-f]{64}$/;
@@ -112,6 +108,8 @@ export class LocalFilesystemObjectStore implements ObjectStoreAdapter {
     const all = await this.versions(lookup.contentHash);
     let candidates = all;
     if (lookup.version !== undefined) {
+      // Precedence, not conjunction: a supplied version wins outright and any
+      // supplied metadata is ignored (see ObjectLookup).
       candidates = candidates.filter((s) => s.version === lookup.version);
     } else if (lookup.metadata !== undefined) {
       // Metadata-scoped lookups never fall back to another dedup identity:

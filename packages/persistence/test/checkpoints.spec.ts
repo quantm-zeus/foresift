@@ -251,4 +251,42 @@ describe('exactly-once canonical events across restore+replay (AC-263)', () => {
     );
     expect(Number(count.rows[0]?.n)).toBe(2);
   });
+
+  // Duplicate classification must be structural (SQLSTATE 23505), not a bet
+  // on driver message wording — a driver that rewords its text must not turn
+  // an exactly-once refusal into some unrelated failure class.
+  describe('duplicate classification is structural (SQLSTATE-first)', () => {
+    const KEY_INPUT = {
+      canonicalKey: 'evm:137:tx:0xdef:log:1',
+      eventFamily: 'pool_swap',
+      firstSeenAt: AT,
+    };
+    function engineFailingWith(err: unknown): DatabaseEngine {
+      return createEngine(
+        {
+          exec: async () => undefined,
+          query: async () => {
+            throw err;
+          },
+        },
+        'pg',
+      );
+    }
+    it('classifies SQLSTATE 23505 as duplicate regardless of message wording', async () => {
+      const sqlstateError = Object.assign(new Error('driver-specific wording'), { code: '23505' });
+      await expect(recordCanonicalEvent(engineFailingWith(sqlstateError), KEY_INPUT)).rejects.toMatchObject(
+        { code: ErrorCode.CANONICAL_EVENT_DUPLICATE },
+      );
+    });
+    it('message fallback still catches drivers that wrap without SQLSTATE', async () => {
+      const wrapped = new Error('duplicate key value violates unique constraint "x_pkey"');
+      await expect(recordCanonicalEvent(engineFailingWith(wrapped), KEY_INPUT)).rejects.toMatchObject(
+        { code: ErrorCode.CANONICAL_EVENT_DUPLICATE },
+      );
+    });
+    it('unrelated failures pass through untouched', async () => {
+      const boom = Object.assign(new Error('storage unavailable'), { code: '58030' });
+      await expect(recordCanonicalEvent(engineFailingWith(boom), KEY_INPUT)).rejects.toBe(boom);
+    });
+  });
 });

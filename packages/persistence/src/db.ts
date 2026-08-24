@@ -42,6 +42,19 @@ export interface DatabaseEngine {
 }
 
 /**
+ * Attach a cleanup-path failure to the primary error as its `cause` when the
+ * primary is an Error that has none yet. Cleanup failures (rollback, lease
+ * release) must never REPLACE the root cause they cleaned up after; on
+ * non-Error throwables there is nowhere to attach, so the cleanup failure is
+ * dropped rather than fabricating a wrapper around unknown shapes.
+ */
+export function attachCleanupFailure(primary: unknown, cleanupFailure: unknown): void {
+  if (primary instanceof Error && !('cause' in primary)) {
+    primary.cause = cleanupFailure;
+  }
+}
+
+/**
  * Process-wide savepoint sequence: keeps names unique across nesting depths
  * AND concurrent transactions without reading the wall clock — determinism
  * requirement of the DR drill harnesses.
@@ -81,7 +94,12 @@ class TransactionalEngine implements DatabaseEngine {
       try {
         return await work(new TransactionalEngine(this.client, this.engineKind, this.depth + 1));
       } catch (error) {
-        await this.client.exec(`ROLLBACK TO SAVEPOINT ${savepoint}`);
+        // A failing savepoint rollback must not bury why the work threw.
+        try {
+          await this.client.exec(`ROLLBACK TO SAVEPOINT ${savepoint}`);
+        } catch (rollbackError) {
+          attachCleanupFailure(error, rollbackError);
+        }
         throw error;
       }
     }
@@ -93,7 +111,12 @@ class TransactionalEngine implements DatabaseEngine {
       await this.client.exec('COMMIT');
       return result;
     } catch (error) {
-      await this.client.exec('ROLLBACK');
+      // A failing outer rollback must not bury why the work threw.
+      try {
+        await this.client.exec('ROLLBACK');
+      } catch (rollbackError) {
+        attachCleanupFailure(error, rollbackError);
+      }
       throw error;
     }
   }

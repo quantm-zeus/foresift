@@ -15,6 +15,7 @@ import {
   createEngine,
   PRECISION_RETAINING_TIMESTAMP_PARSERS,
   type DatabaseEngine,
+  type RawSqlClient,
 } from '../src/index.ts';
 
 const MIGRATIONS_DIR = path.resolve(
@@ -107,5 +108,90 @@ describe('nested transactions use savepoints', () => {
     expect(keys).toContain('tx-sp2:preexisting');
     expect(keys).not.toContain('tx-sp2:outer');
     expect(keys).not.toContain('tx-sp2:inner');
+  });
+});
+
+// A cleanup statement that itself fails (connection severed mid-rollback)
+// must never REPLACE the root cause it cleaned up after — the work error
+// stays the thrown value and the cleanup failure rides along as `cause`.
+// These run on bare PGlite instances (no tables needed) so a poisoned
+// rollback cannot contaminate the shared migrated database above.
+describe('cleanup failures never mask the root cause', () => {
+  const ROLLBACK_FAILURE = 'connection severed during ROLLBACK';
+
+  function poisonedClient(bare: PGlite, poison: RegExp): RawSqlClient {
+    return {
+      exec: async (sql) => {
+        if (poison.test(sql)) throw new Error(ROLLBACK_FAILURE);
+        await bare.exec(sql);
+      },
+      query: async <T,>(sql: string, params?: readonly unknown[]) => {
+        const result = await bare.query(sql, [...(params ?? [])]);
+        return result as { rows: T[] };
+      },
+    };
+  }
+
+  async function withBareEngine(
+    poison: RegExp,
+    run: (engine: DatabaseEngine) => Promise<void>,
+  ): Promise<void> {
+    const bare = new PGlite();
+    try {
+      await run(createEngine(poisonedClient(bare, poison), 'pglite'));
+    } finally {
+      // A poisoned path leaves an aborted transaction open; unwind through
+      // the unpoisoned client before closing so disposal stays clean.
+      await bare.exec('ROLLBACK').catch(() => undefined);
+      await bare.close();
+    }
+  }
+
+  it('a failing outer ROLLBACK surfaces the work error with the failure as cause', async () => {
+    const workFailure = new Error('the actual unit failure');
+    await withBareEngine(/^ROLLBACK$/, async (stubbed) => {
+      let caught: unknown;
+      try {
+        await stubbed.transaction(async () => {
+          throw workFailure;
+        });
+      } catch (err) {
+        caught = err;
+      }
+      expect(caught).toBe(workFailure);
+      expect((workFailure.cause as Error | undefined)?.message).toBe(ROLLBACK_FAILURE);
+    });
+  });
+
+  it('a failing savepoint ROLLBACK keeps the inner root cause primary', async () => {
+    const workFailure = new Error('inner unit failure');
+    await withBareEngine(/ROLLBACK TO SAVEPOINT/, async (stubbed) => {
+      let caught: unknown;
+      try {
+        await stubbed.transaction(async (outer) => {
+          await outer.transaction(async () => {
+            throw workFailure;
+          });
+        });
+      } catch (err) {
+        caught = err;
+      }
+      expect(caught).toBe(workFailure);
+      expect((workFailure.cause as Error | undefined)?.message).toBe(ROLLBACK_FAILURE);
+    });
+  });
+
+  it('a clean unit commits and leaves the engine ready for the next unit', async () => {
+    await withBareEngine(/^POISON-NOTHING$/, async (stubbed) => {
+      await expect(stubbed.transaction(async (tx) => tx.query('SELECT 1'))).resolves.toMatchObject({
+        rows: [{ '?column?': 1 }],
+      });
+      // The engine must have returned to idle: a second unit runs untouched
+      // (a dangling transaction would surface here as an aborted-session
+      // error rather than a clean result).
+      await expect(
+        stubbed.transaction(async (tx) => tx.query('SELECT 2')),
+      ).resolves.toMatchObject({ rows: [{ '?column?': 2 }] });
+    });
   });
 });

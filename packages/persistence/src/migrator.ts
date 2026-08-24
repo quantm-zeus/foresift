@@ -32,7 +32,7 @@ import { createHash, randomUUID } from 'node:crypto';
 import { readdir, readFile } from 'node:fs/promises';
 import path from 'node:path';
 import { ErrorCode, ForesiftError } from '@foresift/domain';
-import type { DatabaseEngine } from './db.ts';
+import { attachCleanupFailure, type DatabaseEngine } from './db.ts';
 
 export const SCHEMA_MIGRATIONS_TABLE = '_foresift_schema_migrations';
 
@@ -183,6 +183,9 @@ export async function applyMigrations(options: MigratorOptions): Promise<ApplyRe
 
   const owner = randomUUID();
   await acquireApplyLease(engine, owner);
+  // Captured so the guarded lease release below can attach its own failure
+  // as the body error's `cause` instead of replacing that root cause.
+  let applyError: unknown;
   try {
     const recorded = new Map((await appliedMigrations(engine)).map((m) => [m.id, m.checksum]));
     const migrations = await discoverMigrations(migrationsDir);
@@ -262,7 +265,15 @@ export async function applyMigrations(options: MigratorOptions): Promise<ApplyRe
     }
 
     return { applied, skipped };
+  } catch (err) {
+    applyError = err;
+    throw err;
   } finally {
-    await releaseApplyLease(engine, owner);
+    // Lease-release failure must not bury why the apply loop threw.
+    try {
+      await releaseApplyLease(engine, owner);
+    } catch (releaseError) {
+      attachCleanupFailure(applyError, releaseError);
+    }
   }
 }

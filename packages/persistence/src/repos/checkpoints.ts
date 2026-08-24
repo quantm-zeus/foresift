@@ -312,7 +312,11 @@ export async function recordCanonicalEvent(
       [input.canonicalKey, input.eventFamily, input.firstSeenAt],
     );
   } catch (err) {
-    if ((err as Error).message.includes('duplicate key')) {
+    // Unique violation is identified structurally by SQLSTATE 23505, which
+    // both supported engines set on their errors; the message fallback only
+    // covers drivers that wrap or reword the original error text.
+    const sqlstate = (err as { code?: unknown }).code;
+    if (sqlstate === '23505' || (err as Error).message.includes('duplicate key')) {
       throw new ForesiftError(
         ErrorCode.CANONICAL_EVENT_DUPLICATE,
         `canonical event ${input.canonicalKey} was already recorded`,

@@ -22,7 +22,9 @@ describe('§35.9 audit coverage vocabulary (FR-SEC-002)', () => {
   });
 
   it('stays identical to the shared-schema vocabulary (single source of truth)', () => {
-    expect([...ALL_AUDIT_ACTION_CLASSES].sort()).toEqual([...AuditActionClassSchema.options].sort());
+    expect([...ALL_AUDIT_ACTION_CLASSES].sort()).toEqual(
+      [...AuditActionClassSchema.options].sort(),
+    );
   });
 
   it('names the security-critical classes explicitly', () => {

@@ -15,15 +15,23 @@ import { createHash, createHmac, timingSafeEqual } from 'node:crypto';
 import { SecErrorCode, WebhookIntegrityError } from './errors.ts';
 
 /** Injectable verifier: returns true when signature is valid for the material. */
-export type SignatureVerifier = (payloadBytes: Uint8Array, signature: string) => Promise<boolean> | boolean;
+export type SignatureVerifier = (
+  payloadBytes: Uint8Array,
+  signature: string,
+) => Promise<boolean> | boolean;
 
 /** Standard HMAC-SHA256 verifier for `sha256=<hex>` style headers. */
 export function hmacSha256Verifier(secret: string): SignatureVerifier {
   return (payloadBytes, signature) => {
     const expected = createHmac('sha256', secret).update(payloadBytes).digest('hex');
-    const provided = signature.startsWith('sha256=') ? signature.slice('sha256='.length) : signature;
+    const provided = signature.startsWith('sha256=')
+      ? signature.slice('sha256='.length)
+      : signature;
     if (!/^[0-9a-f]{64}$/i.test(provided)) return false;
-    return timingSafeEqual(Buffer.from(expected, 'hex'), Buffer.from(provided.toLowerCase(), 'hex'));
+    return timingSafeEqual(
+      Buffer.from(expected, 'hex'),
+      Buffer.from(provided.toLowerCase(), 'hex'),
+    );
   };
 }
 
@@ -98,7 +106,10 @@ export class WebhookGuard {
     }
 
     // 3. Cryptographic verification over the exact received bytes.
-    if (input.signature === undefined || !(await this.verifier(input.payloadBytes, input.signature))) {
+    if (
+      input.signature === undefined ||
+      !(await this.verifier(input.payloadBytes, input.signature))
+    ) {
       throw new WebhookIntegrityError('callback signature verification failed');
     }
 
@@ -128,7 +139,10 @@ export class WebhookGuard {
    * configuration. Any URL sourced from an event payload is structurally
    * refused as a source — this function exists so call sites can prove it.
    */
-  assertEndpointFromConfiguration(candidateUrl: string, configuredEndpoints: readonly string[]): void {
+  assertEndpointFromConfiguration(
+    candidateUrl: string,
+    configuredEndpoints: readonly string[],
+  ): void {
     if (!configuredEndpoints.includes(candidateUrl)) {
       throw new WebhookIntegrityError(
         'endpoint is not part of configured callback URLs; payload-sourced endpoints are refused',
@@ -146,7 +160,11 @@ export class WebhookGuard {
   guardCheckpointAdvance(event: unknown): boolean {
     if (typeof event !== 'object' || event === null) return false;
     const candidate = event as Record<string, unknown>;
-    return typeof candidate.id === 'string' && candidate.id.length > 0 && isValidJson(JSON.stringify(event));
+    return (
+      typeof candidate.id === 'string' &&
+      candidate.id.length > 0 &&
+      isValidJson(JSON.stringify(event))
+    );
   }
 }
 

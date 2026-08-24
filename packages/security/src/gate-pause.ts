@@ -216,7 +216,10 @@ export class GatePauses {
     return rows.rows;
   }
 
-  private rowOrThrow(row: PauseRow | undefined, message = 'pause insert returned no row'): PauseRow {
+  private rowOrThrow(
+    row: PauseRow | undefined,
+    message = 'pause insert returned no row',
+  ): PauseRow {
     if (row === undefined) {
       throw new GatePauseError(message, {});
     }

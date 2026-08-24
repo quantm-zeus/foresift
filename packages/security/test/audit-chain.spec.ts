@@ -248,9 +248,9 @@ describe('audit checkpoints mirror to the object store (FR-SEC-002, AC-259)', ()
     try {
       await appendThree(h);
       await h.chain.checkpointBatch(1, 3, at('2026-08-01T00:05:00Z'));
-      await expect(
-        h.engine.query('DELETE FROM sec.sec_audit_checkpoints'),
-      ).rejects.toThrow(/AUDIT_IMMUTABLE/);
+      await expect(h.engine.query('DELETE FROM sec.sec_audit_checkpoints')).rejects.toThrow(
+        /AUDIT_IMMUTABLE/,
+      );
     } finally {
       await h.db.close();
     }
@@ -301,7 +301,9 @@ describe('divergence classification (AC-259 fixture battery)', () => {
       // swapped (an attacker-reordered history inserted wholesale). Walking
       // by seq meets r3 whose prev points at r2's hash — a hash that exists
       // on the chain, just not beside it.
-      const p1 = '{"n":1}', p2 = '{"n":2}', p3 = '{"n":3}';
+      const p1 = '{"n":1}',
+        p2 = '{"n":2}',
+        p3 = '{"n":3}';
       const e0 = 'GENESIS';
       const e1 = sha256Text(`${e0}${p1}`);
       const e2 = sha256Text(`${e1}${p2}`);
@@ -318,7 +320,15 @@ describe('divergence classification (AC-259 fixture battery)', () => {
              (seq, occurred_at, actor, action_class, subject, payload_canonical,
               payload_sha256, prev_entry_hash, entry_hash)
            OVERRIDING SYSTEM VALUE VALUES ($1,$2,'fixture','CONFIGURATION_CHANGE',$3,$4,$5,$6,$7)`,
-          [seq, at('2026-08-01T00:00:00Z'), subject, payload, sha256Text(payload), prevHash, entryHash],
+          [
+            seq,
+            at('2026-08-01T00:00:00Z'),
+            subject,
+            payload,
+            sha256Text(payload),
+            prevHash,
+            entryHash,
+          ],
         );
       }
       const outcome = await h.chain.verifyRange();
@@ -342,10 +352,7 @@ describe('divergence classification (AC-259 fixture battery)', () => {
           `UPDATE sec.sec_audit_events
            SET prev_entry_hash = $1, entry_hash = $2
            WHERE subject = 's-3'`,
-          [
-            FAKE_HASH,
-            sha256Text(`${FAKE_HASH}${payload}`),
-          ],
+          [FAKE_HASH, sha256Text(`${FAKE_HASH}${payload}`)],
         ),
       );
       const outcome = await h.chain.verifyRange();
@@ -365,7 +372,10 @@ describe('divergence classification (AC-259 fixture battery)', () => {
       // predecessor is on the chain but no longer beside it. INSERT-only:
       // the immutability triggers never fire on inserts, which is exactly
       // why the verifier must catch insertion class corruption.
-      const p1 = '{"n":1}', p2 = '{"n":2}', p3 = '{"n":3}', pf = '{"forged":true}';
+      const p1 = '{"n":1}',
+        p2 = '{"n":2}',
+        p3 = '{"n":3}',
+        pf = '{"forged":true}';
       const e1 = sha256Text(`GENESIS${p1}`);
       const e2 = sha256Text(`${e1}${p2}`);
       const ef = sha256Text(`${e2}${pf}`);
@@ -382,7 +392,15 @@ describe('divergence classification (AC-259 fixture battery)', () => {
              (seq, occurred_at, actor, action_class, subject, payload_canonical,
               payload_sha256, prev_entry_hash, entry_hash)
            OVERRIDING SYSTEM VALUE VALUES ($1,$2,'fixture','CONFIGURATION_CHANGE',$3,$4,$5,$6,$7)`,
-          [seq, at('2026-08-01T00:00:00Z'), subject, payload, sha256Text(payload), prevHash, entryHash],
+          [
+            seq,
+            at('2026-08-01T00:00:00Z'),
+            subject,
+            payload,
+            sha256Text(payload),
+            prevHash,
+            entryHash,
+          ],
         );
       }
       const outcome = await h.chain.verifyRange();

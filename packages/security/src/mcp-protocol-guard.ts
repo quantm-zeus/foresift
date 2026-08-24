@@ -18,10 +18,7 @@ import {
 } from '@foresift/shared-schemas';
 import { ProtocolGuardError } from './errors.ts';
 
-export type ProtocolRefusalReason = Extract<
-  ProtocolVerdict,
-  { decision: 'REFUSE' }
->['reason'];
+export type ProtocolRefusalReason = Extract<ProtocolVerdict, { decision: 'REFUSE' }>['reason'];
 
 export interface ProtocolGuardOptions {
   /** Admissible MCP protocol revisions; defaults to the ADR-004 baseline. */

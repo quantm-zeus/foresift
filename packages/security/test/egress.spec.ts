@@ -6,7 +6,12 @@ import { EgressGuard, isDeniedAddress } from '../src/egress.ts';
 
 const ALLOWLIST = [
   { host: 'api.helius.dev', port: 443, scheme: 'https' as const, plane: 'COLLECTOR' as const },
-  { host: 'api.coingecko.com', port: 443, scheme: 'https' as const, plane: 'CONTROL_PLANE' as const },
+  {
+    host: 'api.coingecko.com',
+    port: 443,
+    scheme: 'https' as const,
+    plane: 'CONTROL_PLANE' as const,
+  },
 ];
 
 const PUBLIC_DNS = ['140.82.112.3'];
@@ -93,10 +98,9 @@ describe('denied IP ranges (AC-257)', () => {
   });
 
   it('refuses when ANY resolved address falls in a denied range', async () => {
-    const decision = await guard({ 'api.helius.dev': ['140.82.112.3', '169.254.169.254'] }).authorize(
-      'https://api.helius.dev/',
-      'COLLECTOR',
-    );
+    const decision = await guard({
+      'api.helius.dev': ['140.82.112.3', '169.254.169.254'],
+    }).authorize('https://api.helius.dev/', 'COLLECTOR');
     expect(decision).toMatchObject({ decision: 'REFUSE', reason: 'ADDRESS_DENIED' });
   });
 
@@ -116,19 +120,30 @@ describe('denied IP ranges (AC-257)', () => {
 describe('redirects and response caps (AC-257)', () => {
   it('revalidates every hop with approval callback and hop cap', async () => {
     const g = guard();
-    const approved = await g.authorizeRedirect('https://api.helius.dev/final', 'COLLECTOR', 1, () => true);
+    const approved = await g.authorizeRedirect(
+      'https://api.helius.dev/final',
+      'COLLECTOR',
+      1,
+      () => true,
+    );
     expect(approved.decision).toBe('ALLOW');
 
-    expect(await g.authorizeRedirect('https://api.helius.dev/x', 'COLLECTOR', 1, () => false)).toMatchObject({
+    expect(
+      await g.authorizeRedirect('https://api.helius.dev/x', 'COLLECTOR', 1, () => false),
+    ).toMatchObject({
       decision: 'REFUSE',
       reason: 'REDIRECT_UNAPPROVED',
     });
-    expect(await g.authorizeRedirect('https://api.helius.dev/x', 'COLLECTOR', 3, () => true)).toMatchObject({
+    expect(
+      await g.authorizeRedirect('https://api.helius.dev/x', 'COLLECTOR', 3, () => true),
+    ).toMatchObject({
       decision: 'REFUSE',
       reason: 'REDIRECT_LIMIT_EXCEEDED',
     });
     // A redirect off the plane's allowlist refuses like any first request.
-    expect(await g.authorizeRedirect('https://api.coingecko.com/', 'COLLECTOR', 1, () => true)).toMatchObject({
+    expect(
+      await g.authorizeRedirect('https://api.coingecko.com/', 'COLLECTOR', 1, () => true),
+    ).toMatchObject({
       decision: 'REFUSE',
       reason: 'HOST_NOT_ALLOWLISTED',
     });
@@ -145,16 +160,30 @@ describe('redirects and response caps (AC-257)', () => {
         allowedContentTypes: ['application/json'],
       },
     });
-    expect(strict.inspectResponse({ bytes: 2000 })).toMatchObject({ decision: 'REFUSE', reason: 'RESPONSE_BYTES_EXCEEDED' });
-    expect(strict.inspectResponse({ timeMs: 501 })).toMatchObject({ decision: 'REFUSE', reason: 'RESPONSE_TIME_EXCEEDED' });
-    expect(
-      strict.inspectResponse({ bytes: 100, decompressedBytes: 5000 }),
-    ).toMatchObject({ decision: 'REFUSE', reason: 'DECOMPRESSION_RATIO_EXCEEDED' });
+    expect(strict.inspectResponse({ bytes: 2000 })).toMatchObject({
+      decision: 'REFUSE',
+      reason: 'RESPONSE_BYTES_EXCEEDED',
+    });
+    expect(strict.inspectResponse({ timeMs: 501 })).toMatchObject({
+      decision: 'REFUSE',
+      reason: 'RESPONSE_TIME_EXCEEDED',
+    });
+    expect(strict.inspectResponse({ bytes: 100, decompressedBytes: 5000 })).toMatchObject({
+      decision: 'REFUSE',
+      reason: 'DECOMPRESSION_RATIO_EXCEEDED',
+    });
     expect(strict.inspectResponse({ contentType: 'text/html' })).toMatchObject({
       decision: 'REFUSE',
       reason: 'CONTENT_TYPE_REFUSED',
     });
-    expect(strict.inspectResponse({ bytes: 10, timeMs: 5, decompressedBytes: 20, contentType: 'application/json' }).decision).toBe('ALLOW');
+    expect(
+      strict.inspectResponse({
+        bytes: 10,
+        timeMs: 5,
+        decompressedBytes: 20,
+        contentType: 'application/json',
+      }).decision,
+    ).toBe('ALLOW');
   });
 
   it('requireAllowed raises typed EgressError for wiring that prefers exceptions', async () => {

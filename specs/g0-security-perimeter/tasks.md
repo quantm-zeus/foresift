@@ -179,7 +179,7 @@ prohibited capability anywhere outside the inert scanner self-test corpus.
 
 ## Phase E — Negative capability, supply chain, secrets, imports, claims
 
-- [ ] T122 Build `scripts/scan-prohibited-capabilities/`: `catalog.json`
+- [x] T122 Build `scripts/scan-prohibited-capabilities/`: `catalog.json`
       (declarative prohibited-pattern categories per §35.7/§41.1: private-key/
       seed, signing, transaction build/sign/submit, swap/order execution,
       bridge/staking, custody/wallet management, exchange trading, copy
@@ -189,23 +189,23 @@ prohibited capability anywhere outside the inert scanner self-test corpus.
       `cli.mjs` (exit 0 clean / nonzero findings, stable JSON report),
       README documenting the fixture-corpus exclusion rule. Traces:
       FR-SEC-003; AC-050, AC-254.
-- [ ] T123 Implement `src/negative-capability.ts` runtime canary consuming the
+- [x] T123 Implement `src/negative-capability.ts` runtime canary consuming the
       SAME `catalog.json` (plan material decision 2): registered-schema/route
       inventory checks, GMGN-shaped read-only query admission vs forbidden
       variant rejection, environment-schema forbidden-name scan, plus the
       parity test asserting CLI and canary classify every fixture identically.
       Traces: FR-SEC-003; AC-050, AC-254, AC-255.
-- [ ] T124 [P] Implement `src/decoder-authority.ts`: configuration validator
+- [x] T124 [P] Implement `src/decoder-authority.ts`: configuration validator
       refusing a deprecated parser marked sole/authoritative economic-event
       decoder while raw-operation + local decoding passes. Traces: FR-SEC-003;
       AC-256.
-- [ ] T125 Implement `src/supply-chain.ts`: pinning verification (exact
+- [x] T125 Implement `src/supply-chain.ts`: pinning verification (exact
       versions for production deps), lockfile presence/reproducibility record,
       SBOM record schema emission, provenance-attestation record fields,
       build-hash recording hooks, restricted-lifecycle-script check,
       network/filesystem/process/crypto/dynamic-code dependency review flags.
       Traces: FR-SEC-006; AC-254 (dependency scan surface).
-- [ ] T126 Implement `src/secrets-policy.ts`: secret classification registry,
+- [x] T126 Implement `src/secrets-policy.ts`: secret classification registry,
       context-envelope guard refusing classified material toward model
       context, log/trace redaction policy, export/UI denial rules, Alpha Lab
       export prohibition flag, environment separation checks, rotation/
@@ -213,7 +213,7 @@ prohibited capability anywhere outside the inert scanner self-test corpus.
       references (never material), incident-triggered invalidation hookup,
       prohibited-secret-class configuration validation. Traces: FR-SEC-007;
       AC-052.
-- [ ] T127 Implement `src/import-gating.ts` over the quarantine state machine:
+- [x] T127 Implement `src/import-gating.ts` over the quarantine state machine:
       format allowlist (versioned JSON/JSONL, Parquet, approved compressed
       containers), file-count/path/size/decompression limits, symlink/path-
       traversal/executable-format refusal, asymmetric signature verification
@@ -224,7 +224,7 @@ prohibited capability anywhere outside the inert scanner self-test corpus.
       (no ACTIVE transition exists), isolated-parsing boundary contract.
       Traces: FR-SEC-008; AC-051 (import attack fixtures), AC-274 (step-up
       coupling).
-- [ ] T128 Implement `src/claims-policy.ts`: prohibited-claim pattern classes
+- [x] T128 Implement `src/claims-policy.ts`: prohibited-claim pattern classes
       (guaranteed-profit, risk-free, universal-recall, uncalibrated
       probability, unsupported performance) across marketing/UI/API/export
       channels with clean-text controls; public-output envelope validator

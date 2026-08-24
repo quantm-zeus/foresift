@@ -37,9 +37,15 @@ class MemoryObjectStore implements ObjectStoreAdapter {
       storedAt: '2026-08-01T00:00:00Z',
     };
   }
-  async get(): Promise<null> { return null; }
-  async verify(): Promise<{ outcome: 'MISSING' }> { return { outcome: 'MISSING' }; }
-  async versions(): Promise<readonly StoredObject[]> { return []; }
+  async get(): Promise<null> {
+    return null;
+  }
+  async verify(): Promise<{ outcome: 'MISSING' }> {
+    return { outcome: 'MISSING' };
+  }
+  async versions(): Promise<readonly StoredObject[]> {
+    return [];
+  }
 }
 
 let db: PGlite;
@@ -120,7 +126,10 @@ describe('high-impact action gate (AC-274)', () => {
 
   it('refuses with STEP_UP_MISSING when no proof is presented', async () => {
     const { gate } = makeGate();
-    const decision = await gate.evaluateHighImpactAction({ ...baseRequest, stepUpProof: undefined });
+    const decision = await gate.evaluateHighImpactAction({
+      ...baseRequest,
+      stepUpProof: undefined,
+    });
     expect(decision.outcome).toBe('REFUSE');
     if (decision.outcome === 'REFUSE') expect(decision.reasons).toContain('STEP_UP_MISSING');
   });
@@ -218,9 +227,10 @@ describe('csrf double-submit + origin binding', () => {
   it('refuses short, mismatched, and cross-origin tokens with distinct reasons', async () => {
     const { evaluateCsrf } = await import('../src/csrf.ts');
     expect(evaluateCsrf({})).toEqual({ valid: false, reason: 'MISSING' });
-    expect(
-      evaluateCsrf({ submittedToken: 'x'.repeat(32), sessionToken: 'y'.repeat(32) }),
-    ).toEqual({ valid: false, reason: 'MISMATCH' });
+    expect(evaluateCsrf({ submittedToken: 'x'.repeat(32), sessionToken: 'y'.repeat(32) })).toEqual({
+      valid: false,
+      reason: 'MISMATCH',
+    });
     expect(
       evaluateCsrf({
         submittedToken: TOKEN,

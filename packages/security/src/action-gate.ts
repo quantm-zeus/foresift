@@ -68,10 +68,7 @@ export interface ActionGateOptions {
   readonly auditHealthBlocked?: () => Promise<boolean> | boolean;
 }
 
-function authenticatorClassSufficient(
-  proof: StepUpProof,
-  policy: StepUpPolicy,
-): boolean {
+function authenticatorClassSufficient(proof: StepUpProof, policy: StepUpPolicy): boolean {
   // TOTP can never clear the bar, regardless of any declared minimum.
   if (!PHISHING_RESISTANT_CLASSES.includes(proof.authenticatorClass)) {
     return false;
@@ -94,16 +91,11 @@ export class ActionGate {
     this.auditHealthBlocked = options.auditHealthBlocked;
   }
 
-  async evaluateHighImpactAction(
-    request: HighImpactActionRequest,
-  ): Promise<ActionGateDecision> {
+  async evaluateHighImpactAction(request: HighImpactActionRequest): Promise<ActionGateDecision> {
     const evaluatedAt = new Date(this.clock()).toISOString().replace('.000Z', 'Z') as UtcTimestamp;
     const reasons: ActionGateRefusalReason[] = [];
 
-    if (
-      request.csrf !== undefined &&
-      !evaluateCsrf(request.csrf).valid
-    ) {
+    if (request.csrf !== undefined && !evaluateCsrf(request.csrf).valid) {
       reasons.push('CSRF_INVALID');
     }
     if ((request.idempotencyKey ?? '').length === 0) {

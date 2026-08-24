@@ -43,7 +43,9 @@ describe('content labeling and envelopes (AC-258)', () => {
 
   it('refuses insertion into system/developer instruction roles', () => {
     for (const role of ['system', 'developer']) {
-      expect(() => refuseProtectedRoleInsertion(role, env())).toThrow(role === 'system' ? /system/ : /developer/);
+      expect(() => refuseProtectedRoleInsertion(role, env())).toThrow(
+        role === 'system' ? /system/ : /developer/,
+      );
     }
     // User-facing roles may carry labeled data.
     expect(() => refuseProtectedRoleInsertion('user', env())).not.toThrow();
@@ -60,7 +62,9 @@ describe('content labeling and envelopes (AC-258)', () => {
 
 describe('render-safety validation (AC-258)', () => {
   it('flags script tags, event handlers, and dangerous URL schemes', () => {
-    const report = validateRenderable('<div onclick="steal()">x</div><script>1</script><a href="javascript:alert(1)">y</a>');
+    const report = validateRenderable(
+      '<div onclick="steal()">x</div><script>1</script><a href="javascript:alert(1)">y</a>',
+    );
     const kinds = new Set(report.violations.map((v) => v.kind));
     expect(kinds.has('SCRIPT_TAG')).toBe(true);
     expect(kinds.has('EVENT_HANDLER_ATTRIBUTE')).toBe(true);
@@ -71,15 +75,15 @@ describe('render-safety validation (AC-258)', () => {
   it('refuses raw HTML unless the policy explicitly allows sanitized HTML', () => {
     expect(validateRenderable('<p>hello</p>').safe).toBe(false);
     expect(
-      validateRenderable('<p>hello</p>', { allowRawHtml: true }).violations.filter((v) => v.kind === 'RAW_HTML_REFUSED'),
+      validateRenderable('<p>hello</p>', { allowRawHtml: true }).violations.filter(
+        (v) => v.kind === 'RAW_HTML_REFUSED',
+      ),
     ).toHaveLength(0);
   });
 
   it('enforces the remote-image policy against trusted hosts only', () => {
     const policy = { trustedImageHosts: ['cdn.example.com'] };
-    expect(
-      validateRenderable('<img src="https://cdn.example.com/a.png">', policy).safe,
-    ).toBe(true);
+    expect(validateRenderable('<img src="https://cdn.example.com/a.png">', policy).safe).toBe(true);
     const flagged = validateRenderable('<img src="https://evil.example.net/p.png">', policy);
     expect(flagged.violations.some((v) => v.kind === 'REMOTE_IMAGE_UNTRUSTED')).toBe(true);
     // No remote images at all by default.
@@ -90,7 +94,9 @@ describe('render-safety validation (AC-258)', () => {
     const bad = validateRenderable('<a href="https://x.com/a" target="_blank">link</a>');
     expect(bad.violations.some((v) => v.kind === 'LINK_MISSING_NOOPENER')).toBe(true);
 
-    const good = validateRenderable('<a href="https://x.com/a" target="_blank" rel="noopener noreferrer">link</a>');
+    const good = validateRenderable(
+      '<a href="https://x.com/a" target="_blank" rel="noopener noreferrer">link</a>',
+    );
     expect(good.violations.some((v) => v.kind === 'LINK_MISSING_NOOPENER')).toBe(false);
 
     const exfil = validateRenderable(
@@ -111,7 +117,9 @@ describe('render-safety validation (AC-258)', () => {
   });
 
   it('passes plain markdown untouched-safe content', () => {
-    const safe = validateRenderable('# Title\n\nJust **markdown** text with [a link](https://example.com).');
+    const safe = validateRenderable(
+      '# Title\n\nJust **markdown** text with [a link](https://example.com).',
+    );
     expect(safe.safe).toBe(true);
     expect(safe.warnings).toEqual([]);
   });
@@ -122,8 +130,14 @@ describe('memory isolation keys (AC-052 cooperation)', () => {
     const base = { actorId: 'a1', sessionId: 's1', workspaceId: 'w1' };
     expect(deriveMemoryIsolationKey(base)).toMatch(/^iso:[0-9a-f]{64}$/);
     expect(deriveMemoryIsolationKey(base)).toBe(deriveMemoryIsolationKey(base));
-    expect(deriveMemoryIsolationKey(base)).not.toBe(deriveMemoryIsolationKey({ ...base, sessionId: 's2' }));
-    expect(deriveMemoryIsolationKey(base)).not.toBe(deriveMemoryIsolationKey({ ...base, actorId: 'a2' }));
-    expect(deriveMemoryIsolationKey(base)).not.toBe(deriveMemoryIsolationKey({ ...base, workspaceId: 'w2' }));
+    expect(deriveMemoryIsolationKey(base)).not.toBe(
+      deriveMemoryIsolationKey({ ...base, sessionId: 's2' }),
+    );
+    expect(deriveMemoryIsolationKey(base)).not.toBe(
+      deriveMemoryIsolationKey({ ...base, actorId: 'a2' }),
+    );
+    expect(deriveMemoryIsolationKey(base)).not.toBe(
+      deriveMemoryIsolationKey({ ...base, workspaceId: 'w2' }),
+    );
   });
 });

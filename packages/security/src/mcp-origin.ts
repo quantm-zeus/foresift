@@ -12,10 +12,7 @@
 import { OriginVerdictSchema, type OriginVerdict } from '@foresift/shared-schemas';
 import { McpOriginError } from './errors.ts';
 
-export type OriginRefusalReason = Extract<
-  OriginVerdict,
-  { decision: 'REFUSE' }
->['reason'];
+export type OriginRefusalReason = Extract<OriginVerdict, { decision: 'REFUSE' }>['reason'];
 
 export interface McpOriginGateOptions {
   /** Exact origins admitted to reach authentication, e.g. https://mcp.example.com. */
@@ -41,11 +38,16 @@ function parseOrigin(origin: string): ParsedOrigin | null {
   } catch {
     return null;
   }
-  if (url.pathname !== '/' || url.search !== '' || url.hash !== '' || url.username !== '' || url.password !== '') {
+  if (
+    url.pathname !== '/' ||
+    url.search !== '' ||
+    url.hash !== '' ||
+    url.username !== '' ||
+    url.password !== ''
+  ) {
     return null;
   }
-  const defaultPort =
-    url.protocol === 'https:' ? '443' : url.protocol === 'http:' ? '80' : '';
+  const defaultPort = url.protocol === 'https:' ? '443' : url.protocol === 'http:' ? '80' : '';
   return {
     scheme: url.protocol.replace(':', ''),
     host: url.hostname.toLowerCase(),
@@ -135,11 +137,7 @@ export class McpOriginGate {
         allowedLabels.slice(-2).join('.') === requestedLabels.slice(-2).join('.') &&
         allowedLabels.length >= 2 &&
         requestedLabels.length >= 2;
-      if (
-        allowed.scheme === parsed.scheme &&
-        portMatches &&
-        sameRegistrableDomain
-      ) {
+      if (allowed.scheme === parsed.scheme && portMatches && sameRegistrableDomain) {
         wrongHostSeen = true;
       }
     }

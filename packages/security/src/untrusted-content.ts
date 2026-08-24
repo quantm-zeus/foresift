@@ -55,7 +55,10 @@ export function structuredExtractionEnvelope(envelope: UntrustedContentEnvelope)
  * §35.4 hard rule: untrusted content NEVER enters protected instruction
  * roles. This refusal happens BEFORE any prompt assembly sees the content.
  */
-export function refuseProtectedRoleInsertion(role: string, envelope: UntrustedContentEnvelope): void {
+export function refuseProtectedRoleInsertion(
+  role: string,
+  envelope: UntrustedContentEnvelope,
+): void {
   if (PROTECTED_INSTRUCTION_ROLES.includes(role)) {
     throw new UntrustedContentError(
       `untrusted content (${envelope.source}) may not enter the '${role}' instruction role`,
@@ -101,7 +104,10 @@ const EXFIL_QUERY_HINTS = ['token', 'key', 'secret', 'session', 'auth', 'cred'];
  * Pure string analysis — no DOM, no network — so verdicts are stable and
  * testable. Safe output requires ZERO violations.
  */
-export function validateRenderable(markup: string, policy: RenderSafetyPolicy = {}): RenderSafetyReport {
+export function validateRenderable(
+  markup: string,
+  policy: RenderSafetyPolicy = {},
+): RenderSafetyReport {
   const violations: { kind: RenderViolationKind; detail: string }[] = [];
   const warnings: string[] = [];
 
@@ -142,7 +148,10 @@ export function validateRenderable(markup: string, policy: RenderSafetyPolicy = 
       host = '';
     }
     if (!trustedImageHosts.includes(host)) {
-      violations.push({ kind: 'REMOTE_IMAGE_UNTRUSTED', detail: `image host '${host}' not trusted` });
+      violations.push({
+        kind: 'REMOTE_IMAGE_UNTRUSTED',
+        detail: `image host '${host}' not trusted`,
+      });
     }
   }
 
@@ -151,8 +160,14 @@ export function validateRenderable(markup: string, policy: RenderSafetyPolicy = 
   for (const match of markup.matchAll(/<a\b[^>]*href\s*=\s*["']?([^"'\s>]+)[^>]*>/gi)) {
     const tag = match[0];
     const href = match[1]!;
-    if (/target\s*=\s*["']?_blank/i.test(tag) && !/rel\s*=\s*["'][^"']*noopener[^"']*noreferrer/i.test(tag)) {
-      violations.push({ kind: 'LINK_MISSING_NOOPENER', detail: 'target=_blank link without rel=noopener noreferrer' });
+    if (
+      /target\s*=\s*["']?_blank/i.test(tag) &&
+      !/rel\s*=\s*["'][^"']*noopener[^"']*noreferrer/i.test(tag)
+    ) {
+      violations.push({
+        kind: 'LINK_MISSING_NOOPENER',
+        detail: 'target=_blank link without rel=noopener noreferrer',
+      });
     }
     let url: URL | null = null;
     try {
@@ -206,9 +221,12 @@ export function deriveMemoryIsolationKey(parts: {
   sessionId: string;
   workspaceId: string;
 }): string {
-  const canonical = JSON.stringify(
-    ['foresift/memory-isolation/v1', parts.actorId, parts.sessionId, parts.workspaceId],
-  );
+  const canonical = JSON.stringify([
+    'foresift/memory-isolation/v1',
+    parts.actorId,
+    parts.sessionId,
+    parts.workspaceId,
+  ]);
   const digest = createHash('sha256').update(canonical, 'utf8').digest('hex');
   return `iso:${digest}`;
 }

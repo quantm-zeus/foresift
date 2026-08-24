@@ -71,7 +71,9 @@ describe('capability pauses (AC-278)', () => {
     try {
       refuseAutoReactivation();
     } catch (err) {
-      expect((err as { code?: string }).code).toBe(SecErrorCode.SEC_PAUSE_AUTO_REACTIVATION_REFUSED);
+      expect((err as { code?: string }).code).toBe(
+        SecErrorCode.SEC_PAUSE_AUTO_REACTIVATION_REFUSED,
+      );
     }
   });
 

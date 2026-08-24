@@ -55,7 +55,10 @@ describe('mcp origin decisions (AC-250)', () => {
   });
 
   it('refuses malformed and userinfo-bearing origins', () => {
-    expect(PROD_GATE.decide('not an origin')).toMatchObject({ decision: 'REFUSE', reason: 'MALFORMED' });
+    expect(PROD_GATE.decide('not an origin')).toMatchObject({
+      decision: 'REFUSE',
+      reason: 'MALFORMED',
+    });
     expect(PROD_GATE.decide('https://user@mcp.example.com')).toMatchObject({
       decision: 'REFUSE',
       reason: 'MALFORMED',
@@ -76,7 +79,9 @@ describe('mcp origin decisions (AC-250)', () => {
   });
 
   it('requireAllowed raises typed errors for transport wiring (403 path)', () => {
-    expect(() => PROD_GATE.requireAllowed('https://evil.example.com')).toThrow(/WRONG_HOST|refused/);
+    expect(() => PROD_GATE.requireAllowed('https://evil.example.com')).toThrow(
+      /WRONG_HOST|refused/,
+    );
     expect(() => PROD_GATE.requireAllowed('https://mcp.example.com')).not.toThrow();
   });
 });
@@ -131,7 +136,9 @@ describe('mcp protocol guard (AC-251)', () => {
       origin: 'https://mcp.example.com',
       protocolRevision: '2025-11-25',
     };
-    expect(GUARD.inspect({ ...okInput, session, requestClaims: {} })).toEqual({ decision: 'ALLOW' });
+    expect(GUARD.inspect({ ...okInput, session, requestClaims: {} })).toEqual({
+      decision: 'ALLOW',
+    });
     for (const claims of [
       { actor: 'someone-else@example.com' },
       { profileId: 'profile-2' },

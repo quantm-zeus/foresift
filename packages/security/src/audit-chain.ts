@@ -146,7 +146,11 @@ export class AuditChain {
    * SQL AND mirror a verifiable copy through the object store. Refuses when
    * no object store is wired — an unverifiable checkpoint is not a checkpoint.
    */
-  async checkpointBatch(fromSeq: number, toSeq: number, storedAt: UtcTimestamp): Promise<AuditCheckpointRecord> {
+  async checkpointBatch(
+    fromSeq: number,
+    toSeq: number,
+    storedAt: UtcTimestamp,
+  ): Promise<AuditCheckpointRecord> {
     if (this.objectStore === undefined) {
       throw new AuditChainError(
         'checkpointing requires an independently verifiable object-store location',
@@ -270,7 +274,7 @@ export class AuditChain {
 
     const { verdict, kind, firstDivergenceSeq } = await outcome;
     const ranAt = new Date().toISOString().replace('.000Z', 'Z') as UtcTimestamp;
-    const runId = `vr-${(globalThis.crypto.randomUUID?.() ?? Math.random().toString(36).slice(2))}`;
+    const runId = `vr-${globalThis.crypto.randomUUID?.() ?? Math.random().toString(36).slice(2)}`;
     const record: AuditVerifyRunRecord = {
       runId,
       verifiedFromSeq: fromSeq ?? 0,
@@ -350,7 +354,11 @@ async function classifyRange(
   lo: number,
   hi: number,
   entries: readonly ChainEntry[],
-): Promise<{ verdict: 'OK' | 'FAILED'; kind: AuditVerifyRunRecord['divergenceKind']; firstDivergenceSeq: number | null }> {
+): Promise<{
+  verdict: 'OK' | 'FAILED';
+  kind: AuditVerifyRunRecord['divergenceKind'];
+  firstDivergenceSeq: number | null;
+}> {
   if (lo <= hi && entries.length === 0) {
     return { verdict: 'FAILED', kind: 'GAP', firstDivergenceSeq: lo };
   }
@@ -376,8 +384,7 @@ async function classifyRange(
       return { verdict: 'FAILED', kind: 'MUTATION', firstDivergenceSeq: entry.seq };
     }
     if (entry.prevEntryHash !== prevHash) {
-      const reordering =
-        entry.prevEntryHash !== 'GENESIS' && knownHashes.has(entry.prevEntryHash);
+      const reordering = entry.prevEntryHash !== 'GENESIS' && knownHashes.has(entry.prevEntryHash);
       return {
         verdict: 'FAILED',
         kind: reordering ? 'REORDERING' : 'CHAIN_BREAK',

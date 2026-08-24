@@ -132,12 +132,8 @@ describe('oauth token binding (AC-253)', () => {
   });
 
   it('refuses upstream provider tokens as passthrough credentials', () => {
-    expect(() =>
-      guard.refuseUpstreamPassthrough({ isUpstreamIssued: true }),
-    ).toThrow(/upstream/i);
-    expect(() =>
-      guard.refuseUpstreamPassthrough({ upstreamIssuer: 'github' }),
-    ).toThrow();
+    expect(() => guard.refuseUpstreamPassthrough({ isUpstreamIssued: true })).toThrow(/upstream/i);
+    expect(() => guard.refuseUpstreamPassthrough({ upstreamIssuer: 'github' })).toThrow();
     expect(() => guard.refuseUpstreamPassthrough({})).not.toThrow();
   });
 });
@@ -162,7 +158,10 @@ describe('mcp credential lifecycle (AC-053)', () => {
     });
   });
 
-  async function issue(id: string, overrides: Partial<Parameters<McpCredentialStore['issue']>[0]> = {}) {
+  async function issue(
+    id: string,
+    overrides: Partial<Parameters<McpCredentialStore['issue']>[0]> = {},
+  ) {
     return store.issue({
       credentialId: id,
       scopes: ['tools:read'],
@@ -184,10 +183,9 @@ describe('mcp credential lifecycle (AC-053)', () => {
     );
     expect(row.rows[0]?.keyed_hash).toMatch(/^sha256:[0-9a-f]{64}$/);
     // The raw secret must NOT appear anywhere in SQL truth.
-    const leak = await engine.query(
-      'SELECT * FROM sec.mcp_credentials WHERE keyed_hash LIKE $1',
-      [`%${firstSecret}%`],
-    );
+    const leak = await engine.query('SELECT * FROM sec.mcp_credentials WHERE keyed_hash LIKE $1', [
+      `%${firstSecret}%`,
+    ]);
     expect(leak.rows).toHaveLength(0);
   });
 
@@ -246,7 +244,9 @@ describe('mcp credential lifecycle (AC-053)', () => {
     await expect(store.revoke('cred-a', at('2026-08-01T13:00:00Z'))).rejects.toMatchObject({
       code: 'SEC_CREDENTIAL_UNKNOWN',
     });
-    await expect(store.revoke('cred-never-existed', at('2026-08-01T13:00:00Z'))).rejects.toMatchObject({
+    await expect(
+      store.revoke('cred-never-existed', at('2026-08-01T13:00:00Z')),
+    ).rejects.toMatchObject({
       code: 'SEC_CREDENTIAL_UNKNOWN',
     });
   });
@@ -256,7 +256,10 @@ describe('mcp credential lifecycle (AC-053)', () => {
       at: at('2026-08-01T14:00:00Z'),
       origin: 'https://mcp.example.com',
     });
-    const row = await engine.query<{ last_used_at: Date | string; last_used_origin: string | null }>(
+    const row = await engine.query<{
+      last_used_at: Date | string;
+      last_used_origin: string | null;
+    }>(
       "SELECT last_used_at, last_used_origin FROM sec.mcp_credentials WHERE credential_id = 'cred-b'",
     );
     expect(row.rows[0]?.last_used_origin).toBe('https://mcp.example.com');

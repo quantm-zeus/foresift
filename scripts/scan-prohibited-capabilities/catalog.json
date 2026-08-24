@@ -1,0 +1,179 @@
+{
+  "catalogVersion": 1,
+  "authority": "docs/spec/crypto_intelligence_agent_gateway_PRD_FINAL_v6.0.md §35.7/§41.1 (READ_ONLY_NO_TRADING_CUSTODY_SIGNING)",
+  "description": "Declarative prohibited-pattern catalog. The runtime canary (packages/security/src/negative-capability.ts) consumes THIS SAME FILE so CLI and runtime classifications can never drift.",
+  "categories": [
+    {
+      "category": "PRIVATE_KEY_SEED",
+      "sourcePatterns": [
+        {
+          "id": "pk-assign",
+          "regex": "(private[_ -]?key|seed[_ -]?phrase|mnemonic|recovery[_ -]?phrase)['\"`]?\\s*[:=]",
+          "flags": "i"
+        },
+        {
+          "id": "pk-import",
+          "regex": "(import|generate|derive|load)\\w*\\(\\s*['\"`]?[^)]*(private[_ -]?key|seed|mnemonic)",
+          "flags": "i"
+        },
+        {
+          "id": "pk-hex64-ctx",
+          "regex": "\\b[0-9a-fA-F]{64}\\b",
+          "flags": "",
+          "contextSignals": ["secret", "private", "seed", "key material"]
+        }
+      ],
+      "dependencyPatterns": ["^@?solana/web3\\.js$", "^ethers$", "^near-seed-phrase$"],
+      "envForbiddenNames": [
+        "PRIVATE_KEY",
+        "SEED_PHRASE",
+        "MNEMONIC",
+        "RECOVERY_PHRASE",
+        "SIGNING_KEY"
+      ]
+    },
+    {
+      "category": "SIGNING",
+      "sourcePatterns": [
+        {
+          "id": "sg-call",
+          "regex": "\\b(sign(message|transaction|tx|typeddata|payload)?|signmessage|signtransaction)\\s*\\(",
+          "flags": "i"
+        },
+        {
+          "id": "sg-keypair",
+          "regex": "\\b(keypair|ed25519|secp256k1)\\b.{0,40}\\b(fromsecret|generate|sign)\\b",
+          "flags": "i"
+        }
+      ],
+      "dependencyPatterns": ["^tweetnacl$", "^@noble/ed25519$", "^sshpk$"],
+      "envForbiddenNames": ["SIGNING_KEYSTORE"]
+    },
+    {
+      "category": "TRANSACTION_BUILD_SIGN_SUBMIT",
+      "sourcePatterns": [
+        {
+          "id": "tx-build",
+          "regex": "\\b(build|construct|assemble|create)\\w*\\(\\s*[^)]{0,60}\\btransaction\\b",
+          "flags": "i"
+        },
+        {
+          "id": "tx-send",
+          "regex": "\\b(sendTransaction|sendRawTransaction|submitTransaction|broadcastTransaction)\\s*\\(",
+          "flags": ""
+        },
+        {
+          "id": "tx-versioned",
+          "regex": "\\bVersionedTransaction\\b|\\bTransaction\\.from\\b",
+          "flags": ""
+        }
+      ],
+      "dependencyPatterns": ["^@solana/web3\\.js$", "^web3$", "^ethers$"],
+      "envForbiddenNames": ["TX_SUBMIT_ENDPOINT", "RPC_SUBMIT_URL"]
+    },
+    {
+      "category": "SWAP_ORDER_EXECUTION",
+      "sourcePatterns": [
+        {
+          "id": "swap-execute",
+          "regex": "\\b(executeSwap|performSwap|swapExecute|placeOrder|createOrder|executeOrder)\\s*\\(",
+          "flags": "i"
+        },
+        {
+          "id": "jupiter-route",
+          "regex": "\\b(jupiter|raydium|orca|uniswap|1inch)\\b.{0,50}\\b(swap|route|quote.?and.?(swap|execute))",
+          "flags": "i"
+        }
+      ],
+      "dependencyPatterns": ["@jup-ag/core", "@jup-ag/react-hook", "uniswap-sdk", "1inch-api"],
+      "envForbiddenNames": ["SWAP_API_KEY", "ORDER_EXECUTION_URL"]
+    },
+    {
+      "category": "BRIDGE_STAKING",
+      "sourcePatterns": [
+        {
+          "id": "bridge-xcall",
+          "regex": "\\b(bridgeTokens|crossChainTransfer|wormholeBridge|stakeSol|delegateStake|unstake)\\s*\\(",
+          "flags": "i"
+        }
+      ],
+      "dependencyPatterns": ["@wormhole/sdk", "portal-bridge"],
+      "envForbiddenNames": ["BRIDGE_ENDPOINT", "STAKING_POOL_ACCOUNT"]
+    },
+    {
+      "category": "CUSTODY_WALLET_MANAGEMENT",
+      "sourcePatterns": [
+        {
+          "id": "cw-create",
+          "regex": "\\b(createWallet|importWallet|newWallet|walletFromSeed|generateWallet)\\s*\\(",
+          "flags": ""
+        },
+        {
+          "id": "cw-manage",
+          "regex": "\\b(exportPrivateKey|backupKeystore|keystore\\.(json|dat)|wallet\\.dat)\\b",
+          "flags": "i"
+        }
+      ],
+      "dependencyPatterns": ["^walletlink$", "^@walletconnect/sign-client$"],
+      "envForbiddenNames": ["WALLET_FILE", "KEYSTORE_PATH", "CUSTODY_PROVIDER_TOKEN"]
+    },
+    {
+      "category": "EXCHANGE_TRADING",
+      "sourcePatterns": [
+        {
+          "id": "ex-trade",
+          "regex": "\\b(placeTrade|marketBuy|marketSell|limitOrder|cancelOrder|binanceSubmit)\\s*\\(",
+          "flags": "i"
+        },
+        {
+          "id": "ex-key-ctx",
+          "regex": "\\b(api[_ -]?secret|exchange[_ -]?credentials)\\s*[:=]",
+          "flags": "i"
+        }
+      ],
+      "dependencyPatterns": ["^ccxt$", "binance-api-node", "coinbase-pro"],
+      "envForbiddenNames": ["BINANCE_API_SECRET", "COINBASE_API_SECRET", "EXCHANGE_TRADE_ENABLED"]
+    },
+    {
+      "category": "COPY_TRADING",
+      "sourcePatterns": [
+        {
+          "id": "ct-follow",
+          "regex": "\\b(copyTrade|followWallet|mirrorWallet|replicateTrade|autoTrade)\\s*[(:=]",
+          "flags": "i"
+        }
+      ],
+      "dependencyPatterns": ["gmgn-bot", "copytrade-engine"],
+      "envForbiddenNames": ["COPY_TRADE_TARGET_WALLET", "AUTO_TRADE_ENABLED"]
+    }
+  ],
+  "readOnlyWalletIntelligenceAllowlist": {
+    "description": "GMGN-shaped READ-ONLY wallet intelligence queries that MUST be admitted; the forbidden variants below must be refused.",
+    "admittedQueryShapes": [
+      "wallet portfolio",
+      "token holdings of wallet",
+      "pnl history for address",
+      "wallet activity timeline",
+      "top holders distribution",
+      "wallet net worth trend",
+      "token balance changes for address"
+    ],
+    "forbiddenQueryShapes": [
+      "buy token from wallet",
+      "sell all holdings",
+      "swap SOL for USDC",
+      "execute trade on behalf of wallet",
+      "transfer funds out of wallet"
+    ]
+  },
+  "inventoryForbiddenVerbs": [
+    "submit",
+    "sign",
+    "execute-trade",
+    "swap",
+    "custody",
+    "bridge-assets",
+    "stake",
+    "copy-trade"
+  ]
+}

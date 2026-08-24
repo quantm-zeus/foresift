@@ -14,8 +14,7 @@ import { AuditActionClassSchema, type AuditActionClass } from '@foresift/shared-
 export type { AuditActionClass };
 
 /** All classes, in schema order (single source: the shared schema). */
-export const ALL_AUDIT_ACTION_CLASSES: readonly AuditActionClass[] =
-  AuditActionClassSchema.options;
+export const ALL_AUDIT_ACTION_CLASSES: readonly AuditActionClass[] = AuditActionClassSchema.options;
 
 /** One §35.9 bullet mapped to its owning class. */
 export interface CoverageBullet {

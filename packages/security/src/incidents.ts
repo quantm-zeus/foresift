@@ -86,7 +86,11 @@ export class Incidents {
 
   async open(input: OpenIncidentInput) {
     if (input.evidenceRefs.length === 0) {
-      throw new IncidentError('an incident requires at least one evidence reference', {}, SecErrorCode.SEC_INCIDENT_EVIDENCE_REQUIRED);
+      throw new IncidentError(
+        'an incident requires at least one evidence reference',
+        {},
+        SecErrorCode.SEC_INCIDENT_EVIDENCE_REQUIRED,
+      );
     }
     const inserted = await this.engine.query<IncidentRow>(
       `INSERT INTO sec.security_incidents

@@ -222,7 +222,10 @@ export class McpCredentialStore {
     return row;
   }
 
-  async recordUsage(credentialId: string, usage: { at: UtcTimestamp; origin: string }): Promise<void> {
+  async recordUsage(
+    credentialId: string,
+    usage: { at: UtcTimestamp; origin: string },
+  ): Promise<void> {
     await this.engine.query(
       'UPDATE sec.mcp_credentials SET last_used_at = $2, last_used_origin = $3 WHERE credential_id = $1',
       [credentialId, usage.at, usage.origin],

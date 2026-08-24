@@ -13,7 +13,11 @@
  * EgressDecisionSchema. DNS rebinding is countered by pinning: callers must
  * connect to the PINNED addresses and re-verify before connect.
  */
-import { EgressDecisionSchema, type EgressAllowlistEntry, type EgressDecision } from '@foresift/shared-schemas';
+import {
+  EgressDecisionSchema,
+  type EgressAllowlistEntry,
+  type EgressDecision,
+} from '@foresift/shared-schemas';
 import { EgressError } from './errors.ts';
 
 export type EgressPlane = EgressAllowlistEntry['plane'];
@@ -59,7 +63,7 @@ function ipv4InRange(ip: string, base: string, prefixBits: number): boolean {
   const baseInt = ipv4ToInt(base);
   if (ipInt === null || baseInt === null) return false;
   const mask = prefixBits === 0 ? 0 : (0xffffffff << (32 - prefixBits)) >>> 0;
-  return ((ipInt & mask) >>> 0) === ((baseInt & mask) >>> 0);
+  return (ipInt & mask) >>> 0 === (baseInt & mask) >>> 0;
 }
 
 function expandIpv6(ip: string): number[] {
@@ -149,13 +153,12 @@ interface ParsedTarget {
 
 /** Ports no legitimate HTTPS API needs; classic internal-service targets. */
 const UNSAFE_PORTS = new Set([
-  1, 7, 9, 11, 13, 15, 17, 19, 20, 21, 22, 23, 25, 37, 43, 53, 69, 77, 79, 87,
-  95, 101, 102, 103, 109, 110, 111, 113, 115, 117, 119, 123, 135, 137, 138,
-  139, 143, 161, 162, 179, 389, 427, 465, 512, 513, 514, 515, 526, 530, 531,
-  532, 540, 548, 554, 556, 563, 587, 593, 631, 636, 691, 873, 990, 992, 993,
-  995, 1080, 1433, 1521, 1723, 2049, 2181, 2375, 2376, 3128, 3306, 3389, 4444,
-  5432, 5555, 5601, 5900, 5984, 6379, 6443, 8080, 8443, 8888, 9042, 9092,
-  9200, 9300, 11211, 27017, 27018, 27019, 28017, 50000,
+  1, 7, 9, 11, 13, 15, 17, 19, 20, 21, 22, 23, 25, 37, 43, 53, 69, 77, 79, 87, 95, 101, 102, 103,
+  109, 110, 111, 113, 115, 117, 119, 123, 135, 137, 138, 139, 143, 161, 162, 179, 389, 427, 465,
+  512, 513, 514, 515, 526, 530, 531, 532, 540, 548, 554, 556, 563, 587, 593, 631, 636, 691, 873,
+  990, 992, 993, 995, 1080, 1433, 1521, 1723, 2049, 2181, 2375, 2376, 3128, 3306, 3389, 4444, 5432,
+  5555, 5601, 5900, 5984, 6379, 6443, 8080, 8443, 8888, 9042, 9092, 9200, 9300, 11211, 27017, 27018,
+  27019, 28017, 50000,
 ]);
 
 function parseTarget(url: string): ParsedTarget | null {
@@ -195,8 +198,10 @@ export class EgressGuard {
    * decision; ALLOW carries the pinned addresses callers MUST connect to.
    */
   async authorize(url: string, plane: EgressPlane): Promise<EgressDecision> {
-    const refuse = (reason: Extract<EgressDecision, { decision: 'REFUSE' }>['reason'], detail: string): EgressDecision =>
-      EgressDecisionSchema.parse({ decision: 'REFUSE', reason, detail });
+    const refuse = (
+      reason: Extract<EgressDecision, { decision: 'REFUSE' }>['reason'],
+      detail: string,
+    ): EgressDecision => EgressDecisionSchema.parse({ decision: 'REFUSE', reason, detail });
 
     const target = parseTarget(url);
     if (target === null) return refuse('URL_MALFORMED', 'unparseable or userinfo-bearing URL');
@@ -215,7 +220,12 @@ export class EgressGuard {
     if (target.scheme !== 'https') {
       return refuse('SCHEME_REFUSED', `scheme '${target.scheme}' is not https`);
     }
-    if (!Number.isInteger(target.port) || target.port < 1 || target.port > 65535 || UNSAFE_PORTS.has(target.port)) {
+    if (
+      !Number.isInteger(target.port) ||
+      target.port < 1 ||
+      target.port > 65535 ||
+      UNSAFE_PORTS.has(target.port)
+    ) {
       return refuse('PORT_UNSAFE', `port ${String(target.port)} is on the unsafe list`);
     }
     const allowlisted = this.entries.some(
@@ -246,7 +256,11 @@ export class EgressGuard {
         return refuse('ADDRESS_DENIED', `resolved address falls in a denied range: ${address}`);
       }
     }
-    return EgressDecisionSchema.parse({ decision: 'ALLOW', host: target.host, pinnedAddresses: [...addresses] });
+    return EgressDecisionSchema.parse({
+      decision: 'ALLOW',
+      host: target.host,
+      pinnedAddresses: [...addresses],
+    });
   }
 
   /**
@@ -314,13 +328,21 @@ export class EgressGuard {
     readonly decompressedBytes?: number | undefined;
     readonly contentType?: string | undefined;
   }): EgressDecision {
-    const refuse = (reason: Extract<EgressDecision, { decision: 'REFUSE' }>['reason'], detail: string): EgressDecision =>
-      EgressDecisionSchema.parse({ decision: 'REFUSE', reason, detail });
+    const refuse = (
+      reason: Extract<EgressDecision, { decision: 'REFUSE' }>['reason'],
+      detail: string,
+    ): EgressDecision => EgressDecisionSchema.parse({ decision: 'REFUSE', reason, detail });
     if (response.bytes !== undefined && response.bytes > this.limits.maxResponseBytes) {
-      return refuse('RESPONSE_BYTES_EXCEEDED', `response exceeded ${String(this.limits.maxResponseBytes)} bytes`);
+      return refuse(
+        'RESPONSE_BYTES_EXCEEDED',
+        `response exceeded ${String(this.limits.maxResponseBytes)} bytes`,
+      );
     }
     if (response.timeMs !== undefined && response.timeMs > this.limits.maxResponseTimeMs) {
-      return refuse('RESPONSE_TIME_EXCEEDED', `response exceeded ${String(this.limits.maxResponseTimeMs)} ms`);
+      return refuse(
+        'RESPONSE_TIME_EXCEEDED',
+        `response exceeded ${String(this.limits.maxResponseTimeMs)} ms`,
+      );
     }
     if (
       response.bytes !== undefined &&

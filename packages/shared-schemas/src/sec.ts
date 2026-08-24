@@ -704,6 +704,10 @@ export const PublicRedactionResultSchema = z.discriminatedUnion('verdict', [
     })
     .strict(),
 ]);
+export type PublicRedactionResult = z.infer<typeof PublicRedactionResultSchema>;
+
+export type ClaimsPolicyChannel = z.infer<typeof ClaimsPolicyChannelSchema>;
+export type ClaimsPolicyResult = z.infer<typeof ClaimsPolicyResultSchema>;
 
 // --- Registry (parse-by-name entrypoint mirroring the data/dr families) ------
 

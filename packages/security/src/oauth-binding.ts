@@ -49,7 +49,11 @@ export class OAuthBindingGuard {
         (issue) => issue.path.join('.') === 'pkceRequired',
       );
       if (pkceFailure) {
-        throw new OAuthBindingError('PKCE is required for every MCP OAuth grant', {}, SecErrorCode.SEC_OAUTH_PKCE_REQUIRED);
+        throw new OAuthBindingError(
+          'PKCE is required for every MCP OAuth grant',
+          {},
+          SecErrorCode.SEC_OAUTH_PKCE_REQUIRED,
+        );
       }
       throw new OAuthBindingError('token binding fails the authoritative schema', {
         issues: parsed.error.issues.map((i) => `${i.path.join('.')}: ${i.message}`).join('; '),

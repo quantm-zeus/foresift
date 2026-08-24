@@ -227,6 +227,10 @@ export interface RestoreDrillReport {
  *     (`[].every(...)` must never manufacture a PASSED from no evidence);
  *  4. any failed check ⇒ FAILED;
  *  5. only then may the outcome be PASSED.
+ *
+ * Known gap (accepted until production wiring): a `credentialProvider.unlock()`
+ * throw lands after step 1's BLOCKED insert and before any check runs, so
+ * that failure currently leaves the drill with no persisted audit row at all.
  */
 export async function runRestoreDrill(config: RestoreDrillConfig): Promise<RestoreDrillReport> {
   const { engine, drillId } = config;

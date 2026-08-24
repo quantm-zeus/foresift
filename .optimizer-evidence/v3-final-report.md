@@ -403,3 +403,17 @@ transition and follows the same item-39 path:
   Regression: `tests/automation/selection-committed-view.spec.ts` (5 real-git
   fixtures), mutation-tested; supervisor selftest PASS=118 FAIL=0; full entry
   appended to `docs/automation/v3-restart-race-matrix.md`.
+- **#11b — the reused run worktree was itself the stale baseline** (same live
+  run, second layer, found during the recovery drill): archon materializes a
+  task worktree fresh at main's tip ONLY at first creation and then reuses it
+  for every later run of that task (`worktrees/archon/task-<launch branch,
+slashes folded>` holding an `archon/task-*` branch). The fresh restart at
+  12:29:32Z preflighted against creation-time main (pre-chore) and refused
+  again; defect-#6 reset and #7 seed reconciliation never saw it because both
+  keyed on the launch branch. **Fix**: before every fresh launch the
+  supervisor fast-forwards the discovered task worktree to origin/main under
+  strict fail-closed guards (strict-ancestor only — unique commits skip as
+  possibly-real product work; dirty trees skip; current no-ops), recorded as
+  `archon_task_worktree_advanced`. Pinned by
+  `tests/automation/archon-task-worktree-advance.spec.ts`, mutation-tested on
+  both guards.

@@ -173,3 +173,22 @@ on_error: all}` (FATAL patterns — auth, permission — still take priority,
   reads HEAD not the dirty tree; defers while uncommitted; allows once the
   chore lands; fails closed on unreadable and on schema-invalid committed
   state), mutation-tested to kill exactly the two defect-specific tests.
+- **The reused run worktree itself was the stale baseline (#11b, same live
+  run ce3e0354)** — the committed-view selection fix let launches proceed
+  only when main carried the PROVEN chore, but archon materializes a task
+  worktree fresh at main's tip ONLY at first creation and then REUSES it for
+  every later run of that task (`worktrees/archon/task-<branch with slashes
+folded to dashes>`, holding an `archon/task-*` branch). The fresh restart
+  at 12:29:32Z therefore preflighted against the CREATION-time main
+  (b21af91, pre-chore) and refused again — and neither defect-#6 reset nor
+  defect-#7 seed reconciliation ever saw it, because both keyed on the
+  launch branch while this worktree holds an archon-internal branch name.
+  Fixed: before every fresh launch the supervisor discovers the task
+  worktree by archon's naming convention and fast-forwards it to
+  origin/main under strict fail-closed guards (strict-ancestor only — any
+  unique commit skips as possibly-real product work; dirty trees skip;
+  already-current no-ops), recorded as `archon_task_worktree_advanced`.
+  Pinned by `tests/automation/archon-task-worktree-advance.spec.ts`
+  (discovery, advance+visibility of the chore in the run tree, current
+  no-op, dirty refusal, diverged refusal, first-launch null),
+  mutation-tested on both guards.

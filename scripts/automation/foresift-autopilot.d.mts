@@ -64,3 +64,21 @@ export declare function selectionView(
   fileMs: unknown,
   committedMs: unknown,
 ): { ms: unknown; why: string };
+
+/** Defect #11b: archon's per-task run-worktree branch name for a launch
+ *  branch (`foresift/<pkg>` → `archon/task-foresift-<pkg>`). */
+export declare function archonTaskBranchName(branch: string): string;
+
+/** Defect #11b: locate archon's reused run worktree for a launch branch by
+ *  its naming convention; null when none is registered. */
+export declare function findArchonTaskWorktree(
+  branch: string,
+  cwd?: string,
+): { path: string } | { error: string } | null;
+
+/** Defect #11b: fast-forward the reused task worktree to origin/main before a
+ *  fresh launch (strict-FF, clean-tree, fail-closed guards). */
+export declare function advanceArchonTaskWorktree(
+  branch: string,
+  cwd?: string,
+): Record<string, unknown> | null;

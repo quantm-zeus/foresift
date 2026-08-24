@@ -1,0 +1,145 @@
+{
+  "$comment": "Decimals resolution vectors (FR-DATA-001 §11.2: sourced, cross-checked, versioned; conflicting is explicitly unusable). Each scenario feeds observations in order against a fresh representation and expects the final state.",
+  "scenarios": [
+    {
+      "name": "single source yields SOURCED",
+      "representation": {
+        "chainId": "eip155:1",
+        "canonicalAddress": "0x00000000000000000000000000000000000d1001"
+      },
+      "observations": [
+        {
+          "observationId": "dec-1a",
+          "decimals": 18,
+          "observedAt": "2026-01-01T00:00:00Z",
+          "sourceRef": "src/rpc-a"
+        }
+      ],
+      "expectedState": "SOURCED",
+      "expectedDecimals": 18
+    },
+    {
+      "name": "two independent sources agreeing yield CROSS_CHECKED",
+      "representation": {
+        "chainId": "eip155:1",
+        "canonicalAddress": "0x00000000000000000000000000000000000d1002"
+      },
+      "observations": [
+        {
+          "observationId": "dec-2a",
+          "decimals": 6,
+          "observedAt": "2026-01-01T00:00:00Z",
+          "sourceRef": "src/rpc-a"
+        },
+        {
+          "observationId": "dec-2b",
+          "decimals": 6,
+          "observedAt": "2026-01-01T00:05:00Z",
+          "sourceRef": "src/explorer-b"
+        }
+      ],
+      "expectedState": "CROSS_CHECKED",
+      "expectedDecimals": 6
+    },
+    {
+      "name": "same source twice stays SOURCED (no cross-check without independence)",
+      "representation": {
+        "chainId": "eip155:1",
+        "canonicalAddress": "0x00000000000000000000000000000000000d1003"
+      },
+      "observations": [
+        {
+          "observationId": "dec-3a",
+          "decimals": 9,
+          "observedAt": "2026-01-01T00:00:00Z",
+          "sourceRef": "src/rpc-a"
+        },
+        {
+          "observationId": "dec-3b",
+          "decimals": 9,
+          "observedAt": "2026-01-01T00:05:00Z",
+          "sourceRef": "src/rpc-a"
+        }
+      ],
+      "expectedState": "SOURCED",
+      "expectedDecimals": 9
+    },
+    {
+      "name": "disagreeing latest observations yield CONFLICTING with no value",
+      "representation": {
+        "chainId": "solana:mainnet",
+        "canonicalAddress": "So11111111111111111111111111111111111111112"
+      },
+      "observations": [
+        {
+          "observationId": "dec-4a",
+          "decimals": 9,
+          "observedAt": "2026-01-01T00:00:00Z",
+          "sourceRef": "src/rpc-a"
+        },
+        {
+          "observationId": "dec-4b",
+          "decimals": 6,
+          "observedAt": "2026-01-02T00:00:00Z",
+          "sourceRef": "src/explorer-b"
+        }
+      ],
+      "expectedState": "CONFLICTING",
+      "expectedDecimals": null
+    },
+    {
+      "name": "later agreement resolves an earlier conflict at the newest version",
+      "representation": {
+        "chainId": "eip155:8453",
+        "canonicalAddress": "0x00000000000000000000000000000000000d1005"
+      },
+      "observations": [
+        {
+          "observationId": "dec-5a",
+          "decimals": 18,
+          "observedAt": "2026-01-01T00:00:00Z",
+          "sourceRef": "src/rpc-a"
+        },
+        {
+          "observationId": "dec-5b",
+          "decimals": 8,
+          "observedAt": "2026-01-02T00:00:00Z",
+          "sourceRef": "src/explorer-b"
+        },
+        {
+          "observationId": "dec-5c",
+          "decimals": 18,
+          "observedAt": "2026-01-03T00:00:00Z",
+          "sourceRef": "src/issuer-c"
+        },
+        {
+          "observationId": "dec-5d",
+          "decimals": 18,
+          "observedAt": "2026-01-04T00:00:00Z",
+          "sourceRef": "src/rpc-a"
+        }
+      ],
+      "expectedState": "CROSS_CHECKED",
+      "expectedDecimals": 18
+    },
+    {
+      "name": "scale bounds are enforced (37 decimals refused)",
+      "representation": {
+        "chainId": "eip155:1",
+        "canonicalAddress": "0x00000000000000000000000000000000000d1006"
+      },
+      "observations": [
+        {
+          "observationId": "dec-6a",
+          "decimals": 37,
+          "observedAt": "2026-01-01T00:00:00Z",
+          "sourceRef": "src/rpc-a",
+          "expectRefusal": true
+        }
+      ],
+      "expectedState": "SOURCED",
+      "expectedDecimals": null,
+      "$note": "the out-of-scale observation is refused; the harness then snapshots the representation and asserts it remains in its seeded SOURCED state with no decimals"
+    }
+  ]
+}

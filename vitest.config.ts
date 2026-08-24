@@ -25,6 +25,14 @@ export default defineConfig({
     // while a nested gate suite ran). A larger timeout only removes
     // scheduling noise — a hang still fails. It must be set PER PROJECT:
     // Vitest 4 project configs do not inherit root-level `testTimeout`.
+    //
+    // `hookTimeout` needs the same budget for the same reason: PGlite-based
+    // beforeAll hooks boot a real in-process Postgres and apply migrations;
+    // when nested gate suites overlap (the gate e2e children run the full
+    // suite), init exceeded the implicit 10s hook default and failed
+    // whichever spec was slowest to boot (observed 2026-08-24: AC-242,
+    // AC-245, AC-247 across three runs). A hung hook still fails — only
+    // load-dependent false reds are removed.
     projects: [
       {
         test: {
@@ -34,6 +42,7 @@ export default defineConfig({
           pool: 'threads',
           isolate: false,
           testTimeout: 30_000,
+          hookTimeout: 30_000,
         },
       },
       {
@@ -44,6 +53,7 @@ export default defineConfig({
           pool: 'forks',
           isolate: true,
           testTimeout: 30_000,
+          hookTimeout: 30_000,
         },
       },
     ],

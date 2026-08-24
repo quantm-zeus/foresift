@@ -1,0 +1,80 @@
+{
+  "$comment": "Golden identity vectors for FR-DATA-001 / AC-023: chain ids with expected mapping quality, EVM addresses (canonical lowercase + EIP-55 rendering), Solana addresses. EIP-55 forms are the official vectors from eips.ethereum.org/EIPS/eip-55.",
+  "chains": [
+    { "chainId": "eip155:1", "expectedMappingQuality": "REGISTERED_EIP155_REFERENCE" },
+    { "chainId": "eip155:8453", "expectedMappingQuality": "REGISTERED_EIP155_REFERENCE" },
+    { "chainId": "solana:mainnet", "expectedMappingQuality": "REGISTERED_CAIP2" },
+    {
+      "chainId": "bip122:000000000019d6689c085ae165831e93",
+      "expectedMappingQuality": "REGISTERED_CAIP2"
+    }
+  ],
+  "invalidChainIds": ["eip155", "EIP155:1", "eip155:", ":", "eip155:1:extra", "x:%%"],
+  "evmAddresses": [
+    {
+      "input": "0x5aAeb6053F3E94C9b9A09f33669435E7Ef1BeAed",
+      "canonical": "0x5aaeb6053f3e94c9b9a09f33669435e7ef1beaed",
+      "eip55": "0x5aAeb6053F3E94C9b9A09f33669435E7Ef1BeAed"
+    },
+    {
+      "input": "0xfB6916095ca1df60bB79Ce92cE3Ea74c37c5d359",
+      "canonical": "0xfb6916095ca1df60bb79ce92ce3ea74c37c5d359",
+      "eip55": "0xfB6916095ca1df60bB79Ce92cE3Ea74c37c5d359"
+    },
+    {
+      "input": "0xdbF03B407c01E7cD3CBea99509d93f8DDDC8C6FB",
+      "canonical": "0xdbf03b407c01e7cd3cbea99509d93f8dddc8c6fb",
+      "eip55": "0xdbF03B407c01E7cD3CBea99509d93f8DDDC8C6FB"
+    },
+    {
+      "input": "0xD1220A0cf47c7B9Be7A2E6BA89F429762e7b9aDb",
+      "canonical": "0xd1220a0cf47c7b9be7a2e6ba89f429762e7b9adb",
+      "eip55": "0xD1220A0cf47c7B9Be7A2E6BA89F429762e7b9aDb"
+    },
+    {
+      "input": "0x52908400098527886E0F7030069857D2E4169EE7",
+      "canonical": "0x52908400098527886e0f7030069857d2e4169ee7",
+      "eip55": "0x52908400098527886E0F7030069857D2E4169EE7"
+    },
+    {
+      "input": "0xde709f2102306220921060314715629080e2fb77",
+      "canonical": "0xde709f2102306220921060314715629080e2fb77",
+      "eip55": "0xde709f2102306220921060314715629080e2fb77"
+    }
+  ],
+  "invalidEvmAddresses": [
+    "0x5aaeb6053f3e94c9b9a09f33669435e7ef1beae",
+    "0x5aaeb6053f3e94c9b9a09f33669435e7ef1beaed0",
+    "5aaeb6053f3e94c9b9a09f33669435e7ef1beaed",
+    "0x5AAEB6053F3E94C9B9A09F33669435E7EF1BEAED"
+  ],
+  "solanaAddresses": [
+    {
+      "input": "11111111111111111111111111111111",
+      "canonical": "11111111111111111111111111111111",
+      "$note": "system program"
+    },
+    {
+      "input": "So11111111111111111111111111111111111111112",
+      "canonical": "So11111111111111111111111111111111111111112",
+      "$note": "wrapped SOL mint"
+    }
+  ],
+  "invalidSolanaAddresses": [
+    "0OIl1111111111111111111111111111111111111111",
+    "short",
+    "111111111111111111111111111111111111111111111111111111111111111111111111111111111"
+  ],
+  "caip10": [
+    {
+      "chainId": "eip155:1",
+      "address": "0xd1220a0cf47c7b9be7a2e6ba89f429762e7b9adb",
+      "accountId": "eip155:1:0xd1220a0cf47c7b9be7a2e6ba89f429762e7b9adb"
+    },
+    {
+      "chainId": "solana:mainnet",
+      "address": "So11111111111111111111111111111111111111112",
+      "accountId": "solana:mainnet:So11111111111111111111111111111111111111112"
+    }
+  ]
+}

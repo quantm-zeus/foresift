@@ -2,7 +2,7 @@
   "name": "foresift",
   "version": "0.0.0",
   "private": true,
-  "description": "Foresift \u2014 greenfield implementation of the Crypto Intelligence Agent Gateway product contract (spec-driven, autonomously developed).",
+  "description": "Foresift — greenfield implementation of the Crypto Intelligence Agent Gateway product contract (spec-driven, autonomously developed).",
   "type": "module",
   "packageManager": "pnpm@11.22.0",
   "engines": {
@@ -33,6 +33,12 @@
     "verify": "pnpm spec:verify && pnpm format:check && pnpm lint && pnpm typecheck && pnpm test"
   },
   "devDependencies": {
+    "@electric-sql/pglite": "^0.5.6",
+    "@foresift/domain": "workspace:*",
+    "@foresift/evidence": "workspace:*",
+    "@foresift/object-store": "workspace:*",
+    "@foresift/persistence": "workspace:*",
+    "@foresift/shared-schemas": "workspace:*",
     "@types/node": "26.2.0",
     "eslint": "10.9.0",
     "globals": "17.11.0",

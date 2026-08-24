@@ -4,10 +4,12 @@ Foresift is a **greenfield implementation** of the Crypto Intelligence Agent Gat
 product contract: a read-only, security-bounded crypto intelligence and research
 system specified by its authoritative PRD.
 
-> **Status: bootstrap stage.** This repository currently contains the authoritative
-> product specification, its verification tooling, and the spec-driven development
-> foundation only. **No product functionality is implemented yet** — nothing here
-> should be read as a claim that the product exists or works.
+> **Status: G0 foundation in progress.** This repository contains the authoritative
+> product specification, its verification tooling, and the first implemented
+> product slice — the G0 contracts & data-truth foundation (`FR-DATA-001…006`,
+> `FR-DR-001/002`). Later milestone packages (capability, security, collector,
+> cost, traceability) are not yet started — nothing here should be read as a
+> claim that the full product exists or works.
 
 ## Authoritative product specification
 
@@ -64,10 +66,18 @@ docs/migration/     migration provenance record
 docs/setup/         bootstrap report
 scripts/            deterministic verification tooling
 tests/              repository verification tests
-apps/, packages/    future workspace packages (empty at bootstrap)
+packages/domain/        pure domain contracts: identity, time, quantity, quality, errors
+packages/shared-schemas/ runtime zod schemas shared across boundaries
+packages/persistence/   SQL migrations, engine port seam, repositories, DR drills
+packages/evidence/      point-in-time replay and evidence bundles
+packages/object-store/  content-addressed, versioned object storage + staged commits
+migrations/         G0 SQL migration scripts applied by the persistence migrator
+telemetry/          deterministic automation telemetry definitions
+specs/              version-controlled planning state (work-package specs, tasks)
 .specify/           Spec Kit installation
 .claude/            Claude Code skills (Spec Kit + Archon)
 .archon/            Archon workflow location for the future autonomous pipeline
+apps/               future application workspace (empty)
 ```
 
 ## Verification

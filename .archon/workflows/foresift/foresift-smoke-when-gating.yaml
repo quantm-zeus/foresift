@@ -1,0 +1,117 @@
+name: foresift-smoke-when-gating
+description: |
+  Deterministic Foresift WHEN-GATING SEMANTICS probe — no AI, no provider
+  spend, no product code. Pins down, on the INSTALLED Archon version, the
+  exact runtime semantics the sharded-wave lane relies on:
+
+    1. a node whose `when:` is false is SKIPPED (never executed);
+    2. what happens to a child whose ONLY dependency was skipped
+       (guard-b depends on skipped writer-b): runs / skips / fails;
+    3. how default all_success treats a mix of completed + skipped deps;
+    4. how none_failed_min_one_success treats that same mix;
+    5. how all_done lets a terminal accounting node run regardless.
+
+  The sharded-wave workflow's empty-lane elimination (override §9) and its
+  guard/integrate join are designed to be correct under EITHER outcome of
+  (2)/(3); this probe records which one reality chose so future control-plane
+  edits reason from evidence instead of guesses.
+
+  Run after any Archon version upgrade:
+
+    rm -rf /tmp/foresift-smoke-whengate
+    archon workflow run foresift-smoke-when-gating --detach --branch foresift/smoke-when-gating
+    archon workflow get <run-id> --json    # expect status completed
+
+  NOT for: anything product-related.
+tags: [foresift, smoke]
+
+nodes:
+  - id: init
+    bash: |
+      set -euo pipefail
+      S="${SMOKE_DIR:-/tmp/foresift-smoke-whengate}"
+      rm -rf "$S"
+      mkdir -p "$S"
+      echo "smoke-init-ok"
+
+  # ── deterministic status tokens (mirrors plan-status emission style) ─────────
+  - id: lane-a-active
+    depends_on: [init]
+    bash: echo "LANE_ACTIVE"
+  - id: lane-b-empty
+    depends_on: [init]
+    bash: echo "LANE_EMPTY"
+
+  # ── provider-node stand-ins: writer-a gated TRUE, writer-b gated FALSE ──────
+  - id: writer-a
+    depends_on: [lane-a-active]
+    when: "$lane-a-active.output == 'LANE_ACTIVE'"
+    bash: |
+      set -euo pipefail
+      S="${SMOKE_DIR:-/tmp/foresift-smoke-whengate}"
+      printf 'a' >> "$S/executed.txt"
+      echo "WRITER-A-RAN"
+  - id: writer-b
+    depends_on: [lane-b-empty]
+    when: "$lane-b-empty.output == 'LANE_ACTIVE'"
+    bash: |
+      set -euo pipefail
+      S="${SMOKE_DIR:-/tmp/foresift-smoke-whengate}"
+      printf 'b' >> "$S/executed.txt"
+      echo "WRITER-B-RAN-SHOULD-NOT-HAPPEN"
+
+  # ── children of the writers: does skip propagate through depends_on? ─────────
+  - id: guard-a
+    depends_on: [writer-a]
+    bash: |
+      set -euo pipefail
+      S="${SMOKE_DIR:-/tmp/foresift-smoke-whengate}"
+      printf 'A' >> "$S/guards.txt"
+      echo "GUARD-A-RAN"
+  - id: guard-b
+    depends_on: [writer-b]
+    bash: |
+      set -euo pipefail
+      S="${SMOKE_DIR:-/tmp/foresift-smoke-whengate}"
+      printf 'B' >> "$S/guards.txt"
+      echo "GUARD-B-RAN"
+
+  # ── joins with the three trigger rules that matter ───────────────────────────
+  - id: join-all-success
+    depends_on: [guard-a, guard-b]
+    bash: |
+      set -euo pipefail
+      S="${SMOKE_DIR:-/tmp/foresift-smoke-whengate}"
+      printf 'all-success' >> "$S/joins.txt"
+      echo "JOIN-ALL-SUCCESS-RAN"
+  - id: join-minone
+    depends_on: [guard-a, guard-b]
+    trigger_rule: none_failed_min_one_success
+    bash: |
+      set -euo pipefail
+      S="${SMOKE_DIR:-/tmp/foresift-smoke-whengate}"
+      printf ' min-one' >> "$S/joins.txt"
+      echo "JOIN-MINONE-RAN"
+  - id: join-alldone
+    depends_on: [writer-b, guard-a, guard-b]
+    trigger_rule: all_done
+    bash: |
+      set -euo pipefail
+      S="${SMOKE_DIR:-/tmp/foresift-smoke-whengate}"
+      printf ' all-done' >> "$S/joins.txt"
+      echo "JOIN-ALLDONE-RAN"
+
+  # ── terminal accounting under all_done: always reachable, never lies ─────────
+  - id: report
+    depends_on: [writer-a, writer-b, guard-a, guard-b, join-all-success, join-minone, join-alldone]
+    trigger_rule: all_done
+    bash: |
+      set -euo pipefail
+      S="${SMOKE_DIR:-/tmp/foresift-smoke-whengate}"
+      EXEC="$(cat "$S/executed.txt" 2>/dev/null || echo '')"
+      GUARDS="$(cat "$S/guards.txt" 2>/dev/null || echo '')"
+      JOINS="$(cat "$S/joins.txt" 2>/dev/null || echo '')"
+      echo "WHEN-GATE EVIDENCE executed=[$EXEC] guards=[$GUARDS] joins=[$JOINS]"
+      case "$EXEC" in *b*) echo "FAIL: when:false node EXECUTED"; exit 1 ;; *) ;; esac
+      case "$EXEC" in *a*) ;; *) echo "FAIL: when:true node did not execute"; exit 1 ;; esac
+      echo "WHEN-GATING PROBE COMPLETE"

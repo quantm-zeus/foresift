@@ -2,10 +2,23 @@ name: foresift-sharded-wave
 description: |
   ONE parallel implementation wave for a work package (implementation-
   acceleration override §8/§28): deterministic task graph + write-disjoint
-  shard plan -> THREE concurrent HIGH-effort writer lanes (serial core +
-  two parallel shards), each in its OWN git worktree at the same pinned base
-  HEAD -> deterministic write-authority guards -> additive streaming-style
-  integration into the canonical branch -> ONE combined package FAST.
+  shard plan -> concurrent HIGH-effort writer lanes (serial core + parallel
+  shards), each in its OWN git worktree at the same pinned base HEAD ->
+  deterministic write-authority guards -> additive streaming-style
+  integration into the canonical branch -> ONE combined package FAST using
+  the DEDICATED FAST TIER (`pnpm wp:fast-verify`, impact-aware, non-
+  attesting, never merge-authorizing) -> durable canonical checkpoint ONLY
+  on a green combined FAST.
+
+  Failure propagation is structural, not printed: the integrator crashes
+  fail the node, an all-rejected wave exits 3 (targeted repair), and a red
+  FAST fails the node so no downstream checkpoint can claim wave success.
+
+  Empty lanes NEVER start a provider: lane-status nodes derive LANE_ACTIVE/
+  LANE_EMPTY deterministically from graph.shards membership and writer nodes
+  carry matching `when:` gates, so late waves with one remaining shard cost
+  one writer invocation, not three.
+
   Canonical bookkeeping (tasks.md, checkpoints) is coordinator-only; writers
   never touch it (override §7). Repeat invocations run further waves; the
   authoritative FULL gate stays downstream in the standard package flow
@@ -56,6 +69,25 @@ nodes:
       '
       cat "$ARTIFACTS_DIR/shard-meta.json"
 
+  # ── DETERMINISTIC LANE ROUTING (override §9): a lane is active iff its id
+  # appears in graph.shards. These tokens gate ONLY provider-backed nodes, so
+  # an empty lane costs zero provider turns.
+  - id: lane-core-active
+    depends_on: [prep]
+    bash: |
+      node -e 'const g=JSON.parse(require("node:fs").readFileSync(process.argv[1],"utf8"));process.stdout.write((g.shards??[]).some(s=>s.id==="core")?"LANE_ACTIVE":"LANE_EMPTY")' \
+        "$ARTIFACTS_DIR/task-graph.json"
+  - id: lane-shard-1-active
+    depends_on: [prep]
+    bash: |
+      node -e 'const g=JSON.parse(require("node:fs").readFileSync(process.argv[1],"utf8"));process.stdout.write((g.shards??[]).some(s=>s.id==="shard-1")?"LANE_ACTIVE":"LANE_EMPTY")' \
+        "$ARTIFACTS_DIR/task-graph.json"
+  - id: lane-shard-2-active
+    depends_on: [prep]
+    bash: |
+      node -e 'const g=JSON.parse(require("node:fs").readFileSync(process.argv[1],"utf8"));process.stdout.write((g.shards??[]).some(s=>s.id==="shard-2")?"LANE_ACTIVE":"LANE_EMPTY")' \
+        "$ARTIFACTS_DIR/task-graph.json"
+
   # Per-shard brief emitters: prompt interpolation reads sibling outputs, so
   # each writer gets ONLY its own brief (override §12 minimal context).
   - id: brief-core
@@ -69,10 +101,15 @@ nodes:
     bash: cat "$ARTIFACTS_DIR/briefs/shard-2-brief.md" 2>/dev/null || echo "NO SHARD-2 THIS WAVE"
 
   # ── WRITER LANES (siblings without edges run CONCURRENTLY — proven R3) ───────
+  # `when:` gates are derived purely from deterministic graph membership, so
+  # NO SHARD THIS WAVE means the provider is never started (override §9).
+  # Retry policy matches the production-proven AI-node policy (initial attempt
+  # + bounded retries, on_error: all) — never weaker than the standard lane.
   - id: writer-core
     depends_on: [brief-core]
+    when: "$lane-core-active.output == 'LANE_ACTIVE'"
     retry:
-      max_attempts: 2
+      max_attempts: 3
       delay_ms: 10000
       on_error: all
     effort: high
@@ -87,16 +124,17 @@ nodes:
       (override §14). Never edit specs/<pkg>/tasks.md, checkpoints, or anything
       outside your allowed write paths. When finished, write your result manifest
       to $ARTIFACTS_DIR/writer-results/core/result.json (see completion contract
-      in the brief). If the brief says NO CORE SHARD THIS WAVE, do nothing and
-      say so.
+      in the brief). If your brief says NO CORE SHARD THIS WAVE, reply
+      LANE_EMPTY_ABORT immediately without invoking any tool.
 
       ===== WRITER BRIEF =====
       $brief-core.output
 
   - id: writer-shard-1
     depends_on: [brief-shard-1]
+    when: "$lane-shard-1-active.output == 'LANE_ACTIVE'"
     retry:
-      max_attempts: 2
+      max_attempts: 3
       delay_ms: 10000
       on_error: all
     effort: high
@@ -110,16 +148,18 @@ nodes:
       FULL gates / repository-wide runs. Never edit specs/<pkg>/tasks.md,
       checkpoints, or anything outside your allowed write paths. When finished,
       write your result manifest to $ARTIFACTS_DIR/writer-results/shard-1/
-      result.json (see completion contract in the brief). If the brief says NO
-      SHARD-1 THIS WAVE, do nothing and say so.
+      result.json (see completion contract in the brief). If your brief says NO
+      SHARD-1 THIS WAVE, reply LANE_EMPTY_ABORT immediately without invoking
+      any tool.
 
       ===== WRITER BRIEF =====
       $brief-shard-1.output
 
   - id: writer-shard-2
     depends_on: [brief-shard-2]
+    when: "$lane-shard-2-active.output == 'LANE_ACTIVE'"
     retry:
-      max_attempts: 2
+      max_attempts: 3
       delay_ms: 10000
       on_error: all
     effort: high
@@ -133,8 +173,9 @@ nodes:
       FULL gates / repository-wide runs. Never edit specs/<pkg>/tasks.md,
       checkpoints, or anything outside your allowed write paths. When finished,
       write your result manifest to $ARTIFACTS_DIR/writer-results/shard-2/
-      result.json (see completion contract in the brief). If the brief says NO
-      SHARD-2 THIS WAVE, do nothing and say so.
+      result.json (see completion contract in the brief). If your brief says NO
+      SHARD-2 THIS WAVE, reply LANE_EMPTY_ABORT immediately without invoking
+      any tool.
 
       ===== WRITER BRIEF =====
       $brief-shard-2.output
@@ -143,40 +184,88 @@ nodes:
   # One guard per lane; each recomputes the actual diff against the pinned base
   # and enforces allowedWritePaths ⊆ scopes. It OVERWRITES result.json with
   # computed facts (branch/head/base) so the integrator never trusts claims.
+  # A lane with no shard in the task graph is skipped CLOSED at zero cost —
+  # this must hold whether or not the runtime propagates writer-node skips.
   - id: guard-core
     depends_on: [writer-core]
     bash: |
       set -euo pipefail
+      if ! node -e 'const g=JSON.parse(require("node:fs").readFileSync(process.argv[1],"utf8"));process.exit((g.shards??[]).some(s=>s.id==="core")?0:1)' "$ARTIFACTS_DIR/task-graph.json"; then
+        echo "GUARD_SKIP lane=core reason=NO_SHARD_THIS_WAVE"; exit 0
+      fi
       node scripts/automation/wave-guard.mjs --shard core \
         --artifacts "$ARTIFACTS_DIR" --graph "$ARTIFACTS_DIR/task-graph.json"
   - id: guard-shard-1
     depends_on: [writer-shard-1]
     bash: |
       set -euo pipefail
+      if ! node -e 'const g=JSON.parse(require("node:fs").readFileSync(process.argv[1],"utf8"));process.exit((g.shards??[]).some(s=>s.id==="shard-1")?0:1)' "$ARTIFACTS_DIR/task-graph.json"; then
+        echo "GUARD_SKIP lane=shard-1 reason=NO_SHARD_THIS_WAVE"; exit 0
+      fi
       node scripts/automation/wave-guard.mjs --shard shard-1 \
         --artifacts "$ARTIFACTS_DIR" --graph "$ARTIFACTS_DIR/task-graph.json"
   - id: guard-shard-2
     depends_on: [writer-shard-2]
     bash: |
       set -euo pipefail
+      if ! node -e 'const g=JSON.parse(require("node:fs").readFileSync(process.argv[1],"utf8"));process.exit((g.shards??[]).some(s=>s.id==="shard-2")?0:1)' "$ARTIFACTS_DIR/task-graph.json"; then
+        echo "GUARD_SKIP lane=shard-2 reason=NO_SHARD_THIS_WAVE"; exit 0
+      fi
       node scripts/automation/wave-guard.mjs --shard shard-2 \
         --artifacts "$ARTIFACTS_DIR" --graph "$ARTIFACTS_DIR/task-graph.json"
 
-  # ── INTEGRATE + COMBINED FAST (serial join, override §16/§17) ────────────────
+  # ── INTEGRATE + COMBINED TRUE FAST (serial join, override §16/§17) ───────────
+  # Failure propagation is STRUCTURAL: `set -euo pipefail` means an integrator
+  # crash fails the node; an all-rejected wave exits 3 (targeted repair); a
+  # red combined FAST fails the node — so nothing downstream can claim wave
+  # success. The durable canonical checkpoint is built ONLY after a green
+  # FAST (override §8): FAST green -> checkpoint -> continue.
   - id: integrate-and-fast
     depends_on: [guard-core, guard-shard-1, guard-shard-2]
     trigger_rule: none_failed_min_one_success   # guards fail closed per-lane
     timeout: 3600000
     bash: |
-      set -uo pipefail
+      set -euo pipefail
       PKG="${ARGUMENTS%%@g*}"
+      BASE="$(cat "$ARTIFACTS_DIR/base-head.txt")"
       node scripts/automation/integrate-writer-results.mjs --package "$PKG" \
         --graph "$ARTIFACTS_DIR/task-graph.json" \
         --results-dir "$ARTIFACTS_DIR/writer-results" \
         --canonical . \
-        --out "$ARTIFACTS_DIR/integration-report.json" || true
+        --out "$ARTIFACTS_DIR/integration-report.json"
       cat "$ARTIFACTS_DIR/integration-report.json"
-      # ONE combined package FAST for the whole wave (never per writer).
-      set +e
-      pnpm foresift:gate --package "$PKG"
-      echo "WAVE_FAST_EXIT=$?"
+      INTEGRATED="$(node -e 'const r=JSON.parse(require("node:fs").readFileSync(process.argv[1],"utf8"));process.stdout.write(String((r.integrated??[]).length))' "$ARTIFACTS_DIR/integration-report.json")"
+      REJECTED="$(node -e 'const r=JSON.parse(require("node:fs").readFileSync(process.argv[1],"utf8"));process.stdout.write(String((r.rejected??[]).length))' "$ARTIFACTS_DIR/integration-report.json")"
+      if [ "$INTEGRATED" -eq 0 ] && [ "$REJECTED" -gt 0 ]; then
+        echo "WAVE_FAILED: every assigned shard was rejected — targeted repair required"
+        exit 3
+      fi
+      if [ "$INTEGRATED" -eq 0 ]; then
+        echo "WAVE_NOOP: no executable units were assigned this invocation"
+        exit 0
+      fi
+      # ONE combined package FAST for the whole wave (never per writer), via
+      # the dedicated FAST tier — impact-aware, seconds-not-minutes, non-
+      # attesting, never merge-authorizing; fail-closed to broader testing
+      # when impact cannot be determined. Exit code propagates.
+      pnpm wp:fast-verify --package "$PKG" \
+        --artifacts-dir "$ARTIFACTS_DIR" --from-git --base "$BASE"
+      # Canonical durable checkpoint ONLY after a green combined FAST.
+      node scripts/automation/package-checkpoint.mjs --build --package "$PKG" \
+        --artifacts-dir "$ARTIFACTS_DIR" \
+        --head "$(git rev-parse HEAD)" \
+        --source tasks="specs/$PKG/tasks.md"
+      echo "WAVE_GREEN integrated=$INTEGRATED rejected=$REJECTED fast=green checkpoint=built"
+
+  # Terminal accounting that completes cleanly even for a zero-work invocation
+  # (all lanes LANE_EMPTY): reports wave outcome without spending providers.
+  - id: wave-complete
+    depends_on: [integrate-and-fast, guard-core, guard-shard-1, guard-shard-2]
+    trigger_rule: all_done
+    bash: |
+      set -euo pipefail
+      if [ -f "$ARTIFACTS_DIR/integration-report.json" ]; then
+        echo "WAVE_COMPLETE: $(tr -d '\n' < "$ARTIFACTS_DIR/integration-report.json" | head -c 400)"
+      else
+        echo "WAVE_COMPLETE_NO_WORK: no executable units were assigned this invocation"
+      fi

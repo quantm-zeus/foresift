@@ -117,9 +117,10 @@ export async function resolveEvidenceAt(
       latestByObservation.set(ref.observationId, entry);
     }
   }
-  // Deterministic read order: by observation id under CODEPOINT comparison
-  // (localeCompare is locale-sensitive and would not be deterministic across
-  // environments), then availability via THE domain timestamp order.
+  // Deterministic read order: by observation id under JS's default string
+  // comparison — UTF-16 code units, not codepoints (and localeCompare is
+  // locale-sensitive, so unusable) — then availability via THE domain
+  // timestamp order.
   const observations = [...latestByObservation.values()]
     .map((e) => e.ref)
     .sort(

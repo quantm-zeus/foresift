@@ -1,7 +1,7 @@
-// Package entrypoint — persistence core (engine port seam, migrator, repos).
-// Convention: every Foresift workspace package carries a tsconfig.json that
-// extends ../../tsconfig.base.json and globs src/** + test/**, so new modules
-// and tests require zero root-config edits.
+// Package entrypoint — persistence core: engine port seam, canonical JSON,
+// migrator, repos (identity/observations/quality/features/sources/acquisition/
+// backfill/checkpoints/recovery), feature computation, and the drill modules
+// (backup/restore).
 export * from './db.ts';
 export * from './canonical-json.ts';
 export * from './migrator.ts';

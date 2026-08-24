@@ -182,6 +182,8 @@ export async function appendRevision(
     // Compare chronologically via epoch ms — UtcTimestamp strings may carry
     // differing fractional precision around the same instant, so lexical `<`
     // is not order-safe here (the convention used by backfill/feature guards).
+    // Known precision limit: this comparison flattens sub-ms ties; the SQL
+    // no-backdating trigger arbitrates such ties at full timestamp precision.
     const anchorAt =
       typeof base.available_at === 'string'
         ? Date.parse(base.available_at)

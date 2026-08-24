@@ -43,5 +43,7 @@ opaque caller-chosen string, so the linkage cannot be made total at this layer.
   CROSS_CHECKED when both refs are registered identities.
 - Callers see reduced credit explicitly (`DECIMAL_UNCERTAIN`) instead of
   discovering inflated confidence downstream.
-- The state machine remains monotone and deterministic: the downgrade depends
-  only on rows visible inside the same transaction.
+- The state machine is deterministic and history-derived (NOT monotone: late
+  memberships can downgrade a state, and CONFLICTING↔upgraded transitions are
+  by design): the downgrade depends only on rows visible inside the same
+  transaction.

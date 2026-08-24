@@ -6,8 +6,9 @@
  *
  * Key separation is structural (§34.5): policies persist an opaque
  * `keyref:` reference into a separately protected keystore — never key
- * material — and snapshot artifacts are scannable so a violation fails
- * loudly instead of shipping secrets into backups.
+ * material. `scanForKeyMaterial` is exported for callers and drills to run
+ * over snapshot artifacts BEFORE promotion; it is not yet wired into
+ * `completeBackupRun` itself, so scanning is a caller obligation today.
  */
 import { createHash } from 'node:crypto';
 import { ErrorCode, ForesiftError, type UtcTimestamp } from '@foresift/domain';

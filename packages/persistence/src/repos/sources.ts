@@ -166,7 +166,7 @@ export async function recordDependenceEdge(
   // Canonical pair order normalizes orientation regardless of who was listed
   // first; storage does NOT enforce uniqueness per pair (multiple edges over
   // time are allowed and the reader returns them newest-first), and self-edges
-  // are meaningless.
+  // are refused outright.
   const [a, b] =
     input.edge.sourceA < input.edge.sourceB
       ? [input.edge.sourceA, input.edge.sourceB]

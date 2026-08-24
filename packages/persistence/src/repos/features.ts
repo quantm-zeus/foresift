@@ -191,7 +191,13 @@ export function recomputeOfflineRollingVolume(
 /** Declared tolerance for online/offline parity: exact (deterministic math). */
 export const PARITY_TOLERANCE = 0n;
 
-/** Sentinel divergence for incomparable values (null vs non-null). */
+/**
+ * Sentinel divergence for incomparable values (null vs non-null).
+ * Magnitude contract: any real divergence is |a − b| over decimal strings of
+ * bounded scale, astronomically below 2^96, so this sentinel can never be
+ * produced by an actual measurement — consumers treat `divergence >= this`
+ * as "incomparable", never as a large-but-real gap.
+ */
 const INCOMPARABLE_DIVERGENCE = 1n << 96n;
 
 export interface ParityResult {

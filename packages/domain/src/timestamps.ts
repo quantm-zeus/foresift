@@ -169,6 +169,10 @@ export interface DecisionActionTimestamps {
   readonly alertDeliveredAt: UtcTimestamp | null;
   readonly counterfactualDeliveryAt: UtcTimestamp;
   readonly validUntil: UtcTimestamp;
+  /**
+   * When the decision expired; `null` means still inside `validUntil` —
+   * a future fact not yet known, NOT missing data.
+   */
   readonly expiredAt: UtcTimestamp | null;
 }
 

@@ -149,9 +149,10 @@ describe('AC-062: backup restore meets configured RPO/RTO in a drill', () => {
       },
       at(15),
     );
-    // Scripted timeline: loss detected 20 min after the backup; recovery
-    // through the snapshot instant (RPO 5 min ≤ target); service verified
-    // restored 40 min after detection start (RTO 40 min ≤ target).
+    // Scripted timeline: loss detected at +20 (10 min after the at(10)
+    // snapshot); recovery through the snapshot instant — data recovered
+    // through at(10) vs last durable write at(5) → RPO 5 min ≤ target;
+    // service restored 40 min after detection start (RTO 40 min ≤ target).
     const outcome = await evaluateAndRecordDrill({
       engine: restored,
       clock: fixedClock(at(60)),

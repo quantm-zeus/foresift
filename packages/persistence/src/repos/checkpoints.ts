@@ -238,7 +238,7 @@ export async function registerGap(
   };
 }
 
-/** Move a gap to a resolved status with its resolution instant. */
+/** Advance a gap's recovery status (including RECOVERING) with its resolution instant. */
 export async function resolveGapStatus(
   engine: DatabaseEngine,
   input: {

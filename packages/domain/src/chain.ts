@@ -32,7 +32,11 @@ export type ChainNamespace = (typeof ChainNamespace)[keyof typeof ChainNamespace
  * versioned internal identifier with explicit state).
  */
 export const ChainMappingQuality = {
-  /** Registered CAIP-2 namespace; reference is the canonical registry value. */
+  /**
+   * Registered CAIP-2 namespace; the reference is TAKEN as the canonical
+   * registry value (same hedge as the EIP-155 sibling: no registry lookup
+   * happens here, so canonicality is asserted, not verified).
+   */
   REGISTERED_CAIP2: 'REGISTERED_CAIP2',
   /**
    * EIP-155 namespace present; the reference is TAKEN as the canonical

@@ -4,13 +4,14 @@
  *
  * A projection is served only through replay-realizable windows: the claimed
  * maturity window may never extend past the resolved-at replay boundary.
- * The underlying row set is APPEND-ONLY: a later qualifying decision inside a
- * historical window can raise a recomputed projection, but no emitted
- * projection for a given (candidate, window, boundary) is ever rewritten in
- * place, and its inputs — trigger-protected frozen bundles, one-way
- * acquisition completions — are immutable. Promotion eligibility is reported
- * honestly: a below-threshold count is stated as below threshold, never
- * inflated toward the gate.
+ * These projections are computed on demand today; when persistence lands,
+ * the intended (and test-pinned) storage contract is APPEND-ONLY: a later
+ * qualifying decision inside a historical window can raise a recomputed
+ * projection, but no projection for a given (candidate, window, boundary)
+ * may be rewritten in place, and its inputs — trigger-protected frozen
+ * bundles, one-way acquisition completions — are immutable. Promotion
+ * eligibility is reported honestly: a below-threshold count is stated as
+ * below threshold, never inflated toward the gate.
  */
 import {
   ForesiftError,

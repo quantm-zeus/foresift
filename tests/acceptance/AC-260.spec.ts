@@ -7,7 +7,8 @@
  * declared 60-minute RPO, or blocks active opportunity mode."
  *
  * Both declared tiers are met on fixture workloads: a metadata-class world
- * (policy + decisions index + evidence bundle) and an observations/
+ * (seeded tier configuration + policy + decisions index + evidence bundle)
+ * and an observations/
  * checkpoints-class world restore byte-identically with scripted timelines
  * inside each tier — so opportunity mode stays unblocked.
  */

@@ -98,8 +98,9 @@ export interface ProbeAssignmentInput {
 
 /**
  * Persist the randomized-probe assignment (and impact) before any retrieval.
- * Zero-probability assignments are refusals — a probe that cannot be assigned
- * must not masquerade as randomization.
+ * Assignments outside (0,1) are refusals — a probe that cannot be assigned
+ * must not masquerade as randomization, and probability ≥ 1 is certainty,
+ * not randomization.
  */
 export async function recordProbeAssignment(
   engine: DatabaseEngine,

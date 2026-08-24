@@ -37,8 +37,10 @@ export interface BackfillReceiptInput {
 
 /**
  * The §13.6 no-backdating guard: historical-query rows may not claim an
- * available_at earlier than their retrieval commit unless an independently
- * persisted live receipt proves earlier availability.
+ * available_at earlier than their retrieval commit unless a live-receipt
+ * reference is supplied. This function admits the reference on PRESENCE
+ * only; that it matches an independently PERSISTED observation receipt is
+ * verified by recordBackfillReceipt, in the same transaction as its insert.
  */
 export function assertNoBackdating(input: {
   availableAt: UtcTimestamp;

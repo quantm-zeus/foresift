@@ -147,7 +147,10 @@ export async function fieldsByQualityState(
   }
 
   const where = clauses.length > 0 ? `WHERE ${clauses.join(' AND ')}` : '';
-  params.push(filter.limit ?? 500);
+  // Default page cap when the caller supplies no limit — bounds unbounded
+  // reads; callers pass an explicit limit to page past it.
+  const DEFAULT_QUALITY_PAGE_LIMIT = 500;
+  params.push(filter.limit ?? DEFAULT_QUALITY_PAGE_LIMIT);
   const rows = await engine.query<{
     field_quality_id: string;
     observation_id: string;

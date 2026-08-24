@@ -37,22 +37,44 @@ because a previous session ended.
 3. `specs/implementation/README.md` and `specs/implementation/current-milestone.json` —
    find the package object with `"id": "$ARGUMENTS"`. Its `requirementIds`,
    `objective`, `dependencies`, `risk`, and `writeScopes` are binding scope.
-4. The authoritative PRD: `docs/spec/crypto_intelligence_agent_gateway_PRD_FINAL_v6.0.md`.
-   Read every section referenced by the package's requirements (the requirement
-   manifest at `docs/spec/crypto_intelligence_agent_gateway_PRD_FINAL_v6.0.requirements.json`
-   gives you each requirement's text, acceptance criteria, invariants, and line anchors).
-   Also read any accepted ADRs relevant to these requirements.
-5. Existing accepted ADRs under `docs/adr/` and the current implementation state.
+4. **Your authority-bound context capsule** — generate it deterministically, then
+   read `plan-capsule.md` IN FULL:
+
+   ```bash
+   node scripts/automation/build-plan-context.mjs --package "$ARGUMENTS" --out "$ARTIFACTS_DIR"
+   ```
+
+   The capsule quotes every assigned requirement's normative text with PRD line
+   anchors, enumerates acceptance criteria with exact positive/negative test-file
+   refs (split into uniquely-owned vs package-shared), lists dependency status,
+   writeScopes, non-goals, and an index of existing code under writeScopes. It is
+   a derivative CACHE bound to main/PRD/manifest hashes — regenerate it if those
+   changed; never treat it as authority itself. Do NOT re-read the whole
+   requirement manifest — the capsule is its complete projection for this package.
+5. The authoritative PRD
+   (`docs/spec/crypto_intelligence_agent_gateway_PRD_FINAL_v6.0.md`) **on demand
+   only**: open the specific sections at the line anchors the capsule cites when
+   the quoted text is not enough context. Do not read the whole PRD. Consult
+   individual accepted ADRs under `docs/adr/` only where relevant to this
+   package's requirements, plus the current implementation state.
 
 ## Produce a scoped Spec Kit plan
 
 Create the Spec Kit feature directory `specs/$ARGUMENTS/` containing:
 
-- `spec.md` — a **scoped derivative** of the authoritative contract for this
-  package only: quote each assigned requirement's normative text with its ID,
-  enumerate its acceptance criteria and applicable invariants from the manifest,
-  and state explicit non-goals (everything in the milestone not assigned to this
-  package). This file is subordinate to the PRD; mark it as such at the top.
+- `spec.md` — seed the mechanical normative skeleton first (it writes ONLY if
+  absent and never clobbers existing work):
+
+  ```bash
+  node scripts/automation/bootstrap-package-spec.mjs --package "$ARGUMENTS"
+  ```
+
+  Then extend it into a **scoped derivative** of the authoritative contract for
+  this package: keep the seeded requirement quotes and acceptance-criteria refs
+  intact, add applicable invariants from the manifest, integration points,
+  risks, and explicit non-goal boundaries (everything in the milestone not
+  assigned to this package). Never remove or weaken seeded normative content.
+  This file is subordinate to the PRD.
 - `plan.md` — implementation approach: architecture decisions, data model,
   module layout inside the package's `writeScopes`, verification strategy per
   acceptance criterion, and risks. Follow the Spec Kit planning methodology

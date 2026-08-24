@@ -138,6 +138,14 @@ nodes:
       nodes:
         - id: scoped-plan-iterate
           command: foresift-wp-plan
+          # Defect #10: a silent provider empty-stream is classified UNKNOWN
+          # by archon's retry table and never retried by default; one hiccup
+          # killed an otherwise green run at the judge. Explicit on_error: all
+          # retries it (FATAL patterns still take priority — auth never retries).
+          retry:
+            max_attempts: 3
+            delay_ms: 10000
+            on_error: all
           effort: high
           idle_timeout: 1800000
         - id: plan-recheck
@@ -200,6 +208,14 @@ nodes:
       nodes:
         - id: implement-iterate
           command: foresift-wp-implement-optimized
+          # Defect #10: a silent provider empty-stream is classified UNKNOWN
+          # by archon's retry table and never retried by default; one hiccup
+          # killed an otherwise green run at the judge. Explicit on_error: all
+          # retries it (FATAL patterns still take priority — auth never retries).
+          retry:
+            max_attempts: 3
+            delay_ms: 10000
+            on_error: all
           effort: high
           idle_timeout: 1800000
         - id: impl-recheck
@@ -266,6 +282,14 @@ nodes:
       nodes:
         - id: gate-repair
           command: foresift-wp-gate-repair
+          # Defect #10: a silent provider empty-stream is classified UNKNOWN
+          # by archon's retry table and never retried by default; one hiccup
+          # killed an otherwise green run at the judge. Explicit on_error: all
+          # retries it (FATAL patterns still take priority — auth never retries).
+          retry:
+            max_attempts: 3
+            delay_ms: 10000
+            on_error: all
           effort: high
           idle_timeout: 1800000
         - id: repair-targeted-recheck
@@ -425,6 +449,14 @@ nodes:
       nodes:
         - id: converge
           command: foresift-wp-converge
+          # Defect #10: a silent provider empty-stream is classified UNKNOWN
+          # by archon's retry table and never retried by default; one hiccup
+          # killed an otherwise green run at the judge. Explicit on_error: all
+          # retries it (FATAL patterns still take priority — auth never retries).
+          retry:
+            max_attempts: 3
+            delay_ms: 10000
+            on_error: all
           effort: high
           idle_timeout: 1800000
         - id: converge-targeted-recheck
@@ -473,6 +505,14 @@ nodes:
               echo "FINAL_FULL_FAILED"
             fi
         - id: judge
+          # Defect #10: a silent provider empty-stream is classified UNKNOWN
+          # by archon's retry table and never retried by default; one hiccup
+          # killed an otherwise green run at the judge. Explicit on_error: all
+          # retries it (FATAL patterns still take priority — auth never retries).
+          retry:
+            max_attempts: 3
+            delay_ms: 10000
+            on_error: all
           prompt: |
             You are the independent convergence judge for Foresift work package
             "$ARGUMENTS". You have read-only intent: verify claims, never fix code.
@@ -528,6 +568,12 @@ nodes:
 
   - id: ai-landing-fallback
     command: foresift-wp-ci-merge-optimized
+    # Defect #10: provider empty-stream failures are UNKNOWN-classified and
+    # unretried by default; this landing fallback must survive one hiccup.
+    retry:
+      max_attempts: 3
+      delay_ms: 10000
+      on_error: all
     when: "$final-land-router.output == 'LANDING_NEEDS_AI'"
     depends_on: [final-land-router]
     context: fresh

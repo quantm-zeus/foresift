@@ -133,3 +133,18 @@ Defects found and fixed while proving this matrix (2026-08-23, PR for this doc):
   preserved as commit `0ee8f42` on the generation branch before recovery so
   the supervisor's residue reset could not destroy verified spend. Machinery
   is authoritative over AI-authored plan text either way (Constitution XVIII).
+- **One silent provider hiccup killed a fully green run at the convergence
+  judge (live run dc67e884, 2026-08-24)** — review approved, the FULL gate
+  had passed, PR #46 was open; then the `judge` node ended after 19 s with
+  "produced no assistant output — the provider stream closed without
+  yielding content". Archon's retry classification matches no TRANSIENT
+  pattern in that message (it is UNKNOWN), and UNKNOWN errors retry only
+  with an explicit `on_error: all` stanza — which no provider-backed node
+  declared. Fixed: every `prompt:`/`command:` node in both work-package
+  workflows now declares `retry: {max_attempts: 3, delay_ms: 10000,
+on_error: all}` (FATAL patterns — auth, permission — still take priority,
+  so non-retryable failures are never retried);
+  `tests/automation/workflow-node-resilience.spec.ts` pins the invariant
+  across both files. The run's other outputs (PR #46 with its review
+  verdict and green exact-head CI) survived on the remote and were consumed
+  by the next recovery launch.

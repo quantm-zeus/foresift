@@ -54,6 +54,13 @@ export interface HighImpactActionRequest {
 const ALLOWED_AUDIT_CLASS = 'APPROVAL_STEP_UP' as const;
 const REFUSED_AUDIT_CLASS = 'BLOCKED_OPERATION' as const;
 
+/**
+ * Tolerated clock skew between the proof's issuer and this gate before a
+ * future-dated completion instant is refused (M11): proofs dated further
+ * than this into the future are STALE, never "infinitely fresh".
+ */
+export const PROOF_CLOCK_SKEW_TOLERANCE_MS = 60_000;
+
 export interface ActionGateOptions {
   /**
    * Hash-chained audit sink for decisions. Optional at construction only so
@@ -117,7 +124,14 @@ export class ActionGate {
       const nowMs = this.clock();
       const completedMs = Date.parse(proof.completedAt);
       const ageSeconds = (nowMs - completedMs) / 1000;
-      if (!Number.isFinite(completedMs) || ageSeconds > request.policy.freshnessWindowSeconds) {
+      // Future-dated proofs never go stale (negative age), so anything
+      // beyond a small clock-skew tolerance is refused as stale — a
+      // far-future timestamp must not become a permanent credential.
+      if (
+        !Number.isFinite(completedMs) ||
+        ageSeconds > request.policy.freshnessWindowSeconds ||
+        completedMs > nowMs + PROOF_CLOCK_SKEW_TOLERANCE_MS
+      ) {
         reasons.push('STEP_UP_STALE');
       }
       if (

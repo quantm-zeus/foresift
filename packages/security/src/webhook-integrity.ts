@@ -6,6 +6,14 @@
  *   cryptographic signature verification → replay prevention via an
  *   event-ID + payload-hash cache.
  *
+ * REPLAY-CACHE SCOPE CONTRACT (M6): the dedupe cache is deliberately
+ * IN-MEMORY and PER-PROCESS. It bounds replays within one process lifetime;
+ * it does NOT survive restarts, span replicas, or outlive capacity eviction.
+ * Deployments running multiple replicas or requiring cross-restart replay
+ * immunity MUST back the dedupe key with shared durable state at the wiring
+ * layer (recorded as an explicit pre-wiring task — the key format emitted by
+ * `verifyCallback` is the persistence contract).
+ *
  * The FIXED-ENDPOINT rule lives here too: reconnect/backfill URLs come from
  * CONFIGURATION only — a URL carried inside an event payload is refused as
  * a source, no matter how valid the event looks. Malformed events can never
@@ -62,6 +70,16 @@ export class WebhookGuard {
   private readonly capacity: number;
 
   constructor(options: WebhookGuardOptions) {
+    // Fail-closed at construction (L12): a non-finite or non-positive window
+    // would silently disable staleness checks for JS callers (NaN compares
+    // false), so it never constructs a guard at all.
+    if (!Number.isFinite(options.maxAgeSeconds) || options.maxAgeSeconds <= 0) {
+      throw new WebhookIntegrityError(
+        'maxAgeSeconds must be a positive finite number',
+        { maxAgeSeconds: options.maxAgeSeconds },
+        SecErrorCode.SEC_WEBHOOK_TIMESTAMP_STALE,
+      );
+    }
     this.verifier = options.verifier;
     this.maxAgeSeconds = options.maxAgeSeconds;
     this.nowMs = options.nowMs;
@@ -154,17 +172,21 @@ export class WebhookGuard {
 
   /**
    * Contract hook: a malformed event must NEVER advance a checkpoint.
-   * Returns false for anything but a well-formed object carrying its id —
-   * callers treat `false` as "stop processing, advance nothing".
+   * Returns FALSE for anything but a well-formed, JSON-serializable object
+   * carrying its id — callers treat `false` as "stop processing, advance
+   * nothing". Serialization failures (circular structures, BigInt) are part
+   * of the documented `false` contract, never thrown.
    */
   guardCheckpointAdvance(event: unknown): boolean {
     if (typeof event !== 'object' || event === null) return false;
     const candidate = event as Record<string, unknown>;
-    return (
-      typeof candidate.id === 'string' &&
-      candidate.id.length > 0 &&
-      isValidJson(JSON.stringify(event))
-    );
+    if (typeof candidate.id !== 'string' || candidate.id.length === 0) return false;
+    try {
+      JSON.stringify(event);
+      return true;
+    } catch {
+      return false;
+    }
   }
 }
 

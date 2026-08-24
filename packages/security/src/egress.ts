@@ -301,7 +301,26 @@ export class EgressGuard {
         detail: 'unparseable URL during pin verification',
       });
     }
-    const fresh = await this.resolve(target.host);
+    // Mirror authorize()'s fail-closed resolver handling (M23): a DNS hiccup
+    // during the rebinding check surfaces as a schema-typed REFUSE, never a
+    // raw exception escaping the boundary — and an empty answer refuses too.
+    let fresh: readonly string[];
+    try {
+      fresh = await this.resolve(target.host);
+    } catch (error) {
+      return EgressDecisionSchema.parse({
+        decision: 'REFUSE',
+        reason: 'RESOLUTION_REFUSED',
+        detail: error instanceof Error ? error.message : String(error),
+      });
+    }
+    if (fresh.length === 0) {
+      return EgressDecisionSchema.parse({
+        decision: 'REFUSE',
+        reason: 'RESOLUTION_REFUSED',
+        detail: 'resolver returned no addresses during pin verification',
+      });
+    }
     const same =
       fresh.length === pinnedAddresses.length &&
       [...fresh].sort().join(',') === [...pinnedAddresses].sort().join(',');

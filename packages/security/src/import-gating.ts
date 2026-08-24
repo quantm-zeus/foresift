@@ -65,6 +65,13 @@ export const DEFAULT_IMPORT_LIMITS: ImportLimits = {
 
 export interface TrustedProducer {
   readonly keyId: string;
+  /**
+   * The producer's public key in PEM (or JWK) form — the material handed to
+   * the injected verifier (M9). Carrying it HERE means a real verifier needs
+   * no out-of-band key store and can never be silently wired against a
+   * placeholder string.
+   */
+  readonly publicKeyPem: string;
   /** Trust anchor expiry — stale producer keys refuse. */
   readonly expiresAt: UtcTimestamp;
   readonly revokedAt?: UtcTimestamp | undefined;
@@ -184,22 +191,37 @@ export class ImportGate {
     }
 
     const manifestHash = sha256Text(request.manifestCanonicalJson);
-    await this.engine.query(
-      `INSERT INTO sec.import_artifacts
-         (artifact_id, manifest_sha256, producer_key_id, format, byte_size,
-          state, state_rank, prior_state_rank, step_up_approval_ref,
-          received_at, state_changed_at)
-       VALUES ($1,$2,$3,$4,$5,'RECEIVED',0,-1,$6,$7,$7)`,
-      [
-        request.artifactId,
-        manifestHash,
-        request.producerKeyId,
-        request.format,
-        request.byteSize,
-        request.stepUpApprovalRef,
-        receivedAt,
-      ],
-    );
+    try {
+      await this.engine.query(
+        `INSERT INTO sec.import_artifacts
+           (artifact_id, manifest_sha256, producer_key_id, format, byte_size,
+            state, state_rank, prior_state_rank, step_up_approval_ref,
+            received_at, state_changed_at)
+         VALUES ($1,$2,$3,$4,$5,'RECEIVED',0,-1,$6,$7,$7)`,
+        [
+          request.artifactId,
+          manifestHash,
+          request.producerKeyId,
+          request.format,
+          request.byteSize,
+          request.stepUpApprovalRef,
+          receivedAt,
+        ],
+      );
+    } catch (error) {
+      // Duplicate artifact IDs surface as a TYPED refusal (L4), never as a
+      // raw driver error escaping intake.
+      const code = (error as { code?: string } | null)?.code;
+      const message = error instanceof Error ? error.message : String(error);
+      if (code === '23505' || /duplicate key/i.test(message)) {
+        throw new ImportGatingError(
+          `artifact '${request.artifactId}' was already received`,
+          { artifactId: request.artifactId },
+          SecErrorCode.SEC_IMPORT_FORMAT_REFUSED,
+        );
+      }
+      throw error;
+    }
     return this.getArtifact(request.artifactId);
   }
 
@@ -240,11 +262,7 @@ export class ImportGate {
         SecErrorCode.SEC_IMPORT_HASH_MISMATCH,
       );
     }
-    const valid = await this.verifier(
-      input.materialBytes,
-      input.signature,
-      `public-key:${producer.keyId}`,
-    );
+    const valid = await this.verifier(input.materialBytes, input.signature, producer.publicKeyPem);
     if (!valid) {
       throw new ImportGatingError(
         'producer signature verification failed',

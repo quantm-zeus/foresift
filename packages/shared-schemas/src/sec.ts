@@ -533,7 +533,7 @@ export const SecurityIncidentRecordSchema = z
     resolvedAt: UtcTimestampSchema.nullish(),
   })
   .strict()
-  .refine((v) => !(v.containment === 'RESOLVED') || v.resolvedAt !== null, {
+  .refine((v) => !(v.containment === 'RESOLVED') || (v.resolvedAt ?? null) !== null, {
     message: 'a RESOLVED incident records its resolution instant',
   });
 

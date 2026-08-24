@@ -72,11 +72,16 @@ export class RowScope {
       );
     }
     if (!isolationActive(this.context) && allowUnscoped) {
-      const sql = `SELECT * FROM ${table}${where.length > 0 ? ` WHERE ${where.join(' AND ')}` : ''}`;
+      const sql = `SELECT * FROM ${table}${
+        where.length > 0 ? ` WHERE ${where.map((clause) => `(${clause})`).join(' AND ')}` : ''
+      }`;
       return { sql, scoped: false };
     }
     const predicate = this.tenantPredicate(options.existingParamCount ?? 0);
-    const clauses = [predicate.sql, ...where];
+    // Each caller clause is parenthesized before the AND join (L8): a clause
+    // containing a top-level OR must never flip precedence past the tenant
+    // predicate.
+    const clauses = [predicate.sql, ...where.map((clause) => `(${clause})`)];
     return {
       sql: `SELECT * FROM ${table} WHERE ${clauses.join(' AND ')}`,
       scoped: true,

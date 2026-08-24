@@ -82,7 +82,10 @@ export class OAuthBindingGuard {
         SecErrorCode.SEC_OAUTH_AUDIENCE_MISMATCH,
       );
     }
-    if (Date.parse(binding.expiresAt) <= this.clock()) {
+    // A non-parseable instant must not pass as "never expires" — NaN
+    // comparisons are false, so finiteness is checked explicitly.
+    const expiresMs = Date.parse(binding.expiresAt);
+    if (!Number.isFinite(expiresMs) || expiresMs <= this.clock()) {
       throw new OAuthBindingError(
         'token binding has expired',
         { expiresAt: binding.expiresAt },
@@ -104,14 +107,25 @@ export class OAuthBindingGuard {
    * Upstream-token passthrough refusal: a token minted by an upstream
    * provider (Anthropic/Slack/GitHub …) must never be presented as THIS
    * system's own MCP credential.
+   *
+   * Fail-closed (M7): positive evidence of LOCAL issuance is REQUIRED. A
+   * presentation carrying no issuer evidence at all is refused — absence of
+   * proof of upstream issuance is not proof of local issuance.
    */
   refuseUpstreamPassthrough(presentation: {
     readonly isUpstreamIssued?: boolean | undefined;
     readonly upstreamIssuer?: string | undefined;
+    /** The issuer claimed for the presented token (from its metadata). */
+    readonly claimedIssuer?: string | undefined;
+    /** The ONLY issuer this deployment accepts as local. */
+    readonly expectedLocalIssuer: string;
   }): void {
+    const claimed = presentation.claimedIssuer?.trim() ?? '';
     if (
       presentation.isUpstreamIssued === true ||
-      (presentation.upstreamIssuer !== undefined && presentation.upstreamIssuer !== '')
+      (presentation.upstreamIssuer !== undefined && presentation.upstreamIssuer !== '') ||
+      claimed === '' ||
+      claimed !== presentation.expectedLocalIssuer
     ) {
       throw new OAuthBindingError(
         'upstream provider tokens are refused as MCP credential material',

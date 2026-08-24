@@ -64,6 +64,13 @@ CREATE TRIGGER sec_audit_events_append_only
     BEFORE UPDATE OR DELETE ON sec.sec_audit_events
     FOR EACH ROW EXECUTE FUNCTION sec.refuse_mutation();
 
+-- Row-level triggers do not fire on TRUNCATE; refuse it statement-wise too
+-- (same rule as g0_data_0002) so a DDL-capable role cannot wipe a young chain
+-- without residue.
+CREATE TRIGGER sec_audit_events_immutable_truncate
+    BEFORE TRUNCATE ON sec.sec_audit_events
+    FOR EACH STATEMENT EXECUTE FUNCTION sec.refuse_mutation();
+
 CREATE TABLE sec.sec_audit_checkpoints (
     checkpoint_id        text PRIMARY KEY,
     from_seq             bigint NOT NULL REFERENCES sec.sec_audit_events(seq),
@@ -82,6 +89,10 @@ CREATE TABLE sec.sec_audit_checkpoints (
 CREATE TRIGGER sec_audit_checkpoints_append_only
     BEFORE UPDATE OR DELETE ON sec.sec_audit_checkpoints
     FOR EACH ROW EXECUTE FUNCTION sec.refuse_mutation();
+
+CREATE TRIGGER sec_audit_checkpoints_immutable_truncate
+    BEFORE TRUNCATE ON sec.sec_audit_checkpoints
+    FOR EACH STATEMENT EXECUTE FUNCTION sec.refuse_mutation();
 
 CREATE TABLE sec.sec_audit_verify_runs (
     run_id               text PRIMARY KEY,

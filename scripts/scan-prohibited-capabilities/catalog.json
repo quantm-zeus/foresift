@@ -60,12 +60,12 @@
         {
           "id": "tx-send",
           "regex": "\\b(sendTransaction|sendRawTransaction|submitTransaction|broadcastTransaction)\\s*\\(",
-          "flags": ""
+          "flags": "i"
         },
         {
           "id": "tx-versioned",
           "regex": "\\bVersionedTransaction\\b|\\bTransaction\\.from\\b",
-          "flags": ""
+          "flags": "i"
         }
       ],
       "dependencyPatterns": ["^@solana/web3\\.js$", "^web3$", "^ethers$"],
@@ -106,7 +106,7 @@
         {
           "id": "cw-create",
           "regex": "\\b(createWallet|importWallet|newWallet|walletFromSeed|generateWallet)\\s*\\(",
-          "flags": ""
+          "flags": "i"
         },
         {
           "id": "cw-manage",

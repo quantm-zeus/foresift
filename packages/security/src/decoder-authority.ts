@@ -54,6 +54,19 @@ export function validateDecoderAuthority(config: DecodingPathConfig): {
       SecErrorCode.SEC_DECODER_AUTHORITY_INVALID,
     );
   }
+  // Operator acknowledgement (M22/L21): running a DEPRECATED parser demands
+  // an explicit, recorded acknowledgement of THAT parser — the parameter is
+  // enforced, not decorative.
+  const unacknowledged = config.decoders
+    .filter((d) => d.status === 'DEPRECATED' && !config.acknowledgedDeprecations?.includes(d.id))
+    .map((d) => d.id);
+  if (unacknowledged.length > 0) {
+    throw new ProhibitedCapabilityError(
+      'deprecated decoders run without explicit operator acknowledgement',
+      { unacknowledged: unacknowledged.join(',') },
+      SecErrorCode.SEC_DECODER_AUTHORITY_INVALID,
+    );
+  }
   const authoritativeDecoderIds = config.decoders
     .filter((d) => d.authority === 'SOLE' || d.authority === 'PRIMARY')
     .map((d) => d.id);

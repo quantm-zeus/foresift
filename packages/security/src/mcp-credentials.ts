@@ -93,6 +93,12 @@ export class McpCredentialStore {
   private readonly entropy: EntropySource;
   /** Injected clock (epoch ms) for expiry checks — policy stays testable. */
   private readonly clock: () => number;
+  /**
+   * M14: production wiring (the mcp-surface package) MUST enable this so
+   * every presentation carries sourceIp, origin, AND requestedScopes — a
+   * wiring bug then refuses loudly instead of silently skipping checks.
+   */
+  private readonly strictPresentation: boolean;
 
   constructor(options: {
     engine: import('@foresift/persistence').DatabaseEngine;
@@ -100,11 +106,14 @@ export class McpCredentialStore {
     pepper: string;
     entropy?: EntropySource | undefined;
     clock?: (() => number) | undefined;
+    /** Require complete presentations on every authenticate call. */
+    readonly strictPresentation?: boolean | undefined;
   }) {
     this.engine = options.engine;
     this.pepper = options.pepper;
     this.entropy = options.entropy ?? DEFAULT_ENTROPY;
     this.clock = options.clock ?? Date.now.bind(globalThis.Date);
+    this.strictPresentation = options.strictPresentation ?? false;
   }
 
   /**
@@ -170,6 +179,12 @@ export class McpCredentialStore {
    * Validate presented material against EVERY recorded dimension:
    * existence, revocation, expiry, IP constraints, origin policy binding,
    * and requested-scope coverage.
+   *
+   * Fail-closed asymmetry fix (M14): a credential that RECORDS a constraint
+   * can never be admitted because the caller WITHHELD the evidence needed to
+   * check it — constrained field + absent evidence refuses. Unconstrained
+   * credentials remain admissible without those fields. Strict mode
+   * additionally requires every presentation dimension explicitly.
    */
   async authenticate(input: AuthenticateInput): Promise<CredentialRow> {
     const row = await this.rowForSecret(input.presentedSecret);
@@ -187,27 +202,36 @@ export class McpCredentialStore {
         SecErrorCode.SEC_CREDENTIAL_EXPIRED,
       );
     }
-    if (
-      input.sourceIp !== undefined &&
-      row.ip_constraints.length > 0 &&
-      !row.ip_constraints.includes(input.sourceIp)
-    ) {
-      throw new CredentialError(
-        'source address is outside the credential IP constraints',
-        { credentialId: row.credential_id },
-        SecErrorCode.SEC_CREDENTIAL_ORIGIN_MISMATCH,
-      );
+    if (this.strictPresentation) {
+      const complete =
+        input.sourceIp !== undefined &&
+        input.origin !== undefined &&
+        input.requestedScopes !== undefined;
+      if (!complete) {
+        throw new CredentialError(
+          'strict presentation requires sourceIp, origin, and requestedScopes',
+          { credentialId: row.credential_id },
+          SecErrorCode.SEC_CREDENTIAL_ORIGIN_MISMATCH,
+        );
+      }
     }
-    if (
-      input.origin !== undefined &&
-      row.origin_policy_ref !== '' &&
-      input.origin !== row.origin_policy_ref
-    ) {
-      throw new CredentialError(
-        'origin does not match the credential policy binding',
-        { credentialId: row.credential_id },
-        SecErrorCode.SEC_CREDENTIAL_ORIGIN_MISMATCH,
-      );
+    if (row.ip_constraints.length > 0) {
+      if (input.sourceIp === undefined || !row.ip_constraints.includes(input.sourceIp)) {
+        throw new CredentialError(
+          'source address is outside the credential IP constraints',
+          { credentialId: row.credential_id },
+          SecErrorCode.SEC_CREDENTIAL_ORIGIN_MISMATCH,
+        );
+      }
+    }
+    if (row.origin_policy_ref !== '') {
+      if (input.origin === undefined || input.origin !== row.origin_policy_ref) {
+        throw new CredentialError(
+          'origin does not match the credential policy binding',
+          { credentialId: row.credential_id },
+          SecErrorCode.SEC_CREDENTIAL_ORIGIN_MISMATCH,
+        );
+      }
     }
     if (input.requestedScopes !== undefined) {
       const exceeded = input.requestedScopes.filter((s) => !row.scopes.includes(s));

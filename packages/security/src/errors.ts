@@ -4,10 +4,15 @@
  * stable machine codes so callers and telemetry branch on `code`, never on
  * prose. Values never change once released; new refusals add new codes.
  *
- * These live beside — not inside — `@foresift/domain`'s ErrorCode because that
- * file is outside this package's binding write scopes; the domain generic
- * (`CONTRACT_INVARIANT_VIOLATED`) remains available for cross-cutting cases,
- * and `ForesiftError` itself is still the base class of every refusal here.
+ * Relationship to `@foresift/domain`: these classes live beside — not
+ * inside — the domain ErrorCode because that file is outside this package's
+ * binding write scopes. They MIRROR the domain `ForesiftError` SHAPE
+ * (code/detail/message contract) rather than extending it: narrowing
+ * `code` from `ErrorCode` down to `SecErrorCode` in a subclass is not type-
+ * sound without widening the domain base class itself. Callers narrow with
+ * {@link isForesiftSecurityError}. Reconciling runtime inheritance (domain
+ * base gaining `ErrorCode | string` typing) is a recorded follow-up task,
+ * deliberately NOT silently forced with lying casts.
  */
 
 /** Stable machine-readable security error codes (values never change). */
@@ -146,26 +151,42 @@ export type SecErrorDetail = Readonly<Record<string, string | number | boolean |
 function secSubclass(
   name: string,
   defaultCode: SecErrorCode,
-): new (message: string, detail?: SecErrorDetail, code?: SecErrorCode) => ForesiftSecurityError {
+): new (
+  message: string,
+  detail?: SecErrorDetail,
+  code?: SecErrorCode,
+  options?: ErrorOptions,
+) => ForesiftSecurityError {
   return class extends ForesiftSecurityError {
-    constructor(message: string, detail: SecErrorDetail = {}, code: SecErrorCode = defaultCode) {
-      super(code, message, detail);
+    constructor(
+      message: string,
+      detail: SecErrorDetail = {},
+      code: SecErrorCode = defaultCode,
+      options?: ErrorOptions,
+    ) {
+      super(code, message, detail, options);
       this.name = name;
     }
   };
 }
 
 /**
- * Base class for every security-perimeter refusal. Extends the domain
- * `ForesiftError` so repository-wide handling keeps working while callers can
- * additionally narrow on `SecErrorCode` values.
+ * Base class for every security-perimeter refusal. Mirrors the domain
+ * `ForesiftError` shape (see the file header for why it does not extend it)
+ * while callers additionally narrow on `SecErrorCode` values. Carries the
+ * ES `cause` chain like every repository error class.
  */
 export class ForesiftSecurityError extends Error {
   readonly code: SecErrorCode | string;
   readonly detail: SecErrorDetail;
 
-  constructor(code: SecErrorCode | string, message: string, detail: SecErrorDetail = {}) {
-    super(`${code}: ${message}`);
+  constructor(
+    code: SecErrorCode | string,
+    message: string,
+    detail: SecErrorDetail = {},
+    options?: ErrorOptions,
+  ) {
+    super(`${code}: ${message}`, options);
     this.name = 'ForesiftSecurityError';
     this.code = code;
     this.detail = detail;

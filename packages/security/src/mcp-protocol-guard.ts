@@ -78,14 +78,24 @@ export class McpProtocolGuard {
       return refuse('CONTENT_TYPE_INVALID');
     }
     // JSON-RPC over HTTP travels in POST bodies; GET/PUT/etc. are refused.
-    if (input.method !== undefined && input.method.toUpperCase() !== 'POST') {
+    // An ABSENT method is an unverifiable transport shape — also refused
+    // (M17): omission may never skip a dimension of the guard.
+    if (input.method === undefined || input.method.toUpperCase() !== 'POST') {
       return refuse('METHOD_INVALID');
     }
+    // An absent byte count cannot be checked against the cap — refused, not
+    // skipped (fail-closed symmetry with every other dimension).
     if (
-      input.messageBytes !== undefined &&
-      (input.messageBytes > this.maxMessageBytes || input.messageBytes < 0)
+      input.messageBytes === undefined ||
+      input.messageBytes > this.maxMessageBytes ||
+      input.messageBytes < 0
     ) {
       return refuse('MESSAGE_OVERSIZE');
+    }
+    // Claims presented without a session to verify against cannot be bound —
+    // refusing beats silently skipping the binding check.
+    if (input.requestClaims !== undefined && input.session === undefined) {
+      return refuse('SESSION_BINDING_INVALID');
     }
     if (input.requestClaims !== undefined && input.session !== undefined) {
       const { requestClaims, session } = input;

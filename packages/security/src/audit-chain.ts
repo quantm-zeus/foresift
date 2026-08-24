@@ -27,6 +27,7 @@
  * couples failure to opening the critical incident (§35.9 block rule).
  */
 import { canonicalJson, sha256Text } from '@foresift/persistence';
+import { randomUUID } from 'node:crypto';
 import type { ObjectStoreAdapter } from '@foresift/object-store';
 import {
   AuditEventRecordSchema,
@@ -272,14 +273,56 @@ export class AuditChain {
   /**
    * Continuous verification over [fromSeq?, toSeq?] (default: everything).
    * Records the run in sec_audit_verify_runs and returns the outcome.
+   *
+   * Fail-closed rules (M2): an EXPLICIT range containing no rows is a GAP;
+   * a full-range request over an EMPTY chain is also a GAP — an unexamined
+   * or wiped chain never reports health; inverted/non-integer arguments are
+   * input errors refused before any query. The recorded run names the ACTUAL
+   * walked bounds, never fabricated provenance.
    */
   async verifyRange(fromSeq?: number, toSeq?: number): Promise<VerifyOutcome> {
+    if (
+      (fromSeq !== undefined && (!Number.isInteger(fromSeq) || fromSeq < 1)) ||
+      (toSeq !== undefined && (!Number.isInteger(toSeq) || toSeq < 1))
+    ) {
+      throw new AuditChainError('verify range must be positive integers', {
+        fromSeq: fromSeq ?? -1,
+        toSeq: toSeq ?? -1,
+      });
+    }
+    if (fromSeq !== undefined && toSeq !== undefined && fromSeq > toSeq) {
+      throw new AuditChainError('verify range must be ascending', { fromSeq, toSeq });
+    }
     const outcome = this.engine.transaction(async (tx) => {
       const bounds = await tx.query<{ min: string | null; max: string | null }>(
         'SELECT min(seq)::text AS min, max(seq)::text AS max FROM sec.sec_audit_events',
       );
-      const lo = fromSeq ?? Number(bounds.rows[0]?.min ?? '1');
-      const hi = toSeq ?? Number(bounds.rows[0]?.max ?? '0');
+      const chainMin = bounds.rows[0]?.min === null ? undefined : Number(bounds.rows[0]?.min);
+      const chainMax = bounds.rows[0]?.max === null ? undefined : Number(bounds.rows[0]?.max);
+      // Full-range request over an empty chain: nothing was verifiable — GAP,
+      // never OK (a wiped chain must not attest its own health).
+      if (chainMin === undefined || chainMax === undefined) {
+        return {
+          verdict: 'FAILED' as const,
+          kind: 'GAP' as const,
+          firstDivergenceSeq: fromSeq ?? 1,
+          walkedLo: fromSeq ?? 1,
+          walkedHi: toSeq ?? 1,
+        };
+      }
+      const lo = fromSeq ?? chainMin;
+      const hi = toSeq ?? chainMax;
+      // A window past the end of the chain (partial explicit args) verifies
+      // nothing — an unexamined span is a GAP, never OK.
+      if (lo > hi) {
+        return {
+          verdict: 'FAILED' as const,
+          kind: 'GAP' as const,
+          firstDivergenceSeq: lo,
+          walkedLo: lo,
+          walkedHi: lo,
+        };
+      }
       const rows = await tx.query<{
         seq: string;
         payload_canonical: string;
@@ -291,16 +334,18 @@ export class AuditChain {
          FROM sec.sec_audit_events WHERE seq BETWEEN $1 AND $2 ORDER BY seq`,
         [lo, hi],
       );
-      return classifyRange(tx, lo, hi, rows.rows.map(rowToChainEntry));
+      const classification = await classifyRange(tx, lo, hi, rows.rows.map(rowToChainEntry));
+      return { ...classification, walkedLo: lo, walkedHi: hi };
     });
 
-    const { verdict, kind, firstDivergenceSeq } = await outcome;
+    const { verdict, kind, firstDivergenceSeq, walkedLo, walkedHi } = await outcome;
     const ranAt = new Date().toISOString().replace('.000Z', 'Z') as UtcTimestamp;
-    const runId = `vr-${globalThis.crypto.randomUUID?.() ?? Math.random().toString(36).slice(2)}`;
+    // House style: randomUUID from node:crypto — no Math.random downgrade path.
+    const runId = `vr-${randomUUID()}`;
     const record: AuditVerifyRunRecord = {
       runId,
-      verifiedFromSeq: fromSeq ?? 0,
-      verifiedToSeq: toSeq ?? 0,
+      verifiedFromSeq: walkedLo,
+      verifiedToSeq: Math.max(walkedHi, walkedLo),
       verdict,
       firstDivergenceSeq: firstDivergenceSeq ?? null,
       divergenceKind: kind ?? null,
@@ -385,7 +430,10 @@ async function classifyRange(
     return { verdict: 'FAILED', kind: 'GAP', firstDivergenceSeq: lo };
   }
   const knownHashes = new Set(entries.map((e) => e.entryHash));
-  let expectedSeq = entries.length > 0 ? entries[0]!.seq : lo;
+  // Positional expectation starts at the REQUESTED window start — so a
+  // leading-edge deletion inside an explicit range surfaces as a seq
+  // discontinuity (DELETION), not as a confusing hash-link verdict.
+  let expectedSeq = lo;
   let prevHash = 'GENESIS';
   for (let i = 0; i < entries.length; i += 1) {
     const entry = entries[i]!;
@@ -395,7 +443,13 @@ async function classifyRange(
         'SELECT entry_hash FROM sec.sec_audit_events WHERE seq = $1',
         [lo - 1],
       );
-      prevHash = priorRow.rows[0]?.entry_hash ?? 'GENESIS';
+      const prior = priorRow.rows[0];
+      if (prior === undefined) {
+        // The earliest present entry's predecessor is itself missing — that
+        // is a DELETION at the window edge, not a broken hash link.
+        return { verdict: 'FAILED', kind: 'DELETION', firstDivergenceSeq: lo - 1 };
+      }
+      prevHash = prior.entry_hash;
     }
     if (entry.seq !== expectedSeq) {
       return { verdict: 'FAILED', kind: 'DELETION', firstDivergenceSeq: expectedSeq };

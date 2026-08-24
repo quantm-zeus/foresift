@@ -85,9 +85,9 @@ export class Incidents {
   }
 
   async open(input: OpenIncidentInput) {
-    if (input.evidenceRefs.length === 0) {
+    if (input.evidenceRefs.length === 0 || input.evidenceRefs.some((r) => r.trim() === '')) {
       throw new IncidentError(
-        'an incident requires at least one evidence reference',
+        'an incident requires at least one non-empty evidence reference',
         {},
         SecErrorCode.SEC_INCIDENT_EVIDENCE_REQUIRED,
       );
@@ -155,29 +155,59 @@ export class Incidents {
           SecErrorCode.SEC_INCIDENT_EVIDENCE_REQUIRED,
         );
       }
+      // CAS enforcement (M10): the UPDATE only lands while SQL truth still
+      // says `containment = from`. A concurrent transition therefore can
+      // never REGRESS containment (e.g. write CONTAINED over RESOLVED).
       const updated = await this.engine.query<IncidentRow>(
         `UPDATE sec.security_incidents SET containment = 'RESOLVED', resolved_at = $2,
            recovery_verified_at = $3, postmortem_ref = $4, regression_test_ref = $5
-         WHERE incident_id = $1 RETURNING *`,
-        [incidentId, opts.at, opts.recoveryVerifiedAt, opts.postmortemRef, opts.regressionTestRef],
+         WHERE incident_id = $1 AND containment = $6 RETURNING *`,
+        [
+          incidentId,
+          opts.at,
+          opts.recoveryVerifiedAt,
+          opts.postmortemRef,
+          opts.regressionTestRef,
+          row.containment,
+        ],
       );
+      if (updated.rows.length !== 1) {
+        throw racedTransition(row.containment, next, incidentId);
+      }
       return rowToRecord(updated.rows[0] as IncidentRow);
     }
     const updated = await this.engine.query<IncidentRow>(
-      `UPDATE sec.security_incidents SET containment = $2 WHERE incident_id = $1 RETURNING *`,
-      [incidentId, next],
+      `UPDATE sec.security_incidents SET containment = $2
+       WHERE incident_id = $1 AND containment = $3 RETURNING *`,
+      [incidentId, next, row.containment],
     );
+    if (updated.rows.length !== 1) {
+      throw racedTransition(row.containment, next, incidentId);
+    }
     return rowToRecord(updated.rows[0] as IncidentRow);
   }
 
-  /** Append further evidence references to an open incident (preservation). */
+  /**
+   * Append further evidence references to an open incident (preservation).
+   * Fail-closed (M21): evidence for an UNKNOWN incident is never silently
+   * dropped — during incident response "evidence recorded" must be TRUE.
+   */
   async attachEvidence(incidentId: string, refs: readonly string[]) {
-    if (refs.length === 0) return;
-    await this.engine.query(
+    if (refs.length === 0 || refs.some((r) => r.trim() === '')) {
+      throw new IncidentError(
+        'evidence attachment requires at least one non-empty reference',
+        { incidentId },
+        SecErrorCode.SEC_INCIDENT_EVIDENCE_REQUIRED,
+      );
+    }
+    const updated = await this.engine.query<{ incident_id: string }>(
       `UPDATE sec.security_incidents SET evidence_refs = evidence_refs || $2::jsonb
-       WHERE incident_id = $1`,
+       WHERE incident_id = $1 RETURNING incident_id`,
       [incidentId, JSON.stringify(refs)],
     );
+    if (updated.rows.length !== 1) {
+      throw new IncidentError(`incident ${incidentId} not found`, { incidentId });
+    }
   }
 
   /**
@@ -212,4 +242,17 @@ const RANK: Record<IncidentContainmentState, number> = {
 
 function isAdvancement(from: IncidentContainmentState, to: IncidentContainmentState): boolean {
   return RANK[to] === RANK[from] + 1;
+}
+
+/** Typed refusal for a CAS race on the containment column (M10). */
+function racedTransition(
+  from: string,
+  to: IncidentContainmentState,
+  incidentId: string,
+): IncidentError {
+  return new IncidentError(
+    `concurrent transition raced: ${from} -> ${to} was no longer legal`,
+    { incidentId, from, to },
+    SecErrorCode.SEC_INCIDENT_STATE_TRANSITION_INVALID,
+  );
 }

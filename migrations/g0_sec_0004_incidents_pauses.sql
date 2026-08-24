@@ -78,3 +78,9 @@ CREATE TABLE sec.activation_events (
 CREATE TRIGGER activation_events_append_only
     BEFORE UPDATE OR DELETE ON sec.activation_events
     FOR EACH ROW EXECUTE FUNCTION sec.refuse_mutation();
+
+-- Row-level triggers do not fire on TRUNCATE; refuse it statement-wise too,
+-- so the activation ledger cannot be wiped without residue.
+CREATE TRIGGER activation_events_immutable_truncate
+    BEFORE TRUNCATE ON sec.activation_events
+    FOR EACH STATEMENT EXECUTE FUNCTION sec.refuse_mutation();

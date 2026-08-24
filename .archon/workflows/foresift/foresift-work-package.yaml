@@ -94,6 +94,13 @@ nodes:
       nodes:
         - id: scoped-plan-iterate
           command: foresift-wp-plan
+          # Defect #10: provider empty-stream failures are UNKNOWN-classified
+          # and never retried by default; explicit on_error: all retries them
+          # (FATAL patterns still take priority).
+          retry:
+            max_attempts: 3
+            delay_ms: 10000
+            on_error: all
           effort: high
           idle_timeout: 1800000
         - id: plan-recheck
@@ -139,6 +146,13 @@ nodes:
       nodes:
         - id: implement-iterate
           command: foresift-wp-implement
+          # Defect #10: provider empty-stream failures are UNKNOWN-classified
+          # and never retried by default; explicit on_error: all retries them
+          # (FATAL patterns still take priority).
+          retry:
+            max_attempts: 3
+            delay_ms: 10000
+            on_error: all
           effort: high
           idle_timeout: 1800000
         - id: impl-recheck
@@ -191,6 +205,13 @@ nodes:
       nodes:
         - id: gate-repair
           command: foresift-wp-gate-repair
+          # Defect #10: provider empty-stream failures are UNKNOWN-classified
+          # and never retried by default; explicit on_error: all retries them
+          # (FATAL patterns still take priority).
+          retry:
+            max_attempts: 3
+            delay_ms: 10000
+            on_error: all
           effort: high
           idle_timeout: 1800000
         - id: gate-rerun
@@ -211,6 +232,12 @@ nodes:
   # ── PHASE 4: PULL REQUEST ──────────────────────────────────────────────────
   - id: create-pr
     command: foresift-wp-create-pr
+    # Defect #10: provider-backed landing/PR nodes need explicit retries
+    # (empty-stream UNKNOWN classification is unretried by default).
+    retry:
+      max_attempts: 3
+      delay_ms: 10000
+      on_error: all
     depends_on: [gate-router, gate-repair-loop]
     trigger_rule: none_failed_min_one_success   # gate-router always completes; repair loop may be skipped
     context: fresh
@@ -240,6 +267,13 @@ nodes:
       nodes:
         - id: converge
           command: foresift-wp-converge
+          # Defect #10: provider empty-stream failures are UNKNOWN-classified
+          # and never retried by default; explicit on_error: all retries them
+          # (FATAL patterns still take priority).
+          retry:
+            max_attempts: 3
+            delay_ms: 10000
+            on_error: all
           effort: high
           idle_timeout: 1800000
         - id: gate-iter
@@ -250,6 +284,13 @@ nodes:
           depends_on: [converge]
           timeout: 1800000
         - id: judge
+          # Defect #10: provider empty-stream failures are UNKNOWN-classified
+          # and never retried by default; explicit on_error: all retries them
+          # (FATAL patterns still take priority).
+          retry:
+            max_attempts: 3
+            delay_ms: 10000
+            on_error: all
           prompt: |
             You are the independent convergence judge for Foresift work package
             "$ARGUMENTS". You have read-only intent: verify claims, never fix code.
@@ -276,6 +317,12 @@ nodes:
   # ── PHASE 7: FINAL DETERMINISTIC GATE + EXACT-HEAD CI + MERGE ──────────────
   - id: ci-merge
     command: foresift-wp-ci-merge
+    # Defect #10: provider-backed landing/PR nodes need explicit retries
+    # (empty-stream UNKNOWN classification is unretried by default).
+    retry:
+      max_attempts: 3
+      delay_ms: 10000
+      on_error: all
     depends_on: [convergence]
     context: fresh
     idle_timeout: 1800000

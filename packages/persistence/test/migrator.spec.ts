@@ -2,21 +2,26 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { PGlite } from '@electric-sql/pglite';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { mkdir, rm, writeFile } from 'node:fs/promises';
 import {
   appliedMigrations,
   applyMigrations,
+  clearMigrationLeases,
   createEngine,
   discoverMigrations,
   PRECISION_RETAINING_TIMESTAMP_PARSERS,
+  SCHEMA_MIGRATION_LEASES_TABLE,
+  SCHEMA_MIGRATIONS_TABLE,
   type DatabaseEngine,
 } from '../src/index.ts';
+import { ErrorCode, ForesiftError } from '@foresift/domain';
 
 const MIGRATIONS_DIR = path.resolve(
   path.dirname(fileURLToPath(import.meta.url)),
   '../../../migrations',
 );
 
-describe('migration suite shape (T015–T019, +AC-243 probe assignments)', () => {
+describe('migration suite shape (+AC-243 probe assignments)', () => {
   it('discovers exactly the G0 scripts in lexicographic order', async () => {
     const migrations = await discoverMigrations(MIGRATIONS_DIR);
     expect(migrations.map((m) => m.id)).toEqual([
@@ -117,7 +122,7 @@ describe('applyMigrations (FR-DATA-001…006, FR-DR-001/002 foundation)', () => 
   });
 });
 
-describe('failure isolation (T021)', () => {
+describe('failure isolation', () => {
   it(
     'a failing script aborts cleanly leaving prior recorded state intact',
     { timeout: 120_000 },
@@ -170,6 +175,273 @@ describe('failure isolation (T021)', () => {
       }
     },
   );
+});
+
+describe('migrator fail-closed defenses (FR-DATA-001…006 / FR-DR-001/002 substrate)', () => {
+  const dirBase = path.dirname(fileURLToPath(import.meta.url));
+
+  async function makeSandbox(name: string): Promise<string> {
+    const sandbox = path.join(dirBase, `.tmp-${name}`);
+    await rm(sandbox, { recursive: true, force: true });
+    await mkdir(sandbox, { recursive: true });
+    return sandbox;
+  }
+
+  async function freshEngine(): Promise<{ db: PGlite; engine: DatabaseEngine }> {
+    const db = new PGlite({ parsers: PRECISION_RETAINING_TIMESTAMP_PARSERS });
+    return { db, engine: createEngine(db, 'pglite') };
+  }
+
+  async function expectCode(promise: Promise<unknown>, code: ErrorCode): Promise<ForesiftError> {
+    let caught: unknown;
+    try {
+      await promise;
+    } catch (error) {
+      caught = error;
+    }
+    expect(caught).toBeInstanceOf(ForesiftError);
+    const foresiftError = caught as ForesiftError;
+    expect(foresiftError.code).toBe(code);
+    return foresiftError;
+  }
+
+  it(
+    'refuses .sql files matching no known family instead of silently ignoring them',
+    { timeout: 120_000 },
+    async () => {
+      const { db, engine } = await freshEngine();
+      try {
+        const sandbox = await makeSandbox('unknown-family');
+        await writeFile(
+          path.join(sandbox, 'g0_data_0001_identity.sql'),
+          await readFileAsync(path.join(MIGRATIONS_DIR, 'g0_data_0001_identity.sql')),
+        );
+        await writeFile(path.join(sandbox, 'legacy_v1_setup.sql'), 'CREATE TABLE legacy (id text);');
+
+        const error = await expectCode(
+          applyMigrations({ engine, migrationsDir: sandbox }),
+          ErrorCode.MIGRATION_FILENAME_UNKNOWN,
+        );
+        expect(error.message).toContain('legacy_v1_setup.sql');
+        // Nothing was applied and nothing recorded — refusal precedes any write.
+        expect(await appliedMigrations(engine)).toEqual([]);
+
+        // A non-.sql entry (e.g. a README) is not SQL truth and stays ignorable.
+        await rm(path.join(sandbox, 'legacy_v1_setup.sql'));
+        await writeFile(path.join(sandbox, 'README.md'), 'notes');
+        const report = await applyMigrations({ engine, migrationsDir: sandbox });
+        expect(report.applied).toEqual(['g0_data_0001_identity']);
+      } finally {
+        await db.close();
+      }
+    },
+  );
+
+  it(
+    'applies future-generation g1_* scripts in lexicographic order (never silently dropped)',
+    { timeout: 120_000 },
+    async () => {
+      const { db, engine } = await freshEngine();
+      try {
+        const sandbox = await makeSandbox('g1-support');
+        await writeFile(
+          path.join(sandbox, 'g0_data_0001_identity.sql'),
+          await readFileAsync(path.join(MIGRATIONS_DIR, 'g0_data_0001_identity.sql')),
+        );
+        await writeFile(path.join(sandbox, 'g1_dr_0009_future_family.sql'), 'CREATE TABLE g1_future (id text);');
+
+        const report = await applyMigrations({ engine, migrationsDir: sandbox });
+        expect(report.applied).toEqual(['g0_data_0001_identity', 'g1_dr_0009_future_family']);
+        const tables = await engine.query("SELECT to_regclass('g1_future') AS t");
+        expect(tables.rows[0]?.t).toBe('g1_future');
+      } finally {
+        await db.close();
+        await rm(path.join(dirBase, '.tmp-g1-support'), { recursive: true, force: true });
+      }
+    },
+  );
+
+  it(
+    'refuses when a recorded migration id has no file on disk',
+    { timeout: 120_000 },
+    async () => {
+      const { db, engine } = await freshEngine();
+      try {
+        const sandbox = await makeSandbox('missing-file');
+        const good = await readFileAsync(path.join(MIGRATIONS_DIR, 'g0_data_0001_identity.sql'));
+        await writeFile(path.join(sandbox, 'g0_data_0001_identity.sql'), good);
+        await applyMigrations({ engine, migrationsDir: sandbox });
+
+        // The applied script disappears from disk; a different id appears.
+        await rm(path.join(sandbox, 'g0_data_0001_identity.sql'));
+        await writeFile(path.join(sandbox, 'g0_data_0002_replacement.sql'), 'CREATE TABLE r (id text);');
+
+        const error = await expectCode(
+          applyMigrations({ engine, migrationsDir: sandbox }),
+          ErrorCode.MIGRATION_FILE_MISSING,
+        );
+        expect(error.message).toContain('g0_data_0001_identity');
+        // Recorded history is untouched by the refusal.
+        expect((await appliedMigrations(engine)).map((m) => m.id)).toEqual([
+          'g0_data_0001_identity',
+        ]);
+      } finally {
+        await db.close();
+        await rm(path.join(dirBase, '.tmp-missing-file'), { recursive: true, force: true });
+      }
+    },
+  );
+
+  it(
+    'refuses a new migration sorting behind already-applied state (out of order)',
+    { timeout: 120_000 },
+    async () => {
+      const { db, engine } = await freshEngine();
+      try {
+        // Establish a database whose ONLY applied migration is 0002.
+        const first = await makeSandbox('out-of-order-first');
+        const sql0002 = 'CREATE TABLE only_0002 (id text);';
+        await writeFile(path.join(first, 'g0_data_0002_standalone.sql'), sql0002);
+        await applyMigrations({ engine, migrationsDir: first });
+
+        // Now present 0001 as a latecomer: it sorts BEFORE the applied 0002.
+        const second = await makeSandbox('out-of-order-second');
+        await writeFile(
+          path.join(second, 'g0_data_0001_latecomer.sql'),
+          'CREATE TABLE latecomer (id text);',
+        );
+        await writeFile(path.join(second, 'g0_data_0002_standalone.sql'), sql0002);
+
+        const error = await expectCode(
+          applyMigrations({ engine, migrationsDir: second }),
+          ErrorCode.MIGRATION_OUT_OF_ORDER_REFUSED,
+        );
+        expect(error.message).toContain('g0_data_0001_latecomer');
+
+        // State intact: nothing new applied, nothing removed.
+        expect((await appliedMigrations(engine)).map((m) => m.id)).toEqual([
+          'g0_data_0002_standalone',
+        ]);
+        const latecomerTable = await engine.query("SELECT to_regclass('latecomer') AS t");
+        expect(latecomerTable.rows[0]?.t).toBeNull();
+      } finally {
+        await db.close();
+        await rm(path.join(dirBase, '.tmp-out-of-order-first'), { recursive: true, force: true });
+        await rm(path.join(dirBase, '.tmp-out-of-order-second'), { recursive: true, force: true });
+      }
+    },
+  );
+
+  it(
+    'fences a concurrent run through the lease table (INV-009)',
+    { timeout: 120_000 },
+    async () => {
+      const { db, engine } = await freshEngine();
+      try {
+        // A foreign holder pre-occupies the fence.
+        await engine.exec(`CREATE TABLE IF NOT EXISTS ${SCHEMA_MIGRATION_LEASES_TABLE} (
+            lease_key text PRIMARY KEY, owner text NOT NULL,
+            acquired_at timestamptz NOT NULL DEFAULT now())`);
+        await engine.query(
+          `INSERT INTO ${SCHEMA_MIGRATION_LEASES_TABLE} (lease_key, owner) VALUES ($1, $2)`,
+          ['schema-migrations-apply', 'other-runner'],
+        );
+
+        const error = await expectCode(
+          applyMigrations({ engine, migrationsDir: MIGRATIONS_DIR }),
+          ErrorCode.MIGRATION_APPLY_ALREADY_RUNNING,
+        );
+        expect(error.message).toContain('other-runner');
+        expect(await appliedMigrations(engine)).toEqual([]);
+
+        // Operator clears the stale fence explicitly…
+        expect(await clearMigrationLeases(engine)).toBe(1);
+        // …and the same call then applies cleanly.
+        const report = await applyMigrations({ engine, migrationsDir: MIGRATIONS_DIR });
+        expect(report.applied.length).toBe(11);
+      } finally {
+        await db.close();
+      }
+    },
+  );
+
+  it(
+    'two simultaneous runs on one engine: exactly one applies, one is fenced',
+    { timeout: 120_000 },
+    async () => {
+      const { db, engine } = await freshEngine();
+      try {
+        const outcomes = await Promise.allSettled([
+          applyMigrations({ engine, migrationsDir: MIGRATIONS_DIR }),
+          applyMigrations({ engine, migrationsDir: MIGRATIONS_DIR }),
+        ]);
+        const fulfilled = outcomes.filter((o) => o.status === 'fulfilled');
+        const rejected = outcomes.filter(
+          (o): o is PromiseRejectedResult => o.status === 'rejected',
+        );
+        expect(fulfilled).toHaveLength(1);
+        expect(rejected).toHaveLength(1);
+        const cause = rejected[0]?.reason;
+        expect(cause).toBeInstanceOf(ForesiftError);
+        expect((cause as ForesiftError).code).toBe(ErrorCode.MIGRATION_APPLY_ALREADY_RUNNING);
+
+        // The winning run completed the full application.
+        expect((await appliedMigrations(engine)).length).toBe(11);
+        // The loser left no lease behind after its refusal cleanup.
+        const leases = await engine.query(`SELECT * FROM ${SCHEMA_MIGRATION_LEASES_TABLE}`);
+        expect(leases.rows).toHaveLength(0);
+      } finally {
+        await db.close();
+      }
+    },
+  );
+
+  it(
+    'releases its own lease after success AND after a failed migration',
+    { timeout: 120_000 },
+    async () => {
+      const { db, engine } = await freshEngine();
+      try {
+        const sandbox = await makeSandbox('lease-release');
+        await writeFile(
+          path.join(sandbox, 'g0_data_0001_identity.sql'),
+          await readFileAsync(path.join(MIGRATIONS_DIR, 'g0_data_0001_identity.sql')),
+        );
+        await writeFile(
+          path.join(sandbox, 'g0_dr_0002_broken.sql'),
+          'CREATE TABLE depends_on_missing (id text REFERENCES does_not_exist(id));',
+        );
+
+        // Failed application must still release the fence…
+        await expectCode(
+          applyMigrations({ engine, migrationsDir: sandbox }),
+          ErrorCode.MIGRATION_APPLICATION_FAILED,
+        );
+        let leases = await engine.query(`SELECT owner FROM ${SCHEMA_MIGRATION_LEASES_TABLE}`);
+        expect(leases.rows).toHaveLength(0);
+
+        // …so the retry (with valid SQL) is not blocked.
+        await rm(path.join(sandbox, 'g0_dr_0002_broken.sql'));
+        await writeFile(
+          path.join(sandbox, 'g0_dr_0003_recovery_tiers.sql'),
+          await readFileAsync(path.join(MIGRATIONS_DIR, 'g0_dr_0001_recovery_tiers.sql')),
+        );
+        const retry = await applyMigrations({ engine, migrationsDir: sandbox });
+        expect(retry.applied).toEqual(['g0_dr_0003_recovery_tiers']);
+        expect(retry.skipped).toEqual(['g0_data_0001_identity']);
+
+        leases = await engine.query(`SELECT owner FROM ${SCHEMA_MIGRATION_LEASES_TABLE}`);
+        expect(leases.rows).toHaveLength(0);
+      } finally {
+        await db.close();
+        await rm(path.join(dirBase, '.tmp-lease-release'), { recursive: true, force: true });
+      }
+    },
+  );
+
+  it('exposes the state-table name constant unchanged for restore checks', () => {
+    expect(SCHEMA_MIGRATIONS_TABLE).toBe('_foresift_schema_migrations');
+  });
 });
 
 async function readFileAsync(p: string): Promise<string> {

@@ -83,7 +83,11 @@ nodes:
   - id: generation-adoption
     bash: |
       set -euo pipefail
-      node scripts/automation/adopt-generation-branch.mjs --message "$ARGUMENTS"
+      # Tee the verdict (and any refusal text) into artifacts: detached-run
+      # logs alone do not carry bash node stderr, and a blind refusal cost a
+      # full diagnosis cycle on 2026-08-24. pipefail keeps the exit code.
+      node scripts/automation/adopt-generation-branch.mjs --message "$ARGUMENTS" 2>&1 |
+        tee "$ARTIFACTS_DIR/adoption-verdict.json"
     timeout: 120000
 
   # ── PHASE 0: DETERMINISTIC PREFLIGHT (fail closed before any AI spend) ─────

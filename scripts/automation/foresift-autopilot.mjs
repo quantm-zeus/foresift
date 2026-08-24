@@ -346,11 +346,155 @@ function setPackageStatus(ms, packageId, status) {
 }
 
 // ── launching ────────────────────────────────────────────────────────────────
-function launchDetached(workflow, branch, message) {
+/** Find the (single) worktree holding a branch, or null when none does. */
+function findWorktreeHoldingBranch(branch) {
+  const list = sh('git worktree list --porcelain');
+  if (!list.ok) return { error: 'worktree_list_failed' };
+  for (const block of list.out.split('\n\n')) {
+    const lines = block.split('\n');
+    const path = lines.find((l) => l.startsWith('worktree '))?.slice(9);
+    const wtBranch = lines.find((l) => l.startsWith('branch '))?.slice(7);
+    if (path && wtBranch === `refs/heads/${branch}`) return { path };
+  }
+  return null;
+}
+
+function isArchonRunWorktree(path) {
+  return path !== REPO && path.includes('/.archon/workspaces/');
+}
+
+/**
+ * Archon reuses ONE run worktree per package+generation across runs, so any
+ * dead run leaves residue behind (planning scratch, stale workflow
+ * materializations) that trips adopt-generation-branch's dirty-tree refusal on
+ * every subsequent fresh launch — a permanent recover-fatal crash-loop
+ * (observed live during gen-1 activation, 2026-08-24). A FRESH detached launch
+ * therefore starts from a clean worktree. Guarded, fail-closed:
+ *   - only Archon-owned worktrees (under /.archon/workspaces/) are touched,
+ *     never this checkout and never operator worktrees;
+ *   - if origin cannot vouch for the branch tip (missing ref or unpushed
+ *     commits) the reset is SKIPPED — adoption's own refusal then pauses for
+ *     an operator instead of destroying possibly-real work.
+ * Returns an outcome object recorded in state history for audit.
+ */
+function resetArchonRunWorktree(branch) {
+  const held = findWorktreeHoldingBranch(branch);
+  if (!held) return null;
+  if (held.error) return { skipped: held.error };
+  const { path } = held;
+  if (!isArchonRunWorktree(path)) return { skipped: 'non_archon_worktree_holds_branch', path };
+  const q = JSON.stringify(path);
+  sh(`git -C ${q} fetch origin ${JSON.stringify(branch)} --quiet`);
+  const originTip = sh(`git -C ${q} rev-parse --verify --quiet origin/${branch}`).out.trim();
+  if (!originTip) return { skipped: 'no_origin_ref', path };
+  const ahead = sh(`git -C ${q} rev-list --count origin/${branch}..${branch}`);
+  if (!ahead.ok || Number(ahead.out.trim()) > 0)
+    return { skipped: 'unpushed_commits', path, unpushed: ahead.out.trim() || null };
+  const status = sh(`git -C ${q} status --porcelain=v1`);
+  const files = status.ok ? status.out.split('\n').filter(Boolean) : [];
+  if (!files.length) return { skipped: 'clean', path };
+  const reset = sh(`git -C ${q} reset --hard`);
+  const cleaned = reset.ok ? sh(`git -C ${q} clean -fd`) : { ok: false };
+  return {
+    ok: reset.ok && cleaned.ok,
+    path,
+    fileCount: files.length,
+    files: files.slice(0, 40),
+  };
+}
+
+/**
+ * ADR-0010's seed-currency gate refuses any generation seed that does not
+ * contain current origin/main — and EVERY control-plane merge to main
+ * re-stales the seed between reconciliation and the next launch, which until
+ * now meant manual operator reconciliation before each recover-fatal attempt
+ * (observed three times live during gen-1 activation; the third refusal was
+ * caused by the defect-#6 fix itself landing on main). The ADR's own
+ * prescribed remediation — merge updated origin/main into the seed as a
+ * normal merge commit ⇒ fresh FULL gate — is deterministic and mechanical,
+ * so the supervisor performs it in the freshly-reset run worktree before
+ * every fresh launch of a generation branch. Fail-closed: a merge conflict
+ * aborts and leaves the seed stale, so adoption's refusal pauses for an
+ * operator instead of forcing divergent history together.
+ */
+function ensureGenerationSeedCurrent(branch) {
+  const held = findWorktreeHoldingBranch(branch);
+  if (!held) return null;
+  if (held.error) return { skipped: held.error };
+  const { path } = held;
+  if (!isArchonRunWorktree(path)) return { skipped: 'non_archon_worktree_holds_branch', path };
+  const q = JSON.stringify(path);
+  sh(`git -C ${q} fetch origin ${JSON.stringify(branch)} --quiet`);
+  sh(`git -C ${q} fetch origin main --quiet`);
+  const originTip = sh(`git -C ${q} rev-parse --verify --quiet origin/${branch}`).out.trim();
+  if (!originTip) return { skipped: 'no_origin_ref' };
+  const head = sh(`git -C ${q} rev-parse HEAD`).out.trim();
+  if (head !== originTip) return { skipped: 'worktree_not_at_origin_tip', head, originTip };
+  if (sh(`git -C ${q} merge-base --is-ancestor origin/main HEAD`).ok)
+    return { skipped: 'current', head: head.slice(0, 10) };
+  const merge = sh(
+    `git -C ${q} merge --no-ff origin/main -m ${JSON.stringify(
+      `chore(generation): absorb updated main into ${branch} seed`,
+    )}`,
+  );
+  if (!merge.ok) {
+    sh(`git -C ${q} merge --abort`);
+    return {
+      ok: false,
+      conflict: true,
+      path,
+      detail: (merge.err || merge.out || '').split('\n').filter(Boolean).slice(0, 5).join(' | '),
+    };
+  }
+  const push = sh(`git -C ${q} push -q origin ${JSON.stringify(branch)}`);
+  if (!push.ok) {
+    sh(`git -C ${q} reset --hard ORIG_HEAD`); // stay at the pushed tip
+    return { ok: false, pushFailed: true, path, detail: (push.err || '').split('\n')[0] };
+  }
+  return {
+    ok: true,
+    path,
+    head: sh(`git -C ${q} rev-parse HEAD`).out.trim().slice(0, 10),
+    mergedMain: sh(`git -C ${q} rev-parse --short origin/main`).out.trim(),
+  };
+}
+
+function launchDetached(st, workflow, branch, message) {
+  const reset = st ? resetArchonRunWorktree(branch) : null;
+  if (reset) record(st, 'run_worktree_reset', { branch, ...reset });
+  const seed = st ? ensureGenerationSeedCurrent(branch) : null;
+  if (seed && !seed.skipped) record(st, 'generation_seed_reconciled', { branch, ...seed });
   const ack = archonJson(
     `workflow run ${workflow} --detach --branch ${branch} --json ${JSON.stringify(message)}`,
   );
   return ack;
+}
+
+/**
+ * A state chore (PENDING→RUNNING etc.) commits straight to main — which
+ * instantly re-stales a generation seed that was just reconciled in
+ * launchDetached, and the workflow's adoption node reads origin/main only
+ * seconds later (observed hermetically: the flip chore raced and beat the
+ * currency check within one tick). Any code path that pushes a state chore
+ * for a package with a live generation branch therefore re-runs the
+ * reconciliation BEHIND the chore on the serialized git queue — running it
+ * inline would read a pre-chore origin/main and no-op as 'current' against
+ * exactly the commit that makes the seed stale.
+ */
+function reconcileSeedAfterStateChore(st, packageId, branch) {
+  if (!st || !branch || !packageId) return;
+  enqueue(() => {
+    const seed = ensureGenerationSeedCurrent(branch);
+    if (seed && !seed.skipped)
+      record(st, 'generation_seed_reconciled', {
+        branch,
+        packageId,
+        after: 'state_chore',
+        ...seed,
+      });
+    // The queue may drain after the caller's own saveState — persist here.
+    saveState(st);
+  });
 }
 
 // ── run bookkeeping ──────────────────────────────────────────────────────────
@@ -646,8 +790,10 @@ async function actOnPendingAction(st, entry) {
         // move PENDING→RUNNING. Until this point the package was never RUNNING.
         try {
           const ms = loadCurrentMilestone(REPO);
-          if (ms && findPackage(ms, entry.packageId)?.status === 'PENDING')
+          if (ms && findPackage(ms, entry.packageId)?.status === 'PENDING') {
             setPackageStatus(ms, entry.packageId, 'RUNNING');
+            reconcileSeedAfterStateChore(st, entry.packageId, entry.branch);
+          }
         } catch (err) {
           record(st, 'discovery_status_flip_failed', {
             packageId: entry.packageId,
@@ -683,7 +829,7 @@ async function actOnPendingAction(st, entry) {
   if (entry.runId === null || entry.abandonedBeforeRestart) {
     // Fresh restart against the SAME branch so existing work persists.
     entry.abandonedBeforeRestart = false;
-    const ack = launchDetached(entry.workflow, entry.branch, entry.message);
+    const ack = launchDetached(st, entry.workflow, entry.branch, entry.message);
     record(st, 'fresh_restart_launched', { branch: entry.branch, ack: sanitizeAck(ack) });
     const newId = resolveRunId(ack, entry.workflow, entry.message);
     Object.assign(entry, { runId: newId, awaitingDiscovery: !newId, discoveryAttempts: 0 });
@@ -857,6 +1003,7 @@ function selectAndLaunch(st) {
     if (st.milestoneRuns.length > 0 || st.pausedFatal) return 0;
     const message = 'plan-or-audit-current-milestone';
     const ack = launchDetached(
+      st,
       'foresift-milestone-control',
       'foresift/milestone-planning',
       message,
@@ -904,7 +1051,7 @@ function selectAndLaunch(st) {
     const verdict = canStartPackage(roadmap, ms, cand, running);
     if (!verdict.ok) continue;
     const { generation, branch, message, workflow: wf } = launchIdentity(cand);
-    const ack = launchDetached(wf, branch, message);
+    const ack = launchDetached(st, wf, branch, message);
     const runId = resolveRunId(ack, wf, message);
     record(st, 'work_package_launched', {
       packageId: cand.id,
@@ -933,6 +1080,7 @@ function selectAndLaunch(st) {
       // by actOnPendingAction at discovery time. PENDING→RUNNING never happens
       // without a durable Archon run association.
       setPackageStatus(ms, cand.id, 'RUNNING');
+      reconcileSeedAfterStateChore(st, cand.id, branch);
     }
     running.push(cand);
     launched++;
@@ -1255,6 +1403,10 @@ async function tick(st) {
     reconcileStrandedPackages(st);
     if (!st.pausedFatal) launched = selectAndLaunch(st);
   }
+  // Post-chore seed reconciliation enqueues behind state-chore pushes on the
+  // serialized git queue; drain it and persist whatever it recorded before
+  // callers snapshot state (and before --once exits and loses the task).
+  await commitQueue.catch(() => {});
   saveState(st);
   return launched;
 }
@@ -1429,7 +1581,7 @@ async function cmdRecoverFatal(positionalRunId) {
     }
     // ONE fresh continuation on the SAME branch/worktree; prior work persists on
     // disk/git and completed tasks are discovered from there by the workflow.
-    const ack = launchDetached(workflow, branch, message);
+    const ack = launchDetached(st, workflow, branch, message);
     record(st, 'operator_recovery_fresh_launch', { branch, ack: sanitizeAck(ack) });
     runId = resolveRunId(ack, workflow, message);
   }
@@ -1467,7 +1619,10 @@ async function cmdRecoverFatal(positionalRunId) {
   // re-failure inside the grace window) must not be misread as a fresh daily
   // quota wall — the same in-flight window that protects automatic probes.
   entry.quotaProbeStartedAt = now();
-  if (kind === 'package' && pkg.status === 'PENDING') setPackageStatus(ms, pkg.id, 'RUNNING');
+  if (kind === 'package' && pkg.status === 'PENDING') {
+    setPackageStatus(ms, pkg.id, 'RUNNING');
+    reconcileSeedAfterStateChore(st, pkg.id, branch);
+  }
   st.pausedFatal = null;
   record(st, 'operator_recovery_complete', {
     runId: runId ?? '(awaiting discovery)',

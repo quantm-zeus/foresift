@@ -848,6 +848,274 @@ describe('first tick drains the queued main fast-forward before selection', () =
   });
 });
 
+const wtGit = (wt: string, args: string[]) =>
+  spawnSync('git', ['-C', wt, ...args], {
+    encoding: 'utf8',
+    env: {
+      ...process.env,
+      GIT_AUTHOR_NAME: 't',
+      GIT_AUTHOR_EMAIL: 't@t',
+      GIT_COMMITTER_NAME: 't',
+      GIT_COMMITTER_EMAIL: 't@t',
+      GIT_CONFIG_GLOBAL: '/dev/null',
+      GIT_CONFIG_SYSTEM: '/dev/null',
+    },
+  });
+
+// Milestone with PKG PENDING at generation 1 so selection launches the
+// gen-1 branch through launchDetached exactly as production would. The gen-1
+// branch is seeded on origin and checked out in exactly ONE worktree, whose
+// location the caller picks (git forbids double checkout of a branch).
+function gen1Fixture(name: string, holder: 'archon' | 'operator') {
+  const fx = gitFixture(name);
+  stubArchon();
+  const ms = {
+    schemaVersion: '1.0.0',
+    milestoneId: 'G0',
+    status: 'ACTIVE',
+    packages: [
+      {
+        id: PKG,
+        objective: 'Implement the contracts and data truth foundation slice.',
+        requirementIds: ['REQ-1'],
+        dependencies: [],
+        risk: 'HIGH',
+        parallelizable: false,
+        writeScopes: ['packages/**'],
+        verificationCommands: ['pnpm test'],
+        status: 'PENDING',
+        generation: 1,
+      },
+      {
+        id: 'pkg-beta',
+        objective: 'Second package so milestone decomposition validates.',
+        requirementIds: ['REQ-2'],
+        dependencies: [PKG],
+        risk: 'LOW',
+        parallelizable: true,
+        writeScopes: ['packages/beta/**'],
+        verificationCommands: ['pnpm test'],
+        status: 'PENDING',
+      },
+    ],
+  };
+  fx.writeFile('specs/implementation/current-milestone.json', JSON.stringify(ms, null, 2) + '\n');
+  fx.writeFile(
+    'specs/implementation/roadmap.json',
+    JSON.stringify(
+      {
+        schemaVersion: '1.0.0',
+        policy: {
+          foundationMilestones: ['G0'],
+          maxParallelCodingPackagesFoundation: 1,
+          maxParallelCodingPackages: 2,
+        },
+        currentMilestoneId: 'G0',
+        milestones: [{ id: 'G0', name: 'foundation', dependsOn: [], status: 'ACTIVE' }],
+      },
+      null,
+      2,
+    ) + '\n',
+  );
+  fx.commitAll('PKG pending at generation 1');
+  fx.g(['push', '-q', 'origin', 'main']);
+  // Path layout for the archon holder mirrors
+  // ~/.archon/workspaces/<org>/<repo>/worktrees/archon/task-<branch-mangled>.
+  const wt =
+    holder === 'archon'
+      ? join(
+          scratch,
+          `${name}-ws`,
+          '.archon',
+          'workspaces',
+          'org',
+          'repo',
+          'worktrees',
+          'archon',
+          `task-${PKG}-g1`,
+        )
+      : join(scratch, `${name}-operator-wt`);
+  mkdirSync(join(wt, '..'), { recursive: true });
+  fx.g(['branch', `foresift/${PKG}-g1`, 'main']);
+  fx.g(['push', '-q', 'origin', `foresift/${PKG}-g1`]);
+  fx.g(['worktree', 'add', '-q', wt, `foresift/${PKG}-g1`]);
+  return { fx, wt };
+}
+
+// ── fresh detached launches reset reused run worktrees ───────────────────────
+// Archon keeps ONE worktree per package+generation across runs; dead-run
+// residue (planning scratch, stale materializations) otherwise trips
+// adopt-generation-branch's dirty-tree refusal on EVERY subsequent fresh
+// launch — observed live during gen-1 activation as a permanent
+// recover-fatal loop. The reset is guarded: unpushed commits are never wiped.
+describe('fresh detached launches reset residue in the reused archon run worktree', () => {
+  const runTick = (fx: ReturnType<typeof gitFixture>, name: string) => {
+    const stateDir = mkdtempSync(join(scratch, `${name}-state-`));
+    writeFileSync(
+      join(stateDir, 'autopilot-state.json'),
+      JSON.stringify({ activeRuns: [], milestoneRuns: [], pausedFatal: null, history: [] }),
+    );
+    const r = runRestartCli({ fx, stateDir, baseSha: '' } as Sandbox, ['--once'], { rows: [] });
+    return { r, stateDir };
+  };
+
+  it('wipes dead-run residue with an audited manifest before launching', () => {
+    const { fx, wt } = gen1Fixture('wt-reset-dirty', 'archon');
+    // Residue of a dead run: a staged new file + an untracked scratch file.
+    writeFileSync(join(wt, 'plan-context.md'), '# stale planning scratch\n');
+    expect(wtGit(wt, ['add', 'plan-context.md']).status).toBe(0);
+    writeFileSync(join(wt, 'out-of-scope-notes.md'), '# more scratch\n');
+    expect(wtGit(wt, ['status', '--porcelain=v1']).stdout.trim().split('\n')).toHaveLength(2);
+
+    const { r, stateDir } = runTick(fx, 'wt-reset-dirty');
+    expect(r.status).toBe(0);
+    const st = JSON.parse(readFileSync(join(stateDir, 'autopilot-state.json'), 'utf8'));
+    const ev = st.history.find((h: { event: string }) => h.event === 'run_worktree_reset');
+    expect(ev?.ok).toBe(true);
+    expect(ev?.fileCount).toBe(2);
+    expect(String(ev?.path)).toContain('/.archon/workspaces/');
+    // The worktree is actually clean and the launch proceeded.
+    expect(wtGit(wt, ['status', '--porcelain=v1']).stdout.trim()).toBe('');
+    expect(st.pausedFatal ?? null).toBeNull();
+    expect(st.history.map((h: { event: string }) => h.event)).toContain('work_package_launched');
+  });
+
+  it('never wipes unpushed commits — skips the reset and still launches', () => {
+    const { fx, wt } = gen1Fixture('wt-reset-unpushed', 'archon');
+    // Real-looking work: a commit on the branch origin cannot vouch for.
+    writeFileSync(join(wt, 'FEATURE.md'), '# unpushed work\n');
+    expect(wtGit(wt, ['add', 'FEATURE.md']).status).toBe(0);
+    expect(wtGit(wt, ['commit', '-qm', 'wip: unpushed']).status).toBe(0);
+
+    const { r, stateDir } = runTick(fx, 'wt-reset-unpushed');
+    expect(r.status).toBe(0);
+    const st = JSON.parse(readFileSync(join(stateDir, 'autopilot-state.json'), 'utf8'));
+    const ev = st.history.find((h: { event: string }) => h.event === 'run_worktree_reset');
+    expect(ev?.skipped).toBe('unpushed_commits');
+    expect(existsSync(join(wt, 'FEATURE.md'))).toBe(true);
+    // Adoption will refuse downstream; that fail-closed pause is the contract.
+    expect(st.history.map((h: { event: string }) => h.event)).toContain('work_package_launched');
+  });
+
+  it('leaves non-archon worktrees holding the branch untouched', () => {
+    const { fx, wt: operatorWt } = gen1Fixture('wt-reset-operator', 'operator');
+    writeFileSync(join(operatorWt, 'OPERATOR-NOTES.md'), '# operator scratch\n');
+
+    const { r, stateDir } = runTick(fx, 'wt-reset-operator');
+    expect(r.status).toBe(0);
+    const st = JSON.parse(readFileSync(join(stateDir, 'autopilot-state.json'), 'utf8'));
+    const ev = st.history.find((h: { event: string }) => h.event === 'run_worktree_reset');
+    expect(ev?.skipped).toBe('non_archon_worktree_holds_branch');
+    expect(existsSync(join(operatorWt, 'OPERATOR-NOTES.md'))).toBe(true);
+  });
+});
+
+// ── fresh launches reconcile stale generation seeds (ADR-0010, automated) ────
+// The ADR-0010 currency gate refuses any seed not containing current
+// origin/main — and every control-plane merge to main re-stales the seed,
+// which used to mean manual reconciliation before EVERY relaunch (observed
+// three times live during gen-1 activation; the third refusal was caused by
+// the defect-#6 fix itself landing on main). The supervisor now performs the
+// ADR's own prescribed remediation before each fresh launch.
+describe('fresh launches reconcile stale generation seeds', () => {
+  it('merges updated origin/main into a stale seed as a merge commit and pushes', () => {
+    const { fx } = gen1Fixture('seed-reconcile-stale', 'archon');
+    // Stale the seed: move ONLY origin/main past it (the post-squash world).
+    fx.g(['switch', '-q', '-c', 'ahead']);
+    fx.writeFile('OTHER.md', '# unrelated control-plane chore\n');
+    fx.commitAll('chore(autopilot): unrelated state chore');
+    fx.g(['push', '-q', 'origin', 'ahead:main']);
+    fx.g(['switch', '-q', 'main']);
+
+    const stateDir = mkdtempSync(join(scratch, 'seed-reconcile-state-'));
+    writeFileSync(
+      join(stateDir, 'autopilot-state.json'),
+      JSON.stringify({ activeRuns: [], milestoneRuns: [], pausedFatal: null, history: [] }),
+    );
+    const r = runRestartCli({ fx, stateDir, baseSha: '' } as Sandbox, ['--once'], { rows: [] });
+    expect(r.status).toBe(0);
+    const st = JSON.parse(readFileSync(join(stateDir, 'autopilot-state.json'), 'utf8'));
+    const evs = st.history.filter(
+      (h: { event: string }) => h.event === 'generation_seed_reconciled',
+    );
+    // TWO reconciliations: one pre-launch, one AFTER the PENDING→RUNNING state
+    // chore re-staled the seed within the same tick (the intra-tick race).
+    // History is newest-first.
+    expect(evs.length).toBe(2);
+    expect(evs[0].after).toBe('state_chore');
+    expect(evs[1].after).toBeUndefined();
+    for (const ev of evs) {
+      expect(ev.ok).toBe(true);
+      expect(ev.mergedMain).toBeTruthy();
+    }
+    // The pushed seed now CONTAINS origin/main (the ADR-0010 gate passes).
+    fx.g(['fetch', '-q', 'origin']);
+    expect(
+      spawnSync(
+        'git',
+        ['merge-base', '--is-ancestor', 'origin/main', `origin/foresift/${PKG}-g1`],
+        {
+          cwd: fx.root,
+        },
+      ).status,
+    ).toBe(0);
+    expect(st.history.map((h: { event: string }) => h.event)).toContain('work_package_launched');
+  });
+
+  it('aborts on a conflicting seed, stays stale, and still launches (adoption refuses)', () => {
+    const { fx, wt } = gen1Fixture('seed-reconcile-conflict', 'archon');
+    // Diverge the seed: rewrite the same objective line the main-side chore
+    // will also rewrite — a genuine content conflict.
+    const msPath = join(wt, 'specs', 'implementation', 'current-milestone.json');
+    const ms = JSON.parse(readFileSync(msPath, 'utf8'));
+    ms.packages[0].objective = 'SEED VERSION objective';
+    writeFileSync(msPath, JSON.stringify(ms, null, 2) + '\n');
+    expect(wtGit(wt, ['add', 'specs/implementation/current-milestone.json']).status).toBe(0);
+    expect(wtGit(wt, ['commit', '-qm', 'wip: seed-side objective']).status).toBe(0);
+    expect(wtGit(wt, ['push', '-q', 'origin', `foresift/${PKG}-g1`]).status).toBe(0);
+
+    // Move origin/main against it.
+    fx.g(['switch', '-q', '-c', 'ahead']);
+    const msMain = JSON.parse(
+      readFileSync(join(fx.root, 'specs', 'implementation', 'current-milestone.json'), 'utf8'),
+    );
+    msMain.packages[0].objective = 'MAIN VERSION objective';
+    writeFileSync(
+      join(fx.root, 'specs', 'implementation', 'current-milestone.json'),
+      JSON.stringify(msMain, null, 2) + '\n',
+    );
+    fx.commitAll('chore(autopilot): main-side objective');
+    fx.g(['push', '-q', 'origin', 'ahead:main']);
+    fx.g(['switch', '-q', 'main']);
+
+    const stateDir = mkdtempSync(join(scratch, 'seed-conflict-state-'));
+    writeFileSync(
+      join(stateDir, 'autopilot-state.json'),
+      JSON.stringify({ activeRuns: [], milestoneRuns: [], pausedFatal: null, history: [] }),
+    );
+    const r = runRestartCli({ fx, stateDir, baseSha: '' } as Sandbox, ['--once'], { rows: [] });
+    expect(r.status).toBe(0);
+    const st = JSON.parse(readFileSync(join(stateDir, 'autopilot-state.json'), 'utf8'));
+    const ev = st.history.find((h: { event: string }) => h.event === 'generation_seed_reconciled');
+    expect(ev?.ok).toBe(false);
+    expect(ev?.conflict).toBe(true);
+    // Seed unchanged on origin (never forced together), worktree aborted clean.
+    fx.g(['fetch', '-q', 'origin']);
+    expect(
+      spawnSync(
+        'git',
+        ['merge-base', '--is-ancestor', 'origin/main', `origin/foresift/${PKG}-g1`],
+        {
+          cwd: fx.root,
+        },
+      ).status,
+    ).not.toBe(0);
+    expect(wtGit(wt, ['status', '--porcelain=v1']).stdout.trim()).toBe('');
+    // Launch proceeds; adoption's fail-closed refusal is the operator gate.
+    expect(st.history.map((h: { event: string }) => h.event)).toContain('work_package_launched');
+  });
+});
+
 // ── --clear-fatal must drop the entries the pause owned ──────────────────────
 // A retained fatal-paused row occupies its package's selection slot forever,
 // and once the milestone has moved generations it is neither resumable

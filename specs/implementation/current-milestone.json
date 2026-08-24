@@ -47,7 +47,8 @@
         "test -d packages/evidence && pnpm --filter @foresift/evidence test",
         "test -d packages/object-store && pnpm --filter @foresift/object-store test"
       ],
-      "status": "RUNNING"
+      "status": "RUNNING",
+      "generation": 1
     },
     {
       "id": "g0-security-perimeter",

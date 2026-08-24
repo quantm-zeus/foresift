@@ -274,7 +274,10 @@ function refreshMain() {
   enqueue(() => {
     sh('git fetch origin main --quiet');
     const behind = sh('git rev-list --count main..origin/main');
-    if (behind.ok && Number(behind.out) > 0 && !sh('git pull --ff-only').ok)
+    // Explicit merge from the fetched ref, NOT bare `git pull`: pull depends on
+    // branch tracking configuration, which is incidental setup — its absence
+    // would silently skip every refresh and freeze selection on a stale tree.
+    if (behind.ok && Number(behind.out) > 0 && !sh('git merge --ff-only origin/main').ok)
       log('WARN: could not fast-forward main');
   });
 }
@@ -1211,6 +1214,15 @@ function failRestartUsage(why) {
 async function tick(st) {
   let launched = 0;
   refreshMain();
+  // refreshMain ENQUEUES its fetch+ff-pull on the serialized git queue; every
+  // decision below (stranded reconciliation, selection, launch identity) reads
+  // the working-tree milestone. Selection must never run against the snapshot
+  // that pull is about to replace: the first tick after a state-chore merge
+  // otherwise sees the PRE-reset milestone and fail-closes on the retired
+  // generation instead of launching the fresh one. Drain pending git work
+  // first; a failed pull still resolves here and downstream paths keep their
+  // existing fail-closed behavior on the stale view.
+  await commitQueue.catch(() => {});
   // Reconcile active entries. Paused entries stay tracked (never filtered as
   // done): fatal pauses wait for operator recovery, quota pauses probe on the
   // supervisor-owned schedule.
@@ -1967,8 +1979,26 @@ async function main() {
       process.exit(1);
     }
     st.pausedFatal = null;
+    // Dropping the entries the pause owned is part of clearing it. A retained
+    // fatal-paused row occupies its package's selection slot forever
+    // (selection skips candidates with a non-done tracked row), and once the
+    // milestone has moved generations such a row is neither resumable
+    // (--recover-fatal refuses cross-generation recovery) nor splicable
+    // (terminal-row reconciliation ignores paused rows) — a permanent
+    // deadlock. Stranded reconciliation rebuilds whatever tracking is still
+    // warranted against current truth on the next tick; the orphan refusal
+    // above already guarded the RUNNING-without-live-track case.
+    const dropped = [...st.activeRuns, ...st.milestoneRuns].filter((e) => e.paused === 'fatal');
+    st.activeRuns = st.activeRuns.filter((e) => e.paused !== 'fatal');
+    st.milestoneRuns = st.milestoneRuns.filter((e) => e.paused !== 'fatal');
+    record(st, 'fatal_pause_entries_dropped', {
+      count: dropped.length,
+      packageIds: dropped.map((e) => e.packageId ?? null),
+    });
     saveState(st);
-    log('fatal pause cleared by operator (no RUNNING package orphaned)');
+    log(
+      `fatal pause cleared by operator (no RUNNING package orphaned; ${dropped.length} paused entr${dropped.length === 1 ? 'y' : 'ies'} dropped)`,
+    );
     return; // one-shot maintenance command; systemd restarts the loop separately
   }
   if (argv.includes('--recover-fatal')) {

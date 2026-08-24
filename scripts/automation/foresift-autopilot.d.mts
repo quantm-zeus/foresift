@@ -52,3 +52,15 @@ export declare function nextPollDelayMs(opts?: {
   awaitingDiscovery?: boolean;
   fastStreak?: number;
 }): PollDecision;
+
+/** Defect #11: milestone state as committed at HEAD (the only baseline a
+ *  freshly materialized run worktree can inherit); null when unreadable. */
+export declare function loadCommittedMilestone(cwd?: string): unknown;
+
+/** Defect #11: resolve the view launch decisions may use. Returns the
+ *  validated committed milestone, or null + reason when selection must
+ *  defer (uncommitted chore flips must never drive launches). */
+export declare function selectionView(
+  fileMs: unknown,
+  committedMs: unknown,
+): { ms: unknown; why: string };

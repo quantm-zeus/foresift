@@ -148,3 +148,28 @@ on_error: all}` (FATAL patterns — auth, permission — still take priority,
   across both files. The run's other outputs (PR #46 with its review
   verdict and green exact-head CI) survived on the remote and were consumed
   by the next recovery launch.
+- **Selection raced the dependency's PROVEN chore commit and launched against
+  invisible state (live run ce3e0354, 2026-08-24)** — minutes after PR #46
+  landed (12:19:34Z), the supervisor selected `g0-security-perimeter` using
+  the WORKING TREE's milestone file, which already held the freshly written
+  but NOT YET COMMITTED `g0-contracts-data-truth -> PROVEN` flip (state
+  chores drain through the queue-deferred git chain; the PROVEN commit
+  landed at 12:20:42Z, five seconds AFTER the launch). Archon materialized
+  the run worktree from COMMITTED main — where the dependency was still
+  RUNNING — so the new run's deterministic preflight refused
+  (`dependency g0-contracts-data-truth is not PROVEN`), every recovery
+  resume re-ran preflight in the same stale baseline, the bounded recovery
+  budget exhausted, and the fatal pause latched. Two views of truth is the
+  root cause: a fresh worktree can only ever inherit committed state, so any
+  selection input newer than HEAD is invisible to the run it launches.
+  Fixed: launch selection now decides from the COMMITTED milestone state
+  (`git show HEAD:specs/implementation/current-milestone.json`) — if no
+  valid committed view exists, selection defers one tick instead of
+  launching against invisible state (fail-closed; the queue drains in
+  seconds, so deferral is bounded). Post-launch status flips keep writing
+  through the FILE lineage, re-read fresh, so flips never clobber newer
+  queued state. The divergence itself is pinned hermetically by
+  `tests/automation/selection-committed-view.spec.ts` (real-git fixtures:
+  reads HEAD not the dirty tree; defers while uncommitted; allows once the
+  chore lands; fails closed on unreadable and on schema-invalid committed
+  state), mutation-tested to kill exactly the two defect-specific tests.

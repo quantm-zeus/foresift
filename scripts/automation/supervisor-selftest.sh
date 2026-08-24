@@ -133,7 +133,19 @@ SHIM
 cat >"$SBX/bin/git" <<'SHIM'
 #!/usr/bin/env bash
 # Stub git: everything succeeds, working tree always clean, never behind.
-case "${1:-}" in rev-list) echo 0 ;; esac
+# `git show HEAD:<path>` emulates a FULLY-COMMITTED tree by catting the file
+# from the fixture repo (fixtures never really commit, so the committed view
+# equals the working-tree view here; the committed-vs-file divergence itself —
+# defect #11 — is pinned hermetically by
+# tests/automation/selection-committed-view.spec.ts).
+case "${1:-}" in
+  rev-list) echo 0 ;;
+  show)
+    p="${2#HEAD:}"
+    [ -n "$p" ] && [ "$p" != "$2" ] && [ -f "${FORESIFT_AUTOPILOT_REPO:?}/$p" ] \
+      && cat "${FORESIFT_AUTOPILOT_REPO}/$p"
+    ;;
+esac
 exit 0
 SHIM
 cat >"$SBX/bin/gh" <<'SHIM'

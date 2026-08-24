@@ -383,3 +383,23 @@ the remediation itself).
   flag itself is present in the REVIEWED tip `33678211` (PR #22 head that
   passed comprehensive review), so retention is parity, not a loosening.
 - **Boundary checklist**: see item 43 — all held; negative tests green throughout.
+
+## Addendum — post-landing defect #11 (2026-08-24, after this report merged)
+
+The report above is accurate AS OF ITS LANDING (PR #48, `a0a3fca1a3`). One
+further control-plane defect surfaced minutes later in the post-landing
+transition and follows the same item-39 path:
+
+- **#11 — selection raced the dependency's PROVEN chore commit** (live run
+  `ce3e0354`): the supervisor selected `g0-security-perimeter` from the
+  working-tree milestone file holding an uncommitted PROVEN flip, while archon
+  materialized the run worktree from committed main where the dependency was
+  still RUNNING → deterministic preflight refusal → bounded recovery exhausted
+  on the stale baseline → fatal pause latched. Root cause: two views of truth
+  (working tree vs HEAD); a fresh worktree can only inherit committed state.
+- **Fix**: launch selection decides from COMMITTED milestone state
+  (`git show HEAD:…`); no valid committed view defers selection one tick
+  (fail-closed, bounded); post-launch flips keep the file lineage.
+  Regression: `tests/automation/selection-committed-view.spec.ts` (5 real-git
+  fixtures), mutation-tested; supervisor selftest PASS=118 FAIL=0; full entry
+  appended to `docs/automation/v3-restart-race-matrix.md`.

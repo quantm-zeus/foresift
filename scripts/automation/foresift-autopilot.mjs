@@ -970,6 +970,47 @@ function pauseFatalCorrupt(st, what, errors) {
   record(st, 'paused_fatal_corrupt_state', { what, errors });
 }
 
+/**
+ * Milestone state as COMMITTED at HEAD — the only view a freshly materialized
+ * Archon run worktree can inherit. Defect #11 (live run ce3e0354, 2026-08-24):
+ * selection evaluated eligibility against the working tree, which already held
+ * the just-written but NOT YET COMMITTED `-> PROVEN` chore flip; archon seeded
+ * the dependent package's worktree from committed main where the dependency
+ * was still RUNNING, preflight refused (`dependency … is not PROVEN`), and
+ * every recovery resume re-ran in that same stale baseline until the fatal
+ * pause latched. Returns null when HEAD carries no readable milestone state.
+ */
+export function loadCommittedMilestone(cwd = REPO) {
+  const r = spawnSync('git show HEAD:specs/implementation/current-milestone.json', {
+    shell: true,
+    cwd,
+    encoding: 'utf8',
+  });
+  if (r.status !== 0) return null;
+  try {
+    return JSON.parse(r.stdout);
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Decide which milestone view may drive LAUNCH decisions. The working tree is
+ * authoritative for WRITES (chore flips persist there and commit via the git
+ * queue), but it is exactly one chore-commit AHEAD of what any new run can see
+ * — so while uncommitted flips exist, launching against them deterministically
+ * produces preflight refusals (defect #11). Selection therefore decides from
+ * the committed view and simply defers one tick when the two disagree or when
+ * no committed view exists; the queue drains within seconds, so deferral is
+ * bounded and honest.
+ */
+export function selectionView(fileMs, committedMs) {
+  if (!committedMs) return { ms: null, why: 'committed_state_unreadable' };
+  const errs = validateMilestoneState(committedMs);
+  if (errs.length > 0) return { ms: null, why: `committed_state_invalid: ${errs.join('; ')}` };
+  return { ms: committedMs, why: 'ok' };
+}
+
 /** Launches performed by one selection pass (V3-B): drives adaptive handoff polling. */
 function selectAndLaunch(st) {
   // Corrupt roadmap/milestone JSON must fail closed (PAUSED_FATAL), never
@@ -996,6 +1037,19 @@ function selectAndLaunch(st) {
     // validate. Never silently re-plan over possibly-corrupt implementation
     // state.
     pauseFatalCorrupt(st, 'specs/implementation/current-milestone.json', msErrs.join('; '));
+    return 0;
+  }
+  // Defect #11: launch decisions come from the COMMITTED milestone state —
+  // the working tree can be a queued chore-commit ahead of what any freshly
+  // materialized run worktree inherits. Uncommitted flips defer selection by
+  // one tick (fail-closed) instead of launching against state no run can see.
+  // When NEITHER view exists nothing is planned yet — fall through so the
+  // milestone-planning-due path below behaves exactly as before.
+  const fileMs = ms;
+  const view = selectionView(ms, loadCommittedMilestone());
+  if (view.ms) ms = view.ms;
+  else if (fileMs) {
+    record(st, 'selection_deferred_uncommitted_state', { why: view.why });
     return 0;
   }
   const milestoneDue = !ms || ms.packages.every((p) => p.status === 'PROVEN');
@@ -1078,8 +1132,11 @@ function selectAndLaunch(st) {
     if (runId) {
       // Durable run id already in hand → RUNNING now; otherwise it is flipped
       // by actOnPendingAction at discovery time. PENDING→RUNNING never happens
-      // without a durable Archon run association.
-      setPackageStatus(ms, cand.id, 'RUNNING');
+      // without a durable Archon run association. The flip writes the FILE
+      // lineage (re-read fresh: it may carry flips newer than the committed
+      // selection view) — never the committed snapshot selection used.
+      const fileNow = loadCurrentMilestone(REPO);
+      if (fileNow) setPackageStatus(fileNow, cand.id, 'RUNNING');
       reconcileSeedAfterStateChore(st, cand.id, branch);
     }
     running.push(cand);

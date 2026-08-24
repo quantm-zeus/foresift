@@ -144,10 +144,27 @@ nodes:
               > "$ARTIFACTS_DIR/plan-completeness.json" 2>&1
             echo "PLAN_RECHECK_EXIT=$?"
 
+  # ── PHASE BOUNDARY BRIDGES ────────────────────────────────────────────────────
+  # Archon v0.9.0 `one_success` counts a condition-skipped parent as NEITHER
+  # success nor failure — a node whose only parent was legitimately skipped
+  # ("already complete") therefore never fires, and the skip cascades to every
+  # downstream trigger_rule (observed live on gen-1 run be355eacd808: a fully-
+  # implemented seed skipped `implement`, `one_success` starved `gate-router`,
+  # and the workflow completed with NO PR, fatal-pausing the supervisor).
+  # Each bridge supplies the min-one-success its phase boundary needs while
+  # PRESERVING failure blocking: the always-completing router parent satisfies
+  # `none_failed_min_one_success`, so the bridge runs when the loop body was
+  # skipped OR succeeded, and stays blocked when the loop body genuinely
+  # FAILED.
+  - id: plan-settled
+    depends_on: [plan-status, scoped-plan]
+    trigger_rule: none_failed_min_one_success   # plan-status always completes; blocks iff scoped-plan FAILED
+    bash: |
+      echo "PLAN_PHASE_SETTLED"
+
   # ── PHASE 2 ROUTER: deterministic implementation-completeness check ─────────
   - id: impl-status
-    depends_on: [scoped-plan]
-    trigger_rule: one_success   # scoped-plan may legitimately be skipped (already complete)
+    depends_on: [plan-settled]
     bash: |
       set +e
       mkdir -p "$ARTIFACTS_DIR"
@@ -197,9 +214,14 @@ nodes:
   # FAILED gate opens the bounded repair loop, whose body repairs against the
   # manifest, re-verifies TARGETED (not full), and runs the FULL gate once more
   # only when targeted evidence is green or unusable.
+  - id: implement-settled
+    depends_on: [impl-status, implement]
+    trigger_rule: none_failed_min_one_success   # impl-status always completes; blocks iff implement FAILED
+    bash: |
+      echo "IMPLEMENT_PHASE_SETTLED"
+
   - id: gate-router
-    depends_on: [implement]
-    trigger_rule: one_success   # implement may legitimately be skipped (already complete)
+    depends_on: [implement-settled]
     idle_timeout: 1800000
     bash: |
       set +e

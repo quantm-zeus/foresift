@@ -233,6 +233,7 @@ describe('migrator fail-closed defenses (FR-DATA-001…006 / FR-DR-001/002 subst
         expect(report.applied).toEqual(['g0_data_0001_identity']);
       } finally {
         await db.close();
+        await rm(path.join(dirBase, '.tmp-unknown-family'), { recursive: true, force: true });
       }
     },
   );

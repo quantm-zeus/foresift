@@ -11,6 +11,7 @@ const GRAPH = join(repoRoot, 'scripts', 'automation', 'build-implementation-task
 const GUARD = join(repoRoot, 'scripts', 'automation', 'wave-guard.mjs');
 const INTEGRATE = join(repoRoot, 'scripts', 'automation', 'integrate-writer-results.mjs');
 const ADMIT = join(repoRoot, 'scripts', 'automation', 'check-writer-admission.mjs');
+const BRIEFS = join(repoRoot, 'scripts', 'automation', 'build-writer-briefs.mjs');
 
 const TASKS = `# Tasks: pkg-x
 
@@ -170,6 +171,42 @@ describe('implementation task graph', () => {
     expect(core.units).toContain('T104'); // demoted despite [P]
     // restore canonical fixture text
     writeFileSync(join(fx.root, 'specs', 'pkg-x', 'tasks.md'), TASKS);
+  });
+});
+
+// The briefs builder must actually EXECUTE (a syntax error here once reached
+// production smoke unseen, because nothing imported the module).
+describe('writer briefs (executed)', () => {
+  it('renders one lane-scoped brief per shard with pinned base and result contract', () => {
+    const g = JSON.parse(readFileSync(fx.graphPath, 'utf8'));
+    const out = join(fx.artifacts, 'briefs');
+    const r = spawnSync(
+      process.execPath,
+      [
+        BRIEFS,
+        '--package', 'pkg-x',
+        '--graph', fx.graphPath,
+        '--out', out,
+        '--root', fx.root,
+        '--base-head', fx.baseSha,
+      ],
+      { encoding: 'utf8' },
+    );
+    expect(`${r.status}: ${r.stderr ?? ''}`).toMatch(/^0/);
+    expect(JSON.parse(r.stdout)).toMatchObject({ ok: true, briefs: g.shards.length });
+    for (const shard of g.shards as Array<{ id: string; units: string[] }>) {
+      const md = readFileSync(join(out, `${shard.id}-brief.md`), 'utf8');
+      expect(md).toContain(`# Writer brief — pkg-x · ${shard.id}`);
+      expect(md).toContain(fx.baseSha.slice(0, 12)); // pinned base is explicit
+      expect(md).toContain('foresift/writer-result@1'); // machine result contract
+      for (const uid of shard.units) expect(md).toContain(`### ${uid}`);
+    }
+    // lane scoping: core's brief must not leak shard-1's predicted path
+    const coreMd = readFileSync(join(out, 'core-brief.md'), 'utf8');
+    const otherPaths = (g.shards as Array<{ id: string; allowedWritePaths: string[] }>)
+      .filter((s) => s.id !== 'core')
+      .flatMap((s) => s.allowedWritePaths);
+    for (const p of otherPaths) expect(coreMd).not.toContain(p);
   });
 });
 

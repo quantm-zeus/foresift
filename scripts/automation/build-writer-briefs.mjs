@@ -111,8 +111,7 @@ for (const shard of graph.shards ?? []) {
   lines.push('');
   lines.push('- Commit coherent slices inside your worktree as you go.');
   lines.push(
-    '- On finish write `$ARTIFACTS_DIR/writer-results/' +
-      `${shard.id}/result.json`: {schema:"foresift/writer-result@1", shardId, units, completed, branch, headSha, testsRun, testResults, blockers}.`,
+    `- On finish write \`$ARTIFACTS_DIR/writer-results/${shard.id}/result.json\`: {schema:"foresift/writer-result@1", shardId, units, completed, branch, headSha, testsRun, testResults, blockers}.`,
   );
   lines.push('- List EVERY unit you finished; list unfinished ones under blockers.');
   lines.push('');

@@ -93,6 +93,33 @@ export function implementationComplete(packageId, rootOverride) {
     errors.push(`git inspection failed: ${String(err?.message ?? err).slice(0, 120)}`);
   }
 
+  // ── completion requires a committed tree ──────────────────────────────────
+  // create-pr refuses a dirty tracked tree, so accepting "complete" over an
+  // uncommitted working tree only moves the failure to the LAST node of the
+  // chain — live run 8061381a lost its landing step to exactly that after its
+  // scoped plan told the agent to leave everything uncommitted (defect #9).
+  // Partial slices legitimately hold dirty trees across iterations; only the
+  // complete verdict demands committed coherence.
+  if (errors.length === 0) {
+    try {
+      const dirty = execFileSync('git', ['status', '--porcelain', '-uall'], {
+        cwd: root,
+        encoding: 'utf8',
+      });
+      const entries = dirty.split('\n').filter((l) => l.trim());
+      if (entries.length > 0) {
+        const shown = entries.slice(0, 8).map((l) => l.slice(3).trim());
+        errors.push(
+          `working tree has ${entries.length} uncommitted change(s) — commit coherent units ` +
+            `before completion (create-pr refuses a dirty tree): ${shown.join(', ')}` +
+            `${entries.length > 8 ? ', …' : ''}`,
+        );
+      }
+    } catch (err) {
+      errors.push(`git inspection failed: ${String(err?.message ?? err).slice(0, 120)}`);
+    }
+  }
+
   return errors.length
     ? { complete: false, remainingTasks: uncheckedCount, errors }
     : { complete: true, package: packageId, tasksCompleted: total };

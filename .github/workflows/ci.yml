@@ -49,3 +49,9 @@ jobs:
 
       - name: Tests
         run: pnpm test
+
+      # Static release gate for the permanent read-only boundary. Runs as its
+      # own step so a CLI-only regression (inverted exit, broadened exclusion)
+      # fails CI even though the vitest suite also pins the exit contract.
+      - name: Prohibited-capability scanner
+        run: node scripts/scan-prohibited-capabilities/cli.mjs

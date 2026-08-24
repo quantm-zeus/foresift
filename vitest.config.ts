@@ -1,11 +1,17 @@
 import { configDefaults, defineConfig } from 'vitest/config';
 
-// Two-tier test organization (V2 task-spec C2.5):
+// Three-tier test organization (V2 task-spec C2.5, extended by the G0
+// security perimeter review fix: package-level suites MUST run under
+// `pnpm test` or they rot invisibly — the persistence migrator spec had
+// already gone stale-red because no project collected it):
 //   unit       — pure/deterministic suites; threads + isolate:false for fast
 //                inner-loop authoring (`pnpm test:unit`).
 //   integration— suites that spawn REAL processes (gates, CLIs, git);
 //                forked + isolated workers (`pnpm test:integration`).
-// `pnpm test` runs BOTH projects and remains the FULL repository authority;
+//   packages   — every `packages/*/test/**` suite (security perimeter,
+//                tenant isolation, persistence edges, schema parity); forked
+//                + isolated like integration because several boot PGlite.
+// `pnpm test` runs ALL projects and remains the FULL repository authority;
 // FAST verification (fast-impact.mjs → `vitest related`) composes unchanged.
 //
 // `.claude/**` MUST stay excluded: stale session worktrees contain old copies
@@ -49,6 +55,17 @@ export default defineConfig({
         test: {
           name: 'integration',
           include: ['tests/**/*e2e*.spec.ts'],
+          exclude: excludeStaleWorktrees,
+          pool: 'forks',
+          isolate: true,
+          testTimeout: 30_000,
+          hookTimeout: 30_000,
+        },
+      },
+      {
+        test: {
+          name: 'packages',
+          include: ['packages/*/test/**/*.spec.ts'],
           exclude: excludeStaleWorktrees,
           pool: 'forks',
           isolate: true,

@@ -5,11 +5,12 @@ product contract: a read-only, security-bounded crypto intelligence and research
 system specified by its authoritative PRD.
 
 > **Status: G0 foundation in progress.** This repository contains the authoritative
-> product specification, its verification tooling, and the first implemented
-> product slice — the G0 contracts & data-truth foundation (`FR-DATA-001…006`,
-> `FR-DR-001/002`). Later milestone packages (capability, security, collector,
-> cost, traceability) are not yet started — nothing here should be read as a
-> claim that the full product exists or works.
+> product specification, its verification tooling, and two implemented G0 slices:
+> the contracts & data-truth foundation (`FR-DATA-001…006`, `FR-DR-001/002`) and
+> the read-only security perimeter (`FR-SEC-001…012`). The remaining G0 packages
+> (tool-core, provider-lifecycle, cost-capacity, first-party observation, MCP
+> surface, traceability conformance) are not yet started — nothing here should be
+> read as a claim that the full product exists or works.
 
 ## Authoritative product specification
 
@@ -63,14 +64,20 @@ Future Autonomous Implementation      .archon/workflows/foresift/README.md
 ```text
 docs/spec/          authoritative product contract (normative — do not hand-edit hashes)
 docs/migration/     migration provenance record
+docs/runbooks/      security operations runbooks (audit chain, incidents, gate pause)
 docs/setup/         bootstrap report
-scripts/            deterministic verification tooling
+scripts/            deterministic verification tooling, incl. the prohibited-
+                    capability scanner CLI (scripts/scan-prohibited-capabilities/)
 tests/              repository verification tests
 packages/domain/        pure domain contracts: identity, time, quantity, quality, errors
 packages/shared-schemas/ runtime zod schemas shared across boundaries
 packages/persistence/   SQL migrations, engine port seam, repositories, DR drills
 packages/evidence/      point-in-time replay and evidence bundles
 packages/object-store/  content-addressed, versioned object storage + staged commits
+packages/security/      read-only security perimeter: egress guard, audit chain,
+                        action gate, untrusted-content isolation, import gating…
+packages/tenant-isolation/ tenant contexts, fail-closed row scoping, signed URLs,
+                           resource-access authorization
 migrations/         G0 SQL migration scripts applied by the persistence migrator
 telemetry/          deterministic automation telemetry definitions
 specs/              version-controlled planning state (work-package specs, tasks)

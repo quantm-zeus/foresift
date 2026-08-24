@@ -54,3 +54,13 @@ Defects found and fixed while proving this matrix (2026-08-23, PR for this doc):
   config). Hermetic proof: first-tick fixture with `origin/main` ahead of the
   checkout asserts the CURRENT generation launches and no fatal pause latches
   (`v3-generations.spec.ts`, "first tick drains the queued main fast-forward").
+- **`--clear-fatal` left a permanent selection deadlock behind the cleared
+  pause (observed live during gen-1 activation, 2026-08-24)** — clearing the
+  flag retained the fatal-paused entry, which occupies its package's selection
+  slot forever; once the milestone has moved generations the row is neither
+  resumable (`--recover-fatal` refuses cross-generation recovery, by design)
+  nor splicable (terminal-row reconciliation ignores paused rows). Fixed:
+  clearing now also untracks every fatal-paused row (recorded as
+  `fatal_pause_entries_dropped`); stranded reconciliation rebuilds whatever
+  tracking is still warranted against current truth next tick, and the
+  pre-existing orphan refusal still guards RUNNING-without-live-track.

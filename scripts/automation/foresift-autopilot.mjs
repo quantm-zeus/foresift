@@ -346,7 +346,56 @@ function setPackageStatus(ms, packageId, status) {
 }
 
 // ── launching ────────────────────────────────────────────────────────────────
-function launchDetached(workflow, branch, message) {
+/**
+ * Archon reuses ONE run worktree per package+generation across runs, so any
+ * dead run leaves residue behind (planning scratch, stale workflow
+ * materializations) that trips adopt-generation-branch's dirty-tree refusal on
+ * every subsequent fresh launch — a permanent recover-fatal crash-loop
+ * (observed live during gen-1 activation, 2026-08-24). A FRESH detached launch
+ * therefore starts from a clean worktree. Guarded, fail-closed:
+ *   - only Archon-owned worktrees (under /.archon/workspaces/) are touched,
+ *     never this checkout and never operator worktrees;
+ *   - if origin cannot vouch for the branch tip (missing ref or unpushed
+ *     commits) the reset is SKIPPED — adoption's own refusal then pauses for
+ *     an operator instead of destroying possibly-real work.
+ * Returns an outcome object recorded in state history for audit.
+ */
+function resetArchonRunWorktree(branch) {
+  const list = sh('git worktree list --porcelain');
+  if (!list.ok) return { skipped: 'worktree_list_failed' };
+  for (const block of list.out.split('\n\n')) {
+    const lines = block.split('\n');
+    const path = lines.find((l) => l.startsWith('worktree '))?.slice(9);
+    const wtBranch = lines.find((l) => l.startsWith('branch '))?.slice(7);
+    if (!path || wtBranch !== `refs/heads/${branch}`) continue;
+    // Exactly one worktree can hold a branch; whichever we found decides.
+    if (path === REPO || !path.includes('/.archon/workspaces/'))
+      return { skipped: 'non_archon_worktree_holds_branch', path };
+    const q = JSON.stringify(path);
+    sh(`git -C ${q} fetch origin ${JSON.stringify(branch)} --quiet`);
+    const originTip = sh(`git -C ${q} rev-parse --verify --quiet origin/${branch}`).out.trim();
+    if (!originTip) return { skipped: 'no_origin_ref', path };
+    const ahead = sh(`git -C ${q} rev-list --count origin/${branch}..${branch}`);
+    if (!ahead.ok || Number(ahead.out.trim()) > 0)
+      return { skipped: 'unpushed_commits', path, unpushed: ahead.out.trim() || null };
+    const status = sh(`git -C ${q} status --porcelain=v1`);
+    const files = status.ok ? status.out.split('\n').filter(Boolean) : [];
+    if (!files.length) return { skipped: 'clean', path };
+    const reset = sh(`git -C ${q} reset --hard`);
+    const cleaned = reset.ok ? sh(`git -C ${q} clean -fd`) : { ok: false };
+    return {
+      ok: reset.ok && cleaned.ok,
+      path,
+      fileCount: files.length,
+      files: files.slice(0, 40),
+    };
+  }
+  return null;
+}
+
+function launchDetached(st, workflow, branch, message) {
+  const reset = st ? resetArchonRunWorktree(branch) : null;
+  if (reset) record(st, 'run_worktree_reset', { branch, ...reset });
   const ack = archonJson(
     `workflow run ${workflow} --detach --branch ${branch} --json ${JSON.stringify(message)}`,
   );
@@ -683,7 +732,7 @@ async function actOnPendingAction(st, entry) {
   if (entry.runId === null || entry.abandonedBeforeRestart) {
     // Fresh restart against the SAME branch so existing work persists.
     entry.abandonedBeforeRestart = false;
-    const ack = launchDetached(entry.workflow, entry.branch, entry.message);
+    const ack = launchDetached(st, entry.workflow, entry.branch, entry.message);
     record(st, 'fresh_restart_launched', { branch: entry.branch, ack: sanitizeAck(ack) });
     const newId = resolveRunId(ack, entry.workflow, entry.message);
     Object.assign(entry, { runId: newId, awaitingDiscovery: !newId, discoveryAttempts: 0 });
@@ -857,6 +906,7 @@ function selectAndLaunch(st) {
     if (st.milestoneRuns.length > 0 || st.pausedFatal) return 0;
     const message = 'plan-or-audit-current-milestone';
     const ack = launchDetached(
+      st,
       'foresift-milestone-control',
       'foresift/milestone-planning',
       message,
@@ -904,7 +954,7 @@ function selectAndLaunch(st) {
     const verdict = canStartPackage(roadmap, ms, cand, running);
     if (!verdict.ok) continue;
     const { generation, branch, message, workflow: wf } = launchIdentity(cand);
-    const ack = launchDetached(wf, branch, message);
+    const ack = launchDetached(st, wf, branch, message);
     const runId = resolveRunId(ack, wf, message);
     record(st, 'work_package_launched', {
       packageId: cand.id,
@@ -1429,7 +1479,7 @@ async function cmdRecoverFatal(positionalRunId) {
     }
     // ONE fresh continuation on the SAME branch/worktree; prior work persists on
     // disk/git and completed tasks are discovered from there by the workflow.
-    const ack = launchDetached(workflow, branch, message);
+    const ack = launchDetached(st, workflow, branch, message);
     record(st, 'operator_recovery_fresh_launch', { branch, ack: sanitizeAck(ack) });
     runId = resolveRunId(ack, workflow, message);
   }

@@ -153,8 +153,12 @@ export function adoptGenerationBranch({ message, repoRoot = process.cwd(), run =
   // pristine state.
   const dirty = g('status', '--porcelain');
   if (dirty.status !== 0) return failRefused('worktree status unreadable');
-  if (dirty.out.trim())
-    return failRefused('worktree is dirty — refusing to rebase adoption over uncommitted changes');
+  if (dirty.out.trim()) {
+    const manifest = dirty.out.trim().split('\n').slice(0, 20).join(' | ');
+    return failRefused(
+      `worktree is dirty — refusing to rebase adoption over uncommitted changes (${manifest})`,
+    );
+  }
 
   const checkout = g('checkout', '-B', expected, seedSha);
   if (checkout.status !== 0)

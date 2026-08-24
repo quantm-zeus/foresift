@@ -12,27 +12,32 @@ generation 1).
 Generation 0 of this package implemented all eight assigned requirements across
 five workspace packages, eleven migrations, the full manifest-declared
 acceptance/negative suites, and telemetry catalogs, then passed independent
-review repair. That content is present on this branch as the adopted seed.
-Generation 1 is therefore a **convergence generation**, not a build-out:
+review repair. That content is present on this branch as the adopted seed and is
+byte-identical to the review-repaired generation-0 tip (`3367821`) inside every
+package content scope (`packages/**`, `migrations/**`, `tests/fixtures/**`,
+`tests/acceptance/**`, `tests/negative/**`, `telemetry/**`). Generation 1 is
+therefore a **convergence generation**, not a build-out:
 
-1. **Restore the four root-configuration deltas** the seed adoption lost
-   relative to the review-repaired generation-0 tip (`3367821` on
-   `foresift/g0-contracts-data-truth`). Every source, migration, test, fixture,
-   and telemetry file is already byte-identical to that tip; only
-   `tsconfig.json`, `tsconfig.base.json`, `pnpm-workspace.yaml`, and
-   `package.json` differ. The lost deltas are the root cause of every current
-   failure: 105 TypeScript TS5097 errors (`.ts`-extension imports without
-   `allowImportingTsExtensions`), two failing config-shape acceptance tests
-   (`tests/acceptance/tooling-globs.spec.ts`: tsconfig include globs + exclude),
-   and three failing automation end-to-end tests whose child processes run
-   `pnpm typecheck`.
-2. **Re-verify everything deterministically**: full `pnpm verify`
-   (spec:verify, format:check, lint, typecheck, tests) plus the package
-   verification commands, at HEAD, leaving work uncommitted for review.
+1. **Restore the remaining root-configuration deltas** versus the reviewed tip.
+   An earlier baseline (at absorbed-main HEAD `5d098b8`) found four differing
+   root-config files causing 105 TS5097 errors and five failing tests; since
+   then this branch absorbed main's own tooling repair (`ac67972`), which
+   already restored `tsconfig.json`'s converged include/exclude shape and
+   `allowImportingTsExtensions` in `tsconfig.base.json`. Re-baselined at current
+   HEAD `1cb934f`: typecheck GREEN (zero errors), full suite GREEN (63 files /
+   444 tests). The remaining delta is exactly two functional edits — the
+   `minimumReleaseAgeExclude` entry in `pnpm-workspace.yaml` and root
+   `package.json` devDependency ordering parity — plus one cosmetic ordering
+   parity edit in `tsconfig.base.json`.
+2. **Re-verify everything deterministically** after those edits: full
+   `pnpm verify` (spec:verify, format:check, lint, typecheck, tests) plus the
+   four package verification commands, at HEAD, leaving work uncommitted for
+   review.
 
 No requirement semantics change in this generation. The normative scope in
 spec.md §2–§4 is restated for traceability; the engineering work below is the
-minimal, evidence-backed path to a green converged tree.
+minimal, evidence-backed path to a fully converged tree matching the reviewed
+tip inside this package's write scopes.
 
 ## Technical Context
 
@@ -71,10 +76,13 @@ benchmark fixtures assert §33-class internal overhead budgets with headroom
 deterministic verification (XI); positive AND failure-path testing (XII);
 every task traces to an assigned requirement or its acceptance criteria (X).
 
-**Scale/Scope of remaining work**: four root-config files, then verification.
-Zero changes to packages/, migrations/, tests/fixtures, tests/acceptance,
-tests/negative, or telemetry are expected; if verification surfaces one, it is
-fixed within writeScopes and recorded in tasks.md.
+**Scale/Scope of remaining work**: two functional root-config edits
+(`pnpm-workspace.yaml`, `package.json`), one cosmetic ordering edit
+(`tsconfig.base.json`), verification of the two already-restored configs, then
+the full deterministic re-verification. Zero changes to packages/, migrations/,
+tests/fixtures, tests/acceptance, tests/negative, or telemetry are expected; if
+verification surfaces one, it is fixed within writeScopes and recorded in
+tasks.md.
 
 ## Constitution Check
 
@@ -101,25 +109,35 @@ _GATE: must pass before implementation. Re-checked after design._
 | XVII Additive Git History             | PASS    | Work stays uncommitted for review in this stage; landing goes through PR; no amend/rebase/force.                                                            |
 | XVIII No AI Claim Is Completion       | PASS    | Completion decided by `package-plan-complete.mjs` now and by `pnpm verify`/CI later.                                                                        |
 
-## Current-State Baseline (verified 2026-08-24 at HEAD `5d098b8`)
+## Current-State Baseline (re-verified 2026-08-24 at HEAD `1cb934f`, after absorbing main's tooling repair)
 
-| Check                      | Status | Detail                                                                                                                                                                                                                                                                                                                                         |
-| -------------------------- | ------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `pnpm spec:verify`         | GREEN  | 13 checks passed.                                                                                                                                                                                                                                                                                                                              |
-| `pnpm format:check`        | GREEN  | All matched files formatted.                                                                                                                                                                                                                                                                                                                   |
-| `pnpm lint`                | GREEN  | No findings.                                                                                                                                                                                                                                                                                                                                   |
-| `pnpm typecheck`           | RED    | 105 × TS5097 ("import path can only end with a '.ts' extension when 'allowImportingTsExtensions' is enabled") across domain/evidence/object-store/persistence/shared-schemas sources reached from tests, and across tests/acceptance + tests/negative specs themselves.                                                                        |
-| `pnpm test`                | RED    | 5 failed / 437 passed: `tests/acceptance/tooling-globs.spec.ts` ×2 (include globs miss synthetic future-package paths; no `exclude` array), `tests/automation/targeted-router-e2e.spec.ts`, `tests/automation/gate-e2e-green.spec.ts`, `tests/automation/gate-e2e-red.spec.ts` (each spawns a gate/executor child that runs `pnpm typecheck`). |
-| Manifest testRefs coverage | GREEN  | All 44 unique manifest-declared test files exist.                                                                                                                                                                                                                                                                                              |
+| Check                | Status | Detail                                                                                                                        |
+| -------------------- | ------ | ----------------------------------------------------------------------------------------------------------------------------- |
+| `pnpm spec:verify`   | GREEN  | 13 checks passed.                                                                                                             |
+| `pnpm typecheck`     | GREEN  | Zero errors (absorbed main commit `ac67972` restored the glob-driven include shape and `allowImportingTsExtensions`).         |
+| `pnpm test`          | GREEN  | 63 files / 444 tests passed, including `tests/acceptance/tooling-globs.spec.ts` (4/4) and the three automation e2e specs.     |
+| Content-scope parity | GREEN  | `git diff --name-only 3367821 HEAD -- packages migrations telemetry tests/fixtures tests/acceptance tests/negative` is empty. |
+| Root-config parity   | DELTA  | Exactly three files differ from the reviewed tip inside this package's root-config scopes (detailed below).                   |
 
-**Root cause (evidence)**: `git diff HEAD 3367821 -- tsconfig.json tsconfig.base.json pnpm-workspace.yaml package.json`
-is the entire tree delta versus the review-repaired generation-0 tip. The g1
-seed absorbed the package sources but retained bootstrap-era root configs
-(`include: ["tests/**/*.ts"]`, no `allowImportingTsExtensions`, no pglite
-release-age exclusion, older dependency ordering). The codebase consistently
-uses `.ts`-extension imports (correct NodeNext ESM style, executed by vitest);
-the compiler flag — valid because every tsconfig sets `noEmit: true` — is the
-intended companion, as proven by generation 0's green gates at `3367821`.
+**Remaining delta versus the review-repaired generation-0 tip** (`git diff HEAD
+3367821 -- tsconfig.json tsconfig.base.json pnpm-workspace.yaml package.json`):
+
+- `pnpm-workspace.yaml`: missing `minimumReleaseAgeExclude:
+['@electric-sql/pglite@0.5.6']` — the mechanically emitted pnpm entry that was
+  part of the reviewed state. Functionally inert while no release-age policy is
+  configured, but its absence breaks parity with the reviewed tip and fresh
+  installs would drift if a policy is re-enabled.
+- `package.json`: devDependencies are listed in a different order than the
+  reviewed tip (workspace packages after vitest instead of before `@types/*`);
+  main-postdating scripts (`autopilot:restart-package`, `test:unit`,
+  `test:integration`) are correctly present and KEPT per material decision 2.
+- `tsconfig.base.json`: `allowImportingTsExtensions: true` is present but
+  positioned after `verbatimModuleSyntax` instead of after `moduleResolution`;
+  functionally identical — cosmetic ordering only.
+
+All other differences between this branch and `3367821` are main's own shared
+tooling, automation, and documentation evolution absorbed through
+`5d098b8`/`1cb934f` — outside this package's write scopes and not its delta.
 
 ## Project Structure
 
@@ -132,17 +150,25 @@ specs/g0-contracts-data-truth@g1/
   tasks.md     # ordered traceable breakdown
 ```
 
-The generation-0 scoped trio remains at `specs/g0-contracts-data-truth/` as
-historical planning record; this directory is authoritative for generation 1.
+The scoped trio exists in TWO mirrored directories:
+`specs/g0-contracts-data-truth/` (bare milestone id) and
+`specs/g0-contracts-data-truth@g1/` (generation-1 execution identity,
+authoritative), because the deterministic guards (`package-plan-complete.mjs`,
+`package-implement-complete.mjs`) resolve `specs/<bare-id>/` while the Archon AI
+commands read `specs/<id>@g<N>/`; divergent copies would let one surface see a
+complete plan while another sees stale state. The two trios are kept identical
+except for self-referential paths; every change to one is mirrored to the other.
 
 ### Source deltas (all inside binding writeScopes)
 
 ```text
-tsconfig.json        # include packages/*/src/**/*.ts, packages/*/test/**/*.ts,
-                     #   tests/**/*.ts; exclude node_modules, dist
-tsconfig.base.json   # add "allowImportingTsExtensions": true (valid under noEmit)
-pnpm-workspace.yaml  # add minimumReleaseAgeExclude entry for @electric-sql/pglite@0.5.6
-package.json         # devDependency list ordering parity with the converged tip;
+tsconfig.json        # VERIFY converged shape already present (absorbed main):
+                     #   include packages/*/src/**/*.ts, packages/*/test/**/*.ts,
+                     #   tests/**/*.ts; exclude node_modules, dist — restore only if drifted
+tsconfig.base.json   # VERIFY "allowImportingTsExtensions": true present (it is);
+                     #   align its position with the reviewed tip (cosmetic ordering only)
+pnpm-workspace.yaml  # ADD minimumReleaseAgeExclude entry for @electric-sql/pglite@0.5.6
+package.json         # devDependency list ordering parity with the reviewed tip;
                      #   KEEP main's newer automation scripts (autopilot:restart-package,
                      #   test:unit, test:integration) that postdate generation 0
 ```
@@ -185,22 +211,23 @@ and RPO measurement.
 | AC-260…264 (recovery-traceability)         | Destructive-drill, clean-environment verifier, degraded-state, checkpoint/gap, and backup-policy suites green.                                    |
 | Cross-cutting                              | `pnpm verify` (all five stages) + the four package verification commands from current-milestone.json, all green at HEAD.                          |
 
-Regression guards specific to this generation: `pnpm typecheck` must report
-zero errors (proves TS5097 resolution); the three automation e2e failures must
-return green (their children run `pnpm typecheck`; if any remains red after the
-config fix, classify per Constitution governance, record in the run's
-out-of-scope notes — `tests/automation/**` is outside this package's
-writeScopes and must not be edited here).
+Regression guards specific to this generation: `pnpm typecheck` stays at zero
+errors (it already is at the re-baselined HEAD; the remaining config edits must
+not regress it); the full suite stays green (444 tests) and the three automation
+e2e specs stay green. If any check turns red after the remaining edits, classify
+per Constitution governance and record in the run's out-of-scope notes —
+`tests/automation/**` is outside this package's writeScopes and must not be
+edited here.
 
 ## Risks
 
-| Risk                                                                                                        | Mitigation                                                                                                                                                                      |
-| ----------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Restoring `allowImportingTsExtensions` globally could mask genuinely wrong extensionless imports elsewhere. | The flag only permits `.ts` suffixes; lint + verbatimModuleSyntax still enforce explicitness. Typecheck must go to exactly zero errors; any new error class stops the task.     |
-| Root include-glob widening could pull generated or vendored files into typecheck.                           | `exclude` lists node_modules/dist; per-package tsconfigs stay intact; the widened include mirrors the exact set that was green at the reviewed tip.                             |
-| Automation e2e failures might have a second, unrelated cause.                                               | Fix configs first, re-run; only if still red, classify (transient/fatal/environmental), document in out-of-scope notes, and never edit `tests/automation/**` from this package. |
-| Lockfile drift when touching package.json/pnpm-workspace.yaml.                                              | Run `pnpm install` after edits so `pnpm-lock.yaml` regenerates mechanically; no hand edits; verify install is a no-op diff beyond the known entries.                            |
-| Silent divergence between the adopted seed and the reviewed tip outside root configs.                       | Guarded by construction: `git diff` shows none today; tasks include a final diff re-check before declaring convergence.                                                         |
+| Risk                                                                                                                                   | Mitigation                                                                                                                                                                           |
+| -------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| The remaining config edits (`pnpm-workspace.yaml`, `package.json`) regress the currently green typecheck/tests.                        | Both edits are non-semantic (an inert pnpm exclusion entry and dependency-list ordering); typecheck + full suite re-run immediately after them must stay at zero errors / 444 green. |
+| Lockfile drift when touching package.json/pnpm-workspace.yaml.                                                                         | Run `pnpm install` after edits so `pnpm-lock.yaml` regenerates mechanically; no hand edits; verify the diff is confined to the known entries.                                        |
+| Silent divergence between the adopted seed and the reviewed tip inside package content scopes.                                         | Guarded by construction: the content-scope diff vs `3367821` is empty today; tasks include a final diff re-check before declaring convergence.                                       |
+| Main absorbs further tooling changes mid-generation, shifting the baseline again.                                                      | Re-run the four baseline checks before editing; treat any new delta as main's shared tooling unless it falls inside this package's write scopes.                                     |
+| Divergence between the mirrored scoped-artifact directories (`specs/g0-contracts-data-truth/` vs `specs/g0-contracts-data-truth@g1/`). | Material decision 4 keeps the two trios byte-identical (self-referential paths adapted); final consistency sweep verifies both.                                                      |
 
 ## Material decisions
 
@@ -219,10 +246,20 @@ writeScopes and must not be edited here).
 ['@electric-sql/pglite@0.5.6']` is the mechanically emitted pnpm entry that
    lets installs resolve while the workspace enforces minimum release age;
    without it fresh CI checkouts can fail dependency installation.
+4. **Mirrored scoped-artifact directories**: the deterministic guards receive
+   the bare package id (`${ARGUMENTS%%@g*}` in the optimized workflow) and read
+   `specs/g0-contracts-data-truth/`, while the Archon AI commands interpolate
+   raw `$ARGUMENTS` and read `specs/g0-contracts-data-truth@g1/` (authoritative
+   for generation 1). Both surfaces must present ONE coherent plan, so the two
+   directories carry byte-identical trios with only self-referential paths
+   adapted, and every change to one is mirrored to the other. This is a
+   workflow-consistency measure inside the planning surface; it changes no
+   requirement semantics and is recorded here rather than as an ADR because it
+   binds only this package's planning artifacts.
 
 ## Supporting changes outside writeScopes (justified)
 
-1. `pnpm-lock.yaml` — mechanical regeneration via `pnpm install` after the two
-   scoped manifest edits above; no hand edits.
+1. `pnpm-lock.yaml` — mechanical regeneration via `pnpm install` after the
+   scoped `package.json`/`pnpm-workspace.yaml` edits; no hand edits.
 2. None otherwise planned. Anything discovered mid-implementation goes to the
    run's `out-of-scope-notes.md` instead of being fixed out of scope.

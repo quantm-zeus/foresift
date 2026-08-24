@@ -1,4 +1,4 @@
-# Work-Package Specification: g0-contracts-data-truth
+# Work-Package Specification: g0-contracts-data-truth (generation 1)
 
 > **SUBORDINATION NOTICE**: This file is a **scoped Spec Kit derivative** of the
 > authoritative product contract
@@ -12,11 +12,24 @@
 | Field             | Value                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
 | ----------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Milestone         | G0 (foundation)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              |
-| Package id        | `g0-contracts-data-truth`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
+| Package id        | `g0-contracts-data-truth@g1` (milestone entry `g0-contracts-data-truth`, generation 1, status RUNNING)                                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
 | Risk              | CRITICAL                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
 | Dependencies      | none (first package in the milestone)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
-| Normative source  | PRD §38.2 (FR-DATA family), §38.43 (FR-DR family), §39 acceptance criteria, §45 architecture invariants; the manifest entries for these requirements carry `line` anchors 5998–6003 (FR-DATA) and 6494–6495 (FR-DR) into that PRD file (the manifest itself is single-line JSON)                                                                                                                                                                                                                                                                                             |
+| Normative source  | PRD §38.2 (FR-DATA family), §38.43 (FR-DR family), §39 acceptance criteria, §45 architecture invariants; manifest `line` anchors 5998–6003 (FR-DATA) and 6494–6495 (FR-DR) into the PRD file (the manifest itself is single-line JSON)                                                                                                                                                                                                                                                                                                                                       |
 | Package objective | Establish the canonical data-truth foundation: versioned chain/asset/pool/launch/migration identity, immutable observations with revisions, point-in-time `available_at` replay with no-backdating, field-level quality codes, online/offline feature consistency, source lineage and independence groups, and tiered backup/PITR durability with separately protected encryption keys and recovery credentials over the shared persistence, object-store, and schema layers — plus glob-driven root tooling configuration so later G0 packages need zero root-config edits. |
+
+## 0. Generation-1 execution context
+
+This is **generation 1** of the package. The generation-0 branch
+(`foresift/g0-contracts-data-truth`) implemented all eight assigned requirements
+and passed review repair (CRITICAL/HIGH/MEDIUM/LOW findings addressed); its
+content is present in this branch as the adopted seed. Generation-1 planning was
+re-run because the deterministic planning gate found the run artifacts missing,
+and generation-1 verification found the seed **not converged**: the adopted tree
+lost four root-configuration deltas relative to the review-repaired
+generation-0 tip (`3367821`), leaving 105 TypeScript errors and five failing
+tests. The requirements, acceptance criteria, invariants, and non-goals below
+are unchanged normative scope; plan.md carries the convergence approach.
 
 ## 1. Scope statement
 
@@ -66,7 +79,8 @@ All eight assigned requirements are normative level **MUST**, dependency group
   CAIP-2/CAIP-10-compatible canonical identifiers with mapping-quality state), and
   §11.6 migration lineage (`launch_pool -> migration_event -> migrated_pool` edges;
   features MUST avoid double counting liquidity, volume, and holders across
-  migration boundaries).
+  migration boundaries). Repository ADR-0016 additionally governs decimals
+  CROSS_CHECKED independence as best-effort over registered identities.
 
 ### FR-DATA-002 — Immutable observations and revisions
 
@@ -176,12 +190,12 @@ non-goal recorded in §6.
 | AC-241 | "Replaying the same frozen candidate … differs only in registered policy components; hidden current-data calls fail the replay."                                                                         | temporal-evaluation | Substrate owned here: frozen-replay read paths that resolve only `available_at <= T` records and expose no current-state bypass; policy-component machinery later.                                                     |
 | AC-242 | "Evidence not requested by policy is stored as `NOT_REQUESTED_BY_POLICY`, not `RETURNED_EMPTY`, `PROVIDER_UNAVAILABLE`, or a negative feature value."                                                    | temporal-evaluation | Storage semantics fully owned here: acquisition-decision records (§13.8) with the exact state vocabulary persisted and queryable.                                                                                      |
 | AC-243 | "Every randomized evidence probe stores eligibility stratum, nonzero assignment probability, seed provenance, selection timestamp, requested fields, and final decision impact before outcome maturity." | temporal-evaluation | Schema/storage obligations owned here: acquisition records persist those fields with write-before-retrieval ordering enforced at the storage contract level; the randomization engine itself later.                    |
-| AC-244 | "A feature learned only from selectively deep-researched candidates cannot claim full-universe lift…"                                                                                                    | temporal-evaluation | Minimal substrate: feature values carry feature version, computation code version, event time, and population/lineage provenance fields enabling later selection-adjustment checks; the lift-claim logic itself later. |
+| AC-244 | "A feature learned only from selectively deep-researched candidates cannot claim full-universe lift without valid selection adjustment or an explicitly restricted population."                          | temporal-evaluation | Minimal substrate: feature values carry feature version, computation code version, event time, and population/lineage provenance fields enabling later selection-adjustment checks; the lift-claim logic itself later. |
 | AC-245 | "Provider pairs with strongly correlated timing, values/errors, outages, and first-seen behavior receive reduced empirical independence credit despite different provider IDs."                          | temporal-evaluation | Dependence-edge storage owned here: pairwise empirical-dependence edge records keyed by declared lineage + observed correlation inputs; credit computation later.                                                      |
-| AC-246 | "Removing or collapsing each major upstream lineage is included in sensitivity analysis; a policy whose alert gate depends on duplicated evidence cannot be promoted…"                                   | temporal-evaluation | Lineage-collapse substrate owned here: independence-group membership queries that collapse to upstream lineage; sensitivity analysis and promotion gates later.                                                        |
+| AC-246 | "Removing or collapsing each major upstream lineage is included in sensitivity analysis; a policy whose alert gate depends on duplicated evidence cannot be promoted as independently confirmed…"        | temporal-evaluation | Lineage-collapse substrate owned here: independence-group membership queries that collapse to upstream lineage; sensitivity analysis and promotion gates later.                                                        |
 | AC-247 | "A retrospective provider-dependence estimate cannot alter a frozen historical evidence count in realizable replay; it is labeled diagnostic unless the estimate was available then."                    | temporal-evaluation | Frozen-count immutability owned here: historical evidence counts resolved through replay boundaries cannot be mutated by later estimates; estimate labeling via availability-provenance classes.                       |
-| AC-248 | "Promotion fails below the registered mature success/failure/risk counts, cluster effective sample size, calendar/regime coverage, or interval precision…"                                               | temporal-evaluation | Non-goal beyond substrate: promotion machinery later packages; this package guarantees the immutable, replay-correct counts they consume.                                                                              |
-| AC-249 | "Timestamp-shift, availability-backdating placebo, … controls show no unexplained material lift; any failure blocks promotion."                                                                          | temporal-evaluation | The availability-backdating placebo control operates on this package's no-backdating rule: fixture-level placebo checks owned here; full promotion blocking later.                                                     |
+| AC-248 | "Promotion fails below the registered mature success/failure/risk counts, cluster effective sample size, calendar/regime coverage, or interval precision even when point estimate is favorable."         | temporal-evaluation | Non-goal beyond substrate: promotion machinery belongs to later packages; this package guarantees the immutable, replay-correct counts they consume.                                                                   |
+| AC-249 | "Timestamp-shift, availability-backdating placebo, outcome permutation, provider-ID predictor, synthetic-noise, delayed-delivery, and leakage controls show no unexplained material lift…"               | temporal-evaluation | The availability-backdating placebo control operates on this package's no-backdating rule: fixture-level placebo checks owned here; full promotion blocking later.                                                     |
 
 ### 3.2 Recovery criteria (FR-DR family)
 
@@ -223,7 +237,7 @@ truth (see tasks).
 
 ## 5. Accepted product ADRs directly binding this package
 
-Quoted/summarized from Appendix D (all ACCEPTED):
+Quoted/summarized from Appendix D of the authoritative PRD (all ACCEPTED there):
 
 - **ADR-001**: PostgreSQL is authoritative for operational state. SQL migrations
   are the schema source of truth; Drizzle mirrors them for typed access. Unique
@@ -242,6 +256,22 @@ Quoted/summarized from Appendix D (all ACCEPTED):
   verification, collector replay/gap integrity.
 - **ADR-058**: release-blocking canonical machine-readable manifest (context for
   why IDs and hashes are preserved verbatim in schemas and migrations).
+
+Accepted repository ADRs (recorded during generation 0, binding here):
+
+- **ADR-0013** (`docs/adr/0013-runtime-schema-validation-zod.md`): Zod is the single
+  approved runtime-validation schema library; authoritative schemas live in
+  `packages/shared-schemas`.
+- **ADR-0014** (`docs/adr/0014-pglite-deterministic-db-test-engine.md`): PGlite is
+  the deterministic in-process PostgreSQL test engine; production remains real
+  PostgreSQL per product ADR-001.
+- **ADR-0015** (`docs/adr/0015-pre-infrastructure-recovery-mechanism.md`): until
+  production infrastructure exists, FR-DR-002's "equivalent tested mechanism" is
+  the deterministic snapshot-and-replay restore harness under
+  `packages/persistence/src/drill/`.
+- **ADR-0016** (`docs/adr/0016-decimals-cross-check-independence-best-effort.md`):
+  decimals CROSS_CHECKED credit collapses best-effort against registered
+  independence groups; unregistered refs keep ref-level semantics.
 
 ## 6. Explicit non-goals (everything else in milestone G0)
 
@@ -270,7 +300,7 @@ scope and belong to other G0 packages per
   deployment topology (operations/deployment concerns outside these write scopes);
   this package delivers the recovery-tier registry, backup/restore mechanism
   interfaces with a deterministically tested equivalent mechanism, and drill
-  harness that production infrastructure configures.
+  harness that production infrastructure configures (per repository ADR-0015).
 - Empirical dependence estimation algorithms, promotion/promotion-gate machinery,
   evaluation-integrity statistics (later milestones consume this package's
   lineage/dependence-edge substrate).
@@ -282,12 +312,13 @@ scope and belong to other G0 packages per
 ## 7. Package success criteria
 
 1. All eight assigned requirements have executable positive AND negative/failure-
-   path verification at the manifest-declared test paths, green in CI.
+   path verification at the manifest-declared test paths, green on this branch.
 2. Migrations apply cleanly to empty databases and are re-runnable without damage;
    immutability, replay-boundary, no-backdating, and idempotency properties hold
    under adversarial (negative) tests, not only happy paths.
 3. Root tooling configuration picks up later G0 package paths automatically
-   (glob-driven tsconfig/eslint/workspace), verified by a config-shape test.
+   (glob-driven tsconfig/eslint/workspace), verified by the config-shape
+   acceptance suite passing.
 4. `pnpm verify` and `pnpm spec:verify` pass at the pushed HEAD.
 5. No template placeholders remain in any scoped artifact; every task traces to an
    assigned requirement or its acceptance criteria.
@@ -295,8 +326,8 @@ scope and belong to other G0 packages per
 ## 8. Assumptions
 
 - In-process Postgres (PGlite) serves as the deterministic migration/repository
-  test engine; production remains real PostgreSQL per ADR-001 (recorded as a
-  proposed ADR in plan.md).
+  test engine; production remains real PostgreSQL per product ADR-001 (accepted
+  as repository ADR-0014).
 - Telemetry definitions are machine-readable catalogs under `telemetry/data.*`
   and `telemetry/dr.*`; emission wiring lands with observability work in later
   packages.

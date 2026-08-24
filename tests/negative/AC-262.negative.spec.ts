@@ -38,6 +38,9 @@ afterAll(() => closeTestDatabase(tdb));
 
 describe('AC-262 negative: illegal health states fail typed review before persistence', () => {
   it('suppressing deterministic risk monitoring alongside degradation is refused', async () => {
+    // BACKUP_POLICY_INVALID here is deliberate, not a copy-paste bug:
+    // recovery-health-state review shares the backup-policy validation
+    // refusal code (see packages/persistence/src/repos/recovery.ts).
     await expect(
       recordRecoveryHealthState(tdb.engine, {
         healthStateId: 'ac262n-health-risk-suppressed',

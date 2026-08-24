@@ -307,8 +307,10 @@ export interface DecimalsObservationInput {
  * - support whose refs share an upstream lineage counts as ONE independent
  *   voice (INV-008): state stays SOURCED and the result carries
  *   `independenceHints: ['DECIMAL_UNCERTAIN']` (ADR-0016);
- * - a lone latest value contradicted by an independent source that never
- *   endorsed it → CONFLICTING (explicitly unusable, never guessed);
+ * - a lone latest value contradicted by a source that never endorsed the
+ *   value → CONFLICTING (explicitly unusable, never guessed; dissent is
+ *   counted per source-ref — lineage folding applies only to cross-check
+ *   support);
  * - otherwise SOURCED (single source, possibly self-correcting).
  */
 export async function recordDecimalsObservation(
@@ -385,7 +387,8 @@ export async function recordDecimalsObservation(
         state = DecimalsResolutionState.CROSS_CHECKED;
         resolvedDecimals = latest;
       } else if (unendorsedDissent) {
-        // A dissenting independent source stands until independently answered.
+        // A source-ref dissenter stands until independently answered (lineage
+        // folding is cross-check support only; dissent itself is per ref).
         state = DecimalsResolutionState.CONFLICTING;
         resolvedDecimals = null;
       } else {

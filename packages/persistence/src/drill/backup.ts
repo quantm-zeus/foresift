@@ -271,7 +271,12 @@ export interface SnapshotTableArtifact {
   /** `table:<name>` */
   readonly name: string;
   readonly rowCount: number;
-  /** sha256 over the canonical row JSON. */
+  /**
+   * sha256 over the UTF-8 encoding of the table's canonical row texts
+   * (one `canonicalRowJson` per row), lexicographically sorted and joined
+   * with `\n`. Hash-compat-critical: any change to the recipe changes every
+   * stored snapshot hash.
+   */
   readonly contentHash: string;
   readonly sizeBytes: number;
 }

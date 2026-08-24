@@ -362,8 +362,9 @@ const AvailabilityProofMethodSchema = z.enum([
  *   receipt reference proves earlier availability;
  * - event time can never sit after availability.
  *
- * Note: availability provenance class is NOT restricted here — receipts may be
- * validated against any §13.2 class by callers; this schema enforces shape.
+ * Note: the proof method is not otherwise restricted here beyond the
+ * live-receipt-ref requirement; §13.2 provenance classification happens
+ * upstream — this schema enforces shape only.
  */
 export const BackfillReceiptSchema = z
   .object({

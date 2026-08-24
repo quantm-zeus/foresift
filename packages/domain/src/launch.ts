@@ -38,6 +38,10 @@ export interface MigrationLineageEdge {
  * - undated samples on a pool with outgoing migrations are refused as
  *   ambiguous rather than guessed (§11.8 abstain rule).
  *
+ * Every supplied edge must already be CONFIRMED with a `migratedAt` boundary;
+ * any AMBIGUOUS or unbounded edge is refused up front, even when its pools
+ * appear nowhere in `contributions`.
+ *
  * Naive summation over the same inputs double counts across every boundary,
  * which is exactly what the AC-022 regression fixture demonstrates.
  */

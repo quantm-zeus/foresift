@@ -129,6 +129,28 @@ describe('mcp protocol guard (AC-251)', () => {
     });
   });
 
+  it('REFUSES ABSENT dimensions instead of skipping them (M17)', () => {
+    // Omission may never skip a guard dimension: absent method/byte-count/
+    // session evidence is unverifiable, and unverifiable refuses.
+    expect(GUARD.inspect({ ...okInput, method: undefined })).toMatchObject({
+      decision: 'REFUSE',
+      reason: 'METHOD_INVALID',
+    });
+    expect(GUARD.inspect({ ...okInput, messageBytes: undefined })).toMatchObject({
+      decision: 'REFUSE',
+      reason: 'MESSAGE_OVERSIZE',
+    });
+    expect(GUARD.inspect({ ...okInput, messageBytes: -1 })).toMatchObject({
+      decision: 'REFUSE',
+      reason: 'MESSAGE_OVERSIZE',
+    });
+    // Claims without a session cannot be bound — refused, not skipped.
+    expect(GUARD.inspect({ ...okInput, requestClaims: {} })).toMatchObject({
+      decision: 'REFUSE',
+      reason: 'SESSION_BINDING_INVALID',
+    });
+  });
+
   it('binds sessions across actor/profile/origin/revision claims', () => {
     const session = {
       actor: 'admin@example.com',

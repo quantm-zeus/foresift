@@ -111,7 +111,9 @@ describe('fail-closed row scoping (T130)', () => {
       existingParamCount: 1,
     });
     expect(scoped).toBe(true);
-    expect(sql).toBe('SELECT * FROM sec.import_artifacts WHERE "tenant_id" = $2 AND state = $1');
+    // Caller clauses are parenthesized (L8) so a top-level OR inside a
+    // clause can never flip precedence past the tenant predicate.
+    expect(sql).toBe('SELECT * FROM sec.import_artifacts WHERE "tenant_id" = $2 AND (state = $1)');
   });
 
   it('REFUSES unscoped selects while isolation is active — even on request', () => {

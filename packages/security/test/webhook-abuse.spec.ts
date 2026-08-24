@@ -6,6 +6,7 @@
 import { describe, expect, it } from 'vitest';
 import { createHmac } from 'node:crypto';
 import { hmacSha256Verifier, WebhookGuard } from '../src/webhook-integrity.ts';
+import { WebhookIntegrityError } from '../src/errors.ts';
 import { AbuseController, PROTECTED_SUBJECTS } from '../src/abuse-controls.ts';
 
 const SECRET = 'webhook-test-secret';
@@ -79,6 +80,45 @@ describe('webhook verification battery (AC-051)', () => {
         code: 'SEC_WEBHOOK_SIGNATURE_INVALID',
       });
     }
+  });
+
+  it('never constructs a guard whose staleness window is disabled (L12)', () => {
+    // NaN comparisons are false in JS — a non-finite or non-positive window
+    // would silently disable staleness checks. Refuse at construction.
+    for (const maxAgeSeconds of [0, -1, Number.NaN, Number.POSITIVE_INFINITY]) {
+      expect(
+        () =>
+          new WebhookGuard({
+            verifier: hmacSha256Verifier(SECRET),
+            maxAgeSeconds,
+            nowMs: () => 0,
+          }),
+      ).toThrow(WebhookIntegrityError);
+    }
+  });
+
+  it('evicts replay-cache entries at capacity so memory stays bounded (M20)', async () => {
+    const now = { ms: 1_800_000_000_000 };
+    const guard = new WebhookGuard({
+      verifier: hmacSha256Verifier(SECRET),
+      maxAgeSeconds: 300,
+      nowMs: () => now.ms,
+      replayCacheCapacity: 2,
+    });
+    const deliver = (id: string) =>
+      guard.verifyCallback({ ...signed(JSON.stringify({ n: id }), now.ms), eventId: id });
+    await deliver('evt-a');
+    await deliver('evt-b');
+    // Third delivery evicts the OLDEST cached entry (evt-a).
+    await deliver('evt-c');
+    // evt-b is still cached → its replay is detected…
+    await expect(deliver('evt-b')).rejects.toMatchObject({
+      code: 'SEC_WEBHOOK_REPLAY_DETECTED',
+    });
+    // …while evicted evt-a reads as a cache miss again. Bounded memory is
+    // the documented scope contract (per-process, capacity-limited); durable
+    // cross-restart immunity is the wiring layer's job.
+    await expect(deliver('evt-a')).resolves.toBeDefined();
   });
 
   it('detects replays of identical event-ID + payload pairs', async () => {
@@ -158,7 +198,7 @@ describe('abuse controls (FR-SEC-010)', () => {
     } catch {
       /* quota exhausted */
     }
-    const degraded = abuse.degradeOnQuotaExhaustion('client');
+    const degraded = abuse.degradeOnQuotaExhaustion({ subject: 'client', quotaRemaining: 0 });
     expect(degraded.serviceClass).toBe('DEGRADED');
     // Even degraded traffic still passes through admit() — no bypass path.
     expect(() => abuse.admit('client', 10)).toThrow(/flood/i);
@@ -177,9 +217,26 @@ describe('abuse controls (FR-SEC-010)', () => {
   it('protected risk-monitoring subjects can NEVER be suspended or degraded', () => {
     for (const subject of PROTECTED_SUBJECTS) {
       expect(() => AbuseController.assertSuspensionAllowed(subject)).toThrow(/never be suspended/i);
-      const decision = new AbuseController({ clock: () => 0 }).degradeOnQuotaExhaustion(subject);
+      const decision = new AbuseController({ clock: () => 0 }).degradeOnQuotaExhaustion({
+        subject,
+        quotaRemaining: 0,
+        verifiedProtectedSubject: true,
+      });
       expect(decision.serviceClass).toBe('PROTECTED');
     }
+    // A raw subject string WITHOUT verified protected class is spoofable and
+    // must NOT earn the PROTECTED class (M16).
+    const spoofed = new AbuseController({ clock: () => 0 }).degradeOnQuotaExhaustion({
+      subject: PROTECTED_SUBJECTS[0]!,
+      quotaRemaining: 0,
+    });
+    expect(spoofed.serviceClass).toBe('DEGRADED');
+    // Remaining budget earns FULL service — degradation reflects real state.
+    const notExhausted = new AbuseController({ clock: () => 0 }).degradeOnQuotaExhaustion({
+      subject: 'client',
+      quotaRemaining: 5,
+    });
+    expect(notExhausted.serviceClass).toBe('FULL');
     expect(() => AbuseController.assertSuspensionAllowed('ordinary-client')).not.toThrow();
   });
 

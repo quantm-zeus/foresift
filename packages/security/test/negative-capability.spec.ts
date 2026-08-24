@@ -14,6 +14,7 @@ import {
   flagCapabilityReview,
   recordBuildHash,
   recordLockfile,
+  requireLockfile,
   verifyPinning,
 } from '../src/supply-chain.ts';
 
@@ -136,6 +137,7 @@ describe('CLI ↔ canary fixture parity (AC-255)', () => {
 describe('decoder-authority validator (AC-256)', () => {
   const base = {
     rawOperationLocalDecodingEnabled: true,
+    acknowledgedDeprecations: ['legacy-parser'],
     decoders: [
       { id: 'raw-local', status: 'ACTIVE', authority: 'SOLE', domains: ['swaps'] },
       { id: 'legacy-parser', status: 'DEPRECATED', authority: 'FALLBACK', domains: ['swaps'] },
@@ -161,6 +163,24 @@ describe('decoder-authority validator (AC-256)', () => {
     expect(() =>
       validateDecoderAuthority({ ...base, rawOperationLocalDecodingEnabled: false }),
     ).toThrow(/raw-operation local decoding/);
+  });
+
+  it('requires explicit per-decoder acknowledgement for running deprecated parsers (L21)', () => {
+    const unacknowledged = {
+      rawOperationLocalDecodingEnabled: true,
+      decoders: [
+        { id: 'raw-local', status: 'ACTIVE', authority: 'SOLE', domains: ['swaps'] },
+        { id: 'legacy-parser', status: 'DEPRECATED', authority: 'FALLBACK', domains: ['swaps'] },
+      ] as const,
+    };
+    expect(() => validateDecoderAuthority(unacknowledged)).toThrow(/operator acknowledgement/);
+    // Acknowledging THAT parser by id admits the configuration.
+    expect(
+      validateDecoderAuthority({
+        ...unacknowledged,
+        acknowledgedDeprecations: ['legacy-parser'],
+      }).authoritativeDecoderIds,
+    ).toEqual(['raw-local']);
   });
 });
 
@@ -215,4 +235,35 @@ describe('supply-chain policy (FR-SEC-006)', () => {
     expect(flags.find((f) => f.dependency === 'net-client')?.reviewRequired).toBe(true);
     expect(flags.find((f) => f.dependency === 'pure-math')?.reviewRequired).toBe(false);
   });
+});
+
+it('refuses incomplete SBOM inventories, attestations, and missing lockfiles (M22)', () => {
+  const codeOf = (fn: () => unknown): string => {
+    try {
+      fn();
+    } catch (error) {
+      return (error as { code?: string }).code ?? '';
+    }
+    return 'NO_THROW';
+  };
+  // An empty inventory attests nothing; a component without a purl is not
+  // an identity.
+  expect(codeOf(() => emitSbomRecord([]))).toBe('SEC_SBOM_RECORD_INCOMPLETE');
+  expect(codeOf(() => emitSbomRecord([{ name: 'pkg', version: '1.0.0', purl: '' }]))).toBe(
+    'SEC_SBOM_RECORD_INCOMPLETE',
+  );
+  // A blank builder/commit field voids the provenance claim.
+  expect(
+    codeOf(() =>
+      recordBuildHash(new TextEncoder().encode('bytes'), {
+        builderId: ' ',
+        buildType: 'pnpm-build',
+        sourceCommit: 'deadbeef',
+        materials: [{ uri: 'git+https://example.com/repo', digest: 'sha256:aa' }],
+      }),
+    ),
+  ).toBe('SEC_BUILD_ATTESTATION_INCOMPLETE');
+  // No lockfile record = no reproducibility anchor.
+  expect(codeOf(() => requireLockfile(undefined))).toBe('SEC_LOCKFILE_MISSING');
+  expect(codeOf(() => requireLockfile(null))).toBe('SEC_LOCKFILE_MISSING');
 });

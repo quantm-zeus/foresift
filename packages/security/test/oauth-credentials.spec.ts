@@ -132,9 +132,28 @@ describe('oauth token binding (AC-253)', () => {
   });
 
   it('refuses upstream provider tokens as passthrough credentials', () => {
-    expect(() => guard.refuseUpstreamPassthrough({ isUpstreamIssued: true })).toThrow(/upstream/i);
-    expect(() => guard.refuseUpstreamPassthrough({ upstreamIssuer: 'github' })).toThrow();
-    expect(() => guard.refuseUpstreamPassthrough({})).not.toThrow();
+    const local = { expectedLocalIssuer: 'https://foresift.example.com' };
+    expect(() => guard.refuseUpstreamPassthrough({ isUpstreamIssued: true, ...local })).toThrow(
+      /upstream/i,
+    );
+    expect(() => guard.refuseUpstreamPassthrough({ upstreamIssuer: 'github', ...local })).toThrow();
+    // Fail-closed (M7): no issuer evidence at all refuses — absence of proof
+    // of upstream issuance is not proof of local issuance.
+    expect(() => guard.refuseUpstreamPassthrough({ expectedLocalIssuer: 'x' } as never)).toThrow(
+      /upstream/i,
+    );
+    expect(() =>
+      guard.refuseUpstreamPassthrough({
+        claimedIssuer: 'https://evil.example.com',
+        ...local,
+      }),
+    ).toThrow(/upstream/i);
+    expect(() =>
+      guard.refuseUpstreamPassthrough({
+        claimedIssuer: 'https://foresift.example.com',
+        ...local,
+      }),
+    ).not.toThrow();
   });
 });
 
@@ -226,7 +245,70 @@ describe('mcp credential lifecycle (AC-053)', () => {
       store.authenticate({ presentedSecret: ipBound.secret, sourceIp: '198.51.100.9' }),
     ).rejects.toMatchObject({ code: 'SEC_CREDENTIAL_ORIGIN_MISMATCH' });
     await expect(
-      store.authenticate({ presentedSecret: ipBound.secret, sourceIp: '203.0.113.7' }),
+      store.authenticate({
+        presentedSecret: ipBound.secret,
+        sourceIp: '203.0.113.7',
+        origin: 'https://mcp.example.com',
+      }),
+    ).resolves.toBeDefined();
+  });
+
+  it('refuses constrained credentials when checking evidence is WITHHELD (M14)', async () => {
+    const ipBound = await issue('cred-withheld-ip', { ipConstraints: ['203.0.113.7'] });
+    // Origin presented but sourceIp WITHHELD: an IP-constrained credential
+    // can never pass without its source address.
+    await expect(
+      store.authenticate({
+        presentedSecret: ipBound.secret,
+        origin: 'https://mcp.example.com',
+        requestedScopes: ['tools:read'],
+      }),
+    ).rejects.toMatchObject({ code: 'SEC_CREDENTIAL_ORIGIN_MISMATCH' });
+    // Valid sourceIp but origin WITHHELD against the bound policy ref.
+    const originBound = await issue('cred-withheld-origin');
+    await expect(
+      store.authenticate({ presentedSecret: originBound.secret, sourceIp: '203.0.113.7' }),
+    ).rejects.toMatchObject({ code: 'SEC_CREDENTIAL_ORIGIN_MISMATCH' });
+  });
+
+  it('strictPresentation refuses ANY withheld dimension even unconstrained (M14 opt-in)', async () => {
+    const strict = new McpCredentialStore({
+      engine,
+      // Distinct pepper AND store: keyed hashes never collide across stores,
+      // and this test only exercises strict-presentation policy.
+      pepper: 'strict-presentation-pepper-test-only-32-chars-min',
+      entropy: counterEntropy(),
+      clock: () => Date.parse('2026-08-01T00:00:00Z'),
+      strictPresentation: true,
+    });
+    // Unconstrained credential (no IP constraints, empty origin ref).
+    const cred = await strict.issue({
+      credentialId: 'cred-strict',
+      scopes: ['tools:read'],
+      originPolicyRef: '',
+      rateLimitClass: 'STANDARD',
+      expiresAt: at('2026-08-02T00:00:00Z'),
+    });
+    for (const partial of [
+      {},
+      { origin: 'https://x.example.com' },
+      { sourceIp: '203.0.113.7' },
+      { origin: 'https://x.example.com', sourceIp: '203.0.113.7' },
+    ]) {
+      await expect(
+        strict.authenticate({ presentedSecret: cred.secret, ...partial }),
+      ).rejects.toMatchObject({
+        code: 'SEC_CREDENTIAL_ORIGIN_MISMATCH',
+      });
+    }
+    // The complete presentation admits.
+    await expect(
+      strict.authenticate({
+        presentedSecret: cred.secret,
+        origin: 'https://x.example.com',
+        sourceIp: '203.0.113.7',
+        requestedScopes: ['tools:read'],
+      }),
     ).resolves.toBeDefined();
   });
 
@@ -238,7 +320,12 @@ describe('mcp credential lifecycle (AC-053)', () => {
     await expect(store.authenticate({ presentedSecret: siblingA.secret })).rejects.toMatchObject({
       code: 'SEC_CREDENTIAL_REVOKED',
     });
-    await expect(store.authenticate({ presentedSecret: siblingB.secret })).resolves.toBeDefined();
+    await expect(
+      store.authenticate({
+        presentedSecret: siblingB.secret,
+        origin: 'https://mcp.example.com',
+      }),
+    ).resolves.toBeDefined();
 
     // Double revocation refuses; unknown credentials refuse identically.
     await expect(store.revoke('cred-a', at('2026-08-01T13:00:00Z'))).rejects.toMatchObject({

@@ -202,3 +202,75 @@ describe('activation ledger (AC-279)', () => {
     expect(rollback.reevaluation_marker).toBe('pending:ae-v4');
   });
 });
+
+describe('gate-pause fail-closed edges (M12/M13)', () => {
+  it('resume refuses WHITESPACE-only actors and audit references (M12)', async () => {
+    await seedIncident('inc-ws');
+    await pauses.open({
+      pauseId: 'pause-ws',
+      scope: 'capability:ws-probe',
+      reason: 'probe',
+      openingIncidentId: 'inc-ws',
+      pausedAt: at('2026-08-01T04:00:00Z'),
+    });
+    await expect(
+      pauses.resume({
+        pauseId: 'pause-ws',
+        resumedByActor: '   ',
+        resumedAt: at('2026-08-01T04:10:00Z'),
+        auditRef: 'audit://ok',
+      }),
+    ).rejects.toMatchObject({ code: SecErrorCode.SEC_PAUSE_RESUME_AUDIT_REQUIRED });
+    await expect(
+      pauses.resume({
+        pauseId: 'pause-ws',
+        resumedByActor: 'admin@example.com',
+        resumedAt: at('2026-08-01T04:20:00Z'),
+        auditRef: '  ',
+      }),
+    ).rejects.toMatchObject({ code: SecErrorCode.SEC_PAUSE_RESUME_AUDIT_REQUIRED });
+    // Both refusals left the pause ACTIVE.
+    await expect(
+      pauses.resume({
+        pauseId: 'pause-ws',
+        resumedByActor: 'admin@example.com',
+        resumedAt: at('2026-08-01T04:30:00Z'),
+        auditRef: 'audit://approval/ws',
+      }),
+    ).resolves.toBeDefined();
+  });
+
+  it('rollbackRestore REFUSES cross-scope restore points and non-ACTIVATE events (M13)', async () => {
+    await pauses.recordActivation({
+      eventId: 'ae-m13-base',
+      eventType: 'ACTIVATE',
+      scope: 'scope:m13',
+      at: at('2026-08-01T05:00:00Z'),
+      actor: 'admin@example.com',
+      approvedSetSnapshotRef: 'snapshot://approved/m13',
+    });
+    // Cross-scope restore would silently transplant another scope's
+    // approved-set snapshot — refused outright.
+    await expect(
+      pauses.rollbackRestore({
+        eventId: 'ae-m13-cross',
+        restoreOfEventId: 'ae-m13-base',
+        scope: 'scope:somewhere-else',
+        at: at('2026-08-01T05:10:00Z'),
+        actor: 'admin@example.com',
+      }),
+    ).rejects.toThrow(/across scopes/);
+    // A ROLLBACK_RESTORE row carries no restore-worthy snapshot of its own;
+    // only ACTIVATE events may anchor a rollback (ae-v3 seeded by the ledger
+    // test above in this sequential file).
+    await expect(
+      pauses.rollbackRestore({
+        eventId: 'ae-m13-wrongtype',
+        restoreOfEventId: 'ae-v3',
+        scope: 'config:v1',
+        at: at('2026-08-01T05:20:00Z'),
+        actor: 'admin@example.com',
+      }),
+    ).rejects.toThrow(/only ACTIVATE events/);
+  });
+});

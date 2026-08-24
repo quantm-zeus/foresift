@@ -5,6 +5,7 @@ import { describe, expect, it } from 'vitest';
 import {
   deriveMemoryIsolationKey,
   envelopeContent,
+  parseStructuredExtractionFence,
   refuseProtectedRoleInsertion,
   structuredExtractionEnvelope,
   validateRenderable,
@@ -55,12 +56,72 @@ describe('content labeling and envelopes (AC-258)', () => {
   it('wraps content in a fenced DATA-ONLY extraction envelope', () => {
     const wrapped = structuredExtractionEnvelope(env());
     expect(wrapped).toContain('[BEGIN UNTRUSTED:SOCIAL_TEXT');
-    expect(wrapped).toContain('[END UNTRUSTED:SOCIAL_TEXT]');
     expect(wrapped).toContain('UNTRUSTED DATA');
+    // Nonce-matched fences (M4/M5): the ONLY sanctioned consumption path is
+    // the parser, which demands the END marker carry the BEGIN nonce and
+    // round-trips the payload byte-for-byte.
+    const parsed = parseStructuredExtractionFence(wrapped);
+    expect(parsed.source).toBe('SOCIAL_TEXT');
+    expect(parsed.content).toBe('some post text');
+    expect(parsed.provenanceRef).toBe('obj://social/123');
+  });
+
+  it('parser REFUSES nonce-mismatched, preamble-stripped, or malformed fences (M4)', () => {
+    const wrapped = structuredExtractionEnvelope(env());
+    // END marker stripped of its nonce no longer pairs with BEGIN.
+    const strippedEnd = wrapped.replace(
+      /\[END UNTRUSTED:SOCIAL_TEXT nonce="[0-9a-f-]+"\]/,
+      '[END UNTRUSTED:SOCIAL_TEXT]',
+    );
+    expect(strippedEnd).not.toBe(wrapped);
+    expect(() => parseStructuredExtractionFence(strippedEnd)).toThrow(/nonce-matched END marker/);
+    // Removing the data-only preamble breaks the fence contract.
+    const lines = wrapped.split('\n');
+    const noPreamble = [lines[0], ...lines.slice(2)].join('\n');
+    expect(() => parseStructuredExtractionFence(noPreamble)).toThrow(/preamble/);
+    // A legacy nonce-less BEGIN marker is not a well-formed fence opener.
+    const legacyBegin = wrapped.replace(lines[0]!, '[BEGIN UNTRUSTED:SOCIAL_TEXT]');
+    expect(() => parseStructuredExtractionFence(legacyBegin)).toThrow(/well-formed BEGIN/);
+  });
+
+  it('REFUSES a fence whose end marker occurs twice (post-emission tampering)', () => {
+    const wrapped = structuredExtractionEnvelope(env());
+    // Duplicating the final line (a relay bug or tamper attempt) makes the
+    // payload boundary ambiguous — refuse rather than guess.
+    const lastLine = wrapped.split('\n').pop()!;
+    const duplicated = `${wrapped}\n${lastLine}`;
+    expect(() => parseStructuredExtractionFence(duplicated)).toThrow(/occurs more than once/);
+  });
+
+  it('wraps identical content with FRESH nonces every emission (anti-forgery)', () => {
+    // A predictable fence could be pre-planted inside untrusted content;
+    // per-emission random nonces make collision unpredictable in advance.
+    expect(structuredExtractionEnvelope(env())).not.toBe(structuredExtractionEnvelope(env()));
+  });
+
+  it('round-trips LARGE multi-line payloads byte-for-byte through the parser', () => {
+    const big = Array.from({ length: 20_000 }, (_, i) => `line-${i}: <b>${i}</b>`).join('\n');
+    const parsed = parseStructuredExtractionFence(
+      structuredExtractionEnvelope(env({ content: big })),
+    );
+    expect(parsed.content).toBe(big);
   });
 });
 
 describe('render-safety validation (AC-258)', () => {
+  it('tag scanning stays LINEAR-TIME on quote-heavy adversarial markup (M5)', () => {
+    // Classic quadratic-backtracking bait: thousands of unterminated
+    // attribute openers followed by a long tail. The quote-aware linear
+    // scanner finishes immediately; a backtracking regex takes minutes.
+    const adversarial = `${'<a href="'.repeat(20_000)}${'x'.repeat(100_000)}"`;
+    const started = Date.now();
+    const report = validateRenderable(adversarial);
+    const elapsedMs = Date.now() - started;
+    expect(report.violations.length).toBeGreaterThanOrEqual(0);
+    // Generous CI-safe ceiling: quadratic behavior blows far past this.
+    expect(elapsedMs).toBeLessThan(5_000);
+  });
+
   it('flags script tags, event handlers, and dangerous URL schemes', () => {
     const report = validateRenderable(
       '<div onclick="steal()">x</div><script>1</script><a href="javascript:alert(1)">y</a>',

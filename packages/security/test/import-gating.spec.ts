@@ -30,6 +30,7 @@ let gate: ImportGate;
 
 const TRUSTED = {
   keyId: 'producer-key-1',
+  publicKeyPem: 'test-producer-public-key-material',
   expiresAt: at('2030-01-01T00:00:00.000Z'),
 };
 
@@ -161,7 +162,13 @@ describe('signature verification against the trusted-producer allowlist', () => 
   it('refuses expired and revoked producer trust anchors', async () => {
     const expiredGate = new ImportGate({
       engine,
-      trustedProducers: [{ keyId: 'expired-key', expiresAt: at('2020-01-01T00:00:00.000Z') }],
+      trustedProducers: [
+        {
+          keyId: 'expired-key',
+          publicKeyPem: 'expired-public-key-material',
+          expiresAt: at('2020-01-01T00:00:00.000Z'),
+        },
+      ],
       verifier: () => true,
     });
     await expiredGate.intake(
@@ -182,6 +189,7 @@ describe('signature verification against the trusted-producer allowlist', () => 
       trustedProducers: [
         {
           keyId: 'revoked-key',
+          publicKeyPem: 'revoked-public-key-material',
           expiresAt: at('2030-01-01T00:00:00.000Z'),
           revokedAt: at('2026-01-01T00:00:00.000Z'),
         },

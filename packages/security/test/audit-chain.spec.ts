@@ -195,6 +195,67 @@ describe('audit chain appends (FR-SEC-002)', () => {
       await h.db.close();
     }
   });
+
+  it('reports GAP for a WIPED chain even under a full-range request (M2)', async () => {
+    const h = await makeHarness();
+    try {
+      // An unexamined or wiped chain never attests its own health.
+      const outcome = await h.chain.verifyRange();
+      expect(outcome.run.verdict).toBe('FAILED');
+      expect(outcome.run.divergenceKind).toBe('GAP');
+      expect(outcome.run.firstDivergenceSeq).toBe(1);
+      // The recorded run names REAL walked bounds — nothing was verified.
+      expect(outcome.run.verifiedFromSeq).toBe(1);
+      expect(outcome.run.verifiedToSeq).toBe(1);
+    } finally {
+      await h.db.close();
+    }
+  });
+
+  it('REFUSES inverted, zero, or fractional ranges before any query (M2)', async () => {
+    const h = await makeHarness();
+    try {
+      await appendThree(h);
+      await expect(h.chain.verifyRange(3, 2)).rejects.toThrow(/ascending/);
+      await expect(h.chain.verifyRange(0)).rejects.toThrow(/positive integers/);
+      await expect(h.chain.verifyRange(1.5)).rejects.toThrow(/positive integers/);
+      await expect(h.chain.verifyRange(-2, 3)).rejects.toThrow(/positive integers/);
+    } finally {
+      await h.db.close();
+    }
+  });
+
+  it('records the ACTUAL walked bounds of partial-range verification (M2)', async () => {
+    const h = await makeHarness();
+    try {
+      await appendThree(h);
+      const outcome = await h.chain.verifyRange(2, 3);
+      expect(outcome.run.verdict).toBe('OK');
+      expect(outcome.run.verifiedFromSeq).toBe(2);
+      expect(outcome.run.verifiedToSeq).toBe(3);
+    } finally {
+      await h.db.close();
+    }
+  });
+
+  it('surfaces a leading-edge deletion as DELETION at the missing seq (M2)', async () => {
+    const h = await makeHarness();
+    try {
+      await appendThree(h);
+      // Delete seq 1 entirely: the earliest PRESENT entry's predecessor is
+      // missing, which is a deletion at the window edge — not a confusing
+      // hash-link verdict.
+      await withTriggerDropped(h.db, async () => {
+        await h.db.exec('DELETE FROM sec.sec_audit_events WHERE seq = 1');
+      });
+      const outcome = await h.chain.verifyRange();
+      expect(outcome.run.verdict).toBe('FAILED');
+      expect(outcome.run.divergenceKind).toBe('DELETION');
+      expect(outcome.run.firstDivergenceSeq).toBe(1);
+    } finally {
+      await h.db.close();
+    }
+  });
 });
 
 describe('audit checkpoints mirror to the object store (FR-SEC-002, AC-259)', () => {

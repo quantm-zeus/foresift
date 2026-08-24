@@ -223,6 +223,52 @@ describe('high-impact action gate (AC-274)', () => {
   });
 });
 
+describe('proof ownership, skew tolerance, and audit-append coupling (M19/M11a)', () => {
+  it('refuses a proof belonging to ANOTHER principal as STEP_UP_MISSING', async () => {
+    const gate = new ActionGate({ clock: () => NOW_MS });
+    const decision = await gate.evaluateHighImpactAction({
+      ...baseRequest,
+      stepUpProof: goodProof({ actor: 'someone-else@example.com' }),
+    });
+    // A valid-looking proof for a different actor is NO proof for this one.
+    expect(decision.outcome).toBe('REFUSE');
+    if (decision.outcome === 'REFUSE') expect(decision.reasons).toEqual(['STEP_UP_MISSING']);
+  });
+
+  it('applies PROOF_CLOCK_SKEW_TOLERANCE to future-dated completions', async () => {
+    const gate = new ActionGate({ clock: () => NOW_MS });
+    const iso = (ms: number) =>
+      new Date(ms).toISOString().replace('.000Z', 'Z') as import('@foresift/domain').UtcTimestamp;
+    // 30s in the future — inside the tolerance, still admissible.
+    const nearFuture = await gate.evaluateHighImpactAction({
+      ...baseRequest,
+      stepUpProof: goodProof({ completedAt: iso(NOW_MS + 30_000) }),
+    });
+    expect(nearFuture.outcome).toBe('ALLOW');
+    // 61s in the future — beyond tolerance: STALE, never "infinitely fresh".
+    const farFuture = await gate.evaluateHighImpactAction({
+      ...baseRequest,
+      stepUpProof: goodProof({ completedAt: iso(NOW_MS + 61_000) }),
+    });
+    expect(farFuture.outcome).toBe('REFUSE');
+    if (farFuture.outcome === 'REFUSE') expect(farFuture.reasons).toContain('STEP_UP_STALE');
+  });
+
+  it('wraps audit-chain append failures instead of dropping the decision', async () => {
+    // §35.9: an unrecorded decision is a silent bypass. A chain that fails
+    // to append must fail the GATE loudly, never swallow into a return.
+    const failingChain = {
+      append: async () => {
+        throw new Error('storage unavailable');
+      },
+    } as unknown as AuditChain;
+    const gate = new ActionGate({ auditChain: failingChain, clock: () => NOW_MS });
+    await expect(gate.evaluateHighImpactAction(baseRequest)).rejects.toThrow(
+      /failed to append gate decision to the audit chain/,
+    );
+  });
+});
+
 describe('csrf double-submit + origin binding', () => {
   it('accepts matching tokens bound to the request origin', async () => {
     const { evaluateCsrf } = await import('../src/csrf.ts');
@@ -236,7 +282,20 @@ describe('csrf double-submit + origin binding', () => {
     ).toEqual({ valid: true });
   });
 
-  it('refuses short, mismatched, and cross-origin tokens with distinct reasons', async () => {
+  it('treats below-floor tokens as MISSING even when both sides MATCH (M18)', async () => {
+    const { evaluateCsrf, MIN_CSRF_TOKEN_LENGTH } = await import('../src/csrf.ts');
+    // A sub-floor token pair carries no forgery resistance — matching does
+    // not rescue it; it is missing protection, exactly like absence.
+    expect(
+      evaluateCsrf({
+        submittedToken: 'x'.repeat(MIN_CSRF_TOKEN_LENGTH - 1),
+        sessionToken: 'x'.repeat(MIN_CSRF_TOKEN_LENGTH - 1),
+      }),
+    ).toEqual({ valid: false, reason: 'MISSING' });
+    expect(MIN_CSRF_TOKEN_LENGTH).toBe(32);
+  });
+
+  it('refuses mismatched and cross-origin tokens with distinct reasons', async () => {
     const { evaluateCsrf } = await import('../src/csrf.ts');
     expect(evaluateCsrf({})).toEqual({ valid: false, reason: 'MISSING' });
     expect(evaluateCsrf({ submittedToken: 'x'.repeat(32), sessionToken: 'y'.repeat(32) })).toEqual({

@@ -169,3 +169,69 @@ describe('incident lifecycle (FR-SEC-011)', () => {
     expect(await openCount()).toBe(baseline);
   });
 });
+
+describe('incident fail-closed edges (M21/M10)', () => {
+  it('fails closed on UNKNOWN incidents across every entrypoint', async () => {
+    await expect(
+      incidents.transition('incident-ghost', 'CONTAINED', { at: at('2026-08-01T01:00:00Z') }),
+    ).rejects.toThrow(/not found/);
+    expect(await incidents.get('incident-ghost')).toBeNull();
+    // Evidence for an unknown incident is NEVER silently dropped.
+    await expect(incidents.attachEvidence('incident-ghost', ['evidence://late'])).rejects.toThrow(
+      /not found/,
+    );
+    await expect(incidents.attachEvidence('incident-ghost', [])).rejects.toMatchObject({
+      code: SecErrorCode.SEC_INCIDENT_EVIDENCE_REQUIRED,
+    });
+    // Whitespace-only evidence references refuse identically to absence.
+    await expect(
+      incidents.open({
+        incidentId: 'inc-blank-evidence',
+        kind: 'OTHER',
+        severity: 'SEV3',
+        owner: 'oncall',
+        openedAt: at('2026-08-01T01:00:00Z'),
+        evidenceRefs: ['   '],
+      }),
+    ).rejects.toMatchObject({ code: SecErrorCode.SEC_INCIDENT_EVIDENCE_REQUIRED });
+  });
+
+  it('CAS-guards containment so a raced legal transition refuses TYPED', async () => {
+    await incidents.open({
+      incidentId: 'inc-cas',
+      kind: 'OTHER',
+      severity: 'SEV3',
+      owner: 'oncall',
+      openedAt: at('2026-08-01T01:00:00Z'),
+      evidenceRefs: ['evidence://cas'],
+    });
+    // Simulate losing the compare-and-swap race: exactly one containment
+    // UPDATE returns zero rows even though the SELECT saw a legal `from`.
+    let swallowOnce = true;
+    const racingEngine = {
+      query: async (sql: string, params: readonly unknown[]) => {
+        if (swallowOnce && /SET containment = \$2/.test(sql)) {
+          swallowOnce = false;
+          return { rows: [], rowCount: 0 };
+        }
+        return engine.query(sql as never, params as never);
+      },
+    } as unknown as typeof engine;
+    const raced = new Incidents(racingEngine);
+    const err = (await raced
+      .transition('inc-cas', 'CONTAINED', { at: at('2026-08-01T02:00:00Z') })
+      .catch((e: unknown) => e as { code?: string; message?: string })) as {
+      code?: string;
+      message?: string;
+    };
+    expect(err.code).toBe(SecErrorCode.SEC_INCIDENT_STATE_TRANSITION_INVALID);
+    expect(err.message).toContain('concurrent transition raced');
+    // The incident is untouched — containment never regressed or vanished.
+    expect((await incidents.get('inc-cas'))?.containment).toBe('OPEN');
+    // And the normal path still advances it afterwards.
+    const advanced = await incidents.transition('inc-cas', 'CONTAINED', {
+      at: at('2026-08-01T03:00:00Z'),
+    });
+    expect(advanced.containment).toBe('CONTAINED');
+  });
+});

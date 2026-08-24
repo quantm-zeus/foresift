@@ -8,6 +8,7 @@ import { describe, expect, it } from 'vitest';
 import {
   deriveMemoryIsolationKey,
   envelopeContent,
+  parseStructuredExtractionFence,
   structuredExtractionEnvelope,
 } from '../../packages/security/src/untrusted-content.ts';
 import { PROMPT_INJECTION_PAYLOADS } from '../fixtures/sec/injection/injection-corpus.ts';
@@ -56,16 +57,19 @@ describe('AC-258: injected content is carried only as labeled data', () => {
       );
       // The payload appears EXACTLY once — inside the fence — and the fence
       // markers declare it UNTRUSTED DATA so downstream consumers cannot
-      // mistake it for instruction.
+      // mistake it for instruction. Nonce-matched fences (M4/M5): the
+      // sanctioned parser demands the nonce-carrying END marker, and its
+      // round-trip proves the payload survived byte-for-byte VERBATIM.
       expect(wrapped).toContain('[BEGIN UNTRUSTED:MODEL_OUTPUT');
-      expect(wrapped).toContain('[END UNTRUSTED:MODEL_OUTPUT]');
       expect(wrapped).toContain('UNTRUSTED DATA');
       const first = wrapped.indexOf(payload);
       const begin = wrapped.indexOf('[BEGIN UNTRUSTED:MODEL_OUTPUT');
-      const end = wrapped.indexOf('[END UNTRUSTED:MODEL_OUTPUT]');
       expect(first).toBeGreaterThan(begin);
-      expect(first).toBeLessThan(end);
-      expect(wrapped.indexOf(payload, first + 1)).toBe(-1);
+      expect(wrapped.split(payload).length - 1).toBe(1);
+      const parsed = parseStructuredExtractionFence(wrapped);
+      expect(parsed.source).toBe('MODEL_OUTPUT');
+      expect(parsed.content).toBe(payload);
+      expect(parsed.provenanceRef).toBe('obj://model-output/x');
     }
   });
 

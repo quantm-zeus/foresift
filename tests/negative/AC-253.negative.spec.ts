@@ -69,8 +69,23 @@ describe('AC-253 negative: every under-bound grant refuses', () => {
   });
 
   it('refuses upstream provider tokens as passthrough credentials', () => {
-    expect(() => GUARD.refuseUpstreamPassthrough({ isUpstreamIssued: true })).toThrow(/upstream/i);
-    expect(() => GUARD.refuseUpstreamPassthrough({ upstreamIssuer: 'github' })).toThrow();
-    expect(() => GUARD.refuseUpstreamPassthrough({})).not.toThrow();
+    expect(() =>
+      GUARD.refuseUpstreamPassthrough({
+        isUpstreamIssued: true,
+        expectedLocalIssuer: 'https://foresift.example.com',
+      }),
+    ).toThrow(/upstream/i);
+    expect(() =>
+      GUARD.refuseUpstreamPassthrough({
+        upstreamIssuer: 'github',
+        expectedLocalIssuer: 'https://foresift.example.com',
+      }),
+    ).toThrow();
+    // Fail-closed: an evidence-free presentation refuses (M7).
+    expect(() =>
+      GUARD.refuseUpstreamPassthrough({
+        expectedLocalIssuer: 'https://foresift.example.com',
+      }),
+    ).toThrow(/upstream/i);
   });
 });

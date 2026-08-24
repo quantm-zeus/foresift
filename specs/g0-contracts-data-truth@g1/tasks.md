@@ -7,18 +7,22 @@ FR-DR-001, FR-DR-002) or an acceptance criterion of those requirements.
 Requirement IDs not assigned to this package never appear here.
 
 Format: `- [ ] T### [P?]` — **[P]** = parallelizable with its neighbors (disjoint files).
-Generation-1 context (re-baselined 2026-08-24 at HEAD `1cb934f`): the adopted
-generation-0 seed is byte-identical to its review-repaired tip (`3367821`)
-inside every package content scope; main's tooling repair (`ac67972`, absorbed
-via `5d098b8`/`1cb934f`) already restored the tsconfig include/exclude shape and
-`allowImportingTsExtensions`, so typecheck and the full suite are GREEN at the
-baseline. Remaining convergence work: two functional root-config edits plus one
-cosmetic ordering edit, then deterministic re-verification of everything.
+Generation-1 context (re-baselined 2026-08-24 at HEAD `0adb46b`): Phase A below
+is COMPLETE and committed on this branch as `0ee8f42` — root-config parity with
+the review-repaired generation-0 tip (`3367821`) is restored (`tsconfig.json`,
+`tsconfig.base.json`, `pnpm-workspace.yaml` byte-identical; `package.json`
+differs only by three intentionally kept newer shared-automation scripts), plus
+four package-local vitest runner configs enabling the milestone per-package
+verification commands. A second automation-only absorb of main (`0adb46b`)
+touched nothing inside this package's write scopes. Re-verified at that HEAD:
+typecheck GREEN (zero errors), full suite GREEN (64 files / 448 tests). The
+remaining work is the final gate re-run at whatever HEAD implementation finds,
+plus any strictly in-scope regression fix it surfaces.
 Tests are mandatory per PRD evidence rules: positive AND negative/failure-path
 specs already exist for every acceptance criterion listed in spec.md §3 and
 must stay green — never weakened.
 
-## Phase A — Restore the remaining root-configuration deltas
+## Phase A — Restore the remaining root-configuration deltas (COMPLETE — landed at commit `0ee8f42`)
 
 - [x] T101 Verify root `tsconfig.json` retains the converged shape restored by
       main's absorbed commit `ac67972`: `"include": ["packages/*/src/**/*.ts",
@@ -54,12 +58,12 @@ must stay green — never weakened.
 
 ## Phase B — Deterministic convergence verification
 
-- [x] T105 Run `pnpm typecheck`; require exactly zero errors before AND after
-      the Phase-A edits (green at the baseline; the edits are non-semantic and
-      must not regress it). If any new error class appears, stop and classify
-      before proceeding. Traces: FR-DATA-001, FR-DATA-002, FR-DATA-003,
-      FR-DATA-004, FR-DATA-005, FR-DATA-006, FR-DR-001, FR-DR-002 (compile
-      integrity of every requirement's code and tests).
+- [x] T105 Run `pnpm typecheck`; require exactly zero errors at the current
+      HEAD (green at the re-baselined HEAD `0adb46b`). If any new error class
+      appears, stop and classify before proceeding. Traces: FR-DATA-001,
+      FR-DATA-002, FR-DATA-003, FR-DATA-004, FR-DATA-005, FR-DATA-006,
+      FR-DR-001, FR-DR-002 (compile integrity of every requirement's code and
+      tests).
 - [x] T106 Run the config-shape acceptance suite (`npx vitest run
 tests/acceptance/tooling-globs.spec.ts`) and require all four assertions
       green (future-package include globs, exclude array, workspace globs,
@@ -75,22 +79,26 @@ pnpm --filter @foresift/shared-schemas test`, and the same for
       including acceptance criteria AC-020…AC-023, AC-240…AC-249, AC-060…AC-062,
       AC-260…AC-264 exercised by those suites.
 - [x] T108 Run the full aggregate gate `pnpm verify` (= spec:verify, format:check,
-      lint, typecheck, all tests) and require green at HEAD (63 files / 444
-      tests at the baseline, including the three automation e2e specs
+      lint, typecheck, all tests) and require green at HEAD (64 files / 448
+      tests at the re-baselined HEAD `0adb46b`, including
       `tests/automation/targeted-router-e2e.spec.ts`,
       `tests/automation/gate-e2e-green.spec.ts`,
-      `tests/automation/gate-e2e-red.spec.ts`). If anything turns red after
-      Phases A–B, do NOT edit `tests/automation/**` (outside writeScopes):
-      classify the failure per governance, record it in the run's out-of-scope
-      notes, and report honestly. Traces: FR-DATA-001 through FR-DATA-006,
+      `tests/automation/gate-e2e-red.spec.ts`; counts may grow if main's
+      absorbed tooling adds suites — growth alone is not a failure). If
+      anything turns red, do NOT edit `tests/automation/**` (outside
+      writeScopes): classify the failure per governance, fix only what falls
+      inside writeScopes, record the rest in the run's out-of-scope notes, and
+      report honestly. Traces: FR-DATA-001 through FR-DATA-006,
       FR-DR-001, FR-DR-002 (full-suite proof of all their acceptance criteria).
 - [x] T109 Divergence guard: within package content scopes (`packages`,
       `migrations`, `telemetry`, `tests/fixtures`, `tests/acceptance`,
       `tests/negative`) `git diff` versus generation-0 review-repaired tip
-      `3367821` must remain EMPTY; within root-config scopes it must show ONLY
-      the intended Phase-A deltas plus mechanical lockfile changes (differences
-      elsewhere are main's shared tooling absorbed onto this branch, not this
-      package's delta); verify all 44 manifest-declared test files for the eight
+      `3367821` may show ONLY the four documented per-package vitest runner
+      configs added by `0ee8f42`; within root-config scopes it must show ONLY
+      the three intentionally kept newer shared-automation scripts in
+      `package.json` plus mechanical lockfile changes (differences elsewhere
+      are main's shared tooling absorbed onto this branch, not this package's
+      delta); verify all 44 manifest-declared test files for the eight
       requirements still exist on disk. Traces: FR-DATA-001, FR-DATA-002,
       FR-DATA-003, FR-DATA-004, FR-DATA-005, FR-DATA-006, FR-DR-001, FR-DR-002
       (no silent loss of reviewed implementation).
@@ -98,8 +106,12 @@ pnpm --filter @foresift/shared-schemas test`, and the same for
       placeholders; every task above traces only assigned requirement IDs;
       both scoped-artifact directories (`specs/g0-contracts-data-truth/`,
       `specs/g0-contracts-data-truth@g1/`) carry identical trios per plan.md
-      material decision 4; working tree left UNCOMMITTED for review (landing
-      happens via PR after machine gates). Traces: FR-DATA-001, FR-DATA-002,
+      material decision 4; converged work is committed additively on the
+      package branch so the stage never ends on a dirty tracked tree —
+      `create-pr` refuses a dirty tree and the implementation completion gate
+      requires a committed one (plan.md material decision 6); corrections are
+      new commits, never amend/rebase/force, and product source reaches main
+      only via CI-gated PRs. Traces: FR-DATA-001, FR-DATA-002,
       FR-DATA-003, FR-DATA-004, FR-DATA-005, FR-DATA-006, FR-DR-001, FR-DR-002.
 
 ## Traceability matrix (AC → tasks)

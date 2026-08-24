@@ -29,17 +29,56 @@ export async function registerFeatureDefinition(
     unitSemantics?: string;
   },
 ): Promise<void> {
+  const name = input.name ?? ROLLING_VOLUME_DEFINITION.name;
+  const version = input.version ?? ROLLING_VOLUME_DEFINITION.version;
+  const unitSemantics = input.unitSemantics ?? ROLLING_VOLUME_DEFINITION.unitSemantics;
   await engine.query(
     `INSERT INTO feature_definitions (definition_id, name, version, unit_semantics)
      VALUES ($1,$2,$3,$4)
      ON CONFLICT (definition_id) DO NOTHING`,
-    [
-      input.definitionId,
-      input.name ?? ROLLING_VOLUME_DEFINITION.name,
-      input.version ?? ROLLING_VOLUME_DEFINITION.version,
-      input.unitSemantics ?? ROLLING_VOLUME_DEFINITION.unitSemantics,
-    ],
+    [input.definitionId, name, version, unitSemantics],
   );
+  // Insert-or-verify convention (same as every identity row): an IDENTICAL
+  // re-registration is a no-op; any divergence refuses as a typed conflict.
+  // Feature values are computed against THE registered semantics — silently
+  // keeping the stored row while a caller believes different semantics would
+  // corrupt online/offline parity (FR-DATA-004) and the AC-244 provenance.
+  const stored = await engine.query<{
+    name: string;
+    version: number | string;
+    unit_semantics: string;
+  }>('SELECT name, version, unit_semantics FROM feature_definitions WHERE definition_id = $1', [
+    input.definitionId,
+  ]);
+  const row = stored.rows[0];
+  if (row === undefined) {
+    throw new ForesiftError(
+      ErrorCode.CONTRACT_INVARIANT_VIOLATED,
+      `feature definition ${input.definitionId} vanished between insert and verify`,
+      { definitionId: input.definitionId },
+    );
+  }
+  if (row.name !== name) {
+    throw new ForesiftError(
+      ErrorCode.CONTRACT_INVARIANT_VIOLATED,
+      `feature-definition conflict on feature_definitions.name: stored ${JSON.stringify(row.name)} != incoming ${JSON.stringify(name)}`,
+      { definitionId: input.definitionId },
+    );
+  }
+  if (Number(row.version) !== version) {
+    throw new ForesiftError(
+      ErrorCode.CONTRACT_INVARIANT_VIOLATED,
+      `feature-definition conflict on feature_definitions.version: stored ${String(row.version)} != incoming ${String(version)}`,
+      { definitionId: input.definitionId },
+    );
+  }
+  if (row.unit_semantics !== unitSemantics) {
+    throw new ForesiftError(
+      ErrorCode.CONTRACT_INVARIANT_VIOLATED,
+      `feature-definition conflict on feature_definitions.unit_semantics: stored ${JSON.stringify(row.unit_semantics)} != incoming ${JSON.stringify(unitSemantics)}`,
+      { definitionId: input.definitionId },
+    );
+  }
 }
 
 export interface RollingVolumeRequest {

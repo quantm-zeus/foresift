@@ -1709,13 +1709,32 @@ async function cmdRestartPackage(packageId, opts = {}) {
   // Safety refusals deliberately precede every replay/idempotency path —
   // something being live must never be papered over by a friendly no-op.
   const currentMessage = generationMessage(packageId, fromGeneration);
-  const trackedLive = st.activeRuns.find((r) => r.packageId === packageId && !r.done && !r.paused);
-  if (trackedLive)
-    return fail(
-      `a tracked active run (${trackedLive.runId ?? 'awaiting discovery'}) exists for ${packageId}; stop/abandon it first`,
-    );
   const list = archonJson('workflow runs --json --limit 50');
   const rows = Array.isArray(list) ? list : (list?.runs ?? []);
+  // A tracked-but-unresolved row must not block a restart forever once Archon
+  // PROVES its run terminal — the only other supported unblock is a supervisor
+  // tick, whose same-tick reconcile→selectAndLaunch order would relaunch retired
+  // generation 0. Reconcile proven-terminal rows here; anything live or
+  // undiscoverable still refuses fail-closed.
+  const trackedLive = st.activeRuns.find((r) => r.packageId === packageId && !r.done && !r.paused);
+  if (trackedLive) {
+    const row = trackedLive.runId ? rows.find((x) => x.id === trackedLive.runId) : null;
+    if (!row || ['running', 'pending'].includes(String(row.status)))
+      return fail(
+        `a tracked active run (${trackedLive.runId ?? 'awaiting discovery'}) exists for ${packageId}; stop/abandon it first`,
+      );
+    // Drop the row outright (the flow-end filter would anyway): later paths
+    // include friendly replays (§7 duplicate gate) that return without
+    // touching state — reconciliation must survive them on disk, or every
+    // future invocation would re-refuse on the same stale row.
+    st.activeRuns = st.activeRuns.filter((r) => r !== trackedLive);
+    record(st, 'restart_reconciled_terminal_tracked_run', {
+      packageId,
+      runId: trackedLive.runId,
+      archonStatus: String(row.status),
+    });
+    saveState(st);
+  }
   const liveCurrent = rows.filter(
     (r) => r.user_message === currentMessage && ['running', 'pending'].includes(String(r.status)),
   );

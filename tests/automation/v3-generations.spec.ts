@@ -644,6 +644,103 @@ describe('--restart-package CLI flows', () => {
     const alpha = readMs(sb).packages.find((p: { id: string }) => p.id === PKG);
     expect(alpha.generation).toBe(2);
   });
+
+  const seedTrackedRow = (runId: string, message: string) =>
+    writeFileSync(
+      join(sb.stateDir, 'autopilot-state.json'),
+      JSON.stringify({
+        activeRuns: [
+          { kind: 'package', packageId: PKG, message, runId, done: false, paused: false },
+        ],
+        milestoneRuns: [],
+        pausedFatal: null,
+        history: [],
+      }),
+    );
+
+  it('§30 Case B′: a tracked run Archon PROVES terminal is reconciled, then the restart completes', () => {
+    // The real-world bind: a stale tracked row blocks the restart, and the only
+    // other supported unblock (a supervisor tick) would relaunch retired
+    // generation 0 in its same-tick reconcile→launch order. The restart must
+    // therefore reconcile rows whose run is provably terminal — and complete.
+    seedTrackedRow('r-dead', PKG);
+    const genBefore = readMs(sb).packages.find((p: { id: string }) => p.id === PKG).generation ?? 0;
+    const r = runRestartCli(
+      sb,
+      [
+        '--restart-package',
+        PKG,
+        '--fresh-generation',
+        '--confirm-new-generation',
+        '--reason',
+        'restart after reconciling an archon-terminal tracked run',
+      ],
+      {
+        rows: [
+          {
+            id: 'r-dead',
+            workflow_name: 'foresift-work-package',
+            user_message: PKG,
+            status: 'cancelled',
+          },
+        ],
+      },
+    );
+    expect(r.status).toBe(0);
+    expect(r.stderr).not.toMatch(/tracked active run/);
+    const st = JSON.parse(readFileSync(join(sb.stateDir, 'autopilot-state.json'), 'utf8'));
+    expect(st.activeRuns).toHaveLength(0); // reconciled row cleared
+    const evidence = (st.history ?? []).find(
+      (h: { event?: string }) => h.event === 'restart_reconciled_terminal_tracked_run',
+    );
+    expect(evidence).toMatchObject({ packageId: PKG, runId: 'r-dead', archonStatus: 'cancelled' });
+    const receipt = JSON.parse(r.stdout.trim());
+    expect(receipt.retiredRunIds).toContain('r-dead'); // retired with the old generations
+    const alpha = readMs(sb).packages.find((p: { id: string }) => p.id === PKG);
+    expect(alpha.generation).toBe(genBefore + 1); // advanced exactly once past the prior state
+  });
+
+  it('§30 Case B″: reconciliation persists even when a later gate replays a receipt', () => {
+    // The completed-but-unlaunched generation makes a PLAIN re-invocation take
+    // the §7 replay short-circuit — which returns without touching state. The
+    // reconciliation (done earlier in the flow) must already be on disk, or
+    // every future invocation would re-refuse on the same stale row.
+    seedTrackedRow('r-dead2', PKG);
+    const r = runRestartCli(sb, ['--restart-package', PKG, '--fresh-generation'], {
+      rows: [
+        {
+          id: 'r-dead2',
+          workflow_name: 'foresift-work-package',
+          user_message: PKG,
+          status: 'cancelled',
+        },
+      ],
+    });
+    expect(r.status).toBe(0); // replayed the unlaunched-generation receipt
+    const st = JSON.parse(readFileSync(join(sb.stateDir, 'autopilot-state.json'), 'utf8'));
+    expect(st.activeRuns).toHaveLength(0); // persisted DESPITE the replay path
+    expect((st.history ?? []).map((h: { event?: string }) => h.event)).toContain(
+      'restart_reconciled_terminal_tracked_run',
+    );
+  });
+
+  it('§30 Case B‴: a tracked run whose Archon row is still RUNNING still refuses', () => {
+    const gen = readMs(sb).packages.find((p: { id: string }) => p.id === PKG).generation ?? 0;
+    seedTrackedRow('r-alive', generationMessage(PKG, gen));
+    const r = runRestartCli(sb, ['--restart-package', PKG, '--fresh-generation'], {
+      rows: [
+        {
+          id: 'r-alive',
+          workflow_name: 'foresift-work-package-optimized',
+          user_message: generationMessage(PKG, gen),
+          status: 'running',
+        },
+      ],
+    });
+    expect(r.status).toBe(1);
+    expect(r.stderr).toMatch(/RESTART REFUSED/);
+    expect(r.stderr).toMatch(/tracked active run/);
+  });
 });
 
 // ── §30 restart race matrix: crash windows and concurrent-invocation faults ──

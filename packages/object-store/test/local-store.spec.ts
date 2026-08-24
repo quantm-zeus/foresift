@@ -200,4 +200,27 @@ describe('tamper detection fails explicitly', () => {
     expect(await store.get({ contentHash: `sha256:${'ab'.repeat(32)}` })).toBeNull();
     expect(await store.versions(`sha256:${'cd'.repeat(32)}`)).toEqual([]);
   });
+
+  it('treats unparsable protection-metadata filenames as layout corruption (EH-L2)', async () => {
+    // A metadata file whose name does not parse as a version must not be
+    // silently skipped — that would make stored versions invisible and
+    // fabricate absence for bytes that sit intact on disk.
+    const bytes = new TextEncoder().encode('meta-filename-probe');
+    const stored = await store.put({ artifactId: 'art-badname', bytes, metadata: META });
+    const dir = path.join(
+      root,
+      'objects',
+      stored.contentHash.slice('sha256:'.length, 'sha256:'.length + 2),
+      stored.contentHash.slice('sha256:'.length),
+    );
+    await writeFile(path.join(dir, 'vX.meta.json'), '{}');
+
+    await expect(store.versions(stored.contentHash)).rejects.toThrow(/layout corruption/);
+    // Non-metadata entries (blobs, stray files) are still ignored by listing.
+    await writeFile(path.join(dir, 'notes.txt'), 'not metadata');
+    await rm(path.join(dir, 'vX.meta.json'));
+    const listed = await store.versions(stored.contentHash);
+    expect(listed).toHaveLength(1);
+    expect(listed[0]?.version).toBe(stored.version);
+  });
 });

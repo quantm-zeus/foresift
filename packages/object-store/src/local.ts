@@ -160,9 +160,19 @@ export class LocalFilesystemObjectStore implements ObjectStoreAdapter {
     const metas: StoredObject[] = [];
     for (const entry of entries) {
       if (!entry.endsWith('.meta.json')) continue;
-      const version = Number(entry.slice(1, -'.meta.json'.length));
-      if (!Number.isInteger(version)) continue;
-      const meta = await readMeta(dir, version);
+      // A protection-metadata file whose name does not parse as a version is
+      // layout corruption: ignoring it would make stored versions invisible
+      // and fabricate absence for bytes that sit intact on disk — the same
+      // doctrine as the corrupt-meta and non-ENOENT refusals above. (The old
+      // Number()-based parse additionally misread `v.meta.json` as version 0
+      // and any `<x><n>.meta.json` prefix as version n.)
+      const match = /^v(\d+)\.meta\.json$/.exec(entry);
+      if (match === null) {
+        throw new Error(
+          `object store layout corruption: unparsable protection-metadata filename ${JSON.stringify(entry)} under ${dir}`,
+        );
+      }
+      const meta = await readMeta(dir, Number(match[1]));
       if (meta !== null) metas.push(meta.stored);
     }
     return metas.sort((a, b) => a.version - b.version);

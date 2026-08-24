@@ -1,0 +1,26 @@
+{
+  "name": "@foresift/security",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Foresift security perimeter: append-only hash-chained audit with continuous verification, high-impact step-up gating, deny-by-default egress, untrusted-content isolation, secrets/supply-chain policy, import quarantine gating, MCP/OAuth policy primitives, abuse controls, incidents/pauses, and the runtime prohibited-capability canary.",
+  "exports": {
+    ".": {
+      "types": "./src/index.ts",
+      "default": "./src/index.ts"
+    }
+  },
+  "scripts": {
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@foresift/domain": "workspace:*",
+    "@foresift/object-store": "workspace:*",
+    "@foresift/persistence": "workspace:*",
+    "@foresift/shared-schemas": "workspace:*"
+  },
+  "devDependencies": {
+    "@electric-sql/pglite": "^0.5.6",
+    "vitest": "4.1.11"
+  }
+}

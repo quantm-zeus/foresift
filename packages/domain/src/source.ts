@@ -96,6 +96,13 @@ export interface DependenceThresholds {
   readonly fingerprintSimilarity: number;
 }
 
+/**
+ * Initial calibration of the AC-245 gate: deliberately conservative starting
+ * values chosen at design time (this is a greenfield system — there is no
+ * production dependence data to fit them against), not empirical estimates.
+ * They are pinned by `tests/fixtures/data/correlated-providers.json` and the
+ * AC-245 acceptance suite, so retuning them is a visible, tested decision.
+ */
 export const DEFAULT_DEPENDENCE_THRESHOLDS: DependenceThresholds = {
   correlation: 0.8,
   outageOverlap: 0.5,

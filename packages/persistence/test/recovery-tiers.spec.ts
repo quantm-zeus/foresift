@@ -288,6 +288,25 @@ describe('tier measurements + incidents + health states (§34.9–§34.10)', () 
     ).rejects.toThrow(/recovery_health_healthy_has_no_incident/);
   });
 
+  it('refuses a degraded health state whose incident reference points at no durable incident (FK)', async () => {
+    // Application-layer validation passes — the reference is present and
+    // well-formed — so the database constraint is the enforcing layer here.
+    await expect(
+      engine.query(
+        `INSERT INTO recovery_health_states
+           (health_state_id, capability, kind, confirmed_opportunity_influence_blocked,
+            deterministic_risk_monitoring_allowed, incident_id, evaluated_at, reason)
+         VALUES ('health-ghost-incident','observations','DEGRADED',true,true,
+                 'incident-never-opened',now(),'degraded traceability without a real incident')`,
+      ),
+    ).rejects.toThrow(/recovery_health_states_incident_fk/);
+    const ghost = await engine.query(
+      'SELECT 1 FROM recovery_health_states WHERE health_state_id = $1',
+      ['health-ghost-incident'],
+    );
+    expect(ghost.rows).toHaveLength(0);
+  });
+
   it('refuses suppressing deterministic risk monitoring and degraded states without incidents', async () => {
     await expect(
       recordRecoveryHealthState(engine, {

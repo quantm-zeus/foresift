@@ -109,7 +109,7 @@ prohibited capability anywhere outside the inert scanner self-test corpus.
 
 ## Phase C — Step-up gate and transport-security primitives
 
-- [ ] T112 Implement `src/csrf.ts` (double-submit + origin-binding validation)
+- [x] T112 Implement `src/csrf.ts` (double-submit + origin-binding validation)
       and `src/action-gate.ts`: `evaluateHighImpactAction` enforcing fresh
       phishing-resistant step-up proof (authenticator-class policy refusing
       TOTP-only), exact authorization scope match against the Appendix B
@@ -117,26 +117,26 @@ prohibited capability anywhere outside the inert scanner self-test corpus.
       audit emission on every decision; freshness windows evaluated via
       injected clock. Refusal reasons typed per missing dimension.
       Traces: FR-SEC-001; AC-274.
-- [ ] T113 Implement `src/mcp-origin.ts`: exact-match Origin decision engine —
+- [x] T113 Implement `src/mcp-origin.ts`: exact-match Origin decision engine —
       allowlist hit reaches authentication; present-but-invalid origins
       (punycode-confused, trailing-dot, mixed-scheme, wrong-port, wrong-host)
       refused BEFORE session/tool/resource processing with typed verdicts
       consumable as HTTP 403 by later transport wiring (plan material
       decision 4). Absent-Origin policy configurable per deployment mode.
       Traces: FR-SEC-001; AC-250.
-- [ ] T114 Wire audit-health consultation into the high-impact gate: while a
+- [x] T114 Wire audit-health consultation into the high-impact gate: while a
       critical audit-verification incident is open, high-impact activation
       actions refuse. Traces: FR-SEC-001, FR-SEC-002, FR-SEC-011 (§35.9
       block rule); AC-274, AC-259 integration.
-- [ ] T115 Implement `src/mcp-protocol-guard.ts`: protocol-revision allowlist
+- [x] T115 Implement `src/mcp-protocol-guard.ts`: protocol-revision allowlist
       (ADR-004 baseline), content-type/method validation, message-size caps,
       session binding checks (actor/profile/origin/revision), resumable-cursor
       authorization — deterministic typed failures without tool execution.
       Traces: FR-SEC-001; AC-251.
-- [ ] T116 [P] Implement `src/oauth-binding.ts`: PKCE required, exact redirect
+- [x] T116 [P] Implement `src/oauth-binding.ts`: PKCE required, exact redirect
       URI matching, audience/resource-indicator binding, expiry, scope
       narrowing, upstream-token-passthrough refusal. Traces: FR-SEC-001; AC-253.
-- [ ] T117 Implement the MCP credential lifecycle over
+- [x] T117 Implement the MCP credential lifecycle over
       `g0_sec_0002_mcp_credentials`: ≥256-bit entropy generation via
       injectable entropy seam, keyed hash at rest (raw secret shown once),
       scope set, origin policy binding, profile/tool/resource/entity bounds,

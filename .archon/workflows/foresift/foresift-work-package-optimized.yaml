@@ -270,6 +270,12 @@ nodes:
           idle_timeout: 1800000
         - id: repair-targeted-recheck
           depends_on: [gate-repair]   # serialize: recheck must observe post-repair state
+          # Explicit budget REQUIRED: without one archon applies its 120 s bash
+          # default, which is shorter than a single targeted TESTS-category
+          # recheck (measured 282 s under contention on this 4-CPU box) — live
+          # run 14ed21bdde69 lost its third repair iteration to exactly that
+          # kill (defect #8). Budget matches the sibling repair-final-full gate.
+          timeout: 1800000
           bash: |
             set +e
             node scripts/automation/package-targeted-verify.mjs \
@@ -423,6 +429,10 @@ nodes:
           idle_timeout: 1800000
         - id: converge-targeted-recheck
           depends_on: [converge]   # serialize: recheck must observe post-converge state
+          # Explicit budget REQUIRED — same defect #8 class as the gate-repair
+          # loop's recheck: archon's 120 s bash default is shorter than one
+          # targeted TESTS-category verification (~282 s under contention).
+          timeout: 1800000
           bash: |
             set +e
             node scripts/automation/package-targeted-verify.mjs \

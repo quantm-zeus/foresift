@@ -61,6 +61,22 @@ describe('raw-integer quantity policy (FR-DATA-001 §11.5)', () => {
     expect(() => parseDecimalString('.5')).toThrowError(ForesiftError);
   });
 
+  it('accepts pure decimal digit strings and nothing else for rawAmount strings', () => {
+    // Raw BigInt() would also admit hex/binary/octal prefixes, a leading '+',
+    // and surrounding whitespace; a §11.5 raw amount is decimal digits only.
+    expect(rawAmount('42')).toBe(42n);
+    expect(rawAmount('007')).toBe(7n);
+    expect(() => rawAmount('0x10')).toThrowError(ForesiftError);
+    expect(() => rawAmount('0b101')).toThrowError(ForesiftError);
+    expect(() => rawAmount('0o17')).toThrowError(ForesiftError);
+    expect(() => rawAmount('+5')).toThrowError(ForesiftError);
+    expect(() => rawAmount(' 5')).toThrowError(ForesiftError);
+    expect(() => rawAmount('5 ')).toThrowError(ForesiftError);
+    expect(() => rawAmount('5.0')).toThrowError(ForesiftError);
+    expect(() => rawAmount('-3')).toThrowError(ForesiftError);
+    expect(() => rawAmount('')).toThrowError(ForesiftError);
+  });
+
   it('never exposes a JS-number pathway: inputs/outputs are bigint or string', () => {
     const raw = tokenQuantityToRaw('2.5', 9);
     expect(typeof raw).toBe('bigint');

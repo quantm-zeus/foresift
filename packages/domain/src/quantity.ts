@@ -35,19 +35,23 @@ export interface QuantitySemantics {
   readonly scale: number;
 }
 
-/** Validate and brand a non-negative raw integer amount. */
+/**
+ * Validate and brand a non-negative raw integer amount. String inputs are
+ * accepted only as pure decimal digit strings (`/^\d+$/`): raw `BigInt()`
+ * would also admit `0x…`/`0b…`/`0o…`, a leading `+`, and surrounding
+ * whitespace — none of which is a §11.5 raw amount.
+ */
 export function rawAmount(value: bigint | string): RawAmount {
   let v: bigint;
   if (typeof value === 'string') {
-    try {
-      v = BigInt(value);
-    } catch {
+    if (!/^\d+$/.test(value)) {
       throw new QuantityError(
         'raw amount must be a decimal digit string',
         { value },
         ErrorCode.QUANTITY_DECIMAL_STRING_INVALID,
       );
     }
+    v = BigInt(value);
   } else {
     v = value;
   }

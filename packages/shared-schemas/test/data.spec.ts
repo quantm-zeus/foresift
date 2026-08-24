@@ -106,7 +106,7 @@ describe('data schema registry', () => {
   });
 });
 
-describe('round-trip: domain fixtures validate against their mirrors (T014)', () => {
+describe('round-trip: domain fixtures validate against their mirrors ', () => {
   const positives: readonly [DataSchemaName, unknown][] = [
     ['ChainIdentity', chainFixture],
     [
@@ -319,7 +319,7 @@ describe('round-trip: domain fixtures validate against their mirrors (T014)', ()
   });
 });
 
-describe('negative fixtures fail validation (T014)', () => {
+describe('negative fixtures fail validation ', () => {
   const mustFail = (name: DataSchemaName, payload: unknown, why: string): void => {
     const result = DATA_SCHEMAS[name].safeParse(payload);
     expect(result.success, `${name}: expected failure — ${why}`).toBe(false);

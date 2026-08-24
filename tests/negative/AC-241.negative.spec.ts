@@ -1,5 +1,5 @@
 /**
- * AC-241 negative / failure-path — task T053.
+ * AC-241 negative / failure-path.
  * Traces: FR-DATA-003, INV-005.
  * The frozen-replay surface has no current-state bypass: every replay
  * entrypoint requires an explicit boundary; an absent or hidden boundary

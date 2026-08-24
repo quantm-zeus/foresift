@@ -163,8 +163,10 @@ export async function recordDependenceEdge(
   input: { edgeId: string; edge: SourceDependenceEdge },
 ): Promise<void> {
   assertDependenceInputs(input.edge.inputs);
-  // Canonical pair order so a pair has exactly one edge regardless of who was
-  // listed first; self-edges are meaningless.
+  // Canonical pair order normalizes orientation regardless of who was listed
+  // first; storage does NOT enforce uniqueness per pair (multiple edges over
+  // time are allowed and the reader returns them newest-first), and self-edges
+  // are meaningless.
   const [a, b] =
     input.edge.sourceA < input.edge.sourceB
       ? [input.edge.sourceA, input.edge.sourceB]

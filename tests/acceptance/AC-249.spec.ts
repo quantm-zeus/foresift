@@ -1,5 +1,5 @@
 /**
- * AC-249 acceptance (positive) — task T057.
+ * AC-249 acceptance (positive).
  * Traces: FR-DATA-003 (no-backdating rule, §13.6), FR-DATA-004.
  * AC text (manifest §39, abridged): "…availability-backdating placebo …
  * controls show no unexplained material lift; any failure blocks promotion."

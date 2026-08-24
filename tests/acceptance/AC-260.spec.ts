@@ -1,5 +1,5 @@
 /**
- * AC-260 acceptance (positive) — task T060.
+ * AC-260 acceptance (positive).
  * Traces: FR-DR-001, FR-DR-002.
  * AC text (manifest §39.25): "A destructive restore drill recovers critical
  * configuration, decisions, alerts, audit/evidence indexes within the

@@ -1,5 +1,5 @@
 /**
- * Identity repository + golden fixtures (T023/T024, FR-DATA-001, AC-022/023
+ * Identity repository + golden fixtures (FR-DATA-001, AC-022/023
  * substrate). Fixtures live at tests/fixtures/data/ (manifest-scoped paths).
  */
 import { readFile } from 'node:fs/promises';
@@ -168,7 +168,7 @@ describe('golden EVM/Solana address vectors (AC-023)', () => {
   });
 });
 
-describe('verified-equivalence memberships and pool identity (T023)', () => {
+describe('verified-equivalence memberships and pool identity', () => {
   it('groups representations only under verified equivalences; refuses heuristics', async () => {
     await createAsset(engine, 'asset_golden_1');
     const rep = vectors.evmAddresses[0];
@@ -378,7 +378,7 @@ describe('insert-only identity semantics (insertOrVerify)', () => {
   });
 });
 
-describe('decimals resolution state machine over golden vectors (T023/T024)', () => {
+describe('decimals resolution state machine over golden vectors', () => {
   it('walks every scenario to its declared final state', async () => {
     for (const scenario of decimalsVectors.scenarios) {
       await ensureChain(engine, scenario.representation.chainId);
@@ -488,7 +488,7 @@ describe('decimals resolution state machine over golden vectors (T023/T024)', ()
   });
 });
 
-describe('pair identity (T023 substrate, §11.6)', () => {
+describe('pair identity (§11.6)', () => {
   it('records a pair insert-or-verify: identical re-record is a no-op, conflict is typed', async () => {
     await ensureChain(engine, 'eip155:1');
     await insertDex(engine, 'eip155:1', 'dex_pairs');

@@ -1,5 +1,5 @@
 /**
- * Field-level data quality (T030, FR-DATA-005, §13.9): "null alone is
+ * Field-level data quality (FR-DATA-005, §13.9): "null alone is
  * insufficient" is enforced at the repository boundary AND structurally by a
  * SQL CHECK; read APIs distinguish usable values from coded absences.
  */
@@ -106,7 +106,7 @@ describe('null alone is insufficient (§13.9)', () => {
   });
 });
 
-describe('field-quality recording and state queries (T030)', () => {
+describe('field-quality recording and state queries', () => {
   it('records usable, coded-value, and coded-null fields and reads them back', async () => {
     const obs = baseObservation('obs_quality_1');
     await appendObservation(engine, obs);

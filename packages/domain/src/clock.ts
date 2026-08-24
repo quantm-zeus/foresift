@@ -4,7 +4,7 @@
  * paths. Production supplies a real clock; tests and drills supply scripted
  * timelines so replay/RPO measurements are exact.
  */
-import type { UtcTimestamp } from './timestamps.ts';
+import { toEpochMs, type UtcTimestamp } from './timestamps.ts';
 
 export interface ClockPort {
   /** Current instant as a validated UTC timestamp. */
@@ -15,7 +15,9 @@ export interface ClockPort {
 
 /** Fixed clock for tests/drills: returns a constant instant. */
 export function fixedClock(at: UtcTimestamp): ClockPort {
-  const epoch = Date.parse(at);
+  // Routed through the validating parser so an unorderable timestamp
+  // (e.g. a leap-second assertion) refuses here instead of yielding NaN.
+  const epoch = toEpochMs(at);
   return {
     now: () => at,
     nowEpochMs: () => epoch,
@@ -26,7 +28,11 @@ export interface ScriptedClock {
   readonly clock: ClockPort;
   /** Move to the next timeline entry (stays on the last entry when exhausted). */
   advance(): void;
-  /** Current position in the supplied timeline. */
+  /**
+   * Current position in the supplied timeline. RAW cursor semantics: after
+   * exhaustion `advance()` keeps incrementing past the last entry (reads stay
+   * clamped to it, but `index()` reports the unclamped position).
+   */
   index(): number;
 }
 
@@ -46,7 +52,7 @@ export function scriptedClock(timeline: readonly UtcTimestamp[]): ScriptedClock 
   return {
     clock: {
       now: () => current(),
-      nowEpochMs: () => Date.parse(current()),
+      nowEpochMs: () => toEpochMs(current()),
     },
     advance: () => {
       i += 1;

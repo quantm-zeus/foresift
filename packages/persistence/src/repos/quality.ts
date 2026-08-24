@@ -1,5 +1,5 @@
 /**
- * Field-level data-quality repository (FR-DATA-005, §13.9, T030).
+ * Field-level data-quality repository (FR-DATA-005, §13.9).
  *
  * Enforces "null alone is insufficient" at the boundary AND in SQL: a stored
  * null field must carry at least one explicit code, and VALID-only never

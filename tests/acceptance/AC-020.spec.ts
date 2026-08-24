@@ -1,5 +1,5 @@
 /**
- * AC-020 acceptance (positive) — task T049.
+ * AC-020 acceptance (positive).
  * Traces: FR-DATA-003 (point-in-time `available_at` replay), FR-DATA-002.
  * AC text (manifest §39): "Replay at time T cannot read evidence with
  * available_at > T."

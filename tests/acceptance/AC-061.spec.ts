@@ -1,5 +1,5 @@
 /**
- * AC-061 acceptance (positive) — task T059.
+ * AC-061 acceptance (positive).
  * Traces: FR-DATA-005, FR-DR-001.
  * AC text (manifest §39.7): "Provider outage returns explicit partial/
  * insufficient output and suppresses unsafe automated alerts."
@@ -21,6 +21,7 @@ import {
   appendObservation,
   fieldQualityForObservation,
   fieldsByQualityState,
+  openIncident,
   recordAcquisitionDecision,
   recordFieldQuality,
   recordRecoveryHealthState,
@@ -88,6 +89,15 @@ beforeAll(async () => {
 
   // Degradation vocabulary: automated opportunity influence suppressed for
   // the affected capability; deterministic risk monitoring stays allowed.
+  // Health states reference a real incident (recovery_health_states_incident_fk):
+  // the outage window pushed the observations tier past its recovery objective,
+  // so the durable incident is opened first and the state anchors to it.
+  await openIncident(tdb.engine, {
+    incidentId: 'incident-ac061-outage',
+    kind: 'RTO_MISSED',
+    reason: 'provider outage window: observations recovery exceeded its RTO objective',
+    openedAt: T('2026-06-01T08:10:00Z'),
+  });
   await recordRecoveryHealthState(tdb.engine, {
     healthStateId: 'ac061-health-outage',
     state: degradedHealthState(

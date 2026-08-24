@@ -1,5 +1,5 @@
 /**
- * AC-062 negative / failure-path — task T060.
+ * AC-062 negative / failure-path.
  * Traces: FR-DR-001, FR-DR-002.
  * The same drill harness, scripted past a tier: a restore that misses RTO
  * reports MISSED_RTO (never WITHIN_TIER), opens a durable incident, records
@@ -47,6 +47,10 @@ afterAll(async () => {
   if (targetDb) await targetDb.close();
 });
 
+// SETUP DEPENDENCY: the tests in this describe share one migrated targetDb.
+// The first test performs applyMigrations + tier seeding that later tests
+// (e.g. the incident-free missed measurement) rely on; run order matters and
+// is intentionally sequential within this file.
 describe('AC-062 negative: a missed tier is reported as a failure, never absorbed', () => {
   it('an over-RTO restore yields MISSED_RTO with incident + degraded health', async () => {
     const engine = createEngine(targetDb!, 'pglite');

@@ -1,5 +1,5 @@
 /**
- * AC-246 negative / failure-path — task T056.
+ * AC-246 negative / failure-path.
  * Traces: FR-DATA-006, INV-008.
  * The collapse is identity-anchored: a source cannot silently migrate between
  * lineages (differing tuples refuse), so independence groups can never be

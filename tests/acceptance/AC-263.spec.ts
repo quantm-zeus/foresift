@@ -1,6 +1,8 @@
 /**
- * AC-263 acceptance (positive) — task T061.
- * Traces: FR-DR-001, FR-DR-002, FR-DR-003 (restore + replay recovery).
+ * AC-263 acceptance (positive).
+ * Traces: FR-DR-002 (restore mechanism + collector checkpoint/gap storage
+ * this package owns). FR-DR-003 is a G2 requirement outside this package's
+ * assigned set and is NOT claimed here.
  * Gap/idempotence semantics are governed by invariant INV-009 ("every state
  * transition and external side effect remains idempotent and fenced"), the
  * on-point authority for no-skip/no-duplicate replay.

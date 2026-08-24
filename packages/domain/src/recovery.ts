@@ -24,7 +24,12 @@ export const RecoveryDataClass = {
 
 export type RecoveryDataClass = (typeof RecoveryDataClass)[keyof typeof RecoveryDataClass];
 
-/** Ceiling in minutes per §34.4 as bound by FR-DR-001. */
+/**
+ * Ceiling in minutes — the FR-DR-001 MAXIMA (§34.4-bound). Note the posture
+ * separation: these values are product law as ceilings, while §34.4's DEFAULT
+ * targets are stricter; deployments configure within the ceilings and may be
+ * required to sit at the stricter defaults.
+ */
 export const TIER_RPO_CEILING_MINUTES: Readonly<Record<RecoveryDataClass, number>> = {
   CRITICAL_METADATA: 15,
   CRITICAL_OBSERVATIONS_CHECKPOINTS: 60,
@@ -96,7 +101,12 @@ export interface RecoveryHealthState {
   readonly kind: RecoveryHealthStateKind;
   /** True ⇒ confirmed-opportunity claims/alerts blocked until repaired. */
   readonly confirmedOpportunityInfluenceBlocked: boolean;
-  /** Always true while any monitoring capability exists — risk alerts stay permitted. */
+  /**
+   * Enforced at the storage layer (recovery_health_states CHECK
+   * `recovery_health_preserves_risk_monitoring` in g0_dr_0002) and re-validated
+   * by `recordRecoveryHealthState` before the database — risk alerts stay
+   * permitted; AC-262's degraded contract.
+   */
   readonly deterministicRiskMonitoringAllowed: boolean;
   /** Incident reference when degraded (§34.9). */
   readonly incidentId: string | null;

@@ -1,5 +1,5 @@
 /**
- * AC-244 negative / failure-path — task T055.
+ * AC-244 negative / failure-path.
  * Traces: FR-DATA-004.
  * A lift claim without valid provenance is refused at the substrate level:
  * values lacking code/version provenance raise FEATURE_PROVENANCE_INCOMPLETE;

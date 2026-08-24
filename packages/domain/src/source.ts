@@ -130,8 +130,9 @@ export function assertDependenceInputs(inputs: DependenceObservationInputs): voi
 
 /**
  * Whether stored inputs justify recording REDUCED empirical independence
- * despite distinct provider ids (AC-245): strongly correlated timing/values,
- * outages, or fingerprints each suffice.
+ * despite distinct provider ids (AC-245): any ONE of valueErrorTimingCorrelation,
+ * outageOverlap, firstSeenLagAgreement, or fingerprintSimilarity reaching its
+ * threshold suffices.
  */
 export function inputsJustifyReducedIndependence(
   inputs: DependenceObservationInputs,

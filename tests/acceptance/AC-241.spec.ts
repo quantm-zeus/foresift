@@ -1,5 +1,5 @@
 /**
- * AC-241 acceptance (positive) — task T053.
+ * AC-241 acceptance (positive).
  * Traces: FR-DATA-003 (INV-005 frozen replay), FR-DATA-002.
  * AC text (manifest §39): "Replaying the same frozen candidate … differs
  * only in registered policy components; hidden current-data calls fail the

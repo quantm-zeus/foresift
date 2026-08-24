@@ -1,14 +1,16 @@
 /**
  * Immutable matured-count projections over frozen evidence bundles
- * (FR-DATA-006, FR-DATA-004, T037; AC-247).
+ * (FR-DATA-006, FR-DATA-004; AC-247).
  *
  * A projection is served only through replay-realizable windows: the claimed
  * maturity window may never extend past the resolved-at replay boundary.
- * Counts derive exclusively from immutable inputs — trigger-protected frozen
- * bundles and one-way acquisition completions — so a projection for a given
- * (candidate, window, boundary) can never be altered afterwards. Promotion
- * eligibility is reported honestly: a below-threshold count is stated as
- * below threshold, never inflated toward the gate.
+ * The underlying row set is APPEND-ONLY: a later qualifying decision inside a
+ * historical window can raise a recomputed projection, but no emitted
+ * projection for a given (candidate, window, boundary) is ever rewritten in
+ * place, and its inputs — trigger-protected frozen bundles, one-way
+ * acquisition completions — are immutable. Promotion eligibility is reported
+ * honestly: a below-threshold count is stated as below threshold, never
+ * inflated toward the gate.
  */
 import {
   ForesiftError,

@@ -1,5 +1,5 @@
 /**
- * AC-262 negative / failure-path — task T061.
+ * AC-262 negative / failure-path.
  * Traces: FR-DR-001, FR-DR-002.
  * The degradation contract is one-directional by law: opportunity influence
  * may be blocked while deterministic risk monitoring stays allowed — never

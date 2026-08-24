@@ -1,5 +1,5 @@
 /**
- * AC-247 negative / failure-path — task T056.
+ * AC-247 negative / failure-path.
  * Traces: FR-DATA-006, INV-005.
  * A frozen historical evidence count cannot be moved by any later dependence
  * estimate, and the availability classifier refuses to bless late inputs as

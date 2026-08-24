@@ -1,5 +1,5 @@
 /**
- * Restore-drill harness + measured-RPO/RTO evaluation (T043–T045,
+ * Restore-drill harness + measured-RPO/RTO evaluation (
  * FR-DR-001/002, §34.5–§34.10, AC-062/AC-260/AC-261).
  *
  * Deterministic snapshot mechanism: identical data ⇒ identical snapshot
@@ -72,7 +72,7 @@ afterAll(async () => {
   await fs.rm(storeRoot, { recursive: true, force: true });
 });
 
-describe('deterministic snapshot mechanism (T043, ADR-0015)', () => {
+describe('deterministic snapshot mechanism (ADR-0015)', () => {
   it('yields byte-identical snapshots for identical data regardless of timing', async () => {
     await engine.query(
       'INSERT INTO canonical_event_keys (canonical_key, event_family, first_seen_at) VALUES ($1,$2,$3)',
@@ -205,7 +205,7 @@ describe('backup run lifecycle (FR-DR-002)', () => {
   });
 });
 
-describe('clean-environment restore verifier (T044, AC-261)', () => {
+describe('clean-environment restore verifier (AC-261)', () => {
   const verifier = {
     async verifyArtifact(artifactId: string, expectedHash: string) {
       const verdict = await store.verify({ contentHash: expectedHash });
@@ -400,7 +400,7 @@ describe('clean-environment restore verifier (T044, AC-261)', () => {
   });
 });
 
-describe('drill timeline honesty (T045, AC-062): inconsistent timelines are refused', () => {
+describe('drill timeline honesty (AC-062): inconsistent timelines are refused', () => {
   it('computes exact minute deltas for a coherent timeline', () => {
     const achieved = achievedMinutes({
       lastDurableWriteAt: utcTimestamp('2026-06-01T11:48:00Z'),
@@ -442,7 +442,7 @@ describe('drill timeline honesty (T045, AC-062): inconsistent timelines are refu
   });
 });
 
-describe('measured RPO/RTO vs configured tiers (T045, AC-062/260/262)', () => {
+describe('measured RPO/RTO vs configured tiers (AC-062/260/262)', () => {
   it('measures a within-tier metadata restore under the 15-minute ceiling using injected time', async () => {
     const timeline = {
       lastDurableWriteAt: at(-12), // last durable write 12 minutes before loss

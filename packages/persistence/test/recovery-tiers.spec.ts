@@ -1,5 +1,5 @@
 /**
- * Tiered recovery objectives storage (T042, FR-DR-001, §34.4/§34.9–§34.10):
+ * Tiered recovery objectives storage (FR-DR-001, §34.4/§34.9–§34.10):
  * §34.4 default tiers seeded under the product-law RPO ceilings; the
  * protected-asset registry covers EVERY table this package creates plus the
  * raw-payload object store; looser-than-ceiling configuration, class
@@ -351,7 +351,7 @@ describe('tier measurements + incidents + health states (§34.9–§34.10)', () 
 
   it('refuses a resolution timestamp earlier than the incident opened', async () => {
     // Fresh incident opened at AT; resolution predating it must be refused —
-    // the refusal half of "closes incidents only forward in time" (review L-23).
+    // incidents close only forward in time.
     await openIncident(engine, {
       incidentId: 'incident-close-order',
       kind: 'RPO_MISSED',
@@ -372,7 +372,7 @@ describe('tier measurements + incidents + health states (§34.9–§34.10)', () 
   });
 });
 
-describe('backup policy persistence shape (T043 substrate)', () => {
+describe('backup policy persistence shape', () => {
   it('stores separated key references only and round-trips', async () => {
     await engine.query(
       `INSERT INTO backup_policies

@@ -1,9 +1,10 @@
 /**
- * LocalFilesystemObjectStore (T038): deterministic content-addressed,
- * versioned filesystem implementation for dev/test. Layout:
+ * LocalFilesystemObjectStore: deterministic content-addressed,
+ * versioned filesystem implementation for dev/test. Layout (`<hash>` is the
+ * BARE sha256 hex — the `sha256:` scheme prefix is stripped):
  *
- *   <root>/objects/<hh>/<contentHash>/v<version>.blob      exact bytes
- *   <root>/objects/<hh>/<contentHash>/v<version>.meta.json protection metadata
+ *   <root>/objects/<hh>/<hash>/v<version>.blob      exact bytes
+ *   <root>/objects/<hh>/<hash>/v<version>.meta.json protection metadata
  *
  * The blob bytes are immutable once written; a rewrite that would change
  * existing bytes is refused rather than silently overwritten.
@@ -121,8 +122,9 @@ export class LocalFilesystemObjectStore implements ObjectStoreAdapter {
       candidates = candidates.filter((s) => dedupIdentityOf(s.metadata) === identity);
     }
     if (candidates.length === 0) return null;
-    // Newest version WITH an intact blob; a meta sidecar whose bytes vanished
-    // reads as absent — physical loss is reported, never fabricated.
+    // Newest version WITH an intact blob. A blob whose bytes vanished reads
+    // as ABSENT at this layer (get returns null); physical loss with surviving
+    // metadata is surfaced by verify()/the reconciler, not fabricated here.
     for (const candidate of [...candidates].reverse()) {
       try {
         const bytes = await readFile(

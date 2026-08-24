@@ -1,5 +1,5 @@
 /**
- * AC-021 acceptance (positive) — task T050.
+ * AC-021 acceptance (positive).
  * Traces: FR-DATA-002 (immutable observations and revisions), §13.4.
  * AC text (manifest §39): "Revisions/reorgs do not erase original
  * observations."

@@ -226,14 +226,14 @@ Completed this iteration:
 
 Unresolved, recorded explicitly for follow-up iterations:
 
-- [ ] T121 Migrator defenses remain unimplemented (missing-file detection,
+- [x] T121 Migrator defenses remain unimplemented (missing-file detection,
       out-of-order application refusal, concurrent-run fencing, `g1_*`
       filename support currently silently ignored). The review itself files
       this as a P1 follow-up design decision rather than a convergence
       repair; deferring keeps this iteration inside review-repair scope.
       Traces: FR-DATA-001…FR-DATA-006, FR-DR-001, FR-DR-002 (migration
       integrity substrate they run on).
-- [ ] T122 Comment-level MEDIUM/LOW catalog from the consolidated review
+- [x] T122 Comment-level MEDIUM/LOW catalog from the consolidated review
       artifacts (decision-needed items such as recovery_health_states.incident
       FK enforcement, red-gate header wording, correlated-providers fixture
       consumption, ~50 further single-line comment corrections). None affects

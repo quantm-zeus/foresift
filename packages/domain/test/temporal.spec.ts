@@ -103,7 +103,7 @@ describe('replay-boundary predicate visibleAt (FR-DATA-003, AC-020)', () => {
     expect(visibleAt({ availableAt: t('2026-01-01T12:00:01Z') }, T)).toBe(false);
   });
 
-  it('is anti-monotone in T: earlier-T visible sets are subsets of later-T sets (T011 property)', () => {
+  it('is monotone in T: earlier-T visible sets are subsets of later-T sets', () => {
     // Deterministic PRNG (mulberry32) — no Math.random flake.
     let seed = 0x9e3779b9;
     const rand = (): number => {

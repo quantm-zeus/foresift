@@ -68,7 +68,12 @@ export const ChainIdSchema = z.string().refine(isChainId, {
   message: 'not a CAIP-2-compatible chain id',
 });
 
-/** Decimal-digit string carrying an unbounded integer (raw amounts, slots). */
+/**
+ * Decimal-digit string carrying an unbounded integer (raw amounts, slots).
+ * Note the deliberate asymmetry vs `DecimalStringSchema`: leading zeros are
+ * ALLOWED here (slot/amount strings arrive zero-padded from sources), while
+ * the §11.5 quantity policy forbids them in canonical decimal quantities.
+ */
 export const DigitStringSchema = z.string().regex(/^[0-9]+$/, 'expected decimal digit string');
 
 /** Exact decimal string per the domain quantity policy: no leading zeros, optional fraction. */
@@ -649,7 +654,11 @@ export const CollectorGapSchema = z
 // Versioned registry
 // ---------------------------------------------------------------------------
 
-/** Every data-family schema under its manifest-facing name. */
+/**
+ * Every data-family schema under its registry key. Registry keys are the
+ * PUBLIC schema names (the names the requirements manifest and fixtures
+ * reference); the local Zod variable names carry the `Schema` suffix.
+ */
 export const DATA_SCHEMAS = {
   ChainIdentity: ChainIdentitySchema,
   AssetRepresentation: AssetRepresentationSchema,

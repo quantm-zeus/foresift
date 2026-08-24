@@ -1,8 +1,9 @@
 /**
- * Recovery tier repository (T042, FR-DR-001, §34.4): tier registration under
- * the product-law RPO ceilings, the protected-asset registry mapping every
- * table/store this package creates onto its covering tier, and tier
- * measurement recording. Measurement timestamps are caller-supplied as of
+ * Recovery tier repository (FR-DR-001, §34.4): tier registration under
+ * the product-law RPO ceilings, the protected-asset registry through which
+ * deployments map their tables/stores onto covering tiers (an obligation
+ * exercised by the specs — no src path enumerates them automatically), and
+ * tier measurement recording. Measurement timestamps are caller-supplied as of
  * §34.10; this repository records the injected instant verbatim and does NOT
  * independently validate it against other clocks — backdating prevention for
  * measurements is a producer-side obligation, enforced by callers that inject
@@ -117,8 +118,9 @@ export async function registerProtectedAsset(
 
 /**
  * Record one measured drill outcome for a tier (§34.10). A missed outcome
- * MUST carry an incident reference — the SQL CHECK enforces it; the domain
- * layer refuses before reaching the database so the refusal is typed.
+ * MUST carry an incident reference — enforced at BOTH layers: this function
+ * refuses before reaching the database so the refusal is typed, and the SQL
+ * CHECK `tier_measurements_incident_on_miss` backs it up.
  */
 export async function recordTierMeasurement(
   engine: DatabaseEngine,
@@ -217,7 +219,7 @@ export async function resolveIncident(
     );
   }
   // Incidents close only forward in time: a resolution predating the opening
-  // would falsify the durable incident record (review L-23).
+  // would falsify the durable incident record.
   const openedIso = typeof row.opened_at === 'string' ? row.opened_at : row.opened_at.toISOString();
   if (compareTimestamps(input.resolvedAt, utcTimestamp(openedIso)) < 0) {
     throw new ForesiftError(

@@ -139,7 +139,7 @@
       ],
       "expectedState": "SOURCED",
       "expectedDecimals": null,
-      "$note": "refused insert leaves the representation untouched; state falls back to the seeded default"
+      "$note": "the out-of-scale observation is refused; the harness then snapshots the representation and asserts it remains in its seeded SOURCED state with no decimals"
     }
   ]
 }

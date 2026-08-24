@@ -1,5 +1,5 @@
 /**
- * Evidence acquisition lifecycle (T035/T036, §13.8, AC-243, AC-247): probe
+ * Evidence acquisition lifecycle (§13.8, AC-243, AC-247): probe
  * assignment and decision impact are persisted BEFORE retrieval; retrieval
  * without a prior assignment is rejected; completion is one-way; historical
  * counts resolved at a replay boundary are frozen against later post-hoc
@@ -61,7 +61,7 @@ function probe(overrides: Partial<ProbeAssignment> = {}): ProbeAssignment {
   };
 }
 
-describe('probe-assignment write-before-retrieval (T035, AC-243)', () => {
+describe('probe-assignment write-before-retrieval (AC-243)', () => {
   it('refuses degenerate assignment probabilities at the boundary', async () => {
     await recordAcquisitionDecision(engine, {
       decisionId: 'd_zero',
@@ -255,7 +255,7 @@ describe('probe-assignment write-before-retrieval (T035, AC-243)', () => {
   });
 });
 
-describe('frozen matured counts (T036, AC-247)', () => {
+describe('frozen matured counts (AC-247)', () => {
   it('resolves counts only from decisions completed at or before t', async () => {
     // Two RETURNED decisions completed before the boundary…
     await recordAcquisitionDecision(engine, {

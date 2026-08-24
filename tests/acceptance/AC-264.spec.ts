@@ -1,7 +1,9 @@
 /**
- * AC-264 acceptance (positive) — task T062.
- * Traces: FR-DR-006 (primary — retention, deletion, legal hold, location,
- * encryption, rights, restore access), FR-DR-002 (mechanism).
+ * AC-264 acceptance (positive).
+ * Traces: FR-DR-002 (primary — retention, deletion, legal hold, location,
+ * encryption, rights, restore-access policy tests live on its backup/restore
+ * machinery), with FR-DR-001 tier context. FR-DR-006 is a G2 source-lineage
+ * requirement outside this package's assigned set and is NOT claimed here.
  * AC text (manifest §39.25): "Backup retention, encryption, location,
  * rights, legal hold, deletion, key access, and restore credentials are
  * validated by policy tests."

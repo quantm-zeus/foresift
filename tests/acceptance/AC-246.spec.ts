@@ -1,5 +1,5 @@
 /**
- * AC-246 acceptance (positive) — task T056.
+ * AC-246 acceptance (positive).
  * Traces: FR-DATA-006 (§11.7 independence groups, INV-008).
  * AC text (manifest §39, abridged): "Removing or collapsing each major
  * upstream lineage is included in sensitivity analysis; a policy whose alert

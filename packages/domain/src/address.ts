@@ -13,7 +13,11 @@ declare const brand: unique symbol;
 
 /** Canonical lowercase `0x`-prefixed 20-byte EVM address. */
 export type EvmAddress = string & { readonly [brand]: 'EvmAddress' };
-/** Validated base58 Solana address (32-byte ed25519 program-derived account). */
+/**
+ * Validated base58 Solana address: any 32-byte account — an ed25519 key
+ * OR a program-derived address (PDA). No curve check is performed here;
+ * this validates the base58 shape and length only.
+ */
 export type SolanaAddress = string & { readonly [brand]: 'SolanaAddress' };
 
 const EVM_ADDRESS_PATTERN = /^0x[0-9a-fA-F]{40}$/;

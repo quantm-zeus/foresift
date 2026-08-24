@@ -5,8 +5,9 @@
  * Where a registered CAIP namespace exists the CAIP-2 form is canonical;
  * otherwise a versioned internal identifier is used and an explicit
  * mapping-quality state (UNVERIFIED_ASSERTION / INTERNAL_VERSIONED) is
- * retained. Only namespace DISPATCH refuses unknown namespaces — parsing
- * itself accepts the generic CAIP-2 shape and marks it unverified.
+ * retained. Parsing (parseChainId) only checks the generic CAIP-2 shape;
+ * assigning that mapping-quality state happens in chainIdentity(), and only
+ * known-namespace dispatch treats unknown namespaces as refusable.
  */
 import { ErrorCode, ForesiftError } from './errors.ts';
 
@@ -33,14 +34,22 @@ export type ChainNamespace = (typeof ChainNamespace)[keyof typeof ChainNamespace
 export const ChainMappingQuality = {
   /** Registered CAIP-2 namespace; reference is the canonical registry value. */
   REGISTERED_CAIP2: 'REGISTERED_CAIP2',
-  /** EIP-155 network id known to be canonical for this deployment. */
+  /**
+   * EIP-155 namespace present; the reference is TAKEN as the canonical
+   * registry value for this deployment — that canonicality is NOT
+   * independently verified by chainIdentity() (no registry lookup happens).
+   */
   REGISTERED_EIP155_REFERENCE: 'REGISTERED_EIP155_REFERENCE',
   /**
    * No registered namespace exists; identity is a versioned internal
    * identifier whose mapping must never be silently reinterpreted.
    */
   INTERNAL_VERSIONED: 'INTERNAL_VERSIONED',
-  /** Mapping asserted by exactly one source and not yet cross-checked. */
+  /**
+   * Mapping assertion retained with attribution tracked by callers/storage;
+   * no cross-check has been performed, and this layer records nothing about
+   * how many sources made the assertion.
+   */
   UNVERIFIED_ASSERTION: 'UNVERIFIED_ASSERTION',
 } as const;
 
@@ -114,7 +123,7 @@ export function chainIdentity(input: {
   if (input.internalIdVersion !== undefined) {
     identity.internalIdVersion = input.internalIdVersion;
   }
-  // Defense-in-depth, not current enforcement (review L-3): the derivation
+  // Defense-in-depth, not the primary enforcement: the derivation
   // above cannot produce INTERNAL_VERSIONED without an id version. If that
   // derivation ever drifts, refuse loudly here rather than minting an
   // unversioned internal identity.

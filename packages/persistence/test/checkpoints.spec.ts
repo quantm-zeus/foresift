@@ -1,5 +1,5 @@
 /**
- * Collector continuity storage contract (T047, §34.7, INV-009, AC-263):
+ * Collector continuity storage contract (§34.7, INV-009, AC-263):
  * fenced checkpoints reject stale-token commits; restore+replay inserts each
  * canonical event exactly once; replay across an unmarked gap is refused
  * until the gap is registered AND resolved.

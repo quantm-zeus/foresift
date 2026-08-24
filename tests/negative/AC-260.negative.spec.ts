@@ -1,5 +1,5 @@
 /**
- * AC-260 negative / failure-path — task T060.
+ * AC-260 negative / failure-path.
  * Traces: FR-DR-001, FR-DR-002.
  * A drill that misses a declared tier cannot pass quietly: it opens a
  * durable incident and flips the machine-readable health state so confirmed

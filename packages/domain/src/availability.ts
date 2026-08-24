@@ -66,8 +66,11 @@ export interface ReplayVisible {
 }
 
 /**
- * The replay-boundary predicate: a record is visible at decision time `T`
- * iff `available_at <= T` (§13.1). One definition, many consumers.
+ * The TEMPORAL half of the §13.1 replay rule: a record is visible at decision
+ * time `T` iff `available_at <= T`. The version-validity conjuncts of §13.1
+ * (which schema versions were registered at `T`) are NOT enforced here or
+ * anywhere else in this repository yet; callers needing them must add that
+ * check explicitly. One definition, many consumers.
  */
 export function visibleAt(record: ReplayVisible, t: UtcTimestamp): boolean {
   return compareTimestamps(record.availableAt, t) <= 0;
@@ -84,9 +87,12 @@ export function visibleAtMs(availableAtEpochMs: number, t: UtcTimestamp): boolea
 }
 
 /**
- * Deterministic tie-break ordering for records sharing an instant: higher
- * revision first, then lexicographically greater stable key. "Availability
- * ties are resolved deterministically; they do not imply causal order" (§13.12).
+ * Deterministic replay-resolution ordering over ALL records, not only ties:
+ * latest `availableAt` first (the PRIMARY sort key), then — among records
+ * sharing that instant — higher revision first (a record without a revision
+ * number ranks as revision −1), then lexicographically greater stable key.
+ * "Availability ties are resolved deterministically; they do not imply causal
+ * order" (§13.12).
  */
 export interface ReplayOrderable extends ReplayVisible {
   readonly revisionNo?: number;

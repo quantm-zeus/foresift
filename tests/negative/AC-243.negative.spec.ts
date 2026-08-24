@@ -1,5 +1,5 @@
 /**
- * AC-243 negative / failure-path — task T054.
+ * AC-243 negative / failure-path.
  * Traces: FR-DATA-005, §13.8, INV-004.
  * Retrieval cannot outrun randomization: completing without a prior probe
  * assignment fails, degenerate probabilities are refused, late assignments

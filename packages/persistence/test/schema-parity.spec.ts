@@ -1,5 +1,5 @@
 /**
- * ADR-001 conformance (T022): the Drizzle mirror must match SQL truth.
+ * ADR-001 conformance: the Drizzle mirror must match SQL truth.
  * The migrations are the source of truth; this test enumerates every
  * foresift table in `information_schema` and compares columns, nullability,
  * type classes, and primary keys against the generated mirror.
@@ -64,7 +64,7 @@ afterAll(async () => {
   await db.close();
 });
 
-describe('Drizzle mirror parity with SQL truth (T022, ADR-001)', () => {
+describe('Drizzle mirror parity with SQL truth (ADR-001)', () => {
   it('mirrors exactly the table set created by the migrations', async () => {
     const sqlTables = await engine.query<{ table_name: string }>(
       `SELECT table_name FROM information_schema.tables
@@ -204,7 +204,7 @@ describe('§13.9 quality-code vocabulary parity (SQL truth ↔ domain)', () => {
         );
       }
     }
-    // observations + observation_revisions + quality_sources + features.
+    // observations + observation_revisions + observation_field_quality + features.
     expect(fullAllowlists).toBeGreaterThanOrEqual(4);
   });
 

@@ -1,5 +1,5 @@
 /**
- * Clean-environment restore verifier (T044, FR-DR-002, §34.6, AC-261).
+ * Clean-environment restore verifier (FR-DR-002, §34.6, AC-261).
  *
  * A restore is successful only when database/migration state, object hashes,
  * cross-store references, and collector checkpoint/gap integrity validate —
@@ -116,9 +116,8 @@ export function objectHashCheck(verifier: ArtifactHashVerifier): RestoreCheck {
  * readable AND its content hash must still match (index ↔ store agreement).
  * Scope note: this check proves row-level HASH CONSISTENCY between the
  * restored index and its manifests. It does not yet look up the artifact ids
- * a manifest references — dangling references are not detected here.
- * Referenced-artifact existence belongs in plugin RestoreChecks (e.g. the
- * ArtifactHashVerifier) until promoted into this built-in check.
+ * a manifest references — dangling references are not detected here; that
+ * belongs in plugin RestoreChecks until promoted into this built-in check.
  */
 export const crossStoreReferenceCheck: RestoreCheck = {
   name: 'cross-store-references',
@@ -312,6 +311,11 @@ export async function runRestoreDrill(config: RestoreDrillConfig): Promise<Resto
   return report;
 }
 
+/**
+ * Durability of drill results. Re-running a drill id re-uses `ON CONFLICT DO
+ * NOTHING`: the FIRST recorded outcome for a drill_id wins and later reruns
+ * never overwrite it — historical drill evidence is append-only by design.
+ */
 async function persistOutcome(
   engine: DatabaseEngine,
   report: RestoreDrillReport,

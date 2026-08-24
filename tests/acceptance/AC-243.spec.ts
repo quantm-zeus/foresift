@@ -1,5 +1,5 @@
 /**
- * AC-243 acceptance (positive) — task T054.
+ * AC-243 acceptance (positive).
  * Traces: FR-DATA-005, FR-DATA-003 (§13.8 randomized probes).
  * AC text (manifest §39): "Every randomized evidence probe stores eligibility
  * stratum, nonzero assignment probability, seed provenance, selection

@@ -1,9 +1,10 @@
 /**
- * AC-240 negative / failure-path — task T053.
+ * AC-240 negative / failure-path.
  * Traces: FR-DATA-003, INV-005.
- * Asymmetric §13.7 records are refused by the schema; non-UTC timestamps are
- * refused at the domain boundary; an entry earlier than its counterfactual
- * delivery time is flagged, never silently accepted.
+ * Layer split: non-UTC timestamps are refused by the domain boundary; the
+ * entry-not-earlier-than-counterfactual ordering asymmetry is flagged by the
+ * DOMAIN predicate (entryIsNotEarlierThanCounterfactual), not by a zod schema;
+ * never silently accepted either way.
  */
 import { describe, expect, it } from 'vitest';
 import {

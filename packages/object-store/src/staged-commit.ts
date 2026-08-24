@@ -1,5 +1,5 @@
 /**
- * Staged cross-store commit protocol (§14.8, T039):
+ * Staged cross-store commit protocol (§14.8):
  *
  *   PENDING_UPLOAD -> STORED_HASH_VERIFIED -> INDEX_COMMITTED -> AVAILABLE
  *
@@ -37,10 +37,9 @@ export interface StagedUploadRequest {
   readonly bytes: Uint8Array;
   readonly metadata: ObjectProtectionMetadata;
   readonly uploadedAt: UtcTimestamp;
-  /**
-   * Injected time source for the stage-transition timestamps. Omitted only by
-   * legacy/dev callers; deterministic paths (drills, tests) MUST supply one.
-   */
+  /** Injected time source for the stage-transition timestamps; a default
+   * wall-clock port is used when omitted. Deterministic paths (drills, tests)
+   * supply one explicitly. */
   readonly now?: ClockPort | undefined;
 }
 
@@ -94,8 +93,10 @@ export async function stagedUpload(
     at: clock.now(),
   });
 
-  // Index commit: the DB row now carries the governed protected-metadata
-  // subset (the columns object_artifacts tracks; see adapter metadata).
+  // Index commit: flips the row staged at PENDING_UPLOAD into
+  // INDEX_COMMITTED — the governed protected-metadata subset was already
+  // inserted at PENDING_UPLOAD time, so a crash before this point leaves a
+  // fully-described row merely awaiting promotion.
   row = await transitionStage(engine, {
     artifactId: request.artifactId,
     reached: 'INDEX_COMMITTED',
@@ -120,8 +121,8 @@ export interface ReconciliationFinding {
     | 'ORPHAN_UPLOAD' // PENDING_UPLOAD row still unadvanced past the cutoff
     | 'MISSING_OBJECT' // index says stored, physical store disagrees
     | 'HASH_MISMATCH' // physical bytes no longer match the recorded hash
-    | 'RIGHTS_METADATA_MISMATCH' // protection metadata drifted between sides
-    | 'RETENTION_DRIFT'; // retention class diverged between sides
+    | 'RIGHTS_METADATA_MISMATCH' // recorded rightsRef differs from the expected one
+    | 'RETENTION_DRIFT'; // retention class outside the declared expectation set (index rows only)
   readonly detail: Record<string, unknown>;
 }
 

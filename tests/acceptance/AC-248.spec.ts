@@ -1,5 +1,5 @@
 /**
- * AC-248 acceptance (positive) — task T057.
+ * AC-248 acceptance (positive).
  * Traces: FR-DATA-003, FR-DATA-004 (immutable replay-correct counts).
  * AC text (manifest §39, abridged): "Promotion fails below the registered
  * mature success/failure/risk counts…"

@@ -1,5 +1,5 @@
 /**
- * AC-023 negative / failure-path — task T052.
+ * AC-023 negative / failure-path.
  * Traces: FR-DATA-001, §11.8 (explicit quality states, never guesses).
  * Invalid chain ids / addresses are refused with typed errors; invalid
  * decimal strings are refused by the quantity contract; a conflicting

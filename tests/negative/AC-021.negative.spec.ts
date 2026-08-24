@@ -1,5 +1,5 @@
 /**
- * AC-021 negative / failure-path — task T050.
+ * AC-021 negative / failure-path.
  * Traces: FR-DATA-002, §13.4, INV-004.
  * Direct mutation attempts against the append-only stores must be rejected by
  * the SQL immutability triggers — originals can never be erased or rewritten,

@@ -1,5 +1,5 @@
 /**
- * Measured-RPO/RTO drill evaluation (T045, FR-DR-001, §34.9–§34.10,
+ * Measured-RPO/RTO drill evaluation (FR-DR-001, §34.9–§34.10,
  * AC-062/AC-260/AC-262).
  *
  * All instants are injected through ClockPort/scripted timelines so tier

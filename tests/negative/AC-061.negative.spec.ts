@@ -1,5 +1,5 @@
 /**
- * AC-061 negative / failure-path — task T059.
+ * AC-061 negative / failure-path.
  * Traces: FR-DATA-005, FR-DR-001.
  * Fabricating a success-shaped output over an outage is impossible at every
  * layer: silent absences are refused (repository AND SQL), the success

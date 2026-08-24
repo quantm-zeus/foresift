@@ -1,5 +1,5 @@
 /**
- * Source identity and independence (T031/T032, FR-DATA-006, §11.7, ADR-052,
+ * Source identity and independence (FR-DATA-006, §11.7, ADR-052,
  * INV-008): distinct brand/provider ids do not imply independence — sources
  * sharing an upstream lineage collapse into ONE group; strongly correlated
  * pairs earn REDUCED independence credit despite distinct ids. Dependence
@@ -138,7 +138,7 @@ describe('lineage collapse — provider count is not independence (INV-008)', ()
   });
 });
 
-describe('pairwise dependence edges (T032, AC-245)', () => {
+describe('pairwise dependence edges (AC-245)', () => {
   it('records reduced-independence evidence for the correlated pair despite distinct ids', async () => {
     expect(correlatedPair).toBeDefined();
     expect(inputsJustifyReducedIndependence(correlatedPair!.edge.inputs)).toBe(

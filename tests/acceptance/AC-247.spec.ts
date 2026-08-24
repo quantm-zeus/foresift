@@ -1,5 +1,5 @@
 /**
- * AC-247 acceptance (positive) — task T056.
+ * AC-247 acceptance (positive).
  * Traces: FR-DATA-006 (frozen historical counts, INV-005).
  * AC text (manifest §39, abridged): "A retrospective provider-dependence
  * estimate cannot alter a frozen historical evidence count in realizable

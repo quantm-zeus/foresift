@@ -1,6 +1,6 @@
 /**
- * AC-022 acceptance (positive) — task T051.
- * Traces: FR-DATA-001 (§11.6 launch/migration lineage), §11.8.
+ * AC-022 acceptance (positive).
+ * Traces: FR-DATA-001 (§11.6 launch/migration lineage).
  * AC text (manifest §39): "Asset/pool migration avoids double counting in
  * fixture tests."
  *

@@ -1,5 +1,5 @@
 /**
- * AC-248 negative / failure-path — task T057.
+ * AC-248 negative / failure-path.
  * Traces: FR-DATA-003, FR-DATA-004.
  * The count substrate refuses to serve unrealizable projections: a maturity
  * window reaching past the replay boundary is a typed refusal, and a

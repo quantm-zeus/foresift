@@ -1,6 +1,6 @@
 /**
- * §13.8 evidence acquisition state vocabulary (FR-DATA-005, FR-DATA-003;
- * AC-242, AC-243).
+ * §13.8 evidence acquisition state vocabulary (AC-242, AC-243; consumed by
+ * FR-DATA-005 quality states and FR-DATA-003 availability semantics).
  *
  * Storage semantics that later layers rely on:
  * - `NOT_REQUESTED_BY_POLICY` is not provider missingness; it is never imputed
@@ -46,7 +46,15 @@ const NOT_RETRIEVED_BY_CHOICE: readonly AcquisitionState[] = [
   AcquisitionState.NOT_REQUESTED_BY_POLICY,
 ];
 
-/** States where retrieval was attempted but produced nothing usable. */
+/**
+ * States where no usable output was produced — covering BOTH sub-kinds:
+ * pre-flight refusals decided by this system before dispatch
+ * (COST_BLOCKED, QUOTA_BLOCKED, CAPABILITY_UNAVAILABLE, RIGHTS_BLOCKED are
+ * self-imposed budget/rights/capacity choices, NOT provider failures) and
+ * genuine attempted-retrieval failures (PROVIDER_UNAVAILABLE, TIMED_OUT,
+ * INVALID_RESPONSE). Rendering the first sub-kind as provider missingness is
+ * exactly the confusion AC-242 guards against.
+ */
 const RETRIEVAL_FAILED_STATES: readonly AcquisitionState[] = [
   AcquisitionState.COST_BLOCKED,
   AcquisitionState.QUOTA_BLOCKED,

@@ -1,5 +1,5 @@
 /**
- * Backup governance policy battery (T046/T048, FR-DR-002, §34.5, AC-264):
+ * Backup governance policy battery (FR-DR-002, §34.5, AC-264):
  * retention windows, encryption status, location allowlist, rights
  * references, legal-hold blocking deletion, deletion execution gating,
  * key-access separation (references never material), and restore
@@ -108,7 +108,7 @@ describe('retention + encryption + location + rights policy records (AC-264)', (
   });
 });
 
-describe('key-access separation (FR-DR-002, T046)', () => {
+describe('key-access separation (FR-DR-002)', () => {
   it('accepts opaque key references and round-trips them without material ever existing', async () => {
     await createBackupPolicy(
       engine,

@@ -1,6 +1,6 @@
 /**
  * Replay-boundary resolution over evidence bundles AND observations
- * (T040, FR-DATA-003, FR-DATA-002). Shares THE domain predicate —
+ * (FR-DATA-003, FR-DATA-002). Shares THE domain predicate —
  * visibleAt({availableAt}, T) = available_at <= T — with the persistence
  * replay repos, so a boundary resolves identically no matter which module
  * answers. Frozen evidence contributes only when frozen at or before the
@@ -117,13 +117,14 @@ export async function resolveEvidenceAt(
       latestByObservation.set(ref.observationId, entry);
     }
   }
-  // Deterministic read order: by observation, then availability via THE
-  // domain timestamp order (not locale-sensitive string comparison).
+  // Deterministic read order: by observation id under CODEPOINT comparison
+  // (localeCompare is locale-sensitive and would not be deterministic across
+  // environments), then availability via THE domain timestamp order.
   const observations = [...latestByObservation.values()]
     .map((e) => e.ref)
     .sort(
       (a, b) =>
-        a.observationId.localeCompare(b.observationId) ||
+        (a.observationId < b.observationId ? -1 : a.observationId > b.observationId ? 1 : 0) ||
         compareTimestamps(a.availableAt, b.availableAt),
     );
 

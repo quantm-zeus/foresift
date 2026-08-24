@@ -1,5 +1,5 @@
 /**
- * Database-side artifact index rows for object_artifacts (§14.8, T039).
+ * Database-side artifact index rows for object_artifacts (§14.8).
  * The stage machine's transitions live here; the cross-store driver in
  * staged-commit.ts composes them with physical store operations. Transitions
  * only ever move FORWARD; each transition records its instant.

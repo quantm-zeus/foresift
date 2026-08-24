@@ -1,5 +1,5 @@
 /**
- * AC-245 negative / failure-path — task T056.
+ * AC-245 negative / failure-path.
  * Traces: FR-DATA-006, INV-008.
  * Degenerate dependence inputs are refused rather than coerced; self-edges
  * are meaningless and rejected; reduced credit is only ever derived from

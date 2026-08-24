@@ -1,5 +1,5 @@
 /**
- * Observations repository (T025/T026, FR-DATA-002, AC-024/025): append-only
+ * Observations repository (FR-DATA-002, AC-021): append-only
  * writes with content-addressed receipts, revision chains that never touch
  * originals, and reorg/finality compensating events. The database itself
  * refuses UPDATE/DELETE on the immutable tables.
@@ -75,7 +75,7 @@ function baseObservation(observationId: string): ObservationInput {
   };
 }
 
-describe('append-only observations with receipt hashes (T025)', () => {
+describe('append-only observations with receipt hashes', () => {
   it('stores an observation whose stored row hashes back to the returned receipt', async () => {
     await appendObservation(engine, baseObservation('obs_r1'));
     const stored = await loadObservation(engine, 'obs_r1');
@@ -168,7 +168,7 @@ describe('append-only observations with receipt hashes (T025)', () => {
   });
 });
 
-describe('revision chains preserve originals byte-for-byte (T026, AC-025)', () => {
+describe('revision chains preserve originals byte-for-byte (AC-021)', () => {
   it('appends revisions without altering the original row or its receipt hash', async () => {
     const before = await loadObservation(engine, 'obs_r1');
     if (before === null) throw new Error('setup missing');
@@ -303,7 +303,7 @@ describe('revision chains preserve originals byte-for-byte (T026, AC-025)', () =
   });
 });
 
-describe('compensating events pin the original receipt hash (T026)', () => {
+describe('compensating events pin the original receipt hash', () => {
   it('records a reorg compensation referencing the superseded original', async () => {
     const before = await loadObservation(engine, 'obs_r1');
     if (before === null) throw new Error('setup missing');

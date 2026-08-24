@@ -1,5 +1,5 @@
 /**
- * LocalFilesystemObjectStore (T038): content addressing, protection-metadata
+ * LocalFilesystemObjectStore: content addressing, protection-metadata
  * dedup identity, immutability, and tamper detection (FR-DR-002, FR-DATA-002,
  * §14.5/§14.7). Negative paths fail explicitly — no silent repair.
  */
@@ -33,7 +33,7 @@ afterAll(async () => {
   await rm(root, { recursive: true, force: true });
 }, 30_000);
 
-describe('content addressing and dedup identity (T038)', () => {
+describe('content addressing and dedup identity', () => {
   it('stores bytes content-addressed and reads them back byte-exact', async () => {
     const bytes = new TextEncoder().encode('{"payload":"hello"}');
     const stored = await store.put({ artifactId: 'art-1', bytes, metadata: META });
@@ -92,7 +92,7 @@ describe('content addressing and dedup identity (T038)', () => {
   });
 });
 
-describe('tamper detection fails explicitly (T041)', () => {
+describe('tamper detection fails explicitly', () => {
   it('reports VERIFIED when bytes match and MISSING when absent', async () => {
     const bytes = new TextEncoder().encode('verify-target');
     const stored = await store.put({ artifactId: 'art-7', bytes, metadata: META });

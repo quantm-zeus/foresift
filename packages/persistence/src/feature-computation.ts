@@ -1,6 +1,6 @@
 /**
  * THE shared deterministic feature computation module (FR-DATA-004, §14.3/
- * §14.4, T033). Both the online writer and the offline batch recomputation
+ * §14.4). Both the online writer and the offline batch recomputation
  * path call these functions — parity is guaranteed by construction, not by
  * discipline. Same inputs yield byte-identical outputs, always.
  *
@@ -66,7 +66,7 @@ export function computeRollingVolume(request: FeatureComputationRequest): Comput
   const inWindow = request.events.filter(
     (e) =>
       // Instant comparison, not lexical — mixed sub-ms precision would shift
-      // the window boundary (review L-2).
+      // the window boundary.
       compareTimestamps(e.eventAt, request.windowStartInclusive) >= 0 &&
       compareTimestamps(e.eventAt, request.windowEndInclusive) <= 0 &&
       visibleAt({ availableAt: e.availableAt }, request.resolvedAt),

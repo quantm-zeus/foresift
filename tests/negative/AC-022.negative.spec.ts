@@ -1,5 +1,5 @@
 /**
- * AC-022 negative / failure-path — task T051.
+ * AC-022 negative / failure-path.
  * Traces: FR-DATA-001, §11.8 (abstain over guessing).
  * Naive aggregation demonstrably double counts the same fixture; ambiguous
  * lineages, undated samples on migrated pools, and cyclic edges are refused

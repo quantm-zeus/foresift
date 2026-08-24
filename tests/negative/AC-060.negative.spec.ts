@@ -1,5 +1,5 @@
 /**
- * AC-060 negative / failure-path — task T058.
+ * AC-060 negative / failure-path.
  * Traces: FR-DATA-001, FR-DATA-003, FR-DR-001.
  * The benchmark harness must be able to FAIL: under an artificial over-budget
  * delay injected at the engine seam, its budget verdicts trip. A benchmark

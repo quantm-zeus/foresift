@@ -3,8 +3,9 @@
 -- default governs; deployments may configure stricter targets — never looser.
 -- Ceilings: critical metadata <= 15 min RPO; critical observations and
 -- checkpoints <= 60 min; replayable raw payloads <= 24 h when rights permit
--- reconstruction. The protected-asset registry maps every table/store created
--- by this package onto its covering tier.
+-- reconstruction. Registering protected assets onto covering tiers is a
+-- DEPLOYMENT obligation discharged through this registry (exercised by the
+-- specs); no migration enumerates this package's tables automatically.
 
 CREATE TABLE recovery_tiers (
     tier_id           text PRIMARY KEY,

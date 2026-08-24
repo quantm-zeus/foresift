@@ -1,12 +1,12 @@
 /**
- * AC-060 acceptance (positive) — task T058.
+ * AC-060 acceptance (positive).
  * Traces: FR-DATA-001, FR-DATA-003, FR-DR-001 (internal-overhead benchmark
  * substrate of AC-060 per spec §3.2).
  * AC text (manifest §39): "Internal overhead targets are met on benchmark
  * workload."
  *
  * Benchmark fixtures over the two persistence hot paths this package owns —
- * identity lookup and replay reads — with explicit budget assertions.
+ * identity upsert path and replay reads — with explicit budget assertions.
  * End-to-end overhead targets close in later integration packages; the
  * negative suite proves the harness itself can fail under injected delay.
  */
@@ -60,7 +60,7 @@ describe('AC-060: persistence benchmark fixtures meet internal overhead budgets'
     poolAddress: '0x00000000000000000000000000000000000d0600',
   };
 
-  it('identity lookup stays within budget on the fixture workload', async () => {
+  it('identity upsert path stays within budget on the fixture workload', async () => {
     const bench = await runPersistenceBenchmark(tdb.engine, workload);
     expect(bench.identity.iterations).toBeGreaterThan(0);
     expect(bench.identity.withinBudget, `worst ${bench.identity.worstMs.toFixed(1)}ms`).toBe(true);

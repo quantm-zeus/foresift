@@ -1,5 +1,5 @@
 /**
- * Backup governance + deterministic snapshot mechanism (T043, FR-DR-002,
+ * Backup governance + deterministic snapshot mechanism (FR-DR-002,
  * §34.5, ADR-0015). This module is the pre-infrastructure equivalent
  * mechanism: production PITR/WAL wiring implements the same
  * `SnapshotMechanism` interface and inherits the same drills.
@@ -22,7 +22,9 @@ export interface BackupPolicyRecord {
   readonly retentionDays: number;
   /** e.g. 'SERVER_SIDE_AES256'; recorded, never faked. */
   readonly encryptionStatus: string;
-  /** Failure-domain/location reference (validated against an allowlist). */
+  /** Failure-domain/location reference. Allowlist validation happens only
+   * when a caller invokes assertLocationAllowed(); storing a policy does not
+   * validate it automatically. */
   readonly locationRef: string;
   /** Reference to the verified rights basis permitting this copy. */
   readonly rightsRef: string;
@@ -201,6 +203,11 @@ export async function startBackupRun(
   );
 }
 
+/**
+ * RUNNING → SUCCEEDED transition. Guarded: only a run currently in RUNNING
+ * updates (the WHERE clause is the guard), and success requires at least one
+ * artifact reference — an empty backup can never be recorded as succeeded.
+ */
 export async function completeBackupRun(
   engine: DatabaseEngine,
   input: { runId: string; artifactRefs: readonly string[]; finishedAt: UtcTimestamp },
@@ -273,7 +280,10 @@ export interface DatabaseSnapshot {
   readonly createdAt: UtcTimestamp;
   readonly mechanismKind: SnapshotMechanism['mechanismKind'];
   readonly tables: readonly SnapshotTableArtifact[];
-  /** sha256 over the per-table artifact hashes in listed order. */
+  /**
+   * sha256 over `<name>=<contentHash>` lines (one per table, in listed
+   * order, joined by `\n`) — table names are part of the hashed input.
+   */
   readonly manifestHash: string;
   /**
    * Canonical artifact bytes (one JSON document) suitable for upload to the
@@ -359,7 +369,7 @@ export function deterministicSnapshotMechanism(engine: DatabaseEngine): Snapshot
 }
 
 // ---------------------------------------------------------------------------
-// Key-material scanning (FR-DR-002, T046/T048)
+// Key-material scanning (FR-DR-002)
 // ---------------------------------------------------------------------------
 
 export interface KeyMaterialFinding {

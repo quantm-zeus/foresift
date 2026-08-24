@@ -1,9 +1,10 @@
 /**
- * AC-020 negative / failure-path — task T049.
+ * AC-020 negative / failure-path.
  * Traces: FR-DATA-003, INV-005/INV-006.
- * Attempts to read future evidence through every replay surface this package
- * exposes; each attempt must fail closed — exclusion, refusal, or typed error,
- * never a silent leak.
+ * Attempts to read future evidence through each replay surface this package
+ * exposes that resolves against an availability boundary (replay queries,
+ * backfill visibility, current-view resolution); each attempt must fail
+ * closed — exclusion, refusal, or typed error, never a silent leak.
  */
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { AcquisitionState, ErrorCode, utcTimestamp, type UtcTimestamp } from '@foresift/domain';

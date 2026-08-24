@@ -120,6 +120,8 @@ CREATE TABLE evidence_bundles (
     created_at   timestamptz NOT NULL DEFAULT now()
 );
 
+-- foresift_refuse_mutation() is defined in g0_data_0002 (applied earlier,
+-- lexicographic order) — same cross-file dependency pattern as g0_data_0007.
 CREATE TRIGGER evidence_bundles_immutable
     BEFORE UPDATE OR DELETE ON evidence_bundles
     FOR EACH ROW EXECUTE FUNCTION foresift_refuse_mutation();

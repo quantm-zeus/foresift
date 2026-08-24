@@ -1,5 +1,5 @@
 /**
- * AC-240 acceptance (positive) — task T053.
+ * AC-240 acceptance (positive).
  * Traces: FR-DATA-003 (§13.7 decision/action timestamps), FR-DATA-002.
  * AC text (manifest §39): "…candidates use the same universal decision/
  * action-time function; a non-delivered arm never receives an earlier entry

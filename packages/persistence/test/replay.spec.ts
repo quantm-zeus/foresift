@@ -1,5 +1,5 @@
 /**
- * Replay resolution (T027, FR-DATA-002, AC-026/027): every replay entrypoint
+ * Replay resolution (FR-DATA-003, FR-DATA-002, AC-020): every replay entrypoint
  * takes an explicit boundary T; rows are admitted inclusively by the shared
  * availability predicate; the winner per observation is the latest revision
  * available at T (base = revision 0), deterministically tie-broken.
@@ -192,7 +192,7 @@ describe('deterministic tie-break on equal availability instants', () => {
   });
 });
 
-describe('current view differs from replay (AC-027)', () => {
+describe('current view differs from replay (AC-020)', () => {
   it('current resolves the global head regardless of any boundary', async () => {
     const current = await currentObservations(engine);
     const a = current.find((r) => r.observationId === 'replay_a');

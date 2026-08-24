@@ -312,18 +312,6 @@ export const evidenceBundles = pgTable('evidence_bundles', {
   createdAt: timestamp('created_at', { withTimezone: true }).notNull(),
 });
 
-// --- g0_data_0006_probe_assignments -----------------------------------------
-
-export const probeAssignments = pgTable('probe_assignments', {
-  decisionId: text('decision_id').primaryKey(),
-  eligibilityStratum: text('eligibility_stratum').notNull(),
-  assignmentProbability: doublePrecision('assignment_probability').notNull(),
-  seedProvenance: text('seed_provenance').notNull(),
-  selectionAt: timestamp('selection_at', { withTimezone: true }).notNull(),
-  requestedFields: text('requested_fields').array().notNull(),
-  createdAt: timestamp('created_at', { withTimezone: true }).notNull(),
-});
-
 // --- g0_data_0005_object_artifact_index ------------------------------------
 
 export const objectArtifacts = pgTable('object_artifacts', {
@@ -346,6 +334,18 @@ export const canonicalEventKeys = pgTable('canonical_event_keys', {
   canonicalKey: text('canonical_key').primaryKey(),
   eventFamily: text('event_family').notNull(),
   firstSeenAt: timestamp('first_seen_at', { withTimezone: true }).notNull(),
+});
+
+// --- g0_data_0006_probe_assignments -----------------------------------------
+
+export const probeAssignments = pgTable('probe_assignments', {
+  decisionId: text('decision_id').primaryKey(),
+  eligibilityStratum: text('eligibility_stratum').notNull(),
+  assignmentProbability: doublePrecision('assignment_probability').notNull(),
+  seedProvenance: text('seed_provenance').notNull(),
+  selectionAt: timestamp('selection_at', { withTimezone: true }).notNull(),
+  requestedFields: text('requested_fields').array().notNull(),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull(),
 });
 
 // --- g0_dr_0001_recovery_tiers ----------------------------------------------

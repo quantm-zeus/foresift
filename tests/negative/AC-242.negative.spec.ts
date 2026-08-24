@@ -1,5 +1,5 @@
 /**
- * AC-242 negative / failure-path — task T054.
+ * AC-242 negative / failure-path.
  * Traces: FR-DATA-005, §13.8.
  * Policy-not-requested cannot be dressed up as a retrieval outcome: lifecycle
  * fields on a NOT_REQUESTED record are refused, completing one is refused,

@@ -243,10 +243,10 @@ export async function applyMigrations(options: MigratorOptions): Promise<ApplyRe
       try {
         await engine.transaction(async (tx) => {
           await tx.exec(migration.sql);
-          await tx.query(
-            `INSERT INTO ${SCHEMA_MIGRATIONS_TABLE} (id, checksum) VALUES ($1, $2)`,
-            [migration.id, migration.checksum],
-          );
+          await tx.query(`INSERT INTO ${SCHEMA_MIGRATIONS_TABLE} (id, checksum) VALUES ($1, $2)`, [
+            migration.id,
+            migration.checksum,
+          ]);
         });
         applied.push(migration.id);
       } catch (cause) {

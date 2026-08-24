@@ -1,5 +1,5 @@
 /**
- * Backfill receipts (T028, §13.6) and watermarks (T029, §13.5): no-backdating
+ * Backfill receipts (§13.6) and watermarks (§13.5): no-backdating
  * is enforced at the repository boundary AND structurally by SQL CHECKs; the
  * live-receipt exception requires an explicit reference; coverage claims over
  * a non-contiguous watermark are refused.

@@ -1,5 +1,5 @@
 /**
- * AC-261 negative / failure-path — task T061.
+ * AC-261 negative / failure-path.
  * Traces: FR-DR-001, FR-DR-002.
  * A clean-environment verification that finds tampering must refuse
  * resumption: drifted object bytes or an unresolved checkpoint gap fail the

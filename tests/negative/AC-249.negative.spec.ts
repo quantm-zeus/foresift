@@ -1,5 +1,5 @@
 /**
- * AC-249 negative / failure-path — task T057.
+ * AC-249 negative / failure-path.
  * Traces: FR-DATA-003 (INV-006), FR-DATA-004.
  * Actual backdating attempts are refused by the no-backdating guard and the
  * SQL CHECKs; a backfilled row without its honest availability can never

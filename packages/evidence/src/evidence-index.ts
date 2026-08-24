@@ -1,5 +1,5 @@
 /**
- * Frozen evidence bundle manifests (T040, FR-DATA-003, §13.8, §14.7).
+ * Frozen evidence bundle manifests (FR-DATA-003, §13.8, §14.7).
  *
  * Bundles are content-addressed: the manifest's canonical JSON hashes to the
  * stored content_hash, and identical content cannot be re-frozen under a
@@ -7,7 +7,7 @@
  * later mutation of a frozen row.
  */
 import { ErrorCode, ForesiftError, utcTimestamp, type UtcTimestamp } from '@foresift/domain';
-// Single shared canonicalizer (review L-4): bundle hashes must stay
+// Single shared canonicalizer: bundle hashes must stay
 // byte-compatible with receipt hashing and restore-drill cross-checks.
 import { canonicalJson, sha256Text } from '@foresift/persistence';
 import type { DatabaseEngine } from '@foresift/persistence';
@@ -114,7 +114,8 @@ export async function loadFrozenBundle(
 
 /**
  * Verify a frozen bundle still hashes to its recorded identity — the
- * tamper-evidence check consumed by restore drills and negative suites.
+ * tamper-evidence primitive; restore drills re-implement their inline check
+ * and negative suites exercise it directly.
  */
 export async function verifyBundleIntegrity(
   engine: DatabaseEngine,

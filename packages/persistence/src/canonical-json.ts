@@ -1,5 +1,5 @@
 /**
- * THE single canonical JSON serializer (review L-4): recursively key-sorted,
+ * THE single canonical JSON serializer: recursively key-sorted,
  * `undefined`-dropping, byte-stable. Hash compatibility across observation
  * receipt hashing, evidence-bundle content addressing, and restore-drill
  * cross-checks depends on every hashing site calling THIS exact function —

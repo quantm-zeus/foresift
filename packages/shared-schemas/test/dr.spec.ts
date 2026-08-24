@@ -67,7 +67,7 @@ describe('dr schema registry', () => {
   });
 });
 
-describe('round-trip: domain fixtures validate against their mirrors (T014)', () => {
+describe('round-trip: domain fixtures validate against their mirrors ', () => {
   const positives: readonly [DrSchemaName, unknown][] = [
     ['RecoveryTier', tierFixture],
     [
@@ -120,12 +120,12 @@ describe('round-trip: domain fixtures validate against their mirrors (T014)', ()
   });
 });
 
-describe('negative fixtures fail validation (T014)', () => {
+describe('negative fixtures fail validation ', () => {
   const mustFail = (name: DrSchemaName, payload: unknown, why: string): void => {
     expect(DR_SCHEMAS[name].safeParse(payload).success, `${name}: ${why}`).toBe(false);
   };
 
-  it('refuses tiers above the §34.4 ceilings', () => {
+  it('refuses tiers above the FR-DR-001 (§34.4-bound) ceilings', () => {
     // Stricter-than-ceiling targets are always allowed.
     expect(
       DR_SCHEMAS.RecoveryTier.safeParse({

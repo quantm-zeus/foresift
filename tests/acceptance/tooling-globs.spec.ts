@@ -4,7 +4,7 @@ import { fileURLToPath } from 'node:url';
 import { join } from 'node:path';
 
 /**
- * Config-shape acceptance test (tasks T001/T002, foundation for FR-DATA-001…006
+ * Config-shape acceptance test (foundation for FR-DATA-001…006
  * and FR-DR-001…002): root tooling configuration must be glob-driven so later G0
  * workspace packages are picked up with ZERO root-config edits.
  *

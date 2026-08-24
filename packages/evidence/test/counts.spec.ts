@@ -1,5 +1,5 @@
 /**
- * Immutable matured-count projections over frozen bundles (T037, FR-DATA-004/
+ * Immutable matured-count projections over frozen bundles (FR-DATA-004/
  * 006, AC-247): projections are served only through replay-realizable windows;
  * counts derive from frozen-at/before-boundary evidence of RETURNED decisions
  * completed within the window; below-threshold results report honestly.
@@ -77,7 +77,7 @@ afterAll(async () => {
   await db.close();
 }, 30_000);
 
-describe('projectMaturedCounts (T037)', () => {
+describe('projectMaturedCounts', () => {
   it('counts distinct frozen evidence of returned decisions inside the window', async () => {
     const projection = await projectMaturedCounts(engine, {
       candidateId: 'cand-x',

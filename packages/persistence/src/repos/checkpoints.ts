@@ -1,5 +1,5 @@
 /**
- * Collector continuity repository (T047, §34.7, INV-009, AC-263).
+ * Collector continuity repository (§34.7, INV-009, AC-263).
  *
  * Storage contract:
  * - checkpoints are fenced: a commit carrying a STALE fencing token is

@@ -1,5 +1,5 @@
 /**
- * AC-244 acceptance (positive) — task T055.
+ * AC-244 acceptance (positive).
  * Traces: FR-DATA-004 (feature provenance, §14.3/§14.4 parity).
  * AC text (manifest §39, abridged): "A feature learned only from selectively
  * deep-researched candidates cannot claim full-universe lift…"

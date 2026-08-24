@@ -1,8 +1,9 @@
 /**
- * Shared bootstrap for the manifest-declared acceptance/negative suites
- * (T049–T062). Each suite gets a fresh in-process PGlite database with the ten
- * G0 migrations applied — PGlite is the deterministic TEST engine only
- * (ADR-0014); production remains real PostgreSQL per product ADR-001.
+ * Shared bootstrap for the manifest-declared acceptance/negative suites.
+ * Each suite gets a fresh in-process PGlite database with the full G0
+ * migration set (migrations/g0_*.sql, whatever the current count) applied —
+ * PGlite is the deterministic TEST engine only (ADR-0014); production remains
+ * real PostgreSQL per product ADR-001.
  */
 import path from 'node:path';
 import { performance } from 'node:perf_hooks';
@@ -62,8 +63,9 @@ export async function seedPool(
 }
 
 /**
- * The promise must reject with a ForesiftError carrying exactly `code`
- * (fail-closed refusals are typed — a bare Error is not acceptable evidence).
+ * The promise must reject with an error carrying exactly `code`. Only the
+ * machine code is checked here (not the class) — fail-closed refusals are
+ * typed so callers can branch on `code`, and that is the property asserted.
  */
 export async function expectForesiftError(promise: Promise<unknown>, code: string): Promise<void> {
   try {
@@ -79,7 +81,7 @@ export async function expectForesiftError(promise: Promise<unknown>, code: strin
   throw new Error(`expected rejection with ForesiftError ${code}, but the call resolved`);
 }
 
-// --- AC-060 benchmark substrate (T058) ---------------------------------------
+// --- AC-060 benchmark substrate ---------------------------------------
 
 /** Generous in-process budgets: CI machines vary; regressions show up as 10x+ deltas. */
 export const IDENTITY_LOOKUP_BUDGET_MS = 250;
@@ -100,8 +102,10 @@ export interface BenchmarkOutcome {
 
 /**
  * Run the AC-060 fixture benchmark over the two persistence hot paths this
- * package owns — identity lookup (chain→dex→pool through the repo seam) and a
- * full replay read at a fixed boundary — and report budget verdicts.
+ * package owns. The "identity" region times the chain→dex→pool UPSERT path
+ * (insert-or-verify through the repo seam), not a pure lookup; the second
+ * region times a full replay read at a fixed boundary. Budget verdicts are
+ * reported per region.
  */
 export async function runPersistenceBenchmark(
   engine: DatabaseEngine,
@@ -139,7 +143,7 @@ export async function runPersistenceBenchmark(
   };
 }
 
-// --- Destructive-drill restore loader (T060, AC-062/AC-260/AC-263) -----------
+// --- Destructive-drill restore loader (AC-062/AC-260/AC-263) -----------
 
 /**
  * Physically load a captured deterministic snapshot into a target engine —

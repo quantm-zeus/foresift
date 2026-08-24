@@ -1,5 +1,5 @@
 /**
- * Feature-value repository (FR-DATA-004, T033): online writes and offline
+ * Feature-value repository (FR-DATA-004): online writes and offline
  * batch recomputation both route through THE shared computation module, so
  * online/offline parity is structural (AC-244 substrate). Values carry the
  * full provenance later lift/lift-claim checks consume.

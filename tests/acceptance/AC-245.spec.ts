@@ -84,10 +84,9 @@ describe('AC-245: reduced independence credit despite distinct provider ids', ()
   it('classifies each fixture pair exactly as its declared vector requires', () => {
     expect(fixture.pairs.length).toBeGreaterThanOrEqual(2);
     for (const pair of fixture.pairs) {
-      expect(
-        inputsJustifyReducedIndependence(pair.edge.inputs),
-        pair.name,
-      ).toBe(pair.expectedEdgeJustifiesReducedIndependenceOnInputsAlone);
+      expect(inputsJustifyReducedIndependence(pair.edge.inputs), pair.name).toBe(
+        pair.expectedEdgeJustifiesReducedIndependenceOnInputsAlone,
+      );
       expect(pair.expectedEdgeJustifiesReducedIndependenceOnInputsAlone).toBe(
         pair.expectedReducedIndependence,
       );
@@ -120,9 +119,7 @@ describe('AC-245: reduced independence credit despite distinct provider ids', ()
     ] as const;
     for (const [dimension, threshold] of dimensions) {
       const atThreshold = { ...base, [dimension]: threshold };
-      expect(inputsJustifyReducedIndependence(atThreshold), `${dimension} at threshold`).toBe(
-        true,
-      );
+      expect(inputsJustifyReducedIndependence(atThreshold), `${dimension} at threshold`).toBe(true);
       const belowThreshold = { ...base, [dimension]: threshold - 0.000001 };
       expect(
         inputsJustifyReducedIndependence(belowThreshold),
@@ -148,7 +145,11 @@ describe('AC-245: reduced independence credit despite distinct provider ids', ()
         availableAt: utcTimestamp(correlated.edge.availableAt),
       },
     });
-    const stored = await dependenceEdgesForPair(tdb.engine, sourceB.id as never, sourceA.id as never);
+    const stored = await dependenceEdgesForPair(
+      tdb.engine,
+      sourceB.id as never,
+      sourceA.id as never,
+    );
     expect(stored.length).toBe(1);
     expect(stored[0]?.edge.sharedUpstreamLineageKeys).toEqual(
       correlated.edge.sharedUpstreamLineageKeys,
@@ -157,7 +158,11 @@ describe('AC-245: reduced independence credit despite distinct provider ids', ()
     expect(stored[0]?.edge.inputs).toEqual(correlated.edge.inputs);
     expect(stored[0]?.edge.label).toBe(DependenceLabel.AVAILABLE_AT_THE_TIME);
     // Canonical pair order: querying either way returns the same single edge.
-    const reversed = await dependenceEdgesForPair(tdb.engine, sourceA.id as never, sourceB.id as never);
+    const reversed = await dependenceEdgesForPair(
+      tdb.engine,
+      sourceA.id as never,
+      sourceB.id as never,
+    );
     expect(reversed.map((e) => e.edgeId)).toEqual(stored.map((e) => e.edgeId));
   });
 });

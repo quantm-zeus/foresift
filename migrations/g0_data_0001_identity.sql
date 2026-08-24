@@ -5,7 +5,10 @@
 --   * an asset representation IS (chain_id, canonical_address); unique.
 --   * asset_id groups representations ONLY through verified equivalence kinds.
 --   * pool_id composes exactly chain_id/dex_id/pool_address.
---   * symbols and names are descriptive columns ONLY — no uniqueness anywhere.
+--   * this table carries NO symbol/name columns at all (they live with the
+--     sources that mint them); uniqueness inside this schema is keyed on
+--     identity columns only (feature_definitions.name is unique-keyed, but
+--     that is a registry key, not a marketing symbol).
 --   * token decimals are sourced/cross-checked/versioned via observations.
 --   * launch_pool -> migration_event -> migrated_pool edges with boundary rules.
 
@@ -64,9 +67,13 @@ CREATE TABLE asset_representations (
     -- supported namespaces and refuses every other shape fail-closed. The
     -- Solana shape CHECK below is a coarse base58-alphabet/length filter only;
     -- the authoritative validator is `packages/domain/src/address.ts`, which
-    -- additionally performs full base58 decoding to a 32-byte ed25519 account
-    -- (rejecting e.g. all-'1' strings this CHECK admits). Repository writes go
-    -- through that normalizer first; raw-SQL writers bypass it at their peril.
+    -- additionally performs full base58 decoding to a 32-byte ed25519 account.
+    -- What the domain rejects but THIS CHECK admits: all-'1' runs of length
+    -- 33–44 (the 32-char all-'1' form IS valid — it decodes to 32 zero bytes,
+    -- the Solana system program address, accepted by both layers).
+    -- Repository inputs are expected to be already normalized before they
+    -- reach this schema; normalization lives in the Zod/domain layer used by
+    -- callers, not in these repositories, so raw-SQL writers bypass it.
     CONSTRAINT asset_representations_namespace_supported
         CHECK (split_part(chain_id, ':', 1) IN ('eip155', 'solana')),
     CONSTRAINT asset_representations_evm_address_shape

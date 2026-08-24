@@ -1,5 +1,5 @@
 /**
- * AC-264 negative / failure-path — task T062.
+ * AC-264 negative / failure-path.
  * Traces: FR-DR-001, FR-DR-002.
  * Every loosening of backup governance is refused with a typed error:
  * degenerate retention windows, blank references, non-opaque or

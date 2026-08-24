@@ -20,7 +20,12 @@ function isLeapYear(year: number): boolean {
   return (year % 4 === 0 && year % 100 !== 0) || year % 400 === 0;
 }
 
-/** Strict validation: real calendar date, real time-of-day, UTC `Z` suffix. */
+/**
+ * Strict validation: real calendar date, real time-of-day, UTC `Z` suffix.
+ * One shape-level exception: `second === 60` is admitted as a leap-second
+ * assertion — see `toEpochMs`, which refuses it at ordering time because
+ * ECMAScript cannot parse it.
+ */
 export function isValidUtcTimestamp(value: string): boolean {
   const match = ISO_UTC_PATTERN.exec(value);
   if (match === null) return false;

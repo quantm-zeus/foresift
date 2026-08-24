@@ -1,5 +1,5 @@
 /**
- * Evidence acquisition repository (§13.8, FR-DATA-003/005, T035/T036).
+ * Evidence acquisition repository (§13.8, FR-DATA-003/005).
  *
  * Lifecycle ordering is enforced at this boundary AND structurally in SQL,
  * with per-rule attribution:
@@ -306,7 +306,7 @@ function toIso(value: Date | string): string {
   return typeof value === 'string' ? value : value.toISOString().replace('.000Z', 'Z');
 }
 
-// --- Frozen counts (T036, AC-247) -------------------------------------------
+// --- Frozen counts (AC-247) -------------------------------------------------
 
 /**
  * Historical matured-evidence count resolved AT a replay boundary. Only

@@ -1,6 +1,6 @@
 /**
  * Frozen evidence bundles and the shared replay-boundary resolver
- * (T040, FR-DATA-003, FR-DATA-002): content addressing is canonical (key
+ * (FR-DATA-003, FR-DATA-002): content addressing is canonical (key
  * order never matters), freezing is one-way, tampering is detectable, and
  * boundary resolution over bundles + observations uses THE domain predicate.
  */
@@ -100,7 +100,7 @@ afterAll(async () => {
   await db.close();
 }, 30_000);
 
-describe('content-addressed frozen bundles (T040)', () => {
+describe('content-addressed frozen bundles', () => {
   it('hashes canonical JSON — key order never changes the content address', () => {
     expect(manifestContentHash({ a: 1, b: [2, 3] })).toBe(manifestContentHash({ b: [2, 3], a: 1 }));
     expect(manifestContentHash({ a: 1 })).not.toBe(manifestContentHash({ a: 2 }));
@@ -161,7 +161,7 @@ describe('content-addressed frozen bundles (T040)', () => {
   });
 });
 
-describe('replay-boundary resolution over bundles + observations (T040)', () => {
+describe('replay-boundary resolution over bundles + observations', () => {
   it('includes only bundles and observation revisions visible at T', async () => {
     const at13 = await resolveEvidenceAt(engine, {
       resolvedAt: utcTimestamp('2026-03-01T13:00:00Z'),

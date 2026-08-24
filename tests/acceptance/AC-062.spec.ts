@@ -1,5 +1,5 @@
 /**
- * AC-062 acceptance (positive) — task T060.
+ * AC-062 acceptance (positive).
  * Traces: FR-DR-001, FR-DR-002.
  * AC text (manifest §39.7): "Backup restore meets configured RPO/RTO in a
  * restore drill."

@@ -218,7 +218,10 @@ describe('migrator fail-closed defenses (FR-DATA-001…006 / FR-DR-001/002 subst
           path.join(sandbox, 'g0_data_0001_identity.sql'),
           await readFileAsync(path.join(MIGRATIONS_DIR, 'g0_data_0001_identity.sql')),
         );
-        await writeFile(path.join(sandbox, 'legacy_v1_setup.sql'), 'CREATE TABLE legacy (id text);');
+        await writeFile(
+          path.join(sandbox, 'legacy_v1_setup.sql'),
+          'CREATE TABLE legacy (id text);',
+        );
 
         const error = await expectCode(
           applyMigrations({ engine, migrationsDir: sandbox }),
@@ -251,7 +254,10 @@ describe('migrator fail-closed defenses (FR-DATA-001…006 / FR-DR-001/002 subst
           path.join(sandbox, 'g0_data_0001_identity.sql'),
           await readFileAsync(path.join(MIGRATIONS_DIR, 'g0_data_0001_identity.sql')),
         );
-        await writeFile(path.join(sandbox, 'g1_dr_0009_future_family.sql'), 'CREATE TABLE g1_future (id text);');
+        await writeFile(
+          path.join(sandbox, 'g1_dr_0009_future_family.sql'),
+          'CREATE TABLE g1_future (id text);',
+        );
 
         const report = await applyMigrations({ engine, migrationsDir: sandbox });
         expect(report.applied).toEqual(['g0_data_0001_identity', 'g1_dr_0009_future_family']);
@@ -264,36 +270,33 @@ describe('migrator fail-closed defenses (FR-DATA-001…006 / FR-DR-001/002 subst
     },
   );
 
-  it(
-    'refuses when a recorded migration id has no file on disk',
-    { timeout: 120_000 },
-    async () => {
-      const { db, engine } = await freshEngine();
-      try {
-        const sandbox = await makeSandbox('missing-file');
-        const good = await readFileAsync(path.join(MIGRATIONS_DIR, 'g0_data_0001_identity.sql'));
-        await writeFile(path.join(sandbox, 'g0_data_0001_identity.sql'), good);
-        await applyMigrations({ engine, migrationsDir: sandbox });
+  it('refuses when a recorded migration id has no file on disk', { timeout: 120_000 }, async () => {
+    const { db, engine } = await freshEngine();
+    try {
+      const sandbox = await makeSandbox('missing-file');
+      const good = await readFileAsync(path.join(MIGRATIONS_DIR, 'g0_data_0001_identity.sql'));
+      await writeFile(path.join(sandbox, 'g0_data_0001_identity.sql'), good);
+      await applyMigrations({ engine, migrationsDir: sandbox });
 
-        // The applied script disappears from disk; a different id appears.
-        await rm(path.join(sandbox, 'g0_data_0001_identity.sql'));
-        await writeFile(path.join(sandbox, 'g0_data_0002_replacement.sql'), 'CREATE TABLE r (id text);');
+      // The applied script disappears from disk; a different id appears.
+      await rm(path.join(sandbox, 'g0_data_0001_identity.sql'));
+      await writeFile(
+        path.join(sandbox, 'g0_data_0002_replacement.sql'),
+        'CREATE TABLE r (id text);',
+      );
 
-        const error = await expectCode(
-          applyMigrations({ engine, migrationsDir: sandbox }),
-          ErrorCode.MIGRATION_FILE_MISSING,
-        );
-        expect(error.message).toContain('g0_data_0001_identity');
-        // Recorded history is untouched by the refusal.
-        expect((await appliedMigrations(engine)).map((m) => m.id)).toEqual([
-          'g0_data_0001_identity',
-        ]);
-      } finally {
-        await db.close();
-        await rm(path.join(dirBase, '.tmp-missing-file'), { recursive: true, force: true });
-      }
-    },
-  );
+      const error = await expectCode(
+        applyMigrations({ engine, migrationsDir: sandbox }),
+        ErrorCode.MIGRATION_FILE_MISSING,
+      );
+      expect(error.message).toContain('g0_data_0001_identity');
+      // Recorded history is untouched by the refusal.
+      expect((await appliedMigrations(engine)).map((m) => m.id)).toEqual(['g0_data_0001_identity']);
+    } finally {
+      await db.close();
+      await rm(path.join(dirBase, '.tmp-missing-file'), { recursive: true, force: true });
+    }
+  });
 
   it(
     'refuses a new migration sorting behind already-applied state (out of order)',

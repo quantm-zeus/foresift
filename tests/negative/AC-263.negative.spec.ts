@@ -1,5 +1,5 @@
 /**
- * AC-263 negative / failure-path — task T061.
+ * AC-263 negative / failure-path.
  * Traces: FR-DATA-004, FR-DR-001, FR-DR-002.
  * The two ways recovery could corrupt collector truth are both refused:
  * advancing a cursor across slots that were never marked as a gap (silent

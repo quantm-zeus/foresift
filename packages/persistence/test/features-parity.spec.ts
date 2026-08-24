@@ -1,5 +1,5 @@
 /**
- * Online/offline feature parity (T033/T034, FR-DATA-004, §14.3/§14.4,
+ * Online/offline feature parity (FR-DATA-004, §14.3/§14.4,
  * AC-244): batch recomputation over identical inputs yields IDENTICAL values
  * (declared tolerance: exactly zero) because both paths call THE shared
  * computation module; a genuine divergence fails loudly with the diff, not a
@@ -131,7 +131,7 @@ const WINDOW = (): { start: UtcTimestamp; end: UtcTimestamp } => ({
   end: utcTimestamp('2026-01-05T11:00:00Z'),
 });
 
-describe('shared-module rolling volume (T033)', () => {
+describe('shared-module rolling volume', () => {
   it('excludes events whose availability exceeds the replay boundary', async () => {
     // Resolved at 11:30, the late event (available 12:00) is NOT yet visible:
     // exact sum 100+250+40 = 390.
@@ -190,7 +190,7 @@ describe('shared-module rolling volume (T033)', () => {
   });
 });
 
-describe('online/offline parity (T034, AC-244)', () => {
+describe('online/offline parity (AC-244)', () => {
   it('recomputation over identical inputs yields byte-identical values at tolerance zero', async () => {
     const w = WINDOW();
     const request = {

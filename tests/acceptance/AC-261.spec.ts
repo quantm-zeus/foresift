@@ -1,5 +1,5 @@
 /**
- * AC-261 acceptance (positive) — task T061.
+ * AC-261 acceptance (positive).
  * Traces: FR-DR-001, FR-DR-002.
  * AC text (manifest §39.25): "Restore into a clean environment verifies
  * database/object hashes, migrations, audit chain, cross-store references,

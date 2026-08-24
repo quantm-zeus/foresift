@@ -4,9 +4,11 @@
  * restore drills, key separation).
  *
  * Mirrors are by construction: data-class and health-state KIND vocabularies
- * plus the §34.4 RPO ceiling constant come from `@foresift/domain`; the
- * degradation/health RULES that consume them live in the persistence layer,
- * not here. Key separation is enforced structurally: a backup policy stores a
+ * plus the §34.4 RPO ceiling constant come from `@foresift/domain`. This file
+ * DOES encode structural rules as refines (a PASSED drill needs a credential
+ * provider, completion, and all checks green); the BEHAVIORAL degradation/
+ * health rules that consume these states live in the persistence layer, not
+ * here. Key separation is enforced structurally: a backup policy stores a
  * `keyReference` matching an opaque-reference pattern — never key material.
  */
 import { z } from 'zod';
@@ -118,8 +120,9 @@ export const RestoreCheckSchema = z
 export const RestoreDrillOutcomeSchema = z.enum(['PASSED', 'FAILED', 'BLOCKED']);
 
 /**
- * One restore drill. A PASSED outcome structurally requires the separately
- * provided credential provider and every check green — fail-closed.
+ * One restore drill. A PASSED outcome structurally requires ALL THREE: the
+ * separately provided credential provider, a non-null finishedAt, and every
+ * check green — fail-closed.
  */
 export const RestoreDrillSchema = z
   .object({

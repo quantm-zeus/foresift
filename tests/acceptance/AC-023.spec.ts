@@ -1,5 +1,5 @@
 /**
- * AC-023 acceptance (positive) — task T052.
+ * AC-023 acceptance (positive).
  * Traces: FR-DATA-001 (§11.2 decimals, §11.5 addresses).
  * AC text (manifest §39): "Decimals and address normalization pass
  * chain-specific golden fixtures."

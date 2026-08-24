@@ -62,7 +62,7 @@ export function assertNoBackdating(input: {
     return; // independently persisted live receipt proves earlier availability
   }
   // Instant comparison, not lexical: mixed sub-ms precision would otherwise
-  // shift the backdating boundary (review L-2).
+  // shift the backdating boundary.
   if (compareTimestamps(input.availableAt, input.retrievedAt) < 0) {
     throw new ForesiftError(
       ErrorCode.BACKFILL_BACKDATING_REJECTED,
@@ -263,6 +263,9 @@ export interface CoverageClaim {
  * §13.5 coverage gate: a non-contiguous watermark cannot support complete-
  * coverage claims for the gap interval. Contiguity over the claimed interval
  * requires highest_contiguous_slot >= end AND no open gap overlapping it.
+ * Approximation boundary: overlap is tested only against the recorded OLDEST
+ * open gap (the schema keeps a single oldest_open_gap_* pair), so younger
+ * open gaps are not individually consulted here.
  */
 export async function canClaimCompleteCoverage(
   engine: DatabaseEngine,

@@ -174,7 +174,7 @@ describe('feature provenance substrate (FR-DATA-004, AC-244)', () => {
 });
 
 describe('recovery tiers (FR-DR-001)', () => {
-  it('enforces §34.4 ceilings: ≤15 / ≤60 / ≤1440 minutes', () => {
+  it('enforces the FR-DR-001 (§34.4-bound) ceilings: ≤15 / ≤60 / ≤1440 minutes', () => {
     validateRecoveryTier({
       id: 't-meta' as never,
       dataClass: 'CRITICAL_METADATA',

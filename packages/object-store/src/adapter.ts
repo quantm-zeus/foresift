@@ -5,9 +5,10 @@
  * never merge with different protection metadata: rights reference, tenant,
  * encryption status, retention class, and availability class are part of the
  * dedup identity — content-addressed deduplication cannot merge artifacts
- * that differ in any of them. Deletion is barred from the general interface;
- * retention execution is a separate governed operation (FR-DR-002), never a
- * convenience method.
+ * that differ in any of them. This implementation is STRICTER than the PRD
+ * minimum: contentType and compression also participate in the identity.
+ * Deletion is barred from the general interface; retention execution is a
+ * separate governed operation (FR-DR-002), never a convenience method.
  */
 
 /** Protection metadata that participates in the dedup identity. */
@@ -15,9 +16,12 @@ export interface ObjectProtectionMetadata {
   /** MIME/content type of the stored bytes. */
   readonly contentType: string;
   readonly compression: 'NONE' | 'GZIP' | 'ZSTD';
-  /** e.g. 'PLAINTEXT' or 'SERVER_SIDE_AES256' — recorded, never faked. */
+  /** e.g. 'PLAINTEXT' or 'SERVER_SIDE_AES256'. Backend contract: this layer
+   * records what the caller declares and cannot independently verify it. */
   readonly encryptionStatus: string;
-  /** Provider licensing/rights policy reference; absent means unrestricted. */
+  /** Provider licensing/rights policy reference. Callers SHOULD always
+   * supply one; there is no "absent means unrestricted" default implemented
+   * at this layer — an absent reference is recorded as absent. */
   readonly rightsRef?: string | null;
   /** Retention class per §14.6 (e.g. 'RAW_PROVIDER_PAYLOAD_7D'). */
   readonly retentionClass: string;
@@ -48,10 +52,12 @@ export interface StoredObject {
   readonly storedAt: string;
 }
 
+/** Lookup by content hash (and, when given, a specific version of that
+ * identity). An omitted `version` returns the newest version of the identity;
+ * `metadata` participates in identity resolution exactly as in put(). */
 export interface ObjectLookup {
   readonly contentHash: string;
   readonly version?: number | undefined;
-  /** When omitted, the newest version of the identity is returned. */
   readonly metadata?: ObjectProtectionMetadata | undefined;
 }
 

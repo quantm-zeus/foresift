@@ -1,5 +1,5 @@
 /**
- * AC-242 acceptance (positive) — task T054.
+ * AC-242 acceptance (positive).
  * Traces: FR-DATA-005 (§13.8 acquisition-state vocabulary), FR-DATA-003.
  * AC text (manifest §39): "Evidence not requested by policy is stored as
  * `NOT_REQUESTED_BY_POLICY`, not `RETURNED_EMPTY`, `PROVIDER_UNAVAILABLE`,

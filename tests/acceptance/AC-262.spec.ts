@@ -1,5 +1,5 @@
 /**
- * AC-262 acceptance (positive) — task T061.
+ * AC-262 acceptance (positive).
  * Traces: FR-DR-001, FR-DR-002.
  * AC text (manifest §39.25, verbatim): "Failure to meet a recovery tier
  * automatically degrades the affected capability and prevents confirmed

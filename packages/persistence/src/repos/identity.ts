@@ -306,7 +306,7 @@ export interface DecimalsObservationInput {
  *   NOT collapse into one independence group → CROSS_CHECKED;
  * - support whose refs share an upstream lineage counts as ONE independent
  *   voice (INV-008): state stays SOURCED and the result carries
- *   `independenceHint: 'DECIMAL_UNCERTAIN'` (ADR-0016);
+ *   `independenceHints: ['DECIMAL_UNCERTAIN']` (ADR-0016);
  * - a lone latest value contradicted by an independent source that never
  *   endorsed it → CONFLICTING (explicitly unusable, never guessed);
  * - otherwise SOURCED (single source, possibly self-correcting).

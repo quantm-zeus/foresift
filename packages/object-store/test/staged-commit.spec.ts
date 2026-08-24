@@ -1,6 +1,5 @@
 /**
- * Staged cross-store commit protocol (T039, §14.8) and its negative battery
- * (T041): decision-critical evidence reaches AVAILABLE only after BOTH sides
+ * Staged cross-store commit protocol (§14.8) and its negative battery: decision-critical evidence reaches AVAILABLE only after BOTH sides
  * verify; stage regression is refused; orphan uploads, missing objects,
  * tampered bytes, rights drift, and retention drift surface as explicit
  * findings — the reconciler never silently repairs.
@@ -59,7 +58,7 @@ afterAll(async () => {
   await rm(root, { recursive: true, force: true });
 }, 30_000);
 
-describe('staged protocol happy path (T039)', () => {
+describe('staged protocol happy path', () => {
   it('advances PENDING_UPLOAD -> STORED_HASH_VERIFIED -> INDEX_COMMITTED -> AVAILABLE', async () => {
     const bytes = new TextEncoder().encode('decision-critical-evidence');
     const row = await stagedUpload(engine, store, {
@@ -150,7 +149,7 @@ describe('staged protocol happy path (T039)', () => {
   });
 });
 
-describe('reconciler findings are explicit, never silent repairs (T041)', () => {
+describe('reconciler findings are explicit, never silent repairs', () => {
   it('detects orphan uploads past the cutoff', async () => {
     await insertPendingArtifact(engine, {
       artifactId: 'art-orphan',

@@ -1,8 +1,7 @@
 // Package entrypoint — persistence core (engine port seam, migrator, repos).
 // Convention: every Foresift workspace package carries a tsconfig.json that
 // extends ../../tsconfig.base.json and globs src/** + test/**, so new modules
-// and tests require zero root-config edits (see specs/g0-contracts-data-truth
-// tasks T001–T003).
+// and tests require zero root-config edits.
 export * from './db.ts';
 export * from './canonical-json.ts';
 export * from './migrator.ts';

@@ -34,7 +34,10 @@ CREATE TABLE observations (
     -- §11.5 quantity: raw integer amount + decimals, or explicit absence.
     raw_amount               text CHECK (raw_amount ~ '^[0-9]+$'),
     decimals                 integer CHECK (decimals BETWEEN 0 AND 36),
-    -- §13.3 chain coordinates (nullable parts stay null when inapplicable).
+    -- §13.3 chain coordinates. NULLABLE columns record "not applicable to
+    -- this observation kind"; this schema cannot express which combinations
+    -- of coordinates are mandatory per event class — that coherence is a
+    -- producer-side obligation.
     coordinates_chain_id     text,
     block_number_or_slot     numeric,
     block_hash               text,

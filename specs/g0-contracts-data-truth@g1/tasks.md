@@ -240,3 +240,68 @@ Unresolved, recorded explicitly for follow-up iterations:
       behavior or weakens verification; recorded so nothing is silently lost.
       Traces: FR-DATA-001…FR-DATA-006, FR-DR-001, FR-DR-002 (documentation
       accuracy for their implemented behavior).
+
+## Convergence iteration g1 continuation (2026-08-24, second pass) — FORMAT repair + residual review items
+
+Entry state: branch ahead of origin by 3 commits with uncommitted prior-session
+work; full-gate-result.json flagged ONLY the FORMAT category at HEAD `ea07e5f`
+(3 files). This pass landed that work, repaired FORMAT, and closed every
+remaining consolidated-review item inside binding writeScopes. Focused
+verification after each step: typecheck zero errors, format:check green,
+lint clean, domain 48 / shared-schemas 24 / persistence 184 (+4 new) /
+object-store 23 (+1 new) / evidence 9 tests green, AC-062/AC-260/AC-264 and
+AC-023 suites green.
+
+Completed this iteration:
+
+- [x] T123 FORMAT gate repair — prettier applied to
+      `packages/persistence/test/checkpoints.spec.ts`,
+      `packages/persistence/test/engine-transactions.spec.ts`,
+      `tests/negative/AC-023.negative.spec.ts`; `pnpm format:check` green.
+      Traces: FR-DATA-001…FR-DATA-006, FR-DR-001, FR-DR-002 (gate integrity).
+- [x] T124 Prior-session repairs verified and landed: M-7/D1 `rawAmount`
+      string input gated to `/^\d+$/` (BigInt would admit hex/binary/octal,
+      `+`, whitespace, empty string) with refusal battery (commit `db4b8f7`);
+      L19 AC-023 refusal battery now consumes THE golden identity fixture
+      instead of a diverging hand-copied list (commit `753c0d8`, cast bug in
+      the WIP version fixed so typecheck is green). Traces: FR-DATA-001
+      (§11.5 quantity policy; identity refusal battery AC-023).
+- [x] T125 Fix-Now comment corrections M-5/M-6/M-9/M-11/M-12 (commit
+      `b814b1c`): BackfillReceipt §13.2-class claim removed; contentHash full
+      recipe documented; decimals dissent no longer called "independent";
+      AC-262 BACKUP_POLICY_INVALID reuse explained; aggregation doc states
+      the every-edge-CONFIRMED up-front rule. Traces: FR-DATA-002, FR-DATA-001
+      (AC-022), FR-DR-002 (hash compatibility).
+- [x] T126 Fail-closed substrate hardening (commit `6dadad4`): canonicalJson
+      REFUSES non-JSON leaves (undefined outside object members, function,
+      symbol) instead of null-coercing distinct inputs into identical hashes
+      (EH-L1 + CQ-L4 header precision; new `canonical-json.spec.ts`); object
+      store versions() treats unparsable `.meta.json` filenames as layout
+      corruption per the module's own doctrine, fixing two latent misparses
+      (EH-L2; new test with clean-listing control). EH-L4 unlock-throw audit-
+      row gap disclosed in restore-drill JSDoc (commit `ffeb2e3`). Traces:
+      FR-DATA-002/003 (receipt/replay hash truthfulness), FR-DR-002.
+- [x] T127 CQ-L comment-accuracy sweep (commit `1647ca8`): L1/L2/L3/L5/L6/L7/
+      L8/L9/L10/L11/L12/L13/L14/L16/L17/L18/L20/L21 as itemized in the commit
+      message. Traces: FR-DATA-001…FR-DATA-006, FR-DR-001, FR-DR-002
+      (documentation honesty).
+
+Unresolved, recorded explicitly for follow-up iterations:
+
+- [ ] T128 CQ-L22 root `vitest.config.ts` "pure/deterministic" unit-project
+      description — root config file outside binding writeScopes; wording-only.
+      Recorded in out-of-scope notes. Traces: FR-DATA-001…FR-DATA-006,
+      FR-DR-001, FR-DR-002 (none affected; documentation wording only).
+- [ ] T129 Wire spec-verify validation of telemetry event names/vocabularies
+      against code (P2 follow-up from M-14) — partially mitigated by
+      tests/telemetry-catalog.spec.ts parity pins; full wiring belongs to
+      g0-traceability-conformance, the milestone-declared central owner of
+      manifest-derived mappings. Traces: FR-DATA-002 (telemetry contracts for
+      its events), milestone-level reconciliation decision.
+- [ ] T130 Restore-drill best-effort THROWN/BLOCKED audit row (EH-L4 P2) —
+      behavior deferred until production restore-drill wiring lands; gap now
+      disclosed in the JSDoc (T126). Traces: FR-DR-001 (§34.9 measurement
+      honesty).
+- [ ] T131 BOOTSTRAP_REPORT "Current state" refresh (DOC-L1 P3) — docs/setup/**
+      outside writeScopes; land as post-merge additive commit. Traces:
+      FR-DATA-001…FR-DATA-006, FR-DR-001, FR-DR-002 (accurate status report).

@@ -39,6 +39,9 @@ describe('V2 structured gate manifest — REAL green milestone gate (spec §9)',
       expect(cats).toEqual(['SPEC', 'FORMAT', 'LINT', 'TYPECHECK', 'TESTS']);
       for (const c of m?.checks ?? []) expect(c.status).toBe('PASS');
     },
-    240_000,
+    // Budget is load headroom, not scope: the nested milestone gate measures
+    // ≈150s solo at the current suite size and overlaps the red-gate file by
+    // design, so both REAL gates contend for the same CPUs. A hang still fails.
+    600_000,
   );
 });

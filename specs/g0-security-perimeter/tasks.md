@@ -54,7 +54,7 @@ prohibited capability anywhere outside the inert scanner self-test corpus.
       prohibited-capability refusal classes. Traces: FR-SEC-001 through
       FR-SEC-012 (typed fail-closed error contract for every perimeter gate;
       Constitution VIII/XII).
-- [ ] T106 Write the four migrations `g0_sec_0001_audit_chain.sql`,
+- [x] T106 Write the four migrations `g0_sec_0001_audit_chain.sql`,
       `g0_sec_0002_mcp_credentials.sql`,
       `g0_sec_0003_import_quarantine.sql`,
       `g0_sec_0004_incidents_pauses.sql` exactly per plan.md Data Model
@@ -65,7 +65,7 @@ prohibited capability anywhere outside the inert scanner self-test corpus.
       information_schema. Migrations must apply cleanly over a fully migrated
       PGlite database containing all proven data/dr sets. Traces: FR-SEC-002,
       FR-SEC-008, FR-SEC-011 (table owners); AC-259, AC-278, AC-279 substrates.
-- [ ] T107 [P] Write `telemetry/sec.catalog.json` in the established declarative
+- [x] T107 [P] Write `telemetry/sec.catalog.json` in the established declarative
       catalog format: events for audit entry/checkpoint/verification-failure,
       step-up completion/refusal, egress blocks, credential revocation,
       import quarantine/rejection, incident opening, capability pause/resume,

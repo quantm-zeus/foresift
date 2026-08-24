@@ -17,7 +17,8 @@
     "@foresift/domain": "workspace:*",
     "@foresift/object-store": "workspace:*",
     "@foresift/persistence": "workspace:*",
-    "@foresift/shared-schemas": "workspace:*"
+    "@foresift/shared-schemas": "workspace:*",
+    "drizzle-orm": "^0.45.2"
   },
   "devDependencies": {
     "@electric-sql/pglite": "^0.5.6",

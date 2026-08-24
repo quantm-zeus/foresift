@@ -1,0 +1,307 @@
+{
+  "$schema": "https://foresift.dev/schemas/telemetry-catalog-v1.json",
+  "catalog": "sec",
+  "description": "Security-perimeter telemetry events for audit-chain integrity, high-impact step-up gating, egress enforcement, MCP credential lifecycle, import quarantine, incidents, capability pauses, tenant-isolation refusals, abuse controls, and prohibited-capability scan findings. Every refusal event carries its typed machine reason; no event ever carries secret material, raw credentials, or unredacted payloads.",
+  "contractStatus": "DECLARATIVE_CONTRACT_ONLY — this file defines the event contracts the requirement manifest maps to (telemetry/sec.*); emitter wiring lands with the observability milestone (dependency group G2), so nothing publishes these event names yet. Field lists mirror the authoritative schemas in packages/shared-schemas/src/sec.ts exactly.",
+  "requirementsCovered": [
+    "FR-SEC-001",
+    "FR-SEC-002",
+    "FR-SEC-003",
+    "FR-SEC-004",
+    "FR-SEC-007",
+    "FR-SEC-008",
+    "FR-SEC-009",
+    "FR-SEC-010",
+    "FR-SEC-011"
+  ],
+  "recoveryDataClass": "CRITICAL_METADATA",
+  "events": [
+    {
+      "name": "audit.entry.appended",
+      "description": "An entry was appended to the hash-chained append-only audit log.",
+      "requirementRefs": ["FR-SEC-002"],
+      "tier": "CRITICAL_METADATA",
+      "fields": [
+        { "name": "seq", "type": "integer", "required": true },
+        { "name": "occurredAt", "type": "string<utc-timestamp>", "required": true },
+        { "name": "actor", "type": "string", "required": true },
+        {
+          "name": "actionClass",
+          "type": "string(AUTHENTICATION_AUTHORIZATION|TOOL_RESOURCE_ACCESS|PROVIDER_COLLECTOR_ACCESS|BLOCKED_OPERATION|CONFIGURATION_CHANGE|CAPABILITY_CHANGE|COST_CHANGE|RIGHTS_CHANGE|SOURCE_DEPENDENCE_CHANGE|POOL_ADAPTER_CHANGE|PUBLIC_GATE_CHANGE|APPROVAL_STEP_UP|IMPORT_PROMOTION|PAUSE_RETIREMENT_ROLLBACK|SECRET_LIFECYCLE|INCIDENT_RECOVERY)",
+          "required": true
+        },
+        { "name": "subject", "type": "string", "required": true },
+        {
+          "name": "payloadSha256",
+          "type": "string",
+          "required": true,
+          "notes": "sha256:<hex> of the canonical payload — never the payload itself."
+        },
+        { "name": "prevEntryHash", "type": "string", "required": true },
+        { "name": "entryHash", "type": "string", "required": true }
+      ]
+    },
+    {
+      "name": "audit.checkpoint.written",
+      "description": "A periodic batch checkpoint was written to SQL truth AND mirrored to the independently verifiable object-store location.",
+      "requirementRefs": ["FR-SEC-002"],
+      "tier": "CRITICAL_METADATA",
+      "fields": [
+        { "name": "checkpointId", "type": "string", "required": true },
+        { "name": "fromSeq", "type": "integer", "required": true },
+        { "name": "toSeq", "type": "integer", "required": true },
+        { "name": "checkpointHash", "type": "string", "required": true },
+        {
+          "name": "objectRef",
+          "type": "string|null",
+          "required": true,
+          "notes": "Object-store artifact reference of the independent copy; null records a failed mirror (which must raise an incident)."
+        },
+        { "name": "storedAt", "type": "string<utc-timestamp>", "required": true }
+      ]
+    },
+    {
+      "name": "audit.verification.failed",
+      "description": "Continuous audit verification found divergence (gap, reordering, mutation, deletion, or chain break); a SEV1 incident was opened and high-impact activation is blocked while it is open.",
+      "requirementRefs": ["FR-SEC-002", "FR-SEC-011"],
+      "tier": "CRITICAL_METADATA",
+      "fields": [
+        { "name": "runId", "type": "string", "required": true },
+        { "name": "verifiedFromSeq", "type": "integer", "required": true },
+        { "name": "verifiedToSeq", "type": "integer", "required": true },
+        {
+          "name": "divergenceKind",
+          "type": "string(GAP|REORDERING|MUTATION|DELETION|CHAIN_BREAK)",
+          "required": true
+        },
+        { "name": "firstDivergenceSeq", "type": "integer|null", "required": true },
+        { "name": "incidentId", "type": "string", "required": true },
+        { "name": "ranAt", "type": "string<utc-timestamp>", "required": true }
+      ]
+    },
+    {
+      "name": "stepup.completed",
+      "description": "A phishing-resistant step-up authentication proof completed and passed policy.",
+      "requirementRefs": ["FR-SEC-001"],
+      "tier": "CRITICAL_METADATA",
+      "fields": [
+        { "name": "proofId", "type": "string", "required": true },
+        { "name": "actor", "type": "string", "required": true },
+        {
+          "name": "authenticatorClass",
+          "type": "string(PASSKEY_PLATFORM|PASSKEY_ROAMING_HARDWARE|HARDWARE_SECURITY_KEY|RECOVERY_TOTP)",
+          "required": true
+        },
+        { "name": "completedAt", "type": "string<utc-timestamp>", "required": true }
+      ]
+    },
+    {
+      "name": "stepup.refused",
+      "description": "A high-impact action gate refused a request; every missing dimension is listed with its typed reason.",
+      "requirementRefs": ["FR-SEC-001"],
+      "tier": "CRITICAL_METADATA",
+      "fields": [
+        { "name": "action", "type": "string", "required": true, "notes": "admin:high:* scope." },
+        { "name": "actor", "type": "string", "required": true },
+        {
+          "name": "reasons",
+          "type": "array<string(STEP_UP_MISSING|STEP_UP_STALE|AUTHENTICATOR_CLASS_INSUFFICIENT|SCOPE_MISMATCH|CSRF_INVALID|IDEMPOTENCY_KEY_MISSING|REASON_MISSING|AUDIT_HEALTH_BLOCKED)>",
+          "required": true
+        },
+        { "name": "evaluatedAt", "type": "string<utc-timestamp>", "required": true }
+      ]
+    },
+    {
+      "name": "egress.blocked",
+      "description": "A deny-by-default egress decision refused an outbound destination, with the typed refusal class.",
+      "requirementRefs": ["FR-SEC-004"],
+      "tier": "CRITICAL_METADATA",
+      "fields": [
+        {
+          "name": "plane",
+          "type": "string(CONTROL_PLANE|COLLECTOR|ALPHA_LAB)",
+          "required": true
+        },
+        {
+          "name": "reason",
+          "type": "string(HOST_NOT_ALLOWLISTED|SCHEME_REFUSED|PORT_UNSAFE|ADDRESS_DENIED|RESOLUTION_REFUSED|REBINDING_DETECTED|REDIRECT_UNAPPROVED|REDIRECT_LIMIT_EXCEEDED|RESPONSE_BYTES_EXCEEDED|RESPONSE_TIME_EXCEEDED|DECOMPRESSION_RATIO_EXCEEDED|CONTENT_TYPE_REFUSED|URL_MALFORMED)",
+          "required": true
+        },
+        {
+          "name": "detail",
+          "type": "string",
+          "required": true,
+          "notes": "Redacted detail — never full URLs carrying query material."
+        },
+        { "name": "evaluatedAt", "type": "string<utc-timestamp>", "required": true }
+      ]
+    },
+    {
+      "name": "credential.revoked",
+      "description": "One MCP credential was independently revoked; sibling credentials remain intact.",
+      "requirementRefs": ["FR-SEC-001", "FR-SEC-007"],
+      "tier": "CRITICAL_METADATA",
+      "fields": [
+        { "name": "credentialId", "type": "string", "required": true },
+        { "name": "revokedAt", "type": "string<utc-timestamp>", "required": true },
+        {
+          "name": "trigger",
+          "type": "string(OPERATOR_ACTION|EXPIRY|INCIDENT_INVALIDATION)",
+          "required": true
+        },
+        {
+          "name": "incidentId",
+          "type": "string|null",
+          "required": true,
+          "notes": "Set when revocation is incident-triggered (§35.11)."
+        }
+      ]
+    },
+    {
+      "name": "import.quarantined",
+      "description": "An Alpha Lab import artifact entered quarantine intake; it can never reach ACTIVE directly.",
+      "requirementRefs": ["FR-SEC-008"],
+      "tier": "CRITICAL_METADATA",
+      "fields": [
+        { "name": "artifactId", "type": "string", "required": true },
+        { "name": "producerKeyId", "type": "string", "required": true },
+        {
+          "name": "format",
+          "type": "string(VERSIONED_JSON|VERSIONED_JSONL|PARQUET|APPROVED_COMPRESSED_CONTAINER)",
+          "required": true
+        },
+        {
+          "name": "manifestSha256",
+          "type": "string",
+          "required": true,
+          "notes": "Hash of the manifest bytes — never the manifest content."
+        },
+        { "name": "state", "type": "string(RECEIVED|QUARANTINED)", "required": true },
+        { "name": "stepUpApprovalRef", "type": "string", "required": true },
+        { "name": "receivedAt", "type": "string<utc-timestamp>", "required": true }
+      ]
+    },
+    {
+      "name": "import.rejected",
+      "description": "An import artifact reached the terminal REJECTED state after failed scanning/validation.",
+      "requirementRefs": ["FR-SEC-008"],
+      "tier": "CRITICAL_METADATA",
+      "fields": [
+        { "name": "artifactId", "type": "string", "required": true },
+        {
+          "name": "rejectedInState",
+          "type": "string(SCANNED|VALIDATING)",
+          "required": true
+        },
+        { "name": "findingRefs", "type": "array<string>", "required": true },
+        { "name": "stateChangedAt", "type": "string<utc-timestamp>", "required": true }
+      ]
+    },
+    {
+      "name": "incident.opened",
+      "description": "A security incident was opened with severity, owner, containment state, and preserved evidence references.",
+      "requirementRefs": ["FR-SEC-011"],
+      "tier": "CRITICAL_METADATA",
+      "fields": [
+        { "name": "incidentId", "type": "string", "required": true },
+        {
+          "name": "kind",
+          "type": "string(AUDIT_CHAIN_FAILURE|CREDENTIAL_COMPROMISE|INTRUSION_SUSPECTED|DATA_LEAKAGE|DEPENDENCY_COMPROMISE|ABUSE_CAMPAIGN|OTHER)",
+          "required": true
+        },
+        { "name": "severity", "type": "string(SEV1|SEV2|SEV3|SEV4)", "required": true },
+        { "name": "owner", "type": "string", "required": true },
+        { "name": "evidenceRefCount", "type": "integer", "required": true },
+        { "name": "openedAt", "type": "string<utc-timestamp>", "required": true }
+      ]
+    },
+    {
+      "name": "capability.paused",
+      "description": "A critical gate failure paused exactly the smallest affected capability scope, with a durable reason linked to the opening incident.",
+      "requirementRefs": ["FR-SEC-011"],
+      "tier": "CRITICAL_METADATA",
+      "fields": [
+        { "name": "pauseId", "type": "string", "required": true },
+        { "name": "scope", "type": "string", "required": true },
+        { "name": "reason", "type": "string", "required": true },
+        { "name": "openingIncidentId", "type": "string", "required": true },
+        { "name": "pausedAt", "type": "string<utc-timestamp>", "required": true }
+      ]
+    },
+    {
+      "name": "capability.resumed",
+      "description": "A paused scope resumed through EXPLICIT audited approval — never automatic reactivation.",
+      "requirementRefs": ["FR-SEC-011"],
+      "tier": "CRITICAL_METADATA",
+      "fields": [
+        { "name": "pauseId", "type": "string", "required": true },
+        { "name": "scope", "type": "string", "required": true },
+        { "name": "resumedByActor", "type": "string", "required": true },
+        { "name": "resumedAt", "type": "string<utc-timestamp>", "required": true }
+      ]
+    },
+    {
+      "name": "cross_tenant.access_blocked",
+      "description": "A cross-tenant resource access attempt was refused by the isolation primitives, including the bypass vector attempted.",
+      "requirementRefs": ["FR-SEC-009"],
+      "tier": "CRITICAL_METADATA",
+      "fields": [
+        {
+          "name": "surface",
+          "type": "string(ROWS|ARTIFACTS|CACHE|QUEUES|SESSIONS|QUOTAS|LOGS|METRICS|SIGNED_URLS|MODEL_CONTEXT|RESOURCE_URIS)",
+          "required": true
+        },
+        {
+          "name": "vector",
+          "type": "string(DIRECT_ROW|SIGNED_URL|RANGE|REDIRECT|PATH_CONFUSION|UNSCOPED_QUERY|OTHER)",
+          "required": true
+        },
+        { "name": "requestorTenantId", "type": "string", "required": true },
+        { "name": "resourceTenantScope", "type": "string", "required": true },
+        { "name": "refusedAt", "type": "string<utc-timestamp>", "required": true }
+      ]
+    },
+    {
+      "name": "abuse.control_triggered",
+      "description": "An abuse control fired (flood, amplification, enumeration/scraping, prompt-attack screening) without weakening protected risk monitoring.",
+      "requirementRefs": ["FR-SEC-010"],
+      "tier": "CRITICAL_METADATA",
+      "fields": [
+        {
+          "name": "control",
+          "type": "string(FLOOD_LIMIT|AMPLIFICATION_COST|QUOTA_DEGRADE|ENUMERATION_SUSPECTED|SCRAPING_SUSPECTED|PROMPT_ATTACK_SCREENED)",
+          "required": true
+        },
+        { "name": "subject", "type": "string", "required": true },
+        {
+          "name": "action",
+          "type": "string(REFUSE|DEGRADE)",
+          "required": true,
+          "notes": "Quota exhaustion DEGRADES — it never bypasses protected deterministic risk monitoring (INV-003)."
+        },
+        { "name": "evaluatedAt", "type": "string<utc-timestamp>", "required": true }
+      ]
+    },
+    {
+      "name": "scan.violation_found",
+      "description": "A prohibited-capability scanner or runtime canary produced a finding — CI fails and the finding is recorded for triage.",
+      "requirementRefs": ["FR-SEC-003"],
+      "tier": "CRITICAL_METADATA",
+      "fields": [
+        {
+          "name": "category",
+          "type": "string(PRIVATE_KEY_SEED|SIGNING|TRANSACTION_BUILD_SIGN_SUBMIT|SWAP_ORDER_EXECUTION|BRIDGE_STAKING|CUSTODY_WALLET_MANAGEMENT|EXCHANGE_TRADING|COPY_TRADING)",
+          "required": true
+        },
+        {
+          "name": "surface",
+          "type": "string(SOURCE_SCAN|DEPENDENCY_MANIFEST|ROUTE_INVENTORY|SCHEMA_INVENTORY|ENV_SCHEMA|RUNTIME_CANARY)",
+          "required": true
+        },
+        { "name": "reference", "type": "string", "required": true },
+        { "name": "findingId", "type": "string", "required": true },
+        { "name": "foundAt", "type": "string<utc-timestamp>", "required": true }
+      ]
+    }
+  ]
+}

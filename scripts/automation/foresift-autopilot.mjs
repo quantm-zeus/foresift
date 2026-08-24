@@ -364,6 +364,91 @@ function isArchonRunWorktree(path) {
 }
 
 /**
+ * Archon names each run worktree's local branch after the LAUNCH branch with
+ * slashes folded to dashes, under its own `archon/task-` namespace
+ * (`--branch foresift/g0-security-perimeter` → worktree branch
+ * `archon/task-foresift-g0-security-perimeter`, worktree path ending in that
+ * same name). Probe-verified live 2026-08-24 across package, generation,
+ * planning, and smoke launches.
+ */
+export function archonTaskBranchName(branch) {
+  return `archon/task-${branch.replaceAll('/', '-')}`;
+}
+
+/**
+ * Defect #11b (live run ce3e0354, 2026-08-24): archon materializes a run
+ * worktree fresh at main's tip ONLY at first creation and then REUSES it for
+ * every later run of the same task. A package relaunched afterwards therefore
+ * preflights against the CREATION-time main — for g0-security-perimeter that
+ * baseline predated the dependency's PROVEN chore forever, so every fresh
+ * restart refused deterministically (`dependency … is not PROVEN`) even though
+ * main itself was fine. The defect-#6/#7 pre-launch machinery never saw these
+ * worktrees: they hold archon-internal `archon/task-*` branches, not the
+ * launch branch, so findWorktreeHoldingBranch(launch branch) returned null.
+ *
+ * Fix: before every fresh launch, discover the task worktree for the launch
+ * branch by archon's naming convention and fast-forward it to origin/main.
+ * Guarded, fail-closed (same discipline as resetArchonRunWorktree):
+ *   - only Archon-owned worktrees (under /.archon/workspaces/) are touched;
+ *   - advancing requires HEAD to be a strict ANCESTOR of origin/main — any
+ *     unique commit (possibly real product work from a crashed run) SKIPS the
+ *     advance for an operator instead of risking it;
+ *   - dirty trees are never advanced (residue/refusal paths surface them);
+ *   - already-current worktrees no-op.
+ * Returns an outcome object recorded in state history for audit; null when no
+ * registered archon task worktree exists for this branch (first-ever launch —
+ * archon then creates one fresh at main's tip itself).
+ */
+export function findArchonTaskWorktree(branch, cwd = REPO) {
+  const taskBranch = archonTaskBranchName(branch);
+  const list = sh('git worktree list --porcelain', { cwd });
+  if (!list.ok) return { error: 'worktree_list_failed' };
+  for (const block of list.out.split('\n\n')) {
+    const lines = block.split('\n');
+    const path = lines.find((l) => l.startsWith('worktree '))?.slice(9);
+    const wtBranch = lines.find((l) => l.startsWith('branch '))?.slice(7);
+    if (
+      path &&
+      isArchonRunWorktree(path) &&
+      (wtBranch === `refs/heads/${taskBranch}` || path.endsWith(`/archon/${taskBranch}`))
+    )
+      return { path };
+  }
+  return null;
+}
+
+export function advanceArchonTaskWorktree(branch, cwd = REPO) {
+  const held = findArchonTaskWorktree(branch, cwd);
+  if (!held || held.error) return held ?? null;
+  const { path } = held;
+  const q = JSON.stringify(path);
+  sh(`git -C ${q} fetch origin main --quiet`, { cwd });
+  const head = sh(`git -C ${q} rev-parse HEAD`, { cwd }).out.trim();
+  if (!head) return { skipped: 'no_head', path };
+  if (sh(`git -C ${q} merge-base --is-ancestor origin/main HEAD`, { cwd }).ok)
+    return { skipped: 'current', path, head: head.slice(0, 10) };
+  // Strict fast-forward only — never advance over anything unique.
+  if (!sh(`git -C ${q} merge-base --is-ancestor HEAD origin/main`, { cwd }).ok)
+    return { skipped: 'diverged', path, head: head.slice(0, 10) };
+  const status = sh(`git -C ${q} status --porcelain=v1`, { cwd });
+  const files = status.ok ? status.out.split('\n').filter(Boolean) : [];
+  if (files.length > 0) return { skipped: 'dirty', path, files: files.slice(0, 40) };
+  const merge = sh(`git -C ${q} merge --ff-only origin/main`, { cwd });
+  if (!merge.ok)
+    return {
+      ok: false,
+      path,
+      detail: (merge.err || merge.out || '').split('\n').filter(Boolean)[0],
+    };
+  return {
+    ok: true,
+    path,
+    from: head.slice(0, 10),
+    to: sh(`git -C ${q} rev-parse HEAD`, { cwd }).out.trim().slice(0, 10),
+  };
+}
+
+/**
  * Archon reuses ONE run worktree per package+generation across runs, so any
  * dead run leaves residue behind (planning scratch, stale workflow
  * materializations) that trips adopt-generation-branch's dirty-tree refusal on
@@ -462,6 +547,10 @@ function ensureGenerationSeedCurrent(branch) {
 function launchDetached(st, workflow, branch, message) {
   const reset = st ? resetArchonRunWorktree(branch) : null;
   if (reset) record(st, 'run_worktree_reset', { branch, ...reset });
+  // Defect #11b: archon reuses its per-task run worktree across launches and
+  // never refreshes it, so advance it to current main before handing off.
+  const advanced = st ? advanceArchonTaskWorktree(branch) : null;
+  if (advanced) record(st, 'archon_task_worktree_advanced', { branch, ...advanced });
   const seed = st ? ensureGenerationSeedCurrent(branch) : null;
   if (seed && !seed.skipped) record(st, 'generation_seed_reconciled', { branch, ...seed });
   const ack = archonJson(

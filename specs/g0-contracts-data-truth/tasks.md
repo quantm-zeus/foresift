@@ -146,3 +146,97 @@ creates trading, custody, signing, private-key, or transaction-submission
 capability anywhere (INV-001); no task edits anything outside the binding
 writeScopes except the justified mechanical lockfile regeneration recorded in
 plan.md.
+
+## Convergence iteration g1 (2026-08-24) — PR #46 comprehensive-review repair
+
+Review verdict was REQUEST_CHANGES (3 CRITICAL / 15 HIGH / 37 MEDIUM / 54 LOW).
+Every CRITICAL and HIGH item with a recommended fix option is addressed below;
+behavior-change MEDIUMs marked "fix now recommended" by the review are also
+implemented. All work is additive conventional commits inside the binding
+writeScopes; focused verification ran after every change (typecheck zero
+errors; domain 47, shared-schemas 24, object-store 21, persistence 157,
+evidence 9, acceptance+negative 180 tests green).
+
+Completed this iteration:
+
+- [x] T111 C1 — `packages/domain/vitest.config.ts` added so
+      `pnpm --filter @foresift/domain test` collects `test/**/*.spec.ts`
+      (44 existing + 3 new tests now execute under a runner); plus the
+      typecheck repairs its first run surfaced (branded `ChainId` construction
+      in the new identity spec; pad-index writes made `noUncheckedIndexedAccess`-
+      safe via the module's own `byteAt` guard). Traces: FR-DATA-001,
+      FR-DATA-002, FR-DATA-003, FR-DATA-004, FR-DATA-005, FR-DATA-006,
+      FR-DR-001, FR-DR-002 (their foundation layer is regression-covered).
+- [x] T112 C2 — revision no-backdating enforced at BOTH layers: BEFORE INSERT
+      trigger `observation_revisions_no_backdating` (migration
+      `g0_data_0002`) refusing `available_at < anchor.available_at`, typed
+      app guard `REVISION_BACKDATING_REJECTED` in `appendRevision`, and
+      violation tests at each layer including the boundary-equal instant.
+      Traces: FR-DATA-002, FR-DATA-003 (§13.6 provenance corruption guard).
+- [x] T113 C3 — insert-or-verify identity semantics asserted: identical chain
+      re-registration reports `inserted:false`; conflicting re-registration
+      refuses `CONTRACT_INVARIANT_VIOLATED`; launch instants compare by epoch,
+      not ISO text shape (`…00Z` ≡ `…00.000Z`). Traces: FR-DATA-001.
+- [x] T114 H1 — Keccak-256 final-block padding XOR-merges domain byte and
+      closing bit (lengths ≡ 135 mod 136 previously diverged); regression
+      vectors at lengths 0/134/135/136/271/272 against an independently
+      validated reference. Traces: FR-DATA-001 (EIP-55 checksum substrate).
+- [x] T115 H2 — object-store metadata reads narrow absence to `ENOENT` only;
+      corrupt meta JSON now surfaces as a fault (with test) instead of
+      fabricating MISSING for intact bytes. Traces: FR-DR-002.
+- [x] T116 H3 — `attachMembership` routes through `insertOrVerify`: identical
+      re-attach is a no-op reporting honestly; re-pointing a representation
+      between asset groupings refuses as a typed conflict (test asserts the
+      original membership survives). Traces: FR-DATA-001.
+- [x] T117 remaining HIGH schema/test gaps — `.strict()` unknown-key sweep
+      over every registered DATA_SCHEMAS fixture; `ChainIdSchema`
+      accept/refuse matrix plus unknown-namespace fail-closed witness;
+      `DigitStringSchema` refusal battery; BackfillReceiptSchema §13.6
+      three-conjunct coverage incl. live-receipt-reference admission;
+      deterministic replay tie-break exercised through the persistence
+      consumer (equal availability resolves highest revision, insertion order
+      irrelevant); `multiplyDecimalStrings` explicit-truncation and signed-
+      rendering coverage. Traces: FR-DATA-002, FR-DATA-003, FR-DATA-001
+      (§11.5 quantity policy).
+- [x] T118 documentation rot — stale ADR citations renumbered to their true
+      targets (ADR-0014 PGlite engine, ADR-0015 recovery mechanism) across
+      db.ts/drill specs/helpers comments; ADR-0016 self-title fixed; README
+      status block and layout refreshed to match repository reality. Traces:
+      FR-DR-001, FR-DR-002 (accurate decision records), all FRs (honest docs).
+- [x] T119 fail-closed behavior repairs (review MEDIUMs marked fix-now) —
+      acquisition completion-vs-request ordering compares epoch ms, not ISO
+      text (mixed sub-second precision accepted/refused correctly; both
+      directions pinned by tests); drill `achievedMinutes` REFUSES
+      negative/non-finite timeline deltas (`DRILL_TIMELINE_INVALID`, new code)
+      instead of clamping impossible timelines to HEALTHY (+tests);
+      `advanceWatermark` gains a monotonicity guard over the three slot
+      high-water marks (`WATERMARK_REGRESSION_REJECTED`, new code, row locked
+      FOR UPDATE; gap windows excluded since they legitimately open/close)
+      with regression-refusal + state-intact + idempotent-re-advance tests.
+      Traces: FR-DATA-005 (acquisition §13.8), FR-DR-001 (§34.9 measurement
+      honesty), FR-DATA-002 (watermarks §13.5 truthfulness).
+- [x] T120 remaining HIGH test-presence gaps — snapshot bytes re-imported
+      into a fresh migrated database replay byte-for-byte (manifest hash AND
+      bytes identical; PITR-style replica-role replay documented in-test);
+      TransactionalEngine depth-0 atomicity and savepoint-scoped nesting now
+      violation-tested (`engine-transactions.spec.ts`); `recordPair` +
+      `pairs` table presence incl. `pairs_distinct_sides` CHECK witness and
+      insert-or-verify conflict semantics. Traces: FR-DR-002 (restore
+      fidelity), FR-DATA-001..FR-DATA-006 (engine substrate integrity).
+
+Unresolved, recorded explicitly for follow-up iterations:
+
+- [ ] T121 Migrator defenses remain unimplemented (missing-file detection,
+      out-of-order application refusal, concurrent-run fencing, `g1_*`
+      filename support currently silently ignored). The review itself files
+      this as a P1 follow-up design decision rather than a convergence
+      repair; deferring keeps this iteration inside review-repair scope.
+      Traces: FR-DATA-001…FR-DATA-006, FR-DR-001, FR-DR-002 (migration
+      integrity substrate they run on).
+- [ ] T122 Comment-level MEDIUM/LOW catalog from the consolidated review
+      artifacts (decision-needed items such as recovery_health_states.incident
+      FK enforcement, red-gate header wording, correlated-providers fixture
+      consumption, ~50 further single-line comment corrections). None affects
+      behavior or weakens verification; recorded so nothing is silently lost.
+      Traces: FR-DATA-001…FR-DATA-006, FR-DR-001, FR-DR-002 (documentation
+      accuracy for their implemented behavior).

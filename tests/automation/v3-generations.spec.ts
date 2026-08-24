@@ -848,6 +848,76 @@ describe('first tick drains the queued main fast-forward before selection', () =
   });
 });
 
+// ── --clear-fatal must drop the entries the pause owned ──────────────────────
+// A retained fatal-paused row occupies its package's selection slot forever,
+// and once the milestone has moved generations it is neither resumable
+// (--recover-fatal refuses cross-generation recovery) nor splicable — found
+// live during gen-1 activation: the pre-fix first tick paused on the retired
+// gen-0 identity, and the operator clear left a zombie blocking selection.
+describe('--clear-fatal drops fatal-paused tracked entries', () => {
+  it('clears the flag AND untracks fatal-paused rows when no RUNNING package is orphaned', () => {
+    const sb = restartSandbox(`clear-fatal-drop-${Date.now()}`);
+    // Current truth: PKG is PENDING at generation 1 (post-reset milestone).
+    const f = join(sb.fx.root, 'specs', 'implementation', 'current-milestone.json');
+    const ms = JSON.parse(readFileSync(f, 'utf8'));
+    const alpha = ms.packages.find((p: { id: string }) => p.id === PKG);
+    alpha.generation = 1;
+    writeFileSync(f, `${JSON.stringify(ms, null, 2)}\n`);
+    // Stale bookkeeping: the retired gen-0 identity, fatal-paused.
+    writeFileSync(
+      join(sb.stateDir, 'autopilot-state.json'),
+      JSON.stringify({
+        activeRuns: [
+          {
+            kind: 'package',
+            workflow: 'foresift-work-package',
+            runId: 'r-dead-gen0',
+            packageId: PKG,
+            branch: `foresift/${PKG}`,
+            message: PKG,
+            startedAt: Date.now(),
+            resumeCount: 0,
+            restartCount: 0,
+            paused: 'fatal',
+            lastPauseReason: 'RUNNING with no supervisor-tracked active run',
+          },
+        ],
+        milestoneRuns: [],
+        pausedFatal: { reason: 'stale gen-0 view', packageId: PKG },
+        history: [],
+      }),
+    );
+    const r = runRestartCli(sb, ['--clear-fatal']);
+    expect(r.status).toBe(0);
+    expect(r.stderr ?? r.stdout).toMatch(/1 paused entry dropped/);
+    const st = JSON.parse(readFileSync(join(sb.stateDir, 'autopilot-state.json'), 'utf8'));
+    expect(st.pausedFatal ?? null).toBeNull();
+    expect(st.activeRuns).toHaveLength(0);
+    expect(st.history[0].event).toBe('fatal_pause_entries_dropped');
+    expect(st.history[0].count).toBe(1);
+  });
+
+  it('still refuses (and mutates nothing) when clearing would orphan a RUNNING package', () => {
+    const sb = restartSandbox(`clear-fatal-refuse-${Date.now()}`);
+    // Milestone already says RUNNING gen 0; no live track exists → orphan.
+    const f = join(sb.fx.root, 'specs', 'implementation', 'current-milestone.json');
+    const ms = JSON.parse(readFileSync(f, 'utf8'));
+    ms.packages.find((p: { id: string }) => p.id === PKG).status = 'RUNNING';
+    writeFileSync(f, `${JSON.stringify(ms, null, 2)}\n`);
+    writeFileSync(
+      join(sb.stateDir, 'autopilot-state.json'),
+      JSON.stringify({ activeRuns: [], milestoneRuns: [], pausedFatal: null, history: [] }),
+    );
+    const r = runRestartCli(sb, ['--clear-fatal']);
+    expect(r.status).toBe(1);
+    expect(r.stderr).toMatch(/REFUSED/);
+    expect(r.stderr).toMatch(/orphan RUNNING package/);
+    const st = JSON.parse(readFileSync(join(sb.stateDir, 'autopilot-state.json'), 'utf8'));
+    expect(st.activeRuns).toHaveLength(0);
+    expect(st.history).toHaveLength(0); // nothing recorded behind a refusal
+  });
+});
+
 // ── §30 restart race matrix: crash windows and concurrent-invocation faults ──
 describe('§30 restart race matrix', () => {
   let sb: Sandbox;

@@ -235,15 +235,15 @@ prohibited capability anywhere outside the inert scanner self-test corpus.
 
 ## Phase F — Tenant isolation
 
-- [ ] T129 Implement `packages/tenant-isolation/src/tenant-context.ts`:
+- [x] T129 Implement `packages/tenant-isolation/src/tenant-context.ts`:
       TenantContext derivation, mode enum (PERSONAL | WORKSPACE | PUBLIC),
       namespaced key derivation for cache, queues, sessions, quotas, logs,
       metrics, and model-context partitions. Traces: FR-SEC-009.
-- [ ] T130 Implement `row-scope.ts`: mandatory tenant predicate composition
+- [x] T130 Implement `row-scope.ts`: mandatory tenant predicate composition
       for queries; refuse unscoped queries whenever isolation mode is active
       (fail-closed); row/artifact ownership assertions. Traces: FR-SEC-009;
       AC-275.
-- [ ] T131 Implement `signed-url.ts` (tenant-bound, expiring, audience-bound
+- [x] T131 Implement `signed-url.ts` (tenant-bound, expiring, audience-bound
       minting/validation) and `resource-access.ts` (cross-tenant resource URI
       authorization refusing signed-URL, range, redirect, and path-confusion
       bypass vectors without original scope+rights). Traces: FR-SEC-009,
@@ -251,7 +251,7 @@ prohibited capability anywhere outside the inert scanner self-test corpus.
 
 ## Phase G — Runbooks and threat models
 
-- [ ] T132 Write `docs/runbooks/security/incident-response.md` (severity
+- [x] T132 Write `docs/runbooks/security/incident-response.md` (severity
       matrix, owner assignment, containment steps, evidence preservation,
       credential rotation duties, notification policy, recovery verification,
       postmortem template, regression-test duty),
@@ -259,7 +259,7 @@ prohibited capability anywhere outside the inert scanner self-test corpus.
       `emergency-dependency-revocation.md` per §35.8/§35.9/§35.11 duties.
       Traces: FR-SEC-011, FR-SEC-006 (revocation runbook), FR-SEC-002
       (audit-failure runbook), FR-SEC-007 (compromise runbook).
-- [ ] T133 Write `docs/runbooks/security/threat-models/register.md` covering
+- [x] T133 Write `docs/runbooks/security/threat-models/register.md` covering
       ALL eleven boundaries (MCP, admin, webhooks, providers, collector,
       model, database, object store, Alpha Lab, notifications, public
       distribution): assets, trust assumptions (§9.3), top threats, controls

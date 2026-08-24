@@ -128,6 +128,14 @@ export const SecErrorCode = {
   SEC_CREDENTIAL_EXPIRED: 'SEC_CREDENTIAL_EXPIRED',
   SEC_CREDENTIAL_SCOPE_EXCEEDED: 'SEC_CREDENTIAL_SCOPE_EXCEEDED',
   SEC_CREDENTIAL_ORIGIN_MISMATCH: 'SEC_CREDENTIAL_ORIGIN_MISMATCH',
+  // --- tenant isolation (FR-SEC-009, §35.15, AC-252/AC-275)
+  SEC_TENANT_CONTEXT_INVALID: 'SEC_TENANT_CONTEXT_INVALID',
+  SEC_TENANT_QUERY_UNSCOPED_REFUSED: 'SEC_TENANT_QUERY_UNSCOPED_REFUSED',
+  SEC_TENANT_ROW_OWNERSHIP_REFUSED: 'SEC_TENANT_ROW_OWNERSHIP_REFUSED',
+  SEC_TENANT_KEY_MALFORMED: 'SEC_TENANT_KEY_MALFORMED',
+  SEC_TENANT_SIGNED_URL_INVALID: 'SEC_TENANT_SIGNED_URL_INVALID',
+  SEC_TENANT_SIGNED_URL_EXPIRED: 'SEC_TENANT_SIGNED_URL_EXPIRED',
+  SEC_TENANT_RESOURCE_ACCESS_REFUSED: 'SEC_TENANT_RESOURCE_ACCESS_REFUSED',
 } as const;
 
 export type SecErrorCode = (typeof SecErrorCode)[keyof typeof SecErrorCode];
@@ -248,6 +256,11 @@ export class ProhibitedCapabilityError extends secSubclass(
 export class CredentialError extends secSubclass(
   'CredentialError',
   SecErrorCode.SEC_CREDENTIAL_REVOKED,
+) {}
+/** Tenant-isolation refusals (unscoped queries, ownership, bypass vectors). */
+export class TenantIsolationError extends secSubclass(
+  'TenantIsolationError',
+  SecErrorCode.SEC_TENANT_RESOURCE_ACCESS_REFUSED,
 ) {}
 
 /** Narrowing guard for security-perimeter errors. */

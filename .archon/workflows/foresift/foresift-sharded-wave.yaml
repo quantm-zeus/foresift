@@ -1,0 +1,182 @@
+name: foresift-sharded-wave
+description: |
+  ONE parallel implementation wave for a work package (implementation-
+  acceleration override §8/§28): deterministic task graph + write-disjoint
+  shard plan -> THREE concurrent HIGH-effort writer lanes (serial core +
+  two parallel shards), each in its OWN git worktree at the same pinned base
+  HEAD -> deterministic write-authority guards -> additive streaming-style
+  integration into the canonical branch -> ONE combined package FAST.
+  Canonical bookkeeping (tasks.md, checkpoints) is coordinator-only; writers
+  never touch it (override §7). Repeat invocations run further waves; the
+  authoritative FULL gate stays downstream in the standard package flow
+  (override §18).
+tags: [foresift, throughput, parallel]
+
+provider: claude
+effort: high
+
+nodes:
+  # ── PREP: task graph, shard plan, briefs, private worktrees ──────────────────
+  - id: prep
+    bash: |
+      set -euo pipefail
+      PKG="${ARGUMENTS%%@g*}"
+      BASE="$(git rev-parse HEAD)"
+      printf '%s' "$BASE" > "$ARTIFACTS_DIR/base-head.txt"
+      node scripts/automation/build-implementation-task-graph.mjs \
+        --package "$PKG" --plan-shards "${FORESIFT_WRITERS:-3}" \
+        --out "$ARTIFACTS_DIR/task-graph.json"
+      node scripts/automation/build-plan-context.mjs --package "$PKG" \
+        --out "$ARTIFACTS_DIR" || true
+      node scripts/automation/build-writer-briefs.mjs --package "$PKG" \
+        --graph "$ARTIFACTS_DIR/task-graph.json" \
+        --capsule "$ARTIFACTS_DIR/plan-capsule.json" \
+        --out "$ARTIFACTS_DIR/briefs" \
+        --writer-root "$ARTIFACTS_DIR/wt" --base-head "$BASE"
+      node scripts/automation/check-writer-admission.mjs \
+        > "$ARTIFACTS_DIR/admission.json" || true
+      # Private worktree + branch per shard, all at the SAME pinned base.
+      node -e '
+        const fs = require("node:fs");
+        const { spawnSync } = require("node:child_process");
+        const dir = process.env.ARTIFACTS_DIR;
+        const g = JSON.parse(fs.readFileSync(dir + "/task-graph.json", "utf8"));
+        const base = fs.readFileSync(dir + "/base-head.txt", "utf8").trim();
+        const meta = {};
+        for (const s of g.shards ?? []) {
+          const wt = dir + "/wt/" + s.id;
+          const br = "foresift/wave/" + base.slice(0,10) + "-" + s.id;
+          const r = spawnSync("git worktree add -B \"" + br + "\" \"" + wt + "\" \"" + base + "\"",
+            { shell: true });
+          if (r.status !== 0) throw new Error("worktree add failed for " + s.id + ": " + r.stderr);
+          meta[s.id] = { branch: br, worktree: wt };
+        }
+        fs.writeFileSync(dir + "/shard-meta.json", JSON.stringify(meta, null, 2));
+        console.log("SHARDS_READY " + Object.keys(meta).join(","));
+      '
+      cat "$ARTIFACTS_DIR/shard-meta.json"
+
+  # Per-shard brief emitters: prompt interpolation reads sibling outputs, so
+  # each writer gets ONLY its own brief (override §12 minimal context).
+  - id: brief-core
+    depends_on: [prep]
+    bash: cat "$ARTIFACTS_DIR/briefs/core-brief.md" 2>/dev/null || echo "NO CORE SHARD THIS WAVE"
+  - id: brief-shard-1
+    depends_on: [prep]
+    bash: cat "$ARTIFACTS_DIR/briefs/shard-1-brief.md" 2>/dev/null || echo "NO SHARD-1 THIS WAVE"
+  - id: brief-shard-2
+    depends_on: [prep]
+    bash: cat "$ARTIFACTS_DIR/briefs/shard-2-brief.md" 2>/dev/null || echo "NO SHARD-2 THIS WAVE"
+
+  # ── WRITER LANES (siblings without edges run CONCURRENTLY — proven R3) ───────
+  - id: writer-core
+    depends_on: [brief-core]
+    retry:
+      max_attempts: 2
+      delay_ms: 10000
+      on_error: all
+    effort: high
+    idle_timeout: 2700000
+    prompt: |
+      You are a Foresift parallel IMPLEMENTATION WRITER for lane "core"
+      (package "${ARGUMENTS%%@g*}"). Your complete assignment is below. Implement
+      it INSIDE YOUR PRIVATE WORKTREE named in the brief — never the checkout you
+      were started in. Commit coherent slices there as you go (signed-off style:
+      plain commits). Run ONLY targeted tests named in your brief or directly
+      affected suites; NEVER pnpm verify / FULL gates / repository-wide runs
+      (override §14). Never edit specs/<pkg>/tasks.md, checkpoints, or anything
+      outside your allowed write paths. When finished, write your result manifest
+      to $ARTIFACTS_DIR/writer-results/core/result.json (see completion contract
+      in the brief). If the brief says NO CORE SHARD THIS WAVE, do nothing and
+      say so.
+
+      ===== WRITER BRIEF =====
+      $brief-core.output
+
+  - id: writer-shard-1
+    depends_on: [brief-shard-1]
+    retry:
+      max_attempts: 2
+      delay_ms: 10000
+      on_error: all
+    effort: high
+    idle_timeout: 2700000
+    prompt: |
+      You are a Foresift parallel IMPLEMENTATION WRITER for lane "shard-1"
+      (package "${ARGUMENTS%%@g*}"). Your complete assignment is below. Implement
+      it INSIDE YOUR PRIVATE WORKTREE named in the brief — never the checkout you
+      were started in. Commit coherent slices there as you go. Run ONLY targeted
+      tests named in your brief or directly affected suites; NEVER pnpm verify /
+      FULL gates / repository-wide runs. Never edit specs/<pkg>/tasks.md,
+      checkpoints, or anything outside your allowed write paths. When finished,
+      write your result manifest to $ARTIFACTS_DIR/writer-results/shard-1/
+      result.json (see completion contract in the brief). If the brief says NO
+      SHARD-1 THIS WAVE, do nothing and say so.
+
+      ===== WRITER BRIEF =====
+      $brief-shard-1.output
+
+  - id: writer-shard-2
+    depends_on: [brief-shard-2]
+    retry:
+      max_attempts: 2
+      delay_ms: 10000
+      on_error: all
+    effort: high
+    idle_timeout: 2700000
+    prompt: |
+      You are a Foresift parallel IMPLEMENTATION WRITER for lane "shard-2"
+      (package "${ARGUMENTS%%@g*}"). Your complete assignment is below. Implement
+      it INSIDE YOUR PRIVATE WORKTREE named in the brief — never the checkout you
+      were started in. Commit coherent slices there as you go. Run ONLY targeted
+      tests named in your brief or directly affected suites; NEVER pnpm verify /
+      FULL gates / repository-wide runs. Never edit specs/<pkg>/tasks.md,
+      checkpoints, or anything outside your allowed write paths. When finished,
+      write your result manifest to $ARTIFACTS_DIR/writer-results/shard-2/
+      result.json (see completion contract in the brief). If the brief says NO
+      SHARD-2 THIS WAVE, do nothing and say so.
+
+      ===== WRITER BRIEF =====
+      $brief-shard-2.output
+
+  # ── GUARDS: deterministic write-authority enforcement (override §9) ──────────
+  # One guard per lane; each recomputes the actual diff against the pinned base
+  # and enforces allowedWritePaths ⊆ scopes. It OVERWRITES result.json with
+  # computed facts (branch/head/base) so the integrator never trusts claims.
+  - id: guard-core
+    depends_on: [writer-core]
+    bash: |
+      set -euo pipefail
+      node scripts/automation/wave-guard.mjs --shard core \
+        --artifacts "$ARTIFACTS_DIR" --graph "$ARTIFACTS_DIR/task-graph.json"
+  - id: guard-shard-1
+    depends_on: [writer-shard-1]
+    bash: |
+      set -euo pipefail
+      node scripts/automation/wave-guard.mjs --shard shard-1 \
+        --artifacts "$ARTIFACTS_DIR" --graph "$ARTIFACTS_DIR/task-graph.json"
+  - id: guard-shard-2
+    depends_on: [writer-shard-2]
+    bash: |
+      set -euo pipefail
+      node scripts/automation/wave-guard.mjs --shard shard-2 \
+        --artifacts "$ARTIFACTS_DIR" --graph "$ARTIFACTS_DIR/task-graph.json"
+
+  # ── INTEGRATE + COMBINED FAST (serial join, override §16/§17) ────────────────
+  - id: integrate-and-fast
+    depends_on: [guard-core, guard-shard-1, guard-shard-2]
+    trigger_rule: none_failed_min_one_success   # guards fail closed per-lane
+    timeout: 3600000
+    bash: |
+      set -uo pipefail
+      PKG="${ARGUMENTS%%@g*}"
+      node scripts/automation/integrate-writer-results.mjs --package "$PKG" \
+        --graph "$ARTIFACTS_DIR/task-graph.json" \
+        --results-dir "$ARTIFACTS_DIR/writer-results" \
+        --canonical . \
+        --out "$ARTIFACTS_DIR/integration-report.json" || true
+      cat "$ARTIFACTS_DIR/integration-report.json"
+      # ONE combined package FAST for the whole wave (never per writer).
+      set +e
+      pnpm foresift:gate --package "$PKG"
+      echo "WAVE_FAST_EXIT=$?"

@@ -1,0 +1,24 @@
+{
+  "name": "@foresift/object-store",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Content-addressed, rights-aware, versioned object storage behind the Foresift ObjectStoreAdapter interface; filesystem implementation for dev/test and the §14.8 staged cross-store commit protocol.",
+  "exports": {
+    ".": {
+      "types": "./src/index.ts",
+      "default": "./src/index.ts"
+    }
+  },
+  "scripts": {
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@foresift/domain": "workspace:*",
+    "@foresift/persistence": "workspace:*"
+  },
+  "devDependencies": {
+    "@electric-sql/pglite": "^0.5.6",
+    "vitest": "4.1.11"
+  }
+}

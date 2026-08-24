@@ -1,0 +1,79 @@
+{
+  "$comment": "Pairwise empirical-dependence vectors (FR-DATA-006 §11.7, ADR-052, AC-245): distinct brand/provider ids do NOT imply independent sources. A pair sharing one upstream lineage collapses into a single independence group; a pair whose observed correlation inputs cross any threshold earns REDUCED independence credit despite distinct ids; an independent pair with distinct lineages and low inputs does not.",
+  "thresholds": {
+    "correlation": 0.8,
+    "outageOverlap": 0.5,
+    "firstSeenLagAgreement": 0.7,
+    "fingerprintSimilarity": 0.9
+  },
+  "pairs": [
+    {
+      "name": "distinct providers reselling one upstream lineage collapse into one group",
+      "expectedReducedIndependence": true,
+      "expectedReason": "SHARED_UPSTREAM_LINEAGE",
+      "sources": [
+        {
+          "id": "src/nodefront",
+          "brandProvider": "NodeFront",
+          "operation": "swaps",
+          "upstreamLineageKey": "upstream/nodesense-mainnet",
+          "endpointRegion": "eu-central",
+          "collectionMethod": "POLLING_API"
+        },
+        {
+          "id": "src/chainmirror",
+          "brandProvider": "ChainMirror",
+          "operation": "swaps",
+          "upstreamLineageKey": "upstream/nodesense-mainnet",
+          "endpointRegion": "us-east",
+          "collectionMethod": "AUTHORIZED_PUSH"
+        }
+      ],
+      "edge": {
+        "sharedUpstreamLineageKeys": ["upstream/nodesense-mainnet"],
+        "inputs": {
+          "valueErrorTimingCorrelation": 0.93,
+          "outageOverlap": 0.71,
+          "firstSeenLagAgreement": 0.82,
+          "fingerprintSimilarity": 0.95
+        },
+        "availableAt": "2026-02-01T00:00:00Z"
+      },
+      "expectedEdgeJustifiesReducedIndependenceOnInputsAlone": true
+    },
+    {
+      "name": "distinct lineages with low observed correlation stay independent",
+      "expectedReducedIndependence": false,
+      "expectedReason": "INDEPENDENT_EVIDENCE",
+      "sources": [
+        {
+          "id": "src/rpc-a",
+          "brandProvider": "RpcA",
+          "operation": "swaps",
+          "upstreamLineageKey": "upstream/rpc-a-own-infra",
+          "endpointRegion": "eu-west",
+          "collectionMethod": "POLLING_API"
+        },
+        {
+          "id": "src/explorer-b",
+          "brandProvider": "ExplorerB",
+          "operation": "swaps",
+          "upstreamLineageKey": "upstream/explorer-b-indexer",
+          "endpointRegion": "ap-south",
+          "collectionMethod": "FIRST_PARTY_COLLECTOR"
+        }
+      ],
+      "edge": {
+        "sharedUpstreamLineageKeys": [],
+        "inputs": {
+          "valueErrorTimingCorrelation": 0.12,
+          "outageOverlap": 0.04,
+          "firstSeenLagAgreement": 0.21,
+          "fingerprintSimilarity": 0.33
+        },
+        "availableAt": "2026-02-01T00:00:00Z"
+      },
+      "expectedEdgeJustifiesReducedIndependenceOnInputsAlone": false
+    }
+  ]
+}

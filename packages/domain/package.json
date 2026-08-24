@@ -1,0 +1,19 @@
+{
+  "name": "@foresift/domain",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Pure TypeScript domain contracts for Foresift: identity, time, quality, acquisition, lineage, recovery. Zero runtime dependencies.",
+  "exports": {
+    ".": {
+      "types": "./src/index.ts",
+      "default": "./src/index.ts"
+    }
+  },
+  "scripts": {
+    "test": "vitest run"
+  },
+  "devDependencies": {
+    "vitest": "4.1.11"
+  }
+}

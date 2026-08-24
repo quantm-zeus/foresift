@@ -274,15 +274,15 @@ describe('exactly-once canonical events across restore+replay (AC-263)', () => {
     }
     it('classifies SQLSTATE 23505 as duplicate regardless of message wording', async () => {
       const sqlstateError = Object.assign(new Error('driver-specific wording'), { code: '23505' });
-      await expect(recordCanonicalEvent(engineFailingWith(sqlstateError), KEY_INPUT)).rejects.toMatchObject(
-        { code: ErrorCode.CANONICAL_EVENT_DUPLICATE },
-      );
+      await expect(
+        recordCanonicalEvent(engineFailingWith(sqlstateError), KEY_INPUT),
+      ).rejects.toMatchObject({ code: ErrorCode.CANONICAL_EVENT_DUPLICATE });
     });
     it('message fallback still catches drivers that wrap without SQLSTATE', async () => {
       const wrapped = new Error('duplicate key value violates unique constraint "x_pkey"');
-      await expect(recordCanonicalEvent(engineFailingWith(wrapped), KEY_INPUT)).rejects.toMatchObject(
-        { code: ErrorCode.CANONICAL_EVENT_DUPLICATE },
-      );
+      await expect(
+        recordCanonicalEvent(engineFailingWith(wrapped), KEY_INPUT),
+      ).rejects.toMatchObject({ code: ErrorCode.CANONICAL_EVENT_DUPLICATE });
     });
     it('unrelated failures pass through untouched', async () => {
       const boom = Object.assign(new Error('storage unavailable'), { code: '58030' });

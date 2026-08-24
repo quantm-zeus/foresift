@@ -125,7 +125,7 @@ describe('cleanup failures never mask the root cause', () => {
         if (poison.test(sql)) throw new Error(ROLLBACK_FAILURE);
         await bare.exec(sql);
       },
-      query: async <T,>(sql: string, params?: readonly unknown[]) => {
+      query: async <T>(sql: string, params?: readonly unknown[]) => {
         const result = await bare.query(sql, [...(params ?? [])]);
         return result as { rows: T[] };
       },
@@ -189,9 +189,9 @@ describe('cleanup failures never mask the root cause', () => {
       // The engine must have returned to idle: a second unit runs untouched
       // (a dangling transaction would surface here as an aborted-session
       // error rather than a clean result).
-      await expect(
-        stubbed.transaction(async (tx) => tx.query('SELECT 2')),
-      ).resolves.toMatchObject({ rows: [{ '?column?': 2 }] });
+      await expect(stubbed.transaction(async (tx) => tx.query('SELECT 2'))).resolves.toMatchObject({
+        rows: [{ '?column?': 2 }],
+      });
     });
   });
 });

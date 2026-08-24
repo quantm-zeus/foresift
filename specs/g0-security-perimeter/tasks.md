@@ -374,6 +374,78 @@ prohibited capability anywhere outside the inert scanner self-test corpus.
       reaches main only via CI-gated PRs. Traces: FR-SEC-001 through
       FR-SEC-012.
 
+## Convergence round 2 — consolidated review MEDIUM/LOW remediation (2026-08-24)
+
+Round triggered by `convergence-decision.json` (review verdict invalid +
+attestation drift). All 24 MEDIUM and 26 LOW findings from
+`artifacts/runs/e800989d…/review/consolidated-review.md` were triaged against
+the CRITICAL+HIGH fixes of T151; every finding resolvable inside writeScopes
+is implemented, reconciled into pinned specs, and verified:
+
+- [x] R1 SQL immutability triggers extended to BEFORE TRUNCATE on
+      `sec_audit_events`, `sec_audit_checkpoints`, `activation_events`
+      (M1); verifier GAP/refusal/bounds semantics hardened (M2); SBOM/build
+      attestation/lockfile validations enforced (M3/M22); nonce-matched
+      extraction fences + linear tag scanning + linear punycode sweep
+      (M4/M5/L13); webhook constructor validation + documented replay-cache
+      scope contract (M6/L12); upstream-passthrough issuer evidence required
+      (M7/L11); error-hierarchy cause threading + honest mirror-shape docs
+      (M8/L3); import signature over real producer keys + duplicate-intake
+      typed refusal (M9/L4); incident CAS containment transitions (M10);
+      proof clock-skew tolerance exported and enforced (M11a); resume
+      actor/audit trim-validation + transactional ledger append (M12/M13);
+      constrained-field evidence-withholding refusal + opt-in
+      `strictPresentation` (M14); bounded abuse-control maps + honest quota
+      degradation (M15/M16); protocol-guard omission refusals (M17);
+      CSRF length floor pinned under its true name (M18); proof-ownership +
+      audit-wrap coupling (M19); replay eviction order pinned (M20);
+      unknown-incident fail-closed paths (M21/L20); decoder acknowledgement
+      enforcement (L21); scanner catalog flags corrected (L16); row-scope
+      clause parenthesization (L8); RESOLVED refine null-safe (L7).
+
+- [x] R2 Pinned specs for every newly enforced branch: wiped-chain GAP,
+      inverted-range refusal, walked-bounds recording, leading-edge DELETION;
+      forged/duplicate/preamble-stripped fence refusals; large-input
+      linear-time regression; omission refusals; withheld-evidence and
+      strict-presentation credential refusals; supply-chain dead-code
+      validations; decoder acknowledgement; rollback cross-scope/wrong-type
+      refusals; whitespace resume refusals; raced-transition CAS stub;
+      unknown-incident paths; table-driven 18-class error-hierarchy spec.
+      Focused suites green at commit time: security 195/195,
+      tenant-isolation 25/25, shared-schemas 65/65, AC-258 acceptance,
+      `pnpm spec:verify` 13 checks, prohibited-capability scan CLEAN,
+      eslint clean on all changed trees.
+
+Deferred items below are EXPLICITLY UNCHECKED — each is real remaining work,
+recorded here per governance rather than silently dropped:
+
+- [ ] R3 Step-up PROOF CONSUMPTION seam (review M11b, priority P1):
+      `evaluateHighImpactAction` proves freshness/class/ownership but does
+      not register proofs as consumed — replaying one captured proof inside
+      its freshness window is currently admissible at the policy layer.
+      Requires a consumed-proof registry keyed by `proofId` wired at the
+      mcp-surface layer (outside this package's writeScopes) plus a gate
+      option to consult it.
+- [ ] R4 Durable webhook dedupe backing (review M6, priority P1): the
+      in-memory per-process replay cache bounds replays within one process
+      only. Cross-restart/replica immunity needs the wiring layer to persist
+      the emitted dedupe key (`eventId:sha256(payload)`) into shared durable
+      state before acknowledging deliveries.
+- [ ] R5 Error-inheritance reconciliation prerequisite (review M8): make
+      `ForesiftSecurityError` genuinely extend the domain `ForesiftError` by
+      widening the domain base (`code` type) in `packages/domain` — outside
+      this package's writeScopes, hence deferred with the mirror-shape
+      documentation kept honest in `packages/security/src/errors.ts`.
+- [ ] R6 Record ADR-0016 capturing this round's material decisions:
+      nonce-matched fence format as THE untrusted-content consumption
+      contract, CAS-guarded containment transitions, evidence-withholding
+      credential refusal + `strictPresentation` deployment guidance, and the
+      webhook replay-cache scope contract.
+- [ ] R7 Canonicalizer unification audit (review L5 follow-up): verify every
+      security module hashes through the single `@foresift/persistence`
+      canonical JSON serializer and add a guard test preventing a second
+      serializer from creeping in.
+
 ## Traceability matrix (AC → tasks)
 
 | AC     | Tasks                             |

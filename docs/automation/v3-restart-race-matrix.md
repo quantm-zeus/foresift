@@ -42,3 +42,15 @@ Defects found and fixed while proving this matrix (2026-08-23, PR for this doc):
   generation 0 in the same tick. Fixed by reconciling proven-terminal rows
   inside the restart itself, persisted immediately so the §7 replay
   short-circuit cannot silently discard the reconciliation.
+- **First tick after start raced the queued main refresh (found while preparing
+  gen-1 activation, 2026-08-24)** — `tick()` enqueued its fetch+fast-forward
+  but reconciled/selected against the working tree immediately, so starting
+  the supervisor right after a state-chore merge read the PRE-reset milestone
+  (`RUNNING` gen 0, every Archon row terminal) and latched a fatal pause
+  instead of launching the fresh generation. Fixed by draining the serialized
+  git queue before any reconcile/selection decision, and by making the
+  fast-forward tracking-independent (`git merge --ff-only origin/main`, not
+  bare `git pull --ff-only`, which silently no-ops without branch tracking
+  config). Hermetic proof: first-tick fixture with `origin/main` ahead of the
+  checkout asserts the CURRENT generation launches and no fatal pause latches
+  (`v3-generations.spec.ts`, "first tick drains the queued main fast-forward").

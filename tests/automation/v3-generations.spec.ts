@@ -743,6 +743,111 @@ describe('--restart-package CLI flows', () => {
   });
 });
 
+// ── First tick must drain the queued main fast-forward BEFORE selection ──────
+// refreshMain enqueues its fetch+pull; stranded reconciliation and selection
+// read the working-tree milestone. A supervisor start right after a state-chore
+// merge (e.g. the real gen-1 reset) used to reconcile against the PRE-reset
+// snapshot — RUNNING gen 0 with only terminal Archon rows — and latch a fatal
+// pause instead of launching the fresh generation.
+describe('first tick drains the queued main fast-forward before selection', () => {
+  it('launches the CURRENT generation instead of fatal-pausing on the pre-pull milestone', () => {
+    const fx = gitFixture('first-tick-ff');
+    stubArchon();
+    // Stale local tree: what the parent checkout shows BEFORE the state-chore
+    // lands — PKG still RUNNING at generation 0 (legacy identity).
+    const staleMs = {
+      schemaVersion: '1.0.0',
+      milestoneId: 'G0',
+      status: 'ACTIVE',
+      packages: [
+        {
+          id: PKG,
+          objective: 'Implement the contracts and data truth foundation slice.',
+          requirementIds: ['REQ-1'],
+          dependencies: [],
+          risk: 'HIGH',
+          parallelizable: false,
+          writeScopes: ['packages/**'],
+          verificationCommands: ['pnpm test'],
+          status: 'RUNNING',
+        },
+        {
+          id: 'pkg-beta',
+          objective: 'Second package so milestone decomposition validates.',
+          requirementIds: ['REQ-2'],
+          dependencies: [PKG],
+          risk: 'LOW',
+          parallelizable: true,
+          writeScopes: ['packages/beta/**'],
+          verificationCommands: ['pnpm test'],
+          status: 'PENDING',
+        },
+      ],
+    };
+    fx.writeFile(
+      'specs/implementation/current-milestone.json',
+      JSON.stringify(staleMs, null, 2) + '\n',
+    );
+    fx.writeFile(
+      'specs/implementation/roadmap.json',
+      JSON.stringify(
+        {
+          schemaVersion: '1.0.0',
+          policy: {
+            foundationMilestones: ['G0'],
+            maxParallelCodingPackagesFoundation: 1,
+            maxParallelCodingPackages: 2,
+          },
+          currentMilestoneId: 'G0',
+          milestones: [{ id: 'G0', name: 'foundation', dependsOn: [], status: 'ACTIVE' }],
+        },
+        null,
+        2,
+      ) + '\n',
+    );
+    fx.commitAll('stale view: PKG RUNNING gen 0');
+    fx.g(['push', '-q', 'origin', 'main']);
+
+    // Advance ONLY origin/main — exactly the post-squash-merge world: origin
+    // carries the reset chore, no checkout has pulled it yet.
+    fx.g(['switch', '-q', '-c', 'ahead']);
+    const freshMs = JSON.parse(JSON.stringify(staleMs));
+    const alpha = freshMs.packages.find((p: { id: string }) => p.id === PKG);
+    alpha.status = 'PENDING';
+    alpha.generation = 1;
+    fx.writeFile(
+      'specs/implementation/current-milestone.json',
+      JSON.stringify(freshMs, null, 2) + '\n',
+    );
+    fx.commitAll('chore(autopilot): PKG -> PENDING gen 1');
+    fx.g(['push', '-q', 'origin', 'ahead:main']);
+    fx.g(['switch', '-q', 'main']); // local tree back on the stale snapshot
+
+    const stateDir = mkdtempSync(join(scratch, 'firsttick-state-'));
+    writeFileSync(
+      join(stateDir, 'autopilot-state.json'),
+      JSON.stringify({ activeRuns: [], milestoneRuns: [], pausedFatal: null, history: [] }),
+    );
+    const r = runRestartCli({ fx, stateDir, baseSha: '' } as Sandbox, ['--once'], { rows: [] });
+
+    expect(r.status).toBe(0);
+    const st = JSON.parse(readFileSync(join(stateDir, 'autopilot-state.json'), 'utf8'));
+    // The retired-generation snapshot must never win: no fatal pause latched,
+    // and no stranded-run conversion for the legacy identity.
+    expect(st.pausedFatal ?? null).toBeNull();
+    expect(st.history.map((h: { event: string }) => h.event)).not.toContain('paused_fatal');
+    expect(st.history.map((h: { event: string }) => h.event)).not.toContain('stranded_run_adopted');
+    // The fresh generation IS launched, under its generation-aware identity.
+    expect(st.history.map((h: { event: string }) => h.event)).toContain('work_package_launched');
+    const entry = st.activeRuns.find((e: { packageId: string }) => e.packageId === PKG);
+    expect(entry?.message).toBe(`${PKG}@g1`);
+    expect(entry?.branch).toBe(`foresift/${PKG}-g1`);
+    const archonLog = readFileSync(join(stateDir, 'archon.log'), 'utf8');
+    expect(archonLog).toContain('foresift-work-package-optimized');
+    expect(archonLog).toContain(`${PKG}@g1`);
+  });
+});
+
 // ── §30 restart race matrix: crash windows and concurrent-invocation faults ──
 describe('§30 restart race matrix', () => {
   let sb: Sandbox;

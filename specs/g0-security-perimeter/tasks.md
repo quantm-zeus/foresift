@@ -77,7 +77,7 @@ prohibited capability anywhere outside the inert scanner self-test corpus.
 
 ## Phase B — Audit chain, incidents, pauses (integrity core)
 
-- [ ] T108 Implement `src/audit-categories.ts`: the §35.9 coverage vocabulary
+- [x] T108 Implement `src/audit-categories.ts`: the §35.9 coverage vocabulary
       as typed event classes (authentication/authorization, tool/resource
       access, provider/collector calls and blocked operations,
       configuration/capability/cost/rights/source-dependence/pool-adapter/
@@ -85,7 +85,7 @@ prohibited capability anywhere outside the inert scanner self-test corpus.
       retirements/rollbacks, secret lifecycle, incidents and recovery) with a
       completeness test asserting every §35.9 bullet maps to a class.
       Traces: FR-SEC-002.
-- [ ] T109 Implement `src/audit-chain.ts`: canonical-JSON payload hashing,
+- [x] T109 Implement `src/audit-chain.ts`: canonical-JSON payload hashing,
       `entry_hash = sha256(prev_entry_hash || canonical_payload)` chaining,
       fenced appends against SQL immutability triggers, periodic batch
       checkpoints written to `sec_audit_checkpoints` AND mirrored through the
@@ -94,12 +94,12 @@ prohibited capability anywhere outside the inert scanner self-test corpus.
       mutation, deletion, and chain breaks; verification failure raises the
       critical incident (with T110) and the high-impact gate consults audit
       health (with T114). Traces: FR-SEC-002; AC-259.
-- [ ] T110 Implement `src/incidents.ts` over `security_incidents`: open with
+- [x] T110 Implement `src/incidents.ts` over `security_incidents`: open with
       severity (SEV1..SEV4)/owner/kind, containment-state transitions,
       evidence-reference preservation, notification-policy flags,
       recovery-verification and postmortem linkage, resolution rules.
       Traces: FR-SEC-011.
-- [ ] T111 Implement `src/gate-pause.ts` over `capability_pauses` +
+- [x] T111 Implement `src/gate-pause.ts` over `capability_pauses` +
       `activation_events`: minimal-scope pause creation on critical gate
       failure with durable reason, machine-checked auto-reactivation refusal,
       explicit audited resume; immutable approved-set snapshots, new

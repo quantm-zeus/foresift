@@ -117,14 +117,21 @@ export interface ResourceAccessDecision {
   readonly canonicalPath: string;
 }
 
+export interface ResourceAccessGuardOptions {
+  /**
+   * Signed-URL service carrying THIS deployment's signing pepper. REQUIRED:
+   * a hardcoded default pepper published in the repository would silently
+   * defeat HMAC tamper-evidence for every deployment that omitted it.
+   */
+  readonly signedUrls: SignedUrlService;
+}
+
 export class ResourceAccessGuard {
   private readonly signedUrls: SignedUrlService;
   private static readonly SCOPE_PATTERN = /^(admin|tenant):[a-z0-9:-]+$/;
 
-  constructor(options: { signedUrls?: SignedUrlService | undefined } = {}) {
-    this.signedUrls =
-      options.signedUrls ??
-      new SignedUrlService({ pepper: 'resource-access-default-pepper', defaultTtlSeconds: 300 });
+  constructor(options: ResourceAccessGuardOptions) {
+    this.signedUrls = options.signedUrls;
   }
 
   /**

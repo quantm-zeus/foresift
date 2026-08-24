@@ -2,6 +2,12 @@
 // findings. Emits a STABLE JSON report (sorted, deterministic ids) so CI
 // diffs are meaningful and the runtime-canary parity test can consume the
 // same classification output.
+//
+// FAIL-CLOSED EVIDENCE RULE (review fix): a file that cannot be stat'ed or
+// read is NOT silently dropped from the evidence corpus — it is reported as
+// an UNSCANNABLE_FILE finding, which makes the scan dirty. Otherwise making
+// a prohibited file unreadable would be the cheapest adversarial dodge of
+// the whole static gate.
 import { lstatSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -31,25 +37,50 @@ function isExcluded(relativePath) {
   );
 }
 
-function* walk(rootDir, rootRelative = '') {
+function errnoReason(error) {
+  const code = error && typeof error === 'object' ? error.code : undefined;
+  return code ? `${code} (unreadable)` : 'unreadable';
+}
+
+/**
+ * Walk the tree yielding scannable files. Unreadable entries land in
+ * `skips` as { rel, reason } so runScan can fail the scan closed.
+ */
+function* walk(rootDir, skips, rootRelative = '') {
   for (const entry of readdirSync(rootDir)) {
     const full = path.join(rootDir, entry);
     const relFromRoot = rootRelative === '' ? entry : `${rootRelative}/${entry}`;
     let stats;
     try {
       stats = lstatSync(full);
-    } catch {
+    } catch (error) {
+      skips.push({ rel: relFromRoot, reason: `lstat failed: ${errnoReason(error)}` });
       continue;
     }
     // Symlinks are never followed; excluded dirs keep the scan inside the repo.
     if (stats.isSymbolicLink()) continue;
     if (stats.isDirectory()) {
       if (['node_modules', 'dist', '.git', 'coverage'].includes(entry)) continue;
-      yield* walk(full, relFromRoot);
-    } else if (SCAN_EXTENSIONS.has(path.extname(entry)) && !isExcluded(relFromRoot)) {
+      yield* walk(full, skips, relFromRoot);
+    } else if (
+      (SCAN_EXTENSIONS.has(path.extname(entry)) || entry === 'package.json') &&
+      !isExcluded(relFromRoot)
+    ) {
       yield { full, rel: relFromRoot };
     }
   }
+}
+
+/** UNSCANNABLE_FILE findings share the uniform finding shape. */
+function unscannableFinding(skip) {
+  const sanitized = skip.rel.toLowerCase().replace(/[^a-z0-9-]/g, '-');
+  return {
+    findingId: `pc-unscannable-${sanitized}`,
+    category: 'UNSCANNABLE_FILE',
+    surface: 'SOURCE_TREE',
+    reference: skip.rel,
+    matchedPattern: skip.reason,
+  };
 }
 
 export function runScan(options = {}) {
@@ -58,28 +89,34 @@ export function runScan(options = {}) {
   const catalog = loadCatalog(catalogPath);
 
   const findings = [];
-  for (const { full, rel } of walk(root)) {
+  const skips = [];
+  for (const { full, rel } of walk(root, skips)) {
     if (path.basename(rel) === 'package.json') {
       try {
         findings.push(
           ...scanDependencyManifest(rel, JSON.parse(readFileSync(full, 'utf8')), catalog),
         );
-      } catch {
-        /* unparseable manifest is not a prohibited-capability finding */
+      } catch (error) {
+        // A manifest that cannot be parsed could be hiding dependencies —
+        // that IS gate-relevant, not ignorable.
+        skips.push({ rel, reason: `manifest unreadable/unparseable: ${errnoReason(error)}` });
       }
       continue;
     }
     let text;
     try {
       text = readFileSync(full, 'utf8');
-    } catch {
+    } catch (error) {
+      skips.push({ rel, reason: `read failed: ${errnoReason(error)}` });
       continue;
     }
     findings.push(...scanSourceFile(rel, text, catalog));
   }
+  findings.push(...skips.map(unscannableFinding));
 
   const inventory = collectInventory(root);
   findings.push(...verifyInventoryReadonly(inventory, catalog));
+  findings.push(...(inventory.unscannable ?? []).map(unscannableFinding));
 
   // Environment names come from committed env EXAMPLE files only — real
   // .env files never exist in git (and are git-ignored by contract).

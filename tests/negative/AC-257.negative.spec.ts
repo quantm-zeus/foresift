@@ -115,7 +115,18 @@ describe('AC-257 negative: every bypass vector refuses deterministically', () =>
   });
 
   it('IPv6 denied forms refuse when a poisoned answer arrives', async () => {
-    for (const answer of [['::1'], ['::ffff:127.0.0.1'], ['fe80::1'], ['fc00::5']]) {
+    for (const answer of [
+      ['::1'],
+      ['::ffff:127.0.0.1'],
+      ['fe80::1'],
+      ['fc00::5'],
+      // Hex-spelled mapped, NAT64, 6to4, and unparseable answers are the
+      // historical bypasses — every spelling must hit the denial table.
+      ['::ffff:7f00:1'],
+      ['64:ff9b::7f00:1'],
+      ['2002:7f00:1::'],
+      ['2130706433'],
+    ]) {
       const poisoned = new EgressGuard({
         allowlist: [{ host: 'api.helius.dev', port: 443, scheme: 'https', plane: 'COLLECTOR' }],
         resolver: async () => answer,

@@ -270,6 +270,48 @@ describe('monotone quarantine state machine (no ACTIVE state)', () => {
     ).rejects.toThrow(/unknown quarantine state 'ACTIVE'/);
   });
 
+  it('REFUSES (never silently no-ops) when a concurrent writer wins the guarded UPDATE', async () => {
+    await gate.intake(intakeRequest({ artifactId: 'art-race' }), at('2026-08-24T14:00:00.000Z'));
+    await gate.transition('art-race', 'QUARANTINED', at('2026-08-24T14:00:01.000Z'));
+    await gate.transition('art-race', 'SCANNED', at('2026-08-24T14:00:02.000Z'));
+
+    // Reproduce the race deterministically: a racing writer advances the row
+    // BETWEEN the legality re-read and the guarded UPDATE, so the CAS UPDATE
+    // matches ZERO rows even though the check just passed.
+    const racingEngine: DatabaseEngine = {
+      engineKind: engine.engineKind,
+      exec: (sql) => engine.exec(sql),
+      query: <T>(sql: string, params?: readonly unknown[]) => {
+        if (sql.includes('UPDATE sec.import_artifacts')) {
+          return (async () => {
+            await engine.query(
+              `UPDATE sec.import_artifacts
+               SET prior_state_rank = state_rank, state_rank = state_rank + 1,
+                   state = 'VALIDATING', state_changed_at = $2
+               WHERE artifact_id = $1`,
+              [params?.[0], at('2026-08-24T14:00:03.000Z')],
+            );
+            return engine.query<T>(sql, params);
+          })();
+        }
+        return engine.query<T>(sql, params);
+      },
+      transaction: <R>(work: (tx: DatabaseEngine) => Promise<R>) => engine.transaction(work),
+    };
+    const racingGate = new ImportGate({
+      engine: racingEngine,
+      trustedProducers: [TRUSTED],
+      verifier: () => true,
+    });
+
+    await expect(
+      racingGate.transition('art-race', 'VALIDATING', at('2026-08-24T14:00:04.000Z')),
+    ).rejects.toThrow(/concurrent transition raced/);
+    // SQL truth kept exactly the racing writer's outcome — no silent loss.
+    const row = await gate.getArtifact('art-race');
+    expect(row.state).toBe('VALIDATING');
+  });
+
   it('couples validation completion to the step-up approval reference', async () => {
     await gate.intake(
       intakeRequest({ artifactId: 'art-finalize' }),

@@ -134,6 +134,18 @@ describe('high-impact action gate (AC-274)', () => {
     if (decision.outcome === 'REFUSE') expect(decision.reasons).toContain('STEP_UP_MISSING');
   });
 
+  it('refuses with CSRF_INVALID when the csrf field is ABSENT — missing protection never passes', async () => {
+    const { gate } = makeGate();
+    const decision = await gate.evaluateHighImpactAction({
+      ...baseRequest,
+      csrf: undefined,
+    });
+    // Every other dimension of baseRequest passes; the gate must still refuse
+    // because high-impact actions FAIL without CSRF protection (AC-274).
+    expect(decision.outcome).toBe('REFUSE');
+    if (decision.outcome === 'REFUSE') expect(decision.reasons).toEqual(['CSRF_INVALID']);
+  });
+
   it('refuses STALE proofs against the INJECTED clock', async () => {
     const { gate } = makeGate();
     const decision = await gate.evaluateHighImpactAction({

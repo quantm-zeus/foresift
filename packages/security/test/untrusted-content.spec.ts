@@ -123,6 +123,36 @@ describe('render-safety validation (AC-258)', () => {
     expect(safe.safe).toBe(true);
     expect(safe.warnings).toEqual([]);
   });
+
+  it('catches the historical bypasses: slash-separated handlers, tabbed schemes, multi-candidate srcset', () => {
+    // (1) '/' between tag name and attribute is valid to HTML parsers.
+    const slashHandler = validateRenderable('<img/onerror=alert(1) src="x">', {
+      trustedImageHosts: ['cdn.example.com'],
+      allowRawHtml: true,
+    });
+    expect(slashHandler.violations.some((v) => v.kind === 'EVENT_HANDLER_ATTRIBUTE')).toBe(true);
+
+    // (2) Browsers strip tab/CR/LF inside URL schemes; entities decode too.
+    for (const scheme of [
+      'java\tscript:alert(1)',
+      'java&#09;script:alert(1)',
+      '&#106;avascript:alert(1)',
+    ]) {
+      const report = validateRenderable(`<a href="${scheme}">y</a>`, { allowRawHtml: true });
+      expect(
+        report.violations.some((v) => v.kind === 'DANGEROUS_URL_SCHEME'),
+        scheme,
+      ).toBe(true);
+    }
+
+    // (3) EVERY srcset candidate is a real fetch target — not just the first.
+    const srcset = validateRenderable(
+      '<img srcset="https://trusted.example/a.jpg 1x, https://evil.example/b.jpg 2x">',
+      { trustedImageHosts: ['trusted.example'] },
+    );
+    expect(srcset.violations.some((v) => v.kind === 'REMOTE_IMAGE_UNTRUSTED')).toBe(true);
+    expect(srcset.violations.some((v) => v.detail.includes('evil.example'))).toBe(true);
+  });
 });
 
 describe('memory isolation keys (AC-052 cooperation)', () => {

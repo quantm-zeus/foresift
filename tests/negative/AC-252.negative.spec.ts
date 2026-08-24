@@ -4,9 +4,12 @@
 import { describe, expect, it } from 'vitest';
 import { ResourceAccessGuard } from '../../packages/tenant-isolation/src/resource-access.ts';
 import type { ResourceAccessRefusalReason } from '../../packages/tenant-isolation/src/resource-access.ts';
+import { SignedUrlService } from '../../packages/tenant-isolation/src/signed-url.ts';
 import { deriveTenantContext } from '../../packages/tenant-isolation/src/tenant-context.ts';
 
-const GUARD = new ResourceAccessGuard();
+const GUARD = new ResourceAccessGuard({
+  signedUrls: new SignedUrlService({ pepper: 'resource-access-test-pepper' }),
+});
 const ALICE = deriveTenantContext({
   tenantId: 'tenant-alice',
   mode: 'WORKSPACE',

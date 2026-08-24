@@ -9,22 +9,24 @@ import path from 'node:path';
 const SOURCE_EXTENSIONS = new Set(['.ts', '.tsx', '.mts', '.mjs', '.js']);
 const EXCLUDED_DIRS = new Set(['node_modules', 'dist', '.git', 'coverage']);
 
-function* walkFiles(dir) {
+function* walkFiles(dir, skips, rootRelative = '') {
   for (const entry of readdirSync(dir)) {
     if (EXCLUDED_DIRS.has(entry)) continue;
     const full = path.join(dir, entry);
+    const relFromRoot = rootRelative === '' ? entry : `${rootRelative}/${entry}`;
     let stats;
     try {
       stats = lstatSync(full);
-    } catch {
+    } catch (error) {
+      skips.push({ rel: relFromRoot, reason: `lstat failed: ${error?.code ?? 'unreadable'}` });
       continue;
     }
     // Symlinks are NEVER followed — the scan stays inside this repository.
     if (stats.isSymbolicLink()) continue;
     if (stats.isDirectory()) {
-      yield* walkFiles(full);
+      yield* walkFiles(full, skips, relFromRoot);
     } else if (SOURCE_EXTENSIONS.has(path.extname(entry))) {
-      yield full;
+      yield { full, rel: relFromRoot };
     }
   }
 }
@@ -33,12 +35,13 @@ export function collectInventory(rootDir) {
   const routes = [];
   const tools = [];
   const schemas = [];
-  for (const file of walkFiles(rootDir)) {
-    const rel = path.relative(rootDir, file).split(path.sep).join('/');
+  const unscannable = [];
+  for (const { full, rel } of walkFiles(rootDir, unscannable)) {
     let text;
     try {
-      text = readFileSync(file, 'utf8');
-    } catch {
+      text = readFileSync(full, 'utf8');
+    } catch (error) {
+      unscannable.push({ rel, reason: `read failed: ${error?.code ?? 'unreadable'}` });
       continue;
     }
     for (const match of text.matchAll(
@@ -55,7 +58,7 @@ export function collectInventory(rootDir) {
       schemas.push({ name: match[1], source: rel });
     }
   }
-  return { routes, tools, schemas };
+  return { routes, tools, schemas, unscannable };
 }
 
 /**

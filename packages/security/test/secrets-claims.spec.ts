@@ -206,6 +206,19 @@ describe('public-output boundary (§35.12, AC-277)', () => {
     expect(redactedBody).not.toContain('7xKQ…');
   });
 
+  it('redacts EVERY threshold occurrence — partial redaction would still ship tuning values', () => {
+    const body =
+      'detector_score is 0.9 here and detector_threshold equals 0.75 too plus detector_score 0.9 again';
+    const { redaction, redactedBody } = validatePublicOutput({ ...envelope, body });
+    expect(redaction.verdict).toBe('COMPLIANT');
+    // No numeric tuning value survives anywhere in the published body.
+    for (const leaked of ['0.9', '0.75', 'detector_score is', 'detector_threshold equals']) {
+      expect(redactedBody).not.toContain(leaked);
+    }
+    expect((redactedBody.match(/\[REDACTED_THRESHOLD\]/g) ?? []).length).toBeGreaterThanOrEqual(2);
+    expect(redactionsAppliedOf(redaction)).toBeGreaterThanOrEqual(2);
+  });
+
   it('refuses envelopes missing any required duty', () => {
     for (const missing of ['evidenceRefs', 'limitations', 'disclaimer'] as const) {
       const candidate = { ...envelope, body: 'clean body', [missing]: undefined };

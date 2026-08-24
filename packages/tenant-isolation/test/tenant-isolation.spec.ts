@@ -207,7 +207,9 @@ describe('signed URLs (T131)', () => {
 });
 
 describe('resource-access authorization bypass battery (T131, AC-252)', () => {
-  const guard = new ResourceAccessGuard();
+  const guard = new ResourceAccessGuard({
+    signedUrls: new SignedUrlService({ pepper: 'resource-access-test-pepper' }),
+  });
   const aliceRequest = {
     grantedScope: 'tenant:artifact:read',
     rights: ['artifact:read'],

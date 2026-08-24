@@ -67,24 +67,23 @@ function ipv4InRange(ip: string, base: string, prefixBits: number): boolean {
 }
 
 function expandIpv6(ip: string): number[] {
-  // Deterministic expansion of :: groups; returns 16 bytes.
-  let head = ip;
-  let tail = '';
-  if (ip.includes('::')) {
-    const halves = ip.split('::');
-    head = halves[0] ?? '';
-    tail = halves[1] ?? '';
-  }
+  // STRICT textual validation + deterministic expansion of :: groups;
+  // returns exactly 16 bytes or throws. Leniency here would let malformed
+  // spellings classify as addresses they are not.
+  if ((ip.match(/::/g)?.length ?? 0) > 1) throw new Error('bad ipv6');
+  const [head = '', tail = ''] = ip.split('::');
   const headGroups = head === '' ? [] : head.split(':');
   const tailGroups = tail === '' ? [] : tail.split(':');
   const missing = 8 - headGroups.length - tailGroups.length;
-  const groups = [...headGroups, ...Array(Math.max(missing, 0)).fill('0'), ...tailGroups];
+  if (ip.includes('::') ? missing < 1 : missing !== 0) throw new Error('bad ipv6');
+  const groups = [...headGroups, ...Array(missing).fill('0'), ...tailGroups];
   const bytes: number[] = [];
   for (const group of groups) {
-    const g = group === '' ? 0 : parseInt(group, 16);
+    if (!/^[0-9A-Fa-f]{1,4}$/.test(group)) throw new Error('bad ipv6');
+    const g = parseInt(group, 16);
     bytes.push((g >> 8) & 0xff, g & 0xff);
   }
-  return bytes.slice(0, 16);
+  return bytes;
 }
 
 function bigIntInCidr6(value: bigint, cidrBase: bigint, prefixBits: number): boolean {
@@ -93,15 +92,29 @@ function bigIntInCidr6(value: bigint, cidrBase: bigint, prefixBits: number): boo
   return value >> shift === cidrBase >> shift;
 }
 
+/** Render one 32-bit embedded IPv4 value as a dotted quad for reclassification. */
+function embeddedIpv4ToQuad(value: bigint): string {
+  return `${(value >> 24n) & 0xffn}.${(value >> 16n) & 0xffn}.${(value >> 8n) & 0xffn}.${
+    value & 0xffn
+  }`;
+}
+
 /**
  * Denied-range table: loopback, RFC1918 private, link-local, CGNAT,
- * cloud-metadata anchor, unspecified/multicast, IPv6 equivalents and
- * IPv4-mapped forms. Zero trust for ANY resolved address.
+ * cloud-metadata anchor, unspecified/multicast; IPv6 equivalents plus the
+ * embedded-IPv4 transports (::ffff:0:0/96 mapped in ANY textual spelling,
+ * 64:ff9b::/96 NAT64, 2002::/16 6to4) whose carried IPv4 address must clear
+ * the same IPv4 rules. Zero trust for ANY resolved address: an address that
+ * cannot be parsed and classified at all is DENIED — classification failure
+ * never admits.
  */
 export function isDeniedAddress(address: string): boolean {
-  if (address.includes('.') && !address.startsWith('::ffff:')) {
-    // Plain IPv4 literal.
-    if (
+  if (address.includes('.') && !address.startsWith('::')) {
+    // Text carrying a dot but not a canonical dotted quad (decimal
+    // '2130706433', hex/octal spellings, partial quads like '127.1') cannot
+    // be classified — fail closed rather than guess.
+    if (ipv4ToInt(address) === null) return true;
+    return (
       ipv4InRange(address, '127.0.0.0', 8) ||
       ipv4InRange(address, '10.0.0.0', 8) ||
       ipv4InRange(address, '172.16.0.0', 12) ||
@@ -110,20 +123,32 @@ export function isDeniedAddress(address: string): boolean {
       ipv4InRange(address, '100.64.0.0', 10) ||
       ipv4InRange(address, '0.0.0.0', 8) ||
       ipv4InRange(address, '224.0.0.0', 4)
-    ) {
-      return true;
-    }
-    return false;
+    );
   }
-  if (address.startsWith('::ffff:')) {
-    const mapped = address.slice('::ffff:'.length);
-    if (mapped.includes('.')) return isDeniedAddress(mapped);
-  }
+  // Dotted-quad tail spelling of an embedded-IPv4 form ('::ffff:a.b.c.d',
+  // deprecated '::a.b.c.d'): classify the carried IPv4 directly.
+  const dottedTail = /^::(?:ffff:)?((?:\d{1,3}\.){3}\d{1,3})$/i.exec(address);
+  if (dottedTail?.[1] !== undefined) return isDeniedAddress(dottedTail[1]);
   let parsed: bigint;
   try {
     parsed = rawIpv6Value(address);
   } catch {
-    return false;
+    // Unparseable resolved address (zone indices, truncated groups,
+    // resolver garbage): NEVER admitted — fail closed.
+    return true;
+  }
+  // Embedded-IPv4 transports: the low 32 bits name the real destination,
+  // whatever the surrounding prefix's textual spelling. The /96 families are
+  // matched CIDR-style over their top 96 bits (::ffff:0:0/96 mapped,
+  // 64:ff9b::/96 NAT64 well-known prefix).
+  const ipv4MappedBase = 0xffffn << 32n;
+  const nat64Base = (0x64n << 112n) | (0xff9bn << 96n);
+  if (bigIntInCidr6(parsed, ipv4MappedBase, 96) || bigIntInCidr6(parsed, nat64Base, 96)) {
+    if (isDeniedAddress(embeddedIpv4ToQuad(parsed & 0xffffffffn))) return true;
+  }
+  if (parsed >> 112n === 0x2002n) {
+    // 2002::/16 (6to4): the embedded IPv4 sits at bits 16..47.
+    if (isDeniedAddress(embeddedIpv4ToQuad((parsed >> 80n) & 0xffffffffn))) return true;
   }
   return (
     bigIntInCidr6(parsed, 1n, 128) || // ::1 loopback

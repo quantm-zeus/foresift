@@ -97,6 +97,42 @@ describe('denied IP ranges (AC-257)', () => {
     }
   });
 
+  it('classifies embedded-IPv4 transports numerically and fails closed when unparseable', () => {
+    for (const address of [
+      '::ffff:7f00:1', // hex-spelled IPv4-mapped loopback (= ::ffff:127.0.0.1)
+      '::FFFF:7F00:1', // same address, upper-case spelling
+      '::ffff:a9fe:11ab', // mapped link-local (cloud-metadata space)
+      '::ffff:c0a8:101', // mapped RFC1918 192.168.1.1
+      '64:ff9b::7f00:1', // NAT64 well-known prefix wrapping loopback
+      '64:ff9b::a9fe:11ab', // NAT64 wrapping link-local metadata
+      '2002:7f00:1::', // 6to4 wrapping loopback
+      '2002:a9fe:11ab::', // 6to4 wrapping link-local metadata
+      '2130706433', // decimal spelling of 127.0.0.1 — unparseable ⇒ denied
+      '0x7f000001', // hex spelling — unparseable ⇒ denied
+      '127.1', // partial quad — not canonical ⇒ denied
+      'fe80::1%eth0', // zone index — unparseable ⇒ denied
+      '::zzzz', // resolver garbage — unparseable ⇒ denied
+      '1:2:3:4:5:6:7:8:9', // over-long group set — unparseable ⇒ denied
+    ]) {
+      expect(isDeniedAddress(address), address).toBe(true);
+    }
+    for (const address of [
+      '::ffff:140.82.112.3', // mapped PUBLIC address follows IPv4 rules → allowed
+      '::ffff:8c52:7003', // hex form of the same public address
+      '64:ff9b::8c52:7003', // NAT64 toward a public address
+      '2002:8c52:7003::', // 6to4 toward a public address
+      '2606:50c0:8000::153', // ordinary global unicast
+    ]) {
+      expect(isDeniedAddress(address), address).toBe(false);
+    }
+  });
+
+  it('the authorize flow refuses hex-mapped and NAT64 spellings of denied ranges', async () => {
+    const g = guard({ 'api.helius.dev': ['::ffff:7f00:1'] });
+    const decision = await g.authorize('https://api.helius.dev/', 'COLLECTOR');
+    expect(decision).toMatchObject({ decision: 'REFUSE', reason: 'ADDRESS_DENIED' });
+  });
+
   it('refuses when ANY resolved address falls in a denied range', async () => {
     const decision = await guard({
       'api.helius.dev': ['140.82.112.3', '169.254.169.254'],

@@ -95,7 +95,9 @@ export class ActionGate {
     const evaluatedAt = new Date(this.clock()).toISOString().replace('.000Z', 'Z') as UtcTimestamp;
     const reasons: ActionGateRefusalReason[] = [];
 
-    if (request.csrf !== undefined && !evaluateCsrf(request.csrf).valid) {
+    // Fail-closed symmetric with every sibling dimension: an ABSENT csrf
+    // field is missing protection, not passed validation (AC-274).
+    if (request.csrf === undefined || !evaluateCsrf(request.csrf).valid) {
       reasons.push('CSRF_INVALID');
     }
     if ((request.idempotencyKey ?? '').length === 0) {

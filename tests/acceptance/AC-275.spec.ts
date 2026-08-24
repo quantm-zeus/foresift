@@ -13,6 +13,7 @@ import {
 } from '../../packages/tenant-isolation/src/tenant-context.ts';
 import { RowScope } from '../../packages/tenant-isolation/src/row-scope.ts';
 import { ResourceAccessGuard } from '../../packages/tenant-isolation/src/resource-access.ts';
+import { SignedUrlService } from '../../packages/tenant-isolation/src/signed-url.ts';
 
 const ALICE = deriveTenantContext({
   tenantId: 'tenant-alice',
@@ -81,7 +82,9 @@ describe('AC-275: isolation holds on every shared surface', () => {
   });
 
   it('same-tenant resource access authorizes with canonical paths', () => {
-    const guard = new ResourceAccessGuard();
+    const guard = new ResourceAccessGuard({
+      signedUrls: new SignedUrlService({ pepper: 'resource-access-test-pepper' }),
+    });
     const decision = guard.authorize({
       request: {
         uri: 'foresift://artifacts/tenant-alice/report.md',

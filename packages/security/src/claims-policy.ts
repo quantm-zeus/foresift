@@ -138,11 +138,15 @@ export function validatePublicOutput(candidate: PublicOutputCandidate): {
   let body = candidate.body;
 
   // 2. Strip detector thresholds — internal tuning never ships publicly.
+  //    EVERY match must be replaced: stopping after the first leaks the
+  //    remaining occurrences, and partial success reads as success downstream
+  //    (FR-SEC-012 / AC-277).
   const thresholdMatches = body.match(DETECTOR_THRESHOLD_PATTERN) ?? [];
   for (const match of thresholdMatches) {
+    const occurrences = body.split(match).length - 1;
+    if (occurrences === 0) continue; // already swallowed by an earlier (greedy) span
     body = body.split(match).join('[REDACTED_THRESHOLD]');
-    redactionsApplied += thresholdMatches.length;
-    break;
+    redactionsApplied += occurrences;
   }
 
   // 3. Redact sensitive entity details.

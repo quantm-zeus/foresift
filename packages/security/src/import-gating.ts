@@ -285,6 +285,10 @@ export class ImportGate {
   /**
    * Monotone typed transition. Terminal states have no outgoing edges;
    * there is no ACTIVE state anywhere in the machine and none can be named.
+   * The guarded UPDATE is the CAS enforcement point: if a concurrent writer
+   * changed the state between the legality check and the write, the UPDATE
+   * matches zero rows and this method REFUSES — a raced transition is never
+   * silently reported as applied.
    */
   async transition(
     artifactId: string,
@@ -307,12 +311,22 @@ export class ImportGate {
         SecErrorCode.SEC_IMPORT_STATE_TRANSITION_INVALID,
       );
     }
-    await this.engine.query(
+    const updated = await this.engine.query<{ artifact_id: string }>(
       `UPDATE sec.import_artifacts
        SET prior_state_rank = state_rank, state_rank = $3, state = $4, state_changed_at = $5
-       WHERE artifact_id = $1 AND state = $2`,
+       WHERE artifact_id = $1 AND state = $2
+       RETURNING artifact_id`,
       [artifactId, row.state, STATE_RANK[to], to, at],
     );
+    if (updated.rows.length !== 1) {
+      // A concurrent writer won the CAS: the requested transition is no
+      // longer legal against actual SQL truth.
+      throw new ImportGatingError(
+        `concurrent transition raced: ${row.state} -> ${to} was no longer legal`,
+        { from: row.state, to },
+        SecErrorCode.SEC_IMPORT_STATE_TRANSITION_INVALID,
+      );
+    }
     return this.getArtifact(artifactId);
   }
 

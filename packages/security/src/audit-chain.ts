@@ -6,8 +6,10 @@
  * where the payload is THE canonical JSON of this repository (single
  * serializer, key-sorted, byte-stable). The first entry chains from
  * `'GENESIS'`. Appends are fenced: head selection happens inside a
- * transaction with `FOR UPDATE` on the head row, so two concurrent appends
- * cannot both claim the same predecessor (INV-009 fencing).
+ * transaction guarded by a transaction-scope advisory lock PLUS `FOR UPDATE`
+ * on the head row, so two concurrent appends cannot both claim the same
+ * predecessor — including at genesis, where no row exists to lock
+ * (INV-009 fencing).
  *
  * Checkpoints are periodic batch anchors written BOTH to SQL truth and
  * through the ObjectStoreAdapter (plan material decision 5) so verification
@@ -71,6 +73,20 @@ export interface AuditChainOptions {
 
 const CHECKPOINT_RETENTION_CLASS = 'AUDIT_CHECKPOINT_PERMANENT';
 
+/**
+ * Transaction-scope advisory lock serializing chain appends AND checkpoint
+ * anchoring (INV-009 fencing). The row-level `FOR UPDATE` head lock alone
+ * does not hold under READ COMMITTED: `LockRows` sits above `Limit`, so a
+ * blocked appender resumes with its ORIGINAL statement snapshot and can
+ * never re-fetch a competing entry committed after it started (EvalPlanQual
+ * re-fetch needs an updatable row; the immutability triggers make these rows
+ * un-updatable) — and at genesis there is NO row to lock at all, so two
+ * entries could both claim `'GENESIS'` and fork the chain permanently. The
+ * advisory key makes predecessor selection linearizable instead. Value is an
+ * arbitrary namespaced constant ('FSEC' + slot 1); only stability matters.
+ */
+const SEC_AUDIT_APPEND_LOCK_KEY = 0x4653454300000001n;
+
 export class AuditChain {
   private readonly engine: import('@foresift/persistence').DatabaseEngine;
   private readonly objectStore: ObjectStoreAdapter | undefined;
@@ -81,15 +97,18 @@ export class AuditChain {
   }
 
   /**
-   * Append one entry. Fenced against concurrent appends by locking the head
-   * row inside the append transaction; SQL immutability triggers make every
-   * committed entry permanent.
+   * Append one entry. Fenced against concurrent appends by the transaction
+   * advisory lock PLUS the head-row lock inside the append transaction; SQL
+   * immutability triggers make every committed entry permanent.
    */
   async append(input: AuditAppendInput): Promise<AuditEventRecord> {
     const payloadCanonical = canonicalJson(input.payload);
     const payloadSha256 = sha256Text(payloadCanonical);
 
     return this.engine.transaction(async (tx) => {
+      // Serialize predecessor selection BEFORE reading head — the row lock
+      // alone cannot fence an INSERT-only chain (see SEC_AUDIT_APPEND_LOCK_KEY).
+      await tx.query('SELECT pg_advisory_xact_lock($1)', [SEC_AUDIT_APPEND_LOCK_KEY]);
       const head = await tx.query<HeadRow>(
         'SELECT seq, entry_hash FROM sec.sec_audit_events ORDER BY seq DESC LIMIT 1 FOR UPDATE',
       );
@@ -164,6 +183,9 @@ export class AuditChain {
       });
     }
     return this.engine.transaction(async (tx) => {
+      // Same fence as append(): two concurrent checkpoints must not both
+      // claim the same prevCheckpointHash predecessor.
+      await tx.query('SELECT pg_advisory_xact_lock($1)', [SEC_AUDIT_APPEND_LOCK_KEY]);
       const entries = await tx.query<{ seq: string; entry_hash: string }>(
         `SELECT seq, entry_hash FROM sec.sec_audit_events
          WHERE seq BETWEEN $1 AND $2 ORDER BY seq`,

@@ -100,6 +100,33 @@ const DANGEROUS_URL_SCHEMES = ['javascript:', 'data:text/html', 'vbscript:', 'fi
 const EXFIL_QUERY_HINTS = ['token', 'key', 'secret', 'session', 'auth', 'cred'];
 
 /**
+ * Decode numeric (decimal/hex) HTML character references plus the named
+ * entities browsers expand inside attribute VALUES. Used ONLY to normalize
+ * the scanned copy for scheme detection — the original markup is what gets
+ * reported.
+ */
+function decodeHtmlEntities(text: string): string {
+  return text.replace(
+    /&(?:#[xX]([0-9a-fA-F]+)|#(\d+)|([a-zA-Z][a-zA-Z0-9]*));/g,
+    (whole, hex, dec, name) => {
+      if (hex !== undefined || dec !== undefined) {
+        const codePoint = Number.parseInt(hex ?? dec, hex !== undefined ? 16 : 10);
+        if (codePoint > 0 && codePoint <= 0x10ffff) return String.fromCodePoint(codePoint);
+        return whole;
+      }
+      const named: Record<string, string> = {
+        colon: ':',
+        Tab: '\t',
+        NewLine: '\n',
+        sol: '/',
+        bsol: '\\',
+      };
+      return named[name ?? ''] ?? whole;
+    },
+  );
+}
+
+/**
  * Deterministic render-safety validation over Markdown/HTML/SVG-ish markup.
  * Pure string analysis — no DOM, no network — so verdicts are stable and
  * testable. Safe output requires ZERO violations.
@@ -111,19 +138,28 @@ export function validateRenderable(
   const violations: { kind: RenderViolationKind; detail: string }[] = [];
   const warnings: string[] = [];
 
+  // Browsers strip tab/newline/CR anywhere in a URL and expand entities in
+  // attribute values, so scheme detection runs over a normalized copy;
+  // matching raw text only would miss 'java&#09;script:' spellings.
+  const schemeScanLower = decodeHtmlEntities(markup)
+    .replace(/[\t\r\n]/g, '')
+    .toLowerCase();
+
   const lower = markup.toLowerCase();
   if (/<script[\s>]/.test(lower) || /<foreignobject[\s>]/.test(lower)) {
     violations.push({ kind: 'SCRIPT_TAG', detail: 'script or foreignObject element present' });
   }
-  for (const match of markup.matchAll(/\son[a-z]+\s*=/gi)) {
+  // Separator-aware: HTML parsers accept '/' between tag name and attribute
+  // ('<img/onerror=…>'), so whitespace alone must not gate detection.
+  for (const match of markup.matchAll(/[\s/]on[a-z]+\s*=/gi)) {
     violations.push({
       kind: 'EVENT_HANDLER_ATTRIBUTE',
-      detail: `event handler attribute '${match[0].trim()}' present`,
+      detail: `event handler attribute '${match[0].replace(/^[\s/]+/, '')}' present`,
     });
     break;
   }
   for (const scheme of DANGEROUS_URL_SCHEMES) {
-    if (lower.includes(scheme)) {
+    if (schemeScanLower.includes(scheme)) {
       violations.push({ kind: 'DANGEROUS_URL_SCHEME', detail: `URL scheme '${scheme}' refused` });
       break;
     }
@@ -138,20 +174,30 @@ export function validateRenderable(
     violations.push({ kind: 'RAW_HTML_REFUSED', detail: 'raw HTML is not admitted by policy' });
   }
 
-  // Images: every http(s) source must be on the trusted-host list.
+  // Images: every http(s) source must be on the trusted-host list. srcset
+  // carries MULTIPLE candidates ('a.jpg 1x, b.jpg 2x') — each one is a real
+  // fetch target, so validating only the first would hide the rest.
   const trustedImageHosts = policy.trustedImageHosts ?? [];
-  for (const match of markup.matchAll(/(?:src|srcset)\s*=\s*["']?(https?:\/\/[^"'\s>]+)/gi)) {
-    let host = '';
-    try {
-      host = new URL(match[1]!).hostname.toLowerCase();
-    } catch {
-      host = '';
-    }
-    if (!trustedImageHosts.includes(host)) {
-      violations.push({
-        kind: 'REMOTE_IMAGE_UNTRUSTED',
-        detail: `image host '${host}' not trusted`,
-      });
+  for (const match of markup.matchAll(/\b(?:src|srcset)\s*=\s*("([^"]*)"|'([^']*)'|([^\s>]*))/gi)) {
+    const rawValue = (match[2] ?? match[3] ?? match[4] ?? '').trim();
+    const candidates = rawValue
+      .split(',')
+      .map((candidate) => candidate.trim().split(/[\t\r\n ]+/)[0] ?? '')
+      .filter((candidate) => /^https?:\/\//i.test(candidate));
+    if (candidates.length === 0) continue;
+    for (const candidate of candidates) {
+      let host = '';
+      try {
+        host = new URL(candidate).hostname.toLowerCase();
+      } catch {
+        host = '';
+      }
+      if (!trustedImageHosts.includes(host)) {
+        violations.push({
+          kind: 'REMOTE_IMAGE_UNTRUSTED',
+          detail: `image host '${host}' not trusted`,
+        });
+      }
     }
   }
 

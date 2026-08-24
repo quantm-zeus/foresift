@@ -2,10 +2,15 @@ name: foresift-sharded-wave
 description: |
   ONE parallel implementation wave for a work package (implementation-
   acceleration override §8/§28): deterministic task graph + write-disjoint
-  shard plan -> THREE concurrent HIGH-effort writer lanes (serial core +
-  two parallel shards), each in its OWN git worktree at the same pinned base
-  HEAD -> deterministic write-authority guards -> additive streaming-style
-  integration into the canonical branch -> ONE combined package FAST.
+  shard plan -> concurrent HIGH-effort writer lanes (serial core + parallel
+  shards), each in its OWN git worktree at the same pinned base HEAD ->
+  deterministic write-authority guards -> additive streaming-style
+  integration into the canonical branch -> ONE TRUE combined package FAST
+  (wp:fast-verify — impact-aware, fail-closed, never the FULL gate) whose RED
+  verdict provably fails the wave path: a bounded targeted-repair loop must
+  converge to a green recheck or the run ends failed, and the durable
+  checkpoint is written ONLY on the green path. Empty lanes are `when`-gated
+  OFF before any provider dispatch — zero executable units invoke zero AI.
   Canonical bookkeeping (tasks.md, checkpoints) is coordinator-only; writers
   never touch it (override §7). Repeat invocations run further waves; the
   authoritative FULL gate stays downstream in the standard package flow
@@ -57,7 +62,12 @@ nodes:
       cat "$ARTIFACTS_DIR/shard-meta.json"
 
   # Per-shard brief emitters: prompt interpolation reads sibling outputs, so
-  # each writer gets ONLY its own brief (override §12 minimal context).
+  # each writer gets ONLY its own brief. When a lane has no assigned units the
+  # emitter prints exactly its deterministic sentinel; the writer/guard nodes
+  # below are `when`-gated on that sentinel so an EMPTY LANE NEVER DISPATCHES
+  # A PROVIDER (zero executable units → zero AI invocations). The exact-match
+  # sentinel pattern is the same proven gating style as $gate-router.output in
+  # the optimized package flow (archon v0.9 condition evaluator supports ==/!=).
   - id: brief-core
     depends_on: [prep]
     bash: cat "$ARTIFACTS_DIR/briefs/core-brief.md" 2>/dev/null || echo "NO CORE SHARD THIS WAVE"
@@ -69,8 +79,14 @@ nodes:
     bash: cat "$ARTIFACTS_DIR/briefs/shard-2-brief.md" 2>/dev/null || echo "NO SHARD-2 THIS WAVE"
 
   # ── WRITER LANES (siblings without edges run CONCURRENTLY — proven R3) ───────
+  # Each lane is skipped entirely when its brief is absent (empty-lane zero-AI);
+  # Defect #10 policy: explicit on_error: all so silent provider empty-streams
+  # (UNKNOWN class) are retried instead of silently killing the lane. Strong
+  # retry layers stay intact: this node-level retry (L1/L2) plus autopilot
+  # recovery (L3) downstream.
   - id: writer-core
     depends_on: [brief-core]
+    when: "$brief-core.output != 'NO CORE SHARD THIS WAVE'"
     retry:
       max_attempts: 2
       delay_ms: 10000
@@ -87,14 +103,14 @@ nodes:
       (override §14). Never edit specs/<pkg>/tasks.md, checkpoints, or anything
       outside your allowed write paths. When finished, write your result manifest
       to $ARTIFACTS_DIR/writer-results/core/result.json (see completion contract
-      in the brief). If the brief says NO CORE SHARD THIS WAVE, do nothing and
-      say so.
+      in the brief).
 
       ===== WRITER BRIEF =====
       $brief-core.output
 
   - id: writer-shard-1
     depends_on: [brief-shard-1]
+    when: "$brief-shard-1.output != 'NO SHARD-1 THIS WAVE'"
     retry:
       max_attempts: 2
       delay_ms: 10000
@@ -110,14 +126,14 @@ nodes:
       FULL gates / repository-wide runs. Never edit specs/<pkg>/tasks.md,
       checkpoints, or anything outside your allowed write paths. When finished,
       write your result manifest to $ARTIFACTS_DIR/writer-results/shard-1/
-      result.json (see completion contract in the brief). If the brief says NO
-      SHARD-1 THIS WAVE, do nothing and say so.
+      result.json (see completion contract in the brief).
 
       ===== WRITER BRIEF =====
       $brief-shard-1.output
 
   - id: writer-shard-2
     depends_on: [brief-shard-2]
+    when: "$brief-shard-2.output != 'NO SHARD-2 THIS WAVE'"
     retry:
       max_attempts: 2
       delay_ms: 10000
@@ -133,8 +149,7 @@ nodes:
       FULL gates / repository-wide runs. Never edit specs/<pkg>/tasks.md,
       checkpoints, or anything outside your allowed write paths. When finished,
       write your result manifest to $ARTIFACTS_DIR/writer-results/shard-2/
-      result.json (see completion contract in the brief). If the brief says NO
-      SHARD-2 THIS WAVE, do nothing and say so.
+      result.json (see completion contract in the brief).
 
       ===== WRITER BRIEF =====
       $brief-shard-2.output
@@ -143,26 +158,48 @@ nodes:
   # One guard per lane; each recomputes the actual diff against the pinned base
   # and enforces allowedWritePaths ⊆ scopes. It OVERWRITES result.json with
   # computed facts (branch/head/base) so the integrator never trusts claims.
+  #
+  # Bridge shape (v0.9 semantics): the always-completing brief parent keeps
+  # `none_failed_min_one_success` satisfiable so the guard runs whenever its
+  # writer was SKIPPED-empty OR succeeded, and stays BLOCKED when the writer
+  # genuinely FAILED (a failed lane must surface, not vanish). The identical
+  # `when` gate keeps truly-empty lanes from executing any guard logic at all.
   - id: guard-core
-    depends_on: [writer-core]
+    depends_on: [brief-core, writer-core]
+    trigger_rule: none_failed_min_one_success
+    when: "$brief-core.output != 'NO CORE SHARD THIS WAVE'"
     bash: |
       set -euo pipefail
       node scripts/automation/wave-guard.mjs --shard core \
         --artifacts "$ARTIFACTS_DIR" --graph "$ARTIFACTS_DIR/task-graph.json"
   - id: guard-shard-1
-    depends_on: [writer-shard-1]
+    depends_on: [brief-shard-1, writer-shard-1]
+    trigger_rule: none_failed_min_one_success
+    when: "$brief-shard-1.output != 'NO SHARD-1 THIS WAVE'"
     bash: |
       set -euo pipefail
       node scripts/automation/wave-guard.mjs --shard shard-1 \
         --artifacts "$ARTIFACTS_DIR" --graph "$ARTIFACTS_DIR/task-graph.json"
   - id: guard-shard-2
-    depends_on: [writer-shard-2]
+    depends_on: [brief-shard-2, writer-shard-2]
+    trigger_rule: none_failed_min_one_success
+    when: "$brief-shard-2.output != 'NO SHARD-2 THIS WAVE'"
     bash: |
       set -euo pipefail
       node scripts/automation/wave-guard.mjs --shard shard-2 \
         --artifacts "$ARTIFACTS_DIR" --graph "$ARTIFACTS_DIR/task-graph.json"
 
-  # ── INTEGRATE + COMBINED FAST (serial join, override §16/§17) ────────────────
+  # ── INTEGRATE + ONE TRUE COMBINED FAST (serial join, override §16/§17) ───────
+  # Integration is additive and skip-closed per lane: a rejected shard never
+  # corrupts the canonical branch (its evidence stays in the report for the
+  # supervisor). Then the wave runs the ACTUAL FAST tier — wp:fast-verify
+  # (package-fast-verify.mjs): impact-aware, fail-closed on unknown scope,
+  # non-attesting, non-merge-authorizing — NEVER the FULL gate, and NEVER per
+  # writer. This node ALWAYS COMPLETES and acts as the deterministic router:
+  # it echoes WAVE_FAST_GREEN / WAVE_FAST_RED from the FAST exit code. RED does
+  # NOT end here silently — it opens the bounded repair loop below, and the
+  # checkpoint fires only through the green path (wave-settled bridge), so no
+  # false green and no checkpoint after red (override §14/§15 acceptance).
   - id: integrate-and-fast
     depends_on: [guard-core, guard-shard-1, guard-shard-2]
     trigger_rule: none_failed_min_one_success   # guards fail closed per-lane
@@ -170,13 +207,124 @@ nodes:
     bash: |
       set -uo pipefail
       PKG="${ARGUMENTS%%@g*}"
+      # Real integrator breakage (unreadable graph/results dir) propagates;
+      # per-lane REJECTION is a normal outcome recorded in the report.
       node scripts/automation/integrate-writer-results.mjs --package "$PKG" \
         --graph "$ARTIFACTS_DIR/task-graph.json" \
         --results-dir "$ARTIFACTS_DIR/writer-results" \
         --canonical . \
-        --out "$ARTIFACTS_DIR/integration-report.json" || true
+        --out "$ARTIFACTS_DIR/integration-report.json"
       cat "$ARTIFACTS_DIR/integration-report.json"
-      # ONE combined package FAST for the whole wave (never per writer).
+      # Defect #12 guard: a wave that DISPATCHED writer lanes but integrated
+      # NONE of them made zero progress and must not ride a green FAST verdict
+      # (its diff-vs-base is empty, so FAST would pass vacuously). Only a truly
+      # empty wave (every lane sentinel-skipped — no result.json anywhere) or a
+      # wave with ≥1 integrated lane proceeds to the FAST verdict.
+      dispatched=$(find "$ARTIFACTS_DIR/writer-results" -name result.json 2>/dev/null | wc -l)
+      integrated=$(node -e 'const r=JSON.parse(require("fs").readFileSync(process.argv[1],"utf8"));console.log((r.integrated??[]).length)' "$ARTIFACTS_DIR/integration-report.json")
+      if [ "$dispatched" -gt 0 ] && [ "$integrated" -eq 0 ]; then
+        printf '{"schema":"foresift/wave-fast-verdict@1","exitCode":90,"reason":"integration_empty"}\n' \
+          > "$ARTIFACTS_DIR/wave-fast-verdict.json"
+        echo "WAVE_FAST_RED"
+        echo "wave integration empty: $dispatched dispatched lane(s), none integrated"
+        exit 0
+      fi
+      # ONE TRUE combined package FAST for the whole integrated wave.
       set +e
-      pnpm foresift:gate --package "$PKG"
-      echo "WAVE_FAST_EXIT=$?"
+      node scripts/automation/package-fast-verify.mjs --package "$PKG" \
+        --artifacts-dir "$ARTIFACTS_DIR" \
+        --from-git --base "$(cat "$ARTIFACTS_DIR/base-head.txt")" \
+        > "$ARTIFACTS_DIR/wave-fast.log" 2>&1
+      code=$?
+      printf '{"schema":"foresift/wave-fast-verdict@1","exitCode":%d}\n' "$code" \
+        > "$ARTIFACTS_DIR/wave-fast-verdict.json"
+      if [ "$code" -eq 0 ]; then
+        echo "WAVE_FAST_GREEN"
+      else
+        echo "WAVE_FAST_RED"
+        tail -n 40 "$ARTIFACTS_DIR/wave-fast.log"
+      fi
+
+  # ── FAST RED: BOUNDED TARGETED REPAIR (override §14 — red really fails) ─────
+  # Runs ONLY on WAVE_FAST_RED. Each iteration performs TARGETED semantic
+  # repair against the structured FAST manifest (never a full rerun), then the
+  # loop guard RE-RUNS THE ACTUAL FAST as the recheck — the loop can only exit
+  # via a genuinely green recheck (fast-verify-result.json is rewritten by that
+  # very invocation). Exhausted iterations with a still-red recheck FAIL the
+  # node: downstream settles blocked, the workflow completes failed, and NO
+  # checkpoint is written. Repair retries follow the defect-#10 policy.
+  - id: fast-repair-loop
+    depends_on: [integrate-and-fast]
+    when: "$integrate-and-fast.output == 'WAVE_FAST_RED'"
+    idle_timeout: 1800000
+    loop_group:
+      max_iterations: 3
+      fresh_context: true
+      until: WAVE_REPAIR_LOOP_TEXT_SIGNAL_NEVER_EMIT_c5f19a
+      until_bash: |
+        set -uo pipefail
+        # Recheck = the ACTUAL FAST tier again (not a heuristic): exit 0 is the
+        # only key out of the repair loop. Verdict JSON refreshed every pass.
+        # Defect #12: while lanes were dispatched but NONE integrated, the
+        # diff-vs-base is empty and FAST would pass vacuously — hold the loop
+        # closed (code=90) so an empty-integration wave can never convert its
+        # own RED into a green exit. Exhaustion then fails the node loudly.
+        dispatched=$(find "$ARTIFACTS_DIR/writer-results" -name result.json 2>/dev/null | wc -l)
+        integrated=$(node -e 'const r=JSON.parse(require("fs").readFileSync(process.argv[1],"utf8"));console.log((r.integrated??[]).length)' "$ARTIFACTS_DIR/integration-report.json")
+        if [ "$dispatched" -gt 0 ] && [ "$integrated" -eq 0 ]; then
+          code=90
+          echo "recheck held: integration still empty ($dispatched dispatched, none integrated)"
+        else
+          set -e
+          node scripts/automation/package-fast-verify.mjs --package "${ARGUMENTS%%@g*}" \
+            --artifacts-dir "$ARTIFACTS_DIR" \
+            --from-git --base "$(cat "$ARTIFACTS_DIR/base-head.txt")" \
+            > "$ARTIFACTS_DIR/wave-fast-recheck.log" 2>&1
+          code=$?
+          set +e
+        fi
+        printf '{"schema":"foresift/wave-fast-verdict@1","exitCode":%d,"phase":"recheck"}\n' "$code" \
+          > "$ARTIFACTS_DIR/wave-fast-verdict.json"
+        tail -n 20 "$ARTIFACTS_DIR/wave-fast-recheck.log" 2>/dev/null || true
+      nodes:
+        - id: fast-repair
+          command: foresift-wave-fast-repair
+          retry:
+            max_attempts: 3
+            delay_ms: 10000
+            on_error: all
+          effort: high
+          idle_timeout: 1800000
+
+  # ── GREEN PATH BRIDGE + DURABLE CHECKPOINT (override §18 item 15) ────────────
+  # wave-settled runs iff the wave reached a genuinely green FAST state: either
+  # integrate-and-fast reported WAVE_FAST_GREEN directly (repair loop legally
+  # skipped) or the repair loop converged to a green recheck. It stays BLOCKED
+  # while repair is still failing — the failure surfaces to the supervisor's
+  # recovery instead of a false-settled wave. Only then is the implementation
+  # checkpoint built (coordinator-only bookkeeping), pinning post-wave HEAD,
+  # completed units, and the FAST outcome for the next turn/wave.
+  - id: wave-settled
+    depends_on: [integrate-and-fast, fast-repair-loop]
+    trigger_rule: none_failed_min_one_success   # blocks iff repair genuinely FAILED
+    bash: |
+      echo "WAVE_PHASE_SETTLED"
+  - id: wave-checkpoint
+    depends_on: [wave-settled]
+    bash: |
+      set -euo pipefail
+      PKG="${ARGUMENTS%%@g*}"
+      UNITS="$(node -e '
+        const fs = require("node:fs");
+        try {
+          const r = JSON.parse(fs.readFileSync(process.argv[1] + "/integration-report.json", "utf8"));
+          console.log([...new Set((r.integrated ?? []).flatMap((x) => x.units ?? []))].join(","));
+        } catch { console.log(""); }
+      ' "$ARTIFACTS_DIR")"
+      CHECK_ARGS=""
+      if [ -n "$UNITS" ]; then CHECK_ARGS="--slice-tasks $UNITS"; fi
+      node scripts/automation/package-checkpoint.mjs --build --package "$PKG" \
+        --artifacts-dir "$ARTIFACTS_DIR" \
+        --slice-id "wave-$(git rev-parse --short HEAD)" \
+        $CHECK_ARGS \
+        --checks '[{"command":"wp:fast-verify","result":"PASS"}]'

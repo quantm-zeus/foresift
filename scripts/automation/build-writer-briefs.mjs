@@ -68,7 +68,9 @@ for (const shard of graph.shards ?? []) {
     '> plus focused package suites); never pnpm verify / FULL gate.',
     '',
     '## Allowed write paths',
-    ...(shard.allowedWritePaths.length ? shard.allowedWritePaths.map((p) => `- \`${p}\``) : ['- (no predicted paths; stay conservative and document actual files)']),
+    ...(shard.allowedWritePaths.length
+      ? shard.allowedWritePaths.map((p) => `- \`${p}\``)
+      : ['- (no predicted paths; stay conservative and document actual files)']),
     '',
     '## Assigned units (implement in listed order)',
     '',
@@ -111,8 +113,7 @@ for (const shard of graph.shards ?? []) {
   lines.push('');
   lines.push('- Commit coherent slices inside your worktree as you go.');
   lines.push(
-    '- On finish write `$ARTIFACTS_DIR/writer-results/' +
-      `${shard.id}/result.json`: {schema:"foresift/writer-result@1", shardId, units, completed, branch, headSha, testsRun, testResults, blockers}.`,
+    `- On finish write \`$ARTIFACTS_DIR/writer-results/${shard.id}/result.json\` with: {"schema":"foresift/writer-result@1", shardId, units, completed, branch, headSha, testsRun, testResults, blockers}.`,
   );
   lines.push('- List EVERY unit you finished; list unfinished ones under blockers.');
   lines.push('');

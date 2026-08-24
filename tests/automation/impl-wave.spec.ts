@@ -38,8 +38,7 @@ interface Fixture {
 
 function sh(cmd: string, cwd: string) {
   const r = spawnSync(cmd, { shell: true, cwd, encoding: 'utf8' });
-  if (r.status !== 0)
-    throw new Error(`fixture cmd failed (${cmd}): ${r.stderr ?? r.stdout}`);
+  if (r.status !== 0) throw new Error(`fixture cmd failed (${cmd}): ${r.stderr ?? r.stdout}`);
   return (r.stdout ?? '').trim();
 }
 
@@ -87,8 +86,8 @@ function buildFixture(): Fixture {
     JSON.stringify(ms),
   );
   sh('git init -q', root);
-  sh("git config user.email t@t", root);
-  sh("git config user.name t", root);
+  sh('git config user.email t@t', root);
+  sh('git config user.name t', root);
   sh('git add -A', root);
   sh('git commit -qm base', root);
   const baseSha = rev(root);
@@ -180,7 +179,7 @@ function commitBranch(branch: string, file: string, content: string): string {
   mkdirSync(dirname(join(wt, file)), { recursive: true });
   writeFileSync(join(wt, file), content);
   sh('git add -A', wt);
-  sh("git -c user.email=w@w -c user.name=w commit -qm work", wt);
+  sh('git -c user.email=w@w -c user.name=w commit -qm work', wt);
   return { wt, head: rev(wt) } as never;
 }
 function laneDir(lane: string) {
@@ -211,11 +210,7 @@ describe('wave guard + integrator (real git)', () => {
       'mkdir -p tests/x && printf "test(\'a\', () => {});\\n" > tests/x/a.spec.ts && git add -A && git -c user.email=w@w -c user.name=w commit -qm work2',
       join(fx.artifacts, 'wt-foresift-wave-core'),
     );
-    bB = commitBranch(
-      'foresift/wave/shard-1',
-      'docs/x-guide.md',
-      '# guide\n',
-    ) as unknown as string;
+    bB = commitBranch('foresift/wave/shard-1', 'docs/x-guide.md', '# guide\n') as unknown as string;
     bEvil = commitBranch(
       'foresift/wave/evil',
       'scripts/evil.mjs',
@@ -228,13 +223,21 @@ describe('wave guard + integrator (real git)', () => {
     for (const lane of ['core', 'shard-1']) {
       const r = spawnSync(
         process.execPath,
-        [GUARD, '--shard', lane, '--artifacts', fx.artifacts, '--graph', fx.graphPath, '--root', fx.root],
+        [
+          GUARD,
+          '--shard',
+          lane,
+          '--artifacts',
+          fx.artifacts,
+          '--graph',
+          fx.graphPath,
+          '--root',
+          fx.root,
+        ],
         { encoding: 'utf8' },
       );
       expect(`${r.status}: ${r.stderr ?? ''}`).toMatch(/^0/);
-      const verdict = JSON.parse(
-        readFileSync(join(laneDir(lane), 'result.json'), 'utf8'),
-      );
+      const verdict = JSON.parse(readFileSync(join(laneDir(lane), 'result.json'), 'utf8'));
       expect(verdict.authorityOk).toBe(true);
       expect(verdict.baseSha).toBe(fx.baseSha);
       expect(verdict.branch).toBe(`foresift/wave/${lane}`);
@@ -249,7 +252,17 @@ describe('wave guard + integrator (real git)', () => {
 
     const r = spawnSync(
       process.execPath,
-      [GUARD, '--shard', 'evil', '--artifacts', fx.artifacts, '--graph', fx.graphPath, '--root', fx.root],
+      [
+        GUARD,
+        '--shard',
+        'evil',
+        '--artifacts',
+        fx.artifacts,
+        '--graph',
+        fx.graphPath,
+        '--root',
+        fx.root,
+      ],
       { encoding: 'utf8' },
     );
     expect(r.status).toBe(1);
@@ -262,13 +275,17 @@ describe('wave guard + integrator (real git)', () => {
     // claimed completions for bookkeeping
     writeFileSync(
       join(laneDir('core'), 'result.json'),
-      readFileSync(join(laneDir('core'), 'result.json'), 'utf8')
-        .replace(/"completed": \[\]/, '"completed": ["T102", "T103"]'),
+      readFileSync(join(laneDir('core'), 'result.json'), 'utf8').replace(
+        /"completed": \[\]/,
+        '"completed": ["T102", "T103"]',
+      ),
     );
     writeFileSync(
       join(laneDir('shard-1'), 'result.json'),
-      readFileSync(join(laneDir('shard-1'), 'result.json'), 'utf8')
-        .replace(/"completed": \[\]/, '"completed": ["T104"]'),
+      readFileSync(join(laneDir('shard-1'), 'result.json'), 'utf8').replace(
+        /"completed": \[\]/,
+        '"completed": ["T104"]',
+      ),
     );
     const before = rev(fx.root);
     const r = spawnSync(
@@ -341,22 +358,32 @@ describe('writer admission function', () => {
     const healthy = JSON.parse(
       spawnSync(process.execPath, [
         ADMIT,
-        '--load1', '0.5',
-        '--mem-available-kb', '6000000',
-        '--mem-total-kb', '8000000',
-        '--provider-failures', '0',
+        '--load1',
+        '0.5',
+        '--mem-available-kb',
+        '6000000',
+        '--mem-total-kb',
+        '8000000',
+        '--provider-failures',
+        '0',
       ]).stdout,
     );
     expect(healthy.admitExtraWriter).toBe(true);
     const pressured = JSON.parse(
       spawnSync(process.execPath, [
         ADMIT,
-        '--load1', '3.9',
-        '--mem-available-kb', '500000',
-        '--mem-total-kb', '8000000',
-        '--swap-total-kb', '2000000',
-        '--swap-free-kb', '100000',
-        '--provider-failures', '5',
+        '--load1',
+        '3.9',
+        '--mem-available-kb',
+        '500000',
+        '--mem-total-kb',
+        '8000000',
+        '--swap-total-kb',
+        '2000000',
+        '--swap-free-kb',
+        '100000',
+        '--provider-failures',
+        '5',
       ]).stdout,
     );
     expect(pressured.admitExtraWriter).toBe(false);
@@ -365,10 +392,119 @@ describe('writer admission function', () => {
 
   it('counts provider failure signals from a journal tail', () => {
     const journal = join(fx.artifacts, 'j.log');
-    writeFileSync(journal, Array.from({ length: 30 }, (_, i) => `event ${i}`).join('\n') + '\n429 too many\nempty stream\n');
+    writeFileSync(
+      journal,
+      Array.from({ length: 30 }, (_, i) => `event ${i}`).join('\n') +
+        '\n429 too many\nempty stream\n',
+    );
     const out = JSON.parse(
-      spawnSync(process.execPath, [ADMIT, '--load1', '0.5', '--journal', journal, '--tail', '10']).stdout,
+      spawnSync(process.execPath, [ADMIT, '--load1', '0.5', '--journal', journal, '--tail', '10'])
+        .stdout,
     ) as { metrics: { providerFailures: number | null }; admitExtraWriter: boolean };
     expect(out.metrics.providerFailures).toBe(2);
+  });
+});
+
+// ── sharded-wave workflow contract (regressions for the false-FAST defects) ────
+// The durable WIP historically invoked the FULL per-package gate at the wave
+// boundary (`pnpm foresift:gate`), swallowed its exit with `set +e … echo`, and
+// dispatched provider writers for empty lanes. These assertions pin the fixed
+// contract; `archon validate workflows` supplies the real YAML parse.
+describe('foresift-sharded-wave workflow contract', () => {
+  const WF = join(repoRoot, '.archon', 'workflows', 'foresift', 'foresift-sharded-wave.yaml');
+  let yaml = '';
+
+  beforeAll(() => {
+    yaml = readFileSync(WF, 'utf8');
+  });
+
+  it('is valid for the installed archon runtime', () => {
+    const r = spawnSync('archon', ['validate', 'workflows', 'foresift-sharded-wave'], {
+      cwd: repoRoot,
+      encoding: 'utf8',
+      timeout: 120_000,
+    });
+    expect(r.status).toBe(0);
+    expect(r.stdout).toContain('ok');
+  });
+
+  it('never invokes the FULL gate as the wave FAST (defect: false fast path)', () => {
+    expect(yaml).not.toMatch(/pnpm\s+foresift:gate/);
+  });
+
+  it('runs the TRUE FAST tier over the pinned wave base with git scope', () => {
+    expect(yaml).toMatch(/package-fast-verify\.mjs/);
+    // Extract each shell statement that invokes the FAST tier (continuation
+    // lines end with '\') and require full scoping on every one of them.
+    const lines = yaml.split('\n');
+    const statements: string[] = [];
+    for (let i = 0; i < lines.length; i++) {
+      if (!lines[i].includes('scripts/automation/package-fast-verify.mjs')) continue;
+      let stmt = '';
+      for (let j = i; j < lines.length; j++) {
+        stmt += lines[j] + '\n';
+        if (!lines[j].trimEnd().endsWith('\\')) break;
+        void j;
+      }
+      statements.push(stmt);
+    }
+    expect(statements.length).toBeGreaterThanOrEqual(2); // integrate + recheck
+    for (const stmt of statements) {
+      expect(stmt).toContain('--from-git');
+      expect(stmt).toMatch(/--base "\$\(cat .*base-head\.txt"\)/);
+      expect(stmt).toContain('--artifacts-dir');
+    }
+  });
+
+  it('when-gates every writer lane so empty shards dispatch zero providers', () => {
+    for (const lane of ['core', 'shard-1', 'shard-2']) {
+      const sentinel =
+        lane === 'core'
+          ? 'NO CORE SHARD THIS WAVE'
+          : `NO ${lane.replace('shard', 'SHARD')} THIS WAVE`;
+      const writerBlock = yaml.match(new RegExp(`- id: writer-${lane}[\\s\\S]*?(?=\\n  - id:)`));
+      expect(writerBlock, `writer-${lane} block`).toBeTruthy();
+      expect(writerBlock?.[0]).toContain(`when: "$brief-${lane}.output != '${sentinel}'"`);
+    }
+  });
+
+  it('never lets a fully-rejected wave settle green over zero progress (defect #12)', () => {
+    // Router: dispatched lanes with NONE integrated → RED emitted WITHOUT a
+    // FAST pass (the empty diff would pass vacuously and mask zero progress).
+    const router = yaml.match(/- id: integrate-and-fast[\s\S]*?(?=\n  - id: fast-repair-loop)/);
+    expect(router).toBeTruthy();
+    expect(router?.[0]).toMatch(/dispatched=.*writer-results.*-name result\.json/s);
+    expect(router?.[0]).toContain('integration-report.json');
+    expect(router?.[0]).toMatch(/\[\s*"\$dispatched" -gt 0\s*\] && \[\s*"\$integrated" -eq 0\s*\]/);
+    // Recheck: while integration is still empty the loop is held closed
+    // (exit-0 impossible), so exhaustion fails loudly instead of converting
+    // its own RED into a vacuous green.
+    const recheck = yaml.match(/until_bash:[\s\S]*?(?=\n      nodes:)/);
+    expect(recheck).toBeTruthy();
+    expect(recheck?.[0]).toMatch(/code=90/);
+    expect(recheck?.[0]).toContain('package-fast-verify.mjs');
+  });
+
+  it('gates the targeted-repair loop on FAST RED and rechecks via the actual FAST', () => {
+    const repairBlock = yaml.match(/- id: fast-repair-loop[\s\S]*?(?=\n  - id: wave-settled)/);
+    expect(repairBlock).toBeTruthy();
+    expect(repairBlock?.[0]).toContain('when: "$integrate-and-fast.output == \'WAVE_FAST_RED\'"');
+    expect(repairBlock?.[0]).toContain('package-fast-verify.mjs'); // recheck is the real tier
+    expect(repairBlock?.[0]).toMatch(/max_iterations: \d+/);
+    expect(repairBlock?.[0]).toMatch(/max_attempts: \d+[\s\S]*on_error: all/); // strong retry preserved
+  });
+
+  it('writes the checkpoint only on the provably green path', () => {
+    const settled = yaml.match(/- id: wave-settled[\s\S]*?(?=\n  - id: wave-checkpoint)/);
+    const checkpoint = yaml.match(/- id: wave-checkpoint[\s\S]*$/);
+    expect(settled).toBeTruthy();
+    expect(checkpoint).toBeTruthy();
+    // Bridge blocks while the repair loop genuinely fails; checkpoint sits
+    // strictly downstream of the bridge, so red-without-recovery never yields
+    // a successful checkpoint.
+    expect(settled?.[0]).toContain('depends_on: [integrate-and-fast, fast-repair-loop]');
+    expect(settled?.[0]).toContain('trigger_rule: none_failed_min_one_success');
+    expect(checkpoint?.[0]).toContain('depends_on: [wave-settled]');
+    expect(checkpoint?.[0]).toContain('package-checkpoint.mjs --build');
   });
 });

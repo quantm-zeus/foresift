@@ -24,6 +24,7 @@
 // Pure functions + Node stdlib only.
 
 import { throughputProfile } from './work-package-throughput-profile.mjs';
+import { SHARDED_WAVE_ROLLOUT, shardedWaveAdmits } from './sharded-wave-rollout.mjs';
 
 /** Generation of a milestone-state package record; absent field ⇒ generation 0. */
 export function packageGeneration(pkg) {
@@ -57,6 +58,13 @@ export function parseGenerationMessage(message) {
  * Workflow selection (§8): generation-aware profile boundary.
  *   gen >= 1            -> OPTIMIZED_V3 topology (the one -optimized DAG)
  *   gen 0 (legacy rows) -> historical LEGACY/OPTIMIZED profile table
+ *
+ * Precedence note (V4 layering review): the gen>=1 rule deliberately
+ * outranks the profile table — pinned by v3-generations.spec.ts ("regardless
+ * of legacy profile"). The LEGACY protection therefore applies to the
+ * generation-0 forensic row itself (how g0-contracts-data-truth actually
+ * lives); the sharded-wave rollout layered on top inherits exactly this
+ * boundary and cannot reroute the retired lane.
  */
 export function usesOptimizedWorkflow(pkg) {
   if (!pkg) return false;
@@ -64,10 +72,17 @@ export function usesOptimizedWorkflow(pkg) {
   return throughputProfile(pkg.id) === 'OPTIMIZED';
 }
 
-export function workPackageWorkflowFor(pkg) {
-  return pkg && usesOptimizedWorkflow(pkg)
-    ? 'foresift-work-package-optimized'
-    : 'foresift-work-package';
+/**
+ * Workflow selection, layered (V4): the LEGACY profile boundary applies first
+ * and forever; then the deterministic sharded-wave rollout decides whether an
+ * OPTIMIZED-eligible package routes to `foresift-sharded-wave` instead of the
+ * single `-optimized` DAG. Ships OFF — see sharded-wave-rollout.mjs for the
+ * flip-safety contract.
+ */
+export function workPackageWorkflowFor(pkg, rollout = SHARDED_WAVE_ROLLOUT) {
+  if (!pkg || !usesOptimizedWorkflow(pkg)) return 'foresift-work-package';
+  if (shardedWaveAdmits(pkg.id, rollout)) return 'foresift-sharded-wave';
+  return 'foresift-work-package-optimized';
 }
 
 function main() {

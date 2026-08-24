@@ -64,3 +64,21 @@ Defects found and fixed while proving this matrix (2026-08-23, PR for this doc):
   `fatal_pause_entries_dropped`); stranded reconciliation rebuilds whatever
   tracking is still warranted against current truth next tick, and the
   pre-existing orphan refusal still guards RUNNING-without-live-track.
+- **Reused run worktrees turned every post-mortem relaunch into a permanent
+  crash-loop (observed live during gen-1 activation, 2026-08-24)** — Archon
+  keeps ONE worktree per package+generation, so a dead run's residue (planning
+  scratch, stale workflow materializations) survived into the next run and
+  tripped adopt-generation-branch's dirty-tree refusal on every fresh launch;
+  nothing in the supported lifecycle reset it, so recover-fatal → relaunch →
+  refusal looped forever. Corollary: any OTHER worktree holding the generation
+  branch (e.g. an operator seed worktree left over from ADR-0010 seed
+  reconciliation) blocks adoption's `checkout -B` the same way. Fixed:
+  every FRESH detached launch now deterministically resets the Archon-owned
+  worktree on its target branch before spawning (`run_worktree_reset` audit
+  event with the wiped manifest), guarded fail-closed — this checkout and
+  non-Archon worktrees are never touched, and a branch origin cannot vouch
+  for (missing ref or unpushed commits) is skipped so adoption's own refusal
+  pauses for an operator instead of destroying possibly-real work. The
+  adoption verdict (and any refusal text) is also teed into
+  `$ARTIFACTS_DIR/adoption-verdict.json` because detached-run logs do not
+  carry bash-node stderr; a blind refusal cost a full diagnosis cycle.

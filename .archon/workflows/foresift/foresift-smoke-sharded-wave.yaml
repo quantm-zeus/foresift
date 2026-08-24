@@ -1,0 +1,337 @@
+name: foresift-smoke-sharded-wave
+description: |
+  Deterministic Foresift SHARDED-WAVE ORCHESTRATION acceptance smoke — no AI,
+  no provider spend, no product code. Exercises the REAL automation scripts
+  (build-implementation-task-graph, build-writer-briefs, wave-guard,
+  integrate-writer-results, package-checkpoint) end-to-end against a
+  disposable fixture repository, with deterministic stand-in writers proving
+  the orchestration contract on the INSTALLED Archon v0.9 runtime:
+
+    1. write-disjoint shard plan from a real tasks.md ([P], deps, backticked
+       paths, serial-core demotion);
+    2. private worktree + branch per shard, all at ONE pinned base HEAD;
+    3. deterministic lane-status derivation (LANE_ACTIVE/LANE_EMPTY);
+    4. guards recompute diffs from git and overwrite claimed manifests;
+    5. additive --no-ff integration into the canonical branch;
+    6. canonical tasks.md marked coordinator-only;
+    7. durable checkpoint built AFTER a green combined step and VALIDATED;
+    8. structural progress accounting (all-rejected => exit 3; noop => clean);
+    9. the PRODUCTION sharded-wave yaml invokes the TRUE FAST tier
+       (`pnpm wp:fast-verify`) and never the authoritative foresift:gate;
+   10. the REAL wp:fast-verify binary propagates red as a nonzero exit and
+       green as exit 0 (DOC_ONLY impact, real repo, real spec:verify);
+   11. zero-work waves derive LANE_EMPTY for every lane (combined with the
+       when-gating probe: empty lanes start ZERO providers).
+
+  Unauthorized-write refusal is proven by tests/automation/impl-wave.spec.ts
+  (evil-lane rejection) and at runtime by the canary; it deliberately does not
+  fail this green-path smoke.
+
+    archon workflow run foresift-smoke-sharded-wave --detach \
+      --branch foresift/smoke-sharded-wave
+    archon workflow get <run-id> --json    # expect status completed
+
+  NOT for: anything product-related.
+tags: [foresift, smoke]
+
+nodes:
+  # ── STAGE 1a: disposable fixture repo with authoritative-shaped state ────────
+  - id: fixture-init
+    bash: |
+      set -euo pipefail
+      FX="$ARTIFACTS_DIR/fixture"
+      rm -rf "$FX"; mkdir -p "$FX/specs/implementation" "$FX/specs/g0-smoke-shard" "$FX/docs"
+      cat > "$FX/specs/implementation/current-milestone.json" <<'EOF'
+      {
+        "schemaVersion": "1.0.0",
+        "milestoneId": "GSMOKE",
+        "status": "ACTIVE",
+        "packages": [
+          {
+            "id": "g0-smoke-shard",
+            "objective": "Smoke fixture package exercising sharded wave orchestration mechanics.",
+            "requirementIds": ["FR-SMOKE-001", "FR-SMOKE-002"],
+            "dependencies": [],
+            "risk": "LOW",
+            "parallelizable": true,
+            "writeScopes": ["docs/**"],
+            "verificationCommands": ["true"],
+            "status": "RUNNING"
+          },
+          {
+            "id": "g0-smoke-shard-next",
+            "objective": "Second fixture package satisfying the two-package minimum decomposition.",
+            "requirementIds": ["FR-SMOKE-003"],
+            "dependencies": ["g0-smoke-shard"],
+            "risk": "LOW",
+            "parallelizable": false,
+            "writeScopes": ["docs2/**"],
+            "verificationCommands": ["true"],
+            "status": "PENDING"
+          }
+        ]
+      }
+      EOF
+      cat > "$FX/specs/g0-smoke-shard/tasks.md" <<'EOF'
+      # Tasks — g0-smoke-shard
+
+      ## Phase A
+
+      - [ ] T001 Serial foundation: record the core contract in `docs/core-note.md`. Traces: FR-SMOKE-001 (AC-1).
+      - [ ] T002 [P] Boundary matrix: record the shard-A matrix in `docs/shard-a.md`. Traces: FR-SMOKE-001 (AC-2).
+      - [ ] T003 [P] Negative battery: record the shard-B battery in `docs/shard-b.md`. Traces: FR-SMOKE-002 (AC-3).
+
+      ## Phase B
+
+      - [ ] T004 Wrap-up: summarize wave outcomes into `docs/wrap-up.md`. Depends on T001, T002 and T003. Traces: FR-SMOKE-002 (AC-4).
+      EOF
+      printf '# Fixture\n\nPlaceholder.\n' > "$FX/docs/README.md"
+      git -C "$FX" init -q
+      git -C "$FX" add -A
+      git -C "$FX" -c user.email=smoke@foresift.local -c user.name=smoke commit -qm fixture-init
+      git -C "$FX" rev-parse HEAD > "$ARTIFACTS_DIR/base-head.txt"
+      echo "FIXTURE_READY base=$(cat "$ARTIFACTS_DIR/base-head.txt")"
+
+  # ── STAGE 1b: prep mirror (graph, briefs, private worktrees) ──────────────────
+  - id: prep
+    depends_on: [fixture-init]
+    bash: |
+      set -euo pipefail
+      FX="$ARTIFACTS_DIR/fixture"
+      BASE="$(cat "$ARTIFACTS_DIR/base-head.txt")"
+      node scripts/automation/build-implementation-task-graph.mjs \
+        --package g0-smoke-shard --root "$FX" --plan-shards 3 \
+        --out "$ARTIFACTS_DIR/task-graph.json"
+      node scripts/automation/build-writer-briefs.mjs --package g0-smoke-shard \
+        --root "$FX" --graph "$ARTIFACTS_DIR/task-graph.json" \
+        --out "$ARTIFACTS_DIR/briefs" \
+        --writer-root "$ARTIFACTS_DIR/wt" --base-head "$BASE"
+      node -e '
+        const fs = require("node:fs");
+        const { spawnSync } = require("node:child_process");
+        const dir = process.env.ARTIFACTS_DIR;
+        const fx = dir + "/fixture";
+        const g = JSON.parse(fs.readFileSync(dir + "/task-graph.json", "utf8"));
+        const base = fs.readFileSync(dir + "/base-head.txt", "utf8").trim();
+        const meta = {};
+        for (const s of g.shards ?? []) {
+          const wt = dir + "/wt/" + s.id;
+          const br = "foresift/wave/" + base.slice(0,10) + "-" + s.id;
+          const r = spawnSync("git -C \"" + fx + "\" worktree add -B \"" + br + "\" \"" + wt + "\" \"" + base + "\"", { shell: true });
+          if (r.status !== 0) throw new Error("worktree add failed for " + s.id + ": " + r.stderr);
+          meta[s.id] = { branch: br, worktree: wt };
+        }
+        fs.writeFileSync(dir + "/shard-meta.json", JSON.stringify(meta, null, 2));
+        console.log("SHARDS_READY " + Object.keys(meta).join(","));
+      '
+      cat "$ARTIFACTS_DIR/shard-meta.json"
+
+  # ── STAGE 1c: deterministic lane routing (identical derivation to prod) ──────
+  - id: lane-core-active
+    depends_on: [prep]
+    bash: |
+      node -e 'const g=JSON.parse(require("node:fs").readFileSync(process.argv[1],"utf8"));process.stdout.write((g.shards??[]).some(s=>s.id==="core")?"LANE_ACTIVE":"LANE_EMPTY")' \
+        "$ARTIFACTS_DIR/task-graph.json"
+  - id: lane-shard-1-active
+    depends_on: [prep]
+    bash: |
+      node -e 'const g=JSON.parse(require("node:fs").readFileSync(process.argv[1],"utf8"));process.stdout.write((g.shards??[]).some(s=>s.id==="shard-1")?"LANE_ACTIVE":"LANE_EMPTY")' \
+        "$ARTIFACTS_DIR/task-graph.json"
+  - id: lane-shard-2-active
+    depends_on: [prep]
+    bash: |
+      node -e 'const g=JSON.parse(require("node:fs").readFileSync(process.argv[1],"utf8"));process.stdout.write((g.shards??[]).some(s=>s.id==="shard-2")?"LANE_ACTIVE":"LANE_EMPTY")' \
+        "$ARTIFACTS_DIR/task-graph.json"
+
+  # ── STAGE 1d: DETERMINISTIC stand-in writers (when-gated like prod AI nodes) ──
+  - id: writer-core
+    depends_on: [lane-core-active]
+    when: "$lane-core-active.output == 'LANE_ACTIVE'"
+    bash: |
+      set -euo pipefail
+      WT="$ARTIFACTS_DIR/wt/core"
+      printf '# Core note\n\nCore contract recorded by writer-core.\n' > "$WT/docs/core-note.md"
+      git -C "$WT" add -A
+      git -C "$WT" -c user.email=smoke@foresift.local -c user.name=smoke commit -qm "core: T001"
+      mkdir -p "$ARTIFACTS_DIR/writer-results/core"
+      BR="$(node -e 'const m=JSON.parse(require("node:fs").readFileSync(process.argv[1]+"/shard-meta.json","utf8"));console.log(m.core.branch)' "$ARTIFACTS_DIR")"
+      node -e '
+        const fs=require("node:fs"), cp=require("node:child_process");
+        const [wt,ad,branch,shard,units]=process.argv.slice(2);
+        fs.writeFileSync(ad+"/writer-results/"+shard+"/result.json", JSON.stringify({
+          shardId:shard, completed:units.split(","),
+          branch,
+          headSha:cp.execSync("git -C "+JSON.stringify(wt)+" rev-parse HEAD").toString().trim(),
+          baseSha:fs.readFileSync(ad+"/base-head.txt","utf8").trim()
+        },null,2)+"\n");
+      ' "$WT" "$ARTIFACTS_DIR" "$BR" "core" "T001"
+      echo "WRITER-CORE-DONE"
+  - id: writer-shard-1
+    depends_on: [lane-shard-1-active]
+    when: "$lane-shard-1-active.output == 'LANE_ACTIVE'"
+    bash: |
+      set -euo pipefail
+      WT="$ARTIFACTS_DIR/wt/shard-1"
+      printf '# Shard A matrix\n\nBoundary values recorded by writer-shard-1.\n' > "$WT/docs/shard-a.md"
+      git -C "$WT" add -A
+      git -C "$WT" -c user.email=smoke@foresift.local -c user.name=smoke commit -qm "shard-1: T002"
+      mkdir -p "$ARTIFACTS_DIR/writer-results/shard-1"
+      BR="$(node -e 'const m=JSON.parse(require("node:fs").readFileSync(process.argv[1]+"/shard-meta.json","utf8"));console.log(m["shard-1"].branch)' "$ARTIFACTS_DIR")"
+      node -e '
+        const fs=require("node:fs"), cp=require("node:child_process");
+        const [wt,ad,branch,shard,units]=process.argv.slice(2);
+        fs.writeFileSync(ad+"/writer-results/"+shard+"/result.json", JSON.stringify({
+          shardId:shard, completed:units.split(","),
+          branch,
+          headSha:cp.execSync("git -C "+JSON.stringify(wt)+" rev-parse HEAD").toString().trim(),
+          baseSha:fs.readFileSync(ad+"/base-head.txt","utf8").trim()
+        },null,2)+"\n");
+      ' "$WT" "$ARTIFACTS_DIR" "$BR" "shard-1" "T002"
+      echo "WRITER-SHARD-1-DONE"
+  - id: writer-shard-2
+    depends_on: [lane-shard-2-active]
+    when: "$lane-shard-2-active.output == 'LANE_ACTIVE'"
+    bash: |
+      set -euo pipefail
+      WT="$ARTIFACTS_DIR/wt/shard-2"
+      printf '# Shard B battery\n\nNegative cases recorded by writer-shard-2.\n' > "$WT/docs/shard-b.md"
+      git -C "$WT" add -A
+      git -C "$WT" -c user.email=smoke@foresift.local -c user.name=smoke commit -qm "shard-2: T003"
+      mkdir -p "$ARTIFACTS_DIR/writer-results/shard-2"
+      BR="$(node -e 'const m=JSON.parse(require("node:fs").readFileSync(process.argv[1]+"/shard-meta.json","utf8"));console.log(m["shard-2"].branch)' "$ARTIFACTS_DIR")"
+      node -e '
+        const fs=require("node:fs"), cp=require("node:child_process");
+        const [wt,ad,branch,shard,units]=process.argv.slice(2);
+        fs.writeFileSync(ad+"/writer-results/"+shard+"/result.json", JSON.stringify({
+          shardId:shard, completed:units.split(","),
+          branch,
+          headSha:cp.execSync("git -C "+JSON.stringify(wt)+" rev-parse HEAD").toString().trim(),
+          baseSha:fs.readFileSync(ad+"/base-head.txt","utf8").trim()
+        },null,2)+"\n");
+      ' "$WT" "$ARTIFACTS_DIR" "$BR" "shard-2" "T003"
+      echo "WRITER-SHARD-2-DONE"
+
+  # ── STAGE 1e: guards (real wave-guard against the fixture repo) ───────────────
+  - id: guard-core
+    depends_on: [writer-core]
+    bash: |
+      set -euo pipefail
+      node scripts/automation/wave-guard.mjs --shard core \
+        --artifacts "$ARTIFACTS_DIR" --graph "$ARTIFACTS_DIR/task-graph.json" --root "$ARTIFACTS_DIR/fixture"
+  - id: guard-shard-1
+    depends_on: [writer-shard-1]
+    bash: |
+      set -euo pipefail
+      node scripts/automation/wave-guard.mjs --shard shard-1 \
+        --artifacts "$ARTIFACTS_DIR" --graph "$ARTIFACTS_DIR/task-graph.json" --root "$ARTIFACTS_DIR/fixture"
+  - id: guard-shard-2
+    depends_on: [writer-shard-2]
+    bash: |
+      set -euo pipefail
+      node scripts/automation/wave-guard.mjs --shard shard-2 \
+        --artifacts "$ARTIFACTS_DIR" --graph "$ARTIFACTS_DIR/task-graph.json" --root "$ARTIFACTS_DIR/fixture"
+
+  # ── STAGE 1f: integrate + checkpoint mirror (structural propagation) ─────────
+  - id: integrate-and-checkpoint
+    depends_on: [guard-core, guard-shard-1, guard-shard-2]
+    trigger_rule: none_failed_min_one_success
+    timeout: 1200000
+    bash: |
+      set -euo pipefail
+      FX="$ARTIFACTS_DIR/fixture"
+      node scripts/automation/integrate-writer-results.mjs --package g0-smoke-shard \
+        --graph "$ARTIFACTS_DIR/task-graph.json" \
+        --results-dir "$ARTIFACTS_DIR/writer-results" \
+        --canonical "$FX" \
+        --out "$ARTIFACTS_DIR/integration-report.json"
+      cat "$ARTIFACTS_DIR/integration-report.json"
+      INTEGRATED="$(node -e 'const r=JSON.parse(require("node:fs").readFileSync(process.argv[1],"utf8"));process.stdout.write(String((r.integrated??[]).length))' "$ARTIFACTS_DIR/integration-report.json")"
+      REJECTED="$(node -e 'const r=JSON.parse(require("node:fs").readFileSync(process.argv[1],"utf8"));process.stdout.write(String((r.rejected??[]).length))' "$ARTIFACTS_DIR/integration-report.json")"
+      if [ "$INTEGRATED" -eq 0 ] && [ "$REJECTED" -gt 0 ]; then
+        echo "WAVE_FAILED: every assigned shard was rejected"; exit 3
+      fi
+      if [ "$INTEGRATED" -eq 0 ]; then
+        echo "WAVE_NOOP"; exit 0
+      fi
+      node scripts/automation/package-checkpoint.mjs --build --package g0-smoke-shard \
+        --artifacts-dir "$ARTIFACTS_DIR" \
+        --head "$(git -C "$FX" rev-parse HEAD)" \
+        --source tasks="$FX/specs/g0-smoke-shard/tasks.md"
+      node scripts/automation/package-checkpoint.mjs --validate --package g0-smoke-shard \
+        --artifacts-dir "$ARTIFACTS_DIR" > /dev/null
+      echo "WAVE_GREEN integrated=$INTEGRATED rejected=$REJECTED checkpoint=valid"
+
+  # ── STAGE 1g: green-wave assertions ───────────────────────────────────────────
+  - id: assert-green-wave
+    depends_on: [integrate-and-checkpoint]
+    bash: |
+      set -euo pipefail
+      FX="$ARTIFACTS_DIR/fixture"
+      grep -q '"integrated"' "$ARTIFACTS_DIR/integration-report.json"
+      N="$(node -e 'const r=JSON.parse(require("node:fs").readFileSync(process.argv[1],"utf8"));console.log(r.integrated.length)' "$ARTIFACTS_DIR/integration-report.json")"
+      if [ "$N" -ne 3 ]; then echo "FAIL: expected 3 integrated shards, got $N"; exit 1; fi
+      for t in T001 T002 T003; do
+        grep -q "\- \[x\] $t" "$FX/specs/g0-smoke-shard/tasks.md" || { echo "FAIL: $t not marked"; exit 1; }
+      done
+      grep -q '\- \[ \] T004' "$FX/specs/g0-smoke-shard/tasks.md" || { echo "FAIL: T004 must stay open"; exit 1; }
+      git -C "$FX" log --oneline | grep -q "wave integration: shard-2" || { echo "FAIL: additive merges missing"; exit 1; }
+      git -C "$FX" log --oneline | grep -q "mark wave-completed units" || { echo "FAIL: bookkeeping commit missing"; exit 1; }
+      # Pinned-base proof: every integrated shard branched from the SAME base.
+      BASE="$(cat "$ARTIFACTS_DIR/base-head.txt")"
+      for s in core shard-1 shard-2; do
+        BR="$(node -e 'const m=JSON.parse(require("node:fs").readFileSync(process.argv[1]+"/shard-meta.json","utf8"));console.log(m[process.argv[2]].branch)' "$ARTIFACTS_DIR" "$s")"
+        PARENT="$(git -C "$FX" rev-parse "$BR^")"
+        [ "$PARENT" = "$BASE" ] || { echo "FAIL: $s did not pin the common base"; exit 1; }
+      done
+      echo "GREEN-WAVE ASSERTIONS PASSED: 3 shards, disjoint scopes, pinned base, additive merges, tasks marked, checkpoint valid"
+
+  # ── STAGE 2: production-yaml FAST-tier assertion + REAL binary red/green ─────
+  - id: fast-tier-proof
+    depends_on: [assert-green-wave]
+    bash: |
+      set -euo pipefail
+      YAML=".archon/workflows/foresift/foresift-sharded-wave.yaml"
+      BODY="$(sed -n '/id: integrate-and-fast/,/^  - id: wave-complete/p' "$YAML")"
+      echo "$BODY" | grep -q "wp:fast-verify" || { echo "FAIL: production wave does not use the true FAST tier"; exit 1; }
+      echo "$BODY" | grep -q "foresift:gate" && { echo "FAIL: production wave still invokes the FULL gate"; exit 1; }
+      echo "$BODY" | grep -q "package-checkpoint.mjs --build" || { echo "FAIL: checkpoint-after-fast missing"; exit 1; }
+      # REAL binary, REAL repo: DOC_ONLY impact => prettier check + mandatory spec:verify.
+      GREENF="docs/.fast-probe-green.md"; REDF="docs/.fast-probe-red.md"
+      printf '# Fast probe\n\nFormatted correctly.\n' > "$GREENF"
+      printf '#   Badly   formatted probe\n' > "$REDF"
+      trap 'rm -f "$GREENF" "$REDF"' EXIT
+      if pnpm wp:fast-verify --package g0-security-perimeter --artifacts-dir "$ARTIFACTS_DIR" --file "$GREENF" >/dev/null 2>&1; then
+        echo "FAST-GREEN exit=0 proven"
+      else
+        echo "FAIL: FAST reported red for a clean DOC_ONLY change"; exit 1
+      fi
+      if pnpm wp:fast-verify --package g0-security-perimeter --artifacts-dir "$ARTIFACTS_DIR" --file "$REDF" >/dev/null 2>&1; then
+        echo "FAIL: FAST reported green for an unformatted DOC_ONLY change"; exit 1
+      else
+        echo "FAST-RED nonzero-exit proven (propagation contract)"
+      fi
+      rm -f "$GREENF" "$REDF"; trap - EXIT
+
+  # ── STAGE 3: zero-work wave — every lane derives LANE_EMPTY ───────────────────
+  - id: zero-work-proof
+    depends_on: [fast-tier-proof]
+    bash: |
+      set -euo pipefail
+      FX="$ARTIFACTS_DIR/fixture"
+      sed -i 's/^- \[ \] /- [x] /' "$FX/specs/g0-smoke-shard/tasks.md"
+      git -C "$FX" add -A
+      git -C "$FX" -c user.email=smoke@foresift.local -c user.name=smoke commit -qm "mark T004 done (wave 2 preparation)"
+      node scripts/automation/build-implementation-task-graph.mjs \
+        --package g0-smoke-shard --root "$FX" --plan-shards 3 \
+        --out "$ARTIFACTS_DIR/task-graph-2.json"
+      COUNT="$(node -e 'const g=JSON.parse(require("node:fs").readFileSync(process.argv[1],"utf8"));console.log((g.shards??[]).length)' "$ARTIFACTS_DIR/task-graph-2.json")"
+      if [ "$COUNT" -ne 0 ]; then echo "FAIL: expected zero shards for a fully-complete package, got $COUNT"; exit 1; fi
+      for lane in core shard-1 shard-2; do
+        TOK="$(node -e 'const g=JSON.parse(require("node:fs").readFileSync(process.argv[1],"utf8"));process.stdout.write((g.shards??[]).some(s=>s.id===process.argv[2])?"LANE_ACTIVE":"LANE_EMPTY")' "$ARTIFACTS_DIR/task-graph-2.json" "$lane")"
+        [ "$TOK" = "LANE_EMPTY" ] || { echo "FAIL: lane $lane not LANE_EMPTY"; exit 1; }
+      done
+      echo "ZERO-WAVE PROVEN: fully-complete package => 0 shards => all lanes LANE_EMPTY => (with when-gating probe) zero provider invocations"
+
+  - id: report
+    depends_on: [zero-work-proof]
+    bash: echo "SHARDED-WAVE ACCEPTANCE SMOKE COMPLETE"

@@ -99,3 +99,22 @@ Defects found and fixed while proving this matrix (2026-08-23, PR for this doc):
   Fail-closed: a merge CONFLICT aborts and leaves the seed stale so
   adoption's refusal pauses for an operator instead of forcing divergent
   history together; push failure rolls the worktree back to the pushed tip.
+- **The gate-repair loop's verification step inherited archon's 120 s bash
+  default, so any real repair died at re-verification (live run
+  14ed21bdde69, 2026-08-24)** — `repair-targeted-recheck` declared no
+  explicit `timeout:`; a targeted TESTS-category recheck measures ~282 s
+  under contention on this box (the repair agent's own full-suite run), so
+  the node was killed mid-verification on the loop's third iteration and the
+  workflow failed with `repair-final-full` correctly skipped by trigger
+  rule. Fail-closed held throughout — no attestation, no PR, everything
+  downstream skipped — but the loop was structurally fail-always: no AI
+  repair could ever be converted into a green verdict. The same latent gap
+  existed at `converge-targeted-recheck` in the convergence loop (found by
+  the structural regression, not by manual audit). Fixed: both nodes carry
+  explicit 30-minute budgets matching their sibling FULL-gate nodes, and
+  `tests/automation/workflow-node-budgets.spec.ts` pins the invariant that
+  any bash node invoking `package-targeted-verify.mjs` or
+  `package-full-gate.mjs` must declare an explicit budget ≥ 10 minutes.
+  Before relaunching, the four committed-but-unpushed repair commits from
+  the dead run were pushed to the generation branch (fast-forward) so
+  adoption's `checkout -B` could not orphan real spend.

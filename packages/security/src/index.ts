@@ -13,3 +13,7 @@ export * from './mcp-origin.ts';
 export * from './mcp-protocol-guard.ts';
 export * from './oauth-binding.ts';
 export * from './mcp-credentials.ts';
+export * from './egress.ts';
+export * from './untrusted-content.ts';
+export * from './webhook-integrity.ts';
+export * from './abuse-controls.ts';

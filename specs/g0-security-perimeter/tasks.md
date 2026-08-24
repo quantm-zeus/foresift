@@ -145,7 +145,7 @@ prohibited capability anywhere outside the inert scanner self-test corpus.
 
 ## Phase D — Egress, untrusted content, webhooks, abuse
 
-- [ ] T118 Implement `src/egress.ts`: exact egress allowlists per plane
+- [x] T118 Implement `src/egress.ts`: exact egress allowlists per plane
       (control plane / collector / Alpha Lab), URL parsing defenses (encoded
       hosts, userinfo, mixed schemes, custom/onion schemes, unsafe ports),
       IP-range denial (loopback, private, link-local, metadata; IPv4+IPv6),
@@ -154,7 +154,7 @@ prohibited capability anywhere outside the inert scanner self-test corpus.
       decompression-ratio/content-type caps, TLS enforcement. Deny-by-default:
       anything not explicitly allowed refuses with a typed reason.
       Traces: FR-SEC-004; AC-051, AC-257.
-- [ ] T119 Implement `src/untrusted-content.ts`: content-class labeling for
+- [x] T119 Implement `src/untrusted-content.ts`: content-class labeling for
       the seven untrusted sources, refusal of insertion into
       system/developer instruction roles, structured-extraction envelope with
       source labels, render-safety validators (Markdown/HTML/SVG sanitization
@@ -162,14 +162,14 @@ prohibited capability anywhere outside the inert scanner self-test corpus.
       resistant link policy, confusable-address warning hooks), memory-isolation
       key derivation by actor/session/workspace. Traces: FR-SEC-005; AC-051,
       AC-052 (context-envelope cooperation with T126), AC-258.
-- [ ] T120 Implement `src/webhook-integrity.ts`: cryptographic signature
+- [x] T120 Implement `src/webhook-integrity.ts`: cryptographic signature
       verification (injectable verifier), timestamp + maximum-age checks,
       replay prevention via message/event-ID + payload-hash cache,
       unsigned/stale/malformed callback refusal, fixed-endpoint rule
       (reconnect/backfill URLs come from configuration, never event payloads),
       malformed-event-cannot-advance-checkpoint contract hook.
       Traces: FR-SEC-005; AC-051 (forged scheduler webhook battery).
-- [ ] T121 Implement `src/abuse-controls.ts`: flood limiter, expensive-query
+- [x] T121 Implement `src/abuse-controls.ts`: flood limiter, expensive-query
       amplification cost weighting, quota-exhaustion degrade-not-bypass rules,
       scraping/enumeration detection counters, prompt-attack screening hook,
       protected-risk-monitoring allowance (an explicit non-weakening set that

@@ -3,12 +3,20 @@
  *
  * Storage contract:
  * - checkpoints are fenced: a commit carrying a STALE fencing token is
- *   refused, and cursor regression within one fencing epoch is refused;
+ *   refused — by the in-transaction guard AND structurally by the conditional
+ *   upsert, so even a commit that races a concurrent committer between its
+ *   read and its write cannot move the stored checkpoint backwards; cursor
+ *   regression within one fencing epoch is refused the same way;
  * - advancing a checkpoint across skipped slots is refused until the
  *   discontinuity is REGISTERED as a gap and RESOLVED (`RECOVERED` or
  *   `DECLARED_UNRECOVERABLE`; unmarked-gap replay is never legitimate);
  * - canonical event keys make duplicate first-seen/event inserts impossible
  *   at the storage layer — restore+replay re-applies each event exactly once.
+ *
+ * The structural guarantee is "stored state only moves forward" (token, then
+ * cursor, lexicographically). Serializing whole epochs — e.g. ensuring a new
+ * lease holder finishes its first commit before an old holder retries —
+ * remains a caller obligation.
  */
 import { ErrorCode, ForesiftError, utcTimestamp, type UtcTimestamp } from '@foresift/domain';
 import type { DatabaseEngine } from '../db.ts';
@@ -22,10 +30,35 @@ export interface CheckpointCommit {
 }
 
 /**
+ * The fenced checkpoint upsert. Conditional at the storage layer: the update
+ * applies only when the incoming (fencing token, cursor) pair is
+ * lexicographically not behind the stored row AS IT EXISTS AT WRITE TIME, so
+ * a commit that races a concurrent committer between its guard read and its
+ * write still loses cleanly (zero RETURNING rows, stored row untouched).
+ * Exported so specs can pin this storage-level guarantee directly — the
+ * in-transaction guard cannot be raced from a single-connection test.
+ */
+export const FENCED_CHECKPOINT_UPSERT_SQL = `INSERT INTO collector_checkpoints (shard_id, fencing_token, cursor_position, updated_at)
+VALUES ($1,$2,$3,$4)
+ON CONFLICT (shard_id) DO UPDATE SET
+  fencing_token = EXCLUDED.fencing_token,
+  cursor_position = EXCLUDED.cursor_position,
+  updated_at = EXCLUDED.updated_at
+WHERE EXCLUDED.fencing_token > collector_checkpoints.fencing_token
+   OR (EXCLUDED.fencing_token = collector_checkpoints.fencing_token
+       AND EXCLUDED.cursor_position >= collector_checkpoints.cursor_position)
+RETURNING fencing_token`;
+
+/**
  * Commit a checkpoint. Same-token commits must be contiguous or covered by
  * resolved gaps (RECOVERED or DECLARED_UNRECOVERABLE); higher tokens acquire
  * the shard (new epoch) and may set any cursor; lower tokens are refused
- * outright.
+ * inside this transaction. The final upsert (see
+ * `FENCED_CHECKPOINT_UPSERT_SQL`) is conditional — it overwrites only when
+ * the incoming pair is not behind the stored row — so a commit that loses a
+ * race against a concurrent committer between the guard read and the write
+ * is still refused with the same typed errors: the stored checkpoint can
+ * never regress.
  */
 export async function commitCheckpoint(
   engine: DatabaseEngine,
@@ -109,13 +142,14 @@ export async function commitCheckpoint(
       }
     }
 
-    await tx.query(
-      `INSERT INTO collector_checkpoints (shard_id, fencing_token, cursor_position, updated_at)
-       VALUES ($1,$2,$3,$4)
-       ON CONFLICT (shard_id) DO UPDATE SET
-         fencing_token = EXCLUDED.fencing_token,
-         cursor_position = EXCLUDED.cursor_position,
-         updated_at = EXCLUDED.updated_at`,
+    // Fencing backstop: the guard checks above ran against a snapshot that a
+    // concurrent committer may already have superseded (READ COMMITTED lost-
+    // update window). The conditional upsert carries the same monotonicity
+    // rule structurally — see FENCED_CHECKPOINT_UPSERT_SQL; RETURNING
+    // detects the refused case so it surfaces as the same typed errors,
+    // never silence.
+    const fenced = await tx.query<{ fencing_token: string | number }>(
+      FENCED_CHECKPOINT_UPSERT_SQL,
       [
         input.shardId,
         input.fencingToken,
@@ -123,6 +157,35 @@ export async function commitCheckpoint(
         input.at ?? utcTimestamp(new Date().toISOString()),
       ],
     );
+    if (fenced.rows.length === 0) {
+      // Zero rows can only mean the WHERE clause refused the overwrite: a
+      // concurrent committer advanced (token, cursor) after this
+      // transaction's read. Re-classify against the now-stored row for the
+      // precise typed refusal.
+      const winner = await tx.query<{
+        fencing_token: string | number;
+        cursor_position: string | number;
+      }>('SELECT fencing_token, cursor_position FROM collector_checkpoints WHERE shard_id = $1', [
+        input.shardId,
+      ]);
+      const stored = winner.rows[0];
+      if (
+        stored !== undefined &&
+        Number(stored.fencing_token) === input.fencingToken &&
+        Number(stored.cursor_position) > input.cursorPosition
+      ) {
+        throw new ForesiftError(
+          ErrorCode.CHECKPOINT_CURSOR_REGRESSION,
+          `cursor regression for ${input.shardId}: ${input.cursorPosition} < ${Number(stored.cursor_position)} (concurrent commit won)`,
+          { shardId: input.shardId },
+        );
+      }
+      throw new ForesiftError(
+        ErrorCode.CHECKPOINT_STALE_FENCING_TOKEN,
+        `stale fencing token ${input.fencingToken} for ${input.shardId}${stored === undefined ? '' : ` (current ${Number(stored.fencing_token)})`} — a concurrent commit advanced the checkpoint`,
+        { shardId: input.shardId },
+      );
+    }
   });
 }
 

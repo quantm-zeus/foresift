@@ -2,6 +2,7 @@
   "$schema": "https://foresift.dev/schemas/telemetry-catalog-v1.json",
   "catalog": "dr",
   "description": "Disaster-recovery telemetry events for governed backups, clean-environment restore drills, recovery-tier violations, and capability degradation. Degradation events always preserve the deterministic-risk-monitoring allowance; no event may report a tier miss without its durable incident.",
+  "contractStatus": "DECLARATIVE_CONTRACT_ONLY — this file defines the event contracts the requirement manifest maps to (telemetry/dr.*); emitter wiring lands with the observability milestone (dependency group G2), so nothing publishes these event names yet. Field lists mirror the authoritative schemas/repos exactly.",
   "requirementsCovered": ["FR-DR-001", "FR-DR-002"],
   "recoveryDataClass": "CRITICAL_METADATA",
   "events": [

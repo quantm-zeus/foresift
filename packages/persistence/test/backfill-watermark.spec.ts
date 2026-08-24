@@ -358,4 +358,24 @@ describe('watermark slot monotonicity (§13.5)', () => {
     expect(w?.highestContiguousSlot).toBe(480n);
     expect(w?.highestFinalizedSlot).toBe(470n);
   });
+
+  it('an advance OMITTING highestFinalizedSlot preserves — never erases — the stored finalized mark', async () => {
+    const preserveKey = { ...MONO_KEY, collectorShard: 'shard-preserve' };
+    await advanceWatermark(engine, {
+      key: preserveKey,
+      highestObservedSlot: 100n,
+      highestContiguousSlot: 100n,
+      highestFinalizedSlot: 90n,
+    });
+    // A partial advance carrying no finality information must not NULL out
+    // the stored mark (the upsert COALESCEs the omitted field).
+    await advanceWatermark(engine, {
+      key: preserveKey,
+      highestObservedSlot: 110n,
+      highestContiguousSlot: 110n,
+    });
+    const w = await loadWatermark(engine, preserveKey);
+    expect(w?.highestFinalizedSlot).toBe(90n);
+    expect(w?.highestObservedSlot).toBe(110n);
+  });
 });

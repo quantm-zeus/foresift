@@ -153,6 +153,10 @@ export interface WatermarkAdvance {
   readonly key: WatermarkKey;
   readonly highestObservedSlot: bigint;
   readonly highestContiguousSlot: bigint;
+  /**
+   * Omit to leave any stored finalized mark untouched (the upsert COALESCEs
+   * it); supplying a value lower than the stored one is refused below.
+   */
   readonly highestFinalizedSlot?: bigint | undefined;
   /** Explicit open gap when the contiguous head lags the observed head. */
   readonly oldestOpenGap?: { startSlot: bigint; endSlot: bigint } | undefined;
@@ -170,12 +174,16 @@ export async function advanceWatermark(
 ): Promise<void> {
   const k = advance.key;
   await engine.transaction(async (tx) => {
-    // Monotonicity guard (§13.5): the slot high-water marks are the only
-    // mutable state machine in the data-truth layer with no structural
-    // floor, so regression is refused at this boundary — a lower incoming
-    // value means a stale or rewound writer, and silently rewinding would
-    // corrupt gap/coverage honesty downstream. Gap windows are excluded:
-    // they legitimately open and close as discovery progresses.
+    // Monotonicity guard (§13.5): supplied slot values are checked against
+    // the stored row and regression is refused at this boundary — a lower
+    // incoming value means a stale or rewound writer, and silently rewinding
+    // would corrupt gap/coverage honesty downstream. The slot high-water
+    // marks have no structural floor in SQL (no trigger/CHECK enforces
+    // monotonicity), so this boundary check IS the enforcement point; the
+    // upsert below additionally COALESCEs an OMITTED highestFinalizedSlot so
+    // a partial advance can never erase the stored finalized mark.
+    // Gap windows are excluded: they legitimately open and close as discovery
+    // progresses.
     const stored = await tx.query<{
       highest_observed_slot: string;
       highest_contiguous_slot: string;
@@ -219,6 +227,9 @@ export async function advanceWatermark(
       }
     }
     await tx.query(
+      // COALESCE on highest_finalized_slot: an OMITTED highestFinalizedSlot
+      // carries no new finality information — it must preserve the stored
+      // mark, never NULL it out (mirrors the GREATEST pattern on lateness).
       `INSERT INTO watermarks (
          provider, operation, collector_shard, program_version, chain_id,
          highest_observed_slot, highest_contiguous_slot, highest_finalized_slot,
@@ -229,7 +240,7 @@ export async function advanceWatermark(
        DO UPDATE SET
          highest_observed_slot = EXCLUDED.highest_observed_slot,
          highest_contiguous_slot = EXCLUDED.highest_contiguous_slot,
-         highest_finalized_slot = EXCLUDED.highest_finalized_slot,
+         highest_finalized_slot = COALESCE(EXCLUDED.highest_finalized_slot, watermarks.highest_finalized_slot),
          oldest_open_gap_start = EXCLUDED.oldest_open_gap_start,
          oldest_open_gap_end = EXCLUDED.oldest_open_gap_end,
          maximum_lateness_seen_ms = GREATEST(watermarks.maximum_lateness_seen_ms, EXCLUDED.maximum_lateness_seen_ms),

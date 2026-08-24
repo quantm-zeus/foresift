@@ -14,6 +14,7 @@ import {
   blockingGapsForShard,
   commitCheckpoint,
   createEngine,
+  FENCED_CHECKPOINT_UPSERT_SQL,
   PRECISION_RETAINING_TIMESTAMP_PARSERS,
   recordCanonicalEvent,
   registerGap,
@@ -154,6 +155,71 @@ describe('fenced checkpoints (INV-009)', () => {
     await expect(
       resolveGapStatus(engine, { gapId: 'gap-e1', status: 'RECOVERED', at: later(5) }),
     ).rejects.toMatchObject({ code: ErrorCode.COLLECTOR_GAP_UNMARKED });
+  });
+});
+
+describe('fenced-upsert storage backstop (INV-009 race window)', () => {
+  // The in-transaction guard in commitCheckpoint cannot be raced from a
+  // single connection — these tests pin the storage-level rule that closes
+  // the READ COMMITTED lost-update window instead: a write whose guard read
+  // was superseded by a concurrent committer loses AT THE UPSERT (zero
+  // RETURNING rows) and leaves the stored checkpoint untouched.
+  const raceUpsert = (shardId: string, fencingToken: number, cursorPosition: number) =>
+    engine.query<{ fencing_token: string | number }>(FENCED_CHECKPOINT_UPSERT_SQL, [
+      shardId,
+      fencingToken,
+      cursorPosition,
+      AT,
+    ]);
+
+  const storedState = async (shardId: string) => {
+    const rows = await engine.query<{ fencing_token: string; cursor_position: string }>(
+      'SELECT fencing_token, cursor_position FROM collector_checkpoints WHERE shard_id = $1',
+      [shardId],
+    );
+    return {
+      token: Number(rows.rows[0]?.fencing_token),
+      cursor: Number(rows.rows[0]?.cursor_position),
+    };
+  };
+
+  it('a stale-token write landing after a concurrent commit is refused and changes nothing', async () => {
+    // The concurrent winner commits token 6 AFTER the loser's guard read…
+    await commitCheckpoint(engine, {
+      shardId: 'shard-race-t',
+      fencingToken: 6,
+      cursorPosition: 60,
+    });
+    // …the loser's write lands last with its stale token 5 — refused.
+    const lost = await raceUpsert('shard-race-t', 5, 99);
+    expect(lost.rows).toEqual([]);
+    expect(await storedState('shard-race-t')).toEqual({ token: 6, cursor: 60 });
+  });
+
+  it('a same-token cursor-regression write landing after a concurrent commit is refused too', async () => {
+    await commitCheckpoint(engine, {
+      shardId: 'shard-race-c',
+      fencingToken: 4,
+      cursorPosition: 40,
+    });
+    const lost = await raceUpsert('shard-race-c', 4, 39);
+    expect(lost.rows).toEqual([]);
+    expect(await storedState('shard-race-c')).toEqual({ token: 4, cursor: 40 });
+  });
+
+  it('the same conditional path admits non-regressing writes (equal or advancing pairs)', async () => {
+    await commitCheckpoint(engine, {
+      shardId: 'shard-race-w',
+      fencingToken: 2,
+      cursorPosition: 20,
+    });
+    // Same epoch, cursor advanced by the normal contiguous step.
+    const stepped = await raceUpsert('shard-race-w', 2, 21);
+    expect(stepped.rows.length).toBe(1);
+    // Idempotent re-commit of the identical pair is not a regression.
+    const idempotent = await raceUpsert('shard-race-w', 2, 21);
+    expect(idempotent.rows.length).toBe(1);
+    expect(await storedState('shard-race-w')).toEqual({ token: 2, cursor: 21 });
   });
 });
 

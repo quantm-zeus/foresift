@@ -2,6 +2,7 @@
   "$schema": "https://foresift.dev/schemas/telemetry-catalog-v1.json",
   "catalog": "data",
   "description": "Data-truth telemetry events for canonical identity, immutable observations/revisions, point-in-time replay, backfill receipts, field-quality flags, acquisition decisions, and source-dependence lineage. Every event carries the instant fields and evidence references its requirement demands; no event ever reports a fabricated success state.",
+  "contractStatus": "DECLARATIVE_CONTRACT_ONLY — this file defines the event contracts the requirement manifest maps to (telemetry/data.*); emitter wiring lands with the observability milestone (dependency group G2), so nothing publishes these event names yet. Field lists mirror the authoritative schemas/repos exactly.",
   "requirementsCovered": ["FR-DATA-002", "FR-DATA-003", "FR-DATA-005", "FR-DATA-006"],
   "recoveryDataClass": "CRITICAL_METADATA",
   "events": [
@@ -12,7 +13,18 @@
       "tier": "CRITICAL_OBSERVATIONS_CHECKPOINTS",
       "fields": [
         { "name": "observationId", "type": "string", "required": true },
-        { "name": "subjectPoolId", "type": "string", "required": true },
+        {
+          "name": "subjectPoolId",
+          "type": "string|null",
+          "required": true,
+          "notes": "Null for asset-scoped observations."
+        },
+        {
+          "name": "subjectAssetId",
+          "type": "string|null",
+          "required": true,
+          "notes": "Null for pool-scoped observations."
+        },
         { "name": "eventAt", "type": "string<utc-timestamp>", "required": true },
         {
           "name": "availableAt",
@@ -20,7 +32,7 @@
           "required": true,
           "notes": "Replay boundary input (FR-DATA-003)."
         },
-        { "name": "availabilityProvenance", "type": "string(§13.4 vocabulary)", "required": true },
+        { "name": "availabilityProvenance", "type": "string(§13.2 vocabulary)", "required": true },
         { "name": "rawAmount", "type": "string|null", "required": true },
         { "name": "decimals", "type": "integer|null", "required": true },
         {
@@ -33,15 +45,18 @@
     },
     {
       "name": "revision.created",
-      "description": "A superseding revision was recorded against an existing observation; both receipts are retained immutably.",
+      "description": "A superseding revision was recorded against an existing immutable anchor observation. Revisions carry no receipt of their own — the anchor retains its original receipt immutably, and the revision cites it via supersededReceiptHash.",
       "requirementRefs": ["FR-DATA-002"],
       "tier": "CRITICAL_OBSERVATIONS_CHECKPOINTS",
       "fields": [
         { "name": "observationId", "type": "string", "required": true },
         { "name": "revisionNo", "type": "integer", "required": true },
-        { "name": "receiptHash", "type": "string", "required": true },
-        { "name": "supersededReceiptHash", "type": "string", "required": true },
-        { "name": "originalReceiptHash", "type": "string", "required": true },
+        {
+          "name": "supersededReceiptHash",
+          "type": "string",
+          "required": true,
+          "notes": "Receipt hash of the immutable anchor being corrected."
+        },
         {
           "name": "availableAt",
           "type": "string<utc-timestamp>",
@@ -116,7 +131,12 @@
         { "name": "evidenceFamily", "type": "string", "required": true },
         { "name": "policyVersion", "type": "string", "required": true },
         { "name": "state", "type": "string(§13.8 AcquisitionState vocabulary)", "required": true },
-        { "name": "requestedAt", "type": "string<utc-timestamp>", "required": true },
+        {
+          "name": "requestedAt",
+          "type": "string<utc-timestamp>|null",
+          "required": true,
+          "notes": "Null when policy did not request the acquisition (NOT_REQUESTED_BY_POLICY carries no lifecycle timestamps)."
+        },
         {
           "name": "completedAt",
           "type": "string<utc-timestamp>|null",

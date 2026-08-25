@@ -18,11 +18,24 @@ capability anywhere outside the inert forbidden-fixture corpus under
 - [ ] T101 Extend the migration filename-family pattern in
       `packages/persistence/src/migrator.ts` from `(data|dr|sec)` to
       `(data|dr|sec|prov)` and update its header/doc comments (plan.md material
-      decision 1; the ONLY content edit outside binding writeScopes).
-      Land FIRST, run `pnpm --filter @foresift/persistence test` and require
-      the existing migrator suite green untouched. Traces: FR-PROV-001,
-      FR-PROV-002, FR-PROV-003, FR-PROV-008, FR-PROV-009, FR-PROV-010 (their
-      declared `g0_prov_*.sql` persistence refs are otherwise unapplyable).
+      decision 1; content edits outside binding writeScopes are recorded as
+      explicit scope exceptions at the end of this unit). Land FIRST, run
+      `pnpm --filter @foresift/persistence test` and require the migrator
+      suite green — including its inventory assertions updated to track the
+      manifest-declared `g0_prov_*.sql` scripts this package adds.
+      Planning-conflict resolution (recorded 2026-08-25): the earlier mandate
+      "existing migrator suite green untouched" is unsatisfiable together with
+      the product-mandated prov family extension, because
+      `packages/persistence/test/migrator.spec.ts` asserts EXACTLY the set of
+      discovered migration scripts; the product contract wins (FR-PROV-*), so
+      that test's enumerations MUST be updated by this unit rather than left
+      untouched. Out-of-scope writes REQUIRED by this unit and recorded as
+      scope exceptions: `packages/persistence/test/migrator.spec.ts`
+      (migration-inventory assertions) and `pnpm-lock.yaml` (workspace
+      lockfile mechanically follows every package scaffold, T102 included).
+      Traces: FR-PROV-001, FR-PROV-002, FR-PROV-003, FR-PROV-008, FR-PROV-009,
+      FR-PROV-010 (their declared `g0_prov_*.sql` persistence refs are
+      otherwise unapplyable).
 - [ ] T102 Scaffold `packages/provider-lifecycle`
       (`@foresift/provider-lifecycle`): package.json (workspace deps on
       domain/persistence/shared-schemas/security), tsconfig extending

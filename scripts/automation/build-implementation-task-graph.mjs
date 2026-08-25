@@ -126,7 +126,14 @@ for (const u of units) {
   const paths = [];
   for (const bt of u.body.matchAll(BACKTICK_PATH)) {
     const p = bt[1].replace(/^\.\//, '');
-    if (/^(packages|tests|telemetry|migrations|docs|scripts)\//.test(p) && !paths.includes(p))
+    // `pnpm-lock.yaml` is collectible at the repo root: it mechanically
+    // follows every workspace package scaffold, so a unit that scaffolds a
+    // package must be able to RECORD it as an out-of-scope write exception
+    // instead of tripping the lane guard at integration time.
+    if (
+      (/^(packages|tests|telemetry|migrations|docs|scripts)\//.test(p) || p === 'pnpm-lock.yaml') &&
+      !paths.includes(p)
+    )
       paths.push(p);
   }
   // Paths are classified against binding writeScopes: a plan-sanctioned

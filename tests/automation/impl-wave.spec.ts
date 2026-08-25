@@ -170,6 +170,32 @@ describe('implementation task graph', () => {
     // restore canonical fixture text
     writeFileSync(join(fx.root, 'specs', 'pkg-x', 'tasks.md'), TASKS);
   });
+
+  it('records the root workspace lockfile as a recordable scope exception (live guard-refusal fix)', () => {
+    // Live finding 2026-08-25: scaffolding a package mechanically updates
+    // pnpm-lock.yaml, but the collector only accepted scoped prefixes, so the
+    // lockfile could NEVER be declared and every compliant writer tripped
+    // guard-core's WRITE-AUTHORITY VIOLATION.
+    const tasks2 = TASKS.replace(
+      '- [ ] T104 [P] Write guide `docs/x-guide.md`. Traces: FR-X-002 (AC-202).',
+      '- [ ] T104 [P] Scaffold `packages/provider-x`; lockfile follows: `pnpm-lock.yaml`. ' +
+        'Traces: FR-X-002.',
+    );
+    writeFileSync(join(fx.root, 'specs', 'pkg-x', 'tasks.md'), tasks2);
+    const out = join(fx.artifacts, 'graph-lock.json');
+    const r = spawnSync(
+      process.execPath,
+      [GRAPH, '--package', 'pkg-x', '--root', fx.root, '--plan-shards', '2', '--out', out],
+      { encoding: 'utf8' },
+    );
+    expect(r.status).toBe(0);
+    const g = JSON.parse(readFileSync(out, 'utf8'));
+    expect(g.scopeExceptions).toContain('pnpm-lock.yaml');
+    const core = g.shards.find((s: { id: string }) => s.id === 'core');
+    expect(core.units).toContain('T104'); // demoted to serial core with its exception
+    // restore canonical fixture text
+    writeFileSync(join(fx.root, 'specs', 'pkg-x', 'tasks.md'), TASKS);
+  });
 });
 
 // Real multi-worktree wave fixture: two writer branches + one violating branch.

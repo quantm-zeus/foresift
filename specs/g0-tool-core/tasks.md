@@ -58,25 +58,25 @@ Format: `- [ ] T### [P?]` — **[P]** = parallelizable with its neighbors
 
 ## Phase B — SQL state machines (g0_core_* family)
 
-- [ ] T201 Author `migrations/g0_core_0001_tool_registry.sql`: registry table
+- [x] T201 Author `migrations/g0_core_0001_tool_registry.sql`: registry table
       with `(tool_name, tool_version)` uniqueness, definition hash, action
       class, profile list, policy-id references, registered/retired columns;
       immutability triggers over normative fields consistent with the landed
       data-truth migration style. PGlite migration-applies tests.
       Traces: FR-CORE-001, FR-CORE-005.
-- [ ] T202 [P] Author `migrations/g0_core_0002_single_flight_leases.sql`:
+- [x] T202 [P] Author `migrations/g0_core_0002_single_flight_leases.sql`:
       resource key, monotonic fencing token, holder mode, acquired/expires/
       released timestamps; release guarded to matching token; expired-reacquire
       bumps fence. PGlite tests covering grant/expire/refuse-stale-release.
       Traces: FR-CORE-006.
-- [ ] T203 [P] Author `migrations/g0_core_0003_quota_reservations.sql`:
+- [x] T203 [P] Author `migrations/g0_core_0003_quota_reservations.sql`:
       reservation rows with dimension columns, estimated/actual units, state
       machine PENDING→RESERVED→COMMITTED, PENDING|RESERVED→RELEASED,
       RESERVED→EXPIRED enforced via CHECK + guarded UPDATEs; idempotency key on
       (pipeline run, stage). PGlite transition-matrix tests including
       concurrent reserve/commit/release races and retry replays.
       Traces: FR-CORE-007.
-- [ ] T204 [P] Author `migrations/g0_core_0004_exact_cache.sql`: cache entries
+- [x] T204 [P] Author `migrations/g0_core_0004_exact_cache.sql`: cache entries
       keyed by canonical-key hash with payload reference, stored/fresh/stale
       windows, license-policy version, rights-permitted flag; point-in-time
       lookup predicate tests. Traces: FR-CORE-006.

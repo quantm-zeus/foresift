@@ -31,7 +31,6 @@ import {
   ProviderConflictRefSchema,
   QuotaModelSchema,
   QuotaReservationRecordSchema,
-  QuotaUsageSummarySchema,
   ReservationStateSchema,
   SingleFlightLeaseRecordSchema,
   ToolDefinitionMetadataSchema,
@@ -350,8 +349,12 @@ describe('registry map + parse-by-name', () => {
         allowed: false,
         policyVersion: 'rights-1',
         reason: 'unverifiable rights refuse fail-closed',
-      }).allowed,
-    ).toBe(false);
+      }),
+    ).toEqual({
+      allowed: false,
+      policyVersion: 'rights-1',
+      reason: 'unverifiable rights refuse fail-closed',
+    });
     expect(() => parseCoreSchema('LicenseVerdict' as CoreSchemaName, {})).toThrow();
   });
 });

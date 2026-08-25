@@ -18,19 +18,11 @@ import {
   ALL_RESERVATION_STATES,
   ALL_TOOL_PROFILE_IDS,
   ALL_WORKLOAD_CLASSES,
-  BackpressureAction,
-  CacheOutcome,
   DEFAULT_FRESHNESS_POLICY_TABLE,
-  ForesiftError,
   FreshnessFieldFamily,
-  HolderMode,
   PIPELINE_STAGE_ORDER,
   PipelineStage,
-  QuotaModel,
-  ReservationState,
   StaleAdmissionScope,
-  ToolProfileId,
-  WorkloadClass,
   actionClass,
   backpressureAction,
   cacheOutcome,
@@ -45,6 +37,7 @@ import {
   toolProfileId,
   workloadClass,
 } from '../src/tool.ts';
+import { ForesiftError } from '../src/errors.ts';
 
 /** [value, resolver, expected] rows for the fail-closed resolution matrix. */
 const VOCABULARIES = [

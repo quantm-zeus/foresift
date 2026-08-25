@@ -76,14 +76,11 @@ const allowed = [
 // Cross-lane ownership: files PREDICTED by another active shard may not be
 // touched by this lane even though they sit inside package scopes.
 const othersPredicted = new Set(
-  (graph.shards ?? [])
-    .filter((s) => s.id !== args.shard)
-    .flatMap((s) => s.allowedWritePaths ?? []),
+  (graph.shards ?? []).filter((s) => s.id !== args.shard).flatMap((s) => s.allowedWritePaths ?? []),
 );
 const exceptions = new Set(graph.scopeExceptions ?? []);
 const violations = changed.filter(
-  (p) =>
-    (!allowed.some((re) => re.test(p)) && !exceptions.has(p)) || othersPredicted.has(p),
+  (p) => (!allowed.some((re) => re.test(p)) && !exceptions.has(p)) || othersPredicted.has(p),
 );
 
 // Carry over whatever the writer claimed about completed units (bookkeeping

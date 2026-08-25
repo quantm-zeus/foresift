@@ -18,4 +18,5 @@ export declare function usesOptimizedWorkflow(
 
 export declare function workPackageWorkflowFor(
   pkg: { id?: string; generation?: number } | string | null | undefined,
-): 'foresift-work-package' | 'foresift-work-package-optimized';
+  rollout?: unknown,
+): 'foresift-work-package' | 'foresift-work-package-optimized' | 'foresift-sharded-wave';

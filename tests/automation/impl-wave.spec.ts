@@ -189,8 +189,7 @@ function laneDir(lane: string) {
 }
 
 describe('wave guard + integrator (real git)', () => {
-  let bA: string, bB: string, bEvil: string;
-  const g = () => JSON.parse(readFileSync(fx.graphPath, 'utf8'));
+  let bEvil: string;
 
   beforeAll(() => {
     // shard-meta.json as prep would write it
@@ -200,17 +199,13 @@ describe('wave guard + integrator (real git)', () => {
     };
     writeFileSync(join(fx.artifacts, 'shard-meta.json'), JSON.stringify(meta));
     writeFileSync(join(fx.artifacts, 'base-head.txt'), fx.baseSha);
-    bA = commitBranch(
-      'foresift/wave/core',
-      'packages/x/src/alpha.ts',
-      'export const alpha = 1;\n',
-    ) as unknown as string;
+    commitBranch('foresift/wave/core', 'packages/x/src/alpha.ts', 'export const alpha = 1;\n');
     // T103 was demoted into core, so core also owns its spec file.
     sh(
       'mkdir -p tests/x && printf "test(\'a\', () => {});\\n" > tests/x/a.spec.ts && git add -A && git -c user.email=w@w -c user.name=w commit -qm work2',
       join(fx.artifacts, 'wt-foresift-wave-core'),
     );
-    bB = commitBranch('foresift/wave/shard-1', 'docs/x-guide.md', '# guide\n') as unknown as string;
+    commitBranch('foresift/wave/shard-1', 'docs/x-guide.md', '# guide\n');
     bEvil = commitBranch(
       'foresift/wave/evil',
       'scripts/evil.mjs',
@@ -356,35 +351,43 @@ describe('wave guard + integrator (real git)', () => {
 describe('writer admission function', () => {
   it('admits under healthy telemetry and refuses under pressure', () => {
     const healthy = JSON.parse(
-      spawnSync(process.execPath, [
-        ADMIT,
-        '--load1',
-        '0.5',
-        '--mem-available-kb',
-        '6000000',
-        '--mem-total-kb',
-        '8000000',
-        '--provider-failures',
-        '0',
-      ]).stdout,
+      spawnSync(
+        process.execPath,
+        [
+          ADMIT,
+          '--load1',
+          '0.5',
+          '--mem-available-kb',
+          '6000000',
+          '--mem-total-kb',
+          '8000000',
+          '--provider-failures',
+          '0',
+        ],
+        { encoding: 'utf8' },
+      ).stdout,
     );
     expect(healthy.admitExtraWriter).toBe(true);
     const pressured = JSON.parse(
-      spawnSync(process.execPath, [
-        ADMIT,
-        '--load1',
-        '3.9',
-        '--mem-available-kb',
-        '500000',
-        '--mem-total-kb',
-        '8000000',
-        '--swap-total-kb',
-        '2000000',
-        '--swap-free-kb',
-        '100000',
-        '--provider-failures',
-        '5',
-      ]).stdout,
+      spawnSync(
+        process.execPath,
+        [
+          ADMIT,
+          '--load1',
+          '3.9',
+          '--mem-available-kb',
+          '500000',
+          '--mem-total-kb',
+          '8000000',
+          '--swap-total-kb',
+          '2000000',
+          '--swap-free-kb',
+          '100000',
+          '--provider-failures',
+          '5',
+        ],
+        { encoding: 'utf8' },
+      ).stdout,
     );
     expect(pressured.admitExtraWriter).toBe(false);
     expect(pressured.checks.providerHealthy).toBe(false);
@@ -398,8 +401,9 @@ describe('writer admission function', () => {
         '\n429 too many\nempty stream\n',
     );
     const out = JSON.parse(
-      spawnSync(process.execPath, [ADMIT, '--load1', '0.5', '--journal', journal, '--tail', '10'])
-        .stdout,
+      spawnSync(process.execPath, [ADMIT, '--load1', '0.5', '--journal', journal, '--tail', '10'], {
+        encoding: 'utf8',
+      }).stdout,
     ) as { metrics: { providerFailures: number | null }; admitExtraWriter: boolean };
     expect(out.metrics.providerFailures).toBe(2);
   });
@@ -439,11 +443,11 @@ describe('foresift-sharded-wave workflow contract', () => {
     const lines = yaml.split('\n');
     const statements: string[] = [];
     for (let i = 0; i < lines.length; i++) {
-      if (!lines[i].includes('scripts/automation/package-fast-verify.mjs')) continue;
+      if (!(lines[i] ?? '').includes('scripts/automation/package-fast-verify.mjs')) continue;
       let stmt = '';
       for (let j = i; j < lines.length; j++) {
-        stmt += lines[j] + '\n';
-        if (!lines[j].trimEnd().endsWith('\\')) break;
+        stmt += (lines[j] ?? '') + '\n';
+        if (!(lines[j] ?? '').trimEnd().endsWith('\\')) break;
         void j;
       }
       statements.push(stmt);
@@ -511,8 +515,8 @@ describe('foresift-sharded-wave workflow contract', () => {
     const lines = body.split('\n');
     const statements: string[] = [];
     for (let i = 0; i < lines.length; i++) {
-      if (!/^\s*echo\s/.test(lines[i])) continue;
-      let stmt = lines[i];
+      if (!/^\s*echo\s/.test(lines[i] ?? '')) continue;
+      let stmt = lines[i] ?? '';
       while (stmt.trimEnd().endsWith('\\')) {
         i++;
         stmt += '\n' + (lines[i] ?? '');

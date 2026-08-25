@@ -142,17 +142,21 @@ for (const u of units) {
   u.predictedWrites = inScope.sort();
   u.outOfScopeWrites = outOfScope.sort();
   u.testRefs = paths.filter((p) => p.startsWith('tests/')).sort();
-  u.dependsOn = [...new Set(idsInBody.filter((t) => t !== u.id && units.some((o) => o.id === t)))].sort();
+  u.dependsOn = [
+    ...new Set(idsInBody.filter((t) => t !== u.id && units.some((o) => o.id === t))),
+  ].sort();
   u.estimatedSize = words < 60 ? 'small' : words < 150 ? 'medium' : 'large';
 }
 
 // Blocking phases: every unit inside a "(blocks" heading blocks all outside it.
-const blockingUnits = new Set(
-  units.filter((u) => /\(blocks/i.test(u.phase)).map((u) => u.id),
-);
+const blockingUnits = new Set(units.filter((u) => /\(blocks/i.test(u.phase)).map((u) => u.id));
 for (const u of units)
   for (const b of blockingUnits)
-    if (!u.dependsOn.includes(b) && b !== u.id && !(blockingUnits.has(u.id) && blockingUnits.has(b)))
+    if (
+      !u.dependsOn.includes(b) &&
+      b !== u.id &&
+      !(blockingUnits.has(u.id) && blockingUnits.has(b))
+    )
       u.dependsOn.push(b);
 for (const u of units) u.dependsOn.sort();
 
@@ -172,8 +176,7 @@ if (args.planShards !== undefined) {
   const coreIds = new Set(coreSeed.map((u) => u.id));
   const coreWriteSet = new Set(coreSeed.flatMap((u) => u.predictedWrites));
   const clashesCore = (u) =>
-    u.predictedWrites.some((p) => coreWriteSet.has(p)) ||
-    u.dependsOn.some((d) => coreIds.has(d));
+    u.predictedWrites.some((p) => coreWriteSet.has(p)) || u.dependsOn.some((d) => coreIds.has(d));
   const clashDemoted = open.filter(
     (u) => u.parallelizable && u.outOfScopeWrites.length === 0 && clashesCore(u),
   );

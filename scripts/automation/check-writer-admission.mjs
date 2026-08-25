@@ -62,7 +62,9 @@ const MAX_PROVIDER_FAILURES = 3;
 const memPct =
   memAvailableKb !== null && memTotalKb ? Math.round((memAvailableKb / memTotalKb) * 100) : 100;
 const swapping =
-  swapTotalKb !== null && swapFreeKb !== null ? swapTotalKb > 0 && swapFreeKb < swapTotalKb * 0.5 : false;
+  swapTotalKb !== null && swapFreeKb !== null
+    ? swapTotalKb > 0 && swapFreeKb < swapTotalKb * 0.5
+    : false;
 const failures = providerFailures ?? 0;
 
 const checks = {
@@ -80,7 +82,11 @@ console.log(
       admitExtraWriter,
       nproc,
       metrics: { load1, memPct, swapping, providerFailures: providerFailures },
-      thresholds: { loadFactor: LOAD_FACTOR, minMemPct: MIN_MEM_PCT, maxProviderFailures: MAX_PROVIDER_FAILURES },
+      thresholds: {
+        loadFactor: LOAD_FACTOR,
+        minMemPct: MIN_MEM_PCT,
+        maxProviderFailures: MAX_PROVIDER_FAILURES,
+      },
       checks,
     },
     null,

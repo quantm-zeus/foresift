@@ -58,7 +58,12 @@ function globToRegExp(glob) {
   return new RegExp('^' + re + '$');
 }
 
-const report = { schema: 'foresift/wave-integration@1', package: args.package, integrated: [], rejected: [] };
+const report = {
+  schema: 'foresift/wave-integration@1',
+  package: args.package,
+  integrated: [],
+  rejected: [],
+};
 
 if (!existsSync(args.resultsDir)) fail(`results dir not found: ${args.resultsDir}`);
 // Results live at <resultsDir>/<lane>/result.json (as wave-guard writes them);
@@ -119,17 +124,14 @@ for (const filePath of resultFiles) {
     ...(graph.package.writeScopes ?? []).map(globToRegExp),
   ];
   const othersPredicted = new Set(
-    (graph.shards ?? [])
-      .filter((s) => s.id !== sid)
-      .flatMap((s) => s.allowedWritePaths ?? []),
+    (graph.shards ?? []).filter((s) => s.id !== sid).flatMap((s) => s.allowedWritePaths ?? []),
   );
   const violations = diffNames.out
     .split('\n')
     .filter(Boolean)
     .filter(
       (p) =>
-        (!allowed.some((re) => re.test(p)) && !scopeExceptions.has(p)) ||
-        othersPredicted.has(p),
+        (!allowed.some((re) => re.test(p)) && !scopeExceptions.has(p)) || othersPredicted.has(p),
     );
   if (violations.length > 0) {
     report.rejected.push({
@@ -149,7 +151,10 @@ for (const filePath of resultFiles) {
   const merge = git(`merge --no-ff -m "wave integration: ${sid}" ${res.branch}`, canonical);
   if (!merge.ok) {
     git('merge --abort', canonical); // best-effort reset; never leave a conflicted index
-    report.rejected.push({ shardId: sid, reason: `merge conflict/failed: ${merge.err.split('\n')[0]}` });
+    report.rejected.push({
+      shardId: sid,
+      reason: `merge conflict/failed: ${merge.err.split('\n')[0]}`,
+    });
     continue;
   }
   const afterHead = git('rev-parse HEAD', canonical).out;
@@ -179,7 +184,7 @@ if (completedUnits.size > 0) {
     }
     if (touched > 0) {
       writeFileSync(tasksPath, lines.join('\n'));
-      const add = git(`add specs/${args.package}/tasks.md`, canonical);
+      git(`add specs/${args.package}/tasks.md`, canonical);
       const commit = git(
         `-c user.email=noreply@foresift.local -c user.name='wave-coordinator' commit -m "chore(${args.package}): mark wave-completed units [${touched}]"`,
         canonical,

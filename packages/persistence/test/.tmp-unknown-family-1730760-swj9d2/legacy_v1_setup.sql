@@ -1,1 +1,0 @@
-CREATE TABLE legacy (id text);

@@ -357,8 +357,7 @@ function workPackageWorkflow(pkgOrId) {
   const pkg = typeof pkgOrId === 'string' ? { id: pkgOrId } : pkgOrId;
   const selected = workPackageWorkflowFor(pkg);
   const wf = admitWorkflowForLaunch(selected, repoPlanningComplete(pkg.id));
-  if (wf !== selected)
-    log(`WAVE_ADMIT_DEFERRED ${pkg.id}: repo planning incomplete -> ${wf}`);
+  if (wf !== selected) log(`WAVE_ADMIT_DEFERRED ${pkg.id}: repo planning incomplete -> ${wf}`);
   return wf;
 }
 

@@ -8,23 +8,26 @@ import {
   usesOptimizedWorkflow,
 } from '../../scripts/automation/package-generations.mjs';
 
+const off = { mode: 'OFF', canaryPackages: [] } as const;
 const canary = { mode: 'CANARY', canaryPackages: ['pkg-a'] } as const;
-const production = { mode: 'PRODUCTION', canaryPackages: [] } as const;
 
 describe('sharded-wave rollout routing (V4)', () => {
-  it('ships OFF — the default state admits nothing', () => {
-    expect(SHARDED_WAVE_ROLLOUT.mode).toBe('OFF');
-    for (const id of ['pkg-a', 'g0-contracts-data-truth', 'anything']) {
-      expect(shardedWaveAdmits(id)).toBe(false);
-    }
+  it('ACTIVE state is PRODUCTION — the §18 acceptance-matrix flip landed', () => {
+    // The flip commit is authorized by .optimizer-evidence/v4-acceptance-
+    // matrix.md (A1/A2/B1/B2/A3 canaries + R1–R7 runtime findings). Any
+    // change BACK must be its own reviewed commit editing this pin.
+    expect(SHARDED_WAVE_ROLLOUT.mode).toBe('PRODUCTION');
+    expect(Object.isFrozen(SHARDED_WAVE_ROLLOUT)).toBe(true);
+    expect(shardedWaveAdmits('pkg-a')).toBe(true);
   });
 
   it('OFF/CANARY admit exactly their sets; unknown modes fail closed', () => {
+    expect(shardedWaveAdmits('pkg-a', off)).toBe(false);
     expect(shardedWaveAdmits('pkg-a', canary)).toBe(true);
     expect(shardedWaveAdmits('pkg-b', canary)).toBe(false);
     expect(shardedWaveAdmits('pkg-a', { mode: 'SOMETHING_ELSE' } as never)).toBe(false);
-    expect(shardedWaveAdmits(null as never, production)).toBe(false);
-    expect(shardedWaveAdmits(undefined as never, production)).toBe(false);
+    expect(shardedWaveAdmits(null as never, off)).toBe(false);
+    expect(shardedWaveAdmits(undefined as never, off)).toBe(false);
   });
 
   it('never reroutes the retired generation-0 forensic lane, even under PRODUCTION', () => {
@@ -33,28 +36,28 @@ describe('sharded-wave rollout routing (V4)', () => {
     // exactly how g0-contracts-data-truth actually lives.
     const g0 = { id: 'g0-contracts-data-truth' };
     expect(usesOptimizedWorkflow(g0)).toBe(false);
-    expect(workPackageWorkflowFor(g0, production)).toBe('foresift-work-package');
+    expect(workPackageWorkflowFor(g0)).toBe('foresift-work-package');
   });
 
-  it('routes OPTIMIZED packages by rollout state (default → optimized DAG)', () => {
+  it('routes OPTIMIZED packages through rollout state (active ⇒ sharded wave)', () => {
     const pkg = { id: 'pkg-future', generation: 1 };
     expect(usesOptimizedWorkflow(pkg)).toBe(true);
-    // shipped OFF state: historical routing preserved
-    expect(workPackageWorkflowFor(pkg)).toBe('foresift-work-package-optimized');
-    // CANARY admits only listed ids
-    expect(workPackageWorkflowFor({ id: 'pkg-a', generation: 1 }, canary as never)).toBe(
+    // ACTIVE PRODUCTION state: every OPTIMIZED-profile package takes the wave.
+    expect(workPackageWorkflowFor(pkg)).toBe('foresift-sharded-wave');
+    // CANARY admits only listed ids; OFF admits nothing (historical DAG).
+    expect(workPackageWorkflowFor({ id: 'pkg-a', generation: 1 }, canary)).toBe(
       'foresift-sharded-wave',
     );
-    expect(workPackageWorkflowFor({ id: 'pkg-b', generation: 1 }, canary as never)).toBe(
+    expect(workPackageWorkflowFor({ id: 'pkg-b', generation: 1 }, canary)).toBe(
       'foresift-work-package-optimized',
     );
+    expect(workPackageWorkflowFor(pkg, off)).toBe('foresift-work-package-optimized');
   });
 
   it('generation-0 legacy-profile rows keep historical routing under any state', () => {
-    // gen-0 non-g0 package is OPTIMIZED by profile table; with a synthetic
-    // PRODUCTION state it routes to the wave; the shipped OFF state cannot.
+    // gen-0 non-g0 package is OPTIMIZED by profile table: routes with state.
     const pkg = { id: 'pkg-gen0' };
-    expect(workPackageWorkflowFor(pkg, production as never)).toBe('foresift-sharded-wave');
-    expect(workPackageWorkflowFor(pkg)).toBe('foresift-work-package-optimized');
+    expect(workPackageWorkflowFor(pkg)).toBe('foresift-sharded-wave'); // active
+    expect(workPackageWorkflowFor(pkg, off)).toBe('foresift-work-package-optimized');
   });
 });

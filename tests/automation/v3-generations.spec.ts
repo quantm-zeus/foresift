@@ -847,10 +847,13 @@ describe('first tick drains the queued main fast-forward before selection', () =
     expect(entry?.message).toBe(`${PKG}@g1`);
     expect(entry?.branch).toBe(`foresift/${PKG}-g1`);
     const archonLog = readFileSync(join(stateDir, 'archon.log'), 'utf8');
-    // V4 rollout flip: the autopilot's default launch workflow for an
-    // OPTIMIZED-profile package is the ACTIVE production topology (the
-    // sharded wave) — see .optimizer-evidence/v4-acceptance-matrix.md.
-    expect(archonLog).toContain('foresift-sharded-wave');
+    // V4 rollout flip + defect #18 admission gate: PRODUCTION routing selects
+    // the sharded wave for an OPTIMIZED-profile package, but the wave is
+    // implementation-only — a package with NO repo planning truth (this
+    // fixture seeds no specs/<pkg>/) must be demoted at the launch seam to the
+    // optimized topology whose Phase-1 router plans first.
+    expect(archonLog).not.toContain('foresift-sharded-wave');
+    expect(archonLog).toContain('foresift-work-package-optimized');
     expect(archonLog).toContain(`${PKG}@g1`);
   });
 });

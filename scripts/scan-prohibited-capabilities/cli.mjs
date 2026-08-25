@@ -43,6 +43,18 @@ function errnoReason(error) {
 }
 
 /**
+ * Directories never scanned, wherever they appear in the tree. `.claude` is
+ * agent-session tooling state: its worktrees hold BRANCH CHECKOUTS of this
+ * same repository, so sweeping them re-reports tracked content under nested
+ * paths and escapes the top-level fixture exclusion (observed live: AC-050
+ * went red locally because
+ * `.claude/worktrees/<session>/tests/fixtures/sec/prohibited/**` — the
+ * documented-excluded canary corpus — was swept). Same infrastructure class
+ * as `.git`; every real finding in tracked source is still detected.
+ */
+const EXCLUDED_DIRS = new Set(['node_modules', 'dist', '.git', 'coverage', '.claude']);
+
+/**
  * Walk the tree yielding scannable files. Unreadable entries land in
  * `skips` as { rel, reason } so runScan can fail the scan closed.
  */
@@ -60,7 +72,7 @@ function* walk(rootDir, skips, rootRelative = '') {
     // Symlinks are never followed; excluded dirs keep the scan inside the repo.
     if (stats.isSymbolicLink()) continue;
     if (stats.isDirectory()) {
-      if (['node_modules', 'dist', '.git', 'coverage'].includes(entry)) continue;
+      if (EXCLUDED_DIRS.has(entry)) continue;
       yield* walk(full, skips, relFromRoot);
     } else if (
       (SCAN_EXTENSIONS.has(path.extname(entry)) || entry === 'package.json') &&

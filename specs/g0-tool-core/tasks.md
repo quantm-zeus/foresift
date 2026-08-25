@@ -83,21 +83,21 @@ Format: `- [ ] T### [P?]` — **[P]** = parallelizable with its neighbors
 
 ## Phase C — Registry and narrow profiles
 
-- [ ] T301 Implement `packages/tool-core/src/registry.ts` (FR-CORE-001):
+- [x] T301 Implement `packages/tool-core/src/registry.ts` (FR-CORE-001):
       register/resolve/list-by-profile over immutable `(name, version)`
       entries, sha256 definition-hash pinning over canonical JSON (execute
       excluded), snapshot versioning, additive retirement; persistence wiring
       to the Phase-B table. Registration refuses duplicate version with
       differing hash. Unit suites in `packages/tool-core/test/`.
       Traces: FR-CORE-001.
-- [ ] T302 [P] Implement `packages/tool-core/src/prohibited.ts` registration
+- [x] T302 [P] Implement `packages/tool-core/src/prohibited.ts` registration
       screen: name/description/schema/action-class screening against the
       security perimeter canary catalog fixtures; refuse trading/signing/
       custody/private-key/transaction-shaped definitions with typed errors;
       audited refusal events. Fixtures under `tests/fixtures/core/` include a
       prohibited-definition corpus (inert data only). Positive refusals +
       clean-pass units. Traces: FR-CORE-005.
-- [ ] T303 [P] Implement `packages/tool-core/src/profiles.ts` (FR-CORE-004):
+- [x] T303 [P] Implement `packages/tool-core/src/profiles.ts` (FR-CORE-004):
       actor→profile→tool-set binding over the eight §16.9 profiles; headless
       agent receives a strict subset of the catalog; provider-specific atomic
       tools visible only to adapter-test/admin-diagnostic/expert-scoped
@@ -107,13 +107,13 @@ Format: `- [ ] T### [P?]` — **[P]** = parallelizable with its neighbors
 
 ## Phase D — Exact caching and cross-mode single-flight
 
-- [ ] T401 Implement `packages/tool-core/src/cache-key.ts` (§16.4): exact key =
+- [x] T401 Implement `packages/tool-core/src/cache-key.ts` (§16.4): exact key =
       canonical JSON over provider, operation, operation_version, chain,
       canonical entity identity, normalized arguments, field projection,
       as-of semantics, license policy; golden-vector fixtures pinning hashes;
       explicit refusal path for financial/identity data classes offered a
       semantic cache (never admitted). Traces: FR-CORE-006.
-- [ ] T402 [P] Implement `packages/tool-core/src/freshness.ts` (§16.5): typed
+- [x] T402 [P] Implement `packages/tool-core/src/freshness.ts` (§16.5): typed
       fresh/stale TTL table with the PRD example defaults, per-deployment
       override at composition time, boundary units (fresh-until vs
       stale-until edges). Traces: FR-CORE-006.

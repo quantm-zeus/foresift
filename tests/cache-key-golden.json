@@ -1,0 +1,90 @@
+[
+  {
+    "label": "full nine-component key pins byte-stable canonical form and hash",
+    "components": {
+      "provider": "gmgn",
+      "operation": "token_security",
+      "operationVersion": "2",
+      "chain": "solana",
+      "canonicalEntityIdentity": "solana:So11111111111111111111111111111111111111112",
+      "normalizedArguments": {
+        "window": "24h",
+        "limit": 50
+      },
+      "fieldProjection": [
+        "price",
+        "liquidity"
+      ],
+      "asOf": "2026-08-01T00:00:00Z",
+      "licensePolicyVersion": "rights-1"
+    },
+    "expectedCanonicalJson": "{\"asOf\":\"2026-08-01T00:00:00Z\",\"canonicalEntityIdentity\":\"solana:So11111111111111111111111111111111111111112\",\"chain\":\"solana\",\"fieldProjection\":[\"price\",\"liquidity\"],\"licensePolicyVersion\":\"rights-1\",\"normalizedArguments\":{\"limit\":50,\"window\":\"24h\"},\"operation\":\"token_security\",\"operationVersion\":\"2\",\"provider\":\"gmgn\"}",
+    "expectedCacheKeyHash": "sha256:ee4104daed86812b89163ed98f6d5664eb439b55e61ffb845e4bc62220fe3c4f"
+  },
+  {
+    "label": "argument objects differing only in member order hash identically",
+    "components": {
+      "provider": "gmgn",
+      "operation": "token_security",
+      "operationVersion": "2",
+      "chain": "solana",
+      "canonicalEntityIdentity": "solana:So11111111111111111111111111111111111111112",
+      "normalizedArguments": {
+        "limit": 50,
+        "window": "24h"
+      },
+      "fieldProjection": [
+        "price",
+        "liquidity"
+      ],
+      "asOf": "2026-08-01T00:00:00Z",
+      "licensePolicyVersion": "rights-1"
+    },
+    "expectedCanonicalJson": "{\"asOf\":\"2026-08-01T00:00:00Z\",\"canonicalEntityIdentity\":\"solana:So11111111111111111111111111111111111111112\",\"chain\":\"solana\",\"fieldProjection\":[\"price\",\"liquidity\"],\"licensePolicyVersion\":\"rights-1\",\"normalizedArguments\":{\"limit\":50,\"window\":\"24h\"},\"operation\":\"token_security\",\"operationVersion\":\"2\",\"provider\":\"gmgn\"}",
+    "expectedCacheKeyHash": "sha256:ee4104daed86812b89163ed98f6d5664eb439b55e61ffb845e4bc62220fe3c4f"
+  },
+  {
+    "label": "a different as-of component produces a different key (as-of is INSIDE the key)",
+    "components": {
+      "provider": "gmgn",
+      "operation": "token_security",
+      "operationVersion": "2",
+      "chain": "solana",
+      "canonicalEntityIdentity": "solana:So11111111111111111111111111111111111111112",
+      "normalizedArguments": {
+        "window": "24h",
+        "limit": 50
+      },
+      "fieldProjection": [
+        "price",
+        "liquidity"
+      ],
+      "asOf": "2026-08-01T00:05:00Z",
+      "licensePolicyVersion": "rights-1"
+    },
+    "expectedCanonicalJson": "{\"asOf\":\"2026-08-01T00:05:00Z\",\"canonicalEntityIdentity\":\"solana:So11111111111111111111111111111111111111112\",\"chain\":\"solana\",\"fieldProjection\":[\"price\",\"liquidity\"],\"licensePolicyVersion\":\"rights-1\",\"normalizedArguments\":{\"limit\":50,\"window\":\"24h\"},\"operation\":\"token_security\",\"operationVersion\":\"2\",\"provider\":\"gmgn\"}",
+    "expectedCacheKeyHash": "sha256:7a3942e20e6a2243c45bc75e9da7b3625069f477c93fedbdffdc8c0f198769af"
+  },
+  {
+    "label": "a different license policy version produces a different key",
+    "components": {
+      "provider": "gmgn",
+      "operation": "token_security",
+      "operationVersion": "2",
+      "chain": "solana",
+      "canonicalEntityIdentity": "solana:So11111111111111111111111111111111111111112",
+      "normalizedArguments": {
+        "window": "24h",
+        "limit": 50
+      },
+      "fieldProjection": [
+        "price",
+        "liquidity"
+      ],
+      "asOf": "2026-08-01T00:00:00Z",
+      "licensePolicyVersion": "rights-2"
+    },
+    "expectedCanonicalJson": "{\"asOf\":\"2026-08-01T00:00:00Z\",\"canonicalEntityIdentity\":\"solana:So11111111111111111111111111111111111111112\",\"chain\":\"solana\",\"fieldProjection\":[\"price\",\"liquidity\"],\"licensePolicyVersion\":\"rights-2\",\"normalizedArguments\":{\"limit\":50,\"window\":\"24h\"},\"operation\":\"token_security\",\"operationVersion\":\"2\",\"provider\":\"gmgn\"}",
+    "expectedCacheKeyHash": "sha256:606f45e3e094a22fbdc6c86354bfeaa0b3160a6da6d719c9576a9f5604065caf"
+  }
+]

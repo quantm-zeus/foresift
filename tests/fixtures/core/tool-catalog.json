@@ -1,0 +1,16 @@
+{
+  "comment": "Mirror of packages/tool-core/src/profiles.ts catalogs (§16.9). The registry spec pins this file EQUAL to the code constants — mirror by construction. Inert names only; never imported by product code.",
+  "domainTools": [
+    "discover_candidates",
+    "get_asset_identity",
+    "get_market_evidence_pack",
+    "get_security_evidence_pack",
+    "get_holder_distribution",
+    "get_wallet_cluster_evidence",
+    "get_tradability_assessment",
+    "get_candidate_delta",
+    "get_thesis_status",
+    "compare_candidates"
+  ],
+  "atomicTools": ["provider_adapter_probe", "raw_ledger_diagnostic"]
+}

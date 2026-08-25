@@ -90,6 +90,12 @@ export const ToolDefinitionMetadataSchema = z
     /** Input/output JSON-Schema shapes for MCP-style surface generation. */
     inputSchemaJson: z.record(z.string(), z.unknown()),
     outputSchemaJson: z.record(z.string(), z.unknown()),
+    /**
+     * Provider-specific atomic tools (§16.9) are visible only to
+     * adapter-test / admin-diagnostic / expert-scoped profiles; domain tools
+     * omit the flag entirely.
+     */
+    atomic: z.boolean().optional(),
   })
   .strict();
 export type ToolDefinitionMetadata = z.infer<typeof ToolDefinitionMetadataSchema>;

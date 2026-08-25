@@ -153,7 +153,7 @@ Format: `- [ ] T### [P?]` — **[P]** = parallelizable with its neighbors
 
 ## Phase F — The exact 24-stage execution pipeline
 
-- [ ] T601 Implement `packages/tool-core/src/pipeline.ts` orchestrator
+- [x] T601 Implement `packages/tool-core/src/pipeline.ts` orchestrator
       (FR-CORE-002): stage sequence held as an ordered constant mirroring
       PRD §16.2 stages 1–24 verbatim; pinned-order unit test diffs the runtime
       sequence against the authoritative list; no configuration may skip or

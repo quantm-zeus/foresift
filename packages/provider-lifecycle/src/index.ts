@@ -8,3 +8,6 @@
 export * from './errors.ts';
 export * from './schemas.ts';
 export * from './lifecycle-states.ts';
+export * from './audit-bridges.ts';
+export * from './lifecycle-machine.ts';
+export * from './operation-registry.ts';

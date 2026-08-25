@@ -4,7 +4,8 @@ import { mkdtempSync, mkdirSync, writeFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { tmpdir } from 'node:os';
 import {
-  PLANNING_WORKFLOW,
+  OPTIMIZED_WORKFLOW,
+  PLANNING_BOOTSTRAP_WORKFLOW,
   WAVE_WORKFLOW,
   admitWorkflowForLaunch,
 } from '../../scripts/automation/wave-admission.mjs';
@@ -91,22 +92,25 @@ describe('wave-admission — launch-seam gate for the implementation-only sharde
       expect(admitWorkflowForLaunch(WAVE_WORKFLOW, true)).toBe(WAVE_WORKFLOW);
     });
 
-    it('demotes a wave-routed package with unproven planning to the planning topology', () => {
-      expect(admitWorkflowForLaunch(WAVE_WORKFLOW, false)).toBe(PLANNING_WORKFLOW);
+    it('demotes a wave-routed package with unproven planning to the PLANNING-ONLY bootstrap', () => {
+      // Planned-handoff law: the demotion target is the bounded planning-only
+      // bootstrap (zero implementation nodes), NOT the full optimized
+      // topology — an unplanned-origin package must never continue into
+      // optimized implementation after its planning bootstrap completes.
+      expect(admitWorkflowForLaunch(WAVE_WORKFLOW, false)).toBe(PLANNING_BOOTSTRAP_WORKFLOW);
       // "could not evaluate" must fail closed toward planning, never toward the wave
-      expect(admitWorkflowForLaunch(WAVE_WORKFLOW, false)).toBe(PLANNING_WORKFLOW);
       expect(admitWorkflowForLaunch(WAVE_WORKFLOW, null as unknown as boolean)).toBe(
-        PLANNING_WORKFLOW,
+        PLANNING_BOOTSTRAP_WORKFLOW,
       );
       expect(admitWorkflowForLaunch(WAVE_WORKFLOW, undefined as unknown as boolean)).toBe(
-        PLANNING_WORKFLOW,
+        PLANNING_BOOTSTRAP_WORKFLOW,
       );
     });
 
     it('never touches non-wave selector verdicts (legacy lane, optimized-under-OFF)', () => {
       expect(admitWorkflowForLaunch('foresift-work-package', false)).toBe('foresift-work-package');
-      expect(admitWorkflowForLaunch(PLANNING_WORKFLOW, false)).toBe(PLANNING_WORKFLOW);
-      expect(admitWorkflowForLaunch(PLANNING_WORKFLOW, true)).toBe(PLANNING_WORKFLOW);
+      expect(admitWorkflowForLaunch(OPTIMIZED_WORKFLOW, false)).toBe(OPTIMIZED_WORKFLOW);
+      expect(admitWorkflowForLaunch(OPTIMIZED_WORKFLOW, true)).toBe(OPTIMIZED_WORKFLOW);
     });
   });
 

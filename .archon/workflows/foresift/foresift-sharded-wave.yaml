@@ -15,14 +15,35 @@ description: |
   never touch it (override §7). Repeat invocations run further waves; the
   authoritative FULL gate stays downstream in the standard package flow
   (override §18).
+
+  Continuation law (planning handoff): archon starts run worktrees FRESH AT
+  MAIN's tip, so a package whose implementation baseline lives on its pushed
+  package branch would be re-implemented from main. The `branch-adoption`
+  node deterministically adopts the launched branch tip (absorbing current
+  origin/main first when stale) BEFORE the base is pinned — zero AI.
 tags: [foresift, throughput, parallel]
 
 provider: claude
 effort: high
 
 nodes:
+  # ── ADOPTION: continue from the launched package branch when it exists ──────
+  # Deterministic, zero-AI (wave-branch-adoption.mjs). No pushed launch
+  # branch ⇒ FRESH_FROM_MAIN no-op — the historical fresh-package shape is
+  # byte-identical. A pushed branch ⇒ adopted as the integration base so
+  # only REMAINING tasks execute on top of durable prior work. Fail-closed:
+  # dirty tree, unverifiable refs, merge conflict, or push failure refuse
+  # before any provider spend; supervisor recovery replays cleanly.
+  - id: branch-adoption
+    bash: |
+      set -euo pipefail
+      node scripts/automation/wave-branch-adoption.mjs --message "$ARGUMENTS" 2>&1 |
+        tee "$ARTIFACTS_DIR/branch-adoption.json"
+    timeout: 120000
+
   # ── PREP: task graph, shard plan, briefs, private worktrees ──────────────────
   - id: prep
+    depends_on: [branch-adoption]
     bash: |
       set -euo pipefail
       PKG="${ARGUMENTS%%@g*}"

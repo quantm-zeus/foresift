@@ -123,7 +123,9 @@ retry L3, milestone bookkeeping all unchanged).
 - **New control-plane capability shipped**: `--finalize-from-main <id>`
   (module `finalize-from-main.mjs`, 14 regression tests) — deterministic,
   fail-closed RUNNING→PROVEN from landed truth ONLY: merged-PR ancestry from
-  current origin/main, T-scoped completeness read AT that commit, green CI on
+  current origin/main, T-scoped completeness read AT that commit (CURRENT
+  origin/main HEAD — never the historical merge commit, so a task reopened on
+  main after landing refuses finalization; pinned in finalize-from-main.spec.ts), green CI on
   exactly origin/main HEAD, and no live competing execution; it refuses with
   precise reasons otherwise and never invokes an AI provider. Defects #16/#17
   are its founding cases.

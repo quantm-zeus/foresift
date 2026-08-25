@@ -96,6 +96,27 @@ describe('finalize-from-main — deterministic fail-closed RUNNING→PROVEN (def
     expect(v.reasons.join(' ')).toMatch(/T-scoped task\(s\) unchecked/);
   });
 
+  it('a T-scoped obligation REOPENED on current main refuses finalization even though the historical merge carried it checked (authority is CURRENT main, never the merge commit)', () => {
+    // V4 §9 pin: the merged PR proves landing ANCESTRY only. The artifact
+    // snapshot is read at CURRENT origin/main HEAD — so if someone reopens
+    // (unchecks) a T task on main after the merge, the finalizer must refuse
+    // exactly as if the work had never landed.
+    const v = evaluateFinalizationFromMain(
+      okFacts({
+        // mergedEvidence stays fully intact from okFacts: PR #52 merged,
+        // merge commit reachable from main, green CI on main HEAD.
+        artifacts: {
+          spec: '# spec\n',
+          plan: '# plan\n',
+          tasks: '- [ ] T118 Implement egress allowlists\n- [x] T119 Implement isolation\n',
+        },
+      }),
+    );
+    expect(v.ok).toBe(false);
+    expect(v.reasons.join(' ')).toMatch(/T-scoped task\(s\) unchecked.*T118|T118.*unchecked/s);
+    expect(v.reasons.join(' ')).not.toMatch(/no MERGED PR/);
+  });
+
   it('never blocks on governance-deferred non-T items but keeps them visible as evidence', () => {
     // Exactly the live g0-security-perimeter shape on current main: all T
     // work checked; R3–R7 recorded per governance, wiring outside writeScopes.

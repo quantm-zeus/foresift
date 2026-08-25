@@ -1,0 +1,130 @@
+name: foresift-package-planning-bootstrap
+description: |
+  PLANNING-ONLY bootstrap for a package the V4 PRODUCTION rollout routing
+  wants to implement through `foresift-sharded-wave`, but whose repo-scoped
+  planning truth (`specs/<pkg>/{spec,plan,tasks}.md`) does not exist yet —
+  i.e. exactly the launches where wave-admission demotes at the launch seam.
+
+  This is the optimized topology's Phases 0A–1 VERBATIM (seeded-generation
+  adoption, deterministic preflight, Phase-1 completeness router, bounded
+  scoped-plan continuation loop with the identical deterministic validator as
+  its only completion authority, and the phase-boundary bridge) plus ONE
+  terminal handoff node. It has ZERO implementation nodes by construction:
+  once planning becomes deterministically complete, this execution TERMINATES
+  and the production supervisor reselects the SAME still-RUNNING package into
+  the sharded wave in the same tick (planning handoff). An unplanned-origin
+  package can therefore never continue into implementation outside wave
+  routing, while nothing about direct invocations of the full
+  `foresift-work-package-optimized` changes (OFF/CANARY rollout lanes and the
+  LEGACY-profile package keep their historical plan→implement→gate lifecycle).
+
+  Invoke exactly as the supervisor does:
+
+    archon workflow run foresift-package-planning-bootstrap \
+      --branch foresift/<package-id>[-g<N>] "<package-id>[@g<N>]"
+
+  The supervisor recognizes a completed run of THIS workflow by its persisted
+  launch identity and performs the first-class handoff: it verifies planning
+  completeness against the run worktree, promotes the scoped planning
+  artifacts to main (control-plane chore — the wave's fresh-at-main worktree
+  can only see them there), then immediately relaunches the same package,
+  which wave-admission now routes to `foresift-sharded-wave`. Package status
+  stays RUNNING across the entire handoff; the old planning run becomes
+  terminal/non-authoritative; adoption matching keys on workflow identity so
+  no stale wake-up of this run can ever mutate the wave execution.
+
+  NOT for: packages that are already planned (the launch seam admits those
+  straight into the wave), non-wave-routed packages (the selector keeps them
+  on their historical topologies), or ad-hoc planning (use
+  foresift-milestone-control).
+
+provider: claude
+effort: high
+tags: [foresift, autonomous, planning]
+
+nodes:
+  # ── PHASE 0A: SEEDED-GENERATION ADOPTION (verbatim from the optimized DAG) ──
+  - id: generation-adoption
+    bash: |
+      set -euo pipefail
+      # Tee the verdict (and any refusal text) into artifacts: detached-run
+      # logs alone do not carry bash node stderr. pipefail keeps the exit code.
+      node scripts/automation/adopt-generation-branch.mjs --message "$ARGUMENTS" 2>&1 |
+        tee "$ARTIFACTS_DIR/adoption-verdict.json"
+    timeout: 120000
+
+  # ── PHASE 0: DETERMINISTIC PREFLIGHT (verbatim) ─────────────────────────────
+  - id: preflight
+    depends_on: [generation-adoption]
+    bash: |
+      set -euo pipefail
+      node scripts/automation/preflight.mjs --package "${ARGUMENTS%%@g*}" --branch "$(git rev-parse --abbrev-ref HEAD)"
+    timeout: 600000
+    retry:
+      max_attempts: 2
+      delay_ms: 10000
+      on_error: transient
+
+  # ── PHASE 1 ROUTER: deterministic planning-completeness check (verbatim) ────
+  - id: plan-status
+    depends_on: [preflight]
+    bash: |
+      set +e
+      mkdir -p "$ARTIFACTS_DIR"
+      node scripts/automation/package-plan-complete.mjs --package "${ARGUMENTS%%@g*}" \
+        > "$ARTIFACTS_DIR/plan-completeness.json" 2>&1
+      if [ $? -eq 0 ]; then echo "WP_PLAN_COMPLETE"; else echo "WP_PLAN_INCOMPLETE"; fi
+
+  # ── PHASE 1: SCOPED SPEC KIT PLANNING (verbatim bounded continuation loop) ───
+  - id: scoped-plan
+    depends_on: [plan-status]
+    when: "$plan-status.output == 'WP_PLAN_INCOMPLETE'"
+    idle_timeout: 1800000
+    loop_group:
+      max_iterations: 4
+      fresh_context: true
+      until: WP_PLAN_LOOP_TEXT_SIGNAL_NEVER_EMIT_b81cf2
+      until_bash: |
+        set -euo pipefail
+        # Archon v0.9.0 exports NO ARTIFACTS_DIR env var into until_bash; bare
+        # $ARTIFACTS_DIR here is TEXTUALLY SUBSTITUTED by archon before execution
+        # (probe-verified). The validator's verdict JSON is captured on every
+        # evaluation so a failing guard leaves a forensic trail.
+        node scripts/automation/package-plan-complete.mjs --package "${ARGUMENTS%%@g*}" \
+          --artifacts-dir "$ARTIFACTS_DIR" > "$ARTIFACTS_DIR/scoped-plan-guard-last.json"
+      nodes:
+        - id: scoped-plan-iterate
+          command: foresift-wp-plan
+          retry:
+            max_attempts: 3
+            delay_ms: 10000
+            on_error: all
+          effort: high
+          idle_timeout: 1800000
+        - id: plan-recheck
+          depends_on: [scoped-plan-iterate]   # siblings without an edge run concurrently
+          bash: |
+            set +e
+            node scripts/automation/package-plan-complete.mjs --package "${ARGUMENTS%%@g*}" \
+              > "$ARTIFACTS_DIR/plan-completeness.json" 2>&1
+            echo "PLAN_RECHECK_EXIT=$?"
+
+  # ── PHASE BOUNDARY BRIDGE (verbatim none_failed_min_one_success pattern) ─────
+  - id: plan-settled
+    depends_on: [plan-status, scoped-plan]
+    trigger_rule: none_failed_min_one_success   # plan-status always completes; blocks iff scoped-plan FAILED
+    bash: |
+      echo "PLAN_PHASE_SETTLED"
+
+  # ── TERMINAL PLANNING HANDOFF ────────────────────────────────────────────────
+  # Nothing follows. No implementation router, no implement loop, no gate:
+  # implementation provider calls can ever occur in this execution. The
+  # supervisor's completion handler classifies a completed run of THIS
+  # workflow as a successful planning bootstrap (never completed-without-
+  # merge), verifies repo-scoped completeness itself, promotes the scoped
+  # artifacts to main, and relaunches the same RUNNING package — which the
+  # unmodified admission gate now routes to foresift-sharded-wave.
+  - id: planning-handoff
+    depends_on: [plan-settled]
+    bash: |
+      echo "PLANNING_BOOTSTRAP_COMPLETE — hand off to supervisor for wave reselection"

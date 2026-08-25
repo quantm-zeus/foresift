@@ -23,10 +23,17 @@
 //                                                              # deterministic fail-closed RUNNING -> PROVEN for a
 //                                                              # package whose implementation ALREADY landed on main
 //                                                              # out-of-band (defect #16 class): proves merged-PR
-//                                                              # ancestry, T-scoped completeness at the main commit,
-//                                                              # green CI on exactly origin/main HEAD, and no live
-//                                                              # execution; refuses otherwise. No AI is invoked.
+//                                                              # ancestry, T-scoped completeness at CURRENT
+//                                                              # origin/main HEAD, green CI on exactly that HEAD,
+//                                                              # and no live execution; refuses otherwise. No AI.
 //                                                              # Stop the service unit first (singleton lock).
+//   node scripts/automation/foresift-autopilot.mjs --seed-package-planning <id> \
+//        --from <source-tree-root>
+//                                                              # operator/maintenance form of the planned-handoff
+//                                                              # promotion: copies ONE package's scoped planning
+//                                                              # artifacts (specs/<id>/** only) from a run worktree
+//                                                              # into main as a control-plane chore. Idempotent;
+//                                                              # fail-closed; no AI. Stop the service unit first.
 //   node scripts/automation/foresift-autopilot.mjs --restart-package <id> \
 //        --fresh-generation [--reason "<text>"] [--salvage-manifest <f>]
 //                                                              # supported fresh-generation restart of ONE package
@@ -78,7 +85,7 @@ import {
 } from './package-generations.mjs';
 import { applySalvage, SALVAGE_MANIFEST_SCHEMA } from './generation-salvage.mjs';
 import { collectFinalizationFacts, evaluateFinalizationFromMain } from './finalize-from-main.mjs';
-import { admitWorkflowForLaunch } from './wave-admission.mjs';
+import { admitWorkflowForLaunch, PLANNING_BOOTSTRAP_WORKFLOW } from './wave-admission.mjs';
 
 // Overridable for hermetic selftests (sandboxed fixture repo + state dir).
 const REPO = process.env.FORESIFT_AUTOPILOT_REPO ?? join(import.meta.dirname, '..', '..');
@@ -318,22 +325,8 @@ async function sleep(ms) {
  * failure counts as INCOMPLETE: fail-closed toward the topology that plans.
  */
 function repoPlanningComplete(packageId) {
-  try {
-    const r = spawnSync(
-      process.execPath,
-      [
-        join(REPO, 'scripts', 'automation', 'package-plan-complete.mjs'),
-        '--package',
-        packageId,
-        '--repo-only',
-      ],
-      { encoding: 'utf8', cwd: REPO, timeout: 60000 },
-    );
-    if (r.status !== 0 || !r.stdout) return false;
-    return JSON.parse(r.stdout)?.complete === true;
-  } catch {
-    return false;
-  }
+  const v = planCompleteAtRoot(REPO, packageId);
+  return v.complete === true;
 }
 
 /**
@@ -643,7 +636,12 @@ function trackRun(st, kind, entry) {
   (kind === 'milestone' ? st.milestoneRuns : st.activeRuns).push(entry);
 }
 
-async function finalizeCompletedRun(st, entry) {
+async function finalizeCompletedRun(st, entry, get = null) {
+  // PLANNED_HANDOFF: a completed planning-bootstrap run is a SUCCESS by
+  // definition — it never produces a PR. Route it to the first-class handoff
+  // before the completed-without-merge anomaly logic can touch it.
+  if (entry.kind === 'package' && entry.workflow === PLANNING_BOOTSTRAP_WORKFLOW)
+    return planningBootstrapHandoff(st, entry, get);
   // Success = PR actually merged into main (never trust AI output alone).
   const gh = sh(
     `gh pr list --repo quantm-zeus/foresift --head ${entry.branch} --state merged --json number,url --limit 1`,
@@ -675,6 +673,255 @@ async function finalizeCompletedRun(st, entry) {
   const ms = loadCurrentMilestone(REPO);
   setPackageStatus(ms, entry.packageId, 'PROVEN');
   record(st, 'package_proven', { packageId: entry.packageId, pr: mergedPr });
+  return true;
+}
+
+// ── planned handoff (post-planning throughput gap) ───────────────────────────
+/**
+ * Deterministic repo-scoped planning completeness at an explicit root.
+ * Returns { complete:boolean, verdict?:object } — "could not evaluate" is
+ * complete:false (fail-closed), never an exception path.
+ */
+function planCompleteAtRoot(root, packageId) {
+  try {
+    const r = spawnSync(
+      process.execPath,
+      [
+        join(import.meta.dirname, 'package-plan-complete.mjs'),
+        '--package',
+        packageId,
+        '--repo-only',
+        '--root',
+        root,
+      ],
+      { encoding: 'utf8', cwd: REPO, timeout: 60000 },
+    );
+    if (r.error) return { complete: false, detail: `validator spawn failed: ${r.error.message}` };
+    if (r.status !== 0)
+      return {
+        complete: false,
+        detail: `validator exit ${r.status ?? '?'}: ${
+          (r.stderr || r.stdout || '').replace(/\s+/g, ' ').trim().slice(0, 300) || 'no output'
+        }`,
+      };
+    if (!r.stdout) return { complete: false, detail: 'validator produced no output' };
+    return { complete: JSON.parse(r.stdout)?.complete === true, verdict: r.stdout };
+  } catch (err) {
+    return { complete: false, detail: `validator unavailable: ${String(err?.message ?? err)}` };
+  }
+}
+
+/**
+ * Promote a bootstrap run's scoped planning artifacts (specs/<pkg>/** only —
+ * NEVER implementation code) from its run worktree into main as a control-
+ * plane chore. Idempotent: identical content short-circuits to no-op; the
+ * commit exists locally before push is attempted and a failed push retries
+ * next tick. Fail-closed: refuses when the REPO side of specs/<pkg> is dirty
+ * (would stomp uncommitted state) or when post-copy validation against MAIN's
+ * own milestone view fails (rolls the copy back first).
+ *
+ * The wave's fresh-at-main worktree can only see planning truth that reached
+ * ORIGIN main, so a push failure blocks the relaunch (the handoff retries
+ * with the tracked entry still in place) instead of launching a wave whose
+ * prep would deterministically crash on missing tasks.md.
+ */
+function promotePackagePlanningArtifacts(packageId, fromRoot) {
+  const specDir = join('specs', packageId);
+  const qRepo = JSON.stringify(REPO);
+  // Refuse to stomp uncommitted state under the target path.
+  const dirty = sh(`git -C ${qRepo} status --porcelain -- ${JSON.stringify(specDir)}`);
+  if (!dirty.ok || dirty.out.trim())
+    return {
+      ok: false,
+      refused: `main checkout has uncommitted changes under ${specDir} — reconcile first`,
+    };
+  if (!fromRoot || !existsSync(join(fromRoot, specDir)))
+    return { ok: false, refused: `source worktree lacks ${specDir}` };
+
+  // Copy specs/<pkg>/** from the worktree into the main checkout.
+  const mkdir = sh(`mkdir -p ${JSON.stringify(join(REPO, specDir))}`);
+  if (!mkdir.ok) return { ok: false, refused: 'mkdir for specs copy failed' };
+  // NOTE: path.join would normalize away a trailing '/.', silently turning
+  // "copy contents" into "nest the directory"; concatenate it explicitly.
+  const cp = sh(
+    `cp -a ${JSON.stringify(`${join(fromRoot, specDir)}/.`)} ${JSON.stringify(join(REPO, specDir))}`,
+  );
+  if (!cp.ok) return { ok: false, refused: 'specs copy failed' };
+
+  // Validate against MAIN's milestone view BEFORE committing; roll back on any
+  // refusal so main never carries half-promoted truth.
+  const check = planCompleteAtRoot(REPO, packageId);
+  if (!check.complete) {
+    sh(`git -C ${qRepo} checkout -- ${JSON.stringify(specDir)}`);
+    // Remove files the copy ADDED (untracked after restore).
+    sh(`git -C ${qRepo} clean -fd -- ${JSON.stringify(specDir + '/')}`);
+    return {
+      ok: false,
+      refused: `post-copy validation against main failed: ${
+        check.detail ??
+        (check.verdict ? String(check.verdict).slice(0, 300) : 'validator unavailable')
+      }`,
+    };
+  }
+
+  const staged = sh(`git -C ${qRepo} add ${JSON.stringify(specDir)}`);
+  if (!staged.ok) return { ok: false, refused: 'git add failed' };
+  const nothing = sh(`git -C ${qRepo} diff --cached --quiet`);
+  if (nothing.ok) return { ok: true, promoted: false, detail: 'already current on main' };
+  const msg = `chore(autopilot): seed ${packageId} planning artifacts (planned-handoff)`;
+  const commit = sh(`git -C ${qRepo} commit -m ${JSON.stringify(msg)} -q`);
+  if (!commit.ok) {
+    sh(`git -C ${qRepo} reset -q`);
+    return { ok: false, refused: 'planning-artifact chore commit failed' };
+  }
+  const sha = sh(`git -C ${qRepo} rev-parse HEAD`).out.trim();
+  const push = sh(`git -C ${qRepo} push origin main --quiet`);
+  if (!push.ok)
+    return {
+      ok: false,
+      pushFailed: true,
+      commit: sha,
+      refused: 'push of planning chore failed (retries next tick)',
+    };
+  return { ok: true, promoted: true, commit: sha };
+}
+
+/**
+ * First-class PLANNED_HANDOFF for a completed planning-bootstrap run. The
+ * required lifecycle: planning truth becomes deterministic → this execution
+ * terminates (it contains ZERO implementation nodes) → supervisor verifies,
+ * promotes the scoped artifacts to main, and IMMEDIATELY reselects the same
+ * still-RUNNING package — which wave-admission now routes to the sharded
+ * wave. Package status is never touched here (RUNNING across the whole
+ * handoff); no PENDING flip forces reselection and nothing is marked PROVEN.
+ *
+ * Crash-safety (ordered verify → promote → adopt-or-launch LAST):
+ *   crash before relaunch          ⇒ next tick replays classification;
+ *                                    promotion is idempotent;
+ *   crash after launch, before save ⇒ adoption: findRecentRunRow keyed on
+ *                                    the WAVE identity re-adopts the live
+ *                                    row instead of duplicating it (the
+ *                                    completed bootstrap row can never match
+ *                                    a different workflow name);
+ *   late wake-up of the old run    ⇒ impossible to act on: its entry is done
+ *                                    and adoption/discovery match on
+ *                                    workflow+message identity.
+ */
+function planningBootstrapHandoff(st, entry, get) {
+  const packageId = entry.packageId;
+  // 1. Verify the bootstrap's planning truth AT ITS RUN WORKTREE (the only
+  // place it exists until promoted). Installed archon v0.9 exposes the run
+  // worktree as `working_path` (probed live); the remaining spellings are
+  // tolerant fallbacks. No path from archon ⇒ fall back to the main tree
+  // (promotion then no-ops); neither provable ⇒ fail closed through ordinary
+  // recovery, never silently onward.
+  const wtPath =
+    get?.working_path ??
+    get?.path ??
+    get?.worktree_path ??
+    get?.workspace_path ??
+    get?.run?.path ??
+    null;
+  const proof = wtPath ? planCompleteAtRoot(wtPath, packageId) : { complete: false };
+  const fallback = proof.complete ? null : planCompleteAtRoot(REPO, packageId);
+  if (!(proof.complete || fallback?.complete)) {
+    record(st, 'planning_handoff_refused', {
+      packageId,
+      runId: entry.runId,
+      why: 'repo-scoped planning completeness not provable at run worktree or main',
+    });
+    attemptResume(st, entry, 'bootstrap completed but planning completeness unprovable');
+    return false;
+  }
+
+  // 2. Promote scoped planning artifacts to main (control-plane chore).
+  const promo = promotePackagePlanningArtifacts(packageId, wtPath);
+  if (!promo.ok) {
+    record(
+      st,
+      promo.pushFailed ? 'planning_handoff_push_failed' : 'planning_handoff_promotion_refused',
+      {
+        packageId,
+        runId: entry.runId,
+        detail: promo.refused ?? null,
+        commit: promo.commit ?? null,
+      },
+    );
+    // Push failures retry verbatim next tick; refusals go through ordinary
+    // recovery (bounded resumes → operator-gated fatal) — both keep the
+    // package RUNNING and never fabricate completion.
+    if (!promo.pushFailed) attemptResume(st, entry, `planning handoff refused: ${promo.refused}`);
+    else saveState(st);
+    return false;
+  }
+
+  // 3. Adopt-or-launch the implementation continuation under CURRENT law.
+  const msFile = loadCurrentMilestone(REPO);
+  const pkg =
+    msFile && validateMilestoneState(msFile).length === 0 ? findPackage(msFile, packageId) : null;
+  if (!pkg) {
+    record(st, 'planning_handoff_refused', {
+      packageId,
+      runId: entry.runId,
+      why: 'package record missing/invalid in current milestone',
+    });
+    attemptResume(st, entry, 'bootstrap completed but package record unusable');
+    return false;
+  }
+  const { generation, branch, message, workflow: wf } = launchIdentity(pkg);
+  // Duplicate-tick / crash-after-launch absorption: a LIVE wave row for this
+  // exact identity is adopted, never duplicated. Keyed on the WAVE identity —
+  // the terminal bootstrap run cannot collide.
+  const liveRow = findRecentRunRow(wf, message);
+  if (liveRow && ['running', 'pending'].includes(String(liveRow.status))) {
+    Object.assign(entry, {
+      workflow: wf,
+      runId: liveRow.id,
+      branch,
+      message,
+      startedAt: normalizeTimestampMs(liveRow.started_at) ?? now(),
+      resumeCount: 0,
+      restartCount: 0,
+      awaitingDiscovery: false,
+      discoveryAttempts: 0,
+    });
+    record(st, 'planning_handoff_wave_adopted', { packageId, runId: liveRow.id, workflow: wf });
+    saveState(st);
+    return false; // the adopted wave run stays tracked and continues
+  }
+  const ack = launchDetached(st, wf, branch, message);
+  const runId = resolveRunId(ack, wf, message);
+  record(st, 'planning_handoff_complete', {
+    packageId,
+    oldRunId: entry.runId,
+    promotedCommit: promo.commit ?? null,
+    generation,
+    workflow: wf,
+    ack: sanitizeAck(ack),
+    runId,
+    discovery: extractRunId(ack) ? 'ack' : 'runs-table',
+  });
+  trackRun(st, 'package', {
+    kind: 'package',
+    workflow: wf,
+    runId,
+    packageId,
+    branch,
+    message,
+    startedAt: now(),
+    resumeCount: 0,
+    restartCount: 0,
+    awaitingDiscovery: !runId,
+    discoveryAttempts: 0,
+  });
+  if (runId) {
+    // Mirror selectAndLaunch's durable-association discipline: RUNNING was
+    // already set when the bootstrap launched; just reconcile the seed behind
+    // any state-chore traffic.
+    reconcileSeedAfterStateChore(st, packageId, branch);
+  }
+  entry.done = true;
+  saveState(st);
   return true;
 }
 
@@ -802,7 +1049,7 @@ function actOnEntry(st, entry) {
   }
   entry.lastSeenStatus = status;
   entry.lastSeenAt = now();
-  if (status === 'completed') return finalizeCompletedRun(st, entry);
+  if (status === 'completed') return finalizeCompletedRun(st, entry, get);
   if (status === 'running' || status === 'pending') {
     // Prefer Archon's own last-activity fields (snake_case in the real CLI),
     // normalized. A present-but-unparsable timestamp is "no opinion": record a
@@ -2410,6 +2657,23 @@ async function main() {
   if (argv.includes('--finalize-from-main')) {
     const positional = argv.filter((a) => !a.startsWith('--'));
     process.exit(await cmdFinalizeFromMain(positional[0] ?? null));
+  }
+  if (argv.includes('--seed-package-planning')) {
+    // Operator/maintenance form of the handoff promotion step: copy ONE
+    // package's scoped planning artifacts from an explicit source tree into
+    // main as a control-plane chore. Same deterministic code path the
+    // supervisor's planningBootstrapHandoff uses internally.
+    const fromIdx = argv.indexOf('--from');
+    const positional = argv.filter((a) => !a.startsWith('--'));
+    if (!positional[0] || fromIdx === -1 || !argv[fromIdx + 1]) {
+      console.error(
+        'usage: node foresift-autopilot.mjs --seed-package-planning <package-id> --from <source-tree-root>',
+      );
+      process.exit(2);
+    }
+    const res = promotePackagePlanningArtifacts(positional[0], argv[fromIdx + 1]);
+    console.log(JSON.stringify(res, null, 2));
+    process.exit(res.ok ? 0 : 1);
   }
   if (argv.includes('--restart-package')) {
     if (!argv.includes('--fresh-generation'))

@@ -1,19 +1,20 @@
 /**
  * Package-local security error vocabulary (FR-SEC-001…012; plan material
- * decision 3). Every perimeter gate refuses fail-closed with ONE of these
+ * decision 3), genuinely extending the domain {@link ForesiftError} base.
+ * Every perimeter gate refuses fail-closed with ONE of these
  * stable machine codes so callers and telemetry branch on `code`, never on
  * prose. Values never change once released; new refusals add new codes.
  *
- * Relationship to `@foresift/domain`: these classes live beside — not
- * inside — the domain ErrorCode because that file is outside this package's
- * binding write scopes. They MIRROR the domain `ForesiftError` SHAPE
- * (code/detail/message contract) rather than extending it: narrowing
- * `code` from `ErrorCode` down to `SecErrorCode` in a subclass is not type-
- * sound without widening the domain base class itself. Callers narrow with
- * {@link isForesiftSecurityError}. Reconciling runtime inheritance (domain
- * base gaining `ErrorCode | string` typing) is a recorded follow-up task,
- * deliberately NOT silently forced with lying casts.
+ * Relationship to `@foresift/domain`: {@link ForesiftSecurityError} now
+ * GENUINELY extends the domain `ForesiftError` base. The domain base keeps
+ * its closed `ErrorCode` vocabulary as the generic DEFAULT while accepting
+ * a subclass code type (R5/M8 reconciliation), so security refusals are
+ * first-class Foresift errors — catchable by the domain narrowing guard —
+ * WITHOUT weakening `SecErrorCode` narrowing or resorting to casts. Callers
+ * narrow with {@link isForesiftSecurityError}; domain-level handlers narrow
+ * with the domain `isForesiftError`.
  */
+import { ForesiftError } from '@foresift/domain';
 
 /** Stable machine-readable security error codes (values never change). */
 export const SecErrorCode = {
@@ -172,25 +173,20 @@ function secSubclass(
 }
 
 /**
- * Base class for every security-perimeter refusal. Mirrors the domain
- * `ForesiftError` shape (see the file header for why it does not extend it)
- * while callers additionally narrow on `SecErrorCode` values. Carries the
- * ES `cause` chain like every repository error class.
+ * Base class for every security-perimeter refusal. Extends the domain
+ * `ForesiftError` with THIS package's closed `SecErrorCode` vocabulary as
+ * the generic code parameter; carries structured detail and the ES `cause`
+ * chain like every repository error class.
  */
-export class ForesiftSecurityError extends Error {
-  readonly code: SecErrorCode | string;
-  readonly detail: SecErrorDetail;
-
+export class ForesiftSecurityError extends ForesiftError<SecErrorCode> {
   constructor(
-    code: SecErrorCode | string,
+    code: SecErrorCode,
     message: string,
     detail: SecErrorDetail = {},
     options?: ErrorOptions,
   ) {
-    super(`${code}: ${message}`, options);
+    super(code, message, detail, options);
     this.name = 'ForesiftSecurityError';
-    this.code = code;
-    this.detail = detail;
   }
 }
 

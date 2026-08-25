@@ -84,13 +84,23 @@ export type ErrorCode = (typeof ErrorCode)[keyof typeof ErrorCode];
 /** Context carried alongside a machine code (never secrets). */
 export type ErrorDetail = Readonly<Record<string, string | number | boolean | null>>;
 
-/** Base class for every refusal this system raises. Fail-closed by construction. */
-export class ForesiftError extends Error {
-  readonly code: ErrorCode;
+/**
+ * Base class for every refusal this system raises. Fail-closed by
+ * construction.
+ *
+ * The machine-code type is a GENERIC (`C extends string`, defaulting to the
+ * domain `ErrorCode`) so perimeter packages can subclass with their OWN
+ * closed code vocabularies (e.g. security's `SecErrorCode`) while every
+ * domain consumer keeps exact `ErrorCode` narrowing — no casts, no widened
+ * `code: ErrorCode | string` field weakening switch exhaustiveness.
+ * `options` threads the ES `cause` chain like every repository error class.
+ */
+export class ForesiftError<C extends string = ErrorCode> extends Error {
+  readonly code: C;
   readonly detail: ErrorDetail;
 
-  constructor(code: ErrorCode, message: string, detail: ErrorDetail = {}) {
-    super(`${code}: ${message}`);
+  constructor(code: C, message: string, detail: ErrorDetail = {}, options?: ErrorOptions) {
+    super(`${code}: ${message}`, options);
     this.name = 'ForesiftError';
     this.code = code;
     this.detail = detail;
@@ -100,10 +110,20 @@ export class ForesiftError extends Error {
 function subclass(
   name: string,
   defaultCode: ErrorCode,
-): new (message: string, detail?: ErrorDetail, code?: ErrorCode) => ForesiftError {
+): new (
+  message: string,
+  detail?: ErrorDetail,
+  code?: ErrorCode,
+  options?: ErrorOptions,
+) => ForesiftError {
   return class extends ForesiftError {
-    constructor(message: string, detail: ErrorDetail = {}, code: ErrorCode = defaultCode) {
-      super(code, message, detail);
+    constructor(
+      message: string,
+      detail: ErrorDetail = {},
+      code: ErrorCode = defaultCode,
+      options?: ErrorOptions,
+    ) {
+      super(code, message, detail, options);
       this.name = name;
     }
   };

@@ -73,6 +73,22 @@ describe('security error hierarchy (M22)', () => {
     expect((error as { cause?: unknown }).cause).toBe(cause);
   });
 
+  it('GENUINELY extends the domain ForesiftError base (R5/M8 reconciliation)', async () => {
+    const { ForesiftError, isForesiftError } = await import('@foresift/domain');
+    for (const [Ctor, name] of TABLE) {
+      const error = new Ctor('boom', {});
+      expect(error, name).toBeInstanceOf(ForesiftError);
+      expect(isForesiftError(error), name).toBe(true);
+      // The machine code stays THIS package's vocabulary at runtime.
+      expect(Object.values(SecErrorCode), name).toContain(error.code);
+    }
+    // The rendered message still leads with the security machine code.
+    const sample = new sec.EgressError('nope', {}, SecErrorCode.SEC_EGRESS_HOST_NOT_ALLOWLISTED);
+    expect(sample.message.startsWith(`${SecErrorCode.SEC_EGRESS_HOST_NOT_ALLOWLISTED}: `)).toBe(
+      true,
+    );
+  });
+
   it('the barrel re-exports the full perimeter surface', async () => {
     for (const [, name] of TABLE) {
       expect(sec, name).toHaveProperty(name);

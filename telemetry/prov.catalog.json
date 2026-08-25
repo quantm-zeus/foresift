@@ -1,0 +1,493 @@
+{
+  "$schema": "https://foresift.dev/schemas/telemetry-catalog-v1.json",
+  "catalog": "prov",
+  "description": "Provider-lifecycle telemetry events for operation registration, seven-state lifecycle transitions and their refusals, verification-TTL expiry and AC-270 refresh, deprecation detection and sunset incidents, time-bounded migration exceptions, metadata-only response quarantine, sixteen-field rights changes with fail-closed use decisions and artifact actions, activation-readiness blocks, and source fingerprints. Quarantine events carry hashes, field paths, and sizes only — never payload or key material; no event ever reports an unreasoned state change.",
+  "contractStatus": "DECLARATIVE_CONTRACT_ONLY — this file defines the event contracts the requirement manifest maps to (telemetry/prov.*); emitter wiring lands with the observability milestone (dependency group G2), so nothing publishes these event names yet. Field lists mirror the authoritative schemas in packages/shared-schemas/src/prov.ts exactly.",
+  "requirementsCovered": [
+    "FR-PROV-001",
+    "FR-PROV-002",
+    "FR-PROV-003",
+    "FR-PROV-008",
+    "FR-PROV-009",
+    "FR-PROV-010"
+  ],
+  "recoveryDataClass": "CRITICAL_METADATA",
+  "events": [
+    {
+      "name": "operation.registered",
+      "description": "A versioned provider operation definition entered the registry after registration-time validation refused prohibited capability classes; the operation starts at lifecycle state DISCOVERED.",
+      "requirementRefs": ["FR-PROV-001"],
+      "tier": "CRITICAL_METADATA",
+      "fields": [
+        { "name": "providerId", "type": "string", "required": true },
+        { "name": "operationId", "type": "string", "required": true },
+        { "name": "version", "type": "string", "required": true },
+        {
+          "name": "currentState",
+          "type": "string(DISCOVERED|VERIFIED|ACTIVE|DEGRADED|DEPRECATED|BLOCKED|REMOVED)",
+          "required": true,
+          "notes": "§12.11 seven-state alphabet; always DISCOVERED at first registration of a version."
+        },
+        {
+          "name": "capabilityClass",
+          "type": "string(READ_MARKET|READ_SECURITY|READ_IDENTITY|READ_TRANSACTION_RAW|READ_TRANSACTION_HISTORY|READ_ACCOUNT_STATE|READ_SOCIAL_AGGREGATE|STREAM_PROGRAM_EVENT|QUOTE_READ_ONLY)",
+          "required": true,
+          "notes": "§15.2 vocabulary minus the PROHIBITED_* classes, which are unrepresentable at registration."
+        },
+        {
+          "name": "costClass",
+          "type": "string(FREE_UNMETERED|FREE_QUOTA|PAID_EXPLICIT|UNKNOWN_COST|DISABLED)",
+          "required": true
+        },
+        { "name": "declaredIndependenceGroup", "type": "string", "required": true },
+        { "name": "upstreamLineage", "type": "array<string>", "required": true },
+        { "name": "licensePolicyId", "type": "string", "required": true },
+        { "name": "allowedInStrictFree", "type": "boolean", "required": true },
+        { "name": "paidFallbackAllowed", "type": "boolean", "required": true },
+        { "name": "protectedReserveEligible", "type": "boolean", "required": true },
+        {
+          "name": "deprecatedAt",
+          "type": "string<utc-timestamp>|null",
+          "required": true,
+          "notes": "Null unless the registered version is already deprecated."
+        },
+        { "name": "sunsetAt", "type": "string<utc-timestamp>|null", "required": true },
+        {
+          "name": "replacementOperationId",
+          "type": "string|null",
+          "required": true,
+          "notes": "Replacement pointer consumed by the decoder-authority validator and §15.4 rule 5 replay resolution."
+        },
+        {
+          "name": "verificationExpiresAt",
+          "type": "string<utc-timestamp>",
+          "required": true,
+          "notes": "Earliest expiry across the operation's verification kinds (§15.3)."
+        },
+        {
+          "name": "forbiddenOutputFields",
+          "type": "array<string>",
+          "required": true,
+          "notes": "Output fields stripped before any persistence or model-context reach."
+        },
+        {
+          "name": "negativeCapabilities",
+          "type": "array<string>",
+          "required": true,
+          "notes": "Non-empty on every registered operation — the scan-surface metadata demanded by AC-254."
+        },
+        { "name": "registeredAt", "type": "string<utc-timestamp>", "required": true }
+      ]
+    },
+    {
+      "name": "lifecycle.transitioned",
+      "description": "A guarded lifecycle transition validated against the legal transition graph and appended to the immutable prov_lifecycle_events ledger under its idempotency key.",
+      "requirementRefs": ["FR-PROV-001"],
+      "tier": "CRITICAL_METADATA",
+      "fields": [
+        { "name": "providerId", "type": "string", "required": true },
+        { "name": "operationId", "type": "string", "required": true },
+        { "name": "operationVersion", "type": "string", "required": true },
+        {
+          "name": "fromState",
+          "type": "string(DISCOVERED|VERIFIED|ACTIVE|DEGRADED|DEPRECATED|BLOCKED|REMOVED)",
+          "required": true
+        },
+        {
+          "name": "toState",
+          "type": "string(DISCOVERED|VERIFIED|ACTIVE|DEGRADED|DEPRECATED|BLOCKED|REMOVED)",
+          "required": true
+        },
+        {
+          "name": "reasonClass",
+          "type": "string",
+          "required": true,
+          "notes": "Stable machine code from the registry's reason-class vocabulary — transitions without a required reason class refuse."
+        },
+        { "name": "actor", "type": "string", "required": true },
+        { "name": "evidenceRefs", "type": "array<string>", "required": true },
+        {
+          "name": "idempotencyKey",
+          "type": "string",
+          "required": true,
+          "notes": "UNIQUE fence — retries cannot double-append (INV-009); historical evidence is never mutated."
+        },
+        { "name": "occurredAt", "type": "string<utc-timestamp>", "required": true }
+      ]
+    },
+    {
+      "name": "lifecycle.transition_refused",
+      "description": "A lifecycle transition was refused fail-closed because the legal graph, reason-class rule, or fencing rejected it; the projected current state is unchanged.",
+      "requirementRefs": ["FR-PROV-001"],
+      "tier": "CRITICAL_METADATA",
+      "fields": [
+        { "name": "providerId", "type": "string", "required": true },
+        { "name": "operationId", "type": "string", "required": true },
+        { "name": "operationVersion", "type": "string", "required": true },
+        {
+          "name": "attemptedFromState",
+          "type": "string(DISCOVERED|VERIFIED|ACTIVE|DEGRADED|DEPRECATED|BLOCKED|REMOVED)",
+          "required": true
+        },
+        {
+          "name": "attemptedToState",
+          "type": "string(DISCOVERED|VERIFIED|ACTIVE|DEGRADED|DEPRECATED|BLOCKED|REMOVED)",
+          "required": true
+        },
+        {
+          "name": "refusalReason",
+          "type": "string",
+          "required": true,
+          "notes": "Typed machine reason (illegal edge, missing reason class, duplicate idempotency key, …)."
+        },
+        {
+          "name": "currentState",
+          "type": "string(DISCOVERED|VERIFIED|ACTIVE|DEGRADED|DEPRECATED|BLOCKED|REMOVED)",
+          "required": true,
+          "notes": "Equals attemptedFromState — a refusal never moves the projection."
+        },
+        { "name": "refusedAt", "type": "string<utc-timestamp>", "required": true }
+      ]
+    },
+    {
+      "name": "verification.expired",
+      "description": "A verification record lapsed its configured TTL under the injected clock; new active use of decision-critical fields is prevented until reverification and the §15.4 rule-3 health outcome was applied.",
+      "requirementRefs": ["FR-PROV-002", "FR-PROV-001"],
+      "tier": "CRITICAL_METADATA",
+      "fields": [
+        { "name": "verificationRecordId", "type": "string", "required": true },
+        { "name": "providerId", "type": "string", "required": true },
+        { "name": "operationId", "type": "string", "required": true },
+        { "name": "operationVersion", "type": "string", "required": true },
+        {
+          "name": "kind",
+          "type": "string(DOCUMENTATION|PRICING_PLAN|QUOTA|RIGHTS|SCHEMA|ENDPOINT|AUTHENTICATION|DEPRECATION|LIVE_PROBE)",
+          "required": true
+        },
+        {
+          "name": "source",
+          "type": "string(OFFICIAL_DOC|LIVE_CONTRACT)",
+          "required": true
+        },
+        { "name": "verifiedAt", "type": "string<utc-timestamp>", "required": true },
+        { "name": "expiresAt", "type": "string<utc-timestamp>", "required": true },
+        {
+          "name": "healthOutcome",
+          "type": "string(PLAN_UNVERIFIED|RIGHTS_UNVERIFIED|DEGRADED)",
+          "required": true,
+          "notes": "§15.4 rule 3 mapping; the paired out-of-ACTIVE movement is its own lifecycle.transitioned event."
+        },
+        { "name": "detectedAt", "type": "string<utc-timestamp>", "required": true }
+      ]
+    },
+    {
+      "name": "verification.refreshed",
+      "description": "A verification kind was re-proven within TTL; active decision-critical use resumes only when BOTH the OFFICIAL_DOC and LIVE_CONTRACT verifications of the lapsed kind hold (AC-270 pair rule).",
+      "requirementRefs": ["FR-PROV-002"],
+      "tier": "CRITICAL_METADATA",
+      "fields": [
+        { "name": "verificationRecordId", "type": "string", "required": true },
+        { "name": "providerId", "type": "string", "required": true },
+        { "name": "operationId", "type": "string", "required": true },
+        { "name": "operationVersion", "type": "string", "required": true },
+        {
+          "name": "kind",
+          "type": "string(DOCUMENTATION|PRICING_PLAN|QUOTA|RIGHTS|SCHEMA|ENDPOINT|AUTHENTICATION|DEPRECATION|LIVE_PROBE)",
+          "required": true
+        },
+        {
+          "name": "source",
+          "type": "string(OFFICIAL_DOC|LIVE_CONTRACT)",
+          "required": true
+        },
+        {
+          "name": "evidenceRefs",
+          "type": "array<string>",
+          "required": true,
+          "notes": "Non-empty — every verification record carries its evidence references."
+        },
+        { "name": "verifiedAt", "type": "string<utc-timestamp>", "required": true },
+        {
+          "name": "expiresAt",
+          "type": "string<utc-timestamp>",
+          "required": true,
+          "notes": "verifiedAt plus the configured per-kind/per-provider TTL."
+        },
+        {
+          "name": "activeUseRestored",
+          "type": "boolean",
+          "required": true,
+          "notes": "True only when both pair members are current; a single-source refresh leaves active use blocked."
+        },
+        { "name": "evaluatedAt", "type": "string<utc-timestamp>", "required": true }
+      ]
+    },
+    {
+      "name": "deprecation.detected",
+      "description": "An operation's deprecatedAt became effective: new feature-dependency registration is blocked unless a valid migration exception exists, and sunset handling is armed.",
+      "requirementRefs": ["FR-PROV-003"],
+      "tier": "CRITICAL_METADATA",
+      "fields": [
+        { "name": "providerId", "type": "string", "required": true },
+        { "name": "operationId", "type": "string", "required": true },
+        { "name": "operationVersion", "type": "string", "required": true },
+        { "name": "deprecatedAt", "type": "string<utc-timestamp>", "required": true },
+        { "name": "sunsetAt", "type": "string<utc-timestamp>|null", "required": true },
+        {
+          "name": "replacementOperationId",
+          "type": "string|null",
+          "required": true,
+          "notes": "Required for the replacement path; null records an unresolved replacement (which blocks sole-critical-source use)."
+        },
+        {
+          "name": "newDependenciesBlocked",
+          "type": "boolean",
+          "required": true,
+          "notes": "Always true while no valid time-bounded migration exception covers the operation (§15.4 rule 1)."
+        },
+        { "name": "detectedAt", "type": "string<utc-timestamp>", "required": true }
+      ]
+    },
+    {
+      "name": "sunset.incident_raised",
+      "description": "A sunset date or official deprecation notice raised an incident through the security incidents API with a migration deadline (§15.4 rule 2).",
+      "requirementRefs": ["FR-PROV-003"],
+      "tier": "CRITICAL_METADATA",
+      "fields": [
+        { "name": "incidentId", "type": "string", "required": true },
+        { "name": "providerId", "type": "string", "required": true },
+        { "name": "operationId", "type": "string", "required": true },
+        { "name": "operationVersion", "type": "string", "required": true },
+        {
+          "name": "trigger",
+          "type": "string(SUNSET_DATE|OFFICIAL_DEPRECATION_NOTICE)",
+          "required": true
+        },
+        { "name": "sunsetAt", "type": "string<utc-timestamp>|null", "required": true },
+        { "name": "migrationDeadline", "type": "string<utc-timestamp>", "required": true },
+        { "name": "raisedAt", "type": "string<utc-timestamp>", "required": true }
+      ]
+    },
+    {
+      "name": "migration_exception.granted",
+      "description": "A time-bounded migration exception bound to an approved replacement plan was granted for a deprecated operation; it authorizes only until its expiry instant.",
+      "requirementRefs": ["FR-PROV-003"],
+      "tier": "CRITICAL_METADATA",
+      "fields": [
+        { "name": "exceptionId", "type": "string", "required": true },
+        { "name": "providerId", "type": "string", "required": true },
+        { "name": "operationId", "type": "string", "required": true },
+        { "name": "operationVersion", "type": "string", "required": true },
+        { "name": "approver", "type": "string", "required": true },
+        {
+          "name": "replacementPlanRef",
+          "type": "string",
+          "required": true,
+          "notes": "Approved replacement-plan reference — exceptions without one do not grant."
+        },
+        { "name": "grantedAt", "type": "string<utc-timestamp>", "required": true },
+        {
+          "name": "exceptionExpiresAt",
+          "type": "string<utc-timestamp>",
+          "required": true,
+          "notes": "Strictly after grantedAt; evaluated at use time against the injected clock — no grace windows."
+        }
+      ]
+    },
+    {
+      "name": "migration_exception.expired",
+      "description": "A migration exception lapsed by expiry or revocation; the deprecated operation re-blocked automatically at use time (fail-closed).",
+      "requirementRefs": ["FR-PROV-003"],
+      "tier": "CRITICAL_METADATA",
+      "fields": [
+        { "name": "exceptionId", "type": "string", "required": true },
+        { "name": "providerId", "type": "string", "required": true },
+        { "name": "operationId", "type": "string", "required": true },
+        { "name": "operationVersion", "type": "string", "required": true },
+        {
+          "name": "cause",
+          "type": "string(EXPIRED|REVOKED)",
+          "required": true
+        },
+        { "name": "exceptionExpiresAt", "type": "string<utc-timestamp>|null", "required": true },
+        { "name": "revokedAt", "type": "string<utc-timestamp>|null", "required": true },
+        { "name": "reBlockedAt", "type": "string<utc-timestamp>", "required": true }
+      ]
+    },
+    {
+      "name": "response.quarantined",
+      "description": "A provider response matching one of the five malicious-response classes was rejected, quarantined metadata-only, audited, and excluded from model context. No payload-body field exists anywhere in the quarantine schema — hazardous material is structurally unpersistable.",
+      "requirementRefs": ["FR-PROV-008"],
+      "tier": "CRITICAL_METADATA",
+      "fields": [
+        { "name": "quarantineId", "type": "string", "required": true },
+        { "name": "providerId", "type": "string", "required": true },
+        { "name": "operationId", "type": "string", "required": true },
+        { "name": "operationVersion", "type": "string", "required": true },
+        {
+          "name": "detectedClasses",
+          "type": "array<string(TRANSACTION_PAYLOAD|SIGNING_REQUEST|EXECUTABLE_INSTRUCTION|PRIVATE_KEY_FIELD|UNEXPECTED_WRITE_CAPABILITY)>",
+          "required": true,
+          "notes": "The five FR-PROV-008 classes; non-empty."
+        },
+        {
+          "name": "fieldPaths",
+          "type": "array<string>",
+          "required": true,
+          "notes": "Paths of the offending fields — structure only, never values."
+        },
+        {
+          "name": "payloadSha256",
+          "type": "string",
+          "required": true,
+          "notes": "sha256:<hex> of the rejected bytes — never the bytes themselves; private-key material is not persisted even for forensics."
+        },
+        { "name": "byteSize", "type": "integer", "required": true },
+        {
+          "name": "disposition",
+          "type": "string(REJECTED)",
+          "required": true,
+          "notes": "Constant — quarantine intake is always a rejection."
+        },
+        {
+          "name": "modelContextExclusion",
+          "type": "string(ENFORCED)",
+          "required": true,
+          "notes": "Constant CHECK — exclusion from evidence/model context is recorded as enforced, never assumed."
+        },
+        { "name": "auditChainRef", "type": "string", "required": true },
+        { "name": "quarantinedAt", "type": "string<utc-timestamp>", "required": true }
+      ]
+    },
+    {
+      "name": "rights.changed",
+      "description": "A versioned change of the sixteen-field data-rights matrix was recorded, naming the use paths that became newly prohibited for affected storage, derived use, redistribution, caching, export, and model-use decisions.",
+      "requirementRefs": ["FR-PROV-009"],
+      "tier": "CRITICAL_METADATA",
+      "fields": [
+        { "name": "rightsChangeId", "type": "string", "required": true },
+        { "name": "providerId", "type": "string", "required": true },
+        { "name": "operationId", "type": "string", "required": true },
+        { "name": "fromRightsVersion", "type": "string", "required": true },
+        { "name": "toRightsVersion", "type": "string", "required": true },
+        { "name": "termsVersion", "type": "string", "required": true },
+        {
+          "name": "newlyProhibitedUses",
+          "type": "array<string(STORAGE|CACHE|RAW_RETENTION|DERIVED_USE|MODEL_USE|REDISTRIBUTION|EXPORT|PUBLIC_ALERT_DERIVATIVE)>",
+          "required": true,
+          "notes": "Empty arrays are valid only for pure loosening changes — loosening never silently reactivates paths without reverification."
+        },
+        { "name": "changedAt", "type": "string<utc-timestamp>", "required": true }
+      ]
+    },
+    {
+      "name": "rights.use_blocked",
+      "description": "The immediate fail-closed rights decision API refused requested use paths against the rights version captured at evaluation — a tightening applies to new attempts instantly.",
+      "requirementRefs": ["FR-PROV-009"],
+      "tier": "CRITICAL_METADATA",
+      "fields": [
+        { "name": "decisionId", "type": "string", "required": true },
+        { "name": "providerId", "type": "string", "required": true },
+        { "name": "operationId", "type": "string", "required": true },
+        { "name": "operationVersion", "type": "string", "required": true },
+        {
+          "name": "evaluatedRightsVersion",
+          "type": "string",
+          "required": true,
+          "notes": "Rights version governing this decision — artifacts captured under older versions re-evaluate against it."
+        },
+        {
+          "name": "requestedPaths",
+          "type": "array<string(STORAGE|CACHE|RAW_RETENTION|DERIVED_USE|MODEL_USE|REDISTRIBUTION|EXPORT|PUBLIC_ALERT_DERIVATIVE)>",
+          "required": true
+        },
+        {
+          "name": "blockedPaths",
+          "type": "array<string(STORAGE|CACHE|RAW_RETENTION|DERIVED_USE|MODEL_USE|REDISTRIBUTION|EXPORT|PUBLIC_ALERT_DERIVATIVE)>",
+          "required": true,
+          "notes": "Subset of requestedPaths refused under the evaluated matrix; non-empty on this event."
+        },
+        {
+          "name": "rightsChangeId",
+          "type": "string|null",
+          "required": true,
+          "notes": "Change driving newly prohibited refusals; null for pre-existing prohibitions."
+        },
+        { "name": "evaluatedAt", "type": "string<utc-timestamp>", "required": true }
+      ]
+    },
+    {
+      "name": "rights.action_executed",
+      "description": "A previously stored restricted artifact was enumerated by a rights tightening and its QUARANTINE or RETIRE action executed durably — enumeration is complete, with no silent retention.",
+      "requirementRefs": ["FR-PROV-009"],
+      "tier": "CRITICAL_METADATA",
+      "fields": [
+        { "name": "actionId", "type": "string", "required": true },
+        { "name": "rightsChangeId", "type": "string", "required": true },
+        { "name": "artifactId", "type": "string", "required": true },
+        {
+          "name": "artifactObjectRef",
+          "type": "string",
+          "required": true,
+          "notes": "Object-store reference registered at capture time."
+        },
+        {
+          "name": "action",
+          "type": "string(QUARANTINE|RETIRE)",
+          "required": true,
+          "notes": "Per the updated rights policy — never deletion-by-rewrite; states move ACTIVE → QUARANTINED|RETIRED."
+        },
+        { "name": "executedAt", "type": "string<utc-timestamp>", "required": true }
+      ]
+    },
+    {
+      "name": "readiness.blocked",
+      "description": "The provider-side activation-readiness evaluator held BLOCKED with typed reasons over rights verification, lifecycle state, verification freshness, migration-exception validity, and prohibited-operation exposure (AC-272 inputs to the future workspace/public gate).",
+      "requirementRefs": ["FR-PROV-009", "FR-PROV-002", "FR-PROV-003"],
+      "tier": "CRITICAL_METADATA",
+      "fields": [
+        { "name": "evaluationId", "type": "string", "required": true },
+        { "name": "providerId", "type": "string", "required": true },
+        { "name": "operationId", "type": "string", "required": true },
+        { "name": "operationVersion", "type": "string", "required": true },
+        {
+          "name": "blockedReasons",
+          "type": "array<string(RIGHTS_UNVERIFIED|VERIFICATION_EXPIRED|DEPRECATED_WITHOUT_VALID_EXCEPTION|PROHIBITED_EXPOSURE)>",
+          "required": true,
+          "notes": "Non-empty — BLOCKED never holds without typed reasons; ELIGIBLE evaluations emit no event."
+        },
+        { "name": "evaluatedAt", "type": "string<utc-timestamp>", "required": true }
+      ]
+    },
+    {
+      "name": "fingerprint.captured",
+      "description": "A source fingerprint of one of the six kinds was captured as canonical JSON and stored versioned for the future empirical dependence estimator (INV-008: provider count is not source independence).",
+      "requirementRefs": ["FR-PROV-010"],
+      "tier": "CRITICAL_METADATA",
+      "fields": [
+        { "name": "fingerprintId", "type": "string", "required": true },
+        { "name": "providerId", "type": "string", "required": true },
+        { "name": "operationId", "type": "string", "required": true },
+        { "name": "operationVersion", "type": "string", "required": true },
+        {
+          "name": "kind",
+          "type": "string(UPSTREAM_LINEAGE|VALUE_CORRELATION|TIMING_BEHAVIOR|OUTAGE_CORRELATION|SCHEMA_CHARACTERISTICS|FIRST_SEEN_BEHAVIOR)",
+          "required": true
+        },
+        {
+          "name": "payloadSha256",
+          "type": "string",
+          "required": true,
+          "notes": "sha256:<hex> of the canonical JSON fingerprint bytes; the store keeps the canonical payload and estimator-input references."
+        },
+        {
+          "name": "estimatorInputRefs",
+          "type": "array<string>",
+          "required": true,
+          "notes": "References to the raw inputs the dependence estimator will consume (§15.7)."
+        },
+        { "name": "computedAt", "type": "string<utc-timestamp>", "required": true }
+      ]
+    }
+  ]
+}

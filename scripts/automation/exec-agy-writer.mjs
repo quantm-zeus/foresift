@@ -10,9 +10,12 @@
 // its hard-won archon provider semantics (defect-#10 retry integration).
 //
 // `exec-agy-writer.mjs` runs one parallel-lane writer through the installed
-// Antigravity CLI in headless print mode. It is the bash-node seam for hybrid
-// lanes because production Archon v0.9 ships no agy provider adapter (and
-// mission §17 forbids modifying production Archon). Fail-closed by contract:
+// Antigravity CLI in headless stream-json mode (the ONLY mode that executes
+// real tools — see R6/R7 in .optimizer-evidence/v4-defects-and-runtime-
+// findings.md: `--print` answers WITHOUT running tools and hallucinated a
+// successful write). It is the bash-node seam for hybrid lanes because
+// production Archon v0.9 ships no agy provider adapter (and mission §17
+// forbids modifying production Archon). Fail-closed by contract:
 //   - the writer brief is rendered verbatim into the prompt;
 //   - the run must produce `$ARTIFACTS_DIR/writer-results/<lane>/result.json`
 //     with schema foresift/writer-result@1 or the process exits non-zero;
@@ -20,6 +23,12 @@
 //   - the wave guard re-verifies EVERYTHING afterwards regardless of engine,
 //     so an agy lane enjoys exactly the same authority boundaries as a claude
 //     lane (private worktree, write-disjoint paths, recomputed diffs).
+//
+// Envelope-status law (R7): a completed agy turn can report status "ERROR"
+// purely because its artifact-path permission declarer rejects writes outside
+// its own scratch/brain dirs — even when every operation really executed.
+// The envelope status is therefore FORENSIC ONLY; the binding gate is the
+// result.json completion contract plus the downstream wave guard.
 //
 // No credentials are read, moved, or logged here; `agy` uses its own OAuth
 // state under ~/.gemini/antigravity-cli. Never commit that state.
@@ -106,29 +115,45 @@ async function main() {
   if (!existsSync(args.brief)) fail(`brief not found: ${args.brief}`);
 
   const brief = readFileSync(args.brief, 'utf8');
+  // R7 (live probe): agy resolves RELATIVE paths against its own scratch dir,
+  // not the process cwd — only ABSOLUTE paths land in the target tree. The
+  // prompt therefore pins the worktree and manifest by absolute path.
   const prompt = [
     brief,
     '',
-    'Execute this brief now, inside the current directory (your private',
-    'worktree). Follow its completion contract EXACTLY: implement every',
-    'assigned unit, run the listed targeted tests, commit coherent slices,',
-    'and finish by writing the required result manifest with your real',
-    'branch name and HEAD sha. Do not touch anything outside this worktree.',
+    'Execute this brief now. Your private worktree is the directory:',
+    `  ${args.worktree}`,
+    'Use ABSOLUTE paths (rooted at that worktree) for EVERY file you create',
+    'or edit — relative paths land in a scratch area outside the worktree.',
+    'Follow the completion contract EXACTLY: implement every assigned unit,',
+    'run the listed targeted tests with absolute paths, commit coherent',
+    'slices there as you go, and finish by writing the required result',
+    'manifest with your real branch name and HEAD sha.',
+    'Do not touch anything outside that worktree.',
     '',
     `RESULT MANIFEST ABSOLUTE PATH (write exactly here): ${args.resultsDir}/result.json`,
   ].join('\n');
 
+  // stream-json turn protocol (R7): one NDJSON input line per turn; requires
+  // --output-format stream-json. Tools really execute in this mode.
+  const ndjson = `${JSON.stringify({
+    event: 'user',
+    message: { role: 'user', content: prompt },
+  })}\n`;
   const timeoutMs = args.timeoutMs ?? 45 * 60_000;
-  const r = spawnSync('agy --print "$AGY_PROMPT" --output-format json --print-timeout 45m', {
-    shell: true,
-    cwd: args.worktree,
-    encoding: 'utf8',
-    timeout: timeoutMs,
-    maxBuffer: 64 * 1024 * 1024,
-    env: { ...process.env, AGY_PROMPT: prompt },
-  });
-  // The JSON envelope goes to stdout; keep it for forensics next to results.
-  const outPath = `${args.resultsDir}/agy-run.json`;
+  const r = spawnSync(
+    'agy --input-format stream-json --output-format stream-json --disable-slash-commands --dangerously-skip-permissions',
+    {
+      shell: true,
+      cwd: args.worktree,
+      input: ndjson,
+      encoding: 'utf8',
+      timeout: timeoutMs,
+      maxBuffer: 64 * 1024 * 1024,
+    },
+  );
+  // Full event stream goes to forensics next to the results.
+  const outPath = `${args.resultsDir}/agy-run.jsonl`;
   try {
     writeFileSync(outPath, r.stdout ?? '');
   } catch {
@@ -137,14 +162,18 @@ async function main() {
   if (r.error) fail(`agy spawn failed: ${r.error.message}`);
   if (r.status !== 0) fail(`agy exited ${r.status}: ${(r.stderr ?? '').slice(-400)}`);
 
-  let envelope = null;
-  try {
-    envelope = JSON.parse((r.stdout ?? '').trim().split('\n').pop() ?? '');
-  } catch {
-    envelope = null;
+  // The LAST `result` event carries the terminal turn state.
+  let resultEvent = null;
+  for (const line of (r.stdout ?? '').split('\n')) {
+    try {
+      const e = JSON.parse(line);
+      if (e?.event === 'result') resultEvent = e.result ?? null;
+    } catch {
+      /* non-JSON line — ignore */
+    }
   }
-  if (envelope?.status !== 'SUCCESS')
-    fail(`agy did not report SUCCESS: ${JSON.stringify(envelope)?.slice(0, 200)}`);
+  if (!resultEvent) fail('agy produced no stream-json result event');
+  // Envelope status is FORENSIC ONLY (R7 false-ERROR quirk); record and move on.
 
   const resultFile = `${args.resultsDir}/result.json`;
   if (!existsSync(resultFile))

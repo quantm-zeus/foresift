@@ -48,6 +48,33 @@ no upgrade performed (mission §17: verify installed behavior, don't upgrade).
 - **R5 — bash-node `$node.output` capture.** The captured output is the
   node's raw stdout text; verdict-routing when-gates therefore require the
   V3 gate-router stdout discipline (single token). See defect #14.
+- **R6 — `agy --print` does NOT execute tools.** Headless print mode
+  (`--print`, even with `--mode accept-edits`) answers WITHOUT running any
+  tool: asked to create+commit a file it replied `SUCCESS`/"AGY_WRITE_OK"
+  with `num_turns:1` while NO file existed (reproduced twice) — a
+  hallucinated completion that only an artifact-level contract check
+  exposes. Never use print mode as an executor.
+- **R7 — agy stream-json turn protocol (decoded empirically 2026-08-25).**
+  Real tool execution requires stdin NDJSON:
+  `{"event":"user","message":{"role":"user","content":PROMPT}}`, one line
+  per turn, with `--input-format stream-json --output-format stream-json`
+  (a positional prompt is rejected in this mode). Verified live:
+  `write_to_file` + git add/commit + result reporting all execute for real.
+  Three operational quirks discovered by probe:
+  1. RELATIVE paths resolve against agy's own scratch dir
+     (`~/.gemini/antigravity-cli/scratch/…`), NOT the process cwd — prompts
+     must pin ABSOLUTE paths for every write;
+  2. a fully-successful out-of-scratch-writing turn can end
+     `status:"ERROR"` because agy's artifact-path permission declarer
+     rejects paths outside its `brain/<conversation>/` dir AFTER the work
+     already happened ⇒ envelope status is FORENSIC ONLY; the binding gate
+     is the writer-result completion contract + wave guards;
+  3. unsupported input events are cheap to detect: stderr warning
+     `ignoring unsupported stream input message event %q`.
+  Executor rewritten accordingly (`exec-agy-writer.mjs` main()); proven
+  end-to-end on a disposable repo: exact file content, real commit on the
+  pinned lane branch, honest `foresift/writer-result@1` manifest whose
+  headSha matched `git rev-parse HEAD`.
 
 ## Part C — Runtime canary methodology (reusable)
 

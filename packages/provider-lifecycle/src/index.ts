@@ -14,3 +14,8 @@ export * from './operation-registry.ts';
 export * from './verification-ttl.ts';
 export * from './deprecation-rules.ts';
 export * from './migration-exceptions.ts';
+export * from './response-quarantine.ts';
+export * from './rights-matrix.ts';
+export * from './artifact-registry.ts';
+export * from './source-fingerprints.ts';
+export * from './readiness.ts';

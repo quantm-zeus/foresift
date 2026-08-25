@@ -80,7 +80,6 @@ export class ProviderAuditBridge {
     readonly actor: string;
     readonly providerId: string;
     readonly operationId: string;
-    readonly version: string;
     readonly fromRightsVersion: number;
     readonly toRightsVersion: number;
     readonly newlyProhibitedUses: readonly string[];
@@ -90,12 +89,44 @@ export class ProviderAuditBridge {
       occurredAt: input.occurredAt,
       actor: input.actor,
       actionClass: 'RIGHTS_CHANGE',
-      subject: providerSubject(input.providerId, input.operationId, input.version),
+      subject: providerSubject(input.providerId, input.operationId, 'rights'),
       payload: {
         changeId: input.changeId,
         fromRightsVersion: input.fromRightsVersion,
         toRightsVersion: input.toRightsVersion,
         newlyProhibitedUses: [...input.newlyProhibitedUses],
+      },
+    });
+  }
+
+  /**
+   * Malicious-response quarantine facts (FR-PROV-008, AC-259/AC-271):
+   * BLOCKED_OPERATION carries the metadata-only refusal. The payload holds
+   * classes/paths/hash/size ONLY — hazardous material is structurally
+   * absent from the audit entry too.
+   */
+  async responseQuarantined(input: {
+    readonly occurredAt: UtcTimestamp;
+    readonly actor: string;
+    readonly providerId: string;
+    readonly operationId: string;
+    readonly detectedClasses: readonly string[];
+    readonly fieldPaths: readonly string[];
+    readonly payloadSha256: string;
+    readonly byteSize: number;
+    readonly quarantineId: string;
+  }): Promise<AuditEventRecord> {
+    return this.chain.append({
+      occurredAt: input.occurredAt,
+      actor: input.actor,
+      actionClass: 'BLOCKED_OPERATION',
+      subject: providerSubject(input.providerId, input.operationId, 'response'),
+      payload: {
+        quarantineId: input.quarantineId,
+        detectedClasses: [...input.detectedClasses],
+        fieldPaths: [...input.fieldPaths],
+        payloadSha256: input.payloadSha256,
+        byteSize: input.byteSize,
       },
     });
   }

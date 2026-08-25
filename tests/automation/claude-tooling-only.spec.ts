@@ -23,8 +23,7 @@ import { classifyPath } from '../../scripts/automation/fast-impact.mjs';
 
 const REPO = join(fileURLToPath(new URL('../..', import.meta.url)));
 
-const SCANNABLE_SOURCE =
-  /\.(ts|tsx|mts|cts|mjs|cjs|js|jsx)$/i;
+const SCANNABLE_SOURCE = /\.(ts|tsx|mts|cts|mjs|cjs|js|jsx)$/i;
 
 function trackedClaudeFiles(): string[] {
   return execFileSync('git', ['ls-files', '.claude/'], { cwd: REPO, encoding: 'utf8' })

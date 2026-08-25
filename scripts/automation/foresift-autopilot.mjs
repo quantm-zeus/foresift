@@ -810,10 +810,18 @@ function promotePackagePlanningArtifacts(packageId, fromRoot) {
 function planningBootstrapHandoff(st, entry, get) {
   const packageId = entry.packageId;
   // 1. Verify the bootstrap's planning truth AT ITS RUN WORKTREE (the only
-  // place it exists until promoted). No path from archon ⇒ fall back to the
-  // main tree (promotion then no-ops); neither provable ⇒ fail closed through
-  // ordinary recovery, never silently onward.
-  const wtPath = get?.path ?? get?.worktree_path ?? get?.workspace_path ?? get?.run?.path ?? null;
+  // place it exists until promoted). Installed archon v0.9 exposes the run
+  // worktree as `working_path` (probed live); the remaining spellings are
+  // tolerant fallbacks. No path from archon ⇒ fall back to the main tree
+  // (promotion then no-ops); neither provable ⇒ fail closed through ordinary
+  // recovery, never silently onward.
+  const wtPath =
+    get?.working_path ??
+    get?.path ??
+    get?.worktree_path ??
+    get?.workspace_path ??
+    get?.run?.path ??
+    null;
   const proof = wtPath ? planCompleteAtRoot(wtPath, packageId) : { complete: false };
   const fallback = proof.complete ? null : planCompleteAtRoot(REPO, packageId);
   if (!(proof.complete || fallback?.complete)) {

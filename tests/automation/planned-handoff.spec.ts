@@ -351,7 +351,7 @@ describe('planning handoff (B: zero impl calls · C: RUNNING preserved · D: imm
   it('completing the bootstrap promotes ONLY scoped planning artifacts and relaunches the SAME package into the wave in the SAME tick', () => {
     const sb = handoffSandbox('handoff-happy');
     const r = tick(sb, ['--once'], {
-      getMap: { 'boot-1': { id: 'boot-1', status: 'completed', path: sb.wtDir } },
+      getMap: { 'boot-1': { id: 'boot-1', status: 'completed', working_path: sb.wtDir } },
     });
     expect(r.status).toBe(0);
 
@@ -385,7 +385,7 @@ describe('planning handoff (B: zero impl calls · C: RUNNING preserved · D: imm
   it('B: the handoff tick issues no provider dispatch other than the wave launch itself', () => {
     const sb = handoffSandbox('handoff-zeroai');
     tick(sb, ['--once'], {
-      getMap: { 'boot-1': { id: 'boot-1', status: 'completed', path: sb.wtDir } },
+      getMap: { 'boot-1': { id: 'boot-1', status: 'completed', working_path: sb.wtDir } },
     });
     const log = archonLog(sb);
     // Every logged invocation is an archon lifecycle command; none is a
@@ -431,7 +431,7 @@ describe('handoff state-machine safety (G: duplicate tick · H: crash-after-laun
     seedState(sb, [bootstrapEntry()]);
     // Tick 1: handoff fires; ack carries NO run id → awaitingDiscovery.
     tick(sb, ['--once'], {
-      getMap: { 'boot-1': { id: 'boot-1', status: 'completed', path: sb.wtDir } },
+      getMap: { 'boot-1': { id: 'boot-1', status: 'completed', working_path: sb.wtDir } },
     });
     let st = readState(sb);
     expect(st.activeRuns[0]?.awaitingDiscovery).toBe(true);
@@ -455,7 +455,7 @@ describe('handoff state-machine safety (G: duplicate tick · H: crash-after-laun
     // runs table proves the wave was already launched before the crash.
     seedState(sb, [bootstrapEntry()]);
     const r = tick(sb, ['--once'], {
-      getMap: { 'boot-1': { id: 'boot-1', status: 'completed', path: sb.wtDir } },
+      getMap: { 'boot-1': { id: 'boot-1', status: 'completed', working_path: sb.wtDir } },
       rows: [waveRow],
     });
     expect(r.status).toBe(0);
@@ -480,7 +480,7 @@ describe('handoff state-machine safety (G: duplicate tick · H: crash-after-laun
       started_at: new Date().toISOString(),
     };
     const r = tick(sb, ['--once'], {
-      getMap: { 'boot-1': { id: 'boot-1', status: 'completed', path: sb.wtDir } },
+      getMap: { 'boot-1': { id: 'boot-1', status: 'completed', working_path: sb.wtDir } },
       rows: [staleBootstrapRow, waveRow],
     });
     expect(r.status).toBe(0);

@@ -78,6 +78,7 @@ import {
 } from './package-generations.mjs';
 import { applySalvage, SALVAGE_MANIFEST_SCHEMA } from './generation-salvage.mjs';
 import { collectFinalizationFacts, evaluateFinalizationFromMain } from './finalize-from-main.mjs';
+import { admitWorkflowForLaunch } from './wave-admission.mjs';
 
 // Overridable for hermetic selftests (sandboxed fixture repo + state dir).
 const REPO = process.env.FORESIFT_AUTOPILOT_REPO ?? join(import.meta.dirname, '..', '..');
@@ -310,16 +311,55 @@ async function sleep(ms) {
 
 // ── package state transitions (version-controlled, machine-driven only) ──────
 /**
+ * Repo-scoped planning-completeness probe for wave admission (defect #18):
+ * runs the SAME deterministic validator the optimized workflow's Phase-1
+ * router uses (`package-plan-complete.mjs`), in its opt-in --repo-only mode —
+ * at launch time no per-run $ARTIFACTS_DIR exists yet. Any spawn or parse
+ * failure counts as INCOMPLETE: fail-closed toward the topology that plans.
+ */
+function repoPlanningComplete(packageId) {
+  try {
+    const r = spawnSync(
+      process.execPath,
+      [
+        join(REPO, 'scripts', 'automation', 'package-plan-complete.mjs'),
+        '--package',
+        packageId,
+        '--repo-only',
+      ],
+      { encoding: 'utf8', cwd: REPO, timeout: 60000 },
+    );
+    if (r.status !== 0 || !r.stdout) return false;
+    return JSON.parse(r.stdout)?.complete === true;
+  } catch {
+    return false;
+  }
+}
+
+/**
  * Workflow variant per EXECUTION GENERATION (V3 ADR-0009) over the historical
  * throughput profile (ADR 0007): every package at generation >= 1 runs the
  * single final optimized topology regardless of the legacy profile table;
  * generation-0 rows keep the historical LEGACY/OPTIMIZED behavior so retired
  * forensic lanes are unchanged. Same single orchestrator, deterministic
  * selection, no behavioral drift for the legacy lane.
+ *
+ * Wave admission gate (defect #18): `foresift-sharded-wave` is an
+ * IMPLEMENTATION-only topology — its prep reads scoped plan/tasks authority
+ * that only planning creates. A package whose repo-scoped planning truth is
+ * incomplete must first take the optimized topology whose Phase-1 router plans
+ * it; later launches/recoveries of the same package then admit to the wave.
+ * Decided strictly at LAUNCH time (before any run exists), persisted into the
+ * tracking row like every other launch identity fact — never re-derived for a
+ * live run, so flip-safety and adoption matching are untouched.
  */
 function workPackageWorkflow(pkgOrId) {
   const pkg = typeof pkgOrId === 'string' ? { id: pkgOrId } : pkgOrId;
-  return workPackageWorkflowFor(pkg);
+  const selected = workPackageWorkflowFor(pkg);
+  const wf = admitWorkflowForLaunch(selected, repoPlanningComplete(pkg.id));
+  if (wf !== selected)
+    log(`WAVE_ADMIT_DEFERRED ${pkg.id}: repo planning incomplete -> ${wf}`);
+  return wf;
 }
 
 /** Generation-aware launch identity for a milestone package record. */

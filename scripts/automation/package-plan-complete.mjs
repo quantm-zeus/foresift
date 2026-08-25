@@ -17,27 +17,41 @@
 //   - tasks exist and every requirement ID traced in tasks.md is one of the
 //     package's assignments (out-of-scope tracing rejected);
 //   - package metadata is structurally valid.
+//
+// `--repo-only` (defect #18): evaluates ONLY the durable repo-scoped planning
+// truth (specs/<pkg>/**) and skips the per-run $ARTIFACTS_DIR copies, which
+// exist only inside a workflow run. This is the launch-seam mode used by the
+// supervisor to decide whether a package may enter the implementation-only
+// sharded wave or must first take the optimized topology whose Phase-1 router
+// plans it. It is strictly opt-in: the in-workflow guard keeps requiring
+// --artifacts-dir so a bash node can never silently skip that block.
 
 import { readFileSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { repoRoot, loadCurrentMilestone, validateMilestoneState, findPackage } from './schema.mjs';
 
 const args = {};
-for (let i = 0; i < process.argv.length - 1; i++) {
+// Full-length scan (not argv.length-1): bare terminal flags like --repo-only
+// must be seen even when they are the LAST argument.
+for (let i = 0; i < process.argv.length; i++) {
   if (process.argv[i] === '--package') args.package = process.argv[i + 1];
   if (process.argv[i] === '--artifacts-dir') args.artifactsDir = process.argv[i + 1];
+  if (process.argv[i] === '--repo-only') args.repoOnly = true;
+  // Test/hermetic override of the repo root (bootstrap-package-spec precedent).
+  if (process.argv[i] === '--root') args.root = process.argv[i + 1];
 }
 // until_bash guards receive NO ARTIFACTS_DIR environment variable (Archon
 // v0.9.0, probe-verified — see docs/adr/0004-archon-until-bash-artifacts-contract.md):
 // guards must pass --artifacts-dir "$ARTIFACTS_DIR", which archon textually
 // substitutes in bare form. The env var remains the fallback for regular
 // workflow bash nodes, where it IS exported.
-const artifactsDir = args.artifactsDir ?? process.env.ARTIFACTS_DIR ?? '';
+const artifactsDir = args.repoOnly ? null : (args.artifactsDir ?? process.env.ARTIFACTS_DIR ?? '');
 if (!args.package) fail('missing --package <id>');
-if (!artifactsDir)
+if (!artifactsDir && !args.repoOnly)
   fail(
     'missing artifacts directory: pass --artifacts-dir "$ARTIFACTS_DIR" ' +
-      '(until_bash guards get no ARTIFACTS_DIR env var) or run inside an Archon bash node',
+      '(until_bash guards get no ARTIFACTS_DIR env var), run inside an Archon bash node, ' +
+      'or pass --repo-only for the supervisor launch-seam mode',
   );
 
 function fail(msg) {
@@ -45,7 +59,7 @@ function fail(msg) {
   process.exit(1);
 }
 
-const root = repoRoot();
+const root = args.root ?? repoRoot();
 const errors = [];
 const pkgDir = join(root, 'specs', args.package);
 
@@ -64,7 +78,7 @@ for (const f of ['spec.md', 'plan.md', 'tasks.md']) {
   else if (readFileSync(p, 'utf8').trim().length < 50)
     errors.push(`specs/${args.package}/${f} is effectively empty`);
 }
-for (const f of ['plan.md', 'plan-context.md']) {
+for (const f of args.repoOnly ? [] : ['plan.md', 'plan-context.md']) {
   const p = join(artifactsDir, f);
   if (!existsSync(p)) errors.push(`missing artifact $ARTIFACTS_DIR/${f}`);
   else if (readFileSync(p, 'utf8').trim().length < 20)

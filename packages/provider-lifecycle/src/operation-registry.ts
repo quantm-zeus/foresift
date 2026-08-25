@@ -231,15 +231,56 @@ export class OperationRegistry {
         [definition.providerId, definition.operationId, definition.version],
       );
       if (duplicate.rows.length > 0) {
-        throw new RegistryError(
-          `operation version already registered: ${definition.providerId}/${definition.operationId}@${definition.version}`,
-          {
-            providerId: definition.providerId,
-            operationId: definition.operationId,
-            version: definition.version,
-          },
-          ProvErrorCode.PROV_OPERATION_VERSION_CONFLICT,
+        const existing = duplicate.rows[0]!;
+        // Identical re-registration is an IDEMPOTENT no-op (INV-009): the
+        // original row and genesis event stand, nothing new appends. A
+        // DIFFERENT definition under the same identity refuses — versions
+        // are immutable truth here, never updatable.
+        const replayingIdentical =
+          canonicalJson(rowToDefinition(existing)) === canonicalJson(definition);
+        if (!replayingIdentical) {
+          throw new RegistryError(
+            `operation version already registered: ${definition.providerId}/${definition.operationId}@${definition.version}`,
+            {
+              providerId: definition.providerId,
+              operationId: definition.operationId,
+              version: definition.version,
+            },
+            ProvErrorCode.PROV_OPERATION_VERSION_CONFLICT,
+          );
+        }
+        const genesisRows = await tx.query<Record<string, unknown>>(
+          'SELECT * FROM prov.prov_lifecycle_events WHERE idempotency_key = $1',
+          [`prov-register:${definition.providerId}:${definition.operationId}:${definition.version}`],
         );
+        const g = genesisRows.rows[0];
+        if (g === undefined) {
+          throw new RegistryError(
+            `registration row without its genesis ledger event: ${definition.providerId}/${definition.operationId}@${definition.version}`,
+            { providerId: definition.providerId, operationId: definition.operationId },
+            ProvErrorCode.PROV_DEFINITION_INVALID,
+          );
+        }
+        return {
+          definition,
+          previousCapabilityClass: null,
+          genesisEvent: LifecycleEventRecordSchema.parse({
+            seq: Number(g.seq),
+            providerId: g.provider_id,
+            operationId: g.operation_id,
+            operationVersion: g.operation_version,
+            fromState: g.from_state ?? null,
+            toState: g.to_state,
+            reasonClass: g.reason_class,
+            actor: g.actor,
+            occurredAt: iso(g.occurred_at as Date | string),
+            evidenceRefs:
+              typeof g.evidence_refs === 'string'
+                ? (JSON.parse(g.evidence_refs) as unknown)
+                : g.evidence_refs,
+            idempotencyKey: g.idempotency_key,
+          }),
+        };
       }
 
       // Latest prior version's capability class, for the change attestation.

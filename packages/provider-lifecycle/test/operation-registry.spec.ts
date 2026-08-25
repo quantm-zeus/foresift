@@ -153,10 +153,23 @@ describe('operation registration (§15.3)', () => {
     ).rejects.toMatchObject({ code: ProvErrorCode.PROV_PROVIDER_UNKNOWN });
   });
 
-  it('refuses re-registering a live version instead of overwriting it', async () => {
-    await expect(registry.registerOperation(validDefinition())).rejects.toMatchObject({
-      code: ProvErrorCode.PROV_OPERATION_VERSION_CONFLICT,
-    });
+  it('treats identical re-registration as an idempotent replay and refuses MUTATION of a live version', async () => {
+    // Identical content: no-op replay returning the ORIGINAL genesis event.
+    const replay = await registry.registerOperation(validDefinition());
+    expect(replay.genesisEvent.idempotencyKey).toBe('prov-register:prov-a:get-account:1.0.0');
+    // No second genesis event appended (INV-004: one registration, one event).
+    const events = await engine.query<{ n: string }>(
+      "SELECT count(*)::text AS n FROM prov.prov_lifecycle_events WHERE idempotency_key = 'prov-register:prov-a:get-account:1.0.0'",
+    );
+    expect(Number(events.rows[0]?.n)).toBe(1);
+
+    // Any content change under the same identity refuses — versions are
+    // immutable truth, never overwritten.
+    await expect(
+      registry.registerOperation({ ...validDefinition(), timeoutMs: 9999 }),
+    ).rejects.toMatchObject({ code: ProvErrorCode.PROV_OPERATION_VERSION_CONFLICT });
+    const readBack = await registry.getDefinition('prov-a', 'get-account', '1.0.0');
+    expect(readBack?.timeoutMs).not.toBe(9999);
   });
 });
 

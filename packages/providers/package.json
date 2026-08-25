@@ -1,0 +1,26 @@
+{
+  "name": "@foresift/providers",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Foresift audited read-only provider adapter framework: injectable fetch seam bound to exact per-adapter allowlists composed with the security EgressGuard, capability-class-validating adapter registration, declarative per-provider operation catalogs, and the GMGN (strictly query-only) and Helius (raw/history + local decoding) reference adapters.",
+  "exports": {
+    ".": {
+      "types": "./src/index.ts",
+      "default": "./src/index.ts"
+    }
+  },
+  "scripts": {
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@foresift/domain": "workspace:*",
+    "@foresift/provider-lifecycle": "workspace:*",
+    "@foresift/security": "workspace:*",
+    "@foresift/shared-schemas": "workspace:*",
+    "zod": "^3.25.76"
+  },
+  "devDependencies": {
+    "vitest": "4.1.11"
+  }
+}

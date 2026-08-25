@@ -437,11 +437,16 @@ recorded here per governance rather than silently dropped:
       code SEC_WEBHOOK_DEDUPE_STATE_UNAVAILABLE. The production store
       backing (delivery-wiring persistence) stays outside writeScopes;
       recorded in out-of-scope notes.
-- [ ] R5 Error-inheritance reconciliation prerequisite (review M8): make
-      `ForesiftSecurityError` genuinely extend the domain `ForesiftError` by
-      widening the domain base (`code` type) in `packages/domain` — outside
-      this package's writeScopes, hence deferred with the mirror-shape
-      documentation kept honest in `packages/security/src/errors.ts`.
+- [x] R5 Error-inheritance reconciliation prerequisite (review M8):
+      DELIVERED — the domain `ForesiftError` base now takes its machine-code
+      type as a GENERIC (`C extends string`, default `ErrorCode`) and threads
+      ES `cause` options, so `ForesiftSecurityError` genuinely extends it as
+      `ForesiftError<SecErrorCode>` with NO lying casts: domain consumers
+      keep exact ErrorCode narrowing, security refusals satisfy the domain
+      narrowing guard, and the constructor requires this package's closed
+      vocabulary. The minimal `packages/domain/src/errors.ts` widening is a
+      recorded out-of-scope necessity (out-of-scope notes item 6); pinned by
+      the error-hierarchy spec's inheritance table test.
 - [ ] R6 Record ADR-0017 capturing this round's material decisions (ADR-0016
       is already taken by the data-truth decimals-independence ADR; use the
       next free slot and re-check `docs/adr/` at execution time):

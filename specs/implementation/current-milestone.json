@@ -87,7 +87,7 @@
         "test -d packages/tenant-isolation && pnpm --filter @foresift/tenant-isolation test",
         "node scripts/scan-prohibited-capabilities/cli.mjs"
       ],
-      "status": "RUNNING"
+      "status": "PROVEN"
     },
     {
       "id": "g0-tool-core",

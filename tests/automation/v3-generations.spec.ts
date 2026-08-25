@@ -90,11 +90,15 @@ describe('generation identity math', () => {
     );
     // ...but EVERY package at generation >= 1 runs the one optimized workflow.
     expect(usesOptimizedWorkflow({ id: 'g0-contracts-data-truth', generation: 1 })).toBe(true);
+    // V4 rollout flip (authorized by .optimizer-evidence/v4-acceptance-
+    // matrix.md): the optimized family's ACTIVE production topology is now
+    // the sharded wave; the optimized DAG remains reachable via OFF/CANARY
+    // states (pinned in sharded-wave-rollout.spec.ts).
     expect(workPackageWorkflowFor({ id: 'g0-contracts-data-truth', generation: 1 })).toBe(
-      'foresift-work-package-optimized',
+      'foresift-sharded-wave',
     );
     expect(workPackageWorkflowFor({ id: 'some-other-package', generation: 0 })).toBe(
-      'foresift-work-package-optimized',
+      'foresift-sharded-wave',
     );
     expect(workPackageWorkflowFor(null)).toBe('foresift-work-package');
   });
@@ -843,7 +847,10 @@ describe('first tick drains the queued main fast-forward before selection', () =
     expect(entry?.message).toBe(`${PKG}@g1`);
     expect(entry?.branch).toBe(`foresift/${PKG}-g1`);
     const archonLog = readFileSync(join(stateDir, 'archon.log'), 'utf8');
-    expect(archonLog).toContain('foresift-work-package-optimized');
+    // V4 rollout flip: the autopilot's default launch workflow for an
+    // OPTIMIZED-profile package is the ACTIVE production topology (the
+    // sharded wave) — see .optimizer-evidence/v4-acceptance-matrix.md.
+    expect(archonLog).toContain('foresift-sharded-wave');
     expect(archonLog).toContain(`${PKG}@g1`);
   });
 });

@@ -419,24 +419,32 @@ is implemented, reconciled into pinned specs, and verified:
 Deferred items below are EXPLICITLY UNCHECKED — each is real remaining work,
 recorded here per governance rather than silently dropped:
 
-- [ ] R3 Step-up PROOF CONSUMPTION seam (review M11b, priority P1):
-      `evaluateHighImpactAction` proves freshness/class/ownership but does
-      not register proofs as consumed — replaying one captured proof inside
-      its freshness window is currently admissible at the policy layer.
-      Requires a consumed-proof registry keyed by `proofId` wired at the
-      mcp-surface layer (outside this package's writeScopes) plus a gate
-      option to consult it.
-- [ ] R4 Durable webhook dedupe backing (review M6, priority P1): the
-      in-memory per-process replay cache bounds replays within one process
-      only. Cross-restart/replica immunity needs the wiring layer to persist
-      the emitted dedupe key (`eventId:sha256(payload)`) into shared durable
-      state before acknowledging deliveries.
+- [x] R3 Step-up PROOF CONSUMPTION seam (review M11b, priority P1): DELIVERED
+      on this branch as the consultable `ConsumedProofRegistry` gate option:
+      proofs already cleared once refuse with the new shared-schema reason
+      STEP_UP_PROOF_CONSUMED even inside their freshness window; registry
+      consultation failures refuse fail-closed; an ALLOW is marked consumed
+      before returning and failing marks propagate loudly. The durable,
+      idempotent registry IMPLEMENTATION stays with the mcp-surface wiring
+      layer (outside writeScopes; recorded in out-of-scope notes).
+- [x] R4 Durable webhook dedupe backing (review M6, priority P1): DELIVERED
+      on this branch as the optional `WebhookDedupeStore` seam on
+      WebhookGuard: replay checks consult shared durable state alongside the
+      local cache, the dedupe key (`eventId:sha256(payloadBytes)`, unchanged
+      persistence contract) is persisted BEFORE success returns
+      (durable-before-ack), put failures propagate with nothing remembered,
+      and an unanswerable backing store refuses fail-closed with the new
+      code SEC_WEBHOOK_DEDUPE_STATE_UNAVAILABLE. The production store
+      backing (delivery-wiring persistence) stays outside writeScopes;
+      recorded in out-of-scope notes.
 - [ ] R5 Error-inheritance reconciliation prerequisite (review M8): make
       `ForesiftSecurityError` genuinely extend the domain `ForesiftError` by
       widening the domain base (`code` type) in `packages/domain` — outside
       this package's writeScopes, hence deferred with the mirror-shape
       documentation kept honest in `packages/security/src/errors.ts`.
-- [ ] R6 Record ADR-0016 capturing this round's material decisions:
+- [ ] R6 Record ADR-0017 capturing this round's material decisions (ADR-0016
+      is already taken by the data-truth decimals-independence ADR; use the
+      next free slot and re-check `docs/adr/` at execution time):
       nonce-matched fence format as THE untrusted-content consumption
       contract, CAS-guarded containment transitions, evidence-withholding
       credential refusal + `strictPresentation` deployment guidance, and the

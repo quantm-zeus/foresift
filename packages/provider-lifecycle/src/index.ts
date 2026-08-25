@@ -11,3 +11,6 @@ export * from './lifecycle-states.ts';
 export * from './audit-bridges.ts';
 export * from './lifecycle-machine.ts';
 export * from './operation-registry.ts';
+export * from './verification-ttl.ts';
+export * from './deprecation-rules.ts';
+export * from './migration-exceptions.ts';

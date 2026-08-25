@@ -117,13 +117,13 @@ Format: `- [ ] T### [P?]` — **[P]** = parallelizable with its neighbors
       fresh/stale TTL table with the PRD example defaults, per-deployment
       override at composition time, boundary units (fresh-until vs
       stale-until edges). Traces: FR-CORE-006.
-- [ ] T403 Implement the cache stage chain in
+- [x] T403 Implement the cache stage chain in
       `packages/tool-core/src/stages/cache.ts` (stages 6–11): request-local
       memoization → fresh → acceptable-stale → post-lease re-check; store-side
       write only when rights and cache policy permit (stage 20); PIT-safe
       lookups. Units cover order short-circuiting and stale admission rules.
       Traces: FR-CORE-006.
-- [ ] T404 Implement `packages/tool-core/src/single-flight.ts` (FR-CORE-006):
+- [x] T404 Implement `packages/tool-core/src/single-flight.ts` (FR-CORE-006):
       database lease acquisition with fencing token across MCP-manual /
       ChatGPT / admin-chat / automation holder modes; expiry handling;
       release-with-fence-validation refusing stale holders (INV-009);
@@ -131,21 +131,21 @@ Format: `- [ ] T### [P?]` — **[P]** = parallelizable with its neighbors
 
 ## Phase E — Extension-point seams (quota + license)
 
-- [ ] T501 Define `packages/tool-core/src/quota-contract.ts` (FR-CORE-007):
+- [x] T501 Define `packages/tool-core/src/quota-contract.ts` (FR-CORE-007):
       `QuotaReservationAdapter` interface (estimate/admission/reserve/commit/
       release against reservation records), lifecycle enforcement helpers over
       the Phase-B state machine, and composition-root injection seam. The
       shipped default adapter is an explicitly deny-closed TEST double living
       outside `src/` (fixture module) — no production cost semantics here.
       Contract unit tests incl. unknown-cost refusal. Traces: FR-CORE-007.
-- [ ] T502 [P] Define `packages/tool-core/src/license-contract.ts`
+- [x] T502 [P] Define `packages/tool-core/src/license-contract.ts`
       (FR-CORE-008): `LicensePolicySource` interface returning typed verdicts
       {allowed, policyVersion, reason}; default fail-closed source that
       refuses any call whose rights status cannot be verified; verdict feeds
       both execution admission and cache-key license component. Units:
       unverifiable-rights refusal, version-pinned allow.
       Traces: FR-CORE-008.
-- [ ] T503 Prove seam stability (milestone objective): a reference adapter
+- [x] T503 Prove seam stability (milestone objective): a reference adapter
       pair DEFINED OUTSIDE `packages/tool-core/src/**` (test-fixture module)
       implements both interfaces and drives the full pipeline without any edit
       to tool-core sources; CI grep asserts tool-core src contains no cost-

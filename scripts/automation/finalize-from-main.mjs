@@ -206,7 +206,10 @@ function git(repo, args) {
 }
 
 function ghJson(args) {
-  const out = execFileSync('gh', [...args, '--json'], { encoding: 'utf8' });
+  // Callers pass the COMPLETE argv incl. `--json <fields>`; appending another
+  // bare --json here makes gh reject the whole invocation (observed live:
+  // both lookups silently degraded to empty results).
+  const out = execFileSync('gh', args, { encoding: 'utf8' });
   return JSON.parse(out);
 }
 
@@ -316,7 +319,7 @@ export async function collectFinalizationFacts(packageId, repo, extra = {}) {
       '--limit',
       '15',
       '--json',
-      'databaseId,headSha,conclusion,url,createdAt',
+      'databaseId,headSha,conclusion,url,startedAt',
     ]);
   } catch {}
 

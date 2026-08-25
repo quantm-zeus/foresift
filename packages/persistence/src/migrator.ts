@@ -1,6 +1,6 @@
 /**
  * Deterministic schema migrator for
- * `migrations/g<generation>_(data|dr|sec)_*.sql`.
+ * `migrations/g<generation>_(data|dr|sec|core)_*.sql`.
  *
  * - Files apply in lexicographic filename order, one transaction each.
  * - Applied state lives in `_foresift_schema_migrations` with a sha256
@@ -41,8 +41,9 @@ export const SCHEMA_MIGRATIONS_TABLE = '_foresift_schema_migrations';
 export const SCHEMA_MIGRATION_LEASES_TABLE = '_foresift_schema_migration_leases';
 
 // Filename families: `data` (identity/observations/features), `dr` (recovery),
-// `sec` (security perimeter). Unknown families stay refused fail-closed.
-const MIGRATION_FILE_PATTERN = /^g\d+_(data|dr|sec)_\d{4}_[a-z0-9_]+\.sql$/;
+// `sec` (security perimeter), `core` (shared tool core state machines).
+// Unknown families stay refused fail-closed.
+const MIGRATION_FILE_PATTERN = /^g\d+_(data|dr|sec|core)_\d{4}_[a-z0-9_]+\.sql$/;
 
 const MIGRATION_LEASE_KEY = 'schema-migrations-apply';
 
@@ -107,7 +108,7 @@ function checksumOf(content: string): string {
 
 /**
  * Discover migration files in `dir` (lexicographic order). Every `.sql`
- * entry MUST belong to a known `<generation>_(data|dr|sec)_<4-digit-seq>_<name>`
+ * entry MUST belong to a known `<generation>_(data|dr|sec|core)_<4-digit-seq>_<name>`
  * family — anything else is a loud refusal, so a renamed or foreign script
  * can never be silently skipped.
  */

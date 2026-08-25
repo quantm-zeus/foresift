@@ -14,3 +14,4 @@ export * from './source.ts';
 export * from './feature.ts';
 export * from './recovery.ts';
 export * from './clock.ts';
+export * from './tool.ts';

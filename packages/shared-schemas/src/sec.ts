@@ -173,6 +173,7 @@ export type HighImpactActionScope = z.infer<typeof HighImpactActionScopeSchema>;
 export const ActionGateRefusalReasonSchema = z.enum([
   'STEP_UP_MISSING',
   'STEP_UP_STALE',
+  'STEP_UP_PROOF_CONSUMED',
   'AUTHENTICATOR_CLASS_INSUFFICIENT',
   'SCOPE_MISMATCH',
   'CSRF_INVALID',

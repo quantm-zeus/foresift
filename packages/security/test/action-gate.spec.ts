@@ -312,3 +312,70 @@ describe('csrf double-submit + origin binding', () => {
     ).toEqual({ valid: false, reason: 'ORIGIN_BOUNDARY' });
   });
 });
+
+// M11b (R3): proof-consumption seam — a proof that already cleared the gate
+// once is SPENT even inside its freshness window; the registry is consultable,
+// fail-closed, and written before an ALLOW reaches its caller.
+describe('consumed-proof registry seam (M11b)', () => {
+  function makeRegistry() {
+    const consumed = new Set<string>();
+    return {
+      registry: {
+        isConsumed: (proofId: string) => consumed.has(proofId),
+        markConsumed: (proofId: string) => {
+          consumed.add(proofId);
+        },
+      },
+      consumed,
+    };
+  }
+
+  it('marks the proof consumed after an ALLOW decision', async () => {
+    const { registry, consumed } = makeRegistry();
+    const { gate } = makeGate({ consumedProofs: registry });
+    const decision = await gate.evaluateHighImpactAction(baseRequest);
+    expect(decision.outcome).toBe('ALLOW');
+    expect([...consumed]).toEqual(['proof-1']);
+  });
+
+  it('refuses a REPLAYED proof with STEP_UP_PROOF_CONSUMED inside its freshness window', async () => {
+    const { registry } = makeRegistry();
+    // Same captured proof presented twice against two gates sharing one
+    // durable registry (the wiring-layer deployment shape).
+    const first = makeGate({ consumedProofs: registry });
+    const firstDecision = await first.gate.evaluateHighImpactAction(baseRequest);
+    expect(firstDecision.outcome).toBe('ALLOW');
+    const second = makeGate({ consumedProofs: registry });
+    const replay = await second.gate.evaluateHighImpactAction(baseRequest);
+    expect(replay.outcome).toBe('REFUSE');
+    if (replay.outcome === 'REFUSE') {
+      expect(replay.reasons).toContain('STEP_UP_PROOF_CONSUMED');
+    }
+  });
+
+  it('fails CLOSED when the registry cannot answer', async () => {
+    const failing = {
+      isConsumed: () => {
+        throw new Error('registry backend down');
+      },
+      markConsumed: () => undefined,
+    };
+    const { gate } = makeGate({ consumedProofs: failing });
+    const decision = await gate.evaluateHighImpactAction(baseRequest);
+    expect(decision.outcome).toBe('REFUSE');
+    if (decision.outcome === 'REFUSE') {
+      expect(decision.reasons).toContain('STEP_UP_PROOF_CONSUMED');
+    }
+  });
+
+  it('propagates a failing markConsumed instead of returning an unconfirmed ALLOW', async () => {
+    const failingMark = {
+      isConsumed: () => false,
+      markConsumed: () => {
+        throw new Error('durable write lost');
+      },
+    };
+    const { gate } = makeGate({ consumedProofs: failingMark });
+    await expect(gate.evaluateHighImpactAction(baseRequest)).rejects.toThrow(/durable write lost/);
+  });
+});

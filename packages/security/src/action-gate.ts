@@ -9,6 +9,9 @@
  *   - fresh, phishing-resistant step-up proof — TOTP (RECOVERY_TOTP) is
  *     NEVER sufficient on its own; freshness is evaluated against an
  *     INJECTED clock so policy windows are testable and cannot drift;
+ *   - proof single-use via an optional consultable consumed-proof registry
+ *     (`ConsumedProofRegistry`, M11b): a replayed proof refuses as
+ *     STEP_UP_PROOF_CONSUMED even inside its freshness window;
  *   - exact authorization scope match against the Appendix B
  *     `admin:high:*` class;
  *   - valid double-submit + origin-bound CSRF token (`./csrf.ts`);
@@ -61,6 +64,23 @@ const REFUSED_AUDIT_CLASS = 'BLOCKED_OPERATION' as const;
  */
 export const PROOF_CLOCK_SKEW_TOLERANCE_MS = 60_000;
 
+/**
+ * Consumed-step-up-proof registry (M11b seam). `evaluateHighImpactAction`
+ * proves freshness/class/ownership but cannot, by itself, make a proof
+ * single-use — within its freshness window a captured proof would replay.
+ * The registry is keyed by `proofId` and MUST be backed by shared durable
+ * state at the wiring layer (the mcp-surface owner), consulted before every
+ * evaluation and written before an ALLOW decision reaches its caller — the
+ * same durable-before-ack discipline as webhook dedupe (M6). Registries must
+ * be idempotent: a mark that raced an audit failure may be retried.
+ */
+export interface ConsumedProofRegistry {
+  /** True when this proofId has already cleared the gate once. */
+  readonly isConsumed: (proofId: string) => Promise<boolean> | boolean;
+  /** Record the proof as consumed; failures propagate loudly (never swallowed). */
+  readonly markConsumed: (proofId: string) => Promise<void> | void;
+}
+
 export interface ActionGateOptions {
   /**
    * Hash-chained audit sink for decisions. Optional at construction only so
@@ -73,6 +93,12 @@ export interface ActionGateOptions {
    * audit-verification incident is open (Incidents.isOpenAuditChainFailure).
    */
   readonly auditHealthBlocked?: () => Promise<boolean> | boolean;
+  /**
+   * M11b consumption seam: optional consumed-proof registry. When wired,
+   * proofs already marked consumed refuse with STEP_UP_PROOF_CONSUMED and
+   * allowed decisions are recorded as consumed before returning.
+   */
+  readonly consumedProofs?: ConsumedProofRegistry | undefined;
 }
 
 function authenticatorClassSufficient(proof: StepUpProof, policy: StepUpPolicy): boolean {
@@ -91,11 +117,13 @@ export class ActionGate {
   private readonly auditChain: AuditChain | undefined;
   private readonly clock: Clock;
   private readonly auditHealthBlocked: (() => Promise<boolean> | boolean) | undefined;
+  private readonly consumedProofs: ConsumedProofRegistry | undefined;
 
   constructor(options: ActionGateOptions = {}) {
     this.auditChain = options.auditChain;
     this.clock = options.clock ?? systemClock;
     this.auditHealthBlocked = options.auditHealthBlocked;
+    this.consumedProofs = options.consumedProofs;
   }
 
   async evaluateHighImpactAction(request: HighImpactActionRequest): Promise<ActionGateDecision> {
@@ -146,6 +174,18 @@ export class ActionGate {
       if (proof.actor !== request.actor) {
         reasons.push('STEP_UP_MISSING');
       }
+      // M11b: a proof that already cleared the gate once is spent, even
+      // while nominally fresh. Consultation failure refuses too — an
+      // unanswerable registry is missing protection, not a pass.
+      if (this.consumedProofs !== undefined) {
+        let consumed: boolean;
+        try {
+          consumed = await this.consumedProofs.isConsumed(proof.proofId);
+        } catch {
+          consumed = true;
+        }
+        if (consumed) reasons.push('STEP_UP_PROOF_CONSUMED');
+      }
     }
 
     if (this.auditHealthBlocked !== undefined && (await this.auditHealthBlocked())) {
@@ -184,6 +224,16 @@ export class ActionGate {
 
     const parsed = ActionGateDecisionSchema.parse(decision);
     await this.recordDecision(parsed);
+    // M11b: only after the ALLOW decision is durably audited is the proof
+    // marked consumed — and a failing mark propagates loudly so no caller
+    // proceeds on an unconfirmed consume (registries are idempotent).
+    if (
+      parsed.outcome === 'ALLOW' &&
+      this.consumedProofs !== undefined &&
+      parsed.stepUpProofId !== undefined
+    ) {
+      await this.consumedProofs.markConsumed(parsed.stepUpProofId);
+    }
     return parsed;
   }
 

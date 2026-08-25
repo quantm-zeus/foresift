@@ -6,13 +6,16 @@
  *   cryptographic signature verification → replay prevention via an
  *   event-ID + payload-hash cache.
  *
- * REPLAY-CACHE SCOPE CONTRACT (M6): the dedupe cache is deliberately
- * IN-MEMORY and PER-PROCESS. It bounds replays within one process lifetime;
- * it does NOT survive restarts, span replicas, or outlive capacity eviction.
- * Deployments running multiple replicas or requiring cross-restart replay
- * immunity MUST back the dedupe key with shared durable state at the wiring
- * layer (recorded as an explicit pre-wiring task — the key format emitted by
- * `verifyCallback` is the persistence contract).
+ * REPLAY-CACHE SCOPE CONTRACT (M6): the built-in dedupe cache is
+ * deliberately IN-MEMORY and PER-PROCESS. It bounds replays within one
+ * process lifetime; it does NOT survive restarts, span replicas, or outlive
+ * capacity eviction. Deployments running multiple replicas or requiring
+ * cross-restart replay immunity MUST wire a {@link WebhookDedupeStore}
+ * (R4/M6 seam): the guard then consults shared durable state before
+ * accepting and persists the dedupe key BEFORE returning success, so no
+ * delivery is acknowledged on an unpersisted key. The key format emitted by
+ * `verifyCallback` — `eventId:sha256(payloadBytes)` — is the persistence
+ * contract in both modes.
  *
  * The FIXED-ENDPOINT rule lives here too: reconnect/backfill URLs come from
  * CONFIGURATION only — a URL carried inside an event payload is refused as
@@ -51,6 +54,21 @@ export interface CallbackInput {
   readonly signatureTimestamp?: number | undefined;
 }
 
+export type DedupeKey = string;
+
+/**
+ * Durable dedupe backing store (R4/M6 seam). Implementations back the
+ * per-process replay cache with SHARED durable state so replay immunity
+ * survives restarts and spans replicas. `has` must answer for every key any
+ * replica persisted; `put` must make the key durable before the delivery is
+ * acknowledged — the guard refuses to return success on an unpersisted key,
+ * so `put` failures propagate and nothing is remembered locally.
+ */
+export interface WebhookDedupeStore {
+  readonly has: (key: DedupeKey) => Promise<boolean> | boolean;
+  readonly put: (key: DedupeKey) => Promise<void> | void;
+}
+
 export interface WebhookGuardOptions {
   readonly verifier: SignatureVerifier;
   /** Callbacks older than this (seconds) are refused as stale. */
@@ -58,9 +76,14 @@ export interface WebhookGuardOptions {
   /** Injected clock in epoch ms — deterministic tests, honest production. */
   readonly nowMs: () => number;
   readonly replayCacheCapacity?: number;
+  /**
+   * Optional durable dedupe backing (M6). When wired, replay checks consult
+   * it in addition to the local cache; an unavailable backing store refuses
+   * fail-closed (SEC_WEBHOOK_DEDUPE_STATE_UNAVAILABLE) instead of trusting
+   * unprovable freshness.
+   */
+  readonly dedupeStore?: WebhookDedupeStore | undefined;
 }
-
-export type DedupeKey = string;
 
 export class WebhookGuard {
   private readonly verifier: SignatureVerifier;
@@ -68,6 +91,7 @@ export class WebhookGuard {
   private readonly nowMs: () => number;
   private readonly seen: Map<DedupeKey, true>;
   private readonly capacity: number;
+  private readonly dedupeStore: WebhookDedupeStore | undefined;
 
   constructor(options: WebhookGuardOptions) {
     // Fail-closed at construction (L12): a non-finite or non-positive window
@@ -85,6 +109,7 @@ export class WebhookGuard {
     this.nowMs = options.nowMs;
     this.capacity = options.replayCacheCapacity ?? 10_000;
     this.seen = new Map();
+    this.dedupeStore = options.dedupeStore;
   }
 
   /**
@@ -131,14 +156,37 @@ export class WebhookGuard {
       throw new WebhookIntegrityError('callback signature verification failed');
     }
 
-    // 4. Replay prevention: event-ID + payload-hash pair, LRU-bounded.
+    // 4. Replay prevention: event-ID + payload-hash pair, LRU-bounded
+    // locally and — when a durable store is wired (M6) — checked against
+    // shared state spanning restarts and replicas.
     const dedupeKey = `${input.eventId}:${createHash('sha256').update(input.payloadBytes).digest('hex')}`;
-    if (this.seen.has(dedupeKey)) {
+    let durablySeen = false;
+    if (!this.seen.has(dedupeKey) && this.dedupeStore !== undefined) {
+      try {
+        durablySeen = await this.dedupeStore.has(dedupeKey);
+      } catch (cause) {
+        // Fail-closed: an unanswerable dedupe backing cannot prove the
+        // delivery fresh, so it is refused, never processed on faith.
+        throw new WebhookIntegrityError(
+          'dedupe backing store is unavailable; delivery freshness cannot be proven',
+          { dedupeKey },
+          SecErrorCode.SEC_WEBHOOK_DEDUPE_STATE_UNAVAILABLE,
+          { cause: cause instanceof Error ? cause.message : String(cause) },
+        );
+      }
+    }
+    if (this.seen.has(dedupeKey) || durablySeen) {
       throw new WebhookIntegrityError(
         'callback is a replay of an already-processed delivery',
         { dedupeKey },
         SecErrorCode.SEC_WEBHOOK_REPLAY_DETECTED,
       );
+    }
+    if (this.dedupeStore !== undefined) {
+      // Durable-before-ack: persist first, THEN remember locally. A failing
+      // put propagates with nothing remembered, so the sender's retry is
+      // re-verified cleanly instead of being misread as an in-process replay.
+      await this.dedupeStore.put(dedupeKey);
     }
     this.remember(dedupeKey);
     return dedupeKey;

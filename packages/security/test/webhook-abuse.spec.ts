@@ -4,7 +4,7 @@
 // limits, amplification weighting, degrade-not-bypass quotas, enumeration
 // detection, protected monitoring, coordination stubs.
 import { describe, expect, it } from 'vitest';
-import { createHmac } from 'node:crypto';
+import { createHash, createHmac } from 'node:crypto';
 import { hmacSha256Verifier, WebhookGuard } from '../src/webhook-integrity.ts';
 import { WebhookIntegrityError } from '../src/errors.ts';
 import { AbuseController, PROTECTED_SUBJECTS } from '../src/abuse-controls.ts';
@@ -258,5 +258,110 @@ describe('abuse controls (FR-SEC-010)', () => {
     expect(abuse.coordinationScore(60_000)).toBe(1);
     now = 120_000; // outside the window
     expect(abuse.coordinationScore(60_000)).toBe(0);
+  });
+});
+
+// R4 (M6): durable dedupe backing — shared store spans restarts/replicas,
+// is consulted before accepting, persists BEFORE success is returned
+// (durable-before-ack), and refuses fail-closed when it cannot answer.
+describe('durable dedupe backing seam (M6/R4)', () => {
+  const NOW = 1_800_000_000_000;
+
+  function makeDurableGuard(store: {
+    has: (k: string) => boolean | Promise<boolean>;
+    put: (k: string) => void | Promise<void>;
+  }) {
+    const guard = new WebhookGuard({
+      verifier: hmacSha256Verifier(SECRET),
+      maxAgeSeconds: 300,
+      nowMs: () => NOW,
+      dedupeStore: {
+        has: (key) => store.has(key),
+        put: (key) => store.put(key),
+      },
+    });
+    return guard;
+  }
+
+  it('persists the exact dedupe key BEFORE returning success', async () => {
+    const persisted: string[] = [];
+    const guard = makeDurableGuard({
+      has: () => false,
+      put: (key) => {
+        persisted.push(key);
+      },
+    });
+    const body = '{"id":"evt-1"}';
+    await expect(guard.verifyCallback(signed(body, NOW - 10_000))).resolves.toBeDefined();
+    const expectedHash = createHash('sha256').update(encoder.encode(body)).digest('hex');
+    expect(persisted).toEqual([`evt-1:${expectedHash}`]);
+  });
+
+  it('refuses a replay across a RESTART via the shared store', async () => {
+    // Replica A processes and persists; its process then dies (fresh local cache).
+    const persisted = new Set<string>();
+    const replicaA = makeDurableGuard({
+      has: (key) => persisted.has(key),
+      put: (key) => {
+        persisted.add(key);
+      },
+    });
+    await replicaA.verifyCallback(signed('{"id":"evt-1"}', NOW - 10_000));
+    // Replica B (or restarted process): empty in-memory cache, shared store only.
+    const replicaB = makeDurableGuard({
+      has: (key) => persisted.has(key),
+      put: (key) => {
+        persisted.add(key);
+      },
+    });
+    await expect(
+      replicaB.verifyCallback(signed('{"id":"evt-1"}', NOW - 10_000)),
+    ).rejects.toMatchObject({ code: 'SEC_WEBHOOK_REPLAY_DETECTED' });
+    // A DIFFERENT payload under the same event id is still admitted.
+    await expect(
+      replicaB.verifyCallback(signed('{"id":"evt-1","n":2}', NOW - 10_000)),
+    ).resolves.toBeDefined();
+  });
+
+  it('refuses fail-closed when the dedupe backing cannot answer', async () => {
+    const guard = makeDurableGuard({
+      has: () => {
+        throw new Error('durable backend unreachable');
+      },
+      put: () => undefined,
+    });
+    await expect(
+      guard.verifyCallback(signed('{"id":"evt-9"}', NOW - 10_000)),
+    ).rejects.toMatchObject({
+      code: 'SEC_WEBHOOK_DEDUPE_STATE_UNAVAILABLE',
+    });
+  });
+
+  it('never returns success on an unpersisted key — put failures propagate with nothing remembered', async () => {
+    const seen = new Set<string>();
+    let puts = 0;
+    const guard = new WebhookGuard({
+      verifier: hmacSha256Verifier(SECRET),
+      maxAgeSeconds: 300,
+      nowMs: () => NOW,
+      dedupeStore: {
+        has: (key) => seen.has(key),
+        put: (key) => {
+          puts += 1;
+          if (puts === 1) throw new Error('durable write lost');
+          seen.add(key);
+        },
+      },
+    });
+    // First delivery: durable write fails → verifyCallback rejects and the
+    // sender retries; nothing was remembered, so the retry re-verifies cleanly.
+    await expect(guard.verifyCallback(signed('{"id":"evt-2"}', NOW - 10_000))).rejects.toThrow(
+      /durable write lost/,
+    );
+    // Backend recovered: the retried delivery verifies and persists normally.
+    await expect(
+      guard.verifyCallback(signed('{"id":"evt-2"}', NOW - 10_000)),
+    ).resolves.toBeDefined();
+    expect(puts).toBe(2);
   });
 });

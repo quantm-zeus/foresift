@@ -19,6 +19,14 @@
 //   node scripts/automation/foresift-autopilot.mjs --clear-fatal
 //                                                              # fail-closed: refuses when clearing would orphan
 //                                                              # a RUNNING package (use --recover-fatal then)
+//   node scripts/automation/foresift-autopilot.mjs --finalize-from-main <id>
+//                                                              # deterministic fail-closed RUNNING -> PROVEN for a
+//                                                              # package whose implementation ALREADY landed on main
+//                                                              # out-of-band (defect #16 class): proves merged-PR
+//                                                              # ancestry, T-scoped completeness at the main commit,
+//                                                              # green CI on exactly origin/main HEAD, and no live
+//                                                              # execution; refuses otherwise. No AI is invoked.
+//                                                              # Stop the service unit first (singleton lock).
 //   node scripts/automation/foresift-autopilot.mjs --restart-package <id> \
 //        --fresh-generation [--reason "<text>"] [--salvage-manifest <f>]
 //                                                              # supported fresh-generation restart of ONE package
@@ -69,6 +77,7 @@ import {
   workPackageWorkflowFor,
 } from './package-generations.mjs';
 import { applySalvage, SALVAGE_MANIFEST_SCHEMA } from './generation-salvage.mjs';
+import { collectFinalizationFacts, evaluateFinalizationFromMain } from './finalize-from-main.mjs';
 
 // Overridable for hermetic selftests (sandboxed fixture repo + state dir).
 const REPO = process.env.FORESIFT_AUTOPILOT_REPO ?? join(import.meta.dirname, '..', '..');
@@ -1921,6 +1930,59 @@ function seedSalvageGeneration({ packageId, toGeneration, manifest, runInstall =
  * A second identical invocation after completion replays the receipt and exits
  * 0 without creating another generation.
  */
+/**
+ * Supported deterministic finalization (defect #16 follow-up): RUNNING ->
+ * PROVEN for a package whose implementation ALREADY landed on main through an
+ * out-of-band merged PR. The full fail-closed proof standard lives in
+ * finalize-from-main.mjs; this command mutates ONLY on an ok verdict, and
+ * then exclusively through the control plane's own version-controlled state
+ * chore path (setPackageStatus) plus supervisor bookkeeping reconciliation.
+ * No AI provider is ever invoked; nothing is reimplemented; every refusal
+ * leaves all state untouched. Run with the service STOPPED (lock discipline).
+ */
+async function cmdFinalizeFromMain(packageId) {
+  if (!packageId) {
+    console.error('usage: --finalize-from-main <package-id>  (stop the service unit first)');
+    return 1;
+  }
+  const st = loadState();
+  const facts = await collectFinalizationFacts(packageId, REPO, {
+    activeRuns: st.activeRuns,
+    milestoneRuns: st.milestoneRuns,
+    pausedFatal: st.pausedFatal,
+  });
+  const verdict = evaluateFinalizationFromMain(facts);
+  if (!verdict.ok) {
+    console.error(`REFUSED: cannot finalize ${packageId} from main:`);
+    for (const r of verdict.reasons) console.error(`  - ${r}`);
+    record(st, 'finalize_from_main_refused', { packageId, reasons: verdict.reasons });
+    saveState(st);
+    return 1;
+  }
+  const ms = loadCurrentMilestone(REPO);
+  setPackageStatus(ms, packageId, 'PROVEN');
+  // Reconcile this package's own supervisor tracking rows — their run is
+  // terminal (the evaluator refused any live one); retaining them would make
+  // selection skip a PROVEN package's slot forever.
+  for (const list of [st.activeRuns, st.milestoneRuns]) {
+    for (const e of list) {
+      if ((e.packageId ?? null) === packageId && !e.done) {
+        e.done = true;
+        e.note = 'finalized-from-main';
+      }
+    }
+  }
+  record(st, 'package_finalized_from_main', { packageId, ...verdict.evidence });
+  saveState(st);
+  await commitQueue; // let the PROVEN state chore land before this one-shot exits
+  log(
+    `FINALIZED ${packageId} -> PROVEN from merged truth: PR #${verdict.evidence.pr.number}, main ${String(
+      verdict.evidence.mainSha ?? '',
+    ).slice(0, 7)}, CI ${verdict.evidence.ci.databaseId}`,
+  );
+  return 0;
+}
+
 async function cmdRestartPackage(packageId, opts = {}) {
   const reason = String(opts.reason ?? 'unspecified').slice(0, 300);
   const fail = (msg) => {
@@ -2305,6 +2367,10 @@ async function main() {
   if (argv.includes('--recover-fatal')) {
     const positional = argv.filter((a) => !a.startsWith('--'));
     process.exit(await cmdRecoverFatal(positional[0] ?? null));
+  }
+  if (argv.includes('--finalize-from-main')) {
+    const positional = argv.filter((a) => !a.startsWith('--'));
+    process.exit(await cmdFinalizeFromMain(positional[0] ?? null));
   }
   if (argv.includes('--restart-package')) {
     if (!argv.includes('--fresh-generation'))

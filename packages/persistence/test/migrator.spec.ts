@@ -21,6 +21,14 @@ const MIGRATIONS_DIR = path.resolve(
   '../../../migrations',
 );
 
+/**
+ * Sandbox dirs are namespaced PER PROCESS: the full suite legitimately runs
+ * twice concurrently (outer vitest run + the nested gate e2e child), and
+ * fixed-path scratch dirs made the two instances trample each other's
+ * migration-refusal fixtures.
+ */
+const RUN_TAG = `${process.pid}-${Math.random().toString(36).slice(2, 8)}`;
+
 describe('migration suite shape (+AC-243 probe assignments)', () => {
   it('discovers exactly the G0 scripts in lexicographic order', async () => {
     const migrations = await discoverMigrations(MIGRATIONS_DIR);
@@ -37,6 +45,10 @@ describe('migration suite shape (+AC-243 probe assignments)', () => {
       'g0_dr_0003_incidents',
       'g0_dr_0004_tier_measurement_incident_fk',
       'g0_dr_0005_health_state_incident_fk',
+      'g0_sec_0001_audit_chain',
+      'g0_sec_0002_mcp_credentials',
+      'g0_sec_0003_import_quarantine',
+      'g0_sec_0004_incidents_pauses',
     ]);
     for (const m of migrations) {
       expect(m.checksum.startsWith('sha256:')).toBe(true);
@@ -59,11 +71,11 @@ describe('applyMigrations (FR-DATA-001…006, FR-DR-001/002 foundation)', () => 
   });
 
   it(
-    'applies all twelve to an empty database and records state',
+    'applies all G0 scripts to an empty database and records state',
     { timeout: 120_000 },
     async () => {
       const report = await applyMigrations({ engine, migrationsDir: MIGRATIONS_DIR });
-      expect(report.applied.length).toBe(12);
+      expect(report.applied.length).toBe(16);
       expect(report.skipped).toEqual([]);
 
       const recorded = await appliedMigrations(engine);
@@ -80,6 +92,10 @@ describe('applyMigrations (FR-DATA-001…006, FR-DR-001/002 foundation)', () => 
         'g0_dr_0003_incidents',
         'g0_dr_0004_tier_measurement_incident_fk',
         'g0_dr_0005_health_state_incident_fk',
+        'g0_sec_0001_audit_chain',
+        'g0_sec_0002_mcp_credentials',
+        'g0_sec_0003_import_quarantine',
+        'g0_sec_0004_incidents_pauses',
       ]);
     },
   );
@@ -87,7 +103,7 @@ describe('applyMigrations (FR-DATA-001…006, FR-DR-001/002 foundation)', () => 
   it('applies twice without damage (idempotent)', async () => {
     const second = await applyMigrations({ engine, migrationsDir: MIGRATIONS_DIR });
     expect(second.applied).toEqual([]);
-    expect(second.skipped.length).toBe(12);
+    expect(second.skipped.length).toBe(16);
 
     // The full table set still exists exactly once each.
     const tables = await engine.query<{ table_name: string }>(
@@ -133,7 +149,7 @@ describe('failure isolation', () => {
       const engine = createEngine(db, 'pglite');
       try {
         const dirBase = path.dirname(fileURLToPath(import.meta.url));
-        const sandbox = path.join(dirBase, '.tmp-migration-sandbox');
+        const sandbox = path.join(dirBase, `.tmp-migration-sandbox-${RUN_TAG}`);
         const { mkdir, writeFile, rm } = await import('node:fs/promises');
         await rm(sandbox, { recursive: true, force: true });
         await mkdir(sandbox, { recursive: true });
@@ -183,7 +199,7 @@ describe('migrator fail-closed defenses (FR-DATA-001…006 / FR-DR-001/002 subst
   const dirBase = path.dirname(fileURLToPath(import.meta.url));
 
   async function makeSandbox(name: string): Promise<string> {
-    const sandbox = path.join(dirBase, `.tmp-${name}`);
+    const sandbox = path.join(dirBase, `.tmp-${name}-${RUN_TAG}`);
     await rm(sandbox, { recursive: true, force: true });
     await mkdir(sandbox, { recursive: true });
     return sandbox;
@@ -238,7 +254,10 @@ describe('migrator fail-closed defenses (FR-DATA-001…006 / FR-DR-001/002 subst
         expect(report.applied).toEqual(['g0_data_0001_identity']);
       } finally {
         await db.close();
-        await rm(path.join(dirBase, '.tmp-unknown-family'), { recursive: true, force: true });
+        await rm(path.join(dirBase, `.tmp-unknown-family-${RUN_TAG}`), {
+          recursive: true,
+          force: true,
+        });
       }
     },
   );
@@ -265,7 +284,10 @@ describe('migrator fail-closed defenses (FR-DATA-001…006 / FR-DR-001/002 subst
         expect(tables.rows[0]?.t).toBe('g1_future');
       } finally {
         await db.close();
-        await rm(path.join(dirBase, '.tmp-g1-support'), { recursive: true, force: true });
+        await rm(path.join(dirBase, `.tmp-g1-support-${RUN_TAG}`), {
+          recursive: true,
+          force: true,
+        });
       }
     },
   );
@@ -294,7 +316,10 @@ describe('migrator fail-closed defenses (FR-DATA-001…006 / FR-DR-001/002 subst
       expect((await appliedMigrations(engine)).map((m) => m.id)).toEqual(['g0_data_0001_identity']);
     } finally {
       await db.close();
-      await rm(path.join(dirBase, '.tmp-missing-file'), { recursive: true, force: true });
+      await rm(path.join(dirBase, `.tmp-missing-file-${RUN_TAG}`), {
+        recursive: true,
+        force: true,
+      });
     }
   });
 
@@ -332,8 +357,14 @@ describe('migrator fail-closed defenses (FR-DATA-001…006 / FR-DR-001/002 subst
         expect(latecomerTable.rows[0]?.t).toBeNull();
       } finally {
         await db.close();
-        await rm(path.join(dirBase, '.tmp-out-of-order-first'), { recursive: true, force: true });
-        await rm(path.join(dirBase, '.tmp-out-of-order-second'), { recursive: true, force: true });
+        await rm(path.join(dirBase, `.tmp-out-of-order-first-${RUN_TAG}`), {
+          recursive: true,
+          force: true,
+        });
+        await rm(path.join(dirBase, `.tmp-out-of-order-second-${RUN_TAG}`), {
+          recursive: true,
+          force: true,
+        });
       }
     },
   );
@@ -364,7 +395,7 @@ describe('migrator fail-closed defenses (FR-DATA-001…006 / FR-DR-001/002 subst
         expect(await clearMigrationLeases(engine)).toBe(1);
         // …and the same call then applies cleanly.
         const report = await applyMigrations({ engine, migrationsDir: MIGRATIONS_DIR });
-        expect(report.applied.length).toBe(12);
+        expect(report.applied.length).toBe(16);
       } finally {
         await db.close();
       }
@@ -392,7 +423,7 @@ describe('migrator fail-closed defenses (FR-DATA-001…006 / FR-DR-001/002 subst
         expect((cause as ForesiftError).code).toBe(ErrorCode.MIGRATION_APPLY_ALREADY_RUNNING);
 
         // The winning run completed the full application.
-        expect((await appliedMigrations(engine)).length).toBe(12);
+        expect((await appliedMigrations(engine)).length).toBe(16);
         // The loser left no lease behind after its refusal cleanup.
         const leases = await engine.query(`SELECT * FROM ${SCHEMA_MIGRATION_LEASES_TABLE}`);
         expect(leases.rows).toHaveLength(0);
@@ -440,7 +471,10 @@ describe('migrator fail-closed defenses (FR-DATA-001…006 / FR-DR-001/002 subst
         expect(leases.rows).toHaveLength(0);
       } finally {
         await db.close();
-        await rm(path.join(dirBase, '.tmp-lease-release'), { recursive: true, force: true });
+        await rm(path.join(dirBase, `.tmp-lease-release-${RUN_TAG}`), {
+          recursive: true,
+          force: true,
+        });
       }
     },
   );

@@ -5,3 +5,4 @@
 // and tests require zero root-config edits.
 export * from './data.ts';
 export * from './dr.ts';
+export * from './sec.ts';

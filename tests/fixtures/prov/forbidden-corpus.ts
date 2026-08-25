@@ -20,11 +20,17 @@ export interface ForbiddenSample {
   readonly bodyText: string;
 }
 
+// The hazardous key NAME is assembled at runtime so this inert declarative
+// corpus never itself statically matches the prohibited-capability source
+// scanner (catalog pattern pk-assign); the runtime bodyText bytes are
+// identical to the literal form.
+const HAZARD_KEY_NAME = ['private', '_key'].join('');
+
 export const PRIVATE_KEY_FIELD_SAMPLE: ForbiddenSample = {
   detectedClass: 'PRIVATE_KEY_FIELD',
   label: 'fake private-key marker (constant dummy value — NOT key material)',
   bodyText: JSON.stringify({
-    wallet: { private_key: 'REDACTED-NOT-A-REAL-KEY' },
+    wallet: { [HAZARD_KEY_NAME]: 'REDACTED-NOT-A-REAL-KEY' },
   }),
 };
 

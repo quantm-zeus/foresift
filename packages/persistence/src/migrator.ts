@@ -1,6 +1,6 @@
 /**
  * Deterministic schema migrator for
- * `migrations/g<generation>_(data|dr|sec)_*.sql`.
+ * `migrations/g<generation>_(data|dr|sec|prov)_*.sql`.
  *
  * - Files apply in lexicographic filename order, one transaction each.
  * - Applied state lives in `_foresift_schema_migrations` with a sha256
@@ -12,7 +12,7 @@
  *
  * Fail-closed defenses (every refusal is a typed `ForesiftError`, never a guess):
  * - A `.sql` file in the migrations directory that matches no known
- *   `<generation>_(data|dr|sec)_<seq>_<name>` family is refused
+ *   `<generation>_(data|dr|sec|prov)_<seq>_<name>` family is refused
  *   (`MIGRATION_FILENAME_UNKNOWN`) instead of being silently ignored — a
  *   future-generation script (e.g. `g1_data_…`) is discovered and applied,
  *   never dropped.
@@ -41,8 +41,9 @@ export const SCHEMA_MIGRATIONS_TABLE = '_foresift_schema_migrations';
 export const SCHEMA_MIGRATION_LEASES_TABLE = '_foresift_schema_migration_leases';
 
 // Filename families: `data` (identity/observations/features), `dr` (recovery),
-// `sec` (security perimeter). Unknown families stay refused fail-closed.
-const MIGRATION_FILE_PATTERN = /^g\d+_(data|dr|sec)_\d{4}_[a-z0-9_]+\.sql$/;
+// `sec` (security perimeter), `prov` (provider lifecycle). Unknown families
+// stay refused fail-closed.
+const MIGRATION_FILE_PATTERN = /^g\d+_(data|dr|sec|prov)_\d{4}_[a-z0-9_]+\.sql$/;
 
 const MIGRATION_LEASE_KEY = 'schema-migrations-apply';
 
@@ -107,9 +108,10 @@ function checksumOf(content: string): string {
 
 /**
  * Discover migration files in `dir` (lexicographic order). Every `.sql`
- * entry MUST belong to a known `<generation>_(data|dr|sec)_<4-digit-seq>_<name>`
- * family — anything else is a loud refusal, so a renamed or foreign script
- * can never be silently skipped.
+ * entry MUST belong to a known
+ * `<generation>_(data|dr|sec|prov)_<4-digit-seq>_<name>` family — anything
+ * else is a loud refusal, so a renamed or foreign script can never be
+ * silently skipped.
  */
 export async function discoverMigrations(
   dir: string,
@@ -134,7 +136,7 @@ export async function discoverMigrations(
 
 export interface MigratorOptions {
   readonly engine: DatabaseEngine;
-  /** Directory containing `g<generation>_(data|dr|sec)_*.sql` scripts. */
+  /** Directory containing `g<generation>_(data|dr|sec|prov)_*.sql` scripts. */
   readonly migrationsDir: string;
 }
 

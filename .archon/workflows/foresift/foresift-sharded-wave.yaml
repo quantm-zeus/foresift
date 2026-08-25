@@ -38,6 +38,12 @@ nodes:
         --capsule "$ARTIFACTS_DIR/plan-capsule.json" \
         --out "$ARTIFACTS_DIR/briefs" \
         --writer-root "$ARTIFACTS_DIR/wt" --base-head "$BASE"
+      # Hybrid engine routing (V4 §25/§30): writes engine-<lane>.txt containing
+      # either the exact empty-lane sentinel, 'CLAUDE' (default), or 'AGY'
+      # (opt-in via FORESIFT_AGY_LANES AND a runnable agy binary; core lane
+      # never routes AGY). Pure deterministic decision — no AI dispatch here.
+      node scripts/automation/exec-agy-writer.mjs --emit-engine-files \
+        "$ARTIFACTS_DIR/task-graph.json" "$ARTIFACTS_DIR"
       node scripts/automation/check-writer-admission.mjs \
         > "$ARTIFACTS_DIR/admission.json" || true
       # Private worktree + branch per shard, all at the SAME pinned base.
@@ -78,6 +84,16 @@ nodes:
     depends_on: [prep]
     bash: cat "$ARTIFACTS_DIR/briefs/shard-2-brief.md" 2>/dev/null || echo "NO SHARD-2 THIS WAVE"
 
+  # Per-lane ENGINE emitters (V4 §30): content is the empty-lane sentinel
+  # itself when the lane has no shard (so BOTH engine variants stay OFF — the
+  # zero-AI invariant survives the hybrid split), else 'CLAUDE' or 'AGY'.
+  - id: exec-shard-1
+    depends_on: [prep]
+    bash: cat "$ARTIFACTS_DIR/engine-shard-1.txt" 2>/dev/null || echo "CLAUDE"
+  - id: exec-shard-2
+    depends_on: [prep]
+    bash: cat "$ARTIFACTS_DIR/engine-shard-2.txt" 2>/dev/null || echo "CLAUDE"
+
   # ── WRITER LANES (siblings without edges run CONCURRENTLY — proven R3) ───────
   # Each lane is skipped entirely when its brief is absent (empty-lane zero-AI);
   # Defect #10 policy: explicit on_error: all so silent provider empty-streams
@@ -109,8 +125,8 @@ nodes:
       $brief-core.output
 
   - id: writer-shard-1
-    depends_on: [brief-shard-1]
-    when: "$brief-shard-1.output != 'NO SHARD-1 THIS WAVE'"
+    depends_on: [brief-shard-1, exec-shard-1]
+    when: "$exec-shard-1.output == 'CLAUDE'"
     retry:
       max_attempts: 2
       delay_ms: 10000
@@ -132,8 +148,8 @@ nodes:
       $brief-shard-1.output
 
   - id: writer-shard-2
-    depends_on: [brief-shard-2]
-    when: "$brief-shard-2.output != 'NO SHARD-2 THIS WAVE'"
+    depends_on: [brief-shard-2, exec-shard-2]
+    when: "$exec-shard-2.output == 'CLAUDE'"
     retry:
       max_attempts: 2
       delay_ms: 10000
@@ -154,6 +170,47 @@ nodes:
       ===== WRITER BRIEF =====
       $brief-shard-2.output
 
+  # ── HYBRID VARIANTS (V4 §25/§30): Antigravity execution for parallel lanes ───
+  # Opt-in and fail-closed: prep's pure decision routes a lane here ONLY when
+  # FORESIFT_AGY_LANES names it AND the `agy` binary is runnable; otherwise the
+  # CLAUDE command lane runs exactly as proven. Same brief, same private
+  # worktree, same write-authority guard + additive integration downstream —
+  # the engine differs, the authority boundary does not. Retry follows the
+  # defect-#10 policy; the executor enforces the writer-result contract itself.
+  - id: writer-shard-1-agy
+    depends_on: [exec-shard-1]
+    when: "$exec-shard-1.output == 'AGY'"
+    retry:
+      max_attempts: 2
+      delay_ms: 10000
+      on_error: all
+    timeout: 3600000
+    bash: |
+      set -euo pipefail
+      mkdir -p "$ARTIFACTS_DIR/writer-results/shard-1"
+      node scripts/automation/exec-agy-writer.mjs \
+        --lane shard-1 \
+        --brief "$ARTIFACTS_DIR/briefs/shard-1-brief.md" \
+        --worktree "$ARTIFACTS_DIR/wt/shard-1" \
+        --results-dir "$ARTIFACTS_DIR/writer-results/shard-1"
+
+  - id: writer-shard-2-agy
+    depends_on: [exec-shard-2]
+    when: "$exec-shard-2.output == 'AGY'"
+    retry:
+      max_attempts: 2
+      delay_ms: 10000
+      on_error: all
+    timeout: 3600000
+    bash: |
+      set -euo pipefail
+      mkdir -p "$ARTIFACTS_DIR/writer-results/shard-2"
+      node scripts/automation/exec-agy-writer.mjs \
+        --lane shard-2 \
+        --brief "$ARTIFACTS_DIR/briefs/shard-2-brief.md" \
+        --worktree "$ARTIFACTS_DIR/wt/shard-2" \
+        --results-dir "$ARTIFACTS_DIR/writer-results/shard-2"
+
   # ── GUARDS: deterministic write-authority enforcement (override §9) ──────────
   # One guard per lane; each recomputes the actual diff against the pinned base
   # and enforces allowedWritePaths ⊆ scopes. It OVERWRITES result.json with
@@ -173,7 +230,7 @@ nodes:
       node scripts/automation/wave-guard.mjs --shard core \
         --artifacts "$ARTIFACTS_DIR" --graph "$ARTIFACTS_DIR/task-graph.json"
   - id: guard-shard-1
-    depends_on: [brief-shard-1, writer-shard-1]
+    depends_on: [brief-shard-1, writer-shard-1, writer-shard-1-agy]
     trigger_rule: none_failed_min_one_success
     when: "$brief-shard-1.output != 'NO SHARD-1 THIS WAVE'"
     bash: |
@@ -181,7 +238,7 @@ nodes:
       node scripts/automation/wave-guard.mjs --shard shard-1 \
         --artifacts "$ARTIFACTS_DIR" --graph "$ARTIFACTS_DIR/task-graph.json"
   - id: guard-shard-2
-    depends_on: [brief-shard-2, writer-shard-2]
+    depends_on: [brief-shard-2, writer-shard-2, writer-shard-2-agy]
     trigger_rule: none_failed_min_one_success
     when: "$brief-shard-2.output != 'NO SHARD-2 THIS WAVE'"
     bash: |
@@ -207,6 +264,13 @@ nodes:
     bash: |
       set -uo pipefail
       PKG="${ARGUMENTS%%@g*}"
+      # STDOUT DISCIPLINE (canary run B, defect #14): this node's stdout must
+      # be EXACTLY one verdict line — the repair loop's when-gate compares the
+      # captured router output to 'WAVE_FAST_RED', so ANY extra stdout (report
+      # dumps, log tails) makes that comparison never match and silently
+      # disables RED handling. The V3 gate-router idiom is authoritative:
+      # diagnostics go to FILES.
+      #
       # Real integrator breakage (unreadable graph/results dir) propagates;
       # per-lane REJECTION is a normal outcome recorded in the report.
       node scripts/automation/integrate-writer-results.mjs --package "$PKG" \
@@ -214,7 +278,6 @@ nodes:
         --results-dir "$ARTIFACTS_DIR/writer-results" \
         --canonical . \
         --out "$ARTIFACTS_DIR/integration-report.json"
-      cat "$ARTIFACTS_DIR/integration-report.json"
       # Defect #12 guard: a wave that DISPATCHED writer lanes but integrated
       # NONE of them made zero progress and must not ride a green FAST verdict
       # (its diff-vs-base is empty, so FAST would pass vacuously). Only a truly
@@ -223,10 +286,11 @@ nodes:
       dispatched=$(find "$ARTIFACTS_DIR/writer-results" -name result.json 2>/dev/null | wc -l)
       integrated=$(node -e 'const r=JSON.parse(require("fs").readFileSync(process.argv[1],"utf8"));console.log((r.integrated??[]).length)' "$ARTIFACTS_DIR/integration-report.json")
       if [ "$dispatched" -gt 0 ] && [ "$integrated" -eq 0 ]; then
+        echo "wave integration empty: $dispatched dispatched lane(s), none integrated; full report: $ARTIFACTS_DIR/integration-report.json" \
+          > "$ARTIFACTS_DIR/wave-integration-empty.log" 2>&1
         printf '{"schema":"foresift/wave-fast-verdict@1","exitCode":90,"reason":"integration_empty"}\n' \
           > "$ARTIFACTS_DIR/wave-fast-verdict.json"
         echo "WAVE_FAST_RED"
-        echo "wave integration empty: $dispatched dispatched lane(s), none integrated"
         exit 0
       fi
       # ONE TRUE combined package FAST for the whole integrated wave.
@@ -242,7 +306,6 @@ nodes:
         echo "WAVE_FAST_GREEN"
       else
         echo "WAVE_FAST_RED"
-        tail -n 40 "$ARTIFACTS_DIR/wave-fast.log"
       fi
 
   # ── FAST RED: BOUNDED TARGETED REPAIR (override §14 — red really fails) ─────

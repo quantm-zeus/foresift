@@ -456,15 +456,27 @@ describe('foresift-sharded-wave workflow contract', () => {
     }
   });
 
-  it('when-gates every writer lane so empty shards dispatch zero providers', () => {
-    for (const lane of ['core', 'shard-1', 'shard-2']) {
-      const sentinel =
-        lane === 'core'
-          ? 'NO CORE SHARD THIS WAVE'
-          : `NO ${lane.replace('shard', 'SHARD')} THIS WAVE`;
-      const writerBlock = yaml.match(new RegExp(`- id: writer-${lane}[\\s\\S]*?(?=\\n  - id:)`));
-      expect(writerBlock, `writer-${lane} block`).toBeTruthy();
-      expect(writerBlock?.[0]).toContain(`when: "$brief-${lane}.output != '${sentinel}'"`);
+  it('when-gates every lane so empty shards dispatch zero providers (both engines)', () => {
+    // core stays single-engine: gated directly on its brief sentinel.
+    const coreBlock = yaml.match(/- id: writer-core[\s\S]*?(?=\n  - id:)/);
+    expect(coreBlock?.[0]).toContain('when: "$brief-core.output != \'NO CORE SHARD THIS WAVE\'"');
+    for (const lane of ['shard-1', 'shard-2']) {
+      // The engine emitter's content IS the empty-lane sentinel when the
+      // shard is absent — so BOTH engine variants stay OFF (zero-AI invariant
+      // survives the hybrid split).
+      const emit = yaml.match(new RegExp(`- id: exec-${lane}[\\s\\S]*?(?=\\n  - id:)`));
+      expect(emit?.[0]).toContain(`cat "$ARTIFACTS_DIR/engine-${lane}.txt"`);
+      const claude = yaml.match(new RegExp(`- id: writer-${lane}[\\s\\S]*?(?=\\n  - id:)`));
+      expect(claude?.[0]).toContain(`when: "$exec-${lane}.output == 'CLAUDE'"`);
+      const agy = yaml.match(new RegExp(`- id: writer-${lane}-agy[\\s\\S]*?(?=\\n  - id:)`));
+      expect(agy?.[0]).toContain(`when: "$exec-${lane}.output == 'AGY'"`);
+      expect(agy?.[0]).toMatch(/max_attempts: \d+[\s\S]*on_error: all/); // defect #10 policy
+      expect(agy?.[0]).toContain('exec-agy-writer.mjs');
+      // the guard spans BOTH engine variants under one bridge
+      const guard = yaml.match(new RegExp(`- id: guard-${lane}[\\s\\S]*?(?=\\n  - id:)`));
+      expect(guard?.[0]).toContain(
+        `depends_on: [brief-${lane}, writer-${lane}, writer-${lane}-agy]`,
+      );
     }
   });
 
@@ -483,6 +495,40 @@ describe('foresift-sharded-wave workflow contract', () => {
     expect(recheck).toBeTruthy();
     expect(recheck?.[0]).toMatch(/code=90/);
     expect(recheck?.[0]).toContain('package-fast-verify.mjs');
+  });
+
+  it('keeps router stdout to bare verdict tokens so the RED gate can match (defect #14)', () => {
+    // Run B canary: the router dumped the integration report to stdout before
+    // echoing its verdict, so `$integrate-and-fast.output` was multiline and
+    // `== 'WAVE_FAST_RED'` never matched — RED handling silently vanished.
+    // The V3 gate-router idiom is law: diagnostics go to files, stdout is the
+    // verdict and nothing else.
+    const router = yaml.match(/- id: integrate-and-fast[\s\S]*?(?=\n  - id: fast-repair-loop)/);
+    expect(router).toBeTruthy();
+    const body = router?.[0] ?? '';
+    // Join continuation lines into whole statements; an echo that redirects
+    // to a file never reaches stdout, so only bare echoes must be verdicts.
+    const lines = body.split('\n');
+    const statements: string[] = [];
+    for (let i = 0; i < lines.length; i++) {
+      if (!/^\s*echo\s/.test(lines[i])) continue;
+      let stmt = lines[i];
+      while (stmt.trimEnd().endsWith('\\')) {
+        i++;
+        stmt += '\n' + (lines[i] ?? '');
+      }
+      statements.push(stmt.replace(/\\\n\s*/g, ' ').trim());
+    }
+    expect(statements.length).toBeGreaterThanOrEqual(2);
+    const bareEchoes = statements.filter((s) => !s.includes('>'));
+    expect(bareEchoes.length).toBeGreaterThanOrEqual(2);
+    for (const e of bareEchoes) {
+      const token = e.replace(/^echo\s+/, '').trim();
+      expect(['"WAVE_FAST_GREEN"', '"WAVE_FAST_RED"']).toContain(token);
+    }
+    // no report/log dump may reach stdout from this node at all
+    expect(body).not.toContain('cat "$ARTIFACTS_DIR/integration-report.json"');
+    expect(body).not.toMatch(/^\s*tail\s+-n/m);
   });
 
   it('gates the targeted-repair loop on FAST RED and rechecks via the actual FAST', () => {

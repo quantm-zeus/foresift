@@ -288,9 +288,18 @@ export function prepareMigration({ root, manifestFile }) {
   const manifest = buildBunMigrationManifest({ root, previousFile });
   const previousBatches = new Map((previous?.batches ?? []).map((batch) => [batch.id, batch]));
   const completed = (previous?.batches ?? []).filter((batch) => batch.state === 'VERIFIED');
-  const planned = planMigrationBatches(manifest).map(
-    (batch) => previousBatches.get(batch.id) ?? batch,
-  );
+  const planned = planMigrationBatches(manifest).map((batch) => {
+    const previousBatch = previousBatches.get(batch.id);
+    // VERIFIED checkpoints are durable and must not be reprocessed. Pending,
+    // blocked, or interrupted batches are replanned from the current manifest
+    // so files migrated by the current product package cannot remain trapped
+    // in a stale pre-barrier batch definition.
+    if (previousBatch?.state === 'VERIFIED') return previousBatch;
+    return {
+      ...batch,
+      attempts: previousBatch?.attempts ?? batch.attempts,
+    };
+  });
   manifest.batches = [...completed, ...planned].filter(
     (batch, index, all) => all.findIndex((candidate) => candidate.id === batch.id) === index,
   );

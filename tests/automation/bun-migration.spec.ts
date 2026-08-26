@@ -4,6 +4,7 @@
 // coordination, affected-test selection, cutover safety, and Node 24 compat.
 
 import { spawnSync } from 'node:child_process';
+import { createHash } from 'node:crypto';
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -229,6 +230,65 @@ describe('Contract 3: Maintenance workflow topology and bounds', () => {
     // Every node has a bash script payload:
     const bashMatches = [...workflowText.matchAll(/bash:\s*\|/g)];
     expect(bashMatches.length).toBe(6);
+  });
+
+  it('maintenance preflight installs frozen pnpm lockfile before invoking TypeScript-dependent Bun migration modules', () => {
+    const preflightMatch = workflowText.match(/- id:\s*preflight[\s\S]*?(?=- id:|$)/);
+    expect(preflightMatch).not.toBeNull();
+    const preflightText = preflightMatch![0];
+
+    // Must install frozen lockfile
+    expect(preflightText).toContain('pnpm install --frozen-lockfile');
+
+    // pnpm install must occur before invoking migration modules
+    const pnpmInstallIndex = preflightText.indexOf('pnpm install --frozen-lockfile');
+    const stateScriptIndex = preflightText.indexOf('scripts/automation/bun-migration-state.mjs');
+    const runnerScriptIndex = preflightText.indexOf('scripts/automation/bun-migration-runner.mjs');
+
+    expect(pnpmInstallIndex).toBeGreaterThan(-1);
+    expect(stateScriptIndex).toBeGreaterThan(pnpmInstallIndex);
+    expect(runnerScriptIndex).toBeGreaterThan(pnpmInstallIndex);
+
+    // Verify imported dependencies: runner and manifest/codemod depend on typescript
+    const manifestCode = readFileSync(
+      join(REPO, 'scripts', 'automation', 'bun-migration-manifest.mjs'),
+      'utf8',
+    );
+    const codemodCode = readFileSync(
+      join(REPO, 'scripts', 'automation', 'bun-migration-codemod.mjs'),
+      'utf8',
+    );
+    const affectedCode = readFileSync(
+      join(REPO, 'scripts', 'automation', 'bun-affected-tests.mjs'),
+      'utf8',
+    );
+
+    expect(manifestCode).toContain("from 'typescript'");
+    expect(codemodCode).toContain("from 'typescript'");
+    expect(affectedCode).toContain("from 'typescript'");
+  });
+
+  it('operator-authorized merge node uses explicit supported gh pr merge --admin path without gh pr checks --watch after authoritative-bun-full', () => {
+    const mergeMatch = workflowText.match(/- id:\s*exact-head-ci-and-merge[\s\S]*?(?=- id:|$)/);
+    expect(mergeMatch).not.toBeNull();
+    const mergeText = mergeMatch![0];
+
+    // Node must depend strictly on authoritative-bun-full
+    expect(mergeText).toContain('depends_on: [authoritative-bun-full]');
+
+    // Must not call gh pr checks --watch or wait on remote CI queue
+    expect(mergeText).not.toMatch(/gh\s+pr\s+checks/);
+    expect(mergeText).not.toContain('--watch');
+
+    // Must use explicit admin merge path
+    expect(mergeText).toContain('gh pr merge "$PR" --squash --admin');
+    expect(mergeText).not.toContain('--delete-branch');
+
+    // Must verify durable merge audit record
+    expect(mergeText).toContain(
+      'gh pr view "$PR" --json state,mergedAt,mergeCommit > "$ARTIFACTS_DIR/merged-pr.json"',
+    );
+    expect(mergeText).toContain('test "$(jq -r .state "$ARTIFACTS_DIR/merged-pr.json")" = MERGED');
   });
 
   it('policy specifies AGY Gemini 3.7 Flash (High) with bounded concurrency', () => {
@@ -476,6 +536,117 @@ describe('Contract 4: Manifest inventory integrity and batch classification', ()
       (b) => ['CODEMOD', 'VERIFY_EXISTING'].includes(b.engine) && b.state !== 'VERIFIED',
     );
     expect(pendingBatches).toHaveLength(0);
+  });
+
+  it('restarts replan pending AGY batches to exclude now-native files while retaining attempt counts and verified checkpoints', () => {
+    const fx = gitFixture('stale-pending-replan-fx');
+    const verifiedFile = 'packages/domain/test/verified.spec.ts';
+    const nowNativeFile = 'packages/domain/test/now-native.spec.ts';
+    const semanticRemainingFile = 'packages/domain/test/semantic-remaining.spec.ts';
+
+    const verifiedContent =
+      "import { describe, expect, it } from 'bun:test';\ndescribe('verified', () => { it('v', () => { expect(1).toBe(1); }); });\n";
+    const nowNativeContent =
+      "import { describe, expect, it } from 'bun:test';\ndescribe('native', () => { it('n', () => { expect(2).toBe(2); }); });\n";
+    const semanticContent =
+      "import { describe, expect, it, vi } from 'vitest';\nvi.mock('./mod');\ndescribe('semantic', () => { it('s', () => {}); });\n";
+
+    fx.writeFile(verifiedFile, verifiedContent);
+    fx.writeFile(nowNativeFile, nowNativeContent);
+    fx.writeFile(semanticRemainingFile, semanticContent);
+    fx.commitAll('add fixture test files for stale pending replan test');
+
+    const verifiedSha = createHash('sha256').update(verifiedContent).digest('hex');
+
+    const previousManifest = {
+      schema: BUN_MIGRATION_MANIFEST_SCHEMA,
+      migrationId: 'bun-test-authority-v1',
+      totalTestFiles: 3,
+      files: [
+        {
+          path: verifiedFile,
+          package: '@foresift/domain',
+          workload: 'PURE',
+          migrationType: 'ALREADY_MIGRATED',
+          state: 'VERIFIED',
+          sha256: verifiedSha,
+        },
+        {
+          path: nowNativeFile,
+          package: '@foresift/domain',
+          workload: 'PURE',
+          migrationType: 'SEMANTIC_REWRITE',
+          state: 'AGY_REQUIRED',
+          sha256: 'stale-hash-1',
+        },
+        {
+          path: semanticRemainingFile,
+          package: '@foresift/domain',
+          workload: 'PURE',
+          migrationType: 'SEMANTIC_REWRITE',
+          state: 'AGY_REQUIRED',
+          sha256: 'stale-hash-2',
+        },
+      ],
+      batches: [
+        {
+          id: 'mechanical-checkpoint-1',
+          engine: 'CODEMOD',
+          workload: 'PURE',
+          files: [verifiedFile],
+          state: 'VERIFIED',
+          checkpointHead: 'deadbeef1234',
+          codexCalls: 0,
+          claudeCalls: 0,
+        },
+        {
+          id: 'agy-semantic-1',
+          engine: 'AGY',
+          workload: 'PURE',
+          files: [nowNativeFile, semanticRemainingFile],
+          state: 'PENDING',
+          attempts: 2,
+        },
+      ],
+    };
+
+    const manifestPath = join(fx.root, 'manifest.json');
+    writeFileSync(manifestPath, JSON.stringify(previousManifest, null, 2) + '\n');
+
+    const prepared = prepareMigration({ root: fx.root, manifestFile: manifestPath });
+
+    // 1. VERIFIED checkpoint batches remain preserved exactly and skipped
+    const verifiedBatch = prepared.batches.find((b) => b.id === 'mechanical-checkpoint-1');
+    expect(verifiedBatch).toBeDefined();
+    expect(verifiedBatch?.state).toBe('VERIFIED');
+    expect(verifiedBatch?.files).toEqual([verifiedFile]);
+    expect(verifiedBatch?.checkpointHead).toBe('deadbeef1234');
+    expect(verifiedBatch?.codexCalls).toBe(0);
+
+    // 2. The already Bun-native file routes to VERIFY_EXISTING, not AGY
+    const verifyExistingBatch = prepared.batches.find((b) => b.files.includes(nowNativeFile));
+    expect(verifyExistingBatch).toBeDefined();
+    expect(verifyExistingBatch?.engine).toBe('VERIFY_EXISTING');
+    expect(verifyExistingBatch?.state).toBe('PENDING');
+    expect(verifyExistingBatch?.files).toEqual([nowNativeFile]);
+
+    // 3. The new AGY batch contains only currently AGY_REQUIRED files (stale file list not retained)
+    const agyBatch = prepared.batches.find((b) => b.id === 'agy-semantic-1');
+    expect(agyBatch).toBeDefined();
+    expect(agyBatch?.engine).toBe('AGY');
+    expect(agyBatch?.state).toBe('PENDING');
+    expect(agyBatch?.files).toEqual([semanticRemainingFile]);
+    expect(agyBatch?.files.includes(nowNativeFile)).toBe(false);
+
+    // 4. Prior attempt count is retained from previous pending batch
+    expect(agyBatch?.attempts).toBe(2);
+
+    // 5. File states in prepared manifest reflect current disk state
+    expect(prepared.files.find((f) => f.path === verifiedFile)?.state).toBe('VERIFIED');
+    expect(prepared.files.find((f) => f.path === nowNativeFile)?.state).toBe('MIGRATED');
+    expect(prepared.files.find((f) => f.path === semanticRemainingFile)?.state).toBe(
+      'AGY_REQUIRED',
+    );
   });
 });
 

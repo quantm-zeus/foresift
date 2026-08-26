@@ -11,7 +11,11 @@ const REPO_ROOT = join(fileURLToPath(new URL('../..', import.meta.url)));
 // Dynamic imports allow Vitest to execute each Matrix case individually,
 // failing cleanly with module resolution errors until the production files are landed.
 async function loadExecutionProfileModule() {
-  return await import('../../scripts/automation/execution-profile.mjs');
+  return (await import('../../scripts/automation/execution-profile.mjs')) as typeof import(
+    '../../scripts/automation/execution-profile.mjs'
+  ) & {
+    EXECUTION_POLICY: Record<string, unknown>;
+  };
 }
 
 async function loadCodexRoutingModule() {
@@ -27,6 +31,7 @@ async function loadMaintainerIncidentModule() {
 }
 
 async function loadAgyTestWriterModule() {
+  // @ts-expect-error untyped dynamic import for module concurrently authored in codex lane
   return await import('../../scripts/automation/exec-agy-test-writer.mjs');
 }
 

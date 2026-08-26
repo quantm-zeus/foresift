@@ -734,7 +734,11 @@ describe('foresift-sharded-wave workflow contract', () => {
 describe('wave routing AGY test lane persistence', () => {
   it('buildWaveRouting attaches version-controlled AGY Gemini model facts to test lanes', async () => {
     const { buildWaveRouting } = await import('../../scripts/automation/codex-routing.mjs');
-    const { EXECUTION_POLICY } = await import('../../scripts/automation/execution-profile.mjs');
+    const { EXECUTION_POLICY } = (await import(
+      '../../scripts/automation/execution-profile.mjs'
+    )) as typeof import('../../scripts/automation/execution-profile.mjs') & {
+      EXECUTION_POLICY: Record<string, unknown>;
+    };
 
     const graph = {
       package: { risk: 'MEDIUM' },

@@ -847,14 +847,22 @@ describe('first tick drains the queued main fast-forward before selection', () =
     expect(entry?.message).toBe(`${PKG}@g1`);
     expect(entry?.branch).toBe(`foresift/${PKG}-g1`);
     const archonLog = readFileSync(join(stateDir, 'archon.log'), 'utf8');
-    // V4 rollout flip + defect #18 admission gate: PRODUCTION routing selects
-    // the sharded wave for an OPTIMIZED-profile package, but the wave is
-    // implementation-only — a package with NO repo planning truth (this
+    // V4 rollout flip + defect #18 admission gate, planned-handoff law: PRODUCTION
+    // routing selects the sharded wave for an OPTIMIZED-profile package, but the
+    // wave is implementation-only — a package with NO repo planning truth (this
     // fixture seeds no specs/<pkg>/) must be demoted at the launch seam to the
-    // optimized topology whose Phase-1 router plans first.
+    // PLANNING-ONLY bootstrap (optimized Phases 0A–1 verbatim, zero
+    // implementation nodes), whose completion hands back to the supervisor for
+    // wave reselection. The full optimized topology stays reachable only via
+    // OFF/CANARY selector verdicts and direct invocation — never as the
+    // unplanned-launch demotion target.
     expect(archonLog).not.toContain('foresift-sharded-wave');
-    expect(archonLog).toContain('foresift-work-package-optimized');
-    expect(archonLog).toContain(`${PKG}@g1`);
+    expect(archonLog).toContain('foresift-package-planning-bootstrap');
+    // Exactly ONE launch for this identity — no duplicate optimized fallback.
+    expect(
+      archonLog.split('\n').filter((l) => l.includes(`run foresift-`) && l.includes(`${PKG}@g1`))
+        .length,
+    ).toBe(1);
   });
 });
 

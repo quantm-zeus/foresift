@@ -265,11 +265,47 @@ function dependsTransitively(ms, fromId, toId) {
   return false;
 }
 
+// Root/shared mechanical surfaces: files whose mutation is order-sensitive
+// across ANY package pair (every workspace scaffold regenerates the lockfile;
+// root configs re-shape every build). Declaring ownership of any of these is
+// therefore a GLOBAL serialization claim — no second coding package may start
+// while either side declares one, even when the package-scoped globs are
+// disjoint. Pair-concurrency audit 2026-08-26: this is exactly how the
+// provider-lifecycle × tool-core collision manifests (both waves regenerate
+// pnpm-lock.yaml and extend the shared migration registry), so the admission
+// gate refuses such pairs by DECLARATION instead of by merge accident.
+const ROOT_SHARED_SURFACES = new Set([
+  'pnpm-lock.yaml',
+  'pnpm-workspace.yaml',
+  'package.json',
+  'tsconfig.json',
+  'tsconfig.base.json',
+  'eslint.config.js',
+]);
+
+function declaresRootSharedSurface(pkg) {
+  return (Array.isArray(pkg.writeScopes) ? pkg.writeScopes : []).some((s) =>
+    ROOT_SHARED_SURFACES.has(s),
+  );
+}
+
+function knownWriteScopes(pkg) {
+  return Array.isArray(pkg.writeScopes) && pkg.writeScopes.length > 0;
+}
+
 /**
- * Concurrency policy (roadmap.policy):
- * - foundation milestones: max 1 concurrent coding package
- * - otherwise max 2; two packages co-run only if every concurrentRequiresAllOf
- *   condition holds between them.
+ * Concurrency policy (roadmap.policy) — the deterministic pairwise admission
+ * gate (canRunTogether law): two packages co-run only when every
+ * concurrentRequiresAllOf condition holds between them, evaluated here as a
+ * total, fail-closed decision:
+ * - foundation milestones: max 1 concurrent coding package; otherwise max 2;
+ * - CRITICAL packages (either side) always serialize;
+ * - both sides must be declared parallelizable;
+ * - no direct or transitive dependency relation in either direction;
+ * - BOTH sides must declare known write scopes (unknown ⇒ deny);
+ * - neither side may claim a root/shared mechanical surface (global
+ *   serialization claim ⇒ deny);
+ * - effective writeScopes must be disjoint.
  */
 export function canStartPackage(roadmap, ms, candidate, runningPackages) {
   const foundation = roadmap.policy.foundationMilestones.includes(ms.milestoneId);
@@ -294,6 +330,15 @@ export function canStartPackage(roadmap, ms, candidate, runningPackages) {
       dependsTransitively(ms, run.id, candidate.id)
     )
       return { ok: false, reason: `dependency relationship with ${run.id}` };
+    // Fail closed on unknown scope truth: a pair may only co-run when BOTH
+    // sides declare provably disjoint ownership. Missing/empty declarations
+    // are UNKNOWN, never safe-by-default.
+    if (!knownWriteScopes(candidate) || !knownWriteScopes(run))
+      return { ok: false, reason: `unknown write-scope truth vs ${run.id}` };
+    // Either side claiming a root/shared mechanical surface serializes the
+    // whole system — co-run denied regardless of package-scope disjointness.
+    if (declaresRootSharedSurface(candidate) || declaresRootSharedSurface(run))
+      return { ok: false, reason: `root/shared surface serialization with ${run.id}` };
     if (scopesOverlap(candidate.writeScopes, run.writeScopes))
       return { ok: false, reason: `writeScopes overlap with ${run.id}` };
   }

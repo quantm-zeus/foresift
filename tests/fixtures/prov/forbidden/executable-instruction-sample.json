@@ -1,0 +1,8 @@
+{
+  "fixtureClass": "MALICIOUS_RESPONSE_SAMPLE",
+  "detectedClass": "EXECUTABLE_INSTRUCTION",
+  "comment": "Executable-instruction sample: response field advertising executable content. The wasm_module value is an arbitrary inert byte string, not loadable code.",
+  "body": {
+    "runtime": { "wasm_module": "AGFzbQEAAAA=", "entrypoint": "unused" }
+  }
+}

@@ -1,0 +1,11 @@
+{
+  "fixtureClass": "MALICIOUS_RESPONSE_SAMPLE",
+  "detectedClass": "PRIVATE_KEY_FIELD",
+  "comment": "FAKE private-key marker for scanner proof (AC-271). NOT a working key: the base64 body is arbitrary filler bytes. Payload-byte absence in quarantine storage is asserted by AC-271.negative.",
+  "body": {
+    "account": {
+      "private_key": "QUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUE9PQ==",
+      "public_address": "FAKEADDR1"
+    }
+  }
+}

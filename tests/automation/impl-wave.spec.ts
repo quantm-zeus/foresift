@@ -170,6 +170,60 @@ describe('implementation task graph', () => {
     // restore canonical fixture text
     writeFileSync(join(fx.root, 'specs', 'pkg-x', 'tasks.md'), TASKS);
   });
+
+  it('records the root workspace lockfile as a recordable scope exception (live guard-refusal fix)', () => {
+    // Live finding 2026-08-25: scaffolding a package mechanically updates
+    // pnpm-lock.yaml, but the collector only accepted scoped prefixes, so the
+    // lockfile could NEVER be declared and every compliant writer tripped
+    // guard-core's WRITE-AUTHORITY VIOLATION.
+    const tasks2 = TASKS.replace(
+      '- [ ] T104 [P] Write guide `docs/x-guide.md`. Traces: FR-X-002 (AC-202).',
+      '- [ ] T104 [P] Scaffold `packages/provider-x`; lockfile follows: `pnpm-lock.yaml`. ' +
+        'Traces: FR-X-002.',
+    );
+    writeFileSync(join(fx.root, 'specs', 'pkg-x', 'tasks.md'), tasks2);
+    const out = join(fx.artifacts, 'graph-lock.json');
+    const r = spawnSync(
+      process.execPath,
+      [GRAPH, '--package', 'pkg-x', '--root', fx.root, '--plan-shards', '2', '--out', out],
+      { encoding: 'utf8' },
+    );
+    expect(r.status).toBe(0);
+    const g = JSON.parse(readFileSync(out, 'utf8'));
+    expect(g.scopeExceptions).toContain('pnpm-lock.yaml');
+    const core = g.shards.find((s: { id: string }) => s.id === 'core');
+    expect(core.units).toContain('T104'); // demoted to serial core with its exception
+    // restore canonical fixture text
+    writeFileSync(join(fx.root, 'specs', 'pkg-x', 'tasks.md'), TASKS);
+  });
+
+  it('records the root package.json as a recordable scope exception (live guard-refusal fix)', () => {
+    // Live finding 2026-08-26 (run f9ed4de6): acceptance/negative suites run
+    // under the root unit project, so linking a new package there requires a
+    // root `package.json` devDependencies edit — but the collector only
+    // accepted scoped prefixes + the bare lockfile, so the link could NEVER be
+    // declared and every compliant writer tripped guard-core's
+    // WRITE-AUTHORITY VIOLATION.
+    const tasks2 = TASKS.replace(
+      '- [ ] T104 [P] Write guide `docs/x-guide.md`. Traces: FR-X-002 (AC-202).',
+      '- [ ] T104 [P] Write guide `docs/x-guide.md`; root unit project links the' +
+        ' package via devDependencies in `package.json`. Traces: FR-X-002.',
+    );
+    writeFileSync(join(fx.root, 'specs', 'pkg-x', 'tasks.md'), tasks2);
+    const out = join(fx.artifacts, 'graph-pkgjson.json');
+    const r = spawnSync(
+      process.execPath,
+      [GRAPH, '--package', 'pkg-x', '--root', fx.root, '--plan-shards', '2', '--out', out],
+      { encoding: 'utf8' },
+    );
+    expect(r.status).toBe(0);
+    const g = JSON.parse(readFileSync(out, 'utf8'));
+    expect(g.scopeExceptions).toContain('package.json');
+    const core2 = g.shards.find((s: { id: string }) => s.id === 'core');
+    expect(core2.units).toContain('T104'); // demoted to serial core with its exception
+    // restore canonical fixture text
+    writeFileSync(join(fx.root, 'specs', 'pkg-x', 'tasks.md'), TASKS);
+  });
 });
 
 // Real multi-worktree wave fixture: two writer branches + one violating branch.
@@ -507,10 +561,24 @@ describe('foresift-sharded-wave workflow contract', () => {
     // Recheck: while integration is still empty the loop is held closed
     // (exit-0 impossible), so exhaustion fails loudly instead of converting
     // its own RED into a vacuous green.
-    const recheck = yaml.match(/until_bash:[\s\S]*?(?=\n      nodes:)/);
-    expect(recheck).toBeTruthy();
-    expect(recheck?.[0]).toMatch(/code=90/);
-    expect(recheck?.[0]).toContain('package-fast-verify.mjs');
+    // Live finding 2026-08-26 (run b101f6c3): the heavy recheck used to run
+    // INSIDE until_bash, but bare guard executions get a short default wall
+    // budget (~3 min observed) — an escalated FULL-suite recheck (~14 min) was
+    // killed mid-run every iteration and the repair loop exhausted
+    // deterministically. Law now mirrors gate-repair-loop: the guard is a
+    // sub-second verdict read; the defect-#12 hold and the full FAST live in
+    // the serialized fast-recheck node with an explicit timeout.
+    const loopBlock = yaml.match(/- id: fast-repair-loop[\s\S]*?(?=\n  - id:)/);
+    expect(loopBlock).toBeTruthy();
+    const guard = loopBlock?.[0].match(/until_bash:[\s\S]*?(?=\n      nodes:)/);
+    expect(guard?.[0]).toBeTruthy();
+    expect(guard?.[0]).not.toContain('package-fast-verify.mjs'); // guard stays cheap
+    expect(guard?.[0]).toContain('wave-fast-verdict.json');
+    const recheckNode = loopBlock?.[0].match(/- id: fast-recheck[\s\S]*/);
+    expect(recheckNode?.[0]).toMatch(/code=90/);
+    expect(recheckNode?.[0]).toContain('package-fast-verify.mjs');
+    expect(recheckNode?.[0]).toContain('--from-git');
+    expect(recheckNode?.[0]).toMatch(/timeout:\s*3600000/);
   });
 
   it('keeps router stdout to bare verdict tokens so the RED gate can match (defect #14)', () => {

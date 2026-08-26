@@ -123,9 +123,46 @@ retry L3, milestone bookkeeping all unchanged).
 - **New control-plane capability shipped**: `--finalize-from-main <id>`
   (module `finalize-from-main.mjs`, 14 regression tests) — deterministic,
   fail-closed RUNNING→PROVEN from landed truth ONLY: merged-PR ancestry from
-  current origin/main, T-scoped completeness read AT that commit, green CI on
+  current origin/main, T-scoped completeness read AT that commit (CURRENT
+  origin/main HEAD — never the historical merge commit, so a task reopened on
+  main after landing refuses finalization; pinned in finalize-from-main.spec.ts), green CI on
   exactly origin/main HEAD, and no live competing execution; it refuses with
   precise reasons otherwise and never invokes an AI provider. Defects #16/#17
   are its founding cases.
-- **Security finalization**: [PENDING — executed after this PR lands]
-- **First production selection under active routing**: [PENDING]
+- **Security finalization**: DONE through the shortest supported deterministic
+  path, with ZERO fresh AI implementation calls. The obsolete pre-V4
+  continuation run was retired via Archon's supported abandon (status
+  `cancelled` 2026-08-25T07:29:35Z) after proving every T-scoped task already
+  merged and snapshotting every surplus delta; the new fail-closed
+  `--finalize-from-main` capability then proved g0-security-perimeter PROVEN
+  entirely from committed-main truth at 09:13:26Z — evidence chain PR #52
+  (merge commit `3ed28a6`) reachable from origin/main `a17a207`, T-scoped
+  completeness read AT that commit (57 boxes checked; 5 governance-deferred
+  R-items visible, never blocking), green CI on exactly that HEAD
+  (`32830074958`), no live competing execution. State chore `9799827` pushed
+  the PROVEN flip; tracked row closed as `finalized-from-main`.
+- **First production selection under active routing**: PROVEN — and it found a
+  real defect by executing. Selection routed g0-provider-lifecycle to
+  `foresift-sharded-wave` under PRODUCTION routing (run `4d8113dd`, 09:14Z);
+  it died at prep in ~80 ms because the implementation-only wave admits
+  never-planned packages whose scoped tasks.md does not exist yet (**defect
+  #18**, findings doc — all six remaining G0 packages are unplanned, so every
+  fresh launch would crash-loop; acceptance canaries all shipped pre-seeded
+  specs). Fixed fail-closed in PR #57 (squash-merged as `b0b27de`, CI
+  `32841691967`): launch-seam admission gate reusing the optimized workflow's
+  own deterministic planning validator in a new opt-in `--repo-only` mode — an
+  unproven package demotes to `foresift-work-package-optimized`, which plans
+  first; the pure rollout selector stays pure. The dead run was retired via
+  supported abandon (log preserved), the supervisor's next tick cleanly
+  requeued the package (`run_cancelled_requeued`), logged
+  `WAVE_ADMIT_DEFERRED … -> foresift-work-package-optimized`, and launched
+  **g0-tool-core** (run `699b29bb…`) on current-committed main: worker live
+  through `generation-adoption → preflight → plan-status → scoped-plan`
+  (Phase-1 planning of an unplanned package, exactly the designed lifecycle),
+  durably tracked by the production supervisor (`run_id_discovered` on the
+  service's own first tick), `foresift-autopilot.service` ACTIVE — autonomous
+  production execution restored end-to-end.
+- **Optimizer retirement**: complete with the above proofs. The control plane
+  now owns itself: finalization from landed truth, planning-aware wave
+  admission, and ordinary supervisor operation are all version-controlled
+  product code with regression pins.

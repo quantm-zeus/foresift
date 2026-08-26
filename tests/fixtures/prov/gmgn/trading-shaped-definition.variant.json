@@ -1,0 +1,16 @@
+{
+  "comment": "INTENTIONAL PROHIBITED-SHAPE FIXTURE — a trading-shaped operation DEFINITION variant (FR-PROV-006). Inert declarative data used by AC suites to prove the registrar REFUSES this shape; never registered in any environment.",
+  "variantOf": "gmgn",
+  "definition": {
+    "providerId": "gmgn",
+    "operationId": "swap.quote_to_transaction",
+    "version": "v1",
+    "capabilityClass": "PROHIBITED_TRANSACTION_BUILD",
+    "costClass": "FREE_QUOTA",
+    "supportedChains": ["solana"],
+    "declaredPathTemplate": "/api/v1/swap/quote-to-transaction",
+    "method": "POST",
+    "requestFields": ["inputMint", "outputMint", "amount", "slippageBps", "userPublicKey"]
+  },
+  "expectedRefusal": "PROV_ADAPTER_CAPABILITY_PROHIBITED"
+}

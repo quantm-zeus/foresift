@@ -7,7 +7,10 @@ import { lstatSync, readFileSync, readdirSync } from 'node:fs';
 import path from 'node:path';
 
 const SOURCE_EXTENSIONS = new Set(['.ts', '.tsx', '.mts', '.mjs', '.js']);
-const EXCLUDED_DIRS = new Set(['node_modules', 'dist', '.git', 'coverage']);
+// `.claude` excluded for the same reason as the CLI scanner: agent-session
+// tooling state whose nested worktrees hold branch checkouts of this same
+// repository (re-reported tracked content + escaped fixture exclusions).
+const EXCLUDED_DIRS = new Set(['node_modules', 'dist', '.git', 'coverage', '.claude']);
 
 function* walkFiles(dir, skips, rootRelative = '') {
   for (const entry of readdirSync(dir)) {

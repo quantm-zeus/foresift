@@ -1,0 +1,20 @@
+{
+  "operationId": "enhanced.get_transaction",
+  "sanitized": true,
+  "recordedAt": "2026-08-26T00:00:00Z",
+  "body": {
+    "signature": "FAKESIG1",
+    "slot": 261485601,
+    "timestamp": 1771891200,
+    "type": "SWAP",
+    "tokenTransfers": [
+      {
+        "fromUserAccount": "FAKEKEY1",
+        "toUserAccount": "FAKEKEY2",
+        "mint": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+        "tokenAmount": 250.0
+      }
+    ]
+  },
+  "comment": "DEPRECATED parser (helius enhanced API). Clean variant: usable ONLY while a valid migration exception exists (FR-PROV-007); see enhanced-parser.hazardous.json for the quarantine path."
+}

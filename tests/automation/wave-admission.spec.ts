@@ -4,7 +4,8 @@ import { mkdtempSync, mkdirSync, writeFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { tmpdir } from 'node:os';
 import {
-  PLANNING_WORKFLOW,
+  OPTIMIZED_WORKFLOW,
+  PLANNING_BOOTSTRAP_WORKFLOW,
   WAVE_WORKFLOW,
   admitWorkflowForLaunch,
 } from '../../scripts/automation/wave-admission.mjs';
@@ -77,11 +78,26 @@ function buildFixture(): string {
   return root;
 }
 
+/**
+ * Hermetic child env for the probes below. Archon exports ARTIFACTS_DIR inside
+ * regular workflow bash nodes (docs/adr/0004), so a child inheriting this
+ * process's environment would silently take the script's documented env-
+ * fallback mode instead of the default-mode refusal under test. Every mode
+ * these probes exercise is selected by explicit argv — ambient runtime state
+ * must not reach the script.
+ */
+function probeEnv(): NodeJS.ProcessEnv {
+  const env = { ...process.env };
+  delete env.ARTIFACTS_DIR;
+  return env;
+}
+
 function runPlanComplete(pkg: string, root: string, extra: string[] = []) {
   // NOTE: --repo-only is intentionally the LAST argument in this base argv —
   // it pins the trailing-bare-flag parsing contract.
   return spawnSync(process.execPath, [SCRIPT, '--package', pkg, '--root', root, ...extra], {
     encoding: 'utf8',
+    env: probeEnv(),
   });
 }
 
@@ -91,22 +107,25 @@ describe('wave-admission — launch-seam gate for the implementation-only sharde
       expect(admitWorkflowForLaunch(WAVE_WORKFLOW, true)).toBe(WAVE_WORKFLOW);
     });
 
-    it('demotes a wave-routed package with unproven planning to the planning topology', () => {
-      expect(admitWorkflowForLaunch(WAVE_WORKFLOW, false)).toBe(PLANNING_WORKFLOW);
+    it('demotes a wave-routed package with unproven planning to the PLANNING-ONLY bootstrap', () => {
+      // Planned-handoff law: the demotion target is the bounded planning-only
+      // bootstrap (zero implementation nodes), NOT the full optimized
+      // topology — an unplanned-origin package must never continue into
+      // optimized implementation after its planning bootstrap completes.
+      expect(admitWorkflowForLaunch(WAVE_WORKFLOW, false)).toBe(PLANNING_BOOTSTRAP_WORKFLOW);
       // "could not evaluate" must fail closed toward planning, never toward the wave
-      expect(admitWorkflowForLaunch(WAVE_WORKFLOW, false)).toBe(PLANNING_WORKFLOW);
       expect(admitWorkflowForLaunch(WAVE_WORKFLOW, null as unknown as boolean)).toBe(
-        PLANNING_WORKFLOW,
+        PLANNING_BOOTSTRAP_WORKFLOW,
       );
       expect(admitWorkflowForLaunch(WAVE_WORKFLOW, undefined as unknown as boolean)).toBe(
-        PLANNING_WORKFLOW,
+        PLANNING_BOOTSTRAP_WORKFLOW,
       );
     });
 
     it('never touches non-wave selector verdicts (legacy lane, optimized-under-OFF)', () => {
       expect(admitWorkflowForLaunch('foresift-work-package', false)).toBe('foresift-work-package');
-      expect(admitWorkflowForLaunch(PLANNING_WORKFLOW, false)).toBe(PLANNING_WORKFLOW);
-      expect(admitWorkflowForLaunch(PLANNING_WORKFLOW, true)).toBe(PLANNING_WORKFLOW);
+      expect(admitWorkflowForLaunch(OPTIMIZED_WORKFLOW, false)).toBe(OPTIMIZED_WORKFLOW);
+      expect(admitWorkflowForLaunch(OPTIMIZED_WORKFLOW, true)).toBe(OPTIMIZED_WORKFLOW);
     });
   });
 
@@ -144,6 +163,7 @@ describe('wave-admission — launch-seam gate for the implementation-only sharde
       const root = buildFixture();
       const r = spawnSync(process.execPath, [SCRIPT, '--package', 'pkg-x', '--root', root], {
         encoding: 'utf8',
+        env: probeEnv(),
       });
       expect(r.status).toBe(1);
       expect(r.stdout).toContain('--repo-only');

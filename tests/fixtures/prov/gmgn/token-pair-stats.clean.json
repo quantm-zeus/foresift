@@ -1,0 +1,13 @@
+{
+  "operationId": "token.pair_stats",
+  "sanitized": true,
+  "recordedAt": "2026-08-26T00:00:00Z",
+  "body": {
+    "pair_address": "58oQChx4yWmvKdwLLZzBi4ChoCc2fqCUWBkwMihLYQo2",
+    "chain": "sol",
+    "liquidity_usd": 1840000.5,
+    "volume_24h_usd": 9210000.0,
+    "price_usd": 1.0001,
+    "fee_24h_usd": 2763.0
+  }
+}

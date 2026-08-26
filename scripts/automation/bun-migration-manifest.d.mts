@@ -24,6 +24,12 @@ export interface BunMigrationBatch {
   workload?: string;
   codexCalls?: number;
   claudeCalls?: number;
+  verification?: {
+    ok: boolean;
+    wallTimeMs?: number;
+    results?: unknown[];
+    [key: string]: unknown;
+  };
   [key: string]: unknown;
 }
 

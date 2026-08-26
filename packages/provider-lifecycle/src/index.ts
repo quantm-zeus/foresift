@@ -12,6 +12,13 @@
 // design so the milestone verification command runs from day one.
 export * from './errors.ts';
 export * from './vocabulary.ts';
+export * from './lifecycle-states.ts';
+export * from './operation-registry.ts';
+export * from './audit-bridges.ts';
+export * from './lifecycle-machine.ts';
+export * from './verification-ttl.ts';
+export * from './deprecation-rules.ts';
+export * from './migration-exceptions.ts';
 export {
   prov,
   provProviders,

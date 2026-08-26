@@ -1482,6 +1482,26 @@ process.exit(${JSON.stringify(options.exitCode ?? 0)});
       const mod = await loadAgyTestWriterModule();
       const fx = setupWriterFixture();
 
+      const gitIdentityKeys = [
+        'GIT_AUTHOR_NAME',
+        'GIT_AUTHOR_EMAIL',
+        'GIT_AUTHOR_DATE',
+        'GIT_COMMITTER_NAME',
+        'GIT_COMMITTER_EMAIL',
+        'GIT_COMMITTER_DATE',
+      ];
+      const savedEnv: Record<string, string | undefined> = {};
+      const allIdentityKeys = new Set([
+        ...gitIdentityKeys,
+        ...Object.keys(process.env).filter(
+          (k) => k.startsWith('GIT_AUTHOR_') || k.startsWith('GIT_COMMITTER_'),
+        ),
+      ]);
+      for (const key of allIdentityKeys) {
+        savedEnv[key] = process.env[key];
+        delete process.env[key];
+      }
+
       const prevPath = process.env.PATH;
       try {
         process.env.PATH = `${fx.binDir}:${prevPath}`;
@@ -1564,6 +1584,13 @@ process.exit(${JSON.stringify(options.exitCode ?? 0)});
         expect(log).toContain('test: AGY test-author lane test-author');
       } finally {
         process.env.PATH = prevPath;
+        for (const [key, value] of Object.entries(savedEnv)) {
+          if (value === undefined) {
+            delete process.env[key];
+          } else {
+            process.env[key] = value;
+          }
+        }
       }
     });
 

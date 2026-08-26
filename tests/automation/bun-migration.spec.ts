@@ -701,7 +701,7 @@ describe('Contract 4: Manifest inventory integrity and batch classification', ()
           path: arrowTestPath,
           package: 'root',
           workload: 'PURE' as const,
-          migrationType: arrowAnalysis.migrationType,
+          migrationType: arrowAnalysis.migrationType!,
           state: arrowAnalysis.state,
         },
       ],
@@ -709,7 +709,7 @@ describe('Contract 4: Manifest inventory integrity and batch classification', ()
     };
     const batches = planMigrationBatches(manifest);
     expect(batches.length).toBe(1);
-    expect(batches[0].engine).toBe('AGY');
+    expect(batches[0]?.engine).toBe('AGY');
   });
 
   it('function-wrapped rejects construct with bun:test import remains SEMANTIC_REWRITE and AGY_REQUIRED across restarts', () => {

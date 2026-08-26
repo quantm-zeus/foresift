@@ -11,9 +11,7 @@ const REPO_ROOT = join(fileURLToPath(new URL('../..', import.meta.url)));
 // Dynamic imports allow Vitest to execute each Matrix case individually,
 // failing cleanly with module resolution errors until the production files are landed.
 async function loadExecutionProfileModule() {
-  return (await import('../../scripts/automation/execution-profile.mjs')) as typeof import(
-    '../../scripts/automation/execution-profile.mjs'
-  ) & {
+  return (await import('../../scripts/automation/execution-profile.mjs')) as typeof import('../../scripts/automation/execution-profile.mjs') & {
     EXECUTION_POLICY: Record<string, unknown>;
   };
 }
@@ -945,9 +943,7 @@ describe('Foresift V4 CODEX_AGY execution profile test matrix (A through AH)', (
       expect(mod.EXECUTION_POLICY.agyTestModel).toBe('gemini-3.7-flash-high');
       expect(mod.EXECUTION_POLICY.agyTestEffort).toBe('high');
       expect(mod.EXECUTION_POLICY.agyPrintTimeout).toBe('40m');
-      expect(mod.EXECUTION_POLICY.routingPolicyVersion).toBe(
-        'codex-sol-luna-terra-agy-gemini@2',
-      );
+      expect(mod.EXECUTION_POLICY.routingPolicyVersion).toBe('codex-sol-luna-terra-agy-gemini@2');
       expect(mod.EXECUTION_POLICY.maxAgyTestWriters).toBe(1);
     });
 
@@ -1295,31 +1291,35 @@ describe('Foresift V4 CODEX_AGY execution profile test matrix (A through AH)', (
   });
 
   describe('Matrix AG: exec-agy-test-writer routing requirements and deterministic spawn', () => {
-    function setupWriterFixture(options: {
-      exitCode?: number;
-      stdout?: string;
-      stderr?: string;
-      agentResult?: object | null;
-      filesToWrite?: Record<string, string>;
-    } = {}) {
+    function setupWriterFixture(
+      options: {
+        exitCode?: number;
+        stdout?: string;
+        stderr?: string;
+        agentResult?: object | null;
+        filesToWrite?: Record<string, string>;
+      } = {},
+    ) {
       const dir = makeTempDir('agy-writer-fx-');
       const binDir = join(dir, 'bin');
       mkdirSync(binDir, { recursive: true });
       const recordPath = join(dir, 'mock-agy-call.json');
       const resultsDir = join(dir, 'results');
 
-      const defaultAgentResult = options.agentResult === undefined
-        ? {
-            baselineClassifications: ['REGRESSION_RED'],
-            testsRun: ['tests/x/a.spec.ts'],
-            testResults: 'pass',
-            blockers: [],
-          }
-        : options.agentResult;
+      const defaultAgentResult =
+        options.agentResult === undefined
+          ? {
+              baselineClassifications: ['REGRESSION_RED'],
+              testsRun: ['tests/x/a.spec.ts'],
+              testResults: 'pass',
+              blockers: [],
+            }
+          : options.agentResult;
 
-      const defaultFiles = options.filesToWrite === undefined
-        ? { 'tests/a.spec.ts': 'test("a", () => {});\n' }
-        : options.filesToWrite;
+      const defaultFiles =
+        options.filesToWrite === undefined
+          ? { 'tests/a.spec.ts': 'test("a", () => {});\n' }
+          : options.filesToWrite;
 
       const agyScriptContent = `#!/usr/bin/env node
 import { writeFileSync, mkdirSync, readFileSync } from 'node:fs';
@@ -1482,6 +1482,26 @@ process.exit(${JSON.stringify(options.exitCode ?? 0)});
       const mod = await loadAgyTestWriterModule();
       const fx = setupWriterFixture();
 
+      const gitIdentityKeys = [
+        'GIT_AUTHOR_NAME',
+        'GIT_AUTHOR_EMAIL',
+        'GIT_AUTHOR_DATE',
+        'GIT_COMMITTER_NAME',
+        'GIT_COMMITTER_EMAIL',
+        'GIT_COMMITTER_DATE',
+      ];
+      const savedEnv: Record<string, string | undefined> = {};
+      const allIdentityKeys = new Set([
+        ...gitIdentityKeys,
+        ...Object.keys(process.env).filter(
+          (k) => k.startsWith('GIT_AUTHOR_') || k.startsWith('GIT_COMMITTER_'),
+        ),
+      ]);
+      for (const key of allIdentityKeys) {
+        savedEnv[key] = process.env[key];
+        delete process.env[key];
+      }
+
       const prevPath = process.env.PATH;
       try {
         process.env.PATH = `${fx.binDir}:${prevPath}`;
@@ -1556,15 +1576,21 @@ process.exit(${JSON.stringify(options.exitCode ?? 0)});
         expect(telemetry.outcome).toBe('SUCCESS');
 
         // Verify git commit author
-        const log = execFileSync(
-          'git',
-          ['log', '-1', '--pretty=format:%an <%ae> - %s'],
-          { cwd: fx.wt, encoding: 'utf8' },
-        );
+        const log = execFileSync('git', ['log', '-1', '--pretty=format:%an <%ae> - %s'], {
+          cwd: fx.wt,
+          encoding: 'utf8',
+        });
         expect(log).toContain('Foresift AGY Test Author <noreply@foresift.local>');
         expect(log).toContain('test: AGY test-author lane test-author');
       } finally {
         process.env.PATH = prevPath;
+        for (const [key, value] of Object.entries(savedEnv)) {
+          if (value === undefined) {
+            delete process.env[key];
+          } else {
+            process.env[key] = value;
+          }
+        }
       }
     });
 
@@ -1685,4 +1711,3 @@ process.exit(${JSON.stringify(options.exitCode ?? 0)});
     });
   });
 });
-

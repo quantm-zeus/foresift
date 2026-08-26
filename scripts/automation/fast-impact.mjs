@@ -8,8 +8,8 @@
 // escalates.
 //
 // Categories and their targeted checks (executed by package-fast-verify.mjs):
-//   CODE_JS_TS          eslint(touched) + vitest related(touched) + pnpm typecheck
-//   DATABASE            vitest related(touched) [+ full suite when nothing relates]
+//   CODE_JS_TS          eslint(touched) + deterministic affected tests + pnpm typecheck
+//   DATABASE            affected tests [+ full suite when nothing relates]
 //   AUTHORITATIVE_SPEC  spec:verify (always run) + authority validators +
 //                       schema/conformance test files
 //   ARCHON_CONTROL_PLANE prettier --check(touched) + archon validate workflows
@@ -91,11 +91,11 @@ export function planFastChecks(classification) {
   const plan = [];
   if (c.CODE_JS_TS.length > 0) {
     plan.push({ kind: 'eslint', files: c.CODE_JS_TS });
-    plan.push({ kind: 'vitest-related', files: [...c.CODE_JS_TS] });
+    plan.push({ kind: 'affected-tests', files: [...c.CODE_JS_TS] });
     plan.push({ kind: 'typecheck' });
   }
   if (c.DATABASE.length > 0) {
-    plan.push({ kind: 'vitest-related', files: c.DATABASE, database: true });
+    plan.push({ kind: 'affected-tests', files: c.DATABASE, database: true });
   }
   if (c.AUTHORITATIVE_SPEC.length > 0) {
     plan.push({ kind: 'authority-validate' });

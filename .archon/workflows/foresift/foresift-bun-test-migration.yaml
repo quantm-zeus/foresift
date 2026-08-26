@@ -1,0 +1,82 @@
+name: foresift-bun-test-migration
+description: |
+  Exclusive, crash-safe Foresift test-authority migration. The supervisor may
+  launch this maintenance workflow only after g0-tool-core is PROVEN and must
+  block every subsequent product package until the merged migration proof is
+  valid. Mechanical files use a syntax-aware codemod; semantic test rewrites
+  use AGY Gemini 3.7 Flash (High) in bounded private worktrees. Healthy progress
+  consumes zero Codex and zero Claude inference.
+tags: [foresift, maintenance, bun, deterministic]
+
+nodes:
+  - id: preflight
+    bash: |
+      set -euo pipefail
+      mkdir -p "$ARTIFACTS_DIR"
+      test "$(bun --version)" = "1.4.0"
+      node scripts/automation/bun-migration-state.mjs \
+        --milestone specs/implementation/current-milestone.json \
+        > "$ARTIFACTS_DIR/barrier-entry.json"
+      grep -q 'BUN_MIGRATION_REQUIRED\|BUN_MIGRATION_RUNNING' "$ARTIFACTS_DIR/barrier-entry.json"
+      node scripts/automation/bun-migration-runner.mjs --prepare
+    timeout: 300000
+
+  - id: mechanical-batches
+    depends_on: [preflight]
+    bash: |
+      set -euo pipefail
+      node scripts/automation/bun-migration-runner.mjs --mechanical
+    timeout: 7200000
+
+  - id: agy-semantic-batches
+    depends_on: [mechanical-batches]
+    bash: |
+      set -euo pipefail
+      node scripts/automation/bun-migration-runner.mjs --agy \
+        --artifacts-dir "$ARTIFACTS_DIR/migration"
+    timeout: 14400000
+
+  - id: cutover
+    depends_on: [agy-semantic-batches]
+    bash: |
+      set -euo pipefail
+      node scripts/automation/bun-test-cutover.mjs
+      pnpm format
+      pnpm spec:verify
+      pnpm lint
+      pnpm typecheck
+    timeout: 1800000
+
+  - id: authoritative-bun-full
+    depends_on: [cutover]
+    bash: |
+      set -euo pipefail
+      node scripts/automation/bun-migration-finalize.mjs
+      git add --all
+      if ! git diff --cached --quiet; then
+        git -c user.name='Foresift Bun Migration Coordinator' \
+          -c user.email=noreply@foresift.local \
+          commit -m 'test: activate Bun Test authority'
+      fi
+      git push origin HEAD:"$(git branch --show-current)"
+    timeout: 7200000
+
+  - id: exact-head-ci-and-merge
+    depends_on: [authoritative-bun-full]
+    bash: |
+      set -euo pipefail
+      BRANCH=$(git branch --show-current)
+      PR=$(gh pr list --head "$BRANCH" --state open --json number --jq '.[0].number // empty')
+      if [ -z "$PR" ]; then
+        gh pr create \
+          --title 'test: migrate Foresift test authority to Bun' \
+          --body 'Crash-safe AGY-only Bun Test migration with parity proof, bounded resource coordinator, affected-test FAST selection, and Node 24 compatibility gate.' \
+          --head "$BRANCH" --base main
+        PR=$(gh pr list --head "$BRANCH" --state open --json number --jq '.[0].number // empty')
+      fi
+      test -n "$PR"
+      gh pr checks "$PR" --watch --fail-fast
+      gh pr merge "$PR" --squash --delete-branch
+      gh pr view "$PR" --json state,mergedAt,mergeCommit > "$ARTIFACTS_DIR/merged-pr.json"
+      test "$(jq -r .state "$ARTIFACTS_DIR/merged-pr.json")" = MERGED
+    timeout: 7200000

@@ -1,0 +1,21 @@
+{
+  "schema": "foresift/test-runtime-policy@1",
+  "productRuntime": "node-24",
+  "currentAuthority": "VITEST_TRANSITION",
+  "targetAuthority": "BUN_TEST",
+  "bunVersion": "1.4.0",
+  "migrationId": "bun-test-authority-v1",
+  "migrationRequired": true,
+  "barrierAfterPackage": "g0-tool-core",
+  "migrationWorkflow": "foresift-bun-test-migration",
+  "migrationBranch": "foresift/bun-test-migration",
+  "agyModel": "gemini-3.7-flash-high",
+  "agyEffort": "high",
+  "agyMaxConcurrency": 2,
+  "agyHeavyMaxConcurrency": 1,
+  "bunPureFileWorkers": 2,
+  "bunPureTestConcurrency": 8,
+  "bunHeavyFileWorkers": 1,
+  "bunHeavyTestConcurrency": 1,
+  "testTimeoutMs": 30000
+}

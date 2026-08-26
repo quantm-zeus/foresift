@@ -75,10 +75,21 @@ const shaFirstExisting = (...candidates) => {
 
 function toolchainVersions(repoRoot) {
   const out = { node: process.version };
+  let testAuthority = 'VITEST_TRANSITION';
+  try {
+    testAuthority = JSON.parse(
+      readFileSync(join(repoRoot, 'config', 'foresift-test-runtime.json'), 'utf8'),
+    ).currentAuthority;
+  } catch {}
   for (const [k, args] of [
     ['pnpm', ['--version']],
     ['typescript', ['./node_modules/.bin/tsc', '--version']],
-    ['vitest', ['./node_modules/.bin/vitest', '--version']],
+    [
+      testAuthority === 'BUN_TEST' ? 'bun' : 'vitest',
+      testAuthority === 'BUN_TEST'
+        ? ['bun', '--version']
+        : ['./node_modules/.bin/vitest', '--version'],
+    ],
   ]) {
     try {
       out[k] = execFileSync(args[0], args.slice(1), { cwd: repoRoot, encoding: 'utf8' }).trim();

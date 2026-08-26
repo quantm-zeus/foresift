@@ -13,7 +13,7 @@
 //                as complete).
 // Both may be combined; the union is classified.
 //
-// Impact-aware checks (fast-impact.mjs): JS/TS → eslint + vitest related +
+// Impact-aware checks (fast-impact.mjs): JS/TS → eslint + affected-test graph +
 // typecheck; SQL/migrations → related persistence tests (escalating to the
 // full suite when NOTHING relates, preserving the old fail-closed behavior of
 // non-JS slices); authoritative spec → authority validators + conformance
@@ -33,6 +33,23 @@ import { join, resolve } from 'node:path';
 import { CHECKPOINT_FILE, validateCheckpoint } from './package-checkpoint.mjs';
 import { resolveSliceChangeset } from './slice-changeset.mjs';
 import { classifyImpact, planFastChecks } from './fast-impact.mjs';
+import { repositorySourcePaths, selectAffectedTests } from './bun-affected-tests.mjs';
+import { buildBunTestPlan, runBunTestPlan } from './bun-test-coordinator.mjs';
+
+const TEST_RUNTIME_POLICY = JSON.parse(
+  readFileSync(
+    join(import.meta.dirname, '..', '..', 'config', 'foresift-test-runtime.json'),
+    'utf8',
+  ),
+);
+const BUN_MANIFEST = join(
+  import.meta.dirname,
+  '..',
+  '..',
+  'evidence',
+  'bun-migration',
+  'bun-migration-manifest.json',
+);
 
 function parseArgs(argv) {
   const a = { files: [] };
@@ -103,33 +120,39 @@ export function resolveFastBase({ repoRoot, packageId, artifactsDir, base }) {
  * Returns { logs, result?, escalateReason? }; injectable `sh` keeps this
  * unit-testable without spawning vitest.
  */
-export function runVitestRelatedStep(step, deps = {}) {
+export function runAffectedTestsStep(step, deps = {}) {
   const { repoRoot, sh: shFn = sh } = deps;
   const logs = [];
-  const existing = step.files
-    .map((f) => (existsSync(f) ? resolve(f) : join(repoRoot, f)))
-    .filter((f) => existsSync(f));
-  if (existing.length === 0) {
-    if (!step.database) return { logs };
-    // Deleted-only DB slice: nothing remains to relate against — the safe
-    // signal is the full suite (schema drift can break anything).
-    logs.push('FAST ▸ database paths all absent — escalating to full test suite');
-    return { logs, escalateReason: 'database-deleted' };
+  const selection = selectAffectedTests({
+    root: repoRoot,
+    changedPaths: step.files,
+    allPaths: repositorySourcePaths(repoRoot),
+  });
+  if (!selection.ok) {
+    logs.push(`FAST ▸ ${selection.reason} — escalating to full suite`);
+    return { logs, selection, escalateReason: selection.reason };
   }
-  const result = shFn(repoRoot, './node_modules/.bin/vitest', ['related', ...existing, '--run']);
-  if (result.result === 'PASS' && /No test files found/i.test(result.stdoutTail ?? '')) {
-    // No retained test imports anything in this slice ⇒ no targeted evidence.
-    logs.push(
-      `FAST ▸ no tests relate to ${existing.length} changed file(s) — escalating to full suite`,
-    );
+  if (TEST_RUNTIME_POLICY.currentAuthority === 'BUN_TEST') {
+    const manifest = JSON.parse(readFileSync(BUN_MANIFEST, 'utf8'));
+    const plan = buildBunTestPlan(manifest, TEST_RUNTIME_POLICY, selection.tests);
+    const evidence = runBunTestPlan({ root: repoRoot, plan, policy: TEST_RUNTIME_POLICY });
     return {
       logs,
-      result,
-      escalateReason: step.database ? 'database-no-related-tests' : 'no-related-tests',
+      selection,
+      result: {
+        command: `bun affected (${selection.tests.length} file(s))`,
+        result: evidence.ok ? 'PASS' : 'FAIL',
+        evidence,
+      },
     };
   }
-  return { logs, result };
+  const result = shFn(repoRoot, './node_modules/.bin/vitest', ['run', ...selection.tests]);
+  return { logs, selection, result };
 }
+
+// Historical export retained only for imported V4 callers; behavior is the
+// deterministic graph selector and never invokes `vitest related`.
+export const runVitestRelatedStep = runAffectedTestsStep;
 
 function sh(repoRoot, cmd, args, opts = {}) {
   const label = [cmd, ...args].join(' ');
@@ -250,10 +273,16 @@ async function main() {
         if (existing.length > 0) results.push(sh(repoRoot, './node_modules/.bin/eslint', existing));
         break;
       }
-      case 'vitest-related': {
-        const out = runVitestRelatedStep(step, { repoRoot });
+      case 'affected-tests': {
+        const out = runAffectedTestsStep(step, { repoRoot });
         for (const line of out.logs ?? []) console.log(line);
         if (out.result) results.push(out.result);
+        if (out.selection)
+          results.push({
+            command: 'deterministic affected-test selection',
+            result: out.selection.ok ? 'PASS' : 'ESCALATED',
+            evidence: out.selection,
+          });
         if (out.escalateReason) {
           escalatedToFullSuite = true;
           results.push({ escalated: true, reason: out.escalateReason });
@@ -277,8 +306,11 @@ async function main() {
           'tests/automation/control-plane.spec.ts',
           'tests/spec-verify.spec.ts',
         ].filter((t) => existsSync(join(repoRoot, t)));
-        if (tests.length > 0)
-          results.push(sh(repoRoot, './node_modules/.bin/vitest', ['run', ...tests]));
+        if (tests.length > 0) {
+          if (TEST_RUNTIME_POLICY.currentAuthority === 'BUN_TEST')
+            results.push(sh(repoRoot, 'bun', ['test', '--parallel=1', ...tests]));
+          else results.push(sh(repoRoot, './node_modules/.bin/vitest', ['run', ...tests]));
+        }
         break;
       }
       case 'format-check': {

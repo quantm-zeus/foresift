@@ -205,8 +205,9 @@ export function buildWaveRouting(
       taskIds: [...testLane.units],
       engine: 'AGY',
       complexityTier: null,
-      model: null,
-      reasoning: null,
+      model: EXECUTION_POLICY.agyTestModel,
+      reasoning: EXECUTION_POLICY.agyTestEffort,
+      providerTimeout: EXECUTION_POLICY.agyPrintTimeout,
       serviceTier: null,
     });
   return {

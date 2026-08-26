@@ -8,12 +8,12 @@
 //                                        suite already ran (e.g. the
 //                                        prohibited-capabilities scan)
 //   DUPLICATE_COVERED_BY_FULL_SUITE   — provably re-runs only tests the root
-//                                        `vitest run` already executed
+//                                        authoritative root test suite already executed
 //
 // A command is classified DUPLICATE only when EVERY link in the proof chain
 // holds:
 //   1. exact known shape  test -d <pkg-dir> && pnpm --filter <pkg-name> test
-//   2. the package's `test` script is EXACTLY `vitest run` (no extra flags,
+//   2. the package's `test` script is EXACTLY the configured plain runner
 //      setup commands, or wrappers)
 //   3. NO package-local vitest config exists (a config could change include,
 //      environment, globals, coverage…)
@@ -51,7 +51,14 @@ export function classifyCommand(command, repoRoot) {
     };
   const [, pkgDir] = m;
 
-  // Proof link 2: the package's test script is exactly `vitest run`.
+  let authority = 'VITEST_TRANSITION';
+  try {
+    authority = JSON.parse(
+      readFileSync(join(repoRoot, 'config', 'foresift-test-runtime.json'), 'utf8'),
+    ).currentAuthority;
+  } catch {}
+  const expectedScript = authority === 'BUN_TEST' ? 'bun test' : 'vitest run';
+  // Proof link 2: the package's test script is exactly the plain authority.
   const pkgAbs = resolve(repoRoot, pkgDir); // pkgDir may be absolute
   let testScript = null;
   try {
@@ -60,14 +67,14 @@ export function classifyCommand(command, repoRoot) {
   } catch {
     return { command, class: 'UNIQUE_MANDATORY', reason: `${pkgDir}/package.json unreadable` };
   }
-  if (testScript !== 'vitest run')
+  if (testScript !== expectedScript)
     return {
       command,
       class: 'UNIQUE_MANDATORY',
-      reason: `package test script is '${testScript}', not plain 'vitest run'`,
+      reason: `package test script is '${testScript}', not plain '${expectedScript}'`,
     };
 
-  // Proof link 3: no local vitest config that could change behavior.
+  // Proof link 3: no package-local runner config that could change behavior.
   const cfg = [
     'vitest.config.ts',
     'vitest.config.js',
@@ -88,7 +95,7 @@ export function classifyCommand(command, repoRoot) {
   return {
     command,
     class: 'DUPLICATE_COVERED_BY_FULL_SUITE',
-    reason: `plain 'vitest run' over ${testFiles.length} default-include test file(s); root suite covers all of them`,
+    reason: `plain '${expectedScript}' over ${testFiles.length} default-include test file(s); root suite covers all of them`,
     testFileCount: testFiles.length,
   };
 }

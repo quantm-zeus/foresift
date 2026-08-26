@@ -1,14 +1,14 @@
 {
   "schema": "foresift/bun-migration-manifest@1",
   "migrationId": "bun-test-authority-v1",
-  "generatedAt": "2026-08-26T20:23:12.801Z",
+  "generatedAt": "2026-08-26T20:34:33.056Z",
   "root": ".",
   "totalTestFiles": 219,
   "counts": {
-    "CODEMOD_READY": 127,
+    "CODEMOD_READY": 125,
     "AGY_REQUIRED": 9,
     "MIGRATED": 83,
-    "VERIFIED": 0,
+    "VERIFIED": 2,
     "BLOCKED": 0
   },
   "parity": {
@@ -143,28 +143,22 @@
     {
       "path": "packages/evidence/test/counts.spec.ts",
       "package": "@foresift/evidence",
-      "bytes": 6900,
+      "bytes": 6902,
       "lines": 160,
-      "sha256": "c773c7567cdecd70bb23a1533a98f5f72fcbd8d7566f27341f4cd54cbe1d7b47",
+      "sha256": "5a6679be63212d18f228de7fbddd084e0034bff22c5ab7882b1d67b6f2ff804b",
       "imports": [
         "node:path",
         "node:url",
-        "vitest",
+        "bun:test",
         "@electric-sql/pglite",
         "@foresift/domain",
         "@foresift/persistence",
         "../src/index.ts"
       ],
-      "vitestImports": [
-        "afterAll",
-        "beforeAll",
-        "describe",
-        "expect",
-        "it"
-      ],
+      "vitestImports": [],
       "features": [],
       "workload": "DATABASE_PGLITE",
-      "migrationType": "EASY_MECHANICAL",
+      "migrationType": "ALREADY_MIGRATED",
       "fixturesAndHelpers": [],
       "sourceAnchors": [
         "@electric-sql/pglite",
@@ -172,33 +166,27 @@
         "@foresift/persistence",
         "../src/index.ts"
       ],
-      "state": "CODEMOD_READY"
+      "state": "VERIFIED"
     },
     {
       "path": "packages/evidence/test/evidence-index-replay.spec.ts",
       "package": "@foresift/evidence",
-      "bytes": 7158,
+      "bytes": 7160,
       "lines": 185,
-      "sha256": "342e3bcf11ecf08d28f71671e2909532e538817cb8cad0f411022f3b77b4bdef",
+      "sha256": "7e93a9981a15e829bb21e292d9db702e6931b20af0d07330fab05bc448527798",
       "imports": [
         "node:path",
         "node:url",
-        "vitest",
+        "bun:test",
         "@electric-sql/pglite",
         "@foresift/domain",
         "@foresift/persistence",
         "../src/index.ts"
       ],
-      "vitestImports": [
-        "afterAll",
-        "beforeAll",
-        "describe",
-        "expect",
-        "it"
-      ],
+      "vitestImports": [],
       "features": [],
       "workload": "DATABASE_PGLITE",
-      "migrationType": "EASY_MECHANICAL",
+      "migrationType": "ALREADY_MIGRATED",
       "fixturesAndHelpers": [],
       "sourceAnchors": [
         "@electric-sql/pglite",
@@ -206,7 +194,7 @@
         "@foresift/persistence",
         "../src/index.ts"
       ],
-      "state": "CODEMOD_READY"
+      "state": "VERIFIED"
     },
     {
       "path": "packages/object-store/test/local-store.spec.ts",
@@ -4045,11 +4033,12 @@
     {
       "path": "tests/automation/bun-migration.spec.ts",
       "package": "automation",
-      "bytes": 29271,
-      "lines": 741,
-      "sha256": "81a41453d0db795070a1d183c905cee479824830e50b7cb938550bf243c0e026",
+      "bytes": 36573,
+      "lines": 912,
+      "sha256": "94c258c1859b732cd7b8c5c0ce27b675dc9968aaf23dffa612ad21f8788b27cf",
       "imports": [
         "node:child_process",
+        "node:crypto",
         "node:fs",
         "node:os",
         "node:path",
@@ -6498,7 +6487,83 @@
         "packages/evidence/test/counts.spec.ts",
         "packages/evidence/test/evidence-index-replay.spec.ts"
       ],
-      "state": "PENDING"
+      "state": "VERIFIED",
+      "verification": {
+        "ok": true,
+        "wallTimeMs": 6875,
+        "peakRssBytes": 0,
+        "cpuSeconds": 0,
+        "counts": {
+          "passed": 9,
+          "failed": 0,
+          "skipped": 0
+        },
+        "results": [
+          {
+            "id": "pglite-1",
+            "workload": "DATABASE_PGLITE",
+            "files": [
+              "packages/evidence/test/counts.spec.ts"
+            ],
+            "fileWorkers": 1,
+            "testConcurrency": 1,
+            "command": [
+              "bun",
+              "test",
+              "--no-orphans",
+              "--isolate",
+              "--parallel=1",
+              "--max-concurrency=1",
+              "--timeout=30000",
+              "packages/evidence/test/counts.spec.ts"
+            ],
+            "status": 0,
+            "wallTimeMs": 3665,
+            "peakRssBytes": null,
+            "cpuSeconds": null,
+            "counts": {
+              "passed": 4,
+              "failed": 0,
+              "skipped": 0
+            },
+            "stdoutTail": "bun test v1.4.0 (34cbb9a40) 1x PARALLEL\n",
+            "stderrTail": "\npackages/evidence/test/counts.spec.ts:\n(pass) projectMaturedCounts > counts distinct frozen evidence of returned decisions inside the window [3.55ms]\n(pass) projectMaturedCounts > reports below-threshold results honestly as ineligible [1.87ms]\n(pass) projectMaturedCounts > refuses windows extending beyond the replay boundary [0.27ms]\n(pass) projectMaturedCounts > is stable under recomputation — a projection cannot drift once resolved [5.88ms]\n\n 4 pass\n 0 fail\n 9 expect() calls\nRan 4 tests across 1 file. [3.57s]\n"
+          },
+          {
+            "id": "pglite-2",
+            "workload": "DATABASE_PGLITE",
+            "files": [
+              "packages/evidence/test/evidence-index-replay.spec.ts"
+            ],
+            "fileWorkers": 1,
+            "testConcurrency": 1,
+            "command": [
+              "bun",
+              "test",
+              "--no-orphans",
+              "--isolate",
+              "--parallel=1",
+              "--max-concurrency=1",
+              "--timeout=30000",
+              "packages/evidence/test/evidence-index-replay.spec.ts"
+            ],
+            "status": 0,
+            "wallTimeMs": 3209,
+            "peakRssBytes": null,
+            "cpuSeconds": null,
+            "counts": {
+              "passed": 5,
+              "failed": 0,
+              "skipped": 0
+            },
+            "stdoutTail": "bun test v1.4.0 (34cbb9a40) 1x PARALLEL\n",
+            "stderrTail": "\npackages/evidence/test/evidence-index-replay.spec.ts:\n(pass) content-addressed frozen bundles > hashes canonical JSON — key order never changes the content address [0.14ms]\n(pass) content-addressed frozen bundles > freezes idempotently for identical content and refuses identity conflicts [14.28ms]\n(pass) content-addressed frozen bundles > refuses any mutation of a frozen bundle row [2.82ms]\n(pass) content-addressed frozen bundles > detects out-of-band manifest tampering as HASH_MISMATCH [6.34ms]\n(pass) replay-boundary resolution over bundles + observations > includes only bundles and observation revisions visible at T [8.48ms]\n\n 5 pass\n 0 fail\n 16 expect() calls\nRan 5 tests across 1 file. [3.11s]\n"
+          }
+        ]
+      },
+      "codexCalls": 0,
+      "claudeCalls": 0,
+      "testedHead": "597ccb846d74523c519c24b85ae0dd19207655b9"
     },
     {
       "id": "mechanical--foresift-object-store-database-pglite-1",

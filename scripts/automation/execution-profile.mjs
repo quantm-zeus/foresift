@@ -66,6 +66,19 @@ function normalizedLane(lane) {
     );
     invariant(lane.serviceTier === 'standard', 'INVALID_CODEX_SERVICE_TIER');
   }
+  if (lane.engine === 'AGY') {
+    invariant(typeof lane.model === 'string' && lane.model, 'INVALID_AGY_ROUTE', 'model');
+    invariant(
+      typeof lane.reasoning === 'string' && lane.reasoning,
+      'INVALID_AGY_ROUTE',
+      'reasoning',
+    );
+    invariant(
+      typeof lane.providerTimeout === 'string' && lane.providerTimeout,
+      'INVALID_AGY_ROUTE',
+      'providerTimeout',
+    );
+  }
   return {
     lane: lane.lane,
     role: lane.role ?? 'implementation',
@@ -74,6 +87,7 @@ function normalizedLane(lane) {
     complexityTier: lane.complexityTier ?? null,
     model: lane.model ?? null,
     reasoning: lane.reasoning ?? null,
+    providerTimeout: lane.providerTimeout ?? null,
     serviceTier: lane.serviceTier ?? null,
   };
 }

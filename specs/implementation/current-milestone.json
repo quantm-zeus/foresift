@@ -119,7 +119,7 @@
         "test -d packages/domain && pnpm --filter @foresift/domain test",
         "test -d packages/tool-core && pnpm --filter @foresift/tool-core test"
       ],
-      "status": "PENDING"
+      "status": "RUNNING"
     },
     {
       "id": "g0-provider-lifecycle",
@@ -154,7 +154,7 @@
         "test -d packages/provider-lifecycle && pnpm --filter @foresift/provider-lifecycle test",
         "test -d packages/providers && pnpm --filter @foresift/providers test"
       ],
-      "status": "RUNNING"
+      "status": "PROVEN"
     },
     {
       "id": "g0-cost-capacity",

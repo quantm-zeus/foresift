@@ -11,7 +11,12 @@ import {
   parseFullGateResult,
 } from '../../scripts/automation/package-full-gate.mjs';
 import { disposeGitFixtureBase, gitFixture } from '../helpers/git-fixture.js';
-import { REPO, SCRIPTS, itE2e, makeScratch, tryNode } from '../helpers/v2-fixtures.js';
+import { GATE_E2E_NESTED, REPO, SCRIPTS, makeScratch, tryNode } from '../helpers/v2-fixtures.js';
+
+const itE2e = (name: string, fn: () => void, timeout?: number) => {
+  if (process.env[GATE_E2E_NESTED] === '1') return it.skip(name, fn, timeout);
+  it(name, fn, timeout);
+};
 
 const { art, cleanup } = makeScratch('foresift-v2-c2-red-');
 afterAll(() => {

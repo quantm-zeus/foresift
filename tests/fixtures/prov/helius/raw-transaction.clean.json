@@ -1,0 +1,26 @@
+{
+  "operationId": "rpc.get_transaction",
+  "sanitized": true,
+  "recordedAt": "2026-08-26T00:00:00Z",
+  "body": {
+    "slot": 261485601,
+    "meta": { "err": null, "fee": 5000, "status": "Ok" },
+    "transaction": {
+      "message": {
+        "accountKeys": ["FAKEKEY1", "FAKEKEY2"],
+        "instructions": [
+          {
+            "programId": "TokenkegQfeZYiSFpPdmLpNSuQUhXZ8B2zLxNTLBZVdPQ",
+            "parsed": {
+              "type": "transferChecked",
+              "info": { "amount": "250000000", "decimals": 6 }
+            }
+          }
+        ]
+      },
+      "signatures": ["FAKESIG1"]
+    },
+    "version": 0
+  },
+  "comment": "Historical record shape only: the RAW broadcast-ready bytes are NOT included — the adapter decodes structured instruction fields locally; this fixture carries parsed shapes."
+}

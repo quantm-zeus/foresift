@@ -1,0 +1,16 @@
+{
+  "operationId": "history.get_transactions_for_address",
+  "sanitized": true,
+  "recordedAt": "2026-08-26T00:00:00Z",
+  "planGate": "METERED_PLAN_ONLY",
+  "body": [
+    {
+      "signature": "FAKESIG1",
+      "timestamp": 1771891200,
+      "type": "TRANSFER",
+      "fee": 5000,
+      "tokenBalances": []
+    }
+  ],
+  "comment": "Plan-gated history endpoint: unavailable in STRICT_FREE plans (PROV_ADAPTER_PLAN_GATED_UNAVAILABLE); positive control for the paid-plan surface only."
+}

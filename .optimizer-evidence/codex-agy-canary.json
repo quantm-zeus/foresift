@@ -49,6 +49,22 @@
     "tests": 1,
     "failures": 0
   },
+  "negativeOwnershipCanary": {
+    "codexImplementationTestMutation": {
+      "commit": "2527f8aec9b903c00493469af3baa3d38f673967",
+      "path": "tests/forbidden.test.mjs",
+      "guardExit": 1,
+      "verdict": "CODEX_TEST_OWNERSHIP_VIOLATION",
+      "integrated": false
+    },
+    "agyTestAuthorProductMutation": {
+      "commit": "59ae7e980871f88dba2bd2a1d376414839e899e9",
+      "path": "src/forbidden.mjs",
+      "guardExit": 1,
+      "verdict": "AGY_PRODUCT_OWNERSHIP_VIOLATION",
+      "integrated": false
+    }
+  },
   "cliProbe": {
     "literalStandard": "unsupported-and-omitted by Codex CLI 0.149.1",
     "supportedStandardWireValue": "default",

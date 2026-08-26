@@ -1,168 +1,162 @@
-# V4 EXTERNAL MAXIMUM-THROUGHPUT CONTROL-PLANE OPTIMIZER — FINAL REPORT
+# V4 THROUGHPUT CLOSEOUT — FINAL REPORT (§14)
 
-Date: 2026-08-25 · Branch: `foresift/sharded-wave-v4` → PR #53 · Baselines:
-origin/main @ `5fca6c5` era + PR #51 (`de0b39e`) + durable WIP lineage
-`foresift/sharded-wave-wip@4d48cb6`. Every claim below cites an artifact,
-test, or live-run record; anything not directly observed is labeled as such.
+Generated against the live production system. Fields marked `TBD` resolve
+when the in-flight wave/tool-core proof completes; this file is finalized
+and committed only once every field is concrete.
 
-## Mission outcome
+## Planning → wave handoff
 
-| Mission obligation                                         | State               | Where                                                                                                                                   |
-| ---------------------------------------------------------- | ------------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
-| Neutralize abandoned Archon Chat optimizer                 | DONE                | prior session; procedure preserved in findings doc R3                                                                                   |
-| True FAST invocation on the wave path                      | DONE                | router runs ONE combined `wp:fast-verify --from-git --base <pinned>`; B2 artifacts                                                      |
-| §14 RED really fails                                       | DONE                | defect #14 root-caused + fixed + regression-pinned; B1 false-green preserved as counter-example; B2 full RED→repair→green-recheck chain |
-| §15 empty shards ⇒ ZERO AI providers                       | DONE                | sentinel/engine-token gates; A2 journal shows condition-skips before any dispatch                                                       |
-| §16 strong retry preserved (L1/L2/L3)                      | DONE                | explicit retry blocks on every writer/guard/repair node incl. agy variants                                                              |
-| §17 verify installed Archon v0.9, never upgrade            | DONE                | findings R1–R7, all empirical, zero production-Archon modifications                                                                     |
-| §18 finish 16-item acceptance before production activation | DONE                | `.optimizer-evidence/v4-acceptance-matrix.md` (guard + regression + runtime proof per item)                                             |
-| Hybrid Claude+Antigravity execution                        | DONE                | pure fail-closed routing; stream-json executor decoded (R6/R7); LIVE canary A3: AGY lane integrated beside CLAUDE core                  |
-| Intra-package parallelism                                  | DONE                | sharded wave: serial core ∥ parallel shards at one pinned base                                                                          |
-| Cross-package parallelism                                  | PRE-EXISTING        | roadmap policy + autopilot concurrency selection (V3-B)                                                                                 |
-| Contract-first scheduling                                  | DONE (ADR 0017)     | scheduling IS the contract pipeline: task graph → briefs → admission → pinned worktrees                                                 |
-| Bounded speculative roadmap pipelining                     | DEFERRED (ADR 0017) | G0 foundation policy serializes packages ⇒ zero benefit today; revisit at ≥2-concurrency milestones                                     |
-| OFF/CANARY/PRODUCTION rollout routing                      | DONE + ACTIVATED    | frozen pure selector; flip = version-controlled commit; PRODUCTION authorized by acceptance matrix                                      |
-| Retire this optimizer                                      | THIS REPORT         | see Retirement below                                                                                                                    |
+- POST_PLANNING_GAP_CONFIRMED: YES
+- ROOT_CAUSE: defect #20 — bootstrap planning verified milestone
+  completeness at one path but the launch seam consumed it from another,
+  so a completed planning run never reached the sharded-wave launcher;
+  waves only started via incidental re-entry.
+- HANDOFF_DESIGN: first-class crash-safe handoff — same-tick ordered
+  sequence [pre-launch worktree advance → `planning_handoff_complete`
+  (completeness verified at the run's `working_path`) → specs-promotion
+  chore → wave launch LAST], additive commits, fail-closed recovery doors.
+- HANDOFF_PR: #60 (squash-merged 2026-08-25T15:11:20Z)
+- HANDOFF_MAIN_SHA: `5f52f8edf2fdf5a876db86e5d9b5d34856dd40f3`
 
-## Defects found by real execution (numbering continues from V3)
+## Old tool-core optimized run reconciliation
 
-- **#12** zero-progress green wave (vacuous FAST over empty integration) —
-  fixed in router AND recheck (`exitCode:90` holds the loop closed).
-- **#14** router stdout pollution silently disabled RED handling — fixed by
-  the V3 gate-router stdout-discipline idiom; B1's green-over-red DAG is the
-  preserved counter-example.
-- **#15** `build-writer-briefs.mjs` SyntaxError crashed prep before any
-  dispatch while hermetic suites stayed green — repaired.
-- **#13** RETRACTED with proof (deliberate V3 law, pinned test).
+- CURRENT_TOOL_CORE_OLD_RUN: `699b29bb…` (optimized-profile run,
+  CANCELLED — terminal)
+- OLD_RUN_HAD_USEFUL_IMPL_WORK: YES
+- OLD_WORK_PRESERVED: YES — durable tip `e9c0cdc` pushed to
+  `refs/heads/foresift/g0-tool-core` (24-stage pipeline orchestrator T601
+  plus T403–T404/T501–T503); discarded scratch reachable until GC.
+- OLD_RUN_RETIRED: YES — cancelled through the supported door; supervisor
+  itself flipped the package RUNNING→PENDING as an idempotent control
+  chore (`c10fa8d`, event `run_cancelled_requeued`).
 
-Full table with fixes and proof columns:
-`v4-defects-and-runtime-findings.md` Part A.
+## Tool-core sharded-wave proof
 
-## Antigravity executor — what was actually proven
+- TOOL_CORE_PLANNING_COMPLETE: YES — planning artifacts seeded to origin
+  main as chore `306b511` scoped exactly to `specs/g0-tool-core/*`;
+  validator reads `complete:true` (42 tasks) against the main tree.
+- TOOL_CORE_SHARDED_RUN_ID: `980e79223794124bd331a77caf82dce6`
+  (launched by the supervisor itself at 2026-08-26T09:49:38Z, one tick
+  after provider-lifecycle finalized PROVEN from merged truth PR #66)
+- TOOL_CORE_SHARDED_RUN_STARTED: 2026-08-26T09:49:38Z
+- TOOL_CORE_WAVE_PREP_PASSED: YES — branch-adoption
+  `ADOPTED_WITH_MAIN_ABSORBED` (head `3202db25`, absorbed main incl.
+  #62–#66), prep planned core+shard-1 lanes over 23 open units,
+  `writer-shard-1-agy` (real AGY) + CLAUDE core dispatched. Required a
+  maintainer worktree advance first: the task worktree sat at its
+  seeding-era base lacking `wave-branch-adoption.mjs` entirely
+  (incident #6, finding 9).
 
-- `agy --print` executes NO tools and hallucinates success (reproduced ×2)
-  ⇒ unusable as an executor (R6).
-- Real tool execution requires stdin NDJSON
-  `{"event":"user","message":{"role":"user","content":…}}` +
-  `--input-format/--output-format stream-json` (R7), absolute paths for all
-  writes (relative land in agy's scratch), and envelope status treated as
-  FORENSIC ONLY (successful out-of-scratch turns can end `status:"ERROR"` via
-  agy's artifact-path declarer — observed again inside A3's own forensics).
-- Live A3 lane: wrote `docs/parallel-guide.md`, committed `e2d1f26` on its
-  private lane branch, honest `foresift/writer-result@1`; guard recomputed
-  branch/head/base; additive merge; TRUE FAST exit 0; checkpoint 2/2.
+## Real product proof (provider-lifecycle waves)
 
-## Safety accounting
+- REAL_WRITER_LANE_EXECUTED: YES — wave 1 core lane: 4h17m real
+  implementation, ~308k output tokens, 31 units on
+  `foresift/wave/5f52f8edf2-core`; wave 3: both non-core lanes executed
+  via real `agy` CLI (heads `07d7104`, `f0e382fb`) and CLAUDE core lane
+  completed 10 commits through run lineage `f9ed4de6` → `ff96e2d0` →
+  `b101f6c3` (two supported-door `--recover-fatal` cycles after novel
+  guard-refusal surfaces, each advancing the task worktree base to
+  fresh main; see findings 4–7).
+- REAL_ADDITIVE_INTEGRATION: YES — twice. Provider run `b101f6c3`
+  integrated all dispatched lanes additively (first full-guard pass of
+  the sharded design); tool-core wave-1 run `980e7922` then passed BOTH
+  lane guards with ZERO refusals (~100 ms each) and integrated shard-1
+  additively (`f46f9c7`) over adopted tip `3202db25`.
+- REAL_TRUE_FAST_GREEN: YES — tool-core wave-1 `980e7922` achieved it
+  through the converged repair loop: RED at FAST on one misformatted
+  file (`packages/shared-schemas/src/core.ts`, caught by the milestone
+  gate's FORMAT category inside the e2e spawners) → repair iteration 1
+  committed `dae5889` → serialized `fast-recheck` NODE reran the actual
+  FAST tier to green (`wave-fast-verdict.json` `exitCode:0,
+  phase:"recheck"`) under its 1 h budget — the exact structure landed in
+  PR #65 after the bare-guard budget killed provider's identical repair.
+  Durable checkpoint written (`implementation-checkpoint@2`, 20/42
+  tasks, targetedChecks fast-verify PASS).
 
-- Product boundary untouched: read-only intelligence system; no trading,
-  custody, wallet signing, private-key handling, or transaction submission
-  capability added or approached.
-- Additive git history only (commits + one merge-commit base refresh after
-  PR #52); no amend/rebase/force-push.
-- No credentials committed; `.env` ignored; agy OAuth state lives outside
-  the repo and is referenced but never copied.
-- Production Archon and the product autopilot were never degraded during
-  optimization work; canaries ran against disposable fixture repos.
-- Verification authority strengthened, never weakened: full `pnpm verify`
-  green at pushed HEAD (spec:verify, prettier, eslint, tsc, 1242 tests);
-  the outer FORMAT/LINT/TYPECHECK layers caught real defects hermetic lane
-  tests had missed (unused binding in integrator, missing d.mts shims for
-  the new modules incl. the un-extended generations shim from an earlier V4
-  commit).
+## Invariants
 
-## Rollout
+- IMPLEMENTATION_AI_IN_PLANNING_BOOTSTRAP: 0 (bootstrap used zero
+  implementation providers; ~35 min deterministic planning)
+- DUPLICATE_ACTIVE_TOOL_CORE_RUNS: NO (exactly one terminal cancelled row)
+- G0_MAX_CONCURRENCY_STILL_1: YES (`maxParallelCodingPackagesFoundation: 1`
+  honored by every observed selection)
 
-`SHARDED_WAVE_ROLLOUT` activated OFF → PRODUCTION in commit `6a40599`,
-authorized exclusively by the acceptance matrix. Flip-safety verified in
-code: supervisor-tracked runs persist their launch workflow and adoption
-matches `(workflow, message)` (`discoverRunId(entry.workflow, …)`), so no
-tracked run changes identity mid-flight; the LEGACY forensic row stays
-retired forever (`usesOptimizedWorkflow` upstream of admission). Hybrid AGY
-lanes remain opt-in (`FORESIFT_AGY_LANES`, unset everywhere ⇒ CLAUDE).
+## Semantics + hardening
 
-## Retirement
+- FINALIZE_FROM_MAIN_SEMANTICS_ALIGNED: YES — finalize authority is the
+  CURRENT origin/main HEAD; reopen of a current-main package refused.
+- CURRENT_MAIN_REOPEN_REGRESSION_PINNED: YES (dedicated spec coverage).
+- CLAUDE_SCANNER_EXCLUSION_SAFE: YES
+- SCANNER_GUARD_OR_NARROWING: prohibited-capability scanner never sweeps
+  `.claude` tooling state (defect #19, PR #59, main commit `849f74f`);
+  exclusion is path-narrowed to Claude Code's own state directories, not
+  a blanket content exemption.
 
-The V4 optimizer retires with this report: no standing optimizer processes
-or chat conversations remain; the sharded wave becomes ORDINARY product
-control plane under the standard supervisor (launch identity, adoption,
-retry L3, milestone bookkeeping all unchanged).
+## Convergence
 
-## Post-merge landing record & autonomy verification (appended 2026-08-25)
+- FULL_VERIFY: green at closeout HEAD (final run logged here at finalize)
+- EXACT_HEAD_CI: SUCCESS run 32911776717 @ main `9b8186844b…`
+  (re-pinned at FINAL_MAIN_SHA during finalize)
+- FINAL_MAIN_SHA: TBD (advances with wave-3 landing before finalize)
+- AUTOPILOT_SERVICE: active (systemd --user, drop-in AGY opt-in loaded)
+- PRODUCT_AUTONOMY_CONTINUING: YES
+- FOLLOWUP_SESSION_SAFE_TO_RETIRE: TBD (set at finalize)
 
-- **Landing**: PR #53 squash-merged to `main` as **`1aeb68c`** at
-  2026-08-25T05:11:02Z; authorizing CI run **`32811287374`** concluded
-  `success` at head `9650be6`. The product checkout (`/home/minhquan_eth/foresift`)
-  was restored to `main@1aeb68c` fast-forward-only — which also cured the
-  per-tick "could not fast-forward main" warning caused by a stale parked
-  branch — and the supervisor restarted onto the landed code.
-- **Autonomy verification surfaced a real incident, resolved through supported
-  doors only** (defect #16, findings doc): the owner had manually merged the
-  finished g0-security-perimeter work as PR #52 straight off the Archon
-  workspace branch four seconds before its workflow reported completion,
-  invisible to the supervisor's head-keyed merge check ⇒ fail-closed
-  PAUSED_FATAL over already-merged work. No JSON was hand-edited:
-  `--recover-fatal` re-verified launch identity, retired the dead run, launched
-  ONE fresh continuation (**`7bb356d4…`**) on the SAME branch/worktree, restored
-  tracking, cleared the pause, exit 0; supervisor resumed autonomous ticking.
-- **Continuation disposition — retired without losing product work** (owner
-  correction: do not let the obsolete pre-V4 workflow traverse planning →
-  implementation → review → convergence again). Proven first: every T-scoped
-  task of the package was already merged via PR #52; the only unchecked boxes
-  in current-main authority are five governance-deferred R-items whose own text
-  places their wiring OUTSIDE this package's writeScopes. The run's post-merge
-  commits were out-of-scope responses to exactly those deferred items (defect
-  #17). It was retired through Archon's supported abandon (status `cancelled`
-  at 2026-08-25T07:29:35Z); log retained; worktree untouched; every surplus
-  delta preserved as patch artifacts under
-  `~/.local/state/foresift/v4-security-run-retirement/`.
-- **Main-push CI flake diagnosed and cleared**: push-run `32811833226` failed
-  via a V8 JIT worker crash (`jit_page_->allocations_.erase(addr)`) while the
-  squashed tree is BYTE-IDENTICAL to the green branch head (`git diff 9650be6
-1aeb68c` empty); a supported rerun of the SAME sha concluded success ⇒
-  environmental, gate evidence valid at HEAD.
-- **New control-plane capability shipped**: `--finalize-from-main <id>`
-  (module `finalize-from-main.mjs`, 14 regression tests) — deterministic,
-  fail-closed RUNNING→PROVEN from landed truth ONLY: merged-PR ancestry from
-  current origin/main, T-scoped completeness read AT that commit (CURRENT
-  origin/main HEAD — never the historical merge commit, so a task reopened on
-  main after landing refuses finalization; pinned in finalize-from-main.spec.ts), green CI on
-  exactly origin/main HEAD, and no live competing execution; it refuses with
-  precise reasons otherwise and never invokes an AI provider. Defects #16/#17
-  are its founding cases.
-- **Security finalization**: DONE through the shortest supported deterministic
-  path, with ZERO fresh AI implementation calls. The obsolete pre-V4
-  continuation run was retired via Archon's supported abandon (status
-  `cancelled` 2026-08-25T07:29:35Z) after proving every T-scoped task already
-  merged and snapshotting every surplus delta; the new fail-closed
-  `--finalize-from-main` capability then proved g0-security-perimeter PROVEN
-  entirely from committed-main truth at 09:13:26Z — evidence chain PR #52
-  (merge commit `3ed28a6`) reachable from origin/main `a17a207`, T-scoped
-  completeness read AT that commit (57 boxes checked; 5 governance-deferred
-  R-items visible, never blocking), green CI on exactly that HEAD
-  (`32830074958`), no live competing execution. State chore `9799827` pushed
-  the PROVEN flip; tracked row closed as `finalized-from-main`.
-- **First production selection under active routing**: PROVEN — and it found a
-  real defect by executing. Selection routed g0-provider-lifecycle to
-  `foresift-sharded-wave` under PRODUCTION routing (run `4d8113dd`, 09:14Z);
-  it died at prep in ~80 ms because the implementation-only wave admits
-  never-planned packages whose scoped tasks.md does not exist yet (**defect
-  #18**, findings doc — all six remaining G0 packages are unplanned, so every
-  fresh launch would crash-loop; acceptance canaries all shipped pre-seeded
-  specs). Fixed fail-closed in PR #57 (squash-merged as `b0b27de`, CI
-  `32841691967`): launch-seam admission gate reusing the optimized workflow's
-  own deterministic planning validator in a new opt-in `--repo-only` mode — an
-  unproven package demotes to `foresift-work-package-optimized`, which plans
-  first; the pure rollout selector stays pure. The dead run was retired via
-  supported abandon (log preserved), the supervisor's next tick cleanly
-  requeued the package (`run_cancelled_requeued`), logged
-  `WAVE_ADMIT_DEFERRED … -> foresift-work-package-optimized`, and launched
-  **g0-tool-core** (run `699b29bb…`) on current-committed main: worker live
-  through `generation-adoption → preflight → plan-status → scoped-plan`
-  (Phase-1 planning of an unplanned package, exactly the designed lifecycle),
-  durably tracked by the production supervisor (`run_id_discovered` on the
-  service's own first tick), `foresift-autopilot.service` ACTIVE — autonomous
-  production execution restored end-to-end.
-- **Optimizer retirement**: complete with the above proofs. The control plane
-  now owns itself: finalization from landed truth, planning-aware wave
-  admission, and ordinary supervisor operation are all version-controlled
-  product code with regression pins.
+## Additive findings recorded during live operation
+
+1. Wave prep should prune its predecessor's wave-scratch worktree
+   registrations before `worktree add -B` (base-freeze collision).
+2. WRITE-AUTHORITY VIOLATION deserves a dedicated failure class (resume
+   budget currently burns before the converging fresh restart).
+3. agy result-event errors should surface in the node_error line (stderr
+   tail alone is empty for in-stream failures).
+4. Guard-refusal coverage is only as complete as the task-graph
+   collector's collectible-path set. Emergent shared surfaces — root
+   `package.json` devDependencies links (PR #63) and an emergent shared
+   test helper `tests/helpers/prov.ts` (PR #64) — were unplannable and
+   therefore unrecordable until the collector was extended and the
+   surfaces recorded as scope exceptions from live guard evidence. A
+   fourth novel surface should trigger the systematic fix: declare the
+   helpers family in milestone writeScopes.
+5. Bare `until_bash` guards carry a short default wall budget (~3 min
+   observed live). Heavy verification must live in a serialized node
+   with an explicit timeout; the guard stays a sub-second verdict read
+   fed by textual substitution (PR #65, gate-repair-loop idiom).
+6. Production env leaks into test processes are a recurring hermeticity
+   class: `FORESIFT_AGY_LANES` (manager env → emitEngineFiles ambient
+   fallback) and `ARTIFACTS_DIR` (ADR-0004 regular-node export → child
+   env-fallback modes) both changed test outcomes only inside the wave
+   process tree. Tests must inject env explicitly via the DI contract,
+   never inherit ambient state.
+7. E2E budgets that embed a FULL nested suite track suite growth, not
+   gate cost: C2.5-era 600 s budgets became deterministic false REDs by
+   pure timeout at ~1500 tests (PR #65 raised to 1 800 000 ms with
+   dated rationale).
+8. Recovery gap (incident #5, run `49d7cc1a`): a relaunch after
+   implementation-complete-but-pre-landing death produces a VACUOUS
+   wave — the graph builder counts open units from the task worktree's
+   tasks.md (all 33 already checked at tip `f3d4481`), branch-adoption
+   trusts only pushed launch branches, so prep plans 0 shards/briefs
+   and the workflow completes in ~14 s; the supervisor correctly pauses
+   on completed_without_merge. Resolution path used: land through a
+   normal PR (#66) and let the supervisor reconcile PROVEN from merged
+   truth (`finalizeCompletedRun`). Workflow-level fix remains open.
+9. Task worktrees are pinned at their seeding-era base forever unless
+   something advances them (incident #6, run `efd9b5f5`): tool-core's
+   task worktree predated `wave-branch-adoption.mjs`, so the wave died
+   at MODULE_NOT_FOUND in 70 ms. The recover-fatal door's advance skips
+   on divergence, which cannot heal this class. Maintainer fix:
+   fast-forwarded the worktree to a reconciled tip containing both its
+   implementation lineage and current main (`0a953ce`). Same family as
+   the smoke-run pinning law; launch-time worktree freshness remains an
+   open workflow-level gap.
+10. The sharded wave is implementation-only by design ("the
+   authoritative FULL gate stays downstream"): every settled wave ends
+   without a merged PR, and continuation happens through further waves.
+   When the supervisor's per-row resume/restart budget is already
+   spent, that design point latches paused_fatal instead of continuing.
+   Continuation sequence proven live on `980e7922` → `4a827e39`:
+   publish the slice's commits to the package branch FIRST, then
+   `--recover-fatal` — adoption absorbs the published tip and the next
+   wave plans only remaining open units. Landing-only-continuation
+   (finding 8) still applies once units reach zero.

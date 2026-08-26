@@ -101,6 +101,8 @@ export function applyBunCutover({ root, manifestFile }) {
     tsconfig.compilerOptions.types = tsconfig.compilerOptions.types.filter(
       (entry) => entry !== 'vitest/globals',
     );
+  tsconfig.compilerOptions.types ??= [];
+  if (!tsconfig.compilerOptions.types.includes('bun')) tsconfig.compilerOptions.types.push('bun');
   writeJson(tsconfigFile, tsconfig);
 
   for (const file of CONFIG_FILES) {

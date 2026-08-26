@@ -127,6 +127,8 @@ const RESUME_LIMIT = 3; // workflow-level automatic resumes per §16
 const FRESH_RESTARTS_LIMIT = 1;
 const BACKOFF_BASE_MS = 60_000;
 const BACKOFF_CAP_MS = 15 * 60_000;
+// Dedupes co_run_denied observability events within one supervisor process.
+const coRunDenialSeen = new Set();
 // A "running" Archon row proves nothing about liveness; if a run shows no
 // activity for this long we treat it as orphaned (§17).
 const STALE_RUN_MS = 90 * 60_000;
@@ -1487,7 +1489,24 @@ function selectAndLaunch(st) {
     const elig = packageEligible(ms, cand);
     if (!elig.eligible) continue;
     const verdict = canStartPackage(roadmap, ms, cand, running);
-    if (!verdict.ok) continue;
+    if (!verdict.ok) {
+      // Maintainer observability: a pairwise concurrency refusal is evidence,
+      // not noise — record WHY an otherwise-eligible candidate was denied a
+      // slot. Once per process for the same package+reason; capacity-limit
+      // saturation is healthy and stays silent.
+      if (
+        !/concurrency limit/.test(verdict.reason) &&
+        !coRunDenialSeen.has(`${cand.id}|${verdict.reason}`)
+      ) {
+        coRunDenialSeen.add(`${cand.id}|${verdict.reason}`);
+        record(st, 'co_run_denied', {
+          packageId: cand.id,
+          reason: verdict.reason,
+          running: running.map((r) => r.id),
+        });
+      }
+      continue;
+    }
     const { generation, branch, message, workflow: wf } = launchIdentity(cand);
     const ack = launchDetached(st, wf, branch, message);
     const runId = resolveRunId(ack, wf, message);

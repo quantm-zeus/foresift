@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'bun:test';
 import {
   ALL_ACQUISITION_STATES,
   ALL_QUALITY_CODES,
@@ -51,7 +51,7 @@ describe('§13.9 quality-code vocabulary (FR-DATA-005)', () => {
       'OUTCOME_CENSORED',
       'RETROSPECTIVE_ONLY',
     ];
-    for (const code of required) expect(ALL_QUALITY_CODES).toContain(code);
+    for (const code of required) expect(ALL_QUALITY_CODES as readonly string[]).toContain(code);
     expect(ALL_QUALITY_CODES.length).toBe(required.length);
   });
 
@@ -88,7 +88,7 @@ describe('§13.8 acquisition-state vocabulary (AC-242 substrate)', () => {
         'TIMED_OUT',
         'RETURNED',
         'INVALID_RESPONSE',
-      ].sort(),
+      ].sort() as AcquisitionState[],
     );
   });
 

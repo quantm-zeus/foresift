@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'bun:test';
 import {
   ErrorCode,
   ForesiftError,
@@ -58,16 +58,16 @@ describe('CAIP-2 chain ids (FR-DATA-001)', () => {
   });
 
   it('composes CAIP-10 account ids and refuses separator injection', () => {
-    expect(caip10(parseChainId('eip155:1'), normalizeEvmAddress('0x' + 'ab'.repeat(20)))).toBe(
-      'eip155:1:0x' + 'ab'.repeat(20),
-    );
+    expect(
+      caip10(parseChainId('eip155:1'), normalizeEvmAddress('0x' + 'ab'.repeat(20))) as string,
+    ).toBe('eip155:1:0x' + 'ab'.repeat(20));
     expect(() => caip10(parseChainId('eip155:1'), 'aa:bb')).toThrowError(ForesiftError);
   });
 });
 
 describe('EVM address normalization + EIP-55 rendering (AC-023)', () => {
   it('canonicalizes any-cased input to lowercase hex', () => {
-    expect(normalizeEvmAddress('0xABCDEF0000000000000000000000000000000987')).toBe(
+    expect(normalizeEvmAddress('0xABCDEF0000000000000000000000000000000987') as string).toBe(
       '0xabcdef0000000000000000000000000000000987',
     );
   });

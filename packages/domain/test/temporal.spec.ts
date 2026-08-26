@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'bun:test';
 import {
   ErrorCode,
   ForesiftError,
@@ -17,8 +17,10 @@ const t = (s: string) => utcTimestamp(s);
 
 describe('UTC timestamp policy (§13.1)', () => {
   it('accepts canonical UTC forms including fractional precision', () => {
-    expect(utcTimestamp('2026-01-02T03:04:05Z')).toBe('2026-01-02T03:04:05Z');
-    expect(utcTimestamp('2026-01-02T03:04:05.123456789Z')).toBe('2026-01-02T03:04:05.123456789Z');
+    expect(utcTimestamp('2026-01-02T03:04:05Z') as string).toBe('2026-01-02T03:04:05Z');
+    expect(utcTimestamp('2026-01-02T03:04:05.123456789Z') as string).toBe(
+      '2026-01-02T03:04:05.123456789Z',
+    );
     expect(isUtcLeapSecondAccepted()).toBe(true);
   });
 
@@ -74,8 +76,8 @@ describe('availability provenance classes (§13.2)', () => {
       'MANUAL_IMPORT_AVAILABLE',
       'DERIVED_FROM_AVAILABLE_INPUTS',
       'LEARNED_ARTIFACT_PUBLISHED',
-    ]) {
-      expect(availabilityProvenanceClass(cls)).toBe(cls);
+    ] as const) {
+      expect(availabilityProvenanceClass(cls) as string).toBe(cls);
     }
     try {
       availabilityProvenanceClass('SOME_FUTURE_CLASS');

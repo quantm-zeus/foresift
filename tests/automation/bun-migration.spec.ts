@@ -20,7 +20,11 @@ import {
   isTestFile,
 } from '../../scripts/automation/bun-migration-manifest.mjs';
 import { migrateMechanicalFile } from '../../scripts/automation/bun-migration-codemod.mjs';
-import { prepareMigration } from '../../scripts/automation/bun-migration-runner.mjs';
+import {
+  planMigrationBatches,
+  prepareMigration,
+  runMechanicalBatches,
+} from '../../scripts/automation/bun-migration-runner.mjs';
 import { buildBunTestPlan, bunTestArgs } from '../../scripts/automation/bun-test-coordinator.mjs';
 import {
   repositorySourcePaths,
@@ -325,6 +329,153 @@ describe('Contract 4: Manifest inventory integrity and batch classification', ()
     const prepared = prepareMigration({ root: fx.root, manifestFile: manifestPath });
     const batch = prepared.batches.find((b) => b.id === 'mechanical-batch-1');
     expect(batch?.state).toBe('VERIFIED');
+  });
+
+  it('classifies Bun-native imports as ALREADY_MIGRATED and MIGRATED state', () => {
+    const dir = mkdtempSync(join(scratch, 'pre-migrated-'));
+    const testPath = 'bun-native.spec.ts';
+    writeFileSync(
+      join(dir, testPath),
+      "import { describe, expect, it } from 'bun:test';\ndescribe('native', () => { it('t', () => { expect(1).toBe(1); }); });\n",
+    );
+    const analysis = analyzeTestFile(dir, testPath);
+    expect(analysis.migrationType).toBe('ALREADY_MIGRATED');
+    expect(analysis.state).toBe('MIGRATED');
+  });
+
+  it('manifest entry in MIGRATED state produces a VERIFY_EXISTING batch rather than being silently omitted', () => {
+    const manifest = {
+      schema: BUN_MIGRATION_MANIFEST_SCHEMA,
+      migrationId: 'bun-test-authority-v1',
+      totalTestFiles: 2,
+      files: [
+        {
+          path: 'packages/domain/test/pre-migrated.spec.ts',
+          package: '@foresift/domain',
+          workload: 'PURE',
+          migrationType: 'ALREADY_MIGRATED',
+          state: 'MIGRATED',
+        },
+        {
+          path: 'packages/db/test/pre-migrated-db.spec.ts',
+          package: '@foresift/db',
+          workload: 'DATABASE_PGLITE',
+          migrationType: 'ALREADY_MIGRATED',
+          state: 'MIGRATED',
+        },
+      ],
+      batches: [],
+    };
+    const batches = planMigrationBatches(manifest);
+    expect(batches.length).toBe(2);
+
+    const pureBatch = batches.find((b) =>
+      b.files.includes('packages/domain/test/pre-migrated.spec.ts'),
+    );
+    expect(pureBatch).toBeDefined();
+    expect(pureBatch?.engine).toBe('VERIFY_EXISTING');
+    expect(pureBatch?.id).toBe('verify-existing--foresift-domain-pure-1');
+    expect(pureBatch?.workload).toBe('PURE');
+    expect(pureBatch?.state).toBe('PENDING');
+
+    const dbBatch = batches.find((b) =>
+      b.files.includes('packages/db/test/pre-migrated-db.spec.ts'),
+    );
+    expect(dbBatch).toBeDefined();
+    expect(dbBatch?.engine).toBe('VERIFY_EXISTING');
+    expect(dbBatch?.id).toBe('verify-existing--foresift-db-database-pglite-1');
+    expect(dbBatch?.workload).toBe('DATABASE_PGLITE');
+    expect(dbBatch?.state).toBe('PENDING');
+  });
+
+  it('VERIFY_EXISTING batch advances Bun-native file to VERIFIED with zero inference and no codemod rewrite', () => {
+    const fx = gitFixture('verify-existing-fx');
+    const testFile = 'packages/domain/test/native-unit.spec.ts';
+    const sourceContent = [
+      "import { describe, expect, it } from 'bun:test';",
+      '// preserved exact comments without rewrite',
+      "describe('native unit test', () => {",
+      "  it('executes directly under bun', () => {",
+      '    expect(10 + 20).toBe(30);',
+      '  });',
+      '});',
+      '',
+    ].join('\n');
+    fx.writeFile(testFile, sourceContent);
+    fx.commitAll('add bun-native test');
+
+    const manifestPath = join(fx.root, 'manifest.json');
+    const preparedManifest = prepareMigration({ root: fx.root, manifestFile: manifestPath });
+
+    const initialEntry = preparedManifest.files.find((f) => f.path === testFile);
+    expect(initialEntry?.state).toBe('MIGRATED');
+    expect(initialEntry?.migrationType).toBe('ALREADY_MIGRATED');
+
+    const batch = preparedManifest.batches.find((b) => b.files.includes(testFile));
+    expect(batch).toBeDefined();
+    expect(batch?.engine).toBe('VERIFY_EXISTING');
+    expect(batch?.state).toBe('PENDING');
+
+    const resultManifest = runMechanicalBatches({
+      root: fx.root,
+      manifestFile: manifestPath,
+      manifest: preparedManifest,
+      policy: DEFAULT_POLICY,
+    });
+
+    expect(batch?.state).toBe('VERIFIED');
+    expect(batch?.codexCalls).toBe(0);
+    expect(batch?.claudeCalls).toBe(0);
+    expect(batch?.verification?.ok).toBe(true);
+
+    const updatedEntry = resultManifest.files.find((f) => f.path === testFile);
+    expect(updatedEntry?.state).toBe('VERIFIED');
+
+    // Content remains completely untouched (no codemod rewrite performed)
+    const contentOnDisk = readFileSync(join(fx.root, testFile), 'utf8');
+    expect(contentOnDisk).toBe(sourceContent);
+  });
+
+  it('previously VERIFIED pre-migrated entries remain skipped on restart', () => {
+    const fx = gitFixture('verify-existing-restart-fx');
+    const testFile = 'packages/domain/test/restart-unit.spec.ts';
+    const sourceContent = [
+      "import { describe, expect, it } from 'bun:test';",
+      "describe('restart test', () => {",
+      "  it('passes', () => {",
+      '    expect(true).toBe(true);',
+      '  });',
+      '});',
+      '',
+    ].join('\n');
+    fx.writeFile(testFile, sourceContent);
+    fx.commitAll('add restart test');
+
+    const manifestPath = join(fx.root, 'manifest.json');
+    const manifest = prepareMigration({ root: fx.root, manifestFile: manifestPath });
+    runMechanicalBatches({
+      root: fx.root,
+      manifestFile: manifestPath,
+      manifest,
+      policy: DEFAULT_POLICY,
+    });
+
+    expect(manifest.files.find((f) => f.path === testFile)?.state).toBe('VERIFIED');
+    const batch = manifest.batches.find((b) => b.files.includes(testFile));
+    expect(batch?.state).toBe('VERIFIED');
+
+    // Restart: re-prepare migration with saved manifest
+    const restartedManifest = prepareMigration({ root: fx.root, manifestFile: manifestPath });
+    const restartedEntry = restartedManifest.files.find((f) => f.path === testFile);
+    expect(restartedEntry?.state).toBe('VERIFIED');
+
+    const restartedBatch = restartedManifest.batches.find((b) => b.files.includes(testFile));
+    expect(restartedBatch?.state).toBe('VERIFIED');
+
+    const pendingBatches = restartedManifest.batches.filter(
+      (b) => ['CODEMOD', 'VERIFY_EXISTING'].includes(b.engine) && b.state !== 'VERIFIED',
+    );
+    expect(pendingBatches).toHaveLength(0);
   });
 });
 

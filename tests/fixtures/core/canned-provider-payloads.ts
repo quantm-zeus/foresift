@@ -18,11 +18,7 @@ export interface PayloadCase {
   /** Delay the serving adapter injects before responding (ms; 0 = immediate). */
   readonly delayMs: number;
   /** The §16.2 stage expected to accept (SUCCESS) or refuse this payload. */
-  readonly expectedStage:
-    | 'SUCCESS'
-    | 'RAW_VALIDATE'
-    | 'NORMALIZE'
-    | 'SEMANTIC_INVARIANTS';
+  readonly expectedStage: 'SUCCESS' | 'RAW_VALIDATE' | 'NORMALIZE' | 'SEMANTIC_INVARIANTS';
   /** Machine-reason prefix expected when expectedStage refuses. */
   readonly expectedReasonPrefix?: string;
 }
@@ -68,13 +64,14 @@ export const MISSING_TIMESTAMP_PAYLOAD: PayloadCase = {
   contentType: 'application/json',
   bodyText: JSON.stringify(
     rawPayload([
+      // Deliberately malformed (no event timestamp) — hence the assertion.
       {
         identity: 'solana:mint-fixture',
         availableAt: T_MINUS_60,
         fetchedAt: T_MINUS_120,
         fields: { risk_score: 0.2 },
         qualityCodes: ['OK'],
-      },
+      } as unknown as RawObservationShape,
     ]),
   ),
   delayMs: 0,
@@ -87,9 +84,7 @@ export const BAD_QUALITY_CODE_PAYLOAD: PayloadCase = {
   name: 'bad-quality-code',
   description: 'quality code contains whitespace/illegal delimiters',
   contentType: 'application/json',
-  bodyText: JSON.stringify(
-    rawPayload([{ ...goodObservation, qualityCodes: ['has space!'] }]),
-  ),
+  bodyText: JSON.stringify(rawPayload([{ ...goodObservation, qualityCodes: ['has space!'] }])),
   delayMs: 0,
   expectedStage: 'NORMALIZE',
 };
@@ -100,9 +95,7 @@ export const TIME_TRAVEL_PAYLOAD: PayloadCase = {
   description: 'observedAt exceeds availableAt — semantic invariant refuses',
   contentType: 'application/json',
   bodyText: JSON.stringify(
-    rawPayload([
-      { ...goodObservation, observedAt: T_ZERO, availableAt: T_MINUS_60 },
-    ]),
+    rawPayload([{ ...goodObservation, observedAt: T_ZERO, availableAt: T_MINUS_60 }]),
   ),
   delayMs: 0,
   expectedStage: 'SEMANTIC_INVARIANTS',

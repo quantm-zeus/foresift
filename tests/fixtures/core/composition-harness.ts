@@ -4,9 +4,7 @@
  * exact 24-stage pipeline WITHOUT any provider network. Everything here is
  * inert and deterministic — no credentials, no live endpoints.
  */
-import type {
-  ActorIdentity,
-} from '../../../packages/tool-core/src/run-context.ts';
+import type { ActorIdentity } from '../../../packages/tool-core/src/run-context.ts';
 import type {
   AuthnPrimitive,
   AuthzPrimitive,
@@ -97,6 +95,66 @@ export class PermissiveEgressGuard {
   }
 }
 
+// ── Object store ─────────────────────────────────────────────────────────────
+
+/**
+ * Minimal in-memory object store: content-addressed bytes with metadata
+ * identity, sufficient for evidence/cache round-trips inside one process.
+ */
+export class InMemoryObjectStore {
+  private readonly objects = new Map<
+    string,
+    {
+      bytes: Uint8Array;
+      stored: {
+        artifactId: string;
+        contentHash: string;
+        version: number;
+        sizeBytes: number;
+        metadata: Record<string, unknown>;
+        storedAt: string;
+      };
+    }
+  >();
+
+  async put(request: {
+    artifactId: string;
+    bytes: Uint8Array;
+    metadata: Record<string, unknown>;
+  }): Promise<{ artifactId: string; contentHash: string; version: number; sizeBytes: number }> {
+    const { createHash } = await import('node:crypto');
+    const contentHash = `sha256:${createHash('sha256').update(request.bytes).digest('hex')}`;
+    const existing = this.objects.get(contentHash);
+    if (existing !== undefined) return existing.stored;
+    const stored = {
+      artifactId: request.artifactId,
+      contentHash,
+      version: 1,
+      sizeBytes: request.bytes.byteLength,
+      metadata: request.metadata,
+      storedAt: new Date(0).toISOString(),
+    };
+    this.objects.set(contentHash, { bytes: request.bytes, stored });
+    return stored;
+  }
+
+  async get(lookup: {
+    contentHash: string;
+  }): Promise<{ bytes: Uint8Array; stored: { contentHash: string } } | null> {
+    const found = this.objects.get(lookup.contentHash);
+    if (found === undefined) return null;
+    return { bytes: found.bytes, stored: found.stored };
+  }
+
+  async verify(): Promise<never> {
+    throw new Error('InMemoryObjectStore.verify not used in these suites');
+  }
+
+  async versions(): Promise<never> {
+    throw new Error('InMemoryObjectStore.versions not used in these suites');
+  }
+}
+
 // ── Quota adapter ────────────────────────────────────────────────────────────
 
 export interface QuotaCallLog {
@@ -136,7 +194,10 @@ export class CountingQuotaAdapter implements QuotaReservationAdapter {
     return `${this.reservationPrefix}-${request.pipelineRunId}`;
   }
 
-  async commit(request: { readonly reservationId: string; readonly actualUnits: number }): Promise<void> {
+  async commit(request: {
+    readonly reservationId: string;
+    readonly actualUnits: number;
+  }): Promise<void> {
     this.log.commits.push({ ...request });
   }
 
@@ -216,7 +277,9 @@ export class FailingAdapter implements ReadOnlyOperationAdapter {
 // ── Route + definition builders ──────────────────────────────────────────────
 
 /** Schema-shaped tool definition matching the §16.9 catalog conventions. */
-export function toolMetadataFixture(over: Partial<ToolDefinitionMetadata> = {}): ToolDefinitionMetadata {
+export function toolMetadataFixture(
+  over: Partial<ToolDefinitionMetadata> = {},
+): ToolDefinitionMetadata {
   const name = over.name ?? 'get_asset_identity';
   return {
     name,
@@ -247,7 +310,9 @@ export function observationFixture(
 }
 
 /** Route binding a canned collector under the reference rights version. */
-export function routeFixture(over: Partial<OperationRoute> & { adapter: ReadOnlyOperationAdapter }): OperationRoute {
+export function routeFixture(
+  over: Partial<OperationRoute> & { adapter: ReadOnlyOperationAdapter },
+): OperationRoute {
   return {
     provider: over.provider ?? 'gmgn',
     operation: over.operation ?? 'token_security',

@@ -66,7 +66,11 @@ import { ToolCoreRegistry } from './registry.ts';
 import { UnverifiableRightsRefusedSource, type LicensePolicySource } from './license-contract.ts';
 import type { QuotaReservationAdapter } from './quota-contract.ts';
 import type { OperationRoute } from './provider-contract.ts';
-import { newToolRunContext, type ToolExecutionRequest, type ToolRunContext } from './run-context.ts';
+import {
+  newToolRunContext,
+  type ToolExecutionRequest,
+  type ToolRunContext,
+} from './run-context.ts';
 
 /** Binds one operation route to the tool (all versions when no version given). */
 export interface ToolRouteBinding {
@@ -104,6 +108,12 @@ export interface ToolCoreConfig {
   readonly policyVersion?: string | undefined;
   /** Lease QUEUE wait cadence (tests shrink this). */
   readonly leaseWaitPollMs?: number | undefined;
+  /**
+   * Read-only per-run observer invoked just before the envelope returns —
+   * conformance suites assert on the journal/audit record without touching
+   * product behavior.
+   */
+  readonly observeRun?: (ctx: Readonly<ToolRunContext>) => void;
   /** Injected clock. */
   readonly now?: () => UtcTimestamp;
 }
@@ -144,7 +154,9 @@ export function createToolCore(config: ToolCoreConfig): ToolCore {
   if (config.auditChain === undefined) {
     // Runtime backstop beside the type-level requirement: no audit sink, no
     // tool core — every exit must be auditable before anything can run.
-    throw new Error('createToolCore requires an auditChain: unauditable pipelines refuse to compose');
+    throw new Error(
+      'createToolCore requires an auditChain: unauditable pipelines refuse to compose',
+    );
   }
   const now = config.now ?? (() => new Date().toISOString() as UtcTimestamp);
 
@@ -281,8 +293,7 @@ export function createToolCore(config: ToolCoreConfig): ToolCore {
           'VALIDATE_AND_CANONICALIZE_INPUT',
           makeValidateInputStage({
             inputSchemaJsonOf: (c) =>
-              registry.resolve(c.request.toolName, c.request.toolVersion)?.metadata
-                .inputSchemaJson,
+              registry.resolve(c.request.toolName, c.request.toolVersion)?.metadata.inputSchemaJson,
           }),
         ),
         VALIDATE_ACQUISITION_DECISION_AND_AUTHORIZATION_ENVELOPE: record(
@@ -294,7 +305,10 @@ export function createToolCore(config: ToolCoreConfig): ToolCore {
           boundStages.persistRequested,
         ),
         CALCULATE_EXACT_CACHE_KEY: record('CALCULATE_EXACT_CACHE_KEY', boundStages.cacheKey),
-        CHECK_REQUEST_LOCAL_MEMOIZATION: record('CHECK_REQUEST_LOCAL_MEMOIZATION', boundStages.memo),
+        CHECK_REQUEST_LOCAL_MEMOIZATION: record(
+          'CHECK_REQUEST_LOCAL_MEMOIZATION',
+          boundStages.memo,
+        ),
         CHECK_FRESH_CACHE: record('CHECK_FRESH_CACHE', boundStages.fresh),
         CHECK_ACCEPTABLE_STALE_CACHE_IF_ALLOWED: record(
           'CHECK_ACCEPTABLE_STALE_CACHE_IF_ALLOWED',
@@ -304,7 +318,10 @@ export function createToolCore(config: ToolCoreConfig): ToolCore {
           'ACQUIRE_DISTRIBUTED_SINGLE_FLIGHT_LEASE',
           boundStages.leaseAcquire,
         ),
-        RECHECK_CACHE_AFTER_LEASE: record('RECHECK_CACHE_AFTER_LEASE', boundStages.postLeaseRecheck),
+        RECHECK_CACHE_AFTER_LEASE: record(
+          'RECHECK_CACHE_AFTER_LEASE',
+          boundStages.postLeaseRecheck,
+        ),
         ESTIMATE_QUOTA_COST_AND_VERIFY_CAPACITY_ADMISSION: record(
           'ESTIMATE_QUOTA_COST_AND_VERIFY_CAPACITY_ADMISSION',
           boundStages.quotaEstimate,
@@ -377,6 +394,7 @@ export function createToolCore(config: ToolCoreConfig): ToolCore {
       if (ctx.envelope === undefined) {
         throw new Error(`run ${ctx.runId} produced no envelope`);
       }
+      config.observeRun?.(ctx);
       return ctx.envelope;
     },
   };

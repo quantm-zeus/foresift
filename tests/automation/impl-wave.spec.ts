@@ -196,6 +196,34 @@ describe('implementation task graph', () => {
     // restore canonical fixture text
     writeFileSync(join(fx.root, 'specs', 'pkg-x', 'tasks.md'), TASKS);
   });
+
+  it('records the root package.json as a recordable scope exception (live guard-refusal fix)', () => {
+    // Live finding 2026-08-26 (run f9ed4de6): acceptance/negative suites run
+    // under the root unit project, so linking a new package there requires a
+    // root `package.json` devDependencies edit — but the collector only
+    // accepted scoped prefixes + the bare lockfile, so the link could NEVER be
+    // declared and every compliant writer tripped guard-core's
+    // WRITE-AUTHORITY VIOLATION.
+    const tasks2 = TASKS.replace(
+      '- [ ] T104 [P] Write guide `docs/x-guide.md`. Traces: FR-X-002 (AC-202).',
+      '- [ ] T104 [P] Write guide `docs/x-guide.md`; root unit project links the' +
+        ' package via devDependencies in `package.json`. Traces: FR-X-002.',
+    );
+    writeFileSync(join(fx.root, 'specs', 'pkg-x', 'tasks.md'), tasks2);
+    const out = join(fx.artifacts, 'graph-pkgjson.json');
+    const r = spawnSync(
+      process.execPath,
+      [GRAPH, '--package', 'pkg-x', '--root', fx.root, '--plan-shards', '2', '--out', out],
+      { encoding: 'utf8' },
+    );
+    expect(r.status).toBe(0);
+    const g = JSON.parse(readFileSync(out, 'utf8'));
+    expect(g.scopeExceptions).toContain('package.json');
+    const core2 = g.shards.find((s: { id: string }) => s.id === 'core');
+    expect(core2.units).toContain('T104'); // demoted to serial core with its exception
+    // restore canonical fixture text
+    writeFileSync(join(fx.root, 'specs', 'pkg-x', 'tasks.md'), TASKS);
+  });
 });
 
 // Real multi-worktree wave fixture: two writer branches + one violating branch.

@@ -526,28 +526,93 @@ describe('foresift-sharded-wave workflow contract', () => {
     }
   });
 
-  it('when-gates every lane so empty shards dispatch zero providers (both engines)', () => {
-    // core stays single-engine: gated directly on its brief sentinel.
-    const coreBlock = yaml.match(/- id: writer-core[\s\S]*?(?=\n  - id:)/);
-    expect(coreBlock?.[0]).toContain('when: "$brief-core.output != \'NO CORE SHARD THIS WAVE\'"');
-    for (const lane of ['shard-1', 'shard-2']) {
-      // The engine emitter's content IS the empty-lane sentinel when the
-      // shard is absent — so BOTH engine variants stay OFF (zero-AI invariant
-      // survives the hybrid split).
-      const emit = yaml.match(new RegExp(`- id: exec-${lane}[\\s\\S]*?(?=\\n  - id:)`));
-      expect(emit?.[0]).toContain(`cat "$ARTIFACTS_DIR/engine-${lane}.txt"`);
-      const claude = yaml.match(new RegExp(`- id: writer-${lane}[\\s\\S]*?(?=\\n  - id:)`));
-      expect(claude?.[0]).toContain(`when: "$exec-${lane}.output == 'CLAUDE'"`);
-      const agy = yaml.match(new RegExp(`- id: writer-${lane}-agy[\\s\\S]*?(?=\\n  - id:)`));
-      expect(agy?.[0]).toContain(`when: "$exec-${lane}.output == 'AGY'"`);
-      expect(agy?.[0]).toMatch(/max_attempts: \d+[\s\S]*on_error: all/); // defect #10 policy
-      expect(agy?.[0]).toContain('exec-agy-writer.mjs');
-      // the guard spans BOTH engine variants under one bridge
-      const guard = yaml.match(new RegExp(`- id: guard-${lane}[\\s\\S]*?(?=\\n  - id:)`));
-      expect(guard?.[0]).toContain(
-        `depends_on: [brief-${lane}, writer-${lane}, writer-${lane}-agy]`,
-      );
+  it('enforces CODEX product writers, CLAUDE_AGY fallbacks, AGY test-author only, and forbidden test edits in implementation prompts', () => {
+    const productLanes = ['core', 'shard-1', 'shard-2'];
+
+    // 1. CODEX product writers for core, shard-1, shard-2
+    for (const lane of productLanes) {
+      const codex = yaml.match(new RegExp(`- id: writer-${lane}[\\s\\S]*?(?=\\n  - id:)`));
+      expect(codex?.[0]).toBeTruthy();
+      expect(codex?.[0]).toContain(`depends_on: [brief-${lane}, exec-${lane}]`);
+      expect(codex?.[0]).toContain(`when: "$exec-${lane}.output == 'CODEX'"`);
+      expect(codex?.[0]).toMatch(/retry:\s*\{\s*max_attempts:\s*2,\s*delay_ms:\s*10000,\s*on_error:\s*all\s*\}/);
+      expect(codex?.[0]).toContain(`exec-codex-writer.mjs --lane ${lane}`);
+      expect(codex?.[0]).toContain(`--brief "$ARTIFACTS_DIR/briefs/${lane}-brief.md"`);
+      expect(codex?.[0]).toContain(`--worktree "$ARTIFACTS_DIR/wt/${lane}"`);
+      expect(codex?.[0]).toContain(`--routing "$ARTIFACTS_DIR/routing.json"`);
+      expect(codex?.[0]).toContain(`--results-dir "$ARTIFACTS_DIR/writer-results/${lane}"`);
     }
+
+    // 2. CLAUDE_AGY fallback variants for core, shard-1, shard-2
+    for (const lane of productLanes) {
+      const claude = yaml.match(new RegExp(`- id: writer-${lane}-claude[\\s\\S]*?(?=\\n  - id:)`));
+      expect(claude?.[0]).toBeTruthy();
+      expect(claude?.[0]).toContain(`depends_on: [brief-${lane}, exec-${lane}]`);
+      expect(claude?.[0]).toContain(`when: "$exec-${lane}.output == 'CLAUDE'"`);
+      expect(claude?.[0]).toMatch(/retry:\s*\{\s*max_attempts:\s*2,\s*delay_ms:\s*10000,\s*on_error:\s*all\s*\}/);
+      expect(claude?.[0]).toContain('effort: high');
+      expect(claude?.[0]).toMatch(/prompt:\s*\|[\s\S]*?CLAUDE_AGY fallback product implementation lane/);
+      expect(claude?.[0]).toContain(`$brief-${lane}.output`);
+    }
+
+    // 3. AGY test-author only (and NO product AGY writers)
+    for (const lane of productLanes) {
+      expect(yaml).not.toContain(`- id: writer-${lane}-agy`);
+    }
+    const agyTest = yaml.match(/- id: writer-test-author-agy[\s\S]*?(?=\n  - id:)/);
+    expect(agyTest?.[0]).toBeTruthy();
+    expect(agyTest?.[0]).toContain('depends_on: [brief-test-author, exec-test-author]');
+    expect(agyTest?.[0]).toContain("when: \"$exec-test-author.output == 'AGY'\"");
+    expect(agyTest?.[0]).toMatch(/retry:\s*\{\s*max_attempts:\s*2,\s*delay_ms:\s*10000,\s*on_error:\s*all\s*\}/);
+    expect(agyTest?.[0]).toContain('exec-agy-test-writer.mjs --lane test-author');
+    expect(agyTest?.[0]).toContain('--brief "$ARTIFACTS_DIR/briefs/test-author-brief.md"');
+    expect(agyTest?.[0]).toContain('--worktree "$ARTIFACTS_DIR/wt/test-author"');
+    expect(agyTest?.[0]).toContain('--results-dir "$ARTIFACTS_DIR/writer-results/test-author"');
+
+    // 4. All implementation prompts forbid test edits
+    for (const lane of productLanes) {
+      const claude = yaml.match(new RegExp(`- id: writer-${lane}-claude[\\s\\S]*?(?=\\n  - id:)`));
+      expect(claude?.[0]).toMatch(/prompt:\s*\|[\s\S]*?Never edit tests/);
+    }
+    expect(yaml).toMatch(/Never edit tests in any implementation\s+#?\s*lane/);
+  });
+
+  it('when-gates every lane so empty shards dispatch zero providers across CODEX, CLAUDE fallbacks, and AGY test-author', () => {
+    // Exact persisted routing tokens emitted per lane
+    const allLanes = ['core', 'shard-1', 'shard-2', 'test-author'];
+    for (const lane of allLanes) {
+      const emit = yaml.match(new RegExp(`- id: exec-${lane}[\\s\\S]*?(?=\\n  - id:)`));
+      expect(emit?.[0]).toBeTruthy();
+      expect(emit?.[0]).toContain(`cat "$ARTIFACTS_DIR/engine-${lane}.txt"`);
+    }
+
+    // Brief emitters output deterministic sentinels when absent
+    expect(yaml).toMatch(/- id: brief-core[\s\S]*?NO CORE SHARD THIS WAVE/);
+    expect(yaml).toMatch(/- id: brief-shard-1[\s\S]*?NO SHARD-1 THIS WAVE/);
+    expect(yaml).toMatch(/- id: brief-shard-2[\s\S]*?NO SHARD-2 THIS WAVE/);
+    expect(yaml).toMatch(/- id: brief-test-author[\s\S]*?NO TEST-AUTHOR THIS WAVE/);
+
+    // Guards are when-gated to skip absent shards and bridge both active and fallback engines
+    const guardCore = yaml.match(/- id: guard-core[\s\S]*?(?=\n  - id:)/);
+    expect(guardCore?.[0]).toContain('depends_on: [brief-core, writer-core, writer-core-claude]');
+    expect(guardCore?.[0]).toContain('when: "$brief-core.output != \'NO CORE SHARD THIS WAVE\'"');
+    expect(guardCore?.[0]).toContain('trigger_rule: none_failed_min_one_success');
+
+    for (const shard of ['shard-1', 'shard-2']) {
+      const guard = yaml.match(new RegExp(`- id: guard-${shard}[\\s\\S]*?(?=\\n  - id:)`));
+      expect(guard?.[0]).toContain(`depends_on: [brief-${shard}, writer-${shard}, writer-${shard}-claude]`);
+      expect(guard?.[0]).toContain(`when: "$brief-${shard}.output != 'NO ${shard.toUpperCase()} THIS WAVE'"`);
+      expect(guard?.[0]).toContain('trigger_rule: none_failed_min_one_success');
+    }
+
+    const guardTest = yaml.match(/- id: guard-test-author[\s\S]*?(?=\n  - id:)/);
+    expect(guardTest?.[0]).toContain('depends_on: [brief-test-author, writer-test-author-agy]');
+    expect(guardTest?.[0]).toContain('when: "$brief-test-author.output != \'NO TEST-AUTHOR THIS WAVE\'"');
+    expect(guardTest?.[0]).toContain('trigger_rule: none_failed_min_one_success');
+
+    // Integrator depends on all 4 guards
+    const integrator = yaml.match(/- id: integrate-and-fast[\s\S]*?(?=\n  - id:)/);
+    expect(integrator?.[0]).toContain('depends_on: [guard-core, guard-shard-1, guard-shard-2, guard-test-author]');
   });
 
   it('never lets a fully-rejected wave settle green over zero progress (defect #12)', () => {

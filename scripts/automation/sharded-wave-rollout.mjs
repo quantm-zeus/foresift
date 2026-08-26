@@ -26,14 +26,11 @@
 // (V4 §18). That evidence is now RECORDED — see
 // `.optimizer-evidence/v4-acceptance-matrix.md`: contract tests, zero
 // empty-lane dispatch (A2), red path with bounded repair and checkpoint only
-// on genuine green (B1 counter-example preserved / B2), hybrid AGY lane live
-// beside a CLAUDE core lane (A3), and the installed-v0.9 runtime findings
-// (R1–R7). This commit IS the enabling flip; any future rollback is another
-// version-controlled commit of this file.
-//
-// Hybrid lanes stay opt-in even under PRODUCTION routing: FORESIFT_AGY_LANES
-// defaults to unset ⇒ every lane runs CLAUDE unless an operator explicitly
-// names lanes for Antigravity execution.
+// on genuine green (B1 counter-example preserved / B2), and installed-v0.9
+// runtime findings (R1–R7). Fresh waves now resolve a first-class execution
+// profile: CODEX_AGY by default or explicit CLAUDE_AGY fallback. AGY owns tests
+// only; the historical FORESIFT_AGY_LANES setting cannot route fresh product
+// work. Any future rollback remains another version-controlled commit.
 //
 // Pure functions + Node stdlib only. CLI form prints JSON:
 //   node scripts/automation/sharded-wave-rollout.mjs <package-id>

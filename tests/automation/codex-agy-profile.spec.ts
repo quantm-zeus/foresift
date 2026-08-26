@@ -228,7 +228,9 @@ describe('Foresift V4 CODEX_AGY execution profile test matrix (A through AD)', (
         routingPolicyVersion: '1.0.0',
       };
       const identity = mod.createExecutionIdentity(input);
-      expect(identity.schema ?? identity.schemaVersion).toMatch(/foresift\/execution-identity@1|1\.0\.0/);
+      expect(identity.schema ?? identity.schemaVersion).toMatch(
+        /foresift\/execution-identity@1|1\.0\.0/,
+      );
       expect(identity.packageId).toBe('g0-provider-lifecycle');
       expect(identity.generation).toBe(1);
       expect(identity.workflow).toBe('foresift-sharded-wave');
@@ -443,7 +445,10 @@ describe('Foresift V4 CODEX_AGY execution profile test matrix (A through AD)', (
       { name: 'auth', input: { domains: ['auth'], taskIds: ['t-auth'] } },
       { name: 'concurrency', input: { domains: ['concurrency'], taskIds: ['t-conc'] } },
       { name: 'durable recovery', input: { domains: ['durable recovery'], taskIds: ['t-rec'] } },
-      { name: 'migration irreversible', input: { domains: ['migration irreversible'], taskIds: ['t-mig'] } },
+      {
+        name: 'migration irreversible',
+        input: { domains: ['migration irreversible'], taskIds: ['t-mig'] },
+      },
       { name: 'product safety', input: { domains: ['product safety'], taskIds: ['t-safe'] } },
       { name: 'tenant isolation', input: { domains: ['tenant isolation'], taskIds: ['t-iso'] } },
       { name: 'crypto', input: { domains: ['crypto'], taskIds: ['t-crypto'] } },
@@ -583,9 +588,7 @@ describe('Foresift V4 CODEX_AGY execution profile test matrix (A through AD)', (
       for (const path of testPaths) {
         const cls = mod.classifyOwnedPath(path);
         expect(
-          cls === 'TEST' ||
-            cls === 'TEST_OWNED' ||
-            (cls as { isTest?: boolean })?.isTest === true,
+          cls === 'TEST' || cls === 'TEST_OWNED' || (cls as { isTest?: boolean })?.isTest === true,
         ).toBe(true);
       }
     });
@@ -619,14 +622,14 @@ describe('Foresift V4 CODEX_AGY execution profile test matrix (A through AD)', (
         role: 'implementation',
         changedPaths: ['packages/domain/src/entity.ts', 'packages/shared-schemas/src/index.ts'],
       });
-      expect(codexProd.ok ?? codexProd.valid ?? (codexProd.violations?.length === 0)).toBe(true);
+      expect(codexProd.ok ?? codexProd.valid ?? codexProd.violations?.length === 0).toBe(true);
 
       const agyTest = mod.validateLaneOwnership({
         engine: 'AGY',
         role: 'test',
         changedPaths: ['tests/automation/some-test.spec.ts', 'tests/fixtures/sec/data.json'],
       });
-      expect(agyTest.ok ?? agyTest.valid ?? (agyTest.violations?.length === 0)).toBe(true);
+      expect(agyTest.ok ?? agyTest.valid ?? agyTest.violations?.length === 0).toBe(true);
     });
   });
 
@@ -699,9 +702,11 @@ describe('Foresift V4 CODEX_AGY execution profile test matrix (A through AD)', (
         progress: true,
       };
       const classification = mod.classifyWatcherEvent(healthyEvent);
-      expect(classification == null || classification.isIncident === false || classification.action === 'NONE').toBe(
-        true,
-      );
+      expect(
+        classification == null ||
+          classification.isIncident === false ||
+          classification.action === 'NONE',
+      ).toBe(true);
     });
   });
 
@@ -731,7 +736,9 @@ describe('Foresift V4 CODEX_AGY execution profile test matrix (A through AD)', (
       };
 
       const capsule = mod.createIncidentCapsule(input);
-      expect(capsule.schema ?? capsule.schemaVersion).toMatch(/foresift\/incident-capsule@1|1\.0\.0/);
+      expect(capsule.schema ?? capsule.schemaVersion).toMatch(
+        /foresift\/incident-capsule@1|1\.0\.0/,
+      );
       expect(capsule.package).toBe('g0-provider-lifecycle');
       expect(capsule.generation).toBe(1);
       expect(capsule.runId).toBe('run-12345');
@@ -827,10 +834,7 @@ describe('Foresift V4 CODEX_AGY execution profile test matrix (A through AD)', (
     });
 
     it('pins text contracts in .archon/workflows/foresift/foresift-sharded-wave.yaml', () => {
-      const workflowPath = join(
-        REPO_ROOT,
-        '.archon/workflows/foresift/foresift-sharded-wave.yaml',
-      );
+      const workflowPath = join(REPO_ROOT, '.archon/workflows/foresift/foresift-sharded-wave.yaml');
       expect(existsSync(workflowPath)).toBe(true);
       const content = readFileSync(workflowPath, 'utf8');
 

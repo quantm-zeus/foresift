@@ -535,7 +535,9 @@ describe('foresift-sharded-wave workflow contract', () => {
       expect(codex?.[0]).toBeTruthy();
       expect(codex?.[0]).toContain(`depends_on: [brief-${lane}, exec-${lane}]`);
       expect(codex?.[0]).toContain(`when: "$exec-${lane}.output == 'CODEX'"`);
-      expect(codex?.[0]).toMatch(/retry:\s*\{\s*max_attempts:\s*2,\s*delay_ms:\s*10000,\s*on_error:\s*all\s*\}/);
+      expect(codex?.[0]).toMatch(
+        /retry:\s*\{\s*max_attempts:\s*2,\s*delay_ms:\s*10000,\s*on_error:\s*all\s*\}/,
+      );
       expect(codex?.[0]).toContain(`exec-codex-writer.mjs --lane ${lane}`);
       expect(codex?.[0]).toContain(`--brief "$ARTIFACTS_DIR/briefs/${lane}-brief.md"`);
       expect(codex?.[0]).toContain(`--worktree "$ARTIFACTS_DIR/wt/${lane}"`);
@@ -549,9 +551,13 @@ describe('foresift-sharded-wave workflow contract', () => {
       expect(claude?.[0]).toBeTruthy();
       expect(claude?.[0]).toContain(`depends_on: [brief-${lane}, exec-${lane}]`);
       expect(claude?.[0]).toContain(`when: "$exec-${lane}.output == 'CLAUDE'"`);
-      expect(claude?.[0]).toMatch(/retry:\s*\{\s*max_attempts:\s*2,\s*delay_ms:\s*10000,\s*on_error:\s*all\s*\}/);
+      expect(claude?.[0]).toMatch(
+        /retry:\s*\{\s*max_attempts:\s*2,\s*delay_ms:\s*10000,\s*on_error:\s*all\s*\}/,
+      );
       expect(claude?.[0]).toContain('effort: high');
-      expect(claude?.[0]).toMatch(/prompt:\s*\|[\s\S]*?CLAUDE_AGY fallback product implementation lane/);
+      expect(claude?.[0]).toMatch(
+        /prompt:\s*\|[\s\S]*?CLAUDE_AGY fallback product implementation lane/,
+      );
       expect(claude?.[0]).toContain(`$brief-${lane}.output`);
     }
 
@@ -562,8 +568,10 @@ describe('foresift-sharded-wave workflow contract', () => {
     const agyTest = yaml.match(/- id: writer-test-author-agy[\s\S]*?(?=\n  - id:)/);
     expect(agyTest?.[0]).toBeTruthy();
     expect(agyTest?.[0]).toContain('depends_on: [brief-test-author, exec-test-author]');
-    expect(agyTest?.[0]).toContain("when: \"$exec-test-author.output == 'AGY'\"");
-    expect(agyTest?.[0]).toMatch(/retry:\s*\{\s*max_attempts:\s*2,\s*delay_ms:\s*10000,\s*on_error:\s*all\s*\}/);
+    expect(agyTest?.[0]).toContain('when: "$exec-test-author.output == \'AGY\'"');
+    expect(agyTest?.[0]).toMatch(
+      /retry:\s*\{\s*max_attempts:\s*2,\s*delay_ms:\s*10000,\s*on_error:\s*all\s*\}/,
+    );
     expect(agyTest?.[0]).toContain('exec-agy-test-writer.mjs --lane test-author');
     expect(agyTest?.[0]).toContain('--brief "$ARTIFACTS_DIR/briefs/test-author-brief.md"');
     expect(agyTest?.[0]).toContain('--worktree "$ARTIFACTS_DIR/wt/test-author"');
@@ -600,19 +608,27 @@ describe('foresift-sharded-wave workflow contract', () => {
 
     for (const shard of ['shard-1', 'shard-2']) {
       const guard = yaml.match(new RegExp(`- id: guard-${shard}[\\s\\S]*?(?=\\n  - id:)`));
-      expect(guard?.[0]).toContain(`depends_on: [brief-${shard}, writer-${shard}, writer-${shard}-claude]`);
-      expect(guard?.[0]).toContain(`when: "$brief-${shard}.output != 'NO ${shard.toUpperCase()} THIS WAVE'"`);
+      expect(guard?.[0]).toContain(
+        `depends_on: [brief-${shard}, writer-${shard}, writer-${shard}-claude]`,
+      );
+      expect(guard?.[0]).toContain(
+        `when: "$brief-${shard}.output != 'NO ${shard.toUpperCase()} THIS WAVE'"`,
+      );
       expect(guard?.[0]).toContain('trigger_rule: none_failed_min_one_success');
     }
 
     const guardTest = yaml.match(/- id: guard-test-author[\s\S]*?(?=\n  - id:)/);
     expect(guardTest?.[0]).toContain('depends_on: [brief-test-author, writer-test-author-agy]');
-    expect(guardTest?.[0]).toContain('when: "$brief-test-author.output != \'NO TEST-AUTHOR THIS WAVE\'"');
+    expect(guardTest?.[0]).toContain(
+      'when: "$brief-test-author.output != \'NO TEST-AUTHOR THIS WAVE\'"',
+    );
     expect(guardTest?.[0]).toContain('trigger_rule: none_failed_min_one_success');
 
     // Integrator depends on all 4 guards
     const integrator = yaml.match(/- id: integrate-and-fast[\s\S]*?(?=\n  - id:)/);
-    expect(integrator?.[0]).toContain('depends_on: [guard-core, guard-shard-1, guard-shard-2, guard-test-author]');
+    expect(integrator?.[0]).toContain(
+      'depends_on: [guard-core, guard-shard-1, guard-shard-2, guard-test-author]',
+    );
   });
 
   it('never lets a fully-rejected wave settle green over zero progress (defect #12)', () => {

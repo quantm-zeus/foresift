@@ -36,6 +36,10 @@ export function runAgyTestWriter(input) {
       throw new Error(`AGY_TEST_ROUTE_INVALID: ${input.lane}.${field}`);
   const resultDir = input['results-dir'];
   mkdirSync(resultDir, { recursive: true });
+  const baseHead = git(['rev-parse', 'HEAD'], input.worktree).stdout.trim();
+  const allowedPaths = input['allowed-paths']
+    ? new Set(JSON.parse(readFileSync(input['allowed-paths'], 'utf8')))
+    : null;
   const prompt = [
     readFileSync(input.brief, 'utf8'),
     '',
@@ -97,9 +101,6 @@ export function runAgyTestWriter(input) {
     .stdout.split('\n')
     .filter(Boolean)
     .map((line) => line.slice(3).split(' -> ').at(-1));
-  const ownership = validateLaneOwnership({ engine: 'AGY', role: 'test', changedPaths: dirty });
-  if (!ownership.ok)
-    throw new Error(`${ownership.violationCode}: ${ownership.violatingPaths.join(',')}`);
   if (dirty.length) {
     git(['add', '--all'], input.worktree);
     const commit = git(
@@ -117,6 +118,14 @@ export function runAgyTestWriter(input) {
     if (commit.status !== 0) throw new Error(`AGY_TEST_COMMIT_FAILED: ${commit.stderr}`);
   }
   const head = git(['rev-parse', 'HEAD'], input.worktree).stdout.trim();
+  const changedPaths = git(['diff', '--name-only', `${baseHead}..${head}`], input.worktree)
+    .stdout.split('\n')
+    .filter(Boolean);
+  const ownership = validateLaneOwnership({ engine: 'AGY', role: 'test', changedPaths });
+  if (!ownership.ok)
+    throw new Error(`${ownership.violationCode}: ${ownership.violatingPaths.join(',')}`);
+  const outside = allowedPaths ? changedPaths.filter((path) => !allowedPaths.has(path)) : [];
+  if (outside.length) throw new Error(`AGY_TEST_SCOPE_VIOLATION: ${outside.join(',')}`);
   const result = {
     schema: 'foresift/writer-result@1',
     shardId: input.lane,
@@ -125,9 +134,12 @@ export function runAgyTestWriter(input) {
     model: route.model,
     reasoning: route.reasoning,
     providerTimeout: route.providerTimeout,
+    baseHead,
     completed: (input['task-ids'] ?? '').split(',').filter(Boolean),
     branch: git(['branch', '--show-current'], input.worktree).stdout.trim(),
     headSha: head,
+    changedPaths,
+    ownership,
     testsRun: Array.isArray(agentResult.testsRun) ? agentResult.testsRun : [],
     testResults: agentResult.testResults ?? 'unknown',
     baselineClassifications: agentResult.baselineClassifications,

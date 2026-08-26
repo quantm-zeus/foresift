@@ -183,6 +183,49 @@ describe('concurrency policy', () => {
         .reason,
     ).toMatch(/parallelizable/);
   });
+
+  it('denies co-run when either side claims a root/shared mechanical surface', () => {
+    // Pair-concurrency audit 2026-08-26: workspace scaffolds regenerate the
+    // lockfile and root configs re-shape every build — declaring one is a
+    // global serialization claim no scope disjointness can override.
+    const lock = pkg({ id: 'lock', writeScopes: ['packages/z/**', 'pnpm-lock.yaml'] });
+    ms.packages.push(lock); // register so find() sees it
+    // candidate side declares the surface
+    expect(canStartPackage(postFoundation, ms, lock, [find('p1')]).reason).toMatch(
+      /root\/shared surface serialization/,
+    );
+    // running side declares it
+    expect(canStartPackage(postFoundation, ms, find('p2'), [lock]).reason).toMatch(
+      /root\/shared surface serialization/,
+    );
+  });
+
+  it('fails closed on unknown write-scope truth (missing or empty declarations)', () => {
+    const empty = pkg({ id: 'empty-scopes', writeScopes: [] });
+    ms.packages.push(empty);
+    const missing = (() => {
+      // Strip the declaration entirely at runtime; the type keeps string[]
+      // because committed milestone truth always declares scopes — this
+      // fixture represents corrupted/partial truth reaching the gate.
+      const { writeScopes, ...rest } = pkg({ id: 'missing-scopes' });
+      void writeScopes;
+      return rest as WorkPackage;
+    })();
+    ms.packages.push(missing);
+    // candidate unknown vs known runner
+    expect(canStartPackage(postFoundation, ms, empty, [find('p1')]).reason).toMatch(
+      /unknown write-scope truth/,
+    );
+    expect(canStartPackage(postFoundation, ms, missing, [find('p1')]).reason).toMatch(
+      /unknown write-scope truth/,
+    );
+    // known candidate vs unknown runner
+    expect(canStartPackage(postFoundation, ms, find('p1'), [missing]).reason).toMatch(
+      /unknown write-scope truth/,
+    );
+    // single-package start with unknown scopes stays permitted (serial law)
+    expect(canStartPackage(postFoundation, ms, empty, []).ok).toBe(true);
+  });
 });
 
 describe('failure classification', () => {

@@ -18,7 +18,7 @@ import { canonicalJson, completeRetrieval } from '@foresift/persistence';
 import type { ObjectStoreAdapter } from '@foresift/object-store';
 import type { QuotaReservationAdapter } from '../quota-contract.ts';
 import type { CacheStageChain } from './cache.ts';
-import type { SingleFlightManager } from '../single-flight.ts';
+import { SingleFlightManager, StaleFencingTokenError } from '../single-flight.ts';
 import type { ToolRunContext } from '../run-context.ts';
 
 export interface PersistStageDeps {
@@ -169,14 +169,27 @@ export function makeCacheUpdateStage(deps: PersistStageDeps) {
 
 /**
  * Stage 21 — RELEASE_LEASE_WITH_FENCING_VALIDATION. A stale token refuses
- * LOUDLY (typed StaleFencingTokenError surfaces in the journal + audit) but
- * never rolls back the already-persisted result.
+ * LOUDLY: the typed StaleFencingTokenError is recorded in the run journal and
+ * the lease is left for its new holder — but it never rolls back the
+ * already-persisted result or crashes the post-settle stages.
  */
 export function makeLeaseReleaseStage(deps: PersistStageDeps) {
   return async (ctx: ToolRunContext): Promise<void> => {
     if (ctx.lease === undefined || ctx.leaseReleased) return;
-    await deps.singleFlight.release(ctx.lease);
-    ctx.leaseReleased = true;
+    try {
+      await deps.singleFlight.release(ctx.lease);
+      ctx.leaseReleased = true;
+    } catch (error) {
+      if (error instanceof StaleFencingTokenError) {
+        ctx.journal.push({
+          stage: 'RELEASE_LEASE_WITH_FENCING_VALIDATION',
+          at: deps.now(),
+          note: `STALE_FENCING_TOKEN: ${error.message}`,
+        });
+        return;
+      }
+      throw error;
+    }
   };
 }
 

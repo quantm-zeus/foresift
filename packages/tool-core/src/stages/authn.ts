@@ -91,11 +91,20 @@ export function block(
 /** Stage 1 — AUTHENTICATE_ACTOR. */
 export function makeAuthenticateStage(deps: AuthnStageDeps) {
   return async (ctx: ToolRunContext): Promise<void> => {
-    const identity = await deps.authn.authenticate({
-      material: ctx.request.authnMaterial,
-      holderMode: ctx.request.holderMode,
-      tenantId: ctx.request.tenantId,
-    });
+    let identity: ActorIdentity;
+    try {
+      identity = await deps.authn.authenticate({
+        material: ctx.request.authnMaterial,
+        holderMode: ctx.request.holderMode,
+        tenantId: ctx.request.tenantId,
+      });
+    } catch (error) {
+      // Refusals are DATA here too: an unbound or refusing perimeter is a
+      // rights block, never a crash past the pipeline.
+      const message = error instanceof Error ? error.message : String(error);
+      block(ctx, 'RIGHTS_BLOCKED', `AUTHENTICATION_REFUSED: ${message}`, 'AUTHENTICATE_ACTOR');
+      return;
+    }
     if (!identity.actorId || !identity.profileId) {
       throw new ForesiftError(
         'AUTHENTICATION_REFUSED',
@@ -199,6 +208,9 @@ export function makeAuthorizeStage(deps: AuthorizeStageDeps) {
       licensePolicyId: entry.metadata.licensePolicyId,
       provider: route.provider,
       operation: route.operation,
+      ...(route.licenseRequestedVersion !== undefined
+        ? { requestedVersion: route.licenseRequestedVersion }
+        : {}),
     });
     if (!rights.allowed) {
       block(ctx, 'RIGHTS_BLOCKED', `LICENSE_REFUSED: ${rights.reason}`, 'AUTHORIZE');

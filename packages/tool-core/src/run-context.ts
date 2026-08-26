@@ -142,6 +142,25 @@ export interface ToolRunContext {
     | undefined;
   envelope?: ToolResultEnvelope | undefined;
 
-  /** Stages that ACTUALLY executed their body (skips are not recorded). */
+  /**
+   * Stages in completion order, plus notable events (e.g. stale fencing
+   * tokens) as annotated entries — an honest trace of how the run flowed.
+   */
   journal: StageJournalEntry[];
+}
+
+/** Fresh per-run context: only identity fields set, everything else undefined. */
+export function newToolRunContext(
+  request: ToolExecutionRequest,
+  startedAt: string,
+): ToolRunContext {
+  return {
+    runId: request.runId,
+    request,
+    startedAt,
+    evidenceIds: [],
+    servedFromCache: false,
+    audited: false,
+    journal: [],
+  };
 }

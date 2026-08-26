@@ -176,7 +176,15 @@ export class ToolCoreRegistry {
           { toolName: metadata.name, toolVersion: metadata.version },
         );
       }
-      // Same-hash re-registration: idempotent convergence.
+      // Same-hash re-registration: idempotent convergence. Adopt the persisted
+      // row into THIS instance's view (another process/instance may have
+      // inserted it), keeping any locally bound execute.
+      const row = existing.rows[0]!;
+      if (!this.tools.has(this.key(metadata.name, metadata.version))) {
+        this.tools.set(this.key(metadata.name, metadata.version), definition);
+      }
+      this.rows.set(this.key(metadata.name, metadata.version), row);
+      this.snapshotVersion += 1;
       return this.requireEntry(metadata.name, metadata.version);
     }
 

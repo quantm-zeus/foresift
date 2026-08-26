@@ -13,7 +13,8 @@
  * PROVIDER_UNAVAILABLE / INVALID_RESPONSE.
  */
 import { sha256Text } from '@foresift/persistence';
-import type { EgressGuard } from '@foresift/security';
+import type { EgressPlane } from '@foresift/security';
+import type { EgressDecision } from '@foresift/shared-schemas';
 import type { ToolRunContext } from '../run-context.ts';
 import { block } from './authn.ts';
 import { normalizeRawPayload, validateNormalizedInvariants } from '../normalize.ts';
@@ -22,8 +23,17 @@ import type {
   ProviderCallRequest,
 } from '../provider-contract.ts';
 
+/**
+ * The ONLY egress surface dispatch needs: authorize one URL on one plane
+ * immediately before any byte moves. The real EgressGuard satisfies this
+ * structurally; tests inject permissive/refusing stand-ins.
+ */
+export interface EgressAuthorizer {
+  authorize(url: string, plane: EgressPlane): Promise<EgressDecision>;
+}
+
 export interface DispatchStageDeps {
-  readonly egressGuard: EgressGuard | undefined;
+  readonly egressGuard: EgressAuthorizer | undefined;
   readonly executionGate: ExecutionGate;
   readonly now: () => string;
 }

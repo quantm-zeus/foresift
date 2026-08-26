@@ -98,6 +98,11 @@ export interface OperationRoute {
   readonly fieldProjection: readonly string[];
   /** Narrower projection used when backpressure downgrades depth. */
   readonly downgradedFieldProjection?: readonly string[] | undefined;
+  /**
+   * When the route pins an acceptable rights-policy version, the license
+   * verdict request carries it (the source may refuse other versions).
+   */
+  readonly licenseRequestedVersion?: string | undefined;
   /** Egress target authorized immediately before the adapter call. */
   readonly endpointUrl: string;
   readonly egressPlane: EgressPlane;

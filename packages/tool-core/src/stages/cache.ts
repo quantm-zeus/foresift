@@ -34,6 +34,14 @@ export interface CacheLookupResult {
   readonly payloadRef?: string;
 }
 
+export interface CacheLookupRequest {
+  readonly components: CacheKeyComponents;
+  readonly holderMode: HolderMode;
+  readonly decisionTime?: string;
+  /** Request-local memo namespace; omitted preserves the direct API's one scope. */
+  readonly requestScope?: string;
+}
+
 export interface CacheStoreRequest {
   readonly components: CacheKeyComponents;
   readonly payloadRef: string;
@@ -75,15 +83,39 @@ export class CacheStageChain {
    * defaults to now; the post-lease re-check passes an explicit time so the
    * second decision is re-evaluated AFTER the lease wait.
    */
-  async lookup(request: {
-    components: CacheKeyComponents;
-    holderMode: HolderMode;
-    decisionTime?: string;
-  }): Promise<CacheLookupResult> {
+  async lookup(request: CacheLookupRequest): Promise<CacheLookupResult> {
     const key = await this.keyFor(request.components);
-    const memoHit = this.memo.get(key.cacheKeyHash);
+    const memoKey = this.memoKey(key.cacheKeyHash, request.requestScope);
+    const memoHit = this.memo.get(memoKey);
     if (memoHit && memoHit.outcome !== 'MISS') return memoHit;
 
+    return this.lookupPersisted(request, key, 'BOTH');
+  }
+
+  /** Stage 7 only: consult request-local memoization without touching SQL. */
+  async lookupMemo(request: CacheLookupRequest): Promise<CacheLookupResult> {
+    const key = await this.keyFor(request.components);
+    const memoHit = this.memo.get(this.memoKey(key.cacheKeyHash, request.requestScope));
+    return memoHit === undefined ? { outcome: 'MISS', key } : { ...memoHit, outcome: 'MEMO_HIT' };
+  }
+
+  /** Stage 8 only: admit FRESH persisted entries. */
+  async lookupFresh(request: CacheLookupRequest): Promise<CacheLookupResult> {
+    const key = await this.keyFor(request.components);
+    return this.lookupPersisted(request, key, 'FRESH');
+  }
+
+  /** Stage 9 only: admit acceptable STALE persisted entries. */
+  async lookupStale(request: CacheLookupRequest): Promise<CacheLookupResult> {
+    const key = await this.keyFor(request.components);
+    return this.lookupPersisted(request, key, 'STALE');
+  }
+
+  private async lookupPersisted(
+    request: CacheLookupRequest,
+    key: ExactCacheKey,
+    tier: 'FRESH' | 'STALE' | 'BOTH',
+  ): Promise<CacheLookupResult> {
     const decisionTime = request.decisionTime ?? this.opts.now?.() ?? new Date().toISOString();
     const rows = await this.opts.engine.query<CacheRow>(
       `SELECT payload_ref, stored_at, fresh_until, stale_until,
@@ -111,13 +143,16 @@ export class CacheStageChain {
       decisionTime,
       holderMode: request.holderMode,
     });
-    if (verdict.outcome === 'HIT_FRESH' || verdict.outcome === 'HIT_STALE') {
+    const admitted =
+      (verdict.outcome === 'HIT_FRESH' && tier !== 'STALE') ||
+      (verdict.outcome === 'HIT_STALE' && tier !== 'FRESH');
+    if (admitted && (verdict.outcome === 'HIT_FRESH' || verdict.outcome === 'HIT_STALE')) {
       const result: CacheLookupResult = {
         outcome: verdict.outcome,
         key,
         payloadRef: row.payload_ref,
       };
-      this.memo.set(key.cacheKeyHash, result);
+      this.memo.set(this.memoKey(key.cacheKeyHash, request.requestScope), result);
       return result;
     }
     return { outcome: 'MISS', key };
@@ -131,10 +166,15 @@ export class CacheStageChain {
   async postLeaseRecheck(request: {
     components: CacheKeyComponents;
     holderMode: HolderMode;
+    requestScope?: string;
   }): Promise<CacheLookupResult> {
     const key = await this.keyFor(request.components);
-    this.memo.delete(key.cacheKeyHash);
+    this.memo.delete(this.memoKey(key.cacheKeyHash, request.requestScope));
     return this.lookup({ ...request, decisionTime: this.opts.now?.() ?? new Date().toISOString() });
+  }
+
+  private memoKey(cacheKeyHash: string, requestScope: string | undefined): string {
+    return `${requestScope ?? '<direct>'}:${cacheKeyHash}`;
   }
 
   /**
@@ -152,7 +192,8 @@ export class CacheStageChain {
       `INSERT INTO core.core_exact_cache_entries
          (cache_key_hash, payload_ref, stored_at, fresh_until, stale_until,
           license_policy_version, rights_permitted)
-       VALUES ($1,$2,$3,$4,$5,$6,true)`,
+       VALUES ($1,$2,$3,$4,$5,$6,true)
+       ON CONFLICT (cache_key_hash) DO NOTHING`,
       [
         key.cacheKeyHash,
         request.payloadRef,

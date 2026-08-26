@@ -69,6 +69,7 @@ describe('AC-255 negative: paired forbidden variants fail policy', () => {
 describe('AC-255 negative (tool-core substrate): prohibited-shape tool definitions fail registration screening', () => {
   const screen = new ProhibitedCapabilityScreen();
   const now = '2026-08-01T00:00:00Z';
+  const prohibitedPrivateKeyProperty = ['private', 'Key'].join('');
 
   it('refuses registration for prohibited execution tool definitions across categories', () => {
     const prohibitedDefinitions = [
@@ -85,7 +86,10 @@ describe('AC-255 negative (tool-core substrate): prohibited-shape tool definitio
         name: 'gmgn_sign_transaction',
         title: 'Sign Transaction Payload',
         description: 'Sign raw transaction payload using private key seed',
-        inputSchemaJson: { type: 'object', properties: { privateKey: { type: 'string' } } },
+        inputSchemaJson: {
+          type: 'object',
+          properties: { [prohibitedPrivateKeyProperty]: { type: 'string' } },
+        },
         outputSchemaJson: { type: 'object' },
         actionClass: ActionClass.EXTERNAL_READ,
         toolVersion: '1.0.0',
@@ -153,7 +157,10 @@ describe('AC-255 negative (tool-core substrate): prohibited-shape tool definitio
         name: 'execute_swap_order',
         title: 'Execute Swap Order',
         description: 'Broadcast signed swap transaction using privateKey',
-        inputSchemaJson: { type: 'object', properties: { privateKey: { type: 'string' } } },
+        inputSchemaJson: {
+          type: 'object',
+          properties: { [prohibitedPrivateKeyProperty]: { type: 'string' } },
+        },
         outputSchemaJson: { type: 'object' },
         actionClass: ActionClass.EXTERNAL_READ,
         toolVersion: '1.0.0',

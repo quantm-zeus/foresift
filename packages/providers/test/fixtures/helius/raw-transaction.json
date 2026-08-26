@@ -1,0 +1,65 @@
+{
+  "slot": 281474976710656,
+  "blockTime": 1770000000,
+  "version": 0,
+  "meta": {
+    "fee": 5000,
+    "status": { "Ok": null }
+  },
+  "transaction": {
+    "message": {
+      "accountKeys": [
+        {
+          "pubkey": "TokenkegQfeZYiSFpPdmLpNSuQUhXZ8B2zLxNTLBZVdPQ",
+          "signer": false,
+          "source": "table",
+          "writable": false
+        },
+        {
+          "pubkey": "9xQeWvG816bUx9EPjHmaT23yvVM2ZWbrrpZb9PusVFin",
+          "signer": false,
+          "source": "table",
+          "writable": true
+        }
+      ]
+    }
+  },
+  "instructions": [
+    {
+      "program": "spl-token",
+      "programId": "TokenkegQfeZYiSFpPdmLpNSuQUhXZ8B2zLxNTLBZVdPQ",
+      "parsed": {
+        "type": "transferChecked",
+        "info": {
+          "source": "Acct11111111111111111111111111111111111111",
+          "destination": "Acct22222222222222222222222222222222222222",
+          "mint": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+          "tokenAmount": { "amount": "250000000", "decimals": 6, "uiAmount": 250.0 }
+        }
+      }
+    },
+    {
+      "programId": "UnknownProg1111111111111111111111111111111111",
+      "data": ["notdecodable", "base58"]
+    }
+  ],
+  "innerInstructions": [
+    {
+      "index": 0,
+      "instructions": [
+        {
+          "program": "spl-token",
+          "programId": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+          "parsed": {
+            "type": "transfer",
+            "info": {
+              "amount": "1000",
+              "source": "Acct33333333333333333333333333333333333333",
+              "destination": "Acct44444444444444444444444444444444444444"
+            }
+          }
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,14 @@
+{
+  "address": "So11111111111111111111111111111111111111112",
+  "chain": "sol",
+  "symbol": "WSOL",
+  "holder_count": 1284,
+  "rug_ratio": 0,
+  "renounced_mint": true,
+  "top10_holder_rate": 0.18,
+  "bluechip_owner_percentage": 0.07,
+  "detection": {
+    "counterfeit": false,
+    "mint_authority_renounced": true
+  }
+}

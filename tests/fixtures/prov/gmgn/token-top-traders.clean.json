@@ -1,0 +1,16 @@
+{
+  "operationId": "token.top_traders",
+  "sanitized": true,
+  "recordedAt": "2026-08-26T00:00:00Z",
+  "body": {
+    "rank": [
+      {
+        "wallet": "FAKE WALLET LABEL A",
+        "pnl": 1200.5,
+        "buy_volume": 900.25,
+        "sell_volume": 2100.75
+      },
+      { "wallet": "FAKE WALLET LABEL B", "pnl": -80.0, "buy_volume": 500.0, "sell_volume": 420.0 }
+    ]
+  }
+}

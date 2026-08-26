@@ -1,0 +1,28 @@
+{
+  "name": "@foresift/provider-lifecycle",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Foresift provider operation lifecycle truth: versioned operation registry, seven-state lifecycle machine over an append-only transition ledger, verification-TTL enforcement that fails closed, deprecation and migration-exception rules, response quarantine, rights-change fail-closed handling, and source fingerprints.",
+  "exports": {
+    ".": {
+      "types": "./src/index.ts",
+      "default": "./src/index.ts"
+    }
+  },
+  "scripts": {
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@foresift/domain": "workspace:*",
+    "@foresift/persistence": "workspace:*",
+    "@foresift/security": "workspace:*",
+    "@foresift/shared-schemas": "workspace:*",
+    "drizzle-orm": "^0.45.2",
+    "zod": "^3.25.76"
+  },
+  "devDependencies": {
+    "@electric-sql/pglite": "^0.5.6",
+    "vitest": "4.1.11"
+  }
+}

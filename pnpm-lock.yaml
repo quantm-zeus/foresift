@@ -23,6 +23,12 @@ importers:
       '@foresift/persistence':
         specifier: workspace:*
         version: link:packages/persistence
+      '@foresift/provider-lifecycle':
+        specifier: workspace:*
+        version: link:packages/provider-lifecycle
+      '@foresift/security':
+        specifier: workspace:*
+        version: link:packages/security
       '@foresift/shared-schemas':
         specifier: workspace:*
         version: link:packages/shared-schemas
@@ -107,6 +113,59 @@ importers:
       '@foresift/object-store':
         specifier: workspace:*
         version: link:../object-store
+      vitest:
+        specifier: 4.1.11
+        version: 4.1.11(@types/node@26.2.0)(vite@8.2.2(@types/node@26.2.0))
+
+  packages/provider-lifecycle:
+    dependencies:
+      '@foresift/domain':
+        specifier: workspace:*
+        version: link:../domain
+      '@foresift/persistence':
+        specifier: workspace:*
+        version: link:../persistence
+      '@foresift/security':
+        specifier: workspace:*
+        version: link:../security
+      '@foresift/shared-schemas':
+        specifier: workspace:*
+        version: link:../shared-schemas
+      drizzle-orm:
+        specifier: ^0.45.2
+        version: 0.45.2(@electric-sql/pglite@0.5.6)
+      zod:
+        specifier: ^3.25.76
+        version: 3.25.76
+    devDependencies:
+      '@electric-sql/pglite':
+        specifier: ^0.5.6
+        version: 0.5.6
+      vitest:
+        specifier: 4.1.11
+        version: 4.1.11(@types/node@26.2.0)(vite@8.2.2(@types/node@26.2.0))
+
+  packages/providers:
+    dependencies:
+      '@foresift/domain':
+        specifier: workspace:*
+        version: link:../domain
+      '@foresift/provider-lifecycle':
+        specifier: workspace:*
+        version: link:../provider-lifecycle
+      '@foresift/security':
+        specifier: workspace:*
+        version: link:../security
+      '@foresift/shared-schemas':
+        specifier: workspace:*
+        version: link:../shared-schemas
+      zod:
+        specifier: ^3.25.76
+        version: 3.25.76
+    devDependencies:
+      '@electric-sql/pglite':
+        specifier: ^0.5.6
+        version: 0.5.6
       vitest:
         specifier: 4.1.11
         version: 4.1.11(@types/node@26.2.0)(vite@8.2.2(@types/node@26.2.0))

@@ -1,0 +1,9 @@
+{
+  "fixtureClass": "MALICIOUS_RESPONSE_SAMPLE",
+  "detectedClass": "TRANSACTION_PAYLOAD",
+  "comment": "Transaction-payload SKELETON: one object carrying BOTH message and signatures — the broadcast-ready shape — plus a payload-NAMED field for strip-path coverage. FAKE values; not a valid serialized transaction.",
+  "body": {
+    "result": { "message": "FAKEBASE58MESSAGEBODY", "signatures": ["FAKESIGX", "FAKESIGY"] },
+    "swap_transaction": "FAKEENCODEDBROADCAST"
+  }
+}

@@ -38,7 +38,12 @@ capability anywhere outside the inert forbidden-fixture corpus under
       whose devDependencies must link `@foresift/provider-lifecycle` and
       `@foresift/security` exactly like every prior G0 package's links —
       a two-line mechanical mirror, observed in run f9ed4de6 core commit
-      91b9c8c).
+      91b9c8c), and `tests/helpers/prov.ts` (recorded 2026-08-26 from live
+      guard evidence: the T126–T129 suites share prov-specific test helpers —
+      injected-clock engines and fixture loaders — placed beside the already
+      declared tests/acceptance/, tests/negative/, and tests/fixtures/prov/
+      surfaces; observed as the sole residual violation in run ff96e2d0,
+      whose full 90-path write-set was otherwise covered).
       Traces: FR-PROV-001, FR-PROV-002, FR-PROV-003, FR-PROV-008, FR-PROV-009,
       FR-PROV-010 (their declared `g0_prov_*.sql` persistence refs are
       otherwise unapplyable).

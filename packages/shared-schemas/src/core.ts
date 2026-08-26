@@ -281,6 +281,138 @@ export const BlockedStatePayloadSchema = z
   .strict();
 export type BlockedStatePayload = z.infer<typeof BlockedStatePayloadSchema>;
 
+// --- telemetry event contracts (mirrored in telemetry/core.catalog.json) ---------------------------
+
+/** One tool registration rejection event record (FR-CORE-001, FR-CORE-005). */
+export const ToolRegistrationRejectionRecordSchema = z
+  .object({
+    toolName: z.string().min(1),
+    toolVersion: z.string().min(1),
+    actionClass: ActionClassSchema,
+    reason: z.string().min(1),
+    reasons: z.array(z.string().min(1)),
+    rejectedAt: UtcTimestampSchema,
+  })
+  .strict();
+export type ToolRegistrationRejectionRecord = z.infer<
+  typeof ToolRegistrationRejectionRecordSchema
+>;
+
+/** One pipeline stage execution event record (FR-CORE-002). */
+export const PipelineStageEventRecordSchema = z
+  .object({
+    pipelineRunId: z.string().min(1),
+    toolName: z.string().min(1),
+    toolVersion: z.string().min(1),
+    stage: PipelineStageSchema,
+    occurredAt: UtcTimestampSchema,
+  })
+  .strict();
+export type PipelineStageEventRecord = z.infer<typeof PipelineStageEventRecordSchema>;
+
+/** One exact cache outcome event record (FR-CORE-006). */
+export const CacheOutcomeRecordSchema = z
+  .object({
+    cacheKeyHash: z.string().regex(/^sha256:[0-9a-f]{64}$/),
+    outcome: CacheOutcomeSchema,
+    freshUntil: UtcTimestampSchema.nullable(),
+    staleUntil: UtcTimestampSchema.nullable(),
+    licensePolicyVersion: z.string().min(1),
+    rightsPermitted: z.boolean(),
+    evaluatedAt: UtcTimestampSchema,
+  })
+  .strict();
+export type CacheOutcomeRecord = z.infer<typeof CacheOutcomeRecordSchema>;
+
+/** One single-flight fencing token refusal event record (FR-CORE-006, INV-009). */
+export const SingleFlightFenceRefusedRecordSchema = z
+  .object({
+    resourceKeyHash: z.string().regex(/^sha256:[0-9a-f]{64}$/),
+    attemptedToken: z.number().int().positive(),
+    currentToken: z.number().int().positive().nullable(),
+    holderMode: HolderModeSchema,
+    holderId: z.string().min(1),
+    reason: z.string().min(1),
+    refusedAt: UtcTimestampSchema,
+  })
+  .strict();
+export type SingleFlightFenceRefusedRecord = z.infer<
+  typeof SingleFlightFenceRefusedRecordSchema
+>;
+
+/** One quota settlement/commit event record (FR-CORE-007). */
+export const QuotaCommittedRecordSchema = z
+  .object({
+    reservationId: z.string().min(1),
+    pipelineRunId: z.string().min(1),
+    estimatedUnits: z.number().nonnegative(),
+    actualUnits: z.number().nonnegative(),
+    committedAt: UtcTimestampSchema,
+  })
+  .strict();
+export type QuotaCommittedRecord = z.infer<typeof QuotaCommittedRecordSchema>;
+
+/** One quota reservation release event record (FR-CORE-007). */
+export const QuotaReleasedRecordSchema = z
+  .object({
+    reservationId: z.string().min(1),
+    pipelineRunId: z.string().min(1),
+    reason: z.string().min(1),
+    releasedAt: UtcTimestampSchema,
+  })
+  .strict();
+export type QuotaReleasedRecord = z.infer<typeof QuotaReleasedRecordSchema>;
+
+/** One quota reservation expiry event record (FR-CORE-007). */
+export const QuotaExpiredRecordSchema = z
+  .object({
+    reservationId: z.string().min(1),
+    pipelineRunId: z.string().min(1),
+    expiredAt: UtcTimestampSchema,
+  })
+  .strict();
+export type QuotaExpiredRecord = z.infer<typeof QuotaExpiredRecordSchema>;
+
+/** One license-policy verdict evaluation event record (FR-CORE-008). */
+export const LicenseVerdictRecordSchema = z
+  .object({
+    allowed: z.boolean(),
+    policyVersion: z.string().min(1),
+    reason: z.string().min(1),
+    provider: z.string().min(1),
+    operation: z.string().min(1),
+    evaluatedAt: UtcTimestampSchema,
+  })
+  .strict();
+export type LicenseVerdictRecord = z.infer<typeof LicenseVerdictRecordSchema>;
+
+/** One prohibited-capability refusal event record (FR-CORE-005, INV-001). */
+export const ProhibitedRefusalRecordSchema = z
+  .object({
+    toolName: z.string().min(1),
+    toolVersion: z.string().min(1),
+    reasons: z.array(z.string().min(1)),
+    findingCount: z.number().int().nonnegative(),
+    refusedAt: UtcTimestampSchema,
+  })
+  .strict();
+export type ProhibitedRefusalRecord = z.infer<typeof ProhibitedRefusalRecordSchema>;
+
+/** One envelope degraded return event record (FR-CORE-003). */
+export const EnvelopeDegradedRecordSchema = z
+  .object({
+    toolName: z.string().min(1),
+    toolVersion: z.string().min(1),
+    partial: z.boolean(),
+    qualityCodes: z.array(z.string().min(1)),
+    conflictCount: z.number().int().nonnegative(),
+    missingCapabilities: z.array(z.string().min(1)),
+    returnedAt: UtcTimestampSchema,
+  })
+  .strict();
+export type EnvelopeDegradedRecord = z.infer<typeof EnvelopeDegradedRecordSchema>;
+
+
 // --- registry map -----------------------------------------------------------------------------------
 
 export const CORE_SCHEMAS = {

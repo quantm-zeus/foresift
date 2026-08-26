@@ -2465,7 +2465,7 @@ function seedSalvageGeneration({ packageId, toGeneration, manifest, runInstall =
  * No AI provider is ever invoked; nothing is reimplemented; every refusal
  * leaves all state untouched. Run with the service STOPPED (lock discipline).
  */
-async function cmdFinalizeFromMain(packageId) {
+async function cmdFinalizeFromMain(packageId, opts = {}) {
   if (!packageId) {
     console.error('usage: --finalize-from-main <package-id>  (stop the service unit first)');
     return 1;
@@ -2475,6 +2475,7 @@ async function cmdFinalizeFromMain(packageId) {
     activeRuns: st.activeRuns,
     milestoneRuns: st.milestoneRuns,
     pausedFatal: st.pausedFatal,
+    operatorCiBypassReason: opts.operatorCiBypassReason ?? null,
   });
   const verdict = evaluateFinalizationFromMain(facts);
   if (!verdict.ok) {
@@ -2486,6 +2487,7 @@ async function cmdFinalizeFromMain(packageId) {
   }
   const ms = loadCurrentMilestone(REPO);
   setPackageStatus(ms, packageId, 'PROVEN');
+  if (verdict.evidence.terminalPauseRetired) st.pausedFatal = null;
   // Reconcile this package's own supervisor tracking rows — their run is
   // terminal (the evaluator refused any live one); retaining them would make
   // selection skip a PROVEN package's slot forever.
@@ -2906,7 +2908,13 @@ async function main() {
   }
   if (argv.includes('--finalize-from-main')) {
     const positional = argv.filter((a) => !a.startsWith('--'));
-    process.exit(await cmdFinalizeFromMain(positional[0] ?? null));
+    const bypassIndex = argv.indexOf('--operator-ci-bypass-reason');
+    const operatorCiBypassReason = bypassIndex >= 0 ? argv[bypassIndex + 1] : null;
+    if (bypassIndex >= 0 && (!operatorCiBypassReason || operatorCiBypassReason.startsWith('--'))) {
+      console.error('--operator-ci-bypass-reason requires a non-empty audit reason');
+      process.exit(2);
+    }
+    process.exit(await cmdFinalizeFromMain(positional[0] ?? null, { operatorCiBypassReason }));
   }
   if (argv.includes('--seed-package-planning')) {
     // Operator/maintenance form of the handoff promotion step: copy ONE

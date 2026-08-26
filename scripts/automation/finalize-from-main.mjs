@@ -116,8 +116,23 @@ export function evaluateFinalizationFromMain(facts) {
       `package ${facts.packageId} status is ${facts.milestone.pkg.status}, not RUNNING — nothing to finalize`,
     );
   }
-  if (facts.pausedFatal)
-    reasons.push('supervisor is latched in PAUSED_FATAL — clear/recover that pause first');
+  if (facts.pausedFatal) {
+    const terminalOwnedPause = (facts.trackedRows ?? []).find(
+      (row) =>
+        row.packageId === facts.packageId &&
+        row.runId === facts.pausedFatal.runId &&
+        row.paused &&
+        ['completed', 'failed', 'cancelled'].includes(String(row.archonStatus)),
+    );
+    if (facts.pausedFatal.packageId === facts.packageId && terminalOwnedPause) {
+      ev.terminalPauseRetired = {
+        runId: terminalOwnedPause.runId,
+        archonStatus: terminalOwnedPause.archonStatus,
+      };
+    } else {
+      reasons.push('supervisor is latched in PAUSED_FATAL — clear/recover that pause first');
+    }
+  }
 
   const co = facts.checkout ?? {};
   if (co.branch !== 'main') reasons.push(`product checkout is on '${co.branch}', not main`);
@@ -160,7 +175,7 @@ export function evaluateFinalizationFromMain(facts) {
   const green = (facts.ciRuns ?? []).find(
     (r) => r.headSha === facts.mainSha && r.conclusion === 'success',
   );
-  if (!green) {
+  if (!green && !facts.operatorCiBypassReason) {
     const seen = (facts.ciRuns ?? [])
       .filter((r) => r.headSha === facts.mainSha)
       .map((r) => r.conclusion ?? 'pending');
@@ -169,8 +184,14 @@ export function evaluateFinalizationFromMain(facts) {
         ? `no green CI on origin/main HEAD ${String(facts.mainSha).slice(0, 7)} (found: ${seen.join(', ')})`
         : `no CI run exists for origin/main HEAD ${String(facts.mainSha).slice(0, 7)} — gate evidence missing/stale`,
     );
-  } else {
+  } else if (green) {
     ev.ci = { databaseId: green.databaseId, url: green.url };
+  } else {
+    ev.ci = {
+      bypassed: true,
+      reason: facts.operatorCiBypassReason,
+      mainSha: facts.mainSha,
+    };
   }
 
   const liveArchon = (facts.archonRows ?? []).filter(
@@ -357,5 +378,6 @@ export async function collectFinalizationFacts(packageId, repo, extra = {}) {
     archonRows,
     trackedRows,
     pausedFatal: extra.pausedFatal ?? null,
+    operatorCiBypassReason: extra.operatorCiBypassReason ?? null,
   };
 }

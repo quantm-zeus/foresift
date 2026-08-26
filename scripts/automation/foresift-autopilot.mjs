@@ -90,6 +90,7 @@ import { applySalvage, SALVAGE_MANIFEST_SCHEMA } from './generation-salvage.mjs'
 import { collectFinalizationFacts, evaluateFinalizationFromMain } from './finalize-from-main.mjs';
 import { admitWorkflowForLaunch, PLANNING_BOOTSTRAP_WORKFLOW } from './wave-admission.mjs';
 import { resolveExecutionProfile } from './execution-profile.mjs';
+import { createIncidentCapsule } from './maintainer-incident.mjs';
 
 // Overridable for hermetic selftests (sandboxed fixture repo + state dir).
 const REPO = process.env.FORESIFT_AUTOPILOT_REPO ?? join(import.meta.dirname, '..', '..');
@@ -972,6 +973,43 @@ function enterFatalPause(st, entry, reason) {
   };
   entry.paused = 'fatal';
   entry.lastPauseReason = String(reason).slice(0, 300);
+  if (!entry.maintainerIncidentPath) {
+    const incidentDir = join(STATE_DIR, 'maintainer-incidents');
+    mkdirSync(incidentDir, { recursive: true });
+    const eventId = `paused-fatal-${entry.runId ?? entry.packageId ?? entry.kind ?? 'unknown'}`;
+    const file = join(incidentDir, `${eventId}.json`);
+    const capsule = createIncidentCapsule({
+      eventId,
+      type: 'paused_fatal',
+      package: entry.packageId ?? null,
+      generation: parseGenerationMessage(entry.message ?? '')?.generation ?? 0,
+      runId: entry.runId ?? null,
+      workflow: entry.workflow ?? null,
+      executionProfile: entry.executionProfile ?? 'HISTORICAL_V4',
+      node: runObservability(entry.runId)?.currentNode ?? null,
+      engine: null,
+      model: null,
+      reasoning: null,
+      serviceTier: null,
+      testEngine: entry.executionProfile ? 'AGY' : 'PERSISTED_HISTORICAL',
+      baseHead: null,
+      currentHead: sh('git rev-parse HEAD').out || null,
+      attempts: (entry.resumeCount ?? 0) + (entry.restartCount ?? 0),
+      failureClassification: 'PAUSED_FATAL',
+      failedGate: null,
+      logTail: String(reason).slice(-1200),
+      diffSummary: null,
+      artifactPointers: { supervisorState: STATE_FILE },
+    });
+    atomicWriteJson(file, capsule);
+    entry.maintainerIncidentPath = file;
+    record(st, 'maintainer_incident_capsule_created', {
+      eventId,
+      file,
+      claudeInference: 0,
+      next: 'invoke Claude maintainer only with this capsule and require a bounded action',
+    });
+  }
   record(st, 'paused_fatal', { reason });
 }
 
@@ -1981,6 +2019,10 @@ async function cmdRecoverFatal(positionalRunId) {
   const kind = workflow === 'foresift-milestone-control' ? 'milestone' : 'package';
   const executionProfile =
     kind === 'package' ? (pf.executionProfile ?? resolveExecutionProfile()) : null;
+  const forceFreshProfileMigration =
+    kind === 'package' &&
+    !pf.executionProfile &&
+    process.env.FORESIFT_FORCE_PROFILE_MIGRATION === '1';
   let ms = null;
   let pkg = null;
   let branch = pf.branch ?? null;
@@ -2034,7 +2076,7 @@ async function cmdRecoverFatal(positionalRunId) {
     resumed = true; // alive — re-adopt under supervisor tracking
   } else if (
     runId &&
-    pf.executionProfile &&
+    !forceFreshProfileMigration &&
     ['failed', 'paused', 'cancelled'].includes(String(row?.status))
   ) {
     const resumeStartTs = now();
@@ -2680,6 +2722,7 @@ async function main() {
   if (profileIndex >= 0) {
     const profile = resolveExecutionProfile(argv[profileIndex + 1]);
     process.env.FORESIFT_EXECUTION_PROFILE = profile;
+    process.env.FORESIFT_FORCE_PROFILE_MIGRATION = '1';
   }
   if (argv.includes('--status')) {
     console.log(buildStatus());

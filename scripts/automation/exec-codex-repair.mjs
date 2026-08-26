@@ -1,6 +1,6 @@
 // Bounded CODEX_AGY FAST repair. Repairs occur in a private worktree, enforce
 // product-only ownership, then merge additively into the canonical run branch.
-import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { mkdirSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
 import { basename, join } from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { buildCodexExecArgs, CODEX_SERVICE_TIER, escalateCodexRoute } from './codex-routing.mjs';
@@ -32,6 +32,10 @@ export function runCodexRepair(input) {
     (lane) => lane.role === 'implementation' && lane.engine === 'CODEX',
   );
   if (!candidates.length) throw new Error('CODEX_REPAIR_ROUTE_MISSING');
+  const repairDir = join(input.artifacts, 'repair');
+  mkdirSync(repairDir, { recursive: true });
+  const priorRepairs = readdirSync(repairDir).filter((name) => name.endsWith('.json')).length;
+  if (priorRepairs >= 2) throw new Error('CODEX_REPAIR_EXHAUSTED');
   let route = candidates.sort(
     (a, b) => (ranked[b.complexityTier] ?? 0) - (ranked[a.complexityTier] ?? 0),
   )[0];
@@ -44,7 +48,6 @@ export function runCodexRepair(input) {
     .slice(-8)}-${Date.now()}`;
   const branch = `foresift/wave-repair/${base.slice(0, 10)}-${token}`;
   const worktree = join(input.artifacts, 'wt', `repair-${token}`);
-  mkdirSync(join(input.artifacts, 'repair'), { recursive: true });
   const addWt = git(['worktree', 'add', '-b', branch, worktree, base], input.canonical);
   if (addWt.status !== 0) throw new Error(`CODEX_REPAIR_WORKTREE_FAILED: ${addWt.stderr}`);
   const logFile = join(input.artifacts, 'wave-fast.log');
@@ -74,7 +77,7 @@ export function runCodexRepair(input) {
     timeout: Number(input['timeout-ms'] ?? 30 * 60_000),
     maxBuffer: 64 * 1024 * 1024,
   });
-  writeFileSync(join(input.artifacts, 'repair', `${token}.jsonl`), run.stdout ?? '');
+  writeFileSync(join(repairDir, `${token}.jsonl`), run.stdout ?? '');
   if (run.error || run.status !== 0)
     throw new Error(`CODEX_REPAIR_FAILED: ${run.error?.message ?? (run.stderr ?? '').slice(-500)}`);
   const dirty = git(['status', '--porcelain=v1'], worktree)
@@ -126,7 +129,7 @@ export function runCodexRepair(input) {
     }
   }
   writeFileSync(
-    join(input.artifacts, 'repair', `${token}.json`),
+    join(repairDir, `${token}.json`),
     `${JSON.stringify(
       {
         schema: 'foresift/codex-repair@1',
@@ -145,10 +148,8 @@ export function runCodexRepair(input) {
       2,
     )}\n`,
   );
-  if (head !== base) {
-    git(['worktree', 'remove', worktree], input.canonical);
-    git(['branch', '-d', branch], input.canonical);
-  }
+  git(['worktree', 'remove', worktree], input.canonical);
+  git(['branch', '-d', branch], input.canonical);
   return { model: route.model, reasoning: route.reasoning, serviceTier: route.serviceTier, head };
 }
 

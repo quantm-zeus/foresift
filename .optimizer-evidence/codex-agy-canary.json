@@ -1,0 +1,57 @@
+{
+  "schema": "foresift/codex-agy-canary@1",
+  "recordedAt": "2026-08-26T14:56:30.000Z",
+  "profile": "CODEX_AGY",
+  "pinnedBaseHead": "fda7501f4abcfee9245be2ddb7e0138dddfdd16e",
+  "codex": {
+    "path": "/home/minhquan_eth/.local/bin/codex",
+    "version": "codex-cli 0.149.1",
+    "authenticated": true,
+    "lane": "core",
+    "model": "gpt-5.6-luna",
+    "reasoning": "low",
+    "logicalServiceTier": "standard",
+    "cliServiceTier": "default",
+    "approvalPrompts": 0,
+    "sandboxPrompts": 0,
+    "worktree": "/tmp/foresift-codex-agy-e2e-canary-codex-wt",
+    "commit": "c5ee78d66a203151aa7a273fd945da6b7c59daed",
+    "changedPaths": ["src/canary.mjs"],
+    "ownershipGuard": "GREEN",
+    "wallTimeMs": 41989,
+    "eventLogSha256": "494229dac12fe52a3fc60d3c2b72b3ba275a266bc051b48c053986f2d9bc5f98"
+  },
+  "agy": {
+    "path": "/home/minhquan_eth/.local/bin/agy",
+    "version": "1.1.21",
+    "authenticated": true,
+    "lane": "test-author",
+    "worktree": "/tmp/foresift-codex-agy-e2e-canary-agy-wt",
+    "commit": "7bb4d8d677afbd065927c56a74642c00b478356c",
+    "changedPaths": ["tests/canary.test.mjs"],
+    "baselineClassification": "NEW_BEHAVIOR_RED",
+    "baselineEvidence": "ERR_MODULE_NOT_FOUND because product module was absent on pinned base",
+    "ownershipGuard": "GREEN",
+    "wallTimeMs": 53872,
+    "eventLogSha256": "37c59f854530a5ca19792c43350bae6538a608bc9dcc4a79e531331bc17d48d4"
+  },
+  "parallelExecution": true,
+  "integration": {
+    "mode": "additive-no-ff",
+    "integratedLanes": ["core", "test-author"],
+    "rejectedLanes": [],
+    "head": "bd1eac9d518d9568be73d2ceee20d2b3ea28f1b3",
+    "reportSha256": "c7b92277c0a43efc3c3f7b55a41a98eef67cdd6abb2b99b0d2d1f5302cf2959f"
+  },
+  "trueFast": {
+    "command": "npm test",
+    "result": "GREEN",
+    "tests": 1,
+    "failures": 0
+  },
+  "cliProbe": {
+    "literalStandard": "unsupported-and-omitted by Codex CLI 0.149.1",
+    "supportedStandardWireValue": "default",
+    "sourceMeaning": "standard pricing and performance"
+  }
+}

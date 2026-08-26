@@ -179,6 +179,7 @@ for (const filePath of resultFiles) {
     shardId: sid,
     role: shard.role ?? 'implementation',
     units: res.completed,
+    baselineClassifications: res.baselineClassifications ?? [],
     branch: res.branch,
     beforeHead,
     afterHead,

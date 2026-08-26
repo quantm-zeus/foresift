@@ -162,6 +162,13 @@ for (const u of units) {
   u.predictedWrites = inScope.sort();
   u.productWrites = u.predictedWrites.filter((p) => classifyOwnedPath(p) === 'PRODUCT');
   u.testWrites = paths.filter((p) => classifyOwnedPath(p) === 'TEST').sort();
+  u.testOnly =
+    u.productWrites.length === 0 &&
+    (u.testWrites.length > 0 || /\b(?:test|fixture|acceptance|negative suite)\b/i.test(u.phase));
+  u.productWork =
+    !u.testOnly &&
+    (u.productWrites.length > 0 ||
+      /\b(?:implement|wire|add|define|create|extend|write|scaffold|author)\b/i.test(u.body));
   u.outOfScopeWrites = outOfScope.sort();
   u.testRefs = paths.filter((p) => p.startsWith('tests/')).sort();
   u.dependsOn = [
@@ -187,31 +194,35 @@ const open = units.filter((u) => !u.done);
 // ── shard planning ────────────────────────────────────────────────────────────
 let shards = null;
 if (args.planShards !== undefined) {
+  const productOpen = args.executionProfile ? open.filter((u) => u.productWork) : open;
   // Units whose predicted writes leave binding writeScopes are demoted to the
   // serial core shard; their paths are recorded as explicit scope exceptions.
-  const scopeDemoted = open.filter((u) => u.outOfScopeWrites.length > 0);
+  const scopeDemoted = productOpen.filter((u) => u.outOfScopeWrites.length > 0);
   // A [P] unit may run beside the concurrently-executing core ONLY if it
   // neither writes a core path nor depends on a core unit; otherwise it is
   // demoted into the core lane (conservative cross-lane disjointness).
-  const nonP = open.filter((u) => !u.parallelizable);
+  const nonP = productOpen.filter((u) => !u.parallelizable);
   const coreSeed = [...nonP, ...scopeDemoted];
   const coreIds = new Set(coreSeed.map((u) => u.id));
   const writesFor = (u) => (args.executionProfile ? u.productWrites : u.predictedWrites);
   const coreWriteSet = new Set(coreSeed.flatMap(writesFor));
   const clashesCore = (u) =>
     writesFor(u).some((p) => coreWriteSet.has(p)) || u.dependsOn.some((d) => coreIds.has(d));
-  const clashDemoted = open.filter(
+  const clashDemoted = productOpen.filter(
     (u) => u.parallelizable && u.outOfScopeWrites.length === 0 && clashesCore(u),
   );
   const serial = [...coreSeed, ...clashDemoted];
-  const par = open.filter(
+  const par = productOpen.filter(
     (u) =>
       u.parallelizable &&
       u.outOfScopeWrites.length === 0 &&
       !coreIds.has(u.id) &&
       !clashDemoted.includes(u),
   );
-  const extra = Math.max(0, args.planShards - 1); // core shard occupies one slot
+  const extra = Math.max(
+    0,
+    args.executionProfile ? args.planShards - (serial.length > 0 ? 1 : 0) : args.planShards - 1,
+  );
   const SIZE_W = { small: 1, medium: 2, large: 4 };
   const groups = Array.from({ length: extra }, () => ({ units: [], writes: new Set(), load: 0 }));
   const unitSize = (u) => SIZE_W[u.estimatedSize] ?? 2;
@@ -247,7 +258,12 @@ if (args.planShards !== undefined) {
     ...groups
       .filter((g) => g.units.length > 0)
       .map((g, i) => ({
-        id: `shard-${i + 1}`,
+        id:
+          args.executionProfile && serial.length === 0
+            ? i === 0
+              ? 'core'
+              : `shard-${i}`
+            : `shard-${i + 1}`,
         mode: 'parallel',
         units: g.units,
       })),

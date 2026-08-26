@@ -113,6 +113,9 @@ const verdict = {
   completed: Array.isArray(claimed.completed) ? claimed.completed : [],
   testsRun: claimed.testsRun ?? [],
   testResults: claimed.testResults ?? 'unknown',
+  baselineClassifications: Array.isArray(claimed.baselineClassifications)
+    ? claimed.baselineClassifications
+    : [],
   blockers: claimed.blockers ?? [],
   // computed facts (override §9 — never trust AI claims):
   branch: shardMeta.branch,

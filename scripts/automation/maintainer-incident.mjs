@@ -61,7 +61,10 @@ export function createIncidentCapsule(input = {}) {
     failedGate: input.failedGate ?? null,
     logTail: Array.isArray(input.logTail) ? input.logTail.slice(-40) : (input.logTail ?? ''),
     diffSummary: input.diffSummary ?? null,
-    artifactPointers: Array.isArray(input.artifactPointers) ? input.artifactPointers : [],
+    artifactPointers:
+      input.artifactPointers && typeof input.artifactPointers === 'object'
+        ? input.artifactPointers
+        : [],
   };
 }
 

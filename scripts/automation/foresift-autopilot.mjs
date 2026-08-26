@@ -11,6 +11,9 @@
 //   node scripts/automation/foresift-autopilot.mjs             # supervisory loop
 //   node scripts/automation/foresift-autopilot.mjs --once      # single tick (tests/cron)
 //   node scripts/automation/foresift-autopilot.mjs --status    # operator status
+//   node scripts/automation/foresift-autopilot.mjs --execution-profile CLAUDE_AGY
+//                                                              # supported fallback override; default comes from
+//                                                              # versioned config/foresift-execution.json
 //   node scripts/automation/foresift-autopilot.mjs --recover-fatal [runId]
 //                                                              # supported operator recovery of a
 //                                                              # PAUSED_FATAL pause (same run, same branch;
@@ -86,6 +89,7 @@ import {
 import { applySalvage, SALVAGE_MANIFEST_SCHEMA } from './generation-salvage.mjs';
 import { collectFinalizationFacts, evaluateFinalizationFromMain } from './finalize-from-main.mjs';
 import { admitWorkflowForLaunch, PLANNING_BOOTSTRAP_WORKFLOW } from './wave-admission.mjs';
+import { resolveExecutionProfile } from './execution-profile.mjs';
 
 // Overridable for hermetic selftests (sandboxed fixture repo + state dir).
 const REPO = process.env.FORESIFT_AUTOPILOT_REPO ?? join(import.meta.dirname, '..', '..');
@@ -364,6 +368,7 @@ function launchIdentity(p) {
     branch: generationBranch(p.id, generation),
     message: generationMessage(p.id, generation),
     workflow: workPackageWorkflow(p),
+    executionProfile: resolveExecutionProfile(),
   };
 }
 
@@ -587,7 +592,16 @@ function ensureGenerationSeedCurrent(branch) {
   };
 }
 
-function launchDetached(st, workflow, branch, message) {
+function launchDetached(st, workflow, branch, message, executionProfile = null) {
+  if (st && executionProfile) {
+    record(st, 'execution_profile_selected', {
+      workflow,
+      branch,
+      message,
+      executionProfile,
+    });
+    saveState(st);
+  }
   const reset = st ? resetArchonRunWorktree(branch) : null;
   if (reset) record(st, 'run_worktree_reset', { branch, ...reset });
   // Defect #11b: archon reuses its per-task run worktree across launches and
@@ -596,9 +610,17 @@ function launchDetached(st, workflow, branch, message) {
   if (advanced) record(st, 'archon_task_worktree_advanced', { branch, ...advanced });
   const seed = st ? ensureGenerationSeedCurrent(branch) : null;
   if (seed && !seed.skipped) record(st, 'generation_seed_reconciled', { branch, ...seed });
-  const ack = archonJson(
-    `workflow run ${workflow} --detach --branch ${branch} --json ${JSON.stringify(message)}`,
-  );
+  const previous = process.env.FORESIFT_EXECUTION_PROFILE;
+  if (executionProfile) process.env.FORESIFT_EXECUTION_PROFILE = executionProfile;
+  let ack;
+  try {
+    ack = archonJson(
+      `workflow run ${workflow} --detach --branch ${branch} --json ${JSON.stringify(message)}`,
+    );
+  } finally {
+    if (previous === undefined) delete process.env.FORESIFT_EXECUTION_PROFILE;
+    else process.env.FORESIFT_EXECUTION_PROFILE = previous;
+  }
   return ack;
 }
 
@@ -870,7 +892,7 @@ function planningBootstrapHandoff(st, entry, get) {
     attemptResume(st, entry, 'bootstrap completed but package record unusable');
     return false;
   }
-  const { generation, branch, message, workflow: wf } = launchIdentity(pkg);
+  const { generation, branch, message, workflow: wf, executionProfile } = launchIdentity(pkg);
   // Duplicate-tick / crash-after-launch absorption: a LIVE wave row for this
   // exact identity is adopted, never duplicated. Keyed on the WAVE identity —
   // the terminal bootstrap run cannot collide.
@@ -886,12 +908,13 @@ function planningBootstrapHandoff(st, entry, get) {
       restartCount: 0,
       awaitingDiscovery: false,
       discoveryAttempts: 0,
+      executionProfile,
     });
     record(st, 'planning_handoff_wave_adopted', { packageId, runId: liveRow.id, workflow: wf });
     saveState(st);
     return false; // the adopted wave run stays tracked and continues
   }
-  const ack = launchDetached(st, wf, branch, message);
+  const ack = launchDetached(st, wf, branch, message, executionProfile);
   const runId = resolveRunId(ack, wf, message);
   record(st, 'planning_handoff_complete', {
     packageId,
@@ -915,6 +938,7 @@ function planningBootstrapHandoff(st, entry, get) {
     restartCount: 0,
     awaitingDiscovery: !runId,
     discoveryAttempts: 0,
+    executionProfile,
   });
   if (runId) {
     // Mirror selectAndLaunch's durable-association discipline: RUNNING was
@@ -1215,7 +1239,13 @@ async function actOnPendingAction(st, entry) {
   if (entry.runId === null || entry.abandonedBeforeRestart) {
     // Fresh restart against the SAME branch so existing work persists.
     entry.abandonedBeforeRestart = false;
-    const ack = launchDetached(st, entry.workflow, entry.branch, entry.message);
+    const ack = launchDetached(
+      st,
+      entry.workflow,
+      entry.branch,
+      entry.message,
+      entry.executionProfile ?? null,
+    );
     record(st, 'fresh_restart_launched', { branch: entry.branch, ack: sanitizeAck(ack) });
     const newId = resolveRunId(ack, entry.workflow, entry.message);
     Object.assign(entry, { runId: newId, awaitingDiscovery: !newId, discoveryAttempts: 0 });
@@ -1296,7 +1326,7 @@ function reconcileStrandedPackages(st) {
     // correlation message are adoptable. A retired generation's runs — under
     // the legacy bare-id message or an older @gN suffix — can never be
     // re-adopted by a newer generation (V3 §6).
-    const { branch, message, workflow: wf } = launchIdentity(p);
+    const { branch, message, workflow: wf, executionProfile } = launchIdentity(p);
     const row = findRecentRunRow(wf, message);
     if (row && ['running', 'pending'].includes(String(row.status))) {
       st.activeRuns.push({
@@ -1311,6 +1341,7 @@ function reconcileStrandedPackages(st) {
         restartCount: 0,
         awaitingDiscovery: false,
         discoveryAttempts: 0,
+        executionProfile,
       });
       record(st, 'stranded_run_adopted', { packageId: p.id, runId: row.id, status: row.status });
       continue;
@@ -1325,6 +1356,7 @@ function reconcileStrandedPackages(st) {
       startedAt: now(),
       resumeCount: 0,
       restartCount: 0,
+      executionProfile,
     };
     st.activeRuns.push(entry);
     enterFatalPause(
@@ -1507,14 +1539,15 @@ function selectAndLaunch(st) {
       }
       continue;
     }
-    const { generation, branch, message, workflow: wf } = launchIdentity(cand);
-    const ack = launchDetached(st, wf, branch, message);
+    const { generation, branch, message, workflow: wf, executionProfile } = launchIdentity(cand);
+    const ack = launchDetached(st, wf, branch, message, executionProfile);
     const runId = resolveRunId(ack, wf, message);
     record(st, 'work_package_launched', {
       packageId: cand.id,
       branch,
       workflow: wf,
       generation,
+      executionProfile,
       ack: sanitizeAck(ack),
       runId,
       discovery: extractRunId(ack) ? 'ack' : 'runs-table',
@@ -1531,6 +1564,7 @@ function selectAndLaunch(st) {
       restartCount: 0,
       awaitingDiscovery: !runId,
       discoveryAttempts: 0,
+      executionProfile,
     });
     if (runId) {
       // Durable run id already in hand → RUNNING now; otherwise it is flipped
@@ -1944,6 +1978,8 @@ async function cmdRecoverFatal(positionalRunId) {
       'paused state carries neither a readable Archon run nor structured workflow/message identity; repair the underlying cause first',
     );
   const kind = workflow === 'foresift-milestone-control' ? 'milestone' : 'package';
+  const executionProfile =
+    kind === 'package' ? (pf.executionProfile ?? resolveExecutionProfile()) : null;
   let ms = null;
   let pkg = null;
   let branch = pf.branch ?? null;
@@ -1995,7 +2031,11 @@ async function cmdRecoverFatal(positionalRunId) {
   let resumed = false;
   if (row && ['running', 'pending'].includes(String(row.status))) {
     resumed = true; // alive — re-adopt under supervisor tracking
-  } else if (runId && ['failed', 'paused', 'cancelled'].includes(String(row?.status))) {
+  } else if (
+    runId &&
+    pf.executionProfile &&
+    ['failed', 'paused', 'cancelled'].includes(String(row?.status))
+  ) {
     const resumeStartTs = now();
     const res = archonJson(`workflow resume ${runId} --json`);
     if (res?.ok === false) {
@@ -2041,10 +2081,18 @@ async function cmdRecoverFatal(positionalRunId) {
     }
     // ONE fresh continuation on the SAME branch/worktree; prior work persists on
     // disk/git and completed tasks are discovered from there by the workflow.
-    const ack = launchDetached(st, workflow, branch, message);
-    record(st, 'operator_recovery_fresh_launch', { branch, ack: sanitizeAck(ack) });
+    const ack = launchDetached(st, workflow, branch, message, executionProfile);
+    record(st, 'operator_recovery_fresh_launch', {
+      branch,
+      executionProfile,
+      ack: sanitizeAck(ack),
+    });
     runId = resolveRunId(ack, workflow, message);
   }
+  const persistedExecutionProfile =
+    kind === 'package'
+      ? (pf.executionProfile ?? (resumed ? 'HISTORICAL_V4' : executionProfile))
+      : null;
   // Restore authoritative tracking: reuse the retained paused entry if present.
   const list2 = kind === 'milestone' ? st.milestoneRuns : st.activeRuns;
   let entry = list2.find((e) => !e.done && ((runId && e.runId === runId) || e.message === message));
@@ -2058,6 +2106,7 @@ async function cmdRecoverFatal(positionalRunId) {
       startedAt: now(),
       resumeCount: 0,
       restartCount: 0,
+      executionProfile: persistedExecutionProfile,
     };
     list2.push(entry);
   }
@@ -2065,6 +2114,7 @@ async function cmdRecoverFatal(positionalRunId) {
     runId: runId ?? null,
     awaitingDiscovery: !runId,
     discoveryAttempts: entry.awaitingDiscovery ? (entry.discoveryAttempts ?? 0) : 0,
+    executionProfile: entry.executionProfile ?? persistedExecutionProfile,
   });
   delete entry.done;
   delete entry.paused;
@@ -2625,6 +2675,11 @@ function buildSalvageReceiptFields(manifestPath) {
 
 async function main() {
   const argv = process.argv.slice(2);
+  const profileIndex = argv.indexOf('--execution-profile');
+  if (profileIndex >= 0) {
+    const profile = resolveExecutionProfile(argv[profileIndex + 1]);
+    process.env.FORESIFT_EXECUTION_PROFILE = profile;
+  }
   if (argv.includes('--status')) {
     console.log(buildStatus());
     return;
@@ -2670,7 +2725,9 @@ async function main() {
     return; // one-shot maintenance command; systemd restarts the loop separately
   }
   if (argv.includes('--recover-fatal')) {
-    const positional = argv.filter((a) => !a.startsWith('--'));
+    const positional = argv.filter(
+      (a, i) => !a.startsWith('--') && argv[i - 1] !== '--execution-profile',
+    );
     process.exit(await cmdRecoverFatal(positional[0] ?? null));
   }
   if (argv.includes('--finalize-from-main')) {

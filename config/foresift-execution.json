@@ -1,0 +1,10 @@
+{
+  "schema": "foresift/execution-policy@1",
+  "defaultProfile": "CODEX_AGY",
+  "supportedProfiles": ["CODEX_AGY", "CLAUDE_AGY"],
+  "codexServiceTier": "standard",
+  "codexCliServiceTier": "default",
+  "routingPolicyVersion": "codex-sol-luna-terra@1",
+  "maxCodexWriters": 3,
+  "maxAgyTestWriters": 1
+}

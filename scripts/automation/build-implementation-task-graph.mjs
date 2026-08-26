@@ -27,6 +27,12 @@ import { spawnSync } from 'node:child_process';
 import { readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { repoRoot, loadCurrentMilestone, validateMilestoneState, findPackage } from './schema.mjs';
+import { classifyOwnedPath } from './path-ownership.mjs';
+import {
+  implementationEngineForProfile,
+  resolveExecutionProfile,
+  testEngineForProfile,
+} from './execution-profile.mjs';
 
 export const TASK_GRAPH_SCHEMA = 'foresift/impl-task-graph@1';
 
@@ -41,11 +47,14 @@ for (let i = 0; i < process.argv.length - 1; i++) {
   if (process.argv[i] === '--root') args.root = process.argv[i + 1];
   if (process.argv[i] === '--tasks') args.tasks = process.argv[i + 1];
   if (process.argv[i] === '--plan-shards') args.planShards = parseInt(process.argv[i + 1], 10);
+  if (process.argv[i] === '--execution-profile') args.executionProfile = process.argv[i + 1];
   if (process.argv[i] === '--out') args.out = process.argv[i + 1];
 }
 if (!args.package) fail('missing --package <id>');
 if (args.planShards !== undefined && (!Number.isInteger(args.planShards) || args.planShards < 1))
   fail('--plan-shards must be a positive integer');
+if (args.executionProfile && args.planShards > 3)
+  fail('fresh execution profiles support at most 3 product writers');
 
 const root = args.root ?? repoRoot();
 
@@ -151,6 +160,8 @@ for (const u of units) {
   u.requirements = reqs;
   u.acceptanceCriteria = acs;
   u.predictedWrites = inScope.sort();
+  u.productWrites = u.predictedWrites.filter((p) => classifyOwnedPath(p) === 'PRODUCT');
+  u.testWrites = paths.filter((p) => classifyOwnedPath(p) === 'TEST').sort();
   u.outOfScopeWrites = outOfScope.sort();
   u.testRefs = paths.filter((p) => p.startsWith('tests/')).sort();
   u.dependsOn = [
@@ -185,9 +196,10 @@ if (args.planShards !== undefined) {
   const nonP = open.filter((u) => !u.parallelizable);
   const coreSeed = [...nonP, ...scopeDemoted];
   const coreIds = new Set(coreSeed.map((u) => u.id));
-  const coreWriteSet = new Set(coreSeed.flatMap((u) => u.predictedWrites));
+  const writesFor = (u) => (args.executionProfile ? u.productWrites : u.predictedWrites);
+  const coreWriteSet = new Set(coreSeed.flatMap(writesFor));
   const clashesCore = (u) =>
-    u.predictedWrites.some((p) => coreWriteSet.has(p)) || u.dependsOn.some((d) => coreIds.has(d));
+    writesFor(u).some((p) => coreWriteSet.has(p)) || u.dependsOn.some((d) => coreIds.has(d));
   const clashDemoted = open.filter(
     (u) => u.parallelizable && u.outOfScopeWrites.length === 0 && clashesCore(u),
   );
@@ -209,7 +221,7 @@ if (args.planShards !== undefined) {
     const compatible = groups.filter(
       (g) =>
         g.units.length > 0 &&
-        !u.predictedWrites.some((p) => g.writes.has(p)) &&
+        !writesFor(u).some((p) => g.writes.has(p)) &&
         !u.dependsOn.some((d) => g.units.some((x) => x.id === d)),
     );
     // An unused group is also a candidate — otherwise the first group hoovers
@@ -219,7 +231,7 @@ if (args.planShards !== undefined) {
     const target =
       pool.sort((a, b) => a.load - b.load || a.units.length - b.units.length)[0] ?? groups[0];
     target.units.push(u.id);
-    for (const p of u.predictedWrites) target.writes.add(p);
+    for (const p of writesFor(u)) target.writes.add(p);
     target.load += unitSize(u);
   }
   shards = [
@@ -247,7 +259,7 @@ if (args.planShards !== undefined) {
     const writes = new Set();
     for (const uid of s.units) {
       const u = open.find((x) => x.id === uid);
-      for (const p of u.predictedWrites) writes.add(p);
+      for (const p of writesFor(u)) writes.add(p);
       if (s.mode === 'serial') for (const p of u.outOfScopeWrites) writes.add(p);
     }
     s.allowedWritePaths = [...writes].sort();
@@ -256,6 +268,45 @@ if (args.planShards !== undefined) {
       .reduce((acc, sz) => ({ small: 1, medium: 2, large: 4 })[sz] + acc, 0);
   }
 }
+
+const executionProfile = args.executionProfile
+  ? resolveExecutionProfile(args.executionProfile)
+  : null;
+if (executionProfile && shards) {
+  const engine = implementationEngineForProfile(executionProfile);
+  for (const shard of shards) {
+    shard.role = 'implementation';
+    shard.engine = engine;
+  }
+}
+const testUnits = executionProfile
+  ? open.filter(
+      (u) =>
+        u.testWrites.length > 0 ||
+        u.testRefs.length > 0 ||
+        u.acceptanceCriteria.length > 0 ||
+        /\b(?:test|regression|fixture|fuzz|property)\b/i.test(u.body),
+    )
+  : [];
+const testLanes = testUnits.length
+  ? [
+      {
+        id: 'test-author',
+        mode: 'parallel',
+        role: 'test',
+        engine: testEngineForProfile(executionProfile),
+        units: testUnits.map((u) => u.id),
+        allowedWritePaths: [...new Set(testUnits.flatMap((u) => u.testWrites))].sort(),
+        baselineClassifications: [
+          'NEW_BEHAVIOR_RED',
+          'REGRESSION_RED',
+          'NEGATIVE_RED',
+          'CHARACTERIZATION_GREEN',
+          'REFACTOR_GUARD_GREEN',
+        ],
+      },
+    ]
+  : [];
 
 // ── emit ──────────────────────────────────────────────────────────────────────
 const graph = {
@@ -269,6 +320,14 @@ const graph = {
     openParallelizable: open.filter((u) => u.parallelizable).length,
   },
   units,
+  ...(executionProfile
+    ? {
+        executionProfile,
+        implementationEngine: implementationEngineForProfile(executionProfile),
+        testEngine: testEngineForProfile(executionProfile),
+        testLanes,
+      }
+    : {}),
   ...(shards
     ? {
         shards,

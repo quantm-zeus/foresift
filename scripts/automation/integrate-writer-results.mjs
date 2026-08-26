@@ -14,6 +14,7 @@ import { spawnSync } from 'node:child_process';
 import { readFileSync, readdirSync, existsSync, writeFileSync } from 'node:fs';
 import { join, basename, dirname } from 'node:path';
 import { repoRoot } from './schema.mjs';
+import { validateLaneOwnership } from './path-ownership.mjs';
 
 function fail(msg) {
   console.error(`integrate-writers: ${msg}`);
@@ -36,7 +37,8 @@ if (!args.resultsDir) fail('missing --results-dir <dir>');
 const root = args.root ?? repoRoot();
 const canonical = args.canonical ?? root;
 const graph = JSON.parse(readFileSync(args.graph, 'utf8'));
-const shardById = new Map((graph.shards ?? []).map((s) => [s.id, s]));
+const allLanes = [...(graph.shards ?? []), ...(graph.testLanes ?? [])];
+const shardById = new Map(allLanes.map((s) => [s.id, s]));
 const scopeExceptions = new Set(graph.scopeExceptions ?? []);
 
 const git = (cmd, cwd = canonical) => {
@@ -124,7 +126,7 @@ for (const filePath of resultFiles) {
     ...(graph.package.writeScopes ?? []).map(globToRegExp),
   ];
   const othersPredicted = new Set(
-    (graph.shards ?? []).filter((s) => s.id !== sid).flatMap((s) => s.allowedWritePaths ?? []),
+    allLanes.filter((s) => s.id !== sid).flatMap((s) => s.allowedWritePaths ?? []),
   );
   const violations = diffNames.out
     .split('\n')
@@ -140,6 +142,21 @@ for (const filePath of resultFiles) {
       violations,
     });
     continue;
+  }
+  if (shard.role) {
+    const ownership = validateLaneOwnership({
+      engine: shard.engine,
+      role: shard.role,
+      changedPaths: diffNames.out.split('\n').filter(Boolean),
+    });
+    if (!ownership.ok) {
+      report.rejected.push({
+        shardId: sid,
+        reason: ownership.violationCode,
+        violations: ownership.violatingPaths,
+      });
+      continue;
+    }
   }
   if ((res.completed ?? []).length === 0) {
     report.rejected.push({ shardId: sid, reason: 'writer reported zero completed units' });
@@ -160,6 +177,7 @@ for (const filePath of resultFiles) {
   const afterHead = git('rev-parse HEAD', canonical).out;
   report.integrated.push({
     shardId: sid,
+    role: shard.role ?? 'implementation',
     units: res.completed,
     branch: res.branch,
     beforeHead,
@@ -168,7 +186,9 @@ for (const filePath of resultFiles) {
 }
 
 // ── canonical bookkeeping: mark completed units in tasks.md ───────────────────
-const completedUnits = new Set(report.integrated.flatMap((r) => r.units));
+const completedUnits = new Set(
+  report.integrated.filter((r) => r.role === 'implementation').flatMap((r) => r.units),
+);
 if (completedUnits.size > 0) {
   const tasksPath = join(canonical, 'specs', args.package, 'tasks.md');
   if (existsSync(tasksPath)) {

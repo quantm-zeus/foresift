@@ -15,6 +15,7 @@ import { spawnSync } from 'node:child_process';
 import { readFileSync, writeFileSync, mkdirSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { repoRoot } from './schema.mjs';
+import { validateLaneOwnership } from './path-ownership.mjs';
 
 function fail(reason) {
   console.error(`wave-guard: ${reason}`);
@@ -41,7 +42,13 @@ const shardMeta = meta[args.shard];
 if (!shardMeta) fail(`no worktree metadata for shard ${args.shard}`);
 
 const graph = JSON.parse(readFileSync(args.graph, 'utf8'));
-const shard = (graph.shards ?? []).find((s) => s.id === args.shard);
+const allLanes = [...(graph.shards ?? []), ...(graph.testLanes ?? [])];
+const shard = allLanes.find((s) => s.id === args.shard) ?? {
+  id: args.shard,
+  mode: 'unknown',
+  units: [],
+  allowedWritePaths: [],
+};
 
 const baseSha = readFileSync(join(args.artifacts, 'base-head.txt'), 'utf8').trim();
 const headR = git(`rev-parse ${shardMeta.branch}`);
@@ -76,12 +83,15 @@ const allowed = [
 // Cross-lane ownership: files PREDICTED by another active shard may not be
 // touched by this lane even though they sit inside package scopes.
 const othersPredicted = new Set(
-  (graph.shards ?? []).filter((s) => s.id !== args.shard).flatMap((s) => s.allowedWritePaths ?? []),
+  allLanes.filter((s) => s.id !== args.shard).flatMap((s) => s.allowedWritePaths ?? []),
 );
 const exceptions = new Set(graph.scopeExceptions ?? []);
 const violations = changed.filter(
   (p) => (!allowed.some((re) => re.test(p)) && !exceptions.has(p)) || othersPredicted.has(p),
 );
+const ownership = shard.role
+  ? validateLaneOwnership({ engine: shard.engine, role: shard.role, changedPaths: changed })
+  : { ok: true, violations: [] };
 
 // Carry over whatever the writer claimed about completed units (bookkeeping
 // only — code truth is decided by the merge + downstream gates).
@@ -110,15 +120,16 @@ const verdict = {
   baseSha,
   headSha,
   changedFiles: changed.length,
-  authorityOk: violations.length === 0,
-  violations,
+  authorityOk: violations.length === 0 && ownership.ok,
+  ownership,
+  violations: [...violations, ...(ownership.ok ? [] : ownership.violations)],
 };
 
-if (violations.length > 0) {
+if (verdict.violations.length > 0) {
   mkdirSync(join(args.artifacts, 'writer-results', args.shard), { recursive: true });
   writeFileSync(resPath, JSON.stringify(verdict, null, 2) + '\n');
   console.error(`wave-guard: WRITE-AUTHORITY VIOLATION in ${args.shard}:`);
-  for (const v of violations) console.error(`  - ${v}`);
+  for (const v of verdict.violations) console.error(`  - ${v}`);
   process.exit(1);
 }
 

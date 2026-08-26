@@ -648,6 +648,233 @@ describe('Contract 4: Manifest inventory integrity and batch classification', ()
       'AGY_REQUIRED',
     );
   });
+
+  // ── Regression tests: Bun function-wrapped rejects classifier ──
+  it('classifies Vitest test with function-wrapped rejects as SEMANTIC_REWRITE and AGY_REQUIRED (not mechanical)', () => {
+    const dir = mkdtempSync(join(scratch, 'fn-rejects-vitest-'));
+
+    // Test arrow function wrapper: expect(() => asyncCall()).rejects
+    const arrowTestPath = 'arrow-rejects.spec.ts';
+    writeFileSync(
+      join(dir, arrowTestPath),
+      [
+        "import { describe, expect, it } from 'vitest';",
+        "describe('arrow function rejects', () => {",
+        "  it('rejects with error', async () => {",
+        "    await expect(() => asyncCall()).rejects.toThrow();",
+        "  });",
+        "});",
+        '',
+      ].join('\n'),
+    );
+    const arrowAnalysis = analyzeTestFile(dir, arrowTestPath);
+    expect(arrowAnalysis.features).toContain('function-wrapped-rejects');
+    expect(arrowAnalysis.migrationType).toBe('SEMANTIC_REWRITE');
+    expect(arrowAnalysis.state).toBe('AGY_REQUIRED');
+
+    // Test function expression wrapper: expect(function() { return asyncCall(); }).rejects
+    const fnExprTestPath = 'fn-expr-rejects.spec.ts';
+    writeFileSync(
+      join(dir, fnExprTestPath),
+      [
+        "import { describe, expect, it } from 'vitest';",
+        "describe('function expression rejects', () => {",
+        "  it('rejects with error', async () => {",
+        "    await expect(function () { return asyncCall(); }).rejects.toThrow();",
+        "  });",
+        "});",
+        '',
+      ].join('\n'),
+    );
+    const fnExprAnalysis = analyzeTestFile(dir, fnExprTestPath);
+    expect(fnExprAnalysis.features).toContain('function-wrapped-rejects');
+    expect(fnExprAnalysis.migrationType).toBe('SEMANTIC_REWRITE');
+    expect(fnExprAnalysis.state).toBe('AGY_REQUIRED');
+
+    // Verify batch planning routes to AGY engine, not CODEMOD
+    const manifest = {
+      schema: BUN_MIGRATION_MANIFEST_SCHEMA,
+      migrationId: 'bun-test-authority-v1',
+      totalTestFiles: 1,
+      files: [
+        {
+          path: arrowTestPath,
+          package: 'root',
+          workload: 'PURE' as const,
+          migrationType: arrowAnalysis.migrationType,
+          state: arrowAnalysis.state,
+        },
+      ],
+      batches: [],
+    };
+    const batches = planMigrationBatches(manifest);
+    expect(batches.length).toBe(1);
+    expect(batches[0].engine).toBe('AGY');
+  });
+
+  it('function-wrapped rejects construct with bun:test import remains SEMANTIC_REWRITE and AGY_REQUIRED across restarts', () => {
+    const fx = gitFixture('bun-fn-rejects-restart-fx');
+    const testFile = 'packages/domain/test/partial-codemod-fn-rejects.spec.ts';
+    const sourceContent = [
+      "import { describe, expect, it } from 'bun:test';",
+      "describe('partially migrated function-wrapped rejects', () => {",
+      "  it('has bun import but unmigrated fn-wrapped rejects', async () => {",
+      "    await expect(() => asyncCall()).rejects.toThrow();",
+      "  });",
+      "});",
+      '',
+    ].join('\n');
+    fx.writeFile(testFile, sourceContent);
+    fx.commitAll('add partially codemodded test with fn-wrapped rejects');
+
+    const analysis = analyzeTestFile(fx.root, testFile);
+    expect(analysis.features).toContain('function-wrapped-rejects');
+    expect(analysis.migrationType).toBe('SEMANTIC_REWRITE');
+    expect(analysis.state).toBe('AGY_REQUIRED');
+
+    // Restart: prepareMigration with existing manifest does not mislabel as MIGRATED or VERIFY_EXISTING
+    const manifestPath = join(fx.root, 'manifest.json');
+    const prepared = prepareMigration({ root: fx.root, manifestFile: manifestPath });
+    const entry = prepared.files.find((f) => f.path === testFile);
+    expect(entry?.state).toBe('AGY_REQUIRED');
+    expect(entry?.migrationType).toBe('SEMANTIC_REWRITE');
+
+    // The planned batch must be AGY, NOT VERIFY_EXISTING
+    const batch = prepared.batches.find((b) => b.files.includes(testFile));
+    expect(batch).toBeDefined();
+    expect(batch?.engine).toBe('AGY');
+    expect(batch?.state).toBe('PENDING');
+  });
+
+  it('direct promise rejects expect(asyncCall()).rejects is not flagged as function-wrapped-rejects', () => {
+    const dir = mkdtempSync(join(scratch, 'direct-promise-rejects-'));
+
+    // Vitest file with direct promise rejects: should be EASY_MECHANICAL / CODEMOD_READY
+    const vitestTestPath = 'vitest-direct-rejects.spec.ts';
+    writeFileSync(
+      join(dir, vitestTestPath),
+      [
+        "import { describe, expect, it } from 'vitest';",
+        "describe('direct promise rejects', () => {",
+        "  it('rejects directly on promise', async () => {",
+        "    await expect(asyncCall()).rejects.toThrow();",
+        "  });",
+        "});",
+        '',
+      ].join('\n'),
+    );
+    const vitestAnalysis = analyzeTestFile(dir, vitestTestPath);
+    expect(vitestAnalysis.features).not.toContain('function-wrapped-rejects');
+    expect(vitestAnalysis.migrationType).toBe('EASY_MECHANICAL');
+    expect(vitestAnalysis.state).toBe('CODEMOD_READY');
+
+    // Bun file with direct promise rejects: should be ALREADY_MIGRATED / MIGRATED
+    const bunTestPath = 'bun-direct-rejects.spec.ts';
+    writeFileSync(
+      join(dir, bunTestPath),
+      [
+        "import { describe, expect, it } from 'bun:test';",
+        "describe('direct promise rejects under bun', () => {",
+        "  it('rejects directly on promise', async () => {",
+        "    await expect(asyncCall()).rejects.toThrow();",
+        "  });",
+        "});",
+        '',
+      ].join('\n'),
+    );
+    const bunAnalysis = analyzeTestFile(dir, bunTestPath);
+    expect(bunAnalysis.features).not.toContain('function-wrapped-rejects');
+    expect(bunAnalysis.migrationType).toBe('ALREADY_MIGRATED');
+    expect(bunAnalysis.state).toBe('MIGRATED');
+  });
+
+  it('unrelated functions, methods, and strings mentioning rejects do not trigger AST-shape classifier (no false positives)', () => {
+    const dir = mkdtempSync(join(scratch, 'unrelated-rejects-'));
+
+    const vitestTestPath = 'unrelated-rejects-vitest.spec.ts';
+    writeFileSync(
+      join(dir, vitestTestPath),
+      [
+        "import { describe, expect, it } from 'vitest';",
+        'function rejects(reason: string) { return reason; }',
+        "describe('unrelated rejects identifiers and strings', () => {",
+        "  it('handles strings and helper functions containing word rejects', () => {",
+        "    const msg = 'server rejects malformed payload';",
+        '    const config = { rejects: false };',
+        '    if (config.rejects) rejects(msg);',
+        "    expect(() => { throw new Error('sync'); }).toThrow('rejects');",
+        '  });',
+        '});',
+        '',
+      ].join('\n'),
+    );
+    const vitestAnalysis = analyzeTestFile(dir, vitestTestPath);
+    expect(vitestAnalysis.features).not.toContain('function-wrapped-rejects');
+    expect(vitestAnalysis.migrationType).toBe('EASY_MECHANICAL');
+    expect(vitestAnalysis.state).toBe('CODEMOD_READY');
+
+    const bunTestPath = 'unrelated-rejects-bun.spec.ts';
+    writeFileSync(
+      join(dir, bunTestPath),
+      [
+        "import { describe, expect, it } from 'bun:test';",
+        "describe('unrelated rejects under bun', () => {",
+        "  it('handles strings and unrelated methods without false positives', () => {",
+        '    const tracker = { rejects: (count: number) => count > 0 };',
+        '    expect(tracker.rejects(0)).toBe(false);',
+        "    expect(() => { throw new Error('fail'); }).toThrow();",
+        '  });',
+        '});',
+        '',
+      ].join('\n'),
+    );
+    const bunAnalysis = analyzeTestFile(dir, bunTestPath);
+    expect(bunAnalysis.features).not.toContain('function-wrapped-rejects');
+    expect(bunAnalysis.migrationType).toBe('ALREADY_MIGRATED');
+    expect(bunAnalysis.state).toBe('MIGRATED');
+  });
+
+  it('existing mechanical imports and already-migrated direct Bun tests retain standard classifications', () => {
+    const dir = mkdtempSync(join(scratch, 'retain-classifications-'));
+
+    // Standard mechanical Vitest test
+    const mechanicalPath = 'standard-mechanical.spec.ts';
+    writeFileSync(
+      join(dir, mechanicalPath),
+      [
+        "import { describe, expect, it } from 'vitest';",
+        "describe('standard mechanical test', () => {",
+        "  it('runs standard assertions', () => {",
+        '    expect(1 + 1).toBe(2);',
+        '  });',
+        '});',
+        '',
+      ].join('\n'),
+    );
+    const mechanicalAnalysis = analyzeTestFile(dir, mechanicalPath);
+    expect(mechanicalAnalysis.features).toEqual([]);
+    expect(mechanicalAnalysis.migrationType).toBe('EASY_MECHANICAL');
+    expect(mechanicalAnalysis.state).toBe('CODEMOD_READY');
+
+    // Standard already-migrated Bun test
+    const nativePath = 'standard-native.spec.ts';
+    writeFileSync(
+      join(dir, nativePath),
+      [
+        "import { describe, expect, it } from 'bun:test';",
+        "describe('standard native test', () => {",
+        "  it('runs native bun test assertions', () => {",
+        "    expect('hello'.length).toBe(5);",
+        '  });',
+        '});',
+        '',
+      ].join('\n'),
+    );
+    const nativeAnalysis = analyzeTestFile(dir, nativePath);
+    expect(nativeAnalysis.features).toEqual([]);
+    expect(nativeAnalysis.migrationType).toBe('ALREADY_MIGRATED');
+    expect(nativeAnalysis.state).toBe('MIGRATED');
+  });
 });
 
 // ── Contract 5: AGY lane ownership enforcement and zero Codex/Claude calls ──

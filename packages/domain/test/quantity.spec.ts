@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'bun:test';
 import {
   ErrorCode,
   ForesiftError,
@@ -17,16 +17,16 @@ const dec = (s: string): DecimalString => s as DecimalString;
 
 describe('raw-integer quantity policy (FR-DATA-001 §11.5)', () => {
   it('converts human decimal strings to raw amounts exactly', () => {
-    expect(tokenQuantityToRaw('1.5', 18)).toBe(1500000000000000000n);
-    expect(tokenQuantityToRaw('150', 6)).toBe(150000000n);
-    expect(tokenQuantityToRaw('0.000001', 6)).toBe(1n);
-    expect(tokenQuantityToRaw('7', 0)).toBe(7n);
+    expect(tokenQuantityToRaw('1.5', 18) as bigint).toBe(1500000000000000000n);
+    expect(tokenQuantityToRaw('150', 6) as bigint).toBe(150000000n);
+    expect(tokenQuantityToRaw('0.000001', 6) as bigint).toBe(1n);
+    expect(tokenQuantityToRaw('7', 0) as bigint).toBe(7n);
   });
 
   it('renders raw amounts back to exact decimal strings', () => {
-    expect(rawToTokenQuantity(1500000000000000000n, 18)).toBe('1.500000000000000000');
-    expect(rawToTokenQuantity(1n, 6)).toBe('0.000001');
-    expect(rawToTokenQuantity(42n, 0)).toBe('42');
+    expect(rawToTokenQuantity(1500000000000000000n, 18) as string).toBe('1.500000000000000000');
+    expect(rawToTokenQuantity(1n, 6) as string).toBe('0.000001');
+    expect(rawToTokenQuantity(42n, 0) as string).toBe('42');
   });
 
   it('roundtrips losslessly across arbitrary decimals', () => {
@@ -40,8 +40,8 @@ describe('raw-integer quantity policy (FR-DATA-001 §11.5)', () => {
         expect(rendered).toBe(expected);
       }
     }
-    expect(tokenQuantityToRaw('7', 0)).toBe(7n);
-    expect(rawToTokenQuantity(7n, 0)).toBe('7');
+    expect(tokenQuantityToRaw('7', 0) as bigint).toBe(7n);
+    expect(rawToTokenQuantity(7n, 0) as string).toBe('7');
   });
 
   it('refuses precision beyond token decimals instead of truncating', () => {
@@ -64,8 +64,8 @@ describe('raw-integer quantity policy (FR-DATA-001 §11.5)', () => {
   it('accepts pure decimal digit strings and nothing else for rawAmount strings', () => {
     // Raw BigInt() would also admit hex/binary/octal prefixes, a leading '+',
     // and surrounding whitespace; a §11.5 raw amount is decimal digits only.
-    expect(rawAmount('42')).toBe(42n);
-    expect(rawAmount('007')).toBe(7n);
+    expect(rawAmount('42') as bigint).toBe(42n);
+    expect(rawAmount('007') as bigint).toBe(7n);
     expect(() => rawAmount('0x10')).toThrowError(ForesiftError);
     expect(() => rawAmount('0b101')).toThrowError(ForesiftError);
     expect(() => rawAmount('0o17')).toThrowError(ForesiftError);
@@ -86,11 +86,11 @@ describe('raw-integer quantity policy (FR-DATA-001 §11.5)', () => {
   });
 
   it('sums and multiplies decimal strings exactly (no float drift)', () => {
-    expect(sumRaw([rawAmount(1n), rawAmount(2n), rawAmount(3000000n)])).toBe(3000003n);
-    expect(multiplyDecimalStrings(dec('0.1'), dec('0.2'), 2)).toBe('0.02');
+    expect(sumRaw([rawAmount(1n), rawAmount(2n), rawAmount(3000000n)]) as bigint).toBe(3000003n);
+    expect(multiplyDecimalStrings(dec('0.1'), dec('0.2'), 2) as string).toBe('0.02');
     const a = renderDecimalString(1n, 1);
     const b = renderDecimalString(2n, 1);
-    expect(multiplyDecimalStrings(a, b, 2)).toBe('0.02');
+    expect(multiplyDecimalStrings(a, b, 2) as string).toBe('0.02');
     expect(compareDecimalStrings(dec('1.5'), dec('1.45'))).toBe(1);
     expect(compareDecimalStrings(dec('1.50'), dec('1.5'))).toBe(0);
     expect(compareDecimalStrings(dec('0.0009'), dec('0.001'))).toBe(-1);
@@ -106,10 +106,10 @@ describe('raw-integer quantity policy (FR-DATA-001 §11.5)', () => {
     // price × size at declared scale: the dropped digits must be TRUNCATED
     // toward zero (1705/10 → 170), never rounded — a refactor to rounding
     // would silently re-scale every USD computation while staying green.
-    expect(multiplyDecimalStrings(dec('1.55'), dec('1.1'), 2)).toBe('1.70');
-    expect(multiplyDecimalStrings(dec('0.999'), dec('0.001'), 2)).toBe('0.00');
+    expect(multiplyDecimalStrings(dec('1.55'), dec('1.1'), 2) as string).toBe('1.70');
+    expect(multiplyDecimalStrings(dec('0.999'), dec('0.001'), 2) as string).toBe('0.00');
     // Output scale above total input scale pads with zeros instead.
-    expect(multiplyDecimalStrings(dec('1.5'), dec('2'), 4)).toBe('3.0000');
+    expect(multiplyDecimalStrings(dec('1.5'), dec('2'), 4) as string).toBe('3.0000');
     // The truncation convention is parse-refuse-compatible: rendered output
     // always parses back losslessly at its own scale.
     const out = multiplyDecimalStrings(dec('1.55'), dec('1.1'), 2);
@@ -119,8 +119,8 @@ describe('raw-integer quantity policy (FR-DATA-001 §11.5)', () => {
   it('renders negative units with a sign and refuses to parse them back', () => {
     // Rendering supports signed units (internal deltas); parsing stays
     // unsigned-canonical — quantities in storage are never negative.
-    expect(renderDecimalString(-1500n, 2)).toBe('-15.00');
-    expect(renderDecimalString(-7n, 0)).toBe('-7');
+    expect(renderDecimalString(-1500n, 2) as string).toBe('-15.00');
+    expect(renderDecimalString(-7n, 0) as string).toBe('-7');
     expect(() => parseDecimalString('-15.00')).toThrowError(ForesiftError);
   });
 });

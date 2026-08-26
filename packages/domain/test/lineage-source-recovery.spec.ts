@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'bun:test';
 import {
   ErrorCode,
   ForesiftError,
@@ -222,16 +222,16 @@ describe('recovery tiers (FR-DR-001)', () => {
 describe('clock port', () => {
   it('fixed and scripted clocks are deterministic', () => {
     const c = fixedClock(at('2026-03-04T05:06:07Z'));
-    expect(c.now()).toBe('2026-03-04T05:06:07Z');
+    expect(c.now() as string).toBe('2026-03-04T05:06:07Z');
     expect(c.nowEpochMs()).toBe(Date.parse('2026-03-04T05:06:07Z'));
 
     const tl = ['2026-01-01T00:00:00Z', '2026-01-01T00:10:00Z', '2026-01-01T00:25:00Z'].map(at);
     const s = scriptedClock(tl);
-    expect(s.clock.now()).toBe(tl[0]);
+    expect(s.clock.now()).toBe(tl[0]!);
     s.advance();
-    expect(s.clock.now()).toBe(tl[1]);
+    expect(s.clock.now()).toBe(tl[1]!);
     s.advance();
     s.advance();
-    expect(s.clock.now()).toBe(tl[2]); // clamps to last entry
+    expect(s.clock.now()).toBe(tl[2]!); // clamps to last entry
   });
 });

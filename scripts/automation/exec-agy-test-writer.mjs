@@ -22,11 +22,24 @@ function git(args, cwd) {
 }
 
 export function runAgyTestWriter(input) {
-  for (const field of ['lane', 'brief', 'worktree', 'results-dir'])
+  for (const field of ['lane', 'brief', 'worktree', 'routing', 'results-dir'])
     if (!input[field]) throw new Error(`AGY_TEST_ARGUMENT_MISSING: ${field}`);
   if (!existsSync(input.brief)) throw new Error(`AGY_TEST_BRIEF_MISSING: ${input.brief}`);
+  if (!existsSync(input.routing)) throw new Error(`AGY_TEST_ROUTING_MISSING: ${input.routing}`);
+  const routing = JSON.parse(readFileSync(input.routing, 'utf8'));
+  const route = routing.lanes?.find(
+    (candidate) => candidate.lane === input.lane && candidate.role === 'test',
+  );
+  if (route?.engine !== 'AGY') throw new Error(`AGY_TEST_ROUTE_INVALID: ${input.lane}`);
+  for (const field of ['model', 'reasoning', 'providerTimeout'])
+    if (typeof route[field] !== 'string' || !route[field])
+      throw new Error(`AGY_TEST_ROUTE_INVALID: ${input.lane}.${field}`);
   const resultDir = input['results-dir'];
   mkdirSync(resultDir, { recursive: true });
+  const baseHead = git(['rev-parse', 'HEAD'], input.worktree).stdout.trim();
+  const allowedPaths = input['allowed-paths']
+    ? new Set(JSON.parse(readFileSync(input['allowed-paths'], 'utf8')))
+    : null;
   const prompt = [
     readFileSync(input.brief, 'utf8'),
     '',
@@ -40,17 +53,28 @@ export function runAgyTestWriter(input) {
   ].join('\n');
   const ndjson = `${JSON.stringify({ event: 'user', message: { role: 'user', content: prompt } })}\n`;
   const started = Date.now();
-  const run = spawnSync(
-    'agy --input-format stream-json --output-format stream-json --disable-slash-commands --dangerously-skip-permissions',
-    {
-      shell: true,
-      cwd: input.worktree,
-      input: ndjson,
-      encoding: 'utf8',
-      timeout: Number(input['timeout-ms'] ?? 45 * 60_000),
-      maxBuffer: 64 * 1024 * 1024,
-    },
-  );
+  const agyArgs = [
+    '--input-format',
+    'stream-json',
+    '--output-format',
+    'stream-json',
+    '--disable-slash-commands',
+    '--dangerously-skip-permissions',
+    '--model',
+    route.model,
+    '--effort',
+    route.reasoning,
+    '--print-timeout',
+    route.providerTimeout,
+  ];
+  const run = spawnSync('agy', agyArgs, {
+    shell: false,
+    cwd: input.worktree,
+    input: ndjson,
+    encoding: 'utf8',
+    timeout: Number(input['timeout-ms'] ?? 45 * 60_000),
+    maxBuffer: 64 * 1024 * 1024,
+  });
   writeFileSync(join(resultDir, 'agy-run.jsonl'), run.stdout ?? '');
   if (run.error) throw new Error(`AGY_TEST_SPAWN_FAILED: ${run.error.message}`);
   if (run.status !== 0) throw new Error(`AGY_TEST_FAILED: ${(run.stderr ?? '').slice(-500)}`);
@@ -77,9 +101,6 @@ export function runAgyTestWriter(input) {
     .stdout.split('\n')
     .filter(Boolean)
     .map((line) => line.slice(3).split(' -> ').at(-1));
-  const ownership = validateLaneOwnership({ engine: 'AGY', role: 'test', changedPaths: dirty });
-  if (!ownership.ok)
-    throw new Error(`${ownership.violationCode}: ${ownership.violatingPaths.join(',')}`);
   if (dirty.length) {
     git(['add', '--all'], input.worktree);
     const commit = git(
@@ -97,14 +118,28 @@ export function runAgyTestWriter(input) {
     if (commit.status !== 0) throw new Error(`AGY_TEST_COMMIT_FAILED: ${commit.stderr}`);
   }
   const head = git(['rev-parse', 'HEAD'], input.worktree).stdout.trim();
+  const changedPaths = git(['diff', '--name-only', `${baseHead}..${head}`], input.worktree)
+    .stdout.split('\n')
+    .filter(Boolean);
+  const ownership = validateLaneOwnership({ engine: 'AGY', role: 'test', changedPaths });
+  if (!ownership.ok)
+    throw new Error(`${ownership.violationCode}: ${ownership.violatingPaths.join(',')}`);
+  const outside = allowedPaths ? changedPaths.filter((path) => !allowedPaths.has(path)) : [];
+  if (outside.length) throw new Error(`AGY_TEST_SCOPE_VIOLATION: ${outside.join(',')}`);
   const result = {
     schema: 'foresift/writer-result@1',
     shardId: input.lane,
     role: 'test',
     engine: 'AGY',
+    model: route.model,
+    reasoning: route.reasoning,
+    providerTimeout: route.providerTimeout,
+    baseHead,
     completed: (input['task-ids'] ?? '').split(',').filter(Boolean),
     branch: git(['branch', '--show-current'], input.worktree).stdout.trim(),
     headSha: head,
+    changedPaths,
+    ownership,
     testsRun: Array.isArray(agentResult.testsRun) ? agentResult.testsRun : [],
     testResults: agentResult.testResults ?? 'unknown',
     baselineClassifications: agentResult.baselineClassifications,
@@ -119,6 +154,9 @@ export function runAgyTestWriter(input) {
         lane: input.lane,
         engine: 'AGY',
         role: 'test',
+        model: route.model,
+        reasoning: route.reasoning,
+        providerTimeout: route.providerTimeout,
         wallTimeMs: Date.now() - started,
         outcome: 'SUCCESS',
       },

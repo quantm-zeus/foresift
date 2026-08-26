@@ -237,6 +237,7 @@ nodes:
       node scripts/automation/exec-agy-test-writer.mjs --lane test-author \
         --brief "$ARTIFACTS_DIR/briefs/test-author-brief.md" \
         --worktree "$ARTIFACTS_DIR/wt/test-author" \
+        --routing "$ARTIFACTS_DIR/routing.json" \
         --results-dir "$ARTIFACTS_DIR/writer-results/test-author" \
         --task-ids "$TASKS"
 

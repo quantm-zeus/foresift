@@ -1,38 +1,57 @@
-// REAL end-to-end RED gate execution (integration tier). Package gates are
+// REAL end-to-end RED gate execution (integration tier) inside a hermetic
+// fixture repository with bounded synthetic commands. Package gates are
 // deterministically RED while any manifest-declared verification target is
 // still absent, proving the manifest writer's failure direction,
-// failedCategories, first-failing-check semantics, and attestation-on-PASS-
-// only — all against reality. Which command fails is derived from the same
-// version-controlled metadata the gate itself reads, so the deterministic red
-// advances down the declared list as G0 packages land instead of being pinned
-// to one repo snapshot.
+// failedCategories, first-failing-check semantics, and attestation-on-PASS-only.
 import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { afterAll, describe, expect } from 'vitest';
+import { afterAll, describe, expect, it } from 'bun:test';
 import {
   GATE_RESULT_FILE,
   parseFullGateResult,
 } from '../../scripts/automation/package-full-gate.mjs';
-import {
-  GATE_E2E_NESTED,
-  REPO,
-  SCRIPTS,
-  itE2e,
-  makeScratch,
-  tryNode,
-} from '../helpers/v2-fixtures.js';
+import { disposeGitFixtureBase, gitFixture } from '../helpers/git-fixture.js';
+import { GATE_E2E_NESTED, REPO, SCRIPTS, makeScratch, tryNode } from '../helpers/v2-fixtures.js';
+
+const itE2e = (name: string, fn: () => void, timeout?: number) => {
+  if (process.env[GATE_E2E_NESTED] === '1') return it.skip(name, fn, timeout);
+  it(name, fn, timeout);
+};
 
 const { art, cleanup } = makeScratch('foresift-v2-c2-red-');
-afterAll(cleanup);
+afterAll(() => {
+  cleanup();
+  disposeGitFixtureBase();
+});
 
 describe('V2 structured gate manifest — REAL red package gate (spec §9)', () => {
-  // itE2e (not it): the red gate runs its TESTS category (a full `pnpm test`)
-  // BEFORE failing at PACKAGE, so an unguarded execution inside a nested gate
-  // suite would re-spawn gates without bound (fork-bomb, observed 2026-08-23).
   itE2e(
     'RED path: package gate fails at its package checks with a structured manifest and NO attestation',
     () => {
       const dir = art('gate-red');
+      const fx = gitFixture('hermetic-gate-red');
+      fx.writeFile(
+        'package.json',
+        JSON.stringify({
+          name: 'foresift-hermetic-red-gate',
+          private: true,
+          scripts: {
+            'spec:verify': 'node -e "process.exit(0)"',
+            'format:check': 'node -e "process.exit(0)"',
+            lint: 'node -e "process.exit(0)"',
+            typecheck: 'node -e "process.exit(0)"',
+            test: 'node -e "process.exit(0)"',
+          },
+        }),
+      );
+      fx.writeFile('pnpm-workspace.yaml', "packages:\n  - 'packages/*'\n");
+      fx.writeFile(
+        'packages/domain/package.json',
+        JSON.stringify({
+          name: '@foresift/domain',
+          scripts: { test: 'node -e "process.exit(0)"' },
+        }),
+      );
       const r = tryNode(
         [
           join(SCRIPTS, 'foresift-gate.mjs'),
@@ -41,21 +60,19 @@ describe('V2 structured gate manifest — REAL red package gate (spec §9)', () 
           '--result-file',
           join(dir, GATE_RESULT_FILE),
         ],
-        { env: { ...process.env, [GATE_E2E_NESTED]: '1' } },
+        {
+          cwd: fx.root,
+          env: {
+            ...process.env,
+            FORESIFT_ALLOW_HERMETIC_NESTED_FULL: '1',
+          },
+        },
       );
       expect(r.status).not.toBe(0);
       const m = parseFullGateResult(readFileSync(join(dir, GATE_RESULT_FILE), 'utf8'));
       expect(m?.passed).toBe(false);
       expect(m?.exitCode).toBe(r.status);
       expect(m?.failedCategories).toEqual(['PACKAGE']);
-      // Gate stops at the FIRST failing package check. The gate derives its
-      // commands from specs/implementation/current-milestone.json, so the
-      // expectation does too: the FAIL row must be a declared g0-tool-core
-      // command, and every DECLARED command before it must have had a
-      // satisfied `test -d` target (absent targets fail deterministically, so
-      // a satisfied predecessor proves the stop was at the first unsatisfied
-      // check — originally packages/domain; since generation-0 landed it is
-      // real and green and the red advanced to packages/tool-core).
       const pkgRow = m?.checks.find((c) => c.status === 'FAIL');
       expect(pkgRow?.category).toBe('PACKAGE');
       const msMeta = JSON.parse(
@@ -67,20 +84,55 @@ describe('V2 structured gate manifest — REAL red package gate (spec §9)', () 
       expect(stopIdx).toBeGreaterThanOrEqual(0);
       for (const prior of declared.slice(0, stopIdx)) {
         const target = /^test -d (\S+) &&/.exec(prior)?.[1];
-        expect(target != null && existsSync(join(REPO, target))).toBe(true);
+        expect(target != null && existsSync(join(fx.root, target))).toBe(true);
       }
-      // Every pre-package stage ran green before the deterministic red.
       for (const c of m?.checks ?? []) {
         if (c.category !== 'PACKAGE') expect(c.status).toBe('PASS');
       }
       expect(existsSync(join(dir, 'full-gate-attestation.json'))).toBe(false);
     },
-    // Budget is load headroom, not scope: the TESTS category here is a FULL
-    // nested `pnpm test`, so the cost tracks suite growth, not the gate
-    // (≈150s at C2.5; ≈590s best-case and >600s under contention by
-    // 2026-08-26 — live false RED by timeout during run b101f6c3's post-fix
-    // reproduction). Still overlaps the green-gate file by design. A hang
-    // still fails.
-    1_800_000,
+    30_000,
   );
+
+  it('structural nested-full block in foresift-gate.mjs refuses unflagged nested full test executions', () => {
+    const dir = art('gate-nested-block');
+    const fx = gitFixture('hermetic-gate-nested-block');
+    fx.writeFile(
+      'package.json',
+      JSON.stringify({
+        name: 'foresift-hermetic-nested-block',
+        private: true,
+        scripts: {
+          'spec:verify': 'node -e "process.exit(0)"',
+          'format:check': 'node -e "process.exit(0)"',
+          lint: 'node -e "process.exit(0)"',
+          typecheck: 'node -e "process.exit(0)"',
+          test: 'node -e "process.exit(0)"',
+        },
+      }),
+    );
+    const r = tryNode(
+      [
+        join(SCRIPTS, 'foresift-gate.mjs'),
+        '--milestone',
+        '--result-file',
+        join(dir, GATE_RESULT_FILE),
+      ],
+      {
+        cwd: fx.root,
+        env: {
+          ...process.env,
+          FORESIFT_ALLOW_HERMETIC_NESTED_FULL: '0',
+          FORESIFT_TEST_AUTHORITY: '1',
+        },
+      },
+    );
+    expect(r.status).toBe(86);
+    const m = parseFullGateResult(readFileSync(join(dir, GATE_RESULT_FILE), 'utf8'));
+    expect(m?.passed).toBe(false);
+    expect(m?.exitCode).toBe(86);
+    expect(m?.failedCategories).toEqual(['TESTS']);
+    const testCheck = m?.checks.find((c) => c.category === 'TESTS');
+    expect(testCheck?.status).toBe('FAIL');
+  }, 30_000);
 });

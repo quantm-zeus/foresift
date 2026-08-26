@@ -1,0 +1,25 @@
+{
+  "schema": "foresift/test-runtime-baseline@1",
+  "recordedAt": "2026-08-26T17:24:01.000Z",
+  "runner": "vitest",
+  "runnerVersion": "4.1.11",
+  "nodeVersion": "24.19.0",
+  "testFiles": 196,
+  "tests": 1565,
+  "passedFiles": 196,
+  "passedTests": 1565,
+  "failedFiles": 0,
+  "failedTests": 0,
+  "wallTimeSeconds": 871.34,
+  "peakRssMeasurement": {
+    "kind": "observed-child-process-sum",
+    "bytesApprox": 5277343744,
+    "detail": "Two recursive FULL-gate Vitest children were observed concurrently at 2690456 KiB and 2343216 KiB RSS; repository memory use reached approximately 6.5 GiB. This is a conservative process-sum, not whole-tree peak metering."
+  },
+  "cpuMeasurement": {
+    "kind": "observed",
+    "detail": "Both recursive Vitest children sustained approximately 58-68% CPU concurrently while the outer suite remained resident. Exact process-tree CPU time was not available from the original invocation."
+  },
+  "nestedFullExecutions": 2,
+  "command": "pnpm spec:verify && pnpm format:check && pnpm lint && pnpm typecheck && pnpm vitest run --maxWorkers=2"
+}

@@ -11,7 +11,9 @@ const REPO_ROOT = join(fileURLToPath(new URL('../..', import.meta.url)));
 // Dynamic imports allow Vitest to execute each Matrix case individually,
 // failing cleanly with module resolution errors until the production files are landed.
 async function loadExecutionProfileModule() {
-  return await import('../../scripts/automation/execution-profile.mjs');
+  return (await import('../../scripts/automation/execution-profile.mjs')) as typeof import('../../scripts/automation/execution-profile.mjs') & {
+    EXECUTION_POLICY: Record<string, unknown>;
+  };
 }
 
 async function loadCodexRoutingModule() {
@@ -24,6 +26,11 @@ async function loadPathOwnershipModule() {
 
 async function loadMaintainerIncidentModule() {
   return await import('../../scripts/automation/maintainer-incident.mjs');
+}
+
+async function loadAgyTestWriterModule() {
+  // @ts-expect-error untyped dynamic import for module concurrently authored in codex lane
+  return await import('../../scripts/automation/exec-agy-test-writer.mjs');
 }
 
 let tempDirs: string[] = [];
@@ -45,7 +52,7 @@ afterEach(() => {
   tempDirs = [];
 });
 
-describe('Foresift V4 CODEX_AGY execution profile test matrix (A through AD)', () => {
+describe('Foresift V4 CODEX_AGY execution profile test matrix (A through AH)', () => {
   // ── Section 1: Execution Profile (Matrix A - I) ──────────────────────────────
 
   describe('Matrix A: Default execution profile', () => {
@@ -858,6 +865,12 @@ describe('Foresift V4 CODEX_AGY execution profile test matrix (A through AD)', (
       expect(content).toContain('fast-repair-loop');
       expect(content).toContain('fast-repair');
       expect(content).toContain('fast-recheck');
+
+      // 6. AGY test author receives persisted routing artifact
+      const agyNode = content.match(/- id: writer-test-author-agy[\s\S]*?(?=\n  - id:)/);
+      expect(agyNode).toBeTruthy();
+      expect(agyNode?.[0]).toContain('exec-agy-test-writer.mjs --lane test-author');
+      expect(agyNode?.[0]).toContain('--routing "$ARTIFACTS_DIR/routing.json"');
     });
   });
 
@@ -908,6 +921,792 @@ describe('Foresift V4 CODEX_AGY execution profile test matrix (A through AD)', (
         }
       } catch {
         // Module might not be landed yet
+      }
+    });
+  });
+
+  // ── Section 7: AGY Gemini Test Routing, Identity & Executor (Matrix AE - AH) ──
+
+  describe('Matrix AE: Version-controlled AGY Gemini routing policy and configuration', () => {
+    it('pins AGY test model to gemini-3.7-flash-high, effort to high, timeout to 40m, and policy version', async () => {
+      const configPath = join(REPO_ROOT, 'config/foresift-execution.json');
+      expect(existsSync(configPath)).toBe(true);
+      const rawConfig = JSON.parse(readFileSync(configPath, 'utf8'));
+
+      expect(rawConfig.agyTestModel).toBe('gemini-3.7-flash-high');
+      expect(rawConfig.agyTestEffort).toBe('high');
+      expect(rawConfig.agyPrintTimeout).toBe('40m');
+      expect(rawConfig.routingPolicyVersion).toBe('codex-sol-luna-terra-agy-gemini@2');
+      expect(rawConfig.maxAgyTestWriters).toBe(1);
+
+      const mod = await loadExecutionProfileModule();
+      expect(mod.EXECUTION_POLICY.agyTestModel).toBe('gemini-3.7-flash-high');
+      expect(mod.EXECUTION_POLICY.agyTestEffort).toBe('high');
+      expect(mod.EXECUTION_POLICY.agyPrintTimeout).toBe('40m');
+      expect(mod.EXECUTION_POLICY.routingPolicyVersion).toBe('codex-sol-luna-terra-agy-gemini@2');
+      expect(mod.EXECUTION_POLICY.maxAgyTestWriters).toBe(1);
+    });
+
+    it('buildWaveRouting persists pinned AGY facts on AGY test lanes for CODEX_AGY profile', async () => {
+      const mod = await loadCodexRoutingModule();
+      const graph = {
+        package: { risk: 'MEDIUM' },
+        shards: [{ id: 'core', units: ['T101', 'T102'] }],
+        units: [
+          { id: 'T101', body: 'setup', predictedWrites: ['packages/x/src/base.ts'] },
+          { id: 'T102', body: 'feature', predictedWrites: ['packages/x/src/alpha.ts'] },
+          { id: 'T103', body: 'spec', predictedWrites: ['tests/x/a.spec.ts'] },
+        ],
+        testLanes: [{ id: 'test-author', units: ['T103'] }],
+      };
+
+      const routing = mod.buildWaveRouting(graph, 'CODEX_AGY');
+      expect(routing.schema).toBe('foresift/wave-routing@1');
+      expect(routing.routingPolicyVersion).toBe('codex-sol-luna-terra-agy-gemini@2');
+      expect(routing.executionProfile).toBe('CODEX_AGY');
+      expect(routing.implementationEngine).toBe('CODEX');
+      expect(routing.testEngine).toBe('AGY');
+
+      const testLane = routing.lanes.find((l: { lane: string }) => l.lane === 'test-author');
+      expect(testLane).toBeDefined();
+      expect(testLane).toEqual({
+        lane: 'test-author',
+        role: 'test',
+        taskIds: ['T103'],
+        engine: 'AGY',
+        complexityTier: null,
+        model: 'gemini-3.7-flash-high',
+        reasoning: 'high',
+        providerTimeout: '40m',
+        serviceTier: null,
+      });
+    });
+
+    it('buildWaveRouting persists pinned AGY facts on AGY test lanes for CLAUDE_AGY profile', async () => {
+      const mod = await loadCodexRoutingModule();
+      const graph = {
+        package: { risk: 'LOW' },
+        shards: [{ id: 'shard-1', units: ['T201'] }],
+        units: [
+          { id: 'T201', body: 'feature', predictedWrites: ['packages/y/src/b.ts'] },
+          { id: 'T202', body: 'test', predictedWrites: ['tests/y/b.spec.ts'] },
+        ],
+        testLanes: [{ id: 'test-author', units: ['T202'] }],
+      };
+
+      const routing = mod.buildWaveRouting(graph, 'CLAUDE_AGY');
+      expect(routing.executionProfile).toBe('CLAUDE_AGY');
+      expect(routing.implementationEngine).toBe('CLAUDE');
+      expect(routing.testEngine).toBe('AGY');
+
+      const testLane = routing.lanes.find((l: { lane: string }) => l.lane === 'test-author');
+      expect(testLane).toBeDefined();
+      expect(testLane.engine).toBe('AGY');
+      expect(testLane.role).toBe('test');
+      expect(testLane.model).toBe('gemini-3.7-flash-high');
+      expect(testLane.reasoning).toBe('high');
+      expect(testLane.providerTimeout).toBe('40m');
+    });
+
+    it('codex-routing CLI --build-wave persists AGY facts in routing artifact', async () => {
+      const dir = makeTempDir('codex-routing-cli-');
+      const graphFile = join(dir, 'graph.json');
+      const outFile = join(dir, 'routing.json');
+
+      const graph = {
+        package: { risk: 'HIGH' },
+        shards: [{ id: 'core', units: ['T1'] }],
+        units: [{ id: 'T1' }, { id: 'T2' }],
+        testLanes: [{ id: 'test-author', units: ['T2'] }],
+      };
+      writeFileSync(graphFile, JSON.stringify(graph, null, 2));
+
+      execFileSync(
+        process.execPath,
+        [
+          join(REPO_ROOT, 'scripts/automation/codex-routing.mjs'),
+          '--build-wave',
+          '--graph',
+          graphFile,
+          '--profile',
+          'CLAUDE_AGY',
+          '--out',
+          outFile,
+        ],
+        { encoding: 'utf8' },
+      );
+
+      expect(existsSync(outFile)).toBe(true);
+      const written = JSON.parse(readFileSync(outFile, 'utf8'));
+      const testLane = written.lanes.find((l: { lane: string }) => l.lane === 'test-author');
+      expect(testLane.model).toBe('gemini-3.7-flash-high');
+      expect(testLane.reasoning).toBe('high');
+      expect(testLane.providerTimeout).toBe('40m');
+      expect(testLane.engine).toBe('AGY');
+    });
+  });
+
+  describe('Matrix AF: Execution identity preserves AGY facts and rejects missing routing facts', () => {
+    it('preserves model, reasoning, and providerTimeout for AGY test lane in execution identity', async () => {
+      const mod = await loadExecutionProfileModule();
+      const identity = mod.createExecutionIdentity({
+        packageId: 'g0-provider-lifecycle',
+        generation: 1,
+        workflow: 'foresift-sharded-wave',
+        executionProfile: 'CODEX_AGY',
+        baseHead: 'cd00ce3cf5ce95e9d2eec928d7cae5d1409406a0',
+        lanes: [
+          {
+            lane: 'core',
+            role: 'implementation',
+            taskIds: ['T101'],
+            engine: 'CODEX',
+            model: 'gpt-5.6-sol',
+            reasoning: 'high',
+            serviceTier: 'standard',
+          },
+          {
+            lane: 'test-author',
+            role: 'test',
+            taskIds: ['T102'],
+            engine: 'AGY',
+            model: 'gemini-3.7-flash-high',
+            reasoning: 'high',
+            providerTimeout: '40m',
+          },
+        ],
+      });
+
+      expect(identity.executionProfile).toBe('CODEX_AGY');
+      expect(identity.implementationEngine).toBe('CODEX');
+      expect(identity.testEngine).toBe('AGY');
+
+      const agyLane = identity.lanes.find((l: { lane: string }) => l.lane === 'test-author');
+      expect(agyLane).toBeDefined();
+      expect(agyLane.model).toBe('gemini-3.7-flash-high');
+      expect(agyLane.reasoning).toBe('high');
+      expect(agyLane.providerTimeout).toBe('40m');
+      expect(agyLane.engine).toBe('AGY');
+      expect(agyLane.role).toBe('test');
+    });
+
+    it('fails closed when AGY lane is missing model, reasoning, or providerTimeout', async () => {
+      const mod = await loadExecutionProfileModule();
+      const baseInput = {
+        packageId: 'g0-provider-lifecycle',
+        generation: 1,
+        workflow: 'foresift-sharded-wave',
+        executionProfile: 'CODEX_AGY',
+        baseHead: 'cd00ce3cf5ce95e9d2eec928d7cae5d1409406a0',
+      };
+
+      // Missing or invalid model
+      for (const badModel of [undefined, null, '', 123, false]) {
+        expect(() =>
+          mod.createExecutionIdentity({
+            ...baseInput,
+            lanes: [
+              {
+                lane: 'test-author',
+                role: 'test',
+                taskIds: ['T1'],
+                engine: 'AGY',
+                model: badModel,
+                reasoning: 'high',
+                providerTimeout: '40m',
+              },
+            ],
+          }),
+        ).toThrow(/INVALID_AGY_ROUTE.*model/);
+      }
+
+      // Missing or invalid reasoning
+      for (const badReasoning of [undefined, null, '', 456, false]) {
+        expect(() =>
+          mod.createExecutionIdentity({
+            ...baseInput,
+            lanes: [
+              {
+                lane: 'test-author',
+                role: 'test',
+                taskIds: ['T1'],
+                engine: 'AGY',
+                model: 'gemini-3.7-flash-high',
+                reasoning: badReasoning,
+                providerTimeout: '40m',
+              },
+            ],
+          }),
+        ).toThrow(/INVALID_AGY_ROUTE.*reasoning/);
+      }
+
+      // Missing or invalid providerTimeout
+      for (const badTimeout of [undefined, null, '', 789, false]) {
+        expect(() =>
+          mod.createExecutionIdentity({
+            ...baseInput,
+            lanes: [
+              {
+                lane: 'test-author',
+                role: 'test',
+                taskIds: ['T1'],
+                engine: 'AGY',
+                model: 'gemini-3.7-flash-high',
+                reasoning: 'high',
+                providerTimeout: badTimeout,
+              },
+            ],
+          }),
+        ).toThrow(/INVALID_AGY_ROUTE.*providerTimeout/);
+      }
+    });
+
+    it('persists and loads AGY execution identity and forbids mutation of persisted AGY facts', async () => {
+      const mod = await loadExecutionProfileModule();
+      const dir = makeTempDir('identity-agy-');
+      const identityFile = join(dir, 'execution-identity.json');
+
+      const original = mod.createExecutionIdentity({
+        packageId: 'g0-provider-lifecycle',
+        generation: 1,
+        workflow: 'foresift-sharded-wave',
+        executionProfile: 'CODEX_AGY',
+        baseHead: 'cd00ce3cf5ce95e9d2eec928d7cae5d1409406a0',
+        lanes: [
+          {
+            lane: 'core',
+            role: 'implementation',
+            taskIds: ['T1'],
+            engine: 'CODEX',
+            model: 'gpt-5.6-sol',
+            reasoning: 'high',
+            serviceTier: 'standard',
+          },
+          {
+            lane: 'test-author',
+            role: 'test',
+            taskIds: ['T2'],
+            engine: 'AGY',
+            model: 'gemini-3.7-flash-high',
+            reasoning: 'high',
+            providerTimeout: '40m',
+          },
+        ],
+      });
+
+      mod.persistExecutionIdentity(identityFile, original);
+      expect(existsSync(identityFile)).toBe(true);
+
+      const loaded = mod.loadExecutionIdentity(identityFile);
+      const agyLane = loaded.lanes.find((l: { lane: string }) => l.lane === 'test-author');
+      expect(agyLane.model).toBe('gemini-3.7-flash-high');
+      expect(agyLane.reasoning).toBe('high');
+      expect(agyLane.providerTimeout).toBe('40m');
+
+      // Attempt mutation of model on persisted identity
+      const mutatedModel = {
+        ...original,
+        lanes: original.lanes.map((l: { lane: string; model: string }) =>
+          l.lane === 'test-author' ? { ...l, model: 'gemini-2.5-pro' } : l,
+        ),
+      };
+      expect(() => mod.persistExecutionIdentity(identityFile, mutatedModel)).toThrow(
+        /EXECUTION_IDENTITY_IMMUTABLE/,
+      );
+
+      // Attempt mutation of providerTimeout on persisted identity
+      const mutatedTimeout = {
+        ...original,
+        lanes: original.lanes.map((l: { lane: string; providerTimeout: string }) =>
+          l.lane === 'test-author' ? { ...l, providerTimeout: '20m' } : l,
+        ),
+      };
+      expect(() => mod.persistExecutionIdentity(identityFile, mutatedTimeout)).toThrow(
+        /EXECUTION_IDENTITY_IMMUTABLE/,
+      );
+    });
+
+    it('CLI execution-profile.mjs --create preserves AGY routing facts', async () => {
+      const dir = makeTempDir('identity-cli-');
+      const routingFile = join(dir, 'routing.json');
+      const identityFile = join(dir, 'identity.json');
+
+      const routing = {
+        schema: 'foresift/wave-routing@1',
+        routingPolicyVersion: 'codex-sol-luna-terra-agy-gemini@2',
+        executionProfile: 'CODEX_AGY',
+        implementationEngine: 'CODEX',
+        testEngine: 'AGY',
+        lanes: [
+          {
+            lane: 'core',
+            role: 'implementation',
+            taskIds: ['T1'],
+            engine: 'CODEX',
+            model: 'gpt-5.6-sol',
+            reasoning: 'high',
+            serviceTier: 'standard',
+          },
+          {
+            lane: 'test-author',
+            role: 'test',
+            taskIds: ['T2'],
+            engine: 'AGY',
+            model: 'gemini-3.7-flash-high',
+            reasoning: 'high',
+            providerTimeout: '40m',
+          },
+        ],
+      };
+      writeFileSync(routingFile, JSON.stringify(routing, null, 2));
+
+      execFileSync(
+        process.execPath,
+        [
+          join(REPO_ROOT, 'scripts/automation/execution-profile.mjs'),
+          '--create',
+          '--routing',
+          routingFile,
+          '--package',
+          'g0-provider-lifecycle',
+          '--generation',
+          '1',
+          '--workflow',
+          'foresift-sharded-wave',
+          '--base-head',
+          'cd00ce3cf5ce95e9d2eec928d7cae5d1409406a0',
+          '--out',
+          identityFile,
+        ],
+        { encoding: 'utf8' },
+      );
+
+      expect(existsSync(identityFile)).toBe(true);
+      const parsed = JSON.parse(readFileSync(identityFile, 'utf8'));
+      const agyLane = parsed.lanes.find((l: { lane: string }) => l.lane === 'test-author');
+      expect(agyLane.model).toBe('gemini-3.7-flash-high');
+      expect(agyLane.reasoning).toBe('high');
+      expect(agyLane.providerTimeout).toBe('40m');
+    });
+  });
+
+  describe('Matrix AG: exec-agy-test-writer routing requirements and deterministic spawn', () => {
+    function setupWriterFixture(
+      options: {
+        exitCode?: number;
+        stdout?: string;
+        stderr?: string;
+        agentResult?: object | null;
+        filesToWrite?: Record<string, string>;
+      } = {},
+    ) {
+      const dir = makeTempDir('agy-writer-fx-');
+      const binDir = join(dir, 'bin');
+      mkdirSync(binDir, { recursive: true });
+      const recordPath = join(dir, 'mock-agy-call.json');
+      const resultsDir = join(dir, 'results');
+
+      const defaultAgentResult =
+        options.agentResult === undefined
+          ? {
+              baselineClassifications: ['REGRESSION_RED'],
+              testsRun: ['tests/x/a.spec.ts'],
+              testResults: 'pass',
+              blockers: [],
+            }
+          : options.agentResult;
+
+      const defaultFiles =
+        options.filesToWrite === undefined
+          ? { 'tests/a.spec.ts': 'test("a", () => {});\n' }
+          : options.filesToWrite;
+
+      const agyScriptContent = `#!/usr/bin/env node
+import { writeFileSync, mkdirSync, readFileSync } from 'node:fs';
+import { join, dirname } from 'node:path';
+
+const stdin = readFileSync(0, 'utf8');
+const args = process.argv.slice(2);
+const cwd = process.cwd();
+
+writeFileSync(${JSON.stringify(recordPath)}, JSON.stringify({
+  argv: args,
+  cwd,
+  stdin,
+  timestamp: Date.now(),
+}, null, 2));
+
+const agentResult = ${JSON.stringify(defaultAgentResult)};
+if (agentResult !== null) {
+  mkdirSync(${JSON.stringify(resultsDir)}, { recursive: true });
+  writeFileSync(join(${JSON.stringify(resultsDir)}, 'agent-result.json'), JSON.stringify(agentResult, null, 2));
+}
+
+const files = ${JSON.stringify(defaultFiles)};
+for (const [relPath, content] of Object.entries(files)) {
+  const full = join(cwd, relPath);
+  mkdirSync(dirname(full), { recursive: true });
+  writeFileSync(full, content);
+}
+
+const stdout = ${JSON.stringify(options.stdout ?? '{"type":"step"}\n{"type":"done"}\n')};
+if (stdout) process.stdout.write(stdout);
+
+const stderr = ${JSON.stringify(options.stderr ?? '')};
+if (stderr) process.stderr.write(stderr);
+
+process.exit(${JSON.stringify(options.exitCode ?? 0)});
+`;
+      const agyPath = join(binDir, 'agy');
+      writeFileSync(agyPath, agyScriptContent, { mode: 0o755 });
+
+      const wt = join(dir, 'wt');
+      mkdirSync(wt, { recursive: true });
+      execFileSync('git', ['init', '-q'], { cwd: wt });
+      execFileSync('git', ['config', 'user.name', 'test-author'], { cwd: wt });
+      execFileSync('git', ['config', 'user.email', 'test@example.com'], { cwd: wt });
+      mkdirSync(join(wt, 'tests'), { recursive: true });
+      writeFileSync(join(wt, 'tests', 'base.spec.ts'), 'test("base", () => {});\n');
+      execFileSync('git', ['add', '.'], { cwd: wt });
+      execFileSync('git', ['commit', '-qm', 'initial base'], { cwd: wt });
+
+      const brief = join(dir, 'brief.md');
+      writeFileSync(brief, '# Test brief\nWrite test AC-201');
+
+      const routingPath = join(dir, 'routing.json');
+      const routing = {
+        schema: 'foresift/wave-routing@1',
+        routingPolicyVersion: 'codex-sol-luna-terra-agy-gemini@2',
+        executionProfile: 'CODEX_AGY',
+        implementationEngine: 'CODEX',
+        testEngine: 'AGY',
+        lanes: [
+          {
+            lane: 'test-author',
+            role: 'test',
+            engine: 'AGY',
+            model: 'gemini-3.7-flash-high',
+            reasoning: 'high',
+            providerTimeout: '40m',
+            taskIds: ['T103'],
+          },
+        ],
+      };
+      writeFileSync(routingPath, JSON.stringify(routing, null, 2));
+
+      return { dir, binDir, wt, brief, routingPath, resultsDir, routing, recordPath };
+    }
+
+    it('fails closed when --routing argument or file is missing or invalid', async () => {
+      const mod = await loadAgyTestWriterModule();
+      const fx = setupWriterFixture();
+
+      // Missing routing argument
+      expect(() =>
+        mod.runAgyTestWriter({
+          lane: 'test-author',
+          brief: fx.brief,
+          worktree: fx.wt,
+          'results-dir': fx.resultsDir,
+        }),
+      ).toThrow(/AGY_TEST_ARGUMENT_MISSING: routing/);
+
+      // Non-existent routing file
+      expect(() =>
+        mod.runAgyTestWriter({
+          lane: 'test-author',
+          brief: fx.brief,
+          worktree: fx.wt,
+          routing: join(fx.dir, 'missing-routing.json'),
+          'results-dir': fx.resultsDir,
+        }),
+      ).toThrow(/AGY_TEST_ROUTING_MISSING/);
+
+      // Route missing for lane
+      const emptyRoutingPath = join(fx.dir, 'empty-routing.json');
+      writeFileSync(emptyRoutingPath, JSON.stringify({ lanes: [] }));
+      expect(() =>
+        mod.runAgyTestWriter({
+          lane: 'test-author',
+          brief: fx.brief,
+          worktree: fx.wt,
+          routing: emptyRoutingPath,
+          'results-dir': fx.resultsDir,
+        }),
+      ).toThrow(/AGY_TEST_ROUTE_INVALID: test-author/);
+
+      // Route has non-AGY engine
+      const codexTestRoutingPath = join(fx.dir, 'codex-routing.json');
+      writeFileSync(
+        codexTestRoutingPath,
+        JSON.stringify({
+          lanes: [{ lane: 'test-author', role: 'test', engine: 'CODEX', model: 'gpt-5.6-sol' }],
+        }),
+      );
+      expect(() =>
+        mod.runAgyTestWriter({
+          lane: 'test-author',
+          brief: fx.brief,
+          worktree: fx.wt,
+          routing: codexTestRoutingPath,
+          'results-dir': fx.resultsDir,
+        }),
+      ).toThrow(/AGY_TEST_ROUTE_INVALID: test-author/);
+
+      // Route missing model, reasoning, or providerTimeout
+      for (const field of ['model', 'reasoning', 'providerTimeout']) {
+        const invalidPath = join(fx.dir, `invalid-${field}.json`);
+        const invalidRoute = {
+          lane: 'test-author',
+          role: 'test',
+          engine: 'AGY',
+          model: 'gemini-3.7-flash-high',
+          reasoning: 'high',
+          providerTimeout: '40m',
+          [field]: undefined,
+        };
+        writeFileSync(invalidPath, JSON.stringify({ lanes: [invalidRoute] }));
+        expect(() =>
+          mod.runAgyTestWriter({
+            lane: 'test-author',
+            brief: fx.brief,
+            worktree: fx.wt,
+            routing: invalidPath,
+            'results-dir': fx.resultsDir,
+          }),
+        ).toThrow(new RegExp(`AGY_TEST_ROUTE_INVALID: test-author\\.${field}`));
+      }
+    });
+
+    it('launches AGY without shell with exact Gemini model, effort, timeout, noninteractive flags and writes telemetry and result', async () => {
+      const mod = await loadAgyTestWriterModule();
+      const fx = setupWriterFixture();
+
+      const gitIdentityKeys = [
+        'GIT_AUTHOR_NAME',
+        'GIT_AUTHOR_EMAIL',
+        'GIT_AUTHOR_DATE',
+        'GIT_COMMITTER_NAME',
+        'GIT_COMMITTER_EMAIL',
+        'GIT_COMMITTER_DATE',
+      ];
+      const savedEnv: Record<string, string | undefined> = {};
+      const allIdentityKeys = new Set([
+        ...gitIdentityKeys,
+        ...Object.keys(process.env).filter(
+          (k) => k.startsWith('GIT_AUTHOR_') || k.startsWith('GIT_COMMITTER_'),
+        ),
+      ]);
+      for (const key of allIdentityKeys) {
+        savedEnv[key] = process.env[key];
+        delete process.env[key];
+      }
+
+      const prevPath = process.env.PATH;
+      try {
+        process.env.PATH = `${fx.binDir}:${prevPath}`;
+
+        const result = mod.runAgyTestWriter({
+          lane: 'test-author',
+          brief: fx.brief,
+          worktree: fx.wt,
+          routing: fx.routingPath,
+          'results-dir': fx.resultsDir,
+          'task-ids': 'T103',
+        });
+
+        expect(existsSync(fx.recordPath)).toBe(true);
+        const record = JSON.parse(readFileSync(fx.recordPath, 'utf8'));
+
+        // CWD rooted at worktree
+        expect(record.cwd).toBe(fx.wt);
+
+        // Required flags: model gemini-3.7-flash-high, effort high, print-timeout 40m, noninteractive flags
+        expect(record.argv).toEqual([
+          '--input-format',
+          'stream-json',
+          '--output-format',
+          'stream-json',
+          '--disable-slash-commands',
+          '--dangerously-skip-permissions',
+          '--model',
+          'gemini-3.7-flash-high',
+          '--effort',
+          'high',
+          '--print-timeout',
+          '40m',
+        ]);
+
+        // Input prompt ndjson
+        const parsedNdjson = JSON.parse(record.stdin.trim() ?? '{}');
+        expect(parsedNdjson.event).toBe('user');
+        expect(parsedNdjson.message.content).toContain('Execute this test-author brief now');
+        expect(parsedNdjson.message.content).toContain('Never edit product implementation');
+
+        // Result verification
+        expect(result.schema).toBe('foresift/writer-result@1');
+        expect(result.shardId).toBe('test-author');
+        expect(result.role).toBe('test');
+        expect(result.engine).toBe('AGY');
+        expect(result.model).toBe('gemini-3.7-flash-high');
+        expect(result.reasoning).toBe('high');
+        expect(result.providerTimeout).toBe('40m');
+        expect(result.completed).toEqual(['T103']);
+        expect(result.baselineClassifications).toEqual(['REGRESSION_RED']);
+        expect(result.testsRun).toEqual(['tests/x/a.spec.ts']);
+
+        // Artifacts on disk
+        const resultJsonPath = join(fx.resultsDir, 'result.json');
+        expect(existsSync(resultJsonPath)).toBe(true);
+        const savedResult = JSON.parse(readFileSync(resultJsonPath, 'utf8'));
+        expect(savedResult.model).toBe('gemini-3.7-flash-high');
+        expect(savedResult.reasoning).toBe('high');
+        expect(savedResult.providerTimeout).toBe('40m');
+
+        const telemetryPath = join(fx.resultsDir, 'telemetry.json');
+        expect(existsSync(telemetryPath)).toBe(true);
+        const telemetry = JSON.parse(readFileSync(telemetryPath, 'utf8'));
+        expect(telemetry.schema).toBe('foresift/lane-telemetry@1');
+        expect(telemetry.lane).toBe('test-author');
+        expect(telemetry.engine).toBe('AGY');
+        expect(telemetry.role).toBe('test');
+        expect(telemetry.model).toBe('gemini-3.7-flash-high');
+        expect(telemetry.reasoning).toBe('high');
+        expect(telemetry.providerTimeout).toBe('40m');
+        expect(telemetry.outcome).toBe('SUCCESS');
+
+        // Verify git commit author
+        const log = execFileSync('git', ['log', '-1', '--pretty=format:%an <%ae> - %s'], {
+          cwd: fx.wt,
+          encoding: 'utf8',
+        });
+        expect(log).toContain('Foresift AGY Test Author <noreply@foresift.local>');
+        expect(log).toContain('test: AGY test-author lane test-author');
+      } finally {
+        process.env.PATH = prevPath;
+        for (const [key, value] of Object.entries(savedEnv)) {
+          if (value === undefined) {
+            delete process.env[key];
+          } else {
+            process.env[key] = value;
+          }
+        }
+      }
+    });
+
+    it('rejects AGY execution when AGY touches product paths (path ownership boundary enforcement)', async () => {
+      const mod = await loadAgyTestWriterModule();
+      const fx = setupWriterFixture({
+        filesToWrite: {
+          'packages/domain/src/entity.ts': 'export const foo = 1;\n',
+        },
+      });
+
+      const prevPath = process.env.PATH;
+      try {
+        process.env.PATH = `${fx.binDir}:${prevPath}`;
+        expect(() =>
+          mod.runAgyTestWriter({
+            lane: 'test-author',
+            brief: fx.brief,
+            worktree: fx.wt,
+            routing: fx.routingPath,
+            'results-dir': fx.resultsDir,
+          }),
+        ).toThrow(/AGY_PRODUCT_OWNERSHIP_VIOLATION/);
+      } finally {
+        process.env.PATH = prevPath;
+      }
+    });
+
+    it('rejects missing or invalid baselineClassifications in agent-result.json', async () => {
+      const mod = await loadAgyTestWriterModule();
+      const fxInvalid = setupWriterFixture({
+        agentResult: {
+          baselineClassifications: ['INVALID_NON_EXISTENT_CLASSIFICATION'],
+          testsRun: [],
+          testResults: 'pass',
+        },
+      });
+
+      const prevPath = process.env.PATH;
+      try {
+        process.env.PATH = `${fxInvalid.binDir}:${prevPath}`;
+        expect(() =>
+          mod.runAgyTestWriter({
+            lane: 'test-author',
+            brief: fxInvalid.brief,
+            worktree: fxInvalid.wt,
+            routing: fxInvalid.routingPath,
+            'results-dir': fxInvalid.resultsDir,
+          }),
+        ).toThrow(/AGY_TEST_BASELINE_CLASSIFICATION_INVALID/);
+      } finally {
+        process.env.PATH = prevPath;
+      }
+
+      const fxEmpty = setupWriterFixture({
+        agentResult: {
+          baselineClassifications: [],
+          testsRun: [],
+          testResults: 'pass',
+        },
+      });
+      try {
+        process.env.PATH = `${fxEmpty.binDir}:${prevPath}`;
+        expect(() =>
+          mod.runAgyTestWriter({
+            lane: 'test-author',
+            brief: fxEmpty.brief,
+            worktree: fxEmpty.wt,
+            routing: fxEmpty.routingPath,
+            'results-dir': fxEmpty.resultsDir,
+          }),
+        ).toThrow(/AGY_TEST_BASELINE_CLASSIFICATION_INVALID/);
+      } finally {
+        process.env.PATH = prevPath;
+      }
+    });
+
+    it('rejects when agy process exits with non-zero code or agent-result.json is missing', async () => {
+      const mod = await loadAgyTestWriterModule();
+      const fxFail = setupWriterFixture({
+        exitCode: 1,
+        stderr: 'fatal: provider timeout or rate limit exceeded',
+      });
+
+      const prevPath = process.env.PATH;
+      try {
+        process.env.PATH = `${fxFail.binDir}:${prevPath}`;
+        expect(() =>
+          mod.runAgyTestWriter({
+            lane: 'test-author',
+            brief: fxFail.brief,
+            worktree: fxFail.wt,
+            routing: fxFail.routingPath,
+            'results-dir': fxFail.resultsDir,
+          }),
+        ).toThrow(/AGY_TEST_FAILED/);
+      } finally {
+        process.env.PATH = prevPath;
+      }
+
+      const fxNoResult = setupWriterFixture({
+        agentResult: null,
+      });
+      try {
+        process.env.PATH = `${fxNoResult.binDir}:${prevPath}`;
+        expect(() =>
+          mod.runAgyTestWriter({
+            lane: 'test-author',
+            brief: fxNoResult.brief,
+            worktree: fxNoResult.wt,
+            routing: fxNoResult.routingPath,
+            'results-dir': fxNoResult.resultsDir,
+          }),
+        ).toThrow(/AGY_TEST_RESULT_CONTRACT_MISSING/);
+      } finally {
+        process.env.PATH = prevPath;
       }
     });
   });

@@ -7,7 +7,7 @@
 import { execFileSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { afterAll, describe, expect, it } from 'vitest';
+import { afterAll, describe, expect, it } from 'bun:test';
 import { disposeGitFixtureBase, gitFixture } from '../helpers/git-fixture.js';
 
 const REPO = process.cwd();
@@ -31,7 +31,7 @@ describe('test-tier configuration (C2.5)', () => {
     expect(config).toMatch(/include:\s*\['tests\/\*\*\/\*\.spec\.ts'\]/);
     expect(config).toContain("include: ['tests/**/*e2e*.spec.ts']");
     const pkg = JSON.parse(readFileSync(join(REPO, 'package.json'), 'utf8'));
-    expect(pkg.scripts.test).toBe('vitest run'); // FULL authority
+    expect(pkg.scripts.test).toBe('node scripts/automation/test-authority.mjs'); // Delegated authority
     expect(pkg.scripts['test:unit']).toContain('--project unit');
     expect(pkg.scripts['test:integration']).toContain('--project integration');
   });

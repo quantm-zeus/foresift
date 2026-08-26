@@ -23,4 +23,5 @@ export function planTargetedChecks(opts: {
   } | null;
   gateLogText?: string | null;
   exists?: (p: string) => boolean;
+  testAuthority?: 'VITEST_TRANSITION' | 'BUN_TEST';
 }): TargetedPlan;

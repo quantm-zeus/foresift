@@ -1,0 +1,51 @@
+{
+  "comment": "Mirror of packages/tool-core/src/profiles.ts admission tables (§16.9). Inert fixture data — AC suites pin this file EQUAL to the code constants (parity by construction); never imported by product code.",
+  "profileClasses": ["STANDARD", "ADAPTER_TEST", "ADMIN_DIAGNOSTIC", "EXPERT_SCOPED"],
+  "atomicAdmittingClasses": ["ADAPTER_TEST", "ADMIN_DIAGNOSTIC", "EXPERT_SCOPED"],
+  "standardProfileToolSets": {
+    "discovery": [
+      "discover_candidates",
+      "get_asset_identity",
+      "get_candidate_delta",
+      "compare_candidates"
+    ],
+    "market-research": [
+      "get_asset_identity",
+      "get_market_evidence_pack",
+      "get_tradability_assessment",
+      "get_candidate_delta",
+      "compare_candidates"
+    ],
+    "security-research": ["get_security_evidence_pack", "get_asset_identity"],
+    "holder-wallet": [
+      "get_holder_distribution",
+      "get_wallet_cluster_evidence",
+      "get_tradability_assessment"
+    ],
+    "social-research": ["get_candidate_delta", "get_thesis_status"],
+    "macro-context": ["discover_candidates", "get_market_evidence_pack"],
+    "run-investigation": [
+      "discover_candidates",
+      "get_asset_identity",
+      "get_market_evidence_pack",
+      "get_security_evidence_pack",
+      "get_holder_distribution",
+      "get_wallet_cluster_evidence",
+      "get_tradability_assessment",
+      "get_candidate_delta",
+      "get_thesis_status"
+    ],
+    "admin-read": [
+      "discover_candidates",
+      "get_asset_identity",
+      "get_market_evidence_pack",
+      "get_security_evidence_pack",
+      "get_holder_distribution",
+      "get_wallet_cluster_evidence",
+      "get_tradability_assessment",
+      "get_candidate_delta",
+      "get_thesis_status"
+    ]
+  },
+  "atomicTools": ["provider_adapter_probe", "raw_ledger_diagnostic"]
+}

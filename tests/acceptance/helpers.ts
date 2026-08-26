@@ -8,7 +8,6 @@
 import path from 'node:path';
 import { performance } from 'node:perf_hooks';
 import { fileURLToPath } from 'node:url';
-import { expect } from 'vitest';
 import { PGlite } from '@electric-sql/pglite';
 import { parseChainId, utcTimestamp, type UtcTimestamp } from '@foresift/domain';
 import {
@@ -72,10 +71,11 @@ export async function expectForesiftError(promise: Promise<unknown>, code: strin
     await promise;
   } catch (err) {
     const actual = err as { code?: string; name?: string };
-    expect(
-      actual.code,
-      `expected ForesiftError ${code}, got ${actual.name}: ${(err as Error).message}`,
-    ).toBe(code);
+    if (actual.code !== code) {
+      throw new Error(
+        `expected ForesiftError ${code}, got ${actual.name}: ${(err as Error).message}`,
+      );
+    }
     return;
   }
   throw new Error(`expected rejection with ForesiftError ${code}, but the call resolved`);

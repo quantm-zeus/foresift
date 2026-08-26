@@ -5,7 +5,7 @@
  * only to manual holder modes, and composition-time overrides replace whole
  * rows while refusing inverted windows.
  */
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'bun:test';
 import { DEFAULT_FRESHNESS_POLICY_TABLE, FreshnessFieldFamily } from '@foresift/domain';
 import { FreshnessEvaluator } from '../src/freshness.ts';
 

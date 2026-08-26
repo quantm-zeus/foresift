@@ -5,7 +5,7 @@
  * refuse), execution is strictly in order, and no composition surface exists
  * that could skip a stage.
  */
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'bun:test';
 import { ALL_PIPELINE_STAGES, PIPELINE_STAGE_ORDER, type PipelineStage } from '@foresift/domain';
 import {
   PipelineOrchestrator,

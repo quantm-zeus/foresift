@@ -4,7 +4,7 @@
  * the row's current state, and the shipped default adapter is the
  * deny-closed test double living OUTSIDE src/ — unknown cost refuses.
  */
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 import { PGlite } from '@electric-sql/pglite';
 import {
   applyMigrations,

@@ -5,8 +5,6 @@ import { execFileSync } from 'node:child_process';
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { it, type TestContext } from 'vitest';
-
 export const SCRIPTS = join(import.meta.dirname, '..', '..', 'scripts', 'automation');
 export const REPO = process.cwd();
 
@@ -69,16 +67,17 @@ export const verdictFixture = (over: Record<string, unknown> = {}) => ({
 // recursion terminates after exactly one level (the nested run skips the
 // spawners; everything else still runs against reality).
 export const GATE_E2E_NESTED = 'FORESIFT_GATE_E2E_NESTED';
-export const itE2e = (
-  name: string,
-  fn: (ctx: TestContext) => void | Promise<void>,
-  timeout?: number,
-) => {
-  // Nested run — see comment above. Register SKIPped (not absent): since C2.5
-  // these spawners live in dedicated files, and Vitest fails a suite that
-  // ends up with zero tests.
-  if (process.env[GATE_E2E_NESTED] === '1') return it.skip(name, fn, timeout);
-  it(name, fn, timeout);
+export const itE2e = (name: string, fn: () => void | Promise<void>, timeout?: number) => {
+  if (process.env[GATE_E2E_NESTED] === '1') {
+    return (
+      globalThis as unknown as { it: { skip: (n: string, f: unknown, t?: number) => void } }
+    ).it.skip(name, fn, timeout);
+  }
+  (globalThis as unknown as { it: (n: string, f: unknown, t?: number) => void }).it(
+    name,
+    fn,
+    timeout,
+  );
 };
 
 /**

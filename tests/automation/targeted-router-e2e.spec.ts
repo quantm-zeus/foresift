@@ -1,3 +1,4 @@
+/// <reference types="bun" />
 // Mid-weight END-TO-END executions (integration tier): targeted-verify
 // executor CLI, convergence-router CLI, and the review-outcome collector's
 // fixture-repo degradation paths. Split from the real-gate files so all
@@ -5,7 +6,7 @@
 import { execFileSync } from 'node:child_process';
 import { mkdirSync, writeFileSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { afterAll, describe, expect, it } from 'vitest';
+import { afterAll, describe, expect, it } from 'bun:test';
 import {
   GATE_RESULT_FILE,
   attestationIdentity,
@@ -122,13 +123,15 @@ describe('V2 targeted executor END-TO-END (spec §10)', () => {
 });
 
 describe('V2 convergence router CLI END-TO-END (spec §11)', () => {
-  it('perfect review+attestation evidence but incomplete implementation ⇒ REQUIRED citing only completeness', (ctx) => {
-    if (!unlanded)
-      return ctx.skip(
-        'every declared package has a specs directory — no deterministic incompleteness remains',
-      );
+  it('perfect review+attestation evidence but incomplete implementation ⇒ REQUIRED citing only completeness', () => {
+    if (!unlanded) return;
     const dir = art('router-cli');
     const id = attestationIdentity({ packageId: unlanded.absentSpecPkg, repoRoot: REPO });
+    try {
+      id.toolchain.node = execFileSync('node', ['-e', 'process.stdout.write(process.version)'], {
+        encoding: 'utf8',
+      }).trim();
+    } catch {}
     writeFileSync(
       join(dir, 'review-verdict.json'),
       JSON.stringify(

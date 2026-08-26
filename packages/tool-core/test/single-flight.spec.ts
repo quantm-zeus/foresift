@@ -4,7 +4,7 @@
  * increasing fencing tokens, stale-holder release refusal, and concurrency
  * races where exactly one interleaved acquirer can win.
  */
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 import { PGlite } from '@electric-sql/pglite';
 import {
   applyMigrations,

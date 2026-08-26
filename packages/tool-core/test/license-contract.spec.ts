@@ -4,7 +4,7 @@
  * source admits only version-pinned verdicts that feed execution admission
  * AND the cache-key license component identically.
  */
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'bun:test';
 import { LicenseVerdictSchema } from '@foresift/shared-schemas';
 import { UnverifiableRightsRefusedSource } from '../src/license-contract.ts';
 import { ReferenceLicenseSource } from '../../../tests/fixtures/core/reference-adapters.ts';

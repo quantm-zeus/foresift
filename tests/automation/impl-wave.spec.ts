@@ -575,6 +575,7 @@ describe('foresift-sharded-wave workflow contract', () => {
     expect(agyTest?.[0]).toContain('exec-agy-test-writer.mjs --lane test-author');
     expect(agyTest?.[0]).toContain('--brief "$ARTIFACTS_DIR/briefs/test-author-brief.md"');
     expect(agyTest?.[0]).toContain('--worktree "$ARTIFACTS_DIR/wt/test-author"');
+    expect(agyTest?.[0]).toContain('--routing "$ARTIFACTS_DIR/routing.json"');
     expect(agyTest?.[0]).toContain('--results-dir "$ARTIFACTS_DIR/writer-results/test-author"');
 
     // 4. All implementation prompts forbid test edits
@@ -718,4 +719,55 @@ describe('foresift-sharded-wave workflow contract', () => {
     expect(checkpoint?.[0]).toContain('depends_on: [wave-settled]');
     expect(checkpoint?.[0]).toContain('package-checkpoint.mjs --build');
   });
+
+  it('passes routing.json artifact to AGY test-author executor node', () => {
+    const agyNode = yaml.match(/- id: writer-test-author-agy[\s\S]*?(?=\n  - id:)/);
+    expect(agyNode).toBeTruthy();
+    expect(agyNode?.[0]).toContain('exec-agy-test-writer.mjs --lane test-author');
+    expect(agyNode?.[0]).toContain('--routing "$ARTIFACTS_DIR/routing.json"');
+    expect(agyNode?.[0]).toContain('--brief "$ARTIFACTS_DIR/briefs/test-author-brief.md"');
+    expect(agyNode?.[0]).toContain('--worktree "$ARTIFACTS_DIR/wt/test-author"');
+    expect(agyNode?.[0]).toContain('--results-dir "$ARTIFACTS_DIR/writer-results/test-author"');
+  });
 });
+
+describe('wave routing AGY test lane persistence', () => {
+  it('buildWaveRouting attaches version-controlled AGY Gemini model facts to test lanes', async () => {
+    const { buildWaveRouting } = await import('../../scripts/automation/codex-routing.mjs');
+    const { EXECUTION_POLICY } = await import('../../scripts/automation/execution-profile.mjs');
+
+    const graph = {
+      package: { risk: 'MEDIUM' },
+      shards: [{ id: 'core', units: ['T101'] }],
+      units: [{ id: 'T101' }, { id: 'T103' }],
+      testLanes: [{ id: 'test-author', units: ['T103'] }],
+    };
+
+    const routingCodex = buildWaveRouting(graph, 'CODEX_AGY');
+    expect(routingCodex.schema).toBe('foresift/wave-routing@1');
+    expect(routingCodex.routingPolicyVersion).toBe(EXECUTION_POLICY.routingPolicyVersion);
+    expect(routingCodex.routingPolicyVersion).toBe('codex-sol-luna-terra-agy-gemini@2');
+    expect(routingCodex.testEngine).toBe('AGY');
+
+    const testLaneCodex = routingCodex.lanes.find((l: { lane: string }) => l.lane === 'test-author');
+    expect(testLaneCodex).toBeDefined();
+    expect(testLaneCodex.engine).toBe('AGY');
+    expect(testLaneCodex.role).toBe('test');
+    expect(testLaneCodex.model).toBe(EXECUTION_POLICY.agyTestModel);
+    expect(testLaneCodex.model).toBe('gemini-3.7-flash-high');
+    expect(testLaneCodex.reasoning).toBe(EXECUTION_POLICY.agyTestEffort);
+    expect(testLaneCodex.reasoning).toBe('high');
+    expect(testLaneCodex.providerTimeout).toBe(EXECUTION_POLICY.agyPrintTimeout);
+    expect(testLaneCodex.providerTimeout).toBe('40m');
+    expect(testLaneCodex.taskIds).toEqual(['T103']);
+
+    const routingClaude = buildWaveRouting(graph, 'CLAUDE_AGY');
+    const testLaneClaude = routingClaude.lanes.find((l: { lane: string }) => l.lane === 'test-author');
+    expect(testLaneClaude).toBeDefined();
+    expect(testLaneClaude.engine).toBe('AGY');
+    expect(testLaneClaude.model).toBe('gemini-3.7-flash-high');
+    expect(testLaneClaude.reasoning).toBe('high');
+    expect(testLaneClaude.providerTimeout).toBe('40m');
+  });
+});
+

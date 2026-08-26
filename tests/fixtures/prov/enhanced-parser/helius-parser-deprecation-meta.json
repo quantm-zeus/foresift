@@ -1,0 +1,10 @@
+{
+  "note": "INERT FIXTURE — deprecation metadata for the Helius enhanced parser. Mirrors helius-decoding.ts: fallback-only authority, acknowledged, raw+local pass required.",
+  "parserId": "helius-enhanced-parser",
+  "status": "DEPRECATED",
+  "authority": "FALLBACK",
+  "deprecatedAt": "2026-07-01T00:00:00Z",
+  "acknowledgedByOperatorRef": "operator-ack://helius/enhanced-parser/2026-07",
+  "replacementDecoderId": "helius-local-decoder",
+  "rawOperationLocalDecodingEnabled": true
+}

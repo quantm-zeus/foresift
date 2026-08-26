@@ -1,0 +1,11 @@
+{
+  "note": "INERT FIXTURE — trading-shaped GMGN variant. Proves a query-only adapter's response channel is STILL scanned: swap-flavored envelopes carrying transaction material are quarantined.",
+  "code": 0,
+  "data": {
+    "pairAddress": "FAKE_PAIR_ADDRESS_FOR_TESTS",
+    "swapSummary": {
+      "documentationOnly": true
+    },
+    "serializedTransaction": "FAKE_BASE64_BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB="
+  }
+}

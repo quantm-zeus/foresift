@@ -1,0 +1,12 @@
+{
+  "note": "INERT FIXTURE — WRITE_CAPABILITY class for AC-271 detection proof. A read-only product refuses provider responses advertising POST/PUT/DELETE/PATCH surfaces.",
+  "providerResponse": {
+    "service": "fake-analytics",
+    "endpoints": [
+      {
+        "path": "/v1/publish",
+        "httpMethods": ["POST", "PUT"]
+      }
+    ]
+  }
+}

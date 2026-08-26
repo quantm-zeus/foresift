@@ -1,0 +1,21 @@
+{
+  "code": 0,
+  "data": {
+    "rank": [
+      {
+        "poolAddress": "58oQChx4yWmvKdwLLZzBi4ChoCc2fqCUWBkwMihLYQo2",
+        "tokenA": "So11111111111111111111111111111112",
+        "tokenB": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+        "volume24hUsd": 9876543.21,
+        "tvlUsd": 45678901.0
+      },
+      {
+        "poolAddress": "9r1vTMKMQHfsXNLyyYkF6X8MTPTnBWUQmLpB8mvdYJvA",
+        "tokenA": "So11111111111111111111111111111112",
+        "tokenB": "Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB",
+        "volume24hUsd": 1234567.89,
+        "tvlUsd": 23456789.0
+      }
+    ]
+  }
+}

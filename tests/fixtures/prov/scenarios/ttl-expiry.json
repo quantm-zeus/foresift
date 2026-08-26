@@ -1,0 +1,31 @@
+{
+  "note": "INERT FIXTURE — AC-270 TTL-expiry scenario timeline. Drives verification-pair expiry tests; all timestamps are documentation values.",
+  "scenarioId": "ttl-expiry-pricing-plan",
+  "provider": "prov-scenario",
+  "operation": "get-token-price",
+  "version": "1.0.0",
+  "timeline": [
+    {
+      "at": "2026-08-01T00:00:00Z",
+      "event": "CONFIGURE_TTLS",
+      "kindsSeconds": { "PRICING_PLAN": 3600, "RIGHTS": 86400, "SCHEMA_CONFORMANCE": 86400, "RAW_OUTPUT_CONFORMANCE": 86400 }
+    },
+    {
+      "at": "2026-08-01T00:00:00Z",
+      "event": "RECORD_PAIRS",
+      "pairs": ["PRICING_PLAN", "RIGHTS", "SCHEMA_CONFORMANCE", "RAW_OUTPUT_CONFORMANCE"]
+    },
+    {
+      "at": "2026-08-01T00:30:00Z",
+      "event": "EXPECT_FRESH",
+      "detail": "all decision-critical kinds inside their TTLs"
+    },
+    {
+      "at": "2026-08-01T02:00:00Z",
+      "event": "SWEEP_EXPECTS_EXIT",
+      "lapsedKind": "PRICING_PLAN",
+      "expectedReasonClass": "VERIFICATION_EXPIRED_PRICING_PLAN",
+      "expectedHealthStatus": "PLAN_UNVERIFIED"
+    }
+  ]
+}

@@ -1,0 +1,20 @@
+{
+  "note": "INERT FIXTURE — Helius enhanced-parser summary. The vendor parser is DEPRECATED and may only run as FALLBACK behind the local decoder; this sanitized positive proves the surface parses without any hazardous class.",
+  "parsedTransactions": [
+    {
+      "signature": "FAKE_SIGNATURE_FOR_TESTS_ONLY",
+      "timestamp": 1754006400,
+      "type": "TRANSFER",
+      "source": "SYSTEM_PROGRAM_DOCUMENTATION_EXAMPLE",
+      "tokenTransfers": [
+        {
+          "fromUserAccount": "FAKE_ACCOUNT_1",
+          "toUserAccount": "FAKE_ACCOUNT_2",
+          "mint": "FAKE_MINT_DOC_EXAMPLE",
+          "tokenAmount": 12.5
+        }
+      ],
+      "fee": 5000
+    }
+  ]
+}

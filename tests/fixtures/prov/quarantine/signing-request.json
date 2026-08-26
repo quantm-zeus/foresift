@@ -1,0 +1,10 @@
+{
+  "note": "INERT FIXTURE — SIGNING_REQUEST class for AC-271 detection proof. Requests that callers sign anything are quarantined product-wide.",
+  "providerResponse": {
+    "type": "signing_request",
+    "signTxn": {
+      "documentationOnly": true,
+      "messageForHumans": "a real response here would ask the caller to sign"
+    }
+  }
+}

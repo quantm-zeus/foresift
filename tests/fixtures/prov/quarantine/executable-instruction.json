@@ -1,0 +1,10 @@
+{
+  "note": "INERT FIXTURE — EXECUTABLE_INSTRUCTION class for AC-271 detection proof. programId + accounts[] + data co-occurring marks an encoded instruction payload.",
+  "providerResponse": {
+    "programId": "FAKE_PROGRAM_ID_FOR_TESTS_ONLY",
+    "accounts": ["FAKE_ACCOUNT_1", "FAKE_ACCOUNT_2"],
+    "data": {
+      "hex": "00fafake"
+    }
+  }
+}

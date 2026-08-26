@@ -1,0 +1,7 @@
+{
+  "note": "INERT FIXTURE — TRANSACTION_PAYLOAD class for AC-271 detection proof. The payload string is a fake marker, never a real transaction.",
+  "providerResponse": {
+    "status": "ok",
+    "serializedTransaction": "FAKE_BASE64_AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="
+  }
+}

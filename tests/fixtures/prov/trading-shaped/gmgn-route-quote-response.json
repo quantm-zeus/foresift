@@ -1,0 +1,14 @@
+{
+  "note": "INERT FIXTURE — trading-shaped GMGN variant: a route quote carrying an unsigned transaction body. Detected as TRANSACTION_PAYLOAD by the quarantine scanner.",
+  "code": 0,
+  "data": {
+    "quote": {
+      "inAmountLamports": 100000000,
+      "outAmountUi": 42.5,
+      "routeLegs": [
+        { "inMint": "FAKE_MINT_A", "outMint": "FAKE_MINT_B", "percent": 100 }
+      ]
+    },
+    "unsignedTransaction": "FAKE_BASE64_CCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCC="
+  }
+}

@@ -1,0 +1,9 @@
+{
+  "note": "INERT FIXTURE — PRIVATE_KEY_FIELD class for AC-271 detection proof. The value is the documented FAKE_PRIVATE_KEY marker; there is no real secret anywhere in this corpus.",
+  "providerResponse": {
+    "accountRef": "FAKE_ADDRESS_FOR_TESTS_ONLY",
+    "credentials": {
+      "privateKey": "FAKE_PRIVATE_KEY_NOT_A_REAL_SECRET_0123456789abcdef"
+    }
+  }
+}

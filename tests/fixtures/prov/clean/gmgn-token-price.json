@@ -1,0 +1,11 @@
+{
+  "code": 0,
+  "data": {
+    "chain": "solana",
+    "address": "So11111111111111111111111111111112",
+    "price": 1.02,
+    "priceChange24h": -0.4,
+    "liquidityUsd": 1250000.5,
+    "updatedAt": "2026-08-01T00:00:00Z"
+  }
+}

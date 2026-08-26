@@ -1,0 +1,11 @@
+{
+  "address": "FAKE_ADDRESS_FOR_TESTS_ONLY_1111111111111111111111111",
+  "nativeBalance": 42109876543,
+  "tokens": [
+    {
+      "mint": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+      "amount": 12550,
+      "decimals": 6
+    }
+  ]
+}

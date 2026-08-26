@@ -1,4 +1,4 @@
-import { afterAll, afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it } from 'vitest';
 import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -497,7 +497,11 @@ describe('Foresift V4 CODEX_AGY execution profile test matrix (A through AD)', (
 
       for (const path of testPaths) {
         const cls = mod.classifyOwnedPath(path);
-        expect(cls === 'TEST' || cls === 'TEST_OWNED' || (cls as any)?.isTest === true).toBe(true);
+        expect(
+          cls === 'TEST' ||
+            cls === 'TEST_OWNED' ||
+            (cls as { isTest?: boolean })?.isTest === true,
+        ).toBe(true);
       }
     });
 
@@ -512,7 +516,11 @@ describe('Foresift V4 CODEX_AGY execution profile test matrix (A through AD)', (
 
       for (const path of prodPaths) {
         const cls = mod.classifyOwnedPath(path);
-        expect(cls === 'PRODUCT' || cls === 'PRODUCT_OWNED' || (cls as any)?.isProduct === true).toBe(true);
+        expect(
+          cls === 'PRODUCT' ||
+            cls === 'PRODUCT_OWNED' ||
+            (cls as { isProduct?: boolean })?.isProduct === true,
+        ).toBe(true);
       }
     });
   });
@@ -662,6 +670,16 @@ describe('Foresift V4 CODEX_AGY execution profile test matrix (A through AD)', (
   });
 
   describe('Matrix AB: Bounded incident actions and event deduplication', () => {
+    interface MaintainerIncidentState {
+      actions?: Array<{
+        eventId: string;
+        action: string;
+        timestamp: number;
+      }>;
+      seenEventIds?: Set<string>;
+      seenIncidentIds?: string[];
+    }
+
     const validActions = [
       'RETRY_CODEX',
       'ESCALATE_CODEX',
@@ -674,7 +692,7 @@ describe('Foresift V4 CODEX_AGY execution profile test matrix (A through AD)', (
     it('accepts only bounded maintainer incident action enum values', async () => {
       const mod = await loadMaintainerIncidentModule();
       for (const action of validActions) {
-        const state: any = { actions: [], seenEventIds: new Set() };
+        const state: MaintainerIncidentState = { actions: [], seenEventIds: new Set<string>() };
         const res = mod.registerIncidentAction(state, {
           eventId: `evt-${action}`,
           action,
@@ -684,7 +702,7 @@ describe('Foresift V4 CODEX_AGY execution profile test matrix (A through AD)', (
       }
 
       // Rejects invalid action
-      const state: any = { actions: [], seenEventIds: new Set() };
+      const state: MaintainerIncidentState = { actions: [], seenEventIds: new Set<string>() };
       expect(() =>
         mod.registerIncidentAction(state, {
           eventId: 'evt-invalid',
@@ -696,7 +714,7 @@ describe('Foresift V4 CODEX_AGY execution profile test matrix (A through AD)', (
 
     it('deduplicates duplicate event IDs idempotently', async () => {
       const mod = await loadMaintainerIncidentModule();
-      const state: any = { actions: [], seenEventIds: new Set() };
+      const state: MaintainerIncidentState = { actions: [], seenEventIds: new Set<string>() };
       const event = {
         eventId: 'dup-event-1',
         action: 'RETRY_CODEX',

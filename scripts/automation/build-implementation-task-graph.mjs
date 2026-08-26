@@ -126,12 +126,16 @@ for (const u of units) {
   const paths = [];
   for (const bt of u.body.matchAll(BACKTICK_PATH)) {
     const p = bt[1].replace(/^\.\//, '');
-    // `pnpm-lock.yaml` is collectible at the repo root: it mechanically
-    // follows every workspace package scaffold, so a unit that scaffolds a
-    // package must be able to RECORD it as an out-of-scope write exception
-    // instead of tripping the lane guard at integration time.
+    // `pnpm-lock.yaml` and root `package.json` are collectible at the repo
+    // root: the lockfile mechanically follows every workspace package scaffold,
+    // and acceptance suites run under the root unit project, whose
+    // devDependencies link each package exactly like every prior G0 package.
+    // A unit that triggers either must be able to RECORD it as an out-of-scope
+    // write exception instead of tripping the lane guard at integration time.
     if (
-      (/^(packages|tests|telemetry|migrations|docs|scripts)\//.test(p) || p === 'pnpm-lock.yaml') &&
+      (/^(packages|tests|telemetry|migrations|docs|scripts)\//.test(p) ||
+        p === 'pnpm-lock.yaml' ||
+        p === 'package.json') &&
       !paths.includes(p)
     )
       paths.push(p);

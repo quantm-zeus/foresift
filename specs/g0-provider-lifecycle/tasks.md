@@ -31,8 +31,14 @@ capability anywhere outside the inert forbidden-fixture corpus under
       that test's enumerations MUST be updated by this unit rather than left
       untouched. Out-of-scope writes REQUIRED by this unit and recorded as
       scope exceptions: `packages/persistence/test/migrator.spec.ts`
-      (migration-inventory assertions) and `pnpm-lock.yaml` (workspace
-      lockfile mechanically follows every package scaffold, T102 included).
+      (migration-inventory assertions), `pnpm-lock.yaml` (workspace
+      lockfile mechanically follows every package scaffold, T102 included),
+      and `package.json` (recorded 2026-08-26 from live guard evidence: the
+      T126–T129 acceptance/negative suites run under the root unit project,
+      whose devDependencies must link `@foresift/provider-lifecycle` and
+      `@foresift/security` exactly like every prior G0 package's links —
+      a two-line mechanical mirror, observed in run f9ed4de6 core commit
+      91b9c8c).
       Traces: FR-PROV-001, FR-PROV-002, FR-PROV-003, FR-PROV-008, FR-PROV-009,
       FR-PROV-010 (their declared `g0_prov_*.sql` persistence refs are
       otherwise unapplyable).

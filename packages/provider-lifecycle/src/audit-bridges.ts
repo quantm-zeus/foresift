@@ -53,3 +53,72 @@ export class LifecycleAuditBridge {
     });
   }
 }
+
+/**
+ * Quarantine emitter (FR-PROV-008 / AC-271; T119): every rejected response is
+ * audited with its detection classes and metadata ONLY — the hazardous
+ * payload material never enters the audit chain either.
+ */
+export class ResponseQuarantineAuditBridge {
+  constructor(private readonly chain: AuditChain) {}
+
+  async responseQuarantined(input: {
+    readonly target: OperationTarget;
+    readonly quarantineId: string;
+    readonly detectedClasses: readonly string[];
+    readonly fieldPaths: readonly string[];
+    readonly payloadSha256: string;
+    readonly byteSize: number;
+    readonly quarantinedAt: UtcTimestamp;
+  }): Promise<void> {
+    await this.chain.append({
+      occurredAt: input.quarantinedAt,
+      actor: 'response-quarantine',
+      actionClass: 'BLOCKED_OPERATION',
+      subject: subjectOf(input.target),
+      payload: {
+        kind: 'RESPONSE_QUARANTINED',
+        quarantineId: input.quarantineId,
+        detectedClasses: [...input.detectedClasses],
+        fieldPaths: [...input.fieldPaths],
+        payloadSha256: input.payloadSha256,
+        byteSize: input.byteSize,
+        modelContextExclusion: 'ENFORCED',
+      },
+    });
+  }
+}
+
+/**
+ * Rights-change emitter (FR-PROV-009 / AC-273; T120): tightening changes are
+ * audited with their newly-prohibited paths so downstream gates can prove
+ * WHEN each path closed.
+ */
+export class RightsChangeAuditBridge {
+  constructor(private readonly chain: AuditChain) {}
+
+  async rightsChanged(input: {
+    readonly providerId: string;
+    readonly operationId: string;
+    readonly changeId: string;
+    readonly fromRightsVersion: number;
+    readonly toRightsVersion: number;
+    readonly newlyProhibitedUses: readonly string[];
+    readonly tightened: boolean;
+    readonly actor: string;
+    readonly changedAt: UtcTimestamp;
+  }): Promise<void> {
+    await this.chain.append({
+      occurredAt: input.changedAt,
+      actor: input.actor,
+      actionClass: 'BLOCKED_OPERATION',
+      subject: `${input.providerId}/${input.operationId}@rights-v${String(input.fromRightsVersion)}→v${String(input.toRightsVersion)}`,
+      payload: {
+        kind: 'RIGHTS_CHANGE',
+        changeId: input.changeId,
+        newlyProhibitedUses: [...input.newlyProhibitedUses],
+        tightened: input.tightened,
+      },
+    });
+  }
+}

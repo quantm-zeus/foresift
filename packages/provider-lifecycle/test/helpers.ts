@@ -91,6 +91,25 @@ export interface Wired {
   readonly rules: DeprecationRules;
 }
 
+/**
+ * Seeds one registered operation row (plus its provider) so FK-bearing
+ * tables (artifacts, fingerprints, quarantine) resolve in focused suites
+ * that do not need the full wired graph.
+ */
+export async function seedOperationRow(
+  engine: DatabaseEngine,
+  target: { providerId: string; operationId: string; version: string },
+  overrides: Partial<OperationDefinition> = {},
+): Promise<void> {
+  const registry = new OperationRegistry(engine, fixedClock(ts(DEFAULT_NOW)));
+  await registry.registerProvider({
+    providerId: target.providerId,
+    displayName: `Provider ${target.providerId}`,
+    providerGroup: 'seeded',
+  });
+  await registry.registerOperation(testDefinition({ ...target, ...overrides }));
+}
+
 export function wireEngine(engine: DatabaseEngine, clock?: ClockPort): Wired {
   const resolvedClock = clock ?? fixedClock(ts(DEFAULT_NOW));
   // The rule-1 gate is late-bound: DeprecationRules needs the registry, and

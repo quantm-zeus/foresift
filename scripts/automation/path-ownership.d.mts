@@ -20,5 +20,8 @@ export declare function validateLaneOwnership(input: {
 export declare function recordTestDispute(
   baselineRecord: Record<string, unknown>,
   dispute: Record<string, unknown>,
-): Record<string, any>;
-/* eslint-disable @typescript-eslint/no-explicit-any */
+): Record<string, unknown> & {
+  classification?: string;
+  passed?: boolean;
+  dispute: Record<string, unknown>;
+};

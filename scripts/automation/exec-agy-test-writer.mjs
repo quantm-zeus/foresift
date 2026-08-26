@@ -67,7 +67,10 @@ export function runAgyTestWriter(input) {
   if (
     !Array.isArray(agentResult.baselineClassifications) ||
     agentResult.baselineClassifications.length === 0 ||
-    agentResult.baselineClassifications.some((item) => !allowedClassifications.has(item))
+    agentResult.baselineClassifications.some((item) => {
+      const classification = typeof item === 'string' ? item : item?.classification;
+      return !allowedClassifications.has(classification);
+    })
   )
     throw new Error('AGY_TEST_BASELINE_CLASSIFICATION_INVALID');
   const dirty = git(['status', '--porcelain=v1'], input.worktree)

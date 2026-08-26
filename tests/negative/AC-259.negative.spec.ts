@@ -401,7 +401,11 @@ describe('AC-259 negative (tool-core substrate): blocked, refused, and failure e
         },
         egressGuard: {
           async authorize(url) {
-            return { decision: 'ALLOW', host: new URL(url).hostname, pinnedAddresses: ['127.0.0.1'] };
+            return {
+              decision: 'ALLOW',
+              host: new URL(url).hostname,
+              pinnedAddresses: ['127.0.0.1'],
+            };
           },
         },
         routes: [

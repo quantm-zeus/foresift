@@ -64,13 +64,15 @@ describe('AC-255 acceptance (tool-core substrate): permitted query fixtures pass
   const now = '2026-08-01T00:00:00Z';
 
   it('permits every admitted GMGN wallet-intelligence query fixture as an EXTERNAL_READ tool definition', async () => {
-    const { ADMITTED_WALLET_INTELLIGENCE_QUERIES } = await import(
-      '../fixtures/sec/clean/gmgn-query-pair.ts'
-    );
+    const { ADMITTED_WALLET_INTELLIGENCE_QUERIES } =
+      await import('../fixtures/sec/clean/gmgn-query-pair.ts');
     expect(ADMITTED_WALLET_INTELLIGENCE_QUERIES.length).toBeGreaterThanOrEqual(7);
 
     for (const query of ADMITTED_WALLET_INTELLIGENCE_QUERIES) {
-      const toolName = query.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '');
+      const toolName = query
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, '_')
+        .replace(/^_+|_+$/g, '');
       const verdict = screen.screenWithReport(
         {
           name: `gmgn_${toolName}`,

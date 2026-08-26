@@ -9,7 +9,7 @@
 // Every eligibility verdict below comes from the production
 // schema.mjs canStartPackage via the documented adapter — the scheduler only
 // adds deterministic ORDER, never policy.
-import { afterAll, describe, expect, it } from 'vitest';
+import { afterAll, describe, expect, it } from 'bun:test';
 import { canStartPackage } from '../../scripts/automation/schema.mjs';
 import {
   criticalPathScore,

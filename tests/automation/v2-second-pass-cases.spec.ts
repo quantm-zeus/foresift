@@ -12,7 +12,7 @@
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { afterAll, describe, expect, it } from 'vitest';
+import { afterAll, describe, expect, it } from 'bun:test';
 import {
   DECISION_NOT_REQUIRED,
   DECISION_REQUIRED,
@@ -119,7 +119,7 @@ describe('CASE B — gate repair package', () => {
     const plan = planTargetedChecks({ manifest: initial, gateLogText: log });
     expect(plan.mode).toBe('TARGETED');
     expect(plan.checks.length).toBeGreaterThan(0);
-    expect(plan.checks.some((c) => /vitest/.test(c.command))).toBe(true);
+    expect(plan.checks.some((c) => /vitest|bun/.test(c.command))).toBe(true);
     // After repair exactly the FINAL FULL evidence lands (initial + final —
     // never one FULL per tiny edit; targeted checks ran in between):
     writeFileSync(join(dir, 'full-gate-result.json'), gateManifest(true));

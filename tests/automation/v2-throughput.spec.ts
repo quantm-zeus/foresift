@@ -6,7 +6,7 @@
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync, readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 import {
   buildCheckpoint,
   CHECKPOINT_SCHEMA,
@@ -222,13 +222,13 @@ describe('V2 impact-aware FAST verification routing (spec §7)', () => {
   it('JS/TS routes to eslint + related tests + typecheck', () => {
     const c = classifyImpact(['packages/x/src/a.ts', 'packages/x/src/b.mjs']);
     expect(c.escalateFull).toBe(false);
-    expect(planFastChecks(c).map((s) => s.kind)).toEqual(['eslint', 'vitest-related', 'typecheck']);
+    expect(planFastChecks(c).map((s) => s.kind)).toEqual(['eslint', 'affected-tests', 'typecheck']);
   });
 
   it('SQL/migrations route to database checks (never silently unchecked)', () => {
     const c = classifyImpact(['migrations/g0_core_init.sql', 'db/schema-extra.sql']);
     expect(c.categories.DATABASE).toHaveLength(2);
-    expect(planFastChecks(c).map((s) => s.kind)).toEqual(['vitest-related']);
+    expect(planFastChecks(c).map((s) => s.kind)).toEqual(['affected-tests']);
     expect(planFastChecks(c)[0]?.database).toBe(true);
   });
 
@@ -457,12 +457,8 @@ describe('V2 deterministic context capsule (spec §5)', () => {
   });
 });
 
-// ── FAST `vitest related` step: absolutize + fail-closed no-match (C2.5) ──────
-// Regression for a measured fail-open hole: bare repo-relative arguments make
-// `vitest related` match NOTHING (exit 0, "No test files found"), and git
-// changesets naturally yield exactly that path shape — FAST would report
-// green while running zero tests. The no-match PASS must escalate instead.
-describe('FAST vitest-related step (C2.5 regression)', () => {
+// ── FAST deterministic affected-test step: graph-derived selection + fail-closed escalation ──
+describe('FAST affected-test step (graph-derived selection & fail-closed escalation)', () => {
   const fakeSh = (stdoutTail: string) => {
     const calls: Array<{ cmd: string; args: string[] }> = [];
     const sh = (_root: string, cmd: string, args: string[]) => {
@@ -472,48 +468,45 @@ describe('FAST vitest-related step (C2.5 regression)', () => {
     return { sh, calls };
   };
 
-  it('absolutizes changed paths before invoking vitest related (repo-relative matched nothing)', () => {
+  it('selects affected test files from import graph and executes them under active runner', () => {
     const { sh, calls } = fakeSh('Tests  29 passed (29)');
     const out = runVitestRelatedStep(
-      { kind: 'vitest-related', files: ['scripts/automation/fast-impact.mjs'] },
+      { kind: 'affected-tests', files: ['scripts/automation/fast-impact.mjs'] },
       { repoRoot: REPO, sh },
     );
     expect(out.escalateReason).toBeUndefined();
     expect(out.result?.result).toBe('PASS');
     expect(calls).toHaveLength(1);
-    expect(calls[0]?.args[0]).toBe('related');
-    // The regression: the argv form `scripts/automation/fast-impact.mjs`
-    // silently selects zero tests; only an absolute path matches.
-    expect(calls[0]?.args[1] ?? '').toMatch(/\/scripts\/automation\/fast-impact\.mjs$/);
+    expect(calls[0]?.args[0]).toBe('run');
+    expect(calls[0]?.args).toContain('tests/automation/v2-throughput.spec.ts');
   });
 
   it.each([
-    ['plain JS/TS', false, 'no-related-tests'],
-    ['database', true, 'database-no-related-tests'],
-  ])('%s slice with no matching tests escalates (%s)', (_kind, database, expectedReason) => {
+    ['plain JS/TS', false],
+    ['database', true],
+  ])('%s slice with zero matching tests escalates fail-closed', (_kind, database) => {
     const { sh } = fakeSh('\nNo test files found, exiting with code 0\n');
     const step: { kind: string; files: string[]; database?: boolean } = {
-      kind: 'vitest-related',
-      files: ['scripts/automation/fast-impact.mjs'],
+      kind: 'affected-tests',
+      files: ['scripts/automation/unknown-orphan-module.mjs'],
     };
     if (database) step.database = true;
     const out = runVitestRelatedStep(step as never, { repoRoot: REPO, sh });
-    expect(out.escalateReason).toBe(expectedReason);
+    expect(out.escalateReason).toMatch(/DELETED_UNKNOWN|ZERO_MATCH_FAIL_CLOSED/);
     expect((out.logs ?? []).join(' ')).toMatch(/escalating to full suite/);
   });
 
-  it('all paths absent ⇒ non-database slices stay silent, database slices escalate fail-closed', () => {
+  it('all paths absent/deleted without package fallback escalate fail-closed', () => {
     const missing = ['definitely/not/present.mjs'];
     const plain = runVitestRelatedStep(
-      { kind: 'vitest-related', files: [...missing] },
+      { kind: 'affected-tests', files: [...missing] },
       { repoRoot: REPO },
     );
-    expect(plain.escalateReason).toBeUndefined();
-    expect(plain.result).toBeUndefined();
+    expect(plain.escalateReason).toMatch(/DELETED_UNKNOWN/);
     const db = runVitestRelatedStep(
-      { kind: 'vitest-related', files: [...missing], database: true },
+      { kind: 'affected-tests', files: [...missing], database: true },
       { repoRoot: REPO },
     );
-    expect(db.escalateReason).toBe('database-deleted');
+    expect(db.escalateReason).toMatch(/DELETED_UNKNOWN/);
   });
 });

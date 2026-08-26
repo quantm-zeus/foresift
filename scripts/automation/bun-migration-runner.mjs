@@ -32,6 +32,20 @@ function chunks(items, size) {
 export function planMigrationBatches(manifest) {
   const batches = [];
   for (const [locality, entries] of groupBy(
+    manifest.files.filter((entry) => entry.state === 'MIGRATED'),
+    (entry) => `${entry.package}:${entry.workload}`,
+  )) {
+    const heavy = /DATABASE_PGLITE|META_GATE/.test(locality);
+    for (const [index, part] of chunks(entries, heavy ? 10 : 40).entries())
+      batches.push({
+        id: `verify-existing-${locality.replace(/[^a-z0-9]+/gi, '-').toLowerCase()}-${index + 1}`,
+        engine: 'VERIFY_EXISTING',
+        workload: part[0].workload,
+        files: part.map((entry) => entry.path),
+        state: 'PENDING',
+      });
+  }
+  for (const [locality, entries] of groupBy(
     manifest.files.filter((entry) => entry.state === 'CODEMOD_READY'),
     (entry) => `${entry.package}:${entry.workload}`,
   )) {
@@ -115,10 +129,12 @@ function targetedVerify(root, manifest, policy, files) {
 
 export function runMechanicalBatches({ root, manifestFile, manifest, policy }) {
   for (const batch of manifest.batches.filter(
-    (entry) => entry.engine === 'CODEMOD' && entry.state !== 'VERIFIED',
+    (entry) => ['CODEMOD', 'VERIFY_EXISTING'].includes(entry.engine) && entry.state !== 'VERIFIED',
   )) {
-    runMechanicalCodemod({ root, manifest, paths: batch.files, write: true });
-    updateFileStates(manifest, batch.files, 'MIGRATED', root);
+    if (batch.engine === 'CODEMOD') {
+      runMechanicalCodemod({ root, manifest, paths: batch.files, write: true });
+      updateFileStates(manifest, batch.files, 'MIGRATED', root);
+    }
     const verification = targetedVerify(root, manifest, policy, batch.files);
     batch.verification = verification.evidence;
     if (!verification.evidence.ok) {

@@ -166,8 +166,9 @@ describe('T120 declarations + changes + fail-closed decisions', () => {
     ).rejects.toMatchObject({ code: ProvErrorCode.PROV_RIGHTS_VERSION_UNKNOWN });
   });
 
-  it('decides per-artifact against the CAPTURED version and fails closed on unknown versions', async () => {
-    // Artifact captured at v1 (STORAGE allowed at capture time).
+  it('binds later tightenings onto pre-tightening captures and fails closed on unknown versions', async () => {
+    // Artifact captured at v1: STORAGE was allowed AT CAPTURE TIME, but the
+    // v2 tightening binds IMMEDIATELY (AC-273) — pre-tightening captures refuse.
     await expect(
       rights.decideForArtifact({
         providerId: 'prov-test',
@@ -175,7 +176,7 @@ describe('T120 declarations + changes + fail-closed decisions', () => {
         capturedRightsVersion: 1,
         path: 'STORAGE' as RightsUsePath,
       }),
-    ).resolves.toEqual({ allowed: true });
+    ).resolves.toEqual({ allowed: false });
     // Captured at v2 → STORAGE is now PROHIBITED even though the row predates the change.
     await expect(
       rights.decideForArtifact({

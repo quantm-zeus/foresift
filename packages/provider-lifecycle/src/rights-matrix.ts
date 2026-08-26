@@ -263,14 +263,30 @@ export class RightsMatrixEngine {
     return row === undefined ? null : rowToDeclaration(row);
   }
 
+  /** Every declaration recorded AFTER a version, oldest first. */
+  private async declarationsAfter(
+    providerId: string,
+    operationId: string,
+    rightsVersion: number,
+  ): Promise<(RightsDeclaration & { rightsVersion: number })[]> {
+    const rows = await this.engine.query<DeclarationRow>(
+      `SELECT * FROM prov.prov_rights_declarations
+       WHERE provider_id = $1 AND operation_id = $2 AND rights_version > $3
+       ORDER BY rights_version ASC`,
+      [providerId, operationId, rightsVersion],
+    );
+    return rows.rows.map((row) => rowToDeclaration(row));
+  }
+
   /**
    * Records a change between consecutive versions with its computed diff.
    *
    * INV-009: a replay of the SAME transition (from→to) resolves to the SAME
    * change row — detected via the recorded change LEDGER, not the current
-   * pointer, because this call itself advances the pointer. A replay carrying
-   * DIFFERENT content than the recorded transition is refused outright: the
-   * first-recorded outcome of a transition is immutable.
+   * pointer, because this call itself advances the pointer. A replay that
+   * would record a DIFFERENT OUTCOME (prohibition diff / tightening flag)
+   * than the first-recorded transition is refused outright: the first
+   * outcome of a transition is immutable.
    */
   async changeRights(input: ChangeRightsInput): Promise<RightsChangeRecord> {
     const to = RightsDeclarationSchema.parse(input.declaration);
@@ -431,9 +447,14 @@ export class RightsMatrixEngine {
   }
 
   /**
-   * The immediate fail-closed decision API: evaluates use of ONE path under
-   * the rights version CAPTURED AT ARTIFACT INGESTION. A missing declaration
-   * refuses; an expired verification window refuses; a false gate refuses.
+   * The immediate fail-closed decision API for ONE path over an EXISTING
+   * artifact captured at `capturedRightsVersion`. AC-273: a later TIGHTENING
+   * binds immediately — the gate must hold under the captured declaration AND
+   * every subsequently recorded version, so loosening can never revive a use
+   * path any intermediate version prohibited (re-capture is the only road
+   * back). A missing captured declaration refuses; an expired captured
+   * verification window refuses; a false gate anywhere from capture onward
+   * refuses.
    */
   async decideForArtifact(input: {
     readonly providerId: string;
@@ -465,6 +486,16 @@ export class RightsMatrixEngine {
     const gate = PATH_GATES[input.path];
     if (gate !== null && declaration[gate] !== true) {
       return { allowed: false };
+    }
+    // Later versions bind pre-tightening captures IMMEDIATELY (AC-273).
+    for (const version of await this.declarationsAfter(
+      input.providerId,
+      input.operationId,
+      input.capturedRightsVersion,
+    )) {
+      if (gate !== null && version[gate] !== true) {
+        return { allowed: false };
+      }
     }
     return { allowed: true };
   }

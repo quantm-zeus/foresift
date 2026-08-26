@@ -23,6 +23,12 @@ importers:
       '@foresift/persistence':
         specifier: workspace:*
         version: link:packages/persistence
+      '@foresift/provider-lifecycle':
+        specifier: workspace:*
+        version: link:packages/provider-lifecycle
+      '@foresift/security':
+        specifier: workspace:*
+        version: link:packages/security
       '@foresift/shared-schemas':
         specifier: workspace:*
         version: link:packages/shared-schemas

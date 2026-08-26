@@ -3,8 +3,9 @@
   "traces": ["FR-PROV-009", "AC-273"],
   "providerId": "helius",
   "operationId": "history.get_transactions_for_address",
+  "v1RightsVersion": 1,
+  "v2RightsVersion": 2,
   "v1Declaration": {
-    "rightsVersion": 1,
     "commercialUseAllowed": true,
     "personalResearchAllowed": true,
     "cacheAllowed": true,
@@ -23,7 +24,6 @@
     "verificationExpiresAt": "2027-08-01T00:00:00Z"
   },
   "v2Declaration": {
-    "rightsVersion": 2,
     "commercialUseAllowed": true,
     "personalResearchAllowed": true,
     "cacheAllowed": true,

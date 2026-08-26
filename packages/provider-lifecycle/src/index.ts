@@ -8,6 +8,23 @@
 // in @foresift/providers, which composes these decisions with the security
 // perimeter.
 //
-// Modules are exported here as they land (T105+); the scaffold ships empty
-// by design so the milestone verification command runs from day one.
-export {};
+// Modules are exported here as they land; the scaffold shipped empty by
+// design so the milestone verification command runs from day one.
+export * from './errors.ts';
+export * from './vocabulary.ts';
+export {
+  prov,
+  provProviders,
+  provOperations,
+  provOperationDependencies,
+  provLifecycleEvents,
+  provVerificationTtlConfigs,
+  provVerificationRecords,
+  provMigrationExceptions,
+  provResponseQuarantine,
+  provRightsDeclarations,
+  provRightsChanges,
+  provProviderArtifacts,
+  provRightsChangeActions,
+  provSourceFingerprints,
+} from './generated/schema.ts';

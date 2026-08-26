@@ -3,36 +3,26 @@
 // maintenance workflow topology, manifest integrity, resource-bounded
 // coordination, affected-test selection, cutover safety, and Node 24 compat.
 
-import { execFileSync, spawnSync } from 'node:child_process';
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { spawnSync } from 'node:child_process';
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 import {
   BUN_MIGRATION_PROOF_SCHEMA,
-  BUN_MIGRATION_STATES,
   evaluateBunMigrationBarrier,
-  loadBunMigrationInputs,
   validateBunMigrationProof,
 } from '../../scripts/automation/bun-migration-state.mjs';
 import {
-  BUN_DIRECT_IMPORTS,
   BUN_MIGRATION_MANIFEST_SCHEMA,
   analyzeTestFile,
   buildBunMigrationManifest,
   isTestFile,
 } from '../../scripts/automation/bun-migration-manifest.mjs';
-import {
-  migrateMechanicalFile,
-  runMechanicalCodemod,
-} from '../../scripts/automation/bun-migration-codemod.mjs';
-import {
-  planMigrationBatches,
-  prepareMigration,
-} from '../../scripts/automation/bun-migration-runner.mjs';
+import { migrateMechanicalFile } from '../../scripts/automation/bun-migration-codemod.mjs';
+import { prepareMigration } from '../../scripts/automation/bun-migration-runner.mjs';
 import { buildBunTestPlan, bunTestArgs } from '../../scripts/automation/bun-test-coordinator.mjs';
 import {
-  buildImportGraph,
   repositorySourcePaths,
   selectAffectedTests,
 } from '../../scripts/automation/bun-affected-tests.mjs';

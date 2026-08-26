@@ -8,26 +8,24 @@
  *
  * Scenario data: tests/fixtures/prov/scenarios/rights-change.scenario.json.
  */
-import { readFileSync } from 'node:fs';
-import path from 'node:path';
-import { fileURLToPath } from 'node:url';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { utcTimestamp, type ClockPort, type UtcTimestamp } from '@foresift/domain';
 import {
   ArtifactRegistry,
   OperationRegistry,
   RightsMatrixEngine,
-  type OperationDefinition,
   type OperationTarget,
   type RightsChangeRecord,
   type RightsDeclaration,
 } from '@foresift/provider-lifecycle';
-import { closeTestDatabase, makeTestDatabase, type TestDatabase } from './helpers.ts';
+import {
+  closeProvTestDatabase,
+  loadProvFixture,
+  makeFixedClock,
+  makeProvTestDatabase,
+  provOperationDefinition,
+  type ProvTestDatabase,
+} from '../helpers/prov.ts';
 
-const SCENARIO_PATH = path.resolve(
-  path.dirname(fileURLToPath(import.meta.url)),
-  '../fixtures/prov/scenarios/rights-change.scenario.json',
-);
 interface Scenario {
   providerId: string;
   operationId: string;
@@ -38,14 +36,11 @@ interface Scenario {
   expectedDiff: { newlyProhibitedUses: string[]; tightened: boolean };
   artifacts: { objectRef: string; capturedRightsVersion: number; comment?: string }[];
 }
-const SCENARIO = JSON.parse(readFileSync(SCENARIO_PATH, 'utf8')) as Scenario;
+const SCENARIO = loadProvFixture<Scenario>('scenarios', 'rights-change.scenario.json');
 
-const clock: ClockPort = {
-  now: () => utcTimestamp('2026-08-26T12:00:00Z'),
-  nowEpochMs: () => Date.parse('2026-08-26T12:00:00Z'),
-};
+const clock = makeFixedClock('2026-08-26T12:00:00Z');
 
-let tdb: TestDatabase;
+let tdb: ProvTestDatabase;
 let rights: RightsMatrixEngine;
 let artifacts: ArtifactRegistry;
 const target: OperationTarget = {
@@ -55,50 +50,21 @@ const target: OperationTarget = {
 };
 let changeRecord: RightsChangeRecord | undefined;
 
-function definition(): OperationDefinition {
-  return {
-    providerId: SCENARIO.providerId,
-    operationId: SCENARIO.operationId,
-    version: 'v1',
-    capabilityClass: 'READ_MARKET',
-    costClass: 'PAID_EXPLICIT',
-    supportedChains: ['solana'],
-    supportedPrograms: [],
-    inputSchemaId: 'in@1',
-    rawOutputSchemaId: 'raw@1',
-    normalizedOutputSchemaId: 'norm@1',
-    quotaModelId: 'qm@1',
-    cachePolicyId: 'cp@1',
-    timeoutMs: 1000,
-    retryPolicyId: 'rp@1',
-    declaredIndependenceGroup: 'group-ac273',
-    upstreamLineage: [],
-    licensePolicyId: 'lic@1',
-    estimatedQuotaUnits: 0,
-    quotaResetPolicyId: 'qrp@1',
-    batchCapability: null,
-    minimumCandidateStage: null,
-    protectedReserveEligible: false,
-    allowedInStrictFree: false,
-    paidFallbackAllowed: false,
-    deprecatedAt: null,
-    sunsetAt: null,
-    replacementOperationId: null,
-    verificationExpiresAt: utcTimestamp('2020-01-01T00:00:00Z') as UtcTimestamp,
-    forbiddenOutputFields: [],
-    negativeCapabilities: [],
-  };
-}
-
 beforeAll(async () => {
-  tdb = await makeTestDatabase();
+  tdb = await makeProvTestDatabase();
   const registry = new OperationRegistry(tdb.engine, clock);
   await registry.registerProvider({
     providerId: SCENARIO.providerId,
     displayName: 'AC-273 provider',
     providerGroup: 'acceptance',
   });
-  await registry.registerOperation(definition());
+  await registry.registerOperation(
+    provOperationDefinition(target, {
+      costClass: 'PAID_EXPLICIT',
+      declaredIndependenceGroup: 'group-ac273',
+      negativeCapabilities: [],
+    }),
+  );
   rights = new RightsMatrixEngine({ engine: tdb.engine, clock });
   artifacts = new ArtifactRegistry({ engine: tdb.engine, clock });
 
@@ -121,7 +87,7 @@ beforeAll(async () => {
 });
 
 afterAll(async () => {
-  await closeTestDatabase(tdb);
+  await closeProvTestDatabase(tdb);
 });
 
 describe('AC-273 tightening enforcement', () => {
@@ -191,7 +157,9 @@ describe('AC-273 tightening enforcement', () => {
     // The post-change capture (captured AT v2) is NOT affected.
     const postCapture = await artifacts.registerArtifact({
       target,
-      objectRef: SCENARIO.artifacts.find((a) => a.capturedRightsVersion === 2)?.objectRef ?? 'obs://scenario-artifact-2',
+      objectRef:
+        SCENARIO.artifacts.find((a) => a.capturedRightsVersion === 2)?.objectRef ??
+        'obs://scenario-artifact-2',
       rightsVersion: 2,
     });
     expect(postCapture.state).toBe('ACTIVE');

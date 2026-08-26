@@ -6,43 +6,50 @@
  * records what was admitted, the untrusted-content envelope labels it, and
  * nothing in the clean path touches quarantine.
  */
-import { readFileSync } from 'node:fs';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { sha256Text } from '@foresift/persistence';
 import { utcTimestamp } from '@foresift/domain';
 import { AuditChain, envelopeContent } from '@foresift/security';
 import { ResponseQuarantine, scanResponse } from '@foresift/provider-lifecycle';
 import type { OperationTarget } from '@foresift/provider-lifecycle';
-import { closeTestDatabase, makeTestDatabase, type TestDatabase } from './helpers.ts';
+import {
+  closeProvTestDatabase,
+  loadProvFixture,
+  makeFixedClock,
+  makeProvTestDatabase,
+  type ProvTestDatabase,
+} from '../helpers/prov.ts';
 
-const TARGET: OperationTarget = { providerId: 'gmgn', operationId: 'token.security', version: 'v1' };
+const TARGET: OperationTarget = {
+  providerId: 'gmgn',
+  operationId: 'token.security',
+  version: 'v1',
+};
 
-let tdb: TestDatabase;
+let tdb: ProvTestDatabase;
 let quarantine: ResponseQuarantine;
 let chain: AuditChain;
 
 beforeAll(async () => {
-  tdb = await makeTestDatabase();
+  tdb = await makeProvTestDatabase();
   chain = new AuditChain({ engine: tdb.engine });
   quarantine = new ResponseQuarantine({
     engine: tdb.engine,
-    clock: {
-      now: () => utcTimestamp('2026-08-26T12:00:00Z'),
-      nowEpochMs: () => Date.parse('2026-08-26T12:00:00Z'),
-    },
+    clock: makeFixedClock('2026-08-26T12:00:00Z'),
     auditChain: chain,
   });
 });
 
 afterAll(async () => {
-  await closeTestDatabase(tdb);
+  await closeProvTestDatabase(tdb);
 });
 
 describe('AC-271 clean-response flow to evidence envelopes', () => {
   it('sanitized fixture scans CLEAN and flows into a labeled evidence envelope', async () => {
-    const fixture = JSON.parse(
-      readFileSync(new URL('../fixtures/prov/gmgn/token-security.clean.json', import.meta.url), 'utf8'),
-    ) as { body: Record<string, unknown> };
+    const fixture = loadProvFixture<{ body: Record<string, unknown> }>(
+      'gmgn',
+      'token-security.clean.json',
+    );
     const bodyText = JSON.stringify(fixture.body);
 
     const scan = scanResponse(bodyText);

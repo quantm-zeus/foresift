@@ -6,47 +6,38 @@
  * (proved for the private-key fixture); stripped transaction-building fields
  * never persist.
  */
-import { readFileSync, readdirSync } from 'node:fs';
-import path from 'node:path';
-import { fileURLToPath } from 'node:url';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { sha256Text } from '@foresift/persistence';
-import { utcTimestamp, type ClockPort, type UtcTimestamp } from '@foresift/domain';
 import { AuditChain } from '@foresift/security';
 import {
   OperationRegistry,
   ProvErrorCode,
-  REQUIRED_NEGATIVE_CAPABILITIES,
   ResponseQuarantine,
   scanResponse,
   stripTransactionBuildingFields,
 } from '@foresift/provider-lifecycle';
-import type { OperationDefinition, OperationTarget } from '@foresift/provider-lifecycle';
-import { closeTestDatabase, makeTestDatabase, type TestDatabase } from '../acceptance/helpers.ts';
+import type { OperationTarget } from '@foresift/provider-lifecycle';
+import {
+  closeProvTestDatabase,
+  loadForbiddenFixtureCorpus,
+  makeFixedClock,
+  makeProvTestDatabase,
+  provOperationDefinition,
+  type ProvTestDatabase,
+} from '../helpers/prov.ts';
 
-const TARGET: OperationTarget = { providerId: 'gmgn', operationId: 'token.security', version: 'v1' };
-const NOW = '2026-08-26T12:00:00Z';
-const clock: ClockPort = {
-  now: () => utcTimestamp(NOW),
-  nowEpochMs: () => Date.parse(NOW),
+const TARGET: OperationTarget = {
+  providerId: 'gmgn',
+  operationId: 'token.security',
+  version: 'v1',
 };
-const FORBIDDEN_DIR = path.resolve(
-  path.dirname(fileURLToPath(import.meta.url)),
-  '../fixtures/prov/forbidden',
-);
+const clock = makeFixedClock('2026-08-26T12:00:00Z');
 
-interface ForbiddenFixture {
-  fixtureClass: string;
-  detectedClass: string;
-  comment?: string;
-  body: Record<string, unknown>;
-}
-
-let tdb: TestDatabase;
+let tdb: ProvTestDatabase;
 let quarantine: ResponseQuarantine;
 
 beforeAll(async () => {
-  tdb = await makeTestDatabase();
+  tdb = await makeProvTestDatabase();
   // The quarantine table FKs onto the registered operation, so seed the
   // gmgn/token.security row the fixtures target.
   const registry = new OperationRegistry(tdb.engine, clock);
@@ -55,7 +46,7 @@ beforeAll(async () => {
     displayName: 'GMGN fixture provider',
     providerGroup: 'fixtures',
   });
-  await registry.registerOperation(definition());
+  await registry.registerOperation(provOperationDefinition(TARGET));
   quarantine = new ResponseQuarantine({
     engine: tdb.engine,
     clock,
@@ -63,58 +54,13 @@ beforeAll(async () => {
   });
 });
 
-function definition(): OperationDefinition {
-  return {
-    providerId: TARGET.providerId,
-    operationId: TARGET.operationId,
-    version: TARGET.version,
-    capabilityClass: 'READ_MARKET',
-    costClass: 'FREE_UNMETERED',
-    supportedChains: ['solana'],
-    supportedPrograms: [],
-    inputSchemaId: 'in@1',
-    rawOutputSchemaId: 'raw@1',
-    normalizedOutputSchemaId: 'norm@1',
-    quotaModelId: 'qm@1',
-    cachePolicyId: 'cp@1',
-    timeoutMs: 1000,
-    retryPolicyId: 'rp@1',
-    declaredIndependenceGroup: 'group-ac271neg',
-    upstreamLineage: [],
-    licensePolicyId: 'lic@1',
-    estimatedQuotaUnits: 0,
-    quotaResetPolicyId: 'qrp@1',
-    batchCapability: null,
-    minimumCandidateStage: null,
-    protectedReserveEligible: false,
-    allowedInStrictFree: false,
-    paidFallbackAllowed: false,
-    deprecatedAt: null,
-    sunsetAt: null,
-    replacementOperationId: null,
-    verificationExpiresAt: utcTimestamp('2020-01-01T00:00:00Z'),
-    forbiddenOutputFields: [],
-    negativeCapabilities: [...REQUIRED_NEGATIVE_CAPABILITIES],
-  };
-}
-
 afterAll(async () => {
-  await closeTestDatabase(tdb);
+  await closeProvTestDatabase(tdb);
 });
-
-function loadFixtures(): { file: string; fixture: ForbiddenFixture; bodyText: string }[] {
-  return readdirSync(FORBIDDEN_DIR)
-    .filter((f) => f.endsWith('.json'))
-    .sort()
-    .map((file) => {
-      const fixture = JSON.parse(readFileSync(path.join(FORBIDDEN_DIR, file), 'utf8')) as ForbiddenFixture;
-      return { file, fixture, bodyText: JSON.stringify(fixture.body) };
-    });
-}
 
 describe('AC-271 refusals per malicious-response class', () => {
   it('every forbidden fixture is DETECTED under its declared class', () => {
-    const fixtures = loadFixtures();
+    const fixtures = loadForbiddenFixtureCorpus();
     expect(fixtures.length).toBeGreaterThanOrEqual(5);
     for (const { file, fixture, bodyText } of fixtures) {
       const report = scanResponse(bodyText);
@@ -127,7 +73,7 @@ describe('AC-271 refusals per malicious-response class', () => {
   });
 
   it('each class is REJECTED + QUARANTINED + AUDITED + EXCLUDED from model context', async () => {
-    const fixtures = loadFixtures();
+    const fixtures = loadForbiddenFixtureCorpus();
     for (const { file, fixture, bodyText } of fixtures) {
       const scan = scanResponse(bodyText);
       const record = await quarantine.rejectAndQuarantine({
@@ -163,7 +109,9 @@ describe('AC-271 refusals per malicious-response class', () => {
   });
 
   it('quarantine storage holds NO payload bytes for the private-key fixture', async () => {
-    const { bodyText } = loadFixtures().find((f) => f.file.startsWith('private-key'))!;
+    const { bodyText } = loadForbiddenFixtureCorpus().find((f) =>
+      f.file.startsWith('private-key'),
+    )!;
     const record = await quarantine.rejectAndQuarantine({
       target: TARGET,
       responseBody: bodyText,
@@ -196,7 +144,9 @@ describe('AC-271 refusals per malicious-response class', () => {
   });
 
   it('stripped transaction-building fields NEVER persist', async () => {
-    const skeleton = loadFixtures().find((f) => f.file.startsWith('transaction-payload-skeleton'))!;
+    const skeleton = loadForbiddenFixtureCorpus().find((f) =>
+      f.file.startsWith('transaction-payload-skeleton'),
+    )!;
     const parsed = JSON.parse(skeleton.bodyText) as Record<string, unknown>;
     const { stripped, removedPaths } = stripTransactionBuildingFields(parsed);
 

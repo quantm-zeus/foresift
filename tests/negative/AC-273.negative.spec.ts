@@ -6,21 +6,23 @@
  * right NEVER reactivates enforced artifacts, and divergent replays of an
  * already-recorded transition are refused outright.
  */
-import { readFileSync } from 'node:fs';
-import path from 'node:path';
-import { fileURLToPath } from 'node:url';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { utcTimestamp, type ClockPort, type UtcTimestamp } from '@foresift/domain';
 import {
   ArtifactRegistry,
   OperationRegistry,
   ProvErrorCode,
   RightsMatrixEngine,
-  type OperationDefinition,
   type OperationTarget,
   type RightsDeclaration,
 } from '@foresift/provider-lifecycle';
-import { closeTestDatabase, makeTestDatabase, type TestDatabase } from '../acceptance/helpers.ts';
+import {
+  closeProvTestDatabase,
+  loadProvFixture,
+  makeFixedClock,
+  makeProvTestDatabase,
+  provOperationDefinition,
+  type ProvTestDatabase,
+} from '../helpers/prov.ts';
 
 interface Scenario {
   providerId: string;
@@ -28,19 +30,11 @@ interface Scenario {
   v1Declaration: RightsDeclaration;
   v2Declaration: RightsDeclaration;
 }
-const SCENARIO = JSON.parse(
-  readFileSync(
-    path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../fixtures/prov/scenarios/rights-change.scenario.json'),
-    'utf8',
-  ),
-) as Scenario;
+const SCENARIO = loadProvFixture<Scenario>('scenarios', 'rights-change.scenario.json');
 
-const clock: ClockPort = {
-  now: () => utcTimestamp('2026-08-26T12:00:00Z'),
-  nowEpochMs: () => Date.parse('2026-08-26T12:00:00Z'),
-};
+const clock = makeFixedClock('2026-08-26T12:00:00Z');
 
-let tdb: TestDatabase;
+let tdb: ProvTestDatabase;
 let rights: RightsMatrixEngine;
 let artifacts: ArtifactRegistry;
 const target: OperationTarget = {
@@ -50,47 +44,12 @@ const target: OperationTarget = {
 };
 
 beforeAll(async () => {
-  tdb = await makeTestDatabase();
+  tdb = await makeProvTestDatabase();
 });
 
 afterAll(async () => {
-  await closeTestDatabase(tdb);
+  await closeProvTestDatabase(tdb);
 });
-
-function definition(): OperationDefinition {
-  return {
-    providerId: SCENARIO.providerId,
-    operationId: target.operationId,
-    version: 'v1',
-    capabilityClass: 'READ_MARKET',
-    costClass: 'PAID_EXPLICIT',
-    supportedChains: ['solana'],
-    supportedPrograms: [],
-    inputSchemaId: 'in@1',
-    rawOutputSchemaId: 'raw@1',
-    normalizedOutputSchemaId: 'norm@1',
-    quotaModelId: 'qm@1',
-    cachePolicyId: 'cp@1',
-    timeoutMs: 1000,
-    retryPolicyId: 'rp@1',
-    declaredIndependenceGroup: 'group-ac273neg',
-    upstreamLineage: [],
-    licensePolicyId: 'lic@1',
-    estimatedQuotaUnits: 0,
-    quotaResetPolicyId: 'qrp@1',
-    batchCapability: null,
-    minimumCandidateStage: null,
-    protectedReserveEligible: false,
-    allowedInStrictFree: false,
-    paidFallbackAllowed: false,
-    deprecatedAt: null,
-    sunsetAt: null,
-    replacementOperationId: null,
-    verificationExpiresAt: utcTimestamp('2020-01-01T00:00:00Z') as UtcTimestamp,
-    forbiddenOutputFields: [],
-    negativeCapabilities: [],
-  };
-}
 
 describe('AC-273 refusals and enforcement completeness', () => {
   let changeId = '';
@@ -102,7 +61,13 @@ describe('AC-273 refusals and enforcement completeness', () => {
       displayName: 'AC-273 negative provider',
       providerGroup: 'acceptance',
     });
-    await registry.registerOperation(definition());
+    await registry.registerOperation(
+      provOperationDefinition(target, {
+        costClass: 'PAID_EXPLICIT',
+        declaredIndependenceGroup: 'group-ac273neg',
+        negativeCapabilities: [],
+      }),
+    );
     rights = new RightsMatrixEngine({ engine: tdb.engine, clock });
     artifacts = new ArtifactRegistry({ engine: tdb.engine, clock });
     await rights.declareRights({
@@ -111,7 +76,11 @@ describe('AC-273 refusals and enforcement completeness', () => {
       rightsVersion: 1,
       declaration: SCENARIO.v1Declaration,
     });
-    await artifacts.registerArtifact({ target, objectRef: 'obs://neg-pre-tighten', rightsVersion: 1 });
+    await artifacts.registerArtifact({
+      target,
+      objectRef: 'obs://neg-pre-tighten',
+      rightsVersion: 1,
+    });
     const change = await rights.changeRights({
       providerId: SCENARIO.providerId,
       operationId: target.operationId,

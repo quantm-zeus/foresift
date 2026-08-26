@@ -16,31 +16,30 @@ import {
   RightsMatrixEngine,
   VerificationTtlEngine,
   ProvErrorCode,
-  REQUIRED_NEGATIVE_CAPABILITIES,
 } from '@foresift/provider-lifecycle';
-import type {
-  OperationDefinition,
-  OperationTarget,
-  ProviderVerificationKind,
-} from '@foresift/provider-lifecycle';
-import { closeTestDatabase, makeTestDatabase, type TestDatabase } from '../acceptance/helpers.ts';
+import type { OperationTarget, ProviderVerificationKind } from '@foresift/provider-lifecycle';
+import {
+  closeProvTestDatabase,
+  makeFixedClock,
+  makeProvTestDatabase,
+  openRightsDeclaration,
+  provOperationDefinition,
+  recordVerificationPair,
+  type ProvTestDatabase,
+} from '../helpers/prov.ts';
 
 const KINDS: readonly ProviderVerificationKind[] = ['DOCUMENTATION', 'PRICING_PLAN', 'RIGHTS'];
-const NOW = '2026-08-26T12:00:00Z';
 
-const clock: ClockPort = {
-  now: () => utcTimestamp(NOW),
-  nowEpochMs: () => Date.parse(NOW),
-};
+const clock = makeFixedClock('2026-08-26T12:00:00Z');
 
-let tdb: TestDatabase;
+let tdb: ProvTestDatabase;
 let registry: OperationRegistry;
 let machine: LifecycleMachine;
 let ttl: VerificationTtlEngine;
 let rights: RightsMatrixEngine;
 
 beforeAll(async () => {
-  tdb = await makeTestDatabase();
+  tdb = await makeProvTestDatabase();
   registry = new OperationRegistry(tdb.engine, clock);
   machine = new LifecycleMachine({ engine: tdb.engine, clock });
   ttl = new VerificationTtlEngine({ engine: tdb.engine, clock, machine });
@@ -57,44 +56,8 @@ beforeAll(async () => {
 });
 
 afterAll(async () => {
-  await closeTestDatabase(tdb);
+  await closeProvTestDatabase(tdb);
 });
-
-function definition(overrides: Partial<OperationDefinition> = {}): OperationDefinition {
-  return {
-    providerId: 'ac272neg-provider',
-    operationId: 'op-ac272neg',
-    version: 'v1',
-    capabilityClass: 'READ_MARKET',
-    costClass: 'FREE_UNMETERED',
-    supportedChains: ['solana'],
-    supportedPrograms: [],
-    inputSchemaId: 'in@1',
-    rawOutputSchemaId: 'raw@1',
-    normalizedOutputSchemaId: 'norm@1',
-    quotaModelId: 'qm@1',
-    cachePolicyId: 'cp@1',
-    timeoutMs: 1000,
-    retryPolicyId: 'rp@1',
-    declaredIndependenceGroup: 'group-ac272neg',
-    upstreamLineage: [],
-    licensePolicyId: 'lic@1',
-    estimatedQuotaUnits: 0,
-    quotaResetPolicyId: 'qrp@1',
-    batchCapability: null,
-    minimumCandidateStage: null,
-    protectedReserveEligible: false,
-    allowedInStrictFree: false,
-    paidFallbackAllowed: false,
-    deprecatedAt: null,
-    sunsetAt: null,
-    replacementOperationId: null,
-    verificationExpiresAt: utcTimestamp('2020-01-01T00:00:00Z'),
-    forbiddenOutputFields: [],
-    negativeCapabilities: [...REQUIRED_NEGATIVE_CAPABILITIES],
-    ...overrides,
-  };
-}
 
 /** Walks an op to ACTIVE with fresh verification pairs; rights optional. */
 async function seedActive(
@@ -102,46 +65,34 @@ async function seedActive(
   options: { withRights?: boolean } = {},
 ): Promise<OperationTarget> {
   const target: OperationTarget = { providerId: 'ac272neg-provider', operationId, version: 'v1' };
-  await registry.registerOperation(definition({ operationId }));
-  await machine.transition({ target, toState: 'VERIFIED', reasonClass: 'VERIFICATION_PASSED', actor: 'ac272n' });
-  await machine.transition({ target, toState: 'ACTIVE', reasonClass: 'ACTIVATION', actor: 'ac272n' });
+  await registry.registerOperation(provOperationDefinition(target));
+  await machine.transition({
+    target,
+    toState: 'VERIFIED',
+    reasonClass: 'VERIFICATION_PASSED',
+    actor: 'ac272n',
+  });
+  await machine.transition({
+    target,
+    toState: 'ACTIVE',
+    reasonClass: 'ACTIVATION',
+    actor: 'ac272n',
+  });
   for (const kind of KINDS) {
     await ttl.configureTtl({ kind, ttlSeconds: 86_400 });
-    for (const source of ['OFFICIAL_DOC', 'LIVE_CONTRACT'] as const) {
-      await ttl.recordVerification({
-        target,
-        kind,
-        source,
-        outcome: 'PASSED',
-        verifiedAt: utcTimestamp('2026-08-26T10:00:00Z'),
-        expiresAt: utcTimestamp('2027-01-01T00:00:00Z'),
-        evidenceRefs: [`evidence:${kind}:${source}`],
-      });
-    }
+    await recordVerificationPair(ttl, {
+      target,
+      kind,
+      clock,
+      window: { verifiedAt: '2026-08-26T10:00:00Z', expiresAt: '2027-01-01T00:00:00Z' },
+    });
   }
   if (options.withRights !== false) {
     await rights.declareRights({
       providerId: target.providerId,
       operationId,
       rightsVersion: 1,
-      declaration: {
-        commercialUseAllowed: true,
-        personalResearchAllowed: true,
-        cacheAllowed: true,
-        maximumCacheDurationSeconds: 86_400,
-        rawRetentionAllowed: true,
-        derivedFeaturesAllowed: true,
-        modelTrainingAllowed: true,
-        redistributionAllowed: true,
-        publicAlertDerivativeAllowed: true,
-        attributionRequired: false,
-        userByokRequired: false,
-        rawExportAllowed: true,
-        jurisdictionRestrictions: [],
-        termsVersion: `terms@${operationId}`,
-        verifiedAt: utcTimestamp('2026-08-01T00:00:00Z'),
-        verificationExpiresAt: utcTimestamp('2027-08-01T00:00:00Z'),
-      },
+      declaration: openRightsDeclaration({ termsVersion: `terms@${operationId}` }),
     });
   }
   return target;
@@ -196,11 +147,20 @@ describe('AC-272 blocked states', () => {
   });
 
   it('DEPRECATED without a valid exception holds BLOCKED with a DEPRECATION reason', async () => {
-    const target: OperationTarget = { providerId: 'ac272neg-provider', operationId: 'op-deprecated-noexc', version: 'v1' };
+    const target: OperationTarget = {
+      providerId: 'ac272neg-provider',
+      operationId: 'op-deprecated-noexc',
+      version: 'v1',
+    };
     await registry.registerOperation(
-      definition({ operationId: 'op-deprecated-noexc', deprecatedAt: utcTimestamp('2026-07-01T00:00:00Z') }),
+      provOperationDefinition(target, { deprecatedAt: utcTimestamp('2026-07-01T00:00:00Z') }),
     );
-    await machine.transition({ target, toState: 'DEPRECATED', reasonClass: 'DEPRECATION_NOTICE', actor: 'ac272n' });
+    await machine.transition({
+      target,
+      toState: 'DEPRECATED',
+      reasonClass: 'DEPRECATION_NOTICE',
+      actor: 'ac272n',
+    });
     const verdict = await evaluatorFor().evaluate(target);
     expect(verdict.status).toBe('BLOCKED');
     if (verdict.status !== 'BLOCKED') return;
@@ -224,7 +184,12 @@ describe('AC-272 blocked states', () => {
 
   it('reasons AGGREGATE — multiple failing dimensions appear together', async () => {
     const target = await seedActive('op-multi-fail', { withRights: false });
-    await machine.transition({ target, toState: 'DEGRADED', reasonClass: 'HEALTH_DEGRADED', actor: 'ac272n' });
+    await machine.transition({
+      target,
+      toState: 'DEGRADED',
+      reasonClass: 'HEALTH_DEGRADED',
+      actor: 'ac272n',
+    });
     const verdict = await evaluatorFor().evaluate(target);
     expect(verdict.status).toBe('BLOCKED');
     if (verdict.status !== 'BLOCKED') return;

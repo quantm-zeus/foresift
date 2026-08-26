@@ -42,9 +42,7 @@ export function ts(value: string): UtcTimestamp {
 export const DEFAULT_NOW = '2026-08-26T12:00:00Z';
 
 /** A valid §15.3 definition; overrides merge shallowly. */
-export function testDefinition(
-  overrides: Partial<OperationDefinition> = {},
-): OperationDefinition {
+export function testDefinition(overrides: Partial<OperationDefinition> = {}): OperationDefinition {
   return {
     providerId: 'prov-test',
     operationId: 'op-test',
@@ -112,13 +110,13 @@ export async function seedOperationRow(
 
 export function wireEngine(engine: DatabaseEngine, clock?: ClockPort): Wired {
   const resolvedClock = clock ?? fixedClock(ts(DEFAULT_NOW));
-  // The rule-1 gate is late-bound: DeprecationRules needs the registry, and
-  // the registry's dependency fence needs the rules — the delegate below
-  // resolves after construction closes the cycle.
-  let dependencyGate: ((target: OperationTarget) => Promise<void>) | undefined;
+  // The rule-1 gate is late-bound through a holder: DeprecationRules needs
+  // the registry and the registry's dependency fence needs the rules — the
+  // delegate below resolves after construction closes the cycle.
+  const lateGate: { current?: (target: OperationTarget) => Promise<void> } = {};
   const registry = new OperationRegistry(engine, resolvedClock, {
     dependencyGate: async (target) => {
-      const gate = dependencyGate;
+      const gate = lateGate.current;
       if (gate !== undefined) await gate(target);
     },
   });
@@ -133,7 +131,7 @@ export function wireEngine(engine: DatabaseEngine, clock?: ClockPort): Wired {
     exceptions,
     ttl,
   });
-  dependencyGate = (target) => rules.assertDependencyRegistrationAllowed(target);
+  lateGate.current = (target) => rules.assertDependencyRegistrationAllowed(target);
   return {
     engine,
     clock: resolvedClock,

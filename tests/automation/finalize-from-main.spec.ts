@@ -360,7 +360,9 @@ describe('finalize-from-main — deterministic fail-closed RUNNING→PROVEN (def
         }),
       );
       expect(nonMain.ok).toBe(false);
-      expect(nonMain.reasons.join(' ')).toContain("product checkout is on 'feature/unmerged', not main");
+      expect(nonMain.reasons.join(' ')).toContain(
+        "product checkout is on 'feature/unmerged', not main",
+      );
 
       // 3. Checkout HEAD detached / not matching mainSha
       const headMismatch = evaluateFinalizationFromMain(

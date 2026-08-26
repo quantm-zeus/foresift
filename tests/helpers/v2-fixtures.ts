@@ -5,7 +5,7 @@ import { execFileSync } from 'node:child_process';
 import { mkdirSync, mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { it } from 'vitest';
+import { it } from 'bun:test';
 
 export const SCRIPTS = join(import.meta.dirname, '..', '..', 'scripts', 'automation');
 export const REPO = process.cwd();

@@ -4,7 +4,7 @@
  * unknown strings with typed codes, and the reservation transition matrix
  * matches the PRD lifecycle exactly — including idempotent retry replays.
  */
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'bun:test';
 import {
   ActionClass,
   ADMISSIBLE_ACTION_CLASSES,
@@ -41,36 +41,24 @@ import { ForesiftError } from '../src/errors.ts';
 
 /** [value, resolver, expected] rows for the fail-closed resolution matrix. */
 const VOCABULARIES = [
-  { name: 'actionClass', resolve: actionClass, all: ALL_ACTION_CLASSES },
-  { name: 'workloadClass', resolve: workloadClass, all: ALL_WORKLOAD_CLASSES },
-  { name: 'cacheOutcome', resolve: cacheOutcome, all: ALL_CACHE_OUTCOMES },
-  { name: 'quotaModel', resolve: quotaModel, all: ALL_QUOTA_MODELS },
-  {
-    name: 'reservationState',
-    resolve: reservationState,
-    all: ALL_RESERVATION_STATES,
-  },
-  {
-    name: 'backpressureAction',
-    resolve: backpressureAction,
-    all: ALL_BACKPRESSURE_ACTIONS,
-  },
-  { name: 'holderMode', resolve: holderMode, all: ALL_HOLDER_MODES },
-  { name: 'toolProfileId', resolve: toolProfileId, all: ALL_TOOL_PROFILE_IDS },
-  {
-    name: 'freshnessFieldFamily',
-    resolve: freshnessFieldFamily,
-    all: ALL_FRESHNESS_FIELD_FAMILIES,
-  },
-  { name: 'pipelineStage', resolve: pipelineStage, all: ALL_PIPELINE_STAGES },
+  ['actionClass', actionClass, ALL_ACTION_CLASSES],
+  ['workloadClass', workloadClass, ALL_WORKLOAD_CLASSES],
+  ['cacheOutcome', cacheOutcome, ALL_CACHE_OUTCOMES],
+  ['quotaModel', quotaModel, ALL_QUOTA_MODELS],
+  ['reservationState', reservationState, ALL_RESERVATION_STATES],
+  ['backpressureAction', backpressureAction, ALL_BACKPRESSURE_ACTIONS],
+  ['holderMode', holderMode, ALL_HOLDER_MODES],
+  ['toolProfileId', toolProfileId, ALL_TOOL_PROFILE_IDS],
+  ['freshnessFieldFamily', freshnessFieldFamily, ALL_FRESHNESS_FIELD_FAMILIES],
+  ['pipelineStage', pipelineStage, ALL_PIPELINE_STAGES],
 ] as const;
 
 describe('§16 vocabulary resolution', () => {
-  it.each(VOCABULARIES)('$name resolves every member of its exact PRD set', ({ resolve, all }) => {
+  it.each(VOCABULARIES)('%s resolves every member of its exact PRD set', (_name, resolve, all) => {
     for (const value of all) expect(resolve(value)).toBe(value);
   });
 
-  it.each(VOCABULARIES)('$name refuses unknown values fail-closed', ({ resolve, all }) => {
+  it.each(VOCABULARIES)('%s refuses unknown values fail-closed', (_name, resolve, all) => {
     expect(() => resolve('TOTALLY_MADE_UP')).toThrow(ForesiftError);
     expect(() => resolve('')).toThrow(ForesiftError);
     // Case drift is a different string — never silently normalized.

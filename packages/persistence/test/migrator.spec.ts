@@ -1,4 +1,4 @@
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 import { PGlite } from '@electric-sql/pglite';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -79,44 +79,40 @@ describe('applyMigrations (FR-DATA-001…006, FR-DR-001/002 foundation)', () => 
     await db.close();
   });
 
-  it(
-    'applies all G0 scripts to an empty database and records state',
-    { timeout: 120_000 },
-    async () => {
-      const report = await applyMigrations({ engine, migrationsDir: MIGRATIONS_DIR });
-      expect(report.applied.length).toBe(25);
-      expect(report.skipped).toEqual([]);
+  it('applies all G0 scripts to an empty database and records state', async () => {
+    const report = await applyMigrations({ engine, migrationsDir: MIGRATIONS_DIR });
+    expect(report.applied.length).toBe(25);
+    expect(report.skipped).toEqual([]);
 
-      const recorded = await appliedMigrations(engine);
-      expect(recorded.map((r) => r.id)).toEqual([
-        'g0_core_0001_tool_registry',
-        'g0_core_0002_single_flight_leases',
-        'g0_core_0003_quota_reservations',
-        'g0_core_0004_exact_cache',
-        'g0_data_0001_identity',
-        'g0_data_0002_observations_revisions',
-        'g0_data_0003_quality_sources',
-        'g0_data_0004_features_acquisition',
-        'g0_data_0005_object_artifact_index',
-        'g0_data_0006_probe_assignments',
-        'g0_data_0007_checkpoints_gaps',
-        'g0_dr_0001_recovery_tiers',
-        'g0_dr_0002_backup_policy',
-        'g0_dr_0003_incidents',
-        'g0_dr_0004_tier_measurement_incident_fk',
-        'g0_dr_0005_health_state_incident_fk',
-        'g0_prov_0001_provider_operations',
-        'g0_prov_0002_verification_ttl',
-        'g0_prov_0003_migration_exceptions',
-        'g0_prov_0004_quarantine',
-        'g0_prov_0005_rights_fingerprints',
-        'g0_sec_0001_audit_chain',
-        'g0_sec_0002_mcp_credentials',
-        'g0_sec_0003_import_quarantine',
-        'g0_sec_0004_incidents_pauses',
-      ]);
-    },
-  );
+    const recorded = await appliedMigrations(engine);
+    expect(recorded.map((r) => r.id)).toEqual([
+      'g0_core_0001_tool_registry',
+      'g0_core_0002_single_flight_leases',
+      'g0_core_0003_quota_reservations',
+      'g0_core_0004_exact_cache',
+      'g0_data_0001_identity',
+      'g0_data_0002_observations_revisions',
+      'g0_data_0003_quality_sources',
+      'g0_data_0004_features_acquisition',
+      'g0_data_0005_object_artifact_index',
+      'g0_data_0006_probe_assignments',
+      'g0_data_0007_checkpoints_gaps',
+      'g0_dr_0001_recovery_tiers',
+      'g0_dr_0002_backup_policy',
+      'g0_dr_0003_incidents',
+      'g0_dr_0004_tier_measurement_incident_fk',
+      'g0_dr_0005_health_state_incident_fk',
+      'g0_prov_0001_provider_operations',
+      'g0_prov_0002_verification_ttl',
+      'g0_prov_0003_migration_exceptions',
+      'g0_prov_0004_quarantine',
+      'g0_prov_0005_rights_fingerprints',
+      'g0_sec_0001_audit_chain',
+      'g0_sec_0002_mcp_credentials',
+      'g0_sec_0003_import_quarantine',
+      'g0_sec_0004_incidents_pauses',
+    ]);
+  }, 120_000);
 
   it('applies twice without damage (idempotent)', async () => {
     const second = await applyMigrations({ engine, migrationsDir: MIGRATIONS_DIR });
@@ -161,7 +157,6 @@ describe('applyMigrations (FR-DATA-001…006, FR-DR-001/002 foundation)', () => 
 describe('failure isolation', () => {
   it(
     'a failing script aborts cleanly leaving prior recorded state intact',
-    { timeout: 120_000 },
     async () => {
       const db = new PGlite({ parsers: PRECISION_RETAINING_TIMESTAMP_PARSERS });
       const engine = createEngine(db, 'pglite');
@@ -210,6 +205,7 @@ describe('failure isolation', () => {
         await db.close();
       }
     },
+    120_000,
   );
 });
 
@@ -243,7 +239,6 @@ describe('migrator fail-closed defenses (FR-DATA-001…006 / FR-DR-001/002 subst
 
   it(
     'refuses .sql files matching no known family instead of silently ignoring them',
-    { timeout: 120_000 },
     async () => {
       const { db, engine } = await freshEngine();
       try {
@@ -278,11 +273,11 @@ describe('migrator fail-closed defenses (FR-DATA-001…006 / FR-DR-001/002 subst
         });
       }
     },
+    120_000,
   );
 
   it(
     'applies future-generation g1_* scripts in lexicographic order (never silently dropped)',
-    { timeout: 120_000 },
     async () => {
       const { db, engine } = await freshEngine();
       try {
@@ -308,9 +303,10 @@ describe('migrator fail-closed defenses (FR-DATA-001…006 / FR-DR-001/002 subst
         });
       }
     },
+    120_000,
   );
 
-  it('refuses when a recorded migration id has no file on disk', { timeout: 120_000 }, async () => {
+  it('refuses when a recorded migration id has no file on disk', async () => {
     const { db, engine } = await freshEngine();
     try {
       const sandbox = await makeSandbox('missing-file');
@@ -339,11 +335,10 @@ describe('migrator fail-closed defenses (FR-DATA-001…006 / FR-DR-001/002 subst
         force: true,
       });
     }
-  });
+  }, 120_000);
 
   it(
     'refuses a new migration sorting behind already-applied state (out of order)',
-    { timeout: 120_000 },
     async () => {
       const { db, engine } = await freshEngine();
       try {
@@ -385,11 +380,11 @@ describe('migrator fail-closed defenses (FR-DATA-001…006 / FR-DR-001/002 subst
         });
       }
     },
+    120_000,
   );
 
   it(
     'fences a concurrent run through the lease table (INV-009)',
-    { timeout: 120_000 },
     async () => {
       const { db, engine } = await freshEngine();
       try {
@@ -418,11 +413,11 @@ describe('migrator fail-closed defenses (FR-DATA-001…006 / FR-DR-001/002 subst
         await db.close();
       }
     },
+    120_000,
   );
 
   it(
     'two simultaneous runs on one engine: exactly one applies, one is fenced',
-    { timeout: 120_000 },
     async () => {
       const { db, engine } = await freshEngine();
       try {
@@ -449,11 +444,11 @@ describe('migrator fail-closed defenses (FR-DATA-001…006 / FR-DR-001/002 subst
         await db.close();
       }
     },
+    120_000,
   );
 
   it(
     'releases its own lease after success AND after a failed migration',
-    { timeout: 120_000 },
     async () => {
       const { db, engine } = await freshEngine();
       try {
@@ -495,6 +490,7 @@ describe('migrator fail-closed defenses (FR-DATA-001…006 / FR-DR-001/002 subst
         });
       }
     },
+    120_000,
   );
 
   it('exposes the state-table name constant unchanged for restore checks', () => {

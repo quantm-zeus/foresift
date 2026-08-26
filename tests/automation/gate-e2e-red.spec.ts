@@ -1,3 +1,4 @@
+/// <reference types="bun" />
 // REAL end-to-end RED gate execution (integration tier) inside a hermetic
 // fixture repository with bounded synthetic commands. Package gates are
 // deterministically RED while any manifest-declared verification target is
@@ -11,7 +12,14 @@ import {
   parseFullGateResult,
 } from '../../scripts/automation/package-full-gate.mjs';
 import { disposeGitFixtureBase, gitFixture } from '../helpers/git-fixture.js';
-import { GATE_E2E_NESTED, REPO, SCRIPTS, makeScratch, tryNode } from '../helpers/v2-fixtures.js';
+import {
+  GATE_E2E_NESTED,
+  REPO,
+  SCRIPTS,
+  makeScratch,
+  tryNode,
+  unlandedFixturePackages,
+} from '../helpers/v2-fixtures.js';
 
 const itE2e = (name: string, fn: () => void, timeout?: number) => {
   if (process.env[GATE_E2E_NESTED] === '1') return it.skip(name, fn, timeout);
@@ -24,10 +32,13 @@ afterAll(() => {
   disposeGitFixtureBase();
 });
 
+const unlanded = unlandedFixturePackages();
+
 describe('V2 structured gate manifest — REAL red package gate (spec §9)', () => {
   itE2e(
     'RED path: package gate fails at its package checks with a structured manifest and NO attestation',
     () => {
+      if (!unlanded) return;
       const dir = art('gate-red');
       const fx = gitFixture('hermetic-gate-red');
       fx.writeFile(
@@ -56,7 +67,7 @@ describe('V2 structured gate manifest — REAL red package gate (spec §9)', () 
         [
           join(SCRIPTS, 'foresift-gate.mjs'),
           '--package',
-          'g0-tool-core',
+          unlanded.redGatePkg,
           '--result-file',
           join(dir, GATE_RESULT_FILE),
         ],
@@ -79,7 +90,7 @@ describe('V2 structured gate manifest — REAL red package gate (spec §9)', () 
         readFileSync(join(REPO, 'specs', 'implementation', 'current-milestone.json'), 'utf8'),
       ) as { packages?: Array<{ id: string; verificationCommands: string[] }> };
       const declared =
-        msMeta.packages?.find((p) => p.id === 'g0-tool-core')?.verificationCommands ?? [];
+        msMeta.packages?.find((p) => p.id === unlanded.redGatePkg)?.verificationCommands ?? [];
       const stopIdx = declared.indexOf(pkgRow?.command ?? '');
       expect(stopIdx).toBeGreaterThanOrEqual(0);
       for (const prior of declared.slice(0, stopIdx)) {

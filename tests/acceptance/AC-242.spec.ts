@@ -9,7 +9,7 @@
  * carries no retrieval lifecycle fields, never conflates with provider
  * missingness, and never contributes as matured evidence.
  */
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 import { AcquisitionState, utcTimestamp, type UtcTimestamp } from '@foresift/domain';
 import {
   maturedEvidenceCountAt,
@@ -17,6 +17,7 @@ import {
   recordProbeAssignment,
   completeRetrieval,
 } from '@foresift/persistence';
+import { parseCoreSchema, type BlockedStatePayload } from '@foresift/shared-schemas';
 import { closeTestDatabase, makeTestDatabase, type TestDatabase } from './helpers.ts';
 
 const T = (iso: string): UtcTimestamp => utcTimestamp(iso);
@@ -133,5 +134,20 @@ describe('AC-242: NOT_REQUESTED_BY_POLICY storage semantics', () => {
       ['ac242-not-requested'],
     );
     expect(rows.rows[0]?.evidence_ids).toEqual([]);
+  });
+});
+
+describe('AC-242 acceptance (tool-core substrate): NOT_REQUESTED_BY_POLICY and blocked states persist distinctly', () => {
+  it('BlockedStatePayload schema validates NOT_REQUESTED_BY_POLICY payload', () => {
+    const payload: BlockedStatePayload = {
+      acquisitionState: 'NOT_REQUESTED_BY_POLICY',
+      machineReason: 'POLICY_EVALUATION_SKIPPED',
+      toolName: 'discover_candidates',
+      toolVersion: '1.0.0',
+      pipelineRunId: 'run-ac242-1',
+      at: T('2026-06-11T09:00:00Z'),
+    };
+    const validated = parseCoreSchema('BlockedStatePayload', payload);
+    expect(validated.acquisitionState).toBe('NOT_REQUESTED_BY_POLICY');
   });
 });

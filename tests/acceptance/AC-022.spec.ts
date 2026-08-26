@@ -9,10 +9,12 @@
  * helper, with edges persisted through the identity repository — each unit is
  * counted exactly once across the boundaries.
  */
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 import {
   LineageStatus,
   aggregateWithoutDoubleCounting,
+  caip10,
+  normalizeEvmAddress,
   parseChainId,
   utcTimestamp,
   type MigrationLineageEdge,
@@ -25,6 +27,9 @@ import {
   registerLaunch,
   registerMigrationEdge,
 } from '@foresift/persistence';
+import type { CacheKeyComponents } from '@foresift/shared-schemas';
+import { computeExactCacheKey } from '../../packages/tool-core/src/cache-key.ts';
+import { CacheStageChain } from '../../packages/tool-core/src/stages/cache.ts';
 import { closeTestDatabase, makeTestDatabase, seedPool, type TestDatabase } from './helpers.ts';
 
 const T = (iso: string): UtcTimestamp => utcTimestamp(iso);
@@ -160,5 +165,68 @@ describe('AC-022: asset/pool migration avoids double counting', () => {
       [migratedC, [sample(null, 7n)]],
     ]);
     expect(aggregateWithoutDoubleCounting(contributions, [])).toBe(7n);
+  });
+});
+
+describe('AC-022 acceptance (tool-core substrate): canonical entity identity in cache keys prevents double counting across migrations', () => {
+  it('migrated pool queries with canonical entity identity produce deterministic exact cache keys', () => {
+    const canonicalPoolId = caip10(
+      parseChainId('eip155:1'),
+      normalizeEvmAddress('0x0000000000000000000000000000000000a10001'),
+    );
+    const componentsA: CacheKeyComponents = {
+      provider: 'first-party-dex-observer',
+      operation: 'get_pool_observation',
+      operationVersion: '1.0.0',
+      chain: 'eip155:1',
+      canonicalEntityIdentity: canonicalPoolId,
+      normalizedArguments: { poolAddress: '0x0000000000000000000000000000000000a10001' },
+      fieldProjection: ['liquidity', 'volume'],
+      asOf: '2026-04-01T12:00:00Z',
+      licensePolicyVersion: 'rights-1',
+    };
+
+    const keyA1 = computeExactCacheKey(componentsA);
+    const keyA2 = computeExactCacheKey({ ...componentsA });
+    expect(keyA1.cacheKeyHash).toBe(keyA2.cacheKeyHash);
+  });
+
+  it('cache lookup on canonical identity retrieves single entry without duplicate counting', async () => {
+    const cacheChain = new CacheStageChain({
+      engine: tdb.engine,
+      now: () => '2026-04-01T12:00:00Z',
+    });
+
+    const canonicalPoolId = caip10(
+      parseChainId('eip155:1'),
+      normalizeEvmAddress('0x0000000000000000000000000000000000a10001'),
+    );
+    const components: CacheKeyComponents = {
+      provider: 'first-party-dex-observer',
+      operation: 'get_pool_observation',
+      operationVersion: '1.0.0',
+      chain: 'eip155:1',
+      canonicalEntityIdentity: canonicalPoolId,
+      normalizedArguments: { poolAddress: '0x0000000000000000000000000000000000a10001' },
+      fieldProjection: ['liquidity'],
+      asOf: '2026-04-01T12:00:00Z',
+      licensePolicyVersion: 'rights-1',
+    };
+
+    await cacheChain.storeIfPermitted({
+      components,
+      payloadRef: 'obj://core-cache/ac22-pool-a',
+      storedAt: '2026-04-01T12:00:00Z',
+      rightsAllowed: true,
+      policy: { cachingPermitted: true },
+    });
+
+    const lookup = await cacheChain.lookup({
+      components,
+      holderMode: 'MCP_MANUAL',
+      decisionTime: '2026-04-01T12:00:00Z',
+    });
+    expect(lookup.outcome).toBe('HIT_FRESH');
+    expect(lookup.payloadRef).toBe('obj://core-cache/ac22-pool-a');
   });
 });

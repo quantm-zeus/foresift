@@ -6,7 +6,7 @@
  * DOMAIN predicate (entryIsNotEarlierThanCounterfactual), not by a zod schema;
  * never silently accepted either way.
  */
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'bun:test';
 import {
   ErrorCode,
   entryIsNotEarlierThanCounterfactual,
@@ -15,6 +15,7 @@ import {
   type UtcTimestamp,
 } from '@foresift/domain';
 import { DATA_SCHEMAS } from '@foresift/shared-schemas';
+import { validateNormalizedInvariants } from '../../packages/tool-core/src/normalize.ts';
 
 const base = (): DecisionActionTimestamps => ({
   discoveredAt: utcTimestamp('2026-06-10T09:00:00Z'),
@@ -67,5 +68,30 @@ describe('AC-240 negative: asymmetric or malformed action-time inputs fail', () 
     expect(
       entryIsNotEarlierThanCounterfactual(utcTimestamp('2026-06-10T09:08:29.999999Z'), cf),
     ).toBe(false);
+  });
+});
+
+describe('AC-240 negative (tool-core substrate): time ordering violations flag invariant issues', () => {
+  it('validateNormalizedInvariants flags future observedAt relative to availableAt', () => {
+    const problems = validateNormalizedInvariants(
+      {
+        observations: [
+          {
+            evidenceId: 'ev-order-1',
+            provider: 'test-p',
+            observedAt: '2026-06-10T09:10:00Z',
+            availableAt: '2026-06-10T09:05:00Z',
+            fetchedAt: '2026-06-10T09:10:00Z',
+            fields: {},
+            qualityCodes: [],
+          },
+        ],
+        conflicts: [],
+        partial: false,
+        missingCapabilities: [],
+      },
+      { now: '2026-06-10T09:15:00Z' },
+    );
+    expect(problems.some((p) => p.includes('observedAt exceeds availableAt'))).toBe(true);
   });
 });

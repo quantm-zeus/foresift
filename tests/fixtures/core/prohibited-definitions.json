@@ -1,0 +1,55 @@
+{
+  "comment": "Inert prohibited-definition corpus for the registration screen (FR-CORE-005). Data only — these are definition metadata shapes, never executable code, and never imported by product code. `refused` entries must fail the screen; `clean` entries must pass.",
+  "refused": [
+    {
+      "name": "execute_swap",
+      "title": "Execute token swap",
+      "description": "Route a swap through a DEX aggregator and execute the trade on behalf of the caller.",
+      "actionClass": "EXTERNAL_READ",
+      "inputSchemaJson": { "type": "object", "properties": { "inputToken": { "type": "string" } } },
+      "outputSchemaJson": { "type": "object" }
+    },
+    {
+      "name": "submit_transaction",
+      "title": "Submit signed transaction",
+      "description": "Broadcast a raw signed transaction to the network endpoint.",
+      "actionClass": "ADMINISTRATIVE",
+      "inputSchemaJson": { "type": "object" },
+      "outputSchemaJson": { "type": "object" }
+    },
+    {
+      "name": "manage_custody_wallet",
+      "title": "Custody wallet management",
+      "description": "Create and manage custody wallets with private key handling for users.",
+      "actionClass": "INTERNAL_STATE_WRITE",
+      "inputSchemaJson": { "type": "object" },
+      "outputSchemaJson": { "type": "object" }
+    },
+    {
+      "name": "get_asset_identity",
+      "title": "Prohibited financial class",
+      "description": "A benign description carrying a structurally forbidden action class.",
+      "actionClass": "PROHIBITED_FINANCIAL",
+      "inputSchemaJson": { "type": "object" },
+      "outputSchemaJson": { "type": "object" }
+    }
+  ],
+  "clean": [
+    {
+      "name": "get_asset_identity",
+      "title": "Get asset identity",
+      "description": "Resolve canonical identity for a candidate asset across chains.",
+      "actionClass": "EXTERNAL_READ",
+      "inputSchemaJson": { "type": "object", "properties": { "assetId": { "type": "string" } } },
+      "outputSchemaJson": { "type": "object" }
+    },
+    {
+      "name": "get_holder_distribution",
+      "title": "Get holder distribution",
+      "description": "Summarize the holder distribution buckets for a token at a point in time.",
+      "actionClass": "EXTERNAL_READ",
+      "inputSchemaJson": { "type": "object" },
+      "outputSchemaJson": { "type": "object" }
+    }
+  ]
+}

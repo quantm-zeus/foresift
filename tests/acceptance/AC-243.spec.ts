@@ -10,14 +10,14 @@
  * after completion the decision row still exposes assignment probability and
  * the impact recorded at selection time.
  */
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 import { AcquisitionState, utcTimestamp, type UtcTimestamp } from '@foresift/domain';
 import {
   completeRetrieval,
   recordAcquisitionDecision,
   recordProbeAssignment,
 } from '@foresift/persistence';
-import { DATA_SCHEMAS } from '@foresift/shared-schemas';
+import { DATA_SCHEMAS, parseDataSchema } from '@foresift/shared-schemas';
 import { closeTestDatabase, makeTestDatabase, type TestDatabase } from './helpers.ts';
 
 const T = (iso: string): UtcTimestamp => utcTimestamp(iso);
@@ -151,5 +151,25 @@ describe('AC-243: probe metadata completeness with write-before-retrieval orderi
     expect(parsed.assignmentProbability).toBe(0.25);
     expect(parsed.completedAt).toBeDefined();
     expect(parsed.evidenceIds).toEqual(['ev/ac243/1']);
+  });
+});
+
+describe('AC-243 acceptance (tool-core substrate): probe assignment schema and persistence validity', () => {
+  it('EvidenceAcquisitionDecision schema validates complete probe assignment', () => {
+    const parsed = parseDataSchema('EvidenceAcquisitionDecision', {
+      id: 'ac243-probe',
+      candidateId: 'cand/ac243',
+      evidenceFamily: 'swaps',
+      policyVersion: 'policy/v1',
+      state: 'RETURNED',
+      requestedAt: T('2026-06-13T09:00:00Z'),
+      completedAt: T('2026-06-13T10:00:00Z'),
+      assignmentProbability: 0.25,
+      estimatedDecisionImpact: 0.35,
+      actualDecisionChanged: true,
+      evidenceIds: ['ev/ac243/1'],
+    });
+    expect(parsed.assignmentProbability).toBe(0.25);
+    expect(parsed.estimatedDecisionImpact).toBe(0.35);
   });
 });

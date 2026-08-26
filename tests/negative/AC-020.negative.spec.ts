@@ -6,7 +6,7 @@
  * backfill visibility, current-view resolution); each attempt must fail
  * closed — exclusion, refusal, or typed error, never a silent leak.
  */
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 import { AcquisitionState, ErrorCode, utcTimestamp, type UtcTimestamp } from '@foresift/domain';
 import {
   appendObservation,
@@ -16,6 +16,9 @@ import {
   completeRetrieval,
 } from '@foresift/persistence';
 import { freezeBundle, projectMaturedCounts } from '@foresift/evidence';
+import type { CacheKeyComponents } from '@foresift/shared-schemas';
+import { assertExactOnlyCaching } from '../../packages/tool-core/src/cache-key.ts';
+import { CacheStageChain } from '../../packages/tool-core/src/stages/cache.ts';
 import {
   closeTestDatabase,
   expectForesiftError,
@@ -136,5 +139,55 @@ describe('AC-020 negative: attempted future-evidence reads fail', () => {
     // boundary: the count is honestly zero, never inflated by what exists now.
     expect(projection.maturedCount).toBe(0);
     expect(projection.promotionEligible).toBe(false);
+  });
+});
+
+describe('AC-020 negative (tool-core substrate): attempted future cache reads and prohibited caching fail closed', () => {
+  it('cache lookup with decisionTime strictly before entry stored_at returns MISS', async () => {
+    const cacheChain = new CacheStageChain({
+      engine: tdb.engine,
+      now: () => '2026-06-01T12:00:00Z',
+    });
+
+    const components: CacheKeyComponents = {
+      provider: 'first-party-dex-observer',
+      operation: 'get_asset_identity',
+      operationVersion: '1.0.0',
+      chain: 'eip155:1',
+      canonicalEntityIdentity: 'eip155:1:0x00000000000000000000000000000000000ac201',
+      normalizedArguments: { address: '0x00000000000000000000000000000000000ac201' },
+      fieldProjection: ['symbol'],
+      asOf: '2026-06-01T12:00:00Z',
+      licensePolicyVersion: 'rights-1',
+    };
+
+    await cacheChain.storeIfPermitted({
+      components,
+      payloadRef: 'obj://core-cache/ac20n-entry-1',
+      storedAt: '2026-06-01T20:00:00Z',
+      rightsAllowed: true,
+      policy: { cachingPermitted: true },
+    });
+
+    const lookup = await cacheChain.lookup({
+      components,
+      holderMode: 'MCP_MANUAL',
+      decisionTime: '2026-06-01T19:59:59.999Z',
+    });
+    expect(lookup.outcome).toBe('MISS');
+  });
+
+  it('assertExactOnlyCaching refuses semantic cache strategy for financial and identity data classes', () => {
+    expect(() =>
+      assertExactOnlyCaching({ requestedStrategy: 'SEMANTIC', dataClass: 'FINANCIAL' }),
+    ).toThrow(/SEMANTIC_CACHE_FORBIDDEN|financial/i);
+
+    expect(() =>
+      assertExactOnlyCaching({ requestedStrategy: 'SEMANTIC', dataClass: 'IDENTITY' }),
+    ).toThrow(/SEMANTIC_CACHE_FORBIDDEN|identity/i);
+
+    expect(() =>
+      assertExactOnlyCaching({ requestedStrategy: 'EXACT', dataClass: 'FINANCIAL' }),
+    ).not.toThrow();
   });
 });

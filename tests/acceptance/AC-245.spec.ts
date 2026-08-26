@@ -13,7 +13,7 @@
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 import {
   DEFAULT_DEPENDENCE_THRESHOLDS,
   DependenceLabel,
@@ -27,6 +27,7 @@ import {
   recordDependenceEdge,
   registerSourceIdentity,
 } from '@foresift/persistence';
+import { parseDataSchema } from '@foresift/shared-schemas';
 import { closeTestDatabase, makeTestDatabase, type TestDatabase } from './helpers.ts';
 
 const FIXTURES = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../fixtures/data');
@@ -164,5 +165,24 @@ describe('AC-245: reduced independence credit despite distinct provider ids', ()
       sourceB.id as never,
     );
     expect(reversed.map((e) => e.edgeId)).toEqual(stored.map((e) => e.edgeId));
+  });
+});
+
+describe('AC-245 acceptance (tool-core substrate): source dependence schema validation', () => {
+  it('SourceDependenceEdge schema validates empirical dependence edge', () => {
+    const parsed = parseDataSchema('SourceDependenceEdge', {
+      sourceA: 'src-1',
+      sourceB: 'src-2',
+      sharedUpstreamLineageKeys: ['up-1'],
+      inputs: {
+        valueErrorTimingCorrelation: 0.85,
+        outageOverlap: 0.7,
+        firstSeenLagAgreement: 0.9,
+        fingerprintSimilarity: 0.95,
+      },
+      label: 'AVAILABLE_AT_THE_TIME',
+      availableAt: utcTimestamp('2026-06-20T00:00:00Z'),
+    });
+    expect(parsed.inputs.valueErrorTimingCorrelation).toBe(0.85);
   });
 });

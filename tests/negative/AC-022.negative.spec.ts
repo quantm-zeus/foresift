@@ -5,7 +5,7 @@
  * lineages, undated samples on migrated pools, and cyclic edges are refused
  * with typed errors instead of being guessed.
  */
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 import {
   ErrorCode,
   LineageStatus,
@@ -17,6 +17,7 @@ import {
   type UtcTimestamp,
 } from '@foresift/domain';
 import { insertPool, registerMigrationEdge } from '@foresift/persistence';
+import { computeExactCacheKey } from '../../packages/tool-core/src/cache-key.ts';
 import {
   closeTestDatabase,
   expectForesiftError,
@@ -158,5 +159,47 @@ describe('AC-022 negative: storage-level lineage refusals', () => {
         }),
       ),
     ).rejects.toThrow(/ambiguous/);
+  });
+});
+
+describe('AC-022 negative (tool-core substrate): non-canonical entity identity in cache key fails exact matching', () => {
+  it('divergent entity identity strings produce distinct cache key hashes', () => {
+    const base = {
+      provider: 'first-party-dex-observer',
+      operation: 'get_pool_observation',
+      operationVersion: '1.0.0',
+      chain: 'eip155:1',
+      normalizedArguments: { poolAddress: '0x0000000000000000000000000000000000a10001' },
+      fieldProjection: ['liquidity'],
+      asOf: '2026-04-01T12:00:00Z',
+      licensePolicyVersion: 'rights-1',
+    };
+
+    const keyCanonical = computeExactCacheKey({
+      ...base,
+      canonicalEntityIdentity: 'eip155:1:0x0000000000000000000000000000000000a10001',
+    });
+    const keyAlias = computeExactCacheKey({
+      ...base,
+      canonicalEntityIdentity: 'eip155:1:0x0000000000000000000000000000000000b20002',
+    });
+
+    expect(keyCanonical.cacheKeyHash).not.toBe(keyAlias.cacheKeyHash);
+  });
+
+  it('empty canonical entity identity throws schema validation error', () => {
+    expect(() =>
+      computeExactCacheKey({
+        provider: 'first-party-dex-observer',
+        operation: 'get_pool_observation',
+        operationVersion: '1.0.0',
+        chain: 'eip155:1',
+        canonicalEntityIdentity: '',
+        normalizedArguments: {},
+        fieldProjection: ['liquidity'],
+        asOf: '2026-04-01T12:00:00Z',
+        licensePolicyVersion: 'rights-1',
+      }),
+    ).toThrow();
   });
 });

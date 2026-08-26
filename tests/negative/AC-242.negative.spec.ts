@@ -5,13 +5,14 @@
  * fields on a NOT_REQUESTED record are refused, completing one is refused,
  * and unknown state strings fail closed.
  */
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 import { AcquisitionState, ErrorCode, utcTimestamp } from '@foresift/domain';
 import {
   completeRetrieval,
   maturedEvidenceCountAt,
   recordAcquisitionDecision,
 } from '@foresift/persistence';
+import { parseCoreSchema } from '@foresift/shared-schemas';
 import {
   closeTestDatabase,
   expectForesiftError,
@@ -87,5 +88,20 @@ describe('AC-242 negative: policy-not-requested is never a retrieval outcome', (
       t: utcTimestamp('2026-06-12T23:00:00Z'),
     });
     expect(matured).toBe(0);
+  });
+});
+
+describe('AC-242 negative (tool-core substrate): invalid blocked states and empty conflations fail closed', () => {
+  it('BlockedStatePayload schema refuses unrecognized blocked state strings', () => {
+    expect(() =>
+      parseCoreSchema('BlockedStatePayload', {
+        acquisitionState: 'RETURNED_EMPTY',
+        machineReason: 'EMPTY_RESULT',
+        toolName: 'discover_candidates',
+        toolVersion: '1.0.0',
+        pipelineRunId: 'run-1',
+        at: '2026-06-12T09:00:00Z',
+      }),
+    ).toThrow();
   });
 });

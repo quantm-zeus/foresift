@@ -9,7 +9,7 @@
  * before the boundary — later dependence estimates are structurally outside
  * its inputs, and late-input estimates carry the diagnostic label.
  */
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 import {
   AcquisitionState,
   DependenceLabel,
@@ -25,6 +25,7 @@ import {
   recordProbeAssignment,
   registerSourceIdentity,
 } from '@foresift/persistence';
+import { parseCoreSchema } from '@foresift/shared-schemas';
 import { closeTestDatabase, makeTestDatabase, type TestDatabase } from './helpers.ts';
 
 const T = (iso: string): UtcTimestamp => utcTimestamp(iso);
@@ -176,5 +177,20 @@ describe('AC-247: retrospective estimates cannot alter frozen counts', () => {
         t: T('2026-06-11T00:00:00Z'),
       }),
     ).toBe(3);
+  });
+});
+
+describe('AC-247 acceptance (tool-core substrate): exact-cache entry record schema validation', () => {
+  it('ExactCacheEntryRecord schema validates entry record', () => {
+    const parsed = parseCoreSchema('ExactCacheEntryRecord', {
+      cacheKeyHash: 'sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef',
+      payloadRef: 'obj://core-cache/ac247-entry',
+      storedAt: T('2026-06-01T09:00:00Z'),
+      freshUntil: T('2026-06-01T10:00:00Z'),
+      staleUntil: T('2026-06-01T12:00:00Z'),
+      licensePolicyVersion: 'policy-1',
+      rightsPermitted: true,
+    });
+    expect(parsed.rightsPermitted).toBe(true);
   });
 });

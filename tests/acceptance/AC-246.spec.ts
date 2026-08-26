@@ -10,12 +10,13 @@
  * duplicated evidence counts as ONE source. Sensitivity analysis and
  * promotion gates consume these groups in later packages.
  */
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 import {
   independenceGroups,
   independenceGroupOf,
   registerSourceIdentity,
 } from '@foresift/persistence';
+import { parseDataSchema } from '@foresift/shared-schemas';
 import { closeTestDatabase, makeTestDatabase, type TestDatabase } from './helpers.ts';
 
 let tdb: TestDatabase;
@@ -86,5 +87,15 @@ describe('AC-246: lineage collapse removes duplicated credit', () => {
     expect(a?.memberSourceIds).toEqual(['src/rpc-a']);
     expect(b?.memberSourceIds).toEqual(['src/explorer-b']);
     expect(a?.groupId).not.toBe(b?.groupId);
+  });
+});
+
+describe('AC-246 acceptance (tool-core substrate): source identity and group membership schemas', () => {
+  it('IndependenceGroup schema validates lineage group record', () => {
+    const parsed = parseDataSchema('IndependenceGroup', {
+      id: 'grp-nodesense',
+      upstreamLineageKey: 'upstream/nodesense-mainnet',
+    });
+    expect(parsed.upstreamLineageKey).toBe('upstream/nodesense-mainnet');
   });
 });

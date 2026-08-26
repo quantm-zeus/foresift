@@ -5,9 +5,10 @@
  * are meaningless and rejected; reduced credit is only ever derived from
  * recorded observed inputs, never from provider-id heuristics.
  */
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 import { DependenceLabel, ErrorCode, assertDependenceInputs, utcTimestamp } from '@foresift/domain';
 import { recordDependenceEdge, registerSourceIdentity } from '@foresift/persistence';
+import { parseDataSchema } from '@foresift/shared-schemas';
 import { closeTestDatabase, makeTestDatabase, type TestDatabase } from '../acceptance/helpers.ts';
 
 let tdb: TestDatabase;
@@ -83,5 +84,25 @@ describe('AC-245 negative: dependence-edge refusals', () => {
         },
       }),
     ).rejects.toThrow(/distinct sources/);
+  });
+});
+
+describe('AC-245 negative (tool-core substrate): degenerate dependence inputs fail schema parsing', () => {
+  it('SourceDependenceEdge schema refuses out-of-bounds correlation inputs', () => {
+    expect(() =>
+      parseDataSchema('SourceDependenceEdge', {
+        sourceA: 'src-1',
+        sourceB: 'src-2',
+        sharedUpstreamLineageKeys: [],
+        inputs: {
+          valueErrorTimingCorrelation: 2.0,
+          outageOverlap: 0.5,
+          firstSeenLagAgreement: 0.5,
+          fingerprintSimilarity: 0.5,
+        },
+        label: 'AVAILABLE_AT_THE_TIME',
+        availableAt: '2026-06-20T00:00:00Z',
+      }),
+    ).toThrow();
   });
 });

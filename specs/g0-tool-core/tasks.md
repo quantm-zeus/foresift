@@ -158,53 +158,53 @@ Format: `- [ ] T### [P?]` — **[P]** = parallelizable with its neighbors
       PRD §16.2 stages 1–24 verbatim; pinned-order unit test diffs the runtime
       sequence against the authoritative list; no configuration may skip or
       reorder stages. Traces: FR-CORE-002.
-- [ ] T602 Implement `src/stages/authn.ts` + `src/stages/validate.ts`
+- [x] T602 Implement `src/stages/authn.ts` + `src/stages/validate.ts`
       (stages 1–4): authenticate via injected perimeter primitive; authorize
       scope/action class/profile/tenant-entity/rights; Zod validate +
       canonicalize input; deterministic acquisition-decision and exact
       authorization-envelope validation. Failure exits produce typed blocked
       states. Traces: FR-CORE-002, FR-CORE-004.
-- [ ] T603 Implement `src/stages/acquisition.ts` (stage 5): persist REQUESTED
+- [x] T603 Implement `src/stages/acquisition.ts` (stage 5): persist REQUESTED
       or the applicable pre-execution blocked/not-requested state through the
       landed acquisition repo BEFORE any external request, keeping
       NOT_REQUESTED_BY_POLICY / COST_BLOCKED / QUOTA_BLOCKED /
       CAPABILITY_UNAVAILABLE / RIGHTS_BLOCKED distinguishable from retrieval
       failures (AC-242 substrate). Traces: FR-CORE-002, FR-CORE-003.
-- [ ] T604 Wire cache + single-flight stages into the pipeline (stages 6–13):
+- [x] T604 Wire cache + single-flight stages into the pipeline (stages 6–13):
       key calc → memo → fresh → stale → lease → recheck → quota estimate /
       capacity admission → atomic reserve, all via the Phase-D/E seams;
       backpressure outcomes (queue | return-cache | downgrade | skip |
       QUOTA_EXHAUSTED) are explicit typed exits; protected-reserve admission is
       delegated through the quota seam. Traces: FR-CORE-002, FR-CORE-006,
       FR-CORE-007.
-- [ ] T605 Implement `src/stages/dispatch.ts` (stages 14–17): call injected
+- [x] T605 Implement `src/stages/dispatch.ts` (stages 14–17): call injected
       allowlisted read-only operation adapters with deadline, byte limit, and
       egress-policy enforcement wrapping the perimeter controls; validate
       content type + raw schema (shared-schemas); normalize identity/units/
       timestamps/availability/lineage/quality codes; validate normalized schema
       and semantic invariants. Provider-failure paths map to TIMED_OUT /
       PROVIDER_UNAVAILABLE / INVALID_RESPONSE. Traces: FR-CORE-002, FR-CORE-003.
-- [ ] T606 Implement `src/stages/persist.ts` + quota settle (stages 18–22):
+- [x] T606 Implement `src/stages/persist.ts` + quota settle (stages 18–22):
       commit or release actual quota/cost per provider semantics through the
       adapter; persist evidence/artifact metadata + source fingerprint;
       update exact cache only when rights and policy permit; release lease with
       fencing validation; persist acquisition outcome, cache/provider source,
       actual cost, evidence IDs, decision impact. Idempotent under retry.
       Traces: FR-CORE-002, FR-CORE-007.
-- [ ] T607 Implement `src/stages/audit.ts` (stage 23): append audit + trace for
+- [x] T607 Implement `src/stages/audit.ts` (stage 23): append audit + trace for
       success AND every failure/blocked exit through the injected AuditChain;
       event payload carries actor, tool name/version, action class, outcome,
       machine-readable reason; never secret material. Tamper-evident chain
       verification stays owned by the security suite — asserted green here.
       Traces: FR-CORE-002, FR-CORE-005.
-- [ ] T608 Implement `src/envelope.ts` assembly (stage 24, FR-CORE-003):
+- [x] T608 Implement `src/envelope.ts` assembly (stage 24, FR-CORE-003):
       structured result with data + meta carrying toolName/version, optional
       provider/operation, evidenceIds, observedAt/availableAt/fetchedAt, cache
       outcome, freshnessSeconds, qualityCodes, conflicts, quota summary,
       partial flag, nextCursor/resourceUris; degraded results mark missing
       capabilities explicitly instead of silent gaps. Round-trip schema tests.
       Traces: FR-CORE-003.
-- [ ] T609 Implement the execution-time prohibited-financial gate inside the
+- [x] T609 Implement the execution-time prohibited-financial gate inside the
       pipeline (FR-CORE-005): action-class re-check before dispatch; refuse
       and audit any call whose resolved operation expresses trading/signing/
       custody/transaction construction regardless of registration state.
@@ -213,13 +213,13 @@ Format: `- [ ] T### [P?]` — **[P]** = parallelizable with its neighbors
 
 ## Phase G — Composition root and telemetry contract
 
-- [ ] T701 Implement `src/index.ts` `createToolCore(...)` composition root:
+- [x] T701 Implement `src/index.ts` `createToolCore(...)` composition root:
       injects AuditChain instance, egress enforcer, authn/authz primitives,
       QuotaReservationAdapter, LicensePolicySource, clock; deny-closed defaults
       wherever an adapter is unbound; exports the public surface only.
       Composition tests prove unbound-seam fail-closed behavior.
       Traces: FR-CORE-001…FR-CORE-008.
-- [ ] T702 [P] Write `telemetry/core.catalog.json` as the declarative
+- [x] T702 [P] Write `telemetry/core.catalog.json` as the declarative
       event-contract catalog (registry.registered/rejected,
       pipeline.stage/blocked, cache.outcome, singleflight.lease/fence-refused,
       quota.reserved/committed/released/expired, license.verdict,
@@ -232,58 +232,58 @@ Format: `- [ ] T### [P?]` — **[P]** = parallelizable with its neighbors
 
 ## Phase H — Fixture corpus and manifest-declared suites
 
-- [ ] T801 Build `tests/fixtures/core/`: clean + prohibited tool-definition
+- [x] T801 Build `tests/fixtures/core/`: clean + prohibited tool-definition
       corpora, canned provider payloads (valid/malformed/truncated/slow),
       cache-key golden vectors, clock/lease/race fixtures, profile bindings.
       All inert data; no credentials, no real endpoints.
       Traces: FR-CORE-001, FR-CORE-005, FR-CORE-006.
-- [ ] T802 Create `tests/acceptance/AC-001.spec.ts` +
+- [x] T802 Create `tests/acceptance/AC-001.spec.ts` +
       `tests/negative/AC-001.negative.spec.ts` scoped to the tool-core facet:
       registry lists a scoped domain-tool profile; stubbed free-discovery call
       executes end-to-end through all 24 stages; unavailable optional sources
       degrade explicitly in the envelope; negative asserts no silent gap and
       no out-of-profile tool exposure. Header comments name which facets later
       packages add. Traces: FR-CORE-001, FR-CORE-002, FR-CORE-003, FR-CORE-004.
-- [ ] T803 Create AC-002 pos+neg suites (envelope completeness: quality, time,
+- [x] T803 Create AC-002 pos+neg suites (envelope completeness: quality, time,
       provenance, evidence references on every important field; negative:
       result lacking them refused). Traces: FR-CORE-003.
-- [ ] T804 Create AC-003 pos+neg suites (cross-mode single-flight: two
+- [x] T804 Create AC-003 pos+neg suites (cross-mode single-flight: two
       concurrent simulated modes, one provider call within dedupe window;
       negative: stale-holder fencing violation refused). Traces: FR-CORE-006.
-- [ ] T805 Create AC-004 pos+neg suites (conflicting provider data preserved in
+- [x] T805 Create AC-004 pos+neg suites (conflicting provider data preserved in
       conflicts[]; unsupported capability explicit CAPABILITY_UNAVAILABLE;
       negative: silent replacement attempts fail the suite). Traces:
       FR-CORE-002, FR-CORE-003.
-- [ ] T806 Extend the AC-020, AC-021, AC-022, and AC-023 suites (+negatives
+- [x] T806 Extend the AC-020, AC-021, AC-022, and AC-023 suites (+negatives
       already present) with tool-core substrate blocks: as-of cache reads
       cannot see available_at > T (AC-020); revisions leave original
       observations reachable via envelope evidence refs (AC-021); migration
       identity keys avoid double counting (AC-022); normalization goldens flow
       unchanged through stage 16 (AC-023). Traces: FR-CORE-003, FR-CORE-006.
-- [ ] T807 Extend AC-050 and AC-254 suites with registry/execution refusal
+- [x] T807 Extend AC-050 and AC-254 suites with registry/execution refusal
       substrate blocks (prohibited definitions rejected at registration;
       prohibited calls rejected at dispatch; tree scans stay green); keep the
       security-owned scan blocks untouched. Extend AC-255 with query-fixture
       pass vs prohibited-shape registration failure.
       Traces: FR-CORE-005.
-- [ ] T808 Extend AC-051/AC-052/AC-053 suites with tool-core blocks: untrusted
+- [x] T808 Extend AC-051/AC-052/AC-053 suites with tool-core blocks: untrusted
       provider text enters envelopes as content-only; emitted artifacts swept
       for secret material; profile binding rejects out-of-scope tools.
       Traces: FR-CORE-004, FR-CORE-002.
-- [ ] T809 Extend the AC-240, AC-241, AC-242, and AC-243 suites with pipeline
+- [x] T809 Extend the AC-240, AC-241, AC-242, and AC-243 suites with pipeline
       substrate blocks: symmetric action-time fields across workload classes
       incl. EVALUATION_LOW and BACKFILL_LOW (AC-240); replay reads only
       as-of-permitted entries with policy-component-only divergence (AC-241);
       NOT_REQUESTED_BY_POLICY persisted distinctly from empty/unavailable/
       negative values (AC-242); probe metadata persisted before maturity
       (AC-243). Traces: FR-CORE-002, FR-CORE-003.
-- [ ] T810 Extend the AC-244, AC-245, AC-246, AC-247, AC-248, and AC-249
+- [x] T810 Extend the AC-244, AC-245, AC-246, AC-247, AC-248, and AC-249
       suites minimally: envelope lineage/conflict round-trips these criteria
       consume; no promotion logic lands here. Keep the upstream-owned facets of
       AC-250, AC-251, AC-252, AC-253, AC-256, AC-257, and AC-258 green;
       extend AC-259 with every-exit-audited substrate assertions.
       Traces: FR-CORE-002, FR-CORE-003, FR-CORE-005.
-- [ ] T811 Engine unit suites in `packages/tool-core/test/` (see plan Verification
+- [x] T811 Engine unit suites in `packages/tool-core/test/` (see plan Verification
       strategy): pinned stage-order property test; lease fencing matrix;
       reservation transition matrix incl. races; cache-key stability vectors;
       TTL boundaries; profile narrowing subset proofs; deny-closed defaults;
@@ -292,13 +292,13 @@ Format: `- [ ] T### [P?]` — **[P]** = parallelizable with its neighbors
 
 ## Phase I — Convergence verification
 
-- [ ] T901 Run the milestone-declared verification commands verbatim:
+- [x] T901 Run the milestone-declared verification commands verbatim:
       `test -d packages/domain && pnpm --filter @foresift/domain test`;
       `test -d packages/tool-core && pnpm --filter @foresift/tool-core test`.
       Then the shared aggregate gate `pnpm verify` and `pnpm spec:verify` at
       the pushed HEAD; fix anything they surface before completion is claimed.
       Traces: FR-CORE-001…FR-CORE-008.
-- [ ] T902 Confirm extension-point boundary holds: reference adapters from
+- [x] T902 Confirm extension-point boundary holds: reference adapters from
       outside tool-core drive the pipeline (T503) with zero edits to
       `packages/tool-core/src/**`; record the evidence output in the package's
       verification notes for review. Traces: FR-CORE-007, FR-CORE-008.

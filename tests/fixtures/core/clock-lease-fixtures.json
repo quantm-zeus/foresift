@@ -1,0 +1,33 @@
+{
+  "comment": "Clock, lease, and race scenario fixtures for tool-core testing (T801; FR-CORE-006, INV-009). All inert data.",
+  "scenarios": [
+    {
+      "name": "standard-lease-lifecycle",
+      "ttlSeconds": 60,
+      "holderMode": "MCP_MANUAL",
+      "holderId": "operator-1",
+      "expectedToken": 1,
+      "reacquireAfterExpiry": {
+        "advanceSeconds": 65,
+        "newHolderMode": "AUTOMATION",
+        "newHolderId": "cron-worker-1",
+        "expectedToken": 2
+      }
+    },
+    {
+      "name": "concurrent-race-different-modes",
+      "resourceKey": "sha256:1111111111111111111111111111111111111111111111111111111111111111",
+      "modeA": "CHATGPT",
+      "modeB": "ADMIN_CHAT",
+      "ttlSeconds": 30,
+      "expectSingleWinner": true
+    },
+    {
+      "name": "stale-holder-fencing-violation",
+      "initialToken": 1,
+      "bumpedToken": 2,
+      "attemptedReleaseToken": 1,
+      "expectedErrorCode": "LEASE_FENCING_TOKEN_STALE"
+    }
+  ]
+}

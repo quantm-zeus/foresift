@@ -1,3 +1,4 @@
+/// <reference types="bun" />
 // Mid-weight END-TO-END executions (integration tier): targeted-verify
 // executor CLI, convergence-router CLI, and the review-outcome collector's
 // fixture-repo degradation paths. Split from the real-gate files so all
@@ -5,7 +6,7 @@
 import { execFileSync } from 'node:child_process';
 import { mkdirSync, writeFileSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { afterAll, describe, expect, it } from 'vitest';
+import { afterAll, describe, expect, it } from 'bun:test';
 import {
   GATE_RESULT_FILE,
   attestationIdentity,
@@ -18,11 +19,16 @@ import {
   makeScratch,
   manifestFixture,
   tryNode,
+  unlandedFixturePackages,
   verdictFixture,
 } from '../helpers/v2-fixtures.js';
 
 const { fx, art, cleanup } = makeScratch('foresift-v2-c2-mid-');
 afterAll(cleanup);
+
+// The incomplete-implementation target advances down the manifest as packages
+// land (originally g0-tool-core, whose own landing expired that pin).
+const unlanded = unlandedFixturePackages();
 
 describe('V2 targeted executor END-TO-END (spec §10)', () => {
   it('END-TO-END: executor runs ONLY the planned check and records a green verdict file', () => {
@@ -61,7 +67,10 @@ describe('V2 targeted executor END-TO-END (spec §10)', () => {
 
   it('END-TO-END: executor re-runs real red package commands and reports red (exit 1)', () => {
     const dir = art('targeted-red');
-    const cmd = 'test -d packages/tool-core && pnpm --filter @foresift/tool-core test';
+    // A never-existing target keeps this deterministically red forever — the
+    // original pin (packages/tool-core) expired when that package landed.
+    const cmd =
+      'test -d packages/__no_such_target__ && pnpm --filter @foresift/__no_such_target__ test';
     writeFileSync(
       join(dir, GATE_RESULT_FILE),
       JSON.stringify(
@@ -115,8 +124,14 @@ describe('V2 targeted executor END-TO-END (spec §10)', () => {
 
 describe('V2 convergence router CLI END-TO-END (spec §11)', () => {
   it('perfect review+attestation evidence but incomplete implementation ⇒ REQUIRED citing only completeness', () => {
+    if (!unlanded) return;
     const dir = art('router-cli');
-    const id = attestationIdentity({ packageId: 'g0-tool-core', repoRoot: REPO });
+    const id = attestationIdentity({ packageId: unlanded.absentSpecPkg, repoRoot: REPO });
+    try {
+      id.toolchain.node = execFileSync('node', ['-e', 'process.stdout.write(process.version)'], {
+        encoding: 'utf8',
+      }).trim();
+    } catch {}
     writeFileSync(
       join(dir, 'review-verdict.json'),
       JSON.stringify(
@@ -134,13 +149,14 @@ describe('V2 convergence router CLI END-TO-END (spec §11)', () => {
     const r = tryNode([
       join(SCRIPTS, 'convergence-router.mjs'),
       '--package',
-      'g0-tool-core',
+      unlanded.absentSpecPkg,
       '--artifacts-dir',
       dir,
       '--repo-root',
       REPO,
     ]);
-    expect(r.status).toBe(1); // specs/g0-tool-core does not exist ⇒ genuinely incomplete
+    // specs/<absentSpecPkg> does not exist ⇒ genuinely incomplete.
+    expect(r.status).toBe(1);
     const decision = JSON.parse(readFileSync(join(dir, 'convergence-decision.json'), 'utf8'));
     expect(decision.decision).toBe(DECISION_REQUIRED);
     expect(decision.currentHead).toMatch(/^[0-9a-f]{40}$/);

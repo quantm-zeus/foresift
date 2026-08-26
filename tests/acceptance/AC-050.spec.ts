@@ -7,12 +7,13 @@
 import { readFileSync, readdirSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'bun:test';
 import {
   NegativeCapabilityCanary,
   loadCanaryCatalog,
   type CanaryFinding,
 } from '../../packages/security/src/negative-capability.ts';
+import { ProhibitedCapabilityScreen } from '../../packages/tool-core/src/prohibited.ts';
 
 const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 
@@ -74,5 +75,24 @@ describe('AC-050: prohibited-capability scans are green over the tree', () => {
         { name: 'pnl-history', source: 'tools' },
       ]),
     ).toEqual([]);
+  });
+});
+
+describe('AC-050 acceptance (tool-core substrate): clean tool definitions pass registration screening', () => {
+  it('clean read-only tool definition passes ProhibitedCapabilityScreen with ok: true', () => {
+    const screen = new ProhibitedCapabilityScreen();
+    const verdict = screen.screenWithReport(
+      {
+        name: 'get_token_holders_distribution',
+        title: 'Token Holders Distribution',
+        description: 'Read-only distribution of token holder balances across pools and accounts',
+        inputSchemaJson: { type: 'object', properties: { tokenAddress: { type: 'string' } } },
+        outputSchemaJson: { type: 'object', properties: { holders: { type: 'array' } } },
+        actionClass: 'EXTERNAL_READ',
+        toolVersion: '1.0.0',
+      },
+      '2026-06-01T00:00:00Z',
+    );
+    expect(verdict.ok).toBe(true);
   });
 });

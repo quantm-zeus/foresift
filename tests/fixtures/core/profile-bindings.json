@@ -1,0 +1,101 @@
+{
+  "comment": "Profile bindings fixture for the eight §16.9 profiles (T801, T802; FR-CORE-004). All inert data.",
+  "profiles": [
+    {
+      "id": "discovery",
+      "klass": "STANDARD",
+      "visibleDomainTools": [
+        "discover_candidates",
+        "get_asset_identity",
+        "get_candidate_delta",
+        "compare_candidates"
+      ],
+      "admitsAtomicTools": false
+    },
+    {
+      "id": "market-research",
+      "klass": "STANDARD",
+      "visibleDomainTools": [
+        "get_asset_identity",
+        "get_market_evidence_pack",
+        "get_holder_distribution",
+        "get_tradability_assessment",
+        "get_candidate_delta"
+      ],
+      "admitsAtomicTools": false
+    },
+    {
+      "id": "security-research",
+      "klass": "STANDARD",
+      "visibleDomainTools": [
+        "get_asset_identity",
+        "get_security_evidence_pack",
+        "get_wallet_cluster_evidence",
+        "get_thesis_status"
+      ],
+      "admitsAtomicTools": false
+    },
+    {
+      "id": "holder-wallet",
+      "klass": "STANDARD",
+      "visibleDomainTools": [
+        "get_asset_identity",
+        "get_holder_distribution",
+        "get_wallet_cluster_evidence"
+      ],
+      "admitsAtomicTools": false
+    },
+    {
+      "id": "social-research",
+      "klass": "STANDARD",
+      "visibleDomainTools": ["get_asset_identity", "get_market_evidence_pack", "get_thesis_status"],
+      "admitsAtomicTools": false
+    },
+    {
+      "id": "macro-context",
+      "klass": "STANDARD",
+      "visibleDomainTools": [
+        "get_asset_identity",
+        "get_market_evidence_pack",
+        "get_tradability_assessment"
+      ],
+      "admitsAtomicTools": false
+    },
+    {
+      "id": "run-investigation",
+      "klass": "STANDARD",
+      "visibleDomainTools": [
+        "discover_candidates",
+        "get_asset_identity",
+        "get_market_evidence_pack",
+        "get_security_evidence_pack",
+        "get_holder_distribution",
+        "get_wallet_cluster_evidence",
+        "get_tradability_assessment",
+        "get_candidate_delta",
+        "get_thesis_status",
+        "compare_candidates"
+      ],
+      "admitsAtomicTools": false
+    },
+    {
+      "id": "admin-read",
+      "klass": "STANDARD",
+      "visibleDomainTools": [
+        "get_asset_identity",
+        "get_market_evidence_pack",
+        "get_security_evidence_pack",
+        "get_thesis_status"
+      ],
+      "admitsAtomicTools": false
+    }
+  ],
+  "expertProfiles": [
+    {
+      "id": "admin-read",
+      "klass": "EXPERT_SCOPED",
+      "extraAtomicTools": ["provider_adapter_probe", "raw_ledger_diagnostic"],
+      "admitsAtomicTools": true
+    }
+  ]
+}

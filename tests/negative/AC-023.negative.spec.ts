@@ -6,7 +6,7 @@
  * decimals history leaves the representation explicitly unusable (null),
  * never silently resolved.
  */
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -25,6 +25,10 @@ import {
   insertRepresentation,
   recordDecimalsObservation,
 } from '@foresift/persistence';
+import {
+  normalizeRawPayload,
+  validateNormalizedInvariants,
+} from '../../packages/tool-core/src/normalize.ts';
 import {
   closeTestDatabase,
   expectForesiftError,
@@ -149,7 +153,7 @@ describe('AC-023 negative: quantity refusals and explicit conflicting states', (
 
   it('rendering keeps exact scale — no float rounding ever enters storage', () => {
     // 1 wei of an 18-decimals token must never degrade through a JS number.
-    expect(renderDecimalString(1n, 18)).toBe('0.000000000000000001');
+    expect(renderDecimalString(1n, 18) as string).toBe('0.000000000000000001');
   });
 
   it('a conflicting decimals representation is stored unusable (null), not guessed', async () => {
@@ -184,5 +188,65 @@ describe('AC-023 negative: quantity refusals and explicit conflicting states', (
     );
     expect(stored.rows[0]?.decimals_state).toBe('CONFLICTING');
     expect(stored.rows[0]?.decimals ?? null).toBeNull();
+  });
+});
+
+describe('AC-023 negative (tool-core substrate): stage-16/17 normalizer and invariant validator refuse invalid inputs', () => {
+  it('normalizer throws on unparseable timestamps in observations', () => {
+    expect(() =>
+      normalizeRawPayload(
+        {
+          observations: [
+            {
+              identity: 'bad-time',
+              observedAt: 'not-a-valid-date',
+              fields: {},
+            },
+          ],
+        },
+        { runId: 'run-neg-1', provider: 'test-p', fetchedAt: '2026-06-05T00:00:00Z' },
+      ),
+    ).toThrow(/unparseable timestamp/i);
+  });
+
+  it('normalizer throws on non-finite numeric field values', () => {
+    expect(() =>
+      normalizeRawPayload(
+        {
+          observations: [
+            {
+              identity: 'bad-num',
+              observedAt: '2026-06-05T00:00:00Z',
+              fields: { amount: Number.NaN },
+            },
+          ],
+        },
+        { runId: 'run-neg-2', provider: 'test-p', fetchedAt: '2026-06-05T00:00:00Z' },
+      ),
+    ).toThrow(/not a finite number/i);
+  });
+
+  it('invariant validator flags event-time ordering violations (observedAt > availableAt)', () => {
+    const problems = validateNormalizedInvariants(
+      {
+        observations: [
+          {
+            evidenceId: 'ev-inv-1',
+            provider: 'test-p',
+            observedAt: '2026-06-05T00:05:00Z',
+            availableAt: '2026-06-05T00:01:00Z',
+            fetchedAt: '2026-06-05T00:05:00Z',
+            fields: {},
+            qualityCodes: [],
+          },
+        ],
+        conflicts: [],
+        partial: false,
+        missingCapabilities: [],
+      },
+      { now: '2026-06-05T00:06:00Z' },
+    );
+
+    expect(problems.some((p) => p.includes('observedAt exceeds availableAt'))).toBe(true);
   });
 });

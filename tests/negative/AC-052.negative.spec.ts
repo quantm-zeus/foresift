@@ -2,7 +2,7 @@
 // stripped from logs/traces, denied on export and UI surfaces — never
 // silently passed through. Material shapes are constructed at RUNTIME so
 // this source file itself stays scanner-clean.
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'bun:test';
 import type { SecretClassification } from '@foresift/shared-schemas';
 import {
   detectMaterial,
@@ -81,5 +81,19 @@ describe('AC-052 negative: classified material refuses every surface', () => {
     expect(() => assertEnvironmentSeparation('PRODUCTION', 'ALPHA_LAB')).toThrow(
       /production secret referenced/,
     );
+  });
+});
+
+describe('AC-052 negative (tool-core substrate): envelopes and audit trails detect secret leaks', () => {
+  it('detects secret material if present in payload text before envelope release', () => {
+    const rawPayloadWithSecret = JSON.stringify({
+      apiKey: OPENAI_STYLE,
+      [['priv', 'ateKey'].join('')]: HEX64,
+    });
+
+    const detected = detectMaterial(rawPayloadWithSecret);
+    expect(detected.length).toBeGreaterThanOrEqual(2);
+    expect(detected).toContain('openai-style-key');
+    expect(detected).toContain('hex-secret');
   });
 });

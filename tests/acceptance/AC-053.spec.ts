@@ -2,7 +2,7 @@
 // revocable." Storage-backed lifecycle: ≥256-bit secrets minted once and
 // stored only as keyed hashes, per-dimension authentication, and one
 // credential's revocation leaving its siblings intact.
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 import { PGlite } from '@electric-sql/pglite';
 import {
   applyMigrations,
@@ -13,6 +13,7 @@ import {
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { McpCredentialStore } from '../../packages/security/src/mcp-credentials.ts';
+import { visibleToolsFor, isVisibleToProfile } from '../../packages/tool-core/src/profiles.ts';
 
 const MIGRATIONS_DIR = path.resolve(
   path.dirname(fileURLToPath(import.meta.url)),
@@ -108,5 +109,23 @@ describe('AC-053: MCP credential lifecycle proves independent scoping + revocati
       "SELECT revoked_at FROM sec.mcp_credentials WHERE credential_id = 'cred-ac53-sibling'",
     );
     expect(siblingRow.rows[0]?.revoked_at ?? null).toBeNull();
+  });
+});
+
+describe('AC-053 acceptance (tool-core substrate): profile binding scopes tool visibility narrowly', () => {
+  it('discovery profile resolves strict subset of tools and excludes unlisted domain tools', () => {
+    const tools = visibleToolsFor({ id: 'discovery', klass: 'STANDARD' });
+    expect(tools).toContain('discover_candidates');
+    expect(tools).toContain('get_asset_identity');
+    expect(tools).not.toContain('get_holder_distribution');
+  });
+
+  it('isVisibleToProfile admits standard domain tools for matching standard profiles', () => {
+    expect(
+      isVisibleToProfile(
+        { name: 'discover_candidates', atomic: false },
+        { id: 'discovery', klass: 'STANDARD' },
+      ),
+    ).toBe(true);
   });
 });

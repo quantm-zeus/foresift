@@ -5,7 +5,7 @@
 import { readdirSync, readFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'bun:test';
 import {
   NegativeCapabilityCanary,
   loadCanaryCatalog,
@@ -123,5 +123,16 @@ describe('AC-254: all five scan surfaces green; read-only intelligence allowed',
       expect(verdict.admitted, shape).toBe(true);
       expect(verdict.matchedShape).toBe(shape);
     }
+  });
+});
+
+describe('AC-254 acceptance (tool-core substrate): execution gate passes clean read-only tool calls', () => {
+  it('execution gate returns empty findings for clean read-only queries', () => {
+    const canary = new NegativeCapabilityCanary(loadCanaryCatalog());
+    const findings = canary.scanSourceText(
+      'tool-core/dispatch/get_portfolio',
+      'get_portfolio\nRead-only portfolio balances and transfer events',
+    );
+    expect(findings).toEqual([]);
   });
 });

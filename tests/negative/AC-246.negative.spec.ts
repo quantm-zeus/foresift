@@ -5,8 +5,9 @@
  * lineages (differing tuples refuse), so independence groups can never be
  * gamed by re-registering a provider under a different upstream lineage.
  */
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 import { independenceGroupOf, registerSourceIdentity } from '@foresift/persistence';
+import { parseDataSchema } from '@foresift/shared-schemas';
 import { closeTestDatabase, makeTestDatabase, type TestDatabase } from '../acceptance/helpers.ts';
 
 let tdb: TestDatabase;
@@ -49,5 +50,15 @@ describe('AC-246 negative: collapse integrity', () => {
   it('an unknown lineage has no group to collapse into', async () => {
     const absent = await independenceGroupOf(tdb.engine, 'upstream/never-registered');
     expect(absent).toBeNull();
+  });
+});
+
+describe('AC-246 negative (tool-core substrate): malformed independence groups fail schema parsing', () => {
+  it('IndependenceGroup schema refuses missing upstreamLineageKey', () => {
+    expect(() =>
+      parseDataSchema('IndependenceGroup', {
+        id: 'grp-bad',
+      }),
+    ).toThrow();
   });
 });

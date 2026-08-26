@@ -231,6 +231,67 @@ describe('Contract 3: Maintenance workflow topology and bounds', () => {
     expect(bashMatches.length).toBe(6);
   });
 
+  it('maintenance preflight installs frozen pnpm lockfile before invoking TypeScript-dependent Bun migration modules', () => {
+    const preflightMatch = workflowText.match(/- id:\s*preflight[\s\S]*?(?=- id:|$)/);
+    expect(preflightMatch).not.toBeNull();
+    const preflightText = preflightMatch![0];
+
+    // Must install frozen lockfile
+    expect(preflightText).toContain('pnpm install --frozen-lockfile');
+
+    // pnpm install must occur before invoking migration modules
+    const pnpmInstallIndex = preflightText.indexOf('pnpm install --frozen-lockfile');
+    const stateScriptIndex = preflightText.indexOf('scripts/automation/bun-migration-state.mjs');
+    const runnerScriptIndex = preflightText.indexOf('scripts/automation/bun-migration-runner.mjs');
+
+    expect(pnpmInstallIndex).toBeGreaterThan(-1);
+    expect(stateScriptIndex).toBeGreaterThan(pnpmInstallIndex);
+    expect(runnerScriptIndex).toBeGreaterThan(pnpmInstallIndex);
+
+    // Verify imported dependencies: runner and manifest/codemod depend on typescript
+    const manifestCode = readFileSync(
+      join(REPO, 'scripts', 'automation', 'bun-migration-manifest.mjs'),
+      'utf8',
+    );
+    const codemodCode = readFileSync(
+      join(REPO, 'scripts', 'automation', 'bun-migration-codemod.mjs'),
+      'utf8',
+    );
+    const affectedCode = readFileSync(
+      join(REPO, 'scripts', 'automation', 'bun-affected-tests.mjs'),
+      'utf8',
+    );
+
+    expect(manifestCode).toContain("from 'typescript'");
+    expect(codemodCode).toContain("from 'typescript'");
+    expect(affectedCode).toContain("from 'typescript'");
+  });
+
+  it('operator-authorized merge node uses explicit supported gh pr merge --admin path without gh pr checks --watch after authoritative-bun-full', () => {
+    const mergeMatch = workflowText.match(/- id:\s*exact-head-ci-and-merge[\s\S]*?(?=- id:|$)/);
+    expect(mergeMatch).not.toBeNull();
+    const mergeText = mergeMatch![0];
+
+    // Node must depend strictly on authoritative-bun-full
+    expect(mergeText).toContain('depends_on: [authoritative-bun-full]');
+
+    // Must not call gh pr checks --watch or wait on remote CI queue
+    expect(mergeText).not.toMatch(/gh\s+pr\s+checks/);
+    expect(mergeText).not.toContain('--watch');
+
+    // Must use explicit admin merge path
+    expect(mergeText).toContain('gh pr merge "$PR" --squash --admin');
+    expect(mergeText).not.toContain('--delete-branch');
+
+    // Must verify durable merge audit record
+    expect(mergeText).toContain(
+      'gh pr view "$PR" --json state,mergedAt,mergeCommit > "$ARTIFACTS_DIR/merged-pr.json"',
+    );
+    expect(mergeText).toContain(
+      'test "$(jq -r .state "$ARTIFACTS_DIR/merged-pr.json")" = MERGED',
+    );
+  });
+
   it('policy specifies AGY Gemini 3.7 Flash (High) with bounded concurrency', () => {
     expect(DEFAULT_POLICY.agyModel).toBe('gemini-3.7-flash-high');
     expect(DEFAULT_POLICY.agyEffort).toBe('high');

@@ -219,7 +219,7 @@ Format: `- [ ] T### [P?]` — **[P]** = parallelizable with its neighbors
       wherever an adapter is unbound; exports the public surface only.
       Composition tests prove unbound-seam fail-closed behavior.
       Traces: FR-CORE-001…FR-CORE-008.
-- [ ] T702 [P] Write `telemetry/core.catalog.json` as the declarative
+- [x] T702 [P] Write `telemetry/core.catalog.json` as the declarative
       event-contract catalog (registry.registered/rejected,
       pipeline.stage/blocked, cache.outcome, singleflight.lease/fence-refused,
       quota.reserved/committed/released/expired, license.verdict,

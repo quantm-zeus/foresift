@@ -125,7 +125,8 @@ export function createExecutionIdentity(input) {
 }
 
 function immutableView(identity) {
-  const { createdAt, ...immutable } = identity;
+  const immutable = { ...identity };
+  delete immutable.createdAt;
   return immutable;
 }
 

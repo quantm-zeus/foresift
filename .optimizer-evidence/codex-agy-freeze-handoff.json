@@ -1,0 +1,89 @@
+{
+  "schema": "foresift/codex-agy-freeze-handoff@1",
+  "recordedAt": "2026-08-26T14:20:00.000Z",
+  "freeze": {
+    "supervisorService": "foresift-autopilot.service",
+    "supervisorState": "disabled-and-inactive",
+    "liveMutatingAuthoritativeRuns": 0,
+    "supervisorNewLaunches": "disabled",
+    "duplicateAuthoritativeRuns": false
+  },
+  "package": {
+    "id": "g0-tool-core",
+    "generation": 0,
+    "oldRunId": "8679502aaee6d786db9b4396da28809e",
+    "oldWorkflow": "foresift-sharded-wave",
+    "oldExecutionProfile": "HISTORICAL_V4_OPTIMIZED",
+    "durableBranch": "foresift/g0-tool-core",
+    "durableHead": "dae58898081241049d7bba574530739f6806b203",
+    "remoteBranch": "origin/foresift/g0-tool-core",
+    "baseBeforeLastUsefulWave": "3202db25",
+    "completedTaskIds": [
+      "T101",
+      "T102",
+      "T103",
+      "T104",
+      "T201",
+      "T202",
+      "T203",
+      "T204",
+      "T301",
+      "T302",
+      "T303",
+      "T401",
+      "T402",
+      "T403",
+      "T404",
+      "T501",
+      "T502",
+      "T503",
+      "T601",
+      "T702"
+    ],
+    "remainingTaskIds": [
+      "T602",
+      "T603",
+      "T604",
+      "T605",
+      "T606",
+      "T607",
+      "T608",
+      "T609",
+      "T701",
+      "T801",
+      "T802",
+      "T803",
+      "T804",
+      "T805",
+      "T806",
+      "T807",
+      "T808",
+      "T809",
+      "T810",
+      "T811",
+      "T901",
+      "T902"
+    ],
+    "freezeReason": "operator-requested control-plane migration; previous run failed prep on a stale writer-branch/worktree collision",
+    "resumeRequirements": [
+      "control-plane PR merged at exact-head green CI",
+      "CODEX_AGY version-controlled default active",
+      "legacy FORESIFT_AGY_LANES drop-in removed",
+      "no duplicate authoritative run",
+      "fresh continuation adopts origin/foresift/g0-tool-core at durableHead",
+      "only remaining task IDs execute"
+    ]
+  },
+  "lastUsefulRun": {
+    "runId": "980e79223794124bd331a77caf82dce6",
+    "workflow": "foresift-sharded-wave",
+    "fastVerdict": "GREEN",
+    "checkpointCompleted": 20,
+    "checkpointTotal": 42
+  },
+  "salvagedClaudeEvidence": {
+    "branch": "salvage/claude-v4-handoff-20260826",
+    "commit": "3fb5bdb9486219ba4a0b47a8ad2214bb935d2c13",
+    "pushed": true
+  }
+}

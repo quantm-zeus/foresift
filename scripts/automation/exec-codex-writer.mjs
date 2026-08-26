@@ -1,8 +1,8 @@
 // Headless Codex implementation-lane executor for fresh CODEX_AGY waves.
 // The logical Foresift tier is always `standard`; Codex CLI 0.149.1 maps that
 // to the supported wire value `default` (standard pricing/performance).
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
-import { dirname, join } from 'node:path';
+import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { buildCodexExecArgs, CODEX_SERVICE_TIER } from './codex-routing.mjs';
 import { validateLaneOwnership } from './path-ownership.mjs';

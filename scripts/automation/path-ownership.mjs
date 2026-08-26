@@ -52,3 +52,7 @@ export function validateLaneOwnership({ engine, role, changedPaths = [], testOwn
     violatingPaths: violations,
   };
 }
+
+export function recordTestDispute(baselineRecord, dispute) {
+  return Object.freeze({ ...baselineRecord, dispute: Object.freeze({ ...dispute }) });
+}

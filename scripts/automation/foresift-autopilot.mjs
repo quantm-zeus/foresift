@@ -1709,6 +1709,7 @@ function describeRun(entry) {
     `run ${entry.runId ?? '(awaiting discovery)'}`,
     `status=${entry.lastSeenStatus ?? '?'}`,
   ];
+  if (entry.executionProfile) parts.push(`execution=${entry.executionProfile}`);
   if (entry.awaitingDiscovery) parts.push('discovering-run-id');
   else if (!entry.runId && !entry.done && !entry.paused) parts.push('restart-scheduled');
   if (entry.paused === 'fatal') parts.push('paused=fatal(operator-recovery)');

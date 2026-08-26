@@ -27,7 +27,6 @@ export function runAgyTestWriter(input) {
   if (!existsSync(input.brief)) throw new Error(`AGY_TEST_BRIEF_MISSING: ${input.brief}`);
   const resultDir = input['results-dir'];
   mkdirSync(resultDir, { recursive: true });
-  const before = git(['rev-parse', 'HEAD'], input.worktree).stdout.trim();
   const prompt = [
     readFileSync(input.brief, 'utf8'),
     '',
@@ -36,6 +35,8 @@ export function runAgyTestWriter(input) {
     'test author. Never edit product implementation. Write tests/fixtures/test',
     'helpers only, run targeted baseline checks, classify each baseline, commit',
     'your test-only changes, and do not attempt to make product code pass.',
+    `Write a minimal JSON report to ${join(resultDir, 'agent-result.json')} with`,
+    '{"baselineClassifications":[...],"testsRun":[...],"testResults":"...","blockers":[...]}.',
   ].join('\n');
   const ndjson = `${JSON.stringify({ event: 'user', message: { role: 'user', content: prompt } })}\n`;
   const started = Date.now();
@@ -53,6 +54,22 @@ export function runAgyTestWriter(input) {
   writeFileSync(join(resultDir, 'agy-run.jsonl'), run.stdout ?? '');
   if (run.error) throw new Error(`AGY_TEST_SPAWN_FAILED: ${run.error.message}`);
   if (run.status !== 0) throw new Error(`AGY_TEST_FAILED: ${(run.stderr ?? '').slice(-500)}`);
+  const agentResultPath = join(resultDir, 'agent-result.json');
+  if (!existsSync(agentResultPath)) throw new Error('AGY_TEST_RESULT_CONTRACT_MISSING');
+  const agentResult = JSON.parse(readFileSync(agentResultPath, 'utf8'));
+  const allowedClassifications = new Set([
+    'NEW_BEHAVIOR_RED',
+    'REGRESSION_RED',
+    'NEGATIVE_RED',
+    'CHARACTERIZATION_GREEN',
+    'REFACTOR_GUARD_GREEN',
+  ]);
+  if (
+    !Array.isArray(agentResult.baselineClassifications) ||
+    agentResult.baselineClassifications.length === 0 ||
+    agentResult.baselineClassifications.some((item) => !allowedClassifications.has(item))
+  )
+    throw new Error('AGY_TEST_BASELINE_CLASSIFICATION_INVALID');
   const dirty = git(['status', '--porcelain=v1'], input.worktree)
     .stdout.split('\n')
     .filter(Boolean)
@@ -82,13 +99,13 @@ export function runAgyTestWriter(input) {
     shardId: input.lane,
     role: 'test',
     engine: 'AGY',
-    completed: head === before ? [] : (input['task-ids'] ?? '').split(',').filter(Boolean),
+    completed: (input['task-ids'] ?? '').split(',').filter(Boolean),
     branch: git(['branch', '--show-current'], input.worktree).stdout.trim(),
     headSha: head,
-    testsRun: [],
-    testResults: 'baseline evidence in AGY event log; deterministic gates remain authoritative',
-    baselineClassifications: ['NEW_BEHAVIOR_RED', 'CHARACTERIZATION_GREEN'],
-    blockers: [],
+    testsRun: Array.isArray(agentResult.testsRun) ? agentResult.testsRun : [],
+    testResults: agentResult.testResults ?? 'unknown',
+    baselineClassifications: agentResult.baselineClassifications,
+    blockers: Array.isArray(agentResult.blockers) ? agentResult.blockers : [],
   };
   writeFileSync(join(resultDir, 'result.json'), `${JSON.stringify(result, null, 2)}\n`);
   writeFileSync(

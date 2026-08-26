@@ -17,7 +17,7 @@ export interface ImpactClassification {
 export interface FastCheckStep {
   kind:
     | 'eslint'
-    | 'vitest-related'
+    | 'affected-tests'
     | 'typecheck'
     | 'authority-validate'
     | 'conformance-tests'

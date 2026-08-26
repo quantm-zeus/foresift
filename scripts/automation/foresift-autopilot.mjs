@@ -91,6 +91,11 @@ import { collectFinalizationFacts, evaluateFinalizationFromMain } from './finali
 import { admitWorkflowForLaunch, PLANNING_BOOTSTRAP_WORKFLOW } from './wave-admission.mjs';
 import { resolveExecutionProfile } from './execution-profile.mjs';
 import { createIncidentCapsule } from './maintainer-incident.mjs';
+import {
+  evaluateBunMigrationBarrier,
+  loadBunMigrationInputs,
+  validateBunMigrationProof,
+} from './bun-migration-state.mjs';
 
 // Overridable for hermetic selftests (sandboxed fixture repo + state dir).
 const REPO = process.env.FORESIFT_AUTOPILOT_REPO ?? join(import.meta.dirname, '..', '..');
@@ -251,9 +256,22 @@ function archonJson(args) {
 // ── runtime state ────────────────────────────────────────────────────────────
 function loadState() {
   try {
-    return JSON.parse(readFileSync(STATE_FILE, 'utf8'));
+    const state = JSON.parse(readFileSync(STATE_FILE, 'utf8'));
+    state.activeRuns ??= [];
+    state.milestoneRuns ??= [];
+    state.maintenanceRuns ??= [];
+    state.testMigration ??= { status: 'BUN_MIGRATION_REQUIRED' };
+    state.history ??= [];
+    return state;
   } catch {
-    return { activeRuns: [], milestoneRuns: [], pausedFatal: null, history: [] };
+    return {
+      activeRuns: [],
+      milestoneRuns: [],
+      maintenanceRuns: [],
+      testMigration: { status: 'BUN_MIGRATION_REQUIRED' },
+      pausedFatal: null,
+      history: [],
+    };
   }
 }
 function saveState(st) {
@@ -658,7 +676,12 @@ function backoffMs(attempt) {
 }
 
 function trackRun(st, kind, entry) {
-  (kind === 'milestone' ? st.milestoneRuns : st.activeRuns).push(entry);
+  (kind === 'milestone'
+    ? st.milestoneRuns
+    : kind === 'maintenance'
+      ? st.maintenanceRuns
+      : st.activeRuns
+  ).push(entry);
 }
 
 async function finalizeCompletedRun(st, entry, get = null) {
@@ -678,6 +701,36 @@ async function finalizeCompletedRun(st, entry, get = null) {
     merged = gh.ok && list.length > 0;
     mergedPr = list[0]?.url ?? null;
   } catch {}
+  if (entry.kind === 'maintenance') {
+    if (!merged) {
+      entry.note = 'completed-without-merge';
+      record(st, 'bun_migration_completed_without_merge', { runId: entry.runId });
+      attemptResume(st, entry, 'Bun migration completed but its PR was not merged');
+      return false;
+    }
+    refreshMain();
+    await commitQueue.catch(() => {});
+    const { policy, proof } = loadBunMigrationInputs(REPO);
+    const verdict = validateBunMigrationProof(proof, policy);
+    if (!verdict.valid) {
+      entry.failureClass = 'FATAL';
+      enterFatalPause(
+        st,
+        entry,
+        `merged Bun migration proof invalid: ${verdict.reasons.join(',')}`,
+      );
+      return false;
+    }
+    st.testMigration = {
+      status: 'BUN_MIGRATION_PROVEN',
+      migrationId: policy.migrationId,
+      runId: entry.runId,
+      pr: mergedPr,
+      provenAt: now(),
+    };
+    record(st, 'bun_migration_proven', { runId: entry.runId, pr: mergedPr });
+    return true;
+  }
   if (entry.kind === 'milestone') {
     if (merged) record(st, 'milestone_workflow_completed', { runId: entry.runId });
     else
@@ -1101,7 +1154,7 @@ function attemptResume(st, entry, reason) {
   );
 }
 
-function actOnEntry(st, entry) {
+async function actOnEntry(st, entry) {
   const get = archonJson(`workflow get ${entry.runId} --json`);
   const status = get?.status ?? get?.run?.status;
   if (get?._unparsed !== undefined || !status) {
@@ -1113,7 +1166,7 @@ function actOnEntry(st, entry) {
   }
   entry.lastSeenStatus = status;
   entry.lastSeenAt = now();
-  if (status === 'completed') return finalizeCompletedRun(st, entry, get);
+  if (status === 'completed') return await finalizeCompletedRun(st, entry, get);
   if (status === 'running' || status === 'pending') {
     // Prefer Archon's own last-activity fields (snake_case in the real CLI),
     // normalized. A present-but-unparsable timestamp is "no opinion": record a
@@ -1169,6 +1222,12 @@ function actOnEntry(st, entry) {
           error: String(err?.message ?? err).slice(0, 200),
         });
       }
+    } else if (entry.kind === 'maintenance') {
+      st.testMigration = {
+        ...(st.testMigration ?? {}),
+        status: 'BUN_MIGRATION_REQUIRED',
+        reason: 'maintenance-run-cancelled',
+      };
     }
     record(st, 'run_cancelled_requeued', { runId: entry.runId, branch: entry.branch });
     return true;
@@ -1508,6 +1567,52 @@ function selectAndLaunch(st) {
     record(st, 'selection_deferred_uncommitted_state', { why: view.why });
     return 0;
   }
+  const { policy: testPolicy, proof: bunProof } = loadBunMigrationInputs(REPO);
+  const barrier = evaluateBunMigrationBarrier({
+    policy: testPolicy,
+    milestone: ms,
+    runtimeState: st.testMigration,
+    proof: bunProof,
+  });
+  st.testMigration = {
+    ...(st.testMigration ?? {}),
+    status: barrier.state,
+    migrationId: testPolicy.migrationId,
+    reason: barrier.reason,
+  };
+  if (barrier.state === 'BUN_MIGRATION_REQUIRED') {
+    if (st.maintenanceRuns.some((entry) => !entry.done) || st.pausedFatal) return 0;
+    const message = testPolicy.migrationId;
+    const ack = launchDetached(
+      st,
+      testPolicy.migrationWorkflow,
+      testPolicy.migrationBranch,
+      message,
+    );
+    const runId = resolveRunId(ack, testPolicy.migrationWorkflow, message);
+    st.testMigration.status = 'BUN_MIGRATION_RUNNING';
+    st.testMigration.runId = runId;
+    record(st, 'bun_migration_launched', {
+      workflow: testPolicy.migrationWorkflow,
+      branch: testPolicy.migrationBranch,
+      runId,
+      discovery: extractRunId(ack) ? 'ack' : 'runs-table',
+    });
+    trackRun(st, 'maintenance', {
+      kind: 'maintenance',
+      workflow: testPolicy.migrationWorkflow,
+      runId,
+      branch: testPolicy.migrationBranch,
+      message,
+      startedAt: now(),
+      resumeCount: 0,
+      restartCount: 0,
+      awaitingDiscovery: !runId,
+      discoveryAttempts: 0,
+    });
+    return 1;
+  }
+  if (barrier.state === 'BUN_MIGRATION_RUNNING') return 0;
   const milestoneDue = !ms || ms.packages.every((p) => p.status === 'PROVEN');
   if (milestoneDue) {
     if (st.milestoneRuns.length > 0 || st.pausedFatal) return 0;
@@ -1552,6 +1657,7 @@ function selectAndLaunch(st) {
   let launched = 0;
   const running = st.activeRuns.map((r) => findPackage(ms, r.packageId)).filter(Boolean);
   for (const cand of rankPendingPackages(ms)) {
+    if (barrier.state === 'CURRENT_PACKAGE' && cand.id !== testPolicy.barrierAfterPackage) continue;
     // Never re-select a package that already has a tracked active launch
     // (covers the window where its run id is still being discovered and its
     // status is therefore still PENDING).
@@ -1821,9 +1927,11 @@ export function buildStatus() {
       `⛔ PAUSED_FATAL: ${st.pausedFatal.reason}`,
       `   recover with: node scripts/automation/foresift-autopilot.mjs --recover-fatal (stop the service unit first)`,
     );
-  const quotaPaused = [...(st.activeRuns ?? []), ...(st.milestoneRuns ?? [])].find(
-    (e) => !e.done && e.paused === 'quota',
-  );
+  const quotaPaused = [
+    ...(st.activeRuns ?? []),
+    ...(st.milestoneRuns ?? []),
+    ...(st.maintenanceRuns ?? []),
+  ].find((e) => !e.done && e.paused === 'quota');
   if (quotaPaused && !st.pausedFatal)
     lines.push(
       `⏸ QUOTA BACKOFF: ${quotaPaused.packageId ?? quotaPaused.kind ?? 'run'} paused on provider daily quota — next automatic probe in ${Math.max(0, Math.round(((quotaPaused.quotaNextProbeAt ?? now()) - now()) / 60_000))}m (probe ${quotaPaused.quotaProbes ?? 0}/${QUOTA_PROBE_LIMIT}); transient retry budget untouched`,
@@ -1874,6 +1982,10 @@ export function buildStatus() {
     }
   }
   for (const m of st.milestoneRuns ?? []) lines.push(`milestone-control: ${describeRun(m)}`);
+  for (const m of st.maintenanceRuns ?? []) lines.push(`bun-migration: ${describeRun(m)}`);
+  lines.push(
+    `test migration: ${st.testMigration?.status ?? 'BUN_MIGRATION_REQUIRED'}${st.testMigration?.reason ? ` (${st.testMigration.reason})` : ''}`,
+  );
   lines.push(`runtime state: ${STATE_FILE}`);
   return lines.join('\n');
 }
@@ -1907,7 +2019,7 @@ async function tick(st) {
   // Reconcile active entries. Paused entries stay tracked (never filtered as
   // done): fatal pauses wait for operator recovery, quota pauses probe on the
   // supervisor-owned schedule.
-  for (const entry of [...st.activeRuns, ...st.milestoneRuns]) {
+  for (const entry of [...st.activeRuns, ...st.milestoneRuns, ...st.maintenanceRuns]) {
     if (entry.done) continue;
     if (entry.paused) {
       actOnPausedEntry(st, entry);
@@ -1922,11 +2034,12 @@ async function tick(st) {
       await actOnPendingAction(st, entry);
       continue;
     }
-    const done = actOnEntry(st, entry);
+    const done = await actOnEntry(st, entry);
     if (done) entry.done = true;
   }
   st.activeRuns = st.activeRuns.filter((e) => !e.done);
   st.milestoneRuns = st.milestoneRuns.filter((e) => !e.done);
+  st.maintenanceRuns = st.maintenanceRuns.filter((e) => !e.done);
 
   if (!st.pausedFatal) {
     // Restore authoritative tracking BEFORE any new selection: an untracked
@@ -1976,7 +2089,9 @@ async function cmdRecoverFatal(positionalRunId) {
     // Early-recovery form: a TRACKED pause without a global pausedFatal (e.g.
     // resuming a daily-quota backoff ahead of schedule) reconciles through the
     // exact same verified flow.
-    const pausedEntry = [...st.activeRuns, ...st.milestoneRuns].find((e) => !e.done && e.paused);
+    const pausedEntry = [...st.activeRuns, ...st.milestoneRuns, ...st.maintenanceRuns].find(
+      (e) => !e.done && e.paused,
+    );
     if (pausedEntry)
       pf = {
         reason: pausedEntry.lastPauseReason ?? `tracked ${pausedEntry.paused} pause`,
@@ -2016,7 +2131,13 @@ async function cmdRecoverFatal(positionalRunId) {
     return fail(
       'paused state carries neither a readable Archon run nor structured workflow/message identity; repair the underlying cause first',
     );
-  const kind = workflow === 'foresift-milestone-control' ? 'milestone' : 'package';
+  const { policy: testRuntimePolicy } = loadBunMigrationInputs(REPO);
+  const kind =
+    workflow === 'foresift-milestone-control'
+      ? 'milestone'
+      : workflow === testRuntimePolicy.migrationWorkflow
+        ? 'maintenance'
+        : 'package';
   const executionProfile =
     kind === 'package' ? (pf.executionProfile ?? resolveExecutionProfile()) : null;
   const forceFreshProfileMigration =
@@ -2054,7 +2175,8 @@ async function cmdRecoverFatal(positionalRunId) {
     // From here on, recovery acts on the CURRENT generation's correlation key.
     message = ident.message;
   } else if (!branch) {
-    branch = 'foresift/milestone-planning';
+    branch =
+      kind === 'maintenance' ? testRuntimePolicy.migrationBranch : 'foresift/milestone-planning';
   }
   // No duplicate product run may exist for this logical package.
   const list = archonJson('workflow runs --json --limit 20');
@@ -2137,7 +2259,12 @@ async function cmdRecoverFatal(positionalRunId) {
       ? (pf.executionProfile ?? (resumed ? 'HISTORICAL_V4' : executionProfile))
       : null;
   // Restore authoritative tracking: reuse the retained paused entry if present.
-  const list2 = kind === 'milestone' ? st.milestoneRuns : st.activeRuns;
+  const list2 =
+    kind === 'milestone'
+      ? st.milestoneRuns
+      : kind === 'maintenance'
+        ? st.maintenanceRuns
+        : st.activeRuns;
   let entry = list2.find((e) => !e.done && ((runId && e.runId === runId) || e.message === message));
   if (!entry) {
     entry = {
@@ -2755,9 +2882,12 @@ async function main() {
     // deadlock. Stranded reconciliation rebuilds whatever tracking is still
     // warranted against current truth on the next tick; the orphan refusal
     // above already guarded the RUNNING-without-live-track case.
-    const dropped = [...st.activeRuns, ...st.milestoneRuns].filter((e) => e.paused === 'fatal');
+    const dropped = [...st.activeRuns, ...st.milestoneRuns, ...st.maintenanceRuns].filter(
+      (e) => e.paused === 'fatal',
+    );
     st.activeRuns = st.activeRuns.filter((e) => e.paused !== 'fatal');
     st.milestoneRuns = st.milestoneRuns.filter((e) => e.paused !== 'fatal');
+    st.maintenanceRuns = st.maintenanceRuns.filter((e) => e.paused !== 'fatal');
     record(st, 'fatal_pause_entries_dropped', {
       count: dropped.length,
       packageIds: dropped.map((e) => e.packageId ?? null),
@@ -2841,7 +2971,7 @@ async function main() {
     if (!once) {
       const next = nextPollDelayMs({
         launched,
-        awaitingDiscovery: [...st.activeRuns, ...st.milestoneRuns].some(
+        awaitingDiscovery: [...st.activeRuns, ...st.milestoneRuns, ...st.maintenanceRuns].some(
           (r) => !r.done && r.awaitingDiscovery,
         ),
         fastStreak,

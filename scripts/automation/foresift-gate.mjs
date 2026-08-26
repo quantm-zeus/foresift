@@ -73,6 +73,19 @@ function writeGateResult(passed, exitCode) {
 }
 
 function run(cmd, label, category) {
+  if (
+    category === 'TESTS' &&
+    (process.env.FORESIFT_TEST_AUTHORITY === '1' ||
+      process.env.FORESIFT_TEST_COORDINATOR === '1') &&
+    process.env.FORESIFT_ALLOW_HERMETIC_NESTED_FULL !== '1'
+  ) {
+    console.error(
+      'NESTED_FULL_EXECUTION_BLOCKED: a test process may exercise gate semantics only against an explicitly marked hermetic fixture repository',
+    );
+    gateChecks.push({ label, category, command: cmd, status: 'FAIL' });
+    writeGateResult(false, 86);
+    process.exit(86);
+  }
   console.log(`\n═══ GATE ▸ ${label}\n═══ $ ${cmd}`);
   const res = spawnSync(cmd, {
     shell: true,
@@ -155,10 +168,10 @@ if (pkg.risk === 'CRITICAL' || pkg.risk === 'HIGH') {
 // before — this path is behaviorally frozen.
 //
 // OPTIMIZED profile: proven-only dedupe. The `pnpm test` above ran the ROOT
-// vitest suite, which includes every default-include test file repo-wide; a
+// authoritative root suite, which includes every test file repo-wide; a
 // per-package filtered rerun is skipped ONLY when classifyCommand proves it
-// re-executes nothing but those already-covered files (plain `vitest run`
-// script, no local config). Absence of proof ⇒ the command runs.
+// re-executes nothing but those already-covered files. Absence of proof ⇒ the
+// command runs.
 const profile = throughputProfile(pkg.id);
 if (profile === 'LEGACY') console.log('(LEGACY profile — dedupe disabled, every check executes)');
 let skippedDuplicates = 0;

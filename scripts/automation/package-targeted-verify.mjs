@@ -62,7 +62,12 @@ export function extractFailingTestFiles(logText, exists = fsExists, cwd = proces
  * Pure planner (task spec §10): from a validated gate manifest (+ optional
  * gate log for failing-test extraction), decide TARGETED checks or escalate.
  */
-export function planTargetedChecks({ manifest, gateLogText, exists = fsExists }) {
+export function planTargetedChecks({
+  manifest,
+  gateLogText,
+  exists = fsExists,
+  testAuthority = 'VITEST_TRANSITION',
+}) {
   if (!manifest)
     return { mode: 'ESCALATE_FULL', reason: 'no structured gate manifest', checks: [] };
   if (manifest.passed === true)
@@ -112,7 +117,10 @@ export function planTargetedChecks({ manifest, gateLogText, exists = fsExists })
         checks: [
           {
             label: `targeted tests: ${files.join(' ')}`.slice(0, 240),
-            command: `pnpm exec vitest run ${files.join(' ')}`,
+            command:
+              testAuthority === 'BUN_TEST'
+                ? `bun test --no-orphans --isolate --parallel=1 ${files.join(' ')}`
+                : `pnpm exec vitest run ${files.join(' ')}`,
           },
         ],
       };
@@ -161,7 +169,20 @@ function main() {
       gateLogText = ''; // absent log degrades TESTS planning to full rerun, never crashes
     }
   }
-  const plan = planTargetedChecks({ manifest: parseFullGateResult(raw), gateLogText });
+  let testAuthority = 'VITEST_TRANSITION';
+  try {
+    testAuthority = JSON.parse(
+      readFileSync(
+        join(import.meta.dirname, '..', '..', 'config', 'foresift-test-runtime.json'),
+        'utf8',
+      ),
+    ).currentAuthority;
+  } catch {}
+  const plan = planTargetedChecks({
+    manifest: parseFullGateResult(raw),
+    gateLogText,
+    testAuthority,
+  });
 
   const results = [];
   let allGreen = true;

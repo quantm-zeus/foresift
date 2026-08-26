@@ -73,14 +73,16 @@ describe('foundation concurrency is untouched (test 42)', () => {
     const one = selectNextPackage(adapterFor(ms), ms, [a]);
     expect(one.selected).toBeNull();
     const refused = one.ranked.find((r) => r.id === 'g0-b');
-    expect(refused?.startable).toBe(false);
-    expect(refused?.reason).toMatch(/foundation/);
+    expect(refused).toBeDefined();
+    if (!refused) throw new Error('Expected g0-b to be ranked');
+    expect(refused.startable).toBe(false);
+    expect(refused.reason).toMatch(/foundation/);
     // And the refusal is the production policy's own verdict, not the
     // scheduler's reimplementation.
     expect(
       canStartPackage(roadmap, ms as CanStartArgs[1], b as CanStartArgs[2], [a] as CanStartArgs[3])
         .reason,
-    ).toBe(refused?.reason);
+    ).toBe(refused.reason);
   });
 
   it('standard milestones still permit their policy maximum of 2', () => {

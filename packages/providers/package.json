@@ -1,0 +1,25 @@
+{
+  "name": "@foresift/providers",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Foresift audited read-only provider adapter framework bound to exact egress allowlists, plus the safety-critical reference families: GMGN strictly query-only and Helius supported raw/history operations with local decoding separation (FR-PROV-004…007).",
+  "exports": {
+    ".": {
+      "types": "./src/index.ts",
+      "default": "./src/index.ts"
+    }
+  },
+  "scripts": {
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@foresift/domain": "workspace:*",
+    "@foresift/provider-lifecycle": "workspace:*",
+    "@foresift/security": "workspace:*",
+    "@foresift/shared-schemas": "workspace:*"
+  },
+  "devDependencies": {
+    "vitest": "4.1.11"
+  }
+}

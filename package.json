@@ -38,6 +38,8 @@
     "@foresift/evidence": "workspace:*",
     "@foresift/object-store": "workspace:*",
     "@foresift/persistence": "workspace:*",
+    "@foresift/provider-lifecycle": "workspace:*",
+    "@foresift/security": "workspace:*",
     "@foresift/shared-schemas": "workspace:*",
     "@types/node": "26.2.0",
     "eslint": "10.9.0",

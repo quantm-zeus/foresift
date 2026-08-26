@@ -158,53 +158,53 @@ Format: `- [ ] T### [P?]` — **[P]** = parallelizable with its neighbors
       PRD §16.2 stages 1–24 verbatim; pinned-order unit test diffs the runtime
       sequence against the authoritative list; no configuration may skip or
       reorder stages. Traces: FR-CORE-002.
-- [ ] T602 Implement `src/stages/authn.ts` + `src/stages/validate.ts`
+- [x] T602 Implement `src/stages/authn.ts` + `src/stages/validate.ts`
       (stages 1–4): authenticate via injected perimeter primitive; authorize
       scope/action class/profile/tenant-entity/rights; Zod validate +
       canonicalize input; deterministic acquisition-decision and exact
       authorization-envelope validation. Failure exits produce typed blocked
       states. Traces: FR-CORE-002, FR-CORE-004.
-- [ ] T603 Implement `src/stages/acquisition.ts` (stage 5): persist REQUESTED
+- [x] T603 Implement `src/stages/acquisition.ts` (stage 5): persist REQUESTED
       or the applicable pre-execution blocked/not-requested state through the
       landed acquisition repo BEFORE any external request, keeping
       NOT_REQUESTED_BY_POLICY / COST_BLOCKED / QUOTA_BLOCKED /
       CAPABILITY_UNAVAILABLE / RIGHTS_BLOCKED distinguishable from retrieval
       failures (AC-242 substrate). Traces: FR-CORE-002, FR-CORE-003.
-- [ ] T604 Wire cache + single-flight stages into the pipeline (stages 6–13):
+- [x] T604 Wire cache + single-flight stages into the pipeline (stages 6–13):
       key calc → memo → fresh → stale → lease → recheck → quota estimate /
       capacity admission → atomic reserve, all via the Phase-D/E seams;
       backpressure outcomes (queue | return-cache | downgrade | skip |
       QUOTA_EXHAUSTED) are explicit typed exits; protected-reserve admission is
       delegated through the quota seam. Traces: FR-CORE-002, FR-CORE-006,
       FR-CORE-007.
-- [ ] T605 Implement `src/stages/dispatch.ts` (stages 14–17): call injected
+- [x] T605 Implement `src/stages/dispatch.ts` (stages 14–17): call injected
       allowlisted read-only operation adapters with deadline, byte limit, and
       egress-policy enforcement wrapping the perimeter controls; validate
       content type + raw schema (shared-schemas); normalize identity/units/
       timestamps/availability/lineage/quality codes; validate normalized schema
       and semantic invariants. Provider-failure paths map to TIMED_OUT /
       PROVIDER_UNAVAILABLE / INVALID_RESPONSE. Traces: FR-CORE-002, FR-CORE-003.
-- [ ] T606 Implement `src/stages/persist.ts` + quota settle (stages 18–22):
+- [x] T606 Implement `src/stages/persist.ts` + quota settle (stages 18–22):
       commit or release actual quota/cost per provider semantics through the
       adapter; persist evidence/artifact metadata + source fingerprint;
       update exact cache only when rights and policy permit; release lease with
       fencing validation; persist acquisition outcome, cache/provider source,
       actual cost, evidence IDs, decision impact. Idempotent under retry.
       Traces: FR-CORE-002, FR-CORE-007.
-- [ ] T607 Implement `src/stages/audit.ts` (stage 23): append audit + trace for
+- [x] T607 Implement `src/stages/audit.ts` (stage 23): append audit + trace for
       success AND every failure/blocked exit through the injected AuditChain;
       event payload carries actor, tool name/version, action class, outcome,
       machine-readable reason; never secret material. Tamper-evident chain
       verification stays owned by the security suite — asserted green here.
       Traces: FR-CORE-002, FR-CORE-005.
-- [ ] T608 Implement `src/envelope.ts` assembly (stage 24, FR-CORE-003):
+- [x] T608 Implement `src/envelope.ts` assembly (stage 24, FR-CORE-003):
       structured result with data + meta carrying toolName/version, optional
       provider/operation, evidenceIds, observedAt/availableAt/fetchedAt, cache
       outcome, freshnessSeconds, qualityCodes, conflicts, quota summary,
       partial flag, nextCursor/resourceUris; degraded results mark missing
       capabilities explicitly instead of silent gaps. Round-trip schema tests.
       Traces: FR-CORE-003.
-- [ ] T609 Implement the execution-time prohibited-financial gate inside the
+- [x] T609 Implement the execution-time prohibited-financial gate inside the
       pipeline (FR-CORE-005): action-class re-check before dispatch; refuse
       and audit any call whose resolved operation expresses trading/signing/
       custody/transaction construction regardless of registration state.
@@ -213,7 +213,7 @@ Format: `- [ ] T### [P?]` — **[P]** = parallelizable with its neighbors
 
 ## Phase G — Composition root and telemetry contract
 
-- [ ] T701 Implement `src/index.ts` `createToolCore(...)` composition root:
+- [x] T701 Implement `src/index.ts` `createToolCore(...)` composition root:
       injects AuditChain instance, egress enforcer, authn/authz primitives,
       QuotaReservationAdapter, LicensePolicySource, clock; deny-closed defaults
       wherever an adapter is unbound; exports the public surface only.
@@ -298,7 +298,7 @@ Format: `- [ ] T### [P?]` — **[P]** = parallelizable with its neighbors
       Then the shared aggregate gate `pnpm verify` and `pnpm spec:verify` at
       the pushed HEAD; fix anything they surface before completion is claimed.
       Traces: FR-CORE-001…FR-CORE-008.
-- [ ] T902 Confirm extension-point boundary holds: reference adapters from
+- [x] T902 Confirm extension-point boundary holds: reference adapters from
       outside tool-core drive the pipeline (T503) with zero edits to
       `packages/tool-core/src/**`; record the evidence output in the package's
       verification notes for review. Traces: FR-CORE-007, FR-CORE-008.

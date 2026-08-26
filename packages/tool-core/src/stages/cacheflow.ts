@@ -20,8 +20,11 @@
  * stage 10 waits on THE database lease or exits.
  */
 import { ForesiftError } from '@foresift/domain';
+import { loadFrozenBundle } from '@foresift/evidence';
+import type { DatabaseEngine } from '@foresift/persistence';
 import { block, exited, type ToolCallContext } from '../run-context.ts';
 import type { CacheStageChain } from './cache.ts';
+import type { NormalizedPayload } from './dispatch.ts';
 import type { SingleFlightManager } from '../single-flight.ts';
 import type { QuotaReservationAdapter } from '../quota-contract.ts';
 
@@ -49,6 +52,17 @@ function refuse(ctx: ToolCallContext, state: 'COST_BLOCKED' | 'QUOTA_BLOCKED' | 
   });
 }
 
+/**
+ * The key component representing an UNPINNED (live) read. PRD §16.4 keys on
+ * "as_of SEMANTICS" — the requested data-time identity, not the wall-clock
+ * instant of the call: pinning as_of to execution time would give every live
+ * read a unique key and exact caching could never serve anyone. Live reads
+ * share this sentinel; their RECENCY is governed by the §16.5 TTL windows,
+ * which is what those windows exist for. Callers pinning an explicit as-of
+ * timestamp get that timestamp verbatim as the component.
+ */
+export const LIVE_AS_OF_SENTINEL = '1970-01-01T00:00:00Z';
+
 /** Stage 6 — calculate exact cache key over the nine §16.4 components. */
 export function calculateExactCacheKey(ctx: ToolCallContext): void {
   if (exited(ctx)) return;
@@ -63,7 +77,7 @@ export function calculateExactCacheKey(ctx: ToolCallContext): void {
     canonicalEntityIdentity: ctx.canonicalEntityIdentity,
     normalizedArguments: (ctx.canonicalInput ?? {}) as Record<string, unknown>,
     fieldProjection: [...(request.fieldProjection ?? [])],
-    asOf: request.asOf ?? ctx.now(),
+    asOf: request.asOf ?? LIVE_AS_OF_SENTINEL,
     licensePolicyVersion: license.policyVersion,
   };
   // ctx.cacheKey is filled by the chain's lookup (it owns key construction);
@@ -134,6 +148,64 @@ export async function acquireSingleFlightLease(
       }
       await new Promise((resolve) => setTimeout(resolve, Math.min(25, Math.max(1, deps.leaseWaitDeadlineMs / 20))));
     }
+  }
+}
+
+/** True when stages 7–11 served the run from any exact-cache tier. */
+export function servedFromCache(ctx: ToolCallContext): boolean {
+  return ctx.cacheResult !== null && ctx.cacheResult.outcome !== 'MISS';
+}
+
+/**
+ * Cache-served retrieval: resolve THE referenced evidence bundle instead of
+ * dispatching. The exact cache stores references only, so serving re-reads
+ * the frozen manifest — normalized payload, event times, quality codes, and
+ * source fingerprint come back byte-identical to the refresh that stored
+ * them. An unresolvable reference refuses fail-closed (INVALID_RESPONSE):
+ * the cache claimed a hit the evidence store cannot honor.
+ */
+export async function serveCachedPayloadIfAny(
+  ctx: ToolCallContext,
+  engine: DatabaseEngine,
+): Promise<void> {
+  if (exited(ctx)) return;
+  if (!servedFromCache(ctx)) return;
+  const payloadRef = ctx.cacheResult?.payloadRef;
+  if (payloadRef === undefined) return; // defensive: hit without reference
+  const bundle = await loadFrozenBundle(engine, payloadRef);
+  const manifest = bundle?.manifest as Record<string, unknown> | undefined | null;
+  if (bundle === null || bundle === undefined || manifest === null || typeof manifest !== 'object') {
+    block(ctx, {
+      payload: {
+        acquisitionState: 'INVALID_RESPONSE',
+        machineReason: `CACHE_PAYLOAD_UNRESOLVABLE:${payloadRef}`,
+        toolName: ctx.request.toolName,
+        toolVersion: ctx.entry?.metadata.version ?? ctx.request.toolVersion ?? 'unknown',
+        pipelineRunId: ctx.runId,
+        at: ctx.now(),
+      },
+      auditOutcome: 'BLOCKED',
+      persistAcquisitionRow: false,
+    });
+    return;
+  }
+  const strings = (value: unknown): readonly string[] =>
+    Array.isArray(value) ? (value as string[]) : [];
+  const normalized: NormalizedPayload = {
+    data: manifest.normalizedData ?? null,
+    ...(typeof manifest.observedAt === 'string' ? { observedAt: manifest.observedAt } : {}),
+    ...(typeof manifest.availableAt === 'string' ? { availableAt: manifest.availableAt } : {}),
+    qualityCodes: strings(manifest.qualityCodes),
+    lineageRefs: strings(manifest.lineageRefs),
+    conflicts: Array.isArray(manifest.conflicts)
+      ? (manifest.conflicts as import('@foresift/shared-schemas').ProviderConflictRef[])
+      : [],
+    partial: false,
+  };
+  ctx.normalized = normalized;
+  ctx.evidenceIds.push(payloadRef); // THE original bundle is the evidence
+  if (typeof manifest.rawResponseFingerprintSha256 === 'string') {
+    ctx.sourceFingerprint = manifest.rawResponseFingerprintSha256;
   }
 }
 

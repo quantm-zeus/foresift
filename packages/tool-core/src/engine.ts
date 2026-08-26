@@ -38,6 +38,8 @@ import {
   estimateQuotaAndAdmission,
   recheckCacheAfterLease,
   reserveQuotaAtomically,
+  serveCachedPayloadIfAny,
+  servedFromCache,
   type CacheFlowDeps,
 } from './stages/cacheflow.ts';
 import {
@@ -125,6 +127,9 @@ function guarded(stage: string, fn: (ctx: ToolCallContext) => Promise<void> | vo
     const ctx = state.context as ToolCallContext;
     try {
       await fn(ctx);
+      // Mirror of the orchestrator's own completion trace, visible to the
+      // audit/envelope stages on the context itself.
+      ctx.completedTrace.push(stage);
     } catch (error) {
       internalErrorExit(ctx, stage, error);
     }
@@ -269,9 +274,17 @@ export class ToolCoreEngine {
       ),
       CALL_ALLOWLISTED_PROVIDER_COLLECTOR_OPERATION: guarded(
         'CALL_ALLOWLISTED_PROVIDER_COLLECTOR_OPERATION',
-        (ctx) => dispatchOperation(ctx, dispatchDeps),
+        async (ctx) => {
+          // Cache-served runs resolve THE referenced evidence bundle instead
+          // of dispatching — an external call would defeat exact caching.
+          await serveCachedPayloadIfAny(ctx, o.engine);
+          if (servedFromCache(ctx) && ctx.normalized !== null) return;
+          await dispatchOperation(ctx, dispatchDeps);
+        },
       ),
       VALIDATE_CONTENT_TYPE_AND_RAW_SCHEMA: guarded('VALIDATE_CONTENT_TYPE_AND_RAW_SCHEMA', (ctx) => {
+        // The served payload was validated when it was first retrieved.
+        if (servedFromCache(ctx)) return;
         const contentType = o.resolveContentType?.();
         validateContentTypeAndRawSchema(
           ctx,
@@ -280,22 +293,34 @@ export class ToolCoreEngine {
       }),
       NORMALIZE_IDENTITY_UNITS_TIMESTAMPS_AVAILABILITY_LINEAGE_QUALITY: guarded(
         'NORMALIZE_IDENTITY_UNITS_TIMESTAMPS_AVAILABILITY_LINEAGE_QUALITY',
-        (ctx) => normalizeProviderResponse(ctx, o.normalize ?? identityNormalizer),
+        (ctx) => {
+          if (servedFromCache(ctx)) return; // normalized at refresh time
+          normalizeProviderResponse(ctx, o.normalize ?? identityNormalizer);
+        },
       ),
       VALIDATE_NORMALIZED_SCHEMA_AND_SEMANTIC_INVARIANTS: guarded(
         'VALIDATE_NORMALIZED_SCHEMA_AND_SEMANTIC_INVARIANTS',
-        (ctx) => validateNormalizedInvariants(ctx),
+        (ctx) => {
+          if (servedFromCache(ctx)) return; // invariants held at refresh time
+          validateNormalizedInvariants(ctx);
+        },
       ),
       COMMIT_OR_RELEASE_ACTUAL_QUOTA_COST: guarded('COMMIT_OR_RELEASE_ACTUAL_QUOTA_COST', (ctx) =>
         settleQuota(ctx, cacheFlowDeps),
       ),
       PERSIST_EVIDENCE_ARTIFACT_METADATA_AND_SOURCE_FINGERPRINT: guarded(
         'PERSIST_EVIDENCE_ARTIFACT_METADATA_AND_SOURCE_FINGERPRINT',
-        (ctx) => persistEvidenceMetadata(ctx, o.engine),
+        (ctx) => {
+          if (servedFromCache(ctx)) return; // THE original bundle already holds the evidence
+          return persistEvidenceMetadata(ctx, o.engine);
+        },
       ),
       UPDATE_EXACT_CACHE_WHEN_RIGHTS_AND_POLICY_PERMIT: guarded(
         'UPDATE_EXACT_CACHE_WHEN_RIGHTS_AND_POLICY_PERMIT',
-        (ctx) => updateExactCache(ctx, cacheFlowDeps, cachePolicy),
+        (ctx) => {
+          if (servedFromCache(ctx)) return; // entry already present — no rewrite
+          return updateExactCache(ctx, cacheFlowDeps, cachePolicy);
+        },
       ),
       RELEASE_LEASE_WITH_FENCING_VALIDATION: guarded(
         'RELEASE_LEASE_WITH_FENCING_VALIDATION',

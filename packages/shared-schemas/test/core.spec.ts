@@ -5,7 +5,7 @@
  * `@foresift/domain` §16 constants (mirror-by-construction); the prohibited
  * financial refusal is structural here as well as behavioral in tool-core.
  */
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'bun:test';
 import {
   ALL_ACTION_CLASSES,
   ALL_BACKPRESSURE_ACTIONS,
@@ -80,19 +80,19 @@ const meta = {
 
 describe('vocabulary mirrors equal the domain §16 constants by construction', () => {
   const parity = [
-    { schema: ActionClassSchema, all: ALL_ACTION_CLASSES },
-    { schema: WorkloadClassSchema, all: ALL_WORKLOAD_CLASSES },
-    { schema: CacheOutcomeSchema, all: ALL_CACHE_OUTCOMES },
-    { schema: QuotaModelSchema, all: ALL_QUOTA_MODELS },
-    { schema: ReservationStateSchema, all: ALL_RESERVATION_STATES },
-    { schema: BackpressureActionSchema, all: ALL_BACKPRESSURE_ACTIONS },
-    { schema: HolderModeSchema, all: ALL_HOLDER_MODES },
-    { schema: ToolProfileIdSchema, all: ALL_TOOL_PROFILE_IDS },
-    { schema: PipelineStageSchema, all: ALL_PIPELINE_STAGES },
+    ['ActionClassSchema', ActionClassSchema, ALL_ACTION_CLASSES],
+    ['WorkloadClassSchema', WorkloadClassSchema, ALL_WORKLOAD_CLASSES],
+    ['CacheOutcomeSchema', CacheOutcomeSchema, ALL_CACHE_OUTCOMES],
+    ['QuotaModelSchema', QuotaModelSchema, ALL_QUOTA_MODELS],
+    ['ReservationStateSchema', ReservationStateSchema, ALL_RESERVATION_STATES],
+    ['BackpressureActionSchema', BackpressureActionSchema, ALL_BACKPRESSURE_ACTIONS],
+    ['HolderModeSchema', HolderModeSchema, ALL_HOLDER_MODES],
+    ['ToolProfileIdSchema', ToolProfileIdSchema, ALL_TOOL_PROFILE_IDS],
+    ['PipelineStageSchema', PipelineStageSchema, ALL_PIPELINE_STAGES],
   ] as const;
 
-  it.each(parity)('$schema.description accepts exactly the domain set', ({ schema, all }) => {
-    expect(schema.options).toEqual(all);
+  it.each(parity)('%s accepts exactly the domain set', (_name, schema, all) => {
+    expect(schema.options).toEqual(all as never);
   });
 });
 

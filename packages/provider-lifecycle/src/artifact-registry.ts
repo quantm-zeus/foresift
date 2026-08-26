@@ -121,24 +121,20 @@ export class ArtifactRegistry {
     };
   }
 
-  async get(artifactId: string): Promise<
-    | {
-        artifactId: string;
-        objectRef: string;
-        providerId: string;
-        operationId: string;
-        operationVersion: string;
-        rightsVersion: number;
-        state: string;
-        capturedAt: string;
-        updatedAt: string;
-      }
-    | null
-  > {
-    const rows = await this.engine.query<ArtifactRow & { provider_id: string; operation_id: string; operation_version: string }>(
-      `SELECT * FROM prov.prov_provider_artifacts WHERE artifact_id = $1`,
-      [artifactId],
-    );
+  async get(artifactId: string): Promise<{
+    artifactId: string;
+    objectRef: string;
+    providerId: string;
+    operationId: string;
+    operationVersion: string;
+    rightsVersion: number;
+    state: string;
+    capturedAt: string;
+    updatedAt: string;
+  } | null> {
+    const rows = await this.engine.query<
+      ArtifactRow & { provider_id: string; operation_id: string; operation_version: string }
+    >(`SELECT * FROM prov.prov_provider_artifacts WHERE artifact_id = $1`, [artifactId]);
     const row = rows.rows[0];
     if (row === undefined) return null;
     return {

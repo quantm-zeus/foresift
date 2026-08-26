@@ -47,7 +47,12 @@ describe('T109 operation registry', () => {
     expect(op.healthStatus).toBe('HEALTHY');
     // Negative-capability metadata is forced onto every registration.
     expect(op.negativeCapabilities).toEqual(
-      expect.arrayContaining(['PROHIBITED_TRANSACTION_BUILD', 'PROHIBITED_SIGN', 'PROHIBITED_SUBMIT', 'PROHIBITED_CUSTODY']),
+      expect.arrayContaining([
+        'PROHIBITED_TRANSACTION_BUILD',
+        'PROHIBITED_SIGN',
+        'PROHIBITED_SUBMIT',
+        'PROHIBITED_CUSTODY',
+      ]),
     );
   });
 
@@ -59,12 +64,16 @@ describe('T109 operation registry', () => {
       'PROHIBITED_CUSTODY',
     ]) {
       await expect(
-        wired.registry.registerOperation(testDefinition({ ...{}, capabilityClass } as Partial<OperationDefinition>)),
+        wired.registry.registerOperation(
+          testDefinition({ ...{}, capabilityClass } as Partial<OperationDefinition>),
+        ),
       ).rejects.toMatchObject({ code: ProvErrorCode.PROV_CAPABILITY_CLASS_PROHIBITED });
     }
     await expect(
       wired.registry.registerOperation(
-        testDefinition({ capabilityClass: 'WRITE_EVERYTHING' } as unknown as Partial<OperationDefinition>),
+        testDefinition({
+          capabilityClass: 'WRITE_EVERYTHING',
+        } as unknown as Partial<OperationDefinition>),
       ),
     ).rejects.toMatchObject({ code: ProvErrorCode.PROV_CAPABILITY_CLASS_UNKNOWN });
   });
@@ -72,7 +81,9 @@ describe('T109 operation registry', () => {
   it('resolves an identical re-registration idempotently but refuses a conflicting one', async () => {
     await seed();
     await wired.registry.registerOperation(testDefinition({ operationId: 'op-idem' }));
-    const retry = await wired.registry.registerOperation(testDefinition({ operationId: 'op-idem' }));
+    const retry = await wired.registry.registerOperation(
+      testDefinition({ operationId: 'op-idem' }),
+    );
     expect(retry.created).toBe(false);
 
     const conflict = testDefinition({ operationId: 'op-idem', timeoutMs: 9999 });

@@ -78,11 +78,7 @@ async function checkConstraints(): Promise<CheckRow[]> {
   return rows.rows;
 }
 
-function findDef(
-  constraints: CheckRow[],
-  table: string,
-  column: string,
-): string {
+function findDef(constraints: CheckRow[], table: string, column: string): string {
   const hits = constraints.filter(
     (c) => c.table_name === `prov.${table}` && c.def.includes(column),
   );
@@ -100,22 +96,102 @@ describe('T108 §12.11 completeness: graph ↔ SQL CHECK ↔ Zod', () => {
       values: readonly string[];
       schema: { options: readonly string[] };
     }[] = [
-      { table: 'prov_operations', column: 'current_state', values: PROVIDER_LIFECYCLE_STATES, schema: ProviderLifecycleStateSchema },
-      { table: 'prov_lifecycle_events', column: 'from_state', values: PROVIDER_LIFECYCLE_STATES, schema: ProviderLifecycleStateSchema },
-      { table: 'prov_lifecycle_events', column: 'to_state', values: PROVIDER_LIFECYCLE_STATES, schema: ProviderLifecycleStateSchema },
-      { table: 'prov_operations', column: 'health_status', values: PROVIDER_HEALTH_STATUSES, schema: ProviderHealthStatusSchema },
-      { table: 'prov_operations', column: 'capability_class', values: ALLOWED_CAPABILITY_CLASSES, schema: ProviderAllowedCapabilityClassSchema },
-      { table: 'prov_operations', column: 'cost_class', values: PROVIDER_COST_CLASSES, schema: ProviderCostClassSchema },
-      { table: 'prov_operation_dependencies', column: 'consumer_kind', values: DEPENDENCY_CONSUMER_KINDS, schema: DependencyConsumerKindSchema },
-      { table: 'prov_verification_records', column: 'kind', values: PROVIDER_VERIFICATION_KINDS, schema: ProviderVerificationKindSchema },
-      { table: 'prov_verification_ttl_configs', column: 'kind', values: PROVIDER_VERIFICATION_KINDS, schema: ProviderVerificationKindSchema },
-      { table: 'prov_verification_records', column: 'source', values: VERIFICATION_SOURCES, schema: VerificationSourceSchema },
-      { table: 'prov_verification_records', column: 'outcome', values: VERIFICATION_OUTCOMES, schema: VerificationOutcomeSchema },
-      { table: 'prov_response_quarantine', column: 'detected_classes', values: QUARANTINE_CLASSES, schema: QuarantineClassSchema },
-      { table: 'prov_rights_changes', column: 'newly_prohibited_uses', values: RIGHTS_USE_PATHS, schema: RightsUsePathSchema },
-      { table: 'prov_provider_artifacts', column: 'state', values: ['ACTIVE', 'QUARANTINED', 'RETIRED'], schema: { options: ['ACTIVE', 'QUARANTINED', 'RETIRED'] } },
-      { table: 'prov_rights_change_actions', column: 'action', values: RIGHTS_ACTION_KINDS, schema: RightsActionKindSchema },
-      { table: 'prov_source_fingerprints', column: 'kind', values: PROVIDER_FINGERPRINT_KINDS, schema: ProviderFingerprintKindSchema },
+      {
+        table: 'prov_operations',
+        column: 'current_state',
+        values: PROVIDER_LIFECYCLE_STATES,
+        schema: ProviderLifecycleStateSchema,
+      },
+      {
+        table: 'prov_lifecycle_events',
+        column: 'from_state',
+        values: PROVIDER_LIFECYCLE_STATES,
+        schema: ProviderLifecycleStateSchema,
+      },
+      {
+        table: 'prov_lifecycle_events',
+        column: 'to_state',
+        values: PROVIDER_LIFECYCLE_STATES,
+        schema: ProviderLifecycleStateSchema,
+      },
+      {
+        table: 'prov_operations',
+        column: 'health_status',
+        values: PROVIDER_HEALTH_STATUSES,
+        schema: ProviderHealthStatusSchema,
+      },
+      {
+        table: 'prov_operations',
+        column: 'capability_class',
+        values: ALLOWED_CAPABILITY_CLASSES,
+        schema: ProviderAllowedCapabilityClassSchema,
+      },
+      {
+        table: 'prov_operations',
+        column: 'cost_class',
+        values: PROVIDER_COST_CLASSES,
+        schema: ProviderCostClassSchema,
+      },
+      {
+        table: 'prov_operation_dependencies',
+        column: 'consumer_kind',
+        values: DEPENDENCY_CONSUMER_KINDS,
+        schema: DependencyConsumerKindSchema,
+      },
+      {
+        table: 'prov_verification_records',
+        column: 'kind',
+        values: PROVIDER_VERIFICATION_KINDS,
+        schema: ProviderVerificationKindSchema,
+      },
+      {
+        table: 'prov_verification_ttl_configs',
+        column: 'kind',
+        values: PROVIDER_VERIFICATION_KINDS,
+        schema: ProviderVerificationKindSchema,
+      },
+      {
+        table: 'prov_verification_records',
+        column: 'source',
+        values: VERIFICATION_SOURCES,
+        schema: VerificationSourceSchema,
+      },
+      {
+        table: 'prov_verification_records',
+        column: 'outcome',
+        values: VERIFICATION_OUTCOMES,
+        schema: VerificationOutcomeSchema,
+      },
+      {
+        table: 'prov_response_quarantine',
+        column: 'detected_classes',
+        values: QUARANTINE_CLASSES,
+        schema: QuarantineClassSchema,
+      },
+      {
+        table: 'prov_rights_changes',
+        column: 'newly_prohibited_uses',
+        values: RIGHTS_USE_PATHS,
+        schema: RightsUsePathSchema,
+      },
+      {
+        table: 'prov_provider_artifacts',
+        column: 'state',
+        values: ['ACTIVE', 'QUARANTINED', 'RETIRED'],
+        schema: { options: ['ACTIVE', 'QUARANTINED', 'RETIRED'] },
+      },
+      {
+        table: 'prov_rights_change_actions',
+        column: 'action',
+        values: RIGHTS_ACTION_KINDS,
+        schema: RightsActionKindSchema,
+      },
+      {
+        table: 'prov_source_fingerprints',
+        column: 'kind',
+        values: PROVIDER_FINGERPRINT_KINDS,
+        schema: ProviderFingerprintKindSchema,
+      },
     ];
 
     const failures: string[] = [];

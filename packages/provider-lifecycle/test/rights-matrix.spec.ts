@@ -6,11 +6,7 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { AuditChain } from '@foresift/security';
 import type { RightsUsePath } from '../src/index.ts';
-import {
-  RightsMatrixEngine,
-  diffRights,
-  ProvErrorCode,
-} from '../src/index.ts';
+import { RightsMatrixEngine, diffRights, ProvErrorCode } from '../src/index.ts';
 import type { RightsDeclaration } from '../src/index.ts';
 import { makeProvEngine, seedOperationRow, ts } from './helpers.ts';
 
@@ -49,7 +45,11 @@ beforeAll(async () => {
   engine = made.engine;
   closeDb = () => made.db.close();
   // The declarations table carries a provider FK; seed one provider+operation.
-  await seedOperationRow(engine, { providerId: 'prov-test', operationId: 'op-rights', version: 'v1' });
+  await seedOperationRow(engine, {
+    providerId: 'prov-test',
+    operationId: 'op-rights',
+    version: 'v1',
+  });
   rights = new RightsMatrixEngine({
     engine,
     clock: { now: () => NOW, nowEpochMs: () => Date.parse(NOW) },
@@ -248,6 +248,8 @@ describe('T120 declarations + changes + fail-closed decisions', () => {
 });
 
 async function auditCount(): Promise<number> {
-  const rows = await engine.query<{ n: string }>('SELECT COUNT(*)::text AS n FROM sec.sec_audit_events');
+  const rows = await engine.query<{ n: string }>(
+    'SELECT COUNT(*)::text AS n FROM sec.sec_audit_events',
+  );
   return Number(rows.rows[0]?.n ?? '0');
 }

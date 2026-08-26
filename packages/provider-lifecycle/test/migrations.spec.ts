@@ -70,12 +70,7 @@ async function seedOperation(
              'in-schema','raw-schema','norm-schema',
              'qm','cp',1000,'rp','dig','lp',
              0,'qrp', now() + interval '30 days', 'DISCOVERED', 'HEALTHY')`,
-    [
-      target.providerId,
-      target.operationId,
-      target.version,
-      capabilityClass,
-    ],
+    [target.providerId, target.operationId, target.version, capabilityClass],
   );
   return target;
 }
@@ -99,9 +94,9 @@ describe('prov migration SQL-truth rules', () => {
     await expect(
       engine.query(`DELETE FROM prov.prov_lifecycle_events WHERE event_id = 'evt-1'`),
     ).rejects.toThrow(/PROV_LEDGER_IMMUTABLE/);
-    await expect(
-      engine.exec('TRUNCATE prov.prov_lifecycle_events'),
-    ).rejects.toThrow(/PROV_LEDGER_IMMUTABLE/);
+    await expect(engine.exec('TRUNCATE prov.prov_lifecycle_events')).rejects.toThrow(
+      /PROV_LEDGER_IMMUTABLE/,
+    );
   });
 
   it('rejects a replayed transition even under a fresh event id (INV-009 fence)', async () => {
@@ -111,12 +106,7 @@ describe('prov migration SQL-truth rules', () => {
          from_state, to_state, reason_class, actor, occurred_at, effective_at)
        VALUES ($5,$1,$2,$3,'DISCOVERED','VERIFIED','VERIFICATION_PASSED',
                'tester', $4, $4)`;
-    const args = [
-      target.providerId,
-      target.operationId,
-      target.version,
-      '2026-08-26T00:00:00Z',
-    ];
+    const args = [target.providerId, target.operationId, target.version, '2026-08-26T00:00:00Z'];
     await engine.query(baseInsert, [...args, 'evt-a']);
     // Same semantic transition, different event id → still fenced by the
     // retry-fence UNIQUE over the semantic tuple.

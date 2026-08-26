@@ -21,12 +21,13 @@
  */
 import type { DatabaseEngine } from '@foresift/persistence';
 import type { ClockPort, UtcTimestamp } from '@foresift/domain';
-import {
-  REQUIRED_NEGATIVE_CAPABILITIES,
-  type ProviderVerificationKind,
-} from './vocabulary.ts';
+import { REQUIRED_NEGATIVE_CAPABILITIES, type ProviderVerificationKind } from './vocabulary.ts';
 import { ProvErrorCode } from './errors.ts';
-import type { OperationRegistry, OperationTarget, RegisteredOperation } from './operation-registry.ts';
+import type {
+  OperationRegistry,
+  OperationTarget,
+  RegisteredOperation,
+} from './operation-registry.ts';
 import type { VerificationTtlEngine } from './verification-ttl.ts';
 import type { RightsMatrixEngine } from './rights-matrix.ts';
 import type { MigrationExceptions } from './migration-exceptions.ts';
@@ -193,7 +194,9 @@ export class ReadinessEvaluator {
       } catch (error) {
         reasons.push({
           dimension: 'RIGHTS',
-          code: isForesiftProviderError(error) ? String(error.code) : ProvErrorCode.PROV_RIGHTS_VERSION_UNKNOWN,
+          code: isForesiftProviderError(error)
+            ? String(error.code)
+            : ProvErrorCode.PROV_RIGHTS_VERSION_UNKNOWN,
           message: `no admissible current rights declaration${
             isForesiftProviderError(error) ? ` (${String(error.code)})` : ''
           }`,

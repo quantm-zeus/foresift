@@ -34,9 +34,7 @@ const GMGN_SECURITY_DESCRIPTOR: AllowlistDescriptor = {
   maxResponseBytes: 1024 * 1024,
 };
 
-const SECURITY_RESPONSE_SCHEMA = z
-  .object({ address: z.string().min(1) })
-  .passthrough();
+const SECURITY_RESPONSE_SCHEMA = z.object({ address: z.string().min(1) }).passthrough();
 
 function securityClient(fetchPort: FetchPort): AdapterClient<{ address: string }> {
   return new AdapterClient<{ address: string }>({
@@ -102,7 +100,9 @@ describe('T114 allowlist descriptor deny-by-default matrix', () => {
       fetchPort: recordedFetchPort(new Map()),
     });
     await expect(
-      client.execute({ body: { jsonrpc: '2.0', id: 1, method: 'getTransaction', smuggledField: true } }),
+      client.execute({
+        body: { jsonrpc: '2.0', id: 1, method: 'getTransaction', smuggledField: true },
+      }),
     ).rejects.toMatchObject({ code: ProvAdapterErrorCode.PROV_ADAPTER_REQUEST_FIELD_REFUSED });
   });
 
@@ -129,10 +129,12 @@ describe('T114 allowlist descriptor deny-by-default matrix', () => {
 
   it('refuses responses on undeclared content types', async () => {
     const port = recordedFetchPort(
-      new Map([[
-        'GET https://api.gmgn.ai:443/api/v1/tokens/sol/MINT1111/security',
-        jsonResponse('<html>not json</html>', 'text/html'),
-      ]]),
+      new Map([
+        [
+          'GET https://api.gmgn.ai:443/api/v1/tokens/sol/MINT1111/security',
+          jsonResponse('<html>not json</html>', 'text/html'),
+        ],
+      ]),
     );
     await expect(
       securityClient(port).execute({ pathParams: { chain: 'sol', address: 'MINT1111' } }),
@@ -150,10 +152,12 @@ describe('T114 allowlist descriptor deny-by-default matrix', () => {
       guard: testGuard(),
       plane: 'COLLECTOR',
       fetchPort: recordedFetchPort(
-        new Map([[
-          'GET https://api.gmgn.ai:443/api/v1/tokens/sol/MINT1111/security',
-          jsonResponse(happyBody),
-        ]]),
+        new Map([
+          [
+            'GET https://api.gmgn.ai:443/api/v1/tokens/sol/MINT1111/security',
+            jsonResponse(happyBody),
+          ],
+        ]),
       ),
     });
     await expect(
@@ -163,10 +167,12 @@ describe('T114 allowlist descriptor deny-by-default matrix', () => {
 
   it('refuses recorded responses that violate the operation response schema', async () => {
     const port = recordedFetchPort(
-      new Map([[
-        'GET https://api.gmgn.ai:443/api/v1/tokens/sol/MINT1111/security',
-        jsonResponse(JSON.stringify({ unexpected_shape: true })),
-      ]]),
+      new Map([
+        [
+          'GET https://api.gmgn.ai:443/api/v1/tokens/sol/MINT1111/security',
+          jsonResponse(JSON.stringify({ unexpected_shape: true })),
+        ],
+      ]),
     );
     await expect(
       securityClient(port).execute({ pathParams: { chain: 'sol', address: 'MINT1111' } }),
@@ -202,10 +208,12 @@ describe('T114 allowlist descriptor deny-by-default matrix', () => {
       'utf8',
     );
     const port = recordedFetchPort(
-      new Map([[
-        'GET https://api.gmgn.ai:443/api/v1/tokens/sol/So11111111111111111111111111111111111111112/security',
-        jsonResponse(fixture),
-      ]]),
+      new Map([
+        [
+          'GET https://api.gmgn.ai:443/api/v1/tokens/sol/So11111111111111111111111111111111111111112/security',
+          jsonResponse(fixture),
+        ],
+      ]),
     );
     const result = await securityClient(port).execute({
       pathParams: { chain: 'sol', address: 'So11111111111111111111111111111111111111112' },

@@ -46,11 +46,7 @@ export class ProviderAdapterError extends Error {
   readonly code: ProvAdapterErrorCodeValue;
   readonly details: Record<string, unknown>;
 
-  constructor(
-    message: string,
-    details: Record<string, unknown>,
-    code: ProvAdapterErrorCodeValue,
-  ) {
+  constructor(message: string, details: Record<string, unknown>, code: ProvAdapterErrorCodeValue) {
     super(message);
     this.name = 'ProviderAdapterError';
     this.code = code;

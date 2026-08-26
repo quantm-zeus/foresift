@@ -63,7 +63,8 @@ export const ProvErrorCode = {
   // --- response quarantine (FR-PROV-008, AC-271)
   PROV_RESPONSE_QUARANTINED: 'PROV_RESPONSE_QUARANTINED',
   PROV_QUARANTINE_RECORD_INVALID: 'PROV_QUARANTINE_RECORD_INVALID',
-  PROV_QUARANTINE_MODEL_CONTEXT_EXCLUSION_ENFORCED: 'PROV_QUARANTINE_MODEL_CONTEXT_EXCLUSION_ENFORCED',
+  PROV_QUARANTINE_MODEL_CONTEXT_EXCLUSION_ENFORCED:
+    'PROV_QUARANTINE_MODEL_CONTEXT_EXCLUSION_ENFORCED',
   // --- rights matrix / changes (FR-PROV-009, §15.6, AC-273)
   PROV_RIGHTS_MATRIX_INVALID: 'PROV_RIGHTS_MATRIX_INVALID',
   PROV_RIGHTS_VERSION_UNKNOWN: 'PROV_RIGHTS_VERSION_UNKNOWN',
@@ -178,7 +179,7 @@ export class SourceFingerprintError extends provSubclass(
   'SourceFingerprintError',
   ProvErrorCode.PROV_FINGERPRINT_KIND_UNKNOWN,
 ) {}
- /** Activation-readiness refusals consumed by the future workspace/public gate. */
+/** Activation-readiness refusals consumed by the future workspace/public gate. */
 export class ReadinessRefusedError extends provSubclass(
   'ReadinessRefusedError',
   ProvErrorCode.PROV_READINESS_BLOCKED,

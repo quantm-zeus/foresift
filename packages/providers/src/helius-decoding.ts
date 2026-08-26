@@ -74,8 +74,7 @@ function str(info: Record<string, unknown>, key: string): string | null {
 export function decodeRawTransaction(raw: {
   readonly instructions?: readonly RawParsedInstruction[] | undefined;
   readonly innerInstructions?:
-    | readonly { readonly instructions?: readonly RawParsedInstruction[] | undefined }[]
-    | undefined;
+    readonly { readonly instructions?: readonly RawParsedInstruction[] | undefined }[] | undefined;
 }): LocalDecodingResult {
   const topLevel = raw.instructions ?? [];
   const nested = (raw.innerInstructions ?? []).flatMap((group) => group.instructions ?? []);
@@ -115,7 +114,9 @@ export function decodeRawTransaction(raw: {
       }
       case 'transferChecked': {
         const tokenAmount =
-          info.tokenAmount !== undefined && info.tokenAmount !== null && typeof info.tokenAmount === 'object'
+          info.tokenAmount !== undefined &&
+          info.tokenAmount !== null &&
+          typeof info.tokenAmount === 'object'
             ? (info.tokenAmount as Record<string, unknown>)
             : {};
         events.push({

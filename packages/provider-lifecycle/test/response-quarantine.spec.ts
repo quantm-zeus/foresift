@@ -35,7 +35,10 @@ beforeAll(async () => {
   await seedOperationRow(engine, { providerId: 'prov-test', operationId: 'op-q', version: 'v1' });
   quarantine = new ResponseQuarantine({
     engine,
-    clock: { now: () => ts('2026-08-26T12:00:00Z'), nowEpochMs: () => Date.parse('2026-08-26T12:00:00Z') },
+    clock: {
+      now: () => ts('2026-08-26T12:00:00Z'),
+      nowEpochMs: () => Date.parse('2026-08-26T12:00:00Z'),
+    },
     auditChain: chain,
   });
 });
@@ -52,9 +55,7 @@ describe('T119 deterministic response scanning', () => {
   });
 
   it('detects the message+signatures transaction skeleton', () => {
-    const report = scanResponse(
-      JSON.stringify({ tx: { message: 'AGV2', signatures: ['sig1'] } }),
-    );
+    const report = scanResponse(JSON.stringify({ tx: { message: 'AGV2', signatures: ['sig1'] } }));
     expect(report.detections.some((d) => d.detectedClass === 'TRANSACTION_PAYLOAD')).toBe(true);
   });
 
@@ -109,7 +110,11 @@ describe('T119 quarantine records + model-context exclusion', () => {
   it('reject-and-quarantine persists metadata only and emits the audit bridge', async () => {
     const before = await countAudit();
     const scan = scanResponse(HAZARD);
-    const record = await quarantine.rejectAndQuarantine({ target: TARGET, responseBody: HAZARD, scan });
+    const record = await quarantine.rejectAndQuarantine({
+      target: TARGET,
+      responseBody: HAZARD,
+      scan,
+    });
     expect(record.disposition).toBe('REJECTED');
     expect(record.modelContextExclusion).toBe('ENFORCED');
     expect(record.detectedClasses).toEqual(['TRANSACTION_PAYLOAD']);
@@ -164,7 +169,9 @@ describe('T119 quarantine records + model-context exclusion', () => {
 });
 
 async function countAudit(): Promise<number> {
-  const rows = await engine.query<{ n: string }>('SELECT COUNT(*)::text AS n FROM sec.sec_audit_events');
+  const rows = await engine.query<{ n: string }>(
+    'SELECT COUNT(*)::text AS n FROM sec.sec_audit_events',
+  );
   return Number(rows.rows[0]?.n ?? '0');
 }
 

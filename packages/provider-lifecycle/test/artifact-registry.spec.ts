@@ -78,10 +78,18 @@ describe('T121 artifact registry + enforcement', () => {
       rightsVersion: 1,
       declaration: openDeclaration(),
     });
-    const first = await artifacts.registerArtifact({ target: TARGET, objectRef: 'obs://a1', rightsVersion: 1 });
+    const first = await artifacts.registerArtifact({
+      target: TARGET,
+      objectRef: 'obs://a1',
+      rightsVersion: 1,
+    });
     expect(first.state).toBe('ACTIVE');
     // Deterministic retry resolves to the same id without mutating state.
-    const replay = await artifacts.registerArtifact({ target: TARGET, objectRef: 'obs://a1', rightsVersion: 1 });
+    const replay = await artifacts.registerArtifact({
+      target: TARGET,
+      objectRef: 'obs://a1',
+      rightsVersion: 1,
+    });
     expect(replay.artifactId).toBe(first.artifactId);
     const fetched = await artifacts.get(first.artifactId);
     expect(fetched).not.toBeNull();
@@ -110,9 +118,7 @@ describe('T121 artifact registry + enforcement', () => {
     });
     expect(applied).toHaveLength(3); // obs://a1 + s1 + s2
     expect(applied.every((a) => a.action === 'RETIRE')).toBe(true);
-    const s1 = await artifacts.get(
-      applied[0]?.artifactId ?? '',
-    );
+    const s1 = await artifacts.get(applied[0]?.artifactId ?? '');
     expect(s1?.state).toBe('RETIRED');
   });
 
@@ -152,14 +158,22 @@ describe('T121 artifact registry + enforcement', () => {
   });
 
   it('replays of the SAME change resolve to the SAME action ledger (INV-009)', async () => {
-    await seedOperationRow(engine, { providerId: 'prov-test', operationId: 'op-replay', version: 'v1' });
+    await seedOperationRow(engine, {
+      providerId: 'prov-test',
+      operationId: 'op-replay',
+      version: 'v1',
+    });
     await rights.declareRights({
       providerId: 'prov-test',
       operationId: 'op-replay',
       rightsVersion: 1,
       declaration: openDeclaration(),
     });
-    const target: OperationTarget = { providerId: 'prov-test', operationId: 'op-replay', version: 'v1' };
+    const target: OperationTarget = {
+      providerId: 'prov-test',
+      operationId: 'op-replay',
+      version: 'v1',
+    };
     await artifacts.registerArtifact({ target, objectRef: 'obs://r1', rightsVersion: 1 });
     const change = await rights.changeRights({
       providerId: 'prov-test',
@@ -169,11 +183,19 @@ describe('T121 artifact registry + enforcement', () => {
       actor: 'rights-operator',
     });
     expect(change.newlyProhibitedUses).toEqual(['REDISTRIBUTION']);
-    const first = await artifacts.applyRightsChange({ change, providerId: 'prov-test', operationId: 'op-replay' });
+    const first = await artifacts.applyRightsChange({
+      change,
+      providerId: 'prov-test',
+      operationId: 'op-replay',
+    });
     expect(first).toHaveLength(1);
     expect(first[0]?.action).toBe('QUARANTINE');
     // Replay: no NEW actions, no state loosening.
-    const second = await artifacts.applyRightsChange({ change, providerId: 'prov-test', operationId: 'op-replay' });
+    const second = await artifacts.applyRightsChange({
+      change,
+      providerId: 'prov-test',
+      operationId: 'op-replay',
+    });
     expect(second).toHaveLength(0);
     const ledger = await artifacts.actionsForChange(change.changeId);
     expect(ledger).toHaveLength(1);

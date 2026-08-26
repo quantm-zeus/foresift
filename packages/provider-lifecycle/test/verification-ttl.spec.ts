@@ -179,7 +179,12 @@ describe('T111 verification TTL engine', () => {
     expect(exitEvent?.effectiveAt.startsWith('2026-01-01T00:01:')).toBe(true);
 
     // Idempotency: reactivate WITHOUT refreshing and sweep again → dedupe.
-    await wired.machine.transition({ target, toState: 'ACTIVE', reasonClass: 'REACTIVATED', actor: 't' });
+    await wired.machine.transition({
+      target,
+      toState: 'ACTIVE',
+      reasonClass: 'REACTIVATED',
+      actor: 't',
+    });
     const second = await wired.ttl.sweepExpired();
     expect(second.transitions[0]?.deduped).toBe(true);
     const historyAfter = await wired.machine.history(target);

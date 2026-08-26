@@ -73,10 +73,12 @@ describe('T116 GMGN query-only contract', () => {
       guard: testGuard(),
       plane: 'COLLECTOR',
       fetchPort: recordedFetchPort(
-        new Map([[
-          `GET https://api.gmgn.ai:443/api/v1/tokens/sol/So11111111111111111111111111111111111111112/security`,
-          jsonResponse(fixture),
-        ]]),
+        new Map([
+          [
+            `GET https://api.gmgn.ai:443/api/v1/tokens/sol/So11111111111111111111111111111111111111112/security`,
+            jsonResponse(fixture),
+          ],
+        ]),
       ),
     });
     const result = await client.execute({

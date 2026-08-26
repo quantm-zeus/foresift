@@ -58,7 +58,10 @@ async function makeEvaluator(options?: { withRights?: boolean }) {
     nowEpochMs: () => Date.parse(NOW),
   });
   const audit = new AuditChain({ engine });
-  const rights = options?.withRights === false ? undefined : new RightsMatrixEngine({ engine, clock: wired.clock, auditChain: audit });
+  const rights =
+    options?.withRights === false
+      ? undefined
+      : new RightsMatrixEngine({ engine, clock: wired.clock, auditChain: audit });
   const evaluator = new ReadinessEvaluator({
     clock: wired.clock,
     registry: wired.registry,
@@ -81,7 +84,12 @@ async function seedFullyActive(target: OperationTarget): Promise<void> {
     reasonClass: 'VERIFICATION_PASSED',
     actor: 'test',
   });
-  await wired.machine.transition({ target, toState: 'ACTIVE', reasonClass: 'ACTIVATION', actor: 'test' });
+  await wired.machine.transition({
+    target,
+    toState: 'ACTIVE',
+    reasonClass: 'ACTIVATION',
+    actor: 'test',
+  });
 }
 
 describe('T123 readiness evaluation', () => {
@@ -119,18 +127,30 @@ describe('T123 readiness evaluation', () => {
   });
 
   it('is BLOCKED while the operation has not reached ACTIVE', async () => {
-    const target: OperationTarget = { providerId: 'prov-r2', operationId: 'op-discovered', version: 'v1' };
-    await seedOperationRow(engine, target, { negativeCapabilities: [...REQUIRED_NEGATIVE_CAPABILITIES] });
+    const target: OperationTarget = {
+      providerId: 'prov-r2',
+      operationId: 'op-discovered',
+      version: 'v1',
+    };
+    await seedOperationRow(engine, target, {
+      negativeCapabilities: [...REQUIRED_NEGATIVE_CAPABILITIES],
+    });
     const { evaluator } = await makeEvaluator({ withRights: false });
     const verdict = await evaluator.evaluate(target);
     expect(verdict.status).toBe('BLOCKED');
     if (verdict.status !== 'BLOCKED') return;
     expect(verdict.reasons.map((r) => r.dimension)).toContain('LIFECYCLE');
-    expect(verdict.reasons.some((r) => r.code === ProvErrorCode.PROV_LIFECYCLE_STATE_CONFLICT)).toBe(true);
+    expect(
+      verdict.reasons.some((r) => r.code === ProvErrorCode.PROV_LIFECYCLE_STATE_CONFLICT),
+    ).toBe(true);
   });
 
   it('aggregates verification-pair staleness and missing rights into typed reasons', async () => {
-    const target: OperationTarget = { providerId: 'prov-r3', operationId: 'op-stale', version: 'v1' };
+    const target: OperationTarget = {
+      providerId: 'prov-r3',
+      operationId: 'op-stale',
+      version: 'v1',
+    };
     await seedFullyActive(target);
     const { wired, evaluator, rights } = await makeEvaluator();
     // TTL configured but NO verification records → both sources stale.
@@ -138,14 +158,22 @@ describe('T123 readiness evaluation', () => {
     const verdict = await evaluator.evaluate(target);
     expect(verdict.status).toBe('BLOCKED');
     if (verdict.status !== 'BLOCKED') return;
-    expect(verdict.reasons.filter((r) => r.dimension === 'VERIFICATION').length).toBeGreaterThanOrEqual(1);
-    expect(verdict.reasons.some((r) => r.code === ProvErrorCode.PROV_VERIFICATION_REFRESH_INCOMPLETE)).toBe(true);
+    expect(
+      verdict.reasons.filter((r) => r.dimension === 'VERIFICATION').length,
+    ).toBeGreaterThanOrEqual(1);
+    expect(
+      verdict.reasons.some((r) => r.code === ProvErrorCode.PROV_VERIFICATION_REFRESH_INCOMPLETE),
+    ).toBe(true);
     expect(verdict.reasons.some((r) => r.dimension === 'RIGHTS')).toBe(true);
     void rights;
   });
 
   it('is BLOCKED when negative-capability metadata is incomplete (exposure)', async () => {
-    const target: OperationTarget = { providerId: 'prov-r4', operationId: 'op-bare', version: 'v1' };
+    const target: OperationTarget = {
+      providerId: 'prov-r4',
+      operationId: 'op-bare',
+      version: 'v1',
+    };
     await seedOperationRow(engine, target);
     // The REGISTRY auto-completes negatives at registration; the evaluator
     // still defends against out-of-band rows, so simulate one directly.
@@ -175,7 +203,11 @@ describe('T123 readiness evaluation', () => {
   });
 
   it('requires a valid migration exception for DEPRECATED operations', async () => {
-    const target: OperationTarget = { providerId: 'prov-r5', operationId: 'op-deprecated', version: 'v1' };
+    const target: OperationTarget = {
+      providerId: 'prov-r5',
+      operationId: 'op-deprecated',
+      version: 'v1',
+    };
     await seedOperationRow(engine, target, {
       negativeCapabilities: [...REQUIRED_NEGATIVE_CAPABILITIES],
       deprecatedAt: ts('2026-08-01T00:00:00Z'),
@@ -195,7 +227,11 @@ describe('T123 readiness evaluation', () => {
   });
 
   it('fails closed on an expired rights window', async () => {
-    const target: OperationTarget = { providerId: 'prov-r6', operationId: 'op-expired-rights', version: 'v1' };
+    const target: OperationTarget = {
+      providerId: 'prov-r6',
+      operationId: 'op-expired-rights',
+      version: 'v1',
+    };
     await seedFullyActive(target);
     const { wired, evaluator, rights } = await makeEvaluator();
     for (const kind of ['DOCUMENTATION', 'PRICING_PLAN', 'RIGHTS'] as const) {
@@ -225,7 +261,8 @@ describe('T123 readiness evaluation', () => {
     if (verdict.status !== 'BLOCKED') return;
     expect(
       verdict.reasons.some(
-        (r) => r.dimension === 'RIGHTS' && r.code === ProvErrorCode.PROV_RIGHTS_VERIFICATION_EXPIRED,
+        (r) =>
+          r.dimension === 'RIGHTS' && r.code === ProvErrorCode.PROV_RIGHTS_VERIFICATION_EXPIRED,
       ),
     ).toBe(true);
   });

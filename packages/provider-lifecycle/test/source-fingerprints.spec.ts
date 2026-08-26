@@ -6,11 +6,7 @@
  */
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { sha256Text } from '@foresift/persistence';
-import {
-  SourceFingerprintStore,
-  PROVIDER_FINGERPRINT_KINDS,
-  ProvErrorCode,
-} from '../src/index.ts';
+import { SourceFingerprintStore, PROVIDER_FINGERPRINT_KINDS, ProvErrorCode } from '../src/index.ts';
 import type { OperationTarget } from '../src/index.ts';
 import { makeProvEngine, seedOperationRow, ts } from './helpers.ts';
 
@@ -26,7 +22,10 @@ beforeAll(async () => {
   closeDb = () => made.db.close();
   store = new SourceFingerprintStore({
     engine,
-    clock: { now: () => ts('2026-08-26T12:00:00Z'), nowEpochMs: () => Date.parse('2026-08-26T12:00:00Z') },
+    clock: {
+      now: () => ts('2026-08-26T12:00:00Z'),
+      nowEpochMs: () => Date.parse('2026-08-26T12:00:00Z'),
+    },
   });
   await seedOperationRow(engine, { providerId: 'prov-test', operationId: 'op-fp', version: 'v1' });
 });

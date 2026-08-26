@@ -14,10 +14,7 @@
 import type { DatabaseEngine } from '@foresift/persistence';
 import { sha256Text } from '@foresift/persistence';
 import type { ClockPort } from '@foresift/domain';
-import {
-  QuarantineClassSchema,
-  type QuarantineClass,
-} from './vocabulary.ts';
+import { QuarantineClassSchema, type QuarantineClass } from './vocabulary.ts';
 import { ProvErrorCode, ResponseQuarantineError } from './errors.ts';
 import { ResponseQuarantineAuditBridge } from './audit-bridges.ts';
 import type { AuditChain } from '@foresift/security';
@@ -234,9 +231,9 @@ export class ResponseQuarantine {
    * Idempotent: the same body re-quarantines to the SAME record (INV-009).
    */
   async rejectAndQuarantine(input: QuarantineRecordInput): Promise<QuarantineRecord> {
-    const classes = [
-      ...new Set(input.scan.detections.flatMap((d) => d.detectedClass)),
-    ].map((c) => QuarantineClassSchema.parse(c));
+    const classes = [...new Set(input.scan.detections.flatMap((d) => d.detectedClass))].map((c) =>
+      QuarantineClassSchema.parse(c),
+    );
     if (classes.length === 0) {
       throw new ResponseQuarantineError(
         'refusing to quarantine a response with no detected malicious class',
@@ -248,12 +245,9 @@ export class ResponseQuarantine {
     const payloadSha256 = sha256Text(input.responseBody);
     const byteSize = Buffer.byteLength(input.responseBody, 'utf8');
     const quarantineId = `prq:${sha256Text(
-      [
-        input.target.providerId,
-        input.target.operationId,
-        input.target.version,
-        payloadSha256,
-      ].join('|'),
+      [input.target.providerId, input.target.operationId, input.target.version, payloadSha256].join(
+        '|',
+      ),
     )}`;
 
     const inserted = await this.engine.query<{ seq: number }>(
@@ -330,7 +324,12 @@ export class ResponseQuarantine {
 
   /** Quarantine history for one operation version (metadata only). */
   async list(target: OperationTarget): Promise<
-    { quarantineId: string; detectedClasses: string[]; fieldPaths: string[]; quarantinedAt: string }[]
+    {
+      quarantineId: string;
+      detectedClasses: string[];
+      fieldPaths: string[];
+      quarantinedAt: string;
+    }[]
   > {
     const rows = await this.engine.query<{
       quarantine_id: string;

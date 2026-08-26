@@ -84,9 +84,11 @@ export async function assertHeliusOperationExecutable(
 ): Promise<void> {
   const entry = heliusCatalogEntry(operationId);
   const provider = entry.operation.providerId;
-  const target: OperationTarget =
-    options.target ??
-    { providerId: provider, operationId: entry.operation.operationId, version: entry.operation.version };
+  const target: OperationTarget = options.target ?? {
+    providerId: provider,
+    operationId: entry.operation.operationId,
+    version: entry.operation.version,
+  };
 
   if (entry.decoder.planGated && options.plan === 'STRICT_FREE') {
     throw new ProviderAdapterError(

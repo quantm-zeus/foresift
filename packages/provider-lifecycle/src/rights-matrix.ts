@@ -171,7 +171,9 @@ export class RightsMatrixEngine {
     this.engine = options.engine;
     this.clock = options.clock;
     this.audit =
-      options.auditChain !== undefined ? new RightsChangeAuditBridge(options.auditChain) : undefined;
+      options.auditChain !== undefined
+        ? new RightsChangeAuditBridge(options.auditChain)
+        : undefined;
   }
 
   private declarationId(providerId: string, operationId: string, version: number): string {
@@ -474,9 +476,7 @@ export class RightsMatrixEngine {
         ProvErrorCode.PROV_RIGHTS_VERSION_UNKNOWN,
       );
     }
-    if (
-      new Date(iso(declaration.verificationExpiresAt)).getTime() <= this.clock.nowEpochMs()
-    ) {
+    if (new Date(iso(declaration.verificationExpiresAt)).getTime() <= this.clock.nowEpochMs()) {
       throw new RightsChangeError(
         `rights verification expired at ${iso(declaration.verificationExpiresAt)}; ${input.path} fails closed`,
         {},

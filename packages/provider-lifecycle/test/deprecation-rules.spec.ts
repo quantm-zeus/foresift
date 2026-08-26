@@ -25,7 +25,10 @@ afterAll(async () => {
   await closeDb();
 });
 
-async function seedDeprecated(operationId: string, options?: { sunsetAt?: string; noticeRef?: string }): Promise<void> {
+async function seedDeprecated(
+  operationId: string,
+  options?: { sunsetAt?: string; noticeRef?: string },
+): Promise<void> {
   await wired.registry.registerProvider({
     providerId: 'prov-test',
     displayName: 'Test Provider',
@@ -47,7 +50,7 @@ describe('T112 deprecation rules', () => {
   it('deprecates an operation and records its metadata', async () => {
     await seedDeprecated('dep-basic');
     const target = { providerId: 'prov-test', operationId: 'dep-basic', version: 'v1' };
-    expect((await wired.machine.currentState(target))).toBe('DEPRECATED');
+    expect(await wired.machine.currentState(target)).toBe('DEPRECATED');
     const op = await wired.registry.getOperation(target);
     expect(op.deprecatedAt).not.toBeNull();
   });
@@ -125,10 +128,18 @@ describe('T112 deprecation rules', () => {
       providerGroup: 'g',
     });
     await wired.registry.registerOperation(
-      testDefinition({ operationId: 'dep-sole', verificationExpiresAt: ts('2099-01-01T00:00:00Z') }),
+      testDefinition({
+        operationId: 'dep-sole',
+        verificationExpiresAt: ts('2099-01-01T00:00:00Z'),
+      }),
     );
     const soleTarget = { providerId: 'prov-test', operationId: 'dep-sole', version: 'v1' };
-    await wired.machine.transition({ target: soleTarget, toState: 'VERIFIED', reasonClass: 'V', actor: 't' });
+    await wired.machine.transition({
+      target: soleTarget,
+      toState: 'VERIFIED',
+      reasonClass: 'V',
+      actor: 't',
+    });
     await wired.registry.registerDependency({
       consumerKind: 'FEATURE',
       consumerKey: 'critical-dashboard',
@@ -138,9 +149,9 @@ describe('T112 deprecation rules', () => {
     expect(await wired.rules.soleSourceConsumers(soleTarget)).toHaveLength(1);
 
     // Deprecation without an exception refuses (Rule 6).
-    await expect(
-      wired.rules.deprecate({ target: soleTarget, actor: 'bot' }),
-    ).rejects.toMatchObject({ code: ProvErrorCode.PROV_DEPRECATED_SOLE_CRITICAL_SOURCE });
+    await expect(wired.rules.deprecate({ target: soleTarget, actor: 'bot' })).rejects.toMatchObject(
+      { code: ProvErrorCode.PROV_DEPRECATED_SOLE_CRITICAL_SOURCE },
+    );
 
     // With a valid exception it proceeds.
     await wired.exceptions.grant({

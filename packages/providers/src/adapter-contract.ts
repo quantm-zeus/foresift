@@ -10,10 +10,7 @@
  * it was not checked".
  */
 import { z } from 'zod';
-import {
-  type EgressAllowlistEntry,
-  type EgressDecision,
-} from '@foresift/shared-schemas';
+import { type EgressAllowlistEntry, type EgressDecision } from '@foresift/shared-schemas';
 import { EgressGuard } from '@foresift/security';
 import {
   ProviderAdapterError,
@@ -211,8 +208,11 @@ export class AdapterRequestValidator {
   }
 
   /** Response-side gates: content type + byte cap (schema parse is the caller's). */
-  checkResponse(response: Pick<AdapterHttpResponse, 'headers' | 'bodyBytes'>): RequestCheckFailure | null {
-    const contentType = (response.headers['content-type'] ?? '').split(';')[0]?.trim().toLowerCase() ?? '';
+  checkResponse(
+    response: Pick<AdapterHttpResponse, 'headers' | 'bodyBytes'>,
+  ): RequestCheckFailure | null {
+    const contentType =
+      (response.headers['content-type'] ?? '').split(';')[0]?.trim().toLowerCase() ?? '';
     if (!this.descriptor.responseContentTypes.includes(contentType)) {
       return {
         code: ProvAdapterErrorCode.PROV_ADAPTER_CONTENT_TYPE_REFUSED,
@@ -323,8 +323,9 @@ export class AdapterClient<T> {
           operationId: this.validator.descriptor.operationId,
           issues: parsedSchema.error.issues
             .slice(0, 10)
-            .map((issue: { path: (string | number | symbol)[]; message: string }) =>
-              `${issue.path.join('.')}: ${issue.message}`,
+            .map(
+              (issue: { path: (string | number | symbol)[]; message: string }) =>
+                `${issue.path.join('.')}: ${issue.message}`,
             ),
         },
         ProvAdapterErrorCode.PROV_ADAPTER_RESPONSE_INVALID,

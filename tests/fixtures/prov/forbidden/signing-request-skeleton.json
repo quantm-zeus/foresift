@@ -3,6 +3,9 @@
   "detectedClass": "SIGNING_REQUEST",
   "comment": "Signing-request skeleton: a provider response asking the client to SIGN. Inert — signing is permanently prohibited in this product, so this shape must always be rejected+quarantined.",
   "body": {
-    "session": { "sign_request": "Please sign the following message to continue", "nonce": "FAKENONCE" }
+    "session": {
+      "sign_request": "Please sign the following message to continue",
+      "nonce": "FAKENONCE"
+    }
   }
 }

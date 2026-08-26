@@ -184,7 +184,11 @@ function definitionFingerprint(definition: OperationDefinition): string {
     value === null ? null : new Date(value).toISOString();
   // Control-plane projections appended by rowToOperation are not part of the
   // immutable §15.3 definition and must not influence the retry fence.
-  const { currentState: _state, healthStatus: _health, ...semantic } = definition as OperationDefinition & Record<string, unknown>;
+  const {
+    currentState: _state,
+    healthStatus: _health,
+    ...semantic
+  } = definition as OperationDefinition & Record<string, unknown>;
   return canonicalJson({
     ...semantic,
     deprecatedAt: normTs(definition.deprecatedAt),
@@ -383,7 +387,12 @@ export class OperationRegistry {
                'DISCOVERED','HEALTHY',$31,$31)`,
       insertArgs(merged, this.clock.now()),
     );
-    return { definition: merged, created: true, currentState: 'DISCOVERED', healthStatus: 'HEALTHY' };
+    return {
+      definition: merged,
+      created: true,
+      currentState: 'DISCOVERED',
+      healthStatus: 'HEALTHY',
+    };
   }
 
   /** Throws {@link ProvErrorCode.PROV_OPERATION_UNKNOWN} when absent. */
@@ -469,7 +478,9 @@ export class OperationRegistry {
   }
 
   /** Dependency edges pointing AT an operation (its blast radius). */
-  async dependents(target: OperationTarget): Promise<
+  async dependents(
+    target: OperationTarget,
+  ): Promise<
     { dependencyId: string; consumerKind: string; consumerKey: string; active: boolean }[]
   > {
     const rows = await this.engine.query<{

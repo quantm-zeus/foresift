@@ -151,8 +151,7 @@ export class MigrationExceptions {
       // partial index for this version (refusal). Any other failure (FK,
       // CHECK, connectivity) is genuine and must surface as itself.
       const pgCode = (error as { code?: string }).code;
-      const isUniqueViolation =
-        pgCode === '23505' || /duplicate key value/i.test(String(error));
+      const isUniqueViolation = pgCode === '23505' || /duplicate key value/i.test(String(error));
       if (!isUniqueViolation) throw error;
       const existing = await this.engine.query<ExceptionRow>(
         'SELECT * FROM prov.prov_migration_exceptions WHERE exception_id = $1',

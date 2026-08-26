@@ -32,7 +32,8 @@ function configFromCatalog(overrides?: {
   return {
     decoders: HELIUS_OPERATIONS.map((entry) => ({
       id: `helius:${entry.operation.operationId}`,
-      status: entry.decoder.decoderStatus === 'ACTIVE' ? ('ACTIVE' as const) : ('DEPRECATED' as const),
+      status:
+        entry.decoder.decoderStatus === 'ACTIVE' ? ('ACTIVE' as const) : ('DEPRECATED' as const),
       authority:
         entry.operation.operationId === 'enhanced.get_transaction' && authority !== undefined
           ? authority
@@ -40,8 +41,9 @@ function configFromCatalog(overrides?: {
       domains: ['solana-economic-events'],
     })),
     rawOperationLocalDecodingEnabled: overrides?.rawOperationLocalDecodingEnabled ?? true,
-    acknowledgedDeprecations:
-      overrides?.acknowledgedDeprecations ?? ['helius:enhanced.get_transaction'],
+    acknowledgedDeprecations: overrides?.acknowledgedDeprecations ?? [
+      'helius:enhanced.get_transaction',
+    ],
   };
 }
 
@@ -129,7 +131,9 @@ describe('T117 runtime gates', () => {
 
   it('refuses plan-gated history on STRICT_FREE and admits on METERED', async () => {
     await expect(
-      assertHeliusOperationExecutable('history.get_transactions_for_address', { plan: 'STRICT_FREE' }),
+      assertHeliusOperationExecutable('history.get_transactions_for_address', {
+        plan: 'STRICT_FREE',
+      }),
     ).rejects.toMatchObject({ code: ProvAdapterErrorCode.PROV_ADAPTER_PLAN_GATED_UNAVAILABLE });
     await expect(
       assertHeliusOperationExecutable('history.get_transactions_for_address', { plan: 'METERED' }),
@@ -137,7 +141,9 @@ describe('T117 runtime gates', () => {
   });
 
   it('raw normative operations never require an exception or plan gate', async () => {
-    await expect(assertHeliusOperationExecutable('rpc.get_transaction', {})).resolves.toBeUndefined();
+    await expect(
+      assertHeliusOperationExecutable('rpc.get_transaction', {}),
+    ).resolves.toBeUndefined();
     await expect(
       assertHeliusOperationExecutable('rpc.get_signatures_for_address', { plan: 'STRICT_FREE' }),
     ).resolves.toBeUndefined();

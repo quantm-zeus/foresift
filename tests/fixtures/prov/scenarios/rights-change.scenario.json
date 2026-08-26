@@ -48,6 +48,10 @@
   "expectedArtifactPolicy": "STORAGE newly prohibited => affected pre-v2 ACTIVE artifacts RETIRE",
   "artifacts": [
     { "objectRef": "obs://scenario-artifact-1", "capturedRightsVersion": 1 },
-    { "objectRef": "obs://scenario-artifact-2", "capturedRightsVersion": 2, "comment": "captured AFTER the change; unaffected by enumeration" }
+    {
+      "objectRef": "obs://scenario-artifact-2",
+      "capturedRightsVersion": 2,
+      "comment": "captured AFTER the change; unaffected by enumeration"
+    }
   ]
 }

@@ -10,7 +10,16 @@
  * `information_schema` (table_schema = 'prov') against these definitions.
  * Update both together, always.
  */
-import { bigint, boolean, integer, jsonb, pgSchema, primaryKey, text, timestamp } from 'drizzle-orm/pg-core';
+import {
+  bigint,
+  boolean,
+  integer,
+  jsonb,
+  pgSchema,
+  primaryKey,
+  text,
+  timestamp,
+} from 'drizzle-orm/pg-core';
 
 export const prov = pgSchema('prov');
 
@@ -80,24 +89,21 @@ export const provOperationDependencies = prov.table('prov_operation_dependencies
   registeredAt: timestamp('registered_at', { withTimezone: true }).notNull(),
 });
 
-export const provLifecycleEvents = prov.table(
-  'prov_lifecycle_events',
-  {
-    seq: bigint('seq', { mode: 'number' }).primaryKey(),
-    eventId: text('event_id').notNull(),
-    providerId: text('provider_id').notNull(),
-    operationId: text('operation_id').notNull(),
-    version: text('version').notNull(),
-    fromState: text('from_state').notNull(),
-    toState: text('to_state').notNull(),
-    reasonClass: text('reason_class').notNull(),
-    actor: text('actor').notNull(),
-    occurredAt: timestamp('occurred_at', { withTimezone: true }).notNull(),
-    effectiveAt: timestamp('effective_at', { withTimezone: true }).notNull(),
-    evidenceRefs: jsonb('evidence_refs').notNull(),
-    recordedAt: timestamp('recorded_at', { withTimezone: true }).notNull(),
-  },
-);
+export const provLifecycleEvents = prov.table('prov_lifecycle_events', {
+  seq: bigint('seq', { mode: 'number' }).primaryKey(),
+  eventId: text('event_id').notNull(),
+  providerId: text('provider_id').notNull(),
+  operationId: text('operation_id').notNull(),
+  version: text('version').notNull(),
+  fromState: text('from_state').notNull(),
+  toState: text('to_state').notNull(),
+  reasonClass: text('reason_class').notNull(),
+  actor: text('actor').notNull(),
+  occurredAt: timestamp('occurred_at', { withTimezone: true }).notNull(),
+  effectiveAt: timestamp('effective_at', { withTimezone: true }).notNull(),
+  evidenceRefs: jsonb('evidence_refs').notNull(),
+  recordedAt: timestamp('recorded_at', { withTimezone: true }).notNull(),
+});
 
 // --- g0_prov_0002_verification_ttl ---------------------------------------------
 
@@ -109,24 +115,21 @@ export const provVerificationTtlConfigs = prov.table('prov_verification_ttl_conf
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull(),
 });
 
-export const provVerificationRecords = prov.table(
-  'prov_verification_records',
-  {
-    seq: bigint('seq', { mode: 'number' }).primaryKey(),
-    verificationId: text('verification_id').notNull(),
-    providerId: text('provider_id').notNull(),
-    operationId: text('operation_id').notNull(),
-    operationVersion: text('operation_version').notNull(),
-    kind: text('kind').notNull(),
-    source: text('source').notNull(),
-    outcome: text('outcome').notNull(),
-    verifiedAt: timestamp('verified_at', { withTimezone: true }).notNull(),
-    expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
-    evidenceRefs: jsonb('evidence_refs').notNull(),
-    notes: text('notes'),
-    recordedAt: timestamp('recorded_at', { withTimezone: true }).notNull(),
-  },
-);
+export const provVerificationRecords = prov.table('prov_verification_records', {
+  seq: bigint('seq', { mode: 'number' }).primaryKey(),
+  verificationId: text('verification_id').notNull(),
+  providerId: text('provider_id').notNull(),
+  operationId: text('operation_id').notNull(),
+  operationVersion: text('operation_version').notNull(),
+  kind: text('kind').notNull(),
+  source: text('source').notNull(),
+  outcome: text('outcome').notNull(),
+  verifiedAt: timestamp('verified_at', { withTimezone: true }).notNull(),
+  expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
+  evidenceRefs: jsonb('evidence_refs').notNull(),
+  notes: text('notes'),
+  recordedAt: timestamp('recorded_at', { withTimezone: true }).notNull(),
+});
 
 // --- g0_prov_0003_migration_exceptions ------------------------------------------
 
@@ -149,25 +152,22 @@ export const provMigrationExceptions = prov.table('prov_migration_exceptions', {
 // Deliberately NO payload-body column — quarantine persists metadata only
 // (plan material decision 6).
 
-export const provResponseQuarantine = prov.table(
-  'prov_response_quarantine',
-  {
-    seq: bigint('seq', { mode: 'number' }).primaryKey(),
-    quarantineId: text('quarantine_id').notNull(),
-    providerId: text('provider_id').notNull(),
-    operationId: text('operation_id').notNull(),
-    operationVersion: text('operation_version').notNull(),
-    detectedClasses: text('detected_classes').array().notNull(),
-    fieldPaths: text('field_paths').array().notNull(),
-    payloadSha256: text('payload_sha256').notNull(),
-    byteSize: bigint('byte_size', { mode: 'number' }).notNull(),
-    disposition: text('disposition').notNull(),
-    modelContextExclusion: text('model_context_exclusion').notNull(),
-    auditChainRef: text('audit_chain_ref').notNull(),
-    quarantinedAt: timestamp('quarantined_at', { withTimezone: true }).notNull(),
-    details: text('details'),
-  },
-);
+export const provResponseQuarantine = prov.table('prov_response_quarantine', {
+  seq: bigint('seq', { mode: 'number' }).primaryKey(),
+  quarantineId: text('quarantine_id').notNull(),
+  providerId: text('provider_id').notNull(),
+  operationId: text('operation_id').notNull(),
+  operationVersion: text('operation_version').notNull(),
+  detectedClasses: text('detected_classes').array().notNull(),
+  fieldPaths: text('field_paths').array().notNull(),
+  payloadSha256: text('payload_sha256').notNull(),
+  byteSize: bigint('byte_size', { mode: 'number' }).notNull(),
+  disposition: text('disposition').notNull(),
+  modelContextExclusion: text('model_context_exclusion').notNull(),
+  auditChainRef: text('audit_chain_ref').notNull(),
+  quarantinedAt: timestamp('quarantined_at', { withTimezone: true }).notNull(),
+  details: text('details'),
+});
 
 // --- g0_prov_0005_rights_fingerprints ---------------------------------------------
 
@@ -196,37 +196,31 @@ export const provRightsDeclarations = prov.table('prov_rights_declarations', {
   declaredAt: timestamp('declared_at', { withTimezone: true }).notNull(),
 });
 
-export const provRightsChanges = prov.table(
-  'prov_rights_changes',
-  {
-    seq: bigint('seq', { mode: 'number' }).primaryKey(),
-    changeId: text('change_id').notNull(),
-    providerId: text('provider_id').notNull(),
-    operationId: text('operation_id').notNull(),
-    fromRightsVersion: integer('from_rights_version').notNull(),
-    toRightsVersion: integer('to_rights_version').notNull(),
-    newlyProhibitedUses: text('newly_prohibited_uses').array().notNull(),
-    tightened: boolean('tightened').notNull(),
-    changedAt: timestamp('changed_at', { withTimezone: true }).notNull(),
-    actor: text('actor').notNull(),
-    auditChainRef: text('audit_chain_ref').notNull(),
-  },
-);
+export const provRightsChanges = prov.table('prov_rights_changes', {
+  seq: bigint('seq', { mode: 'number' }).primaryKey(),
+  changeId: text('change_id').notNull(),
+  providerId: text('provider_id').notNull(),
+  operationId: text('operation_id').notNull(),
+  fromRightsVersion: integer('from_rights_version').notNull(),
+  toRightsVersion: integer('to_rights_version').notNull(),
+  newlyProhibitedUses: text('newly_prohibited_uses').array().notNull(),
+  tightened: boolean('tightened').notNull(),
+  changedAt: timestamp('changed_at', { withTimezone: true }).notNull(),
+  actor: text('actor').notNull(),
+  auditChainRef: text('audit_chain_ref').notNull(),
+});
 
-export const provProviderArtifacts = prov.table(
-  'prov_provider_artifacts',
-  {
-    artifactId: text('artifact_id').primaryKey(),
-    objectRef: text('object_ref').notNull(),
-    providerId: text('provider_id').notNull(),
-    operationId: text('operation_id').notNull(),
-    operationVersion: text('operation_version').notNull(),
-    rightsVersion: integer('rights_version').notNull(),
-    state: text('state').notNull(),
-    capturedAt: timestamp('captured_at', { withTimezone: true }).notNull(),
-    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull(),
-  },
-);
+export const provProviderArtifacts = prov.table('prov_provider_artifacts', {
+  artifactId: text('artifact_id').primaryKey(),
+  objectRef: text('object_ref').notNull(),
+  providerId: text('provider_id').notNull(),
+  operationId: text('operation_id').notNull(),
+  operationVersion: text('operation_version').notNull(),
+  rightsVersion: integer('rights_version').notNull(),
+  state: text('state').notNull(),
+  capturedAt: timestamp('captured_at', { withTimezone: true }).notNull(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull(),
+});
 
 export const provRightsChangeActions = prov.table('prov_rights_change_actions', {
   actionId: text('action_id').primaryKey(),
@@ -237,19 +231,16 @@ export const provRightsChangeActions = prov.table('prov_rights_change_actions', 
   details: text('details'),
 });
 
-export const provSourceFingerprints = prov.table(
-  'prov_source_fingerprints',
-  {
-    seq: bigint('seq', { mode: 'number' }).primaryKey(),
-    fingerprintId: text('fingerprint_id').notNull(),
-    providerId: text('provider_id').notNull(),
-    operationId: text('operation_id').notNull(),
-    operationVersion: text('operation_version').notNull(),
-    kind: text('kind').notNull(),
-    fingerprintPayloadCanonical: text('fingerprint_payload_canonical').notNull(),
-    fingerprintSha256: text('fingerprint_sha256').notNull(),
-    computedAt: timestamp('computed_at', { withTimezone: true }).notNull(),
-    estimatorInputRefs: jsonb('estimator_input_refs').notNull(),
-    recordedAt: timestamp('recorded_at', { withTimezone: true }).notNull(),
-  },
-);
+export const provSourceFingerprints = prov.table('prov_source_fingerprints', {
+  seq: bigint('seq', { mode: 'number' }).primaryKey(),
+  fingerprintId: text('fingerprint_id').notNull(),
+  providerId: text('provider_id').notNull(),
+  operationId: text('operation_id').notNull(),
+  operationVersion: text('operation_version').notNull(),
+  kind: text('kind').notNull(),
+  fingerprintPayloadCanonical: text('fingerprint_payload_canonical').notNull(),
+  fingerprintSha256: text('fingerprint_sha256').notNull(),
+  computedAt: timestamp('computed_at', { withTimezone: true }).notNull(),
+  estimatorInputRefs: jsonb('estimator_input_refs').notNull(),
+  recordedAt: timestamp('recorded_at', { withTimezone: true }).notNull(),
+});

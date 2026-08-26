@@ -31,8 +31,18 @@ async function seedActive(operationId = 'op-machine'): Promise<void> {
   });
   await wired.registry.registerOperation(testDefinition({ operationId }));
   const target = { providerId: 'prov-test', operationId, version: 'v1' };
-  await wired.machine.transition({ target, toState: 'VERIFIED', reasonClass: 'VERIFICATION_PASSED', actor: 'test' });
-  await wired.machine.transition({ target, toState: 'ACTIVE', reasonClass: 'ACTIVATION', actor: 'test' });
+  await wired.machine.transition({
+    target,
+    toState: 'VERIFIED',
+    reasonClass: 'VERIFICATION_PASSED',
+    actor: 'test',
+  });
+  await wired.machine.transition({
+    target,
+    toState: 'ACTIVE',
+    reasonClass: 'ACTIVATION',
+    actor: 'test',
+  });
 }
 
 describe('T110 lifecycle machine', () => {
@@ -40,9 +50,19 @@ describe('T110 lifecycle machine', () => {
     await seedActive('op-walk');
     const target = { providerId: 'prov-test', operationId: 'op-walk', version: 'v1' };
     expect(await wired.machine.currentState(target)).toBe('ACTIVE');
-    await wired.machine.transition({ target, toState: 'DEGRADED', reasonClass: 'PROBE_FAILED', actor: 'test' });
+    await wired.machine.transition({
+      target,
+      toState: 'DEGRADED',
+      reasonClass: 'PROBE_FAILED',
+      actor: 'test',
+    });
     expect(await wired.machine.currentState(target)).toBe('DEGRADED');
-    await wired.machine.transition({ target, toState: 'ACTIVE', reasonClass: 'RECOVERY', actor: 'test' });
+    await wired.machine.transition({
+      target,
+      toState: 'ACTIVE',
+      reasonClass: 'RECOVERY',
+      actor: 'test',
+    });
     const history = await wired.machine.history(target);
     expect(history.map((h) => h.toState)).toEqual(['VERIFIED', 'ACTIVE', 'DEGRADED', 'ACTIVE']);
   });
@@ -51,7 +71,12 @@ describe('T110 lifecycle machine', () => {
     await seedActive('op-illegal');
     const target = { providerId: 'prov-test', operationId: 'op-illegal', version: 'v1' };
     await expect(
-      wired.machine.transition({ target, toState: 'DISCOVERED', reasonClass: 'TIME_TRAVEL', actor: 'test' }),
+      wired.machine.transition({
+        target,
+        toState: 'DISCOVERED',
+        reasonClass: 'TIME_TRAVEL',
+        actor: 'test',
+      }),
     ).rejects.toMatchObject({ code: ProvErrorCode.PROV_LIFECYCLE_TRANSITION_ILLEGAL });
     await expect(
       wired.machine.transition({ target, toState: 'BLOCKED', reasonClass: '   ', actor: 'test' }),
@@ -64,7 +89,12 @@ describe('T110 lifecycle machine', () => {
   it('dedupes a retried transition to the SAME event (INV-009)', async () => {
     await seedActive('op-retry');
     const target = { providerId: 'prov-test', operationId: 'op-retry', version: 'v1' };
-    await wired.machine.transition({ target, toState: 'DEGRADED', reasonClass: 'PROBE_FAILED', actor: 'test' });
+    await wired.machine.transition({
+      target,
+      toState: 'DEGRADED',
+      reasonClass: 'PROBE_FAILED',
+      actor: 'test',
+    });
     const retry = await wired.machine.transition({
       target,
       toState: 'DEGRADED',
@@ -88,12 +118,10 @@ describe('T110 lifecycle machine', () => {
   it('emits audit through the bridge — BLOCKED_OPERATION for blocks — and skips audit on dedupe', async () => {
     const emitted: { actionClass: string; toState: string }[] = [];
     const auditSink = {
-      transitionAppended: async (input: {
-        toState: string;
-        eventId: string;
-      }): Promise<void> => {
+      transitionAppended: async (input: { toState: string; eventId: string }): Promise<void> => {
         emitted.push({
-          actionClass: input.toState === 'BLOCKED' ? 'BLOCKED_OPERATION' : 'PROVIDER_COLLECTOR_ACCESS',
+          actionClass:
+            input.toState === 'BLOCKED' ? 'BLOCKED_OPERATION' : 'PROVIDER_COLLECTOR_ACCESS',
           toState: input.toState,
         });
         void input.eventId;
@@ -102,7 +130,11 @@ describe('T110 lifecycle machine', () => {
     const { db, engine } = await makeProvEngine();
     try {
       const audited = wireEngine(engine);
-      const machine = new LifecycleMachine({ engine, clock: audited.clock, audit: auditSink as unknown as LifecycleAuditBridge });
+      const machine = new LifecycleMachine({
+        engine,
+        clock: audited.clock,
+        audit: auditSink as unknown as LifecycleAuditBridge,
+      });
       await audited.registry.registerProvider({
         providerId: 'prov-test',
         displayName: 'Test Provider',
@@ -111,8 +143,18 @@ describe('T110 lifecycle machine', () => {
       await audited.registry.registerOperation(testDefinition({ operationId: 'op-audit' }));
       const target = { providerId: 'prov-test', operationId: 'op-audit', version: 'v1' };
       await machine.transition({ target, toState: 'VERIFIED', reasonClass: 'V', actor: 'a' });
-      await machine.transition({ target, toState: 'BLOCKED', reasonClass: 'MALICIOUS_RESPONSE', actor: 'a' });
-      await machine.transition({ target, toState: 'BLOCKED', reasonClass: 'MALICIOUS_RESPONSE', actor: 'a' }); // dedupe
+      await machine.transition({
+        target,
+        toState: 'BLOCKED',
+        reasonClass: 'MALICIOUS_RESPONSE',
+        actor: 'a',
+      });
+      await machine.transition({
+        target,
+        toState: 'BLOCKED',
+        reasonClass: 'MALICIOUS_RESPONSE',
+        actor: 'a',
+      }); // dedupe
       expect(emitted.map((e) => e.actionClass)).toEqual([
         'PROVIDER_COLLECTOR_ACCESS',
         'BLOCKED_OPERATION',

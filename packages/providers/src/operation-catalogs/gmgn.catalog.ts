@@ -21,7 +21,11 @@ const GMGN_HOST = 'api.gmgn.ai';
 const GMGN_PORT = 443;
 
 /** Query-only descriptor factory — GET, JSON responses, redirects refused. */
-function gmgnQueryDescriptor(operationId: string, pathTemplate: string, allowedQueryFields: string[]): AllowlistDescriptor {
+function gmgnQueryDescriptor(
+  operationId: string,
+  pathTemplate: string,
+  allowedQueryFields: string[],
+): AllowlistDescriptor {
   return {
     operationId,
     scheme: 'https',
@@ -85,17 +89,29 @@ export interface GmgnCatalogEntry {
 export const GMGN_OPERATIONS: readonly GmgnCatalogEntry[] = [
   {
     operation: gmgnOperation('token.security'),
-    descriptor: gmgnQueryDescriptor('token.security', '/api/v1/tokens/{chain}/{address}/security', []),
+    descriptor: gmgnQueryDescriptor(
+      'token.security',
+      '/api/v1/tokens/{chain}/{address}/security',
+      [],
+    ),
     responseSchemaId: 'gmgn/token.security@1',
   },
   {
     operation: gmgnOperation('token.top_traders'),
-    descriptor: gmgnQueryDescriptor('token.top_traders', '/api/v1/tokens/{chain}/{address}/top_traders', ['limit']),
+    descriptor: gmgnQueryDescriptor(
+      'token.top_traders',
+      '/api/v1/tokens/{chain}/{address}/top_traders',
+      ['limit'],
+    ),
     responseSchemaId: 'gmgn/token.top_traders@1',
   },
   {
     operation: gmgnOperation('token.pair_stats'),
-    descriptor: gmgnQueryDescriptor('token.pair_stats', '/api/v1/pairs/{chain}/{pairAddress}/stats', []),
+    descriptor: gmgnQueryDescriptor(
+      'token.pair_stats',
+      '/api/v1/pairs/{chain}/{pairAddress}/stats',
+      [],
+    ),
     responseSchemaId: 'gmgn/token.pair_stats@1',
   },
 ] as const;

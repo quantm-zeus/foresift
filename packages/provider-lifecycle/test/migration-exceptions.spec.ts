@@ -114,7 +114,10 @@ describe('T113 migration exceptions', () => {
   it('re-blocks automatically the moment the exception lapses (use-time expiry)', async () => {
     const target = { providerId: 'prov-test', operationId: 'op-lapse', version: 'v1' };
     await wired.registry.registerOperation(
-      testDefinition({ operationId: 'op-lapse', verificationExpiresAt: ts('2099-01-01T00:00:00Z') }),
+      testDefinition({
+        operationId: 'op-lapse',
+        verificationExpiresAt: ts('2099-01-01T00:00:00Z'),
+      }),
     );
     await wired.rules.deprecate({ target, actor: 'bot' });
     // Deprecation blocked dependency registration…
@@ -145,13 +148,16 @@ describe('T113 migration exceptions', () => {
   });
 
   it('refuses unknown ids and conflicting replayed revocations', async () => {
-    await expect(
-      wired.exceptions.revoke('no-such-exception', 'actor'),
-    ).rejects.toMatchObject({ code: ProvErrorCode.PROV_MIGRATION_EXCEPTION_UNKNOWN });
+    await expect(wired.exceptions.revoke('no-such-exception', 'actor')).rejects.toMatchObject({
+      code: ProvErrorCode.PROV_MIGRATION_EXCEPTION_UNKNOWN,
+    });
 
     const target = { providerId: 'prov-test', operationId: 'op-revoke', version: 'v1' };
     await wired.registry.registerOperation(
-      testDefinition({ operationId: 'op-revoke', verificationExpiresAt: ts('2099-01-01T00:00:00Z') }),
+      testDefinition({
+        operationId: 'op-revoke',
+        verificationExpiresAt: ts('2099-01-01T00:00:00Z'),
+      }),
     );
     const granted = await wired.exceptions.grant({
       target,
@@ -166,9 +172,9 @@ describe('T113 migration exceptions', () => {
       wired.exceptions.revoke(granted.exceptionId, 'revoker-a'),
     ).resolves.toBeUndefined();
     // A different actor claiming the same revocation refuses.
-    await expect(
-      wired.exceptions.revoke(granted.exceptionId, 'revoker-b'),
-    ).rejects.toMatchObject({ code: ProvErrorCode.PROV_MIGRATION_EXCEPTION_REVOKED });
+    await expect(wired.exceptions.revoke(granted.exceptionId, 'revoker-b')).rejects.toMatchObject({
+      code: ProvErrorCode.PROV_MIGRATION_EXCEPTION_REVOKED,
+    });
     // And the revoked exception no longer authorizes anything.
     await expect(wired.exceptions.findActive(target)).resolves.toBeNull();
   });

@@ -9,8 +9,18 @@
   "transaction": {
     "message": {
       "accountKeys": [
-        { "pubkey": "TokenkegQfeZYiSFpPdmLpNSuQUhXZ8B2zLxNTLBZVdPQ", "signer": false, "source": "table", "writable": false },
-        { "pubkey": "9xQeWvG816bUx9EPjHmaT23yvVM2ZWbrrpZb9PusVFin", "signer": false, "source": "table", "writable": true }
+        {
+          "pubkey": "TokenkegQfeZYiSFpPdmLpNSuQUhXZ8B2zLxNTLBZVdPQ",
+          "signer": false,
+          "source": "table",
+          "writable": false
+        },
+        {
+          "pubkey": "9xQeWvG816bUx9EPjHmaT23yvVM2ZWbrrpZb9PusVFin",
+          "signer": false,
+          "source": "table",
+          "writable": true
+        }
       ]
     }
   },

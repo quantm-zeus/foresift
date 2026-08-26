@@ -55,9 +55,7 @@ export function fetchPortFromGlobal(): FetchPort {
 }
 
 /** Deterministic recorded transport for contract tests and fixtures. */
-export function recordedFetchPort(
-  routes: ReadonlyMap<string, AdapterHttpResponse>,
-): FetchPort {
+export function recordedFetchPort(routes: ReadonlyMap<string, AdapterHttpResponse>): FetchPort {
   return async (request) => {
     const hit = routes.get(`${request.method} ${request.url}`);
     if (hit === undefined) {

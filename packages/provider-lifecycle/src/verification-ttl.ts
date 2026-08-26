@@ -32,11 +32,7 @@ import {
   type VerificationSource,
 } from './vocabulary.ts';
 import { ProvErrorCode, VerificationTtlError } from './errors.ts';
-import type {
-  LifecycleMachine,
-  OperationTarget,
-  TransitionResult,
-} from './lifecycle-machine.ts';
+import type { LifecycleMachine, OperationTarget, TransitionResult } from './lifecycle-machine.ts';
 
 export interface VerificationTtlEngineOptions {
   readonly engine: DatabaseEngine;
@@ -250,23 +246,13 @@ export class VerificationTtlEngine {
         await this.engine.query(
           `UPDATE prov.prov_operations SET last_documentation_verification_at = $4, updated_at = $4
            WHERE provider_id = $1 AND operation_id = $2 AND version = $3`,
-          [
-            input.target.providerId,
-            input.target.operationId,
-            input.target.version,
-            verifiedAt,
-          ],
+          [input.target.providerId, input.target.operationId, input.target.version, verifiedAt],
         );
       } else if (kind === 'LIVE_PROBE') {
         await this.engine.query(
           `UPDATE prov.prov_operations SET last_live_probe_at = $4, updated_at = $4
            WHERE provider_id = $1 AND operation_id = $2 AND version = $3`,
-          [
-            input.target.providerId,
-            input.target.operationId,
-            input.target.version,
-            verifiedAt,
-          ],
+          [input.target.providerId, input.target.operationId, input.target.version, verifiedAt],
         );
       }
       // Advance the blanket window to cover the freshest PASSED evidence.
@@ -280,7 +266,10 @@ export class VerificationTtlEngine {
    * latest PASSED record per source whose window covers now; the pair rule
    * requires BOTH sources fresh.
    */
-  async evaluateKind(target: OperationTarget, kind: ProviderVerificationKind): Promise<KindFreshness> {
+  async evaluateKind(
+    target: OperationTarget,
+    kind: ProviderVerificationKind,
+  ): Promise<KindFreshness> {
     // Fail-closed: even evaluating freshness requires a configured TTL.
     await this.ttlSecondsFor(kind, target.providerId);
     const perSource = await Promise.all(
@@ -352,7 +341,9 @@ export class VerificationTtlEngine {
    * Builds a LifecycleMachine activation gate enforcing the AC-270 pair rule
    * over the supplied kinds (policy choice stays with the caller).
    */
-  activationGate(kinds: readonly ProviderVerificationKind[]): (target: OperationTarget) => Promise<void> {
+  activationGate(
+    kinds: readonly ProviderVerificationKind[],
+  ): (target: OperationTarget) => Promise<void> {
     return async (target: OperationTarget) => {
       for (const kind of kinds) {
         await this.assertActiveUseAllowed(target, kind);
@@ -405,7 +396,10 @@ export class VerificationTtlEngine {
         // The pair broke at the EARLIEST source window end; that instant —
         // stable across sweeps — is the event's effective_at so repeated
         // sweeps dedupe to the same idempotency key.
-        const candidates = [freshness.officialDoc.lastExpiresAt, freshness.liveContract.lastExpiresAt]
+        const candidates = [
+          freshness.officialDoc.lastExpiresAt,
+          freshness.liveContract.lastExpiresAt,
+        ]
           .filter((v): v is string => v !== null)
           .sort();
         const lapsedAt = candidates[0] ?? target.windowExpiresAt ?? this.clock.now();

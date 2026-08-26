@@ -72,7 +72,12 @@ describe('T115 adapter registration', () => {
     ]);
     expect(result.allowlistEntries).toHaveLength(3);
     for (const entry of result.allowlistEntries) {
-      expect(entry).toMatchObject({ host: 'api.gmgn.ai', port: 443, scheme: 'https', plane: 'COLLECTOR' });
+      expect(entry).toMatchObject({
+        host: 'api.gmgn.ai',
+        port: 443,
+        scheme: 'https',
+        plane: 'COLLECTOR',
+      });
     }
   });
 
@@ -138,7 +143,10 @@ describe('T115 adapter registration', () => {
         providerId: 'gmgn',
         plane: 'COLLECTOR',
         operations: [
-          { ...first, operation: { ...first.operation, capabilityClass: 'PROHIBITED_SIGN' as never } },
+          {
+            ...first,
+            operation: { ...first.operation, capabilityClass: 'PROHIBITED_SIGN' as never },
+          },
         ],
       }),
     ).rejects.toMatchObject({ code: ProvAdapterErrorCode.PROV_ADAPTER_CAPABILITY_PROHIBITED });
@@ -165,9 +173,7 @@ describe('T115 adapter registration', () => {
         adapterId: 'bundle-exposure',
         providerId: 'gmgn',
         plane: 'COLLECTOR',
-        operations: [
-          { ...first, bundleOperationIds: ['token.security', 'token.top_traders'] },
-        ],
+        operations: [{ ...first, bundleOperationIds: ['token.security', 'token.top_traders'] }],
       }),
     ).rejects.toMatchObject({ code: ProvAdapterErrorCode.PROV_ADAPTER_BUNDLE_EXPOSURE_REFUSED });
   });

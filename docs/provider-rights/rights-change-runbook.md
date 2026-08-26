@@ -49,11 +49,11 @@ their (more restrictive) state; they are never loosened by this drill.
 
 Policy per affected artifact:
 
-| Condition | Action | Resulting state |
-| --------- | ------ | --------------- |
-| `STORAGE` ∈ newly prohibited | `RETIRE` | `RETIRED` (the raw copy cannot even be held) |
-| any OTHER newly prohibited path | `QUARANTINE` | `QUARANTINED` |
-| tightened but NO newly prohibited path | none | dynamic gates enforce at use time |
+| Condition                              | Action       | Resulting state                              |
+| -------------------------------------- | ------------ | -------------------------------------------- |
+| `STORAGE` ∈ newly prohibited           | `RETIRE`     | `RETIRED` (the raw copy cannot even be held) |
+| any OTHER newly prohibited path        | `QUARANTINE` | `QUARANTINED`                                |
+| tightened but NO newly prohibited path | none         | dynamic gates enforce at use time            |
 
 Action rows land in `prov.prov_rights_change_actions`, uniquely fenced on
 `(change_id, artifact_id)` — replaying the execution resolves to the SAME
@@ -67,7 +67,7 @@ reactivation path: loosened rights require re-capture under the new version.
    action per affected artifact; count matches the enumeration from step 2.
 2. **States flipped** — spot-check `state` for RETIRED/QUARANTINED as policy.
 3. **Decision API refuses** — `decideForArtifact({capturedRightsVersion: old,
-   path: closed})` returns `{ allowed: false }`; unknown versions throw
+path: closed})` returns `{ allowed: false }`; unknown versions throw
    `PROV_RIGHTS_VERSION_UNKNOWN`.
 4. **Audit chain** — exactly ONE `RIGHTS_CHANGE` entry for the change id;
    replays do not append duplicates.

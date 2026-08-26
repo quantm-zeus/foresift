@@ -145,5 +145,7 @@ export function egressGuardFor(
 }
 
 /** Zod passthrough used by catalogs to type recorded query responses. */
-export const recordedQueryResponse = <T extends z.ZodRawShape>(shape: T): z.ZodType<z.infer<z.ZodObject<T>>> =>
+export const recordedQueryResponse = <T extends z.ZodRawShape>(
+  shape: T,
+): z.ZodType<z.infer<z.ZodObject<T>>> =>
   z.object(shape).passthrough() as unknown as z.ZodType<z.infer<z.ZodObject<T>>>;

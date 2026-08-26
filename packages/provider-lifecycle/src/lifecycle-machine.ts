@@ -23,11 +23,7 @@ import type { ClockPort, UtcTimestamp } from '@foresift/domain';
 import type { ProviderLifecycleState } from './lifecycle-states.ts';
 import { assertLegalLifecycleTransition } from './lifecycle-states.ts';
 import type { OperationTarget } from './operation-registry.ts';
-import {
-  ForesiftProviderError,
-  LifecycleTransitionError,
-  ProvErrorCode,
-} from './errors.ts';
+import { ForesiftProviderError, LifecycleTransitionError, ProvErrorCode } from './errors.ts';
 
 export type { OperationTarget };
 
@@ -323,8 +319,7 @@ export class LifecycleMachine {
     const prior = await this.findEvent(eventId);
     return {
       eventId,
-      fromState:
-        prior !== null ? (prior.fromState as ProviderLifecycleState) : existing,
+      fromState: prior !== null ? (prior.fromState as ProviderLifecycleState) : existing,
       toState: input.toState,
       reasonClass: reason,
       deduped: true,
@@ -341,7 +336,11 @@ export class LifecycleMachine {
     reasonClass: string,
     effectiveAt: UtcTimestamp,
   ): Promise<LifecycleEventRecord | null> {
-    const rows = await this.engine.query<{ event_id: string; from_state: string; reason_class: string }>(
+    const rows = await this.engine.query<{
+      event_id: string;
+      from_state: string;
+      reason_class: string;
+    }>(
       `SELECT event_id, from_state, reason_class
        FROM prov.prov_lifecycle_events
        WHERE provider_id = $1 AND operation_id = $2 AND version = $3

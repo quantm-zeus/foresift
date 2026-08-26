@@ -76,9 +76,7 @@ export class DeprecationRules {
     this.ttl = deps.ttl;
     // Degrades to SQL-absent behavior only when no incident sink is wired;
     // production wires the security package's Incidents.
-    this.incidents =
-      deps.incidents ??
-      new Incidents(deps.engine);
+    this.incidents = deps.incidents ?? new Incidents(deps.engine);
   }
 
   /**
@@ -154,9 +152,7 @@ export class DeprecationRules {
           evidenceRefs,
         });
         if (input.sunsetAt !== undefined) {
-          await this.incidents.attachEvidence(incidentId, [
-            `migration-deadline:${input.sunsetAt}`,
-          ]);
+          await this.incidents.attachEvidence(incidentId, [`migration-deadline:${input.sunsetAt}`]);
         }
       } catch (error) {
         // A replayed deprecation must not fail because its incident exists.

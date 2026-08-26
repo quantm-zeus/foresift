@@ -292,7 +292,7 @@ Format: `- [ ] T### [P?]` — **[P]** = parallelizable with its neighbors
 
 ## Phase I — Convergence verification
 
-- [ ] T901 Run the milestone-declared verification commands verbatim:
+- [x] T901 Run the milestone-declared verification commands verbatim:
       `test -d packages/domain && pnpm --filter @foresift/domain test`;
       `test -d packages/tool-core && pnpm --filter @foresift/tool-core test`.
       Then the shared aggregate gate `pnpm verify` and `pnpm spec:verify` at

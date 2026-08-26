@@ -17,7 +17,8 @@
     "@foresift/domain": "workspace:*",
     "@foresift/provider-lifecycle": "workspace:*",
     "@foresift/security": "workspace:*",
-    "@foresift/shared-schemas": "workspace:*"
+    "@foresift/shared-schemas": "workspace:*",
+    "zod": "^3.25.76"
   },
   "devDependencies": {
     "@electric-sql/pglite": "^0.5.6",

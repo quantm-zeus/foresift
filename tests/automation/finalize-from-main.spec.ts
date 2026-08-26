@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'bun:test';
 import {
   evaluateFinalizationFromMain,
   scanScopedTasks,
@@ -29,8 +29,38 @@ function okFacts(overrides: Record<string, unknown> = {}) {
     archonRows: [],
     trackedRows: [],
     pausedFatal: null,
+    operatorCiBypassReason: null,
     ...overrides,
   };
+}
+
+interface AuditedCiEvidence {
+  databaseId?: number;
+  url?: string;
+  bypassed?: boolean;
+  reason?: string | null;
+  mainSha?: string | null;
+}
+
+interface AuditedPauseEvidence {
+  runId: string;
+  archonStatus: string;
+}
+
+interface AuditedFinalizationEvidence {
+  packageId?: string;
+  mainSha?: string | null;
+  pr?: { number: number; url: string; mergeCommit: string };
+  ci?: AuditedCiEvidence;
+  terminalPauseRetired?: AuditedPauseEvidence;
+  taskBoxes?: number;
+  deferredNonScopeItems?: number;
+}
+
+function auditEvidence(
+  v: ReturnType<typeof evaluateFinalizationFromMain>,
+): AuditedFinalizationEvidence {
+  return v.evidence as unknown as AuditedFinalizationEvidence;
 }
 
 describe('finalize-from-main — deterministic fail-closed RUNNING→PROVEN (defect #16 follow-up)', () => {
@@ -230,6 +260,440 @@ describe('finalize-from-main — deterministic fail-closed RUNNING→PROVEN (def
     );
     expect(liveTracked.ok).toBe(false);
     expect(liveTracked.reasons.join(' ')).toMatch(/still tracks live run/);
+  });
+
+  describe('audited operator CI bypass finalization semantics', () => {
+    it('no green exact-head CI and no explicit bypass still refuses fail-closed', () => {
+      const absentCi = evaluateFinalizationFromMain(
+        okFacts({
+          ciRuns: [],
+          operatorCiBypassReason: null,
+        }),
+      );
+      expect(absentCi.ok).toBe(false);
+      expect(absentCi.reasons.join(' ')).toMatch(/no CI run exists for origin\/main HEAD/);
+
+      const redCi = evaluateFinalizationFromMain(
+        okFacts({
+          ciRuns: [{ databaseId: 9, headSha: MAIN, conclusion: 'failure', url: 'ci/9' }],
+          operatorCiBypassReason: undefined,
+        }),
+      );
+      expect(redCi.ok).toBe(false);
+      expect(redCi.reasons.join(' ')).toMatch(/no green CI on origin\/main HEAD/);
+
+      const emptyStringBypass = evaluateFinalizationFromMain(
+        okFacts({
+          ciRuns: [{ databaseId: 9, headSha: MAIN, conclusion: 'failure', url: 'ci/9' }],
+          operatorCiBypassReason: '',
+        }),
+      );
+      expect(emptyStringBypass.ok).toBe(false);
+      expect(emptyStringBypass.reasons.join(' ')).toMatch(/no green CI on origin\/main HEAD/);
+
+      const staleCiNoBypass = evaluateFinalizationFromMain(
+        okFacts({
+          ciRuns: [{ databaseId: 8, headSha: 'c'.repeat(40), conclusion: 'success', url: 'ci/8' }],
+          operatorCiBypassReason: null,
+        }),
+      );
+      expect(staleCiNoBypass.ok).toBe(false);
+      expect(staleCiNoBypass.reasons.join(' ')).toMatch(/no CI run exists for origin\/main HEAD/);
+    });
+
+    it('a non-empty explicit operatorCiBypassReason permits the CI evidence slot only and records {bypassed: true, reason, mainSha}', () => {
+      const bypassNoCi = evaluateFinalizationFromMain(
+        okFacts({
+          ciRuns: [],
+          operatorCiBypassReason: 'manual operator audit: staging smoke test verified by @lead',
+        }),
+      );
+      expect(bypassNoCi.ok).toBe(true);
+      expect(bypassNoCi.reasons).toEqual([]);
+      expect(auditEvidence(bypassNoCi).ci).toEqual({
+        bypassed: true,
+        reason: 'manual operator audit: staging smoke test verified by @lead',
+        mainSha: MAIN,
+      });
+      expect(bypassNoCi.evidence.pr?.number).toBe(52);
+
+      const bypassRedCi = evaluateFinalizationFromMain(
+        okFacts({
+          ciRuns: [{ databaseId: 9, headSha: MAIN, conclusion: 'failure', url: 'ci/9' }],
+          operatorCiBypassReason: 'flaky linter infra outage, landed commits verified offline',
+        }),
+      );
+      expect(bypassRedCi.ok).toBe(true);
+      expect(bypassRedCi.reasons).toEqual([]);
+      expect(auditEvidence(bypassRedCi).ci).toEqual({
+        bypassed: true,
+        reason: 'flaky linter infra outage, landed commits verified offline',
+        mainSha: MAIN,
+      });
+    });
+
+    it('operatorCiBypassReason permits the CI evidence slot ONLY — all other fail-closed gates still refuse', () => {
+      const bypassReason = 'manual audit approved';
+
+      // 1. Checkout dirty
+      const dirty = evaluateFinalizationFromMain(
+        okFacts({
+          ciRuns: [],
+          operatorCiBypassReason: bypassReason,
+          checkout: { branch: 'main', trackedDirty: true, headSha: MAIN },
+        }),
+      );
+      expect(dirty.ok).toBe(false);
+      expect(dirty.reasons.join(' ')).toContain('product checkout has uncommitted tracked changes');
+      expect(auditEvidence(dirty).ci).toEqual({
+        bypassed: true,
+        reason: bypassReason,
+        mainSha: MAIN,
+      });
+
+      // 2. Checkout on non-main branch
+      const nonMain = evaluateFinalizationFromMain(
+        okFacts({
+          ciRuns: [],
+          operatorCiBypassReason: bypassReason,
+          checkout: { branch: 'feature/unmerged', trackedDirty: false, headSha: MAIN },
+        }),
+      );
+      expect(nonMain.ok).toBe(false);
+      expect(nonMain.reasons.join(' ')).toContain("product checkout is on 'feature/unmerged', not main");
+
+      // 3. Checkout HEAD detached / not matching mainSha
+      const headMismatch = evaluateFinalizationFromMain(
+        okFacts({
+          ciRuns: [],
+          operatorCiBypassReason: bypassReason,
+          checkout: { branch: 'main', trackedDirty: false, headSha: 'e'.repeat(40) },
+        }),
+      );
+      expect(headMismatch.ok).toBe(false);
+      expect(headMismatch.reasons.join(' ')).toMatch(/checkout HEAD .* ≠ origin\/main/);
+
+      // 4. Missing merged PR evidence
+      const noMergedPr = evaluateFinalizationFromMain(
+        okFacts({
+          ciRuns: [],
+          operatorCiBypassReason: bypassReason,
+          mergedEvidence: null,
+        }),
+      );
+      expect(noMergedPr.ok).toBe(false);
+      expect(noMergedPr.reasons.join(' ')).toMatch(/no MERGED PR/);
+
+      // 5. Unchecked T-scoped tasks
+      const uncheckedTask = evaluateFinalizationFromMain(
+        okFacts({
+          ciRuns: [],
+          operatorCiBypassReason: bypassReason,
+          artifacts: {
+            spec: '# spec\n',
+            plan: '# plan\n',
+            tasks: '- [x] T118 done\n- [ ] T119 unfinished task\n',
+          },
+        }),
+      );
+      expect(uncheckedTask.ok).toBe(false);
+      expect(uncheckedTask.reasons.join(' ')).toMatch(/T-scoped task\(s\) unchecked/);
+
+      // 6. Unresolved markers in artifacts
+      const unresolvedMarker = evaluateFinalizationFromMain(
+        okFacts({
+          ciRuns: [],
+          operatorCiBypassReason: bypassReason,
+          artifacts: {
+            spec: '# spec\nTODO: write implementation details\n',
+            plan: '# plan\n',
+            tasks: '- [x] T118 done\n',
+          },
+        }),
+      );
+      expect(unresolvedMarker.ok).toBe(false);
+      expect(unresolvedMarker.reasons.join(' ')).toContain(`specs/${PKG}/spec.md`);
+
+      // 7. Live Archon execution
+      const liveArchon = evaluateFinalizationFromMain(
+        okFacts({
+          ciRuns: [],
+          operatorCiBypassReason: bypassReason,
+          archonRows: [{ id: 'live-archon-1', userMessage: PKG, status: 'running' }],
+        }),
+      );
+      expect(liveArchon.ok).toBe(false);
+      expect(liveArchon.reasons.join(' ')).toMatch(/live Archon execution/);
+
+      // 8. Live tracked supervisor row
+      const liveTracked = evaluateFinalizationFromMain(
+        okFacts({
+          ciRuns: [],
+          operatorCiBypassReason: bypassReason,
+          trackedRows: [
+            {
+              runId: 'live-run-1',
+              packageId: PKG,
+              done: false,
+              paused: false,
+              archonStatus: 'running',
+            },
+          ],
+        }),
+      );
+      expect(liveTracked.ok).toBe(false);
+      expect(liveTracked.reasons.join(' ')).toMatch(/supervisor still tracks live run/);
+    });
+
+    it('records genuine CI evidence rather than bypass when green exact-head CI run is found', () => {
+      const v = evaluateFinalizationFromMain(
+        okFacts({
+          ciRuns: [{ databaseId: 42, headSha: MAIN, conclusion: 'success', url: 'ci/42' }],
+          operatorCiBypassReason: 'unnecessary bypass',
+        }),
+      );
+      expect(v.ok).toBe(true);
+      expect(v.evidence.ci).toEqual({ databaseId: 42, url: 'ci/42' });
+    });
+  });
+
+  describe('PAUSED_FATAL retirement and ownership semantics', () => {
+    it('permits a PAUSED_FATAL owned by this exact package/run when the matching tracked row is paused and Archon-terminal, and returns retirement evidence', () => {
+      for (const archonStatus of ['failed', 'cancelled', 'completed'] as const) {
+        const runId = `archon-run-${archonStatus}`;
+        const v = evaluateFinalizationFromMain(
+          okFacts({
+            pausedFatal: {
+              packageId: PKG,
+              runId,
+              reason: `recovered ${archonStatus} run`,
+            },
+            trackedRows: [
+              {
+                runId,
+                packageId: PKG,
+                done: false,
+                paused: true,
+                archonStatus,
+              },
+            ],
+          }),
+        );
+        expect(v.ok).toBe(true);
+        expect(v.reasons).toEqual([]);
+        expect(auditEvidence(v).terminalPauseRetired).toEqual({
+          runId,
+          archonStatus,
+        });
+      }
+    });
+
+    it('refuses a pause owned by another package even if tracked row exists and is terminal', () => {
+      const v = evaluateFinalizationFromMain(
+        okFacts({
+          pausedFatal: {
+            packageId: 'g0-contracts-data-truth',
+            runId: 'run-other-pkg',
+            reason: 'crash on other package',
+          },
+          trackedRows: [
+            {
+              runId: 'run-other-pkg',
+              packageId: 'g0-contracts-data-truth',
+              done: false,
+              paused: true,
+              archonStatus: 'failed',
+            },
+          ],
+        }),
+      );
+      expect(v.ok).toBe(false);
+      expect(v.reasons.join(' ')).toMatch(/supervisor is latched in PAUSED_FATAL/);
+      expect(auditEvidence(v).terminalPauseRetired).toBeUndefined();
+    });
+
+    it('refuses a pause when the matching tracked run is live (running or pending) or unknown', () => {
+      // Live running
+      const vRunning = evaluateFinalizationFromMain(
+        okFacts({
+          pausedFatal: {
+            packageId: PKG,
+            runId: 'run-live-1',
+            reason: 'paused midway',
+          },
+          trackedRows: [
+            {
+              runId: 'run-live-1',
+              packageId: PKG,
+              done: false,
+              paused: true,
+              archonStatus: 'running',
+            },
+          ],
+        }),
+      );
+      expect(vRunning.ok).toBe(false);
+      expect(vRunning.reasons.join(' ')).toMatch(/supervisor is latched in PAUSED_FATAL/);
+      expect(auditEvidence(vRunning).terminalPauseRetired).toBeUndefined();
+
+      // Live pending
+      const vPending = evaluateFinalizationFromMain(
+        okFacts({
+          pausedFatal: {
+            packageId: PKG,
+            runId: 'run-live-2',
+            reason: 'paused in queue',
+          },
+          trackedRows: [
+            {
+              runId: 'run-live-2',
+              packageId: PKG,
+              done: false,
+              paused: true,
+              archonStatus: 'pending',
+            },
+          ],
+        }),
+      );
+      expect(vPending.ok).toBe(false);
+      expect(vPending.reasons.join(' ')).toMatch(/supervisor is latched in PAUSED_FATAL/);
+      expect(auditEvidence(vPending).terminalPauseRetired).toBeUndefined();
+
+      // Unknown status
+      const vUnknown = evaluateFinalizationFromMain(
+        okFacts({
+          pausedFatal: {
+            packageId: PKG,
+            runId: 'run-unk',
+            reason: 'unknown status',
+          },
+          trackedRows: [
+            {
+              runId: 'run-unk',
+              packageId: PKG,
+              done: false,
+              paused: true,
+              archonStatus: 'unknown',
+            },
+          ],
+        }),
+      );
+      expect(vUnknown.ok).toBe(false);
+      expect(vUnknown.reasons.join(' ')).toMatch(/supervisor is latched in PAUSED_FATAL/);
+      expect(auditEvidence(vUnknown).terminalPauseRetired).toBeUndefined();
+    });
+
+    it('refuses a pause when the matching tracked row is NOT paused (paused: false)', () => {
+      const v = evaluateFinalizationFromMain(
+        okFacts({
+          pausedFatal: {
+            packageId: PKG,
+            runId: 'run-unpaused',
+            reason: 'unpaused mismatch',
+          },
+          trackedRows: [
+            {
+              runId: 'run-unpaused',
+              packageId: PKG,
+              done: false,
+              paused: false,
+              archonStatus: 'failed',
+            },
+          ],
+        }),
+      );
+      expect(v.ok).toBe(false);
+      expect(v.reasons.join(' ')).toMatch(/supervisor is latched in PAUSED_FATAL/);
+      expect(auditEvidence(v).terminalPauseRetired).toBeUndefined();
+    });
+
+    it('refuses a pause when runId is not found in trackedRows (unknown run)', () => {
+      const v = evaluateFinalizationFromMain(
+        okFacts({
+          pausedFatal: {
+            packageId: PKG,
+            runId: 'run-missing-from-tracked',
+            reason: 'orphan pause latch',
+          },
+          trackedRows: [
+            {
+              runId: 'some-other-run',
+              packageId: PKG,
+              done: false,
+              paused: true,
+              archonStatus: 'failed',
+            },
+          ],
+        }),
+      );
+      expect(v.ok).toBe(false);
+      expect(v.reasons.join(' ')).toMatch(/supervisor is latched in PAUSED_FATAL/);
+      expect(auditEvidence(v).terminalPauseRetired).toBeUndefined();
+    });
+
+    it('refuses a pause when tracked row packageId mismatches package under evaluation', () => {
+      const v = evaluateFinalizationFromMain(
+        okFacts({
+          pausedFatal: {
+            packageId: PKG,
+            runId: 'run-pkg-mismatch',
+            reason: 'mismatch',
+          },
+          trackedRows: [
+            {
+              runId: 'run-pkg-mismatch',
+              packageId: 'g0-different-pkg',
+              done: false,
+              paused: true,
+              archonStatus: 'failed',
+            },
+          ],
+        }),
+      );
+      expect(v.ok).toBe(false);
+      expect(v.reasons.join(' ')).toMatch(/supervisor is latched in PAUSED_FATAL/);
+      expect(auditEvidence(v).terminalPauseRetired).toBeUndefined();
+    });
+  });
+
+  describe('composite CI-bypass and terminal-pause finalization', () => {
+    it('finalizes successfully when both audited CI bypass and terminal PAUSED_FATAL retirement co-occur on valid landed main', () => {
+      const runId = 'archon-dead-run-55';
+      const bypassReason = 'manual audit: CI pipeline timeout on main after successful PR merge';
+      const v = evaluateFinalizationFromMain(
+        okFacts({
+          ciRuns: [{ databaseId: 99, headSha: MAIN, conclusion: 'failure', url: 'ci/99' }],
+          operatorCiBypassReason: bypassReason,
+          pausedFatal: {
+            packageId: PKG,
+            runId,
+            reason: 'fatal failure recovered by landed PR #52',
+          },
+          trackedRows: [
+            {
+              runId,
+              packageId: PKG,
+              done: false,
+              paused: true,
+              archonStatus: 'failed',
+            },
+          ],
+        }),
+      );
+      expect(v.ok).toBe(true);
+      expect(v.reasons).toEqual([]);
+      expect(auditEvidence(v).ci).toEqual({
+        bypassed: true,
+        reason: bypassReason,
+        mainSha: MAIN,
+      });
+      expect(auditEvidence(v).terminalPauseRetired).toEqual({
+        runId,
+        archonStatus: 'failed',
+      });
+      expect(v.evidence.pr?.number).toBe(52);
+      expect(v.evidence.mainSha).toBe(MAIN);
+    });
   });
 
   describe('titleCarriesPackage token-boundary semantics', () => {

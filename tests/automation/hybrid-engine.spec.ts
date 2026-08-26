@@ -40,7 +40,11 @@ describe('engine-file emission (prep-time routing tokens)', () => {
   writeFileSync(graphCoreOnly, JSON.stringify({ shards: [{ id: 'core' }] }));
 
   it('emits CLAUDE by default for present lanes', () => {
-    const out = emitEngineFiles(graphWithShards, dir);
+    // Hermetic: the autopilot service env opts lanes into AGY (FORESIFT_AGY_LANES
+    // + an agy binary on PATH), so default-mode emission must be decided by the
+    // injected empty env — same DI contract as decideWriterEngine above — never
+    // by ambient host state.
+    const out = emitEngineFiles(graphWithShards, dir, undefined, { env: {} });
     expect(out).toEqual({ 'shard-1': 'CLAUDE', 'shard-2': 'NO SHARD-2 THIS WAVE' });
     expect(readFileSync(join(dir, 'engine-shard-1.txt'), 'utf8')).toBe('CLAUDE');
   });

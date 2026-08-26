@@ -78,11 +78,26 @@ function buildFixture(): string {
   return root;
 }
 
+/**
+ * Hermetic child env for the probes below. Archon exports ARTIFACTS_DIR inside
+ * regular workflow bash nodes (docs/adr/0004), so a child inheriting this
+ * process's environment would silently take the script's documented env-
+ * fallback mode instead of the default-mode refusal under test. Every mode
+ * these probes exercise is selected by explicit argv — ambient runtime state
+ * must not reach the script.
+ */
+function probeEnv(): NodeJS.ProcessEnv {
+  const env = { ...process.env };
+  delete env.ARTIFACTS_DIR;
+  return env;
+}
+
 function runPlanComplete(pkg: string, root: string, extra: string[] = []) {
   // NOTE: --repo-only is intentionally the LAST argument in this base argv —
   // it pins the trailing-bare-flag parsing contract.
   return spawnSync(process.execPath, [SCRIPT, '--package', pkg, '--root', root, ...extra], {
     encoding: 'utf8',
+    env: probeEnv(),
   });
 }
 
@@ -148,6 +163,7 @@ describe('wave-admission — launch-seam gate for the implementation-only sharde
       const root = buildFixture();
       const r = spawnSync(process.execPath, [SCRIPT, '--package', 'pkg-x', '--root', root], {
         encoding: 'utf8',
+        env: probeEnv(),
       });
       expect(r.status).toBe(1);
       expect(r.stdout).toContain('--repo-only');

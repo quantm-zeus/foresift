@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it } from 'vitest';
-import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { execFileSync } from 'node:child_process';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -85,6 +86,71 @@ describe('Foresift V4 CODEX_AGY execution profile test matrix (A through AD)', (
         mod.resolveExecutionProfile({ env: { FORESIFT_EXECUTION_PROFILE: 'CLAUDE_AGY' } }),
       ).toBe('CLAUDE_AGY');
     });
+
+    it('selecting CLAUDE_AGY is pure and preserves a useful real Git fixture HEAD/file', async () => {
+      const mod = await loadExecutionProfileModule();
+      const fixtureDir = makeTempDir('codex-agy-fixture-');
+
+      execFileSync('git', ['init', '-q'], { cwd: fixtureDir });
+      execFileSync('git', ['config', 'user.name', 'test-author'], { cwd: fixtureDir });
+      execFileSync('git', ['config', 'user.email', 'test@example.com'], { cwd: fixtureDir });
+
+      const sampleFilePath = join(fixtureDir, 'src', 'tracked-file.ts');
+      mkdirSync(join(fixtureDir, 'src'), { recursive: true });
+      const initialContent = 'export const state = "immutable-base";\n';
+      writeFileSync(sampleFilePath, initialContent, 'utf8');
+
+      execFileSync('git', ['add', '.'], { cwd: fixtureDir });
+      execFileSync('git', ['commit', '-qm', 'initial base commit'], { cwd: fixtureDir });
+
+      const initialHead = execFileSync('git', ['rev-parse', 'HEAD'], {
+        cwd: fixtureDir,
+        encoding: 'utf8',
+      }).trim();
+      expect(initialHead).toMatch(/^[0-9a-f]{40}$/);
+
+      // Select CLAUDE_AGY programmatically and via CLI
+      const resolved = mod.resolveExecutionProfile('CLAUDE_AGY');
+      expect(resolved).toBe('CLAUDE_AGY');
+      expect(mod.implementationEngineForProfile(resolved)).toBe('CLAUDE');
+      expect(mod.testEngineForProfile(resolved)).toBe('AGY');
+
+      const selectionFile = join(fixtureDir, 'execution-profile-selection.json');
+      execFileSync(
+        process.execPath,
+        [
+          join(REPO_ROOT, 'scripts/automation/execution-profile.mjs'),
+          '--select',
+          '--profile',
+          'CLAUDE_AGY',
+          '--out',
+          selectionFile,
+        ],
+        { cwd: fixtureDir, encoding: 'utf8' },
+      );
+
+      expect(existsSync(selectionFile)).toBe(true);
+      const parsedSelection = JSON.parse(readFileSync(selectionFile, 'utf8'));
+      expect(parsedSelection.executionProfile).toBe('CLAUDE_AGY');
+      expect(parsedSelection.implementationEngine).toBe('CLAUDE');
+      expect(parsedSelection.testEngine).toBe('AGY');
+
+      // Verify that selecting CLAUDE_AGY is pure: Git HEAD and tracked files are preserved
+      const currentHead = execFileSync('git', ['rev-parse', 'HEAD'], {
+        cwd: fixtureDir,
+        encoding: 'utf8',
+      }).trim();
+      expect(currentHead).toBe(initialHead);
+
+      expect(existsSync(sampleFilePath)).toBe(true);
+      expect(readFileSync(sampleFilePath, 'utf8')).toBe(initialContent);
+
+      const diff = execFileSync('git', ['diff', 'HEAD', '--', 'src/tracked-file.ts'], {
+        cwd: fixtureDir,
+        encoding: 'utf8',
+      }).trim();
+      expect(diff).toBe('');
+    });
   });
 
   describe('Matrix C: Invalid profile rejection (fails closed / throws)', () => {
@@ -124,6 +190,25 @@ describe('Foresift V4 CODEX_AGY execution profile test matrix (A through AD)', (
     it('throws when querying test engine for an invalid profile', async () => {
       const mod = await loadExecutionProfileModule();
       expect(() => mod.testEngineForProfile('INVALID_PROFILE')).toThrow();
+    });
+
+    it('requireAgyForTests fails closed for test-bearing work when AGY is false and does not require AGY for non-test work', async () => {
+      const mod = await loadExecutionProfileModule();
+      expect(() => mod.requireAgyForTests({ testBearing: true, hasAgy: false })).toThrow(
+        /AGY_UNAVAILABLE_TEST_BEARING_WORK/,
+      );
+      expect(mod.requireAgyForTests({ testBearing: true, hasAgy: true })).toEqual({
+        required: true,
+        engine: 'AGY',
+      });
+      expect(mod.requireAgyForTests({ testBearing: false, hasAgy: false })).toEqual({
+        required: false,
+        engine: null,
+      });
+      expect(mod.requireAgyForTests({ testBearing: false, hasAgy: true })).toEqual({
+        required: false,
+        engine: null,
+      });
     });
   });
 

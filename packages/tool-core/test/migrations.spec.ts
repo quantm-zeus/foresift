@@ -9,7 +9,7 @@
  * stale holders, and retry replays match zero rows or converge without
  * double-counting).
  */
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 import { PGlite } from '@electric-sql/pglite';
 import {
   applyMigrations,
@@ -389,7 +389,7 @@ describe('quota reservation state machine (FR-CORE-007)', () => {
       [id],
     );
     // The recorded units come from the single winner only (never summed).
-    expect(['5', '7']).toContain(row.rows[0]?.actual_units);
+    expect(['5', '7']).toContain(row.rows[0]?.actual_units as string);
   });
 });
 

@@ -5,7 +5,7 @@
  * mismatch refuses, post-lease re-check observes concurrent refreshes, and
  * stage-20 writes happen only when rights AND policy permit.
  */
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 import { PGlite } from '@electric-sql/pglite';
 import {
   applyMigrations,

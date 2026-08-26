@@ -80,20 +80,21 @@ export function makeQuotaEstimateStage(deps: QuotaStageDeps) {
     if (admission.allowed) return;
 
     // Capacity refused: resolve THE explicit backpressure exit.
-    const policy = deps.backpressurePolicy ?? ((r) => ({ action: 'QUOTA_EXHAUSTED' }) as const);
+    const policy = deps.backpressurePolicy ?? (() => ({ action: 'QUOTA_EXHAUSTED' }) as const);
     const decision = policy({ ...admission, estimate }, ctx);
     switch (decision.action) {
       case 'DOWNGRADE_DEPTH': {
         // One downgrade attempt with the narrower projection; a second
         // refusal cannot downgrade again.
-        const narrowed = ctx.route?.downgradedFieldProjection;
+        const route = ctx.route!;
+        const narrowed = route.downgradedFieldProjection;
         if (narrowed !== undefined && !ctx.downgradedProjection) {
           ctx.downgradedProjection = true;
           ctx.request = { ...ctx.request, fieldProjection: narrowed };
           const retryEstimate = await deps.quotaAdapter.estimate(estimateRequestOf(ctx));
           const retryAdmission = await deps.quotaAdapter.admit({
-            provider: ctx.route.provider,
-            operation: ctx.route.operation,
+            provider: route.provider,
+            operation: route.operation,
             workloadClass: ctx.request.workloadClass,
             estimate: retryEstimate,
           });

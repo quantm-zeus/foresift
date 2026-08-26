@@ -52,9 +52,16 @@ export interface ActorIdentity {
   readonly scopes: readonly string[];
 }
 
+/**
+ * The acquisition states a pipeline may EXIT blocked in: every §16.2 refusal
+ * state except the two lifecycle states (REQUESTED/RETURNED) that only ever
+ * describe successful progress. Matches BlockedStatePayloadSchema exactly.
+ */
+export type RefusedAcquisitionState = Exclude<AcquisitionState, 'REQUESTED' | 'RETURNED'>;
+
 /** Which stage a blocked exit happened at, and why (machine-readable). */
 export interface BlockedExit {
-  readonly state: AcquisitionState;
+  readonly state: RefusedAcquisitionState;
   readonly machineReason: string;
   readonly atStage: string;
   /** Explicit §16.8 backpressure action when capacity drove the exit. */
@@ -112,17 +119,27 @@ export interface ToolRunContext {
 
   // stages 14–17
   rawResponse?: ProviderRawResponse | undefined;
+  /** JSON-parsed raw payload carried from stage 15 into stage 16. */
+  rawParsed?: unknown;
   sourceFingerprint?: string | undefined;
   result?: NormalizedResult | undefined;
 
   // stages 18–22
   evidenceIds: string[];
   committedUnits?: number | null | undefined;
+  /** True once stage 5 persisted a REQUESTED (retrieval-completable) row. */
+  requestedAtPersisted?: boolean | undefined;
+  leaseReleased?: boolean | undefined;
+  outcomeState?: string | undefined;
 
   // exits
   blocked?: BlockedExit | undefined;
   servedFromCache: boolean;
   audited: boolean;
+  /** Stage-23 chain position of this run's exit entry. */
+  auditRecord?:
+    | { readonly seq: number; readonly entryHash: string; readonly auditClass: string }
+    | undefined;
   envelope?: ToolResultEnvelope | undefined;
 
   /** Stages that ACTUALLY executed their body (skips are not recorded). */

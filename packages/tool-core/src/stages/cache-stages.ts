@@ -14,7 +14,7 @@ import { computeExactCacheKey } from '../cache-key.ts';
 import { CacheStageChain } from './cache.ts';
 import type { ToolRunContext } from '../run-context.ts';
 import { block } from './authn.ts';
-import type { SingleFlightManager } from '../single-flight.ts';
+import { SingleFlightManager } from '../single-flight.ts';
 
 export interface CacheStagesDeps {
   readonly chain: CacheStageChain;
@@ -113,7 +113,6 @@ export function makeLeaseAcquireStage(deps: CacheStagesDeps) {
         resourceKeyHash,
         holderMode: ctx.request.holderMode,
         holderId: ctx.runId,
-        ttlSeconds: undefined,
       });
     } catch {
       // Live lease held by another mode/actor ⇒ QUEUE: bounded wait for the
@@ -138,7 +137,6 @@ export function makeLeaseAcquireStage(deps: CacheStagesDeps) {
             resourceKeyHash,
             holderMode: ctx.request.holderMode,
             holderId: ctx.runId,
-            ttlSeconds: undefined,
           });
           return;
         } catch {

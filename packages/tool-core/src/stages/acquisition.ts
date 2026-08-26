@@ -82,8 +82,8 @@ export function makePersistRequestedStage(deps: AcquisitionStageDeps) {
     // REQUESTED decisions get their randomized-probe assignment + impact
     // BEFORE retrieval so stage 22 can complete lawfully (AC-243).
     if (!policyNotRequested && !isPreExecutionBlock) {
-      const probe = deps.probeAssignment?.(ctx) ?? DEFAULT_PROBE;
-      await recordProbeAssignment(deps.engine, {
+      ctx.requestedAtPersisted = true;
+      const probe = deps.probeAssignment?.(ctx) ?? DEFAULT_PROBE;      await recordProbeAssignment(deps.engine, {
         decisionId,
         assignment: {
           eligibilityStratum: probe.eligibilityStratum,

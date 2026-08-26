@@ -8,10 +8,16 @@
  * Failure exits produce typed blocked states — never thrown past the engine.
  */
 import { ForesiftError, isAdmissibleActionClass, toolProfileId } from '@foresift/domain';
-import type { AcquisitionState, BackpressureAction, HolderMode } from '@foresift/domain';
-import type { ToolRunContext, ActorIdentity, ToolExecutionRequest } from '../run-context.ts';
+import type { BackpressureAction, HolderMode } from '@foresift/domain';
+import type {
+  RefusedAcquisitionState,
+  ToolRunContext,
+  ActorIdentity,
+  ToolExecutionRequest,
+} from '../run-context.ts';
 import type { ToolCoreRegistry } from '../registry.ts';
 import type { LicensePolicySource } from '../license-contract.ts';
+import type { OperationRoute } from '../provider-contract.ts';
 import { isVisibleToProfile, type ProfileBinding } from '../profiles.ts';
 
 /** Authentication seam implemented by the security perimeter consumer. */
@@ -74,7 +80,7 @@ export interface AuthnStageDeps {
 /** Record a typed blocked exit on the context (later functional stages skip). */
 export function block(
   ctx: ToolRunContext,
-  state: AcquisitionState,
+  state: RefusedAcquisitionState,
   machineReason: string,
   atStage: string,
   backpressure?: BackpressureAction,
@@ -157,7 +163,13 @@ export function makeAuthorizeStage(deps: AuthorizeStageDeps) {
     }
     if (
       !entry.metadata.profiles.includes(binding.id) ||
-      !isVisibleToProfile({ name: entry.metadata.name, atomic: entry.metadata.atomic }, binding)
+      !isVisibleToProfile(
+        {
+          name: entry.metadata.name,
+          ...(entry.metadata.atomic !== undefined ? { atomic: entry.metadata.atomic } : {}),
+        },
+        binding,
+      )
     ) {
       block(ctx, 'RIGHTS_BLOCKED', `tool ${req.toolName} is not visible to profile ${binding.id}`, 'AUTHORIZE');
       return;

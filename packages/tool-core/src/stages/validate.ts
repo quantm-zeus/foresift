@@ -17,6 +17,7 @@ import type { ToolRunContext } from '../run-context.ts';
 import type { SchemaLike } from '../provider-contract.ts';
 import type { JsonSchemaObject } from '../json-schema.ts';
 import { jsonSchemaValidator } from '../json-schema.ts';
+import { block } from './authn.ts';
 
 /** Compile the registration-declared input shape into a runtime validator. */
 function validatorFor(routeInput: SchemaLike | undefined, schemaJson: unknown): SchemaLike {

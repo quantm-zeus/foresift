@@ -63,18 +63,14 @@ export function runAgyTestWriter(input) {
     '--print-timeout',
     route.providerTimeout,
   ];
-  const run = spawnSync(
-    'agy',
-    agyArgs,
-    {
-      shell: false,
-      cwd: input.worktree,
-      input: ndjson,
-      encoding: 'utf8',
-      timeout: Number(input['timeout-ms'] ?? 45 * 60_000),
-      maxBuffer: 64 * 1024 * 1024,
-    },
-  );
+  const run = spawnSync('agy', agyArgs, {
+    shell: false,
+    cwd: input.worktree,
+    input: ndjson,
+    encoding: 'utf8',
+    timeout: Number(input['timeout-ms'] ?? 45 * 60_000),
+    maxBuffer: 64 * 1024 * 1024,
+  });
   writeFileSync(join(resultDir, 'agy-run.jsonl'), run.stdout ?? '');
   if (run.error) throw new Error(`AGY_TEST_SPAWN_FAILED: ${run.error.message}`);
   if (run.status !== 0) throw new Error(`AGY_TEST_FAILED: ${(run.stderr ?? '').slice(-500)}`);

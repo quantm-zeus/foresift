@@ -734,11 +734,10 @@ describe('foresift-sharded-wave workflow contract', () => {
 describe('wave routing AGY test lane persistence', () => {
   it('buildWaveRouting attaches version-controlled AGY Gemini model facts to test lanes', async () => {
     const { buildWaveRouting } = await import('../../scripts/automation/codex-routing.mjs');
-    const { EXECUTION_POLICY } = (await import(
-      '../../scripts/automation/execution-profile.mjs'
-    )) as typeof import('../../scripts/automation/execution-profile.mjs') & {
-      EXECUTION_POLICY: Record<string, unknown>;
-    };
+    const { EXECUTION_POLICY } =
+      (await import('../../scripts/automation/execution-profile.mjs')) as typeof import('../../scripts/automation/execution-profile.mjs') & {
+        EXECUTION_POLICY: Record<string, unknown>;
+      };
 
     const graph = {
       package: { risk: 'MEDIUM' },
@@ -753,7 +752,9 @@ describe('wave routing AGY test lane persistence', () => {
     expect(routingCodex.routingPolicyVersion).toBe('codex-sol-luna-terra-agy-gemini@2');
     expect(routingCodex.testEngine).toBe('AGY');
 
-    const testLaneCodex = routingCodex.lanes.find((l: { lane: string }) => l.lane === 'test-author');
+    const testLaneCodex = routingCodex.lanes.find(
+      (l: { lane: string }) => l.lane === 'test-author',
+    );
     expect(testLaneCodex).toBeDefined();
     expect(testLaneCodex.engine).toBe('AGY');
     expect(testLaneCodex.role).toBe('test');
@@ -766,7 +767,9 @@ describe('wave routing AGY test lane persistence', () => {
     expect(testLaneCodex.taskIds).toEqual(['T103']);
 
     const routingClaude = buildWaveRouting(graph, 'CLAUDE_AGY');
-    const testLaneClaude = routingClaude.lanes.find((l: { lane: string }) => l.lane === 'test-author');
+    const testLaneClaude = routingClaude.lanes.find(
+      (l: { lane: string }) => l.lane === 'test-author',
+    );
     expect(testLaneClaude).toBeDefined();
     expect(testLaneClaude.engine).toBe('AGY');
     expect(testLaneClaude.model).toBe('gemini-3.7-flash-high');
@@ -774,4 +777,3 @@ describe('wave routing AGY test lane persistence', () => {
     expect(testLaneClaude.providerTimeout).toBe('40m');
   });
 });
-

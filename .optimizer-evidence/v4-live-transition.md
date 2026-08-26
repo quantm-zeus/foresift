@@ -170,10 +170,71 @@ worktree's untracked `specs/g0-provider-lifecycle/` (content verified
 identical to promoted commit `32f9c8f`) so its next advance reaches current
 main and future bases stop freezing.
 
+## Planning-truth fix PR (#61) + supported-door recovery — wave 3 live
+
+Root cause of the repeated guard refusals: contradictory planning truth, not
+writer error. T101 mandated the prov filename-family extension while also
+demanding "existing migrator suite green untouched", but
+`packages/persistence/test/migrator.spec.ts` asserts EXACTLY the discovered
+script set ⇒ unsatisfiable as written; and `pnpm-lock.yaml` mechanically
+follows every package scaffold yet was undeclarable (collector only accepted
+scoped prefixes). Resolution recorded per operating contract:
+
+- PR #61 squash-merged 23:39Z → origin/main `9b81868` (CI pass 7m35s;
+  local FULL verify 1290/1290): T101 amendment documenting the conflict +
+  declaring required out-of-scope writes; minimal builder extension making
+  `pnpm-lock.yaml` collectible; regression pin in impl-wave.spec.ts
+  (suite 18/18).
+
+Recovery executed strictly through doors (23:41Z), service stopped first:
+production checkout ff at `9b81868`; untracked task-worktree residue
+`specs/g0-provider-lifecycle/` removed (byte-identical to promoted content,
+verified pre-delete); `--recover-fatal 34067833…` → noop-resume detected →
+dead run abandoned (`cancelled`) → task worktree advanced `5f52f8e` →
+`9b8186844b` (freeze broken) → single fresh continuation
+run `f9ed4de6b7eb7704567c9a3cf1684b73`, pause cleared, service restarted.
+
+Wave-3 prep immediately proved all three fixes at once:
+
+| Fact | Value |
+| --- | --- |
+| base-head | `9b8186844b…` (current main ⇒ new branch names, collision impossible) |
+| engine-shard-1 / shard-2 | **AGY** / **AGY** — first production AGY routing |
+| writer-core | CLAUDE, serial 34 units (unchanged policy) |
+| scopeExceptions | includes `packages/persistence/test/migrator.spec.ts` + `pnpm-lock.yaml`; both present in core allowedWritePaths |
+
+The recover-fatal relaunch inherited the operator shell env, so
+`FORESIFT_AGY_LANES=shard-1,shard-2` was exported explicitly for this launch
+— matching the durable unit drop-in; service-tick launches carry it natively.
+
+## AGY production proof — real shards, real commits (23:48Z)
+
+Both parallel lanes of wave 3 routed to and executed through the real `agy`
+CLI (`--input-format stream-json … --dangerously-skip-permissions`, own
+OAuth):
+
+- `writer-shard-1-agy` → T104 (`packages/shared-schemas/src/prov.ts`),
+  128 tests PASS, head `07d7104` on `foresift/wave/9b8186844b-shard-1`;
+  envelope `authorityOk:true, violations:[]`.
+- `writer-shard-2-agy` → T107 (`telemetry/prov.catalog.json`), all suites
+  PASS incl. 85-file acceptance/negative regressions, head `f0e382fb` on
+  `foresift/wave/9b8186844b-shard-2`; envelope clean.
+
+First attempt of shard-1 died on an agy-internal `"timeout waiting for
+response"` (result-event status ERROR after 119 productive steps; empty
+stderr — error visible only in the archived stdout stream
+`writer-results/shard-1/agy-run.jsonl`). R7 envelope-status law failed the
+lane closed correctly; Archon v0.9's node-level retry (attempt 2/3)
+re-ran it to success in 109 s. No supervisor recovery was consumed.
+Forensic note for closeout: surface agy result-event errors in the
+node_error line (stderr tail alone is empty for in-stream failures).
+
 ## Pending at time of writing
 
-- Provider wave: writer completion → additive integration → TRUE FAST →
-  push/PR → merge → finalize RUNNING→PROVEN from main.
+- Provider wave 3 (`f9ed4de6`): AGY shard lanes + CLAUDE core → guards
+  (exceptions now lawful) → integration → TRUE FAST → push/PR → merge →
+  finalize RUNNING→PROVEN from current main.
 - Tool-core: top-ranked C4 ⇒ direct `foresift-sharded-wave` entry (routing
   verified: `admitWorkflowForLaunch(WAVE_WORKFLOW, true)` → wave), with
-  branch-adoption restoring `e9c0cdc` and absorbing main.
+  branch-adoption restoring `e9c0cdc` and absorbing main; its service-tick
+  env carries the durable AGY opt-in.

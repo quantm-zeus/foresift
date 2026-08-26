@@ -119,7 +119,7 @@
         "test -d packages/domain && pnpm --filter @foresift/domain test",
         "test -d packages/tool-core && pnpm --filter @foresift/tool-core test"
       ],
-      "status": "RUNNING"
+      "status": "PROVEN"
     },
     {
       "id": "g0-provider-lifecycle",

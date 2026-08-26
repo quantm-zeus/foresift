@@ -5,7 +5,7 @@
  * estimate, and the availability classifier refuses to bless late inputs as
  * available-at-the-time.
  */
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 import {
   AcquisitionState,
   DependenceLabel,
@@ -21,6 +21,7 @@ import {
   recordProbeAssignment,
   registerSourceIdentity,
 } from '@foresift/persistence';
+import { parseCoreSchema } from '@foresift/shared-schemas';
 import { closeTestDatabase, makeTestDatabase, type TestDatabase } from '../acceptance/helpers.ts';
 
 const BOUNDARY: UtcTimestamp = utcTimestamp('2026-06-05T00:00:00Z');
@@ -121,3 +122,20 @@ describe('AC-247 negative: frozen counts are immovable', () => {
     ).not.toBe(DependenceLabel.AVAILABLE_AT_THE_TIME);
   });
 });
+
+describe('AC-247 negative (tool-core substrate): invalid exact cache entry records fail schema parsing', () => {
+  it('ExactCacheEntryRecord schema refuses malformed sha256 cacheKeyHash', () => {
+    expect(() =>
+      parseCoreSchema('ExactCacheEntryRecord', {
+        cacheKeyHash: 'not-a-valid-sha256-hash',
+        payloadRef: 'obj://core-cache/bad',
+        storedAt: '2026-06-01T09:00:00Z',
+        freshUntil: '2026-06-01T10:00:00Z',
+        staleUntil: '2026-06-01T12:00:00Z',
+        licensePolicyVersion: 'policy-1',
+        rightsPermitted: true,
+      }),
+    ).toThrow();
+  });
+});
+

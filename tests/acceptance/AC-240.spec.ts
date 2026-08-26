@@ -11,14 +11,14 @@
  * evidence resolution gives both arms identical views at identical action
  * times. The universal function itself belongs to evaluation packages.
  */
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 import {
   entryIsNotEarlierThanCounterfactual,
   utcTimestamp,
   type DecisionActionTimestamps,
   type UtcTimestamp,
 } from '@foresift/domain';
-import { DATA_SCHEMAS } from '@foresift/shared-schemas';
+import { DATA_SCHEMAS, parseCoreSchema, type ToolResultEnvelope } from '@foresift/shared-schemas';
 import { appendObservation, replayObservations } from '@foresift/persistence';
 import { freezeBundle, resolveEvidenceAt } from '@foresift/evidence';
 import { closeTestDatabase, makeTestDatabase, seedPool, type TestDatabase } from './helpers.ts';
@@ -129,3 +129,35 @@ describe('AC-240: symmetric action-time substrate', () => {
     }
   });
 });
+
+describe('AC-240 acceptance (tool-core substrate): symmetric event and action timestamps in envelopes', () => {
+  it('envelope meta supports symmetric observedAt, availableAt, fetchedAt for evaluation workloads', () => {
+    const envelope: ToolResultEnvelope = {
+      data: { candidateId: 'cand/ac240', score: 0.95 },
+      meta: {
+        toolName: 'compare_candidates',
+        toolVersion: '1.0.0',
+        evidenceIds: ['ev-cand-1'],
+        observedAt: T('2026-06-10T09:00:00Z'),
+        availableAt: T('2026-06-10T09:03:00Z'),
+        fetchedAt: T('2026-06-10T09:05:00Z'),
+        cache: 'HIT_FRESH',
+        qualityCodes: ['QUALITY_HIGH'],
+        conflicts: [],
+        quota: {
+          quotaModel: 'REQUESTS_PER_PERIOD',
+          reservationState: 'COMMITTED',
+          estimatedUnits: 1,
+          actualUnits: 1,
+        },
+        partial: false,
+      },
+    };
+
+    const parsed = parseCoreSchema('ToolResultEnvelope', envelope);
+    expect(parsed.meta.observedAt).toBe(T('2026-06-10T09:00:00Z'));
+    expect(parsed.meta.availableAt).toBe(T('2026-06-10T09:03:00Z'));
+    expect(parsed.meta.fetchedAt).toBe(T('2026-06-10T09:05:00Z'));
+  });
+});
+

@@ -5,9 +5,11 @@
  * the SQL immutability triggers — originals can never be erased or rewritten,
  * not even by raw SQL from the application's own engine seam.
  */
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 import { utcTimestamp, type UtcTimestamp } from '@foresift/domain';
 import { appendObservation, loadObservation } from '@foresift/persistence';
+import { parseCoreSchema } from '@foresift/shared-schemas';
+import { normalizeRawPayload } from '../../packages/tool-core/src/normalize.ts';
 import { closeTestDatabase, makeTestDatabase, type TestDatabase } from '../acceptance/helpers.ts';
 
 const T = (iso: string): UtcTimestamp => utcTimestamp(iso);
@@ -84,3 +86,45 @@ describe('AC-021 negative: mutation attempts are rejected by triggers', () => {
     ).rejects.toThrow(/immutable/);
   });
 });
+
+describe('AC-021 negative (tool-core substrate): attempts to erase evidence refs or overwrite observations fail', () => {
+  it('envelope validation fails when evidenceIds contains non-string elements or invalid format', () => {
+    const invalidEnvelope = {
+      data: { poolId: 'ac21-pool' },
+      meta: {
+        toolName: 'get_pool_observation',
+        toolVersion: '1.0.0',
+        evidenceIds: [12345 as unknown as string],
+        fetchedAt: '2026-06-03T09:00:00Z',
+        cache: 'MISS',
+        qualityCodes: [],
+        conflicts: [],
+        quota: {
+          quotaModel: 'REQUESTS_PER_PERIOD',
+          reservationState: 'COMMITTED',
+          estimatedUnits: 1,
+          actualUnits: 1,
+        },
+        partial: false,
+      },
+    };
+    expect(() => parseCoreSchema('ToolResultEnvelope', invalidEnvelope)).toThrow();
+  });
+
+  it('normalizer refuses payload when observations is missing or malformed', () => {
+    expect(() =>
+      normalizeRawPayload(
+        { observations: 'not-an-array' },
+        { runId: 'run-1', provider: 'test-p', fetchedAt: '2026-06-03T09:00:00Z' },
+      ),
+    ).toThrow(/raw payload carries no observations array/);
+
+    expect(() =>
+      normalizeRawPayload(
+        { observations: [null] },
+        { runId: 'run-1', provider: 'test-p', fetchedAt: '2026-06-03T09:00:00Z' },
+      ),
+    ).toThrow(/observation 0 is not an object/);
+  });
+});
+

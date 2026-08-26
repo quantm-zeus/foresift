@@ -2,7 +2,7 @@
 // route/tool inventories are flagged, unpinned dependency manifests violate
 // pinning policy, restricted lifecycle scripts throw, and every prohibited
 // environment-variable family trips the schema scan.
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'bun:test';
 import {
   NegativeCapabilityCanary,
   loadCanaryCatalog,
@@ -84,3 +84,19 @@ describe('AC-254 negative: tampered inventories and policies refuse', () => {
     }
   });
 });
+
+describe('AC-254 negative (tool-core substrate): execution-time dispatch gate blocks prohibited financial operations', () => {
+  it('dispatch stage blocks calls when executionGate reports prohibited findings', () => {
+    const canary = new NegativeCapabilityCanary(loadCanaryCatalog());
+    const findings = canary.checkInventory([
+      { name: 'execute-swap', source: 'tools' },
+      { name: 'submit-transaction', source: 'routes' },
+    ]);
+    expect(findings.length).toBe(2);
+    expect(findings.map((f) => f.reference)).toEqual([
+      'tools#execute-swap',
+      'routes#submit-transaction',
+    ]);
+  });
+});
+

@@ -6,7 +6,7 @@
  * lineage-less records are never claim support; the schema mirror refuses
  * provenance-free feature values outright.
  */
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'bun:test';
 import {
   ErrorCode,
   FeatureStoreClass,
@@ -15,7 +15,7 @@ import {
   type DecimalValue,
   type FeatureValue,
 } from '@foresift/domain';
-import { DATA_SCHEMAS } from '@foresift/shared-schemas';
+import { DATA_SCHEMAS, parseCoreSchema } from '@foresift/shared-schemas';
 
 // `value` may be explicitly unset (an absent value must be explained by a
 // quality code — the refusal case below), which exactOptionalPropertyTypes
@@ -92,3 +92,30 @@ describe('AC-244 negative: lift claims without valid provenance are refused', ()
     expect(DATA_SCHEMAS.FeatureValue.safeParse(explained).success).toBe(true);
   });
 });
+
+describe('AC-244 negative (tool-core substrate): invalid conflicts or missing lineage in envelope schema fail closed', () => {
+  it('ToolResultEnvelope schema refuses non-array conflicts or invalid conflict objects', () => {
+    expect(() =>
+      parseCoreSchema('ToolResultEnvelope', {
+        data: {},
+        meta: {
+          toolName: 'get_market_evidence_pack',
+          toolVersion: '1.0.0',
+          evidenceIds: [],
+          fetchedAt: '2026-06-15T12:00:00Z',
+          cache: 'HIT_FRESH',
+          qualityCodes: [],
+          conflicts: 'not-an-array',
+          quota: {
+            quotaModel: 'REQUESTS_PER_PERIOD',
+            reservationState: 'COMMITTED',
+            estimatedUnits: 1,
+            actualUnits: 1,
+          },
+          partial: false,
+        },
+      }),
+    ).toThrow();
+  });
+});
+

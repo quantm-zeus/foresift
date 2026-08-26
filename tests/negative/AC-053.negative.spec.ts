@@ -1,7 +1,7 @@
 // AC-053 (negative): revoked, expired, and misused credentials are refused
 // with typed errors; revocation is idempotent-guarded and unknown
 // credentials never authenticate.
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 import { PGlite } from '@electric-sql/pglite';
 import {
   applyMigrations,
@@ -12,6 +12,7 @@ import {
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { McpCredentialStore } from '../../packages/security/src/mcp-credentials.ts';
+import { visibleToolsFor, isVisibleToProfile } from '../../packages/tool-core/src/profiles.ts';
 
 const MIGRATIONS_DIR = path.resolve(
   path.dirname(fileURLToPath(import.meta.url)),
@@ -138,3 +139,24 @@ describe('AC-053 negative: misused credentials refuse with typed errors', () => 
     await expect(store.revoke('cred-never-existed', at('2026-08-01T07:00:00Z'))).rejects.toThrow();
   });
 });
+
+describe('AC-053 negative (tool-core substrate): out-of-profile and atomic tools fail profile authorization', () => {
+  it('throws AUTHORIZATION_REFUSED if a STANDARD profile requests atomic tools', () => {
+    expect(() =>
+      visibleToolsFor({
+        id: 'discovery',
+        klass: 'STANDARD',
+        extraAtomicTools: ['provider_adapter_probe'],
+      }),
+    ).toThrow(/cannot bind provider-specific atomic tools|AUTHORIZATION_REFUSED/);
+  });
+
+  it('isVisibleToProfile returns false for atomic tools under standard profiles', () => {
+    const visible = isVisibleToProfile(
+      { name: 'provider_adapter_probe', atomic: true },
+      { id: 'discovery', klass: 'STANDARD' },
+    );
+    expect(visible).toBe(false);
+  });
+});
+

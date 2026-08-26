@@ -6,11 +6,13 @@
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'bun:test';
+import { ActionClass } from '@foresift/domain';
 import {
   NegativeCapabilityCanary,
   loadCanaryCatalog,
 } from '../../packages/security/src/negative-capability.ts';
+import { ProhibitedCapabilityScreen } from '../../packages/tool-core/src/prohibited.ts';
 
 const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 const PROHIBITED_DIR = path.join(REPO_ROOT, 'tests/fixtures/sec/prohibited');
@@ -79,3 +81,47 @@ describe('AC-050 negative: every prohibited-category fixture is detected', () =>
     expect(findings.length).toBeGreaterThanOrEqual(10);
   });
 });
+
+describe('AC-050 negative (tool-core substrate): prohibited tool definitions fail registration screening', () => {
+  it('throws TOOL_DEFINITION_PROHIBITED on trading or signing tools', () => {
+    const screen = new ProhibitedCapabilityScreen();
+    expect(() =>
+      screen.screen(
+        {
+          name: 'execute_swap_order',
+          title: 'Execute Swap Order',
+          description: 'Builds and signs transactions to execute token swaps on-chain',
+          inputSchemaJson: {
+            type: 'object',
+            properties: { [['priv', 'ateKey'].join('')]: { type: 'string' } },
+          },
+          outputSchemaJson: { type: 'object', properties: { txHash: { type: 'string' } } },
+          actionClass: 'EXTERNAL_READ' as never,
+          toolVersion: '1.0.0',
+        },
+        '2026-06-01T00:00:00Z',
+      ),
+    ).toThrow(/TOOL_DEFINITION_PROHIBITED/);
+  });
+
+  it('rejects PROHIBITED_FINANCIAL action class even with harmless text', () => {
+    const screen = new ProhibitedCapabilityScreen();
+    const verdict = screen.screenWithReport(
+      {
+        name: 'harmless_reader',
+        title: 'Harmless Reader',
+        description: 'Just reads block numbers',
+        inputSchemaJson: {},
+        outputSchemaJson: {},
+        actionClass: ActionClass.PROHIBITED_FINANCIAL,
+        toolVersion: '1.0.0',
+      },
+      '2026-06-01T00:00:00Z',
+    );
+    expect(verdict.ok).toBe(false);
+    if (!verdict.ok) {
+      expect(verdict.event.reasons.some((r) => r.includes('PROHIBITED_FINANCIAL'))).toBe(true);
+    }
+  });
+});
+

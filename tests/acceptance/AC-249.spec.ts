@@ -9,7 +9,7 @@
  * bit-for-bit unchanged before and after the backfill. Any apparent "lift"
  * from the backfill would be an explained artifact of a later boundary only.
  */
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 import { utcTimestamp, type UtcTimestamp } from '@foresift/domain';
 import {
   appendObservation,
@@ -17,6 +17,7 @@ import {
   replayObservations,
 } from '@foresift/persistence';
 import { resolveEvidenceAt } from '@foresift/evidence';
+import { parseDataSchema } from '@foresift/shared-schemas';
 import { closeTestDatabase, makeTestDatabase, seedPool, type TestDatabase } from './helpers.ts';
 
 const T = (iso: string): UtcTimestamp => utcTimestamp(iso);
@@ -106,3 +107,22 @@ describe('AC-249: availability-backdating placebo leaves replay unchanged', () =
     );
   });
 });
+
+describe('AC-249 acceptance (tool-core substrate): backfill receipt schema validation', () => {
+  it('BackfillReceipt schema validates live receipt proof', () => {
+    const parsed = parseDataSchema('BackfillReceipt', {
+      backfillJobId: 'job/ac249',
+      backfillReason: 'PROVIDER_GAP_COVERAGE',
+      historicalEventAt: T('2026-06-01T09:00:00Z'),
+      retrievedAt: T('2026-06-05T13:00:00Z'),
+      availableAt: T('2026-06-05T14:00:00Z'),
+      retrospectiveOnly: false,
+      wouldHaveBeenObservableLive: null,
+      availabilityProof: {
+        method: 'RECOVERY_FETCH_COMMIT',
+      },
+    });
+    expect(parsed.backfillJobId).toBe('job/ac249');
+  });
+});
+

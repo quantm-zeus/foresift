@@ -9,7 +9,7 @@
  * proving the boundary is inclusive, exclusion is exact, and revision
  * resolution respects it.
  */
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 import { utcTimestamp, type UtcTimestamp } from '@foresift/domain';
 import {
   appendObservation,
@@ -18,6 +18,9 @@ import {
   replayObservations,
 } from '@foresift/persistence';
 import { freezeBundle } from '@foresift/evidence';
+import type { CacheKeyComponents } from '@foresift/shared-schemas';
+import { computeExactCacheKey } from '../../packages/tool-core/src/cache-key.ts';
+import { CacheStageChain } from '../../packages/tool-core/src/stages/cache.ts';
 import { closeTestDatabase, makeTestDatabase, seedPool, type TestDatabase } from './helpers.ts';
 
 const T = (iso: string): UtcTimestamp => utcTimestamp(iso);
@@ -161,3 +164,71 @@ describe('AC-020: replay at T excludes available_at > T', () => {
     ]);
   });
 });
+
+describe('AC-020 acceptance (tool-core substrate): exact-cache lookups enforce point-in-time boundary', () => {
+  it('exact-cache lookup at decisionTime T cannot read cache entries with stored_at > T', async () => {
+    const cacheChain = new CacheStageChain({
+      engine: tdb.engine,
+      now: () => '2026-06-01T12:00:00Z',
+    });
+
+    const components: CacheKeyComponents = {
+      provider: 'first-party-dex-observer',
+      operation: 'get_asset_identity',
+      operationVersion: '1.0.0',
+      chain: 'eip155:1',
+      canonicalEntityIdentity: 'eip155:1:0x00000000000000000000000000000000000ac200',
+      normalizedArguments: { address: '0x00000000000000000000000000000000000ac200' },
+      fieldProjection: ['symbol', 'decimals'],
+      asOf: '2026-06-01T12:00:00Z',
+      licensePolicyVersion: 'rights-1',
+    };
+
+    // Store entry with stored_at at 14:00:00Z
+    const stored = await cacheChain.storeIfPermitted({
+      components,
+      payloadRef: 'obj://core-cache/ac20-entry-1',
+      storedAt: '2026-06-01T14:00:00Z',
+      rightsAllowed: true,
+      policy: { cachingPermitted: true },
+    });
+    expect(stored).toBe(true);
+
+    // Lookup at earlier decisionTime 12:00:00Z -> MISS (point-in-time boundary exclusion)
+    const earlyLookup = await cacheChain.lookup({
+      components,
+      holderMode: 'MCP_MANUAL',
+      decisionTime: '2026-06-01T12:00:00Z',
+    });
+    expect(earlyLookup.outcome).toBe('MISS');
+
+    // Lookup at or after stored_at (14:00:00Z or 14:01:00Z) -> HIT_FRESH
+    const onTimeLookup = await cacheChain.lookup({
+      components,
+      holderMode: 'MCP_MANUAL',
+      decisionTime: '2026-06-01T14:00:00Z',
+    });
+    expect(onTimeLookup.outcome).toBe('HIT_FRESH');
+    expect(onTimeLookup.payloadRef).toBe('obj://core-cache/ac20-entry-1');
+  });
+
+  it('exact cache keys with distinct asOf semantics isolate point-in-time queries', () => {
+    const baseComponents: CacheKeyComponents = {
+      provider: 'first-party-dex-observer',
+      operation: 'get_asset_identity',
+      operationVersion: '1.0.0',
+      chain: 'eip155:1',
+      canonicalEntityIdentity: 'eip155:1:0x00000000000000000000000000000000000ac200',
+      normalizedArguments: { address: '0x00000000000000000000000000000000000ac200' },
+      fieldProjection: ['symbol'],
+      asOf: '2026-06-01T12:00:00Z',
+      licensePolicyVersion: 'rights-1',
+    };
+
+    const keyEarly = computeExactCacheKey(baseComponents);
+    const keyLate = computeExactCacheKey({ ...baseComponents, asOf: '2026-06-01T14:00:00Z' });
+
+    expect(keyEarly.cacheKeyHash).not.toBe(keyLate.cacheKeyHash);
+  });
+});
+

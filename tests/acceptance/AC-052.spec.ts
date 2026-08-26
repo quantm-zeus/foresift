@@ -2,7 +2,7 @@
 // traces, exports, or UI." Positive flows: clean text passes context
 // guards, log redaction is idempotent and stable, keyed references follow
 // their sanctioned export/UI paths, and lifecycle rotation records cleanly.
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'bun:test';
 import {
   SECRET_CLASSIFICATIONS,
   SecretLifecycleLedger,
@@ -14,6 +14,7 @@ import {
   assertUiDisplayAllowed,
   validateSecretClassConfiguration,
 } from '../../packages/security/src/secrets-policy.ts';
+import { parseCoreSchema, type ToolResultEnvelope } from '@foresift/shared-schemas';
 
 describe('AC-052: secret-hygiene flows admit only clean material', () => {
   it('clean operational text carries no detectable material into context', () => {
@@ -68,3 +69,35 @@ describe('AC-052: secret-hygiene flows admit only clean material', () => {
     expect(ledger.all()).toHaveLength(1);
   });
 });
+
+describe('AC-052 acceptance (tool-core substrate): emitted envelopes and audit payloads carry no secrets', () => {
+  it('clean envelope payload validates with zero detected secrets', () => {
+    const envelope: ToolResultEnvelope = {
+      data: {
+        poolAddress: '0x1111111111111111111111111111111111111111',
+        reserveUsd: '500000',
+      },
+      meta: {
+        toolName: 'get_pool_reserves',
+        toolVersion: '1.0.0',
+        evidenceIds: ['ev-clean-1'],
+        fetchedAt: '2026-08-24T00:00:00Z' as never,
+        cache: 'MISS',
+        qualityCodes: ['QUALITY_HIGH'],
+        conflicts: [],
+        quota: {
+          quotaModel: 'REQUESTS_PER_PERIOD',
+          reservationState: 'COMMITTED',
+          estimatedUnits: 1,
+          actualUnits: 1,
+        },
+        partial: false,
+      },
+    };
+
+    const parsed = parseCoreSchema('ToolResultEnvelope', envelope);
+    const json = JSON.stringify(parsed);
+    expect(detectMaterial(json)).toEqual([]);
+  });
+});
+

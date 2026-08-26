@@ -9,7 +9,7 @@
  * the substrate-level claim check admits only FULL_UNIVERSE values with real
  * lineage as full-universe claim support.
  */
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 import {
   FeatureStoreClass,
   supportsPopulationClaim,
@@ -26,6 +26,7 @@ import {
   registerFeatureDefinition,
   writeOnlineRollingVolume,
 } from '@foresift/persistence';
+import { parseCoreSchema, type ToolResultEnvelope } from '@foresift/shared-schemas';
 import { closeTestDatabase, makeTestDatabase, seedPool, type TestDatabase } from './helpers.ts';
 
 const T = (iso: string): UtcTimestamp => utcTimestamp(iso);
@@ -187,3 +188,38 @@ describe('AC-244: feature provenance fields are present and enforced', () => {
     expect(supportsPopulationClaim(domainValue)).toBe(false);
   });
 });
+
+describe('AC-244 acceptance (tool-core substrate): envelope lineage and conflict preservation', () => {
+  it('ToolResultEnvelope preserves conflicts and evidence lineage cleanly', () => {
+    const envelope: ToolResultEnvelope = {
+      data: { volume: '3500' },
+      meta: {
+        toolName: 'get_market_evidence_pack',
+        toolVersion: '1.0.0',
+        evidenceIds: ['ev-lin-1'],
+        fetchedAt: T('2026-06-15T12:00:00Z'),
+        cache: 'HIT_FRESH',
+        qualityCodes: ['QUALITY_HIGH'],
+        conflicts: [
+          {
+            conflictId: 'conf-1',
+            providers: ['prov-1', 'prov-2'],
+            fieldPath: 'volume',
+            evidenceIds: ['ev-lin-1', 'ev-lin-2'],
+          },
+        ],
+        quota: {
+          quotaModel: 'REQUESTS_PER_PERIOD',
+          reservationState: 'COMMITTED',
+          estimatedUnits: 1,
+          actualUnits: 1,
+        },
+        partial: false,
+      },
+    };
+    const parsed = parseCoreSchema('ToolResultEnvelope', envelope);
+    expect(parsed.meta.conflicts).toHaveLength(1);
+    expect(parsed.meta.conflicts[0]?.fieldPath).toBe('volume');
+  });
+});
+

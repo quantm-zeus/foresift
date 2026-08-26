@@ -8,7 +8,7 @@
  * This suite proves the counts they consume are honest below thresholds,
  * immutable under re-resolution, and never inflated toward a gate.
  */
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 import { AcquisitionState, utcTimestamp, type UtcTimestamp } from '@foresift/domain';
 import {
   appendObservation,
@@ -18,6 +18,7 @@ import {
   recordProbeAssignment,
 } from '@foresift/persistence';
 import { freezeBundle, projectMaturedCounts } from '@foresift/evidence';
+import { parseDataSchema } from '@foresift/shared-schemas';
 import { closeTestDatabase, makeTestDatabase, seedPool, type TestDatabase } from './helpers.ts';
 
 const T = (iso: string): UtcTimestamp => utcTimestamp(iso);
@@ -175,3 +176,23 @@ describe('AC-248: immutable projections reported honestly below thresholds', () 
     expect(later.maturedCount).toBe(3); // visible only to the later horizon
   });
 });
+
+describe('AC-248 acceptance (tool-core substrate): watermark and checkpoint schemas', () => {
+  it('WatermarkState schema validates contiguous watermark', () => {
+    const parsed = parseDataSchema('WatermarkState', {
+      provider: 'dex-provider',
+      operation: 'swaps',
+      collectorShard: 'shard-0',
+      programVersion: 'v1.0.0',
+      chainId: 'eip155:1',
+      highestObservedSlot: '1000',
+      highestContiguousSlot: '1000',
+      highestFinalizedSlot: '900',
+      oldestOpenGap: null,
+      maximumLatenessSeenMs: 50,
+      gapRecoveryStatus: 'NONE',
+    });
+    expect(parsed.highestObservedSlot).toBe('1000');
+  });
+});
+

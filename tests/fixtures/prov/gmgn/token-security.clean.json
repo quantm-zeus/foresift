@@ -1,0 +1,19 @@
+{
+  "operationId": "token.security",
+  "sanitized": true,
+  "recordedAt": "2026-08-26T00:00:00Z",
+  "body": {
+    "address": "So11111111111111111111111111111111111111112",
+    "symbol": "SANITIZED",
+    "renounced_mint": true,
+    "freezeable": false,
+    "top_holder_ratio": 0.21,
+    "holder_count": 48122,
+    "lp_burned": true,
+    "launchpad": null,
+    "rug_ratio": 0.01,
+    "bluechip_owner_percentage": 0.04,
+    "smart_degen_count": 33,
+    "price_change_24h": -0.032
+  }
+}

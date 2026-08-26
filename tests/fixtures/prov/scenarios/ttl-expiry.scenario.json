@@ -1,0 +1,21 @@
+{
+  "scenario": "TTL_EXPIRY_AND_REFRESH",
+  "traces": ["FR-PROV-002", "AC-270"],
+  "target": { "providerId": "gmgn", "operationId": "token.security", "version": "v1" },
+  "clock": {
+    "verifiedAt": "2026-01-01T00:00:00Z",
+    "expiresAt": "2026-02-01T00:00:00Z",
+    "preExpiryCheckAt": "2026-01-31T23:59:59Z",
+    "postExpiryCheckAt": "2026-02-01T00:00:01Z"
+  },
+  "ttlConfiguration": [
+    { "kind": "DOCUMENTATION", "ttlSeconds": 2678400 },
+    { "kind": "RIGHTS", "ttlSeconds": 2678400 }
+  ],
+  "expected": {
+    "beforeExpiry": "pairFresh=true; active decision use allowed",
+    "afterExpiry": "both sources stale; operation leaves active decision-critical use (DEGRADED sweep)",
+    "afterSingleSourceRefresh": "pairFresh=false; use STILL refused",
+    "afterBothRefreshed": "pairFresh=true; active decision use restored"
+  }
+}

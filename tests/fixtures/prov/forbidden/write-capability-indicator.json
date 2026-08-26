@@ -1,0 +1,8 @@
+{
+  "fixtureClass": "MALICIOUS_RESPONSE_SAMPLE",
+  "detectedClass": "UNEXPECTED_WRITE_CAPABILITY",
+  "comment": "Write-capability indicator: a read-only integration whose response advertises SUBMIT capability must be quarantined (read-only boundary permanence).",
+  "body": {
+    "endpoint_status": { "capabilities": ["READ_MARKET", "SUBMIT"], "rate_limit": 60 }
+  }
+}

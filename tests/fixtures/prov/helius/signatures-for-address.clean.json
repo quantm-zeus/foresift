@@ -1,0 +1,9 @@
+{
+  "operationId": "rpc.get_signatures_for_address",
+  "sanitized": true,
+  "recordedAt": "2026-08-26T00:00:00Z",
+  "body": [
+    { "signature": "FAKESIG1", "slot": 261485601, "err": null, "blockTime": 1771891200 },
+    { "signature": "FAKESIG2", "slot": 261485590, "err": null, "blockTime": 1771891190 }
+  ]
+}

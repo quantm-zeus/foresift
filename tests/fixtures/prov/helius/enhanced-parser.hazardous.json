@@ -1,0 +1,10 @@
+{
+  "operationId": "enhanced.get_transaction",
+  "sanitized": true,
+  "fixtureClass": "MALICIOUS_RESPONSE_SAMPLE",
+  "comment": "Inert hazardous VARIANT of the deprecated enhanced parser response: carries a transaction-payload skeleton to prove the deprecated surface is scanned with the SAME five-class quarantine gate (AC-271). FAKE values throughout.",
+  "body": {
+    "signature": "FAKESIG1",
+    "swapTransaction": { "message": "FAKEBASE58MESSAGE", "signatures": ["FAKESIGX"] }
+  }
+}

@@ -1,0 +1,273 @@
+{
+  "$schema": "https://foresift.dev/schemas/telemetry-catalog-v1.json",
+  "catalog": "core",
+  "description": "Shared Tool Core telemetry events for tool registration and rejection, execution pipeline stage transitions and blocked exits, exact caching outcomes, distributed single-flight leasing and fencing-refusal, quota reservation lifecycle (reserved, committed, released, expired), license-policy verdicts, permanent prohibited-financial enforcement, and result envelope degradation. Every refusal event carries its typed machine reason; no event ever carries secret material, private keys, or raw credentials.",
+  "contractStatus": "DECLARATIVE_CONTRACT_ONLY — this file defines the event contracts the requirement manifest maps to (telemetry/core.*); emitter wiring lands with the observability milestone (dependency group G2), so nothing publishes these event names yet. Field lists mirror the authoritative schemas in packages/shared-schemas/src/core.ts exactly.",
+  "requirementsCovered": [
+    "FR-CORE-001",
+    "FR-CORE-002",
+    "FR-CORE-003",
+    "FR-CORE-004",
+    "FR-CORE-005",
+    "FR-CORE-006",
+    "FR-CORE-007",
+    "FR-CORE-008"
+  ],
+  "recoveryDataClass": "CRITICAL_METADATA",
+  "events": [
+    {
+      "name": "registry.registered",
+      "description": "A tool definition was registered in the central versioned tool registry with its immutable definition hash, action class, narrow profiles, and policy references.",
+      "requirementRefs": ["FR-CORE-001"],
+      "tier": "CRITICAL_METADATA",
+      "fields": [
+        { "name": "toolName", "type": "string", "required": true },
+        { "name": "toolVersion", "type": "string", "required": true },
+        {
+          "name": "definitionHash",
+          "type": "string",
+          "required": true,
+          "notes": "sha256:<hex> hash of definition metadata excluding the execute function."
+        },
+        {
+          "name": "actionClass",
+          "type": "string(EXTERNAL_READ|INTERNAL_STATE_WRITE|NOTIFICATION|ADMINISTRATIVE|PROHIBITED_FINANCIAL)",
+          "required": true
+        },
+        {
+          "name": "profiles",
+          "type": "array<string(discovery|market-research|security-research|holder-wallet|social-research|macro-context|run-investigation|admin-read)>",
+          "required": true
+        },
+        { "name": "requiredScopes", "type": "array<string>", "required": true },
+        { "name": "cachePolicyId", "type": "string", "required": true },
+        { "name": "quotaPolicyId", "type": "string", "required": true },
+        { "name": "licensePolicyId", "type": "string", "required": true },
+        { "name": "registeredAt", "type": "string<utc-timestamp>", "required": true },
+        { "name": "retiredAt", "type": "string<utc-timestamp>|null", "required": true }
+      ]
+    },
+    {
+      "name": "registry.rejected",
+      "description": "An attempted tool registration was rejected because of invalid definition metadata, duplicate version hash mismatch, unadmissible action class, or prohibited capability screening.",
+      "requirementRefs": ["FR-CORE-001", "FR-CORE-005"],
+      "tier": "CRITICAL_METADATA",
+      "fields": [
+        { "name": "toolName", "type": "string", "required": true },
+        { "name": "toolVersion", "type": "string", "required": true },
+        {
+          "name": "actionClass",
+          "type": "string(EXTERNAL_READ|INTERNAL_STATE_WRITE|NOTIFICATION|ADMINISTRATIVE|PROHIBITED_FINANCIAL)",
+          "required": true
+        },
+        { "name": "reason", "type": "string", "required": true },
+        { "name": "reasons", "type": "array<string>", "required": true },
+        { "name": "rejectedAt", "type": "string<utc-timestamp>", "required": true }
+      ]
+    },
+    {
+      "name": "pipeline.stage",
+      "description": "An execution walked a stage of the exact 24-stage execution pipeline in the unalterable §16.2 sequence.",
+      "requirementRefs": ["FR-CORE-002"],
+      "tier": "CRITICAL_METADATA",
+      "fields": [
+        { "name": "pipelineRunId", "type": "string", "required": true },
+        { "name": "toolName", "type": "string", "required": true },
+        { "name": "toolVersion", "type": "string", "required": true },
+        {
+          "name": "stage",
+          "type": "string(AUTHENTICATE_ACTOR|AUTHORIZE_SCOPE_ACTION_CLASS_PROFILE_TENANT_RIGHTS|VALIDATE_AND_CANONICALIZE_INPUT|VALIDATE_ACQUISITION_DECISION_AND_AUTHORIZATION_ENVELOPE|PERSIST_REQUESTED_OR_PRE_EXECUTION_BLOCKED_STATE|CALCULATE_EXACT_CACHE_KEY|CHECK_REQUEST_LOCAL_MEMOIZATION|CHECK_FRESH_CACHE|CHECK_ACCEPTABLE_STALE_CACHE_IF_ALLOWED|ACQUIRE_DISTRIBUTED_SINGLE_FLIGHT_LEASE|RECHECK_CACHE_AFTER_LEASE|ESTIMATE_QUOTA_COST_AND_VERIFY_CAPACITY_ADMISSION|ATOMICALLY_RESERVE_QUOTA|CALL_ALLOWLISTED_PROVIDER_COLLECTOR_OPERATION|VALIDATE_CONTENT_TYPE_AND_RAW_SCHEMA|NORMALIZE_IDENTITY_UNITS_TIMESTAMPS_AVAILABILITY_LINEAGE_QUALITY|VALIDATE_NORMALIZED_SCHEMA_AND_SEMANTIC_INVARIANTS|COMMIT_OR_RELEASE_ACTUAL_QUOTA_COST|PERSIST_EVIDENCE_ARTIFACT_METADATA_AND_SOURCE_FINGERPRINT|UPDATE_EXACT_CACHE_WHEN_RIGHTS_AND_POLICY_PERMIT|RELEASE_LEASE_WITH_FENCING_VALIDATION|PERSIST_ACQUISITION_OUTCOME_SOURCE_COST_EVIDENCE_IMPACT|WRITE_AUDIT_AND_TRACE_FOR_SUCCESS_OR_EVERY_FAILURE_BLOCKED_EXIT|RETURN_STRUCTURED_RESULT)",
+          "required": true
+        },
+        { "name": "occurredAt", "type": "string<utc-timestamp>", "required": true }
+      ]
+    },
+    {
+      "name": "pipeline.blocked",
+      "description": "The execution pipeline exited in a blocked or not-requested state before external request, keeping policy choices distinguishable from retrieval failures.",
+      "requirementRefs": ["FR-CORE-002"],
+      "tier": "CRITICAL_METADATA",
+      "fields": [
+        {
+          "name": "acquisitionState",
+          "type": "string(NOT_REQUESTED_BY_POLICY|COST_BLOCKED|QUOTA_BLOCKED|CAPABILITY_UNAVAILABLE|RIGHTS_BLOCKED|PROVIDER_UNAVAILABLE|TIMED_OUT|INVALID_RESPONSE)",
+          "required": true
+        },
+        { "name": "machineReason", "type": "string", "required": true },
+        { "name": "toolName", "type": "string", "required": true },
+        { "name": "toolVersion", "type": "string", "required": true },
+        { "name": "pipelineRunId", "type": "string", "required": true },
+        { "name": "at", "type": "string<utc-timestamp>", "required": true }
+      ]
+    },
+    {
+      "name": "cache.outcome",
+      "description": "An exact cache lookup completed across the request-local memo, fresh, acceptable-stale, or post-lease recheck stages.",
+      "requirementRefs": ["FR-CORE-006"],
+      "tier": "CRITICAL_METADATA",
+      "fields": [
+        {
+          "name": "cacheKeyHash",
+          "type": "string",
+          "required": true,
+          "notes": "sha256:<hex> of the 9-component canonical cache key."
+        },
+        {
+          "name": "outcome",
+          "type": "string(MISS|HIT_FRESH|HIT_STALE|REFRESHED)",
+          "required": true
+        },
+        { "name": "freshUntil", "type": "string<utc-timestamp>|null", "required": true },
+        { "name": "staleUntil", "type": "string<utc-timestamp>|null", "required": true },
+        { "name": "licensePolicyVersion", "type": "string", "required": true },
+        { "name": "rightsPermitted", "type": "boolean", "required": true },
+        { "name": "evaluatedAt", "type": "string<utc-timestamp>", "required": true }
+      ]
+    },
+    {
+      "name": "singleflight.lease",
+      "description": "A distributed single-flight lease was acquired or released with its monotonic fencing token.",
+      "requirementRefs": ["FR-CORE-006"],
+      "tier": "CRITICAL_METADATA",
+      "fields": [
+        { "name": "resourceKeyHash", "type": "string", "required": true },
+        { "name": "fencingToken", "type": "integer", "required": true },
+        {
+          "name": "holderMode",
+          "type": "string(MCP_MANUAL|CHATGPT|ADMIN_CHAT|AUTOMATION)",
+          "required": true
+        },
+        { "name": "holderId", "type": "string", "required": true },
+        { "name": "acquiredAt", "type": "string<utc-timestamp>", "required": true },
+        { "name": "expiresAt", "type": "string<utc-timestamp>", "required": true },
+        { "name": "releasedAt", "type": "string<utc-timestamp>|null", "required": true }
+      ]
+    },
+    {
+      "name": "singleflight.fence-refused",
+      "description": "A single-flight lease release or takeover attempt was refused because the caller presented a stale fencing token (INV-009).",
+      "requirementRefs": ["FR-CORE-006"],
+      "tier": "CRITICAL_METADATA",
+      "fields": [
+        { "name": "resourceKeyHash", "type": "string", "required": true },
+        { "name": "attemptedToken", "type": "integer", "required": true },
+        { "name": "currentToken", "type": "integer|null", "required": true },
+        {
+          "name": "holderMode",
+          "type": "string(MCP_MANUAL|CHATGPT|ADMIN_CHAT|AUTOMATION)",
+          "required": true
+        },
+        { "name": "holderId", "type": "string", "required": true },
+        { "name": "reason", "type": "string", "required": true },
+        { "name": "refusedAt", "type": "string<utc-timestamp>", "required": true }
+      ]
+    },
+    {
+      "name": "quota.reserved",
+      "description": "Quota units were atomically reserved for a pipeline execution across the §16.7 state machine.",
+      "requirementRefs": ["FR-CORE-007"],
+      "tier": "CRITICAL_METADATA",
+      "fields": [
+        { "name": "reservationId", "type": "string", "required": true },
+        { "name": "pipelineRunId", "type": "string", "required": true },
+        { "name": "stage", "type": "string", "required": true },
+        { "name": "actorId", "type": "string", "required": true },
+        { "name": "provider", "type": "string", "required": true },
+        { "name": "operation", "type": "string", "required": true },
+        {
+          "name": "workloadClass",
+          "type": "string(INTERACTIVE_HIGH|RISK_MONITOR_HIGH|SCHEDULED_NORMAL|EVALUATION_LOW|BACKFILL_LOW)",
+          "required": true
+        },
+        { "name": "estimatedUnits", "type": "number", "required": true },
+        { "name": "actualUnits", "type": "number|null", "required": true },
+        {
+          "name": "state",
+          "type": "string(PENDING|RESERVED|COMMITTED|RELEASED|EXPIRED)",
+          "required": true
+        },
+        { "name": "createdAt", "type": "string<utc-timestamp>", "required": true },
+        { "name": "reservedAt", "type": "string<utc-timestamp>|null", "required": true },
+        { "name": "settledAt", "type": "string<utc-timestamp>|null", "required": true }
+      ]
+    },
+    {
+      "name": "quota.committed",
+      "description": "Actual quota units were settled and committed at stage 18 after execution outcome.",
+      "requirementRefs": ["FR-CORE-007"],
+      "tier": "CRITICAL_METADATA",
+      "fields": [
+        { "name": "reservationId", "type": "string", "required": true },
+        { "name": "pipelineRunId", "type": "string", "required": true },
+        { "name": "estimatedUnits", "type": "number", "required": true },
+        { "name": "actualUnits", "type": "number", "required": true },
+        { "name": "committedAt", "type": "string<utc-timestamp>", "required": true }
+      ]
+    },
+    {
+      "name": "quota.released",
+      "description": "A quota reservation was released without consumption (e.g. cache hit or pre-execution failure).",
+      "requirementRefs": ["FR-CORE-007"],
+      "tier": "CRITICAL_METADATA",
+      "fields": [
+        { "name": "reservationId", "type": "string", "required": true },
+        { "name": "pipelineRunId", "type": "string", "required": true },
+        { "name": "reason", "type": "string", "required": true },
+        { "name": "releasedAt", "type": "string<utc-timestamp>", "required": true }
+      ]
+    },
+    {
+      "name": "quota.expired",
+      "description": "A quota reservation expired across the state machine without explicit commit or release.",
+      "requirementRefs": ["FR-CORE-007"],
+      "tier": "CRITICAL_METADATA",
+      "fields": [
+        { "name": "reservationId", "type": "string", "required": true },
+        { "name": "pipelineRunId", "type": "string", "required": true },
+        { "name": "expiredAt", "type": "string<utc-timestamp>", "required": true }
+      ]
+    },
+    {
+      "name": "license.verdict",
+      "description": "A license-policy verdict was evaluated for tool execution admission and cache key component.",
+      "requirementRefs": ["FR-CORE-008"],
+      "tier": "CRITICAL_METADATA",
+      "fields": [
+        { "name": "allowed", "type": "boolean", "required": true },
+        { "name": "policyVersion", "type": "string", "required": true },
+        { "name": "reason", "type": "string", "required": true },
+        { "name": "provider", "type": "string", "required": true },
+        { "name": "operation", "type": "string", "required": true },
+        { "name": "evaluatedAt", "type": "string<utc-timestamp>", "required": true }
+      ]
+    },
+    {
+      "name": "prohibited.refused",
+      "description": "A tool registration or execution dispatch was refused by the permanent prohibited-financial capability controls (FR-CORE-005; INV-001).",
+      "requirementRefs": ["FR-CORE-005"],
+      "tier": "CRITICAL_METADATA",
+      "fields": [
+        { "name": "toolName", "type": "string", "required": true },
+        { "name": "toolVersion", "type": "string", "required": true },
+        { "name": "reasons", "type": "array<string>", "required": true },
+        { "name": "findingCount", "type": "integer", "required": true },
+        { "name": "refusedAt", "type": "string<utc-timestamp>", "required": true }
+      ]
+    },
+    {
+      "name": "envelope.degraded",
+      "description": "A tool result envelope was assembled with partial data or degraded capability flags instead of silent gaps.",
+      "requirementRefs": ["FR-CORE-003"],
+      "tier": "CRITICAL_METADATA",
+      "fields": [
+        { "name": "toolName", "type": "string", "required": true },
+        { "name": "toolVersion", "type": "string", "required": true },
+        { "name": "partial", "type": "boolean", "required": true },
+        { "name": "qualityCodes", "type": "array<string>", "required": true },
+        { "name": "conflictCount", "type": "integer", "required": true },
+        { "name": "missingCapabilities", "type": "array<string>", "required": true },
+        { "name": "returnedAt", "type": "string<utc-timestamp>", "required": true }
+      ]
+    }
+  ]
+}

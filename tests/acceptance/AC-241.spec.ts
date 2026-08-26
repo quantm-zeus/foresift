@@ -10,10 +10,12 @@
  * data never leaks in, and the only way the view changes is through the
  * explicitly registered component (the resolved-at boundary).
  */
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 import { utcTimestamp, type UtcTimestamp } from '@foresift/domain';
 import { appendObservation, replayObservations } from '@foresift/persistence';
 import { freezeBundle, resolveEvidenceAt } from '@foresift/evidence';
+import type { CacheKeyComponents } from '@foresift/shared-schemas';
+import { CacheStageChain } from '../../packages/tool-core/src/stages/cache.ts';
 import { closeTestDatabase, makeTestDatabase, seedPool, type TestDatabase } from './helpers.ts';
 
 const T = (iso: string): UtcTimestamp => utcTimestamp(iso);
@@ -103,3 +105,47 @@ describe('AC-241: frozen replay differs only via registered components', () => {
     expect(late.resolvedAt).toBe(T('2026-07-01T13:00:00Z'));
   });
 });
+
+describe('AC-241 acceptance (tool-core substrate): exact-cache point-in-time replay consistency', () => {
+  it('exact cache lookups at frozen decisionTime T return identical fresh hits', async () => {
+    const cacheChain = new CacheStageChain({
+      engine: tdb.engine,
+      now: () => '2026-07-01T10:00:00Z',
+    });
+
+    const components: CacheKeyComponents = {
+      provider: 'first-party-dex-observer',
+      operation: 'get_asset_identity',
+      operationVersion: '1.0.0',
+      chain: 'eip155:1',
+      canonicalEntityIdentity: 'eip155:1:0x00000000000000000000000000000000000ac241',
+      normalizedArguments: { address: '0x00000000000000000000000000000000000ac241' },
+      fieldProjection: ['symbol'],
+      asOf: '2026-07-01T10:00:00Z',
+      licensePolicyVersion: 'rights-1',
+    };
+
+    await cacheChain.storeIfPermitted({
+      components,
+      payloadRef: 'obj://core-cache/ac241-entry',
+      storedAt: '2026-07-01T10:00:00Z',
+      rightsAllowed: true,
+      policy: { cachingPermitted: true },
+    });
+
+    const first = await cacheChain.lookup({
+      components,
+      holderMode: 'MCP_MANUAL',
+      decisionTime: '2026-07-01T10:00:00Z',
+    });
+    const second = await cacheChain.lookup({
+      components,
+      holderMode: 'MCP_MANUAL',
+      decisionTime: '2026-07-01T10:00:00Z',
+    });
+    expect(first.outcome).toBe('HIT_FRESH');
+    expect(second.outcome).toBe('HIT_FRESH');
+    expect(first.payloadRef).toBe(second.payloadRef);
+  });
+});
+

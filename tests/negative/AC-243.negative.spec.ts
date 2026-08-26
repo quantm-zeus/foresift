@@ -6,13 +6,14 @@
  * are refused, and an assignment without a recorded decision impact cannot
  * mature — every ordering violation is a typed refusal.
  */
-import { afterAll, beforeAll, describe, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 import { AcquisitionState, ErrorCode, utcTimestamp, type UtcTimestamp } from '@foresift/domain';
 import {
   completeRetrieval,
   recordAcquisitionDecision,
   recordProbeAssignment,
 } from '@foresift/persistence';
+import { parseDataSchema } from '@foresift/shared-schemas';
 import {
   closeTestDatabase,
   expectForesiftError,
@@ -187,3 +188,23 @@ describe('AC-243 negative: write-before-retrieval violations fail closed', () =>
     );
   });
 });
+
+describe('AC-243 negative (tool-core substrate): degenerate probe payloads fail schema validation', () => {
+  it('EvidenceAcquisitionDecision schema refuses zero or out-of-range assignmentProbability', () => {
+    expect(() =>
+      parseDataSchema('EvidenceAcquisitionDecision', {
+        id: 'ac243n-zero-p',
+        candidateId: 'cand/ac243n',
+        evidenceFamily: 'swaps',
+        policyVersion: 'policy/v1',
+        state: 'RETURNED',
+        requestedAt: T('2026-06-14T09:00:00Z'),
+        completedAt: T('2026-06-14T10:00:00Z'),
+        assignmentProbability: 0,
+        estimatedDecisionImpact: 0.2,
+        evidenceIds: [],
+      }),
+    ).toThrow();
+  });
+});
+

@@ -5,10 +5,12 @@
  * entrypoint requires an explicit boundary; an absent or hidden boundary
  * fails the replay with a typed error instead of falling back to "now".
  */
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 import { ErrorCode, utcTimestamp } from '@foresift/domain';
 import { appendObservation, replayObservations } from '@foresift/persistence';
 import { resolveEvidenceAt } from '@foresift/evidence';
+import type { CacheKeyComponents } from '@foresift/shared-schemas';
+import { CacheStageChain } from '../../packages/tool-core/src/stages/cache.ts';
 import { expectForesiftError, makeTestDatabase, seedPool } from '../acceptance/helpers.ts';
 
 let tdb: Awaited<ReturnType<typeof makeTestDatabase>>;
@@ -72,3 +74,40 @@ describe('AC-241 negative: hidden current-data calls fail the replay', () => {
     expect(replayed).toEqual([]);
   });
 });
+
+describe('AC-241 negative (tool-core substrate): cache lookup refuses future decision times or unpinned license versions', () => {
+  it('cache lookup with mismatched licensePolicyVersion misses even when stored at same instant', async () => {
+    const cacheChain = new CacheStageChain({
+      engine: tdb.engine,
+      now: () => '2026-07-02T09:00:00Z',
+    });
+
+    const componentsA: CacheKeyComponents = {
+      provider: 'first-party-dex-observer',
+      operation: 'get_asset_identity',
+      operationVersion: '1.0.0',
+      chain: 'eip155:1',
+      canonicalEntityIdentity: 'eip155:1:0x00000000000000000000000000000000000ac241',
+      normalizedArguments: { address: '0x00000000000000000000000000000000000ac241' },
+      fieldProjection: ['symbol'],
+      asOf: '2026-07-02T09:00:00Z',
+      licensePolicyVersion: 'policy-v1',
+    };
+
+    await cacheChain.storeIfPermitted({
+      components: componentsA,
+      payloadRef: 'obj://core-cache/ac241n-entry-1',
+      storedAt: '2026-07-02T09:00:00Z',
+      rightsAllowed: true,
+      policy: { cachingPermitted: true },
+    });
+
+    const lookupV2 = await cacheChain.lookup({
+      components: { ...componentsA, licensePolicyVersion: 'policy-v2' },
+      holderMode: 'MCP_MANUAL',
+      decisionTime: '2026-07-02T09:00:00Z',
+    });
+    expect(lookupV2.outcome).toBe('MISS');
+  });
+});
+

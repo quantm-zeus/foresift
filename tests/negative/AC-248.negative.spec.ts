@@ -6,7 +6,7 @@
  * projection over unfrozen evidence stays honestly zero instead of counting
  * what merely exists now.
  */
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 import { AcquisitionState, ErrorCode, utcTimestamp, type UtcTimestamp } from '@foresift/domain';
 import {
   completeRetrieval,
@@ -15,6 +15,7 @@ import {
   recordProbeAssignment,
 } from '@foresift/persistence';
 import { projectMaturedCounts } from '@foresift/evidence';
+import { parseDataSchema } from '@foresift/shared-schemas';
 import {
   closeTestDatabase,
   expectForesiftError,
@@ -125,3 +126,24 @@ describe('AC-248 negative: the substrate refuses dishonest counts', () => {
     expect(projection.promotionThreshold).toBe(-3); // echoed verbatim, auditable
   });
 });
+
+describe('AC-248 negative (tool-core substrate): invalid watermarks fail schema parsing', () => {
+  it('WatermarkState schema refuses non-contiguous watermark without an explicit open gap', () => {
+    expect(() =>
+      parseDataSchema('WatermarkState', {
+        provider: 'dex-provider',
+        operation: 'swaps',
+        collectorShard: 'shard-0',
+        programVersion: 'v1.0.0',
+        chainId: 'eip155:1',
+        highestObservedSlot: '1000',
+        highestContiguousSlot: '500',
+        highestFinalizedSlot: '400',
+        oldestOpenGap: null,
+        maximumLatenessSeenMs: 50,
+        gapRecoveryStatus: 'NONE',
+      }),
+    ).toThrow();
+  });
+});
+

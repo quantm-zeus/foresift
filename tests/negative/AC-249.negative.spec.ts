@@ -6,9 +6,10 @@
  * enter an earlier replay, so the placebo control cannot be defeated by
  * rewriting history.
  */
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 import { ErrorCode, utcTimestamp, type UtcTimestamp } from '@foresift/domain';
 import { assertNoBackdating, recordBackfillReceipt } from '@foresift/persistence';
+import { parseDataSchema } from '@foresift/shared-schemas';
 import { closeTestDatabase, makeTestDatabase, type TestDatabase } from '../acceptance/helpers.ts';
 
 const T = (iso: string): UtcTimestamp => utcTimestamp(iso);
@@ -81,3 +82,23 @@ describe('AC-249 negative: backdating is refused', () => {
     expect(Number(rows.rows[0]?.n ?? '0')).toBe(0);
   });
 });
+
+describe('AC-249 negative (tool-core substrate): backdating in backfill receipt schema is refused', () => {
+  it('BackfillReceipt schema refuses availableAt preceding retrievedAt without live receipt proof', () => {
+    expect(() =>
+      parseDataSchema('BackfillReceipt', {
+        backfillJobId: 'job/cheat',
+        backfillReason: 'PROVIDER_GAP_COVERAGE',
+        historicalEventAt: T('2026-06-01T09:00:00Z'),
+        retrievedAt: T('2026-06-05T13:00:00Z'),
+        availableAt: T('2026-06-01T08:30:00Z'),
+        retrospectiveOnly: false,
+        wouldHaveBeenObservableLive: null,
+        availabilityProof: {
+          method: 'RECOVERY_FETCH_COMMIT',
+        },
+      }),
+    ).toThrow();
+  });
+});
+

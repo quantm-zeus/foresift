@@ -96,4 +96,3 @@ describe('AC-050 acceptance (tool-core substrate): clean tool definitions pass r
     expect(verdict.ok).toBe(true);
   });
 });
-

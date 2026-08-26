@@ -110,4 +110,3 @@ describe('AC-241 negative (tool-core substrate): cache lookup refuses future dec
     expect(lookupV2.outcome).toBe('MISS');
   });
 });
-

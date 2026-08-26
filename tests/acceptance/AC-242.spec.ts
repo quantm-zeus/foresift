@@ -151,4 +151,3 @@ describe('AC-242 acceptance (tool-core substrate): NOT_REQUESTED_BY_POLICY and b
     expect(validated.acquisitionState).toBe('NOT_REQUESTED_BY_POLICY');
   });
 });
-

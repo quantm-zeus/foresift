@@ -159,4 +159,3 @@ describe('AC-053 negative (tool-core substrate): out-of-profile and atomic tools
     expect(visible).toBe(false);
   });
 });
-

@@ -173,5 +173,3 @@ describe('AC-243 acceptance (tool-core substrate): probe assignment schema and p
     expect(parsed.estimatedDecisionImpact).toBe(0.35);
   });
 });
-
-

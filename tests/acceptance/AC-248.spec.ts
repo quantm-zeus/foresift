@@ -195,4 +195,3 @@ describe('AC-248 acceptance (tool-core substrate): watermark and checkpoint sche
     expect(parsed.highestObservedSlot).toBe('1000');
   });
 });
-

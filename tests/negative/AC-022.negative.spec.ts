@@ -203,4 +203,3 @@ describe('AC-022 negative (tool-core substrate): non-canonical entity identity i
     ).toThrow();
   });
 });
-

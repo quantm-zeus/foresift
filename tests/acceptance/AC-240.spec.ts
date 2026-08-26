@@ -160,4 +160,3 @@ describe('AC-240 acceptance (tool-core substrate): symmetric event and action ti
     expect(parsed.meta.fetchedAt).toBe(T('2026-06-10T09:05:00Z'));
   });
 });
-

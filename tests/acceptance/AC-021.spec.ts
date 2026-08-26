@@ -221,4 +221,3 @@ describe('AC-021 acceptance (tool-core substrate): revisions leave original obse
     expect(normalized.observations[0]?.evidenceId).not.toBe(normalized.observations[1]?.evidenceId);
   });
 });
-

@@ -125,4 +125,3 @@ describe('AC-249 acceptance (tool-core substrate): backfill receipt schema valid
     expect(parsed.backfillJobId).toBe('job/ac249');
   });
 });
-

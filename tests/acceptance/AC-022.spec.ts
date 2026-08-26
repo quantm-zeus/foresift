@@ -230,4 +230,3 @@ describe('AC-022 acceptance (tool-core substrate): canonical entity identity in 
     expect(lookup.payloadRef).toBe('obj://core-cache/ac22-pool-a');
   });
 });
-

@@ -106,4 +106,3 @@ describe('AC-051 acceptance (tool-core substrate): untrusted text enters envelop
     expect((parsed.data as { sanitizedText: string }).sanitizedText).toBe('benign payload');
   });
 });
-

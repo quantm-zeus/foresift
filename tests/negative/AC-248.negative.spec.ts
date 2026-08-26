@@ -146,4 +146,3 @@ describe('AC-248 negative (tool-core substrate): invalid watermarks fail schema 
     ).toThrow();
   });
 });
-

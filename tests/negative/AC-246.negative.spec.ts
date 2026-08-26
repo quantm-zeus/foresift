@@ -62,4 +62,3 @@ describe('AC-246 negative (tool-core substrate): malformed independence groups f
     ).toThrow();
   });
 });
-

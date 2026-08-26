@@ -106,4 +106,3 @@ describe('AC-245 negative (tool-core substrate): degenerate dependence inputs fa
     ).toThrow();
   });
 });
-

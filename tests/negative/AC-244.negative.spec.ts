@@ -118,4 +118,3 @@ describe('AC-244 negative (tool-core substrate): invalid conflicts or missing li
     ).toThrow();
   });
 });
-

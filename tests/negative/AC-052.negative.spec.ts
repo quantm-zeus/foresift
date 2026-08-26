@@ -97,4 +97,3 @@ describe('AC-052 negative (tool-core substrate): envelopes and audit trails dete
     expect(detected).toContain('hex-secret');
   });
 });
-

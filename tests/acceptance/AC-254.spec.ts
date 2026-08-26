@@ -136,4 +136,3 @@ describe('AC-254 acceptance (tool-core substrate): execution gate passes clean r
     expect(findings).toEqual([]);
   });
 });
-

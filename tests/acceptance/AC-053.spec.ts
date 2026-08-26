@@ -129,4 +129,3 @@ describe('AC-053 acceptance (tool-core substrate): profile binding scopes tool v
     ).toBe(true);
   });
 });
-

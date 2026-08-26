@@ -138,4 +138,3 @@ describe('AC-247 negative (tool-core substrate): invalid exact cache entry recor
     ).toThrow();
   });
 });
-

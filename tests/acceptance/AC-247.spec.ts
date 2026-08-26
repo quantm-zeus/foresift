@@ -194,4 +194,3 @@ describe('AC-247 acceptance (tool-core substrate): exact-cache entry record sche
     expect(parsed.rightsPermitted).toBe(true);
   });
 });
-

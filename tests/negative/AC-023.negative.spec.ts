@@ -250,4 +250,3 @@ describe('AC-023 negative (tool-core substrate): stage-16/17 normalizer and inva
     expect(problems.some((p) => p.includes('observedAt exceeds availableAt'))).toBe(true);
   });
 });
-

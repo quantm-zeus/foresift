@@ -126,4 +126,3 @@ describe('AC-051 negative (tool-core substrate): prompt injection in provider da
     expect(injectionAttempt.meta.toolName).toBe('read_social_feed');
   });
 });
-

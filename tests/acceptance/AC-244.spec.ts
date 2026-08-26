@@ -222,4 +222,3 @@ describe('AC-244 acceptance (tool-core substrate): envelope lineage and conflict
     expect(parsed.meta.conflicts[0]?.fieldPath).toBe('volume');
   });
 });
-

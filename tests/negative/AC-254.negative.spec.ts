@@ -99,4 +99,3 @@ describe('AC-254 negative (tool-core substrate): execution-time dispatch gate bl
     ]);
   });
 });
-

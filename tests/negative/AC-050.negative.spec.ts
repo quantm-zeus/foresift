@@ -124,4 +124,3 @@ describe('AC-050 negative (tool-core substrate): prohibited tool definitions fai
     }
   });
 });
-

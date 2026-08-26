@@ -95,4 +95,3 @@ describe('AC-240 negative (tool-core substrate): time ordering violations flag i
     expect(problems.some((p) => p.includes('observedAt exceeds availableAt'))).toBe(true);
   });
 });
-

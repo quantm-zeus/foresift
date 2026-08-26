@@ -105,4 +105,3 @@ describe('AC-242 negative (tool-core substrate): invalid blocked states and empt
     ).toThrow();
   });
 });
-

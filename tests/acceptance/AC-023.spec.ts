@@ -211,4 +211,3 @@ describe('AC-023 acceptance (tool-core substrate): normalization goldens flow un
     expect((parsed.data as { rawSupply: string }).rawSupply).toBe('1000000000000000000000000');
   });
 });
-

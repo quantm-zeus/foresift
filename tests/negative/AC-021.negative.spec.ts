@@ -127,4 +127,3 @@ describe('AC-021 negative (tool-core substrate): attempts to erase evidence refs
     ).toThrow(/observation 0 is not an object/);
   });
 });
-

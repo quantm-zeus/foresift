@@ -148,4 +148,3 @@ describe('AC-241 acceptance (tool-core substrate): exact-cache point-in-time rep
     expect(first.payloadRef).toBe(second.payloadRef);
   });
 });
-

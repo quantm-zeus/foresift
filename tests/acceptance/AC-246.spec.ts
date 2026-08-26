@@ -99,4 +99,3 @@ describe('AC-246 acceptance (tool-core substrate): source identity and group mem
     expect(parsed.upstreamLineageKey).toBe('upstream/nodesense-mainnet');
   });
 });
-

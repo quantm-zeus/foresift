@@ -100,4 +100,3 @@ describe('AC-052 acceptance (tool-core substrate): emitted envelopes and audit p
     expect(detectMaterial(json)).toEqual([]);
   });
 });
-

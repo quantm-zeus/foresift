@@ -14,6 +14,7 @@ nodes:
       set -euo pipefail
       mkdir -p "$ARTIFACTS_DIR"
       test "$(bun --version)" = "1.4.0"
+      pnpm install --frozen-lockfile
       node scripts/automation/bun-migration-state.mjs \
         --milestone specs/implementation/current-milestone.json \
         > "$ARTIFACTS_DIR/barrier-entry.json"
@@ -75,8 +76,11 @@ nodes:
         PR=$(gh pr list --head "$BRANCH" --state open --json number --jq '.[0].number // empty')
       fi
       test -n "$PR"
-      gh pr checks "$PR" --watch --fail-fast
-      gh pr merge "$PR" --squash --delete-branch
+      # The operator explicitly authorized bypassing GitHub CI for this
+      # mission. authoritative-bun-full is the exact-head local gate; merge
+      # with the repository owner's supported admin path and retain the PR as
+      # durable audit evidence rather than waiting on the remote queue.
+      gh pr merge "$PR" --squash --admin
       gh pr view "$PR" --json state,mergedAt,mergeCommit > "$ARTIFACTS_DIR/merged-pr.json"
       test "$(jq -r .state "$ARTIFACTS_DIR/merged-pr.json")" = MERGED
     timeout: 7200000

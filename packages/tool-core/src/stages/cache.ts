@@ -32,6 +32,8 @@ export interface CacheLookupResult {
   readonly outcome: Exclude<FreshnessOutcome, 'EXPIRED'> | 'MISS' | 'MEMO_HIT';
   readonly key: ExactCacheKey;
   readonly payloadRef?: string;
+  /** When the served entry was stored — drives envelope freshnessSeconds. */
+  readonly storedAt?: string;
 }
 
 export interface CacheStoreRequest {
@@ -116,6 +118,7 @@ export class CacheStageChain {
         outcome: verdict.outcome,
         key,
         payloadRef: row.payload_ref,
+        storedAt: toIso(row.stored_at),
       };
       this.memo.set(key.cacheKeyHash, result);
       return result;
@@ -168,4 +171,8 @@ export class CacheStageChain {
 
 function addSeconds(iso: string, seconds: number): string {
   return new Date(new Date(iso).getTime() + seconds * 1000).toISOString();
+}
+
+function toIso(value: string | Date): string {
+  return typeof value === 'string' ? value : value.toISOString();
 }

@@ -124,4 +124,50 @@ export class ProhibitedCapabilityScreen {
       });
     }
   }
+
+  /**
+   * EXECUTION-TIME gate (FR-CORE-005; T609): re-checks the resolved
+   * operation's action class and text/schema surface against the same canary
+   * catalog immediately BEFORE dispatch — regardless of registration state.
+   * A definition that was registered clean but resolves an operation whose
+   * name/description/schema expresses trading, signing, custody, private-key
+   * handling, or transaction construction is refused here, fail-closed.
+   */
+  screenResolvedOperation(request: {
+    readonly toolName: string;
+    readonly toolVersion: string;
+    readonly actionClass: ActionClass;
+    readonly operationName: string;
+    readonly description?: string;
+    readonly schemaJson?: unknown;
+  }, at: string): ScreenVerdict {
+    const verdict = this.screenWithReport(
+      {
+        name: request.operationName,
+        title: request.toolName,
+        description: request.description ?? '',
+        inputSchemaJson: request.schemaJson ?? {},
+        outputSchemaJson: {},
+        actionClass: request.actionClass,
+        toolVersion: request.toolVersion,
+      },
+      at,
+    );
+    if (verdict.ok && !isAdmissibleActionClass(request.actionClass)) {
+      return {
+        ok: false,
+        event: {
+          toolName: request.toolName,
+          toolVersion: request.toolVersion,
+          reasons: [`action-class ${request.actionClass} is not admissible at dispatch`],
+          findings: [],
+          at,
+        },
+      };
+    }
+    return verdict;
+  }
 }
+
+/** Machine reason prefix carried by every execution-time prohibited refusal. */
+export const PROHIBITED_EXECUTION_REASON = 'PROHIBITED_FINANCIAL_EXECUTION_REFUSED';

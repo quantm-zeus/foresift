@@ -17,11 +17,21 @@ import type { ToolDefinitionMetadata } from '@foresift/shared-schemas';
 import { canonicalJson, sha256Text, type DatabaseEngine } from '@foresift/persistence';
 import { ToolDefinitionMetadataSchema } from '@foresift/shared-schemas';
 import { ProhibitedCapabilityScreen, type ProhibitedRefusalSink } from './prohibited.ts';
+import type { BoundSchema } from './schema.ts';
 
-/** A registered tool: validated metadata plus its opaque execution function. */
+/**
+ * A registered tool: validated metadata plus its opaque execution function.
+ * The §16.1 Zod input/output schemas MAY be bound alongside the JSON-Schema
+ * projections; the pipeline validates against them at stages 3/15/17 and
+ * REFUSES calls on definitions where the required binding is absent
+ * (fail-closed), so registration without schemas is legal storage-wise but
+ * never executable.
+ */
 export interface RegisteredTool {
   readonly metadata: ToolDefinitionMetadata;
   readonly execute: (input: unknown) => Promise<unknown>;
+  readonly inputSchema?: BoundSchema;
+  readonly outputSchema?: BoundSchema;
 }
 
 /**
@@ -34,6 +44,8 @@ export interface RegistryEntry {
   readonly definitionHash: string;
   readonly retiredAt: string | null;
   readonly execute?: (input: unknown) => Promise<unknown>;
+  readonly inputSchema?: BoundSchema;
+  readonly outputSchema?: BoundSchema;
 }
 
 export interface RegistrySnapshot {
@@ -184,6 +196,7 @@ export class ToolCoreRegistry {
       ...definition,
       metadata,
     });
+    // (schemas ride along on `definition` via the spread above)
     this.rows.set(this.key(metadata.name, metadata.version), {
       tool_name: metadata.name,
       tool_version: metadata.version,
@@ -267,6 +280,8 @@ export class ToolCoreRegistry {
         definitionHash: row.definition_hash,
         retiredAt: row.retired_at,
         ...(tool ? { execute: tool.execute } : {}),
+        ...(tool?.inputSchema !== undefined ? { inputSchema: tool.inputSchema } : {}),
+        ...(tool?.outputSchema !== undefined ? { outputSchema: tool.outputSchema } : {}),
       });
     }
     entries.sort((a, b) =>

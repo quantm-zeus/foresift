@@ -42,6 +42,11 @@ export interface PipelineRunState {
   readonly runId: string;
   /** Append-only trace: stage ids in completion order up to the present. */
   readonly completedStages: readonly PipelineStage[];
+  /**
+   * Engine-attached mutable execution context. The orchestrator itself never
+   * inspects it; stage handlers read/write their own slices.
+   */
+  context?: unknown;
 }
 
 export type StageHandler = (state: PipelineRunState) => Promise<void>;
@@ -78,11 +83,13 @@ export class PipelineOrchestrator {
   /**
    * Execute every stage strictly in the pinned order. Each stage runs exactly
    * once per run; a throwing stage propagates AFTER its id stays unrecorded,
-   * leaving the trace honest about how far the run reached.
+   * leaving the trace honest about how far the run reached. An optional
+   * engine-owned context rides along on the state.
    */
-  async run(runId: string): Promise<PipelineRunState> {
+  async run(runId: string, context?: unknown): Promise<PipelineRunState> {
     const completed: PipelineStage[] = [];
     const state: PipelineRunState = { runId, completedStages: completed };
+    if (context !== undefined) state.context = context;
     for (const stage of RUNTIME_STAGE_SEQUENCE) {
       await this.handlers[stage](state);
       completed.push(stage);

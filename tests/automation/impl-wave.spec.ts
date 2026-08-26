@@ -561,10 +561,24 @@ describe('foresift-sharded-wave workflow contract', () => {
     // Recheck: while integration is still empty the loop is held closed
     // (exit-0 impossible), so exhaustion fails loudly instead of converting
     // its own RED into a vacuous green.
-    const recheck = yaml.match(/until_bash:[\s\S]*?(?=\n      nodes:)/);
-    expect(recheck).toBeTruthy();
-    expect(recheck?.[0]).toMatch(/code=90/);
-    expect(recheck?.[0]).toContain('package-fast-verify.mjs');
+    // Live finding 2026-08-26 (run b101f6c3): the heavy recheck used to run
+    // INSIDE until_bash, but bare guard executions get a short default wall
+    // budget (~3 min observed) — an escalated FULL-suite recheck (~14 min) was
+    // killed mid-run every iteration and the repair loop exhausted
+    // deterministically. Law now mirrors gate-repair-loop: the guard is a
+    // sub-second verdict read; the defect-#12 hold and the full FAST live in
+    // the serialized fast-recheck node with an explicit timeout.
+    const loopBlock = yaml.match(/- id: fast-repair-loop[\s\S]*?(?=\n  - id:)/);
+    expect(loopBlock).toBeTruthy();
+    const guard = loopBlock?.[0].match(/until_bash:[\s\S]*?(?=\n      nodes:)/);
+    expect(guard?.[0]).toBeTruthy();
+    expect(guard?.[0]).not.toContain('package-fast-verify.mjs'); // guard stays cheap
+    expect(guard?.[0]).toContain('wave-fast-verdict.json');
+    const recheckNode = loopBlock?.[0].match(/- id: fast-recheck[\s\S]*/);
+    expect(recheckNode?.[0]).toMatch(/code=90/);
+    expect(recheckNode?.[0]).toContain('package-fast-verify.mjs');
+    expect(recheckNode?.[0]).toContain('--from-git');
+    expect(recheckNode?.[0]).toMatch(/timeout:\s*3600000/);
   });
 
   it('keeps router stdout to bare verdict tokens so the RED gate can match (defect #14)', () => {

@@ -333,10 +333,20 @@ nodes:
   # Runs ONLY on WAVE_FAST_RED. Each iteration performs TARGETED semantic
   # repair against the structured FAST manifest (never a full rerun), then the
   # loop guard RE-RUNS THE ACTUAL FAST as the recheck — the loop can only exit
-  # via a genuinely green recheck (fast-verify-result.json is rewritten by that
+  # via a genuinely green recheck (wave-fast-verdict.json is rewritten by that
   # very invocation). Exhausted iterations with a still-red recheck FAIL the
   # node: downstream settles blocked, the workflow completes failed, and NO
   # checkpoint is written. Repair retries follow the defect-#10 policy.
+  #
+  # Live finding 2026-08-26 (run b101f6c3): the full-tier recheck used to run
+  # INSIDE this guard, but a bare until_bash execution gets a short default
+  # wall budget (~3 min observed) — an escalated FULL-suite recheck (~14 min)
+  # was killed mid-run every iteration and the loop exhausted deterministically.
+  # Same shape as gate-repair-loop in foresift-work-package.yaml: the heavy
+  # verification is a serialized NODE with an explicit timeout that refreshes
+  # wave-fast-verdict.json; this guard stays a sub-second verdict read fed by
+  # archon's bare-form $ARTIFACTS_DIR textual substitution (process.env is NOT
+  # exported into until_bash — probe-verified contract, ADR-0004 family).
   - id: fast-repair-loop
     depends_on: [integrate-and-fast]
     when: "$integrate-and-fast.output == 'WAVE_FAST_RED'"
@@ -347,29 +357,12 @@ nodes:
       until: WAVE_REPAIR_LOOP_TEXT_SIGNAL_NEVER_EMIT_c5f19a
       until_bash: |
         set -uo pipefail
-        # Recheck = the ACTUAL FAST tier again (not a heuristic): exit 0 is the
-        # only key out of the repair loop. Verdict JSON refreshed every pass.
-        # Defect #12: while lanes were dispatched but NONE integrated, the
-        # diff-vs-base is empty and FAST would pass vacuously — hold the loop
-        # closed (code=90) so an empty-integration wave can never convert its
-        # own RED into a green exit. Exhaustion then fails the node loudly.
-        dispatched=$(find "$ARTIFACTS_DIR/writer-results" -name result.json 2>/dev/null | wc -l)
-        integrated=$(node -e 'const r=JSON.parse(require("fs").readFileSync(process.argv[1],"utf8"));console.log((r.integrated??[]).length)' "$ARTIFACTS_DIR/integration-report.json")
-        if [ "$dispatched" -gt 0 ] && [ "$integrated" -eq 0 ]; then
-          code=90
-          echo "recheck held: integration still empty ($dispatched dispatched, none integrated)"
-        else
-          set -e
-          node scripts/automation/package-fast-verify.mjs --package "${ARGUMENTS%%@g*}" \
-            --artifacts-dir "$ARTIFACTS_DIR" \
-            --from-git --base "$(cat "$ARTIFACTS_DIR/base-head.txt")" \
-            > "$ARTIFACTS_DIR/wave-fast-recheck.log" 2>&1
-          code=$?
-          set +e
-        fi
-        printf '{"schema":"foresift/wave-fast-verdict@1","exitCode":%d,"phase":"recheck"}\n' "$code" \
-          > "$ARTIFACTS_DIR/wave-fast-verdict.json"
-        tail -n 20 "$ARTIFACTS_DIR/wave-fast-recheck.log" 2>/dev/null || true
+        # CHEAP convergence read — exit 0 is the only key out of the repair
+        # loop, and the verdict is the ACTUAL FAST tier's exit code (produced
+        # by the fast-recheck node below), never a heuristic. Defect #12 hold:
+        # an empty-integration wave keeps code=90 in the verdict so it can
+        # never convert its own RED into a green exit.
+        node -e 'const fs=require("fs");const f=process.argv[1]+"/wave-fast-verdict.json";if(!fs.existsSync(f))process.exit(1);const r=JSON.parse(fs.readFileSync(f,"utf8"));process.exit(r.exitCode===0?0:1)' "$ARTIFACTS_DIR"
       nodes:
         - id: fast-repair
           command: foresift-wave-fast-repair
@@ -379,6 +372,33 @@ nodes:
             on_error: all
           effort: high
           idle_timeout: 1800000
+        - id: fast-recheck
+          depends_on: [fast-repair]   # serialize: recheck observes post-repair state (feeds guard)
+          bash: |
+            set +e
+            # Recheck = the ACTUAL FAST tier again (not a heuristic). Verdict
+            # JSON refreshed every pass for the loop guard above. Defect #12:
+            # while lanes were dispatched but NONE integrated, the diff-vs-
+            # base is empty and FAST would pass vacuously — hold closed
+            # (code=90) so an empty-integration wave can never convert its own
+            # RED into a green exit. Exhaustion then fails the node loudly.
+            dispatched=$(find "$ARTIFACTS_DIR/writer-results" -name result.json 2>/dev/null | wc -l)
+            integrated=$(node -e 'const r=JSON.parse(require("fs").readFileSync(process.argv[1],"utf8"));console.log((r.integrated??[]).length)' "$ARTIFACTS_DIR/integration-report.json")
+            if [ "$dispatched" -gt 0 ] && [ "$integrated" -eq 0 ]; then
+              code=90
+              echo "recheck held: integration still empty ($dispatched dispatched, none integrated)"
+            else
+              node scripts/automation/package-fast-verify.mjs --package "${ARGUMENTS%%@g*}" \
+                --artifacts-dir "$ARTIFACTS_DIR" \
+                --from-git --base "$(cat "$ARTIFACTS_DIR/base-head.txt")" \
+                > "$ARTIFACTS_DIR/wave-fast-recheck.log" 2>&1
+              code=$?
+            fi
+            printf '{"schema":"foresift/wave-fast-verdict@1","exitCode":%d,"phase":"recheck"}\n' "$code" \
+              > "$ARTIFACTS_DIR/wave-fast-verdict.json"
+            tail -n 20 "$ARTIFACTS_DIR/wave-fast-recheck.log" 2>/dev/null || true
+            if [ "$code" -ne 0 ]; then echo "WAVE_FAST_STILL_RED"; else echo "WAVE_FAST_GREEN"; fi
+          timeout: 3600000
 
   # ── GREEN PATH BRIDGE + DURABLE CHECKPOINT (override §18 item 15) ────────────
   # wave-settled runs iff the wave reached a genuinely green FAST state: either

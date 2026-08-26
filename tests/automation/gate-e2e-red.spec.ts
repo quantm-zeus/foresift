@@ -75,10 +75,12 @@ describe('V2 structured gate manifest — REAL red package gate (spec §9)', () 
       }
       expect(existsSync(join(dir, 'full-gate-attestation.json'))).toBe(false);
     },
-    // Budget is load headroom, not scope: this gate runs its TESTS category
-    // (a full nested `pnpm test`) and overlaps the green-gate file by design
-    // (solo milestone/package gates measured ≈150s at the current suite size;
-    // contention roughly doubles that). A hang still fails.
-    600_000,
+    // Budget is load headroom, not scope: the TESTS category here is a FULL
+    // nested `pnpm test`, so the cost tracks suite growth, not the gate
+    // (≈150s at C2.5; ≈590s best-case and >600s under contention by
+    // 2026-08-26 — live false RED by timeout during run b101f6c3's post-fix
+    // reproduction). Still overlaps the green-gate file by design. A hang
+    // still fails.
+    1_800_000,
   );
 });

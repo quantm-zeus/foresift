@@ -294,9 +294,7 @@ export const ToolRegistrationRejectionRecordSchema = z
     rejectedAt: UtcTimestampSchema,
   })
   .strict();
-export type ToolRegistrationRejectionRecord = z.infer<
-  typeof ToolRegistrationRejectionRecordSchema
->;
+export type ToolRegistrationRejectionRecord = z.infer<typeof ToolRegistrationRejectionRecordSchema>;
 
 /** One pipeline stage execution event record (FR-CORE-002). */
 export const PipelineStageEventRecordSchema = z
@@ -336,9 +334,7 @@ export const SingleFlightFenceRefusedRecordSchema = z
     refusedAt: UtcTimestampSchema,
   })
   .strict();
-export type SingleFlightFenceRefusedRecord = z.infer<
-  typeof SingleFlightFenceRefusedRecordSchema
->;
+export type SingleFlightFenceRefusedRecord = z.infer<typeof SingleFlightFenceRefusedRecordSchema>;
 
 /** One quota settlement/commit event record (FR-CORE-007). */
 export const QuotaCommittedRecordSchema = z
@@ -411,7 +407,6 @@ export const EnvelopeDegradedRecordSchema = z
   })
   .strict();
 export type EnvelopeDegradedRecord = z.infer<typeof EnvelopeDegradedRecordSchema>;
-
 
 // --- registry map -----------------------------------------------------------------------------------
 

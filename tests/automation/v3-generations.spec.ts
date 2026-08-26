@@ -23,7 +23,7 @@ import {
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'bun:test';
 import {
   generationBranch,
   generationMessage,
@@ -48,6 +48,20 @@ const AUTOPILOT = fileURLToPath(
   new URL('../../scripts/automation/foresift-autopilot.mjs', import.meta.url),
 );
 const PKG = 'pkg-alpha';
+
+const TEST_RUNTIME_POLICY = JSON.stringify(
+  {
+    ...JSON.parse(
+      readFileSync(
+        fileURLToPath(new URL('../../config/foresift-test-runtime.json', import.meta.url)),
+        'utf8',
+      ),
+    ),
+    barrierAfterPackage: PKG,
+  },
+  null,
+  2,
+);
 
 // ── pure units: generation identity ─────────────────────────────────────────
 describe('generation identity math', () => {
@@ -364,6 +378,7 @@ function restartSandbox(name: string): Sandbox {
       2,
     ) + '\n',
   );
+  fx.writeFile('config/foresift-test-runtime.json', TEST_RUNTIME_POLICY);
   fx.commitAll('milestone fixtures');
   fx.g(['push', '-q', 'origin', 'main']);
 
@@ -809,6 +824,7 @@ describe('first tick drains the queued main fast-forward before selection', () =
         2,
       ) + '\n',
     );
+    fx.writeFile('config/foresift-test-runtime.json', TEST_RUNTIME_POLICY);
     fx.commitAll('stale view: PKG RUNNING gen 0');
     fx.g(['push', '-q', 'origin', 'main']);
 
@@ -935,6 +951,7 @@ function gen1Fixture(name: string, holder: 'archon' | 'operator') {
       2,
     ) + '\n',
   );
+  fx.writeFile('config/foresift-test-runtime.json', TEST_RUNTIME_POLICY);
   fx.commitAll('PKG pending at generation 1');
   fx.g(['push', '-q', 'origin', 'main']);
   // Path layout for the archon holder mirrors

@@ -4,13 +4,18 @@
 import { execFileSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { afterAll, describe, expect } from 'bun:test';
+import { afterAll, describe, expect, it } from 'bun:test';
 import {
   GATE_RESULT_FILE,
   parseFullGateResult,
 } from '../../scripts/automation/package-full-gate.mjs';
 import { disposeGitFixtureBase, gitFixture } from '../helpers/git-fixture.js';
-import { SCRIPTS, itE2e, makeScratch } from '../helpers/v2-fixtures.js';
+import { GATE_E2E_NESTED, SCRIPTS, makeScratch } from '../helpers/v2-fixtures.js';
+
+const itE2e = (name: string, fn: () => void, timeout?: number) => {
+  if (process.env[GATE_E2E_NESTED] === '1') return it.skip(name, fn, timeout);
+  it(name, fn, timeout);
+};
 
 const { art, cleanup } = makeScratch('foresift-v2-c2-green-');
 afterAll(() => {

@@ -29,8 +29,27 @@ import {
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { afterAll, beforeEach, describe, expect, it } from 'vitest';
+import { afterAll, beforeEach, describe, expect, it } from 'bun:test';
 import { disposeGitFixtureBase, gitFixture, type GitFixture } from '../helpers/git-fixture.js';
+
+const PKG = 'pkg-alpha';
+const BOOTSTRAP_WF = 'foresift-package-planning-bootstrap';
+const WAVE_WF = 'foresift-sharded-wave';
+const OPTIMIZED_WF = 'foresift-work-package-optimized';
+
+const TEST_RUNTIME_POLICY = JSON.stringify(
+  {
+    ...JSON.parse(
+      readFileSync(
+        fileURLToPath(new URL('../../config/foresift-test-runtime.json', import.meta.url)),
+        'utf8',
+      ),
+    ),
+    barrierAfterPackage: PKG,
+  },
+  null,
+  2,
+);
 
 const AUTOPILOT = fileURLToPath(
   new URL('../../scripts/automation/foresift-autopilot.mjs', import.meta.url),
@@ -44,10 +63,6 @@ const BOOTSTRAP_YAML = fileURLToPath(
 const WAVE_YAML = fileURLToPath(
   new URL('../../.archon/workflows/foresift/foresift-sharded-wave.yaml', import.meta.url),
 );
-const PKG = 'pkg-alpha';
-const BOOTSTRAP_WF = 'foresift-package-planning-bootstrap';
-const WAVE_WF = 'foresift-sharded-wave';
-const OPTIMIZED_WF = 'foresift-work-package-optimized';
 
 // ── structural: the planning bootstrap cannot implement ─────────────────────
 describe('structural: planning-bootstrap DAG carries zero implementation nodes', () => {
@@ -202,6 +217,7 @@ function makeSandbox(
     JSON.stringify(milestoneFixture(pkgStatus), null, 2),
   );
   fx.writeFile('specs/implementation/roadmap.json', JSON.stringify(ROADMAP, null, 2));
+  fx.writeFile('config/foresift-test-runtime.json', TEST_RUNTIME_POLICY);
   fx.commitAll('fixture state');
   fx.g(['push', '-q', 'origin', 'main']);
 

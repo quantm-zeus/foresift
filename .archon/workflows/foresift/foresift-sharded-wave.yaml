@@ -41,17 +41,32 @@ nodes:
         tee "$ARTIFACTS_DIR/branch-adoption.json"
     timeout: 120000
 
-  # ── PREP: task graph, shard plan, briefs, private worktrees ──────────────────
+  # ── PREP: immutable profile, routing, graph, briefs, private worktrees ───────
   - id: prep
     depends_on: [branch-adoption]
     bash: |
       set -euo pipefail
       PKG="${ARGUMENTS%%@g*}"
+      GEN=0
+      case "$ARGUMENTS" in *@g*) GEN="${ARGUMENTS##*@g}" ;; esac
       BASE="$(git rev-parse HEAD)"
       printf '%s' "$BASE" > "$ARTIFACTS_DIR/base-head.txt"
+      PROFILE_ARGS=()
+      if [ -n "${FORESIFT_EXECUTION_PROFILE:-}" ]; then
+        PROFILE_ARGS=(--profile "$FORESIFT_EXECUTION_PROFILE")
+      fi
+      node scripts/automation/execution-profile.mjs --select \
+        "${PROFILE_ARGS[@]}" --out "$ARTIFACTS_DIR/execution-profile.json"
+      PROFILE="$(node -e 'const r=require(process.argv[1]);process.stdout.write(r.executionProfile)' "$ARTIFACTS_DIR/execution-profile.json")"
       node scripts/automation/build-implementation-task-graph.mjs \
         --package "$PKG" --plan-shards "${FORESIFT_WRITERS:-3}" \
+        --execution-profile "$PROFILE" \
         --out "$ARTIFACTS_DIR/task-graph.json"
+      TEST_LANES="$(node -e 'const g=require(process.argv[1]);process.stdout.write(String((g.testLanes??[]).length))' "$ARTIFACTS_DIR/task-graph.json")"
+      if [ "$TEST_LANES" -gt 0 ] && ! command -v agy >/dev/null 2>&1; then
+        echo "AGY_UNAVAILABLE_TEST_BEARING_WORK" >&2
+        exit 71
+      fi
       node scripts/automation/build-plan-context.mjs --package "$PKG" \
         --out "$ARTIFACTS_DIR" || true
       node scripts/automation/build-writer-briefs.mjs --package "$PKG" \
@@ -59,15 +74,26 @@ nodes:
         --capsule "$ARTIFACTS_DIR/plan-capsule.json" \
         --out "$ARTIFACTS_DIR/briefs" \
         --writer-root "$ARTIFACTS_DIR/wt" --base-head "$BASE"
-      # Hybrid engine routing (V4 §25/§30): writes engine-<lane>.txt containing
-      # either the exact empty-lane sentinel, 'CLAUDE' (default), or 'AGY'
-      # (opt-in via FORESIFT_AGY_LANES AND a runnable agy binary; core lane
-      # never routes AGY). Pure deterministic decision — no AI dispatch here.
-      node scripts/automation/exec-agy-writer.mjs --emit-engine-files \
-        "$ARTIFACTS_DIR/task-graph.json" "$ARTIFACTS_DIR"
+      node scripts/automation/codex-routing.mjs --build-wave \
+        --graph "$ARTIFACTS_DIR/task-graph.json" --profile "$PROFILE" \
+        --out "$ARTIFACTS_DIR/routing.json"
+      node scripts/automation/execution-profile.mjs --create \
+        --package "$PKG" --generation "$GEN" --workflow foresift-sharded-wave \
+        --base-head "$BASE" --routing "$ARTIFACTS_DIR/routing.json" \
+        --out "$ARTIFACTS_DIR/execution-identity.json"
+      # Exact engine tokens are persisted from routing before any writer runs.
+      node -e '
+        const fs=require("node:fs"), d=process.env.ARTIFACTS_DIR;
+        const r=JSON.parse(fs.readFileSync(d+"/routing.json","utf8"));
+        for (const id of ["core","shard-1","shard-2","test-author"]) {
+          const lane=(r.lanes??[]).find(x=>x.lane===id);
+          fs.writeFileSync(d+"/engine-"+id+".txt", lane?.engine ?? ("NO "+id.toUpperCase()+" THIS WAVE"));
+        }
+      '
       node scripts/automation/check-writer-admission.mjs \
         > "$ARTIFACTS_DIR/admission.json" || true
-      # Private worktree + branch per shard, all at the SAME pinned base.
+      # Private worktree + unique branch per implementation/test lane, all at
+      # the SAME pinned semantic base. The run token prevents stale collisions.
       node -e '
         const fs = require("node:fs");
         const { spawnSync } = require("node:child_process");
@@ -75,10 +101,11 @@ nodes:
         const g = JSON.parse(fs.readFileSync(dir + "/task-graph.json", "utf8"));
         const base = fs.readFileSync(dir + "/base-head.txt", "utf8").trim();
         const meta = {};
-        for (const s of g.shards ?? []) {
+        const token=require("node:path").basename(dir).replace(/[^a-zA-Z0-9]/g,"").slice(-10);
+        for (const s of [...(g.shards ?? []), ...(g.testLanes ?? [])]) {
           const wt = dir + "/wt/" + s.id;
-          const br = "foresift/wave/" + base.slice(0,10) + "-" + s.id;
-          const r = spawnSync("git worktree add -B \"" + br + "\" \"" + wt + "\" \"" + base + "\"",
+          const br = "foresift/wave/" + base.slice(0,10) + "-" + token + "-" + s.id;
+          const r = spawnSync("git worktree add -b \"" + br + "\" \"" + wt + "\" \"" + base + "\"",
             { shell: true });
           if (r.status !== 0) throw new Error("worktree add failed for " + s.id + ": " + r.stderr);
           meta[s.id] = { branch: br, worktree: wt };
@@ -104,133 +131,114 @@ nodes:
   - id: brief-shard-2
     depends_on: [prep]
     bash: cat "$ARTIFACTS_DIR/briefs/shard-2-brief.md" 2>/dev/null || echo "NO SHARD-2 THIS WAVE"
+  - id: brief-test-author
+    depends_on: [prep]
+    bash: cat "$ARTIFACTS_DIR/briefs/test-author-brief.md" 2>/dev/null || echo "NO TEST-AUTHOR THIS WAVE"
 
-  # Per-lane ENGINE emitters (V4 §30): content is the empty-lane sentinel
-  # itself when the lane has no shard (so BOTH engine variants stay OFF — the
-  # zero-AI invariant survives the hybrid split), else 'CLAUDE' or 'AGY'.
+  # Engine emitters are exact persisted routing tokens. Fresh profiles ignore
+  # legacy FORESIFT_AGY_LANES, so AGY can never become a product writer.
+  - id: exec-core
+    depends_on: [prep]
+    bash: cat "$ARTIFACTS_DIR/engine-core.txt"
   - id: exec-shard-1
     depends_on: [prep]
-    bash: cat "$ARTIFACTS_DIR/engine-shard-1.txt" 2>/dev/null || echo "CLAUDE"
+    bash: cat "$ARTIFACTS_DIR/engine-shard-1.txt"
   - id: exec-shard-2
     depends_on: [prep]
-    bash: cat "$ARTIFACTS_DIR/engine-shard-2.txt" 2>/dev/null || echo "CLAUDE"
+    bash: cat "$ARTIFACTS_DIR/engine-shard-2.txt"
+  - id: exec-test-author
+    depends_on: [prep]
+    bash: cat "$ARTIFACTS_DIR/engine-test-author.txt"
+  - id: profile
+    depends_on: [prep]
+    bash: node -e 'const r=require(process.argv[1]);process.stdout.write(r.executionProfile)' "$ARTIFACTS_DIR/execution-profile.json"
 
-  # ── WRITER LANES (siblings without edges run CONCURRENTLY — proven R3) ───────
-  # Each lane is skipped entirely when its brief is absent (empty-lane zero-AI);
-  # Defect #10 policy: explicit on_error: all so silent provider empty-streams
-  # (UNKNOWN class) are retried instead of silently killing the lane. Strong
-  # retry layers stay intact: this node-level retry (L1/L2) plus autopilot
-  # recovery (L3) downstream.
+  # ── PRODUCT WRITERS + AGY TEST AUTHOR (all siblings run concurrently) ───────
+  # Codex bash lanes use the probed CLI, standard logical service tier (wire
+  # `default`), and approval/sandbox prompts disabled. Claude variants run only
+  # for the explicit CLAUDE_AGY fallback. Never edit tests in any implementation
+  # lane; the deterministic wave guard rejects actual test-path mutations.
   - id: writer-core
-    depends_on: [brief-core]
-    when: "$brief-core.output != 'NO CORE SHARD THIS WAVE'"
-    retry:
-      max_attempts: 2
-      delay_ms: 10000
-      on_error: all
-    effort: high
-    idle_timeout: 2700000
-    prompt: |
-      You are a Foresift parallel IMPLEMENTATION WRITER for lane "core"
-      (package "${ARGUMENTS%%@g*}"). Your complete assignment is below. Implement
-      it INSIDE YOUR PRIVATE WORKTREE named in the brief — never the checkout you
-      were started in. Commit coherent slices there as you go (signed-off style:
-      plain commits). Run ONLY targeted tests named in your brief or directly
-      affected suites; NEVER pnpm verify / FULL gates / repository-wide runs
-      (override §14). Never edit specs/<pkg>/tasks.md, checkpoints, or anything
-      outside your allowed write paths. When finished, write your result manifest
-      to $ARTIFACTS_DIR/writer-results/core/result.json (see completion contract
-      in the brief).
-
-      ===== WRITER BRIEF =====
-      $brief-core.output
-
+    depends_on: [brief-core, exec-core]
+    when: "$exec-core.output == 'CODEX'"
+    retry: { max_attempts: 2, delay_ms: 10000, on_error: all }
+    timeout: 3600000
+    bash: |
+      node scripts/automation/exec-codex-writer.mjs --lane core \
+        --brief "$ARTIFACTS_DIR/briefs/core-brief.md" \
+        --worktree "$ARTIFACTS_DIR/wt/core" \
+        --routing "$ARTIFACTS_DIR/routing.json" \
+        --results-dir "$ARTIFACTS_DIR/writer-results/core"
   - id: writer-shard-1
     depends_on: [brief-shard-1, exec-shard-1]
-    when: "$exec-shard-1.output == 'CLAUDE'"
-    retry:
-      max_attempts: 2
-      delay_ms: 10000
-      on_error: all
-    effort: high
-    idle_timeout: 2700000
-    prompt: |
-      You are a Foresift parallel IMPLEMENTATION WRITER for lane "shard-1"
-      (package "${ARGUMENTS%%@g*}"). Your complete assignment is below. Implement
-      it INSIDE YOUR PRIVATE WORKTREE named in the brief — never the checkout you
-      were started in. Commit coherent slices there as you go. Run ONLY targeted
-      tests named in your brief or directly affected suites; NEVER pnpm verify /
-      FULL gates / repository-wide runs. Never edit specs/<pkg>/tasks.md,
-      checkpoints, or anything outside your allowed write paths. When finished,
-      write your result manifest to $ARTIFACTS_DIR/writer-results/shard-1/
-      result.json (see completion contract in the brief).
-
-      ===== WRITER BRIEF =====
-      $brief-shard-1.output
-
-  - id: writer-shard-2
-    depends_on: [brief-shard-2, exec-shard-2]
-    when: "$exec-shard-2.output == 'CLAUDE'"
-    retry:
-      max_attempts: 2
-      delay_ms: 10000
-      on_error: all
-    effort: high
-    idle_timeout: 2700000
-    prompt: |
-      You are a Foresift parallel IMPLEMENTATION WRITER for lane "shard-2"
-      (package "${ARGUMENTS%%@g*}"). Your complete assignment is below. Implement
-      it INSIDE YOUR PRIVATE WORKTREE named in the brief — never the checkout you
-      were started in. Commit coherent slices there as you go. Run ONLY targeted
-      tests named in your brief or directly affected suites; NEVER pnpm verify /
-      FULL gates / repository-wide runs. Never edit specs/<pkg>/tasks.md,
-      checkpoints, or anything outside your allowed write paths. When finished,
-      write your result manifest to $ARTIFACTS_DIR/writer-results/shard-2/
-      result.json (see completion contract in the brief).
-
-      ===== WRITER BRIEF =====
-      $brief-shard-2.output
-
-  # ── HYBRID VARIANTS (V4 §25/§30): Antigravity execution for parallel lanes ───
-  # Opt-in and fail-closed: prep's pure decision routes a lane here ONLY when
-  # FORESIFT_AGY_LANES names it AND the `agy` binary is runnable; otherwise the
-  # CLAUDE command lane runs exactly as proven. Same brief, same private
-  # worktree, same write-authority guard + additive integration downstream —
-  # the engine differs, the authority boundary does not. Retry follows the
-  # defect-#10 policy; the executor enforces the writer-result contract itself.
-  - id: writer-shard-1-agy
-    depends_on: [exec-shard-1]
-    when: "$exec-shard-1.output == 'AGY'"
-    retry:
-      max_attempts: 2
-      delay_ms: 10000
-      on_error: all
+    when: "$exec-shard-1.output == 'CODEX'"
+    retry: { max_attempts: 2, delay_ms: 10000, on_error: all }
     timeout: 3600000
     bash: |
-      set -euo pipefail
-      mkdir -p "$ARTIFACTS_DIR/writer-results/shard-1"
-      node scripts/automation/exec-agy-writer.mjs \
-        --lane shard-1 \
+      node scripts/automation/exec-codex-writer.mjs --lane shard-1 \
         --brief "$ARTIFACTS_DIR/briefs/shard-1-brief.md" \
         --worktree "$ARTIFACTS_DIR/wt/shard-1" \
+        --routing "$ARTIFACTS_DIR/routing.json" \
         --results-dir "$ARTIFACTS_DIR/writer-results/shard-1"
-
-  - id: writer-shard-2-agy
-    depends_on: [exec-shard-2]
-    when: "$exec-shard-2.output == 'AGY'"
-    retry:
-      max_attempts: 2
-      delay_ms: 10000
-      on_error: all
+  - id: writer-shard-2
+    depends_on: [brief-shard-2, exec-shard-2]
+    when: "$exec-shard-2.output == 'CODEX'"
+    retry: { max_attempts: 2, delay_ms: 10000, on_error: all }
     timeout: 3600000
     bash: |
-      set -euo pipefail
-      mkdir -p "$ARTIFACTS_DIR/writer-results/shard-2"
-      node scripts/automation/exec-agy-writer.mjs \
-        --lane shard-2 \
+      node scripts/automation/exec-codex-writer.mjs --lane shard-2 \
         --brief "$ARTIFACTS_DIR/briefs/shard-2-brief.md" \
         --worktree "$ARTIFACTS_DIR/wt/shard-2" \
+        --routing "$ARTIFACTS_DIR/routing.json" \
         --results-dir "$ARTIFACTS_DIR/writer-results/shard-2"
+
+  - id: writer-core-claude
+    depends_on: [brief-core, exec-core]
+    when: "$exec-core.output == 'CLAUDE'"
+    retry: { max_attempts: 2, delay_ms: 10000, on_error: all }
+    effort: high
+    idle_timeout: 2700000
+    prompt: |
+      CLAUDE_AGY fallback product implementation lane core. Work only inside
+      the private worktree named below. Never edit tests, fixtures, test-only
+      helpers, tasks.md, checkpoints, or anything outside allowed write paths.
+      Commit coherent product changes and write the required result manifest.
+      $brief-core.output
+  - id: writer-shard-1-claude
+    depends_on: [brief-shard-1, exec-shard-1]
+    when: "$exec-shard-1.output == 'CLAUDE'"
+    retry: { max_attempts: 2, delay_ms: 10000, on_error: all }
+    effort: high
+    idle_timeout: 2700000
+    prompt: |
+      CLAUDE_AGY fallback product implementation lane shard-1. Work only in the
+      private worktree. Never edit tests or anything outside allowed paths.
+      Commit coherent product changes and write the result manifest.
+      $brief-shard-1.output
+  - id: writer-shard-2-claude
+    depends_on: [brief-shard-2, exec-shard-2]
+    when: "$exec-shard-2.output == 'CLAUDE'"
+    retry: { max_attempts: 2, delay_ms: 10000, on_error: all }
+    effort: high
+    idle_timeout: 2700000
+    prompt: |
+      CLAUDE_AGY fallback product implementation lane shard-2. Work only in the
+      private worktree. Never edit tests or anything outside allowed paths.
+      Commit coherent product changes and write the result manifest.
+      $brief-shard-2.output
+
+  - id: writer-test-author-agy
+    depends_on: [brief-test-author, exec-test-author]
+    when: "$exec-test-author.output == 'AGY'"
+    retry: { max_attempts: 2, delay_ms: 10000, on_error: all }
+    timeout: 3600000
+    bash: |
+      TASKS="$(node -e 'const g=require(process.argv[1]);process.stdout.write((g.testLanes?.[0]?.units??[]).join(","))' "$ARTIFACTS_DIR/task-graph.json")"
+      node scripts/automation/exec-agy-test-writer.mjs --lane test-author \
+        --brief "$ARTIFACTS_DIR/briefs/test-author-brief.md" \
+        --worktree "$ARTIFACTS_DIR/wt/test-author" \
+        --results-dir "$ARTIFACTS_DIR/writer-results/test-author" \
+        --task-ids "$TASKS"
 
   # ── GUARDS: deterministic write-authority enforcement (override §9) ──────────
   # One guard per lane; each recomputes the actual diff against the pinned base
@@ -243,7 +251,7 @@ nodes:
   # genuinely FAILED (a failed lane must surface, not vanish). The identical
   # `when` gate keeps truly-empty lanes from executing any guard logic at all.
   - id: guard-core
-    depends_on: [brief-core, writer-core]
+    depends_on: [brief-core, writer-core, writer-core-claude]
     trigger_rule: none_failed_min_one_success
     when: "$brief-core.output != 'NO CORE SHARD THIS WAVE'"
     bash: |
@@ -251,7 +259,7 @@ nodes:
       node scripts/automation/wave-guard.mjs --shard core \
         --artifacts "$ARTIFACTS_DIR" --graph "$ARTIFACTS_DIR/task-graph.json"
   - id: guard-shard-1
-    depends_on: [brief-shard-1, writer-shard-1, writer-shard-1-agy]
+    depends_on: [brief-shard-1, writer-shard-1, writer-shard-1-claude]
     trigger_rule: none_failed_min_one_success
     when: "$brief-shard-1.output != 'NO SHARD-1 THIS WAVE'"
     bash: |
@@ -259,12 +267,20 @@ nodes:
       node scripts/automation/wave-guard.mjs --shard shard-1 \
         --artifacts "$ARTIFACTS_DIR" --graph "$ARTIFACTS_DIR/task-graph.json"
   - id: guard-shard-2
-    depends_on: [brief-shard-2, writer-shard-2, writer-shard-2-agy]
+    depends_on: [brief-shard-2, writer-shard-2, writer-shard-2-claude]
     trigger_rule: none_failed_min_one_success
     when: "$brief-shard-2.output != 'NO SHARD-2 THIS WAVE'"
     bash: |
       set -euo pipefail
       node scripts/automation/wave-guard.mjs --shard shard-2 \
+        --artifacts "$ARTIFACTS_DIR" --graph "$ARTIFACTS_DIR/task-graph.json"
+  - id: guard-test-author
+    depends_on: [brief-test-author, writer-test-author-agy]
+    trigger_rule: none_failed_min_one_success
+    when: "$brief-test-author.output != 'NO TEST-AUTHOR THIS WAVE'"
+    bash: |
+      set -euo pipefail
+      node scripts/automation/wave-guard.mjs --shard test-author \
         --artifacts "$ARTIFACTS_DIR" --graph "$ARTIFACTS_DIR/task-graph.json"
 
   # ── INTEGRATE + ONE TRUE COMBINED FAST (serial join, override §16/§17) ───────
@@ -279,7 +295,7 @@ nodes:
   # checkpoint fires only through the green path (wave-settled bridge), so no
   # false green and no checkpoint after red (override §14/§15 acceptance).
   - id: integrate-and-fast
-    depends_on: [guard-core, guard-shard-1, guard-shard-2]
+    depends_on: [guard-core, guard-shard-1, guard-shard-2, guard-test-author]
     trigger_rule: none_failed_min_one_success   # guards fail closed per-lane
     timeout: 3600000
     bash: |
@@ -364,7 +380,20 @@ nodes:
         # never convert its own RED into a green exit.
         node -e 'const fs=require("fs");const f=process.argv[1]+"/wave-fast-verdict.json";if(!fs.existsSync(f))process.exit(1);const r=JSON.parse(fs.readFileSync(f,"utf8"));process.exit(r.exitCode===0?0:1)' "$ARTIFACTS_DIR"
       nodes:
+        - id: fast-repair-codex
+          when: "$profile.output == 'CODEX_AGY'"
+          retry:
+            max_attempts: 2
+            delay_ms: 10000
+            on_error: all
+          timeout: 3600000
+          bash: |
+            node scripts/automation/exec-codex-repair.mjs \
+              --canonical . --artifacts "$ARTIFACTS_DIR" \
+              --routing "$ARTIFACTS_DIR/routing.json" \
+              --package "${ARGUMENTS%%@g*}"
         - id: fast-repair
+          when: "$profile.output == 'CLAUDE_AGY'"
           command: foresift-wave-fast-repair
           retry:
             max_attempts: 3
@@ -373,7 +402,8 @@ nodes:
           effort: high
           idle_timeout: 1800000
         - id: fast-recheck
-          depends_on: [fast-repair]   # serialize: recheck observes post-repair state (feeds guard)
+          depends_on: [fast-repair-codex, fast-repair]
+          trigger_rule: none_failed_min_one_success
           bash: |
             set +e
             # Recheck = the ACTUAL FAST tier again (not a heuristic). Verdict

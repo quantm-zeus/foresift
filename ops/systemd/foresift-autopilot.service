@@ -13,7 +13,9 @@
 #
 # The supervisor is deliberately thin: it only starts/stops/resumes Archon
 # workflow runs and commits version-controlled implementation state. All
-# intelligence lives in the Archon workflows and Claude Code.
+# deterministic policy lives in version-controlled automation and Archon
+# workflows. Codex is the default product writer, AGY owns task tests, and
+# Claude is retained for incidents and the explicit CLAUDE_AGY fallback.
 
 [Unit]
 Description=Foresift autonomous development autopilot
@@ -34,6 +36,9 @@ RestartSec=30
 KillMode=process
 Environment=PATH=/home/minhquan_eth/.nvm/versions/node/v24.19.0/bin:/home/minhquan_eth/.local/bin:/usr/local/bin:/usr/bin:/bin
 Environment=HOME=/home/minhquan_eth
+# Default execution profile is intentionally NOT an environment variable here:
+# config/foresift-execution.json is the version-controlled authority. Operators
+# may add FORESIFT_EXECUTION_PROFILE=CLAUDE_AGY in a temporary systemd drop-in.
 
 [Install]
 WantedBy=default.target

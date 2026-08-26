@@ -53,11 +53,11 @@ const reqText = new Map((capsule?.requirements ?? []).map((r) => [r.id, r]));
 mkdirSync(args.out, { recursive: true });
 
 const written = [];
-for (const shard of graph.shards ?? []) {
+for (const shard of [...(graph.shards ?? []), ...(graph.testLanes ?? [])]) {
   const units = shard.units.map((uid) => graph.units.find((u) => u.id === uid)).filter(Boolean);
   const reqs = [...new Set(units.flatMap((u) => u.requirements))].sort();
   const lines = [
-    `# Writer brief — ${args.package} · ${shard.id}`,
+    `# ${shard.role === 'test' ? 'AGY test-author' : 'Implementation writer'} brief — ${args.package} · ${shard.id}`,
     '',
     `Mode: **${shard.mode}**. Pinned base HEAD: \`${String(baseHead).slice(0, 12)}\`.`,
     `Private worktree (write HERE only): \`${join(writerRoot, shard.id)}\``,
@@ -66,13 +66,26 @@ for (const shard of graph.shards ?? []) {
     '> checkout, never edit specs/<pkg>/tasks.md or any checkpoint — the',
     '> coordinator owns those. Run targeted tests only (your listed test refs',
     '> plus focused package suites); never pnpm verify / FULL gate.',
+    ...(shard.role === 'test'
+      ? [
+          '> You are the sole task-owned TEST AUTHOR. Write tests, fixtures, and',
+          '> test-only helpers only. Never modify product implementation paths.',
+          '> Record each test baseline as NEW_BEHAVIOR_RED, REGRESSION_RED,',
+          '> NEGATIVE_RED, CHARACTERIZATION_GREEN, or REFACTOR_GUARD_GREEN.',
+        ]
+      : [
+          '> You implement PRODUCT CODE only. Never edit tests, *.test.*, *.spec.*,',
+          '> __tests__, fixtures, or test-only helpers. You may read and run tests.',
+          '> If a test conflicts with requirements, emit TEST_DISPUTE evidence;',
+          '> never modify the disputed test.',
+        ]),
     '',
     '## Allowed write paths',
     ...(shard.allowedWritePaths.length
       ? shard.allowedWritePaths.map((p) => `- \`${p}\``)
       : ['- (no predicted paths; stay conservative and document actual files)']),
     '',
-    '## Assigned units (implement in listed order)',
+    `## Assigned units (${shard.role === 'test' ? 'author task-owned tests' : 'implement in listed order'})`,
     '',
   ];
   for (const u of units) {
@@ -113,7 +126,7 @@ for (const shard of graph.shards ?? []) {
   lines.push('');
   lines.push('- Commit coherent slices inside your worktree as you go.');
   lines.push(
-    `- On finish write \`$ARTIFACTS_DIR/writer-results/${shard.id}/result.json\` with: {"schema":"foresift/writer-result@1", shardId, units, completed, branch, headSha, testsRun, testResults, blockers}.`,
+    `- On finish write \`$ARTIFACTS_DIR/writer-results/${shard.id}/result.json\` with: {"schema":"foresift/writer-result@1", shardId, role, engine, units, completed, branch, headSha, testsRun, testResults, baselineClassifications, blockers}.`,
   );
   lines.push('- List EVERY unit you finished; list unfinished ones under blockers.');
   lines.push('');

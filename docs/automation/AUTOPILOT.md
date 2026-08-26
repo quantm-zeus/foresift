@@ -39,9 +39,45 @@ supervisory loop over the `archon` CLI). Architecture rationale:
 3. Marks packages PROVEN only when their PR is actually merged; audits each
    milestone independently before declaring it proven.
 
+## Execution profiles
+
+Fresh sharded implementation waves use the version-controlled policy in
+`config/foresift-execution.json`:
+
+- `CODEX_AGY` (default): Codex writes product implementation; AGY is the sole
+  task-owned test author.
+- `CLAUDE_AGY` (maintainer fallback): Claude writes product implementation;
+  AGY remains the sole task-owned test author.
+
+The supervisor persists the selected profile before launching a workflow. The
+workflow then persists its immutable execution identity (base HEAD, engines,
+lane model/reasoning, Codex service tier, and routing policy) before dispatching
+writers. A later environment change cannot mutate that identity. Historical V4
+runs without an execution identity retain explicit historical semantics.
+
+Codex lanes are selected deterministically: LOW uses Luna, MEDIUM uses Terra,
+and HIGH uses Sol. Sensitive and CRITICAL work is forced HIGH and never silently
+downgraded. Every Codex call records logical `serviceTier=standard`; installed
+Codex CLI 0.149.1 expresses that standard pricing/performance tier on the wire
+as `service_tier="default"`. All calls are non-interactive with approval and
+sandbox prompts disabled, while the existing Git/diff guards remain binding.
+
+For a one-shot supported fallback override while the service is stopped:
+
+```sh
+node scripts/automation/foresift-autopilot.mjs --once \
+  --execution-profile CLAUDE_AGY
+```
+
+For a service-level fallback, add
+`Environment=FORESIFT_EXECUTION_PROFILE=CLAUDE_AGY` to a systemd drop-in and
+restart the unit. Remove the drop-in to return to the version-controlled
+`CODEX_AGY` default. Invalid profile values fail closed. The retired
+`FORESIFT_AGY_LANES` setting has no effect on fresh profiled waves.
+
 ## Continuation without humans
 
-A Claude turn ending cleanly is NOT stage completion. Long stages run as
+An AI turn ending cleanly is NOT stage completion. Long stages run as
 Archon `loop_group`s whose completion is decided ONLY by a deterministic
 `until_bash` guard (the `until` text signals are sentinels agents are
 instructed never to emit). When a guard fails, Archon automatically starts

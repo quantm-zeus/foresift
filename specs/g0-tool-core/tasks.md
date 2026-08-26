@@ -232,58 +232,58 @@ Format: `- [ ] T### [P?]` — **[P]** = parallelizable with its neighbors
 
 ## Phase H — Fixture corpus and manifest-declared suites
 
-- [ ] T801 Build `tests/fixtures/core/`: clean + prohibited tool-definition
+- [x] T801 Build `tests/fixtures/core/`: clean + prohibited tool-definition
       corpora, canned provider payloads (valid/malformed/truncated/slow),
       cache-key golden vectors, clock/lease/race fixtures, profile bindings.
       All inert data; no credentials, no real endpoints.
       Traces: FR-CORE-001, FR-CORE-005, FR-CORE-006.
-- [ ] T802 Create `tests/acceptance/AC-001.spec.ts` +
+- [x] T802 Create `tests/acceptance/AC-001.spec.ts` +
       `tests/negative/AC-001.negative.spec.ts` scoped to the tool-core facet:
       registry lists a scoped domain-tool profile; stubbed free-discovery call
       executes end-to-end through all 24 stages; unavailable optional sources
       degrade explicitly in the envelope; negative asserts no silent gap and
       no out-of-profile tool exposure. Header comments name which facets later
       packages add. Traces: FR-CORE-001, FR-CORE-002, FR-CORE-003, FR-CORE-004.
-- [ ] T803 Create AC-002 pos+neg suites (envelope completeness: quality, time,
+- [x] T803 Create AC-002 pos+neg suites (envelope completeness: quality, time,
       provenance, evidence references on every important field; negative:
       result lacking them refused). Traces: FR-CORE-003.
-- [ ] T804 Create AC-003 pos+neg suites (cross-mode single-flight: two
+- [x] T804 Create AC-003 pos+neg suites (cross-mode single-flight: two
       concurrent simulated modes, one provider call within dedupe window;
       negative: stale-holder fencing violation refused). Traces: FR-CORE-006.
-- [ ] T805 Create AC-004 pos+neg suites (conflicting provider data preserved in
+- [x] T805 Create AC-004 pos+neg suites (conflicting provider data preserved in
       conflicts[]; unsupported capability explicit CAPABILITY_UNAVAILABLE;
       negative: silent replacement attempts fail the suite). Traces:
       FR-CORE-002, FR-CORE-003.
-- [ ] T806 Extend the AC-020, AC-021, AC-022, and AC-023 suites (+negatives
+- [x] T806 Extend the AC-020, AC-021, AC-022, and AC-023 suites (+negatives
       already present) with tool-core substrate blocks: as-of cache reads
       cannot see available_at > T (AC-020); revisions leave original
       observations reachable via envelope evidence refs (AC-021); migration
       identity keys avoid double counting (AC-022); normalization goldens flow
       unchanged through stage 16 (AC-023). Traces: FR-CORE-003, FR-CORE-006.
-- [ ] T807 Extend AC-050 and AC-254 suites with registry/execution refusal
+- [x] T807 Extend AC-050 and AC-254 suites with registry/execution refusal
       substrate blocks (prohibited definitions rejected at registration;
       prohibited calls rejected at dispatch; tree scans stay green); keep the
       security-owned scan blocks untouched. Extend AC-255 with query-fixture
       pass vs prohibited-shape registration failure.
       Traces: FR-CORE-005.
-- [ ] T808 Extend AC-051/AC-052/AC-053 suites with tool-core blocks: untrusted
+- [x] T808 Extend AC-051/AC-052/AC-053 suites with tool-core blocks: untrusted
       provider text enters envelopes as content-only; emitted artifacts swept
       for secret material; profile binding rejects out-of-scope tools.
       Traces: FR-CORE-004, FR-CORE-002.
-- [ ] T809 Extend the AC-240, AC-241, AC-242, and AC-243 suites with pipeline
+- [x] T809 Extend the AC-240, AC-241, AC-242, and AC-243 suites with pipeline
       substrate blocks: symmetric action-time fields across workload classes
       incl. EVALUATION_LOW and BACKFILL_LOW (AC-240); replay reads only
       as-of-permitted entries with policy-component-only divergence (AC-241);
       NOT_REQUESTED_BY_POLICY persisted distinctly from empty/unavailable/
       negative values (AC-242); probe metadata persisted before maturity
       (AC-243). Traces: FR-CORE-002, FR-CORE-003.
-- [ ] T810 Extend the AC-244, AC-245, AC-246, AC-247, AC-248, and AC-249
+- [x] T810 Extend the AC-244, AC-245, AC-246, AC-247, AC-248, and AC-249
       suites minimally: envelope lineage/conflict round-trips these criteria
       consume; no promotion logic lands here. Keep the upstream-owned facets of
       AC-250, AC-251, AC-252, AC-253, AC-256, AC-257, and AC-258 green;
       extend AC-259 with every-exit-audited substrate assertions.
       Traces: FR-CORE-002, FR-CORE-003, FR-CORE-005.
-- [ ] T811 Engine unit suites in `packages/tool-core/test/` (see plan Verification
+- [x] T811 Engine unit suites in `packages/tool-core/test/` (see plan Verification
       strategy): pinned stage-order property test; lease fencing matrix;
       reservation transition matrix incl. races; cache-key stability vectors;
       TTL boundaries; profile narrowing subset proofs; deny-closed defaults;

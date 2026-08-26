@@ -1,0 +1,786 @@
+{
+  "$schema": "https://foresift.dev/schemas/telemetry-catalog-v1.json",
+  "catalog": "prov",
+  "description": "Provider-lifecycle telemetry events for operation registration, lifecycle transitions/refusals, verification TTL expiries/refreshes, deprecation notices, sunset incidents, migration exceptions, response quarantine, rights matrix changes/blocks/actions, activation readiness, and source fingerprints. Every refusal and block carries its typed machine reason; no event ever carries private keys, transaction payloads, or raw credentials.",
+  "contractStatus": "DECLARATIVE_CONTRACT_ONLY — this file defines the event contracts the requirement manifest maps to (telemetry/prov.*); emitter wiring lands with the observability milestone (dependency group G2), so nothing publishes these event names yet. Field lists mirror the authoritative schemas in packages/shared-schemas/src/prov.ts exactly.",
+  "requirementsCovered": [
+    "FR-PROV-001",
+    "FR-PROV-002",
+    "FR-PROV-003",
+    "FR-PROV-008",
+    "FR-PROV-009",
+    "FR-PROV-010"
+  ],
+  "recoveryDataClass": "CRITICAL_METADATA",
+  "events": [
+    {
+      "name": "operation.registered",
+      "description": "A provider operation definition was registered in the versioned operation registry with its capability class, cost class, health status, and verification expiry.",
+      "requirementRefs": ["FR-PROV-001"],
+      "tier": "CRITICAL_METADATA",
+      "fields": [
+        {
+          "name": "providerId",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "operationId",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "version",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "capabilityClass",
+          "type": "string(READ_HISTORICAL|READ_REALTIME|READ_REFERENCE|SEARCH|ANALYTICS|SIMULATE_READ|RESOLVE|ORACLE_READ)",
+          "required": true,
+          "notes": "Prohibited capability classes are refused at registration."
+        },
+        {
+          "name": "supportedChains",
+          "type": "array<string>",
+          "required": true
+        },
+        {
+          "name": "costClass",
+          "type": "string(FREE_UNMETERED|FREE_QUOTA|PAID_EXPLICIT|UNKNOWN_COST|DISABLED)",
+          "required": true
+        },
+        {
+          "name": "healthStatus",
+          "type": "string(HEALTHY|DEGRADED|SCHEMA_DRIFT|PLAN_UNVERIFIED|RIGHTS_UNVERIFIED|DEPRECATED|SUNSET_PENDING|QUOTA_LOW|QUOTA_EXHAUSTED|AUTH_FAILED|UNSUPPORTED|DISABLED)",
+          "required": true
+        },
+        {
+          "name": "currentState",
+          "type": "string(DISCOVERED|VERIFIED|ACTIVE|DEGRADED|DEPRECATED|BLOCKED|REMOVED)",
+          "required": true
+        },
+        {
+          "name": "allowedInStrictFree",
+          "type": "boolean",
+          "required": true
+        },
+        {
+          "name": "verificationExpiresAt",
+          "type": "string<utc-timestamp>",
+          "required": true
+        },
+        {
+          "name": "registeredAt",
+          "type": "string<utc-timestamp>",
+          "required": true
+        }
+      ]
+    },
+    {
+      "name": "lifecycle.transitioned",
+      "description": "A provider operation transitioned between states in the legal lifecycle graph, recorded in the immutable transition ledger.",
+      "requirementRefs": ["FR-PROV-001"],
+      "tier": "CRITICAL_METADATA",
+      "fields": [
+        {
+          "name": "providerId",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "operationId",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "version",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "fromState",
+          "type": "string(DISCOVERED|VERIFIED|ACTIVE|DEGRADED|DEPRECATED|BLOCKED|REMOVED)",
+          "required": true
+        },
+        {
+          "name": "toState",
+          "type": "string(DISCOVERED|VERIFIED|ACTIVE|DEGRADED|DEPRECATED|BLOCKED|REMOVED)",
+          "required": true
+        },
+        {
+          "name": "reasonClass",
+          "type": "string(INITIAL_REGISTRATION|VERIFICATION_PASSED|VERIFICATION_EXPIRED|LIVE_PROBE_FAILED|SCHEMA_DRIFT_DETECTED|DEPRECATION_ANNOUNCED|SUNSET_REACHED|OPERATOR_BLOCKED|PROHIBITED_CAPABILITY_DETECTED|REMOVED_BY_POLICY)",
+          "required": true
+        },
+        {
+          "name": "actor",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "evidenceRefs",
+          "type": "array<string>",
+          "required": true
+        },
+        {
+          "name": "idempotencyKey",
+          "type": "string",
+          "required": true,
+          "notes": "Fences transitions against double-append under retry (INV-009)."
+        },
+        {
+          "name": "occurredAt",
+          "type": "string<utc-timestamp>",
+          "required": true
+        }
+      ]
+    },
+    {
+      "name": "lifecycle.refused",
+      "description": "An attempted lifecycle transition was refused because it violated the legal state graph, missing evidence, or prohibited capability controls.",
+      "requirementRefs": ["FR-PROV-001"],
+      "tier": "CRITICAL_METADATA",
+      "fields": [
+        {
+          "name": "providerId",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "operationId",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "version",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "fromState",
+          "type": "string(DISCOVERED|VERIFIED|ACTIVE|DEGRADED|DEPRECATED|BLOCKED|REMOVED)",
+          "required": true
+        },
+        {
+          "name": "attemptedState",
+          "type": "string(DISCOVERED|VERIFIED|ACTIVE|DEGRADED|DEPRECATED|BLOCKED|REMOVED)",
+          "required": true
+        },
+        {
+          "name": "reasons",
+          "type": "array<string>",
+          "required": true
+        },
+        {
+          "name": "actor",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "evaluatedAt",
+          "type": "string<utc-timestamp>",
+          "required": true
+        }
+      ]
+    },
+    {
+      "name": "verification.expired",
+      "description": "A provider operation verification kind expired after its configured TTL, moving the operation out of active decision use.",
+      "requirementRefs": ["FR-PROV-002", "FR-PROV-001"],
+      "tier": "CRITICAL_METADATA",
+      "fields": [
+        {
+          "name": "providerId",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "operationId",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "version",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "kind",
+          "type": "string(DOCUMENTATION|PRICING_PLAN|QUOTA|RIGHTS|SCHEMA|ENDPOINT|AUTHENTICATION|DEPRECATION|LIVE_PROBE)",
+          "required": true
+        },
+        {
+          "name": "ttlSeconds",
+          "type": "integer",
+          "required": true
+        },
+        {
+          "name": "lastVerifiedAt",
+          "type": "string<utc-timestamp>",
+          "required": true
+        },
+        {
+          "name": "expiredAt",
+          "type": "string<utc-timestamp>",
+          "required": true
+        },
+        {
+          "name": "newHealthStatus",
+          "type": "string(HEALTHY|DEGRADED|SCHEMA_DRIFT|PLAN_UNVERIFIED|RIGHTS_UNVERIFIED|DEPRECATED|SUNSET_PENDING|QUOTA_LOW|QUOTA_EXHAUSTED|AUTH_FAILED|UNSUPPORTED|DISABLED)",
+          "required": true
+        },
+        {
+          "name": "activeUseBlocked",
+          "type": "boolean",
+          "required": true,
+          "notes": "True whenever decision-critical verification expires."
+        }
+      ]
+    },
+    {
+      "name": "verification.refreshed",
+      "description": "A verification record was refreshed with evidence; full restoration of active decision use requires both official-doc and live-contract verification to succeed (AC-270).",
+      "requirementRefs": ["FR-PROV-002"],
+      "tier": "CRITICAL_METADATA",
+      "fields": [
+        {
+          "name": "providerId",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "operationId",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "version",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "kind",
+          "type": "string(DOCUMENTATION|PRICING_PLAN|QUOTA|RIGHTS|SCHEMA|ENDPOINT|AUTHENTICATION|DEPRECATION|LIVE_PROBE)",
+          "required": true
+        },
+        {
+          "name": "source",
+          "type": "string(OFFICIAL_DOC|LIVE_CONTRACT)",
+          "required": true
+        },
+        {
+          "name": "outcome",
+          "type": "string(PASSED|FAILED|INCONCLUSIVE)",
+          "required": true
+        },
+        {
+          "name": "evidenceRefs",
+          "type": "array<string>",
+          "required": true
+        },
+        {
+          "name": "verifiedAt",
+          "type": "string<utc-timestamp>",
+          "required": true
+        },
+        {
+          "name": "expiresAt",
+          "type": "string<utc-timestamp>",
+          "required": true
+        },
+        {
+          "name": "actor",
+          "type": "string",
+          "required": true
+        }
+      ]
+    },
+    {
+      "name": "deprecation.detected",
+      "description": "A deprecation or maintenance-only notice was detected for a provider operation, blocking new feature dependency registrations without an approved migration exception.",
+      "requirementRefs": ["FR-PROV-003", "FR-PROV-001"],
+      "tier": "CRITICAL_METADATA",
+      "fields": [
+        {
+          "name": "providerId",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "operationId",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "version",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "deprecatedAt",
+          "type": "string<utc-timestamp>",
+          "required": true
+        },
+        {
+          "name": "sunsetAt",
+          "type": "string<utc-timestamp>|null",
+          "required": true
+        },
+        {
+          "name": "replacementOperationId",
+          "type": "string|null",
+          "required": true
+        },
+        {
+          "name": "affectedFeatureCount",
+          "type": "integer",
+          "required": true
+        },
+        {
+          "name": "detectedAt",
+          "type": "string<utc-timestamp>",
+          "required": true
+        }
+      ]
+    },
+    {
+      "name": "sunset.incident_raised",
+      "description": "A provider operation sunset date or official deprecation notice raised a tracked migration incident with a deadline.",
+      "requirementRefs": ["FR-PROV-003"],
+      "tier": "CRITICAL_METADATA",
+      "fields": [
+        {
+          "name": "incidentId",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "providerId",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "operationId",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "version",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "sunsetAt",
+          "type": "string<utc-timestamp>",
+          "required": true
+        },
+        {
+          "name": "migrationDeadline",
+          "type": "string<utc-timestamp>",
+          "required": true
+        },
+        {
+          "name": "replacementOperationId",
+          "type": "string|null",
+          "required": true
+        },
+        {
+          "name": "raisedAt",
+          "type": "string<utc-timestamp>",
+          "required": true
+        }
+      ]
+    },
+    {
+      "name": "migration_exception.granted",
+      "description": "A time-bounded migration exception and replacement plan were approved for a deprecated provider operation.",
+      "requirementRefs": ["FR-PROV-003"],
+      "tier": "CRITICAL_METADATA",
+      "fields": [
+        {
+          "name": "exceptionId",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "providerId",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "operationId",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "version",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "approver",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "replacementPlanRef",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "grantedAt",
+          "type": "string<utc-timestamp>",
+          "required": true
+        },
+        {
+          "name": "expiresAt",
+          "type": "string<utc-timestamp>",
+          "required": true
+        },
+        {
+          "name": "reason",
+          "type": "string",
+          "required": true
+        }
+      ]
+    },
+    {
+      "name": "migration_exception.expired",
+      "description": "A time-bounded migration exception reached its expiry instant or was revoked, re-blocking new implementations fail-closed.",
+      "requirementRefs": ["FR-PROV-003"],
+      "tier": "CRITICAL_METADATA",
+      "fields": [
+        {
+          "name": "exceptionId",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "providerId",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "operationId",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "version",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "expiredAt",
+          "type": "string<utc-timestamp>",
+          "required": true
+        },
+        {
+          "name": "reason",
+          "type": "string(TTL_EXPIRED|EXPLICIT_REVOCATION)",
+          "required": true
+        }
+      ]
+    },
+    {
+      "name": "response.quarantined",
+      "description": "A provider response containing transaction payloads, signing requests, executable instructions, private-key fields, or unexpected write capability was rejected, quarantined, audited, and excluded from model context.",
+      "requirementRefs": ["FR-PROV-008"],
+      "tier": "CRITICAL_METADATA",
+      "fields": [
+        {
+          "name": "quarantineId",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "providerId",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "operationId",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "version",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "detectedClasses",
+          "type": "array<string(TRANSACTION_PAYLOAD|SIGNING_REQUEST|EXECUTABLE_INSTRUCTION|PRIVATE_KEY_FIELD|UNEXPECTED_WRITE_CAPABILITY)>",
+          "required": true
+        },
+        {
+          "name": "fieldPaths",
+          "type": "array<string>",
+          "required": true
+        },
+        {
+          "name": "payloadSha256",
+          "type": "string",
+          "required": true,
+          "notes": "Hash of the rejected payload — hazardous material is never persisted."
+        },
+        {
+          "name": "byteSize",
+          "type": "integer",
+          "required": true
+        },
+        {
+          "name": "disposition",
+          "type": "string(REJECTED)",
+          "required": true
+        },
+        {
+          "name": "modelContextExclusion",
+          "type": "string(ENFORCED)",
+          "required": true
+        },
+        {
+          "name": "auditChainRef",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "quarantinedAt",
+          "type": "string<utc-timestamp>",
+          "required": true
+        }
+      ]
+    },
+    {
+      "name": "rights.changed",
+      "description": "A provider data-rights matrix declaration was updated; newly restricted uses fail closed immediately across storage, derived use, redistribution, caching, and export paths.",
+      "requirementRefs": ["FR-PROV-009"],
+      "tier": "CRITICAL_METADATA",
+      "fields": [
+        {
+          "name": "providerId",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "operationId",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "version",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "fromRightsVersion",
+          "type": "integer",
+          "required": true
+        },
+        {
+          "name": "toRightsVersion",
+          "type": "integer",
+          "required": true
+        },
+        {
+          "name": "termsVersion",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "newlyProhibitedUses",
+          "type": "array<string(COMMERCIAL_USE|PERSONAL_RESEARCH|CACHE|RAW_RETENTION|DERIVED_FEATURES|MODEL_TRAINING|REDISTRIBUTION|PUBLIC_ALERT_DERIVATIVE|RAW_EXPORT)>",
+          "required": true
+        },
+        {
+          "name": "verifiedAt",
+          "type": "string<utc-timestamp>",
+          "required": true
+        },
+        {
+          "name": "verificationExpiresAt",
+          "type": "string<utc-timestamp>",
+          "required": true
+        },
+        {
+          "name": "changedAt",
+          "type": "string<utc-timestamp>",
+          "required": true
+        }
+      ]
+    },
+    {
+      "name": "rights.use_blocked",
+      "description": "A requested use path was blocked fail-closed by the updated provider data-rights policy.",
+      "requirementRefs": ["FR-PROV-009"],
+      "tier": "CRITICAL_METADATA",
+      "fields": [
+        {
+          "name": "providerId",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "operationId",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "version",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "rightsVersion",
+          "type": "integer",
+          "required": true
+        },
+        {
+          "name": "attemptedUse",
+          "type": "string(COMMERCIAL_USE|PERSONAL_RESEARCH|CACHE|RAW_RETENTION|DERIVED_FEATURES|MODEL_TRAINING|REDISTRIBUTION|PUBLIC_ALERT_DERIVATIVE|RAW_EXPORT)",
+          "required": true
+        },
+        {
+          "name": "reason",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "blockedAt",
+          "type": "string<utc-timestamp>",
+          "required": true
+        }
+      ]
+    },
+    {
+      "name": "rights.action_executed",
+      "description": "A quarantine or retirement action was executed against previously stored restricted artifacts following a rights policy change.",
+      "requirementRefs": ["FR-PROV-009"],
+      "tier": "CRITICAL_METADATA",
+      "fields": [
+        {
+          "name": "actionId",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "changeId",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "artifactId",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "providerId",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "operationId",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "action",
+          "type": "string(QUARANTINE|RETIRE)",
+          "required": true
+        },
+        {
+          "name": "executedAt",
+          "type": "string<utc-timestamp>",
+          "required": true
+        }
+      ]
+    },
+    {
+      "name": "readiness.blocked",
+      "description": "Provider activation readiness evaluation reported BLOCKED due to unverified rights, expired verification, deprecated operation without exception, or prohibited exposure.",
+      "requirementRefs": ["FR-PROV-001", "FR-PROV-002", "FR-PROV-003", "FR-PROV-009"],
+      "tier": "CRITICAL_METADATA",
+      "fields": [
+        {
+          "name": "providerId",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "operationId",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "version",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "verdict",
+          "type": "string(BLOCKED)",
+          "required": true
+        },
+        {
+          "name": "reasons",
+          "type": "array<string(RIGHTS_UNVERIFIED|VERIFICATION_EXPIRED|DEPRECATED_WITHOUT_EXCEPTION|PROHIBITED_CAPABILITY_EXPOSED|HEALTH_DEGRADED|LIFECYCLE_NOT_ACTIVE)>",
+          "required": true
+        },
+        {
+          "name": "evaluatedAt",
+          "type": "string<utc-timestamp>",
+          "required": true
+        }
+      ]
+    },
+    {
+      "name": "fingerprint.captured",
+      "description": "A provider source fingerprint was captured for empirical dependence analysis.",
+      "requirementRefs": ["FR-PROV-010"],
+      "tier": "CRITICAL_METADATA",
+      "fields": [
+        {
+          "name": "fingerprintId",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "providerId",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "operationId",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "version",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "fingerprintKind",
+          "type": "string(UPSTREAM_LINEAGE|VALUE_CORRELATION|TIMING_BEHAVIOR|OUTAGE_CORRELATION|SCHEMA_CHARACTERISTICS|FIRST_SEEN_BEHAVIOR)",
+          "required": true
+        },
+        {
+          "name": "fingerprintSha256",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "upstreamLineage",
+          "type": "array<string>",
+          "required": true
+        },
+        {
+          "name": "capturedAt",
+          "type": "string<utc-timestamp>",
+          "required": true
+        }
+      ]
+    }
+  ]
+}

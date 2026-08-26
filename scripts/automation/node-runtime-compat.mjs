@@ -27,8 +27,14 @@ try {
 } finally {
   rmSync(dir, { recursive: true, force: true });
 }
-const child = spawnSync(process.execPath, ['-e', 'process.stdout.write(import.meta.url.startsWith("file:")?"ok":"bad")'], {
-  encoding: 'utf8',
-});
+const child = spawnSync(
+  process.execPath,
+  ['-e', 'process.stdout.write(import.meta.url.startsWith("file:")?"ok":"bad")'],
+  {
+    encoding: 'utf8',
+  },
+);
 check('node-esm-child-process', child.status === 0 && child.stdout === 'ok');
-process.stdout.write(JSON.stringify({ schema: 'foresift/node-runtime-compat@1', passed: true, checks }) + '\n');
+process.stdout.write(
+  JSON.stringify({ schema: 'foresift/node-runtime-compat@1', passed: true, checks }) + '\n',
+);

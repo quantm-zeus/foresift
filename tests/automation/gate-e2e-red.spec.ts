@@ -33,8 +33,8 @@ describe('V2 structured gate manifest — REAL red package gate (spec §9)', () 
           scripts: {
             'spec:verify': 'node -e "process.exit(0)"',
             'format:check': 'node -e "process.exit(0)"',
-            'lint': 'node -e "process.exit(0)"',
-            'typecheck': 'node -e "process.exit(0)"',
+            lint: 'node -e "process.exit(0)"',
+            typecheck: 'node -e "process.exit(0)"',
             test: 'node -e "process.exit(0)"',
           },
         }),
@@ -89,49 +89,45 @@ describe('V2 structured gate manifest — REAL red package gate (spec §9)', () 
     30_000,
   );
 
-  it(
-    'structural nested-full block in foresift-gate.mjs refuses unflagged nested full test executions',
-    () => {
-      const dir = art('gate-nested-block');
-      const fx = gitFixture('hermetic-gate-nested-block');
-      fx.writeFile(
-        'package.json',
-        JSON.stringify({
-          name: 'foresift-hermetic-nested-block',
-          private: true,
-          scripts: {
-            'spec:verify': 'node -e "process.exit(0)"',
-            'format:check': 'node -e "process.exit(0)"',
-            'lint': 'node -e "process.exit(0)"',
-            'typecheck': 'node -e "process.exit(0)"',
-            test: 'node -e "process.exit(0)"',
-          },
-        }),
-      );
-      const r = tryNode(
-        [
-          join(SCRIPTS, 'foresift-gate.mjs'),
-          '--milestone',
-          '--result-file',
-          join(dir, GATE_RESULT_FILE),
-        ],
-        {
-          cwd: fx.root,
-          env: {
-            ...process.env,
-            FORESIFT_ALLOW_HERMETIC_NESTED_FULL: '0',
-            FORESIFT_TEST_AUTHORITY: '1',
-          },
+  it('structural nested-full block in foresift-gate.mjs refuses unflagged nested full test executions', () => {
+    const dir = art('gate-nested-block');
+    const fx = gitFixture('hermetic-gate-nested-block');
+    fx.writeFile(
+      'package.json',
+      JSON.stringify({
+        name: 'foresift-hermetic-nested-block',
+        private: true,
+        scripts: {
+          'spec:verify': 'node -e "process.exit(0)"',
+          'format:check': 'node -e "process.exit(0)"',
+          lint: 'node -e "process.exit(0)"',
+          typecheck: 'node -e "process.exit(0)"',
+          test: 'node -e "process.exit(0)"',
         },
-      );
-      expect(r.status).toBe(86);
-      const m = parseFullGateResult(readFileSync(join(dir, GATE_RESULT_FILE), 'utf8'));
-      expect(m?.passed).toBe(false);
-      expect(m?.exitCode).toBe(86);
-      expect(m?.failedCategories).toEqual(['TESTS']);
-      const testCheck = m?.checks.find((c) => c.category === 'TESTS');
-      expect(testCheck?.status).toBe('FAIL');
-    },
-    30_000,
-  );
+      }),
+    );
+    const r = tryNode(
+      [
+        join(SCRIPTS, 'foresift-gate.mjs'),
+        '--milestone',
+        '--result-file',
+        join(dir, GATE_RESULT_FILE),
+      ],
+      {
+        cwd: fx.root,
+        env: {
+          ...process.env,
+          FORESIFT_ALLOW_HERMETIC_NESTED_FULL: '0',
+          FORESIFT_TEST_AUTHORITY: '1',
+        },
+      },
+    );
+    expect(r.status).toBe(86);
+    const m = parseFullGateResult(readFileSync(join(dir, GATE_RESULT_FILE), 'utf8'));
+    expect(m?.passed).toBe(false);
+    expect(m?.exitCode).toBe(86);
+    expect(m?.failedCategories).toEqual(['TESTS']);
+    const testCheck = m?.checks.find((c) => c.category === 'TESTS');
+    expect(testCheck?.status).toBe('FAIL');
+  }, 30_000);
 });

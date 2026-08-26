@@ -30,10 +30,7 @@ import {
   planMigrationBatches,
   prepareMigration,
 } from '../../scripts/automation/bun-migration-runner.mjs';
-import {
-  buildBunTestPlan,
-  bunTestArgs,
-} from '../../scripts/automation/bun-test-coordinator.mjs';
+import { buildBunTestPlan, bunTestArgs } from '../../scripts/automation/bun-test-coordinator.mjs';
 import {
   buildImportGraph,
   repositorySourcePaths,
@@ -522,7 +519,12 @@ describe('Contract 8: CODEX_AGY execution profile routing and G0 concurrency', (
     };
     const candidate = milestone.packages[1];
     const running = [milestone.packages[0]];
-    const verdict = canStartPackage(roadmap as never, milestone as never, candidate as never, running as never);
+    const verdict = canStartPackage(
+      roadmap as never,
+      milestone as never,
+      candidate as never,
+      running as never,
+    );
     expect(verdict.ok).toBe(false);
     expect(verdict.reason).toMatch(/foundation/);
   });

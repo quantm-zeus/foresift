@@ -1,14 +1,14 @@
 {
   "schema": "foresift/bun-migration-manifest@1",
   "migrationId": "bun-test-authority-v1",
-  "generatedAt": "2026-08-27T01:49:33.213Z",
+  "generatedAt": "2026-08-27T01:49:33.764Z",
   "root": ".",
   "totalTestFiles": 219,
   "counts": {
-    "CODEMOD_READY": 83,
+    "CODEMOD_READY": 73,
     "AGY_REQUIRED": 17,
     "MIGRATED": 76,
-    "VERIFIED": 43,
+    "VERIFIED": 53,
     "BLOCKED": 0
   },
   "parity": {
@@ -1270,28 +1270,24 @@
     {
       "path": "packages/security/test/audit-categories.spec.ts",
       "package": "@foresift/security",
-      "bytes": 1481,
+      "bytes": 1483,
       "lines": 43,
-      "sha256": "a19313e6ea248198aeeea913c5803b8cd56cfbb3be1bb930c7f31ee24ff092b5",
+      "sha256": "b6f535f47d0aaf9c410d87237442340551eab97d773800d5a6c88f4efb6b3837",
       "imports": [
-        "vitest",
+        "bun:test",
         "@foresift/shared-schemas",
         "../src/audit-categories.ts"
       ],
-      "vitestImports": [
-        "describe",
-        "expect",
-        "it"
-      ],
+      "vitestImports": [],
       "features": [],
       "workload": "PURE",
-      "migrationType": "EASY_MECHANICAL",
+      "migrationType": "ALREADY_MIGRATED",
       "fixturesAndHelpers": [],
       "sourceAnchors": [
         "@foresift/shared-schemas",
         "../src/audit-categories.ts"
       ],
-      "state": "CODEMOD_READY"
+      "state": "VERIFIED"
     },
     {
       "path": "packages/security/test/audit-chain.spec.ts",
@@ -1325,52 +1321,44 @@
     {
       "path": "packages/security/test/egress.spec.ts",
       "package": "@foresift/security",
-      "bytes": 8674,
+      "bytes": 8676,
       "lines": 231,
-      "sha256": "1aa941360dde18535e7cbe0659a036b11721b950e9a9873c90581a97293fb615",
+      "sha256": "dddb1db19420daf39574d0357defc63a2718fd58e0def1b6b014655028fdfe71",
       "imports": [
-        "vitest",
+        "bun:test",
         "../src/egress.ts"
       ],
-      "vitestImports": [
-        "describe",
-        "expect",
-        "it"
-      ],
+      "vitestImports": [],
       "features": [],
       "workload": "PURE",
-      "migrationType": "EASY_MECHANICAL",
+      "migrationType": "ALREADY_MIGRATED",
       "fixturesAndHelpers": [],
       "sourceAnchors": [
         "../src/egress.ts"
       ],
-      "state": "CODEMOD_READY"
+      "state": "VERIFIED"
     },
     {
       "path": "packages/security/test/error-hierarchy.spec.ts",
       "package": "@foresift/security",
-      "bytes": 4204,
+      "bytes": 4206,
       "lines": 97,
-      "sha256": "dd4cb155d4b5165ce4e278032f387d0cd37288285ab8490f8da20f5e1712f46d",
+      "sha256": "19b7b5bcb27a911e8876d63f07042269605cc76fcb96f34f59f4f2640ed80e92",
       "imports": [
-        "vitest",
+        "bun:test",
         "../src/index.ts",
         "../src/errors.ts"
       ],
-      "vitestImports": [
-        "describe",
-        "expect",
-        "it"
-      ],
+      "vitestImports": [],
       "features": [],
       "workload": "PURE",
-      "migrationType": "EASY_MECHANICAL",
+      "migrationType": "ALREADY_MIGRATED",
       "fixturesAndHelpers": [],
       "sourceAnchors": [
         "../src/index.ts",
         "../src/errors.ts"
       ],
-      "state": "CODEMOD_READY"
+      "state": "VERIFIED"
     },
     {
       "path": "packages/security/test/gate-pause.spec.ts",
@@ -1461,61 +1449,53 @@
     {
       "path": "packages/security/test/mcp-origin-protocol.spec.ts",
       "package": "@foresift/security",
-      "bytes": 6586,
+      "bytes": 6588,
       "lines": 186,
-      "sha256": "9ac7746fde44a573b7fbd695721cd33e217b2b3a8a5668fbc9e6018f64e4e3c2",
+      "sha256": "dd1013379fc1c163c7fceb9a7202b6110bfe9d9aab6e6dcebaf60140b594ca01",
       "imports": [
-        "vitest",
+        "bun:test",
         "../src/mcp-origin.ts",
         "../src/mcp-protocol-guard.ts"
       ],
-      "vitestImports": [
-        "describe",
-        "expect",
-        "it"
-      ],
+      "vitestImports": [],
       "features": [],
       "workload": "PURE",
-      "migrationType": "EASY_MECHANICAL",
+      "migrationType": "ALREADY_MIGRATED",
       "fixturesAndHelpers": [],
       "sourceAnchors": [
         "../src/mcp-origin.ts",
         "../src/mcp-protocol-guard.ts"
       ],
-      "state": "CODEMOD_READY"
+      "state": "VERIFIED"
     },
     {
       "path": "packages/security/test/negative-capability.spec.ts",
       "package": "@foresift/security",
-      "bytes": 10425,
+      "bytes": 10427,
       "lines": 270,
-      "sha256": "d0f235816d878ebc3b2c469bbd976a29697290d54c000e4ea3731362563be45c",
+      "sha256": "6a638ee721215c5b50f0b36e909f873ea19f94b3c47cbce2fcc4708b5c621f1f",
       "imports": [
         "node:fs",
         "node:path",
         "node:url",
-        "vitest",
+        "bun:test",
         "../src/negative-capability.ts",
         "../src/decoder-authority.ts",
         "../src/supply-chain.ts"
       ],
-      "vitestImports": [
-        "describe",
-        "expect",
-        "it"
-      ],
+      "vitestImports": [],
       "features": [
         "dynamic-import"
       ],
       "workload": "PURE",
-      "migrationType": "EASY_MECHANICAL",
+      "migrationType": "ALREADY_MIGRATED",
       "fixturesAndHelpers": [],
       "sourceAnchors": [
         "../src/negative-capability.ts",
         "../src/decoder-authority.ts",
         "../src/supply-chain.ts"
       ],
-      "state": "CODEMOD_READY"
+      "state": "VERIFIED"
     },
     {
       "path": "packages/security/test/oauth-credentials.spec.ts",
@@ -1574,29 +1554,25 @@
     {
       "path": "packages/security/test/scan-traversal.spec.ts",
       "package": "@foresift/security",
-      "bytes": 3206,
+      "bytes": 3208,
       "lines": 72,
-      "sha256": "339f40cccfea60ac933e7cee2e2e9669f2aab07432b73b85216553762461d896",
+      "sha256": "7602aebbd5f82f2afd65929c61b6560dae8c19051b6a298071f4cc3bd3b861ec",
       "imports": [
         "node:fs",
         "node:path",
         "node:os",
         "node:url",
-        "vitest"
+        "bun:test"
       ],
-      "vitestImports": [
-        "describe",
-        "expect",
-        "it"
-      ],
+      "vitestImports": [],
       "features": [
         "dynamic-import"
       ],
       "workload": "PURE",
-      "migrationType": "EASY_MECHANICAL",
+      "migrationType": "ALREADY_MIGRATED",
       "fixturesAndHelpers": [],
       "sourceAnchors": [],
-      "state": "CODEMOD_READY"
+      "state": "VERIFIED"
     },
     {
       "path": "packages/security/test/scanner-exit-contract.spec.ts",
@@ -1653,108 +1629,92 @@
     {
       "path": "packages/security/test/secrets-claims.spec.ts",
       "package": "@foresift/security",
-      "bytes": 9975,
+      "bytes": 9977,
       "lines": 243,
-      "sha256": "8ff72348d93ba3575fafc4775162bd27e35b46a825f805051013521e6d3bdab3",
+      "sha256": "61299b8061013ac412b5401d151987c61d919077ca6853f89bd9a4ba40ae9bff",
       "imports": [
-        "vitest",
+        "bun:test",
         "node:assert",
         "@foresift/shared-schemas",
         "../src/secrets-policy.ts",
         "../src/claims-policy.ts"
       ],
-      "vitestImports": [
-        "describe",
-        "expect",
-        "it"
-      ],
+      "vitestImports": [],
       "features": [],
       "workload": "PURE",
-      "migrationType": "EASY_MECHANICAL",
+      "migrationType": "ALREADY_MIGRATED",
       "fixturesAndHelpers": [],
       "sourceAnchors": [
         "@foresift/shared-schemas",
         "../src/secrets-policy.ts",
         "../src/claims-policy.ts"
       ],
-      "state": "CODEMOD_READY"
+      "state": "VERIFIED"
     },
     {
       "path": "packages/security/test/threat-model-register.spec.ts",
       "package": "@foresift/security",
-      "bytes": 3264,
+      "bytes": 3266,
       "lines": 89,
-      "sha256": "4baa05fa2882cf81e3f5616e9cba464ffb60157113425a5825d461cdfeefa1b8",
+      "sha256": "404a79ba13b06a57a533067ff33b1c1712a5da99f5dda24b5f1f05e88aecbb74",
       "imports": [
         "node:fs",
         "node:path",
         "node:url",
-        "vitest"
+        "bun:test"
       ],
-      "vitestImports": [
-        "describe",
-        "expect",
-        "it"
-      ],
+      "vitestImports": [],
       "features": [],
       "workload": "PURE",
-      "migrationType": "EASY_MECHANICAL",
+      "migrationType": "ALREADY_MIGRATED",
       "fixturesAndHelpers": [],
       "sourceAnchors": [],
-      "state": "CODEMOD_READY"
+      "state": "VERIFIED"
     },
     {
       "path": "packages/security/test/untrusted-content.spec.ts",
       "package": "@foresift/security",
-      "bytes": 10384,
+      "bytes": 10386,
       "lines": 235,
-      "sha256": "2ae76105a84de434595e0f93e16663e2e305bd9b781a1139e777fd92f569e042",
+      "sha256": "7aede3c32fc98f015279a81accd3fa4f10cf7eff3d83999b21a9d40631ca2b44",
       "imports": [
-        "vitest",
+        "bun:test",
         "../src/untrusted-content.ts"
       ],
-      "vitestImports": [
-        "describe",
-        "expect",
-        "it"
-      ],
+      "vitestImports": [],
       "features": [],
       "workload": "PURE",
-      "migrationType": "EASY_MECHANICAL",
+      "migrationType": "ALREADY_MIGRATED",
       "fixturesAndHelpers": [],
       "sourceAnchors": [
         "../src/untrusted-content.ts"
       ],
-      "state": "CODEMOD_READY"
+      "state": "VERIFIED"
     },
     {
       "path": "packages/security/test/webhook-abuse.spec.ts",
       "package": "@foresift/security",
-      "bytes": 10650,
+      "bytes": 10652,
       "lines": 263,
-      "sha256": "e52bf0135333358cbd84c1a783c498036807187d55acccfd37ad11c4fa6bc061",
+      "sha256": "d2637805fcfbe372fb339581fb40b47248c194aa13a3a4e95bffbf18c5047d9a",
       "imports": [
-        "vitest",
+        "bun:test",
         "node:crypto",
         "../src/webhook-integrity.ts",
         "../src/errors.ts",
         "../src/abuse-controls.ts"
       ],
-      "vitestImports": [
-        "describe",
-        "expect",
-        "it"
-      ],
+      "vitestImports": [],
       "features": [],
       "workload": "PURE",
-      "migrationType": "EASY_MECHANICAL",
+      "migrationType": "ALREADY_MIGRATED",
       "fixturesAndHelpers": [],
       "sourceAnchors": [
         "../src/webhook-integrity.ts",
         "../src/errors.ts",
         "../src/abuse-controls.ts"
       ],
-      "state": "CODEMOD_READY"
+      "state": "VERIFIED"
     },
     {
       "path": "packages/shared-schemas/test/core.spec.ts",
@@ -7579,7 +7539,8 @@
       },
       "codexCalls": 0,
       "claudeCalls": 0,
-      "testedHead": "654747780bda57edf07c52dad40204bf3e665c55"
+      "testedHead": "654747780bda57edf07c52dad40204bf3e665c55",
+      "checkpointHead": "0d43f8aa6a66e9d0bee3d6a0afcc6dbf72ed3f3e"
     },
     {
       "id": "mechanical--foresift-security-pure-1",
@@ -7597,7 +7558,71 @@
         "packages/security/test/untrusted-content.spec.ts",
         "packages/security/test/webhook-abuse.spec.ts"
       ],
-      "state": "PENDING"
+      "state": "VERIFIED",
+      "verification": {
+        "ok": true,
+        "wallTimeMs": 427,
+        "peakRssBytes": 0,
+        "cpuSeconds": 0,
+        "counts": {
+          "passed": 103,
+          "failed": 0,
+          "skipped": 0
+        },
+        "results": [
+          {
+            "id": "pure-1",
+            "workload": "PURE",
+            "files": [
+              "packages/security/test/audit-categories.spec.ts",
+              "packages/security/test/egress.spec.ts",
+              "packages/security/test/error-hierarchy.spec.ts",
+              "packages/security/test/mcp-origin-protocol.spec.ts",
+              "packages/security/test/negative-capability.spec.ts",
+              "packages/security/test/scan-traversal.spec.ts",
+              "packages/security/test/secrets-claims.spec.ts",
+              "packages/security/test/threat-model-register.spec.ts",
+              "packages/security/test/untrusted-content.spec.ts",
+              "packages/security/test/webhook-abuse.spec.ts"
+            ],
+            "fileWorkers": 2,
+            "testConcurrency": 8,
+            "command": [
+              "bun",
+              "test",
+              "--no-orphans",
+              "--isolate",
+              "--parallel=2",
+              "--max-concurrency=8",
+              "--timeout=30000",
+              "packages/security/test/audit-categories.spec.ts",
+              "packages/security/test/egress.spec.ts",
+              "packages/security/test/error-hierarchy.spec.ts",
+              "packages/security/test/mcp-origin-protocol.spec.ts",
+              "packages/security/test/negative-capability.spec.ts",
+              "packages/security/test/scan-traversal.spec.ts",
+              "packages/security/test/secrets-claims.spec.ts",
+              "packages/security/test/threat-model-register.spec.ts",
+              "packages/security/test/untrusted-content.spec.ts",
+              "packages/security/test/webhook-abuse.spec.ts"
+            ],
+            "status": 0,
+            "wallTimeMs": 427,
+            "peakRssBytes": null,
+            "cpuSeconds": null,
+            "counts": {
+              "passed": 103,
+              "failed": 0,
+              "skipped": 0
+            },
+            "stdoutTail": "bun test v1.4.0 (34cbb9a40) 2x PARALLEL\n",
+            "stderrTail": "quote-heavy adversarial markup (M5) [5.44ms]\n(pass) render-safety validation (AC-258) > flags script tags, event handlers, and dangerous URL schemes [0.35ms]\n(pass) render-safety validation (AC-258) > refuses raw HTML unless the policy explicitly allows sanitized HTML [0.21ms]\n(pass) render-safety validation (AC-258) > enforces the remote-image policy against trusted hosts only [0.32ms]\n(pass) render-safety validation (AC-258) > requires rel=noopener noreferrer on target=_blank links and flags exfil-shaped queries [0.40ms]\n(pass) render-safety validation (AC-258) > surfaces confusable-address warnings as non-blocking hooks [0.38ms]\n(pass) render-safety validation (AC-258) > passes plain markdown untouched-safe content [0.08ms]\n(pass) render-safety validation (AC-258) > catches the historical bypasses: slash-separated handlers, tabbed schemes, multi-candidate srcset [0.49ms]\n(pass) memory isolation keys (AC-052 cooperation) > derives distinct keys per actor/session/workspace [0.49ms]\n\npackages/security/test/webhook-abuse.spec.ts:\n(pass) webhook verification battery (AC-051) > accepts a correctly signed fresh callback once [1.26ms]\n(pass) webhook verification battery (AC-051) > refuses FORGED scheduler webhooks (bad key / tampered body) [0.41ms]\n(pass) webhook verification battery (AC-051) > refuses stale and missing timestamps [0.20ms]\n(pass) webhook verification battery (AC-051) > refuses malformed payloads outright [0.27ms]\n(pass) webhook verification battery (AC-051) > never constructs a guard whose staleness window is disabled (L12) [0.13ms]\n(pass) webhook verification battery (AC-051) > evicts replay-cache entries at capacity so memory stays bounded (M20) [0.35ms]\n(pass) webhook verification battery (AC-051) > detects replays of identical event-ID + payload pairs [0.37ms]\n(pass) webhook verification battery (AC-051) > enforces the FIXED-ENDPOINT rule: reconnect URLs come from configuration only [0.21ms]\n(pass) webhook verification battery (AC-051) > malformed events can NEVER advance a checkpoint [0.12ms]\n(pass) abuse controls (FR-SEC-010) > flood-limits by cost-weighted admission inside a sliding window [0.50ms]\n(pass) abuse controls (FR-SEC-010) > weights expensive queries so one heavy scan consumes many slots [0.21ms]\n(pass) abuse controls (FR-SEC-010) > degrades on quota exhaustion WITHOUT bypassing any control [0.24ms]\n(pass) abuse controls (FR-SEC-010) > detects enumeration sweeps across many distinct objects [0.35ms]\n(pass) abuse controls (FR-SEC-010) > protected risk-monitoring subjects can NEVER be suspended or degraded [0.66ms]\n(pass) abuse controls (FR-SEC-010) > screens explicit prompt-attack markers deterministically [0.11ms]\n(pass) abuse controls (FR-SEC-010) > coordination-score stub counts repeated bursts deterministically [0.20ms]\n\npackages/security/test/negative-capability.spec.ts:\n(pass) CLI ↔ canary fixture parity (AC-255) > repo-root scan stays CLEAN while the excluded fixture corpus is detected [184.88ms]\n(pass) decoder-authority validator (AC-256) > accepts deprecated parsers only as fallbacks beside the raw local path [0.40ms]\n(pass) decoder-authority validator (AC-256) > REFUSES a deprecated parser marked sole/authoritative [0.27ms]\n(pass) decoder-authority validator (AC-256) > refuses deprecated decoders running without the raw local decoding pass [0.11ms]\n(pass) decoder-authority validator (AC-256) > requires explicit per-decoder acknowledgement for running deprecated parsers (L21) [0.18ms]\n(pass) supply-chain policy (FR-SEC-006) > requires EXACT version pins for production dependencies [0.42ms]\n(pass) supply-chain policy (FR-SEC-006) > records lockfile, SBOM, and build-hash records deterministically [0.45ms]\n(pass) supply-chain policy (FR-SEC-006) > refuses restricted lifecycle scripts and flags capability review [0.40ms]\n(pass) refuses incomplete SBOM inventories, attestations, and missing lockfiles (M22) [0.34ms]\n\n 103 pass\n 0 fail\n 521 expect() calls\nRan 103 tests across 10 files. [411.00ms]\n"
+          }
+        ]
+      },
+      "codexCalls": 0,
+      "claudeCalls": 0,
+      "testedHead": "0d43f8aa6a66e9d0bee3d6a0afcc6dbf72ed3f3e"
     },
     {
       "id": "mechanical--foresift-shared-schemas-pure-1",

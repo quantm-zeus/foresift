@@ -2,7 +2,7 @@
 // defaults to its declared machine code, carries structured detail, threads
 // ES `cause` options, and is exported from the package barrel — verified
 // table-driven so a newly added class without a declared default FAILS here.
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'bun:test';
 import * as sec from '../src/index.ts';
 import { ForesiftSecurityError, SecErrorCode } from '../src/errors.ts';
 

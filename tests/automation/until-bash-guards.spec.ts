@@ -2,7 +2,7 @@ import { spawnSync } from 'node:child_process';
 import { mkdtempSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'bun:test';
 
 // Regression coverage for ADR-0004: Archon v0.9.0 does NOT export ARTIFACTS_DIR
 // into until_bash guard environments (only bare-form `$ARTIFACTS_DIR` textual

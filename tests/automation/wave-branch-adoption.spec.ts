@@ -15,7 +15,7 @@
 import { execFileSync } from 'node:child_process';
 import { writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { afterAll, describe, expect, it } from 'vitest';
+import { afterAll, describe, expect, it } from 'bun:test';
 
 // The adoption core spawns plain `git` inheriting this process's env; give it
 // a commit identity so merge commits (main-absorption) can be created.

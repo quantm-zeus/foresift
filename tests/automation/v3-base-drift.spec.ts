@@ -14,7 +14,7 @@ import { execFileSync, spawn, spawnSync } from 'node:child_process';
 import { chmodSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { afterAll, describe, expect, it } from 'vitest';
+import { afterAll, describe, expect, it } from 'bun:test';
 import {
   BASE_DRIFT_REASON,
   landingAdmission,
@@ -559,12 +559,12 @@ describe('runFinalLand base-drift admission (V3-D §11.2)', () => {
      *  sets exit codes instead of exiting when used as a library). */
     function captureExit(fn: () => unknown): string | number | undefined {
       const prev = process.exitCode;
-      process.exitCode = undefined as never;
+      process.exitCode = 0;
       try {
         fn();
       } finally {
         const code = process.exitCode;
-        process.exitCode = prev as never;
+        process.exitCode = prev ?? 0;
         return code;
       }
     }
@@ -589,12 +589,12 @@ describe('runFinalLand base-drift admission (V3-D §11.2)', () => {
     freshArtifacts();
     function captureExit(fn: () => unknown): string | number | undefined {
       const prev = process.exitCode;
-      process.exitCode = undefined as never;
+      process.exitCode = 0;
       try {
         fn();
       } finally {
         const code = process.exitCode;
-        process.exitCode = prev as never;
+        process.exitCode = prev ?? 0;
         return code;
       }
     }

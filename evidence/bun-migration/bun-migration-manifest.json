@@ -1,14 +1,14 @@
 {
   "schema": "foresift/bun-migration-manifest@1",
   "migrationId": "bun-test-authority-v1",
-  "generatedAt": "2026-08-27T01:50:18.861Z",
+  "generatedAt": "2026-08-27T01:51:28.058Z",
   "root": ".",
   "totalTestFiles": 219,
   "counts": {
-    "CODEMOD_READY": 44,
+    "CODEMOD_READY": 31,
     "AGY_REQUIRED": 17,
-    "MIGRATED": 76,
-    "VERIFIED": 82,
+    "MIGRATED": 78,
+    "VERIFIED": 93,
     "BLOCKED": 0
   },
   "parity": {
@@ -3588,31 +3588,26 @@
     {
       "path": "tests/automation/archon-task-worktree-advance.spec.ts",
       "package": "automation",
-      "bytes": 6190,
+      "bytes": 6192,
       "lines": 132,
-      "sha256": "aeb0b5524c11e045436306e7026d452cf0925657866d5cc30f78b574cc602ef7",
+      "sha256": "b78ed400b0583e2b2e03c8ff58f11dca18f4c6d5eef80376610ce5250edc099a",
       "imports": [
         "node:child_process",
         "node:fs",
         "node:os",
         "node:path",
-        "vitest",
+        "bun:test",
         "../../scripts/automation/foresift-autopilot.mjs"
       ],
-      "vitestImports": [
-        "afterEach",
-        "describe",
-        "expect",
-        "it"
-      ],
+      "vitestImports": [],
       "features": [],
       "workload": "PROCESS",
-      "migrationType": "EASY_MECHANICAL",
+      "migrationType": "ALREADY_MIGRATED",
       "fixturesAndHelpers": [],
       "sourceAnchors": [
         "../../scripts/automation/foresift-autopilot.mjs"
       ],
-      "state": "CODEMOD_READY"
+      "state": "VERIFIED"
     },
     {
       "path": "tests/automation/bun-migration.spec.ts",
@@ -3665,30 +3660,26 @@
     {
       "path": "tests/automation/claude-tooling-only.spec.ts",
       "package": "automation",
-      "bytes": 3112,
+      "bytes": 3114,
       "lines": 63,
-      "sha256": "c8b1197824fe4f26bedc7ffeaee9528f3732dcd5e2a408bb56dd32d5eb0a52b0",
+      "sha256": "9ad581c80e28c350ac0ee019816294d0b05d80374587e20b19e8356718b328de",
       "imports": [
         "node:child_process",
         "node:fs",
         "node:path",
         "node:url",
-        "vitest",
+        "bun:test",
         "../../scripts/automation/fast-impact.mjs"
       ],
-      "vitestImports": [
-        "describe",
-        "expect",
-        "it"
-      ],
+      "vitestImports": [],
       "features": [],
       "workload": "PROCESS",
-      "migrationType": "EASY_MECHANICAL",
+      "migrationType": "ALREADY_MIGRATED",
       "fixturesAndHelpers": [],
       "sourceAnchors": [
         "../../scripts/automation/fast-impact.mjs"
       ],
-      "state": "CODEMOD_READY"
+      "state": "VERIFIED"
     },
     {
       "path": "tests/automation/codex-agy-profile.spec.ts",
@@ -3723,30 +3714,26 @@
     {
       "path": "tests/automation/control-plane.spec.ts",
       "package": "automation",
-      "bytes": 21767,
+      "bytes": 21769,
       "lines": 541,
-      "sha256": "afe6062bae8387ca462ae99e71b59b39a89dd34615f204ed6eb3be20d5f68908",
+      "sha256": "5ebe0e105205d71a89bdbca6e934cae8388c839af26209861b2453262d1ebb3e",
       "imports": [
-        "vitest",
+        "bun:test",
         "../../scripts/automation/schema.mjs",
         "../../scripts/automation/schema.mjs"
       ],
-      "vitestImports": [
-        "describe",
-        "expect",
-        "it"
-      ],
+      "vitestImports": [],
       "features": [
         "dynamic-import"
       ],
       "workload": "PROCESS",
-      "migrationType": "EASY_MECHANICAL",
+      "migrationType": "ALREADY_MIGRATED",
       "fixturesAndHelpers": [],
       "sourceAnchors": [
         "../../scripts/automation/schema.mjs",
         "../../scripts/automation/schema.mjs"
       ],
-      "state": "CODEMOD_READY"
+      "state": "VERIFIED"
     },
     {
       "path": "tests/automation/finalize-from-main.spec.ts",
@@ -3858,91 +3845,74 @@
     {
       "path": "tests/automation/impl-wave.spec.ts",
       "package": "automation",
-      "bytes": 33892,
+      "bytes": 33894,
       "lines": 780,
-      "sha256": "e01cdb089a2f2c29d0934277972a2850c89b0eef994fb62d31406397bfbac0e8",
+      "sha256": "d5ece9003f0fd8d20a2a14008c41a9e6475599a01a3599b11661f46132ff0213",
       "imports": [
-        "vitest",
+        "bun:test",
         "node:child_process",
         "node:fs",
         "node:os",
         "node:path",
         "node:url"
       ],
-      "vitestImports": [
-        "afterAll",
-        "beforeAll",
-        "describe",
-        "expect",
-        "it"
-      ],
+      "vitestImports": [],
       "features": [
         "dynamic-import"
       ],
       "workload": "PROCESS",
-      "migrationType": "EASY_MECHANICAL",
+      "migrationType": "ALREADY_MIGRATED",
       "fixturesAndHelpers": [],
       "sourceAnchors": [],
-      "state": "CODEMOD_READY"
+      "state": "VERIFIED"
     },
     {
       "path": "tests/automation/implement-completeness-clean-tree.spec.ts",
       "package": "automation",
-      "bytes": 5546,
+      "bytes": 5548,
       "lines": 136,
-      "sha256": "79df1e7b58496cd5cac6d563ece73f889ffd3e4212e414a7d24b0e4560bc5a47",
+      "sha256": "16da296f07fa26ac94570dd6dc485c7c3654ef541a1c8e895b5170b910a547aa",
       "imports": [
         "node:child_process",
         "node:fs",
         "node:os",
         "node:path",
-        "vitest",
+        "bun:test",
         "../../scripts/automation/package-implement-complete.mjs"
       ],
-      "vitestImports": [
-        "afterEach",
-        "describe",
-        "expect",
-        "it"
-      ],
+      "vitestImports": [],
       "features": [],
       "workload": "PROCESS",
-      "migrationType": "EASY_MECHANICAL",
+      "migrationType": "ALREADY_MIGRATED",
       "fixturesAndHelpers": [],
       "sourceAnchors": [
         "../../scripts/automation/package-implement-complete.mjs"
       ],
-      "state": "CODEMOD_READY"
+      "state": "VERIFIED"
     },
     {
       "path": "tests/automation/plan-context-capsule.spec.ts",
       "package": "automation",
-      "bytes": 11890,
+      "bytes": 11892,
       "lines": 315,
-      "sha256": "88a1298dba8d9dc46dde072afcebd3542936b2ba0e797d2238847182767b43d7",
+      "sha256": "b845de80b037adf077799d52dc2fe36c2f2b4564d6440edf44cd6f2c358217a0",
       "imports": [
-        "vitest",
+        "bun:test",
         "node:child_process",
         "node:fs",
         "node:os",
         "node:path",
         "node:url"
       ],
-      "vitestImports": [
-        "afterAll",
-        "beforeAll",
-        "describe",
-        "expect",
-        "it"
-      ],
+      "vitestImports": [],
       "features": [
         "dynamic-import"
       ],
       "workload": "PROCESS",
-      "migrationType": "EASY_MECHANICAL",
+      "migrationType": "ALREADY_MIGRATED",
       "fixturesAndHelpers": [],
       "sourceAnchors": [],
-      "state": "CODEMOD_READY"
+      "state": "VERIFIED"
     },
     {
       "path": "tests/automation/planned-handoff.spec.ts",
@@ -3974,33 +3944,28 @@
     {
       "path": "tests/automation/selection-committed-view.spec.ts",
       "package": "automation",
-      "bytes": 6601,
+      "bytes": 6603,
       "lines": 153,
-      "sha256": "067603ea20de44cc6089f825331aaf74c834957ce72a52f2c5bebb33ea2a78af",
+      "sha256": "1abbaaa09aa3ba296cbd8a8f451798c521dc42308247c9b5af1ff4195bd3f082",
       "imports": [
         "node:child_process",
         "node:fs",
         "node:os",
         "node:path",
-        "vitest",
+        "bun:test",
         "../../scripts/automation/schema.mjs",
         "../../scripts/automation/foresift-autopilot.mjs"
       ],
-      "vitestImports": [
-        "afterEach",
-        "describe",
-        "expect",
-        "it"
-      ],
+      "vitestImports": [],
       "features": [],
       "workload": "PROCESS",
-      "migrationType": "EASY_MECHANICAL",
+      "migrationType": "ALREADY_MIGRATED",
       "fixturesAndHelpers": [],
       "sourceAnchors": [
         "../../scripts/automation/schema.mjs",
         "../../scripts/automation/foresift-autopilot.mjs"
       ],
-      "state": "CODEMOD_READY"
+      "state": "VERIFIED"
     },
     {
       "path": "tests/automation/sharded-wave-rollout.spec.ts",
@@ -4123,27 +4088,23 @@
     {
       "path": "tests/automation/until-bash-guards.spec.ts",
       "package": "automation",
-      "bytes": 8378,
+      "bytes": 8380,
       "lines": 209,
-      "sha256": "420b05d3ce23fcd6b34f9204945b30da3210e26651d4b994062191416c4ff223",
+      "sha256": "be07b89fc42358ab5e5b26c4b1f84bd33af0b28112d5681b035f8f0ed53cf566",
       "imports": [
         "node:child_process",
         "node:fs",
         "node:os",
         "node:path",
-        "vitest"
+        "bun:test"
       ],
-      "vitestImports": [
-        "describe",
-        "expect",
-        "it"
-      ],
+      "vitestImports": [],
       "features": [],
       "workload": "PROCESS",
-      "migrationType": "EASY_MECHANICAL",
+      "migrationType": "ALREADY_MIGRATED",
       "fixturesAndHelpers": [],
       "sourceAnchors": [],
-      "state": "CODEMOD_READY"
+      "state": "VERIFIED"
     },
     {
       "path": "tests/automation/v2-gate-convergence.spec.ts",
@@ -4254,35 +4215,30 @@
     {
       "path": "tests/automation/v3-base-drift.spec.ts",
       "package": "automation",
-      "bytes": 23253,
+      "bytes": 23213,
       "lines": 615,
-      "sha256": "57af63730a896a9b452c31f39d01d4bff4d6016e225096819ea2a39f73462146",
+      "sha256": "5bde0c769e2a80c04d899287fb0a95a62a10c87cc3da30e5850f42f8998a232e",
       "imports": [
         "node:child_process",
         "node:fs",
         "node:os",
         "node:path",
-        "vitest",
+        "bun:test",
         "../../scripts/automation/base-drift.mjs",
         "../../scripts/automation/package-full-gate.mjs",
         "../../scripts/automation/package-final-land.mjs"
       ],
-      "vitestImports": [
-        "afterAll",
-        "describe",
-        "expect",
-        "it"
-      ],
+      "vitestImports": [],
       "features": [],
       "workload": "META_GATE",
-      "migrationType": "EASY_MECHANICAL",
+      "migrationType": "ALREADY_MIGRATED",
       "fixturesAndHelpers": [],
       "sourceAnchors": [
         "../../scripts/automation/base-drift.mjs",
         "../../scripts/automation/package-full-gate.mjs",
         "../../scripts/automation/package-final-land.mjs"
       ],
-      "state": "CODEMOD_READY"
+      "state": "MIGRATED"
     },
     {
       "path": "tests/automation/v3-generations.spec.ts",
@@ -4324,33 +4280,28 @@
     {
       "path": "tests/automation/v3-mechanical-landing.spec.ts",
       "package": "automation",
-      "bytes": 19201,
+      "bytes": 19203,
       "lines": 527,
-      "sha256": "7e24740c27f2f4d5d589fef221394443efd9eccd48a5f5286ec3f488f40d9afc",
+      "sha256": "b75391c30f8600889a2c16026a523a9ca1e0fab360d309b67473e713feb273d4",
       "imports": [
         "node:child_process",
         "node:fs",
         "node:os",
         "node:path",
-        "vitest",
+        "bun:test",
         "../../scripts/automation/package-create-pr.mjs",
         "../../scripts/automation/package-final-land.mjs"
       ],
-      "vitestImports": [
-        "afterAll",
-        "describe",
-        "expect",
-        "it"
-      ],
+      "vitestImports": [],
       "features": [],
       "workload": "PROCESS",
-      "migrationType": "EASY_MECHANICAL",
+      "migrationType": "ALREADY_MIGRATED",
       "fixturesAndHelpers": [],
       "sourceAnchors": [
         "../../scripts/automation/package-create-pr.mjs",
         "../../scripts/automation/package-final-land.mjs"
       ],
-      "state": "CODEMOD_READY"
+      "state": "VERIFIED"
     },
     {
       "path": "tests/automation/v3-scheduler-runtime.spec.ts",
@@ -4441,54 +4392,45 @@
     {
       "path": "tests/automation/wave-admission.spec.ts",
       "package": "automation",
-      "bytes": 6790,
+      "bytes": 6792,
       "lines": 173,
-      "sha256": "aa76be46c3f0cc59fd180e15f71734341ef88ea6941784a6cc868c37822880ae",
+      "sha256": "d97b4f3f1da6b46d4b8a9e77c24e643a180539d9884d6553cb7af2ac014faee1",
       "imports": [
-        "vitest",
+        "bun:test",
         "node:child_process",
         "node:fs",
         "node:path",
         "node:os",
         "../../scripts/automation/wave-admission.mjs"
       ],
-      "vitestImports": [
-        "describe",
-        "expect",
-        "it"
-      ],
+      "vitestImports": [],
       "features": [],
       "workload": "PROCESS",
-      "migrationType": "EASY_MECHANICAL",
+      "migrationType": "ALREADY_MIGRATED",
       "fixturesAndHelpers": [],
       "sourceAnchors": [
         "../../scripts/automation/wave-admission.mjs"
       ],
-      "state": "CODEMOD_READY"
+      "state": "VERIFIED"
     },
     {
       "path": "tests/automation/wave-branch-adoption.spec.ts",
       "package": "automation",
-      "bytes": 7435,
+      "bytes": 7437,
       "lines": 181,
-      "sha256": "fca61121d90f79467cdf42947526d2f4c8c050d21ba05e16e7f7614698a6d9e7",
+      "sha256": "6c5e263050df1f9adfacf9ce34338d4db97d6020a662bf09d274eb604d2b589e",
       "imports": [
         "node:child_process",
         "node:fs",
         "node:path",
-        "vitest",
+        "bun:test",
         "../helpers/git-fixture.js",
         "../../scripts/automation/wave-branch-adoption.mjs"
       ],
-      "vitestImports": [
-        "afterAll",
-        "describe",
-        "expect",
-        "it"
-      ],
+      "vitestImports": [],
       "features": [],
       "workload": "PROCESS",
-      "migrationType": "EASY_MECHANICAL",
+      "migrationType": "ALREADY_MIGRATED",
       "fixturesAndHelpers": [
         "../helpers/git-fixture.js"
       ],
@@ -4496,30 +4438,26 @@
         "../helpers/git-fixture.js",
         "../../scripts/automation/wave-branch-adoption.mjs"
       ],
-      "state": "CODEMOD_READY"
+      "state": "VERIFIED"
     },
     {
       "path": "tests/automation/workflow-node-budgets.spec.ts",
       "package": "automation",
-      "bytes": 4452,
+      "bytes": 4454,
       "lines": 103,
-      "sha256": "5cf1c42c240900a084669003de875aca8cbd9ac8c4019701487db22f4ae0fb46",
+      "sha256": "dbccfdf14d54d3fafed29b18fe54d1c16ae4c5e4a470033bc6806dcd4e4773d2",
       "imports": [
         "node:fs",
         "node:path",
-        "vitest"
+        "bun:test"
       ],
-      "vitestImports": [
-        "describe",
-        "expect",
-        "it"
-      ],
+      "vitestImports": [],
       "features": [],
       "workload": "META_GATE",
-      "migrationType": "EASY_MECHANICAL",
+      "migrationType": "ALREADY_MIGRATED",
       "fixturesAndHelpers": [],
       "sourceAnchors": [],
-      "state": "CODEMOD_READY"
+      "state": "MIGRATED"
     },
     {
       "path": "tests/automation/workflow-node-resilience.spec.ts",
@@ -6045,32 +5983,6 @@
     }
   ],
   "batches": [
-    {
-      "id": "agy-semantic-1",
-      "engine": "AGY",
-      "workload": "OTHER_HEAVY",
-      "files": [
-        "packages/persistence/test/backup-governance.spec.ts",
-        "packages/persistence/test/features-parity.spec.ts",
-        "packages/persistence/test/migrator.spec.ts",
-        "packages/provider-lifecycle/test/scaffold.spec.ts",
-        "packages/providers/test/scaffold.spec.ts",
-        "packages/security/test/scaffold.spec.ts",
-        "packages/shared-schemas/test/prov.spec.ts",
-        "packages/shared-schemas/test/sec.spec.ts",
-        "packages/tenant-isolation/test/scaffold.spec.ts",
-        "tests/automation/bun-migration.spec.ts",
-        "tests/automation/codex-agy-profile.spec.ts",
-        "tests/automation/test-tiers.spec.ts",
-        "tests/automation/throughput.spec.ts",
-        "tests/automation/v2-gate-convergence.spec.ts",
-        "tests/automation/v2-second-pass-cases.spec.ts",
-        "tests/automation/v3-generations.spec.ts",
-        "tests/spec-verify.spec.ts"
-      ],
-      "state": "PENDING",
-      "attempts": 0
-    },
     {
       "id": "mechanical--foresift-evidence-database-pglite-1",
       "engine": "CODEMOD",
@@ -7915,17 +7827,34 @@
       },
       "codexCalls": 0,
       "claudeCalls": 0,
-      "testedHead": "19ec19dc45ac0cfd2d05ef6d027b12aa665e193e"
+      "testedHead": "19ec19dc45ac0cfd2d05ef6d027b12aa665e193e",
+      "checkpointHead": "f8347f874b34c5c2bdc1c824b1fea54db0802b93"
     },
     {
-      "id": "mechanical-automation-meta-gate-1",
-      "engine": "CODEMOD",
-      "workload": "META_GATE",
+      "id": "agy-semantic-1",
+      "engine": "AGY",
+      "workload": "OTHER_HEAVY",
       "files": [
-        "tests/automation/v3-base-drift.spec.ts",
-        "tests/automation/workflow-node-budgets.spec.ts"
+        "packages/persistence/test/backup-governance.spec.ts",
+        "packages/persistence/test/features-parity.spec.ts",
+        "packages/persistence/test/migrator.spec.ts",
+        "packages/provider-lifecycle/test/scaffold.spec.ts",
+        "packages/providers/test/scaffold.spec.ts",
+        "packages/security/test/scaffold.spec.ts",
+        "packages/shared-schemas/test/prov.spec.ts",
+        "packages/shared-schemas/test/sec.spec.ts",
+        "packages/tenant-isolation/test/scaffold.spec.ts",
+        "tests/automation/bun-migration.spec.ts",
+        "tests/automation/codex-agy-profile.spec.ts",
+        "tests/automation/test-tiers.spec.ts",
+        "tests/automation/throughput.spec.ts",
+        "tests/automation/v2-gate-convergence.spec.ts",
+        "tests/automation/v2-second-pass-cases.spec.ts",
+        "tests/automation/v3-generations.spec.ts",
+        "tests/spec-verify.spec.ts"
       ],
-      "state": "PENDING"
+      "state": "PENDING",
+      "attempts": 0
     },
     {
       "id": "mechanical-automation-process-1",
@@ -7944,7 +7873,73 @@
         "tests/automation/wave-admission.spec.ts",
         "tests/automation/wave-branch-adoption.spec.ts"
       ],
-      "state": "PENDING"
+      "state": "VERIFIED",
+      "verification": {
+        "ok": true,
+        "wallTimeMs": 6361,
+        "peakRssBytes": 0,
+        "cpuSeconds": 0,
+        "counts": {
+          "passed": 122,
+          "failed": 0,
+          "skipped": 0
+        },
+        "results": [
+          {
+            "id": "process-1",
+            "workload": "PROCESS",
+            "files": [
+              "tests/automation/archon-task-worktree-advance.spec.ts",
+              "tests/automation/claude-tooling-only.spec.ts",
+              "tests/automation/control-plane.spec.ts",
+              "tests/automation/impl-wave.spec.ts",
+              "tests/automation/implement-completeness-clean-tree.spec.ts",
+              "tests/automation/plan-context-capsule.spec.ts",
+              "tests/automation/selection-committed-view.spec.ts",
+              "tests/automation/until-bash-guards.spec.ts",
+              "tests/automation/v3-mechanical-landing.spec.ts",
+              "tests/automation/wave-admission.spec.ts",
+              "tests/automation/wave-branch-adoption.spec.ts"
+            ],
+            "fileWorkers": 1,
+            "testConcurrency": 2,
+            "command": [
+              "bun",
+              "test",
+              "--no-orphans",
+              "--isolate",
+              "--parallel=1",
+              "--max-concurrency=2",
+              "--timeout=30000",
+              "tests/automation/archon-task-worktree-advance.spec.ts",
+              "tests/automation/claude-tooling-only.spec.ts",
+              "tests/automation/control-plane.spec.ts",
+              "tests/automation/impl-wave.spec.ts",
+              "tests/automation/implement-completeness-clean-tree.spec.ts",
+              "tests/automation/plan-context-capsule.spec.ts",
+              "tests/automation/selection-committed-view.spec.ts",
+              "tests/automation/until-bash-guards.spec.ts",
+              "tests/automation/v3-mechanical-landing.spec.ts",
+              "tests/automation/wave-admission.spec.ts",
+              "tests/automation/wave-branch-adoption.spec.ts"
+            ],
+            "status": 0,
+            "wallTimeMs": 6360,
+            "peakRssBytes": null,
+            "cpuSeconds": null,
+            "counts": {
+              "passed": 122,
+              "failed": 0,
+              "skipped": 0
+            },
+            "stdoutTail": "bun test v1.4.0 (34cbb9a40) 1x PARALLEL\n{\"merged\":true,\"pr\":123,\"squashSha\":\"abc\"}\nLAND ▸ MERGED mechanically (ATTESTATION_REUSE)\nLAND ▸ no valid attestation — running one final FULL gate\n{\"merged\":true,\"pr\":9}\nLAND ▸ MERGED mechanically (FULL_RUN)\nLAND ▸ no valid attestation — running one final FULL gate\nLAND ▸ ci-red: x\n{\n  \"merged\": false,\n  \"reason\": \"ci-red\",\n  \"failures\": [\"Verify:failure\"]\n}\nkaboom\n{}\nLAND ▸ MERGED mechanically (ATTESTATION_REUSE)\n",
+            "stderrTail": "chon task-worktree advance before fresh launches (defect #11b) > fast-forwards a stale clean worktree to current main [191.86ms]\n(pass) archon task-worktree advance before fresh launches (defect #11b) > refuses to advance a dirty worktree (fail-closed) [143.84ms]\n(pass) archon task-worktree advance before fresh launches (defect #11b) > refuses to advance over unique commits (possibly real product work) [145.91ms]\n(pass) archon task-worktree advance before fresh launches (defect #11b) > returns null for a repo with no registered task worktree (first launch) [29.60ms]\n\ntests/automation/claude-tooling-only.spec.ts:\n(pass) .claude tooling-only invariant > tracked .claude/** carries NO scannable source files (tripwire against silent scanner blind spots) [5.12ms]\n(pass) .claude tooling-only invariant > no npm package can hide under .claude (packaging/discovery cannot rely on the excluded prefix) [3.59ms]\n(pass) .claude tooling-only invariant > the control-plane classification itself stays armed (positive detection) [0.40ms]\n\ntests/automation/wave-admission.spec.ts:\n(pass) wave-admission — launch-seam gate for the implementation-only sharded wave (defect #18) > pure admission decision > admits a wave-routed package whose planning completeness is proven [0.11ms]\n(pass) wave-admission — launch-seam gate for the implementation-only sharded wave (defect #18) > pure admission decision > demotes a wave-routed package with unproven planning to the PLANNING-ONLY bootstrap [0.04ms]\n(pass) wave-admission — launch-seam gate for the implementation-only sharded wave (defect #18) > pure admission decision > never touches non-wave selector verdicts (legacy lane, optimized-under-OFF) [0.04ms]\n(pass) wave-admission — launch-seam gate for the implementation-only sharded wave (defect #18) > package-plan-complete.mjs --repo-only (supervisor probe mode) > reports a planned package complete without any artifacts dir [26.63ms]\n(pass) wave-admission — launch-seam gate for the implementation-only sharded wave (defect #18) > package-plan-complete.mjs --repo-only (supervisor probe mode) > reports an unplanned package incomplete with precise reasons [20.45ms]\n(pass) wave-admission — launch-seam gate for the implementation-only sharded wave (defect #18) > package-plan-complete.mjs --repo-only (supervisor probe mode) > keeps placeholder/marker scanning active in repo-only mode [22.13ms]\n(pass) wave-admission — launch-seam gate for the implementation-only sharded wave (defect #18) > package-plan-complete.mjs --repo-only (supervisor probe mode) > refuses the default mode without an artifacts dir — repo-only stays opt-in [21.46ms]\n\ntests/automation/until-bash-guards.spec.ts:\n(pass) plan validator artifacts-dir contract (ADR-0004) > fails closed naming --artifacts-dir when neither flag nor env provides a path [46.60ms]\n(pass) plan validator artifacts-dir contract (ADR-0004) > accepts --artifacts-dir alone (guard context, env unset) [52.51ms]\n(pass) plan validator artifacts-dir contract (ADR-0004) > --artifacts-dir takes precedence over a (garbage) env value [48.57ms]\n(pass) audit-progress artifacts-dir contract (ADR-0004) > fails closed naming --artifacts-dir when neither flag nor env provides a path [44.92ms]\n(pass) audit-progress artifacts-dir contract (ADR-0004) > accepts --artifacts-dir alone (guard context, env unset) [70.03ms]\n(pass) until_bash guard contract across all workflows (ADR-0004) > every workflow exposes at least one scannable guard surface [2.23ms]\n(pass) until_bash guard contract across all workflows (ADR-0004) > no guard references process.env.ARTIFACTS_DIR (absent in guard env) [1.04ms]\n(pass) until_bash guard contract across all workflows (ADR-0004) > no guard uses brace-form ${ARTIFACTS_DIR} (never substituted) [0.86ms]\n(pass) until_bash guard contract across all workflows (ADR-0004) > validators needing the artifacts dir get --artifacts-dir \"$ARTIFACTS_DIR\" [0.91ms]\n\n 122 pass\n 0 fail\n 604 expect() calls\nRan 122 tests across 11 files. [6.34s]\n"
+          }
+        ]
+      },
+      "codexCalls": 0,
+      "claudeCalls": 0,
+      "testedHead": "f8347f874b34c5c2bdc1c824b1fea54db0802b93"
     },
     {
       "id": "mechanical-automation-pure-1",
@@ -8109,7 +8104,9 @@
         "tests/automation/gate-e2e-green.spec.ts",
         "tests/automation/gate-e2e-red.spec.ts",
         "tests/automation/planned-handoff.spec.ts",
-        "tests/automation/targeted-router-e2e.spec.ts"
+        "tests/automation/targeted-router-e2e.spec.ts",
+        "tests/automation/v3-base-drift.spec.ts",
+        "tests/automation/workflow-node-budgets.spec.ts"
       ],
       "state": "PENDING"
     },

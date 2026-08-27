@@ -6,7 +6,7 @@
 
 import { execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
-import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
@@ -24,6 +24,7 @@ import { classifyCommand } from '../../scripts/automation/verify-dedupe.mjs';
 import { throughputProfile } from '../../scripts/automation/work-package-throughput-profile.mjs';
 
 const SCRIPTS = join(import.meta.dirname, '..', '..', 'scripts', 'automation');
+const REPO = process.cwd();
 
 let fx: string;
 beforeAll(() => {
@@ -218,12 +219,15 @@ describe('15. FULL-gate attestation identity', () => {
 });
 
 describe('16–17. proven-only verification dedupe classifier', () => {
+  const runtimePolicy = JSON.parse(readFileSync(join(REPO, 'config', 'foresift-test-runtime.json'), 'utf8'));
+  const plainScript = runtimePolicy.currentAuthority === 'BUN_TEST' ? 'bun test' : 'vitest run';
+
   const pkgRoot = () => {
     const root = mkdtempSync(join(fx, '/dedupe-'));
     mkdirSync(join(root, 'packages', 'alpha'), { recursive: true });
     writeFileSync(
       join(root, 'packages', 'alpha', 'package.json'),
-      JSON.stringify({ name: '@foresift/alpha', scripts: { test: 'vitest run' } }),
+      JSON.stringify({ name: '@foresift/alpha', scripts: { test: plainScript } }),
     );
     writeFileSync(join(root, 'packages', 'alpha', 'core.test.ts'), 'it("x", () => {});\n');
     return root;
@@ -231,31 +235,34 @@ describe('16–17. proven-only verification dedupe classifier', () => {
   const cmdFor = (root: string) =>
     `test -d ${join(root, 'packages', 'alpha')} && pnpm --filter @foresift/alpha test`;
 
-  it('POSITIVE: plain vitest run + no local config ⇒ PROVEN duplicate of the full suite', () => {
+  it('POSITIVE: plain test run + no local config ⇒ PROVEN duplicate of the full suite', () => {
     const root = pkgRoot();
     const verdict = classifyCommand(cmdFor(root), root);
     expect(verdict.class).toBe('DUPLICATE_COVERED_BY_FULL_SUITE');
     expect(verdict.reason).toMatch(/root suite covers all of them/);
   });
 
-  it('NEGATIVE: a package-local vitest config destroys the proof ⇒ unique', () => {
+  it('NEGATIVE: a package-local runner config destroys the proof ⇒ unique', () => {
     const root = pkgRoot();
     writeFileSync(join(root, 'packages', 'alpha', 'vitest.config.ts'), 'export default {};\n');
     expect(classifyCommand(cmdFor(root), root).class).toBe('UNIQUE_MANDATORY');
   });
 
-  it.each([
-    ['wrapped test script', { test: 'vitest run --coverage' }],
-    ['composite test script', { test: 'eslint . && vitest run' }],
+  const negativeDedupeCases = [
+    ['wrapped test script', { test: `${plainScript} --coverage` }],
+    ['composite test script', { test: `eslint . && ${plainScript}` }],
     ['missing test script', {}],
-  ])('NEGATIVE: %s ⇒ unique (deduped only with proof)', (_name, scripts) => {
-    const root = pkgRoot();
-    writeFileSync(
-      join(root, 'packages', 'alpha', 'package.json'),
-      JSON.stringify({ name: '@foresift/alpha', scripts }),
-    );
-    expect(classifyCommand(cmdFor(root), root).class).toBe('UNIQUE_MANDATORY');
-  });
+  ] as const;
+  for (const [name, scripts] of negativeDedupeCases) {
+    it(`NEGATIVE: ${name} ⇒ unique (deduped only with proof)`, () => {
+      const root = pkgRoot();
+      writeFileSync(
+        join(root, 'packages', 'alpha', 'package.json'),
+        JSON.stringify({ name: '@foresift/alpha', scripts }),
+      );
+      expect(classifyCommand(cmdFor(root), root).class).toBe('UNIQUE_MANDATORY');
+    });
+  }
 
   it('prohibited-capabilities scan is ALWAYS unique-mandatory', () => {
     expect(classifyCommand('node scripts/scan-prohibited-capabilities/cli.mjs', fx).class).toBe(

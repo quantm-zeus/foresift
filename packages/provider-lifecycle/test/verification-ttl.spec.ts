@@ -3,7 +3,7 @@
  * requires the OFFICIAL_DOC+LIVE_CONTRACT refresh pair, sweeps map expired
  * kinds to §15.4 health outcomes with idempotent (dedupe-safe) events.
  */
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 import type { ClockPort, UtcTimestamp } from '@foresift/domain';
 import { makeProvEngine, testDefinition, wireEngine, type Wired } from './helpers.ts';
 import { expiryHealthFor } from '../src/verification-ttl.ts';

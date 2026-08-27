@@ -1,14 +1,14 @@
 {
   "schema": "foresift/bun-migration-manifest@1",
   "migrationId": "bun-test-authority-v1",
-  "generatedAt": "2026-08-27T01:48:07.955Z",
+  "generatedAt": "2026-08-27T01:48:33.657Z",
   "root": ".",
   "totalTestFiles": 219,
   "counts": {
-    "CODEMOD_READY": 105,
+    "CODEMOD_READY": 95,
     "AGY_REQUIRED": 17,
     "MIGRATED": 76,
-    "VERIFIED": 21,
+    "VERIFIED": 31,
     "BLOCKED": 0
   },
   "parity": {
@@ -716,24 +716,18 @@
     {
       "path": "packages/provider-lifecycle/test/artifact-registry.spec.ts",
       "package": "@foresift/provider-lifecycle",
-      "bytes": 8531,
+      "bytes": 8533,
       "lines": 240,
-      "sha256": "57645120c38aad2d28aa1b438d74433b44c0f47d5711608e55360c31a92e4508",
+      "sha256": "136245a66de9f4b52fe6178363ea9bd89e2643b218d643b36207dd37dbd2b5b0",
       "imports": [
-        "vitest",
+        "bun:test",
         "../src/index.ts",
         "./helpers.ts"
       ],
-      "vitestImports": [
-        "afterAll",
-        "beforeAll",
-        "describe",
-        "expect",
-        "it"
-      ],
+      "vitestImports": [],
       "features": [],
       "workload": "PURE",
-      "migrationType": "EASY_MECHANICAL",
+      "migrationType": "ALREADY_MIGRATED",
       "fixturesAndHelpers": [
         "./helpers.ts"
       ],
@@ -741,7 +735,7 @@
         "../src/index.ts",
         "./helpers.ts"
       ],
-      "state": "CODEMOD_READY"
+      "state": "VERIFIED"
     },
     {
       "path": "packages/provider-lifecycle/test/deprecation-rules.spec.ts",
@@ -772,27 +766,21 @@
     {
       "path": "packages/provider-lifecycle/test/lifecycle-machine.spec.ts",
       "package": "@foresift/provider-lifecycle",
-      "bytes": 8440,
+      "bytes": 8442,
       "lines": 230,
-      "sha256": "5e81dce0abcba2778ac1714c5bdf91d7f90f8d96c043a8d94899f5509c1cd0fe",
+      "sha256": "07fcab24e870b27f1e6607932e4fba3c30c7019820328ad3d2831396d167279b",
       "imports": [
-        "vitest",
+        "bun:test",
         "@foresift/domain",
         "./helpers.ts",
         "../src/audit-bridges.ts",
         "../src/lifecycle-machine.ts",
         "../src/errors.ts"
       ],
-      "vitestImports": [
-        "afterAll",
-        "beforeAll",
-        "describe",
-        "expect",
-        "it"
-      ],
+      "vitestImports": [],
       "features": [],
       "workload": "PURE",
-      "migrationType": "EASY_MECHANICAL",
+      "migrationType": "ALREADY_MIGRATED",
       "fixturesAndHelpers": [
         "./helpers.ts"
       ],
@@ -803,31 +791,25 @@
         "../src/lifecycle-machine.ts",
         "../src/errors.ts"
       ],
-      "state": "CODEMOD_READY"
+      "state": "VERIFIED"
     },
     {
       "path": "packages/provider-lifecycle/test/lifecycle-states.spec.ts",
       "package": "@foresift/provider-lifecycle",
-      "bytes": 7719,
+      "bytes": 7721,
       "lines": 240,
-      "sha256": "bc2b8c397f4841e130130490f29b58aa245b080beb2ba65abdf3cdc314a62411",
+      "sha256": "7b0a2f081534c9a82db39a902c3e60b6daf013bd32d88adbe1d9d61725da6031",
       "imports": [
-        "vitest",
+        "bun:test",
         "@foresift/persistence",
         "../src/vocabulary.ts",
         "../src/lifecycle-states.ts",
         "./helpers.ts"
       ],
-      "vitestImports": [
-        "afterAll",
-        "beforeAll",
-        "describe",
-        "expect",
-        "it"
-      ],
+      "vitestImports": [],
       "features": [],
       "workload": "PURE",
-      "migrationType": "EASY_MECHANICAL",
+      "migrationType": "ALREADY_MIGRATED",
       "fixturesAndHelpers": [
         "./helpers.ts"
       ],
@@ -837,30 +819,24 @@
         "../src/lifecycle-states.ts",
         "./helpers.ts"
       ],
-      "state": "CODEMOD_READY"
+      "state": "VERIFIED"
     },
     {
       "path": "packages/provider-lifecycle/test/migration-exceptions.spec.ts",
       "package": "@foresift/provider-lifecycle",
-      "bytes": 6766,
+      "bytes": 6768,
       "lines": 182,
-      "sha256": "2efbda4facc522208c5054826e35bcbdab0f9623a66f86638e53434d70fff713",
+      "sha256": "4b7eb2402bd41067742c4c4b7621a7e50929000e809daba52594820325e898b8",
       "imports": [
-        "vitest",
+        "bun:test",
         "@foresift/domain",
         "./helpers.ts",
         "../src/errors.ts"
       ],
-      "vitestImports": [
-        "afterAll",
-        "beforeAll",
-        "describe",
-        "expect",
-        "it"
-      ],
+      "vitestImports": [],
       "features": [],
       "workload": "PURE",
-      "migrationType": "EASY_MECHANICAL",
+      "migrationType": "ALREADY_MIGRATED",
       "fixturesAndHelpers": [
         "./helpers.ts"
       ],
@@ -869,7 +845,7 @@
         "./helpers.ts",
         "../src/errors.ts"
       ],
-      "state": "CODEMOD_READY"
+      "state": "VERIFIED"
     },
     {
       "path": "packages/provider-lifecycle/test/migrations.spec.ts",
@@ -898,25 +874,19 @@
     {
       "path": "packages/provider-lifecycle/test/operation-registry.spec.ts",
       "package": "@foresift/provider-lifecycle",
-      "bytes": 4574,
+      "bytes": 4576,
       "lines": 129,
-      "sha256": "5dc870a6c8c11cec1f0cc1650e69dda2e75e072ac22afe98ec8f642141f57bc1",
+      "sha256": "979455de1cfb570de4202953a4af4bd9d756d423268d110d0b36b120c4a21e6d",
       "imports": [
-        "vitest",
+        "bun:test",
         "./helpers.ts",
         "../src/operation-registry.ts",
         "../src/errors.ts"
       ],
-      "vitestImports": [
-        "afterAll",
-        "beforeAll",
-        "describe",
-        "expect",
-        "it"
-      ],
+      "vitestImports": [],
       "features": [],
       "workload": "PURE",
-      "migrationType": "EASY_MECHANICAL",
+      "migrationType": "ALREADY_MIGRATED",
       "fixturesAndHelpers": [
         "./helpers.ts"
       ],
@@ -925,31 +895,25 @@
         "../src/operation-registry.ts",
         "../src/errors.ts"
       ],
-      "state": "CODEMOD_READY"
+      "state": "VERIFIED"
     },
     {
       "path": "packages/provider-lifecycle/test/readiness.spec.ts",
       "package": "@foresift/provider-lifecycle",
-      "bytes": 10281,
+      "bytes": 10283,
       "lines": 281,
-      "sha256": "6a61d86ad78c88d8c755c3b1e31e09a68e9cf798a90c648a9065477c8db67cda",
+      "sha256": "bb28e7dcb975056f4a946827912264bb0d72bac4c93fc7be1db6891f50d9dc46",
       "imports": [
-        "vitest",
+        "bun:test",
         "@foresift/security",
         "../src/index.ts",
         "../src/index.ts",
         "./helpers.ts"
       ],
-      "vitestImports": [
-        "afterAll",
-        "beforeAll",
-        "describe",
-        "expect",
-        "it"
-      ],
+      "vitestImports": [],
       "features": [],
       "workload": "PURE",
-      "migrationType": "EASY_MECHANICAL",
+      "migrationType": "ALREADY_MIGRATED",
       "fixturesAndHelpers": [
         "./helpers.ts"
       ],
@@ -959,32 +923,26 @@
         "../src/index.ts",
         "./helpers.ts"
       ],
-      "state": "CODEMOD_READY"
+      "state": "VERIFIED"
     },
     {
       "path": "packages/provider-lifecycle/test/response-quarantine.spec.ts",
       "package": "@foresift/provider-lifecycle",
-      "bytes": 7400,
+      "bytes": 7402,
       "lines": 185,
-      "sha256": "99e08eea1eec1609bf658cf09034b298a7d42d4c37897c3877c89f97ac9b2907",
+      "sha256": "aa3bdc3056d16ff03be917744ebfa9939dab3141e6f1326d061e1dfc7d824f4e",
       "imports": [
-        "vitest",
+        "bun:test",
         "@foresift/security",
         "@foresift/persistence",
         "../src/index.ts",
         "../src/index.ts",
         "./helpers.ts"
       ],
-      "vitestImports": [
-        "afterAll",
-        "beforeAll",
-        "describe",
-        "expect",
-        "it"
-      ],
+      "vitestImports": [],
       "features": [],
       "workload": "PURE",
-      "migrationType": "EASY_MECHANICAL",
+      "migrationType": "ALREADY_MIGRATED",
       "fixturesAndHelpers": [
         "./helpers.ts"
       ],
@@ -995,32 +953,26 @@
         "../src/index.ts",
         "./helpers.ts"
       ],
-      "state": "CODEMOD_READY"
+      "state": "VERIFIED"
     },
     {
       "path": "packages/provider-lifecycle/test/rights-matrix.spec.ts",
       "package": "@foresift/provider-lifecycle",
-      "bytes": 8962,
+      "bytes": 8964,
       "lines": 256,
-      "sha256": "2a5b55787cb07a66830cde9fee23c5a7952313e8f2c36f4f3ddb9141784a29dc",
+      "sha256": "269387f078e1de5e4288f2eacd145b8847a0434b8bf9cc27d4a93b3616c7104c",
       "imports": [
-        "vitest",
+        "bun:test",
         "@foresift/security",
         "../src/index.ts",
         "../src/index.ts",
         "../src/index.ts",
         "./helpers.ts"
       ],
-      "vitestImports": [
-        "afterAll",
-        "beforeAll",
-        "describe",
-        "expect",
-        "it"
-      ],
+      "vitestImports": [],
       "features": [],
       "workload": "PURE",
-      "migrationType": "EASY_MECHANICAL",
+      "migrationType": "ALREADY_MIGRATED",
       "fixturesAndHelpers": [
         "./helpers.ts"
       ],
@@ -1031,7 +983,7 @@
         "../src/index.ts",
         "./helpers.ts"
       ],
-      "state": "CODEMOD_READY"
+      "state": "VERIFIED"
     },
     {
       "path": "packages/provider-lifecycle/test/scaffold.spec.ts",
@@ -1090,26 +1042,20 @@
     {
       "path": "packages/provider-lifecycle/test/source-fingerprints.spec.ts",
       "package": "@foresift/provider-lifecycle",
-      "bytes": 4931,
+      "bytes": 4933,
       "lines": 123,
-      "sha256": "72aa82ccd08910e1467267d170e560ec10626d1f05e390a407dbcee57ed9e212",
+      "sha256": "c95467be9cb5072905555832913361cded2b5a73825a26b6ab48c452ebaff85c",
       "imports": [
-        "vitest",
+        "bun:test",
         "@foresift/persistence",
         "../src/index.ts",
         "../src/index.ts",
         "./helpers.ts"
       ],
-      "vitestImports": [
-        "afterAll",
-        "beforeAll",
-        "describe",
-        "expect",
-        "it"
-      ],
+      "vitestImports": [],
       "features": [],
       "workload": "PURE",
-      "migrationType": "EASY_MECHANICAL",
+      "migrationType": "ALREADY_MIGRATED",
       "fixturesAndHelpers": [
         "./helpers.ts"
       ],
@@ -1119,31 +1065,25 @@
         "../src/index.ts",
         "./helpers.ts"
       ],
-      "state": "CODEMOD_READY"
+      "state": "VERIFIED"
     },
     {
       "path": "packages/provider-lifecycle/test/verification-ttl.spec.ts",
       "package": "@foresift/provider-lifecycle",
-      "bytes": 9366,
+      "bytes": 9368,
       "lines": 240,
-      "sha256": "cb57cbaafce52055480503701c6ffc0ae6e990c4909ff4460f0cc8fa8df79cbd",
+      "sha256": "282769bfcee497b9bdb30ab79515747edee8e65fd8eb70c04a8c1047307cdd46",
       "imports": [
-        "vitest",
+        "bun:test",
         "@foresift/domain",
         "./helpers.ts",
         "../src/verification-ttl.ts",
         "../src/errors.ts"
       ],
-      "vitestImports": [
-        "afterAll",
-        "beforeAll",
-        "describe",
-        "expect",
-        "it"
-      ],
+      "vitestImports": [],
       "features": [],
       "workload": "PURE",
-      "migrationType": "EASY_MECHANICAL",
+      "migrationType": "ALREADY_MIGRATED",
       "fixturesAndHelpers": [
         "./helpers.ts"
       ],
@@ -1153,7 +1093,7 @@
         "../src/verification-ttl.ts",
         "../src/errors.ts"
       ],
-      "state": "CODEMOD_READY"
+      "state": "VERIFIED"
     },
     {
       "path": "packages/providers/test/adapter-contract.spec.ts",
@@ -7202,7 +7142,8 @@
       },
       "codexCalls": 0,
       "claudeCalls": 0,
-      "testedHead": "56f5f2cb75c1270090b62975608265befa1d6fbf"
+      "testedHead": "56f5f2cb75c1270090b62975608265befa1d6fbf",
+      "checkpointHead": "3f47dd7d67ce5f47e2dca7794216f28061602305"
     },
     {
       "id": "mechanical--foresift-provider-lifecycle-pure-1",
@@ -7220,7 +7161,71 @@
         "packages/provider-lifecycle/test/source-fingerprints.spec.ts",
         "packages/provider-lifecycle/test/verification-ttl.spec.ts"
       ],
-      "state": "PENDING"
+      "state": "VERIFIED",
+      "verification": {
+        "ok": true,
+        "wallTimeMs": 25559,
+        "peakRssBytes": 0,
+        "cpuSeconds": 0,
+        "counts": {
+          "passed": 69,
+          "failed": 0,
+          "skipped": 0
+        },
+        "results": [
+          {
+            "id": "pure-1",
+            "workload": "PURE",
+            "files": [
+              "packages/provider-lifecycle/test/artifact-registry.spec.ts",
+              "packages/provider-lifecycle/test/lifecycle-machine.spec.ts",
+              "packages/provider-lifecycle/test/lifecycle-states.spec.ts",
+              "packages/provider-lifecycle/test/migration-exceptions.spec.ts",
+              "packages/provider-lifecycle/test/operation-registry.spec.ts",
+              "packages/provider-lifecycle/test/readiness.spec.ts",
+              "packages/provider-lifecycle/test/response-quarantine.spec.ts",
+              "packages/provider-lifecycle/test/rights-matrix.spec.ts",
+              "packages/provider-lifecycle/test/source-fingerprints.spec.ts",
+              "packages/provider-lifecycle/test/verification-ttl.spec.ts"
+            ],
+            "fileWorkers": 2,
+            "testConcurrency": 8,
+            "command": [
+              "bun",
+              "test",
+              "--no-orphans",
+              "--isolate",
+              "--parallel=2",
+              "--max-concurrency=8",
+              "--timeout=30000",
+              "packages/provider-lifecycle/test/artifact-registry.spec.ts",
+              "packages/provider-lifecycle/test/lifecycle-machine.spec.ts",
+              "packages/provider-lifecycle/test/lifecycle-states.spec.ts",
+              "packages/provider-lifecycle/test/migration-exceptions.spec.ts",
+              "packages/provider-lifecycle/test/operation-registry.spec.ts",
+              "packages/provider-lifecycle/test/readiness.spec.ts",
+              "packages/provider-lifecycle/test/response-quarantine.spec.ts",
+              "packages/provider-lifecycle/test/rights-matrix.spec.ts",
+              "packages/provider-lifecycle/test/source-fingerprints.spec.ts",
+              "packages/provider-lifecycle/test/verification-ttl.spec.ts"
+            ],
+            "status": 0,
+            "wallTimeMs": 25559,
+            "peakRssBytes": null,
+            "cpuSeconds": null,
+            "counts": {
+              "passed": 69,
+              "failed": 0,
+              "skipped": 0
+            },
+            "stdoutTail": "bun test v1.4.0 (34cbb9a40) 2x PARALLEL\n",
+            "stderrTail": "0 declarations + changes + fail-closed decisions > binds later tightenings onto pre-tightening captures and fails closed on unknown versions [7.43ms]\n(pass) T120 declarations + changes + fail-closed decisions > fails closed on an expired verification window [6.50ms]\n(pass) T120 declarations + changes + fail-closed decisions > fails closed for operations with NO declaration at all [1.50ms]\n(pass) T120 declarations + changes + fail-closed decisions > re-declaring the SAME version is idempotent (no duplicate rows) [4.42ms]\n\npackages/provider-lifecycle/test/lifecycle-machine.spec.ts:\n(pass) T110 lifecycle machine > gates entry into ACTIVE through the injected activation gate [2593.15ms]\n(pass) T110 lifecycle machine > expiry-driven exits append history without mutating stored evidence [19.43ms]\n(pass) T110 lifecycle machine > refuses transitions for unregistered operations [0.84ms]\n\npackages/provider-lifecycle/test/source-fingerprints.spec.ts:\n(pass) T122 source fingerprints > accepts all six kinds and hashes the CANONICAL payload form [24.17ms]\n(pass) T122 source fingerprints > identical recomputation dedupes to the SAME row (retry fence) [8.89ms]\n(pass) T122 source fingerprints > a DIFFERENT recomputation of the same kind is preserved as new evidence (drift) [7.45ms]\n(pass) T122 source fingerprints > refuses unknown kinds and non-object payloads [1.18ms]\n(pass) T122 source fingerprints > records estimator input provenance refs [3.26ms]\n\npackages/provider-lifecycle/test/lifecycle-states.spec.ts:\n(pass) T108 §12.11 completeness: graph ↔ SQL CHECK ↔ Zod > SQL CHECK alphabets equal the TS/Zod vocabularies value-for-value [9.35ms]\n(pass) T108 §12.11 completeness: graph ↔ SQL CHECK ↔ Zod > the transition graph matches the task-pinned shape exactly [0.19ms]\n(pass) T108 §12.11 completeness: graph ↔ SQL CHECK ↔ Zod > guards representative legal and illegal edges [0.54ms]\n\npackages/provider-lifecycle/test/verification-ttl.spec.ts:\n(pass) T111 verification TTL engine > refuses freshness evaluation when no TTL is configured (fail-closed) [26.80ms]\n(pass) T111 verification TTL engine > enforces the AC-270 refresh pair per kind [95.33ms]\n\npackages/provider-lifecycle/test/migration-exceptions.spec.ts:\n(pass) T113 migration exceptions > requires an APPROVED replacement plan [1.56ms]\n(pass) T113 migration exceptions > refuses windows that do not lie strictly in the future [0.40ms]\n(pass) T113 migration exceptions > enforces ONE active exception per operation version [14.96ms]\n(pass) T113 migration exceptions > re-blocks automatically the moment the exception lapses (use-time expiry) [31.19ms]\n(pass) T113 migration exceptions > refuses unknown ids and conflicting replayed revocations [17.73ms]\n\npackages/provider-lifecycle/test/verification-ttl.spec.ts:\n(pass) T111 verification TTL engine > expires records against the injected clock only [2730.70ms]\n(pass) T111 verification TTL engine > dedupes replayed verification ingestion to the SAME record [22.29ms]\n(pass) T111 verification TTL engine > sweeps expired ACTIVE operations to the mapped §15.4 health outcomes, idempotently [57.82ms]\n(pass) T111 verification TTL engine > maps expired kinds to the §15.4 health outcomes exactly [0.12ms]\n(pass) T111 verification TTL engine > advances last-documentation/probe projection instants on PASSED records [33.91ms]\n\npackages/provider-lifecycle/test/operation-registry.spec.ts:\n(pass) T109 operation registry > registers a definition and starts it DISCOVERED / HEALTHY [9.07ms]\n(pass) T109 operation registry > refuses prohibited and unknown capability classes outright [0.52ms]\n(pass) T109 operation registry > resolves an identical re-registration idempotently but refuses a conflicting one [16.40ms]\n(pass) T109 operation registry > refuses operations for unknown providers [1.07ms]\n(pass) T109 operation registry > registers affected-feature dependencies with INV-009 replay fencing [15.51ms]\n\n 69 pass\n 0 fail\n 239 expect() calls\nRan 69 tests across 10 files. [25.54s]\n"
+          }
+        ]
+      },
+      "codexCalls": 0,
+      "claudeCalls": 0,
+      "testedHead": "3f47dd7d67ce5f47e2dca7794216f28061602305"
     },
     {
       "id": "mechanical--foresift-providers-database-pglite-1",

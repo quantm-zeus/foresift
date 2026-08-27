@@ -1,14 +1,14 @@
 {
   "schema": "foresift/bun-migration-manifest@1",
   "migrationId": "bun-test-authority-v1",
-  "generatedAt": "2026-08-27T01:57:39.048Z",
+  "generatedAt": "2026-08-27T01:57:49.003Z",
   "root": ".",
   "totalTestFiles": 219,
   "counts": {
     "CODEMOD_READY": 0,
     "AGY_REQUIRED": 17,
-    "MIGRATED": 48,
-    "VERIFIED": 154,
+    "MIGRATED": 45,
+    "VERIFIED": 157,
     "BLOCKED": 0
   },
   "parity": {
@@ -498,7 +498,7 @@
         "../src/index.ts",
         "@foresift/domain"
       ],
-      "state": "MIGRATED"
+      "state": "VERIFIED"
     },
     {
       "path": "packages/persistence/test/migrator.spec.ts",
@@ -684,7 +684,7 @@
         "../src/index.ts",
         "../src/generated/schema.ts"
       ],
-      "state": "MIGRATED"
+      "state": "VERIFIED"
     },
     {
       "path": "packages/persistence/test/sources.spec.ts",
@@ -711,7 +711,7 @@
         "@foresift/domain",
         "../src/index.ts"
       ],
-      "state": "MIGRATED"
+      "state": "VERIFIED"
     },
     {
       "path": "packages/provider-lifecycle/test/artifact-registry.spec.ts",
@@ -8903,7 +8903,8 @@
       },
       "codexCalls": 0,
       "claudeCalls": 0,
-      "testedHead": "62457256b5bcf76e93a2aa7296ceeb5656f1f298"
+      "testedHead": "62457256b5bcf76e93a2aa7296ceeb5656f1f298",
+      "checkpointHead": "f75081a1716509740d429b2566ca59800fe97501"
     },
     {
       "id": "verify-existing--foresift-persistence-database-pglite-1",
@@ -8914,7 +8915,113 @@
         "packages/persistence/test/schema-parity.spec.ts",
         "packages/persistence/test/sources.spec.ts"
       ],
-      "state": "PENDING"
+      "state": "VERIFIED",
+      "verification": {
+        "ok": true,
+        "wallTimeMs": 9841,
+        "peakRssBytes": 0,
+        "cpuSeconds": 0,
+        "counts": {
+          "passed": 34,
+          "failed": 0,
+          "skipped": 0
+        },
+        "results": [
+          {
+            "id": "pglite-1",
+            "workload": "DATABASE_PGLITE",
+            "files": [
+              "packages/persistence/test/identity-repo.spec.ts"
+            ],
+            "fileWorkers": 1,
+            "testConcurrency": 1,
+            "command": [
+              "bun",
+              "test",
+              "--no-orphans",
+              "--isolate",
+              "--parallel=1",
+              "--max-concurrency=1",
+              "--timeout=30000",
+              "packages/persistence/test/identity-repo.spec.ts"
+            ],
+            "status": 0,
+            "wallTimeMs": 3189,
+            "peakRssBytes": null,
+            "cpuSeconds": null,
+            "counts": {
+              "passed": 19,
+              "failed": 0,
+              "skipped": 0
+            },
+            "stdoutTail": "bun test v1.4.0 (34cbb9a40) 1x PARALLEL\n",
+            "stderrTail": "\npackages/persistence/test/identity-repo.spec.ts:\n(pass) golden chain-id vectors through the repository (AC-023) > stores each registered chain with its expected mapping quality [14.11ms]\n(pass) golden chain-id vectors through the repository (AC-023) > refuses malformed chain ids at the domain boundary [0.51ms]\n(pass) golden EVM/Solana address vectors (AC-023) > canonicalizes any-cased input and renders EIP-55 exactly as the fixture declares [7.25ms]\n(pass) golden EVM/Solana address vectors (AC-023) > rejects wrong-length and non-canonical EVM forms on insert [11.72ms]\n(pass) golden EVM/Solana address vectors (AC-023) > accepts the Solana vectors as representations [7.11ms]\n(pass) golden EVM/Solana address vectors (AC-023) > rejects invalid Solana addresses [0.24ms]\n(pass) golden EVM/Solana address vectors (AC-023) > builds CAIP-10 account ids from the fixtures [0.14ms]\n(pass) verified-equivalence memberships and pool identity > groups representations only under verified equivalences; refuses heuristics [14.74ms]\n(pass) verified-equivalence memberships and pool identity > composes pool ids strictly as chain/dex/address [5.52ms]\n(pass) verified-equivalence memberships and pool identity > registers launch pools and migration edges; refuses cycles and ambiguous boundaries [33.75ms]\n(pass) verified-equivalence memberships and pool identity > refuses re-pointing a representation between asset groupings; identical re-attach is a no-op [11.41ms]\n(pass) insert-only identity semantics (insertOrVerify) > treats an identical re-registration as a no-op reporting inserted:false [2.32ms]\n(pass) insert-only identity semantics (insertOrVerify) > refuses a conflicting re-registration with a typed error [1.87ms]\n(pass) insert-only identity semantics (insertOrVerify) > compares instants by epoch, not text shape (…00Z vs …00.000Z) [4.37ms]\n(pass) decimals resolution state machine over golden vectors > walks every scenario to its declared final state [57.35ms]\n(pass) decimals resolution state machine over golden vectors > keeps conflicting values explicitly unusable instead of guessing [0.84ms]\n(pass) decimals resolution state machine over golden vectors > refuses full cross-check credit when supporting refs share one upstream lineage (INV-008, ADR-0016) [27.13ms]\n(pass) pair identity (§11.6) > records a pair insert-or-verify: identical re-record is a no-op, conflict is typed [10.72ms]\n(pass) pair identity (§11.6) > the pairs_distinct_sides CHECK refuses base == quote at the SQL layer [1.18ms]\n\n 19 pass\n 0 fail\n 85 expect() calls\nRan 19 tests across 1 file. [3.09s]\n"
+          },
+          {
+            "id": "pglite-2",
+            "workload": "DATABASE_PGLITE",
+            "files": [
+              "packages/persistence/test/schema-parity.spec.ts"
+            ],
+            "fileWorkers": 1,
+            "testConcurrency": 1,
+            "command": [
+              "bun",
+              "test",
+              "--no-orphans",
+              "--isolate",
+              "--parallel=1",
+              "--max-concurrency=1",
+              "--timeout=30000",
+              "packages/persistence/test/schema-parity.spec.ts"
+            ],
+            "status": 0,
+            "wallTimeMs": 3555,
+            "peakRssBytes": null,
+            "cpuSeconds": null,
+            "counts": {
+              "passed": 7,
+              "failed": 0,
+              "skipped": 0
+            },
+            "stdoutTail": "bun test v1.4.0 (34cbb9a40) 1x PARALLEL\n",
+            "stderrTail": "\npackages/persistence/test/schema-parity.spec.ts:\n(pass) Drizzle mirror parity with SQL truth (ADR-001) > mirrors exactly the table set created by the migrations [8.45ms]\n(pass) Drizzle mirror parity with SQL truth (ADR-001) > matches every column: name, nullability, and type class [245.75ms]\n(pass) Drizzle mirror parity with SQL truth (ADR-001) > matches primary keys on every table [14.52ms]\n(pass) §13.9 quality-code vocabulary parity (SQL truth ↔ domain) > the quality_codes seed table is exactly ALL_QUALITY_CODES [1.47ms]\n(pass) §13.9 quality-code vocabulary parity (SQL truth ↔ domain) > every full `<@` allowlist CHECK is byte-equal to the domain vocabulary [10.66ms]\n(pass) §13.9 quality-code vocabulary parity (SQL truth ↔ domain) > admits the real §13.9 outcome codes and refuses the historical typo [15.97ms]\n(pass) §13.9 quality-code vocabulary parity (SQL truth ↔ domain) > every enum IN-list CHECK on a mirrored column equals its domain registry (M-5) [30.30ms]\n\n 7 pass\n 0 fail\n 237 expect() calls\nRan 7 tests across 1 file. [3.45s]\n"
+          },
+          {
+            "id": "pglite-3",
+            "workload": "DATABASE_PGLITE",
+            "files": [
+              "packages/persistence/test/sources.spec.ts"
+            ],
+            "fileWorkers": 1,
+            "testConcurrency": 1,
+            "command": [
+              "bun",
+              "test",
+              "--no-orphans",
+              "--isolate",
+              "--parallel=1",
+              "--max-concurrency=1",
+              "--timeout=30000",
+              "packages/persistence/test/sources.spec.ts"
+            ],
+            "status": 0,
+            "wallTimeMs": 3097,
+            "peakRssBytes": null,
+            "cpuSeconds": null,
+            "counts": {
+              "passed": 8,
+              "failed": 0,
+              "skipped": 0
+            },
+            "stdoutTail": "bun test v1.4.0 (34cbb9a40) 1x PARALLEL\n",
+            "stderrTail": "\npackages/persistence/test/sources.spec.ts:\n(pass) lineage collapse — provider count is not independence (INV-008) > collapses the correlated fixture pair into one independence group [1.78ms]\n(pass) lineage collapse — provider count is not independence (INV-008) > keeps genuinely independent lineages in separate groups [1.77ms]\n(pass) lineage collapse — provider count is not independence (INV-008) > verifies an identical re-registration and refuses a conflicting tuple [13.31ms]\n(pass) pairwise dependence edges (AC-245) > records reduced-independence evidence for the correlated pair despite distinct ids [7.63ms]\n(pass) pairwise dependence edges (AC-245) > keeps the independent pair below every reduction threshold [0.05ms]\n(pass) pairwise dependence edges (AC-245) > labels post-hoc estimates DIAGNOSTIC_RETROSPECTIVE and stores them anyway [2.61ms]\n(pass) pairwise dependence edges (AC-245) > refuses self-edges and out-of-range inputs [0.33ms]\n(pass) pairwise dependence edges (AC-245) > returns newest-first edges per pair with canonical ordering [2.95ms]\n\n 8 pass\n 0 fail\n 23 expect() calls\nRan 8 tests across 1 file. [2.97s]\n"
+          }
+        ]
+      },
+      "codexCalls": 0,
+      "claudeCalls": 0,
+      "testedHead": "f75081a1716509740d429b2566ca59800fe97501"
     },
     {
       "id": "verify-existing--foresift-provider-lifecycle-database-pglite-1",

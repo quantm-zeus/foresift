@@ -1,14 +1,14 @@
 {
   "schema": "foresift/bun-migration-manifest@1",
   "migrationId": "bun-test-authority-v1",
-  "generatedAt": "2026-08-27T01:52:39.899Z",
+  "generatedAt": "2026-08-27T01:52:40.073Z",
   "root": ".",
   "totalTestFiles": 219,
   "counts": {
     "CODEMOD_READY": 0,
     "AGY_REQUIRED": 17,
-    "MIGRATED": 78,
-    "VERIFIED": 124,
+    "MIGRATED": 72,
+    "VERIFIED": 130,
     "BLOCKED": 0
   },
   "parity": {
@@ -34,7 +34,7 @@
       "sourceAnchors": [
         "../src/index.ts"
       ],
-      "state": "MIGRATED"
+      "state": "VERIFIED"
     },
     {
       "path": "packages/domain/test/lineage-source-recovery.spec.ts",
@@ -54,7 +54,7 @@
       "sourceAnchors": [
         "../src/index.ts"
       ],
-      "state": "MIGRATED"
+      "state": "VERIFIED"
     },
     {
       "path": "packages/domain/test/quantity.spec.ts",
@@ -74,7 +74,7 @@
       "sourceAnchors": [
         "../src/index.ts"
       ],
-      "state": "MIGRATED"
+      "state": "VERIFIED"
     },
     {
       "path": "packages/domain/test/temporal.spec.ts",
@@ -94,7 +94,7 @@
       "sourceAnchors": [
         "../src/index.ts"
       ],
-      "state": "MIGRATED"
+      "state": "VERIFIED"
     },
     {
       "path": "packages/domain/test/tool.spec.ts",
@@ -118,7 +118,7 @@
         "../src/tool.ts",
         "../src/errors.ts"
       ],
-      "state": "MIGRATED"
+      "state": "VERIFIED"
     },
     {
       "path": "packages/domain/test/vocabulary.spec.ts",
@@ -138,7 +138,7 @@
       "sourceAnchors": [
         "../src/index.ts"
       ],
-      "state": "MIGRATED"
+      "state": "VERIFIED"
     },
     {
       "path": "packages/evidence/test/counts.spec.ts",
@@ -8229,7 +8229,8 @@
       },
       "codexCalls": 0,
       "claudeCalls": 0,
-      "testedHead": "981452309eae3891e01b8390fc6b07edc5006a56"
+      "testedHead": "981452309eae3891e01b8390fc6b07edc5006a56",
+      "checkpointHead": "b3b3b52170357ee14a1e27bfd7bfd7905485ed90"
     },
     {
       "id": "verify-existing--foresift-domain-pure-1",
@@ -8243,7 +8244,63 @@
         "packages/domain/test/tool.spec.ts",
         "packages/domain/test/vocabulary.spec.ts"
       ],
-      "state": "PENDING"
+      "state": "VERIFIED",
+      "verification": {
+        "ok": true,
+        "wallTimeMs": 75,
+        "peakRssBytes": 0,
+        "cpuSeconds": 0,
+        "counts": {
+          "passed": 104,
+          "failed": 0,
+          "skipped": 0
+        },
+        "results": [
+          {
+            "id": "pure-1",
+            "workload": "PURE",
+            "files": [
+              "packages/domain/test/address-chain.spec.ts",
+              "packages/domain/test/lineage-source-recovery.spec.ts",
+              "packages/domain/test/quantity.spec.ts",
+              "packages/domain/test/temporal.spec.ts",
+              "packages/domain/test/tool.spec.ts",
+              "packages/domain/test/vocabulary.spec.ts"
+            ],
+            "fileWorkers": 2,
+            "testConcurrency": 8,
+            "command": [
+              "bun",
+              "test",
+              "--no-orphans",
+              "--isolate",
+              "--parallel=2",
+              "--max-concurrency=8",
+              "--timeout=30000",
+              "packages/domain/test/address-chain.spec.ts",
+              "packages/domain/test/lineage-source-recovery.spec.ts",
+              "packages/domain/test/quantity.spec.ts",
+              "packages/domain/test/temporal.spec.ts",
+              "packages/domain/test/tool.spec.ts",
+              "packages/domain/test/vocabulary.spec.ts"
+            ],
+            "status": 0,
+            "wallTimeMs": 75,
+            "peakRssBytes": null,
+            "cpuSeconds": null,
+            "counts": {
+              "passed": 104,
+              "failed": 0,
+              "skipped": 0
+            },
+            "stdoutTail": "bun test v1.4.0 (34cbb9a40) 2x PARALLEL\n",
+            "stderrTail": " each sample once across the boundary while naive summation double counts [0.86ms]\n(pass) migration-lineage double-count-safe aggregation (FR-DATA-001, AC-022 substrate) > refuses undated samples on migrated pools and ambiguous edges [0.36ms]\n(pass) migration-lineage double-count-safe aggregation (FR-DATA-001, AC-022 substrate) > detects lineage cycles before registration [0.27ms]\n\npackages/domain/test/vocabulary.spec.ts:\n(pass) §13.9 quality-code vocabulary (FR-DATA-005) > declares the complete 31-code vocabulary with stable spellings [0.16ms]\n\npackages/domain/test/lineage-source-recovery.spec.ts:\n(pass) source dependence inputs (FR-DATA-006, AC-245 substrate) > flags strongly correlated pairs despite distinct provider ids [0.12ms]\n\npackages/domain/test/vocabulary.spec.ts:\n(pass) §13.9 quality-code vocabulary (FR-DATA-005) > refuses unknown codes fail-closed [0.21ms]\n(pass) §13.9 quality-code vocabulary (FR-DATA-005) > enforces \"null alone is insufficient\" [0.16ms]\n\npackages/domain/test/lineage-source-recovery.spec.ts:\n(pass) source dependence inputs (FR-DATA-006, AC-245 substrate) > validates ranges fail-closed [0.19ms]\n(pass) feature provenance substrate (FR-DATA-004, AC-244) > accepts full-universe values with complete provenance [0.07ms]\n(pass) feature provenance substrate (FR-DATA-004, AC-244) > refuses selectively-researched populations backing universe claims [0.03ms]\n\npackages/domain/test/vocabulary.spec.ts:\n(pass) §13.8 acquisition-state vocabulary (AC-242 substrate) > declares the exact ten-state vocabulary [0.04ms]\n(pass) §13.8 acquisition-state vocabulary (AC-242 substrate) > keeps NOT_REQUESTED_BY_POLICY semantically distinct from provider missingness [0.06ms]\n\npackages/domain/test/lineage-source-recovery.spec.ts:\n(pass) feature provenance substrate (FR-DATA-004, AC-244) > refuses missing code-version provenance at the substrate level [0.14ms]\n\npackages/domain/test/vocabulary.spec.ts:\n(pass) §13.8 acquisition-state vocabulary (AC-242 substrate) > classifies retrieval failures and terminal states [0.08ms]\n(pass) §13.8 acquisition-state vocabulary (AC-242 substrate) > refuses unknown states fail-closed [0.12ms]\n\npackages/domain/test/lineage-source-recovery.spec.ts:\n(pass) recovery tiers (FR-DR-001) > enforces the FR-DR-001 (§34.4-bound) ceilings: ≤15 / ≤60 / ≤1440 minutes [0.28ms]\n(pass) recovery tiers (FR-DR-001) > degraded states block opportunity influence but preserve risk monitoring [0.07ms]\n(pass) clock port > fixed and scripted clocks are deterministic [0.54ms]\n\npackages/domain/test/quantity.spec.ts:\n(pass) raw-integer quantity policy (FR-DATA-001 §11.5) > converts human decimal strings to raw amounts exactly [0.27ms]\n(pass) raw-integer quantity policy (FR-DATA-001 §11.5) > renders raw amounts back to exact decimal strings [0.11ms]\n(pass) raw-integer quantity policy (FR-DATA-001 §11.5) > roundtrips losslessly across arbitrary decimals [0.27ms]\n(pass) raw-integer quantity policy (FR-DATA-001 §11.5) > refuses precision beyond token decimals instead of truncating [0.11ms]\n(pass) raw-integer quantity policy (FR-DATA-001 §11.5) > refuses negatives and malformed decimal strings [0.20ms]\n(pass) raw-integer quantity policy (FR-DATA-001 §11.5) > accepts pure decimal digit strings and nothing else for rawAmount strings [0.23ms]\n(pass) raw-integer quantity policy (FR-DATA-001 §11.5) > never exposes a JS-number pathway: inputs/outputs are bigint or string [0.05ms]\n(pass) raw-integer quantity policy (FR-DATA-001 §11.5) > sums and multiplies decimal strings exactly (no float drift) [0.22ms]\n(pass) raw-integer quantity policy (FR-DATA-001 §11.5) > enforces documented scale bounds [0.10ms]\n(pass) raw-integer quantity policy (FR-DATA-001 §11.5) > multiplies by explicit truncation at the declared output scale [0.13ms]\n(pass) raw-integer quantity policy (FR-DATA-001 §11.5) > renders negative units with a sign and refuses to parse them back [0.08ms]\n\n 104 pass\n 0 fail\n 845 expect() calls\nRan 104 tests across 6 files. [63.00ms]\n"
+          }
+        ]
+      },
+      "codexCalls": 0,
+      "claudeCalls": 0,
+      "testedHead": "b3b3b52170357ee14a1e27bfd7bfd7905485ed90"
     },
     {
       "id": "verify-existing--foresift-shared-schemas-pure-1",

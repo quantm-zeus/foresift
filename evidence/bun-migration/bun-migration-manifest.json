@@ -1,14 +1,14 @@
 {
   "schema": "foresift/bun-migration-manifest@1",
   "migrationId": "bun-test-authority-v1",
-  "generatedAt": "2026-08-27T01:58:36.723Z",
+  "generatedAt": "2026-08-27T01:59:16.065Z",
   "root": ".",
   "totalTestFiles": 219,
   "counts": {
     "CODEMOD_READY": 0,
     "AGY_REQUIRED": 17,
-    "MIGRATED": 38,
-    "VERIFIED": 164,
+    "MIGRATED": 32,
+    "VERIFIED": 170,
     "BLOCKED": 0
   },
   "parity": {
@@ -3783,7 +3783,7 @@
         "../helpers/git-fixture.js",
         "../helpers/v2-fixtures.js"
       ],
-      "state": "MIGRATED"
+      "state": "VERIFIED"
     },
     {
       "path": "tests/automation/gate-e2e-red.spec.ts",
@@ -3812,7 +3812,7 @@
         "../helpers/git-fixture.js",
         "../helpers/v2-fixtures.js"
       ],
-      "state": "MIGRATED"
+      "state": "VERIFIED"
     },
     {
       "path": "tests/automation/hybrid-engine.spec.ts",
@@ -3934,7 +3934,7 @@
       "sourceAnchors": [
         "../helpers/git-fixture.js"
       ],
-      "state": "MIGRATED"
+      "state": "VERIFIED"
     },
     {
       "path": "tests/automation/selection-committed-view.spec.ts",
@@ -4013,7 +4013,7 @@
         "../../scripts/automation/convergence-router.mjs",
         "../helpers/v2-fixtures.js"
       ],
-      "state": "MIGRATED"
+      "state": "VERIFIED"
     },
     {
       "path": "tests/automation/test-tiers.spec.ts",
@@ -4229,7 +4229,7 @@
         "../../scripts/automation/package-full-gate.mjs",
         "../../scripts/automation/package-final-land.mjs"
       ],
-      "state": "MIGRATED"
+      "state": "VERIFIED"
     },
     {
       "path": "tests/automation/v3-generations.spec.ts",
@@ -4439,7 +4439,7 @@
       "migrationType": "ALREADY_MIGRATED",
       "fixturesAndHelpers": [],
       "sourceAnchors": [],
-      "state": "MIGRATED"
+      "state": "VERIFIED"
     },
     {
       "path": "tests/automation/workflow-node-resilience.spec.ts",
@@ -9335,7 +9335,8 @@
       },
       "codexCalls": 0,
       "claudeCalls": 0,
-      "testedHead": "2b844b7da8c206f51d45409b16c9130a7d4cf19c"
+      "testedHead": "2b844b7da8c206f51d45409b16c9130a7d4cf19c",
+      "checkpointHead": "6ae87e40357bc4f8923b8ee8f7c2c53b236b4438"
     },
     {
       "id": "verify-existing-automation-meta-gate-1",
@@ -9349,7 +9350,203 @@
         "tests/automation/v3-base-drift.spec.ts",
         "tests/automation/workflow-node-budgets.spec.ts"
       ],
-      "state": "PENDING"
+      "state": "VERIFIED",
+      "verification": {
+        "ok": true,
+        "wallTimeMs": 39233,
+        "peakRssBytes": 0,
+        "cpuSeconds": 0,
+        "counts": {
+          "passed": 43,
+          "failed": 0,
+          "skipped": 0
+        },
+        "results": [
+          {
+            "id": "meta-1",
+            "workload": "META_GATE",
+            "files": [
+              "tests/automation/gate-e2e-green.spec.ts"
+            ],
+            "fileWorkers": 1,
+            "testConcurrency": 1,
+            "command": [
+              "bun",
+              "test",
+              "--no-orphans",
+              "--isolate",
+              "--parallel=1",
+              "--max-concurrency=1",
+              "--timeout=30000",
+              "tests/automation/gate-e2e-green.spec.ts"
+            ],
+            "status": 0,
+            "wallTimeMs": 4103,
+            "peakRssBytes": null,
+            "cpuSeconds": null,
+            "counts": {
+              "passed": 1,
+              "failed": 0,
+              "skipped": 0
+            },
+            "stdoutTail": "bun test v1.4.0 (34cbb9a40) 1x PARALLEL\n",
+            "stderrTail": "\ntests/automation/gate-e2e-green.spec.ts:\n$ node -e \"process.exit(0)\"\n$ node -e \"process.exit(0)\"\n$ node -e \"process.exit(0)\"\n$ node -e \"process.exit(0)\"\n$ node -e \"process.exit(0)\"\n(pass) V2 structured gate manifest — REAL green milestone gate (spec §9) > GREEN path: milestone gate passes and writes an all-PASS manifest with every category [4051.52ms]\n\n 1 pass\n 0 fail\n 9 expect() calls\nRan 1 test across 1 file. [4.09s]\n"
+          },
+          {
+            "id": "meta-2",
+            "workload": "META_GATE",
+            "files": [
+              "tests/automation/gate-e2e-red.spec.ts"
+            ],
+            "fileWorkers": 1,
+            "testConcurrency": 1,
+            "command": [
+              "bun",
+              "test",
+              "--no-orphans",
+              "--isolate",
+              "--parallel=1",
+              "--max-concurrency=1",
+              "--timeout=30000",
+              "tests/automation/gate-e2e-red.spec.ts"
+            ],
+            "status": 0,
+            "wallTimeMs": 7665,
+            "peakRssBytes": null,
+            "cpuSeconds": null,
+            "counts": {
+              "passed": 2,
+              "failed": 0,
+              "skipped": 0
+            },
+            "stdoutTail": "bun test v1.4.0 (34cbb9a40) 1x PARALLEL\n",
+            "stderrTail": "\ntests/automation/gate-e2e-red.spec.ts:\n(pass) V2 structured gate manifest — REAL red package gate (spec §9) > RED path: package gate fails at its package checks with a structured manifest and NO attestation [4227.86ms]\n(pass) V2 structured gate manifest — REAL red package gate (spec §9) > structural nested-full block in foresift-gate.mjs refuses unflagged nested full test executions [3378.73ms]\n\n 2 pass\n 0 fail\n 17 expect() calls\nRan 2 tests across 1 file. [7.65s]\n"
+          },
+          {
+            "id": "meta-3",
+            "workload": "META_GATE",
+            "files": [
+              "tests/automation/planned-handoff.spec.ts"
+            ],
+            "fileWorkers": 1,
+            "testConcurrency": 1,
+            "command": [
+              "bun",
+              "test",
+              "--no-orphans",
+              "--isolate",
+              "--parallel=1",
+              "--max-concurrency=1",
+              "--timeout=30000",
+              "tests/automation/planned-handoff.spec.ts"
+            ],
+            "status": 0,
+            "wallTimeMs": 4127,
+            "peakRssBytes": null,
+            "cpuSeconds": null,
+            "counts": {
+              "passed": 13,
+              "failed": 0,
+              "skipped": 0
+            },
+            "stdoutTail": "bun test v1.4.0 (34cbb9a40) 1x PARALLEL\n",
+            "stderrTail": "\ntests/automation/planned-handoff.spec.ts:\n(pass) structural: planning-bootstrap DAG carries zero implementation nodes > has no implementation/gate/landing provider commands (B: zero impl calls by construction) [0.40ms]\n(pass) structural: planning-bootstrap DAG carries zero implementation nodes > is the optimized Phases 0A–1 verbatim plus ONE terminal handoff node [0.17ms]\n(pass) structural: planning-bootstrap DAG carries zero implementation nodes > the wave DAG pins its integration base only AFTER branch adoption [0.16ms]\n(pass) launch seam (A: unplanned → planner-capable path · E: planned → direct wave) > A: an unplanned wave-eligible package launches the planning-only bootstrap, never the wave prep [291.30ms]\n(pass) launch seam (A: unplanned → planner-capable path · E: planned → direct wave) > E: a planned package at initial launch goes straight to the sharded wave [255.46ms]\n(pass) planning handoff (B: zero impl calls · C: RUNNING preserved · D: immediate wave reselect) > completing the bootstrap promotes ONLY scoped planning artifacts and relaunches the SAME package into the wave in the SAME tick [493.80ms]\n(pass) planning handoff (B: zero impl calls · C: RUNNING preserved · D: immediate wave reselect) > B: the handoff tick issues no provider dispatch other than the wave launch itself [478.65ms]\n(pass) legacy preservation (F) > a completed OPTIMIZED run without a merged PR still raises the recoverable anomaly — the handoff classification keys strictly on the bootstrap workflow identity [640.43ms]\n(pass) handoff state-machine safety (G: duplicate tick · H: crash-after-launch · I: stale rows) > G: the tick after a detached wave launch discovers the run instead of launching again (exactly one implementation execution) [594.71ms]\n(pass) handoff state-machine safety (G: duplicate tick · H: crash-after-launch · I: stale rows) > H: a crash after the wave launch but before state persistence replays into ADOPTION — still exactly one run [458.30ms]\n(pass) handoff state-machine safety (G: duplicate tick · H: crash-after-launch · I: stale rows) > I: a completed bootstrap row lingering in the runs table can never be adopted or relaunched after the wave becomes authoritative [438.02ms]\n(pass) --seed-package-planning (J: useful work preserved, promotion is scoped + idempotent) > copies only specs/<pkg>/** into main as a chore; a second run is a no-op; the package branch is untouched [293.64ms]\n(pass) --seed-package-planning (J: useful work preserved, promotion is scoped + idempotent) > refuses when the main checkout has uncommitted state under specs/<pkg> [93.19ms]\n\n 13 pass\n 0 fail\n 71 expect() calls\nRan 13 tests across 1 file. [4.11s]\n"
+          },
+          {
+            "id": "meta-4",
+            "workload": "META_GATE",
+            "files": [
+              "tests/automation/targeted-router-e2e.spec.ts"
+            ],
+            "fileWorkers": 1,
+            "testConcurrency": 1,
+            "command": [
+              "bun",
+              "test",
+              "--no-orphans",
+              "--isolate",
+              "--parallel=1",
+              "--max-concurrency=1",
+              "--timeout=30000",
+              "tests/automation/targeted-router-e2e.spec.ts"
+            ],
+            "status": 0,
+            "wallTimeMs": 10116,
+            "peakRssBytes": null,
+            "cpuSeconds": null,
+            "counts": {
+              "passed": 6,
+              "failed": 0,
+              "skipped": 0
+            },
+            "stdoutTail": "bun test v1.4.0 (34cbb9a40) 1x PARALLEL\n",
+            "stderrTail": "\ntests/automation/targeted-router-e2e.spec.ts:\n(pass) V2 targeted executor END-TO-END (spec §10) > END-TO-END: executor runs ONLY the planned check and records a green verdict file [8995.98ms]\n(pass) V2 targeted executor END-TO-END (spec §10) > END-TO-END: executor re-runs real red package commands and reports red (exit 1) [54.82ms]\n(pass) V2 targeted executor END-TO-END (spec §10) > END-TO-END: ambiguous evidence escalates (exit 3) without running any check [52.83ms]\n(pass) V2 convergence router CLI END-TO-END (spec §11) > perfect review+attestation evidence but incomplete implementation ⇒ REQUIRED citing only completeness [511.43ms]\nfatal: not a git repository (or any of the parent directories): .git\n(pass) V2 review-outcome collector degradation (spec §11) > missing snapshot/pr-number ⇒ invalid verdict with reasons, no throw [7.36ms]\nno git remotes found\ngh: Field 'pullRequests' doesn't accept argument 'number'\nVariable $n is declared by anonymous query but not used\n(pass) V2 review-outcome collector degradation (spec §11) > valid local evidence with unreachable GitHub stays invalid-but-informative (fail-closed) [445.62ms]\n\n 6 pass\n 0 fail\n 25 expect() calls\nRan 6 tests across 1 file. [10.10s]\n"
+          },
+          {
+            "id": "meta-5",
+            "workload": "META_GATE",
+            "files": [
+              "tests/automation/v3-base-drift.spec.ts"
+            ],
+            "fileWorkers": 1,
+            "testConcurrency": 1,
+            "command": [
+              "bun",
+              "test",
+              "--no-orphans",
+              "--isolate",
+              "--parallel=1",
+              "--max-concurrency=1",
+              "--timeout=30000",
+              "tests/automation/v3-base-drift.spec.ts"
+            ],
+            "status": 0,
+            "wallTimeMs": 13182,
+            "peakRssBytes": null,
+            "cpuSeconds": null,
+            "counts": {
+              "passed": 19,
+              "failed": 0,
+              "skipped": 0
+            },
+            "stdoutTail": "bun test v1.4.0 (34cbb9a40) 1x PARALLEL\n{\"merged\":true,\"pr\":7}\nLAND ▸ MERGED mechanically (ATTESTATION_REUSE)\n",
+            "stderrTail": "\ntests/automation/v3-base-drift.spec.ts:\n(pass) landingAdmission (pure) > admits a branch that carries current main [0.10ms]\n(pass) landingAdmission (pure) > refuses with base-drift when main advanced past what the branch carries [0.17ms]\n(pass) landingAdmission (pure) > fails closed when origin/main is unverifiable [0.05ms]\n(pass) isAncestorSha > true on exit 0, false on exit 1 (a real answer), null otherwise [0.21ms]\n(pass) isShallowCheckout > true/false/null map straight through; git failure is unverifiable [0.13ms]\n(pass) isShallowCheckout > a real shallow clone reports true; a full fixture repo reports false [177.77ms]\n(pass) FULL-gate attestation records baseMainSha (V3-D §11.1) > identity includes baseMainSha from the injected resolver [198.40ms]\n(pass) FULL-gate attestation records baseMainSha (V3-D §11.1) > reuse is INVALID once origin/main moved past the attested base [186.54ms]\n(pass) FULL-gate attestation records baseMainSha (V3-D §11.1) > an OLD attestation without baseMainSha fails closed against a resolved base [187.21ms]\n(pass) mechanical lander enforces base admission (V3-D §11.3) > happy path: branch seeded at main tip lands; trace shows base-admitted [280.31ms]\n(pass) mechanical lander enforces base admission (V3-D §11.3) > pre-push refusal: a sibling already merged ⇒ base-drift, no PR, no merge [246.04ms]\n(pass) mechanical lander enforces base admission (V3-D §11.3) > TOCTOU closure: main advances DURING the CI wait ⇒ pre-merge re-check refuses [326.89ms]\n(pass) mechanical lander enforces base admission (V3-D §11.3) > §29-E21: red CI at the pinned head ⇒ ci-red refusal, never bypassed [230.89ms]\n(pass) mechanical lander enforces base admission (V3-D §11.3) > §29-E22: zero check-runs at pinned head ⇒ no-check-runs diagnose-and-fail-fast [10235.06ms]\n(pass) mechanical lander enforces base admission (V3-D §11.3) > §29-E24: origin branch moves DURING the wait ⇒ head-moved abort, never merge a moving target [423.68ms]\n(pass) §31: two landers racing the same origin ⇒ exactly one winner > concurrent landing never double-merges; the loser refuses or loses at merge time [425.90ms]\ngh: pull request is not up to date with main (squash refused)\n(pass) §31: two landers racing the same origin ⇒ exactly one winner > merge serialization alone holds even without main advancement (idempotent guard) [150.69ms]\nLAND ▸ base-drift: main moved\n(pass) runFinalLand base-drift admission (V3-D §11.2) > provably drifted ⇒ refuses BEFORE any gate work, exit 4, verdict persisted [1.24ms]\n(pass) runFinalLand base-drift admission (V3-D §11.2) > advisory-ok environments proceed to the normal reuse route [1.09ms]\n\n 19 pass\n 0 fail\n 56 expect() calls\nRan 19 tests across 1 file. [13.16s]\n"
+          },
+          {
+            "id": "meta-6",
+            "workload": "META_GATE",
+            "files": [
+              "tests/automation/workflow-node-budgets.spec.ts"
+            ],
+            "fileWorkers": 1,
+            "testConcurrency": 1,
+            "command": [
+              "bun",
+              "test",
+              "--no-orphans",
+              "--isolate",
+              "--parallel=1",
+              "--max-concurrency=1",
+              "--timeout=30000",
+              "tests/automation/workflow-node-budgets.spec.ts"
+            ],
+            "status": 0,
+            "wallTimeMs": 40,
+            "peakRssBytes": null,
+            "cpuSeconds": null,
+            "counts": {
+              "passed": 2,
+              "failed": 0,
+              "skipped": 0
+            },
+            "stdoutTail": "bun test v1.4.0 (34cbb9a40) 1x PARALLEL\n",
+            "stderrTail": "\ntests/automation/workflow-node-budgets.spec.ts:\n(pass) workflow bash nodes running heavyweight verifiers declare explicit budgets > gives every package-targeted-verify / package-full-gate bash node a >=10 min timeout [1.62ms]\n(pass) workflow bash nodes running heavyweight verifiers declare explicit budgets > keeps the repaired repair-targeted-recheck budget at the full-gate level [0.95ms]\n\n 2 pass\n 0 fail\n 4 expect() calls\nRan 2 tests across 1 file. [24.00ms]\n"
+          }
+        ]
+      },
+      "codexCalls": 0,
+      "claudeCalls": 0,
+      "testedHead": "6ae87e40357bc4f8923b8ee8f7c2c53b236b4438"
     },
     {
       "id": "verify-existing-automation-process-1",

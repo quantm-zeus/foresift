@@ -34,8 +34,13 @@ import {
   isShallowCheckout,
   BASE_DRIFT_REASON,
 } from './base-drift.mjs';
-
-const DEFAULT_CHECK = 'Verify (spec, format, lint, types, tests)';
+import {
+  getExactHeadCiStatus,
+  captureCiIncident,
+  DEFAULT_REQUIRED_CHECK,
+  DEFAULT_REQUIRED_APP_ID,
+  DEFAULT_REPO,
+} from './ci-authority.mjs';
 
 function sh(cmd, args, opts = {}) {
   return execFileSync(cmd, args, { encoding: 'utf8', ...opts }).trim();
@@ -85,7 +90,7 @@ function main() {
     console.error('usage: package-land.mjs --branch <branch> --title <title> [--body-file <f>]');
     process.exit(2);
   }
-  const checkName = a.checkName ?? DEFAULT_CHECK;
+  const checkName = a.checkName ?? DEFAULT_REQUIRED_CHECK;
   const deadlineMs = (a.deadlineS ?? 1800) * 1000;
   const pollMs = Math.max((a.pollS ?? 20) * 1000, 5000);
   if (a.bodyFile && !existsSync(a.bodyFile)) {
@@ -199,51 +204,60 @@ function main() {
 
   const start = Date.now();
   let sawAnyCheckRun = false;
-  let lastFailures = [];
   while (Date.now() - start < deadlineMs) {
-    const res = shAllowFail('gh', [
-      'api',
-      `repos/{owner}/{repo}/commits/${pinSha}/check-runs`,
-      '--jq',
-      '[.check_runs[] | {name: .name, status: .status, conclusion: .conclusion}]',
-    ]);
-    if (!res.ok) {
-      step('api-transient', res.out.split('\n')[0] ?? 'unknown error');
-      sleepSync(pollMs);
-      continue;
-    }
-    let runs = [];
-    try {
-      runs = JSON.parse(res.out || '[]');
-    } catch {
-      step('api-unparseable', res.out.split('\n')[0] ?? '');
-      sleepSync(pollMs);
-      continue;
-    }
-    const ours = runs.filter((r) => r.name === checkName);
-    if (ours.length > 0) sawAnyCheckRun = true;
-    const completed = ours.filter((r) => r.status === 'completed');
-    if (completed.length > 0 && completed.every((r) => r.conclusion === 'success')) {
+    const verdict = getExactHeadCiStatus({
+      sha: pinSha,
+      repo: DEFAULT_REPO,
+      checkName,
+      requiredAppId: DEFAULT_REQUIRED_APP_ID,
+      cwd: process.cwd(),
+    });
+
+    if (verdict.runs && verdict.runs.length > 0) sawAnyCheckRun = true;
+
+    if (verdict.ok && verdict.state === 'SUCCESS') {
       step('ci-green', `${checkName} succeeded at ${pinSha}`);
       break;
     }
-    if (completed.some((r) => r.conclusion !== 'success')) {
-      lastFailures = completed
-        .filter((r) => r.conclusion !== 'success')
-        .map((r) => `${r.name}:${r.conclusion}`);
+
+    if (verdict.state === 'FAILURE' || verdict.state === 'UNTRUSTED') {
+      const incident = captureCiIncident({
+        sha: pinSha,
+        repo: DEFAULT_REPO,
+        checkName,
+        requiredAppId: DEFAULT_REQUIRED_APP_ID,
+        cwd: process.cwd(),
+      });
+      const failureReason = verdict.state === 'UNTRUSTED' ? 'ci-untrusted' : 'ci-red';
       step(
-        'ci-red',
-        `${lastFailures.join(', ')} at ${pinSha} — red CI is never bypassed; fix forward with new commits`,
+        failureReason,
+        `${verdict.reason || verdict.failureSummary} at ${pinSha} — failed CI is never bypassed; fix forward with new commits`,
       );
       console.log(
         JSON.stringify(
-          { merged: false, reason: 'ci-red', failures: lastFailures, pinnedHead: pinSha, trace },
+          {
+            merged: false,
+            reason: failureReason,
+            failures: verdict.failureSummary,
+            pinnedHead: pinSha,
+            incidentId: incident?.capsule?.eventId,
+            incidentPath: incident?.filePath,
+            repairRoute: incident?.capsule?.repairRoute,
+            trace,
+          },
           null,
           2,
         ),
       );
       process.exit(1);
     }
+
+    if (verdict.state === 'API_ERROR') {
+      step('api-transient', verdict.reason || 'unknown API error');
+    } else if (verdict.state === 'API_UNPARSEABLE') {
+      step('api-unparseable', verdict.reason || 'unparseable API response');
+    }
+
     // Still running (or not yet reported).
     const elapsed = Date.now() - start;
     if (!sawAnyCheckRun && elapsed > Math.min(deadlineMs / 2, 300000)) {

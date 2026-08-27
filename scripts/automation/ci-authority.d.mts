@@ -1,5 +1,7 @@
+export const DEFAULT_REQUIRED_CHECK: string;
+export const DEFAULT_REQUIRED_APP_ID: number;
+export const DEFAULT_REPO: string;
 export const STATE_ONLY_WHITELIST: readonly RegExp[];
-export const REQUIRED_CHECK_NAME: string;
 
 export interface WhitelistValidationResult {
   allowed: boolean;
@@ -11,71 +13,139 @@ export interface CiCheckRun {
   name: string;
   status: string;
   conclusion: string | null;
+  html_url?: string;
+  id?: number;
+  app_id?: number;
+  app_slug?: string;
 }
+
+export type ExactHeadCiState =
+  'SUCCESS' | 'FAILURE' | 'PENDING' | 'MISSING' | 'UNTRUSTED' | 'API_ERROR' | 'API_UNPARSEABLE';
 
 export interface CiStatusResult {
   ok: boolean;
-  state: 'SUCCESS' | 'FAILURE' | 'PENDING' | 'MISSING' | 'API_ERROR';
-  sha: string;
-  check?: CiCheckRun;
+  state: ExactHeadCiState;
+  sha: string | null;
+  checkName?: string;
+  requiredAppId?: number | null;
   reason?: string;
-  failureSummary?: string;
-  allChecks?: CiCheckRun[];
+  failureSummary?: string | null;
+  runs?: CiCheckRun[];
+  failedRuns?: CiCheckRun[];
 }
+
+export type MainCiState =
+  'GREEN' | 'RED' | 'FETCH_ERROR' | 'REV_PARSE_ERROR' | 'UNKNOWN' | ExactHeadCiState;
 
 export interface MainCiStatusResult {
   ok: boolean;
-  state: 'GREEN' | 'RED' | 'PENDING' | 'MISSING' | 'API_ERROR';
-  sha?: string;
+  state: MainCiState;
+  sha: string | null;
   reason?: string;
-  advisory?: boolean;
   verdict?: CiStatusResult;
 }
 
 export interface ClassifiedCiFailure {
-  category: 'FORMAT' | 'LINT' | 'TYPECHECK' | 'TESTS' | 'SPEC' | 'INFRA';
+  category: 'FORMAT' | 'SPEC' | 'LINT' | 'TYPECHECK' | 'TESTS' | 'INFRA' | 'UNKNOWN';
   repairable: boolean;
   failedFiles: string[];
-  summary: string;
+  logTail: string;
+}
+
+export interface CiRepairRoute {
+  route:
+    | 'DETERMINISTIC_FORMAT'
+    | 'INFRASTRUCTURE_WAIT'
+    | 'AGY_TEST_REPAIR'
+    | 'CODEX_IMPLEMENTATION_REPAIR'
+    | 'SPEC_INTEGRITY_REPAIR'
+    | 'MAINTAINER_ESCALATION'
+    | 'MAINTAINER_INCIDENT';
+  engine: 'FORMATTER' | 'NONE' | 'AGY' | 'CODEX' | 'CLAUDE';
+  role: 'mechanical' | 'infra' | 'test' | 'implementation' | 'maintainer';
+  action: string;
+  reason: string;
+  needsAi: boolean;
+}
+
+export interface CiIncidentCapsule {
+  schema: string;
+  eventId: string;
+  package: string | null;
+  runId: number | string | null;
+  runUrl: string | null;
+  workflow: string | null;
+  executionProfile: string;
+  sha: string;
+  repo: string;
+  checkName: string;
+  requiredAppId: number | null;
+  failureSummary?: string | null;
+  classification: ClassifiedCiFailure;
+  repairRoute: CiRepairRoute;
+  attempts: number;
+  capturedAt: string;
 }
 
 export interface CiIncidentRecord {
   filePath: string;
-  capsule: {
-    schema: string;
-    incidentId: string;
-    sha: string;
-    url: string | null;
-    classification: ClassifiedCiFailure;
-    capturedAt: string;
-  };
+  capsule: CiIncidentCapsule;
+  deduplicated: boolean;
 }
 
-export function validateDirectMainPushWhitelist(
-  paths: string[],
-  whitelist?: readonly RegExp[],
-): WhitelistValidationResult;
+export function validateDirectMainPushWhitelist(files?: string[]): WhitelistValidationResult;
 
-export function getExactHeadCiStatus(opts: {
-  sha: string;
+export function getExactHeadCiStatus(opts?: {
+  sha?: string | null;
   repo?: string;
   checkName?: string;
-  ghFn?: (args: string[]) => { ok: boolean; stdout: string; stderr?: string };
+  requiredAppId?: number | null;
+  cwd?: string;
+  ghFn?: (
+    args: string[],
+    opts?: { cwd?: string },
+  ) => { ok: boolean; stdout: string; stderr?: string; status?: number };
 }): CiStatusResult;
 
 export function getMainCiStatus(opts?: {
   repo?: string;
-  cwd?: string;
   checkName?: string;
-  gitFn?: (cmd: string) => { ok: boolean; stdout: string; stderr?: string };
-  ghFn?: (args: string[]) => { ok: boolean; stdout: string; stderr?: string };
+  requiredAppId?: number | null;
+  cwd?: string;
+  ghFn?: (
+    args: string[],
+    opts?: { cwd?: string },
+  ) => { ok: boolean; stdout: string; stderr?: string; status?: number };
+  gitFn?: (
+    args: string[],
+    opts?: { cwd?: string },
+  ) => { ok: boolean; stdout: string; stderr?: string; status?: number };
 }): MainCiStatusResult;
 
-export function classifyCiFailure(logText: string): ClassifiedCiFailure;
+export function classifyCiFailure(logText?: string): ClassifiedCiFailure;
 
-export function captureCiIncident(opts: {
+export function selectCiRepairRoute(opts?: {
+  classification?: ClassifiedCiFailure | string;
+  executionProfile?: string;
+  failedFiles?: string[];
+  attempts?: number;
+  maxAttempts?: number;
+}): CiRepairRoute;
+
+export function captureCiIncident(opts?: {
   sha: string;
   repo?: string;
+  checkName?: string;
+  requiredAppId?: number | null;
+  packageId?: string | null;
+  runId?: number | string | null;
+  workflow?: string | null;
+  executionProfile?: string;
+  attempts?: number;
   stateDir?: string;
-  ghFn?: (args: string[]) => { ok: boolean; stdout: string; stderr?: string };
+  cwd?: string;
+  ghFn?: (
+    args: string[],
+    opts?: { cwd?: string },
+  ) => { ok: boolean; stdout: string; stderr?: string; status?: number };
 }): CiIncidentRecord | null;

@@ -12,3 +12,4 @@ coverage/
 
 # Archon-managed agent skills (third-party managed content)
 .agents/
+.local/

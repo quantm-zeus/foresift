@@ -262,7 +262,7 @@ case "\$cmd/\$sub" in
       git -C "\${SIBLING_REPO}" push -q origin "HEAD:\$BRANCH_NAME"
     fi
     if [ -n "\${GHSTUB_EMPTY_RUNS:-}" ]; then printf '[]'; exit 0; fi
-    printf '[{"name":"%s","status":"completed","conclusion":"%s"}]' \\
+    printf '[{"name":"%s","status":"completed","conclusion":"%s","app_id":15368}]' \\
       "\${GHSTUB_CHECK_NAME:?}" "\${GHSTUB_CONCLUSION:-success}"
     ;;
   *) echo "stub: unsupported invocation: $*" >&2; exit 1 ;;

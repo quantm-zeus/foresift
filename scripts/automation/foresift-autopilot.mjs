@@ -1665,13 +1665,16 @@ function selectAndLaunch(st) {
   let launched = 0;
   const running = st.activeRuns.map((r) => findPackage(ms, r.packageId)).filter(Boolean);
 
-  // B. MAIN RED GLOBAL BLOCK (V4 Invariant): if current origin/main required CI is RED/FAILURE/CANCELLED/TIMED_OUT,
-  // do not launch any new product coding package.
+  // B. MAIN RED GLOBAL BLOCK (V4 Invariant): ONLY verified GREEN origin/main required CI
+  // permits a NEW product coding package launch. Everything else fails closed.
   const mainCi = getMainCiStatus({ cwd: REPO });
-  if (mainCi.ok === false && ['RED', 'FAILURE', 'CANCELLED', 'TIMED_OUT'].includes(mainCi.state)) {
-    if (!coRunDenialSeen.has(`main_ci_red|${mainCi.sha}`)) {
-      coRunDenialSeen.add(`main_ci_red|${mainCi.sha}`);
-      log(`product package launch blocked: origin/main required CI is RED (${mainCi.reason})`);
+  if (!mainCi.ok || mainCi.state !== 'GREEN') {
+    const reasonKey = `main_ci_not_green|${mainCi.sha ?? 'no_sha'}|${mainCi.state}`;
+    if (!coRunDenialSeen.has(reasonKey)) {
+      coRunDenialSeen.add(reasonKey);
+      log(
+        `product package launch blocked: origin/main required CI is not GREEN (state=${mainCi.state}, reason=${mainCi.reason})`,
+      );
       record(st, 'product_launch_blocked_by_main_ci', {
         state: mainCi.state,
         reason: mainCi.reason,

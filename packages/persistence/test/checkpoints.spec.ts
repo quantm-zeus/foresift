@@ -4,7 +4,7 @@
  * canonical event exactly once; replay across an unmarked gap is refused
  * until the gap is registered AND resolved.
  */
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 import { PGlite } from '@electric-sql/pglite';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';

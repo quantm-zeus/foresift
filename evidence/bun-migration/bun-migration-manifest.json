@@ -1,14 +1,14 @@
 {
   "schema": "foresift/bun-migration-manifest@1",
   "migrationId": "bun-test-authority-v1",
-  "generatedAt": "2026-08-27T01:47:10.530Z",
+  "generatedAt": "2026-08-27T01:47:48.597Z",
   "root": ".",
   "totalTestFiles": 219,
   "counts": {
-    "CODEMOD_READY": 122,
+    "CODEMOD_READY": 112,
     "AGY_REQUIRED": 17,
     "MIGRATED": 76,
-    "VERIFIED": 4,
+    "VERIFIED": 14,
     "BLOCKED": 0
   },
   "parity": {
@@ -252,66 +252,54 @@
     {
       "path": "packages/persistence/test/acquisition.spec.ts",
       "package": "@foresift/persistence",
-      "bytes": 16047,
+      "bytes": 16049,
       "lines": 434,
-      "sha256": "bf959a0d1268fe6462c7b5f2c32dfc5a6980201a7dfda8ad9687956e99e33fb2",
+      "sha256": "999244ebb68c2ee09abde6559a19902461739ea04816eea2704c1246833ee43b",
       "imports": [
         "node:path",
         "node:url",
-        "vitest",
+        "bun:test",
         "@electric-sql/pglite",
         "@foresift/domain",
         "../src/index.ts"
       ],
-      "vitestImports": [
-        "afterAll",
-        "beforeAll",
-        "describe",
-        "expect",
-        "it"
-      ],
+      "vitestImports": [],
       "features": [],
       "workload": "DATABASE_PGLITE",
-      "migrationType": "EASY_MECHANICAL",
+      "migrationType": "ALREADY_MIGRATED",
       "fixturesAndHelpers": [],
       "sourceAnchors": [
         "@electric-sql/pglite",
         "@foresift/domain",
         "../src/index.ts"
       ],
-      "state": "CODEMOD_READY"
+      "state": "VERIFIED"
     },
     {
       "path": "packages/persistence/test/backfill-watermark.spec.ts",
       "package": "@foresift/persistence",
-      "bytes": 13848,
+      "bytes": 13850,
       "lines": 382,
-      "sha256": "476b53a3e29253cabc9a16045167e79583ddb7fcd7952dc51ed7ada878134584",
+      "sha256": "cc22f89ada1028a28c296aea7ee6048d2151461a26c660b508311eca9324384d",
       "imports": [
         "node:path",
         "node:url",
-        "vitest",
+        "bun:test",
         "@electric-sql/pglite",
         "@foresift/domain",
         "../src/index.ts"
       ],
-      "vitestImports": [
-        "afterAll",
-        "beforeAll",
-        "describe",
-        "expect",
-        "it"
-      ],
+      "vitestImports": [],
       "features": [],
       "workload": "DATABASE_PGLITE",
-      "migrationType": "EASY_MECHANICAL",
+      "migrationType": "ALREADY_MIGRATED",
       "fixturesAndHelpers": [],
       "sourceAnchors": [
         "@electric-sql/pglite",
         "@foresift/domain",
         "../src/index.ts"
       ],
-      "state": "CODEMOD_READY"
+      "state": "VERIFIED"
     },
     {
       "path": "packages/persistence/test/backup-governance.spec.ts",
@@ -374,43 +362,37 @@
     {
       "path": "packages/persistence/test/checkpoints.spec.ts",
       "package": "@foresift/persistence",
-      "bytes": 11650,
+      "bytes": 11652,
       "lines": 293,
-      "sha256": "41ebc3a9bf8312be26f83798d8a80b6ae9b1511d5c0883c6b42dc29169e9579f",
+      "sha256": "007524d1c8da2b40667d2684415a770d4dc0de11775adb7d8d395aab5a34d5d4",
       "imports": [
-        "vitest",
+        "bun:test",
         "@electric-sql/pglite",
         "node:path",
         "node:url",
         "@foresift/domain",
         "../src/index.ts"
       ],
-      "vitestImports": [
-        "afterAll",
-        "beforeAll",
-        "describe",
-        "expect",
-        "it"
-      ],
+      "vitestImports": [],
       "features": [],
       "workload": "DATABASE_PGLITE",
-      "migrationType": "EASY_MECHANICAL",
+      "migrationType": "ALREADY_MIGRATED",
       "fixturesAndHelpers": [],
       "sourceAnchors": [
         "@electric-sql/pglite",
         "@foresift/domain",
         "../src/index.ts"
       ],
-      "state": "CODEMOD_READY"
+      "state": "VERIFIED"
     },
     {
       "path": "packages/persistence/test/drill-restore-rpo.spec.ts",
       "package": "@foresift/persistence",
-      "bytes": 21143,
+      "bytes": 21145,
       "lines": 513,
-      "sha256": "68e15ea8fc3b9450220f085371da316b6ac5ce977e43219bf7d48816ea4f47ef",
+      "sha256": "321bf6f4c78fefc83a1a48af900ff56bd1511fe4220b906a8923aadebe8409c6",
       "imports": [
-        "vitest",
+        "bun:test",
         "@electric-sql/pglite",
         "node:path",
         "node:os",
@@ -420,16 +402,10 @@
         "../src/index.ts",
         "@foresift/object-store"
       ],
-      "vitestImports": [
-        "afterAll",
-        "beforeAll",
-        "describe",
-        "expect",
-        "it"
-      ],
+      "vitestImports": [],
       "features": [],
       "workload": "DATABASE_PGLITE",
-      "migrationType": "EASY_MECHANICAL",
+      "migrationType": "ALREADY_MIGRATED",
       "fixturesAndHelpers": [],
       "sourceAnchors": [
         "@electric-sql/pglite",
@@ -437,39 +413,33 @@
         "../src/index.ts",
         "@foresift/object-store"
       ],
-      "state": "CODEMOD_READY"
+      "state": "VERIFIED"
     },
     {
       "path": "packages/persistence/test/engine-transactions.spec.ts",
       "package": "@foresift/persistence",
-      "bytes": 7224,
+      "bytes": 7226,
       "lines": 198,
-      "sha256": "d43011f5d47aa37487b19b5d793b93f4bd777a9372a56f8ddc4e40de50d767e3",
+      "sha256": "d1b6b6209a35e5f90e53ddaa63f9ada6c99ec61c41837924591665bce2c5b5b1",
       "imports": [
         "node:path",
         "node:url",
-        "vitest",
+        "bun:test",
         "@electric-sql/pglite",
         "@foresift/domain",
         "../src/index.ts"
       ],
-      "vitestImports": [
-        "afterAll",
-        "beforeAll",
-        "describe",
-        "expect",
-        "it"
-      ],
+      "vitestImports": [],
       "features": [],
       "workload": "DATABASE_PGLITE",
-      "migrationType": "EASY_MECHANICAL",
+      "migrationType": "ALREADY_MIGRATED",
       "fixturesAndHelpers": [],
       "sourceAnchors": [
         "@electric-sql/pglite",
         "@foresift/domain",
         "../src/index.ts"
       ],
-      "state": "CODEMOD_READY"
+      "state": "VERIFIED"
     },
     {
       "path": "packages/persistence/test/features-parity.spec.ts",
@@ -508,29 +478,23 @@
     {
       "path": "packages/persistence/test/identity-repo.spec.ts",
       "package": "@foresift/persistence",
-      "bytes": 19763,
+      "bytes": 19765,
       "lines": 533,
-      "sha256": "0d73ae0a41e36235fe972c0c88ea99504ae4d9b3ba7248da56bc8001e35525af",
+      "sha256": "45d00b11125f813dbc107eeb2b7d30e1e4085c80faac1fcc37737f476bf48a72",
       "imports": [
         "node:fs/promises",
         "node:path",
         "node:url",
-        "vitest",
+        "bun:test",
         "@electric-sql/pglite",
         "@foresift/domain",
         "../src/index.ts",
         "@foresift/domain"
       ],
-      "vitestImports": [
-        "afterAll",
-        "beforeAll",
-        "describe",
-        "expect",
-        "it"
-      ],
+      "vitestImports": [],
       "features": [],
       "workload": "DATABASE_PGLITE",
-      "migrationType": "EASY_MECHANICAL",
+      "migrationType": "ALREADY_MIGRATED",
       "fixturesAndHelpers": [],
       "sourceAnchors": [
         "@electric-sql/pglite",
@@ -538,7 +502,7 @@
         "../src/index.ts",
         "@foresift/domain"
       ],
-      "state": "CODEMOD_READY"
+      "state": "VERIFIED"
     },
     {
       "path": "packages/persistence/test/migrator.spec.ts",
@@ -573,122 +537,100 @@
     {
       "path": "packages/persistence/test/observations-revisions.spec.ts",
       "package": "@foresift/persistence",
-      "bytes": 15929,
+      "bytes": 15931,
       "lines": 397,
-      "sha256": "01ded64f81fe3b93960a260dc8359556d041abf9c6011e5c25134d4bd7a11f2a",
+      "sha256": "11dcc4f7bb0a906d4184c4692fde50ad3b884acfd9ce2b0243a271b163e42567",
       "imports": [
         "node:path",
         "node:url",
-        "vitest",
+        "bun:test",
         "@electric-sql/pglite",
         "@foresift/domain",
         "../src/index.ts"
       ],
-      "vitestImports": [
-        "afterAll",
-        "beforeAll",
-        "describe",
-        "expect",
-        "it"
-      ],
+      "vitestImports": [],
       "features": [],
       "workload": "DATABASE_PGLITE",
-      "migrationType": "EASY_MECHANICAL",
+      "migrationType": "ALREADY_MIGRATED",
       "fixturesAndHelpers": [],
       "sourceAnchors": [
         "@electric-sql/pglite",
         "@foresift/domain",
         "../src/index.ts"
       ],
-      "state": "CODEMOD_READY"
+      "state": "VERIFIED"
     },
     {
       "path": "packages/persistence/test/pg-pool-wiring.spec.ts",
       "package": "@foresift/persistence",
-      "bytes": 4305,
+      "bytes": 4307,
       "lines": 111,
-      "sha256": "1a804cccd099d7328027bf6e44a4089d11f946ad1091eaef1cf92d1abd389497",
+      "sha256": "6b783c99981fd820b485ae2dcee91ea1bbbfbc285e31661edb7767141ead56e0",
       "imports": [
-        "vitest",
+        "bun:test",
         "../src/index.ts"
       ],
-      "vitestImports": [
-        "describe",
-        "expect",
-        "it"
-      ],
+      "vitestImports": [],
       "features": [],
       "workload": "DATABASE_PGLITE",
-      "migrationType": "EASY_MECHANICAL",
+      "migrationType": "ALREADY_MIGRATED",
       "fixturesAndHelpers": [],
       "sourceAnchors": [
         "../src/index.ts"
       ],
-      "state": "CODEMOD_READY"
+      "state": "VERIFIED"
     },
     {
       "path": "packages/persistence/test/quality.spec.ts",
       "package": "@foresift/persistence",
-      "bytes": 5772,
+      "bytes": 5774,
       "lines": 166,
-      "sha256": "85c4670be7526d428eda8a38cd6a269608deaff24bec6ed0cc08c85949fa2c12",
+      "sha256": "59af4e5ec486fbe22cc3fda2da7774657b541cd053ab0f7c09c89b25858252e5",
       "imports": [
         "node:path",
         "node:url",
-        "vitest",
+        "bun:test",
         "@electric-sql/pglite",
         "@foresift/domain",
         "../src/index.ts"
       ],
-      "vitestImports": [
-        "afterAll",
-        "beforeAll",
-        "describe",
-        "expect",
-        "it"
-      ],
+      "vitestImports": [],
       "features": [],
       "workload": "DATABASE_PGLITE",
-      "migrationType": "EASY_MECHANICAL",
+      "migrationType": "ALREADY_MIGRATED",
       "fixturesAndHelpers": [],
       "sourceAnchors": [
         "@electric-sql/pglite",
         "@foresift/domain",
         "../src/index.ts"
       ],
-      "state": "CODEMOD_READY"
+      "state": "VERIFIED"
     },
     {
       "path": "packages/persistence/test/recovery-tiers.spec.ts",
       "package": "@foresift/persistence",
-      "bytes": 15302,
+      "bytes": 15304,
       "lines": 396,
-      "sha256": "323f00f37139c193fa33e689dfdcf4759fa7d6cd663ff0cc2a7d72634efb7fb0",
+      "sha256": "77fe3efae4a6cb2d3c6b8045060bc65f53a160653b600d90df488dadd36b444e",
       "imports": [
-        "vitest",
+        "bun:test",
         "@electric-sql/pglite",
         "node:path",
         "node:url",
         "@foresift/domain",
         "../src/index.ts"
       ],
-      "vitestImports": [
-        "afterAll",
-        "beforeAll",
-        "describe",
-        "expect",
-        "it"
-      ],
+      "vitestImports": [],
       "features": [],
       "workload": "DATABASE_PGLITE",
-      "migrationType": "EASY_MECHANICAL",
+      "migrationType": "ALREADY_MIGRATED",
       "fixturesAndHelpers": [],
       "sourceAnchors": [
         "@electric-sql/pglite",
         "@foresift/domain",
         "../src/index.ts"
       ],
-      "state": "CODEMOD_READY"
+      "state": "VERIFIED"
     },
     {
       "path": "packages/persistence/test/replay.spec.ts",
@@ -6673,7 +6615,8 @@
       },
       "codexCalls": 0,
       "claudeCalls": 0,
-      "testedHead": "922204dfa1a5f922f5695608ac44345428883980"
+      "testedHead": "922204dfa1a5f922f5695608ac44345428883980",
+      "checkpointHead": "6377ff069dbce66cda97e4c5840a2053b54bb7b1"
     },
     {
       "id": "mechanical--foresift-persistence-database-pglite-1",
@@ -6691,7 +6634,323 @@
         "packages/persistence/test/quality.spec.ts",
         "packages/persistence/test/recovery-tiers.spec.ts"
       ],
-      "state": "PENDING"
+      "state": "VERIFIED",
+      "verification": {
+        "ok": true,
+        "wallTimeMs": 37900,
+        "peakRssBytes": 0,
+        "cpuSeconds": 0,
+        "counts": {
+          "passed": 119,
+          "failed": 0,
+          "skipped": 0
+        },
+        "results": [
+          {
+            "id": "pglite-1",
+            "workload": "DATABASE_PGLITE",
+            "files": [
+              "packages/persistence/test/acquisition.spec.ts"
+            ],
+            "fileWorkers": 1,
+            "testConcurrency": 1,
+            "command": [
+              "bun",
+              "test",
+              "--no-orphans",
+              "--isolate",
+              "--parallel=1",
+              "--max-concurrency=1",
+              "--timeout=30000",
+              "packages/persistence/test/acquisition.spec.ts"
+            ],
+            "status": 0,
+            "wallTimeMs": 3511,
+            "peakRssBytes": null,
+            "cpuSeconds": null,
+            "counts": {
+              "passed": 9,
+              "failed": 0,
+              "skipped": 0
+            },
+            "stdoutTail": "bun test v1.4.0 (34cbb9a40) 1x PARALLEL\n",
+            "stderrTail": "\npackages/persistence/test/acquisition.spec.ts:\n(pass) probe-assignment write-before-retrieval (AC-243) > refuses degenerate assignment probabilities at the boundary [3.73ms]\n(pass) probe-assignment write-before-retrieval (AC-243) > refuses retrieval completed without any prior probe assignment [5.06ms]\n(pass) probe-assignment write-before-retrieval (AC-243) > refuses completion of a NOT_REQUESTED_BY_POLICY outcome and a mis-scoped record [16.55ms]\n(pass) probe-assignment write-before-retrieval (AC-243) > completes only after assignment + impact, and completion is one-way [15.25ms]\n(pass) probe-assignment write-before-retrieval (AC-243) > refuses completion before request at the boundary AND in SQL [11.57ms]\n(pass) probe-assignment write-before-retrieval (AC-243) > refuses out-of-range impacts and NOT_REQUESTED records carrying lifecycle [1.34ms]\n(pass) frozen matured counts (AC-247) > resolves counts only from decisions completed at or before t [38.78ms]\n(pass) completion-vs-request ordering compares instants, not ISO text shape (§13.8) > accepts a sub-second-later completion whose text sorts lexically before the request [5.84ms]\n(pass) completion-vs-request ordering compares instants, not ISO text shape (§13.8) > refuses a completion that precedes its request across mixed sub-second precision [4.41ms]\n\n 9 pass\n 0 fail\n 27 expect() calls\nRan 9 tests across 1 file. [3.41s]\n"
+          },
+          {
+            "id": "pglite-2",
+            "workload": "DATABASE_PGLITE",
+            "files": [
+              "packages/persistence/test/backfill-watermark.spec.ts"
+            ],
+            "fileWorkers": 1,
+            "testConcurrency": 1,
+            "command": [
+              "bun",
+              "test",
+              "--no-orphans",
+              "--isolate",
+              "--parallel=1",
+              "--max-concurrency=1",
+              "--timeout=30000",
+              "packages/persistence/test/backfill-watermark.spec.ts"
+            ],
+            "status": 0,
+            "wallTimeMs": 3117,
+            "peakRssBytes": null,
+            "cpuSeconds": null,
+            "counts": {
+              "passed": 14,
+              "failed": 0,
+              "skipped": 0
+            },
+            "stdoutTail": "bun test v1.4.0 (34cbb9a40) 1x PARALLEL\n",
+            "stderrTail": "\npackages/persistence/test/backfill-watermark.spec.ts:\n(pass) no-backdating guard (§13.6 rule 5) > refuses available_at earlier than retrieval without a live receipt [1.00ms]\n(pass) no-backdating guard (§13.6 rule 5) > admits earlier availability only with LIVE_RECEIPT_REFERENCE + ref [0.11ms]\n(pass) no-backdating guard (§13.6 rule 5) > the database CHECK independently refuses backdated receipts [17.12ms]\n(pass) no-backdating guard (§13.6 rule 5) > persists a live-receipt-backed receipt whose event precedes retrieval [7.98ms]\n(pass) no-backdating guard (§13.6 rule 5) > refuses a live-receipt reference that matches no persisted receipt [2.54ms]\n(pass) no-backdating guard (§13.6 rule 5) > replay admission of a backfilled row uses THE shared predicate [0.15ms]\n(pass) watermarks and complete-coverage honesty (§13.5) > advances and reloads watermark state [4.86ms]\n(pass) watermarks and complete-coverage honesty (§13.5) > keeps the worst observed lateness across advances [4.15ms]\n(pass) watermarks and complete-coverage honesty (§13.5) > refuses coverage claims until contiguity covers the claimed interval [8.05ms]\n(pass) watermarks and complete-coverage honesty (§13.5) > answers false when no watermark exists for the key [0.92ms]\n(pass) watermarks and complete-coverage honesty (§13.5) > refuses structural nonsense: gap bounds inverted or beyond the head [2.30ms]\n(pass) watermark slot monotonicity (§13.5) > advances monotonically and keeps the stored head [6.66ms]\n(pass) watermark slot monotonicity (§13.5) > refuses an advance that would regress any slot high-water mark, leaving stored state intact [5.80ms]\n(pass) watermark slot monotonicity (§13.5) > an advance OMITTING highestFinalizedSlot preserves — never erases — the stored finalized mark [6.15ms]\n\n 14 pass\n 0 fail\n 37 expect() calls\nRan 14 tests across 1 file. [3.02s]\n"
+          },
+          {
+            "id": "pglite-3",
+            "workload": "DATABASE_PGLITE",
+            "files": [
+              "packages/persistence/test/checkpoints.spec.ts"
+            ],
+            "fileWorkers": 1,
+            "testConcurrency": 1,
+            "command": [
+              "bun",
+              "test",
+              "--no-orphans",
+              "--isolate",
+              "--parallel=1",
+              "--max-concurrency=1",
+              "--timeout=30000",
+              "packages/persistence/test/checkpoints.spec.ts"
+            ],
+            "status": 0,
+            "wallTimeMs": 3070,
+            "peakRssBytes": null,
+            "cpuSeconds": null,
+            "counts": {
+              "passed": 14,
+              "failed": 0,
+              "skipped": 0
+            },
+            "stdoutTail": "bun test v1.4.0 (34cbb9a40) 1x PARALLEL\n",
+            "stderrTail": "\npackages/persistence/test/checkpoints.spec.ts:\n(pass) fenced checkpoints (INV-009) > accepts a fresh commit and a higher fencing token at any cursor [6.94ms]\n(pass) fenced checkpoints (INV-009) > rejects a STALE fencing token commit [13.63ms]\n(pass) fenced checkpoints (INV-009) > rejects cursor regression within one fencing epoch [3.04ms]\n(pass) fenced checkpoints (INV-009) > refuses same-epoch advance across skipped slots until gaps are recovered [12.39ms]\n(pass) fenced checkpoints (INV-009) > lets DECLARED_UNRECOVERABLE gaps cover skipped slots too [6.48ms]\n(pass) fenced checkpoints (INV-009) > lists only unresolved gaps as blocking for a shard [6.57ms]\n(pass) fenced checkpoints (INV-009) > refuses inverted gap bounds and resolution of unknown/resolved gaps [1.60ms]\n(pass) fenced-upsert storage backstop (INV-009 race window) > a stale-token write landing after a concurrent commit is refused and changes nothing [3.64ms]\n(pass) fenced-upsert storage backstop (INV-009 race window) > a same-token cursor-regression write landing after a concurrent commit is refused too [3.57ms]\n(pass) fenced-upsert storage backstop (INV-009 race window) > the same conditional path admits non-regressing writes (equal or advancing pairs) [3.65ms]\n(pass) exactly-once canonical events across restore+replay (AC-263) > records each canonical key once; re-application after restore is refused [4.71ms]\n(pass) exactly-once canonical events across restore+replay (AC-263) > duplicate classification is structural (SQLSTATE-first) > classifies SQLSTATE 23505 as duplicate regardless of message wording [0.31ms]\n(pass) exactly-once canonical events across restore+replay (AC-263) > duplicate classification is structural (SQLSTATE-first) > message fallback still catches drivers that wrap without SQLSTATE [0.16ms]\n(pass) exactly-once canonical events across restore+replay (AC-263) > duplicate classification is structural (SQLSTATE-first) > unrelated failures pass through untouched [0.12ms]\n\n 14 pass\n 0 fail\n 24 expect() calls\nRan 14 tests across 1 file. [2.96s]\n"
+          },
+          {
+            "id": "pglite-4",
+            "workload": "DATABASE_PGLITE",
+            "files": [
+              "packages/persistence/test/drill-restore-rpo.spec.ts"
+            ],
+            "fileWorkers": 1,
+            "testConcurrency": 1,
+            "command": [
+              "bun",
+              "test",
+              "--no-orphans",
+              "--isolate",
+              "--parallel=1",
+              "--max-concurrency=1",
+              "--timeout=30000",
+              "packages/persistence/test/drill-restore-rpo.spec.ts"
+            ],
+            "status": 0,
+            "wallTimeMs": 5987,
+            "peakRssBytes": null,
+            "cpuSeconds": null,
+            "counts": {
+              "passed": 18,
+              "failed": 0,
+              "skipped": 0
+            },
+            "stdoutTail": "bun test v1.4.0 (34cbb9a40) 1x PARALLEL\n",
+            "stderrTail": "\npackages/persistence/test/drill-restore-rpo.spec.ts:\n(pass) deterministic snapshot mechanism (ADR-0015) > yields byte-identical snapshots for identical data regardless of timing [90.05ms]\n(pass) deterministic snapshot mechanism (ADR-0015) > changes the manifest hash when data changes [64.41ms]\n(pass) deterministic snapshot mechanism (ADR-0015) > exposes the mechanism port for production PITR implementations [21.27ms]\n(pass) deterministic snapshot mechanism (ADR-0015) > snapshot bytes restore into a fresh database byte-for-byte (round-trip fidelity) [2610.08ms]\n(pass) backup run lifecycle (FR-DR-002) > runs RUNNING → SUCCEEDED with artifacts; SUCCEEDED requires artifacts [35.11ms]\n(pass) backup run lifecycle (FR-DR-002) > records FAILED runs with a mandatory reason [3.91ms]\n(pass) clean-environment restore verifier (AC-261) > refuses to run at all without a separately provided credential provider (fail closed) [2.20ms]\n(pass) clean-environment restore verifier (AC-261) > blocks resumption while a declared check has no registered verifier (audit chain not built yet) [1.22ms]\n(pass) clean-environment restore verifier (AC-261) > blocks a zero-verification drill instead of passing vacuously [1.55ms]\n(pass) clean-environment restore verifier (AC-261) > PASSES every owned check on an untampered environment once audit-chain is registered green [8.08ms]\n(pass) clean-environment restore verifier (AC-261) > catches tampered object bytes as FAILED (never silent repair) [12.70ms]\n(pass) clean-environment restore verifier (AC-261) > fails when a frozen evidence bundle manifest no longer matches its indexed hash [9.09ms]\n(pass) clean-environment restore verifier (AC-261) > fails resumption when unresolved gaps sit below a checkpoint cursor [11.37ms]\n(pass) drill timeline honesty (AC-062): inconsistent timelines are refused > computes exact minute deltas for a coherent timeline [0.23ms]\n(pass) drill timeline honesty (AC-062): inconsistent timelines are refused > refuses a timeline whose recovery point precedes the last durable write [0.11ms]\n(pass) drill timeline honesty (AC-062): inconsistent timelines are refused > refuses restore completion that precedes its own start [0.14ms]\n(pass) measured RPO/RTO vs configured tiers (AC-062/260/262) > measures a within-tier metadata restore under the 15-minute ceiling using injected time [2.41ms]\n(pass) measured RPO/RTO vs configured tiers (AC-062/260/262) > flips health DEGRADED, blocks opportunity influence, preserves risk monitoring, and opens an incident on a miss [5.69ms]\n\n 18 pass\n 0 fail\n 53 expect() calls\nRan 18 tests across 1 file. [5.84s]\n"
+          },
+          {
+            "id": "pglite-5",
+            "workload": "DATABASE_PGLITE",
+            "files": [
+              "packages/persistence/test/engine-transactions.spec.ts"
+            ],
+            "fileWorkers": 1,
+            "testConcurrency": 1,
+            "command": [
+              "bun",
+              "test",
+              "--no-orphans",
+              "--isolate",
+              "--parallel=1",
+              "--max-concurrency=1",
+              "--timeout=30000",
+              "packages/persistence/test/engine-transactions.spec.ts"
+            ],
+            "status": 0,
+            "wallTimeMs": 9407,
+            "peakRssBytes": null,
+            "cpuSeconds": null,
+            "counts": {
+              "passed": 7,
+              "failed": 0,
+              "skipped": 0
+            },
+            "stdoutTail": "bun test v1.4.0 (34cbb9a40) 1x PARALLEL\n",
+            "stderrTail": "\npackages/persistence/test/engine-transactions.spec.ts:\n(pass) depth-0 transaction atomicity > persists the whole unit on success [4.69ms]\n(pass) depth-0 transaction atomicity > rolls back EVERY statement of the unit when work throws [15.13ms]\n(pass) nested transactions use savepoints > a caught inner failure rolls back only its own scope; the outer unit commits [4.15ms]\n(pass) nested transactions use savepoints > an uncaught inner failure rolls back the entire outer unit [3.76ms]\n(pass) cleanup failures never mask the root cause > a failing outer ROLLBACK surfaces the work error with the failure as cause [1769.34ms]\n(pass) cleanup failures never mask the root cause > a failing savepoint ROLLBACK keeps the inner root cause primary [2058.74ms]\n(pass) cleanup failures never mask the root cause > a clean unit commits and leaves the engine ready for the next unit [2420.83ms]\n\n 7 pass\n 0 fail\n 17 expect() calls\nRan 7 tests across 1 file. [9.11s]\n"
+          },
+          {
+            "id": "pglite-6",
+            "workload": "DATABASE_PGLITE",
+            "files": [
+              "packages/persistence/test/identity-repo.spec.ts"
+            ],
+            "fileWorkers": 1,
+            "testConcurrency": 1,
+            "command": [
+              "bun",
+              "test",
+              "--no-orphans",
+              "--isolate",
+              "--parallel=1",
+              "--max-concurrency=1",
+              "--timeout=30000",
+              "packages/persistence/test/identity-repo.spec.ts"
+            ],
+            "status": 0,
+            "wallTimeMs": 3141,
+            "peakRssBytes": null,
+            "cpuSeconds": null,
+            "counts": {
+              "passed": 19,
+              "failed": 0,
+              "skipped": 0
+            },
+            "stdoutTail": "bun test v1.4.0 (34cbb9a40) 1x PARALLEL\n",
+            "stderrTail": "\npackages/persistence/test/identity-repo.spec.ts:\n(pass) golden chain-id vectors through the repository (AC-023) > stores each registered chain with its expected mapping quality [12.21ms]\n(pass) golden chain-id vectors through the repository (AC-023) > refuses malformed chain ids at the domain boundary [0.41ms]\n(pass) golden EVM/Solana address vectors (AC-023) > canonicalizes any-cased input and renders EIP-55 exactly as the fixture declares [5.08ms]\n(pass) golden EVM/Solana address vectors (AC-023) > rejects wrong-length and non-canonical EVM forms on insert [8.99ms]\n(pass) golden EVM/Solana address vectors (AC-023) > accepts the Solana vectors as representations [9.61ms]\n(pass) golden EVM/Solana address vectors (AC-023) > rejects invalid Solana addresses [0.34ms]\n(pass) golden EVM/Solana address vectors (AC-023) > builds CAIP-10 account ids from the fixtures [0.18ms]\n(pass) verified-equivalence memberships and pool identity > groups representations only under verified equivalences; refuses heuristics [13.27ms]\n(pass) verified-equivalence memberships and pool identity > composes pool ids strictly as chain/dex/address [6.56ms]\n(pass) verified-equivalence memberships and pool identity > registers launch pools and migration edges; refuses cycles and ambiguous boundaries [22.73ms]\n(pass) verified-equivalence memberships and pool identity > refuses re-pointing a representation between asset groupings; identical re-attach is a no-op [9.95ms]\n(pass) insert-only identity semantics (insertOrVerify) > treats an identical re-registration as a no-op reporting inserted:false [2.28ms]\n(pass) insert-only identity semantics (insertOrVerify) > refuses a conflicting re-registration with a typed error [2.61ms]\n(pass) insert-only identity semantics (insertOrVerify) > compares instants by epoch, not text shape (…00Z vs …00.000Z) [4.78ms]\n(pass) decimals resolution state machine over golden vectors > walks every scenario to its declared final state [64.00ms]\n(pass) decimals resolution state machine over golden vectors > keeps conflicting values explicitly unusable instead of guessing [1.17ms]\n(pass) decimals resolution state machine over golden vectors > refuses full cross-check credit when supporting refs share one upstream lineage (INV-008, ADR-0016) [35.42ms]\n(pass) pair identity (§11.6) > records a pair insert-or-verify: identical re-record is a no-op, conflict is typed [13.75ms]\n(pass) pair identity (§11.6) > the pairs_distinct_sides CHECK refuses base == quote at the SQL layer [1.31ms]\n\n 19 pass\n 0 fail\n 85 expect() calls\nRan 19 tests across 1 file. [3.04s]\n"
+          },
+          {
+            "id": "pglite-7",
+            "workload": "DATABASE_PGLITE",
+            "files": [
+              "packages/persistence/test/observations-revisions.spec.ts"
+            ],
+            "fileWorkers": 1,
+            "testConcurrency": 1,
+            "command": [
+              "bun",
+              "test",
+              "--no-orphans",
+              "--isolate",
+              "--parallel=1",
+              "--max-concurrency=1",
+              "--timeout=30000",
+              "packages/persistence/test/observations-revisions.spec.ts"
+            ],
+            "status": 0,
+            "wallTimeMs": 3195,
+            "peakRssBytes": null,
+            "cpuSeconds": null,
+            "counts": {
+              "passed": 13,
+              "failed": 0,
+              "skipped": 0
+            },
+            "stdoutTail": "bun test v1.4.0 (34cbb9a40) 1x PARALLEL\n",
+            "stderrTail": "\npackages/persistence/test/observations-revisions.spec.ts:\n(pass) append-only observations with receipt hashes > stores an observation whose stored row hashes back to the returned receipt [9.57ms]\n(pass) append-only observations with receipt hashes > refuses duplicate observation ids (receipt_hash is a unique content address) [8.37ms]\n(pass) append-only observations with receipt hashes > rejects mutation attempts against observations at the database boundary [3.72ms]\n(pass) append-only observations with receipt hashes > rejects TRUNCATE on the immutable tables (row triggers do not cover it) [5.39ms]\n(pass) append-only observations with receipt hashes > refuses null quantities without an explicit quality code (§13.2) [3.79ms]\n(pass) revision chains preserve originals byte-for-byte (AC-021) > appends revisions without altering the original row or its receipt hash [16.88ms]\n(pass) revision chains preserve originals byte-for-byte (AC-021) > rejects mutation of revision rows too [2.85ms]\n(pass) revision chains preserve originals byte-for-byte (AC-021) > refuses revisions for unknown observations and duplicate revision ids [6.26ms]\n(pass) revision chains preserve originals byte-for-byte (AC-021) > refuses revision availability earlier than the anchor observation (§13.6) [11.15ms]\n(pass) revision chains preserve originals byte-for-byte (AC-021) > the database trigger independently refuses raw-SQL backdated revisions [4.11ms]\n(pass) compensating events pin the original receipt hash > records a reorg compensation referencing the superseded original [5.82ms]\n(pass) compensating events pin the original receipt hash > refuses compensations for unknown targets and refuses mutation [3.47ms]\n(pass) sub-millisecond precision survives the storage round-trip (FR-DATA-003) > reads back exactly the digits that were written, byte-for-byte [3.25ms]\n\n 13 pass\n 0 fail\n 34 expect() calls\nRan 13 tests across 1 file. [3.10s]\n"
+          },
+          {
+            "id": "pglite-8",
+            "workload": "DATABASE_PGLITE",
+            "files": [
+              "packages/persistence/test/pg-pool-wiring.spec.ts"
+            ],
+            "fileWorkers": 1,
+            "testConcurrency": 1,
+            "command": [
+              "bun",
+              "test",
+              "--no-orphans",
+              "--isolate",
+              "--parallel=1",
+              "--max-concurrency=1",
+              "--timeout=30000",
+              "packages/persistence/test/pg-pool-wiring.spec.ts"
+            ],
+            "status": 0,
+            "wallTimeMs": 51,
+            "peakRssBytes": null,
+            "cpuSeconds": null,
+            "counts": {
+              "passed": 5,
+              "failed": 0,
+              "skipped": 0
+            },
+            "stdoutTail": "bun test v1.4.0 (34cbb9a40) 1x PARALLEL\n",
+            "stderrTail": "\npackages/persistence/test/pg-pool-wiring.spec.ts:\n(pass) createProductionPgPool wires precision-retaining timestamp parsers > registers OIDs 1114 and 1184 before the first Pool exists [0.34ms]\n(pass) createProductionPgPool wires precision-retaining timestamp parsers > passes configuration through to the Pool untouched [0.12ms]\n(pass) createProductionPgPool wires precision-retaining timestamp parsers > registered parsers retain full fractional precision and normalize to ISO-8601 UTC [0.28ms]\n(pass) createProductionPgPool wires precision-retaining timestamp parsers > registered parsers fail closed on non-UTC session text instead of reinterpreting [0.25ms]\n(pass) createProductionPgPool wires precision-retaining timestamp parsers > re-wiring is idempotent against registries that tolerate re-registration [0.09ms]\n\n 5 pass\n 0 fail\n 12 expect() calls\nRan 5 tests across 1 file. [34.00ms]\n"
+          },
+          {
+            "id": "pglite-9",
+            "workload": "DATABASE_PGLITE",
+            "files": [
+              "packages/persistence/test/quality.spec.ts"
+            ],
+            "fileWorkers": 1,
+            "testConcurrency": 1,
+            "command": [
+              "bun",
+              "test",
+              "--no-orphans",
+              "--isolate",
+              "--parallel=1",
+              "--max-concurrency=1",
+              "--timeout=30000",
+              "packages/persistence/test/quality.spec.ts"
+            ],
+            "status": 0,
+            "wallTimeMs": 3207,
+            "peakRssBytes": null,
+            "cpuSeconds": null,
+            "counts": {
+              "passed": 6,
+              "failed": 0,
+              "skipped": 0
+            },
+            "stdoutTail": "bun test v1.4.0 (34cbb9a40) 1x PARALLEL\n",
+            "stderrTail": "\npackages/persistence/test/quality.spec.ts:\n(pass) null alone is insufficient (§13.9) > refuses a null with no codes at the boundary [0.50ms]\n(pass) null alone is insufficient (§13.9) > refuses VALID as the sole explanation of a null [0.11ms]\n(pass) null alone is insufficient (§13.9) > accepts a null explained by an explicit code [0.09ms]\n(pass) null alone is insufficient (§13.9) > the SQL CHECK refuses a coded null inserted directly [19.80ms]\n(pass) field-quality recording and state queries > records usable, coded-value, and coded-null fields and reads them back [9.46ms]\n(pass) field-quality recording and state queries > filters fields by quality state across observations [4.99ms]\n\n 6 pass\n 0 fail\n 14 expect() calls\nRan 6 tests across 1 file. [3.07s]\n"
+          },
+          {
+            "id": "pglite-10",
+            "workload": "DATABASE_PGLITE",
+            "files": [
+              "packages/persistence/test/recovery-tiers.spec.ts"
+            ],
+            "fileWorkers": 1,
+            "testConcurrency": 1,
+            "command": [
+              "bun",
+              "test",
+              "--no-orphans",
+              "--isolate",
+              "--parallel=1",
+              "--max-concurrency=1",
+              "--timeout=30000",
+              "packages/persistence/test/recovery-tiers.spec.ts"
+            ],
+            "status": 0,
+            "wallTimeMs": 3210,
+            "peakRssBytes": null,
+            "cpuSeconds": null,
+            "counts": {
+              "passed": 14,
+              "failed": 0,
+              "skipped": 0
+            },
+            "stdoutTail": "bun test v1.4.0 (34cbb9a40) 1x PARALLEL\n",
+            "stderrTail": "\npackages/persistence/test/recovery-tiers.spec.ts:\n(pass) recovery-tier registry seeding (FR-DR-001) > seeds the §34.4 default tiers within their ceilings [5.64ms]\n(pass) recovery-tier registry seeding (FR-DR-001) > is idempotent — reseeding converges instead of duplicating [4.35ms]\n(pass) recovery-tier registry seeding (FR-DR-001) > refuses tiers configured looser than the class ceiling [12.83ms]\n(pass) protected-asset registry coverage (FR-DR-001, §14.9) > maps EVERY table created by this package plus the raw-payload object store onto covering tiers [61.06ms]\n(pass) protected-asset registry coverage (FR-DR-001, §14.9) > refuses an asset whose declared class does not match its tier class [1.16ms]\n(pass) protected-asset registry coverage (FR-DR-001, §14.9) > refuses protection against an unknown tier [0.56ms]\n(pass) tier measurements + incidents + health states (§34.9–§34.10) > records a WITHIN_TIER measurement without an incident [2.05ms]\n(pass) tier measurements + incidents + health states (§34.9–§34.10) > refuses a missed measurement without an incident reference — typed first, then by CHECK [1.30ms]\n(pass) tier measurements + incidents + health states (§34.9–§34.10) > persists a miss with its incident, degrading capability machine-readably while preserving risk monitoring [5.10ms]\n(pass) tier measurements + incidents + health states (§34.9–§34.10) > refuses a degraded health state whose incident reference points at no durable incident (FK) [1.83ms]\n(pass) tier measurements + incidents + health states (§34.9–§34.10) > refuses suppressing deterministic risk monitoring and degraded states without incidents [0.19ms]\n(pass) tier measurements + incidents + health states (§34.9–§34.10) > closes incidents only forward in time [2.07ms]\n(pass) tier measurements + incidents + health states (§34.9–§34.10) > refuses a resolution timestamp earlier than the incident opened [1.86ms]\n(pass) backup policy persistence shape > stores separated key references only and round-trips [2.65ms]\n\n 14 pass\n 0 fail\n 67 expect() calls\nRan 14 tests across 1 file. [3.10s]\n"
+          }
+        ]
+      },
+      "codexCalls": 0,
+      "claudeCalls": 0,
+      "testedHead": "6377ff069dbce66cda97e4c5840a2053b54bb7b1"
     },
     {
       "id": "mechanical--foresift-persistence-database-pglite-2",

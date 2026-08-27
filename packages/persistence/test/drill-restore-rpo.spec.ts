@@ -8,7 +8,7 @@
  * measurements use ClockPort-injected timelines so ≤15 min / ≤60 min tiers
  * are measured exactly.
  */
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 import { PGlite } from '@electric-sql/pglite';
 import path from 'node:path';
 import os from 'node:os';

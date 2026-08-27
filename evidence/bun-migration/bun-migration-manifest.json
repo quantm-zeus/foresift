@@ -1,14 +1,14 @@
 {
   "schema": "foresift/bun-migration-manifest@1",
   "migrationId": "bun-test-authority-v1",
-  "generatedAt": "2026-08-26T20:34:36.336Z",
+  "generatedAt": "2026-08-27T03:05:31.554Z",
   "root": ".",
   "totalTestFiles": 219,
   "counts": {
-    "CODEMOD_READY": 123,
+    "CODEMOD_READY": 109,
     "AGY_REQUIRED": 9,
-    "MIGRATED": 83,
-    "VERIFIED": 4,
+    "MIGRATED": 93,
+    "VERIFIED": 8,
     "BLOCKED": 0
   },
   "parity": {
@@ -252,98 +252,80 @@
     {
       "path": "packages/persistence/test/acquisition.spec.ts",
       "package": "@foresift/persistence",
-      "bytes": 16047,
+      "bytes": 16049,
       "lines": 434,
-      "sha256": "bf959a0d1268fe6462c7b5f2c32dfc5a6980201a7dfda8ad9687956e99e33fb2",
+      "sha256": "999244ebb68c2ee09abde6559a19902461739ea04816eea2704c1246833ee43b",
       "imports": [
         "node:path",
         "node:url",
-        "vitest",
+        "bun:test",
         "@electric-sql/pglite",
         "@foresift/domain",
         "../src/index.ts"
       ],
-      "vitestImports": [
-        "afterAll",
-        "beforeAll",
-        "describe",
-        "expect",
-        "it"
-      ],
+      "vitestImports": [],
       "features": [],
       "workload": "DATABASE_PGLITE",
-      "migrationType": "EASY_MECHANICAL",
+      "migrationType": "ALREADY_MIGRATED",
       "fixturesAndHelpers": [],
       "sourceAnchors": [
         "@electric-sql/pglite",
         "@foresift/domain",
         "../src/index.ts"
       ],
-      "state": "CODEMOD_READY"
+      "state": "MIGRATED"
     },
     {
       "path": "packages/persistence/test/backfill-watermark.spec.ts",
       "package": "@foresift/persistence",
-      "bytes": 13848,
+      "bytes": 13850,
       "lines": 382,
-      "sha256": "476b53a3e29253cabc9a16045167e79583ddb7fcd7952dc51ed7ada878134584",
+      "sha256": "cc22f89ada1028a28c296aea7ee6048d2151461a26c660b508311eca9324384d",
       "imports": [
         "node:path",
         "node:url",
-        "vitest",
+        "bun:test",
         "@electric-sql/pglite",
         "@foresift/domain",
         "../src/index.ts"
       ],
-      "vitestImports": [
-        "afterAll",
-        "beforeAll",
-        "describe",
-        "expect",
-        "it"
-      ],
+      "vitestImports": [],
       "features": [],
       "workload": "DATABASE_PGLITE",
-      "migrationType": "EASY_MECHANICAL",
+      "migrationType": "ALREADY_MIGRATED",
       "fixturesAndHelpers": [],
       "sourceAnchors": [
         "@electric-sql/pglite",
         "@foresift/domain",
         "../src/index.ts"
       ],
-      "state": "CODEMOD_READY"
+      "state": "MIGRATED"
     },
     {
       "path": "packages/persistence/test/backup-governance.spec.ts",
       "package": "@foresift/persistence",
-      "bytes": 8096,
+      "bytes": 8098,
       "lines": 220,
-      "sha256": "cc5e225dc5c424bb351258b6e212c242261c51bf9d4febe3fbe17d7c4687b833",
+      "sha256": "5fd9805bb880d1de71caa9163a46676466a18c6662e86ca8f33c4864ef36f413",
       "imports": [
-        "vitest",
+        "bun:test",
         "@electric-sql/pglite",
         "node:path",
         "node:url",
         "@foresift/domain",
         "../src/index.ts"
       ],
-      "vitestImports": [
-        "afterAll",
-        "beforeAll",
-        "describe",
-        "expect",
-        "it"
-      ],
+      "vitestImports": [],
       "features": [],
       "workload": "DATABASE_PGLITE",
-      "migrationType": "EASY_MECHANICAL",
+      "migrationType": "ALREADY_MIGRATED",
       "fixturesAndHelpers": [],
       "sourceAnchors": [
         "@electric-sql/pglite",
         "@foresift/domain",
         "../src/index.ts"
       ],
-      "state": "CODEMOD_READY"
+      "state": "MIGRATED"
     },
     {
       "path": "packages/persistence/test/canonical-json.spec.ts",
@@ -372,43 +354,37 @@
     {
       "path": "packages/persistence/test/checkpoints.spec.ts",
       "package": "@foresift/persistence",
-      "bytes": 11650,
+      "bytes": 11652,
       "lines": 293,
-      "sha256": "41ebc3a9bf8312be26f83798d8a80b6ae9b1511d5c0883c6b42dc29169e9579f",
+      "sha256": "007524d1c8da2b40667d2684415a770d4dc0de11775adb7d8d395aab5a34d5d4",
       "imports": [
-        "vitest",
+        "bun:test",
         "@electric-sql/pglite",
         "node:path",
         "node:url",
         "@foresift/domain",
         "../src/index.ts"
       ],
-      "vitestImports": [
-        "afterAll",
-        "beforeAll",
-        "describe",
-        "expect",
-        "it"
-      ],
+      "vitestImports": [],
       "features": [],
       "workload": "DATABASE_PGLITE",
-      "migrationType": "EASY_MECHANICAL",
+      "migrationType": "ALREADY_MIGRATED",
       "fixturesAndHelpers": [],
       "sourceAnchors": [
         "@electric-sql/pglite",
         "@foresift/domain",
         "../src/index.ts"
       ],
-      "state": "CODEMOD_READY"
+      "state": "MIGRATED"
     },
     {
       "path": "packages/persistence/test/drill-restore-rpo.spec.ts",
       "package": "@foresift/persistence",
-      "bytes": 21143,
+      "bytes": 21145,
       "lines": 513,
-      "sha256": "68e15ea8fc3b9450220f085371da316b6ac5ce977e43219bf7d48816ea4f47ef",
+      "sha256": "321bf6f4c78fefc83a1a48af900ff56bd1511fe4220b906a8923aadebe8409c6",
       "imports": [
-        "vitest",
+        "bun:test",
         "@electric-sql/pglite",
         "node:path",
         "node:os",
@@ -418,16 +394,10 @@
         "../src/index.ts",
         "@foresift/object-store"
       ],
-      "vitestImports": [
-        "afterAll",
-        "beforeAll",
-        "describe",
-        "expect",
-        "it"
-      ],
+      "vitestImports": [],
       "features": [],
       "workload": "DATABASE_PGLITE",
-      "migrationType": "EASY_MECHANICAL",
+      "migrationType": "ALREADY_MIGRATED",
       "fixturesAndHelpers": [],
       "sourceAnchors": [
         "@electric-sql/pglite",
@@ -435,39 +405,33 @@
         "../src/index.ts",
         "@foresift/object-store"
       ],
-      "state": "CODEMOD_READY"
+      "state": "MIGRATED"
     },
     {
       "path": "packages/persistence/test/engine-transactions.spec.ts",
       "package": "@foresift/persistence",
-      "bytes": 7224,
+      "bytes": 7226,
       "lines": 198,
-      "sha256": "d43011f5d47aa37487b19b5d793b93f4bd777a9372a56f8ddc4e40de50d767e3",
+      "sha256": "d1b6b6209a35e5f90e53ddaa63f9ada6c99ec61c41837924591665bce2c5b5b1",
       "imports": [
         "node:path",
         "node:url",
-        "vitest",
+        "bun:test",
         "@electric-sql/pglite",
         "@foresift/domain",
         "../src/index.ts"
       ],
-      "vitestImports": [
-        "afterAll",
-        "beforeAll",
-        "describe",
-        "expect",
-        "it"
-      ],
+      "vitestImports": [],
       "features": [],
       "workload": "DATABASE_PGLITE",
-      "migrationType": "EASY_MECHANICAL",
+      "migrationType": "ALREADY_MIGRATED",
       "fixturesAndHelpers": [],
       "sourceAnchors": [
         "@electric-sql/pglite",
         "@foresift/domain",
         "../src/index.ts"
       ],
-      "state": "CODEMOD_READY"
+      "state": "MIGRATED"
     },
     {
       "path": "packages/persistence/test/features-parity.spec.ts",
@@ -506,29 +470,23 @@
     {
       "path": "packages/persistence/test/identity-repo.spec.ts",
       "package": "@foresift/persistence",
-      "bytes": 19763,
+      "bytes": 19765,
       "lines": 533,
-      "sha256": "0d73ae0a41e36235fe972c0c88ea99504ae4d9b3ba7248da56bc8001e35525af",
+      "sha256": "45d00b11125f813dbc107eeb2b7d30e1e4085c80faac1fcc37737f476bf48a72",
       "imports": [
         "node:fs/promises",
         "node:path",
         "node:url",
-        "vitest",
+        "bun:test",
         "@electric-sql/pglite",
         "@foresift/domain",
         "../src/index.ts",
         "@foresift/domain"
       ],
-      "vitestImports": [
-        "afterAll",
-        "beforeAll",
-        "describe",
-        "expect",
-        "it"
-      ],
+      "vitestImports": [],
       "features": [],
       "workload": "DATABASE_PGLITE",
-      "migrationType": "EASY_MECHANICAL",
+      "migrationType": "ALREADY_MIGRATED",
       "fixturesAndHelpers": [],
       "sourceAnchors": [
         "@electric-sql/pglite",
@@ -536,7 +494,7 @@
         "../src/index.ts",
         "@foresift/domain"
       ],
-      "state": "CODEMOD_READY"
+      "state": "MIGRATED"
     },
     {
       "path": "packages/persistence/test/migrator.spec.ts",
@@ -571,163 +529,135 @@
     {
       "path": "packages/persistence/test/observations-revisions.spec.ts",
       "package": "@foresift/persistence",
-      "bytes": 15929,
+      "bytes": 15931,
       "lines": 397,
-      "sha256": "01ded64f81fe3b93960a260dc8359556d041abf9c6011e5c25134d4bd7a11f2a",
+      "sha256": "11dcc4f7bb0a906d4184c4692fde50ad3b884acfd9ce2b0243a271b163e42567",
       "imports": [
         "node:path",
         "node:url",
-        "vitest",
+        "bun:test",
         "@electric-sql/pglite",
         "@foresift/domain",
         "../src/index.ts"
       ],
-      "vitestImports": [
-        "afterAll",
-        "beforeAll",
-        "describe",
-        "expect",
-        "it"
-      ],
+      "vitestImports": [],
       "features": [],
       "workload": "DATABASE_PGLITE",
-      "migrationType": "EASY_MECHANICAL",
+      "migrationType": "ALREADY_MIGRATED",
       "fixturesAndHelpers": [],
       "sourceAnchors": [
         "@electric-sql/pglite",
         "@foresift/domain",
         "../src/index.ts"
       ],
-      "state": "CODEMOD_READY"
+      "state": "MIGRATED"
     },
     {
       "path": "packages/persistence/test/pg-pool-wiring.spec.ts",
       "package": "@foresift/persistence",
-      "bytes": 4305,
+      "bytes": 4307,
       "lines": 111,
-      "sha256": "1a804cccd099d7328027bf6e44a4089d11f946ad1091eaef1cf92d1abd389497",
+      "sha256": "6b783c99981fd820b485ae2dcee91ea1bbbfbc285e31661edb7767141ead56e0",
       "imports": [
-        "vitest",
+        "bun:test",
         "../src/index.ts"
       ],
-      "vitestImports": [
-        "describe",
-        "expect",
-        "it"
-      ],
+      "vitestImports": [],
       "features": [],
       "workload": "DATABASE_PGLITE",
-      "migrationType": "EASY_MECHANICAL",
+      "migrationType": "ALREADY_MIGRATED",
       "fixturesAndHelpers": [],
       "sourceAnchors": [
         "../src/index.ts"
       ],
-      "state": "CODEMOD_READY"
+      "state": "MIGRATED"
     },
     {
       "path": "packages/persistence/test/quality.spec.ts",
       "package": "@foresift/persistence",
-      "bytes": 5772,
+      "bytes": 5774,
       "lines": 166,
-      "sha256": "85c4670be7526d428eda8a38cd6a269608deaff24bec6ed0cc08c85949fa2c12",
+      "sha256": "59af4e5ec486fbe22cc3fda2da7774657b541cd053ab0f7c09c89b25858252e5",
       "imports": [
         "node:path",
         "node:url",
-        "vitest",
+        "bun:test",
         "@electric-sql/pglite",
         "@foresift/domain",
         "../src/index.ts"
       ],
-      "vitestImports": [
-        "afterAll",
-        "beforeAll",
-        "describe",
-        "expect",
-        "it"
-      ],
+      "vitestImports": [],
       "features": [],
       "workload": "DATABASE_PGLITE",
-      "migrationType": "EASY_MECHANICAL",
+      "migrationType": "ALREADY_MIGRATED",
       "fixturesAndHelpers": [],
       "sourceAnchors": [
         "@electric-sql/pglite",
         "@foresift/domain",
         "../src/index.ts"
       ],
-      "state": "CODEMOD_READY"
+      "state": "MIGRATED"
     },
     {
       "path": "packages/persistence/test/recovery-tiers.spec.ts",
       "package": "@foresift/persistence",
-      "bytes": 15302,
+      "bytes": 15304,
       "lines": 396,
-      "sha256": "323f00f37139c193fa33e689dfdcf4759fa7d6cd663ff0cc2a7d72634efb7fb0",
+      "sha256": "77fe3efae4a6cb2d3c6b8045060bc65f53a160653b600d90df488dadd36b444e",
       "imports": [
-        "vitest",
+        "bun:test",
         "@electric-sql/pglite",
         "node:path",
         "node:url",
         "@foresift/domain",
         "../src/index.ts"
       ],
-      "vitestImports": [
-        "afterAll",
-        "beforeAll",
-        "describe",
-        "expect",
-        "it"
-      ],
+      "vitestImports": [],
       "features": [],
       "workload": "DATABASE_PGLITE",
-      "migrationType": "EASY_MECHANICAL",
+      "migrationType": "ALREADY_MIGRATED",
       "fixturesAndHelpers": [],
       "sourceAnchors": [
         "@electric-sql/pglite",
         "@foresift/domain",
         "../src/index.ts"
       ],
-      "state": "CODEMOD_READY"
+      "state": "VERIFIED"
     },
     {
       "path": "packages/persistence/test/replay.spec.ts",
       "package": "@foresift/persistence",
-      "bytes": 8645,
+      "bytes": 8647,
       "lines": 220,
-      "sha256": "dfbb5017ae8cc8474e257e5e35685c073cc3fb261bfb0644883cd772067dd7ff",
+      "sha256": "ce9c9761a356a0542d78c4480b83285037e7b2cd1f78dfdba994b4e0ec0560e6",
       "imports": [
         "node:path",
         "node:url",
-        "vitest",
+        "bun:test",
         "@electric-sql/pglite",
         "@foresift/domain",
         "../src/index.ts"
       ],
-      "vitestImports": [
-        "afterAll",
-        "beforeAll",
-        "describe",
-        "expect",
-        "it"
-      ],
+      "vitestImports": [],
       "features": [],
       "workload": "DATABASE_PGLITE",
-      "migrationType": "EASY_MECHANICAL",
+      "migrationType": "ALREADY_MIGRATED",
       "fixturesAndHelpers": [],
       "sourceAnchors": [
         "@electric-sql/pglite",
         "@foresift/domain",
         "../src/index.ts"
       ],
-      "state": "CODEMOD_READY"
+      "state": "VERIFIED"
     },
     {
       "path": "packages/persistence/test/schema-parity.spec.ts",
       "package": "@foresift/persistence",
-      "bytes": 10898,
+      "bytes": 10900,
       "lines": 284,
-      "sha256": "b0c5e2b7f48f2c865b98c497eb22bb93b60292d3a11d07e1a68f1c4a855ae69f",
+      "sha256": "b94c3f7099a352a8c43ff018588fcf021b8b334c53ceef5fe5679ef6c106b751",
       "imports": [
-        "vitest",
+        "bun:test",
         "@electric-sql/pglite",
         "@foresift/domain",
         "drizzle-orm/pg-core",
@@ -737,16 +667,10 @@
         "../src/index.ts",
         "../src/generated/schema.ts"
       ],
-      "vitestImports": [
-        "afterAll",
-        "beforeAll",
-        "describe",
-        "expect",
-        "it"
-      ],
+      "vitestImports": [],
       "features": [],
       "workload": "DATABASE_PGLITE",
-      "migrationType": "EASY_MECHANICAL",
+      "migrationType": "ALREADY_MIGRATED",
       "fixturesAndHelpers": [],
       "sourceAnchors": [
         "@electric-sql/pglite",
@@ -756,40 +680,34 @@
         "../src/index.ts",
         "../src/generated/schema.ts"
       ],
-      "state": "CODEMOD_READY"
+      "state": "VERIFIED"
     },
     {
       "path": "packages/persistence/test/sources.spec.ts",
       "package": "@foresift/persistence",
-      "bytes": 7944,
+      "bytes": 7946,
       "lines": 220,
-      "sha256": "ae38a91ababbdd0f3edbb34c5a2d5db8a2f429ce4f2ae76784a14286ff83a7af",
+      "sha256": "35f5c11cf4f4126ee9383302f40061f3db5ef032b73e5d9be5bd27824b52140c",
       "imports": [
         "node:path",
         "node:url",
         "node:fs",
-        "vitest",
+        "bun:test",
         "@electric-sql/pglite",
         "@foresift/domain",
         "../src/index.ts"
       ],
-      "vitestImports": [
-        "afterAll",
-        "beforeAll",
-        "describe",
-        "expect",
-        "it"
-      ],
+      "vitestImports": [],
       "features": [],
       "workload": "DATABASE_PGLITE",
-      "migrationType": "EASY_MECHANICAL",
+      "migrationType": "ALREADY_MIGRATED",
       "fixturesAndHelpers": [],
       "sourceAnchors": [
         "@electric-sql/pglite",
         "@foresift/domain",
         "../src/index.ts"
       ],
-      "state": "CODEMOD_READY"
+      "state": "VERIFIED"
     },
     {
       "path": "packages/provider-lifecycle/test/artifact-registry.spec.ts",
@@ -6450,24 +6368,6 @@
   ],
   "batches": [
     {
-      "id": "agy-semantic-1",
-      "engine": "AGY",
-      "workload": "OTHER_HEAVY",
-      "files": [
-        "packages/persistence/test/features-parity.spec.ts",
-        "packages/provider-lifecycle/test/scaffold.spec.ts",
-        "packages/providers/test/scaffold.spec.ts",
-        "packages/security/test/scaffold.spec.ts",
-        "packages/shared-schemas/test/prov.spec.ts",
-        "packages/shared-schemas/test/sec.spec.ts",
-        "packages/tenant-isolation/test/scaffold.spec.ts",
-        "tests/automation/codex-agy-profile.spec.ts",
-        "tests/spec-verify.spec.ts"
-      ],
-      "state": "PENDING",
-      "attempts": 0
-    },
-    {
       "id": "mechanical--foresift-evidence-database-pglite-1",
       "engine": "CODEMOD",
       "workload": "DATABASE_PGLITE",
@@ -6663,28 +6563,29 @@
       },
       "codexCalls": 0,
       "claudeCalls": 0,
-      "testedHead": "8224807067f8ec28197763057a9bef179f107010"
+      "testedHead": "8224807067f8ec28197763057a9bef179f107010",
+      "checkpointHead": "eb9cad21445ef937accc8420456936a8ff25b56c"
+    },
+    {
+      "id": "agy-semantic-1",
+      "engine": "AGY",
+      "workload": "OTHER_HEAVY",
+      "files": [
+        "packages/persistence/test/features-parity.spec.ts",
+        "packages/provider-lifecycle/test/scaffold.spec.ts",
+        "packages/providers/test/scaffold.spec.ts",
+        "packages/security/test/scaffold.spec.ts",
+        "packages/shared-schemas/test/prov.spec.ts",
+        "packages/shared-schemas/test/sec.spec.ts",
+        "packages/tenant-isolation/test/scaffold.spec.ts",
+        "tests/automation/codex-agy-profile.spec.ts",
+        "tests/spec-verify.spec.ts"
+      ],
+      "state": "PENDING",
+      "attempts": 0
     },
     {
       "id": "mechanical--foresift-persistence-database-pglite-1",
-      "engine": "CODEMOD",
-      "workload": "DATABASE_PGLITE",
-      "files": [
-        "packages/persistence/test/acquisition.spec.ts",
-        "packages/persistence/test/backfill-watermark.spec.ts",
-        "packages/persistence/test/backup-governance.spec.ts",
-        "packages/persistence/test/checkpoints.spec.ts",
-        "packages/persistence/test/drill-restore-rpo.spec.ts",
-        "packages/persistence/test/engine-transactions.spec.ts",
-        "packages/persistence/test/identity-repo.spec.ts",
-        "packages/persistence/test/observations-revisions.spec.ts",
-        "packages/persistence/test/pg-pool-wiring.spec.ts",
-        "packages/persistence/test/quality.spec.ts"
-      ],
-      "state": "PENDING"
-    },
-    {
-      "id": "mechanical--foresift-persistence-database-pglite-2",
       "engine": "CODEMOD",
       "workload": "DATABASE_PGLITE",
       "files": [
@@ -6693,7 +6594,143 @@
         "packages/persistence/test/schema-parity.spec.ts",
         "packages/persistence/test/sources.spec.ts"
       ],
-      "state": "PENDING"
+      "state": "VERIFIED",
+      "verification": {
+        "ok": true,
+        "wallTimeMs": 13421,
+        "peakRssBytes": 0,
+        "cpuSeconds": 0,
+        "counts": {
+          "passed": 38,
+          "failed": 0,
+          "skipped": 0
+        },
+        "results": [
+          {
+            "id": "pglite-1",
+            "workload": "DATABASE_PGLITE",
+            "files": [
+              "packages/persistence/test/recovery-tiers.spec.ts"
+            ],
+            "fileWorkers": 1,
+            "testConcurrency": 1,
+            "command": [
+              "bun",
+              "test",
+              "--no-orphans",
+              "--isolate",
+              "--parallel=1",
+              "--max-concurrency=1",
+              "--timeout=30000",
+              "packages/persistence/test/recovery-tiers.spec.ts"
+            ],
+            "status": 0,
+            "wallTimeMs": 3318,
+            "peakRssBytes": null,
+            "cpuSeconds": null,
+            "counts": {
+              "passed": 14,
+              "failed": 0,
+              "skipped": 0
+            },
+            "stdoutTail": "bun test v1.4.0 (34cbb9a40) 1x PARALLEL\n",
+            "stderrTail": "\npackages/persistence/test/recovery-tiers.spec.ts:\n(pass) recovery-tier registry seeding (FR-DR-001) > seeds the §34.4 default tiers within their ceilings [6.75ms]\n(pass) recovery-tier registry seeding (FR-DR-001) > is idempotent — reseeding converges instead of duplicating [5.60ms]\n(pass) recovery-tier registry seeding (FR-DR-001) > refuses tiers configured looser than the class ceiling [13.74ms]\n(pass) protected-asset registry coverage (FR-DR-001, §14.9) > maps EVERY table created by this package plus the raw-payload object store onto covering tiers [70.28ms]\n(pass) protected-asset registry coverage (FR-DR-001, §14.9) > refuses an asset whose declared class does not match its tier class [1.74ms]\n(pass) protected-asset registry coverage (FR-DR-001, §14.9) > refuses protection against an unknown tier [0.58ms]\n(pass) tier measurements + incidents + health states (§34.9–§34.10) > records a WITHIN_TIER measurement without an incident [2.28ms]\n(pass) tier measurements + incidents + health states (§34.9–§34.10) > refuses a missed measurement without an incident reference — typed first, then by CHECK [2.04ms]\n(pass) tier measurements + incidents + health states (§34.9–§34.10) > persists a miss with its incident, degrading capability machine-readably while preserving risk monitoring [8.89ms]\n(pass) tier measurements + incidents + health states (§34.9–§34.10) > refuses a degraded health state whose incident reference points at no durable incident (FK) [2.22ms]\n(pass) tier measurements + incidents + health states (§34.9–§34.10) > refuses suppressing deterministic risk monitoring and degraded states without incidents [0.22ms]\n(pass) tier measurements + incidents + health states (§34.9–§34.10) > closes incidents only forward in time [2.16ms]\n(pass) tier measurements + incidents + health states (§34.9–§34.10) > refuses a resolution timestamp earlier than the incident opened [1.98ms]\n(pass) backup policy persistence shape > stores separated key references only and round-trips [3.08ms]\n\n 14 pass\n 0 fail\n 67 expect() calls\nRan 14 tests across 1 file. [3.19s]\n"
+          },
+          {
+            "id": "pglite-2",
+            "workload": "DATABASE_PGLITE",
+            "files": [
+              "packages/persistence/test/replay.spec.ts"
+            ],
+            "fileWorkers": 1,
+            "testConcurrency": 1,
+            "command": [
+              "bun",
+              "test",
+              "--no-orphans",
+              "--isolate",
+              "--parallel=1",
+              "--max-concurrency=1",
+              "--timeout=30000",
+              "packages/persistence/test/replay.spec.ts"
+            ],
+            "status": 0,
+            "wallTimeMs": 3209,
+            "peakRssBytes": null,
+            "cpuSeconds": null,
+            "counts": {
+              "passed": 9,
+              "failed": 0,
+              "skipped": 0
+            },
+            "stdoutTail": "bun test v1.4.0 (34cbb9a40) 1x PARALLEL\n",
+            "stderrTail": "\npackages/persistence/test/replay.spec.ts:\n(pass) replayObservations honors the inclusive availability boundary > admits a row exactly at T and excludes anything after it [13.75ms]\n(pass) replayObservations honors the inclusive availability boundary > resolves the latest revision available AT T, not the global head [7.86ms]\n(pass) replayObservations honors the inclusive availability boundary > never admits future revisions into historical boundaries [2.32ms]\n(pass) replayObservations honors the inclusive availability boundary > supports subject filters without weakening the boundary [4.58ms]\n(pass) deterministic tie-break on equal availability instants > prefers the higher revision when base and revision share an instant [9.39ms]\n(pass) deterministic tie-break on equal availability instants > breaks revision-vs-revision ties by highest revision number [12.49ms]\n(pass) current view differs from replay (AC-020) > current resolves the global head regardless of any boundary [7.13ms]\n(pass) current view differs from replay (AC-020) > replay at an earlier T disagrees with current — that is the point [5.60ms]\n(pass) current view differs from replay (AC-020) > every replay entrypoint takes an explicit T (compile-time contract) [1.99ms]\n\n 9 pass\n 0 fail\n 25 expect() calls\nRan 9 tests across 1 file. [3.11s]\n"
+          },
+          {
+            "id": "pglite-3",
+            "workload": "DATABASE_PGLITE",
+            "files": [
+              "packages/persistence/test/schema-parity.spec.ts"
+            ],
+            "fileWorkers": 1,
+            "testConcurrency": 1,
+            "command": [
+              "bun",
+              "test",
+              "--no-orphans",
+              "--isolate",
+              "--parallel=1",
+              "--max-concurrency=1",
+              "--timeout=30000",
+              "packages/persistence/test/schema-parity.spec.ts"
+            ],
+            "status": 0,
+            "wallTimeMs": 3667,
+            "peakRssBytes": null,
+            "cpuSeconds": null,
+            "counts": {
+              "passed": 7,
+              "failed": 0,
+              "skipped": 0
+            },
+            "stdoutTail": "bun test v1.4.0 (34cbb9a40) 1x PARALLEL\n",
+            "stderrTail": "\npackages/persistence/test/schema-parity.spec.ts:\n(pass) Drizzle mirror parity with SQL truth (ADR-001) > mirrors exactly the table set created by the migrations [7.94ms]\n(pass) Drizzle mirror parity with SQL truth (ADR-001) > matches every column: name, nullability, and type class [229.61ms]\n(pass) Drizzle mirror parity with SQL truth (ADR-001) > matches primary keys on every table [16.61ms]\n(pass) §13.9 quality-code vocabulary parity (SQL truth ↔ domain) > the quality_codes seed table is exactly ALL_QUALITY_CODES [1.75ms]\n(pass) §13.9 quality-code vocabulary parity (SQL truth ↔ domain) > every full `<@` allowlist CHECK is byte-equal to the domain vocabulary [12.13ms]\n(pass) §13.9 quality-code vocabulary parity (SQL truth ↔ domain) > admits the real §13.9 outcome codes and refuses the historical typo [18.02ms]\n(pass) §13.9 quality-code vocabulary parity (SQL truth ↔ domain) > every enum IN-list CHECK on a mirrored column equals its domain registry (M-5) [32.32ms]\n\n 7 pass\n 0 fail\n 237 expect() calls\nRan 7 tests across 1 file. [3.58s]\n"
+          },
+          {
+            "id": "pglite-4",
+            "workload": "DATABASE_PGLITE",
+            "files": [
+              "packages/persistence/test/sources.spec.ts"
+            ],
+            "fileWorkers": 1,
+            "testConcurrency": 1,
+            "command": [
+              "bun",
+              "test",
+              "--no-orphans",
+              "--isolate",
+              "--parallel=1",
+              "--max-concurrency=1",
+              "--timeout=30000",
+              "packages/persistence/test/sources.spec.ts"
+            ],
+            "status": 0,
+            "wallTimeMs": 3225,
+            "peakRssBytes": null,
+            "cpuSeconds": null,
+            "counts": {
+              "passed": 8,
+              "failed": 0,
+              "skipped": 0
+            },
+            "stdoutTail": "bun test v1.4.0 (34cbb9a40) 1x PARALLEL\n",
+            "stderrTail": "\npackages/persistence/test/sources.spec.ts:\n(pass) lineage collapse — provider count is not independence (INV-008) > collapses the correlated fixture pair into one independence group [1.82ms]\n(pass) lineage collapse — provider count is not independence (INV-008) > keeps genuinely independent lineages in separate groups [1.70ms]\n(pass) lineage collapse — provider count is not independence (INV-008) > verifies an identical re-registration and refuses a conflicting tuple [13.72ms]\n(pass) pairwise dependence edges (AC-245) > records reduced-independence evidence for the correlated pair despite distinct ids [7.53ms]\n(pass) pairwise dependence edges (AC-245) > keeps the independent pair below every reduction threshold [0.06ms]\n(pass) pairwise dependence edges (AC-245) > labels post-hoc estimates DIAGNOSTIC_RETROSPECTIVE and stores them anyway [3.09ms]\n(pass) pairwise dependence edges (AC-245) > refuses self-edges and out-of-range inputs [0.40ms]\n(pass) pairwise dependence edges (AC-245) > returns newest-first edges per pair with canonical ordering [3.09ms]\n\n 8 pass\n 0 fail\n 23 expect() calls\nRan 8 tests across 1 file. [3.13s]\n"
+          }
+        ]
+      },
+      "codexCalls": 0,
+      "claudeCalls": 0,
+      "testedHead": "eb9cad21445ef937accc8420456936a8ff25b56c"
     },
     {
       "id": "mechanical--foresift-persistence-pure-1",
@@ -6967,7 +7004,25 @@
       "engine": "VERIFY_EXISTING",
       "workload": "DATABASE_PGLITE",
       "files": [
-        "packages/persistence/test/migrator.spec.ts"
+        "packages/persistence/test/acquisition.spec.ts",
+        "packages/persistence/test/backfill-watermark.spec.ts",
+        "packages/persistence/test/backup-governance.spec.ts",
+        "packages/persistence/test/checkpoints.spec.ts",
+        "packages/persistence/test/drill-restore-rpo.spec.ts",
+        "packages/persistence/test/engine-transactions.spec.ts",
+        "packages/persistence/test/identity-repo.spec.ts",
+        "packages/persistence/test/migrator.spec.ts",
+        "packages/persistence/test/observations-revisions.spec.ts",
+        "packages/persistence/test/pg-pool-wiring.spec.ts"
+      ],
+      "state": "PENDING"
+    },
+    {
+      "id": "verify-existing--foresift-persistence-database-pglite-2",
+      "engine": "VERIFY_EXISTING",
+      "workload": "DATABASE_PGLITE",
+      "files": [
+        "packages/persistence/test/quality.spec.ts"
       ],
       "state": "PENDING"
     },

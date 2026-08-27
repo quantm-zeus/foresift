@@ -4,7 +4,7 @@
  * foresift table in `information_schema` and compares columns, nullability,
  * type classes, and primary keys against the generated mirror.
  */
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 import { PGlite } from '@electric-sql/pglite';
 import {
   ALL_ACQUISITION_STATES,

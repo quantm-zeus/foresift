@@ -12,7 +12,7 @@
  * driver is injected structurally here exactly as production will inject it,
  * keeping PGlite test-only and the seam driver-free.
  */
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'bun:test';
 import {
   createProductionPgPool,
   PRECISION_RETAINING_TIMESTAMP_PARSERS,

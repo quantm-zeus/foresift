@@ -4,7 +4,7 @@
  * scoping, signed-URL bindings, and the full cross-tenant bypass battery
  * (signed-URL, range, redirect, path confusion).
  */
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'bun:test';
 import {
   ARTIFACT_RANGE_READ_RIGHT,
   ResourceAccessGuard,

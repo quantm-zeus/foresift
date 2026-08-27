@@ -1,14 +1,14 @@
 {
   "schema": "foresift/bun-migration-manifest@1",
   "migrationId": "bun-test-authority-v1",
-  "generatedAt": "2026-08-27T01:52:59.398Z",
+  "generatedAt": "2026-08-27T01:53:05.406Z",
   "root": ".",
   "totalTestFiles": 219,
   "counts": {
     "CODEMOD_READY": 0,
     "AGY_REQUIRED": 17,
-    "MIGRATED": 59,
-    "VERIFIED": 143,
+    "MIGRATED": 57,
+    "VERIFIED": 145,
     "BLOCKED": 0
   },
   "parity": {
@@ -2548,7 +2548,7 @@
         "../../packages/security/src/mcp-credentials.ts",
         "../../packages/tool-core/src/profiles.ts"
       ],
-      "state": "MIGRATED"
+      "state": "VERIFIED"
     },
     {
       "path": "tests/acceptance/AC-060.spec.ts",
@@ -3158,7 +3158,7 @@
         "../../packages/security/src/audit-chain.ts",
         "../../packages/tool-core/src/engine.ts"
       ],
-      "state": "MIGRATED"
+      "state": "VERIFIED"
     },
     {
       "path": "tests/acceptance/AC-260.spec.ts",
@@ -8638,7 +8638,8 @@
       },
       "codexCalls": 0,
       "claudeCalls": 0,
-      "testedHead": "9893031e51b5f7d26a0db035f3be1c94fa8857c3"
+      "testedHead": "9893031e51b5f7d26a0db035f3be1c94fa8857c3",
+      "checkpointHead": "a0a807948027bf526470b52212f969261909b7d5"
     },
     {
       "id": "verify-existing-acceptance-database-pglite-1",
@@ -8648,7 +8649,83 @@
         "tests/acceptance/AC-053.spec.ts",
         "tests/acceptance/AC-259.spec.ts"
       ],
-      "state": "PENDING"
+      "state": "VERIFIED",
+      "verification": {
+        "ok": true,
+        "wallTimeMs": 5918,
+        "peakRssBytes": 0,
+        "cpuSeconds": 0,
+        "counts": {
+          "passed": 10,
+          "failed": 0,
+          "skipped": 0
+        },
+        "results": [
+          {
+            "id": "pglite-1",
+            "workload": "DATABASE_PGLITE",
+            "files": [
+              "tests/acceptance/AC-053.spec.ts"
+            ],
+            "fileWorkers": 1,
+            "testConcurrency": 1,
+            "command": [
+              "bun",
+              "test",
+              "--no-orphans",
+              "--isolate",
+              "--parallel=1",
+              "--max-concurrency=1",
+              "--timeout=30000",
+              "tests/acceptance/AC-053.spec.ts"
+            ],
+            "status": 0,
+            "wallTimeMs": 2891,
+            "peakRssBytes": null,
+            "cpuSeconds": null,
+            "counts": {
+              "passed": 6,
+              "failed": 0,
+              "skipped": 0
+            },
+            "stdoutTail": "bun test v1.4.0 (34cbb9a40) 1x PARALLEL\n",
+            "stderrTail": "\ntests/acceptance/AC-053.spec.ts:\n(pass) AC-053: MCP credential lifecycle proves independent scoping + revocation > mints a ≥256-bit secret shown ONCE; SQL truth holds ONLY a keyed hash [6.06ms]\n(pass) AC-053: MCP credential lifecycle proves independent scoping + revocation > authenticates across every recorded dimension (scope set, origin, expiry) [1.73ms]\n(pass) AC-053: MCP credential lifecycle proves independent scoping + revocation > issues a scoped sibling with an INDEPENDENT lifecycle [2.43ms]\n(pass) AC-053: MCP credential lifecycle proves independent scoping + revocation > revoking ONE credential leaves its sibling fully functional [3.93ms]\n(pass) AC-053 acceptance (tool-core substrate): profile binding scopes tool visibility narrowly > discovery profile resolves strict subset of tools and excludes unlisted domain tools [0.11ms]\n(pass) AC-053 acceptance (tool-core substrate): profile binding scopes tool visibility narrowly > isVisibleToProfile admits standard domain tools for matching standard profiles [0.05ms]\n\n 6 pass\n 0 fail\n 12 expect() calls\nRan 6 tests across 1 file. [2.79s]\n"
+          },
+          {
+            "id": "pglite-2",
+            "workload": "DATABASE_PGLITE",
+            "files": [
+              "tests/acceptance/AC-259.spec.ts"
+            ],
+            "fileWorkers": 1,
+            "testConcurrency": 1,
+            "command": [
+              "bun",
+              "test",
+              "--no-orphans",
+              "--isolate",
+              "--parallel=1",
+              "--max-concurrency=1",
+              "--timeout=30000",
+              "tests/acceptance/AC-259.spec.ts"
+            ],
+            "status": 0,
+            "wallTimeMs": 3027,
+            "peakRssBytes": null,
+            "cpuSeconds": null,
+            "counts": {
+              "passed": 4,
+              "failed": 0,
+              "skipped": 0
+            },
+            "stdoutTail": "bun test v1.4.0 (34cbb9a40) 1x PARALLEL\n",
+            "stderrTail": "\ntests/acceptance/AC-259.spec.ts:\n(pass) AC-259: append → checkpoint → independent verification is green > chains entries from GENESIS with recomputable hashes [14.37ms]\n(pass) AC-259: append → checkpoint → independent verification is green > checkpoints mirror chained anchors to the INDEPENDENT object store [13.11ms]\n(pass) AC-259: append → checkpoint → independent verification is green > continuous verification records a durable OK verdict over the whole chain [21.64ms]\n(pass) AC-259 acceptance (tool-core substrate): every pipeline exit appends audit evidence to the AuditChain > every successful tool execution appends an audit event to the AuditChain [44.70ms]\n\n 4 pass\n 0 fail\n 22 expect() calls\nRan 4 tests across 1 file. [2.91s]\n"
+          }
+        ]
+      },
+      "codexCalls": 0,
+      "claudeCalls": 0,
+      "testedHead": "a0a807948027bf526470b52212f969261909b7d5"
     },
     {
       "id": "verify-existing-acceptance-pure-1",

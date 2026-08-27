@@ -16,8 +16,45 @@ permissions:
   contents: read
 
 jobs:
-  verify:
-    name: Verify (spec, format, lint, types, tests)
+  gates:
+    name: Fast Gates (spec, format, lint, types, node-compat, security)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7.0.1
+
+      - name: Install pnpm (pinned via package.json packageManager)
+        uses: pnpm/action-setup@v6.0.10
+
+      - name: Install Node.js (pinned via .nvmrc)
+        uses: actions/setup-node@v7.0.0
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+
+      - name: Install dependencies (frozen lockfile)
+        run: pnpm install --frozen-lockfile
+
+      - name: Specification integrity verification
+        run: pnpm spec:verify
+
+      - name: Formatting check
+        run: pnpm format:check
+
+      - name: Lint
+        run: pnpm lint
+
+      - name: TypeScript check
+        run: pnpm typecheck
+
+      - name: Node.js runtime compatibility
+        run: pnpm test:node-compat
+
+      - name: Prohibited-capability scanner
+        run: node scripts/scan-prohibited-capabilities/cli.mjs
+
+  test-pure:
+    name: Tests (Pure Workload)
     runs-on: ubuntu-latest
     steps:
       - name: Check out repository
@@ -40,23 +77,76 @@ jobs:
       - name: Install dependencies (frozen lockfile)
         run: pnpm install --frozen-lockfile
 
-      - name: Specification integrity verification
-        run: pnpm spec:verify
+      - name: Run Pure Tests
+        run: pnpm test:pure
 
-      - name: Formatting check
-        run: pnpm format:check
+  test-process-meta:
+    name: Tests (Process & Meta-Gate Workloads)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7.0.1
 
-      - name: Lint
-        run: pnpm lint
+      - name: Install pnpm (pinned via package.json packageManager)
+        uses: pnpm/action-setup@v6.0.10
 
-      - name: TypeScript check
-        run: pnpm typecheck
+      - name: Install Node.js (pinned via .nvmrc)
+        uses: actions/setup-node@v7.0.0
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
 
-      - name: Tests
-        run: pnpm test
+      - name: Install Bun Test (pinned)
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.4.0
 
-      # Static release gate for the permanent read-only boundary. Runs as its
-      # own step so a CLI-only regression (inverted exit, broadened exclusion)
-      # fails CI even though the test suite also pins the exit contract.
-      - name: Prohibited-capability scanner
-        run: node scripts/scan-prohibited-capabilities/cli.mjs
+      - name: Install dependencies (frozen lockfile)
+        run: pnpm install --frozen-lockfile
+
+      - name: Run Process and Meta Tests
+        run: pnpm test:process-meta
+
+  test-pglite:
+    name: Tests (Database PGlite Workload)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7.0.1
+
+      - name: Install pnpm (pinned via package.json packageManager)
+        uses: pnpm/action-setup@v6.0.10
+
+      - name: Install Node.js (pinned via .nvmrc)
+        uses: actions/setup-node@v7.0.0
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+
+      - name: Install Bun Test (pinned)
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.4.0
+
+      - name: Install dependencies (frozen lockfile)
+        run: pnpm install --frozen-lockfile
+
+      - name: Run PGlite Tests
+        run: pnpm test:pglite
+
+  verify:
+    name: Verify (spec, format, lint, types, tests)
+    runs-on: ubuntu-latest
+    needs: [gates, test-pure, test-process-meta, test-pglite]
+    if: always()
+    steps:
+      - name: Assert all parallel verification jobs passed
+        run: |
+          if [ "${{ needs.gates.result }}" != "success" ] || \
+             [ "${{ needs.test-pure.result }}" != "success" ] || \
+             [ "${{ needs.test-process-meta.result }}" != "success" ] || \
+             [ "${{ needs.test-pglite.result }}" != "success" ]; then
+            echo "One or more required parallel verification jobs failed."
+            exit 1
+          fi
+          echo "All required parallel verification jobs passed successfully."

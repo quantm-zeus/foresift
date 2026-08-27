@@ -5,7 +5,7 @@
   "targetAuthority": "BUN_TEST",
   "bunVersion": "1.4.0",
   "migrationId": "bun-test-authority-v1",
-  "migrationRequired": true,
+  "migrationRequired": false,
   "barrierAfterPackage": "g0-tool-core",
   "migrationWorkflow": "foresift-bun-test-migration",
   "migrationBranch": "foresift/bun-test-migration",

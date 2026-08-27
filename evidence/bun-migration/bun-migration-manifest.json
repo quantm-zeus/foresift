@@ -1,14 +1,14 @@
 {
   "schema": "foresift/bun-migration-manifest@1",
   "migrationId": "bun-test-authority-v1",
-  "generatedAt": "2026-08-27T01:57:49.003Z",
+  "generatedAt": "2026-08-27T01:57:52.229Z",
   "root": ".",
   "totalTestFiles": 219,
   "counts": {
     "CODEMOD_READY": 0,
     "AGY_REQUIRED": 17,
-    "MIGRATED": 45,
-    "VERIFIED": 157,
+    "MIGRATED": 44,
+    "VERIFIED": 158,
     "BLOCKED": 0
   },
   "parity": {
@@ -1037,7 +1037,7 @@
         "@foresift/persistence",
         "../src/generated/schema.ts"
       ],
-      "state": "MIGRATED"
+      "state": "VERIFIED"
     },
     {
       "path": "packages/provider-lifecycle/test/source-fingerprints.spec.ts",
@@ -9021,7 +9021,8 @@
       },
       "codexCalls": 0,
       "claudeCalls": 0,
-      "testedHead": "f75081a1716509740d429b2566ca59800fe97501"
+      "testedHead": "f75081a1716509740d429b2566ca59800fe97501",
+      "checkpointHead": "663d52f76d78624cf0a461ffcd6fa8b36b3eb5c2"
     },
     {
       "id": "verify-existing--foresift-provider-lifecycle-database-pglite-1",
@@ -9030,7 +9031,53 @@
       "files": [
         "packages/provider-lifecycle/test/schema-parity.spec.ts"
       ],
-      "state": "PENDING"
+      "state": "VERIFIED",
+      "verification": {
+        "ok": true,
+        "wallTimeMs": 3132,
+        "peakRssBytes": 0,
+        "cpuSeconds": 0,
+        "counts": {
+          "passed": 5,
+          "failed": 0,
+          "skipped": 0
+        },
+        "results": [
+          {
+            "id": "pglite-1",
+            "workload": "DATABASE_PGLITE",
+            "files": [
+              "packages/provider-lifecycle/test/schema-parity.spec.ts"
+            ],
+            "fileWorkers": 1,
+            "testConcurrency": 1,
+            "command": [
+              "bun",
+              "test",
+              "--no-orphans",
+              "--isolate",
+              "--parallel=1",
+              "--max-concurrency=1",
+              "--timeout=30000",
+              "packages/provider-lifecycle/test/schema-parity.spec.ts"
+            ],
+            "status": 0,
+            "wallTimeMs": 3132,
+            "peakRssBytes": null,
+            "cpuSeconds": null,
+            "counts": {
+              "passed": 5,
+              "failed": 0,
+              "skipped": 0
+            },
+            "stdoutTail": "bun test v1.4.0 (34cbb9a40) 1x PARALLEL\n",
+            "stderrTail": "\npackages/provider-lifecycle/test/schema-parity.spec.ts:\n(pass) prov-schema Drizzle mirror parity with SQL truth (ADR-001) > applies all five g0_prov migrations over the full proven data/dr/sec set [5.10ms]\n(pass) prov-schema Drizzle mirror parity with SQL truth (ADR-001) > adds zero tables to the public schema (proven parity contract untouched) [5.64ms]\n(pass) prov-schema Drizzle mirror parity with SQL truth (ADR-001) > mirrors exactly the prov-schema table set [4.62ms]\n(pass) prov-schema Drizzle mirror parity with SQL truth (ADR-001) > matches every column: name, nullability, and type class [94.78ms]\n(pass) prov-schema Drizzle mirror parity with SQL truth (ADR-001) > matches primary keys on every prov table [16.85ms]\n\n 5 pass\n 0 fail\n 36 expect() calls\nRan 5 tests across 1 file. [3.03s]\n"
+          }
+        ]
+      },
+      "codexCalls": 0,
+      "claudeCalls": 0,
+      "testedHead": "663d52f76d78624cf0a461ffcd6fa8b36b3eb5c2"
     },
     {
       "id": "verify-existing--foresift-provider-lifecycle-pure-1",

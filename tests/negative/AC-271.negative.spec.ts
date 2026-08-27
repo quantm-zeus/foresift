@@ -6,7 +6,7 @@
  * (proved for the private-key fixture); stripped transaction-building fields
  * never persist.
  */
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 import { sha256Text } from '@foresift/persistence';
 import { AuditChain } from '@foresift/security';
 import {
@@ -85,7 +85,7 @@ describe('AC-271 refusals per malicious-response class', () => {
       // QUARANTINED — metadata-only record persisted.
       expect(record.disposition).toBe('REJECTED');
       expect(record.modelContextExclusion).toBe('ENFORCED');
-      expect(record.detectedClasses).toContain(fixture.detectedClass);
+      expect(record.detectedClasses as readonly string[]).toContain(fixture.detectedClass);
 
       // AUDITED — one BLOCKED_OPERATION entry naming the quarantine id.
       const auditRows = await tdb.engine.query<{ payload_canonical: string }>(

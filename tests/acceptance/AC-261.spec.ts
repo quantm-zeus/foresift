@@ -12,7 +12,7 @@
  * then may automation resume.
  */
 import { createHash } from 'node:crypto';
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 import { utcTimestamp, type UtcTimestamp } from '@foresift/domain';
 import {
   appendObservation,

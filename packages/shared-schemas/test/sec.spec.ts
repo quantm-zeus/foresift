@@ -4,7 +4,7 @@
  * a schema that tolerates extra fields would let an unvetted capability flag
  * ride alongside a valid record. Table-driven where the rule is uniform.
  */
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'bun:test';
 import {
   ActionGateDecisionSchema,
   ActivationEventRecordSchema,
@@ -218,12 +218,11 @@ describe('SEC schema family — registry', () => {
     expect(names).toContain('ProhibitedCapabilityFinding');
   });
 
-  it.each(Object.keys(SEC_SCHEMAS) as SecSchemaName[])(
-    'parseSecSchema(%s) is wired to its schema (refuses garbage)',
-    (name) => {
+  for (const name of Object.keys(SEC_SCHEMAS) as SecSchemaName[]) {
+    it(`parseSecSchema(${name}) is wired to its schema (refuses garbage)`, () => {
       expect(() => parseSecSchema(name, { obviously: 'wrong' })).toThrow();
-    },
-  );
+    });
+  }
 });
 
 describe('audit chain schemas (FR-SEC-002)', () => {
@@ -385,7 +384,7 @@ describe('import gating schemas (FR-SEC-008)', () => {
 
 describe('tenant context (FR-SEC-009)', () => {
   it('accepts the three isolation modes and refuses unknown ones', () => {
-    for (const mode of ['PERSONAL', 'WORKSPACE', 'PUBLIC']) {
+    for (const mode of ['PERSONAL', 'WORKSPACE', 'PUBLIC'] as const) {
       expect(TenantContextSchema.parse({ ...tenantContextFixture, mode }).mode).toBe(mode);
     }
     expect(() => TenantContextSchema.parse({ ...tenantContextFixture, mode: 'SHARED' })).toThrow();

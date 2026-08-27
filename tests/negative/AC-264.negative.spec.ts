@@ -7,7 +7,7 @@
  * drill without its separately provided credentials blocks before any
  * verification runs.
  */
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 import { ErrorCode, utcTimestamp, type UtcTimestamp } from '@foresift/domain';
 import {
   assertLocationAllowed,

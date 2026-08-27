@@ -4,7 +4,7 @@
  * foresift table in `information_schema` and compares columns, nullability,
  * type classes, and primary keys against the generated mirror.
  */
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 import { PGlite } from '@electric-sql/pglite';
 import {
   ALL_ACQUISITION_STATES,
@@ -162,7 +162,7 @@ describe('Drizzle mirror parity with SQL truth (ADR-001)', () => {
       ];
       const expected = sqlPkMap.get(config.name);
       expect(expected, `${config.name} missing PK in SQL`).toBeDefined();
-      expect([...mirrorPk].sort(), `${config.name} PK mismatch`).toEqual(expected);
+      expect([...mirrorPk].sort(), `${config.name} PK mismatch`).toEqual(expected!);
     }
   });
 });

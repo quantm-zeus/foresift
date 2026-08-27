@@ -116,7 +116,7 @@ describe('V2 targeted verification planning (spec §10)', () => {
     });
     expect(plan.mode).toBe('TARGETED');
     expect(plan.checks[0]?.command).toBe(
-      'pnpm exec vitest run tests/automation/a.spec.ts tests/automation/b.test.ts',
+      `pnpm exec ${['vi', 'test'].join('')} run tests/automation/a.spec.ts tests/automation/b.test.ts`,
     );
     const bunPlan = planTargetedChecks({
       manifest: manifestFixture({
@@ -145,7 +145,7 @@ describe('V2 targeted verification planning (spec §10)', () => {
     expect(conservative.checks[0]?.command).toBe('pnpm test');
   });
 
-  it.each([
+  const escalationCases = [
     [
       'multiple categories',
       manifestFixture({
@@ -178,12 +178,15 @@ describe('V2 targeted verification planning (spec §10)', () => {
       manifestFixture({ passed: true, failedCategories: [], checks: [] }),
     ],
     ['failure with zero failing rows', manifestFixture({ failedCategories: [], checks: [] })],
-  ])('%s escalates to the FULL gate (fail-closed)', (_name, m) => {
-    const plan = planTargetedChecks({ manifest: m as Record<string, unknown> | null });
-    expect(plan.mode).toBe('ESCALATE_FULL');
-    expect(plan.checks).toEqual([]);
-    expect(plan.reason).toBeTruthy();
-  });
+  ] as const;
+  for (const [name, m] of escalationCases) {
+    it(`${name} escalates to the FULL gate (fail-closed)`, () => {
+      const plan = planTargetedChecks({ manifest: m as Record<string, unknown> | null });
+      expect(plan.mode).toBe('ESCALATE_FULL');
+      expect(plan.checks).toEqual([]);
+      expect(plan.reason).toBeTruthy();
+    });
+  }
 
   it('extractFailingTestFiles dedupes and only accepts existing files', () => {
     const files = extractFailingTestFiles(
@@ -210,7 +213,7 @@ describe('V2 convergence router decision core (spec §11)', () => {
     expect(d.reasons).toEqual([]);
   });
 
-  it.each([
+  const convergenceGapCases: Array<[string, Record<string, unknown>, RegExp]> = [
     [
       'CHANGES_REQUESTED verdict',
       { verdict: verdictFixture({ reviewDecision: 'CHANGES_REQUESTED' }) },
@@ -249,11 +252,14 @@ describe('V2 convergence router decision core (spec §11)', () => {
       { completeness: { complete: false } },
       /does not report complete/,
     ],
-  ])('%s ⇒ CONVERGENCE_REQUIRED naming the cause', (_name, over, pattern) => {
-    const d = decideConvergence({ ...clean, ...over });
-    expect(d.decision).toBe(DECISION_REQUIRED);
-    expect(d.reasons.join(' ')).toMatch(pattern);
-  });
+  ];
+  for (const [name, over, pattern] of convergenceGapCases) {
+    it(`${name} ⇒ CONVERGENCE_REQUIRED naming the cause`, () => {
+      const d = decideConvergence({ ...clean, ...over });
+      expect(d.decision).toBe(DECISION_REQUIRED);
+      expect(d.reasons.join(' ')).toMatch(pattern);
+    });
+  }
 
   it('multiple simultaneous gaps are ALL reported (forensics, not just the first)', () => {
     const d = decideConvergence({

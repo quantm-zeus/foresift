@@ -7,7 +7,7 @@
  */
 import { performance } from 'node:perf_hooks';
 import { PGlite } from '@electric-sql/pglite';
-import { afterAll, describe, expect, it } from 'vitest';
+import { afterAll, describe, expect, it } from 'bun:test';
 import { parseChainId, utcTimestamp } from '@foresift/domain';
 import {
   appendObservation,

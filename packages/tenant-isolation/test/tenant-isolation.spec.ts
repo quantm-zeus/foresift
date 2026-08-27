@@ -4,7 +4,7 @@
  * scoping, signed-URL bindings, and the full cross-tenant bypass battery
  * (signed-URL, range, redirect, path confusion).
  */
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'bun:test';
 import {
   ARTIFACT_RANGE_READ_RIGHT,
   ResourceAccessGuard,
@@ -256,7 +256,7 @@ describe('resource-access authorization bypass battery (T131, AC-252)', () => {
         // Either normalization unmasks a foreign tenant segment or the
         // escape structure itself is confusion — both refuse pre-fetch.
         expect(['CROSS_TENANT', 'PATH_CONFUSION'], uri).toContain(
-          (error as { detail?: { reason?: string } }).detail?.reason,
+          (error as { detail?: { reason?: string } }).detail?.reason ?? '',
         );
       }
       expect(refused, `must refuse: ${uri}`).toBe(true);

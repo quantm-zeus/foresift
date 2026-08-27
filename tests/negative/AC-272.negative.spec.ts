@@ -5,7 +5,7 @@
  * exception, and prohibited-exposure states each hold the gate BLOCKED with
  * typed reasons — never a throw past the gate, never a silent pass.
  */
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 import { utcTimestamp, type ClockPort } from '@foresift/domain';
 import { AuditChain } from '@foresift/security';
 import {

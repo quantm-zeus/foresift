@@ -11,7 +11,7 @@
     }
   },
   "scripts": {
-    "test": "vitest run"
+    "test": "bun test"
   },
   "dependencies": {
     "@foresift/domain": "workspace:*",
@@ -21,7 +21,6 @@
   },
   "devDependencies": {
     "@electric-sql/pglite": "^0.5.6",
-    "@foresift/object-store": "workspace:*",
-    "vitest": "4.1.11"
+    "@foresift/object-store": "workspace:*"
   }
 }

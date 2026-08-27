@@ -4,7 +4,7 @@
  * metadata-only and HARD-EXCLUDED from model-context envelopes; retries
  * resolve to the same quarantine record.
  */
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 import { AuditChain } from '@foresift/security';
 import { sha256Text } from '@foresift/persistence';
 import {
@@ -100,7 +100,7 @@ describe('T119 deterministic response scanning', () => {
     const input = { a: 1, swap_transaction: 'x', nested: { serialized_tx: 'y' }, keep: true };
     const { stripped, removedPaths } = stripTransactionBuildingFields(input);
     expect(removedPaths).toEqual(['nested.serialized_tx', 'swap_transaction']);
-    expect(stripped).toEqual({ a: 1, nested: {}, keep: true });
+    expect(stripped as Record<string, unknown>).toEqual({ a: 1, nested: {}, keep: true });
   });
 });
 

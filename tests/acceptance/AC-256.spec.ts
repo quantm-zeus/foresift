@@ -3,7 +3,7 @@
 // raw transaction/history operations plus local decoding remain the
 // normative path." The decoder-authority validator admits exactly the
 // raw-operation-plus-local-decoding configuration.
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'bun:test';
 import { validateDecoderAuthority } from '../../packages/security/src/decoder-authority.ts';
 
 function normativeConfig() {

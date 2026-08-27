@@ -3,7 +3,7 @@
  * declarations, consecutive-version change diffs into newly-prohibited use
  * paths, audited tightening, and the fail-closed per-artifact decision API.
  */
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 import { AuditChain } from '@foresift/security';
 import type { RightsUsePath } from '../src/index.ts';
 import { RightsMatrixEngine, diffRights, ProvErrorCode } from '../src/index.ts';

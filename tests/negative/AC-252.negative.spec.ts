@@ -1,7 +1,7 @@
 // AC-252 (negative): a resource URI minted under tenant A NEVER resolves
 // for tenant B — including through signed-URL replay, ranged reads without
 // the right, redirects to foreign targets, and path-confusion vectors.
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'bun:test';
 import { ResourceAccessGuard } from '../../packages/tenant-isolation/src/resource-access.ts';
 import type { ResourceAccessRefusalReason } from '../../packages/tenant-isolation/src/resource-access.ts';
 import { SignedUrlService } from '../../packages/tenant-isolation/src/signed-url.ts';

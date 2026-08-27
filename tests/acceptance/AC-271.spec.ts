@@ -6,7 +6,7 @@
  * records what was admitted, the untrusted-content envelope labels it, and
  * nothing in the clean path touches quarantine.
  */
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 import { sha256Text } from '@foresift/persistence';
 import { utcTimestamp } from '@foresift/domain';
 import { AuditChain, envelopeContent } from '@foresift/security';

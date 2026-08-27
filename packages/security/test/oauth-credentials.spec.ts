@@ -3,7 +3,7 @@
 // binding, expiry, scope narrowing, upstream-passthrough refusal; ≥256-bit
 // entropy via injectable seam, keyed hash at rest, per-dimension use
 // validation, independent revocation.
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 import { PGlite } from '@electric-sql/pglite';
 import {
   applyMigrations,

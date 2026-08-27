@@ -10,7 +10,7 @@
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { readFileSync } from 'node:fs';
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 import { PGlite } from '@electric-sql/pglite';
 import {
   DependenceLabel,
@@ -155,8 +155,8 @@ describe('pairwise dependence edges (AC-245)', () => {
     const edges = await dependenceEdgesForPair(engine, 'src/nodefront', 'src/chainmirror');
     expect(edges).toHaveLength(1);
     // Canonical order regardless of who was listed first.
-    expect(edges[0]!.edge.sourceA).toBe('src/chainmirror');
-    expect(edges[0]!.edge.sourceB).toBe('src/nodefront');
+    expect(String(edges[0]!.edge.sourceA)).toBe('src/chainmirror');
+    expect(String(edges[0]!.edge.sourceB)).toBe('src/nodefront');
     expect(edges[0]!.edge.label).toBe(DependenceLabel.AVAILABLE_AT_THE_TIME);
   });
 

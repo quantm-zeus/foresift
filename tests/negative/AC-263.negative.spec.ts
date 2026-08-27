@@ -6,7 +6,7 @@
  * history loss) and re-recording a first-seen canonical event (duplicate
  * application). Gap lifecycle transitions are one-way.
  */
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 import { ErrorCode, utcTimestamp, type UtcTimestamp } from '@foresift/domain';
 import {
   commitCheckpoint,

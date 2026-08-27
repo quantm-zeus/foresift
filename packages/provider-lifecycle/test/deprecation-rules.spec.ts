@@ -3,7 +3,7 @@
  * escape hatch, Rule 2 incident raising through the security API, Rule 6
  * sole-source refusal, and STRICT_FREE plan-verification gating.
  */
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 import type { UtcTimestamp } from '@foresift/domain';
 import { makeProvEngine, testDefinition, wireEngine, type Wired } from './helpers.ts';
 import { ProvErrorCode } from '../src/errors.ts';

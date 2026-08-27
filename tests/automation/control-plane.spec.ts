@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'bun:test';
 import {
   canStartPackage,
   classifyFailure,
@@ -429,7 +429,14 @@ describe('run observability', () => {
 });
 
 describe('milestone mode selection', () => {
-  const runMode = async (fixture: string): Promise<{ mode: string; resumingDraft?: boolean }> => {
+  const runMode = async (
+    fixture: string,
+  ): Promise<{
+    mode: string;
+    resumingDraft?: boolean;
+    milestoneId?: string;
+    isFinal?: boolean;
+  }> => {
     const { execFileSync } = await import('node:child_process');
     const path = await import('node:path');
     const out = execFileSync(

@@ -7,7 +7,7 @@
  * `sec` schema — see implementation-notes.md for why sec tables do not live
  * in `public`).
  */
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 import { PGlite } from '@electric-sql/pglite';
 import { getTableConfig } from 'drizzle-orm/pg-core';
 import type { PgTable } from 'drizzle-orm/pg-core';
@@ -178,7 +178,7 @@ describe('sec-schema Drizzle mirror parity with SQL truth (ADR-001)', () => {
       const mirrorPk = config.primaryKeys.flatMap((pk) => pk.columns.map((c) => c.name));
       const singleColPk = config.columns.filter((c) => c.primary).map((c) => c.name);
       const actual = [...mirrorPk, ...singleColPk].sort();
-      expect(actual, `${config.name} PK matches`).toEqual(expected);
+      expect(actual, `${config.name} PK matches`).toEqual(expected!);
       matched += 1;
     }
     expect(matched).toBe(9);

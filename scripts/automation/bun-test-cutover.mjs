@@ -89,10 +89,12 @@ export function applyBunCutover({ root, manifestFile }) {
   for (const file of packageJsonFiles(root)) {
     const absolute = join(root, file);
     const value = readJson(absolute);
+    delete value.dependencies?.vitest;
+    delete value.devDependencies?.vitest;
     if (value.scripts?.test) {
       value.scripts.test = 'bun test';
-      writeJson(absolute, value);
     }
+    writeJson(absolute, value);
   }
 
   const tsconfigFile = join(root, 'tsconfig.json');
@@ -116,21 +118,22 @@ export function applyBunCutover({ root, manifestFile }) {
   writeJson(policyFile, policy);
 
   const ciFile = join(root, '.github', 'workflows', 'ci.yml');
-  const ci = readFileSync(ciFile, 'utf8');
-  if (!ci.includes('oven-sh/setup-bun')) {
-    const anchor = '      - name: Install dependencies (frozen lockfile)\n';
-    if (!ci.includes(anchor)) throw new Error('BUN_CUTOVER_CI_ANCHOR_MISSING');
-    writeFileSync(
-      ciFile,
-      ci.replace(
+  if (existsSync(ciFile)) {
+    let ci = readFileSync(ciFile, 'utf8');
+    ci = ci.replace(/\bvitest\b/gi, 'test');
+    if (!ci.includes('oven-sh/setup-bun')) {
+      const anchor = '      - name: Install dependencies (frozen lockfile)\n';
+      if (!ci.includes(anchor)) throw new Error('BUN_CUTOVER_CI_ANCHOR_MISSING');
+      ci = ci.replace(
         anchor,
         '      - name: Install Bun Test (pinned)\n' +
           '        uses: oven-sh/setup-bun@v2\n' +
           '        with:\n' +
           `          bun-version: ${policy.bunVersion}\n\n` +
           anchor,
-      ),
-    );
+      );
+    }
+    writeFileSync(ciFile, ci);
   }
 
   const install = spawnSync('pnpm', ['install', '--lockfile-only'], {

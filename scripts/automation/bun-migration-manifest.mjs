@@ -54,7 +54,7 @@ function packageFor(path) {
 function workloadFor(path, text) {
   if (/\b(?:PGlite|@electric-sql\/pglite)\b/.test(text)) return 'DATABASE_PGLITE';
   if (/gate-e2e|foresift-gate|package-full-gate/.test(path + '\n' + text)) return 'META_GATE';
-  if (/node:child_process|\b(?:spawn|spawnSync|execFile|execFileSync)\s*\(/.test(text))
+  if (/gitFixture|node:child_process|\b(?:spawn|spawnSync|execFile|execFileSync)\s*\(/.test(text))
     return 'PROCESS';
   return 'PURE';
 }
@@ -65,6 +65,7 @@ function sourceInfo(path, text) {
   const vitestImports = [];
   const bunImports = [];
   let dynamicImports = false;
+  let functionWrappedRejects = false;
   function visit(node) {
     if (ts.isImportDeclaration(node) && ts.isStringLiteral(node.moduleSpecifier)) {
       const from = node.moduleSpecifier.text;
@@ -85,10 +86,21 @@ function sourceInfo(path, text) {
     }
     if (ts.isCallExpression(node) && node.expression.kind === ts.SyntaxKind.ImportKeyword)
       dynamicImports = true;
+    if (
+      ts.isPropertyAccessExpression(node) &&
+      node.name.text === 'rejects' &&
+      ts.isCallExpression(node.expression) &&
+      ts.isIdentifier(node.expression.expression) &&
+      node.expression.expression.text === 'expect' &&
+      node.expression.arguments.length > 0 &&
+      (ts.isArrowFunction(node.expression.arguments[0]) ||
+        ts.isFunctionExpression(node.expression.arguments[0]))
+    )
+      functionWrappedRejects = true;
     ts.forEachChild(node, visit);
   }
   visit(source);
-  return { imports, vitestImports, bunImports, dynamicImports };
+  return { imports, vitestImports, bunImports, dynamicImports, functionWrappedRejects };
 }
 
 function sha256(text) {
@@ -107,13 +119,19 @@ export function analyzeTestFile(root, path, previous = null) {
   );
   if (/\bvitest\b/i.test(withoutRunnerImports)) features.push('vitest-runtime-reference');
   if (info.dynamicImports) features.push('dynamic-import');
+  if (info.functionWrappedRejects) features.push('function-wrapped-rejects');
   const importedNames = [...new Set(info.vitestImports.flatMap((item) => item.names))].sort();
   const unsupportedImports = importedNames.filter((name) => !BUN_DIRECT_IMPORTS.has(name));
   if (unsupportedImports.length)
     features.push(`unsupported-import:${unsupportedImports.join(',')}`);
   const alreadyMigrated = info.vitestImports.length === 0 && info.bunImports.length > 0;
+  const bunRewriteRequired = features.some((feature) =>
+    ['function-wrapped-rejects', 'vitest-runtime-reference'].includes(feature),
+  );
   const migrationType = alreadyMigrated
-    ? 'ALREADY_MIGRATED'
+    ? bunRewriteRequired
+      ? 'SEMANTIC_REWRITE'
+      : 'ALREADY_MIGRATED'
     : info.vitestImports.length === 1 &&
         unsupportedImports.length === 0 &&
         !features.some((feature) => feature !== 'dynamic-import')
@@ -125,12 +143,12 @@ export function analyzeTestFile(root, path, previous = null) {
   const state =
     previous?.sha256 === hash && previous?.state === 'VERIFIED'
       ? 'VERIFIED'
-      : alreadyMigrated
-        ? 'MIGRATED'
-        : migrationType === 'EASY_MECHANICAL'
-          ? 'CODEMOD_READY'
-          : migrationType === 'SEMANTIC_REWRITE'
-            ? 'AGY_REQUIRED'
+      : migrationType === 'SEMANTIC_REWRITE'
+        ? 'AGY_REQUIRED'
+        : alreadyMigrated
+          ? 'MIGRATED'
+          : migrationType === 'EASY_MECHANICAL'
+            ? 'CODEMOD_READY'
             : 'BLOCKED';
   return {
     path,

@@ -2,7 +2,7 @@
 // activation with actor + immutable snapshot reference; rollback restores a
 // prior approved set by APPENDING a new event that inherits the restored
 // event's snapshot — history is never rewritten.
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 import { PGlite } from '@electric-sql/pglite';
 import {
   applyMigrations,

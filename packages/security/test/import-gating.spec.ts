@@ -3,7 +3,7 @@
  * T127). DB-backed over the real sec.import_artifacts rows so CHECKs,
  * monotone ranks, and finding evidence are exercised against SQL truth.
  */
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 import { PGlite } from '@electric-sql/pglite';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';

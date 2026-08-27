@@ -5,7 +5,7 @@
  * key-access separation (references never material), and restore
  * credentials — positive AND violation paths for each.
  */
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 import { PGlite } from '@electric-sql/pglite';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -73,7 +73,7 @@ describe('retention + encryption + location + rights policy records (AC-264)', (
   });
 
   it('refuses sub-day retention windows', async () => {
-    expect(() => createBackupPolicy(engine, policyWith({ retentionDays: 0 }), AT)).rejects.toThrow(
+    await expect(createBackupPolicy(engine, policyWith({ retentionDays: 0 }), AT)).rejects.toThrow(
       /retentionDays/,
     );
     await expect(

@@ -1,7 +1,7 @@
 {
   "schema": "foresift/test-runtime-policy@1",
   "productRuntime": "node-24",
-  "currentAuthority": "VITEST_TRANSITION",
+  "currentAuthority": "BUN_TEST",
   "targetAuthority": "BUN_TEST",
   "bunVersion": "1.4.0",
   "migrationId": "bun-test-authority-v1",

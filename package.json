@@ -27,9 +27,9 @@
     "lint": "eslint .",
     "typecheck": "tsc --noEmit -p tsconfig.json",
     "test": "node scripts/automation/test-authority.mjs",
-    "test:unit": "vitest run --project unit",
-    "test:integration": "vitest run --project integration",
-    "test:watch": "vitest",
+    "test:unit": "node scripts/automation/bun-test-coordinator.mjs --manifest evidence/bun-migration/bun-migration-manifest.json --workload PURE",
+    "test:integration": "node scripts/automation/bun-test-coordinator.mjs --manifest evidence/bun-migration/bun-migration-manifest.json --workload PROCESS,DATABASE_PGLITE,META_GATE",
+    "test:watch": "bun test --watch",
     "test:node-compat": "node scripts/automation/node-runtime-compat.mjs",
     "verify": "pnpm spec:verify && pnpm format:check && pnpm lint && pnpm typecheck && pnpm test && pnpm test:node-compat"
   },
@@ -48,7 +48,6 @@
     "globals": "17.11.0",
     "prettier": "3.9.6",
     "typescript": "5.9.3",
-    "typescript-eslint": "8.67.0",
-    "vitest": "4.1.11"
+    "typescript-eslint": "8.67.0"
   }
 }

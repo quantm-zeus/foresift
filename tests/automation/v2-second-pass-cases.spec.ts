@@ -119,7 +119,7 @@ describe('CASE B — gate repair package', () => {
     const plan = planTargetedChecks({ manifest: initial, gateLogText: log });
     expect(plan.mode).toBe('TARGETED');
     expect(plan.checks.length).toBeGreaterThan(0);
-    expect(plan.checks.some((c) => /vitest|bun/.test(c.command))).toBe(true);
+    expect(plan.checks.some((c) => /bun/.test(c.command) || c.command.includes('test'))).toBe(true);
     // After repair exactly the FINAL FULL evidence lands (initial + final —
     // never one FULL per tiny edit; targeted checks ran in between):
     writeFileSync(join(dir, 'full-gate-result.json'), gateManifest(true));

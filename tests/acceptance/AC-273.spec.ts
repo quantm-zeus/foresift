@@ -8,7 +8,7 @@
  *
  * Scenario data: tests/fixtures/prov/scenarios/rights-change.scenario.json.
  */
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 import {
   ArtifactRegistry,
   OperationRegistry,
@@ -99,8 +99,8 @@ describe('AC-273 tightening enforcement', () => {
       declaration: SCENARIO.v2Declaration,
       actor: 'ac273-operator',
     });
-    expect([...changeRecord.newlyProhibitedUses].sort()).toEqual(
-      [...SCENARIO.expectedDiff.newlyProhibitedUses].sort(),
+    expect([...changeRecord.newlyProhibitedUses].sort() as string[]).toEqual(
+      [...SCENARIO.expectedDiff.newlyProhibitedUses].sort() as string[],
     );
     expect(changeRecord.tightened).toBe(true);
   });

@@ -4,7 +4,7 @@
  * classification guards, redaction, environment separation, lifecycle
  * records; prohibited-claim classes and the §35.12 distribution envelope.
  */
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'bun:test';
 import { strict as assert } from 'node:assert';
 import type { PublicRedactionResult } from '@foresift/shared-schemas';
 import {
@@ -164,7 +164,7 @@ describe('claims policy: prohibited claim classes (AC-276)', () => {
       const result = evaluateClaims(text, 'MARKETING');
       expect(result.verdict, text).toBe('REFUSED');
       assert(result.verdict === 'REFUSED', text);
-      expect(result.claimClasses).toContain(expected);
+      expect(result.claimClasses as readonly string[]).toContain(expected);
     }
   });
 

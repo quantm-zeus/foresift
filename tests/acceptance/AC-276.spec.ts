@@ -1,7 +1,7 @@
 // AC-276 (acceptance): compliant marketing/UI/API/export text passes
 // content-policy validation on its channel — the paired clean-text controls
 // for the prohibited claim classes.
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'bun:test';
 import {
   assertClaimsCompliant,
   evaluateClaims,

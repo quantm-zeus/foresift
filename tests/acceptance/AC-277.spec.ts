@@ -1,7 +1,7 @@
 // AC-277 (acceptance): public output exposes evidence, timestamps,
 // execution assumptions, limitations, and disclaimer — AND redacts protected
 // detector thresholds and sensitive entity details before publication.
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'bun:test';
 import { validatePublicOutput } from '../../packages/security/src/claims-policy.ts';
 import { strict as assert } from 'node:assert';
 

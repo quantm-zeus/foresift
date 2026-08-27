@@ -4,7 +4,7 @@
 // isolation-layer proof: every content class is carried ONLY as labeled,
 // fence-delimited DATA through the structured-extraction envelope — there is
 // no path from content to enforcement dimensions.
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'bun:test';
 import {
   deriveMemoryIsolationKey,
   envelopeContent,

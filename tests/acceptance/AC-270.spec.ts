@@ -6,7 +6,7 @@
  * active decision-critical use; refreshing BOTH official-doc AND
  * live-contract sources restores that use.
  */
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 import {
   LifecycleMachine,
   OperationRegistry,

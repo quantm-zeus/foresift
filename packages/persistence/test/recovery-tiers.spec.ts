@@ -5,7 +5,7 @@
  * raw-payload object store; looser-than-ceiling configuration, class
  * mismatches, incident-less misses, and invalid health states all refuse.
  */
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 import { PGlite } from '@electric-sql/pglite';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';

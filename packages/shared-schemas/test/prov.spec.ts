@@ -6,7 +6,7 @@
  * extra fields would let an unvetted capability flag or prohibited parameter
  * bypass security controls.
  */
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'bun:test';
 import {
   ALL_QUARANTINE_DETECTION_CLASSES,
   ALL_SOURCE_FINGERPRINT_KINDS,
@@ -365,7 +365,13 @@ describe('prov schema registry', () => {
 
 describe('§15.2 Cost and capability classes', () => {
   it('accepts all valid cost classes and refuses invalid ones', () => {
-    const valid = ['FREE_UNMETERED', 'FREE_QUOTA', 'PAID_EXPLICIT', 'UNKNOWN_COST', 'DISABLED'];
+    const valid = [
+      'FREE_UNMETERED',
+      'FREE_QUOTA',
+      'PAID_EXPLICIT',
+      'UNKNOWN_COST',
+      'DISABLED',
+    ] as const;
     for (const c of valid) {
       expect(ProviderCostClassSchema.parse(c)).toBe(c);
     }
@@ -392,8 +398,8 @@ describe('§15.2 Cost and capability classes', () => {
   });
 });
 
-describe('§12.11 Lifecycle states and legal transitions', () => {
-  it('accepts the seven-state alphabet and refuses unknown states', () => {
+describe('§15.3 Lifecycle states', () => {
+  it('accepts all 7 lifecycle states and refuses unknown states', () => {
     const states = [
       'DISCOVERED',
       'VERIFIED',
@@ -402,7 +408,7 @@ describe('§12.11 Lifecycle states and legal transitions', () => {
       'DEPRECATED',
       'BLOCKED',
       'REMOVED',
-    ];
+    ] as const;
     for (const s of states) {
       expect(ProviderLifecycleStateSchema.parse(s)).toBe(s);
     }
@@ -469,7 +475,7 @@ describe('§15.4 Health statuses', () => {
       'AUTH_FAILED',
       'UNSUPPORTED',
       'DISABLED',
-    ];
+    ] as const;
     for (const h of valid) {
       expect(ProviderHealthStatusSchema.parse(h)).toBe(h);
     }
@@ -762,7 +768,7 @@ describe('FR-PROV-010: Source fingerprints and empirical dependence', () => {
       'HIGHLY_DEPENDENT',
       'UNKNOWN_DEPENDENCE',
       'SAME_UPSTREAM',
-    ];
+    ] as const;
     for (const s of states) {
       expect(ProviderDependenceStateSchema.parse(s)).toBe(s);
     }
@@ -798,13 +804,15 @@ describe('FR-PROV-005 & AC-272: Readiness reports and adapter allowlists', () =>
 });
 
 describe('Table-driven .strict() unknown-key refusal across all registered schemas', () => {
-  it.each(positives)('%s refuses unvetted/unknown keys', (name, fixture) => {
-    const schema = PROV_SCHEMAS[name];
-    if (!fixture || typeof fixture !== 'object' || Array.isArray(fixture)) return;
-    const contaminated = {
-      ...(fixture as Record<string, unknown>),
-      __prohibited_or_unvetted_extra_field__: 'MALICIOUS_INJECTION',
-    };
-    expect(() => schema.parse(contaminated), `${name} did not refuse unknown key`).toThrow();
-  });
+  for (const [name, fixture] of positives) {
+    it(`${name} refuses unvetted/unknown keys`, () => {
+      const schema = PROV_SCHEMAS[name];
+      if (!fixture || typeof fixture !== 'object' || Array.isArray(fixture)) return;
+      const contaminated = {
+        ...(fixture as Record<string, unknown>),
+        __prohibited_or_unvetted_extra_field__: 'MALICIOUS_INJECTION',
+      };
+      expect(() => schema.parse(contaminated), `${name} did not refuse unknown key`).toThrow();
+    });
+  }
 });

@@ -3,7 +3,7 @@
 // (migrations applied) so classifications never cross-contaminate; tampering
 // simulates an attacker WITH DDL privileges (trigger dropped and restored),
 // proving detection survives even owner-level mutation.
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'bun:test';
 import { createHash } from 'node:crypto';
 import { PGlite } from '@electric-sql/pglite';
 import type { ObjectStoreAdapter, PutObjectRequest, StoredObject } from '@foresift/object-store';
@@ -466,7 +466,7 @@ describe('divergence classification (AC-259 fixture battery)', () => {
       }
       const outcome = await h.chain.verifyRange();
       expect(outcome.run.verdict).toBe('FAILED');
-      expect(['CHAIN_BREAK', 'REORDERING']).toContain(outcome.run.divergenceKind);
+      expect(['CHAIN_BREAK', 'REORDERING']).toContain(outcome.run.divergenceKind!);
       expect(outcome.run.firstDivergenceSeq).toBe(4);
     } finally {
       await h.db.close();

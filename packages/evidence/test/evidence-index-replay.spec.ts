@@ -6,7 +6,7 @@
  */
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 import { PGlite } from '@electric-sql/pglite';
 import { chainIdentity, ErrorCode, ForesiftError, utcTimestamp } from '@foresift/domain';
 import {
@@ -168,12 +168,12 @@ describe('replay-boundary resolution over bundles + observations', () => {
     });
     expect(at13.bundles.map((b) => b.bundleId)).toEqual(['bundle-early']);
     expect(at13.observations.map((o) => o.observationId)).toEqual(['obs_ev_1']);
-    expect(at13.observations[0]!.availableAt).toBe('2026-03-01T12:00:00Z');
+    expect(String(at13.observations[0]!.availableAt)).toBe('2026-03-01T12:00:00Z');
 
     const at17 = await resolveEvidenceAt(engine, {
       resolvedAt: utcTimestamp('2026-03-01T17:00:00Z'),
     });
-    expect(at17.observations[0]!.availableAt).toBe('2026-03-01T16:00:00Z'); // revision now visible
+    expect(String(at17.observations[0]!.availableAt)).toBe('2026-03-01T16:00:00Z'); // revision now visible
     expect(at17.bundles.map((b) => b.bundleId)).toEqual(['bundle-early']);
 
     const at12nextDay = await resolveEvidenceAt(engine, {

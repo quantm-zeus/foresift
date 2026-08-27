@@ -2,7 +2,7 @@
 // mixed-scheme, or wrong-port Origin receives its typed refusal BEFORE any
 // session/tool/resource processing. (The MCP-surface package wires refuse
 // verdicts to HTTP 403.)
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'bun:test';
 import { McpOriginGate } from '../../packages/security/src/mcp-origin.ts';
 
 const PROD_GATE = new McpOriginGate({

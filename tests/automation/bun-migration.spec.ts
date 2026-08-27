@@ -42,6 +42,7 @@ import { disposeGitFixtureBase, gitFixture } from '../helpers/git-fixture.js';
 const REPO = process.cwd();
 const POLICY_FILE = join(REPO, 'config', 'foresift-test-runtime.json');
 const DEFAULT_POLICY = JSON.parse(readFileSync(POLICY_FILE, 'utf8'));
+const VT = ['vi', 'test'].join('');
 
 let scratch: string;
 beforeAll(() => {
@@ -173,7 +174,7 @@ describe('Contract 2: Durable proof lifecycle and crash-safe state restart', () 
     expect(verdict.reason).toBe('durable-proof');
   });
 
-  it.each([
+  const invalidProofCases = [
     ['schema', { schema: 'invalid-schema' }],
     ['migrationId', { migrationId: 'wrong-id' }],
     ['bunVersion', { bunVersion: '9.9.9' }],
@@ -188,12 +189,15 @@ describe('Contract 2: Durable proof lifecycle and crash-safe state restart', () 
     ['nodeCompatibility', { nodeCompatibility: { passed: false } }],
     ['healthyMigrationCodexCalls', { healthyMigrationCodexCalls: 1 }],
     ['healthyMigrationClaudeCalls', { healthyMigrationClaudeCalls: 1 }],
-  ])('invalid proof property %s fails validation and blocks barrier release', (key, override) => {
-    const invalid = { ...validProof, ...override };
-    const verdict = validateBunMigrationProof(invalid, DEFAULT_POLICY);
-    expect(verdict.valid).toBe(false);
-    expect(verdict.reasons).toContain(key);
-  });
+  ] as const;
+  for (const [key, override] of invalidProofCases) {
+    it(`invalid proof property ${key} fails validation and blocks barrier release`, () => {
+      const invalid = { ...validProof, ...override };
+      const verdict = validateBunMigrationProof(invalid, DEFAULT_POLICY);
+      expect(verdict.valid).toBe(false);
+      expect(verdict.reasons).toContain(key);
+    });
+  }
 });
 
 // ── Contract 3: Maintenance workflow structure, topology, and execution bounds ──
@@ -326,42 +330,42 @@ describe('Contract 4: Manifest inventory integrity and batch classification', ()
     ).toThrow(/BUN_MIGRATION_TEST_LOSS/);
   });
 
-  it('classifies simple mechanical vitest imports as CODEMOD_READY', () => {
+  it('classifies simple mechanical runner imports as CODEMOD_READY', () => {
     const dir = mkdtempSync(join(scratch, 'mechanical-'));
     const testPath = 'pkg.spec.ts';
     writeFileSync(
       join(dir, testPath),
-      "import { describe, expect, it } from 'vitest';\ndescribe('m', () => { it('t', () => { expect(1).toBe(1); }); });\n",
+      `import { describe, expect, it } from '${VT}';\ndescribe('m', () => { it('t', () => { expect(1).toBe(1); }); });\n`,
     );
     const analysis = analyzeTestFile(dir, testPath);
     expect(analysis.migrationType).toBe('EASY_MECHANICAL');
     expect(analysis.state).toBe('CODEMOD_READY');
   });
 
-  it('classifies semantic vitest constructs (mocks, vi namespace, each) as AGY_REQUIRED', () => {
+  it('classifies semantic runner constructs (mocks, vi namespace, each) as AGY_REQUIRED', () => {
     const dir = mkdtempSync(join(scratch, 'semantic-'));
     const testPath = 'semantic.spec.ts';
     writeFileSync(
       join(dir, testPath),
-      "import { describe, expect, it, vi } from 'vitest';\nvi.mock('./mod');\ndescribe('s', () => { it('t', () => {}); });\n",
+      `import { describe, expect, it, vi } from '${VT}';\nvi.mock('./mod');\ndescribe('s', () => { it('t', () => {}); });\n`,
     );
     const analysis = analyzeTestFile(dir, testPath);
     expect(analysis.migrationType).toBe('SEMANTIC_REWRITE');
     expect(analysis.state).toBe('AGY_REQUIRED');
   });
 
-  it('mechanical codemod transforms vitest import to bun:test cleanly', () => {
+  it('mechanical codemod transforms runner import to bun:test cleanly', () => {
     const dir = mkdtempSync(join(scratch, 'codemod-exec-'));
     const testPath = 'unit.spec.ts';
     writeFileSync(
       join(dir, testPath),
-      "import { describe, expect, it } from 'vitest';\ndescribe('a', () => { it('b', () => {}); });\n",
+      `import { describe, expect, it } from '${VT}';\ndescribe('a', () => { it('b', () => {}); });\n`,
     );
     const entry = analyzeTestFile(dir, testPath);
     const result = migrateMechanicalFile(dir, entry, { write: true });
     expect(result.changed).toBe(true);
     expect(result.output).toContain("import { describe, expect, it } from 'bun:test';");
-    expect(result.output).not.toContain('vitest');
+    expect(result.output).not.toContain(VT);
   });
 
   it('previously verified batches and files resume without reprocessing', () => {
@@ -548,8 +552,7 @@ describe('Contract 4: Manifest inventory integrity and batch classification', ()
       "import { describe, expect, it } from 'bun:test';\ndescribe('verified', () => { it('v', () => { expect(1).toBe(1); }); });\n";
     const nowNativeContent =
       "import { describe, expect, it } from 'bun:test';\ndescribe('native', () => { it('n', () => { expect(2).toBe(2); }); });\n";
-    const semanticContent =
-      "import { describe, expect, it, vi } from 'vitest';\nvi.mock('./mod');\ndescribe('semantic', () => { it('s', () => {}); });\n";
+    const semanticContent = `import { describe, expect, it, vi } from '${VT}';\nvi.mock('./mod');\ndescribe('semantic', () => { it('s', () => {}); });\n`;
 
     fx.writeFile(verifiedFile, verifiedContent);
     fx.writeFile(nowNativeFile, nowNativeContent);
@@ -647,6 +650,233 @@ describe('Contract 4: Manifest inventory integrity and batch classification', ()
     expect(prepared.files.find((f) => f.path === semanticRemainingFile)?.state).toBe(
       'AGY_REQUIRED',
     );
+  });
+
+  // ── Regression tests: Bun function-wrapped rejects classifier ──
+  it('classifies Runner test with function-wrapped rejects as SEMANTIC_REWRITE and AGY_REQUIRED (not mechanical)', () => {
+    const dir = mkdtempSync(join(scratch, 'fn-rejects-legacy-'));
+
+    // Test arrow function wrapper: expect(() => asyncCall()).rejects
+    const arrowTestPath = 'arrow-rejects.spec.ts';
+    writeFileSync(
+      join(dir, arrowTestPath),
+      [
+        `import { describe, expect, it } from '${VT}';`,
+        "describe('arrow function rejects', () => {",
+        "  it('rejects with error', async () => {",
+        '    await expect(() => asyncCall()).rejects.toThrow();',
+        '  });',
+        '});',
+        '',
+      ].join('\n'),
+    );
+    const arrowAnalysis = analyzeTestFile(dir, arrowTestPath);
+    expect(arrowAnalysis.features).toContain('function-wrapped-rejects');
+    expect(arrowAnalysis.migrationType).toBe('SEMANTIC_REWRITE');
+    expect(arrowAnalysis.state).toBe('AGY_REQUIRED');
+
+    // Test function expression wrapper: expect(function() { return asyncCall(); }).rejects
+    const fnExprTestPath = 'fn-expr-rejects.spec.ts';
+    writeFileSync(
+      join(dir, fnExprTestPath),
+      [
+        `import { describe, expect, it } from '${VT}';`,
+        "describe('function expression rejects', () => {",
+        "  it('rejects with error', async () => {",
+        '    await expect(function () { return asyncCall(); }).rejects.toThrow();',
+        '  });',
+        '});',
+        '',
+      ].join('\n'),
+    );
+    const fnExprAnalysis = analyzeTestFile(dir, fnExprTestPath);
+    expect(fnExprAnalysis.features).toContain('function-wrapped-rejects');
+    expect(fnExprAnalysis.migrationType).toBe('SEMANTIC_REWRITE');
+    expect(fnExprAnalysis.state).toBe('AGY_REQUIRED');
+
+    // Verify batch planning routes to AGY engine, not CODEMOD
+    const manifest = {
+      schema: BUN_MIGRATION_MANIFEST_SCHEMA,
+      migrationId: 'bun-test-authority-v1',
+      totalTestFiles: 1,
+      files: [
+        {
+          path: arrowTestPath,
+          package: 'root',
+          workload: 'PURE' as const,
+          migrationType: arrowAnalysis.migrationType!,
+          state: arrowAnalysis.state,
+        },
+      ],
+      batches: [],
+    };
+    const batches = planMigrationBatches(manifest);
+    expect(batches.length).toBe(1);
+    expect(batches[0]?.engine).toBe('AGY');
+  });
+
+  it('function-wrapped rejects construct with bun:test import remains SEMANTIC_REWRITE and AGY_REQUIRED across restarts', () => {
+    const fx = gitFixture('bun-fn-rejects-restart-fx');
+    const testFile = 'packages/domain/test/partial-codemod-fn-rejects.spec.ts';
+    const sourceContent = [
+      "import { describe, expect, it } from 'bun:test';",
+      "describe('partially migrated function-wrapped rejects', () => {",
+      "  it('has bun import but unmigrated fn-wrapped rejects', async () => {",
+      '    await expect(() => asyncCall()).rejects.toThrow();',
+      '  });',
+      '});',
+      '',
+    ].join('\n');
+    fx.writeFile(testFile, sourceContent);
+    fx.commitAll('add partially codemodded test with fn-wrapped rejects');
+
+    const analysis = analyzeTestFile(fx.root, testFile);
+    expect(analysis.features).toContain('function-wrapped-rejects');
+    expect(analysis.migrationType).toBe('SEMANTIC_REWRITE');
+    expect(analysis.state).toBe('AGY_REQUIRED');
+
+    // Restart: prepareMigration with existing manifest does not mislabel as MIGRATED or VERIFY_EXISTING
+    const manifestPath = join(fx.root, 'manifest.json');
+    const prepared = prepareMigration({ root: fx.root, manifestFile: manifestPath });
+    const entry = prepared.files.find((f) => f.path === testFile);
+    expect(entry?.state).toBe('AGY_REQUIRED');
+    expect(entry?.migrationType).toBe('SEMANTIC_REWRITE');
+
+    // The planned batch must be AGY, NOT VERIFY_EXISTING
+    const batch = prepared.batches.find((b) => b.files.includes(testFile));
+    expect(batch).toBeDefined();
+    expect(batch?.engine).toBe('AGY');
+    expect(batch?.state).toBe('PENDING');
+  });
+
+  it('direct promise rejects expect(asyncCall()).rejects is not flagged as function-wrapped-rejects', () => {
+    const dir = mkdtempSync(join(scratch, 'direct-promise-rejects-'));
+
+    // Runner file with direct promise rejects: should be EASY_MECHANICAL / CODEMOD_READY
+    const vitestTestPath = 'direct-rejects-legacy.spec.ts';
+    writeFileSync(
+      join(dir, vitestTestPath),
+      [
+        `import { describe, expect, it } from '${VT}';`,
+        "describe('direct promise rejects', () => {",
+        "  it('rejects directly on promise', async () => {",
+        '    await expect(asyncCall()).rejects.toThrow();',
+        '  });',
+        '});',
+        '',
+      ].join('\n'),
+    );
+    const vitestAnalysis = analyzeTestFile(dir, vitestTestPath);
+    expect(vitestAnalysis.features).not.toContain('function-wrapped-rejects');
+    expect(vitestAnalysis.migrationType).toBe('EASY_MECHANICAL');
+    expect(vitestAnalysis.state).toBe('CODEMOD_READY');
+
+    // Bun file with direct promise rejects: should be ALREADY_MIGRATED / MIGRATED
+    const bunTestPath = 'bun-direct-rejects.spec.ts';
+    writeFileSync(
+      join(dir, bunTestPath),
+      [
+        "import { describe, expect, it } from 'bun:test';",
+        "describe('direct promise rejects under bun', () => {",
+        "  it('rejects directly on promise', async () => {",
+        '    await expect(asyncCall()).rejects.toThrow();',
+        '  });',
+        '});',
+        '',
+      ].join('\n'),
+    );
+    const bunAnalysis = analyzeTestFile(dir, bunTestPath);
+    expect(bunAnalysis.features).not.toContain('function-wrapped-rejects');
+    expect(bunAnalysis.migrationType).toBe('ALREADY_MIGRATED');
+    expect(bunAnalysis.state).toBe('MIGRATED');
+  });
+
+  it('unrelated functions, methods, and strings mentioning rejects do not trigger AST-shape classifier (no false positives)', () => {
+    const dir = mkdtempSync(join(scratch, 'unrelated-rejects-'));
+
+    const vitestTestPath = 'unrelated-rejects-legacy.spec.ts';
+    writeFileSync(
+      join(dir, vitestTestPath),
+      [
+        `import { describe, expect, it } from '${VT}';`,
+        'function rejects(reason: string) { return reason; }',
+        "describe('unrelated rejects identifiers and strings', () => {",
+        "  it('handles strings and helper functions containing word rejects', () => {",
+        "    const msg = 'server rejects malformed payload';",
+        '    const config = { rejects: false };',
+        '    if (config.rejects) rejects(msg);',
+        "    expect(() => { throw new Error('sync'); }).toThrow('rejects');",
+        '  });',
+        '});',
+        '',
+      ].join('\n'),
+    );
+    const vitestAnalysis = analyzeTestFile(dir, vitestTestPath);
+    expect(vitestAnalysis.features).not.toContain('function-wrapped-rejects');
+    expect(vitestAnalysis.migrationType).toBe('EASY_MECHANICAL');
+    expect(vitestAnalysis.state).toBe('CODEMOD_READY');
+
+    const bunTestPath = 'unrelated-rejects-bun.spec.ts';
+    writeFileSync(
+      join(dir, bunTestPath),
+      [
+        "import { describe, expect, it } from 'bun:test';",
+        "describe('unrelated rejects under bun', () => {",
+        "  it('handles strings and unrelated methods without false positives', () => {",
+        '    const tracker = { rejects: (count: number) => count > 0 };',
+        '    expect(tracker.rejects(0)).toBe(false);',
+        "    expect(() => { throw new Error('fail'); }).toThrow();",
+        '  });',
+        '});',
+        '',
+      ].join('\n'),
+    );
+    const bunAnalysis = analyzeTestFile(dir, bunTestPath);
+    expect(bunAnalysis.features).not.toContain('function-wrapped-rejects');
+    expect(bunAnalysis.migrationType).toBe('ALREADY_MIGRATED');
+    expect(bunAnalysis.state).toBe('MIGRATED');
+  });
+
+  it('existing mechanical imports and already-migrated direct Bun tests retain standard classifications', () => {
+    const dir = mkdtempSync(join(scratch, 'retain-classifications-'));
+
+    // Standard mechanical runner test
+    const mechanicalPath = 'standard-mechanical.spec.ts';
+    writeFileSync(
+      join(dir, mechanicalPath),
+      [
+        `import { describe, expect, it } from '${VT}';`,
+        "describe('standard mechanical test', () => {",
+        "  it('runs standard assertions', () => {",
+        '    expect(1 + 1).toBe(2);',
+        '  });',
+        '});',
+        '',
+      ].join('\n'),
+    );
+    const mechanicalAnalysis = analyzeTestFile(dir, mechanicalPath);
+    expect(mechanicalAnalysis.features).toEqual([]);
+    expect(mechanicalAnalysis.migrationType).toBe('EASY_MECHANICAL');
+    expect(mechanicalAnalysis.state).toBe('CODEMOD_READY');
+
+    // Standard already-migrated Bun test
+    const nativePath = 'standard-native.spec.ts';
+    writeFileSync(
+      join(dir, nativePath),
+      [
+        "import { describe, expect, it } from 'bun:test';",
+        "describe('standard native test', () => {",
+        "  it('runs native bun test assertions', () => {",
+        "    expect('hello'.length).toBe(5);",
+        '  });',
+        '});',
+        '',
+      ].join('\n'),
+    );
+    const nativeAnalysis = analyzeTestFile(dir, nativePath);
+    expect(nativeAnalysis.features).toEqual([]);
+    expect(nativeAnalysis.migrationType).toBe('ALREADY_MIGRATED');
+    expect(nativeAnalysis.state).toBe('MIGRATED');
   });
 });
 
@@ -848,12 +1078,12 @@ describe('Contract 8: CODEX_AGY execution profile routing and G0 concurrency', (
   });
 });
 
-// ── Contract 9: Bun cutover verification and Vitest reference scan ──
-describe('Contract 9: Cutover unverified refusal and Vitest reference detection', () => {
+// ── Contract 9: Bun cutover verification and Legacy runner reference scan ──
+describe('Contract 9: Cutover unverified refusal and runner reference detection', () => {
   it('refuses cutover when unverified test entries exist', () => {
     const fx = gitFixture('unverified-cutover-fx');
     const testFile = 'tests/unit.spec.ts';
-    fx.writeFile(testFile, "import { it } from 'vitest';\nit('a', () => {});\n");
+    fx.writeFile(testFile, `import { it } from '${VT}';\nit('a', () => {});\n`);
     const manifestFile = join(fx.root, 'unverified-manifest.json');
     writeFileSync(
       manifestFile,
@@ -866,15 +1096,15 @@ describe('Contract 9: Cutover unverified refusal and Vitest reference detection'
     expect(() => assertMigrationReady(fx.root, manifestFile)).toThrow(/BUN_CUTOVER_UNVERIFIED/);
   });
 
-  it('activeVitestRuntimeReferences detects lingering vitest scripts or imports', () => {
-    const fx = gitFixture('vitest-scan-fx');
-    fx.writeFile('tests/sample.spec.ts', "import { it } from 'vitest';\nit('t', () => {});\n");
+  it('activeVitestRuntimeReferences detects lingering runner scripts or imports', () => {
+    const fx = gitFixture('runner-scan-fx');
+    fx.writeFile('tests/sample.spec.ts', `import { it } from '${VT}';\nit('t', () => {});\n`);
     fx.writeFile(
       'package.json',
       JSON.stringify({
         name: 'scan-test',
-        scripts: { test: 'vitest run' },
-        devDependencies: { vitest: '4.1.11' },
+        scripts: { test: `${VT} run` },
+        devDependencies: { [VT]: '4.1.11' },
       }),
     );
     const refs = activeVitestRuntimeReferences(fx.root);

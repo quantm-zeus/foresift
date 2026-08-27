@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it } from 'bun:test';
 import { execFileSync } from 'node:child_process';
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -8,7 +8,7 @@ import { fileURLToPath } from 'node:url';
 const REPO_ROOT = join(fileURLToPath(new URL('../..', import.meta.url)));
 
 // Dynamic loaders for modules concurrently authored in the Codex lane.
-// Dynamic imports allow Vitest to execute each Matrix case individually,
+// Dynamic imports allow Bun Test to execute each Matrix case individually,
 // failing cleanly with module resolution errors until the production files are landed.
 async function loadExecutionProfileModule() {
   return (await import('../../scripts/automation/execution-profile.mjs')) as typeof import('../../scripts/automation/execution-profile.mjs') & {

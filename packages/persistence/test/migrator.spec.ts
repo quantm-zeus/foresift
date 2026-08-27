@@ -23,7 +23,7 @@ const MIGRATIONS_DIR = path.resolve(
 
 /**
  * Sandbox dirs are namespaced PER PROCESS: the full suite legitimately runs
- * twice concurrently (outer vitest run + the nested gate e2e child), and
+ * twice concurrently (outer bun test run + the nested gate e2e child), and
  * fixed-path scratch dirs made the two instances trample each other's
  * migration-refusal fixtures.
  */

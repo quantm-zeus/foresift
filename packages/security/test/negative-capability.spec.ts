@@ -4,7 +4,7 @@
 import { readFileSync, readdirSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'bun:test';
 import { NegativeCapabilityCanary, loadCanaryCatalog } from '../src/negative-capability.ts';
 import { validateDecoderAuthority } from '../src/decoder-authority.ts';
 import {
@@ -86,7 +86,7 @@ describe('CLI ↔ canary fixture parity (AC-255)', () => {
       path.join(REPO_ROOT, 'scripts/scan-prohibited-capabilities/cli.mjs')
     );
     const report = runScan({ root: FIXTURES_DIR });
-    const cliKeys = new Set(
+    const cliKeys = new Set<string>(
       report.findings
         .filter((f: { surface: string }) => f.surface === 'SOURCE_SCAN')
         .map(

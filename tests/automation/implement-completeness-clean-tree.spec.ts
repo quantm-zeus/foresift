@@ -2,7 +2,7 @@ import { execFileSync } from 'node:child_process';
 import { mkdirSync, mkdtempSync, appendFileSync, writeFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { describe, expect, it, afterEach } from 'vitest';
+import { describe, expect, it, afterEach } from 'bun:test';
 import { implementationComplete } from '../../scripts/automation/package-implement-complete.mjs';
 
 // Regression coverage for defect #9 (live run 8061381a, 2026-08-24): the

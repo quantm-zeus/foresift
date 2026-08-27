@@ -2,7 +2,7 @@
 // affected scope with a durable reason linked to an incident; automatic
 // reactivation is machine-refused; resume requires explicit audited
 // approval and lands a re-evaluation ledger event.
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 import { PGlite } from '@electric-sql/pglite';
 import {
   applyMigrations,

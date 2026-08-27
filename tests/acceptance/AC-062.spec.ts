@@ -10,7 +10,7 @@
  * the configured tier with an injected clock — WITHIN_TIER, no incident.
  */
 import { PGlite } from '@electric-sql/pglite';
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 import { fixedClock, utcTimestamp, type RecoveryTierId, type UtcTimestamp } from '@foresift/domain';
 import {
   appendObservation,

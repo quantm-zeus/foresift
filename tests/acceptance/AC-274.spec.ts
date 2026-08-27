@@ -3,7 +3,7 @@
 // idempotency key, reason — is ADMITTED and the decision lands in the audit
 // chain. Admin-UI wiring is a non-goal owned elsewhere.
 import { createHash } from 'node:crypto';
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 import { PGlite } from '@electric-sql/pglite';
 import type { ObjectStoreAdapter, PutObjectRequest, StoredObject } from '@foresift/object-store';
 import {

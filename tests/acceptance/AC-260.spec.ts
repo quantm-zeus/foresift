@@ -13,7 +13,7 @@
  * inside each tier — so opportunity mode stays unblocked.
  */
 import { PGlite } from '@electric-sql/pglite';
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 import {
   AcquisitionState,
   fixedClock,

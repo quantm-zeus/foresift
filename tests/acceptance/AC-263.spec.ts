@@ -16,7 +16,7 @@
  * discontinuity works ONLY because the gap was explicitly recovered.
  */
 import { PGlite } from '@electric-sql/pglite';
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 import { ErrorCode, utcTimestamp, type UtcTimestamp } from '@foresift/domain';
 import {
   applyMigrations,

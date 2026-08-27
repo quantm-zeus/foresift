@@ -1,7 +1,7 @@
 // Incident lifecycle over sec.security_incidents (T110): severity taxonomy,
 // monotone containment, evidence preservation, resolution evidence duties,
 // and the §35.9 open-audit-failure query that gates high-impact activation.
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 import { PGlite } from '@electric-sql/pglite';
 import {
   applyMigrations,

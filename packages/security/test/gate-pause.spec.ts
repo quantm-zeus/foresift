@@ -2,7 +2,7 @@
 // pauses, machine-checked auto-reactivation refusal, explicit audited resume,
 // append-only rollback ledger with immutable snapshots and re-evaluation
 // markers.
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 import { PGlite } from '@electric-sql/pglite';
 import {
   applyMigrations,

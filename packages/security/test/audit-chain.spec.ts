@@ -3,7 +3,7 @@
 // (migrations applied) so classifications never cross-contaminate; tampering
 // simulates an attacker WITH DDL privileges (trigger dropped and restored),
 // proving detection survives even owner-level mutation.
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'bun:test';
 import { createHash } from 'node:crypto';
 import { PGlite } from '@electric-sql/pglite';
 import type { ObjectStoreAdapter, PutObjectRequest, StoredObject } from '@foresift/object-store';

@@ -6,11 +6,13 @@ function sh(cmd, args) {
   return execFileSync(cmd, args, { encoding: 'utf8' }).trim();
 }
 
-export function auditGitHubProtection({ repo = DEFAULT_REPO, branch = 'main' } = {}) {
+export function auditGitHubProtection({ repo = DEFAULT_REPO, branch = 'main', ghFn = null } = {}) {
   let protection;
   try {
-    const raw = sh('gh', ['api', `repos/${repo}/branches/${branch}/protection`]);
-    protection = JSON.parse(raw);
+    const raw = ghFn
+      ? ghFn(['api', `repos/${repo}/branches/${branch}/protection`]).stdout
+      : sh('gh', ['api', `repos/${repo}/branches/${branch}/protection`]);
+    protection = typeof raw === 'string' ? JSON.parse(raw) : raw;
   } catch (error) {
     return {
       ok: false,

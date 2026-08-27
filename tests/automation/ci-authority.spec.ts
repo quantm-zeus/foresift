@@ -432,13 +432,50 @@ $ prettier --check .
     });
 
     it('auditGitHubProtection verifies required check, enforce_admins, and app id', () => {
-      const audit = auditGitHubProtection();
+      const mockGh = () => ({
+        ok: true,
+        stdout: JSON.stringify({
+          enforce_admins: { enabled: true },
+          required_status_checks: {
+            strict: true,
+            checks: [
+              {
+                context: DEFAULT_REQUIRED_CHECK,
+                app_id: DEFAULT_REQUIRED_APP_ID,
+              },
+            ],
+          },
+        }),
+      });
+      const audit = auditGitHubProtection({ ghFn: mockGh });
       expect(audit.ok).toBe(true);
       expect(audit.enforceAdmins).toBe(true);
       expect(audit.strictChecks).toBe(true);
       expect(audit.checkFound).toBe(true);
       expect(audit.appIdMatches).toBe(true);
       expect(audit.expectedAppId).toBe(15368);
+    });
+
+    it('auditGitHubProtection detects missing enforce_admins or wrong app id', () => {
+      const mockGh = () => ({
+        ok: true,
+        stdout: JSON.stringify({
+          enforce_admins: { enabled: false },
+          required_status_checks: {
+            strict: false,
+            checks: [
+              {
+                context: DEFAULT_REQUIRED_CHECK,
+                app_id: 99999,
+              },
+            ],
+          },
+        }),
+      });
+      const audit = auditGitHubProtection({ ghFn: mockGh });
+      expect(audit.ok).toBe(false);
+      expect(audit.enforceAdmins).toBe(false);
+      expect(audit.appIdMatches).toBe(false);
     });
   });
 });

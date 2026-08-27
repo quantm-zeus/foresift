@@ -16,4 +16,8 @@ export interface GitHubProtectionAuditResult {
 export function auditGitHubProtection(opts?: {
   repo?: string;
   branch?: string;
+  ghFn?: (
+    args: string[],
+    opts?: { cwd?: string },
+  ) => { ok: boolean; stdout: string; stderr?: string; status?: number };
 }): GitHubProtectionAuditResult;

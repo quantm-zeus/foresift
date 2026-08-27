@@ -4,7 +4,7 @@
  * fields, request fields, content types, redirect policy, response bytes,
  * response schema, and the egress layer beneath it all.
  */
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'bun:test';
 import { readFileSync } from 'node:fs';
 import { z } from 'zod';
 import {

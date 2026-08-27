@@ -2,7 +2,7 @@
 // with no restore origin (SQL CHECK), refuses ANY UPDATE or DELETE on
 // recorded history (append-only trigger), and stamps every rollback/resume
 // with a pending re-evaluation marker that must be consumed before alerting.
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 import { PGlite } from '@electric-sql/pglite';
 import {
   applyMigrations,

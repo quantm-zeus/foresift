@@ -3,7 +3,7 @@
 // stale, or class-insufficient; CSRF pair broken; idempotency key missing;
 // reason missing; scope mismatch; audit health blocked.
 import { createHash } from 'node:crypto';
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 import { PGlite } from '@electric-sql/pglite';
 import type { ObjectStoreAdapter, PutObjectRequest, StoredObject } from '@foresift/object-store';
 import {

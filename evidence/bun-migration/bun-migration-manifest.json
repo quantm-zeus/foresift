@@ -1,14 +1,14 @@
 {
   "schema": "foresift/bun-migration-manifest@1",
   "migrationId": "bun-test-authority-v1",
-  "generatedAt": "2026-08-27T01:51:28.998Z",
+  "generatedAt": "2026-08-27T01:52:20.255Z",
   "root": ".",
   "totalTestFiles": 219,
   "counts": {
-    "CODEMOD_READY": 26,
+    "CODEMOD_READY": 20,
     "AGY_REQUIRED": 17,
     "MIGRATED": 78,
-    "VERIFIED": 98,
+    "VERIFIED": 104,
     "BLOCKED": 0
   },
   "parity": {
@@ -4786,26 +4786,21 @@
     {
       "path": "tests/negative/AC-060.negative.spec.ts",
       "package": "negative",
-      "bytes": 4718,
+      "bytes": 4720,
       "lines": 129,
-      "sha256": "5fee1a3e1734ab2db1535836f0937fe1606d7a0c6aae0ebdf88b44d9020dbabe",
+      "sha256": "7ab899dd3c7f37f94a7be48f40f208ea2b68d027e1bc258e1a3ab44636389d5a",
       "imports": [
         "node:perf_hooks",
         "@electric-sql/pglite",
-        "vitest",
+        "bun:test",
         "@foresift/domain",
         "@foresift/persistence",
         "../acceptance/helpers.ts"
       ],
-      "vitestImports": [
-        "afterAll",
-        "describe",
-        "expect",
-        "it"
-      ],
+      "vitestImports": [],
       "features": [],
       "workload": "DATABASE_PGLITE",
-      "migrationType": "EASY_MECHANICAL",
+      "migrationType": "ALREADY_MIGRATED",
       "fixturesAndHelpers": [
         "../acceptance/helpers.ts"
       ],
@@ -4815,7 +4810,7 @@
         "@foresift/persistence",
         "../acceptance/helpers.ts"
       ],
-      "state": "CODEMOD_READY"
+      "state": "VERIFIED"
     },
     {
       "path": "tests/negative/AC-061.negative.spec.ts",
@@ -4852,26 +4847,20 @@
     {
       "path": "tests/negative/AC-062.negative.spec.ts",
       "package": "negative",
-      "bytes": 5096,
+      "bytes": 5098,
       "lines": 138,
-      "sha256": "95fff2c83e855155398d1161514c2d42166493fb971bf09258b79c09d46fdacd",
+      "sha256": "8e4f316fe96b96d994358282c15697b615695d14a92056b9acebdef9ef55c690",
       "imports": [
         "@electric-sql/pglite",
-        "vitest",
+        "bun:test",
         "@foresift/domain",
         "@foresift/persistence",
         "../acceptance/helpers.ts"
       ],
-      "vitestImports": [
-        "afterAll",
-        "beforeAll",
-        "describe",
-        "expect",
-        "it"
-      ],
+      "vitestImports": [],
       "features": [],
       "workload": "DATABASE_PGLITE",
-      "migrationType": "EASY_MECHANICAL",
+      "migrationType": "ALREADY_MIGRATED",
       "fixturesAndHelpers": [
         "../acceptance/helpers.ts"
       ],
@@ -4881,7 +4870,7 @@
         "@foresift/persistence",
         "../acceptance/helpers.ts"
       ],
-      "state": "CODEMOD_READY"
+      "state": "VERIFIED"
     },
     {
       "path": "tests/negative/AC-240.negative.spec.ts",
@@ -5418,27 +5407,21 @@
     {
       "path": "tests/negative/AC-260.negative.spec.ts",
       "package": "negative",
-      "bytes": 5255,
+      "bytes": 5257,
       "lines": 154,
-      "sha256": "6dd6930fd9dbe45f803facb985a54bb7c1c8cd42d307d5404942491cd4aa5b2c",
+      "sha256": "d92ce90509d80f401f945ca4c09a57e84275d8e6f756fd3bbc3930fb6d2f5d91",
       "imports": [
         "node:fs",
         "@electric-sql/pglite",
-        "vitest",
+        "bun:test",
         "@foresift/domain",
         "@foresift/persistence",
         "../acceptance/helpers.ts"
       ],
-      "vitestImports": [
-        "afterAll",
-        "beforeAll",
-        "describe",
-        "expect",
-        "it"
-      ],
+      "vitestImports": [],
       "features": [],
       "workload": "DATABASE_PGLITE",
-      "migrationType": "EASY_MECHANICAL",
+      "migrationType": "ALREADY_MIGRATED",
       "fixturesAndHelpers": [
         "../acceptance/helpers.ts"
       ],
@@ -5448,7 +5431,7 @@
         "@foresift/persistence",
         "../acceptance/helpers.ts"
       ],
-      "state": "CODEMOD_READY"
+      "state": "VERIFIED"
     },
     {
       "path": "tests/negative/AC-261.negative.spec.ts",
@@ -5722,12 +5705,12 @@
     {
       "path": "tests/negative/AC-274.negative.spec.ts",
       "package": "negative",
-      "bytes": 6628,
+      "bytes": 6630,
       "lines": 195,
-      "sha256": "2f7a9ceda6764677633791d4833024bb3084e3785d77332ab9b02f1ecf23015e",
+      "sha256": "6311481869d6e6c015b6f64bb972f7da00d819c7a5f9a3593fec58e474393835",
       "imports": [
         "node:crypto",
-        "vitest",
+        "bun:test",
         "@electric-sql/pglite",
         "@foresift/object-store",
         "@foresift/persistence",
@@ -5738,16 +5721,10 @@
         "../../packages/security/src/incidents.ts",
         "@foresift/shared-schemas"
       ],
-      "vitestImports": [
-        "afterAll",
-        "beforeAll",
-        "describe",
-        "expect",
-        "it"
-      ],
+      "vitestImports": [],
       "features": [],
       "workload": "DATABASE_PGLITE",
-      "migrationType": "EASY_MECHANICAL",
+      "migrationType": "ALREADY_MIGRATED",
       "fixturesAndHelpers": [],
       "sourceAnchors": [
         "@electric-sql/pglite",
@@ -5758,7 +5735,7 @@
         "../../packages/security/src/incidents.ts",
         "@foresift/shared-schemas"
       ],
-      "state": "CODEMOD_READY"
+      "state": "VERIFIED"
     },
     {
       "path": "tests/negative/AC-275.negative.spec.ts",
@@ -5840,11 +5817,11 @@
     {
       "path": "tests/negative/AC-278.negative.spec.ts",
       "package": "negative",
-      "bytes": 3754,
+      "bytes": 3756,
       "lines": 110,
-      "sha256": "c13ebdd7924c6d6f4803bb913a4f672e41b6d0f158e3d24153e411ca4e8228d5",
+      "sha256": "6a9caa1bcfdd681b46592848e0ed6f11f0c522b12f4f498b96bf5fd90883782d",
       "imports": [
-        "vitest",
+        "bun:test",
         "@electric-sql/pglite",
         "@foresift/persistence",
         "node:path",
@@ -5852,16 +5829,10 @@
         "../../packages/security/src/incidents.ts",
         "../../packages/security/src/gate-pause.ts"
       ],
-      "vitestImports": [
-        "afterAll",
-        "beforeAll",
-        "describe",
-        "expect",
-        "it"
-      ],
+      "vitestImports": [],
       "features": [],
       "workload": "DATABASE_PGLITE",
-      "migrationType": "EASY_MECHANICAL",
+      "migrationType": "ALREADY_MIGRATED",
       "fixturesAndHelpers": [],
       "sourceAnchors": [
         "@electric-sql/pglite",
@@ -5869,16 +5840,16 @@
         "../../packages/security/src/incidents.ts",
         "../../packages/security/src/gate-pause.ts"
       ],
-      "state": "CODEMOD_READY"
+      "state": "VERIFIED"
     },
     {
       "path": "tests/negative/AC-279.negative.spec.ts",
       "package": "negative",
-      "bytes": 4731,
+      "bytes": 4733,
       "lines": 135,
-      "sha256": "60183c82ef18558169d085fc0a81de83d8c272fd6e3b5abf59bb2e9185484876",
+      "sha256": "1c03231086e0767c94a749262e1321f9c668d63a9231301899b92a6dfab89799",
       "imports": [
-        "vitest",
+        "bun:test",
         "@electric-sql/pglite",
         "@foresift/persistence",
         "node:path",
@@ -5886,16 +5857,10 @@
         "../../packages/security/src/incidents.ts",
         "../../packages/security/src/gate-pause.ts"
       ],
-      "vitestImports": [
-        "afterAll",
-        "beforeAll",
-        "describe",
-        "expect",
-        "it"
-      ],
+      "vitestImports": [],
       "features": [],
       "workload": "DATABASE_PGLITE",
-      "migrationType": "EASY_MECHANICAL",
+      "migrationType": "ALREADY_MIGRATED",
       "fixturesAndHelpers": [],
       "sourceAnchors": [
         "@electric-sql/pglite",
@@ -5903,7 +5868,7 @@
         "../../packages/security/src/incidents.ts",
         "../../packages/security/src/gate-pause.ts"
       ],
-      "state": "CODEMOD_READY"
+      "state": "VERIFIED"
     },
     {
       "path": "tests/spec-verify.spec.ts",
@@ -7985,7 +7950,8 @@
       },
       "codexCalls": 0,
       "claudeCalls": 0,
-      "testedHead": "6c063441766da060e1d72c45587ca1bb4d24f602"
+      "testedHead": "6c063441766da060e1d72c45587ca1bb4d24f602",
+      "checkpointHead": "69a3f9800e7ee60bac458c8915c1815bfa0caf8a"
     },
     {
       "id": "mechanical-negative-database-pglite-1",
@@ -7999,7 +7965,203 @@
         "tests/negative/AC-278.negative.spec.ts",
         "tests/negative/AC-279.negative.spec.ts"
       ],
-      "state": "PENDING"
+      "state": "VERIFIED",
+      "verification": {
+        "ok": true,
+        "wallTimeMs": 51139,
+        "peakRssBytes": 0,
+        "cpuSeconds": 0,
+        "counts": {
+          "passed": 21,
+          "failed": 0,
+          "skipped": 0
+        },
+        "results": [
+          {
+            "id": "pglite-1",
+            "workload": "DATABASE_PGLITE",
+            "files": [
+              "tests/negative/AC-060.negative.spec.ts"
+            ],
+            "fileWorkers": 1,
+            "testConcurrency": 1,
+            "command": [
+              "bun",
+              "test",
+              "--no-orphans",
+              "--isolate",
+              "--parallel=1",
+              "--max-concurrency=1",
+              "--timeout=30000",
+              "tests/negative/AC-060.negative.spec.ts"
+            ],
+            "status": 0,
+            "wallTimeMs": 32138,
+            "peakRssBytes": null,
+            "cpuSeconds": null,
+            "counts": {
+              "passed": 2,
+              "failed": 0,
+              "skipped": 0
+            },
+            "stdoutTail": "bun test v1.4.0 (34cbb9a40) 1x PARALLEL\n",
+            "stderrTail": "\ntests/negative/AC-060.negative.spec.ts:\n(pass) AC-060 negative: the harness fails under artificial over-budget delay > a delayed engine trips the identity budget the positive suite asserts [30111.06ms]\n(pass) AC-060 negative: the harness fails under artificial over-budget delay > a single call through the delay wrapper measurably exceeds the delay floor [1694.40ms]\n\n 2 pass\n 0 fail\n 4 expect() calls\nRan 2 tests across 1 file. [31.90s]\n"
+          },
+          {
+            "id": "pglite-2",
+            "workload": "DATABASE_PGLITE",
+            "files": [
+              "tests/negative/AC-062.negative.spec.ts"
+            ],
+            "fileWorkers": 1,
+            "testConcurrency": 1,
+            "command": [
+              "bun",
+              "test",
+              "--no-orphans",
+              "--isolate",
+              "--parallel=1",
+              "--max-concurrency=1",
+              "--timeout=30000",
+              "tests/negative/AC-062.negative.spec.ts"
+            ],
+            "status": 0,
+            "wallTimeMs": 5064,
+            "peakRssBytes": null,
+            "cpuSeconds": null,
+            "counts": {
+              "passed": 2,
+              "failed": 0,
+              "skipped": 0
+            },
+            "stdoutTail": "bun test v1.4.0 (34cbb9a40) 1x PARALLEL\n",
+            "stderrTail": "\ntests/negative/AC-062.negative.spec.ts:\n(pass) AC-062 negative: a missed tier is reported as a failure, never absorbed > an over-RTO restore yields MISSED_RTO with incident + degraded health [2032.98ms]\n(pass) AC-062 negative: a missed tier is reported as a failure, never absorbed > a missed measurement can never be recorded without an incident reference [0.38ms]\n\n 2 pass\n 0 fail\n 10 expect() calls\nRan 2 tests across 1 file. [4.89s]\n"
+          },
+          {
+            "id": "pglite-3",
+            "workload": "DATABASE_PGLITE",
+            "files": [
+              "tests/negative/AC-260.negative.spec.ts"
+            ],
+            "fileWorkers": 1,
+            "testConcurrency": 1,
+            "command": [
+              "bun",
+              "test",
+              "--no-orphans",
+              "--isolate",
+              "--parallel=1",
+              "--max-concurrency=1",
+              "--timeout=30000",
+              "tests/negative/AC-260.negative.spec.ts"
+            ],
+            "status": 0,
+            "wallTimeMs": 4927,
+            "peakRssBytes": null,
+            "cpuSeconds": null,
+            "counts": {
+              "passed": 2,
+              "failed": 0,
+              "skipped": 0
+            },
+            "stdoutTail": "bun test v1.4.0 (34cbb9a40) 1x PARALLEL\n",
+            "stderrTail": "\ntests/negative/AC-260.negative.spec.ts:\n(pass) AC-260 negative: missed tiers block opportunity mode and create incidents > an RPO miss on the observations tier creates an incident and blocks opportunity influence [1934.50ms]\n(pass) AC-260 negative: missed tiers block opportunity mode and create incidents > registering a tier looser than the product-law RPO ceiling is refused [17.37ms]\n\n 2 pass\n 0 fail\n 16 expect() calls\nRan 2 tests across 1 file. [4.76s]\n"
+          },
+          {
+            "id": "pglite-4",
+            "workload": "DATABASE_PGLITE",
+            "files": [
+              "tests/negative/AC-274.negative.spec.ts"
+            ],
+            "fileWorkers": 1,
+            "testConcurrency": 1,
+            "command": [
+              "bun",
+              "test",
+              "--no-orphans",
+              "--isolate",
+              "--parallel=1",
+              "--max-concurrency=1",
+              "--timeout=30000",
+              "tests/negative/AC-274.negative.spec.ts"
+            ],
+            "status": 0,
+            "wallTimeMs": 3008,
+            "peakRssBytes": null,
+            "cpuSeconds": null,
+            "counts": {
+              "passed": 8,
+              "failed": 0,
+              "skipped": 0
+            },
+            "stdoutTail": "bun test v1.4.0 (34cbb9a40) 1x PARALLEL\n",
+            "stderrTail": "\ntests/negative/AC-274.negative.spec.ts:\n(pass) AC-274 negatives: every missing dimension refuses with its typed reason > refuses STEP_UP_MISSING when no proof is presented [13.81ms]\n(pass) AC-274 negatives: every missing dimension refuses with its typed reason > refuses STEP_UP_STALE when the proof predates the freshness window [6.08ms]\n(pass) AC-274 negatives: every missing dimension refuses with its typed reason > refuses AUTHENTICATOR_CLASS_INSUFFICIENT for TOTP-only recovery proofs [5.26ms]\n(pass) AC-274 negatives: every missing dimension refuses with its typed reason > refuses CSRF_INVALID when submitted and session tokens disagree [4.89ms]\n(pass) AC-274 negatives: every missing dimension refuses with its typed reason > refuses IDEMPOTENCY_KEY_MISSING for an empty idempotency key [4.49ms]\n(pass) AC-274 negatives: every missing dimension refuses with its typed reason > refuses REASON_MISSING when no durable reason entry is supplied [4.63ms]\n(pass) AC-274 negatives: every missing dimension refuses with its typed reason > refuses SCOPE_MISMATCH when the action exceeds authorized scopes [4.84ms]\n(pass) AC-274 negatives: every missing dimension refuses with its typed reason > refuses AUDIT_HEALTH_BLOCKED while an open SEV1 audit-chain failure exists [9.53ms]\n\n 8 pass\n 0 fail\n 10 expect() calls\nRan 8 tests across 1 file. [2.92s]\n"
+          },
+          {
+            "id": "pglite-5",
+            "workload": "DATABASE_PGLITE",
+            "files": [
+              "tests/negative/AC-278.negative.spec.ts"
+            ],
+            "fileWorkers": 1,
+            "testConcurrency": 1,
+            "command": [
+              "bun",
+              "test",
+              "--no-orphans",
+              "--isolate",
+              "--parallel=1",
+              "--max-concurrency=1",
+              "--timeout=30000",
+              "tests/negative/AC-278.negative.spec.ts"
+            ],
+            "status": 0,
+            "wallTimeMs": 3063,
+            "peakRssBytes": null,
+            "cpuSeconds": null,
+            "counts": {
+              "passed": 4,
+              "failed": 0,
+              "skipped": 0
+            },
+            "stdoutTail": "bun test v1.4.0 (34cbb9a40) 1x PARALLEL\n",
+            "stderrTail": "\ntests/negative/AC-278.negative.spec.ts:\n(pass) AC-278 negatives: pauses only lift through audited explicit resumes > automatic reactivation throws its dedicated typed refusal [0.32ms]\n(pass) AC-278 negatives: pauses only lift through audited explicit resumes > resume with an empty audit reference refuses [8.69ms]\n(pass) AC-278 negatives: pauses only lift through audited explicit resumes > a second resume of the same pause refuses (already resumed) [5.86ms]\n(pass) AC-278 negatives: pauses only lift through audited explicit resumes > resuming an unknown pause id refuses [1.67ms]\n\n 4 pass\n 0 fail\n 7 expect() calls\nRan 4 tests across 1 file. [2.97s]\n"
+          },
+          {
+            "id": "pglite-6",
+            "workload": "DATABASE_PGLITE",
+            "files": [
+              "tests/negative/AC-279.negative.spec.ts"
+            ],
+            "fileWorkers": 1,
+            "testConcurrency": 1,
+            "command": [
+              "bun",
+              "test",
+              "--no-orphans",
+              "--isolate",
+              "--parallel=1",
+              "--max-concurrency=1",
+              "--timeout=30000",
+              "tests/negative/AC-279.negative.spec.ts"
+            ],
+            "status": 0,
+            "wallTimeMs": 2938,
+            "peakRssBytes": null,
+            "cpuSeconds": null,
+            "counts": {
+              "passed": 3,
+              "failed": 0,
+              "skipped": 0
+            },
+            "stdoutTail": "bun test v1.4.0 (34cbb9a40) 1x PARALLEL\n",
+            "stderrTail": "\ntests/negative/AC-279.negative.spec.ts:\n(pass) AC-279 negatives: history is append-only and re-evaluation gated > refuses a ROLLBACK_RESTORE event without a restore origin [15.31ms]\n(pass) AC-279 negatives: history is append-only and re-evaluation gated > refuses UPDATE and DELETE against recorded activation history [5.89ms]\n(pass) AC-279 negatives: history is append-only and re-evaluation gated > stamps rollbacks and resumes with a pending re-evaluation marker [12.16ms]\n\n 3 pass\n 0 fail\n 8 expect() calls\nRan 3 tests across 1 file. [2.84s]\n"
+          }
+        ]
+      },
+      "codexCalls": 0,
+      "claudeCalls": 0,
+      "testedHead": "69a3f9800e7ee60bac458c8915c1815bfa0caf8a"
     },
     {
       "id": "mechanical-negative-pure-1",

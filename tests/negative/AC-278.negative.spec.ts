@@ -1,7 +1,7 @@
 // AC-278 (negative): pause lifecycle refusals — automatic reactivation is
 // machine-refused, resume without an audit reference is refused, resuming an
 // already-resumed or unknown pause refuses.
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 import { PGlite } from '@electric-sql/pglite';
 import {
   applyMigrations,

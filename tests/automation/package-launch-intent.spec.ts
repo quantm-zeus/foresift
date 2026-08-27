@@ -70,11 +70,15 @@ describe('Package Launch Intent Matrix (§20)', () => {
     expect(intent.status).toBe('INTENT_DURABLE');
 
     // Mock Archon runs query function returning existing run
+    // F7 fix: strong matching requires user_message, working_path, and bounded time
     const fakeArchonRuns = [
       {
         id: 'archon-run-123',
         workflow_name: 'foresift-package-planning-bootstrap',
         status: 'running',
+        user_message: 'g0-cost-capacity',
+        working_path: '/path/task-foresift-g0-cost-capacity',
+        started_at: new Date().toISOString(),
       },
     ];
 

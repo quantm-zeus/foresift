@@ -14,15 +14,7 @@ import { execFileSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
-export const ALLOWED_STATUS_TRANSITIONS = new Set([
-  'PENDING->RUNNING',
-  'RUNNING->PROVEN',
-  'RUNNING->PENDING',
-  'PROVEN->RUNNING',
-  'PENDING->PROVEN',
-]);
-
-const ALLOWED_STATUSES = new Set(['PENDING', 'RUNNING', 'PROVEN']);
+import { ALLOWED_STATUS_TRANSITIONS } from './schema.mjs';
 
 function sh(args, { cwd } = {}) {
   try {
@@ -50,96 +42,90 @@ export function compareMilestoneJsonSemantic(before, after) {
     return { ok: false, reason: 'missing milestone JSON object' };
   }
 
-  if (before.milestoneId !== after.milestoneId) {
-    return {
-      ok: false,
-      reason: `milestoneId changed from '${before.milestoneId}' to '${after.milestoneId}'`,
-    };
+  function getDiffs(b, a, path = '') {
+    if (b === a) return [];
+    if (Array.isArray(b) && Array.isArray(a)) {
+      if (b.length !== a.length) {
+        return [{ path, type: 'length', before: b.length, after: a.length }];
+      }
+      let diffs = [];
+      for (let i = 0; i < b.length; i++) {
+        diffs.push(...getDiffs(b[i], a[i], `${path}/${i}`));
+      }
+      return diffs;
+    }
+    if (b && a && typeof b === 'object' && typeof a === 'object') {
+      let diffs = [];
+      const keys = new Set([...Object.keys(b), ...Object.keys(a)]);
+      for (const k of keys) {
+        if (!(k in b)) diffs.push({ path: `${path}/${k}`, type: 'added', after: a[k] });
+        else if (!(k in a)) diffs.push({ path: `${path}/${k}`, type: 'removed', before: b[k] });
+        else diffs.push(...getDiffs(b[k], a[k], `${path}/${k}`));
+      }
+      return diffs;
+    }
+    return [{ path, type: 'changed', before: b, after: a }];
   }
 
-  const beforePkgs = before.packages ?? [];
-  const afterPkgs = after.packages ?? [];
+  const diffs = getDiffs(before, after);
 
-  if (beforePkgs.length !== afterPkgs.length) {
-    return {
-      ok: false,
-      reason: `package count changed (${beforePkgs.length} vs ${afterPkgs.length})`,
-    };
+  if (diffs.length === 0) {
+    return { ok: false, reason: 'empty diff (no changes)' };
   }
 
   const changes = [];
 
-  for (let i = 0; i < beforePkgs.length; i++) {
-    const bp = beforePkgs[i];
-    const ap = afterPkgs[i];
+  for (const diff of diffs) {
+    const p = diff.path;
+    const packageStatusMatch = p.match(/^\/packages\/(\d+)\/status$/);
+    const packageGenMatch = p.match(/^\/packages\/(\d+)\/generation$/);
 
-    if (bp.id !== ap.id) {
-      return { ok: false, reason: `package[${i}].id changed ('${bp.id}' vs '${ap.id}')` };
+    if (p === '/packages') {
+      return { ok: false, reason: 'package addition/removal (length change)' };
     }
 
-    if (bp.objective !== ap.objective) {
-      return { ok: false, reason: `package '${bp.id}' objective modified` };
-    }
+    if (packageStatusMatch) {
+      const idx = packageStatusMatch[1];
+      const pkgBefore = before.packages[idx];
+      const pkgAfter = after.packages[idx];
 
-    const bReqs = JSON.stringify([...(bp.requirementIds ?? [])].sort());
-    const aReqs = JSON.stringify([...(ap.requirementIds ?? [])].sort());
-    if (bReqs !== aReqs) {
-      return { ok: false, reason: `package '${bp.id}' requirementIds modified` };
-    }
-
-    const bDeps = JSON.stringify([...(bp.dependencies ?? [])].sort());
-    const aDeps = JSON.stringify([...(ap.dependencies ?? [])].sort());
-    if (bDeps !== aDeps) {
-      return { ok: false, reason: `package '${bp.id}' dependencies modified` };
-    }
-
-    if (bp.risk !== ap.risk) {
-      return { ok: false, reason: `package '${bp.id}' risk modified` };
-    }
-
-    if (bp.parallelizable !== ap.parallelizable) {
-      return { ok: false, reason: `package '${bp.id}' parallelizable modified` };
-    }
-
-    const bScopes = JSON.stringify([...(bp.writeScopes ?? [])].sort());
-    const aScopes = JSON.stringify([...(ap.writeScopes ?? [])].sort());
-    if (bScopes !== aScopes) {
-      return { ok: false, reason: `package '${bp.id}' writeScopes modified` };
-    }
-
-    const bCmds = JSON.stringify(bp.verificationCommands ?? []);
-    const aCmds = JSON.stringify(ap.verificationCommands ?? []);
-    if (bCmds !== aCmds) {
-      return { ok: false, reason: `package '${bp.id}' verificationCommands modified` };
-    }
-
-    // Check status transition
-    if (bp.status !== ap.status) {
-      if (!ALLOWED_STATUSES.has(ap.status)) {
-        return { ok: false, reason: `package '${bp.id}' invalid target status '${ap.status}'` };
-      }
-      const transitionKey = `${bp.status}->${ap.status}`;
+      const transitionKey = `${pkgBefore.status}->${pkgAfter.status}`;
       if (!ALLOWED_STATUS_TRANSITIONS.has(transitionKey)) {
         return {
           ok: false,
-          reason: `package '${bp.id}' disallowed status transition: ${transitionKey}`,
+          reason: `package '${pkgBefore?.id || idx}' disallowed status transition: ${transitionKey}`,
         };
       }
-      changes.push({ packageId: bp.id, field: 'status', from: bp.status, to: ap.status });
-    }
+      changes.push({
+        packageId: pkgBefore.id,
+        field: 'status',
+        from: pkgBefore.status,
+        to: pkgAfter.status,
+      });
+    } else if (packageGenMatch) {
+      const idx = packageGenMatch[1];
+      const pkgBefore = before.packages[idx];
+      const pkgAfter = after.packages[idx];
 
-    // Check generation
-    if (bp.generation !== ap.generation) {
-      if (typeof ap.generation !== 'number' && ap.generation !== undefined) {
-        return { ok: false, reason: `package '${bp.id}' invalid generation '${ap.generation}'` };
+      if (typeof pkgAfter.generation !== 'number' && pkgAfter.generation !== undefined) {
+        return {
+          ok: false,
+          reason: `package '${pkgBefore?.id || idx}' invalid generation '${pkgAfter.generation}'`,
+        };
       }
       changes.push({
-        packageId: bp.id,
+        packageId: pkgBefore.id,
         field: 'generation',
-        from: bp.generation,
-        to: ap.generation,
+        from: pkgBefore.generation,
+        to: pkgAfter.generation,
       });
+    } else {
+      return { ok: false, reason: `disallowed pointer change: ${p}` };
     }
+  }
+
+  if (changes.length === 0) {
+    return { ok: false, reason: 'no valid semantic changes found' };
   }
 
   return { ok: true, changes };

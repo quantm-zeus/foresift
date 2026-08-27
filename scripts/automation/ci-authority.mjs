@@ -571,6 +571,18 @@ export function selectCiRepairRoute({
       };
     }
 
+    // If PR changed files unavailable, always TEST_DISPUTE for TESTS failures
+    if (prChangedFiles.length === 0) {
+      return {
+        route: 'TEST_DISPUTE',
+        engine: 'NONE',
+        role: 'dispute',
+        action: 'TRIAGE_TEST_DISPUTE',
+        reason: 'PR changed-file evidence unavailable — routed to TEST_DISPUTE',
+        needsAi: true,
+      };
+    }
+
     // If PR changed files unknown / not provided, check diagnostics
     if (diagHasProduct) {
       if (executionProfile === 'CODEX_AGY') {
@@ -689,6 +701,10 @@ export function triageTestDispute({ disputeAssessment } = {}) {
  */
 export function captureCiIncident({
   sha,
+  headSha = null,
+  prNumber = null,
+  baseSha = null,
+  prChangedFiles = [],
   repo = DEFAULT_REPO,
   checkName = DEFAULT_REQUIRED_CHECK,
   requiredAppId = DEFAULT_REQUIRED_APP_ID,
@@ -701,8 +717,9 @@ export function captureCiIncident({
   cwd = process.cwd(),
   ghFn = defaultGh,
 } = {}) {
+  const actualSha = sha || headSha;
   const verdict = getExactHeadCiStatus({
-    sha,
+    sha: actualSha,
     repo,
     checkName,
     requiredAppId,
@@ -720,7 +737,7 @@ export function captureCiIncident({
   // This ensures different checks on the same SHA get different capsules,
   // and prevents any deduplication key collision across check authorities.
   const checkSlug = checkName.replace(/[^a-zA-Z0-9_-]/g, '_');
-  const incidentKey = `ci-failure-${sha}-${checkSlug}-${requiredAppId}`;
+  const incidentKey = `ci-failure-${actualSha}-${checkSlug}-${requiredAppId}`;
   const filePath = join(incidentsDir, `${incidentKey}.json`);
 
   // Deduplication: if an incident capsule for this exact (SHA, check, appId) already exists, return it
@@ -738,7 +755,7 @@ export function captureCiIncident({
 
   if (!runId) {
     const runsRes = ghFn(
-      ['run', 'list', '--commit', sha, '--json', 'databaseId,url,conclusion,status'],
+      ['run', 'list', '--commit', actualSha, '--json', 'databaseId,url,conclusion,status'],
       { cwd },
     );
     if (runsRes.ok) {
@@ -764,21 +781,25 @@ export function captureCiIncident({
     classification,
     executionProfile,
     failedFiles: classification.failedFiles,
+    prChangedFiles,
     attempts,
   });
 
   // eventId includes SHA + check name + app id for strong identity
-  const eventId = `CI_FAILURE/${sha}/${checkSlug}/${requiredAppId}`;
+  const eventId = `CI_FAILURE/${actualSha}/${checkSlug}/${requiredAppId}`;
 
   const capsule = {
     schema: 'foresift/ci-failure-incident@1',
     eventId,
     package: packageId,
+    prNumber,
+    baseSha,
+    prChangedFiles,
     runId,
     runUrl,
     workflow,
     executionProfile,
-    sha,
+    sha: actualSha,
     repo,
     checkName,
     requiredAppId,

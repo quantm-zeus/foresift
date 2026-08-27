@@ -11,10 +11,45 @@ import { createFakeGh } from '../helpers/state-landing-fixture.js';
 import {
   advanceStateTransition,
   discoverPendingReceipts,
-  landStateViaPR,
   recoverPendingStateLandings,
   STATE_TRANSITIONS_DIR_NAME,
+  RECEIPT_STATUSES,
 } from '../../scripts/automation/state-landing.mjs';
+
+// Test-only compatibility shim: wraps advanceStateTransition in a loop for existing tests.
+// Production code MUST NOT use this — the real supervisor uses step-driven tick outbox.
+function landStateViaPR(opts: Record<string, unknown>) {
+  const maxIterations = 15;
+  const deadlineMs = typeof opts.deadlineMs === 'number' ? opts.deadlineMs : 2000;
+  const startTime = Date.now();
+  let receipt = null;
+  for (let i = 0; i < maxIterations; i++) {
+    const res = advanceStateTransition({
+      receipt,
+      ...opts,
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any -- test-only shim adapter
+    } as any);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- receipt type narrowing for test adapter
+    receipt = res.receipt as any;
+    if (
+      receipt?.status === RECEIPT_STATUSES.MERGED ||
+      res.step === 'DONE' ||
+      res.step === 'ALREADY_CURRENT'
+    ) {
+      return { ok: true, receipt };
+    }
+    if (!res.ok && res.step !== 'WAITING_CI' && res.step !== 'PR_PENDING') {
+      return { ok: false, reason: res.reason, receipt };
+    }
+    if (res.step === 'WAITING_CI' && (Date.now() - startTime >= deadlineMs || i >= 2)) {
+      return { ok: false, reason: 'ci_pending_timeout', receipt };
+    }
+    if (res.step === 'PR_PENDING' && (Date.now() - startTime >= deadlineMs || i >= 2)) {
+      return { ok: false, reason: 'pr_pending_timeout', receipt };
+    }
+  }
+  return { ok: false, reason: 'landStateViaPR-shim-max-iterations', receipt };
+}
 
 const scratch = mkdtempSync(join(tmpdir(), 'state-landing-lifecycle-'));
 
@@ -390,7 +425,7 @@ describe('Adversarial State Landing Lifecycle Matrix (§19)', () => {
 
     expect(fakeGhState.calls.prMerge.length).toBe(1);
     expect(res.ok).toBe(true);
-    expect(res.receipt?.status).toBe('merged');
+    expect(res.receipt?.status).toBe(RECEIPT_STATUSES.MERGED);
   });
 
   it('7. Merge command returns exit 1 → receipt not merged', () => {
@@ -801,7 +836,7 @@ describe('Adversarial State Landing Lifecycle Matrix (§19)', () => {
     });
 
     expect(res.ok).toBe(true);
-    expect(res.receipt?.status).toBe('merged');
+    expect(res.receipt?.status).toBe(RECEIPT_STATUSES.MERGED);
     expect(res.receipt?.mergedSha).toBeDefined();
     expect(res.receipt?.mergedSha).not.toBeNull();
   });
@@ -824,23 +859,47 @@ describe('Adversarial State Landing Lifecycle Matrix (§19)', () => {
     gitFix.g(['push', 'origin', 'main']);
     const sourceSha = gitFix.baseSha();
 
-    // Simulate crash after PR created: receipt is at 'pr_created'
+    // Simulate crash after PR created: receipt is at 'PR_READY' (v2)
     const transDir = join(stateDir, STATE_TRANSITIONS_DIR_NAME);
     mkdirSync(transDir, { recursive: true });
 
+    const desiredContent =
+      JSON.stringify(
+        { milestoneId: 'G0', packages: [{ id: 'g0-test', status: 'RUNNING' }] },
+        null,
+        2,
+      ) + '\n';
     const receipt = {
-      schema: 'foresift/state-transition@1',
+      schema: 'foresift/state-transition@2' as const,
       transitionId: `g0-test-PENDING-RUNNING-${sourceSha.slice(0, 8)}-12345678`,
-      package: 'g0-test',
-      from: 'PENDING',
-      to: 'RUNNING',
-      sourceSha,
-      stateBranch: `state/chore/g0-test-PENDING-RUNNING-${sourceSha.slice(0, 8)}-12345678`,
-      pr: '1',
-      prUrl: 'https://github.com/quantm-zeus/foresift/pull/1',
+      logicalTransitionKey: 'g0-test-PENDING-RUNNING-12345678',
+      packageId: 'g0-test',
+      fromStatus: 'PENDING',
+      toStatus: 'RUNNING',
+      sourceMainSha: sourceSha,
       desiredFileHash: 'dummyhash',
-      status: 'pr_created',
+      desiredFiles: [
+        {
+          path: 'specs/implementation/current-milestone.json',
+          content: desiredContent,
+          contentSha256: 'abc',
+        },
+      ],
+      commitMessage: 'chore: g0-test PENDING->RUNNING',
+      stateBranch: `state/chore/g0-test-PENDING-RUNNING-${sourceSha.slice(0, 8)}-12345678`,
+      stateWorktree: null,
+      prNumber: '1',
+      prUrl: 'https://github.com/quantm-zeus/foresift/pull/1',
+      authorizedHeadSha: null,
+      authorizedAt: null,
+      authorizedCheckName: null,
+      authorizedAppId: null,
+      status: RECEIPT_STATUSES.PR_READY,
+      retryClass: null,
+      retryCount: 0,
+      nextRetryAt: null,
       mergedSha: null,
+      failedReason: null,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     };
@@ -853,8 +912,22 @@ describe('Adversarial State Landing Lifecycle Matrix (§19)', () => {
     expect(pending.length).toBe(1);
     expect(pending[0]!.transitionId).toBe(receipt.transitionId);
 
+    const gitFn = (args: string[], opts?: Record<string, unknown>) => {
+      try {
+        const out = execFileSync('git', args, {
+          cwd: (opts?.cwd as string) || gitFix.root,
+          encoding: 'utf8',
+          env: { ...process.env, GIT_CONFIG_GLOBAL: '/dev/null', GIT_CONFIG_SYSTEM: '/dev/null' },
+        });
+        return { ok: true, stdout: out, stderr: '', status: 0 };
+      } catch (e: unknown) {
+        const err = e as { message?: string; status?: number };
+        return { ok: false, stdout: '', stderr: err.message ?? '', status: err.status ?? 1 };
+      }
+    };
+
     // Run recovery
-    const recovered = recoverPendingStateLandings({ stateDir, cwd: gitFix.root, ghFn });
+    const recovered = recoverPendingStateLandings({ stateDir, cwd: gitFix.root, ghFn, gitFn });
     expect(recovered.length).toBe(1);
   });
 
@@ -961,8 +1034,8 @@ describe('Adversarial State Landing Lifecycle Matrix (§19)', () => {
 
     const elapsed = Date.now() - tStart;
     expect(elapsed).toBeLessThan(5000);
-    expect(step1.step).toBe('BRANCH_CREATED');
-    expect(step1.receipt?.status).toBe('branch_created');
+    expect(step1.step).toBe('BRANCH_READY');
+    expect(step1.receipt?.status).toBe(RECEIPT_STATUSES.BRANCH_READY);
   });
 
   it('20. Same intent called twice → one authoritative transition (idempotent)', () => {
@@ -1014,8 +1087,25 @@ describe('Adversarial State Landing Lifecycle Matrix (§19)', () => {
       ghFn,
     });
 
+    // First call creates receipt at BRANCH_READY, second reuses it and advances to BRANCH_PUSHED
     expect(step1.receipt?.transitionId).toBe(step2.receipt?.transitionId);
-    expect(step2.step).toBe('PR_CREATED');
+    // Step-driven: each call advances ONE step. First = BRANCH_READY, second = BRANCH_PUSHED.
+    expect(step2.step).toBe('BRANCH_PUSHED');
+    // PR not yet created (needs third call from BRANCH_PUSHED → PR_READY)
+    expect(fakeGhState.calls.prCreate.length).toBe(0);
+
+    // Third call should create the PR
+    const step3 = advanceStateTransition({
+      fileChanges,
+      message: 'chore: flip to RUNNING',
+      stateDir,
+      repoDir: gitFix.root,
+      packageId: 'g0-test',
+      fromStatus: 'PENDING',
+      toStatus: 'RUNNING',
+      ghFn,
+    });
+    expect(step3.receipt?.transitionId).toBe(step1.receipt?.transitionId);
     expect(fakeGhState.calls.prCreate.length).toBe(1); // PR created once
   });
 });

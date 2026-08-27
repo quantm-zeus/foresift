@@ -323,6 +323,7 @@ describe('CI Authority & Merge Invariants (V4 Hard Invariants A-F & Hardening)',
       const route = selectCiRepairRoute({
         classification: 'TESTS',
         failedFiles: ['tests/acceptance/AC-001.spec.ts'],
+        prChangedFiles: ['tests/acceptance/AC-001.spec.ts'],
       });
       expect(route.route).toBe('AGY_TEST_REPAIR');
       expect(route.engine).toBe('AGY');

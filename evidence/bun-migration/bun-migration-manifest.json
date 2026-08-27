@@ -1,14 +1,14 @@
 {
   "schema": "foresift/bun-migration-manifest@1",
   "migrationId": "bun-test-authority-v1",
-  "generatedAt": "2026-08-27T01:57:55.469Z",
+  "generatedAt": "2026-08-27T01:58:36.190Z",
   "root": ".",
   "totalTestFiles": 219,
   "counts": {
     "CODEMOD_READY": 0,
     "AGY_REQUIRED": 17,
-    "MIGRATED": 43,
-    "VERIFIED": 159,
+    "MIGRATED": 41,
+    "VERIFIED": 161,
     "BLOCKED": 0
   },
   "parity": {
@@ -1316,7 +1316,7 @@
         "@foresift/persistence",
         "../src/audit-chain.ts"
       ],
-      "state": "MIGRATED"
+      "state": "VERIFIED"
     },
     {
       "path": "packages/security/test/egress.spec.ts",
@@ -1624,7 +1624,7 @@
         "@foresift/persistence",
         "../src/generated/schema.ts"
       ],
-      "state": "MIGRATED"
+      "state": "VERIFIED"
     },
     {
       "path": "packages/security/test/secrets-claims.spec.ts",
@@ -9133,7 +9133,8 @@
       },
       "codexCalls": 0,
       "claudeCalls": 0,
-      "testedHead": "3febae85d59421c4cffa8f1ded3a0a41b795f767"
+      "testedHead": "3febae85d59421c4cffa8f1ded3a0a41b795f767",
+      "checkpointHead": "22da1df10b43016d9e0fd3e325d18a29ec667e47"
     },
     {
       "id": "verify-existing--foresift-security-database-pglite-1",
@@ -9143,7 +9144,83 @@
         "packages/security/test/audit-chain.spec.ts",
         "packages/security/test/schema-parity.spec.ts"
       ],
-      "state": "PENDING"
+      "state": "VERIFIED",
+      "verification": {
+        "ok": true,
+        "wallTimeMs": 40597,
+        "peakRssBytes": 0,
+        "cpuSeconds": 0,
+        "counts": {
+          "passed": 23,
+          "failed": 0,
+          "skipped": 0
+        },
+        "results": [
+          {
+            "id": "pglite-1",
+            "workload": "DATABASE_PGLITE",
+            "files": [
+              "packages/security/test/audit-chain.spec.ts"
+            ],
+            "fileWorkers": 1,
+            "testConcurrency": 1,
+            "command": [
+              "bun",
+              "test",
+              "--no-orphans",
+              "--isolate",
+              "--parallel=1",
+              "--max-concurrency=1",
+              "--timeout=30000",
+              "packages/security/test/audit-chain.spec.ts"
+            ],
+            "status": 0,
+            "wallTimeMs": 37491,
+            "peakRssBytes": null,
+            "cpuSeconds": null,
+            "counts": {
+              "passed": 18,
+              "failed": 0,
+              "skipped": 0
+            },
+            "stdoutTail": "bun test v1.4.0 (34cbb9a40) 1x PARALLEL\n",
+            "stderrTail": "\npackages/security/test/audit-chain.spec.ts:\n(pass) audit chain appends (FR-SEC-002) > chains entry_hash = sha256(prev || canonical payload) from GENESIS [2836.81ms]\n(pass) audit chain appends (FR-SEC-002) > canonicalizes payloads so key order cannot fork the hash [1958.14ms]\n(pass) audit chain appends (FR-SEC-002) > refuses SQL-level mutation and deletion via the immutability trigger [1965.34ms]\n(pass) audit chain appends (FR-SEC-002) > verifies a clean chain OK and records the run durably [2020.93ms]\n(pass) audit chain appends (FR-SEC-002) > reports GAP for an explicitly requested empty range [2002.31ms]\n(pass) audit chain appends (FR-SEC-002) > reports GAP for a WIPED chain even under a full-range request (M2) [1837.93ms]\n(pass) audit chain appends (FR-SEC-002) > REFUSES inverted, zero, or fractional ranges before any query (M2) [2058.98ms]\n(pass) audit chain appends (FR-SEC-002) > records the ACTUAL walked bounds of partial-range verification (M2) [1903.26ms]\n(pass) audit chain appends (FR-SEC-002) > surfaces a leading-edge deletion as DELETION at the missing seq (M2) [1967.63ms]\n(pass) audit checkpoints mirror to the object store (FR-SEC-002, AC-259) > writes the chained anchor to SQL AND an independent copy to the store [2243.18ms]\n(pass) audit checkpoints mirror to the object store (FR-SEC-002, AC-259) > chains successive checkpoints and refuses checkpointing without a store [2033.94ms]\n(pass) audit checkpoints mirror to the object store (FR-SEC-002, AC-259) > refuses non-contiguous or uncovered ranges [1960.39ms]\n(pass) audit checkpoints mirror to the object store (FR-SEC-002, AC-259) > checkpoints are append-only in SQL too [2226.74ms]\n(pass) divergence classification (AC-259 fixture battery) > detects MUTATION when content no longer matches its stored hashes [2102.03ms]\n(pass) divergence classification (AC-259 fixture battery) > detects DELETION as a sequence discontinuity [2098.04ms]\n(pass) divergence classification (AC-259 fixture battery) > detects REORDERING when a predecessor hash exists but off-position [2065.22ms]\n(pass) divergence classification (AC-259 fixture battery) > detects CHAIN_BREAK when a predecessor matches nothing on the chain [2005.57ms]\n(pass) divergence classification (AC-259 fixture battery) > a forged mid-chain insertion surfaces as a downstream divergence [1967.61ms]\n\n 18 pass\n 0 fail\n 57 expect() calls\nRan 18 tests across 1 file. [37.35s]\n"
+          },
+          {
+            "id": "pglite-2",
+            "workload": "DATABASE_PGLITE",
+            "files": [
+              "packages/security/test/schema-parity.spec.ts"
+            ],
+            "fileWorkers": 1,
+            "testConcurrency": 1,
+            "command": [
+              "bun",
+              "test",
+              "--no-orphans",
+              "--isolate",
+              "--parallel=1",
+              "--max-concurrency=1",
+              "--timeout=30000",
+              "packages/security/test/schema-parity.spec.ts"
+            ],
+            "status": 0,
+            "wallTimeMs": 3106,
+            "peakRssBytes": null,
+            "cpuSeconds": null,
+            "counts": {
+              "passed": 5,
+              "failed": 0,
+              "skipped": 0
+            },
+            "stdoutTail": "bun test v1.4.0 (34cbb9a40) 1x PARALLEL\n",
+            "stderrTail": "\npackages/security/test/schema-parity.spec.ts:\n(pass) sec-schema Drizzle mirror parity with SQL truth (ADR-001) > applies all four g0_sec migrations over the full proven set [6.02ms]\n(pass) sec-schema Drizzle mirror parity with SQL truth (ADR-001) > adds zero tables to the public schema (proven parity contract untouched) [6.25ms]\n(pass) sec-schema Drizzle mirror parity with SQL truth (ADR-001) > mirrors exactly the sec-schema table set [6.01ms]\n(pass) sec-schema Drizzle mirror parity with SQL truth (ADR-001) > matches every column: name, nullability, and type class [69.83ms]\n(pass) sec-schema Drizzle mirror parity with SQL truth (ADR-001) > matches primary keys on every sec table [12.26ms]\n\n 5 pass\n 0 fail\n 27 expect() calls\nRan 5 tests across 1 file. [3.00s]\n"
+          }
+        ]
+      },
+      "codexCalls": 0,
+      "claudeCalls": 0,
+      "testedHead": "22da1df10b43016d9e0fd3e325d18a29ec667e47"
     },
     {
       "id": "verify-existing--foresift-security-pure-1",

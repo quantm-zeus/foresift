@@ -1,14 +1,14 @@
 {
   "schema": "foresift/bun-migration-manifest@1",
   "migrationId": "bun-test-authority-v1",
-  "generatedAt": "2026-08-27T01:59:16.065Z",
+  "generatedAt": "2026-08-27T01:59:16.611Z",
   "root": ".",
   "totalTestFiles": 219,
   "counts": {
     "CODEMOD_READY": 0,
     "AGY_REQUIRED": 17,
-    "MIGRATED": 32,
-    "VERIFIED": 170,
+    "MIGRATED": 31,
+    "VERIFIED": 171,
     "BLOCKED": 0
   },
   "parity": {
@@ -3733,7 +3733,7 @@
         "../../scripts/automation/schema.mjs",
         "../../scripts/automation/schema.mjs"
       ],
-      "state": "MIGRATED"
+      "state": "VERIFIED"
     },
     {
       "path": "tests/automation/finalize-from-main.spec.ts",
@@ -9546,7 +9546,8 @@
       },
       "codexCalls": 0,
       "claudeCalls": 0,
-      "testedHead": "6ae87e40357bc4f8923b8ee8f7c2c53b236b4438"
+      "testedHead": "6ae87e40357bc4f8923b8ee8f7c2c53b236b4438",
+      "checkpointHead": "a5001dc2caf80dc9c643064c977cb52f91adc2b9"
     },
     {
       "id": "verify-existing-automation-process-1",
@@ -9555,7 +9556,53 @@
       "files": [
         "tests/automation/control-plane.spec.ts"
       ],
-      "state": "PENDING"
+      "state": "VERIFIED",
+      "verification": {
+        "ok": true,
+        "wallTimeMs": 445,
+        "peakRssBytes": 0,
+        "cpuSeconds": 0,
+        "counts": {
+          "passed": 29,
+          "failed": 0,
+          "skipped": 0
+        },
+        "results": [
+          {
+            "id": "process-1",
+            "workload": "PROCESS",
+            "files": [
+              "tests/automation/control-plane.spec.ts"
+            ],
+            "fileWorkers": 1,
+            "testConcurrency": 2,
+            "command": [
+              "bun",
+              "test",
+              "--no-orphans",
+              "--isolate",
+              "--parallel=1",
+              "--max-concurrency=2",
+              "--timeout=30000",
+              "tests/automation/control-plane.spec.ts"
+            ],
+            "status": 0,
+            "wallTimeMs": 445,
+            "peakRssBytes": null,
+            "cpuSeconds": null,
+            "counts": {
+              "passed": 29,
+              "failed": 0,
+              "skipped": 0
+            },
+            "stdoutTail": "bun test v1.4.0 (34cbb9a40) 1x PARALLEL\n",
+            "stderrTail": "\ntests/automation/control-plane.spec.ts:\n(pass) roadmap validation > accepts the shipped roadmap derived from the PRD manifest [0.34ms]\n(pass) roadmap validation > rejects unknown dependency references and bad statuses [0.29ms]\n(pass) milestone state validation > accepts a well-formed two-package plan [0.62ms]\n(pass) milestone state validation > rejects duplicate ids and invalid fields [0.17ms]\n(pass) milestone state validation > rejects circular dependencies via deterministic topo sort [0.13ms]\n(pass) milestone state validation > enforces the 2-8 package bound and CRITICAL serializability [0.13ms]\n(pass) package eligibility > permits PENDING with all deps PROVEN [0.18ms]\n(pass) package eligibility > fails closed on unproven dependencies or wrong status [0.17ms]\n(pass) concurrency policy > foundation milestones cap concurrency at 1 [0.24ms]\n(pass) concurrency policy > CRITICAL packages always run serially [0.14ms]\n(pass) concurrency policy > post-foundation allows 2 disjoint parallelizable non-critical packages [0.29ms]\n(pass) concurrency policy > blocks overlapping scopes, dependency relations, and a third co-runner [0.22ms]\n(pass) concurrency policy > denies co-run when either side claims a root/shared mechanical surface [0.19ms]\n(pass) concurrency policy > fails closed on unknown write-scope truth (missing or empty declarations) [0.24ms]\n(pass) failure classification > buckets transient, fatal, and unknown failures per recovery policy [0.21ms]\n(pass) failure classification > classifies daily/provider quota exhaustion separately from burst throttling (QUOTA_DAILY) [0.29ms]\n(pass) failure classification > extracts a provider-supplied quota reset time; null when none is given [0.57ms]\n(pass) resume-effect verification > accepts a row that left the terminal state (running/pending/completed) [14.86ms]\n(pass) resume-effect verification > counts fresh failure activity as effect — the engine restarted and re-failed fast [0.29ms]\n(pass) resume-effect verification > rejects the zombie signature: failed row whose activity is frozen from before the resume [2.69ms]\n(pass) resume-effect verification > keeps polling through unreadable responses instead of concluding either way [5.25ms]\n(pass) timestamp normalization > parses epoch-ms numbers, second-epoch numbers, numeric strings, and ISO forms [0.55ms]\n(pass) timestamp normalization > returns null for unparsable input instead of NaN or an epoch guess [0.28ms]\n(pass) run observability > derives the open DAG node and loop iteration from a structured JSONL run log [1.91ms]\n(pass) run observability > never throws on unknown runs or malformed logs — observability is advisory [0.20ms]\n(pass) milestone mode selection > resumes PLAN for an uncommitted (unlanded) draft milestone [81.50ms]\n(pass) milestone mode selection > resumes PLAN for a locally modified tracked milestone file (draft edits) [102.92ms]\n(pass) milestone mode selection > returns NONE for a committed-clean milestone with packages in flight [101.71ms]\n(pass) milestone mode selection > returns AUDIT once every package of the committed milestone is PROVEN [78.52ms]\n\n 29 pass\n 0 fail\n 81 expect() calls\nRan 29 tests across 1 file. [428.00ms]\n"
+          }
+        ]
+      },
+      "codexCalls": 0,
+      "claudeCalls": 0,
+      "testedHead": "a5001dc2caf80dc9c643064c977cb52f91adc2b9"
     },
     {
       "id": "verify-existing-automation-pure-1",

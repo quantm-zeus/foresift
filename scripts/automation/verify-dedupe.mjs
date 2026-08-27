@@ -58,8 +58,7 @@ export function classifyCommand(command, repoRoot) {
       : join(process.cwd(), 'config', 'foresift-test-runtime.json');
     authority = JSON.parse(readFileSync(policyPath, 'utf8')).currentAuthority ?? 'BUN_TEST';
   } catch {}
-  const expectedScript =
-    authority === 'BUN_TEST' ? 'bun test' : `${['vi', 'test'].join('')} run`;
+  const expectedScript = authority === 'BUN_TEST' ? 'bun test' : `${['vi', 'test'].join('')} run`;
   // Proof link 2: the package's test script is exactly the plain authority.
   const pkgAbs = resolve(repoRoot, pkgDir); // pkgDir may be absolute
   let testScript = null;

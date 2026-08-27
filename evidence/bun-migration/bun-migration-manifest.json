@@ -1,14 +1,14 @@
 {
   "schema": "foresift/bun-migration-manifest@1",
   "migrationId": "bun-test-authority-v1",
-  "generatedAt": "2026-08-27T01:58:36.533Z",
+  "generatedAt": "2026-08-27T01:58:36.723Z",
   "root": ".",
   "totalTestFiles": 219,
   "counts": {
     "CODEMOD_READY": 0,
     "AGY_REQUIRED": 17,
-    "MIGRATED": 39,
-    "VERIFIED": 163,
+    "MIGRATED": 38,
+    "VERIFIED": 164,
     "BLOCKED": 0
   },
   "parity": {
@@ -1881,7 +1881,7 @@
       "sourceAnchors": [
         "../src/index.ts"
       ],
-      "state": "MIGRATED"
+      "state": "VERIFIED"
     },
     {
       "path": "packages/tool-core/test/cache-key.spec.ts",
@@ -9279,7 +9279,8 @@
       },
       "codexCalls": 0,
       "claudeCalls": 0,
-      "testedHead": "fd11676c342bbbd2c403e3e473401114d9da5f72"
+      "testedHead": "fd11676c342bbbd2c403e3e473401114d9da5f72",
+      "checkpointHead": "2b844b7da8c206f51d45409b16c9130a7d4cf19c"
     },
     {
       "id": "verify-existing--foresift-tenant-isolation-pure-1",
@@ -9288,7 +9289,53 @@
       "files": [
         "packages/tenant-isolation/test/tenant-isolation.spec.ts"
       ],
-      "state": "PENDING"
+      "state": "VERIFIED",
+      "verification": {
+        "ok": true,
+        "wallTimeMs": 98,
+        "peakRssBytes": 0,
+        "cpuSeconds": 0,
+        "counts": {
+          "passed": 24,
+          "failed": 0,
+          "skipped": 0
+        },
+        "results": [
+          {
+            "id": "pure-1",
+            "workload": "PURE",
+            "files": [
+              "packages/tenant-isolation/test/tenant-isolation.spec.ts"
+            ],
+            "fileWorkers": 2,
+            "testConcurrency": 8,
+            "command": [
+              "bun",
+              "test",
+              "--no-orphans",
+              "--isolate",
+              "--parallel=2",
+              "--max-concurrency=8",
+              "--timeout=30000",
+              "packages/tenant-isolation/test/tenant-isolation.spec.ts"
+            ],
+            "status": 0,
+            "wallTimeMs": 98,
+            "peakRssBytes": null,
+            "cpuSeconds": null,
+            "counts": {
+              "passed": 24,
+              "failed": 0,
+              "skipped": 0
+            },
+            "stdoutTail": "bun test v1.4.0 (34cbb9a40) 2x PARALLEL\n",
+            "stderrTail": "\npackages/tenant-isolation/test/tenant-isolation.spec.ts:\n(pass) tenant context derivation (T129) > derives schema-valid contexts and rejects malformed ones [1.01ms]\n(pass) tenant context derivation (T129) > treats isolation as active for everything but PUBLIC [0.04ms]\n(pass) namespaced keys across the isolated surfaces (T129, AC-275) > derives tenant-prefixed keys for EVERY isolated surface [0.15ms]\n(pass) namespaced keys across the isolated surfaces (T129, AC-275) > keeps tenants in disjoint namespaces even for identical keys [0.03ms]\n(pass) namespaced keys across the isolated surfaces (T129, AC-275) > refuses traversal, absolute, empty, and NUL keys [0.15ms]\n(pass) namespaced keys across the isolated surfaces (T129, AC-275) > derives OPAQUE model-context partitions that never leak tenant ids [0.34ms]\n(pass) namespaced keys across the isolated surfaces (T129, AC-275) > provides queue/session derivations through the same namespace rule [0.05ms]\n(pass) fail-closed row scoping (T130) > composes parameterized tenant predicates [0.14ms]\n(pass) fail-closed row scoping (T130) > builds scoped SELECTs with the predicate always present [0.11ms]\n(pass) fail-closed row scoping (T130) > REFUSES unscoped selects while isolation is active — even on request [0.09ms]\n(pass) fail-closed row scoping (T130) > allows explicit unscoped selects ONLY in PUBLIC mode [0.04ms]\n(pass) fail-closed row scoping (T130) > asserts row ownership and refuses missing or foreign owners [0.14ms]\n(pass) signed URLs (T131) > round-trips mint → validate within audience/tenant/method/uri bindings [0.60ms]\n(pass) signed URLs (T131) > refuses tampered payloads, wrong audiences, methods, and foreign tenants [0.36ms]\n(pass) signed URLs (T131) > enforces expiry against the injected clock [0.14ms]\n(pass) resource-access authorization bypass battery (T131, AC-252) > admits same-tenant URIs holding scope and rights [0.41ms]\n(pass) resource-access authorization bypass battery (T131, AC-252) > refuses cross-tenant URIs regardless of query decoration [0.11ms]\n(pass) resource-access authorization bypass battery (T131, AC-252) > refuses path-confusion vectors before any fetch [0.21ms]\n(pass) resource-access authorization bypass battery (T131, AC-252) > refuses plainly foreign tenants as CROSS_TENANT [0.07ms]\n(pass) resource-access authorization bypass battery (T131, AC-252) > normalizes benign paths without refusing them [0.03ms]\n(pass) resource-access authorization bypass battery (T131, AC-252) > rejects another tenant's signed URL replayed into the query [0.23ms]\n(pass) resource-access authorization bypass battery (T131, AC-252) > refuses ranged reads without the dedicated right [0.16ms]\n(pass) resource-access authorization bypass battery (T131, AC-252) > re-authorizes redirect targets from scratch [0.13ms]\n(pass) resource-access authorization bypass battery (T131, AC-252) > refuses callers with no recognized scope or no rights at all [0.09ms]\n\n 24 pass\n 0 fail\n 78 expect() calls\nRan 24 tests across 1 file. [79.00ms]\n"
+          }
+        ]
+      },
+      "codexCalls": 0,
+      "claudeCalls": 0,
+      "testedHead": "2b844b7da8c206f51d45409b16c9130a7d4cf19c"
     },
     {
       "id": "verify-existing-automation-meta-gate-1",

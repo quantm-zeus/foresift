@@ -1,14 +1,14 @@
 {
   "schema": "foresift/bun-migration-manifest@1",
   "migrationId": "bun-test-authority-v1",
-  "generatedAt": "2026-08-27T01:49:33.764Z",
+  "generatedAt": "2026-08-27T01:49:33.951Z",
   "root": ".",
   "totalTestFiles": 219,
   "counts": {
-    "CODEMOD_READY": 73,
+    "CODEMOD_READY": 71,
     "AGY_REQUIRED": 17,
     "MIGRATED": 76,
-    "VERIFIED": 53,
+    "VERIFIED": 55,
     "BLOCKED": 0
   },
   "parity": {
@@ -1743,54 +1743,46 @@
     {
       "path": "packages/shared-schemas/test/data.spec.ts",
       "package": "@foresift/shared-schemas",
-      "bytes": 20488,
+      "bytes": 20490,
       "lines": 627,
-      "sha256": "9c4f52f955b99aab3154d9d5ff0c3453e871bf6bc96219a327904c0f8d751c5e",
+      "sha256": "4a7bef63dc14d0b3602d40f0fc2d6e819d265dc2650c4d7fd8d444ef959dbe9f",
       "imports": [
-        "vitest",
+        "bun:test",
         "@foresift/domain",
         "../src/data.ts"
       ],
-      "vitestImports": [
-        "describe",
-        "expect",
-        "it"
-      ],
+      "vitestImports": [],
       "features": [],
       "workload": "PURE",
-      "migrationType": "EASY_MECHANICAL",
+      "migrationType": "ALREADY_MIGRATED",
       "fixturesAndHelpers": [],
       "sourceAnchors": [
         "@foresift/domain",
         "../src/data.ts"
       ],
-      "state": "CODEMOD_READY"
+      "state": "VERIFIED"
     },
     {
       "path": "packages/shared-schemas/test/dr.spec.ts",
       "package": "@foresift/shared-schemas",
-      "bytes": 6924,
+      "bytes": 6926,
       "lines": 240,
-      "sha256": "f2612fa921602b54de12adfbef24c1895393354c4f384f8a9fb4d60caec8137d",
+      "sha256": "ccad2df1caf8f938f5d58a61b8df45a85cf43417bdacad5dc042552c871662ce",
       "imports": [
-        "vitest",
+        "bun:test",
         "@foresift/domain",
         "../src/dr.ts"
       ],
-      "vitestImports": [
-        "describe",
-        "expect",
-        "it"
-      ],
+      "vitestImports": [],
       "features": [],
       "workload": "PURE",
-      "migrationType": "EASY_MECHANICAL",
+      "migrationType": "ALREADY_MIGRATED",
       "fixturesAndHelpers": [],
       "sourceAnchors": [
         "@foresift/domain",
         "../src/dr.ts"
       ],
-      "state": "CODEMOD_READY"
+      "state": "VERIFIED"
     },
     {
       "path": "packages/shared-schemas/test/prov.spec.ts",
@@ -7622,7 +7614,8 @@
       },
       "codexCalls": 0,
       "claudeCalls": 0,
-      "testedHead": "0d43f8aa6a66e9d0bee3d6a0afcc6dbf72ed3f3e"
+      "testedHead": "0d43f8aa6a66e9d0bee3d6a0afcc6dbf72ed3f3e",
+      "checkpointHead": "07f92fbaa3a381fc7fc37ec17499948469ba95eb"
     },
     {
       "id": "mechanical--foresift-shared-schemas-pure-1",
@@ -7632,7 +7625,55 @@
         "packages/shared-schemas/test/data.spec.ts",
         "packages/shared-schemas/test/dr.spec.ts"
       ],
-      "state": "PENDING"
+      "state": "VERIFIED",
+      "verification": {
+        "ok": true,
+        "wallTimeMs": 81,
+        "peakRssBytes": 0,
+        "cpuSeconds": 0,
+        "counts": {
+          "passed": 24,
+          "failed": 0,
+          "skipped": 0
+        },
+        "results": [
+          {
+            "id": "pure-1",
+            "workload": "PURE",
+            "files": [
+              "packages/shared-schemas/test/data.spec.ts",
+              "packages/shared-schemas/test/dr.spec.ts"
+            ],
+            "fileWorkers": 2,
+            "testConcurrency": 8,
+            "command": [
+              "bun",
+              "test",
+              "--no-orphans",
+              "--isolate",
+              "--parallel=2",
+              "--max-concurrency=8",
+              "--timeout=30000",
+              "packages/shared-schemas/test/data.spec.ts",
+              "packages/shared-schemas/test/dr.spec.ts"
+            ],
+            "status": 0,
+            "wallTimeMs": 81,
+            "peakRssBytes": null,
+            "cpuSeconds": null,
+            "counts": {
+              "passed": 24,
+              "failed": 0,
+              "skipped": 0
+            },
+            "stdoutTail": "bun test v1.4.0 (34cbb9a40) 2x PARALLEL\n",
+            "stderrTail": "\npackages/shared-schemas/test/data.spec.ts:\n(pass) data schema registry > is versioned and non-empty [0.07ms]\n(pass) round-trip: domain fixtures validate against their mirrors  > every fixture parses against its named schema [5.48ms]\n\npackages/shared-schemas/test/dr.spec.ts:\n(pass) dr schema registry > is versioned and covers the FR-DR family [0.15ms]\n\npackages/shared-schemas/test/data.spec.ts:\n(pass) round-trip: domain fixtures validate against their mirrors  > rejects unknown keys on every registered schema (.strict() fail-closed policy) [2.74ms]\n(pass) round-trip: domain fixtures validate against their mirrors  > parses a Solana representation through its namespace-specific rule [0.55ms]\n(pass) negative fixtures fail validation  > refuses a bad availability provenance class without defaulting [0.31ms]\n(pass) negative fixtures fail validation  > enforces null-alone-is-insufficient on absent quantities and feature values [0.75ms]\n(pass) negative fixtures fail validation  > refuses unknown acquisition states and lifecycle violations [0.56ms]\n(pass) negative fixtures fail validation  > rejects identity-shape tampering [1.01ms]\n(pass) negative fixtures fail validation  > rejects unknown keys on strict records [0.16ms]\n(pass) negative fixtures fail validation  > rejects a revision whose quantity pair is half-specified (SQL parity) [0.14ms]\n(pass) negative fixtures fail validation  > rejects collector records that drift from the SQL storage contract [0.18ms]\n(pass) building-block refusals (fail-closed boundaries) > refuses malformed chain ids without defaulting [0.34ms]\n(pass) building-block refusals (fail-closed boundaries) > refuses non-digit strings wherever raw integers cross the boundary [0.20ms]\n(pass) BackfillReceipt §13.6 refinements hold per-conjunct > refuses LIVE_RECEIPT_REFERENCE claims that cite no persisted reference [0.13ms]\n(pass) BackfillReceipt §13.6 refinements hold per-conjunct > admits earlier-than-retrieval availability ONLY with a live-receipt ref [0.11ms]\n(pass) BackfillReceipt §13.6 refinements hold per-conjunct > refuses historical event times that follow their own availability [0.25ms]\n\npackages/shared-schemas/test/dr.spec.ts:\n(pass) round-trip: domain fixtures validate against their mirrors  > every fixture parses against its named schema [4.50ms]\n(pass) round-trip: domain fixtures validate against their mirrors  > agrees with the domain validator on ceilings [0.56ms]\n(pass) negative fixtures fail validation  > refuses tiers above the FR-DR-001 (§34.4-bound) ceilings [0.81ms]\n(pass) negative fixtures fail validation  > refuses key material smuggled into key references [0.34ms]\n(pass) negative fixtures fail validation  > refuses successful runs without artifacts and failed runs without reasons [0.32ms]\n(pass) negative fixtures fail validation  > refuses PASSED drills lacking credentials or green checks (fail-closed) [0.35ms]\n(pass) negative fixtures fail validation  > refuses health states that suppress risk monitoring or lack incidents [0.61ms]\n\n 24 pass\n 0 fail\n 121 expect() calls\nRan 24 tests across 2 files. [67.00ms]\n"
+          }
+        ]
+      },
+      "codexCalls": 0,
+      "claudeCalls": 0,
+      "testedHead": "07f92fbaa3a381fc7fc37ec17499948469ba95eb"
     },
     {
       "id": "mechanical--foresift-tenant-isolation-pure-1",

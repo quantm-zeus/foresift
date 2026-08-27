@@ -1,14 +1,14 @@
 {
   "schema": "foresift/bun-migration-manifest@1",
   "migrationId": "bun-test-authority-v1",
-  "generatedAt": "2026-08-27T01:53:05.406Z",
+  "generatedAt": "2026-08-27T01:53:40.058Z",
   "root": ".",
   "totalTestFiles": 219,
   "counts": {
     "CODEMOD_READY": 0,
     "AGY_REQUIRED": 17,
-    "MIGRATED": 57,
-    "VERIFIED": 145,
+    "MIGRATED": 34,
+    "VERIFIED": 168,
     "BLOCKED": 0
   },
   "parity": {
@@ -2233,7 +2233,7 @@
         "../../packages/tool-core/src/profiles.ts",
         "./helpers.ts"
       ],
-      "state": "MIGRATED"
+      "state": "VERIFIED"
     },
     {
       "path": "tests/acceptance/AC-002.spec.ts",
@@ -2255,7 +2255,7 @@
         "@foresift/domain",
         "@foresift/shared-schemas"
       ],
-      "state": "MIGRATED"
+      "state": "VERIFIED"
     },
     {
       "path": "tests/acceptance/AC-003.spec.ts",
@@ -2285,7 +2285,7 @@
         "../../packages/tool-core/src/cache-key.ts",
         "./helpers.ts"
       ],
-      "state": "MIGRATED"
+      "state": "VERIFIED"
     },
     {
       "path": "tests/acceptance/AC-004.spec.ts",
@@ -2307,7 +2307,7 @@
         "@foresift/domain",
         "@foresift/shared-schemas"
       ],
-      "state": "MIGRATED"
+      "state": "VERIFIED"
     },
     {
       "path": "tests/acceptance/AC-020.spec.ts",
@@ -2343,7 +2343,7 @@
         "../../packages/tool-core/src/stages/cache.ts",
         "./helpers.ts"
       ],
-      "state": "MIGRATED"
+      "state": "VERIFIED"
     },
     {
       "path": "tests/acceptance/AC-021.spec.ts",
@@ -2375,7 +2375,7 @@
         "../../packages/tool-core/src/normalize.ts",
         "./helpers.ts"
       ],
-      "state": "MIGRATED"
+      "state": "VERIFIED"
     },
     {
       "path": "tests/acceptance/AC-022.spec.ts",
@@ -2407,7 +2407,7 @@
         "../../packages/tool-core/src/stages/cache.ts",
         "./helpers.ts"
       ],
-      "state": "MIGRATED"
+      "state": "VERIFIED"
     },
     {
       "path": "tests/acceptance/AC-023.spec.ts",
@@ -2440,7 +2440,7 @@
         "../../packages/tool-core/src/normalize.ts",
         "./helpers.ts"
       ],
-      "state": "MIGRATED"
+      "state": "VERIFIED"
     },
     {
       "path": "tests/acceptance/AC-050.spec.ts",
@@ -2467,7 +2467,7 @@
         "../../packages/security/src/negative-capability.ts",
         "../../packages/tool-core/src/prohibited.ts"
       ],
-      "state": "MIGRATED"
+      "state": "VERIFIED"
     },
     {
       "path": "tests/acceptance/AC-051.spec.ts",
@@ -2498,7 +2498,7 @@
         "@foresift/shared-schemas",
         "../fixtures/sec/ssrf/ssrf-urls.ts"
       ],
-      "state": "MIGRATED"
+      "state": "VERIFIED"
     },
     {
       "path": "tests/acceptance/AC-052.spec.ts",
@@ -2520,7 +2520,7 @@
         "../../packages/security/src/secrets-policy.ts",
         "@foresift/shared-schemas"
       ],
-      "state": "MIGRATED"
+      "state": "VERIFIED"
     },
     {
       "path": "tests/acceptance/AC-053.spec.ts",
@@ -2660,7 +2660,7 @@
         "@foresift/evidence",
         "./helpers.ts"
       ],
-      "state": "MIGRATED"
+      "state": "VERIFIED"
     },
     {
       "path": "tests/acceptance/AC-241.spec.ts",
@@ -2692,7 +2692,7 @@
         "../../packages/tool-core/src/stages/cache.ts",
         "./helpers.ts"
       ],
-      "state": "MIGRATED"
+      "state": "VERIFIED"
     },
     {
       "path": "tests/acceptance/AC-242.spec.ts",
@@ -2720,7 +2720,7 @@
         "@foresift/shared-schemas",
         "./helpers.ts"
       ],
-      "state": "MIGRATED"
+      "state": "VERIFIED"
     },
     {
       "path": "tests/acceptance/AC-243.spec.ts",
@@ -2748,7 +2748,7 @@
         "@foresift/shared-schemas",
         "./helpers.ts"
       ],
-      "state": "MIGRATED"
+      "state": "VERIFIED"
     },
     {
       "path": "tests/acceptance/AC-244.spec.ts",
@@ -2776,7 +2776,7 @@
         "@foresift/shared-schemas",
         "./helpers.ts"
       ],
-      "state": "MIGRATED"
+      "state": "VERIFIED"
     },
     {
       "path": "tests/acceptance/AC-245.spec.ts",
@@ -2807,7 +2807,7 @@
         "@foresift/shared-schemas",
         "./helpers.ts"
       ],
-      "state": "MIGRATED"
+      "state": "VERIFIED"
     },
     {
       "path": "tests/acceptance/AC-246.spec.ts",
@@ -2833,7 +2833,7 @@
         "@foresift/shared-schemas",
         "./helpers.ts"
       ],
-      "state": "MIGRATED"
+      "state": "VERIFIED"
     },
     {
       "path": "tests/acceptance/AC-247.spec.ts",
@@ -2861,7 +2861,7 @@
         "@foresift/shared-schemas",
         "./helpers.ts"
       ],
-      "state": "MIGRATED"
+      "state": "VERIFIED"
     },
     {
       "path": "tests/acceptance/AC-248.spec.ts",
@@ -2891,7 +2891,7 @@
         "@foresift/shared-schemas",
         "./helpers.ts"
       ],
-      "state": "MIGRATED"
+      "state": "VERIFIED"
     },
     {
       "path": "tests/acceptance/AC-249.spec.ts",
@@ -2921,7 +2921,7 @@
         "@foresift/shared-schemas",
         "./helpers.ts"
       ],
-      "state": "MIGRATED"
+      "state": "VERIFIED"
     },
     {
       "path": "tests/acceptance/AC-250.spec.ts",
@@ -3030,7 +3030,7 @@
         "../../packages/security/src/negative-capability.ts",
         "../../packages/security/src/supply-chain.ts"
       ],
-      "state": "MIGRATED"
+      "state": "VERIFIED"
     },
     {
       "path": "tests/acceptance/AC-255.spec.ts",
@@ -3059,7 +3059,7 @@
         "../../packages/security/src/negative-capability.ts",
         "../../packages/tool-core/src/prohibited.ts"
       ],
-      "state": "MIGRATED"
+      "state": "VERIFIED"
     },
     {
       "path": "tests/acceptance/AC-256.spec.ts",
@@ -8725,7 +8725,8 @@
       },
       "codexCalls": 0,
       "claudeCalls": 0,
-      "testedHead": "a0a807948027bf526470b52212f969261909b7d5"
+      "testedHead": "a0a807948027bf526470b52212f969261909b7d5",
+      "checkpointHead": "ac21469cbef2a3b59c43388a64b8f5bab8224bd6"
     },
     {
       "id": "verify-existing-acceptance-pure-1",
@@ -8756,7 +8757,97 @@
         "tests/acceptance/AC-254.spec.ts",
         "tests/acceptance/AC-255.spec.ts"
       ],
-      "state": "PENDING"
+      "state": "VERIFIED",
+      "verification": {
+        "ok": true,
+        "wallTimeMs": 34525,
+        "peakRssBytes": 0,
+        "cpuSeconds": 0,
+        "counts": {
+          "passed": 113,
+          "failed": 0,
+          "skipped": 0
+        },
+        "results": [
+          {
+            "id": "pure-1",
+            "workload": "PURE",
+            "files": [
+              "tests/acceptance/AC-001.spec.ts",
+              "tests/acceptance/AC-002.spec.ts",
+              "tests/acceptance/AC-003.spec.ts",
+              "tests/acceptance/AC-004.spec.ts",
+              "tests/acceptance/AC-020.spec.ts",
+              "tests/acceptance/AC-021.spec.ts",
+              "tests/acceptance/AC-022.spec.ts",
+              "tests/acceptance/AC-023.spec.ts",
+              "tests/acceptance/AC-050.spec.ts",
+              "tests/acceptance/AC-051.spec.ts",
+              "tests/acceptance/AC-052.spec.ts",
+              "tests/acceptance/AC-240.spec.ts",
+              "tests/acceptance/AC-241.spec.ts",
+              "tests/acceptance/AC-242.spec.ts",
+              "tests/acceptance/AC-243.spec.ts",
+              "tests/acceptance/AC-244.spec.ts",
+              "tests/acceptance/AC-245.spec.ts",
+              "tests/acceptance/AC-246.spec.ts",
+              "tests/acceptance/AC-247.spec.ts",
+              "tests/acceptance/AC-248.spec.ts",
+              "tests/acceptance/AC-249.spec.ts",
+              "tests/acceptance/AC-254.spec.ts",
+              "tests/acceptance/AC-255.spec.ts"
+            ],
+            "fileWorkers": 2,
+            "testConcurrency": 8,
+            "command": [
+              "bun",
+              "test",
+              "--no-orphans",
+              "--isolate",
+              "--parallel=2",
+              "--max-concurrency=8",
+              "--timeout=30000",
+              "tests/acceptance/AC-001.spec.ts",
+              "tests/acceptance/AC-002.spec.ts",
+              "tests/acceptance/AC-003.spec.ts",
+              "tests/acceptance/AC-004.spec.ts",
+              "tests/acceptance/AC-020.spec.ts",
+              "tests/acceptance/AC-021.spec.ts",
+              "tests/acceptance/AC-022.spec.ts",
+              "tests/acceptance/AC-023.spec.ts",
+              "tests/acceptance/AC-050.spec.ts",
+              "tests/acceptance/AC-051.spec.ts",
+              "tests/acceptance/AC-052.spec.ts",
+              "tests/acceptance/AC-240.spec.ts",
+              "tests/acceptance/AC-241.spec.ts",
+              "tests/acceptance/AC-242.spec.ts",
+              "tests/acceptance/AC-243.spec.ts",
+              "tests/acceptance/AC-244.spec.ts",
+              "tests/acceptance/AC-245.spec.ts",
+              "tests/acceptance/AC-246.spec.ts",
+              "tests/acceptance/AC-247.spec.ts",
+              "tests/acceptance/AC-248.spec.ts",
+              "tests/acceptance/AC-249.spec.ts",
+              "tests/acceptance/AC-254.spec.ts",
+              "tests/acceptance/AC-255.spec.ts"
+            ],
+            "status": 0,
+            "wallTimeMs": 34525,
+            "peakRssBytes": null,
+            "cpuSeconds": null,
+            "counts": {
+              "passed": 113,
+              "failed": 0,
+              "skipped": 0
+            },
+            "stdoutTail": "bun test v1.4.0 (34cbb9a40) 2x PARALLEL\n",
+            "stderrTail": "ol-core substrate): backfill receipt schema validation > BackfillReceipt schema validates live receipt proof [1.50ms]\n\ntests/acceptance/AC-254.spec.ts:\n(pass) AC-254: all five scan surfaces green; read-only intelligence allowed > surface 1 — the dependency catalogue carries NO prohibited dependency [1.57ms]\n(pass) AC-254: all five scan surfaces green; read-only intelligence allowed > surface 1b — pinning + lifecycle policy primitives accept clean manifests [0.69ms]\n(pass) AC-254: all five scan surfaces green; read-only intelligence allowed > surfaces 2+3 — route and tool inventories admit only read-shaped entries [0.34ms]\n(pass) AC-254: all five scan surfaces green; read-only intelligence allowed > surface 4 — environment schema admits operational variables only [0.24ms]\n(pass) AC-254: all five scan surfaces green; read-only intelligence allowed > surface 5 — runtime canary stays silent over shipped source [9.04ms]\n(pass) AC-254: all five scan surfaces green; read-only intelligence allowed > SBOM records emit with component inventory [0.55ms]\n(pass) AC-254: all five scan surfaces green; read-only intelligence allowed > read-only wallet intelligence is EXPLICITLY allowlisted and admitted [0.67ms]\n(pass) AC-254 acceptance (tool-core substrate): execution gate passes clean read-only tool calls > execution gate returns empty findings for clean read-only queries [0.21ms]\n\ntests/acceptance/AC-255.spec.ts:\n(pass) AC-255: GMGN pair passes gates; forbidden pairs fail policy > every admitted GMGN-shaped query passes the runtime policy gate [1.23ms]\n(pass) AC-255: GMGN pair passes gates; forbidden pairs fail policy > the clean fixture corpus is scanner-silent on BOTH surfaces [1.88ms]\n(pass) AC-255: GMGN pair passes gates; forbidden pairs fail policy > paired forbidden variants refuse at the RUNTIME-validation layer [0.64ms]\n(pass) AC-255 acceptance (tool-core substrate): permitted query fixtures pass registration screening > permits every admitted GMGN wallet-intelligence query fixture as an EXTERNAL_READ tool definition [0.77ms]\n(pass) AC-255 acceptance (tool-core substrate): permitted query fixtures pass registration screening > permits clean query definitions across all admissible action classes [0.29ms]\n\ntests/acceptance/AC-247.spec.ts:\n(pass) AC-247: retrospective estimates cannot alter frozen counts > the count at the boundary is frozen at the pre-boundary maturity [2.61ms]\n(pass) AC-247: retrospective estimates cannot alter frozen counts > recording a later diagnostic estimate leaves the frozen count unchanged [1.82ms]\n(pass) AC-247: retrospective estimates cannot alter frozen counts > inputs not available at the estimate time are labeled DIAGNOSTIC_RETROSPECTIVE [0.60ms]\n(pass) AC-247: retrospective estimates cannot alter frozen counts > inputs genuinely available at the time keep the AVAILABLE_AT_THE_TIME label [0.07ms]\n(pass) AC-247: retrospective estimates cannot alter frozen counts > only completions within the boundary contribute (later ones excluded) [17.34ms]\n(pass) AC-247 acceptance (tool-core substrate): exact-cache entry record schema validation > ExactCacheEntryRecord schema validates entry record [1.22ms]\n\ntests/acceptance/AC-248.spec.ts:\n(pass) AC-248: immutable projections reported honestly below thresholds > a count of 2 against threshold 5 is reported below threshold, not inflated [4.55ms]\n(pass) AC-248: immutable projections reported honestly below thresholds > the same count clears an honest threshold of 2 [3.48ms]\n(pass) AC-248: immutable projections reported honestly below thresholds > re-resolution is identical — projections are immutable [9.82ms]\n(pass) AC-248: immutable projections reported honestly below thresholds > later maturity never reaches back into an earlier boundary [11.61ms]\n(pass) AC-248 acceptance (tool-core substrate): watermark and checkpoint schemas > WatermarkState schema validates contiguous watermark [1.47ms]\n\n 113 pass\n 0 fail\n 398 expect() calls\nRan 113 tests across 23 files. [34.51s]\n"
+          }
+        ]
+      },
+      "codexCalls": 0,
+      "claudeCalls": 0,
+      "testedHead": "ac21469cbef2a3b59c43388a64b8f5bab8224bd6"
     },
     {
       "id": "verify-existing-automation-meta-gate-1",

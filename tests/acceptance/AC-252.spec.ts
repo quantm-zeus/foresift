@@ -2,7 +2,7 @@
 // caller of the SAME tenant holding the original scope and rights — plain
 // reads, query-carrying URIs, valid embedded signed URLs, and authorized
 // redirects all admit with canonical paths.
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'bun:test';
 import { ResourceAccessGuard } from '../../packages/tenant-isolation/src/resource-access.ts';
 import { SignedUrlService } from '../../packages/tenant-isolation/src/signed-url.ts';
 import { deriveTenantContext } from '../../packages/tenant-isolation/src/tenant-context.ts';

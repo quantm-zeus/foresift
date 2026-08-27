@@ -1,7 +1,7 @@
 // AC-250 (acceptance): a valid allowlisted MCP Origin reaches
 // authentication — exact scheme/host/port tuple matches admit; NON_PRODUCTION
 // deployments explicitly allow absent origins through to authentication.
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'bun:test';
 import { McpOriginGate } from '../../packages/security/src/mcp-origin.ts';
 
 const PROD_GATE = new McpOriginGate({

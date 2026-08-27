@@ -10,7 +10,7 @@
  * End-to-end overhead targets close in later integration packages; the
  * negative suite proves the harness itself can fail under injected delay.
  */
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 import { parseChainId, utcTimestamp } from '@foresift/domain';
 import { appendObservation, insertPool } from '@foresift/persistence';
 import {

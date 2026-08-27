@@ -5,7 +5,7 @@
  * zero prohibited exposure yields ELIGIBLE readiness for the future
  * workspace/public activation gate.
  */
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 import { AuditChain } from '@foresift/security';
 import {
   LifecycleMachine,

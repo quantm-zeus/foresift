@@ -2,7 +2,7 @@
 // revision, admissible content type and method, in-cap message, bound
 // session, authorized resumable cursor — are ADMITTED deterministically.
 // Transport wiring itself belongs to the mcp-surface package.
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'bun:test';
 import { McpProtocolGuard } from '../../packages/security/src/mcp-protocol-guard.ts';
 
 const GUARD = new McpProtocolGuard({ maxMessageBytes: 1024 * 1024 });

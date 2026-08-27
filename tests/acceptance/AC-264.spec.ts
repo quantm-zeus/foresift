@@ -14,7 +14,7 @@
  * fail-closed key-material scanning, and separately provided restore
  * credentials gating drill execution.
  */
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 import { utcTimestamp, type UtcTimestamp } from '@foresift/domain';
 import {
   assertLocationAllowed,

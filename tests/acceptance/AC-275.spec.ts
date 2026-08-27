@@ -2,7 +2,7 @@
 // surface — cache, queues, sessions, quotas, logs, metrics, model context,
 // rows/artifacts (predicates + ownership), signed URLs. Same-tenant flows
 // resolve correctly; different tenants can never collide.
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'bun:test';
 import {
   deriveModelContextPartition,
   deriveNamespacedKey,

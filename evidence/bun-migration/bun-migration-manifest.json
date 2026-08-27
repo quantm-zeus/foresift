@@ -1,14 +1,14 @@
 {
   "schema": "foresift/bun-migration-manifest@1",
   "migrationId": "bun-test-authority-v1",
-  "generatedAt": "2026-08-27T01:47:10.342Z",
+  "generatedAt": "2026-08-27T01:47:10.530Z",
   "root": ".",
   "totalTestFiles": 219,
   "counts": {
-    "CODEMOD_READY": 123,
+    "CODEMOD_READY": 122,
     "AGY_REQUIRED": 17,
     "MIGRATED": 76,
-    "VERIFIED": 3,
+    "VERIFIED": 4,
     "BLOCKED": 0
   },
   "parity": {
@@ -199,31 +199,25 @@
     {
       "path": "packages/object-store/test/local-store.spec.ts",
       "package": "@foresift/object-store",
-      "bytes": 10093,
+      "bytes": 10095,
       "lines": 227,
-      "sha256": "40862c0d2d90bf7ab45a962f659a7807b618449ed734ec7c35203b3b90565e48",
+      "sha256": "4635ed6392ed959dd5d4fe0748d2c92183b520f4502643d2a404abe8d3fec465",
       "imports": [
         "node:fs/promises",
         "node:os",
         "node:path",
-        "vitest",
+        "bun:test",
         "../src/index.ts"
       ],
-      "vitestImports": [
-        "afterAll",
-        "beforeAll",
-        "describe",
-        "expect",
-        "it"
-      ],
+      "vitestImports": [],
       "features": [],
       "workload": "PURE",
-      "migrationType": "EASY_MECHANICAL",
+      "migrationType": "ALREADY_MIGRATED",
       "fixturesAndHelpers": [],
       "sourceAnchors": [
         "../src/index.ts"
       ],
-      "state": "CODEMOD_READY"
+      "state": "VERIFIED"
     },
     {
       "path": "packages/object-store/test/staged-commit.spec.ts",
@@ -6623,7 +6617,8 @@
       },
       "codexCalls": 0,
       "claudeCalls": 0,
-      "testedHead": "821dcb56e179659f9860df1c21a36226e53c84bd"
+      "testedHead": "821dcb56e179659f9860df1c21a36226e53c84bd",
+      "checkpointHead": "922204dfa1a5f922f5695608ac44345428883980"
     },
     {
       "id": "mechanical--foresift-object-store-pure-1",
@@ -6632,7 +6627,53 @@
       "files": [
         "packages/object-store/test/local-store.spec.ts"
       ],
-      "state": "PENDING"
+      "state": "VERIFIED",
+      "verification": {
+        "ok": true,
+        "wallTimeMs": 90,
+        "peakRssBytes": 0,
+        "cpuSeconds": 0,
+        "counts": {
+          "passed": 12,
+          "failed": 0,
+          "skipped": 0
+        },
+        "results": [
+          {
+            "id": "pure-1",
+            "workload": "PURE",
+            "files": [
+              "packages/object-store/test/local-store.spec.ts"
+            ],
+            "fileWorkers": 2,
+            "testConcurrency": 8,
+            "command": [
+              "bun",
+              "test",
+              "--no-orphans",
+              "--isolate",
+              "--parallel=2",
+              "--max-concurrency=8",
+              "--timeout=30000",
+              "packages/object-store/test/local-store.spec.ts"
+            ],
+            "status": 0,
+            "wallTimeMs": 90,
+            "peakRssBytes": null,
+            "cpuSeconds": null,
+            "counts": {
+              "passed": 12,
+              "failed": 0,
+              "skipped": 0
+            },
+            "stdoutTail": "bun test v1.4.0 (34cbb9a40) 2x PARALLEL\n",
+            "stderrTail": "\npackages/object-store/test/local-store.spec.ts:\n(pass) content addressing and dedup identity > stores bytes content-addressed and reads them back byte-exact [5.38ms]\n(pass) content addressing and dedup identity > dedups identical bytes under identical protected metadata [2.70ms]\n(pass) content addressing and dedup identity > never merges identical bytes that differ in rights/tenant/encryption/retention [2.68ms]\n(pass) content addressing and dedup identity > lists all versions of one content-hash identity in order [2.49ms]\n(pass) content addressing and dedup identity > resolution is precedence-based: a supplied version wins and metadata is ignored (ObjectLookup) [2.34ms]\n(pass) tamper detection fails explicitly > reports VERIFIED when bytes match and MISSING when absent [2.18ms]\n(pass) tamper detection fails explicitly > refuses malformed content hashes instead of deriving a path from them [0.30ms]\n(pass) tamper detection fails explicitly > reads a metadata-scoped miss as absent, never as another identity’s version [1.40ms]\n(pass) tamper detection fails explicitly > reports HASH_MISMATCH when stored bytes are tampered on disk [1.70ms]\n(pass) tamper detection fails explicitly > refuses to overwrite an existing immutable blob slot [2.47ms]\n(pass) tamper detection fails explicitly > surfaces corrupt protection metadata instead of reporting absence [2.80ms]\n(pass) tamper detection fails explicitly > treats unparsable protection-metadata filenames as layout corruption (EH-L2) [2.00ms]\n\n 12 pass\n 0 fail\n 34 expect() calls\nRan 12 tests across 1 file. [72.00ms]\n"
+          }
+        ]
+      },
+      "codexCalls": 0,
+      "claudeCalls": 0,
+      "testedHead": "922204dfa1a5f922f5695608ac44345428883980"
     },
     {
       "id": "mechanical--foresift-persistence-database-pglite-1",

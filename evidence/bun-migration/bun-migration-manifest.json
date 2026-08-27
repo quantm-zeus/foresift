@@ -1,14 +1,14 @@
 {
   "schema": "foresift/bun-migration-manifest@1",
   "migrationId": "bun-test-authority-v1",
-  "generatedAt": "2026-08-27T01:49:32.818Z",
+  "generatedAt": "2026-08-27T01:49:33.213Z",
   "root": ".",
   "totalTestFiles": 219,
   "counts": {
-    "CODEMOD_READY": 84,
+    "CODEMOD_READY": 83,
     "AGY_REQUIRED": 17,
     "MIGRATED": 76,
-    "VERIFIED": 42,
+    "VERIFIED": 43,
     "BLOCKED": 0
   },
   "parity": {
@@ -1601,28 +1601,24 @@
     {
       "path": "packages/security/test/scanner-exit-contract.spec.ts",
       "package": "@foresift/security",
-      "bytes": 3440,
+      "bytes": 3442,
       "lines": 79,
-      "sha256": "2d04869a9dbb860c43219c6eda21ae049129ae9f65dd0093ad2ae70b97551eb3",
+      "sha256": "40f78b99e41ddbbc15e2ca8da26ab565ab906828bc408e6ff4735ec1e38db793",
       "imports": [
         "node:child_process",
         "node:fs",
         "node:os",
         "node:path",
         "node:url",
-        "vitest"
+        "bun:test"
       ],
-      "vitestImports": [
-        "describe",
-        "expect",
-        "it"
-      ],
+      "vitestImports": [],
       "features": [],
       "workload": "PROCESS",
-      "migrationType": "EASY_MECHANICAL",
+      "migrationType": "ALREADY_MIGRATED",
       "fixturesAndHelpers": [],
       "sourceAnchors": [],
-      "state": "CODEMOD_READY"
+      "state": "VERIFIED"
     },
     {
       "path": "packages/security/test/schema-parity.spec.ts",
@@ -7527,7 +7523,8 @@
       },
       "codexCalls": 0,
       "claudeCalls": 0,
-      "testedHead": "e85a0c951ce00d5a7f5ea0da7a6724293fda7988"
+      "testedHead": "e85a0c951ce00d5a7f5ea0da7a6724293fda7988",
+      "checkpointHead": "654747780bda57edf07c52dad40204bf3e665c55"
     },
     {
       "id": "mechanical--foresift-security-process-1",
@@ -7536,7 +7533,53 @@
       "files": [
         "packages/security/test/scanner-exit-contract.spec.ts"
       ],
-      "state": "PENDING"
+      "state": "VERIFIED",
+      "verification": {
+        "ok": true,
+        "wallTimeMs": 297,
+        "peakRssBytes": 0,
+        "cpuSeconds": 0,
+        "counts": {
+          "passed": 3,
+          "failed": 0,
+          "skipped": 0
+        },
+        "results": [
+          {
+            "id": "process-1",
+            "workload": "PROCESS",
+            "files": [
+              "packages/security/test/scanner-exit-contract.spec.ts"
+            ],
+            "fileWorkers": 1,
+            "testConcurrency": 2,
+            "command": [
+              "bun",
+              "test",
+              "--no-orphans",
+              "--isolate",
+              "--parallel=1",
+              "--max-concurrency=2",
+              "--timeout=30000",
+              "packages/security/test/scanner-exit-contract.spec.ts"
+            ],
+            "status": 0,
+            "wallTimeMs": 297,
+            "peakRssBytes": null,
+            "cpuSeconds": null,
+            "counts": {
+              "passed": 3,
+              "failed": 0,
+              "skipped": 0
+            },
+            "stdoutTail": "bun test v1.4.0 (34cbb9a40) 1x PARALLEL\n",
+            "stderrTail": "\npackages/security/test/scanner-exit-contract.spec.ts:\n(pass) prohibited-capability scanner exit contract > exits 1 with findings for a tree carrying prohibited capability text [32.16ms]\n(pass) prohibited-capability scanner exit contract > exits 1 with UNSCANNABLE_FILE when evidence becomes unreadable — skipping is not silence [27.17ms]\n(pass) prohibited-capability scanner exit contract > exits 0 CLEAN over the real repository tree (fixture corpus excluded from its own verdict) [196.88ms]\n\n 3 pass\n 0 fail\n 10 expect() calls\nRan 3 tests across 1 file. [282.00ms]\n"
+          }
+        ]
+      },
+      "codexCalls": 0,
+      "claudeCalls": 0,
+      "testedHead": "654747780bda57edf07c52dad40204bf3e665c55"
     },
     {
       "id": "mechanical--foresift-security-pure-1",

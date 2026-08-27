@@ -7,7 +7,7 @@
  */
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 import { PGlite } from '@electric-sql/pglite';
 import {
   chainIdentity,
@@ -314,11 +314,13 @@ describe('feature-definition re-registration semantics', () => {
     expect(rows.rows).toHaveLength(1);
   });
 
-  it.each([
+  const divergenceCases = [
     ['name', { name: 'rolling-volume-impostor' }],
     ['version', { version: 99 }],
     ['unit_semantics', { unitSemantics: 'USD_PER_SECOND' }],
-  ])('refuses divergence in %s and keeps the stored definition', async (_column, override) => {
+  ] as const;
+  for (const [column, override] of divergenceCases) {
+    it(`refuses divergence in ${column} and keeps the stored definition`, async () => {
     // The probe carries its own distinct content so each attempt diverges in
     // EXACTLY one column without touching UNIQUE (name, version) — this block
     // pins the insert-or-verify convention, not that schema constraint.
@@ -347,4 +349,5 @@ describe('feature-definition re-registration semantics', () => {
       unit_semantics: probeContent.unitSemantics,
     });
   });
+  }
 });

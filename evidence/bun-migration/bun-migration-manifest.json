@@ -1,14 +1,14 @@
 {
   "schema": "foresift/bun-migration-manifest@1",
   "migrationId": "bun-test-authority-v1",
-  "generatedAt": "2026-08-27T01:49:33.951Z",
+  "generatedAt": "2026-08-27T01:49:34.160Z",
   "root": ".",
   "totalTestFiles": 219,
   "counts": {
-    "CODEMOD_READY": 71,
+    "CODEMOD_READY": 70,
     "AGY_REQUIRED": 17,
     "MIGRATED": 76,
-    "VERIFIED": 55,
+    "VERIFIED": 56,
     "BLOCKED": 0
   },
   "parity": {
@@ -1866,26 +1866,22 @@
     {
       "path": "packages/tenant-isolation/test/tenant-isolation.spec.ts",
       "package": "@foresift/tenant-isolation",
-      "bytes": 13188,
+      "bytes": 13190,
       "lines": 373,
-      "sha256": "76e517c550d7b87d122e628826f8efcd95124c3dfc47b6d33260703ac5987632",
+      "sha256": "9fa07af4b5e4556c7421df129fade3712878a71b7ddcff51f2c73f7064ce5b04",
       "imports": [
-        "vitest",
+        "bun:test",
         "../src/index.ts"
       ],
-      "vitestImports": [
-        "describe",
-        "expect",
-        "it"
-      ],
+      "vitestImports": [],
       "features": [],
       "workload": "PURE",
-      "migrationType": "EASY_MECHANICAL",
+      "migrationType": "ALREADY_MIGRATED",
       "fixturesAndHelpers": [],
       "sourceAnchors": [
         "../src/index.ts"
       ],
-      "state": "CODEMOD_READY"
+      "state": "VERIFIED"
     },
     {
       "path": "packages/tool-core/test/cache-key.spec.ts",
@@ -7673,7 +7669,8 @@
       },
       "codexCalls": 0,
       "claudeCalls": 0,
-      "testedHead": "07f92fbaa3a381fc7fc37ec17499948469ba95eb"
+      "testedHead": "07f92fbaa3a381fc7fc37ec17499948469ba95eb",
+      "checkpointHead": "bf2a970708dadc3779f40ae9c0882283cb354d44"
     },
     {
       "id": "mechanical--foresift-tenant-isolation-pure-1",
@@ -7682,7 +7679,53 @@
       "files": [
         "packages/tenant-isolation/test/tenant-isolation.spec.ts"
       ],
-      "state": "PENDING"
+      "state": "VERIFIED",
+      "verification": {
+        "ok": true,
+        "wallTimeMs": 103,
+        "peakRssBytes": 0,
+        "cpuSeconds": 0,
+        "counts": {
+          "passed": 24,
+          "failed": 0,
+          "skipped": 0
+        },
+        "results": [
+          {
+            "id": "pure-1",
+            "workload": "PURE",
+            "files": [
+              "packages/tenant-isolation/test/tenant-isolation.spec.ts"
+            ],
+            "fileWorkers": 2,
+            "testConcurrency": 8,
+            "command": [
+              "bun",
+              "test",
+              "--no-orphans",
+              "--isolate",
+              "--parallel=2",
+              "--max-concurrency=8",
+              "--timeout=30000",
+              "packages/tenant-isolation/test/tenant-isolation.spec.ts"
+            ],
+            "status": 0,
+            "wallTimeMs": 103,
+            "peakRssBytes": null,
+            "cpuSeconds": null,
+            "counts": {
+              "passed": 24,
+              "failed": 0,
+              "skipped": 0
+            },
+            "stdoutTail": "bun test v1.4.0 (34cbb9a40) 2x PARALLEL\n",
+            "stderrTail": "\npackages/tenant-isolation/test/tenant-isolation.spec.ts:\n(pass) tenant context derivation (T129) > derives schema-valid contexts and rejects malformed ones [1.14ms]\n(pass) tenant context derivation (T129) > treats isolation as active for everything but PUBLIC [0.05ms]\n(pass) namespaced keys across the isolated surfaces (T129, AC-275) > derives tenant-prefixed keys for EVERY isolated surface [0.20ms]\n(pass) namespaced keys across the isolated surfaces (T129, AC-275) > keeps tenants in disjoint namespaces even for identical keys [0.05ms]\n(pass) namespaced keys across the isolated surfaces (T129, AC-275) > refuses traversal, absolute, empty, and NUL keys [0.19ms]\n(pass) namespaced keys across the isolated surfaces (T129, AC-275) > derives OPAQUE model-context partitions that never leak tenant ids [0.39ms]\n(pass) namespaced keys across the isolated surfaces (T129, AC-275) > provides queue/session derivations through the same namespace rule [0.05ms]\n(pass) fail-closed row scoping (T130) > composes parameterized tenant predicates [0.15ms]\n(pass) fail-closed row scoping (T130) > builds scoped SELECTs with the predicate always present [0.15ms]\n(pass) fail-closed row scoping (T130) > REFUSES unscoped selects while isolation is active — even on request [0.09ms]\n(pass) fail-closed row scoping (T130) > allows explicit unscoped selects ONLY in PUBLIC mode [0.04ms]\n(pass) fail-closed row scoping (T130) > asserts row ownership and refuses missing or foreign owners [0.16ms]\n(pass) signed URLs (T131) > round-trips mint → validate within audience/tenant/method/uri bindings [0.62ms]\n(pass) signed URLs (T131) > refuses tampered payloads, wrong audiences, methods, and foreign tenants [0.37ms]\n(pass) signed URLs (T131) > enforces expiry against the injected clock [0.15ms]\n(pass) resource-access authorization bypass battery (T131, AC-252) > admits same-tenant URIs holding scope and rights [0.44ms]\n(pass) resource-access authorization bypass battery (T131, AC-252) > refuses cross-tenant URIs regardless of query decoration [0.11ms]\n(pass) resource-access authorization bypass battery (T131, AC-252) > refuses path-confusion vectors before any fetch [0.22ms]\n(pass) resource-access authorization bypass battery (T131, AC-252) > refuses plainly foreign tenants as CROSS_TENANT [0.07ms]\n(pass) resource-access authorization bypass battery (T131, AC-252) > normalizes benign paths without refusing them [0.03ms]\n(pass) resource-access authorization bypass battery (T131, AC-252) > rejects another tenant's signed URL replayed into the query [0.21ms]\n(pass) resource-access authorization bypass battery (T131, AC-252) > refuses ranged reads without the dedicated right [0.16ms]\n(pass) resource-access authorization bypass battery (T131, AC-252) > re-authorizes redirect targets from scratch [0.16ms]\n(pass) resource-access authorization bypass battery (T131, AC-252) > refuses callers with no recognized scope or no rights at all [0.09ms]\n\n 24 pass\n 0 fail\n 78 expect() calls\nRan 24 tests across 1 file. [86.00ms]\n"
+          }
+        ]
+      },
+      "codexCalls": 0,
+      "claudeCalls": 0,
+      "testedHead": "bf2a970708dadc3779f40ae9c0882283cb354d44"
     },
     {
       "id": "mechanical-acceptance-database-pglite-1",

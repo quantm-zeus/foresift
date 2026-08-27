@@ -1,14 +1,14 @@
 {
   "schema": "foresift/bun-migration-manifest@1",
   "migrationId": "bun-test-authority-v1",
-  "generatedAt": "2026-08-27T01:58:36.190Z",
+  "generatedAt": "2026-08-27T01:58:36.533Z",
   "root": ".",
   "totalTestFiles": 219,
   "counts": {
     "CODEMOD_READY": 0,
     "AGY_REQUIRED": 17,
-    "MIGRATED": 41,
-    "VERIFIED": 161,
+    "MIGRATED": 39,
+    "VERIFIED": 163,
     "BLOCKED": 0
   },
   "parity": {
@@ -1495,7 +1495,7 @@
         "../src/decoder-authority.ts",
         "../src/supply-chain.ts"
       ],
-      "state": "MIGRATED"
+      "state": "VERIFIED"
     },
     {
       "path": "packages/security/test/oauth-credentials.spec.ts",
@@ -1649,7 +1649,7 @@
         "../src/secrets-policy.ts",
         "../src/claims-policy.ts"
       ],
-      "state": "MIGRATED"
+      "state": "VERIFIED"
     },
     {
       "path": "packages/security/test/threat-model-register.spec.ts",
@@ -9220,7 +9220,8 @@
       },
       "codexCalls": 0,
       "claudeCalls": 0,
-      "testedHead": "22da1df10b43016d9e0fd3e325d18a29ec667e47"
+      "testedHead": "22da1df10b43016d9e0fd3e325d18a29ec667e47",
+      "checkpointHead": "fd11676c342bbbd2c403e3e473401114d9da5f72"
     },
     {
       "id": "verify-existing--foresift-security-pure-1",
@@ -9230,7 +9231,55 @@
         "packages/security/test/negative-capability.spec.ts",
         "packages/security/test/secrets-claims.spec.ts"
       ],
-      "state": "PENDING"
+      "state": "VERIFIED",
+      "verification": {
+        "ok": true,
+        "wallTimeMs": 241,
+        "peakRssBytes": 0,
+        "cpuSeconds": 0,
+        "counts": {
+          "passed": 31,
+          "failed": 0,
+          "skipped": 0
+        },
+        "results": [
+          {
+            "id": "pure-1",
+            "workload": "PURE",
+            "files": [
+              "packages/security/test/negative-capability.spec.ts",
+              "packages/security/test/secrets-claims.spec.ts"
+            ],
+            "fileWorkers": 2,
+            "testConcurrency": 8,
+            "command": [
+              "bun",
+              "test",
+              "--no-orphans",
+              "--isolate",
+              "--parallel=2",
+              "--max-concurrency=8",
+              "--timeout=30000",
+              "packages/security/test/negative-capability.spec.ts",
+              "packages/security/test/secrets-claims.spec.ts"
+            ],
+            "status": 0,
+            "wallTimeMs": 241,
+            "peakRssBytes": null,
+            "cpuSeconds": null,
+            "counts": {
+              "passed": 31,
+              "failed": 0,
+              "skipped": 0
+            },
+            "stdoutTail": "bun test v1.4.0 (34cbb9a40) 2x PARALLEL\n",
+            "stderrTail": "y/test/negative-capability.spec.ts:\n(pass) runtime canary consumes the shared catalog (AC-255) > admits GMGN-shaped READ-ONLY wallet queries [0.41ms]\n(pass) runtime canary consumes the shared catalog (AC-255) > refuses forbidden execution variants with typed errors [0.58ms]\n(pass) runtime canary consumes the shared catalog (AC-255) > scans environment names against the shared forbidden lists [0.37ms]\n(pass) runtime canary consumes the shared catalog (AC-255) > flags inventory entries carrying forbidden action verbs [0.21ms]\n(pass) CLI ↔ canary fixture parity (AC-255) > classifies EVERY fixture identically on both surfaces [9.69ms]\n\npackages/security/test/secrets-claims.spec.ts:\n(pass) secrets policy: context / log / export / UI boundaries (AC-052) > refuses classified material toward model context by declaration [0.61ms]\n(pass) secrets policy: context / log / export / UI boundaries (AC-052) > detects secret-SHAPED material even when undeclared [0.26ms]\n(pass) secrets policy: context / log / export / UI boundaries (AC-052) > admits genuinely inert content [0.19ms]\n(pass) secrets policy: context / log / export / UI boundaries (AC-052) > redacts known reference values and material shapes from logs [0.30ms]\n(pass) secrets policy: context / log / export / UI boundaries (AC-052) > denies raw credential classes at export channels while keyed references pass [0.22ms]\n(pass) secrets policy: context / log / export / UI boundaries (AC-052) > allows only keyed REFERENCES to render in UI [0.16ms]\n(pass) secrets policy: context / log / export / UI boundaries (AC-052) > enforces environment separation: production secrets never referenced downward [0.17ms]\n(pass) secret lifecycle ledger > records rotation events with strictly ordered overlap windows [1.68ms]\n(pass) secret lifecycle ledger > couples incident invalidation to REVOKED lifecycle records [0.30ms]\n(pass) secret lifecycle ledger > validates configured classes against the registry [0.19ms]\n(pass) claims policy: prohibited claim classes (AC-276) > flags every prohibited class on its channel [0.96ms]\n(pass) claims policy: prohibited claim classes (AC-276) > admits compliant copy and refuses assertion-raising variants [0.33ms]\n(pass) claims policy: prohibited claim classes (AC-276) > screens per channel without cross-channel drift [0.40ms]\n(pass) public-output boundary (§35.12, AC-277) > ships a compliant body after stripping thresholds and entities [0.80ms]\n(pass) public-output boundary (§35.12, AC-277) > redacts EVERY threshold occurrence — partial redaction would still ship tuning values [0.27ms]\n(pass) public-output boundary (§35.12, AC-277) > refuses envelopes missing any required duty [1.39ms]\n(pass) public-output boundary (§35.12, AC-277) > refuses publication when the body carries prohibited claims [0.23ms]\n\npackages/security/test/negative-capability.spec.ts:\n(pass) CLI ↔ canary fixture parity (AC-255) > repo-root scan stays CLEAN while the excluded fixture corpus is detected [173.03ms]\n(pass) decoder-authority validator (AC-256) > accepts deprecated parsers only as fallbacks beside the raw local path [0.34ms]\n(pass) decoder-authority validator (AC-256) > REFUSES a deprecated parser marked sole/authoritative [0.26ms]\n(pass) decoder-authority validator (AC-256) > refuses deprecated decoders running without the raw local decoding pass [0.15ms]\n(pass) decoder-authority validator (AC-256) > requires explicit per-decoder acknowledgement for running deprecated parsers (L21) [0.20ms]\n(pass) supply-chain policy (FR-SEC-006) > requires EXACT version pins for production dependencies [0.44ms]\n(pass) supply-chain policy (FR-SEC-006) > records lockfile, SBOM, and build-hash records deterministically [0.39ms]\n(pass) supply-chain policy (FR-SEC-006) > refuses restricted lifecycle scripts and flags capability review [0.41ms]\n(pass) refuses incomplete SBOM inventories, attestations, and missing lockfiles (M22) [0.28ms]\n\n 31 pass\n 0 fail\n 112 expect() calls\nRan 31 tests across 2 files. [228.00ms]\n"
+          }
+        ]
+      },
+      "codexCalls": 0,
+      "claudeCalls": 0,
+      "testedHead": "fd11676c342bbbd2c403e3e473401114d9da5f72"
     },
     {
       "id": "verify-existing--foresift-tenant-isolation-pure-1",

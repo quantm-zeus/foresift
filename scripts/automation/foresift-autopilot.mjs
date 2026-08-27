@@ -96,9 +96,16 @@ import {
   loadBunMigrationInputs,
   validateBunMigrationProof,
 } from './bun-migration-state.mjs';
-import { getMainCiStatus, validateDirectMainPushWhitelist } from './ci-authority.mjs';
+import { getMainCiStatus } from './ci-authority.mjs';
 import { landStateViaPR, recoverPendingStateLandings } from './state-landing.mjs';
 import { auditGitHubProtection } from './audit-github-protection.mjs';
+import {
+  createLaunchIntent,
+  associateRunIdWithIntent,
+  isPackageLaunchInFlight,
+  reconcileLaunchIntentsOnStartup,
+  discoverPendingLaunchIntents,
+} from './launch-intent.mjs';
 
 // Overridable for hermetic selftests (sandboxed fixture repo + state dir).
 const REPO = process.env.FORESIFT_AUTOPILOT_REPO ?? join(import.meta.dirname, '..', '..');
@@ -414,35 +421,6 @@ function commitStateViaPR(
 // Keep legacy name as alias: the supervisory loop uses commitStateViaPR (PR lane).
 const commitState = commitStateViaPR;
 
-/**
- * Operator-only direct-commit path for maintenance commands that run AFTER
- * the service unit has been stopped (--restart-package, --finalize-from-main,
- * --seed-package-planning). These are explicit operator actions, not
- * autonomous supervisory pushes. They still validate the whitelist.
- *
- * HARD LAW: This function MUST NOT be called from the supervisory loop (tick,
- * selectAndLaunch, etc.) — only from operator maintenance command handlers.
- */
-function commitStateDirect(pathspec, message) {
-  enqueue(() => {
-    if (!sh(`git add ${pathspec}`).ok) return log('WARN: git add failed');
-    if (sh('git diff --cached --quiet').ok) return; // nothing staged
-    const staged = sh('git diff --cached --name-only').out.split('\n').filter(Boolean);
-    const wl = validateDirectMainPushWhitelist(staged);
-    if (!wl.allowed) {
-      sh('git reset -q');
-      log(`WARN: operator direct commit refused (non-whitelist files): ${wl.reason}`);
-      return;
-    }
-    if (!sh(`git commit -m ${JSON.stringify(message)} -q`).ok) {
-      sh('git reset -q');
-      return log('WARN: operator state commit failed');
-    }
-    if (!sh('git push origin main --quiet').ok)
-      log('WARN: operator push failed (will require manual push)');
-  });
-}
-
 async function sleep(ms) {
   await new Promise((r) => setTimeout(r, ms));
 }
@@ -497,7 +475,7 @@ function launchIdentity(p) {
   };
 }
 
-function persistMilestoneState(ms, message, { direct = false } = {}) {
+function persistMilestoneState(ms, message) {
   const file = join(REPO, 'specs', 'implementation', 'current-milestone.json');
   writeFileSync(file, JSON.stringify(ms, null, 2) + '\n');
   // Keep supervisor-written state Prettier-clean: these chore commits land
@@ -507,22 +485,15 @@ function persistMilestoneState(ms, message, { direct = false } = {}) {
     'npx --no-install prettier --write --log-level silent specs/implementation/current-milestone.json',
   );
   if (!fmt.ok) log('WARN: prettier-format of milestone state skipped (cosmetic only)');
-  // Supervisory loop: PR-lane (HARD LAW: no direct main push from normal autopilot).
-  // Operator maintenance commands: direct commit (service unit must be stopped first).
-  if (direct) {
-    commitStateDirect('specs/implementation', message);
-  } else {
-    commitState('specs/implementation', message);
-  }
+  // Supervisory loop & operator commands: all use the protected PR-lane.
+  commitState('specs/implementation', message);
 }
 
-function setPackageStatus(ms, packageId, status, { direct = false } = {}) {
+function setPackageStatus(ms, packageId, status) {
   const pkg = findPackage(ms, packageId);
   if (!pkg || pkg.status === status) return false;
   pkg.status = status;
-  persistMilestoneState(ms, `chore(autopilot): ${ms.milestoneId}/${packageId} -> ${status}`, {
-    direct,
-  });
+  persistMilestoneState(ms, `chore(autopilot): ${ms.milestoneId}/${packageId} -> ${status}`);
   return true;
 }
 
@@ -1409,6 +1380,11 @@ async function actOnPendingAction(st, entry) {
       if (entry.kind === 'package') {
         // Durable Archon association established — only NOW may the package
         // move PENDING→RUNNING. Until this point the package was never RUNNING.
+        const pendingIntents = discoverPendingLaunchIntents(STATE_DIR);
+        const matched = pendingIntents.find((i) => i.packageId === entry.packageId);
+        if (matched) {
+          associateRunIdWithIntent(STATE_DIR, matched.intentId, id);
+        }
         try {
           const ms = loadCurrentMilestone(REPO);
           if (ms && findPackage(ms, entry.packageId)?.status === 'PENDING') {
@@ -1829,10 +1805,9 @@ function selectAndLaunch(st) {
 
   for (const cand of rankPendingPackages(ms)) {
     if (barrier.state === 'CURRENT_PACKAGE' && cand.id !== testPolicy.barrierAfterPackage) continue;
-    // Never re-select a package that already has a tracked active launch
-    // (covers the window where its run id is still being discovered and its
-    // status is therefore still PENDING).
+    // Never re-select a package that already has a tracked active launch or in-flight intent
     if (st.activeRuns.some((r) => r.packageId === cand.id && !r.done)) continue;
+    if (isPackageLaunchInFlight(STATE_DIR, cand.id)) continue;
     const elig = packageEligible(ms, cand);
     if (!elig.eligible) continue;
     const verdict = canStartPackage(roadmap, ms, cand, running);
@@ -1855,8 +1830,24 @@ function selectAndLaunch(st) {
       continue;
     }
     const { generation, branch, message, workflow: wf, executionProfile } = launchIdentity(cand);
+    // Two-Phase Launch Protocol: Phase A (Durable Launch Intent)
+    const intent = createLaunchIntent(STATE_DIR, {
+      packageId: cand.id,
+      generation,
+      executionProfile,
+      workflow: wf,
+      branch,
+      sourceSha: mainCi.sha,
+    });
+
     const ack = launchDetached(st, wf, branch, message, executionProfile);
     const runId = resolveRunId(ack, wf, message);
+
+    // Two-Phase Launch Protocol: Phase B (Real Run Association)
+    if (runId) {
+      associateRunIdWithIntent(STATE_DIR, intent.intentId, runId);
+    }
+
     record(st, 'work_package_launched', {
       packageId: cand.id,
       branch,
@@ -1865,6 +1856,7 @@ function selectAndLaunch(st) {
       executionProfile,
       ack: sanitizeAck(ack),
       runId,
+      intentId: intent.intentId,
       discovery: extractRunId(ack) ? 'ack' : 'runs-table',
     });
     trackRun(st, 'package', {
@@ -2471,7 +2463,7 @@ async function cmdRecoverFatal(positionalRunId) {
   // quota wall — the same in-flight window that protects automatic probes.
   entry.quotaProbeStartedAt = now();
   if (kind === 'package' && pkg.status === 'PENDING') {
-    setPackageStatus(ms, pkg.id, 'RUNNING', { direct: true });
+    setPackageStatus(ms, pkg.id, 'RUNNING');
     reconcileSeedAfterStateChore(st, pkg.id, branch);
   }
   st.pausedFatal = null;
@@ -2657,7 +2649,7 @@ async function cmdFinalizeFromMain(packageId, opts = {}) {
     return 1;
   }
   const ms = loadCurrentMilestone(REPO);
-  setPackageStatus(ms, packageId, 'PROVEN', { direct: true });
+  setPackageStatus(ms, packageId, 'PROVEN');
   if (verdict.evidence.terminalPauseRetired) st.pausedFatal = null;
   // Reconcile this package's own supervisor tracking rows — their run is
   // terminal (the evaluator refused any live one); retaining them would make
@@ -2927,11 +2919,10 @@ async function cmdRestartPackage(packageId, opts = {}) {
   // PENDING (the common restart case) and silently drop the generation bump,
   // so the unconditional writer backs it up.
   pkg.generation = toGeneration;
-  if (!setPackageStatus(ms, packageId, 'PENDING', { direct: true }))
+  if (!setPackageStatus(ms, packageId, 'PENDING'))
     persistMilestoneState(
       ms,
       `chore(autopilot): ${ms.milestoneId}/${packageId} -> generation ${toGeneration} (fresh restart)`,
-      { direct: true },
     );
   await new Promise((res) => {
     commitQueue = commitQueue.then(res, res);
@@ -3164,10 +3155,28 @@ async function main() {
     }
   }
 
-  // ── State-landing crash recovery ────────────────────────────────────────────
-  // On startup, discover any pending state-transition receipts and attempt to
-  // adopt their results (e.g. if the supervisor crashed after PR creation).
+  // ── Launch-intent & State-landing crash recovery ───────────────────────────
+  // On startup, reconcile any pending launch intents with Archon runs,
+  // and discover any pending state-transition receipts to resume landing.
   {
+    const runsList = archonJson('workflow runs --json --limit 50');
+    const archonRuns = Array.isArray(runsList)
+      ? runsList
+      : Array.isArray(runsList?.runs)
+        ? runsList.runs
+        : [];
+    const intentRecovery = reconcileLaunchIntentsOnStartup(STATE_DIR, {
+      archonRuns,
+      milestoneState: loadCurrentMilestone(REPO),
+      log,
+    });
+    if (intentRecovery.adopted.length > 0 || intentRecovery.dangling.length > 0) {
+      record(st, 'launch_intent_crash_recovery', {
+        adopted: intentRecovery.adopted.length,
+        dangling: intentRecovery.dangling.length,
+      });
+    }
+
     const recoveryResults = recoverPendingStateLandings({ stateDir: STATE_DIR, cwd: REPO, log });
     if (recoveryResults.length > 0) {
       record(st, 'state_landing_crash_recovery', {

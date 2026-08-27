@@ -59,10 +59,11 @@ export interface CiRepairRoute {
     | 'AGY_TEST_REPAIR'
     | 'CODEX_IMPLEMENTATION_REPAIR'
     | 'SPEC_INTEGRITY_REPAIR'
+    | 'TEST_DISPUTE'
     | 'MAINTAINER_ESCALATION'
     | 'MAINTAINER_INCIDENT';
   engine: 'FORMATTER' | 'NONE' | 'AGY' | 'CODEX' | 'CLAUDE';
-  role: 'mechanical' | 'infra' | 'test' | 'implementation' | 'maintainer';
+  role: 'mechanical' | 'infra' | 'test' | 'implementation' | 'dispute' | 'maintainer';
   action: string;
   reason: string;
   needsAi: boolean;
@@ -128,9 +129,21 @@ export function selectCiRepairRoute(opts?: {
   classification?: ClassifiedCiFailure | string;
   executionProfile?: string;
   failedFiles?: string[];
+  prChangedFiles?: string[];
   attempts?: number;
   maxAttempts?: number;
 }): CiRepairRoute;
+
+export interface TestDisputeResult {
+  decision: 'TEST_VALID' | 'TEST_DEFECT' | 'INCONCLUSIVE';
+  nextRoute: CiRepairRoute;
+}
+
+export function triageTestDispute(opts?: {
+  disputeAssessment?: 'TEST_VALID' | 'TEST_DEFECT' | 'INCONCLUSIVE' | string;
+  productFiles?: string[];
+  testFiles?: string[];
+}): TestDisputeResult;
 
 export function captureCiIncident(opts?: {
   sha: string;

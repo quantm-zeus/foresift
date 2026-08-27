@@ -1,6 +1,7 @@
 // state-landing.d.mts — Type declarations for the protected state landing lane.
 
 export declare const STATE_TRANSITIONS_DIR_NAME: string;
+export declare const STATE_WORKTREES_DIR_NAME: string;
 
 export interface StateTransitionReceipt {
   schema: 'foresift/state-transition@1';
@@ -28,7 +29,8 @@ export interface StateFileChange {
 export interface LandStateResult {
   ok: boolean;
   reason?: string;
-  receipt?: StateTransitionReceipt;
+  receipt?: StateTransitionReceipt | null;
+  step?: string;
 }
 
 export interface ValidateStateFilesResult {
@@ -39,60 +41,76 @@ export interface ValidateStateFilesResult {
 export interface AdoptMergedStateResult {
   adopted: boolean;
   mergedSha: string | null;
+  reason?: string;
 }
 
 export interface RecoverResult {
-  transitionId: string;
+  transitionId?: string;
+  receipt?: StateTransitionReceipt;
   adopted: boolean;
   mergedSha?: string | null;
   reason?: string;
 }
 
-/**
- * Validate that all file paths are on the state-only whitelist.
- * Accepts either string paths directly or StateFileChange objects.
- * Returns { ok: true } if all paths are allowed, or { ok: false, violations: [...] } otherwise.
- */
 export function validateStateFiles(
   fileChanges: string[] | StateFileChange[],
 ): ValidateStateFilesResult;
 
-/**
- * Discover all non-terminal (pending, branch_created, pr_created, ci_green) receipts.
- */
 export function discoverPendingReceipts(stateDir: string): StateTransitionReceipt[];
 
-/**
- * Check whether a receipt's PR has since been merged.
- * Returns { adopted: true, mergedSha } if merged, { adopted: false } otherwise.
- */
 export function adoptMergedState(opts: {
   receipt: StateTransitionReceipt;
+  fileChanges?: StateFileChange[];
   stateDir: string;
   cwd: string;
   ghFn?: (
     args: string[],
     opts?: { cwd?: string },
-  ) => { ok: boolean; stdout: string; stderr?: string };
+  ) => { ok: boolean; stdout: string; stderr?: string; status?: number };
+  gitFn?: (
+    args: string[],
+    opts?: { cwd?: string },
+  ) => { ok: boolean; stdout: string; stderr?: string; status?: number };
+  log?: (msg: string) => void;
 }): AdoptMergedStateResult;
 
-/**
- * On supervisor startup, discover pending state-transition receipts and attempt
- * to adopt their merged results (crash recovery).
- */
+export function advanceStateTransition(opts: {
+  receipt?: StateTransitionReceipt | null;
+  fileChanges: StateFileChange[];
+  message: string;
+  stateDir: string;
+  repoDir: string;
+  packageId?: string | null;
+  fromStatus?: string | null;
+  toStatus?: string | null;
+  repo?: string;
+  checkName?: string;
+  requiredAppId?: number;
+  ghFn?: (
+    args: string[],
+    opts?: { cwd?: string },
+  ) => { ok: boolean; stdout: string; stderr?: string; status?: number };
+  gitFn?: (
+    args: string[],
+    opts?: { cwd?: string },
+  ) => { ok: boolean; stdout: string; stderr?: string; status?: number };
+  log?: (msg: string) => void;
+}): LandStateResult;
+
 export function recoverPendingStateLandings(opts: {
   stateDir: string;
   cwd: string;
-  log: (msg: string) => void;
+  ghFn?: (
+    args: string[],
+    opts?: { cwd?: string },
+  ) => { ok: boolean; stdout: string; stderr?: string; status?: number };
+  gitFn?: (
+    args: string[],
+    opts?: { cwd?: string },
+  ) => { ok: boolean; stdout: string; stderr?: string; status?: number };
+  log?: (msg: string) => void;
 }): RecoverResult[];
 
-/**
- * Protected state landing lane: creates a temp branch, applies state file changes,
- * pushes, creates a PR, waits for CI, and squash-merges.
- *
- * HARD LAW: This is the ONLY path for normal autopilot state mutations.
- * No direct push to main is permitted.
- */
 export function landStateViaPR(opts: {
   fileChanges: StateFileChange[];
   message: string;
@@ -101,9 +119,18 @@ export function landStateViaPR(opts: {
   packageId?: string | null;
   fromStatus?: string | null;
   toStatus?: string | null;
-  log?: (msg: string) => void;
+  repo?: string;
+  checkName?: string;
+  requiredAppId?: number;
+  deadlineMs?: number;
+  pollMs?: number;
   ghFn?: (
     args: string[],
     opts?: { cwd?: string },
-  ) => { ok: boolean; stdout: string; stderr?: string };
+  ) => { ok: boolean; stdout: string; stderr?: string; status?: number };
+  gitFn?: (
+    args: string[],
+    opts?: { cwd?: string },
+  ) => { ok: boolean; stdout: string; stderr?: string; status?: number };
+  log?: (msg: string) => void;
 }): LandStateResult;

@@ -12,11 +12,7 @@ export const DEFAULT_REPO = 'quantm-zeus/foresift';
  * Deterministic whitelist of files that autopilot is permitted to commit directly to main.
  * Product code, tests, configs, workflows, and root dependencies are strictly prohibited.
  */
-export const STATE_ONLY_WHITELIST = [
-  /^specs\/implementation\/current-milestone\.json$/,
-  /^specs\/implementation\/roadmap\.json$/,
-  /^specs\/g0-[a-zA-Z0-9_-]+\/(?:plan|spec|tasks)\.md$/,
-];
+export const STATE_ONLY_WHITELIST = [/^specs\/implementation\/current-milestone\.json$/];
 
 export function validateDirectMainPushWhitelist(files = []) {
   const violations = files.filter(
@@ -452,6 +448,7 @@ export function selectCiRepairRoute({
   classification,
   executionProfile = 'CODEX_AGY',
   failedFiles = [],
+  prChangedFiles = [],
   attempts = 0,
   maxAttempts = 2,
 } = {}) {
@@ -491,27 +488,35 @@ export function selectCiRepairRoute({
     };
   }
 
-  // Check file ownership if files are identified
-  const hasTestFiles = failedFiles.some((f) => classifyOwnedPath(f) === 'TEST');
-  const hasProductFiles = failedFiles.some((f) => classifyOwnedPath(f) === 'PRODUCT');
-
-  if (hasTestFiles && !hasProductFiles) {
+  if (category === 'SPEC') {
     return {
-      route: 'AGY_TEST_REPAIR',
-      engine: 'AGY',
-      role: 'test',
-      action: 'RETRY_AGY_TEST',
-      reason: 'test-owned failure scope routed to AGY test authority',
+      route: 'SPEC_INTEGRITY_REPAIR',
+      engine: 'CLAUDE',
+      role: 'maintainer',
+      action: 'REPAIR_CONTROL_PLANE',
+      reason: 'spec verification failure requires maintainer control-plane repair',
       needsAi: true,
     };
   }
 
-  if (
-    category === 'LINT' ||
-    category === 'TYPECHECK' ||
-    category === 'TESTS' ||
-    category === 'PRODUCT'
-  ) {
+  const prHasProduct = prChangedFiles.some((f) => classifyOwnedPath(f) === 'PRODUCT');
+  const prHasTest = prChangedFiles.some((f) => classifyOwnedPath(f) === 'TEST');
+
+  const diagHasProduct = failedFiles.some((f) => classifyOwnedPath(f) === 'PRODUCT');
+  const diagHasTest = failedFiles.some((f) => classifyOwnedPath(f) === 'TEST');
+
+  // CASE A: Syntax/type/lint in test file
+  if (category === 'TYPECHECK' || category === 'LINT') {
+    if (diagHasTest && !diagHasProduct && !prHasProduct) {
+      return {
+        route: 'AGY_TEST_REPAIR',
+        engine: 'AGY',
+        role: 'test',
+        action: 'RETRY_AGY_TEST',
+        reason: 'test helper/fixture syntax or type defect routed to AGY test authority',
+        needsAi: true,
+      };
+    }
     if (executionProfile === 'CODEX_AGY') {
       return {
         route: 'CODEX_IMPLEMENTATION_REPAIR',
@@ -524,15 +529,95 @@ export function selectCiRepairRoute({
     }
   }
 
-  if (category === 'SPEC') {
+  // TESTS assertion failures (Section 13):
+  if (category === 'TESTS') {
+    // CASE D: Both product and test modified in PR -> TEST_DISPUTE
+    if (prHasProduct && prHasTest) {
+      return {
+        route: 'TEST_DISPUTE',
+        engine: 'NONE',
+        role: 'dispute',
+        action: 'TRIAGE_TEST_DISPUTE',
+        reason:
+          'both product and test files modified in PR — requires structured TEST_DISPUTE triage',
+        needsAi: true,
+      };
+    }
+
+    // CASE B: Product code modified in PR, test was NOT modified -> CODEX
+    if (prHasProduct && !prHasTest) {
+      if (executionProfile === 'CODEX_AGY') {
+        return {
+          route: 'CODEX_IMPLEMENTATION_REPAIR',
+          engine: 'CODEX',
+          role: 'implementation',
+          action: 'RETRY_CODEX',
+          reason:
+            'product assertion failure with unchanged test expectation routed to Codex repair path',
+          needsAi: true,
+        };
+      }
+    }
+
+    // CASE C: Only test code modified in PR -> AGY
+    if (!prHasProduct && prHasTest) {
+      return {
+        route: 'AGY_TEST_REPAIR',
+        engine: 'AGY',
+        role: 'test',
+        action: 'RETRY_AGY_TEST',
+        reason: 'test-owned failure scope routed to AGY test authority',
+        needsAi: true,
+      };
+    }
+
+    // If PR changed files unknown / not provided, check diagnostics
+    if (diagHasProduct) {
+      if (executionProfile === 'CODEX_AGY') {
+        return {
+          route: 'CODEX_IMPLEMENTATION_REPAIR',
+          engine: 'CODEX',
+          role: 'implementation',
+          action: 'RETRY_CODEX',
+          reason: 'product failure routed to Codex',
+          needsAi: true,
+        };
+      }
+    }
+
+    if (diagHasTest && !diagHasProduct) {
+      return {
+        route: 'AGY_TEST_REPAIR',
+        engine: 'AGY',
+        role: 'test',
+        action: 'RETRY_AGY_TEST',
+        reason: 'test-owned failure scope routed to AGY test authority',
+        needsAi: true,
+      };
+    }
+
+    // Unclear causal ownership: never blindly AGY -> TEST_DISPUTE
     return {
-      route: 'SPEC_INTEGRITY_REPAIR',
-      engine: 'CLAUDE',
-      role: 'maintainer',
-      action: 'REPAIR_CONTROL_PLANE',
-      reason: 'spec verification failure requires maintainer control-plane repair',
+      route: 'TEST_DISPUTE',
+      engine: 'NONE',
+      role: 'dispute',
+      action: 'TRIAGE_TEST_DISPUTE',
+      reason: 'ambiguous assertion failure ownership — routed to structured TEST_DISPUTE',
       needsAi: true,
     };
+  }
+
+  if (category === 'PRODUCT' || category === 'NODE_COMPAT') {
+    if (executionProfile === 'CODEX_AGY') {
+      return {
+        route: 'CODEX_IMPLEMENTATION_REPAIR',
+        engine: 'CODEX',
+        role: 'implementation',
+        action: 'RETRY_CODEX',
+        reason: 'product defect routed to Codex repair path',
+        needsAi: true,
+      };
+    }
   }
 
   return {
@@ -542,6 +627,51 @@ export function selectCiRepairRoute({
     action: 'BLOCKED_OPERATOR_REQUIRED',
     reason: `unclassified failure (${category}) escalated to maintainer`,
     needsAi: true,
+  };
+}
+
+/**
+ * Triage a TEST_DISPUTE into structured next action.
+ */
+export function triageTestDispute({ disputeAssessment } = {}) {
+  if (disputeAssessment === 'TEST_VALID') {
+    return {
+      decision: 'TEST_VALID',
+      nextRoute: {
+        route: 'CODEX_IMPLEMENTATION_REPAIR',
+        engine: 'CODEX',
+        role: 'implementation',
+        action: 'RETRY_CODEX',
+        reason: 'test validated as correct; product implementation defect routed to Codex',
+        needsAi: true,
+      },
+    };
+  }
+
+  if (disputeAssessment === 'TEST_DEFECT') {
+    return {
+      decision: 'TEST_DEFECT',
+      nextRoute: {
+        route: 'AGY_TEST_REPAIR',
+        engine: 'AGY',
+        role: 'test',
+        action: 'RETRY_AGY_TEST',
+        reason: 'test defect confirmed by triage; routed to AGY test repair',
+        needsAi: true,
+      },
+    };
+  }
+
+  return {
+    decision: 'INCONCLUSIVE',
+    nextRoute: {
+      route: 'MAINTAINER_ESCALATION',
+      engine: 'CLAUDE',
+      role: 'maintainer',
+      action: 'BLOCKED_OPERATOR_REQUIRED',
+      reason: 'dispute triage inconclusive; escalated to maintainer',
+      needsAi: true,
+    },
   };
 }
 

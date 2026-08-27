@@ -2,7 +2,7 @@ import { spawn } from 'node:child_process';
 import { mkdtemp, cp, readFile, writeFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { afterAll, describe, expect, it } from 'vitest';
+import { afterAll, describe, expect, it } from 'bun:test';
 
 const REPO_ROOT = join(import.meta.dirname, '..');
 
@@ -63,7 +63,7 @@ describe('spec:verify against the authoritative specification', () => {
     }
   });
 
-  it.each([
+  const failureScenarios = [
     {
       name: 'tampered SHA256SUMS entry',
       mutate: async (root: string) => {
@@ -88,18 +88,21 @@ describe('spec:verify against the authoritative specification', () => {
       },
       expectedIssue: 'LEGACY_BRANDING_OUTSIDE_ALLOWLIST',
     },
-  ])('fails on $name', async ({ name, mutate, expectedIssue }) => {
-    const tempRoot = await mkdtemp(
-      join(tmpdir(), `foresift-spec-${name.includes('branding') ? 'b' : 's'}-`),
-    );
-    tempRoots.push(tempRoot);
-    await cp(REPO_ROOT, tempRoot, {
-      recursive: true,
-      filter: (source) => !source.includes(`${'node_modules'}`),
+  ];
+  for (const { name, mutate, expectedIssue } of failureScenarios) {
+    it(`fails on ${name}`, async () => {
+      const tempRoot = await mkdtemp(
+        join(tmpdir(), `foresift-spec-${name.includes('branding') ? 'b' : 's'}-`),
+      );
+      tempRoots.push(tempRoot);
+      await cp(REPO_ROOT, tempRoot, {
+        recursive: true,
+        filter: (source) => !source.includes(`${'node_modules'}`),
+      });
+      await mutate(tempRoot);
+      const result = await runSpecVerify(tempRoot);
+      expect(result.code, `${name} should fail verification`).toBe(1);
+      expect(result.stderr).toContain(expectedIssue);
     });
-    await mutate(tempRoot);
-    const result = await runSpecVerify(tempRoot);
-    expect(result.code, `${name} should fail verification`).toBe(1);
-    expect(result.stderr).toContain(expectedIssue);
-  });
+  }
 });

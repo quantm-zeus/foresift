@@ -1,14 +1,14 @@
 {
   "schema": "foresift/bun-migration-manifest@1",
   "migrationId": "bun-test-authority-v1",
-  "generatedAt": "2026-08-27T01:48:37.060Z",
+  "generatedAt": "2026-08-27T01:48:37.374Z",
   "root": ".",
   "totalTestFiles": 219,
   "counts": {
-    "CODEMOD_READY": 94,
+    "CODEMOD_READY": 91,
     "AGY_REQUIRED": 17,
     "MIGRATED": 76,
-    "VERIFIED": 32,
+    "VERIFIED": 35,
     "BLOCKED": 0
   },
   "parity": {
@@ -1098,11 +1098,11 @@
     {
       "path": "packages/providers/test/adapter-contract.spec.ts",
       "package": "@foresift/providers",
-      "bytes": 8372,
+      "bytes": 8374,
       "lines": 225,
-      "sha256": "ff7cc82c43278b3399b1945eda793fae777f3a5ae290e9ce06a2a6b6ab8b469d",
+      "sha256": "cb418975eff8ed2651ca0fe64e1c4154a1d2ffc917389e9201db79c613227a94",
       "imports": [
-        "vitest",
+        "bun:test",
         "node:fs",
         "zod",
         "../src/index.ts",
@@ -1110,14 +1110,10 @@
         "../src/index.ts",
         "./helpers.ts"
       ],
-      "vitestImports": [
-        "describe",
-        "expect",
-        "it"
-      ],
+      "vitestImports": [],
       "features": [],
       "workload": "PURE",
-      "migrationType": "EASY_MECHANICAL",
+      "migrationType": "ALREADY_MIGRATED",
       "fixturesAndHelpers": [
         "./helpers.ts"
       ],
@@ -1128,29 +1124,25 @@
         "../src/index.ts",
         "./helpers.ts"
       ],
-      "state": "CODEMOD_READY"
+      "state": "VERIFIED"
     },
     {
       "path": "packages/providers/test/gmgn-adapter.spec.ts",
       "package": "@foresift/providers",
-      "bytes": 3902,
+      "bytes": 3904,
       "lines": 91,
-      "sha256": "f2e0cd4b2704f82b5219192ce0a9fdafabcc11791e954e0dc857e584e55e4106",
+      "sha256": "81314ad3c655dbb7e60f855d24b2a58ed793a0139b3a31536ac0c8567bd6c9e5",
       "imports": [
-        "vitest",
+        "bun:test",
         "node:fs",
         "zod",
         "../src/index.ts",
         "./helpers.ts"
       ],
-      "vitestImports": [
-        "describe",
-        "expect",
-        "it"
-      ],
+      "vitestImports": [],
       "features": [],
       "workload": "PURE",
-      "migrationType": "EASY_MECHANICAL",
+      "migrationType": "ALREADY_MIGRATED",
       "fixturesAndHelpers": [
         "./helpers.ts"
       ],
@@ -1159,36 +1151,32 @@
         "../src/index.ts",
         "./helpers.ts"
       ],
-      "state": "CODEMOD_READY"
+      "state": "VERIFIED"
     },
     {
       "path": "packages/providers/test/helius-adapter.spec.ts",
       "package": "@foresift/providers",
-      "bytes": 7552,
+      "bytes": 7554,
       "lines": 188,
-      "sha256": "c373abea3a7a6f7b8e81c2ff02be87053aa5e1936f3cd216307d722ce6557e07",
+      "sha256": "c9f247da9e3088c4d3c8c624b091549e5553526341ad245f6bf6b33e5c61f62c",
       "imports": [
-        "vitest",
+        "bun:test",
         "node:fs",
         "../src/index.ts",
         "@foresift/security",
         "@foresift/security"
       ],
-      "vitestImports": [
-        "describe",
-        "expect",
-        "it"
-      ],
+      "vitestImports": [],
       "features": [],
       "workload": "PURE",
-      "migrationType": "EASY_MECHANICAL",
+      "migrationType": "ALREADY_MIGRATED",
       "fixturesAndHelpers": [],
       "sourceAnchors": [
         "../src/index.ts",
         "@foresift/security",
         "@foresift/security"
       ],
-      "state": "CODEMOD_READY"
+      "state": "VERIFIED"
     },
     {
       "path": "packages/providers/test/registration.spec.ts",
@@ -7275,7 +7263,8 @@
       },
       "codexCalls": 0,
       "claudeCalls": 0,
-      "testedHead": "6575a4c5257695426b345b954dfa459e575e7af2"
+      "testedHead": "6575a4c5257695426b345b954dfa459e575e7af2",
+      "checkpointHead": "5a5b30308f9466623640dc1d405adc32638cbb44"
     },
     {
       "id": "mechanical--foresift-providers-pure-1",
@@ -7286,7 +7275,57 @@
         "packages/providers/test/gmgn-adapter.spec.ts",
         "packages/providers/test/helius-adapter.spec.ts"
       ],
-      "state": "PENDING"
+      "state": "VERIFIED",
+      "verification": {
+        "ok": true,
+        "wallTimeMs": 211,
+        "peakRssBytes": 0,
+        "cpuSeconds": 0,
+        "counts": {
+          "passed": 29,
+          "failed": 0,
+          "skipped": 0
+        },
+        "results": [
+          {
+            "id": "pure-1",
+            "workload": "PURE",
+            "files": [
+              "packages/providers/test/adapter-contract.spec.ts",
+              "packages/providers/test/gmgn-adapter.spec.ts",
+              "packages/providers/test/helius-adapter.spec.ts"
+            ],
+            "fileWorkers": 2,
+            "testConcurrency": 8,
+            "command": [
+              "bun",
+              "test",
+              "--no-orphans",
+              "--isolate",
+              "--parallel=2",
+              "--max-concurrency=8",
+              "--timeout=30000",
+              "packages/providers/test/adapter-contract.spec.ts",
+              "packages/providers/test/gmgn-adapter.spec.ts",
+              "packages/providers/test/helius-adapter.spec.ts"
+            ],
+            "status": 0,
+            "wallTimeMs": 211,
+            "peakRssBytes": null,
+            "cpuSeconds": null,
+            "counts": {
+              "passed": 29,
+              "failed": 0,
+              "skipped": 0
+            },
+            "stdoutTail": "bun test v1.4.0 (34cbb9a40) 2x PARALLEL\n",
+            "stderrTail": "\npackages/providers/test/adapter-contract.spec.ts:\n(pass) T114 allowlist descriptor deny-by-default matrix > a fully declared request flows through egress + validation to data [6.85ms]\n(pass) T114 allowlist descriptor deny-by-default matrix > refuses an undeclared HTTP method [0.40ms]\n(pass) T114 allowlist descriptor deny-by-default matrix > refuses an undeclared query field (deny-by-default) [0.59ms]\n(pass) T114 allowlist descriptor deny-by-default matrix > refuses an undeclared JSON body field [0.44ms]\n(pass) T114 allowlist descriptor deny-by-default matrix > refuses a missing path parameter [0.30ms]\n(pass) T114 allowlist descriptor deny-by-default matrix > surfaces an undeclared DESTINATION as a typed egress refusal [0.60ms]\n(pass) T114 allowlist descriptor deny-by-default matrix > refuses responses on undeclared content types [0.66ms]\n(pass) T114 allowlist descriptor deny-by-default matrix > refuses responses above the declared byte cap [0.66ms]\n(pass) T114 allowlist descriptor deny-by-default matrix > refuses recorded responses that violate the operation response schema [1.41ms]\n(pass) T114 allowlist descriptor deny-by-default matrix > redirects follow the descriptor policy — REFUSE means REFUSE [0.67ms]\n(pass) T114 allowlist descriptor deny-by-default matrix > SAME_ORIGIN_APPROVED admits same-host hops and refuses cross-origin ones [0.33ms]\n(pass) T114 allowlist descriptor deny-by-default matrix > the end-to-end fixture passes through the full gate stack [0.85ms]\n\npackages/providers/test/gmgn-adapter.spec.ts:\n(pass) T116 GMGN query-only contract > enumerates EXACTLY the query operations and nothing else [0.13ms]\n(pass) T116 GMGN query-only contract > FAILS if any exposed operation id carries a trading-related shape [0.40ms]\n(pass) T116 GMGN query-only contract > every descriptor is GET-only JSON with empty request fields and refused redirects [0.14ms]\n(pass) T116 GMGN query-only contract > a trading-shaped operation can never be registered through the manifest [0.19ms]\n(pass) T116 GMGN query-only contract > clean recorded query fixtures flow end-to-end through allowlist + validation [4.85ms]\n\npackages/providers/test/helius-adapter.spec.ts:\n(pass) T117 Helius catalog separation > separates raw, standard history, deprecated parser, and plan-gated ops [0.48ms]\n(pass) T117 LOCAL supported-program decoding > decodes supported-program instructions deterministically with explicit coverage [0.46ms]\n(pass) T117 runtime gates > blocks the deprecated enhanced parser without a wired exception gate [0.44ms]\n(pass) T117 runtime gates > blocks the enhanced parser when the exception gate REFUSES (lapsed) [0.17ms]\n(pass) T117 runtime gates > admits the enhanced parser ONLY under a valid migration exception [0.13ms]\n(pass) T117 runtime gates > refuses plan-gated history on STRICT_FREE and admits on METERED [0.09ms]\n(pass) T117 runtime gates > raw normative operations never require an exception or plan gate [0.06ms]\n(pass) T118 decoder-authority wiring over REAL catalog entries > the normative raw/history-plus-local-decoding configuration PASSES [0.29ms]\n(pass) T118 decoder-authority wiring over REAL catalog entries > REFUSES the deprecated enhanced parser as SOLE authoritative decoder [0.32ms]\n(pass) T118 decoder-authority wiring over REAL catalog entries > REFUSES the deprecated enhanced parser as PRIMARY authority [0.06ms]\n(pass) T118 decoder-authority wiring over REAL catalog entries > REFUSES configurations running deprecated parsing WITHOUT the local decoding path [0.07ms]\n(pass) T118 decoder-authority wiring over REAL catalog entries > REFUSES deprecated parsers without explicit operator acknowledgement [0.12ms]\n\n 29 pass\n 0 fail\n 72 expect() calls\nRan 29 tests across 3 files. [196.00ms]\n"
+          }
+        ]
+      },
+      "codexCalls": 0,
+      "claudeCalls": 0,
+      "testedHead": "5a5b30308f9466623640dc1d405adc32638cbb44"
     },
     {
       "id": "mechanical--foresift-security-database-pglite-1",

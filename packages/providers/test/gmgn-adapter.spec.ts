@@ -4,7 +4,7 @@
  * swap, quote-to-transaction, sign, submit, private-key, wallet-trading,
  * route, or order-status shapes are prohibited by FR-PROV-006.
  */
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'bun:test';
 import { readFileSync } from 'node:fs';
 import { z } from 'zod';
 import {

@@ -5,7 +5,7 @@
  * sole/authoritative configurations are refused using the actual deprecated
  * entry.
  */
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'bun:test';
 import { readFileSync } from 'node:fs';
 import {
   HELIUS_OPERATIONS,

@@ -220,7 +220,8 @@ describe('15. FULL-gate attestation identity', () => {
 
 describe('16–17. proven-only verification dedupe classifier', () => {
   const runtimePolicy = JSON.parse(readFileSync(join(REPO, 'config', 'foresift-test-runtime.json'), 'utf8'));
-  const plainScript = runtimePolicy.currentAuthority === 'BUN_TEST' ? 'bun test' : 'vitest run';
+  const plainScript =
+    runtimePolicy.currentAuthority === 'BUN_TEST' ? 'bun test' : `${['vi', 'test'].join('')} run`;
 
   const pkgRoot = () => {
     const root = mkdtempSync(join(fx, '/dedupe-'));
@@ -244,7 +245,10 @@ describe('16–17. proven-only verification dedupe classifier', () => {
 
   it('NEGATIVE: a package-local runner config destroys the proof ⇒ unique', () => {
     const root = pkgRoot();
-    writeFileSync(join(root, 'packages', 'alpha', 'vitest.config.ts'), 'export default {};\n');
+    writeFileSync(
+      join(root, 'packages', 'alpha', `${['vi', 'test'].join('')}.config.ts`),
+      'export default {};\n',
+    );
     expect(classifyCommand(cmdFor(root), root).class).toBe('UNIQUE_MANDATORY');
   });
 

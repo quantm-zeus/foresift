@@ -259,7 +259,7 @@ describe('V2 impact-aware FAST verification routing (spec §7)', () => {
     expect(planFastChecks(c).map((s) => s.kind)).toEqual(['format-check']);
   });
 
-  it.each([
+  const escalateCases = [
     ['package.json', 'root manifest'],
     ['pnpm-lock.yaml', 'lockfile'],
     ['tsconfig.base.json', 'tsconfig'],
@@ -267,10 +267,13 @@ describe('V2 impact-aware FAST verification routing (spec §7)', () => {
     ['Dockerfile', 'extensionless root type'],
     ['weird.config.unknownext', 'unknown extension'],
     ['scripts/tool.rb', 'unknown language'],
-  ])('%s (%s) escalates FULL — unknown impact never guesses (spec §7)', (p) => {
-    expect(classifyPath(p)).toBe('ROOT_OR_UNKNOWN');
-    expect(classifyImpact([p]).escalateFull).toBe(true);
-  });
+  ] as const;
+  for (const [p, label] of escalateCases) {
+    it(`${p} (${label}) escalates FULL — unknown impact never guesses (spec §7)`, () => {
+      expect(classifyPath(p)).toBe('ROOT_OR_UNKNOWN');
+      expect(classifyImpact([p]).escalateFull).toBe(true);
+    });
+  }
 
   it('mixed slices inherit the strongest requirement (one unknown ⇒ FULL)', () => {
     const c = classifyImpact(['src/tiny.ts', 'package.json']);
@@ -481,20 +484,23 @@ describe('FAST affected-test step (graph-derived selection & fail-closed escalat
     expect(calls[0]?.args).toContain('tests/automation/v2-throughput.spec.ts');
   });
 
-  it.each([
+  const zeroMatchCases = [
     ['plain JS/TS', false],
     ['database', true],
-  ])('%s slice with zero matching tests escalates fail-closed', (_kind, database) => {
-    const { sh } = fakeSh('\nNo test files found, exiting with code 0\n');
-    const step: { kind: string; files: string[]; database?: boolean } = {
-      kind: 'affected-tests',
-      files: ['scripts/automation/unknown-orphan-module.mjs'],
-    };
-    if (database) step.database = true;
-    const out = runVitestRelatedStep(step as never, { repoRoot: REPO, sh });
-    expect(out.escalateReason).toMatch(/DELETED_UNKNOWN|ZERO_MATCH_FAIL_CLOSED/);
-    expect((out.logs ?? []).join(' ')).toMatch(/escalating to full suite/);
-  });
+  ] as const;
+  for (const [kind, database] of zeroMatchCases) {
+    it(`${kind} slice with zero matching tests escalates fail-closed`, () => {
+      const { sh } = fakeSh('\nNo test files found, exiting with code 0\n');
+      const step: { kind: string; files: string[]; database?: boolean } = {
+        kind: 'affected-tests',
+        files: ['scripts/automation/unknown-orphan-module.mjs'],
+      };
+      if (database) step.database = true;
+      const out = runVitestRelatedStep(step as never, { repoRoot: REPO, sh });
+      expect(out.escalateReason).toMatch(/DELETED_UNKNOWN|ZERO_MATCH_FAIL_CLOSED/);
+      expect((out.logs ?? []).join(' ')).toMatch(/escalating to full suite/);
+    });
+  }
 
   it('all paths absent/deleted without package fallback escalate fail-closed', () => {
     const missing = ['definitely/not/present.mjs'];

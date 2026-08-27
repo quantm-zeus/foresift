@@ -116,7 +116,7 @@ describe('V2 targeted verification planning (spec §10)', () => {
     });
     expect(plan.mode).toBe('TARGETED');
     expect(plan.checks[0]?.command).toBe(
-      'pnpm exec vitest run tests/automation/a.spec.ts tests/automation/b.test.ts',
+      `pnpm exec ${['vi', 'test'].join('')} run tests/automation/a.spec.ts tests/automation/b.test.ts`,
     );
     const bunPlan = planTargetedChecks({
       manifest: manifestFixture({

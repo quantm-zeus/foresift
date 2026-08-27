@@ -430,6 +430,7 @@ function runRestartCli(
       FORESIFT_AUTOPILOT_REPO: sb.fx.root,
       FORESIFT_AUTOPILOT_STATE_DIR: sb.stateDir,
       FORESIFT_SALVAGE_SKIP_INSTALL: '1', // fixture repos carry no pnpm workspace
+      FORESIFT_HERMETIC_CI_GREEN: '1',
       PATH: `${STUB_DIR}:${process.env.PATH ?? ''}`,
       FAKE_ARCHON_LOG: join(sb.stateDir, 'archon.log'),
       FAKE_RUNS_FILE: runsFile,

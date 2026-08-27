@@ -272,6 +272,7 @@ function tick(sandbox: Sandbox, args: string[] = ['--once'], opts: TickOpts = {}
       FORESIFT_AUTOPILOT_REPO: sandbox.fx.root,
       FORESIFT_AUTOPILOT_STATE_DIR: sandbox.stateDir,
       FORESIFT_SALVAGE_SKIP_INSTALL: '1',
+      FORESIFT_HERMETIC_CI_GREEN: '1',
       PATH: `${stubDir()}:${process.env.PATH ?? ''}`,
       FAKE_ARCHON_LOG: join(sandbox.stateDir, 'archon.log'),
       FAKE_RUNS_FILE: join(sandbox.stateDir, 'fake-runs.json'),

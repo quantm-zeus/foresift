@@ -1,14 +1,14 @@
 {
   "schema": "foresift/bun-migration-manifest@1",
   "migrationId": "bun-test-authority-v1",
-  "generatedAt": "2026-08-27T01:52:40.073Z",
+  "generatedAt": "2026-08-27T01:52:40.229Z",
   "root": ".",
   "totalTestFiles": 219,
   "counts": {
     "CODEMOD_READY": 0,
     "AGY_REQUIRED": 17,
-    "MIGRATED": 72,
-    "VERIFIED": 130,
+    "MIGRATED": 71,
+    "VERIFIED": 131,
     "BLOCKED": 0
   },
   "parity": {
@@ -1738,7 +1738,7 @@
         "@foresift/domain",
         "../src/core.ts"
       ],
-      "state": "MIGRATED"
+      "state": "VERIFIED"
     },
     {
       "path": "packages/shared-schemas/test/data.spec.ts",
@@ -8300,7 +8300,8 @@
       },
       "codexCalls": 0,
       "claudeCalls": 0,
-      "testedHead": "b3b3b52170357ee14a1e27bfd7bfd7905485ed90"
+      "testedHead": "b3b3b52170357ee14a1e27bfd7bfd7905485ed90",
+      "checkpointHead": "1e4c2afef821c1560233fccece7c801468bb026a"
     },
     {
       "id": "verify-existing--foresift-shared-schemas-pure-1",
@@ -8309,7 +8310,53 @@
       "files": [
         "packages/shared-schemas/test/core.spec.ts"
       ],
-      "state": "PENDING"
+      "state": "VERIFIED",
+      "verification": {
+        "ok": true,
+        "wallTimeMs": 66,
+        "peakRssBytes": 0,
+        "cpuSeconds": 0,
+        "counts": {
+          "passed": 27,
+          "failed": 0,
+          "skipped": 0
+        },
+        "results": [
+          {
+            "id": "pure-1",
+            "workload": "PURE",
+            "files": [
+              "packages/shared-schemas/test/core.spec.ts"
+            ],
+            "fileWorkers": 2,
+            "testConcurrency": 8,
+            "command": [
+              "bun",
+              "test",
+              "--no-orphans",
+              "--isolate",
+              "--parallel=2",
+              "--max-concurrency=8",
+              "--timeout=30000",
+              "packages/shared-schemas/test/core.spec.ts"
+            ],
+            "status": 0,
+            "wallTimeMs": 66,
+            "peakRssBytes": null,
+            "cpuSeconds": null,
+            "counts": {
+              "passed": 27,
+              "failed": 0,
+              "skipped": 0
+            },
+            "stdoutTail": "bun test v1.4.0 (34cbb9a40) 2x PARALLEL\n",
+            "stderrTail": "\npackages/shared-schemas/test/core.spec.ts:\n(pass) vocabulary mirrors equal the domain §16 constants by construction > ActionClassSchema accepts exactly the domain set [0.07ms]\n(pass) vocabulary mirrors equal the domain §16 constants by construction > WorkloadClassSchema accepts exactly the domain set\n(pass) vocabulary mirrors equal the domain §16 constants by construction > CacheOutcomeSchema accepts exactly the domain set\n(pass) vocabulary mirrors equal the domain §16 constants by construction > QuotaModelSchema accepts exactly the domain set\n(pass) vocabulary mirrors equal the domain §16 constants by construction > ReservationStateSchema accepts exactly the domain set\n(pass) vocabulary mirrors equal the domain §16 constants by construction > BackpressureActionSchema accepts exactly the domain set\n(pass) vocabulary mirrors equal the domain §16 constants by construction > HolderModeSchema accepts exactly the domain set\n(pass) vocabulary mirrors equal the domain §16 constants by construction > ToolProfileIdSchema accepts exactly the domain set\n(pass) vocabulary mirrors equal the domain §16 constants by construction > PipelineStageSchema accepts exactly the domain set\n(pass) accept matrices (round-trip stability) > ToolDefinitionMetadata accepts its fixture and round-trips byte-stable [2.23ms]\n(pass) accept matrices (round-trip stability) > ToolRegistryEntry accepts its fixture and round-trips byte-stable [0.45ms]\n(pass) accept matrices (round-trip stability) > ToolResultEnvelope accepts its fixture and round-trips byte-stable [0.58ms]\n(pass) accept matrices (round-trip stability) > ProviderConflictRef accepts its fixture and round-trips byte-stable [0.25ms]\n(pass) accept matrices (round-trip stability) > CacheKeyComponents accepts its fixture and round-trips byte-stable [0.19ms]\n(pass) accept matrices (round-trip stability) > SingleFlightLeaseRecord accepts its fixture and round-trips byte-stable [0.18ms]\n(pass) accept matrices (round-trip stability) > ExactCacheEntryRecord accepts its fixture and round-trips byte-stable [0.17ms]\n(pass) accept matrices (round-trip stability) > QuotaReservationRecord accepts its fixture and round-trips byte-stable [0.27ms]\n(pass) accept matrices (round-trip stability) > LicenseVerdict accepts its fixture and round-trips byte-stable [0.08ms]\n(pass) accept matrices (round-trip stability) > BlockedStatePayload accepts its fixture and round-trips byte-stable [0.07ms]\n(pass) refuse matrix > refuses PROHIBITED_FINANCIAL definitions structurally [0.60ms]\n(pass) refuse matrix > refuses every strict object gaining an unknown key [0.52ms]\n(pass) refuse matrix > refuses envelope meta missing any mandated §16.3 field [1.58ms]\n(pass) refuse matrix > refuses cache keys missing one of the nine mandated components [0.85ms]\n(pass) refuse matrix > refuses non-sha256 hashes and zero fencing tokens [0.28ms]\n(pass) refuse matrix > refuses blocked-state payloads carrying retrieval-success states [0.23ms]\n(pass) registry map + parse-by-name > exposes every core schema under a stable name [0.07ms]\n(pass) registry map + parse-by-name > parses by name through the generic boundary entrypoint [0.20ms]\n\n 27 pass\n 0 fail\n 47 expect() calls\nRan 27 tests across 1 file. [49.00ms]\n"
+          }
+        ]
+      },
+      "codexCalls": 0,
+      "claudeCalls": 0,
+      "testedHead": "1e4c2afef821c1560233fccece7c801468bb026a"
     },
     {
       "id": "verify-existing--foresift-tool-core-database-pglite-1",

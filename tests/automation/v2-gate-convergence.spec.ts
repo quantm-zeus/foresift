@@ -213,7 +213,7 @@ describe('V2 convergence router decision core (spec §11)', () => {
     expect(d.reasons).toEqual([]);
   });
 
-  const convergenceGapCases = [
+  const convergenceGapCases: Array<[string, Record<string, unknown>, RegExp]> = [
     [
       'CHANGES_REQUESTED verdict',
       { verdict: verdictFixture({ reviewDecision: 'CHANGES_REQUESTED' }) },
@@ -252,7 +252,7 @@ describe('V2 convergence router decision core (spec §11)', () => {
       { completeness: { complete: false } },
       /does not report complete/,
     ],
-  ] as const;
+  ];
   for (const [name, over, pattern] of convergenceGapCases) {
     it(`${name} ⇒ CONVERGENCE_REQUIRED naming the cause`, () => {
       const d = decideConvergence({ ...clean, ...over });

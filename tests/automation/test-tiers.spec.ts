@@ -4,7 +4,6 @@
 //    (measured: 60 duplicate tests + false red, 2026-08-23).
 // 2. The seeded-template git fixture factory must produce isolated,
 //    identity-correct repos with zero per-fixture git spawns.
-import { execFileSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { afterAll, describe, expect, it } from 'bun:test';

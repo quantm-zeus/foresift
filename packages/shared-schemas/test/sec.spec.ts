@@ -384,7 +384,7 @@ describe('import gating schemas (FR-SEC-008)', () => {
 
 describe('tenant context (FR-SEC-009)', () => {
   it('accepts the three isolation modes and refuses unknown ones', () => {
-    for (const mode of ['PERSONAL', 'WORKSPACE', 'PUBLIC']) {
+    for (const mode of ['PERSONAL', 'WORKSPACE', 'PUBLIC'] as const) {
       expect(TenantContextSchema.parse({ ...tenantContextFixture, mode }).mode).toBe(mode);
     }
     expect(() => TenantContextSchema.parse({ ...tenantContextFixture, mode: 'SHARED' })).toThrow();

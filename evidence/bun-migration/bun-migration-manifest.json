@@ -1,14 +1,14 @@
 {
   "schema": "foresift/bun-migration-manifest@1",
   "migrationId": "bun-test-authority-v1",
-  "generatedAt": "2026-08-27T01:52:39.724Z",
+  "generatedAt": "2026-08-27T01:52:39.899Z",
   "root": ".",
   "totalTestFiles": 219,
   "counts": {
-    "CODEMOD_READY": 1,
+    "CODEMOD_READY": 0,
     "AGY_REQUIRED": 17,
     "MIGRATED": 78,
-    "VERIFIED": 123,
+    "VERIFIED": 124,
     "BLOCKED": 0
   },
   "parity": {
@@ -5807,28 +5807,24 @@
     {
       "path": "tests/telemetry-catalog.spec.ts",
       "package": "root",
-      "bytes": 5187,
+      "bytes": 5189,
       "lines": 124,
-      "sha256": "13e1690e72fceafcfb07c80c7d6d5f51435a9bc3cef561906e2b804afa91cc22",
+      "sha256": "52b4d4992bf519ee94de25d69b2c6f2ededd21b91e10d76af0678b2d9ab972ca",
       "imports": [
         "node:fs",
         "node:path",
-        "vitest",
+        "bun:test",
         "@foresift/shared-schemas"
       ],
-      "vitestImports": [
-        "describe",
-        "expect",
-        "it"
-      ],
+      "vitestImports": [],
       "features": [],
       "workload": "PURE",
-      "migrationType": "EASY_MECHANICAL",
+      "migrationType": "ALREADY_MIGRATED",
       "fixturesAndHelpers": [],
       "sourceAnchors": [
         "@foresift/shared-schemas"
       ],
-      "state": "CODEMOD_READY"
+      "state": "VERIFIED"
     }
   ],
   "batches": [
@@ -8177,7 +8173,8 @@
       },
       "codexCalls": 0,
       "claudeCalls": 0,
-      "testedHead": "2b898e54bbf07e5433b64803fff32ea5b76c8369"
+      "testedHead": "2b898e54bbf07e5433b64803fff32ea5b76c8369",
+      "checkpointHead": "981452309eae3891e01b8390fc6b07edc5006a56"
     },
     {
       "id": "mechanical-root-pure-1",
@@ -8186,7 +8183,53 @@
       "files": [
         "tests/telemetry-catalog.spec.ts"
       ],
-      "state": "PENDING"
+      "state": "VERIFIED",
+      "verification": {
+        "ok": true,
+        "wallTimeMs": 73,
+        "peakRssBytes": 0,
+        "cpuSeconds": 0,
+        "counts": {
+          "passed": 4,
+          "failed": 0,
+          "skipped": 0
+        },
+        "results": [
+          {
+            "id": "pure-1",
+            "workload": "PURE",
+            "files": [
+              "tests/telemetry-catalog.spec.ts"
+            ],
+            "fileWorkers": 2,
+            "testConcurrency": 8,
+            "command": [
+              "bun",
+              "test",
+              "--no-orphans",
+              "--isolate",
+              "--parallel=2",
+              "--max-concurrency=8",
+              "--timeout=30000",
+              "tests/telemetry-catalog.spec.ts"
+            ],
+            "status": 0,
+            "wallTimeMs": 73,
+            "peakRssBytes": null,
+            "cpuSeconds": null,
+            "counts": {
+              "passed": 4,
+              "failed": 0,
+              "skipped": 0
+            },
+            "stdoutTail": "bun test v1.4.0 (34cbb9a40) 2x PARALLEL\n",
+            "stderrTail": "\ntests/telemetry-catalog.spec.ts:\n(pass) telemetry/data.catalog.json parity with authoritative schemas > revision.created names only fields ObservationRevisionSchema actually has [0.27ms]\n(pass) telemetry/data.catalog.json parity with authoritative schemas > observation.committed keeps both subject ids nullable and cites §13.2 provenance [0.10ms]\n(pass) telemetry/data.catalog.json parity with authoritative schemas > acquisition.recorded.requestedAt is nullable — unrequested decisions carry no lifecycle [0.34ms]\n(pass) telemetry/data.catalog.json parity with authoritative schemas > both catalogs declare themselves contracts-only until emitter wiring lands [0.04ms]\n\n 4 pass\n 0 fail\n 24 expect() calls\nRan 4 tests across 1 file. [57.00ms]\n"
+          }
+        ]
+      },
+      "codexCalls": 0,
+      "claudeCalls": 0,
+      "testedHead": "981452309eae3891e01b8390fc6b07edc5006a56"
     },
     {
       "id": "verify-existing--foresift-domain-pure-1",

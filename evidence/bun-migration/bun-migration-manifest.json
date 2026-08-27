@@ -1,14 +1,14 @@
 {
   "schema": "foresift/bun-migration-manifest@1",
   "migrationId": "bun-test-authority-v1",
-  "generatedAt": "2026-08-27T01:48:37.374Z",
+  "generatedAt": "2026-08-27T01:49:32.818Z",
   "root": ".",
   "totalTestFiles": 219,
   "counts": {
-    "CODEMOD_READY": 91,
+    "CODEMOD_READY": 84,
     "AGY_REQUIRED": 17,
     "MIGRATED": 76,
-    "VERIFIED": 35,
+    "VERIFIED": 42,
     "BLOCKED": 0
   },
   "parity": {
@@ -1235,12 +1235,12 @@
     {
       "path": "packages/security/test/action-gate.spec.ts",
       "package": "@foresift/security",
-      "bytes": 12137,
+      "bytes": 12139,
       "lines": 315,
-      "sha256": "f2b11e904e49294db99f0bd3d59d5f1e6cc99105406c630f26b44d35c84fd681",
+      "sha256": "fca690998c429bf2760489b3637950eddb21a540a0b177f22e92eb376e404a32",
       "imports": [
         "node:crypto",
-        "vitest",
+        "bun:test",
         "@electric-sql/pglite",
         "@foresift/object-store",
         "@foresift/persistence",
@@ -1250,18 +1250,12 @@
         "../src/audit-chain.ts",
         "@foresift/shared-schemas"
       ],
-      "vitestImports": [
-        "afterAll",
-        "beforeAll",
-        "describe",
-        "expect",
-        "it"
-      ],
+      "vitestImports": [],
       "features": [
         "dynamic-import"
       ],
       "workload": "DATABASE_PGLITE",
-      "migrationType": "EASY_MECHANICAL",
+      "migrationType": "ALREADY_MIGRATED",
       "fixturesAndHelpers": [],
       "sourceAnchors": [
         "@electric-sql/pglite",
@@ -1271,7 +1265,7 @@
         "../src/audit-chain.ts",
         "@foresift/shared-schemas"
       ],
-      "state": "CODEMOD_READY"
+      "state": "VERIFIED"
     },
     {
       "path": "packages/security/test/audit-categories.spec.ts",
@@ -1302,11 +1296,11 @@
     {
       "path": "packages/security/test/audit-chain.spec.ts",
       "package": "@foresift/security",
-      "bytes": 17041,
+      "bytes": 17043,
       "lines": 476,
-      "sha256": "0b1b7e9ca310c4c994bd1b827d86ba4507131779f418f6736d915246b633a815",
+      "sha256": "46d9bc2d8d21196196aaac8c0dc723a58e3b503f920f3cb7b615035938e4ae46",
       "imports": [
-        "vitest",
+        "bun:test",
         "node:crypto",
         "@electric-sql/pglite",
         "@foresift/object-store",
@@ -1315,14 +1309,10 @@
         "node:url",
         "../src/audit-chain.ts"
       ],
-      "vitestImports": [
-        "describe",
-        "expect",
-        "it"
-      ],
+      "vitestImports": [],
       "features": [],
       "workload": "DATABASE_PGLITE",
-      "migrationType": "EASY_MECHANICAL",
+      "migrationType": "ALREADY_MIGRATED",
       "fixturesAndHelpers": [],
       "sourceAnchors": [
         "@electric-sql/pglite",
@@ -1330,7 +1320,7 @@
         "@foresift/persistence",
         "../src/audit-chain.ts"
       ],
-      "state": "CODEMOD_READY"
+      "state": "VERIFIED"
     },
     {
       "path": "packages/security/test/egress.spec.ts",
@@ -1385,11 +1375,11 @@
     {
       "path": "packages/security/test/gate-pause.spec.ts",
       "package": "@foresift/security",
-      "bytes": 9656,
+      "bytes": 9658,
       "lines": 277,
-      "sha256": "75176720f2e63898ab9e9ff002e048d57f7f89cea1e340c946f8c9590da9e9db",
+      "sha256": "f82e85a8cc1e5ddd083fc25251cc4790cc03c2ebf39c0b43ed32810422ce7d8a",
       "imports": [
-        "vitest",
+        "bun:test",
         "@electric-sql/pglite",
         "@foresift/persistence",
         "node:path",
@@ -1398,16 +1388,10 @@
         "../src/gate-pause.ts",
         "../src/errors.ts"
       ],
-      "vitestImports": [
-        "afterAll",
-        "beforeAll",
-        "describe",
-        "expect",
-        "it"
-      ],
+      "vitestImports": [],
       "features": [],
       "workload": "DATABASE_PGLITE",
-      "migrationType": "EASY_MECHANICAL",
+      "migrationType": "ALREADY_MIGRATED",
       "fixturesAndHelpers": [],
       "sourceAnchors": [
         "@electric-sql/pglite",
@@ -1416,16 +1400,16 @@
         "../src/gate-pause.ts",
         "../src/errors.ts"
       ],
-      "state": "CODEMOD_READY"
+      "state": "VERIFIED"
     },
     {
       "path": "packages/security/test/import-gating.spec.ts",
       "package": "@foresift/security",
-      "bytes": 14242,
+      "bytes": 14244,
       "lines": 388,
-      "sha256": "8ef878396157d08578e08354e8623922a3d2f218f312e7fc9f809a092538428b",
+      "sha256": "ff2646605595cc9844b56d4d3a0d57a6f2761c7194037bbf5fd466cb48dba241",
       "imports": [
-        "vitest",
+        "bun:test",
         "@electric-sql/pglite",
         "node:path",
         "node:url",
@@ -1433,16 +1417,10 @@
         "@foresift/persistence",
         "../src/import-gating.ts"
       ],
-      "vitestImports": [
-        "afterAll",
-        "beforeAll",
-        "describe",
-        "expect",
-        "it"
-      ],
+      "vitestImports": [],
       "features": [],
       "workload": "DATABASE_PGLITE",
-      "migrationType": "EASY_MECHANICAL",
+      "migrationType": "ALREADY_MIGRATED",
       "fixturesAndHelpers": [],
       "sourceAnchors": [
         "@electric-sql/pglite",
@@ -1450,16 +1428,16 @@
         "@foresift/persistence",
         "../src/import-gating.ts"
       ],
-      "state": "CODEMOD_READY"
+      "state": "VERIFIED"
     },
     {
       "path": "packages/security/test/incidents.spec.ts",
       "package": "@foresift/security",
-      "bytes": 9262,
+      "bytes": 9264,
       "lines": 238,
-      "sha256": "c68edd59195139f4eb7f0ce1ec190a71ce13581184546c5d66c1232bc8f7dcd7",
+      "sha256": "c6f81e127ca80ec6c6bc0cdd2fedd07d391015f6e3e5d5035c6fbfd33a781bbe",
       "imports": [
-        "vitest",
+        "bun:test",
         "@electric-sql/pglite",
         "@foresift/persistence",
         "node:path",
@@ -1467,16 +1445,10 @@
         "../src/incidents.ts",
         "../src/errors.ts"
       ],
-      "vitestImports": [
-        "afterAll",
-        "beforeAll",
-        "describe",
-        "expect",
-        "it"
-      ],
+      "vitestImports": [],
       "features": [],
       "workload": "DATABASE_PGLITE",
-      "migrationType": "EASY_MECHANICAL",
+      "migrationType": "ALREADY_MIGRATED",
       "fixturesAndHelpers": [],
       "sourceAnchors": [
         "@electric-sql/pglite",
@@ -1484,7 +1456,7 @@
         "../src/incidents.ts",
         "../src/errors.ts"
       ],
-      "state": "CODEMOD_READY"
+      "state": "VERIFIED"
     },
     {
       "path": "packages/security/test/mcp-origin-protocol.spec.ts",
@@ -1548,11 +1520,11 @@
     {
       "path": "packages/security/test/oauth-credentials.spec.ts",
       "package": "@foresift/security",
-      "bytes": 12999,
+      "bytes": 13001,
       "lines": 356,
-      "sha256": "4a32251915c461154b08b0a635d8cce820f352372047d4e7b9776803b670adea",
+      "sha256": "f39228db69b207fd82d6ff169e969ba376cb66ac714c3bc54ed771201bd9d6f0",
       "imports": [
-        "vitest",
+        "bun:test",
         "@electric-sql/pglite",
         "@foresift/persistence",
         "node:path",
@@ -1560,16 +1532,10 @@
         "../src/oauth-binding.ts",
         "../src/mcp-credentials.ts"
       ],
-      "vitestImports": [
-        "afterAll",
-        "beforeAll",
-        "describe",
-        "expect",
-        "it"
-      ],
+      "vitestImports": [],
       "features": [],
       "workload": "DATABASE_PGLITE",
-      "migrationType": "EASY_MECHANICAL",
+      "migrationType": "ALREADY_MIGRATED",
       "fixturesAndHelpers": [],
       "sourceAnchors": [
         "@electric-sql/pglite",
@@ -1577,7 +1543,7 @@
         "../src/oauth-binding.ts",
         "../src/mcp-credentials.ts"
       ],
-      "state": "CODEMOD_READY"
+      "state": "VERIFIED"
     },
     {
       "path": "packages/security/test/scaffold.spec.ts",
@@ -1661,11 +1627,11 @@
     {
       "path": "packages/security/test/schema-parity.spec.ts",
       "package": "@foresift/security",
-      "bytes": 7374,
+      "bytes": 7376,
       "lines": 187,
-      "sha256": "f6fe91060f4ee76430554d2317b77066e303003a45beea115463a27a403a110c",
+      "sha256": "a3124497628f587a2c671913b6dd108be858053d4ddc837dd19750cd8cebd587",
       "imports": [
-        "vitest",
+        "bun:test",
         "@electric-sql/pglite",
         "drizzle-orm/pg-core",
         "drizzle-orm/pg-core",
@@ -1674,16 +1640,10 @@
         "node:url",
         "../src/generated/schema.ts"
       ],
-      "vitestImports": [
-        "afterAll",
-        "beforeAll",
-        "describe",
-        "expect",
-        "it"
-      ],
+      "vitestImports": [],
       "features": [],
       "workload": "DATABASE_PGLITE",
-      "migrationType": "EASY_MECHANICAL",
+      "migrationType": "ALREADY_MIGRATED",
       "fixturesAndHelpers": [],
       "sourceAnchors": [
         "@electric-sql/pglite",
@@ -1692,7 +1652,7 @@
         "@foresift/persistence",
         "../src/generated/schema.ts"
       ],
-      "state": "CODEMOD_READY"
+      "state": "VERIFIED"
     },
     {
       "path": "packages/security/test/secrets-claims.spec.ts",
@@ -7325,7 +7285,8 @@
       },
       "codexCalls": 0,
       "claudeCalls": 0,
-      "testedHead": "5a5b30308f9466623640dc1d405adc32638cbb44"
+      "testedHead": "5a5b30308f9466623640dc1d405adc32638cbb44",
+      "checkpointHead": "e85a0c951ce00d5a7f5ea0da7a6724293fda7988"
     },
     {
       "id": "mechanical--foresift-security-database-pglite-1",
@@ -7340,7 +7301,233 @@
         "packages/security/test/oauth-credentials.spec.ts",
         "packages/security/test/schema-parity.spec.ts"
       ],
-      "state": "PENDING"
+      "state": "VERIFIED",
+      "verification": {
+        "ok": true,
+        "wallTimeMs": 55309,
+        "peakRssBytes": 0,
+        "cpuSeconds": 0,
+        "counts": {
+          "passed": 90,
+          "failed": 0,
+          "skipped": 0
+        },
+        "results": [
+          {
+            "id": "pglite-1",
+            "workload": "DATABASE_PGLITE",
+            "files": [
+              "packages/security/test/action-gate.spec.ts"
+            ],
+            "fileWorkers": 1,
+            "testConcurrency": 1,
+            "command": [
+              "bun",
+              "test",
+              "--no-orphans",
+              "--isolate",
+              "--parallel=1",
+              "--max-concurrency=1",
+              "--timeout=30000",
+              "packages/security/test/action-gate.spec.ts"
+            ],
+            "status": 0,
+            "wallTimeMs": 3096,
+            "peakRssBytes": null,
+            "cpuSeconds": null,
+            "counts": {
+              "passed": 15,
+              "failed": 0,
+              "skipped": 0
+            },
+            "stdoutTail": "bun test v1.4.0 (34cbb9a40) 1x PARALLEL\n",
+            "stderrTail": "\npackages/security/test/action-gate.spec.ts:\n(pass) high-impact action gate (AC-274) > allows a fully-dimensioned request and audits the ALLOW decision [13.94ms]\n(pass) high-impact action gate (AC-274) > refuses with STEP_UP_MISSING when no proof is presented [6.06ms]\n(pass) high-impact action gate (AC-274) > refuses with CSRF_INVALID when the csrf field is ABSENT — missing protection never passes [4.73ms]\n(pass) high-impact action gate (AC-274) > refuses STALE proofs against the INJECTED clock [3.86ms]\n(pass) high-impact action gate (AC-274) > NEVER accepts TOTP as the sole production factor [3.38ms]\n(pass) high-impact action gate (AC-274) > refuses proofs that skip user presence/verification when required [3.28ms]\n(pass) high-impact action gate (AC-274) > requires an EXACT scope match, refusing lookalike scopes [3.61ms]\n(pass) high-impact action gate (AC-274) > collects EVERY missing dimension into one typed refusal [4.44ms]\n(pass) high-impact action gate (AC-274) > blocks ALL high-impact activation while a critical audit incident is open (T114, §35.9) [3.74ms]\n(pass) proof ownership, skew tolerance, and audit-append coupling (M19/M11a) > refuses a proof belonging to ANOTHER principal as STEP_UP_MISSING [0.49ms]\n(pass) proof ownership, skew tolerance, and audit-append coupling (M19/M11a) > applies PROOF_CLOCK_SKEW_TOLERANCE to future-dated completions [0.45ms]\n(pass) proof ownership, skew tolerance, and audit-append coupling (M19/M11a) > wraps audit-chain append failures instead of dropping the decision [10.81ms]\n(pass) csrf double-submit + origin binding > accepts matching tokens bound to the request origin [0.31ms]\n(pass) csrf double-submit + origin binding > treats below-floor tokens as MISSING even when both sides MATCH (M18) [0.18ms]\n(pass) csrf double-submit + origin binding > refuses mismatched and cross-origin tokens with distinct reasons [0.22ms]\n\n 15 pass\n 0 fail\n 32 expect() calls\nRan 15 tests across 1 file. [2.98s]\n"
+          },
+          {
+            "id": "pglite-2",
+            "workload": "DATABASE_PGLITE",
+            "files": [
+              "packages/security/test/audit-chain.spec.ts"
+            ],
+            "fileWorkers": 1,
+            "testConcurrency": 1,
+            "command": [
+              "bun",
+              "test",
+              "--no-orphans",
+              "--isolate",
+              "--parallel=1",
+              "--max-concurrency=1",
+              "--timeout=30000",
+              "packages/security/test/audit-chain.spec.ts"
+            ],
+            "status": 0,
+            "wallTimeMs": 36920,
+            "peakRssBytes": null,
+            "cpuSeconds": null,
+            "counts": {
+              "passed": 18,
+              "failed": 0,
+              "skipped": 0
+            },
+            "stdoutTail": "bun test v1.4.0 (34cbb9a40) 1x PARALLEL\n",
+            "stderrTail": "\npackages/security/test/audit-chain.spec.ts:\n(pass) audit chain appends (FR-SEC-002) > chains entry_hash = sha256(prev || canonical payload) from GENESIS [2940.64ms]\n(pass) audit chain appends (FR-SEC-002) > canonicalizes payloads so key order cannot fork the hash [2145.55ms]\n(pass) audit chain appends (FR-SEC-002) > refuses SQL-level mutation and deletion via the immutability trigger [1912.56ms]\n(pass) audit chain appends (FR-SEC-002) > verifies a clean chain OK and records the run durably [2192.19ms]\n(pass) audit chain appends (FR-SEC-002) > reports GAP for an explicitly requested empty range [2015.45ms]\n(pass) audit chain appends (FR-SEC-002) > reports GAP for a WIPED chain even under a full-range request (M2) [1921.12ms]\n(pass) audit chain appends (FR-SEC-002) > REFUSES inverted, zero, or fractional ranges before any query (M2) [1970.75ms]\n(pass) audit chain appends (FR-SEC-002) > records the ACTUAL walked bounds of partial-range verification (M2) [1921.84ms]\n(pass) audit chain appends (FR-SEC-002) > surfaces a leading-edge deletion as DELETION at the missing seq (M2) [1908.52ms]\n(pass) audit checkpoints mirror to the object store (FR-SEC-002, AC-259) > writes the chained anchor to SQL AND an independent copy to the store [2027.89ms]\n(pass) audit checkpoints mirror to the object store (FR-SEC-002, AC-259) > chains successive checkpoints and refuses checkpointing without a store [1991.88ms]\n(pass) audit checkpoints mirror to the object store (FR-SEC-002, AC-259) > refuses non-contiguous or uncovered ranges [1951.42ms]\n(pass) audit checkpoints mirror to the object store (FR-SEC-002, AC-259) > checkpoints are append-only in SQL too [1968.21ms]\n(pass) divergence classification (AC-259 fixture battery) > detects MUTATION when content no longer matches its stored hashes [1973.17ms]\n(pass) divergence classification (AC-259 fixture battery) > detects DELETION as a sequence discontinuity [1935.67ms]\n(pass) divergence classification (AC-259 fixture battery) > detects REORDERING when a predecessor hash exists but off-position [2042.10ms]\n(pass) divergence classification (AC-259 fixture battery) > detects CHAIN_BREAK when a predecessor matches nothing on the chain [1977.57ms]\n(pass) divergence classification (AC-259 fixture battery) > a forged mid-chain insertion surfaces as a downstream divergence [1901.01ms]\n\n 18 pass\n 0 fail\n 57 expect() calls\nRan 18 tests across 1 file. [36.78s]\n"
+          },
+          {
+            "id": "pglite-3",
+            "workload": "DATABASE_PGLITE",
+            "files": [
+              "packages/security/test/gate-pause.spec.ts"
+            ],
+            "fileWorkers": 1,
+            "testConcurrency": 1,
+            "command": [
+              "bun",
+              "test",
+              "--no-orphans",
+              "--isolate",
+              "--parallel=1",
+              "--max-concurrency=1",
+              "--timeout=30000",
+              "packages/security/test/gate-pause.spec.ts"
+            ],
+            "status": 0,
+            "wallTimeMs": 3066,
+            "peakRssBytes": null,
+            "cpuSeconds": null,
+            "counts": {
+              "passed": 10,
+              "failed": 0,
+              "skipped": 0
+            },
+            "stdoutTail": "bun test v1.4.0 (34cbb9a40) 1x PARALLEL\n",
+            "stderrTail": "\npackages/security/test/gate-pause.spec.ts:\n(pass) capability pauses (AC-278) > pauses exactly the smallest affected scope with a durable reason [11.40ms]\n(pass) capability pauses (AC-278) > auto-reactivation is refused as a machine-checked invariant [0.40ms]\n(pass) capability pauses (AC-278) > resume requires explicit actor AND audit reference [20.32ms]\n(pass) capability pauses (AC-278) > resume lands a RESUME_AFTER_RE_EVALUATION ledger event with a pending marker [8.69ms]\n(pass) activation ledger (AC-279) > rollback appends a NEW event referencing the restored snapshot; history intact [6.37ms]\n(pass) activation ledger (AC-279) > ledger history cannot be mutated or deleted (SQL trigger) [4.55ms]\n(pass) activation ledger (AC-279) > ROLLBACK_RESTORE without a restore origin is refused (SQL CHECK) [1.68ms]\n(pass) activation ledger (AC-279) > rollback emits a re-evaluation marker before alerts may resume [2.94ms]\n(pass) gate-pause fail-closed edges (M12/M13) > resume refuses WHITESPACE-only actors and audit references (M12) [6.47ms]\n(pass) gate-pause fail-closed edges (M12/M13) > rollbackRestore REFUSES cross-scope restore points and non-ACTIVATE events (M13) [3.40ms]\n\n 10 pass\n 0 fail\n 23 expect() calls\nRan 10 tests across 1 file. [2.96s]\n"
+          },
+          {
+            "id": "pglite-4",
+            "workload": "DATABASE_PGLITE",
+            "files": [
+              "packages/security/test/import-gating.spec.ts"
+            ],
+            "fileWorkers": 1,
+            "testConcurrency": 1,
+            "command": [
+              "bun",
+              "test",
+              "--no-orphans",
+              "--isolate",
+              "--parallel=1",
+              "--max-concurrency=1",
+              "--timeout=30000",
+              "packages/security/test/import-gating.spec.ts"
+            ],
+            "status": 0,
+            "wallTimeMs": 3203,
+            "peakRssBytes": null,
+            "cpuSeconds": null,
+            "counts": {
+              "passed": 18,
+              "failed": 0,
+              "skipped": 0
+            },
+            "stdoutTail": "bun test v1.4.0 (34cbb9a40) 1x PARALLEL\n",
+            "stderrTail": "\npackages/security/test/import-gating.spec.ts:\n(pass) intake hygiene (§35.14 — refusals happen BEFORE a row exists) > records a RECEIVED artifact at rank 0 with its step-up reference [5.03ms]\n(pass) intake hygiene (§35.14 — refusals happen BEFORE a row exists) > refuses non-allowlisted formats without inserting anything [1.75ms]\n(pass) intake hygiene (§35.14 — refusals happen BEFORE a row exists) > refuses intake without a step-up approval reference [0.16ms]\n(pass) intake hygiene (§35.14 — refusals happen BEFORE a row exists) > enforces count and size limits and the decompression-ratio cap [0.22ms]\n(pass) intake hygiene (§35.14 — refusals happen BEFORE a row exists) > refuses traversal, absolute, drive-letter, and NUL member paths structurally [0.37ms]\n(pass) signature verification against the trusted-producer allowlist > verifies matching material signed by a trusted producer [12.98ms]\n(pass) signature verification against the trusted-producer allowlist > refuses unknown producers BEFORE verification is attempted [4.60ms]\n(pass) signature verification against the trusted-producer allowlist > refuses expired and revoked producer trust anchors [5.98ms]\n(pass) signature verification against the trusted-producer allowlist > refuses presented material whose hash diverges from the recorded manifest [1.73ms]\n(pass) signature verification against the trusted-producer allowlist > refuses an invalid producer signature even when the hash matches [1.45ms]\n(pass) monotone quarantine state machine (no ACTIVE state) > walks RECEIVED→QUARANTINED→SCANNED→VALIDATING→SHADOW_ELIGIBLE monotonically [24.42ms]\n(pass) monotone quarantine state machine (no ACTIVE state) > refuses backward and skipping transitions [9.48ms]\n(pass) monotone quarantine state machine (no ACTIVE state) > cannot name an ACTIVE state anywhere in the machine [0.30ms]\n(pass) monotone quarantine state machine (no ACTIVE state) > REFUSES (never silently no-ops) when a concurrent writer wins the guarded UPDATE [16.76ms]\n(pass) monotone quarantine state machine (no ACTIVE state) > couples validation completion to the step-up approval reference [13.98ms]\n(pass) content-scan findings and auto-reject > persists scan findings as evidence child rows [4.90ms]\n(pass) content-scan findings and auto-reject > auto-transitions MALICIOUS verdicts straight to REJECTED [13.66ms]\n(pass) isolated-parsing boundary contract > refuses any claim that parsing ran in-process [0.31ms]\n\n 18 pass\n 0 fail\n 40 expect() calls\nRan 18 tests across 1 file. [3.10s]\n"
+          },
+          {
+            "id": "pglite-5",
+            "workload": "DATABASE_PGLITE",
+            "files": [
+              "packages/security/test/incidents.spec.ts"
+            ],
+            "fileWorkers": 1,
+            "testConcurrency": 1,
+            "command": [
+              "bun",
+              "test",
+              "--no-orphans",
+              "--isolate",
+              "--parallel=1",
+              "--max-concurrency=1",
+              "--timeout=30000",
+              "packages/security/test/incidents.spec.ts"
+            ],
+            "status": 0,
+            "wallTimeMs": 2994,
+            "peakRssBytes": null,
+            "cpuSeconds": null,
+            "counts": {
+              "passed": 9,
+              "failed": 0,
+              "skipped": 0
+            },
+            "stdoutTail": "bun test v1.4.0 (34cbb9a40) 1x PARALLEL\n",
+            "stderrTail": "\npackages/security/test/incidents.spec.ts:\n(pass) incident lifecycle (FR-SEC-011) > opens with OPEN containment, owner, kind, and preserved evidence [5.38ms]\n(pass) incident lifecycle (FR-SEC-011) > refuses opening without any evidence reference [0.30ms]\n(pass) incident lifecycle (FR-SEC-011) > advances containment strictly monotonically [23.18ms]\n(pass) incident lifecycle (FR-SEC-011) > refuses RESOLVED without recovery verification, postmortem, regression link [5.87ms]\n(pass) incident lifecycle (FR-SEC-011) > preserves evidence across later appends (no overwrite) [3.69ms]\n(pass) incident lifecycle (FR-SEC-011) > reports open critical audit-chain failures for the §35.9 block rule [12.06ms]\n(pass) incident lifecycle (FR-SEC-011) > a non-critical or non-audit incident never triggers the §35.9 block [3.23ms]\n(pass) incident fail-closed edges (M21/M10) > fails closed on UNKNOWN incidents across every entrypoint [2.78ms]\n(pass) incident fail-closed edges (M21/M10) > CAS-guards containment so a raced legal transition refuses TYPED [5.77ms]\n\n 9 pass\n 0 fail\n 23 expect() calls\nRan 9 tests across 1 file. [2.90s]\n"
+          },
+          {
+            "id": "pglite-6",
+            "workload": "DATABASE_PGLITE",
+            "files": [
+              "packages/security/test/oauth-credentials.spec.ts"
+            ],
+            "fileWorkers": 1,
+            "testConcurrency": 1,
+            "command": [
+              "bun",
+              "test",
+              "--no-orphans",
+              "--isolate",
+              "--parallel=1",
+              "--max-concurrency=1",
+              "--timeout=30000",
+              "packages/security/test/oauth-credentials.spec.ts"
+            ],
+            "status": 0,
+            "wallTimeMs": 2940,
+            "peakRssBytes": null,
+            "cpuSeconds": null,
+            "counts": {
+              "passed": 15,
+              "failed": 0,
+              "skipped": 0
+            },
+            "stdoutTail": "bun test v1.4.0 (34cbb9a40) 1x PARALLEL\n",
+            "stderrTail": "\npackages/security/test/oauth-credentials.spec.ts:\n(pass) oauth token binding (AC-253) > accepts a fully-bound grant [2.37ms]\n(pass) oauth token binding (AC-253) > refuses grants without PKCE [0.91ms]\n(pass) oauth token binding (AC-253) > requires EXACT redirect URI equality (no normalization games) [0.55ms]\n(pass) oauth token binding (AC-253) > binds audience and RFC 8707 resource indicator exactly [0.15ms]\n(pass) oauth token binding (AC-253) > honours expiry against the injected clock [0.18ms]\n(pass) oauth token binding (AC-253) > refuses scope WIDENING beyond the registered set [0.14ms]\n(pass) oauth token binding (AC-253) > refuses upstream provider tokens as passthrough credentials [0.25ms]\n(pass) mcp credential lifecycle (AC-053) > mints a ≥256-bit secret shown ONCE and stores ONLY a keyed hash [6.88ms]\n(pass) mcp credential lifecycle (AC-053) > authenticates valid material across every recorded dimension [1.91ms]\n(pass) mcp credential lifecycle (AC-053) > fails closed on unknown material, wrong origin, and scope excess [3.30ms]\n(pass) mcp credential lifecycle (AC-053) > enforces expiry and optional IP constraints [4.69ms]\n(pass) mcp credential lifecycle (AC-053) > refuses constrained credentials when checking evidence is WITHHELD (M14) [3.26ms]\n(pass) mcp credential lifecycle (AC-053) > strictPresentation refuses ANY withheld dimension even unconstrained (M14 opt-in) [7.09ms]\n(pass) mcp credential lifecycle (AC-053) > revokes ONE credential independently; siblings keep working [10.71ms]\n(pass) mcp credential lifecycle (AC-053) > records last-used metadata without weakening any other dimension [2.16ms]\n\n 15 pass\n 0 fail\n 37 expect() calls\nRan 15 tests across 1 file. [2.83s]\n"
+          },
+          {
+            "id": "pglite-7",
+            "workload": "DATABASE_PGLITE",
+            "files": [
+              "packages/security/test/schema-parity.spec.ts"
+            ],
+            "fileWorkers": 1,
+            "testConcurrency": 1,
+            "command": [
+              "bun",
+              "test",
+              "--no-orphans",
+              "--isolate",
+              "--parallel=1",
+              "--max-concurrency=1",
+              "--timeout=30000",
+              "packages/security/test/schema-parity.spec.ts"
+            ],
+            "status": 0,
+            "wallTimeMs": 3090,
+            "peakRssBytes": null,
+            "cpuSeconds": null,
+            "counts": {
+              "passed": 5,
+              "failed": 0,
+              "skipped": 0
+            },
+            "stdoutTail": "bun test v1.4.0 (34cbb9a40) 1x PARALLEL\n",
+            "stderrTail": "\npackages/security/test/schema-parity.spec.ts:\n(pass) sec-schema Drizzle mirror parity with SQL truth (ADR-001) > applies all four g0_sec migrations over the full proven set [4.93ms]\n(pass) sec-schema Drizzle mirror parity with SQL truth (ADR-001) > adds zero tables to the public schema (proven parity contract untouched) [5.07ms]\n(pass) sec-schema Drizzle mirror parity with SQL truth (ADR-001) > mirrors exactly the sec-schema table set [4.80ms]\n(pass) sec-schema Drizzle mirror parity with SQL truth (ADR-001) > matches every column: name, nullability, and type class [75.53ms]\n(pass) sec-schema Drizzle mirror parity with SQL truth (ADR-001) > matches primary keys on every sec table [16.68ms]\n\n 5 pass\n 0 fail\n 27 expect() calls\nRan 5 tests across 1 file. [2.97s]\n"
+          }
+        ]
+      },
+      "codexCalls": 0,
+      "claudeCalls": 0,
+      "testedHead": "e85a0c951ce00d5a7f5ea0da7a6724293fda7988"
     },
     {
       "id": "mechanical--foresift-security-process-1",

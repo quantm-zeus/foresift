@@ -4,7 +4,7 @@
  * a schema that tolerates extra fields would let an unvetted capability flag
  * ride alongside a valid record. Table-driven where the rule is uniform.
  */
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'bun:test';
 import {
   ActionGateDecisionSchema,
   ActivationEventRecordSchema,
@@ -218,12 +218,11 @@ describe('SEC schema family — registry', () => {
     expect(names).toContain('ProhibitedCapabilityFinding');
   });
 
-  it.each(Object.keys(SEC_SCHEMAS) as SecSchemaName[])(
-    'parseSecSchema(%s) is wired to its schema (refuses garbage)',
-    (name) => {
+  for (const name of Object.keys(SEC_SCHEMAS) as SecSchemaName[]) {
+    it(`parseSecSchema(${name}) is wired to its schema (refuses garbage)`, () => {
       expect(() => parseSecSchema(name, { obviously: 'wrong' })).toThrow();
-    },
-  );
+    });
+  }
 });
 
 describe('audit chain schemas (FR-SEC-002)', () => {

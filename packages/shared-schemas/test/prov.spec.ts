@@ -6,7 +6,7 @@
  * extra fields would let an unvetted capability flag or prohibited parameter
  * bypass security controls.
  */
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'bun:test';
 import {
   ALL_QUARANTINE_DETECTION_CLASSES,
   ALL_SOURCE_FINGERPRINT_KINDS,
@@ -798,13 +798,15 @@ describe('FR-PROV-005 & AC-272: Readiness reports and adapter allowlists', () =>
 });
 
 describe('Table-driven .strict() unknown-key refusal across all registered schemas', () => {
-  it.each(positives)('%s refuses unvetted/unknown keys', (name, fixture) => {
-    const schema = PROV_SCHEMAS[name];
-    if (!fixture || typeof fixture !== 'object' || Array.isArray(fixture)) return;
-    const contaminated = {
-      ...(fixture as Record<string, unknown>),
-      __prohibited_or_unvetted_extra_field__: 'MALICIOUS_INJECTION',
-    };
-    expect(() => schema.parse(contaminated), `${name} did not refuse unknown key`).toThrow();
-  });
+  for (const [name, fixture] of positives) {
+    it(`${name} refuses unvetted/unknown keys`, () => {
+      const schema = PROV_SCHEMAS[name];
+      if (!fixture || typeof fixture !== 'object' || Array.isArray(fixture)) return;
+      const contaminated = {
+        ...(fixture as Record<string, unknown>),
+        __prohibited_or_unvetted_extra_field__: 'MALICIOUS_INJECTION',
+      };
+      expect(() => schema.parse(contaminated), `${name} did not refuse unknown key`).toThrow();
+    });
+  }
 });

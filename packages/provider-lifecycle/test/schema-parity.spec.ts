@@ -6,7 +6,7 @@
  * primary keys against the generated mirror (same arrangement as the proven
  * security package, scoped to the `prov` schema).
  */
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 import { PGlite } from '@electric-sql/pglite';
 import { getTableConfig } from 'drizzle-orm/pg-core';
 import type { PgTable } from 'drizzle-orm/pg-core';

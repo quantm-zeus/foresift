@@ -12,7 +12,7 @@
  *   * response quarantine is METADATA-ONLY — no payload-body column exists to
  *     persist hazardous material into (plan material decision 6).
  */
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 import { PGlite } from '@electric-sql/pglite';
 import {
   applyMigrations,

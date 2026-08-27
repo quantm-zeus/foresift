@@ -1,14 +1,14 @@
 {
   "schema": "foresift/bun-migration-manifest@1",
   "migrationId": "bun-test-authority-v1",
-  "generatedAt": "2026-08-27T01:47:58.566Z",
+  "generatedAt": "2026-08-27T01:48:07.955Z",
   "root": ".",
   "totalTestFiles": 219,
   "counts": {
-    "CODEMOD_READY": 108,
+    "CODEMOD_READY": 105,
     "AGY_REQUIRED": 17,
     "MIGRATED": 76,
-    "VERIFIED": 18,
+    "VERIFIED": 21,
     "BLOCKED": 0
   },
   "parity": {
@@ -746,25 +746,19 @@
     {
       "path": "packages/provider-lifecycle/test/deprecation-rules.spec.ts",
       "package": "@foresift/provider-lifecycle",
-      "bytes": 8368,
+      "bytes": 8370,
       "lines": 220,
-      "sha256": "188eff6d8e32d70f4010b5d9f84413346789431dbf1a207a6c4855a93f707868",
+      "sha256": "03837b80f06ae5a7717e654249d61930385f0bbb850381b611a8b5109a9168ed",
       "imports": [
-        "vitest",
+        "bun:test",
         "@foresift/domain",
         "./helpers.ts",
         "../src/errors.ts"
       ],
-      "vitestImports": [
-        "afterAll",
-        "beforeAll",
-        "describe",
-        "expect",
-        "it"
-      ],
+      "vitestImports": [],
       "features": [],
       "workload": "DATABASE_PGLITE",
-      "migrationType": "EASY_MECHANICAL",
+      "migrationType": "ALREADY_MIGRATED",
       "fixturesAndHelpers": [
         "./helpers.ts"
       ],
@@ -773,7 +767,7 @@
         "./helpers.ts",
         "../src/errors.ts"
       ],
-      "state": "CODEMOD_READY"
+      "state": "VERIFIED"
     },
     {
       "path": "packages/provider-lifecycle/test/lifecycle-machine.spec.ts",
@@ -880,32 +874,26 @@
     {
       "path": "packages/provider-lifecycle/test/migrations.spec.ts",
       "package": "@foresift/provider-lifecycle",
-      "bytes": 5891,
+      "bytes": 5893,
       "lines": 155,
-      "sha256": "7d3e9d94d935275c9bdd051d755a09fcfaa7ce2ca2ff57bc8750210335f7f8d7",
+      "sha256": "ea2cb3464edd910c93c1d21ca565ae481bf9da3d3c7a44b0b1eea0b538670a05",
       "imports": [
-        "vitest",
+        "bun:test",
         "@electric-sql/pglite",
         "@foresift/persistence",
         "node:path",
         "node:url"
       ],
-      "vitestImports": [
-        "afterAll",
-        "beforeAll",
-        "describe",
-        "expect",
-        "it"
-      ],
+      "vitestImports": [],
       "features": [],
       "workload": "DATABASE_PGLITE",
-      "migrationType": "EASY_MECHANICAL",
+      "migrationType": "ALREADY_MIGRATED",
       "fixturesAndHelpers": [],
       "sourceAnchors": [
         "@electric-sql/pglite",
         "@foresift/persistence"
       ],
-      "state": "CODEMOD_READY"
+      "state": "VERIFIED"
     },
     {
       "path": "packages/provider-lifecycle/test/operation-registry.spec.ts",
@@ -1072,11 +1060,11 @@
     {
       "path": "packages/provider-lifecycle/test/schema-parity.spec.ts",
       "package": "@foresift/provider-lifecycle",
-      "bytes": 7504,
+      "bytes": 7506,
       "lines": 189,
-      "sha256": "9afce11ca5f507e9e81895987990be07ee921d44e4fc942b3a06c17bd6bbb71e",
+      "sha256": "bfbc468e8561a88a7e3e8983223c0c8ad41dd56a0e42473627d5e186384e93ce",
       "imports": [
-        "vitest",
+        "bun:test",
         "@electric-sql/pglite",
         "drizzle-orm/pg-core",
         "drizzle-orm/pg-core",
@@ -1085,16 +1073,10 @@
         "node:url",
         "../src/generated/schema.ts"
       ],
-      "vitestImports": [
-        "afterAll",
-        "beforeAll",
-        "describe",
-        "expect",
-        "it"
-      ],
+      "vitestImports": [],
       "features": [],
       "workload": "DATABASE_PGLITE",
-      "migrationType": "EASY_MECHANICAL",
+      "migrationType": "ALREADY_MIGRATED",
       "fixturesAndHelpers": [],
       "sourceAnchors": [
         "@electric-sql/pglite",
@@ -1103,7 +1085,7 @@
         "@foresift/persistence",
         "../src/generated/schema.ts"
       ],
-      "state": "CODEMOD_READY"
+      "state": "VERIFIED"
     },
     {
       "path": "packages/provider-lifecycle/test/source-fingerprints.spec.ts",
@@ -7102,7 +7084,8 @@
       },
       "codexCalls": 0,
       "claudeCalls": 0,
-      "testedHead": "cc58ded0831d7d9abf825eda4b43d063ac964c46"
+      "testedHead": "cc58ded0831d7d9abf825eda4b43d063ac964c46",
+      "checkpointHead": "56f5f2cb75c1270090b62975608265befa1d6fbf"
     },
     {
       "id": "mechanical--foresift-provider-lifecycle-database-pglite-1",
@@ -7113,7 +7096,113 @@
         "packages/provider-lifecycle/test/migrations.spec.ts",
         "packages/provider-lifecycle/test/schema-parity.spec.ts"
       ],
-      "state": "PENDING"
+      "state": "VERIFIED",
+      "verification": {
+        "ok": true,
+        "wallTimeMs": 9284,
+        "peakRssBytes": 0,
+        "cpuSeconds": 0,
+        "counts": {
+          "passed": 14,
+          "failed": 0,
+          "skipped": 0
+        },
+        "results": [
+          {
+            "id": "pglite-1",
+            "workload": "DATABASE_PGLITE",
+            "files": [
+              "packages/provider-lifecycle/test/deprecation-rules.spec.ts"
+            ],
+            "fileWorkers": 1,
+            "testConcurrency": 1,
+            "command": [
+              "bun",
+              "test",
+              "--no-orphans",
+              "--isolate",
+              "--parallel=1",
+              "--max-concurrency=1",
+              "--timeout=30000",
+              "packages/provider-lifecycle/test/deprecation-rules.spec.ts"
+            ],
+            "status": 0,
+            "wallTimeMs": 3036,
+            "peakRssBytes": null,
+            "cpuSeconds": null,
+            "counts": {
+              "passed": 5,
+              "failed": 0,
+              "skipped": 0
+            },
+            "stdoutTail": "bun test v1.4.0 (34cbb9a40) 1x PARALLEL\n",
+            "stderrTail": "\npackages/provider-lifecycle/test/deprecation-rules.spec.ts:\n(pass) T112 deprecation rules > deprecates an operation and records its metadata [25.53ms]\n(pass) T112 deprecation rules > Rule 1: blocks NEW dependency registration unless a valid exception exists [29.01ms]\n(pass) T112 deprecation rules > Rule 2: raises exactly one incident carrying the migration deadline [26.03ms]\n(pass) T112 deprecation rules > Rule 6: refuses when deprecated op is the sole active source of a consumer [24.87ms]\n(pass) T112 deprecation rules > STRICT_FREE surfaces disabled metadata instead of fabricating availability [31.46ms]\n\n 5 pass\n 0 fail\n 16 expect() calls\nRan 5 tests across 1 file. [2.93s]\n"
+          },
+          {
+            "id": "pglite-2",
+            "workload": "DATABASE_PGLITE",
+            "files": [
+              "packages/provider-lifecycle/test/migrations.spec.ts"
+            ],
+            "fileWorkers": 1,
+            "testConcurrency": 1,
+            "command": [
+              "bun",
+              "test",
+              "--no-orphans",
+              "--isolate",
+              "--parallel=1",
+              "--max-concurrency=1",
+              "--timeout=30000",
+              "packages/provider-lifecycle/test/migrations.spec.ts"
+            ],
+            "status": 0,
+            "wallTimeMs": 3172,
+            "peakRssBytes": null,
+            "cpuSeconds": null,
+            "counts": {
+              "passed": 4,
+              "failed": 0,
+              "skipped": 0
+            },
+            "stdoutTail": "bun test v1.4.0 (34cbb9a40) 1x PARALLEL\n",
+            "stderrTail": "\npackages/provider-lifecycle/test/migrations.spec.ts:\n(pass) prov migration SQL-truth rules > refuses UPDATE on the lifecycle ledger with PROV_LEDGER_IMMUTABLE [24.20ms]\n(pass) prov migration SQL-truth rules > rejects a replayed transition even under a fresh event id (INV-009 fence) [5.00ms]\n(pass) prov migration SQL-truth rules > makes prohibited capability classes unrepresentable in SQL truth [7.46ms]\n(pass) prov migration SQL-truth rules > keeps response quarantine metadata-only: exact column set, no payload body [12.83ms]\n\n 4 pass\n 0 fail\n 9 expect() calls\nRan 4 tests across 1 file. [3.05s]\n"
+          },
+          {
+            "id": "pglite-3",
+            "workload": "DATABASE_PGLITE",
+            "files": [
+              "packages/provider-lifecycle/test/schema-parity.spec.ts"
+            ],
+            "fileWorkers": 1,
+            "testConcurrency": 1,
+            "command": [
+              "bun",
+              "test",
+              "--no-orphans",
+              "--isolate",
+              "--parallel=1",
+              "--max-concurrency=1",
+              "--timeout=30000",
+              "packages/provider-lifecycle/test/schema-parity.spec.ts"
+            ],
+            "status": 0,
+            "wallTimeMs": 3076,
+            "peakRssBytes": null,
+            "cpuSeconds": null,
+            "counts": {
+              "passed": 5,
+              "failed": 0,
+              "skipped": 0
+            },
+            "stdoutTail": "bun test v1.4.0 (34cbb9a40) 1x PARALLEL\n",
+            "stderrTail": "\npackages/provider-lifecycle/test/schema-parity.spec.ts:\n(pass) prov-schema Drizzle mirror parity with SQL truth (ADR-001) > applies all five g0_prov migrations over the full proven data/dr/sec set [6.31ms]\n(pass) prov-schema Drizzle mirror parity with SQL truth (ADR-001) > adds zero tables to the public schema (proven parity contract untouched) [6.26ms]\n(pass) prov-schema Drizzle mirror parity with SQL truth (ADR-001) > mirrors exactly the prov-schema table set [5.26ms]\n(pass) prov-schema Drizzle mirror parity with SQL truth (ADR-001) > matches every column: name, nullability, and type class [94.21ms]\n(pass) prov-schema Drizzle mirror parity with SQL truth (ADR-001) > matches primary keys on every prov table [12.94ms]\n\n 5 pass\n 0 fail\n 36 expect() calls\nRan 5 tests across 1 file. [2.97s]\n"
+          }
+        ]
+      },
+      "codexCalls": 0,
+      "claudeCalls": 0,
+      "testedHead": "56f5f2cb75c1270090b62975608265befa1d6fbf"
     },
     {
       "id": "mechanical--foresift-provider-lifecycle-pure-1",

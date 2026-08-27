@@ -3,7 +3,7 @@
 // pin and connect, unapproved redirects, and response-cap abuse (oversized
 // bodies, slow streams, decompression bombs, disallowed content types) —
 // each fail closed with their specific typed refusal.
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'bun:test';
 import { EgressGuard } from '../../packages/security/src/egress.ts';
 
 const PUBLIC_DNS = ['140.82.112.3'];

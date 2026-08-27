@@ -2,7 +2,7 @@
 // distribution channel — guaranteed profit, risk-free, universal recall,
 // uncalibrated probability, unsupported performance — and
 // assertClaimsCompliant throws rather than letting the copy through.
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'bun:test';
 import {
   assertClaimsCompliant,
   evaluateClaims,

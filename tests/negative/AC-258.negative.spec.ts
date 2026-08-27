@@ -2,7 +2,7 @@
 // Payloads try to become instructions (role insertion), render as active
 // content (raw HTML), or hide their destinations (disguised links) — every
 // attempt is refused deterministically.
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'bun:test';
 import {
   envelopeContent,
   refuseProtectedRoleInsertion,

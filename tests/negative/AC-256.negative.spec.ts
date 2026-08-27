@@ -1,7 +1,7 @@
 // AC-256 (negative): a Helius enhanced-parser fixture configured as SOLE or
 // PRIMARY economic-event decoder REFUSES; so does any deprecated decoder
 // running without the raw-operation local decoding pass.
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'bun:test';
 import { validateDecoderAuthority } from '../../packages/security/src/decoder-authority.ts';
 
 const HELIUS_ENHANCED = {

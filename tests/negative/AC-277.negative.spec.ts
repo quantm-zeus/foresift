@@ -3,7 +3,7 @@
 // prohibited claims refuse with SENSITIVE_DETAIL_PRESENT; redaction never
 // leaks the raw values it replaced.
 import { strict as assert } from 'node:assert';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'bun:test';
 import { validatePublicOutput } from '../../packages/security/src/claims-policy.ts';
 
 const COMPLETE_ENVELOPE = {

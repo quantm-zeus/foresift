@@ -1,7 +1,7 @@
 // AC-275 (negative): adversarial cross-tenant attempts fail closed on EVERY
 // isolated surface — key collisions, unscoped queries, foreign row
 // ownership, signed-URL tenant mismatch, traversal keys, opaque partitions.
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'bun:test';
 import {
   deriveModelContextPartition,
   deriveNamespacedKey,

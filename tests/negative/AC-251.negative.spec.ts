@@ -1,7 +1,7 @@
 // AC-251 (negative): unsupported MCP protocol version, invalid content type/
 // method, oversized message, foreign session ID, or unauthorized resumable
 // cursor fails DETERMINISTICALLY without tool execution.
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'bun:test';
 import { McpProtocolGuard } from '../../packages/security/src/mcp-protocol-guard.ts';
 
 const GUARD = new McpProtocolGuard({ maxMessageBytes: 1024 * 1024 });

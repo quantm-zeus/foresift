@@ -6,7 +6,7 @@
  * (proved for the private-key fixture); stripped transaction-building fields
  * never persist.
  */
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 import { sha256Text } from '@foresift/persistence';
 import { AuditChain } from '@foresift/security';
 import {

@@ -1,7 +1,7 @@
 // AC-253 (negative): grants missing PKCE, using near-miss redirect URIs,
 // carrying wrong audiences/resource indicators, expired, or WIDENED beyond
 // registered scopes refuse — and upstream tokens never pass through.
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'bun:test';
 import { OAuthBindingGuard } from '../../packages/security/src/oauth-binding.ts';
 
 const NOW_MS = Date.parse('2026-08-01T00:00:00Z');

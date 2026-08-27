@@ -6,7 +6,7 @@
  * verification records do not satisfy; lapsed migration exceptions re-block
  * use of deprecated operations with no grace period.
  */
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 import { utcTimestamp } from '@foresift/domain';
 import {
   LifecycleMachine,

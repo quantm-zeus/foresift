@@ -7,7 +7,7 @@
  * degrade without an incident, or claim HEALTHY while carrying an incident
  * fails typed review before it can persist.
  */
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 import { ErrorCode, utcTimestamp, type UtcTimestamp } from '@foresift/domain';
 import { recordRecoveryHealthState } from '@foresift/persistence';
 import type { RecoveryHealthState } from '@foresift/domain';

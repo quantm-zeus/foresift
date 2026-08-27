@@ -6,7 +6,7 @@
  * right NEVER reactivates enforced artifacts, and divergent replays of an
  * already-recorded transition are refused outright.
  */
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 import {
   ArtifactRegistry,
   OperationRegistry,

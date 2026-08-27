@@ -6,7 +6,7 @@
  * vocabulary cannot explain a null, and an outage decision can never be
  * patched into a completed retrieval after the fact.
  */
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 import { AcquisitionState, ErrorCode, utcTimestamp, type UtcTimestamp } from '@foresift/domain';
 import {
   appendObservation,

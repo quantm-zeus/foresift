@@ -1,14 +1,14 @@
 {
   "schema": "foresift/bun-migration-manifest@1",
   "migrationId": "bun-test-authority-v1",
-  "generatedAt": "2026-08-27T01:57:52.229Z",
+  "generatedAt": "2026-08-27T01:57:55.469Z",
   "root": ".",
   "totalTestFiles": 219,
   "counts": {
     "CODEMOD_READY": 0,
     "AGY_REQUIRED": 17,
-    "MIGRATED": 44,
-    "VERIFIED": 158,
+    "MIGRATED": 43,
+    "VERIFIED": 159,
     "BLOCKED": 0
   },
   "parity": {
@@ -953,7 +953,7 @@
         "../src/index.ts",
         "./helpers.ts"
       ],
-      "state": "MIGRATED"
+      "state": "VERIFIED"
     },
     {
       "path": "packages/provider-lifecycle/test/rights-matrix.spec.ts",
@@ -9077,7 +9077,8 @@
       },
       "codexCalls": 0,
       "claudeCalls": 0,
-      "testedHead": "663d52f76d78624cf0a461ffcd6fa8b36b3eb5c2"
+      "testedHead": "663d52f76d78624cf0a461ffcd6fa8b36b3eb5c2",
+      "checkpointHead": "3febae85d59421c4cffa8f1ded3a0a41b795f767"
     },
     {
       "id": "verify-existing--foresift-provider-lifecycle-pure-1",
@@ -9086,7 +9087,53 @@
       "files": [
         "packages/provider-lifecycle/test/response-quarantine.spec.ts"
       ],
-      "state": "PENDING"
+      "state": "VERIFIED",
+      "verification": {
+        "ok": true,
+        "wallTimeMs": 3141,
+        "peakRssBytes": 0,
+        "cpuSeconds": 0,
+        "counts": {
+          "passed": 13,
+          "failed": 0,
+          "skipped": 0
+        },
+        "results": [
+          {
+            "id": "pure-1",
+            "workload": "PURE",
+            "files": [
+              "packages/provider-lifecycle/test/response-quarantine.spec.ts"
+            ],
+            "fileWorkers": 2,
+            "testConcurrency": 8,
+            "command": [
+              "bun",
+              "test",
+              "--no-orphans",
+              "--isolate",
+              "--parallel=2",
+              "--max-concurrency=8",
+              "--timeout=30000",
+              "packages/provider-lifecycle/test/response-quarantine.spec.ts"
+            ],
+            "status": 0,
+            "wallTimeMs": 3141,
+            "peakRssBytes": null,
+            "cpuSeconds": null,
+            "counts": {
+              "passed": 13,
+              "failed": 0,
+              "skipped": 0
+            },
+            "stdoutTail": "bun test v1.4.0 (34cbb9a40) 2x PARALLEL\n",
+            "stderrTail": "\npackages/provider-lifecycle/test/response-quarantine.spec.ts:\n(pass) T119 deterministic response scanning > detects a raw transaction payload field [0.84ms]\n(pass) T119 deterministic response scanning > detects the message+signatures transaction skeleton [0.20ms]\n(pass) T119 deterministic response scanning > does NOT flag an object with only one of the skeleton keys [0.04ms]\n(pass) T119 deterministic response scanning > detects signing requests, executable content, and private-key fields [0.13ms]\n(pass) T119 deterministic response scanning > detects PEM key text and shebang scripts at the text level [0.21ms]\n(pass) T119 deterministic response scanning > detects unexpected WRITE capability advertisements on a read-only surface [0.09ms]\n(pass) T119 deterministic response scanning > passes clean read-only market payloads [0.05ms]\n(pass) T119 deterministic response scanning > stripTransactionBuildingFields removes payload keys and reports paths [0.19ms]\n(pass) T119 quarantine records + model-context exclusion > reject-and-quarantine persists metadata only and emits the audit bridge [17.83ms]\n(pass) T119 quarantine records + model-context exclusion > is idempotent: the same body re-quarantines to the SAME record without a second audit entry [6.04ms]\n(pass) T119 quarantine records + model-context exclusion > refuses to quarantine a clean scan (no detected class) [0.50ms]\n(pass) T119 quarantine records + model-context exclusion > HARD-EXCLUDES the exact payload from model-context envelopes [2.40ms]\n(pass) T119 quarantine records + model-context exclusion > lists quarantine history with detection metadata only [3.39ms]\n\n 13 pass\n 0 fail\n 27 expect() calls\nRan 13 tests across 1 file. [3.02s]\n"
+          }
+        ]
+      },
+      "codexCalls": 0,
+      "claudeCalls": 0,
+      "testedHead": "3febae85d59421c4cffa8f1ded3a0a41b795f767"
     },
     {
       "id": "verify-existing--foresift-security-database-pglite-1",

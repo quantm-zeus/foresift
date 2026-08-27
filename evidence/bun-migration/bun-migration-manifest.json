@@ -1,14 +1,14 @@
 {
   "schema": "foresift/bun-migration-manifest@1",
   "migrationId": "bun-test-authority-v1",
-  "generatedAt": "2026-08-27T01:52:40.229Z",
+  "generatedAt": "2026-08-27T01:52:59.171Z",
   "root": ".",
   "totalTestFiles": 219,
   "counts": {
     "CODEMOD_READY": 0,
     "AGY_REQUIRED": 17,
-    "MIGRATED": 71,
-    "VERIFIED": 131,
+    "MIGRATED": 65,
+    "VERIFIED": 137,
     "BLOCKED": 0
   },
   "parity": {
@@ -1937,7 +1937,7 @@
         "@foresift/domain",
         "../src/stages/cache.ts"
       ],
-      "state": "MIGRATED"
+      "state": "VERIFIED"
     },
     {
       "path": "packages/tool-core/test/freshness.spec.ts",
@@ -2015,7 +2015,7 @@
         "@electric-sql/pglite",
         "@foresift/persistence"
       ],
-      "state": "MIGRATED"
+      "state": "VERIFIED"
     },
     {
       "path": "packages/tool-core/test/pipeline.spec.ts",
@@ -2119,7 +2119,7 @@
         "../src/quota-contract.ts",
         "../../../tests/fixtures/core/deny-closed-quota-adapter.ts"
       ],
-      "state": "MIGRATED"
+      "state": "VERIFIED"
     },
     {
       "path": "packages/tool-core/test/registry.spec.ts",
@@ -2149,7 +2149,7 @@
         "../src/registry.ts",
         "../src/prohibited.ts"
       ],
-      "state": "MIGRATED"
+      "state": "VERIFIED"
     },
     {
       "path": "packages/tool-core/test/seam-stability.spec.ts",
@@ -2177,7 +2177,7 @@
         "@foresift/persistence",
         "../../../tests/fixtures/core/reference-adapters.ts"
       ],
-      "state": "MIGRATED"
+      "state": "VERIFIED"
     },
     {
       "path": "packages/tool-core/test/single-flight.spec.ts",
@@ -2203,7 +2203,7 @@
         "@foresift/persistence",
         "../src/single-flight.ts"
       ],
-      "state": "MIGRATED"
+      "state": "VERIFIED"
     },
     {
       "path": "tests/acceptance/AC-001.spec.ts",
@@ -8356,7 +8356,8 @@
       },
       "codexCalls": 0,
       "claudeCalls": 0,
-      "testedHead": "1e4c2afef821c1560233fccece7c801468bb026a"
+      "testedHead": "1e4c2afef821c1560233fccece7c801468bb026a",
+      "checkpointHead": "fe454efb06e18d51755c9e1200aecfac5509b54b"
     },
     {
       "id": "verify-existing--foresift-tool-core-database-pglite-1",
@@ -8370,7 +8371,203 @@
         "packages/tool-core/test/seam-stability.spec.ts",
         "packages/tool-core/test/single-flight.spec.ts"
       ],
-      "state": "PENDING"
+      "state": "VERIFIED",
+      "verification": {
+        "ok": true,
+        "wallTimeMs": 18840,
+        "peakRssBytes": 0,
+        "cpuSeconds": 0,
+        "counts": {
+          "passed": 61,
+          "failed": 0,
+          "skipped": 0
+        },
+        "results": [
+          {
+            "id": "pglite-1",
+            "workload": "DATABASE_PGLITE",
+            "files": [
+              "packages/tool-core/test/cache-stage.spec.ts"
+            ],
+            "fileWorkers": 1,
+            "testConcurrency": 1,
+            "command": [
+              "bun",
+              "test",
+              "--no-orphans",
+              "--isolate",
+              "--parallel=1",
+              "--max-concurrency=1",
+              "--timeout=30000",
+              "packages/tool-core/test/cache-stage.spec.ts"
+            ],
+            "status": 0,
+            "wallTimeMs": 3394,
+            "peakRssBytes": null,
+            "cpuSeconds": null,
+            "counts": {
+              "passed": 9,
+              "failed": 0,
+              "skipped": 0
+            },
+            "stdoutTail": "bun test v1.4.0 (34cbb9a40) 1x PARALLEL\n",
+            "stderrTail": "\npackages/tool-core/test/cache-stage.spec.ts:\n(pass) cache stage chain (stages 6–11) > misses on an empty store, then hits FRESH after a permitted store [13.18ms]\n(pass) cache stage chain (stages 6–11) > memoizes within a request: a second lookup does not re-query [6.16ms]\n(pass) cache stage chain (stages 6–11) > admits stale to automation for AUTOMATED families at the family edge [4.98ms]\n(pass) cache stage chain (stages 6–11) > point-in-time safety: a reader before the write never sees the entry [4.12ms]\n(pass) cache stage chain (stages 6–11) > refuses entries whose license component no longer matches [3.04ms]\n(pass) cache stage chain (stages 6–11) > post-lease re-check drops the memo and observes a concurrent refresh [7.55ms]\n(pass) stage-20 write admission > rights refused ⇒ nothing is written [1.00ms]\n(pass) stage-20 write admission > cache policy denied ⇒ nothing is written [0.64ms]\n(pass) stage-20 write admission > writes windows derived from the §16.5 family row at write time [1.99ms]\n\n 9 pass\n 0 fail\n 18 expect() calls\nRan 9 tests across 1 file. [3.27s]\n"
+          },
+          {
+            "id": "pglite-2",
+            "workload": "DATABASE_PGLITE",
+            "files": [
+              "packages/tool-core/test/migrations.spec.ts"
+            ],
+            "fileWorkers": 1,
+            "testConcurrency": 1,
+            "command": [
+              "bun",
+              "test",
+              "--no-orphans",
+              "--isolate",
+              "--parallel=1",
+              "--max-concurrency=1",
+              "--timeout=30000",
+              "packages/tool-core/test/migrations.spec.ts"
+            ],
+            "status": 0,
+            "wallTimeMs": 3122,
+            "peakRssBytes": null,
+            "cpuSeconds": null,
+            "counts": {
+              "passed": 24,
+              "failed": 0,
+              "skipped": 0
+            },
+            "stdoutTail": "bun test v1.4.0 (34cbb9a40) 1x PARALLEL\n",
+            "stderrTail": "\npackages/tool-core/test/migrations.spec.ts:\n(pass) g0_core migrations apply over the full landed set > applies every family including core, lexicographically [0.06ms]\n(pass) g0_core migrations apply over the full landed set > exposes exactly the four core tables in the core namespace [7.15ms]\n(pass) tool registry SQL truth (FR-CORE-001/FR-CORE-005) > registers an admissible definition [6.24ms]\n(pass) tool registry SQL truth (FR-CORE-001/FR-CORE-005) > refuses PROHIBITED_FINANCIAL structurally beneath every TS screen [13.87ms]\n(pass) tool registry SQL truth (FR-CORE-001/FR-CORE-005) > refuses duplicate (name, version) regardless of hash equality [4.61ms]\n(pass) tool registry SQL truth (FR-CORE-001/FR-CORE-005) > refuses normative mutation, allows only retirement, refuses deletion [7.19ms]\n(pass) tool registry SQL truth (FR-CORE-001/FR-CORE-005) > pins profiles to the eight §16.9 ids and demands at least one [3.10ms]\n(pass) single-flight leases (FR-CORE-006, INV-009 fencing) > grants a fresh lease with a monotonic sequence token [2.24ms]\n(pass) single-flight leases (FR-CORE-006, INV-009 fencing) > refuses a second grant while the lease is live [1.59ms]\n(pass) single-flight leases (FR-CORE-006, INV-009 fencing) > releases only the matching unreleased token; stale tokens fail closed [3.58ms]\n(pass) single-flight leases (FR-CORE-006, INV-009 fencing) > expired/released takeover allocates a STRICTLY higher fence [2.75ms]\n(pass) single-flight leases (FR-CORE-006, INV-009 fencing) > rejects expiry before acquisition at SQL truth level [1.29ms]\n(pass) quota reservation state machine (FR-CORE-007) > reserve behaves per the §16.7 matrix [2.86ms]\n(pass) quota reservation state machine (FR-CORE-007) > commit-from-pending behaves per the §16.7 matrix [1.87ms]\n(pass) quota reservation state machine (FR-CORE-007) > release-from-pending behaves per the §16.7 matrix [1.80ms]\n(pass) quota reservation state machine (FR-CORE-007) > walks PENDING -> RESERVED -> COMMITTED recording actual units once [3.81ms]\n(pass) quota reservation state machine (FR-CORE-007) > commit-replay-converges (idempotent retry semantics) [4.62ms]\n(pass) quota reservation state machine (FR-CORE-007) > release-replay-converges (idempotent retry semantics) [5.09ms]\n(pass) quota reservation state machine (FR-CORE-007) > refuses releasing a COMMITTED reservation (illegal edge) [5.76ms]\n(pass) quota reservation state machine (FR-CORE-007) > expires RESERVED but never COMMITTED or RELEASED [6.23ms]\n(pass) quota reservation state machine (FR-CORE-007) > enforces the (pipeline_run_id, stage) idempotency key [1.64ms]\n(pass) quota reservation state machine (FR-CORE-007) > interleaved actors cannot double-commit: the loser matches zero rows [3.44ms]\n(pass) exact cache entries (FR-CORE-006, INV-005/006) > stores an entry and honors point-in-time visibility [2.26ms]\n(pass) exact cache entries (FR-CORE-006, INV-005/006) > refuses inverted freshness windows [1.30ms]\n\n 24 pass\n 0 fail\n 39 expect() calls\nRan 24 tests across 1 file. [3.02s]\n"
+          },
+          {
+            "id": "pglite-3",
+            "workload": "DATABASE_PGLITE",
+            "files": [
+              "packages/tool-core/test/quota-contract.spec.ts"
+            ],
+            "fileWorkers": 1,
+            "testConcurrency": 1,
+            "command": [
+              "bun",
+              "test",
+              "--no-orphans",
+              "--isolate",
+              "--parallel=1",
+              "--max-concurrency=1",
+              "--timeout=30000",
+              "packages/tool-core/test/quota-contract.spec.ts"
+            ],
+            "status": 0,
+            "wallTimeMs": 3066,
+            "peakRssBytes": null,
+            "cpuSeconds": null,
+            "counts": {
+              "passed": 7,
+              "failed": 0,
+              "skipped": 0
+            },
+            "stdoutTail": "bun test v1.4.0 (34cbb9a40) 1x PARALLEL\n",
+            "stderrTail": "\npackages/tool-core/test/quota-contract.spec.ts:\n(pass) reservation lifecycle helpers > walks PENDING → RESERVED → COMMITTED recording actual units once [6.85ms]\n(pass) reservation lifecycle helpers > commit from PENDING behaves per the §16.7 matrix [15.23ms]\n(pass) reservation lifecycle helpers > release from PENDING behaves per the §16.7 matrix [2.50ms]\n(pass) reservation lifecycle helpers > illegal edges carry the CURRENT state in detail.from [6.29ms]\n(pass) reservation lifecycle helpers > expires RESERVED reservations; an EXPIRED row is terminal for release [7.73ms]\n(pass) reservation lifecycle helpers > enforces the (pipeline_run_id, stage) idempotency key on insert [3.78ms]\n(pass) reservation lifecycle helpers > deny-closed default adapter refuses everything as UNKNOWN_COST [0.43ms]\n\n 7 pass\n 0 fail\n 14 expect() calls\nRan 7 tests across 1 file. [2.96s]\n"
+          },
+          {
+            "id": "pglite-4",
+            "workload": "DATABASE_PGLITE",
+            "files": [
+              "packages/tool-core/test/registry.spec.ts"
+            ],
+            "fileWorkers": 1,
+            "testConcurrency": 1,
+            "command": [
+              "bun",
+              "test",
+              "--no-orphans",
+              "--isolate",
+              "--parallel=1",
+              "--max-concurrency=1",
+              "--timeout=30000",
+              "packages/tool-core/test/registry.spec.ts"
+            ],
+            "status": 0,
+            "wallTimeMs": 3198,
+            "peakRssBytes": null,
+            "cpuSeconds": null,
+            "counts": {
+              "passed": 9,
+              "failed": 0,
+              "skipped": 0
+            },
+            "stdoutTail": "bun test v1.4.0 (34cbb9a40) 1x PARALLEL\n",
+            "stderrTail": "\npackages/tool-core/test/registry.spec.ts:\n(pass) tool registry registration + hash pinning > registers a definition and pins its hash to canonical metadata JSON [16.84ms]\n(pass) tool registry registration + hash pinning > refuses duplicate version with a DIFFERING hash [17.69ms]\n(pass) tool registry registration + hash pinning > screens before insert: prohibited definitions are refused AND audited [2.30ms]\n(pass) tool registry registration + hash pinning > keeps snapshot version monotonic across registrations [4.88ms]\n(pass) tool registry registration + hash pinning > lists by profile only for live entries carrying that profile [3.51ms]\n(pass) tool registry registration + hash pinning > retires additively; retired entries leave resolution but stay stored [12.91ms]\n(pass) tool registry registration + hash pinning > hydrates rows persisted by another instance without granting execute [5.80ms]\n(pass) tool registry registration + hash pinning > seeds every §16.9 domain catalog name as a registrable fixture definition [23.17ms]\n(pass) tool registry registration + hash pinning > excludes unregistered names from resolution (fail-closed) [0.18ms]\n\n 9 pass\n 0 fail\n 19 expect() calls\nRan 9 tests across 1 file. [3.10s]\n"
+          },
+          {
+            "id": "pglite-5",
+            "workload": "DATABASE_PGLITE",
+            "files": [
+              "packages/tool-core/test/seam-stability.spec.ts"
+            ],
+            "fileWorkers": 1,
+            "testConcurrency": 1,
+            "command": [
+              "bun",
+              "test",
+              "--no-orphans",
+              "--isolate",
+              "--parallel=1",
+              "--max-concurrency=1",
+              "--timeout=30000",
+              "packages/tool-core/test/seam-stability.spec.ts"
+            ],
+            "status": 0,
+            "wallTimeMs": 3077,
+            "peakRssBytes": null,
+            "cpuSeconds": null,
+            "counts": {
+              "passed": 3,
+              "failed": 0,
+              "skipped": 0
+            },
+            "stdoutTail": "bun test v1.4.0 (34cbb9a40) 1x PARALLEL\n",
+            "stderrTail": "\npackages/tool-core/test/seam-stability.spec.ts:\n(pass) extension-point seams are implementable from outside the package > the fixture module path is outside packages/tool-core/src [0.15ms]\n(pass) extension-point seams are implementable from outside the package > reference adapters drive reserve→commit through BOTH seams with zero src edits [21.23ms]\n(pass) tool-core src carries no cost-table vocabulary > no forbidden token appears in any src file [1.84ms]\n\n 3 pass\n 0 fail\n 7 expect() calls\nRan 3 tests across 1 file. [2.96s]\n"
+          },
+          {
+            "id": "pglite-6",
+            "workload": "DATABASE_PGLITE",
+            "files": [
+              "packages/tool-core/test/single-flight.spec.ts"
+            ],
+            "fileWorkers": 1,
+            "testConcurrency": 1,
+            "command": [
+              "bun",
+              "test",
+              "--no-orphans",
+              "--isolate",
+              "--parallel=1",
+              "--max-concurrency=1",
+              "--timeout=30000",
+              "packages/tool-core/test/single-flight.spec.ts"
+            ],
+            "status": 0,
+            "wallTimeMs": 2983,
+            "peakRssBytes": null,
+            "cpuSeconds": null,
+            "counts": {
+              "passed": 9,
+              "failed": 0,
+              "skipped": 0
+            },
+            "stdoutTail": "bun test v1.4.0 (34cbb9a40) 1x PARALLEL\n",
+            "stderrTail": "\npackages/tool-core/test/single-flight.spec.ts:\n(pass) cross-mode lease acquisition > MCP_MANUAL acquires a fresh lease with a positive token [3.87ms]\n(pass) cross-mode lease acquisition > CHATGPT acquires a fresh lease with a positive token [1.91ms]\n(pass) cross-mode lease acquisition > ADMIN_CHAT acquires a fresh lease with a positive token [1.49ms]\n(pass) cross-mode lease acquisition > AUTOMATION acquires a fresh lease with a positive token [1.57ms]\n(pass) cross-mode lease acquisition > refuses a second live holder across modes (cross-mode single-flight) [17.21ms]\n(pass) cross-mode lease acquisition > allows takeover only after expiry and bumps the fence strictly [3.60ms]\n(pass) cross-mode lease acquisition > release with the matching token succeeds; replay refuses [3.92ms]\n(pass) cross-mode lease acquisition > interleaved acquirers of an expired lease elect exactly ONE winner [3.32ms]\n(pass) cross-mode lease acquisition > derives identical resource hashes for identical identity tuples [0.25ms]\n\n 9 pass\n 0 fail\n 20 expect() calls\nRan 9 tests across 1 file. [2.86s]\n"
+          }
+        ]
+      },
+      "codexCalls": 0,
+      "claudeCalls": 0,
+      "testedHead": "fe454efb06e18d51755c9e1200aecfac5509b54b"
     },
     {
       "id": "verify-existing--foresift-tool-core-pure-1",

@@ -173,7 +173,7 @@ describe('Contract 2: Durable proof lifecycle and crash-safe state restart', () 
     expect(verdict.reason).toBe('durable-proof');
   });
 
-  it.each([
+  const invalidProofCases = [
     ['schema', { schema: 'invalid-schema' }],
     ['migrationId', { migrationId: 'wrong-id' }],
     ['bunVersion', { bunVersion: '9.9.9' }],
@@ -188,12 +188,15 @@ describe('Contract 2: Durable proof lifecycle and crash-safe state restart', () 
     ['nodeCompatibility', { nodeCompatibility: { passed: false } }],
     ['healthyMigrationCodexCalls', { healthyMigrationCodexCalls: 1 }],
     ['healthyMigrationClaudeCalls', { healthyMigrationClaudeCalls: 1 }],
-  ])('invalid proof property %s fails validation and blocks barrier release', (key, override) => {
-    const invalid = { ...validProof, ...override };
-    const verdict = validateBunMigrationProof(invalid, DEFAULT_POLICY);
-    expect(verdict.valid).toBe(false);
-    expect(verdict.reasons).toContain(key);
-  });
+  ] as const;
+  for (const [key, override] of invalidProofCases) {
+    it(`invalid proof property ${key} fails validation and blocks barrier release`, () => {
+      const invalid = { ...validProof, ...override };
+      const verdict = validateBunMigrationProof(invalid, DEFAULT_POLICY);
+      expect(verdict.valid).toBe(false);
+      expect(verdict.reasons).toContain(key);
+    });
+  }
 });
 
 // ── Contract 3: Maintenance workflow structure, topology, and execution bounds ──

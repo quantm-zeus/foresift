@@ -204,10 +204,10 @@ describe('reconcileJsonManifest (current main wins)', () => {
   });
 
   it('adds missing entries inside dependency maps without touching existing ones', () => {
-    const cur = JSON.stringify({ devDependencies: { vitest: '4.1.11' } });
-    const sal = JSON.stringify({ devDependencies: { vitest: '0.9', zod: '3.0.0' } });
+    const cur = JSON.stringify({ devDependencies: { typescript: '5.4.0' } });
+    const sal = JSON.stringify({ devDependencies: { typescript: '5.0.0', zod: '3.0.0' } });
     const merged = JSON.parse(reconcileJsonManifest(cur, sal)!);
-    expect(merged.devDependencies.vitest).toBe('4.1.11'); // current wins
+    expect(merged.devDependencies.typescript).toBe('5.4.0'); // current wins
     expect(merged.devDependencies.zod).toBe('3.0.0'); // missing dep added
   });
 

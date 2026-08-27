@@ -2,7 +2,7 @@
 // AC-251): exact-match allowlisting with hygiene checks that fire BEFORE
 // authentication processing, absent-origin deployment policy,
 // revision/content-type/method/size/session/cursor refusals.
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'bun:test';
 import { McpOriginGate } from '../src/mcp-origin.ts';
 import { McpProtocolGuard } from '../src/mcp-protocol-guard.ts';
 

@@ -1,6 +1,6 @@
 // §35.9 coverage completeness (T108): every bullet maps to a class, every
 // class is reachable, and the vocabulary matches the shared schema exactly.
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'bun:test';
 import { AuditActionClassSchema } from '@foresift/shared-schemas';
 import {
   ALL_AUDIT_ACTION_CLASSES,

@@ -1,7 +1,7 @@
 // Egress guard (T118): deny-by-default allowlists, URL parsing defenses,
 // denied IP ranges, pin→connect rebinding counter, redirect revalidation,
 // response caps.
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'bun:test';
 import { EgressGuard, isDeniedAddress } from '../src/egress.ts';
 
 const ALLOWLIST = [

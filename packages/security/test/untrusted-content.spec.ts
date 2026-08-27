@@ -1,7 +1,7 @@
 // Untrusted content (T119): seven-source labeling, protected-role refusal,
 // structured extraction envelopes, render-safety validators, memory
 // isolation keys. (AC-051, AC-052, AC-258)
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'bun:test';
 import {
   deriveMemoryIsolationKey,
   envelopeContent,

@@ -3,7 +3,7 @@
 // cache, fixed-endpoint rule, malformed-cannot-advance contract; flood
 // limits, amplification weighting, degrade-not-bypass quotas, enumeration
 // detection, protected monitoring, coordination stubs.
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'bun:test';
 import { createHmac } from 'node:crypto';
 import { hmacSha256Verifier, WebhookGuard } from '../src/webhook-integrity.ts';
 import { WebhookIntegrityError } from '../src/errors.ts';

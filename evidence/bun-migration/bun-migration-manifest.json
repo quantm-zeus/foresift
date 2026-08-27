@@ -1,14 +1,14 @@
 {
   "schema": "foresift/bun-migration-manifest@1",
   "migrationId": "bun-test-authority-v1",
-  "generatedAt": "2026-08-27T02:06:58.182Z",
+  "generatedAt": "2026-08-27T02:06:59.657Z",
   "root": ".",
   "totalTestFiles": 219,
   "counts": {
     "CODEMOD_READY": 0,
     "AGY_REQUIRED": 0,
-    "MIGRATED": 18,
-    "VERIFIED": 201,
+    "MIGRATED": 17,
+    "VERIFIED": 202,
     "BLOCKED": 0
   },
   "parity": {
@@ -5722,7 +5722,7 @@
       "migrationType": "ALREADY_MIGRATED",
       "fixturesAndHelpers": [],
       "sourceAnchors": [],
-      "state": "MIGRATED"
+      "state": "VERIFIED"
     },
     {
       "path": "tests/telemetry-catalog.spec.ts",
@@ -9856,7 +9856,8 @@
       },
       "codexCalls": 0,
       "claudeCalls": 0,
-      "testedHead": "3f17844a75f805cb914f4f4cf2bba1de520d1242"
+      "testedHead": "3f17844a75f805cb914f4f4cf2bba1de520d1242",
+      "checkpointHead": "ee3447636edc1e71248aac932e9f543e33ff58a9"
     },
     {
       "id": "verify-existing-root-process-1",
@@ -9865,7 +9866,53 @@
       "files": [
         "tests/spec-verify.spec.ts"
       ],
-      "state": "PENDING"
+      "state": "VERIFIED",
+      "verification": {
+        "ok": true,
+        "wallTimeMs": 1381,
+        "peakRssBytes": 0,
+        "cpuSeconds": 0,
+        "counts": {
+          "passed": 3,
+          "failed": 0,
+          "skipped": 0
+        },
+        "results": [
+          {
+            "id": "process-1",
+            "workload": "PROCESS",
+            "files": [
+              "tests/spec-verify.spec.ts"
+            ],
+            "fileWorkers": 1,
+            "testConcurrency": 2,
+            "command": [
+              "bun",
+              "test",
+              "--no-orphans",
+              "--isolate",
+              "--parallel=1",
+              "--max-concurrency=2",
+              "--timeout=30000",
+              "tests/spec-verify.spec.ts"
+            ],
+            "status": 0,
+            "wallTimeMs": 1381,
+            "peakRssBytes": null,
+            "cpuSeconds": null,
+            "counts": {
+              "passed": 3,
+              "failed": 0,
+              "skipped": 0
+            },
+            "stdoutTail": "bun test v1.4.0 (34cbb9a40) 1x PARALLEL\n",
+            "stderrTail": "\ntests/spec-verify.spec.ts:\n(pass) spec:verify against the authoritative specification > passes on the repository as checked in [151.18ms]\n(pass) spec:verify against the authoritative specification > fails on tampered SHA256SUMS entry [582.12ms]\n(pass) spec:verify against the authoritative specification > fails on legacy branding introduced into active tooling [591.10ms]\n\n 3 pass\n 0 fail\n 20 expect() calls\nRan 3 tests across 1 file. [1365.00ms]\n"
+          }
+        ]
+      },
+      "codexCalls": 0,
+      "claudeCalls": 0,
+      "testedHead": "ee3447636edc1e71248aac932e9f543e33ff58a9"
     }
   ]
 }

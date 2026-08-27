@@ -1,14 +1,14 @@
 {
   "schema": "foresift/bun-migration-manifest@1",
   "migrationId": "bun-test-authority-v1",
-  "generatedAt": "2026-08-27T01:59:48.911Z",
+  "generatedAt": "2026-08-27T02:00:24.452Z",
   "root": ".",
   "totalTestFiles": 219,
   "counts": {
     "CODEMOD_READY": 0,
     "AGY_REQUIRED": 17,
-    "MIGRATED": 25,
-    "VERIFIED": 177,
+    "MIGRATED": 1,
+    "VERIFIED": 201,
     "BLOCKED": 0
   },
   "parity": {
@@ -4480,7 +4480,7 @@
         "@foresift/shared-schemas",
         "../../packages/tool-core/src/profiles.ts"
       ],
-      "state": "MIGRATED"
+      "state": "VERIFIED"
     },
     {
       "path": "tests/negative/AC-002.negative.spec.ts",
@@ -4500,7 +4500,7 @@
       "sourceAnchors": [
         "@foresift/shared-schemas"
       ],
-      "state": "MIGRATED"
+      "state": "VERIFIED"
     },
     {
       "path": "tests/negative/AC-003.negative.spec.ts",
@@ -4548,7 +4548,7 @@
       "sourceAnchors": [
         "@foresift/shared-schemas"
       ],
-      "state": "MIGRATED"
+      "state": "VERIFIED"
     },
     {
       "path": "tests/negative/AC-020.negative.spec.ts",
@@ -4584,7 +4584,7 @@
         "../../packages/tool-core/src/stages/cache.ts",
         "../acceptance/helpers.ts"
       ],
-      "state": "MIGRATED"
+      "state": "VERIFIED"
     },
     {
       "path": "tests/negative/AC-021.negative.spec.ts",
@@ -4616,7 +4616,7 @@
         "../../packages/tool-core/src/normalize.ts",
         "../acceptance/helpers.ts"
       ],
-      "state": "MIGRATED"
+      "state": "VERIFIED"
     },
     {
       "path": "tests/negative/AC-022.negative.spec.ts",
@@ -4644,7 +4644,7 @@
         "../../packages/tool-core/src/cache-key.ts",
         "../acceptance/helpers.ts"
       ],
-      "state": "MIGRATED"
+      "state": "VERIFIED"
     },
     {
       "path": "tests/negative/AC-023.negative.spec.ts",
@@ -4675,7 +4675,7 @@
         "../../packages/tool-core/src/normalize.ts",
         "../acceptance/helpers.ts"
       ],
-      "state": "MIGRATED"
+      "state": "VERIFIED"
     },
     {
       "path": "tests/negative/AC-050.negative.spec.ts",
@@ -4702,7 +4702,7 @@
         "../../packages/security/src/negative-capability.ts",
         "../../packages/tool-core/src/prohibited.ts"
       ],
-      "state": "MIGRATED"
+      "state": "VERIFIED"
     },
     {
       "path": "tests/negative/AC-051.negative.spec.ts",
@@ -4731,7 +4731,7 @@
         "../fixtures/sec/webhook/webhook-forgery.ts",
         "../fixtures/sec/injection/injection-corpus.ts"
       ],
-      "state": "MIGRATED"
+      "state": "VERIFIED"
     },
     {
       "path": "tests/negative/AC-052.negative.spec.ts",
@@ -4753,7 +4753,7 @@
         "@foresift/shared-schemas",
         "../../packages/security/src/secrets-policy.ts"
       ],
-      "state": "MIGRATED"
+      "state": "VERIFIED"
     },
     {
       "path": "tests/negative/AC-053.negative.spec.ts",
@@ -4888,7 +4888,7 @@
         "@foresift/shared-schemas",
         "../../packages/tool-core/src/normalize.ts"
       ],
-      "state": "MIGRATED"
+      "state": "VERIFIED"
     },
     {
       "path": "tests/negative/AC-241.negative.spec.ts",
@@ -4920,7 +4920,7 @@
         "../../packages/tool-core/src/stages/cache.ts",
         "../acceptance/helpers.ts"
       ],
-      "state": "MIGRATED"
+      "state": "VERIFIED"
     },
     {
       "path": "tests/negative/AC-242.negative.spec.ts",
@@ -4948,7 +4948,7 @@
         "@foresift/shared-schemas",
         "../acceptance/helpers.ts"
       ],
-      "state": "MIGRATED"
+      "state": "VERIFIED"
     },
     {
       "path": "tests/negative/AC-243.negative.spec.ts",
@@ -4976,7 +4976,7 @@
         "@foresift/shared-schemas",
         "../acceptance/helpers.ts"
       ],
-      "state": "MIGRATED"
+      "state": "VERIFIED"
     },
     {
       "path": "tests/negative/AC-244.negative.spec.ts",
@@ -4998,7 +4998,7 @@
         "@foresift/domain",
         "@foresift/shared-schemas"
       ],
-      "state": "MIGRATED"
+      "state": "VERIFIED"
     },
     {
       "path": "tests/negative/AC-245.negative.spec.ts",
@@ -5026,7 +5026,7 @@
         "@foresift/shared-schemas",
         "../acceptance/helpers.ts"
       ],
-      "state": "MIGRATED"
+      "state": "VERIFIED"
     },
     {
       "path": "tests/negative/AC-246.negative.spec.ts",
@@ -5052,7 +5052,7 @@
         "@foresift/shared-schemas",
         "../acceptance/helpers.ts"
       ],
-      "state": "MIGRATED"
+      "state": "VERIFIED"
     },
     {
       "path": "tests/negative/AC-247.negative.spec.ts",
@@ -5080,7 +5080,7 @@
         "@foresift/shared-schemas",
         "../acceptance/helpers.ts"
       ],
-      "state": "MIGRATED"
+      "state": "VERIFIED"
     },
     {
       "path": "tests/negative/AC-248.negative.spec.ts",
@@ -5110,7 +5110,7 @@
         "@foresift/shared-schemas",
         "../acceptance/helpers.ts"
       ],
-      "state": "MIGRATED"
+      "state": "VERIFIED"
     },
     {
       "path": "tests/negative/AC-249.negative.spec.ts",
@@ -5138,7 +5138,7 @@
         "@foresift/shared-schemas",
         "../acceptance/helpers.ts"
       ],
-      "state": "MIGRATED"
+      "state": "VERIFIED"
     },
     {
       "path": "tests/negative/AC-250.negative.spec.ts",
@@ -5246,7 +5246,7 @@
         "../../packages/security/src/negative-capability.ts",
         "../../packages/security/src/supply-chain.ts"
       ],
-      "state": "MIGRATED"
+      "state": "VERIFIED"
     },
     {
       "path": "tests/negative/AC-255.negative.spec.ts",
@@ -5273,7 +5273,7 @@
         "../../packages/security/src/negative-capability.ts",
         "../../packages/tool-core/src/prohibited.ts"
       ],
-      "state": "MIGRATED"
+      "state": "VERIFIED"
     },
     {
       "path": "tests/negative/AC-256.negative.spec.ts",
@@ -5564,7 +5564,7 @@
         "@foresift/provider-lifecycle",
         "../helpers/prov.ts"
       ],
-      "state": "MIGRATED"
+      "state": "VERIFIED"
     },
     {
       "path": "tests/negative/AC-272.negative.spec.ts",
@@ -5697,7 +5697,7 @@
       "sourceAnchors": [
         "../../packages/security/src/claims-policy.ts"
       ],
-      "state": "MIGRATED"
+      "state": "VERIFIED"
     },
     {
       "path": "tests/negative/AC-277.negative.spec.ts",
@@ -9782,7 +9782,8 @@
       },
       "codexCalls": 0,
       "claudeCalls": 0,
-      "testedHead": "d103307265573a6ef617795b23307960ed78327a"
+      "testedHead": "d103307265573a6ef617795b23307960ed78327a",
+      "checkpointHead": "c99d0817aec9f217c0141c3122bec231fe818b2f"
     },
     {
       "id": "verify-existing-negative-pure-1",
@@ -9814,7 +9815,99 @@
         "tests/negative/AC-271.negative.spec.ts",
         "tests/negative/AC-276.negative.spec.ts"
       ],
-      "state": "PENDING"
+      "state": "VERIFIED",
+      "verification": {
+        "ok": true,
+        "wallTimeMs": 35407,
+        "peakRssBytes": 0,
+        "cpuSeconds": 0,
+        "counts": {
+          "passed": 143,
+          "failed": 0,
+          "skipped": 0
+        },
+        "results": [
+          {
+            "id": "pure-1",
+            "workload": "PURE",
+            "files": [
+              "tests/negative/AC-001.negative.spec.ts",
+              "tests/negative/AC-002.negative.spec.ts",
+              "tests/negative/AC-004.negative.spec.ts",
+              "tests/negative/AC-020.negative.spec.ts",
+              "tests/negative/AC-021.negative.spec.ts",
+              "tests/negative/AC-022.negative.spec.ts",
+              "tests/negative/AC-023.negative.spec.ts",
+              "tests/negative/AC-050.negative.spec.ts",
+              "tests/negative/AC-051.negative.spec.ts",
+              "tests/negative/AC-052.negative.spec.ts",
+              "tests/negative/AC-240.negative.spec.ts",
+              "tests/negative/AC-241.negative.spec.ts",
+              "tests/negative/AC-242.negative.spec.ts",
+              "tests/negative/AC-243.negative.spec.ts",
+              "tests/negative/AC-244.negative.spec.ts",
+              "tests/negative/AC-245.negative.spec.ts",
+              "tests/negative/AC-246.negative.spec.ts",
+              "tests/negative/AC-247.negative.spec.ts",
+              "tests/negative/AC-248.negative.spec.ts",
+              "tests/negative/AC-249.negative.spec.ts",
+              "tests/negative/AC-254.negative.spec.ts",
+              "tests/negative/AC-255.negative.spec.ts",
+              "tests/negative/AC-271.negative.spec.ts",
+              "tests/negative/AC-276.negative.spec.ts"
+            ],
+            "fileWorkers": 2,
+            "testConcurrency": 8,
+            "command": [
+              "bun",
+              "test",
+              "--no-orphans",
+              "--isolate",
+              "--parallel=2",
+              "--max-concurrency=8",
+              "--timeout=30000",
+              "tests/negative/AC-001.negative.spec.ts",
+              "tests/negative/AC-002.negative.spec.ts",
+              "tests/negative/AC-004.negative.spec.ts",
+              "tests/negative/AC-020.negative.spec.ts",
+              "tests/negative/AC-021.negative.spec.ts",
+              "tests/negative/AC-022.negative.spec.ts",
+              "tests/negative/AC-023.negative.spec.ts",
+              "tests/negative/AC-050.negative.spec.ts",
+              "tests/negative/AC-051.negative.spec.ts",
+              "tests/negative/AC-052.negative.spec.ts",
+              "tests/negative/AC-240.negative.spec.ts",
+              "tests/negative/AC-241.negative.spec.ts",
+              "tests/negative/AC-242.negative.spec.ts",
+              "tests/negative/AC-243.negative.spec.ts",
+              "tests/negative/AC-244.negative.spec.ts",
+              "tests/negative/AC-245.negative.spec.ts",
+              "tests/negative/AC-246.negative.spec.ts",
+              "tests/negative/AC-247.negative.spec.ts",
+              "tests/negative/AC-248.negative.spec.ts",
+              "tests/negative/AC-249.negative.spec.ts",
+              "tests/negative/AC-254.negative.spec.ts",
+              "tests/negative/AC-255.negative.spec.ts",
+              "tests/negative/AC-271.negative.spec.ts",
+              "tests/negative/AC-276.negative.spec.ts"
+            ],
+            "status": 0,
+            "wallTimeMs": 35407,
+            "peakRssBytes": null,
+            "cpuSeconds": null,
+            "counts": {
+              "passed": 143,
+              "failed": 0,
+              "skipped": 0
+            },
+            "stdoutTail": "bun test v1.4.0 (34cbb9a40) 2x PARALLEL\n",
+            "stderrTail": "RUNTIME layer: forbidden execution query variants throw typed errors [0.50ms]\n(pass) AC-255 negative (tool-core substrate): prohibited-shape tool definitions fail registration screening > refuses registration for prohibited execution tool definitions across categories [1.00ms]\n(pass) AC-255 negative (tool-core substrate): prohibited-shape tool definitions fail registration screening > audited refusal events carry matched prohibited findings for prohibited tool definitions [0.14ms]\n\ntests/negative/AC-248.negative.spec.ts:\n(pass) AC-248 negative: the substrate refuses dishonest counts > a window past the replay boundary is refused (SOURCE_FROZEN_COUNT_IMMUTABLE) [1.03ms]\n(pass) AC-248 negative: the substrate refuses dishonest counts > unfrozen evidence is counted as zero, never as present-now maturity [6.00ms]\n(pass) AC-248 negative: the substrate refuses dishonest counts > the projection adds a frozen-bundle gate the raw outcome count lacks [6.15ms]\n(pass) AC-248 negative: the substrate refuses dishonest counts > the reported count is honest regardless of the gate passed in [5.65ms]\n(pass) AC-248 negative (tool-core substrate): invalid watermarks fail schema parsing > WatermarkState schema refuses non-contiguous watermark without an explicit open gap [2.09ms]\n\ntests/negative/AC-271.negative.spec.ts:\n(pass) AC-271 refusals per malicious-response class > every forbidden fixture is DETECTED under its declared class [1.77ms]\n(pass) AC-271 refusals per malicious-response class > each class is REJECTED + QUARANTINED + AUDITED + EXCLUDED from model context [144.66ms]\n(pass) AC-271 refusals per malicious-response class > quarantine storage holds NO payload bytes for the private-key fixture [46.14ms]\n(pass) AC-271 refusals per malicious-response class > stripped transaction-building fields NEVER persist [12.88ms]\n\ntests/negative/AC-276.negative.spec.ts:\n(pass) AC-276 negatives: prohibited claims refuse on every channel > refuses each claim class with the matching class label on all channels [13.64ms]\n(pass) AC-276 negatives: prohibited claims refuse on every channel > mixed-copy smuggling still refuses (claims hidden inside longer text) [0.18ms]\n\ntests/negative/AC-254.negative.spec.ts:\n(pass) AC-254 negative: tampered inventories and policies refuse > flags EVERY inventory forbidden verb [1.35ms]\n(pass) AC-254 negative: tampered inventories and policies refuse > refuses route inventories carrying execution capability names [3.00ms]\n(pass) AC-254 negative: tampered inventories and policies refuse > violates pinning policy on ranged or unpinned dependencies [0.99ms]\n(pass) AC-254 negative: tampered inventories and policies refuse > throws on restricted install lifecycle hooks [0.34ms]\n(pass) AC-254 negative: tampered inventories and policies refuse > environment schema refuses every prohibited-variable family [0.32ms]\n(pass) AC-254 negative (tool-core substrate): execution-time dispatch gate blocks prohibited financial operations > dispatch stage blocks calls when executionGate reports prohibited findings [0.32ms]\n\ntests/negative/AC-249.negative.spec.ts:\n(pass) AC-249 negative: backdating is refused > the guard refuses available_at before retrieval commit without a live receipt [0.70ms]\n(pass) AC-249 negative: backdating is refused > a claimed live-receipt proof without the receipt reference is still backdating [0.45ms]\n(pass) AC-249 negative: backdating is refused > a genuine live receipt proves earlier availability honestly [0.11ms]\n(pass) AC-249 negative: backdating is refused > the repository refuses a backdating receipt insert before SQL is reached [0.44ms]\n(pass) AC-249 negative: backdating is refused > no refused row ever landed in the receipts table [3.74ms]\n(pass) AC-249 negative (tool-core substrate): backdating in backfill receipt schema is refused > BackfillReceipt schema refuses availableAt preceding retrievedAt without live receipt proof [1.84ms]\n\n 143 pass\n 0 fail\n 447 expect() calls\nRan 143 tests across 24 files. [35.39s]\n"
+          }
+        ]
+      },
+      "codexCalls": 0,
+      "claudeCalls": 0,
+      "testedHead": "c99d0817aec9f217c0141c3122bec231fe818b2f"
     }
   ]
 }

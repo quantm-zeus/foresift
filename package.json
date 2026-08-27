@@ -34,6 +34,7 @@
     "test:integration": "node scripts/automation/bun-test-coordinator.mjs --manifest evidence/bun-migration/bun-migration-manifest.json --workload PROCESS,DATABASE_PGLITE,META_GATE",
     "test:watch": "bun test --watch",
     "test:node-compat": "node scripts/automation/node-runtime-compat.mjs",
+    "test:state-control-plane": "bun test tests/automation/ci-authority-hardening.spec.ts tests/automation/state-landing-lifecycle.spec.ts tests/automation/package-launch-intent.spec.ts tests/automation/ci-repair-lifecycle.spec.ts tests/automation/ci-diff-classifier.spec.ts",
     "verify": "pnpm spec:verify && pnpm format:check && pnpm lint && pnpm typecheck && pnpm test && pnpm test:node-compat"
   },
   "devDependencies": {

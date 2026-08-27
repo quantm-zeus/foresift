@@ -374,7 +374,7 @@ describe('CI Authority & Merge Invariants (V4 Hard Invariants A-F & Hardening)',
           'specs/g0-cost-capacity/spec.md',
           'specs/g0-cost-capacity/tasks.md',
         ]).allowed,
-      ).toBe(true);
+      ).toBe(false);
 
       expect(validateDirectMainPushWhitelist(['packages/persistence/src/index.ts']).allowed).toBe(
         false,

@@ -57,8 +57,10 @@ export function incrementRepairAttempts(filePath: string): number;
  */
 export function executeFormatRepair(opts: {
   failedFiles: string[];
+  prChangedFiles?: string[];
   worktreeDir: string;
   branch: string;
+  log?: (msg: string) => void;
 }): FormatRepairResult;
 
 /**

@@ -89,66 +89,89 @@ export function incrementRepairAttempts(incidentFilePath) {
 /**
  * Execute deterministic formatting repair.
  *
- * - Only runs prettier on failedFiles that are FORMAT-safe paths.
- * - Verifies the diff scope before committing.
- * - NEVER touches product source or test files.
+ * Requirements (Task Spec §16):
+ * - File must appear in CI FORMAT failure evidence
+ * - File must already be part of current PR changed-file set
+ * - Formatter may modify ONLY those files
+ * - Actual diff after formatter must remain within that exact set
  * - ZERO AI calls.
- *
- * @param {Object} opts
- * @param {string[]} opts.failedFiles - files reported by CI as format failures
- * @param {string} opts.worktreeDir - git worktree to operate in
- * @param {string} opts.branch - current branch
- * @param {string} opts.repoDir - canonical repo root (may differ from worktree)
- * @returns {{ ok: boolean, newHead: string|null, reason: string }}
  */
 export function executeFormatRepair({
   failedFiles = [],
+  prChangedFiles = [],
   worktreeDir,
   branch,
   log = console.log,
 } = {}) {
-  // Filter to only FORMAT-safe paths
-  const safe = failedFiles.filter(isFormatSafePath);
-  const unsafe = failedFiles.filter((f) => !isFormatSafePath(f));
-
-  if (unsafe.length > 0) {
+  // If failedFiles is empty, do not run broad whole-repo formatter
+  if (failedFiles.length === 0) {
     return {
       ok: false,
       newHead: null,
-      reason: `FORMAT repair refused: non-safe paths in diff scope: ${unsafe.join(', ')}`,
+      reason: 'FORMAT repair: no safe targets identified',
     };
   }
 
-  if (safe.length === 0) {
-    // No specific files identified — run prettier on known-safe directories only
-    // NEVER run on entire repo (would touch product/test files)
-    const safeDirs = ['specs/implementation', 'specs'];
-    const targets = safeDirs.filter((d) => existsSync(join(worktreeDir, d)));
+  // If prChangedFiles is not provided, enforce FORMAT_SAFE_PATTERNS
+  if (prChangedFiles.length === 0) {
+    const unsafe = failedFiles.filter((f) => !isFormatSafePath(f));
+    if (unsafe.length > 0) {
+      return {
+        ok: false,
+        newHead: null,
+        reason: `FORMAT repair refused: non-safe paths in diff scope: ${unsafe.join(', ')}`,
+      };
+    }
+  }
+
+  // Intersect with prChangedFiles if provided
+  let targets = failedFiles;
+  if (prChangedFiles.length > 0) {
+    targets = failedFiles.filter((f) => prChangedFiles.includes(f));
     if (targets.length === 0) {
       return {
         ok: false,
         newHead: null,
-        reason: 'FORMAT repair: no safe targets identified',
+        reason: 'FORMAT repair: failed files not in PR changed files set',
       };
     }
-    safe.push(...targets.map((d) => `${d}/**/*.json`));
   }
 
-  // Run prettier on safe targets
-  log(`FORMAT repair: running prettier on ${safe.length} target(s)`);
-  const prettierArgs = ['--no-install', 'prettier', '--write', '--log-level', 'warn', ...safe];
+  // Check that target files exist in worktree
+  const existingTargets = targets.filter((f) => existsSync(join(worktreeDir, f)));
+  if (existingTargets.length === 0) {
+    return {
+      ok: false,
+      newHead: null,
+      reason: 'FORMAT repair: none of target files exist in worktree',
+    };
+  }
+
+  log(
+    `FORMAT repair: running prettier on ${existingTargets.length} target(s): ${existingTargets.join(', ')}`,
+  );
+  const prettierArgs = [
+    '--no-install',
+    'prettier',
+    '--write',
+    '--log-level',
+    'warn',
+    ...existingTargets,
+  ];
   const fmt = shSync('npx', prettierArgs, { cwd: worktreeDir, allowFail: true });
   if (!fmt.ok) {
-    log(`FORMAT repair: prettier returned error: ${fmt.err}`);
-    // Continue — prettier --write returns non-zero if files changed (in some versions)
+    log(`FORMAT repair: prettier returned: ${fmt.err || fmt.out}`);
   }
 
-  // Check if we actually changed anything
-  const diff = shSync('git', ['diff', '--name-only', '--', ...safe], {
+  // Check git diff
+  const diff = shSync('git', ['diff', '--name-only'], {
     cwd: worktreeDir,
     allowFail: true,
   });
-  const changedFiles = diff.out.split('\n').filter(Boolean);
+  const changedFiles = diff.out
+    .split('\n')
+    .map((s) => s.trim())
+    .filter(Boolean);
 
   if (changedFiles.length === 0) {
     return {
@@ -158,15 +181,15 @@ export function executeFormatRepair({
     };
   }
 
-  // Verify ONLY safe files changed
-  const unsafeChanged = changedFiles.filter((f) => !isFormatSafePath(f));
-  if (unsafeChanged.length > 0) {
-    // Roll back
+  // Verify actual diff stays within the target set
+  const outOfBounds = changedFiles.filter((f) => !existingTargets.includes(f));
+  if (outOfBounds.length > 0) {
+    // Roll back changes
     shSync('git', ['checkout', '--', ...changedFiles], { cwd: worktreeDir, allowFail: true });
     return {
       ok: false,
       newHead: null,
-      reason: `FORMAT repair: aborting — formatter modified unsafe paths: ${unsafeChanged.join(', ')}`,
+      reason: `FORMAT repair: aborting — formatter modified files outside allowed set: ${outOfBounds.join(', ')}`,
     };
   }
 
@@ -175,7 +198,16 @@ export function executeFormatRepair({
     shSync('git', ['add', '--', ...changedFiles], { cwd: worktreeDir });
     shSync(
       'git',
-      ['commit', '-m', 'fix(format): automated prettier repair [state-only]', '--quiet'],
+      [
+        '-c',
+        'user.name=Foresift Formatter',
+        '-c',
+        'user.email=formatter@foresift.local',
+        'commit',
+        '-m',
+        'fix(format): automated prettier repair',
+        '--quiet',
+      ],
       { cwd: worktreeDir },
     );
   } catch (e) {

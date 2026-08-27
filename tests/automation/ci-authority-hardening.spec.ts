@@ -256,10 +256,7 @@ describe('§E — Same transition + file hash → same receipt (idempotent)', ()
 // ── §F/§G: Whitelist validation ───────────────────────────────────────────────
 describe('§F/§G — State-only whitelist validates file paths', () => {
   it('§F: validateStateFiles allows known whitelist paths', () => {
-    const allowed = [
-      'specs/implementation/current-milestone.json',
-      'specs/implementation/roadmap.json',
-    ];
+    const allowed = ['specs/implementation/current-milestone.json'];
     const result = validateStateFiles(allowed);
     expect(result.ok).toBe(true);
     expect(result.violations).toHaveLength(0);
@@ -290,10 +287,7 @@ describe('§F/§G — State-only whitelist validates file paths', () => {
 // ── §H/§I/§J: classifyDiff ────────────────────────────────────────────────────
 describe('§H/§I/§J — classifyDiff for state-only vs full CI path', () => {
   it('§H: all state-only files → STATE_ONLY', () => {
-    const files = [
-      'specs/implementation/current-milestone.json',
-      'specs/implementation/roadmap.json',
-    ];
+    const files = ['specs/implementation/current-milestone.json'];
     expect(classifyDiff(files)).toBe('STATE_ONLY');
   });
 
@@ -313,10 +307,7 @@ describe('§H/§I/§J — classifyDiff for state-only vs full CI path', () => {
 
   it('§H: STATE_ONLY_WHITELIST covers the known patterns', () => {
     // All of these must be on the whitelist
-    const whitelisted = [
-      'specs/implementation/current-milestone.json',
-      'specs/implementation/roadmap.json',
-    ];
+    const whitelisted = ['specs/implementation/current-milestone.json'];
     for (const path of whitelisted) {
       const result = STATE_ONLY_WHITELIST.some((p) => p.test(path));
       expect(result).toBe(true);

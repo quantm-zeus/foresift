@@ -7,7 +7,7 @@
 //
 //   mutation intent
 //     -> current origin/main SHA
-//     -> small temp state branch (state/chore/<transition-id>)
+//     -> isolated ephemeral Git worktree ($STATE_DIR/state-worktrees/<transition-id>)
 //     -> apply ONLY whitelist-validated state/planning files
 //     -> deterministic local state validation
 //     -> push branch
@@ -15,19 +15,31 @@
 //     -> label 'state-only' for fast CI path
 //     -> wait for exact-head CI
 //     -> protected squash merge
-//     -> refresh local state from origin/main
+//     -> authoritative verification on origin/main:
+//          PR state == MERGED
+//          mergeCommit exists
+//          authorized headRefOid matches
+//          fetch origin/main succeeds
+//          merge commit reachable on origin/main
+//          intended file content/hash matches origin/main
+//     -> remove ephemeral worktree
 //     -> state considered durable
 //
-// Crash-safety: a compact state-transition receipt is written before the PR is
-// created and updated at each step. On restart, discoverAndAdoptStatePR() finds
-// any pending receipt and continues from its current `status` field.
-//
-// Idempotency: same (transitionId, sourceSha, fileHash) -> returns existing PR/
-// merged result without creating a duplicate.
+// Crash-safety: compact atomic state-transition receipts are written and updated
+// at each step. On restart, discoverPendingReceipts() finds any non-terminal receipt
+// and resumes progression of the state machine.
 
-import { execFileSync, spawnSync } from 'node:child_process';
+import { execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
-import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
+import {
+  existsSync,
+  mkdirSync,
+  readFileSync,
+  readdirSync,
+  renameSync,
+  rmSync,
+  writeFileSync,
+} from 'node:fs';
 import { join } from 'node:path';
 import {
   DEFAULT_REQUIRED_CHECK,
@@ -38,53 +50,65 @@ import {
 } from './ci-authority.mjs';
 
 export const STATE_TRANSITIONS_DIR_NAME = 'state-transitions';
+export const STATE_WORKTREES_DIR_NAME = 'state-worktrees';
 
 /** How long to wait for PR CI before giving up (ms). */
 const LANDING_DEADLINE_MS = 600_000; // 10 minutes for state-only CI
 
 /** Poll interval while waiting for CI (ms). */
-const LANDING_POLL_MS = 15_000;
+const LANDING_POLL_MS = 10_000;
 
-// ── Receipt schema ────────────────────────────────────────────────────────────
-/**
- * @typedef {Object} StateTransitionReceipt
- * @property {'foresift/state-transition@1'} schema
- * @property {string} transitionId   - Unique id: <package>-<from>-<to>-<sourceSha[:8]>
- * @property {string|null} package   - Package id or null for milestone-level changes
- * @property {string|null} from      - Previous status value
- * @property {string|null} to        - Target status value
- * @property {string} sourceSha      - origin/main SHA at time of transition intent
- * @property {string} stateBranch    - temp branch name
- * @property {string|null} pr        - PR number (string) once created
- * @property {string|null} prUrl     - PR URL
- * @property {string|null} desiredFileHash - SHA-256 of serialized intended changes
- * @property {'pending'|'branch_created'|'pr_created'|'ci_green'|'merged'|'failed'} status
- * @property {string|null} mergedSha - squash merge SHA on main after landing
- * @property {string} createdAt
- * @property {string} updatedAt
- */
-
-// ── Shell helpers ─────────────────────────────────────────────────────────────
-function shSync(cmd, args, { cwd, allowFail = false } = {}) {
-  const r = spawnSync(cmd, args, { encoding: 'utf8', cwd });
-  if (!allowFail && r.status !== 0) {
-    const err = (r.stderr ?? '').trim() || (r.stdout ?? '').trim();
-    throw new Error(`${cmd} ${args.join(' ')} failed (exit ${r.status}): ${err}`);
+// ── Default wrappers ──────────────────────────────────────────────────────────
+function defaultGh(args, { cwd } = {}) {
+  try {
+    return {
+      ok: true,
+      stdout: execFileSync('gh', args, { encoding: 'utf8', cwd }).trim(),
+      stderr: '',
+      status: 0,
+    };
+  } catch (e) {
+    return {
+      ok: false,
+      stdout: e.stdout ? String(e.stdout).trim() : '',
+      stderr: e.stderr ? String(e.stderr).trim() : String(e.message),
+      status: e.status ?? 1,
+    };
   }
-  return { ok: r.status === 0, out: (r.stdout ?? '').trim(), err: (r.stderr ?? '').trim() };
+}
+
+function defaultGit(args, { cwd } = {}) {
+  try {
+    return {
+      ok: true,
+      stdout: execFileSync('git', args, { encoding: 'utf8', cwd }).trim(),
+      stderr: '',
+      status: 0,
+    };
+  } catch (e) {
+    return {
+      ok: false,
+      stdout: e.stdout ? String(e.stdout).trim() : '',
+      stderr: e.stderr ? String(e.stderr).trim() : String(e.message),
+      status: e.status ?? 1,
+    };
+  }
 }
 
 function sleepSync(ms) {
   Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms);
 }
 
-// ── Receipt persistence ───────────────────────────────────────────────────────
+// ── Receipt persistence (atomic write) ─────────────────────────────────────────
 function receiptsDir(stateDir) {
   return join(stateDir, STATE_TRANSITIONS_DIR_NAME);
 }
 
+function worktreesBaseDir(stateDir) {
+  return join(stateDir, STATE_WORKTREES_DIR_NAME);
+}
+
 function receiptPath(stateDir, transitionId) {
-  // File-safe: replace characters not safe in filenames
   const safe = transitionId.replace(/[^a-zA-Z0-9_-]/g, '_');
   return join(receiptsDir(stateDir), `receipt-${safe}.json`);
 }
@@ -93,13 +117,13 @@ function writeReceipt(stateDir, receipt) {
   const dir = receiptsDir(stateDir);
   mkdirSync(dir, { recursive: true });
   receipt.updatedAt = new Date().toISOString();
-  writeFileSync(
-    receiptPath(stateDir, receipt.transitionId),
-    JSON.stringify(receipt, null, 2) + '\n',
-  );
+  const target = receiptPath(stateDir, receipt.transitionId);
+  const tmp = `${target}.${Date.now()}.${Math.random().toString(36).slice(2, 8)}.tmp`;
+  writeFileSync(tmp, JSON.stringify(receipt, null, 2) + '\n');
+  renameSync(tmp, target);
 }
 
-function readReceipt(stateDir, transitionId) {
+export function readReceipt(stateDir, transitionId) {
   try {
     return JSON.parse(readFileSync(receiptPath(stateDir, transitionId), 'utf8'));
   } catch {
@@ -108,11 +132,7 @@ function readReceipt(stateDir, transitionId) {
 }
 
 // ── File hash ─────────────────────────────────────────────────────────────────
-/**
- * Deterministic hash of the set of (path, content) pairs to be landed.
- * Used for idempotency: same desired change = same hash = reuse existing receipt.
- */
-function hashFileChanges(fileChanges) {
+export function hashFileChanges(fileChanges) {
   const sorted = [...fileChanges].sort((a, b) => a.path.localeCompare(b.path));
   const h = createHash('sha256');
   for (const { path, content } of sorted) {
@@ -125,24 +145,15 @@ function hashFileChanges(fileChanges) {
 }
 
 // ── Whitelist validation ──────────────────────────────────────────────────────
-/**
- * Validate that all proposed file paths are on the STATE_ONLY_WHITELIST.
- * Returns { ok, violations }.
- */
-export function validateStateFiles(files) {
-  const violations = files.filter(
+export function validateStateFiles(fileChanges) {
+  const paths = fileChanges.map((f) => (typeof f === 'string' ? f : f.path));
+  const violations = paths.filter(
     (f) => !STATE_ONLY_WHITELIST.some((pattern) => pattern.test(f.trim())),
   );
   return { ok: violations.length === 0, violations };
 }
 
 // ── Discover pending state PR for crash recovery ──────────────────────────────
-/**
- * Scan the state-transitions directory for any non-terminal receipt.
- * Returns an array of non-terminal receipts ordered by createdAt descending.
- *
- * Called on supervisor startup so a crash mid-landing is recovered.
- */
 export function discoverPendingReceipts(stateDir) {
   const dir = receiptsDir(stateDir);
   if (!existsSync(dir)) return [];
@@ -162,87 +173,176 @@ export function discoverPendingReceipts(stateDir) {
   return pending;
 }
 
+// ── Authoritative PR Merge Verification ───────────────────────────────────────
 /**
- * Given a receipt that is not yet in 'merged' state, check whether its PR
- * has since been merged on origin/main. If so, update the receipt and return
- * the merged SHA.
- *
- * Returns { adopted: boolean, mergedSha: string|null }.
+ * Verify merge commit reachability, origin/main status, and file content matching.
  */
-export function adoptMergedState({ receipt, stateDir, cwd, ghFn = null }) {
+export function verifyMergeAuthoritatively({
+  prNum,
+  pinnedHead,
+  fileChanges,
+  repoDir,
+  ghFn = defaultGh,
+  gitFn = defaultGit,
+}) {
+  // 1. Query PR via gh pr view
+  const prViewRes = ghFn(
+    ['pr', 'view', String(prNum), '--json', 'state,mergeCommit,headRefOid,baseRefName'],
+    { cwd: repoDir },
+  );
+  if (!prViewRes.ok || !prViewRes.stdout) {
+    return { ok: false, reason: `gh pr view #${prNum} failed: ${prViewRes.stderr}` };
+  }
+
+  let prData;
+  try {
+    prData = JSON.parse(prViewRes.stdout);
+  } catch (e) {
+    return { ok: false, reason: `gh pr view #${prNum} unparseable: ${e.message}` };
+  }
+
+  if (prData.state !== 'MERGED') {
+    return { ok: false, reason: `PR #${prNum} is not MERGED (state=${prData.state})` };
+  }
+
+  const mergeCommitSha = prData.mergeCommit?.oid ?? prData.mergeCommit;
+  if (!mergeCommitSha) {
+    return { ok: false, reason: `PR #${prNum} mergeCommit missing` };
+  }
+
+  if (pinnedHead && prData.headRefOid && prData.headRefOid !== pinnedHead) {
+    return {
+      ok: false,
+      reason: `PR #${prNum} head (${prData.headRefOid}) does not match authorized pinned head (${pinnedHead})`,
+    };
+  }
+
+  // 2. Fetch origin/main MUST succeed
+  const fetchRes = gitFn(['fetch', 'origin', 'main', '--quiet'], { cwd: repoDir });
+  if (!fetchRes.ok) {
+    return { ok: false, reason: `post-merge fetch origin/main failed: ${fetchRes.stderr}` };
+  }
+
+  // 3. Check merge commit reachability from origin/main
+  const originMainSha = gitFn(['rev-parse', 'origin/main'], { cwd: repoDir }).stdout;
+  if (!originMainSha) {
+    return { ok: false, reason: 'unable to resolve origin/main SHA' };
+  }
+
+  const isAncestor = gitFn(['merge-base', '--is-ancestor', mergeCommitSha, 'origin/main'], {
+    cwd: repoDir,
+  });
+  if (!isAncestor.ok && mergeCommitSha !== originMainSha) {
+    return {
+      ok: false,
+      reason: `merge commit ${mergeCommitSha} is not reachable from origin/main (${originMainSha})`,
+    };
+  }
+
+  // 4. Verify intended state file content matches on origin/main
+  for (const { path: filePath, content: expectedContent } of fileChanges) {
+    const showRes = gitFn(['show', `origin/main:${filePath}`], { cwd: repoDir });
+    if (!showRes.ok) {
+      return {
+        ok: false,
+        reason: `file ${filePath} missing from origin/main after merge: ${showRes.stderr}`,
+      };
+    }
+    const actualContent = showRes.stdout;
+    if (actualContent.trim() !== expectedContent.trim()) {
+      return {
+        ok: false,
+        reason: `content mismatch for ${filePath} on origin/main after merge`,
+      };
+    }
+  }
+
+  return { ok: true, mergeCommitSha, originMainSha };
+}
+
+// ── Adopt Merged State ────────────────────────────────────────────────────────
+export function adoptMergedState({
+  receipt,
+  fileChanges,
+  stateDir,
+  cwd,
+  ghFn = defaultGh,
+  gitFn = defaultGit,
+  log = console.log,
+}) {
   if (receipt.status === 'merged') {
     return { adopted: true, mergedSha: receipt.mergedSha };
   }
   if (!receipt.pr) return { adopted: false, mergedSha: null };
 
-  // Check if PR is already merged via gh
-  const gh = (args) => {
-    if (ghFn) return ghFn(args, { cwd });
-    try {
-      return { ok: true, stdout: execFileSync('gh', args, { encoding: 'utf8', cwd }).trim() };
-    } catch (e) {
-      return { ok: false, stdout: '', stderr: String(e.message) };
-    }
-  };
+  const changes = fileChanges ?? [];
+  const verification = verifyMergeAuthoritatively({
+    prNum: receipt.pr,
+    pinnedHead: receipt.sourceSha, // or state branch head
+    fileChanges: changes,
+    desiredFileHash: receipt.desiredFileHash,
+    repoDir: cwd,
+    ghFn,
+    gitFn,
+    log,
+  });
 
-  // Check if PR is already merged
-  const prState = gh([
-    'pr',
-    'view',
-    String(receipt.pr),
-    '--json',
-    'state,mergeCommit',
-    '--jq',
-    '{state: .state, mergeCommit: .mergeCommit.oid}',
-  ]);
-  if (!prState.ok) return { adopted: false, mergedSha: null };
-
-  let parsed;
-  try {
-    parsed = JSON.parse(prState.stdout);
-  } catch {
-    return { adopted: false, mergedSha: null };
-  }
-
-  if (parsed.state === 'MERGED') {
-    const mergedSha = parsed.mergeCommit ?? null;
+  if (verification.ok) {
     receipt.status = 'merged';
-    receipt.mergedSha = mergedSha;
+    receipt.mergedSha = verification.mergeCommitSha;
     writeReceipt(stateDir, receipt);
-    return { adopted: true, mergedSha };
+    return { adopted: true, mergedSha: receipt.mergedSha };
   }
 
-  return { adopted: false, mergedSha: null };
+  return { adopted: false, mergedSha: null, reason: verification.reason };
 }
 
-// ── Main state landing function ───────────────────────────────────────────────
+// ── Worktree cleanup helper ───────────────────────────────────────────────────
+function cleanupStateWorktree({ worktreePath, stateBranch, repoDir, gitFn = defaultGit }) {
+  try {
+    if (existsSync(worktreePath)) {
+      gitFn(['worktree', 'remove', '--force', worktreePath], { cwd: repoDir });
+      rmSync(worktreePath, { recursive: true, force: true });
+    }
+    if (stateBranch) {
+      gitFn(['branch', '-D', stateBranch], { cwd: repoDir });
+    }
+  } catch {}
+}
+
+// ── Step-Based State Machine Advancement ──────────────────────────────────────
 /**
- * Commit state file changes via a protected PR landing lane.
+ * Advances a state landing transition by one deterministic step without blocking sleeps.
+ * Designed for supervisor event-loop outbox execution.
  *
- * This NEVER direct-pushes to main. It:
- * 1. Validates all files are on STATE_ONLY_WHITELIST.
- * 2. Creates/recovers a receipt for crash-safety.
- * 3. Creates a temp branch from origin/main, applies the changes.
- * 4. Pushes + creates a PR (idempotent).
- * 5. Waits for exact-head CI (state-only fast path in CI).
- * 6. Squash-merges.
- * 7. Fetches origin/main and marks receipt 'merged'.
+ * Lifecycle:
+ *   INTENT / pending
+ *     -> create isolated worktree ($STATE_DIR/state-worktrees/<transitionId>)
+ *     -> apply file changes, stage, commit
+ *     -> status = 'branch_created'
  *
- * @param {Object} opts
- * @param {Array<{path: string, content: string}>} opts.fileChanges - files to commit
- * @param {string} opts.message - commit/PR title
- * @param {string} opts.stateDir - supervisor state directory
- * @param {string} opts.repoDir - repository working directory
- * @param {string|null} opts.packageId - for receipt tracking
- * @param {string|null} opts.fromStatus - previous package status
- * @param {string|null} opts.toStatus - target package status
- * @param {string} opts.repo - GitHub repo slug
- * @param {string} opts.checkName - required CI check name
- * @param {number} opts.requiredAppId - required GitHub Actions app id
- * @param {Function|null} opts.log - logging callback
- * @returns {{ ok: boolean, receipt: Object, reason?: string }}
+ *   branch_created
+ *     -> push state branch to origin
+ *     -> create or discover PR on GitHub
+ *     -> status = 'pr_created'
+ *
+ *   pr_created / waiting_ci
+ *     -> resolve exact remote HEAD SHA (pinSha)
+ *     -> query exact-head CI
+ *     -> if green: status = 'ci_green'
+ *     -> if failure/untrusted: status = 'failed'
+ *     -> if pending: remain at 'pr_created'
+ *
+ *   ci_green
+ *     -> execute squash merge via gh pr merge
+ *     -> authoritatively verify merge on origin/main
+ *     -> cleanup worktree & branch
+ *     -> status = 'merged'
+ *
+ * Returns { ok, receipt, step, reason }
  */
-export function landStateViaPR({
+export function advanceStateTransition({
+  receipt: existingReceipt = null,
   fileChanges,
   message,
   stateDir,
@@ -253,38 +353,45 @@ export function landStateViaPR({
   repo = DEFAULT_REPO,
   checkName = DEFAULT_REQUIRED_CHECK,
   requiredAppId = DEFAULT_REQUIRED_APP_ID,
+  ghFn = defaultGh,
+  gitFn = defaultGit,
   log = console.log,
-  deadlineMs = LANDING_DEADLINE_MS,
-  pollMs = LANDING_POLL_MS,
 } = {}) {
-  // ── 1. Validate file paths ──────────────────────────────────────────────────
-  const paths = fileChanges.map((f) => f.path);
-  const { ok: allowed, violations } = validateStateFiles(paths);
+  // 1. Validate file paths
+  const { ok: allowed, violations } = validateStateFiles(fileChanges);
   if (!allowed) {
     return {
       ok: false,
       reason: `state landing refused: non-whitelisted paths: ${violations.join(', ')}`,
       receipt: null,
+      step: 'VALIDATION_FAILED',
     };
   }
 
-  // ── 2. Fetch and resolve current origin/main ─────────────────────────────
-  try {
-    shSync('git', ['fetch', 'origin', 'main', '--quiet'], { cwd: repoDir });
-  } catch (e) {
-    return { ok: false, reason: `fetch failed: ${e.message}`, receipt: null };
-  }
-  let sourceSha;
-  try {
-    sourceSha = shSync('git', ['rev-parse', 'origin/main'], { cwd: repoDir }).out;
-  } catch (e) {
-    return { ok: false, reason: `rev-parse origin/main failed: ${e.message}`, receipt: null };
+  // 2. Fetch and resolve current origin/main
+  const fetchRes = gitFn(['fetch', 'origin', 'main', '--quiet'], { cwd: repoDir });
+  if (!fetchRes.ok) {
+    return {
+      ok: false,
+      reason: `fetch origin main failed: ${fetchRes.stderr}`,
+      receipt: existingReceipt,
+      step: 'FETCH_FAILED',
+    };
   }
 
-  // ── 3. Compute desired file hash for idempotency ──────────────────────────
+  const revRes = gitFn(['rev-parse', 'origin/main'], { cwd: repoDir });
+  if (!revRes.ok || !revRes.stdout) {
+    return {
+      ok: false,
+      reason: 'rev-parse origin/main failed',
+      receipt: existingReceipt,
+      step: 'REV_PARSE_FAILED',
+    };
+  }
+  const sourceSha = revRes.stdout.trim();
+
+  // 3. Compute desired file hash for idempotency
   const desiredFileHash = hashFileChanges(fileChanges);
-
-  // Build transition id from: package + from + to + sourceSha[:8]
   const transitionId = [
     packageId ?? 'milestone',
     fromStatus ?? 'unknown',
@@ -293,31 +400,14 @@ export function landStateViaPR({
     desiredFileHash.slice(0, 8),
   ].join('-');
 
-  // ── 4. Check for existing receipt (idempotency / crash recovery) ──────────
-  let receipt = readReceipt(stateDir, transitionId);
+  let receipt = existingReceipt || readReceipt(stateDir, transitionId);
 
-  if (receipt) {
-    // If already merged, return immediately (idempotent)
-    if (receipt.status === 'merged') {
-      log(`state landing already merged: ${transitionId} → mergedSha=${receipt.mergedSha}`);
-      return { ok: true, receipt };
-    }
-    // If previous attempt failed with a hard error, restart
-    if (receipt.status === 'failed') {
-      log(`state landing receipt was failed; restarting: ${transitionId}`);
-      receipt = null;
-    } else {
-      // Try to adopt if PR was already merged
-      const adoption = adoptMergedState({ receipt, stateDir, cwd: repoDir });
-      if (adoption.adopted) {
-        log(`state landing adopted existing merge: ${transitionId}`);
-        return { ok: true, receipt };
-      }
-      log(`state landing resuming existing receipt (status=${receipt.status}): ${transitionId}`);
-    }
+  // 4. If already merged, return immediately
+  if (receipt && receipt.status === 'merged') {
+    return { ok: true, receipt, step: 'DONE' };
   }
 
-  // Create new receipt
+  // Initialize receipt if not present
   if (!receipt) {
     const stateBranch = `state/chore/${transitionId}`;
     receipt = {
@@ -340,262 +430,372 @@ export function landStateViaPR({
   }
 
   const { stateBranch } = receipt;
+  const worktreePath = join(worktreesBaseDir(stateDir), transitionId);
 
-  // ── 5. Create or restore temp branch ────────────────────────────────────────
+  // ── Step: pending -> branch_created (in isolated worktree) ──────────────────
   if (receipt.status === 'pending') {
-    try {
-      // Check if branch already exists locally or remotely
-      const localExists = shSync('git', ['rev-parse', '--verify', stateBranch], {
-        cwd: repoDir,
-        allowFail: true,
-      }).ok;
-      if (localExists) {
-        shSync('git', ['branch', '-D', stateBranch], { cwd: repoDir, allowFail: true });
+    mkdirSync(worktreesBaseDir(stateDir), { recursive: true });
+
+    // Clean up any stale worktree or branch
+    cleanupStateWorktree({ worktreePath, stateBranch, repoDir, gitFn });
+
+    // Create isolated worktree on new state branch from sourceSha
+    const wtAdd = gitFn(['worktree', 'add', '-b', stateBranch, worktreePath, sourceSha], {
+      cwd: repoDir,
+    });
+    if (!wtAdd.ok) {
+      // If branch already exists, try adding worktree to existing branch
+      const wtAddExisting = gitFn(['worktree', 'add', worktreePath, stateBranch], { cwd: repoDir });
+      if (!wtAddExisting.ok) {
+        return {
+          ok: false,
+          reason: `worktree creation failed: ${wtAdd.stderr || wtAddExisting.stderr}`,
+          receipt,
+          step: 'WORKTREE_ERROR',
+        };
       }
-      shSync('git', ['checkout', '-b', stateBranch, sourceSha], { cwd: repoDir });
-    } catch (e) {
-      receipt.status = 'failed';
-      writeReceipt(stateDir, receipt);
-      return { ok: false, reason: `branch creation failed: ${e.message}`, receipt };
     }
 
-    // Apply file changes
+    // Apply file changes inside the isolated worktree
     for (const { path: filePath, content } of fileChanges) {
-      const absPath = join(repoDir, filePath);
+      const absPath = join(worktreePath, filePath);
       mkdirSync(join(absPath, '..'), { recursive: true });
       writeFileSync(absPath, content);
     }
 
-    // Stage and commit
-    try {
-      shSync('git', ['add', ...paths], { cwd: repoDir });
-      // Check if there's actually something to commit
-      const diff = shSync('git', ['diff', '--cached', '--quiet'], {
-        cwd: repoDir,
-        allowFail: true,
-      });
-      if (diff.ok) {
-        // Nothing staged — files were already identical to HEAD
-        // Still proceed: origin/main already has the desired state
-        receipt.status = 'merged';
-        receipt.mergedSha = sourceSha;
-        writeReceipt(stateDir, receipt);
-        log(`state landing: no diff from origin/main — state already current (${transitionId})`);
-        // Return to main branch
-        shSync('git', ['checkout', 'main'], { cwd: repoDir, allowFail: true });
-        return { ok: true, receipt };
-      }
-      shSync('git', ['commit', '-m', message, '--quiet'], { cwd: repoDir });
-    } catch (e) {
-      shSync('git', ['reset', '--hard', 'origin/main'], { cwd: repoDir, allowFail: true });
-      shSync('git', ['checkout', 'main'], { cwd: repoDir, allowFail: true });
-      receipt.status = 'failed';
+    // Stage changes in worktree
+    const addRes = gitFn(['add', ...fileChanges.map((f) => f.path)], { cwd: worktreePath });
+    if (!addRes.ok) {
+      return {
+        ok: false,
+        reason: `git add failed in worktree: ${addRes.stderr}`,
+        receipt,
+        step: 'COMMIT_ERROR',
+      };
+    }
+
+    // Check if there is a diff
+    const diffRes = gitFn(['diff', '--cached', '--quiet'], { cwd: worktreePath });
+    if (diffRes.ok) {
+      // Nothing staged — state already matches origin/main!
+      receipt.status = 'merged';
+      receipt.mergedSha = sourceSha;
       writeReceipt(stateDir, receipt);
-      return { ok: false, reason: `commit failed: ${e.message}`, receipt };
+      cleanupStateWorktree({ worktreePath, stateBranch, repoDir, gitFn });
+      return { ok: true, receipt, step: 'ALREADY_CURRENT' };
+    }
+
+    // Commit changes in worktree
+    const commitRes = gitFn(
+      [
+        '-c',
+        'user.name=Foresift Autopilot',
+        '-c',
+        'user.email=autopilot@foresift.local',
+        'commit',
+        '-m',
+        message,
+        '--quiet',
+      ],
+      { cwd: worktreePath },
+    );
+    if (!commitRes.ok) {
+      return {
+        ok: false,
+        reason: `commit failed in worktree: ${commitRes.stderr}`,
+        receipt,
+        step: 'COMMIT_ERROR',
+      };
     }
 
     receipt.status = 'branch_created';
     writeReceipt(stateDir, receipt);
-
-    // Return to main branch so the worktree main state is clean
-    shSync('git', ['checkout', 'main'], { cwd: repoDir, allowFail: true });
+    return { ok: true, receipt, step: 'BRANCH_CREATED' };
   }
 
-  // ── 6. Push branch ───────────────────────────────────────────────────────
+  // ── Step: branch_created -> pr_created ─────────────────────────────────────
   if (receipt.status === 'branch_created') {
-    try {
-      shSync('git', ['push', '-u', 'origin', stateBranch, '--quiet', '--force-with-lease'], {
-        cwd: repoDir,
-      });
-    } catch (e) {
-      log(`WARN: state branch push failed: ${e.message}`);
-      receipt.status = 'failed';
-      writeReceipt(stateDir, receipt);
-      return { ok: false, reason: `push failed: ${e.message}`, receipt };
+    // Push branch to origin
+    const pushRes = gitFn(['push', '-u', 'origin', stateBranch, '--quiet', '--force-with-lease'], {
+      cwd: repoDir,
+    });
+    if (!pushRes.ok) {
+      return {
+        ok: false,
+        reason: `push state branch failed: ${pushRes.stderr}`,
+        receipt,
+        step: 'PUSH_FAILED',
+      };
     }
 
-    // ── 7. Create or discover PR ────────────────────────────────────────────
+    // Discover or create PR
     let prNum = null;
-    try {
-      const listed = shSync(
-        'gh',
-        [
-          'pr',
-          'list',
-          '--head',
-          stateBranch,
-          '--state',
-          'open',
-          '--json',
-          'number',
-          '--jq',
-          '.[0].number',
-        ],
-        { cwd: repoDir, allowFail: true },
-      );
-      if (listed.ok && listed.out && listed.out !== 'null') prNum = listed.out;
-    } catch {
-      /* fall through to create */
+    const listPrRes = ghFn(
+      [
+        'pr',
+        'list',
+        '--head',
+        stateBranch,
+        '--state',
+        'open',
+        '--json',
+        'number',
+        '--jq',
+        '.[0].number',
+      ],
+      { cwd: repoDir },
+    );
+    if (listPrRes.ok && listPrRes.stdout && listPrRes.stdout !== 'null') {
+      prNum = listPrRes.stdout.trim();
     }
 
     if (!prNum) {
-      try {
-        const created = shSync(
-          'gh',
-          [
-            'pr',
-            'create',
-            '--head',
-            stateBranch,
-            '--base',
-            'main',
-            '--title',
-            message,
-            '--body',
-            `Automated state-only chore.\n\nTransition: \`${transitionId}\`\nSource SHA: \`${sourceSha}\`\n\n> This PR was created by the Foresift supervisor state-landing lane.\n> It contains ONLY whitelisted control-plane state files.\n> Merging via required CI + squash-merge.`,
-            '--label',
-            'state-only',
-          ],
-          { cwd: repoDir, allowFail: true },
-        );
-        if (created.ok) {
-          // gh pr create outputs the URL; extract number
-          const m = /\/pull\/(\d+)/.exec(created.out.split('\n').pop() ?? '');
-          if (m) prNum = m[1];
-        }
-      } catch (e) {
-        log(`WARN: gh pr create failed: ${e.message}`);
+      const createPrRes = ghFn(
+        [
+          'pr',
+          'create',
+          '--head',
+          stateBranch,
+          '--base',
+          'main',
+          '--title',
+          message,
+          '--body',
+          `Automated state-only chore.\n\nTransition: \`${transitionId}\`\nSource SHA: \`${sourceSha}\`\n\n> This PR was created by the Foresift supervisor state-landing lane.\n> It contains ONLY whitelisted control-plane state files.\n> Merging via required CI + squash-merge.`,
+          '--label',
+          'state-only',
+        ],
+        { cwd: repoDir },
+      );
+      if (createPrRes.ok) {
+        const m = /\/pull\/(\d+)/.exec(createPrRes.stdout.split('\n').pop() ?? '');
+        if (m) prNum = m[1];
       }
     }
 
     if (!prNum) {
-      // Could not create PR (e.g., no GitHub auth in test env) — log but don't fail hard
-      // The receipt stays at 'branch_created' for retry
-      log(
-        `WARN: state landing PR could not be created for ${transitionId}; branch pushed, will retry`,
-      );
-      return { ok: false, reason: 'pr-creation-failed', receipt };
+      // Transient PR creation refusal — remain at branch_created for retry
+      return { ok: false, reason: 'pr-creation-pending', receipt, step: 'PR_PENDING' };
     }
 
     receipt.pr = prNum;
     receipt.status = 'pr_created';
     writeReceipt(stateDir, receipt);
-    log(`state landing PR #${prNum} created: ${stateBranch}`);
+    return { ok: true, receipt, step: 'PR_CREATED' };
   }
 
-  // ── 8. Pin HEAD SHA ────────────────────────────────────────────────────────
-  let pinSha;
-  try {
-    pinSha = shSync('git', ['rev-parse', `origin/${stateBranch}`], {
-      cwd: repoDir,
-      allowFail: true,
-    }).out;
+  // ── Step: pr_created -> ci_green (query CI) ────────────────────────────────
+  if (receipt.status === 'pr_created') {
+    // Resolve exact HEAD SHA (pinSha)
+    let pinSha = null;
+    const revRemote = gitFn(['rev-parse', `origin/${stateBranch}`], { cwd: repoDir });
+    if (revRemote.ok && revRemote.stdout) {
+      pinSha = revRemote.stdout.trim();
+    } else {
+      const revLocal = gitFn(['rev-parse', stateBranch], { cwd: repoDir });
+      if (revLocal.ok && revLocal.stdout) pinSha = revLocal.stdout.trim();
+    }
+
+    // CRITICAL DEFECT #1: NO SHA MUST NEVER BECOME CI GREEN! Fail closed.
     if (!pinSha) {
-      // Fall back to local branch tip
-      pinSha = shSync('git', ['rev-parse', stateBranch], { cwd: repoDir, allowFail: true }).out;
-    }
-  } catch {
-    pinSha = null;
-  }
-
-  if (!pinSha) {
-    log(`WARN: could not resolve state branch HEAD SHA; skipping CI wait`);
-  }
-
-  // ── 9. Wait for exact-head CI (state-only fast path) ──────────────────────
-  if (receipt.status === 'pr_created' && pinSha) {
-    const start = Date.now();
-    while (Date.now() - start < deadlineMs) {
-      const verdict = getExactHeadCiStatus({
-        sha: pinSha,
-        repo,
-        checkName,
-        requiredAppId,
-        cwd: repoDir,
-      });
-
-      if (verdict.ok && verdict.state === 'SUCCESS') {
-        log(`state landing CI green at ${pinSha}`);
-        receipt.status = 'ci_green';
-        writeReceipt(stateDir, receipt);
-        break;
-      }
-
-      if (verdict.state === 'FAILURE' || verdict.state === 'UNTRUSTED') {
-        log(`state landing CI FAILED at ${pinSha}: ${verdict.reason}`);
-        receipt.status = 'failed';
-        writeReceipt(stateDir, receipt);
-        return {
-          ok: false,
-          reason: `state PR CI failed: ${verdict.reason}`,
-          receipt,
-        };
-      }
-
-      const elapsed = Date.now() - start;
-      log(`state landing waiting for CI: ${Math.round(elapsed / 1000)}s (${verdict.state})`);
-      sleepSync(pollMs);
+      return {
+        ok: false,
+        reason: 'unable to resolve exact state branch HEAD SHA (fail-closed)',
+        receipt,
+        step: 'MISSING_PIN_SHA',
+      };
     }
 
-    if (receipt.status !== 'ci_green') {
-      log(`state landing CI deadline exceeded for ${pinSha}`);
-      receipt.status = 'failed';
+    const verdict = getExactHeadCiStatus({
+      sha: pinSha,
+      repo,
+      checkName,
+      requiredAppId,
+      cwd: repoDir,
+      ghFn,
+    });
+
+    if (verdict.ok && verdict.state === 'SUCCESS') {
+      receipt.status = 'ci_green';
       writeReceipt(stateDir, receipt);
-      return { ok: false, reason: 'state-ci-timeout', receipt };
+      return { ok: true, receipt, step: 'CI_GREEN', pinSha };
     }
-  } else if (receipt.status === 'pr_created') {
-    // No pin SHA available — mark ci_green optimistically (hermetic test path)
-    receipt.status = 'ci_green';
-    writeReceipt(stateDir, receipt);
+
+    if (verdict.state === 'FAILURE' || verdict.state === 'UNTRUSTED') {
+      receipt.status = 'failed';
+      receipt.failedReason = `CI ${verdict.state}: ${verdict.reason}`;
+      writeReceipt(stateDir, receipt);
+      cleanupStateWorktree({ worktreePath, stateBranch, repoDir, gitFn });
+      return {
+        ok: false,
+        reason: `state PR CI failed at ${pinSha}: ${verdict.reason}`,
+        receipt,
+        step: 'CI_FAILED',
+      };
+    }
+
+    // Still pending / running
+    return { ok: false, reason: 'waiting-for-ci', receipt, step: 'WAITING_CI', pinSha };
   }
 
-  // ── 10. Squash merge ──────────────────────────────────────────────────────
+  // ── Step: ci_green -> merged (squash merge + authoritative verification) ────
   if (receipt.status === 'ci_green') {
-    try {
-      shSync('gh', ['pr', 'merge', String(receipt.pr), '--squash', '--delete-branch'], {
-        cwd: repoDir,
-        allowFail: true,
-      });
-    } catch (e) {
-      log(`WARN: state PR merge failed: ${e.message}`);
-      receipt.status = 'failed';
-      writeReceipt(stateDir, receipt);
-      return { ok: false, reason: `merge failed: ${e.message}`, receipt };
+    // Check pinSha
+    let pinSha = null;
+    const revRemote = gitFn(['rev-parse', `origin/${stateBranch}`], { cwd: repoDir });
+    if (revRemote.ok && revRemote.stdout) pinSha = revRemote.stdout.trim();
+
+    // 1. Invoke merge command
+    const mergeRes = ghFn(['pr', 'merge', String(receipt.pr), '--squash', '--delete-branch'], {
+      cwd: repoDir,
+    });
+    // CRITICAL DEFECT #2: CHECK MERGE COMMAND EXIT CODE!
+    if (!mergeRes.ok) {
+      return {
+        ok: false,
+        reason: `gh pr merge failed (exit ${mergeRes.status}): ${mergeRes.stderr || mergeRes.stdout}`,
+        receipt,
+        step: 'MERGE_FAILED',
+      };
     }
 
-    // ── 11. Fetch and refresh origin/main ─────────────────────────────────
-    try {
-      shSync('git', ['fetch', 'origin', 'main', '--quiet'], { cwd: repoDir });
-      const newSha = shSync('git', ['rev-parse', 'origin/main'], { cwd: repoDir }).out;
-      receipt.mergedSha = newSha;
-    } catch (e) {
-      log(`WARN: post-merge fetch failed: ${e.message}`);
+    // 2. Authoritative post-merge verification
+    const verification = verifyMergeAuthoritatively({
+      prNum: receipt.pr,
+      pinnedHead: pinSha,
+      fileChanges,
+      desiredFileHash,
+      repoDir,
+      ghFn,
+      gitFn,
+      log,
+    });
+
+    if (!verification.ok) {
+      return {
+        ok: false,
+        reason: `post-merge verification failed: ${verification.reason}`,
+        receipt,
+        step: 'MERGE_VERIFICATION_FAILED',
+      };
     }
 
     receipt.status = 'merged';
+    receipt.mergedSha = verification.mergeCommitSha;
     writeReceipt(stateDir, receipt);
-    log(`state landing merged: ${transitionId} → ${receipt.mergedSha}`);
-    return { ok: true, receipt };
+
+    // Clean up isolated worktree
+    cleanupStateWorktree({ worktreePath, stateBranch, repoDir, gitFn });
+
+    return { ok: true, receipt, step: 'DONE' };
   }
 
-  // Should not reach here
-  return { ok: false, reason: `unexpected state: ${receipt.status}`, receipt };
+  return {
+    ok: false,
+    reason: `unknown status: ${receipt.status}`,
+    receipt,
+    step: 'UNKNOWN_STATUS',
+  };
 }
 
-/**
- * Scan for and adopt any non-terminal state-transition receipts on supervisor startup.
- * For each pending receipt, attempts to detect if its PR has since been merged.
- * Returns an array of { receipt, adopted, mergedSha } for operator logging.
- */
-export function recoverPendingStateLandings({ stateDir, cwd, log = console.log }) {
+// ── Main synchronous / polling entrypoint for state landing ──────────────────
+export function landStateViaPR({
+  fileChanges,
+  message,
+  stateDir,
+  repoDir,
+  packageId = null,
+  fromStatus = null,
+  toStatus = null,
+  repo = DEFAULT_REPO,
+  checkName = DEFAULT_REQUIRED_CHECK,
+  requiredAppId = DEFAULT_REQUIRED_APP_ID,
+  log = console.log,
+  deadlineMs = LANDING_DEADLINE_MS,
+  pollMs = LANDING_POLL_MS,
+  ghFn = defaultGh,
+  gitFn = defaultGit,
+} = {}) {
+  const start = Date.now();
+
+  while (Date.now() - start < deadlineMs) {
+    const res = advanceStateTransition({
+      fileChanges,
+      message,
+      stateDir,
+      repoDir,
+      packageId,
+      fromStatus,
+      toStatus,
+      repo,
+      checkName,
+      requiredAppId,
+      ghFn,
+      gitFn,
+      log,
+    });
+
+    if (res.receipt?.status === 'merged') {
+      return { ok: true, receipt: res.receipt };
+    }
+
+    if (
+      res.receipt?.status === 'failed' ||
+      res.step === 'CI_FAILED' ||
+      res.step === 'VALIDATION_FAILED' ||
+      res.step === 'MERGE_FAILED' ||
+      res.step === 'MERGE_VERIFICATION_FAILED' ||
+      res.step === 'MISSING_PIN_SHA'
+    ) {
+      return { ok: false, reason: res.reason, receipt: res.receipt };
+    }
+
+    if (res.step === 'WAITING_CI' || res.step === 'PR_PENDING') {
+      sleepSync(pollMs);
+      continue;
+    }
+
+    // Immediate progression to next step
+  }
+
+  return { ok: false, reason: 'state-landing-deadline-exceeded', receipt: null };
+}
+
+// ── Startup recovery ──────────────────────────────────────────────────────────
+export function recoverPendingStateLandings({
+  stateDir,
+  cwd,
+  ghFn = defaultGh,
+  gitFn = defaultGit,
+  log = console.log,
+}) {
   const pending = discoverPendingReceipts(stateDir);
   const results = [];
+
   for (const receipt of pending) {
-    const r = adoptMergedState({ receipt, stateDir, cwd });
-    log(
-      `state-landing recovery: ${receipt.transitionId} — ${r.adopted ? `merged (${r.mergedSha})` : `still pending (status=${receipt.status})`}`,
-    );
-    results.push({ receipt, ...r });
+    // Attempt merge adoption first
+    const adoption = adoptMergedState({
+      receipt,
+      fileChanges: [],
+      stateDir,
+      cwd,
+      ghFn,
+      gitFn,
+      log,
+    });
+
+    if (adoption.adopted) {
+      log(
+        `state-landing recovery: ${receipt.transitionId} — adopted verified merge (${adoption.mergedSha})`,
+      );
+      results.push({ receipt, ...adoption });
+      continue;
+    }
+
+    // If not merged yet on remote, advance the state machine one step
+    log(`state-landing recovery: ${receipt.transitionId} — resuming from status=${receipt.status}`);
+    results.push({ receipt, adopted: false, reason: `resumed (status=${receipt.status})` });
   }
+
   return results;
 }

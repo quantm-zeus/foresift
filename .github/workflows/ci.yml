@@ -49,38 +49,7 @@ jobs:
             HEAD="${GITHUB_SHA}"
           fi
 
-          CHANGED=$(git diff --name-only "$BASE" "$HEAD" 2>/dev/null || git diff --name-only HEAD~1 HEAD 2>/dev/null || echo "UNKNOWN")
-
-          if [ "$CHANGED" = "UNKNOWN" ] || [ -z "$CHANGED" ]; then
-            echo "state_only=false" >> "$GITHUB_OUTPUT"
-            echo "Classification: FULL (could not determine diff)"
-            exit 0
-          fi
-
-          echo "Changed files:"
-          echo "$CHANGED"
-
-          # STATE_ONLY_WHITELIST patterns (must match ci-authority.mjs exactly)
-          STATE_ONLY=true
-          while IFS= read -r FILE; do
-            if [[ "$FILE" =~ ^specs/implementation/current-milestone\.json$ ]] || \
-               [[ "$FILE" =~ ^specs/implementation/roadmap\.json$ ]] || \
-               [[ "$FILE" =~ ^specs/g0-[a-zA-Z0-9_-]+/(plan|spec|tasks)\.md$ ]]; then
-              echo "  ✓ state-only: $FILE"
-            else
-              echo "  ✗ full CI required: $FILE"
-              STATE_ONLY=false
-              break
-            fi
-          done <<< "$CHANGED"
-
-          if [ "$STATE_ONLY" = "true" ]; then
-            echo "state_only=true" >> "$GITHUB_OUTPUT"
-            echo "Classification: STATE_ONLY — fast CI path"
-          else
-            echo "state_only=false" >> "$GITHUB_OUTPUT"
-            echo "Classification: FULL — all CI jobs required"
-          fi
+          node scripts/automation/classify-ci-diff.mjs --base "$BASE" --head "$HEAD"
 
   gates:
     name: Fast Gates (spec, format, lint, types, node-compat, security)
@@ -119,6 +88,35 @@ jobs:
 
       - name: Prohibited-capability scanner
         run: node scripts/scan-prohibited-capabilities/cli.mjs
+
+  test-state-control-plane:
+    name: Tests (State Control Plane)
+    runs-on: ubuntu-latest
+    needs: [classify]
+    if: needs.classify.outputs.state_only == 'true'
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7.0.1
+
+      - name: Install pnpm (pinned via package.json packageManager)
+        uses: pnpm/action-setup@v6.0.10
+
+      - name: Install Node.js (pinned via .nvmrc)
+        uses: actions/setup-node@v7.0.0
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+
+      - name: Install Bun Test (pinned)
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.4.0
+
+      - name: Install dependencies (frozen lockfile)
+        run: pnpm install --frozen-lockfile
+
+      - name: Run State Control Plane Tests
+        run: pnpm test:state-control-plane
 
   test-pure:
     name: Tests (Pure Workload)
@@ -213,19 +211,21 @@ jobs:
   verify:
     name: Verify (spec, format, lint, types, tests)
     runs-on: ubuntu-latest
-    needs: [classify, gates, test-pure, test-process-meta, test-pglite]
+    needs: [classify, gates, test-state-control-plane, test-pure, test-process-meta, test-pglite]
     if: always()
     steps:
       - name: Assert all required verification jobs passed
         run: |
           STATE_ONLY="${{ needs.classify.outputs.state_only }}"
           GATES="${{ needs.gates.result }}"
+          TEST_STATE="${{ needs.test-state-control-plane.result }}"
           TEST_PURE="${{ needs.test-pure.result }}"
           TEST_PROCESS_META="${{ needs.test-process-meta.result }}"
           TEST_PGLITE="${{ needs.test-pglite.result }}"
 
           echo "Classification: state_only=${STATE_ONLY}"
           echo "Gates: ${GATES}"
+          echo "test-state-control-plane: ${TEST_STATE}"
           echo "test-pure: ${TEST_PURE}"
           echo "test-process-meta: ${TEST_PROCESS_META}"
           echo "test-pglite: ${TEST_PGLITE}"
@@ -236,9 +236,11 @@ jobs:
           fi
 
           if [ "$STATE_ONLY" = "true" ]; then
-            # State-only path: test jobs were skipped — this is expected and authoritative.
-            # Gates already verified spec, format, lint, types, node-compat, security.
-            echo "State-only path: test jobs skipped as expected. Gates passed. VERIFY OK."
+            if [ "$TEST_STATE" != "success" ]; then
+              echo "FAILED: state control plane tests did not succeed"
+              exit 1
+            fi
+            echo "State-only path: state control plane tests and gates passed. VERIFY OK."
           else
             # Full path: all test jobs must have succeeded.
             if [ "$TEST_PURE" != "success" ] || \

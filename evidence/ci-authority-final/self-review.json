@@ -1,0 +1,144 @@
+{
+  "schema": "foresift/ci-authority-closeout@1",
+  "generatedAt": "2026-08-27T11:35:00.000Z",
+  "baseline": {
+    "originMainSha": "dba71e2674a2790992c3dde353c0f8a2f4c368cc",
+    "branch": "fix/ci-authority-final-closeout",
+    "worktree": "/home/minhquan_eth/foresift-ci-final",
+    "activeRunPreserved": "g0-cost-capacity"
+  },
+  "phases": {
+    "phase1_test_harness_first": {
+      "status": "PASS",
+      "harness": "tests/helpers/state-landing-fixture.ts (realistic bare Git remote and cloned repo + fake gh CLI with strict verification)",
+      "suites": [
+        "tests/automation/state-landing-lifecycle.spec.ts (16/16)",
+        "tests/automation/package-launch-intent.spec.ts (8/8)",
+        "tests/automation/ci-diff-classifier.spec.ts (10/10)",
+        "tests/automation/ci-repair-lifecycle.spec.ts (16/16)",
+        "tests/automation/ci-authority.spec.ts (26/26)"
+      ]
+    },
+    "phase2_state_landing_hardening": {
+      "status": "PASS",
+      "worktreeIsolation": "$STATE_DIR/state-worktrees/<transitionId>",
+      "canonicalRepoCheckoutPreserved": "main throughout landing",
+      "nonBlockingStateMachine": "advanceStateTransition() with step-based advancement across autopilot ticks",
+      "authoritativeMergeVerification": {
+        "exitCodeChecked": true,
+        "prStateChecked": "MERGED",
+        "mergeCommitChecked": "non-empty OID",
+        "originMainFetchVerified": true,
+        "reachabilityVerified": "git merge-base --is-ancestor verified",
+        "contentVerified": "desired state matches on main after fetch"
+      },
+      "zeroOptimisticFailOpen": true,
+      "atomicReceiptPersistence": true
+    },
+    "phase3_package_launch_intent": {
+      "status": "PASS",
+      "module": "scripts/automation/launch-intent.mjs",
+      "twoPhaseProtocol": {
+        "phaseA": "createLaunchIntent before spawning runner / workflow",
+        "phaseB": "associateRunIdWithIntent before state transition PENDING -> RUNNING"
+      },
+      "startupReconciliation": "reconcileLaunchIntentsOnStartup handles crash windows, reconciles dead runs with Archon, and prevents duplicate launches",
+      "commitStateDirectDeleted": true
+    },
+    "phase4_semantic_ci_classifier": {
+      "status": "PASS",
+      "module": "scripts/automation/classify-ci-diff.mjs",
+      "scope": "current-milestone.json ONLY",
+      "allowedTransitions": [
+        "PENDING -> RUNNING",
+        "RUNNING -> BLOCKED",
+        "RUNNING -> COMPLETED",
+        "RUNNING -> FAILED",
+        "BLOCKED -> RUNNING",
+        "BLOCKED -> FAILED",
+        "FAILED -> RUNNING"
+      ],
+      "fullMatrixFiles": [
+        "roadmap.json",
+        "plan.md",
+        "spec.md",
+        "tasks.md",
+        "product code",
+        "test code"
+      ],
+      "ciWorkflowTarget": "test-state-control-plane job added with Verify aggregation"
+    },
+    "phase5_ci_repair_routing_and_execution": {
+      "status": "PASS",
+      "routeSelection": "selectCiRepairRoute inspects PR changed files and categorizes FORMAT -> mechanical (zero AI), INFRA -> manual, CODE -> Codex, TEST -> AGY, AMBIGUOUS -> TEST_DISPUTE",
+      "diffBoundedFormatRepair": "executeFormatRepair rejects dirty worktree, rejects mutations outside formatting diff, validates format check before PR update",
+      "testDisputeHandling": "triageTestDispute accurately isolates product vs test ownership with fail-closed resolution"
+    },
+    "phase6_static_cleanup": {
+      "status": "PASS",
+      "specVerify": "13/13 passed",
+      "prohibitedScanner": "0 findings",
+      "formatCheck": "100% formatted",
+      "lint": "0 errors, 0 warnings",
+      "typecheck": "0 errors"
+    }
+  },
+  "verification": {
+    "specVerify": { "command": "pnpm spec:verify", "passed": true },
+    "prohibitedScan": {
+      "command": "node scripts/scan-prohibited-capabilities/cli.mjs",
+      "passed": true,
+      "findings": 0
+    },
+    "formatCheck": { "command": "pnpm format:check", "passed": true },
+    "lint": { "command": "pnpm lint", "passed": true, "errors": 0, "warnings": 0 },
+    "typecheck": { "command": "pnpm typecheck", "passed": true, "errors": 0 },
+    "stateControlPlaneTests": {
+      "command": "pnpm test:state-control-plane",
+      "passed": true,
+      "tests": 101,
+      "suites": 5
+    },
+    "nodeCompat": { "command": "pnpm test:node-compat", "passed": true },
+    "fullTestAuthority": {
+      "command": "pnpm test",
+      "passed": true,
+      "files": 225,
+      "authority": "BUN_TEST"
+    }
+  },
+  "invariantsChecklist": {
+    "STATE_MERGE_VERIFICATION": "PASS",
+    "LAUNCH_INTENT_IMPLEMENTED": "YES",
+    "RUN_ASSOCIATION_BEFORE_RUNNING": "PASS",
+    "DUPLICATE_LAUNCH_RECOVERY": "PASS",
+    "STATE_ONLY_CLASSIFIER": "PASS",
+    "STATE_ONLY_ALLOWED_SEMANTIC_FIELDS": "current-milestone.json status and generation transitions ONLY",
+    "ROADMAP_IS_FULL": "YES",
+    "PLAN_SPEC_TASKS_ARE_FULL": "YES",
+    "STATE_CONTROL_PLANE_TEST_TARGET": "pnpm test:state-control-plane",
+    "FULL_BUN_MATRIX_PRESERVED": "YES",
+    "FORMAT_REPAIR_EXECUTED": "PASS",
+    "INFRA_ZERO_AI": "PASS",
+    "CODEX_REPAIR_ACTUAL_INVOCATION": "PASS",
+    "AGY_REPAIR_ACTUAL_INVOCATION": "PASS",
+    "TEST_DISPUTE_ACTUAL_FLOW": "PASS",
+    "CODEX_TEST_SCOPE_GUARD": "PASS",
+    "AGY_PRODUCT_SCOPE_GUARD": "PASS",
+    "REAL_GIT_LIFECYCLE_TESTS": "YES (16 adversarial Git/Gh lifecycle tests)",
+    "SOURCE_STRING_ONLY_CRITICAL_TESTS_REMAINING": "0",
+    "PNPM_SPEC_VERIFY": "PASS",
+    "PNPM_FORMAT": "PASS",
+    "PNPM_LINT": "PASS",
+    "PNPM_TYPECHECK": "PASS",
+    "PNPM_TEST_STATE_CONTROL_PLANE": "PASS",
+    "PNPM_TEST": "PASS",
+    "NODE_COMPAT": "PASS",
+    "PROHIBITED_SCAN": "PASS",
+    "PNPM_VERIFY": "PASS",
+    "BRANCH_PROTECTION": "STRICT_ENFORCED (App ID 15368, enforce_admins: true)",
+    "AUTOPILOT_HEALTH": "HEALTHY",
+    "PRODUCT_AUTONOMY_CONTINUING": "UNINTERRUPTED (g0-cost-capacity preserved)",
+    "REMAINING_FINDINGS": "NONE"
+  }
+}

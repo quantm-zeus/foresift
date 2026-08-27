@@ -149,3 +149,18 @@ export function captureCiIncident(opts?: {
     opts?: { cwd?: string },
   ) => { ok: boolean; stdout: string; stderr?: string; status?: number };
 }): CiIncidentRecord | null;
+
+/**
+ * Classify a diff (list of changed file paths) as STATE_ONLY or FULL.
+ * Fail-closed: empty or unknown files → FULL.
+ */
+export function classifyDiff(files?: string[]): 'STATE_ONLY' | 'FULL';
+
+/**
+ * Increment the durable repair attempt counter in an existing incident capsule.
+ * Returns the new count. Survives supervisor restarts.
+ */
+export function incrementIncidentRepairAttempts(filePath: string): number;
+
+/** Whitelist of regex patterns for state-only file paths. */
+export declare const STATE_ONLY_WHITELIST: RegExp[];

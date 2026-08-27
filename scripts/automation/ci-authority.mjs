@@ -229,15 +229,9 @@ export function getMainCiStatus({
 
   const mainSha = rev.stdout.trim();
 
-  if (process.env.FORESIFT_HERMETIC_CI_GREEN === '1') {
-    return {
-      ok: true,
-      state: 'GREEN',
-      sha: mainSha,
-      verdict: { ok: true, state: 'SUCCESS', sha: mainSha, checkName, requiredAppId },
-    };
-  }
-
+  // NOTE: There is intentionally no environment variable that can bypass this
+  // function and force CI to appear GREEN. Tests must use ghFn/gitFn injection
+  // or a stub 'gh' binary in PATH. See ci-authority-hardening.spec.ts §K.
   const verdict = getExactHeadCiStatus({
     sha: mainSha,
     repo,
@@ -264,9 +258,21 @@ export function getMainCiStatus({
 
 /**
  * Classify a CI log failure into a category and extract affected files/log tail.
+ *
+ * Parses REAL current output patterns from:
+ *   PRETTIER: [warn] path/file
+ *   TYPESCRIPT: path/file.ts(line,col): error TSxxxx
+ *   ESLINT: file path headings + ESLint diagnostic lines
+ *   BUN/FORESIFT COORDINATOR: FAILED GROUP, .spec.ts/.test.ts paths, assertion stacks
+ *   NODE COMPAT: compatibility test file paths
+ *   SPEC: spec/planning/state verification paths
+ *
+ * Returns normalized repository-relative paths in failedFiles.
  */
 export function classifyCiFailure(logText = '') {
   const text = String(logText);
+
+  // ── INFRA: transient GitHub Actions / network failures ───────────────────
   if (
     /ECONNRESET|ETIMEDOUT|GitHub Actions has encountered an internal error|runner.*disconnected|API rate limit exceeded/i.test(
       text,
@@ -279,59 +285,164 @@ export function classifyCiFailure(logText = '') {
       logTail: text.slice(-4000),
     };
   }
-  if (/Code style issues found|prettier --check/i.test(text)) {
+
+  // ── FORMAT: Prettier output ───────────────────────────────────────────────
+  // Prettier --check outputs: [warn] path/to/file
+  // Also: "Code style issues found in N files. Run Prettier with --write to fix."
+  if (/Code style issues found|prettier --check|\[warn\]\s+\S/i.test(text)) {
     const files = [];
-    for (const match of text.matchAll(/\[warn\]\s+(\S+)/g)) {
-      files.push(match[1]);
+    // [warn] path/file — match file-looking lines (with extension or slash)
+    for (const match of text.matchAll(/\[warn\]\s+((?:\S+\/\S+|\S+\.\S+))/g)) {
+      const candidate = match[1].trim();
+      // Exclude summary messages like "Code style issues found in 2 files."
+      if (!/^\d|found|issues|style/i.test(candidate)) {
+        files.push(candidate);
+      }
     }
     return {
       category: 'FORMAT',
       repairable: true,
-      failedFiles: files,
+      failedFiles: [...new Set(files)],
       logTail: text.slice(-4000),
     };
   }
+
+  // ── SPEC: specification integrity ────────────────────────────────────────
   if (/Specification integrity verification|spec:verify failed/i.test(text)) {
+    const files = [];
+    // Look for spec file paths in the output
+    for (const match of text.matchAll(/\b(specs\/[^\s:,'"]+(?:\.json|\.md))/g)) {
+      files.push(match[1]);
+    }
     return {
       category: 'SPEC',
       repairable: false,
-      failedFiles: [],
+      failedFiles: [...new Set(files)],
       logTail: text.slice(-4000),
     };
   }
+
+  // ── LINT: ESLint output ───────────────────────────────────────────────────
+  // ESLint output: file paths at start of diagnostic blocks, then indented errors
+  // Pattern: "/repo/path/file.ts" or "packages/foo/src/bar.ts" as line headings
   if (/ESLint|@typescript-eslint/i.test(text)) {
+    const files = [];
+    // ESLint outputs bare file paths as headings before diagnostics
+    for (const match of text.matchAll(
+      /^((?:packages|src|scripts|tests|apps)\/[^\s:]+(?:\.ts|\.tsx|\.js|\.mjs))/gm,
+    )) {
+      files.push(match[1]);
+    }
+    // Also match absolute paths that contain known repo structure
+    for (const match of text.matchAll(
+      /\/(packages|src|scripts|tests|apps)\/[^\s:]+(?:\.ts|\.tsx|\.js|\.mjs)/g,
+    )) {
+      // Normalize to relative by stripping leading absolute path prefix
+      const rel = match[0].replace(/^.*?\/(packages|src|scripts|tests|apps)\//, '$1/');
+      files.push(rel);
+    }
     return {
       category: 'LINT',
       repairable: false,
-      failedFiles: [],
+      failedFiles: [...new Set(files)],
       logTail: text.slice(-4000),
     };
   }
+
+  // ── TYPECHECK: TypeScript compiler output ────────────────────────────────
+  // tsc outputs: path/to/file.ts(line,col): error TSxxxx: message
   if (/error TS\d+:|TypeScript check/i.test(text)) {
+    const files = [];
+    // Standard tsc format: path(line,col): error TSxxxx
+    for (const match of text.matchAll(
+      /([^\s(]+\.(?:ts|tsx|mts|cts))\(\d+,\d+\):\s+error\s+TS\d+/g,
+    )) {
+      files.push(match[1]);
+    }
+    // Also: path.ts: error TSxxxx (without position)
+    for (const match of text.matchAll(/([^\s('"]+\.(?:ts|tsx|mts|cts)):\s+error\s+TS\d+/g)) {
+      files.push(match[1]);
+    }
     return {
       category: 'TYPECHECK',
       repairable: false,
-      failedFiles: [],
+      failedFiles: [...new Set(files)],
       logTail: text.slice(-4000),
     };
   }
+
+  // ── TESTS: Bun / FORESIFT coordinator test output ────────────────────────
+  // Bun outputs:
+  //   FAILED GROUP: <description>
+  //   Listed group files / .spec.ts paths
+  //   Assertion stack: at <file>:<line>:<col>
+  //   × <test-name> [.../path/file.spec.ts]
   if (
     /\b(?:FAIL|fail)\b.*(?:spec|test)\.[cm]?[jt]sx?/i.test(text) ||
-    /Tests\s+failed/i.test(text)
+    /Tests\s+failed/i.test(text) ||
+    /FAILED\s+GROUP/i.test(text) ||
+    /bun test --/i.test(text)
   ) {
+    const files = [];
+    // Bun: × test-name [.../path/file.spec.ts]
+    for (const match of text.matchAll(/\[([^\]]+\.spec\.[cm]?[jt]sx?)\]/g)) {
+      files.push(match[1].replace(/^.*?\/tests\//, 'tests/').replace(/^.*?\/test\//, 'test/'));
+    }
+    // Bun: at path/file.spec.ts:line:col (assertion stacks)
+    for (const match of text.matchAll(/at\s+([^\s:]+\.(?:spec|test)\.[cm]?[jt]sx?):\d+:\d+/g)) {
+      files.push(match[1]);
+    }
+    // General .spec.ts/.test.ts paths in output
+    for (const match of text.matchAll(
+      /((?:tests?|__tests__)\/[^\s:'"]+\.(?:spec|test)\.[cm]?[jt]sx?)/g,
+    )) {
+      files.push(match[1]);
+    }
+    // FORESIFT COORDINATOR: group file listings (plain relative paths)
+    for (const match of text.matchAll(/^\s+(tests?\/[^\s]+\.(?:spec|test)\.[cm]?[jt]sx?)$/gm)) {
+      files.push(match[1].trim());
+    }
     return {
       category: 'TESTS',
       repairable: false,
-      failedFiles: [],
+      failedFiles: [...new Set(files)],
       logTail: text.slice(-4000),
     };
   }
+
+  // ── NODE COMPAT: Node runtime compatibility tests ─────────────────────────
+  if (/node.*compat|node-compat|runtime.*compat/i.test(text)) {
+    const files = [];
+    for (const match of text.matchAll(/(scripts\/[^\s:]+\.(?:mjs|js|cjs))/g)) {
+      files.push(match[1]);
+    }
+    return {
+      category: 'NODE_COMPAT',
+      repairable: false,
+      failedFiles: [...new Set(files)],
+      logTail: text.slice(-4000),
+    };
+  }
+
   return {
     category: 'UNKNOWN',
     repairable: false,
     failedFiles: [],
     logTail: text.slice(-4000),
   };
+}
+
+/**
+ * Classify whether a set of changed file paths is state-only or requires full CI.
+ * Returns 'STATE_ONLY' if ALL files are on the STATE_ONLY_WHITELIST, 'FULL' otherwise.
+ * This is used by the CI workflow and state-landing lane.
+ *
+ * Fail-closed: empty file list → 'FULL' (unknown change set).
+ */
+export function classifyDiff(files = []) {
+  if (files.length === 0) return 'FULL';
+  const allState = files.every((f) => STATE_ONLY_WHITELIST.some((p) => p.test(f.trim())));
+  return allState ? 'STATE_ONLY' : 'FULL';
 }
 
 /**
@@ -436,6 +547,15 @@ export function selectCiRepairRoute({
 
 /**
  * Capture a compact, deduplicated incident capsule for a CI failure.
+ *
+ * Incident identity is keyed by: SHA + required check name + trusted app id.
+ * This ensures:
+ *   - Same exact failure event → one capsule (deduplicated)
+ *   - New HEAD → new incident identity
+ *   - Different authoritative check → different incident identity
+ *
+ * repair_attempts is persisted durably in the capsule so supervisor restarts
+ * do not reset the budget.
  */
 export function captureCiIncident({
   sha,
@@ -465,9 +585,15 @@ export function captureCiIncident({
   if (!existsSync(incidentsDir)) {
     mkdirSync(incidentsDir, { recursive: true });
   }
-  const filePath = join(incidentsDir, `ci-failure-${sha}.json`);
 
-  // Deduplication: if an incident capsule for this exact SHA already exists, return it
+  // Incident identity: SHA + check name slug + app id
+  // This ensures different checks on the same SHA get different capsules,
+  // and prevents any deduplication key collision across check authorities.
+  const checkSlug = checkName.replace(/[^a-zA-Z0-9_-]/g, '_');
+  const incidentKey = `ci-failure-${sha}-${checkSlug}-${requiredAppId}`;
+  const filePath = join(incidentsDir, `${incidentKey}.json`);
+
+  // Deduplication: if an incident capsule for this exact (SHA, check, appId) already exists, return it
   if (existsSync(filePath)) {
     try {
       const existing = JSON.parse(readFileSync(filePath, 'utf8'));
@@ -511,7 +637,8 @@ export function captureCiIncident({
     attempts,
   });
 
-  const eventId = `CI_FAILURE/${sha}/${checkName.replace(/[^a-zA-Z0-9_-]/g, '_')}`;
+  // eventId includes SHA + check name + app id for strong identity
+  const eventId = `CI_FAILURE/${sha}/${checkSlug}/${requiredAppId}`;
 
   const capsule = {
     schema: 'foresift/ci-failure-incident@1',
@@ -529,9 +656,29 @@ export function captureCiIncident({
     classification,
     repairRoute,
     attempts,
+    repairAttempts: 0, // durable counter: incremented by ci-repair-executor on each attempt
     capturedAt: new Date().toISOString(),
   };
 
   writeFileSync(filePath, JSON.stringify(capsule, null, 2) + '\n');
   return { capsule, filePath, deduplicated: false };
+}
+
+/**
+ * Increment the repair attempt counter in an existing incident capsule.
+ * Returns the new count. This is the authoritative budget tracker that
+ * survives supervisor restarts.
+ *
+ * NOTE: This is also exported from ci-repair-executor.mjs which delegates here.
+ */
+export function incrementIncidentRepairAttempts(filePath) {
+  try {
+    const capsule = JSON.parse(readFileSync(filePath, 'utf8'));
+    capsule.repairAttempts = (capsule.repairAttempts ?? 0) + 1;
+    capsule.lastRepairAttemptAt = new Date().toISOString();
+    writeFileSync(filePath, JSON.stringify(capsule, null, 2) + '\n');
+    return capsule.repairAttempts;
+  } catch {
+    return 1;
+  }
 }

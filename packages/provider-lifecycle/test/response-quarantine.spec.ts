@@ -4,7 +4,7 @@
  * metadata-only and HARD-EXCLUDED from model-context envelopes; retries
  * resolve to the same quarantine record.
  */
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 import { AuditChain } from '@foresift/security';
 import { sha256Text } from '@foresift/persistence';
 import {

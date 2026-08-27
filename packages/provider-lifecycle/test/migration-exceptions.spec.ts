@@ -2,7 +2,7 @@
  * T113: migration exceptions — APPROVED-plan requirement, strict windows,
  * single-active enforcement, and USE-TIME expiry (fail-closed, no grace).
  */
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 import type { UtcTimestamp } from '@foresift/domain';
 import { makeProvEngine, testDefinition, wireEngine, type Wired } from './helpers.ts';
 import { ProvErrorCode } from '../src/errors.ts';

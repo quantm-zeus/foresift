@@ -5,7 +5,7 @@
  * (STORAGE revoked ⇒ RETIRE), replays are fenced to identical ledgers, and
  * there is no reactivation path.
  */
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 import {
   ArtifactRegistry,
   RightsMatrixEngine,

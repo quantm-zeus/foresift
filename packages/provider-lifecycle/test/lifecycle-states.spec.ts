@@ -5,7 +5,7 @@
  * constants, and their Zod schemas. A divergence in any one representation
  * fails here instead of at 3 a.m. in production.
  */
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 import type { DatabaseEngine } from '@foresift/persistence';
 import {
   ALLOWED_CAPABILITY_CLASSES,

@@ -3,7 +3,7 @@
  * the API layer (before any SQL), identical re-registration is idempotent,
  * conflicting re-registration refuses, dependencies fence retries.
  */
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 import { makeProvEngine, testDefinition, wireEngine } from './helpers.ts';
 import type { OperationDefinition } from '../src/operation-registry.ts';
 import { ProvErrorCode } from '../src/errors.ts';

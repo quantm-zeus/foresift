@@ -3,7 +3,7 @@
  * retry dedupe, AC-270 activation gating, audit emission, and the guarantee
  * that expiry-style exits never mutate stored ledger evidence.
  */
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 import type { UtcTimestamp } from '@foresift/domain';
 import { makeProvEngine, testDefinition, wireEngine, type Wired } from './helpers.ts';
 import type { LifecycleAuditBridge } from '../src/audit-bridges.ts';

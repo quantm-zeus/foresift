@@ -4,7 +4,7 @@
  * identical recomputation while genuinely different (drifted) recomputations
  * are preserved as NEW evidence rows.
  */
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 import { sha256Text } from '@foresift/persistence';
 import { SourceFingerprintStore, PROVIDER_FINGERPRINT_KINDS, ProvErrorCode } from '../src/index.ts';
 import type { OperationTarget } from '../src/index.ts';

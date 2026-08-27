@@ -4,7 +4,7 @@
  * verification pair, rights presence, and deprecation-exception validity ALL
  * pass; every failure aggregates into a typed BLOCKED verdict (never a throw).
  */
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 import { AuditChain } from '@foresift/security';
 import {
   ReadinessEvaluator,

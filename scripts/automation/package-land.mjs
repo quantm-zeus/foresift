@@ -222,8 +222,23 @@ function main() {
     }
 
     if (verdict.state === 'FAILURE' || verdict.state === 'UNTRUSTED') {
+      let baseSha = null;
+      let prChangedFiles = [];
+      try {
+        sh('git', ['fetch', 'origin', 'main']);
+        baseSha = sh('git', ['merge-base', 'origin/main', pinSha]);
+        const diffRes = shAllowFail('git', ['diff', '--name-only', baseSha, pinSha]);
+        prChangedFiles = diffRes.ok ? diffRes.out.split('\n').filter(Boolean) : [];
+      } catch {
+        step('diff-error', 'failed to resolve PR changed files');
+      }
+
       const incident = captureCiIncident({
         sha: pinSha,
+        headSha: pinSha,
+        prNumber: prNum,
+        baseSha,
+        prChangedFiles,
         repo: DEFAULT_REPO,
         checkName,
         requiredAppId: DEFAULT_REQUIRED_APP_ID,

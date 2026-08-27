@@ -116,7 +116,11 @@ export function discoverPendingLaunchIntents(stateDir) {
     if (!name.startsWith('intent-') || !name.endsWith('.json')) continue;
     try {
       const item = JSON.parse(readFileSync(join(dir, name), 'utf8'));
-      if (item.status === 'INTENT_DURABLE' || item.status === 'RUN_ASSOCIATED') {
+      if (
+        item.status === 'INTENT_DURABLE' ||
+        item.status === 'RUN_ASSOCIATED' ||
+        item.status === 'RECONCILIATION_BLOCKED'
+      ) {
         pending.push(item);
       }
     } catch {}
@@ -131,6 +135,25 @@ export function discoverPendingLaunchIntents(stateDir) {
 export function isPackageLaunchInFlight(stateDir, packageId) {
   const pending = discoverPendingLaunchIntents(stateDir);
   return pending.some((i) => i.packageId === packageId);
+}
+
+/**
+ * Strong match checking for run vs intent.
+ */
+export function runMatchesLaunchIntent(intent, run) {
+  if (run.workflow_name !== intent.workflow) return false;
+  if (run.user_message !== intent.packageId) return false;
+  if (!run.working_path || !run.working_path.includes(`task-foresift-${intent.packageId}`))
+    return false;
+
+  if (!run.started_at || !intent.createdAt) return false;
+  const tRun = new Date(run.started_at).getTime();
+  const tIntent = new Date(intent.createdAt).getTime();
+  if (Number.isNaN(tRun) || Number.isNaN(tIntent)) return false;
+
+  if (Math.abs(tRun - tIntent) > 5 * 60 * 1000) return false;
+
+  return true;
 }
 
 /**
@@ -149,7 +172,7 @@ export function reconcileLaunchIntentsOnStartup(
       // Find matching run in Archon runs table
       const match = archonRuns.find(
         (r) =>
-          r.workflow_name === intent.workflow &&
+          runMatchesLaunchIntent(intent, r) &&
           (r.status === 'running' || r.status === 'pending' || r.status === 'completed'),
       );
       if (match) {
@@ -159,7 +182,12 @@ export function reconcileLaunchIntentsOnStartup(
         adopted.push(intent);
         log(`launch-intent recovery: matched ${intent.intentId} to existing run ${match.id}`);
       } else {
+        intent.status = 'RECONCILIATION_BLOCKED';
+        writeIntentAtomic(stateDir, intent);
         dangling.push(intent);
+        log(
+          `launch-intent recovery: no strong match for ${intent.intentId}, marked RECONCILIATION_BLOCKED`,
+        );
       }
     } else if (intent.status === 'RUN_ASSOCIATED') {
       // Check if milestone already contains RUNNING or PROVEN on main
@@ -170,6 +198,8 @@ export function reconcileLaunchIntentsOnStartup(
       } else {
         adopted.push(intent);
       }
+    } else if (intent.status === 'RECONCILIATION_BLOCKED') {
+      dangling.push(intent);
     }
   }
 

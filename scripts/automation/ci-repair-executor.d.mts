@@ -93,3 +93,52 @@ export function executeCiRepair(opts?: {
   executionProfile?: string;
   log?: (msg: string) => void;
 }): CiRepairResult;
+
+export interface RepairRequest {
+  schema: string;
+  requestId?: string;
+  incidentId: string;
+  packageId: string | null;
+  prNumber: number | string | null;
+  baseSha: string | null;
+  failedHeadSha: string;
+  branch: string;
+  worktreeDir: string | null;
+  executionProfile: string;
+  route: string;
+  engine: string;
+  failedFiles: string[];
+  prChangedFiles: string[];
+  allowedWritePaths?: string[];
+  attemptCount: number;
+  status:
+    | 'PENDING'
+    | 'WORKTREE_READY'
+    | 'ENGINE_INVOKED'
+    | 'OWNERSHIP_VERIFIED'
+    | 'COMMITTED'
+    | 'PUSHED'
+    | 'COMPLETE'
+    | 'FAILED';
+  newHeadSha: string | null;
+  failureReason?: string;
+  createdAt: string;
+  updatedAt?: string;
+}
+
+export function persistRepairRequest(stateDir: string, request: RepairRequest): string;
+export function discoverPendingRepairRequests(
+  stateDir: string,
+): { request: RepairRequest; path: string }[];
+export function validateRepairOwnership(opts: { engine: string; actualDiffPaths: string[] }): {
+  ok: boolean;
+  violations: string[];
+  violationType: string | null;
+};
+export function advanceRepairRequest(opts: {
+  request: RepairRequest;
+  stateDir: string;
+  repoDir: string;
+  executorFn?: (req: RepairRequest) => Promise<void>;
+  log?: (msg: string) => void;
+}): Promise<{ action: string; violations?: string[]; status?: string }>;

@@ -73,6 +73,9 @@ export interface CiIncidentCapsule {
   schema: string;
   eventId: string;
   package: string | null;
+  prNumber: number | string | null;
+  baseSha: string | null;
+  prChangedFiles: string[];
   runId: number | string | null;
   runUrl: string | null;
   workflow: string | null;
@@ -146,7 +149,11 @@ export function triageTestDispute(opts?: {
 }): TestDisputeResult;
 
 export function captureCiIncident(opts?: {
-  sha: string;
+  sha?: string;
+  headSha?: string | null;
+  prNumber?: number | string | null;
+  baseSha?: string | null;
+  prChangedFiles?: string[];
   repo?: string;
   checkName?: string;
   requiredAppId?: number | null;

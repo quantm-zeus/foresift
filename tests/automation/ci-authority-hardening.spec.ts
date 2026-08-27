@@ -135,7 +135,7 @@ describe('§B — State transition creates a PR branch, not a direct push', () =
       'utf8',
     );
     expect(src).toContain('state/chore/');
-    expect(src).toContain("schema: 'foresift/state-transition@1'");
+    expect(src).toContain("schema: 'foresift/state-transition@2'");
   });
 });
 
@@ -146,12 +146,12 @@ describe('§C — State not considered durable until receipt.status === merged',
       join(import.meta.dirname, '../../scripts/automation/state-landing.mjs'),
       'utf8',
     );
-    expect(src).toContain("'pending'");
-    expect(src).toContain("'branch_created'");
-    expect(src).toContain("'pr_created'");
-    expect(src).toContain("'ci_green'");
-    expect(src).toContain("'merged'");
-    expect(src).toContain("'failed'");
+    expect(src).toContain("REQUESTED: 'REQUESTED'");
+    expect(src).toContain("BRANCH_READY: 'BRANCH_READY'");
+    expect(src).toContain("PR_READY: 'PR_READY'");
+    expect(src).toContain("CI_AUTHORIZED: 'CI_AUTHORIZED'");
+    expect(src).toContain("MERGED: 'MERGED'");
+    expect(src).toContain("FAILED: 'FAILED'");
   });
 
   it('state is only returned as ok:true when receipt.status === merged', () => {
@@ -159,10 +159,10 @@ describe('§C — State not considered durable until receipt.status === merged',
       join(import.meta.dirname, '../../scripts/automation/state-landing.mjs'),
       'utf8',
     );
-    // The landStateViaPR function should only return { ok: true } when status is 'merged'
-    expect(src).toContain("receipt.status = 'merged'");
-    // It should check status === 'merged' for adoption
-    expect(src).toContain("if (receipt.status === 'merged')");
+    // The advanceStateTransition function should only return { ok: true } at DONE when status is MERGED
+    expect(src).toContain('receipt.status = RECEIPT_STATUSES.MERGED');
+    // It should check MERGED status for adoption
+    expect(src).toContain('receipt.status === RECEIPT_STATUSES.MERGED');
   });
 });
 
@@ -173,20 +173,32 @@ describe('§D — Crash recovery discovers pending receipts on startup', () => {
     const transDir = join(stateDir, STATE_TRANSITIONS_DIR_NAME);
     mkdirSync(transDir, { recursive: true });
 
-    // Write a pending receipt
+    // Write a pending receipt (v2)
     const pendingReceipt = {
-      schema: 'foresift/state-transition@1',
+      schema: 'foresift/state-transition@2',
       transitionId: 'test-pkg-PENDING-RUNNING-abc12345-de12fg34',
-      package: 'test-pkg',
-      from: 'PENDING',
-      to: 'RUNNING',
-      sourceSha: 'abc12345def',
-      stateBranch: 'state/chore/test-pkg-PENDING-RUNNING-abc12345-de12fg34',
-      pr: '42',
-      prUrl: 'https://github.com/test/repo/pull/42',
+      logicalTransitionKey: 'test-pkg-PENDING-RUNNING-de12fg34',
+      packageId: 'test-pkg',
+      fromStatus: 'PENDING',
+      toStatus: 'RUNNING',
+      sourceMainSha: 'abc12345def',
       desiredFileHash: 'deadbeef',
-      status: 'pr_created',
+      desiredFiles: [],
+      commitMessage: 'chore: test',
+      stateBranch: 'state/chore/test-pkg-PENDING-RUNNING-abc12345-de12fg34',
+      stateWorktree: null,
+      prNumber: '42',
+      prUrl: 'https://github.com/test/repo/pull/42',
+      authorizedHeadSha: null,
+      authorizedAt: null,
+      authorizedCheckName: null,
+      authorizedAppId: null,
+      status: 'PR_READY',
+      retryClass: null,
+      retryCount: 0,
+      nextRetryAt: null,
       mergedSha: null,
+      failedReason: null,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     };
@@ -199,7 +211,7 @@ describe('§D — Crash recovery discovers pending receipts on startup', () => {
     const mergedReceipt = {
       ...pendingReceipt,
       transitionId: 'merged-receipt',
-      status: 'merged',
+      status: 'MERGED',
       mergedSha: 'def456',
     };
     writeFileSync(
@@ -210,7 +222,7 @@ describe('§D — Crash recovery discovers pending receipts on startup', () => {
     const pending = discoverPendingReceipts(stateDir);
     expect(pending).toHaveLength(1);
     expect(pending[0]!.transitionId).toBe('test-pkg-PENDING-RUNNING-abc12345-de12fg34');
-    expect(pending[0]!.status).toBe('pr_created');
+    expect(pending[0]!.status).toBe('PR_READY');
   });
 
   it('discoverPendingReceipts returns empty for no pending receipts', () => {
@@ -229,18 +241,30 @@ describe('§E — Same transition + file hash → same receipt (idempotent)', ()
     mkdirSync(transDir, { recursive: true });
 
     const receipt = {
-      schema: 'foresift/state-transition@1',
+      schema: 'foresift/state-transition@2',
       transitionId: 'same-id-twice',
-      package: 'pkg-a',
-      from: 'PENDING',
-      to: 'RUNNING',
-      sourceSha: 'abc123',
-      stateBranch: 'state/chore/same-id-twice',
-      pr: '10',
-      prUrl: null,
+      logicalTransitionKey: 'same-id-twice',
+      packageId: 'pkg-a',
+      fromStatus: 'PENDING',
+      toStatus: 'RUNNING',
+      sourceMainSha: 'abc123',
       desiredFileHash: 'hash1',
-      status: 'pr_created',
+      desiredFiles: [],
+      commitMessage: 'chore: test',
+      stateBranch: 'state/chore/same-id-twice',
+      stateWorktree: null,
+      prNumber: '10',
+      prUrl: null,
+      authorizedHeadSha: null,
+      authorizedAt: null,
+      authorizedCheckName: null,
+      authorizedAppId: null,
+      status: 'PR_READY',
+      retryClass: null,
+      retryCount: 0,
+      nextRetryAt: null,
       mergedSha: null,
+      failedReason: null,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     };

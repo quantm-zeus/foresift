@@ -6,14 +6,18 @@
 // Instead, every state mutation intent follows this deterministic lane:
 //
 //   mutation intent
-//     -> current origin/main SHA
-//     -> isolated ephemeral Git worktree ($STATE_DIR/state-worktrees/<transition-id>)
+//     -> in-memory desired milestone object
+//     -> deterministic serialization
+//     -> durable state-transition request/receipt
+//     -> current origin/main SHA (fetched ONCE at creation)
+//     -> isolated ephemeral Git worktree ($STATE_DIR/state-worktrees/<transitionId>)
 //     -> apply ONLY whitelist-validated state/planning files
 //     -> deterministic local state validation
 //     -> push branch
 //     -> PR (idempotent — discover existing)
 //     -> label 'state-only' for fast CI path
-//     -> wait for exact-head CI
+//     -> exact-head CI authorization (durably persisted)
+//     -> pre-merge HEAD verification (TOCTOU guard)
 //     -> protected squash merge
 //     -> authoritative verification on origin/main:
 //          PR state == MERGED
@@ -25,12 +29,18 @@
 //     -> remove ephemeral worktree
 //     -> state considered durable
 //
-// Crash-safety: compact atomic state-transition receipts are written and updated
+// INVARIANT: canonical current-milestone.json == origin/main version
+//            BEFORE state PR merge. It is NEVER mutated locally before merge.
+//
+// Crash-safety: atomic state-transition receipts (v2) are written and updated
 // at each step. On restart, discoverPendingReceipts() finds any non-terminal receipt
-// and resumes progression of the state machine.
+// and advanceStateTransition() resumes progression one step at a time.
+//
+// Receipt v2 persists desiredFiles, authorizedHeadSha, and the full state needed
+// for recovery without caller memory.
 
-import { execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
+import { execFileSync } from 'node:child_process';
 import {
   existsSync,
   mkdirSync,
@@ -52,11 +62,21 @@ import {
 export const STATE_TRANSITIONS_DIR_NAME = 'state-transitions';
 export const STATE_WORKTREES_DIR_NAME = 'state-worktrees';
 
-/** How long to wait for PR CI before giving up (ms). */
-const LANDING_DEADLINE_MS = 600_000; // 10 minutes for state-only CI
+// Receipt v2 status values
+export const RECEIPT_STATUSES = {
+  REQUESTED: 'REQUESTED',
+  BRANCH_READY: 'BRANCH_READY',
+  BRANCH_PUSHED: 'BRANCH_PUSHED',
+  PR_READY: 'PR_READY',
+  WAITING_CI: 'WAITING_CI',
+  CI_AUTHORIZED: 'CI_AUTHORIZED',
+  MERGE_READY: 'MERGE_READY',
+  MERGE_REQUESTED: 'MERGE_REQUESTED',
+  MERGED: 'MERGED',
+  FAILED: 'FAILED',
+};
 
-/** Poll interval while waiting for CI (ms). */
-const LANDING_POLL_MS = 10_000;
+const TERMINAL_STATUSES = new Set([RECEIPT_STATUSES.MERGED, RECEIPT_STATUSES.FAILED]);
 
 // ── Default wrappers ──────────────────────────────────────────────────────────
 function defaultGh(args, { cwd } = {}) {
@@ -93,10 +113,6 @@ function defaultGit(args, { cwd } = {}) {
       status: e.status ?? 1,
     };
   }
-}
-
-function sleepSync(ms) {
-  Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms);
 }
 
 // ── Receipt persistence (atomic write) ─────────────────────────────────────────
@@ -144,6 +160,10 @@ export function hashFileChanges(fileChanges) {
   return h.digest('hex');
 }
 
+function computeContentSha256(content) {
+  return createHash('sha256').update(content).digest('hex');
+}
+
 // ── Whitelist validation ──────────────────────────────────────────────────────
 export function validateStateFiles(fileChanges) {
   const paths = fileChanges.map((f) => (typeof f === 'string' ? f : f.path));
@@ -162,7 +182,7 @@ export function discoverPendingReceipts(stateDir) {
     if (!name.startsWith('receipt-') || !name.endsWith('.json')) continue;
     try {
       const r = JSON.parse(readFileSync(join(dir, name), 'utf8'));
-      if (r.status !== 'merged' && r.status !== 'failed') {
+      if (!TERMINAL_STATUSES.has(r.status)) {
         pending.push(r);
       }
     } catch {
@@ -263,24 +283,30 @@ export function verifyMergeAuthoritatively({
 // ── Adopt Merged State ────────────────────────────────────────────────────────
 export function adoptMergedState({
   receipt,
-  fileChanges,
   stateDir,
   cwd,
   ghFn = defaultGh,
   gitFn = defaultGit,
   log = console.log,
 }) {
-  if (receipt.status === 'merged') {
+  if (receipt.status === RECEIPT_STATUSES.MERGED) {
     return { adopted: true, mergedSha: receipt.mergedSha };
   }
-  if (!receipt.pr) return { adopted: false, mergedSha: null };
+  if (!receipt.prNumber && !receipt.pr) return { adopted: false, mergedSha: null };
 
-  const changes = fileChanges ?? [];
+  // Extract fileChanges from receipt's desiredFiles
+  const fileChanges = (receipt.desiredFiles || []).map((f) => ({
+    path: f.path,
+    content: f.content,
+  }));
+
+  // Use authorizedHeadSha (correct) NOT sourceMainSha (wrong) as pinnedHead
+  const pinnedHead = receipt.authorizedHeadSha || null;
+
   const verification = verifyMergeAuthoritatively({
-    prNum: receipt.pr,
-    pinnedHead: receipt.sourceSha, // or state branch head
-    fileChanges: changes,
-    desiredFileHash: receipt.desiredFileHash,
+    prNum: receipt.prNumber ?? receipt.pr,
+    pinnedHead,
+    fileChanges,
     repoDir: cwd,
     ghFn,
     gitFn,
@@ -288,7 +314,7 @@ export function adoptMergedState({
   });
 
   if (verification.ok) {
-    receipt.status = 'merged';
+    receipt.status = RECEIPT_STATUSES.MERGED;
     receipt.mergedSha = verification.mergeCommitSha;
     writeReceipt(stateDir, receipt);
     return { adopted: true, mergedSha: receipt.mergedSha };
@@ -310,36 +336,110 @@ function cleanupStateWorktree({ worktreePath, stateBranch, repoDir, gitFn = defa
   } catch {}
 }
 
+// ── Legacy v1 receipt migration ───────────────────────────────────────────────
+function migrateV1Receipt(v1) {
+  if (v1.schema === 'foresift/state-transition@2') return v1;
+
+  // v1 receipts lack desiredFiles and authorizedHeadSha.
+  // If they have enough information we can migrate; otherwise block.
+  const v2 = {
+    schema: 'foresift/state-transition@2',
+    transitionId: v1.transitionId,
+    logicalTransitionKey: v1.transitionId, // best effort
+    packageId: v1.package ?? null,
+    fromStatus: v1.from ?? null,
+    toStatus: v1.to ?? null,
+    sourceMainSha: v1.sourceSha ?? null,
+    desiredFileHash: v1.desiredFileHash ?? null,
+    desiredFiles: [], // v1 did not persist these
+    commitMessage: null,
+    stateBranch: v1.stateBranch,
+    stateWorktree: null,
+    prNumber: v1.pr ?? null,
+    prUrl: v1.prUrl ?? null,
+    authorizedHeadSha: null, // v1 did not persist this
+    authorizedAt: null,
+    authorizedCheckName: null,
+    authorizedAppId: null,
+    status: mapV1Status(v1.status),
+    retryClass: null,
+    retryCount: 0,
+    nextRetryAt: null,
+    mergedSha: v1.mergedSha ?? null,
+    failedReason: v1.failedReason ?? null,
+    createdAt: v1.createdAt,
+    updatedAt: v1.updatedAt,
+  };
+
+  // If receipt is non-terminal and lacks desiredFiles, we can't safely proceed
+  if (!TERMINAL_STATUSES.has(v2.status) && v2.desiredFiles.length === 0) {
+    v2.status = RECEIPT_STATUSES.FAILED;
+    v2.failedReason = 'LEGACY_RECEIPT_BLOCKED: v1 receipt lacks desiredFiles for safe recovery';
+    v2.retryClass = 'TERMINAL_CORRUPTION';
+  }
+
+  return v2;
+}
+
+function mapV1Status(v1Status) {
+  const map = {
+    pending: RECEIPT_STATUSES.REQUESTED,
+    branch_created: RECEIPT_STATUSES.BRANCH_READY,
+    pr_created: RECEIPT_STATUSES.PR_READY,
+    ci_green: RECEIPT_STATUSES.CI_AUTHORIZED,
+    merged: RECEIPT_STATUSES.MERGED,
+    failed: RECEIPT_STATUSES.FAILED,
+  };
+  return map[v1Status] || RECEIPT_STATUSES.REQUESTED;
+}
+
 // ── Step-Based State Machine Advancement ──────────────────────────────────────
 /**
  * Advances a state landing transition by one deterministic step without blocking sleeps.
  * Designed for supervisor event-loop outbox execution.
  *
- * Lifecycle:
- *   INTENT / pending
+ * Receipt v2 lifecycle:
+ *   REQUESTED
  *     -> create isolated worktree ($STATE_DIR/state-worktrees/<transitionId>)
  *     -> apply file changes, stage, commit
- *     -> status = 'branch_created'
+ *     -> status = 'BRANCH_READY'
  *
- *   branch_created
+ *   BRANCH_READY
  *     -> push state branch to origin
+ *     -> status = 'BRANCH_PUSHED'
+ *
+ *   BRANCH_PUSHED
  *     -> create or discover PR on GitHub
- *     -> status = 'pr_created'
+ *     -> status = 'PR_READY'
  *
- *   pr_created / waiting_ci
- *     -> resolve exact remote HEAD SHA (pinSha)
+ *   PR_READY / WAITING_CI
+ *     -> resolve exact remote HEAD SHA
  *     -> query exact-head CI
- *     -> if green: status = 'ci_green'
- *     -> if failure/untrusted: status = 'failed'
- *     -> if pending: remain at 'pr_created'
+ *     -> if green: persist authorization, status = 'CI_AUTHORIZED'
+ *     -> if failure/untrusted: status = 'FAILED'
+ *     -> if pending: status = 'WAITING_CI', return immediately
  *
- *   ci_green
+ *   CI_AUTHORIZED
+ *     -> verify authorizedHeadSha still matches PR HEAD and remote branch HEAD
+ *     -> re-verify CI at authorizedHeadSha
+ *     -> if all checks pass: status = 'MERGE_READY'
+ *     -> if HEAD changed: clear authorization, status = 'WAITING_CI'
+ *
+ *   MERGE_READY
  *     -> execute squash merge via gh pr merge
+ *     -> status = 'MERGE_REQUESTED'
+ *
+ *   MERGE_REQUESTED
  *     -> authoritatively verify merge on origin/main
  *     -> cleanup worktree & branch
- *     -> status = 'merged'
+ *     -> status = 'MERGED'
  *
  * Returns { ok, receipt, step, reason }
+ *
+ * CRITICAL DESIGN INVARIANT:
+ *   - Transition identity (transitionId, sourceMainSha) is created ONCE at receipt creation.
+ *   - If an existingReceipt is provided, its identity is NEVER re-derived.
+ *   - A different origin/main appearing while state PR waits does NOT create another transition.
  */
 export function advanceStateTransition({
   receipt: existingReceipt = null,
@@ -357,90 +457,182 @@ export function advanceStateTransition({
   gitFn = defaultGit,
   log = console.log,
 } = {}) {
-  // 1. Validate file paths
-  const { ok: allowed, violations } = validateStateFiles(fileChanges);
-  if (!allowed) {
-    return {
-      ok: false,
-      reason: `state landing refused: non-whitelisted paths: ${violations.join(', ')}`,
-      receipt: null,
-      step: 'VALIDATION_FAILED',
-    };
+  // ── Migrate legacy v1 receipts ───────────────────────────────────────────────
+  if (existingReceipt && existingReceipt.schema === 'foresift/state-transition@1') {
+    existingReceipt = migrateV1Receipt(existingReceipt);
+    writeReceipt(stateDir, existingReceipt);
+    if (existingReceipt.status === RECEIPT_STATUSES.FAILED) {
+      return {
+        ok: false,
+        reason: existingReceipt.failedReason,
+        receipt: existingReceipt,
+        step: 'LEGACY_BLOCKED',
+      };
+    }
   }
 
-  // 2. Fetch and resolve current origin/main
-  const fetchRes = gitFn(['fetch', 'origin', 'main', '--quiet'], { cwd: repoDir });
-  if (!fetchRes.ok) {
-    return {
-      ok: false,
-      reason: `fetch origin main failed: ${fetchRes.stderr}`,
-      receipt: existingReceipt,
-      step: 'FETCH_FAILED',
-    };
-  }
+  // ── If existing receipt has identity, use it (F6: create once, never re-derive) ──
+  let receipt = existingReceipt;
+  let sourceMainSha;
+  let desiredFileHash;
+  let transitionId;
 
-  const revRes = gitFn(['rev-parse', 'origin/main'], { cwd: repoDir });
-  if (!revRes.ok || !revRes.stdout) {
-    return {
-      ok: false,
-      reason: 'rev-parse origin/main failed',
-      receipt: existingReceipt,
-      step: 'REV_PARSE_FAILED',
-    };
-  }
-  const sourceSha = revRes.stdout.trim();
+  if (receipt && receipt.transitionId) {
+    // EXISTING RECEIPT: use its persisted identity
+    sourceMainSha = receipt.sourceMainSha ?? receipt.sourceSha;
+    desiredFileHash = receipt.desiredFileHash;
+    transitionId = receipt.transitionId;
 
-  // 3. Compute desired file hash for idempotency
-  const desiredFileHash = hashFileChanges(fileChanges);
-  const transitionId = [
-    packageId ?? 'milestone',
-    fromStatus ?? 'unknown',
-    toStatus ?? 'unknown',
-    sourceSha.slice(0, 8),
-    desiredFileHash.slice(0, 8),
-  ].join('-');
+    // Use desiredFiles from receipt if caller didn't provide fileChanges
+    if ((!fileChanges || fileChanges.length === 0) && receipt.desiredFiles?.length > 0) {
+      fileChanges = receipt.desiredFiles.map((f) => ({ path: f.path, content: f.content }));
+    }
+  } else {
+    // NEW RECEIPT: fetch origin/main ONCE, create identity
+    // 1. Validate file paths
+    const { ok: allowed, violations } = validateStateFiles(fileChanges);
+    if (!allowed) {
+      return {
+        ok: false,
+        reason: `state landing refused: non-whitelisted paths: ${violations.join(', ')}`,
+        receipt: null,
+        step: 'VALIDATION_FAILED',
+      };
+    }
 
-  let receipt = existingReceipt || readReceipt(stateDir, transitionId);
+    // 2. Fetch and resolve current origin/main ONCE
+    const fetchRes = gitFn(['fetch', 'origin', 'main', '--quiet'], { cwd: repoDir });
+    if (!fetchRes.ok) {
+      return {
+        ok: false,
+        reason: `fetch origin main failed: ${fetchRes.stderr}`,
+        receipt: null,
+        step: 'FETCH_FAILED',
+      };
+    }
 
-  // 4. If already merged, return immediately
-  if (receipt && receipt.status === 'merged') {
-    return { ok: true, receipt, step: 'DONE' };
-  }
+    const revRes = gitFn(['rev-parse', 'origin/main'], { cwd: repoDir });
+    if (!revRes.ok || !revRes.stdout) {
+      return {
+        ok: false,
+        reason: 'rev-parse origin/main failed',
+        receipt: null,
+        step: 'REV_PARSE_FAILED',
+      };
+    }
+    sourceMainSha = revRes.stdout.trim();
 
-  // Initialize receipt if not present
-  if (!receipt) {
-    const stateBranch = `state/chore/${transitionId}`;
-    receipt = {
-      schema: 'foresift/state-transition@1',
-      transitionId,
-      package: packageId,
-      from: fromStatus,
-      to: toStatus,
-      sourceSha,
-      stateBranch,
-      pr: null,
-      prUrl: null,
-      desiredFileHash,
-      status: 'pending',
-      mergedSha: null,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-    };
-    writeReceipt(stateDir, receipt);
+    // 3. Compute desired file hash for idempotency
+    desiredFileHash = hashFileChanges(fileChanges);
+
+    // 4. Build stable logical transition key (does NOT include sourceMainSha)
+    const logicalTransitionKey = [
+      packageId ?? 'milestone',
+      fromStatus ?? 'unknown',
+      toStatus ?? 'unknown',
+      desiredFileHash.slice(0, 12),
+    ].join('-');
+
+    // 5. Build transitionId (includes sourceMainSha for uniqueness)
+    transitionId = [
+      packageId ?? 'milestone',
+      fromStatus ?? 'unknown',
+      toStatus ?? 'unknown',
+      sourceMainSha.slice(0, 8),
+      desiredFileHash.slice(0, 8),
+    ].join('-');
+
+    // Check for existing receipt with same transitionId
+    receipt = readReceipt(stateDir, transitionId);
+
+    // Already merged? Return immediately
+    if (receipt && receipt.status === RECEIPT_STATUSES.MERGED) {
+      return { ok: true, receipt, step: 'DONE' };
+    }
+
+    // Also check for existing receipt with same logicalTransitionKey but different sourceMainSha
+    // (This prevents creating a second transition if main advanced)
+    if (!receipt) {
+      const allPending = discoverPendingReceipts(stateDir);
+      const existingLogical = allPending.find(
+        (r) => r.logicalTransitionKey === logicalTransitionKey,
+      );
+      if (existingLogical) {
+        // Reuse the existing transition — do NOT create a second one
+        receipt = existingLogical;
+        transitionId = receipt.transitionId;
+        sourceMainSha = receipt.sourceMainSha;
+        desiredFileHash = receipt.desiredFileHash;
+        log(
+          `state-landing: reusing existing transition ${transitionId} (main advanced but logical key matches)`,
+        );
+      }
+    }
+
+    // Initialize receipt if not present
+    if (!receipt) {
+      const stateBranch = `state/chore/${transitionId}`;
+      const worktreePath = join(worktreesBaseDir(stateDir), transitionId);
+
+      receipt = {
+        schema: 'foresift/state-transition@2',
+        transitionId,
+        logicalTransitionKey,
+        packageId,
+        fromStatus,
+        toStatus,
+        sourceMainSha,
+        desiredFileHash,
+        desiredFiles: fileChanges.map((f) => ({
+          path: f.path,
+          content: f.content,
+          contentSha256: computeContentSha256(f.content),
+        })),
+        commitMessage: message,
+        stateBranch,
+        stateWorktree: worktreePath,
+        prNumber: null,
+        prUrl: null,
+        authorizedHeadSha: null,
+        authorizedAt: null,
+        authorizedCheckName: null,
+        authorizedAppId: null,
+        status: RECEIPT_STATUSES.REQUESTED,
+        retryClass: null,
+        retryCount: 0,
+        nextRetryAt: null,
+        mergedSha: null,
+        failedReason: null,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      };
+      writeReceipt(stateDir, receipt);
+    }
   }
 
   const { stateBranch } = receipt;
-  const worktreePath = join(worktreesBaseDir(stateDir), transitionId);
+  const worktreePath = receipt.stateWorktree || join(worktreesBaseDir(stateDir), transitionId);
 
-  // ── Step: pending -> branch_created (in isolated worktree) ──────────────────
-  if (receipt.status === 'pending') {
+  // ── Step: REQUESTED -> BRANCH_READY (in isolated worktree) ──────────────────
+  if (receipt.status === RECEIPT_STATUSES.REQUESTED) {
     mkdirSync(worktreesBaseDir(stateDir), { recursive: true });
 
     // Clean up any stale worktree or branch
     cleanupStateWorktree({ worktreePath, stateBranch, repoDir, gitFn });
 
-    // Create isolated worktree on new state branch from sourceSha
-    const wtAdd = gitFn(['worktree', 'add', '-b', stateBranch, worktreePath, sourceSha], {
+    // Need a valid sourceMainSha to create worktree from
+    const srcSha = receipt.sourceMainSha || sourceMainSha;
+    if (!srcSha) {
+      return {
+        ok: false,
+        reason: 'no sourceMainSha available for worktree creation',
+        receipt,
+        step: 'MISSING_SOURCE_SHA',
+      };
+    }
+
+    // Create isolated worktree on new state branch from sourceMainSha
+    const wtAdd = gitFn(['worktree', 'add', '-b', stateBranch, worktreePath, srcSha], {
       cwd: repoDir,
     });
     if (!wtAdd.ok) {
@@ -478,14 +670,15 @@ export function advanceStateTransition({
     const diffRes = gitFn(['diff', '--cached', '--quiet'], { cwd: worktreePath });
     if (diffRes.ok) {
       // Nothing staged — state already matches origin/main!
-      receipt.status = 'merged';
-      receipt.mergedSha = sourceSha;
+      receipt.status = RECEIPT_STATUSES.MERGED;
+      receipt.mergedSha = srcSha;
       writeReceipt(stateDir, receipt);
       cleanupStateWorktree({ worktreePath, stateBranch, repoDir, gitFn });
       return { ok: true, receipt, step: 'ALREADY_CURRENT' };
     }
 
     // Commit changes in worktree
+    const commitMsg = receipt.commitMessage || message;
     const commitRes = gitFn(
       [
         '-c',
@@ -494,7 +687,7 @@ export function advanceStateTransition({
         'user.email=autopilot@foresift.local',
         'commit',
         '-m',
-        message,
+        commitMsg,
         '--quiet',
       ],
       { cwd: worktreePath },
@@ -508,18 +701,21 @@ export function advanceStateTransition({
       };
     }
 
-    receipt.status = 'branch_created';
+    receipt.status = RECEIPT_STATUSES.BRANCH_READY;
     writeReceipt(stateDir, receipt);
-    return { ok: true, receipt, step: 'BRANCH_CREATED' };
+    return { ok: true, receipt, step: 'BRANCH_READY' };
   }
 
-  // ── Step: branch_created -> pr_created ─────────────────────────────────────
-  if (receipt.status === 'branch_created') {
-    // Push branch to origin
+  // ── Step: BRANCH_READY -> BRANCH_PUSHED ─────────────────────────────────────
+  if (receipt.status === RECEIPT_STATUSES.BRANCH_READY) {
     const pushRes = gitFn(['push', '-u', 'origin', stateBranch, '--quiet', '--force-with-lease'], {
       cwd: repoDir,
     });
     if (!pushRes.ok) {
+      receipt.retryCount = (receipt.retryCount || 0) + 1;
+      receipt.retryClass = 'RETRYABLE';
+      receipt.nextRetryAt = new Date(Date.now() + 30_000).toISOString();
+      writeReceipt(stateDir, receipt);
       return {
         ok: false,
         reason: `push state branch failed: ${pushRes.stderr}`,
@@ -528,6 +724,13 @@ export function advanceStateTransition({
       };
     }
 
+    receipt.status = RECEIPT_STATUSES.BRANCH_PUSHED;
+    writeReceipt(stateDir, receipt);
+    return { ok: true, receipt, step: 'BRANCH_PUSHED' };
+  }
+
+  // ── Step: BRANCH_PUSHED -> PR_READY ─────────────────────────────────────────
+  if (receipt.status === RECEIPT_STATUSES.BRANCH_PUSHED) {
     // Discover or create PR
     let prNum = null;
     const listPrRes = ghFn(
@@ -550,7 +753,9 @@ export function advanceStateTransition({
     }
 
     if (!prNum) {
-      const createPrRes = ghFn(
+      const srcSha = receipt.sourceMainSha || sourceMainSha;
+      const commitMsg = receipt.commitMessage || message;
+      let createPrRes = ghFn(
         [
           'pr',
           'create',
@@ -559,14 +764,31 @@ export function advanceStateTransition({
           '--base',
           'main',
           '--title',
-          message,
+          commitMsg,
           '--body',
-          `Automated state-only chore.\n\nTransition: \`${transitionId}\`\nSource SHA: \`${sourceSha}\`\n\n> This PR was created by the Foresift supervisor state-landing lane.\n> It contains ONLY whitelisted control-plane state files.\n> Merging via required CI + squash-merge.`,
+          `Automated state-only chore.\n\nTransition: \`${transitionId}\`\nSource SHA: \`${srcSha}\`\n\n> This PR was created by the Foresift supervisor state-landing lane.\n> It contains ONLY whitelisted control-plane state files.\n> Merging via required CI + squash-merge.`,
           '--label',
           'state-only',
         ],
         { cwd: repoDir },
       );
+      if (!createPrRes.ok) {
+        createPrRes = ghFn(
+          [
+            'pr',
+            'create',
+            '--head',
+            stateBranch,
+            '--base',
+            'main',
+            '--title',
+            commitMsg,
+            '--body',
+            `Automated state-only chore.\n\nTransition: \`${transitionId}\`\nSource SHA: \`${srcSha}\`\n\n> This PR was created by the Foresift supervisor state-landing lane.\n> It contains ONLY whitelisted control-plane state files.\n> Merging via required CI + squash-merge.`,
+          ],
+          { cwd: repoDir },
+        );
+      }
       if (createPrRes.ok) {
         const m = /\/pull\/(\d+)/.exec(createPrRes.stdout.split('\n').pop() ?? '');
         if (m) prNum = m[1];
@@ -574,29 +796,40 @@ export function advanceStateTransition({
     }
 
     if (!prNum) {
-      // Transient PR creation refusal — remain at branch_created for retry
+      // Transient PR creation refusal — remain at BRANCH_PUSHED for retry
+      receipt.retryCount = (receipt.retryCount || 0) + 1;
+      receipt.retryClass = 'RETRYABLE';
+      receipt.nextRetryAt = new Date(Date.now() + 30_000).toISOString();
+      writeReceipt(stateDir, receipt);
       return { ok: false, reason: 'pr-creation-pending', receipt, step: 'PR_PENDING' };
     }
 
-    receipt.pr = prNum;
-    receipt.status = 'pr_created';
+    receipt.prNumber = prNum;
+    receipt.status = RECEIPT_STATUSES.PR_READY;
     writeReceipt(stateDir, receipt);
-    return { ok: true, receipt, step: 'PR_CREATED' };
+    return { ok: true, receipt, step: 'PR_READY' };
   }
 
-  // ── Step: pr_created -> ci_green (query CI) ────────────────────────────────
-  if (receipt.status === 'pr_created') {
-    // Resolve exact HEAD SHA (pinSha)
+  // ── Step: PR_READY / WAITING_CI -> CI_AUTHORIZED ────────────────────────────
+  if (
+    receipt.status === RECEIPT_STATUSES.PR_READY ||
+    receipt.status === RECEIPT_STATUSES.WAITING_CI
+  ) {
+    // Resolve exact HEAD SHA of the state branch on remote
     let pinSha = null;
-    const revRemote = gitFn(['rev-parse', `origin/${stateBranch}`], { cwd: repoDir });
-    if (revRemote.ok && revRemote.stdout) {
-      pinSha = revRemote.stdout.trim();
-    } else {
+    const fetchBranchRes = gitFn(['fetch', 'origin', stateBranch, '--quiet'], { cwd: repoDir });
+    if (fetchBranchRes.ok) {
+      const revRemote = gitFn(['rev-parse', `origin/${stateBranch}`], { cwd: repoDir });
+      if (revRemote.ok && revRemote.stdout) {
+        pinSha = revRemote.stdout.trim();
+      }
+    }
+    if (!pinSha) {
       const revLocal = gitFn(['rev-parse', stateBranch], { cwd: repoDir });
       if (revLocal.ok && revLocal.stdout) pinSha = revLocal.stdout.trim();
     }
 
-    // CRITICAL DEFECT #1: NO SHA MUST NEVER BECOME CI GREEN! Fail closed.
+    // FAIL CLOSED: NO SHA MUST NEVER BECOME CI GREEN!
     if (!pinSha) {
       return {
         ok: false,
@@ -616,16 +849,22 @@ export function advanceStateTransition({
     });
 
     if (verdict.ok && verdict.state === 'SUCCESS') {
-      receipt.status = 'ci_green';
+      // F4: Persist authorization BEFORE moving to CI_AUTHORIZED
+      receipt.authorizedHeadSha = pinSha;
+      receipt.authorizedAt = new Date().toISOString();
+      receipt.authorizedCheckName = checkName;
+      receipt.authorizedAppId = requiredAppId;
+      receipt.status = RECEIPT_STATUSES.CI_AUTHORIZED;
       writeReceipt(stateDir, receipt);
-      return { ok: true, receipt, step: 'CI_GREEN', pinSha };
+      return { ok: true, receipt, step: 'CI_AUTHORIZED', pinSha };
     }
 
     if (verdict.state === 'FAILURE' || verdict.state === 'UNTRUSTED') {
-      receipt.status = 'failed';
+      receipt.status = RECEIPT_STATUSES.FAILED;
       receipt.failedReason = `CI ${verdict.state}: ${verdict.reason}`;
+      receipt.retryClass = 'AUTHORITY_REFUSAL';
       writeReceipt(stateDir, receipt);
-      cleanupStateWorktree({ worktreePath, stateBranch, repoDir, gitFn });
+      // Do NOT destroy worktree on authority refusal — preserve evidence
       return {
         ok: false,
         reason: `state PR CI failed at ${pinSha}: ${verdict.reason}`,
@@ -634,23 +873,124 @@ export function advanceStateTransition({
       };
     }
 
-    // Still pending / running
+    // Still pending / running — mark WAITING_CI and return immediately (NO BLOCKING)
+    receipt.status = RECEIPT_STATUSES.WAITING_CI;
+    receipt.nextRetryAt = new Date(Date.now() + 15_000).toISOString();
+    writeReceipt(stateDir, receipt);
     return { ok: false, reason: 'waiting-for-ci', receipt, step: 'WAITING_CI', pinSha };
   }
 
-  // ── Step: ci_green -> merged (squash merge + authoritative verification) ────
-  if (receipt.status === 'ci_green') {
-    // Check pinSha
-    let pinSha = null;
-    const revRemote = gitFn(['rev-parse', `origin/${stateBranch}`], { cwd: repoDir });
-    if (revRemote.ok && revRemote.stdout) pinSha = revRemote.stdout.trim();
+  // ── Step: CI_AUTHORIZED -> MERGE_READY ──────────────────────────────────────
+  if (receipt.status === RECEIPT_STATUSES.CI_AUTHORIZED) {
+    // F4/F8: TOCTOU guard — verify authorizedHeadSha still matches PR HEAD
+    const prViewRes = ghFn(
+      ['pr', 'view', String(receipt.prNumber), '--json', 'state,headRefOid,baseRefName'],
+      { cwd: repoDir },
+    );
+    if (!prViewRes.ok) {
+      return {
+        ok: false,
+        reason: `cannot query PR for TOCTOU check: ${prViewRes.stderr}`,
+        receipt,
+        step: 'TOCTOU_QUERY_FAILED',
+      };
+    }
 
-    // 1. Invoke merge command
-    const mergeRes = ghFn(['pr', 'merge', String(receipt.pr), '--squash', '--delete-branch'], {
+    let prData;
+    try {
+      prData = JSON.parse(prViewRes.stdout);
+    } catch {
+      return {
+        ok: false,
+        reason: 'PR query unparseable',
+        receipt,
+        step: 'TOCTOU_QUERY_FAILED',
+      };
+    }
+
+    // Check 1: PR headRefOid matches authorizedHeadSha
+    if (prData.headRefOid !== receipt.authorizedHeadSha) {
+      log(
+        `state-landing TOCTOU: PR HEAD (${prData.headRefOid}) !== authorized (${receipt.authorizedHeadSha}). Clearing authorization.`,
+      );
+      receipt.authorizedHeadSha = null;
+      receipt.authorizedAt = null;
+      receipt.status = RECEIPT_STATUSES.WAITING_CI;
+      writeReceipt(stateDir, receipt);
+      return {
+        ok: false,
+        reason: `HEAD changed: authorized=${receipt.authorizedHeadSha}, actual=${prData.headRefOid}`,
+        receipt,
+        step: 'HEAD_CHANGED',
+      };
+    }
+
+    // Check 2: Remote state branch HEAD matches authorizedHeadSha
+    const fetchBranchRes = gitFn(['fetch', 'origin', stateBranch, '--quiet'], { cwd: repoDir });
+    if (fetchBranchRes.ok) {
+      const revRemote = gitFn(['rev-parse', `origin/${stateBranch}`], { cwd: repoDir });
+      if (revRemote.ok && revRemote.stdout) {
+        const remoteBranchHead = revRemote.stdout.trim();
+        if (remoteBranchHead !== receipt.authorizedHeadSha) {
+          log(
+            `state-landing TOCTOU: remote branch HEAD (${remoteBranchHead}) !== authorized (${receipt.authorizedHeadSha}). Clearing authorization.`,
+          );
+          receipt.authorizedHeadSha = null;
+          receipt.authorizedAt = null;
+          receipt.status = RECEIPT_STATUSES.WAITING_CI;
+          writeReceipt(stateDir, receipt);
+          return {
+            ok: false,
+            reason: `remote branch HEAD changed`,
+            receipt,
+            step: 'HEAD_CHANGED',
+          };
+        }
+      }
+    }
+
+    // Check 3: Re-verify CI at authorizedHeadSha
+    const reVerdict = getExactHeadCiStatus({
+      sha: receipt.authorizedHeadSha,
+      repo,
+      checkName: receipt.authorizedCheckName || checkName,
+      requiredAppId: receipt.authorizedAppId || requiredAppId,
       cwd: repoDir,
+      ghFn,
     });
-    // CRITICAL DEFECT #2: CHECK MERGE COMMAND EXIT CODE!
+
+    if (!reVerdict.ok || reVerdict.state !== 'SUCCESS') {
+      receipt.authorizedHeadSha = null;
+      receipt.authorizedAt = null;
+      receipt.status = RECEIPT_STATUSES.WAITING_CI;
+      writeReceipt(stateDir, receipt);
+      return {
+        ok: false,
+        reason: `CI re-verification failed for ${receipt.authorizedHeadSha}`,
+        receipt,
+        step: 'CI_REVERIFY_FAILED',
+      };
+    }
+
+    receipt.status = RECEIPT_STATUSES.MERGE_READY;
+    writeReceipt(stateDir, receipt);
+    return { ok: true, receipt, step: 'MERGE_READY' };
+  }
+
+  // ── Step: MERGE_READY -> MERGE_REQUESTED ────────────────────────────────────
+  if (receipt.status === RECEIPT_STATUSES.MERGE_READY) {
+    const mergeRes = ghFn(
+      ['pr', 'merge', String(receipt.prNumber), '--squash', '--delete-branch'],
+      { cwd: repoDir },
+    );
     if (!mergeRes.ok) {
+      // Merge rejected — may be transient or authority issue
+      if (mergeRes.status === 1) {
+        receipt.retryCount = (receipt.retryCount || 0) + 1;
+        receipt.retryClass = 'RETRYABLE';
+        receipt.nextRetryAt = new Date(Date.now() + 30_000).toISOString();
+        writeReceipt(stateDir, receipt);
+      }
       return {
         ok: false,
         reason: `gh pr merge failed (exit ${mergeRes.status}): ${mergeRes.stderr || mergeRes.stdout}`,
@@ -659,12 +999,25 @@ export function advanceStateTransition({
       };
     }
 
-    // 2. Authoritative post-merge verification
+    receipt.status = RECEIPT_STATUSES.MERGE_REQUESTED;
+    writeReceipt(stateDir, receipt);
+    return { ok: true, receipt, step: 'MERGE_REQUESTED' };
+  }
+
+  // ── Step: MERGE_REQUESTED -> MERGED (authoritative verification) ────────────
+  if (receipt.status === RECEIPT_STATUSES.MERGE_REQUESTED) {
+    const verifyFileChanges = (receipt.desiredFiles || []).map((f) => ({
+      path: f.path,
+      content: f.content,
+    }));
+
+    // If desiredFiles are empty, use caller-provided fileChanges as fallback
+    const changes = verifyFileChanges.length > 0 ? verifyFileChanges : fileChanges || [];
+
     const verification = verifyMergeAuthoritatively({
-      prNum: receipt.pr,
-      pinnedHead: pinSha,
-      fileChanges,
-      desiredFileHash,
+      prNum: receipt.prNumber,
+      pinnedHead: receipt.authorizedHeadSha,
+      fileChanges: changes,
       repoDir,
       ghFn,
       gitFn,
@@ -680,7 +1033,7 @@ export function advanceStateTransition({
       };
     }
 
-    receipt.status = 'merged';
+    receipt.status = RECEIPT_STATUSES.MERGED;
     receipt.mergedSha = verification.mergeCommitSha;
     writeReceipt(stateDir, receipt);
 
@@ -698,87 +1051,32 @@ export function advanceStateTransition({
   };
 }
 
-// ── Main synchronous / polling entrypoint for state landing ──────────────────
-export function landStateViaPR({
-  fileChanges,
-  message,
+// ── Startup recovery ──────────────────────────────────────────────────────────
+/**
+ * On startup, discover non-terminal receipts and resume each one.
+ * This MUST actually advance each receipt, not just log.
+ */
+export function recoverPendingStateLandings({
   stateDir,
   repoDir,
-  packageId = null,
-  fromStatus = null,
-  toStatus = null,
+  cwd,
   repo = DEFAULT_REPO,
   checkName = DEFAULT_REQUIRED_CHECK,
   requiredAppId = DEFAULT_REQUIRED_APP_ID,
-  log = console.log,
-  deadlineMs = LANDING_DEADLINE_MS,
-  pollMs = LANDING_POLL_MS,
-  ghFn = defaultGh,
-  gitFn = defaultGit,
-} = {}) {
-  const start = Date.now();
-
-  while (Date.now() - start < deadlineMs) {
-    const res = advanceStateTransition({
-      fileChanges,
-      message,
-      stateDir,
-      repoDir,
-      packageId,
-      fromStatus,
-      toStatus,
-      repo,
-      checkName,
-      requiredAppId,
-      ghFn,
-      gitFn,
-      log,
-    });
-
-    if (res.receipt?.status === 'merged') {
-      return { ok: true, receipt: res.receipt };
-    }
-
-    if (
-      res.receipt?.status === 'failed' ||
-      res.step === 'CI_FAILED' ||
-      res.step === 'VALIDATION_FAILED' ||
-      res.step === 'MERGE_FAILED' ||
-      res.step === 'MERGE_VERIFICATION_FAILED' ||
-      res.step === 'MISSING_PIN_SHA'
-    ) {
-      return { ok: false, reason: res.reason, receipt: res.receipt };
-    }
-
-    if (res.step === 'WAITING_CI' || res.step === 'PR_PENDING') {
-      sleepSync(pollMs);
-      continue;
-    }
-
-    // Immediate progression to next step
-  }
-
-  return { ok: false, reason: 'state-landing-deadline-exceeded', receipt: null };
-}
-
-// ── Startup recovery ──────────────────────────────────────────────────────────
-export function recoverPendingStateLandings({
-  stateDir,
-  cwd,
   ghFn = defaultGh,
   gitFn = defaultGit,
   log = console.log,
 }) {
   const pending = discoverPendingReceipts(stateDir);
   const results = [];
+  const effectiveRepoDir = repoDir || cwd;
 
   for (const receipt of pending) {
-    // Attempt merge adoption first
+    // Attempt merge adoption first (handles remote PR already MERGED but receipt stale)
     const adoption = adoptMergedState({
       receipt,
-      fileChanges: [],
       stateDir,
-      cwd,
+      cwd: effectiveRepoDir,
       ghFn,
       gitFn,
       log,
@@ -792,9 +1090,41 @@ export function recoverPendingStateLandings({
       continue;
     }
 
-    // If not merged yet on remote, advance the state machine one step
-    log(`state-landing recovery: ${receipt.transitionId} — resuming from status=${receipt.status}`);
-    results.push({ receipt, adopted: false, reason: `resumed (status=${receipt.status})` });
+    // If not merged yet on remote, actually advance the state machine one step
+    log(
+      `state-landing recovery: ${receipt.transitionId} — advancing from status=${receipt.status}`,
+    );
+
+    // Extract fileChanges from receipt's desiredFiles for advancement
+    const fileChanges = (receipt.desiredFiles || []).map((f) => ({
+      path: f.path,
+      content: f.content,
+    }));
+
+    const advanceResult = advanceStateTransition({
+      receipt,
+      fileChanges,
+      message: receipt.commitMessage || `chore: resume state transition ${receipt.transitionId}`,
+      stateDir,
+      repoDir: effectiveRepoDir,
+      packageId: receipt.packageId,
+      fromStatus: receipt.fromStatus,
+      toStatus: receipt.toStatus,
+      repo,
+      checkName,
+      requiredAppId,
+      ghFn,
+      gitFn,
+      log,
+    });
+
+    results.push({
+      receipt: advanceResult.receipt || receipt,
+      adopted: false,
+      advanced: true,
+      step: advanceResult.step,
+      reason: advanceResult.reason || `advanced (step=${advanceResult.step})`,
+    });
   }
 
   return results;

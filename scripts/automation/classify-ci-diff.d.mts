@@ -1,7 +1,5 @@
 // classify-ci-diff.d.mts — Type declarations for semantic CI classifier.
 
-export declare const ALLOWED_STATUS_TRANSITIONS: Set<string>;
-
 export function compareMilestoneJsonSemantic(
   before: unknown,
   after: unknown,

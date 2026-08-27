@@ -12,7 +12,7 @@ export interface LaunchIntent {
   branch: string;
   sourceSha?: string | null;
   runId: string | null;
-  status: 'INTENT_DURABLE' | 'RUN_ASSOCIATED' | 'MERGED' | 'FAILED';
+  status: 'INTENT_DURABLE' | 'RUN_ASSOCIATED' | 'MERGED' | 'FAILED' | 'RECONCILIATION_BLOCKED';
   mergedSha?: string | null;
   createdAt: string;
   updatedAt: string;
@@ -47,6 +47,8 @@ export function markIntentComplete(
 export function discoverPendingLaunchIntents(stateDir: string): LaunchIntent[];
 
 export function isPackageLaunchInFlight(stateDir: string, packageId: string): boolean;
+
+export function runMatchesLaunchIntent(intent: LaunchIntent, run: Record<string, unknown>): boolean;
 
 export function reconcileLaunchIntentsOnStartup(
   stateDir: string,

@@ -97,7 +97,12 @@ import {
   validateBunMigrationProof,
 } from './bun-migration-state.mjs';
 import { getMainCiStatus } from './ci-authority.mjs';
-import { landStateViaPR, recoverPendingStateLandings } from './state-landing.mjs';
+import {
+  advanceStateTransition,
+  discoverPendingReceipts,
+  recoverPendingStateLandings,
+} from './state-landing.mjs';
+import { serializeMilestoneState } from './schema.mjs';
 import { auditGitHubProtection } from './audit-github-protection.mjs';
 import {
   createLaunchIntent,
@@ -340,86 +345,136 @@ function refreshMain() {
 /**
  * HARD LAW: NORMAL AUTOPILOT NEVER DIRECT-PUSHES A NEW COMMIT TO PROTECTED MAIN.
  *
- * All state mutation goes through the protected state-landing PR lane:
- *   state branch → push → PR → exact-head CI → squash merge → refresh
+ * CI Authority Correctness V2: state transitions are ENTIRELY in-memory.
  *
- * This replaces the old `commitState()` which attempted `git push origin main`.
- * The transition is crash-safe and idempotent via the state-transition receipt.
+ * The old pattern mutated canonical current-milestone.json on disk, staged it,
+ * read content, reset, then called blocking landStateViaPR(). This violated:
+ *   F1 — referenced removed validateDirectMainPushWhitelist symbol
+ *   F2 — mutated canonical file before merge
+ *   F3 — called blocking 10-minute polling loop
  *
- * @param {string} pathspec - git pathspec for files to stage (e.g. 'specs/implementation')
+ * New design:
+ *   1. Caller modifies the in-memory milestone object
+ *   2. requestMilestoneStateTransition() serializes it deterministically
+ *   3. Calls advanceStateTransition() which advances ONE step and returns immediately
+ *   4. Canonical current-milestone.json on disk is NEVER written until merge is verified
+ *   5. Normal supervisor ticks call advanceStateLandings() to progress pending transitions
+ *
+ * @param {object} ms - in-memory milestone state object
  * @param {string} message - commit message / PR title
  * @param {{ packageId?: string, fromStatus?: string, toStatus?: string }} [meta]
  */
-function commitStateViaPR(
-  pathspec,
+function requestMilestoneStateTransition(
+  ms,
   message,
   { packageId = null, fromStatus = null, toStatus = null } = {},
 ) {
   enqueue(async () => {
-    // Stage files to read current content
-    const addResult = sh(`git add ${pathspec}`);
-    if (!addResult.ok) return log('WARN: git add failed for state landing');
+    // Serialize desired state deterministically (in-memory only — no disk write)
+    const desiredContent = serializeMilestoneState(ms);
+    const fileChanges = [
+      { path: 'specs/implementation/current-milestone.json', content: desiredContent },
+    ];
 
-    // Check if there's actually anything staged
-    if (sh('git diff --cached --quiet').ok) {
-      sh('git reset -q');
-      return; // nothing to commit — already matches working tree
-    }
-
-    // Collect staged files and their new contents
-    const staged = sh('git diff --cached --name-only').out.split('\n').filter(Boolean);
-    const wl = validateDirectMainPushWhitelist(staged);
-    if (!wl.allowed) {
-      sh('git reset -q');
-      log(`WARN: state landing refused (non-whitelist files): ${wl.reason}`);
-      return;
-    }
-
-    // Capture file contents BEFORE resetting the index
-    const fileChanges = [];
-    for (const filePath of staged) {
-      try {
-        const { readFileSync: rf } = await import('node:fs');
-        fileChanges.push({ path: filePath, content: rf(join(REPO, filePath), 'utf8') });
-      } catch (e) {
-        log(`WARN: could not read staged file ${filePath}: ${e.message}`);
+    // Progress state transition as far as possible without blocking (returns on WAITING_CI, DONE, or error)
+    let currentReceipt = null;
+    let result = null;
+    for (let i = 0; i < 10; i++) {
+      result = advanceStateTransition({
+        receipt: currentReceipt,
+        fileChanges,
+        message,
+        stateDir: STATE_DIR,
+        repoDir: REPO,
+        packageId,
+        fromStatus,
+        toStatus,
+        log: (msg) => log(msg),
+      });
+      currentReceipt = result.receipt || currentReceipt;
+      if (
+        !result.ok ||
+        result.step === 'DONE' ||
+        result.step === 'WAITING_CI' ||
+        result.step === 'PR_PENDING'
+      ) {
+        break;
       }
     }
 
-    // Reset the index so the working tree is clean for landing
-    sh('git reset -q');
-
-    if (fileChanges.length === 0) {
-      log('WARN: state landing: no file contents captured');
-      return;
-    }
-
-    // Use the protected state-landing PR lane
-    const result = landStateViaPR({
-      fileChanges,
-      message,
-      stateDir: STATE_DIR,
-      repoDir: REPO,
-      packageId,
-      fromStatus,
-      toStatus,
-      log: (msg) => log(msg),
-    });
-
-    if (result.ok) {
+    if (result?.ok && result.step === 'DONE') {
       log(`state landing complete: ${result.receipt?.transitionId} → ${result.receipt?.mergedSha}`);
       // Refresh local main to pick up the merged commit
       sh('git fetch origin main --quiet');
       if (!sh('git merge --ff-only origin/main').ok)
         log('WARN: could not fast-forward after state landing');
-    } else {
-      log(`WARN: state landing failed: ${result.reason}`);
+    } else if (result?.ok) {
+      log(`state transition advanced: ${result.receipt?.transitionId} → step=${result.step}`);
+    } else if (result && result.step !== 'WAITING_CI' && result.step !== 'PR_PENDING') {
+      log(`WARN: state landing step failed: ${result.reason} (step=${result.step})`);
     }
   });
 }
 
-// Keep legacy name as alias: the supervisory loop uses commitStateViaPR (PR lane).
-const commitState = commitStateViaPR;
+/**
+ * Advance all pending state landings by one step each.
+ * Called once per supervisor tick. Each transition advances at most one external step
+ * and returns immediately. No blocking waits.
+ */
+function advanceStateLandings() {
+  const pending = discoverPendingReceipts(STATE_DIR);
+  for (const receipt of pending) {
+    // Check retry backoff
+    if (receipt.nextRetryAt && new Date(receipt.nextRetryAt) > new Date()) continue;
+
+    // Extract desiredFiles from receipt
+    const fileChanges = (receipt.desiredFiles || []).map((f) => ({
+      path: f.path,
+      content: f.content,
+    }));
+
+    let currentReceipt = receipt;
+    let result = null;
+    for (let i = 0; i < 10; i++) {
+      result = advanceStateTransition({
+        receipt: currentReceipt,
+        fileChanges,
+        message:
+          currentReceipt.commitMessage || `chore: state transition ${currentReceipt.transitionId}`,
+        stateDir: STATE_DIR,
+        repoDir: REPO,
+        packageId: currentReceipt.packageId,
+        fromStatus: currentReceipt.fromStatus,
+        toStatus: currentReceipt.toStatus,
+        log: (msg) => log(msg),
+      });
+      currentReceipt = result.receipt || currentReceipt;
+      if (
+        !result.ok ||
+        result.step === 'DONE' ||
+        result.step === 'WAITING_CI' ||
+        result.step === 'PR_PENDING'
+      ) {
+        break;
+      }
+    }
+
+    if (result?.ok && result.step === 'DONE') {
+      log(`state landing complete: ${receipt.transitionId} → ${result.receipt?.mergedSha}`);
+      // Refresh local main to pick up the merged commit
+      sh('git fetch origin main --quiet');
+      if (!sh('git merge --ff-only origin/main').ok)
+        log('WARN: could not fast-forward after state landing');
+    }
+  }
+}
+
+// Legacy alias for code paths that still reference commitState / commitStateViaPR.
+// Both now delegate to requestMilestoneStateTransition via persistMilestoneState.
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+const commitState = requestMilestoneStateTransition;
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+const commitStateViaPR = requestMilestoneStateTransition;
 
 async function sleep(ms) {
   await new Promise((r) => setTimeout(r, ms));
@@ -475,18 +530,13 @@ function launchIdentity(p) {
   };
 }
 
+/**
+ * Persist milestone state via the protected state-landing PR lane.
+ * INVARIANT: canonical current-milestone.json is NEVER written to disk by this function.
+ * The desired state is serialized in-memory and sent through the state-transition lane.
+ */
 function persistMilestoneState(ms, message) {
-  const file = join(REPO, 'specs', 'implementation', 'current-milestone.json');
-  writeFileSync(file, JSON.stringify(ms, null, 2) + '\n');
-  // Keep supervisor-written state Prettier-clean: these chore commits land
-  // via the state-landing PR lane, and a raw JSON.stringify write would leave
-  // the next PR failing format:check. Cosmetic only — never blocks the status flip.
-  const fmt = sh(
-    'npx --no-install prettier --write --log-level silent specs/implementation/current-milestone.json',
-  );
-  if (!fmt.ok) log('WARN: prettier-format of milestone state skipped (cosmetic only)');
-  // Supervisory loop & operator commands: all use the protected PR-lane.
-  commitState('specs/implementation', message);
+  requestMilestoneStateTransition(ms, message);
 }
 
 function setPackageStatus(ms, packageId, status) {
@@ -2179,6 +2229,9 @@ async function tick(st) {
   // first; a failed pull still resolves here and downstream paths keep their
   // existing fail-closed behavior on the stale view.
   await commitQueue.catch(() => {});
+  // Drive any pending state transitions forward one step each (non-blocking).
+  // This replaces the old blocking landStateViaPR() polling loop.
+  advanceStateLandings();
   // Reconcile active entries. Paused entries stay tracked (never filtered as
   // done): fatal pauses wait for operator recovery, quota pauses probe on the
   // supervisor-owned schedule.

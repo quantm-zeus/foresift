@@ -15,6 +15,18 @@ export const PACKAGE_STATUSES = [
 export const MILESTONE_STATUSES = ['PLANNED', 'ACTIVE', 'CONVERGED', 'PROVEN'];
 export const RISKS = ['LOW', 'MEDIUM', 'HIGH', 'CRITICAL'];
 
+export const ALLOWED_STATUS_TRANSITIONS = new Set([
+  'PENDING->RUNNING',
+  'RUNNING->PROVEN',
+  'RUNNING->PENDING',
+  'PROVEN->RUNNING',
+  'PENDING->PROVEN',
+]);
+
+export function serializeMilestoneState(ms) {
+  return JSON.stringify(ms, null, 2) + '\n';
+}
+
 export function repoRoot() {
   // This file lives at <root>/scripts/automation/schema.mjs
   return join(import.meta.dirname, '..', '..');

@@ -14,7 +14,14 @@
 // and executes EXACTLY ONE bounded repair step, then returns.
 
 import { spawnSync } from 'node:child_process';
-import { existsSync, readFileSync, writeFileSync } from 'node:fs';
+import {
+  existsSync,
+  readFileSync,
+  writeFileSync,
+  mkdirSync,
+  renameSync,
+  readdirSync,
+} from 'node:fs';
 import { join } from 'node:path';
 
 /** Maximum repair attempts before mandatory escalation. */
@@ -451,6 +458,130 @@ export function executeCiRepair({
     escalate: true,
     reason: `unknown repair route: ${route}`,
   };
+}
+
+// ── Repair Request Management & Execution (F8) ────────────────────────────────
+
+export function persistRepairRequest(stateDir, request) {
+  const dir = join(stateDir, 'repair-requests');
+  if (!existsSync(dir)) {
+    mkdirSync(dir, { recursive: true });
+  }
+  const id = request.requestId || `${request.incidentId}-${request.route}-${request.failedHeadSha}`;
+  request.requestId = id;
+  const path = join(dir, `request-${id}.json`);
+  const tmpPath = path + '.tmp';
+  writeFileSync(tmpPath, JSON.stringify(request, null, 2) + '\n');
+  renameSync(tmpPath, path);
+  return id;
+}
+
+export function discoverPendingRepairRequests(stateDir) {
+  const dir = join(stateDir, 'repair-requests');
+  if (!existsSync(dir)) return [];
+  const files = readdirSync(dir);
+  const reqs = [];
+  for (const f of files) {
+    if (!f.startsWith('request-') || !f.endsWith('.json')) continue;
+    try {
+      const p = join(dir, f);
+      const req = JSON.parse(readFileSync(p, 'utf8'));
+      if (req.status !== 'COMPLETE' && req.status !== 'FAILED') {
+        reqs.push({ request: req, path: p });
+      }
+    } catch {}
+  }
+  return reqs;
+}
+
+export function validateRepairOwnership({ engine, actualDiffPaths = [] }) {
+  const isTestPath = (p) =>
+    p.includes('tests/') || p.includes('__tests__/') || /\.spec\./.test(p) || /\.test\./.test(p);
+
+  let violations = [];
+  let violationType = null;
+
+  if (engine === 'CODEX') {
+    // CODEX repair: forbidden paths include tests/**, *.spec.*, *.test.*, __tests__/**
+    violations = actualDiffPaths.filter(isTestPath);
+    if (violations.length > 0) {
+      violationType = 'CODEX_TEST_OWNERSHIP_VIOLATION';
+    }
+  } else if (engine === 'AGY') {
+    // AGY repair: forbidden paths include production implementation paths (not test-owned)
+    violations = actualDiffPaths.filter((p) => {
+      // Allow tests, specs, evidence, tools
+      if (
+        isTestPath(p) ||
+        p.startsWith('specs/') ||
+        p.startsWith('evidence/') ||
+        p.startsWith('scripts/')
+      ) {
+        return false;
+      }
+      return true; // everything else is production code
+    });
+    if (violations.length > 0) {
+      violationType = 'AGY_PRODUCT_OWNERSHIP_VIOLATION';
+    }
+  }
+
+  return { ok: violations.length === 0, violations, violationType };
+}
+
+export async function advanceRepairRequest({
+  request,
+  stateDir,
+  repoDir,
+  executorFn,
+  log = console.log,
+}) {
+  const advance = (status) => {
+    request.status = status;
+    request.updatedAt = new Date().toISOString();
+    persistRepairRequest(stateDir, request);
+  };
+
+  if (request.status === 'PENDING') {
+    advance('WORKTREE_READY');
+    return { action: 'prepared-worktree' };
+  }
+  if (request.status === 'WORKTREE_READY') {
+    advance('ENGINE_INVOKED');
+    if (executorFn) {
+      await executorFn(request);
+    }
+    return { action: 'invoked-engine' };
+  }
+  if (request.status === 'ENGINE_INVOKED') {
+    const diff = shSync('git', ['diff', '--name-only'], { cwd: repoDir, allowFail: true });
+    const paths = diff.out
+      .split('\n')
+      .map((s) => s.trim())
+      .filter(Boolean);
+
+    const ownership = validateRepairOwnership({ engine: request.engine, actualDiffPaths: paths });
+    if (!ownership.ok) {
+      log(`Ownership violation: ${ownership.violationType} on ${ownership.violations.join(', ')}`);
+      advance('FAILED');
+      return { action: 'failed-ownership', violations: ownership.violations };
+    }
+    advance('OWNERSHIP_VERIFIED');
+    return { action: 'verified-ownership' };
+  }
+  if (request.status === 'OWNERSHIP_VERIFIED') {
+    advance('COMMITTED');
+    return { action: 'committed' };
+  }
+  if (request.status === 'COMMITTED') {
+    advance('PUSHED');
+    return { action: 'pushed' };
+  }
+  if (request.status === 'PUSHED') {
+    advance('COMPLETE');
+    return { action: 'completed' };
+  }
+  return { action: 'no-op', status: request.status };
 }
 
 const invokedDirectly = process.argv[1]?.endsWith('ci-repair-executor.mjs');

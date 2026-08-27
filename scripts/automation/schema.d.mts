@@ -43,6 +43,8 @@ export interface MilestoneState {
 export declare const PACKAGE_STATUSES: string[];
 export declare const MILESTONE_STATUSES: string[];
 export declare const RISKS: string[];
+export declare const ALLOWED_STATUS_TRANSITIONS: Set<string>;
+export declare function serializeMilestoneState(ms: MilestoneState): string;
 export declare function repoRoot(): string;
 export declare function implementationDir(root?: string): string;
 export declare function loadJson(path: string): unknown;

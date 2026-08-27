@@ -1,14 +1,14 @@
 {
   "schema": "foresift/bun-migration-manifest@1",
   "migrationId": "bun-test-authority-v1",
-  "generatedAt": "2026-08-27T01:49:34.160Z",
+  "generatedAt": "2026-08-27T01:49:58.593Z",
   "root": ".",
   "totalTestFiles": 219,
   "counts": {
-    "CODEMOD_READY": 70,
+    "CODEMOD_READY": 64,
     "AGY_REQUIRED": 17,
     "MIGRATED": 76,
-    "VERIFIED": 56,
+    "VERIFIED": 62,
     "BLOCKED": 0
   },
   "parity": {
@@ -2617,27 +2617,21 @@
     {
       "path": "tests/acceptance/AC-062.spec.ts",
       "package": "acceptance",
-      "bytes": 7260,
+      "bytes": 7262,
       "lines": 197,
-      "sha256": "5962ab1c22beed905af33737ac5b78c0868001dc695212e69a6910d16e8141d0",
+      "sha256": "87f230c573dd6f54d5814b740451618035919b28861c49a3ca2d19af29201ea0",
       "imports": [
         "@electric-sql/pglite",
-        "vitest",
+        "bun:test",
         "@foresift/domain",
         "@foresift/persistence",
         "@foresift/domain",
         "./helpers.ts"
       ],
-      "vitestImports": [
-        "afterAll",
-        "beforeAll",
-        "describe",
-        "expect",
-        "it"
-      ],
+      "vitestImports": [],
       "features": [],
       "workload": "DATABASE_PGLITE",
-      "migrationType": "EASY_MECHANICAL",
+      "migrationType": "ALREADY_MIGRATED",
       "fixturesAndHelpers": [
         "./helpers.ts"
       ],
@@ -2648,7 +2642,7 @@
         "@foresift/domain",
         "./helpers.ts"
       ],
-      "state": "CODEMOD_READY"
+      "state": "VERIFIED"
     },
     {
       "path": "tests/acceptance/AC-240.spec.ts",
@@ -3209,27 +3203,21 @@
     {
       "path": "tests/acceptance/AC-260.spec.ts",
       "package": "acceptance",
-      "bytes": 7460,
+      "bytes": 7462,
       "lines": 207,
-      "sha256": "32a5700d781cd10e6596a6a71ab9db6c66c9355d49af1172f4bc4c8e45ec6403",
+      "sha256": "2e47c2610accdfe04ce1f7ccaff02d188cc16ecfb1263533356b6b94b2469c2a",
       "imports": [
         "@electric-sql/pglite",
-        "vitest",
+        "bun:test",
         "@foresift/domain",
         "@foresift/persistence",
         "@foresift/evidence",
         "./helpers.ts"
       ],
-      "vitestImports": [
-        "afterAll",
-        "beforeAll",
-        "describe",
-        "expect",
-        "it"
-      ],
+      "vitestImports": [],
       "features": [],
       "workload": "DATABASE_PGLITE",
-      "migrationType": "EASY_MECHANICAL",
+      "migrationType": "ALREADY_MIGRATED",
       "fixturesAndHelpers": [
         "./helpers.ts"
       ],
@@ -3240,7 +3228,7 @@
         "@foresift/evidence",
         "./helpers.ts"
       ],
-      "state": "CODEMOD_READY"
+      "state": "VERIFIED"
     },
     {
       "path": "tests/acceptance/AC-261.spec.ts",
@@ -3314,26 +3302,20 @@
     {
       "path": "tests/acceptance/AC-263.spec.ts",
       "package": "acceptance",
-      "bytes": 5971,
+      "bytes": 5973,
       "lines": 155,
-      "sha256": "e753d912c7dca5b5f065d145b8fa0a85c7eff3222a9f045f27bd67c9d4fbba5f",
+      "sha256": "ab3cffe359631b61ff3be569bc587149b5912a3040388e02a7a0de2c10a5eabc",
       "imports": [
         "@electric-sql/pglite",
-        "vitest",
+        "bun:test",
         "@foresift/domain",
         "@foresift/persistence",
         "./helpers.ts"
       ],
-      "vitestImports": [
-        "afterAll",
-        "beforeAll",
-        "describe",
-        "expect",
-        "it"
-      ],
+      "vitestImports": [],
       "features": [],
       "workload": "DATABASE_PGLITE",
-      "migrationType": "EASY_MECHANICAL",
+      "migrationType": "ALREADY_MIGRATED",
       "fixturesAndHelpers": [
         "./helpers.ts"
       ],
@@ -3343,7 +3325,7 @@
         "@foresift/persistence",
         "./helpers.ts"
       ],
-      "state": "CODEMOD_READY"
+      "state": "VERIFIED"
     },
     {
       "path": "tests/acceptance/AC-264.spec.ts",
@@ -3514,12 +3496,12 @@
     {
       "path": "tests/acceptance/AC-274.spec.ts",
       "package": "acceptance",
-      "bytes": 4910,
+      "bytes": 4912,
       "lines": 142,
-      "sha256": "cadb78df2cc4ca02b11cff08936a359ebc31de7041b0197fef8cf9a6b1e755bd",
+      "sha256": "72a9ae04f31fea2c9ce0f39f36db4e080f3bdbbe54b182c81f5f25cde37dcbdb",
       "imports": [
         "node:crypto",
-        "vitest",
+        "bun:test",
         "@electric-sql/pglite",
         "@foresift/object-store",
         "@foresift/persistence",
@@ -3529,16 +3511,10 @@
         "../../packages/security/src/audit-chain.ts",
         "@foresift/shared-schemas"
       ],
-      "vitestImports": [
-        "afterAll",
-        "beforeAll",
-        "describe",
-        "expect",
-        "it"
-      ],
+      "vitestImports": [],
       "features": [],
       "workload": "DATABASE_PGLITE",
-      "migrationType": "EASY_MECHANICAL",
+      "migrationType": "ALREADY_MIGRATED",
       "fixturesAndHelpers": [],
       "sourceAnchors": [
         "@electric-sql/pglite",
@@ -3548,7 +3524,7 @@
         "../../packages/security/src/audit-chain.ts",
         "@foresift/shared-schemas"
       ],
-      "state": "CODEMOD_READY"
+      "state": "VERIFIED"
     },
     {
       "path": "tests/acceptance/AC-275.spec.ts",
@@ -3632,11 +3608,11 @@
     {
       "path": "tests/acceptance/AC-278.spec.ts",
       "package": "acceptance",
-      "bytes": 3323,
+      "bytes": 3325,
       "lines": 91,
-      "sha256": "6cb34d4c09b6a96ae01be6cceeb0b71b6f84455f34af6a792638fb4dd6b5e5c3",
+      "sha256": "fcd41d318437cab7e069a7d951e690eaad1c3d65befd2c855a931a2a2d581237",
       "imports": [
-        "vitest",
+        "bun:test",
         "@electric-sql/pglite",
         "@foresift/persistence",
         "node:path",
@@ -3644,16 +3620,10 @@
         "../../packages/security/src/incidents.ts",
         "../../packages/security/src/gate-pause.ts"
       ],
-      "vitestImports": [
-        "afterAll",
-        "beforeAll",
-        "describe",
-        "expect",
-        "it"
-      ],
+      "vitestImports": [],
       "features": [],
       "workload": "DATABASE_PGLITE",
-      "migrationType": "EASY_MECHANICAL",
+      "migrationType": "ALREADY_MIGRATED",
       "fixturesAndHelpers": [],
       "sourceAnchors": [
         "@electric-sql/pglite",
@@ -3661,39 +3631,33 @@
         "../../packages/security/src/incidents.ts",
         "../../packages/security/src/gate-pause.ts"
       ],
-      "state": "CODEMOD_READY"
+      "state": "VERIFIED"
     },
     {
       "path": "tests/acceptance/AC-279.spec.ts",
       "package": "acceptance",
-      "bytes": 3696,
+      "bytes": 3698,
       "lines": 103,
-      "sha256": "00264325fb6b888036dabd73fb5928f4e85526e6063d5a1ec00a9879b5ec74cf",
+      "sha256": "92a8d535115a7377a3ffeacd221f13f2d8300f6a246579a28fb59d363f82c165",
       "imports": [
-        "vitest",
+        "bun:test",
         "@electric-sql/pglite",
         "@foresift/persistence",
         "node:path",
         "node:url",
         "../../packages/security/src/gate-pause.ts"
       ],
-      "vitestImports": [
-        "afterAll",
-        "beforeAll",
-        "describe",
-        "expect",
-        "it"
-      ],
+      "vitestImports": [],
       "features": [],
       "workload": "DATABASE_PGLITE",
-      "migrationType": "EASY_MECHANICAL",
+      "migrationType": "ALREADY_MIGRATED",
       "fixturesAndHelpers": [],
       "sourceAnchors": [
         "@electric-sql/pglite",
         "@foresift/persistence",
         "../../packages/security/src/gate-pause.ts"
       ],
-      "state": "CODEMOD_READY"
+      "state": "VERIFIED"
     },
     {
       "path": "tests/acceptance/tooling-globs.spec.ts",
@@ -7725,7 +7689,8 @@
       },
       "codexCalls": 0,
       "claudeCalls": 0,
-      "testedHead": "bf2a970708dadc3779f40ae9c0882283cb354d44"
+      "testedHead": "bf2a970708dadc3779f40ae9c0882283cb354d44",
+      "checkpointHead": "4e34f6f69f5c3e3e4d3b80484a2318b2aeaee5f1"
     },
     {
       "id": "mechanical-acceptance-database-pglite-1",
@@ -7739,7 +7704,203 @@
         "tests/acceptance/AC-278.spec.ts",
         "tests/acceptance/AC-279.spec.ts"
       ],
-      "state": "PENDING"
+      "state": "VERIFIED",
+      "verification": {
+        "ok": true,
+        "wallTimeMs": 24325,
+        "peakRssBytes": 0,
+        "cpuSeconds": 0,
+        "counts": {
+          "passed": 18,
+          "failed": 0,
+          "skipped": 0
+        },
+        "results": [
+          {
+            "id": "pglite-1",
+            "workload": "DATABASE_PGLITE",
+            "files": [
+              "tests/acceptance/AC-062.spec.ts"
+            ],
+            "fileWorkers": 1,
+            "testConcurrency": 1,
+            "command": [
+              "bun",
+              "test",
+              "--no-orphans",
+              "--isolate",
+              "--parallel=1",
+              "--max-concurrency=1",
+              "--timeout=30000",
+              "tests/acceptance/AC-062.spec.ts"
+            ],
+            "status": 0,
+            "wallTimeMs": 5260,
+            "peakRssBytes": null,
+            "cpuSeconds": null,
+            "counts": {
+              "passed": 3,
+              "failed": 0,
+              "skipped": 0
+            },
+            "stdoutTail": "bun test v1.4.0 (34cbb9a40) 1x PARALLEL\n",
+            "stderrTail": "\ntests/acceptance/AC-062.spec.ts:\n(pass) AC-062: backup restore meets configured RPO/RTO in a drill > backup → destroy → clean-environment restore reproduces the workload byte-identically [2025.06ms]\n(pass) AC-062: backup restore meets configured RPO/RTO in a drill > the measured restore lands WITHIN the configured tier — no incident, health untouched [3.55ms]\n(pass) AC-062: backup restore meets configured RPO/RTO in a drill > the restored environment passes the owned clean-environment checks [18.22ms]\n\n 3 pass\n 0 fail\n 10 expect() calls\nRan 3 tests across 1 file. [5.10s]\n"
+          },
+          {
+            "id": "pglite-2",
+            "workload": "DATABASE_PGLITE",
+            "files": [
+              "tests/acceptance/AC-260.spec.ts"
+            ],
+            "fileWorkers": 1,
+            "testConcurrency": 1,
+            "command": [
+              "bun",
+              "test",
+              "--no-orphans",
+              "--isolate",
+              "--parallel=1",
+              "--max-concurrency=1",
+              "--timeout=30000",
+              "tests/acceptance/AC-260.spec.ts"
+            ],
+            "status": 0,
+            "wallTimeMs": 5134,
+            "peakRssBytes": null,
+            "cpuSeconds": null,
+            "counts": {
+              "passed": 4,
+              "failed": 0,
+              "skipped": 0
+            },
+            "stdoutTail": "bun test v1.4.0 (34cbb9a40) 1x PARALLEL\n",
+            "stderrTail": "\ntests/acceptance/AC-260.spec.ts:\n(pass) AC-260: destructive drill meets both declared RPO tiers on fixtures > the destroyed environment restores both workload classes byte-identically [2090.25ms]\n(pass) AC-260: destructive drill meets both declared RPO tiers on fixtures > critical metadata is recovered within its declared 15-minute RPO tier [2.85ms]\n(pass) AC-260: destructive drill meets both declared RPO tiers on fixtures > critical observations/checkpoints are recovered within their declared 60-minute RPO tier [1.52ms]\n(pass) AC-260: destructive drill meets both declared RPO tiers on fixtures > both tiers met ⇒ opportunity mode is NOT blocked anywhere [0.95ms]\n\n 4 pass\n 0 fail\n 13 expect() calls\nRan 4 tests across 1 file. [4.96s]\n"
+          },
+          {
+            "id": "pglite-3",
+            "workload": "DATABASE_PGLITE",
+            "files": [
+              "tests/acceptance/AC-263.spec.ts"
+            ],
+            "fileWorkers": 1,
+            "testConcurrency": 1,
+            "command": [
+              "bun",
+              "test",
+              "--no-orphans",
+              "--isolate",
+              "--parallel=1",
+              "--max-concurrency=1",
+              "--timeout=30000",
+              "tests/acceptance/AC-263.spec.ts"
+            ],
+            "status": 0,
+            "wallTimeMs": 4990,
+            "peakRssBytes": null,
+            "cpuSeconds": null,
+            "counts": {
+              "passed": 2,
+              "failed": 0,
+              "skipped": 0
+            },
+            "stdoutTail": "bun test v1.4.0 (34cbb9a40) 1x PARALLEL\n",
+            "stderrTail": "\ntests/acceptance/AC-263.spec.ts:\n(pass) AC-263: restore + replay neither duplicates nor skips unmarked history > replaying applied events after a destructive restore is refused by storage [1973.11ms]\n(pass) AC-263: restore + replay neither duplicates nor skips unmarked history > checkpoint recovery advances across the gap only because it was explicitly recovered [8.59ms]\n\n 2 pass\n 0 fail\n 11 expect() calls\nRan 2 tests across 1 file. [4.83s]\n"
+          },
+          {
+            "id": "pglite-4",
+            "workload": "DATABASE_PGLITE",
+            "files": [
+              "tests/acceptance/AC-274.spec.ts"
+            ],
+            "fileWorkers": 1,
+            "testConcurrency": 1,
+            "command": [
+              "bun",
+              "test",
+              "--no-orphans",
+              "--isolate",
+              "--parallel=1",
+              "--max-concurrency=1",
+              "--timeout=30000",
+              "tests/acceptance/AC-274.spec.ts"
+            ],
+            "status": 0,
+            "wallTimeMs": 3066,
+            "peakRssBytes": null,
+            "cpuSeconds": null,
+            "counts": {
+              "passed": 3,
+              "failed": 0,
+              "skipped": 0
+            },
+            "stdoutTail": "bun test v1.4.0 (34cbb9a40) 1x PARALLEL\n",
+            "stderrTail": "\ntests/acceptance/AC-274.spec.ts:\n(pass) AC-274: complete high-impact requests admit with full audit > admits a fully-dimensioned request [11.71ms]\n(pass) AC-274: complete high-impact requests admit with full audit > audits the ALLOW decision into the hash-chained store [5.74ms]\n(pass) AC-274: complete high-impact requests admit with full audit > admits hardware-security-key proofs at the policy floor [4.05ms]\n\n 3 pass\n 0 fail\n 5 expect() calls\nRan 3 tests across 1 file. [2.95s]\n"
+          },
+          {
+            "id": "pglite-5",
+            "workload": "DATABASE_PGLITE",
+            "files": [
+              "tests/acceptance/AC-278.spec.ts"
+            ],
+            "fileWorkers": 1,
+            "testConcurrency": 1,
+            "command": [
+              "bun",
+              "test",
+              "--no-orphans",
+              "--isolate",
+              "--parallel=1",
+              "--max-concurrency=1",
+              "--timeout=30000",
+              "tests/acceptance/AC-278.spec.ts"
+            ],
+            "status": 0,
+            "wallTimeMs": 3011,
+            "peakRssBytes": null,
+            "cpuSeconds": null,
+            "counts": {
+              "passed": 3,
+              "failed": 0,
+              "skipped": 0
+            },
+            "stdoutTail": "bun test v1.4.0 (34cbb9a40) 1x PARALLEL\n",
+            "stderrTail": "\ntests/acceptance/AC-278.spec.ts:\n(pass) AC-278: scoped pauses with durable reasons and audited resumes > pauses ONLY the failed scope; unrelated scopes stay live [14.74ms]\n(pass) AC-278: scoped pauses with durable reasons and audited resumes > automatic reactivation is refused as a machine-checked invariant [0.40ms]\n(pass) AC-278: scoped pauses with durable reasons and audited resumes > resume requires an explicit actor AND audit reference [5.80ms]\n\n 3 pass\n 0 fail\n 7 expect() calls\nRan 3 tests across 1 file. [2.90s]\n"
+          },
+          {
+            "id": "pglite-6",
+            "workload": "DATABASE_PGLITE",
+            "files": [
+              "tests/acceptance/AC-279.spec.ts"
+            ],
+            "fileWorkers": 1,
+            "testConcurrency": 1,
+            "command": [
+              "bun",
+              "test",
+              "--no-orphans",
+              "--isolate",
+              "--parallel=1",
+              "--max-concurrency=1",
+              "--timeout=30000",
+              "tests/acceptance/AC-279.spec.ts"
+            ],
+            "status": 0,
+            "wallTimeMs": 2864,
+            "peakRssBytes": null,
+            "cpuSeconds": null,
+            "counts": {
+              "passed": 3,
+              "failed": 0,
+              "skipped": 0
+            },
+            "stdoutTail": "bun test v1.4.0 (34cbb9a40) 1x PARALLEL\n",
+            "stderrTail": "\ntests/acceptance/AC-279.spec.ts:\n(pass) AC-279: append-only activation ledger with snapshot-preserving rollback > records each activation with its actor and immutable snapshot ref [5.89ms]\n(pass) AC-279: append-only activation ledger with snapshot-preserving rollback > rollback appends a ROLLBACK_RESTORE that inherits the restored snapshot [2.97ms]\n(pass) AC-279: append-only activation ledger with snapshot-preserving rollback > history stays intact and ordered after the rollback [1.51ms]\n\n 3 pass\n 0 fail\n 11 expect() calls\nRan 3 tests across 1 file. [2.76s]\n"
+          }
+        ]
+      },
+      "codexCalls": 0,
+      "claudeCalls": 0,
+      "testedHead": "4e34f6f69f5c3e3e4d3b80484a2318b2aeaee5f1"
     },
     {
       "id": "mechanical-acceptance-pure-1",

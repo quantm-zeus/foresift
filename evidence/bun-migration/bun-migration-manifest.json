@@ -1,13 +1,13 @@
 {
   "schema": "foresift/bun-migration-manifest@1",
   "migrationId": "bun-test-authority-v1",
-  "generatedAt": "2026-08-27T02:00:24.452Z",
+  "generatedAt": "2026-08-27T02:06:58.182Z",
   "root": ".",
   "totalTestFiles": 219,
   "counts": {
     "CODEMOD_READY": 0,
-    "AGY_REQUIRED": 17,
-    "MIGRATED": 1,
+    "AGY_REQUIRED": 0,
+    "MIGRATED": 18,
     "VERIFIED": 201,
     "BLOCKED": 0
   },
@@ -304,36 +304,28 @@
     {
       "path": "packages/persistence/test/backup-governance.spec.ts",
       "package": "@foresift/persistence",
-      "bytes": 8096,
+      "bytes": 8098,
       "lines": 220,
-      "sha256": "cc5e225dc5c424bb351258b6e212c242261c51bf9d4febe3fbe17d7c4687b833",
+      "sha256": "59a9a83be058217cc5fb6f4f19be1a8841b6278b33c3cb9317b929f32ef3da7a",
       "imports": [
-        "vitest",
+        "bun:test",
         "@electric-sql/pglite",
         "node:path",
         "node:url",
         "@foresift/domain",
         "../src/index.ts"
       ],
-      "vitestImports": [
-        "afterAll",
-        "beforeAll",
-        "describe",
-        "expect",
-        "it"
-      ],
-      "features": [
-        "function-wrapped-rejects"
-      ],
+      "vitestImports": [],
+      "features": [],
       "workload": "DATABASE_PGLITE",
-      "migrationType": "SEMANTIC_REWRITE",
+      "migrationType": "ALREADY_MIGRATED",
       "fixturesAndHelpers": [],
       "sourceAnchors": [
         "@electric-sql/pglite",
         "@foresift/domain",
         "../src/index.ts"
       ],
-      "state": "AGY_REQUIRED"
+      "state": "MIGRATED"
     },
     {
       "path": "packages/persistence/test/canonical-json.spec.ts",
@@ -440,36 +432,28 @@
     {
       "path": "packages/persistence/test/features-parity.spec.ts",
       "package": "@foresift/persistence",
-      "bytes": 12868,
-      "lines": 351,
-      "sha256": "c6c36c11926b81aa825ffb0201fc0dc2c3f7c5ddefda743a7e9b5a507af4eec3",
+      "bytes": 12950,
+      "lines": 354,
+      "sha256": "69bfeaaf016bc276133d877c1619905df38a27a8c8ed2213ed3004f3545ec6d9",
       "imports": [
         "node:path",
         "node:url",
-        "vitest",
+        "bun:test",
         "@electric-sql/pglite",
         "@foresift/domain",
         "../src/index.ts"
       ],
-      "vitestImports": [
-        "afterAll",
-        "beforeAll",
-        "describe",
-        "expect",
-        "it"
-      ],
-      "features": [
-        "table-driven-each"
-      ],
+      "vitestImports": [],
+      "features": [],
       "workload": "DATABASE_PGLITE",
-      "migrationType": "SEMANTIC_REWRITE",
+      "migrationType": "ALREADY_MIGRATED",
       "fixturesAndHelpers": [],
       "sourceAnchors": [
         "@electric-sql/pglite",
         "@foresift/domain",
         "../src/index.ts"
       ],
-      "state": "AGY_REQUIRED"
+      "state": "MIGRATED"
     },
     {
       "path": "packages/persistence/test/identity-repo.spec.ts",
@@ -503,9 +487,9 @@
     {
       "path": "packages/persistence/test/migrator.spec.ts",
       "package": "@foresift/persistence",
-      "bytes": 18944,
+      "bytes": 18946,
       "lines": 472,
-      "sha256": "5fff5ec85801daa85c5d08418bdf3c33bdb0d82a392dd25bdb5ce4c3b5458992",
+      "sha256": "1047666cc8f287da397a1a7a560f514aea1aa5be0db07e0155cb4888c0a5565a",
       "imports": [
         "bun:test",
         "@electric-sql/pglite",
@@ -517,18 +501,17 @@
       ],
       "vitestImports": [],
       "features": [
-        "dynamic-import",
-        "vitest-runtime-reference"
+        "dynamic-import"
       ],
       "workload": "DATABASE_PGLITE",
-      "migrationType": "SEMANTIC_REWRITE",
+      "migrationType": "ALREADY_MIGRATED",
       "fixturesAndHelpers": [],
       "sourceAnchors": [
         "@electric-sql/pglite",
         "../src/index.ts",
         "@foresift/domain"
       ],
-      "state": "AGY_REQUIRED"
+      "state": "MIGRATED"
     },
     {
       "path": "packages/persistence/test/observations-revisions.spec.ts",
@@ -988,26 +971,21 @@
     {
       "path": "packages/provider-lifecycle/test/scaffold.spec.ts",
       "package": "@foresift/provider-lifecycle",
-      "bytes": 479,
+      "bytes": 483,
       "lines": 12,
-      "sha256": "8ed049089511a58bf90225b4fd0fc61ea8cf4332dadeedee9b1f18fe564fa662",
+      "sha256": "69ae42b99d185380acab8d990f5f9c09b78d53bfa3aa6348afbd2b97860ddd8e",
       "imports": [
-        "vitest"
+        "bun:test"
       ],
-      "vitestImports": [
-        "describe",
-        "expect",
-        "it"
-      ],
+      "vitestImports": [],
       "features": [
-        "dynamic-import",
-        "vitest-runtime-reference"
+        "dynamic-import"
       ],
       "workload": "PURE",
-      "migrationType": "SEMANTIC_REWRITE",
+      "migrationType": "ALREADY_MIGRATED",
       "fixturesAndHelpers": [],
       "sourceAnchors": [],
-      "state": "AGY_REQUIRED"
+      "state": "MIGRATED"
     },
     {
       "path": "packages/provider-lifecycle/test/schema-parity.spec.ts",
@@ -1211,26 +1189,21 @@
     {
       "path": "packages/providers/test/scaffold.spec.ts",
       "package": "@foresift/providers",
-      "bytes": 470,
+      "bytes": 474,
       "lines": 12,
-      "sha256": "3662eaeb9122717ca7301a0410de0de4eadaa11f0a76e099d9366813a3f2b783",
+      "sha256": "e6da15640e72c3f6b2a93c0e2646c5cb16f129574862b4029907a86daab5056a",
       "imports": [
-        "vitest"
+        "bun:test"
       ],
-      "vitestImports": [
-        "describe",
-        "expect",
-        "it"
-      ],
+      "vitestImports": [],
       "features": [
-        "dynamic-import",
-        "vitest-runtime-reference"
+        "dynamic-import"
       ],
       "workload": "PURE",
-      "migrationType": "SEMANTIC_REWRITE",
+      "migrationType": "ALREADY_MIGRATED",
       "fixturesAndHelpers": [],
       "sourceAnchors": [],
-      "state": "AGY_REQUIRED"
+      "state": "VERIFIED"
     },
     {
       "path": "packages/security/test/action-gate.spec.ts",
@@ -1528,28 +1501,22 @@
     {
       "path": "packages/security/test/scaffold.spec.ts",
       "package": "@foresift/security",
-      "bytes": 556,
+      "bytes": 560,
       "lines": 14,
-      "sha256": "652276c2e5be943226f573f27f147a18af808a5be36a72b87c0680265785f2ab",
+      "sha256": "b8335e423b0f90efd9bb3eedd3ef9249b83e8cd05e10b1a6c73632fb86f14cd4",
       "imports": [
-        "vitest",
+        "bun:test",
         "../src/errors.ts"
       ],
-      "vitestImports": [
-        "describe",
-        "expect",
-        "it"
-      ],
-      "features": [
-        "vitest-runtime-reference"
-      ],
+      "vitestImports": [],
+      "features": [],
       "workload": "PURE",
-      "migrationType": "SEMANTIC_REWRITE",
+      "migrationType": "ALREADY_MIGRATED",
       "fixturesAndHelpers": [],
       "sourceAnchors": [
         "../src/errors.ts"
       ],
-      "state": "AGY_REQUIRED"
+      "state": "MIGRATED"
     },
     {
       "path": "packages/security/test/scan-traversal.spec.ts",
@@ -1787,81 +1754,64 @@
     {
       "path": "packages/shared-schemas/test/prov.spec.ts",
       "package": "@foresift/shared-schemas",
-      "bytes": 29022,
-      "lines": 811,
-      "sha256": "d8e2ce9e77aceed6399262eecad9f6f6484d6a0b9ec61c6adb8b67e42bdfac66",
+      "bytes": 29067,
+      "lines": 813,
+      "sha256": "023e3fe858fa11b17e5bc52b80e1845da399103775c6b81be216a0f8d1c650a7",
       "imports": [
-        "vitest",
+        "bun:test",
         "../src/prov.ts"
       ],
-      "vitestImports": [
-        "describe",
-        "expect",
-        "it"
-      ],
-      "features": [
-        "table-driven-each"
-      ],
+      "vitestImports": [],
+      "features": [],
       "workload": "PURE",
-      "migrationType": "SEMANTIC_REWRITE",
+      "migrationType": "ALREADY_MIGRATED",
       "fixturesAndHelpers": [],
       "sourceAnchors": [
         "../src/prov.ts"
       ],
-      "state": "AGY_REQUIRED"
+      "state": "MIGRATED"
     },
     {
       "path": "packages/shared-schemas/test/sec.spec.ts",
       "package": "@foresift/shared-schemas",
-      "bytes": 14755,
-      "lines": 456,
-      "sha256": "18c4ee3e27c0fd792cb1f30e6da3233d3adad67d2d1619482bdc9b683ea97526",
+      "bytes": 14769,
+      "lines": 455,
+      "sha256": "6d8f7afca6c3c8d855b251f6e0fe49af6c743396af18c4ddb99ea00566404dac",
       "imports": [
-        "vitest",
+        "bun:test",
         "../src/sec.ts"
       ],
-      "vitestImports": [
-        "describe",
-        "expect",
-        "it"
-      ],
+      "vitestImports": [],
       "features": [
-        "dynamic-import",
-        "table-driven-each"
+        "dynamic-import"
       ],
       "workload": "PURE",
-      "migrationType": "SEMANTIC_REWRITE",
+      "migrationType": "ALREADY_MIGRATED",
       "fixturesAndHelpers": [],
       "sourceAnchors": [
         "../src/sec.ts"
       ],
-      "state": "AGY_REQUIRED"
+      "state": "MIGRATED"
     },
     {
       "path": "packages/tenant-isolation/test/scaffold.spec.ts",
       "package": "@foresift/tenant-isolation",
-      "bytes": 512,
+      "bytes": 516,
       "lines": 12,
-      "sha256": "e538d6d243ea1772c704352e111c1da163c8007ca74eb8e0d13aae2d857a43f7",
+      "sha256": "04bb0e21c732c1260795a5760c0b45ba76f4a35e383f719b267a2e3d49818068",
       "imports": [
-        "vitest",
+        "bun:test",
         "../src/index.ts"
       ],
-      "vitestImports": [
-        "describe",
-        "expect",
-        "it"
-      ],
-      "features": [
-        "vitest-runtime-reference"
-      ],
+      "vitestImports": [],
+      "features": [],
       "workload": "PURE",
-      "migrationType": "SEMANTIC_REWRITE",
+      "migrationType": "ALREADY_MIGRATED",
       "fixturesAndHelpers": [],
       "sourceAnchors": [
         "../src/index.ts"
       ],
-      "state": "AGY_REQUIRED"
+      "state": "MIGRATED"
     },
     {
       "path": "packages/tenant-isolation/test/tenant-isolation.spec.ts",
@@ -3612,9 +3562,9 @@
     {
       "path": "tests/automation/bun-migration.spec.ts",
       "package": "automation",
-      "bytes": 45927,
-      "lines": 1139,
-      "sha256": "f5285bba6a4f24490911fba7b02668121b11482e88939e2803decb9fd5e04f76",
+      "bytes": 46042,
+      "lines": 1143,
+      "sha256": "260491e5adce022f7a38ae1a02eda3d24801cee57d91cbcb22456a5a0214b3c1",
       "imports": [
         "node:child_process",
         "node:crypto",
@@ -3634,12 +3584,9 @@
         "../helpers/git-fixture.js"
       ],
       "vitestImports": [],
-      "features": [
-        "table-driven-each",
-        "vitest-runtime-reference"
-      ],
+      "features": [],
       "workload": "PROCESS",
-      "migrationType": "SEMANTIC_REWRITE",
+      "migrationType": "ALREADY_MIGRATED",
       "fixturesAndHelpers": [
         "../helpers/git-fixture.js"
       ],
@@ -3655,7 +3602,7 @@
         "../../scripts/automation/schema.mjs",
         "../helpers/git-fixture.js"
       ],
-      "state": "AGY_REQUIRED"
+      "state": "MIGRATED"
     },
     {
       "path": "tests/automation/claude-tooling-only.spec.ts",
@@ -3684,32 +3631,26 @@
     {
       "path": "tests/automation/codex-agy-profile.spec.ts",
       "package": "automation",
-      "bytes": 65184,
+      "bytes": 65188,
       "lines": 1714,
-      "sha256": "8e14bf781d92f1a91588c505eeead3779f81ce7e8b6db86f3ee712bd7eab5f51",
+      "sha256": "1b53da263829c9e288ec104ccf1a7b62f721923e1f3e82e1804df598ca4d00dd",
       "imports": [
-        "vitest",
+        "bun:test",
         "node:child_process",
         "node:fs",
         "node:os",
         "node:path",
         "node:url"
       ],
-      "vitestImports": [
-        "afterEach",
-        "describe",
-        "expect",
-        "it"
-      ],
+      "vitestImports": [],
       "features": [
-        "dynamic-import",
-        "vitest-runtime-reference"
+        "dynamic-import"
       ],
       "workload": "PROCESS",
-      "migrationType": "SEMANTIC_REWRITE",
+      "migrationType": "ALREADY_MIGRATED",
       "fixturesAndHelpers": [],
       "sourceAnchors": [],
-      "state": "AGY_REQUIRED"
+      "state": "MIGRATED"
     },
     {
       "path": "tests/automation/control-plane.spec.ts",
@@ -4018,9 +3959,9 @@
     {
       "path": "tests/automation/test-tiers.spec.ts",
       "package": "automation",
-      "bytes": 4210,
-      "lines": 91,
-      "sha256": "14d14b624206aea08f67af2704d455440d9def11ff6450e0d7d631620db50463",
+      "bytes": 3680,
+      "lines": 78,
+      "sha256": "4cd4675bb9867972d6a953d272f46de64247c7aea3005bf5e044076631e30f2c",
       "imports": [
         "node:child_process",
         "node:fs",
@@ -4029,25 +3970,23 @@
         "../helpers/git-fixture.js"
       ],
       "vitestImports": [],
-      "features": [
-        "vitest-runtime-reference"
-      ],
+      "features": [],
       "workload": "META_GATE",
-      "migrationType": "SEMANTIC_REWRITE",
+      "migrationType": "ALREADY_MIGRATED",
       "fixturesAndHelpers": [
         "../helpers/git-fixture.js"
       ],
       "sourceAnchors": [
         "../helpers/git-fixture.js"
       ],
-      "state": "AGY_REQUIRED"
+      "state": "MIGRATED"
     },
     {
       "path": "tests/automation/throughput.spec.ts",
       "package": "automation",
-      "bytes": 10868,
-      "lines": 273,
-      "sha256": "c152437b8c4710613318082725c518f9a211f5436fb60a3216d1b136887a94ba",
+      "bytes": 11286,
+      "lines": 284,
+      "sha256": "3b5db8d5a666343dcf9f6febea308d13f5728cff131c777ef8eb096cd64f65a2",
       "imports": [
         "node:child_process",
         "node:crypto",
@@ -4061,12 +4000,9 @@
         "../../scripts/automation/work-package-throughput-profile.mjs"
       ],
       "vitestImports": [],
-      "features": [
-        "table-driven-each",
-        "vitest-runtime-reference"
-      ],
+      "features": [],
       "workload": "META_GATE",
-      "migrationType": "SEMANTIC_REWRITE",
+      "migrationType": "ALREADY_MIGRATED",
       "fixturesAndHelpers": [],
       "sourceAnchors": [
         "../../scripts/automation/package-checkpoint.mjs",
@@ -4074,7 +4010,7 @@
         "../../scripts/automation/verify-dedupe.mjs",
         "../../scripts/automation/work-package-throughput-profile.mjs"
       ],
-      "state": "AGY_REQUIRED"
+      "state": "MIGRATED"
     },
     {
       "path": "tests/automation/until-bash-guards.spec.ts",
@@ -4100,9 +4036,9 @@
     {
       "path": "tests/automation/v2-gate-convergence.spec.ts",
       "package": "automation",
-      "bytes": 10559,
-      "lines": 275,
-      "sha256": "46bde3f4634097c7967cfdc016de8a8515114b8a25ed30baf8d25c2e15bbf3ec",
+      "bytes": 10761,
+      "lines": 281,
+      "sha256": "a372214df16a49c9898389427274304adbba569aa414f77818aa82deda5c3d3c",
       "imports": [
         "bun:test",
         "../../scripts/automation/package-full-gate.mjs",
@@ -4111,12 +4047,9 @@
         "../helpers/v2-fixtures.js"
       ],
       "vitestImports": [],
-      "features": [
-        "table-driven-each",
-        "vitest-runtime-reference"
-      ],
+      "features": [],
       "workload": "META_GATE",
-      "migrationType": "SEMANTIC_REWRITE",
+      "migrationType": "ALREADY_MIGRATED",
       "fixturesAndHelpers": [
         "../helpers/v2-fixtures.js"
       ],
@@ -4126,14 +4059,14 @@
         "../../scripts/automation/convergence-router.mjs",
         "../helpers/v2-fixtures.js"
       ],
-      "state": "AGY_REQUIRED"
+      "state": "MIGRATED"
     },
     {
       "path": "tests/automation/v2-second-pass-cases.spec.ts",
       "package": "automation",
-      "bytes": 9551,
+      "bytes": 9574,
       "lines": 234,
-      "sha256": "dbf3a6178d0d0163ebf0df3d832277333e41dc5484e7a30c7309e6870410d765",
+      "sha256": "dd827930ba926f42f3110afbc92865d21bdfce84c1c15aee04ccbed755d1c358",
       "imports": [
         "node:fs",
         "node:os",
@@ -4147,11 +4080,9 @@
         "../helpers/git-fixture.js"
       ],
       "vitestImports": [],
-      "features": [
-        "vitest-runtime-reference"
-      ],
+      "features": [],
       "workload": "META_GATE",
-      "migrationType": "SEMANTIC_REWRITE",
+      "migrationType": "ALREADY_MIGRATED",
       "fixturesAndHelpers": [
         "../helpers/git-fixture.js"
       ],
@@ -4163,14 +4094,14 @@
         "../../scripts/automation/package-final-land.mjs",
         "../helpers/git-fixture.js"
       ],
-      "state": "AGY_REQUIRED"
+      "state": "MIGRATED"
     },
     {
       "path": "tests/automation/v2-throughput.spec.ts",
       "package": "automation",
-      "bytes": 21531,
-      "lines": 513,
-      "sha256": "9fa880ace7a7dccfd18ec2e5816244ab983c6cd0bae0182c68fe70fc9a1d33d7",
+      "bytes": 21718,
+      "lines": 519,
+      "sha256": "d5200bb33362894120648edd8a75f770bffde4c9d9afdcab4c4bbe768fd30e67",
       "imports": [
         "node:fs",
         "node:os",
@@ -4184,9 +4115,7 @@
         "../helpers/v2-fixtures.js"
       ],
       "vitestImports": [],
-      "features": [
-        "table-driven-each"
-      ],
+      "features": [],
       "workload": "PURE",
       "migrationType": "ALREADY_MIGRATED",
       "fixturesAndHelpers": [
@@ -4201,7 +4130,7 @@
         "../helpers/git-fixture.js",
         "../helpers/v2-fixtures.js"
       ],
-      "state": "VERIFIED"
+      "state": "MIGRATED"
     },
     {
       "path": "tests/automation/v3-base-drift.spec.ts",
@@ -4234,9 +4163,9 @@
     {
       "path": "tests/automation/v3-generations.spec.ts",
       "package": "automation",
-      "bytes": 62464,
+      "bytes": 62476,
       "lines": 1482,
-      "sha256": "db734e9aedb93b90ee963f03fb13999076dcdd1011f3457e509788de69dd4686",
+      "sha256": "9281c21b2178f1db7cd40de54278d0723e65157ec4b89f20c0eb330f85dae828",
       "imports": [
         "node:child_process",
         "node:fs",
@@ -4251,11 +4180,9 @@
         "../helpers/git-fixture.js"
       ],
       "vitestImports": [],
-      "features": [
-        "vitest-runtime-reference"
-      ],
+      "features": [],
       "workload": "PROCESS",
-      "migrationType": "SEMANTIC_REWRITE",
+      "migrationType": "ALREADY_MIGRATED",
       "fixturesAndHelpers": [
         "../helpers/git-fixture.js"
       ],
@@ -4266,7 +4193,7 @@
         "../../scripts/automation/generation-salvage.mjs",
         "../helpers/git-fixture.js"
       ],
-      "state": "AGY_REQUIRED"
+      "state": "MIGRATED"
     },
     {
       "path": "tests/automation/v3-mechanical-landing.spec.ts",
@@ -5779,30 +5706,23 @@
     {
       "path": "tests/spec-verify.spec.ts",
       "package": "root",
-      "bytes": 3528,
-      "lines": 106,
-      "sha256": "623f4262c131bd9fa63471f0b048faa98a6ba0cfe41c5019fe408016704c5694",
+      "bytes": 3623,
+      "lines": 109,
+      "sha256": "e9568f644ec5466934e4d6f5edf46fa9ffbe498a3170655bb7b03e89958965aa",
       "imports": [
         "node:child_process",
         "node:fs/promises",
         "node:os",
         "node:path",
-        "vitest"
+        "bun:test"
       ],
-      "vitestImports": [
-        "afterAll",
-        "describe",
-        "expect",
-        "it"
-      ],
-      "features": [
-        "table-driven-each"
-      ],
+      "vitestImports": [],
+      "features": [],
       "workload": "PROCESS",
-      "migrationType": "SEMANTIC_REWRITE",
+      "migrationType": "ALREADY_MIGRATED",
       "fixturesAndHelpers": [],
       "sourceAnchors": [],
-      "state": "AGY_REQUIRED"
+      "state": "MIGRATED"
     },
     {
       "path": "tests/telemetry-catalog.spec.ts",
@@ -8825,32 +8745,6 @@
       "checkpointHead": "62457256b5bcf76e93a2aa7296ceeb5656f1f298"
     },
     {
-      "id": "agy-semantic-1",
-      "engine": "AGY",
-      "workload": "OTHER_HEAVY",
-      "files": [
-        "packages/persistence/test/backup-governance.spec.ts",
-        "packages/persistence/test/features-parity.spec.ts",
-        "packages/persistence/test/migrator.spec.ts",
-        "packages/provider-lifecycle/test/scaffold.spec.ts",
-        "packages/providers/test/scaffold.spec.ts",
-        "packages/security/test/scaffold.spec.ts",
-        "packages/shared-schemas/test/prov.spec.ts",
-        "packages/shared-schemas/test/sec.spec.ts",
-        "packages/tenant-isolation/test/scaffold.spec.ts",
-        "tests/automation/bun-migration.spec.ts",
-        "tests/automation/codex-agy-profile.spec.ts",
-        "tests/automation/test-tiers.spec.ts",
-        "tests/automation/throughput.spec.ts",
-        "tests/automation/v2-gate-convergence.spec.ts",
-        "tests/automation/v2-second-pass-cases.spec.ts",
-        "tests/automation/v3-generations.spec.ts",
-        "tests/spec-verify.spec.ts"
-      ],
-      "state": "PENDING",
-      "attempts": 0
-    },
-    {
       "id": "verify-existing--foresift-evidence-database-pglite-1",
       "engine": "VERIFY_EXISTING",
       "workload": "DATABASE_PGLITE",
@@ -9908,6 +9802,70 @@
       "codexCalls": 0,
       "claudeCalls": 0,
       "testedHead": "c99d0817aec9f217c0141c3122bec231fe818b2f"
+    },
+    {
+      "id": "verify-existing--foresift-providers-pure-1",
+      "engine": "VERIFY_EXISTING",
+      "workload": "PURE",
+      "files": [
+        "packages/providers/test/scaffold.spec.ts"
+      ],
+      "state": "VERIFIED",
+      "verification": {
+        "ok": true,
+        "wallTimeMs": 128,
+        "peakRssBytes": 0,
+        "cpuSeconds": 0,
+        "counts": {
+          "passed": 1,
+          "failed": 0,
+          "skipped": 0
+        },
+        "results": [
+          {
+            "id": "pure-1",
+            "workload": "PURE",
+            "files": [
+              "packages/providers/test/scaffold.spec.ts"
+            ],
+            "fileWorkers": 2,
+            "testConcurrency": 8,
+            "command": [
+              "bun",
+              "test",
+              "--no-orphans",
+              "--isolate",
+              "--parallel=2",
+              "--max-concurrency=8",
+              "--timeout=30000",
+              "packages/providers/test/scaffold.spec.ts"
+            ],
+            "status": 0,
+            "wallTimeMs": 127,
+            "peakRssBytes": null,
+            "cpuSeconds": null,
+            "counts": {
+              "passed": 1,
+              "failed": 0,
+              "skipped": 0
+            },
+            "stdoutTail": "bun test v1.4.0 (34cbb9a40) 2x PARALLEL\n",
+            "stderrTail": "\npackages/providers/test/scaffold.spec.ts:\n(pass) @foresift/providers scaffold > resolves the package entrypoint [95.43ms]\n\n 1 pass\n 0 fail\n 1 expect() calls\nRan 1 test across 1 file. [109.00ms]\n"
+          }
+        ]
+      },
+      "codexCalls": 0,
+      "claudeCalls": 0,
+      "testedHead": "3f17844a75f805cb914f4f4cf2bba1de520d1242"
+    },
+    {
+      "id": "verify-existing-root-process-1",
+      "engine": "VERIFY_EXISTING",
+      "workload": "PROCESS",
+      "files": [
+        "tests/spec-verify.spec.ts"
+      ],
+      "state": "PENDING"
     }
   ]
 }

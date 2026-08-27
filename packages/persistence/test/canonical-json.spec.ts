@@ -4,7 +4,7 @@
  * substrate — observation receipt hashes, evidence content addressing, and
  * restore-drill cross-checks all hash through this one function; EH-L1).
  */
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'bun:test';
 import { canonicalJson } from '../src/index.ts';
 
 describe('canonicalJson hashing substrate', () => {

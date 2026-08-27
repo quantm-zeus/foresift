@@ -1,14 +1,14 @@
 {
   "schema": "foresift/bun-migration-manifest@1",
   "migrationId": "bun-test-authority-v1",
-  "generatedAt": "2026-08-27T01:47:58.426Z",
+  "generatedAt": "2026-08-27T01:47:58.566Z",
   "root": ".",
   "totalTestFiles": 219,
   "counts": {
-    "CODEMOD_READY": 109,
+    "CODEMOD_READY": 108,
     "AGY_REQUIRED": 17,
     "MIGRATED": 76,
-    "VERIFIED": 17,
+    "VERIFIED": 18,
     "BLOCKED": 0
   },
   "parity": {
@@ -338,26 +338,22 @@
     {
       "path": "packages/persistence/test/canonical-json.spec.ts",
       "package": "@foresift/persistence",
-      "bytes": 2048,
+      "bytes": 2050,
       "lines": 40,
-      "sha256": "c97da455ac971a80fd70c8685185a78cbb5e651ec1b255952a57a150e1868fa1",
+      "sha256": "eb6d6e8b45d6cc1154823e5439ba9c5237166f3b4c4a0283731e93401db6ac75",
       "imports": [
-        "vitest",
+        "bun:test",
         "../src/index.ts"
       ],
-      "vitestImports": [
-        "describe",
-        "expect",
-        "it"
-      ],
+      "vitestImports": [],
       "features": [],
       "workload": "PURE",
-      "migrationType": "EASY_MECHANICAL",
+      "migrationType": "ALREADY_MIGRATED",
       "fixturesAndHelpers": [],
       "sourceAnchors": [
         "../src/index.ts"
       ],
-      "state": "CODEMOD_READY"
+      "state": "VERIFIED"
     },
     {
       "path": "packages/persistence/test/checkpoints.spec.ts",
@@ -7050,7 +7046,8 @@
       },
       "codexCalls": 0,
       "claudeCalls": 0,
-      "testedHead": "d340955e2344b6242f7a216dd468d6cca8bfcfed"
+      "testedHead": "d340955e2344b6242f7a216dd468d6cca8bfcfed",
+      "checkpointHead": "cc58ded0831d7d9abf825eda4b43d063ac964c46"
     },
     {
       "id": "mechanical--foresift-persistence-pure-1",
@@ -7059,7 +7056,53 @@
       "files": [
         "packages/persistence/test/canonical-json.spec.ts"
       ],
-      "state": "PENDING"
+      "state": "VERIFIED",
+      "verification": {
+        "ok": true,
+        "wallTimeMs": 56,
+        "peakRssBytes": 0,
+        "cpuSeconds": 0,
+        "counts": {
+          "passed": 4,
+          "failed": 0,
+          "skipped": 0
+        },
+        "results": [
+          {
+            "id": "pure-1",
+            "workload": "PURE",
+            "files": [
+              "packages/persistence/test/canonical-json.spec.ts"
+            ],
+            "fileWorkers": 2,
+            "testConcurrency": 8,
+            "command": [
+              "bun",
+              "test",
+              "--no-orphans",
+              "--isolate",
+              "--parallel=2",
+              "--max-concurrency=8",
+              "--timeout=30000",
+              "packages/persistence/test/canonical-json.spec.ts"
+            ],
+            "status": 0,
+            "wallTimeMs": 56,
+            "peakRssBytes": null,
+            "cpuSeconds": null,
+            "counts": {
+              "passed": 4,
+              "failed": 0,
+              "skipped": 0
+            },
+            "stdoutTail": "bun test v1.4.0 (34cbb9a40) 2x PARALLEL\n",
+            "stderrTail": "\npackages/persistence/test/canonical-json.spec.ts:\n(pass) canonicalJson hashing substrate > sorts keys recursively and stays byte-stable [0.47ms]\n(pass) canonicalJson hashing substrate > drops undefined object members so absent and explicit-undefined are the same input [0.04ms]\n(pass) canonicalJson hashing substrate > refuses non-JSON leaf values instead of coercing them to null (EH-L1) [0.39ms]\n(pass) canonicalJson hashing substrate > still renders JSON leaves exactly like JSON.stringify would [0.06ms]\n\n 4 pass\n 0 fail\n 13 expect() calls\nRan 4 tests across 1 file. [41.00ms]\n"
+          }
+        ]
+      },
+      "codexCalls": 0,
+      "claudeCalls": 0,
+      "testedHead": "cc58ded0831d7d9abf825eda4b43d063ac964c46"
     },
     {
       "id": "mechanical--foresift-provider-lifecycle-database-pglite-1",

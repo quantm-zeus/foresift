@@ -16,7 +16,7 @@
 //   3. nextPollDelayMs — adaptive handoff cadence table + bounded-streak
 //      property sweep (60s base; ~10s fast handoff after launches/discovery;
 //      fast streak hard-bounded; quiet tick resets).
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'bun:test';
 import { canStartPackage, findPackage, packageEligible } from '../../scripts/automation/schema.mjs';
 import {
   criticalPathScore,

@@ -1,14 +1,14 @@
 {
   "schema": "foresift/bun-migration-manifest@1",
   "migrationId": "bun-test-authority-v1",
-  "generatedAt": "2026-08-27T01:51:28.058Z",
+  "generatedAt": "2026-08-27T01:51:28.998Z",
   "root": ".",
   "totalTestFiles": 219,
   "counts": {
-    "CODEMOD_READY": 31,
+    "CODEMOD_READY": 26,
     "AGY_REQUIRED": 17,
     "MIGRATED": 78,
-    "VERIFIED": 93,
+    "VERIFIED": 98,
     "BLOCKED": 0
   },
   "parity": {
@@ -3817,30 +3817,25 @@
     {
       "path": "tests/automation/hybrid-engine.spec.ts",
       "package": "automation",
-      "bytes": 3225,
+      "bytes": 3227,
       "lines": 70,
-      "sha256": "d47b3333489268c674bd3b28c874470e4a7eca46990815581d1d7624a80dfd6d",
+      "sha256": "3cd012faf5a63ad5a1504a34ccf87654ae1baf28c374730cd8b6542f07bc3667",
       "imports": [
-        "vitest",
+        "bun:test",
         "node:fs",
         "node:os",
         "node:path",
         "../../scripts/automation/exec-agy-writer.mjs"
       ],
-      "vitestImports": [
-        "afterAll",
-        "describe",
-        "expect",
-        "it"
-      ],
+      "vitestImports": [],
       "features": [],
       "workload": "PURE",
-      "migrationType": "EASY_MECHANICAL",
+      "migrationType": "ALREADY_MIGRATED",
       "fixturesAndHelpers": [],
       "sourceAnchors": [
         "../../scripts/automation/exec-agy-writer.mjs"
       ],
-      "state": "CODEMOD_READY"
+      "state": "VERIFIED"
     },
     {
       "path": "tests/automation/impl-wave.spec.ts",
@@ -3970,28 +3965,24 @@
     {
       "path": "tests/automation/sharded-wave-rollout.spec.ts",
       "package": "automation",
-      "bytes": 3057,
+      "bytes": 3059,
       "lines": 64,
-      "sha256": "5ee265eb821b074648569dfe524b06f028cfa899d9f9a3b351230309087054c6",
+      "sha256": "7391fa51c4c0ab4a2d750d24e8b38cac90259122b9a9bd3a4bc6739a04b8fed5",
       "imports": [
-        "vitest",
+        "bun:test",
         "../../scripts/automation/sharded-wave-rollout.mjs",
         "../../scripts/automation/package-generations.mjs"
       ],
-      "vitestImports": [
-        "describe",
-        "expect",
-        "it"
-      ],
+      "vitestImports": [],
       "features": [],
       "workload": "PURE",
-      "migrationType": "EASY_MECHANICAL",
+      "migrationType": "ALREADY_MIGRATED",
       "fixturesAndHelpers": [],
       "sourceAnchors": [
         "../../scripts/automation/sharded-wave-rollout.mjs",
         "../../scripts/automation/package-generations.mjs"
       ],
-      "state": "CODEMOD_READY"
+      "state": "VERIFIED"
     },
     {
       "path": "tests/automation/targeted-router-e2e.spec.ts",
@@ -4306,54 +4297,45 @@
     {
       "path": "tests/automation/v3-scheduler-runtime.spec.ts",
       "package": "automation",
-      "bytes": 14550,
+      "bytes": 14552,
       "lines": 359,
-      "sha256": "53c6b74be530383f067fc5c4dc4bde0192af80fdd1b373865e04c1cd48b08334",
+      "sha256": "401677561f0bc31ea64e25152d81588c4a5e90fff23cb9d4fb6d4009c8ccf332",
       "imports": [
-        "vitest",
+        "bun:test",
         "../../scripts/automation/schema.mjs",
         "../../scripts/automation/milestone-scheduler.mjs",
         "../../scripts/automation/foresift-autopilot.mjs"
       ],
-      "vitestImports": [
-        "describe",
-        "expect",
-        "it"
-      ],
+      "vitestImports": [],
       "features": [],
       "workload": "PURE",
-      "migrationType": "EASY_MECHANICAL",
+      "migrationType": "ALREADY_MIGRATED",
       "fixturesAndHelpers": [],
       "sourceAnchors": [
         "../../scripts/automation/schema.mjs",
         "../../scripts/automation/milestone-scheduler.mjs",
         "../../scripts/automation/foresift-autopilot.mjs"
       ],
-      "state": "CODEMOD_READY"
+      "state": "VERIFIED"
     },
     {
       "path": "tests/automation/v4-review-packet.spec.ts",
       "package": "automation",
-      "bytes": 10938,
+      "bytes": 10940,
       "lines": 279,
-      "sha256": "074f3d2558d7b7ae22412b7cfa0eaa1eadda4ef636e7dfe0518f9337d233190a",
+      "sha256": "38eb049e2ff2bfc5e35c9f5a0567d904d837dad315833ed1b58c49a99a325435",
       "imports": [
         "node:fs",
         "node:os",
         "node:path",
-        "vitest",
+        "bun:test",
         "../../scripts/automation/review-packet.mjs",
         "../helpers/git-fixture.js"
       ],
-      "vitestImports": [
-        "afterAll",
-        "describe",
-        "expect",
-        "it"
-      ],
+      "vitestImports": [],
       "features": [],
       "workload": "PURE",
-      "migrationType": "EASY_MECHANICAL",
+      "migrationType": "ALREADY_MIGRATED",
       "fixturesAndHelpers": [
         "../helpers/git-fixture.js"
       ],
@@ -4361,7 +4343,7 @@
         "../../scripts/automation/review-packet.mjs",
         "../helpers/git-fixture.js"
       ],
-      "state": "CODEMOD_READY"
+      "state": "VERIFIED"
     },
     {
       "path": "tests/automation/v4-scheduler.spec.ts",
@@ -4462,25 +4444,21 @@
     {
       "path": "tests/automation/workflow-node-resilience.spec.ts",
       "package": "automation",
-      "bytes": 3711,
+      "bytes": 3713,
       "lines": 87,
-      "sha256": "b04c74c6d9309932623444b612561498a693fb4964dee19bc29fed999650bcdb",
+      "sha256": "f09af7c259c56c8cf645bbe47e4f480c5882045d04f29f025e2581ca26b58938",
       "imports": [
         "node:fs",
         "node:path",
-        "vitest"
+        "bun:test"
       ],
-      "vitestImports": [
-        "describe",
-        "expect",
-        "it"
-      ],
+      "vitestImports": [],
       "features": [],
       "workload": "PURE",
-      "migrationType": "EASY_MECHANICAL",
+      "migrationType": "ALREADY_MIGRATED",
       "fixturesAndHelpers": [],
       "sourceAnchors": [],
-      "state": "CODEMOD_READY"
+      "state": "VERIFIED"
     },
     {
       "path": "tests/negative/AC-001.negative.spec.ts",
@@ -7939,7 +7917,8 @@
       },
       "codexCalls": 0,
       "claudeCalls": 0,
-      "testedHead": "f8347f874b34c5c2bdc1c824b1fea54db0802b93"
+      "testedHead": "f8347f874b34c5c2bdc1c824b1fea54db0802b93",
+      "checkpointHead": "6c063441766da060e1d72c45587ca1bb4d24f602"
     },
     {
       "id": "mechanical-automation-pure-1",
@@ -7952,7 +7931,61 @@
         "tests/automation/v4-review-packet.spec.ts",
         "tests/automation/workflow-node-resilience.spec.ts"
       ],
-      "state": "PENDING"
+      "state": "VERIFIED",
+      "verification": {
+        "ok": true,
+        "wallTimeMs": 807,
+        "peakRssBytes": 0,
+        "cpuSeconds": 0,
+        "counts": {
+          "passed": 38,
+          "failed": 0,
+          "skipped": 0
+        },
+        "results": [
+          {
+            "id": "pure-1",
+            "workload": "PURE",
+            "files": [
+              "tests/automation/hybrid-engine.spec.ts",
+              "tests/automation/sharded-wave-rollout.spec.ts",
+              "tests/automation/v3-scheduler-runtime.spec.ts",
+              "tests/automation/v4-review-packet.spec.ts",
+              "tests/automation/workflow-node-resilience.spec.ts"
+            ],
+            "fileWorkers": 2,
+            "testConcurrency": 8,
+            "command": [
+              "bun",
+              "test",
+              "--no-orphans",
+              "--isolate",
+              "--parallel=2",
+              "--max-concurrency=8",
+              "--timeout=30000",
+              "tests/automation/hybrid-engine.spec.ts",
+              "tests/automation/sharded-wave-rollout.spec.ts",
+              "tests/automation/v3-scheduler-runtime.spec.ts",
+              "tests/automation/v4-review-packet.spec.ts",
+              "tests/automation/workflow-node-resilience.spec.ts"
+            ],
+            "status": 0,
+            "wallTimeMs": 807,
+            "peakRssBytes": null,
+            "cpuSeconds": null,
+            "counts": {
+              "passed": 38,
+              "failed": 0,
+              "skipped": 0
+            },
+            "stdoutTail": "bun test v1.4.0 (34cbb9a40) 2x PARALLEL\n",
+            "stderrTail": "node in foresift-work-package.yaml on_error: all with >=2 attempts [0.31ms]\n\ntests/automation/v3-scheduler-runtime.spec.ts:\n(pass) rankPendingPackages (V3-B runtime order) > is deterministic and total: same inputs ⇒ identical full ordering [6.61ms]\n(pass) rankPendingPackages (V3-B runtime order) > ordering agrees with the documented score comparison at every adjacent pair [5.30ms]\n(pass) rankPendingPackages (V3-B runtime order) > is pure: ranking never mutates milestone state [0.40ms]\n(pass) rankPendingPackages (V3-B runtime order) > ranks only PENDING packages regardless of dependency shape [0.32ms]\n(pass) same-tick slot filling over seeded random DAGs (state machine) > launch sequence is fully deterministic per seed [24.05ms]\n(pass) same-tick slot filling over seeded random DAGs (state machine) > every valid DAG completes: cap/CRITICAL/deps invariants hold throughout [4.30ms]\n(pass) same-tick slot filling over seeded random DAGs (state machine) > one tick fills BOTH standard-policy slots when two candidates are eligible [0.64ms]\n(pass) same-tick slot filling over seeded random DAGs (state machine) > G0 stays capped at ONE concurrent package even with many eligible roots [0.71ms]\n(pass) nextPollDelayMs (V3-B §18 adaptive handoff) > base cadence is the 60s poll on quiet ticks and resets the streak [0.16ms]\n(pass) nextPollDelayMs (V3-B §18 adaptive handoff) > drops to the fast handoff rate right after a launch or during discovery [0.07ms]\n(pass) nextPollDelayMs (V3-B §18 adaptive handoff) > hard-bounds the fast streak, then holds base until a quiet tick resets [0.07ms]\n(pass) nextPollDelayMs (V3-B §18 adaptive handoff) > property sweep: output is always a known cadence with a sane streak [0.24ms]\n\ntests/automation/v4-review-packet.spec.ts:\n(pass) review packet — HEAD binding and determinism (tests 39–40) > binds the exact reviewed HEAD; validation passes at that HEAD [120.93ms]\n(pass) review packet — HEAD binding and determinism (tests 39–40) > changed HEAD after build invalidates the packet (fail-closed) [66.57ms]\n(pass) review packet — HEAD binding and determinism (tests 39–40) > two builds at the same tree are byte-identical (no timestamp, deterministic) [72.92ms]\nfatal: not a git repository (or any of the parent directories): .git\nfatal: not a git repository (or any of the parent directories): .git\n(pass) review packet — HEAD binding and determinism (tests 39–40) > malformed/wrong-schema packets fail closed in validateReviewPacket [10.59ms]\nfatal: not a git repository (or any of the parent directories): .git\nfatal: not a git repository (or any of the parent directories): .git\n(pass) review packet — degradation is recorded, never fabricated > unknown package and absent authority produce valid=false with reasons, still buildable [6.70ms]\n(pass) review packet — degradation is recorded, never fabricated > reads out-of-scope notes verbatim when present [43.83ms]\n(pass) review packet — degradation is recorded, never fabricated > prior unresolved PR threads and unfinished tasks surface as known open issues [42.30ms]\n(pass) finding aggregation — exact duplicates merge, disagreement survives (test 41) > exact duplicates collapse into one entry with occurrences count [0.44ms]\n(pass) finding aggregation — exact duplicates merge, disagreement survives (test 41) > any differing field keeps findings separate — no semantic merging [0.09ms]\n(pass) finding aggregation — exact duplicates merge, disagreement survives (test 41) > empty and undefined inputs aggregate to nothing without throwing [0.04ms]\n(pass) packet artifact round-trip > buildReviewPacket output persists and revalidates from disk bytes [48.17ms]\n(pass) renderReviewPacketMarkdown (V3-C §12) > renders byte-deterministic markdown carrying identity, files, gate evidence [49.49ms]\n(pass) renderReviewPacketMarkdown (V3-C §12) > surfaces degradation HONESTLY at the top instead of pretending health [0.14ms]\n\n 38 pass\n 0 fail\n 445 expect() calls\nRan 38 tests across 5 files. [791.00ms]\n"
+          }
+        ]
+      },
+      "codexCalls": 0,
+      "claudeCalls": 0,
+      "testedHead": "6c063441766da060e1d72c45587ca1bb4d24f602"
     },
     {
       "id": "mechanical-negative-database-pglite-1",

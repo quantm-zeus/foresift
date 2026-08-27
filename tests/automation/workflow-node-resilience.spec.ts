@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'bun:test';
 
 // Regression coverage for defect #10 (live run dc67e884, 2026-08-24): the
 // convergence judge died on "produced no assistant output — the provider

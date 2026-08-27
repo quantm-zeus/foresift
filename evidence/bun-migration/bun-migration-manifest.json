@@ -1,14 +1,14 @@
 {
   "schema": "foresift/bun-migration-manifest@1",
   "migrationId": "bun-test-authority-v1",
-  "generatedAt": "2026-08-27T01:59:16.611Z",
+  "generatedAt": "2026-08-27T01:59:20.460Z",
   "root": ".",
   "totalTestFiles": 219,
   "counts": {
     "CODEMOD_READY": 0,
     "AGY_REQUIRED": 17,
-    "MIGRATED": 31,
-    "VERIFIED": 171,
+    "MIGRATED": 28,
+    "VERIFIED": 174,
     "BLOCKED": 0
   },
   "parity": {
@@ -3753,7 +3753,7 @@
       "sourceAnchors": [
         "../../scripts/automation/finalize-from-main.mjs"
       ],
-      "state": "MIGRATED"
+      "state": "VERIFIED"
     },
     {
       "path": "tests/automation/gate-e2e-green.spec.ts",
@@ -4201,7 +4201,7 @@
         "../helpers/git-fixture.js",
         "../helpers/v2-fixtures.js"
       ],
-      "state": "MIGRATED"
+      "state": "VERIFIED"
     },
     {
       "path": "tests/automation/v3-base-drift.spec.ts",
@@ -4369,7 +4369,7 @@
         "../../scripts/automation/milestone-scheduler.mjs",
         "../helpers/git-fixture.js"
       ],
-      "state": "MIGRATED"
+      "state": "VERIFIED"
     },
     {
       "path": "tests/automation/wave-admission.spec.ts",
@@ -9602,7 +9602,8 @@
       },
       "codexCalls": 0,
       "claudeCalls": 0,
-      "testedHead": "a5001dc2caf80dc9c643064c977cb52f91adc2b9"
+      "testedHead": "a5001dc2caf80dc9c643064c977cb52f91adc2b9",
+      "checkpointHead": "17a39ae35a365e672fdac317ac5ba832ac54eabc"
     },
     {
       "id": "verify-existing-automation-pure-1",
@@ -9613,7 +9614,57 @@
         "tests/automation/v2-throughput.spec.ts",
         "tests/automation/v4-scheduler.spec.ts"
       ],
-      "state": "PENDING"
+      "state": "VERIFIED",
+      "verification": {
+        "ok": true,
+        "wallTimeMs": 3734,
+        "peakRssBytes": 0,
+        "cpuSeconds": 0,
+        "counts": {
+          "passed": 67,
+          "failed": 0,
+          "skipped": 0
+        },
+        "results": [
+          {
+            "id": "pure-1",
+            "workload": "PURE",
+            "files": [
+              "tests/automation/finalize-from-main.spec.ts",
+              "tests/automation/v2-throughput.spec.ts",
+              "tests/automation/v4-scheduler.spec.ts"
+            ],
+            "fileWorkers": 2,
+            "testConcurrency": 8,
+            "command": [
+              "bun",
+              "test",
+              "--no-orphans",
+              "--isolate",
+              "--parallel=2",
+              "--max-concurrency=8",
+              "--timeout=30000",
+              "tests/automation/finalize-from-main.spec.ts",
+              "tests/automation/v2-throughput.spec.ts",
+              "tests/automation/v4-scheduler.spec.ts"
+            ],
+            "status": 0,
+            "wallTimeMs": 3734,
+            "peakRssBytes": null,
+            "cpuSeconds": null,
+            "counts": {
+              "passed": 67,
+              "failed": 0,
+              "skipped": 0
+            },
+            "stdoutTail": "bun test v1.4.0 (34cbb9a40) 2x PARALLEL\n",
+            "stderrTail": "8.88ms]\n(pass) V2 git-derived slice changeset (spec §6) > uncommitted continuation from an interrupted slice is included without any commit [32.70ms]\nfatal: Not a valid object name deadbeefdeadbeef^{commit}\nfatal: Not a valid object name origin/main\n(pass) V2 git-derived slice changeset (spec §6) > unresolvable explicit base falls back WIDER (merge-base); no base at all fails closed [55.00ms]\n(pass) V2 git-derived slice changeset (spec §6) > -z parsers handle diff (from→to) and porcelain (to→from) rename orders [0.27ms]\n(pass) V2 impact-aware FAST verification routing (spec §7) > JS/TS routes to eslint + related tests + typecheck [0.81ms]\n(pass) V2 impact-aware FAST verification routing (spec §7) > SQL/migrations route to database checks (never silently unchecked) [0.16ms]\n(pass) V2 impact-aware FAST verification routing (spec §7) > authoritative JSON/spec routes to authority validators + conformance tests [0.09ms]\n(pass) V2 impact-aware FAST verification routing (spec §7) > Archon YAML/control-plane routes to format check + archon validation [0.09ms]\n(pass) V2 impact-aware FAST verification routing (spec §7) > docs-only slices avoid the full test suite [0.13ms]\n(pass) V2 impact-aware FAST verification routing (spec §7) > package.json (root manifest) escalates FULL — unknown impact never guesses (spec §7) [0.07ms]\n(pass) V2 impact-aware FAST verification routing (spec §7) > pnpm-lock.yaml (lockfile) escalates FULL — unknown impact never guesses (spec §7) [0.02ms]\n(pass) V2 impact-aware FAST verification routing (spec §7) > tsconfig.base.json (tsconfig) escalates FULL — unknown impact never guesses (spec §7) [0.01ms]\n(pass) V2 impact-aware FAST verification routing (spec §7) > .github/workflows/ci.yml (CI definition) escalates FULL — unknown impact never guesses (spec §7) [0.03ms]\n(pass) V2 impact-aware FAST verification routing (spec §7) > Dockerfile (extensionless root type) escalates FULL — unknown impact never guesses (spec §7) [0.04ms]\n(pass) V2 impact-aware FAST verification routing (spec §7) > weird.config.unknownext (unknown extension) escalates FULL — unknown impact never guesses (spec §7) [0.05ms]\n(pass) V2 impact-aware FAST verification routing (spec §7) > scripts/tool.rb (unknown language) escalates FULL — unknown impact never guesses (spec §7) [0.04ms]\n(pass) V2 impact-aware FAST verification routing (spec §7) > mixed slices inherit the strongest requirement (one unknown ⇒ FULL) [0.09ms]\n(pass) V2 impact-aware FAST verification routing (spec §7) > deletions still trigger their category checks even though the file is gone [0.18ms]\n(pass) V2 FAST scope base resolution (spec §6) > prefers a VALID checkpoint head, falls back on drifted cache, then merge-base [18.16ms]\n(pass) V2 deterministic context capsule (spec §5) > derives requirement→acceptance→PRD/ADR references from the manifest [1.68ms]\n(pass) V2 deterministic context capsule (spec §5) > degrades to empty capsule fields instead of throwing when authority is absent [0.46ms]\n(pass) V2 deterministic context capsule (spec §5) > records the previous FAST outcome as a summary, not volatile bulk [0.41ms]\n(pass) V2 deterministic context capsule (spec §5) > source-hash invalidation contract is unchanged by the capsule (PR #19 semantics) [0.48ms]\n(pass) FAST affected-test step (graph-derived selection & fail-closed escalation) > selects affected test files from import graph and executes them under active runner [894.50ms]\n(pass) FAST affected-test step (graph-derived selection & fail-closed escalation) > plain JS/TS slice with zero matching tests escalates fail-closed [629.78ms]\n(pass) FAST affected-test step (graph-derived selection & fail-closed escalation) > database slice with zero matching tests escalates fail-closed [571.28ms]\n(pass) FAST affected-test step (graph-derived selection & fail-closed escalation) > all paths absent/deleted without package fallback escalate fail-closed [1034.02ms]\n\n 67 pass\n 0 fail\n 247 expect() calls\nRan 67 tests across 3 files. [3.72s]\n"
+          }
+        ]
+      },
+      "codexCalls": 0,
+      "claudeCalls": 0,
+      "testedHead": "17a39ae35a365e672fdac317ac5ba832ac54eabc"
     },
     {
       "id": "verify-existing-negative-database-pglite-1",

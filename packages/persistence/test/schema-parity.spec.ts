@@ -162,7 +162,7 @@ describe('Drizzle mirror parity with SQL truth (ADR-001)', () => {
       ];
       const expected = sqlPkMap.get(config.name);
       expect(expected, `${config.name} missing PK in SQL`).toBeDefined();
-      expect([...mirrorPk].sort(), `${config.name} PK mismatch`).toEqual(expected);
+      expect([...mirrorPk].sort(), `${config.name} PK mismatch`).toEqual(expected!);
     }
   });
 });

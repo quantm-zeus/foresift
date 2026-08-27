@@ -105,7 +105,7 @@ describe('golden chain-id vectors through the repository (AC-023)', () => {
   it('stores each registered chain with its expected mapping quality', async () => {
     for (const c of vectors.chains) {
       const identity = await ensureChain(engine, c.chainId);
-      expect(identity.mappingQuality).toBe(c.expectedMappingQuality);
+      expect(String(identity.mappingQuality)).toBe(c.expectedMappingQuality);
       const stored = await engine.query<{ mapping_quality: string }>(
         'SELECT mapping_quality FROM chains WHERE chain_id = $1',
         [c.chainId],
@@ -163,7 +163,9 @@ describe('golden EVM/Solana address vectors (AC-023)', () => {
 
   it('builds CAIP-10 account ids from the fixtures', () => {
     for (const v of vectors.caip10) {
-      expect(caip10(chainIdentity({ chainId: v.chainId }).chainId, v.address)).toBe(v.accountId);
+      expect(String(caip10(chainIdentity({ chainId: v.chainId }).chainId, v.address))).toBe(
+        v.accountId,
+      );
     }
   });
 });
@@ -404,8 +406,8 @@ describe('decimals resolution state machine over golden vectors', () => {
         scenario.representation.chainId,
         scenario.representation.canonicalAddress,
       );
-      expect(snapshot?.decimalsState, scenario.name).toBe(scenario.expectedState);
-      if (last !== null) expect(last.state, scenario.name).toBe(scenario.expectedState);
+      expect(String(snapshot?.decimalsState), scenario.name).toBe(scenario.expectedState);
+      if (last !== null) expect(String(last.state), scenario.name).toBe(scenario.expectedState);
       expect(snapshot?.decimals ?? null, scenario.name).toBe(scenario.expectedDecimals);
     }
   });

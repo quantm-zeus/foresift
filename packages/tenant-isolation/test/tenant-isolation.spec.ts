@@ -256,7 +256,7 @@ describe('resource-access authorization bypass battery (T131, AC-252)', () => {
         // Either normalization unmasks a foreign tenant segment or the
         // escape structure itself is confusion — both refuse pre-fetch.
         expect(['CROSS_TENANT', 'PATH_CONFUSION'], uri).toContain(
-          (error as { detail?: { reason?: string } }).detail?.reason,
+          (error as { detail?: { reason?: string } }).detail?.reason!,
         );
       }
       expect(refused, `must refuse: ${uri}`).toBe(true);

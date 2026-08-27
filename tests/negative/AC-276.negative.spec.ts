@@ -25,7 +25,7 @@ describe('AC-276 negatives: prohibited claims refuse on every channel', () => {
         const result = evaluateClaims(text, channel);
         expect(result.verdict, `${claimClass} on ${channel}`).toBe('REFUSED');
         if (result.verdict === 'REFUSED') {
-          expect(result.claimClasses).toContain(claimClass);
+          expect(result.claimClasses as readonly string[]).toContain(claimClass);
         }
         expect(() => assertClaimsCompliant(text, channel), `${claimClass} via assert`).toThrow(
           /prohibited claims/,

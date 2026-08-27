@@ -164,7 +164,7 @@ describe('claims policy: prohibited claim classes (AC-276)', () => {
       const result = evaluateClaims(text, 'MARKETING');
       expect(result.verdict, text).toBe('REFUSED');
       assert(result.verdict === 'REFUSED', text);
-      expect(result.claimClasses).toContain(expected);
+      expect(result.claimClasses as readonly string[]).toContain(expected);
     }
   });
 

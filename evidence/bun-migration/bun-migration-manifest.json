@@ -1,14 +1,14 @@
 {
   "schema": "foresift/bun-migration-manifest@1",
   "migrationId": "bun-test-authority-v1",
-  "generatedAt": "2026-08-27T01:53:40.058Z",
+  "generatedAt": "2026-08-27T01:57:39.048Z",
   "root": ".",
   "totalTestFiles": 219,
   "counts": {
     "CODEMOD_READY": 0,
     "AGY_REQUIRED": 17,
-    "MIGRATED": 34,
-    "VERIFIED": 168,
+    "MIGRATED": 48,
+    "VERIFIED": 154,
     "BLOCKED": 0
   },
   "parity": {
@@ -171,9 +171,9 @@
     {
       "path": "packages/evidence/test/evidence-index-replay.spec.ts",
       "package": "@foresift/evidence",
-      "bytes": 7160,
+      "bytes": 7176,
       "lines": 185,
-      "sha256": "7e93a9981a15e829bb21e292d9db702e6931b20af0d07330fab05bc448527798",
+      "sha256": "b5808f484a0827a3c8f9c76c4ff8334698a0e37e21de69249832112836160ee4",
       "imports": [
         "node:path",
         "node:url",
@@ -474,9 +474,9 @@
     {
       "path": "packages/persistence/test/identity-repo.spec.ts",
       "package": "@foresift/persistence",
-      "bytes": 19765,
-      "lines": 533,
-      "sha256": "45d00b11125f813dbc107eeb2b7d30e1e4085c80faac1fcc37737f476bf48a72",
+      "bytes": 19814,
+      "lines": 535,
+      "sha256": "472a5eb8758b2579bbf3df3fe82c41577362e5e0608f45430970678932fc7369",
       "imports": [
         "node:fs/promises",
         "node:path",
@@ -498,7 +498,7 @@
         "../src/index.ts",
         "@foresift/domain"
       ],
-      "state": "VERIFIED"
+      "state": "MIGRATED"
     },
     {
       "path": "packages/persistence/test/migrator.spec.ts",
@@ -657,9 +657,9 @@
     {
       "path": "packages/persistence/test/schema-parity.spec.ts",
       "package": "@foresift/persistence",
-      "bytes": 10900,
+      "bytes": 10901,
       "lines": 284,
-      "sha256": "b94c3f7099a352a8c43ff018588fcf021b8b334c53ceef5fe5679ef6c106b751",
+      "sha256": "6d01fbe5490693218733bac9742f1097d45da07d742c66f4f29e82f09de27268",
       "imports": [
         "bun:test",
         "@electric-sql/pglite",
@@ -684,14 +684,14 @@
         "../src/index.ts",
         "../src/generated/schema.ts"
       ],
-      "state": "VERIFIED"
+      "state": "MIGRATED"
     },
     {
       "path": "packages/persistence/test/sources.spec.ts",
       "package": "@foresift/persistence",
-      "bytes": 7946,
+      "bytes": 7962,
       "lines": 220,
-      "sha256": "35f5c11cf4f4126ee9383302f40061f3db5ef032b73e5d9be5bd27824b52140c",
+      "sha256": "4da27b275b08b92e66cdad5fa4967e87031055db32f6329d96a11179900bcc37",
       "imports": [
         "node:path",
         "node:url",
@@ -711,7 +711,7 @@
         "@foresift/domain",
         "../src/index.ts"
       ],
-      "state": "VERIFIED"
+      "state": "MIGRATED"
     },
     {
       "path": "packages/provider-lifecycle/test/artifact-registry.spec.ts",
@@ -928,9 +928,9 @@
     {
       "path": "packages/provider-lifecycle/test/response-quarantine.spec.ts",
       "package": "@foresift/provider-lifecycle",
-      "bytes": 7402,
+      "bytes": 7429,
       "lines": 185,
-      "sha256": "aa3bdc3056d16ff03be917744ebfa9939dab3141e6f1326d061e1dfc7d824f4e",
+      "sha256": "84bc872631fd36b13b2a3b9ab243df4cd81272144820490d759a1d25117afb82",
       "imports": [
         "bun:test",
         "@foresift/security",
@@ -953,7 +953,7 @@
         "../src/index.ts",
         "./helpers.ts"
       ],
-      "state": "VERIFIED"
+      "state": "MIGRATED"
     },
     {
       "path": "packages/provider-lifecycle/test/rights-matrix.spec.ts",
@@ -1012,9 +1012,9 @@
     {
       "path": "packages/provider-lifecycle/test/schema-parity.spec.ts",
       "package": "@foresift/provider-lifecycle",
-      "bytes": 7506,
+      "bytes": 7507,
       "lines": 189,
-      "sha256": "bfbc468e8561a88a7e3e8983223c0c8ad41dd56a0e42473627d5e186384e93ce",
+      "sha256": "eb138d57b3a0b578a83cc66a3547afe696ae37672c459c39e7ac40e6ae5f6892",
       "imports": [
         "bun:test",
         "@electric-sql/pglite",
@@ -1037,7 +1037,7 @@
         "@foresift/persistence",
         "../src/generated/schema.ts"
       ],
-      "state": "VERIFIED"
+      "state": "MIGRATED"
     },
     {
       "path": "packages/provider-lifecycle/test/source-fingerprints.spec.ts",
@@ -1292,9 +1292,9 @@
     {
       "path": "packages/security/test/audit-chain.spec.ts",
       "package": "@foresift/security",
-      "bytes": 17043,
+      "bytes": 17044,
       "lines": 476,
-      "sha256": "46d9bc2d8d21196196aaac8c0dc723a58e3b503f920f3cb7b615035938e4ae46",
+      "sha256": "5e5dd667969f3d9f2290b3835e6593d72f14cee41cd813f126d2432716f917bc",
       "imports": [
         "bun:test",
         "node:crypto",
@@ -1316,7 +1316,7 @@
         "@foresift/persistence",
         "../src/audit-chain.ts"
       ],
-      "state": "VERIFIED"
+      "state": "MIGRATED"
     },
     {
       "path": "packages/security/test/egress.spec.ts",
@@ -1471,9 +1471,9 @@
     {
       "path": "packages/security/test/negative-capability.spec.ts",
       "package": "@foresift/security",
-      "bytes": 10427,
+      "bytes": 10435,
       "lines": 270,
-      "sha256": "6a638ee721215c5b50f0b36e909f873ea19f94b3c47cbce2fcc4708b5c621f1f",
+      "sha256": "00b879d9a1af2c35a08cede8d95c903bd9e9e0f223a5abd2c4a70cd56bdd8a8f",
       "imports": [
         "node:fs",
         "node:path",
@@ -1495,7 +1495,7 @@
         "../src/decoder-authority.ts",
         "../src/supply-chain.ts"
       ],
-      "state": "VERIFIED"
+      "state": "MIGRATED"
     },
     {
       "path": "packages/security/test/oauth-credentials.spec.ts",
@@ -1599,9 +1599,9 @@
     {
       "path": "packages/security/test/schema-parity.spec.ts",
       "package": "@foresift/security",
-      "bytes": 7376,
+      "bytes": 7377,
       "lines": 187,
-      "sha256": "a3124497628f587a2c671913b6dd108be858053d4ddc837dd19750cd8cebd587",
+      "sha256": "b4f49c144628cb3fe39c47c1e139c8d836f81dd53aa94ad3264d1cde82e20638",
       "imports": [
         "bun:test",
         "@electric-sql/pglite",
@@ -1624,14 +1624,14 @@
         "@foresift/persistence",
         "../src/generated/schema.ts"
       ],
-      "state": "VERIFIED"
+      "state": "MIGRATED"
     },
     {
       "path": "packages/security/test/secrets-claims.spec.ts",
       "package": "@foresift/security",
-      "bytes": 9977,
+      "bytes": 9998,
       "lines": 243,
-      "sha256": "61299b8061013ac412b5401d151987c61d919077ca6853f89bd9a4ba40ae9bff",
+      "sha256": "ff64a9df4bfaad664731ae5fbce0047444cd30b0c94a0be3914bcf7d6b013ee2",
       "imports": [
         "bun:test",
         "node:assert",
@@ -1649,7 +1649,7 @@
         "../src/secrets-policy.ts",
         "../src/claims-policy.ts"
       ],
-      "state": "VERIFIED"
+      "state": "MIGRATED"
     },
     {
       "path": "packages/security/test/threat-model-register.spec.ts",
@@ -1866,9 +1866,9 @@
     {
       "path": "packages/tenant-isolation/test/tenant-isolation.spec.ts",
       "package": "@foresift/tenant-isolation",
-      "bytes": 13190,
+      "bytes": 13191,
       "lines": 373,
-      "sha256": "9fa07af4b5e4556c7421df129fade3712878a71b7ddcff51f2c73f7064ce5b04",
+      "sha256": "7c560fb7f9514ec591cb9863953d1998349d15f1806fced30ae9dfca22ddf35d",
       "imports": [
         "bun:test",
         "../src/index.ts"
@@ -1881,7 +1881,7 @@
       "sourceAnchors": [
         "../src/index.ts"
       ],
-      "state": "VERIFIED"
+      "state": "MIGRATED"
     },
     {
       "path": "packages/tool-core/test/cache-key.spec.ts",
@@ -3390,9 +3390,9 @@
     {
       "path": "tests/acceptance/AC-273.spec.ts",
       "package": "acceptance",
-      "bytes": 6470,
+      "bytes": 6494,
       "lines": 178,
-      "sha256": "9e69626d8ee1d153e80e474df27ff215f3e86e03453f67652883930784bc801c",
+      "sha256": "83743e5e98728cc80bad5e9fa667e44deabb5381a6fc11c108356216bc90324e",
       "imports": [
         "bun:test",
         "@foresift/provider-lifecycle",
@@ -3409,7 +3409,7 @@
         "@foresift/provider-lifecycle",
         "../helpers/prov.ts"
       ],
-      "state": "VERIFIED"
+      "state": "MIGRATED"
     },
     {
       "path": "tests/acceptance/AC-274.spec.ts",
@@ -3714,9 +3714,9 @@
     {
       "path": "tests/automation/control-plane.spec.ts",
       "package": "automation",
-      "bytes": 21769,
-      "lines": 541,
-      "sha256": "5ebe0e105205d71a89bdbca6e934cae8388c839af26209861b2453262d1ebb3e",
+      "bytes": 21819,
+      "lines": 543,
+      "sha256": "900b8923f893cf973005775fc9daaacb68d8daef7e8fb69cfe04076e81af832f",
       "imports": [
         "bun:test",
         "../../scripts/automation/schema.mjs",
@@ -3733,7 +3733,7 @@
         "../../scripts/automation/schema.mjs",
         "../../scripts/automation/schema.mjs"
       ],
-      "state": "VERIFIED"
+      "state": "MIGRATED"
     },
     {
       "path": "tests/automation/finalize-from-main.spec.ts",
@@ -5539,9 +5539,9 @@
     {
       "path": "tests/negative/AC-271.negative.spec.ts",
       "package": "negative",
-      "bytes": 7353,
+      "bytes": 7374,
       "lines": 182,
-      "sha256": "7f552e2bd79e97512a7612d34099c3134f71ca3610d84ef3be87584c661cc722",
+      "sha256": "284b9df981e8054df1fac57c6e5a61e60d153f3080e528ed868745fe8b30c6b3",
       "imports": [
         "bun:test",
         "@foresift/persistence",
@@ -5564,7 +5564,7 @@
         "@foresift/provider-lifecycle",
         "../helpers/prov.ts"
       ],
-      "state": "VERIFIED"
+      "state": "MIGRATED"
     },
     {
       "path": "tests/negative/AC-272.negative.spec.ts",
@@ -5682,9 +5682,9 @@
     {
       "path": "tests/negative/AC-276.negative.spec.ts",
       "package": "negative",
-      "bytes": 2079,
+      "bytes": 2100,
       "lines": 47,
-      "sha256": "d28710ee1fae992961efcfa5287c74cd95403bb588744e176108469dde047a0d",
+      "sha256": "3fc0bbcf88c6a399c5ff4acc529f6fecd9eb6ea1a4a57a3cfeffdef51dcc51d7",
       "imports": [
         "bun:test",
         "../../packages/security/src/claims-policy.ts"
@@ -5697,7 +5697,7 @@
       "sourceAnchors": [
         "../../packages/security/src/claims-policy.ts"
       ],
-      "state": "VERIFIED"
+      "state": "MIGRATED"
     },
     {
       "path": "tests/negative/AC-277.negative.spec.ts",
@@ -7676,32 +7676,6 @@
       "checkpointHead": "f8347f874b34c5c2bdc1c824b1fea54db0802b93"
     },
     {
-      "id": "agy-semantic-1",
-      "engine": "AGY",
-      "workload": "OTHER_HEAVY",
-      "files": [
-        "packages/persistence/test/backup-governance.spec.ts",
-        "packages/persistence/test/features-parity.spec.ts",
-        "packages/persistence/test/migrator.spec.ts",
-        "packages/provider-lifecycle/test/scaffold.spec.ts",
-        "packages/providers/test/scaffold.spec.ts",
-        "packages/security/test/scaffold.spec.ts",
-        "packages/shared-schemas/test/prov.spec.ts",
-        "packages/shared-schemas/test/sec.spec.ts",
-        "packages/tenant-isolation/test/scaffold.spec.ts",
-        "tests/automation/bun-migration.spec.ts",
-        "tests/automation/codex-agy-profile.spec.ts",
-        "tests/automation/test-tiers.spec.ts",
-        "tests/automation/throughput.spec.ts",
-        "tests/automation/v2-gate-convergence.spec.ts",
-        "tests/automation/v2-second-pass-cases.spec.ts",
-        "tests/automation/v3-generations.spec.ts",
-        "tests/spec-verify.spec.ts"
-      ],
-      "state": "PENDING",
-      "attempts": 0
-    },
-    {
       "id": "mechanical-automation-process-1",
       "engine": "CODEMOD",
       "workload": "PROCESS",
@@ -8847,7 +8821,147 @@
       },
       "codexCalls": 0,
       "claudeCalls": 0,
-      "testedHead": "ac21469cbef2a3b59c43388a64b8f5bab8224bd6"
+      "testedHead": "ac21469cbef2a3b59c43388a64b8f5bab8224bd6",
+      "checkpointHead": "62457256b5bcf76e93a2aa7296ceeb5656f1f298"
+    },
+    {
+      "id": "agy-semantic-1",
+      "engine": "AGY",
+      "workload": "OTHER_HEAVY",
+      "files": [
+        "packages/persistence/test/backup-governance.spec.ts",
+        "packages/persistence/test/features-parity.spec.ts",
+        "packages/persistence/test/migrator.spec.ts",
+        "packages/provider-lifecycle/test/scaffold.spec.ts",
+        "packages/providers/test/scaffold.spec.ts",
+        "packages/security/test/scaffold.spec.ts",
+        "packages/shared-schemas/test/prov.spec.ts",
+        "packages/shared-schemas/test/sec.spec.ts",
+        "packages/tenant-isolation/test/scaffold.spec.ts",
+        "tests/automation/bun-migration.spec.ts",
+        "tests/automation/codex-agy-profile.spec.ts",
+        "tests/automation/test-tiers.spec.ts",
+        "tests/automation/throughput.spec.ts",
+        "tests/automation/v2-gate-convergence.spec.ts",
+        "tests/automation/v2-second-pass-cases.spec.ts",
+        "tests/automation/v3-generations.spec.ts",
+        "tests/spec-verify.spec.ts"
+      ],
+      "state": "PENDING",
+      "attempts": 0
+    },
+    {
+      "id": "verify-existing--foresift-evidence-database-pglite-1",
+      "engine": "VERIFY_EXISTING",
+      "workload": "DATABASE_PGLITE",
+      "files": [
+        "packages/evidence/test/evidence-index-replay.spec.ts"
+      ],
+      "state": "VERIFIED",
+      "verification": {
+        "ok": true,
+        "wallTimeMs": 2963,
+        "peakRssBytes": 0,
+        "cpuSeconds": 0,
+        "counts": {
+          "passed": 5,
+          "failed": 0,
+          "skipped": 0
+        },
+        "results": [
+          {
+            "id": "pglite-1",
+            "workload": "DATABASE_PGLITE",
+            "files": [
+              "packages/evidence/test/evidence-index-replay.spec.ts"
+            ],
+            "fileWorkers": 1,
+            "testConcurrency": 1,
+            "command": [
+              "bun",
+              "test",
+              "--no-orphans",
+              "--isolate",
+              "--parallel=1",
+              "--max-concurrency=1",
+              "--timeout=30000",
+              "packages/evidence/test/evidence-index-replay.spec.ts"
+            ],
+            "status": 0,
+            "wallTimeMs": 2962,
+            "peakRssBytes": null,
+            "cpuSeconds": null,
+            "counts": {
+              "passed": 5,
+              "failed": 0,
+              "skipped": 0
+            },
+            "stdoutTail": "bun test v1.4.0 (34cbb9a40) 1x PARALLEL\n",
+            "stderrTail": "\npackages/evidence/test/evidence-index-replay.spec.ts:\n(pass) content-addressed frozen bundles > hashes canonical JSON — key order never changes the content address [0.19ms]\n(pass) content-addressed frozen bundles > freezes idempotently for identical content and refuses identity conflicts [17.71ms]\n(pass) content-addressed frozen bundles > refuses any mutation of a frozen bundle row [3.27ms]\n(pass) content-addressed frozen bundles > detects out-of-band manifest tampering as HASH_MISMATCH [7.79ms]\n(pass) replay-boundary resolution over bundles + observations > includes only bundles and observation revisions visible at T [9.16ms]\n\n 5 pass\n 0 fail\n 16 expect() calls\nRan 5 tests across 1 file. [2.84s]\n"
+          }
+        ]
+      },
+      "codexCalls": 0,
+      "claudeCalls": 0,
+      "testedHead": "62457256b5bcf76e93a2aa7296ceeb5656f1f298"
+    },
+    {
+      "id": "verify-existing--foresift-persistence-database-pglite-1",
+      "engine": "VERIFY_EXISTING",
+      "workload": "DATABASE_PGLITE",
+      "files": [
+        "packages/persistence/test/identity-repo.spec.ts",
+        "packages/persistence/test/schema-parity.spec.ts",
+        "packages/persistence/test/sources.spec.ts"
+      ],
+      "state": "PENDING"
+    },
+    {
+      "id": "verify-existing--foresift-provider-lifecycle-database-pglite-1",
+      "engine": "VERIFY_EXISTING",
+      "workload": "DATABASE_PGLITE",
+      "files": [
+        "packages/provider-lifecycle/test/schema-parity.spec.ts"
+      ],
+      "state": "PENDING"
+    },
+    {
+      "id": "verify-existing--foresift-provider-lifecycle-pure-1",
+      "engine": "VERIFY_EXISTING",
+      "workload": "PURE",
+      "files": [
+        "packages/provider-lifecycle/test/response-quarantine.spec.ts"
+      ],
+      "state": "PENDING"
+    },
+    {
+      "id": "verify-existing--foresift-security-database-pglite-1",
+      "engine": "VERIFY_EXISTING",
+      "workload": "DATABASE_PGLITE",
+      "files": [
+        "packages/security/test/audit-chain.spec.ts",
+        "packages/security/test/schema-parity.spec.ts"
+      ],
+      "state": "PENDING"
+    },
+    {
+      "id": "verify-existing--foresift-security-pure-1",
+      "engine": "VERIFY_EXISTING",
+      "workload": "PURE",
+      "files": [
+        "packages/security/test/negative-capability.spec.ts",
+        "packages/security/test/secrets-claims.spec.ts"
+      ],
+      "state": "PENDING"
+    },
+    {
+      "id": "verify-existing--foresift-tenant-isolation-pure-1",
+      "engine": "VERIFY_EXISTING",
+      "workload": "PURE",
+      "files": [
+        "packages/tenant-isolation/test/tenant-isolation.spec.ts"
+      ],
+      "state": "PENDING"
     },
     {
       "id": "verify-existing-automation-meta-gate-1",
@@ -8860,6 +8974,15 @@
         "tests/automation/targeted-router-e2e.spec.ts",
         "tests/automation/v3-base-drift.spec.ts",
         "tests/automation/workflow-node-budgets.spec.ts"
+      ],
+      "state": "PENDING"
+    },
+    {
+      "id": "verify-existing-automation-process-1",
+      "engine": "VERIFY_EXISTING",
+      "workload": "PROCESS",
+      "files": [
+        "tests/automation/control-plane.spec.ts"
       ],
       "state": "PENDING"
     },
@@ -8911,7 +9034,9 @@
         "tests/negative/AC-248.negative.spec.ts",
         "tests/negative/AC-249.negative.spec.ts",
         "tests/negative/AC-254.negative.spec.ts",
-        "tests/negative/AC-255.negative.spec.ts"
+        "tests/negative/AC-255.negative.spec.ts",
+        "tests/negative/AC-271.negative.spec.ts",
+        "tests/negative/AC-276.negative.spec.ts"
       ],
       "state": "PENDING"
     }

@@ -86,7 +86,7 @@ describe('CLI ↔ canary fixture parity (AC-255)', () => {
       path.join(REPO_ROOT, 'scripts/scan-prohibited-capabilities/cli.mjs')
     );
     const report = runScan({ root: FIXTURES_DIR });
-    const cliKeys = new Set(
+    const cliKeys = new Set<string>(
       report.findings
         .filter((f: { surface: string }) => f.surface === 'SOURCE_SCAN')
         .map(

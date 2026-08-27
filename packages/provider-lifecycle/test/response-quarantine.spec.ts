@@ -100,7 +100,7 @@ describe('T119 deterministic response scanning', () => {
     const input = { a: 1, swap_transaction: 'x', nested: { serialized_tx: 'y' }, keep: true };
     const { stripped, removedPaths } = stripTransactionBuildingFields(input);
     expect(removedPaths).toEqual(['nested.serialized_tx', 'swap_transaction']);
-    expect(stripped).toEqual({ a: 1, nested: {}, keep: true });
+    expect(stripped as Record<string, unknown>).toEqual({ a: 1, nested: {}, keep: true });
   });
 });
 

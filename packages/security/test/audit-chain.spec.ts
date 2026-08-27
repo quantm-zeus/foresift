@@ -466,7 +466,7 @@ describe('divergence classification (AC-259 fixture battery)', () => {
       }
       const outcome = await h.chain.verifyRange();
       expect(outcome.run.verdict).toBe('FAILED');
-      expect(['CHAIN_BREAK', 'REORDERING']).toContain(outcome.run.divergenceKind);
+      expect(['CHAIN_BREAK', 'REORDERING']).toContain(outcome.run.divergenceKind!);
       expect(outcome.run.firstDivergenceSeq).toBe(4);
     } finally {
       await h.db.close();

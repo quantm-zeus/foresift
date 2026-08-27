@@ -238,9 +238,9 @@ function stubDir() {
 function installStub() {
   const dir = stubDir();
   mkdirSync(dir, { recursive: true });
-  const p = join(dir, 'archon');
+  const archonPath = join(dir, 'archon');
   writeFileSync(
-    p,
+    archonPath,
     [
       '#!/usr/bin/env bash',
       'printf \'%s\\n\' "$*" >> "${FAKE_ARCHON_LOG:?}"',
@@ -252,7 +252,56 @@ function installStub() {
       'esac',
     ].join('\n'),
   );
-  chmodSync(p, 0o755);
+  chmodSync(archonPath, 0o755);
+
+  // Stub 'gh' binary: returns green CI check-run responses for API calls.
+  // This replaces the removed FORESIFT_HERMETIC_CI_GREEN production bypass.
+  // Tests that need specific CI behavior can override via opts.env.
+  const ghPath = join(dir, 'gh');
+  const greenCheckRun = JSON.stringify([
+    {
+      name: 'Verify (spec, format, lint, types, tests)',
+      status: 'completed',
+      conclusion: 'success',
+      html_url: 'https://github.com/quantm-zeus/foresift/actions/runs/stub',
+      id: 1,
+      app_id: 15368,
+      app_slug: 'github-actions',
+    },
+  ]);
+  const greenProtection = JSON.stringify({
+    enforce_admins: { enabled: true },
+    required_status_checks: {
+      strict: true,
+      checks: [
+        {
+          context: 'Verify (spec, format, lint, types, tests)',
+          app_id: 15368,
+        },
+      ],
+    },
+  });
+  writeFileSync(
+    ghPath,
+    [
+      '#!/usr/bin/env bash',
+      '# Stub gh: intercepts CI authority and state-landing calls without network.',
+      '# Replaces FORESIFT_HERMETIC_CI_GREEN with a proper stub gh binary.',
+      'case "$*" in',
+      `  "api repos/"*"/branches/"*"/protection") printf '%s\\n' '${greenProtection}' ;;`,
+      `  "api repos/"*"/commits/"*"/check-runs"*) printf '%s\\n' '${greenCheckRun}' ;;`,
+      `  "api repos/"*) printf '%s\\n' '${greenCheckRun}' ;;`,
+      '  "pr list"*) printf \'[]\' ;;',
+      '  "pr create"*) printf \'https://github.com/quantm-zeus/foresift/pull/stub\' ;;',
+      '  "pr merge"*) printf \'{"merged":true}\' ;;',
+      '  "pr view"*) printf \'{"state":"MERGED","mergeCommit":{"oid":"stubmergesha"}}\' ;;',
+      '  "run list"*) printf \'[]\' ;;',
+      '  "run view"*) printf \'\' ;;',
+      '  *) printf \'{"ok":true}\' ;;',
+      'esac',
+    ].join('\n'),
+  );
+  chmodSync(ghPath, 0o755);
 }
 
 interface TickOpts {
@@ -272,7 +321,7 @@ function tick(sandbox: Sandbox, args: string[] = ['--once'], opts: TickOpts = {}
       FORESIFT_AUTOPILOT_REPO: sandbox.fx.root,
       FORESIFT_AUTOPILOT_STATE_DIR: sandbox.stateDir,
       FORESIFT_SALVAGE_SKIP_INSTALL: '1',
-      FORESIFT_HERMETIC_CI_GREEN: '1',
+      // NOTE: No FORESIFT_HERMETIC_CI_GREEN here — CI authority uses the stub gh binary in PATH.
       PATH: `${stubDir()}:${process.env.PATH ?? ''}`,
       FAKE_ARCHON_LOG: join(sandbox.stateDir, 'archon.log'),
       FAKE_RUNS_FILE: join(sandbox.stateDir, 'fake-runs.json'),

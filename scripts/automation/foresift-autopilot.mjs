@@ -97,6 +97,8 @@ import {
   validateBunMigrationProof,
 } from './bun-migration-state.mjs';
 import { getMainCiStatus, validateDirectMainPushWhitelist } from './ci-authority.mjs';
+import { landStateViaPR, recoverPendingStateLandings } from './state-landing.mjs';
+import { auditGitHubProtection } from './audit-github-protection.mjs';
 
 // Overridable for hermetic selftests (sandboxed fixture repo + state dir).
 const REPO = process.env.FORESIFT_AUTOPILOT_REPO ?? join(import.meta.dirname, '..', '..');
@@ -115,6 +117,14 @@ export const POLL_INTERVAL_MS = 60_000;
 // interval until a quiet tick resets the streak.
 export const HANDOFF_POLL_MS = 10_000;
 export const HANDOFF_FAST_STREAK_MAX = 6;
+
+// ── Protection audit cache ────────────────────────────────────────────────────
+// Audit runs at startup and before first product launch; cached for TTL.
+// Fail-closed for NEW launches on audit failure — does NOT kill active packages.
+export const PROTECTION_AUDIT_TTL_MS = 1_800_000; // 30 minutes
+let _auditResult = null; // last audit result
+let _auditAt = 0; // timestamp of last audit
+let _auditBlocksLaunches = false; // true if last audit failed
 
 /**
  * Pure handoff-cadence decision (V3-B §18). Given whether the last tick
@@ -309,11 +319,6 @@ let commitQueue = Promise.resolve();
 const enqueue = (fn) => (commitQueue = commitQueue.then(fn, fn));
 
 function refreshMain() {
-  const dirty = sh('git status --porcelain -- specs/implementation');
-  if (!dirty.ok || dirty.out) {
-    log('main checkout has uncommitted implementation-state changes; committing first');
-    commitState('specs/implementation', 'chore(autopilot): restore unsaved implementation state');
-  }
   enqueue(() => {
     sh('git fetch origin main --quiet');
     const behind = sh('git rev-list --count main..origin/main');
@@ -324,8 +329,101 @@ function refreshMain() {
       log('WARN: could not fast-forward main');
   });
 }
-/** Commit + push implementation-state metadata directly (not product source). Serialized. */
-function commitState(pathspec, message) {
+
+/**
+ * HARD LAW: NORMAL AUTOPILOT NEVER DIRECT-PUSHES A NEW COMMIT TO PROTECTED MAIN.
+ *
+ * All state mutation goes through the protected state-landing PR lane:
+ *   state branch → push → PR → exact-head CI → squash merge → refresh
+ *
+ * This replaces the old `commitState()` which attempted `git push origin main`.
+ * The transition is crash-safe and idempotent via the state-transition receipt.
+ *
+ * @param {string} pathspec - git pathspec for files to stage (e.g. 'specs/implementation')
+ * @param {string} message - commit message / PR title
+ * @param {{ packageId?: string, fromStatus?: string, toStatus?: string }} [meta]
+ */
+function commitStateViaPR(
+  pathspec,
+  message,
+  { packageId = null, fromStatus = null, toStatus = null } = {},
+) {
+  enqueue(async () => {
+    // Stage files to read current content
+    const addResult = sh(`git add ${pathspec}`);
+    if (!addResult.ok) return log('WARN: git add failed for state landing');
+
+    // Check if there's actually anything staged
+    if (sh('git diff --cached --quiet').ok) {
+      sh('git reset -q');
+      return; // nothing to commit — already matches working tree
+    }
+
+    // Collect staged files and their new contents
+    const staged = sh('git diff --cached --name-only').out.split('\n').filter(Boolean);
+    const wl = validateDirectMainPushWhitelist(staged);
+    if (!wl.allowed) {
+      sh('git reset -q');
+      log(`WARN: state landing refused (non-whitelist files): ${wl.reason}`);
+      return;
+    }
+
+    // Capture file contents BEFORE resetting the index
+    const fileChanges = [];
+    for (const filePath of staged) {
+      try {
+        const { readFileSync: rf } = await import('node:fs');
+        fileChanges.push({ path: filePath, content: rf(join(REPO, filePath), 'utf8') });
+      } catch (e) {
+        log(`WARN: could not read staged file ${filePath}: ${e.message}`);
+      }
+    }
+
+    // Reset the index so the working tree is clean for landing
+    sh('git reset -q');
+
+    if (fileChanges.length === 0) {
+      log('WARN: state landing: no file contents captured');
+      return;
+    }
+
+    // Use the protected state-landing PR lane
+    const result = landStateViaPR({
+      fileChanges,
+      message,
+      stateDir: STATE_DIR,
+      repoDir: REPO,
+      packageId,
+      fromStatus,
+      toStatus,
+      log: (msg) => log(msg),
+    });
+
+    if (result.ok) {
+      log(`state landing complete: ${result.receipt?.transitionId} → ${result.receipt?.mergedSha}`);
+      // Refresh local main to pick up the merged commit
+      sh('git fetch origin main --quiet');
+      if (!sh('git merge --ff-only origin/main').ok)
+        log('WARN: could not fast-forward after state landing');
+    } else {
+      log(`WARN: state landing failed: ${result.reason}`);
+    }
+  });
+}
+
+// Keep legacy name as alias: the supervisory loop uses commitStateViaPR (PR lane).
+const commitState = commitStateViaPR;
+
+/**
+ * Operator-only direct-commit path for maintenance commands that run AFTER
+ * the service unit has been stopped (--restart-package, --finalize-from-main,
+ * --seed-package-planning). These are explicit operator actions, not
+ * autonomous supervisory pushes. They still validate the whitelist.
+ *
+ * HARD LAW: This function MUST NOT be called from the supervisory loop (tick,
+ * selectAndLaunch, etc.) — only from operator maintenance command handlers.
+ */
+function commitStateDirect(pathspec, message) {
   enqueue(() => {
     if (!sh(`git add ${pathspec}`).ok) return log('WARN: git add failed');
     if (sh('git diff --cached --quiet').ok) return; // nothing staged
@@ -333,15 +431,15 @@ function commitState(pathspec, message) {
     const wl = validateDirectMainPushWhitelist(staged);
     if (!wl.allowed) {
       sh('git reset -q');
-      log(`WARN: direct-main state commit refused: ${wl.reason}`);
+      log(`WARN: operator direct commit refused (non-whitelist files): ${wl.reason}`);
       return;
     }
     if (!sh(`git commit -m ${JSON.stringify(message)} -q`).ok) {
       sh('git reset -q');
-      return log('WARN: state commit failed');
+      return log('WARN: operator state commit failed');
     }
     if (!sh('git push origin main --quiet').ok)
-      log('WARN: push of state commit failed (will retry next tick)');
+      log('WARN: operator push failed (will require manual push)');
   });
 }
 
@@ -399,24 +497,32 @@ function launchIdentity(p) {
   };
 }
 
-function persistMilestoneState(ms, message) {
+function persistMilestoneState(ms, message, { direct = false } = {}) {
   const file = join(REPO, 'specs', 'implementation', 'current-milestone.json');
   writeFileSync(file, JSON.stringify(ms, null, 2) + '\n');
   // Keep supervisor-written state Prettier-clean: these chore commits land
-  // directly on main, and a raw JSON.stringify write would leave the next
-  // PR failing format:check. Cosmetic only — never blocks the status flip.
+  // via the state-landing PR lane, and a raw JSON.stringify write would leave
+  // the next PR failing format:check. Cosmetic only — never blocks the status flip.
   const fmt = sh(
     'npx --no-install prettier --write --log-level silent specs/implementation/current-milestone.json',
   );
   if (!fmt.ok) log('WARN: prettier-format of milestone state skipped (cosmetic only)');
-  commitState('specs/implementation', message);
+  // Supervisory loop: PR-lane (HARD LAW: no direct main push from normal autopilot).
+  // Operator maintenance commands: direct commit (service unit must be stopped first).
+  if (direct) {
+    commitStateDirect('specs/implementation', message);
+  } else {
+    commitState('specs/implementation', message);
+  }
 }
 
-function setPackageStatus(ms, packageId, status) {
+function setPackageStatus(ms, packageId, status, { direct = false } = {}) {
   const pkg = findPackage(ms, packageId);
   if (!pkg || pkg.status === status) return false;
   pkg.status = status;
-  persistMilestoneState(ms, `chore(autopilot): ${ms.milestoneId}/${packageId} -> ${status}`);
+  persistMilestoneState(ms, `chore(autopilot): ${ms.milestoneId}/${packageId} -> ${status}`, {
+    direct,
+  });
   return true;
 }
 
@@ -1684,6 +1790,43 @@ function selectAndLaunch(st) {
     return 0;
   }
 
+  // C. PROTECTION AUDIT GATE: Branch protection must be verifiably intact
+  // before launching new packages. Cached result used within TTL.
+  // Does NOT kill active packages — only blocks NEW launches.
+  {
+    const auditStale = !_auditResult || Date.now() - _auditAt > PROTECTION_AUDIT_TTL_MS;
+    if (auditStale) {
+      const freshAudit = auditGitHubProtection();
+      _auditResult = freshAudit;
+      _auditAt = Date.now();
+      _auditBlocksLaunches = !freshAudit.ok;
+      if (freshAudit.ok) {
+        log('protection_audit_refreshed_ok');
+      } else {
+        log(
+          `WARN: protection_audit_refreshed_failed: ${freshAudit.error ?? 'audit properties invalid'}`,
+        );
+        record(st, 'protection_audit_failed', {
+          reason: freshAudit.error ?? 'audit properties invalid',
+        });
+      }
+    }
+    if (_auditBlocksLaunches) {
+      const auditKey = 'protection_audit_blocks_launch';
+      if (!coRunDenialSeen.has(auditKey)) {
+        coRunDenialSeen.add(auditKey);
+        log(
+          'product package launch blocked: GitHub branch protection audit failed or stale — will retry on next tick',
+        );
+        record(st, 'product_launch_blocked_by_protection_audit', {
+          auditOk: _auditResult?.ok,
+          auditAt: new Date(_auditAt).toISOString(),
+        });
+      }
+      return 0;
+    }
+  }
+
   for (const cand of rankPendingPackages(ms)) {
     if (barrier.state === 'CURRENT_PACKAGE' && cand.id !== testPolicy.barrierAfterPackage) continue;
     // Never re-select a package that already has a tracked active launch
@@ -2328,7 +2471,7 @@ async function cmdRecoverFatal(positionalRunId) {
   // quota wall — the same in-flight window that protects automatic probes.
   entry.quotaProbeStartedAt = now();
   if (kind === 'package' && pkg.status === 'PENDING') {
-    setPackageStatus(ms, pkg.id, 'RUNNING');
+    setPackageStatus(ms, pkg.id, 'RUNNING', { direct: true });
     reconcileSeedAfterStateChore(st, pkg.id, branch);
   }
   st.pausedFatal = null;
@@ -2514,7 +2657,7 @@ async function cmdFinalizeFromMain(packageId, opts = {}) {
     return 1;
   }
   const ms = loadCurrentMilestone(REPO);
-  setPackageStatus(ms, packageId, 'PROVEN');
+  setPackageStatus(ms, packageId, 'PROVEN', { direct: true });
   if (verdict.evidence.terminalPauseRetired) st.pausedFatal = null;
   // Reconcile this package's own supervisor tracking rows — their run is
   // terminal (the evaluator refused any live one); retaining them would make
@@ -2784,10 +2927,11 @@ async function cmdRestartPackage(packageId, opts = {}) {
   // PENDING (the common restart case) and silently drop the generation bump,
   // so the unconditional writer backs it up.
   pkg.generation = toGeneration;
-  if (!setPackageStatus(ms, packageId, 'PENDING'))
+  if (!setPackageStatus(ms, packageId, 'PENDING', { direct: true }))
     persistMilestoneState(
       ms,
       `chore(autopilot): ${ms.milestoneId}/${packageId} -> generation ${toGeneration} (fresh restart)`,
+      { direct: true },
     );
   await new Promise((res) => {
     commitQueue = commitQueue.then(res, res);
@@ -2993,6 +3137,46 @@ async function main() {
   const once = argv.includes('--once');
   const st = loadState();
   record(st, 'supervisor_started', { pid: process.pid });
+
+  // ── Protection audit at startup ────────────────────────────────────────────
+  // Audit branch protection immediately. Fail-closed for NEW launches.
+  // Never kills active packages. Results cached for PROTECTION_AUDIT_TTL_MS.
+  {
+    const audit = auditGitHubProtection();
+    _auditResult = audit;
+    _auditAt = Date.now();
+    _auditBlocksLaunches = !audit.ok;
+    if (audit.ok) {
+      log(
+        'protection_audit_ok',
+        JSON.stringify({
+          enforceAdmins: audit.enforceAdmins,
+          strictChecks: audit.strictChecks,
+          checkFound: audit.checkFound,
+          appIdMatches: audit.appIdMatches,
+        }),
+      );
+    } else {
+      log(
+        `WARN: protection_audit_failed — new product launches blocked until audit passes: ${audit.error ?? JSON.stringify({ enforceAdmins: audit.enforceAdmins, strictChecks: audit.strictChecks, checkFound: audit.checkFound, appIdMatches: audit.appIdMatches })}`,
+      );
+      record(st, 'protection_audit_failed', { reason: audit.error ?? 'audit properties invalid' });
+    }
+  }
+
+  // ── State-landing crash recovery ────────────────────────────────────────────
+  // On startup, discover any pending state-transition receipts and attempt to
+  // adopt their results (e.g. if the supervisor crashed after PR creation).
+  {
+    const recoveryResults = recoverPendingStateLandings({ stateDir: STATE_DIR, cwd: REPO, log });
+    if (recoveryResults.length > 0) {
+      record(st, 'state_landing_crash_recovery', {
+        count: recoveryResults.length,
+        adopted: recoveryResults.filter((r) => r.adopted).length,
+      });
+    }
+  }
+
   // V3-B §18 adaptive handoff: fast-poll right after launches / during run-id
   // discovery, base cadence otherwise (see nextPollDelayMs).
   let fastStreak = 0;

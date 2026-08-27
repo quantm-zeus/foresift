@@ -41,6 +41,7 @@ import {
   DEFAULT_REQUIRED_APP_ID,
   DEFAULT_REPO,
 } from './ci-authority.mjs';
+import { executeCiRepair } from './ci-repair-executor.mjs';
 
 function sh(cmd, args, opts = {}) {
   return execFileSync(cmd, args, { encoding: 'utf8', ...opts }).trim();
@@ -199,7 +200,7 @@ function main() {
   step('pr-ready', `#${prNum}`);
 
   // 5. Pin the head; wait for the check AT THAT SHA.
-  const pinSha = sh('git', ['rev-parse', 'HEAD']);
+  let pinSha = sh('git', ['rev-parse', 'HEAD']);
   step('head-pinned', pinSha);
 
   const start = Date.now();
@@ -229,10 +230,43 @@ function main() {
         cwd: process.cwd(),
       });
       const failureReason = verdict.state === 'UNTRUSTED' ? 'ci-untrusted' : 'ci-red';
-      step(
-        failureReason,
-        `${verdict.reason || verdict.failureSummary} at ${pinSha} — failed CI is never bypassed; fix forward with new commits`,
-      );
+      step(failureReason, `${verdict.reason || verdict.failureSummary} at ${pinSha}`);
+
+      // ── Execute bounded repair if available ─────────────────────────────────
+      if (incident?.capsule) {
+        const repairResult = executeCiRepair({
+          incident,
+          branch: a.branch,
+          worktreeDir: process.cwd(),
+          log: (msg) => step('repair', msg),
+        });
+        step(
+          'repair-result',
+          JSON.stringify({
+            action: repairResult.action,
+            result: repairResult.result,
+            newHead: repairResult.newHead,
+          }),
+        );
+
+        if (repairResult.retry && repairResult.newHead) {
+          // FORMAT repair pushed a new HEAD — update pinSha and continue CI polling
+          pinSha = repairResult.newHead;
+          step('head-updated', `new HEAD after repair: ${pinSha}`);
+          // Reset sawAnyCheckRun so the deadline heuristic doesn't fire prematurely
+          sawAnyCheckRun = false;
+          sleepSync(pollMs); // brief pause before next CI check
+          continue;
+        }
+
+        if (repairResult.retry && !repairResult.newHead) {
+          // INFRA retry: wait the backoff period then loop
+          if (repairResult.waitMs) sleepSync(repairResult.waitMs);
+          continue;
+        }
+      }
+
+      // Not retryable — emit incident info and fail
       console.log(
         JSON.stringify(
           {

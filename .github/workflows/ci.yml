@@ -16,9 +16,76 @@ permissions:
   contents: read
 
 jobs:
+  # Classify whether this is a state-only change (only whitelisted planning/state
+  # files changed) or a full product change. This gates which test jobs run.
+  #
+  # STATE_ONLY_WHITELIST (from ci-authority.mjs):
+  #   - specs/implementation/current-milestone.json
+  #   - specs/implementation/roadmap.json
+  #   - specs/g0-<id>/(plan|spec|tasks).md
+  #
+  # Fail-closed: any unknown/unclassified path → FULL CI.
+  classify:
+    name: Classify diff (state-only vs full)
+    runs-on: ubuntu-latest
+    outputs:
+      state_only: ${{ steps.classify.outputs.state_only }}
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7.0.1
+        with:
+          fetch-depth: 0
+
+      - name: Classify changed files
+        id: classify
+        run: |
+          # Get list of changed files relative to base
+          if [ "$GITHUB_EVENT_NAME" = "pull_request" ]; then
+            BASE="${{ github.event.pull_request.base.sha }}"
+            HEAD="${{ github.event.pull_request.head.sha }}"
+          else
+            # For push to main: compare to parent
+            BASE="${GITHUB_SHA}^"
+            HEAD="${GITHUB_SHA}"
+          fi
+
+          CHANGED=$(git diff --name-only "$BASE" "$HEAD" 2>/dev/null || git diff --name-only HEAD~1 HEAD 2>/dev/null || echo "UNKNOWN")
+
+          if [ "$CHANGED" = "UNKNOWN" ] || [ -z "$CHANGED" ]; then
+            echo "state_only=false" >> "$GITHUB_OUTPUT"
+            echo "Classification: FULL (could not determine diff)"
+            exit 0
+          fi
+
+          echo "Changed files:"
+          echo "$CHANGED"
+
+          # STATE_ONLY_WHITELIST patterns (must match ci-authority.mjs exactly)
+          STATE_ONLY=true
+          while IFS= read -r FILE; do
+            if [[ "$FILE" =~ ^specs/implementation/current-milestone\.json$ ]] || \
+               [[ "$FILE" =~ ^specs/implementation/roadmap\.json$ ]] || \
+               [[ "$FILE" =~ ^specs/g0-[a-zA-Z0-9_-]+/(plan|spec|tasks)\.md$ ]]; then
+              echo "  ✓ state-only: $FILE"
+            else
+              echo "  ✗ full CI required: $FILE"
+              STATE_ONLY=false
+              break
+            fi
+          done <<< "$CHANGED"
+
+          if [ "$STATE_ONLY" = "true" ]; then
+            echo "state_only=true" >> "$GITHUB_OUTPUT"
+            echo "Classification: STATE_ONLY — fast CI path"
+          else
+            echo "state_only=false" >> "$GITHUB_OUTPUT"
+            echo "Classification: FULL — all CI jobs required"
+          fi
+
   gates:
     name: Fast Gates (spec, format, lint, types, node-compat, security)
     runs-on: ubuntu-latest
+    needs: [classify]
     steps:
       - name: Check out repository
         uses: actions/checkout@v7.0.1
@@ -56,6 +123,9 @@ jobs:
   test-pure:
     name: Tests (Pure Workload)
     runs-on: ubuntu-latest
+    needs: [classify]
+    # Skip for state-only changes: these tests cannot be affected by state/planning files.
+    if: needs.classify.outputs.state_only != 'true'
     steps:
       - name: Check out repository
         uses: actions/checkout@v7.0.1
@@ -83,6 +153,9 @@ jobs:
   test-process-meta:
     name: Tests (Process & Meta-Gate Workloads)
     runs-on: ubuntu-latest
+    needs: [classify]
+    # Skip for state-only changes: these tests cannot be affected by state/planning files.
+    if: needs.classify.outputs.state_only != 'true'
     steps:
       - name: Check out repository
         uses: actions/checkout@v7.0.1
@@ -110,6 +183,9 @@ jobs:
   test-pglite:
     name: Tests (Database PGlite Workload)
     runs-on: ubuntu-latest
+    needs: [classify]
+    # Skip for state-only changes: these tests cannot be affected by state/planning files.
+    if: needs.classify.outputs.state_only != 'true'
     steps:
       - name: Check out repository
         uses: actions/checkout@v7.0.1
@@ -137,16 +213,40 @@ jobs:
   verify:
     name: Verify (spec, format, lint, types, tests)
     runs-on: ubuntu-latest
-    needs: [gates, test-pure, test-process-meta, test-pglite]
+    needs: [classify, gates, test-pure, test-process-meta, test-pglite]
     if: always()
     steps:
-      - name: Assert all parallel verification jobs passed
+      - name: Assert all required verification jobs passed
         run: |
-          if [ "${{ needs.gates.result }}" != "success" ] || \
-             [ "${{ needs.test-pure.result }}" != "success" ] || \
-             [ "${{ needs.test-process-meta.result }}" != "success" ] || \
-             [ "${{ needs.test-pglite.result }}" != "success" ]; then
-            echo "One or more required parallel verification jobs failed."
+          STATE_ONLY="${{ needs.classify.outputs.state_only }}"
+          GATES="${{ needs.gates.result }}"
+          TEST_PURE="${{ needs.test-pure.result }}"
+          TEST_PROCESS_META="${{ needs.test-process-meta.result }}"
+          TEST_PGLITE="${{ needs.test-pglite.result }}"
+
+          echo "Classification: state_only=${STATE_ONLY}"
+          echo "Gates: ${GATES}"
+          echo "test-pure: ${TEST_PURE}"
+          echo "test-process-meta: ${TEST_PROCESS_META}"
+          echo "test-pglite: ${TEST_PGLITE}"
+
+          if [ "$GATES" != "success" ]; then
+            echo "FAILED: gates job did not succeed"
             exit 1
           fi
-          echo "All required parallel verification jobs passed successfully."
+
+          if [ "$STATE_ONLY" = "true" ]; then
+            # State-only path: test jobs were skipped — this is expected and authoritative.
+            # Gates already verified spec, format, lint, types, node-compat, security.
+            echo "State-only path: test jobs skipped as expected. Gates passed. VERIFY OK."
+          else
+            # Full path: all test jobs must have succeeded.
+            if [ "$TEST_PURE" != "success" ] || \
+               [ "$TEST_PROCESS_META" != "success" ] || \
+               [ "$TEST_PGLITE" != "success" ]; then
+              echo "FAILED: one or more test jobs did not succeed"
+              echo "  test-pure=${TEST_PURE} test-process-meta=${TEST_PROCESS_META} test-pglite=${TEST_PGLITE}"
+              exit 1
+            fi
+            echo "Full CI path: all parallel verification jobs passed. VERIFY OK."
+          fi

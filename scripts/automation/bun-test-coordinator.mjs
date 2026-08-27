@@ -43,27 +43,27 @@ export function buildBunTestPlan(manifest, policy, requestedPaths = null, worklo
       id: `pure-${index + 1}`,
       workload: 'PURE',
       files,
-      fileWorkers: policy.bunPureFileWorkers,
-      testConcurrency: policy.bunPureTestConcurrency,
+      fileWorkers: policy.bunPureFileWorkers ?? 2,
+      testConcurrency: policy.bunPureTestConcurrency ?? 8,
     })),
-    ...chunks(processFiles, 20).map((files, index) => ({
+    ...chunks(processFiles, 6).map((files, index) => ({
       id: `process-${index + 1}`,
       workload: 'PROCESS',
       files,
       fileWorkers: 1,
-      testConcurrency: 2,
+      testConcurrency: 1,
     })),
-    ...pglite.map((path, index) => ({
+    ...chunks(pglite, 10).map((files, index) => ({
       id: `pglite-${index + 1}`,
       workload: 'DATABASE_PGLITE',
-      files: [path],
-      fileWorkers: policy.bunHeavyFileWorkers,
-      testConcurrency: policy.bunHeavyTestConcurrency,
+      files,
+      fileWorkers: policy.bunHeavyFileWorkers ?? 1,
+      testConcurrency: policy.bunHeavyTestConcurrency ?? 1,
     })),
-    ...meta.map((path, index) => ({
+    ...chunks(meta, 5).map((files, index) => ({
       id: `meta-${index + 1}`,
       workload: 'META_GATE',
-      files: [path],
+      files,
       fileWorkers: 1,
       testConcurrency: 1,
     })),
@@ -129,14 +129,29 @@ export function runBunTestPlan({ root, plan, policy, bun = 'bun' }) {
       stderrTail: (result.stderr ?? '').slice(-4000),
     };
     results.push(evidence);
-    if (result.status !== 0)
+    if (result.status !== 0) {
+      console.error(
+        `\n[coordinator] FAILED GROUP: ${group.id} (${group.workload}) - files (${group.files.length}):`,
+      );
+      for (const f of group.files) console.error(`  - ${f}`);
+      if (evidence.stdoutTail) console.error(`STDOUT TAIL:\n${evidence.stdoutTail}`);
+      if (evidence.stderrTail) console.error(`STDERR TAIL:\n${evidence.stderrTail}`);
       return {
         ok: false,
         wallTimeMs: Date.now() - started,
         peakRssBytes: Math.max(0, ...results.map((entry) => entry.peakRssBytes ?? 0)),
         cpuSeconds: results.reduce((sum, entry) => sum + (entry.cpuSeconds ?? 0), 0),
+        counts: results.reduce(
+          (all, entry) => ({
+            passed: all.passed + entry.counts.passed,
+            failed: all.failed + entry.counts.failed,
+            skipped: all.skipped + entry.counts.skipped,
+          }),
+          { passed: 0, failed: 0, skipped: 0 },
+        ),
         results,
       };
+    }
   }
   return {
     ok: true,

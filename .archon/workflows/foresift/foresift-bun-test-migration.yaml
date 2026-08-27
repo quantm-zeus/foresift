@@ -67,20 +67,9 @@ nodes:
     bash: |
       set -euo pipefail
       BRANCH=$(git branch --show-current)
-      PR=$(gh pr list --head "$BRANCH" --state open --json number --jq '.[0].number // empty')
-      if [ -z "$PR" ]; then
-        gh pr create \
-          --title 'test: migrate Foresift test authority to Bun' \
-          --body 'Crash-safe AGY-only Bun Test migration with parity proof, bounded resource coordinator, affected-test FAST selection, and Node 24 compatibility gate.' \
-          --head "$BRANCH" --base main
-        PR=$(gh pr list --head "$BRANCH" --state open --json number --jq '.[0].number // empty')
-      fi
-      test -n "$PR"
-      # The operator explicitly authorized bypassing GitHub CI for this
-      # mission. authoritative-bun-full is the exact-head local gate; merge
-      # with the repository owner's supported admin path and retain the PR as
-      # durable audit evidence rather than waiting on the remote queue.
-      gh pr merge "$PR" --squash --admin
-      gh pr view "$PR" --json state,mergedAt,mergeCommit > "$ARTIFACTS_DIR/merged-pr.json"
-      test "$(jq -r .state "$ARTIFACTS_DIR/merged-pr.json")" = MERGED
+      node scripts/automation/package-land.mjs \
+        --branch "$BRANCH" \
+        --title 'test: migrate Foresift test authority to Bun' \
+        --deadline-s 3600
     timeout: 7200000
+

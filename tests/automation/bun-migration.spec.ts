@@ -41,7 +41,10 @@ import { disposeGitFixtureBase, gitFixture } from '../helpers/git-fixture.js';
 
 const REPO = process.cwd();
 const POLICY_FILE = join(REPO, 'config', 'foresift-test-runtime.json');
-const DEFAULT_POLICY = JSON.parse(readFileSync(POLICY_FILE, 'utf8'));
+const DEFAULT_POLICY = {
+  ...JSON.parse(readFileSync(POLICY_FILE, 'utf8')),
+  migrationRequired: true,
+};
 const VT = ['vi', 'test'].join('');
 
 let scratch: string;
@@ -272,7 +275,7 @@ describe('Contract 3: Maintenance workflow topology and bounds', () => {
     expect(affectedCode).toContain("from 'typescript'");
   });
 
-  it('operator-authorized merge node uses explicit supported gh pr merge --admin path without gh pr checks --watch after authoritative-bun-full', () => {
+  it('merge node uses deterministic package-land.mjs with exact-head CI and no admin bypass', () => {
     const mergeMatch = workflowText.match(/- id:\s*exact-head-ci-and-merge[\s\S]*?(?=- id:|$)/);
     expect(mergeMatch).not.toBeNull();
     const mergeText = mergeMatch![0];
@@ -280,19 +283,11 @@ describe('Contract 3: Maintenance workflow topology and bounds', () => {
     // Node must depend strictly on authoritative-bun-full
     expect(mergeText).toContain('depends_on: [authoritative-bun-full]');
 
-    // Must not call gh pr checks --watch or wait on remote CI queue
-    expect(mergeText).not.toMatch(/gh\s+pr\s+checks/);
-    expect(mergeText).not.toContain('--watch');
+    // Must use package-land.mjs
+    expect(mergeText).toContain('node scripts/automation/package-land.mjs');
 
-    // Must use explicit admin merge path
-    expect(mergeText).toContain('gh pr merge "$PR" --squash --admin');
-    expect(mergeText).not.toContain('--delete-branch');
-
-    // Must verify durable merge audit record
-    expect(mergeText).toContain(
-      'gh pr view "$PR" --json state,mergedAt,mergeCommit > "$ARTIFACTS_DIR/merged-pr.json"',
-    );
-    expect(mergeText).toContain('test "$(jq -r .state "$ARTIFACTS_DIR/merged-pr.json")" = MERGED');
+    // Must NOT use --admin
+    expect(mergeText).not.toContain('--admin');
   });
 
   it('policy specifies AGY Gemini 3.7 Flash (High) with bounded concurrency', () => {
@@ -1001,7 +996,7 @@ describe('Contract 7: Bun test coordinator concurrency and workload isolation', 
 
     const proc = plan.find((g) => g.workload === 'PROCESS');
     expect(proc?.fileWorkers).toBe(1);
-    expect(proc?.testConcurrency).toBe(2);
+    expect(proc?.testConcurrency).toBe(1);
 
     const db = plan.find((g) => g.workload === 'DATABASE_PGLITE');
     expect(db?.fileWorkers).toBe(DEFAULT_POLICY.bunHeavyFileWorkers);

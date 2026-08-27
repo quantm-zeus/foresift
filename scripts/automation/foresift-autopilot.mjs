@@ -96,6 +96,7 @@ import {
   loadBunMigrationInputs,
   validateBunMigrationProof,
 } from './bun-migration-state.mjs';
+import { getMainCiStatus, validateDirectMainPushWhitelist } from './ci-authority.mjs';
 
 // Overridable for hermetic selftests (sandboxed fixture repo + state dir).
 const REPO = process.env.FORESIFT_AUTOPILOT_REPO ?? join(import.meta.dirname, '..', '..');
@@ -328,6 +329,13 @@ function commitState(pathspec, message) {
   enqueue(() => {
     if (!sh(`git add ${pathspec}`).ok) return log('WARN: git add failed');
     if (sh('git diff --cached --quiet').ok) return; // nothing staged
+    const staged = sh('git diff --cached --name-only').out.split('\n').filter(Boolean);
+    const wl = validateDirectMainPushWhitelist(staged);
+    if (!wl.allowed) {
+      sh('git reset -q');
+      log(`WARN: direct-main state commit refused: ${wl.reason}`);
+      return;
+    }
     if (!sh(`git commit -m ${JSON.stringify(message)} -q`).ok) {
       sh('git reset -q');
       return log('WARN: state commit failed');
@@ -1656,6 +1664,23 @@ function selectAndLaunch(st) {
   // B in ONE cycle). Foundation G0 stays capped at 1 by the same policy.
   let launched = 0;
   const running = st.activeRuns.map((r) => findPackage(ms, r.packageId)).filter(Boolean);
+
+  // B. MAIN RED GLOBAL BLOCK (V4 Invariant): if current origin/main required CI is RED/FAILURE/CANCELLED/TIMED_OUT,
+  // do not launch any new product coding package.
+  const mainCi = getMainCiStatus({ cwd: REPO });
+  if (mainCi.ok === false && ['RED', 'FAILURE', 'CANCELLED', 'TIMED_OUT'].includes(mainCi.state)) {
+    if (!coRunDenialSeen.has(`main_ci_red|${mainCi.sha}`)) {
+      coRunDenialSeen.add(`main_ci_red|${mainCi.sha}`);
+      log(`product package launch blocked: origin/main required CI is RED (${mainCi.reason})`);
+      record(st, 'product_launch_blocked_by_main_ci', {
+        state: mainCi.state,
+        reason: mainCi.reason,
+        sha: mainCi.sha,
+      });
+    }
+    return 0;
+  }
+
   for (const cand of rankPendingPackages(ms)) {
     if (barrier.state === 'CURRENT_PACKAGE' && cand.id !== testPolicy.barrierAfterPackage) continue;
     // Never re-select a package that already has a tracked active launch

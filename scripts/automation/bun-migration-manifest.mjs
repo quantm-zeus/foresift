@@ -150,6 +150,7 @@ export function analyzeTestFile(root, path, previous = null) {
           : migrationType === 'EASY_MECHANICAL'
             ? 'CODEMOD_READY'
             : 'BLOCKED';
+
   return {
     path,
     package: packageFor(path),

@@ -73,9 +73,9 @@ describe('retention + encryption + location + rights policy records (AC-264)', (
   });
 
   it('refuses sub-day retention windows', async () => {
-    await expect(
-      createBackupPolicy(engine, policyWith({ retentionDays: 0 }), AT),
-    ).rejects.toThrow(/retentionDays/);
+    await expect(createBackupPolicy(engine, policyWith({ retentionDays: 0 }), AT)).rejects.toThrow(
+      /retentionDays/,
+    );
     await expect(
       engine.query(
         `INSERT INTO backup_policies (policy_id, retention_days, encryption_status, location_ref,

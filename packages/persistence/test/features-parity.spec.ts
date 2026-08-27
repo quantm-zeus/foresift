@@ -321,33 +321,33 @@ describe('feature-definition re-registration semantics', () => {
   ] as const;
   for (const [column, override] of divergenceCases) {
     it(`refuses divergence in ${column} and keeps the stored definition`, async () => {
-    // The probe carries its own distinct content so each attempt diverges in
-    // EXACTLY one column without touching UNIQUE (name, version) — this block
-    // pins the insert-or-verify convention, not that schema constraint.
-    const probeId = 'fd:re-registration-probe';
-    const probeContent = {
-      name: 're-registration-probe',
-      version: ROLLING_VOLUME_DEFINITION.version,
-      unitSemantics: ROLLING_VOLUME_DEFINITION.unitSemantics,
-    };
-    await registerFeatureDefinition(engine, { definitionId: probeId, ...probeContent });
-    await expect(
-      registerFeatureDefinition(engine, { definitionId: probeId, ...probeContent, ...override }),
-    ).rejects.toMatchObject({ code: ErrorCode.CONTRACT_INVARIANT_VIOLATED });
-    // The stored definition survived untouched — later values keep computing
-    // against the originally registered semantics.
-    const rows = await engine.query<{
-      name: string;
-      version: number;
-      unit_semantics: string;
-    }>('SELECT name, version, unit_semantics FROM feature_definitions WHERE definition_id = $1', [
-      probeId,
-    ]);
-    expect(rows.rows[0]).toEqual({
-      name: probeContent.name,
-      version: probeContent.version,
-      unit_semantics: probeContent.unitSemantics,
+      // The probe carries its own distinct content so each attempt diverges in
+      // EXACTLY one column without touching UNIQUE (name, version) — this block
+      // pins the insert-or-verify convention, not that schema constraint.
+      const probeId = 'fd:re-registration-probe';
+      const probeContent = {
+        name: 're-registration-probe',
+        version: ROLLING_VOLUME_DEFINITION.version,
+        unitSemantics: ROLLING_VOLUME_DEFINITION.unitSemantics,
+      };
+      await registerFeatureDefinition(engine, { definitionId: probeId, ...probeContent });
+      await expect(
+        registerFeatureDefinition(engine, { definitionId: probeId, ...probeContent, ...override }),
+      ).rejects.toMatchObject({ code: ErrorCode.CONTRACT_INVARIANT_VIOLATED });
+      // The stored definition survived untouched — later values keep computing
+      // against the originally registered semantics.
+      const rows = await engine.query<{
+        name: string;
+        version: number;
+        unit_semantics: string;
+      }>('SELECT name, version, unit_semantics FROM feature_definitions WHERE definition_id = $1', [
+        probeId,
+      ]);
+      expect(rows.rows[0]).toEqual({
+        name: probeContent.name,
+        version: probeContent.version,
+        unit_semantics: probeContent.unitSemantics,
+      });
     });
-  });
   }
 });

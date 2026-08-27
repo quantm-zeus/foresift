@@ -54,7 +54,7 @@ function packageFor(path) {
 function workloadFor(path, text) {
   if (/\b(?:PGlite|@electric-sql\/pglite)\b/.test(text)) return 'DATABASE_PGLITE';
   if (/gate-e2e|foresift-gate|package-full-gate/.test(path + '\n' + text)) return 'META_GATE';
-  if (/node:child_process|\b(?:spawn|spawnSync|execFile|execFileSync)\s*\(/.test(text))
+  if (/gitFixture|node:child_process|\b(?:spawn|spawnSync|execFile|execFileSync)\s*\(/.test(text))
     return 'PROCESS';
   return 'PURE';
 }

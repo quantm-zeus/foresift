@@ -552,8 +552,7 @@ describe('Contract 4: Manifest inventory integrity and batch classification', ()
       "import { describe, expect, it } from 'bun:test';\ndescribe('verified', () => { it('v', () => { expect(1).toBe(1); }); });\n";
     const nowNativeContent =
       "import { describe, expect, it } from 'bun:test';\ndescribe('native', () => { it('n', () => { expect(2).toBe(2); }); });\n";
-    const semanticContent =
-      `import { describe, expect, it, vi } from '${VT}';\nvi.mock('./mod');\ndescribe('semantic', () => { it('s', () => {}); });\n`;
+    const semanticContent = `import { describe, expect, it, vi } from '${VT}';\nvi.mock('./mod');\ndescribe('semantic', () => { it('s', () => {}); });\n`;
 
     fx.writeFile(verifiedFile, verifiedContent);
     fx.writeFile(nowNativeFile, nowNativeContent);

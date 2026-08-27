@@ -39,7 +39,16 @@ if (policy.currentAuthority === 'VITEST_TRANSITION') {
 if (bunFiles.length > 0) {
   const plan = buildBunTestPlan(manifest, policy, bunFiles);
   const evidence = runBunTestPlan({ root, plan, policy });
-  if (!evidence.ok) process.exit(1);
+  if (!evidence.ok) {
+    for (const r of evidence.results ?? []) {
+      if (r.status !== 0) {
+        console.error(`FAILED GROUP: ${r.id} (${r.workload}) - files: ${r.files.join(', ')}`);
+        console.error(`STDOUT:\n${r.stdoutTail}`);
+        console.error(`STDERR:\n${r.stderrTail}`);
+      }
+    }
+    process.exit(1);
+  }
 }
 
 process.stdout.write(

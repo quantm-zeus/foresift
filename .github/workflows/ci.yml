@@ -32,6 +32,11 @@ jobs:
           node-version-file: .nvmrc
           cache: pnpm
 
+      - name: Install Bun Test (pinned)
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.4.0
+
       - name: Install dependencies (frozen lockfile)
         run: pnpm install --frozen-lockfile
 
@@ -52,6 +57,6 @@ jobs:
 
       # Static release gate for the permanent read-only boundary. Runs as its
       # own step so a CLI-only regression (inverted exit, broadened exclusion)
-      # fails CI even though the vitest suite also pins the exit contract.
+      # fails CI even though the test suite also pins the exit contract.
       - name: Prohibited-capability scanner
         run: node scripts/scan-prohibited-capabilities/cli.mjs

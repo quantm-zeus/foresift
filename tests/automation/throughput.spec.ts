@@ -219,7 +219,9 @@ describe('15. FULL-gate attestation identity', () => {
 });
 
 describe('16–17. proven-only verification dedupe classifier', () => {
-  const runtimePolicy = JSON.parse(readFileSync(join(REPO, 'config', 'foresift-test-runtime.json'), 'utf8'));
+  const runtimePolicy = JSON.parse(
+    readFileSync(join(REPO, 'config', 'foresift-test-runtime.json'), 'utf8'),
+  );
   const plainScript =
     runtimePolicy.currentAuthority === 'BUN_TEST' ? 'bun test' : `${['vi', 'test'].join('')} run`;
 

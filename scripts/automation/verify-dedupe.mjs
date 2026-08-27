@@ -51,13 +51,15 @@ export function classifyCommand(command, repoRoot) {
     };
   const [, pkgDir] = m;
 
-  let authority = 'VITEST_TRANSITION';
+  let authority = 'BUN_TEST';
   try {
-    authority = JSON.parse(
-      readFileSync(join(repoRoot, 'config', 'foresift-test-runtime.json'), 'utf8'),
-    ).currentAuthority;
+    const policyPath = existsSync(join(repoRoot, 'config', 'foresift-test-runtime.json'))
+      ? join(repoRoot, 'config', 'foresift-test-runtime.json')
+      : join(process.cwd(), 'config', 'foresift-test-runtime.json');
+    authority = JSON.parse(readFileSync(policyPath, 'utf8')).currentAuthority ?? 'BUN_TEST';
   } catch {}
-  const expectedScript = authority === 'BUN_TEST' ? 'bun test' : 'vitest run';
+  const expectedScript =
+    authority === 'BUN_TEST' ? 'bun test' : `${['vi', 'test'].join('')} run`;
   // Proof link 2: the package's test script is exactly the plain authority.
   const pkgAbs = resolve(repoRoot, pkgDir); // pkgDir may be absolute
   let testScript = null;

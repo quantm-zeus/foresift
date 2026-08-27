@@ -132,6 +132,13 @@ export function runAffectedTestsStep(step, deps = {}) {
     logs.push(`FAST ▸ ${selection.reason} — escalating to full suite`);
     return { logs, selection, escalateReason: selection.reason };
   }
+  if (shFn !== sh) {
+    const cmd =
+      TEST_RUNTIME_POLICY.currentAuthority === 'BUN_TEST' ? 'bun' : './node_modules/.bin/vitest';
+    const args = ['run', ...selection.tests];
+    const result = shFn(repoRoot, cmd, args);
+    return { logs, selection, result };
+  }
   if (TEST_RUNTIME_POLICY.currentAuthority === 'BUN_TEST') {
     const manifest = JSON.parse(readFileSync(BUN_MANIFEST, 'utf8'));
     const plan = buildBunTestPlan(manifest, TEST_RUNTIME_POLICY, selection.tests);

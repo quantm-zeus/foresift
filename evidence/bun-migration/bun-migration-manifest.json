@@ -1,14 +1,14 @@
 {
   "schema": "foresift/bun-migration-manifest@1",
   "migrationId": "bun-test-authority-v1",
-  "generatedAt": "2026-08-27T01:52:59.171Z",
+  "generatedAt": "2026-08-27T01:52:59.398Z",
   "root": ".",
   "totalTestFiles": 219,
   "counts": {
     "CODEMOD_READY": 0,
     "AGY_REQUIRED": 17,
-    "MIGRATED": 65,
-    "VERIFIED": 137,
+    "MIGRATED": 59,
+    "VERIFIED": 143,
     "BLOCKED": 0
   },
   "parity": {
@@ -1907,7 +1907,7 @@
         "../src/cache-key.ts",
         "@foresift/shared-schemas"
       ],
-      "state": "MIGRATED"
+      "state": "VERIFIED"
     },
     {
       "path": "packages/tool-core/test/cache-stage.spec.ts",
@@ -1961,7 +1961,7 @@
         "@foresift/domain",
         "../src/freshness.ts"
       ],
-      "state": "MIGRATED"
+      "state": "VERIFIED"
     },
     {
       "path": "packages/tool-core/test/license-contract.spec.ts",
@@ -1989,7 +1989,7 @@
         "../src/license-contract.ts",
         "../../../tests/fixtures/core/reference-adapters.ts"
       ],
-      "state": "MIGRATED"
+      "state": "VERIFIED"
     },
     {
       "path": "packages/tool-core/test/migrations.spec.ts",
@@ -2037,7 +2037,7 @@
         "@foresift/domain",
         "../src/pipeline.ts"
       ],
-      "state": "MIGRATED"
+      "state": "VERIFIED"
     },
     {
       "path": "packages/tool-core/test/profiles.spec.ts",
@@ -2063,7 +2063,7 @@
         "../src/profiles.ts",
         "@foresift/domain"
       ],
-      "state": "MIGRATED"
+      "state": "VERIFIED"
     },
     {
       "path": "packages/tool-core/test/prohibited.spec.ts",
@@ -2089,7 +2089,7 @@
         "@foresift/domain",
         "../src/prohibited.ts"
       ],
-      "state": "MIGRATED"
+      "state": "VERIFIED"
     },
     {
       "path": "packages/tool-core/test/quota-contract.spec.ts",
@@ -8567,7 +8567,8 @@
       },
       "codexCalls": 0,
       "claudeCalls": 0,
-      "testedHead": "fe454efb06e18d51755c9e1200aecfac5509b54b"
+      "testedHead": "fe454efb06e18d51755c9e1200aecfac5509b54b",
+      "checkpointHead": "9893031e51b5f7d26a0db035f3be1c94fa8857c3"
     },
     {
       "id": "verify-existing--foresift-tool-core-pure-1",
@@ -8581,7 +8582,63 @@
         "packages/tool-core/test/profiles.spec.ts",
         "packages/tool-core/test/prohibited.spec.ts"
       ],
-      "state": "PENDING"
+      "state": "VERIFIED",
+      "verification": {
+        "ok": true,
+        "wallTimeMs": 132,
+        "peakRssBytes": 0,
+        "cpuSeconds": 0,
+        "counts": {
+          "passed": 71,
+          "failed": 0,
+          "skipped": 0
+        },
+        "results": [
+          {
+            "id": "pure-1",
+            "workload": "PURE",
+            "files": [
+              "packages/tool-core/test/cache-key.spec.ts",
+              "packages/tool-core/test/freshness.spec.ts",
+              "packages/tool-core/test/license-contract.spec.ts",
+              "packages/tool-core/test/pipeline.spec.ts",
+              "packages/tool-core/test/profiles.spec.ts",
+              "packages/tool-core/test/prohibited.spec.ts"
+            ],
+            "fileWorkers": 2,
+            "testConcurrency": 8,
+            "command": [
+              "bun",
+              "test",
+              "--no-orphans",
+              "--isolate",
+              "--parallel=2",
+              "--max-concurrency=8",
+              "--timeout=30000",
+              "packages/tool-core/test/cache-key.spec.ts",
+              "packages/tool-core/test/freshness.spec.ts",
+              "packages/tool-core/test/license-contract.spec.ts",
+              "packages/tool-core/test/pipeline.spec.ts",
+              "packages/tool-core/test/profiles.spec.ts",
+              "packages/tool-core/test/prohibited.spec.ts"
+            ],
+            "status": 0,
+            "wallTimeMs": 131,
+            "peakRssBytes": null,
+            "cpuSeconds": null,
+            "counts": {
+              "passed": 71,
+              "failed": 0,
+              "skipped": 0
+            },
+            "stdoutTail": "bun test v1.4.0 (34cbb9a40) 2x PARALLEL\n",
+            "stderrTail": "he prohibition (§16.4) > admits EXACT strategy for every data class [0.07ms]\n\npackages/tool-core/test/freshness.spec.ts:\n(pass) default-table evaluation with inclusive edges > price-trades automated holder: at stored_at ⇒ %s [0.47ms]\n(pass) default-table evaluation with inclusive edges > price-trades automated holder: one second before the fresh edge ⇒ %s [0.04ms]\n(pass) default-table evaluation with inclusive edges > price-trades automated holder: exactly at the fresh edge (inclusive) ⇒ %s [0.01ms]\n(pass) default-table evaluation with inclusive edges > price-trades automated holder: inside the stale window ⇒ %s [0.03ms]\n(pass) default-table evaluation with inclusive edges > price-trades automated holder: exactly at the stale edge ⇒ %s [0.01ms]\n(pass) default-table evaluation with inclusive edges > price-trades automated holder: beyond the stale window ⇒ %s [0.03ms]\n(pass) default-table evaluation with inclusive edges > price-trades manual holder: one second past the fresh edge ⇒ %s [0.08ms]\n(pass) default-table evaluation with inclusive edges > price-trades manual holder: mid stale window ⇒ %s [0.02ms]\n(pass) default-table evaluation with inclusive edges > price-trades manual holder: exactly at the stale edge (inclusive) ⇒ %s\n(pass) default-table evaluation with inclusive edges > price-trades manual holder: one second beyond ⇒ %s\n(pass) default-table evaluation with inclusive edges > MCP_MANUAL admits manual-only stale [0.05ms]\n(pass) default-table evaluation with inclusive edges > ADMIN_CHAT admits manual-only stale [0.01ms]\n(pass) default-table evaluation with inclusive edges > CHATGPT is refused manual-only stale [0.05ms]\n(pass) default-table evaluation with inclusive edges > AUTOMATION is refused manual-only stale [0.01ms]\n(pass) default-table evaluation with inclusive edges > holder-summary AUTOMATED family admits stale to automation at its fresh edge [0.07ms]\n(pass) default-table evaluation with inclusive edges > metadata AUTOMATED family admits stale to automation at its fresh edge [0.06ms]\n(pass) composition-time overrides > replaces whole rows without touching the shared default table [0.11ms]\n(pass) composition-time overrides > refuses overrides that invert the window shape [0.23ms]\n(pass) composition-time overrides > reports freshUntil/staleUntil consistent with the policy row [0.09ms]\n\npackages/tool-core/test/license-contract.spec.ts:\n(pass) default license source (fail-closed) > refuses token_security with an unverified typed verdict [0.86ms]\n(pass) default license source (fail-closed) > refuses token_profile with an unverified typed verdict [0.12ms]\n(pass) default license source (fail-closed) > never allows for any query shape [0.16ms]\n(pass) composed license source (version-pinned allow) > allows only the pinned policy version [0.16ms]\n(pass) composed license source (version-pinned allow) > the verdict doubles as the cache-key license component [0.11ms]\n\npackages/tool-core/test/prohibited.spec.ts:\n(pass) prohibited-capability registration screen > refuses execute_swap with a typed audited refusal [1.16ms]\n(pass) prohibited-capability registration screen > refuses submit_transaction with a typed audited refusal [0.19ms]\n(pass) prohibited-capability registration screen > refuses manage_custody_wallet with a typed audited refusal [0.16ms]\n(pass) prohibited-capability registration screen > refuses get_asset_identity with a typed audited refusal [0.08ms]\n(pass) prohibited-capability registration screen > admits get_asset_identity as a clean read-only definition [0.16ms]\n(pass) prohibited-capability registration screen > admits get_holder_distribution as a clean read-only definition [0.12ms]\n(pass) prohibited-capability registration screen > throws TOOL_DEFINITION_PROHIBITED carrying the full refusal event [0.35ms]\n(pass) prohibited-capability registration screen > refuses PROHIBITED_FINANCIAL even when every text signal is benign [1.64ms]\n\n 71 pass\n 0 fail\n 254 expect() calls\nRan 71 tests across 6 files. [117.00ms]\n"
+          }
+        ]
+      },
+      "codexCalls": 0,
+      "claudeCalls": 0,
+      "testedHead": "9893031e51b5f7d26a0db035f3be1c94fa8857c3"
     },
     {
       "id": "verify-existing-acceptance-database-pglite-1",

@@ -940,51 +940,63 @@ function planCompleteAtRoot(root, packageId) {
  */
 function promotePackagePlanningArtifacts(packageId, fromRoot) {
   const specDir = join('specs', packageId);
+  const qRepo = JSON.stringify(REPO);
+  // Refuse to stomp uncommitted state under the target path.
+  const dirty = sh(`git -C ${qRepo} status --porcelain -- ${JSON.stringify(specDir)}`);
+  if (!dirty.ok || dirty.out.trim())
+    return {
+      ok: false,
+      refused: `main checkout has uncommitted changes under ${specDir} — reconcile first`,
+    };
   if (!fromRoot || !existsSync(join(fromRoot, specDir)))
     return { ok: false, refused: `source worktree lacks ${specDir}` };
 
-  const files = ['plan.md', 'spec.md', 'tasks.md'];
-  const fileChanges = [];
-  for (const f of files) {
-    const src = join(fromRoot, specDir, f);
-    if (existsSync(src)) {
-      fileChanges.push({
-        path: join(specDir, f),
-        content: readFileSync(src, 'utf8'),
-      });
-    }
-  }
+  // Copy specs/<pkg>/** from the worktree into the main checkout.
+  const mkdir = sh(`mkdir -p ${JSON.stringify(join(REPO, specDir))}`);
+  if (!mkdir.ok) return { ok: false, refused: 'mkdir for specs copy failed' };
+  // NOTE: path.join would normalize away a trailing '/.', silently turning
+  // "copy contents" into "nest the directory"; concatenate it explicitly.
+  const cp = sh(
+    `cp -a ${JSON.stringify(`${join(fromRoot, specDir)}/.`)} ${JSON.stringify(join(REPO, specDir))}`,
+  );
+  if (!cp.ok) return { ok: false, refused: 'specs copy failed' };
 
-  if (fileChanges.length === 0) {
-    return { ok: false, refused: `no planning files found under ${specDir}` };
-  }
-
-  const msg = `chore(autopilot): seed ${packageId} planning artifacts (planned-handoff)`;
-  const transRes = advanceStateTransition({
-    fileChanges,
-    message: msg,
-    stateDir: STATE_DIR,
-    repoDir: REPO,
-    packageId,
-    log: (m) => log(m),
-  });
-
-  if (transRes.ok && transRes.step === 'DONE') {
-    sh(`git -C ${JSON.stringify(REPO)} fetch origin main --quiet`);
-    sh(`git -C ${JSON.stringify(REPO)} merge --ff-only origin/main`);
-    return { ok: true, promoted: true, commit: transRes.receipt?.mergedSha };
-  }
-
-  if (transRes.ok) {
+  // Validate against MAIN's milestone view BEFORE committing; roll back on any
+  // refusal so main never carries half-promoted truth.
+  const check = planCompleteAtRoot(REPO, packageId);
+  if (!check.complete) {
+    sh(`git -C ${qRepo} checkout -- ${JSON.stringify(specDir)}`);
+    // Remove files the copy ADDED (untracked after restore).
+    sh(`git -C ${qRepo} clean -fd -- ${JSON.stringify(specDir + '/')}`);
     return {
-      ok: true,
-      promoted: true,
-      inFlight: true,
-      transitionId: transRes.receipt?.transitionId,
+      ok: false,
+      refused: `post-copy validation against main failed: ${
+        check.detail ??
+        (check.verdict ? String(check.verdict).slice(0, 300) : 'validator unavailable')
+      }`,
     };
   }
 
-  return { ok: false, refused: `planning state landing failed: ${transRes.reason}` };
+  const staged = sh(`git -C ${qRepo} add ${JSON.stringify(specDir)}`);
+  if (!staged.ok) return { ok: false, refused: 'git add failed' };
+  const nothing = sh(`git -C ${qRepo} diff --cached --quiet`);
+  if (nothing.ok) return { ok: true, promoted: false, detail: 'already current on main' };
+  const msg = `chore(autopilot): seed ${packageId} planning artifacts (planned-handoff)`;
+  const commit = sh(`git -C ${qRepo} commit -m ${JSON.stringify(msg)} -q`);
+  if (!commit.ok) {
+    sh(`git -C ${qRepo} reset -q`);
+    return { ok: false, refused: 'planning-artifact chore commit failed' };
+  }
+  const sha = sh(`git -C ${qRepo} rev-parse HEAD`).out.trim();
+  const push = sh(`git -C ${qRepo} push origin main --quiet`);
+  if (!push.ok)
+    return {
+      ok: false,
+      pushFailed: true,
+      commit: sha,
+      refused: 'push of planning chore failed (retries next tick)',
+    };
+  return { ok: true, promoted: true, commit: sha };
 }
 
 /**

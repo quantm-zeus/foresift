@@ -11,7 +11,7 @@
  * After repair (incident resolved + re-verification) the capability returns
  * to HEALTHY through the same vocabulary.
  */
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 import { fixedClock, utcTimestamp, type RecoveryTierId, type UtcTimestamp } from '@foresift/domain';
 import {
   evaluateAndRecordDrill,

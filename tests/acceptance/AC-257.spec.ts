@@ -3,7 +3,7 @@
 // link-local/metadata/encoded target outright. Line two: even an allowlisted
 // name that resolves into a denied range (poisoned/rebinding DNS) refuses
 // with ADDRESS_DENIED before any connection.
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'bun:test';
 import { EgressGuard } from '../../packages/security/src/egress.ts';
 import {
   ADMITTED_PUBLIC_TARGETS,

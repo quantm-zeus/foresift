@@ -1,14 +1,14 @@
 {
   "schema": "foresift/bun-migration-manifest@1",
   "migrationId": "bun-test-authority-v1",
-  "generatedAt": "2026-08-27T01:49:58.593Z",
+  "generatedAt": "2026-08-27T01:50:18.861Z",
   "root": ".",
   "totalTestFiles": 219,
   "counts": {
-    "CODEMOD_READY": 64,
+    "CODEMOD_READY": 44,
     "AGY_REQUIRED": 17,
     "MIGRATED": 76,
-    "VERIFIED": 62,
+    "VERIFIED": 82,
     "BLOCKED": 0
   },
   "parity": {
@@ -2553,25 +2553,19 @@
     {
       "path": "tests/acceptance/AC-060.spec.ts",
       "package": "acceptance",
-      "bytes": 2789,
+      "bytes": 2791,
       "lines": 75,
-      "sha256": "e4abaf8c3cbd27d751d947adcb8c616e09a989a3e010430ba7cb91111f013b0b",
+      "sha256": "978f417831508be5221e260d69d24b53195819db65ff5269738d7f73df1814f7",
       "imports": [
-        "vitest",
+        "bun:test",
         "@foresift/domain",
         "@foresift/persistence",
         "./helpers.ts"
       ],
-      "vitestImports": [
-        "afterAll",
-        "beforeAll",
-        "describe",
-        "expect",
-        "it"
-      ],
+      "vitestImports": [],
       "features": [],
       "workload": "PURE",
-      "migrationType": "EASY_MECHANICAL",
+      "migrationType": "ALREADY_MIGRATED",
       "fixturesAndHelpers": [
         "./helpers.ts"
       ],
@@ -2580,30 +2574,24 @@
         "@foresift/persistence",
         "./helpers.ts"
       ],
-      "state": "CODEMOD_READY"
+      "state": "VERIFIED"
     },
     {
       "path": "tests/acceptance/AC-061.spec.ts",
       "package": "acceptance",
-      "bytes": 7147,
+      "bytes": 7149,
       "lines": 183,
-      "sha256": "81d1109629740b0bec1eb9fbf9b2138459d629593a8eaa2b163743a5f73d90ba",
+      "sha256": "7ac72b5178b96c05ccc064cc6cb174942e214e19f42ff62fddee7d84a9879bd6",
       "imports": [
-        "vitest",
+        "bun:test",
         "@foresift/domain",
         "@foresift/persistence",
         "./helpers.ts"
       ],
-      "vitestImports": [
-        "afterAll",
-        "beforeAll",
-        "describe",
-        "expect",
-        "it"
-      ],
+      "vitestImports": [],
       "features": [],
       "workload": "PURE",
-      "migrationType": "EASY_MECHANICAL",
+      "migrationType": "ALREADY_MIGRATED",
       "fixturesAndHelpers": [
         "./helpers.ts"
       ],
@@ -2612,7 +2600,7 @@
         "@foresift/persistence",
         "./helpers.ts"
       ],
-      "state": "CODEMOD_READY"
+      "state": "VERIFIED"
     },
     {
       "path": "tests/acceptance/AC-062.spec.ts",
@@ -2938,102 +2926,86 @@
     {
       "path": "tests/acceptance/AC-250.spec.ts",
       "package": "acceptance",
-      "bytes": 1618,
+      "bytes": 1620,
       "lines": 41,
-      "sha256": "27362e0b45d27ecab1be3316296e0524ddce0d057f03a1589d6deb5324b97664",
+      "sha256": "59a4371955767bfee659b107f0981162d282097a0bf05f7445165e455db44740",
       "imports": [
-        "vitest",
+        "bun:test",
         "../../packages/security/src/mcp-origin.ts"
       ],
-      "vitestImports": [
-        "describe",
-        "expect",
-        "it"
-      ],
+      "vitestImports": [],
       "features": [],
       "workload": "PURE",
-      "migrationType": "EASY_MECHANICAL",
+      "migrationType": "ALREADY_MIGRATED",
       "fixturesAndHelpers": [],
       "sourceAnchors": [
         "../../packages/security/src/mcp-origin.ts"
       ],
-      "state": "CODEMOD_READY"
+      "state": "VERIFIED"
     },
     {
       "path": "tests/acceptance/AC-251.spec.ts",
       "package": "acceptance",
-      "bytes": 1835,
+      "bytes": 1837,
       "lines": 49,
-      "sha256": "f4938a65cb6060f3b590a4c71e02c450558e43e6fabeef6b44d838c02efd694f",
+      "sha256": "1451bf6314e6d78e4c8d56447545cb2fb390756725505f8fb45ec91e3ca8e76b",
       "imports": [
-        "vitest",
+        "bun:test",
         "../../packages/security/src/mcp-protocol-guard.ts"
       ],
-      "vitestImports": [
-        "describe",
-        "expect",
-        "it"
-      ],
+      "vitestImports": [],
       "features": [],
       "workload": "PURE",
-      "migrationType": "EASY_MECHANICAL",
+      "migrationType": "ALREADY_MIGRATED",
       "fixturesAndHelpers": [],
       "sourceAnchors": [
         "../../packages/security/src/mcp-protocol-guard.ts"
       ],
-      "state": "CODEMOD_READY"
+      "state": "VERIFIED"
     },
     {
       "path": "tests/acceptance/AC-252.spec.ts",
       "package": "acceptance",
-      "bytes": 3134,
+      "bytes": 3136,
       "lines": 96,
-      "sha256": "94fa5cf49766d72de64d9aa18ea9db48c116a54fb02ef3823eae423110c8c33c",
+      "sha256": "32beb9a3bfa64df017ff971e0db27f4971011cdfc9071b6e5bc8df0d6d14e9f8",
       "imports": [
-        "vitest",
+        "bun:test",
         "../../packages/tenant-isolation/src/resource-access.ts",
         "../../packages/tenant-isolation/src/signed-url.ts",
         "../../packages/tenant-isolation/src/tenant-context.ts"
       ],
-      "vitestImports": [
-        "describe",
-        "expect",
-        "it"
-      ],
+      "vitestImports": [],
       "features": [],
       "workload": "PURE",
-      "migrationType": "EASY_MECHANICAL",
+      "migrationType": "ALREADY_MIGRATED",
       "fixturesAndHelpers": [],
       "sourceAnchors": [
         "../../packages/tenant-isolation/src/resource-access.ts",
         "../../packages/tenant-isolation/src/signed-url.ts",
         "../../packages/tenant-isolation/src/tenant-context.ts"
       ],
-      "state": "CODEMOD_READY"
+      "state": "VERIFIED"
     },
     {
       "path": "tests/acceptance/AC-253.spec.ts",
       "package": "acceptance",
-      "bytes": 2306,
+      "bytes": 2308,
       "lines": 62,
-      "sha256": "949a3ec0a0c6162b55c3e7425c50693c4a94075d938a4447aaff298b7b0a3619",
+      "sha256": "b4d4afebc934886b8ab47315509133f54ff952cd789a34e0f018e02f8c00611c",
       "imports": [
-        "vitest",
+        "bun:test",
         "../../packages/security/src/oauth-binding.ts"
       ],
-      "vitestImports": [
-        "describe",
-        "expect",
-        "it"
-      ],
+      "vitestImports": [],
       "features": [],
       "workload": "PURE",
-      "migrationType": "EASY_MECHANICAL",
+      "migrationType": "ALREADY_MIGRATED",
       "fixturesAndHelpers": [],
       "sourceAnchors": [
         "../../packages/security/src/oauth-binding.ts"
       ],
-      "state": "CODEMOD_READY"
+      "state": "VERIFIED"
     },
     {
       "path": "tests/acceptance/AC-254.spec.ts",
@@ -3092,46 +3064,38 @@
     {
       "path": "tests/acceptance/AC-256.spec.ts",
       "package": "acceptance",
-      "bytes": 2218,
+      "bytes": 2220,
       "lines": 68,
-      "sha256": "e3e5ac213bf3673fb99ad44c1f13f07678c8adb5e21ccbd851545ccbf728bced",
+      "sha256": "82a2d154cb2752e49d018c1e72db69dbd212d1381da9606524f17e5a4fbc8500",
       "imports": [
-        "vitest",
+        "bun:test",
         "../../packages/security/src/decoder-authority.ts"
       ],
-      "vitestImports": [
-        "describe",
-        "expect",
-        "it"
-      ],
+      "vitestImports": [],
       "features": [],
       "workload": "PURE",
-      "migrationType": "EASY_MECHANICAL",
+      "migrationType": "ALREADY_MIGRATED",
       "fixturesAndHelpers": [],
       "sourceAnchors": [
         "../../packages/security/src/decoder-authority.ts"
       ],
-      "state": "CODEMOD_READY"
+      "state": "VERIFIED"
     },
     {
       "path": "tests/acceptance/AC-257.spec.ts",
       "package": "acceptance",
-      "bytes": 3234,
+      "bytes": 3236,
       "lines": 89,
-      "sha256": "e23616b307c63f1c08a34034e4c22d8e480e6d08247b14de3c273995727f8a00",
+      "sha256": "0a8f11b2105fa35ba4d3991210c9b9baca6976bf4906ad03b0ec6b461cebb87e",
       "imports": [
-        "vitest",
+        "bun:test",
         "../../packages/security/src/egress.ts",
         "../fixtures/sec/ssrf/ssrf-urls.ts"
       ],
-      "vitestImports": [
-        "describe",
-        "expect",
-        "it"
-      ],
+      "vitestImports": [],
       "features": [],
       "workload": "PURE",
-      "migrationType": "EASY_MECHANICAL",
+      "migrationType": "ALREADY_MIGRATED",
       "fixturesAndHelpers": [
         "../fixtures/sec/ssrf/ssrf-urls.ts"
       ],
@@ -3139,27 +3103,23 @@
         "../../packages/security/src/egress.ts",
         "../fixtures/sec/ssrf/ssrf-urls.ts"
       ],
-      "state": "CODEMOD_READY"
+      "state": "VERIFIED"
     },
     {
       "path": "tests/acceptance/AC-258.spec.ts",
       "package": "acceptance",
-      "bytes": 4514,
+      "bytes": 4516,
       "lines": 103,
-      "sha256": "bf47447552196b10c3dcf59c1dad37bfae43832a751534893902e754155437c6",
+      "sha256": "5ddbcbedd25ee7a2698d1e94b357bea5bc1ac5f6a34d85dc1f834cbede83c69a",
       "imports": [
-        "vitest",
+        "bun:test",
         "../../packages/security/src/untrusted-content.ts",
         "../fixtures/sec/injection/injection-corpus.ts"
       ],
-      "vitestImports": [
-        "describe",
-        "expect",
-        "it"
-      ],
+      "vitestImports": [],
       "features": [],
       "workload": "PURE",
-      "migrationType": "EASY_MECHANICAL",
+      "migrationType": "ALREADY_MIGRATED",
       "fixturesAndHelpers": [
         "../fixtures/sec/injection/injection-corpus.ts"
       ],
@@ -3167,7 +3127,7 @@
         "../../packages/security/src/untrusted-content.ts",
         "../fixtures/sec/injection/injection-corpus.ts"
       ],
-      "state": "CODEMOD_READY"
+      "state": "VERIFIED"
     },
     {
       "path": "tests/acceptance/AC-259.spec.ts",
@@ -3233,28 +3193,22 @@
     {
       "path": "tests/acceptance/AC-261.spec.ts",
       "package": "acceptance",
-      "bytes": 7805,
+      "bytes": 7807,
       "lines": 216,
-      "sha256": "7b1ddc20d2c3d30e682eaf2c2c5a70c59a08a7950c93c27a9e5b60c65f126e8f",
+      "sha256": "af10c78fbcfc267865abae0bfc6e46b378b0b8496a55da8b5e7b3f18bb4240ca",
       "imports": [
         "node:crypto",
-        "vitest",
+        "bun:test",
         "@foresift/domain",
         "@foresift/persistence",
         "@foresift/object-store",
         "@foresift/evidence",
         "./helpers.ts"
       ],
-      "vitestImports": [
-        "afterAll",
-        "beforeAll",
-        "describe",
-        "expect",
-        "it"
-      ],
+      "vitestImports": [],
       "features": [],
       "workload": "PURE",
-      "migrationType": "EASY_MECHANICAL",
+      "migrationType": "ALREADY_MIGRATED",
       "fixturesAndHelpers": [
         "./helpers.ts"
       ],
@@ -3265,30 +3219,24 @@
         "@foresift/evidence",
         "./helpers.ts"
       ],
-      "state": "CODEMOD_READY"
+      "state": "VERIFIED"
     },
     {
       "path": "tests/acceptance/AC-262.spec.ts",
       "package": "acceptance",
-      "bytes": 6156,
+      "bytes": 6158,
       "lines": 158,
-      "sha256": "b57e067bafa692d74ad8bfa8735c70f3a904420ee1d0ddd4cafe3eca7a19cf0b",
+      "sha256": "1304d574c6ff0a32b993a6306f7f094228e99501736cbd36741f66b3cfc71f3d",
       "imports": [
-        "vitest",
+        "bun:test",
         "@foresift/domain",
         "@foresift/persistence",
         "./helpers.ts"
       ],
-      "vitestImports": [
-        "afterAll",
-        "beforeAll",
-        "describe",
-        "expect",
-        "it"
-      ],
+      "vitestImports": [],
       "features": [],
       "workload": "PURE",
-      "migrationType": "EASY_MECHANICAL",
+      "migrationType": "ALREADY_MIGRATED",
       "fixturesAndHelpers": [
         "./helpers.ts"
       ],
@@ -3297,7 +3245,7 @@
         "@foresift/persistence",
         "./helpers.ts"
       ],
-      "state": "CODEMOD_READY"
+      "state": "VERIFIED"
     },
     {
       "path": "tests/acceptance/AC-263.spec.ts",
@@ -3330,25 +3278,19 @@
     {
       "path": "tests/acceptance/AC-264.spec.ts",
       "package": "acceptance",
-      "bytes": 5950,
+      "bytes": 5952,
       "lines": 154,
-      "sha256": "9e96547cfe7805c6d418208d4356476d00e2e63de0f47ec17d87dd095fc06396",
+      "sha256": "ae827c4225d8dc972a1e0cd4d809dcc21c1d1780b5f5ceebcf3c9ae07d75c9c0",
       "imports": [
-        "vitest",
+        "bun:test",
         "@foresift/domain",
         "@foresift/persistence",
         "./helpers.ts"
       ],
-      "vitestImports": [
-        "afterAll",
-        "beforeAll",
-        "describe",
-        "expect",
-        "it"
-      ],
+      "vitestImports": [],
       "features": [],
       "workload": "PURE",
-      "migrationType": "EASY_MECHANICAL",
+      "migrationType": "ALREADY_MIGRATED",
       "fixturesAndHelpers": [
         "./helpers.ts"
       ],
@@ -3357,30 +3299,24 @@
         "@foresift/persistence",
         "./helpers.ts"
       ],
-      "state": "CODEMOD_READY"
+      "state": "VERIFIED"
     },
     {
       "path": "tests/acceptance/AC-270.spec.ts",
       "package": "acceptance",
-      "bytes": 4438,
+      "bytes": 4440,
       "lines": 126,
-      "sha256": "abaa29ae339369251610fb458422dc35e52f1e4fd5710d52c061452fbff0c096",
+      "sha256": "f613c5b3f0000b063561d602552ef147a92cdaf3d65f850bb1912628f466ccf7",
       "imports": [
-        "vitest",
+        "bun:test",
         "@foresift/provider-lifecycle",
         "@foresift/provider-lifecycle",
         "../helpers/prov.ts"
       ],
-      "vitestImports": [
-        "afterAll",
-        "beforeAll",
-        "describe",
-        "expect",
-        "it"
-      ],
+      "vitestImports": [],
       "features": [],
       "workload": "PURE",
-      "migrationType": "EASY_MECHANICAL",
+      "migrationType": "ALREADY_MIGRATED",
       "fixturesAndHelpers": [
         "../helpers/prov.ts"
       ],
@@ -3389,16 +3325,16 @@
         "@foresift/provider-lifecycle",
         "../helpers/prov.ts"
       ],
-      "state": "CODEMOD_READY"
+      "state": "VERIFIED"
     },
     {
       "path": "tests/acceptance/AC-271.spec.ts",
       "package": "acceptance",
-      "bytes": 3518,
+      "bytes": 3520,
       "lines": 98,
-      "sha256": "42c4f31966556467c78c6c64729d34a9f31822a6407ea844bce1648f5c4ccfd1",
+      "sha256": "5f9f4334d27d281ec6e27e587929bcff77eb119ac21cb8f6199ba6c90273954f",
       "imports": [
-        "vitest",
+        "bun:test",
         "@foresift/persistence",
         "@foresift/domain",
         "@foresift/security",
@@ -3406,16 +3342,10 @@
         "@foresift/provider-lifecycle",
         "../helpers/prov.ts"
       ],
-      "vitestImports": [
-        "afterAll",
-        "beforeAll",
-        "describe",
-        "expect",
-        "it"
-      ],
+      "vitestImports": [],
       "features": [],
       "workload": "PURE",
-      "migrationType": "EASY_MECHANICAL",
+      "migrationType": "ALREADY_MIGRATED",
       "fixturesAndHelpers": [
         "../helpers/prov.ts"
       ],
@@ -3427,31 +3357,25 @@
         "@foresift/provider-lifecycle",
         "../helpers/prov.ts"
       ],
-      "state": "CODEMOD_READY"
+      "state": "VERIFIED"
     },
     {
       "path": "tests/acceptance/AC-272.spec.ts",
       "package": "acceptance",
-      "bytes": 3993,
+      "bytes": 3995,
       "lines": 127,
-      "sha256": "0d867a7a177b43f8c02c97978696b8a401833329b0db96d6ca76bf365ad4a711",
+      "sha256": "077466246c9bab3a47c2dd2e63604fac6a244251979569d0dc3307ef8d7aa980",
       "imports": [
-        "vitest",
+        "bun:test",
         "@foresift/security",
         "@foresift/provider-lifecycle",
         "@foresift/provider-lifecycle",
         "../helpers/prov.ts"
       ],
-      "vitestImports": [
-        "afterAll",
-        "beforeAll",
-        "describe",
-        "expect",
-        "it"
-      ],
+      "vitestImports": [],
       "features": [],
       "workload": "PURE",
-      "migrationType": "EASY_MECHANICAL",
+      "migrationType": "ALREADY_MIGRATED",
       "fixturesAndHelpers": [
         "../helpers/prov.ts"
       ],
@@ -3461,29 +3385,23 @@
         "@foresift/provider-lifecycle",
         "../helpers/prov.ts"
       ],
-      "state": "CODEMOD_READY"
+      "state": "VERIFIED"
     },
     {
       "path": "tests/acceptance/AC-273.spec.ts",
       "package": "acceptance",
-      "bytes": 6468,
+      "bytes": 6470,
       "lines": 178,
-      "sha256": "f3e8f5feea34100ce80363ad62c379d2793a0ceba823f48e726e4398ca261176",
+      "sha256": "9e69626d8ee1d153e80e474df27ff215f3e86e03453f67652883930784bc801c",
       "imports": [
-        "vitest",
+        "bun:test",
         "@foresift/provider-lifecycle",
         "../helpers/prov.ts"
       ],
-      "vitestImports": [
-        "afterAll",
-        "beforeAll",
-        "describe",
-        "expect",
-        "it"
-      ],
+      "vitestImports": [],
       "features": [],
       "workload": "PURE",
-      "migrationType": "EASY_MECHANICAL",
+      "migrationType": "ALREADY_MIGRATED",
       "fixturesAndHelpers": [
         "../helpers/prov.ts"
       ],
@@ -3491,7 +3409,7 @@
         "@foresift/provider-lifecycle",
         "../helpers/prov.ts"
       ],
-      "state": "CODEMOD_READY"
+      "state": "VERIFIED"
     },
     {
       "path": "tests/acceptance/AC-274.spec.ts",
@@ -3529,24 +3447,20 @@
     {
       "path": "tests/acceptance/AC-275.spec.ts",
       "package": "acceptance",
-      "bytes": 3642,
+      "bytes": 3644,
       "lines": 101,
-      "sha256": "728d1c466d2d659ddc282071fe6bc5124395451e20d927348779921d7dd13ae4",
+      "sha256": "1a8bbf90a759ed6d06c71cc7923c8645dabc1f7e1e88cff7faa31b917ad25177",
       "imports": [
-        "vitest",
+        "bun:test",
         "../../packages/tenant-isolation/src/tenant-context.ts",
         "../../packages/tenant-isolation/src/row-scope.ts",
         "../../packages/tenant-isolation/src/resource-access.ts",
         "../../packages/tenant-isolation/src/signed-url.ts"
       ],
-      "vitestImports": [
-        "describe",
-        "expect",
-        "it"
-      ],
+      "vitestImports": [],
       "features": [],
       "workload": "PURE",
-      "migrationType": "EASY_MECHANICAL",
+      "migrationType": "ALREADY_MIGRATED",
       "fixturesAndHelpers": [],
       "sourceAnchors": [
         "../../packages/tenant-isolation/src/tenant-context.ts",
@@ -3554,56 +3468,48 @@
         "../../packages/tenant-isolation/src/resource-access.ts",
         "../../packages/tenant-isolation/src/signed-url.ts"
       ],
-      "state": "CODEMOD_READY"
+      "state": "VERIFIED"
     },
     {
       "path": "tests/acceptance/AC-276.spec.ts",
       "package": "acceptance",
-      "bytes": 1421,
+      "bytes": 1423,
       "lines": 35,
-      "sha256": "b1f170459688956e139f9cb1a112abb95a420779068e1d067598843b5a39a279",
+      "sha256": "cf105e9eb3dcc3d4481c6ceb94ba391400c7609867761c7ceb0587c4beaeb34c",
       "imports": [
-        "vitest",
+        "bun:test",
         "../../packages/security/src/claims-policy.ts"
       ],
-      "vitestImports": [
-        "describe",
-        "expect",
-        "it"
-      ],
+      "vitestImports": [],
       "features": [],
       "workload": "PURE",
-      "migrationType": "EASY_MECHANICAL",
+      "migrationType": "ALREADY_MIGRATED",
       "fixturesAndHelpers": [],
       "sourceAnchors": [
         "../../packages/security/src/claims-policy.ts"
       ],
-      "state": "CODEMOD_READY"
+      "state": "VERIFIED"
     },
     {
       "path": "tests/acceptance/AC-277.spec.ts",
       "package": "acceptance",
-      "bytes": 2220,
+      "bytes": 2222,
       "lines": 51,
-      "sha256": "890df8cfad881d03717d02f819799f89ded856480222ec66f92e90463715246f",
+      "sha256": "60b1368d97b59c4db32d0996cde6b7c60b803232aaeac718d0808670d06c47f4",
       "imports": [
-        "vitest",
+        "bun:test",
         "../../packages/security/src/claims-policy.ts",
         "node:assert"
       ],
-      "vitestImports": [
-        "describe",
-        "expect",
-        "it"
-      ],
+      "vitestImports": [],
       "features": [],
       "workload": "PURE",
-      "migrationType": "EASY_MECHANICAL",
+      "migrationType": "ALREADY_MIGRATED",
       "fixturesAndHelpers": [],
       "sourceAnchors": [
         "../../packages/security/src/claims-policy.ts"
       ],
-      "state": "CODEMOD_READY"
+      "state": "VERIFIED"
     },
     {
       "path": "tests/acceptance/AC-278.spec.ts",
@@ -3662,26 +3568,22 @@
     {
       "path": "tests/acceptance/tooling-globs.spec.ts",
       "package": "acceptance",
-      "bytes": 4110,
+      "bytes": 4112,
       "lines": 109,
-      "sha256": "4758aef416d5643ece463fc200b360393c8a4844cefe107561395d6a383f150d",
+      "sha256": "adcf24bea87daf7279157961a4dafff340304069b087a49c74349fabf757ac8e",
       "imports": [
-        "vitest",
+        "bun:test",
         "node:fs",
         "node:url",
         "node:path"
       ],
-      "vitestImports": [
-        "describe",
-        "expect",
-        "it"
-      ],
+      "vitestImports": [],
       "features": [],
       "workload": "PURE",
-      "migrationType": "EASY_MECHANICAL",
+      "migrationType": "ALREADY_MIGRATED",
       "fixturesAndHelpers": [],
       "sourceAnchors": [],
-      "state": "CODEMOD_READY"
+      "state": "VERIFIED"
     },
     {
       "path": "tests/automation/archon-task-worktree-advance.spec.ts",
@@ -7900,7 +7802,8 @@
       },
       "codexCalls": 0,
       "claudeCalls": 0,
-      "testedHead": "4e34f6f69f5c3e3e4d3b80484a2318b2aeaee5f1"
+      "testedHead": "4e34f6f69f5c3e3e4d3b80484a2318b2aeaee5f1",
+      "checkpointHead": "19ec19dc45ac0cfd2d05ef6d027b12aa665e193e"
     },
     {
       "id": "mechanical-acceptance-pure-1",
@@ -7928,7 +7831,91 @@
         "tests/acceptance/AC-277.spec.ts",
         "tests/acceptance/tooling-globs.spec.ts"
       ],
-      "state": "PENDING"
+      "state": "VERIFIED",
+      "verification": {
+        "ok": true,
+        "wallTimeMs": 20125,
+        "peakRssBytes": 0,
+        "cpuSeconds": 0,
+        "counts": {
+          "passed": 68,
+          "failed": 0,
+          "skipped": 0
+        },
+        "results": [
+          {
+            "id": "pure-1",
+            "workload": "PURE",
+            "files": [
+              "tests/acceptance/AC-060.spec.ts",
+              "tests/acceptance/AC-061.spec.ts",
+              "tests/acceptance/AC-250.spec.ts",
+              "tests/acceptance/AC-251.spec.ts",
+              "tests/acceptance/AC-252.spec.ts",
+              "tests/acceptance/AC-253.spec.ts",
+              "tests/acceptance/AC-256.spec.ts",
+              "tests/acceptance/AC-257.spec.ts",
+              "tests/acceptance/AC-258.spec.ts",
+              "tests/acceptance/AC-261.spec.ts",
+              "tests/acceptance/AC-262.spec.ts",
+              "tests/acceptance/AC-264.spec.ts",
+              "tests/acceptance/AC-270.spec.ts",
+              "tests/acceptance/AC-271.spec.ts",
+              "tests/acceptance/AC-272.spec.ts",
+              "tests/acceptance/AC-273.spec.ts",
+              "tests/acceptance/AC-275.spec.ts",
+              "tests/acceptance/AC-276.spec.ts",
+              "tests/acceptance/AC-277.spec.ts",
+              "tests/acceptance/tooling-globs.spec.ts"
+            ],
+            "fileWorkers": 2,
+            "testConcurrency": 8,
+            "command": [
+              "bun",
+              "test",
+              "--no-orphans",
+              "--isolate",
+              "--parallel=2",
+              "--max-concurrency=8",
+              "--timeout=30000",
+              "tests/acceptance/AC-060.spec.ts",
+              "tests/acceptance/AC-061.spec.ts",
+              "tests/acceptance/AC-250.spec.ts",
+              "tests/acceptance/AC-251.spec.ts",
+              "tests/acceptance/AC-252.spec.ts",
+              "tests/acceptance/AC-253.spec.ts",
+              "tests/acceptance/AC-256.spec.ts",
+              "tests/acceptance/AC-257.spec.ts",
+              "tests/acceptance/AC-258.spec.ts",
+              "tests/acceptance/AC-261.spec.ts",
+              "tests/acceptance/AC-262.spec.ts",
+              "tests/acceptance/AC-264.spec.ts",
+              "tests/acceptance/AC-270.spec.ts",
+              "tests/acceptance/AC-271.spec.ts",
+              "tests/acceptance/AC-272.spec.ts",
+              "tests/acceptance/AC-273.spec.ts",
+              "tests/acceptance/AC-275.spec.ts",
+              "tests/acceptance/AC-276.spec.ts",
+              "tests/acceptance/AC-277.spec.ts",
+              "tests/acceptance/tooling-globs.spec.ts"
+            ],
+            "status": 0,
+            "wallTimeMs": 20125,
+            "peakRssBytes": null,
+            "cpuSeconds": null,
+            "counts": {
+              "passed": 68,
+              "failed": 0,
+              "skipped": 0
+            },
+            "stdoutTail": "bun test v1.4.0 (34cbb9a40) 2x PARALLEL\n",
+            "stderrTail": "the extraction envelope wraps payloads VERBATIM inside data-only fences [0.74ms]\n(pass) AC-258: injected content is carried only as labeled data > enforcement dimensions are structurally ABSENT from the envelope contract [0.12ms]\n(pass) AC-258: injected content is carried only as labeled data > memory-isolation keys differ per session dimension so contexts cannot cross-pollinate [0.27ms]\n\ntests/acceptance/AC-270.spec.ts:\n(pass) AC-270 refresh-pair lifecycle > allows active decision use while both sources are fresh (pre-expiry) [18.00ms]\n(pass) AC-270 refresh-pair lifecycle > injected-clock expiry moves the operation out of active decision-critical use [27.15ms]\n(pass) AC-270 refresh-pair lifecycle > refreshing BOTH sources restores active decision use and re-activates [54.81ms]\n\ntests/acceptance/AC-261.spec.ts:\n(pass) AC-261: clean-environment verification gates automation resumption > every named verification is registered and green on an untampered environment [38.17ms]\n\ntests/acceptance/AC-276.spec.ts:\n(pass) AC-276: compliant content passes policy on every channel > admits each clean-copy control on its channel [1.02ms]\n(pass) AC-276: compliant content passes policy on every channel > admits hedged performance language that names its own uncertainty [0.12ms]\n\ntests/acceptance/AC-277.spec.ts:\n(pass) AC-277: public output ships complete duties with enforced redaction > publishes a compliant body after stripping thresholds and entities [3.38ms]\n(pass) AC-277: public output ships complete duties with enforced redaction > publishes bodies that never needed redaction untouched [0.71ms]\n\ntests/acceptance/tooling-globs.spec.ts:\n(pass) root tooling is glob-driven for future packages > root tsconfig.json include globs pick up synthetic future package sources and tests [0.66ms]\n(pass) root tooling is glob-driven for future packages > root tsconfig.json excludes build output and dependencies [0.14ms]\n(pass) root tooling is glob-driven for future packages > pnpm-workspace.yaml covers every future packages/* directory [0.14ms]\n(pass) root tooling is glob-driven for future packages > eslint flat config applies TypeScript rules via unrestricted **/*.ts globs [0.06ms]\n\ntests/acceptance/AC-271.spec.ts:\n(pass) AC-271 clean-response flow to evidence envelopes > sanitized fixture scans CLEAN and flows into a labeled evidence envelope [17.72ms]\n(pass) AC-271 clean-response flow to evidence envelopes > the audit trail carries hashes only — never response bytes [2.93ms]\n\ntests/acceptance/AC-273.spec.ts:\n(pass) AC-273 tightening enforcement > records the v1→v2 change with the EXPECTED newly-prohibited diff [11.87ms]\n(pass) AC-273 tightening enforcement > use decisions flip to REFUSE IMMEDIATELY on every newly prohibited path [11.56ms]\n(pass) AC-273 tightening enforcement > enumerates affected artifacts into RETIRE actions (STORAGE revoked) [9.87ms]\n\ntests/acceptance/AC-275.spec.ts:\n(pass) AC-275: isolation holds on every shared surface > namespaced keys stay disjoint between tenants for EVERY surface [0.21ms]\n(pass) AC-275: isolation holds on every shared surface > model-context partitions are opaque and tenant-distinct [0.31ms]\n(pass) AC-275: isolation holds on every shared surface > queues and sessions carry tenant-safe derived names [0.08ms]\n(pass) AC-275: isolation holds on every shared surface > row predicates bind the caller tenant; ownership asserts pass for owners [0.29ms]\n(pass) AC-275: isolation holds on every shared surface > same-tenant resource access authorizes with canonical paths [0.15ms]\n\ntests/acceptance/AC-272.spec.ts:\n(pass) AC-272 readiness eligibility > yields ELIGIBLE for the workspace/public gate with every dimension green [19.13ms]\n(pass) AC-272 readiness eligibility > applies the SAME evidence bar in the WORKSPACE scope [15.64ms]\n(pass) AC-272 readiness eligibility > stays ELIGIBLE under re-evaluation (idempotent reads, no state churn) [33.30ms]\n\n 68 pass\n 0 fail\n 288 expect() calls\nRan 68 tests across 20 files. [20.11s]\n"
+          }
+        ]
+      },
+      "codexCalls": 0,
+      "claudeCalls": 0,
+      "testedHead": "19ec19dc45ac0cfd2d05ef6d027b12aa665e193e"
     },
     {
       "id": "mechanical-automation-meta-gate-1",

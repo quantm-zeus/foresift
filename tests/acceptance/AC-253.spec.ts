@@ -2,7 +2,7 @@
 // grants — PKCE present, exact registered redirect URI, audience/resource
 // binding, live expiry, narrowed scopes. OAuth server wiring itself lands
 // with the mcp-surface package.
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'bun:test';
 import { OAuthBindingGuard } from '../../packages/security/src/oauth-binding.ts';
 
 const NOW_MS = Date.parse('2026-08-01T00:00:00Z');

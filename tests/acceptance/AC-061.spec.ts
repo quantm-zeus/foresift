@@ -10,7 +10,7 @@
  * automated opportunity influence while deterministic risk monitoring stays
  * allowed. No surface can be read as fabricated success.
  */
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 import {
   AcquisitionState,
   degradedHealthState,

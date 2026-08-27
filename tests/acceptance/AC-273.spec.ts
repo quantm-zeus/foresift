@@ -8,7 +8,7 @@
  *
  * Scenario data: tests/fixtures/prov/scenarios/rights-change.scenario.json.
  */
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 import {
   ArtifactRegistry,
   OperationRegistry,

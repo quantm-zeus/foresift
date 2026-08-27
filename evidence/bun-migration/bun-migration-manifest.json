@@ -1,14 +1,14 @@
 {
   "schema": "foresift/bun-migration-manifest@1",
   "migrationId": "bun-test-authority-v1",
-  "generatedAt": "2026-08-27T01:48:33.657Z",
+  "generatedAt": "2026-08-27T01:48:37.060Z",
   "root": ".",
   "totalTestFiles": 219,
   "counts": {
-    "CODEMOD_READY": 95,
+    "CODEMOD_READY": 94,
     "AGY_REQUIRED": 17,
     "MIGRATED": 76,
-    "VERIFIED": 31,
+    "VERIFIED": 32,
     "BLOCKED": 0
   },
   "parity": {
@@ -1193,11 +1193,11 @@
     {
       "path": "packages/providers/test/registration.spec.ts",
       "package": "@foresift/providers",
-      "bytes": 6599,
+      "bytes": 6601,
       "lines": 186,
-      "sha256": "50d1e9141bee28f1658ff02225692c1690223c97b5075eb6149c56d08efa4b3f",
+      "sha256": "b2725e780f0beb16365ba74e021c6bee35a2110960e319107315280486d2c8db",
       "imports": [
-        "vitest",
+        "bun:test",
         "@electric-sql/pglite",
         "@foresift/persistence",
         "@foresift/domain",
@@ -1206,16 +1206,10 @@
         "node:path",
         "node:url"
       ],
-      "vitestImports": [
-        "afterAll",
-        "beforeAll",
-        "describe",
-        "expect",
-        "it"
-      ],
+      "vitestImports": [],
       "features": [],
       "workload": "DATABASE_PGLITE",
-      "migrationType": "EASY_MECHANICAL",
+      "migrationType": "ALREADY_MIGRATED",
       "fixturesAndHelpers": [],
       "sourceAnchors": [
         "@electric-sql/pglite",
@@ -1224,7 +1218,7 @@
         "@foresift/provider-lifecycle",
         "../src/index.ts"
       ],
-      "state": "CODEMOD_READY"
+      "state": "VERIFIED"
     },
     {
       "path": "packages/providers/test/scaffold.spec.ts",
@@ -7225,7 +7219,8 @@
       },
       "codexCalls": 0,
       "claudeCalls": 0,
-      "testedHead": "3f47dd7d67ce5f47e2dca7794216f28061602305"
+      "testedHead": "3f47dd7d67ce5f47e2dca7794216f28061602305",
+      "checkpointHead": "6575a4c5257695426b345b954dfa459e575e7af2"
     },
     {
       "id": "mechanical--foresift-providers-database-pglite-1",
@@ -7234,7 +7229,53 @@
       "files": [
         "packages/providers/test/registration.spec.ts"
       ],
-      "state": "PENDING"
+      "state": "VERIFIED",
+      "verification": {
+        "ok": true,
+        "wallTimeMs": 3299,
+        "peakRssBytes": 0,
+        "cpuSeconds": 0,
+        "counts": {
+          "passed": 8,
+          "failed": 0,
+          "skipped": 0
+        },
+        "results": [
+          {
+            "id": "pglite-1",
+            "workload": "DATABASE_PGLITE",
+            "files": [
+              "packages/providers/test/registration.spec.ts"
+            ],
+            "fileWorkers": 1,
+            "testConcurrency": 1,
+            "command": [
+              "bun",
+              "test",
+              "--no-orphans",
+              "--isolate",
+              "--parallel=1",
+              "--max-concurrency=1",
+              "--timeout=30000",
+              "packages/providers/test/registration.spec.ts"
+            ],
+            "status": 0,
+            "wallTimeMs": 3299,
+            "peakRssBytes": null,
+            "cpuSeconds": null,
+            "counts": {
+              "passed": 8,
+              "failed": 0,
+              "skipped": 0
+            },
+            "stdoutTail": "bun test v1.4.0 (34cbb9a40) 1x PARALLEL\n",
+            "stderrTail": "\npackages/providers/test/registration.spec.ts:\n(pass) T115 adapter registration > registers the full GMGN query manifest with allowlist entries derived [19.06ms]\n(pass) T115 adapter registration > attaches the negative-capability metadata to every registered operation [1.54ms]\n(pass) T115 adapter registration > refuses catalog entries without an allowlist descriptor [0.44ms]\n(pass) T115 adapter registration > refuses descriptors attached to a DIFFERENT operation id [0.44ms]\n(pass) T115 adapter registration > refuses a prohibited capability class outright [0.33ms]\n(pass) T115 adapter registration > refuses capability classes outside the vocabulary [0.30ms]\n(pass) T115 adapter registration > refuses wholesale multi-operation bundle exposure [0.14ms]\n(pass) T115 adapter registration > re-registers identically without conflict (idempotent) [9.24ms]\n\n 8 pass\n 0 fail\n 19 expect() calls\nRan 8 tests across 1 file. [3.19s]\n"
+          }
+        ]
+      },
+      "codexCalls": 0,
+      "claudeCalls": 0,
+      "testedHead": "6575a4c5257695426b345b954dfa459e575e7af2"
     },
     {
       "id": "mechanical--foresift-providers-pure-1",

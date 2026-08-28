@@ -365,11 +365,11 @@ describe('Foresift V4 CODEX_AGY execution profile test matrix (A through AH)', (
   });
 
   describe('Matrix K: Codex models mapping', () => {
-    it('maps LOW to gpt-5.6-luna, MEDIUM to gpt-5.6-terra, and HIGH to gpt-5.6-sol', async () => {
+    it('maps all tiers to authoritative gpt-5.6-sol model', async () => {
       const mod = await loadCodexRoutingModule();
       expect(mod.CODEX_MODELS).toBeDefined();
-      expect(mod.CODEX_MODELS.LOW).toBe('gpt-5.6-luna');
-      expect(mod.CODEX_MODELS.MEDIUM).toBe('gpt-5.6-terra');
+      expect(mod.CODEX_MODELS.LOW).toBe('gpt-5.6-sol');
+      expect(mod.CODEX_MODELS.MEDIUM).toBe('gpt-5.6-sol');
       expect(mod.CODEX_MODELS.HIGH).toBe('gpt-5.6-sol');
     });
   });
@@ -410,7 +410,7 @@ describe('Foresift V4 CODEX_AGY execution profile test matrix (A through AH)', (
   });
 
   describe('Matrix N: Complexity tier model and reasoning effort policy', () => {
-    it('assigns Luna/low for LOW, Terra/medium for MEDIUM, and Sol/high (or xhigh) for HIGH', async () => {
+    it('assigns gpt-5.6-sol and medium reasoning across LOW, MEDIUM, and HIGH while preserving complexityTier', async () => {
       const mod = await loadCodexRoutingModule();
 
       const lowRoute = mod.routeCodexLane({
@@ -420,8 +420,9 @@ describe('Foresift V4 CODEX_AGY execution profile test matrix (A through AH)', (
         files: ['docs/readme.md'],
         complexityTier: 'LOW',
       });
-      expect(lowRoute.model).toBe('gpt-5.6-luna');
-      expect(lowRoute.reasoning).toBe('low');
+      expect(lowRoute.complexityTier).toBe('LOW');
+      expect(lowRoute.model).toBe('gpt-5.6-sol');
+      expect(lowRoute.reasoning).toBe('medium');
 
       const medRoute = mod.routeCodexLane({
         lane: 'shard-med',
@@ -430,7 +431,8 @@ describe('Foresift V4 CODEX_AGY execution profile test matrix (A through AH)', (
         files: ['packages/domain/src/helpers.ts'],
         complexityTier: 'MEDIUM',
       });
-      expect(medRoute.model).toBe('gpt-5.6-terra');
+      expect(medRoute.complexityTier).toBe('MEDIUM');
+      expect(medRoute.model).toBe('gpt-5.6-sol');
       expect(medRoute.reasoning).toBe('medium');
 
       const highRoute = mod.routeCodexLane({
@@ -440,8 +442,9 @@ describe('Foresift V4 CODEX_AGY execution profile test matrix (A through AH)', (
         files: ['packages/domain/src/core.ts'],
         complexityTier: 'HIGH',
       });
+      expect(highRoute.complexityTier).toBe('HIGH');
       expect(highRoute.model).toBe('gpt-5.6-sol');
-      expect(['high', 'xhigh']).toContain(highRoute.reasoning);
+      expect(highRoute.reasoning).toBe('medium');
     });
   });
 
@@ -467,7 +470,7 @@ describe('Foresift V4 CODEX_AGY execution profile test matrix (A through AH)', (
         const route = mod.routeCodexLane({ lane: 'core', ...input });
         expect(route.complexityTier).toBe('HIGH');
         expect(route.model).toBe('gpt-5.6-sol');
-        expect(['high', 'xhigh']).toContain(route.reasoning);
+        expect(route.reasoning).toBe('medium');
       });
     }
   });
@@ -538,7 +541,7 @@ describe('Foresift V4 CODEX_AGY execution profile test matrix (A through AH)', (
       const mod = await loadCodexRoutingModule();
       const route = {
         model: 'gpt-5.6-sol',
-        reasoning: 'high',
+        reasoning: 'medium',
         serviceTier: 'standard',
       };
       const args = mod.buildCodexExecArgs(route, { worktree: '/tmp/wt/shard-1' });
@@ -556,7 +559,7 @@ describe('Foresift V4 CODEX_AGY execution profile test matrix (A through AH)', (
       expect(mIdx).toBeGreaterThanOrEqual(0);
       expect(args[mIdx + 1]).toBe('gpt-5.6-sol');
 
-      expect(args).toContain('model_reasoning_effort=high');
+      expect(args).toContain('model_reasoning_effort=medium');
       expect(args).toContain('service_tier="default"');
 
       // Worktree path

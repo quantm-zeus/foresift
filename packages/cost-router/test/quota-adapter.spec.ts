@@ -13,7 +13,11 @@ import {
 } from '@foresift/persistence';
 import type { QuotaReservationAdapter } from '../../../packages/tool-core/src/quota-contract.ts';
 import { CostQuotaAdapter } from '../src/quota-adapter.ts';
-import { FREE_QUOTA_OP } from '../../../tests/fixtures/cost/operations.ts';
+import {
+  FREE_QUOTA_OP,
+  seedCostOperationFixture,
+  seedCostQuotaBalance,
+} from '../../../tests/fixtures/cost/operations.ts';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -30,6 +34,8 @@ beforeAll(async () => {
   db = new PGlite({ parsers: PRECISION_RETAINING_TIMESTAMP_PARSERS });
   engine = createEngine(db, 'pglite');
   await applyMigrations({ engine, migrationsDir: MIGRATIONS_DIR });
+  await seedCostOperationFixture(engine, FREE_QUOTA_OP);
+  await seedCostQuotaBalance(engine, { providerId: FREE_QUOTA_OP.providerId });
   adapter = new CostQuotaAdapter({ engine, mode: 'STRICT_FREE' });
 });
 
@@ -67,7 +73,18 @@ describe('CostQuotaAdapter lifecycle', () => {
   });
 
   it('reserves quota and returns reservationId', async () => {
-    const estimate = { quotaModel: 'REQUESTS_PER_PERIOD' as const, estimatedUnits: 1 };
+    const estimate = await adapter.estimate({
+      provider: FREE_QUOTA_OP.providerId,
+      operation: FREE_QUOTA_OP.operationId,
+      workloadClass: 'INTERACTIVE_HIGH',
+    });
+    await adapter.admit({
+      provider: FREE_QUOTA_OP.providerId,
+      operation: FREE_QUOTA_OP.operationId,
+      workloadClass: 'INTERACTIVE_HIGH',
+      estimate,
+    });
+
     const reservationId = await adapter.reserve({
       provider: FREE_QUOTA_OP.providerId,
       operation: FREE_QUOTA_OP.operationId,
@@ -85,6 +102,18 @@ describe('CostQuotaAdapter lifecycle', () => {
   });
 
   it('replaying reserve with identical (pipelineRunId, stage) is idempotent', async () => {
+    const estimate = await adapter.estimate({
+      provider: FREE_QUOTA_OP.providerId,
+      operation: FREE_QUOTA_OP.operationId,
+      workloadClass: 'INTERACTIVE_HIGH',
+    });
+    await adapter.admit({
+      provider: FREE_QUOTA_OP.providerId,
+      operation: FREE_QUOTA_OP.operationId,
+      workloadClass: 'INTERACTIVE_HIGH',
+      estimate,
+    });
+
     const req = {
       provider: FREE_QUOTA_OP.providerId,
       operation: FREE_QUOTA_OP.operationId,
@@ -92,7 +121,7 @@ describe('CostQuotaAdapter lifecycle', () => {
       actorId: 'actor_alice',
       pipelineRunId: 'run_idempotent_002',
       stage: 'ATOMICALLY_RESERVE_QUOTA',
-      estimate: { quotaModel: 'REQUESTS_PER_PERIOD' as const, estimatedUnits: 1 },
+      estimate,
     };
 
     const rsv1 = await adapter.reserve(req);

@@ -109,7 +109,7 @@ export const AUTO_UPGRADE_OP: OperationCostFixture = {
   },
   minimumCandidateStage: 'DISCOVERED',
   protectedReserveEligible: false,
-  allowedInStrictFree: false,
+  allowedInStrictFree: true,
   verificationExpiresAt: T_FUTURE,
 };
 
@@ -136,3 +136,102 @@ export const ALL_COST_OPERATION_FIXTURES: readonly OperationCostFixture[] = [
   AUTO_UPGRADE_OP,
   UNVERIFIED_EXPIRED_OP,
 ];
+
+export async function seedCostOperationFixture(
+  engine: { query: (sql: string, params?: unknown[]) => Promise<unknown> },
+  fixture: OperationCostFixture = FREE_QUOTA_OP,
+): Promise<void> {
+  await engine.query(
+    `INSERT INTO prov.prov_providers (provider_id, display_name, provider_group, disabled_by_default)
+     VALUES ($1, $2, 'test-group', FALSE)
+     ON CONFLICT (provider_id) DO NOTHING`,
+    [fixture.providerId, fixture.providerId],
+  );
+  await engine.query(
+    `INSERT INTO prov.prov_operations (
+       provider_id, operation_id, version,
+       capability_class, cost_class, supported_chains,
+       input_schema_id, raw_output_schema_id, normalized_output_schema_id,
+       quota_model_id, cache_policy_id, timeout_ms, retry_policy_id,
+       declared_independence_group, license_policy_id,
+       estimated_quota_units, quota_reset_policy_id,
+       batch_capability, minimum_candidate_stage,
+       protected_reserve_eligible, allowed_in_strict_free,
+       verification_expires_at, current_state, health_status
+     ) VALUES (
+       $1, $2, $3,
+       'READ_MARKET', $4, ARRAY['solana'],
+       'in-schema', 'raw-schema', 'norm-schema',
+       $5, 'cp', 1000, 'rp',
+       'dig', 'lp',
+       $6, $7,
+       $8, $9,
+       $10, $11,
+       $12, 'ACTIVE', 'HEALTHY'
+     ) ON CONFLICT (provider_id, operation_id, version) DO UPDATE SET
+       cost_class = EXCLUDED.cost_class,
+       quota_model_id = EXCLUDED.quota_model_id,
+       estimated_quota_units = EXCLUDED.estimated_quota_units,
+       quota_reset_policy_id = EXCLUDED.quota_reset_policy_id,
+       batch_capability = EXCLUDED.batch_capability,
+       minimum_candidate_stage = EXCLUDED.minimum_candidate_stage,
+       protected_reserve_eligible = EXCLUDED.protected_reserve_eligible,
+       allowed_in_strict_free = EXCLUDED.allowed_in_strict_free,
+       verification_expires_at = EXCLUDED.verification_expires_at,
+       current_state = 'ACTIVE'`,
+    [
+      fixture.providerId,
+      fixture.operationId,
+      fixture.version,
+      fixture.costClass,
+      fixture.quotaModelId,
+      fixture.estimatedQuotaUnits,
+      fixture.quotaResetPolicyId,
+      fixture.batchCapability === null ? null : JSON.stringify(fixture.batchCapability),
+      fixture.minimumCandidateStage,
+      fixture.protectedReserveEligible,
+      fixture.allowedInStrictFree,
+      fixture.verificationExpiresAt,
+    ],
+  );
+}
+
+export async function seedCostQuotaBalance(
+  engine: { query: (sql: string, params?: unknown[]) => Promise<unknown> },
+  options: {
+    providerId: string;
+    quotaModelId?: string;
+    periodWindowStart?: string;
+    periodResetAt?: string;
+    capLimit?: number;
+    consumedReserved?: number;
+    consumedCommitted?: number;
+  },
+): Promise<void> {
+  const quotaModelId = options.quotaModelId ?? 'REQUESTS_PER_PERIOD';
+  const periodWindowStart = options.periodWindowStart ?? '2026-08-01T00:00:00Z';
+  const periodResetAt = options.periodResetAt ?? '2027-01-01T00:00:00Z';
+  const capLimit = options.capLimit ?? 10000;
+  const consumedReserved = options.consumedReserved ?? 0;
+  const consumedCommitted = options.consumedCommitted ?? 0;
+
+  await engine.query(
+    `INSERT INTO cost.cost_quota_balances
+       (provider_id, quota_model_id, period_window_start, period_reset_at, cap_limit, consumed_reserved, consumed_committed)
+     VALUES ($1, $2, $3, $4, $5, $6, $7)
+     ON CONFLICT (provider_id, quota_model_id, period_window_start) DO UPDATE SET
+       cap_limit = EXCLUDED.cap_limit,
+       consumed_reserved = EXCLUDED.consumed_reserved,
+       consumed_committed = EXCLUDED.consumed_committed,
+       period_reset_at = EXCLUDED.period_reset_at`,
+    [
+      options.providerId,
+      quotaModelId,
+      periodWindowStart,
+      periodResetAt,
+      capLimit,
+      consumedReserved,
+      consumedCommitted,
+    ],
+  );
+}

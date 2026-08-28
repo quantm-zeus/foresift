@@ -1,0 +1,46 @@
+{
+  "budgets": [
+    {
+      "dimension": "SCHEDULER",
+      "cap": 50000,
+      "used": 12000,
+      "forecastUsed": 15000,
+      "degradeBehavior": "EXTEND_INTERVAL"
+    },
+    {
+      "dimension": "WORKFLOW",
+      "cap": 20000,
+      "used": 5000,
+      "forecastUsed": 6000,
+      "degradeBehavior": "REDUCE_DEPTH"
+    },
+    {
+      "dimension": "DATABASE",
+      "cap": 1048576000,
+      "used": 209715200,
+      "forecastUsed": 250000000,
+      "degradeBehavior": "DROP_OPTIONAL"
+    },
+    {
+      "dimension": "OBJECT_STORE",
+      "cap": 5242880000,
+      "used": 1048576000,
+      "forecastUsed": 1200000000,
+      "degradeBehavior": "TRUNCATE_UNINDEXED"
+    },
+    {
+      "dimension": "NOTIFICATION",
+      "cap": 5000,
+      "used": 800,
+      "forecastUsed": 1000,
+      "degradeBehavior": "BATCH_NOTIFICATIONS"
+    },
+    {
+      "dimension": "MODEL_TOKENS_BYOK",
+      "cap": 10000000,
+      "used": 2500000,
+      "forecastUsed": 3000000,
+      "degradeBehavior": "FALLBACK_CHEAP_MODEL"
+    }
+  ]
+}

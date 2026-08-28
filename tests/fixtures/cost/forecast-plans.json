@@ -1,0 +1,103 @@
+{
+  "verifiedPlans": [
+    {
+      "planId": "gmgn-public-free",
+      "providerId": "gmgn",
+      "planLimits": {
+        "monthlyCredits": 1000000,
+        "dailyCredits": 50000,
+        "rateLimitPerSecond": 10,
+        "maxConcurrentRequests": 5
+      },
+      "verifiedAt": "2026-06-01T00:00:00Z",
+      "verificationExpiresAt": "2026-12-31T23:59:59Z",
+      "status": "VERIFIED"
+    },
+    {
+      "planId": "helius-free-tier",
+      "providerId": "helius",
+      "planLimits": {
+        "monthlyCredits": 100000,
+        "dailyCredits": 5000,
+        "rateLimitPerSecond": 5,
+        "maxConcurrentRequests": 2
+      },
+      "verifiedAt": "2026-06-01T00:00:00Z",
+      "verificationExpiresAt": "2026-12-31T23:59:59Z",
+      "status": "VERIFIED"
+    },
+    {
+      "planId": "stale-plan-001",
+      "providerId": "stale_provider",
+      "planLimits": {
+        "monthlyCredits": 50000,
+        "dailyCredits": 2000
+      },
+      "verifiedAt": "2026-01-01T00:00:00Z",
+      "verificationExpiresAt": "2026-06-01T12:00:00Z",
+      "status": "EXPIRED"
+    }
+  ],
+  "observedUsageSamples": [
+    {
+      "providerId": "gmgn",
+      "windowStart": "2026-08-01T00:00:00Z",
+      "windowEnd": "2026-08-01T23:59:59Z",
+      "creditsUsed": 12500,
+      "forecastEstimated": 12000,
+      "toleranceThreshold": 0.10,
+      "withinTolerance": true
+    },
+    {
+      "providerId": "helius",
+      "windowStart": "2026-08-01T00:00:00Z",
+      "windowEnd": "2026-08-01T23:59:59Z",
+      "creditsUsed": 8500,
+      "forecastEstimated": 5000,
+      "toleranceThreshold": 0.10,
+      "withinTolerance": false,
+      "incidentRaised": true
+    }
+  ],
+  "capacityReplay30Days": {
+    "expectedLoad": {
+      "providerCredits": 150000,
+      "streamedBytes": 50000000,
+      "modelTokens": 1000000,
+      "workflowSteps": 25000,
+      "databaseWrites": 100000,
+      "databaseStorageBytes": 104857600,
+      "objectStorageBytes": 524288000,
+      "egressBytes": 20971520,
+      "retryAllowance": 1500,
+      "notifications": 500,
+      "reservesReserved": 30000
+    },
+    "stressLoad": {
+      "providerCredits": 450000,
+      "streamedBytes": 150000000,
+      "modelTokens": 3000000,
+      "workflowSteps": 75000,
+      "databaseWrites": 300000,
+      "databaseStorageBytes": 314572800,
+      "objectStorageBytes": 1572864000,
+      "egressBytes": 62914560,
+      "retryAllowance": 4500,
+      "notifications": 1500,
+      "reservesReserved": 90000
+    },
+    "verifiedCeilings": {
+      "providerCredits": 500000,
+      "streamedBytes": 200000000,
+      "modelTokens": 5000000,
+      "workflowSteps": 100000,
+      "databaseWrites": 500000,
+      "databaseStorageBytes": 524288000,
+      "objectStorageBytes": 2097152000,
+      "egressBytes": 104857600,
+      "retryAllowance": 10000,
+      "notifications": 5000,
+      "reservesReserved": 150000
+    }
+  }
+}

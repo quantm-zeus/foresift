@@ -1,0 +1,106 @@
+{
+  "operations": [
+    {
+      "providerId": "gmgn",
+      "operationId": "token_security",
+      "version": "1.0.0",
+      "costClass": "FREE_UNMETERED",
+      "quotaUnitCost": 0,
+      "resetPolicyId": "CALENDAR_DAY_UTC",
+      "batchCapability": {
+        "maxBatchSize": 20,
+        "safeMaxUtilization": 0.85,
+        "keyFields": ["tokenAddress", "chainId"]
+      },
+      "minimumCandidateStage": "CHEAP_MONITOR",
+      "protectedReserveEligible": true,
+      "allowedInStrictFree": true,
+      "paidFallbackAllowed": false,
+      "planId": "gmgn-public-free",
+      "verificationExpiresAt": "2026-12-31T23:59:59Z"
+    },
+    {
+      "providerId": "helius",
+      "operationId": "get_asset",
+      "version": "1.0.0",
+      "costClass": "FREE_QUOTA",
+      "quotaUnitCost": 1,
+      "resetPolicyId": "CALENDAR_MONTH_UTC",
+      "batchCapability": {
+        "maxBatchSize": 50,
+        "safeMaxUtilization": 0.90,
+        "keyFields": ["assetId"]
+      },
+      "minimumCandidateStage": "PROMOTED",
+      "protectedReserveEligible": true,
+      "allowedInStrictFree": true,
+      "paidFallbackAllowed": false,
+      "planId": "helius-free-tier",
+      "verificationExpiresAt": "2026-12-31T23:59:59Z"
+    },
+    {
+      "providerId": "helius",
+      "operationId": "enhanced_transactions",
+      "version": "1.0.0",
+      "costClass": "PAID_EXPLICIT",
+      "quotaUnitCost": 10,
+      "resetPolicyId": "MONTHLY_CALENDAR",
+      "batchCapability": {
+        "maxBatchSize": 10,
+        "safeMaxUtilization": 0.80,
+        "keyFields": ["signature"]
+      },
+      "minimumCandidateStage": "ACTIVE_OPPORTUNITY",
+      "protectedReserveEligible": false,
+      "allowedInStrictFree": false,
+      "paidFallbackAllowed": true,
+      "planId": "helius-paid-developer",
+      "verificationExpiresAt": "2026-12-31T23:59:59Z"
+    },
+    {
+      "providerId": "coingecko",
+      "operationId": "market_chart_range",
+      "version": "1.0.0",
+      "costClass": "FREE_QUOTA",
+      "quotaUnitCost": 2,
+      "resetPolicyId": "CALENDAR_DAY_UTC",
+      "batchCapability": null,
+      "minimumCandidateStage": "PROMOTED",
+      "protectedReserveEligible": false,
+      "allowedInStrictFree": true,
+      "paidFallbackAllowed": false,
+      "planId": "coingecko-demo",
+      "verificationExpiresAt": "2026-12-31T23:59:59Z"
+    },
+    {
+      "providerId": "unknown_provider",
+      "operationId": "unverified_probe",
+      "version": "0.0.1",
+      "costClass": "UNKNOWN_COST",
+      "quotaUnitCost": 999,
+      "resetPolicyId": "NONE",
+      "batchCapability": null,
+      "minimumCandidateStage": null,
+      "protectedReserveEligible": false,
+      "allowedInStrictFree": false,
+      "paidFallbackAllowed": false,
+      "planId": "unverified-plan",
+      "verificationExpiresAt": "2026-01-01T00:00:00Z"
+    },
+    {
+      "providerId": "legacy_provider",
+      "operationId": "disabled_endpoint",
+      "version": "0.1.0",
+      "costClass": "DISABLED",
+      "quotaUnitCost": 0,
+      "resetPolicyId": "NONE",
+      "batchCapability": null,
+      "minimumCandidateStage": null,
+      "protectedReserveEligible": false,
+      "allowedInStrictFree": false,
+      "paidFallbackAllowed": false,
+      "planId": "disabled-plan",
+      "verificationExpiresAt": "2025-01-01T00:00:00Z"
+    }
+  ]
+}

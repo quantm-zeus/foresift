@@ -1,0 +1,40 @@
+{
+  "policies": [
+    {
+      "policyId": "pol-helius-paid-001",
+      "providerId": "helius",
+      "approvedBudgetUsd": 250.00,
+      "approver": "ops-admin@foresift.internal",
+      "createdAt": "2026-06-01T00:00:00Z",
+      "activatedAt": "2026-06-01T01:00:00Z",
+      "expiresAt": "2026-12-31T23:59:59Z",
+      "reAuthDueAt": "2026-09-01T00:00:00Z",
+      "supersededBy": null,
+      "status": "ACTIVE"
+    },
+    {
+      "policyId": "pol-helius-paid-expired",
+      "providerId": "helius_secondary",
+      "approvedBudgetUsd": 100.00,
+      "approver": "ops-admin@foresift.internal",
+      "createdAt": "2026-01-01T00:00:00Z",
+      "activatedAt": "2026-01-01T01:00:00Z",
+      "expiresAt": "2026-06-01T00:00:00Z",
+      "reAuthDueAt": "2026-05-01T00:00:00Z",
+      "supersededBy": null,
+      "status": "EXPIRED"
+    },
+    {
+      "policyId": "pol-helius-paid-superseded",
+      "providerId": "helius",
+      "approvedBudgetUsd": 150.00,
+      "approver": "ops-admin@foresift.internal",
+      "createdAt": "2026-01-01T00:00:00Z",
+      "activatedAt": "2026-01-01T01:00:00Z",
+      "expiresAt": "2026-12-31T23:59:59Z",
+      "reAuthDueAt": "2026-06-01T00:00:00Z",
+      "supersededBy": "pol-helius-paid-001",
+      "status": "SUPERSEDED"
+    }
+  ]
+}

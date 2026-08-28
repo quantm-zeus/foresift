@@ -1,0 +1,64 @@
+{
+  "compatibleBatches": [
+    {
+      "batchId": "batch-gmgn-sec-001",
+      "providerId": "gmgn",
+      "operationId": "token_security",
+      "maxBatchSize": 20,
+      "items": [
+        { "tokenAddress": "So11111111111111111111111111111111111111112", "chainId": "solana:mainnet" },
+        { "tokenAddress": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v", "chainId": "solana:mainnet" },
+        { "tokenAddress": "Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB", "chainId": "solana:mainnet" },
+        { "tokenAddress": "DezXAZ8z7PnrnRJjz3wXBoRgixCa6xjnB7YaB1pPB263", "chainId": "solana:mainnet" }
+      ],
+      "expectedUtilization": 0.20,
+      "expectedReservationCount": 1
+    },
+    {
+      "batchId": "batch-helius-asset-001",
+      "providerId": "helius",
+      "operationId": "get_asset",
+      "maxBatchSize": 50,
+      "items": [
+        { "assetId": "asset-sol-1" },
+        { "assetId": "asset-sol-2" },
+        { "assetId": "asset-sol-3" }
+      ],
+      "expectedUtilization": 0.06,
+      "expectedReservationCount": 1
+    }
+  ],
+  "incompatibleBatches": [
+    {
+      "batchId": "batch-mixed-providers-001",
+      "reason": "CROSS_PROVIDER_MERGE_FORBIDDEN",
+      "items": [
+        { "providerId": "gmgn", "operationId": "token_security", "tokenAddress": "addr1" },
+        { "providerId": "helius", "operationId": "get_asset", "assetId": "asset1" }
+      ],
+      "expectedReservationCount": 2
+    },
+    {
+      "batchId": "batch-mixed-operations-001",
+      "reason": "CROSS_OPERATION_MERGE_FORBIDDEN",
+      "items": [
+        { "providerId": "helius", "operationId": "get_asset", "assetId": "asset1" },
+        { "providerId": "helius", "operationId": "enhanced_transactions", "signature": "sig1" }
+      ],
+      "expectedReservationCount": 2
+    },
+    {
+      "batchId": "batch-exceeding-size-001",
+      "reason": "EXCEEDS_MAX_BATCH_SIZE",
+      "providerId": "gmgn",
+      "operationId": "token_security",
+      "maxBatchSize": 2,
+      "items": [
+        { "tokenAddress": "addr1" },
+        { "tokenAddress": "addr2" },
+        { "tokenAddress": "addr3" }
+      ],
+      "expectedReservationCount": 2
+    }
+  ]
+}

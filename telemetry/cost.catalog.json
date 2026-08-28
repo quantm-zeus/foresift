@@ -1,0 +1,163 @@
+{
+  "$schema": "https://foresift.dev/schemas/telemetry-catalog-v1.json",
+  "catalog": "cost",
+  "description": "Declarative cost, quota, forecast, paid-policy, and independently capped resource-budget event contracts. No field carries credentials, provider payloads, or secret material.",
+  "contractStatus": "DECLARATIVE_CONTRACT_ONLY — emitter wiring is deferred to G2 observability.",
+  "requirementsCovered": [
+    "FR-COST-001",
+    "FR-COST-002",
+    "FR-COST-003",
+    "FR-COST-004",
+    "FR-COST-005",
+    "FR-COST-006",
+    "FR-COST-007",
+    "FR-COST-008",
+    "FR-COST-009",
+    "FR-COST-010"
+  ],
+  "recoveryDataClass": "CRITICAL_METADATA",
+  "events": [
+    {
+      "name": "cost.blocked",
+      "requirementRefs": ["FR-COST-002", "FR-COST-007"],
+      "tier": "CRITICAL_METADATA",
+      "fields": [
+        { "name": "candidate", "type": "string", "required": true },
+        { "name": "caller", "type": "string", "required": true },
+        { "name": "reason", "type": "string", "required": true },
+        { "name": "alternative", "type": "string", "required": true }
+      ]
+    },
+    {
+      "name": "cost.quota_committed",
+      "requirementRefs": ["FR-COST-001"],
+      "tier": "CRITICAL_METADATA",
+      "fields": [
+        { "name": "reservationId", "type": "string", "required": true },
+        { "name": "actualUnits", "type": "number", "required": true },
+        { "name": "committedAt", "type": "string<utc-timestamp>", "required": true }
+      ]
+    },
+    {
+      "name": "cost.quota_released",
+      "requirementRefs": ["FR-COST-001"],
+      "tier": "CRITICAL_METADATA",
+      "fields": [
+        { "name": "reservationId", "type": "string", "required": true },
+        { "name": "releasedAt", "type": "string<utc-timestamp>", "required": true }
+      ]
+    },
+    {
+      "name": "cost.quota_expired",
+      "requirementRefs": ["FR-COST-001"],
+      "tier": "CRITICAL_METADATA",
+      "fields": [
+        { "name": "reservationId", "type": "string", "required": true },
+        { "name": "expiredAt", "type": "string<utc-timestamp>", "required": true }
+      ]
+    },
+    {
+      "name": "cost.reserve_consumed",
+      "requirementRefs": ["FR-COST-003"],
+      "tier": "CRITICAL_METADATA",
+      "fields": [
+        {
+          "name": "reserveId",
+          "type": "string(RISK_MONITORING|ALERT_VERIFICATION|INTERACTIVE_MCP|EMERGENCY_BACKFILL)",
+          "required": true
+        },
+        { "name": "providerId", "type": "string", "required": true },
+        { "name": "consumedUnits", "type": "number", "required": true },
+        { "name": "consumedAt", "type": "string<utc-timestamp>", "required": true }
+      ]
+    },
+    {
+      "name": "cost.batch_coalesced",
+      "requirementRefs": ["FR-COST-005"],
+      "tier": "CRITICAL_METADATA",
+      "fields": [
+        { "name": "providerId", "type": "string", "required": true },
+        { "name": "operationId", "type": "string", "required": true },
+        { "name": "batchKey", "type": "string", "required": true },
+        { "name": "itemCount", "type": "integer", "required": true },
+        { "name": "maxBatchSize", "type": "integer", "required": true },
+        { "name": "utilization", "type": "number", "required": true },
+        { "name": "coalescedAt", "type": "string<utc-timestamp>", "required": true }
+      ]
+    },
+    {
+      "name": "cost.forecast_computed",
+      "requirementRefs": ["FR-COST-006"],
+      "tier": "CRITICAL_METADATA",
+      "fields": [
+        { "name": "snapshotId", "type": "string", "required": true },
+        { "name": "estimatedForecast", "type": "object<number>", "required": true },
+        { "name": "actualObserved", "type": "object<number>", "required": true },
+        { "name": "delta", "type": "object<number>", "required": true },
+        { "name": "withinTolerance", "type": "boolean", "required": true }
+      ]
+    },
+    {
+      "name": "cost.plan_unverified",
+      "requirementRefs": ["FR-COST-006"],
+      "tier": "CRITICAL_METADATA",
+      "fields": [
+        { "name": "planVersionId", "type": "string", "required": true },
+        { "name": "expiresAt", "type": "string<utc-timestamp>", "required": true },
+        { "name": "detectedAt", "type": "string<utc-timestamp>", "required": true }
+      ]
+    },
+    {
+      "name": "cost.paid_policy_activated",
+      "requirementRefs": ["FR-COST-008"],
+      "tier": "CRITICAL_METADATA",
+      "fields": [
+        { "name": "policyId", "type": "string", "required": true },
+        { "name": "providerId", "type": "string", "required": true },
+        { "name": "approvedBy", "type": "string", "required": true },
+        { "name": "activatedAt", "type": "string<utc-timestamp>", "required": true },
+        { "name": "reAuthDueAt", "type": "string<utc-timestamp>", "required": true }
+      ]
+    },
+    {
+      "name": "cost.capacity_replay_blocked",
+      "requirementRefs": ["FR-COST-006", "FR-COST-009"],
+      "tier": "CRITICAL_METADATA",
+      "fields": [
+        { "name": "replayId", "type": "string", "required": true },
+        { "name": "snapshotId", "type": "string", "required": true },
+        { "name": "mode", "type": "string(expected|stress)", "required": true },
+        { "name": "exceededCeilings", "type": "array<string>", "required": true },
+        { "name": "blockingFlag", "type": "boolean", "required": true }
+      ]
+    },
+    {
+      "name": "cost.resource_budget_exhausted",
+      "requirementRefs": ["FR-COST-009", "FR-COST-010"],
+      "tier": "CRITICAL_METADATA",
+      "fields": [
+        {
+          "name": "kind",
+          "type": "string(SCHEDULER_SLOTS|WORKFLOW_STEPS|DATABASE_BYTES|OBJECT_STORE_BYTES|NOTIFICATION_RATE|MODEL_TOKENS_BYOK)",
+          "required": true
+        },
+        { "name": "capLimit", "type": "number", "required": true },
+        { "name": "used", "type": "number", "required": true },
+        { "name": "forecastUsed", "type": "number", "required": true },
+        { "name": "degradeBehavior", "type": "string", "required": true },
+        { "name": "ceilingExceededAt", "type": "string<utc-timestamp>", "required": true }
+      ]
+    },
+    {
+      "name": "cost.forecast_tolerance_breached",
+      "requirementRefs": ["FR-COST-006"],
+      "tier": "CRITICAL_METADATA",
+      "fields": [
+        { "name": "snapshotId", "type": "string", "required": true },
+        { "name": "breachedDimensions", "type": "array<string>", "required": true },
+        { "name": "incidentId", "type": "string", "required": true },
+        { "name": "recomputedAdmissionCaps", "type": "object<number>", "required": true }
+      ]
+    }
+  ]
+}

@@ -5,7 +5,7 @@ import {
   type OperationCostDeclaration,
 } from '@foresift/shared-schemas';
 
-interface OperationRow {
+export interface ProviderOperationCostRow {
   provider_id: unknown;
   operation_id: unknown;
   cost_class: unknown;
@@ -16,8 +16,9 @@ interface OperationRow {
   minimum_candidate_stage: unknown;
   protected_reserve_eligible: unknown;
   allowed_in_strict_free: unknown;
-  paid_fallback_allowed: unknown;
-  verification_expires_at: unknown;
+  paid_fallback_allowed?: unknown;
+  verification_expires_at?: unknown;
+  version?: unknown;
 }
 
 function unknownCost(
@@ -51,10 +52,13 @@ function parseBatch(value: unknown): unknown {
     keyFields: raw.keyFields ?? [],
     ...(raw.coalescingWindowMs === undefined ? {} : { coalescingWindowMs: raw.coalescingWindowMs }),
     ...(raw.automaticUpgrade === undefined ? {} : { automaticUpgrade: raw.automaticUpgrade }),
+    ...(raw.autoUpgrade === undefined ? {} : { autoUpgrade: raw.autoUpgrade }),
   };
 }
 
-export function operationCostDeclarationFromRow(row: OperationRow): OperationCostDeclaration {
+export function operationCostDeclarationFromRow(
+  row: ProviderOperationCostRow,
+): OperationCostDeclaration {
   const requiredStrings = [
     row.provider_id,
     row.operation_id,
@@ -88,6 +92,7 @@ export function operationCostDeclarationFromRow(row: OperationRow): OperationCos
   const candidate = {
     providerId: row.provider_id as string,
     operationId: row.operation_id as string,
+    ...(typeof row.version === 'string' ? { version: row.version } : {}),
     costClass: parsedCost,
     quotaModelId: parsedModel,
     quotaUnitCost: units,
@@ -112,8 +117,8 @@ export class OperationCostDeclarationReader {
   constructor(private readonly engine: DatabaseEngine) {}
 
   async get(providerId: string, operationId: string): Promise<OperationCostDeclaration> {
-    const result = await this.engine.query<OperationRow>(
-      `SELECT provider_id, operation_id, cost_class, quota_model_id,
+    const result = await this.engine.query<ProviderOperationCostRow>(
+      `SELECT provider_id, operation_id, version, cost_class, quota_model_id,
               estimated_quota_units, quota_reset_policy_id, batch_capability,
               minimum_candidate_stage, protected_reserve_eligible,
               allowed_in_strict_free, paid_fallback_allowed, verification_expires_at
@@ -128,6 +133,34 @@ export class OperationCostDeclarationReader {
       unknownCost('provider operation is not registered', { providerId, operationId });
     return operationCostDeclarationFromRow(row);
   }
+}
+
+export type { OperationCostDeclaration } from '@foresift/shared-schemas';
+
+export function loadCostDeclaration(value: unknown): OperationCostDeclaration {
+  if (value === null || typeof value !== 'object') unknownCost('operation declaration is absent');
+  return operationCostDeclarationFromRow(value as ProviderOperationCostRow);
+}
+
+export function isCostDeclarationComplete(value: unknown): boolean {
+  if (value === null || typeof value !== 'object') return false;
+  const raw = value as Record<string, unknown>;
+  return OperationCostDeclarationSchema.safeParse({
+    providerId: raw.providerId,
+    operationId: raw.operationId,
+    ...(raw.version === undefined ? {} : { version: raw.version }),
+    costClass: raw.costClass,
+    quotaModelId: raw.quotaModelId,
+    quotaUnitCost: raw.quotaUnitCost ?? raw.estimatedQuotaUnits,
+    resetPolicyId: raw.resetPolicyId ?? raw.quotaResetPolicyId,
+    batchCapability: raw.batchCapability,
+    minimumCandidateStage: raw.minimumCandidateStage,
+    protectedReserveEligible: raw.protectedReserveEligible,
+    allowedInStrictFree: raw.allowedInStrictFree,
+    ...(raw.verificationExpiresAt === undefined
+      ? {}
+      : { verificationExpiresAt: raw.verificationExpiresAt }),
+  }).success;
 }
 
 export async function readOperationCostDeclaration(

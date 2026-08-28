@@ -15,6 +15,11 @@ import {
   type PlanFreshnessSource,
 } from '@foresift/cost-router';
 import { ResourceBudgetManager, type ResourceBudgetDemand } from './resource-budgets.ts';
+import {
+  evaluateResourceBudgetAdmission,
+  type ResourceBudgetSnapshot,
+} from './resource-budgets.ts';
+import type { ResourceBudgetKind, WorkloadClass } from '@foresift/domain';
 
 export type ResourceDemandSource = (
   request: QuotaEstimateRequest,
@@ -75,4 +80,32 @@ export function createCostCapacityComposition(
     paidPolicies,
     resourceBudgets,
   };
+}
+
+export interface PlannerAdmissionInput {
+  readonly providerId: string;
+  readonly operationId: string;
+  readonly workloadClass: WorkloadClass;
+  readonly estimatedUnits: number;
+  readonly costRouterVerdict: QuotaAdmissionDecision;
+  readonly requiredResourceKind?: ResourceBudgetKind;
+}
+export interface CapacityPlannerOptions {
+  readonly resourceBudgets: readonly ResourceBudgetSnapshot[];
+}
+
+export class CapacityPlanner {
+  constructor(private readonly options: CapacityPlannerOptions) {}
+  async admit(input: PlannerAdmissionInput): Promise<QuotaAdmissionDecision> {
+    if (!input.costRouterVerdict.allowed) return input.costRouterVerdict;
+    if (input.requiredResourceKind === undefined) return { allowed: true, reason: 'ADMITTED' };
+    const resource = evaluateResourceBudgetAdmission({
+      budgets: this.options.resourceBudgets,
+      requestedKind: input.requiredResourceKind,
+      requestedAmount: input.estimatedUnits,
+    });
+    return resource.allowed
+      ? { allowed: true, reason: 'ADMITTED' }
+      : { allowed: false, reason: `${resource.action}: resource budget exhausted` };
+  }
 }

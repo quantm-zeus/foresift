@@ -53,3 +53,28 @@ export class DegradePolicy {
     return broadScanDegradeStrategy(state);
   }
 }
+
+export interface DegradePolicyContext {
+  readonly workloadClass: WorkloadClassType;
+  readonly generalPoolRemaining: number;
+  readonly hasNarrowedProjectionAvailable: boolean;
+  readonly alreadyDowngraded: boolean;
+  readonly cacheAvailable?: boolean;
+}
+
+export function getDegradationPriorityOrder(): readonly string[] {
+  return ['social', 'analog', 'wallet_history', 'exploration', 'broad_scan_depth'];
+}
+
+export function evaluateDegradeAction(
+  context: DegradePolicyContext,
+): 'DOWNGRADE_DEPTH' | 'RETURN_CACHE' | 'SKIP_LOW_PRIORITY' | 'QUOTA_EXHAUSTED' {
+  if (context.generalPoolRemaining > 0) return 'QUOTA_EXHAUSTED';
+  if (context.hasNarrowedProjectionAvailable && !context.alreadyDowngraded) {
+    return 'DOWNGRADE_DEPTH';
+  }
+  if (context.cacheAvailable) return 'RETURN_CACHE';
+  return context.workloadClass === WorkloadClass.RISK_MONITOR_HIGH
+    ? 'QUOTA_EXHAUSTED'
+    : 'SKIP_LOW_PRIORITY';
+}

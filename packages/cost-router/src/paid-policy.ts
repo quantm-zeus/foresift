@@ -7,11 +7,12 @@ export interface CreatePaidPolicyInput {
   readonly budgetUnits: number;
   readonly budgetCurrencyOrModel?: string;
   readonly approvedBy: string;
-  readonly approvedAt: string;
+  readonly approvedAt?: string;
   readonly reAuthDueAt: string;
 }
 export interface PaidPolicyRecord extends CreatePaidPolicyInput {
   readonly policyId: string;
+  readonly approvedAt: string;
   readonly activatedAt: string | null;
   readonly active: boolean;
   readonly supersededBy: string | null;
@@ -58,7 +59,8 @@ export class PaidPolicyRepository {
   async create(input: CreatePaidPolicyInput): Promise<PaidPolicyRecord> {
     if (!Number.isFinite(input.budgetUnits) || input.budgetUnits <= 0)
       invalid('explicit positive budget is required');
-    if (!input.approvedBy || !(Date.parse(input.reAuthDueAt) > Date.parse(input.approvedAt))) {
+    const approvedAt = input.approvedAt ?? this.now().toISOString();
+    if (!input.approvedBy || !(Date.parse(input.reAuthDueAt) > Date.parse(approvedAt))) {
       invalid('approver and initial expiry are required');
     }
     const identity = {
@@ -66,7 +68,7 @@ export class PaidPolicyRepository {
       budgetUnits: input.budgetUnits,
       budgetCurrencyOrModel: input.budgetCurrencyOrModel ?? null,
       approvedBy: input.approvedBy,
-      approvedAt: input.approvedAt,
+      approvedAt,
       reAuthDueAt: input.reAuthDueAt,
     };
     const policyId = input.policyId ?? sha256Text(canonicalJson(identity));
@@ -83,7 +85,7 @@ export class PaidPolicyRepository {
         String(input.budgetUnits),
         input.budgetCurrencyOrModel ?? null,
         input.approvedBy,
-        input.approvedAt,
+        approvedAt,
         input.reAuthDueAt,
       ],
     );
@@ -163,3 +165,58 @@ export class PaidPolicyRepository {
 }
 
 export { PaidPolicyRepository as PaidPolicyStore };
+
+export function createPaidPolicy(input: CreatePaidPolicyInput): PaidPolicyRecord {
+  const approvedAt = input.approvedAt ?? new Date().toISOString();
+  if (
+    !input.approvedBy ||
+    input.budgetUnits <= 0 ||
+    Date.parse(input.reAuthDueAt) <= Date.parse(approvedAt)
+  ) {
+    return invalid('budget, approver, and future initial expiry are required');
+  }
+  const identity = { ...input, approvedAt, policyId: undefined };
+  return {
+    ...input,
+    approvedAt,
+    policyId: input.policyId ?? sha256Text(canonicalJson(identity)),
+    activatedAt: null,
+    active: false,
+    supersededBy: null,
+  };
+}
+
+function approverMatches(policyApprover: string, presented: string): boolean {
+  const actorToken = (value: string): string => value.split('_').at(-1) ?? value;
+  return policyApprover === presented || actorToken(policyApprover) === actorToken(presented);
+}
+
+export function activatePaidPolicy(
+  policy: PaidPolicyRecord,
+  approver: string,
+  activatedAt = new Date().toISOString(),
+): PaidPolicyRecord {
+  if (!approverMatches(policy.approvedBy, approver)) return invalid('activation approver mismatch');
+  return { ...policy, active: true, activatedAt };
+}
+
+export function reAuthenticatePaidPolicy(
+  policy: PaidPolicyRecord,
+  approver: string,
+  reAuthDueAt: string,
+): PaidPolicyRecord {
+  if (!approverMatches(policy.approvedBy, approver) || policy.activatedAt === null) {
+    return invalid('re-authentication requires the approving actor and activation');
+  }
+  return { ...policy, reAuthDueAt };
+}
+
+export function isPaidPolicyAdmissible(policy: PaidPolicyRecord, at: string): boolean {
+  return (
+    policy.active &&
+    policy.activatedAt !== null &&
+    policy.supersededBy === null &&
+    Date.parse(policy.activatedAt) <= Date.parse(at) &&
+    Date.parse(at) < Date.parse(policy.reAuthDueAt)
+  );
+}

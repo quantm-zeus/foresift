@@ -5,19 +5,24 @@ import { shapeCostDenial, type CostDenial } from './cost-audit.ts';
 export interface StrictFreeGuardInput {
   readonly mode?: CostMode;
   readonly declaration: OperationCostDeclaration;
-  readonly candidate: string;
-  readonly caller: string;
+  readonly candidate?: string;
+  readonly caller?: string;
+  readonly workloadClass?: string;
+  readonly callerId?: string;
   readonly remainingUnits?: number;
   readonly estimatedUnits?: number;
+  readonly requestedUnits?: number;
   readonly automaticUpgrade?: boolean;
   readonly paidFallback?: boolean;
+  readonly paidFallbackAttempted?: boolean;
   readonly alternative?: string;
 }
 
 function denial(input: StrictFreeGuardInput, reason: string): CostDenial {
   return shapeCostDenial({
-    candidate: input.candidate,
-    caller: input.caller,
+    candidate:
+      input.candidate ?? `${input.declaration.providerId}/${input.declaration.operationId}`,
+    caller: input.caller ?? input.callerId ?? 'unknown-caller',
     reason,
     alternative: input.alternative ?? 'RETURN_CACHE',
   });
@@ -39,19 +44,38 @@ export function strictFreeGuard(input: StrictFreeGuardInput): CostDenial | undef
   if (!declaration.allowedInStrictFree) {
     return denial(input, 'STRICT_FREE_BLOCKED: operation is not explicitly free-enabled');
   }
-  if (input.automaticUpgrade || declaration.batchCapability?.automaticUpgrade === true) {
+  if (
+    input.automaticUpgrade ||
+    declaration.batchCapability?.automaticUpgrade === true ||
+    declaration.batchCapability?.autoUpgrade === true
+  ) {
     return denial(input, 'AUTO_UPGRADE_BLOCKED: automatic billing upgrade is forbidden');
   }
-  if (input.paidFallback || declaration.paidFallbackAllowed === true) {
+  if (
+    input.paidFallback ||
+    input.paidFallbackAttempted ||
+    declaration.paidFallbackAllowed === true
+  ) {
     return denial(input, 'PAID_FALLBACK_BLOCKED: paid fallback is forbidden');
   }
   if (
     input.remainingUnits !== undefined &&
-    (input.estimatedUnits ?? declaration.quotaUnitCost) > input.remainingUnits
+    (input.estimatedUnits ?? input.requestedUnits ?? declaration.quotaUnitCost) >
+      input.remainingUnits
   ) {
     return denial(input, 'QUOTA_EXHAUSTED: free quota would be exceeded');
   }
   return undefined;
+}
+
+export interface StrictFreeGuardVerdict {
+  readonly allowed: boolean;
+  readonly denial?: CostDenial;
+}
+
+export function evaluateStrictFreeGuard(input: StrictFreeGuardInput): StrictFreeGuardVerdict {
+  const blocked = strictFreeGuard(input);
+  return blocked === undefined ? { allowed: true } : { allowed: false, denial: blocked };
 }
 
 export class StrictFreeGuard {

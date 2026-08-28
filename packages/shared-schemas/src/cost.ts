@@ -41,6 +41,7 @@ export const CostBatchCapabilitySchema = z
     keyFields: z.array(z.string().min(1)),
     coalescingWindowMs: z.number().int().nonnegative().optional(),
     automaticUpgrade: z.boolean().optional(),
+    autoUpgrade: z.boolean().optional(),
   })
   .strict();
 
@@ -48,6 +49,7 @@ export const OperationCostDeclarationSchema = z
   .object({
     providerId: z.string().min(1),
     operationId: z.string().min(1),
+    version: z.string().min(1).optional(),
     costClass: CostClassSchema,
     quotaModelId: QuotaModelSchema,
     quotaUnitCost: z.number().nonnegative(),
@@ -84,13 +86,18 @@ export const ReserveBucketSchema = z
     reserveId: ReserveIdSchema,
     providerId: z.string().min(1),
     periodWindowStart: UtcTimestampSchema,
-    periodResetAt: UtcTimestampSchema,
-    capLimit: z.number().nonnegative(),
+    periodResetAt: UtcTimestampSchema.optional(),
+    capLimit: z.number().nonnegative().optional(),
+    floorUnits: z.number().nonnegative().optional(),
     remainingUnits: z.number().nonnegative(),
-    consumedReserved: z.number().nonnegative(),
-    consumedCommitted: z.number().nonnegative(),
+    consumedUnits: z.number().nonnegative().optional(),
+    consumedReserved: z.number().nonnegative().optional(),
+    consumedCommitted: z.number().nonnegative().optional(),
   })
-  .strict();
+  .strict()
+  .refine((v) => v.capLimit !== undefined || v.floorUnits !== undefined, {
+    message: 'reserve cap or floor is required',
+  });
 export type ReserveBucket = z.infer<typeof ReserveBucketSchema>;
 
 export const PaidProviderPolicySchema = z
@@ -138,6 +145,7 @@ export const ForecastSnapshotSchema = z
     planLimitsJson: NumericMapSchema,
     observedUsageJson: NumericMapSchema,
     estimatedForecastJson: NumericMapSchema,
+    createdAt: UtcTimestampSchema.optional(),
   })
   .strict()
   .refine((v) => v.expiresAt > v.verifiedAt, { message: 'expiresAt must follow verifiedAt' });
@@ -145,28 +153,38 @@ export type ForecastSnapshot = z.infer<typeof ForecastSnapshotSchema>;
 
 export const CostDenialRecordSchema = z
   .object({
+    denialId: z.string().min(1).optional(),
     candidate: z.string().min(1),
     caller: z.string().min(1),
     reason: z.string().min(1),
     alternative: z.string().min(1),
+    pipelineRunId: z.string().min(1).optional(),
+    occurredAt: UtcTimestampSchema.optional(),
   })
   .strict();
 export type CostDenialRecord = z.infer<typeof CostDenialRecordSchema>;
 
 export const BatchDescriptorSchema = z
   .object({
-    providerId: z.string().min(1),
-    operationId: z.string().min(1),
-    batchKey: z.string().min(1),
-    itemCount: z.number().int().positive(),
     maxBatchSize: z.number().int().positive(),
-    utilization: z.number().min(0).max(1),
+    safeMaxUtilization: z.number().positive().max(1),
+    keyFields: z.array(z.string().min(1)),
+    autoUpgrade: z.boolean().optional(),
   })
   .strict();
 export type BatchDescriptor = z.infer<typeof BatchDescriptorSchema>;
-export const BatchCoalescedEventSchema = BatchDescriptorSchema.extend({
-  coalescedAt: UtcTimestampSchema,
-}).strict();
+export const BatchCoalescedEventSchema = z
+  .object({
+    batchId: z.string().min(1),
+    providerId: z.string().min(1),
+    operationId: z.string().min(1),
+    itemCount: z.number().int().positive(),
+    maxBatchSize: z.number().int().positive(),
+    safeMaxUtilization: z.number().positive().max(1),
+    utilization: z.number().min(0).max(1),
+    coalescedAt: UtcTimestampSchema,
+  })
+  .strict();
 export type BatchCoalescedEvent = z.infer<typeof BatchCoalescedEventSchema>;
 
 export const COST_SCHEMAS = {

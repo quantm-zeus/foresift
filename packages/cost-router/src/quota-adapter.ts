@@ -38,6 +38,7 @@ export interface QuotaReservationAdapterOptions {
   readonly costMode?: CostModePolicy;
   readonly planFreshness?: PlanFreshnessSource;
   readonly now?: () => Date;
+  readonly mode?: CostMode;
 }
 interface AdmissionContext {
   declaration: OperationCostDeclaration;
@@ -80,7 +81,7 @@ export class QuotaReservationAdapter implements ToolQuotaAdapter {
     const declaration =
       this.contexts.get(keyOf(request.provider, request.operation))?.declaration ??
       (await this.declarations.get(request.provider, request.operation));
-    const mode = await this.modes.resolve(request.provider);
+    const mode = this.options.mode ?? (await this.modes.resolve(request.provider));
     if (declaration.costClass === CostClass.PAID_EXPLICIT && mode !== CostMode.PAID_ENABLED) {
       return { allowed: false, reason: 'PAID_BLOCKED: no current immutable paid policy' };
     }
@@ -330,3 +331,5 @@ export class QuotaReservationAdapter implements ToolQuotaAdapter {
     });
   }
 }
+
+export { QuotaReservationAdapter as CostQuotaAdapter };

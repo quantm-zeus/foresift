@@ -79,3 +79,67 @@ export class BatchCoalescer {
     return batches;
   }
 }
+
+export interface BatchCoalesceItem {
+  readonly providerId: string;
+  readonly operationId: string;
+  readonly requestedAt?: string;
+  readonly [field: string]: unknown;
+}
+export interface BatchCoalesceInput<T extends BatchCoalesceItem = BatchCoalesceItem> {
+  readonly items: readonly T[];
+  readonly capability: {
+    readonly maxBatchSize: number;
+    readonly safeMaxUtilization: number;
+    readonly keyFields: readonly string[];
+  };
+}
+export interface CoalescedRequestBatch<T extends BatchCoalesceItem = BatchCoalesceItem> {
+  readonly providerId: string;
+  readonly operationId: string;
+  readonly batchKey: string;
+  readonly items: readonly T[];
+  readonly utilization: number;
+}
+
+export function computeBatchKey(
+  providerId: string,
+  operationId: string,
+  fields: Readonly<Record<string, unknown>>,
+): string {
+  return canonical({ providerId, operationId, fields });
+}
+
+/** Pure descriptor API used before the adapter creates one reservation per returned batch. */
+export function coalesceBatchRequests<T extends BatchCoalesceItem>(
+  input: BatchCoalesceInput<T>,
+): readonly CoalescedRequestBatch<T>[] {
+  if (!Number.isInteger(input.capability.maxBatchSize) || input.capability.maxBatchSize <= 0) {
+    throw new Error('BATCH_CAPABILITY_INVALID: maxBatchSize must be positive');
+  }
+  const grouped = new Map<string, T[]>();
+  for (const item of input.items) {
+    const groupKey = canonical({ providerId: item.providerId, operationId: item.operationId });
+    const group = grouped.get(groupKey) ?? [];
+    group.push(item);
+    grouped.set(groupKey, group);
+  }
+  const result: CoalescedRequestBatch<T>[] = [];
+  for (const [groupKey, items] of [...grouped.entries()].sort(([a], [b]) => a.localeCompare(b))) {
+    for (let offset = 0; offset < items.length; offset += input.capability.maxBatchSize) {
+      const chunk = items.slice(offset, offset + input.capability.maxBatchSize);
+      const first = chunk[0]!;
+      result.push({
+        providerId: first.providerId,
+        operationId: first.operationId,
+        batchKey: computeBatchKey(first.providerId, first.operationId, {
+          group: groupKey,
+          ordinal: offset / input.capability.maxBatchSize,
+        }),
+        items: chunk,
+        utilization: chunk.length / input.capability.maxBatchSize,
+      });
+    }
+  }
+  return result;
+}

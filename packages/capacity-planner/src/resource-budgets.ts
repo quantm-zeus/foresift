@@ -12,7 +12,41 @@ export interface ResourceBudgetState {
   readonly used: number;
   readonly forecastUsed: number;
   readonly degradeBehavior: string;
-  readonly ceilingExceededAt: string | null;
+  readonly ceilingExceededAt?: string | null;
+}
+
+export interface ResourceBudgetSnapshot {
+  readonly kind: string;
+  readonly capLimit: number;
+  readonly used: number;
+  readonly forecastUsed: number;
+  readonly degradeBehavior: string;
+}
+export interface ResourceBudgetAdmissionInput {
+  readonly budgets: readonly ResourceBudgetSnapshot[];
+  readonly requestedKind: BudgetKind;
+  readonly requestedAmount: number;
+}
+export interface ResourceBudgetAdmissionVerdict {
+  readonly allowed: boolean;
+  readonly action: string;
+  readonly preserveFrozenEvidence: true;
+}
+
+export function evaluateResourceBudgetAdmission(
+  input: ResourceBudgetAdmissionInput,
+): ResourceBudgetAdmissionVerdict {
+  const budget = input.budgets.find((candidate) => candidate.kind === input.requestedKind);
+  const allowed =
+    budget !== undefined &&
+    input.requestedAmount >= 0 &&
+    budget.used + input.requestedAmount <= budget.capLimit &&
+    budget.forecastUsed <= budget.capLimit;
+  return {
+    allowed,
+    action: allowed ? 'ADMIT' : (budget?.degradeBehavior ?? 'QUOTA_EXHAUSTED'),
+    preserveFrozenEvidence: true,
+  };
 }
 export interface ResourceBudgetDemand {
   readonly kind: BudgetKind;

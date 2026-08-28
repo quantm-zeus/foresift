@@ -1,5 +1,6 @@
 /** Closed, fail-closed cost and capacity vocabularies (FR-COST-001…010). */
 import { ErrorCode, ForesiftError } from './errors.ts';
+import { WorkloadClass, type WorkloadClass as WorkloadClassType } from './tool.ts';
 
 export const CostClass = {
   FREE_UNMETERED: 'FREE_UNMETERED',
@@ -72,3 +73,11 @@ export const resourceBudgetKind = (value: string): ResourceBudgetKind =>
   );
 export const costMode = (value: string): CostMode =>
   parse(ALL_COST_MODES, value, ErrorCode.COST_MODE_UNKNOWN, 'cost mode');
+
+export function isAllowedInStrictFreeCostClass(value: CostClass): boolean {
+  return value === CostClass.FREE_UNMETERED || value === CostClass.FREE_QUOTA;
+}
+
+export function isProtectedReserveWorkload(value: WorkloadClassType): boolean {
+  return value === WorkloadClass.INTERACTIVE_HIGH || value === WorkloadClass.RISK_MONITOR_HIGH;
+}

@@ -22,6 +22,18 @@ export function planVerificationState(
   return 'VERIFIED';
 }
 
+export function isPlanMetadataVerified(expiresAt: string, at: string): boolean {
+  return Number.isFinite(Date.parse(expiresAt)) && Date.parse(at) < Date.parse(expiresAt);
+}
+
+export function verifyPlanFreshness(
+  snapshot: { readonly expiresAt: string },
+  at: string,
+): { readonly verified: boolean; readonly status: PlanVerificationState } {
+  const verified = isPlanMetadataVerified(snapshot.expiresAt, at);
+  return { verified, status: verified ? 'VERIFIED' : 'UNVERIFIED' };
+}
+
 export class PlanVerifier {
   private readonly refreshed = new Map<string, string>();
   constructor(private readonly now: () => Date = () => new Date()) {}

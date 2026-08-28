@@ -13,6 +13,12 @@ export interface ReserveRouteInput {
   readonly depthDegraded?: boolean;
 }
 
+export interface ReserveRouteResult {
+  readonly allowed: boolean;
+  readonly reserveId: ReserveIdType | null;
+  readonly reason: string;
+}
+
 const BROAD_SCAN = new Set<WorkloadClassType>([
   WorkloadClass.BACKFILL_LOW,
   WorkloadClass.EVALUATION_LOW,
@@ -36,4 +42,20 @@ export class ReserveRouter {
   isBroadScan(workloadClass: WorkloadClassType): boolean {
     return BROAD_SCAN.has(workloadClass);
   }
+}
+
+export function routeToReserve(input: {
+  readonly workloadClass: WorkloadClassType;
+  readonly operation: { readonly operationId: string; readonly protectedReserveEligible: boolean };
+}): ReserveRouteResult {
+  const reserveId = routeProtectedReserve({
+    workloadClass: input.workloadClass,
+    operation: input.operation.operationId,
+    protectedReserveEligible: input.operation.protectedReserveEligible,
+  });
+  return {
+    allowed: reserveId !== null,
+    reserveId,
+    reason: reserveId === null ? 'GENERAL_POOL_ONLY' : `RESERVE:${reserveId}`,
+  };
 }

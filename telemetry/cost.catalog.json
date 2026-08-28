@@ -22,10 +22,13 @@
       "requirementRefs": ["FR-COST-002", "FR-COST-007"],
       "tier": "CRITICAL_METADATA",
       "fields": [
+        { "name": "denialId", "type": "string", "required": false },
         { "name": "candidate", "type": "string", "required": true },
         { "name": "caller", "type": "string", "required": true },
         { "name": "reason", "type": "string", "required": true },
-        { "name": "alternative", "type": "string", "required": true }
+        { "name": "alternative", "type": "string", "required": true },
+        { "name": "pipelineRunId", "type": "string", "required": false },
+        { "name": "occurredAt", "type": "string<utc-timestamp>", "required": false }
       ]
     },
     {
@@ -76,11 +79,12 @@
       "requirementRefs": ["FR-COST-005"],
       "tier": "CRITICAL_METADATA",
       "fields": [
+        { "name": "batchId", "type": "string", "required": true },
         { "name": "providerId", "type": "string", "required": true },
         { "name": "operationId", "type": "string", "required": true },
-        { "name": "batchKey", "type": "string", "required": true },
         { "name": "itemCount", "type": "integer", "required": true },
         { "name": "maxBatchSize", "type": "integer", "required": true },
+        { "name": "safeMaxUtilization", "type": "number", "required": true },
         { "name": "utilization", "type": "number", "required": true },
         { "name": "coalescedAt", "type": "string<utc-timestamp>", "required": true }
       ]

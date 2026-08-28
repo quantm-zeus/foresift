@@ -20,11 +20,17 @@ export function verificationState(expiresAt: string, at: string): VerificationSt
 
 export class PlanVerifier {
   private readonly snapshots = new Map<string, ForecastSnapshot>();
+  private readonly operationExpiries = new Map<string, string>();
+  private readonly now: () => string;
   constructor(
-    snapshots: readonly ForecastSnapshot[] = [],
-    private readonly now: () => string = () => new Date().toISOString(),
+    snapshotsOrEngine: readonly ForecastSnapshot[] | unknown = [],
+    now: (() => string) | undefined = undefined,
   ) {
-    for (const snapshot of snapshots) this.reVerify(snapshot);
+    this.now = now ?? (() => new Date().toISOString());
+    if (Array.isArray(snapshotsOrEngine)) {
+      for (const snapshot of snapshotsOrEngine as readonly ForecastSnapshot[])
+        this.reVerify(snapshot);
+    }
   }
 
   reVerify(snapshot: ForecastSnapshot): ForecastSnapshot {
@@ -74,6 +80,64 @@ export class PlanVerifier {
   ): T {
     return estimator(this.requireVerified(snapshotId, at));
   }
+
+  async isOperationAdmissible(
+    operationId: string,
+    asOf: string,
+  ): Promise<{ readonly admissible: boolean; readonly state: VerificationState }> {
+    const expiresAt = this.operationExpiries.get(operationId);
+    const state = expiresAt === undefined ? 'UNVERIFIED' : verificationState(expiresAt, asOf);
+    return { admissible: state === 'VERIFIED', state };
+  }
+
+  async reVerifyOperation(operationId: string, ttlSeconds: number, asOf: string): Promise<void> {
+    if (!Number.isFinite(ttlSeconds) || ttlSeconds <= 0)
+      throw new RangeError('TTL must be positive');
+    this.operationExpiries.set(
+      operationId,
+      new Date(epoch(asOf) + ttlSeconds * 1000).toISOString(),
+    );
+  }
 }
 
 export { PlanVerifier as VerifiedPlanVerifier };
+
+export function checkPlanFreshness(
+  plan: { readonly expiresAt: string },
+  asOf: string,
+): { readonly isVerified: boolean; readonly status: VerificationState } {
+  const status = verificationState(plan.expiresAt, asOf);
+  return { isVerified: status === 'VERIFIED', status };
+}
+
+export function assertPlanVerified(plan: {
+  readonly isVerified: boolean;
+  readonly status: string;
+  readonly planId: string;
+}): void {
+  if (!plan.isVerified || plan.status !== 'VERIFIED')
+    throw new ForesiftError(ErrorCode.COST_PLAN_UNVERIFIED, `UNVERIFIED: ${plan.planId}`);
+}
+
+export function assertPlanValidity(plan: {
+  readonly planId: string;
+  readonly expiresAt: string;
+  readonly asOf: string;
+}): void {
+  if (verificationState(plan.expiresAt, plan.asOf) === 'UNVERIFIED')
+    throw new ForesiftError(ErrorCode.COST_PLAN_UNVERIFIED, `PLAN_EXPIRED: ${plan.planId}`);
+}
+
+export function reVerifyPlan(
+  _planId: string,
+  freshTtlSeconds: number,
+  now: string,
+): { readonly isVerified: true; readonly status: 'VERIFIED'; readonly newExpiresAt: string } {
+  if (!Number.isFinite(freshTtlSeconds) || freshTtlSeconds <= 0)
+    throw new RangeError('fresh TTL must be positive');
+  return {
+    isVerified: true,
+    status: 'VERIFIED',
+    newExpiresAt: new Date(epoch(now) + freshTtlSeconds * 1000).toISOString().replace('.000Z', 'Z'),
+  };
+}

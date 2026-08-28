@@ -104,3 +104,41 @@ export class ProtectedReserveRouter {
 }
 
 export { ProtectedReserveRouter as ReserveRouter };
+
+const DIRECT_RESERVE_WORKLOADS: Readonly<Record<string, ReserveIdType>> = {
+  RISK_MONITORING: ReserveId.RISK_MONITORING,
+  ALERT_VERIFICATION: ReserveId.ALERT_VERIFICATION,
+  INTERACTIVE_MCP: ReserveId.INTERACTIVE_MCP,
+  EMERGENCY_BACKFILL: ReserveId.EMERGENCY_BACKFILL,
+};
+
+export function resolveReserveBucket(
+  workloadClass: string,
+  _operation: string,
+): ReserveIdType | null {
+  if (
+    (BROAD_SCAN_WORKLOADS as readonly string[]).includes(workloadClass) ||
+    workloadClass === 'DISCOVERY_BROAD'
+  )
+    return null;
+  return DIRECT_RESERVE_WORKLOADS[workloadClass] ?? null;
+}
+
+export function canAdmitFromReserve(
+  workloadClass: string,
+  balances: Readonly<Record<string, number>>,
+): boolean {
+  const reserve = resolveReserveBucket(workloadClass, '');
+  return reserve !== null && Number.isFinite(balances[reserve]) && (balances[reserve] ?? 0) > 0;
+}
+
+export function allocateFromReserve(input: {
+  readonly targetReserve: string;
+  readonly workloadClass: string;
+  readonly units: number;
+}): { readonly success: boolean; readonly error?: string } {
+  const authorized = resolveReserveBucket(input.workloadClass, '') === input.targetReserve;
+  return authorized && Number.isFinite(input.units) && input.units > 0
+    ? { success: true }
+    : { success: false, error: 'RESERVE_ACCESS_UNAUTHORIZED: WORKLOAD_NOT_ELIGIBLE' };
+}

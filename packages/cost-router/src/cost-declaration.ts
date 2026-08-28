@@ -166,3 +166,50 @@ export class InMemoryCostDeclarationSource implements CostDeclarationSource {
 }
 
 export { SqlCostDeclarationSource as CostDeclarationReader };
+
+/** Seven-field pure projection used at non-SQL registry boundaries. */
+export function projectCostDeclaration(input: unknown): Readonly<{
+  costClass: CostClass;
+  quotaUnitCost: number;
+  resetPolicyId: string;
+  batchCapability: unknown;
+  minimumCandidateStage: string | null;
+  protectedReserveEligible: boolean;
+  allowedInStrictFree: boolean;
+}> {
+  if (typeof input !== 'object' || input === null) unknownCost('declaration must be an object');
+  const row = input as Record<string, unknown>;
+  try {
+    const projected = {
+      costClass: costClass(required(row, 'costClass')),
+      quotaUnitCost: required(row, 'quotaUnitCost'),
+      resetPolicyId: required(row, 'resetPolicyId'),
+      batchCapability: required(row, 'batchCapability'),
+      minimumCandidateStage: required(row, 'minimumCandidateStage'),
+      protectedReserveEligible: required(row, 'protectedReserveEligible'),
+      allowedInStrictFree: required(row, 'allowedInStrictFree'),
+    };
+    if (!Number.isFinite(projected.quotaUnitCost) || Number(projected.quotaUnitCost) < 0)
+      unknownCost('quotaUnitCost must be finite and nonnegative');
+    if (typeof projected.resetPolicyId !== 'string' || projected.resetPolicyId.length === 0)
+      unknownCost('resetPolicyId must be non-empty');
+    CostBatchCapabilitySchema.parse(projected.batchCapability);
+    if (
+      projected.minimumCandidateStage !== null &&
+      (typeof projected.minimumCandidateStage !== 'string' ||
+        projected.minimumCandidateStage.length === 0)
+    )
+      unknownCost('minimumCandidateStage must be non-empty or null');
+    if (
+      typeof projected.protectedReserveEligible !== 'boolean' ||
+      typeof projected.allowedInStrictFree !== 'boolean'
+    )
+      unknownCost('reserve eligibility and STRICT_FREE permission must be booleans');
+    return projected as ReturnType<typeof projectCostDeclaration>;
+  } catch (error) {
+    if (error instanceof ForesiftError) throw error;
+    unknownCost(
+      `invalid provider cost declaration: ${error instanceof Error ? error.message : String(error)}`,
+    );
+  }
+}

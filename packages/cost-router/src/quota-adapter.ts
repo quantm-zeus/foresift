@@ -66,7 +66,16 @@ export class CostQuotaReservationAdapter implements QuotaReservationAdapter {
   private readonly auditor: CostAuditor | undefined;
   private readonly clock: () => string;
 
-  constructor(options: CostQuotaAdapterOptions) {
+  constructor(options: CostQuotaAdapterOptions);
+  constructor(engine: DatabaseEngine, legacyOptions?: Omit<CostQuotaAdapterOptions, 'engine'>);
+  constructor(
+    optionsOrEngine: CostQuotaAdapterOptions | DatabaseEngine,
+    legacyOptions: Omit<CostQuotaAdapterOptions, 'engine'> = {},
+  ) {
+    const options: CostQuotaAdapterOptions =
+      'engineKind' in optionsOrEngine
+        ? { engine: optionsOrEngine, ...legacyOptions }
+        : optionsOrEngine;
     this.engine = options.engine;
     this.declarations = options.declarations ?? new SqlCostDeclarationSource(options.engine);
     this.paidPolicies = options.paidPolicies ?? new PaidPolicyStore(options.engine);
@@ -480,3 +489,4 @@ export function createQuotaReservationAdapter(
 /** Compatibility alias describing the primary seam by its tool-core name. */
 export { CostQuotaReservationAdapter as QuotaReservationAdapterImpl };
 export { CostQuotaReservationAdapter as CostRouterQuotaAdapter };
+export { CostQuotaReservationAdapter as CostQuotaAdapter };

@@ -27,3 +27,28 @@ export class CostAuditor {
     return record;
   }
 }
+
+function redact(value: string): string {
+  return value
+    .replace(/\bBearer\s+[A-Za-z0-9._~+\/-]+/gi, '[REDACTED]')
+    .replace(/\b(?:sk_live|secret_key|api[_-]?key)[_=:-]?[A-Za-z0-9_-]+/gi, '[REDACTED]');
+}
+
+export function formatCostDenial(
+  input: CostDenialRecord & { readonly context?: unknown },
+): CostDenialRecord {
+  return shapeCostDenial({
+    ...input,
+    candidate: redact(input.candidate),
+    caller: redact(input.caller),
+    reason: redact(input.reason),
+    alternative: redact(input.alternative),
+    ...(input.provider === undefined ? {} : { provider: redact(input.provider) }),
+    ...(input.operation === undefined ? {} : { operation: redact(input.operation) }),
+  });
+}
+
+export function validateDenialPayload(payload: unknown): true {
+  CostDenialRecordSchema.parse(payload);
+  return true;
+}

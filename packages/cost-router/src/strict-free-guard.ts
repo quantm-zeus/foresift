@@ -1,5 +1,5 @@
 /** Deny-closed data-provider mode guard, evaluated before any egress (FR-COST-002). */
-import { CostClass, CostMode } from '@foresift/domain';
+import { CostClass, CostMode, costClass as parseCostClass } from '@foresift/domain';
 import type { CostClass as CostClassType, CostMode as CostModeType } from '@foresift/domain';
 import type { CostDenialRecord } from '@foresift/shared-schemas';
 
@@ -83,4 +83,38 @@ export class StrictFreeGuard {
   }
 }
 
-export const evaluateStrictFree = strictFreeDenial;
+export function evaluateStrictFree(input: {
+  readonly costMode: string;
+  readonly costClass: string;
+  readonly candidate?: string;
+  readonly caller?: string;
+  readonly quotaExhausted?: boolean;
+  readonly attemptAutoUpgrade?: boolean;
+  readonly isPaidFallback?: boolean;
+}): { readonly allowed: boolean; readonly denial?: CostDenial } {
+  let parsedCostClass: CostClassType;
+  try {
+    parsedCostClass = parseCostClass(input.costClass);
+  } catch {
+    return {
+      allowed: false,
+      denial: {
+        candidate: input.candidate ?? '<unknown-candidate>',
+        caller: input.caller ?? '<unknown-caller>',
+        reason: `UNKNOWN_COST:${input.costClass}`,
+        alternative: 'USE_VERIFIED_FREE_OPERATION',
+      },
+    };
+  }
+  const evaluated = strictFreeDenial({
+    mode: input.costMode === 'STRICT_FREE' ? CostMode.STRICT_FREE : CostMode.PAID_ENABLED,
+    costClass: parsedCostClass,
+    allowedInStrictFree: true,
+    quotaAvailable: input.quotaExhausted !== true,
+    ...(input.attemptAutoUpgrade === undefined ? {} : { autoUpgrade: input.attemptAutoUpgrade }),
+    ...(input.isPaidFallback === undefined ? {} : { paidFallback: input.isPaidFallback }),
+    candidate: input.candidate ?? '<unknown-candidate>',
+    caller: input.caller ?? '<unknown-caller>',
+  });
+  return evaluated === null ? { allowed: true } : { allowed: false, denial: evaluated };
+}

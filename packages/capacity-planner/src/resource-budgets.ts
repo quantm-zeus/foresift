@@ -109,3 +109,62 @@ export class ResourceBudgetManager {
 export const ALL_INDEPENDENT_RESOURCE_BUDGETS = Object.freeze(Object.values(ResourceBudgetKind));
 
 export { ResourceBudgetManager as ResourceBudgets };
+
+export class ResourceBudgetTracker {
+  private readonly caps = new Map<string, number>();
+  private readonly used = new Map<string, number>();
+  setBudget(dimension: string, cap: number): void {
+    if (!Number.isFinite(cap) || cap < 0) throw new RangeError('budget cap must be nonnegative');
+    this.caps.set(dimension, cap);
+    this.used.set(dimension, 0);
+  }
+  recordUsage(dimension: string, amount: number): void {
+    if (!this.caps.has(dimension)) throw new Error(`RESOURCE_BUDGET_UNBOUND:${dimension}`);
+    if (!Number.isFinite(amount) || amount < 0) throw new RangeError('usage must be nonnegative');
+    this.used.set(dimension, (this.used.get(dimension) ?? 0) + amount);
+  }
+  getRemaining(dimension: string): number {
+    return Math.max(0, (this.caps.get(dimension) ?? 0) - (this.used.get(dimension) ?? 0));
+  }
+  isExhausted(dimension: string): boolean {
+    return this.caps.has(dimension) && this.getRemaining(dimension) === 0;
+  }
+}
+
+export function evaluateWorkloadAdmission(
+  workloadClass: string,
+  _dimension: string,
+  isExhausted: boolean,
+): { readonly allowed: boolean; readonly action: string } {
+  if (workloadClass === 'RISK_MONITORING' || workloadClass === 'ALERT_VERIFICATION')
+    return { allowed: true, action: 'PRESERVE_CRITICAL' };
+  return isExhausted
+    ? { allowed: false, action: 'SKIP_LOW_PRIORITY' }
+    : { allowed: true, action: 'NONE' };
+}
+
+export const isByokModelNamespace = (dimension: string): boolean =>
+  dimension === ResourceBudgetKind.MODEL_TOKENS_BYOK;
+
+export function attemptReclaimStorage(input: {
+  readonly targetType: string;
+  readonly isFrozenEvidence: boolean;
+}): { readonly allowed: boolean; readonly error?: string } {
+  return input.isFrozenEvidence
+    ? { allowed: false, error: 'FROZEN_EVIDENCE_IMMUTABLE: CANNOT_PURGE_EVIDENCE' }
+    : { allowed: true };
+}
+
+export class ResourceBudgetEngine {
+  private readonly exhausted = new Set<string>();
+  exhaustDimension(dimension: string): void {
+    this.exhausted.add(dimension);
+  }
+  canExecute(workload: string): boolean {
+    if (workload === 'RISK_MONITORING' || workload === 'ALERT_VERIFICATION') return true;
+    return this.exhausted.size === 0;
+  }
+  canEvictFrozenEvidence(): false {
+    return false;
+  }
+}

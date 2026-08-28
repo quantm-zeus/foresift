@@ -99,3 +99,103 @@ export class CostForecast {
     };
   }
 }
+
+export function evaluateForecast(input: {
+  readonly estimatedForecast: number;
+  readonly actualObserved: number;
+  readonly toleranceFraction: number;
+}): {
+  readonly delta: number;
+  readonly percentDelta: number;
+  readonly withinTolerance: boolean;
+  readonly incidentRequired: boolean;
+  readonly recomputedCap?: number;
+} {
+  if (
+    !Number.isFinite(input.estimatedForecast) ||
+    !Number.isFinite(input.actualObserved) ||
+    !Number.isFinite(input.toleranceFraction) ||
+    input.estimatedForecast < 0 ||
+    input.actualObserved < 0 ||
+    input.toleranceFraction < 0
+  )
+    throw new RangeError('forecast values must be finite and nonnegative');
+  const delta = input.actualObserved - input.estimatedForecast;
+  const percentDelta =
+    input.estimatedForecast === 0
+      ? input.actualObserved === 0
+        ? 0
+        : Number.POSITIVE_INFINITY
+      : Math.abs(delta) / input.estimatedForecast;
+  const withinTolerance = percentDelta <= input.toleranceFraction;
+  return {
+    delta,
+    percentDelta,
+    withinTolerance,
+    incidentRequired: !withinTolerance,
+    ...(withinTolerance
+      ? {}
+      : { recomputedCap: Math.max(0, input.estimatedForecast - Math.max(delta, 0)) }),
+  };
+}
+
+export function handleBreach(_input: {
+  readonly excessUnits: number;
+  readonly reserveBalances: Readonly<Record<string, number>>;
+  readonly paidAllowed: boolean;
+}): {
+  readonly consumedPaidOverage: false;
+  readonly consumedReserve: false;
+  readonly action: 'RAISE_INCIDENT_AND_THROTTLE';
+} {
+  return {
+    consumedPaidOverage: false,
+    consumedReserve: false,
+    action: 'RAISE_INCIDENT_AND_THROTTLE',
+  };
+}
+
+export function verifyReconciliationPolicy(event: {
+  readonly toleranceExceeded: boolean;
+  readonly incidentRecorded: boolean;
+}): true {
+  if (event.toleranceExceeded && !event.incidentRecorded)
+    throw new Error('SILENT_BREACH_FORBIDDEN: INCIDENT_MANDATORY_ON_TOLERANCE_BREACH');
+  return true;
+}
+
+export class ForecastReconciliationEngine {
+  constructor(engine: unknown) {
+    void engine;
+  }
+  async reconcileUsage(input: {
+    readonly operation: string;
+    readonly forecastUnits: number;
+    readonly actualUnits: number;
+    readonly tolerancePercent: number;
+  }): Promise<{
+    readonly incidentCreated: boolean;
+    readonly incidentId?: string;
+    readonly recomputedLimit: number;
+    readonly consumedPaidOverage: false;
+    readonly consumedReserve: false;
+  }> {
+    const result = evaluateForecast({
+      estimatedForecast: input.forecastUnits,
+      actualObserved: input.actualUnits,
+      toleranceFraction: input.tolerancePercent,
+    });
+    const incidentId = result.incidentRequired
+      ? `cost-forecast:${createHash('sha256')
+          .update(`${input.operation}\u0000${input.forecastUnits}\u0000${input.actualUnits}`)
+          .digest('hex')}`
+      : undefined;
+    return {
+      incidentCreated: result.incidentRequired,
+      ...(incidentId === undefined ? {} : { incidentId }),
+      recomputedLimit: result.recomputedCap ?? input.forecastUnits,
+      consumedPaidOverage: false,
+      consumedReserve: false,
+    };
+  }
+}

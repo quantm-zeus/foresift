@@ -158,3 +158,91 @@ export class BatchCoalescer {
 }
 
 export const coalesceBatchRequests = coalesceBatches;
+
+export function computeBatchKey(
+  provider: string,
+  operation: string,
+  keyFields: Readonly<Record<string, unknown>>,
+): string {
+  return `batch_key:${createHash('sha256')
+    .update(canonical({ provider, operation, keyFields }))
+    .digest('hex')}`;
+}
+
+export function coalesceRequests<T extends { provider: string; operation: string }>(
+  requests: readonly T[],
+  capability: { readonly maxBatchSize: number; readonly safeMaxUtilization: number },
+): readonly {
+  batchId: string;
+  provider: string;
+  operation: string;
+  items: readonly T[];
+  utilization: number;
+}[] {
+  if (!Number.isInteger(capability.maxBatchSize) || capability.maxBatchSize <= 0)
+    throw new RangeError('maxBatchSize must be positive');
+  if (capability.safeMaxUtilization <= 0 || capability.safeMaxUtilization > 1)
+    throw new RangeError('safeMaxUtilization must be in (0,1]');
+  const safeSize = Math.max(1, Math.floor(capability.maxBatchSize * capability.safeMaxUtilization));
+  const groups = new Map<string, T[]>();
+  for (const request of requests) {
+    const key = `${request.provider}\u0000${request.operation}`;
+    const values = groups.get(key) ?? [];
+    values.push(request);
+    groups.set(key, values);
+  }
+  const result = [];
+  for (const [groupKey, items] of [...groups.entries()].sort(([a], [b]) => a.localeCompare(b))) {
+    for (let offset = 0; offset < items.length; offset += safeSize) {
+      const members = items.slice(offset, offset + safeSize);
+      const first = members[0]!;
+      result.push({
+        batchId: computeBatchKey(first.provider, first.operation, { groupKey, offset }),
+        provider: first.provider,
+        operation: first.operation,
+        items: members,
+        utilization: members.length / capability.maxBatchSize,
+      });
+    }
+  }
+  return result;
+}
+
+export async function processBatchRequests<T>(input: {
+  readonly provider: string;
+  readonly operation: string;
+  readonly items: readonly T[];
+  readonly batchCapability: { readonly maxBatchSize: number; readonly safeMaxUtilization: number };
+}): Promise<{
+  readonly batches: readonly { batchId: string; itemCount: number; utilization: number }[];
+  readonly reservationCount: number;
+}> {
+  const batches = coalesceRequests(
+    input.items.map((item) => ({ provider: input.provider, operation: input.operation, item })),
+    input.batchCapability,
+  );
+  return {
+    batches: batches.map((batch) => ({
+      batchId: batch.batchId,
+      itemCount: batch.items.length,
+      utilization: batch.utilization,
+    })),
+    reservationCount: batches.length,
+  };
+}
+
+export async function processMixedRequests<T extends { provider: string; operation: string }>(
+  requests: readonly T[],
+): Promise<{
+  readonly providerBatches: Readonly<Record<string, number>>;
+  readonly totalReservations: number;
+}> {
+  const batches = coalesceRequests(requests, {
+    maxBatchSize: Number.MAX_SAFE_INTEGER,
+    safeMaxUtilization: 1,
+  });
+  const providerBatches: Record<string, number> = {};
+  for (const batch of batches)
+    providerBatches[batch.provider] = (providerBatches[batch.provider] ?? 0) + 1;
+  return { providerBatches, totalReservations: batches.length };
+}

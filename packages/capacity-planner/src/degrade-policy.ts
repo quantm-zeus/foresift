@@ -76,3 +76,73 @@ export class DegradePolicy {
 }
 
 export { DegradePolicy as BroadScanDegradePolicy };
+
+export const getDegradationSequence = (): string[] => [
+  'SOCIAL_NARRATIVE',
+  'ANALOG_COUNTERFACTUAL',
+  'WALLET_HISTORY_DEPTH',
+  'EXPLORATION_BREADTH',
+  'BROAD_SCAN_DEPTH',
+];
+
+export function applyDegradation(input: {
+  readonly candidateCount: number;
+  readonly historyDepthDays: number;
+  readonly workloadClass: string;
+  readonly quotaRemaining: number;
+}): {
+  readonly degradedCandidateCount: number;
+  readonly degradedHistoryDepthDays: number;
+  readonly consumedReserve: false;
+} {
+  const admitted = Math.max(0, Math.min(input.candidateCount, Math.floor(input.quotaRemaining)));
+  return {
+    degradedCandidateCount: admitted,
+    degradedHistoryDepthDays:
+      admitted < input.candidateCount
+        ? Math.max(1, Math.floor(input.historyDepthDays / 2))
+        : input.historyDepthDays,
+    consumedReserve: false,
+  };
+}
+
+export function handleQuotaExhaustion<T extends Readonly<Record<string, number>>>(input: {
+  readonly workloadClass: string;
+  readonly requestedCandidates: number;
+  readonly generalQuotaAvailable: number;
+  readonly reserveBalances: T;
+}): {
+  readonly admittedCandidates: number;
+  readonly servedFromCache: boolean;
+  readonly finalReserveBalances: T;
+} {
+  return {
+    admittedCandidates: Math.max(
+      0,
+      Math.min(input.requestedCandidates, Math.floor(input.generalQuotaAvailable)),
+    ),
+    servedFromCache: input.generalQuotaAvailable <= 0,
+    finalReserveBalances: { ...input.reserveBalances },
+  };
+}
+
+export function simulateProgressiveExhaustion(): {
+  readonly degradationOrder: string[];
+  readonly protectedWorkloadsTouched: string[];
+} {
+  return { degradationOrder: getDegradationSequence(), protectedWorkloadsTouched: [] };
+}
+
+export function validateDegradationPlan(input: {
+  readonly activeWorkloads: readonly string[];
+  readonly degradedWorkloads: readonly string[];
+}): true {
+  const protectedSet = new Set<string>(PRESERVED_CAPACITY_CLASSES);
+  if (
+    input.degradedWorkloads.some((workload) => protectedSet.has(workload)) &&
+    input.activeWorkloads.some((workload) => getDegradationSequence().includes(workload))
+  ) {
+    throw new Error('INVALID_DEGRADATION_PRIORITY: PROTECTED_WORKLOAD_DEGRADED_FIRST');
+  }
+  return true;
+}

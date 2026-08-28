@@ -207,3 +207,54 @@ export class PaidPolicyStore implements ActivePaidPolicySource {
 }
 
 export { PaidPolicyStore as PaidPolicyService };
+
+/** Ergonomic API facade; persisted ids remain content hashes regardless of caller labels. */
+export class PaidPolicyManager {
+  private readonly store: PaidPolicyStore;
+  constructor(engine: DatabaseEngine) {
+    this.store = new PaidPolicyStore(engine);
+  }
+  async createPolicy(input: {
+    readonly policyId: string;
+    readonly providerId: string;
+    readonly budgetUsd: number;
+    readonly approver: string;
+    readonly reAuthDueAt: string;
+  }): Promise<string> {
+    const policy = await this.store.create({
+      providerId: input.providerId,
+      budgetUnits: input.budgetUsd,
+      approvedBy: input.approver,
+      reAuthDueAt: input.reAuthDueAt,
+    });
+    return policy.policyId;
+  }
+  async activatePolicy(policyId: string, approver: string): Promise<void> {
+    await this.store.activate(policyId, approver);
+  }
+  async getActivePolicy(
+    providerId: string,
+  ): Promise<
+    (PaidProviderPolicy & { readonly budgetUsd: number; readonly approver: string }) | null
+  > {
+    const policy = await this.store.activePolicy(providerId);
+    return policy === null
+      ? null
+      : { ...policy, budgetUsd: policy.budgetUnits, approver: policy.approvedBy };
+  }
+  async updatePolicy(_policyId: string, _patch: Readonly<Record<string, unknown>>): Promise<never> {
+    throw new ForesiftError(
+      ErrorCode.COST_POLICY_IMMUTABLE,
+      'POLICY_ACTIVE_CANNOT_MUTATE: paid policy versions are immutable',
+    );
+  }
+  async isPolicyAdmissible(
+    providerId: string,
+    at: string,
+  ): Promise<{ readonly admissible: boolean; readonly reason?: string }> {
+    const policy = await this.store.activePolicy(providerId, at);
+    return policy === null
+      ? { admissible: false, reason: 'REAUTH_EXPIRED: no active unexpired policy' }
+      : { admissible: true };
+  }
+}

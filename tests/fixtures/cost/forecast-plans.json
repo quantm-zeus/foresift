@@ -1,0 +1,73 @@
+{
+  "$comment": "Inert provider plan metadata and forecast snapshots (FR-COST-006, AC-103, AC-229).",
+  "plans": [
+    {
+      "planId": "helius-dev-free",
+      "providerId": "helius",
+      "displayName": "Helius Developer Plan",
+      "costMode": "STRICT_FREE",
+      "limits": {
+        "monthlyCredits": 1000000,
+        "rateLimitRps": 50,
+        "streamedBytesMonthly": 10737418240,
+        "maxConcurrentRequests": 10
+      },
+      "verifiedAt": "2026-08-01T00:00:00Z",
+      "expiresAt": "2026-09-01T00:00:00Z",
+      "verificationTtlSeconds": 2678400,
+      "status": "VERIFIED"
+    },
+    {
+      "planId": "gmgn-free-tier",
+      "providerId": "gmgn",
+      "displayName": "GMGN Free API Tier",
+      "costMode": "STRICT_FREE",
+      "limits": {
+        "dailyQuota": 5000,
+        "rateLimitRps": 5,
+        "streamedBytesMonthly": 0,
+        "maxConcurrentRequests": 2
+      },
+      "verifiedAt": "2026-08-01T00:00:00Z",
+      "expiresAt": "2026-08-15T00:00:00Z",
+      "verificationTtlSeconds": 1209600,
+      "status": "VERIFIED"
+    },
+    {
+      "planId": "expired-plan-snapshot",
+      "providerId": "coingecko",
+      "displayName": "CoinGecko Free API",
+      "costMode": "STRICT_FREE",
+      "limits": {
+        "monthlyCredits": 10000,
+        "rateLimitRps": 1,
+        "streamedBytesMonthly": 0,
+        "maxConcurrentRequests": 1
+      },
+      "verifiedAt": "2026-07-01T00:00:00Z",
+      "expiresAt": "2026-08-01T00:00:00Z",
+      "verificationTtlSeconds": 2678400,
+      "status": "EXPIRED"
+    }
+  ],
+  "forecastSnapshots": [
+    {
+      "snapshotId": "snap-2026-08",
+      "planId": "helius-dev-free",
+      "period": "2026-08",
+      "planLimitsJson": {
+        "monthlyCredits": 1000000,
+        "rateLimitRps": 50
+      },
+      "observedUsageJson": {
+        "creditsConsumed": 320000,
+        "peakRps": 22
+      },
+      "forecastTolerancePercent": 0.15,
+      "estimatedForecast": 400000,
+      "actualObserved": 320000,
+      "withinTolerance": true,
+      "expiresAt": "2026-09-01T00:00:00Z"
+    }
+  ]
+}

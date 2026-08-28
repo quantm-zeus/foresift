@@ -1,0 +1,45 @@
+{
+  "$comment": "Inert batch coalescing test inputs (FR-COST-005, AC-102).",
+  "compatibleBatch": {
+    "provider": "gmgn",
+    "operation": "token_security",
+    "batchCapability": {
+      "maxBatchSize": 20,
+      "safeMaxUtilization": 0.8,
+      "keyFields": ["address"]
+    },
+    "requests": [
+      { "address": "So11111111111111111111111111111111111111111", "requestId": "req-01" },
+      { "address": "So11111111111111111111111111111111111111112", "requestId": "req-02" },
+      { "address": "So11111111111111111111111111111111111111113", "requestId": "req-03" },
+      { "address": "So11111111111111111111111111111111111111114", "requestId": "req-04" },
+      { "address": "So11111111111111111111111111111111111111115", "requestId": "req-05" },
+      { "address": "So11111111111111111111111111111111111111116", "requestId": "req-06" },
+      { "address": "So11111111111111111111111111111111111111117", "requestId": "req-07" },
+      { "address": "So11111111111111111111111111111111111111118", "requestId": "req-08" },
+      { "address": "So11111111111111111111111111111111111111119", "requestId": "req-09" },
+      { "address": "So1111111111111111111111111111111111111111a", "requestId": "req-10" },
+      { "address": "So1111111111111111111111111111111111111111b", "requestId": "req-11" },
+      { "address": "So1111111111111111111111111111111111111111c", "requestId": "req-12" },
+      { "address": "So1111111111111111111111111111111111111111d", "requestId": "req-13" },
+      { "address": "So1111111111111111111111111111111111111111e", "requestId": "req-14" },
+      { "address": "So1111111111111111111111111111111111111111f", "requestId": "req-15" },
+      { "address": "So11111111111111111111111111111111111111120", "requestId": "req-16" }
+    ],
+    "expectedFirstBatchSize": 16,
+    "expectedSafeUtilization": 0.8,
+    "expectedTotalBatches": 1
+  },
+  "incompatibleCrossProvider": [
+    {
+      "provider": "gmgn",
+      "operation": "token_security",
+      "address": "So11111111111111111111111111111111111111111"
+    },
+    {
+      "provider": "helius",
+      "operation": "raw_asset_query",
+      "address": "So11111111111111111111111111111111111111111"
+    }
+  ]
+}

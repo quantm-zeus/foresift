@@ -1,0 +1,124 @@
+{
+  "$comment": "Inert 30-day sustainable capacity contracts with 9 dimension families (FR-COST-009, FR-COST-011..016, AC-227, AC-228).",
+  "passingContract": {
+    "contractId": "scc-passing-v1",
+    "version": "1.0.0",
+    "horizonDays": 30,
+    "candidateLoad": {
+      "newAssetsPerDayExpected": 100,
+      "newAssetsPerDayStress": 500,
+      "cheapMonitorRowsPerDay": 2000,
+      "promotedCandidatesPerDay": 10,
+      "activeRiskCandidatesPerDay": 5,
+      "highResolutionOutcomeCasesPerDay": 20,
+      "interactiveInvestigationsPerDay": 5
+    },
+    "providerEnvelope": [
+      {
+        "operationId": "helius:raw_asset_query",
+        "callsExpected": 15000,
+        "callsStress": 45000,
+        "quotaUnitsExpected": 0,
+        "quotaUnitsStress": 0,
+        "streamedBytesExpected": 5368709120,
+        "streamedBytesStress": 16106127360,
+        "retryAllowance": 3,
+        "reserveClass": "FIRST_PARTY_COLLECTOR"
+      },
+      {
+        "operationId": "gmgn:token_security",
+        "callsExpected": 3000,
+        "callsStress": 9000,
+        "quotaUnitsExpected": 3000,
+        "quotaUnitsStress": 9000,
+        "retryAllowance": 2,
+        "reserveClass": "RISK_MONITORING"
+      }
+    ],
+    "systemEnvelope": {
+      "modelInputTokens": 1000000,
+      "modelOutputTokens": 200000,
+      "modelSpendUsd": 5.0,
+      "workflowSteps": 25000,
+      "schedulerMessages": 50000,
+      "databaseReads": 100000,
+      "databaseWrites": 20000,
+      "databaseStorageBytes": 2147483648,
+      "objectOperations": 5000,
+      "objectStorageBytes": 10737418240,
+      "egressBytes": 1073741824,
+      "notificationSends": 500
+    },
+    "reserves": {
+      "risk_monitoring": 0.2,
+      "alert_verification": 0.15,
+      "interactive_mcp": 0.1,
+      "emergency_backfill": 0.1,
+      "outcome_collection": 0.1,
+      "scheduled_candidate_verification": 0.15,
+      "deep_research": 0.1,
+      "first_party_collector": 0.05,
+      "randomized_exploration": 0.05
+    },
+    "minimumHeadroomFraction": 0.2,
+    "degradationPolicyVersion": "v1-deterministic",
+    "verifiedAt": "2026-08-01T00:00:00Z",
+    "expiresAt": "2026-09-01T00:00:00Z",
+    "result": "PASS"
+  },
+  "failingContractExceededStress": {
+    "contractId": "scc-failing-stress-v1",
+    "version": "1.0.0",
+    "horizonDays": 30,
+    "candidateLoad": {
+      "newAssetsPerDayExpected": 100,
+      "newAssetsPerDayStress": 50000,
+      "cheapMonitorRowsPerDay": 200000,
+      "promotedCandidatesPerDay": 1000,
+      "activeRiskCandidatesPerDay": 500,
+      "highResolutionOutcomeCasesPerDay": 2000,
+      "interactiveInvestigationsPerDay": 500
+    },
+    "providerEnvelope": [
+      {
+        "operationId": "gmgn:token_security",
+        "callsExpected": 3000,
+        "callsStress": 2500000,
+        "quotaUnitsExpected": 3000,
+        "quotaUnitsStress": 2500000,
+        "retryAllowance": 5,
+        "reserveClass": "RISK_MONITORING"
+      }
+    ],
+    "systemEnvelope": {
+      "modelInputTokens": 100000000,
+      "modelOutputTokens": 20000000,
+      "modelSpendUsd": 5000.0,
+      "workflowSteps": 2500000,
+      "schedulerMessages": 5000000,
+      "databaseReads": 10000000,
+      "databaseWrites": 2000000,
+      "databaseStorageBytes": 214748364800,
+      "objectOperations": 500000,
+      "objectStorageBytes": 1073741824000,
+      "egressBytes": 107374182400,
+      "notificationSends": 50000
+    },
+    "reserves": {
+      "risk_monitoring": 0.2,
+      "alert_verification": 0.15,
+      "interactive_mcp": 0.1,
+      "emergency_backfill": 0.1,
+      "outcome_collection": 0.1,
+      "scheduled_candidate_verification": 0.15,
+      "deep_research": 0.1,
+      "first_party_collector": 0.05,
+      "randomized_exploration": 0.05
+    },
+    "minimumHeadroomFraction": 0.2,
+    "degradationPolicyVersion": "v1-deterministic",
+    "verifiedAt": "2026-08-01T00:00:00Z",
+    "expiresAt": "2026-09-01T00:00:00Z",
+    "result": "FAIL"
+  }
+}

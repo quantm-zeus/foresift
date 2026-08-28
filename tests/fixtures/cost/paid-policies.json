@@ -1,0 +1,48 @@
+{
+  "$comment": "Inert paid provider policy records (FR-COST-008, FR-COST-010, AC-105).",
+  "policies": [
+    {
+      "policyId": "pol-coinglass-001",
+      "providerId": "coinglass",
+      "mode": "PAID_ALLOWED",
+      "budgetUsd": 150.0,
+      "approver": "sec-officer-alpha",
+      "activatedAt": "2026-08-01T00:00:00Z",
+      "reAuthDueAt": "2026-09-01T00:00:00Z",
+      "status": "ACTIVE",
+      "supersededBy": null,
+      "immutableHash": "sha256:1111111111111111111111111111111111111111111111111111111111111111"
+    },
+    {
+      "policyId": "pol-expired-reauth-002",
+      "providerId": "enterprise-rpc",
+      "mode": "PAID_ALLOWED",
+      "budgetUsd": 500.0,
+      "approver": "sec-officer-beta",
+      "activatedAt": "2026-07-01T00:00:00Z",
+      "reAuthDueAt": "2026-08-01T00:00:00Z",
+      "status": "ACTIVE",
+      "supersededBy": null,
+      "immutableHash": "sha256:2222222222222222222222222222222222222222222222222222222222222222"
+    },
+    {
+      "policyId": "pol-superseded-003",
+      "providerId": "coinglass",
+      "mode": "PAID_ALLOWED",
+      "budgetUsd": 100.0,
+      "approver": "sec-officer-alpha",
+      "activatedAt": "2026-06-01T00:00:00Z",
+      "reAuthDueAt": "2026-07-01T00:00:00Z",
+      "status": "SUPERSEDED",
+      "supersededBy": "pol-coinglass-001",
+      "immutableHash": "sha256:3333333333333333333333333333333333333333333333333333333333333333"
+    }
+  ],
+  "byokModelPolicy": {
+    "policyId": "byok-model-personal",
+    "budgetUsd": 25.0,
+    "modelTokensMonthly": 5000000,
+    "approver": "owner-user",
+    "active": true
+  }
+}

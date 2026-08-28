@@ -1,0 +1,59 @@
+{
+  "$comment": "Inert 6-dimension resource budget configurations (FR-COST-009, FR-COST-010, AC-104, AC-105).",
+  "budgets": [
+    {
+      "dimension": "SCHEDULER",
+      "cap": 100000,
+      "used": 45000,
+      "forecastUsed": 60000,
+      "unit": "MESSAGES",
+      "degradeBehavior": "EXTEND_INTERVAL",
+      "protected": false
+    },
+    {
+      "dimension": "WORKFLOW",
+      "cap": 50000,
+      "used": 20000,
+      "forecastUsed": 30000,
+      "unit": "STEPS",
+      "degradeBehavior": "SKIP_NOTEBOOK_ENRICHMENT",
+      "protected": false
+    },
+    {
+      "dimension": "DATABASE",
+      "cap": 10737418240,
+      "used": 4000000000,
+      "forecastUsed": 6000000000,
+      "unit": "BYTES",
+      "degradeBehavior": "REDUCE_ANALOG_HISTORY",
+      "protected": true
+    },
+    {
+      "dimension": "OBJECT_STORE",
+      "cap": 53687091200,
+      "used": 12000000000,
+      "forecastUsed": 20000000000,
+      "unit": "BYTES",
+      "degradeBehavior": "COMPACT_HISTORICAL_ARTIFACTS",
+      "protected": true
+    },
+    {
+      "dimension": "NOTIFICATION",
+      "cap": 1000,
+      "used": 300,
+      "forecastUsed": 450,
+      "unit": "SENDS",
+      "degradeBehavior": "DIGEST_ONLY",
+      "protected": false
+    },
+    {
+      "dimension": "MODEL_TOKENS_BYOK",
+      "cap": 2000000,
+      "used": 800000,
+      "forecastUsed": 1200000,
+      "unit": "TOKENS",
+      "degradeBehavior": "DETERMINISTIC_FALLBACK",
+      "protected": false
+    }
+  ]
+}

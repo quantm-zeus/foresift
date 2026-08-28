@@ -7,9 +7,18 @@ export const CODEX_SERVICE_TIER = 'standard';
 // tier is `default`. Literal `standard` is warned-and-omitted by the real CLI.
 export const CODEX_CLI_SERVICE_TIER = 'default';
 export const MAX_CODEX_WRITERS = 3;
+// Cost-aware adaptive policy (routingPolicyVersion codex-terra-sol-agy-gemini@3):
+// ordinary implementation runs on gpt-5.6-terra; every sensitive/forced-HIGH
+// category (security/auth, durable recovery, concurrency, migrations, product
+// safety, tenant isolation, cryptography, CRITICAL risk) stays on gpt-5.6-sol.
+// Reasoning is pinned to `medium` everywhere — the quality evidence in this
+// repository does not justify `high`/`xhigh` burn, and the cheapest tier
+// (gpt-5.6-luna) stays DISABLED for product writers until repository tests or
+// landed waves demonstrate acceptable implementation quality for it. Enable
+// Luna only by adding benchmark evidence, never by editing the map alone.
 export const CODEX_MODELS = Object.freeze({
-  LOW: 'gpt-5.6-sol',
-  MEDIUM: 'gpt-5.6-sol',
+  LOW: 'gpt-5.6-terra',
+  MEDIUM: 'gpt-5.6-terra',
   HIGH: 'gpt-5.6-sol',
 });
 
@@ -85,11 +94,25 @@ export function routeCodexLane(input = {}, availability = Object.values(CODEX_MO
   };
 }
 
+// Escalation ladder (deterministic, monotone, model-before-reasoning):
+//   terra (LOW/MEDIUM) -> sol (HIGH). Once at sol the route stays at sol and
+// reasoning stays at medium — repeated sol failures must trigger better
+// failure evidence, smaller task decomposition, TEST_DISPUTE, or maintainer
+// escalation, never an automatic high/xhigh reasoning burn.
+export const CODEX_ESCALATION_LADDER = Object.freeze({
+  LOW: 'MEDIUM',
+  MEDIUM: 'HIGH',
+  HIGH: 'HIGH',
+});
+
 export function retryCodexRoute(route) {
+  const nextTier = CODEX_ESCALATION_LADDER[route.complexityTier] ?? 'HIGH';
+  const model = CODEX_MODELS[nextTier] ?? CODEX_MODELS.HIGH;
   return {
     ...route,
     attempt: (route.attempt ?? 1) + 1,
-    model: 'gpt-5.6-sol',
+    complexityTier: nextTier,
+    model,
     reasoning: 'medium',
     serviceTier: CODEX_SERVICE_TIER,
     cliServiceTier: CODEX_CLI_SERVICE_TIER,
@@ -97,8 +120,8 @@ export function retryCodexRoute(route) {
 }
 
 export function escalateCodexRoute(route, availability = Object.values(CODEX_MODELS)) {
-  const next = route.complexityTier === 'LOW' ? 'MEDIUM' : 'HIGH';
-  const model = CODEX_MODELS[next] ?? 'gpt-5.6-sol';
+  const next = CODEX_ESCALATION_LADDER[route.complexityTier] ?? 'HIGH';
+  const model = CODEX_MODELS[next] ?? CODEX_MODELS.HIGH;
   const availabilityList = availability?.availableModels ?? availability;
   const available = availabilityList instanceof Set ? availabilityList : new Set(availabilityList);
   if (!available.has(model)) throw new Error(`REQUIRED_HIGH_MODEL_UNAVAILABLE: ${model}`);

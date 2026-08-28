@@ -21,6 +21,39 @@ function git(args, cwd) {
   return spawnSync('git', args, { cwd, encoding: 'utf8' });
 }
 
+export const ALLOWED_BASELINE_CLASSIFICATIONS = Object.freeze([
+  'NEW_BEHAVIOR_RED',
+  'REGRESSION_RED',
+  'NEGATIVE_RED',
+  'CHARACTERIZATION_GREEN',
+  'REFACTOR_GUARD_GREEN',
+]);
+
+/**
+ * Validate the test-author's baseline report. The report contract names the
+ * item key `classification`, but the model observably writes the equivalent
+ * `baseline` key (run 265f6fe1 shipped valid classifications as
+ * {"file","baseline"} and was rejected purely on shape). Both spellings and
+ * bare strings are accepted; the value set is still validated strictly.
+ */
+export function validateBaselineClassifications(items) {
+  const allowed = new Set(ALLOWED_BASELINE_CLASSIFICATIONS);
+  const ok =
+    Array.isArray(items) &&
+    items.length > 0 &&
+    items.every((item) => {
+      const classification =
+        typeof item === 'string'
+          ? item
+          : typeof item?.classification === 'string'
+            ? item.classification
+            : item?.baseline;
+      return allowed.has(classification);
+    });
+  if (!ok) throw new Error('AGY_TEST_BASELINE_CLASSIFICATION_INVALID');
+  return true;
+}
+
 export function runAgyTestWriter(input) {
   for (const field of ['lane', 'brief', 'worktree', 'routing', 'results-dir'])
     if (!input[field]) throw new Error(`AGY_TEST_ARGUMENT_MISSING: ${field}`);
@@ -50,6 +83,8 @@ export function runAgyTestWriter(input) {
     'your test-only changes, and do not attempt to make product code pass.',
     `Write a minimal JSON report to ${join(resultDir, 'agent-result.json')} with`,
     '{"baselineClassifications":[...],"testsRun":[...],"testResults":"...","blockers":[...]}.',
+    'Each baselineClassifications item MUST be exactly',
+    '{"file":"<repo-relative spec path>","classification":"<one of NEW_BEHAVIOR_RED|REGRESSION_RED|NEGATIVE_RED|CHARACTERIZATION_GREEN|REFACTOR_GUARD_GREEN>"}.',
   ].join('\n');
   const ndjson = `${JSON.stringify({ event: 'user', message: { role: 'user', content: prompt } })}\n`;
   const started = Date.now();
@@ -81,22 +116,7 @@ export function runAgyTestWriter(input) {
   const agentResultPath = join(resultDir, 'agent-result.json');
   if (!existsSync(agentResultPath)) throw new Error('AGY_TEST_RESULT_CONTRACT_MISSING');
   const agentResult = JSON.parse(readFileSync(agentResultPath, 'utf8'));
-  const allowedClassifications = new Set([
-    'NEW_BEHAVIOR_RED',
-    'REGRESSION_RED',
-    'NEGATIVE_RED',
-    'CHARACTERIZATION_GREEN',
-    'REFACTOR_GUARD_GREEN',
-  ]);
-  if (
-    !Array.isArray(agentResult.baselineClassifications) ||
-    agentResult.baselineClassifications.length === 0 ||
-    agentResult.baselineClassifications.some((item) => {
-      const classification = typeof item === 'string' ? item : item?.classification;
-      return !allowedClassifications.has(classification);
-    })
-  )
-    throw new Error('AGY_TEST_BASELINE_CLASSIFICATION_INVALID');
+  validateBaselineClassifications(agentResult.baselineClassifications);
   const dirty = git(['status', '--porcelain=v1'], input.worktree)
     .stdout.split('\n')
     .filter(Boolean)

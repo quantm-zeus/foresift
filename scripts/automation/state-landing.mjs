@@ -106,7 +106,15 @@ function defaultGit(args, { cwd } = {}) {
   try {
     return {
       ok: true,
-      stdout: execFileSync('git', args, { encoding: 'utf8', cwd }).trim(),
+      // stdio pipes are explicit: without one, execFileSync inherits the
+      // parent's stderr and every handled git failure (e.g. a deleted state
+      // branch fetched during receipt reconciliation) leaks a raw `fatal:`
+      // line into the supervisor journal.
+      stdout: execFileSync('git', args, {
+        encoding: 'utf8',
+        cwd,
+        stdio: ['pipe', 'pipe', 'pipe'],
+      }).trim(),
       stderr: '',
       status: 0,
     };
@@ -1095,6 +1103,69 @@ export function advanceStateTransition({
       prData = prViewRes.ok ? JSON.parse(prViewRes.stdout) : null;
     } catch {
       prData = null;
+    }
+    // Reconciliation: the PR may already be MERGED — the merge can land in a
+    // process that dies before finalizing, or an operator may merge directly.
+    // A merged PR at the AUTHORIZED head is not an authority violation; it is
+    // a completed merge whose receipt must finalize through the same
+    // authoritative post-merge verification as the MERGE_REQUESTED step.
+    // (Observed live 2026-08-28: PR #82 merged while its receipt sat at
+    // CI_AUTHORIZED, then this step's OPEN-only guard revoked and re-authorized
+    // forever — a permanent CI_AUTHORIZED ↔ MERGE_READY live-lock.)
+    if (prData && prData.state === 'MERGED') {
+      if (prData.headRefOid !== receipt.authorizedHeadSha) {
+        receipt.status = RECEIPT_STATUSES.FAILED;
+        receipt.failedReason = `PR #${receipt.prNumber} merged at unauthorized head ${prData.headRefOid} (authorized ${receipt.authorizedHeadSha})`;
+        receipt.retryClass = 'AUTHORITY_REFUSAL';
+        writeReceipt(stateDir, receipt);
+        return {
+          ok: false,
+          reason: receipt.failedReason,
+          receipt,
+          step: 'MERGE_AUTHORITY_CHANGED',
+        };
+      }
+      const verification = verifyMergeAuthoritatively({
+        prNum: receipt.prNumber,
+        pinnedHead: receipt.authorizedHeadSha,
+        fileChanges: (receipt.desiredFiles || []).map((f) => ({
+          path: f.path,
+          content: f.content,
+        })),
+        repoDir,
+        repo,
+        authorizedCheckName: receipt.authorizedCheckName,
+        authorizedAppId: receipt.authorizedAppId,
+        ghFn,
+        gitFn,
+        log,
+      });
+      if (!verification.ok) {
+        // Bounded retry for transient verification failures (API/fetch blips);
+        // a verification that keeps failing is an authority refusal the
+        // operator must reconcile — never an automatic live-lock.
+        receipt.retryCount = (receipt.retryCount || 0) + 1;
+        if (receipt.retryCount > 5) {
+          receipt.status = RECEIPT_STATUSES.FAILED;
+          receipt.failedReason = `post-merge verification failed: ${verification.reason}`;
+          receipt.retryClass = 'AUTHORITY_REFUSAL';
+        } else {
+          receipt.retryClass = 'RETRYABLE';
+          receipt.nextRetryAt = new Date(Date.now() + 30_000).toISOString();
+        }
+        writeReceipt(stateDir, receipt);
+        return {
+          ok: false,
+          reason: `post-merge verification failed: ${verification.reason}`,
+          receipt,
+          step: 'MERGE_VERIFICATION_FAILED',
+        };
+      }
+      receipt.status = RECEIPT_STATUSES.MERGED;
+      receipt.mergedSha = verification.mergeCommitSha;
+      writeReceipt(stateDir, receipt);
+      cleanupStateWorktree({ worktreePath, stateBranch, repoDir, gitFn });
+      return { ok: true, receipt, step: 'DONE' };
     }
     const fetchBranchRes = gitFn(['fetch', 'origin', stateBranch, '--quiet'], { cwd: repoDir });
     const remoteHeadRes = fetchBranchRes.ok

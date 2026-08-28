@@ -14,7 +14,7 @@ Deliver the free-first cost, quota, and sustainable-capacity control plane as th
 - **Validation**: Zod schemas authoritative in `packages/shared-schemas/src/cost.ts` (ADR-0013); fail-closed on every validation failure. Every external string (cost class, quota model, period window, reserve name) is parsed through a strict enum/table; unknown values throw `ForesiftError` with a stable code, never a default.
 - **Audit**: sole sink is `@foresift/security`'s hash-chained `AuditChain` (already PROVEN); cost denials are typed audit records appended at stage 23 by tool-core's audit stage — this package never builds its own chain, only shapes the blocked payload that stage 23 persists.
 - **Provider operation truth**: `prov.prov_operations` (provider-lifecycle) is READ-ONLY here. Declared fields — `costClass`, `quotaModelId`, `estimatedQuotaUnits`, `quotaResetPolicyId`, `batchCapability`, `minimumCandidateStage`, `protectedReserveEligible`, `allowedInStrictFree`, `verificationExpiresAt` — are the operation registry's authoritative declarations (FR-COST-001). Verification TTL (`verificationExpiresAt`) is checked at estimate time; expiry transitions to `UNVERIFIED`/blocked (AC-103).
-- **Test stack**: vitest; root config covers `tests/**`, colocated suites via local `vitest.config.ts` per package (proven arrangement in `packages/tool-core`, `packages/provider-lifecycle`).
+- **Test stack**: Bun Test (repository authority); root config covers `tests/**`, colocated suites run via each package's `"test": "bun test"` script with no per-package runner config files (the actual arrangement in `packages/tool-core`, `packages/provider-lifecycle`).
 
 ## Constitution Check
 
@@ -52,7 +52,7 @@ packages/domain/src/cost.ts                  # NEW — pure domain vocabularies:
 packages/domain/src/index.ts                 # extend exports
 
 packages/cost-router/                        # PRIMARY owner per manifest
-  package.json  tsconfig.json  vitest.config.ts
+  package.json  tsconfig.json
   src/
     index.ts                 # public surface re-exports
     cost-declaration.ts      # read view over prov_operations (OperationCostDeclaration);
@@ -87,7 +87,7 @@ packages/cost-router/                        # PRIMARY owner per manifest
     migrations.spec.ts       # migration ordering + idempotent replay
 
 packages/capacity-planner/                   # implements degrade-before-protected + resource caps
-  package.json  tsconfig.json  vitest.config.ts
+  package.json  tsconfig.json
   src/
     index.ts
     degrade-policy.ts        # Broad-scan degrade strategy: reduce breadth/depth
@@ -111,7 +111,7 @@ packages/capacity-planner/                   # implements degrade-before-protect
     migrations.spec.ts
 
 packages/quota-forecast/                     # owns forecast freshness + capacity replay
-  package.json  tsconfig.json  vitest.config.ts
+  package.json  tsconfig.json
   src/
     index.ts
     plan-verifier.ts         # Verifies provider plan metadata freshness via

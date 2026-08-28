@@ -75,6 +75,15 @@ you are done. Completion requires the relevant specification, acceptance criteri
 invariants, integration verification, and required evidence to converge — including
 `pnpm verify` and `pnpm spec:verify` passing at the pushed HEAD.
 
+## Test runtime contract
+
+The complete Bun suite runs ONLY through the coordinator: `pnpm test:all` or the
+per-workload scripts (`test:pure`, `test:process-meta`, `test:pglite`). A bare
+`bun test` over the full tree runs in one process without isolation; the
+DATABASE_PGLITE suites accumulate PGlite instances across files and will OOM a
+15 GiB host (observed 2026-08-28). Targeted suites (e.g. `test:state-control-plane`,
+`bun test <specific files>`) are fine.
+
 ## Git history contract
 
 Normal autonomous work must not use:

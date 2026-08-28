@@ -178,6 +178,7 @@
         "packages/cost-router/**",
         "packages/capacity-planner/**",
         "packages/quota-forecast/**",
+        "packages/domain/**",
         "packages/shared-schemas/**",
         "migrations/g0_cost_*.sql",
         "tests/fixtures/cost/**",

@@ -3,7 +3,7 @@
 
 import { describe, expect, it } from 'bun:test';
 import { execFileSync } from 'node:child_process';
-import { mkdirSync, mkdtempSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { gitFixture } from '../helpers/git-fixture.js';
@@ -1107,5 +1107,164 @@ describe('Adversarial State Landing Lifecycle Matrix (§19)', () => {
     });
     expect(step3.receipt?.transitionId).toBe(step1.receipt?.transitionId);
     expect(fakeGhState.calls.prCreate.length).toBe(1); // PR created once
+  });
+
+  // ── Merged-PR receipt reconciliation (live-lock observed 2026-08-28) ────────
+  // PR #82 merged while its receipt sat at CI_AUTHORIZED; MERGE_READY's
+  // OPEN-only guard then revoked and re-authorized forever. These tests pin
+  // the reconciliation: a merged PR at the authorized head finalizes through
+  // authoritative post-merge verification; anything else fails closed.
+  describe('merged-PR receipt reconciliation', () => {
+    const initialMilestone = {
+      milestoneId: 'g0',
+      packages: [{ id: 'g0-test', status: 'PENDING' }],
+    };
+    const targetMilestone = { milestoneId: 'g0', packages: [{ id: 'g0-test', status: 'RUNNING' }] };
+    const fileChanges = () => [
+      {
+        path: 'specs/implementation/current-milestone.json',
+        content: JSON.stringify(targetMilestone, null, 2) + '\n',
+      },
+    ];
+
+    function greenGhFn(ghFn: ReturnType<typeof createFakeGh>['ghFn']) {
+      return (args: string[], opts?: Record<string, unknown>) => {
+        if (args[0] === 'api' && args[1]?.includes('check-runs')) {
+          return {
+            ok: true,
+            stdout: JSON.stringify([
+              {
+                name: 'Verify (spec, format, lint, types, tests)',
+                status: 'completed',
+                conclusion: 'success',
+                app_id: 15368,
+              },
+            ]),
+            stderr: '',
+            status: 0,
+          };
+        }
+        return ghFn(args, opts);
+      };
+    }
+
+    function driveTo(
+      gitFix: ReturnType<typeof gitFixture>,
+      ghFn: ReturnType<typeof createFakeGh>['ghFn'],
+      stateDir: string,
+      targetStatus: string,
+    ) {
+      const base = {
+        fileChanges: fileChanges(),
+        message: 'chore: flip to RUNNING',
+        stateDir,
+        repoDir: gitFix.root,
+        packageId: 'g0-test',
+        fromStatus: 'PENDING',
+        toStatus: 'RUNNING',
+        ghFn,
+      };
+      let res = advanceStateTransition(base as never);
+      let receipt = res.receipt as never as {
+        status: string;
+        prNumber: number;
+        mergedSha: string | null;
+        stateWorktree: string;
+      };
+      for (let i = 0; i < 8 && receipt && receipt.status !== targetStatus; i++) {
+        res = advanceStateTransition({ ...base, receipt } as never);
+        receipt = res.receipt as never as {
+          status: string;
+          prNumber: number;
+          mergedSha: string | null;
+          stateWorktree: string;
+        };
+      }
+      return { res, receipt, base };
+    }
+
+    it('receipt finalizes (MERGED) when the PR merged before the merge step ran', () => {
+      const gitFix = gitFixture('recon-1-merged-pr-finalizes');
+      const { state: fakeGhState, ghFn } = createFakeGh(gitFix);
+      const stateDir = join(scratch, 'state-recon-1');
+      mkdirSync(stateDir, { recursive: true });
+
+      gitFix.writeFile(
+        'specs/implementation/current-milestone.json',
+        JSON.stringify(initialMilestone, null, 2) + '\n',
+      );
+      gitFix.commitAll('chore: init');
+      gitFix.g(['push', 'origin', 'main']);
+
+      const { receipt, base } = driveTo(
+        gitFix,
+        greenGhFn(ghFn),
+        stateDir,
+        RECEIPT_STATUSES.CI_AUTHORIZED,
+      );
+      expect(receipt?.status).toBe(RECEIPT_STATUSES.CI_AUTHORIZED);
+
+      // External merge while the receipt is at CI_AUTHORIZED: push the branch
+      // head onto origin main (what a squash merge lands) and flip PR state.
+      const pr = fakeGhState.prs.get(Number(receipt?.prNumber));
+      const headSha = pr?.headRefOid;
+      gitFix.g(['push', 'origin', `${headSha}:refs/heads/main`]);
+      const mergedSha = gitFix.g(['rev-parse', 'origin/main']).trim();
+      pr!.state = 'MERGED';
+      pr!.mergeCommit = { oid: mergedSha };
+
+      // CI_AUTHORIZED -> MERGE_READY (TOCTOU holds at the authorized head)
+      const toMergeReady = advanceStateTransition({ ...base, receipt } as never);
+      expect(toMergeReady.step).toBe('MERGE_READY');
+
+      // MERGE_READY -> DONE via authoritative reconciliation, NOT revoke+loop
+      const done = advanceStateTransition({ ...base, receipt } as never);
+      expect(done.step).toBe('DONE');
+      expect(receipt?.status).toBe(RECEIPT_STATUSES.MERGED);
+      expect(receipt?.mergedSha).toBe(mergedSha);
+      // No live-lock: the already-merged PR is never merged again, and the
+      // isolated state worktree is cleaned up.
+      expect(fakeGhState.calls.prMerge.length).toBe(0);
+      expect(existsSync(receipt?.stateWorktree ?? '')).toBe(false);
+    });
+
+    it('merged PR at an unauthorized head fails closed as AUTHORITY_REFUSAL', () => {
+      const gitFix = gitFixture('recon-2-merged-unauthorized-head');
+      const { state: fakeGhState, ghFn } = createFakeGh(gitFix);
+      const stateDir = join(scratch, 'state-recon-2');
+      mkdirSync(stateDir, { recursive: true });
+
+      gitFix.writeFile(
+        'specs/implementation/current-milestone.json',
+        JSON.stringify(initialMilestone, null, 2) + '\n',
+      );
+      gitFix.commitAll('chore: init');
+      gitFix.g(['push', 'origin', 'main']);
+
+      const { receipt } = driveTo(gitFix, greenGhFn(ghFn), stateDir, RECEIPT_STATUSES.MERGE_READY);
+      expect(receipt?.status).toBe(RECEIPT_STATUSES.MERGE_READY);
+
+      // External merge at a head this receipt never authorized.
+      const pr = fakeGhState.prs.get(Number(receipt?.prNumber));
+      pr!.state = 'MERGED';
+      pr!.headRefOid = 'f'.repeat(40);
+      pr!.mergeCommit = { oid: gitFix.g(['rev-parse', 'origin/main']).trim() };
+
+      const refused = advanceStateTransition({
+        fileChanges: fileChanges(),
+        message: 'chore: flip to RUNNING',
+        stateDir,
+        repoDir: gitFix.root,
+        packageId: 'g0-test',
+        fromStatus: 'PENDING',
+        toStatus: 'RUNNING',
+        ghFn: greenGhFn(ghFn),
+        receipt,
+      } as never);
+      expect(refused.step).toBe('MERGE_AUTHORITY_CHANGED');
+      expect(refused.receipt?.status).toBe(RECEIPT_STATUSES.FAILED);
+      expect(refused.receipt?.retryClass).toBe('AUTHORITY_REFUSAL');
+      expect(fakeGhState.calls.prMerge.length).toBe(0);
+    });
   });
 });

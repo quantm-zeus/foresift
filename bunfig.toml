@@ -1,0 +1,7 @@
+# Bun Test authority configuration (test runtime policy: config/foresift-test-runtime.json).
+#
+# The preload is advisory-only and never fails a run: it emits one warning when
+# a bun test run bypasses the coordinator, which is the only safe way to run
+# the complete suite (see scripts/automation/bare-bun-test-guard.mjs).
+[test]
+preload = ["./scripts/automation/bare-bun-test-guard.mjs"]

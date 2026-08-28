@@ -34,7 +34,14 @@ function defaultGit(args, { cwd } = {}) {
   try {
     return {
       ok: true,
-      stdout: execFileSync('git', args, { encoding: 'utf8', cwd }).trim(),
+      // stdio pipes are explicit: without one, execFileSync inherits the
+      // parent's stderr and every handled git failure leaks a raw `fatal:`
+      // line into the supervisor journal.
+      stdout: execFileSync('git', args, {
+        encoding: 'utf8',
+        cwd,
+        stdio: ['pipe', 'pipe', 'pipe'],
+      }).trim(),
     };
   } catch (error) {
     return {

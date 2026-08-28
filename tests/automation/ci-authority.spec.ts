@@ -11,9 +11,9 @@ import {
   getExactHeadCiStatus,
   getMainCiStatus,
   selectCiRepairRoute,
-  validateDirectMainPushWhitelist,
   captureCiIncident,
 } from '../../scripts/automation/ci-authority.mjs';
+import { validateStateFiles } from '../../scripts/automation/state-landing.mjs';
 import { auditGitHubProtection } from '../../scripts/automation/audit-github-protection.mjs';
 
 describe('CI Authority & Merge Invariants (V4 Hard Invariants A-F & Hardening)', () => {
@@ -365,35 +365,35 @@ describe('CI Authority & Merge Invariants (V4 Hard Invariants A-F & Hardening)',
   });
 
   describe('Finding 2 & 5: Admin Elimination & Declaration Parity', () => {
-    it('direct-main state whitelist permits only state files', () => {
+    it('state whitelist permits only state and planning files, rejects product/test code', () => {
+      expect(validateStateFiles(['specs/implementation/current-milestone.json']).ok).toBe(true);
       expect(
-        validateDirectMainPushWhitelist(['specs/implementation/current-milestone.json']).allowed,
-      ).toBe(true);
-      expect(
-        validateDirectMainPushWhitelist([
+        validateStateFiles([
           'specs/g0-cost-capacity/plan.md',
           'specs/g0-cost-capacity/spec.md',
           'specs/g0-cost-capacity/tasks.md',
-        ]).allowed,
-      ).toBe(false);
+        ]).ok,
+      ).toBe(true);
 
-      expect(validateDirectMainPushWhitelist(['packages/persistence/src/index.ts']).allowed).toBe(
-        false,
-      );
-      expect(validateDirectMainPushWhitelist(['package.json']).allowed).toBe(false);
-      expect(validateDirectMainPushWhitelist(['tests/acceptance/AC-001.spec.ts']).allowed).toBe(
-        false,
-      );
-      expect(validateDirectMainPushWhitelist(['.github/workflows/ci.yml']).allowed).toBe(false);
+      expect(validateStateFiles(['packages/persistence/src/index.ts']).ok).toBe(false);
+      expect(validateStateFiles(['package.json']).ok).toBe(false);
+      expect(validateStateFiles(['tests/acceptance/AC-001.spec.ts']).ok).toBe(false);
+      expect(validateStateFiles(['.github/workflows/ci.yml']).ok).toBe(false);
     });
 
-    it('package-land.mjs and workflows contain zero --admin merges', () => {
+    it('no obsolete validateDirectMainPushWhitelist bypass exists in ci-authority', async () => {
+      const mod = await import('../../scripts/automation/ci-authority.mjs');
+      expect((mod as Record<string, unknown>).validateDirectMainPushWhitelist).toBeUndefined();
+    });
+
+    it('package-land.mjs and workflows contain zero --admin merges and enforce pinned exact HEAD', () => {
       const landerCode = readFileSync(
         join(root, 'scripts', 'automation', 'package-land.mjs'),
         'utf8',
       );
       expect(landerCode).not.toContain('--admin');
-      expect(landerCode).toContain("sh('gh', ['pr', 'merge', prNum, '--squash'])");
+      expect(landerCode).toContain("'--match-head-commit'");
+      expect(landerCode).toContain("'--squash'");
 
       const workflowsDir = join(root, '.archon', 'workflows');
       const walk = (dir: string): string[] => {

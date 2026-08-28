@@ -46,7 +46,7 @@ export function buildBunTestPlan(manifest, policy, requestedPaths = null, worklo
       fileWorkers: policy.bunPureFileWorkers ?? 2,
       testConcurrency: policy.bunPureTestConcurrency ?? 8,
     })),
-    ...chunks(processFiles, 6).map((files, index) => ({
+    ...chunks(processFiles, 2).map((files, index) => ({
       id: `process-${index + 1}`,
       workload: 'PROCESS',
       files,

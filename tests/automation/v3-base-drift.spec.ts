@@ -219,6 +219,10 @@ echo "$*" >>"\${GHSTUB_LOG:?}"
 cmd="\${1:-}"; sub="\${2:-}"
 case "\$cmd/\$sub" in
   pr/list) echo '' ;;
+  pr/view)
+    HEAD_OID="$(git rev-parse HEAD 2>/dev/null || echo '')"
+    printf '{"state":"OPEN","headRefOid":"%s"}\n' "$HEAD_OID"
+    ;;
   pr/create) echo 'https://github.com/o/r/pull/77' ;;
   pr/merge)
     # §31 race serialization: exactly ONE squash merge ever succeeds. A second

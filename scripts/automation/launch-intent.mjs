@@ -17,6 +17,7 @@ import {
   writeFileSync,
 } from 'node:fs';
 import { join } from 'node:path';
+import { generationMessage } from './package-generations.mjs';
 
 export const LAUNCH_INTENTS_DIR_NAME = 'launch-intents';
 
@@ -96,9 +97,21 @@ export function associateRunIdWithIntent(stateDir, intentId, runId) {
 /**
  * Mark launch intent completed after state PR merges to main.
  */
-export function markIntentComplete(stateDir, intentId, mergedSha = null) {
+export function markIntentComplete(
+  stateDir,
+  intentId,
+  { milestoneState = null, mergedSha = null } = {},
+) {
   const intent = readIntent(stateDir, intentId);
   if (!intent) return null;
+  const pkg = milestoneState?.packages?.find((candidate) => candidate.id === intent.packageId);
+  if (
+    !pkg ||
+    (pkg.generation ?? 0) !== intent.generation ||
+    (pkg.status !== 'RUNNING' && pkg.status !== 'PROVEN')
+  ) {
+    return null;
+  }
   intent.status = 'MERGED';
   intent.mergedSha = mergedSha;
   writeIntentAtomic(stateDir, intent);
@@ -142,16 +155,20 @@ export function isPackageLaunchInFlight(stateDir, packageId) {
  */
 export function runMatchesLaunchIntent(intent, run) {
   if (run.workflow_name !== intent.workflow) return false;
-  if (run.user_message !== intent.packageId) return false;
-  if (!run.working_path || !run.working_path.includes(`task-foresift-${intent.packageId}`))
-    return false;
+  if (run.user_message !== generationMessage(intent.packageId, intent.generation)) return false;
+  if (run.working_path && intent.branch.startsWith('foresift/')) {
+    const expectedTaskIdentity = `task-${intent.branch.replaceAll('/', '-')}`;
+    if (!run.working_path.includes(expectedTaskIdentity)) return false;
+  }
 
   if (!run.started_at || !intent.createdAt) return false;
   const tRun = new Date(run.started_at).getTime();
   const tIntent = new Date(intent.createdAt).getTime();
   if (Number.isNaN(tRun) || Number.isNaN(tIntent)) return false;
 
-  if (Math.abs(tRun - tIntent) > 5 * 60 * 1000) return false;
+  const clockSkewMs = 30_000;
+  const launchWindowMs = 5 * 60_000;
+  if (tRun < tIntent - clockSkewMs || tRun > tIntent + launchWindowMs) return false;
 
   return true;
 }
@@ -168,14 +185,19 @@ export function reconcileLaunchIntentsOnStartup(
   const dangling = [];
 
   for (const intent of pending) {
-    if (intent.status === 'INTENT_DURABLE' && !intent.runId) {
-      // Find matching run in Archon runs table
-      const match = archonRuns.find(
+    if (
+      (intent.status === 'INTENT_DURABLE' || intent.status === 'RECONCILIATION_BLOCKED') &&
+      !intent.runId
+    ) {
+      // Re-evaluate blocked intents every startup. Exactly one strong match is
+      // required; ambiguity remains blocked and must never cause a duplicate launch.
+      const matches = archonRuns.filter(
         (r) =>
           runMatchesLaunchIntent(intent, r) &&
           (r.status === 'running' || r.status === 'pending' || r.status === 'completed'),
       );
-      if (match) {
+      if (matches.length === 1) {
+        const match = matches[0];
         intent.runId = match.id;
         intent.status = 'RUN_ASSOCIATED';
         writeIntentAtomic(stateDir, intent);
@@ -186,20 +208,22 @@ export function reconcileLaunchIntentsOnStartup(
         writeIntentAtomic(stateDir, intent);
         dangling.push(intent);
         log(
-          `launch-intent recovery: no strong match for ${intent.intentId}, marked RECONCILIATION_BLOCKED`,
+          `launch-intent recovery: ${matches.length === 0 ? 'no' : 'ambiguous'} strong match for ${intent.intentId}, marked RECONCILIATION_BLOCKED`,
         );
       }
     } else if (intent.status === 'RUN_ASSOCIATED') {
-      // Check if milestone already contains RUNNING or PROVEN on main
+      // Only authoritative package+generation state can complete association.
       const pkg = milestoneState?.packages?.find((p) => p.id === intent.packageId);
-      if (pkg?.status === 'RUNNING' || pkg?.status === 'PROVEN') {
+      const milestoneGeneration = pkg?.generation ?? 0;
+      if (
+        milestoneGeneration === intent.generation &&
+        (pkg?.status === 'RUNNING' || pkg?.status === 'PROVEN')
+      ) {
         intent.status = 'MERGED';
         writeIntentAtomic(stateDir, intent);
       } else {
         adopted.push(intent);
       }
-    } else if (intent.status === 'RECONCILIATION_BLOCKED') {
-      dangling.push(intent);
     }
   }
 

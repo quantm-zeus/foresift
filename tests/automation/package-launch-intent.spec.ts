@@ -162,9 +162,53 @@ describe('Package Launch Intent Matrix (§20)', () => {
     });
 
     associateRunIdWithIntent(stateDir, intent.intentId, 'archon-run-789');
-    markIntentComplete(stateDir, intent.intentId, 'merged-sha-12345');
+    const completed = markIntentComplete(stateDir, intent.intentId, {
+      mergedSha: 'merged-sha-12345',
+      milestoneState: {
+        packages: [{ id: 'g0-cost-capacity', generation: 0, status: 'RUNNING' }],
+      },
+    });
 
+    expect(completed).not.toBeNull();
+    expect(completed!.status).toBe('MERGED');
+    expect(completed!.mergedSha).toBe('merged-sha-12345');
     expect(isPackageLaunchInFlight(stateDir, 'g0-cost-capacity')).toBe(false);
+  });
+
+  it('7b. Stale or mismatched generation cannot complete intent', () => {
+    const stateDir = join(scratch, 'intent-7b');
+    mkdirSync(stateDir, { recursive: true });
+
+    const intent = createLaunchIntent(stateDir, {
+      packageId: 'g0-cost-capacity',
+      generation: 1,
+      executionProfile: 'CODEX_AGY',
+      workflow: 'foresift-package-planning-bootstrap',
+      branch: 'archon/task-foresift-g0-cost-capacity',
+      sourceSha: 'abc1234567890',
+    });
+
+    associateRunIdWithIntent(stateDir, intent.intentId, 'archon-run-789');
+
+    // Milestone has older generation 0
+    const failedAttempt = markIntentComplete(stateDir, intent.intentId, {
+      mergedSha: 'merged-sha-12345',
+      milestoneState: {
+        packages: [{ id: 'g0-cost-capacity', generation: 0, status: 'RUNNING' }],
+      },
+    });
+    expect(failedAttempt).toBeNull();
+    expect(isPackageLaunchInFlight(stateDir, 'g0-cost-capacity')).toBe(true);
+
+    // Milestone has status PENDING (not RUNNING or PROVEN)
+    const failedStatusAttempt = markIntentComplete(stateDir, intent.intentId, {
+      mergedSha: 'merged-sha-12345',
+      milestoneState: {
+        packages: [{ id: 'g0-cost-capacity', generation: 1, status: 'PENDING' }],
+      },
+    });
+    expect(failedStatusAttempt).toBeNull();
+    expect(isPackageLaunchInFlight(stateDir, 'g0-cost-capacity')).toBe(true);
   });
 
   it('8. Atomic receipt persistence: crash during write cannot corrupt existing receipt', () => {
@@ -184,5 +228,72 @@ describe('Package Launch Intent Matrix (§20)', () => {
     const content = JSON.parse(readFileSync(file, 'utf8'));
     expect(content.intentId).toBe(intent.intentId);
     expect(content.status).toBe('INTENT_DURABLE');
+  });
+
+  it('9. Directional time matching: run before intent - skew or after launch window is rejected', () => {
+    const stateDir = join(scratch, 'intent-9');
+    mkdirSync(stateDir, { recursive: true });
+
+    const now = Date.now();
+    createLaunchIntent(stateDir, {
+      packageId: 'g0-cost-capacity',
+      generation: 1,
+      executionProfile: 'CODEX_AGY',
+      workflow: 'foresift-package-planning-bootstrap',
+      branch: 'archon/task-foresift-g0-cost-capacity',
+      sourceSha: 'abc1234567890',
+    });
+
+    // Too far in the past (before intent creation - 30s skew)
+    const wayTooEarlyRun = {
+      id: 'early-run',
+      workflow_name: 'foresift-package-planning-bootstrap',
+      user_message: 'g0-cost-capacity@g1',
+      started_at: new Date(now - 60_000).toISOString(),
+    };
+
+    const resEarly = reconcileLaunchIntentsOnStartup(stateDir, {
+      archonRuns: [wayTooEarlyRun],
+    });
+    expect(resEarly.adopted.length).toBe(0);
+    expect(resEarly.dangling.length).toBe(1);
+    expect(resEarly.dangling[0]!.status).toBe('RECONCILIATION_BLOCKED');
+  });
+
+  it('10. Ambiguous match blocks reconciliation without duplicate launch', () => {
+    const stateDir = join(scratch, 'intent-10');
+    mkdirSync(stateDir, { recursive: true });
+
+    const now = Date.now();
+    createLaunchIntent(stateDir, {
+      packageId: 'g0-cost-capacity',
+      generation: 0,
+      executionProfile: 'CODEX_AGY',
+      workflow: 'foresift-package-planning-bootstrap',
+      branch: 'archon/task-foresift-g0-cost-capacity',
+      sourceSha: 'abc1234567890',
+    });
+
+    // Two ambiguous runs matching the same criteria
+    const run1 = {
+      id: 'run-1',
+      workflow_name: 'foresift-package-planning-bootstrap',
+      user_message: 'g0-cost-capacity',
+      started_at: new Date(now).toISOString(),
+    };
+    const run2 = {
+      id: 'run-2',
+      workflow_name: 'foresift-package-planning-bootstrap',
+      user_message: 'g0-cost-capacity',
+      started_at: new Date(now + 1000).toISOString(),
+    };
+
+    const resAmbiguous = reconcileLaunchIntentsOnStartup(stateDir, {
+      archonRuns: [run1, run2],
+    });
+    expect(resAmbiguous.adopted.length).toBe(0);
+    expect(resAmbiguous.dangling.length).toBe(1);
+    expect(resAmbiguous.dangling[0]!.status).toBe('RECONCILIATION_BLOCKED');
+    expect(isPackageLaunchInFlight(stateDir, 'g0-cost-capacity')).toBe(true);
   });
 });

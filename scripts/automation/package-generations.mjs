@@ -43,6 +43,17 @@ export function generationMessage(packageId, generation) {
   return generation > 0 ? `${packageId}@g${generation}` : `${packageId}`;
 }
 
+/** The only supervisor-supported generation mutation is one deterministic bump. */
+export function isSupportedNextGeneration(fromGeneration, toGeneration) {
+  const from = fromGeneration === undefined || fromGeneration === null ? 0 : fromGeneration;
+  return (
+    Number.isInteger(from) &&
+    from >= 0 &&
+    Number.isInteger(toGeneration) &&
+    toGeneration === from + 1
+  );
+}
+
 /**
  * Parse a message back to its package id + generation. Legacy messages
  * (bare package id) parse to generation 0. Returns null for non-messages.

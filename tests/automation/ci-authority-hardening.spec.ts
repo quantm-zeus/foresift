@@ -45,7 +45,6 @@ import {
   captureCiIncident,
   incrementIncidentRepairAttempts,
   STATE_ONLY_WHITELIST,
-  validateDirectMainPushWhitelist,
   DEFAULT_REQUIRED_CHECK,
   DEFAULT_REQUIRED_APP_ID,
 } from '../../scripts/automation/ci-authority.mjs';
@@ -299,12 +298,18 @@ describe('§F/§G — State-only whitelist validates file paths', () => {
     expect(result.ok).toBe(false);
   });
 
-  it('§G: validateDirectMainPushWhitelist rejects mixed paths', () => {
-    const result = validateDirectMainPushWhitelist([
+  it('§G: validateStateFiles rejects mixed paths', () => {
+    const result = validateStateFiles([
       'specs/implementation/current-milestone.json',
       'packages/core/src/index.ts',
     ]);
-    expect(result.allowed).toBe(false);
+    expect(result.ok).toBe(false);
+    expect(result.violations).toContain('packages/core/src/index.ts');
+  });
+
+  it('§G: no obsolete validateDirectMainPushWhitelist bypass exists', async () => {
+    const mod = await import('../../scripts/automation/ci-authority.mjs');
+    expect((mod as Record<string, unknown>).validateDirectMainPushWhitelist).toBeUndefined();
   });
 });
 

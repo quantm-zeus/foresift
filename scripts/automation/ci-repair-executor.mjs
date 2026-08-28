@@ -5,13 +5,13 @@
 //
 //   FORMAT:   deterministic prettier --write on whitelisted files only
 //   INFRA:    bounded backoff retry, ZERO AI turns
-//   CODEX:    emit routing instruction (Codex owns product repair)
-//   AGY:      emit routing instruction (AGY owns test repair)
+//   CODEX:    persist a durable request consumed by the existing supervisor
+//   AGY:      persist a durable request consumed by the existing supervisor
 //   SPEC:     emit maintainer incident capsule, halt
 //   UNKNOWN:  escalate to maintainer
 //
 // This is NOT a new supervisor. It is called by package-land.mjs after CI red
-// and executes EXACTLY ONE bounded repair step, then returns.
+// and either executes a deterministic repair or durably queues one AI repair.
 
 import { spawnSync } from 'node:child_process';
 import {
@@ -23,6 +23,11 @@ import {
   readdirSync,
 } from 'node:fs';
 import { join } from 'node:path';
+import { routeCodexLane } from './codex-routing.mjs';
+import { EXECUTION_POLICY } from './execution-profile.mjs';
+import { runCodexWriter } from './exec-codex-writer.mjs';
+import { runAgyTestWriter } from './exec-agy-test-writer.mjs';
+import { validateLaneOwnership } from './path-ownership.mjs';
 
 /** Maximum repair attempts before mandatory escalation. */
 export const MAX_REPAIR_ATTEMPTS = 2;
@@ -295,6 +300,7 @@ export function executeCiRepair({
   branch,
   worktreeDir,
   executionProfile = 'CODEX_AGY',
+  stateDir = join(process.env.HOME || '', '.local', 'state', 'foresift'),
   log = console.log,
 } = {}) {
   if (!incident?.capsule) {
@@ -314,6 +320,7 @@ export function executeCiRepair({
 
   // Increment attempt count durably before executing repair
   const attempts = incidentFilePath ? incrementRepairAttempts(incidentFilePath) : 1;
+  capsule.repairAttempts = attempts;
 
   // Check exhaustion AFTER incrementing
   if (attempts > MAX_REPAIR_ATTEMPTS) {
@@ -381,6 +388,15 @@ export function executeCiRepair({
         reason: `Codex repair required but executionProfile=${executionProfile}; escalate to maintainer`,
       };
     }
+    const request = durableRepairRequest({
+      capsule,
+      branch,
+      executionProfile,
+      route,
+      engine: 'CODEX',
+    });
+    const existing = readRepairRequest(stateDir, request.requestId);
+    const requestId = persistRepairRequest(stateDir, existing ?? request);
     return {
       action: 'ROUTE_CODEX',
       engine: 'CODEX',
@@ -389,6 +405,7 @@ export function executeCiRepair({
       retry: false, // Codex will push a new HEAD; caller re-triggers CI observation
       escalate: false,
       reason: 'product implementation defect routed to Codex repair engine',
+      requestId,
       routeInstruction: {
         engine: 'CODEX',
         action: 'RETRY_CODEX',
@@ -401,6 +418,15 @@ export function executeCiRepair({
 
   // ── AGY: route test authority repair ─────────────────────────────────────
   if (route === 'AGY_TEST_REPAIR') {
+    const request = durableRepairRequest({
+      capsule,
+      branch,
+      executionProfile,
+      route,
+      engine: 'AGY',
+    });
+    const existing = readRepairRequest(stateDir, request.requestId);
+    const requestId = persistRepairRequest(stateDir, existing ?? request);
     return {
       action: 'ROUTE_AGY',
       engine: 'AGY',
@@ -409,6 +435,7 @@ export function executeCiRepair({
       retry: false,
       escalate: false,
       reason: 'test-owned failure routed to AGY test authority',
+      requestId,
       routeInstruction: {
         engine: 'AGY',
         action: 'RETRY_AGY_TEST',
@@ -462,6 +489,47 @@ export function executeCiRepair({
 
 // ── Repair Request Management & Execution (F8) ────────────────────────────────
 
+function packageIdFromBranch(branch) {
+  const match = /^foresift\/(.+?)(?:-g\d+)?$/.exec(branch ?? '');
+  return match?.[1] ?? null;
+}
+
+function durableRepairRequest({ capsule, branch, executionProfile, route, engine }) {
+  const requestId = `pr${capsule.prNumber ?? 'unknown'}-${engine.toLowerCase()}-${capsule.sha.slice(0, 16)}`;
+  return {
+    schema: 'foresift/ci-repair-request@1',
+    requestId,
+    incidentId: capsule.eventId,
+    packageId: capsule.package ?? packageIdFromBranch(branch),
+    prNumber: capsule.prNumber ?? null,
+    baseSha: capsule.baseSha ?? null,
+    failedHeadSha: capsule.sha,
+    branch,
+    worktreeDir: null,
+    executionProfile,
+    route,
+    engine,
+    failedFiles: capsule.classification?.failedFiles ?? [],
+    classification: capsule.classification ?? null,
+    failureSummary: capsule.failureSummary ?? null,
+    prChangedFiles: capsule.prChangedFiles ?? [],
+    attemptCount: capsule.repairAttempts ?? 1,
+    status: 'PENDING',
+    newHeadSha: null,
+    createdAt: new Date().toISOString(),
+  };
+}
+
+function readRepairRequest(stateDir, requestId) {
+  try {
+    return JSON.parse(
+      readFileSync(join(stateDir, 'repair-requests', `request-${requestId}.json`), 'utf8'),
+    );
+  } catch {
+    return null;
+  }
+}
+
 export function persistRepairRequest(stateDir, request) {
   const dir = join(stateDir, 'repair-requests');
   if (!existsSync(dir)) {
@@ -495,38 +563,124 @@ export function discoverPendingRepairRequests(stateDir) {
 }
 
 export function validateRepairOwnership({ engine, actualDiffPaths = [] }) {
-  const isTestPath = (p) =>
-    p.includes('tests/') || p.includes('__tests__/') || /\.spec\./.test(p) || /\.test\./.test(p);
+  const role = engine === 'AGY' ? 'test' : 'implementation';
+  const verdict = validateLaneOwnership({ engine, role, changedPaths: actualDiffPaths });
+  return {
+    ok: verdict.ok,
+    violations: verdict.violatingPaths,
+    violationType: verdict.violationCode,
+  };
+}
 
-  let violations = [];
-  let violationType = null;
+function repairWorktreePath(stateDir, request) {
+  return join(stateDir, 'repair-worktrees', request.requestId.replace(/[^a-zA-Z0-9_-]/g, '_'));
+}
 
-  if (engine === 'CODEX') {
-    // CODEX repair: forbidden paths include tests/**, *.spec.*, *.test.*, __tests__/**
-    violations = actualDiffPaths.filter(isTestPath);
-    if (violations.length > 0) {
-      violationType = 'CODEX_TEST_OWNERSHIP_VIOLATION';
-    }
-  } else if (engine === 'AGY') {
-    // AGY repair: forbidden paths include production implementation paths (not test-owned)
-    violations = actualDiffPaths.filter((p) => {
-      // Allow tests, specs, evidence, tools
-      if (
-        isTestPath(p) ||
-        p.startsWith('specs/') ||
-        p.startsWith('evidence/') ||
-        p.startsWith('scripts/')
-      ) {
-        return false;
-      }
-      return true; // everything else is production code
+function repairArtifactsPath(stateDir, request) {
+  return join(stateDir, 'repair-artifacts', request.requestId.replace(/[^a-zA-Z0-9_-]/g, '_'));
+}
+
+function remoteBranchHead(repoDir, branch) {
+  const result = shSync('git', ['ls-remote', '--heads', 'origin', `refs/heads/${branch}`], {
+    cwd: repoDir,
+    allowFail: true,
+  });
+  if (!result.ok) return null;
+  return result.out.split(/\s+/)[0] || null;
+}
+
+function invokeSupportedRepairExecutor(request, stateDir) {
+  const artifacts = repairArtifactsPath(stateDir, request);
+  const resultsDir = join(artifacts, 'results');
+  mkdirSync(resultsDir, { recursive: true });
+  const briefPath = join(artifacts, 'repair-brief.md');
+  const routingPath = join(artifacts, 'routing.json');
+  const ownershipRule =
+    request.engine === 'CODEX'
+      ? 'Modify product implementation only. Never edit tests, fixtures, test helpers, *.test.*, *.spec.*, or __tests__.'
+      : 'Modify test-owned files only. Never edit product implementation.';
+  writeFileSync(
+    briefPath,
+    [
+      `Repair exact-head CI failure ${request.incidentId}.`,
+      `Package: ${request.packageId ?? 'unknown'}`,
+      `Failed head: ${request.failedHeadSha}`,
+      `Failure summary: ${request.failureSummary ?? '(unavailable)'}`,
+      `Classification: ${JSON.stringify(request.classification ?? {})}`,
+      `Failed files: ${request.failedFiles.join(', ') || '(not identified)'}`,
+      `PR changed files: ${request.prChangedFiles.join(', ') || '(none)'}`,
+      ownershipRule,
+      'Make the smallest repair required by the failure evidence and commit it.',
+    ].join('\n') + '\n',
+  );
+
+  if (request.engine === 'CODEX') {
+    const route = {
+      role: 'implementation',
+      engine: 'CODEX',
+      ...routeCodexLane({
+        lane: 'ci-repair',
+        taskIds: ['ci-repair'],
+        files: request.failedFiles,
+        complexityTier: 'HIGH',
+      }),
+    };
+    writeFileSync(
+      routingPath,
+      JSON.stringify(
+        {
+          schema: 'foresift/wave-routing@1',
+          routingPolicyVersion: EXECUTION_POLICY.routingPolicyVersion,
+          executionProfile: request.executionProfile,
+          implementationEngine: 'CODEX',
+          testEngine: 'AGY',
+          lanes: [route],
+        },
+        null,
+        2,
+      ) + '\n',
+    );
+    return runCodexWriter({
+      lane: 'ci-repair',
+      brief: briefPath,
+      worktree: request.worktreeDir,
+      routing: routingPath,
+      'results-dir': resultsDir,
     });
-    if (violations.length > 0) {
-      violationType = 'AGY_PRODUCT_OWNERSHIP_VIOLATION';
-    }
   }
 
-  return { ok: violations.length === 0, violations, violationType };
+  const route = {
+    lane: 'ci-repair',
+    role: 'test',
+    taskIds: ['ci-repair'],
+    engine: 'AGY',
+    model: EXECUTION_POLICY.agyTestModel,
+    reasoning: EXECUTION_POLICY.agyTestEffort,
+    providerTimeout: EXECUTION_POLICY.agyPrintTimeout,
+  };
+  writeFileSync(
+    routingPath,
+    JSON.stringify(
+      {
+        schema: 'foresift/wave-routing@1',
+        routingPolicyVersion: EXECUTION_POLICY.routingPolicyVersion,
+        executionProfile: request.executionProfile,
+        implementationEngine: 'CODEX',
+        testEngine: 'AGY',
+        lanes: [route],
+      },
+      null,
+      2,
+    ) + '\n',
+  );
+  return runAgyTestWriter({
+    lane: 'ci-repair',
+    brief: briefPath,
+    worktree: request.worktreeDir,
+    routing: routingPath,
+    'results-dir': resultsDir,
+    'task-ids': 'ci-repair',
+  });
 }
 
 export async function advanceRepairRequest({
@@ -543,24 +697,100 @@ export async function advanceRepairRequest({
   };
 
   if (request.status === 'PENDING') {
+    if (!request.failedHeadSha || !request.branch) {
+      request.failureReason = 'repair request lacks failedHeadSha or branch';
+      advance('FAILED');
+      return { action: 'failed-invalid-request' };
+    }
+    const currentRemoteHead = remoteBranchHead(repoDir, request.branch);
+    if (currentRemoteHead !== request.failedHeadSha) {
+      request.failureReason = `remote branch moved before repair: expected ${request.failedHeadSha}, actual ${currentRemoteHead}`;
+      advance('FAILED');
+      return { action: 'failed-stale-head' };
+    }
+    const fetch = shSync('git', ['fetch', 'origin', request.branch, '--quiet'], {
+      cwd: repoDir,
+      allowFail: true,
+    });
+    const fetched = fetch.ok
+      ? shSync('git', ['rev-parse', 'FETCH_HEAD'], { cwd: repoDir, allowFail: true })
+      : { ok: false, out: '' };
+    if (!fetched.ok || fetched.out !== request.failedHeadSha) {
+      request.failureReason = 'failed to fetch the exact repair head from origin';
+      advance('FAILED');
+      return { action: 'failed-fetch-head' };
+    }
+    const worktreeDir = repairWorktreePath(stateDir, request);
+    mkdirSync(join(worktreeDir, '..'), { recursive: true });
+    if (existsSync(worktreeDir)) {
+      const head = shSync('git', ['rev-parse', 'HEAD'], { cwd: worktreeDir, allowFail: true });
+      const clean = shSync('git', ['status', '--porcelain=v1'], {
+        cwd: worktreeDir,
+        allowFail: true,
+      });
+      if (!head.ok || head.out !== request.failedHeadSha || clean.out) {
+        request.failureReason = 'existing repair worktree is not a clean failed-head checkout';
+        advance('FAILED');
+        return { action: 'failed-worktree-collision' };
+      }
+    } else {
+      const branchName = `repair/${request.requestId}`.slice(0, 220);
+      const add = shSync(
+        'git',
+        ['worktree', 'add', '-b', branchName, worktreeDir, request.failedHeadSha],
+        { cwd: repoDir, allowFail: true },
+      );
+      if (!add.ok) {
+        request.failureReason = `repair worktree creation failed: ${add.err || add.out}`;
+        advance('FAILED');
+        return { action: 'failed-worktree-create' };
+      }
+    }
+    request.worktreeDir = worktreeDir;
     advance('WORKTREE_READY');
     return { action: 'prepared-worktree' };
   }
   if (request.status === 'WORKTREE_READY') {
-    advance('ENGINE_INVOKED');
-    if (executorFn) {
-      await executorFn(request);
+    if (!request.worktreeDir || !existsSync(request.worktreeDir)) {
+      request.failureReason = 'persisted repair worktree is missing';
+      advance('FAILED');
+      return { action: 'failed-missing-worktree' };
     }
+    // Persist an uncertainty barrier before invoking a writer. A crash after
+    // this point requires operator reconciliation and never starts a second writer.
+    advance('ENGINE_INVOCATION_STARTED');
+    try {
+      const result = executorFn
+        ? await executorFn(request)
+        : await invokeSupportedRepairExecutor(request, stateDir);
+      request.engineResult = result ?? null;
+    } catch (error) {
+      request.failureReason = `repair executor failed: ${error.message}`;
+      advance('FAILED');
+      return { action: 'failed-engine' };
+    }
+    advance('ENGINE_INVOKED');
     return { action: 'invoked-engine' };
   }
+  if (request.status === 'ENGINE_INVOCATION_STARTED') {
+    return { action: 'invocation-uncertain', status: request.status };
+  }
   if (request.status === 'ENGINE_INVOKED') {
-    const diff = shSync('git', ['diff', '--name-only'], { cwd: repoDir, allowFail: true });
+    const diff = shSync('git', ['diff', '--name-only', `${request.failedHeadSha}..HEAD`], {
+      cwd: request.worktreeDir,
+      allowFail: true,
+    });
     const paths = diff.out
       .split('\n')
       .map((s) => s.trim())
       .filter(Boolean);
 
     const ownership = validateRepairOwnership({ engine: request.engine, actualDiffPaths: paths });
+    if (!diff.ok || paths.length === 0) {
+      request.failureReason = 'repair executor produced no committed Git diff';
+      advance('FAILED');
+      return { action: 'failed-empty-diff' };
+    }
     if (!ownership.ok) {
       log(`Ownership violation: ${ownership.violationType} on ${ownership.violations.join(', ')}`);
       advance('FAILED');
@@ -570,14 +800,61 @@ export async function advanceRepairRequest({
     return { action: 'verified-ownership' };
   }
   if (request.status === 'OWNERSHIP_VERIFIED') {
+    const newHead = shSync('git', ['rev-parse', 'HEAD^{commit}'], {
+      cwd: request.worktreeDir,
+      allowFail: true,
+    });
+    const descendant = newHead.ok
+      ? shSync('git', ['merge-base', '--is-ancestor', request.failedHeadSha, newHead.out], {
+          cwd: request.worktreeDir,
+          allowFail: true,
+        })
+      : { ok: false };
+    if (!newHead.ok || !descendant.ok || newHead.out === request.failedHeadSha) {
+      request.failureReason = 'no valid descendant repair commit exists';
+      advance('FAILED');
+      return { action: 'failed-commit-proof' };
+    }
+    request.newHeadSha = newHead.out;
     advance('COMMITTED');
     return { action: 'committed' };
   }
   if (request.status === 'COMMITTED') {
+    const expectedRemote = remoteBranchHead(repoDir, request.branch);
+    if (expectedRemote === request.newHeadSha) {
+      advance('PUSHED');
+      return { action: 'verified-existing-push' };
+    }
+    if (expectedRemote !== request.failedHeadSha) {
+      request.failureReason = `remote branch moved before repair push: expected ${request.failedHeadSha}, actual ${expectedRemote}`;
+      advance('FAILED');
+      return { action: 'failed-push-lease' };
+    }
+    const push = shSync(
+      'git',
+      [
+        'push',
+        'origin',
+        `HEAD:refs/heads/${request.branch}`,
+        `--force-with-lease=refs/heads/${request.branch}:${request.failedHeadSha}`,
+      ],
+      { cwd: request.worktreeDir, allowFail: true },
+    );
+    const pushedHead = remoteBranchHead(repoDir, request.branch);
+    if (!push.ok || pushedHead !== request.newHeadSha) {
+      request.failureReason = `repair push was not verified at ${request.newHeadSha}`;
+      advance('FAILED');
+      return { action: 'failed-push-verification' };
+    }
     advance('PUSHED');
     return { action: 'pushed' };
   }
   if (request.status === 'PUSHED') {
+    if (!request.newHeadSha || remoteBranchHead(repoDir, request.branch) !== request.newHeadSha) {
+      request.failureReason = 'remote branch no longer resolves to persisted repair head';
+      advance('FAILED');
+      return { action: 'failed-completion-proof' };
+    }
     advance('COMPLETE');
     return { action: 'completed' };
   }

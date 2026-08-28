@@ -1,101 +1,74 @@
 {
   "schema": "foresift/ci-authority-review@2",
-  "evaluatedAt": "2026-08-27T15:05:00Z",
+  "evaluatedAt": "2026-08-28T00:00:00Z",
   "repository": "quantm-zeus/foresift",
-  "worktree": "/home/minhquan_eth/foresift-ci-final-v2",
-  "baseMainSha": "512cc2fb13fc3df22430e6f9c6bb99e43e01267a",
-  "branch": "fix/ci-authority-correctness-closeout-v2",
+  "worktree": "/home/minhquan_eth/foresift-codex-runner-fix",
+  "baseMainSha": "dfbf17255d08953d0a05ab0da1c05fb5a9e62ed5",
+  "branch": "fix/runner-control-plane-closeout",
   "verifications": {
     "direct_main_push_impossible": {
       "verified": true,
-      "details": "Static audit grep across all scripts/automation/*.mjs confirms zero occurrences of 'git push origin main' or direct main refspecs. State landing strictly pushes to isolated state branches (state/chore/<transitionId>) from dedicated worktrees and merges only via gh pr merge --squash. The obsolete validateDirectMainPushWhitelist symbol is completely removed from the repository.",
+      "details": "Production automation contains no supported direct-main writer. State changes use isolated state branches and protected PR merge. The obsolete validateDirectMainPushWhitelist implementation and declaration have been removed because production has zero consumers.",
       "codeReferences": [
-        "scripts/automation/state-landing.mjs:L670-685",
-        "scripts/automation/foresift-autopilot.mjs:L367-416"
+        "scripts/automation/foresift-autopilot.mjs",
+        "scripts/automation/state-landing.mjs"
       ]
     },
-    "no_pre_merge_state_mutation": {
+    "immutable_state_transition": {
       "verified": true,
-      "details": "requestMilestoneStateTransition in scripts/automation/foresift-autopilot.mjs (L373-377) uses in-memory state serialization (serializeMilestoneState(ms)) and passes serialized content as in-memory fileChanges to advanceStateTransition. The canonical working tree is never mutated prior to merge; changes are staged and committed strictly inside the isolated state worktree ($STATE_DIR/state-worktrees/<transitionId>). Canonical main is fast-forwarded only after authoritative post-merge verification.",
+      "details": "requestMilestoneStateTransition serializes milestone state and captures packageId/fromStatus/toStatus/message before enqueue. setPackageStatus captures and validates the old status before mutation.",
+      "codeReferences": ["scripts/automation/foresift-autopilot.mjs"]
+    },
+    "one_state_step_per_tick": {
+      "verified": true,
+      "details": "Both new and pending state transitions call advanceStateTransition exactly once per supervisor tick. WAITING_CI persists nextRetryAt and returns without sleeping or polling.",
       "codeReferences": [
-        "scripts/automation/foresift-autopilot.mjs:L373-377",
-        "scripts/automation/state-landing.mjs:L617-660"
+        "scripts/automation/foresift-autopilot.mjs",
+        "scripts/automation/state-landing.mjs"
       ]
     },
-    "non_blocking_state_landing": {
+    "authorized_merge_adoption": {
       "verified": true,
-      "details": "advanceStateTransition in scripts/automation/state-landing.mjs (L444-1050) is structured as a step-driven state machine performing one deterministic step per invocation without blocking sleep loops or Atomics.wait. When CI is pending, it returns immediately with step='WAITING_CI'. The supervisor advances pending transitions asynchronously via advancePendingStateTransitions in the tick outbox loop.",
+      "details": "Merged-state adoption requires a complete v2 receipt with non-empty hash-verified desiredFiles and non-empty authorized head/check/app authority. It proves PR head equality, trusted exact-head CI, MERGED state, merge reachability from fetched origin/main, and exact desired content.",
+      "codeReferences": ["scripts/automation/state-landing.mjs"]
+    },
+    "merge_head_pin": {
+      "verified": true,
+      "details": "State and package merge paths re-check PR head, remote branch head, and trusted exact-head CI immediately before invoking gh pr merge with --match-head-commit and without --admin.",
       "codeReferences": [
-        "scripts/automation/state-landing.mjs:L444-1050",
-        "scripts/automation/foresift-autopilot.mjs:L420-435"
+        "scripts/automation/state-landing.mjs",
+        "scripts/automation/package-land.mjs"
       ]
     },
-    "exact_head_authorization": {
+    "generation_aware_launch_intent": {
       "verified": true,
-      "details": "In scripts/automation/state-landing.mjs (L770-840), queryExactHeadCi queries check runs specifically for the resolved exact remote PR HEAD SHA. When app_id 15368 returns success for 'Verify (spec, format, lint, types, tests)', the exact commit SHA is durably persisted to receipt.authorizedHeadSha with authorizedAt, authorizedCheckName, and authorizedAppId before transitioning to CI_AUTHORIZED.",
+      "details": "Launch matching uses canonical generationMessage(packageId, generation), exact workflow, directional bounded time, and canonical branch worktree identity when available. Blocked intents are re-evaluated; zero or multiple matches remain blocked. Completion requires matching package generation and RUNNING or PROVEN milestone status.",
       "codeReferences": [
-        "scripts/automation/state-landing.mjs:L770-840",
-        "scripts/automation/state-landing.mjs:L578-608"
-      ]
-    },
-    "toctou_mitigation": {
-      "verified": true,
-      "details": "In scripts/automation/state-landing.mjs (L855-885), when processing CI_AUTHORIZED state, advanceStateTransition re-verifies that the current remote PR HEAD SHA strictly matches receipt.authorizedHeadSha. If HEAD has changed, authorization is immediately revoked (authorizedHeadSha=null, status=WAITING_CI) and persisted before returning step='CI_REVOKED'.",
-      "codeReferences": ["scripts/automation/state-landing.mjs:L855-885"]
-    },
-    "source_sha_not_pinned_head": {
-      "verified": true,
-      "details": "In scripts/automation/state-landing.mjs (L284-315), adoptMergedState extracts pinnedHead from receipt.authorizedHeadSha (not sourceMainSha or sourceSha) and passes it to verifyMergeAuthoritatively. This ensures merge verification checks the squash merge of the actual authorized PR HEAD rather than the base commit.",
-      "codeReferences": ["scripts/automation/state-landing.mjs:L284-315"]
-    },
-    "stable_transition_identity": {
-      "verified": true,
-      "details": "In scripts/automation/state-landing.mjs (L474-490 & L553-570), transitionId, sourceMainSha, and logicalTransitionKey are created once at receipt initialization. When origin/main advances while a state PR waits for CI, logicalTransitionKey matching reuses the existing in-flight transition without re-deriving identity from the newer main commit SHA.",
-      "codeReferences": [
-        "scripts/automation/state-landing.mjs:L474-490",
-        "scripts/automation/state-landing.mjs:L553-570"
-      ]
-    },
-    "strong_intent_recovery": {
-      "verified": true,
-      "details": "In scripts/automation/launch-intent.mjs (L143-157), runMatchesLaunchIntent checks 4 distinct identity dimensions: workflow_name === intent.workflow, user_message === intent.packageId, working_path includes task-foresift-<packageId>, and started_at within a 5-minute window of intent.createdAt. Intents without strong matches are marked RECONCILIATION_BLOCKED rather than loosely matched.",
-      "codeReferences": [
-        "scripts/automation/launch-intent.mjs:L143-157",
-        "scripts/automation/launch-intent.mjs:L185-191"
+        "scripts/automation/launch-intent.mjs",
+        "scripts/automation/package-generations.mjs"
       ]
     },
     "repair_route_execution": {
       "verified": true,
-      "details": "scripts/automation/ci-repair-executor.mjs implements durable repair outbox persistence (persistRepairRequest L230-260, discoverPendingRepairRequests L265-285, advanceRepairRequest L290-450) and path ownership enforcement (validateRepairOwnership L460-520). Repair routes are executed deterministically and bounded by attempt counters.",
+      "details": "package-land persists exact-head CODEX/AGY repair requests. The existing autopilot consumes one request step per tick. The state machine creates a real worktree, persists an invocation uncertainty barrier, calls the existing Codex or AGY writer adapter, inspects the committed Git diff, validates ownership, proves a descendant commit, lease-pushes it, verifies the remote SHA, and persists newHeadSha before COMPLETE.",
       "codeReferences": [
-        "scripts/automation/ci-repair-executor.mjs:L230-450",
-        "scripts/automation/ci-repair-executor.mjs:L460-520"
+        "scripts/automation/package-land.mjs",
+        "scripts/automation/foresift-autopilot.mjs",
+        "scripts/automation/ci-repair-executor.mjs",
+        "scripts/automation/exec-codex-writer.mjs",
+        "scripts/automation/exec-agy-test-writer.mjs"
       ]
     },
-    "pr_changed_files_passed": {
+    "generation_state_only_classifier": {
       "verified": true,
-      "details": "In scripts/automation/package-land.mjs (L120-145), git diff --name-only origin/main...HEAD computes the PR changed-file set. These files are passed as prChangedFiles to captureCiIncident and selectCiRepairRoute in scripts/automation/ci-authority.mjs (L447-540), enabling strict ownership validation.",
+      "details": "STATE_ONLY generation changes reuse the same canonical next-generation validator as supervisor restart. Only a non-negative integer N to N+1 transition is accepted; jumps, resets, and removal fail closed to FULL CI.",
       "codeReferences": [
-        "scripts/automation/package-land.mjs:L120-145",
-        "scripts/automation/ci-authority.mjs:L447-540"
-      ]
-    },
-    "strict_state_diff_classification": {
-      "verified": true,
-      "details": "In scripts/automation/classify-ci-diff.mjs (L40-132), compareMilestoneJsonSemantic performs recursive JSON pointer diffing between base and head milestone JSON. Only /packages/<i>/status (with valid transitions in ALLOWED_STATUS_TRANSITIONS) and /packages/<i>/generation (numeric) are allowed. Any other mutation fails closed to FULL CI.",
-      "codeReferences": [
-        "scripts/automation/classify-ci-diff.mjs:L40-132",
-        "scripts/automation/schema.mjs:L40-60"
-      ]
-    },
-    "active_package_preserved": {
-      "verified": true,
-      "details": "specs/implementation/current-milestone.json maintains g0-cost-capacity in RUNNING status (generation 0). State landing recovery and launch intent reconciliation preserve in-flight packages and do not reset or corrupt active packages on main.",
-      "codeReferences": [
-        "specs/implementation/current-milestone.json",
-        "scripts/automation/launch-intent.mjs:L193-200"
+        "scripts/automation/classify-ci-diff.mjs",
+        "scripts/automation/package-generations.mjs",
+        "scripts/automation/foresift-autopilot.mjs"
       ]
     }
   },
-  "verdict": "PASS"
+  "verdict": "UNPROVEN",
+  "verdictReason": "Production source closes the reviewed defects, but an overall PASS remains unproven until AGY-owned tests are updated for the removed obsolete whitelist API, real Git-backed repair facts, authority-bound intent completion, and asynchronous one-step protected state/planning landings."
 }

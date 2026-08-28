@@ -62,6 +62,11 @@ import {
 export const STATE_TRANSITIONS_DIR_NAME = 'state-transitions';
 export const STATE_WORKTREES_DIR_NAME = 'state-worktrees';
 
+const PROTECTED_CONTROL_PLANE_WHITELIST = [
+  ...STATE_ONLY_WHITELIST,
+  /^specs\/[a-z0-9]+(?:-[a-z0-9]+)*(?:@g\d+)?\/(?:spec|plan|tasks)\.md$/,
+];
+
 // Receipt v2 status values
 export const RECEIPT_STATUSES = {
   REQUESTED: 'REQUESTED',
@@ -164,11 +169,33 @@ function computeContentSha256(content) {
   return createHash('sha256').update(content).digest('hex');
 }
 
+function desiredFilesAreComplete(desiredFiles) {
+  return (
+    Array.isArray(desiredFiles) &&
+    desiredFiles.length > 0 &&
+    desiredFiles.every(
+      (f) =>
+        typeof f.path === 'string' &&
+        f.path.length > 0 &&
+        typeof f.content === 'string' &&
+        typeof f.contentSha256 === 'string' &&
+        f.contentSha256 === computeContentSha256(f.content),
+    )
+  );
+}
+
+function revokeAuthorization(receipt) {
+  receipt.authorizedHeadSha = null;
+  receipt.authorizedAt = null;
+  receipt.authorizedCheckName = null;
+  receipt.authorizedAppId = null;
+}
+
 // ── Whitelist validation ──────────────────────────────────────────────────────
 export function validateStateFiles(fileChanges) {
   const paths = fileChanges.map((f) => (typeof f === 'string' ? f : f.path));
   const violations = paths.filter(
-    (f) => !STATE_ONLY_WHITELIST.some((pattern) => pattern.test(f.trim())),
+    (f) => !PROTECTED_CONTROL_PLANE_WHITELIST.some((pattern) => pattern.test(f.trim())),
   );
   return { ok: violations.length === 0, violations };
 }
@@ -202,9 +229,18 @@ export function verifyMergeAuthoritatively({
   pinnedHead,
   fileChanges,
   repoDir,
+  repo = DEFAULT_REPO,
+  authorizedCheckName,
+  authorizedAppId,
   ghFn = defaultGh,
   gitFn = defaultGit,
 }) {
+  if (!pinnedHead || !authorizedCheckName || !authorizedAppId) {
+    return { ok: false, reason: 'missing immutable exact-head CI authority' };
+  }
+  if (!Array.isArray(fileChanges) || fileChanges.length === 0) {
+    return { ok: false, reason: 'desiredFiles must be non-empty for merge verification' };
+  }
   // 1. Query PR via gh pr view
   const prViewRes = ghFn(
     ['pr', 'view', String(prNum), '--json', 'state,mergeCommit,headRefOid,baseRefName'],
@@ -230,10 +266,25 @@ export function verifyMergeAuthoritatively({
     return { ok: false, reason: `PR #${prNum} mergeCommit missing` };
   }
 
-  if (pinnedHead && prData.headRefOid && prData.headRefOid !== pinnedHead) {
+  if (!prData.headRefOid || prData.headRefOid !== pinnedHead) {
     return {
       ok: false,
       reason: `PR #${prNum} head (${prData.headRefOid}) does not match authorized pinned head (${pinnedHead})`,
+    };
+  }
+
+  const ciVerdict = getExactHeadCiStatus({
+    sha: pinnedHead,
+    repo,
+    checkName: authorizedCheckName,
+    requiredAppId: authorizedAppId,
+    cwd: repoDir,
+    ghFn,
+  });
+  if (!ciVerdict.ok || ciVerdict.state !== 'SUCCESS') {
+    return {
+      ok: false,
+      reason: `trusted exact-head CI is not SUCCESS for authorized head ${pinnedHead}: ${ciVerdict.reason}`,
     };
   }
 
@@ -289,25 +340,34 @@ export function adoptMergedState({
   gitFn = defaultGit,
   log = console.log,
 }) {
-  if (receipt.status === RECEIPT_STATUSES.MERGED) {
-    return { adopted: true, mergedSha: receipt.mergedSha };
+  if (receipt.schema !== 'foresift/state-transition@2') {
+    return { adopted: false, mergedSha: null, reason: 'LEGACY_RECEIPT_BLOCKED' };
   }
   if (!receipt.prNumber && !receipt.pr) return { adopted: false, mergedSha: null };
+  const authorityComplete =
+    desiredFilesAreComplete(receipt.desiredFiles) &&
+    typeof receipt.authorizedHeadSha === 'string' &&
+    receipt.authorizedHeadSha.length > 0 &&
+    typeof receipt.authorizedCheckName === 'string' &&
+    receipt.authorizedCheckName.length > 0 &&
+    Number.isInteger(Number(receipt.authorizedAppId)) &&
+    Number(receipt.authorizedAppId) > 0;
+  if (!authorityComplete) {
+    return { adopted: false, mergedSha: null, reason: 'missing complete v2 merge authority' };
+  }
 
-  // Extract fileChanges from receipt's desiredFiles
-  const fileChanges = (receipt.desiredFiles || []).map((f) => ({
+  const fileChanges = receipt.desiredFiles.map((f) => ({
     path: f.path,
     content: f.content,
   }));
 
-  // Use authorizedHeadSha (correct) NOT sourceMainSha (wrong) as pinnedHead
-  const pinnedHead = receipt.authorizedHeadSha || null;
-
   const verification = verifyMergeAuthoritatively({
     prNum: receipt.prNumber ?? receipt.pr,
-    pinnedHead,
+    pinnedHead: receipt.authorizedHeadSha,
     fileChanges,
     repoDir: cwd,
+    authorizedCheckName: receipt.authorizedCheckName,
+    authorizedAppId: receipt.authorizedAppId,
     ghFn,
     gitFn,
     log,
@@ -371,8 +431,8 @@ function migrateV1Receipt(v1) {
     updatedAt: v1.updatedAt,
   };
 
-  // If receipt is non-terminal and lacks desiredFiles, we can't safely proceed
-  if (!TERMINAL_STATUSES.has(v2.status) && v2.desiredFiles.length === 0) {
+  // No legacy status, including a claimed merge, may bypass missing immutable authority.
+  if (v2.desiredFiles.length === 0) {
     v2.status = RECEIPT_STATUSES.FAILED;
     v2.failedReason = 'LEGACY_RECEIPT_BLOCKED: v1 receipt lacks desiredFiles for safe recovery';
     v2.retryClass = 'TERMINAL_CORRUPTION';
@@ -453,6 +513,7 @@ export function advanceStateTransition({
   repo = DEFAULT_REPO,
   checkName = DEFAULT_REQUIRED_CHECK,
   requiredAppId = DEFAULT_REQUIRED_APP_ID,
+  initializeOnly = false,
   ghFn = defaultGh,
   gitFn = defaultGit,
   log = console.log,
@@ -489,6 +550,14 @@ export function advanceStateTransition({
     }
   } else {
     // NEW RECEIPT: fetch origin/main ONCE, create identity
+    if (!Array.isArray(fileChanges) || fileChanges.length === 0) {
+      return {
+        ok: false,
+        reason: 'state landing refused: desiredFiles must be non-empty',
+        receipt: null,
+        step: 'VALIDATION_FAILED',
+      };
+    }
     // 1. Validate file paths
     const { ok: allowed, violations } = validateStateFiles(fileChanges);
     if (!allowed) {
@@ -612,6 +681,26 @@ export function advanceStateTransition({
 
   const { stateBranch } = receipt;
   const worktreePath = receipt.stateWorktree || join(worktreesBaseDir(stateDir), transitionId);
+
+  if (!desiredFilesAreComplete(receipt.desiredFiles)) {
+    receipt.status = RECEIPT_STATUSES.FAILED;
+    receipt.failedReason = 'v2 receipt has missing or invalid desired file hashes';
+    receipt.retryClass = 'TERMINAL_CORRUPTION';
+    writeReceipt(stateDir, receipt);
+    return { ok: false, receipt, reason: receipt.failedReason, step: 'INVALID_RECEIPT' };
+  }
+
+  if (initializeOnly) {
+    return { ok: true, receipt, step: receipt.status };
+  }
+
+  if (
+    receipt.status === RECEIPT_STATUSES.WAITING_CI &&
+    receipt.nextRetryAt &&
+    new Date(receipt.nextRetryAt).getTime() > Date.now()
+  ) {
+    return { ok: false, receipt, reason: 'waiting-for-ci-retry-window', step: 'WAITING_CI' };
+  }
 
   // ── Step: REQUESTED -> BRANCH_READY (in isolated worktree) ──────────────────
   if (receipt.status === RECEIPT_STATUSES.REQUESTED) {
@@ -755,6 +844,13 @@ export function advanceStateTransition({
     if (!prNum) {
       const srcSha = receipt.sourceMainSha || sourceMainSha;
       const commitMsg = receipt.commitMessage || message;
+      const isStateOnly = (receipt.desiredFiles || []).every((file) =>
+        STATE_ONLY_WHITELIST.some((pattern) => pattern.test(file.path)),
+      );
+      const prBody =
+        `Automated protected control-plane chore.\n\nTransition: \`${transitionId}\`\nSource SHA: \`${srcSha}\`\n\n` +
+        '> This PR was created by the Foresift supervisor state-landing lane.\n' +
+        '> CI classifies the actual diff and runs the required exact-head gate before merge.';
       let createPrRes = ghFn(
         [
           'pr',
@@ -766,9 +862,8 @@ export function advanceStateTransition({
           '--title',
           commitMsg,
           '--body',
-          `Automated state-only chore.\n\nTransition: \`${transitionId}\`\nSource SHA: \`${srcSha}\`\n\n> This PR was created by the Foresift supervisor state-landing lane.\n> It contains ONLY whitelisted control-plane state files.\n> Merging via required CI + squash-merge.`,
-          '--label',
-          'state-only',
+          prBody,
+          ...(isStateOnly ? ['--label', 'state-only'] : []),
         ],
         { cwd: repoDir },
       );
@@ -784,7 +879,7 @@ export function advanceStateTransition({
             '--title',
             commitMsg,
             '--body',
-            `Automated state-only chore.\n\nTransition: \`${transitionId}\`\nSource SHA: \`${srcSha}\`\n\n> This PR was created by the Foresift supervisor state-landing lane.\n> It contains ONLY whitelisted control-plane state files.\n> Merging via required CI + squash-merge.`,
+            prBody,
           ],
           { cwd: repoDir },
         );
@@ -910,16 +1005,16 @@ export function advanceStateTransition({
 
     // Check 1: PR headRefOid matches authorizedHeadSha
     if (prData.headRefOid !== receipt.authorizedHeadSha) {
+      const revokedHead = receipt.authorizedHeadSha;
       log(
         `state-landing TOCTOU: PR HEAD (${prData.headRefOid}) !== authorized (${receipt.authorizedHeadSha}). Clearing authorization.`,
       );
-      receipt.authorizedHeadSha = null;
-      receipt.authorizedAt = null;
+      revokeAuthorization(receipt);
       receipt.status = RECEIPT_STATUSES.WAITING_CI;
       writeReceipt(stateDir, receipt);
       return {
         ok: false,
-        reason: `HEAD changed: authorized=${receipt.authorizedHeadSha}, actual=${prData.headRefOid}`,
+        reason: `HEAD changed: authorized=${revokedHead}, actual=${prData.headRefOid}`,
         receipt,
         step: 'HEAD_CHANGED',
       };
@@ -935,8 +1030,7 @@ export function advanceStateTransition({
           log(
             `state-landing TOCTOU: remote branch HEAD (${remoteBranchHead}) !== authorized (${receipt.authorizedHeadSha}). Clearing authorization.`,
           );
-          receipt.authorizedHeadSha = null;
-          receipt.authorizedAt = null;
+          revokeAuthorization(receipt);
           receipt.status = RECEIPT_STATUSES.WAITING_CI;
           writeReceipt(stateDir, receipt);
           return {
@@ -960,13 +1054,13 @@ export function advanceStateTransition({
     });
 
     if (!reVerdict.ok || reVerdict.state !== 'SUCCESS') {
-      receipt.authorizedHeadSha = null;
-      receipt.authorizedAt = null;
+      const revokedHead = receipt.authorizedHeadSha;
+      revokeAuthorization(receipt);
       receipt.status = RECEIPT_STATUSES.WAITING_CI;
       writeReceipt(stateDir, receipt);
       return {
         ok: false,
-        reason: `CI re-verification failed for ${receipt.authorizedHeadSha}`,
+        reason: `CI re-verification failed for ${revokedHead}`,
         receipt,
         step: 'CI_REVERIFY_FAILED',
       };
@@ -979,8 +1073,71 @@ export function advanceStateTransition({
 
   // ── Step: MERGE_READY -> MERGE_REQUESTED ────────────────────────────────────
   if (receipt.status === RECEIPT_STATUSES.MERGE_READY) {
+    if (
+      !receipt.authorizedHeadSha ||
+      !receipt.authorizedCheckName ||
+      receipt.authorizedAppId === null ||
+      receipt.authorizedAppId === undefined
+    ) {
+      return {
+        ok: false,
+        reason: 'merge authority is incomplete',
+        receipt,
+        step: 'MISSING_AUTHORITY',
+      };
+    }
+    const prViewRes = ghFn(
+      ['pr', 'view', String(receipt.prNumber), '--json', 'state,headRefOid,baseRefName'],
+      { cwd: repoDir },
+    );
+    let prData;
+    try {
+      prData = prViewRes.ok ? JSON.parse(prViewRes.stdout) : null;
+    } catch {
+      prData = null;
+    }
+    const fetchBranchRes = gitFn(['fetch', 'origin', stateBranch, '--quiet'], { cwd: repoDir });
+    const remoteHeadRes = fetchBranchRes.ok
+      ? gitFn(['rev-parse', `origin/${stateBranch}`], { cwd: repoDir })
+      : { ok: false, stdout: '' };
+    const ciVerdict = getExactHeadCiStatus({
+      sha: receipt.authorizedHeadSha,
+      repo,
+      checkName: receipt.authorizedCheckName,
+      requiredAppId: receipt.authorizedAppId,
+      cwd: repoDir,
+      ghFn,
+    });
+    if (
+      !prData ||
+      prData.state !== 'OPEN' ||
+      prData.headRefOid !== receipt.authorizedHeadSha ||
+      !remoteHeadRes.ok ||
+      remoteHeadRes.stdout.trim() !== receipt.authorizedHeadSha ||
+      !ciVerdict.ok ||
+      ciVerdict.state !== 'SUCCESS'
+    ) {
+      revokeAuthorization(receipt);
+      receipt.status = RECEIPT_STATUSES.WAITING_CI;
+      receipt.nextRetryAt = new Date(Date.now() + 15_000).toISOString();
+      writeReceipt(stateDir, receipt);
+      return {
+        ok: false,
+        reason: 'immediate pre-merge exact-head authority check failed',
+        receipt,
+        step: 'MERGE_AUTHORITY_CHANGED',
+      };
+    }
     const mergeRes = ghFn(
-      ['pr', 'merge', String(receipt.prNumber), '--squash', '--delete-branch'],
+      [
+        'pr',
+        'merge',
+        String(receipt.prNumber),
+        '--squash',
+        '--delete-branch',
+        '--match-head-commit',
+        receipt.authorizedHeadSha,
+      ],
       { cwd: repoDir },
     );
     if (!mergeRes.ok) {
@@ -1011,14 +1168,14 @@ export function advanceStateTransition({
       content: f.content,
     }));
 
-    // If desiredFiles are empty, use caller-provided fileChanges as fallback
-    const changes = verifyFileChanges.length > 0 ? verifyFileChanges : fileChanges || [];
-
     const verification = verifyMergeAuthoritatively({
       prNum: receipt.prNumber,
       pinnedHead: receipt.authorizedHeadSha,
-      fileChanges: changes,
+      fileChanges: verifyFileChanges,
       repoDir,
+      repo,
+      authorizedCheckName: receipt.authorizedCheckName,
+      authorizedAppId: receipt.authorizedAppId,
       ghFn,
       gitFn,
       log,

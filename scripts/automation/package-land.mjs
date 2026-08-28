@@ -28,6 +28,7 @@
 
 import { execFileSync } from 'node:child_process';
 import { existsSync } from 'node:fs';
+import { join } from 'node:path';
 import {
   landingAdmission,
   isAncestorSha,
@@ -76,6 +77,9 @@ function parseArgs(argv) {
       case '--poll-s':
         a.pollS = Number(argv[++i]);
         break;
+      case '--package':
+        a.packageId = argv[++i];
+        break;
     }
   }
   return a;
@@ -92,6 +96,9 @@ function main() {
     process.exit(2);
   }
   const checkName = a.checkName ?? DEFAULT_REQUIRED_CHECK;
+  const stateDir =
+    process.env.FORESIFT_AUTOPILOT_STATE_DIR ??
+    join(process.env.HOME || '', '.local', 'state', 'foresift');
   const deadlineMs = (a.deadlineS ?? 1800) * 1000;
   const pollMs = Math.max((a.pollS ?? 20) * 1000, 5000);
   if (a.bodyFile && !existsSync(a.bodyFile)) {
@@ -243,6 +250,8 @@ function main() {
         checkName,
         requiredAppId: DEFAULT_REQUIRED_APP_ID,
         cwd: process.cwd(),
+        packageId: a.packageId ?? null,
+        stateDir,
       });
       const failureReason = verdict.state === 'UNTRUSTED' ? 'ci-untrusted' : 'ci-red';
       step(failureReason, `${verdict.reason || verdict.failureSummary} at ${pinSha}`);
@@ -253,6 +262,7 @@ function main() {
           incident,
           branch: a.branch,
           worktreeDir: process.cwd(),
+          stateDir,
           log: (msg) => step('repair', msg),
         });
         step(
@@ -371,7 +381,50 @@ function main() {
     );
     process.exit(1);
   }
-  sh('gh', ['pr', 'merge', prNum, '--squash']);
+  const prHeadView = shAllowFail('gh', ['pr', 'view', prNum, '--json', 'state,headRefOid']);
+  let prHead = null;
+  let prState = null;
+  try {
+    const data = prHeadView.ok ? JSON.parse(prHeadView.out) : null;
+    prHead = data?.headRefOid ?? null;
+    prState = data?.state ?? null;
+  } catch {}
+  const finalCi = getExactHeadCiStatus({
+    sha: pinSha,
+    repo: DEFAULT_REPO,
+    checkName,
+    requiredAppId: DEFAULT_REQUIRED_APP_ID,
+    cwd: process.cwd(),
+  });
+  if (
+    !prHeadView.ok ||
+    prState !== 'OPEN' ||
+    prHead !== pinSha ||
+    !finalCi.ok ||
+    finalCi.state !== 'SUCCESS'
+  ) {
+    step(
+      'merge-authority-changed',
+      `PR head=${prHead} state=${prState}; CI=${finalCi.state} at authorized ${pinSha}`,
+    );
+    console.log(
+      JSON.stringify(
+        {
+          merged: false,
+          reason: 'merge-authority-changed',
+          pinnedHead: pinSha,
+          prHead,
+          prState,
+          ciState: finalCi.state,
+          trace,
+        },
+        null,
+        2,
+      ),
+    );
+    process.exit(1);
+  }
+  sh('gh', ['pr', 'merge', prNum, '--squash', '--delete-branch', '--match-head-commit', pinSha]);
   step('merged', `PR #${prNum} squash-merged at pinned head ${pinSha}`);
   console.log(
     JSON.stringify(

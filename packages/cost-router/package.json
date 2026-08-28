@@ -1,0 +1,23 @@
+{
+  "name": "@foresift/cost-router",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Free-first provider cost, quota, reserve, batch, and paid-policy routing.",
+  "exports": {
+    ".": {
+      "types": "./src/index.ts",
+      "default": "./src/index.ts"
+    }
+  },
+  "scripts": {
+    "test": "bun test"
+  },
+  "dependencies": {
+    "@foresift/domain": "workspace:*",
+    "@foresift/persistence": "workspace:*",
+    "@foresift/shared-schemas": "workspace:*",
+    "@foresift/tool-core": "workspace:*"
+  },
+  "devDependencies": {}
+}

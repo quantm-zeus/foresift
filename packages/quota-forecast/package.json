@@ -1,0 +1,25 @@
+{
+  "name": "@foresift/quota-forecast",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Verified-plan quota forecasting, usage actuals, and capacity replay.",
+  "exports": {
+    ".": {
+      "types": "./src/index.ts",
+      "default": "./src/index.ts"
+    }
+  },
+  "scripts": {
+    "test": "bun test"
+  },
+  "dependencies": {
+    "@foresift/capacity-planner": "workspace:*",
+    "@foresift/cost-router": "workspace:*",
+    "@foresift/domain": "workspace:*",
+    "@foresift/persistence": "workspace:*",
+    "@foresift/shared-schemas": "workspace:*",
+    "@foresift/tool-core": "workspace:*"
+  },
+  "devDependencies": {}
+}

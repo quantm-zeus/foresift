@@ -18,14 +18,7 @@
 //      (B/C/D/G/H/I), legacy preservation (F), and artifact preservation
 //      (J).
 import { spawnSync } from 'node:child_process';
-import {
-  chmodSync,
-  existsSync,
-  mkdirSync,
-  mkdtempSync,
-  readFileSync,
-  writeFileSync,
-} from 'node:fs';
+import { chmodSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -425,28 +418,47 @@ describe('planning handoff (B: zero impl calls · C: RUNNING preserved · D: imm
 
   it('completing the bootstrap promotes ONLY scoped planning artifacts and relaunches the SAME package into the wave in the SAME tick', () => {
     const sb = handoffSandbox('handoff-happy');
-    const r = tick(sb, ['--once'], {
+    // Tick 1: initiates protected planning PR transition
+    const r1 = tick(sb, ['--once'], {
       getMap: { 'boot-1': { id: 'boot-1', status: 'completed', working_path: sb.wtDir } },
     });
-    expect(r.status).toBe(0);
+    expect(r1.status).toBe(0);
 
-    const st = readState(sb);
-    const events = st.history.map((h: { event: string }) => h.event);
-    expect(events).toContain('planning_handoff_complete');
+    const st1 = readState(sb);
+    const events1 = st1.history.map((h: { event: string }) => h.event);
+    expect(events1).toContain('planning_handoff_promotion_refused');
+
+    // Simulate PR landing onto main
+    mkdirSync(join(sb.fx.root, 'specs', PKG), { recursive: true });
+    writeFileSync(join(sb.fx.root, 'specs', PKG, 'spec.md'), SPEC);
+    writeFileSync(join(sb.fx.root, 'specs', PKG, 'plan.md'), PLAN);
+    writeFileSync(join(sb.fx.root, 'specs', PKG, 'tasks.md'), TASKS);
+    sb.fx.commitAll('chore(autopilot): seed pkg-alpha planning artifacts');
+    sb.fx.g(['push', 'origin', 'main']);
+
+    // Tick 2: promotion is already on main -> immediate wave launch
+    const r2 = tick(sb, ['--once'], {
+      getMap: { 'boot-1': { id: 'boot-1', status: 'completed', working_path: sb.wtDir } },
+    });
+    expect(r2.status).toBe(0);
+
+    const st2 = readState(sb);
+    const events2 = st2.history.map((h: { event: string }) => h.event);
+    expect(events2).toContain('planning_handoff_complete');
 
     // C: package status NEVER left RUNNING (no PENDING-forcing, no PROVEN fabrication).
     expect(readMs(sb).packages.find((p: { id: string }) => p.id === PKG)?.status).toBe('RUNNING');
 
-    // D: immediate reselection — the wave launch happened in this very tick.
+    // D: immediate reselection — the wave launch happened in this tick.
     const log = archonLog(sb);
     const waveLaunches = log.split('\n').filter((l) => l.includes(`run ${WAVE_WF} --detach`));
     expect(waveLaunches).toHaveLength(1);
     expect(log).not.toContain(`run ${BOOTSTRAP_WF} --detach`);
 
     // The old bootstrap execution is terminal/non-authoritative.
-    expect(st.activeRuns).toHaveLength(1);
-    expect(st.activeRuns[0]?.workflow).toBe(WAVE_WF);
-    expect(st.activeRuns[0]?.packageId).toBe(PKG);
+    expect(st2.activeRuns).toHaveLength(1);
+    expect(st2.activeRuns[0]?.workflow).toBe(WAVE_WF);
+    expect(st2.activeRuns[0]?.packageId).toBe(PKG);
 
     // J (promotion scope): the chore touches ONLY specs/<pkg>/**.
     const show = spawnSync('git', ['-C', sb.fx.root, 'show', '--name-only', '--format=', 'HEAD'], {
@@ -459,6 +471,10 @@ describe('planning handoff (B: zero impl calls · C: RUNNING preserved · D: imm
 
   it('B: the handoff tick issues no provider dispatch other than the wave launch itself', () => {
     const sb = handoffSandbox('handoff-zeroai');
+    writePlannedTree(sb.fx.root);
+    sb.fx.commitAll('chore(autopilot): seed pkg-alpha planning artifacts');
+    sb.fx.g(['push', 'origin', 'main']);
+
     tick(sb, ['--once'], {
       getMap: { 'boot-1': { id: 'boot-1', status: 'completed', working_path: sb.wtDir } },
     });
@@ -504,6 +520,10 @@ describe('handoff state-machine safety (G: duplicate tick · H: crash-after-laun
     const sb = makeSandbox('dup-tick', 'RUNNING');
     installStub();
     seedState(sb, [bootstrapEntry()]);
+    writePlannedTree(sb.fx.root);
+    sb.fx.commitAll('chore(autopilot): seed pkg-alpha planning artifacts');
+    sb.fx.g(['push', 'origin', 'main']);
+
     // Tick 1: handoff fires; ack carries NO run id → awaitingDiscovery.
     tick(sb, ['--once'], {
       getMap: { 'boot-1': { id: 'boot-1', status: 'completed', working_path: sb.wtDir } },
@@ -526,6 +546,10 @@ describe('handoff state-machine safety (G: duplicate tick · H: crash-after-laun
   it('H: a crash after the wave launch but before state persistence replays into ADOPTION — still exactly one run', () => {
     const sb = makeSandbox('crash-replay', 'RUNNING');
     installStub();
+    writePlannedTree(sb.fx.root);
+    sb.fx.commitAll('chore(autopilot): seed pkg-alpha planning artifacts');
+    sb.fx.g(['push', 'origin', 'main']);
+
     // Pre-crash durable state still tracks the OLD bootstrap entry; origin'
     // runs table proves the wave was already launched before the crash.
     seedState(sb, [bootstrapEntry()]);
@@ -546,6 +570,10 @@ describe('handoff state-machine safety (G: duplicate tick · H: crash-after-laun
   it('I: a completed bootstrap row lingering in the runs table can never be adopted or relaunched after the wave becomes authoritative', () => {
     const sb = makeSandbox('stale-row', 'RUNNING');
     installStub();
+    writePlannedTree(sb.fx.root);
+    sb.fx.commitAll('chore(autopilot): seed pkg-alpha planning artifacts');
+    sb.fx.g(['push', 'origin', 'main']);
+
     seedState(sb, [bootstrapEntry()]);
     const staleBootstrapRow = {
       id: 'boot-1',
@@ -594,7 +622,7 @@ describe('--seed-package-planning (J: useful work preserved, promotion is scoped
     );
   }
 
-  it('copies only specs/<pkg>/** into main as a chore; a second run is a no-op; the package branch is untouched', () => {
+  it('copies only specs/<pkg>/** via protected state PR; a second run is a no-op; the package branch is untouched', () => {
     const sb = makeSandbox('seed-cli', 'RUNNING');
     // A package branch carrying useful implementation work — the promotion
     // must not move it.
@@ -609,14 +637,12 @@ describe('--seed-package-planning (J: useful work preserved, promotion is scoped
     const r1 = seedCli(sb);
     expect(r1.status).toBe(0);
     const res1 = JSON.parse(r1.stdout);
-    expect(res1.ok).toBe(true);
-    expect(res1.promoted).toBe(true);
-    expect(existsSync(join(sb.fx.root, 'specs', PKG, 'tasks.md'))).toBe(true);
-    const show = spawnSync('git', ['-C', sb.fx.root, 'show', '--name-only', '--format=', 'HEAD'], {
-      encoding: 'utf8',
-    }).stdout;
-    for (const f of show.trim().split('\n').filter(Boolean))
-      expect(f.startsWith(`specs/${PKG}/`)).toBe(true);
+    expect(res1.pending).toBe(true);
+
+    // Simulate landing the protected state PR onto main
+    writePlannedTree(sb.fx.root);
+    sb.fx.commitAll('chore(autopilot): seed pkg-alpha planning artifacts');
+    sb.fx.g(['push', 'origin', 'main']);
 
     const r2 = seedCli(sb);
     expect(r2.status).toBe(0);
@@ -628,11 +654,11 @@ describe('--seed-package-planning (J: useful work preserved, promotion is scoped
     expect(shaAfter).toBe(branchSha);
   });
 
-  it('refuses when the main checkout has uncommitted state under specs/<pkg>', () => {
-    const sb = makeSandbox('seed-dirty', 'RUNNING');
-    writePlannedTree(sb.fx.root); // uncommitted planning truth on main side
+  it('refuses when the source worktree lacks planning artifacts', () => {
+    const sb = makeSandbox('seed-missing', 'RUNNING');
+    rmSync(join(sb.wtDir, 'specs', PKG), { recursive: true, force: true });
     const r = seedCli(sb);
     expect(r.status).toBe(1);
-    expect(JSON.parse(r.stdout).refused).toMatch(/uncommitted changes under specs/);
+    expect(JSON.parse(r.stdout).refused).toMatch(/lacks specs/);
   });
 });

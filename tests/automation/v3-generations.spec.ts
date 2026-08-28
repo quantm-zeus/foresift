@@ -505,6 +505,12 @@ const readMs = (sb: Sandbox) =>
     readFileSync(join(sb.fx.root, 'specs', 'implementation', 'current-milestone.json'), 'utf8'),
   );
 
+const writeMs = (sb: Sandbox, ms: unknown) =>
+  writeFileSync(
+    join(sb.fx.root, 'specs', 'implementation', 'current-milestone.json'),
+    JSON.stringify(ms, null, 2) + '\n',
+  );
+
 describe('--restart-package CLI flows', () => {
   let sb: Sandbox;
   let manifestPath: string;
@@ -533,6 +539,32 @@ describe('--restart-package CLI flows', () => {
   });
 
   it('performs a fresh-generation restart with a seeded, pushed salvage branch', () => {
+    // Pass 1: initiates protected milestone state transition (generation 0 -> 1)
+    const r1 = runRestartCli(sb, [
+      '--restart-package',
+      PKG,
+      '--fresh-generation',
+      '--reason',
+      'V3 controlled reset of retired generation 0',
+      '--salvage-manifest',
+      manifestPath,
+    ]);
+    expect(r1.status).toBe(0);
+    const pending = JSON.parse(r1.stdout.trim());
+    expect(pending.schema).toBe('foresift/restart-pending@1');
+    expect(pending.status).toBe('WAITING_FOR_PROTECTED_STATE_MERGE');
+    expect(pending.toGeneration).toBe(1);
+
+    // Simulate landing the protected state PR onto main
+    const ms = readMs(sb);
+    const pkg = ms.packages.find((p: { id: string }) => p.id === PKG);
+    pkg.generation = 1;
+    pkg.status = 'PENDING';
+    writeMs(sb, ms);
+    sb.fx.commitAll('chore(autopilot): g0/pkg-alpha -> generation 1 (fresh restart)');
+    sb.fx.g(['push', 'origin', 'main']);
+
+    // Pass 2: state already persisted -> seeds salvage branch and completes receipt
     const r = runRestartCli(sb, [
       '--restart-package',
       PKG,
@@ -703,7 +735,8 @@ describe('--restart-package CLI flows', () => {
   });
 
   it('--confirm-new-generation deliberately advances past the duplicate gate', () => {
-    const r = runRestartCli(sb, [
+    // Pass 1: initiates protected milestone state transition (generation 1 -> 2)
+    const r1 = runRestartCli(sb, [
       '--restart-package',
       PKG,
       '--fresh-generation',
@@ -711,12 +744,34 @@ describe('--restart-package CLI flows', () => {
       '--reason',
       'deliberate second reset after generation 1 executed',
     ]);
-    expect(r.status).toBe(0);
-    const receipt = JSON.parse(r.stdout.trim());
+    expect(r1.status).toBe(0);
+    const pending = JSON.parse(r1.stdout.trim());
+    expect(pending.schema).toBe('foresift/restart-pending@1');
+    expect(pending.toGeneration).toBe(2);
+
+    // Simulate landing the protected state PR onto main
+    const ms = readMs(sb);
+    const alpha = ms.packages.find((p: { id: string }) => p.id === PKG);
+    alpha.generation = 2;
+    alpha.status = 'PENDING';
+    writeMs(sb, ms);
+    sb.fx.commitAll('chore(autopilot): g0/pkg-alpha -> generation 2 (fresh restart)');
+    sb.fx.g(['push', 'origin', 'main']);
+
+    // Pass 2: completes receipt for generation 2
+    const r2 = runRestartCli(sb, [
+      '--restart-package',
+      PKG,
+      '--fresh-generation',
+      '--confirm-new-generation',
+      '--reason',
+      'deliberate second reset after generation 1 executed',
+    ]);
+    expect(r2.status).toBe(0);
+    const receipt = JSON.parse(r2.stdout.trim());
     expect(receipt.toGeneration).toBe(2);
     expect(receipt.retiredGeneration).toBe(1);
     expect(receipt.generationBranch).toBe(`foresift/${PKG}-g2`);
-    const alpha = readMs(sb).packages.find((p: { id: string }) => p.id === PKG);
     expect(alpha.generation).toBe(2);
   });
 
@@ -740,7 +795,7 @@ describe('--restart-package CLI flows', () => {
     // therefore reconcile rows whose run is provably terminal — and complete.
     seedTrackedRow('r-dead', PKG);
     const genBefore = readMs(sb).packages.find((p: { id: string }) => p.id === PKG).generation ?? 0;
-    const r = runRestartCli(
+    const r1 = runRestartCli(
       sb,
       [
         '--restart-package',
@@ -761,17 +816,48 @@ describe('--restart-package CLI flows', () => {
         ],
       },
     );
-    expect(r.status).toBe(0);
-    expect(r.stderr).not.toMatch(/tracked active run/);
+    expect(r1.status).toBe(0);
+    expect(r1.stderr).not.toMatch(/tracked active run/);
     const st = JSON.parse(readFileSync(join(sb.stateDir, 'autopilot-state.json'), 'utf8'));
     expect(st.activeRuns).toHaveLength(0); // reconciled row cleared
     const evidence = (st.history ?? []).find(
       (h: { event?: string }) => h.event === 'restart_reconciled_terminal_tracked_run',
     );
     expect(evidence).toMatchObject({ packageId: PKG, runId: 'r-dead', archonStatus: 'cancelled' });
-    const receipt = JSON.parse(r.stdout.trim());
+
+    // Simulate landing the protected state transition onto main
+    const ms = readMs(sb);
+    const alpha = ms.packages.find((p: { id: string }) => p.id === PKG);
+    alpha.generation = genBefore + 1;
+    alpha.status = 'PENDING';
+    writeMs(sb, ms);
+    sb.fx.commitAll('chore(autopilot): bump generation after terminal run');
+    sb.fx.g(['push', 'origin', 'main']);
+
+    const r2 = runRestartCli(
+      sb,
+      [
+        '--restart-package',
+        PKG,
+        '--fresh-generation',
+        '--confirm-new-generation',
+        '--reason',
+        'restart after reconciling an archon-terminal tracked run',
+      ],
+      {
+        rows: [
+          {
+            id: 'r-dead',
+            workflow_name: 'foresift-work-package',
+            user_message: PKG,
+            status: 'cancelled',
+          },
+        ],
+      },
+    );
+    expect(r2.status).toBe(0);
+    const receipt = JSON.parse(r2.stdout.trim());
     expect(receipt.retiredRunIds).toContain('r-dead'); // retired with the old generations
-    const alpha = readMs(sb).packages.find((p: { id: string }) => p.id === PKG);
     expect(alpha.generation).toBe(genBefore + 1); // advanced exactly once past the prior state
   });
 

@@ -1,5 +1,5 @@
 import { describe, test, expect, beforeEach, afterEach } from 'bun:test';
-import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { mkdtempSync, readFileSync, rmSync, writeFileSync, mkdirSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { execFileSync } from 'node:child_process';
@@ -399,26 +399,34 @@ describe('State Authority V2 Core Correctness', () => {
   });
 
   // H. ACTUAL REPAIR CONSUMER
-  test('§H: ACTUAL REPAIR CONSUMER - execute and ownership', async () => {
+  test('§H: ACTUAL REPAIR CONSUMER - execute and ownership violation', async () => {
+    const branch = 'foresift/task-pkg-repair';
+    fix.g(['checkout', '-b', branch]);
+    fix.writeFile('packages/core/src/service.ts', 'export const a = 1;');
+    fix.commitAll('initial failed commit');
+    const failedHeadSha = fix.g(['rev-parse', 'HEAD']).trim();
+    fix.g(['push', '-u', 'origin', branch]);
+    fix.g(['checkout', 'main']);
+
     let invoked = 0;
     // eslint-disable-next-line @typescript-eslint/no-explicit-any -- mock with all fields
     const req: any = {
       requestId: 'req1',
       engine: 'CODEX',
       incidentId: '1',
-      failedHeadSha: 'sha',
+      failedHeadSha,
       route: 'CODEX_IMPLEMENTATION_REPAIR',
       status: 'PENDING',
       schema: 'foresift/repair-request@1',
-      packageId: '1',
+      packageId: 'pkg-repair',
       prNumber: 1,
-      baseSha: 'base',
-      branch: 'branch',
-      worktreeDir: 'dir',
+      baseSha: failedHeadSha,
+      branch,
+      worktreeDir: null,
       executionProfile: 'CODEX_AGY',
-      failedFiles: [],
-      prChangedFiles: [],
-      allowedWritePaths: [],
+      failedFiles: ['packages/core/src/service.ts'],
+      prChangedFiles: ['packages/core/src/service.ts'],
+      allowedWritePaths: ['packages/**'],
       attemptCount: 1,
       newHeadSha: null,
       createdAt: new Date().toISOString(),
@@ -444,17 +452,20 @@ describe('State Authority V2 Core Correctness', () => {
       log: logSpy,
       executorFn: async () => {
         invoked++;
+        // Write to a test file (ownership violation for CODEX) and commit
+        const testFile = join(req.worktreeDir, 'tests', 'bad.spec.ts');
+        mkdirSync(join(req.worktreeDir, 'tests'), { recursive: true });
+        writeFileSync(testFile, 'test');
+        execFileSync('git', ['add', 'tests/bad.spec.ts'], { cwd: req.worktreeDir });
+        execFileSync(
+          'git',
+          ['-c', 'user.name=t', '-c', 'user.email=t@t', 'commit', '-m', 'bad test commit'],
+          { cwd: req.worktreeDir },
+        );
       },
     });
     expect(invoked).toBe(1);
     expect(req.status).toBe('ENGINE_INVOKED');
-
-    // Track a file so it shows in diff
-    fix.writeFile('tests/bad.spec.ts', 'base');
-    fix.commitAll('base');
-
-    // Simulate unstaged diff with test files for CODEX (which should fail ownership check)
-    fix.writeFile('tests/bad.spec.ts', 'modified');
 
     const res = await advanceRepairRequest({
       request: req,
@@ -465,6 +476,110 @@ describe('State Authority V2 Core Correctness', () => {
     });
     expect(res.action).toBe('failed-ownership');
     expect(req.status).toBe('FAILED');
+  });
+
+  test('§H2: ACTUAL REPAIR CONSUMER - successful full lifecycle', async () => {
+    const branch = 'foresift/task-pkg-good';
+    fix.g(['checkout', '-b', branch]);
+    fix.writeFile('packages/core/src/service.ts', 'export const a = 1;');
+    fix.commitAll('failed commit');
+    const failedHeadSha = fix.g(['rev-parse', 'HEAD']).trim();
+    fix.g(['push', '-u', 'origin', branch]);
+    fix.g(['checkout', 'main']);
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- mock with all fields
+    const req: any = {
+      requestId: 'req2',
+      engine: 'CODEX',
+      incidentId: '2',
+      failedHeadSha,
+      route: 'CODEX_IMPLEMENTATION_REPAIR',
+      status: 'PENDING',
+      schema: 'foresift/repair-request@1',
+      packageId: 'pkg-good',
+      prNumber: 2,
+      baseSha: failedHeadSha,
+      branch,
+      worktreeDir: null,
+      executionProfile: 'CODEX_AGY',
+      failedFiles: ['packages/core/src/service.ts'],
+      prChangedFiles: ['packages/core/src/service.ts'],
+      allowedWritePaths: ['packages/**'],
+      attemptCount: 1,
+      newHeadSha: null,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
+    persistRepairRequest(stateDir, req);
+
+    // PENDING -> WORKTREE_READY
+    let res = await advanceRepairRequest({
+      request: req,
+      stateDir,
+      repoDir: fix.root,
+      log: logSpy,
+    });
+    expect(res.action).toBe('prepared-worktree');
+    expect(req.status).toBe('WORKTREE_READY');
+
+    // WORKTREE_READY -> ENGINE_INVOKED
+    res = await advanceRepairRequest({
+      request: req,
+      stateDir,
+      repoDir: fix.root,
+      log: logSpy,
+      executorFn: async () => {
+        writeFileSync(join(req.worktreeDir, 'packages/core/src/service.ts'), 'export const a = 2;');
+        execFileSync('git', ['add', 'packages/core/src/service.ts'], { cwd: req.worktreeDir });
+        execFileSync(
+          'git',
+          ['-c', 'user.name=t', '-c', 'user.email=t@t', 'commit', '-m', 'fix(core): valid fix'],
+          { cwd: req.worktreeDir },
+        );
+      },
+    });
+    expect(res.action).toBe('invoked-engine');
+    expect(req.status).toBe('ENGINE_INVOKED');
+
+    // ENGINE_INVOKED -> OWNERSHIP_VERIFIED
+    res = await advanceRepairRequest({
+      request: req,
+      stateDir,
+      repoDir: fix.root,
+      log: logSpy,
+    });
+    expect(res.action).toBe('verified-ownership');
+    expect(req.status).toBe('OWNERSHIP_VERIFIED');
+
+    // OWNERSHIP_VERIFIED -> COMMITTED
+    res = await advanceRepairRequest({
+      request: req,
+      stateDir,
+      repoDir: fix.root,
+      log: logSpy,
+    });
+    expect(res.action).toBe('committed');
+    expect(req.status).toBe('COMMITTED');
+
+    // COMMITTED -> PUSHED
+    res = await advanceRepairRequest({
+      request: req,
+      stateDir,
+      repoDir: fix.root,
+      log: logSpy,
+    });
+    expect(res.action).toBe('pushed');
+    expect(req.status).toBe('PUSHED');
+
+    // PUSHED -> COMPLETE
+    res = await advanceRepairRequest({
+      request: req,
+      stateDir,
+      repoDir: fix.root,
+      log: logSpy,
+    });
+    expect(res.action).toBe('completed');
+    expect(req.status).toBe('COMPLETE');
   });
 
   // I. DEEP STATE CLASSIFIER

@@ -33,9 +33,9 @@
 //   node scripts/automation/foresift-autopilot.mjs --seed-package-planning <id> \
 //        --from <source-tree-root>
 //                                                              # operator/maintenance form of the planned-handoff
-//                                                              # promotion: copies ONE package's scoped planning
+//                                                              # promotion: snapshots ONE package's scoped planning
 //                                                              # artifacts (specs/<id>/** only) from a run worktree
-//                                                              # into main as a control-plane chore. Idempotent;
+//                                                              # into a protected control-plane PR. Idempotent;
 //                                                              # fail-closed; no AI. Stop the service unit first.
 //   node scripts/automation/foresift-autopilot.mjs --restart-package <id> \
 //        --fresh-generation [--reason "<text>"] [--salvage-manifest <f>]
@@ -69,6 +69,7 @@ import {
   loadCurrentMilestone,
   validateRoadmap,
   validateMilestoneState,
+  ALLOWED_STATUS_TRANSITIONS,
   findPackage,
   packageEligible,
   canStartPackage,
@@ -82,6 +83,7 @@ import {
   packageGeneration,
   generationBranch,
   generationMessage,
+  isSupportedNextGeneration,
   parseGenerationMessage,
   usesOptimizedWorkflow,
   workPackageWorkflowFor,
@@ -111,6 +113,7 @@ import {
   reconcileLaunchIntentsOnStartup,
   discoverPendingLaunchIntents,
 } from './launch-intent.mjs';
+import { advanceRepairRequest, discoverPendingRepairRequests } from './ci-repair-executor.mjs';
 
 // Overridable for hermetic selftests (sandboxed fixture repo + state dir).
 const REPO = process.env.FORESIFT_AUTOPILOT_REPO ?? join(import.meta.dirname, '..', '..');
@@ -369,38 +372,28 @@ function requestMilestoneStateTransition(
   message,
   { packageId = null, fromStatus = null, toStatus = null } = {},
 ) {
+  // Snapshot before enqueue: callers continue mutating milestone state while
+  // the serialized Git queue waits, so the closure must contain immutable data.
+  const desiredContent = serializeMilestoneState(ms);
+  const transitionMeta = { packageId, fromStatus, toStatus, message };
   enqueue(async () => {
-    // Serialize desired state deterministically (in-memory only — no disk write)
-    const desiredContent = serializeMilestoneState(ms);
     const fileChanges = [
       { path: 'specs/implementation/current-milestone.json', content: desiredContent },
     ];
 
     // Progress state transition as far as possible without blocking (returns on WAITING_CI, DONE, or error)
-    let currentReceipt = null;
-    let result = null;
-    for (let i = 0; i < 10; i++) {
-      result = advanceStateTransition({
-        receipt: currentReceipt,
-        fileChanges,
-        message,
-        stateDir: STATE_DIR,
-        repoDir: REPO,
-        packageId,
-        fromStatus,
-        toStatus,
-        log: (msg) => log(msg),
-      });
-      currentReceipt = result.receipt || currentReceipt;
-      if (
-        !result.ok ||
-        result.step === 'DONE' ||
-        result.step === 'WAITING_CI' ||
-        result.step === 'PR_PENDING'
-      ) {
-        break;
-      }
-    }
+    const result = advanceStateTransition({
+      receipt: null,
+      fileChanges,
+      message: transitionMeta.message,
+      stateDir: STATE_DIR,
+      repoDir: REPO,
+      packageId: transitionMeta.packageId,
+      fromStatus: transitionMeta.fromStatus,
+      toStatus: transitionMeta.toStatus,
+      initializeOnly: true,
+      log: (msg) => log(msg),
+    });
 
     if (result?.ok && result.step === 'DONE') {
       log(`state landing complete: ${result.receipt?.transitionId} → ${result.receipt?.mergedSha}`);
@@ -433,31 +426,17 @@ function advanceStateLandings() {
       content: f.content,
     }));
 
-    let currentReceipt = receipt;
-    let result = null;
-    for (let i = 0; i < 10; i++) {
-      result = advanceStateTransition({
-        receipt: currentReceipt,
-        fileChanges,
-        message:
-          currentReceipt.commitMessage || `chore: state transition ${currentReceipt.transitionId}`,
-        stateDir: STATE_DIR,
-        repoDir: REPO,
-        packageId: currentReceipt.packageId,
-        fromStatus: currentReceipt.fromStatus,
-        toStatus: currentReceipt.toStatus,
-        log: (msg) => log(msg),
-      });
-      currentReceipt = result.receipt || currentReceipt;
-      if (
-        !result.ok ||
-        result.step === 'DONE' ||
-        result.step === 'WAITING_CI' ||
-        result.step === 'PR_PENDING'
-      ) {
-        break;
-      }
-    }
+    const result = advanceStateTransition({
+      receipt,
+      fileChanges,
+      message: receipt.commitMessage || `chore: state transition ${receipt.transitionId}`,
+      stateDir: STATE_DIR,
+      repoDir: REPO,
+      packageId: receipt.packageId,
+      fromStatus: receipt.fromStatus,
+      toStatus: receipt.toStatus,
+      log: (msg) => log(msg),
+    });
 
     if (result?.ok && result.step === 'DONE') {
       log(`state landing complete: ${receipt.transitionId} → ${result.receipt?.mergedSha}`);
@@ -466,6 +445,19 @@ function advanceStateLandings() {
       if (!sh('git merge --ff-only origin/main').ok)
         log('WARN: could not fast-forward after state landing');
     }
+  }
+}
+
+/** Advance each durable CI repair request by exactly one bounded fact transition. */
+async function advanceCiRepairs() {
+  for (const { request } of discoverPendingRepairRequests(STATE_DIR)) {
+    const result = await advanceRepairRequest({
+      request,
+      stateDir: STATE_DIR,
+      repoDir: REPO,
+      log: (msg) => log(msg),
+    });
+    log(`CI repair ${request.requestId}: ${result.action} (${request.status})`);
   }
 }
 
@@ -542,8 +534,15 @@ function persistMilestoneState(ms, message) {
 function setPackageStatus(ms, packageId, status) {
   const pkg = findPackage(ms, packageId);
   if (!pkg || pkg.status === status) return false;
+  const oldStatus = pkg.status;
+  if (!ALLOWED_STATUS_TRANSITIONS.has(`${oldStatus}->${status}`))
+    throw new Error(`disallowed package status transition: ${packageId} ${oldStatus}->${status}`);
   pkg.status = status;
-  persistMilestoneState(ms, `chore(autopilot): ${ms.milestoneId}/${packageId} -> ${status}`);
+  requestMilestoneStateTransition(
+    ms,
+    `chore(autopilot): ${ms.milestoneId}/${packageId} -> ${status}`,
+    { packageId, fromStatus: oldStatus, toStatus: status },
+  );
   return true;
 }
 
@@ -925,78 +924,88 @@ function planCompleteAtRoot(root, packageId) {
 }
 
 /**
- * Promote a bootstrap run's scoped planning artifacts (specs/<pkg>/** only —
- * NEVER implementation code) from its run worktree into main as a control-
- * plane chore. Idempotent: identical content short-circuits to no-op; the
- * commit exists locally before push is attempted and a failed push retries
- * next tick. Fail-closed: refuses when the REPO side of specs/<pkg> is dirty
- * (would stomp uncommitted state) or when post-copy validation against MAIN's
- * own milestone view fails (rolls the copy back first).
+ * Submit a bootstrap run's scoped planning artifacts (specs/<pkg>/** only —
+ * NEVER implementation code) through the protected control-plane PR lane.
+ * Source content is snapshotted in memory; the canonical checkout is never
+ * mutated. Idempotent receipts and the normal exact-head CI/merge state
+ * machine carry the snapshot to origin/main over later supervisor ticks.
  *
  * The wave's fresh-at-main worktree can only see planning truth that reached
- * ORIGIN main, so a push failure blocks the relaunch (the handoff retries
- * with the tracked entry still in place) instead of launching a wave whose
- * prep would deterministically crash on missing tasks.md.
+ * origin/main, so a pending or failed protected landing blocks continuation
+ * with the tracked entry still in place.
  */
 function promotePackagePlanningArtifacts(packageId, fromRoot) {
   const specDir = join('specs', packageId);
   const qRepo = JSON.stringify(REPO);
-  // Refuse to stomp uncommitted state under the target path.
-  const dirty = sh(`git -C ${qRepo} status --porcelain -- ${JSON.stringify(specDir)}`);
-  if (!dirty.ok || dirty.out.trim())
-    return {
-      ok: false,
-      refused: `main checkout has uncommitted changes under ${specDir} — reconcile first`,
-    };
+  const fetched = sh(`git -C ${qRepo} fetch origin main --quiet`);
+  if (!fetched.ok)
+    return { ok: false, refused: 'could not fetch origin/main for planning handoff' };
+  const clean = sh(`git -C ${qRepo} status --porcelain -- ${JSON.stringify(specDir)}`);
+  const matchesOrigin = sh(
+    `git -C ${qRepo} diff --quiet origin/main -- ${JSON.stringify(specDir)}`,
+  );
+  if (
+    clean.ok &&
+    !clean.out.trim() &&
+    matchesOrigin.ok &&
+    planCompleteAtRoot(REPO, packageId).complete
+  )
+    return { ok: true, promoted: false, detail: 'already current on main' };
   if (!fromRoot || !existsSync(join(fromRoot, specDir)))
     return { ok: false, refused: `source worktree lacks ${specDir}` };
 
-  // Copy specs/<pkg>/** from the worktree into the main checkout.
-  const mkdir = sh(`mkdir -p ${JSON.stringify(join(REPO, specDir))}`);
-  if (!mkdir.ok) return { ok: false, refused: 'mkdir for specs copy failed' };
-  // NOTE: path.join would normalize away a trailing '/.', silently turning
-  // "copy contents" into "nest the directory"; concatenate it explicitly.
-  const cp = sh(
-    `cp -a ${JSON.stringify(`${join(fromRoot, specDir)}/.`)} ${JSON.stringify(join(REPO, specDir))}`,
-  );
-  if (!cp.ok) return { ok: false, refused: 'specs copy failed' };
-
-  // Validate against MAIN's milestone view BEFORE committing; roll back on any
-  // refusal so main never carries half-promoted truth.
-  const check = planCompleteAtRoot(REPO, packageId);
+  const check = planCompleteAtRoot(fromRoot, packageId);
   if (!check.complete) {
-    sh(`git -C ${qRepo} checkout -- ${JSON.stringify(specDir)}`);
-    // Remove files the copy ADDED (untracked after restore).
-    sh(`git -C ${qRepo} clean -fd -- ${JSON.stringify(specDir + '/')}`);
     return {
       ok: false,
-      refused: `post-copy validation against main failed: ${
+      refused: `source planning validation failed: ${
         check.detail ??
         (check.verdict ? String(check.verdict).slice(0, 300) : 'validator unavailable')
       }`,
     };
   }
 
-  const staged = sh(`git -C ${qRepo} add ${JSON.stringify(specDir)}`);
-  if (!staged.ok) return { ok: false, refused: 'git add failed' };
-  const nothing = sh(`git -C ${qRepo} diff --cached --quiet`);
-  if (nothing.ok) return { ok: true, promoted: false, detail: 'already current on main' };
-  const msg = `chore(autopilot): seed ${packageId} planning artifacts (planned-handoff)`;
-  const commit = sh(`git -C ${qRepo} commit -m ${JSON.stringify(msg)} -q`);
-  if (!commit.ok) {
-    sh(`git -C ${qRepo} reset -q`);
-    return { ok: false, refused: 'planning-artifact chore commit failed' };
+  const sourceDir = join(fromRoot, specDir);
+  const fileChanges = [];
+  const collect = (dir, prefix) => {
+    for (const item of readdirSync(dir, { withFileTypes: true })) {
+      if (item.isSymbolicLink())
+        throw new Error(`planning handoff refuses symbolic link: ${join(prefix, item.name)}`);
+      const absolute = join(dir, item.name);
+      const relativePath = join(prefix, item.name);
+      if (item.isDirectory()) collect(absolute, relativePath);
+      else if (item.isFile())
+        fileChanges.push({ path: relativePath, content: readFileSync(absolute, 'utf8') });
+    }
+  };
+  try {
+    collect(sourceDir, specDir);
+  } catch (error) {
+    return { ok: false, refused: error.message };
   }
-  const sha = sh(`git -C ${qRepo} rev-parse HEAD`).out.trim();
-  const push = sh(`git -C ${qRepo} push origin main --quiet`);
-  if (!push.ok)
-    return {
-      ok: false,
-      pushFailed: true,
-      commit: sha,
-      refused: 'push of planning chore failed (retries next tick)',
-    };
-  return { ok: true, promoted: true, commit: sha };
+  fileChanges.sort((a, b) => a.path.localeCompare(b.path));
+  if (fileChanges.length === 0) return { ok: false, refused: 'source planning directory is empty' };
+
+  const msg = `chore(autopilot): seed ${packageId} planning artifacts (planned-handoff)`;
+  const immutableChanges = fileChanges.map((file) => ({ ...file }));
+  enqueue(async () => {
+    const result = advanceStateTransition({
+      receipt: null,
+      fileChanges: immutableChanges,
+      message: msg,
+      stateDir: STATE_DIR,
+      repoDir: REPO,
+      packageId,
+      initializeOnly: true,
+      log: (message) => log(message),
+    });
+    if (!result.ok) log(`WARN: planning handoff request failed: ${result.reason}`);
+  });
+  return {
+    ok: false,
+    pending: true,
+    refused: 'protected planning PR requested; waiting for exact-head CI and merge',
+  };
 }
 
 /**
@@ -1047,7 +1056,7 @@ function planningBootstrapHandoff(st, entry, get) {
     return false;
   }
 
-  // 2. Promote scoped planning artifacts to main (control-plane chore).
+  // 2. Submit scoped planning artifacts through the protected PR lane.
   const promo = promotePackagePlanningArtifacts(packageId, wtPath);
   if (!promo.ok) {
     record(
@@ -1060,11 +1069,10 @@ function planningBootstrapHandoff(st, entry, get) {
         commit: promo.commit ?? null,
       },
     );
-    // Push failures retry verbatim next tick; refusals go through ordinary
-    // recovery (bounded resumes → operator-gated fatal) — both keep the
-    // package RUNNING and never fabricate completion.
-    if (!promo.pushFailed) attemptResume(st, entry, `planning handoff refused: ${promo.refused}`);
-    else saveState(st);
+    // Pending receipts retry through the state-landing outbox. Source
+    // refusals use ordinary recovery. Both keep the package RUNNING.
+    if (promo.pending) saveState(st);
+    else attemptResume(st, entry, `planning handoff refused: ${promo.refused}`);
     return false;
   }
 
@@ -1431,7 +1439,14 @@ async function actOnPendingAction(st, entry) {
         // Durable Archon association established — only NOW may the package
         // move PENDING→RUNNING. Until this point the package was never RUNNING.
         const pendingIntents = discoverPendingLaunchIntents(STATE_DIR);
-        const matched = pendingIntents.find((i) => i.packageId === entry.packageId);
+        const entryGeneration = parseGenerationMessage(entry.message ?? '')?.generation ?? 0;
+        const matched = pendingIntents.find(
+          (i) =>
+            i.packageId === entry.packageId &&
+            i.generation === entryGeneration &&
+            i.workflow === entry.workflow &&
+            i.branch === entry.branch,
+        );
         if (matched) {
           associateRunIdWithIntent(STATE_DIR, matched.intentId, id);
         }
@@ -2229,6 +2244,7 @@ async function tick(st) {
   // first; a failed pull still resolves here and downstream paths keep their
   // existing fail-closed behavior on the stale view.
   await commitQueue.catch(() => {});
+  await advanceCiRepairs();
   // Drive any pending state transitions forward one step each (non-blocking).
   // This replaces the old blocking landStateViaPR() polling loop.
   advanceStateLandings();
@@ -2971,15 +2987,39 @@ async function cmdRestartPackage(packageId, opts = {}) {
   // setPackageStatus alone would short-circuit when the package is ALREADY
   // PENDING (the common restart case) and silently drop the generation bump,
   // so the unconditional writer backs it up.
-  pkg.generation = toGeneration;
-  if (!setPackageStatus(ms, packageId, 'PENDING'))
-    persistMilestoneState(
-      ms,
-      `chore(autopilot): ${ms.milestoneId}/${packageId} -> generation ${toGeneration} (fresh restart)`,
+  const transitionFrom = intent.fromGeneration;
+  if (!isSupportedNextGeneration(transitionFrom, toGeneration))
+    return failRestartUsage(
+      `unsupported generation transition ${transitionFrom}->${toGeneration}; only one deterministic next-generation bump is supported`,
     );
-  await new Promise((res) => {
-    commitQueue = commitQueue.then(res, res);
-  });
+  const generationAlreadyPersisted =
+    toGeneration === fromGeneration && transitionFrom === fromGeneration - 1;
+  if (!generationAlreadyPersisted) {
+    pkg.generation = toGeneration;
+    if (!setPackageStatus(ms, packageId, 'PENDING'))
+      persistMilestoneState(
+        ms,
+        `chore(autopilot): ${ms.milestoneId}/${packageId} -> generation ${toGeneration} (fresh restart)`,
+      );
+    await new Promise((res) => {
+      commitQueue = commitQueue.then(res, res);
+    });
+    saveState(st);
+    console.log(
+      JSON.stringify(
+        {
+          schema: 'foresift/restart-pending@1',
+          packageId,
+          fromGeneration: transitionFrom,
+          toGeneration,
+          status: 'WAITING_FOR_PROTECTED_STATE_MERGE',
+        },
+        null,
+        2,
+      ),
+    );
+    return 0;
+  }
 
   // Seed the generation branch from salvaged product work (override §11–15).
   let salvageSeed = null;
@@ -3001,7 +3041,6 @@ async function cmdRestartPackage(packageId, opts = {}) {
   // Receipt (atomic) — includes salvage provenance when a manifest was given.
   // A Case-C resume records the ORIGINAL interrupted transition (intent
   // origin → persisted generation), which is the restart this paperwork backs.
-  const transitionFrom = intent ? intent.fromGeneration : fromGeneration;
   const receipt = {
     schema: RESTART_RECEIPT_SCHEMA,
     packageId,
@@ -3133,9 +3172,9 @@ async function main() {
     process.exit(await cmdFinalizeFromMain(positional[0] ?? null, { operatorCiBypassReason }));
   }
   if (argv.includes('--seed-package-planning')) {
-    // Operator/maintenance form of the handoff promotion step: copy ONE
+    // Operator/maintenance form of the handoff promotion step: snapshot ONE
     // package's scoped planning artifacts from an explicit source tree into
-    // main as a control-plane chore. Same deterministic code path the
+    // a protected control-plane PR. Same deterministic code path the
     // supervisor's planningBootstrapHandoff uses internally.
     const fromIdx = argv.indexOf('--from');
     const positional = argv.filter((a) => !a.startsWith('--'));
@@ -3146,8 +3185,9 @@ async function main() {
       process.exit(2);
     }
     const res = promotePackagePlanningArtifacts(positional[0], argv[fromIdx + 1]);
+    await commitQueue.catch(() => {});
     console.log(JSON.stringify(res, null, 2));
-    process.exit(res.ok ? 0 : 1);
+    process.exit(res.ok || res.pending ? 0 : 1);
   }
   if (argv.includes('--restart-package')) {
     if (!argv.includes('--fresh-generation'))

@@ -121,6 +121,9 @@ export function verifyMergeAuthoritatively(opts: {
   pinnedHead: string | null;
   fileChanges: StateFileChange[];
   repoDir: string;
+  repo?: string;
+  authorizedCheckName: string;
+  authorizedAppId: number;
   ghFn?: GhFn;
   gitFn?: GitFn;
 }): { ok: boolean; mergeCommitSha?: string; originMainSha?: string; reason?: string };
@@ -146,6 +149,7 @@ export function advanceStateTransition(opts: {
   repo?: string;
   checkName?: string;
   requiredAppId?: number;
+  initializeOnly?: boolean;
   ghFn?: GhFn;
   gitFn?: GitFn;
   log?: (msg: string) => void;

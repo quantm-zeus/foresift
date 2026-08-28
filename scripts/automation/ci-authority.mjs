@@ -9,24 +9,10 @@ export const DEFAULT_REQUIRED_APP_ID = 15368; // GitHub Actions
 export const DEFAULT_REPO = 'quantm-zeus/foresift';
 
 /**
- * Deterministic whitelist of files that autopilot is permitted to commit directly to main.
- * Product code, tests, configs, workflows, and root dependencies are strictly prohibited.
+ * Files eligible for the reduced STATE_ONLY CI classifier. This is not a
+ * direct-write allowance; all supervisor changes still land through PRs.
  */
 export const STATE_ONLY_WHITELIST = [/^specs\/implementation\/current-milestone\.json$/];
-
-export function validateDirectMainPushWhitelist(files = []) {
-  const violations = files.filter(
-    (file) => !STATE_ONLY_WHITELIST.some((pattern) => pattern.test(file.trim())),
-  );
-  if (violations.length > 0) {
-    return {
-      allowed: false,
-      violations,
-      reason: `Direct main mutation attempted with non-state files: ${violations.join(', ')}`,
-    };
-  }
-  return { allowed: true, violations: [] };
-}
 
 function defaultGh(args, { cwd } = {}) {
   try {

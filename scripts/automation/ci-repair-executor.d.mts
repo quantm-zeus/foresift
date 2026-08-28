@@ -12,6 +12,7 @@ export declare const MAX_FORMAT_FILES: number;
 export interface FormatRepairResult {
   ok: boolean;
   reason?: string;
+  requestId?: string;
   newHead: string | null;
 }
 
@@ -57,6 +58,8 @@ export function incrementRepairAttempts(filePath: string): number;
  */
 export function executeFormatRepair(opts: {
   failedFiles: string[];
+  classification?: unknown;
+  failureSummary?: string | null;
   prChangedFiles?: string[];
   worktreeDir: string;
   branch: string;
@@ -75,7 +78,8 @@ export function executeInfraRetry(opts: { attempt: number; maxRetries?: number }
  *
  * FORMAT → deterministic prettier, zero AI, scope-verified before commit
  * INFRA → bounded backoff retry, zero AI
- * CODEX/AGY/SPEC → emit routeInstruction, do NOT call AI
+ * CODEX/AGY → persist a durable request for the existing supervisor consumer
+ * SPEC → escalate without invoking a repair writer
  * ESCALATE → after budget exhaustion
  */
 export function executeCiRepair(opts?: {
@@ -91,6 +95,7 @@ export function executeCiRepair(opts?: {
   branch?: string;
   worktreeDir?: string;
   executionProfile?: string;
+  stateDir?: string;
   log?: (msg: string) => void;
 }): CiRepairResult;
 
@@ -114,6 +119,7 @@ export interface RepairRequest {
   status:
     | 'PENDING'
     | 'WORKTREE_READY'
+    | 'ENGINE_INVOCATION_STARTED'
     | 'ENGINE_INVOKED'
     | 'OWNERSHIP_VERIFIED'
     | 'COMMITTED'
@@ -121,6 +127,7 @@ export interface RepairRequest {
     | 'COMPLETE'
     | 'FAILED';
   newHeadSha: string | null;
+  engineResult?: unknown;
   failureReason?: string;
   createdAt: string;
   updatedAt?: string;

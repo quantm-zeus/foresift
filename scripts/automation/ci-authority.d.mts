@@ -3,12 +3,6 @@ export const DEFAULT_REQUIRED_APP_ID: number;
 export const DEFAULT_REPO: string;
 export const STATE_ONLY_WHITELIST: readonly RegExp[];
 
-export interface WhitelistValidationResult {
-  allowed: boolean;
-  reason?: string;
-  violations?: string[];
-}
-
 export interface CiCheckRun {
   name: string;
   status: string;
@@ -96,8 +90,6 @@ export interface CiIncidentRecord {
   capsule: CiIncidentCapsule;
   deduplicated: boolean;
 }
-
-export function validateDirectMainPushWhitelist(files?: string[]): WhitelistValidationResult;
 
 export function getExactHeadCiStatus(opts?: {
   sha?: string | null;

@@ -30,6 +30,7 @@ export interface WorkPackage {
   writeScopes: string[];
   verificationCommands: string[];
   status: string;
+  generation?: number;
 }
 
 export interface MilestoneState {

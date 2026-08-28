@@ -41,7 +41,7 @@ export function associateRunIdWithIntent(
 export function markIntentComplete(
   stateDir: string,
   intentId: string,
-  mergedSha?: string | null,
+  opts?: { milestoneState?: Record<string, unknown> | null; mergedSha?: string | null },
 ): LaunchIntent | null;
 
 export function discoverPendingLaunchIntents(stateDir: string): LaunchIntent[];

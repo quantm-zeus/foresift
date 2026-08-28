@@ -15,6 +15,7 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
 import { ALLOWED_STATUS_TRANSITIONS } from './schema.mjs';
+import { isSupportedNextGeneration } from './package-generations.mjs';
 
 function sh(args, { cwd } = {}) {
   try {
@@ -107,10 +108,10 @@ export function compareMilestoneJsonSemantic(before, after) {
       const pkgBefore = before.packages[idx];
       const pkgAfter = after.packages[idx];
 
-      if (typeof pkgAfter.generation !== 'number' && pkgAfter.generation !== undefined) {
+      if (!isSupportedNextGeneration(pkgBefore.generation, pkgAfter.generation)) {
         return {
           ok: false,
-          reason: `package '${pkgBefore?.id || idx}' invalid generation '${pkgAfter.generation}'`,
+          reason: `package '${pkgBefore?.id || idx}' unsupported generation transition '${pkgBefore.generation ?? 0}->${pkgAfter.generation}'`,
         };
       }
       changes.push({

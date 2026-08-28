@@ -114,13 +114,15 @@ export function runFinalLand(a, deps = {}) {
         [FULL_GATE_TOOL, '--run', '--package', packageId, '--artifacts-dir', artifactsDir],
         { encoding: 'utf8' },
       ),
-    lander = ({ branch, title, bodyFile, deadlineS }) =>
+    lander = ({ packageId, branch, title, bodyFile, deadlineS }) =>
       spawnSync(
         process.execPath,
         [
           LANDER_TOOL,
           '--branch',
           branch,
+          '--package',
+          packageId,
           '--title',
           title,
           '--body-file',
@@ -213,7 +215,13 @@ export function runFinalLand(a, deps = {}) {
   }
 
   // ── 3. mechanical lander (push → CI wait at pinned head → squash-merge) ────
-  const res = lander({ branch: a.branch, title, bodyFile, deadlineS: a.deadlineS });
+  const res = lander({
+    packageId: a.package,
+    branch: a.branch,
+    title,
+    bodyFile,
+    deadlineS: a.deadlineS,
+  });
   const out = String(res.stdout ?? '');
   // Mirror the lander transcript into our log stream for artifact capture.
   if (out.trim()) console.log(out.trimEnd());

@@ -8,8 +8,8 @@ export const CODEX_SERVICE_TIER = 'standard';
 export const CODEX_CLI_SERVICE_TIER = 'default';
 export const MAX_CODEX_WRITERS = 3;
 export const CODEX_MODELS = Object.freeze({
-  LOW: 'gpt-5.6-luna',
-  MEDIUM: 'gpt-5.6-terra',
+  LOW: 'gpt-5.6-sol',
+  MEDIUM: 'gpt-5.6-sol',
   HIGH: 'gpt-5.6-sol',
 });
 
@@ -67,23 +67,11 @@ export function classifyCodexLane(input = {}) {
 
 export function routeCodexLane(input = {}, availability = Object.values(CODEX_MODELS)) {
   const classification = classifyCodexLane(input);
-  const model = CODEX_MODELS[classification.complexityTier];
+  const model = CODEX_MODELS[classification.complexityTier] ?? 'gpt-5.6-sol';
   const availabilityList = availability?.availableModels ?? availability;
   const available = availabilityList instanceof Set ? availabilityList : new Set(availabilityList);
-  if (!available.has(model))
-    throw new Error(
-      `${classification.complexityTier === 'HIGH' ? 'REQUIRED_HIGH_MODEL_UNAVAILABLE' : 'CODEX_MODEL_UNAVAILABLE'}: ${model}`,
-    );
-  const reasoning =
-    classification.complexityTier === 'LOW'
-      ? 'low'
-      : classification.complexityTier === 'MEDIUM'
-        ? 'medium'
-        : classification.routingReasons.some((r) =>
-              /CRITICAL|cryptography|tenant isolation/.test(r),
-            )
-          ? 'xhigh'
-          : 'high';
+  if (!available.has(model)) throw new Error(`REQUIRED_HIGH_MODEL_UNAVAILABLE: ${model}`);
+  const reasoning = 'medium';
   return {
     lane: input.lane ?? 'core',
     taskIds: [...(input.taskIds ?? (input.units ?? []).map((u) => u.id).filter(Boolean))],
@@ -101,6 +89,8 @@ export function retryCodexRoute(route) {
   return {
     ...route,
     attempt: (route.attempt ?? 1) + 1,
+    model: 'gpt-5.6-sol',
+    reasoning: 'medium',
     serviceTier: CODEX_SERVICE_TIER,
     cliServiceTier: CODEX_CLI_SERVICE_TIER,
   };
@@ -108,16 +98,15 @@ export function retryCodexRoute(route) {
 
 export function escalateCodexRoute(route, availability = Object.values(CODEX_MODELS)) {
   const next = route.complexityTier === 'LOW' ? 'MEDIUM' : 'HIGH';
-  const model = CODEX_MODELS[next];
-  if (!(availability instanceof Set ? availability : new Set(availability)).has(model))
-    throw new Error(
-      `${next === 'HIGH' ? 'REQUIRED_HIGH_MODEL_UNAVAILABLE' : 'CODEX_MODEL_UNAVAILABLE'}: ${model}`,
-    );
+  const model = CODEX_MODELS[next] ?? 'gpt-5.6-sol';
+  const availabilityList = availability?.availableModels ?? availability;
+  const available = availabilityList instanceof Set ? availabilityList : new Set(availabilityList);
+  if (!available.has(model)) throw new Error(`REQUIRED_HIGH_MODEL_UNAVAILABLE: ${model}`);
   return {
     ...route,
     complexityTier: next,
     model,
-    reasoning: next === 'MEDIUM' ? 'medium' : 'high',
+    reasoning: 'medium',
     serviceTier: CODEX_SERVICE_TIER,
     cliServiceTier: CODEX_CLI_SERVICE_TIER,
     escalation: (route.escalation ?? 0) + 1,

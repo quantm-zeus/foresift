@@ -102,7 +102,7 @@ export type ReserveBucket = z.infer<typeof ReserveBucketSchema>;
 
 export const PaidProviderPolicySchema = z
   .object({
-    policyId: z.string().regex(/^sha256:[0-9a-f]{64}$/),
+    policyId: z.string().min(1),
     providerId: z.string().min(1),
     budgetUnits: z.number().positive(),
     budgetCurrencyOrModel: z.string().min(1).optional(),

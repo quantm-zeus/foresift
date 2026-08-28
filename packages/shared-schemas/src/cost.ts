@@ -117,7 +117,7 @@ export const PaidProviderPolicySchema = z
       .nullable(),
   })
   .strict()
-  .refine((v) => v.activatedAt === null || v.reAuthDueAt > v.activatedAt, {
+  .refine((v) => v.activatedAt === null || Date.parse(v.reAuthDueAt) > Date.parse(v.activatedAt), {
     message: 'reAuthDueAt must follow activatedAt',
   });
 export type PaidProviderPolicy = z.infer<typeof PaidProviderPolicySchema>;

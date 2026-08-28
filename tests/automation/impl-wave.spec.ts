@@ -777,3 +777,106 @@ describe('wave routing AGY test lane persistence', () => {
     expect(testLaneClaude.providerTimeout).toBe('40m');
   });
 });
+
+// ── central migration registry duty (fail-closed, pre-writer cost) ───────────
+// The central suite packages/persistence/test/migrator.spec.ts asserts EXACTLY
+// the full G0 migration script set. A package predicting NEW migration scripts
+// must name it as a plan-sanctioned scope exception; when the duty is missing
+// the wave guard legally refuses every repair and the run exhausts its bounded
+// repair budget deterministically (observed live 2026-08-28, g0-cost-capacity).
+describe('central migration registry duty enforcement', () => {
+  function buildScratchRepo(tasksMd: string): string {
+    const root = mkdtempSync(join(tmpdir(), 'mig-duty-fx-'));
+    mkdirSync(join(root, 'specs', 'pkg-m'), { recursive: true });
+    mkdirSync(join(root, 'specs', 'implementation'), { recursive: true });
+    writeFileSync(join(root, 'specs', 'pkg-m', 'tasks.md'), tasksMd);
+    const ms = {
+      schemaVersion: '1.0.0',
+      milestoneId: 'MM',
+      status: 'ACTIVE',
+      packages: [
+        {
+          id: 'pkg-m',
+          objective: 'Deliver a new migration family with full registry convergence.',
+          requirementIds: ['FR-M-001'],
+          dependencies: [],
+          risk: 'MEDIUM',
+          parallelizable: false,
+          writeScopes: ['packages/m/**', 'migrations/g0_m_*.sql', 'tests/acceptance/**'],
+          verificationCommands: ['pnpm test'],
+          status: 'RUNNING',
+        },
+        {
+          id: 'pkg-m-b',
+          objective: 'Inert companion package required by the 2-8 package decomposition rule.',
+          requirementIds: ['FR-M-002'],
+          dependencies: ['pkg-m'],
+          risk: 'LOW',
+          parallelizable: true,
+          writeScopes: ['packages/mb/**'],
+          verificationCommands: ['pnpm test'],
+          status: 'PENDING',
+        },
+      ],
+    };
+    writeFileSync(
+      join(root, 'specs', 'implementation', 'current-milestone.json'),
+      JSON.stringify(ms),
+    );
+    sh('git init -q', root);
+    sh('git config user.email t@t', root);
+    sh('git config user.name t', root);
+    sh('git add -A', root);
+    sh('git commit -qm base', root);
+    return root;
+  }
+
+  const MIGRATION_TASKS_BODY = `
+- [ ] T201 Write \`migrations/g0_m_0001_ledgers.sql\` — new family scripts. Traces: FR-M-001.
+`;
+
+  it('refuses at graph build when new migration scripts never name the central suite', () => {
+    const root = buildScratchRepo(`# Tasks: pkg-m\n${MIGRATION_TASKS_BODY}`);
+    try {
+      const r = spawnSync(
+        process.execPath,
+        [GRAPH, '--package', 'pkg-m', '--root', root, '--plan-shards', '2'],
+        { encoding: 'utf8' },
+      );
+      expect(r.status).not.toBe(0);
+      expect(`${r.stderr ?? ''}`).toContain('CENTRAL_MIGRATION_SUITE_UNREFERENCED');
+      expect(`${r.stderr ?? ''}`).toContain('packages/persistence/test/migrator.spec.ts');
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  it('builds and records the plan-sanctioned exception when the central suite is named', () => {
+    const root = buildScratchRepo(
+      `# Tasks: pkg-m\n${MIGRATION_TASKS_BODY}
+- [ ] T202 Extend the central registry \`packages/persistence/test/migrator.spec.ts\`
+      expected G0 script list with the new family in lexicographic position.
+      Traces: FR-M-001.
+`,
+    );
+    const artifacts = mkdtempSync(join(tmpdir(), 'mig-duty-art-'));
+    try {
+      const graphPath = join(artifacts, 'task-graph.json');
+      const r = spawnSync(
+        process.execPath,
+        [GRAPH, '--package', 'pkg-m', '--root', root, '--plan-shards', '2', '--out', graphPath],
+        { encoding: 'utf8' },
+      );
+      expect(r.status).toBe(0);
+      const g = JSON.parse(readFileSync(graphPath, 'utf8'));
+      expect(g.scopeExceptions).toContain('packages/persistence/test/migrator.spec.ts');
+      // The central-suite unit is demoted into the serial core lane, whose
+      // allowedWritePaths carry the exception path.
+      const core = g.shards.find((s: { id: string }) => s.id === 'core');
+      expect(core.allowedWritePaths).toContain('packages/persistence/test/migrator.spec.ts');
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+      rmSync(artifacts, { recursive: true, force: true });
+    }
+  });
+});

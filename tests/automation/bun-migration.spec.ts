@@ -1134,3 +1134,88 @@ describe('Contract 10: Node 24 runtime compatibility gate', () => {
     }
   });
 });
+
+// ── Contract 5: test-runtime resource safety (kernel OOM observed 2026-08-28) ──
+// A bare `bun test` over the full tree runs in ONE process with no --isolate;
+// DATABASE_PGLITE suites accumulate PGlite instances across files (measured
+// 5.07 GiB peak for 10 PGlite files, >9 GiB before 25) and OOM-killed bun at
+// 15.1 GiB on the 15 GiB host. The complete suite is only sanctioned through
+// the coordinator (`pnpm test:all`), whose isolated groups peak at ~3.3 GiB.
+describe('Contract 5: test-runtime resource safety (coordinator-only full-suite path)', () => {
+  it('test:all routes the COMPLETE manifest through the coordinator (no workload filter)', () => {
+    const pkg = JSON.parse(readFileSync(join(REPO, 'package.json'), 'utf8'));
+    const script = pkg.scripts['test:all'];
+    expect(script).toBeDefined();
+    expect(script).toContain('bun-test-coordinator.mjs');
+    // No --workload filter: the plan must cover every workload so no test file
+    // is silently skipped by the full-suite command.
+    expect(script).not.toContain('--workload');
+
+    const manifest = JSON.parse(
+      readFileSync(join(REPO, 'evidence', 'bun-migration', 'bun-migration-manifest.json'), 'utf8'),
+    );
+    const policy = JSON.parse(readFileSync(POLICY_FILE, 'utf8'));
+    const plan = buildBunTestPlan(manifest, policy, null, null);
+    const workloads = new Set(plan.map((g: { workload: string }) => g.workload));
+    expect([...workloads].sort()).toEqual(
+      ['DATABASE_PGLITE', 'META_GATE', 'PROCESS', 'PURE'].sort(),
+    );
+    const plannedFiles = plan.flatMap((g: { files: string[] }) => g.files);
+    const verifiedFiles = manifest.files
+      .filter((f: { state: string }) => ['MIGRATED', 'VERIFIED'].includes(f.state))
+      .map((f: { path: string }) => f.path);
+    expect(new Set(plannedFiles)).toEqual(new Set(verifiedFiles));
+  });
+
+  it('bunfig wires the advisory guard preload and the guard never exits a run', () => {
+    const bunfig = readFileSync(join(REPO, 'bunfig.toml'), 'utf8');
+    expect(bunfig).toContain('[test]');
+    expect(bunfig).toContain('bare-bun-test-guard.mjs');
+    const guardPath = join(REPO, 'scripts', 'automation', 'bare-bun-test-guard.mjs');
+    const guard = readFileSync(guardPath, 'utf8');
+    // Advisory only: a failing preload would break every test run.
+    expect(guard).not.toMatch(/process\.exit/);
+    expect(guard).not.toMatch(/throw new Error/);
+  });
+
+  it('guard warns outside the coordinator and stays silent inside it (behavioral)', () => {
+    const fixtureDir = mkdtempSync(join(REPO, '.guard-fixture-'));
+    try {
+      const fixturePath = join(fixtureDir, 'guard-fixture.spec.ts');
+      writeFileSync(
+        fixturePath,
+        "import { describe, expect, it } from 'bun:test';\ndescribe('guard', () => { it('runs', () => { expect(1).toBe(1); }); });\n",
+      );
+
+      const base = {
+        cwd: REPO,
+        encoding: 'utf8',
+        timeout: 120_000,
+      } as const;
+      // A "bare" run must actually be bare: when this suite itself runs under
+      // the coordinator, FORESIFT_TEST_COORDINATOR is set in the group env and
+      // would otherwise be inherited by the inner spawn.
+      const bareEnv = { ...process.env };
+      delete bareEnv.FORESIFT_TEST_COORDINATOR;
+
+      // Outside the coordinator: advisory appears, run still passes.
+      const bare = spawnSync('bun', ['test', fixturePath], { ...base, env: bareEnv });
+      expect(bare.status).toBe(0);
+      const bareOutput = `${bare.stdout ?? ''}\n${bare.stderr ?? ''}`;
+      expect(bareOutput).toContain('[foresift] advisory: bun test without the coordinator');
+      // Advisory at most once per process.
+      expect(bareOutput.split('[foresift] advisory:').length - 1).toBe(1);
+
+      // Inside the coordinator: silent.
+      const coordinated = spawnSync('bun', ['test', fixturePath], {
+        ...base,
+        env: { ...process.env, FORESIFT_TEST_COORDINATOR: '1' },
+      });
+      expect(coordinated.status).toBe(0);
+      const coordinatedOutput = `${coordinated.stdout ?? ''}\n${coordinated.stderr ?? ''}`;
+      expect(coordinatedOutput).not.toContain('[foresift] advisory:');
+    } finally {
+      rmSync(fixtureDir, { recursive: true, force: true });
+    }
+  });
+});

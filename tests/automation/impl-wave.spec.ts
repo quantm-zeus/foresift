@@ -749,7 +749,7 @@ describe('wave routing AGY test lane persistence', () => {
     const routingCodex = buildWaveRouting(graph, 'CODEX_AGY');
     expect(routingCodex.schema).toBe('foresift/wave-routing@1');
     expect(routingCodex.routingPolicyVersion).toBe(EXECUTION_POLICY.routingPolicyVersion);
-    expect(routingCodex.routingPolicyVersion).toBe('codex-sol-luna-terra-agy-gemini@2');
+    expect(routingCodex.routingPolicyVersion).toBe('codex-terra-sol-agy-gemini@3');
     expect(routingCodex.testEngine).toBe('AGY');
 
     const testLaneCodex = routingCodex.lanes.find(

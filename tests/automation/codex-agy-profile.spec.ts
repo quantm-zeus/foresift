@@ -365,12 +365,15 @@ describe('Foresift V4 CODEX_AGY execution profile test matrix (A through AH)', (
   });
 
   describe('Matrix K: Codex models mapping', () => {
-    it('maps all tiers to authoritative gpt-5.6-sol model', async () => {
+    it('routes LOW/MEDIUM to gpt-5.6-terra, HIGH to gpt-5.6-sol, and never Luna', async () => {
       const mod = await loadCodexRoutingModule();
       expect(mod.CODEX_MODELS).toBeDefined();
-      expect(mod.CODEX_MODELS.LOW).toBe('gpt-5.6-sol');
-      expect(mod.CODEX_MODELS.MEDIUM).toBe('gpt-5.6-sol');
+      expect(mod.CODEX_MODELS.LOW).toBe('gpt-5.6-terra');
+      expect(mod.CODEX_MODELS.MEDIUM).toBe('gpt-5.6-terra');
       expect(mod.CODEX_MODELS.HIGH).toBe('gpt-5.6-sol');
+      // Luna stays disabled for product writers until repository evidence
+      // proves its implementation quality (cost-policy quality gate).
+      expect(Object.values(mod.CODEX_MODELS)).not.toContain('gpt-5.6-luna');
     });
   });
 
@@ -410,7 +413,7 @@ describe('Foresift V4 CODEX_AGY execution profile test matrix (A through AH)', (
   });
 
   describe('Matrix N: Complexity tier model and reasoning effort policy', () => {
-    it('assigns gpt-5.6-sol and medium reasoning across LOW, MEDIUM, and HIGH while preserving complexityTier', async () => {
+    it('assigns gpt-5.6-terra to LOW/MEDIUM, gpt-5.6-sol to HIGH, medium reasoning everywhere', async () => {
       const mod = await loadCodexRoutingModule();
 
       const lowRoute = mod.routeCodexLane({
@@ -421,7 +424,7 @@ describe('Foresift V4 CODEX_AGY execution profile test matrix (A through AH)', (
         complexityTier: 'LOW',
       });
       expect(lowRoute.complexityTier).toBe('LOW');
-      expect(lowRoute.model).toBe('gpt-5.6-sol');
+      expect(lowRoute.model).toBe('gpt-5.6-terra');
       expect(lowRoute.reasoning).toBe('medium');
 
       const medRoute = mod.routeCodexLane({
@@ -432,7 +435,7 @@ describe('Foresift V4 CODEX_AGY execution profile test matrix (A through AH)', (
         complexityTier: 'MEDIUM',
       });
       expect(medRoute.complexityTier).toBe('MEDIUM');
-      expect(medRoute.model).toBe('gpt-5.6-sol');
+      expect(medRoute.model).toBe('gpt-5.6-terra');
       expect(medRoute.reasoning).toBe('medium');
 
       const highRoute = mod.routeCodexLane({
@@ -533,6 +536,130 @@ describe('Foresift V4 CODEX_AGY execution profile test matrix (A through AH)', (
         isEscalation: true,
       });
       expect(escalatedRoute.serviceTier).toBe('standard');
+    });
+  });
+
+  describe('Matrix R2: Cost-aware adaptive routing acceptance (routingPolicyVersion @3)', () => {
+    it('LOW routing can never receive sensitive tasks — sensitive categories force HIGH/sol', async () => {
+      const mod = await loadCodexRoutingModule();
+      for (const sensitive of [
+        'rotate the auth credential store',
+        'durable recovery state machine',
+        'migration schema change',
+        'prohibited-capability safety boundary',
+        'tenant isolation wall',
+        'signing private key handling',
+      ]) {
+        const forced = mod.classifyCodexLane({
+          lane: 'core',
+          risk: 'LOW',
+          taskIds: ['t-small'],
+          files: [],
+          domains: [sensitive],
+        });
+        expect(forced.complexityTier).toBe('HIGH');
+        expect(forced.forcedHigh).toBe(true);
+        const route = mod.routeCodexLane({
+          lane: 'core',
+          risk: 'LOW',
+          complexityTier: 'LOW',
+          taskIds: ['t-small'],
+          domains: [sensitive],
+        });
+        expect(route.model).toBe('gpt-5.6-sol');
+      }
+    });
+
+    it('MEDIUM routing excludes forced-high categories and always receives terra', async () => {
+      const mod = await loadCodexRoutingModule();
+      const ordinary = mod.routeCodexLane({
+        lane: 'shard-1',
+        risk: 'MEDIUM',
+        complexityTier: 'MEDIUM',
+        taskIds: ['t1', 't2', 't3'],
+      });
+      expect(ordinary.model).toBe('gpt-5.6-terra');
+      expect(ordinary.forcedHigh).toBe(false);
+    });
+
+    it('retries escalate monotonically terra→sol and never downgrade or loop back to terra', async () => {
+      const mod = await loadCodexRoutingModule();
+
+      const lowRoute = mod.routeCodexLane({
+        lane: 'core',
+        risk: 'LOW',
+        complexityTier: 'LOW',
+        taskIds: ['t1'],
+      });
+      const lowRetry = mod.retryCodexRoute(lowRoute);
+      expect(lowRetry.complexityTier).toBe('MEDIUM');
+      expect(lowRetry.model).toBe('gpt-5.6-terra');
+      expect(lowRetry.attempt).toBe(2);
+
+      const medRoute = mod.routeCodexLane({
+        lane: 'core',
+        risk: 'MEDIUM',
+        complexityTier: 'MEDIUM',
+        taskIds: ['t1'],
+      });
+      const medRetry = mod.retryCodexRoute(medRoute);
+      expect(medRetry.model).toBe('gpt-5.6-sol');
+      expect(medRetry.complexityTier).toBe('HIGH');
+
+      const highRoute = mod.routeCodexLane({ lane: 'core', risk: 'CRITICAL', taskIds: ['t1'] });
+      const highRetry = mod.retryCodexRoute(highRoute);
+      expect(highRetry.model).toBe('gpt-5.6-sol');
+      expect(highRetry.complexityTier).toBe('HIGH');
+      // Monotone: no path from sol back to terra.
+      const highRetryTwice = mod.retryCodexRoute(highRetry);
+      expect(highRetryTwice.model).toBe('gpt-5.6-sol');
+      expect(highRetryTwice.reasoning).toBe('medium');
+    });
+
+    it('escalations climb LOW→MEDIUM→HIGH with a monotone counter and medium ceiling', async () => {
+      const mod = await loadCodexRoutingModule();
+      let route = mod.routeCodexLane({
+        lane: 'core',
+        risk: 'LOW',
+        complexityTier: 'LOW',
+        taskIds: ['t1'],
+      });
+      route = mod.escalateCodexRoute(route);
+      expect(route.complexityTier).toBe('MEDIUM');
+      expect(route.model).toBe('gpt-5.6-terra');
+      expect(route.escalation).toBe(1);
+      route = mod.escalateCodexRoute(route);
+      expect(route.complexityTier).toBe('HIGH');
+      expect(route.model).toBe('gpt-5.6-sol');
+      expect(route.escalation).toBe(2);
+      route = mod.escalateCodexRoute(route);
+      expect(route.model).toBe('gpt-5.6-sol');
+      expect(route.escalation).toBe(3);
+      // Sol never automatically moves to high/xhigh reasoning.
+      expect(route.reasoning).toBe('medium');
+    });
+
+    it('reasoning is pinned to medium across every route, retry, and escalation', async () => {
+      const mod = await loadCodexRoutingModule();
+      let route = mod.routeCodexLane({ lane: 'core', risk: 'CRITICAL', taskIds: ['t1'] });
+      for (let i = 0; i < 4; i++) {
+        expect(route.reasoning).toBe('medium');
+        route = mod.retryCodexRoute(route);
+      }
+      expect(route.reasoning).toBe('medium');
+    });
+
+    it('never emits Fast/Priority service tier and the CLI wire value stays default', async () => {
+      const mod = await loadCodexRoutingModule();
+      const route = mod.routeCodexLane({ lane: 'core', risk: 'CRITICAL', taskIds: ['t1'] });
+      expect(route.serviceTier).toBe('standard');
+      expect(route.cliServiceTier).toBe('default');
+      const args = mod.buildCodexExecArgs(route, { worktree: '/tmp/wt' });
+      const joined = args.join(' ');
+      expect(joined).toContain('service_tier="default"');
+      for (const banned of ['priority', 'fast', '--fast']) {
+        expect(joined.toLowerCase()).not.toContain(banned);
+      }
     });
   });
 
@@ -939,14 +1066,14 @@ describe('Foresift V4 CODEX_AGY execution profile test matrix (A through AH)', (
       expect(rawConfig.agyTestModel).toBe('gemini-3.7-flash-high');
       expect(rawConfig.agyTestEffort).toBe('high');
       expect(rawConfig.agyPrintTimeout).toBe('40m');
-      expect(rawConfig.routingPolicyVersion).toBe('codex-sol-luna-terra-agy-gemini@2');
+      expect(rawConfig.routingPolicyVersion).toBe('codex-terra-sol-agy-gemini@3');
       expect(rawConfig.maxAgyTestWriters).toBe(1);
 
       const mod = await loadExecutionProfileModule();
       expect(mod.EXECUTION_POLICY.agyTestModel).toBe('gemini-3.7-flash-high');
       expect(mod.EXECUTION_POLICY.agyTestEffort).toBe('high');
       expect(mod.EXECUTION_POLICY.agyPrintTimeout).toBe('40m');
-      expect(mod.EXECUTION_POLICY.routingPolicyVersion).toBe('codex-sol-luna-terra-agy-gemini@2');
+      expect(mod.EXECUTION_POLICY.routingPolicyVersion).toBe('codex-terra-sol-agy-gemini@3');
       expect(mod.EXECUTION_POLICY.maxAgyTestWriters).toBe(1);
     });
 
@@ -965,7 +1092,7 @@ describe('Foresift V4 CODEX_AGY execution profile test matrix (A through AH)', (
 
       const routing = mod.buildWaveRouting(graph, 'CODEX_AGY');
       expect(routing.schema).toBe('foresift/wave-routing@1');
-      expect(routing.routingPolicyVersion).toBe('codex-sol-luna-terra-agy-gemini@2');
+      expect(routing.routingPolicyVersion).toBe('codex-terra-sol-agy-gemini@3');
       expect(routing.executionProfile).toBe('CODEX_AGY');
       expect(routing.implementationEngine).toBe('CODEX');
       expect(routing.testEngine).toBe('AGY');
@@ -1236,7 +1363,7 @@ describe('Foresift V4 CODEX_AGY execution profile test matrix (A through AH)', (
 
       const routing = {
         schema: 'foresift/wave-routing@1',
-        routingPolicyVersion: 'codex-sol-luna-terra-agy-gemini@2',
+        routingPolicyVersion: 'codex-terra-sol-agy-gemini@3',
         executionProfile: 'CODEX_AGY',
         implementationEngine: 'CODEX',
         testEngine: 'AGY',
@@ -1379,7 +1506,7 @@ process.exit(${JSON.stringify(options.exitCode ?? 0)});
       const routingPath = join(dir, 'routing.json');
       const routing = {
         schema: 'foresift/wave-routing@1',
-        routingPolicyVersion: 'codex-sol-luna-terra-agy-gemini@2',
+        routingPolicyVersion: 'codex-terra-sol-agy-gemini@3',
         executionProfile: 'CODEX_AGY',
         implementationEngine: 'CODEX',
         testEngine: 'AGY',
@@ -1711,6 +1838,72 @@ process.exit(${JSON.stringify(options.exitCode ?? 0)});
       } finally {
         process.env.PATH = prevPath;
       }
+    });
+  });
+
+  describe('Matrix AH: AGY baseline classification report contract', () => {
+    it('accepts the documented {file, classification} shape', async () => {
+      const mod = await loadAgyTestWriterModule();
+      expect(
+        mod.validateBaselineClassifications([
+          { file: 'tests/a.spec.ts', classification: 'NEW_BEHAVIOR_RED' },
+          { file: 'tests/b.spec.ts', classification: 'NEGATIVE_RED' },
+          { file: 'tests/c.spec.ts', classification: 'CHARACTERIZATION_GREEN' },
+          { file: 'tests/d.spec.ts', classification: 'REFACTOR_GUARD_GREEN' },
+          { file: 'tests/e.spec.ts', classification: 'REGRESSION_RED' },
+        ]),
+      ).toBe(true);
+    });
+
+    it('accepts the {file, baseline} shape the model observably emits (run 265f6fe1)', async () => {
+      const mod = await loadAgyTestWriterModule();
+      expect(
+        mod.validateBaselineClassifications([
+          { file: 'packages/domain/test/cost.spec.ts', baseline: 'NEW_BEHAVIOR_RED' },
+          { file: 'tests/negative/AC-100.negative.spec.ts', baseline: 'NEGATIVE_RED' },
+        ]),
+      ).toBe(true);
+    });
+
+    it('accepts bare string items and mixed shapes', async () => {
+      const mod = await loadAgyTestWriterModule();
+      expect(mod.validateBaselineClassifications(['REGRESSION_RED'])).toBe(true);
+      expect(
+        mod.validateBaselineClassifications([
+          'NEGATIVE_RED',
+          { file: 'tests/x.spec.ts', classification: 'NEW_BEHAVIOR_RED' },
+          { file: 'tests/y.spec.ts', baseline: 'CHARACTERIZATION_GREEN' },
+        ]),
+      ).toBe(true);
+    });
+
+    it('fails closed on unknown values, empty lists, and non-arrays', async () => {
+      const mod = await loadAgyTestWriterModule();
+      expect(() =>
+        mod.validateBaselineClassifications([{ file: 't', classification: 'ALL_GREEN_BRO' }]),
+      ).toThrow(/AGY_TEST_BASELINE_CLASSIFICATION_INVALID/);
+      expect(() => mod.validateBaselineClassifications([{ file: 't', baseline: 'PASS' }])).toThrow(
+        /AGY_TEST_BASELINE_CLASSIFICATION_INVALID/,
+      );
+      expect(() => mod.validateBaselineClassifications([])).toThrow(
+        /AGY_TEST_BASELINE_CLASSIFICATION_INVALID/,
+      );
+      expect(() => mod.validateBaselineClassifications('NEW_BEHAVIOR_RED')).toThrow(
+        /AGY_TEST_BASELINE_CLASSIFICATION_INVALID/,
+      );
+      expect(() => mod.validateBaselineClassifications(undefined)).toThrow(
+        /AGY_TEST_BASELINE_CLASSIFICATION_INVALID/,
+      );
+    });
+
+    it('the writer prompt specifies the exact classification item shape', async () => {
+      const { readFileSync } = await import('node:fs');
+      const src = readFileSync(
+        join(REPO_ROOT, 'scripts/automation/exec-agy-test-writer.mjs'),
+        'utf8',
+      );
+      expect(src).toContain('"classification"');
+      expect(src).toContain('NEW_BEHAVIOR_RED|REGRESSION_RED|NEGATIVE_RED');
     });
   });
 });

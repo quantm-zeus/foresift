@@ -4,7 +4,7 @@
   "supportedProfiles": ["CODEX_AGY", "CLAUDE_AGY"],
   "codexServiceTier": "standard",
   "codexCliServiceTier": "default",
-  "routingPolicyVersion": "codex-sol-luna-terra-agy-gemini@2",
+  "routingPolicyVersion": "codex-terra-sol-agy-gemini@3",
   "maxCodexWriters": 3,
   "maxAgyTestWriters": 1,
   "agyTestModel": "gemini-3.7-flash-high",

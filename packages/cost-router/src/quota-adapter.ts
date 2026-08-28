@@ -14,6 +14,12 @@ import { CostModeResolver } from './cost-mode.ts';
 import { StrictFreeGuard } from './strict-free-guard.ts';
 import { ReserveRouter } from './reserve-router.ts';
 import type { CostAudit } from './cost-audit.ts';
+import {
+  BatchCoalescer,
+  type BatchCapability,
+  type BatchableRequest,
+  type CoalescedBatch,
+} from './batch-coalescer.ts';
 
 interface QuotaBalanceRow {
   provider_id: string;
@@ -57,6 +63,7 @@ export interface CostQuotaAdapterDeps {
   readonly costModes: CostModeResolver;
   readonly strictFreeGuard?: StrictFreeGuard;
   readonly reserveRouter?: ReserveRouter;
+  readonly batchCoalescer?: BatchCoalescer;
   readonly audit?: CostAudit;
   readonly flags?: (request: QuotaEstimateRequest) => QuotaAdapterRequestFlags;
   readonly now?: () => Date;
@@ -76,12 +83,25 @@ function refusal(message: string): never {
 export class CostQuotaReservationAdapter implements QuotaReservationAdapter {
   private readonly guard: StrictFreeGuard;
   private readonly reserves: ReserveRouter;
+  private readonly batches: BatchCoalescer;
   private readonly now: () => Date;
 
   constructor(private readonly deps: CostQuotaAdapterDeps) {
     this.guard = deps.strictFreeGuard ?? new StrictFreeGuard();
     this.reserves = deps.reserveRouter ?? new ReserveRouter();
+    this.batches = deps.batchCoalescer ?? new BatchCoalescer();
     this.now = deps.now ?? (() => new Date());
+  }
+
+  /**
+   * Provider-call preparation surface: callers coalesce before invoking the
+   * tool-core seam, so each returned batch receives exactly one reservation.
+   */
+  coalesceProviderCalls<T>(
+    requests: readonly BatchableRequest<T>[],
+    capability: BatchCapability,
+  ): readonly CoalescedBatch<T>[] {
+    return this.batches.coalesce(requests, capability);
   }
 
   async estimate(request: QuotaEstimateRequest): Promise<QuotaEstimate> {

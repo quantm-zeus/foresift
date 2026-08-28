@@ -12,13 +12,19 @@
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 import { closeTestDatabase, makeTestDatabase, type TestDatabase } from './helpers.ts';
 import { CostQuotaAdapter } from '../../packages/cost-router/src/quota-adapter.ts';
-import { FREE_QUOTA_OP } from '../fixtures/cost/operations.ts';
+import {
+  FREE_QUOTA_OP,
+  seedCostOperationFixture,
+  seedCostQuotaBalance,
+} from '../fixtures/cost/operations.ts';
 
 let tdb: TestDatabase;
 let adapter: CostQuotaAdapter;
 
 beforeAll(async () => {
   tdb = await makeTestDatabase();
+  await seedCostOperationFixture(tdb.engine, FREE_QUOTA_OP);
+  await seedCostQuotaBalance(tdb.engine, { providerId: FREE_QUOTA_OP.providerId });
   adapter = new CostQuotaAdapter({ engine: tdb.engine, mode: 'STRICT_FREE' });
 });
 
@@ -28,6 +34,18 @@ afterAll(async () => {
 
 describe('AC-224 acceptance (positive): collector resume does not duplicate quota reservations', () => {
   it('resuming checkpoint and replaying window creates exactly one quota reservation', async () => {
+    const estimate = await adapter.estimate({
+      provider: FREE_QUOTA_OP.providerId,
+      operation: FREE_QUOTA_OP.operationId,
+      workloadClass: 'INTERACTIVE_HIGH',
+    });
+    await adapter.admit({
+      provider: FREE_QUOTA_OP.providerId,
+      operation: FREE_QUOTA_OP.operationId,
+      workloadClass: 'INTERACTIVE_HIGH',
+      estimate,
+    });
+
     const reservationPayload = {
       provider: FREE_QUOTA_OP.providerId,
       operation: FREE_QUOTA_OP.operationId,
@@ -35,7 +53,7 @@ describe('AC-224 acceptance (positive): collector resume does not duplicate quot
       actorId: 'collector_solana_1',
       pipelineRunId: 'collector_run_checkpoint_42',
       stage: 'ATOMICALLY_RESERVE_QUOTA',
-      estimate: { quotaModel: 'REQUESTS_PER_PERIOD' as const, estimatedUnits: 1 },
+      estimate,
     };
 
     // First attempt before simulated disconnect
@@ -45,5 +63,11 @@ describe('AC-224 acceptance (positive): collector resume does not duplicate quot
     const rsv2 = await adapter.reserve(reservationPayload);
 
     expect(rsv1).toBe(rsv2);
+
+    const countResult = await tdb.engine.query<{ count: string }>(
+      'SELECT count(*) FROM core.core_quota_reservations WHERE pipeline_run_id = $1',
+      ['collector_run_checkpoint_42'],
+    );
+    expect(Number(countResult.rows[0]?.count)).toBe(1);
   });
 });

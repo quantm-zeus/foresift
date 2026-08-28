@@ -28,16 +28,17 @@ describe('AC-227 acceptance (positive): 30-day capacity replay across 9 dimensio
     expect(replay.activationBlocked).toBe(false);
     expect(replay.dimensionsEvaluated).toEqual(
       expect.arrayContaining([
-        'credits_or_rates',
-        'stream_bytes',
-        'model_tokens',
-        'workflow_steps',
-        'database_growth',
-        'object_storage',
-        'egress_bytes',
+        'credits',
+        'rates',
+        'streamedBytes',
+        'modelTokens',
+        'workflowSteps',
+        'databaseGrowthBytes',
+        'objectGrowthBytes',
+        'egressBytes',
         'retries',
         'notifications',
-        'protected_reserves',
+        'reserves',
       ]),
     );
   });

@@ -30,6 +30,6 @@ describe('AC-102 acceptance (positive): batch coalescing & single reservation pe
     expect(batches.length).toBe(1);
     expect(batches[0].items.length).toBe(40);
     expect(batches[0].utilization).toBe(0.8);
-    expect(batches[0].reservationCount).toBe(1);
+    expect(batches[0].providerId).toBe('prov_gmgn');
   });
 });

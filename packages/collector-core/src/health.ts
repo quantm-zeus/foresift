@@ -10,6 +10,25 @@ export async function persistCollectorHealth(
   const health = assembleCollectorHealth(input);
   await engine.query(
     'INSERT INTO col.collector_health (partition_id, measured_at, snapshot_json) VALUES ($1,$2,$3)',
-    [health.partitionId, health.measuredAt, JSON.stringify(health)],
+    [health.partitionId, health.sampledAt, JSON.stringify(health)],
   );
+}
+export function assembleHealthSnapshot(partitionId: string): CollectorHealth {
+  return {
+    partitionId,
+    connectedState: 'DISCONNECTED',
+    endpointGeneration: 0,
+    headSlot: '0',
+    finalizedSlot: '0',
+    checkpointLag: 0,
+    gapCount: 0,
+    gapDurationSeconds: 0,
+    backfillStatus: 'IDLE',
+    decodeFailureRate: 0,
+    streamedBytes: 0,
+    eventRate: 0,
+    deduplicationRate: 0,
+    resourceConsumption: { cpuPercent: 0, memoryMb: 0 },
+    sampledAt: new Date().toISOString(),
+  };
 }

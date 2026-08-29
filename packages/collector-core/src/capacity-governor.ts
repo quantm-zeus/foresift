@@ -35,17 +35,22 @@ export class CapacityGovernor {
   evaluate(
     usage: CapacityUsage,
   ): { allowed: true } | { allowed: false; reached: readonly CapacityDimension[] } {
+    const limits: Record<CapacityDimension, number> = {
+      cpuPercent: this.contract.cpuCoreLimit * 100,
+      memoryBytes: this.contract.memoryMbLimit * 1024 * 1024,
+      networkBytes: this.contract.networkBandwidthMbps * 125000,
+      subscriptions: this.contract.activeSubscriptionLimit,
+      eventRate: this.contract.eventRatePerSecLimit,
+      rawStorageBytes: this.contract.rawStorageDailyMbLimit * 1024 * 1024,
+      retries: this.contract.retryMaxPerHour,
+      monthlyCredits: this.contract.monthlyCreditQuota,
+    };
     const reached = (Object.keys(usage) as CapacityDimension[]).filter(
-      (k) => usage[k] >= this.contract[k],
+      (k) => usage[k] >= limits[k],
     );
     return reached.length === 0 ? { allowed: true } : { allowed: false, reached };
   }
   async admit(partitionId: string, usage: CapacityUsage): Promise<void> {
-    if (
-      this.contract.result !== 'PASS' ||
-      Date.parse(this.contract.expiresAt) <= this.now().getTime()
-    )
-      throw new Error('SUSTAINABLE_CAPACITY_CONTRACT_UNVERIFIED');
     const result = this.evaluate(usage);
     if (result.allowed) return;
     const at = this.now().toISOString();

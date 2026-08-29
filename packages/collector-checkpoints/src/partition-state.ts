@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import type { DatabaseEngine } from '@foresift/persistence';
 import type { CollectorPartitionState } from '@foresift/shared-schemas';
-export type PartitionState = CollectorPartitionState['state'];
+export type PartitionState = CollectorPartitionState;
 export const LEGAL_PARTITION_TRANSITIONS: Readonly<
   Record<PartitionState, readonly PartitionState[]>
 > = {

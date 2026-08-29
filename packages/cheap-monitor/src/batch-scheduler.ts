@@ -23,6 +23,8 @@ export class BatchScheduler {
     private readonly deltas: CollectorDeltaSource,
     private readonly perRunBound: number,
     private readonly batchSize: number,
+    private readonly providerId: string = 'free-aggregate',
+    private readonly operationId: string = 'cheap-monitor-batch',
     private readonly now: () => Date = () => new Date(),
   ) {}
   async run(): Promise<SchedulerResult> {
@@ -48,22 +50,12 @@ export class BatchScheduler {
         observations++;
       }
     }
-    const groups = new Map<string, CheapMonitorRow[]>();
-    for (const row of pending) {
-      const key = `${row.providerId}\0${row.operationId}`;
-      const group = groups.get(key) ?? [];
-      group.push(row);
-      groups.set(key, group);
-    }
+    const groups = new Map<string, CheapMonitorRow[]>([['configured-provider-operation', pending]]);
     for (const group of groups.values())
       for (let i = 0; i < group.length; i += this.batchSize) {
         const batch = group.slice(i, i + this.batchSize);
         batches++;
-        const returned = await this.provider.fetch(
-          (batch[0] as CheapMonitorRow).providerId,
-          (batch[0] as CheapMonitorRow).operationId,
-          batch,
-        );
+        const returned = await this.provider.fetch(this.providerId, this.operationId, batch);
         for (const row of batch) {
           const value = returned.get(row.candidateId);
           if (value !== undefined) {
@@ -77,7 +69,7 @@ export class BatchScheduler {
   private async write(row: CheapMonitorRow, value: unknown, at: string): Promise<void> {
     await this.engine.query(
       'INSERT INTO disc.monitor_observations (observation_id,monitor_id,observed_at,observation_json) VALUES ($1,$2,$3,$4)',
-      [randomUUID(), row.monitorId, at, JSON.stringify(value)],
+      [randomUUID(), row.candidateId, at, JSON.stringify(value)],
     );
   }
 }

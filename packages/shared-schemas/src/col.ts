@@ -1,76 +1,60 @@
 import { z } from 'zod';
-import { ALL_AVAILABILITY_PROVENANCE_CLASSES } from '@foresift/domain';
 import { UtcTimestampSchema } from './data.ts';
 
-const Sha256Schema = z.string().regex(/^sha256:[0-9a-f]{64}$/);
-const NonEmptySetSchema = z.array(z.string().min(1)).min(1);
+const ContentAddressSchema = z.string().regex(/^sha256:.+$/);
+const NonEmptyStringsSchema = z.array(z.string().min(1)).min(1);
 
-export const CollectorFinalityPolicySchema = z.enum(['PROCESSED', 'CONFIRMED', 'FINALIZED']);
 export const CollectorScopeDeclarationSchema = z
   .object({
     scopeId: z.string().min(1),
-    scopeVersion: z.number().int().positive(),
     chainId: z.string().min(1),
     programId: z.string().min(1),
     programVersion: z.string().min(1),
-    eventFamilies: NonEmptySetSchema,
-    accountFilters: z.array(z.string().min(1)),
-    coverageStart: UtcTimestampSchema,
-    finalityPolicy: CollectorFinalityPolicySchema,
+    accountLayoutVersion: z.string().min(1),
+    supportedEventFamilies: NonEmptyStringsSchema,
+    coverageStartSlot: z.string().regex(/^\d+$/),
+    coverageStartTime: UtcTimestampSchema,
+    finalityPolicy: z.enum(['confirmed', 'finalized']),
     decoderVersion: z.string().min(1),
-    byteEnvelope: z.number().int().positive(),
-    quotaEnvelope: z.number().nonnegative(),
-    maxLagSlots: z.number().int().nonnegative(),
-    maxGapAgeMs: z.number().int().nonnegative(),
-    rightsPolicyRef: z.string().min(1),
-    retentionPolicyRef: z.string().min(1),
-    supportManifestRef: Sha256Schema,
-    active: z.boolean(),
+    quotaStreamedByteEnvelope: z
+      .object({ maxBytesPerSec: z.number().positive(), maxEventsPerSec: z.number().positive() })
+      .strict(),
+    maximumLagSlots: z.number().int().nonnegative(),
+    maximumGapAgeSeconds: z.number().int().nonnegative(),
+    rightsPolicy: z.string().min(1),
   })
   .strict();
 export type CollectorScopeDeclaration = z.infer<typeof CollectorScopeDeclarationSchema>;
 
-const AvailabilityClassSchema = z.enum(
-  ALL_AVAILABILITY_PROVENANCE_CLASSES as [
-    (typeof ALL_AVAILABILITY_PROVENANCE_CLASSES)[number],
-    ...(typeof ALL_AVAILABILITY_PROVENANCE_CLASSES)[number][],
-  ],
-);
 export const CollectorStreamRecordSchema = z
   .object({
     recordId: z.string().min(1),
-    scopeId: z.string().min(1),
-    scopeVersion: z.number().int().positive(),
-    chainId: z.string().min(1),
-    programId: z.string().min(1),
-    programVersion: z.string().min(1),
-    eventFamily: z.string().min(1),
-    endpointId: z.string().min(1),
-    subscriptionVersion: z.string().min(1),
-    filterVersion: z.string().min(1),
+    endpoint: z.string().min(1),
+    subscriptionFilterVersion: z.string().min(1),
     connectionGeneration: z.number().int().nonnegative(),
-    slot: z.number().int().nonnegative(),
+    slot: z.string().regex(/^\d+$/),
     blockHash: z.string().min(1),
     transactionSignature: z.string().min(1),
-    transactionIndex: z.number().int().nonnegative().nullable(),
-    instructionIndex: z.number().int().nonnegative().nullable(),
-    innerInstructionIndex: z.number().int().nonnegative().nullable(),
-    logIndex: z.number().int().nonnegative().nullable(),
-    accountAddress: z.string().min(1).nullable(),
-    accountWriteVersion: z.number().int().nonnegative().nullable(),
+    instructionIndex: z.number().int().nonnegative(),
+    logIndex: z.number().int().nonnegative().optional(),
+    accountCoordinates: z.array(z.string().min(1)).min(1),
     receivedAt: UtcTimestampSchema,
     availableAt: UtcTimestampSchema,
-    availabilityProvenance: AvailabilityClassSchema,
-    finality: CollectorFinalityPolicySchema,
-    rawArtifactHash: Sha256Schema,
-    normalizedEventHash: Sha256Schema,
+    ingestedAt: UtcTimestampSchema,
+    finality: z.enum(['processed', 'confirmed', 'finalized']),
+    rawArtifactHash: ContentAddressSchema,
     decoderVersion: z.string().min(1),
-    rightsPolicyRef: z.string().min(1),
-    receiptHash: Sha256Schema,
+    rightsPolicy: z.string().min(1),
+    normalizedEventHash: ContentAddressSchema,
+    eventType: z.string().min(1),
+    payload: z.record(z.string(), z.unknown()),
   })
   .strict()
   .refine((v) => Date.parse(v.availableAt) >= Date.parse(v.receivedAt), {
     message: 'availableAt cannot precede collector receipt',
+  })
+  .refine((v) => Date.parse(v.ingestedAt) >= Date.parse(v.availableAt), {
+    message: 'ingestedAt cannot precede availability',
   });
 export type CollectorStreamRecord = z.infer<typeof CollectorStreamRecordSchema>;
 
@@ -86,7 +70,7 @@ export const ProgramSupportManifestSchema = z
   .object({
     manifestId: z.string().min(1),
     chainId: z.string().min(1),
-    protocolFamily: z.string().min(1),
+    protocolFamily: z.enum(['PUMP', 'RAYDIUM', 'ORCA', 'METEORA', 'JUPITER']),
     productFamily: z.string().min(1),
     programId: z.string().min(1),
     programDataAddress: z.string().min(1).optional(),
@@ -96,21 +80,21 @@ export const ProgramSupportManifestSchema = z
     upgradeAuthorityAddress: z.string().min(1).optional(),
     accountLayoutVersion: z.string().min(1),
     instructionLayoutVersion: z.string().min(1),
-    idlOrLayoutSha256: Sha256Schema,
+    idlOrLayoutSha256: ContentAddressSchema,
     decoderVersion: z.string().min(1),
     poolMathAdapterVersion: z.string().min(1).optional(),
     transferSemanticsVersion: z.string().min(1).optional(),
-    supportedEventFamilies: NonEmptySetSchema,
+    supportedEventFamilies: NonEmptyStringsSchema,
     requiredAccountFamilies: z.array(z.string().min(1)),
     officialReferenceUris: z.array(z.string().url()).min(1),
     officialReferencesVerifiedAt: UtcTimestampSchema,
     liveChainVerificationSlot: z.string().regex(/^\d+$/),
-    liveChainVerificationHash: z.string().min(1),
+    liveChainVerificationHash: ContentAddressSchema,
     capabilityState: ProgramCapabilityStateSchema,
     unsupportedReasons: z.array(z.string().min(1)),
     validFrom: UtcTimestampSchema,
     validUntil: UtcTimestampSchema.optional(),
-    contentHash: Sha256Schema,
+    contentHash: ContentAddressSchema,
     approvalArtifactId: z.string().min(1),
   })
   .strict()
@@ -119,7 +103,7 @@ export const ProgramSupportManifestSchema = z
   });
 export type ProgramSupportManifest = z.infer<typeof ProgramSupportManifestSchema>;
 
-export const CollectorPartitionStateKindSchema = z.enum([
+export const CollectorPartitionStateSchema = z.enum([
   'DISABLED',
   'STARTING',
   'SYNCING',
@@ -130,22 +114,17 @@ export const CollectorPartitionStateKindSchema = z.enum([
   'PAUSED',
   'FAILED',
 ]);
-export const CollectorPartitionStateSchema = z
-  .object({
-    partitionId: z.string().min(1),
-    scopeId: z.string().min(1),
-    scopeVersion: z.number().int().positive(),
-    state: CollectorPartitionStateKindSchema,
-    fencingToken: z.number().int().positive(),
-    shardId: z.string().min(1),
-    leaseRef: z.string().min(1),
-    checkpoint: z.number().int().nonnegative(),
-    transitionedAt: UtcTimestampSchema,
-    auditRef: z.string().min(1),
-    reason: z.string().min(1),
-  })
-  .strict();
 export type CollectorPartitionState = z.infer<typeof CollectorPartitionStateSchema>;
+export const CollectorGapStateSchema = z.enum([
+  'OPEN',
+  'BACKFILL_QUEUED',
+  'BACKFILLING',
+  'RESOLVED_COMPLETE',
+  'RESOLVED_EMPTY_PROOF',
+  'PARTIAL',
+  'UNRESOLVED',
+  'WAIVED_FOR_NARROW_SCOPE',
+]);
 
 export const CollectorDecodePauseSchema = z
   .object({
@@ -168,7 +147,6 @@ export const CollectorDecodePauseSchema = z
   })
   .strict();
 export type CollectorDecodePause = z.infer<typeof CollectorDecodePauseSchema>;
-
 export const CollectorIncidentSchema = z
   .object({
     incidentId: z.string().min(1),
@@ -182,37 +160,28 @@ export const CollectorIncidentSchema = z
   })
   .strict();
 
-export const CollectorResourceConsumptionSchema = z
-  .object({
-    cpuPercent: z.number().nonnegative(),
-    memoryBytes: z.number().nonnegative(),
-    networkBytes: z.number().nonnegative(),
-    subscriptions: z.number().int().nonnegative(),
-    rawStorageBytes: z.number().nonnegative(),
-    retries: z.number().int().nonnegative(),
-    monthlyCredits: z.number().nonnegative(),
-  })
-  .strict();
 export const CollectorHealthSchema = z
   .object({
     partitionId: z.string().min(1),
-    measuredAt: UtcTimestampSchema,
-    connected: z.boolean(),
+    connectedState: z.enum(['CONNECTED', 'DISCONNECTED', 'CONNECTING']),
     endpointGeneration: z.number().int().nonnegative(),
-    headSlot: z.number().int().nonnegative(),
-    finalizedSlot: z.number().int().nonnegative(),
+    headSlot: z.string().regex(/^\d+$/),
+    finalizedSlot: z.string().regex(/^\d+$/),
     checkpointLag: z.number().int().nonnegative(),
     gapCount: z.number().int().nonnegative(),
-    oldestGapDurationMs: z.number().int().nonnegative(),
+    gapDurationSeconds: z.number().nonnegative(),
     backfillStatus: z.enum(['IDLE', 'QUEUED', 'RUNNING', 'PARTIAL', 'BLOCKED']),
     decodeFailureRate: z.number().min(0).max(1),
     streamedBytes: z.number().nonnegative(),
     eventRate: z.number().nonnegative(),
     deduplicationRate: z.number().min(0).max(1),
-    resourceConsumption: CollectorResourceConsumptionSchema,
+    resourceConsumption: z
+      .object({ cpuPercent: z.number().nonnegative(), memoryMb: z.number().nonnegative() })
+      .strict(),
+    sampledAt: UtcTimestampSchema,
   })
   .strict()
-  .refine((v) => v.finalizedSlot <= v.headSlot, {
+  .refine((v) => BigInt(v.finalizedSlot) <= BigInt(v.headSlot), {
     message: 'finalizedSlot cannot exceed headSlot',
   });
 export type CollectorHealth = z.infer<typeof CollectorHealthSchema>;
@@ -220,50 +189,43 @@ export type CollectorHealth = z.infer<typeof CollectorHealthSchema>;
 const CeilingSchema = z.number().nonnegative();
 export const CollectorCeilingSetSchema = z
   .object({
-    contractId: z.string().min(1),
-    version: z.string().min(1),
-    horizonDays: z.number().int().min(30),
-    verifiedAt: UtcTimestampSchema,
-    expiresAt: UtcTimestampSchema,
-    result: z.enum(['PASS', 'FAIL', 'UNVERIFIED']),
-    minimumHeadroomFraction: z.number().min(0).max(1),
-    degradationPolicyVersion: z.string().min(1),
-    cpuPercent: CeilingSchema,
-    memoryBytes: CeilingSchema,
-    networkBytes: CeilingSchema,
-    subscriptions: CeilingSchema,
-    eventRate: CeilingSchema,
-    rawStorageBytes: CeilingSchema,
-    retries: CeilingSchema,
-    monthlyCredits: CeilingSchema,
-    paidOverageAllowed: z.literal(false),
-    reserveConsumptionAllowed: z.literal(false),
+    ceilingSetId: z.string().min(1),
+    cpuCoreLimit: CeilingSchema,
+    memoryMbLimit: CeilingSchema,
+    networkBandwidthMbps: CeilingSchema,
+    activeSubscriptionLimit: CeilingSchema,
+    eventRatePerSecLimit: CeilingSchema,
+    rawStorageDailyMbLimit: CeilingSchema,
+    retryMaxPerHour: CeilingSchema,
+    monthlyCreditQuota: CeilingSchema,
+    sustainableContractId: z.string().min(1),
   })
-  .strict()
-  .refine((v) => Date.parse(v.expiresAt) > Date.parse(v.verifiedAt), {
-    message: 'capacity contract expiry must follow verification',
-  });
+  .strict();
 export type CollectorCeilingSet = z.infer<typeof CollectorCeilingSetSchema>;
-
 export const FirstSeenLatencySpansSchema = z
   .object({
-    subjectId: z.string().min(1),
-    scopeId: z.string().min(1),
-    scopeVerified: z.boolean(),
-    sourceEventAt: UtcTimestampSchema,
-    collectorReceiptAt: UtcTimestampSchema,
-    providerAvailableAt: UtcTimestampSchema.nullable(),
-    featureReadyAt: UtcTimestampSchema.nullable(),
-    decisionReadyAt: UtcTimestampSchema.nullable(),
-    deliveredAt: UtcTimestampSchema.nullable(),
-    recordedAt: UtcTimestampSchema,
+    eventToCollectorMs: z.number().nonnegative(),
+    collectorToFeatureMs: z.number().nonnegative(),
+    featureToDecisionMs: z.number().nonnegative(),
+    decisionToDeliveryMs: z.number().nonnegative(),
+    providerComparisonMs: z.number().nonnegative(),
+    isFirstPartyVerifiedScope: z.boolean(),
   })
-  .strict()
-  .refine((v) => Date.parse(v.collectorReceiptAt) >= Date.parse(v.sourceEventAt), {
-    message: 'receipt cannot precede source event',
-  });
+  .strict();
 export type FirstSeenLatencySpans = z.infer<typeof FirstSeenLatencySpansSchema>;
 
+export const COLLECTOR_SCHEMAS = {
+  CollectorScopeDeclaration: CollectorScopeDeclarationSchema,
+  CollectorStreamRecord: CollectorStreamRecordSchema,
+  ProgramSupportManifest: ProgramSupportManifestSchema,
+  CollectorPartitionState: CollectorPartitionStateSchema,
+  CollectorGapState: CollectorGapStateSchema,
+  CollectorDecodePause: CollectorDecodePauseSchema,
+  CollectorIncident: CollectorIncidentSchema,
+  CollectorHealth: CollectorHealthSchema,
+  CollectorCeilingSet: CollectorCeilingSetSchema,
+  FirstSeenLatencySpans: FirstSeenLatencySpansSchema,
+} as const;
 export class CollectorSchemaError extends Error {
   readonly code = 'COLLECTOR_SCHEMA_INVALID' as const;
   constructor(
@@ -274,17 +236,6 @@ export class CollectorSchemaError extends Error {
     this.name = 'CollectorSchemaError';
   }
 }
-export const COLLECTOR_SCHEMAS = {
-  CollectorScopeDeclaration: CollectorScopeDeclarationSchema,
-  CollectorStreamRecord: CollectorStreamRecordSchema,
-  ProgramSupportManifest: ProgramSupportManifestSchema,
-  CollectorPartitionState: CollectorPartitionStateSchema,
-  CollectorDecodePause: CollectorDecodePauseSchema,
-  CollectorIncident: CollectorIncidentSchema,
-  CollectorHealth: CollectorHealthSchema,
-  CollectorCeilingSet: CollectorCeilingSetSchema,
-  FirstSeenLatencySpans: FirstSeenLatencySpansSchema,
-} as const;
 export function parseCollectorSchema<T extends keyof typeof COLLECTOR_SCHEMAS>(
   name: T,
   payload: unknown,
@@ -293,3 +244,4 @@ export function parseCollectorSchema<T extends keyof typeof COLLECTOR_SCHEMAS>(
   if (!parsed.success) throw new CollectorSchemaError(name, parsed.error.issues);
   return parsed.data as z.infer<(typeof COLLECTOR_SCHEMAS)[T]>;
 }
+export const parseColSchema = parseCollectorSchema;

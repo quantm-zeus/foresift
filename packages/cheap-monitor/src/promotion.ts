@@ -25,10 +25,18 @@ export function decidePromotion(
     input.securityEligible;
   const inputsHash = promotionInputsHash(input);
   return PromotionDecisionSchema.parse({
-    ...input,
     decisionId: `promotion:${inputsHash}`,
+    candidateId: input.candidateId,
+    policyVersion: input.policyVersion,
+    featureSnapshotVersion: sha256Text(
+      canonicalJson({ features: input.frozenFeatures, versions: input.featureVersions }),
+    ),
     inputsHash,
+    decisionVersion: input.decisionVersion,
     decision: eligible ? 'PROMOTE_TO_VERIFY' : 'MONITOR_CHEAP',
+    rationale: eligible
+      ? 'all persistence, change, execution, and security gates passed'
+      : 'one or more eligibility gates did not pass',
     decidedAt,
   });
 }

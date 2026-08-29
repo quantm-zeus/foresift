@@ -4,14 +4,8 @@
  * strict refusal for broad-scan workloads, and eligibility constraints.
  */
 import { describe, expect, it } from 'bun:test';
-import {
-  routeToReserve,
-  type ReserveRouteResult,
-} from '../src/reserve-router.ts';
-import {
-  FREE_QUOTA_OP,
-  PAID_EXPLICIT_OP,
-} from '../../../tests/fixtures/cost/operations.ts';
+import { routeToReserve } from '../src/reserve-router.ts';
+import { FREE_QUOTA_OP } from '../../../tests/fixtures/cost/operations.ts';
 
 describe('routeToReserve', () => {
   it('routes RISK_MONITOR_HIGH workload to RISK_MONITORING reserve when eligible', () => {

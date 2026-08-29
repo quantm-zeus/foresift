@@ -143,7 +143,11 @@ describe('cost schema vocabulary mirrors match domain constants', () => {
 
 describe('cost schemas accept valid records', () => {
   it.each([
-    ['OperationCostDeclarationSchema', OperationCostDeclarationSchema, validOperationCostDeclaration],
+    [
+      'OperationCostDeclarationSchema',
+      OperationCostDeclarationSchema,
+      validOperationCostDeclaration,
+    ],
     ['QuotaBalanceSchema', QuotaBalanceSchema, validQuotaBalance],
     ['ReserveBucketSchema', ReserveBucketSchema, validReserveBucket],
     ['PaidProviderPolicySchema', PaidProviderPolicySchema, validPaidProviderPolicy],
@@ -160,7 +164,11 @@ describe('cost schemas accept valid records', () => {
 
 describe('cost schemas refuse unknown keys fail-closed (strictness)', () => {
   it.each([
-    ['OperationCostDeclarationSchema', OperationCostDeclarationSchema, validOperationCostDeclaration],
+    [
+      'OperationCostDeclarationSchema',
+      OperationCostDeclarationSchema,
+      validOperationCostDeclaration,
+    ],
     ['QuotaBalanceSchema', QuotaBalanceSchema, validQuotaBalance],
     ['ReserveBucketSchema', ReserveBucketSchema, validReserveBucket],
     ['PaidProviderPolicySchema', PaidProviderPolicySchema, validPaidProviderPolicy],
@@ -205,5 +213,7 @@ describe('parseCostSchema helper & registry version', () => {
     for (const name of Object.keys(COST_SCHEMAS) as CostSchemaName[]) {
       expect(COST_SCHEMAS[name]).toBeDefined();
     }
+    const parsed = parseCostSchema('OperationCostDeclaration', validOperationCostDeclaration);
+    expect(parsed.providerId).toBe('prov_helius');
   });
 });

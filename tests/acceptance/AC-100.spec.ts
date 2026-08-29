@@ -10,9 +10,7 @@
  * - Asserts COST_BLOCKED stage block before network execution.
  * - Confirms audited denial record contains candidate, caller, reason, alternative.
  */
-import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
-import { closeTestDatabase, makeTestDatabase, type TestDatabase } from './helpers.ts';
-import { CostQuotaAdapter } from '../../packages/cost-router/src/quota-adapter.ts';
+import { describe, expect, it } from 'bun:test';
 import { evaluateStrictFreeGuard } from '../../packages/cost-router/src/strict-free-guard.ts';
 import {
   FREE_QUOTA_OP,
@@ -21,18 +19,6 @@ import {
   UNKNOWN_COST_OP,
   AUTO_UPGRADE_OP,
 } from '../fixtures/cost/operations.ts';
-
-let tdb: TestDatabase;
-let adapter: CostQuotaAdapter;
-
-beforeAll(async () => {
-  tdb = await makeTestDatabase();
-  adapter = new CostQuotaAdapter({ engine: tdb.engine, mode: 'STRICT_FREE' });
-});
-
-afterAll(async () => {
-  await closeTestDatabase(tdb);
-});
 
 describe('AC-100 acceptance (positive): STRICT_FREE pre-network blocking and audit', () => {
   it('admits free unmetered operations under STRICT_FREE', async () => {

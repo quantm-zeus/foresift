@@ -11,10 +11,6 @@ import {
   ALL_RESET_POLICY_KINDS,
   ALL_RESOURCE_BUDGET_KINDS,
   CostClass,
-  CostMode,
-  ReserveId,
-  ResetPolicyKind,
-  ResourceBudgetKind,
   costClass,
   costMode,
   isAllowedInStrictFreeCostClass,
@@ -40,16 +36,19 @@ describe('cost domain vocabulary resolution', () => {
     }
   });
 
-  it.each(VOCABULARIES)('%s refuses unknown values fail-closed with ForesiftError', (_name, resolve, all) => {
-    expect(() => resolve('TOTALLY_UNKNOWN')).toThrow(ForesiftError);
-    expect(() => resolve('')).toThrow(ForesiftError);
-    for (const value of all) {
-      const drifted = value.toLowerCase();
-      if (!all.includes(drifted as never)) {
-        expect(() => resolve(drifted)).toThrow(ForesiftError);
+  it.each(VOCABULARIES)(
+    '%s refuses unknown values fail-closed with ForesiftError',
+    (_name, resolve, all) => {
+      expect(() => resolve('TOTALLY_UNKNOWN')).toThrow(ForesiftError);
+      expect(() => resolve('')).toThrow(ForesiftError);
+      for (const value of all) {
+        const drifted = value.toLowerCase();
+        if (!all.includes(drifted as never)) {
+          expect(() => resolve(drifted)).toThrow(ForesiftError);
+        }
       }
-    }
-  });
+    },
+  );
 });
 
 describe('CostClass exact PRD specification', () => {

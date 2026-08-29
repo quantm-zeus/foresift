@@ -15,8 +15,11 @@ describe('AC-225 acceptance (positive): backfilled event cost impact scoped to r
     const historicalEventAt = '2026-01-01T00:00:00Z';
     const retrievalTime = '2026-08-01T12:00:00Z';
 
-    const accountingWindowStart = '2026-08-01T00:00:00Z'; // Daily window containing retrievalTime
+    const accountingWindowStart = new Date(retrievalTime).toISOString().slice(0, 10) + 'T00:00:00Z';
+    const historicalWindowStart =
+      new Date(historicalEventAt).toISOString().slice(0, 10) + 'T00:00:00Z';
 
-    expect(accountingWindowStart).not.toBe('2026-01-01T00:00:00Z');
+    expect(accountingWindowStart).toBe('2026-08-01T00:00:00Z');
+    expect(accountingWindowStart).not.toBe(historicalWindowStart);
   });
 });

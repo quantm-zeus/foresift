@@ -4,10 +4,7 @@
  * fail-closed UNVERIFIED transition on expired TTL, and clearing on re-verification.
  */
 import { describe, expect, it } from 'bun:test';
-import {
-  isPlanMetadataVerified,
-  verifyPlanFreshness,
-} from '../src/plan-verifier.ts';
+import { isPlanMetadataVerified, verifyPlanFreshness } from '../src/plan-verifier.ts';
 import {
   EXPIRED_FORECAST_SNAPSHOT,
   VERIFIED_FORECAST_SNAPSHOT,

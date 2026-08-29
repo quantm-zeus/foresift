@@ -11,10 +11,7 @@
  */
 import { describe, expect, it } from 'bun:test';
 import { verifyPlanFreshness } from '../../packages/quota-forecast/src/plan-verifier.ts';
-import {
-  EXPIRED_FORECAST_SNAPSHOT,
-  VERIFIED_FORECAST_SNAPSHOT,
-} from '../fixtures/cost/plans.ts';
+import { EXPIRED_FORECAST_SNAPSHOT, VERIFIED_FORECAST_SNAPSHOT } from '../fixtures/cost/plans.ts';
 
 describe('AC-103 acceptance (positive): unverified plan expiry blocks estimation', () => {
   it('identifies unexpired plan snapshot as VERIFIED', () => {

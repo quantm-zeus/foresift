@@ -11,10 +11,7 @@
  */
 import { describe, expect, it } from 'bun:test';
 import { run30DayCapacityReplay } from '../../packages/quota-forecast/src/capacity-replay.ts';
-import {
-  BASELINE_OBSERVED_USAGE,
-  VALID_PLAN_LIMITS,
-} from '../fixtures/cost/plans.ts';
+import { BASELINE_OBSERVED_USAGE, VALID_PLAN_LIMITS } from '../fixtures/cost/plans.ts';
 
 describe('AC-227 acceptance (positive): 30-day capacity replay across 9 dimensions', () => {
   it('approves activation when expected 30-day simulation satisfies all 9 dimension ceilings', () => {

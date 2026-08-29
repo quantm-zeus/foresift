@@ -5,10 +5,7 @@
  */
 import { describe, expect, it } from 'bun:test';
 import { run30DayCapacityReplay } from '../../packages/quota-forecast/src/capacity-replay.ts';
-import {
-  CEILING_EXCEEDED_OBSERVED_USAGE,
-  VALID_PLAN_LIMITS,
-} from '../fixtures/cost/plans.ts';
+import { CEILING_EXCEEDED_OBSERVED_USAGE, VALID_PLAN_LIMITS } from '../fixtures/cost/plans.ts';
 
 describe('AC-227 negative: single ceiling breach blocks overall release activation', () => {
   it('blocks activation when credits ceiling is breached during stress replay', () => {

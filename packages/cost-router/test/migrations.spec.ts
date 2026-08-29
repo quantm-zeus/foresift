@@ -6,7 +6,6 @@
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 import { PGlite } from '@electric-sql/pglite';
 import {
-  appliedMigrations,
   applyMigrations,
   createEngine,
   discoverMigrations,

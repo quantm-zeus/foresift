@@ -4,10 +4,7 @@
  * and incident creation upon tolerance breach.
  */
 import { describe, expect, it } from 'bun:test';
-import {
-  computeCostForecast,
-  type ForecastEvaluationResult,
-} from '../src/forecast.ts';
+import { computeCostForecast } from '../src/forecast.ts';
 import {
   BASELINE_OBSERVED_USAGE,
   TOLERANCE_BREACH_OBSERVED_USAGE,

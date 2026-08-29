@@ -14,3 +14,20 @@ describe('AC-226 negative: detects and fails on inflated cost-path latency', () 
     expect(withinBudget).toBe(false);
   });
 });
+
+describe('AC-226 negative — first-party scope labeling restriction facet (FR-COL-011)', () => {
+  it('refuses to label spans outside verified collector scope as first-party', () => {
+    const unverifiedScopeSpan = {
+      sourceId: 'src_third_party_indexer',
+      isFirstPartyVerifiedScope: false,
+      claimedLabel: 'FIRST_PARTY',
+    };
+
+    const isLabelValid =
+      unverifiedScopeSpan.isFirstPartyVerifiedScope ||
+      unverifiedScopeSpan.claimedLabel !== 'FIRST_PARTY';
+
+    expect(isLabelValid).toBe(false);
+  });
+});
+

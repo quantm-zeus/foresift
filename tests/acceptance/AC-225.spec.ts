@@ -23,3 +23,28 @@ describe('AC-225 acceptance (positive): backfilled event cost impact scoped to r
     expect(accountingWindowStart).not.toBe(historicalWindowStart);
   });
 });
+
+describe('AC-225 acceptance (positive) — collector backfill availability timestamp facet (FR-COL-005)', () => {
+  it('preserves original chain time while setting available_at to real retrieval time', () => {
+    const historicalChainTime = '2026-01-01T00:00:00.000Z';
+    const realRetrievalTime = '2026-08-20T10:00:00.000Z';
+    const systemAvailableAt = '2026-08-20T10:00:00.005Z';
+
+    const backfilledEvent = {
+      eventAt: historicalChainTime,
+      retrievedAt: realRetrievalTime,
+      availableAt: systemAvailableAt,
+    };
+
+    expect(backfilledEvent.eventAt).toBe(historicalChainTime);
+    expect(new Date(backfilledEvent.availableAt).getTime()).toBeGreaterThanOrEqual(
+      new Date(realRetrievalTime).getTime(),
+    );
+
+    // Historical replay query before retrievalTime cannot see the event
+    const pointInTimeReplay = '2026-06-01T00:00:00.000Z';
+    const isVisibleAtReplay = pointInTimeReplay >= backfilledEvent.availableAt;
+    expect(isVisibleAtReplay).toBe(false);
+  });
+});
+

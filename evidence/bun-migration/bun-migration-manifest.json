@@ -1,18 +1,18 @@
 {
   "schema": "foresift/bun-migration-manifest@1",
   "migrationId": "bun-test-authority-v1",
-  "generatedAt": "2026-08-29T10:55:16.368Z",
+  "generatedAt": "2026-08-29T14:28:32.346Z",
   "root": ".",
-  "totalTestFiles": 261,
+  "totalTestFiles": 262,
   "counts": {
     "CODEMOD_READY": 0,
     "AGY_REQUIRED": 0,
-    "MIGRATED": 261,
+    "MIGRATED": 262,
     "VERIFIED": 0,
     "BLOCKED": 0
   },
   "parity": {
-    "previousTotal": 261,
+    "previousTotal": 262,
     "disappeared": []
   },
   "files": [
@@ -3980,6 +3980,21 @@
         "../../scripts/automation/convergence-router.mjs",
         "../helpers/v2-fixtures.js"
       ],
+      "state": "MIGRATED"
+    },
+    {
+      "path": "tests/automation/test-runtime-containment.spec.ts",
+      "package": "automation",
+      "bytes": 4515,
+      "lines": 82,
+      "sha256": "670623664963a2f99d6b34085357992495301a853f412ec85b6fbcb9fce9bf25",
+      "imports": ["bun:test", "node:child_process", "node:fs", "node:path"],
+      "vitestImports": [],
+      "features": [],
+      "workload": "PROCESS",
+      "migrationType": "ALREADY_MIGRATED",
+      "fixturesAndHelpers": [],
+      "sourceAnchors": [],
       "state": "MIGRATED"
     },
     {

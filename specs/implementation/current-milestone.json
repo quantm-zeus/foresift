@@ -67,7 +67,9 @@
         "FR-SEC-011",
         "FR-SEC-012"
       ],
-      "dependencies": ["g0-contracts-data-truth"],
+      "dependencies": [
+        "g0-contracts-data-truth"
+      ],
       "risk": "CRITICAL",
       "parallelizable": false,
       "writeScopes": [
@@ -102,7 +104,10 @@
         "FR-CORE-007",
         "FR-CORE-008"
       ],
-      "dependencies": ["g0-contracts-data-truth", "g0-security-perimeter"],
+      "dependencies": [
+        "g0-contracts-data-truth",
+        "g0-security-perimeter"
+      ],
       "risk": "HIGH",
       "parallelizable": false,
       "writeScopes": [
@@ -136,7 +141,10 @@
         "FR-PROV-009",
         "FR-PROV-010"
       ],
-      "dependencies": ["g0-contracts-data-truth", "g0-security-perimeter"],
+      "dependencies": [
+        "g0-contracts-data-truth",
+        "g0-security-perimeter"
+      ],
       "risk": "HIGH",
       "parallelizable": false,
       "writeScopes": [
@@ -171,7 +179,10 @@
         "FR-COST-009",
         "FR-COST-010"
       ],
-      "dependencies": ["g0-tool-core", "g0-provider-lifecycle"],
+      "dependencies": [
+        "g0-tool-core",
+        "g0-provider-lifecycle"
+      ],
       "risk": "HIGH",
       "parallelizable": false,
       "writeScopes": [
@@ -191,7 +202,7 @@
         "test -d packages/capacity-planner && pnpm --filter @foresift/capacity-planner test",
         "test -d packages/quota-forecast && pnpm --filter @foresift/quota-forecast test"
       ],
-      "status": "RUNNING"
+      "status": "PROVEN"
     },
     {
       "id": "g0-first-party-observation",
@@ -264,7 +275,11 @@
         "FR-MCP-009",
         "FR-MCP-010"
       ],
-      "dependencies": ["g0-tool-core", "g0-security-perimeter", "g0-cost-capacity"],
+      "dependencies": [
+        "g0-tool-core",
+        "g0-security-perimeter",
+        "g0-cost-capacity"
+      ],
       "risk": "HIGH",
       "parallelizable": false,
       "writeScopes": [
@@ -278,7 +293,9 @@
         "tests/negative/**",
         "telemetry/mcp.*"
       ],
-      "verificationCommands": ["test -d apps/api && pnpm --filter @foresift/api test"],
+      "verificationCommands": [
+        "test -d apps/api && pnpm --filter @foresift/api test"
+      ],
       "status": "PENDING"
     },
     {

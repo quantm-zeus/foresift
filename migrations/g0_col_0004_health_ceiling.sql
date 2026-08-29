@@ -29,7 +29,14 @@ CREATE TABLE col.collector_health (
                                      AND resource_consumption ?& ARRAY[
                                          'cpuPercent', 'memoryBytes', 'networkBytes',
                                          'subscriptions', 'rawStorageBytes', 'retries',
-                                         'monthlyCredits']),
+                                         'monthlyCredits']
+                                     AND jsonb_typeof(resource_consumption -> 'cpuPercent') = 'number'
+                                     AND jsonb_typeof(resource_consumption -> 'memoryBytes') = 'number'
+                                     AND jsonb_typeof(resource_consumption -> 'networkBytes') = 'number'
+                                     AND jsonb_typeof(resource_consumption -> 'subscriptions') = 'number'
+                                     AND jsonb_typeof(resource_consumption -> 'rawStorageBytes') = 'number'
+                                     AND jsonb_typeof(resource_consumption -> 'retries') = 'number'
+                                     AND jsonb_typeof(resource_consumption -> 'monthlyCredits') = 'number'),
     created_at                timestamptz NOT NULL DEFAULT now(),
     PRIMARY KEY (partition_id, measured_at),
     FOREIGN KEY (partition_id) REFERENCES col.collector_partitions(partition_id),

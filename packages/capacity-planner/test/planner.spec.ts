@@ -4,10 +4,7 @@
  * into a single QuotaAdmissionDecision consumed by tool-core stage 12.
  */
 import { describe, expect, it } from 'bun:test';
-import {
-  CapacityPlanner,
-  type PlannerAdmissionInput,
-} from '../src/planner.ts';
+import { CapacityPlanner, type PlannerAdmissionInput } from '../src/planner.ts';
 import { SIX_RESOURCE_BUDGETS_FIXTURES } from '../../../tests/fixtures/cost/paid-policies.ts';
 import { FREE_QUOTA_OP } from '../../../tests/fixtures/cost/operations.ts';
 

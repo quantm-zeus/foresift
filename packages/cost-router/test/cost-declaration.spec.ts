@@ -4,11 +4,7 @@
  * rejection on missing fields or unrecognized enums.
  */
 import { describe, expect, it } from 'bun:test';
-import {
-  isCostDeclarationComplete,
-  loadCostDeclaration,
-  type OperationCostDeclaration,
-} from '../src/cost-declaration.ts';
+import { isCostDeclarationComplete, loadCostDeclaration } from '../src/cost-declaration.ts';
 import {
   FREE_QUOTA_OP,
   FREE_UNMETERED_OP,

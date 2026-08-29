@@ -5,10 +5,7 @@
  */
 import { describe, expect, it } from 'bun:test';
 import { computeCostForecast } from '../../packages/quota-forecast/src/forecast.ts';
-import {
-  TOLERANCE_BREACH_OBSERVED_USAGE,
-  VALID_PLAN_LIMITS,
-} from '../fixtures/cost/plans.ts';
+import { TOLERANCE_BREACH_OBSERVED_USAGE, VALID_PLAN_LIMITS } from '../fixtures/cost/plans.ts';
 
 describe('AC-229 negative: repeated tolerance breaches each incident individually', () => {
   it('raises incident on first breach and raises new incident on second breach without silent spillover', () => {

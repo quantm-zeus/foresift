@@ -4,13 +4,8 @@
  * and refusal to merge across disparate providers or operations.
  */
 import { describe, expect, it } from 'bun:test';
+import { coalesceBatchRequests, computeBatchKey } from '../src/batch-coalescer.ts';
 import {
-  coalesceBatchRequests,
-  computeBatchKey,
-  type BatchCoalesceInput,
-} from '../src/batch-coalescer.ts';
-import {
-  COMPATIBLE_BATCH_ITEMS,
   INCOMPATIBLE_DIFFERENT_OPERATION_ITEMS,
   INCOMPATIBLE_DIFFERENT_PROVIDER_ITEMS,
   generateCompatibleBatchItems,

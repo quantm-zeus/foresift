@@ -11,10 +11,7 @@
  */
 import { describe, expect, it } from 'bun:test';
 import { computeCostForecast } from '../../packages/quota-forecast/src/forecast.ts';
-import {
-  TOLERANCE_BREACH_OBSERVED_USAGE,
-  VALID_PLAN_LIMITS,
-} from '../fixtures/cost/plans.ts';
+import { TOLERANCE_BREACH_OBSERVED_USAGE, VALID_PLAN_LIMITS } from '../fixtures/cost/plans.ts';
 
 describe('AC-229 acceptance (positive): forecast tolerance breach incident & cap recomputation', () => {
   it('raises incident and recomputes limits downward when usage exceeds forecast tolerance', () => {

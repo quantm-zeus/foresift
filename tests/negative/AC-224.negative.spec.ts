@@ -59,7 +59,10 @@ describe('AC-224 negative: replayed collector window does not produce secondary 
 
     expect(id1).toBe(id2);
 
-    const balanceResult = await tdb.engine.query<{ consumed_reserved: string; remaining_units: string }>(
+    const balanceResult = await tdb.engine.query<{
+      consumed_reserved: string;
+      remaining_units: string;
+    }>(
       'SELECT consumed_reserved, remaining_units FROM cost.cost_quota_balances WHERE provider_id = $1',
       [FREE_QUOTA_OP.providerId],
     );

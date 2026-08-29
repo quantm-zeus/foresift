@@ -8,17 +8,8 @@
  * - PAID_FALLBACK_BLOCKED:*
  */
 import { describe, expect, it } from 'bun:test';
-import {
-  evaluateStrictFreeGuard,
-  type StrictFreeGuardInput,
-} from '../src/strict-free-guard.ts';
-import {
-  AUTO_UPGRADE_OP,
-  FREE_QUOTA_OP,
-  FREE_UNMETERED_OP,
-  PAID_EXPLICIT_OP,
-  UNKNOWN_COST_OP,
-} from '../../../tests/fixtures/cost/operations.ts';
+import { evaluateStrictFreeGuard, type StrictFreeGuardInput } from '../src/strict-free-guard.ts';
+import { FREE_QUOTA_OP } from '../../../tests/fixtures/cost/operations.ts';
 
 describe('evaluateStrictFreeGuard', () => {
   const baseInput: StrictFreeGuardInput = {

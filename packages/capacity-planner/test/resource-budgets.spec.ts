@@ -4,10 +4,7 @@
  * non-critical degradation containment, and BYOK namespace isolation.
  */
 import { describe, expect, it } from 'bun:test';
-import {
-  evaluateResourceBudgetAdmission,
-  type ResourceBudgetSnapshot,
-} from '../src/resource-budgets.ts';
+import { evaluateResourceBudgetAdmission } from '../src/resource-budgets.ts';
 import { SIX_RESOURCE_BUDGETS_FIXTURES } from '../../../tests/fixtures/cost/paid-policies.ts';
 
 describe('resource-budgets', () => {
@@ -53,9 +50,7 @@ describe('resource-budgets', () => {
   });
 
   it('keeps MODEL_TOKENS_BYOK strictly isolated from provider quota counters', () => {
-    const byokBudget = SIX_RESOURCE_BUDGETS_FIXTURES.find(
-      (b) => b.kind === 'MODEL_TOKENS_BYOK',
-    );
+    const byokBudget = SIX_RESOURCE_BUDGETS_FIXTURES.find((b) => b.kind === 'MODEL_TOKENS_BYOK');
     expect(byokBudget).toBeDefined();
     expect(byokBudget!.kind).toBe('MODEL_TOKENS_BYOK');
   });

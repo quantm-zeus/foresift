@@ -9,7 +9,6 @@ import {
   createPaidPolicy,
   isPaidPolicyAdmissible,
   reAuthenticatePaidPolicy,
-  type PaidPolicyRecord,
 } from '../src/paid-policy.ts';
 import {
   ACTIVE_PAID_POLICY,

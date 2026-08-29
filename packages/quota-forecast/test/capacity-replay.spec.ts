@@ -4,10 +4,7 @@
  * activation blocking when ceilings exceeded, and replay determinism.
  */
 import { describe, expect, it } from 'bun:test';
-import {
-  run30DayCapacityReplay,
-  type CapacityReplayInput,
-} from '../src/capacity-replay.ts';
+import { run30DayCapacityReplay, type CapacityReplayInput } from '../src/capacity-replay.ts';
 import {
   BASELINE_OBSERVED_USAGE,
   CEILING_EXCEEDED_OBSERVED_USAGE,

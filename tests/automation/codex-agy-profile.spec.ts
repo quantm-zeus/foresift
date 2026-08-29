@@ -33,6 +33,11 @@ async function loadAgyTestWriterModule() {
   return await import('../../scripts/automation/exec-agy-test-writer.mjs');
 }
 
+async function loadCodexRepairModule() {
+  // @ts-expect-error untyped dynamic import for module concurrently authored in codex lane
+  return await import('../../scripts/automation/exec-codex-repair.mjs');
+}
+
 let tempDirs: string[] = [];
 
 function makeTempDir(prefix = 'codex-agy-test-'): string {
@@ -1904,6 +1909,151 @@ process.exit(${JSON.stringify(options.exitCode ?? 0)});
       );
       expect(src).toContain('"classification"');
       expect(src).toContain('NEW_BEHAVIOR_RED|REGRESSION_RED|NEGATIVE_RED');
+    });
+  });
+
+  describe('Matrix AI: repair route selection for lane-less waves', () => {
+    it('picks the highest-tier implementation lane and escalates it to HIGH', async () => {
+      const mod = await loadCodexRepairModule();
+      const route = mod.selectRepairRoute({
+        lanes: [
+          { lane: 'core', role: 'implementation', engine: 'CODEX', complexityTier: 'MEDIUM' },
+        ],
+      });
+      expect(route.complexityTier).toBe('HIGH');
+      expect(route.model).toBe('gpt-5.6-sol');
+      expect(route.reasoning).toBe('medium');
+      expect(route.synthesizedForLaneLessWave).toBeUndefined();
+    });
+
+    it('synthesizes a sol/medium repair route when no implementation lane exists', async () => {
+      const mod = await loadCodexRepairModule();
+      const route = mod.selectRepairRoute({
+        lanes: [
+          { lane: 'test-author', role: 'test', engine: 'AGY', model: 'gemini-3.7-flash-high' },
+        ],
+      });
+      expect(route.engine).toBe('CODEX');
+      expect(route.complexityTier).toBe('HIGH');
+      expect(route.model).toBe('gpt-5.6-sol');
+      expect(route.reasoning).toBe('medium');
+      expect(route.serviceTier).toBe('standard');
+      expect(route.cliServiceTier).toBe('default');
+      expect(route.synthesizedForLaneLessWave).toBe(true);
+    });
+  });
+
+  describe('Matrix AJ: AGY type-repair pass (lane output must compile)', () => {
+    function setupTypeRepairFixture() {
+      const dir = makeTempDir('agy-type-repair-');
+      const wt = join(dir, 'wt');
+      const binDir = join(dir, 'bin');
+      const resultsDir = join(dir, 'results');
+      mkdirSync(binDir, { recursive: true });
+      mkdirSync(join(wt, 'tests'), { recursive: true });
+      execFileSync('git', ['-C', wt, 'init', '-q'], { cwd: dir });
+      execFileSync('git', ['-C', wt, 'config', 'user.email', 't@t'], { cwd: dir });
+      execFileSync('git', ['-C', wt, 'config', 'user.name', 't'], { cwd: dir });
+
+      const recordPath = join(dir, 'agy-calls.jsonl');
+      const briefPath = join(dir, 'brief.md');
+      writeFileSync(briefPath, 'Author the cost fixtures suite.\n');
+      // Fake typecheck: fails while the marker exists, with a TS-shaped error
+      // line targeting the AGY-authored spec.
+      writeFileSync(
+        join(wt, 'typecheck.js'),
+        [
+          "const { existsSync, rmSync, writeFileSync } = require('node:fs');",
+          `const marker = ${JSON.stringify(join(wt, 'tests', 'marker.txt'))};`,
+          'if (existsSync(marker)) {',
+          '  console.log("tests/a.spec.ts(1,1): error TS2322: fixture type mismatch");',
+          '  process.exit(1);',
+          '}',
+          'process.exit(0);',
+        ].join('\n'),
+      );
+      writeFileSync(
+        join(wt, 'package.json'),
+        JSON.stringify({ name: 'wt-fixture', scripts: { typecheck: 'node typecheck.js' } }),
+      );
+      // Mock agy: call 1 authors the spec + marker (typecheck fails);
+      // call 2 (type repair) removes the marker.
+      const mock = `#!/usr/bin/env node
+const { readFileSync, writeFileSync, rmSync, appendFileSync, existsSync } = require('node:fs');
+const stdin = readFileSync(0, 'utf8');
+appendFileSync(${JSON.stringify(recordPath)}, JSON.stringify({ stdin }) + '\\n');
+const marker = ${JSON.stringify(join(wt, 'tests', 'marker.txt'))};
+if (existsSync(marker)) {
+  rmSync(marker, { force: true });
+} else {
+  writeFileSync(marker, 'fail\\n');
+}
+writeFileSync(${JSON.stringify(join(wt, 'tests', 'a.spec.ts'))}, 'test("a", () => {});\\n');
+writeFileSync(${JSON.stringify(join(resultsDir, 'agent-result.json'))}, JSON.stringify({
+  baselineClassifications: [{ file: 'tests/a.spec.ts', baseline: 'NEW_BEHAVIOR_RED' }],
+  testsRun: ['tests/a.spec.ts'],
+  testResults: 'pass',
+  blockers: [],
+}));
+`;
+      writeFileSync(join(binDir, 'agy'), mock);
+      execFileSync('chmod', ['+x', join(binDir, 'agy')]);
+
+      execFileSync('git', ['-C', wt, 'add', '-A'], { cwd: dir });
+      execFileSync('git', ['-C', wt, 'commit', '-qm', 'base'], { cwd: dir });
+
+      const routingPath = join(dir, 'routing.json');
+      writeFileSync(
+        routingPath,
+        JSON.stringify({
+          executionProfile: 'CODEX_AGY',
+          lanes: [
+            {
+              lane: 'test-author',
+              role: 'test',
+              engine: 'AGY',
+              model: 'gemini-3.7-flash-high',
+              reasoning: 'high',
+              providerTimeout: '40m',
+              taskIds: ['T006'],
+            },
+          ],
+        }),
+      );
+      return { dir, wt, resultsDir, routingPath, briefPath, recordPath };
+    }
+
+    it('re-invokes AGY to fix type errors in its own files and completes', async () => {
+      const mod = await loadAgyTestWriterModule();
+      const fx = setupTypeRepairFixture();
+      const prevPath = process.env.PATH;
+      process.env.PATH = `${fx.dir}/bin:${prevPath}`;
+      try {
+        const result = mod.runAgyTestWriter({
+          lane: 'test-author',
+          brief: fx.briefPath,
+          worktree: fx.wt,
+          routing: fx.routingPath,
+          'results-dir': fx.resultsDir,
+        });
+        expect(result.typeRepair.attempted).toBe(true);
+        expect(result.typeRepair.remaining).toEqual([]);
+        // Two AGY invocations: original + type-repair pass.
+        const calls = readFileSync(fx.recordPath, 'utf8').trim().split('\n');
+        expect(calls.length).toBe(2);
+        expect(calls[1]).toContain('error TS2322');
+        expect(calls[1]).toContain('TYPE REPAIR PASS');
+        // All authorship is committed; only tooling side effects (pnpm's
+        // node_modules/lockfile noise from the typecheck probe) may remain
+        // uncommitted.
+        const status = execFileSync('git', ['-C', fx.wt, 'status', '--porcelain'], {
+          encoding: 'utf8',
+        });
+        expect(status).not.toContain('tests/a.spec.ts');
+        expect(status).not.toContain('marker');
+      } finally {
+        process.env.PATH = prevPath;
+      }
     });
   });
 });

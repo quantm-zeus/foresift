@@ -86,7 +86,6 @@ export function runAgyTestWriter(input) {
     'Each baselineClassifications item MUST be exactly',
     '{"file":"<repo-relative spec path>","classification":"<one of NEW_BEHAVIOR_RED|REGRESSION_RED|NEGATIVE_RED|CHARACTERIZATION_GREEN|REFACTOR_GUARD_GREEN>"}.',
   ].join('\n');
-  const ndjson = `${JSON.stringify({ event: 'user', message: { role: 'user', content: prompt } })}\n`;
   const started = Date.now();
   const agyArgs = [
     '--input-format',
@@ -102,14 +101,16 @@ export function runAgyTestWriter(input) {
     '--print-timeout',
     route.providerTimeout,
   ];
-  const run = spawnSync('agy', agyArgs, {
-    shell: false,
-    cwd: input.worktree,
-    input: ndjson,
-    encoding: 'utf8',
-    timeout: Number(input['timeout-ms'] ?? 45 * 60_000),
-    maxBuffer: 64 * 1024 * 1024,
-  });
+  const runAgy = (promptText) =>
+    spawnSync('agy', agyArgs, {
+      shell: false,
+      cwd: input.worktree,
+      input: `${JSON.stringify({ event: 'user', message: { role: 'user', content: promptText } })}\n`,
+      encoding: 'utf8',
+      timeout: Number(input['timeout-ms'] ?? 45 * 60_000),
+      maxBuffer: 64 * 1024 * 1024,
+    });
+  const run = runAgy(prompt);
   writeFileSync(join(resultDir, 'agy-run.jsonl'), run.stdout ?? '');
   if (run.error) throw new Error(`AGY_TEST_SPAWN_FAILED: ${run.error.message}`);
   if (run.status !== 0) throw new Error(`AGY_TEST_FAILED: ${(run.stderr ?? '').slice(-500)}`);
@@ -137,8 +138,8 @@ export function runAgyTestWriter(input) {
     );
     if (commit.status !== 0) throw new Error(`AGY_TEST_COMMIT_FAILED: ${commit.stderr}`);
   }
-  const head = git(['rev-parse', 'HEAD'], input.worktree).stdout.trim();
-  const changedPaths = git(['diff', '--name-only', `${baseHead}..${head}`], input.worktree)
+  let head = git(['rev-parse', 'HEAD'], input.worktree).stdout.trim();
+  let changedPaths = git(['diff', '--name-only', `${baseHead}..${head}`], input.worktree)
     .stdout.split('\n')
     .filter(Boolean);
   const ownership = validateLaneOwnership({ engine: 'AGY', role: 'test', changedPaths });
@@ -146,6 +147,91 @@ export function runAgyTestWriter(input) {
     throw new Error(`${ownership.violationCode}: ${ownership.violatingPaths.join(',')}`);
   const outside = allowedPaths ? changedPaths.filter((path) => !allowedPaths.has(path)) : [];
   if (outside.length) throw new Error(`AGY_TEST_SCOPE_VIOLATION: ${outside.join(',')}`);
+
+  // ── type-repair pass (bounded: exactly one) ──────────────────────────────────
+  // The lane's own output must compile: test files that fail `pnpm typecheck`
+  // fail every downstream fast gate, and the only legal repairer of AGY-owned
+  // test files is AGY itself (Codex repairs are product-owned). Re-invoke the
+  // same agent with the filtered error list, restricted to files this lane
+  // changed. (Observed live: run e01370f3's AGY lane shipped type-broken test
+  // fixtures; no repair path existed for them.)
+  const typecheckErrorsFor = (paths, cwd) => {
+    const r = spawnSync('pnpm', ['typecheck'], {
+      cwd,
+      encoding: 'utf8',
+      timeout: 300_000,
+      maxBuffer: 64 * 1024 * 1024,
+    });
+    const out = `${r.stdout ?? ''}\n${r.stderr ?? ''}`;
+    const changed = new Set(paths);
+    return [...out.matchAll(/^([^\s(]+)\(\d+,\d+\): error TS[^\n]*/gm)]
+      .map((m) => m[0])
+      .filter((line) => changed.has(line.split('(')[0]));
+  };
+  let typeErrors = typecheckErrorsFor(changedPaths, input.worktree);
+  const typeRepair = { attempted: false, remaining: typeErrors };
+  if (typeErrors.length) {
+    typeRepair.attempted = true;
+    const repairPrompt = [
+      prompt,
+      '',
+      'TYPE REPAIR PASS. Your committed test-author changes introduced TypeScript',
+      'errors. Fix ONLY these errors, ONLY inside the files you authored:',
+      ...typeErrors.map((line) => `  ${line}`),
+      '',
+      'Do not edit product implementation. Do not weaken test intent to dodge a',
+      'type error — fix the fixture/helper/type usage. Re-run the affected suites,',
+      `commit the fixes, and rewrite ${join(resultDir, 'agent-result.json')} with`,
+      'the same JSON contract as before.',
+    ].join('\n');
+    const repairRun = runAgy(repairPrompt);
+    writeFileSync(join(resultDir, 'agy-run-type-repair.jsonl'), repairRun.stdout ?? '');
+    if (repairRun.error)
+      throw new Error(`AGY_TEST_REPAIR_SPAWN_FAILED: ${repairRun.error.message}`);
+    if (repairRun.status !== 0)
+      throw new Error(`AGY_TEST_REPAIR_FAILED: ${(repairRun.stderr ?? '').slice(-500)}`);
+    const dirty2 = git(['status', '--porcelain=v1'], input.worktree)
+      .stdout.split('\n')
+      .filter(Boolean)
+      .map((line) => line.slice(3).split(' -> ').at(-1));
+    // Commit ONLY ownership-clean paths: tooling side effects (pnpm may touch
+    // node_modules metadata or the lockfile during typecheck) must not be
+    // swallowed into the AGY authorship commit.
+    const commitable2 = dirty2.filter(
+      (p) => validateLaneOwnership({ engine: 'AGY', role: 'test', changedPaths: [p] }).ok,
+    );
+    if (commitable2.length) {
+      git(['add', '--', ...commitable2], input.worktree);
+      const commit2 = git(
+        [
+          '-c',
+          'user.name=Foresift AGY Test Author',
+          '-c',
+          'user.email=noreply@foresift.local',
+          'commit',
+          '-m',
+          `test: AGY test-author type repair ${input.lane}`,
+        ],
+        input.worktree,
+      );
+      if (commit2.status !== 0) throw new Error(`AGY_TEST_REPAIR_COMMIT_FAILED: ${commit2.stderr}`);
+    }
+    head = git(['rev-parse', 'HEAD'], input.worktree).stdout.trim();
+    changedPaths = git(['diff', '--name-only', `${baseHead}..${head}`], input.worktree)
+      .stdout.split('\n')
+      .filter(Boolean);
+    const ownership2 = validateLaneOwnership({ engine: 'AGY', role: 'test', changedPaths });
+    if (!ownership2.ok)
+      throw new Error(`${ownership2.violationCode}: ${ownership2.violatingPaths.join(',')}`);
+    const outside2 = allowedPaths ? changedPaths.filter((path) => !allowedPaths.has(path)) : [];
+    if (outside2.length) throw new Error(`AGY_TEST_SCOPE_VIOLATION: ${outside2.join(',')}`);
+    typeErrors = typecheckErrorsFor(changedPaths, input.worktree);
+    if (typeErrors.length)
+      throw new Error(
+        `AGY_TEST_TYPECHECK_FAILED: ${typeErrors.slice(0, 10).join(' | ').slice(0, 800)}`,
+      );
+    typeRepair.remaining = [];
+  }
   const result = {
     schema: 'foresift/writer-result@1',
     shardId: input.lane,
@@ -164,6 +250,7 @@ export function runAgyTestWriter(input) {
     testResults: agentResult.testResults ?? 'unknown',
     baselineClassifications: agentResult.baselineClassifications,
     blockers: Array.isArray(agentResult.blockers) ? agentResult.blockers : [],
+    typeRepair,
   };
   writeFileSync(join(resultDir, 'result.json'), `${JSON.stringify(result, null, 2)}\n`);
   writeFileSync(

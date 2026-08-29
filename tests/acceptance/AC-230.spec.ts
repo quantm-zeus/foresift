@@ -2,7 +2,7 @@
  * AC-230 acceptance (positive) — protocol adapter fixture sweep & versioned resolution.
  * Traces: FR-COL-002.
  * AC text (manifest §39): "Full fixture sweep — Pump/PumpSwap, Raydium AMM v4/CPMM/CLMM/Stable AMM/LaunchLab,
- * Orca Whirlpools, Meteora DLMM/DAMM v1-v2/DBC, Jupiter route observation, constant-product,
+ * Orca Whirlpools, Meteora DLMM/DAMM v1-v2/DBC, Jupiter path-observation coverage, constant-product,
  * concentrated-liquidity, bin-based, bonding-curve, dynamic-fee — each resolves ONLY to its
  * matching versioned decoder/adapter with signed support manifest."
  */
@@ -115,7 +115,7 @@ describe('AC-230 acceptance (positive): full protocol adapter resolution sweep',
     }
   });
 
-  it('resolves Jupiter route observation manifest', () => {
+  it('resolves Jupiter path-observation manifest', () => {
     const res = resolveProtocolAdapter(
       {
         programId: JUPITER_ROUTE_MANIFEST.programId,

@@ -45,7 +45,7 @@ describe('AC-231 acceptance (positive): active decoder layout verification & par
     }
   });
 
-  it('reconciles Jupiter route observations to underlying venue adapters without treating Jupiter as pool math authority', () => {
+  it('reconciles Jupiter path-observation records to underlying venue adapters without treating Jupiter as pool math authority', () => {
     expect(JUPITER_ROUTE_MANIFEST.poolMathAdapterVersion).toBeUndefined();
     expect(JUPITER_ROUTE_MANIFEST.protocolFamily).toBe('JUPITER');
   });

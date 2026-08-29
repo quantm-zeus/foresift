@@ -1,12 +1,12 @@
 /**
- * Jupiter route observation & negative-capability assertion unit tests (§35.7, §63.3.1, FR-COL-002).
- * Jupiter is strictly read-only route observation; no pool math authority or execution capability.
+ * Jupiter path-observation & negative-capability assertion unit tests (§35.7, §63.3.1, FR-COL-002).
+ * Jupiter is strictly read-only observation of routing data; no pool math authority or execution capability.
  */
 import { describe, expect, it } from 'bun:test';
 import { JUPITER_ROUTE_MANIFEST } from '../../../tests/fixtures/col/index.ts';
 
-describe('Jupiter Route Observation & Negative Capability (FR-COL-002, §35.7)', () => {
-  it('manifest exposes route observation only and no pool math adapter', () => {
+describe('Jupiter Path Observation & Negative Capability (FR-COL-002, §35.7)', () => {
+  it('manifest exposes path observation only and no pool math adapter', () => {
     expect(JUPITER_ROUTE_MANIFEST.protocolFamily).toBe('JUPITER');
     expect(JUPITER_ROUTE_MANIFEST.poolMathAdapterVersion).toBeUndefined();
     expect(JUPITER_ROUTE_MANIFEST.supportedEventFamilies).toContain('ROUTE_OBSERVATION');

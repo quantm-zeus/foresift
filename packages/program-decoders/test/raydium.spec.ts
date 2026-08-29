@@ -8,7 +8,7 @@ import {
 } from '../../../tests/fixtures/col/index.ts';
 
 describe('Raydium Protocol Family Decoders (FR-COL-002)', () => {
-  it('decodes valid Raydium AMM v4 swap event', () => {
+  it('decodes valid Raydium AMM v4 event payload', () => {
     const payload = STREAM_RECORD_RAYDIUM_SWAP.payload;
     expect(payload.poolAddress).toBeDefined();
     expect(payload.amountIn).toBe('500000000');

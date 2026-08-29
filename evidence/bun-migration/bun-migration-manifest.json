@@ -1,21 +1,255 @@
 {
   "schema": "foresift/bun-migration-manifest@1",
   "migrationId": "bun-test-authority-v1",
-  "generatedAt": "2026-08-27T03:37:21.398Z",
+  "generatedAt": "2026-08-29T10:55:16.368Z",
   "root": ".",
-  "totalTestFiles": 220,
+  "totalTestFiles": 261,
   "counts": {
     "CODEMOD_READY": 0,
     "AGY_REQUIRED": 0,
-    "MIGRATED": 0,
-    "VERIFIED": 220,
+    "MIGRATED": 261,
+    "VERIFIED": 0,
     "BLOCKED": 0
   },
   "parity": {
-    "previousTotal": 220,
+    "previousTotal": 261,
     "disappeared": []
   },
   "files": [
+    {
+      "path": "packages/capacity-planner/test/degrade-policy.spec.ts",
+      "package": "@foresift/capacity-planner",
+      "bytes": 2078,
+      "lines": 64,
+      "sha256": "b6db8b931069521477a5c74256fbaf45b863d151c954f19bee845a27e855ba00",
+      "imports": ["bun:test", "../src/degrade-policy.ts"],
+      "vitestImports": [],
+      "features": [],
+      "workload": "PURE",
+      "migrationType": "ALREADY_MIGRATED",
+      "fixturesAndHelpers": [],
+      "sourceAnchors": ["../src/degrade-policy.ts"],
+      "state": "MIGRATED"
+    },
+    {
+      "path": "packages/capacity-planner/test/migrations.spec.ts",
+      "package": "@foresift/capacity-planner",
+      "bytes": 2944,
+      "lines": 89,
+      "sha256": "fd7baa1ac35aa28bf2b84548f5cab9997e4cb3e3d873b150e371905c4ebf618a",
+      "imports": [
+        "bun:test",
+        "@electric-sql/pglite",
+        "@foresift/persistence",
+        "node:path",
+        "node:url"
+      ],
+      "vitestImports": [],
+      "features": [],
+      "workload": "DATABASE_PGLITE",
+      "migrationType": "ALREADY_MIGRATED",
+      "fixturesAndHelpers": [],
+      "sourceAnchors": ["@electric-sql/pglite", "@foresift/persistence"],
+      "state": "MIGRATED"
+    },
+    {
+      "path": "packages/capacity-planner/test/planner.spec.ts",
+      "package": "@foresift/capacity-planner",
+      "bytes": 2521,
+      "lines": 69,
+      "sha256": "2b2b74f3f84c2980db26523765cec9aa929f675a4796984d17dd41a4d16f1fc9",
+      "imports": [
+        "bun:test",
+        "../src/planner.ts",
+        "../../../tests/fixtures/cost/paid-policies.ts",
+        "../../../tests/fixtures/cost/operations.ts"
+      ],
+      "vitestImports": [],
+      "features": [],
+      "workload": "PURE",
+      "migrationType": "ALREADY_MIGRATED",
+      "fixturesAndHelpers": [
+        "../../../tests/fixtures/cost/paid-policies.ts",
+        "../../../tests/fixtures/cost/operations.ts"
+      ],
+      "sourceAnchors": [
+        "../src/planner.ts",
+        "../../../tests/fixtures/cost/paid-policies.ts",
+        "../../../tests/fixtures/cost/operations.ts"
+      ],
+      "state": "MIGRATED"
+    },
+    {
+      "path": "packages/capacity-planner/test/resource-budgets.spec.ts",
+      "package": "@foresift/capacity-planner",
+      "bytes": 2154,
+      "lines": 58,
+      "sha256": "a70a4a514119befaa9131f868f3d68b821cbc3788c7fd7805590a77883f51397",
+      "imports": [
+        "bun:test",
+        "../src/resource-budgets.ts",
+        "../../../tests/fixtures/cost/paid-policies.ts"
+      ],
+      "vitestImports": [],
+      "features": [],
+      "workload": "PURE",
+      "migrationType": "ALREADY_MIGRATED",
+      "fixturesAndHelpers": ["../../../tests/fixtures/cost/paid-policies.ts"],
+      "sourceAnchors": [
+        "../src/resource-budgets.ts",
+        "../../../tests/fixtures/cost/paid-policies.ts"
+      ],
+      "state": "MIGRATED"
+    },
+    {
+      "path": "packages/cost-router/test/batch-coalescer.spec.ts",
+      "package": "@foresift/cost-router",
+      "bytes": 2852,
+      "lines": 93,
+      "sha256": "29d7fa0dc14842925852b44dd873d3135de76126fbc286c65c7f1c6de084ee20",
+      "imports": [
+        "bun:test",
+        "../src/batch-coalescer.ts",
+        "../../../tests/fixtures/cost/batches.ts"
+      ],
+      "vitestImports": [],
+      "features": [],
+      "workload": "PURE",
+      "migrationType": "ALREADY_MIGRATED",
+      "fixturesAndHelpers": ["../../../tests/fixtures/cost/batches.ts"],
+      "sourceAnchors": ["../src/batch-coalescer.ts", "../../../tests/fixtures/cost/batches.ts"],
+      "state": "MIGRATED"
+    },
+    {
+      "path": "packages/cost-router/test/cost-declaration.spec.ts",
+      "package": "@foresift/cost-router",
+      "bytes": 3668,
+      "lines": 98,
+      "sha256": "6037e4d067c9b78031fd13ef0c8157c5aef0c19d7dad1f9c25c1e530c438292c",
+      "imports": [
+        "bun:test",
+        "../src/cost-declaration.ts",
+        "../../../tests/fixtures/cost/operations.ts"
+      ],
+      "vitestImports": [],
+      "features": [],
+      "workload": "PURE",
+      "migrationType": "ALREADY_MIGRATED",
+      "fixturesAndHelpers": ["../../../tests/fixtures/cost/operations.ts"],
+      "sourceAnchors": ["../src/cost-declaration.ts", "../../../tests/fixtures/cost/operations.ts"],
+      "state": "MIGRATED"
+    },
+    {
+      "path": "packages/cost-router/test/migrations.spec.ts",
+      "package": "@foresift/cost-router",
+      "bytes": 4182,
+      "lines": 109,
+      "sha256": "c1439cc3f046ba7281c6147c797edd1e2b96a2a5dfe44b12d436c2f98360b8cf",
+      "imports": [
+        "bun:test",
+        "@electric-sql/pglite",
+        "@foresift/persistence",
+        "node:path",
+        "node:url"
+      ],
+      "vitestImports": [],
+      "features": [],
+      "workload": "DATABASE_PGLITE",
+      "migrationType": "ALREADY_MIGRATED",
+      "fixturesAndHelpers": [],
+      "sourceAnchors": ["@electric-sql/pglite", "@foresift/persistence"],
+      "state": "MIGRATED"
+    },
+    {
+      "path": "packages/cost-router/test/paid-policy.spec.ts",
+      "package": "@foresift/cost-router",
+      "bytes": 2424,
+      "lines": 67,
+      "sha256": "62a248ca57ba8e4a7430e8a20f59aba219b1d24c094d4ec5bcf02777582ce8e0",
+      "imports": [
+        "bun:test",
+        "../src/paid-policy.ts",
+        "../../../tests/fixtures/cost/paid-policies.ts"
+      ],
+      "vitestImports": [],
+      "features": [],
+      "workload": "PURE",
+      "migrationType": "ALREADY_MIGRATED",
+      "fixturesAndHelpers": ["../../../tests/fixtures/cost/paid-policies.ts"],
+      "sourceAnchors": ["../src/paid-policy.ts", "../../../tests/fixtures/cost/paid-policies.ts"],
+      "state": "MIGRATED"
+    },
+    {
+      "path": "packages/cost-router/test/quota-adapter.spec.ts",
+      "package": "@foresift/cost-router",
+      "bytes": 4258,
+      "lines": 134,
+      "sha256": "5d40747082bfb8a2749408dbb9205e4caaa657fa449fde8c9ad39e41d3e9ddcd",
+      "imports": [
+        "bun:test",
+        "@electric-sql/pglite",
+        "@foresift/persistence",
+        "../../../packages/tool-core/src/quota-contract.ts",
+        "../src/quota-adapter.ts",
+        "../../../tests/fixtures/cost/operations.ts",
+        "node:path",
+        "node:url"
+      ],
+      "vitestImports": [],
+      "features": [],
+      "workload": "DATABASE_PGLITE",
+      "migrationType": "ALREADY_MIGRATED",
+      "fixturesAndHelpers": ["../../../tests/fixtures/cost/operations.ts"],
+      "sourceAnchors": [
+        "@electric-sql/pglite",
+        "@foresift/persistence",
+        "../../../packages/tool-core/src/quota-contract.ts",
+        "../src/quota-adapter.ts",
+        "../../../tests/fixtures/cost/operations.ts"
+      ],
+      "state": "MIGRATED"
+    },
+    {
+      "path": "packages/cost-router/test/reserve-router.spec.ts",
+      "package": "@foresift/cost-router",
+      "bytes": 2506,
+      "lines": 86,
+      "sha256": "06b933a7b8419e4464960bb6c4888c874e919a762dc92342519c15fcbc2ae1fb",
+      "imports": [
+        "bun:test",
+        "../src/reserve-router.ts",
+        "../../../tests/fixtures/cost/operations.ts"
+      ],
+      "vitestImports": [],
+      "features": [],
+      "workload": "PURE",
+      "migrationType": "ALREADY_MIGRATED",
+      "fixturesAndHelpers": ["../../../tests/fixtures/cost/operations.ts"],
+      "sourceAnchors": ["../src/reserve-router.ts", "../../../tests/fixtures/cost/operations.ts"],
+      "state": "MIGRATED"
+    },
+    {
+      "path": "packages/cost-router/test/strict-free-guard.spec.ts",
+      "package": "@foresift/cost-router",
+      "bytes": 4680,
+      "lines": 146,
+      "sha256": "df642341ee3ab459ec9260283ecc0554b65c59538fffdb7766b23b4d057e2fb3",
+      "imports": [
+        "bun:test",
+        "../src/strict-free-guard.ts",
+        "../../../tests/fixtures/cost/operations.ts"
+      ],
+      "vitestImports": [],
+      "features": [],
+      "workload": "PURE",
+      "migrationType": "ALREADY_MIGRATED",
+      "fixturesAndHelpers": ["../../../tests/fixtures/cost/operations.ts"],
+      "sourceAnchors": [
+        "../src/strict-free-guard.ts",
+        "../../../tests/fixtures/cost/operations.ts"
+      ],
+      "state": "MIGRATED"
+    },
     {
       "path": "packages/domain/test/address-chain.spec.ts",
       "package": "@foresift/domain",
@@ -29,7 +263,22 @@
       "migrationType": "ALREADY_MIGRATED",
       "fixturesAndHelpers": [],
       "sourceAnchors": ["../src/index.ts"],
-      "state": "VERIFIED"
+      "state": "MIGRATED"
+    },
+    {
+      "path": "packages/domain/test/cost.spec.ts",
+      "package": "@foresift/domain",
+      "bytes": 3629,
+      "lines": 111,
+      "sha256": "c05e713310b4649744da0bdbdfb26ab34555ccaac2b323f210f40be7c0a0177a",
+      "imports": ["bun:test", "../src/cost.ts", "../src/errors.ts"],
+      "vitestImports": [],
+      "features": ["table-driven-each"],
+      "workload": "PURE",
+      "migrationType": "ALREADY_MIGRATED",
+      "fixturesAndHelpers": [],
+      "sourceAnchors": ["../src/cost.ts", "../src/errors.ts"],
+      "state": "MIGRATED"
     },
     {
       "path": "packages/domain/test/lineage-source-recovery.spec.ts",
@@ -44,7 +293,7 @@
       "migrationType": "ALREADY_MIGRATED",
       "fixturesAndHelpers": [],
       "sourceAnchors": ["../src/index.ts"],
-      "state": "VERIFIED"
+      "state": "MIGRATED"
     },
     {
       "path": "packages/domain/test/quantity.spec.ts",
@@ -59,7 +308,7 @@
       "migrationType": "ALREADY_MIGRATED",
       "fixturesAndHelpers": [],
       "sourceAnchors": ["../src/index.ts"],
-      "state": "VERIFIED"
+      "state": "MIGRATED"
     },
     {
       "path": "packages/domain/test/temporal.spec.ts",
@@ -74,7 +323,7 @@
       "migrationType": "ALREADY_MIGRATED",
       "fixturesAndHelpers": [],
       "sourceAnchors": ["../src/index.ts"],
-      "state": "VERIFIED"
+      "state": "MIGRATED"
     },
     {
       "path": "packages/domain/test/tool.spec.ts",
@@ -89,7 +338,7 @@
       "migrationType": "ALREADY_MIGRATED",
       "fixturesAndHelpers": [],
       "sourceAnchors": ["../src/tool.ts", "../src/errors.ts"],
-      "state": "VERIFIED"
+      "state": "MIGRATED"
     },
     {
       "path": "packages/domain/test/vocabulary.spec.ts",
@@ -104,7 +353,7 @@
       "migrationType": "ALREADY_MIGRATED",
       "fixturesAndHelpers": [],
       "sourceAnchors": ["../src/index.ts"],
-      "state": "VERIFIED"
+      "state": "MIGRATED"
     },
     {
       "path": "packages/evidence/test/counts.spec.ts",
@@ -132,7 +381,7 @@
         "@foresift/persistence",
         "../src/index.ts"
       ],
-      "state": "VERIFIED"
+      "state": "MIGRATED"
     },
     {
       "path": "packages/evidence/test/evidence-index-replay.spec.ts",
@@ -160,7 +409,7 @@
         "@foresift/persistence",
         "../src/index.ts"
       ],
-      "state": "VERIFIED"
+      "state": "MIGRATED"
     },
     {
       "path": "packages/object-store/test/local-store.spec.ts",
@@ -175,7 +424,7 @@
       "migrationType": "ALREADY_MIGRATED",
       "fixturesAndHelpers": [],
       "sourceAnchors": ["../src/index.ts"],
-      "state": "VERIFIED"
+      "state": "MIGRATED"
     },
     {
       "path": "packages/object-store/test/staged-commit.spec.ts",
@@ -205,7 +454,7 @@
         "@foresift/persistence",
         "../src/index.ts"
       ],
-      "state": "VERIFIED"
+      "state": "MIGRATED"
     },
     {
       "path": "packages/persistence/test/acquisition.spec.ts",
@@ -227,7 +476,7 @@
       "migrationType": "ALREADY_MIGRATED",
       "fixturesAndHelpers": [],
       "sourceAnchors": ["@electric-sql/pglite", "@foresift/domain", "../src/index.ts"],
-      "state": "VERIFIED"
+      "state": "MIGRATED"
     },
     {
       "path": "packages/persistence/test/backfill-watermark.spec.ts",
@@ -249,7 +498,7 @@
       "migrationType": "ALREADY_MIGRATED",
       "fixturesAndHelpers": [],
       "sourceAnchors": ["@electric-sql/pglite", "@foresift/domain", "../src/index.ts"],
-      "state": "VERIFIED"
+      "state": "MIGRATED"
     },
     {
       "path": "packages/persistence/test/backup-governance.spec.ts",
@@ -271,7 +520,7 @@
       "migrationType": "ALREADY_MIGRATED",
       "fixturesAndHelpers": [],
       "sourceAnchors": ["@electric-sql/pglite", "@foresift/domain", "../src/index.ts"],
-      "state": "VERIFIED"
+      "state": "MIGRATED"
     },
     {
       "path": "packages/persistence/test/canonical-json.spec.ts",
@@ -286,7 +535,7 @@
       "migrationType": "ALREADY_MIGRATED",
       "fixturesAndHelpers": [],
       "sourceAnchors": ["../src/index.ts"],
-      "state": "VERIFIED"
+      "state": "MIGRATED"
     },
     {
       "path": "packages/persistence/test/checkpoints.spec.ts",
@@ -308,7 +557,7 @@
       "migrationType": "ALREADY_MIGRATED",
       "fixturesAndHelpers": [],
       "sourceAnchors": ["@electric-sql/pglite", "@foresift/domain", "../src/index.ts"],
-      "state": "VERIFIED"
+      "state": "MIGRATED"
     },
     {
       "path": "packages/persistence/test/drill-restore-rpo.spec.ts",
@@ -338,7 +587,7 @@
         "../src/index.ts",
         "@foresift/object-store"
       ],
-      "state": "VERIFIED"
+      "state": "MIGRATED"
     },
     {
       "path": "packages/persistence/test/engine-transactions.spec.ts",
@@ -360,7 +609,7 @@
       "migrationType": "ALREADY_MIGRATED",
       "fixturesAndHelpers": [],
       "sourceAnchors": ["@electric-sql/pglite", "@foresift/domain", "../src/index.ts"],
-      "state": "VERIFIED"
+      "state": "MIGRATED"
     },
     {
       "path": "packages/persistence/test/features-parity.spec.ts",
@@ -382,7 +631,7 @@
       "migrationType": "ALREADY_MIGRATED",
       "fixturesAndHelpers": [],
       "sourceAnchors": ["@electric-sql/pglite", "@foresift/domain", "../src/index.ts"],
-      "state": "VERIFIED"
+      "state": "MIGRATED"
     },
     {
       "path": "packages/persistence/test/identity-repo.spec.ts",
@@ -411,14 +660,14 @@
         "../src/index.ts",
         "@foresift/domain"
       ],
-      "state": "VERIFIED"
+      "state": "MIGRATED"
     },
     {
       "path": "packages/persistence/test/migrator.spec.ts",
       "package": "@foresift/persistence",
-      "bytes": 18946,
-      "lines": 472,
-      "sha256": "1047666cc8f287da397a1a7a560f514aea1aa5be0db07e0155cb4888c0a5565a",
+      "bytes": 19266,
+      "lines": 480,
+      "sha256": "450686cb1af6cec84fa40e37a24b87428858e780efe28e8298bbfba8ec1000df",
       "imports": [
         "bun:test",
         "@electric-sql/pglite",
@@ -434,7 +683,7 @@
       "migrationType": "ALREADY_MIGRATED",
       "fixturesAndHelpers": [],
       "sourceAnchors": ["@electric-sql/pglite", "../src/index.ts", "@foresift/domain"],
-      "state": "VERIFIED"
+      "state": "MIGRATED"
     },
     {
       "path": "packages/persistence/test/observations-revisions.spec.ts",
@@ -456,7 +705,7 @@
       "migrationType": "ALREADY_MIGRATED",
       "fixturesAndHelpers": [],
       "sourceAnchors": ["@electric-sql/pglite", "@foresift/domain", "../src/index.ts"],
-      "state": "VERIFIED"
+      "state": "MIGRATED"
     },
     {
       "path": "packages/persistence/test/pg-pool-wiring.spec.ts",
@@ -471,7 +720,7 @@
       "migrationType": "ALREADY_MIGRATED",
       "fixturesAndHelpers": [],
       "sourceAnchors": ["../src/index.ts"],
-      "state": "VERIFIED"
+      "state": "MIGRATED"
     },
     {
       "path": "packages/persistence/test/quality.spec.ts",
@@ -493,7 +742,7 @@
       "migrationType": "ALREADY_MIGRATED",
       "fixturesAndHelpers": [],
       "sourceAnchors": ["@electric-sql/pglite", "@foresift/domain", "../src/index.ts"],
-      "state": "VERIFIED"
+      "state": "MIGRATED"
     },
     {
       "path": "packages/persistence/test/recovery-tiers.spec.ts",
@@ -515,7 +764,7 @@
       "migrationType": "ALREADY_MIGRATED",
       "fixturesAndHelpers": [],
       "sourceAnchors": ["@electric-sql/pglite", "@foresift/domain", "../src/index.ts"],
-      "state": "VERIFIED"
+      "state": "MIGRATED"
     },
     {
       "path": "packages/persistence/test/replay.spec.ts",
@@ -537,7 +786,7 @@
       "migrationType": "ALREADY_MIGRATED",
       "fixturesAndHelpers": [],
       "sourceAnchors": ["@electric-sql/pglite", "@foresift/domain", "../src/index.ts"],
-      "state": "VERIFIED"
+      "state": "MIGRATED"
     },
     {
       "path": "packages/persistence/test/schema-parity.spec.ts",
@@ -569,7 +818,7 @@
         "../src/index.ts",
         "../src/generated/schema.ts"
       ],
-      "state": "VERIFIED"
+      "state": "MIGRATED"
     },
     {
       "path": "packages/persistence/test/sources.spec.ts",
@@ -592,7 +841,7 @@
       "migrationType": "ALREADY_MIGRATED",
       "fixturesAndHelpers": [],
       "sourceAnchors": ["@electric-sql/pglite", "@foresift/domain", "../src/index.ts"],
-      "state": "VERIFIED"
+      "state": "MIGRATED"
     },
     {
       "path": "packages/provider-lifecycle/test/artifact-registry.spec.ts",
@@ -607,7 +856,7 @@
       "migrationType": "ALREADY_MIGRATED",
       "fixturesAndHelpers": ["./helpers.ts"],
       "sourceAnchors": ["../src/index.ts", "./helpers.ts"],
-      "state": "VERIFIED"
+      "state": "MIGRATED"
     },
     {
       "path": "packages/provider-lifecycle/test/deprecation-rules.spec.ts",
@@ -622,7 +871,7 @@
       "migrationType": "ALREADY_MIGRATED",
       "fixturesAndHelpers": ["./helpers.ts"],
       "sourceAnchors": ["@foresift/domain", "./helpers.ts", "../src/errors.ts"],
-      "state": "VERIFIED"
+      "state": "MIGRATED"
     },
     {
       "path": "packages/provider-lifecycle/test/lifecycle-machine.spec.ts",
@@ -650,7 +899,7 @@
         "../src/lifecycle-machine.ts",
         "../src/errors.ts"
       ],
-      "state": "VERIFIED"
+      "state": "MIGRATED"
     },
     {
       "path": "packages/provider-lifecycle/test/lifecycle-states.spec.ts",
@@ -676,7 +925,7 @@
         "../src/lifecycle-states.ts",
         "./helpers.ts"
       ],
-      "state": "VERIFIED"
+      "state": "MIGRATED"
     },
     {
       "path": "packages/provider-lifecycle/test/migration-exceptions.spec.ts",
@@ -691,7 +940,7 @@
       "migrationType": "ALREADY_MIGRATED",
       "fixturesAndHelpers": ["./helpers.ts"],
       "sourceAnchors": ["@foresift/domain", "./helpers.ts", "../src/errors.ts"],
-      "state": "VERIFIED"
+      "state": "MIGRATED"
     },
     {
       "path": "packages/provider-lifecycle/test/migrations.spec.ts",
@@ -712,7 +961,7 @@
       "migrationType": "ALREADY_MIGRATED",
       "fixturesAndHelpers": [],
       "sourceAnchors": ["@electric-sql/pglite", "@foresift/persistence"],
-      "state": "VERIFIED"
+      "state": "MIGRATED"
     },
     {
       "path": "packages/provider-lifecycle/test/operation-registry.spec.ts",
@@ -727,7 +976,7 @@
       "migrationType": "ALREADY_MIGRATED",
       "fixturesAndHelpers": ["./helpers.ts"],
       "sourceAnchors": ["./helpers.ts", "../src/operation-registry.ts", "../src/errors.ts"],
-      "state": "VERIFIED"
+      "state": "MIGRATED"
     },
     {
       "path": "packages/provider-lifecycle/test/readiness.spec.ts",
@@ -748,7 +997,7 @@
       "migrationType": "ALREADY_MIGRATED",
       "fixturesAndHelpers": ["./helpers.ts"],
       "sourceAnchors": ["@foresift/security", "../src/index.ts", "../src/index.ts", "./helpers.ts"],
-      "state": "VERIFIED"
+      "state": "MIGRATED"
     },
     {
       "path": "packages/provider-lifecycle/test/response-quarantine.spec.ts",
@@ -776,7 +1025,7 @@
         "../src/index.ts",
         "./helpers.ts"
       ],
-      "state": "VERIFIED"
+      "state": "MIGRATED"
     },
     {
       "path": "packages/provider-lifecycle/test/rights-matrix.spec.ts",
@@ -804,7 +1053,7 @@
         "../src/index.ts",
         "./helpers.ts"
       ],
-      "state": "VERIFIED"
+      "state": "MIGRATED"
     },
     {
       "path": "packages/provider-lifecycle/test/scaffold.spec.ts",
@@ -819,7 +1068,7 @@
       "migrationType": "ALREADY_MIGRATED",
       "fixturesAndHelpers": [],
       "sourceAnchors": [],
-      "state": "VERIFIED"
+      "state": "MIGRATED"
     },
     {
       "path": "packages/provider-lifecycle/test/schema-parity.spec.ts",
@@ -849,7 +1098,7 @@
         "@foresift/persistence",
         "../src/generated/schema.ts"
       ],
-      "state": "VERIFIED"
+      "state": "MIGRATED"
     },
     {
       "path": "packages/provider-lifecycle/test/source-fingerprints.spec.ts",
@@ -875,7 +1124,7 @@
         "../src/index.ts",
         "./helpers.ts"
       ],
-      "state": "VERIFIED"
+      "state": "MIGRATED"
     },
     {
       "path": "packages/provider-lifecycle/test/verification-ttl.spec.ts",
@@ -901,7 +1150,7 @@
         "../src/verification-ttl.ts",
         "../src/errors.ts"
       ],
-      "state": "VERIFIED"
+      "state": "MIGRATED"
     },
     {
       "path": "packages/providers/test/adapter-contract.spec.ts",
@@ -930,7 +1179,7 @@
         "../src/index.ts",
         "./helpers.ts"
       ],
-      "state": "VERIFIED"
+      "state": "MIGRATED"
     },
     {
       "path": "packages/providers/test/gmgn-adapter.spec.ts",
@@ -945,7 +1194,7 @@
       "migrationType": "ALREADY_MIGRATED",
       "fixturesAndHelpers": ["./helpers.ts"],
       "sourceAnchors": ["zod", "../src/index.ts", "./helpers.ts"],
-      "state": "VERIFIED"
+      "state": "MIGRATED"
     },
     {
       "path": "packages/providers/test/helius-adapter.spec.ts",
@@ -966,7 +1215,7 @@
       "migrationType": "ALREADY_MIGRATED",
       "fixturesAndHelpers": [],
       "sourceAnchors": ["../src/index.ts", "@foresift/security", "@foresift/security"],
-      "state": "VERIFIED"
+      "state": "MIGRATED"
     },
     {
       "path": "packages/providers/test/registration.spec.ts",
@@ -996,7 +1245,7 @@
         "@foresift/provider-lifecycle",
         "../src/index.ts"
       ],
-      "state": "VERIFIED"
+      "state": "MIGRATED"
     },
     {
       "path": "packages/providers/test/scaffold.spec.ts",
@@ -1011,7 +1260,73 @@
       "migrationType": "ALREADY_MIGRATED",
       "fixturesAndHelpers": [],
       "sourceAnchors": [],
-      "state": "VERIFIED"
+      "state": "MIGRATED"
+    },
+    {
+      "path": "packages/quota-forecast/test/capacity-replay.spec.ts",
+      "package": "@foresift/quota-forecast",
+      "bytes": 1911,
+      "lines": 56,
+      "sha256": "f0e27b74d55447c13a31865bbe13f5215c8122af3fc1e082a38b58ea0d3cd8ea",
+      "imports": ["bun:test", "../src/capacity-replay.ts", "../../../tests/fixtures/cost/plans.ts"],
+      "vitestImports": [],
+      "features": [],
+      "workload": "PURE",
+      "migrationType": "ALREADY_MIGRATED",
+      "fixturesAndHelpers": ["../../../tests/fixtures/cost/plans.ts"],
+      "sourceAnchors": ["../src/capacity-replay.ts", "../../../tests/fixtures/cost/plans.ts"],
+      "state": "MIGRATED"
+    },
+    {
+      "path": "packages/quota-forecast/test/forecast.spec.ts",
+      "package": "@foresift/quota-forecast",
+      "bytes": 1805,
+      "lines": 52,
+      "sha256": "0f163bcf22cf822d48df9fc1cff2278a675825796928fd81fe5ade6f2fcbc9d7",
+      "imports": ["bun:test", "../src/forecast.ts", "../../../tests/fixtures/cost/plans.ts"],
+      "vitestImports": [],
+      "features": [],
+      "workload": "PURE",
+      "migrationType": "ALREADY_MIGRATED",
+      "fixturesAndHelpers": ["../../../tests/fixtures/cost/plans.ts"],
+      "sourceAnchors": ["../src/forecast.ts", "../../../tests/fixtures/cost/plans.ts"],
+      "state": "MIGRATED"
+    },
+    {
+      "path": "packages/quota-forecast/test/migrations.spec.ts",
+      "package": "@foresift/quota-forecast",
+      "bytes": 2638,
+      "lines": 69,
+      "sha256": "1b1ff2d828422af45169d9eb81e84fd2b1a0165eb7ef0de0eda4c378a9a1b645",
+      "imports": [
+        "bun:test",
+        "@electric-sql/pglite",
+        "@foresift/persistence",
+        "node:path",
+        "node:url"
+      ],
+      "vitestImports": [],
+      "features": [],
+      "workload": "DATABASE_PGLITE",
+      "migrationType": "ALREADY_MIGRATED",
+      "fixturesAndHelpers": [],
+      "sourceAnchors": ["@electric-sql/pglite", "@foresift/persistence"],
+      "state": "MIGRATED"
+    },
+    {
+      "path": "packages/quota-forecast/test/plan-verifier.spec.ts",
+      "package": "@foresift/quota-forecast",
+      "bytes": 2207,
+      "lines": 55,
+      "sha256": "ded6e11a0a550d6d139f48a5f7174e869606c3d60e6ba2636b4dee3272b48a76",
+      "imports": ["bun:test", "../src/plan-verifier.ts", "../../../tests/fixtures/cost/plans.ts"],
+      "vitestImports": [],
+      "features": [],
+      "workload": "PURE",
+      "migrationType": "ALREADY_MIGRATED",
+      "fixturesAndHelpers": ["../../../tests/fixtures/cost/plans.ts"],
+      "sourceAnchors": ["../src/plan-verifier.ts", "../../../tests/fixtures/cost/plans.ts"],
+      "state": "MIGRATED"
     },
     {
       "path": "packages/security/test/action-gate.spec.ts",
@@ -1044,7 +1359,7 @@
         "../src/audit-chain.ts",
         "@foresift/shared-schemas"
       ],
-      "state": "VERIFIED"
+      "state": "MIGRATED"
     },
     {
       "path": "packages/security/test/audit-categories.spec.ts",
@@ -1059,7 +1374,7 @@
       "migrationType": "ALREADY_MIGRATED",
       "fixturesAndHelpers": [],
       "sourceAnchors": ["@foresift/shared-schemas", "../src/audit-categories.ts"],
-      "state": "VERIFIED"
+      "state": "MIGRATED"
     },
     {
       "path": "packages/security/test/audit-chain.spec.ts",
@@ -1088,7 +1403,7 @@
         "@foresift/persistence",
         "../src/audit-chain.ts"
       ],
-      "state": "VERIFIED"
+      "state": "MIGRATED"
     },
     {
       "path": "packages/security/test/egress.spec.ts",
@@ -1103,7 +1418,7 @@
       "migrationType": "ALREADY_MIGRATED",
       "fixturesAndHelpers": [],
       "sourceAnchors": ["../src/egress.ts"],
-      "state": "VERIFIED"
+      "state": "MIGRATED"
     },
     {
       "path": "packages/security/test/error-hierarchy.spec.ts",
@@ -1118,7 +1433,7 @@
       "migrationType": "ALREADY_MIGRATED",
       "fixturesAndHelpers": [],
       "sourceAnchors": ["../src/index.ts", "../src/errors.ts"],
-      "state": "VERIFIED"
+      "state": "MIGRATED"
     },
     {
       "path": "packages/security/test/gate-pause.spec.ts",
@@ -1148,7 +1463,7 @@
         "../src/gate-pause.ts",
         "../src/errors.ts"
       ],
-      "state": "VERIFIED"
+      "state": "MIGRATED"
     },
     {
       "path": "packages/security/test/import-gating.spec.ts",
@@ -1176,7 +1491,7 @@
         "@foresift/persistence",
         "../src/import-gating.ts"
       ],
-      "state": "VERIFIED"
+      "state": "MIGRATED"
     },
     {
       "path": "packages/security/test/incidents.spec.ts",
@@ -1204,7 +1519,7 @@
         "../src/incidents.ts",
         "../src/errors.ts"
       ],
-      "state": "VERIFIED"
+      "state": "MIGRATED"
     },
     {
       "path": "packages/security/test/mcp-origin-protocol.spec.ts",
@@ -1219,7 +1534,7 @@
       "migrationType": "ALREADY_MIGRATED",
       "fixturesAndHelpers": [],
       "sourceAnchors": ["../src/mcp-origin.ts", "../src/mcp-protocol-guard.ts"],
-      "state": "VERIFIED"
+      "state": "MIGRATED"
     },
     {
       "path": "packages/security/test/negative-capability.spec.ts",
@@ -1246,7 +1561,7 @@
         "../src/decoder-authority.ts",
         "../src/supply-chain.ts"
       ],
-      "state": "VERIFIED"
+      "state": "MIGRATED"
     },
     {
       "path": "packages/security/test/oauth-credentials.spec.ts",
@@ -1274,7 +1589,7 @@
         "../src/oauth-binding.ts",
         "../src/mcp-credentials.ts"
       ],
-      "state": "VERIFIED"
+      "state": "MIGRATED"
     },
     {
       "path": "packages/security/test/scaffold.spec.ts",
@@ -1289,7 +1604,7 @@
       "migrationType": "ALREADY_MIGRATED",
       "fixturesAndHelpers": [],
       "sourceAnchors": ["../src/errors.ts"],
-      "state": "VERIFIED"
+      "state": "MIGRATED"
     },
     {
       "path": "packages/security/test/scan-traversal.spec.ts",
@@ -1304,7 +1619,7 @@
       "migrationType": "ALREADY_MIGRATED",
       "fixturesAndHelpers": [],
       "sourceAnchors": [],
-      "state": "VERIFIED"
+      "state": "MIGRATED"
     },
     {
       "path": "packages/security/test/scanner-exit-contract.spec.ts",
@@ -1319,7 +1634,7 @@
       "migrationType": "ALREADY_MIGRATED",
       "fixturesAndHelpers": [],
       "sourceAnchors": [],
-      "state": "VERIFIED"
+      "state": "MIGRATED"
     },
     {
       "path": "packages/security/test/schema-parity.spec.ts",
@@ -1349,7 +1664,7 @@
         "@foresift/persistence",
         "../src/generated/schema.ts"
       ],
-      "state": "VERIFIED"
+      "state": "MIGRATED"
     },
     {
       "path": "packages/security/test/secrets-claims.spec.ts",
@@ -1374,7 +1689,7 @@
         "../src/secrets-policy.ts",
         "../src/claims-policy.ts"
       ],
-      "state": "VERIFIED"
+      "state": "MIGRATED"
     },
     {
       "path": "packages/security/test/threat-model-register.spec.ts",
@@ -1389,7 +1704,7 @@
       "migrationType": "ALREADY_MIGRATED",
       "fixturesAndHelpers": [],
       "sourceAnchors": [],
-      "state": "VERIFIED"
+      "state": "MIGRATED"
     },
     {
       "path": "packages/security/test/untrusted-content.spec.ts",
@@ -1404,7 +1719,7 @@
       "migrationType": "ALREADY_MIGRATED",
       "fixturesAndHelpers": [],
       "sourceAnchors": ["../src/untrusted-content.ts"],
-      "state": "VERIFIED"
+      "state": "MIGRATED"
     },
     {
       "path": "packages/security/test/webhook-abuse.spec.ts",
@@ -1429,7 +1744,7 @@
         "../src/errors.ts",
         "../src/abuse-controls.ts"
       ],
-      "state": "VERIFIED"
+      "state": "MIGRATED"
     },
     {
       "path": "packages/shared-schemas/test/core.spec.ts",
@@ -1444,7 +1759,22 @@
       "migrationType": "ALREADY_MIGRATED",
       "fixturesAndHelpers": [],
       "sourceAnchors": ["@foresift/domain", "../src/core.ts"],
-      "state": "VERIFIED"
+      "state": "MIGRATED"
+    },
+    {
+      "path": "packages/shared-schemas/test/cost.spec.ts",
+      "package": "@foresift/shared-schemas",
+      "bytes": 7170,
+      "lines": 220,
+      "sha256": "f394efbe9307c61e7c29b94244cf8ecd86bad7e7fbe3aee5785b02720385b4a6",
+      "imports": ["bun:test", "@foresift/domain", "../src/cost.ts"],
+      "vitestImports": [],
+      "features": ["table-driven-each"],
+      "workload": "PURE",
+      "migrationType": "ALREADY_MIGRATED",
+      "fixturesAndHelpers": [],
+      "sourceAnchors": ["@foresift/domain", "../src/cost.ts"],
+      "state": "MIGRATED"
     },
     {
       "path": "packages/shared-schemas/test/data.spec.ts",
@@ -1459,7 +1789,7 @@
       "migrationType": "ALREADY_MIGRATED",
       "fixturesAndHelpers": [],
       "sourceAnchors": ["@foresift/domain", "../src/data.ts"],
-      "state": "VERIFIED"
+      "state": "MIGRATED"
     },
     {
       "path": "packages/shared-schemas/test/dr.spec.ts",
@@ -1474,7 +1804,7 @@
       "migrationType": "ALREADY_MIGRATED",
       "fixturesAndHelpers": [],
       "sourceAnchors": ["@foresift/domain", "../src/dr.ts"],
-      "state": "VERIFIED"
+      "state": "MIGRATED"
     },
     {
       "path": "packages/shared-schemas/test/prov.spec.ts",
@@ -1489,7 +1819,7 @@
       "migrationType": "ALREADY_MIGRATED",
       "fixturesAndHelpers": [],
       "sourceAnchors": ["../src/prov.ts"],
-      "state": "VERIFIED"
+      "state": "MIGRATED"
     },
     {
       "path": "packages/shared-schemas/test/sec.spec.ts",
@@ -1504,7 +1834,7 @@
       "migrationType": "ALREADY_MIGRATED",
       "fixturesAndHelpers": [],
       "sourceAnchors": ["../src/sec.ts"],
-      "state": "VERIFIED"
+      "state": "MIGRATED"
     },
     {
       "path": "packages/tenant-isolation/test/scaffold.spec.ts",
@@ -1519,7 +1849,7 @@
       "migrationType": "ALREADY_MIGRATED",
       "fixturesAndHelpers": [],
       "sourceAnchors": ["../src/index.ts"],
-      "state": "VERIFIED"
+      "state": "MIGRATED"
     },
     {
       "path": "packages/tenant-isolation/test/tenant-isolation.spec.ts",
@@ -1534,7 +1864,7 @@
       "migrationType": "ALREADY_MIGRATED",
       "fixturesAndHelpers": [],
       "sourceAnchors": ["../src/index.ts"],
-      "state": "VERIFIED"
+      "state": "MIGRATED"
     },
     {
       "path": "packages/tool-core/test/cache-key.spec.ts",
@@ -1555,7 +1885,7 @@
       "migrationType": "ALREADY_MIGRATED",
       "fixturesAndHelpers": [],
       "sourceAnchors": ["../src/cache-key.ts", "@foresift/shared-schemas"],
-      "state": "VERIFIED"
+      "state": "MIGRATED"
     },
     {
       "path": "packages/tool-core/test/cache-stage.spec.ts",
@@ -1583,7 +1913,7 @@
         "@foresift/domain",
         "../src/stages/cache.ts"
       ],
-      "state": "VERIFIED"
+      "state": "MIGRATED"
     },
     {
       "path": "packages/tool-core/test/freshness.spec.ts",
@@ -1598,7 +1928,7 @@
       "migrationType": "ALREADY_MIGRATED",
       "fixturesAndHelpers": [],
       "sourceAnchors": ["@foresift/domain", "../src/freshness.ts"],
-      "state": "VERIFIED"
+      "state": "MIGRATED"
     },
     {
       "path": "packages/tool-core/test/license-contract.spec.ts",
@@ -1622,7 +1952,7 @@
         "../src/license-contract.ts",
         "../../../tests/fixtures/core/reference-adapters.ts"
       ],
-      "state": "VERIFIED"
+      "state": "MIGRATED"
     },
     {
       "path": "packages/tool-core/test/migrations.spec.ts",
@@ -1643,7 +1973,7 @@
       "migrationType": "ALREADY_MIGRATED",
       "fixturesAndHelpers": [],
       "sourceAnchors": ["@electric-sql/pglite", "@foresift/persistence"],
-      "state": "VERIFIED"
+      "state": "MIGRATED"
     },
     {
       "path": "packages/tool-core/test/pipeline.spec.ts",
@@ -1658,7 +1988,7 @@
       "migrationType": "ALREADY_MIGRATED",
       "fixturesAndHelpers": [],
       "sourceAnchors": ["@foresift/domain", "../src/pipeline.ts"],
-      "state": "VERIFIED"
+      "state": "MIGRATED"
     },
     {
       "path": "packages/tool-core/test/profiles.spec.ts",
@@ -1673,7 +2003,7 @@
       "migrationType": "ALREADY_MIGRATED",
       "fixturesAndHelpers": [],
       "sourceAnchors": ["../src/profiles.ts", "@foresift/domain"],
-      "state": "VERIFIED"
+      "state": "MIGRATED"
     },
     {
       "path": "packages/tool-core/test/prohibited.spec.ts",
@@ -1688,7 +2018,7 @@
       "migrationType": "ALREADY_MIGRATED",
       "fixturesAndHelpers": [],
       "sourceAnchors": ["@foresift/domain", "../src/prohibited.ts"],
-      "state": "VERIFIED"
+      "state": "MIGRATED"
     },
     {
       "path": "packages/tool-core/test/quota-contract.spec.ts",
@@ -1714,7 +2044,7 @@
         "../src/quota-contract.ts",
         "../../../tests/fixtures/core/deny-closed-quota-adapter.ts"
       ],
-      "state": "VERIFIED"
+      "state": "MIGRATED"
     },
     {
       "path": "packages/tool-core/test/registry.spec.ts",
@@ -1744,7 +2074,7 @@
         "../src/registry.ts",
         "../src/prohibited.ts"
       ],
-      "state": "VERIFIED"
+      "state": "MIGRATED"
     },
     {
       "path": "packages/tool-core/test/seam-stability.spec.ts",
@@ -1770,7 +2100,7 @@
         "@foresift/persistence",
         "../../../tests/fixtures/core/reference-adapters.ts"
       ],
-      "state": "VERIFIED"
+      "state": "MIGRATED"
     },
     {
       "path": "packages/tool-core/test/single-flight.spec.ts",
@@ -1790,7 +2120,7 @@
       "migrationType": "ALREADY_MIGRATED",
       "fixturesAndHelpers": [],
       "sourceAnchors": ["@electric-sql/pglite", "@foresift/persistence", "../src/single-flight.ts"],
-      "state": "VERIFIED"
+      "state": "MIGRATED"
     },
     {
       "path": "tests/acceptance/AC-001.spec.ts",
@@ -1818,7 +2148,7 @@
         "../../packages/tool-core/src/profiles.ts",
         "./helpers.ts"
       ],
-      "state": "VERIFIED"
+      "state": "MIGRATED"
     },
     {
       "path": "tests/acceptance/AC-002.spec.ts",
@@ -1833,7 +2163,7 @@
       "migrationType": "ALREADY_MIGRATED",
       "fixturesAndHelpers": [],
       "sourceAnchors": ["@foresift/domain", "@foresift/shared-schemas"],
-      "state": "VERIFIED"
+      "state": "MIGRATED"
     },
     {
       "path": "tests/acceptance/AC-003.spec.ts",
@@ -1861,7 +2191,7 @@
         "../../packages/tool-core/src/cache-key.ts",
         "./helpers.ts"
       ],
-      "state": "VERIFIED"
+      "state": "MIGRATED"
     },
     {
       "path": "tests/acceptance/AC-004.spec.ts",
@@ -1876,7 +2206,7 @@
       "migrationType": "ALREADY_MIGRATED",
       "fixturesAndHelpers": [],
       "sourceAnchors": ["@foresift/domain", "@foresift/shared-schemas"],
-      "state": "VERIFIED"
+      "state": "MIGRATED"
     },
     {
       "path": "tests/acceptance/AC-020.spec.ts",
@@ -1908,7 +2238,7 @@
         "../../packages/tool-core/src/stages/cache.ts",
         "./helpers.ts"
       ],
-      "state": "VERIFIED"
+      "state": "MIGRATED"
     },
     {
       "path": "tests/acceptance/AC-021.spec.ts",
@@ -1936,7 +2266,7 @@
         "../../packages/tool-core/src/normalize.ts",
         "./helpers.ts"
       ],
-      "state": "VERIFIED"
+      "state": "MIGRATED"
     },
     {
       "path": "tests/acceptance/AC-022.spec.ts",
@@ -1966,7 +2296,7 @@
         "../../packages/tool-core/src/stages/cache.ts",
         "./helpers.ts"
       ],
-      "state": "VERIFIED"
+      "state": "MIGRATED"
     },
     {
       "path": "tests/acceptance/AC-023.spec.ts",
@@ -1997,7 +2327,7 @@
         "../../packages/tool-core/src/normalize.ts",
         "./helpers.ts"
       ],
-      "state": "VERIFIED"
+      "state": "MIGRATED"
     },
     {
       "path": "tests/acceptance/AC-050.spec.ts",
@@ -2022,7 +2352,7 @@
         "../../packages/security/src/negative-capability.ts",
         "../../packages/tool-core/src/prohibited.ts"
       ],
-      "state": "VERIFIED"
+      "state": "MIGRATED"
     },
     {
       "path": "tests/acceptance/AC-051.spec.ts",
@@ -2051,7 +2381,7 @@
         "@foresift/shared-schemas",
         "../fixtures/sec/ssrf/ssrf-urls.ts"
       ],
-      "state": "VERIFIED"
+      "state": "MIGRATED"
     },
     {
       "path": "tests/acceptance/AC-052.spec.ts",
@@ -2073,7 +2403,7 @@
         "../../packages/security/src/secrets-policy.ts",
         "@foresift/shared-schemas"
       ],
-      "state": "VERIFIED"
+      "state": "MIGRATED"
     },
     {
       "path": "tests/acceptance/AC-053.spec.ts",
@@ -2101,7 +2431,7 @@
         "../../packages/security/src/mcp-credentials.ts",
         "../../packages/tool-core/src/profiles.ts"
       ],
-      "state": "VERIFIED"
+      "state": "MIGRATED"
     },
     {
       "path": "tests/acceptance/AC-060.spec.ts",
@@ -2116,7 +2446,7 @@
       "migrationType": "ALREADY_MIGRATED",
       "fixturesAndHelpers": ["./helpers.ts"],
       "sourceAnchors": ["@foresift/domain", "@foresift/persistence", "./helpers.ts"],
-      "state": "VERIFIED"
+      "state": "MIGRATED"
     },
     {
       "path": "tests/acceptance/AC-061.spec.ts",
@@ -2131,7 +2461,7 @@
       "migrationType": "ALREADY_MIGRATED",
       "fixturesAndHelpers": ["./helpers.ts"],
       "sourceAnchors": ["@foresift/domain", "@foresift/persistence", "./helpers.ts"],
-      "state": "VERIFIED"
+      "state": "MIGRATED"
     },
     {
       "path": "tests/acceptance/AC-062.spec.ts",
@@ -2159,7 +2489,267 @@
         "@foresift/domain",
         "./helpers.ts"
       ],
-      "state": "VERIFIED"
+      "state": "MIGRATED"
+    },
+    {
+      "path": "tests/acceptance/AC-100.spec.ts",
+      "package": "acceptance",
+      "bytes": 4173,
+      "lines": 122,
+      "sha256": "6ab2e6a1ef20dab952a2b3f1c71aceb7b69ee725204c463c37329c862846b011",
+      "imports": [
+        "bun:test",
+        "../../packages/cost-router/src/strict-free-guard.ts",
+        "../fixtures/cost/operations.ts"
+      ],
+      "vitestImports": [],
+      "features": [],
+      "workload": "PURE",
+      "migrationType": "ALREADY_MIGRATED",
+      "fixturesAndHelpers": ["../fixtures/cost/operations.ts"],
+      "sourceAnchors": [
+        "../../packages/cost-router/src/strict-free-guard.ts",
+        "../fixtures/cost/operations.ts"
+      ],
+      "state": "MIGRATED"
+    },
+    {
+      "path": "tests/acceptance/AC-101.spec.ts",
+      "package": "acceptance",
+      "bytes": 2097,
+      "lines": 61,
+      "sha256": "52965e008b8a831eadcce12e363da08f214b3bc5c25473837805cd3866e8d440",
+      "imports": [
+        "bun:test",
+        "./helpers.ts",
+        "../../packages/capacity-planner/src/degrade-policy.ts",
+        "../../packages/cost-router/src/reserve-router.ts",
+        "../fixtures/cost/operations.ts"
+      ],
+      "vitestImports": [],
+      "features": [],
+      "workload": "PURE",
+      "migrationType": "ALREADY_MIGRATED",
+      "fixturesAndHelpers": ["./helpers.ts", "../fixtures/cost/operations.ts"],
+      "sourceAnchors": [
+        "./helpers.ts",
+        "../../packages/capacity-planner/src/degrade-policy.ts",
+        "../../packages/cost-router/src/reserve-router.ts",
+        "../fixtures/cost/operations.ts"
+      ],
+      "state": "MIGRATED"
+    },
+    {
+      "path": "tests/acceptance/AC-102.spec.ts",
+      "package": "acceptance",
+      "bytes": 1347,
+      "lines": 36,
+      "sha256": "73a95f82c9e1de81abd6f1c9de57d24b85c6eae75d48bd448dbcd32dd507de55",
+      "imports": [
+        "bun:test",
+        "../../packages/cost-router/src/batch-coalescer.ts",
+        "../fixtures/cost/batches.ts"
+      ],
+      "vitestImports": [],
+      "features": [],
+      "workload": "PURE",
+      "migrationType": "ALREADY_MIGRATED",
+      "fixturesAndHelpers": ["../fixtures/cost/batches.ts"],
+      "sourceAnchors": [
+        "../../packages/cost-router/src/batch-coalescer.ts",
+        "../fixtures/cost/batches.ts"
+      ],
+      "state": "MIGRATED"
+    },
+    {
+      "path": "tests/acceptance/AC-103.spec.ts",
+      "package": "acceptance",
+      "bytes": 1754,
+      "lines": 41,
+      "sha256": "60834143e2a61f099338a3d0ae18889aa1865c6e506410b1298fdf01db84e923",
+      "imports": [
+        "bun:test",
+        "../../packages/quota-forecast/src/plan-verifier.ts",
+        "../fixtures/cost/plans.ts"
+      ],
+      "vitestImports": [],
+      "features": [],
+      "workload": "PURE",
+      "migrationType": "ALREADY_MIGRATED",
+      "fixturesAndHelpers": ["../fixtures/cost/plans.ts"],
+      "sourceAnchors": [
+        "../../packages/quota-forecast/src/plan-verifier.ts",
+        "../fixtures/cost/plans.ts"
+      ],
+      "state": "MIGRATED"
+    },
+    {
+      "path": "tests/acceptance/AC-104.spec.ts",
+      "package": "acceptance",
+      "bytes": 2000,
+      "lines": 49,
+      "sha256": "9bfc1d71529d8b199723f89fef02df9642351d23979c3a7d049e380ce45ad76a",
+      "imports": [
+        "bun:test",
+        "../../packages/capacity-planner/src/resource-budgets.ts",
+        "../fixtures/cost/paid-policies.ts"
+      ],
+      "vitestImports": [],
+      "features": [],
+      "workload": "PURE",
+      "migrationType": "ALREADY_MIGRATED",
+      "fixturesAndHelpers": ["../fixtures/cost/paid-policies.ts"],
+      "sourceAnchors": [
+        "../../packages/capacity-planner/src/resource-budgets.ts",
+        "../fixtures/cost/paid-policies.ts"
+      ],
+      "state": "MIGRATED"
+    },
+    {
+      "path": "tests/acceptance/AC-105.spec.ts",
+      "package": "acceptance",
+      "bytes": 2272,
+      "lines": 53,
+      "sha256": "e7e072d7d19f7d2d7fbcda2ae11348e7646dbcd84af77915556f2e3ba2ad1a11",
+      "imports": [
+        "bun:test",
+        "../../packages/capacity-planner/src/resource-budgets.ts",
+        "../../packages/cost-router/src/strict-free-guard.ts",
+        "../fixtures/cost/paid-policies.ts",
+        "../fixtures/cost/operations.ts"
+      ],
+      "vitestImports": [],
+      "features": [],
+      "workload": "PURE",
+      "migrationType": "ALREADY_MIGRATED",
+      "fixturesAndHelpers": ["../fixtures/cost/paid-policies.ts", "../fixtures/cost/operations.ts"],
+      "sourceAnchors": [
+        "../../packages/capacity-planner/src/resource-budgets.ts",
+        "../../packages/cost-router/src/strict-free-guard.ts",
+        "../fixtures/cost/paid-policies.ts",
+        "../fixtures/cost/operations.ts"
+      ],
+      "state": "MIGRATED"
+    },
+    {
+      "path": "tests/acceptance/AC-224.spec.ts",
+      "package": "acceptance",
+      "bytes": 2700,
+      "lines": 74,
+      "sha256": "f713708728f3a30f20547b39f8741a0eff3cb2b29d388accf9eaced55ddf0aa9",
+      "imports": [
+        "bun:test",
+        "./helpers.ts",
+        "../../packages/cost-router/src/quota-adapter.ts",
+        "../fixtures/cost/operations.ts"
+      ],
+      "vitestImports": [],
+      "features": [],
+      "workload": "PURE",
+      "migrationType": "ALREADY_MIGRATED",
+      "fixturesAndHelpers": ["./helpers.ts", "../fixtures/cost/operations.ts"],
+      "sourceAnchors": [
+        "./helpers.ts",
+        "../../packages/cost-router/src/quota-adapter.ts",
+        "../fixtures/cost/operations.ts"
+      ],
+      "state": "MIGRATED"
+    },
+    {
+      "path": "tests/acceptance/AC-225.spec.ts",
+      "package": "acceptance",
+      "bytes": 1185,
+      "lines": 26,
+      "sha256": "25ff17fde809fd5b754cf851c780f5b42043b3c5dea56b0acbbf4c29a2637ab9",
+      "imports": ["bun:test"],
+      "vitestImports": [],
+      "features": [],
+      "workload": "PURE",
+      "migrationType": "ALREADY_MIGRATED",
+      "fixturesAndHelpers": [],
+      "sourceAnchors": [],
+      "state": "MIGRATED"
+    },
+    {
+      "path": "tests/acceptance/AC-226.spec.ts",
+      "package": "acceptance",
+      "bytes": 1330,
+      "lines": 34,
+      "sha256": "b768392a2321bccd65b863866304fd58855557a2be4abff65a4092a8281e77f5",
+      "imports": [
+        "bun:test",
+        "../../packages/cost-router/src/reserve-router.ts",
+        "../fixtures/cost/operations.ts"
+      ],
+      "vitestImports": [],
+      "features": [],
+      "workload": "PURE",
+      "migrationType": "ALREADY_MIGRATED",
+      "fixturesAndHelpers": ["../fixtures/cost/operations.ts"],
+      "sourceAnchors": [
+        "../../packages/cost-router/src/reserve-router.ts",
+        "../fixtures/cost/operations.ts"
+      ],
+      "state": "MIGRATED"
+    },
+    {
+      "path": "tests/acceptance/AC-227.spec.ts",
+      "package": "acceptance",
+      "bytes": 1590,
+      "lines": 43,
+      "sha256": "5fb87bf0db15c014af700d2a0dec132ba8b0aaf26b0cd039158767bca02cf578",
+      "imports": [
+        "bun:test",
+        "../../packages/quota-forecast/src/capacity-replay.ts",
+        "../fixtures/cost/plans.ts"
+      ],
+      "vitestImports": [],
+      "features": [],
+      "workload": "PURE",
+      "migrationType": "ALREADY_MIGRATED",
+      "fixturesAndHelpers": ["../fixtures/cost/plans.ts"],
+      "sourceAnchors": [
+        "../../packages/quota-forecast/src/capacity-replay.ts",
+        "../fixtures/cost/plans.ts"
+      ],
+      "state": "MIGRATED"
+    },
+    {
+      "path": "tests/acceptance/AC-228.spec.ts",
+      "package": "acceptance",
+      "bytes": 1605,
+      "lines": 36,
+      "sha256": "e5e795f697295cd0ce61cdd2426f8bb2cb5cb64a7b2dd8bacc8f4d06a29e27f1",
+      "imports": ["bun:test", "../../packages/capacity-planner/src/degrade-policy.ts"],
+      "vitestImports": [],
+      "features": [],
+      "workload": "PURE",
+      "migrationType": "ALREADY_MIGRATED",
+      "fixturesAndHelpers": [],
+      "sourceAnchors": ["../../packages/capacity-planner/src/degrade-policy.ts"],
+      "state": "MIGRATED"
+    },
+    {
+      "path": "tests/acceptance/AC-229.spec.ts",
+      "package": "acceptance",
+      "bytes": 1612,
+      "lines": 33,
+      "sha256": "157b67a969fd9056a57b30ea78d0afc0d40bdbde014b6c0a401230c7f5c14207",
+      "imports": [
+        "bun:test",
+        "../../packages/quota-forecast/src/forecast.ts",
+        "../fixtures/cost/plans.ts"
+      ],
+      "vitestImports": [],
+      "features": [],
+      "workload": "PURE",
+      "migrationType": "ALREADY_MIGRATED",
+      "fixturesAndHelpers": ["../fixtures/cost/plans.ts"],
+      "sourceAnchors": [
+        "../../packages/quota-forecast/src/forecast.ts",
+        "../fixtures/cost/plans.ts"
+      ],
+      "state": "MIGRATED"
     },
     {
       "path": "tests/acceptance/AC-240.spec.ts",
@@ -2187,7 +2777,7 @@
         "@foresift/evidence",
         "./helpers.ts"
       ],
-      "state": "VERIFIED"
+      "state": "MIGRATED"
     },
     {
       "path": "tests/acceptance/AC-241.spec.ts",
@@ -2217,7 +2807,7 @@
         "../../packages/tool-core/src/stages/cache.ts",
         "./helpers.ts"
       ],
-      "state": "VERIFIED"
+      "state": "MIGRATED"
     },
     {
       "path": "tests/acceptance/AC-242.spec.ts",
@@ -2243,7 +2833,7 @@
         "@foresift/shared-schemas",
         "./helpers.ts"
       ],
-      "state": "VERIFIED"
+      "state": "MIGRATED"
     },
     {
       "path": "tests/acceptance/AC-243.spec.ts",
@@ -2269,7 +2859,7 @@
         "@foresift/shared-schemas",
         "./helpers.ts"
       ],
-      "state": "VERIFIED"
+      "state": "MIGRATED"
     },
     {
       "path": "tests/acceptance/AC-244.spec.ts",
@@ -2295,7 +2885,7 @@
         "@foresift/shared-schemas",
         "./helpers.ts"
       ],
-      "state": "VERIFIED"
+      "state": "MIGRATED"
     },
     {
       "path": "tests/acceptance/AC-245.spec.ts",
@@ -2324,7 +2914,7 @@
         "@foresift/shared-schemas",
         "./helpers.ts"
       ],
-      "state": "VERIFIED"
+      "state": "MIGRATED"
     },
     {
       "path": "tests/acceptance/AC-246.spec.ts",
@@ -2339,7 +2929,7 @@
       "migrationType": "ALREADY_MIGRATED",
       "fixturesAndHelpers": ["./helpers.ts"],
       "sourceAnchors": ["@foresift/persistence", "@foresift/shared-schemas", "./helpers.ts"],
-      "state": "VERIFIED"
+      "state": "MIGRATED"
     },
     {
       "path": "tests/acceptance/AC-247.spec.ts",
@@ -2365,7 +2955,7 @@
         "@foresift/shared-schemas",
         "./helpers.ts"
       ],
-      "state": "VERIFIED"
+      "state": "MIGRATED"
     },
     {
       "path": "tests/acceptance/AC-248.spec.ts",
@@ -2393,7 +2983,7 @@
         "@foresift/shared-schemas",
         "./helpers.ts"
       ],
-      "state": "VERIFIED"
+      "state": "MIGRATED"
     },
     {
       "path": "tests/acceptance/AC-249.spec.ts",
@@ -2421,7 +3011,7 @@
         "@foresift/shared-schemas",
         "./helpers.ts"
       ],
-      "state": "VERIFIED"
+      "state": "MIGRATED"
     },
     {
       "path": "tests/acceptance/AC-250.spec.ts",
@@ -2436,7 +3026,7 @@
       "migrationType": "ALREADY_MIGRATED",
       "fixturesAndHelpers": [],
       "sourceAnchors": ["../../packages/security/src/mcp-origin.ts"],
-      "state": "VERIFIED"
+      "state": "MIGRATED"
     },
     {
       "path": "tests/acceptance/AC-251.spec.ts",
@@ -2451,7 +3041,7 @@
       "migrationType": "ALREADY_MIGRATED",
       "fixturesAndHelpers": [],
       "sourceAnchors": ["../../packages/security/src/mcp-protocol-guard.ts"],
-      "state": "VERIFIED"
+      "state": "MIGRATED"
     },
     {
       "path": "tests/acceptance/AC-252.spec.ts",
@@ -2475,7 +3065,7 @@
         "../../packages/tenant-isolation/src/signed-url.ts",
         "../../packages/tenant-isolation/src/tenant-context.ts"
       ],
-      "state": "VERIFIED"
+      "state": "MIGRATED"
     },
     {
       "path": "tests/acceptance/AC-253.spec.ts",
@@ -2490,7 +3080,7 @@
       "migrationType": "ALREADY_MIGRATED",
       "fixturesAndHelpers": [],
       "sourceAnchors": ["../../packages/security/src/oauth-binding.ts"],
-      "state": "VERIFIED"
+      "state": "MIGRATED"
     },
     {
       "path": "tests/acceptance/AC-254.spec.ts",
@@ -2515,7 +3105,7 @@
         "../../packages/security/src/negative-capability.ts",
         "../../packages/security/src/supply-chain.ts"
       ],
-      "state": "VERIFIED"
+      "state": "MIGRATED"
     },
     {
       "path": "tests/acceptance/AC-255.spec.ts",
@@ -2542,7 +3132,7 @@
         "../../packages/security/src/negative-capability.ts",
         "../../packages/tool-core/src/prohibited.ts"
       ],
-      "state": "VERIFIED"
+      "state": "MIGRATED"
     },
     {
       "path": "tests/acceptance/AC-256.spec.ts",
@@ -2557,7 +3147,7 @@
       "migrationType": "ALREADY_MIGRATED",
       "fixturesAndHelpers": [],
       "sourceAnchors": ["../../packages/security/src/decoder-authority.ts"],
-      "state": "VERIFIED"
+      "state": "MIGRATED"
     },
     {
       "path": "tests/acceptance/AC-257.spec.ts",
@@ -2579,7 +3169,7 @@
         "../../packages/security/src/egress.ts",
         "../fixtures/sec/ssrf/ssrf-urls.ts"
       ],
-      "state": "VERIFIED"
+      "state": "MIGRATED"
     },
     {
       "path": "tests/acceptance/AC-258.spec.ts",
@@ -2601,7 +3191,7 @@
         "../../packages/security/src/untrusted-content.ts",
         "../fixtures/sec/injection/injection-corpus.ts"
       ],
-      "state": "VERIFIED"
+      "state": "MIGRATED"
     },
     {
       "path": "tests/acceptance/AC-259.spec.ts",
@@ -2632,7 +3222,7 @@
         "../../packages/security/src/audit-chain.ts",
         "../../packages/tool-core/src/engine.ts"
       ],
-      "state": "VERIFIED"
+      "state": "MIGRATED"
     },
     {
       "path": "tests/acceptance/AC-260.spec.ts",
@@ -2660,7 +3250,7 @@
         "@foresift/evidence",
         "./helpers.ts"
       ],
-      "state": "VERIFIED"
+      "state": "MIGRATED"
     },
     {
       "path": "tests/acceptance/AC-261.spec.ts",
@@ -2689,7 +3279,7 @@
         "@foresift/evidence",
         "./helpers.ts"
       ],
-      "state": "VERIFIED"
+      "state": "MIGRATED"
     },
     {
       "path": "tests/acceptance/AC-262.spec.ts",
@@ -2704,7 +3294,7 @@
       "migrationType": "ALREADY_MIGRATED",
       "fixturesAndHelpers": ["./helpers.ts"],
       "sourceAnchors": ["@foresift/domain", "@foresift/persistence", "./helpers.ts"],
-      "state": "VERIFIED"
+      "state": "MIGRATED"
     },
     {
       "path": "tests/acceptance/AC-263.spec.ts",
@@ -2730,7 +3320,7 @@
         "@foresift/persistence",
         "./helpers.ts"
       ],
-      "state": "VERIFIED"
+      "state": "MIGRATED"
     },
     {
       "path": "tests/acceptance/AC-264.spec.ts",
@@ -2745,7 +3335,7 @@
       "migrationType": "ALREADY_MIGRATED",
       "fixturesAndHelpers": ["./helpers.ts"],
       "sourceAnchors": ["@foresift/domain", "@foresift/persistence", "./helpers.ts"],
-      "state": "VERIFIED"
+      "state": "MIGRATED"
     },
     {
       "path": "tests/acceptance/AC-270.spec.ts",
@@ -2769,7 +3359,7 @@
         "@foresift/provider-lifecycle",
         "../helpers/prov.ts"
       ],
-      "state": "VERIFIED"
+      "state": "MIGRATED"
     },
     {
       "path": "tests/acceptance/AC-271.spec.ts",
@@ -2799,7 +3389,7 @@
         "@foresift/provider-lifecycle",
         "../helpers/prov.ts"
       ],
-      "state": "VERIFIED"
+      "state": "MIGRATED"
     },
     {
       "path": "tests/acceptance/AC-272.spec.ts",
@@ -2825,7 +3415,7 @@
         "@foresift/provider-lifecycle",
         "../helpers/prov.ts"
       ],
-      "state": "VERIFIED"
+      "state": "MIGRATED"
     },
     {
       "path": "tests/acceptance/AC-273.spec.ts",
@@ -2840,7 +3430,7 @@
       "migrationType": "ALREADY_MIGRATED",
       "fixturesAndHelpers": ["../helpers/prov.ts"],
       "sourceAnchors": ["@foresift/provider-lifecycle", "../helpers/prov.ts"],
-      "state": "VERIFIED"
+      "state": "MIGRATED"
     },
     {
       "path": "tests/acceptance/AC-274.spec.ts",
@@ -2873,7 +3463,7 @@
         "../../packages/security/src/audit-chain.ts",
         "@foresift/shared-schemas"
       ],
-      "state": "VERIFIED"
+      "state": "MIGRATED"
     },
     {
       "path": "tests/acceptance/AC-275.spec.ts",
@@ -2899,7 +3489,7 @@
         "../../packages/tenant-isolation/src/resource-access.ts",
         "../../packages/tenant-isolation/src/signed-url.ts"
       ],
-      "state": "VERIFIED"
+      "state": "MIGRATED"
     },
     {
       "path": "tests/acceptance/AC-276.spec.ts",
@@ -2914,7 +3504,7 @@
       "migrationType": "ALREADY_MIGRATED",
       "fixturesAndHelpers": [],
       "sourceAnchors": ["../../packages/security/src/claims-policy.ts"],
-      "state": "VERIFIED"
+      "state": "MIGRATED"
     },
     {
       "path": "tests/acceptance/AC-277.spec.ts",
@@ -2929,7 +3519,7 @@
       "migrationType": "ALREADY_MIGRATED",
       "fixturesAndHelpers": [],
       "sourceAnchors": ["../../packages/security/src/claims-policy.ts"],
-      "state": "VERIFIED"
+      "state": "MIGRATED"
     },
     {
       "path": "tests/acceptance/AC-278.spec.ts",
@@ -2957,7 +3547,7 @@
         "../../packages/security/src/incidents.ts",
         "../../packages/security/src/gate-pause.ts"
       ],
-      "state": "VERIFIED"
+      "state": "MIGRATED"
     },
     {
       "path": "tests/acceptance/AC-279.spec.ts",
@@ -2983,7 +3573,7 @@
         "@foresift/persistence",
         "../../packages/security/src/gate-pause.ts"
       ],
-      "state": "VERIFIED"
+      "state": "MIGRATED"
     },
     {
       "path": "tests/acceptance/tooling-globs.spec.ts",
@@ -2998,7 +3588,7 @@
       "migrationType": "ALREADY_MIGRATED",
       "fixturesAndHelpers": [],
       "sourceAnchors": [],
-      "state": "VERIFIED"
+      "state": "MIGRATED"
     },
     {
       "path": "tests/automation/archon-task-worktree-advance.spec.ts",
@@ -3020,14 +3610,14 @@
       "migrationType": "ALREADY_MIGRATED",
       "fixturesAndHelpers": [],
       "sourceAnchors": ["../../scripts/automation/foresift-autopilot.mjs"],
-      "state": "VERIFIED"
+      "state": "MIGRATED"
     },
     {
       "path": "tests/automation/bun-migration.spec.ts",
       "package": "automation",
-      "bytes": 45588,
-      "lines": 1140,
-      "sha256": "edda18ab1fd4b85d6217980fb79d4c3edecbf0b615cef2f1e940825ede623c9b",
+      "bytes": 49828,
+      "lines": 1222,
+      "sha256": "9b437fa5f8cc1ba12554b0348129215d4c177e450f12e74761b7be50c0792f96",
       "imports": [
         "node:child_process",
         "node:crypto",
@@ -3048,7 +3638,7 @@
       ],
       "vitestImports": [],
       "features": [],
-      "workload": "PROCESS",
+      "workload": "DATABASE_PGLITE",
       "migrationType": "ALREADY_MIGRATED",
       "fixturesAndHelpers": ["../helpers/git-fixture.js"],
       "sourceAnchors": [
@@ -3063,22 +3653,34 @@
         "../../scripts/automation/schema.mjs",
         "../helpers/git-fixture.js"
       ],
-      "state": "VERIFIED"
+      "state": "MIGRATED"
     },
     {
       "path": "tests/automation/ci-authority.spec.ts",
       "package": "automation",
-      "bytes": 9134,
-      "lines": 305,
-      "sha256": "05d06bc97c5f9f419728aa4027f6dd282d1052a0a645548f0e25b1adf066dda5",
-      "imports": ["bun:test", "node:fs", "node:path", "../../scripts/automation/ci-authority.mjs"],
+      "bytes": 17358,
+      "lines": 483,
+      "sha256": "5022328350f22fb021f5f00e8db47a364ac0b4cb6763a84184ea7174e27881f3",
+      "imports": [
+        "bun:test",
+        "node:fs",
+        "node:os",
+        "node:path",
+        "../../scripts/automation/ci-authority.mjs",
+        "../../scripts/automation/state-landing.mjs",
+        "../../scripts/automation/audit-github-protection.mjs"
+      ],
       "vitestImports": [],
-      "features": [],
+      "features": ["dynamic-import"],
       "workload": "PURE",
       "migrationType": "ALREADY_MIGRATED",
       "fixturesAndHelpers": [],
-      "sourceAnchors": ["../../scripts/automation/ci-authority.mjs"],
-      "state": "VERIFIED"
+      "sourceAnchors": [
+        "../../scripts/automation/ci-authority.mjs",
+        "../../scripts/automation/state-landing.mjs",
+        "../../scripts/automation/audit-github-protection.mjs"
+      ],
+      "state": "MIGRATED"
     },
     {
       "path": "tests/automation/claude-tooling-only.spec.ts",
@@ -3100,14 +3702,14 @@
       "migrationType": "ALREADY_MIGRATED",
       "fixturesAndHelpers": [],
       "sourceAnchors": ["../../scripts/automation/fast-impact.mjs"],
-      "state": "VERIFIED"
+      "state": "MIGRATED"
     },
     {
       "path": "tests/automation/codex-agy-profile.spec.ts",
       "package": "automation",
-      "bytes": 65188,
-      "lines": 1714,
-      "sha256": "1b53da263829c9e288ec104ccf1a7b62f721923e1f3e82e1804df598ca4d00dd",
+      "bytes": 79430,
+      "lines": 2060,
+      "sha256": "ff1e5c1d9ee67bf3fb27d6addfe2f9d6db144f688a51d0895af7117acc688817",
       "imports": ["bun:test", "node:child_process", "node:fs", "node:os", "node:path", "node:url"],
       "vitestImports": [],
       "features": ["dynamic-import"],
@@ -3115,7 +3717,7 @@
       "migrationType": "ALREADY_MIGRATED",
       "fixturesAndHelpers": [],
       "sourceAnchors": [],
-      "state": "VERIFIED"
+      "state": "MIGRATED"
     },
     {
       "path": "tests/automation/control-plane.spec.ts",
@@ -3137,7 +3739,7 @@
         "../../scripts/automation/schema.mjs",
         "../../scripts/automation/schema.mjs"
       ],
-      "state": "VERIFIED"
+      "state": "MIGRATED"
     },
     {
       "path": "tests/automation/finalize-from-main.spec.ts",
@@ -3152,7 +3754,7 @@
       "migrationType": "ALREADY_MIGRATED",
       "fixturesAndHelpers": [],
       "sourceAnchors": ["../../scripts/automation/finalize-from-main.mjs"],
-      "state": "VERIFIED"
+      "state": "MIGRATED"
     },
     {
       "path": "tests/automation/gate-e2e-green.spec.ts",
@@ -3179,7 +3781,7 @@
         "../helpers/git-fixture.js",
         "../helpers/v2-fixtures.js"
       ],
-      "state": "VERIFIED"
+      "state": "MIGRATED"
     },
     {
       "path": "tests/automation/gate-e2e-red.spec.ts",
@@ -3205,7 +3807,7 @@
         "../helpers/git-fixture.js",
         "../helpers/v2-fixtures.js"
       ],
-      "state": "VERIFIED"
+      "state": "MIGRATED"
     },
     {
       "path": "tests/automation/hybrid-engine.spec.ts",
@@ -3226,14 +3828,14 @@
       "migrationType": "ALREADY_MIGRATED",
       "fixturesAndHelpers": [],
       "sourceAnchors": ["../../scripts/automation/exec-agy-writer.mjs"],
-      "state": "VERIFIED"
+      "state": "MIGRATED"
     },
     {
       "path": "tests/automation/impl-wave.spec.ts",
       "package": "automation",
-      "bytes": 33894,
-      "lines": 780,
-      "sha256": "d5ece9003f0fd8d20a2a14008c41a9e6475599a01a3599b11661f46132ff0213",
+      "bytes": 38163,
+      "lines": 883,
+      "sha256": "0ca6d38a45c28e1535e8cf3aa3e94d2fec5a765927dd8d51c02b5c5aba4dcbf2",
       "imports": ["bun:test", "node:child_process", "node:fs", "node:os", "node:path", "node:url"],
       "vitestImports": [],
       "features": ["dynamic-import"],
@@ -3241,7 +3843,7 @@
       "migrationType": "ALREADY_MIGRATED",
       "fixturesAndHelpers": [],
       "sourceAnchors": [],
-      "state": "VERIFIED"
+      "state": "MIGRATED"
     },
     {
       "path": "tests/automation/implement-completeness-clean-tree.spec.ts",
@@ -3263,7 +3865,7 @@
       "migrationType": "ALREADY_MIGRATED",
       "fixturesAndHelpers": [],
       "sourceAnchors": ["../../scripts/automation/package-implement-complete.mjs"],
-      "state": "VERIFIED"
+      "state": "MIGRATED"
     },
     {
       "path": "tests/automation/plan-context-capsule.spec.ts",
@@ -3278,14 +3880,14 @@
       "migrationType": "ALREADY_MIGRATED",
       "fixturesAndHelpers": [],
       "sourceAnchors": [],
-      "state": "VERIFIED"
+      "state": "MIGRATED"
     },
     {
       "path": "tests/automation/planned-handoff.spec.ts",
       "package": "automation",
-      "bytes": 22758,
-      "lines": 580,
-      "sha256": "67a3580c19064bbc0b3cbb2b1e995d1ff2654445515007272cc3b1c8fcc5b034",
+      "bytes": 26517,
+      "lines": 665,
+      "sha256": "93506517f3ff6335d9c053ed654409673c110d4c26afbbcae31bc099118c81cb",
       "imports": [
         "node:child_process",
         "node:fs",
@@ -3301,7 +3903,7 @@
       "migrationType": "ALREADY_MIGRATED",
       "fixturesAndHelpers": ["../helpers/git-fixture.js"],
       "sourceAnchors": ["../helpers/git-fixture.js"],
-      "state": "VERIFIED"
+      "state": "MIGRATED"
     },
     {
       "path": "tests/automation/selection-committed-view.spec.ts",
@@ -3327,7 +3929,7 @@
         "../../scripts/automation/schema.mjs",
         "../../scripts/automation/foresift-autopilot.mjs"
       ],
-      "state": "VERIFIED"
+      "state": "MIGRATED"
     },
     {
       "path": "tests/automation/sharded-wave-rollout.spec.ts",
@@ -3349,7 +3951,7 @@
         "../../scripts/automation/sharded-wave-rollout.mjs",
         "../../scripts/automation/package-generations.mjs"
       ],
-      "state": "VERIFIED"
+      "state": "MIGRATED"
     },
     {
       "path": "tests/automation/targeted-router-e2e.spec.ts",
@@ -3378,7 +3980,7 @@
         "../../scripts/automation/convergence-router.mjs",
         "../helpers/v2-fixtures.js"
       ],
-      "state": "VERIFIED"
+      "state": "MIGRATED"
     },
     {
       "path": "tests/automation/test-tiers.spec.ts",
@@ -3393,7 +3995,7 @@
       "migrationType": "ALREADY_MIGRATED",
       "fixturesAndHelpers": ["../helpers/git-fixture.js"],
       "sourceAnchors": ["../helpers/git-fixture.js"],
-      "state": "VERIFIED"
+      "state": "MIGRATED"
     },
     {
       "path": "tests/automation/throughput.spec.ts",
@@ -3424,7 +4026,7 @@
         "../../scripts/automation/verify-dedupe.mjs",
         "../../scripts/automation/work-package-throughput-profile.mjs"
       ],
-      "state": "VERIFIED"
+      "state": "MIGRATED"
     },
     {
       "path": "tests/automation/until-bash-guards.spec.ts",
@@ -3439,7 +4041,7 @@
       "migrationType": "ALREADY_MIGRATED",
       "fixturesAndHelpers": [],
       "sourceAnchors": [],
-      "state": "VERIFIED"
+      "state": "MIGRATED"
     },
     {
       "path": "tests/automation/v2-gate-convergence.spec.ts",
@@ -3465,7 +4067,7 @@
         "../../scripts/automation/convergence-router.mjs",
         "../helpers/v2-fixtures.js"
       ],
-      "state": "VERIFIED"
+      "state": "MIGRATED"
     },
     {
       "path": "tests/automation/v2-second-pass-cases.spec.ts",
@@ -3498,7 +4100,7 @@
         "../../scripts/automation/package-final-land.mjs",
         "../helpers/git-fixture.js"
       ],
-      "state": "VERIFIED"
+      "state": "MIGRATED"
     },
     {
       "path": "tests/automation/v2-throughput.spec.ts",
@@ -3531,14 +4133,14 @@
         "../helpers/git-fixture.js",
         "../helpers/v2-fixtures.js"
       ],
-      "state": "VERIFIED"
+      "state": "MIGRATED"
     },
     {
       "path": "tests/automation/v3-base-drift.spec.ts",
       "package": "automation",
-      "bytes": 23213,
-      "lines": 615,
-      "sha256": "5bde0c769e2a80c04d899287fb0a95a62a10c87cc3da30e5850f42f8998a232e",
+      "bytes": 23368,
+      "lines": 619,
+      "sha256": "e49be7e023439f5f8f6f5f10dbb101e6823e896a05886f953f0003ef8501ca7a",
       "imports": [
         "node:child_process",
         "node:fs",
@@ -3559,14 +4161,14 @@
         "../../scripts/automation/package-full-gate.mjs",
         "../../scripts/automation/package-final-land.mjs"
       ],
-      "state": "VERIFIED"
+      "state": "MIGRATED"
     },
     {
       "path": "tests/automation/v3-generations.spec.ts",
       "package": "automation",
-      "bytes": 62476,
-      "lines": 1482,
-      "sha256": "9281c21b2178f1db7cd40de54278d0723e65157ec4b89f20c0eb330f85dae828",
+      "bytes": 68205,
+      "lines": 1622,
+      "sha256": "dedd25a887083b20c1a42d734e069022c82723318ca2eb118c42c74715cf21a6",
       "imports": [
         "node:child_process",
         "node:fs",
@@ -3592,7 +4194,7 @@
         "../../scripts/automation/generation-salvage.mjs",
         "../helpers/git-fixture.js"
       ],
-      "state": "VERIFIED"
+      "state": "MIGRATED"
     },
     {
       "path": "tests/automation/v3-mechanical-landing.spec.ts",
@@ -3618,7 +4220,7 @@
         "../../scripts/automation/package-create-pr.mjs",
         "../../scripts/automation/package-final-land.mjs"
       ],
-      "state": "VERIFIED"
+      "state": "MIGRATED"
     },
     {
       "path": "tests/automation/v3-scheduler-runtime.spec.ts",
@@ -3642,7 +4244,7 @@
         "../../scripts/automation/milestone-scheduler.mjs",
         "../../scripts/automation/foresift-autopilot.mjs"
       ],
-      "state": "VERIFIED"
+      "state": "MIGRATED"
     },
     {
       "path": "tests/automation/v4-review-packet.spec.ts",
@@ -3664,7 +4266,7 @@
       "migrationType": "ALREADY_MIGRATED",
       "fixturesAndHelpers": ["../helpers/git-fixture.js"],
       "sourceAnchors": ["../../scripts/automation/review-packet.mjs", "../helpers/git-fixture.js"],
-      "state": "VERIFIED"
+      "state": "MIGRATED"
     },
     {
       "path": "tests/automation/v4-scheduler.spec.ts",
@@ -3688,7 +4290,7 @@
         "../../scripts/automation/milestone-scheduler.mjs",
         "../helpers/git-fixture.js"
       ],
-      "state": "VERIFIED"
+      "state": "MIGRATED"
     },
     {
       "path": "tests/automation/wave-admission.spec.ts",
@@ -3710,7 +4312,7 @@
       "migrationType": "ALREADY_MIGRATED",
       "fixturesAndHelpers": [],
       "sourceAnchors": ["../../scripts/automation/wave-admission.mjs"],
-      "state": "VERIFIED"
+      "state": "MIGRATED"
     },
     {
       "path": "tests/automation/wave-branch-adoption.spec.ts",
@@ -3735,7 +4337,7 @@
         "../helpers/git-fixture.js",
         "../../scripts/automation/wave-branch-adoption.mjs"
       ],
-      "state": "VERIFIED"
+      "state": "MIGRATED"
     },
     {
       "path": "tests/automation/workflow-node-budgets.spec.ts",
@@ -3750,7 +4352,7 @@
       "migrationType": "ALREADY_MIGRATED",
       "fixturesAndHelpers": [],
       "sourceAnchors": [],
-      "state": "VERIFIED"
+      "state": "MIGRATED"
     },
     {
       "path": "tests/automation/workflow-node-resilience.spec.ts",
@@ -3765,7 +4367,7 @@
       "migrationType": "ALREADY_MIGRATED",
       "fixturesAndHelpers": [],
       "sourceAnchors": [],
-      "state": "VERIFIED"
+      "state": "MIGRATED"
     },
     {
       "path": "tests/negative/AC-001.negative.spec.ts",
@@ -3784,7 +4386,7 @@
       "migrationType": "ALREADY_MIGRATED",
       "fixturesAndHelpers": [],
       "sourceAnchors": ["@foresift/shared-schemas", "../../packages/tool-core/src/profiles.ts"],
-      "state": "VERIFIED"
+      "state": "MIGRATED"
     },
     {
       "path": "tests/negative/AC-002.negative.spec.ts",
@@ -3799,7 +4401,7 @@
       "migrationType": "ALREADY_MIGRATED",
       "fixturesAndHelpers": [],
       "sourceAnchors": ["@foresift/shared-schemas"],
-      "state": "VERIFIED"
+      "state": "MIGRATED"
     },
     {
       "path": "tests/negative/AC-003.negative.spec.ts",
@@ -3825,7 +4427,7 @@
         "../../packages/tool-core/src/single-flight.ts",
         "../acceptance/helpers.ts"
       ],
-      "state": "VERIFIED"
+      "state": "MIGRATED"
     },
     {
       "path": "tests/negative/AC-004.negative.spec.ts",
@@ -3840,7 +4442,7 @@
       "migrationType": "ALREADY_MIGRATED",
       "fixturesAndHelpers": [],
       "sourceAnchors": ["@foresift/shared-schemas"],
-      "state": "VERIFIED"
+      "state": "MIGRATED"
     },
     {
       "path": "tests/negative/AC-020.negative.spec.ts",
@@ -3872,7 +4474,7 @@
         "../../packages/tool-core/src/stages/cache.ts",
         "../acceptance/helpers.ts"
       ],
-      "state": "VERIFIED"
+      "state": "MIGRATED"
     },
     {
       "path": "tests/negative/AC-021.negative.spec.ts",
@@ -3900,7 +4502,7 @@
         "../../packages/tool-core/src/normalize.ts",
         "../acceptance/helpers.ts"
       ],
-      "state": "VERIFIED"
+      "state": "MIGRATED"
     },
     {
       "path": "tests/negative/AC-022.negative.spec.ts",
@@ -3926,7 +4528,7 @@
         "../../packages/tool-core/src/cache-key.ts",
         "../acceptance/helpers.ts"
       ],
-      "state": "VERIFIED"
+      "state": "MIGRATED"
     },
     {
       "path": "tests/negative/AC-023.negative.spec.ts",
@@ -3955,7 +4557,7 @@
         "../../packages/tool-core/src/normalize.ts",
         "../acceptance/helpers.ts"
       ],
-      "state": "VERIFIED"
+      "state": "MIGRATED"
     },
     {
       "path": "tests/negative/AC-050.negative.spec.ts",
@@ -3982,7 +4584,7 @@
         "../../packages/security/src/negative-capability.ts",
         "../../packages/tool-core/src/prohibited.ts"
       ],
-      "state": "VERIFIED"
+      "state": "MIGRATED"
     },
     {
       "path": "tests/negative/AC-051.negative.spec.ts",
@@ -4011,7 +4613,7 @@
         "../fixtures/sec/webhook/webhook-forgery.ts",
         "../fixtures/sec/injection/injection-corpus.ts"
       ],
-      "state": "VERIFIED"
+      "state": "MIGRATED"
     },
     {
       "path": "tests/negative/AC-052.negative.spec.ts",
@@ -4033,7 +4635,7 @@
         "@foresift/shared-schemas",
         "../../packages/security/src/secrets-policy.ts"
       ],
-      "state": "VERIFIED"
+      "state": "MIGRATED"
     },
     {
       "path": "tests/negative/AC-053.negative.spec.ts",
@@ -4061,7 +4663,7 @@
         "../../packages/security/src/mcp-credentials.ts",
         "../../packages/tool-core/src/profiles.ts"
       ],
-      "state": "VERIFIED"
+      "state": "MIGRATED"
     },
     {
       "path": "tests/negative/AC-060.negative.spec.ts",
@@ -4088,7 +4690,7 @@
         "@foresift/persistence",
         "../acceptance/helpers.ts"
       ],
-      "state": "VERIFIED"
+      "state": "MIGRATED"
     },
     {
       "path": "tests/negative/AC-061.negative.spec.ts",
@@ -4108,7 +4710,7 @@
       "migrationType": "ALREADY_MIGRATED",
       "fixturesAndHelpers": ["../acceptance/helpers.ts"],
       "sourceAnchors": ["@foresift/domain", "@foresift/persistence", "../acceptance/helpers.ts"],
-      "state": "VERIFIED"
+      "state": "MIGRATED"
     },
     {
       "path": "tests/negative/AC-062.negative.spec.ts",
@@ -4134,7 +4736,260 @@
         "@foresift/persistence",
         "../acceptance/helpers.ts"
       ],
-      "state": "VERIFIED"
+      "state": "MIGRATED"
+    },
+    {
+      "path": "tests/negative/AC-100.negative.spec.ts",
+      "package": "negative",
+      "bytes": 2416,
+      "lines": 80,
+      "sha256": "f147f9a44c5ced0dc783b241303aef14ce7f5e7d61c7ea898cdb6ec118d83583",
+      "imports": [
+        "bun:test",
+        "../acceptance/helpers.ts",
+        "../../packages/cost-router/src/strict-free-guard.ts",
+        "../fixtures/cost/operations.ts"
+      ],
+      "vitestImports": [],
+      "features": [],
+      "workload": "PURE",
+      "migrationType": "ALREADY_MIGRATED",
+      "fixturesAndHelpers": ["../acceptance/helpers.ts", "../fixtures/cost/operations.ts"],
+      "sourceAnchors": [
+        "../acceptance/helpers.ts",
+        "../../packages/cost-router/src/strict-free-guard.ts",
+        "../fixtures/cost/operations.ts"
+      ],
+      "state": "MIGRATED"
+    },
+    {
+      "path": "tests/negative/AC-101.negative.spec.ts",
+      "package": "negative",
+      "bytes": 1656,
+      "lines": 48,
+      "sha256": "c5c6e80ea33d605faabdaae1fdcfc900ce02f0c8930de6ad6e1cab8279757e19",
+      "imports": [
+        "bun:test",
+        "../../packages/cost-router/src/reserve-router.ts",
+        "../../packages/capacity-planner/src/degrade-policy.ts",
+        "../fixtures/cost/operations.ts"
+      ],
+      "vitestImports": [],
+      "features": [],
+      "workload": "PURE",
+      "migrationType": "ALREADY_MIGRATED",
+      "fixturesAndHelpers": ["../fixtures/cost/operations.ts"],
+      "sourceAnchors": [
+        "../../packages/cost-router/src/reserve-router.ts",
+        "../../packages/capacity-planner/src/degrade-policy.ts",
+        "../fixtures/cost/operations.ts"
+      ],
+      "state": "MIGRATED"
+    },
+    {
+      "path": "tests/negative/AC-102.negative.spec.ts",
+      "package": "negative",
+      "bytes": 1418,
+      "lines": 42,
+      "sha256": "79b6e2453cedf9a94ede0e4a96323623e32358d7ba0691169fc0e6428219e262",
+      "imports": [
+        "bun:test",
+        "../../packages/cost-router/src/batch-coalescer.ts",
+        "../fixtures/cost/batches.ts"
+      ],
+      "vitestImports": [],
+      "features": [],
+      "workload": "PURE",
+      "migrationType": "ALREADY_MIGRATED",
+      "fixturesAndHelpers": ["../fixtures/cost/batches.ts"],
+      "sourceAnchors": [
+        "../../packages/cost-router/src/batch-coalescer.ts",
+        "../fixtures/cost/batches.ts"
+      ],
+      "state": "MIGRATED"
+    },
+    {
+      "path": "tests/negative/AC-103.negative.spec.ts",
+      "package": "negative",
+      "bytes": 1299,
+      "lines": 30,
+      "sha256": "c96a5e7e3b6195ffbe30cf679fe158a3bede4b15b24a2ddcbbdbdb568115c780",
+      "imports": [
+        "bun:test",
+        "../../packages/quota-forecast/src/plan-verifier.ts",
+        "../fixtures/cost/plans.ts"
+      ],
+      "vitestImports": [],
+      "features": [],
+      "workload": "PURE",
+      "migrationType": "ALREADY_MIGRATED",
+      "fixturesAndHelpers": ["../fixtures/cost/plans.ts"],
+      "sourceAnchors": [
+        "../../packages/quota-forecast/src/plan-verifier.ts",
+        "../fixtures/cost/plans.ts"
+      ],
+      "state": "MIGRATED"
+    },
+    {
+      "path": "tests/negative/AC-104.negative.spec.ts",
+      "package": "negative",
+      "bytes": 1894,
+      "lines": 50,
+      "sha256": "50c75adee19cfb3d2feef6092355f689c72323f7e34507a471455a9db65b53a9",
+      "imports": [
+        "bun:test",
+        "../../packages/capacity-planner/src/resource-budgets.ts",
+        "../fixtures/cost/paid-policies.ts"
+      ],
+      "vitestImports": [],
+      "features": [],
+      "workload": "PURE",
+      "migrationType": "ALREADY_MIGRATED",
+      "fixturesAndHelpers": ["../fixtures/cost/paid-policies.ts"],
+      "sourceAnchors": [
+        "../../packages/capacity-planner/src/resource-budgets.ts",
+        "../fixtures/cost/paid-policies.ts"
+      ],
+      "state": "MIGRATED"
+    },
+    {
+      "path": "tests/negative/AC-105.negative.spec.ts",
+      "package": "negative",
+      "bytes": 1674,
+      "lines": 43,
+      "sha256": "e57cd8660c7e965c67d5322a0c6b8415730c045283ecd5738991da5dba190804",
+      "imports": [
+        "bun:test",
+        "../../packages/cost-router/src/strict-free-guard.ts",
+        "../../packages/capacity-planner/src/resource-budgets.ts",
+        "../fixtures/cost/operations.ts",
+        "../fixtures/cost/paid-policies.ts"
+      ],
+      "vitestImports": [],
+      "features": [],
+      "workload": "PURE",
+      "migrationType": "ALREADY_MIGRATED",
+      "fixturesAndHelpers": ["../fixtures/cost/operations.ts", "../fixtures/cost/paid-policies.ts"],
+      "sourceAnchors": [
+        "../../packages/cost-router/src/strict-free-guard.ts",
+        "../../packages/capacity-planner/src/resource-budgets.ts",
+        "../fixtures/cost/operations.ts",
+        "../fixtures/cost/paid-policies.ts"
+      ],
+      "state": "MIGRATED"
+    },
+    {
+      "path": "tests/negative/AC-224.negative.spec.ts",
+      "package": "negative",
+      "bytes": 2479,
+      "lines": 73,
+      "sha256": "ccb9c811f216089172422c528f06f095fcfb5acda66d4338ffa4a85eafdeed3f",
+      "imports": [
+        "bun:test",
+        "../acceptance/helpers.ts",
+        "../../packages/cost-router/src/quota-adapter.ts",
+        "../fixtures/cost/operations.ts"
+      ],
+      "vitestImports": [],
+      "features": [],
+      "workload": "PURE",
+      "migrationType": "ALREADY_MIGRATED",
+      "fixturesAndHelpers": ["../acceptance/helpers.ts", "../fixtures/cost/operations.ts"],
+      "sourceAnchors": [
+        "../acceptance/helpers.ts",
+        "../../packages/cost-router/src/quota-adapter.ts",
+        "../fixtures/cost/operations.ts"
+      ],
+      "state": "MIGRATED"
+    },
+    {
+      "path": "tests/negative/AC-225.negative.spec.ts",
+      "package": "negative",
+      "bytes": 737,
+      "lines": 17,
+      "sha256": "7837b7b3b9e755f274f96c6c323ef3f1ee55350ac46448142fc4a5a2fa6a5331",
+      "imports": ["bun:test"],
+      "vitestImports": [],
+      "features": [],
+      "workload": "PURE",
+      "migrationType": "ALREADY_MIGRATED",
+      "fixturesAndHelpers": [],
+      "sourceAnchors": [],
+      "state": "MIGRATED"
+    },
+    {
+      "path": "tests/negative/AC-226.negative.spec.ts",
+      "package": "negative",
+      "bytes": 601,
+      "lines": 17,
+      "sha256": "54a3340ada5fd7f4049a65fe1b85949b091b9d6038ce485353295f929dd2b89b",
+      "imports": ["bun:test"],
+      "vitestImports": [],
+      "features": [],
+      "workload": "PURE",
+      "migrationType": "ALREADY_MIGRATED",
+      "fixturesAndHelpers": [],
+      "sourceAnchors": [],
+      "state": "MIGRATED"
+    },
+    {
+      "path": "tests/negative/AC-227.negative.spec.ts",
+      "package": "negative",
+      "bytes": 934,
+      "lines": 23,
+      "sha256": "86ba054c295df73e37459fee715166a3920fb9eeb965852349cf5c67e3ddecfa",
+      "imports": [
+        "bun:test",
+        "../../packages/quota-forecast/src/capacity-replay.ts",
+        "../fixtures/cost/plans.ts"
+      ],
+      "vitestImports": [],
+      "features": [],
+      "workload": "PURE",
+      "migrationType": "ALREADY_MIGRATED",
+      "fixturesAndHelpers": ["../fixtures/cost/plans.ts"],
+      "sourceAnchors": [
+        "../../packages/quota-forecast/src/capacity-replay.ts",
+        "../fixtures/cost/plans.ts"
+      ],
+      "state": "MIGRATED"
+    },
+    {
+      "path": "tests/negative/AC-228.negative.spec.ts",
+      "package": "negative",
+      "bytes": 865,
+      "lines": 19,
+      "sha256": "a28a03a7e6a615560112c76fc5e0d41dfdd70bf630b8c3612861938323a12a1e",
+      "imports": ["bun:test", "../../packages/capacity-planner/src/degrade-policy.ts"],
+      "vitestImports": [],
+      "features": [],
+      "workload": "PURE",
+      "migrationType": "ALREADY_MIGRATED",
+      "fixturesAndHelpers": [],
+      "sourceAnchors": ["../../packages/capacity-planner/src/degrade-policy.ts"],
+      "state": "MIGRATED"
+    },
+    {
+      "path": "tests/negative/AC-229.negative.spec.ts",
+      "package": "negative",
+      "bytes": 1366,
+      "lines": 35,
+      "sha256": "60c31e1f478dbbbed34d3209b83fe3bc7f69e9f5283051c26163faff922ae04b",
+      "imports": [
+        "bun:test",
+        "../../packages/quota-forecast/src/forecast.ts",
+        "../fixtures/cost/plans.ts"
+      ],
+      "vitestImports": [],
+      "features": [],
+      "workload": "PURE",
+      "migrationType": "ALREADY_MIGRATED",
+      "fixturesAndHelpers": ["../fixtures/cost/plans.ts"],
+      "sourceAnchors": [
+        "../../packages/quota-forecast/src/forecast.ts",
+        "../fixtures/cost/plans.ts"
+      ],
+      "state": "MIGRATED"
     },
     {
       "path": "tests/negative/AC-240.negative.spec.ts",
@@ -4158,7 +5013,7 @@
         "@foresift/shared-schemas",
         "../../packages/tool-core/src/normalize.ts"
       ],
-      "state": "VERIFIED"
+      "state": "MIGRATED"
     },
     {
       "path": "tests/negative/AC-241.negative.spec.ts",
@@ -4188,7 +5043,7 @@
         "../../packages/tool-core/src/stages/cache.ts",
         "../acceptance/helpers.ts"
       ],
-      "state": "VERIFIED"
+      "state": "MIGRATED"
     },
     {
       "path": "tests/negative/AC-242.negative.spec.ts",
@@ -4214,7 +5069,7 @@
         "@foresift/shared-schemas",
         "../acceptance/helpers.ts"
       ],
-      "state": "VERIFIED"
+      "state": "MIGRATED"
     },
     {
       "path": "tests/negative/AC-243.negative.spec.ts",
@@ -4240,7 +5095,7 @@
         "@foresift/shared-schemas",
         "../acceptance/helpers.ts"
       ],
-      "state": "VERIFIED"
+      "state": "MIGRATED"
     },
     {
       "path": "tests/negative/AC-244.negative.spec.ts",
@@ -4255,7 +5110,7 @@
       "migrationType": "ALREADY_MIGRATED",
       "fixturesAndHelpers": [],
       "sourceAnchors": ["@foresift/domain", "@foresift/shared-schemas"],
-      "state": "VERIFIED"
+      "state": "MIGRATED"
     },
     {
       "path": "tests/negative/AC-245.negative.spec.ts",
@@ -4281,7 +5136,7 @@
         "@foresift/shared-schemas",
         "../acceptance/helpers.ts"
       ],
-      "state": "VERIFIED"
+      "state": "MIGRATED"
     },
     {
       "path": "tests/negative/AC-246.negative.spec.ts",
@@ -4305,7 +5160,7 @@
         "@foresift/shared-schemas",
         "../acceptance/helpers.ts"
       ],
-      "state": "VERIFIED"
+      "state": "MIGRATED"
     },
     {
       "path": "tests/negative/AC-247.negative.spec.ts",
@@ -4331,7 +5186,7 @@
         "@foresift/shared-schemas",
         "../acceptance/helpers.ts"
       ],
-      "state": "VERIFIED"
+      "state": "MIGRATED"
     },
     {
       "path": "tests/negative/AC-248.negative.spec.ts",
@@ -4359,7 +5214,7 @@
         "@foresift/shared-schemas",
         "../acceptance/helpers.ts"
       ],
-      "state": "VERIFIED"
+      "state": "MIGRATED"
     },
     {
       "path": "tests/negative/AC-249.negative.spec.ts",
@@ -4385,7 +5240,7 @@
         "@foresift/shared-schemas",
         "../acceptance/helpers.ts"
       ],
-      "state": "VERIFIED"
+      "state": "MIGRATED"
     },
     {
       "path": "tests/negative/AC-250.negative.spec.ts",
@@ -4400,7 +5255,7 @@
       "migrationType": "ALREADY_MIGRATED",
       "fixturesAndHelpers": [],
       "sourceAnchors": ["../../packages/security/src/mcp-origin.ts"],
-      "state": "VERIFIED"
+      "state": "MIGRATED"
     },
     {
       "path": "tests/negative/AC-251.negative.spec.ts",
@@ -4415,7 +5270,7 @@
       "migrationType": "ALREADY_MIGRATED",
       "fixturesAndHelpers": [],
       "sourceAnchors": ["../../packages/security/src/mcp-protocol-guard.ts"],
-      "state": "VERIFIED"
+      "state": "MIGRATED"
     },
     {
       "path": "tests/negative/AC-252.negative.spec.ts",
@@ -4441,7 +5296,7 @@
         "../../packages/tenant-isolation/src/signed-url.ts",
         "../../packages/tenant-isolation/src/tenant-context.ts"
       ],
-      "state": "VERIFIED"
+      "state": "MIGRATED"
     },
     {
       "path": "tests/negative/AC-253.negative.spec.ts",
@@ -4456,7 +5311,7 @@
       "migrationType": "ALREADY_MIGRATED",
       "fixturesAndHelpers": [],
       "sourceAnchors": ["../../packages/security/src/oauth-binding.ts"],
-      "state": "VERIFIED"
+      "state": "MIGRATED"
     },
     {
       "path": "tests/negative/AC-254.negative.spec.ts",
@@ -4478,7 +5333,7 @@
         "../../packages/security/src/negative-capability.ts",
         "../../packages/security/src/supply-chain.ts"
       ],
-      "state": "VERIFIED"
+      "state": "MIGRATED"
     },
     {
       "path": "tests/negative/AC-255.negative.spec.ts",
@@ -4505,7 +5360,7 @@
         "../../packages/security/src/negative-capability.ts",
         "../../packages/tool-core/src/prohibited.ts"
       ],
-      "state": "VERIFIED"
+      "state": "MIGRATED"
     },
     {
       "path": "tests/negative/AC-256.negative.spec.ts",
@@ -4520,7 +5375,7 @@
       "migrationType": "ALREADY_MIGRATED",
       "fixturesAndHelpers": [],
       "sourceAnchors": ["../../packages/security/src/decoder-authority.ts"],
-      "state": "VERIFIED"
+      "state": "MIGRATED"
     },
     {
       "path": "tests/negative/AC-257.negative.spec.ts",
@@ -4535,7 +5390,7 @@
       "migrationType": "ALREADY_MIGRATED",
       "fixturesAndHelpers": [],
       "sourceAnchors": ["../../packages/security/src/egress.ts"],
-      "state": "VERIFIED"
+      "state": "MIGRATED"
     },
     {
       "path": "tests/negative/AC-258.negative.spec.ts",
@@ -4557,7 +5412,7 @@
         "../../packages/security/src/untrusted-content.ts",
         "../fixtures/sec/injection/injection-corpus.ts"
       ],
-      "state": "VERIFIED"
+      "state": "MIGRATED"
     },
     {
       "path": "tests/negative/AC-259.negative.spec.ts",
@@ -4588,7 +5443,7 @@
         "../../packages/security/src/audit-chain.ts",
         "../../packages/tool-core/src/engine.ts"
       ],
-      "state": "VERIFIED"
+      "state": "MIGRATED"
     },
     {
       "path": "tests/negative/AC-260.negative.spec.ts",
@@ -4615,7 +5470,7 @@
         "@foresift/persistence",
         "../acceptance/helpers.ts"
       ],
-      "state": "VERIFIED"
+      "state": "MIGRATED"
     },
     {
       "path": "tests/negative/AC-261.negative.spec.ts",
@@ -4642,7 +5497,7 @@
         "@foresift/object-store",
         "../acceptance/helpers.ts"
       ],
-      "state": "VERIFIED"
+      "state": "MIGRATED"
     },
     {
       "path": "tests/negative/AC-262.negative.spec.ts",
@@ -4668,7 +5523,7 @@
         "@foresift/domain",
         "../acceptance/helpers.ts"
       ],
-      "state": "VERIFIED"
+      "state": "MIGRATED"
     },
     {
       "path": "tests/negative/AC-263.negative.spec.ts",
@@ -4688,7 +5543,7 @@
       "migrationType": "ALREADY_MIGRATED",
       "fixturesAndHelpers": ["../acceptance/helpers.ts"],
       "sourceAnchors": ["@foresift/domain", "@foresift/persistence", "../acceptance/helpers.ts"],
-      "state": "VERIFIED"
+      "state": "MIGRATED"
     },
     {
       "path": "tests/negative/AC-264.negative.spec.ts",
@@ -4708,7 +5563,7 @@
       "migrationType": "ALREADY_MIGRATED",
       "fixturesAndHelpers": ["../acceptance/helpers.ts"],
       "sourceAnchors": ["@foresift/domain", "@foresift/persistence", "../acceptance/helpers.ts"],
-      "state": "VERIFIED"
+      "state": "MIGRATED"
     },
     {
       "path": "tests/negative/AC-270.negative.spec.ts",
@@ -4734,7 +5589,7 @@
         "@foresift/provider-lifecycle",
         "../helpers/prov.ts"
       ],
-      "state": "VERIFIED"
+      "state": "MIGRATED"
     },
     {
       "path": "tests/negative/AC-271.negative.spec.ts",
@@ -4762,7 +5617,7 @@
         "@foresift/provider-lifecycle",
         "../helpers/prov.ts"
       ],
-      "state": "VERIFIED"
+      "state": "MIGRATED"
     },
     {
       "path": "tests/negative/AC-272.negative.spec.ts",
@@ -4790,7 +5645,7 @@
         "@foresift/provider-lifecycle",
         "../helpers/prov.ts"
       ],
-      "state": "VERIFIED"
+      "state": "MIGRATED"
     },
     {
       "path": "tests/negative/AC-273.negative.spec.ts",
@@ -4805,7 +5660,7 @@
       "migrationType": "ALREADY_MIGRATED",
       "fixturesAndHelpers": ["../helpers/prov.ts"],
       "sourceAnchors": ["@foresift/provider-lifecycle", "../helpers/prov.ts"],
-      "state": "VERIFIED"
+      "state": "MIGRATED"
     },
     {
       "path": "tests/negative/AC-274.negative.spec.ts",
@@ -4840,7 +5695,7 @@
         "../../packages/security/src/incidents.ts",
         "@foresift/shared-schemas"
       ],
-      "state": "VERIFIED"
+      "state": "MIGRATED"
     },
     {
       "path": "tests/negative/AC-275.negative.spec.ts",
@@ -4864,7 +5719,7 @@
         "../../packages/tenant-isolation/src/row-scope.ts",
         "../../packages/tenant-isolation/src/signed-url.ts"
       ],
-      "state": "VERIFIED"
+      "state": "MIGRATED"
     },
     {
       "path": "tests/negative/AC-276.negative.spec.ts",
@@ -4879,7 +5734,7 @@
       "migrationType": "ALREADY_MIGRATED",
       "fixturesAndHelpers": [],
       "sourceAnchors": ["../../packages/security/src/claims-policy.ts"],
-      "state": "VERIFIED"
+      "state": "MIGRATED"
     },
     {
       "path": "tests/negative/AC-277.negative.spec.ts",
@@ -4894,7 +5749,7 @@
       "migrationType": "ALREADY_MIGRATED",
       "fixturesAndHelpers": [],
       "sourceAnchors": ["../../packages/security/src/claims-policy.ts"],
-      "state": "VERIFIED"
+      "state": "MIGRATED"
     },
     {
       "path": "tests/negative/AC-278.negative.spec.ts",
@@ -4922,7 +5777,7 @@
         "../../packages/security/src/incidents.ts",
         "../../packages/security/src/gate-pause.ts"
       ],
-      "state": "VERIFIED"
+      "state": "MIGRATED"
     },
     {
       "path": "tests/negative/AC-279.negative.spec.ts",
@@ -4950,7 +5805,7 @@
         "../../packages/security/src/incidents.ts",
         "../../packages/security/src/gate-pause.ts"
       ],
-      "state": "VERIFIED"
+      "state": "MIGRATED"
     },
     {
       "path": "tests/spec-verify.spec.ts",
@@ -4965,7 +5820,7 @@
       "migrationType": "ALREADY_MIGRATED",
       "fixturesAndHelpers": [],
       "sourceAnchors": [],
-      "state": "VERIFIED"
+      "state": "MIGRATED"
     },
     {
       "path": "tests/telemetry-catalog.spec.ts",
@@ -4980,112 +5835,8 @@
       "migrationType": "ALREADY_MIGRATED",
       "fixturesAndHelpers": [],
       "sourceAnchors": ["@foresift/shared-schemas"],
-      "state": "VERIFIED"
+      "state": "MIGRATED"
     }
   ],
-  "batches": [
-    {
-      "id": "verify-existing-automation-process-1",
-      "engine": "VERIFY_EXISTING",
-      "workload": "PROCESS",
-      "files": ["tests/automation/bun-migration.spec.ts"],
-      "state": "VERIFIED",
-      "verification": {
-        "ok": true,
-        "wallTimeMs": 2466,
-        "peakRssBytes": 0,
-        "cpuSeconds": 0,
-        "counts": {
-          "passed": 56,
-          "failed": 0,
-          "skipped": 0
-        },
-        "results": [
-          {
-            "id": "process-1",
-            "workload": "PROCESS",
-            "files": ["tests/automation/bun-migration.spec.ts"],
-            "fileWorkers": 1,
-            "testConcurrency": 1,
-            "command": [
-              "bun",
-              "test",
-              "--no-orphans",
-              "--isolate",
-              "--parallel=1",
-              "--max-concurrency=1",
-              "--timeout=30000",
-              "tests/automation/bun-migration.spec.ts"
-            ],
-            "status": 0,
-            "wallTimeMs": 2465,
-            "peakRssBytes": null,
-            "cpuSeconds": null,
-            "counts": {
-              "passed": 56,
-              "failed": 0,
-              "skipped": 0
-            },
-            "stdoutTail": "bun test v1.4.0 (34cbb9a40) 1x PARALLEL\n",
-            "stderrTail": "ive imports as ALREADY_MIGRATED and MIGRATED state [0.41ms]\n(pass) Contract 4: Manifest inventory integrity and batch classification > manifest entry in MIGRATED state produces a VERIFY_EXISTING batch rather than being silently omitted [0.87ms]\n(pass) Contract 4: Manifest inventory integrity and batch classification > VERIFY_EXISTING batch advances Bun-native file to VERIFIED with zero inference and no codemod rewrite [54.39ms]\n(pass) Contract 4: Manifest inventory integrity and batch classification > previously VERIFIED pre-migrated entries remain skipped on restart [58.14ms]\n(pass) Contract 4: Manifest inventory integrity and batch classification > restarts replan pending AGY batches to exclude now-native files while retaining attempt counts and verified checkpoints [24.47ms]\n(pass) Contract 4: Manifest inventory integrity and batch classification > classifies Runner test with function-wrapped rejects as SEMANTIC_REWRITE and AGY_REQUIRED (not mechanical) [1.37ms]\n(pass) Contract 4: Manifest inventory integrity and batch classification > function-wrapped rejects construct with bun:test import remains SEMANTIC_REWRITE and AGY_REQUIRED across restarts [26.65ms]\n(pass) Contract 4: Manifest inventory integrity and batch classification > direct promise rejects expect(asyncCall()).rejects is not flagged as function-wrapped-rejects [0.82ms]\n(pass) Contract 4: Manifest inventory integrity and batch classification > unrelated functions, methods, and strings mentioning rejects do not trigger AST-shape classifier (no false positives) [0.92ms]\n(pass) Contract 4: Manifest inventory integrity and batch classification > existing mechanical imports and already-migrated direct Bun tests retain standard classifications [0.48ms]\n(pass) Contract 5: AGY lane ownership validation and zero legacy calls > AGY test lane accepts test files and helper paths [0.42ms]\n(pass) Contract 5: AGY lane ownership validation and zero legacy calls > AGY test lane rejects modifications to product code (fail-closed) [0.12ms]\n(pass) Contract 5: AGY lane ownership validation and zero legacy calls > healthy migration batches and final proof record exactly zero Codex and Claude calls [0.07ms]\n(pass) Contract 6: Deterministic affected-test graph selection > empty changed paths list escalates to FULL fail-closed [7.46ms]\n(pass) Contract 6: Deterministic affected-test graph selection > selects directly affected test files for known script dependencies [677.68ms]\n(pass) Contract 6: Deterministic affected-test graph selection > deleted file with unknown package escalates to FULL fail-closed [576.17ms]\n(pass) Contract 6: Deterministic affected-test graph selection > unreferenced source file with zero matching tests fails closed (cannot false-green) [0.41ms]\n(pass) Contract 7: Bun test coordinator concurrency and workload isolation > builds plan with correct worker and concurrency bounds per workload category [0.33ms]\n(pass) Contract 7: Bun test coordinator concurrency and workload isolation > generates standard Bun test CLI arguments with no-orphans and isolation [0.04ms]\n(pass) Contract 7: Bun test coordinator concurrency and workload isolation > refuses unmigrated requested paths fail-closed [0.15ms]\n(pass) Contract 8: CODEX_AGY execution profile routing and G0 concurrency > G0 milestone enforces foundation concurrency = 1 [0.23ms]\n(pass) Contract 8: CODEX_AGY execution profile routing and G0 concurrency > policy pins Bun version and test runtime settings [0.03ms]\n(pass) Contract 9: Cutover unverified refusal and runner reference detection > refuses cutover when unverified test entries exist [10.88ms]\n(pass) Contract 9: Cutover unverified refusal and runner reference detection > activeVitestRuntimeReferences detects lingering runner scripts or imports [15.16ms]\n(pass) Contract 10: Node 24 runtime compatibility gate > executes node-runtime-compat.mjs and validates all runtime surface checks [105.93ms]\n\n 56 pass\n 0 fail\n 230 expect() calls\nRan 56 tests across 1 file. [2.44s]\n"
-          }
-        ]
-      },
-      "codexCalls": 0,
-      "claudeCalls": 0,
-      "testedHead": "ded6e03acc854626aba5ed772d9908792708419f",
-      "checkpointHead": "442d45002873ce12d3e64f925107f4af83f06f4d"
-    },
-    {
-      "id": "verify-existing-automation-pure-1",
-      "engine": "VERIFY_EXISTING",
-      "workload": "PURE",
-      "files": ["tests/automation/ci-authority.spec.ts"],
-      "state": "VERIFIED",
-      "verification": {
-        "ok": true,
-        "wallTimeMs": 42,
-        "peakRssBytes": 0,
-        "cpuSeconds": 0,
-        "counts": {
-          "passed": 12,
-          "failed": 0,
-          "skipped": 0
-        },
-        "results": [
-          {
-            "id": "pure-1",
-            "workload": "PURE",
-            "files": ["tests/automation/ci-authority.spec.ts"],
-            "fileWorkers": 2,
-            "testConcurrency": 8,
-            "command": [
-              "bun",
-              "test",
-              "--no-orphans",
-              "--isolate",
-              "--parallel=2",
-              "--max-concurrency=8",
-              "--timeout=30000",
-              "tests/automation/ci-authority.spec.ts"
-            ],
-            "status": 0,
-            "wallTimeMs": 42,
-            "peakRssBytes": null,
-            "cpuSeconds": null,
-            "counts": {
-              "passed": 12,
-              "failed": 0,
-              "skipped": 0
-            },
-            "stdoutTail": "bun test v1.4.0 (34cbb9a40) 2x PARALLEL\n",
-            "stderrTail": "\ntests/automation/ci-authority.spec.ts:\n(pass) CI Authority & Merge Invariants (V4 Hard Invariants A-F) > 1. PR check pending -> merge prohibited [0.49ms]\n(pass) CI Authority & Merge Invariants (V4 Hard Invariants A-F) > 2. PR check failure -> merge prohibited [0.20ms]\n(pass) CI Authority & Merge Invariants (V4 Hard Invariants A-F) > 3. exact-head check success -> merge allowed [0.06ms]\n(pass) CI Authority & Merge Invariants (V4 Hard Invariants A-F) > 4. stale green SHA does not authorize newer PR HEAD [0.08ms]\n(pass) CI Authority & Merge Invariants (V4 Hard Invariants A-F) > 5. admin capability does not bypass policy in package-land.mjs [0.23ms]\n(pass) CI Authority & Merge Invariants (V4 Hard Invariants A-F) > 6. main CI red -> next product package selection blocked [0.22ms]\n(pass) CI Authority & Merge Invariants (V4 Hard Invariants A-F) > 7. main CI cancelled/timed out -> blocked [0.10ms]\n(pass) CI Authority & Merge Invariants (V4 Hard Invariants A-F) > 8. main CI green -> product selection may proceed [0.09ms]\n(pass) CI Authority & Merge Invariants (V4 Hard Invariants A-F) > 9. direct-main state commit cannot include product/test/config changes [0.30ms]\n(pass) CI Authority & Merge Invariants (V4 Hard Invariants A-F) > 10. CI failure generates one incident capsule, not repeated AI polling [0.87ms]\n(pass) CI Authority & Merge Invariants (V4 Hard Invariants A-F) > 11. formatting failure is surfaced with exact files/log tail [0.06ms]\n(pass) CI Authority & Merge Invariants (V4 Hard Invariants A-F) > 12. no gh pr merge --admin remains in normal workflows [0.77ms]\n\n 12 pass\n 0 fail\n 64 expect() calls\nRan 12 tests across 1 file. [25.00ms]\n"
-          }
-        ]
-      },
-      "codexCalls": 0,
-      "claudeCalls": 0,
-      "testedHead": "442d45002873ce12d3e64f925107f4af83f06f4d"
-    }
-  ]
+  "batches": []
 }

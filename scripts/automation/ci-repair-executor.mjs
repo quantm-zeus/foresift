@@ -162,15 +162,13 @@ export function executeFormatRepair({
   log(
     `FORMAT repair: running prettier on ${existingTargets.length} target(s): ${existingTargets.join(', ')}`,
   );
-  const prettierArgs = [
-    '--no-install',
-    'prettier',
-    '--write',
-    '--log-level',
-    'warn',
-    ...existingTargets,
-  ];
-  const fmt = shSync('npx', prettierArgs, { cwd: worktreeDir, allowFail: true });
+  // Resolve the repo's OWN pinned prettier (devDependency of this checkout) —
+  // repair worktrees carry no node_modules, and `npx --no-install prettier`
+  // cannot walk up to the main checkout's binary, so on CI it fell through to
+  // a blocked registry download ("canceled due to missing packages").
+  const prettierBin = join(import.meta.dirname, '..', '..', 'node_modules', '.bin', 'prettier');
+  const prettierArgs = ['--write', '--log-level', 'warn', ...existingTargets];
+  const fmt = shSync(prettierBin, prettierArgs, { cwd: worktreeDir, allowFail: true });
   if (!fmt.ok) {
     log(`FORMAT repair: prettier returned: ${fmt.err || fmt.out}`);
   }

@@ -466,6 +466,42 @@ nodes:
     trigger_rule: none_failed_min_one_success   # blocks iff repair genuinely FAILED
     bash: |
       echo "WAVE_PHASE_SETTLED"
+  # ── LANDING: push + discover-or-create exactly ONE PR (zero AI) ─────────────
+  # The sharded wave is an implementation-only topology: its job ends with a
+  # green FAST and a durable checkpoint on the canonical package branch. The
+  # FULL gate and the squash-merge stay downstream: package-final-land.mjs
+  # re-runs the FULL gate at the pushed head, opens/discovers exactly one PR,
+  # waits for exact-head CI and squash-merges. Running it HERE closes the
+  # landing gap observed 2026-08-29 (runs 4e7698e8 + d007fbf6): the wave
+  # completed green with no PR, the supervisor's finalizeCompletedRun then
+  # saw completed-without-merge, its resume was refused (archon cannot resume
+  # a completed run), the fresh restart duplicated work, and the recovery
+  # policy exhausted into a fatal pause. package-final-land exit 4 (bounded
+  # repair route) is a normal outcome for a still-draining landing and must
+  # not fail the run: the supervisor re-invokes landing on a later tick; exit
+  # 4 loops are bounded by the supervisor's own recovery budget, and any
+  # terminal refusal surfaces there. Base drift (origin/main moved past the
+  # branch) is refused here with a loud log and exit 4 — recovery replays
+  # after absorbing main; it never force-lands.
+  - id: wave-land
+    depends_on: [wave-settled]
+    timeout: 5400000
+    bash: |
+      set -uo pipefail
+      PKG="${ARGUMENTS%%@g*}"
+      node scripts/automation/package-final-land.mjs \
+        --package "$PKG" \
+        --branch "$(git rev-parse --abbrev-ref HEAD)" \
+        --artifacts-dir "$ARTIFACTS_DIR" \
+        > "$ARTIFACTS_DIR/wave-land.log" 2>&1
+      code=$?
+      cat "$ARTIFACTS_DIR/wave-land.log" >&2 || true
+      if [ "$code" -eq 0 ]; then
+        echo "WAVE_LANDED"
+      else
+        echo "WAVE_LAND_PENDING"
+        exit 0
+      fi
   - id: wave-checkpoint
     depends_on: [wave-settled]
     bash: |

@@ -109,6 +109,11 @@ const verdict = {
   schema: 'foresift/writer-result@1',
   shardId: args.shard,
   mode: shard?.mode ?? 'unknown',
+  // lane role from the task graph so the integrator can distinguish
+  // implementation from test bookkeeping (test units complete without
+  // product checkbox semantics).
+  role: shard?.role ?? 'implementation',
+  engine: shard?.engine ?? null,
   assignedUnits: shard?.units ?? [],
   completed: Array.isArray(claimed.completed) ? claimed.completed : [],
   testsRun: claimed.testsRun ?? [],

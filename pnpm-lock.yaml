@@ -104,13 +104,13 @@ importers:
       '@foresift/domain':
         specifier: workspace:*
         version: link:../domain
-      '@foresift/persistence':
-        specifier: workspace:*
-        version: link:../persistence
     devDependencies:
       '@electric-sql/pglite':
         specifier: ^0.5.6
         version: 0.5.6
+      '@foresift/persistence':
+        specifier: workspace:*
+        version: link:../persistence
 
   packages/persistence:
     dependencies:

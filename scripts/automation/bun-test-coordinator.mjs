@@ -105,22 +105,47 @@ function bunCounts(output) {
 export function runBunTestPlan({ root, plan, policy, bun = 'bun' }) {
   const started = Date.now();
   const results = [];
+  // Per-group hard wall clock. A Bun per-test timeout cannot bound a Bun
+  // process that never exits (wedged child, open handle, stdin/stdout pipe
+  // stall — observed live in CI 2026-08-29 where a group produced zero bytes
+  // for 23 minutes). Default scales with the largest group workload; the
+  // policy file may pin bunGroupTimeoutMs.
+  const policyTimeoutMs = Number(policy?.bunGroupTimeoutMs ?? 0);
   for (const group of plan) {
     const groupStarted = Date.now();
+    // Emit group identity BEFORE spawning so a CI log always shows exactly
+    // where execution stopped, even when the group process produces nothing.
+    console.log(
+      `[coordinator] START ${group.id} (${group.workload}) files=${group.files.length}: ${group.files.join(', ')}`,
+    );
     const args = bunTestArgs(group, policy);
     const timed = existsSync('/usr/bin/time');
     const command = timed ? '/usr/bin/time' : bun;
     const commandArgs = timed ? ['-v', bun, ...args] : args;
+    const timeoutMs = policyTimeoutMs || 15 * 60_000 + group.files.length * 60_000;
     const result = spawnSync(command, commandArgs, {
       cwd: root,
       encoding: 'utf8',
       maxBuffer: 128 * 1024 * 1024,
+      timeout: timeoutMs,
+      // SIGTERM the direct child; detached+POSIX kill delivers to the whole
+      // process tree (bun workers, /usr/bin/time wrapper) via the process
+      // group, so a wedged group cannot outlive its timeout.
+      detached: process.platform !== 'win32',
+      killSignal: 'SIGTERM',
       env: { ...process.env, FORESIFT_TEST_COORDINATOR: '1' },
     });
+    if (result.signal) {
+      console.error(
+        `\n[coordinator] GROUP TIMEOUT: ${group.id} (${group.workload}) exceeded ${Math.round(timeoutMs / 60_000)}m — killed via ${result.signal}.`,
+      );
+    }
     const evidence = {
       ...group,
       command: [bun, ...args],
       status: result.status,
+      signal: result.signal ?? null,
+      timedOut: Boolean(result.signal),
       wallTimeMs: Date.now() - groupStarted,
       peakRssBytes: maxRss(result.stderr),
       cpuSeconds: cpuSeconds(result.stderr),
@@ -129,7 +154,7 @@ export function runBunTestPlan({ root, plan, policy, bun = 'bun' }) {
       stderrTail: (result.stderr ?? '').slice(-4000),
     };
     results.push(evidence);
-    if (result.status !== 0) {
+    if (result.status !== 0 || result.signal) {
       console.error(
         `\n[coordinator] FAILED GROUP: ${group.id} (${group.workload}) - files (${group.files.length}):`,
       );

@@ -11,7 +11,10 @@ export function appendAttribution(
   const parsed = DiscoveryUniverseEntrySchema.parse(value);
   if (
     existing.some(
-      (x) => x.sourceId === parsed.sourceId && x.sourceAvailableAt === parsed.sourceAvailableAt,
+      (x) =>
+        x.sourceId === parsed.sourceId &&
+        x.sourceAvailableAt === parsed.sourceAvailableAt &&
+        x.sourceMetadataHash === parsed.sourceMetadataHash,
     )
   )
     return existing;

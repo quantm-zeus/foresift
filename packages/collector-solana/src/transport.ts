@@ -21,6 +21,7 @@ export interface InboundContract {
   readonly programId: string;
   readonly programVersion: string;
   readonly accountLayouts: readonly string[];
+  readonly accountAddresses?: readonly string[];
   readonly maximumBytes: number;
   readonly decoderVersion: string;
 }
@@ -50,12 +51,20 @@ export function validateInboundMessage(
     v.programVersion !== contract.programVersion ||
     !Number.isInteger(v.slot) ||
     Number(v.slot) < 0 ||
+    !(
+      v.accountAddress === null ||
+      (typeof v.accountAddress === 'string' && v.accountAddress.length > 0)
+    ) ||
+    (contract.accountAddresses !== undefined &&
+      (v.accountAddress === null || !contract.accountAddresses.includes(v.accountAddress))) ||
     typeof v.accountLayoutHash !== 'string' ||
     !contract.accountLayouts.includes(v.accountLayoutHash) ||
     typeof v.byteLength !== 'number' ||
+    !Number.isInteger(v.byteLength) ||
     v.byteLength < 0 ||
     v.byteLength > contract.maximumBytes ||
-    v.decoderVersion !== contract.decoderVersion
+    v.decoderVersion !== contract.decoderVersion ||
+    v.payload === undefined
   )
     throw new MalformedCollectorMessageError(
       'chain/program/version/slot/layout/size/decoder contract refused',

@@ -18,7 +18,7 @@ export class CheapMonitorStore {
   ) {}
   async put(value: CheapMonitorRow): Promise<void> {
     const row = CheapMonitorRowSchema.parse(value);
-    await this.engine.query(
+    const persisted = await this.engine.query<{ state: CheapMonitorRow['state'] }>(
       `INSERT INTO disc.cheap_monitor_rows (
         monitor_id,candidate_id,state,checks_completed,max_checks,next_check_at,expires_at,
         backoff_ms,max_staleness_ms,resource_budget_class,provider_id,operation_id,
@@ -31,7 +31,9 @@ export class CheapMonitorStore {
         max_staleness_ms=EXCLUDED.max_staleness_ms,
         resource_budget_class=EXCLUDED.resource_budget_class,
         provider_id=EXCLUDED.provider_id,operation_id=EXCLUDED.operation_id,
-        last_observation_at=EXCLUDED.last_observation_at,updated_at=EXCLUDED.updated_at`,
+        last_observation_at=EXCLUDED.last_observation_at,updated_at=EXCLUDED.updated_at
+      WHERE disc.cheap_monitor_rows.state IN ('NEW','MONITORING_CHEAP')
+      RETURNING state`,
       [
         row.candidateId,
         row.candidateId,
@@ -49,6 +51,14 @@ export class CheapMonitorStore {
         this.now().toISOString(),
       ],
     );
+    if (persisted.rows.length === 0) {
+      const existing = await this.engine.query<{ state: CheapMonitorRow['state'] }>(
+        'SELECT state FROM disc.cheap_monitor_rows WHERE monitor_id=$1',
+        [row.candidateId],
+      );
+      if (existing.rows[0]?.state !== row.state)
+        throw new Error('MONITOR_TERMINAL_STATE_IMMUTABLE');
+    }
   }
   normalize(row: CheapMonitorRow): CheapMonitorRow {
     if (terminal.has(row.state)) return row;

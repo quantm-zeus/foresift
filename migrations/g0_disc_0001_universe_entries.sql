@@ -1,4 +1,8 @@
 -- g0_disc_0001_universe_entries.sql
+-- Rollback: DROP TABLE disc.coverage_population_manifests;
+--           DROP TABLE disc.discovery_attribution;
+--           DROP FUNCTION disc.refuse_mutation();
+--           DROP TABLE disc.discovery_universe_entries;
 -- Point-in-time discovery universe, subsequent-source attribution, and
 -- coverage population manifests (FR-DISC-002, FR-DISC-003, §63.5, §63.7).
 
@@ -9,7 +13,15 @@ CREATE TABLE disc.discovery_universe_entries (
     asset_representation_id        text NOT NULL CHECK (
                                        length(asset_representation_id) > 0),
     source_id                      text NOT NULL CHECK (length(source_id) > 0),
-    source_class                   text NOT NULL CHECK (length(source_class) > 0),
+    source_class                   text NOT NULL CHECK (source_class IN (
+                                       'FIRST_PARTY_SUPPORTED_PROGRAM_EVENT',
+                                       'FREE_AGGREGATE_DISCOVERY',
+                                       'AUTHORIZED_LAUNCH_FEED',
+                                       'USER_WATCHLIST_OR_MCP',
+                                       'AUTHORIZED_SOCIAL_AGGREGATE',
+                                       'SELECTIVE_CHAIN_VERIFICATION',
+                                       'RETROSPECTIVE_UNIVERSE_ENUMERATION',
+                                       'STRATIFIED_UNIVERSE_SAMPLE')),
     -- Stable identity assigned by the source adapter to this exact sighting.
     sighting_id                    text NOT NULL CHECK (length(sighting_id) > 0),
     source_observed_at             timestamptz,
@@ -21,12 +33,13 @@ CREATE TABLE disc.discovery_universe_entries (
     chain_coordinates              text,
     source_rank                    integer CHECK (source_rank >= 0),
     source_metadata_hash           text NOT NULL CHECK (
-                                       length(source_metadata_hash) > 0),
+                                       source_metadata_hash ~ '^sha256:.+$'),
     discovery_policy_version       text NOT NULL CHECK (
                                        length(discovery_policy_version) > 0),
     collector_coverage_manifest_id text,
-    quality_codes                  text[] NOT NULL CHECK (
-                                       array_length(quality_codes, 1) >= 1),
+    -- The §63.5 interface requires the field, but an empty list is valid when
+    -- no quality condition applies to an otherwise valid source sighting.
+    quality_codes                  text[] NOT NULL,
     CONSTRAINT discovery_universe_entries_sighting_unique UNIQUE (
         asset_representation_id, source_id, sighting_id),
     CONSTRAINT discovery_universe_entries_availability_order CHECK (
@@ -60,7 +73,15 @@ CREATE TABLE disc.discovery_attribution (
     universe_entry_id    text NOT NULL REFERENCES
                              disc.discovery_universe_entries(entry_id),
     source_id            text NOT NULL CHECK (length(source_id) > 0),
-    source_class         text NOT NULL CHECK (length(source_class) > 0),
+    source_class         text NOT NULL CHECK (source_class IN (
+                             'FIRST_PARTY_SUPPORTED_PROGRAM_EVENT',
+                             'FREE_AGGREGATE_DISCOVERY',
+                             'AUTHORIZED_LAUNCH_FEED',
+                             'USER_WATCHLIST_OR_MCP',
+                             'AUTHORIZED_SOCIAL_AGGREGATE',
+                             'SELECTIVE_CHAIN_VERIFICATION',
+                             'RETROSPECTIVE_UNIVERSE_ENUMERATION',
+                             'STRATIFIED_UNIVERSE_SAMPLE')),
     sighting_id          text NOT NULL CHECK (length(sighting_id) > 0),
     source_observed_at   timestamptz,
     source_published_at  timestamptz,
@@ -68,8 +89,9 @@ CREATE TABLE disc.discovery_attribution (
     first_received_at    timestamptz,
     first_ingested_at    timestamptz NOT NULL,
     source_rank          integer CHECK (source_rank >= 0),
-    source_metadata_hash text NOT NULL CHECK (length(source_metadata_hash) > 0),
-    quality_codes        text[] NOT NULL CHECK (array_length(quality_codes, 1) >= 1),
+    source_metadata_hash text NOT NULL CHECK (
+                             source_metadata_hash ~ '^sha256:.+$'),
+    quality_codes        text[] NOT NULL,
     CONSTRAINT discovery_attribution_sighting_unique UNIQUE (
         universe_entry_id, source_id, sighting_id),
     CONSTRAINT discovery_attribution_availability_order CHECK (
@@ -134,9 +156,8 @@ CREATE TABLE disc.coverage_population_manifests (
                                      jsonb_typeof(source_dependence_assessment) = 'object'),
     created_at                   timestamptz NOT NULL DEFAULT now(),
     CONSTRAINT coverage_population_manifests_window_order CHECK (
-        window_end >= window_start)
+        window_end > window_start)
 );
 
 CREATE INDEX coverage_population_manifests_population_time_idx
     ON disc.coverage_population_manifests (population, window_start, window_end);
-

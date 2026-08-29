@@ -22,24 +22,46 @@ function fail(message) {
   process.exit(1);
 }
 
+// Test-only waves (all remaining units owned by the AGY lane) carry no
+// implementation lane in the routing artifact. The repair must still run —
+// synthesize a deterministic HIGH repair route instead of failing closed
+// with CODEX_REPAIR_ROUTE_MISSING (observed live on run e01370f3). Repairs
+// are sensitive by nature: gpt-5.6-sol / medium / standard tier.
+export function selectRepairRoute(routing) {
+  const ranked = { LOW: 0, MEDIUM: 1, HIGH: 2 };
+  const candidates = (routing.lanes ?? []).filter(
+    (lane) => lane.role === 'implementation' && lane.engine === 'CODEX',
+  );
+  if (candidates.length) {
+    let route = candidates.sort(
+      (a, b) => (ranked[b.complexityTier] ?? 0) - (ranked[a.complexityTier] ?? 0),
+    )[0];
+    if (route.complexityTier !== 'HIGH') route = escalateCodexRoute(route);
+    return route;
+  }
+  return {
+    lane: 'repair',
+    role: 'implementation',
+    engine: 'CODEX',
+    complexityTier: 'HIGH',
+    model: 'gpt-5.6-sol',
+    reasoning: 'medium',
+    serviceTier: CODEX_SERVICE_TIER,
+    cliServiceTier: 'default',
+    synthesizedForLaneLessWave: true,
+  };
+}
+
 export function runCodexRepair(input) {
   for (const field of ['canonical', 'artifacts', 'routing', 'package'])
     if (!input[field]) throw new Error(`CODEX_REPAIR_ARGUMENT_MISSING: ${field}`);
   const routing = JSON.parse(readFileSync(input.routing, 'utf8'));
   if (routing.executionProfile !== 'CODEX_AGY') throw new Error('CODEX_REPAIR_PROFILE_MISMATCH');
-  const ranked = { LOW: 0, MEDIUM: 1, HIGH: 2 };
-  const candidates = (routing.lanes ?? []).filter(
-    (lane) => lane.role === 'implementation' && lane.engine === 'CODEX',
-  );
-  if (!candidates.length) throw new Error('CODEX_REPAIR_ROUTE_MISSING');
   const repairDir = join(input.artifacts, 'repair');
   mkdirSync(repairDir, { recursive: true });
   const priorRepairs = readdirSync(repairDir).filter((name) => name.endsWith('.json')).length;
   if (priorRepairs >= 2) throw new Error('CODEX_REPAIR_EXHAUSTED');
-  let route = candidates.sort(
-    (a, b) => (ranked[b.complexityTier] ?? 0) - (ranked[a.complexityTier] ?? 0),
-  )[0];
-  if (route.complexityTier !== 'HIGH') route = escalateCodexRoute(route);
+  const route = selectRepairRoute(routing);
   if (route.serviceTier !== CODEX_SERVICE_TIER) throw new Error('INVALID_CODEX_SERVICE_TIER');
 
   const base = git(['rev-parse', 'HEAD'], input.canonical).stdout.trim();

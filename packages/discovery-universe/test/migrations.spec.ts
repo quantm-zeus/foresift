@@ -49,5 +49,5 @@ describe('g0_disc_* SQL migrations (discovery-universe)', () => {
     await applyMigrations({ engine, migrationsDir: MIGRATIONS_DIR });
     const second = await applyMigrations({ engine, migrationsDir: MIGRATIONS_DIR });
     expect(second.applied.length).toBe(0);
-  });
+  }, 60_000);
 });

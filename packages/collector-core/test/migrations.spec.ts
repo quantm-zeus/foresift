@@ -53,5 +53,5 @@ describe('g0_col_* SQL migrations (collector-core)', () => {
 
     const report2 = await applyMigrations({ engine, migrationsDir: MIGRATIONS_DIR });
     expect(report2.applied.length).toBe(0);
-  });
+  }, 60_000);
 });

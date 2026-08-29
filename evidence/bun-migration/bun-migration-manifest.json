@@ -1,7 +1,7 @@
 {
   "schema": "foresift/bun-migration-manifest@1",
   "migrationId": "bun-test-authority-v1",
-  "generatedAt": "2026-08-29T18:10:42.671Z",
+  "generatedAt": "2026-08-29T18:13:46.111Z",
   "root": ".",
   "totalTestFiles": 314,
   "counts": {
@@ -104,9 +104,9 @@
     {
       "path": "packages/cheap-monitor/test/migrations.spec.ts",
       "package": "@foresift/cheap-monitor",
-      "bytes": 1487,
+      "bytes": 1495,
       "lines": 50,
-      "sha256": "a77249ef02ca3564134e4e299974800907996894249e4d728e75b5e88d788b60",
+      "sha256": "17cf6f93d357bd9408d043806ba2fe6e69174d21307f356dc76ea4a01f0630db",
       "imports": [
         "bun:test",
         "@electric-sql/pglite",
@@ -170,9 +170,9 @@
     {
       "path": "packages/collector-checkpoints/test/migrations.spec.ts",
       "package": "@foresift/collector-checkpoints",
-      "bytes": 1543,
+      "bytes": 1551,
       "lines": 51,
-      "sha256": "21daa1d457faccd0cc9ea828c29c5182ae747d6f17d4b0c258e8fcf9ce9eacb7",
+      "sha256": "f19685c212ef082d04869ee6a88ea0b388327fdcb56c85f40105b12650c95487",
       "imports": [
         "bun:test",
         "@electric-sql/pglite",
@@ -281,9 +281,9 @@
     {
       "path": "packages/collector-core/test/migrations.spec.ts",
       "package": "@foresift/collector-core",
-      "bytes": 1896,
+      "bytes": 1904,
       "lines": 58,
-      "sha256": "90945188a06b7abdd2965c5571ec4f9e590658f6298eb2173dfd35d015cde095",
+      "sha256": "9dd0125b06b88db0a8a31a6a35dcac8c193127326d1687f53aed19dc36e818ec",
       "imports": [
         "bun:test",
         "@electric-sql/pglite",
@@ -362,9 +362,9 @@
     {
       "path": "packages/collector-gap-recovery/test/migrations.spec.ts",
       "package": "@foresift/collector-gap-recovery",
-      "bytes": 1530,
+      "bytes": 1538,
       "lines": 51,
-      "sha256": "d7c950bafa76232dcd289f3d4da2ae03baca7e537cec461e8601e420a1a02c38",
+      "sha256": "6418fb4980aab781c048dfaa3b89453efcc5981ffb5d1c4ce78c93bfd7bc7dd5",
       "imports": [
         "bun:test",
         "@electric-sql/pglite",
@@ -428,9 +428,9 @@
     {
       "path": "packages/collector-solana/test/migrations.spec.ts",
       "package": "@foresift/collector-solana",
-      "bytes": 1535,
+      "bytes": 1543,
       "lines": 51,
-      "sha256": "154a0387c5628b15dabee8dc9043bdd990b063ffa0f1ce31f5727dfaffefc3ac",
+      "sha256": "fa614ed90acd3d6709fbaa881d7cb9b35fe373afe6fe87822a26d168f9344c13",
       "imports": [
         "bun:test",
         "@electric-sql/pglite",
@@ -643,9 +643,9 @@
     {
       "path": "packages/discovery-universe/test/migrations.spec.ts",
       "package": "@foresift/discovery-universe",
-      "bytes": 1705,
+      "bytes": 1713,
       "lines": 54,
-      "sha256": "3bd9a6e80a100e297fe42b0f8816792137d31a440e40a1a1970b57d092755ea2",
+      "sha256": "3f6b0b27e0202672640ed64a5bb123c4659f449f406354af97e75a865d633ab3",
       "imports": [
         "bun:test",
         "@electric-sql/pglite",
@@ -1332,9 +1332,9 @@
     {
       "path": "packages/program-decoders/test/migrations.spec.ts",
       "package": "@foresift/program-decoders",
-      "bytes": 1552,
+      "bytes": 1560,
       "lines": 51,
-      "sha256": "be75274e6b9ea0476a90962a49f7ada0777240a8dde55d27f6b0c7729212ee3e",
+      "sha256": "32bdcea5438381a9682ab9d5bd910e16fd810819f47e320637f6d49eb80c878f",
       "imports": [
         "bun:test",
         "@electric-sql/pglite",

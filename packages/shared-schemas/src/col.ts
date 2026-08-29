@@ -176,7 +176,15 @@ export const CollectorHealthSchema = z
     eventRate: z.number().nonnegative(),
     deduplicationRate: z.number().min(0).max(1),
     resourceConsumption: z
-      .object({ cpuPercent: z.number().nonnegative(), memoryMb: z.number().nonnegative() })
+      .object({
+        cpuPercent: z.number().nonnegative(),
+        memoryMb: z.number().nonnegative(),
+        networkBytes: z.number().nonnegative().optional(),
+        subscriptions: z.number().int().nonnegative().optional(),
+        rawStorageBytes: z.number().nonnegative().optional(),
+        retries: z.number().int().nonnegative().optional(),
+        monthlyCredits: z.number().nonnegative().optional(),
+      })
       .strict(),
     sampledAt: UtcTimestampSchema,
   })

@@ -54,6 +54,36 @@ importers:
         specifier: 8.67.0
         version: 8.67.0(eslint@10.9.0)(typescript@5.9.3)
 
+  packages/capacity-planner:
+    dependencies:
+      '@foresift/cost-router':
+        specifier: workspace:*
+        version: link:../cost-router
+      '@foresift/domain':
+        specifier: workspace:*
+        version: link:../domain
+      '@foresift/persistence':
+        specifier: workspace:*
+        version: link:../persistence
+      '@foresift/tool-core':
+        specifier: workspace:*
+        version: link:../tool-core
+
+  packages/cost-router:
+    dependencies:
+      '@foresift/domain':
+        specifier: workspace:*
+        version: link:../domain
+      '@foresift/persistence':
+        specifier: workspace:*
+        version: link:../persistence
+      '@foresift/shared-schemas':
+        specifier: workspace:*
+        version: link:../shared-schemas
+      '@foresift/tool-core':
+        specifier: workspace:*
+        version: link:../tool-core
+
   packages/domain: {}
 
   packages/evidence:
@@ -150,6 +180,18 @@ importers:
       '@electric-sql/pglite':
         specifier: ^0.5.6
         version: 0.5.6
+
+  packages/quota-forecast:
+    dependencies:
+      '@foresift/domain':
+        specifier: workspace:*
+        version: link:../domain
+      '@foresift/persistence':
+        specifier: workspace:*
+        version: link:../persistence
+      '@foresift/shared-schemas':
+        specifier: workspace:*
+        version: link:../shared-schemas
 
   packages/security:
     dependencies:

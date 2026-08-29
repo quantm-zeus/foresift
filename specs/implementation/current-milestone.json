@@ -249,7 +249,7 @@
         "test -d packages/discovery-universe && pnpm --filter @foresift/discovery-universe test",
         "test -d packages/cheap-monitor && pnpm --filter @foresift/cheap-monitor test"
       ],
-      "status": "PENDING"
+      "status": "RUNNING"
     },
     {
       "id": "g0-mcp-surface",

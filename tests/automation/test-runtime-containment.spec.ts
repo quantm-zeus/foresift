@@ -24,7 +24,6 @@
 // modules-dir management is the most plausible wedging primitive for a
 // runner-state-dependent stall; the cycle was never a runtime requirement.
 import { describe, expect, it } from 'bun:test';
-import { execFileSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 

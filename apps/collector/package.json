@@ -1,0 +1,20 @@
+{
+  "name": "@foresift/collector-app",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "bun test",
+    "start": "node --experimental-strip-types src/main.ts"
+  },
+  "dependencies": {
+    "@foresift/collector-checkpoints": "workspace:*",
+    "@foresift/collector-core": "workspace:*",
+    "@foresift/collector-gap-recovery": "workspace:*",
+    "@foresift/collector-solana": "workspace:*",
+    "@foresift/discovery-universe": "workspace:*",
+    "@foresift/persistence": "workspace:*",
+    "@foresift/program-decoders": "workspace:*",
+    "@foresift/shared-schemas": "workspace:*"
+  }
+}

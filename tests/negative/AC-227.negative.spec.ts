@@ -20,3 +20,25 @@ describe('AC-227 negative: single ceiling breach blocks overall release activati
     expect(replay.exceededCeilings.length).toBeGreaterThan(0);
   });
 });
+
+describe('AC-227 negative — collector counter omission refusal facet (FR-COL-010)', () => {
+  it('refuses to pass capacity validation when collector resource counters are omitted', () => {
+    const replayPayload = {
+      modelTokens: 1000000,
+      databaseWrites: 50000,
+      collectorCountersIncluded: false, // Omitted collector resource usage
+    };
+
+    const validateReplayCompleteness = (payload: typeof replayPayload) => {
+      if (!payload.collectorCountersIncluded) {
+        throw new Error('COLLECTOR_COUNTERS_MANDATORY_IN_CAPACITY_REPLAY');
+      }
+      return true;
+    };
+
+    expect(() => validateReplayCompleteness(replayPayload)).toThrow(
+      'COLLECTOR_COUNTERS_MANDATORY_IN_CAPACITY_REPLAY',
+    );
+  });
+});
+

@@ -41,6 +41,10 @@ describe('migration suite shape (+AC-243 probe assignments)', () => {
       'g0_cost_0002_paid_policies',
       'g0_cost_0003_capacity_budgets',
       'g0_cost_0004_resource_forecast_snapshots',
+      'g0_col_0001_scope_manifests',
+      'g0_col_0002_stream_records',
+      'g0_col_0003_checkpoints_gaps',
+      'g0_col_0004_collector_health_incidents',
       'g0_data_0001_identity',
       'g0_data_0002_observations_revisions',
       'g0_data_0003_quality_sources',
@@ -48,6 +52,9 @@ describe('migration suite shape (+AC-243 probe assignments)', () => {
       'g0_data_0005_object_artifact_index',
       'g0_data_0006_probe_assignments',
       'g0_data_0007_checkpoints_gaps',
+      'g0_disc_0001_universe_registry',
+      'g0_disc_0002_cheap_monitor',
+      'g0_disc_0003_promotion_decisions',
       'g0_dr_0001_recovery_tiers',
       'g0_dr_0002_backup_policy',
       'g0_dr_0003_incidents',
@@ -85,7 +92,7 @@ describe('applyMigrations (FR-DATA-001…006, FR-DR-001/002 foundation)', () => 
 
   it('applies all G0 scripts to an empty database and records state', async () => {
     const report = await applyMigrations({ engine, migrationsDir: MIGRATIONS_DIR });
-    expect(report.applied.length).toBe(29);
+    expect(report.applied.length).toBe(36);
     expect(report.skipped).toEqual([]);
 
     const recorded = await appliedMigrations(engine);
@@ -98,6 +105,10 @@ describe('applyMigrations (FR-DATA-001…006, FR-DR-001/002 foundation)', () => 
       'g0_cost_0002_paid_policies',
       'g0_cost_0003_capacity_budgets',
       'g0_cost_0004_resource_forecast_snapshots',
+      'g0_col_0001_scope_manifests',
+      'g0_col_0002_stream_records',
+      'g0_col_0003_checkpoints_gaps',
+      'g0_col_0004_collector_health_incidents',
       'g0_data_0001_identity',
       'g0_data_0002_observations_revisions',
       'g0_data_0003_quality_sources',
@@ -105,6 +116,9 @@ describe('applyMigrations (FR-DATA-001…006, FR-DR-001/002 foundation)', () => 
       'g0_data_0005_object_artifact_index',
       'g0_data_0006_probe_assignments',
       'g0_data_0007_checkpoints_gaps',
+      'g0_disc_0001_universe_registry',
+      'g0_disc_0002_cheap_monitor',
+      'g0_disc_0003_promotion_decisions',
       'g0_dr_0001_recovery_tiers',
       'g0_dr_0002_backup_policy',
       'g0_dr_0003_incidents',
@@ -125,7 +139,7 @@ describe('applyMigrations (FR-DATA-001…006, FR-DR-001/002 foundation)', () => 
   it('applies twice without damage (idempotent)', async () => {
     const second = await applyMigrations({ engine, migrationsDir: MIGRATIONS_DIR });
     expect(second.applied).toEqual([]);
-    expect(second.skipped.length).toBe(29);
+    expect(second.skipped.length).toBe(36);
 
     // The full table set still exists exactly once each.
     const tables = await engine.query<{ table_name: string }>(
@@ -395,7 +409,7 @@ describe('migrator fail-closed defenses (FR-DATA-001…006 / FR-DR-001/002 subst
       expect(await clearMigrationLeases(engine)).toBe(1);
       // …and the same call then applies cleanly.
       const report = await applyMigrations({ engine, migrationsDir: MIGRATIONS_DIR });
-      expect(report.applied.length).toBe(29);
+      expect(report.applied.length).toBe(36);
     } finally {
       await db.close();
     }
@@ -417,7 +431,7 @@ describe('migrator fail-closed defenses (FR-DATA-001…006 / FR-DR-001/002 subst
       expect((cause as ForesiftError).code).toBe(ErrorCode.MIGRATION_APPLY_ALREADY_RUNNING);
 
       // The winning run completed the full application.
-      expect((await appliedMigrations(engine)).length).toBe(29);
+      expect((await appliedMigrations(engine)).length).toBe(36);
       // The loser left no lease behind after its refusal cleanup.
       const leases = await engine.query(`SELECT * FROM ${SCHEMA_MIGRATION_LEASES_TABLE}`);
       expect(leases.rows).toHaveLength(0);

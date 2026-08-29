@@ -84,7 +84,6 @@ export interface BatchCoalesceItem {
   readonly providerId: string;
   readonly operationId: string;
   readonly requestedAt?: string;
-  readonly [field: string]: unknown;
 }
 export interface BatchCoalesceInput<T extends BatchCoalesceItem = BatchCoalesceItem> {
   readonly items: readonly T[];

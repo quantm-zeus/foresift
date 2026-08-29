@@ -1,0 +1,284 @@
+{
+  "$schema": "https://foresift.dev/schemas/telemetry-catalog-v1.json",
+  "catalog": "col",
+  "description": "Declarative first-party collector lifecycle, continuity, health, capacity, and first-seen contracts. Fields carry identifiers, hashes, policy references, and measurements only; no credentials, raw payloads, signed URLs, or secret material are permitted.",
+  "contractStatus": "DECLARATIVE_CONTRACT_ONLY — emitter wiring is deferred to G2 observability.",
+  "requirementsCovered": [
+    "FR-COL-001",
+    "FR-COL-002",
+    "FR-COL-003",
+    "FR-COL-004",
+    "FR-COL-005",
+    "FR-COL-006",
+    "FR-COL-007",
+    "FR-COL-008",
+    "FR-COL-009",
+    "FR-COL-010",
+    "FR-COL-011",
+    "FR-COL-012"
+  ],
+  "recoveryDataClass": "CRITICAL_OBSERVATIONS_CHECKPOINTS",
+  "events": [
+    {
+      "name": "scope_activated",
+      "requirementRefs": ["FR-COL-001", "FR-COL-002"],
+      "tier": "CRITICAL_METADATA",
+      "fields": [
+        { "name": "scopeId", "type": "string", "required": true },
+        { "name": "scopeVersion", "type": "integer", "required": true },
+        { "name": "chainId", "type": "string", "required": true },
+        { "name": "programId", "type": "string", "required": true },
+        { "name": "programVersion", "type": "string", "required": true },
+        { "name": "eventFamilies", "type": "array<string>", "required": true },
+        { "name": "accountFilters", "type": "array<string>", "required": true },
+        { "name": "coverageStart", "type": "string<utc-timestamp>", "required": true },
+        {
+          "name": "finalityPolicy",
+          "type": "string(PROCESSED|CONFIRMED|FINALIZED)",
+          "required": true
+        },
+        { "name": "decoderVersion", "type": "string", "required": true },
+        { "name": "byteEnvelope", "type": "integer", "required": true },
+        { "name": "quotaEnvelope", "type": "number", "required": true },
+        { "name": "maxLagSlots", "type": "integer", "required": true },
+        { "name": "maxGapAgeMs", "type": "integer", "required": true },
+        { "name": "rightsPolicyRef", "type": "string", "required": true },
+        { "name": "retentionPolicyRef", "type": "string", "required": true },
+        { "name": "supportManifestRef", "type": "string<sha256>", "required": true },
+        { "name": "active", "type": "boolean", "required": true }
+      ]
+    },
+    {
+      "name": "stream_receipt_committed",
+      "requirementRefs": ["FR-COL-003", "FR-COL-006"],
+      "tier": "CRITICAL_OBSERVATIONS_CHECKPOINTS",
+      "fields": [
+        { "name": "recordId", "type": "string", "required": true },
+        { "name": "scopeId", "type": "string", "required": true },
+        { "name": "scopeVersion", "type": "integer", "required": true },
+        { "name": "chainId", "type": "string", "required": true },
+        { "name": "programId", "type": "string", "required": true },
+        { "name": "programVersion", "type": "string", "required": true },
+        { "name": "eventFamily", "type": "string", "required": true },
+        { "name": "endpointId", "type": "string", "required": true },
+        { "name": "subscriptionVersion", "type": "string", "required": true },
+        { "name": "filterVersion", "type": "string", "required": true },
+        { "name": "connectionGeneration", "type": "integer", "required": true },
+        { "name": "slot", "type": "integer", "required": true },
+        { "name": "blockHash", "type": "string", "required": true },
+        { "name": "transactionSignature", "type": "string", "required": true },
+        { "name": "transactionIndex", "type": "integer|null", "required": true },
+        { "name": "instructionIndex", "type": "integer|null", "required": true },
+        { "name": "innerInstructionIndex", "type": "integer|null", "required": true },
+        { "name": "logIndex", "type": "integer|null", "required": true },
+        { "name": "accountAddress", "type": "string|null", "required": true },
+        { "name": "accountWriteVersion", "type": "integer|null", "required": true },
+        { "name": "receivedAt", "type": "string<utc-timestamp>", "required": true },
+        { "name": "availableAt", "type": "string<utc-timestamp>", "required": true },
+        { "name": "availabilityProvenance", "type": "string(§13.2 vocabulary)", "required": true },
+        { "name": "finality", "type": "string(PROCESSED|CONFIRMED|FINALIZED)", "required": true },
+        { "name": "rawArtifactHash", "type": "string<sha256>", "required": true },
+        { "name": "normalizedEventHash", "type": "string<sha256>", "required": true },
+        { "name": "decoderVersion", "type": "string", "required": true },
+        { "name": "rightsPolicyRef", "type": "string", "required": true },
+        { "name": "receiptHash", "type": "string<sha256>", "required": true }
+      ]
+    },
+    {
+      "name": "checkpoint_advanced",
+      "requirementRefs": ["FR-COL-004", "FR-COL-009"],
+      "tier": "CRITICAL_OBSERVATIONS_CHECKPOINTS",
+      "fields": [
+        { "name": "partitionId", "type": "string", "required": true },
+        { "name": "scopeId", "type": "string", "required": true },
+        { "name": "scopeVersion", "type": "integer", "required": true },
+        { "name": "state", "type": "string(§12.9 vocabulary)", "required": true },
+        { "name": "fencingToken", "type": "integer", "required": true },
+        { "name": "shardId", "type": "string", "required": true },
+        { "name": "leaseRef", "type": "string", "required": true },
+        { "name": "checkpoint", "type": "integer", "required": true },
+        { "name": "transitionedAt", "type": "string<utc-timestamp>", "required": true },
+        { "name": "auditRef", "type": "string", "required": true },
+        { "name": "reason", "type": "string", "required": true }
+      ]
+    },
+    {
+      "name": "gap_registered",
+      "requirementRefs": ["FR-COL-004"],
+      "tier": "CRITICAL_OBSERVATIONS_CHECKPOINTS",
+      "fields": [
+        { "name": "gapId", "type": "string", "required": true },
+        { "name": "partitionId", "type": "string", "required": true },
+        { "name": "startPosition", "type": "integer", "required": true },
+        { "name": "endPosition", "type": "integer", "required": true },
+        {
+          "name": "status",
+          "type": "string(OPEN|BACKFILL_QUEUED|BACKFILLING|RESOLVED_COMPLETE|RESOLVED_EMPTY_PROOF|PARTIAL|UNRESOLVED|WAIVED_FOR_NARROW_SCOPE)",
+          "required": true
+        },
+        { "name": "updatedAt", "type": "string<utc-timestamp>", "required": true }
+      ]
+    },
+    {
+      "name": "gap_resolved",
+      "requirementRefs": ["FR-COL-004", "FR-COL-005"],
+      "tier": "CRITICAL_OBSERVATIONS_CHECKPOINTS",
+      "fields": [
+        { "name": "gapId", "type": "string", "required": true },
+        { "name": "partitionId", "type": "string", "required": true },
+        { "name": "startPosition", "type": "integer", "required": true },
+        { "name": "endPosition", "type": "integer", "required": true },
+        {
+          "name": "status",
+          "type": "string(RESOLVED_COMPLETE|RESOLVED_EMPTY_PROOF|PARTIAL|UNRESOLVED|WAIVED_FOR_NARROW_SCOPE)",
+          "required": true
+        },
+        { "name": "updatedAt", "type": "string<utc-timestamp>", "required": true }
+      ]
+    },
+    {
+      "name": "backfill_completed",
+      "requirementRefs": ["FR-COL-005"],
+      "tier": "CRITICAL_OBSERVATIONS_CHECKPOINTS",
+      "fields": [
+        { "name": "backfillReceiptId", "type": "string", "required": true },
+        { "name": "backfillJobId", "type": "string", "required": true },
+        { "name": "backfillReason", "type": "string", "required": true },
+        { "name": "historicalEventAt", "type": "string<utc-timestamp>", "required": true },
+        { "name": "retrievedAt", "type": "string<utc-timestamp>", "required": true },
+        { "name": "availableAt", "type": "string<utc-timestamp>", "required": true },
+        { "name": "retrospectiveOnly", "type": "boolean", "required": true },
+        { "name": "wouldHaveBeenObservableLive", "type": "boolean|null", "required": true },
+        {
+          "name": "availabilityProofMethod",
+          "type": "string(LIVE_RECEIPT_REFERENCE|RECOVERY_FETCH_COMMIT|MANUAL_IMPORT_RECEIPT)",
+          "required": true
+        },
+        { "name": "liveReceiptRef", "type": "string|null", "required": true }
+      ]
+    },
+    {
+      "name": "decode_paused",
+      "requirementRefs": ["FR-COL-007"],
+      "tier": "CRITICAL_METADATA",
+      "fields": [
+        { "name": "pauseId", "type": "string", "required": true },
+        { "name": "scopeId", "type": "string", "required": true },
+        { "name": "programId", "type": "string", "required": true },
+        { "name": "programVersion", "type": "string", "required": true },
+        { "name": "decoderVersion", "type": "string", "required": true },
+        {
+          "name": "reason",
+          "type": "string(UNKNOWN_INSTRUCTION_VARIANT|ACCOUNT_LAYOUT_CHANGE|DECODER_DRIFT|PARITY_FAILURE|PROGRAM_UPGRADE)",
+          "required": true
+        },
+        { "name": "rawEventsPreserved", "type": "boolean(true)", "required": true },
+        { "name": "pausedAt", "type": "string<utc-timestamp>", "required": true },
+        { "name": "revalidatedAt", "type": "string<utc-timestamp>|null", "required": true },
+        { "name": "incidentId", "type": "string", "required": true }
+      ]
+    },
+    {
+      "name": "incident_opened",
+      "requirementRefs": ["FR-COL-007", "FR-COL-010"],
+      "tier": "CRITICAL_METADATA",
+      "fields": [
+        { "name": "incidentId", "type": "string", "required": true },
+        { "name": "scopeId", "type": "string|null", "required": true },
+        { "name": "partitionId", "type": "string|null", "required": true },
+        { "name": "kind", "type": "string", "required": true },
+        { "name": "severity", "type": "string(INFO|WARNING|CRITICAL)", "required": true },
+        { "name": "openedAt", "type": "string<utc-timestamp>", "required": true },
+        { "name": "resolvedAt", "type": "string<utc-timestamp>|null", "required": true },
+        { "name": "evidenceRefs", "type": "array<string>", "required": true }
+      ]
+    },
+    {
+      "name": "health_snapshot",
+      "requirementRefs": ["FR-COL-008"],
+      "tier": "CRITICAL_METADATA",
+      "fields": [
+        { "name": "partitionId", "type": "string", "required": true },
+        { "name": "measuredAt", "type": "string<utc-timestamp>", "required": true },
+        { "name": "connected", "type": "boolean", "required": true },
+        { "name": "endpointGeneration", "type": "integer", "required": true },
+        { "name": "headSlot", "type": "integer", "required": true },
+        { "name": "finalizedSlot", "type": "integer", "required": true },
+        { "name": "checkpointLag", "type": "integer", "required": true },
+        { "name": "gapCount", "type": "integer", "required": true },
+        { "name": "oldestGapDurationMs", "type": "integer", "required": true },
+        {
+          "name": "backfillStatus",
+          "type": "string(IDLE|QUEUED|RUNNING|PARTIAL|BLOCKED)",
+          "required": true
+        },
+        { "name": "decodeFailureRate", "type": "number[0,1]", "required": true },
+        { "name": "streamedBytes", "type": "number", "required": true },
+        { "name": "eventRate", "type": "number", "required": true },
+        { "name": "deduplicationRate", "type": "number[0,1]", "required": true },
+        {
+          "name": "resourceConsumption",
+          "type": "object{cpuPercent,memoryBytes,networkBytes,subscriptions,rawStorageBytes,retries,monthlyCredits}",
+          "required": true
+        }
+      ]
+    },
+    {
+      "name": "capacity_paused",
+      "requirementRefs": ["FR-COL-010"],
+      "tier": "CRITICAL_METADATA",
+      "fields": [
+        { "name": "contractId", "type": "string", "required": true },
+        { "name": "contractVersion", "type": "string", "required": true },
+        { "name": "validFrom", "type": "string<utc-timestamp>", "required": true },
+        { "name": "validUntil", "type": "string<utc-timestamp>", "required": true },
+        { "name": "verifiedAt", "type": "string<utc-timestamp>", "required": true },
+        { "name": "cpuPercent", "type": "number", "required": true },
+        { "name": "memoryBytes", "type": "number", "required": true },
+        { "name": "networkBytes", "type": "number", "required": true },
+        { "name": "subscriptions", "type": "number", "required": true },
+        { "name": "eventRate", "type": "number", "required": true },
+        { "name": "rawStorageBytes", "type": "number", "required": true },
+        { "name": "retries", "type": "number", "required": true },
+        { "name": "monthlyCredits", "type": "number", "required": true },
+        { "name": "paidOverageAllowed", "type": "boolean(false)", "required": true },
+        { "name": "reserveConsumptionAllowed", "type": "boolean(false)", "required": true }
+      ]
+    },
+    {
+      "name": "reconnected",
+      "requirementRefs": ["FR-COL-009"],
+      "tier": "CRITICAL_OBSERVATIONS_CHECKPOINTS",
+      "fields": [
+        { "name": "partitionId", "type": "string", "required": true },
+        { "name": "scopeId", "type": "string", "required": true },
+        { "name": "scopeVersion", "type": "integer", "required": true },
+        { "name": "state", "type": "string(§12.9 vocabulary)", "required": true },
+        { "name": "fencingToken", "type": "integer", "required": true },
+        { "name": "shardId", "type": "string", "required": true },
+        { "name": "leaseRef", "type": "string", "required": true },
+        { "name": "checkpoint", "type": "integer", "required": true },
+        { "name": "transitionedAt", "type": "string<utc-timestamp>", "required": true },
+        { "name": "auditRef", "type": "string", "required": true },
+        { "name": "reason", "type": "string", "required": true }
+      ]
+    },
+    {
+      "name": "first_seen_recorded",
+      "requirementRefs": ["FR-COL-011"],
+      "tier": "CRITICAL_METADATA",
+      "fields": [
+        { "name": "subjectId", "type": "string", "required": true },
+        { "name": "scopeId", "type": "string", "required": true },
+        { "name": "scopeVerified", "type": "boolean", "required": true },
+        { "name": "sourceEventAt", "type": "string<utc-timestamp>", "required": true },
+        { "name": "collectorReceiptAt", "type": "string<utc-timestamp>", "required": true },
+        { "name": "providerAvailableAt", "type": "string<utc-timestamp>|null", "required": true },
+        { "name": "featureReadyAt", "type": "string<utc-timestamp>|null", "required": true },
+        { "name": "decisionReadyAt", "type": "string<utc-timestamp>|null", "required": true },
+        { "name": "deliveredAt", "type": "string<utc-timestamp>|null", "required": true },
+        { "name": "recordedAt", "type": "string<utc-timestamp>", "required": true }
+      ]
+    }
+  ]
+}

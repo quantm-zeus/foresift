@@ -170,15 +170,35 @@ export function analyzeTestFile(root, path, previous = null) {
   };
 }
 
+// State-control-plane specs are executed by CI's dedicated
+// test:state-control-plane job. They must NOT enter the coordinator manifest:
+// sweeping them into the PROCESS workload duplicates them and wedged the CI
+// Process job ~1s into every attempt (observed live 2026-08-29 on the
+// g0-cost-capacity landing PR after the first manifest regeneration).
+export const STATE_CONTROL_PLANE_SPECS = Object.freeze([
+  'tests/automation/ci-authority-hardening.spec.ts',
+  'tests/automation/state-landing-lifecycle.spec.ts',
+  'tests/automation/package-launch-intent.spec.ts',
+  'tests/automation/ci-repair-lifecycle.spec.ts',
+  'tests/automation/ci-diff-classifier.spec.ts',
+  'tests/automation/state-authority-v2.spec.ts',
+]);
+
 export function buildBunMigrationManifest({ root = process.cwd(), previousFile = null } = {}) {
   let previous = null;
   if (previousFile && existsSync(previousFile))
     previous = JSON.parse(readFileSync(previousFile, 'utf8'));
   const previousByPath = new Map((previous?.files ?? []).map((entry) => [entry.path, entry]));
-  const paths = gitFiles(root).map(slash).filter(isTestFile).sort();
+  const paths = gitFiles(root)
+    .map(slash)
+    .filter(isTestFile)
+    .filter((path) => !STATE_CONTROL_PLANE_SPECS.includes(path))
+    .sort();
   const files = paths.map((path) => analyzeTestFile(root, path, previousByPath.get(path)));
   const previousPaths = new Set((previous?.files ?? []).map((entry) => entry.path));
-  const disappeared = [...previousPaths].filter((path) => !paths.includes(path));
+  const disappeared = [...previousPaths].filter(
+    (path) => !paths.includes(path) && !STATE_CONTROL_PLANE_SPECS.includes(path),
+  );
   if (disappeared.length)
     throw new Error(`BUN_MIGRATION_TEST_LOSS: ${disappeared.slice(0, 20).join(',')}`);
   const counts = Object.fromEntries(

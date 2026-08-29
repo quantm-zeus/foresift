@@ -24,7 +24,7 @@
 // (serialized within it). allowedWritePaths = union of member paths, each
 // validated against the package's writeScopes — a scope violation fails closed.
 import { spawnSync } from 'node:child_process';
-import { readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { repoRoot, loadCurrentMilestone, validateMilestoneState, findPackage } from './schema.mjs';
 import { classifyOwnedPath } from './path-ownership.mjs';
@@ -190,6 +190,35 @@ for (const u of units)
 for (const u of units) u.dependsOn.sort();
 
 const open = units.filter((u) => !u.done);
+
+// ── central migration registry duty (fail-closed, pre-writer cost) ───────────
+// packages/persistence/test/migrator.spec.ts asserts EXACTLY the full G0
+// migration script set (lexicographic, checksum-pinned). Any package whose
+// tasks predict NEW migration scripts must also name that central suite as a
+// (plan-sanctioned, scope-exception) write — the g0-provider-lifecycle
+// precedent. When the duty is missing, the wave guard legally refuses every
+// repair that touches the central suite and the run exhausts its bounded
+// repair budget deterministically (observed live 2026-08-28 on
+// g0-cost-capacity). Refuse at graph build time so no writer cost is burned.
+const CENTRAL_MIGRATION_SUITE = 'packages/persistence/test/migrator.spec.ts';
+{
+  const migrationWriteRe = /^migrations\/g0_[a-z]+_\d+.*\.sql$/;
+  const predictsNewMigrationScript = (u) =>
+    (u.outOfScopeWrites ?? []).some(
+      (p) => migrationWriteRe.test(p) && !existsSync(join(root, p)),
+    ) ||
+    (u.predictedWrites ?? []).some((p) => migrationWriteRe.test(p) && !existsSync(join(root, p)));
+  const referencesCentralSuite = (u) => u.body.includes(CENTRAL_MIGRATION_SUITE);
+  if (
+    open.some(predictsNewMigrationScript) &&
+    !open.some(referencesCentralSuite) &&
+    !units.some(referencesCentralSuite)
+  ) {
+    fail(
+      `CENTRAL_MIGRATION_SUITE_UNREFERENCED: tasks predict new migrations/g0_*.sql scripts but never name ${CENTRAL_MIGRATION_SUITE} — the central expected-script registry must be updated in the same package (plan-sanctioned scope exception)`,
+    );
+  }
+}
 
 // ── shard planning ────────────────────────────────────────────────────────────
 let shards = null;

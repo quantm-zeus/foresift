@@ -9,3 +9,5 @@ export * from './prov.ts';
 export * from './sec.ts';
 export * from './core.ts';
 export * from './cost.ts';
+export * from './col.ts';
+export * from './disc.ts';

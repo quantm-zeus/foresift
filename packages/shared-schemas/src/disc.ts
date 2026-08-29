@@ -56,6 +56,9 @@ export const CheapMonitorRowSchema = z
     nextCheckDueAt: UtcTimestampSchema,
     expiresAt: UtcTimestampSchema,
     stalenessLimitSeconds: z.number().nonnegative(),
+    resourceBudgetClass: z.string().min(1).optional(),
+    providerId: z.string().min(1).optional(),
+    operationId: z.string().min(1).optional(),
     decisionHistory: z.array(z.string().min(1)),
   })
   .strict()

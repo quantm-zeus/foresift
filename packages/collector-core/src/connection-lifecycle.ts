@@ -13,6 +13,21 @@ function hash(seed: string): number {
   return h >>> 0;
 }
 export function boundedReconnectDelay(attempt: number, policy: BackoffPolicy): number {
+  if (
+    !Number.isInteger(attempt) ||
+    attempt < 0 ||
+    !Number.isFinite(policy.initialMs) ||
+    policy.initialMs < 0 ||
+    !Number.isFinite(policy.maximumMs) ||
+    policy.maximumMs < policy.initialMs ||
+    !Number.isFinite(policy.multiplier) ||
+    policy.multiplier < 1 ||
+    !Number.isFinite(policy.jitterRatio) ||
+    policy.jitterRatio < 0 ||
+    policy.jitterRatio > 1 ||
+    policy.seed.length === 0
+  )
+    throw new Error('INVALID_RECONNECT_BACKOFF_POLICY');
   const base = Math.min(
     policy.maximumMs,
     policy.initialMs * policy.multiplier ** Math.max(0, attempt),
@@ -29,7 +44,21 @@ export class ConnectionLifecycle {
   constructor(
     private readonly endpoints: readonly CollectorEndpoint[],
     private readonly policy: BackoffPolicy,
-  ) {}
+  ) {
+    if (
+      endpoints.length === 0 ||
+      new Set(endpoints.map((endpoint) => endpoint.endpointId)).size !== endpoints.length ||
+      endpoints.some(
+        (endpoint) =>
+          endpoint.endpointId.length === 0 ||
+          endpoint.url.length === 0 ||
+          !Number.isFinite(endpoint.priority),
+      )
+    )
+      throw new Error('INVALID_FIXED_ENDPOINT_CONFIGURATION');
+    // Validate the policy at construction, before a failure path needs it.
+    boundedReconnectDelay(0, policy);
+  }
   connect(replay: ReplayCursor): {
     endpoint: CollectorEndpoint;
     generation: number;

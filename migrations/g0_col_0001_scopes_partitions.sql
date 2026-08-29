@@ -8,8 +8,10 @@ CREATE TABLE col.collector_scopes (
   chain_id text NOT NULL,
   program_id text NOT NULL,
   program_version text NOT NULL,
+  account_layout_version text NOT NULL,
   event_families text[] NOT NULL CHECK (cardinality(event_families) > 0),
   account_filters text[] NOT NULL DEFAULT '{}',
+  coverage_start_slot numeric NOT NULL CHECK (coverage_start_slot >= 0),
   coverage_start timestamptz NOT NULL,
   finality_policy text NOT NULL CHECK (finality_policy IN ('PROCESSED','CONFIRMED','FINALIZED')),
   decoder_version text NOT NULL,
@@ -54,6 +56,32 @@ BEGIN
 END $$;
 CREATE TRIGGER collector_partition_monotonic BEFORE UPDATE ON col.collector_partitions
 FOR EACH ROW EXECUTE FUNCTION col.guard_partition_monotonicity();
+
+CREATE TABLE col.collector_gap_registry (
+  gap_id text PRIMARY KEY,
+  partition_id text NOT NULL REFERENCES col.collector_partitions(partition_id),
+  start_position numeric NOT NULL CHECK (start_position >= 0),
+  end_position numeric NOT NULL CHECK (end_position >= start_position),
+  status text NOT NULL CHECK (status IN (
+    'OPEN','BACKFILL_QUEUED','BACKFILLING','RESOLVED_COMPLETE',
+    'RESOLVED_EMPTY_PROOF','PARTIAL','UNRESOLVED','WAIVED_FOR_NARROW_SCOPE'
+  )),
+  waiver_scope text,
+  waiver_signature text,
+  waiver_expires_at timestamptz,
+  updated_at timestamptz NOT NULL,
+  CHECK (
+    status <> 'WAIVED_FOR_NARROW_SCOPE'
+    OR (waiver_scope IS NOT NULL AND waiver_signature IS NOT NULL AND waiver_expires_at IS NOT NULL)
+  )
+);
+
+CREATE TABLE col.collector_watermarks (
+  watermark_key text PRIMARY KEY,
+  contiguous_through numeric NOT NULL CHECK (contiguous_through >= 0),
+  fencing_token bigint NOT NULL CHECK (fencing_token > 0),
+  updated_at timestamptz NOT NULL
+);
 
 CREATE TABLE col.program_support_manifests (
   content_hash text PRIMARY KEY, manifest_json jsonb NOT NULL, valid_from timestamptz NOT NULL,

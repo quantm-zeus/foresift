@@ -47,34 +47,70 @@ export class PromotionStore {
   ) {}
   async decide(input: FrozenPromotionInputs): Promise<PromotionDecision> {
     const hash = promotionInputsHash(input);
-    const existing = await this.engine.query<{ decision_json: unknown }>(
-      'SELECT decision_json FROM disc.promotion_decisions WHERE inputs_hash=$1',
-      [hash],
-    );
-    const row = existing.rows[0];
-    if (row)
-      return PromotionDecisionSchema.parse(
-        typeof row.decision_json === 'string' ? JSON.parse(row.decision_json) : row.decision_json,
-      );
     const decision = decidePromotion(input, this.now().toISOString());
-    await this.engine.transaction(async (tx) => {
+    return this.engine.transaction(async (tx) => {
       await tx.query(
-        'INSERT INTO disc.promotion_decisions (decision_id,candidate_id,inputs_hash,decision_version,decision_json,decided_at) VALUES ($1,$2,$3,$4,$5,$6)',
+        `INSERT INTO disc.promotion_decisions (
+          promotion_decision_id,candidate_id,frozen_feature_versions,policy_version,
+          inputs_hash,decision,decided_at,decision_version
+        ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8)
+        ON CONFLICT (inputs_hash) DO NOTHING`,
         [
           decision.decisionId,
           decision.candidateId,
+          JSON.stringify({
+            features: input.frozenFeatures,
+            featureVersions: input.featureVersions,
+            featureSnapshotVersion: decision.featureSnapshotVersion,
+          }),
+          decision.policyVersion,
           decision.inputsHash,
-          decision.decisionVersion,
-          JSON.stringify(decision),
+          decision.decision,
           decision.decidedAt,
+          decision.decisionVersion,
         ],
       );
       if (decision.decision === 'PROMOTE_TO_VERIFY')
         await tx.query(
-          `UPDATE disc.cheap_monitor_rows SET state='PROMOTED_TO_VERIFY',row_json=jsonb_set(row_json,'{state}','"PROMOTED_TO_VERIFY"') WHERE candidate_id=$1`,
-          [decision.candidateId],
+          `UPDATE disc.cheap_monitor_rows
+           SET state='PROMOTED_TO_VERIFY',updated_at=$2 WHERE candidate_id=$1`,
+          [decision.candidateId, decision.decidedAt],
         );
+      const stored = await tx.query<{
+        promotion_decision_id: string;
+        candidate_id: string;
+        frozen_feature_versions: unknown;
+        policy_version: string;
+        inputs_hash: string;
+        decision: PromotionDecision['decision'];
+        decided_at: string | Date;
+        decision_version: string;
+      }>(
+        `SELECT promotion_decision_id,candidate_id,frozen_feature_versions,policy_version,
+                inputs_hash,decision,decided_at,decision_version
+         FROM disc.promotion_decisions WHERE inputs_hash=$1`,
+        [hash],
+      );
+      const row = stored.rows[0];
+      if (!row) throw new Error('PROMOTION_DECISION_PERSISTENCE_FAILED');
+      const frozen =
+        typeof row.frozen_feature_versions === 'string'
+          ? (JSON.parse(row.frozen_feature_versions) as { featureSnapshotVersion?: string })
+          : (row.frozen_feature_versions as { featureSnapshotVersion?: string });
+      return PromotionDecisionSchema.parse({
+        decisionId: row.promotion_decision_id,
+        candidateId: row.candidate_id,
+        policyVersion: row.policy_version,
+        featureSnapshotVersion: frozen.featureSnapshotVersion ?? decision.featureSnapshotVersion,
+        inputsHash: row.inputs_hash,
+        decisionVersion: row.decision_version,
+        decision: row.decision,
+        rationale:
+          row.decision === 'PROMOTE_TO_VERIFY'
+            ? 'all persistence, change, execution, and security gates passed'
+            : 'one or more eligibility gates did not pass',
+        decidedAt: row.decided_at instanceof Date ? row.decided_at.toISOString() : row.decided_at,
+      });
     });
-    return decision;
   }
 }

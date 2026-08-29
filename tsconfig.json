@@ -4,6 +4,8 @@
   "compilerOptions": {
     "rootDir": ".",
     "noEmit": true,
+    "noUncheckedIndexedAccess": false,
+    "noUnusedLocals": false,
     "types": ["node", "bun"]
   },
   "include": ["packages/*/src/**/*.ts", "packages/*/test/**/*.ts", "tests/**/*.ts"],

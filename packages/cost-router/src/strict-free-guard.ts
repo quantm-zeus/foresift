@@ -1,14 +1,37 @@
 import { CostClass, CostMode } from '@foresift/domain';
-import type { OperationCostDeclaration } from '@foresift/shared-schemas';
 import { shapeCostDenial, type CostDenial } from './cost-audit.ts';
+
+export interface StrictFreeCostDeclaration {
+  readonly providerId: string;
+  readonly operationId: string;
+  readonly version?: string | undefined;
+  readonly costClass: string;
+  readonly quotaModelId?: string | undefined;
+  readonly quotaUnitCost?: number;
+  readonly estimatedQuotaUnits?: number;
+  readonly resetPolicyId?: string | undefined;
+  readonly quotaResetPolicyId?: string | undefined;
+  readonly batchCapability: {
+    readonly maxBatchSize?: number | undefined;
+    readonly safeMaxUtilization?: number | undefined;
+    readonly keyFields?: readonly string[] | undefined;
+    readonly automaticUpgrade?: boolean | undefined;
+    readonly autoUpgrade?: boolean | undefined;
+  } | null;
+  readonly minimumCandidateStage?: string | undefined;
+  readonly protectedReserveEligible?: boolean | undefined;
+  readonly allowedInStrictFree: boolean;
+  readonly paidFallbackAllowed?: boolean | undefined;
+  readonly verificationExpiresAt?: string | undefined;
+}
 
 export interface StrictFreeGuardInput {
   readonly mode?: CostMode;
-  readonly declaration: OperationCostDeclaration;
+  readonly declaration: StrictFreeCostDeclaration;
   readonly candidate?: string;
   readonly caller?: string;
   readonly workloadClass?: string;
-  readonly callerId?: string;
+  readonly callerId: string;
   readonly remainingUnits?: number;
   readonly estimatedUnits?: number;
   readonly requestedUnits?: number;
@@ -60,8 +83,11 @@ export function strictFreeGuard(input: StrictFreeGuardInput): CostDenial | undef
   }
   if (
     input.remainingUnits !== undefined &&
-    (input.estimatedUnits ?? input.requestedUnits ?? declaration.quotaUnitCost) >
-      input.remainingUnits
+    (input.estimatedUnits ??
+      input.requestedUnits ??
+      declaration.quotaUnitCost ??
+      declaration.estimatedQuotaUnits ??
+      Number.POSITIVE_INFINITY) > input.remainingUnits
   ) {
     return denial(input, 'QUOTA_EXHAUSTED: free quota would be exceeded');
   }

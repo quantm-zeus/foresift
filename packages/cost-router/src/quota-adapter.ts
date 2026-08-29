@@ -91,6 +91,7 @@ export class QuotaReservationAdapter implements ToolQuotaAdapter {
         declaration,
         candidate: `${request.provider}/${request.operation}`,
         caller: request.workloadClass,
+        callerId: request.workloadClass,
         estimatedUnits: request.estimate.estimatedUnits,
       });
       if (blocked !== undefined) return { allowed: false, reason: blocked.reason };
@@ -135,6 +136,7 @@ export class QuotaReservationAdapter implements ToolQuotaAdapter {
       declaration,
       candidate: `${request.provider}/${request.operation}`,
       caller: request.workloadClass,
+      callerId: request.workloadClass,
       remainingUnits: remaining,
       estimatedUnits: request.estimate.estimatedUnits,
     });

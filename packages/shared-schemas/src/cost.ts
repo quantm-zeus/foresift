@@ -62,7 +62,14 @@ export const OperationCostDeclarationSchema = z
     verificationExpiresAt: UtcTimestampSchema.optional(),
   })
   .strict();
-export type OperationCostDeclaration = z.infer<typeof OperationCostDeclarationSchema>;
+type ParsedOperationCostDeclaration = z.infer<typeof OperationCostDeclarationSchema>;
+export type OperationCostDeclaration = Omit<ParsedOperationCostDeclaration, 'batchCapability'> & {
+  readonly batchCapability:
+    | (Omit<NonNullable<ParsedOperationCostDeclaration['batchCapability']>, 'keyFields'> & {
+        readonly keyFields: readonly string[];
+      })
+    | null;
+};
 
 export const QuotaBalanceSchema = z
   .object({

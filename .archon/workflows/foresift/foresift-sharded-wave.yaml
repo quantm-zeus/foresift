@@ -92,6 +92,28 @@ nodes:
       '
       node scripts/automation/check-writer-admission.mjs \
         > "$ARTIFACTS_DIR/admission.json" || true
+      # Mechanical bookkeeping duty (zero-AI): regenerate the coordinator test
+      # manifest whenever test files changed on this base relative to main.
+      # New test files MUST appear in evidence/bun-migration/bun-migration-manifest.json
+      # or `pnpm test` never sees them. Previously this regeneration was a
+      # task-assigned AI write (T063-class) that tripped the AGY product
+      # ownership guard (observed live 2026-08-29, run 9cf2bf57: the test-author
+      # lane regenerated the manifest and was rejected closed). The manifest is
+      # mechanical output of bun-migration-manifest.mjs over the current tree;
+      # committing it here is bookkeeping, not product authorship. Preserved as
+      # an explicit unchanged skip so identity stays stable across restarts.
+      if ! git diff --quiet HEAD -- tests/ packages/ apps/ || \
+         [ -n "$(git status --porcelain tests/ packages/ apps/)" ]; then
+        node scripts/automation/bun-migration-manifest.mjs \
+          --previous evidence/bun-migration/bun-migration-manifest.json \
+          --out evidence/bun-migration/bun-migration-manifest.json \
+          > /dev/null
+        if ! git diff --quiet -- evidence/bun-migration/bun-migration-manifest.json; then
+          git add evidence/bun-migration/bun-migration-manifest.json
+          git -c user.name="Foresift Wave Prep" -c user.email=noreply@foresift.local \
+            commit -m "chore(test-manifest): mechanical coordinator manifest regen (wave prep)"
+        fi
+      fi
       # Private worktree + unique branch per implementation/test lane, all at
       # the SAME pinned semantic base. The run token prevents stale collisions.
       node -e '

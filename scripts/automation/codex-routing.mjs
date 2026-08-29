@@ -174,7 +174,22 @@ export function installedCodexModels(binary = 'codex') {
   const r = spawnSync(binary, ['debug', 'models'], { encoding: 'utf8' });
   if (r.status !== 0) throw new Error(`CODEX_MODEL_PROBE_FAILED: ${(r.stderr ?? '').slice(-200)}`);
   const parsed = JSON.parse(r.stdout);
-  return new Set((parsed.models ?? []).map((m) => m.slug));
+  // `codex debug models` slugs carry a provider prefix ("Codex API/gpt-5.6-sol",
+  // "B.AI/glm-5.3-flash"), but `codex exec -m` accepts the BARE slug. The wave
+  // router reasons in bare slugs (CODEX_MODELS), so normalize every entry to
+  // its last path segment and keep only entries the router can name exactly.
+  // Normalization must be unambiguous: two entries sharing a final segment
+  // collapse to one bare name, which is still correct for exec because the
+  // CLI itself resolves a bare slug to one model.
+  // (Observed live 2026-08-29: run d2e29f0c5ef6704287e693ba7cfaee38 prep died
+  // with REQUIRED_HIGH_MODEL_UNAVAILABLE: gpt-5.6-sol because the probe
+  // returned only prefixed slugs and availability was matched exactly.)
+  return new Set(
+    (parsed.models ?? [])
+      .map((m) => String(m.slug ?? ''))
+      .filter((slug) => Object.values(CODEX_MODELS).includes(slug) || slug.includes('/'))
+      .map((slug) => (slug.includes('/') ? slug.split('/').at(-1) : slug)),
+  );
 }
 
 export function buildWaveRouting(

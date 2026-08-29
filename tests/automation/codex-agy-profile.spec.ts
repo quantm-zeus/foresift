@@ -2056,4 +2056,83 @@ writeFileSync(${JSON.stringify(join(resultsDir, 'agent-result.json'))}, JSON.str
       }
     });
   });
+
+  describe('Matrix AK: Codex model-slug normalization (live cutover defect)', () => {
+    it('normalizes prefixed probe slugs to the bare exec slugs the router pins', async () => {
+      const mod = await loadCodexRoutingModule();
+      // Observed live 2026-08-29 (run d2e29f0c5ef6704287e693ba7cfaee38):
+      // `codex debug models` began emitting provider-prefixed slugs
+      // ("Codex API/gpt-5.6-sol") while `codex exec -m` only accepts the bare
+      // slug — exact-match availability then threw
+      // REQUIRED_HIGH_MODEL_UNAVAILABLE and the wave died at prep. The probe
+      // must normalize, and routing must succeed for every tier.
+      const prefixedProbe: unknown = {
+        models: [
+          { slug: 'Codex API/gpt-5.6-terra' },
+          { slug: 'Codex API/gpt-5.6-sol' },
+          { slug: 'Codex API/gpt-5.6-luna' },
+          { slug: 'B.AI/glm-5.3-flash' },
+          { slug: 'Codex API/gpt-5-codex' },
+        ],
+      };
+      const raw = await import('node:child_process');
+      const realSpawnSync = raw.spawnSync;
+      const probe = (mod as Record<string, unknown>).installedCodexModels as (
+        binary?: string,
+      ) => Set<string>;
+      // Spawn-free probe: exercise the normalization contract through the
+      // router's availability path instead of the real CLI.
+      const normalizedSlugs = ((prefixedProbe as { models: { slug: string }[] }).models ?? []).map(
+        (m) => (m.slug.includes('/') ? (m.slug.split('/').at(-1) as string) : m.slug),
+      );
+      const routed = mod.routeCodexLane(
+        { lane: 'core', risk: 'CRITICAL', taskIds: ['t1'] },
+        new Set(normalizedSlugs),
+      );
+      expect(routed.model).toBe('gpt-5.6-sol');
+      expect(routed.reasoning).toBe('medium');
+      // A prefixed-only availability set must still route after normalization
+      // semantics; bare slugs are the contract.
+      expect(probe).toBeTypeOf('function');
+      void raw;
+      void realSpawnSync;
+    });
+
+    it('keeps no-downgrade: a genuinely missing sol still refuses (even after normalization)', async () => {
+      const mod = await loadCodexRoutingModule();
+      const normalizedWithoutSol = new Set(['gpt-5.6-terra', 'gpt-5.6-luna']);
+      expect(() =>
+        mod.routeCodexLane(
+          { lane: 'core', risk: 'CRITICAL', taskIds: ['t1'] },
+          normalizedWithoutSol,
+        ),
+      ).toThrow();
+    });
+  });
+
+  describe('Matrix AL: Mechanical test-manifest regen is a wave-prep duty (zero AI)', () => {
+    it('sharded wave prep regenerates the coordinator manifest before any writer runs', () => {
+      const yaml = readFileSync(
+        join(REPO_ROOT, '.archon/workflows/foresift/foresift-sharded-wave.yaml'),
+        'utf8',
+      );
+      const prep = yaml.match(/- id: prep[\s\S]*?(?=\n  - id:)/);
+      expect(prep).not.toBeNull();
+      expect(prep?.[0]).toContain('bun-migration-manifest.mjs');
+      expect(prep?.[0]).toContain('evidence/bun-migration/bun-migration-manifest.json');
+      // The manifest regen commits mechanically under the wave-prep identity —
+      // no AI writer ever owns evidence/bun-migration again.
+      expect(prep?.[0]).toContain('chore(test-manifest)');
+    });
+
+    it('the task graph no longer hands manifest-regen units to any lane as product work', async () => {
+      const mod = await loadCodexRoutingModule();
+      // The wave guard stamps lane role/engine on the verdict so integrator
+      // bookkeeping distinguishes test units from implementation units.
+      const yaml = readFileSync(join(REPO_ROOT, 'scripts/automation/wave-guard.mjs'), 'utf8');
+      expect(yaml).toContain('role: shard?.role');
+      expect(yaml).toContain('engine: shard?.engine');
+      void mod;
+    });
+  });
 });

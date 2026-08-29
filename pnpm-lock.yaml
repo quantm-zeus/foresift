@@ -54,6 +54,33 @@ importers:
         specifier: 8.67.0
         version: 8.67.0(eslint@10.9.0)(typescript@5.9.3)
 
+  apps/collector:
+    dependencies:
+      '@foresift/collector-checkpoints':
+        specifier: workspace:*
+        version: link:../../packages/collector-checkpoints
+      '@foresift/collector-core':
+        specifier: workspace:*
+        version: link:../../packages/collector-core
+      '@foresift/collector-gap-recovery':
+        specifier: workspace:*
+        version: link:../../packages/collector-gap-recovery
+      '@foresift/collector-solana':
+        specifier: workspace:*
+        version: link:../../packages/collector-solana
+      '@foresift/discovery-universe':
+        specifier: workspace:*
+        version: link:../../packages/discovery-universe
+      '@foresift/persistence':
+        specifier: workspace:*
+        version: link:../../packages/persistence
+      '@foresift/program-decoders':
+        specifier: workspace:*
+        version: link:../../packages/program-decoders
+      '@foresift/shared-schemas':
+        specifier: workspace:*
+        version: link:../../packages/shared-schemas
+
   packages/capacity-planner:
     dependencies:
       '@foresift/cost-router':
@@ -69,6 +96,60 @@ importers:
         specifier: workspace:*
         version: link:../tool-core
 
+  packages/cheap-monitor:
+    dependencies:
+      '@foresift/persistence':
+        specifier: workspace:*
+        version: link:../persistence
+      '@foresift/shared-schemas':
+        specifier: workspace:*
+        version: link:../shared-schemas
+
+  packages/collector-checkpoints:
+    dependencies:
+      '@foresift/domain':
+        specifier: workspace:*
+        version: link:../domain
+      '@foresift/persistence':
+        specifier: workspace:*
+        version: link:../persistence
+      '@foresift/shared-schemas':
+        specifier: workspace:*
+        version: link:../shared-schemas
+
+  packages/collector-core:
+    dependencies:
+      '@foresift/domain':
+        specifier: workspace:*
+        version: link:../domain
+      '@foresift/persistence':
+        specifier: workspace:*
+        version: link:../persistence
+      '@foresift/shared-schemas':
+        specifier: workspace:*
+        version: link:../shared-schemas
+
+  packages/collector-gap-recovery:
+    dependencies:
+      '@foresift/domain':
+        specifier: workspace:*
+        version: link:../domain
+      '@foresift/persistence':
+        specifier: workspace:*
+        version: link:../persistence
+
+  packages/collector-solana:
+    dependencies:
+      '@foresift/collector-core':
+        specifier: workspace:*
+        version: link:../collector-core
+      '@foresift/security':
+        specifier: workspace:*
+        version: link:../security
+      '@foresift/shared-schemas':
+        specifier: workspace:*
+        version: link:../shared-schemas
+
   packages/cost-router:
     dependencies:
       '@foresift/domain':
@@ -83,6 +164,12 @@ importers:
       '@foresift/tool-core':
         specifier: workspace:*
         version: link:../tool-core
+
+  packages/discovery-universe:
+    dependencies:
+      '@foresift/shared-schemas':
+        specifier: workspace:*
+        version: link:../shared-schemas
 
   packages/domain: {}
 
@@ -133,6 +220,18 @@ importers:
       '@foresift/object-store':
         specifier: workspace:*
         version: link:../object-store
+
+  packages/program-decoders:
+    dependencies:
+      '@foresift/domain':
+        specifier: workspace:*
+        version: link:../domain
+      '@foresift/persistence':
+        specifier: workspace:*
+        version: link:../persistence
+      '@foresift/shared-schemas':
+        specifier: workspace:*
+        version: link:../shared-schemas
 
   packages/provider-lifecycle:
     dependencies:

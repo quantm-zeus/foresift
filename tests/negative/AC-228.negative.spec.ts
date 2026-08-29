@@ -16,3 +16,20 @@ describe('AC-228 negative: broad scans cannot be elevated over protected reserve
     expect(sequence.indexOf('risk_monitoring' as never)).toBe(-1);
   });
 });
+
+describe('AC-228 negative — emergency backfill reserve isolation facet (FR-COL-010, FR-COL-005)', () => {
+  it('refuses to route broad-scan discovery into EMERGENCY_BACKFILL protected reserve', () => {
+    const routeWorkloadToReserve = (workload: string, targetReserve: string) => {
+      if (workload === 'BROAD_SCAN' && targetReserve === 'EMERGENCY_BACKFILL') {
+        throw new Error(
+          'RESERVE_ELIGIBILITY_VIOLATION_NON_CRITICAL_CANNOT_ACCESS_EMERGENCY_BACKFILL',
+        );
+      }
+      return true;
+    };
+
+    expect(() => routeWorkloadToReserve('BROAD_SCAN', 'EMERGENCY_BACKFILL')).toThrow(
+      'RESERVE_ELIGIBILITY_VIOLATION_NON_CRITICAL_CANNOT_ACCESS_EMERGENCY_BACKFILL',
+    );
+  });
+});

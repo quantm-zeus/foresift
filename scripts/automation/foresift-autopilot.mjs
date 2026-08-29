@@ -875,6 +875,59 @@ async function finalizeCompletedRun(st, entry, get = null) {
     return true; // done either way; next tick re-reads git state
   }
   if (!merged) {
+    // WAVE LANDING ADOPTION: the sharded wave closes its own loop by running
+    // package-final-land.mjs (wave-land node) — push + FULL gate + PR +
+    // exact-head CI + squash-merge. When the PR simply has not merged YET
+    // (open PR, CI running) the run is still making progress and must NOT
+    // count as an anomaly: resuming a completed archon run is refused (a
+    // completed run cannot resume), so a fresh restart here would duplicate
+    // the whole wave (observed live 2026-08-29, runs 4e7698e8 → d007fbf6 →
+    // recovery-exhaustion fatal pause). Instead: hold the tracked entry,
+    // defer to the landing budget, and let a later tick re-check merge state.
+    if (entry.workflow === 'foresift-sharded-wave') {
+      const prList = sh(
+        `gh pr list --repo quantm-zeus/foresift --head ${entry.branch} --state open --json number --limit 1`,
+      );
+      let openPr = null;
+      try {
+        openPr = JSON.parse(prList.out || '[]')[0]?.number ?? null;
+      } catch {}
+      if (openPr) {
+        entry.note = 'awaiting-landing-ci';
+        record(st, 'wave_awaiting_landing', { runId: entry.runId, pr: openPr });
+        return false;
+      }
+      // No open PR ⇒ the wave's landing step never produced one (older run or
+      // landing refused). Drive the deterministic lander DIRECTLY from the
+      // supervisor tick — zero AI, fail-closed, same tool the wave uses.
+      const canonPath = findWorktreeHoldingBranch(entry.branch);
+      const landCwd = canonPath?.path ?? REPO;
+      // Resolve the run's artifacts dir from archon (probed `working_path`
+      // convention): the run's worktree sibling artifacts dir holds the
+      // pr-number/gate evidence; when unavailable degrade to a derived dir.
+      let artifacts = null;
+      if (entry.runId) {
+        const get = archonJson(`workflow get ${entry.runId} --json`);
+        const wt = get?.working_path ?? get?.path ?? get?.run?.path ?? null;
+        if (wt) artifacts = join(dirname(dirname(wt)), 'artifacts', 'runs', entry.runId);
+      }
+      if (!artifacts) artifacts = join(STATE_DIR, 'wave-landing', entry.runId ?? 'unknown');
+      mkdirSync(artifacts, { recursive: true });
+      const land = sh(
+        `node scripts/automation/package-final-land.mjs --package ${JSON.stringify(entry.packageId)} --branch ${JSON.stringify(entry.branch)} --artifacts-dir ${JSON.stringify(artifacts)}`,
+        { cwd: landCwd, timeout: 45 * 60 * 1000 },
+      );
+      record(st, 'wave_landing_attempted', {
+        runId: entry.runId,
+        cwd: landCwd,
+        exit: land.status,
+        tail: (land.err || land.out || '').split('\n').filter(Boolean).slice(-3).join(' | '),
+      });
+      if (land.status === 0) return false; // merged — next tick's PROVEN path
+      entry.note = 'landing-pending';
+      attemptResume(st, entry, 'wave landing pending (lander exit ' + (land.status ?? '?') + ')');
+      return false;
+    }
     // Workflow reported success without a merged PR — treat as recoverable anomaly.
     entry.note = 'completed-without-merge';
     record(st, 'anomaly_completed_without_merge', entry);

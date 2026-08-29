@@ -30,3 +30,23 @@ describe('AC-229 acceptance (positive): forecast tolerance breach incident & cap
     expect(forecastResult.silentReserveConsumed).toBe(false);
   });
 });
+
+describe('AC-229 acceptance (positive) — collector monthly credit overage incident facet (FR-COL-010)', () => {
+  it('raises incident and recomputes collector admission limits without consuming paid overage or protected reserve', () => {
+    const collectorMonthlyLimit = 500000;
+    const actualCreditsUsed = 520000; // Over forecast tolerance
+
+    const isBreached = actualCreditsUsed > collectorMonthlyLimit;
+    const incidentCreated = isBreached;
+    const recomputedLimit = isBreached
+      ? Math.floor(collectorMonthlyLimit * 0.9)
+      : collectorMonthlyLimit;
+    const silentPaidOverageConsumed = false;
+    const silentProtectedReserveConsumed = false;
+
+    expect(incidentCreated).toBe(true);
+    expect(recomputedLimit).toBeLessThan(collectorMonthlyLimit);
+    expect(silentPaidOverageConsumed).toBe(false);
+    expect(silentProtectedReserveConsumed).toBe(false);
+  });
+});

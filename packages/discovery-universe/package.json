@@ -1,0 +1,18 @@
+{
+  "name": "@foresift/discovery-universe",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./src/index.ts",
+      "default": "./src/index.ts"
+    }
+  },
+  "scripts": {
+    "test": "bun test"
+  },
+  "dependencies": {
+    "@foresift/shared-schemas": "workspace:*"
+  }
+}

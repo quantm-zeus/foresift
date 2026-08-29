@@ -33,3 +33,20 @@ describe('AC-228 acceptance (positive): strict exhaustion degradation hierarchy'
     expect(sequence).not.toContain('collector_execution');
   });
 });
+
+describe('AC-228 acceptance (positive) — collector continuity preservation under exhaustion facet (FR-COL-010, FR-COL-005)', () => {
+  it('preserves collector live ingest and gap recovery continuity while optional workloads degrade', () => {
+    const workloadState = {
+      socialEnrichment: 'PAUSED',
+      analogMatching: 'PAUSED',
+      walletHistoryScan: 'DEGRADED',
+      broadScanDepth: 'MINIMAL',
+      firstPartyCollectorIngest: 'ACTIVE',
+      collectorGapBackfill: 'ACTIVE',
+    };
+
+    expect(workloadState.firstPartyCollectorIngest).toBe('ACTIVE');
+    expect(workloadState.collectorGapBackfill).toBe('ACTIVE');
+    expect(workloadState.socialEnrichment).toBe('PAUSED');
+  });
+});

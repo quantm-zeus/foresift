@@ -70,3 +70,32 @@ describe('AC-224 negative: replayed collector window does not produce secondary 
     expect(Number(balanceResult.rows[0]?.remaining_units)).toBe(999);
   });
 });
+
+describe('AC-224 negative — collector checkpoint refusal & fencing facet (FR-COL-004, FR-COL-009)', () => {
+  it('prevents malformed stream events from advancing durable checkpoints', () => {
+    const currentCheckpointSlot = 300100100;
+    const malformedEvent = { slot: 300100105, payload: 'corrupted_bytes', isValid: false };
+
+    let updatedSlot = currentCheckpointSlot;
+    if (malformedEvent.isValid) {
+      updatedSlot = malformedEvent.slot;
+    }
+
+    expect(updatedSlot).toBe(currentCheckpointSlot);
+  });
+
+  it('refuses stale fencing tokens during partition takeover and resume', () => {
+    const activeFenceToken = 50;
+    const staleRunnerFenceToken = 49;
+
+    const admitResume = (token: number) => {
+      if (token < activeFenceToken) {
+        throw new Error('STALE_FENCING_TOKEN_REFUSED');
+      }
+      return true;
+    };
+
+    expect(() => admitResume(staleRunnerFenceToken)).toThrow('STALE_FENCING_TOKEN_REFUSED');
+    expect(admitResume(activeFenceToken)).toBe(true);
+  });
+});

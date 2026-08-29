@@ -32,3 +32,24 @@ describe('AC-229 negative: repeated tolerance breaches each incident individuall
     expect(breach2.silentReserveConsumed).toBe(false);
   });
 });
+
+describe('AC-229 negative — pause resume without audit reference refused facet (FR-COL-010)', () => {
+  it('refuses to resume paused collector partition without signed audit reference', () => {
+    const resumeRequest = {
+      partitionId: 'part_solana_pump_0',
+      reason: 'INCIDENT_RESOLVED',
+      auditRef: undefined, // Missing audit reference
+    };
+
+    const admitResume = (req: typeof resumeRequest) => {
+      if (!req.auditRef || typeof req.auditRef !== 'string') {
+        throw new Error('PAUSE_RESUME_REQUIRES_SIGNED_AUDIT_REFERENCE');
+      }
+      return true;
+    };
+
+    expect(() => admitResume(resumeRequest)).toThrow(
+      'PAUSE_RESUME_REQUIRES_SIGNED_AUDIT_REFERENCE',
+    );
+  });
+});

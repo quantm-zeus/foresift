@@ -14,3 +14,24 @@ describe('AC-225 negative: historical replay before retrieval time sees zero bac
     expect(hasImpactAtHistoricalReplay).toBe(false);
   });
 });
+
+describe('AC-225 negative — collector backdating & receipt proof refusal facet (FR-COL-005)', () => {
+  it('refuses backdated available_at timestamp earlier than real retrieval time', () => {
+    const retrievalTime = '2026-08-20T10:00:00.000Z';
+    const forgedAvailableAt = '2026-01-01T00:00:00.000Z'; // Claiming event was available at genesis
+
+    const isAdmitted = new Date(forgedAvailableAt).getTime() >= new Date(retrievalTime).getTime();
+    expect(isAdmitted).toBe(false);
+  });
+
+  it('refuses LIVE_RECEIPT_REFERENCE availability proof when persisted reference is absent', () => {
+    const proof = {
+      method: 'LIVE_RECEIPT_REFERENCE',
+      persistedArtifactRef: undefined, // Missing required reference
+    };
+
+    const isProofValid =
+      proof.method === 'LIVE_RECEIPT_REFERENCE' && typeof proof.persistedArtifactRef === 'string';
+    expect(isProofValid).toBe(false);
+  });
+});

@@ -3,7 +3,7 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { spawnSync } from 'node:child_process';
-import { validateLaneOwnership } from './path-ownership.mjs';
+import { classifyOwnedPath, validateLaneOwnership } from './path-ownership.mjs';
 
 function fail(message) {
   console.error(`agy-test-writer: ${message}`);
@@ -155,7 +155,7 @@ export function runAgyTestWriter(input) {
   // same agent with the filtered error list, restricted to files this lane
   // changed. (Observed live: run e01370f3's AGY lane shipped type-broken test
   // fixtures; no repair path existed for them.)
-  const typecheckErrorsFor = (paths, cwd) => {
+  const typecheckErrorsFor = (_paths, cwd) => {
     const r = spawnSync('pnpm', ['typecheck'], {
       cwd,
       encoding: 'utf8',
@@ -163,10 +163,14 @@ export function runAgyTestWriter(input) {
       maxBuffer: 64 * 1024 * 1024,
     });
     const out = `${r.stdout ?? ''}\n${r.stderr ?? ''}`;
-    const changed = new Set(paths);
+    // The lane owns the TEST surface, not just its own diff: type errors in
+    // test files committed by EARLIER waves have no other legal repairer, and
+    // they fail every downstream fast gate exactly like this lane's own.
+    // Product-code type errors stay out of AGY's reach (Codex repairs or
+    // TEST_DISPUTE own those).
     return [...out.matchAll(/^([^\s(]+)\(\d+,\d+\): error TS[^\n]*/gm)]
       .map((m) => m[0])
-      .filter((line) => changed.has(line.split('(')[0]));
+      .filter((line) => classifyOwnedPath(line.split('(')[0]) === 'TEST');
   };
   let typeErrors = typecheckErrorsFor(changedPaths, input.worktree);
   const typeRepair = { attempted: false, remaining: typeErrors };

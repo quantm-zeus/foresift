@@ -10,7 +10,10 @@ interface LatencySpanInput {
   systemAvailableAt: string;
 }
 
-function computeCollectorSpans(input: LatencySpanInput): { eventToReceiptMs: number; receiptToAvailableMs: number } {
+function computeCollectorSpans(input: LatencySpanInput): {
+  eventToReceiptMs: number;
+  receiptToAvailableMs: number;
+} {
   const tEvent = new Date(input.sourceEventAt).getTime();
   const tReceipt = new Date(input.collectorReceiptAt).getTime();
   const tAvailable = new Date(input.systemAvailableAt).getTime();

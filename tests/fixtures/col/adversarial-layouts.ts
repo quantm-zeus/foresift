@@ -13,7 +13,8 @@ export const ADVERSARIAL_PUMP_CORRUPTED_DISCRIMINATOR: AdversarialLayoutFixture 
   protocolFamily: 'PUMP',
   programId: '6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P',
   description: '8-byte Anchor discriminator modified to match unknown struct',
-  rawAccountDataBase64: '/////////////////////wAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=',
+  rawAccountDataBase64:
+    '/////////////////////wAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=',
   expectedFailureReason: 'INVALID_ACCOUNT_DISCRIMINATOR',
   expectedQualityCode: 'SCHEMA_DEGRADED',
 };

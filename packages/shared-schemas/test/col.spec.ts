@@ -5,10 +5,8 @@
 import { describe, expect, it } from 'bun:test';
 import {
   CollectorCeilingSetSchema,
-  CollectorDecodePauseSchema,
   CollectorGapStateSchema,
   CollectorHealthSchema,
-  CollectorIncidentSchema,
   CollectorPartitionStateSchema,
   CollectorScopeDeclarationSchema,
   CollectorStreamRecordSchema,
@@ -89,10 +87,15 @@ describe('Collector schemas (FR-COL-001…011, ADR-0013)', () => {
     });
 
     it('refuses unknown protocol families or capability states', () => {
-      const unknownFamily = { ...PUMP_MANIFEST, protocolFamily: 'UNKNOWN_DEX' };
-      // If protocolFamily is an enum or checked string
       const invalidCapability = { ...PUMP_MANIFEST, capabilityState: 'INVALID_STATE' };
       expect(ProgramSupportManifestSchema.safeParse(invalidCapability).success).toBe(false);
+      // Unknown protocol family likewise refused (PUMP_MANIFEST carries a
+      // known family; any unknown family must fail the enum).
+      const unknownFamilyResult = ProgramSupportManifestSchema.safeParse({
+        ...PUMP_MANIFEST,
+        protocolFamily: 'UNKNOWN_DEX',
+      });
+      expect(unknownFamilyResult.success).toBe(false);
     });
 
     it('refuses unknown upgrade authority state', () => {

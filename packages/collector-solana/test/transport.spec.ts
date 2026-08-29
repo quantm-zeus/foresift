@@ -5,7 +5,9 @@
  */
 import { describe, expect, it } from 'bun:test';
 
-async function validateTransportMessage(msg: unknown): Promise<{ valid: boolean; reason?: string }> {
+async function validateTransportMessage(
+  msg: unknown,
+): Promise<{ valid: boolean; reason?: string }> {
   try {
     const mod = await import('../src/transport.ts');
     return mod.validateTransportMessage(msg);

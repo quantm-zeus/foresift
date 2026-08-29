@@ -3,10 +3,7 @@
  * Asserts batch-oriented processing, bounded workflow messages, finite checks, and expiry.
  */
 import { describe, expect, it } from 'bun:test';
-import {
-  ACTIVE_MONITOR_ROW,
-  EXPIRED_MONITOR_ROW,
-} from '../../../tests/fixtures/disc/index.ts';
+import { ACTIVE_MONITOR_ROW, EXPIRED_MONITOR_ROW } from '../../../tests/fixtures/disc/index.ts';
 
 function partitionCandidatesIntoBatches(candidateIds: string[], maxBatchSize: number): string[][] {
   const batches: string[][] = [];

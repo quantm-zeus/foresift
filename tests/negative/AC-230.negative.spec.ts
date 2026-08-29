@@ -5,17 +5,17 @@
  * substituting generic constant-product formulas or inferring support from symbols.
  */
 import { describe, expect, it } from 'bun:test';
-import {
-  DEGRADED_MANIFEST,
-  PUMP_MANIFEST,
-} from '../fixtures/col/index.ts';
+import { DEGRADED_MANIFEST, PUMP_MANIFEST } from '../fixtures/col/index.ts';
 
 function resolveAdapterStrict(params: {
   programId: string;
   accountLayoutVersion: string;
   idlOrLayoutSha256: string;
 }) {
-  if (params.programId === DEGRADED_MANIFEST.programId && params.idlOrLayoutSha256 === DEGRADED_MANIFEST.idlOrLayoutSha256) {
+  if (
+    params.programId === DEGRADED_MANIFEST.programId &&
+    params.idlOrLayoutSha256 === DEGRADED_MANIFEST.idlOrLayoutSha256
+  ) {
     return { status: 'DEGRADED', reason: 'IDL_OR_LAYOUT_MISMATCH' };
   }
   if (params.programId !== PUMP_MANIFEST.programId) {

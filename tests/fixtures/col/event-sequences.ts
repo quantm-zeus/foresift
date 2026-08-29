@@ -13,7 +13,8 @@ export interface EventSequenceFixture {
 
 export const REORG_EVENT_SEQUENCE: EventSequenceFixture = {
   sequenceId: 'seq_reorg_001',
-  description: 'Two competing blocks at slot 300100200; chain tip reorganizes and emits compensating revision',
+  description:
+    'Two competing blocks at slot 300100200; chain tip reorganizes and emits compensating revision',
   initialRecords: [
     {
       ...STREAM_RECORD_PUMP_BUY,

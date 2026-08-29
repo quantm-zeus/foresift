@@ -47,4 +47,3 @@ describe('AC-225 acceptance (positive) — collector backfill availability times
     expect(isVisibleAtReplay).toBe(false);
   });
 });
-

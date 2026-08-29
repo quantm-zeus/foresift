@@ -5,7 +5,11 @@
  */
 import { describe, expect, it } from 'bun:test';
 
-function assertQuoteParityWithinTolerance(actualOutput: number, expectedQuote: number, maxToleranceFraction: number) {
+function assertQuoteParityWithinTolerance(
+  actualOutput: number,
+  expectedQuote: number,
+  maxToleranceFraction: number,
+) {
   const relativeDiff = Math.abs(actualOutput - expectedQuote) / expectedQuote;
   if (relativeDiff > maxToleranceFraction) {
     throw new Error('PARITY_TOLERANCE_BREACH_FAILS_PROTOCOL_FAMILY');

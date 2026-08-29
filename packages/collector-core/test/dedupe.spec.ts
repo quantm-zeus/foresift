@@ -2,7 +2,10 @@
  * Collector event deduplication & idempotency unit tests (FR-COL-006, FR-COL-009).
  */
 import { describe, expect, it } from 'bun:test';
-import { DUPLICATE_EVENT_SEQUENCE, REORG_EVENT_SEQUENCE } from '../../../tests/fixtures/col/index.ts';
+import {
+  DUPLICATE_EVENT_SEQUENCE,
+  REORG_EVENT_SEQUENCE,
+} from '../../../tests/fixtures/col/index.ts';
 
 describe('Collector Event Deduplication (FR-COL-006, FR-COL-009)', () => {
   it('identifies duplicate events by chain coordinates and normalized hash without emitting duplicate rows', () => {

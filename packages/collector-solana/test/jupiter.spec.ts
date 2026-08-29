@@ -16,9 +16,7 @@ describe('Jupiter Route Observation & Negative Capability (FR-COL-002, §35.7)',
     const routeEvent = {
       inAmount: '1000000000',
       outAmount: '50000000000',
-      routePlan: [
-        { venue: 'RAYDIUM_AMM_V4', percent: 100 },
-      ],
+      routePlan: [{ venue: 'RAYDIUM_AMM_V4', percent: 100 }],
     };
 
     expect(routeEvent.routePlan[0].venue).toBe('RAYDIUM_AMM_V4');

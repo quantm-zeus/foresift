@@ -28,10 +28,13 @@ describe('AC-237 negative: unaffected scope containment & auto-reactivation refu
   });
 
   it('refuses automatic reactivation of degraded scope without signed revalidation proof', () => {
+    // exactOptionalPropertyTypes: absent optional proof is represented by
+    // omitting the property, not by an explicit `undefined` value.
     const degradedScope = {
       status: 'DEGRADED' as const,
-      revalidationProof: undefined, // Missing signed revalidation
     };
+    const scopeWithoutProof: Parameters<typeof reactivateDegradedScope>[0] = degradedScope;
+    void scopeWithoutProof;
 
     expect(() => reactivateDegradedScope(degradedScope)).toThrow(
       'AUTO_REACTIVATION_WITHOUT_SIGNED_REVALIDATION_REFUSED',

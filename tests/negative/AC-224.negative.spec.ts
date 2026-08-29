@@ -99,4 +99,3 @@ describe('AC-224 negative — collector checkpoint refusal & fencing facet (FR-C
     expect(admitResume(activeFenceToken)).toBe(true);
   });
 });
-

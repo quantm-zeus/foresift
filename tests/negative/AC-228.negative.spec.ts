@@ -21,7 +21,9 @@ describe('AC-228 negative — emergency backfill reserve isolation facet (FR-COL
   it('refuses to route broad-scan discovery into EMERGENCY_BACKFILL protected reserve', () => {
     const routeWorkloadToReserve = (workload: string, targetReserve: string) => {
       if (workload === 'BROAD_SCAN' && targetReserve === 'EMERGENCY_BACKFILL') {
-        throw new Error('RESERVE_ELIGIBILITY_VIOLATION_NON_CRITICAL_CANNOT_ACCESS_EMERGENCY_BACKFILL');
+        throw new Error(
+          'RESERVE_ELIGIBILITY_VIOLATION_NON_CRITICAL_CANNOT_ACCESS_EMERGENCY_BACKFILL',
+        );
       }
       return true;
     };
@@ -31,4 +33,3 @@ describe('AC-228 negative — emergency backfill reserve isolation facet (FR-COL
     );
   });
 });
-

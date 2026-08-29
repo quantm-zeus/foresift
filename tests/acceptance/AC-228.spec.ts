@@ -50,4 +50,3 @@ describe('AC-228 acceptance (positive) — collector continuity preservation und
     expect(workloadState.socialEnrichment).toBe('PAUSED');
   });
 });
-

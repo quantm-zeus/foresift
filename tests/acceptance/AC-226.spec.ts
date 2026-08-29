@@ -54,4 +54,3 @@ describe('AC-226 acceptance (positive) — first-seen latency decomposition face
     expect(latencySpans.isFirstPartyVerifiedScope).toBe(true);
   });
 });
-

@@ -12,7 +12,8 @@ function planCheapMonitoringBatches(totalCandidates: number, batchCapacity: numb
   return {
     batchCount,
     schedulerMessagesEmitted,
-    isOrderBatches: schedulerMessagesEmitted === batchCount && schedulerMessagesEmitted < totalCandidates,
+    isOrderBatches:
+      schedulerMessagesEmitted === batchCount && schedulerMessagesEmitted < totalCandidates,
   };
 }
 

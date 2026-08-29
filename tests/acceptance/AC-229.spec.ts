@@ -38,7 +38,9 @@ describe('AC-229 acceptance (positive) — collector monthly credit overage inci
 
     const isBreached = actualCreditsUsed > collectorMonthlyLimit;
     const incidentCreated = isBreached;
-    const recomputedLimit = isBreached ? Math.floor(collectorMonthlyLimit * 0.9) : collectorMonthlyLimit;
+    const recomputedLimit = isBreached
+      ? Math.floor(collectorMonthlyLimit * 0.9)
+      : collectorMonthlyLimit;
     const silentPaidOverageConsumed = false;
     const silentProtectedReserveConsumed = false;
 
@@ -48,4 +50,3 @@ describe('AC-229 acceptance (positive) — collector monthly credit overage inci
     expect(silentProtectedReserveConsumed).toBe(false);
   });
 });
-

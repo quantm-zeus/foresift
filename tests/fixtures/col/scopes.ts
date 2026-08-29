@@ -108,7 +108,12 @@ export const ORCA_WHIRLPOOLS_SCOPE: CollectorScopeDeclaration = {
   programId: 'whirLbMiicVdio4qvUfM5KAg6Ct8VwpYzGff3uctyCc',
   programVersion: '1.0.0',
   accountLayoutVersion: '1.0.0',
-  supportedEventFamilies: ['WHIRLPOOL_INITIALIZE', 'SWAP', 'INCREASE_LIQUIDITY', 'DECREASE_LIQUIDITY'],
+  supportedEventFamilies: [
+    'WHIRLPOOL_INITIALIZE',
+    'SWAP',
+    'INCREASE_LIQUIDITY',
+    'DECREASE_LIQUIDITY',
+  ],
   coverageStartSlot: '250000000',
   coverageStartTime: '2026-01-01T00:00:00Z' as UtcTimestamp,
   finalityPolicy: 'confirmed',

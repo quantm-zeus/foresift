@@ -53,4 +53,3 @@ describe('AC-229 negative — pause resume without audit reference refused facet
     );
   });
 });
-

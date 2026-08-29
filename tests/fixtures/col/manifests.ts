@@ -150,7 +150,12 @@ export const ORCA_WHIRLPOOLS_MANIFEST: ProgramSupportManifestFixture = {
   idlOrLayoutSha256: 'sha256:orca_whirlpools_layout_hash_pinned',
   decoderVersion: '1.0.0',
   poolMathAdapterVersion: '1.0.0',
-  supportedEventFamilies: ['WHIRLPOOL_INITIALIZE', 'SWAP', 'INCREASE_LIQUIDITY', 'DECREASE_LIQUIDITY'],
+  supportedEventFamilies: [
+    'WHIRLPOOL_INITIALIZE',
+    'SWAP',
+    'INCREASE_LIQUIDITY',
+    'DECREASE_LIQUIDITY',
+  ],
   requiredAccountFamilies: ['Whirlpool', 'TickArray', 'Position'],
   officialReferenceUris: ['https://github.com/orca-so/whirlpools'],
   officialReferencesVerifiedAt: '2026-01-01T00:00:00Z',

@@ -105,4 +105,3 @@ describe('AC-224 acceptance (positive) — collector continuity & gap registrati
     expect(canonicalEventKeys.size).toBe(2);
   });
 });
-

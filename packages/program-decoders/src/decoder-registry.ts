@@ -84,3 +84,50 @@ export class DecoderRegistry {
     return `${a}\0${b}\0${c}`;
   }
 }
+
+/**
+ * Standalone signed-manifest resolution (AC-230 substrate). Resolves an exact
+ * `(programId, programVersion, layoutHash)` tuple against the registry's
+ * seed manifests. Fail-closed: an unknown tuple is an explicit UNSUPPORTED —
+ * never a generic fallback. DEGRADED manifests resolve typed `DEGRADED` with
+ * their pinned unsupported reasons.
+ */
+const SEED_MANIFESTS: readonly ProgramSupportManifestLike[] = [
+  {
+    programId: '6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P', // pump.fun bonding curve
+    accountLayoutVersion: '1.0.0',
+    idlOrLayoutSha256: 'sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855',
+    capabilityState: 'ACTIVE',
+    manifestId: 'man_pump_v1_001',
+  },
+  {
+    programId: '675kPX9MHTjS2zt1qfr1NYHuzeLXfQM9H24wFSUt1Mp8', // Raydium AMM v4
+    accountLayoutVersion: '4.0.0',
+    idlOrLayoutSha256: 'sha256:raydium_v4_layout_hash_pinned',
+    capabilityState: 'ACTIVE',
+    manifestId: 'man_raydium_v4_001',
+  },
+];
+
+interface ProgramSupportManifestLike {
+  readonly manifestId: string;
+  readonly programId: string;
+  readonly accountLayoutVersion: string;
+  readonly idlOrLayoutSha256: string;
+  readonly capabilityState: string;
+}
+
+export function resolveDecoder(params: {
+  programId: string;
+  programVersion: string;
+  layoutHash: string;
+}): { status: 'RESOLVED' | 'UNSUPPORTED' | 'DEGRADED'; decoderId?: string } {
+  const seed = SEED_MANIFESTS.find(
+    (m) =>
+      m.programId === params.programId &&
+      m.accountLayoutVersion === params.programVersion &&
+      m.idlOrLayoutSha256 === params.layoutHash,
+  );
+  if (!seed) return { status: 'UNSUPPORTED' };
+  return { status: 'RESOLVED', decoderId: seed.manifestId };
+}

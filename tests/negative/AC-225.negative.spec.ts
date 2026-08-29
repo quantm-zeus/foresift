@@ -30,8 +30,8 @@ describe('AC-225 negative — collector backdating & receipt proof refusal facet
       persistedArtifactRef: undefined, // Missing required reference
     };
 
-    const isProofValid = proof.method === 'LIVE_RECEIPT_REFERENCE' && typeof proof.persistedArtifactRef === 'string';
+    const isProofValid =
+      proof.method === 'LIVE_RECEIPT_REFERENCE' && typeof proof.persistedArtifactRef === 'string';
     expect(isProofValid).toBe(false);
   });
 });
-

@@ -1,11 +1,7 @@
 import type { UtcTimestamp } from '@foresift/domain';
 
 export type CheapMonitorState =
-  | 'NEW'
-  | 'MONITORING_CHEAP'
-  | 'PROMOTED_TO_VERIFY'
-  | 'REJECTED_CHEAP'
-  | 'EXPIRED_CHEAP';
+  'NEW' | 'MONITORING_CHEAP' | 'PROMOTED_TO_VERIFY' | 'REJECTED_CHEAP' | 'EXPIRED_CHEAP';
 
 export interface CheapMonitorRowFixture {
   readonly candidateId: string;
@@ -102,7 +98,10 @@ export const EXPIRED_MONITOR_ROW: CheapMonitorRowFixture = {
 export const MONITOR_BATCH_FIXTURE: MonitorBatchDescriptorFixture = {
   batchId: 'batch_disc_20260820_001',
   batchSize: 50,
-  candidateIds: Array.from({ length: 50 }, (_, i) => `cand_disc_batch_${String(i).padStart(3, '0')}`),
+  candidateIds: Array.from(
+    { length: 50 },
+    (_, i) => `cand_disc_batch_${String(i).padStart(3, '0')}`,
+  ),
   providerId: 'prov_gmgn',
   operationId: 'get_token_security',
   scheduledAt: '2026-08-20T10:10:00.000Z' as UtcTimestamp,

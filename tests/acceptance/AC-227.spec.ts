@@ -59,4 +59,3 @@ describe('AC-227 acceptance (positive) — collector ceilings in 30-day capacity
     expect(isCollectorWithinCeilings).toBe(true);
   });
 });
-

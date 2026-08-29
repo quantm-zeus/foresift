@@ -41,4 +41,3 @@ describe('AC-227 negative — collector counter omission refusal facet (FR-COL-0
     );
   });
 });
-

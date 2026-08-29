@@ -62,6 +62,30 @@ export function validateInboundMessage(
     );
   return v as RawSolanaMessage;
 }
+
+/** Largest wire-message age accepted by the transport security matrix (§35.6). */
+const MAXIMUM_MESSAGE_AGE_MS = 60_000;
+
+/**
+ * Single-argument wire-message security check (FR-COL-009 substrate): a
+ * transport-agnostic verdict over { timestamp, payload, signature? }. Refuses
+ * stale timestamps, non-object payloads, missing signatures, and oversized
+ * payloads without advancing any checkpoint (stateless by construction —
+ * contract-bound validation of full first-party messages is
+ * `validateInboundMessage`'s job).
+ */
+export function validateTransportMessage(msg: unknown): { valid: boolean; reason?: string } {
+  if (typeof msg !== 'object' || msg === null) return { valid: false, reason: 'NOT_AN_OBJECT' };
+  const m = msg as { timestamp?: unknown; payload?: unknown; signature?: unknown };
+  const ts = typeof m.timestamp === 'string' ? Date.parse(m.timestamp) : Number.NaN;
+  if (!Number.isFinite(ts)) return { valid: false, reason: 'INVALID_TIMESTAMP' };
+  if (Date.now() - ts > MAXIMUM_MESSAGE_AGE_MS) return { valid: false, reason: 'STALE_MESSAGE' };
+  if (m.payload === null || typeof m.payload !== 'object')
+    return { valid: false, reason: 'MALFORMED_PAYLOAD' };
+  if (typeof m.signature !== 'string' || m.signature.length === 0)
+    return { valid: false, reason: 'MISSING_SIGNATURE' };
+  return { valid: true };
+}
 export class SolanaTransport implements ReadOnlySubscriptionPort {
   private generation = 0;
   readonly endpoints: readonly CollectorEndpoint[];

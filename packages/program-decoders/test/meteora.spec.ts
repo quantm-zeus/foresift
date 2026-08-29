@@ -2,10 +2,7 @@
  * Meteora DLMM, DAMM v1/v2, DBC decoder vectors unit tests (FR-COL-002).
  */
 import { describe, expect, it } from 'bun:test';
-import {
-  METEORA_DLMM_MANIFEST,
-  METEORA_DBC_MANIFEST,
-} from '../../../tests/fixtures/col/index.ts';
+import { METEORA_DLMM_MANIFEST, METEORA_DBC_MANIFEST } from '../../../tests/fixtures/col/index.ts';
 
 describe('Meteora Protocol Family Decoders (FR-COL-002)', () => {
   it('DLMM manifest specifies LbPair and BinArray account families', () => {

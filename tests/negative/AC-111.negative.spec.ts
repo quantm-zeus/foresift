@@ -21,7 +21,8 @@ describe('AC-111 negative: shared upstream lineage cannot claim independent reca
 
   it('refuses admission of retrospective evidence into historical decision bundles (§63.9)', () => {
     const decisionBundleInputs: string[] = ['feature_snapshot_live', 'quote_adapter_live'];
-    const canInjectRetrospective = !RETROSPECTIVE_SAMPLE_INDEPENDENT_MISSED.excludedFromHistoricalDecisionBundle;
+    const canInjectRetrospective =
+      !RETROSPECTIVE_SAMPLE_INDEPENDENT_MISSED.excludedFromHistoricalDecisionBundle;
 
     expect(canInjectRetrospective).toBe(false);
     expect(decisionBundleInputs).not.toContain('retro_sample_001');

@@ -17,9 +17,9 @@ describe('AC-112 negative: per-candidate message/workflow creation structurally 
     const candidatesCount = 1000;
     const individualMessagesCount = 1000; // 1-to-1 unbatched attempt
 
-    expect(() =>
-      assertBatchSchedulingPolicy(individualMessagesCount, candidatesCount),
-    ).toThrow('STRUCTURAL_REFUSAL_PER_CANDIDATE_SCHEDULING_FORBIDDEN');
+    expect(() => assertBatchSchedulingPolicy(individualMessagesCount, candidatesCount)).toThrow(
+      'STRUCTURAL_REFUSAL_PER_CANDIDATE_SCHEDULING_FORBIDDEN',
+    );
   });
 
   it('permits batch-oriented message count', () => {

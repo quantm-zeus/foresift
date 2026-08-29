@@ -8,7 +8,9 @@ import {
   STREAM_RECORD_RAYDIUM_SWAP,
 } from '../../../tests/fixtures/col/index.ts';
 
-async function processStreamRecord(record: unknown): Promise<{ valid: boolean; normalizedHash?: string }> {
+async function processStreamRecord(
+  record: unknown,
+): Promise<{ valid: boolean; normalizedHash?: string }> {
   try {
     const mod = await import('../src/stream-record.ts');
     return mod.processStreamRecord(record);

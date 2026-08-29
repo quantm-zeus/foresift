@@ -8,7 +8,8 @@ export interface RetrospectiveSampleFixture {
   readonly upstreamLineageSharedWithLive: boolean;
   readonly discoveredByLiveSources: boolean;
   readonly outcomeProfileMet: boolean;
-  readonly expectedClassification: 'NOT_DISCOVERED' | 'DISCOVERED' | 'INELIGIBLE' | 'LINEAGE_DEPENDENT';
+  readonly expectedClassification:
+    'NOT_DISCOVERED' | 'DISCOVERED' | 'INELIGIBLE' | 'LINEAGE_DEPENDENT';
   readonly excludedFromHistoricalDecisionBundle: boolean;
   readonly sampleTimestamp: UtcTimestamp;
 }

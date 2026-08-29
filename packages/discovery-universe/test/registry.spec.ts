@@ -43,6 +43,9 @@ describe('Discovery Universe Registry (FR-DISC-002, FR-DISC-003)', () => {
     // FREE_AGGREGATE availableAt: 10:00:02.000Z
     expect(result.winningSourceId).toBe('col_solana_pump_live');
     expect(result.firstSeenAvailableAt).toBe('2026-08-20T10:00:00.005Z');
-    expect(result.subsequentSources).toEqual(['src_pump_official_webhook', 'src_gmgn_free_aggregate']);
+    expect(result.subsequentSources).toEqual([
+      'src_pump_official_webhook',
+      'src_gmgn_free_aggregate',
+    ]);
   });
 });

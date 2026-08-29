@@ -30,4 +30,3 @@ describe('AC-226 negative — first-party scope labeling restriction facet (FR-C
     expect(isLabelValid).toBe(false);
   });
 });
-

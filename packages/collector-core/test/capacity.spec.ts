@@ -2,9 +2,14 @@
  * Collector capacity ceilings & sustainable capacity contract unit tests (FR-COL-010).
  */
 import { describe, expect, it } from 'bun:test';
-import { VALID_COLLECTOR_CEILINGS, BREACHED_COLLECTOR_CEILINGS } from '../../../tests/fixtures/col/index.ts';
+import {
+  VALID_COLLECTOR_CEILINGS,
+  BREACHED_COLLECTOR_CEILINGS,
+} from '../../../tests/fixtures/col/index.ts';
 
-async function checkCeilings(ceilings: unknown): Promise<{ withinLimits: boolean; violatedDimensions?: string[] }> {
+async function checkCeilings(
+  ceilings: unknown,
+): Promise<{ withinLimits: boolean; violatedDimensions?: string[] }> {
   try {
     const mod = await import('../src/capacity.ts');
     return mod.checkCapacityCeilings(ceilings);

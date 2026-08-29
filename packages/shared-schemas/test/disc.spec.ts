@@ -54,9 +54,15 @@ describe('Discovery schemas (FR-DISC-001…005, ADR-0013)', () => {
 
   describe('DiscoveryUniverseEntrySchema (§63.5)', () => {
     it('accepts valid discovery universe entries', () => {
-      expect(DiscoveryUniverseEntrySchema.safeParse(FIRST_PARTY_DISCOVERY_ENTRY).success).toBe(true);
-      expect(DiscoveryUniverseEntrySchema.safeParse(FREE_AGGREGATE_DISCOVERY_ENTRY).success).toBe(true);
-      expect(DiscoveryUniverseEntrySchema.safeParse(AUTHORIZED_LAUNCH_FEED_ENTRY).success).toBe(true);
+      expect(DiscoveryUniverseEntrySchema.safeParse(FIRST_PARTY_DISCOVERY_ENTRY).success).toBe(
+        true,
+      );
+      expect(DiscoveryUniverseEntrySchema.safeParse(FREE_AGGREGATE_DISCOVERY_ENTRY).success).toBe(
+        true,
+      );
+      expect(DiscoveryUniverseEntrySchema.safeParse(AUTHORIZED_LAUNCH_FEED_ENTRY).success).toBe(
+        true,
+      );
     });
 
     it('refuses entries missing required timestamps or metadata hash', () => {

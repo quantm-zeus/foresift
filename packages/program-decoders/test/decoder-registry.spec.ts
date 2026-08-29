@@ -5,8 +5,6 @@
 import { describe, expect, it } from 'bun:test';
 import {
   PUMP_MANIFEST,
-  RAYDIUM_V4_MANIFEST,
-  DEGRADED_MANIFEST,
 } from '../../../tests/fixtures/col/index.ts';
 
 async function resolveDecoder(params: {
@@ -19,7 +17,10 @@ async function resolveDecoder(params: {
     return mod.resolveDecoder(params);
   } catch {
     // When unimplemented, fallback matches baseline
-    if (params.programId === PUMP_MANIFEST.programId && params.layoutHash === PUMP_MANIFEST.idlOrLayoutSha256) {
+    if (
+      params.programId === PUMP_MANIFEST.programId &&
+      params.layoutHash === PUMP_MANIFEST.idlOrLayoutSha256
+    ) {
       return { status: 'RESOLVED', decoderId: 'decoder_pump_v1' };
     }
     return { status: 'UNSUPPORTED' };

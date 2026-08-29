@@ -3,9 +3,7 @@
  * Resolution strictly by (programId, programVersion, layoutHash) against signed manifests.
  */
 import { describe, expect, it } from 'bun:test';
-import {
-  PUMP_MANIFEST,
-} from '../../../tests/fixtures/col/index.ts';
+import { PUMP_MANIFEST } from '../../../tests/fixtures/col/index.ts';
 
 async function resolveDecoder(params: {
   programId: string;

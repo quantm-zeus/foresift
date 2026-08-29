@@ -35,9 +35,9 @@ describe('g0_disc_* SQL migrations (discovery-universe)', () => {
     const all = await discoverMigrations(MIGRATIONS_DIR);
     const discMigrations = all.filter((m) => m.id.startsWith('g0_disc_'));
     expect(discMigrations.map((m) => m.id)).toEqual([
-      'g0_disc_0001_universe_registry',
+      'g0_disc_0001_universe_entries',
       'g0_disc_0002_cheap_monitor',
-      'g0_disc_0003_promotion_decisions',
+      'g0_disc_0003_promotions',
     ]);
     for (const m of discMigrations) {
       expect(m.checksum.startsWith('sha256:')).toBe(true);

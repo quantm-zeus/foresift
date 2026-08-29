@@ -35,10 +35,10 @@ describe('g0_col_* SQL migrations (collector-gap-recovery)', () => {
     const all = await discoverMigrations(MIGRATIONS_DIR);
     const colMigrations = all.filter((m) => m.id.startsWith('g0_col_'));
     expect(colMigrations.map((m) => m.id)).toEqual([
-      'g0_col_0001_scope_manifests',
-      'g0_col_0002_stream_records',
-      'g0_col_0003_checkpoints_gaps',
-      'g0_col_0004_collector_health_incidents',
+      'g0_col_0001_scopes_partitions',
+      'g0_col_0002_stream_receipts',
+      'g0_col_0003_incidents_decodescope',
+      'g0_col_0004_health_ceiling',
     ]);
   });
 

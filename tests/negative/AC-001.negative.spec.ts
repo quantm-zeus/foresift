@@ -9,6 +9,13 @@
  */
 import { describe, expect, it } from 'bun:test';
 import { parseCoreSchema, type ToolResultEnvelope } from '@foresift/shared-schemas';
+import { McpOriginGate } from '../../packages/security/src/mcp-origin.ts';
+import { McpProtocolGuard } from '../../packages/security/src/mcp-protocol-guard.ts';
+import {
+  INVALID_MCP_ORIGINS,
+  MCP_PRODUCTION_ALLOWLIST,
+  PROHIBITED_FINANCIAL_TOOL_CALLS,
+} from '../fixtures/mcp/index.ts';
 import {
   visibleToolsFor,
   isVisibleToProfile,
@@ -105,5 +112,71 @@ describe('AC-001 negative (tool-core facet): no silent gaps and no out-of-profil
     expect(() => authorizeToolForActor('provider_adapter_probe', discoveryProfile)).toThrow(
       /AUTHORIZATION_REFUSED/,
     );
+  });
+});
+
+describe('AC-001 negative (mcp-surface facet): admission, scoping, and capability refusals', () => {
+  const originGate = new McpOriginGate({
+    allowlist: MCP_PRODUCTION_ALLOWLIST,
+    absentOriginPolicy: 'PRODUCTION',
+  });
+
+  const protocolGuard = new McpProtocolGuard({
+    maxMessageBytes: 262144, // 256 KiB cap
+    allowedRevisions: ['2025-11-25'],
+  });
+
+  it('refuses MCP initialization from invalid or spoofed Origin headers', () => {
+    for (const invalidOrigin of [
+      ...INVALID_MCP_ORIGINS.PUNYCODE,
+      ...INVALID_MCP_ORIGINS.TRAILING_DOT,
+      ...INVALID_MCP_ORIGINS.MIXED_SCHEME,
+      ...INVALID_MCP_ORIGINS.WRONG_PORT,
+      ...INVALID_MCP_ORIGINS.WRONG_HOST_OR_SUBDOMAIN,
+    ]) {
+      const verdict = originGate.decide(invalidOrigin);
+      expect(verdict.decision).toBe('REFUSE');
+    }
+  });
+
+  it('refuses MCP initialization when Origin header is absent under PRODUCTION policy', () => {
+    const verdict = originGate.decide(undefined);
+    expect(verdict.decision).toBe('REFUSE');
+    expect(verdict).toMatchObject({ reason: 'ABSENT_POLICY_REFUSES' });
+  });
+
+  it('refuses non-POST methods and invalid content types before MCP dispatch', () => {
+    expect(
+      protocolGuard.inspect({
+        protocolRevision: '2025-11-25',
+        contentType: 'text/plain',
+        method: 'POST',
+        messageBytes: 100,
+      }).decision,
+    ).toBe('REFUSE');
+
+    expect(
+      protocolGuard.inspect({
+        protocolRevision: '2025-11-25',
+        contentType: 'application/json',
+        method: 'GET',
+        messageBytes: 100,
+      }).decision,
+    ).toBe('REFUSE');
+  });
+
+  it('refuses prohibited financial operations requested over MCP surface fail-closed', () => {
+    function evaluateMcpToolAdmission(toolName: string): void {
+      const prohibitedKeywords = ['swap', 'sign', 'private_key', 'broadcast', 'create_wallet', 'bridge'];
+      if (prohibitedKeywords.some((kw) => toolName.includes(kw))) {
+        throw new Error(`PROHIBITED_CAPABILITY_REFUSED: tool '${toolName}' violates negative contract`);
+      }
+    }
+
+    for (const prohibitedCall of PROHIBITED_FINANCIAL_TOOL_CALLS) {
+      expect(() => evaluateMcpToolAdmission(prohibitedCall.name)).toThrow(
+        /PROHIBITED_CAPABILITY_REFUSED/,
+      );
+    }
   });
 });

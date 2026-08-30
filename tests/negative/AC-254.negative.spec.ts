@@ -33,6 +33,9 @@ describe('AC-254 negative: tampered inventories and policies refuse', () => {
       { name: 'swap', source: 'routes' },
       { name: 'custody', source: 'tools' },
       { name: 'stake', source: 'routes' },
+      { name: 'mcp-sign-transaction', source: 'routes' },
+      { name: 'mcp-execute-swap', source: 'tools' },
+      { name: 'mcp-copy-trade', source: 'tools' },
     ]);
     expect(findings.map((f) => f.reference)).toEqual([
       'routes#submit-transaction',
@@ -40,6 +43,9 @@ describe('AC-254 negative: tampered inventories and policies refuse', () => {
       'routes#swap',
       'tools#custody',
       'routes#stake',
+      'routes#mcp-sign-transaction',
+      'tools#mcp-execute-swap',
+      'tools#mcp-copy-trade',
     ]);
   });
 

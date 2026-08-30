@@ -135,4 +135,45 @@ describe('AC-255 acceptance (tool-core substrate): permitted query fixtures pass
       expect(verdict.ok, actionClass).toBe(true);
     }
   });
+
+  it('permits MCP surface wallet intelligence tools under EXTERNAL_READ', () => {
+    const mcpTools = [
+      {
+        name: 'get_asset_identity',
+        title: 'Get Asset Identity',
+        description: 'Read-only token metadata and mint authority verification',
+      },
+      {
+        name: 'discover_candidates',
+        title: 'Discover Candidates',
+        description: 'Read-only candidate discovery stream from first-party observer',
+      },
+      {
+        name: 'get_candidate_delta',
+        title: 'Get Candidate Delta',
+        description: 'Read-only candidate metrics changes between timestamps',
+      },
+      {
+        name: 'compare_candidates',
+        title: 'Compare Candidates',
+        description: 'Read-only pairwise candidate comparison and thesis scoring',
+      },
+    ];
+
+    for (const tool of mcpTools) {
+      const verdict = screen.screenWithReport(
+        {
+          name: tool.name,
+          title: tool.title,
+          description: tool.description,
+          inputSchemaJson: { type: 'object' },
+          outputSchemaJson: { type: 'object' },
+          actionClass: ActionClass.EXTERNAL_READ,
+          toolVersion: '1.0.0',
+        },
+        now,
+      );
+      expect(verdict.ok, tool.name).toBe(true);
+    }
+  });
 });

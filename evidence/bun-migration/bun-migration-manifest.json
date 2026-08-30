@@ -1,18 +1,18 @@
 {
   "schema": "foresift/bun-migration-manifest@1",
   "migrationId": "bun-test-authority-v1",
-  "generatedAt": "2026-08-30T10:22:22.533Z",
+  "generatedAt": "2026-08-30T10:56:54.464Z",
   "root": ".",
-  "totalTestFiles": 317,
+  "totalTestFiles": 318,
   "counts": {
     "CODEMOD_READY": 0,
     "AGY_REQUIRED": 0,
-    "MIGRATED": 317,
+    "MIGRATED": 318,
     "VERIFIED": 0,
     "BLOCKED": 0
   },
   "parity": {
-    "previousTotal": 315,
+    "previousTotal": 317,
     "disappeared": []
   },
   "files": [
@@ -4667,9 +4667,9 @@
     {
       "path": "tests/automation/runtime-admission.spec.ts",
       "package": "automation",
-      "bytes": 6343,
-      "lines": 139,
-      "sha256": "da5f2ddafe7f4634ee8f5babf9242b9a2ab9a915b164257efa62cd1025d5dcca",
+      "bytes": 6434,
+      "lines": 151,
+      "sha256": "e379c7342c4eec3605cabfb64476b2fbf77aef0d1584f079a22d0511c2b8b770",
       "imports": [
         "bun:test",
         "node:fs",
@@ -5138,6 +5138,21 @@
         "../helpers/git-fixture.js",
         "../../scripts/automation/wave-branch-adoption.mjs"
       ],
+      "state": "MIGRATED"
+    },
+    {
+      "path": "tests/automation/wave-guard-exception.spec.ts",
+      "package": "automation",
+      "bytes": 9679,
+      "lines": 246,
+      "sha256": "d9418935cbe4c514f58099461140e5d1eb8e1e30cd3089e52b538853d4050d4b",
+      "imports": ["bun:test", "node:child_process", "node:fs", "node:os", "node:path", "node:url"],
+      "vitestImports": [],
+      "features": [],
+      "workload": "PROCESS",
+      "migrationType": "ALREADY_MIGRATED",
+      "fixturesAndHelpers": [],
+      "sourceAnchors": [],
       "state": "MIGRATED"
     },
     {

@@ -128,12 +128,16 @@ for (const filePath of resultFiles) {
   const othersPredicted = new Set(
     allLanes.filter((s) => s.id !== sid).flatMap((s) => s.allowedWritePaths ?? []),
   );
+  // Cross-lane exclusion must not fire on graph-recorded scope exceptions:
+  // the central migration registry is a plan-sanctioned duty both sides may
+  // write (mirrors wave-guard.mjs; live self-collision runs 831d0819/99e8e23b).
   const violations = diffNames.out
     .split('\n')
     .filter(Boolean)
     .filter(
       (p) =>
-        (!allowed.some((re) => re.test(p)) && !scopeExceptions.has(p)) || othersPredicted.has(p),
+        (!allowed.some((re) => re.test(p)) && !scopeExceptions.has(p)) ||
+        (othersPredicted.has(p) && !scopeExceptions.has(p)),
     );
   if (violations.length > 0) {
     report.rejected.push({

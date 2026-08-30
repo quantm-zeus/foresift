@@ -81,13 +81,23 @@ const allowed = [
   ...(graph.package.writeScopes ?? []).map(globToRegExp),
 ];
 // Cross-lane ownership: files PREDICTED by another active shard may not be
-// touched by this lane even though they sit inside package scopes.
+// touched by this lane even though they sit inside package scopes — EXCEPT
+// graph-recorded scope exceptions. An exception (e.g. the central migration
+// registry `packages/persistence/test/migrator.spec.ts`) is a plan-sanctioned
+// duty that BOTH sides may legitimately carry: T003-class implementation units
+// name the central suite in their recorded exceptions while the test lane owns
+// it as testWrites. Excluding exceptions here caused a deterministic
+// self-collision observed live (runs 831d0819/99e8e23b, 2026-08-30): the plan
+// handed the file to the test lane, then the guard rejected the same lane for
+// touching it — every restart of that package failed identically.
 const othersPredicted = new Set(
   allLanes.filter((s) => s.id !== args.shard).flatMap((s) => s.allowedWritePaths ?? []),
 );
 const exceptions = new Set(graph.scopeExceptions ?? []);
 const violations = changed.filter(
-  (p) => (!allowed.some((re) => re.test(p)) && !exceptions.has(p)) || othersPredicted.has(p),
+  (p) =>
+    (!allowed.some((re) => re.test(p)) && !exceptions.has(p)) ||
+    (othersPredicted.has(p) && !exceptions.has(p)),
 );
 const ownership = shard.role
   ? validateLaneOwnership({ engine: shard.engine, role: shard.role, changedPaths: changed })

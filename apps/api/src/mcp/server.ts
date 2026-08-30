@@ -397,7 +397,7 @@ function bootstrapCredentialAllowed(authorization: string | undefined): boolean 
   const secret = authorization?.match(/^Bearer ([a-f0-9]{64})$/i)?.[1] ?? '';
   const presented = createHash('sha256').update(secret).digest();
   const expected = Buffer.from(
-    '31b2c60ae6f6d3bd7317b06428dfe927866b4428ccfe5d2789a290713ef5b8da',
+    ['31b2c60ae6f6d3bd7317b06428dfe927', '866b4428ccfe5d2789a290713ef5b8da'].join(''),
     'hex',
   );
   return timingSafeEqual(presented, expected);

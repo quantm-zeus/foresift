@@ -1,14 +1,14 @@
 {
   "schema": "foresift/bun-migration-manifest@1",
   "migrationId": "bun-test-authority-v1",
-  "generatedAt": "2026-08-30T15:17:21.871Z",
+  "generatedAt": "2026-08-30T15:17:27.383Z",
   "root": ".",
   "totalTestFiles": 319,
   "counts": {
     "CODEMOD_READY": 0,
     "AGY_REQUIRED": 0,
-    "MIGRATED": 309,
-    "VERIFIED": 10,
+    "MIGRATED": 308,
+    "VERIFIED": 11,
     "BLOCKED": 0
   },
   "parity": {
@@ -360,7 +360,7 @@
         "@electric-sql/pglite",
         "@foresift/persistence"
       ],
-      "state": "MIGRATED"
+      "state": "VERIFIED"
     },
     {
       "path": "packages/collector-core/test/scope.spec.ts",
@@ -8350,7 +8350,8 @@
       },
       "codexCalls": 0,
       "claudeCalls": 0,
-      "testedHead": "59caf06a360cdcf9cfb99ec66b8a3686baba62a6"
+      "testedHead": "59caf06a360cdcf9cfb99ec66b8a3686baba62a6",
+      "checkpointHead": "188c1a602123db6df11b31dbe3199ef64a0a4986"
     },
     {
       "id": "verify-existing--foresift-collector-core-database-pglite-1",
@@ -8359,7 +8360,55 @@
       "files": [
         "packages/collector-core/test/migrations.spec.ts"
       ],
-      "state": "PENDING"
+      "state": "VERIFIED",
+      "verification": {
+        "ok": true,
+        "wallTimeMs": 5362,
+        "peakRssBytes": 0,
+        "cpuSeconds": 0,
+        "counts": {
+          "passed": 2,
+          "failed": 0,
+          "skipped": 0
+        },
+        "results": [
+          {
+            "id": "pglite-1",
+            "workload": "DATABASE_PGLITE",
+            "files": [
+              "packages/collector-core/test/migrations.spec.ts"
+            ],
+            "fileWorkers": 1,
+            "testConcurrency": 1,
+            "command": [
+              "bun",
+              "test",
+              "--no-orphans",
+              "--isolate",
+              "--parallel=1",
+              "--max-concurrency=1",
+              "--timeout=30000",
+              "packages/collector-core/test/migrations.spec.ts"
+            ],
+            "status": 0,
+            "signal": null,
+            "timedOut": false,
+            "wallTimeMs": 5361,
+            "peakRssBytes": null,
+            "cpuSeconds": null,
+            "counts": {
+              "passed": 2,
+              "failed": 0,
+              "skipped": 0
+            },
+            "stdoutTail": "bun test v1.4.0 (34cbb9a40) 1x PARALLEL\n",
+            "stderrTail": "\n 2 pass\n 0 fail\n 11 expect() calls\nRan 2 tests across 1 file. [5.21s]\n"
+          }
+        ]
+      },
+      "codexCalls": 0,
+      "claudeCalls": 0,
+      "testedHead": "188c1a602123db6df11b31dbe3199ef64a0a4986"
     },
     {
       "id": "verify-existing--foresift-collector-core-pure-1",

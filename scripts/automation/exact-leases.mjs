@@ -94,11 +94,18 @@ export function normalizeExactFiles(input, { scopeFallback = [] } = {}) {
  * files. Returns { ok, granted, conflicts } — ok:false leaves state untouched.
  * Shared-surface files always lease as one whole file (single holder max).
  */
-export function acquireLeases(stateDir, holder, exactFiles, { baseSha = null, scopeFallback = [] } = {}) {
+export function acquireLeases(
+  stateDir,
+  holder,
+  exactFiles,
+  { baseSha = null, scopeFallback = [] } = {},
+) {
   invariant(holder && typeof holder === 'string', 'INVALID_LEASE_HOLDER');
   const files = normalizeExactFiles(exactFiles, { scopeFallback });
   const doc = loadLeases(stateDir);
-  const active = doc.leases.filter((l) => [LEASE_STATES.RESERVED, LEASE_STATES.LEASED].includes(l.state));
+  const active = doc.leases.filter((l) =>
+    [LEASE_STATES.RESERVED, LEASE_STATES.LEASED].includes(l.state),
+  );
   const conflicts = [];
   for (const file of files) {
     const holderLease = active.find((l) => l.file === file && l.holder === holder);
@@ -145,10 +152,17 @@ export function acquireLeases(stateDir, holder, exactFiles, { baseSha = null, sc
 }
 
 /** Mark leases RESERVED (prewarming: prepared but no writer permit yet). */
-export function reserveLeases(stateDir, holder, exactFiles, { baseSha = null, scopeFallback = [] } = {}) {
+export function reserveLeases(
+  stateDir,
+  holder,
+  exactFiles,
+  { baseSha = null, scopeFallback = [] } = {},
+) {
   const files = normalizeExactFiles(exactFiles, { scopeFallback });
   const doc = loadLeases(stateDir);
-  const active = doc.leases.filter((l) => [LEASE_STATES.RESERVED, LEASE_STATES.LEASED].includes(l.state));
+  const active = doc.leases.filter((l) =>
+    [LEASE_STATES.RESERVED, LEASE_STATES.LEASED].includes(l.state),
+  );
   const conflicts = [];
   for (const file of files) {
     for (const l of active) {

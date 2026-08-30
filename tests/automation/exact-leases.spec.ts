@@ -18,7 +18,7 @@ import {
   SHARED_SURFACE_FILES,
 } from '../../scripts/automation/exact-leases.mjs';
 
-let stateDir;
+let stateDir: string;
 
 beforeEach(() => {
   stateDir = mkdtempSync(join(tmpdir(), 'exact-leases-'));
@@ -85,9 +85,7 @@ describe('Exact-file lease manager (§73)', () => {
 
   test('leases persist across a simulated supervisor restart (durable state)', () => {
     acquireLeases(stateDir, 'pkgA', ['packages/shared-schemas/src/a.ts']);
-    const raw = JSON.parse(
-      readFileSync(join(stateDir, 'exact-leases', 'leases.json'), 'utf8'),
-    );
+    const raw = JSON.parse(readFileSync(join(stateDir, 'exact-leases', 'leases.json'), 'utf8'));
     expect(raw.schema).toBe('foresift/exact-lease@1');
     // a fresh module instance (new process semantics) reads the same file
     expect(activeLeases(stateDir).map((l) => l.holder)).toContain('pkgA');

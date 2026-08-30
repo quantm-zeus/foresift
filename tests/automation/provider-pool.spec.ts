@@ -13,7 +13,7 @@ import {
   CODEX_QUOTA_STATES,
 } from '../../scripts/automation/provider-pool.mjs';
 
-let stateDir;
+let stateDir: string;
 
 beforeEach(() => {
   stateDir = mkdtempSync(join(tmpdir(), 'provider-pools-'));
@@ -59,15 +59,15 @@ describe('Claude AIMD governor (§15/§16/§67)', () => {
     });
     expect(ra.backoffUntil).toBe(1_000_000 + 120_000);
     // hammer pressure down to the floor
-    let r;
+    let r: { limit: number; active: number; backoffUntil: number } | undefined;
     for (let i = 0; i < 4; i++) r = observeClaudeOutcome(stateDir, { healthy: false });
-    expect(r.limit).toBe(1);
+    expect(r!.limit).toBe(1);
   });
 
   test('never exceeds burstTarget on sustained health', () => {
-    let r;
+    let r: { limit: number; active: number; backoffUntil: number } | undefined;
     for (let i = 0; i < 30; i++) r = observeClaudeOutcome(stateDir, { healthy: true });
-    expect(r.limit).toBeLessThanOrEqual(8);
+    expect(r!.limit).toBeLessThanOrEqual(8);
   });
 });
 

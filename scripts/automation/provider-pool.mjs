@@ -85,7 +85,7 @@ function savePools(stateDir, pools) {
   renameSync(tmp, file);
 }
 
-function currentLimitField(provider) {
+function currentLimitField() {
   // All pools carry their effective limit in `limit`; the field indirection
   // keeps the door open for per-provider field names without a function map.
   return 'limit';
@@ -120,7 +120,7 @@ export function acquirePermit(stateDir, provider, { now = Date.now() } = {}) {
   return { ok: true, waitMs: 0 };
 }
 
-export function releasePermit(stateDir, provider, { now = Date.now() } = {}) {
+export function releasePermit(stateDir, provider) {
   invariant(['claude', 'codex', 'agy'].includes(provider), 'UNKNOWN_PROVIDER', provider);
   const pools = loadPools(stateDir);
   const pool = pools[provider];
@@ -170,10 +170,7 @@ export function observeClaudeOutcome(
  * Unknown failures map to UNKNOWN (probe before trusting). Quota exhaustion
  * is NEVER a package failure — callers reroute or wait.
  */
-export function observeCodexOutcome(
-  stateDir,
-  { event, resetAt = null, now = Date.now() } = {},
-) {
+export function observeCodexOutcome(stateDir, { event, resetAt = null, now = Date.now() } = {}) {
   const pools = loadPools(stateDir);
   const pool = pools.codex;
   const prev = pool.quotaState;
@@ -224,7 +221,8 @@ export function providerAdmissionView(stateDir, { now = Date.now() } = {}) {
     view[provider] = {
       limit: pool[currentLimitField()],
       active: pool.active,
-      state: provider === 'codex' ? pool.quotaState : (pool.backoffUntil ?? 0) > now ? 'BACKOFF' : 'OK',
+      state:
+        provider === 'codex' ? pool.quotaState : (pool.backoffUntil ?? 0) > now ? 'BACKOFF' : 'OK',
       blocked,
     };
   }

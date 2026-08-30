@@ -336,9 +336,10 @@ describe('nextPollDelayMs (V3-B §18 adaptive handoff)', () => {
       fastStreak: HANDOFF_FAST_STREAK_MAX,
     });
     // No active work and no ready work: saturated streak reverts to base…
-    expect(
-      nextPollDelayMs({ launched: 0, awaitingDiscovery: false, fastStreak: 999 }),
-    ).toEqual({ delayMs: POLL_INTERVAL_MS, fastStreak: 0 });
+    expect(nextPollDelayMs({ launched: 0, awaitingDiscovery: false, fastStreak: 999 })).toEqual({
+      delayMs: POLL_INTERVAL_MS,
+      fastStreak: 0,
+    });
     // …but a non-empty ready queue keeps the fast rate even with nothing in flight.
     expect(
       nextPollDelayMs({

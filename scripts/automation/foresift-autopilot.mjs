@@ -162,7 +162,8 @@ export function nextPollDelayMs({
   activeWork = false,
   readyWork = false,
 } = {}) {
-  const wantFast = launched > 0 || Boolean(awaitingDiscovery) || Boolean(activeWork) || Boolean(readyWork);
+  const wantFast =
+    launched > 0 || Boolean(awaitingDiscovery) || Boolean(activeWork) || Boolean(readyWork);
   if (!wantFast) return { delayMs: POLL_INTERVAL_MS, fastStreak: 0 };
   if (fastStreak >= HANDOFF_FAST_STREAK_MAX) {
     // Bound reached: hold the fast rate while work remains ACTIVE/ready (a
@@ -3376,11 +3377,11 @@ async function main() {
           const ms = loadCurrentMilestone(REPO);
           readyWork = Boolean(
             ms &&
-              ms.packages.some(
-                (p) =>
-                  (p.status ?? 'PENDING') === 'PENDING' &&
-                  (p.dependencies ?? []).every((d) => findPackage(ms, d)?.status === 'PROVEN'),
-              ),
+            ms.packages.some(
+              (p) =>
+                (p.status ?? 'PENDING') === 'PENDING' &&
+                (p.dependencies ?? []).every((d) => findPackage(ms, d)?.status === 'PROVEN'),
+            ),
           );
         } catch {
           readyWork = false;

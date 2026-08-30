@@ -1,14 +1,14 @@
 {
   "schema": "foresift/bun-migration-manifest@1",
   "migrationId": "bun-test-authority-v1",
-  "generatedAt": "2026-08-30T15:17:16.717Z",
+  "generatedAt": "2026-08-30T15:17:21.644Z",
   "root": ".",
   "totalTestFiles": 319,
   "counts": {
     "CODEMOD_READY": 0,
     "AGY_REQUIRED": 0,
-    "MIGRATED": 312,
-    "VERIFIED": 7,
+    "MIGRATED": 311,
+    "VERIFIED": 8,
     "BLOCKED": 0
   },
   "parity": {
@@ -218,7 +218,7 @@
         "@electric-sql/pglite",
         "@foresift/persistence"
       ],
-      "state": "MIGRATED"
+      "state": "VERIFIED"
     },
     {
       "path": "packages/collector-checkpoints/test/watermarks.spec.ts",
@@ -8231,7 +8231,8 @@
       },
       "codexCalls": 0,
       "claudeCalls": 0,
-      "testedHead": "fa657ec72683f6e92df796a925c5943509b0cbb2"
+      "testedHead": "fa657ec72683f6e92df796a925c5943509b0cbb2",
+      "checkpointHead": "f931e48c8739ac7383d57498f6d63313dfa4484a"
     },
     {
       "id": "verify-existing--foresift-collector-checkpoints-database-pglite-1",
@@ -8240,7 +8241,55 @@
       "files": [
         "packages/collector-checkpoints/test/migrations.spec.ts"
       ],
-      "state": "PENDING"
+      "state": "VERIFIED",
+      "verification": {
+        "ok": true,
+        "wallTimeMs": 4803,
+        "peakRssBytes": 0,
+        "cpuSeconds": 0,
+        "counts": {
+          "passed": 2,
+          "failed": 0,
+          "skipped": 0
+        },
+        "results": [
+          {
+            "id": "pglite-1",
+            "workload": "DATABASE_PGLITE",
+            "files": [
+              "packages/collector-checkpoints/test/migrations.spec.ts"
+            ],
+            "fileWorkers": 1,
+            "testConcurrency": 1,
+            "command": [
+              "bun",
+              "test",
+              "--no-orphans",
+              "--isolate",
+              "--parallel=1",
+              "--max-concurrency=1",
+              "--timeout=30000",
+              "packages/collector-checkpoints/test/migrations.spec.ts"
+            ],
+            "status": 0,
+            "signal": null,
+            "timedOut": false,
+            "wallTimeMs": 4803,
+            "peakRssBytes": null,
+            "cpuSeconds": null,
+            "counts": {
+              "passed": 2,
+              "failed": 0,
+              "skipped": 0
+            },
+            "stdoutTail": "bun test v1.4.0 (34cbb9a40) 1x PARALLEL\n",
+            "stderrTail": "\n 2 pass\n 0 fail\n 2 expect() calls\nRan 2 tests across 1 file. [4.62s]\n"
+          }
+        ]
+      },
+      "codexCalls": 0,
+      "claudeCalls": 0,
+      "testedHead": "f931e48c8739ac7383d57498f6d63313dfa4484a"
     },
     {
       "id": "verify-existing--foresift-collector-checkpoints-pure-1",

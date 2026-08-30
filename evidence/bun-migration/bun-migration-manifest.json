@@ -1,14 +1,14 @@
 {
   "schema": "foresift/bun-migration-manifest@1",
   "migrationId": "bun-test-authority-v1",
-  "generatedAt": "2026-08-30T15:17:54.814Z",
+  "generatedAt": "2026-08-30T15:17:55.007Z",
   "root": ".",
   "totalTestFiles": 319,
   "counts": {
     "CODEMOD_READY": 0,
     "AGY_REQUIRED": 0,
-    "MIGRATED": 283,
-    "VERIFIED": 36,
+    "MIGRATED": 280,
+    "VERIFIED": 39,
     "BLOCKED": 0
   },
   "parity": {
@@ -836,7 +836,7 @@
       "sourceAnchors": [
         "../../../tests/fixtures/disc/index.ts"
       ],
-      "state": "MIGRATED"
+      "state": "VERIFIED"
     },
     {
       "path": "packages/discovery-universe/test/registry.spec.ts",
@@ -858,7 +858,7 @@
       "sourceAnchors": [
         "../../../tests/fixtures/disc/index.ts"
       ],
-      "state": "MIGRATED"
+      "state": "VERIFIED"
     },
     {
       "path": "packages/discovery-universe/test/retrospective.spec.ts",
@@ -880,7 +880,7 @@
       "sourceAnchors": [
         "../../../tests/fixtures/disc/index.ts"
       ],
-      "state": "MIGRATED"
+      "state": "VERIFIED"
     },
     {
       "path": "packages/domain/test/address-chain.spec.ts",
@@ -8923,7 +8923,8 @@
       },
       "codexCalls": 0,
       "claudeCalls": 0,
-      "testedHead": "a5e70aee0fcf1c5d3ddcba5d12a907a0010cdcd5"
+      "testedHead": "a5e70aee0fcf1c5d3ddcba5d12a907a0010cdcd5",
+      "checkpointHead": "8694eec2e26625485741e2d4e18a50aaae77f852"
     },
     {
       "id": "verify-existing--foresift-discovery-universe-pure-1",
@@ -8934,7 +8935,59 @@
         "packages/discovery-universe/test/registry.spec.ts",
         "packages/discovery-universe/test/retrospective.spec.ts"
       ],
-      "state": "PENDING"
+      "state": "VERIFIED",
+      "verification": {
+        "ok": true,
+        "wallTimeMs": 77,
+        "peakRssBytes": 0,
+        "cpuSeconds": 0,
+        "counts": {
+          "passed": 6,
+          "failed": 0,
+          "skipped": 0
+        },
+        "results": [
+          {
+            "id": "pure-1",
+            "workload": "PURE",
+            "files": [
+              "packages/discovery-universe/test/populations.spec.ts",
+              "packages/discovery-universe/test/registry.spec.ts",
+              "packages/discovery-universe/test/retrospective.spec.ts"
+            ],
+            "fileWorkers": 2,
+            "testConcurrency": 8,
+            "command": [
+              "bun",
+              "test",
+              "--no-orphans",
+              "--isolate",
+              "--parallel=2",
+              "--max-concurrency=8",
+              "--timeout=30000",
+              "packages/discovery-universe/test/populations.spec.ts",
+              "packages/discovery-universe/test/registry.spec.ts",
+              "packages/discovery-universe/test/retrospective.spec.ts"
+            ],
+            "status": 0,
+            "signal": null,
+            "timedOut": false,
+            "wallTimeMs": 77,
+            "peakRssBytes": null,
+            "cpuSeconds": null,
+            "counts": {
+              "passed": 6,
+              "failed": 0,
+              "skipped": 0
+            },
+            "stdoutTail": "bun test v1.4.0 (34cbb9a40) 2x PARALLEL\n",
+            "stderrTail": "\n 6 pass\n 0 fail\n 13 expect() calls\nRan 6 tests across 3 files. [58.00ms]\n"
+          }
+        ]
+      },
+      "codexCalls": 0,
+      "claudeCalls": 0,
+      "testedHead": "8694eec2e26625485741e2d4e18a50aaae77f852"
     },
     {
       "id": "verify-existing--foresift-domain-pure-1",

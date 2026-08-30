@@ -403,3 +403,17 @@ export function releaseLanePermit(stateDir, holder, provider) {
     return { released: 1, active: r.active };
   });
 }
+
+/**
+ * Canonical pool state dir for writer-side lane permits (H2 §2). Writers run
+ * as independent lane processes outside the supervisor, so they must land on
+ * the SAME durable pools file the supervisor's admission gate mutates.
+ * FORESIFT_PROVIDER_POOL_STATE_DIR > FORESIFT_AUTOPILOT_STATE_DIR > XDG default.
+ */
+export function resolvePoolStateDir(env = process.env) {
+  return (
+    env.FORESIFT_PROVIDER_POOL_STATE_DIR ??
+    env.FORESIFT_AUTOPILOT_STATE_DIR ??
+    join(env.HOME ?? '', '.local', 'state', 'foresift')
+  );
+}

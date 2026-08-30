@@ -6,6 +6,12 @@ import { join } from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { buildCodexExecArgs, CODEX_SERVICE_TIER } from './codex-routing.mjs';
 import { validateLaneOwnership } from './path-ownership.mjs';
+import {
+  acquireLanePermit,
+  releaseLanePermit,
+  observeCodexOutcome,
+  resolvePoolStateDir,
+} from './provider-pool.mjs';
 
 function fail(message, code = 1) {
   console.error(`codex-writer: ${message}`);
@@ -42,9 +48,34 @@ export function classifyCodexExit(result) {
   return 'SEMANTIC_OR_PROVIDER_FAILURE';
 }
 
+/**
+ * Engine-specific provider attribution (H2 §5/§6): map the lane outcome onto
+ * the CODEX pool ONLY — never onto Claude (a Codex 429 must not throttle
+ * Claude lanes). `exhausted` with a sane reset time latches RESET_WAIT so the
+ * scheduler can reroute compatible lanes to Claude; generic transient failure
+ * maps to UNKNOWN (probe before trusting).
+ */
+export function codexProviderEvent(classification, detail) {
+  if (classification === 'SUCCESS') return { event: 'healthy' };
+  const text = detail ?? '';
+  const resetMatch = /resets? (?:at|in)[^.\n]{0,80}?(\d{10,13})/.exec(text);
+  if (resetMatch) {
+    const resetAt = Number(resetMatch[1]);
+    return { event: 'exhausted', resetAt: resetAt < 1e12 ? resetAt * 1000 : resetAt };
+  }
+  if (/usage.?limit|quota|exhaust/i.test(text)) return { event: 'exhausted' };
+  if (/429|rate.?limit|503|overloaded/i.test(text)) return { event: 'near_limit' };
+  return { event: 'unknown' };
+}
+
 export function runCodexWriter(input) {
   for (const field of ['lane', 'brief', 'worktree', 'routing', 'results-dir'])
     if (!input[field]) throw new Error(`CODEX_WRITER_ARGUMENT_MISSING: ${field}`);
+  // Lane-permit identity (H2 §2): ONE Codex process = ONE permit, keyed to
+  // packageId:generation:laneId. Missing identity fails closed — an
+  // unattributable writer may not consume a provider permit.
+  if (!input.package || !input.generation)
+    throw new Error('CODEX_WRITER_ARGUMENT_MISSING: package/generation');
   const routing = JSON.parse(readFileSync(input.routing, 'utf8'));
   const route = codexRouteForLane(routing, input.lane);
   const brief = readFileSync(input.brief, 'utf8');
@@ -63,14 +94,40 @@ export function runCodexWriter(input) {
   ].join('\n');
   const command = buildCodexExecArgs(route, { worktree: input.worktree });
   const started = Date.now();
-  const run = spawnSync(command[0], command.slice(1), {
-    cwd: input.worktree,
-    input: `${prompt}\n`,
-    encoding: 'utf8',
-    timeout: Number(input['timeout-ms'] ?? 45 * 60_000),
-    maxBuffer: 64 * 1024 * 1024,
-  });
+  const stateDir = resolvePoolStateDir();
+  const holder = `${input.package}:${input.generation}:${input.lane}`;
+  // Acquire immediately BEFORE the provider invocation (H2 §2). On refusal
+  // the provider is NOT dispatched; the refusal is recorded verbatim.
+  const permit = acquireLanePermit(stateDir, holder, 'codex');
+  if (!permit.ok) {
+    writeFileSync(
+      join(resultDir, 'permit-denied.json'),
+      `${JSON.stringify({ schema: 'foresift/lane-permit-denial@1', holder, provider: 'codex', reason: permit.reason, waitMs: permit.waitMs }, null, 2)}\n`,
+    );
+    throw new Error(`CODEX_WRITER_PERMIT_DENIED: ${permit.reason}`);
+  }
+  let run;
+  try {
+    run = spawnSync(command[0], command.slice(1), {
+      cwd: input.worktree,
+      input: `${prompt}\n`,
+      encoding: 'utf8',
+      timeout: Number(input['timeout-ms'] ?? 45 * 60_000),
+      maxBuffer: 64 * 1024 * 1024,
+    });
+  } finally {
+    // Finally-equivalent release immediately AFTER lane termination (H2 §2).
+    releaseLanePermit(stateDir, holder, 'codex');
+  }
   const classification = classifyCodexExit(run);
+  // Engine-specific attribution (H2 §5/§6): healthy outcomes feed the Codex
+  // quota machine; failures feed ONLY the Codex pool. Claude is untouched.
+  try {
+    const event = codexProviderEvent(classification, `${run?.stderr ?? ''}\n${run?.stdout ?? ''}`);
+    observeCodexOutcome(stateDir, event);
+  } catch {
+    /* attribution is best-effort telemetry; never mask the lane verdict */
+  }
   writeFileSync(join(resultDir, 'codex-run.jsonl'), run.stdout ?? '');
   writeFileSync(
     join(resultDir, 'telemetry.json'),

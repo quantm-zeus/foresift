@@ -41,3 +41,4 @@ export declare function releaseLanePermit(
   holder: string,
   provider: 'claude' | 'codex' | 'agy',
 ): { released: 0 | 1; active: number | undefined };
+export declare function resolvePoolStateDir(env?: Record<string, string | undefined>): string;

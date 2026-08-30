@@ -190,7 +190,9 @@ nodes:
         --brief "$ARTIFACTS_DIR/briefs/core-brief.md" \
         --worktree "$ARTIFACTS_DIR/wt/core" \
         --routing "$ARTIFACTS_DIR/routing.json" \
-        --results-dir "$ARTIFACTS_DIR/writer-results/core"
+        --results-dir "$ARTIFACTS_DIR/writer-results/core" \
+        --package "${ARGUMENTS%%@g*}" \
+        --generation "$(case "$ARGUMENTS" in *@g*) echo "${ARGUMENTS##*@g}";; *) echo 0;; esac)"
   - id: writer-shard-1
     depends_on: [brief-shard-1, exec-shard-1]
     when: "$exec-shard-1.output == 'CODEX'"
@@ -201,7 +203,9 @@ nodes:
         --brief "$ARTIFACTS_DIR/briefs/shard-1-brief.md" \
         --worktree "$ARTIFACTS_DIR/wt/shard-1" \
         --routing "$ARTIFACTS_DIR/routing.json" \
-        --results-dir "$ARTIFACTS_DIR/writer-results/shard-1"
+        --results-dir "$ARTIFACTS_DIR/writer-results/shard-1" \
+        --package "${ARGUMENTS%%@g*}" \
+        --generation "$(case "$ARGUMENTS" in *@g*) echo "${ARGUMENTS##*@g}";; *) echo 0;; esac)"
   - id: writer-shard-2
     depends_on: [brief-shard-2, exec-shard-2]
     when: "$exec-shard-2.output == 'CODEX'"
@@ -212,7 +216,9 @@ nodes:
         --brief "$ARTIFACTS_DIR/briefs/shard-2-brief.md" \
         --worktree "$ARTIFACTS_DIR/wt/shard-2" \
         --routing "$ARTIFACTS_DIR/routing.json" \
-        --results-dir "$ARTIFACTS_DIR/writer-results/shard-2"
+        --results-dir "$ARTIFACTS_DIR/writer-results/shard-2" \
+        --package "${ARGUMENTS%%@g*}" \
+        --generation "$(case "$ARGUMENTS" in *@g*) echo "${ARGUMENTS##*@g}";; *) echo 0;; esac)"
 
   - id: writer-core-claude
     depends_on: [brief-core, exec-core]
@@ -261,7 +267,9 @@ nodes:
         --worktree "$ARTIFACTS_DIR/wt/test-author" \
         --routing "$ARTIFACTS_DIR/routing.json" \
         --results-dir "$ARTIFACTS_DIR/writer-results/test-author" \
-        --task-ids "$TASKS"
+        --task-ids "$TASKS" \
+        --package "${ARGUMENTS%%@g*}" \
+        --generation "$(case "$ARGUMENTS" in *@g*) echo "${ARGUMENTS##*@g}";; *) echo 0;; esac)"
 
   # ── GUARDS: deterministic write-authority enforcement (override §9) ──────────
   # One guard per lane; each recomputes the actual diff against the pinned base
@@ -424,8 +432,25 @@ nodes:
             on_error: all
           effort: high
           idle_timeout: 1800000
+        # HYBRID_AGY waves route implementation lanes to CODEX (classifyCodexLane),
+        # so their engine-specific repairer is the same Codex tool. Without this
+        # node the loop_group had NO eligible repair lane under HYBRID_AGY: both
+        # siblings were when-skipped, recheck never ran, and the loop exhausted
+        # deterministically in milliseconds (runs 5579a4c7/165799b9, 2026-08-30).
+        - id: fast-repair-hybrid
+          when: "$profile.output == 'HYBRID_AGY'"
+          retry:
+            max_attempts: 2
+            delay_ms: 10000
+            on_error: all
+          timeout: 3600000
+          bash: |
+            node scripts/automation/exec-codex-repair.mjs \
+              --canonical . --artifacts "$ARTIFACTS_DIR" \
+              --routing "$ARTIFACTS_DIR/routing.json" \
+              --package "${ARGUMENTS%%@g*}"
         - id: fast-recheck
-          depends_on: [fast-repair-codex, fast-repair]
+          depends_on: [fast-repair-codex, fast-repair, fast-repair-hybrid]
           trigger_rule: none_failed_min_one_success
           bash: |
             set +e

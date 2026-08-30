@@ -1,13 +1,13 @@
 {
   "schema": "foresift/bun-migration-manifest@1",
   "migrationId": "bun-test-authority-v1",
-  "generatedAt": "2026-08-30T15:18:12.939Z",
+  "generatedAt": "2026-08-30T17:04:30.894Z",
   "root": ".",
-  "totalTestFiles": 319,
+  "totalTestFiles": 320,
   "counts": {
     "CODEMOD_READY": 0,
     "AGY_REQUIRED": 0,
-    "MIGRATED": 269,
+    "MIGRATED": 270,
     "VERIFIED": 50,
     "BLOCKED": 0
   },
@@ -4424,9 +4424,9 @@
     {
       "path": "tests/automation/codex-agy-profile.spec.ts",
       "package": "automation",
-      "bytes": 89136,
-      "lines": 2305,
-      "sha256": "577f3e1bda5abab34bc87b97708b271c4889caa632dbfc2c221b1acd7e89809b",
+      "bytes": 89856,
+      "lines": 2329,
+      "sha256": "501dad451bfa9d7b723b595d7816b97af10cb3aca2b30e22b491132ac4b5afd6",
       "imports": ["bun:test", "node:child_process", "node:fs", "node:os", "node:path", "node:url"],
       "vitestImports": [],
       "features": ["dynamic-import"],
@@ -5205,6 +5205,31 @@
       "migrationType": "ALREADY_MIGRATED",
       "fixturesAndHelpers": [],
       "sourceAnchors": [],
+      "state": "MIGRATED"
+    },
+    {
+      "path": "tests/automation/writer-lane-permits.spec.ts",
+      "package": "automation",
+      "bytes": 5020,
+      "lines": 125,
+      "sha256": "f6359bcbb75f65140b10398cf26dfee69319bbcbee657395b3498e673a7f5aa5",
+      "imports": [
+        "bun:test",
+        "node:fs",
+        "node:os",
+        "node:path",
+        "../../scripts/automation/provider-pool.mjs",
+        "../../scripts/automation/exec-codex-writer.mjs"
+      ],
+      "vitestImports": [],
+      "features": [],
+      "workload": "PURE",
+      "migrationType": "ALREADY_MIGRATED",
+      "fixturesAndHelpers": [],
+      "sourceAnchors": [
+        "../../scripts/automation/provider-pool.mjs",
+        "../../scripts/automation/exec-codex-writer.mjs"
+      ],
       "state": "MIGRATED"
     },
     {

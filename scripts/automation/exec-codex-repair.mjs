@@ -56,7 +56,14 @@ export function runCodexRepair(input) {
   for (const field of ['canonical', 'artifacts', 'routing', 'package'])
     if (!input[field]) throw new Error(`CODEX_REPAIR_ARGUMENT_MISSING: ${field}`);
   const routing = JSON.parse(readFileSync(input.routing, 'utf8'));
-  if (routing.executionProfile !== 'CODEX_AGY') throw new Error('CODEX_REPAIR_PROFILE_MISMATCH');
+  // HYBRID_AGY waves route their implementation lanes to CODEX exactly like
+  // CODEX_AGY waves (codex-routing classifyCodexLane), so the engine-specific
+  // repairer is the same Codex tool. Runs 165799b9/5579a4c7 (2026-08-30) died
+  // deterministically in fast-repair-loop: the workflow's repair nodes are
+  // when-gated to CODEX_AGY/CLAUDE_AGY only, so a HYBRID_AGY wave with a red
+  // FAST had NO repair lane and the loop exhausted in milliseconds.
+  if (!['CODEX_AGY', 'HYBRID_AGY'].includes(routing.executionProfile))
+    throw new Error('CODEX_REPAIR_PROFILE_MISMATCH');
   const repairDir = join(input.artifacts, 'repair');
   mkdirSync(repairDir, { recursive: true });
   const priorRepairs = readdirSync(repairDir).filter((name) => name.endsWith('.json')).length;
@@ -155,7 +162,7 @@ export function runCodexRepair(input) {
     `${JSON.stringify(
       {
         schema: 'foresift/codex-repair@1',
-        profile: 'CODEX_AGY',
+        profile: routing.executionProfile,
         package: input.package,
         baseHead: base,
         repairHead: head,

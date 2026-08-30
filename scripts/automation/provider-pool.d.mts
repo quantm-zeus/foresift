@@ -25,3 +25,19 @@ export declare function providerAdmissionView(
     now?: number;
   },
 ): Record<string, { limit: number; active: number; state: string; blocked: boolean }>;
+export declare function acquireLanePermit(
+  stateDir: string,
+  holder: string,
+  provider: 'claude' | 'codex' | 'agy',
+  opts?: { now?: number },
+): {
+  ok: boolean;
+  waitMs: number;
+  reason: string | null;
+  holder: string;
+};
+export declare function releaseLanePermit(
+  stateDir: string,
+  holder: string,
+  provider: 'claude' | 'codex' | 'agy',
+): { released: 0 | 1; active: number | undefined };

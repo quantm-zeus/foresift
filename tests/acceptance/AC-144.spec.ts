@@ -14,7 +14,6 @@ import { describe, expect, it } from 'bun:test';
 import { MCP_PROTOCOL_BASELINE_REVISION } from '@foresift/shared-schemas';
 import { McpProtocolGuard } from '../../packages/security/src/mcp-protocol-guard.ts';
 import {
-  ALLOWED_ORIGINS,
   VALID_AUTHORIZED_CURSOR,
   VALID_MCP_OUTPUT_ENVELOPE,
 } from '../fixtures/mcp/index.ts';

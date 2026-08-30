@@ -3,7 +3,6 @@
  * Every `.strict()` schema must refuse unknown keys fail-closed (ADR-0013).
  */
 import { describe, expect, it } from 'bun:test';
-// @ts-ignore TS2307: pending implementation in T002
 import {
   McpConfigSchema,
   McpCursorSchema,
@@ -16,7 +15,6 @@ import {
   MCP_SCHEMAS,
   parseMcpSchema,
   type McpSchemaName,
-  // @ts-ignore TS2307
 } from '../src/mcp.ts';
 import {
   ACTIVE_SESSION_FIXTURE,

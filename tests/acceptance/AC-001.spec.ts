@@ -249,16 +249,6 @@ describe('AC-001 acceptance (mcp-surface facet): manual client initialize -> lis
   });
 
   it('executes free discovery analysis over MCP tool call returning structured output with complete metadata', async () => {
-    const callRequest = {
-      jsonrpc: '2.0',
-      id: 'call-001',
-      method: 'tools/call',
-      params: {
-        name: 'discover_candidates',
-        arguments: { chain: 'solana' },
-      },
-    };
-
     // Structured MCP tool call result
     const mcpResult = {
       content: [

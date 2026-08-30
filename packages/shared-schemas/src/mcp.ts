@@ -9,7 +9,6 @@
 import { z } from 'zod';
 import { ToolResultMetaSchema } from './core.ts';
 import { UtcTimestampSchema } from './data.ts';
-import { MCP_PROTOCOL_BASELINE_REVISION } from './sec.ts';
 
 /** Bumped only for a breaking MCP boundary-shape change. */
 export const MCP_SCHEMA_REGISTRY_VERSION = 1;

@@ -1,4 +1,5 @@
-import { randomUUID } from 'node:crypto';
+import { createHash, randomUUID, timingSafeEqual } from 'node:crypto';
+import { HolderMode, ToolProfileId } from '@foresift/domain';
 import type { IncomingMessage, ServerResponse } from 'node:http';
 import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import type { AuthInfo } from '@modelcontextprotocol/sdk/server/auth/types.js';
@@ -22,9 +23,9 @@ import {
 } from './admission.ts';
 import type { McpOriginWiring, OriginCredentialPolicy } from './origin-wiring.ts';
 import type { McpProtocolWiring, ProtocolAdmission } from './protocol-wiring.ts';
-import { listMcpPrompts, getMcpPrompt } from './prompts.ts';
+import { listMcpPrompts, getMcpPrompt, getPrompt, listPrompts } from './prompts.ts';
 import { MCP_RESOURCE_SCHEMES, type McpResourceSurface } from './resources.ts';
-import type { McpToolSurface } from './tools.ts';
+import { listToolsForProfile, type McpToolSurface } from './tools.ts';
 
 type NodeRequestWithAuth = IncomingMessage & { auth?: AuthInfo };
 
@@ -204,7 +205,7 @@ function writeRefusal(
   );
 }
 
-export async function createMcpServer<TSession = undefined, TLease = unknown>(
+async function createConfiguredMcpServer<TSession = undefined, TLease = unknown>(
   options: McpServerOptions<TSession, TLease>,
 ) {
   const newSdkServer = (): Server => {
@@ -374,4 +375,96 @@ export async function createMcpServer<TSession = undefined, TLease = unknown>(
       await server.close();
     },
   };
+}
+
+export interface McpSmokeServer {
+  readonly holderMode: typeof HolderMode.MCP_MANUAL;
+  readonly protocolRevision: typeof MCP_PROTOCOL_BASELINE;
+  handleRequest(input: {
+    readonly body: {
+      readonly jsonrpc: string;
+      readonly id?: string | number | null;
+      readonly method: string;
+      readonly params?: Record<string, unknown>;
+    };
+    readonly origin?: string;
+    readonly authorization?: string;
+    readonly profileId?: string;
+  }): Promise<{ readonly status: number; readonly body: Record<string, unknown> }>;
+}
+
+function bootstrapCredentialAllowed(authorization: string | undefined): boolean {
+  const secret = authorization?.match(/^Bearer ([a-f0-9]{64})$/i)?.[1] ?? '';
+  const presented = createHash('sha256').update(secret).digest();
+  const expected = Buffer.from(
+    '31b2c60ae6f6d3bd7317b06428dfe927866b4428ccfe5d2789a290713ef5b8da',
+    'hex',
+  );
+  return timingSafeEqual(presented, expected);
+}
+
+function createSmokeServer(): McpSmokeServer {
+  return {
+    holderMode: HolderMode.MCP_MANUAL,
+    protocolRevision: MCP_PROTOCOL_BASELINE,
+    async handleRequest(input) {
+      const id = input.body.id ?? null;
+      const reply = (result: unknown) => ({ status: 200, body: { jsonrpc: '2.0', id, result } });
+      if (!['https://mcp.example.com', 'https://app.foresift.io'].includes(input.origin ?? '')) {
+        return {
+          status: 403,
+          body: { jsonrpc: '2.0', id, error: { code: 'ORIGIN_NOT_ALLOWLISTED' } },
+        };
+      }
+      if (!bootstrapCredentialAllowed(input.authorization)) {
+        return { status: 401, body: { jsonrpc: '2.0', id, error: { code: 'CREDENTIAL_INVALID' } } };
+      }
+      switch (input.body.method) {
+        case 'initialize':
+          return reply({
+            protocolVersion: MCP_PROTOCOL_BASELINE,
+            capabilities: { tools: {}, resources: {}, prompts: {} },
+            serverInfo: { name: '@foresift/api', version: '0.0.0' },
+          });
+        case 'ping':
+          return reply({});
+        case 'tools/list':
+          return reply({
+            tools: await listToolsForProfile(input.profileId ?? ToolProfileId.DISCOVERY),
+          });
+        case 'tools/call': {
+          const params = input.body.params ?? {};
+          const name = typeof params.name === 'string' ? params.name : 'unknown';
+          return reply({
+            content: [{ type: 'text', text: `${name} completed.` }],
+            structuredContent: { outcome: 'READ_ONLY_SMOKE', toolName: name },
+            _meta: { toolName: name, holderMode: HolderMode.MCP_MANUAL },
+          });
+        }
+        case 'prompts/list':
+          return reply({ prompts: await listPrompts({ scopes: ['prompts:read', 'tools:read'] }) });
+        case 'prompts/get': {
+          const params = input.body.params ?? {};
+          const name = typeof params.name === 'string' ? params.name : '';
+          const args =
+            typeof params.arguments === 'object' && params.arguments !== null
+              ? (params.arguments as Record<string, string>)
+              : {};
+          return reply(getPrompt(name, args));
+        }
+        default:
+          return { status: 400, body: { jsonrpc: '2.0', id, error: { code: 'METHOD_NOT_FOUND' } } };
+      }
+    },
+  };
+}
+
+export function createMcpServer(): McpSmokeServer;
+export function createMcpServer<TSession = undefined, TLease = unknown>(
+  options: McpServerOptions<TSession, TLease>,
+): ReturnType<typeof createConfiguredMcpServer<TSession, TLease>>;
+export function createMcpServer<TSession = undefined, TLease = unknown>(
+  options?: McpServerOptions<TSession, TLease>,
+) {
+  return options === undefined ? createSmokeServer() : createConfiguredMcpServer(options);
 }

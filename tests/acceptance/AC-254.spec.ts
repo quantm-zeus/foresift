@@ -108,11 +108,36 @@ describe('AC-254: all five scan surfaces green; read-only intelligence allowed',
 
   it('surfaces 2+3 — route and tool inventories admit only read-shaped entries across apps/api', async () => {
     const canary = new NegativeCapabilityCanary(loadCanaryCatalog());
-    const discoveryTools = await listToolsForProfile('discovery');
-    const adminTools = await listToolsForProfile('admin-read');
+    const standardProfiles = [
+      'discovery',
+      'market-research',
+      'security-research',
+      'holder-wallet',
+      'social-research',
+      'macro-context',
+      'run-investigation',
+      'admin-read',
+    ] as const;
+
+    const allProfileTools: { name: string; source: string }[] = [];
+    for (const profile of standardProfiles) {
+      const tools = await listToolsForProfile(profile);
+      expect(tools.length).toBeGreaterThan(0);
+      for (const t of tools) {
+        if (t.name !== 'solana_rpc_get_signatures_for_address') {
+          allProfileTools.push({ name: t.name, source: `apps/api/profile:${profile}` });
+        }
+      }
+    }
+
     const candidateCatalogTools = MCP_G0_TOOL_CATALOG.filter(
       (t) => t !== 'solana_rpc_get_signatures_for_address',
     );
+
+    const { collectInventory } = await import(
+      path.join(REPO_ROOT, 'scripts/scan-prohibited-capabilities/inventory.mjs')
+    );
+    const apiInventory = collectInventory(path.join(REPO_ROOT, 'apps/api'));
 
     const inventory = [
       { name: 'get-token-metadata', source: 'routes' },
@@ -120,14 +145,17 @@ describe('AC-254: all five scan surfaces green; read-only intelligence allowed',
       { name: 'get-shadow-portfolio', source: 'routes' },
       { name: 'query-wallet-intelligence', source: 'tools' },
       { name: 'mcp-streamable-http', source: 'routes' },
-      ...discoveryTools.map((t) => ({ name: t.name, source: 'apps/api/profile:discovery' })),
-      ...adminTools.map((t) => ({ name: t.name, source: 'apps/api/profile:admin-read' })),
+      ...allProfileTools,
       ...candidateCatalogTools.map((t) => ({ name: t, source: 'apps/api/tools' })),
       ...MCP_RESOURCE_SCHEMES.map((scheme) => ({
         name: `${scheme}_resource`,
         source: 'apps/api/resources',
       })),
       ...MCP_PROMPT_NAMES.map((prompt) => ({ name: prompt, source: 'apps/api/prompts' })),
+      ...(apiInventory.schemas as ReadonlyArray<{ name: string; source: string }>).map((s) => ({
+        name: s.name,
+        source: s.source,
+      })),
     ];
 
     expect(canary.checkInventory(inventory)).toEqual([]);

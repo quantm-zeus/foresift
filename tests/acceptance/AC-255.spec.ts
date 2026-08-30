@@ -218,6 +218,21 @@ describe('AC-255 acceptance (tool-core substrate): permitted query fixtures pass
         title: 'Compare Candidates',
         description: 'Read-only pairwise candidate comparison and thesis scoring',
       },
+      {
+        name: 'research_get_wallet_alpha_lineage',
+        title: 'Wallet Alpha Lineage',
+        description: 'Read-only wallet alpha score and transaction history analysis',
+      },
+      {
+        name: 'research_get_holder_evidence',
+        title: 'Holder Evidence',
+        description: 'Read-only holder concentration and retention metrics',
+      },
+      {
+        name: 'research_get_shadow_portfolio_evidence',
+        title: 'Shadow Portfolio Evidence',
+        description: 'Read-only shadow portfolio tracking and simulated balance history',
+      },
     ];
 
     for (const tool of mcpTools) {
@@ -235,5 +250,25 @@ describe('AC-255 acceptance (tool-core substrate): permitted query fixtures pass
       );
       expect(verdict.ok, tool.name).toBe(true);
     }
+  });
+
+  it('permits clean GMGN intelligence results through MCP output payload validator', async () => {
+    const { assertPermittedMcpPayload } = await import('../../apps/api/src/mcp/output.ts');
+    const gmgnPayload = {
+      meta: {
+        toolName: 'gmgn_get_top_holders',
+        toolVersion: '1.0.0',
+        actionClass: ActionClass.EXTERNAL_READ,
+        occurredAt: '2026-08-01T00:00:00.000Z',
+        quality: 'EXACT',
+        evidenceIds: ['ev_gmgn_top_holders'],
+      },
+      data: {
+        holders: [
+          { address: '7xKXtg2CW87d97TXJSDpbD5jBkheTqA83TZRuJosgAsU', balance: 50000, percentage: 5.0 },
+        ],
+      },
+    };
+    expect(() => assertPermittedMcpPayload(gmgnPayload)).not.toThrow();
   });
 });

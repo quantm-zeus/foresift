@@ -14,6 +14,7 @@ import {
   loadCanaryCatalog,
 } from '../../packages/security/src/negative-capability.ts';
 import { ProhibitedCapabilityScreen } from '../../packages/tool-core/src/prohibited.ts';
+import { assertPermittedMcpPayload } from '../../apps/api/src/mcp/output.ts';
 
 const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 const PROHIBITED_DIR = path.join(REPO_ROOT, 'tests/fixtures/sec/prohibited');
@@ -97,9 +98,29 @@ describe('AC-050 negative: every prohibited-category fixture is detected', () =>
       { name: 'POST /mcp/tools/sign_transaction', source: 'routes' },
       { name: 'POST /mcp/tools/custody_wallet', source: 'routes' },
       { name: 'POST /mcp/tools/copy_trade', source: 'routes' },
+      { name: 'POST /mcp/tools/bridge_assets_action', source: 'routes' },
+      { name: 'POST /mcp/tools/submit_order', source: 'routes' },
     ];
     const findings = canary.checkInventory(prohibitedRoutes);
-    expect(findings.length).toBe(10);
+    expect(findings.length).toBe(12);
+  });
+
+  it('assertPermittedMcpPayload in apps/api refuses outputs containing transactions or key material', () => {
+    const prohibitedPayloads = [
+      { transactionPayload: 'AQAAAA==' },
+      { unsignedTransaction: 'base64rawtx' },
+      { [PROHIBITED_PRIVATE_KEY_FIELD]: '0123456789abcdef0123456789abcdef' },
+      { [PROHIBITED_SEED_FIELD]: 'twelve word secret mnemonic phrase' },
+      { signatureRequest: { tx: 'raw' } },
+      { action: 'execute_swap', amount: 100 },
+      { action: 'sign_transaction', payload: 'data' },
+      { action: 'submit_tx', raw: '0x1234' },
+      { action: 'broadcast_tx', raw: '0x5678' },
+    ];
+
+    for (const payload of prohibitedPayloads) {
+      expect(() => assertPermittedMcpPayload(payload)).toThrow(/PROHIBITED_PAYLOAD_DETECTED/i);
+    }
   });
 });
 
@@ -216,6 +237,53 @@ describe('AC-050 negative (tool-core substrate): prohibited tool definitions fai
         now,
       );
       expect(verdict.ok).toBe(false);
+    }
+  });
+
+  it('rejects wallet creation, key export, cross-chain bridge, and copy trade tool definitions', () => {
+    const prohibitedSurfaceTools = [
+      {
+        name: 'mcp_create_wallet',
+        title: 'Create Wallet',
+        description: `${['create', 'Wallet'].join('')}(params) generates new keypair and seed phrase for user`,
+        inputSchemaJson: { type: 'object' },
+        outputSchemaJson: { type: 'object' },
+        actionClass: ActionClass.EXTERNAL_READ,
+        toolVersion: '1.0.0',
+      },
+      {
+        name: 'mcp_export_private_key',
+        title: 'Export Private Key',
+        description: `${['export', 'PrivateKey'].join('')}(wallet) exports raw private key material from keystore`,
+        inputSchemaJson: { type: 'object' },
+        outputSchemaJson: { type: 'object' },
+        actionClass: ActionClass.EXTERNAL_READ,
+        toolVersion: '1.0.0',
+      },
+      {
+        name: 'mcp_bridge_assets',
+        title: 'Bridge Assets',
+        description: `${['bridge', 'Tokens'].join('')}(tx) performs cross-chain token transfer across bridges`,
+        inputSchemaJson: { type: 'object' },
+        outputSchemaJson: { type: 'object' },
+        actionClass: ActionClass.EXTERNAL_READ,
+        toolVersion: '1.0.0',
+      },
+      {
+        name: 'mcp_copy_trade',
+        title: 'Copy Trade Target',
+        description: `${['copy', 'Trade'].join('')}(target) automatically replicates trades from target wallet`,
+        inputSchemaJson: { type: 'object' },
+        outputSchemaJson: { type: 'object' },
+        actionClass: ActionClass.EXTERNAL_READ,
+        toolVersion: '1.0.0',
+      },
+    ];
+
+    for (const tool of prohibitedSurfaceTools) {
+      const verdict = screen.screenWithReport(tool, now);
+      expect(verdict.ok, tool.name).toBe(false);
+      expect(() => screen.screen(tool, now)).toThrow(ForesiftError);
     }
   });
 });

@@ -35,10 +35,19 @@ export function serializeMilestoneState(ms) {
 
 export async function formatMilestoneText(text) {
   // Prettier collapses short arrays; raw JSON.stringify does not. Formatting
-  // state-landing content keeps the format:check gate green.
+  // state-landing content keeps the format:check gate green. The filepath
+  // must be REPO-ANCHORED (not a bare name): prettier resolves its config
+  // from the filepath's directory, and a bare name yields the default
+  // printWidth 80 — producing output the repo's printWidth-100 gate rejects
+  // (observed live 2026-08-30, state PRs #102–#113).
   try {
-    const { format } = await import('prettier');
-    return await format(text, { filepath: 'current-milestone.json' });
+    const prettier = await import('prettier');
+    const filepath = join(repoRoot(), 'specs', 'implementation', 'current-milestone.json');
+    // format() alone does NOT load .prettierrc.json — resolveConfig must run
+    // first, or the repo's printWidth 100 never applies (format lands on the
+    // 80-col default and re-expands arrays the CLI then rejects).
+    const config = await prettier.resolveConfig(filepath, { editorconfig: false });
+    return await prettier.format(text, { ...config, filepath });
   } catch {
     return text;
   }

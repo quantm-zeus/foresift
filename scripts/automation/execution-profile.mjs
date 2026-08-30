@@ -44,6 +44,11 @@ export function resolveExecutionProfile(input) {
 
 export function implementationEngineForProfile(profile) {
   invariant(SUPPORTED_EXECUTION_PROFILES.includes(profile), 'INVALID_EXECUTION_PROFILE', profile);
+  // HYBRID has NO single implementation engine: every implementation lane
+  // carries its own engine in the routing/identity lanes list, selected by
+  // the per-lane router (codex-routing.buildWaveRouting). Legacy profiles
+  // keep their exact historical mapping.
+  if (profile === 'HYBRID_AGY') return 'HYBRID';
   return profile === 'CODEX_AGY' ? 'CODEX' : 'CLAUDE';
 }
 
@@ -118,8 +123,21 @@ export function createExecutionIdentity(input) {
       }));
   const lanes = laneInputs.map(normalizedLane);
   for (const lane of lanes) {
-    if (lane.role === 'implementation')
-      invariant(lane.engine === implementationEngine, 'PROFILE_ENGINE_MISMATCH', lane.lane);
+    if (lane.role === 'implementation') {
+      // HYBRID is the one profile whose implementation lanes may MIX engines:
+      // each lane's engine was selected by the per-lane router and must be a
+      // legal product engine, not the profile-level default. Legacy profiles
+      // remain strictly uniform (historical identity compatibility).
+      if (implementationEngine === 'HYBRID') {
+        invariant(
+          lane.engine === 'CODEX' || lane.engine === 'CLAUDE',
+          'PROFILE_ENGINE_MISMATCH',
+          `${lane.lane}: ${lane.engine}`,
+        );
+      } else {
+        invariant(lane.engine === implementationEngine, 'PROFILE_ENGINE_MISMATCH', lane.lane);
+      }
+    }
     if (lane.role === 'test')
       invariant(lane.engine === testEngine, 'PROFILE_ENGINE_MISMATCH', lane.lane);
   }

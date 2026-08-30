@@ -171,6 +171,43 @@ export function runFinalLand(a, deps = {}) {
     return result;
   };
 
+  // ── 0a. already-landed short circuit: when this branch's PR is ALREADY
+  // merged, a concurrent lander (wave-land node + supervisor tick) racing for
+  // the same branch must record success, not exit 4 with 'lander-exit-1'.
+  // Without this the second lander burns a FULL gate and reports a bogus
+  // failure AFTER the merge (observed live 2026-08-30, runs 6528ff62/057807af:
+  // the wave-land node's lander merged PR #108 while the supervisor-tick
+  // lander's final authority re-check saw PR state != OPEN and exited 1,
+  // fatal-pausing a successfully landed package).
+  try {
+    const already = spawnSync(
+      'gh',
+      [
+        'pr',
+        'list',
+        '--head',
+        a.branch,
+        '--state',
+        'merged',
+        '--json',
+        'number,url',
+        '--limit',
+        '1',
+      ],
+      { encoding: 'utf8' },
+    );
+    if (already.status === 0) {
+      const list = JSON.parse(already.stdout || '[]');
+      if (list.length > 0) {
+        console.log(`LAND ▸ already merged: ${list[0].url ?? `PR #${list[0].number}`}`);
+        record(true, 'already-merged', { gateMode: 'ALREADY_MERGED' });
+        return { ok: true };
+      }
+    }
+  } catch {
+    /* probe failure falls through to the normal landing flow */
+  }
+
   // ── 0. base-drift admission (V3-D §11): never burn a FULL gate on a branch
   // that provably no longer carries current origin/main.
   const adm = admission(a.branch);

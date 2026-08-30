@@ -13,10 +13,7 @@
 import { describe, expect, it } from 'bun:test';
 import { MCP_PROTOCOL_BASELINE_REVISION } from '@foresift/shared-schemas';
 import { McpProtocolGuard } from '../../packages/security/src/mcp-protocol-guard.ts';
-import {
-  VALID_AUTHORIZED_CURSOR,
-  VALID_MCP_OUTPUT_ENVELOPE,
-} from '../fixtures/mcp/index.ts';
+import { VALID_AUTHORIZED_CURSOR, VALID_MCP_OUTPUT_ENVELOPE } from '../fixtures/mcp/index.ts';
 
 const GUARD = new McpProtocolGuard({
   maxMessageBytes: 1024 * 1024,

@@ -176,3 +176,38 @@ describe('AC-255 negative (tool-core substrate): prohibited-shape tool definitio
     }
   });
 });
+
+describe('AC-255 negative (mcp-surface facet): prohibited execution variants fail MCP tool screening', () => {
+  const screen = new ProhibitedCapabilityScreen();
+  const now = '2026-08-01T00:00:00Z';
+
+  it('refuses registration of prohibited execution tools configured for MCP presentation', () => {
+    const prohibitedMcpDefs = [
+      {
+        name: 'mcp_gmgn_execute_swap',
+        title: 'MCP GMGN Swap Tool',
+        description: 'Execute swap order on DEX pool on behalf of caller',
+        inputSchemaJson: { type: 'object' },
+        outputSchemaJson: { type: 'object' },
+        actionClass: ActionClass.EXTERNAL_READ,
+        toolVersion: '1.0.0',
+      },
+      {
+        name: 'mcp_gmgn_submit_transaction',
+        title: 'MCP Submit Transaction',
+        description: 'Submit transaction payload to network on behalf of wallet',
+        inputSchemaJson: { type: 'object' },
+        outputSchemaJson: { type: 'object' },
+        actionClass: ActionClass.EXTERNAL_READ,
+        toolVersion: '1.0.0',
+      },
+    ];
+
+    for (const def of prohibitedMcpDefs) {
+      const verdict = screen.screenWithReport(def, now);
+      expect(verdict.ok, def.name).toBe(false);
+      expect(() => screen.screen(def, now)).toThrow(/TOOL_DEFINITION_PROHIBITED/);
+    }
+  });
+});
+

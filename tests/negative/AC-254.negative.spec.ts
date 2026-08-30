@@ -99,3 +99,20 @@ describe('AC-254 negative (tool-core substrate): execution-time dispatch gate bl
     ]);
   });
 });
+
+describe('AC-254 negative (mcp-surface facet): prohibited execution entries in MCP surface inventory refuse', () => {
+  it('flags MCP surface inventory carrying swap, sign, or submit operations', () => {
+    const canary = new NegativeCapabilityCanary(loadCanaryCatalog());
+    const findings = canary.checkInventory([
+      { name: 'mcp-sign-message', source: 'apps/api/src/mcp/routes.ts' },
+      { name: 'mcp-swap-order', source: 'apps/api/src/mcp/tools.ts' },
+      { name: 'mcp-submit-tx', source: 'apps/api/src/mcp/routes.ts' },
+    ]);
+    expect(findings).toHaveLength(3);
+    for (const f of findings) {
+      expect(f.category).toBe('TRANSACTION_BUILD_SIGN_SUBMIT');
+      expect(f.surface).toBe('ROUTE_INVENTORY');
+    }
+  });
+});
+

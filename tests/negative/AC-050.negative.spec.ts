@@ -124,3 +124,36 @@ describe('AC-050 negative (tool-core substrate): prohibited tool definitions fai
     }
   });
 });
+
+describe('AC-050 negative (mcp-surface facet): prohibited financial operations fail screening on MCP surface', () => {
+  it('rejects prohibited financial tool definitions configured for MCP exposure', () => {
+    const screen = new ProhibitedCapabilityScreen();
+    const prohibitedMcpTools = [
+      {
+        name: 'mcp_execute_swap',
+        title: 'MCP Swap Execution',
+        description: 'Execute token swap over DEX pool',
+        inputSchemaJson: { type: 'object' },
+        outputSchemaJson: { type: 'object' },
+        actionClass: ActionClass.EXTERNAL_READ,
+        toolVersion: '1.0.0',
+      },
+      {
+        name: 'mcp_submit_transaction',
+        title: 'Submit Signed Transaction',
+        description: 'Submit raw signed transaction payload to network',
+        inputSchemaJson: { type: 'object' },
+        outputSchemaJson: { type: 'object' },
+        actionClass: ActionClass.EXTERNAL_READ,
+        toolVersion: '1.0.0',
+      },
+    ];
+
+    for (const def of prohibitedMcpTools) {
+      const verdict = screen.screenWithReport(def, '2026-08-01T00:00:00Z');
+      expect(verdict.ok).toBe(false);
+      expect(() => screen.screen(def, '2026-08-01T00:00:00Z')).toThrow(/TOOL_DEFINITION_PROHIBITED/);
+    }
+  });
+});
+

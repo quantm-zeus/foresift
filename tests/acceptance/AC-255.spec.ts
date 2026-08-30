@@ -136,3 +136,45 @@ describe('AC-255 acceptance (tool-core substrate): permitted query fixtures pass
     }
   });
 });
+
+describe('AC-255 acceptance (mcp-surface facet): admitted GMGN queries pass MCP tool schema screening', () => {
+  const screen = new ProhibitedCapabilityScreen();
+  const now = '2026-08-01T00:00:00Z';
+
+  it('permits admitted GMGN queries mapped into MCP tool definitions with outputSchema', async () => {
+    const { ADMITTED_WALLET_INTELLIGENCE_QUERIES } =
+      await import('../fixtures/sec/clean/gmgn-query-pair.ts');
+
+    for (const query of ADMITTED_WALLET_INTELLIGENCE_QUERIES) {
+      const toolName = query
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, '_')
+        .replace(/^_+|_+$/g, '');
+      const verdict = screen.screenWithReport(
+        {
+          name: `mcp_gmgn_${toolName}`,
+          title: `MCP GMGN ${query}`,
+          description: `Read-only MCP tool for wallet intelligence: ${query}`,
+          inputSchemaJson: {
+            type: 'object',
+            properties: { address: { type: 'string' } },
+            required: ['address'],
+          },
+          outputSchemaJson: {
+            type: 'object',
+            properties: {
+              content: { type: 'array' },
+              structuredContent: { type: 'object' },
+              _meta: { type: 'object' },
+            },
+          },
+          actionClass: ActionClass.EXTERNAL_READ,
+          toolVersion: '1.0.0',
+        },
+        now,
+      );
+      expect(verdict.ok, query).toBe(true);
+    }
+  });
+});
+

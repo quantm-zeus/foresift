@@ -2,7 +2,7 @@
 // tree — dependency catalogue, route inventory, tool registry input,
 // environment schema, runtime canary — while read-only wallet-intelligence
 // entries are EXPLICITLY allowlisted and their permission re-proven.
-import { readdirSync, readFileSync } from 'node:fs';
+import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'bun:test';
@@ -35,11 +35,20 @@ describe('AC-254: all five scan surfaces green; read-only intelligence allowed',
         'utf8',
       ),
     ) as RawCatalog;
-    // Every production dependency declared across the workspace…
+    // Every production dependency declared across the workspace (packages + apps)…
     const manifestPaths = ['package.json'];
-    for (const entry of readdirSync(path.join(REPO_ROOT, 'packages'), { withFileTypes: true })) {
-      if (entry.isDirectory())
-        manifestPaths.push(path.join('packages', entry.name, 'package.json'));
+    for (const parent of ['packages', 'apps']) {
+      const parentDir = path.join(REPO_ROOT, parent);
+      if (existsSync(parentDir)) {
+        for (const entry of readdirSync(parentDir, { withFileTypes: true })) {
+          if (entry.isDirectory()) {
+            const pkgJson = path.join(parent, entry.name, 'package.json');
+            if (existsSync(path.join(REPO_ROOT, pkgJson))) {
+              manifestPaths.push(pkgJson);
+            }
+          }
+        }
+      }
     }
     const declared: string[] = [];
     for (const rel of manifestPaths) {
@@ -77,6 +86,15 @@ describe('AC-254: all five scan surfaces green; read-only intelligence allowed',
         { name: 'list-detectors', source: 'tools' },
         { name: 'get-shadow-portfolio', source: 'routes' },
         { name: 'query-wallet-intelligence', source: 'tools' },
+        { name: 'mcp-streamable-http', source: 'apps/api/src/mcp/server.ts' },
+        { name: 'system_health', source: 'apps/api/src/mcp/tools.ts' },
+        { name: 'quota_get_status', source: 'apps/api/src/mcp/tools.ts' },
+        { name: 'capacity_get_status', source: 'apps/api/src/mcp/tools.ts' },
+        { name: 'provider_get_health', source: 'apps/api/src/mcp/tools.ts' },
+        { name: 'collector_get_health', source: 'apps/api/src/mcp/tools.ts' },
+        { name: 'capability_get_status', source: 'apps/api/src/mcp/tools.ts' },
+        { name: 'discover_candidates', source: 'apps/api/src/mcp/tools.ts' },
+        { name: 'get_asset_identity', source: 'apps/api/src/mcp/tools.ts' },
       ]),
     ).toEqual([]);
   });
@@ -87,6 +105,8 @@ describe('AC-254: all five scan surfaces green; read-only intelligence allowed',
       canary.scanEnvironmentNames([
         'DATABASE_URL',
         'HELIUS_API_KEY',
+        'MCP_PORT',
+        'MCP_ORIGIN_ALLOWLIST',
         'MCP_SESSION_PEPPER',
         'OBJECT_STORE_ENDPOINT',
       ]),
@@ -95,13 +115,20 @@ describe('AC-254: all five scan surfaces green; read-only intelligence allowed',
 
   it('surface 5 — runtime canary stays silent over shipped source', async () => {
     const canary = new NegativeCapabilityCanary(loadCanaryCatalog());
-    const srcDir = path.join(REPO_ROOT, 'packages/security/src');
-    const files = readdirSync(srcDir, { recursive: true })
-      .map(String)
-      .filter((f) => f.endsWith('.ts'));
-    for (const file of files) {
-      const text = readFileSync(path.join(srcDir, file), 'utf8');
-      expect(canary.scanSourceText(file, text), file).toEqual([]);
+    const srcDirs = [
+      path.join(REPO_ROOT, 'packages/security/src'),
+      ...(existsSync(path.join(REPO_ROOT, 'apps/api/src'))
+        ? [path.join(REPO_ROOT, 'apps/api/src')]
+        : []),
+    ];
+    for (const srcDir of srcDirs) {
+      const files = readdirSync(srcDir, { recursive: true })
+        .map(String)
+        .filter((f) => f.endsWith('.ts'));
+      for (const file of files) {
+        const text = readFileSync(path.join(srcDir, file), 'utf8');
+        expect(canary.scanSourceText(file, text), file).toEqual([]);
+      }
     }
   });
 

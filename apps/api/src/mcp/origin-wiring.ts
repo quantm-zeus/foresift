@@ -149,8 +149,7 @@ export function createMcpOriginMiddleware(options: {
         return { allowed: false, httpStatus: 403, reason: 'MALFORMED' };
       }
       const looksLoopback =
-        origin !== undefined &&
-        /^http:\/\/(?:localhost|127\.0\.0\.1|\[::1\])(?::|$)/i.test(origin);
+        origin !== undefined && /^http:\/\/(?:localhost|127\.0\.0\.1|\[::1\])(?::|$)/i.test(origin);
       const loopbackRequest = input.isLoopbackRequest ?? input.isLoopback ?? false;
       if (looksLoopback && options.localAllowlist !== undefined && !loopbackRequest) {
         return { allowed: false, httpStatus: 403, reason: 'NOT_ALLOWLISTED' };

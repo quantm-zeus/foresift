@@ -43,7 +43,9 @@ describe('T018: MCP prompts catalog and message generation (AC-001, FR-MCP-002)'
     expect(result.messages).toBeInstanceOf(Array);
     expect(result.messages.length).toBeGreaterThan(0);
     expect(result.messages[0]?.role).toBe('user');
-    expect(result.messages[0]?.content.text).toContain('So11111111111111111111111111111111111111112');
+    expect(result.messages[0]?.content.text).toContain(
+      'So11111111111111111111111111111111111111112',
+    );
   });
 
   it('generates prompt messages for investigate-alert and challenge-opportunity-thesis', async () => {

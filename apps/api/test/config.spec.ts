@@ -85,9 +85,9 @@ describe('T005: MCP server config (G.13 security block, AC-251)', () => {
     expect(
       McpServerConfigSchema.safeParse({ ...validConfig, maximumResponseBytes: -100 }).success,
     ).toBe(false);
-    expect(
-      McpServerConfigSchema.safeParse({ ...validConfig, maximumPageRecords: 0 }).success,
-    ).toBe(false);
+    expect(McpServerConfigSchema.safeParse({ ...validConfig, maximumPageRecords: 0 }).success).toBe(
+      false,
+    );
   });
 
   it('enforces absentOriginPolicy to be either PRODUCTION or NON_PRODUCTION', async () => {

@@ -203,7 +203,9 @@ export class McpAdmissionPipeline {
     }
     this.options.onAuthCheck?.();
     const bearer = input.headers.authorization?.match(/^Bearer ([a-f0-9]{64})$/i)?.[1];
-    const presentedDigest = createHash('sha256').update(bearer ?? '').digest();
+    const presentedDigest = createHash('sha256')
+      .update(bearer ?? '')
+      .digest();
     const bootstrapDigest = Buffer.from(
       '31b2c60ae6f6d3bd7317b06428dfe927866b4428ccfe5d2789a290713ef5b8da',
       'hex',

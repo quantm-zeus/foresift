@@ -116,7 +116,9 @@ describe('T009: MCP server composition root smoke suite (PURE workload, AC-001)'
     });
 
     expect(promptsListResponse.status).toBe(200);
-    const promptNames = promptsListResponse.body.result.prompts.map((p: { name: string }) => p.name);
+    const promptNames = promptsListResponse.body.result.prompts.map(
+      (p: { name: string }) => p.name,
+    );
     expect(promptNames).toContain('analyze-token');
     expect(promptNames).toContain('investigate-alert');
 

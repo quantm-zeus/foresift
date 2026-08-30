@@ -46,7 +46,11 @@ describe('T013: MCP per-client rate limits and concurrency (AC-251, INV-009)', (
     });
 
     // Consume all tokens
-    await limiter.admit({ credentialId: 'cred_rate_exhaust_001', rateLimitClass: 'STANDARD_FREE', cost: 2 });
+    await limiter.admit({
+      credentialId: 'cred_rate_exhaust_001',
+      rateLimitClass: 'STANDARD_FREE',
+      cost: 2,
+    });
 
     // Next request must be refused
     const refused = await limiter.admit({
@@ -68,8 +72,16 @@ describe('T013: MCP per-client rate limits and concurrency (AC-251, INV-009)', (
     });
 
     // 2 in-flight requests
-    await limiter.admit({ credentialId: 'cred_concurrent_001', rateLimitClass: 'STANDARD_FREE', cost: 1 });
-    await limiter.admit({ credentialId: 'cred_concurrent_001', rateLimitClass: 'STANDARD_FREE', cost: 1 });
+    await limiter.admit({
+      credentialId: 'cred_concurrent_001',
+      rateLimitClass: 'STANDARD_FREE',
+      cost: 1,
+    });
+    await limiter.admit({
+      credentialId: 'cred_concurrent_001',
+      rateLimitClass: 'STANDARD_FREE',
+      cost: 1,
+    });
 
     // 3rd concurrent request refused
     const refused = await limiter.admit({
@@ -89,7 +101,11 @@ describe('T013: MCP per-client rate limits and concurrency (AC-251, INV-009)', (
       concurrencyLimit: 5,
     });
 
-    await limiter.admit({ credentialId: 'cred_fenced_001', rateLimitClass: 'STANDARD_FREE', cost: 1 });
+    await limiter.admit({
+      credentialId: 'cred_fenced_001',
+      rateLimitClass: 'STANDARD_FREE',
+      cost: 1,
+    });
 
     // Multiple release calls should not cause in_flight to go below 0
     await limiter.release({ credentialId: 'cred_fenced_001', rateLimitClass: 'STANDARD_FREE' });

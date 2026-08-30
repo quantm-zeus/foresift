@@ -21,7 +21,7 @@ CREATE TABLE col.collector_stream_receipts (
     -- Chain and event coordinates. Nullable sub-coordinates mean "not
     -- applicable" for that allowlisted event family, never "unknown by
     -- default"; producers validate the event-family-specific combination.
-    slot                           numeric NOT NULL CHECK (slot >= 0),
+    slot                           numeric NOT NULL CHECK (slot >= 0 AND scale(slot) = 0),
     block_hash                     text NOT NULL CHECK (length(block_hash) > 0),
     transaction_signature         text NOT NULL CHECK (length(transaction_signature) > 0),
     transaction_index             integer CHECK (transaction_index IS NULL OR transaction_index >= 0),

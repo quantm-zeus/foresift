@@ -32,13 +32,16 @@ export class WatermarkCoordinator {
     }
     if (next === current && sorted.some((e) => e.position > current + 1))
       throw new Error('WATERMARK_NON_CONTIGUOUS');
-    await this.engine.query(
+    const persisted = await this.engine.query<{ contiguous_through: string | number }>(
       `INSERT INTO col.collector_watermarks (watermark_key,contiguous_through,fencing_token,updated_at) VALUES ($1,$2,$3,$4)
       ON CONFLICT (watermark_key) DO UPDATE SET contiguous_through=EXCLUDED.contiguous_through,fencing_token=EXCLUDED.fencing_token,updated_at=EXCLUDED.updated_at
-      WHERE EXCLUDED.fencing_token>col.collector_watermarks.fencing_token OR (EXCLUDED.fencing_token=col.collector_watermarks.fencing_token AND EXCLUDED.contiguous_through>=col.collector_watermarks.contiguous_through)`,
+      WHERE EXCLUDED.fencing_token>col.collector_watermarks.fencing_token OR (EXCLUDED.fencing_token=col.collector_watermarks.fencing_token AND EXCLUDED.contiguous_through>=col.collector_watermarks.contiguous_through)
+      RETURNING contiguous_through`,
       [this.key(key), next, fencingToken, this.now().toISOString()],
     );
-    return next;
+    const row = persisted.rows[0];
+    if (!row) throw new Error('STALE_WATERMARK_FENCING_TOKEN');
+    return Number(row.contiguous_through);
   }
   completeCoverage(contiguousThrough: number, claimedThrough: number, openGaps: number): boolean {
     return openGaps === 0 && contiguousThrough >= claimedThrough;

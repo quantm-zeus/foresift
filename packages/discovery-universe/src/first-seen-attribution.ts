@@ -1,5 +1,4 @@
-import { randomUUID } from 'node:crypto';
-import type { DatabaseEngine } from '@foresift/persistence';
+import { canonicalJson, sha256Text, type DatabaseEngine } from '@foresift/persistence';
 import {
   DiscoveryUniverseEntrySchema,
   type DiscoveryUniverseEntry,
@@ -12,7 +11,10 @@ export function appendAttribution(
   const parsed = DiscoveryUniverseEntrySchema.parse(value);
   if (
     existing.some(
-      (x) => x.sourceId === parsed.sourceId && x.sourceAvailableAt === parsed.sourceAvailableAt,
+      (x) =>
+        x.sourceId === parsed.sourceId &&
+        x.sourceAvailableAt === parsed.sourceAvailableAt &&
+        x.sourceMetadataHash === parsed.sourceMetadataHash,
     )
   )
     return existing;
@@ -38,15 +40,35 @@ export async function persistAttribution(
   value: DiscoveryAttribution,
 ): Promise<void> {
   const parsed = DiscoveryUniverseEntrySchema.parse(value);
+  const sightingId = sha256Text(
+    canonicalJson({
+      sourceId: parsed.sourceId,
+      sourceAvailableAt: parsed.sourceAvailableAt,
+      sourceMetadataHash: parsed.sourceMetadataHash,
+    }),
+  );
+  const attributionId = sha256Text(canonicalJson({ universeEntryId: entryId, sightingId }));
   await engine.query(
-    'INSERT INTO disc.discovery_attributions (entry_id,source_id,source_timestamp,system_timestamp,source_rank,attribution_json) VALUES ($1,$2,$3,$4,$5,$6) ON CONFLICT DO NOTHING',
+    `INSERT INTO disc.discovery_attribution (
+      attribution_id,universe_entry_id,source_id,source_class,sighting_id,
+      source_observed_at,source_published_at,source_available_at,first_received_at,
+      first_ingested_at,source_rank,source_metadata_hash,quality_codes
+    ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)
+    ON CONFLICT (universe_entry_id,source_id,sighting_id) DO NOTHING`,
     [
+      attributionId,
       entryId,
       parsed.sourceId,
-      parsed.sourceObservedAt ?? parsed.sourcePublishedAt ?? parsed.sourceAvailableAt,
+      parsed.sourceClass,
+      sightingId,
+      parsed.sourceObservedAt ?? null,
+      parsed.sourcePublishedAt ?? null,
       parsed.sourceAvailableAt,
-      parsed.sourceRank ?? 0,
-      JSON.stringify({ ...parsed, attributionId: randomUUID() }),
+      parsed.firstReceivedAt ?? null,
+      parsed.firstIngestedAt,
+      parsed.sourceRank ?? null,
+      parsed.sourceMetadataHash,
+      [...parsed.qualityCodes],
     ],
   );
 }

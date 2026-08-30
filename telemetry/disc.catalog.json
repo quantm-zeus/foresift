@@ -1,7 +1,7 @@
 {
   "$schema": "https://foresift.dev/schemas/telemetry-catalog-v1.json",
   "catalog": "disc",
-  "description": "Declarative discovery-universe, attribution, finite batch-monitoring, deterministic promotion, and coverage contracts. The catalog contains no provider payloads, credentials, tokens, or secret material.",
+  "description": "Declarative discovery, finite batch-monitoring, promotion, and coverage contracts projected from the authoritative shared schemas. Catalog metadata contains no provider payloads, credentials, tokens, or secret material.",
   "contractStatus": "DECLARATIVE_CONTRACT_ONLY — emitter wiring is deferred to G2 observability.",
   "requirementsCovered": [
     "FR-DISC-001",
@@ -17,15 +17,21 @@
       "requirementRefs": ["FR-DISC-001", "FR-DISC-002", "FR-DISC-003"],
       "tier": "CRITICAL_METADATA",
       "fields": [
-        { "name": "entryId", "type": "string", "required": true },
-        { "name": "subjectId", "type": "string", "required": true },
-        { "name": "populationId", "type": "string", "required": true },
-        { "name": "firstSeenAt", "type": "string<utc-timestamp>", "required": true },
-        { "name": "firstSeenSourceId", "type": "string", "required": true },
-        { "name": "attributions", "type": "array<DiscoveryAttribution>", "required": true },
-        { "name": "validFrom", "type": "string<utc-timestamp>", "required": true },
-        { "name": "validUntil", "type": "string<utc-timestamp>|null", "required": true },
-        { "name": "retrospectiveOnly", "type": "boolean", "required": true }
+        { "name": "assetRepresentationId", "type": "string", "required": true },
+        { "name": "sourceId", "type": "string", "required": true },
+        { "name": "sourceClass", "type": "string(§63.2 vocabulary)", "required": true },
+        { "name": "sourceObservedAt", "type": "string<utc-timestamp>", "required": false },
+        { "name": "sourcePublishedAt", "type": "string<utc-timestamp>", "required": false },
+        { "name": "sourceAvailableAt", "type": "string<utc-timestamp>", "required": true },
+        { "name": "firstFetchedAt", "type": "string<utc-timestamp>", "required": false },
+        { "name": "firstReceivedAt", "type": "string<utc-timestamp>", "required": false },
+        { "name": "firstIngestedAt", "type": "string<utc-timestamp>", "required": true },
+        { "name": "chainCoordinates", "type": "string", "required": false },
+        { "name": "sourceRank", "type": "integer", "required": false },
+        { "name": "sourceMetadataHash", "type": "string<sha256>", "required": true },
+        { "name": "discoveryPolicyVersion", "type": "string", "required": true },
+        { "name": "collectorCoverageManifestId", "type": "string", "required": false },
+        { "name": "qualityCodes", "type": "array<string>", "required": true }
       ]
     },
     {
@@ -33,16 +39,21 @@
       "requirementRefs": ["FR-DISC-002"],
       "tier": "CRITICAL_METADATA",
       "fields": [
+        { "name": "assetRepresentationId", "type": "string", "required": true },
         { "name": "sourceId", "type": "string", "required": true },
-        {
-          "name": "sourceClass",
-          "type": "string(FIRST_PARTY_COLLECTOR|FREE_AGGREGATE|FREE_PROVIDER|AUTHORIZED_PUSH|RETROSPECTIVE_UNIVERSE)",
-          "required": true
-        },
-        { "name": "sourceTimestamp", "type": "string<utc-timestamp>", "required": true },
-        { "name": "systemTimestamp", "type": "string<utc-timestamp>", "required": true },
-        { "name": "sourceRank", "type": "integer", "required": true },
-        { "name": "lineageIndependenceGroup", "type": "string", "required": true }
+        { "name": "sourceClass", "type": "string(§63.2 vocabulary)", "required": true },
+        { "name": "sourceObservedAt", "type": "string<utc-timestamp>", "required": false },
+        { "name": "sourcePublishedAt", "type": "string<utc-timestamp>", "required": false },
+        { "name": "sourceAvailableAt", "type": "string<utc-timestamp>", "required": true },
+        { "name": "firstFetchedAt", "type": "string<utc-timestamp>", "required": false },
+        { "name": "firstReceivedAt", "type": "string<utc-timestamp>", "required": false },
+        { "name": "firstIngestedAt", "type": "string<utc-timestamp>", "required": true },
+        { "name": "chainCoordinates", "type": "string", "required": false },
+        { "name": "sourceRank", "type": "integer", "required": false },
+        { "name": "sourceMetadataHash", "type": "string<sha256>", "required": true },
+        { "name": "discoveryPolicyVersion", "type": "string", "required": true },
+        { "name": "collectorCoverageManifestId", "type": "string", "required": false },
+        { "name": "qualityCodes", "type": "array<string>", "required": true }
       ]
     },
     {
@@ -51,10 +62,10 @@
       "tier": "CRITICAL_METADATA",
       "fields": [
         { "name": "batchId", "type": "string", "required": true },
+        { "name": "batchSize", "type": "integer", "required": true },
+        { "name": "candidateIds", "type": "array<string>", "required": true },
         { "name": "providerId", "type": "string", "required": true },
         { "name": "operationId", "type": "string", "required": true },
-        { "name": "monitorIds", "type": "array<string>", "required": true },
-        { "name": "maxBatchSize", "type": "integer", "required": true },
         { "name": "scheduledAt", "type": "string<utc-timestamp>", "required": true }
       ]
     },
@@ -63,27 +74,11 @@
       "requirementRefs": ["FR-DISC-004", "FR-DISC-005"],
       "tier": "CRITICAL_METADATA",
       "fields": [
-        { "name": "decisionId", "type": "string", "required": true },
-        { "name": "candidateId", "type": "string", "required": true },
         {
           "name": "decision",
           "type": "string(REJECT_CHEAP|MONITOR_CHEAP|PROMOTE_TO_VERIFY)",
           "required": true
-        },
-        {
-          "name": "frozenFeatures",
-          "type": "object<string|number|boolean|null>",
-          "required": true
-        },
-        { "name": "featureVersions", "type": "object<string>", "required": true },
-        { "name": "policyVersion", "type": "string", "required": true },
-        { "name": "decisionVersion", "type": "string", "required": true },
-        { "name": "inputsHash", "type": "string<sha256>", "required": true },
-        { "name": "decidedAt", "type": "string<utc-timestamp>", "required": true },
-        { "name": "persistenceEligible", "type": "boolean", "required": true },
-        { "name": "changeEligible", "type": "boolean", "required": true },
-        { "name": "executionEligible", "type": "boolean", "required": true },
-        { "name": "securityEligible", "type": "boolean", "required": true }
+        }
       ]
     },
     {
@@ -93,25 +88,17 @@
       "fields": [
         { "name": "decisionId", "type": "string", "required": true },
         { "name": "candidateId", "type": "string", "required": true },
+        { "name": "policyVersion", "type": "string", "required": true },
+        { "name": "featureSnapshotVersion", "type": "string", "required": true },
+        { "name": "inputsHash", "type": "string<sha256>", "required": true },
+        { "name": "decisionVersion", "type": "string", "required": true },
         {
           "name": "decision",
           "type": "string(REJECT_CHEAP|MONITOR_CHEAP|PROMOTE_TO_VERIFY)",
           "required": true
         },
-        {
-          "name": "frozenFeatures",
-          "type": "object<string|number|boolean|null>",
-          "required": true
-        },
-        { "name": "featureVersions", "type": "object<string>", "required": true },
-        { "name": "policyVersion", "type": "string", "required": true },
-        { "name": "decisionVersion", "type": "string", "required": true },
-        { "name": "inputsHash", "type": "string<sha256>", "required": true },
-        { "name": "decidedAt", "type": "string<utc-timestamp>", "required": true },
-        { "name": "persistenceEligible", "type": "boolean", "required": true },
-        { "name": "changeEligible", "type": "boolean", "required": true },
-        { "name": "executionEligible", "type": "boolean", "required": true },
-        { "name": "securityEligible", "type": "boolean", "required": true }
+        { "name": "rationale", "type": "string", "required": true },
+        { "name": "decidedAt", "type": "string<utc-timestamp>", "required": true }
       ]
     },
     {
@@ -119,24 +106,21 @@
       "requirementRefs": ["FR-DISC-004"],
       "tier": "CRITICAL_METADATA",
       "fields": [
-        { "name": "monitorId", "type": "string", "required": true },
         { "name": "candidateId", "type": "string", "required": true },
+        { "name": "assetRepresentationId", "type": "string", "required": true },
         {
           "name": "state",
           "type": "string(NEW|MONITORING_CHEAP|PROMOTED_TO_VERIFY|REJECTED_CHEAP|EXPIRED_CHEAP)",
           "required": true
         },
-        { "name": "checksCompleted", "type": "integer", "required": true },
+        { "name": "checkCount", "type": "integer", "required": true },
         { "name": "maxChecks", "type": "integer", "required": true },
-        { "name": "nextCheckAt", "type": "string<utc-timestamp>", "required": true },
+        { "name": "backoffSeconds", "type": "number", "required": true },
+        { "name": "lastCheckedAt", "type": "string<utc-timestamp>", "required": false },
+        { "name": "nextCheckDueAt", "type": "string<utc-timestamp>", "required": true },
         { "name": "expiresAt", "type": "string<utc-timestamp>", "required": true },
-        { "name": "backoffMs", "type": "integer", "required": true },
-        { "name": "maxStalenessMs", "type": "integer", "required": true },
-        { "name": "resourceBudgetClass", "type": "string", "required": true },
-        { "name": "providerId", "type": "string", "required": true },
-        { "name": "operationId", "type": "string", "required": true },
-        { "name": "lastObservationAt", "type": "string<utc-timestamp>|null", "required": true },
-        { "name": "retainedAt", "type": "string<utc-timestamp>", "required": true }
+        { "name": "stalenessLimitSeconds", "type": "number", "required": true },
+        { "name": "decisionHistory", "type": "array<string>", "required": true }
       ]
     },
     {
@@ -145,17 +129,17 @@
       "tier": "CRITICAL_METADATA",
       "fields": [
         { "name": "manifestId", "type": "string", "required": true },
-        { "name": "populationId", "type": "string", "required": true },
-        { "name": "populationDefinition", "type": "string", "required": true },
+        { "name": "populationClass", "type": "string(§63.7 vocabulary)", "required": true },
+        { "name": "collectorScopeIds", "type": "array<string>", "required": true },
         { "name": "sourceIds", "type": "array<string>", "required": true },
-        { "name": "windowStart", "type": "string<utc-timestamp>", "required": true },
-        { "name": "windowEnd", "type": "string<utc-timestamp>", "required": true },
-        { "name": "gaps", "type": "array<{start,end,status}>", "required": true },
+        { "name": "startSlot", "type": "string<digits>", "required": true },
+        { "name": "endSlot", "type": "string<digits>", "required": true },
+        { "name": "startTime", "type": "string<utc-timestamp>", "required": true },
+        { "name": "endTime", "type": "string<utc-timestamp>", "required": true },
+        { "name": "knownGapsCount", "type": "integer", "required": true },
         { "name": "rightsExclusions", "type": "array<string>", "required": true },
-        { "name": "selectionProbability", "type": "number[0,1]|null", "required": true },
-        { "name": "selectionProbabilityMethod", "type": "string|null", "required": true },
-        { "name": "lineageIndependenceDisclosed", "type": "boolean", "required": true },
-        { "name": "contentHash", "type": "string<sha256>", "required": true }
+        { "name": "selectionProbabilities", "type": "object<number[0,1]>", "required": false },
+        { "name": "sourceDependenceDisclosed", "type": "boolean", "required": true }
       ]
     }
   ]

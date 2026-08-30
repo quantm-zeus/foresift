@@ -12,11 +12,15 @@ export interface PartitionAssignment {
   readonly replayStart: number;
   readonly replayEnd: number;
 }
+export type EndpointPlanScope = CollectorScopeDeclaration & {
+  readonly scopeVersion?: number;
+  readonly accountFilters?: readonly string[];
+};
 function stableInt(value: string): number {
   return Number.parseInt(createHash('sha256').update(value).digest('hex').slice(0, 12), 16);
 }
 export function createEndpointPlan(
-  scopes: readonly CollectorScopeDeclaration[],
+  scopes: readonly EndpointPlanScope[],
   shardCount: number,
   replay: { start: number; end: number },
 ): readonly PartitionAssignment[] {
@@ -29,22 +33,26 @@ export function createEndpointPlan(
     throw new Error('INVALID_SHARD_PLAN');
   const rows: PartitionAssignment[] = [];
   for (const scope of [...scopes].sort((a, b) => a.scopeId.localeCompare(b.scopeId))) {
-    const account = scope.programId;
-    for (const eventFamily of [...scope.supportedEventFamilies].sort()) {
-      const partitionId = `${scope.scopeId}:${account}:${eventFamily}`;
-      rows.push({
-        partitionId,
-        shard: stableInt(partitionId) % shardCount,
-        scopeId: scope.scopeId,
-        scopeVersion: 1,
-        programId: scope.programId,
-        programVersion: scope.programVersion,
-        account,
-        eventFamily,
-        replayStart: replay.start,
-        replayEnd: replay.end,
-      });
-    }
+    const accounts =
+      scope.accountFilters === undefined || scope.accountFilters.length === 0
+        ? [scope.programId]
+        : [...new Set(scope.accountFilters)].sort();
+    for (const account of accounts)
+      for (const eventFamily of [...scope.supportedEventFamilies].sort()) {
+        const partitionId = `${scope.scopeId}:${account}:${eventFamily}`;
+        rows.push({
+          partitionId,
+          shard: stableInt(partitionId) % shardCount,
+          scopeId: scope.scopeId,
+          scopeVersion: scope.scopeVersion ?? 1,
+          programId: scope.programId,
+          programVersion: scope.programVersion,
+          account,
+          eventFamily,
+          replayStart: replay.start,
+          replayEnd: replay.end,
+        });
+      }
   }
   return rows.sort((a, b) => a.partitionId.localeCompare(b.partitionId));
 }

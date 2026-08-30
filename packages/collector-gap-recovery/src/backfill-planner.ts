@@ -41,10 +41,29 @@ export class BackfillPlanner {
     private readonly declaration: BackfillDeclaration,
     private readonly cost: BackfillCostAdmission,
     private readonly clock: RetrievalClock,
-  ) {}
+  ) {
+    if (
+      declaration.provider.length === 0 ||
+      declaration.operation.length === 0 ||
+      !Number.isInteger(declaration.maximumRange) ||
+      declaration.maximumRange < 1 ||
+      !Number.isInteger(declaration.maximumJobs) ||
+      declaration.maximumJobs < 1 ||
+      !Number.isFinite(declaration.estimatedUnitsPerJob) ||
+      declaration.estimatedUnitsPerJob < 0
+    )
+      throw new Error('INVALID_BOUNDED_BACKFILL_DECLARATION');
+  }
   async plan(gaps: readonly GapForBackfill[]): Promise<readonly BackfillJob[]> {
     const jobs: BackfillJob[] = [];
     for (const gap of gaps) {
+      if (
+        !Number.isInteger(gap.start) ||
+        !Number.isInteger(gap.end) ||
+        gap.start < 0 ||
+        gap.end < gap.start
+      )
+        throw new Error(`INVALID_GAP_BOUNDS:${gap.gapId}`);
       for (
         let start = gap.start;
         start <= gap.end && jobs.length < this.declaration.maximumJobs;

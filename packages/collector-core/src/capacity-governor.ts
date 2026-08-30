@@ -10,6 +10,16 @@ export interface CapacityUsage {
   readonly monthlyCredits: number;
 }
 export type CapacityDimension = keyof CapacityUsage;
+const CAPACITY_DIMENSIONS = [
+  'cpuPercent',
+  'memoryBytes',
+  'networkBytes',
+  'subscriptions',
+  'eventRate',
+  'rawStorageBytes',
+  'retries',
+  'monthlyCredits',
+] as const satisfies readonly CapacityDimension[];
 export interface CapacityPersistence {
   pausePartition(input: { partitionId: string; reason: string; at: string }): Promise<void>;
   createIncident(input: {
@@ -45,9 +55,17 @@ export class CapacityGovernor {
       retries: this.contract.retryMaxPerHour,
       monthlyCredits: this.contract.monthlyCreditQuota,
     };
-    const reached = (Object.keys(usage) as CapacityDimension[]).filter(
-      (k) => usage[k] >= limits[k],
-    );
+    const reached = CAPACITY_DIMENSIONS.filter((dimension) => {
+      const consumed = usage[dimension];
+      const limit = limits[dimension];
+      return (
+        !Number.isFinite(consumed) ||
+        consumed < 0 ||
+        !Number.isFinite(limit) ||
+        limit < 0 ||
+        consumed >= limit
+      );
+    });
     return reached.length === 0 ? { allowed: true } : { allowed: false, reached };
   }
   async admit(partitionId: string, usage: CapacityUsage): Promise<void> {

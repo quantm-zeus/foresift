@@ -94,9 +94,12 @@ export class CollectorApplication {
           if (this.stopped) break;
           const decoded = await this.ports.decode(scope, raw);
           await this.ports.appendImmutable(scope, decoded);
-          await this.ports.checkpoint(scope, decoded);
           await this.ports.attributeFirstSeen(scope, decoded);
           await this.ports.emitFeatureUpdate(scope, decoded);
+          // Commit only after every externally visible durable side effect.
+          // A replay after an attribution/feature failure must see the event
+          // again; advancing earlier could permanently erase first-seen truth.
+          await this.ports.checkpoint(scope, decoded);
           returnedAny = true;
           outcome = 'RETURNED_VALID';
         }

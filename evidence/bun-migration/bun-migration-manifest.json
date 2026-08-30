@@ -1,18 +1,18 @@
 {
   "schema": "foresift/bun-migration-manifest@1",
   "migrationId": "bun-test-authority-v1",
-  "generatedAt": "2026-08-30T10:56:54.464Z",
+  "generatedAt": "2026-08-30T13:08:48.870Z",
   "root": ".",
-  "totalTestFiles": 318,
+  "totalTestFiles": 321,
   "counts": {
     "CODEMOD_READY": 0,
     "AGY_REQUIRED": 0,
-    "MIGRATED": 318,
+    "MIGRATED": 321,
     "VERIFIED": 0,
     "BLOCKED": 0
   },
   "parity": {
-    "previousTotal": 317,
+    "previousTotal": 318,
     "disappeared": []
   },
   "files": [
@@ -1121,9 +1121,9 @@
     {
       "path": "packages/persistence/test/migrator.spec.ts",
       "package": "@foresift/persistence",
-      "bytes": 19792,
-      "lines": 494,
-      "sha256": "ca703a9aac1e34f1a1ff3509c766b5c094e73b907b1c9f3305c3e4305634be76",
+      "bytes": 19916,
+      "lines": 498,
+      "sha256": "857464955e8c97812f73395f06cf8f41e99256428ee1b1a4dff6e7d56956a5d3",
       "imports": [
         "bun:test",
         "@electric-sql/pglite",
@@ -2419,6 +2419,21 @@
       "state": "MIGRATED"
     },
     {
+      "path": "packages/shared-schemas/test/mcp.spec.ts",
+      "package": "@foresift/shared-schemas",
+      "bytes": 8783,
+      "lines": 255,
+      "sha256": "487f3ea016acceb481faf5b6eedcd3d86d2a080a16bc20fa2b8388317b6eb51e",
+      "imports": ["bun:test", "../src/mcp.ts", "../../../tests/fixtures/mcp/index.ts"],
+      "vitestImports": [],
+      "features": [],
+      "workload": "PURE",
+      "migrationType": "ALREADY_MIGRATED",
+      "fixturesAndHelpers": ["../../../tests/fixtures/mcp/index.ts"],
+      "sourceAnchors": ["../src/mcp.ts", "../../../tests/fixtures/mcp/index.ts"],
+      "state": "MIGRATED"
+    },
+    {
       "path": "packages/shared-schemas/test/prov.spec.ts",
       "package": "@foresift/shared-schemas",
       "bytes": 29115,
@@ -2737,9 +2752,9 @@
     {
       "path": "tests/acceptance/AC-001.spec.ts",
       "package": "acceptance",
-      "bytes": 7339,
-      "lines": 181,
-      "sha256": "e7dcc5e5baf87bbc88778b6300e8b17bb158a26481c73a9879e38f7335599ac1",
+      "bytes": 12900,
+      "lines": 350,
+      "sha256": "2d4007e156477f965214ba092d3a5f3a66a7a76950cb1bbbda5c4c1ad12ea3bd",
       "imports": [
         "bun:test",
         "@foresift/domain",
@@ -3301,6 +3316,30 @@
       "migrationType": "ALREADY_MIGRATED",
       "fixturesAndHelpers": ["../fixtures/disc/index.ts"],
       "sourceAnchors": ["../fixtures/disc/index.ts"],
+      "state": "MIGRATED"
+    },
+    {
+      "path": "tests/acceptance/AC-144.spec.ts",
+      "package": "acceptance",
+      "bytes": 8396,
+      "lines": 273,
+      "sha256": "cedf7df7dbb546b8b8a991d16d2fcc77696c3d61a2e7576f2f2c1895a65241d8",
+      "imports": [
+        "bun:test",
+        "@foresift/shared-schemas",
+        "../../packages/security/src/mcp-protocol-guard.ts",
+        "../fixtures/mcp/index.ts"
+      ],
+      "vitestImports": [],
+      "features": ["table-driven-each"],
+      "workload": "PURE",
+      "migrationType": "ALREADY_MIGRATED",
+      "fixturesAndHelpers": ["../fixtures/mcp/index.ts"],
+      "sourceAnchors": [
+        "@foresift/shared-schemas",
+        "../../packages/security/src/mcp-protocol-guard.ts",
+        "../fixtures/mcp/index.ts"
+      ],
       "state": "MIGRATED"
     },
     {
@@ -5143,9 +5182,9 @@
     {
       "path": "tests/automation/wave-guard-exception.spec.ts",
       "package": "automation",
-      "bytes": 9679,
+      "bytes": 9687,
       "lines": 246,
-      "sha256": "d9418935cbe4c514f58099461140e5d1eb8e1e30cd3089e52b538853d4050d4b",
+      "sha256": "9a8ee870237e507fb7834d3faeb715e06babb1d48b0998fafc9dc70702975e27",
       "imports": ["bun:test", "node:child_process", "node:fs", "node:os", "node:path", "node:url"],
       "vitestImports": [],
       "features": [],
@@ -5188,9 +5227,9 @@
     {
       "path": "tests/negative/AC-001.negative.spec.ts",
       "package": "negative",
-      "bytes": 4527,
-      "lines": 110,
-      "sha256": "7ce274ea0f149a66bdc0d993e9792dee462d5a03eb375c2be86f1acaa6c3404f",
+      "bytes": 7249,
+      "lines": 174,
+      "sha256": "78377a5609a05309a988c6652b9af3f692ce0c05f0286af81d81553e906b2f02",
       "imports": [
         "bun:test",
         "@foresift/shared-schemas",
@@ -5752,6 +5791,30 @@
       "migrationType": "ALREADY_MIGRATED",
       "fixturesAndHelpers": [],
       "sourceAnchors": [],
+      "state": "MIGRATED"
+    },
+    {
+      "path": "tests/negative/AC-144.negative.spec.ts",
+      "package": "negative",
+      "bytes": 6478,
+      "lines": 177,
+      "sha256": "aaafe989dad9dca8d563c7fc9d465806663e2a56d733ed69931d0adcf13a4143",
+      "imports": [
+        "bun:test",
+        "@foresift/shared-schemas",
+        "../../packages/security/src/mcp-protocol-guard.ts",
+        "../fixtures/mcp/index.ts"
+      ],
+      "vitestImports": [],
+      "features": [],
+      "workload": "PURE",
+      "migrationType": "ALREADY_MIGRATED",
+      "fixturesAndHelpers": ["../fixtures/mcp/index.ts"],
+      "sourceAnchors": [
+        "@foresift/shared-schemas",
+        "../../packages/security/src/mcp-protocol-guard.ts",
+        "../fixtures/mcp/index.ts"
+      ],
       "state": "MIGRATED"
     },
     {

@@ -24,7 +24,7 @@
       `MIGRATION_FILE_PATTERN` with the `mcp` family AND update the central expected-script
       registry in `packages/persistence/test/migrator.spec.ts` (all assertion counts) — the
       plan-sanctioned scope exception per ADR-0019. — **FR-MCP-009** — AC-251
-- [ ] T004 [P] Create `tests/fixtures/mcp/`: valid/invalid Origin header sets
+- [x] T004 [P] Create `tests/fixtures/mcp/`: valid/invalid Origin header sets
       (punycode, trailing-dot, mixed-case, wrong-port, IPv6, mixed-scheme), credential seeds
       (known HMAC test peppers only), session fixtures, resumable cursors, oversized payloads,
       injection strings. — **FR-MCP-008** — AC-250
@@ -118,31 +118,31 @@
 
 ## Phase 5 — Acceptance facets, AC-144 suites, negative scans
 
-- [ ] T019 [P] Extend `tests/acceptance/AC-001.spec.ts` + `tests/negative/AC-001.negative.spec.ts`
+- [x] T019 [P] Extend `tests/acceptance/AC-001.spec.ts` + `tests/negative/AC-001.negative.spec.ts`
       with the mcp-surface facet: manual client initialize → list scoped profile → analyze via
       HTTP tool call; explicit degradation of unavailable optional providers. — **FR-MCP-002** —
       AC-001
-- [ ] T020 [P] Extend AC-002/AC-003/AC-004 positive+negative suites with mcp-surface facets:
+- [x] T020 [P] Extend AC-002/AC-003/AC-004 positive+negative suites with mcp-surface facets:
       envelope passthrough (quality/time/provenance/evidence), concurrent-mode single provider
       call, explicit abstention over MCP. — **FR-MCP-003** — AC-002, AC-003, AC-004
-- [ ] T021 [P] Create `tests/acceptance/AC-144.spec.ts` + `tests/negative/AC-144.negative.spec.ts`:
+- [x] T021 [P] Create `tests/acceptance/AC-144.spec.ts` + `tests/negative/AC-144.negative.spec.ts`:
       compatibility matrix green for stable revision `2025-11-25` and each supported target
       client; draft revisions refused unless explicitly opted in. — **FR-MCP-009** — AC-144
-- [ ] T022 [P] Extend AC-050/AC-254/AC-255 scan suites: add `apps/api` routes, tools, schemas,
+- [x] T022 [P] Extend AC-050/AC-254/AC-255 scan suites: add `apps/api` routes, tools, schemas,
       and environment schema to the five-scan-surface pattern; prove no swap/bridge/order
       execution, transaction build/sign/submit, private-key/seed, wallet
       creation/import/export/custody path exists on the surface; GMGN query fixtures pass while
       prohibited schemas/endpoints/tools/env/imports fail policy. — **FR-MCP-003** — AC-050,
       AC-254, AC-255
-- [ ] T023 [P] Extend AC-250/AC-251 positive+negative suites: real-HTTP wiring of Origin verdicts
+- [x] T023 [P] Extend AC-250/AC-251 positive+negative suites: real-HTTP wiring of Origin verdicts
       (allowlisted passes; punycode-confused/trailing-dot/mixed-scheme/wrong-port/invalid → 403
       before anything) and protocol refusals (unsupported revision, invalid content type,
       invalid method, oversized message, foreign session ID, unauthorized cursor → deterministic
       failure, zero tool execution). — **FR-MCP-008** — AC-250, AC-251
-- [ ] T024 [P] Extend AC-252 positive+negative suites: cross-client/cross-tenant resource fetch
+- [x] T024 [P] Extend AC-252 positive+negative suites: cross-client/cross-tenant resource fetch
       refused without original scope+rights, including signed-URL, range, redirect, and
       path-confusion attempts. — **FR-MCP-010** — AC-252
-- [ ] T025 [P] Extend AC-051/AC-052/AC-053 and AC-257/AC-258/AC-259 suites with surface facets:
+- [x] T025 [P] Extend AC-051/AC-052/AC-053 and AC-257/AC-258/AC-259 suites with surface facets:
       injection fixtures cannot alter tools/scopes/URLs/budgets/policies; pepper/bearer secrets
       absent from logs/traces/outputs; revocation effective next request; SSRF/oversized/slow
       fail-closed through the request cap; audit tamper detection green with surface events.
@@ -156,7 +156,7 @@
       request/refusal outcomes by stage, session lifecycle, rate-limit admissions, resource
       access — with requirementRefs to the FR-MCP assignments) satisfying the telemetry catalog
       contract test. — **FR-MCP-001** — AC-251
-- [ ] T027 Run the full gate: `pnpm --filter @foresift/api test`,
+- [x] T027 Run the full gate: `pnpm --filter @foresift/api test`,
       `packages/persistence/test/migrator.spec.ts` green with the extended registry,
       `pnpm verify` and `pnpm spec:verify` at HEAD; fix all findings additively (no amend, no
       rebase). — **FR-MCP-001** — AC-001, AC-251

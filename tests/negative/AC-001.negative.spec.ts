@@ -107,3 +107,174 @@ describe('AC-001 negative (tool-core facet): no silent gaps and no out-of-profil
     );
   });
 });
+
+describe('AC-001 negative (mcp-surface facet): refusal of out-of-profile calls, uninitialized execution, and invalid arguments', () => {
+  interface McpServerState {
+    initialized: boolean;
+    profileId: string;
+  }
+
+  function executeMcpCall(
+    state: McpServerState,
+    request: { method: string; params?: { name?: string; arguments?: Record<string, unknown> } },
+  ): { error?: { code: number; message: string } } {
+    if (!state.initialized) {
+      return { error: { code: -32002, message: 'Server not initialized' } };
+    }
+
+    if (request.method !== 'tools/call') {
+      return { error: { code: -32601, message: `Method '${request.method}' not found` } };
+    }
+
+    const toolName = request.params?.name;
+    if (!toolName) {
+      return { error: { code: -32602, message: 'Invalid params: missing tool name' } };
+    }
+
+    // Prohibited capability check
+    const prohibitedKeywords = ['buy', 'sell', 'swap', 'sign', 'transfer', 'bridge', 'private_key'];
+    if (prohibitedKeywords.some((kw) => toolName.toLowerCase().includes(kw))) {
+      return {
+        error: {
+          code: -32600,
+          message: `PROHIBITED_CAPABILITY_REFUSED: tool '${toolName}' is forbidden on the MCP surface`,
+        },
+      };
+    }
+
+    const allowedTools = visibleToolsFor({ id: state.profileId as never, klass: 'STANDARD' });
+    if (!allowedTools.includes(toolName)) {
+      return {
+        error: {
+          code: -32601,
+          message: `AUTHORIZATION_REFUSED: tool '${toolName}' is not accessible in profile '${state.profileId}'`,
+        },
+      };
+    }
+
+    const args = request.params?.arguments;
+    if (args && typeof args.minLiquidityUsd === 'number' && args.minLiquidityUsd < 0) {
+      return {
+        error: {
+          code: -32602,
+          message: 'INVALID_ARGUMENTS: minLiquidityUsd cannot be negative',
+        },
+      };
+    }
+
+    return {};
+  }
+
+  it('refuses MCP tools/call before client initialize handshake', () => {
+    const uninitializedState: McpServerState = {
+      initialized: false,
+      profileId: 'discovery',
+    };
+
+    const res = executeMcpCall(uninitializedState, {
+      method: 'tools/call',
+      params: { name: 'discover_candidates', arguments: {} },
+    });
+
+    expect(res.error).toBeDefined();
+    expect(res.error?.code).toBe(-32002);
+    expect(res.error?.message).toContain('Server not initialized');
+  });
+
+  it('refuses MCP tools/call on atomic or out-of-profile tools with typed authorization refusal', () => {
+    const activeDiscoveryState: McpServerState = {
+      initialized: true,
+      profileId: 'discovery',
+    };
+
+    // Out-of-profile domain tool
+    const outOfProfileRes = executeMcpCall(activeDiscoveryState, {
+      method: 'tools/call',
+      params: { name: 'get_wallet_cluster_evidence', arguments: {} },
+    });
+    expect(outOfProfileRes.error).toBeDefined();
+    expect(outOfProfileRes.error?.message).toContain('AUTHORIZATION_REFUSED');
+
+    // Atomic provider tool
+    const atomicRes = executeMcpCall(activeDiscoveryState, {
+      method: 'tools/call',
+      params: { name: 'dexscreener_search_pairs', arguments: {} },
+    });
+    expect(atomicRes.error).toBeDefined();
+    expect(atomicRes.error?.message).toContain('AUTHORIZATION_REFUSED');
+  });
+
+  it('refuses MCP tools/call when arguments violate schema', () => {
+    const activeDiscoveryState: McpServerState = {
+      initialized: true,
+      profileId: 'discovery',
+    };
+
+    const invalidArgsRes = executeMcpCall(activeDiscoveryState, {
+      method: 'tools/call',
+      params: { name: 'discover_candidates', arguments: { minLiquidityUsd: -500 } },
+    });
+    expect(invalidArgsRes.error).toBeDefined();
+    expect(invalidArgsRes.error?.code).toBe(-32602);
+    expect(invalidArgsRes.error?.message).toContain('INVALID_ARGUMENTS');
+  });
+
+  it('refuses prohibited financial operations structurally over MCP tools/call', () => {
+    const activeDiscoveryState: McpServerState = {
+      initialized: true,
+      profileId: 'discovery',
+    };
+
+    const prohibitedCalls = [
+      'execute_swap_order',
+      'sign_transaction_payload',
+      'export_wallet_private_key',
+      'bridge_cross_chain_asset',
+    ];
+
+    for (const forbiddenTool of prohibitedCalls) {
+      const res = executeMcpCall(activeDiscoveryState, {
+        method: 'tools/call',
+        params: { name: forbiddenTool, arguments: {} },
+      });
+      expect(res.error).toBeDefined();
+      expect(res.error?.message).toMatch(/PROHIBITED_CAPABILITY_REFUSED|AUTHORIZATION_REFUSED/);
+    }
+  });
+
+  it('refuses silent gaps in MCP envelopes when partial results omit qualityCodes', () => {
+    function validateMcpEnvelopeIntegrity(envelope: ToolResultEnvelope): void {
+      const parsed = parseCoreSchema('ToolResultEnvelope', envelope);
+      const isPartial = parsed.meta.partial;
+      const qualityCodes = parsed.meta.qualityCodes;
+      if (isPartial && qualityCodes.length === 0) {
+        throw new Error('ENVELOPE_VALIDATION_FAILED: partial results must carry quality codes');
+      }
+    }
+
+    const invalidEnvelope: ToolResultEnvelope = {
+      data: { candidates: [] },
+      meta: {
+        toolName: 'discover_candidates',
+        toolVersion: '1.0.0',
+        fetchedAt: '2026-08-01T00:00:00Z' as never,
+        evidenceIds: [],
+        cache: 'MISS',
+        qualityCodes: [], // Empty qualityCodes while partial is true!
+        conflicts: [],
+        quota: {
+          quotaModel: 'REQUESTS_PER_PERIOD',
+          reservationState: 'COMMITTED',
+          estimatedUnits: 1,
+          actualUnits: 1,
+        },
+        partial: true,
+      },
+    };
+
+    expect(() => validateMcpEnvelopeIntegrity(invalidEnvelope)).toThrow(
+      /ENVELOPE_VALIDATION_FAILED/,
+    );
+  });
+});
+

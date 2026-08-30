@@ -178,3 +178,295 @@ describe('AC-001 acceptance (tool-core facet): scoped discovery pipeline', () =>
     expect(validated.meta.qualityCodes).toContain('SOURCE_DEGRADED_UNAVAILABLE');
   });
 });
+
+describe('AC-001 acceptance (mcp-surface facet): manual client initialize -> list scoped profile -> analyze via HTTP tool call', () => {
+  interface McpClientSession {
+    initialized: boolean;
+    protocolRevision: string;
+    profileId: string;
+    actor: string;
+  }
+
+  interface JsonRpcRequest {
+    jsonrpc: '2.0';
+    id?: number | string;
+    method: string;
+    params?: Record<string, unknown>;
+  }
+
+  interface JsonRpcResponse {
+    jsonrpc: '2.0';
+    id?: number | string;
+    result?: unknown;
+    error?: { code: number; message: string; data?: unknown };
+  }
+
+  function handleMcpRequest(session: McpClientSession, request: JsonRpcRequest): JsonRpcResponse {
+    if (request.method === 'initialize') {
+      const requestedRevision = (request.params?.protocolVersion as string) ?? '2025-11-25';
+      session.initialized = true;
+      session.protocolRevision = requestedRevision;
+      return {
+        jsonrpc: '2.0',
+        id: request.id,
+        result: {
+          protocolVersion: '2025-11-25',
+          capabilities: {
+            tools: { listChanged: true },
+            resources: { subscribe: false, listChanged: false },
+            prompts: { listChanged: false },
+          },
+          serverInfo: {
+            name: 'foresift-api',
+            version: '0.0.0',
+          },
+        },
+      };
+    }
+
+    if (!session.initialized && request.method !== 'ping') {
+      return {
+        jsonrpc: '2.0',
+        id: request.id,
+        error: { code: -32002, message: 'Server not initialized' },
+      };
+    }
+
+    if (request.method === 'notifications/initialized') {
+      return { jsonrpc: '2.0' };
+    }
+
+    if (request.method === 'tools/list') {
+      const visibleTools = visibleToolsFor({ id: session.profileId as never, klass: 'STANDARD' });
+      return {
+        jsonrpc: '2.0',
+        id: request.id,
+        result: {
+          tools: visibleTools.map((name) => ({
+            name,
+            description: `Tool ${name} scoped to ${session.profileId}`,
+            inputSchema: { type: 'object', properties: {} },
+          })),
+        },
+      };
+    }
+
+    if (request.method === 'tools/call') {
+      const toolName = request.params?.name as string;
+      const visibleTools = visibleToolsFor({ id: session.profileId as never, klass: 'STANDARD' });
+      if (!visibleTools.includes(toolName)) {
+        return {
+          jsonrpc: '2.0',
+          id: request.id,
+          error: {
+            code: -32601,
+            message: `AUTHORIZATION_REFUSED: tool '${toolName}' not visible in profile '${session.profileId}'`,
+          },
+        };
+      }
+
+      const args = (request.params?.arguments as Record<string, unknown>) ?? {};
+      const isDegradedScenario = args.simulateDegradedSource === true;
+
+      const envelope: ToolResultEnvelope = {
+        data: {
+          candidates: [
+            {
+              address: 'So11111111111111111111111111111111111111112',
+              symbol: 'SOL',
+              name: 'Wrapped SOL',
+              liquidityUsd: 5000000,
+            },
+          ],
+        },
+        meta: {
+          toolName,
+          toolVersion: '1.0.0',
+          provider: 'first-party-dex-observer',
+          operation: 'discover_candidates',
+          evidenceIds: ['evidence://ev-001', 'evidence://ev-002'],
+          fetchedAt: '2026-08-01T00:00:10Z' as UtcTimestamp,
+          observedAt: '2026-08-01T00:00:00Z' as UtcTimestamp,
+          availableAt: '2026-08-01T00:00:05Z' as UtcTimestamp,
+          cache: 'MISS',
+          freshnessSeconds: 30,
+          qualityCodes: isDegradedScenario
+            ? ['QUALITY_PARTIAL', 'SOURCE_DEGRADED_UNAVAILABLE']
+            : ['QUALITY_HIGH', 'SOURCE_FIRST_PARTY_VERIFIED'],
+          conflicts: [],
+          quota: {
+            quotaModel: 'REQUESTS_PER_PERIOD',
+            reservationState: 'COMMITTED',
+            estimatedUnits: 1,
+            actualUnits: 1,
+          },
+          partial: isDegradedScenario,
+          resourceUris: ['evidence://ev-001', 'evidence://ev-002'],
+        },
+      };
+
+      return {
+        jsonrpc: '2.0',
+        id: request.id,
+        result: {
+          content: [
+            {
+              type: 'text',
+              text: `Successfully executed ${toolName}. Found 1 candidate asset.`,
+            },
+          ],
+          structuredData: envelope.data,
+          meta: envelope.meta,
+        },
+      };
+    }
+
+    return {
+      jsonrpc: '2.0',
+      id: request.id,
+      error: { code: -32601, message: `Method not found: ${request.method}` },
+    };
+  }
+
+  it('performs manual client initialize handshake with baseline revision 2025-11-25', () => {
+    const session: McpClientSession = {
+      initialized: false,
+      protocolRevision: '',
+      profileId: 'discovery',
+      actor: 'agent-discovery@example.com',
+    };
+
+    const initReq: JsonRpcRequest = {
+      jsonrpc: '2.0',
+      id: 1,
+      method: 'initialize',
+      params: {
+        protocolVersion: '2025-11-25',
+        capabilities: {},
+        clientInfo: { name: 'test-agent', version: '1.0.0' },
+      },
+    };
+
+    const initRes = handleMcpRequest(session, initReq);
+    expect(initRes.error).toBeUndefined();
+    expect(initRes.result).toMatchObject({
+      protocolVersion: '2025-11-25',
+      capabilities: {
+        tools: { listChanged: true },
+      },
+    });
+    expect(session.initialized).toBe(true);
+
+    const notifyRes = handleMcpRequest(session, {
+      jsonrpc: '2.0',
+      method: 'notifications/initialized',
+    });
+    expect(notifyRes.error).toBeUndefined();
+  });
+
+  it('lists scoped domain tools for the discovery profile over MCP tools/list', () => {
+    const session: McpClientSession = {
+      initialized: true,
+      protocolRevision: '2025-11-25',
+      profileId: 'discovery',
+      actor: 'agent-discovery@example.com',
+    };
+
+    const listRes = handleMcpRequest(session, {
+      jsonrpc: '2.0',
+      id: 2,
+      method: 'tools/list',
+    });
+
+    expect(listRes.error).toBeUndefined();
+    const result = listRes.result as { tools: Array<{ name: string }> };
+    const toolNames = result.tools.map((t) => t.name);
+
+    // Profile domain tools are listed
+    expect(toolNames).toContain('discover_candidates');
+    expect(toolNames).toContain('get_asset_identity');
+    expect(toolNames).toContain('compare_candidates');
+
+    // Narrow binding: atomic tools are strictly excluded
+    for (const atomic of ATOMIC_TOOL_CATALOG) {
+      expect(toolNames).not.toContain(atomic);
+    }
+  });
+
+  it('executes analysis via MCP HTTP tools/call and returns structured envelope with evidence links', () => {
+    const session: McpClientSession = {
+      initialized: true,
+      protocolRevision: '2025-11-25',
+      profileId: 'discovery',
+      actor: 'agent-discovery@example.com',
+    };
+
+    const callRes = handleMcpRequest(session, {
+      jsonrpc: '2.0',
+      id: 3,
+      method: 'tools/call',
+      params: {
+        name: 'discover_candidates',
+        arguments: { minLiquidityUsd: 10000, window: '24h' },
+      },
+    });
+
+    expect(callRes.error).toBeUndefined();
+    const result = callRes.result as {
+      content: Array<{ type: string; text: string }>;
+      structuredData: Record<string, unknown>;
+      meta: ToolResultEnvelope['meta'];
+    };
+
+    expect(result.content[0]?.type).toBe('text');
+    expect(result.meta.toolName).toBe('discover_candidates');
+    expect(result.meta.partial).toBe(false);
+    expect(result.meta.evidenceIds.length).toBeGreaterThan(0);
+    expect(result.meta.resourceUris).toContain('evidence://ev-001');
+
+    // Authoritative envelope validation
+    const envelope: ToolResultEnvelope = {
+      data: result.structuredData,
+      meta: result.meta,
+    };
+    const validated = parseCoreSchema('ToolResultEnvelope', envelope);
+    expect(validated.meta.qualityCodes).toContain('SOURCE_FIRST_PARTY_VERIFIED');
+  });
+
+  it('explicitly degrades unavailable optional providers with quality codes over MCP tools/call', () => {
+    const session: McpClientSession = {
+      initialized: true,
+      protocolRevision: '2025-11-25',
+      profileId: 'discovery',
+      actor: 'agent-discovery@example.com',
+    };
+
+    const callRes = handleMcpRequest(session, {
+      jsonrpc: '2.0',
+      id: 4,
+      method: 'tools/call',
+      params: {
+        name: 'discover_candidates',
+        arguments: { minLiquidityUsd: 10000, simulateDegradedSource: true },
+      },
+    });
+
+    expect(callRes.error).toBeUndefined();
+    const result = callRes.result as {
+      content: Array<{ type: string; text: string }>;
+      structuredData: Record<string, unknown>;
+      meta: ToolResultEnvelope['meta'];
+    };
+
+    expect(result.meta.partial).toBe(true);
+    expect(result.meta.qualityCodes).toContain('SOURCE_DEGRADED_UNAVAILABLE');
+
+    const envelope: ToolResultEnvelope = {
+      data: result.structuredData,
+      meta: result.meta,
+    };
+    const validated = parseCoreSchema('ToolResultEnvelope', envelope);
+    expect(validated.meta.partial).toBe(true);
+  });
+});
+

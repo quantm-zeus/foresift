@@ -279,7 +279,7 @@
         "telemetry/mcp.*"
       ],
       "verificationCommands": ["test -d apps/api && pnpm --filter @foresift/api test"],
-      "status": "PENDING"
+      "status": "RUNNING"
     },
     {
       "id": "g0-traceability-conformance",

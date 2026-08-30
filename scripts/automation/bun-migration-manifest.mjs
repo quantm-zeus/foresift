@@ -4,6 +4,7 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join, sep } from 'node:path';
 import { spawnSync } from 'node:child_process';
 import ts from 'typescript';
+import { formatMilestoneText } from './schema.mjs';
 
 export const BUN_MIGRATION_MANIFEST_SCHEMA = 'foresift/bun-migration-manifest@1';
 export const BUN_DIRECT_IMPORTS = new Set([
@@ -220,7 +221,7 @@ export function buildBunMigrationManifest({ root = process.cwd(), previousFile =
   };
 }
 
-function cli() {
+async function cli() {
   const argv = process.argv.slice(2);
   const value = (flag) => {
     const index = argv.indexOf(flag);
@@ -231,9 +232,20 @@ function cli() {
   const manifest = buildBunMigrationManifest({ root, previousFile: value('--previous') });
   if (out) {
     mkdirSync(dirname(out), { recursive: true });
-    writeFileSync(out, JSON.stringify(manifest, null, 2) + '\n');
+    // Prettier-format: the format:check gate covers this file, and raw
+    // JSON.stringify output fails it (observed live 2026-08-30, PR #120).
+    // formatMilestoneText resolves the repo prettier config + falls back.
+    const formatted = await formatMilestoneText(JSON.stringify(manifest, null, 2) + '\n');
+    writeFileSync(out, formatted);
   }
   process.stdout.write(JSON.stringify(manifest, null, out ? 0 : 2) + '\n');
 }
 
-if (process.argv[1]?.endsWith('bun-migration-manifest.mjs')) cli();
+if (process.argv[1]?.endsWith('bun-migration-manifest.mjs'))
+  cli().then(
+    () => process.exit(0),
+    (err) => {
+      console.error(err?.message ?? err);
+      process.exit(1);
+    },
+  );

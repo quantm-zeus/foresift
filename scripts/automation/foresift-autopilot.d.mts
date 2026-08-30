@@ -40,9 +40,10 @@ export declare const POLL_INTERVAL_MS: number;
 export declare const HANDOFF_POLL_MS: number;
 export declare const HANDOFF_FAST_STREAK_MAX: number;
 
-/** Pure handoff-cadence decision: fast-poll right after a tick launched work
- *  or while run-id discovery is pending, bounded by the fast streak, base
- *  interval otherwise. Deterministic and total. */
+/** Pure handoff-cadence decision: fast-poll right after a tick launched work,
+ *  while run-id discovery is pending, while ACTIVE work is tracked, or while
+ *  the ready queue is non-empty (§49); bounded by the fast streak, base
+ *  interval for a fully quiet project. Deterministic and total. */
 export interface PollDecision {
   delayMs: number;
   fastStreak: number;
@@ -51,6 +52,8 @@ export declare function nextPollDelayMs(opts?: {
   launched?: number;
   awaitingDiscovery?: boolean;
   fastStreak?: number;
+  activeWork?: boolean;
+  readyWork?: boolean;
 }): PollDecision;
 
 /** Defect #11: milestone state as committed at HEAD (the only baseline a

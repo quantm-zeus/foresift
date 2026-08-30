@@ -1,0 +1,194 @@
+{
+  "$schema": "https://foresift.dev/schemas/telemetry-catalog-v1.json",
+  "catalog": "mcp",
+  "description": "Declarative MCP Streamable HTTP event contracts for request-stage outcomes, deterministic refusals, session lifecycle, per-client rate and concurrency admission, and per-call tool/resource authorization. Identifiers are opaque IDs or one-way hashes; events never contain bearer credentials, OAuth tokens, raw request bodies, raw resource URIs, or provider payloads.",
+  "contractStatus": "DECLARATIVE_CONTRACT_ONLY — this file defines the mcp.* event contracts mapped by telemetry/mcp.*; emitter wiring lands with the MCP surface observability milestone, so nothing publishes these event names yet.",
+  "requirementsCovered": [
+    "FR-MCP-001",
+    "FR-MCP-002",
+    "FR-MCP-003",
+    "FR-MCP-004",
+    "FR-MCP-005",
+    "FR-MCP-006",
+    "FR-MCP-007",
+    "FR-MCP-008",
+    "FR-MCP-009",
+    "FR-MCP-010",
+    "FR-MCP-011",
+    "FR-MCP-012"
+  ],
+  "recoveryDataClass": "CRITICAL_METADATA",
+  "events": [
+    {
+      "name": "mcp.request.stage",
+      "description": "A Streamable HTTP request reached one ordered, side-effect-aware surface stage. A refused Origin is recorded at ORIGIN before session creation, authentication, dispatch, or resource access.",
+      "requirementRefs": ["FR-MCP-001", "FR-MCP-008", "FR-MCP-009"],
+      "tier": "CRITICAL_METADATA",
+      "fields": [
+        { "name": "requestId", "type": "string", "required": true },
+        { "name": "clientIdHash", "type": "string<sha256>", "required": true },
+        {
+          "name": "stage",
+          "type": "string(ORIGIN|AUTHENTICATE|TRANSPORT_VALIDATE|SESSION_BIND|RATE_LIMIT|AUTHORIZE|DISPATCH|RESOURCE_FETCH|RESPOND)",
+          "required": true
+        },
+        { "name": "outcome", "type": "string(ALLOW|REFUSE)", "required": true },
+        { "name": "protocolRevision", "type": "string|null", "required": true },
+        { "name": "occurredAt", "type": "string<utc-timestamp>", "required": true }
+      ]
+    },
+    {
+      "name": "mcp.request.refused",
+      "description": "A request was refused deterministically before tool execution. The machine reason is the typed origin, transport, authorization, or capacity refusal class; redacted details must not include request bodies, tokens, or raw origins.",
+      "requirementRefs": ["FR-MCP-001", "FR-MCP-008", "FR-MCP-009", "FR-MCP-010"],
+      "tier": "CRITICAL_METADATA",
+      "fields": [
+        { "name": "requestId", "type": "string", "required": true },
+        { "name": "clientIdHash", "type": "string<sha256>|null", "required": true },
+        {
+          "name": "stage",
+          "type": "string(ORIGIN|AUTHENTICATE|TRANSPORT_VALIDATE|SESSION_BIND|RATE_LIMIT|AUTHORIZE|RESOURCE_FETCH)",
+          "required": true
+        },
+        { "name": "machineReason", "type": "string", "required": true },
+        { "name": "httpStatus", "type": "integer", "required": true },
+        { "name": "occurredAt", "type": "string<utc-timestamp>", "required": true }
+      ]
+    },
+    {
+      "name": "mcp.session.opened",
+      "description": "A transport session was created only after origin, authentication, and transport validation admitted the request; the session reference is opaque and binding dimensions are represented without raw origin or actor values.",
+      "requirementRefs": ["FR-MCP-001", "FR-MCP-004", "FR-MCP-009"],
+      "tier": "CRITICAL_METADATA",
+      "fields": [
+        { "name": "sessionId", "type": "string", "required": true },
+        { "name": "clientIdHash", "type": "string<sha256>", "required": true },
+        { "name": "profileId", "type": "string", "required": true },
+        { "name": "originHash", "type": "string<sha256>|null", "required": true },
+        { "name": "protocolRevision", "type": "string", "required": true },
+        { "name": "openedAt", "type": "string<utc-timestamp>", "required": true }
+      ]
+    },
+    {
+      "name": "mcp.session.closed",
+      "description": "A transport session ended through normal completion, expiry, revocation, or a deterministic binding failure.",
+      "requirementRefs": ["FR-MCP-001", "FR-MCP-004", "FR-MCP-009"],
+      "tier": "CRITICAL_METADATA",
+      "fields": [
+        { "name": "sessionId", "type": "string", "required": true },
+        { "name": "clientIdHash", "type": "string<sha256>", "required": true },
+        {
+          "name": "reason",
+          "type": "string(NORMAL|EXPIRED|CREDENTIAL_REVOKED|BINDING_REFUSED|TRANSPORT_CLOSED)",
+          "required": true
+        },
+        { "name": "closedAt", "type": "string<utc-timestamp>", "required": true }
+      ]
+    },
+    {
+      "name": "mcp.rate_limit.admitted",
+      "description": "A per-client rate and concurrency check admitted one request before dispatch, with the policy class and remaining capacity snapshot needed to diagnose fair-use decisions.",
+      "requirementRefs": ["FR-MCP-004", "FR-MCP-009"],
+      "tier": "CRITICAL_METADATA",
+      "fields": [
+        { "name": "requestId", "type": "string", "required": true },
+        { "name": "clientIdHash", "type": "string<sha256>", "required": true },
+        { "name": "rateLimitClass", "type": "string", "required": true },
+        { "name": "remainingRequests", "type": "integer", "required": true },
+        { "name": "activeConcurrency", "type": "integer", "required": true },
+        { "name": "admittedAt", "type": "string<utc-timestamp>", "required": true }
+      ]
+    },
+    {
+      "name": "mcp.rate_limit.refused",
+      "description": "A per-client rate or concurrency limit refused a request before dispatch.",
+      "requirementRefs": ["FR-MCP-004", "FR-MCP-009"],
+      "tier": "CRITICAL_METADATA",
+      "fields": [
+        { "name": "requestId", "type": "string", "required": true },
+        { "name": "clientIdHash", "type": "string<sha256>", "required": true },
+        { "name": "rateLimitClass", "type": "string", "required": true },
+        {
+          "name": "reason",
+          "type": "string(RATE_LIMIT_EXCEEDED|CONCURRENCY_LIMIT_EXCEEDED)",
+          "required": true
+        },
+        { "name": "retryAfterSeconds", "type": "integer|null", "required": true },
+        { "name": "refusedAt", "type": "string<utc-timestamp>", "required": true }
+      ]
+    },
+    {
+      "name": "mcp.tool.authorization",
+      "description": "Tool authorization was re-evaluated for an individual invocation; a registered tool name never grants authority beyond the caller credential, profile, quota, and scope.",
+      "requirementRefs": ["FR-MCP-002", "FR-MCP-004", "FR-MCP-010"],
+      "tier": "CRITICAL_METADATA",
+      "fields": [
+        { "name": "requestId", "type": "string", "required": true },
+        { "name": "clientIdHash", "type": "string<sha256>", "required": true },
+        { "name": "toolName", "type": "string", "required": true },
+        { "name": "outcome", "type": "string(ALLOW|REFUSE)", "required": true },
+        { "name": "machineReason", "type": "string|null", "required": true },
+        { "name": "evaluatedAt", "type": "string<utc-timestamp>", "required": true }
+      ]
+    },
+    {
+      "name": "mcp.resource.access",
+      "description": "Resource authorization was re-evaluated for one fetch; the URI is represented only by a one-way hash so an identifier, signed URL, redirect, range request, or path spelling cannot disclose resource content or grant authority.",
+      "requirementRefs": ["FR-MCP-002", "FR-MCP-010", "FR-MCP-012"],
+      "tier": "CRITICAL_METADATA",
+      "fields": [
+        { "name": "requestId", "type": "string", "required": true },
+        { "name": "clientIdHash", "type": "string<sha256>", "required": true },
+        { "name": "resourceUriHash", "type": "string<sha256>", "required": true },
+        { "name": "surface", "type": "string", "required": true },
+        { "name": "outcome", "type": "string(ALLOW|REFUSE)", "required": true },
+        { "name": "machineReason", "type": "string|null", "required": true },
+        { "name": "evaluatedAt", "type": "string<utc-timestamp>", "required": true }
+      ]
+    },
+    {
+      "name": "mcp.pagination.served",
+      "description": "A tools, resources, or prompts listing returned a bounded structured page; cursors are represented only by one-way hashes.",
+      "requirementRefs": ["FR-MCP-002", "FR-MCP-003", "FR-MCP-009"],
+      "tier": "CRITICAL_METADATA",
+      "fields": [
+        { "name": "requestId", "type": "string", "required": true },
+        { "name": "clientIdHash", "type": "string<sha256>", "required": true },
+        { "name": "surface", "type": "string(TOOLS|RESOURCES|PROMPTS)", "required": true },
+        { "name": "itemCount", "type": "integer", "required": true },
+        { "name": "nextCursorHash", "type": "string<sha256>|null", "required": true },
+        { "name": "servedAt", "type": "string<utc-timestamp>", "required": true }
+      ]
+    },
+    {
+      "name": "mcp.oauth.binding",
+      "description": "An OAuth 2.1 token binding was accepted or refused before public/workspace distribution. Token material and raw redirect/resource URLs are never emitted.",
+      "requirementRefs": ["FR-MCP-006", "FR-MCP-011"],
+      "tier": "CRITICAL_METADATA",
+      "fields": [
+        { "name": "clientIdHash", "type": "string<sha256>", "required": true },
+        { "name": "outcome", "type": "string(ALLOW|REFUSE)", "required": true },
+        { "name": "machineReason", "type": "string|null", "required": true },
+        { "name": "scopeCount", "type": "integer", "required": true },
+        { "name": "validatedAt", "type": "string<utc-timestamp>", "required": true }
+      ]
+    },
+    {
+      "name": "mcp.scheduled.readiness",
+      "description": "A versioned Scheduled integration readiness evaluation records whether background MCP access, scope, delivery, and failure isolation are all proven before availability is claimed.",
+      "requirementRefs": ["FR-MCP-007"],
+      "tier": "CRITICAL_METADATA",
+      "fields": [
+        { "name": "readinessVersion", "type": "string", "required": true },
+        { "name": "accountWorkspaceHash", "type": "string<sha256>", "required": true },
+        { "name": "outcome", "type": "string(READY|UNAVAILABLE)", "required": true },
+        {
+          "name": "failedDimensions",
+          "type": "array<string(ACCESS|SCOPE|DELIVERY|FAILURE_ISOLATION)>",
+          "required": true
+        },
+        { "name": "evaluatedAt", "type": "string<utc-timestamp>", "required": true }
+      ]
+    }
+  ]
+}

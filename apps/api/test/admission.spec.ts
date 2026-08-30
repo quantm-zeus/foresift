@@ -93,7 +93,8 @@ describe('T006: MCP normative admission pipeline (AC-251, INV-037)', () => {
   });
 
   it('Stage 3: protocol revision or method violation short-circuits before auth side effects', async () => {
-    await loadAdmissionModule();
+    const { McpAdmissionPipeline } = await loadAdmissionModule();
+    const pipeline = new McpAdmissionPipeline();
     const badMethodInput = {
       ...defaultValidAdmissionInput,
       method: 'GET',
@@ -139,7 +140,8 @@ describe('T006: MCP normative admission pipeline (AC-251, INV-037)', () => {
   });
 
   it('Stage 5: session binding mismatch refuses before rate allocation', async () => {
-    await loadAdmissionModule();
+    const { McpAdmissionPipeline } = await loadAdmissionModule();
+    const pipeline = new McpAdmissionPipeline();
     const mismatchedSessionInput = {
       ...defaultValidAdmissionInput,
       headers: {

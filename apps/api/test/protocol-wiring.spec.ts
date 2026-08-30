@@ -4,7 +4,7 @@
  * request correlation, and draft revision opt-in constraints.
  */
 import { describe, expect, it } from 'bun:test';
-import { MCP_PROTOCOL_BASELINE_REVISION } from '@foresift/shared-schemas';
+import { MCP_PROTOCOL_BASELINE_REVISION } from '../../../packages/shared-schemas/src/index.ts';
 import {
   VALID_AUTHORIZED_CURSOR,
   UNAUTHORIZED_CURSOR_INSPECTION,

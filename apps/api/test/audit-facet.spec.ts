@@ -5,8 +5,8 @@
  * for AuditChain append, actionClass compliance, hash chain continuity, and tamper detection.
  */
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
-import type { UtcTimestamp } from '@foresift/domain';
-import { AuditChain } from '../../packages/security/src/audit-chain.ts';
+import type { UtcTimestamp } from '../../../packages/domain/src/index.ts';
+import { AuditChain } from '../../../packages/security/src/audit-chain.ts';
 import {
   closeTestDatabase,
   makeTestDatabase,

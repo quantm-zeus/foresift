@@ -4,7 +4,7 @@
  * per-client profile binding, atomic tool exclusion, and plan gating.
  */
 import { describe, expect, it } from 'bun:test';
-import { ToolProfileId } from '@foresift/domain';
+import { ToolProfileId } from '../../../packages/domain/src/index.ts';
 
 async function loadToolsModule() {
   return await import('../src/mcp/tools.ts');

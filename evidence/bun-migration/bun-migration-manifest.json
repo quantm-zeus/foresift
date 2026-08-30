@@ -1,14 +1,14 @@
 {
   "schema": "foresift/bun-migration-manifest@1",
   "migrationId": "bun-test-authority-v1",
-  "generatedAt": "2026-08-30T15:17:32.792Z",
+  "generatedAt": "2026-08-30T15:17:33.059Z",
   "root": ".",
   "totalTestFiles": 319,
   "counts": {
     "CODEMOD_READY": 0,
     "AGY_REQUIRED": 0,
-    "MIGRATED": 300,
-    "VERIFIED": 19,
+    "MIGRATED": 297,
+    "VERIFIED": 22,
     "BLOCKED": 0
   },
   "parity": {
@@ -425,7 +425,7 @@
       "migrationType": "ALREADY_MIGRATED",
       "fixturesAndHelpers": [],
       "sourceAnchors": [],
-      "state": "MIGRATED"
+      "state": "VERIFIED"
     },
     {
       "path": "packages/collector-gap-recovery/test/gap-detector.spec.ts",
@@ -447,7 +447,7 @@
       "sourceAnchors": [
         "../../../tests/fixtures/col/index.ts"
       ],
-      "state": "MIGRATED"
+      "state": "VERIFIED"
     },
     {
       "path": "packages/collector-gap-recovery/test/migrations.spec.ts",
@@ -493,7 +493,7 @@
       "sourceAnchors": [
         "../../../tests/fixtures/col/index.ts"
       ],
-      "state": "MIGRATED"
+      "state": "VERIFIED"
     },
     {
       "path": "packages/collector-solana/test/egress.spec.ts",
@@ -8542,7 +8542,8 @@
       },
       "codexCalls": 0,
       "claudeCalls": 0,
-      "testedHead": "64a19bac93600eeeb1ac85adab563203af1ad9dc"
+      "testedHead": "64a19bac93600eeeb1ac85adab563203af1ad9dc",
+      "checkpointHead": "40f6747faf3984b486ccbc43a2ce9d700dffff47"
     },
     {
       "id": "verify-existing--foresift-collector-gap-recovery-pure-1",
@@ -8553,7 +8554,59 @@
         "packages/collector-gap-recovery/test/gap-detector.spec.ts",
         "packages/collector-gap-recovery/test/waivers.spec.ts"
       ],
-      "state": "PENDING"
+      "state": "VERIFIED",
+      "verification": {
+        "ok": true,
+        "wallTimeMs": 91,
+        "peakRssBytes": 0,
+        "cpuSeconds": 0,
+        "counts": {
+          "passed": 7,
+          "failed": 0,
+          "skipped": 0
+        },
+        "results": [
+          {
+            "id": "pure-1",
+            "workload": "PURE",
+            "files": [
+              "packages/collector-gap-recovery/test/backfill.spec.ts",
+              "packages/collector-gap-recovery/test/gap-detector.spec.ts",
+              "packages/collector-gap-recovery/test/waivers.spec.ts"
+            ],
+            "fileWorkers": 2,
+            "testConcurrency": 8,
+            "command": [
+              "bun",
+              "test",
+              "--no-orphans",
+              "--isolate",
+              "--parallel=2",
+              "--max-concurrency=8",
+              "--timeout=30000",
+              "packages/collector-gap-recovery/test/backfill.spec.ts",
+              "packages/collector-gap-recovery/test/gap-detector.spec.ts",
+              "packages/collector-gap-recovery/test/waivers.spec.ts"
+            ],
+            "status": 0,
+            "signal": null,
+            "timedOut": false,
+            "wallTimeMs": 90,
+            "peakRssBytes": null,
+            "cpuSeconds": null,
+            "counts": {
+              "passed": 7,
+              "failed": 0,
+              "skipped": 0
+            },
+            "stdoutTail": "bun test v1.4.0 (34cbb9a40) 2x PARALLEL\n",
+            "stderrTail": "\n 7 pass\n 0 fail\n 13 expect() calls\nRan 7 tests across 3 files. [61.00ms]\n"
+          }
+        ]
+      },
+      "codexCalls": 0,
+      "claudeCalls": 0,
+      "testedHead": "40f6747faf3984b486ccbc43a2ce9d700dffff47"
     },
     {
       "id": "verify-existing--foresift-collector-solana-database-pglite-1",

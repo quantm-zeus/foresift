@@ -5,8 +5,8 @@
  * deny-closed defaults, HolderMode.MCP_MANUAL, and streamable HTTP JSON-RPC dispatch.
  */
 import { describe, expect, it } from 'bun:test';
-import { HolderMode, ToolProfileId } from '@foresift/domain';
-import { MCP_PROTOCOL_BASELINE_REVISION } from '@foresift/shared-schemas';
+import { HolderMode, ToolProfileId } from '../../../packages/domain/src/index.ts';
+import { MCP_PROTOCOL_BASELINE_REVISION } from '../../../packages/shared-schemas/src/index.ts';
 import { STANDARD_DISCOVERY_CREDENTIAL } from '../../../tests/fixtures/mcp/index.ts';
 
 async function loadServerModule() {

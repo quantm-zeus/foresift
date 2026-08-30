@@ -1,14 +1,14 @@
 {
   "schema": "foresift/bun-migration-manifest@1",
   "migrationId": "bun-test-authority-v1",
-  "generatedAt": "2026-08-30T15:17:49.927Z",
+  "generatedAt": "2026-08-30T15:17:50.209Z",
   "root": ".",
   "totalTestFiles": 319,
   "counts": {
     "CODEMOD_READY": 0,
     "AGY_REQUIRED": 0,
-    "MIGRATED": 289,
-    "VERIFIED": 30,
+    "MIGRATED": 284,
+    "VERIFIED": 35,
     "BLOCKED": 0
   },
   "parity": {
@@ -638,7 +638,7 @@
         "../src/batch-coalescer.ts",
         "../../../tests/fixtures/cost/batches.ts"
       ],
-      "state": "MIGRATED"
+      "state": "VERIFIED"
     },
     {
       "path": "packages/cost-router/test/cost-declaration.spec.ts",
@@ -662,7 +662,7 @@
         "../src/cost-declaration.ts",
         "../../../tests/fixtures/cost/operations.ts"
       ],
-      "state": "MIGRATED"
+      "state": "VERIFIED"
     },
     {
       "path": "packages/cost-router/test/migrations.spec.ts",
@@ -710,7 +710,7 @@
         "../src/paid-policy.ts",
         "../../../tests/fixtures/cost/paid-policies.ts"
       ],
-      "state": "MIGRATED"
+      "state": "VERIFIED"
     },
     {
       "path": "packages/cost-router/test/quota-adapter.spec.ts",
@@ -766,7 +766,7 @@
         "../src/reserve-router.ts",
         "../../../tests/fixtures/cost/operations.ts"
       ],
-      "state": "MIGRATED"
+      "state": "VERIFIED"
     },
     {
       "path": "packages/cost-router/test/strict-free-guard.spec.ts",
@@ -790,7 +790,7 @@
         "../src/strict-free-guard.ts",
         "../../../tests/fixtures/cost/operations.ts"
       ],
-      "state": "MIGRATED"
+      "state": "VERIFIED"
     },
     {
       "path": "packages/discovery-universe/test/migrations.spec.ts",
@@ -8795,7 +8795,8 @@
       },
       "codexCalls": 0,
       "claudeCalls": 0,
-      "testedHead": "c8ab956a35be1c4122f9ab9e2471609d1c6194fd"
+      "testedHead": "c8ab956a35be1c4122f9ab9e2471609d1c6194fd",
+      "checkpointHead": "ad33098a17305b38a5b2b42f6f3e185ae659b9f1"
     },
     {
       "id": "verify-existing--foresift-cost-router-pure-1",
@@ -8808,7 +8809,63 @@
         "packages/cost-router/test/reserve-router.spec.ts",
         "packages/cost-router/test/strict-free-guard.spec.ts"
       ],
-      "state": "PENDING"
+      "state": "VERIFIED",
+      "verification": {
+        "ok": true,
+        "wallTimeMs": 152,
+        "peakRssBytes": 0,
+        "cpuSeconds": 0,
+        "counts": {
+          "passed": 30,
+          "failed": 0,
+          "skipped": 0
+        },
+        "results": [
+          {
+            "id": "pure-1",
+            "workload": "PURE",
+            "files": [
+              "packages/cost-router/test/batch-coalescer.spec.ts",
+              "packages/cost-router/test/cost-declaration.spec.ts",
+              "packages/cost-router/test/paid-policy.spec.ts",
+              "packages/cost-router/test/reserve-router.spec.ts",
+              "packages/cost-router/test/strict-free-guard.spec.ts"
+            ],
+            "fileWorkers": 2,
+            "testConcurrency": 8,
+            "command": [
+              "bun",
+              "test",
+              "--no-orphans",
+              "--isolate",
+              "--parallel=2",
+              "--max-concurrency=8",
+              "--timeout=30000",
+              "packages/cost-router/test/batch-coalescer.spec.ts",
+              "packages/cost-router/test/cost-declaration.spec.ts",
+              "packages/cost-router/test/paid-policy.spec.ts",
+              "packages/cost-router/test/reserve-router.spec.ts",
+              "packages/cost-router/test/strict-free-guard.spec.ts"
+            ],
+            "status": 0,
+            "signal": null,
+            "timedOut": false,
+            "wallTimeMs": 152,
+            "peakRssBytes": null,
+            "cpuSeconds": null,
+            "counts": {
+              "passed": 30,
+              "failed": 0,
+              "skipped": 0
+            },
+            "stdoutTail": "bun test v1.4.0 (34cbb9a40) 2x PARALLEL\n",
+            "stderrTail": "\n 30 pass\n 0 fail\n 72 expect() calls\nRan 30 tests across 5 files. [130.00ms]\n"
+          }
+        ]
+      },
+      "codexCalls": 0,
+      "claudeCalls": 0,
+      "testedHead": "ad33098a17305b38a5b2b42f6f3e185ae659b9f1"
     },
     {
       "id": "verify-existing--foresift-discovery-universe-database-pglite-1",

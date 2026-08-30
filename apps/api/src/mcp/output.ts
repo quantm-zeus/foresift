@@ -33,6 +33,8 @@ export interface FormatOutputOptions {
   readonly rights?: unknown;
   readonly cost?: unknown;
   readonly sourceDependence?: readonly string[];
+  readonly maxBytes?: number;
+  readonly maxRecords?: number;
 }
 
 export class McpOutputError extends Error {
@@ -149,6 +151,12 @@ export function formatMcpOutput(
   options: FormatOutputOptions = {},
 ): McpFormattedOutput {
   assertPermittedMcpPayload(envelope);
+  if (options.maxBytes !== undefined) {
+    const bytes = Buffer.byteLength(JSON.stringify(envelope), 'utf8');
+    if (bytes > options.maxBytes) throw new McpOutputError('OUTPUT_OVERSIZE');
+  }
+  if (options.maxRecords !== undefined)
+    validateOutputCaps(envelope, { maxRecords: options.maxRecords });
   const maximumPageRecords = Math.min(
     options.maximumPageRecords ?? MCP_MAXIMUM_PAGE_RECORDS,
     MCP_MAXIMUM_PAGE_RECORDS,
@@ -201,7 +209,9 @@ export function formatMcpOutput(
   }
   const textContent =
     options.conciseText ??
-    `${envelope.meta.toolName}: ${outcome.toLowerCase()} (${envelope.meta.evidenceIds.length} evidence reference${envelope.meta.evidenceIds.length === 1 ? '' : 's'}).`;
+    (outcome === 'ABSTAINED'
+      ? `Explicit abstention: ${String(abstentionReason)}.`
+      : `${envelope.meta.toolName}: ${outcome.toLowerCase()} (${envelope.meta.evidenceIds.length} evidence reference${envelope.meta.evidenceIds.length === 1 ? '' : 's'}).`);
   const result: McpFormattedOutput = {
     outputSchema: options.outputSchema ?? ({ type: 'object', additionalProperties: true } as const),
     structuredContent,
@@ -212,4 +222,30 @@ export function formatMcpOutput(
   };
   assertPermittedMcpPayload(result);
   return result;
+}
+
+export function scrubProhibitedPayloads(payload: unknown): void {
+  assertPermittedMcpPayload(payload);
+}
+
+export function validateOutputCaps(
+  envelope: { readonly data?: unknown },
+  options: { readonly maxRecords?: number; readonly maxBytes?: number } = {},
+): void {
+  const maxRecords = options.maxRecords ?? MCP_MAXIMUM_PAGE_RECORDS;
+  const visit = (value: unknown): void => {
+    if (Array.isArray(value)) {
+      if (value.length > maxRecords) throw new Error('page records exceed maximum');
+      for (const child of value) visit(child);
+    } else if (typeof value === 'object' && value !== null) {
+      for (const child of Object.values(value)) visit(child);
+    }
+  };
+  visit(envelope.data);
+  if (
+    options.maxBytes !== undefined &&
+    Buffer.byteLength(JSON.stringify(envelope), 'utf8') > options.maxBytes
+  ) {
+    throw new McpOutputError('OUTPUT_OVERSIZE');
+  }
 }

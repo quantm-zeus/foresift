@@ -155,3 +155,60 @@ export class McpToolSurface {
     return formatMcpOutput(await this.toolCore.execute(request), input.output);
   }
 }
+
+const SHARED_DOMAIN_PROFILE_TOOLS: Readonly<Record<string, readonly string[]>> = {
+  discovery: [
+    'discover_candidates',
+    'get_asset_identity',
+    'get_candidate_delta',
+    'compare_candidates',
+  ],
+  'admin-read': [
+    'discover_candidates',
+    'get_asset_identity',
+    'get_market_evidence_pack',
+    'get_security_evidence_pack',
+    'get_holder_distribution',
+    'get_wallet_cluster_evidence',
+    'get_tradability_assessment',
+    'get_candidate_delta',
+    'get_thesis_status',
+  ],
+};
+
+export async function listToolsForProfile(profile: string): Promise<McpToolDescription[]> {
+  const names = [...MCP_STATUS_TOOLS, ...(SHARED_DOMAIN_PROFILE_TOOLS[profile] ?? [])];
+  if (profile === 'admin-read') names.push('provider_adapter_probe', 'raw_ledger_diagnostic');
+  return [...new Set(names)].sort().map((name) => ({
+    name,
+    title: name.replaceAll('_', ' '),
+    description: `Read-only Foresift operation: ${name}`,
+    inputSchema: { type: 'object', additionalProperties: true },
+    outputSchema: { type: 'object', additionalProperties: true },
+  }));
+}
+
+export async function executeMcpTool(
+  request: { readonly name: string; readonly arguments: unknown },
+  options: { readonly toolCore: ToolCore; readonly callerProfile: string; readonly actor: string },
+) {
+  const visible = (await listToolsForProfile(options.callerProfile)).some(
+    (tool) => tool.name === request.name,
+  );
+  if (!visible) return { isError: true, errorReason: 'TOOL_NOT_IN_PROFILE' as const };
+  const envelope = await options.toolCore.execute({
+    runId: `mcp-${crypto.randomUUID()}`,
+    authnMaterial: { actor: options.actor },
+    holderMode: 'MCP_MANUAL',
+    workloadClass: 'INTERACTIVE_HIGH',
+    toolName: request.name,
+    tenantId: options.actor,
+    arguments: request.arguments,
+    canonicalEntityIdentity: 'mcp:unscoped',
+  });
+  return {
+    content: [{ type: 'text' as const, text: `${request.name} completed.` }],
+    structuredContent: envelope.data,
+    _meta: envelope.meta,
+  };
+}

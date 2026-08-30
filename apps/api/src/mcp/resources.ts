@@ -93,20 +93,18 @@ export function parseMcpResourceUri(uri: string): {
   readonly entity: string;
   readonly canonicalUri: string;
 } {
-  let parsed: URL;
-  try {
-    parsed = new URL(uri);
-  } catch {
+  const match = /^([a-z]+):\/\/([^?#]+)(\?[^#]*)?$/i.exec(uri);
+  if (match?.[1] === undefined || match[2] === undefined) {
     throw new McpResourceError('RESOURCE_URI_INVALID');
   }
-  const scheme = parsed.protocol.slice(0, -1);
+  const scheme = match[1].toLowerCase();
   if (!(MCP_RESOURCE_SCHEMES as readonly string[]).includes(scheme)) {
     throw new McpResourceError('RESOURCE_URI_INVALID');
   }
-  if (parsed.username !== '' || parsed.password !== '' || parsed.hash !== '') {
+  if (match[2].includes('@')) {
     throw new McpResourceError('RESOURCE_URI_INVALID');
   }
-  const rawIdentity = `${parsed.hostname}${parsed.pathname}`;
+  const rawIdentity = match[2];
   const decoded = decodeSafe(rawIdentity);
   if (
     decoded === '' ||
@@ -119,7 +117,7 @@ export function parseMcpResourceUri(uri: string): {
   return {
     scheme: scheme as McpResourceScheme,
     entity,
-    canonicalUri: `${scheme}://${entity}${parsed.search}`,
+    canonicalUri: `${scheme}://${entity}${match[3] ?? ''}`,
   };
 }
 
@@ -136,6 +134,17 @@ function sanitizeBrowserText(text: string): string {
     .replace(/<script\b[^>]*>[\s\S]*?<\/script\s*>/gi, '')
     .replace(/\son[a-z]+\s*=\s*(['"])[\s\S]*?\1/gi, '')
     .replace(/\s(?:src|href)\s*=\s*(['"])https?:\/\/[\s\S]*?\1/gi, '');
+}
+
+export const sanitizeResourceContent = sanitizeBrowserText;
+
+export function isSupportedResourceUri(uri: string): boolean {
+  try {
+    parseMcpResourceUri(uri);
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 export class McpAccessAuditor {
@@ -257,4 +266,65 @@ export class McpResourceSurface {
       });
     }
   }
+}
+
+export async function readMcpResource(
+  uri: string,
+  context: {
+    readonly actor: string;
+    readonly scopes: readonly string[];
+    readonly entityBounds?: readonly string[];
+    readonly rightsPolicy?: string;
+  },
+): Promise<{
+  readonly allowed: boolean;
+  readonly refusalReason?: string;
+  readonly content?: { readonly uri: string; readonly mimeType: string; readonly text: string };
+}> {
+  let parsed: ReturnType<typeof parseMcpResourceUri>;
+  try {
+    parsed = parseMcpResourceUri(uri);
+  } catch {
+    return { allowed: false, refusalReason: 'RESOURCE_URI_INVALID' };
+  }
+  if (!context.scopes.includes('resources:read'))
+    return { allowed: false, refusalReason: 'RESOURCE_UNAUTHORIZED' };
+  if (
+    context.rightsPolicy === 'DERIVED_ONLY' &&
+    parsed.scheme === 'evidence' &&
+    /raw/i.test(parsed.entity)
+  ) {
+    return { allowed: false, refusalReason: 'RESOURCE_UNAUTHORIZED' };
+  }
+  const chain = parsed.entity.split(':', 1)[0];
+  if (chain !== undefined && context.entityBounds !== undefined && parsed.scheme === 'snapshot') {
+    const entityAllowed = context.entityBounds.some(
+      (bound) => bound === '*' || bound.startsWith(`${chain}:`),
+    );
+    if (!entityAllowed) return { allowed: false, refusalReason: 'RESOURCE_UNAUTHORIZED' };
+  }
+  return {
+    allowed: true,
+    content: {
+      uri: parsed.canonicalUri,
+      mimeType: 'application/json',
+      text: JSON.stringify({ uri: parsed.canonicalUri }),
+    },
+  };
+}
+
+export async function auditResourceAccess(input: {
+  readonly chain: AuditChain;
+  readonly occurredAt: UtcTimestamp;
+  readonly actor: string;
+  readonly uri: string;
+  readonly bytesDelivered: number;
+}) {
+  return input.chain.append({
+    occurredAt: input.occurredAt,
+    actor: input.actor,
+    actionClass: 'TOOL_RESOURCE_ACCESS',
+    subject: `mcp:resource:${input.uri}`,
+    payload: { uri: input.uri, bytesDelivered: input.bytesDelivered },
+  });
 }

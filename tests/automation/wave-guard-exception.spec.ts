@@ -29,7 +29,7 @@ const GUARD = join(repoRoot, 'scripts', 'automation', 'wave-guard.mjs');
 // graph.scopeExceptions.
 function buildFixture() {
   const root = mkdtempSync(join(tmpdir(), 'guard-exc-fx-'));
-  const run = (cmd) => {
+  const run = (cmd: string) => {
     const r = spawnSync(cmd, { shell: true, cwd: root, encoding: 'utf8' });
     if (r.status !== 0) throw new Error(`fixture cmd failed: ${cmd}: ${r.stderr ?? r.stdout}`);
     return (r.stdout ?? '').trim();

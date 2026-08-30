@@ -109,9 +109,12 @@ const MANDATED_RESOURCE_SCHEMES = [
 
 describe('AC-144 acceptance: MCP protocol compatibility matrix (baseline 2025-11-25)', () => {
   describe('target client initialize handshake matrix', () => {
-    it.each(SUPPORTED_TARGET_CLIENTS)(
-      'admits initialize handshake for client: $clientName ($clientId v$version)',
-      (client) => {
+    it.each(
+      SUPPORTED_TARGET_CLIENTS.map((client) => [
+        `${client.clientName} (${client.clientId} v${client.version})`,
+        client,
+      ] as const),
+    )('admits initialize handshake for client: %s', (_label, client) => {
         const initInput = {
           protocolRevision: MCP_PROTOCOL_BASELINE_REVISION,
           contentType: 'application/json; charset=utf-8',

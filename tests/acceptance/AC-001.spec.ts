@@ -21,6 +21,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 import {
   ALL_PIPELINE_STAGES,
   PIPELINE_STAGE_ORDER,
+  ToolProfileId,
   type PipelineStage,
   type UtcTimestamp,
 } from '@foresift/domain';
@@ -34,6 +35,7 @@ import {
   visibleToolsFor,
   DOMAIN_TOOL_CATALOG,
   ATOMIC_TOOL_CATALOG,
+  type ProfileBinding,
 } from '../../packages/tool-core/src/profiles.ts';
 import { closeTestDatabase, makeTestDatabase, type TestDatabase } from './helpers.ts';
 
@@ -224,7 +226,7 @@ describe('AC-001 acceptance (mcp-surface facet): manual client initialize -> lis
   });
 
   it('lists only scoped domain tools for discovery profile over MCP surface', () => {
-    const discoveryBinding = { id: 'discovery', klass: 'STANDARD' as const };
+    const discoveryBinding: ProfileBinding = { id: ToolProfileId.DISCOVERY, klass: 'STANDARD' };
     const availableTools = visibleToolsFor(discoveryBinding);
 
     // MCP tools/list maps registry tools to MCP tool descriptors

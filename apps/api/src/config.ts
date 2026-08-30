@@ -89,3 +89,36 @@ export function parseMcpSecurityConfig(value: unknown): McpSecurityConfig {
 export const McpConfigSchema = McpSecurityConfigSchema;
 export const DEFAULT_MCP_CONFIG = DEFAULT_MCP_SECURITY_CONFIG;
 export const parseMcpConfig = parseMcpSecurityConfig;
+
+/** Public transport-facing spelling retained for the G.13 API contract. */
+export const McpServerConfigSchema = z
+  .object({
+    protocolBaseline: z.literal(MCP_PROTOCOL_BASELINE),
+    allowedRevisions: z
+      .array(z.string().min(1))
+      .min(1)
+      .refine(
+        (revisions) =>
+          revisions.includes(MCP_PROTOCOL_BASELINE) &&
+          revisions.every(
+            (revision) =>
+              revision === MCP_PROTOCOL_BASELINE || /^\d{4}-draft-[a-z0-9.-]+$/i.test(revision),
+          ),
+        { message: 'allowed revisions must be mutually tested or explicitly opted-in drafts' },
+      ),
+    transport: z.literal('STREAMABLE_HTTP'),
+    originPolicy: z.literal('EXACT_ALLOWLIST'),
+    allowedOrigins: z.array(BareOriginSchema).min(1),
+    absentOriginPolicy: z.enum(['PRODUCTION', 'NON_PRODUCTION']),
+    statefulSessionsEnabled: z.literal(false),
+    maximumRequestBytes: z.number().int().positive().max(MCP_MAXIMUM_REQUEST_BYTES),
+    maximumResponseBytes: z.number().int().positive().max(MCP_MAXIMUM_RESPONSE_BYTES),
+    maximumPageRecords: z.number().int().positive().max(MCP_MAXIMUM_PAGE_RECORDS),
+  })
+  .strict();
+
+export type McpServerConfig = z.infer<typeof McpServerConfigSchema>;
+
+export function validateMcpConfig(value: unknown): McpServerConfig {
+  return McpServerConfigSchema.parse(value);
+}

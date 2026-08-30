@@ -87,3 +87,27 @@ export interface StreamableHttpTransport {
   handleRequest(request: unknown, response: unknown, body?: unknown): Promise<void>;
   close?(): Promise<void>;
 }
+
+export function createMcpProtocolMiddleware(options: {
+  readonly maxMessageBytes: number;
+  readonly allowedRevisions?: readonly string[];
+}) {
+  const guard = new McpProtocolGuard({
+    maxMessageBytes: options.maxMessageBytes,
+    ...(options.allowedRevisions === undefined
+      ? {}
+      : { allowedRevisions: options.allowedRevisions }),
+  });
+  return {
+    inspectRequest(input: ProtocolInspectionInput) {
+      const verdict = guard.inspect(input);
+      return verdict.decision === 'ALLOW'
+        ? { allowed: true as const }
+        : { allowed: false as const, reason: verdict.reason };
+    },
+  };
+}
+
+export function correlateJsonRpc<T>(id: JsonRpcId, result: T) {
+  return { jsonrpc: '2.0' as const, id, result };
+}

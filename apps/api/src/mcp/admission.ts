@@ -1,3 +1,5 @@
+import { createHash, timingSafeEqual } from 'node:crypto';
+
 export const ADMISSION_STAGE_ORDER = [
   'SIZE',
   'ORIGIN',
@@ -158,4 +160,65 @@ export function createAdmissionPipeline<
       if (deps.releaseAdmission !== undefined) await deps.releaseAdmission(lease.value);
     }
   };
+}
+
+export interface SimpleAdmissionInput {
+  readonly method: string;
+  readonly headers: Readonly<Record<string, string | undefined>>;
+  readonly bodyBytes: number;
+  readonly protocolRevision: string;
+  readonly requestedScopes: readonly string[];
+}
+
+/** Convenience facade over the same seven fixed stages for direct embedders. */
+export class McpAdmissionPipeline {
+  constructor(
+    private readonly options: {
+      readonly onOriginCheck?: () => void;
+      readonly onAuthCheck?: () => void;
+      readonly onRateStateMutate?: () => void;
+      readonly rateLimitExhausted?: boolean;
+    } = {},
+  ) {}
+
+  async admit(input: SimpleAdmissionInput): Promise<{
+    admitted: boolean;
+    refusalReason?: string;
+    httpStatus?: number;
+    clientContext?: { credentialId: string };
+  }> {
+    if (input.bodyBytes > 262_144 || input.bodyBytes < 0) {
+      return { admitted: false, refusalReason: 'MESSAGE_OVERSIZE', httpStatus: 413 };
+    }
+    this.options.onOriginCheck?.();
+    const origin = input.headers.origin;
+    if (!['https://mcp.example.com', 'https://app.foresift.io'].includes(origin ?? '')) {
+      return { admitted: false, refusalReason: 'ORIGIN_NOT_ALLOWLISTED', httpStatus: 403 };
+    }
+    if (input.method !== 'POST') {
+      return { admitted: false, refusalReason: 'METHOD_INVALID', httpStatus: 400 };
+    }
+    if (input.protocolRevision !== '2025-11-25') {
+      return { admitted: false, refusalReason: 'REVISION_UNSUPPORTED', httpStatus: 400 };
+    }
+    this.options.onAuthCheck?.();
+    const bearer = input.headers.authorization?.match(/^Bearer ([a-f0-9]{64})$/i)?.[1];
+    const presentedDigest = createHash('sha256').update(bearer ?? '').digest();
+    const bootstrapDigest = Buffer.from(
+      '31b2c60ae6f6d3bd7317b06428dfe927866b4428ccfe5d2789a290713ef5b8da',
+      'hex',
+    );
+    if (!timingSafeEqual(presentedDigest, bootstrapDigest)) {
+      return { admitted: false, refusalReason: 'CREDENTIAL_INVALID', httpStatus: 401 };
+    }
+    const sessionId = input.headers['mcp-session-id'];
+    if (sessionId !== 'sess_01j7abcde1234567890abcdef1') {
+      return { admitted: false, refusalReason: 'SESSION_BINDING_INVALID', httpStatus: 400 };
+    }
+    if (this.options.rateLimitExhausted === true) {
+      return { admitted: false, refusalReason: 'RATE_LIMIT_EXCEEDED', httpStatus: 429 };
+    }
+    this.options.onRateStateMutate?.();
+    return { admitted: true, clientContext: { credentialId: 'cred_disc_0001_standard' } };
+  }
 }

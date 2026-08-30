@@ -113,3 +113,70 @@ export class McpOriginWiring {
 export function createOriginWiring(options: OriginWiringOptions): McpOriginWiring {
   return new McpOriginWiring(options);
 }
+
+/** HTTP middleware adapter around the normative wiring/gate composition. */
+export function createMcpOriginMiddleware(options: {
+  readonly allowlist: readonly string[];
+  readonly localAllowlist?: readonly string[];
+  readonly trustedProxies?: readonly string[];
+  readonly absentOriginPolicy: 'PRODUCTION' | 'NON_PRODUCTION';
+}) {
+  const publicGate = new McpOriginGate({
+    allowlist: options.allowlist,
+    absentOriginPolicy: options.absentOriginPolicy,
+  });
+  const localGate = new McpOriginGate({
+    allowlist: options.localAllowlist ?? options.allowlist,
+    absentOriginPolicy: options.absentOriginPolicy,
+  });
+  const trusted = new Set(options.trustedProxies ?? []);
+  return {
+    evaluateOrigin(input: {
+      readonly originHeader?: string;
+      readonly clientRegisteredNonBrowser?: boolean;
+      readonly isLoopback?: boolean;
+      readonly isLoopbackRequest?: boolean;
+    }): { readonly allowed: boolean; readonly httpStatus: 200 | 403; readonly reason?: string } {
+      if (input.originHeader === undefined && input.clientRegisteredNonBrowser === true) {
+        return { allowed: true, httpStatus: 200 };
+      }
+      const origin = input.originHeader;
+      if (
+        origin === '' ||
+        origin === 'null' ||
+        (origin !== undefined && (/[\r\n]/.test(origin) || origin.endsWith('/')))
+      ) {
+        return { allowed: false, httpStatus: 403, reason: 'MALFORMED' };
+      }
+      const looksLoopback =
+        origin !== undefined &&
+        /^http:\/\/(?:localhost|127\.0\.0\.1|\[::1\])(?::|$)/i.test(origin);
+      const loopbackRequest = input.isLoopbackRequest ?? input.isLoopback ?? false;
+      if (looksLoopback && options.localAllowlist !== undefined && !loopbackRequest) {
+        return { allowed: false, httpStatus: 403, reason: 'NOT_ALLOWLISTED' };
+      }
+      const verdict =
+        looksLoopback && options.localAllowlist !== undefined
+          ? localGate.decide(origin)
+          : publicGate.decide(origin);
+      return verdict.decision === 'ALLOW'
+        ? { allowed: true, httpStatus: 200 }
+        : { allowed: false, httpStatus: 403, reason: verdict.reason };
+    },
+    resolveClientOrigin(input: {
+      readonly remoteIp: string;
+      readonly headers: Readonly<Record<string, string | undefined>>;
+    }) {
+      const trustedProxy = trusted.has(input.remoteIp);
+      return {
+        trustedProxy,
+        origin:
+          trustedProxy &&
+          input.headers['x-forwarded-proto'] !== undefined &&
+          input.headers['x-forwarded-host'] !== undefined
+            ? `${input.headers['x-forwarded-proto']}://${input.headers['x-forwarded-host']}`
+            : undefined,
+      };
+    },
+  };
+}

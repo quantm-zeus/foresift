@@ -13,7 +13,6 @@ import {
   SESSION_CLAIM_MISMATCH_VECTORS,
   UNAUTHORIZED_CURSORS,
   EXPIRED_CURSORS,
-  MALFORMED_CURSORS,
 } from '../fixtures/mcp/index.ts';
 
 interface McpServerEngine {
@@ -55,7 +54,10 @@ function createNegativeTestMcpServer(options?: {
         return {
           statusCode: 405,
           headers: { 'content-type': 'application/json', allow: 'POST' },
-          body: JSON.stringify({ error: 'METHOD_INVALID', message: `Method '${method}' not allowed` }),
+          body: JSON.stringify({
+            error: 'METHOD_INVALID',
+            message: `Method '${method}' not allowed`,
+          }),
         };
       }
 
@@ -111,7 +113,9 @@ function createNegativeTestMcpServer(options?: {
         typeof jsonRpc.method !== 'string' ||
         (jsonRpc.id === undefined && jsonRpc.method !== 'notifications/initialized') ||
         (jsonRpc.params !== undefined &&
-          (typeof jsonRpc.params !== 'object' || jsonRpc.params === null || Array.isArray(jsonRpc.params)))
+          (typeof jsonRpc.params !== 'object' ||
+            jsonRpc.params === null ||
+            Array.isArray(jsonRpc.params)))
       ) {
         return {
           statusCode: 400,

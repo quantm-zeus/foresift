@@ -189,16 +189,16 @@ describe('AC-001 acceptance (mcp-surface facet): manual client initialize -> lis
 
   interface JsonRpcRequest {
     jsonrpc: '2.0';
-    id?: number | string;
+    id?: number | string | undefined;
     method: string;
-    params?: Record<string, unknown>;
+    params?: Record<string, unknown> | undefined;
   }
 
   interface JsonRpcResponse {
     jsonrpc: '2.0';
-    id?: number | string;
+    id?: number | string | undefined;
     result?: unknown;
-    error?: { code: number; message: string; data?: unknown };
+    error?: { code: number; message: string; data?: unknown | undefined } | undefined;
   }
 
   function handleMcpRequest(session: McpClientSession, request: JsonRpcRequest): JsonRpcResponse {
@@ -469,4 +469,3 @@ describe('AC-001 acceptance (mcp-surface facet): manual client initialize -> lis
     expect(validated.meta.partial).toBe(true);
   });
 });
-

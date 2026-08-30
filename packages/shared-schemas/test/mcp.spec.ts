@@ -6,28 +6,11 @@
  * caps are structural.
  */
 import { describe, expect, it } from 'bun:test';
-import {
-  ALL_TOOL_PROFILE_IDS,
-} from '@foresift/domain';
-import {
-  MCP_SCHEMA_REGISTRY_VERSION,
-  MCP_SCHEMAS,
-  McpOutputEnvelopeSchema,
-  McpOutputMetadataSchema,
-  McpSessionBindingSchema,
-  McpResumableCursorSchema,
-  McpRefusalReasonSchema,
-  McpPromptNameSchema,
-  McpResourceUriSchema,
-  McpClientContextSchema,
-  parseMcpSchema,
-  ALL_MCP_PROMPT_NAMES,
-  ALL_MCP_RESOURCE_SCHEMES,
-  type McpSchemaName,
-} from '../src/mcp.ts';
+// prettier-ignore
+// @ts-expect-error ../src/mcp.ts is implemented in T002
+import { MCP_SCHEMA_REGISTRY_VERSION, MCP_SCHEMAS, McpOutputEnvelopeSchema, McpOutputMetadataSchema, McpSessionBindingSchema, McpResumableCursorSchema, McpRefusalReasonSchema, McpPromptNameSchema, McpResourceUriSchema, McpClientContextSchema, parseMcpSchema, ALL_MCP_PROMPT_NAMES, ALL_MCP_RESOURCE_SCHEMES, type McpSchemaName } from '../src/mcp.ts';
 
 const at = (s: string) => s;
-const HASH = `sha256:${'ab'.repeat(32)}`;
 
 const outputMetadataFixture = {
   toolName: 'discover_candidates',
@@ -204,7 +187,13 @@ describe('MCP output envelope & metadata schemas (§17.4, FR-MCP-003)', () => {
   });
 
   it('refuses missing mandated metadata fields', () => {
-    for (const key of ['toolName', 'toolVersion', 'fetchedAt', 'qualityCodes', 'partial'] as const) {
+    for (const key of [
+      'toolName',
+      'toolVersion',
+      'fetchedAt',
+      'qualityCodes',
+      'partial',
+    ] as const) {
       const broken: Record<string, unknown> = { ...outputMetadataFixture };
       delete broken[key];
       expect(() => McpOutputMetadataSchema.parse(broken)).toThrow();

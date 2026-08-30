@@ -16,7 +16,7 @@ export const PROMPT_INJECTION_STRINGS = [
 export const SQL_INJECTION_STRINGS = [
   "' OR '1'='1",
   "'; DROP TABLE _foresift_schema_migrations; --",
-  "1 UNION SELECT null, null, secret_hash FROM _foresift_mcp_credentials --",
+  '1 UNION SELECT null, null, secret_hash FROM _foresift_mcp_credentials --',
   "' OR 1=1; DELETE FROM _foresift_schema_migration_leases; --",
   "admin' --",
 ] as const;

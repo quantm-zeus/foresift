@@ -58,7 +58,7 @@ export const VALID_BEARER_SEEDS: readonly TestMcpCredentialSeed[] = [
     actor: 'expert-oncall@example.com',
     rawSecret: 'fs_mcp_live_sec_aabbccddeeff00112233445566778899aabbccddeeff0011',
     prefix: 'fs_mcp_live_sec_aabb',
-    profileId: 'expert-diagnostic',
+    profileId: 'admin-read',
     allowedScopes: ['mcp:tools:read', 'mcp:tools:call', 'diagnostic:read', 'providers:probe'],
     allowedOrigins: ['https://agent.foresift.internal:8443'],
     rateLimitRps: 50,

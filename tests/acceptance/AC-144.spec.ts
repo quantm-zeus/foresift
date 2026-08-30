@@ -17,7 +17,6 @@ import { describe, expect, it } from 'bun:test';
 import {
   ALL_MCP_PROMPT_NAMES,
   ALL_MCP_RESOURCE_SCHEMES,
-  VALID_JSONRPC_INITIALIZE_REQUEST,
   VALID_JSONRPC_INITIALIZED_NOTIFICATION,
   VALID_JSONRPC_PING_REQUEST,
   VALID_JSONRPC_TOOLS_LIST_REQUEST,
@@ -25,7 +24,6 @@ import {
   VALID_JSONRPC_RESOURCES_LIST_REQUEST,
   VALID_JSONRPC_RESOURCES_READ_REQUEST,
   VALID_JSONRPC_PROMPTS_LIST_REQUEST,
-  VALID_JSONRPC_PROMPTS_GET_REQUEST,
   VALID_ALLOWLISTED_ORIGINS,
   VALID_BEARER_SEEDS,
 } from '../fixtures/mcp/index.ts';
@@ -494,7 +492,9 @@ describe('AC-144 acceptance: MCP client compatibility matrix (FR-MCP-009, §17.1
       expect(res.statusCode).toBe(200);
       const parsed = JSON.parse(res.body);
       expect(parsed.result.tools.length).toBeGreaterThanOrEqual(2);
-      expect(parsed.result.tools.some((t: { name: string }) => t.name === 'discover_candidates')).toBe(true);
+      expect(
+        parsed.result.tools.some((t: { name: string }) => t.name === 'discover_candidates'),
+      ).toBe(true);
     });
 
     it('executes tool call returning structured output with evidence links and metadata', () => {

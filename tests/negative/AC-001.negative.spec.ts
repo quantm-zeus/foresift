@@ -277,4 +277,3 @@ describe('AC-001 negative (mcp-surface facet): refusal of out-of-profile calls, 
     );
   });
 });
-

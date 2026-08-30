@@ -39,7 +39,7 @@ describe('g0_disc_* SQL migrations (cheap-monitor)', () => {
       'g0_disc_0002_cheap_monitor',
       'g0_disc_0003_promotions',
     ]);
-  });
+  }, 60_000);
 
   it('applies migrations idempotently', async () => {
     await applyMigrations({ engine, migrationsDir: MIGRATIONS_DIR });

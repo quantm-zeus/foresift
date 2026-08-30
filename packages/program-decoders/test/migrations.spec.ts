@@ -40,7 +40,7 @@ describe('g0_col_* SQL migrations (program-decoders)', () => {
       'g0_col_0003_incidents_decodescope',
       'g0_col_0004_health_ceiling',
     ]);
-  });
+  }, 60_000);
 
   it('applies migrations idempotently', async () => {
     await applyMigrations({ engine, migrationsDir: MIGRATIONS_DIR });

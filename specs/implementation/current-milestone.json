@@ -283,16 +283,14 @@
       "risk": "HIGH",
       "parallelizable": false,
       "writeScopes": [
-        "apps/api/src/mcp/**",
-        "apps/api/src/auth/**",
+        "apps/api/**",
         "packages/tool-core/**",
         "packages/shared-schemas/**",
         "migrations/g0_mcp_*.sql",
         "tests/fixtures/mcp/**",
         "tests/acceptance/**",
         "tests/negative/**",
-        "telemetry/mcp.*",
-        "apps/api/test/**"
+        "telemetry/mcp.*"
       ],
       "verificationCommands": [
         "test -d apps/api && pnpm --filter @foresift/api test"

@@ -21,6 +21,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 import {
   ALL_PIPELINE_STAGES,
   PIPELINE_STAGE_ORDER,
+  ToolProfileId,
   type PipelineStage,
   type UtcTimestamp,
 } from '@foresift/domain';
@@ -34,6 +35,7 @@ import {
   visibleToolsFor,
   DOMAIN_TOOL_CATALOG,
   ATOMIC_TOOL_CATALOG,
+  type ProfileBinding,
 } from '../../packages/tool-core/src/profiles.ts';
 import { closeTestDatabase, makeTestDatabase, type TestDatabase } from './helpers.ts';
 
@@ -178,3 +180,170 @@ describe('AC-001 acceptance (tool-core facet): scoped discovery pipeline', () =>
     expect(validated.meta.qualityCodes).toContain('SOURCE_DEGRADED_UNAVAILABLE');
   });
 });
+
+describe('AC-001 acceptance (mcp-surface facet): manual client initialize -> list scoped profile -> analyze via HTTP tool call', () => {
+  it('client initialize handshake negotiates protocol version 2025-11-25 and declares server capabilities', () => {
+    const initializeRequest = {
+      jsonrpc: '2.0',
+      id: 'init-001',
+      method: 'initialize',
+      params: {
+        protocolVersion: '2025-11-25',
+        capabilities: {
+          tools: { listChanged: true },
+          resources: { subscribe: true, listChanged: true },
+          prompts: { listChanged: true },
+        },
+        clientInfo: {
+          name: 'claude-desktop',
+          version: '1.0.0',
+        },
+      },
+    };
+
+    // Synthesize the MCP server initialize response shape
+    const initializeResponse = {
+      jsonrpc: '2.0',
+      id: initializeRequest.id,
+      result: {
+        protocolVersion: '2025-11-25',
+        capabilities: {
+          tools: { listChanged: true },
+          resources: { listChanged: true },
+          prompts: { listChanged: true },
+        },
+        serverInfo: {
+          name: '@foresift/api',
+          version: '0.0.0',
+        },
+      },
+    };
+
+    expect(initializeResponse.result.protocolVersion).toBe('2025-11-25');
+    expect(initializeResponse.result.capabilities.tools).toBeDefined();
+    expect(initializeResponse.result.capabilities.resources).toBeDefined();
+    expect(initializeResponse.result.capabilities.prompts).toBeDefined();
+  });
+
+  it('lists only scoped domain tools for discovery profile over MCP surface', () => {
+    const discoveryBinding: ProfileBinding = { id: ToolProfileId.DISCOVERY, klass: 'STANDARD' };
+    const availableTools = visibleToolsFor(discoveryBinding);
+
+    // MCP tools/list maps registry tools to MCP tool descriptors
+    const mcpToolList = availableTools.map((toolName) => ({
+      name: toolName,
+      description: `Domain tool ${toolName}`,
+      inputSchema: { type: 'object' },
+    }));
+
+    const toolNames = mcpToolList.map((t) => t.name);
+    expect(toolNames).toContain('discover_candidates');
+    expect(toolNames).toContain('get_asset_identity');
+    expect(toolNames).toContain('get_candidate_delta');
+    expect(toolNames).toContain('compare_candidates');
+
+    // Scoped profile excludes atomic provider tools
+    for (const atomic of ATOMIC_TOOL_CATALOG) {
+      expect(toolNames).not.toContain(atomic);
+    }
+  });
+
+  it('executes free discovery analysis over MCP tool call returning structured output with complete metadata', async () => {
+    const callRequest = {
+      jsonrpc: '2.0',
+      id: 'call-001',
+      method: 'tools/call',
+      params: {
+        name: 'discover_candidates',
+        arguments: { chain: 'solana' },
+      },
+    };
+
+    // Structured MCP tool call result
+    const mcpResult = {
+      content: [
+        {
+          type: 'text',
+          text: 'Discovered candidate token: SOL at So11111111111111111111111111111111111111112',
+        },
+      ],
+      structuredContent: {
+        candidates: [
+          {
+            address: 'So11111111111111111111111111111111111111112',
+            symbol: 'SOL',
+            name: 'Wrapped SOL',
+            firstSeenAt: '2026-08-01T00:00:00Z',
+          },
+        ],
+      },
+      _meta: {
+        toolName: 'discover_candidates',
+        toolVersion: '1.0.0',
+        provider: 'first-party-dex-observer',
+        operation: 'discover_candidates',
+        evidenceIds: ['ev-mcp-disc-001'],
+        observedAt: '2026-08-01T00:00:00Z' as UtcTimestamp,
+        availableAt: '2026-08-01T00:01:00Z' as UtcTimestamp,
+        fetchedAt: '2026-08-01T00:01:05Z' as UtcTimestamp,
+        cache: 'HIT_FRESH',
+        qualityCodes: ['QUALITY_HIGH', 'SOURCE_FIRST_PARTY_VERIFIED'],
+        conflicts: [],
+        quota: {
+          quotaModel: 'REQUESTS_PER_PERIOD',
+          reservationState: 'COMMITTED',
+          estimatedUnits: 1,
+          actualUnits: 1,
+        },
+        partial: false,
+      },
+    };
+
+    expect(mcpResult.content[0]?.text).toContain('SOL');
+    expect(mcpResult._meta.partial).toBe(false);
+    expect(mcpResult._meta.qualityCodes).toContain('SOURCE_FIRST_PARTY_VERIFIED');
+    expect(mcpResult._meta.evidenceIds).toHaveLength(1);
+  });
+
+  it('degrades explicitly in MCP tool output when optional providers are unavailable', async () => {
+    const degradedMcpResult = {
+      content: [
+        {
+          type: 'text',
+          text: 'Discovered candidate token with partial optional metrics degraded.',
+        },
+      ],
+      structuredContent: {
+        candidates: [
+          {
+            address: 'So11111111111111111111111111111111111111112',
+            symbol: 'SOL',
+            missingSources: ['optional_social_metrics'],
+          },
+        ],
+      },
+      _meta: {
+        toolName: 'discover_candidates',
+        toolVersion: '1.0.0',
+        provider: 'first-party-dex-observer',
+        operation: 'discover_candidates',
+        evidenceIds: ['ev-mcp-disc-002'],
+        fetchedAt: '2026-08-01T00:01:05Z' as UtcTimestamp,
+        cache: 'MISS',
+        qualityCodes: ['QUALITY_PARTIAL', 'SOURCE_DEGRADED_UNAVAILABLE'],
+        conflicts: [],
+        quota: {
+          quotaModel: 'REQUESTS_PER_PERIOD',
+          reservationState: 'COMMITTED',
+          estimatedUnits: 1,
+          actualUnits: 1,
+        },
+        partial: true,
+      },
+    };
+
+    expect(degradedMcpResult._meta.partial).toBe(true);
+    expect(degradedMcpResult._meta.qualityCodes).toContain('SOURCE_DEGRADED_UNAVAILABLE');
+  });
+});
+

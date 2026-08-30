@@ -1,14 +1,14 @@
 {
   "schema": "foresift/bun-migration-manifest@1",
   "migrationId": "bun-test-authority-v1",
-  "generatedAt": "2026-08-30T15:18:12.656Z",
+  "generatedAt": "2026-08-30T15:18:12.939Z",
   "root": ".",
   "totalTestFiles": 319,
   "counts": {
     "CODEMOD_READY": 0,
     "AGY_REQUIRED": 0,
-    "MIGRATED": 270,
-    "VERIFIED": 49,
+    "MIGRATED": 269,
+    "VERIFIED": 50,
     "BLOCKED": 0
   },
   "parity": {
@@ -1107,7 +1107,7 @@
       "sourceAnchors": [
         "../src/index.ts"
       ],
-      "state": "MIGRATED"
+      "state": "VERIFIED"
     },
     {
       "path": "packages/object-store/test/staged-commit.spec.ts",
@@ -9182,7 +9182,8 @@
       },
       "codexCalls": 0,
       "claudeCalls": 0,
-      "testedHead": "c51e0ddfa5023a43b4579f79a7f5eeafa429ace9"
+      "testedHead": "c51e0ddfa5023a43b4579f79a7f5eeafa429ace9",
+      "checkpointHead": "cdc495bda63fa16e0c0ba21c4fbbc957722ba29e"
     },
     {
       "id": "verify-existing--foresift-object-store-pure-1",
@@ -9191,7 +9192,55 @@
       "files": [
         "packages/object-store/test/local-store.spec.ts"
       ],
-      "state": "PENDING"
+      "state": "VERIFIED",
+      "verification": {
+        "ok": true,
+        "wallTimeMs": 139,
+        "peakRssBytes": 0,
+        "cpuSeconds": 0,
+        "counts": {
+          "passed": 12,
+          "failed": 0,
+          "skipped": 0
+        },
+        "results": [
+          {
+            "id": "pure-1",
+            "workload": "PURE",
+            "files": [
+              "packages/object-store/test/local-store.spec.ts"
+            ],
+            "fileWorkers": 2,
+            "testConcurrency": 8,
+            "command": [
+              "bun",
+              "test",
+              "--no-orphans",
+              "--isolate",
+              "--parallel=2",
+              "--max-concurrency=8",
+              "--timeout=30000",
+              "packages/object-store/test/local-store.spec.ts"
+            ],
+            "status": 0,
+            "signal": null,
+            "timedOut": false,
+            "wallTimeMs": 139,
+            "peakRssBytes": null,
+            "cpuSeconds": null,
+            "counts": {
+              "passed": 12,
+              "failed": 0,
+              "skipped": 0
+            },
+            "stdoutTail": "bun test v1.4.0 (34cbb9a40) 2x PARALLEL\n",
+            "stderrTail": "\n 12 pass\n 0 fail\n 34 expect() calls\nRan 12 tests across 1 file. [107.00ms]\n"
+          }
+        ]
+      },
+      "codexCalls": 0,
+      "claudeCalls": 0,
+      "testedHead": "cdc495bda63fa16e0c0ba21c4fbbc957722ba29e"
     },
     {
       "id": "verify-existing--foresift-persistence-database-pglite-1",

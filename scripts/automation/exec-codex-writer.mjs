@@ -68,14 +68,31 @@ export function codexProviderEvent(classification, detail) {
   return { event: 'unknown' };
 }
 
+/**
+ * Lane-permit generation identity (P0 review finding): generation is valid
+ * iff it is an integer >= 0. Generation 0 is a REAL generation — legacy and
+ * non-@g launches fall back to it — so a falsy check here wrongly rejected
+ * every gen-0 writer. Refuses undefined/null/NaN/negative/non-integer.
+ */
+export function validateGeneration(generation) {
+  if (
+    typeof generation !== 'string' ||
+    !/^\d+$/.test(generation.trim()) ||
+    !Number.isSafeInteger(Number(generation))
+  )
+    throw new Error(`CODEX_WRITER_INVALID_GENERATION: ${String(generation)}`);
+  return Number(generation);
+}
+
 export function runCodexWriter(input) {
   for (const field of ['lane', 'brief', 'worktree', 'routing', 'results-dir'])
     if (!input[field]) throw new Error(`CODEX_WRITER_ARGUMENT_MISSING: ${field}`);
   // Lane-permit identity (H2 §2): ONE Codex process = ONE permit, keyed to
   // packageId:generation:laneId. Missing identity fails closed — an
-  // unattributable writer may not consume a provider permit.
-  if (!input.package || !input.generation)
-    throw new Error('CODEX_WRITER_ARGUMENT_MISSING: package/generation');
+  // unattributable writer may not consume a provider permit. Generation 0
+  // is accepted (validateGeneration enforces integer >= 0).
+  if (!input.package) throw new Error('CODEX_WRITER_ARGUMENT_MISSING: package/generation');
+  validateGeneration(input.generation ?? '');
   const routing = JSON.parse(readFileSync(input.routing, 'utf8'));
   const route = codexRouteForLane(routing, input.lane);
   const brief = readFileSync(input.brief, 'utf8');

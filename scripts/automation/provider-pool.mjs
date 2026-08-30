@@ -353,6 +353,10 @@ function holdersPath(stateDir) {
   return join(stateDir, 'provider-pools.holders.json');
 }
 
+function holderKey(provider, holder) {
+  return `${provider} ${holder}`;
+}
+
 function loadHolders(stateDir) {
   try {
     return JSON.parse(readFileSync(holdersPath(stateDir), 'utf8'));
@@ -368,22 +372,33 @@ function saveHolders(stateDir, holders) {
 }
 
 /**
- * Acquire one provider permit for ONE lane process. On ok:false the caller
- * must NOT dispatch the provider and may retry after waitMs (or reroute
- * per §20 — the reason distinguishes quota from capacity).
+ * Durable holder record (P0 crash-recovery finding): identity beyond the
+ * holder string, so reconciliation can decide staleness from run truth
+ * instead of a reusable pid. `pid` is advisory liveness only — pids are
+ * recycled after restart and are NEVER the sole staleness evidence.
+ * opts: { packageId, generation, laneId, pid, runId }
  */
 export function acquireLanePermit(stateDir, holder, provider, opts = {}) {
   invariant(holder && typeof holder === 'string', 'INVALID_LANE_HOLDER', String(holder));
-  const r = acquirePermit(stateDir, provider, opts);
-  if (r.ok) {
-    return withPoolLock(stateDir, () => {
-      const holders = loadHolders(stateDir);
-      holders[`${provider}\u0000${holder}`] = { at: new Date().toISOString() };
-      saveHolders(stateDir, holders);
-      return { ...r, holder };
-    });
-  }
-  return r;
+  return withPoolLock(stateDir, () => {
+    const key = holderKey(provider, holder);
+    const holders = loadHolders(stateDir);
+    if (holders[key]) return { ok: true, alreadyHeld: true, waitMs: 0, holder };
+    const r = acquirePermitLocked(stateDir, provider, opts);
+    if (!r.ok) return r;
+    holders[key] = {
+      at: new Date().toISOString(),
+      provider,
+      holder,
+      packageId: opts.packageId ?? null,
+      generation: opts.generation ?? null,
+      laneId: opts.laneId ?? null,
+      pid: Number.isInteger(opts.pid) ? opts.pid : process.pid,
+      runId: opts.runId ?? null,
+    };
+    saveHolders(stateDir, holders);
+    return { ...r, holder };
+  });
 }
 
 /**
@@ -395,12 +410,85 @@ export function releaseLanePermit(stateDir, holder, provider) {
   invariant(holder && typeof holder === 'string', 'INVALID_LANE_HOLDER', String(holder));
   return withPoolLock(stateDir, () => {
     const holders = loadHolders(stateDir);
-    const key = `${provider}\u0000${holder}`;
+    const key = holderKey(provider, holder);
     if (!holders[key]) return { released: 0, active: undefined };
     delete holders[key];
     saveHolders(stateDir, holders);
     const r = releasePermitLocked(stateDir, provider);
     return { released: 1, active: r.active };
+  });
+}
+
+/**
+ * Deterministic stale-holder reconciliation (P0 crash-recovery finding).
+ *
+ * A writer process that dies between acquire and its finally-equivalent
+ * release strands a registered holder forever, permanently eating pool
+ * capacity. Reconciliation releases a holder ONLY when it is PROVABLY no
+ * longer active:
+ *   · liveProofFn(holderRecord, key) returns true  → holder considered live,
+ *     kept (fail closed);
+ *   · returns false                                → provably dead, released;
+ *   · returns null/undefined (unknown)             → FAIL CLOSED: the holder
+ *     is kept and reported in `unknown` so an operator incident can decide —
+ *     reconciliation never guesses and never silently frees capacity.
+ *
+ * The default proof is process-liveness on the recorded pid, used ONLY as a
+ * belt-and-suspenders heuristic for holder records that carry no richer run
+ * identity; pid recycling is why unknown/ambiguous cases fail closed rather
+ * than trusting the pid.
+ */
+export function reconcileLaneHolders(stateDir, liveProofFn = null) {
+  return withPoolLock(stateDir, () => {
+    const holders = loadHolders(stateDir);
+    const released = [];
+    const kept = [];
+    const unknown = [];
+    const proof = liveProofFn ?? ((record) => (record?.pid ? pidAlive(record.pid) : null));
+    for (const [key, record] of Object.entries(holders)) {
+      let verdict;
+      try {
+        verdict = proof(record, key);
+      } catch {
+        verdict = null;
+      }
+      if (verdict === true) {
+        kept.push(key);
+      } else if (verdict === false) {
+        delete holders[key];
+        saveHolders(stateDir, holders);
+        const provider = record?.provider ?? key.split(' ')[0];
+        releasePermitLocked(stateDir, provider);
+        saveHolders(stateDir, holders);
+        released.push(key);
+      } else {
+        unknown.push(key);
+      }
+    }
+    return { released, kept, unknown };
+  });
+}
+
+/**
+ * Read-only holder registry view for supervisors/incidents: holder records
+ * plus the admission view, so an operator can see WHO holds capacity and
+ * WHAT staleness reconciliation would decide without mutating anything.
+ */
+export function holderRegistryView(stateDir, liveProofFn = null) {
+  return withPoolLock(stateDir, () => {
+    const holders = loadHolders(stateDir);
+    const proof = liveProofFn ?? ((record) => (record?.pid ? pidAlive(record.pid) : null));
+    const view = {};
+    for (const [key, record] of Object.entries(holders)) {
+      let liveness = null;
+      try {
+        liveness = proof(record, key);
+      } catch {
+        liveness = null;
+      }
+      view[key] = { ...record, liveness };
+    }
+    return view;
   });
 }
 

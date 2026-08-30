@@ -55,13 +55,24 @@ export function validateBaselineClassifications(items) {
   return true;
 }
 
+export function validateGeneration(generation) {
+  if (
+    typeof generation !== 'string' ||
+    !/^\d+$/.test(generation.trim()) ||
+    !Number.isSafeInteger(Number(generation))
+  )
+    throw new Error(`AGY_TEST_INVALID_GENERATION: ${String(generation)}`);
+  return Number(generation);
+}
+
 export function runAgyTestWriter(input) {
   for (const field of ['lane', 'brief', 'worktree', 'routing', 'results-dir'])
     if (!input[field]) throw new Error(`AGY_TEST_ARGUMENT_MISSING: ${field}`);
   // Lane-permit identity (H2 §2): ONE AGY process = ONE permit, keyed to
-  // packageId:generation:laneId. Missing identity fails closed.
-  if (!input.package || !input.generation)
-    throw new Error('AGY_TEST_ARGUMENT_MISSING: package/generation');
+  // packageId:generation:laneId. Missing identity fails closed. Generation
+  // 0 is accepted (validateGeneration enforces integer >= 0).
+  if (!input.package) throw new Error('AGY_TEST_ARGUMENT_MISSING: package/generation');
+  validateGeneration(input.generation ?? '');
   if (!existsSync(input.brief)) throw new Error(`AGY_TEST_BRIEF_MISSING: ${input.brief}`);
   if (!existsSync(input.routing)) throw new Error(`AGY_TEST_ROUTING_MISSING: ${input.routing}`);
   const routing = JSON.parse(readFileSync(input.routing, 'utf8'));

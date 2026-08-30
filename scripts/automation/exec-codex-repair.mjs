@@ -5,6 +5,13 @@ import { basename, join } from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { buildCodexExecArgs, CODEX_SERVICE_TIER, escalateCodexRoute } from './codex-routing.mjs';
 import { validateLaneOwnership } from './path-ownership.mjs';
+import { codexProviderEvent } from './exec-codex-writer.mjs';
+import {
+  acquireLanePermit,
+  releaseLanePermit,
+  observeCodexOutcome,
+  resolvePoolStateDir,
+} from './provider-pool.mjs';
 
 function parseArgs(argv) {
   const out = {};
@@ -99,13 +106,41 @@ export function runCodexRepair(input) {
   ].join('\n');
   const command = buildCodexExecArgs(route, { worktree });
   const started = Date.now();
-  const run = spawnSync(command[0], command.slice(1), {
-    cwd: worktree,
-    input: `${prompt}\n`,
-    encoding: 'utf8',
-    timeout: Number(input['timeout-ms'] ?? 30 * 60_000),
-    maxBuffer: 64 * 1024 * 1024,
-  });
+  // ONE Codex process = ONE lane permit (H2 §2), same as the writers. The
+  // repair lane is a real Codex invocation and must be attributed/held
+  // exactly like an implementation lane.
+  const stateDir = resolvePoolStateDir();
+  const holder = `${input.package}:${input.generation ?? 0}:repair`;
+  const permit = acquireLanePermit(stateDir, holder, 'codex');
+  if (!permit.ok) throw new Error(`CODEX_REPAIR_PERMIT_DENIED: ${permit.reason}`);
+  let run;
+  try {
+    run = spawnSync(command[0], command.slice(1), {
+      cwd: worktree,
+      input: `${prompt}\n`,
+      encoding: 'utf8',
+      timeout: Number(input['timeout-ms'] ?? 30 * 60_000),
+      maxBuffer: 64 * 1024 * 1024,
+    });
+  } finally {
+    releaseLanePermit(stateDir, holder, 'codex');
+  }
+  // Engine-specific attribution (H2 §5/§6): the repair outcome feeds ONLY
+  // the Codex pool — same canonical event mapping as the writers.
+  try {
+    const detail = `${run?.stderr ?? ''}\n${run?.stdout ?? ''}`;
+    const classification =
+      run?.error?.code === 'ETIMEDOUT'
+        ? 'TIMEOUT'
+        : run?.status === 0
+          ? 'SUCCESS'
+          : /429|rate.?limit|usage.?limit|quota|exhaust|overload/i.test(detail)
+            ? 'TRANSIENT_PROVIDER_FAILURE'
+            : 'SEMANTIC_OR_PROVIDER_FAILURE';
+    observeCodexOutcome(stateDir, codexProviderEvent(classification, detail));
+  } catch {
+    /* attribution is best-effort telemetry; never mask the repair verdict */
+  }
   writeFileSync(join(repairDir, `${token}.jsonl`), run.stdout ?? '');
   if (run.error || run.status !== 0)
     throw new Error(`CODEX_REPAIR_FAILED: ${run.error?.message ?? (run.stderr ?? '').slice(-500)}`);

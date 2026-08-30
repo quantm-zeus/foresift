@@ -29,16 +29,32 @@ export declare function acquireLanePermit(
   stateDir: string,
   holder: string,
   provider: 'claude' | 'codex' | 'agy',
-  opts?: { now?: number },
+  opts?: {
+    now?: number;
+    packageId?: string | null;
+    generation?: number | null;
+    laneId?: string | null;
+    pid?: number | null;
+    runId?: string | null;
+  },
 ): {
   ok: boolean;
   waitMs: number;
   reason: string | null;
   holder: string;
+  alreadyHeld?: boolean;
 };
 export declare function releaseLanePermit(
   stateDir: string,
   holder: string,
   provider: 'claude' | 'codex' | 'agy',
 ): { released: 0 | 1; active: number | undefined };
+export declare function reconcileLaneHolders(
+  stateDir: string,
+  liveProofFn?: (record: Record<string, any>, key: string) => boolean | null,
+): { released: string[]; kept: string[]; unknown: string[] };
+export declare function holderRegistryView(
+  stateDir: string,
+  liveProofFn?: (record: Record<string, any>, key: string) => boolean | null,
+): Record<string, Record<string, any> & { liveness: boolean | null }>;
 export declare function resolvePoolStateDir(env?: Record<string, string | undefined>): string;

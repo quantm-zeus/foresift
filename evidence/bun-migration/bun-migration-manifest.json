@@ -1,18 +1,18 @@
 {
   "schema": "foresift/bun-migration-manifest@1",
   "migrationId": "bun-test-authority-v1",
-  "generatedAt": "2026-08-30T17:04:30.894Z",
+  "generatedAt": "2026-08-30T21:02:49.031Z",
   "root": ".",
-  "totalTestFiles": 320,
+  "totalTestFiles": 321,
   "counts": {
     "CODEMOD_READY": 0,
     "AGY_REQUIRED": 0,
-    "MIGRATED": 270,
+    "MIGRATED": 271,
     "VERIFIED": 50,
     "BLOCKED": 0
   },
   "parity": {
-    "previousTotal": 319,
+    "previousTotal": 320,
     "disappeared": []
   },
   "files": [
@@ -4400,6 +4400,31 @@
       "state": "MIGRATED"
     },
     {
+      "path": "tests/automation/claude-lane-permits.spec.ts",
+      "package": "automation",
+      "bytes": 3039,
+      "lines": 71,
+      "sha256": "bb9e197c44afbc3f53be8beaba3fe3dd6c20575dc311e105bef43f95a7ec6f31",
+      "imports": [
+        "bun:test",
+        "node:fs",
+        "node:os",
+        "node:path",
+        "../../scripts/automation/provider-pool.mjs",
+        "../../scripts/automation/exec-claude-writer.mjs"
+      ],
+      "vitestImports": [],
+      "features": ["dynamic-import"],
+      "workload": "PURE",
+      "migrationType": "ALREADY_MIGRATED",
+      "fixturesAndHelpers": [],
+      "sourceAnchors": [
+        "../../scripts/automation/provider-pool.mjs",
+        "../../scripts/automation/exec-claude-writer.mjs"
+      ],
+      "state": "MIGRATED"
+    },
+    {
       "path": "tests/automation/claude-tooling-only.spec.ts",
       "package": "automation",
       "bytes": 3114,
@@ -4424,9 +4449,9 @@
     {
       "path": "tests/automation/codex-agy-profile.spec.ts",
       "package": "automation",
-      "bytes": 89856,
-      "lines": 2329,
-      "sha256": "501dad451bfa9d7b723b595d7816b97af10cb3aca2b30e22b491132ac4b5afd6",
+      "bytes": 89764,
+      "lines": 2328,
+      "sha256": "8142a4f7aa1023252cc3be1d2e47a65181bb3c71f82ae9585ebd59db7fe5c5e9",
       "imports": ["bun:test", "node:child_process", "node:fs", "node:os", "node:path", "node:url"],
       "vitestImports": [],
       "features": ["dynamic-import"],
@@ -4571,9 +4596,9 @@
     {
       "path": "tests/automation/impl-wave.spec.ts",
       "package": "automation",
-      "bytes": 38163,
-      "lines": 883,
-      "sha256": "0ca6d38a45c28e1535e8cf3aa3e94d2fec5a765927dd8d51c02b5c5aba4dcbf2",
+      "bytes": 38837,
+      "lines": 889,
+      "sha256": "61f7d7174e7d942e499a97d72fef613d159e7da4a196f34a548ba8d40a899fda",
       "imports": ["bun:test", "node:child_process", "node:fs", "node:os", "node:path", "node:url"],
       "vitestImports": [],
       "features": ["dynamic-import"],
@@ -4793,9 +4818,9 @@
     {
       "path": "tests/automation/test-runtime-containment.spec.ts",
       "package": "automation",
-      "bytes": 4464,
-      "lines": 81,
-      "sha256": "225650de0a77bc6721f787dc086b66857d04a37607703df5b1f8a16cf82d1a6b",
+      "bytes": 5153,
+      "lines": 94,
+      "sha256": "c7c3647ce9487078f69e3fdff7d9381f4fd40e1c1c8a9e47d4ebd104395600a3",
       "imports": ["bun:test", "node:fs", "node:path"],
       "vitestImports": [],
       "features": [],
@@ -5210,9 +5235,9 @@
     {
       "path": "tests/automation/writer-lane-permits.spec.ts",
       "package": "automation",
-      "bytes": 5020,
-      "lines": 125,
-      "sha256": "f6359bcbb75f65140b10398cf26dfee69319bbcbee657395b3498e673a7f5aa5",
+      "bytes": 11296,
+      "lines": 236,
+      "sha256": "f506481ba287459f9e5be6171ebc02de5b547eef393284857bef3d05239dbe91",
       "imports": [
         "bun:test",
         "node:fs",
@@ -5222,7 +5247,7 @@
         "../../scripts/automation/exec-codex-writer.mjs"
       ],
       "vitestImports": [],
-      "features": [],
+      "features": ["dynamic-import"],
       "workload": "PURE",
       "migrationType": "ALREADY_MIGRATED",
       "fixturesAndHelpers": [],

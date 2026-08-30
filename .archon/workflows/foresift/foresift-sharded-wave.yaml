@@ -224,36 +224,41 @@ nodes:
     depends_on: [brief-core, exec-core]
     when: "$exec-core.output == 'CLAUDE'"
     retry: { max_attempts: 2, delay_ms: 10000, on_error: all }
-    effort: high
-    idle_timeout: 2700000
-    prompt: |
-      CLAUDE_AGY fallback product implementation lane core. Work only inside
-      the private worktree named below. Never edit tests, fixtures, test-only
-      helpers, tasks.md, checkpoints, or anything outside allowed write paths.
-      Commit coherent product changes and write the required result manifest.
-      $brief-core.output
+    timeout: 3600000
+    bash: |
+      node scripts/automation/exec-claude-writer.mjs \
+        --lane core \
+        --brief "$ARTIFACTS_DIR/briefs/core-brief.md" \
+        --worktree "$ARTIFACTS_DIR/wt/core" \
+        --results-dir "$ARTIFACTS_DIR/writer-results/core" \
+        --package "${ARGUMENTS%%@g*}" \
+        --generation "$(case "$ARGUMENTS" in *@g*) echo "${ARGUMENTS##*@g}";; *) echo 0;; esac)"
   - id: writer-shard-1-claude
     depends_on: [brief-shard-1, exec-shard-1]
     when: "$exec-shard-1.output == 'CLAUDE'"
     retry: { max_attempts: 2, delay_ms: 10000, on_error: all }
-    effort: high
-    idle_timeout: 2700000
-    prompt: |
-      CLAUDE_AGY fallback product implementation lane shard-1. Work only in the
-      private worktree. Never edit tests or anything outside allowed paths.
-      Commit coherent product changes and write the result manifest.
-      $brief-shard-1.output
+    timeout: 3600000
+    bash: |
+      node scripts/automation/exec-claude-writer.mjs \
+        --lane shard-1 \
+        --brief "$ARTIFACTS_DIR/briefs/shard-1-brief.md" \
+        --worktree "$ARTIFACTS_DIR/wt/shard-1" \
+        --results-dir "$ARTIFACTS_DIR/writer-results/shard-1" \
+        --package "${ARGUMENTS%%@g*}" \
+        --generation "$(case "$ARGUMENTS" in *@g*) echo "${ARGUMENTS##*@g}";; *) echo 0;; esac)"
   - id: writer-shard-2-claude
     depends_on: [brief-shard-2, exec-shard-2]
     when: "$exec-shard-2.output == 'CLAUDE'"
     retry: { max_attempts: 2, delay_ms: 10000, on_error: all }
-    effort: high
-    idle_timeout: 2700000
-    prompt: |
-      CLAUDE_AGY fallback product implementation lane shard-2. Work only in the
-      private worktree. Never edit tests or anything outside allowed paths.
-      Commit coherent product changes and write the result manifest.
-      $brief-shard-2.output
+    timeout: 3600000
+    bash: |
+      node scripts/automation/exec-claude-writer.mjs \
+        --lane shard-2 \
+        --brief "$ARTIFACTS_DIR/briefs/shard-2-brief.md" \
+        --worktree "$ARTIFACTS_DIR/wt/shard-2" \
+        --results-dir "$ARTIFACTS_DIR/writer-results/shard-2" \
+        --package "${ARGUMENTS%%@g*}" \
+        --generation "$(case "$ARGUMENTS" in *@g*) echo "${ARGUMENTS##*@g}";; *) echo 0;; esac)"
 
   - id: writer-test-author-agy
     depends_on: [brief-test-author, exec-test-author]

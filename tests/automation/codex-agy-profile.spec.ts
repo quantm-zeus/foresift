@@ -29,7 +29,6 @@ async function loadMaintainerIncidentModule() {
 }
 
 async function loadAgyTestWriterModule() {
-  // @ts-expect-error untyped dynamic import for module concurrently authored in codex lane
   return await import('../../scripts/automation/exec-agy-test-writer.mjs');
 }
 

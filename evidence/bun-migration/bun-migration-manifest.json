@@ -1,14 +1,14 @@
 {
   "schema": "foresift/bun-migration-manifest@1",
   "migrationId": "bun-test-authority-v1",
-  "generatedAt": "2026-08-30T15:17:27.383Z",
+  "generatedAt": "2026-08-30T15:17:27.718Z",
   "root": ".",
   "totalTestFiles": 319,
   "counts": {
     "CODEMOD_READY": 0,
     "AGY_REQUIRED": 0,
-    "MIGRATED": 308,
-    "VERIFIED": 11,
+    "MIGRATED": 301,
+    "VERIFIED": 18,
     "BLOCKED": 0
   },
   "parity": {
@@ -259,7 +259,7 @@
       "sourceAnchors": [
         "../../../tests/fixtures/col/index.ts"
       ],
-      "state": "MIGRATED"
+      "state": "VERIFIED"
     },
     {
       "path": "packages/collector-core/test/dedupe.spec.ts",
@@ -281,7 +281,7 @@
       "sourceAnchors": [
         "../../../tests/fixtures/col/index.ts"
       ],
-      "state": "MIGRATED"
+      "state": "VERIFIED"
     },
     {
       "path": "packages/collector-core/test/first-seen.spec.ts",
@@ -298,7 +298,7 @@
       "migrationType": "ALREADY_MIGRATED",
       "fixturesAndHelpers": [],
       "sourceAnchors": [],
-      "state": "MIGRATED"
+      "state": "VERIFIED"
     },
     {
       "path": "packages/collector-core/test/health.spec.ts",
@@ -317,7 +317,7 @@
       "migrationType": "ALREADY_MIGRATED",
       "fixturesAndHelpers": [],
       "sourceAnchors": [],
-      "state": "MIGRATED"
+      "state": "VERIFIED"
     },
     {
       "path": "packages/collector-core/test/lifecycle.spec.ts",
@@ -336,7 +336,7 @@
       "migrationType": "ALREADY_MIGRATED",
       "fixturesAndHelpers": [],
       "sourceAnchors": [],
-      "state": "MIGRATED"
+      "state": "VERIFIED"
     },
     {
       "path": "packages/collector-core/test/migrations.spec.ts",
@@ -384,7 +384,7 @@
       "sourceAnchors": [
         "../../../tests/fixtures/col/index.ts"
       ],
-      "state": "MIGRATED"
+      "state": "VERIFIED"
     },
     {
       "path": "packages/collector-core/test/stream-records.spec.ts",
@@ -408,7 +408,7 @@
       "sourceAnchors": [
         "../../../tests/fixtures/col/index.ts"
       ],
-      "state": "MIGRATED"
+      "state": "VERIFIED"
     },
     {
       "path": "packages/collector-gap-recovery/test/backfill.spec.ts",
@@ -8408,7 +8408,8 @@
       },
       "codexCalls": 0,
       "claudeCalls": 0,
-      "testedHead": "188c1a602123db6df11b31dbe3199ef64a0a4986"
+      "testedHead": "188c1a602123db6df11b31dbe3199ef64a0a4986",
+      "checkpointHead": "ebe07e28e29e97ce87ef6baf794f7c85751bbccf"
     },
     {
       "id": "verify-existing--foresift-collector-core-pure-1",
@@ -8423,7 +8424,67 @@
         "packages/collector-core/test/scope.spec.ts",
         "packages/collector-core/test/stream-records.spec.ts"
       ],
-      "state": "PENDING"
+      "state": "VERIFIED",
+      "verification": {
+        "ok": true,
+        "wallTimeMs": 193,
+        "peakRssBytes": 0,
+        "cpuSeconds": 0,
+        "counts": {
+          "passed": 14,
+          "failed": 0,
+          "skipped": 0
+        },
+        "results": [
+          {
+            "id": "pure-1",
+            "workload": "PURE",
+            "files": [
+              "packages/collector-core/test/capacity.spec.ts",
+              "packages/collector-core/test/dedupe.spec.ts",
+              "packages/collector-core/test/first-seen.spec.ts",
+              "packages/collector-core/test/health.spec.ts",
+              "packages/collector-core/test/lifecycle.spec.ts",
+              "packages/collector-core/test/scope.spec.ts",
+              "packages/collector-core/test/stream-records.spec.ts"
+            ],
+            "fileWorkers": 2,
+            "testConcurrency": 8,
+            "command": [
+              "bun",
+              "test",
+              "--no-orphans",
+              "--isolate",
+              "--parallel=2",
+              "--max-concurrency=8",
+              "--timeout=30000",
+              "packages/collector-core/test/capacity.spec.ts",
+              "packages/collector-core/test/dedupe.spec.ts",
+              "packages/collector-core/test/first-seen.spec.ts",
+              "packages/collector-core/test/health.spec.ts",
+              "packages/collector-core/test/lifecycle.spec.ts",
+              "packages/collector-core/test/scope.spec.ts",
+              "packages/collector-core/test/stream-records.spec.ts"
+            ],
+            "status": 0,
+            "signal": null,
+            "timedOut": false,
+            "wallTimeMs": 193,
+            "peakRssBytes": null,
+            "cpuSeconds": null,
+            "counts": {
+              "passed": 14,
+              "failed": 0,
+              "skipped": 0
+            },
+            "stdoutTail": "bun test v1.4.0 (34cbb9a40) 2x PARALLEL\n",
+            "stderrTail": "\n 14 pass\n 0 fail\n 38 expect() calls\nRan 14 tests across 7 files. [171.00ms]\n"
+          }
+        ]
+      },
+      "codexCalls": 0,
+      "claudeCalls": 0,
+      "testedHead": "ebe07e28e29e97ce87ef6baf794f7c85751bbccf"
     },
     {
       "id": "verify-existing--foresift-collector-gap-recovery-database-pglite-1",

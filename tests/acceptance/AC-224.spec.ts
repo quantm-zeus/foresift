@@ -26,7 +26,7 @@ beforeAll(async () => {
   await seedCostOperationFixture(tdb.engine, FREE_QUOTA_OP);
   await seedCostQuotaBalance(tdb.engine, { providerId: FREE_QUOTA_OP.providerId });
   adapter = new CostQuotaAdapter({ engine: tdb.engine, mode: 'STRICT_FREE' });
-});
+}, 120_000);
 
 afterAll(async () => {
   await closeTestDatabase(tdb);

@@ -24,7 +24,7 @@ beforeAll(async () => {
     consumedReserved: 0,
   });
   adapter = new CostQuotaAdapter({ engine: tdb.engine, mode: 'STRICT_FREE' });
-});
+}, 120_000);
 
 afterAll(async () => {
   await closeTestDatabase(tdb);

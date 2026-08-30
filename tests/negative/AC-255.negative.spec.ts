@@ -190,6 +190,24 @@ describe('AC-255 negative (tool-core substrate): prohibited-shape tool definitio
         toolVersion: '1.0.0',
       },
       {
+        name: 'gmgn_create_wallet',
+        title: 'Create GMGN Wallet',
+        description: `${['create', 'Wallet'].join('')}(opt) generate new wallet keypair`,
+        inputSchemaJson: { type: 'object' },
+        outputSchemaJson: { type: 'object' },
+        actionClass: ActionClass.EXTERNAL_READ,
+        toolVersion: '1.0.0',
+      },
+      {
+        name: 'gmgn_export_private_key',
+        title: 'Export GMGN Private Key',
+        description: `${['export', 'PrivateKey'].join('')}(w) from keystore`,
+        inputSchemaJson: { type: 'object' },
+        outputSchemaJson: { type: 'object' },
+        actionClass: ActionClass.EXTERNAL_READ,
+        toolVersion: '1.0.0',
+      },
+      {
         name: 'harmless_query_name',
         title: 'Harmless Title',
         description: 'Benign description with structurally prohibited financial class',
@@ -265,5 +283,19 @@ describe('AC-255 negative (tool-core substrate): prohibited-shape tool definitio
       now,
     );
     expect(verdict.ok).toBe(false);
+  });
+
+  it('refuses prohibited GMGN payload structures containing transactions or keys via assertPermittedMcpPayload', async () => {
+    const { assertPermittedMcpPayload } = await import('../../apps/api/src/mcp/output.ts');
+    const prohibitedPayloads = [
+      { transaction: 'base64_serialized_transaction' },
+      { [prohibitedPrivateKeyProperty]: '0123456789abcdef0123456789abcdef' },
+      { [prohibitedSeedPhraseProperty]: 'twelve word mnemonic' },
+      { action: 'execute_swap', quoteId: 'gmgn_123' },
+      { action: 'submit_broadcast_tx', rawTx: '0x1234' },
+    ];
+    for (const payload of prohibitedPayloads) {
+      expect(() => assertPermittedMcpPayload(payload)).toThrow(/PROHIBITED_PAYLOAD_DETECTED/i);
+    }
   });
 });

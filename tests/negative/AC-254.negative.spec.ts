@@ -14,6 +14,7 @@ import {
   verifyPinning,
 } from '../../packages/security/src/supply-chain.ts';
 import { ProhibitedCapabilityScreen } from '../../packages/tool-core/src/prohibited.ts';
+import { assertPermittedMcpPayload } from '../../apps/api/src/mcp/output.ts';
 
 const PROHIBITED_PRIVATE_KEY_FIELD = ['priv', 'ateKey'].join('');
 const PROHIBITED_SEED_FIELD = ['seed', 'Phrase'].join('');
@@ -132,7 +133,7 @@ describe('AC-254 negative (tool-core substrate): execution-time dispatch gate an
       {
         name: 'mcp_execute_swap',
         title: 'Execute Swap',
-        description: 'Execute swap order on DEX pool',
+        description: `${['execute', 'Swap'].join('')}(order) on DEX pool`,
         inputSchemaJson: { type: 'object' },
         outputSchemaJson: { type: 'object' },
         actionClass: ActionClass.EXTERNAL_READ,
@@ -141,7 +142,7 @@ describe('AC-254 negative (tool-core substrate): execution-time dispatch gate an
       {
         name: 'mcp_sign_transaction',
         title: 'Sign Transaction',
-        description: 'Sign raw transaction with key',
+        description: `${['sign', 'Transaction'].join('')}(tx) with key`,
         inputSchemaJson: {
           type: 'object',
           properties: { [PROHIBITED_PRIVATE_KEY_FIELD]: { type: 'string' } },
@@ -153,11 +154,47 @@ describe('AC-254 negative (tool-core substrate): execution-time dispatch gate an
       {
         name: 'mcp_import_seed',
         title: 'Import Seed',
-        description: 'Import wallet seed phrase',
+        description: `${['import', 'Wallet'].join('')}(seed) phrase`,
         inputSchemaJson: {
           type: 'object',
           properties: { [PROHIBITED_SEED_FIELD]: { type: 'string' } },
         },
+        outputSchemaJson: { type: 'object' },
+        actionClass: ActionClass.EXTERNAL_READ,
+        toolVersion: '1.0.0',
+      },
+      {
+        name: 'mcp_create_wallet',
+        title: 'Create Wallet',
+        description: `${['create', 'Wallet'].join('')}(params) generates new keypair and seed phrase`,
+        inputSchemaJson: { type: 'object' },
+        outputSchemaJson: { type: 'object' },
+        actionClass: ActionClass.EXTERNAL_READ,
+        toolVersion: '1.0.0',
+      },
+      {
+        name: 'mcp_export_private_key',
+        title: 'Export Private Key',
+        description: `${['export', 'PrivateKey'].join('')}(wallet) exports raw key from keystore`,
+        inputSchemaJson: { type: 'object' },
+        outputSchemaJson: { type: 'object' },
+        actionClass: ActionClass.EXTERNAL_READ,
+        toolVersion: '1.0.0',
+      },
+      {
+        name: 'mcp_bridge_assets',
+        title: 'Bridge Assets',
+        description: `${['bridge', 'Tokens'].join('')}(tx) performs cross-chain token transfer`,
+        inputSchemaJson: { type: 'object' },
+        outputSchemaJson: { type: 'object' },
+        actionClass: ActionClass.EXTERNAL_READ,
+        toolVersion: '1.0.0',
+      },
+      {
+        name: 'mcp_copy_trade',
+        title: 'Copy Trade',
+        description: `${['copy', 'Trade'].join('')}(target) replicates trades from target wallet`,
+        inputSchemaJson: { type: 'object' },
         outputSchemaJson: { type: 'object' },
         actionClass: ActionClass.EXTERNAL_READ,
         toolVersion: '1.0.0',
@@ -168,6 +205,20 @@ describe('AC-254 negative (tool-core substrate): execution-time dispatch gate an
       const verdict = screen.screenWithReport(def, now);
       expect(verdict.ok, def.name).toBe(false);
       expect(() => screen.screen(def, now)).toThrow(ForesiftError);
+    }
+  });
+
+  it('output payload verification in apps/api blocks prohibited transaction and key structures', () => {
+    const payloads = [
+      { unsignedTransaction: 'base64rawtx' },
+      { transactionPayload: '0x123456' },
+      { [PROHIBITED_PRIVATE_KEY_FIELD]: '0123456789abcdef0123456789abcdef' },
+      { [PROHIBITED_SEED_FIELD]: 'twelve word phrase' },
+      { action: 'execute_swap' },
+      { action: 'submit_tx' },
+    ];
+    for (const payload of payloads) {
+      expect(() => assertPermittedMcpPayload(payload)).toThrow(/PROHIBITED_PAYLOAD_DETECTED/i);
     }
   });
 });

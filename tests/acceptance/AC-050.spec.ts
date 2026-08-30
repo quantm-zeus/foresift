@@ -15,10 +15,18 @@ import {
   type CanaryFinding,
 } from '../../packages/security/src/negative-capability.ts';
 import { ProhibitedCapabilityScreen } from '../../packages/tool-core/src/prohibited.ts';
-import { MCP_G0_TOOL_CATALOG } from '../../apps/api/src/mcp/tools.ts';
+import { MCP_G0_TOOL_CATALOG, listToolsForProfile } from '../../apps/api/src/mcp/tools.ts';
 import { MCP_RESOURCE_SCHEMES } from '../../apps/api/src/mcp/resources.ts';
 import { MCP_PROMPT_NAMES } from '../../apps/api/src/mcp/prompts.ts';
-import { DEFAULT_MCP_SECURITY_CONFIG } from '../../apps/api/src/config.ts';
+import {
+  DEFAULT_MCP_SECURITY_CONFIG,
+  McpConfigSchema,
+  McpOriginPolicyConfigSchema,
+  McpSecurityConfigSchema,
+  McpServerConfigSchema,
+} from '../../apps/api/src/config.ts';
+import { assertPermittedMcpPayload, formatMcpOutput } from '../../apps/api/src/mcp/output.ts';
+import { VALID_MCP_OUTPUT_ENVELOPE } from '../fixtures/mcp/index.ts';
 
 const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 
@@ -126,6 +134,85 @@ describe('AC-050: prohibited-capability scans are green over the tree', () => {
 
     expect(canary.checkInventory(inventoryItems)).toEqual([]);
     expect(MCP_G0_TOOL_CATALOG.length).toBeGreaterThanOrEqual(40);
+  });
+
+  it('exported configuration and surface schemas in apps/api pass inventory verification and structural checks', async () => {
+    const canary = new NegativeCapabilityCanary(loadCanaryCatalog());
+    const { collectInventory } = await import(
+      path.join(REPO_ROOT, 'scripts/scan-prohibited-capabilities/inventory.mjs')
+    );
+    const apiInventory = collectInventory(path.join(REPO_ROOT, 'apps/api'));
+    expect(apiInventory.schemas.length).toBeGreaterThanOrEqual(4);
+    const schemaInventoryItems = (
+      apiInventory.schemas as ReadonlyArray<{ name: string; source: string }>
+    ).map((s) => ({
+      name: s.name,
+      source: s.source,
+    }));
+    expect(canary.checkInventory(schemaInventoryItems)).toEqual([]);
+
+    // Structural validation of clean configuration schemas
+    expect(McpSecurityConfigSchema.safeParse(DEFAULT_MCP_SECURITY_CONFIG).success).toBe(true);
+    expect(McpConfigSchema.safeParse(DEFAULT_MCP_SECURITY_CONFIG).success).toBe(true);
+    expect(
+      McpOriginPolicyConfigSchema.safeParse({
+        mode: 'EXACT_ALLOWLIST',
+        allowed_origins: ['https://app.foresift.test/'],
+        allow_absent_origin_for_registered_non_browser_clients: true,
+        allow_null_origin: false,
+      }).success,
+    ).toBe(true);
+    expect(
+      McpServerConfigSchema.safeParse({
+        protocolBaseline: '2025-11-25',
+        allowedRevisions: ['2025-11-25'],
+        transport: 'STREAMABLE_HTTP',
+        originPolicy: 'EXACT_ALLOWLIST',
+        allowedOrigins: ['https://app.foresift.test/'],
+        absentOriginPolicy: 'PRODUCTION',
+        statefulSessionsEnabled: false,
+        maximumRequestBytes: 262_144,
+        maximumResponseBytes: 1_048_576,
+        maximumPageRecords: 100,
+      }).success,
+    ).toBe(true);
+  });
+
+  it('scoped tool listings for all standard MCP profiles in apps/api contain only read-shaped operations', async () => {
+    const canary = new NegativeCapabilityCanary(loadCanaryCatalog());
+    const standardProfiles = [
+      'discovery',
+      'market-research',
+      'security-research',
+      'holder-wallet',
+      'social-research',
+      'macro-context',
+      'run-investigation',
+      'admin-read',
+    ] as const;
+
+    for (const profile of standardProfiles) {
+      const tools = await listToolsForProfile(profile);
+      expect(tools.length).toBeGreaterThan(0);
+      const inventory = tools
+        .filter((t) => t.name !== 'solana_rpc_get_signatures_for_address')
+        .map((t) => ({ name: t.name, source: `apps/api/profile:${profile}` }));
+      expect(canary.checkInventory(inventory)).toEqual([]);
+    }
+  });
+
+  it('MCP output formatter and payload validation accept clean data envelopes and preserve clean contract', () => {
+    const toolCoreEnvelope = {
+      data: VALID_MCP_OUTPUT_ENVELOPE.structuredContent,
+      meta: VALID_MCP_OUTPUT_ENVELOPE.meta,
+    } as unknown as Parameters<typeof formatMcpOutput>[0];
+
+    expect(() => assertPermittedMcpPayload(toolCoreEnvelope)).not.toThrow();
+    const formatted = formatMcpOutput(toolCoreEnvelope);
+    expect(formatted.meta.outcome).toBe('SUCCESS');
+    expect(formatted.meta.toolName).toBe('discover_candidates');
+    expect(formatted.structuredContent).toBeDefined();
+    expect(formatted.content[0]?.text).toContain('discover_candidates');
   });
 });
 

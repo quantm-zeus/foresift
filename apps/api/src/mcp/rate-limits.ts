@@ -35,19 +35,64 @@ export class McpRateLimitError extends Error {
 
 export class McpRateLimiter {
   private readonly released = new Set<string>();
+  private readonly engine?: DatabaseEngine;
+  private readonly abuse: AbuseController | undefined;
+  private readonly auditChain: AuditChain | undefined;
+  private readonly clock: () => number;
+  private readonly memoryConfig?: {
+    readonly defaultCapacity: number;
+    readonly refillPerSecond: number;
+    readonly concurrencyLimit: number;
+  };
+  private readonly memoryState = new Map<
+    string,
+    { tokens: number; lastRefill: number; inFlight: number }
+  >();
 
   constructor(
-    private readonly engine: DatabaseEngine,
-    private readonly abuse: AbuseController,
-    private readonly auditChain: AuditChain,
-    private readonly clock: () => number = Date.now.bind(globalThis.Date),
-  ) {}
+    engineOrOptions:
+      | DatabaseEngine
+      | {
+          readonly defaultCapacity: number;
+          readonly refillPerSecond: number;
+          readonly concurrencyLimit: number;
+          readonly clock?: () => number;
+        },
+    abuse?: AbuseController,
+    auditChain?: AuditChain,
+    clock: () => number = Date.now.bind(globalThis.Date),
+  ) {
+    this.clock = 'defaultCapacity' in engineOrOptions ? (engineOrOptions.clock ?? clock) : clock;
+    if ('defaultCapacity' in engineOrOptions) {
+      this.memoryConfig = engineOrOptions;
+    } else {
+      this.engine = engineOrOptions;
+      this.abuse = abuse;
+      this.auditChain = auditChain;
+    }
+  }
 
   async admit(
-    credentialId: string,
-    rateClass: McpRateClass,
+    credentialOrInput:
+      | string
+      | { readonly credentialId: string; readonly rateLimitClass: string; readonly cost: number },
+    rateClass?: McpRateClass,
     cost = 1,
-  ): Promise<RateAdmissionLease> {
+  ): Promise<
+    | RateAdmissionLease
+    | {
+        readonly admitted: boolean;
+        readonly remainingTokens?: number;
+        readonly currentInFlight?: number;
+        readonly refusalReason?: string;
+        readonly retryAfterSeconds?: number;
+      }
+  > {
+    if (typeof credentialOrInput !== 'string') return this.admitInMemory(credentialOrInput);
+    const credentialId = credentialOrInput;
+    if (rateClass === undefined || this.engine === undefined || this.abuse === undefined) {
+      throw new Error('durable rate admission dependencies are not configured');
+    }
     try {
       this.abuse.admit(credentialId, cost);
     } catch (error) {
@@ -122,6 +167,16 @@ export class McpRateLimiter {
   }
 
   async release(lease: RateAdmissionLease): Promise<void> {
+    if (!('fencingToken' in lease)) {
+      const input = lease as unknown as {
+        readonly credentialId: string;
+        readonly rateLimitClass: string;
+      };
+      const state = this.memoryState.get(`${input.credentialId}:${input.rateLimitClass}`);
+      if (state !== undefined) state.inFlight = Math.max(0, state.inFlight - 1);
+      return;
+    }
+    if (this.engine === undefined) throw new Error('durable rate admission is not configured');
     const key = `${lease.credentialId}:${lease.rateClass}:${lease.fencingToken}`;
     if (this.released.has(key)) return;
     const result = await this.engine.query<{ fencing_token: string | number }>(
@@ -148,6 +203,7 @@ export class McpRateLimiter {
     reason: string,
     payload: Record<string, unknown>,
   ): Promise<void> {
+    if (this.auditChain === undefined) return;
     await this.auditChain.append({
       occurredAt: new Date(this.clock()).toISOString() as UtcTimestamp,
       actor,
@@ -155,5 +211,56 @@ export class McpRateLimiter {
       subject: 'mcp.rate-admission',
       payload: { reason, ...payload },
     });
+  }
+
+  private admitInMemory(input: {
+    readonly credentialId: string;
+    readonly rateLimitClass: string;
+    readonly cost: number;
+  }) {
+    const config = this.memoryConfig;
+    if (config === undefined) throw new Error('in-memory rate admission is not configured');
+    const key = `${input.credentialId}:${input.rateLimitClass}`;
+    const now = this.clock();
+    const state = this.memoryState.get(key) ?? {
+      tokens: config.defaultCapacity,
+      lastRefill: now,
+      inFlight: 0,
+    };
+    state.tokens = Math.min(
+      config.defaultCapacity,
+      state.tokens + (Math.max(0, now - state.lastRefill) / 1000) * config.refillPerSecond,
+    );
+    state.lastRefill = now;
+    if (state.inFlight >= config.concurrencyLimit) {
+      this.memoryState.set(key, state);
+      return { admitted: false, refusalReason: 'CONCURRENCY_LIMIT_EXCEEDED' };
+    }
+    if (state.tokens < input.cost) {
+      this.memoryState.set(key, state);
+      return {
+        admitted: false,
+        refusalReason: 'RATE_LIMIT_EXCEEDED',
+        retryAfterSeconds: Math.max(
+          1,
+          Math.ceil((input.cost - state.tokens) / config.refillPerSecond),
+        ),
+      };
+    }
+    state.tokens -= input.cost;
+    state.inFlight += 1;
+    this.memoryState.set(key, state);
+    return { admitted: true, remainingTokens: state.tokens, currentInFlight: state.inFlight };
+  }
+
+  async getState(
+    credentialId: string,
+    rateLimitClass: string,
+  ): Promise<{ readonly inFlight: number; readonly availableTokens: number }> {
+    const state = this.memoryState.get(`${credentialId}:${rateLimitClass}`);
+    return {
+      inFlight: state?.inFlight ?? 0,
+      availableTokens: state?.tokens ?? this.memoryConfig?.defaultCapacity ?? 0,
+    };
   }
 }

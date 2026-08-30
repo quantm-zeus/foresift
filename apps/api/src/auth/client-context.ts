@@ -65,3 +65,35 @@ export function clientCanAccessEntity(context: McpClientContext, entity: string)
     return entity === bound;
   });
 }
+
+export function buildClientContext(result: {
+  readonly authenticated: boolean;
+  readonly credentialId?: string;
+  readonly identificationPrefix?: string;
+  readonly scopes?: readonly string[];
+  readonly profileBindings?: readonly string[];
+  readonly toolBounds?: readonly string[];
+  readonly resourceBounds?: readonly string[];
+  readonly entityBounds?: readonly string[];
+  readonly rateLimitClass?: string;
+  readonly originPolicyRef?: string;
+  readonly expiresAt?: UtcTimestamp;
+}) {
+  if (!result.authenticated || result.credentialId === undefined) {
+    throw new ClientContextError('cannot build a context from a refused credential');
+  }
+  return {
+    actorId: `mcp-client:${result.credentialId}`,
+    credentialId: result.credentialId,
+    identificationPrefix: result.identificationPrefix ?? '',
+    scopes: [...(result.scopes ?? [])],
+    toolProfileId: result.profileBindings?.[0] ?? 'discovery',
+    toolBounds: [...(result.toolBounds ?? [])],
+    resourceBounds: [...(result.resourceBounds ?? [])],
+    entityBounds: [...(result.entityBounds ?? [])],
+    quotaClass: result.rateLimitClass ?? 'STANDARD_FREE',
+    rateLimitClass: result.rateLimitClass ?? 'STANDARD_FREE',
+    originPolicyRef: result.originPolicyRef ?? '',
+    expiresAt: result.expiresAt ?? ('1970-01-01T00:00:00Z' as UtcTimestamp),
+  };
+}

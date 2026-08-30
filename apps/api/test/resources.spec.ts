@@ -7,7 +7,6 @@ import { describe, expect, it } from 'bun:test';
 import {
   MCP_MALICIOUS_RESOURCE_URIS,
   MCP_SSRF_RESOURCE_URIS,
-  STANDARD_DISCOVERY_CREDENTIAL,
 } from '../../../tests/fixtures/mcp/index.ts';
 
 async function loadResourcesModule() {

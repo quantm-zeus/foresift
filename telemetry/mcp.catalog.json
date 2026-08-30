@@ -1,0 +1,127 @@
+{
+  "$schema": "https://foresift.dev/schemas/telemetry-catalog-v1.json",
+  "catalog": "mcp",
+  "description": "Declarative Streamable HTTP MCP surface event contracts. Request outcomes retain the admission stage and typed reason, session and rate-limit lifecycle events retain only opaque identifiers, and resource/tool access retains authorization outcomes. Events never carry bearer tokens, credentials, raw request bodies, tool arguments, resource contents, or provider payloads.",
+  "contractStatus": "DECLARATIVE_CONTRACT_ONLY — this file defines the event contracts the requirement manifest maps to (telemetry/mcp.*); emitter wiring lands with the observability milestone (dependency group G2), so nothing publishes these event names yet.",
+  "requirementsCovered": [
+    "FR-MCP-001",
+    "FR-MCP-002",
+    "FR-MCP-003",
+    "FR-MCP-004",
+    "FR-MCP-005",
+    "FR-MCP-008",
+    "FR-MCP-009",
+    "FR-MCP-010"
+  ],
+  "recoveryDataClass": "CRITICAL_METADATA",
+  "events": [
+    {
+      "name": "mcp.request.admitted",
+      "description": "A Streamable HTTP request passed every admission stage and may proceed to MCP dispatch.",
+      "requirementRefs": ["FR-MCP-001", "FR-MCP-008", "FR-MCP-009"],
+      "tier": "CRITICAL_METADATA",
+      "fields": [
+        { "name": "requestId", "type": "string", "required": true },
+        { "name": "clientId", "type": "string", "required": true },
+        { "name": "protocolRevision", "type": "string", "required": true },
+        { "name": "method", "type": "string", "required": true },
+        { "name": "admittedAt", "type": "string<utc-timestamp>", "required": true }
+      ]
+    },
+    {
+      "name": "mcp.request.refused",
+      "description": "A request was refused at a deterministic admission stage before MCP dispatch or protected resource access.",
+      "requirementRefs": ["FR-MCP-001", "FR-MCP-008", "FR-MCP-009"],
+      "tier": "CRITICAL_METADATA",
+      "fields": [
+        { "name": "requestId", "type": "string", "required": true },
+        { "name": "clientId", "type": "string|null", "required": true },
+        { "name": "stage", "type": "string(ORIGIN|AUTHENTICATION|PROTOCOL|SESSION|CURSOR|MESSAGE_SIZE|RATE_LIMIT|AUTHORIZATION)", "required": true },
+        { "name": "reason", "type": "string", "required": true },
+        { "name": "httpStatus", "type": "integer", "required": true },
+        { "name": "refusedAt", "type": "string<utc-timestamp>", "required": true }
+      ]
+    },
+    {
+      "name": "mcp.session.created",
+      "description": "A bound MCP session was created after origin, authentication, and transport admission succeeded.",
+      "requirementRefs": ["FR-MCP-001", "FR-MCP-004", "FR-MCP-005", "FR-MCP-009"],
+      "tier": "CRITICAL_METADATA",
+      "fields": [
+        { "name": "sessionId", "type": "string", "required": true },
+        { "name": "clientId", "type": "string", "required": true },
+        { "name": "profileId", "type": "string", "required": true },
+        { "name": "protocolRevision", "type": "string", "required": true },
+        { "name": "createdAt", "type": "string<utc-timestamp>", "required": true }
+      ]
+    },
+    {
+      "name": "mcp.session.closed",
+      "description": "An MCP session reached an explicit close, expiry, revocation, or transport termination outcome.",
+      "requirementRefs": ["FR-MCP-004", "FR-MCP-005", "FR-MCP-009"],
+      "tier": "CRITICAL_METADATA",
+      "fields": [
+        { "name": "sessionId", "type": "string", "required": true },
+        { "name": "clientId", "type": "string", "required": true },
+        { "name": "outcome", "type": "string(CLOSED|EXPIRED|REVOKED|TERMINATED)", "required": true },
+        { "name": "closedAt", "type": "string<utc-timestamp>", "required": true }
+      ]
+    },
+    {
+      "name": "mcp.rate_limit.admitted",
+      "description": "A client request was admitted by its rate and concurrency budget.",
+      "requirementRefs": ["FR-MCP-004", "FR-MCP-009"],
+      "tier": "CRITICAL_METADATA",
+      "fields": [
+        { "name": "requestId", "type": "string", "required": true },
+        { "name": "clientId", "type": "string", "required": true },
+        { "name": "rateLimitClass", "type": "string", "required": true },
+        { "name": "concurrencyInUse", "type": "integer", "required": true },
+        { "name": "admittedAt", "type": "string<utc-timestamp>", "required": true }
+      ]
+    },
+    {
+      "name": "mcp.rate_limit.refused",
+      "description": "A client request was refused because its rate or concurrency admission limit was exhausted.",
+      "requirementRefs": ["FR-MCP-004", "FR-MCP-009"],
+      "tier": "CRITICAL_METADATA",
+      "fields": [
+        { "name": "requestId", "type": "string", "required": true },
+        { "name": "clientId", "type": "string", "required": true },
+        { "name": "rateLimitClass", "type": "string", "required": true },
+        { "name": "reason", "type": "string(RATE_LIMIT_EXCEEDED|CONCURRENCY_LIMIT_EXCEEDED)", "required": true },
+        { "name": "retryAfterSeconds", "type": "integer|null", "required": true },
+        { "name": "refusedAt", "type": "string<utc-timestamp>", "required": true }
+      ]
+    },
+    {
+      "name": "mcp.tool.accessed",
+      "description": "A tool invocation completed authorization evaluation for the requesting credential and entity scope.",
+      "requirementRefs": ["FR-MCP-002", "FR-MCP-003", "FR-MCP-010"],
+      "tier": "CRITICAL_METADATA",
+      "fields": [
+        { "name": "requestId", "type": "string", "required": true },
+        { "name": "clientId", "type": "string", "required": true },
+        { "name": "toolName", "type": "string", "required": true },
+        { "name": "authorized", "type": "boolean", "required": true },
+        { "name": "outcome", "type": "string(ALLOWED|REFUSED)", "required": true },
+        { "name": "evaluatedAt", "type": "string<utc-timestamp>", "required": true }
+      ]
+    },
+    {
+      "name": "mcp.resource.accessed",
+      "description": "A resource fetch completed authorization evaluation; the URI itself was never treated as authority.",
+      "requirementRefs": ["FR-MCP-002", "FR-MCP-010"],
+      "tier": "CRITICAL_METADATA",
+      "fields": [
+        { "name": "requestId", "type": "string", "required": true },
+        { "name": "clientId", "type": "string", "required": true },
+        { "name": "resourceScheme", "type": "string", "required": true },
+        { "name": "authorized", "type": "boolean", "required": true },
+        { "name": "outcome", "type": "string(ALLOWED|REFUSED)", "required": true },
+        { "name": "reason", "type": "string|null", "required": true },
+        { "name": "evaluatedAt", "type": "string<utc-timestamp>", "required": true }
+      ]
+    }
+  ]
+}

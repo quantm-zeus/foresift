@@ -41,6 +41,21 @@ describe('AC-254: all five scan surfaces green; read-only intelligence allowed',
       if (entry.isDirectory())
         manifestPaths.push(path.join('packages', entry.name, 'package.json'));
     }
+    try {
+      for (const entry of readdirSync(path.join(REPO_ROOT, 'apps'), { withFileTypes: true })) {
+        if (entry.isDirectory()) {
+          const appPkg = path.join('apps', entry.name, 'package.json');
+          try {
+            readFileSync(path.join(REPO_ROOT, appPkg), 'utf8');
+            manifestPaths.push(appPkg);
+          } catch {
+            // No package.json yet
+          }
+        }
+      }
+    } catch {
+      // apps directory not found
+    }
     const declared: string[] = [];
     for (const rel of manifestPaths) {
       const parsed = JSON.parse(readFileSync(path.join(REPO_ROOT, rel), 'utf8')) as {
@@ -77,6 +92,15 @@ describe('AC-254: all five scan surfaces green; read-only intelligence allowed',
         { name: 'list-detectors', source: 'tools' },
         { name: 'get-shadow-portfolio', source: 'routes' },
         { name: 'query-wallet-intelligence', source: 'tools' },
+        { name: 'mcp', source: 'routes' },
+        { name: 'discover_candidates', source: 'tools' },
+        { name: 'get_asset_identity', source: 'tools' },
+        { name: 'get_candidate_delta', source: 'tools' },
+        { name: 'compare_candidates', source: 'tools' },
+        { name: 'system_health', source: 'tools' },
+        { name: 'quota_get_status', source: 'tools' },
+        { name: 'capacity_get_status', source: 'tools' },
+        { name: 'provider_get_health', source: 'tools' },
       ]),
     ).toEqual([]);
   });
@@ -88,6 +112,8 @@ describe('AC-254: all five scan surfaces green; read-only intelligence allowed',
         'DATABASE_URL',
         'HELIUS_API_KEY',
         'MCP_SESSION_PEPPER',
+        'MCP_ALLOWED_ORIGINS',
+        'MCP_MAX_REQUEST_BYTES',
         'OBJECT_STORE_ENDPOINT',
       ]),
     ).toEqual([]);
@@ -95,13 +121,21 @@ describe('AC-254: all five scan surfaces green; read-only intelligence allowed',
 
   it('surface 5 — runtime canary stays silent over shipped source', async () => {
     const canary = new NegativeCapabilityCanary(loadCanaryCatalog());
-    const srcDir = path.join(REPO_ROOT, 'packages/security/src');
-    const files = readdirSync(srcDir, { recursive: true })
-      .map(String)
-      .filter((f) => f.endsWith('.ts'));
-    for (const file of files) {
-      const text = readFileSync(path.join(srcDir, file), 'utf8');
-      expect(canary.scanSourceText(file, text), file).toEqual([]);
+    const dirs = [path.join(REPO_ROOT, 'packages/security/src')];
+    const apiSrc = path.join(REPO_ROOT, 'apps/api/src');
+    try {
+      if (readdirSync(apiSrc).length > 0) dirs.push(apiSrc);
+    } catch {
+      // not yet present
+    }
+    for (const srcDir of dirs) {
+      const files = readdirSync(srcDir, { recursive: true })
+        .map(String)
+        .filter((f) => f.endsWith('.ts'));
+      for (const file of files) {
+        const text = readFileSync(path.join(srcDir, file), 'utf8');
+        expect(canary.scanSourceText(file, text), file).toEqual([]);
+      }
     }
   });
 

@@ -34,14 +34,21 @@ describe('AC-050: prohibited-capability scans are green over the tree', () => {
     expect(report.findings).toEqual([]);
   });
 
-  it('the runtime canary finds nothing in product source (security + tenant-isolation)', () => {
+  it('the runtime canary finds nothing in product source (security + tenant-isolation + apps/api)', () => {
     const canary = new NegativeCapabilityCanary(loadCanaryCatalog());
     const findings: CanaryFinding[] = [];
-    for (const dir of [
+    const scanDirs = [
       path.join(REPO_ROOT, 'packages/security/src'),
       path.join(REPO_ROOT, 'packages/tenant-isolation/src'),
       path.join(REPO_ROOT, 'packages/shared-schemas/src'),
-    ]) {
+    ];
+    const apiSrc = path.join(REPO_ROOT, 'apps/api/src');
+    try {
+      if (readdirSync(apiSrc).length > 0) scanDirs.push(apiSrc);
+    } catch {
+      // apps/api/src not yet present
+    }
+    for (const dir of scanDirs) {
       for (const file of sourceFiles(dir)) {
         const rel = path.relative(REPO_ROOT, file).split(path.sep).join('/');
         findings.push(...canary.scanSourceText(rel, readFileSync(file, 'utf8')));
@@ -53,7 +60,7 @@ describe('AC-050: prohibited-capability scans are green over the tree', () => {
   it('environment schema carries none of the catalog forbidden names', () => {
     const canary = new NegativeCapabilityCanary(loadCanaryCatalog());
     // A representative production environment: database, RPC viewing keys,
-    // provider tokens — NO private-key/seed/signing/submit variables.
+    // provider tokens, MCP configuration — NO private-key/seed/signing/submit variables.
     const findings = canary.scanEnvironmentNames([
       'DATABASE_URL',
       'HELIUS_API_KEY',
@@ -61,6 +68,8 @@ describe('AC-050: prohibited-capability scans are green over the tree', () => {
       'OBJECT_STORE_BUCKET',
       'AUDIT_CHECKPOINT_BUCKET',
       'MCP_SESSION_PEPPER',
+      'MCP_ALLOWED_ORIGINS',
+      'MCP_MAX_REQUEST_BYTES',
     ]);
     expect(findings).toEqual([]);
   });
@@ -73,6 +82,12 @@ describe('AC-050: prohibited-capability scans are green over the tree', () => {
         { name: 'wallet-activity-timeline', source: 'tools' },
         { name: 'token-holders-distribution', source: 'routes' },
         { name: 'pnl-history', source: 'tools' },
+        { name: 'mcp', source: 'routes' },
+        { name: 'discover_candidates', source: 'tools' },
+        { name: 'system_health', source: 'tools' },
+        { name: 'quota_get_status', source: 'tools' },
+        { name: 'capacity_get_status', source: 'tools' },
+        { name: 'provider_get_health', source: 'tools' },
       ]),
     ).toEqual([]);
   });

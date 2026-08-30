@@ -1,14 +1,14 @@
 {
   "schema": "foresift/bun-migration-manifest@1",
   "migrationId": "bun-test-authority-v1",
-  "generatedAt": "2026-08-30T15:17:11.189Z",
+  "generatedAt": "2026-08-30T15:17:16.526Z",
   "root": ".",
   "totalTestFiles": 319,
   "counts": {
     "CODEMOD_READY": 0,
     "AGY_REQUIRED": 0,
-    "MIGRATED": 315,
-    "VERIFIED": 4,
+    "MIGRATED": 314,
+    "VERIFIED": 5,
     "BLOCKED": 0
   },
   "parity": {
@@ -133,7 +133,7 @@
         "@electric-sql/pglite",
         "@foresift/persistence"
       ],
-      "state": "MIGRATED"
+      "state": "VERIFIED"
     },
     {
       "path": "packages/cheap-monitor/test/monitor.spec.ts",
@@ -8112,7 +8112,8 @@
       },
       "codexCalls": 0,
       "claudeCalls": 0,
-      "testedHead": "56426b21fa6e91451400459f6dbd2e03532e66fc"
+      "testedHead": "56426b21fa6e91451400459f6dbd2e03532e66fc",
+      "checkpointHead": "07cd7a1b7591bacdefc1a6ee5646fa80cb4402dd"
     },
     {
       "id": "verify-existing--foresift-cheap-monitor-database-pglite-1",
@@ -8121,7 +8122,55 @@
       "files": [
         "packages/cheap-monitor/test/migrations.spec.ts"
       ],
-      "state": "PENDING"
+      "state": "VERIFIED",
+      "verification": {
+        "ok": true,
+        "wallTimeMs": 5192,
+        "peakRssBytes": 0,
+        "cpuSeconds": 0,
+        "counts": {
+          "passed": 2,
+          "failed": 0,
+          "skipped": 0
+        },
+        "results": [
+          {
+            "id": "pglite-1",
+            "workload": "DATABASE_PGLITE",
+            "files": [
+              "packages/cheap-monitor/test/migrations.spec.ts"
+            ],
+            "fileWorkers": 1,
+            "testConcurrency": 1,
+            "command": [
+              "bun",
+              "test",
+              "--no-orphans",
+              "--isolate",
+              "--parallel=1",
+              "--max-concurrency=1",
+              "--timeout=30000",
+              "packages/cheap-monitor/test/migrations.spec.ts"
+            ],
+            "status": 0,
+            "signal": null,
+            "timedOut": false,
+            "wallTimeMs": 5192,
+            "peakRssBytes": null,
+            "cpuSeconds": null,
+            "counts": {
+              "passed": 2,
+              "failed": 0,
+              "skipped": 0
+            },
+            "stdoutTail": "bun test v1.4.0 (34cbb9a40) 1x PARALLEL\n",
+            "stderrTail": "\n 2 pass\n 0 fail\n 2 expect() calls\nRan 2 tests across 1 file. [5.00s]\n"
+          }
+        ]
+      },
+      "codexCalls": 0,
+      "claudeCalls": 0,
+      "testedHead": "07cd7a1b7591bacdefc1a6ee5646fa80cb4402dd"
     },
     {
       "id": "verify-existing--foresift-cheap-monitor-pure-1",

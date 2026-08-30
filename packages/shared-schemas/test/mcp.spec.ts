@@ -7,17 +7,9 @@
  * cursors validate resumable ownership; refusal reasons pass through deterministically.
  */
 import { describe, expect, it } from 'bun:test';
-import {
-  McpAdmissionRefusalSchema,
-  McpCursorSchema,
-  McpOutputEnvelopeSchema,
-  McpOutputMetaSchema,
-  McpRefusalReasonSchema,
-  McpSessionBindingSchema,
-  MCP_SCHEMAS,
-  parseMcpSchema,
-  type McpSchemaName,
-} from '../src/mcp.ts';
+// prettier-ignore
+// @ts-expect-error TS2307: module under implementation in T002
+import { McpAdmissionRefusalSchema, McpCursorSchema, McpOutputEnvelopeSchema, McpOutputMetaSchema, McpRefusalReasonSchema, McpSessionBindingSchema, MCP_SCHEMAS, parseMcpSchema, type McpSchemaName } from '../src/mcp.ts';
 
 const at = (s: string) => s;
 

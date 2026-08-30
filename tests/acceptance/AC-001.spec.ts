@@ -371,4 +371,3 @@ describe('AC-001 acceptance (mcp-surface facet): manual client initialize → li
     );
   });
 });
-

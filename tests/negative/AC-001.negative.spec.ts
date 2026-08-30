@@ -197,4 +197,3 @@ describe('AC-001 negative (mcp-surface facet): MCP exposure, degradation honesty
     }
   });
 });
-

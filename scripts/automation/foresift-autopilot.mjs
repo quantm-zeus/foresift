@@ -382,7 +382,7 @@ async function requestMilestoneStateTransition(
     ];
 
     // Progress state transition as far as possible without blocking (returns on WAITING_CI, DONE, or error)
-    const result = advanceStateTransition({
+    const result = await advanceStateTransition({
       receipt: null,
       fileChanges,
       message: transitionMeta.message,
@@ -414,7 +414,7 @@ async function requestMilestoneStateTransition(
  * Called once per supervisor tick. Each transition advances at most one external step
  * and returns immediately. No blocking waits.
  */
-function advanceStateLandings() {
+async function advanceStateLandings() {
   const pending = discoverPendingReceipts(STATE_DIR);
   for (const receipt of pending) {
     // Check retry backoff
@@ -426,7 +426,7 @@ function advanceStateLandings() {
       content: f.content,
     }));
 
-    const result = advanceStateTransition({
+    const result = await advanceStateTransition({
       receipt,
       fileChanges,
       message: receipt.commitMessage || `chore: state transition ${receipt.transitionId}`,
@@ -1042,7 +1042,7 @@ function promotePackagePlanningArtifacts(packageId, fromRoot) {
   const msg = `chore(autopilot): seed ${packageId} planning artifacts (planned-handoff)`;
   const immutableChanges = fileChanges.map((file) => ({ ...file }));
   enqueue(async () => {
-    const result = advanceStateTransition({
+    const result = await advanceStateTransition({
       receipt: null,
       fileChanges: immutableChanges,
       message: msg,
@@ -2300,7 +2300,7 @@ async function tick(st) {
   await advanceCiRepairs();
   // Drive any pending state transitions forward one step each (non-blocking).
   // This replaces the old blocking landStateViaPR() polling loop.
-  advanceStateLandings();
+  await advanceStateLandings();
   // Reconcile active entries. Paused entries stay tracked (never filtered as
   // done): fatal pauses wait for operator recovery, quota pauses probe on the
   // supervisor-owned schedule.

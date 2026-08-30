@@ -29,7 +29,15 @@ const SENSITIVE = [
   ['migration', /\b(?:migration|schema change|irreversible)\b/i],
   ['product safety', /\b(?:product safety|safety boundary|prohibited|fail[- ]closed)\b/i],
   ['tenant isolation', /\btenant isolation\b/i],
-  ['cryptography', /\b(?:cryptograph|crypto|signing|private key)\b/i],
+  // Cryptography targets the SECURITY CONCEPT, not the product domain.
+  // Foresift is a crypto INTELLIGENCE product — the bare word "crypto" (crypto
+  // intelligence, crypto token metadata, crypto market observation) is
+  // ubiquitous and must NOT force HIGH. Observed live 2026-08-30: routine
+  // market-observation lanes were routed to gpt-5.6-sol solely on "crypto".
+  [
+    'cryptography',
+    /\b(?:cryptograph\w*|signing|private[- ]?key|key material|wallet[- ]?signing|transaction[- ]?signing|signature verification)\b/i,
+  ],
 ];
 
 function unitText(units = []) {
@@ -197,13 +205,37 @@ export function buildWaveRouting(
   executionProfile,
   availability = Object.values(CODEX_MODELS),
 ) {
-  const implementationEngine = executionProfile === 'CODEX_AGY' ? 'CODEX' : 'CLAUDE';
+  // HYBRID_AGY: per-lane engine selection. Each implementation shard is
+  // independently classified by classifyCodexLane and routed CODEX when the
+  // provider is healthy AND the lane's score/complexity justifies Codex's
+  // constrained quota (MEDIUM+ score, forced-HIGH sensitivity, or explicit
+  // HIGH tier). LOW-scored shards route to CLAUDE by default — Codex quota
+  // is reserved for the work that actually needs it. Non-HYBRID profiles
+  // keep their exact uniform historical mapping.
+  const implementationEngine =
+    executionProfile === 'CODEX_AGY'
+      ? 'CODEX'
+      : executionProfile === 'CLAUDE_AGY'
+        ? 'CLAUDE'
+        : 'HYBRID';
   const lanes = [];
   for (const shard of graph.shards ?? []) {
     const units = (shard.units ?? [])
       .map((id) => graph.units.find((u) => u.id === id))
       .filter(Boolean);
-    if (implementationEngine === 'CODEX') {
+    const classification = classifyCodexLane({
+      lane: shard.id,
+      taskIds: shard.units,
+      units,
+      packageRisk: graph.package?.risk,
+    });
+    const laneEngine =
+      implementationEngine === 'HYBRID'
+        ? classification.complexityTier === 'LOW'
+          ? 'CLAUDE'
+          : 'CODEX'
+        : implementationEngine;
+    if (laneEngine === 'CODEX') {
       lanes.push({
         role: 'implementation',
         engine: 'CODEX',
@@ -242,9 +274,17 @@ export function buildWaveRouting(
     routingPolicyVersion: EXECUTION_POLICY.routingPolicyVersion,
     executionProfile,
     implementationEngine,
+    // HYBRID carries 'HYBRID' as the profile-level engine marker — the
+    // per-lane truth lives in `lanes[].engine`. Legacy fields stay stable for
+    // downstream consumers that switch on CODEX/CLAUDE.
     testEngine: 'AGY',
     maxCodexWriters: MAX_CODEX_WRITERS,
-    codexWriterCount: implementationEngine === 'CODEX' ? codexWriterCount(graph) : 0,
+    codexWriterCount:
+      implementationEngine === 'CODEX'
+        ? codexWriterCount(graph)
+        : implementationEngine === 'HYBRID'
+          ? lanes.filter((l) => l.role === 'implementation' && l.engine === 'CODEX').length
+          : 0,
     lanes,
   };
 }

@@ -1,5 +1,5 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-export type ExecutionProfile = 'CODEX_AGY' | 'CLAUDE_AGY';
+export type ExecutionProfile = 'HYBRID_AGY' | 'CODEX_AGY' | 'CLAUDE_AGY';
 export declare const DEFAULT_EXECUTION_PROFILE: ExecutionProfile;
 export declare const SUPPORTED_EXECUTION_PROFILES: readonly ExecutionProfile[];
 export declare const BASELINE_TEST_CLASSIFICATIONS: readonly string[];
@@ -13,7 +13,9 @@ export declare function resolveExecutionProfile(
         env?: Record<string, string | undefined>;
       },
 ): ExecutionProfile;
-export declare function implementationEngineForProfile(profile: string): 'CODEX' | 'CLAUDE';
+export declare function implementationEngineForProfile(
+  profile: string,
+): 'HYBRID' | 'CODEX' | 'CLAUDE';
 export declare function testEngineForProfile(profile: string): 'AGY';
 export declare function createExecutionIdentity(
   input: Record<string, unknown>,

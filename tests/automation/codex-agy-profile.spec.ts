@@ -61,17 +61,17 @@ describe('Foresift V4 CODEX_AGY execution profile test matrix (A through AH)', (
   // ── Section 1: Execution Profile (Matrix A - I) ──────────────────────────────
 
   describe('Matrix A: Default execution profile', () => {
-    it('DEFAULT_EXECUTION_PROFILE constant is CODEX_AGY', async () => {
+    it('DEFAULT_EXECUTION_PROFILE constant is HYBRID_AGY (Hyperdrive per-lane default)', async () => {
       const mod = await loadExecutionProfileModule();
-      expect(mod.DEFAULT_EXECUTION_PROFILE).toBe('CODEX_AGY');
+      expect(mod.DEFAULT_EXECUTION_PROFILE).toBe('HYBRID_AGY');
     });
 
-    it('resolveExecutionProfile() defaults to CODEX_AGY when input is empty or omitted', async () => {
+    it('resolveExecutionProfile() defaults to HYBRID_AGY when input is empty or omitted', async () => {
       const mod = await loadExecutionProfileModule();
-      expect(mod.resolveExecutionProfile()).toBe('CODEX_AGY');
-      expect(mod.resolveExecutionProfile(undefined)).toBe('CODEX_AGY');
-      expect(mod.resolveExecutionProfile({})).toBe('CODEX_AGY');
-      expect(mod.resolveExecutionProfile({ env: {} })).toBe('CODEX_AGY');
+      expect(mod.resolveExecutionProfile()).toBe('HYBRID_AGY');
+      expect(mod.resolveExecutionProfile(undefined)).toBe('HYBRID_AGY');
+      expect(mod.resolveExecutionProfile({})).toBe('HYBRID_AGY');
+      expect(mod.resolveExecutionProfile({ env: {} })).toBe('HYBRID_AGY');
     });
   });
 
@@ -469,7 +469,14 @@ describe('Foresift V4 CODEX_AGY execution profile test matrix (A through AH)', (
       },
       { name: 'product safety', input: { domains: ['product safety'], taskIds: ['t-safe'] } },
       { name: 'tenant isolation', input: { domains: ['tenant isolation'], taskIds: ['t-iso'] } },
-      { name: 'crypto', input: { domains: ['crypto'], taskIds: ['t-crypto'] } },
+      {
+        name: 'cryptographic verification',
+        input: { domains: ['cryptographic verification'], taskIds: ['t-crypto'] },
+      },
+      {
+        name: 'private key handling',
+        input: { domains: ['private key handling'], taskIds: ['t-privkey'] },
+      },
     ];
 
     for (const { name, input } of forcedDomains) {
@@ -2133,6 +2140,165 @@ writeFileSync(${JSON.stringify(join(resultsDir, 'agent-result.json'))}, JSON.str
       expect(yaml).toContain('role: shard?.role');
       expect(yaml).toContain('engine: shard?.engine');
       void mod;
+    });
+  });
+
+  describe('Matrix AM: HYBRID_AGY profile — per-lane engine selection', () => {
+    it('accepts HYBRID_AGY as an explicit profile', async () => {
+      const mod = await loadExecutionProfileModule();
+      expect(mod.resolveExecutionProfile({ override: 'HYBRID_AGY' as never, env: {} })).toBe(
+        'HYBRID_AGY',
+      );
+    });
+
+    it('refuses an unknown profile (fail closed)', async () => {
+      const mod = await loadExecutionProfileModule();
+      expect(() => mod.resolveExecutionProfile({ override: 'MAGIC_AGY', env: {} })).toThrow();
+    });
+
+    it('HYBRID identity supports mixed CODEX + CLAUDE + AGY lanes', async () => {
+      const mod = await loadExecutionProfileModule();
+      const identity = mod.createExecutionIdentity({
+        executionProfile: 'HYBRID_AGY',
+        packageId: 'pkg-hybrid',
+        workflow: 'foresift-sharded-wave',
+        baseHead: 'a'.repeat(40),
+        generation: 0,
+        lanes: [
+          {
+            lane: 'core',
+            role: 'implementation',
+            taskIds: ['t1'],
+            engine: 'CODEX',
+            model: 'gpt-5.6-sol',
+            reasoning: 'medium',
+            serviceTier: 'standard',
+          },
+          { lane: 'shard-1', role: 'implementation', taskIds: ['t2'], engine: 'CLAUDE' },
+          {
+            lane: 'test-author',
+            role: 'test',
+            taskIds: ['t3'],
+            engine: 'AGY',
+            model: 'gemini-3.7-flash-high',
+            reasoning: 'high',
+            providerTimeout: '40m',
+          },
+        ],
+      });
+      expect(identity.implementationEngine).toBe('HYBRID');
+      const engines = (identity.lanes as Array<{ role: string; engine: string }>)
+        .filter((l) => l.role === 'implementation')
+        .map((l) => l.engine);
+      expect(engines).toContain('CODEX');
+      expect(engines).toContain('CLAUDE');
+    });
+
+    it('CODEX_AGY and CLAUDE_AGY identities stay uniform (historical compatibility)', async () => {
+      const mod = await loadExecutionProfileModule();
+      // A CLAUDE implementation lane inside CODEX_AGY is refused — legacy
+      // profiles remain strictly uniform (invariant throws).
+      expect(() =>
+        mod.createExecutionIdentity({
+          executionProfile: 'CODEX_AGY',
+          packageId: 'pkg-codex',
+          workflow: 'foresift-sharded-wave',
+          baseHead: 'b'.repeat(40),
+          generation: 0,
+          lanes: [
+            {
+              lane: 'core',
+              role: 'implementation',
+              taskIds: ['t1'],
+              engine: 'CLAUDE',
+            },
+          ],
+        }),
+      ).toThrow();
+    });
+
+    it('HYBRID routing assigns CLAUDE to LOW tiers and CODEX to MEDIUM+', async () => {
+      const routing = await loadCodexRoutingModule();
+      const graph = {
+        package: { risk: 'LOW' },
+        units: [
+          { id: 't-low', body: 'add a simple readme example' },
+          {
+            id: 't-high',
+            body: 'implement durable checkpoint reconciliation with concurrency control',
+          },
+        ],
+        shards: [
+          { id: 'shard-low', units: ['t-low'] },
+          { id: 'shard-high', units: ['t-high'] },
+        ],
+        testLanes: [{ id: 'test-author', units: ['t9'] }],
+      };
+      const wave = routing.buildWaveRouting(
+        graph,
+        'HYBRID_AGY',
+        new Set(['gpt-5.6-terra', 'gpt-5.6-sol']),
+      );
+      expect(wave.implementationEngine).toBe('HYBRID');
+      const byLane = Object.fromEntries(
+        (wave.lanes as Array<{ lane: string; engine: string }>).map((l) => [l.lane, l.engine]),
+      );
+      expect(byLane['shard-low']).toBe('CLAUDE');
+      expect(byLane['shard-high']).toBe('CODEX');
+      expect(byLane['test-author']).toBe('AGY');
+    });
+
+    it('CODEX_AGY routing keeps all product lanes CODEX', async () => {
+      const routing = await loadCodexRoutingModule();
+      const graph = {
+        package: { risk: 'MEDIUM' },
+        units: [{ id: 't1', body: 'simple' }],
+        shards: [{ id: 'core', units: ['t1'] }],
+        testLanes: [],
+      };
+      const wave = routing.buildWaveRouting(
+        graph,
+        'CODEX_AGY',
+        new Set(['gpt-5.6-terra', 'gpt-5.6-sol']),
+      );
+      for (const lane of (wave.lanes as Array<{ role: string; engine: string }>).filter(
+        (l) => l.role === 'implementation',
+      ))
+        expect(lane.engine).toBe('CODEX');
+    });
+  });
+
+  describe('Matrix AN: generic-crypto wording must NOT force HIGH', () => {
+    it('crypto intelligence / token metadata / market observation stay below forced HIGH', async () => {
+      const routing = await loadCodexRoutingModule();
+      const cases = [
+        'Provide bounded first-party observation of crypto market activity',
+        'record crypto token metadata for the observation universe',
+        'crypto intelligence aggregation endpoint',
+      ];
+      for (const body of cases) {
+        const classified = routing.classifyCodexLane({
+          lane: 'lane-ok',
+          taskIds: ['t-x'],
+          units: [{ id: 't-x', body }],
+          risk: 'LOW',
+          files: ['packages/collector-solana/src/observer.ts'],
+        });
+        expect(classified.forcedHigh).toBe(false);
+      }
+    });
+
+    it('cryptographic concepts still force HIGH', async () => {
+      const routing = await loadCodexRoutingModule();
+      const classified = routing.classifyCodexLane({
+        lane: 'lane-sec',
+        taskIds: ['t-y'],
+        units: [{ id: 't-y', body: 'verify private key material never leaves the vault' }],
+        risk: 'LOW',
+        files: ['packages/security/src/vault.ts'],
+      });
+      expect(classified.forcedHigh).toBe(true);
+      expect(classified.complexityTier).toBe('HIGH');
     });
   });
 });

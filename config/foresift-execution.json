@@ -1,7 +1,7 @@
 {
-  "schema": "foresift/execution-policy@1",
-  "defaultProfile": "CODEX_AGY",
-  "supportedProfiles": ["CODEX_AGY", "CLAUDE_AGY"],
+  "schema": "foresift/execution-policy@2",
+  "defaultProfile": "HYBRID_AGY",
+  "supportedProfiles": ["HYBRID_AGY", "CODEX_AGY", "CLAUDE_AGY"],
   "codexServiceTier": "standard",
   "codexCliServiceTier": "default",
   "routingPolicyVersion": "codex-terra-sol-agy-gemini@3",
@@ -9,5 +9,14 @@
   "maxAgyTestWriters": 1,
   "agyTestModel": "gemini-3.7-flash-high",
   "agyTestEffort": "high",
-  "agyPrintTimeout": "40m"
+  "agyPrintTimeout": "40m",
+  "hybridRouting": {
+    "lowTierEngine": "CLAUDE",
+    "mediumAndAboveEngine": "CODEX"
+  },
+  "providerPools": {
+    "claude": { "initial": 3, "normalTarget": 5, "burstTarget": 8, "hardCap": 10 },
+    "codex": { "initial": 1, "normalTarget": 2, "burstTarget": 2, "hardCap": 3 },
+    "agy": { "normalTarget": 3, "burstTarget": 5, "hardCap": 6 }
+  }
 }

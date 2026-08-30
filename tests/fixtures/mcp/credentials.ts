@@ -35,7 +35,12 @@ export const STANDARD_DISCOVERY_CREDENTIAL = {
   scopes: ['tools:read', 'tools:execute', 'discovery:read', 'resources:read'],
   originPolicyRef: 'origin-policy-standard',
   profileBindings: ['discovery'],
-  toolBounds: ['discover_candidates', 'get_asset_identity', 'get_candidate_delta', 'compare_candidates'],
+  toolBounds: [
+    'discover_candidates',
+    'get_asset_identity',
+    'get_candidate_delta',
+    'compare_candidates',
+  ],
   resourceBounds: ['evidence://*', 'run://*', 'candidate://*'],
   entityBounds: ['solana:*'],
   rateLimitClass: 'STANDARD_FREE',
@@ -83,7 +88,10 @@ export const EXPIRED_CREDENTIAL = {
 export const REVOKED_CREDENTIAL = {
   credentialId: 'cred_revoked_0001',
   rawSecret: 'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855',
-  keyedHash: computeTestKeyedHash(TEST_MCP_PEPPER, 'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855'),
+  keyedHash: computeTestKeyedHash(
+    TEST_MCP_PEPPER,
+    'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855',
+  ),
   scopes: ['tools:read', 'tools:execute'],
   originPolicyRef: 'origin-policy-standard',
   profileBindings: ['discovery'],

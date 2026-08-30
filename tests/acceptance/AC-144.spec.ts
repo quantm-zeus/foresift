@@ -110,44 +110,43 @@ const MANDATED_RESOURCE_SCHEMES = [
 describe('AC-144 acceptance: MCP protocol compatibility matrix (baseline 2025-11-25)', () => {
   describe('target client initialize handshake matrix', () => {
     it.each(
-      SUPPORTED_TARGET_CLIENTS.map((client) => [
-        `${client.clientName} (${client.clientId} v${client.version})`,
-        client,
-      ] as const),
+      SUPPORTED_TARGET_CLIENTS.map(
+        (client) =>
+          [`${client.clientName} (${client.clientId} v${client.version})`, client] as const,
+      ),
     )('admits initialize handshake for client: %s', (_label, client) => {
-        const initInput = {
-          protocolRevision: MCP_PROTOCOL_BASELINE_REVISION,
-          contentType: 'application/json; charset=utf-8',
-          method: 'POST',
-          messageBytes: 512,
-        };
+      const initInput = {
+        protocolRevision: MCP_PROTOCOL_BASELINE_REVISION,
+        contentType: 'application/json; charset=utf-8',
+        method: 'POST',
+        messageBytes: 512,
+      };
 
-        const verdict = GUARD.inspect(initInput);
-        expect(verdict.decision).toBe('ALLOW');
+      const verdict = GUARD.inspect(initInput);
+      expect(verdict.decision).toBe('ALLOW');
 
-        // Synthesized server initialize response
-        const serverResponse = {
-          jsonrpc: '2.0',
-          id: `init-${client.clientId}`,
-          result: {
-            protocolVersion: MCP_PROTOCOL_BASELINE_REVISION,
-            capabilities: {
-              tools: { listChanged: true },
-              resources: { subscribe: true, listChanged: true },
-              prompts: { listChanged: true },
-            },
-            serverInfo: {
-              name: '@foresift/api',
-              version: '0.0.0',
-            },
+      // Synthesized server initialize response
+      const serverResponse = {
+        jsonrpc: '2.0',
+        id: `init-${client.clientId}`,
+        result: {
+          protocolVersion: MCP_PROTOCOL_BASELINE_REVISION,
+          capabilities: {
+            tools: { listChanged: true },
+            resources: { subscribe: true, listChanged: true },
+            prompts: { listChanged: true },
           },
-        };
+          serverInfo: {
+            name: '@foresift/api',
+            version: '0.0.0',
+          },
+        },
+      };
 
-        expect(serverResponse.result.protocolVersion).toBe('2025-11-25');
-        expect(serverResponse.result.serverInfo.name).toBe('@foresift/api');
-        expect(serverResponse.result.capabilities.tools.listChanged).toBe(true);
-      },
-    );
+      expect(serverResponse.result.protocolVersion).toBe('2025-11-25');
+      expect(serverResponse.result.serverInfo.name).toBe('@foresift/api');
+      expect(serverResponse.result.capabilities.tools.listChanged).toBe(true);
+    });
   });
 
   describe('protocol transport inspections (baseline 2025-11-25)', () => {

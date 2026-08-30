@@ -50,7 +50,8 @@ export const VALID_MCP_OUTPUT_ENVELOPE = {
     pageSize: 1,
     totalRecords: 1,
   },
-  textContent: 'Discovered 1 candidate token: SOL (Wrapped SOL) at So11111111111111111111111111111111111111112.',
+  textContent:
+    'Discovered 1 candidate token: SOL (Wrapped SOL) at So11111111111111111111111111111111111111112.',
   meta: {
     toolName: 'discover_candidates',
     toolVersion: '1.0.0',
@@ -86,10 +87,12 @@ export const DEGRADED_MCP_OUTPUT_ENVELOPE = {
     candidates: [],
     abstention: {
       reason: 'INSUFFICIENT_FIRST_PARTY_EVIDENCE',
-      details: 'Optional provider metrics unavailable; degraded breadth without paying paid provider fees.',
+      details:
+        'Optional provider metrics unavailable; degraded breadth without paying paid provider fees.',
     },
   },
-  textContent: 'Explicit abstention: Insufficient first-party evidence to verify token security thesis.',
+  textContent:
+    'Explicit abstention: Insufficient first-party evidence to verify token security thesis.',
   meta: {
     toolName: 'research_get_security_evidence',
     toolVersion: '1.0.0',
@@ -108,9 +111,7 @@ export const DEGRADED_MCP_OUTPUT_ENVELOPE = {
     abstentionReason: 'INSUFFICIENT_FIRST_PARTY_EVIDENCE',
     resourceUris: ['conflict://conf-001'],
   },
-  resourceLinks: [
-    { uri: 'conflict://conf-001', title: 'Disagreement Record' },
-  ],
+  resourceLinks: [{ uri: 'conflict://conf-001', title: 'Disagreement Record' }],
 };
 
 /** Prohibited financial payloads that must be scrubbed / rejected (§17.4, INV-001, AC-050). */
@@ -118,7 +119,8 @@ export const PROHIBITED_FINANCIAL_PAYLOADS = [
   {
     name: 'raw unsigned transaction payload',
     data: {
-      transaction: 'AQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=',
+      transaction:
+        'AQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=',
       type: 'SOLANA_TRANSACTION',
     },
   },

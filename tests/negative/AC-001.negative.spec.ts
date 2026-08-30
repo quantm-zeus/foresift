@@ -113,7 +113,9 @@ describe('AC-001 negative (mcp-surface facet): MCP transport and execution failu
     function executeMcpTool(toolName: string, profile: ProfileBinding): void {
       const allowed = visibleToolsFor(profile);
       if (!allowed.includes(toolName)) {
-        throw new Error(`MCP_TOOL_AUTHORIZATION_REFUSED: tool '${toolName}' not visible to profile '${profile.id}'`);
+        throw new Error(
+          `MCP_TOOL_AUTHORIZATION_REFUSED: tool '${toolName}' not visible to profile '${profile.id}'`,
+        );
       }
     }
 
@@ -144,7 +146,9 @@ describe('AC-001 negative (mcp-surface facet): MCP transport and execution failu
     }
 
     expect(() => authenticateMcpRequest(undefined)).toThrow(/MCP_AUTHENTICATION_REQUIRED/);
-    expect(() => authenticateMcpRequest('Basic dXNlcjpwYXNz')).toThrow(/MCP_AUTHENTICATION_REQUIRED/);
+    expect(() => authenticateMcpRequest('Basic dXNlcjpwYXNz')).toThrow(
+      /MCP_AUTHENTICATION_REQUIRED/,
+    );
     expect(() => authenticateMcpRequest('')).toThrow(/MCP_AUTHENTICATION_REQUIRED/);
   });
 
@@ -158,7 +162,9 @@ describe('AC-001 negative (mcp-surface facet): MCP transport and execution failu
         payload.data.missingSources.length > 0 &&
         (!payload.meta.partial || payload.meta.qualityCodes.length === 0)
       ) {
-        throw new Error('SILENT_GAP_REFUSED: MCP response with missing sources must declare partial: true and qualityCodes');
+        throw new Error(
+          'SILENT_GAP_REFUSED: MCP response with missing sources must declare partial: true and qualityCodes',
+        );
       }
     }
 
@@ -170,4 +176,3 @@ describe('AC-001 negative (mcp-surface facet): MCP transport and execution failu
     expect(() => validateMcpResponseIntegrity(invalidMcpResponse)).toThrow(/SILENT_GAP_REFUSED/);
   });
 });
-

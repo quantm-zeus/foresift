@@ -471,15 +471,19 @@ export const g0McpSessions = pgTable('g0_mcp_sessions', {
 
 // --- g0_mcp_0002_rate_state ---------------------------------------------------
 
-export const g0McpRateState = pgTable('g0_mcp_rate_state', {
-  credentialId: text('credential_id').notNull(),
-  rateLimitClass: text('rate_limit_class').notNull(),
-  bucketCapacity: numeric('bucket_capacity').notNull(),
-  availableTokens: numeric('available_tokens').notNull(),
-  refillTokensPerSec: numeric('refill_tokens_per_sec').notNull(),
-  lastRefilledAt: timestamp('last_refilled_at', { withTimezone: true }).notNull(),
-  inFlight: integer('in_flight').notNull(),
-  concurrencyLimit: integer('concurrency_limit').notNull(),
-  fencingToken: bigint('fencing_token', { mode: 'number' }).notNull(),
-  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull(),
-}, (t) => [primaryKey({ columns: [t.credentialId, t.rateLimitClass] })]);
+export const g0McpRateState = pgTable(
+  'g0_mcp_rate_state',
+  {
+    credentialId: text('credential_id').notNull(),
+    rateLimitClass: text('rate_limit_class').notNull(),
+    bucketCapacity: numeric('bucket_capacity').notNull(),
+    availableTokens: numeric('available_tokens').notNull(),
+    refillTokensPerSec: numeric('refill_tokens_per_sec').notNull(),
+    lastRefilledAt: timestamp('last_refilled_at', { withTimezone: true }).notNull(),
+    inFlight: integer('in_flight').notNull(),
+    concurrencyLimit: integer('concurrency_limit').notNull(),
+    fencingToken: bigint('fencing_token', { mode: 'number' }).notNull(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull(),
+  },
+  (t) => [primaryKey({ columns: [t.credentialId, t.rateLimitClass] })],
+);

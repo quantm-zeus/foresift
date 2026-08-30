@@ -16,7 +16,7 @@ import {
   MCP_SCHEMAS,
   parseMcpSchema,
   type McpSchemaName,
-// @ts-ignore TS2307
+  // @ts-ignore TS2307
 } from '../src/mcp.ts';
 import {
   ACTIVE_SESSION_FIXTURE,
@@ -53,9 +53,9 @@ describe('MCP shared schemas (FR-MCP-001…010, ADR-0013)', () => {
       expect(
         McpSessionBindingSchema.safeParse({ ...validBinding, profileId: undefined }).success,
       ).toBe(false);
-      expect(McpSessionBindingSchema.safeParse({ ...validBinding, origin: undefined }).success).toBe(
-        false,
-      );
+      expect(
+        McpSessionBindingSchema.safeParse({ ...validBinding, origin: undefined }).success,
+      ).toBe(false);
       expect(
         McpSessionBindingSchema.safeParse({ ...validBinding, protocolRevision: undefined }).success,
       ).toBe(false);
@@ -97,7 +97,8 @@ describe('MCP shared schemas (FR-MCP-001…010, ADR-0013)', () => {
 
     it('refuses unknown keys fail-closed', () => {
       expect(
-        McpCursorSchema.safeParse({ ...VALID_AUTHORIZED_CURSOR, unauthorizedPayload: true }).success,
+        McpCursorSchema.safeParse({ ...VALID_AUTHORIZED_CURSOR, unauthorizedPayload: true })
+          .success,
       ).toBe(false);
     });
   });

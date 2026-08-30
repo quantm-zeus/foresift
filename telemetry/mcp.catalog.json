@@ -36,7 +36,11 @@
       "fields": [
         { "name": "requestId", "type": "string", "required": true },
         { "name": "clientId", "type": "string|null", "required": true },
-        { "name": "stage", "type": "string(ORIGIN|AUTHENTICATION|PROTOCOL|SESSION|CURSOR|MESSAGE_SIZE|RATE_LIMIT|AUTHORIZATION)", "required": true },
+        {
+          "name": "stage",
+          "type": "string(ORIGIN|AUTHENTICATION|PROTOCOL|SESSION|CURSOR|MESSAGE_SIZE|RATE_LIMIT|AUTHORIZATION)",
+          "required": true
+        },
         { "name": "reason", "type": "string", "required": true },
         { "name": "httpStatus", "type": "integer", "required": true },
         { "name": "refusedAt", "type": "string<utc-timestamp>", "required": true }
@@ -63,7 +67,11 @@
       "fields": [
         { "name": "sessionId", "type": "string", "required": true },
         { "name": "clientId", "type": "string", "required": true },
-        { "name": "outcome", "type": "string(CLOSED|EXPIRED|REVOKED|TERMINATED)", "required": true },
+        {
+          "name": "outcome",
+          "type": "string(CLOSED|EXPIRED|REVOKED|TERMINATED)",
+          "required": true
+        },
         { "name": "closedAt", "type": "string<utc-timestamp>", "required": true }
       ]
     },
@@ -89,7 +97,11 @@
         { "name": "requestId", "type": "string", "required": true },
         { "name": "clientId", "type": "string", "required": true },
         { "name": "rateLimitClass", "type": "string", "required": true },
-        { "name": "reason", "type": "string(RATE_LIMIT_EXCEEDED|CONCURRENCY_LIMIT_EXCEEDED)", "required": true },
+        {
+          "name": "reason",
+          "type": "string(RATE_LIMIT_EXCEEDED|CONCURRENCY_LIMIT_EXCEEDED)",
+          "required": true
+        },
         { "name": "retryAfterSeconds", "type": "integer|null", "required": true },
         { "name": "refusedAt", "type": "string<utc-timestamp>", "required": true }
       ]

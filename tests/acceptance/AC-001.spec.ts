@@ -346,4 +346,3 @@ describe('AC-001 acceptance (mcp-surface facet): manual client initialize -> lis
     expect(degradedMcpResult._meta.qualityCodes).toContain('SOURCE_DEGRADED_UNAVAILABLE');
   });
 });
-

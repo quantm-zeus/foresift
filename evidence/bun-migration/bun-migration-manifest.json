@@ -1,14 +1,14 @@
 {
   "schema": "foresift/bun-migration-manifest@1",
   "migrationId": "bun-test-authority-v1",
-  "generatedAt": "2026-08-30T15:17:10.896Z",
+  "generatedAt": "2026-08-30T15:17:11.189Z",
   "root": ".",
   "totalTestFiles": 319,
   "counts": {
     "CODEMOD_READY": 0,
     "AGY_REQUIRED": 0,
-    "MIGRATED": 318,
-    "VERIFIED": 1,
+    "MIGRATED": 315,
+    "VERIFIED": 4,
     "BLOCKED": 0
   },
   "parity": {
@@ -34,7 +34,7 @@
       "sourceAnchors": [
         "../src/degrade-policy.ts"
       ],
-      "state": "MIGRATED"
+      "state": "VERIFIED"
     },
     {
       "path": "packages/capacity-planner/test/migrations.spec.ts",
@@ -85,7 +85,7 @@
         "../../../tests/fixtures/cost/paid-policies.ts",
         "../../../tests/fixtures/cost/operations.ts"
       ],
-      "state": "MIGRATED"
+      "state": "VERIFIED"
     },
     {
       "path": "packages/capacity-planner/test/resource-budgets.spec.ts",
@@ -109,7 +109,7 @@
         "../src/resource-budgets.ts",
         "../../../tests/fixtures/cost/paid-policies.ts"
       ],
-      "state": "MIGRATED"
+      "state": "VERIFIED"
     },
     {
       "path": "packages/cheap-monitor/test/migrations.spec.ts",
@@ -8048,7 +8048,8 @@
       },
       "codexCalls": 0,
       "claudeCalls": 0,
-      "testedHead": "852e2fa4af01467fc841dbc510f6facce1ecce3f"
+      "testedHead": "852e2fa4af01467fc841dbc510f6facce1ecce3f",
+      "checkpointHead": "56426b21fa6e91451400459f6dbd2e03532e66fc"
     },
     {
       "id": "verify-existing--foresift-capacity-planner-pure-1",
@@ -8059,7 +8060,59 @@
         "packages/capacity-planner/test/planner.spec.ts",
         "packages/capacity-planner/test/resource-budgets.spec.ts"
       ],
-      "state": "PENDING"
+      "state": "VERIFIED",
+      "verification": {
+        "ok": true,
+        "wallTimeMs": 154,
+        "peakRssBytes": 0,
+        "cpuSeconds": 0,
+        "counts": {
+          "passed": 11,
+          "failed": 0,
+          "skipped": 0
+        },
+        "results": [
+          {
+            "id": "pure-1",
+            "workload": "PURE",
+            "files": [
+              "packages/capacity-planner/test/degrade-policy.spec.ts",
+              "packages/capacity-planner/test/planner.spec.ts",
+              "packages/capacity-planner/test/resource-budgets.spec.ts"
+            ],
+            "fileWorkers": 2,
+            "testConcurrency": 8,
+            "command": [
+              "bun",
+              "test",
+              "--no-orphans",
+              "--isolate",
+              "--parallel=2",
+              "--max-concurrency=8",
+              "--timeout=30000",
+              "packages/capacity-planner/test/degrade-policy.spec.ts",
+              "packages/capacity-planner/test/planner.spec.ts",
+              "packages/capacity-planner/test/resource-budgets.spec.ts"
+            ],
+            "status": 0,
+            "signal": null,
+            "timedOut": false,
+            "wallTimeMs": 153,
+            "peakRssBytes": null,
+            "cpuSeconds": null,
+            "counts": {
+              "passed": 11,
+              "failed": 0,
+              "skipped": 0
+            },
+            "stdoutTail": "bun test v1.4.0 (34cbb9a40) 2x PARALLEL\n",
+            "stderrTail": "\n 11 pass\n 0 fail\n 16 expect() calls\nRan 11 tests across 3 files. [133.00ms]\n"
+          }
+        ]
+      },
+      "codexCalls": 0,
+      "claudeCalls": 0,
+      "testedHead": "56426b21fa6e91451400459f6dbd2e03532e66fc"
     },
     {
       "id": "verify-existing--foresift-cheap-monitor-database-pglite-1",

@@ -47,13 +47,59 @@ describe('AC-255 negative: paired forbidden variants fail policy', () => {
     expect(found.map((f) => f.category)).toContain('PRIVATE_KEY_SEED');
   });
 
+  it('BUILD layer: the bridge-staking fixture is detected as BRIDGE_STAKING', () => {
+    const found = canary.scanSourceText(
+      'prohibited/bridge-staking.ts',
+      fixtureText('bridge-staking.ts'),
+    );
+    expect(found.map((f) => f.category)).toContain('BRIDGE_STAKING');
+  });
+
+  it('BUILD layer: the custody fixture is detected as CUSTODY_WALLET_MANAGEMENT', () => {
+    const found = canary.scanSourceText(
+      'prohibited/custody-wallet-management.ts',
+      fixtureText('custody-wallet-management.ts'),
+    );
+    expect(found.map((f) => f.category)).toContain('CUSTODY_WALLET_MANAGEMENT');
+  });
+
+  it('BUILD layer: the exchange-trading fixture is detected as EXCHANGE_TRADING', () => {
+    const found = canary.scanSourceText(
+      'prohibited/exchange-trading.ts',
+      fixtureText('exchange-trading.ts'),
+    );
+    expect(found.map((f) => f.category)).toContain('EXCHANGE_TRADING');
+  });
+
+  it('BUILD layer: the copy-trading fixture is detected as COPY_TRADING', () => {
+    const found = canary.scanSourceText(
+      'prohibited/copy-trading.ts',
+      fixtureText('copy-trading.ts'),
+    );
+    expect(found.map((f) => f.category)).toContain('COPY_TRADING');
+  });
+
   it('RUNTIME layer: private-key environment names refuse with typed errors', () => {
-    const findings = canary.scanEnvironmentNames(['PRIVATE_KEY', 'SEED_PHRASE']);
-    expect(findings.length).toBeGreaterThanOrEqual(2);
+    const findings = canary.scanEnvironmentNames([
+      'PRIVATE_KEY',
+      'SEED_PHRASE',
+      'MNEMONIC',
+      'RECOVERY_PHRASE',
+      'SIGNING_KEY',
+      'SIGNING_KEYSTORE',
+    ]);
+    expect(findings.length).toBeGreaterThanOrEqual(6);
   });
 
   it('RUNTIME layer: forbidden execution query variants throw typed errors', () => {
-    for (const query of ['swap SOL for USDC', 'execute trade on behalf of wallet']) {
+    const forbiddenQueries = [
+      'swap SOL for USDC',
+      'execute trade on behalf of wallet',
+      'buy token from wallet',
+      'sell all holdings',
+      'transfer funds out of wallet',
+    ];
+    for (const query of forbiddenQueries) {
       let error: unknown;
       try {
         canary.classifyWalletQuery(query);
@@ -70,6 +116,7 @@ describe('AC-255 negative (tool-core substrate): prohibited-shape tool definitio
   const screen = new ProhibitedCapabilityScreen();
   const now = '2026-08-01T00:00:00Z';
   const prohibitedPrivateKeyProperty = ['private', 'Key'].join('');
+  const prohibitedSeedPhraseProperty = ['seed', 'Phrase'].join('');
 
   it('refuses registration for prohibited execution tool definitions across categories', () => {
     const prohibitedDefinitions = [
@@ -107,7 +154,10 @@ describe('AC-255 negative (tool-core substrate): prohibited-shape tool definitio
         name: 'gmgn_manage_custody_wallet',
         title: 'Manage Custody Wallet',
         description: 'Custody wallet private key and seed phrase management',
-        inputSchemaJson: { type: 'object' },
+        inputSchemaJson: {
+          type: 'object',
+          properties: { [prohibitedSeedPhraseProperty]: { type: 'string' } },
+        },
         outputSchemaJson: { type: 'object' },
         actionClass: ActionClass.EXTERNAL_READ,
         toolVersion: '1.0.0',
@@ -116,6 +166,24 @@ describe('AC-255 negative (tool-core substrate): prohibited-shape tool definitio
         name: 'gmgn_execute_trade',
         title: 'Execute Trade on Behalf of Wallet',
         description: 'Execute trade order on behalf of wallet',
+        inputSchemaJson: { type: 'object' },
+        outputSchemaJson: { type: 'object' },
+        actionClass: ActionClass.EXTERNAL_READ,
+        toolVersion: '1.0.0',
+      },
+      {
+        name: 'gmgn_bridge_assets',
+        title: 'Bridge Assets Across Chains',
+        description: 'Cross-chain bridge assets transfer via Wormhole bridge',
+        inputSchemaJson: { type: 'object' },
+        outputSchemaJson: { type: 'object' },
+        actionClass: ActionClass.EXTERNAL_READ,
+        toolVersion: '1.0.0',
+      },
+      {
+        name: 'gmgn_copy_trade',
+        title: 'Copy Trade Target Wallet',
+        description: 'Follow and copy-trade target wallet transactions automatically',
         inputSchemaJson: { type: 'object' },
         outputSchemaJson: { type: 'object' },
         actionClass: ActionClass.EXTERNAL_READ,
@@ -174,5 +242,28 @@ describe('AC-255 negative (tool-core substrate): prohibited-shape tool definitio
       expect(verdict.event.reasons.length).toBeGreaterThan(0);
       expect(verdict.event.findings.length).toBeGreaterThan(0);
     }
+  });
+
+  it('refuses prohibited definition from GMGN trading-shaped variant fixture', async () => {
+    const fixture = JSON.parse(
+      readFileSync(
+        path.join(REPO_ROOT, 'tests/fixtures/prov/gmgn/trading-shaped-definition.variant.json'),
+        'utf8',
+      ),
+    ) as { definition: { operationId: string; capabilityClass: string } };
+
+    const verdict = screen.screenWithReport(
+      {
+        name: fixture.definition.operationId.replaceAll('.', '_'),
+        title: 'GMGN Quote to Transaction',
+        description: 'Build swap quote to raw transaction',
+        inputSchemaJson: { type: 'object' },
+        outputSchemaJson: { type: 'object' },
+        actionClass: ActionClass.PROHIBITED_FINANCIAL,
+        toolVersion: '1.0.0',
+      },
+      now,
+    );
+    expect(verdict.ok).toBe(false);
   });
 });

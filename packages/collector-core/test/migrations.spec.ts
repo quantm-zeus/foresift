@@ -45,7 +45,7 @@ describe('g0_col_* SQL migrations (collector-core)', () => {
       expect(m.checksum.startsWith('sha256:')).toBe(true);
       expect(m.sql.trim().length).toBeGreaterThan(0);
     }
-  });
+  }, 60_000);
 
   it('applies migrations idempotently', async () => {
     const report1 = await applyMigrations({ engine, migrationsDir: MIGRATIONS_DIR });

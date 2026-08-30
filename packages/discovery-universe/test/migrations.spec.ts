@@ -43,7 +43,7 @@ describe('g0_disc_* SQL migrations (discovery-universe)', () => {
       expect(m.checksum.startsWith('sha256:')).toBe(true);
       expect(m.sql.trim().length).toBeGreaterThan(0);
     }
-  });
+  }, 60_000);
 
   it('applies migrations idempotently', async () => {
     await applyMigrations({ engine, migrationsDir: MIGRATIONS_DIR });

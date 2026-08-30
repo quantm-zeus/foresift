@@ -320,25 +320,63 @@ describe('nextPollDelayMs (V3-B §18 adaptive handoff)', () => {
     expect(HANDOFF_POLL_MS).toBe(10_000);
   });
 
-  it('hard-bounds the fast streak, then holds base until a quiet tick resets', () => {
-    // Streak reaching the bound reverts to base WITHOUT growing further…
+  it('hard-bounds the fast streak, then holds FAST while work stays active/ready (§49)', () => {
+    // Streak reaching the bound holds the fast rate while a tracked entry is
+    // active — a live wave or waiting CI must not idle the scheduler…
     expect(
       nextPollDelayMs({
         launched: 1,
         awaitingDiscovery: true,
         fastStreak: HANDOFF_FAST_STREAK_MAX,
       }),
-    ).toEqual({ delayMs: POLL_INTERVAL_MS, fastStreak: HANDOFF_FAST_STREAK_MAX });
+    ).toEqual({ delayMs: HANDOFF_POLL_MS, fastStreak: HANDOFF_FAST_STREAK_MAX });
     // …and overshoot inputs are clamped, never amplified.
     expect(nextPollDelayMs({ launched: 2, awaitingDiscovery: true, fastStreak: 999 })).toEqual({
-      delayMs: POLL_INTERVAL_MS,
+      delayMs: HANDOFF_POLL_MS,
       fastStreak: HANDOFF_FAST_STREAK_MAX,
     });
-    // Quiet tick resets even after a saturated streak.
-    expect(nextPollDelayMs({ launched: 0, awaitingDiscovery: false, fastStreak: 999 })).toEqual({
-      delayMs: POLL_INTERVAL_MS,
-      fastStreak: 0,
-    });
+    // No active work and no ready work: saturated streak reverts to base…
+    expect(
+      nextPollDelayMs({ launched: 0, awaitingDiscovery: false, fastStreak: 999 }),
+    ).toEqual({ delayMs: POLL_INTERVAL_MS, fastStreak: 0 });
+    // …but a non-empty ready queue keeps the fast rate even with nothing in flight.
+    expect(
+      nextPollDelayMs({
+        launched: 0,
+        awaitingDiscovery: false,
+        fastStreak: HANDOFF_FAST_STREAK_MAX,
+        readyWork: true,
+      }),
+    ).toEqual({ delayMs: HANDOFF_POLL_MS, fastStreak: HANDOFF_FAST_STREAK_MAX });
+    // Quiet tick (no active, no ready) resets even after a saturated streak.
+    expect(
+      nextPollDelayMs({
+        launched: 0,
+        awaitingDiscovery: false,
+        fastStreak: 999,
+        activeWork: false,
+        readyWork: false,
+      }),
+    ).toEqual({ delayMs: POLL_INTERVAL_MS, fastStreak: 0 });
+  });
+
+  it('§49: ACTIVE work or a non-empty ready queue pulls the fast cadence without a fresh launch', () => {
+    expect(
+      nextPollDelayMs({ launched: 0, awaitingDiscovery: false, fastStreak: 0, activeWork: true }),
+    ).toEqual({ delayMs: HANDOFF_POLL_MS, fastStreak: 1 });
+    expect(
+      nextPollDelayMs({ launched: 0, awaitingDiscovery: false, fastStreak: 3, readyWork: true }),
+    ).toEqual({ delayMs: HANDOFF_POLL_MS, fastStreak: 4 });
+    // Fully idle project: base cadence, streak reset.
+    expect(
+      nextPollDelayMs({
+        launched: 0,
+        awaitingDiscovery: false,
+        fastStreak: 0,
+        activeWork: false,
+        readyWork: false,
+      }),
+    ).toEqual({ delayMs: POLL_INTERVAL_MS, fastStreak: 0 });
   });
 
   it('property sweep: output is always a known cadence with a sane streak', () => {

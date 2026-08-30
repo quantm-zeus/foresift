@@ -142,20 +142,37 @@ let _auditAt = 0; // timestamp of last audit
 let _auditBlocksLaunches = false; // true if last audit failed
 
 /**
- * Pure handoff-cadence decision (V3-B §18). Given whether the last tick
- * launched anything, whether any tracked entry still awaits run-id discovery,
- * and the current fast-poll streak, returns the next sleep plus the new
- * streak. Deterministic and total: same inputs ⇒ same delay.
+ * Pure handoff-cadence decision (V3-B §18 + Hyperdrive §49). Given whether
+ * the last tick launched anything, whether any tracked entry still awaits
+ * run-id discovery, whether ACTIVE work is present, whether the ready queue
+ * is non-empty, and the current fast-poll streak, returns the next sleep plus
+ * the new streak. Deterministic and total: same inputs ⇒ same delay.
+ *
+ * §49 cadences: active useful work or a non-empty ready queue polls at the
+ * fast handoff rate (READY→LAUNCH P95 < 30s) without a launch having just
+ * happened; a fully idle project drops back to the base minute cadence. The
+ * fast streak stays bounded exactly as before.
  *
  * @returns {{delayMs: number, fastStreak: number}}
  */
-export function nextPollDelayMs({ launched = 0, awaitingDiscovery = false, fastStreak = 0 } = {}) {
-  const wantFast = launched > 0 || Boolean(awaitingDiscovery);
+export function nextPollDelayMs({
+  launched = 0,
+  awaitingDiscovery = false,
+  fastStreak = 0,
+  activeWork = false,
+  readyWork = false,
+} = {}) {
+  const wantFast = launched > 0 || Boolean(awaitingDiscovery) || Boolean(activeWork) || Boolean(readyWork);
   if (!wantFast) return { delayMs: POLL_INTERVAL_MS, fastStreak: 0 };
   if (fastStreak >= HANDOFF_FAST_STREAK_MAX) {
-    // Bound reached: hold the base interval (streak clamped) until a quiet
-    // tick resets it — never grow unbounded.
-    return { delayMs: POLL_INTERVAL_MS, fastStreak: HANDOFF_FAST_STREAK_MAX };
+    // Bound reached: hold the fast rate while work remains ACTIVE/ready (a
+    // live wave or a waiting CI must not idle the scheduler for a minute),
+    // but drop back to base the moment the project goes quiet. Reverting to
+    // base resets the streak (original V3-B §18 clamp semantics), so a later
+    // launch rebuilds the fast streak from zero.
+    if (activeWork || readyWork || awaitingDiscovery)
+      return { delayMs: HANDOFF_POLL_MS, fastStreak: HANDOFF_FAST_STREAK_MAX };
+    return { delayMs: POLL_INTERVAL_MS, fastStreak: 0 };
   }
   return { delayMs: HANDOFF_POLL_MS, fastStreak: fastStreak + 1 };
 }
@@ -3348,12 +3365,33 @@ async function main() {
       saveState(st);
     }
     if (!once) {
+      // §49 fast-wake signals: ACTIVE work = any live/paused tracked entry;
+      // ready work = a PENDING package whose dependencies are all PROVEN
+      // (i.e. the ready queue the next tick can legally pull from).
+      const trackedEntries = [...st.activeRuns, ...st.milestoneRuns, ...st.maintenanceRuns];
+      const activeWork = trackedEntries.some((r) => !r.done);
+      let readyWork = false;
+      if (!activeWork && !st.pausedFatal) {
+        try {
+          const ms = loadCurrentMilestone(REPO);
+          readyWork = Boolean(
+            ms &&
+              ms.packages.some(
+                (p) =>
+                  (p.status ?? 'PENDING') === 'PENDING' &&
+                  (p.dependencies ?? []).every((d) => findPackage(ms, d)?.status === 'PROVEN'),
+              ),
+          );
+        } catch {
+          readyWork = false;
+        }
+      }
       const next = nextPollDelayMs({
         launched,
-        awaitingDiscovery: [...st.activeRuns, ...st.milestoneRuns, ...st.maintenanceRuns].some(
-          (r) => !r.done && r.awaitingDiscovery,
-        ),
+        awaitingDiscovery: trackedEntries.some((r) => !r.done && r.awaitingDiscovery),
         fastStreak,
+        activeWork,
+        readyWork,
       });
       fastStreak = next.fastStreak;
       await sleep(next.delayMs);

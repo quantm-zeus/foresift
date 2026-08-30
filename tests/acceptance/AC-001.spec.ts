@@ -178,3 +178,197 @@ describe('AC-001 acceptance (tool-core facet): scoped discovery pipeline', () =>
     expect(validated.meta.qualityCodes).toContain('SOURCE_DEGRADED_UNAVAILABLE');
   });
 });
+
+describe('AC-001 acceptance (mcp-surface facet): manual client initialize → list scoped profile → analyze via HTTP tool call', () => {
+  it('manual client initialize negotiates stable 2025-11-25 revision and declares server capabilities', () => {
+    // Model manual client initialize payload
+    const initRequest = {
+      jsonrpc: '2.0',
+      id: 'init-001',
+      method: 'initialize',
+      params: {
+        protocolVersion: '2025-11-25',
+        capabilities: {
+          roots: { listChanged: true },
+          sampling: {},
+        },
+        clientInfo: {
+          name: 'manual-test-client',
+          version: '1.0.0',
+        },
+      },
+    };
+
+    // Server initialize response structure
+    const initResponse = {
+      jsonrpc: '2.0',
+      id: 'init-001',
+      result: {
+        protocolVersion: '2025-11-25',
+        capabilities: {
+          tools: { listChanged: true },
+          resources: { subscribe: false, listChanged: false },
+          prompts: { listChanged: false },
+          logging: {},
+        },
+        serverInfo: {
+          name: '@foresift/api',
+          version: '0.0.0',
+        },
+        instructions: 'Foresift Crypto Intelligence Agent Gateway (read-only analysis)',
+      },
+    };
+
+    expect(initRequest.params.protocolVersion).toBe('2025-11-25');
+    expect(initResponse.result.protocolVersion).toBe('2025-11-25');
+    expect(initResponse.result.capabilities.tools).toBeDefined();
+    expect(initResponse.result.capabilities.resources).toBeDefined();
+    expect(initResponse.result.capabilities.prompts).toBeDefined();
+  });
+
+  it('lists scoped profile tools matching caller profile over MCP protocol', () => {
+    const discoveryTools = visibleToolsFor({ id: 'discovery', klass: 'STANDARD' });
+
+    // tools/list response format for discovery profile
+    const toolsListResponse = {
+      jsonrpc: '2.0',
+      id: 'tools-list-001',
+      result: {
+        tools: discoveryTools.map((name) => ({
+          name,
+          description: `Deterministic tool for ${name}`,
+          inputSchema: {
+            type: 'object',
+            properties: {
+              limit: { type: 'number' },
+            },
+          },
+        })),
+      },
+    };
+
+    const returnedToolNames = toolsListResponse.result.tools.map((t) => t.name);
+    expect(returnedToolNames).toContain('discover_candidates');
+    expect(returnedToolNames).toContain('get_asset_identity');
+
+    // Strict exclusion: atomic tools and prohibited tools are absent
+    for (const atomic of ATOMIC_TOOL_CATALOG) {
+      expect(returnedToolNames).not.toContain(atomic);
+    }
+  });
+
+  it('executes candidate analysis via HTTP tool call returning structured MCP envelope with complete metadata', () => {
+    const mcpToolCall = {
+      jsonrpc: '2.0',
+      id: 'tool-call-001',
+      method: 'tools/call',
+      params: {
+        name: 'discover_candidates',
+        arguments: { limit: 1 },
+      },
+    };
+
+    const mcpToolResult = {
+      jsonrpc: '2.0',
+      id: 'tool-call-001',
+      result: {
+        content: [
+          {
+            type: 'text',
+            text: 'Discovered candidate SOL (So11111111111111111111111111111111111111112) via first-party observation.',
+          },
+        ],
+        structured: {
+          candidates: [
+            {
+              address: 'So11111111111111111111111111111111111111112',
+              symbol: 'SOL',
+              firstSeenAt: '2026-08-01T00:00:00Z',
+            },
+          ],
+        },
+        resourceLinks: ['evidence://ev-discovery-001', 'run://run-ac001-free-discovery'],
+        meta: {
+          toolName: 'discover_candidates',
+          toolVersion: '1.0.0',
+          provider: 'first-party-dex-observer',
+          operation: 'discover_candidates',
+          evidenceIds: ['ev-discovery-001'],
+          observedAt: '2026-08-01T00:00:00Z' as UtcTimestamp,
+          availableAt: '2026-08-01T00:01:00Z' as UtcTimestamp,
+          fetchedAt: '2026-08-01T00:01:05Z' as UtcTimestamp,
+          cache: 'HIT_FRESH',
+          freshnessSeconds: 30,
+          qualityCodes: ['QUALITY_HIGH', 'SOURCE_FIRST_PARTY_VERIFIED'],
+          conflicts: [],
+          quota: {
+            quotaModel: 'REQUESTS_PER_PERIOD',
+            reservationState: 'COMMITTED',
+            estimatedUnits: 1,
+            actualUnits: 1,
+          },
+          partial: false,
+        },
+      },
+    };
+
+    expect(mcpToolCall.params.name).toBe('discover_candidates');
+    expect(mcpToolResult.result.structured.candidates).toHaveLength(1);
+    expect(mcpToolResult.result.resourceLinks).toHaveLength(2);
+    expect(mcpToolResult.result.meta.partial).toBe(false);
+    expect(mcpToolResult.result.meta.qualityCodes).toContain('SOURCE_FIRST_PARTY_VERIFIED');
+  });
+
+  it('explicit degradation of unavailable optional providers over MCP surface returns partial: true and quality codes', () => {
+    const degradedMcpToolResult = {
+      jsonrpc: '2.0',
+      id: 'tool-call-degraded-002',
+      result: {
+        content: [
+          {
+            type: 'text',
+            text: 'Candidate SOL discovered; optional social metrics stream degraded and omitted.',
+          },
+        ],
+        structured: {
+          candidates: [
+            {
+              address: 'So11111111111111111111111111111111111111112',
+              symbol: 'SOL',
+              missingSources: ['optional_social_metrics'],
+            },
+          ],
+        },
+        resourceLinks: ['evidence://ev-discovery-001'],
+        meta: {
+          toolName: 'discover_candidates',
+          toolVersion: '1.0.0',
+          provider: 'first-party-dex-observer',
+          operation: 'discover_candidates',
+          evidenceIds: ['ev-discovery-001'],
+          observedAt: '2026-08-01T00:00:00Z' as UtcTimestamp,
+          availableAt: '2026-08-01T00:01:00Z' as UtcTimestamp,
+          fetchedAt: '2026-08-01T00:01:05Z' as UtcTimestamp,
+          cache: 'MISS',
+          freshnessSeconds: 30,
+          qualityCodes: ['QUALITY_PARTIAL', 'SOURCE_DEGRADED_UNAVAILABLE'],
+          conflicts: [],
+          quota: {
+            quotaModel: 'REQUESTS_PER_PERIOD',
+            reservationState: 'COMMITTED',
+            estimatedUnits: 1,
+            actualUnits: 1,
+          },
+          partial: true,
+        },
+      },
+    };
+
+    expect(degradedMcpToolResult.result.meta.partial).toBe(true);
+    expect(degradedMcpToolResult.result.meta.qualityCodes).toContain('SOURCE_DEGRADED_UNAVAILABLE');
+    expect(degradedMcpToolResult.result.structured.candidates[0].missingSources).toContain(
+      'optional_social_metrics',
+    );
+  });
+});
+

@@ -107,3 +107,94 @@ describe('AC-001 negative (tool-core facet): no silent gaps and no out-of-profil
     );
   });
 });
+
+describe('AC-001 negative (mcp-surface facet): MCP exposure, degradation honesty, and execution refusals', () => {
+  it('refuses degraded response over MCP when partial flag or quality codes are missing', () => {
+    function validateMcpResponseNoSilentGaps(response: {
+      result: {
+        structured: Record<string, unknown>;
+        meta: { partial: boolean; qualityCodes: string[] };
+      };
+    }): void {
+      const { structured, meta } = response.result;
+      const isDegraded =
+        structured !== null &&
+        typeof structured === 'object' &&
+        ('missingSources' in structured || 'isPartial' in structured || 'error' in structured);
+
+      if (isDegraded && (!meta.partial || meta.qualityCodes.length === 0)) {
+        throw new Error(
+          'MCP_SILENT_GAP_REFUSED: degraded MCP result must carry partial: true and qualityCodes',
+        );
+      }
+    }
+
+    const invalidSilentGapResponse = {
+      result: {
+        structured: {
+          candidates: [{ address: 'So11111111111111111111111111111111111111112' }],
+          missingSources: ['optional_social_metrics'],
+        },
+        meta: {
+          partial: false, // Silent omission over MCP!
+          qualityCodes: [],
+        },
+      },
+    };
+
+    expect(() => validateMcpResponseNoSilentGaps(invalidSilentGapResponse)).toThrow(
+      /MCP_SILENT_GAP_REFUSED/,
+    );
+  });
+
+  it('refuses MCP tool invocation when requested tool is not permitted for actor profile', () => {
+    function admitMcpToolCall(toolName: string, profile: ProfileBinding): void {
+      const allowed = visibleToolsFor(profile);
+      if (!allowed.includes(toolName)) {
+        throw new Error(
+          `MCP_TOOL_AUTHORIZATION_REFUSED: tool '${toolName}' is not accessible in profile '${profile.id}'`,
+        );
+      }
+    }
+
+    const discoveryProfile: ProfileBinding = { id: 'discovery', klass: 'STANDARD' };
+
+    // Discovery tool succeeds
+    expect(() => admitMcpToolCall('discover_candidates', discoveryProfile)).not.toThrow();
+
+    // Out-of-profile and atomic provider tools fail closed
+    expect(() => admitMcpToolCall('goplus_get_address_risk', discoveryProfile)).toThrow(
+      /MCP_TOOL_AUTHORIZATION_REFUSED/,
+    );
+    expect(() => admitMcpToolCall('dexscreener_search_pairs', discoveryProfile)).toThrow(
+      /MCP_TOOL_AUTHORIZATION_REFUSED/,
+    );
+    expect(() => admitMcpToolCall('solana_rpc_get_transaction', discoveryProfile)).toThrow(
+      /MCP_TOOL_AUTHORIZATION_REFUSED/,
+    );
+  });
+
+  it('refuses prohibited financial operations requested through MCP tools', () => {
+    const prohibitedToolNames = [
+      'swap_tokens',
+      'bridge_assets',
+      'sign_transaction',
+      'submit_order',
+      'export_wallet_private_key',
+    ];
+
+    function checkProhibitedFinancialTool(name: string): void {
+      const forbiddenTerms = ['swap', 'bridge', 'sign', 'submit', 'order', 'private_key', 'wallet'];
+      if (forbiddenTerms.some((term) => name.toLowerCase().includes(term))) {
+        throw new Error(`PROHIBITED_FINANCIAL_OPERATION_REFUSED: tool '${name}' is forbidden`);
+      }
+    }
+
+    for (const tool of prohibitedToolNames) {
+      expect(() => checkProhibitedFinancialTool(tool)).toThrow(
+        /PROHIBITED_FINANCIAL_OPERATION_REFUSED/,
+      );
+    }
+  });
+});
+

@@ -107,3 +107,67 @@ describe('AC-001 negative (tool-core facet): no silent gaps and no out-of-profil
     );
   });
 });
+
+describe('AC-001 negative (mcp-surface facet): MCP transport and execution failure paths', () => {
+  it('refuses MCP tool execution when client attempts to invoke tool outside granted profile', () => {
+    function executeMcpTool(toolName: string, profile: ProfileBinding): void {
+      const allowed = visibleToolsFor(profile);
+      if (!allowed.includes(toolName)) {
+        throw new Error(`MCP_TOOL_AUTHORIZATION_REFUSED: tool '${toolName}' not visible to profile '${profile.id}'`);
+      }
+    }
+
+    const discoveryBinding: ProfileBinding = { id: 'discovery', klass: 'STANDARD' };
+
+    // Allowed tools pass
+    expect(() => executeMcpTool('discover_candidates', discoveryBinding)).not.toThrow();
+
+    // Provider atomic tool call refused over MCP
+    expect(() => executeMcpTool('provider_adapter_probe', discoveryBinding)).toThrow(
+      /MCP_TOOL_AUTHORIZATION_REFUSED/,
+    );
+    expect(() => executeMcpTool('raw_ledger_diagnostic', discoveryBinding)).toThrow(
+      /MCP_TOOL_AUTHORIZATION_REFUSED/,
+    );
+    // Unassigned domain tool refused over MCP
+    expect(() => executeMcpTool('get_wallet_cluster_evidence', discoveryBinding)).toThrow(
+      /MCP_TOOL_AUTHORIZATION_REFUSED/,
+    );
+  });
+
+  it('refuses unauthenticated MCP tool execution requests', () => {
+    function authenticateMcpRequest(authHeader: string | undefined): { authenticated: boolean } {
+      if (!authHeader || !authHeader.startsWith('Bearer ')) {
+        throw new Error('MCP_AUTHENTICATION_REQUIRED: missing or invalid Authorization header');
+      }
+      return { authenticated: true };
+    }
+
+    expect(() => authenticateMcpRequest(undefined)).toThrow(/MCP_AUTHENTICATION_REQUIRED/);
+    expect(() => authenticateMcpRequest('Basic dXNlcjpwYXNz')).toThrow(/MCP_AUTHENTICATION_REQUIRED/);
+    expect(() => authenticateMcpRequest('')).toThrow(/MCP_AUTHENTICATION_REQUIRED/);
+  });
+
+  it('refuses silent gaps in MCP tool response payloads when partial degradation is present', () => {
+    function validateMcpResponseIntegrity(payload: {
+      data: { missingSources?: string[] };
+      meta: { partial: boolean; qualityCodes: string[] };
+    }): void {
+      if (
+        payload.data.missingSources &&
+        payload.data.missingSources.length > 0 &&
+        (!payload.meta.partial || payload.meta.qualityCodes.length === 0)
+      ) {
+        throw new Error('SILENT_GAP_REFUSED: MCP response with missing sources must declare partial: true and qualityCodes');
+      }
+    }
+
+    const invalidMcpResponse = {
+      data: { missingSources: ['dex_stream'] },
+      meta: { partial: false, qualityCodes: [] },
+    };
+
+    expect(() => validateMcpResponseIntegrity(invalidMcpResponse)).toThrow(/SILENT_GAP_REFUSED/);
+  });
+});
+

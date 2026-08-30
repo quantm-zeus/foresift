@@ -5,6 +5,8 @@
  * per-client profile bindings, rate limits, and revocation/expiry fixtures.
  */
 
+import { ToolProfileId } from '@foresift/domain';
+
 /**
  * Fixed test pepper used for HMAC-SHA256 credential hashing in tests.
  * NEVER used in production; exactly 32 bytes (256 bits).
@@ -15,7 +17,7 @@ export interface McpCredentialSeed {
   readonly actor: string;
   readonly keyPrefix: string;
   readonly rawSecret: string;
-  readonly profileId: string;
+  readonly profileId: ToolProfileId;
   readonly allowedScopes: readonly string[];
   readonly originPolicy: 'EXACT_ALLOWLIST' | 'NON_PRODUCTION';
   readonly allowedOrigins: readonly string[];
@@ -32,7 +34,7 @@ export const CREDENTIAL_DISCOVERY_CLIENT: McpCredentialSeed = {
   actor: 'actor_discovery_01@foresift.internal',
   keyPrefix: 'fs_live_disc01',
   rawSecret: 'fs_live_disc01_secret_99999999999999999999999999999999',
-  profileId: 'discovery',
+  profileId: ToolProfileId.DISCOVERY,
   allowedScopes: ['tools:read', 'tools:execute', 'resources:read'],
   originPolicy: 'EXACT_ALLOWLIST',
   allowedOrigins: ['https://mcp.foresift.internal'],
@@ -48,7 +50,7 @@ export const CREDENTIAL_RESEARCH_CLIENT: McpCredentialSeed = {
   actor: 'actor_research_01@foresift.internal',
   keyPrefix: 'fs_live_res01',
   rawSecret: 'fs_live_res01_secret_88888888888888888888888888888888',
-  profileId: 'market-research',
+  profileId: ToolProfileId.MARKET_RESEARCH,
   allowedScopes: ['tools:read', 'tools:execute', 'resources:read', 'prompts:read'],
   originPolicy: 'EXACT_ALLOWLIST',
   allowedOrigins: ['https://mcp.foresift.internal', 'https://partner.agent-gateway.io'],
@@ -64,7 +66,7 @@ export const CREDENTIAL_ADMIN_CLIENT: McpCredentialSeed = {
   actor: 'actor_admin_01@foresift.internal',
   keyPrefix: 'fs_live_adm01',
   rawSecret: 'fs_live_adm01_secret_77777777777777777777777777777777',
-  profileId: 'admin-diagnostic',
+  profileId: ToolProfileId.ADMIN_READ,
   allowedScopes: ['tools:read', 'tools:execute', 'resources:read', 'prompts:read', 'admin:diagnostics'],
   originPolicy: 'EXACT_ALLOWLIST',
   allowedOrigins: ['https://mcp.foresift.internal'],
@@ -80,7 +82,7 @@ export const CREDENTIAL_REVOKED_CLIENT: McpCredentialSeed = {
   actor: 'actor_revoked_01@foresift.internal',
   keyPrefix: 'fs_live_rev01',
   rawSecret: 'fs_live_rev01_secret_00000000000000000000000000000000',
-  profileId: 'discovery',
+  profileId: ToolProfileId.DISCOVERY,
   allowedScopes: ['tools:read', 'tools:execute'],
   originPolicy: 'EXACT_ALLOWLIST',
   allowedOrigins: ['https://mcp.foresift.internal'],
@@ -97,7 +99,7 @@ export const CREDENTIAL_EXPIRED_CLIENT: McpCredentialSeed = {
   actor: 'actor_expired_01@foresift.internal',
   keyPrefix: 'fs_live_exp01',
   rawSecret: 'fs_live_exp01_secret_11111111111111111111111111111111',
-  profileId: 'discovery',
+  profileId: ToolProfileId.DISCOVERY,
   allowedScopes: ['tools:read', 'tools:execute'],
   originPolicy: 'EXACT_ALLOWLIST',
   allowedOrigins: ['https://mcp.foresift.internal'],

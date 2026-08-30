@@ -20,6 +20,7 @@ import {
   McpSessionBindingSchema,
   parseMcpSchema,
   type McpSchemaName,
+  // @ts-expect-error TS2307: product implementation will provide ../src/mcp.ts (T002)
 } from '../src/mcp.ts';
 import {
   CURSOR_DISCOVERY_PAGE_1,

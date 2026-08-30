@@ -1,18 +1,18 @@
 {
   "schema": "foresift/bun-migration-manifest@1",
   "migrationId": "bun-test-authority-v1",
-  "generatedAt": "2026-08-30T06:58:22.832Z",
+  "generatedAt": "2026-08-30T10:22:22.533Z",
   "root": ".",
-  "totalTestFiles": 315,
+  "totalTestFiles": 317,
   "counts": {
     "CODEMOD_READY": 0,
     "AGY_REQUIRED": 0,
-    "MIGRATED": 315,
+    "MIGRATED": 317,
     "VERIFIED": 0,
     "BLOCKED": 0
   },
   "parity": {
-    "previousTotal": 314,
+    "previousTotal": 315,
     "disappeared": []
   },
   "files": [
@@ -4461,9 +4461,9 @@
     {
       "path": "tests/automation/exact-leases.spec.ts",
       "package": "automation",
-      "bytes": 5162,
-      "lines": 118,
-      "sha256": "0e054a025355d821a6ee3fdd60de4f7287864d528b55c599213810a1ce24bfb0",
+      "bytes": 5157,
+      "lines": 116,
+      "sha256": "5106ae3d8fab99d6f70de72127a8017ae9afe436fee67458973beab3f6d08cc8",
       "imports": [
         "bun:test",
         "node:fs",
@@ -4641,6 +4641,54 @@
       "migrationType": "ALREADY_MIGRATED",
       "fixturesAndHelpers": ["../helpers/git-fixture.js"],
       "sourceAnchors": ["../helpers/git-fixture.js"],
+      "state": "MIGRATED"
+    },
+    {
+      "path": "tests/automation/provider-pool.spec.ts",
+      "package": "automation",
+      "bytes": 6295,
+      "lines": 155,
+      "sha256": "34714f5ffa3e491f208071c64f62436d8fae242a38cd2275cd6fe4e6dda189ee",
+      "imports": [
+        "bun:test",
+        "node:fs",
+        "node:os",
+        "node:path",
+        "../../scripts/automation/provider-pool.mjs"
+      ],
+      "vitestImports": [],
+      "features": [],
+      "workload": "PURE",
+      "migrationType": "ALREADY_MIGRATED",
+      "fixturesAndHelpers": [],
+      "sourceAnchors": ["../../scripts/automation/provider-pool.mjs"],
+      "state": "MIGRATED"
+    },
+    {
+      "path": "tests/automation/runtime-admission.spec.ts",
+      "package": "automation",
+      "bytes": 6343,
+      "lines": 139,
+      "sha256": "da5f2ddafe7f4634ee8f5babf9242b9a2ab9a915b164257efa62cd1025d5dcca",
+      "imports": [
+        "bun:test",
+        "node:fs",
+        "node:os",
+        "node:path",
+        "../../scripts/automation/runtime-admission.mjs",
+        "../../scripts/automation/provider-pool.mjs",
+        "../../scripts/automation/exact-leases.mjs"
+      ],
+      "vitestImports": [],
+      "features": [],
+      "workload": "PURE",
+      "migrationType": "ALREADY_MIGRATED",
+      "fixturesAndHelpers": [],
+      "sourceAnchors": [
+        "../../scripts/automation/runtime-admission.mjs",
+        "../../scripts/automation/provider-pool.mjs",
+        "../../scripts/automation/exact-leases.mjs"
+      ],
       "state": "MIGRATED"
     },
     {
@@ -4978,9 +5026,9 @@
     {
       "path": "tests/automation/v3-scheduler-runtime.spec.ts",
       "package": "automation",
-      "bytes": 14552,
-      "lines": 359,
-      "sha256": "401677561f0bc31ea64e25152d81588c4a5e90fff23cb9d4fb6d4009c8ccf332",
+      "bytes": 16065,
+      "lines": 398,
+      "sha256": "1c9b0c047a9f672a8798e809fa8ef6d41062d601c6b72f772a813014c67b0a44",
       "imports": [
         "bun:test",
         "../../scripts/automation/schema.mjs",

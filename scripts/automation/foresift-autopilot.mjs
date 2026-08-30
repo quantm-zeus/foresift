@@ -114,6 +114,8 @@ import {
   discoverPendingLaunchIntents,
 } from './launch-intent.mjs';
 import { advanceRepairRequest, discoverPendingRepairRequests } from './ci-repair-executor.mjs';
+import { admitPackageLaunch, releasePackageRuntime } from './runtime-admission.mjs';
+import { observeClaudeOutcome, observeCodexOutcome } from './provider-pool.mjs';
 
 // Overridable for hermetic selftests (sandboxed fixture repo + state dir).
 const REPO = process.env.FORESIFT_AUTOPILOT_REPO ?? join(import.meta.dirname, '..', '..');
@@ -956,6 +958,7 @@ async function finalizeCompletedRun(st, entry, get = null) {
   const ms = loadCurrentMilestone(REPO);
   await setPackageStatus(ms, entry.packageId, 'PROVEN');
   record(st, 'package_proven', { packageId: entry.packageId, pr: mergedPr });
+  releasePackageRuntime(STATE_DIR, entry); // H2: terminal success releases its permits + leases
   return true;
 }
 
@@ -1228,6 +1231,9 @@ function planningBootstrapHandoff(st, entry, get) {
  * only the supported `--recover-fatal` command clears this state.
  */
 function enterFatalPause(st, entry, reason) {
+  // H2: a fatally-paused package stops consuming its provider permits and
+  // leases — recovery re-admits through the normal launch gate.
+  releasePackageRuntime(STATE_DIR, entry);
   st.pausedFatal = {
     reason,
     runId: entry.runId ?? null,
@@ -1318,10 +1324,35 @@ function escalatePausedQuota(st, entry, why) {
 }
 
 /**
- * Recovery-policy application for a failed run. Returns nothing meaningful —
- * paused entries stay tracked (never `done`), so the caller must not filter
- * them out; tick() routes paused entries to actOnPausedEntry.
+ * H2 §19/§20: map a tracked run's failure text onto provider-capacity signals
+ * in the global pools. Daily-quota walls on any engine register as Codex
+ * exhaustion (with provider-supplied reset timing when extractable); hard
+ * 429/503 pressure registers as Claude backoff. Best-effort and idempotent:
+ * observability must never throw into the recovery path.
  */
+function observeProviderFailureSignals(st, entry, errText) {
+  if (!errText) return;
+  try {
+    if (entry.failureClass === 'QUOTA_DAILY') {
+      const resetAt = extractQuotaResetAt(errText);
+      observeCodexOutcome(STATE_DIR, { event: 'exhausted', resetAt });
+      record(st, 'provider_quota_observed', {
+        runId: entry.runId,
+        packageId: entry.packageId ?? null,
+        resetAt: resetAt ?? null,
+      });
+    } else if (/\b429\b|\brate.?limit\b|\b503\b|overloaded/i.test(errText)) {
+      observeClaudeOutcome(STATE_DIR, { healthy: false });
+      record(st, 'provider_backoff_observed', {
+        runId: entry.runId,
+        packageId: entry.packageId ?? null,
+      });
+    }
+  } catch {
+    /* pool files unreadable/corrupt: recovery continues on its own budget */
+  }
+}
+
 function attemptResume(st, entry, reason) {
   const cls = entry.failureClass ?? 'UNKNOWN';
   if (cls === 'FATAL') {
@@ -1444,6 +1475,7 @@ async function actOnEntry(st, entry) {
       };
     }
     record(st, 'run_cancelled_requeued', { runId: entry.runId, branch: entry.branch });
+    releasePackageRuntime(STATE_DIR, entry); // H2: permits + leases travel with the terminal entry
     return true;
   }
   if (status === 'failed' || status === 'paused') {
@@ -1451,6 +1483,10 @@ async function actOnEntry(st, entry) {
       `${get?.error ?? ''} ${get?.lastError ?? ''} ${get?.metadata?.error ?? ''}`.trim();
     if (errText) entry.failureClass = classifyFailure(errText);
     else entry.failureClass = entry.failureClass ?? 'UNKNOWN';
+    // H2 §19/§20: feed observed provider capacity signals into the global
+    // pools BEFORE recovery decides — a quota wall recorded here makes the
+    // NEXT admission deny or reroute Codex instead of retry-storming it.
+    observeProviderFailureSignals(st, entry, errText);
     attemptResume(st, entry, `${status}: ${errText.slice(0, 200)}`);
     // Paused entries stay tracked (never `done`): recovery identity survives.
     return false;
@@ -1966,6 +2002,22 @@ async function selectAndLaunch(st) {
       continue;
     }
     const { generation, branch, message, workflow: wf, executionProfile } = launchIdentity(cand);
+    // H2 admission bridge (§17/§20/§41): global provider permits + exact-file
+    // leases BEFORE any launch. Denied candidates are skipped this tick (the
+    // same reason is recorded once per process; a full pool is healthy
+    // saturation, not a failure) — never re-launched blind past a quota.
+    const admission = admitPackageLaunch(STATE_DIR, cand, executionProfile);
+    if (!admission.ok) {
+      const key = `${cand.id}|${admission.reason}`;
+      if (!coRunDenialSeen.has(key)) {
+        coRunDenialSeen.add(key);
+        record(st, 'launch_denied_provider_pool', {
+          packageId: cand.id,
+          reason: admission.reason,
+        });
+      }
+      continue;
+    }
     // Two-Phase Launch Protocol: Phase A (Durable Launch Intent)
     const intent = createLaunchIntent(STATE_DIR, {
       packageId: cand.id,
@@ -1990,6 +2042,8 @@ async function selectAndLaunch(st) {
       workflow: wf,
       generation,
       executionProfile,
+      providers: admission.providers,
+      providerFallback: admission.fallback,
       ack: sanitizeAck(ack),
       runId,
       intentId: intent.intentId,
@@ -2008,6 +2062,7 @@ async function selectAndLaunch(st) {
       awaitingDiscovery: !runId,
       discoveryAttempts: 0,
       executionProfile,
+      providers: admission.providers,
     });
     if (runId) {
       // Durable run id already in hand → RUNNING now; otherwise it is flipped
@@ -2497,6 +2552,7 @@ async function cmdRecoverFatal(positionalRunId) {
     );
   // Exactly one continuation: resume the same run when possible.
   let resumed = false;
+  let freshAdmission = null;
   if (row && ['running', 'pending'].includes(String(row.status))) {
     resumed = true; // alive — re-adopt under supervisor tracking
   } else if (
@@ -2539,6 +2595,18 @@ async function cmdRecoverFatal(positionalRunId) {
     }
   }
   if (!resumed) {
+    // H2: a fresh continuation re-enters through the global admission gate —
+    // recovery must not bypass pool/lease truth the ordinary path honors.
+    const pkgForAdmission = kind === 'package' ? (pkg ?? { id: message }) : { id: `__${kind}` };
+    const admission = admitPackageLaunch(STATE_DIR, pkgForAdmission, executionProfile);
+    if (!admission.ok) {
+      console.error(
+        `REFUSED: recovery admission denied (${admission.reason}); retry once pools/leases clear`,
+      );
+      record(st, 'operator_recovery_admission_denied', { reason: admission.reason });
+      saveState(st);
+      return 1;
+    }
     // Retire the dead run via the supported lifecycle op (same call the
     // stale-run policy uses) so it cannot wake behind the fresh continuation.
     // Best-effort: a refusal here cannot block recovery — the row was already
@@ -2553,9 +2621,12 @@ async function cmdRecoverFatal(positionalRunId) {
     record(st, 'operator_recovery_fresh_launch', {
       branch,
       executionProfile,
+      providers: admission.providers,
+      providerFallback: admission.fallback,
       ack: sanitizeAck(ack),
     });
     runId = resolveRunId(ack, workflow, message);
+    freshAdmission = admission;
   }
   const persistedExecutionProfile =
     kind === 'package'
@@ -2588,6 +2659,7 @@ async function cmdRecoverFatal(positionalRunId) {
     awaitingDiscovery: !runId,
     discoveryAttempts: entry.awaitingDiscovery ? (entry.discoveryAttempts ?? 0) : 0,
     executionProfile: entry.executionProfile ?? persistedExecutionProfile,
+    ...(freshAdmission ? { providers: freshAdmission.providers } : {}),
   });
   delete entry.done;
   delete entry.paused;

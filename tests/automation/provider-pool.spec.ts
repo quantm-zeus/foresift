@@ -108,8 +108,13 @@ describe('Codex quota state machine (§19/§20/§68)', () => {
   });
 
   test('EXHAUSTED ⇒ zero new Codex permits with a reset wait, never a package failure', () => {
+    // Fixed clock, self-consistent: the observation and the acquire must see
+    // the SAME now, or a wall-clock observation of a fixed future resetAt
+    // latches EXHAUSTED (correct at observe time) while the acquire's rewound
+    // clock re-reads the stored resetAt as still-future (nondeterminism).
+    const now = 1_000_000;
     const resetAt = 2_000_000;
-    observeCodexOutcome(stateDir, { event: 'exhausted', resetAt });
+    observeCodexOutcome(stateDir, { event: 'exhausted', resetAt, now });
     const p = acquirePermit(stateDir, 'codex', { now: 1_500_000 });
     expect(p.ok).toBe(false);
     expect(p.reason).toBe('CODEX_QUOTA_RESET_WAIT');

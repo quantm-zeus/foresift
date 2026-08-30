@@ -41,6 +41,7 @@
 
 import { createHash } from 'node:crypto';
 import { execFileSync } from 'node:child_process';
+import { formatMilestoneText } from './schema.mjs';
 import {
   existsSync,
   mkdirSync,
@@ -509,7 +510,7 @@ function mapV1Status(v1Status) {
  *   - If an existingReceipt is provided, its identity is NEVER re-derived.
  *   - A different origin/main appearing while state PR waits does NOT create another transition.
  */
-export function advanceStateTransition({
+export async function advanceStateTransition({
   receipt: existingReceipt = null,
   fileChanges,
   message,
@@ -576,6 +577,16 @@ export function advanceStateTransition({
         step: 'VALIDATION_FAILED',
       };
     }
+
+    // 1b. Prettier-format JSON content so state PRs never fail format:check.
+    // (Prettier collapses short arrays; raw JSON.stringify does not — observed
+    // live 2026-08-30 on state PR #102, whose CI failed Formatting check.)
+    fileChanges = await Promise.all(
+      fileChanges.map(async (f) => ({
+        path: f.path,
+        content: await formatMilestoneText(f.content),
+      })),
+    );
 
     // 2. Fetch and resolve current origin/main ONCE
     const fetchRes = gitFn(['fetch', 'origin', 'main', '--quiet'], { cwd: repoDir });
@@ -1284,7 +1295,7 @@ export function advanceStateTransition({
  * On startup, discover non-terminal receipts and resume each one.
  * This MUST actually advance each receipt, not just log.
  */
-export function recoverPendingStateLandings({
+export async function recoverPendingStateLandings({
   stateDir,
   repoDir,
   cwd,
@@ -1329,7 +1340,7 @@ export function recoverPendingStateLandings({
       content: f.content,
     }));
 
-    const advanceResult = advanceStateTransition({
+    const advanceResult = await advanceStateTransition({
       receipt,
       fileChanges,
       message: receipt.commitMessage || `chore: resume state transition ${receipt.transitionId}`,

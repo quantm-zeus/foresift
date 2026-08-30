@@ -61,7 +61,7 @@ describe('State Authority V2 Core Correctness', () => {
   });
 
   // A. CANONICAL STATE
-  test('§A: CANONICAL STATE - verify canonical file unchanged until merge verified', () => {
+  test('§A: CANONICAL STATE - verify canonical file unchanged until merge verified', async () => {
     fix.writeFile('specs/implementation/current-milestone.json', JSON.stringify({ packages: [] }));
     fix.commitAll('init ms');
     fix.g(['push', 'origin', 'main']);
@@ -74,7 +74,7 @@ describe('State Authority V2 Core Correctness', () => {
     ];
 
     // REQUESTED -> BRANCH_READY
-    const res = advanceStateTransition({
+    const res = await advanceStateTransition({
       fileChanges,
       message: 'chore: transition',
       stateDir,
@@ -99,7 +99,7 @@ describe('State Authority V2 Core Correctness', () => {
   });
 
   // B. NON-BLOCKING
-  test('§B: NON-BLOCKING - WAITING_CI returns immediately (< 100ms)', () => {
+  test('§B: NON-BLOCKING - WAITING_CI returns immediately (< 100ms)', async () => {
     fix.writeFile('specs/implementation/current-milestone.json', '{}');
     fix.commitAll('init');
     fix.g(['push', 'origin', 'main']);
@@ -107,7 +107,7 @@ describe('State Authority V2 Core Correctness', () => {
       { path: 'specs/implementation/current-milestone.json', content: '{"a": 1}' },
     ];
 
-    let res = advanceStateTransition({
+    let res = await advanceStateTransition({
       fileChanges,
       message: 'chore',
       stateDir,
@@ -116,7 +116,7 @@ describe('State Authority V2 Core Correctness', () => {
       gitFn: makeGitFn(fix),
     });
     // BRANCH_READY
-    res = advanceStateTransition({
+    res = await advanceStateTransition({
       receipt: res.receipt!,
       fileChanges: [],
       message: '',
@@ -126,7 +126,7 @@ describe('State Authority V2 Core Correctness', () => {
       gitFn: makeGitFn(fix),
     });
     // BRANCH_PUSHED
-    res = advanceStateTransition({
+    res = await advanceStateTransition({
       receipt: res.receipt!,
       fileChanges: [],
       message: '',
@@ -139,7 +139,7 @@ describe('State Authority V2 Core Correctness', () => {
 
     const start = performance.now();
     for (let i = 0; i < 5; i++) {
-      const iterRes = advanceStateTransition({
+      const iterRes = await advanceStateTransition({
         receipt: res.receipt!,
         fileChanges: [],
         message: '',
@@ -155,7 +155,7 @@ describe('State Authority V2 Core Correctness', () => {
   });
 
   // C. CI HEAD TOCTOU
-  test('§C: CI HEAD TOCTOU - drops authorization if head changes', () => {
+  test('§C: CI HEAD TOCTOU - drops authorization if head changes', async () => {
     fix.writeFile('specs/implementation/current-milestone.json', '{}');
     fix.commitAll('init');
     fix.g(['push', 'origin', 'main']);
@@ -163,7 +163,7 @@ describe('State Authority V2 Core Correctness', () => {
       { path: 'specs/implementation/current-milestone.json', content: '{"a": 1}' },
     ];
 
-    let res = advanceStateTransition({
+    let res = await advanceStateTransition({
       fileChanges,
       message: 'chore',
       stateDir,
@@ -171,7 +171,7 @@ describe('State Authority V2 Core Correctness', () => {
       ghFn: fakeGh.ghFn,
       gitFn: makeGitFn(fix),
     }); // BRANCH_READY
-    res = advanceStateTransition({
+    res = await advanceStateTransition({
       receipt: res.receipt!,
       fileChanges: [],
       message: '',
@@ -180,7 +180,7 @@ describe('State Authority V2 Core Correctness', () => {
       ghFn: fakeGh.ghFn,
       gitFn: makeGitFn(fix),
     }); // BRANCH_PUSHED
-    res = advanceStateTransition({
+    res = await advanceStateTransition({
       receipt: res.receipt!,
       fileChanges: [],
       message: '',
@@ -202,7 +202,7 @@ describe('State Authority V2 Core Correctness', () => {
       },
     ]);
 
-    res = advanceStateTransition({
+    res = await advanceStateTransition({
       receipt: res.receipt!,
       fileChanges: [],
       message: '',
@@ -217,7 +217,7 @@ describe('State Authority V2 Core Correctness', () => {
     pr!.headRefOid = 'NEW_SHA_B';
 
     // Try to advance to MERGE_READY
-    res = advanceStateTransition({
+    res = await advanceStateTransition({
       receipt: res.receipt!,
       fileChanges: [],
       message: '',
@@ -232,7 +232,7 @@ describe('State Authority V2 Core Correctness', () => {
   });
 
   // D. RECOVERY
-  test('§D: RECOVERY - REQUESTED to BRANCH_READY', () => {
+  test('§D: RECOVERY - REQUESTED to BRANCH_READY', async () => {
     fix.writeFile('specs/implementation/current-milestone.json', '{}');
     fix.commitAll('init');
     fix.g(['push', 'origin', 'main']);
@@ -240,7 +240,7 @@ describe('State Authority V2 Core Correctness', () => {
       { path: 'specs/implementation/current-milestone.json', content: '{"a": 1}' },
     ];
 
-    const res = advanceStateTransition({
+    const res = await advanceStateTransition({
       fileChanges,
       message: 'chore',
       stateDir,
@@ -255,7 +255,7 @@ describe('State Authority V2 Core Correctness', () => {
 
     // D2: BRANCH_READY to BRANCH_PUSHED
     const recovered = readReceipt(stateDir, res.receipt!.transitionId);
-    const res2 = advanceStateTransition({
+    const res2 = await advanceStateTransition({
       receipt: recovered!,
       fileChanges: [],
       message: '',
@@ -269,7 +269,7 @@ describe('State Authority V2 Core Correctness', () => {
   });
 
   // E. TRANSITION ID STABILITY
-  test('§E: TRANSITION ID STABILITY - same fileChanges gives same PR after main advances', () => {
+  test('§E: TRANSITION ID STABILITY - same fileChanges gives same PR after main advances', async () => {
     fix.writeFile('specs/implementation/current-milestone.json', '{}');
     fix.commitAll('init');
     fix.g(['push', 'origin', 'main']);
@@ -277,7 +277,7 @@ describe('State Authority V2 Core Correctness', () => {
       { path: 'specs/implementation/current-milestone.json', content: '{"a": 1}' },
     ];
 
-    const res1 = advanceStateTransition({
+    const res1 = await advanceStateTransition({
       fileChanges,
       message: 'chore',
       packageId: 'pkg',
@@ -294,7 +294,7 @@ describe('State Authority V2 Core Correctness', () => {
     fix.commitAll('unrelated');
     fix.g(['push', 'origin', 'main']);
 
-    const res2 = advanceStateTransition({
+    const res2 = await advanceStateTransition({
       fileChanges,
       message: 'chore',
       packageId: 'pkg',
@@ -310,7 +310,7 @@ describe('State Authority V2 Core Correctness', () => {
   });
 
   // F. STRONG LAUNCH MATCHING
-  test('§F: STRONG LAUNCH MATCHING - reconcileLaunchIntentsOnStartup', () => {
+  test('§F: STRONG LAUNCH MATCHING - reconcileLaunchIntentsOnStartup', async () => {
     createLaunchIntent(stateDir, {
       packageId: 'P1',
       workflow: 'WF',
@@ -346,7 +346,7 @@ describe('State Authority V2 Core Correctness', () => {
   });
 
   // G. PRODUCTION INCIDENT ROUTING
-  test('§G: PRODUCTION INCIDENT ROUTING', () => {
+  test('§G: PRODUCTION INCIDENT ROUTING', async () => {
     const cap1 = captureCiIncident({
       sha: '111',
       checkName: 'Check',
@@ -583,7 +583,7 @@ describe('State Authority V2 Core Correctness', () => {
   });
 
   // I. DEEP STATE CLASSIFIER
-  test('§I: DEEP STATE CLASSIFIER - compareMilestoneJsonSemantic', () => {
+  test('§I: DEEP STATE CLASSIFIER - compareMilestoneJsonSemantic', async () => {
     const before = {
       schemaVersion: '1.0.0',
       packages: [{ id: '1', status: 'PENDING', generation: 0 }],

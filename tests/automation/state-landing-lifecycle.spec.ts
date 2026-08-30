@@ -18,13 +18,13 @@ import {
 
 // Test-only compatibility shim: wraps advanceStateTransition in a loop for existing tests.
 // Production code MUST NOT use this — the real supervisor uses step-driven tick outbox.
-function landStateViaPR(opts: Record<string, unknown>) {
+async function landStateViaPR(opts: Record<string, unknown>) {
   const maxIterations = 15;
   const deadlineMs = typeof opts.deadlineMs === 'number' ? opts.deadlineMs : 2000;
   const startTime = Date.now();
   let receipt = null;
   for (let i = 0; i < maxIterations; i++) {
-    const res = advanceStateTransition({
+    const res = await advanceStateTransition({
       receipt,
       ...opts,
       // eslint-disable-next-line @typescript-eslint/no-explicit-any -- test-only shim adapter
@@ -54,7 +54,7 @@ function landStateViaPR(opts: Record<string, unknown>) {
 const scratch = mkdtempSync(join(tmpdir(), 'state-landing-lifecycle-'));
 
 describe('Adversarial State Landing Lifecycle Matrix (§19)', () => {
-  it('1. No pin SHA → zero merge calls, status != ci_green, status != merged', () => {
+  it('1. No pin SHA → zero merge calls, status != ci_green, status != merged', async () => {
     const gitFix = gitFixture('mat-1-no-pin-sha');
     const { state: fakeGhState, ghFn } = createFakeGh(gitFix);
     const stateDir = join(scratch, 'state-1');
@@ -91,7 +91,7 @@ describe('Adversarial State Landing Lifecycle Matrix (§19)', () => {
       }
     };
 
-    const res = landStateViaPR({
+    const res = await landStateViaPR({
       fileChanges: [
         {
           path: 'specs/implementation/current-milestone.json',
@@ -116,7 +116,7 @@ describe('Adversarial State Landing Lifecycle Matrix (§19)', () => {
     expect(res.receipt?.status).not.toBe('merged');
   });
 
-  it('2. CI pending → zero merge calls', () => {
+  it('2. CI pending → zero merge calls', async () => {
     const gitFix = gitFixture('mat-2-ci-pending');
     const { state: fakeGhState, ghFn } = createFakeGh(gitFix);
     const stateDir = join(scratch, 'state-2');
@@ -157,7 +157,7 @@ describe('Adversarial State Landing Lifecycle Matrix (§19)', () => {
 
     const targetMilestone = { milestoneId: 'g0', packages: [{ id: 'g0-test', status: 'RUNNING' }] };
 
-    const res = landStateViaPR({
+    const res = await landStateViaPR({
       fileChanges: [
         {
           path: 'specs/implementation/current-milestone.json',
@@ -180,7 +180,7 @@ describe('Adversarial State Landing Lifecycle Matrix (§19)', () => {
     expect(res.receipt?.status).not.toBe('merged');
   });
 
-  it('3. CI failure → zero merge calls', () => {
+  it('3. CI failure → zero merge calls', async () => {
     const gitFix = gitFixture('mat-3-ci-failure');
     const { state: fakeGhState, ghFn } = createFakeGh(gitFix);
     const stateDir = join(scratch, 'state-3');
@@ -218,7 +218,7 @@ describe('Adversarial State Landing Lifecycle Matrix (§19)', () => {
 
     const targetMilestone = { milestoneId: 'g0', packages: [{ id: 'g0-test', status: 'RUNNING' }] };
 
-    const res = landStateViaPR({
+    const res = await landStateViaPR({
       fileChanges: [
         {
           path: 'specs/implementation/current-milestone.json',
@@ -241,7 +241,7 @@ describe('Adversarial State Landing Lifecycle Matrix (§19)', () => {
     expect(res.receipt?.status).not.toBe('merged');
   });
 
-  it('4. CI wrong app id → zero merge calls', () => {
+  it('4. CI wrong app id → zero merge calls', async () => {
     const gitFix = gitFixture('mat-4-ci-wrong-app');
     const { state: fakeGhState, ghFn } = createFakeGh(gitFix);
     const stateDir = join(scratch, 'state-4');
@@ -279,7 +279,7 @@ describe('Adversarial State Landing Lifecycle Matrix (§19)', () => {
 
     const targetMilestone = { milestoneId: 'g0', packages: [{ id: 'g0-test', status: 'RUNNING' }] };
 
-    const res = landStateViaPR({
+    const res = await landStateViaPR({
       fileChanges: [
         {
           path: 'specs/implementation/current-milestone.json',
@@ -302,7 +302,7 @@ describe('Adversarial State Landing Lifecycle Matrix (§19)', () => {
     expect(res.receipt?.status).not.toBe('merged');
   });
 
-  it('5. CI stale SHA green → zero merge calls for current PR HEAD', () => {
+  it('5. CI stale SHA green → zero merge calls for current PR HEAD', async () => {
     const gitFix = gitFixture('mat-5-stale-sha');
     const { state: fakeGhState, ghFn } = createFakeGh(gitFix);
     const stateDir = join(scratch, 'state-5');
@@ -345,7 +345,7 @@ describe('Adversarial State Landing Lifecycle Matrix (§19)', () => {
 
     const targetMilestone = { milestoneId: 'g0', packages: [{ id: 'g0-test', status: 'RUNNING' }] };
 
-    const res = landStateViaPR({
+    const res = await landStateViaPR({
       fileChanges: [
         {
           path: 'specs/implementation/current-milestone.json',
@@ -367,7 +367,7 @@ describe('Adversarial State Landing Lifecycle Matrix (§19)', () => {
     expect(res.ok).toBe(false);
   });
 
-  it('6. CI correct exact-head green → merge may be attempted', () => {
+  it('6. CI correct exact-head green → merge may be attempted', async () => {
     const gitFix = gitFixture('mat-6-exact-head-green');
     const { state: fakeGhState, ghFn } = createFakeGh(gitFix);
     const stateDir = join(scratch, 'state-6');
@@ -405,7 +405,7 @@ describe('Adversarial State Landing Lifecycle Matrix (§19)', () => {
 
     const targetMilestone = { milestoneId: 'g0', packages: [{ id: 'g0-test', status: 'RUNNING' }] };
 
-    const res = landStateViaPR({
+    const res = await landStateViaPR({
       fileChanges: [
         {
           path: 'specs/implementation/current-milestone.json',
@@ -428,7 +428,7 @@ describe('Adversarial State Landing Lifecycle Matrix (§19)', () => {
     expect(res.receipt?.status).toBe(RECEIPT_STATUSES.MERGED);
   });
 
-  it('7. Merge command returns exit 1 → receipt not merged', () => {
+  it('7. Merge command returns exit 1 → receipt not merged', async () => {
     const gitFix = gitFixture('mat-7-merge-exit-1');
     const { state: fakeGhState, ghFn } = createFakeGh(gitFix);
     const stateDir = join(scratch, 'state-7');
@@ -468,7 +468,7 @@ describe('Adversarial State Landing Lifecycle Matrix (§19)', () => {
 
     const targetMilestone = { milestoneId: 'g0', packages: [{ id: 'g0-test', status: 'RUNNING' }] };
 
-    const res = landStateViaPR({
+    const res = await landStateViaPR({
       fileChanges: [
         {
           path: 'specs/implementation/current-milestone.json',
@@ -490,7 +490,7 @@ describe('Adversarial State Landing Lifecycle Matrix (§19)', () => {
     expect(res.receipt?.status).not.toBe('merged');
   });
 
-  it('8. Merge command exit 0 but PR state OPEN → receipt not merged', () => {
+  it('8. Merge command exit 0 but PR state OPEN → receipt not merged', async () => {
     const gitFix = gitFixture('mat-8-merge-pr-open');
     const { state: fakeGhState, ghFn } = createFakeGh(gitFix);
     const stateDir = join(scratch, 'state-8');
@@ -531,7 +531,7 @@ describe('Adversarial State Landing Lifecycle Matrix (§19)', () => {
 
     const targetMilestone = { milestoneId: 'g0', packages: [{ id: 'g0-test', status: 'RUNNING' }] };
 
-    const res = landStateViaPR({
+    const res = await landStateViaPR({
       fileChanges: [
         {
           path: 'specs/implementation/current-milestone.json',
@@ -553,7 +553,7 @@ describe('Adversarial State Landing Lifecycle Matrix (§19)', () => {
     expect(res.receipt?.status).not.toBe('merged');
   });
 
-  it('9. PR MERGED but fetch origin/main fails → receipt not authoritative merged', () => {
+  it('9. PR MERGED but fetch origin/main fails → receipt not authoritative merged', async () => {
     const gitFix = gitFixture('mat-9-fetch-fail');
     const { ghFn } = createFakeGh(gitFix);
     const stateDir = join(scratch, 'state-9');
@@ -618,7 +618,7 @@ describe('Adversarial State Landing Lifecycle Matrix (§19)', () => {
 
     const targetMilestone = { milestoneId: 'g0', packages: [{ id: 'g0-test', status: 'RUNNING' }] };
 
-    const res = landStateViaPR({
+    const res = await landStateViaPR({
       fileChanges: [
         {
           path: 'specs/implementation/current-milestone.json',
@@ -641,7 +641,7 @@ describe('Adversarial State Landing Lifecycle Matrix (§19)', () => {
     expect(res.receipt?.status).not.toBe('merged');
   });
 
-  it('10. Merge commit absent / unreachable from origin/main → not merged', () => {
+  it('10. Merge commit absent / unreachable from origin/main → not merged', async () => {
     const gitFix = gitFixture('mat-10-unreachable-commit');
     const { state: fakeGhState, ghFn } = createFakeGh(gitFix);
     const stateDir = join(scratch, 'state-10');
@@ -681,7 +681,7 @@ describe('Adversarial State Landing Lifecycle Matrix (§19)', () => {
 
     const targetMilestone = { milestoneId: 'g0', packages: [{ id: 'g0-test', status: 'RUNNING' }] };
 
-    const res = landStateViaPR({
+    const res = await landStateViaPR({
       fileChanges: [
         {
           path: 'specs/implementation/current-milestone.json',
@@ -703,7 +703,7 @@ describe('Adversarial State Landing Lifecycle Matrix (§19)', () => {
     expect(res.receipt?.status).not.toBe('merged');
   });
 
-  it('11. Desired state differs on main after merge → not merged', () => {
+  it('11. Desired state differs on main after merge → not merged', async () => {
     const gitFix = gitFixture('mat-11-content-differs');
     const { state: fakeGhState, ghFn } = createFakeGh(gitFix);
     const stateDir = join(scratch, 'state-11');
@@ -757,7 +757,7 @@ describe('Adversarial State Landing Lifecycle Matrix (§19)', () => {
 
     const targetMilestone = { milestoneId: 'g0', packages: [{ id: 'g0-test', status: 'RUNNING' }] };
 
-    const res = landStateViaPR({
+    const res = await landStateViaPR({
       fileChanges: [
         {
           path: 'specs/implementation/current-milestone.json',
@@ -779,7 +779,7 @@ describe('Adversarial State Landing Lifecycle Matrix (§19)', () => {
     expect(res.receipt?.status).not.toBe('merged');
   });
 
-  it('12. Complete correct merge → merged=true with verified mergedSha', () => {
+  it('12. Complete correct merge → merged=true with verified mergedSha', async () => {
     const gitFix = gitFixture('mat-12-correct-merge');
     const { ghFn } = createFakeGh(gitFix);
     const stateDir = join(scratch, 'state-12');
@@ -817,7 +817,7 @@ describe('Adversarial State Landing Lifecycle Matrix (§19)', () => {
 
     const targetMilestone = { milestoneId: 'g0', packages: [{ id: 'g0-test', status: 'RUNNING' }] };
 
-    const res = landStateViaPR({
+    const res = await landStateViaPR({
       fileChanges: [
         {
           path: 'specs/implementation/current-milestone.json',
@@ -841,7 +841,7 @@ describe('Adversarial State Landing Lifecycle Matrix (§19)', () => {
     expect(res.receipt?.mergedSha).not.toBeNull();
   });
 
-  it('13-17. Crash recovery resumes all non-terminal states and adopts verified merges', () => {
+  it('13-17. Crash recovery resumes all non-terminal states and adopts verified merges', async () => {
     const gitFix = gitFixture('mat-13-crash-recovery');
     const { ghFn } = createFakeGh(gitFix);
     const stateDir = join(scratch, 'state-13');
@@ -927,11 +927,16 @@ describe('Adversarial State Landing Lifecycle Matrix (§19)', () => {
     };
 
     // Run recovery
-    const recovered = recoverPendingStateLandings({ stateDir, cwd: gitFix.root, ghFn, gitFn });
+    const recovered = await recoverPendingStateLandings({
+      stateDir,
+      cwd: gitFix.root,
+      ghFn,
+      gitFn,
+    });
     expect(recovered.length).toBe(1);
   });
 
-  it('18. Canonical repo checkout branch stays main throughout landing', () => {
+  it('18. Canonical repo checkout branch stays main throughout landing', async () => {
     const gitFix = gitFixture('mat-18-canonical-stays-main');
     const { ghFn } = createFakeGh(gitFix);
     const stateDir = join(scratch, 'state-18');
@@ -972,7 +977,7 @@ describe('Adversarial State Landing Lifecycle Matrix (§19)', () => {
       return ghFn(args, opts);
     };
 
-    landStateViaPR({
+    await landStateViaPR({
       fileChanges: [
         {
           path: 'specs/implementation/current-milestone.json',
@@ -994,7 +999,7 @@ describe('Adversarial State Landing Lifecycle Matrix (§19)', () => {
     expect(branchAfter).toBe('main');
   });
 
-  it('19. State landing step-based advancement is non-blocking', () => {
+  it('19. State landing step-based advancement is non-blocking', async () => {
     const gitFix = gitFixture('mat-19-non-blocking');
     const { ghFn } = createFakeGh(gitFix);
     const stateDir = join(scratch, 'state-19');
@@ -1016,7 +1021,7 @@ describe('Adversarial State Landing Lifecycle Matrix (§19)', () => {
     const tStart = Date.now();
 
     // Advance one step: should take < 1 second (no multi-minute sleeping)
-    const step1 = advanceStateTransition({
+    const step1 = await advanceStateTransition({
       fileChanges: [
         {
           path: 'specs/implementation/current-milestone.json',
@@ -1038,7 +1043,7 @@ describe('Adversarial State Landing Lifecycle Matrix (§19)', () => {
     expect(step1.receipt?.status).toBe(RECEIPT_STATUSES.BRANCH_READY);
   });
 
-  it('20. Same intent called twice → one authoritative transition (idempotent)', () => {
+  it('20. Same intent called twice → one authoritative transition (idempotent)', async () => {
     const gitFix = gitFixture('mat-20-idempotent');
     const { state: fakeGhState, ghFn } = createFakeGh(gitFix);
     const stateDir = join(scratch, 'state-20');
@@ -1064,7 +1069,7 @@ describe('Adversarial State Landing Lifecycle Matrix (§19)', () => {
     ];
 
     // First call advances from pending to branch_created
-    const step1 = advanceStateTransition({
+    const step1 = await advanceStateTransition({
       fileChanges,
       message: 'chore: flip to RUNNING',
       stateDir,
@@ -1076,7 +1081,7 @@ describe('Adversarial State Landing Lifecycle Matrix (§19)', () => {
     });
 
     // Second call with same intent reuses existing receipt
-    const step2 = advanceStateTransition({
+    const step2 = await advanceStateTransition({
       fileChanges,
       message: 'chore: flip to RUNNING',
       stateDir,
@@ -1095,7 +1100,7 @@ describe('Adversarial State Landing Lifecycle Matrix (§19)', () => {
     expect(fakeGhState.calls.prCreate.length).toBe(0);
 
     // Third call should create the PR
-    const step3 = advanceStateTransition({
+    const step3 = await advanceStateTransition({
       fileChanges,
       message: 'chore: flip to RUNNING',
       stateDir,
@@ -1148,7 +1153,7 @@ describe('Adversarial State Landing Lifecycle Matrix (§19)', () => {
       };
     }
 
-    function driveTo(
+    async function driveTo(
       gitFix: ReturnType<typeof gitFixture>,
       ghFn: ReturnType<typeof createFakeGh>['ghFn'],
       stateDir: string,
@@ -1164,7 +1169,7 @@ describe('Adversarial State Landing Lifecycle Matrix (§19)', () => {
         toStatus: 'RUNNING',
         ghFn,
       };
-      let res = advanceStateTransition(base as never);
+      let res = await advanceStateTransition(base as never);
       let receipt = res.receipt as never as {
         status: string;
         prNumber: number;
@@ -1172,7 +1177,7 @@ describe('Adversarial State Landing Lifecycle Matrix (§19)', () => {
         stateWorktree: string;
       };
       for (let i = 0; i < 8 && receipt && receipt.status !== targetStatus; i++) {
-        res = advanceStateTransition({ ...base, receipt } as never);
+        res = await advanceStateTransition({ ...base, receipt } as never);
         receipt = res.receipt as never as {
           status: string;
           prNumber: number;
@@ -1183,7 +1188,7 @@ describe('Adversarial State Landing Lifecycle Matrix (§19)', () => {
       return { res, receipt, base };
     }
 
-    it('receipt finalizes (MERGED) when the PR merged before the merge step ran', () => {
+    it('receipt finalizes (MERGED) when the PR merged before the merge step ran', async () => {
       const gitFix = gitFixture('recon-1-merged-pr-finalizes');
       const { state: fakeGhState, ghFn } = createFakeGh(gitFix);
       const stateDir = join(scratch, 'state-recon-1');
@@ -1196,7 +1201,7 @@ describe('Adversarial State Landing Lifecycle Matrix (§19)', () => {
       gitFix.commitAll('chore: init');
       gitFix.g(['push', 'origin', 'main']);
 
-      const { receipt, base } = driveTo(
+      const { receipt, base } = await driveTo(
         gitFix,
         greenGhFn(ghFn),
         stateDir,
@@ -1214,11 +1219,11 @@ describe('Adversarial State Landing Lifecycle Matrix (§19)', () => {
       pr!.mergeCommit = { oid: mergedSha };
 
       // CI_AUTHORIZED -> MERGE_READY (TOCTOU holds at the authorized head)
-      const toMergeReady = advanceStateTransition({ ...base, receipt } as never);
+      const toMergeReady = await advanceStateTransition({ ...base, receipt } as never);
       expect(toMergeReady.step).toBe('MERGE_READY');
 
       // MERGE_READY -> DONE via authoritative reconciliation, NOT revoke+loop
-      const done = advanceStateTransition({ ...base, receipt } as never);
+      const done = await advanceStateTransition({ ...base, receipt } as never);
       expect(done.step).toBe('DONE');
       expect(receipt?.status).toBe(RECEIPT_STATUSES.MERGED);
       expect(receipt?.mergedSha).toBe(mergedSha);
@@ -1228,7 +1233,7 @@ describe('Adversarial State Landing Lifecycle Matrix (§19)', () => {
       expect(existsSync(receipt?.stateWorktree ?? '')).toBe(false);
     });
 
-    it('merged PR at an unauthorized head fails closed as AUTHORITY_REFUSAL', () => {
+    it('merged PR at an unauthorized head fails closed as AUTHORITY_REFUSAL', async () => {
       const gitFix = gitFixture('recon-2-merged-unauthorized-head');
       const { state: fakeGhState, ghFn } = createFakeGh(gitFix);
       const stateDir = join(scratch, 'state-recon-2');
@@ -1241,7 +1246,12 @@ describe('Adversarial State Landing Lifecycle Matrix (§19)', () => {
       gitFix.commitAll('chore: init');
       gitFix.g(['push', 'origin', 'main']);
 
-      const { receipt } = driveTo(gitFix, greenGhFn(ghFn), stateDir, RECEIPT_STATUSES.MERGE_READY);
+      const { receipt } = await driveTo(
+        gitFix,
+        greenGhFn(ghFn),
+        stateDir,
+        RECEIPT_STATUSES.MERGE_READY,
+      );
       expect(receipt?.status).toBe(RECEIPT_STATUSES.MERGE_READY);
 
       // External merge at a head this receipt never authorized.
@@ -1250,7 +1260,7 @@ describe('Adversarial State Landing Lifecycle Matrix (§19)', () => {
       pr!.headRefOid = 'f'.repeat(40);
       pr!.mergeCommit = { oid: gitFix.g(['rev-parse', 'origin/main']).trim() };
 
-      const refused = advanceStateTransition({
+      const refused = await advanceStateTransition({
         fileChanges: fileChanges(),
         message: 'chore: flip to RUNNING',
         stateDir,

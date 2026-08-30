@@ -24,7 +24,24 @@ export const ALLOWED_STATUS_TRANSITIONS = new Set([
 ]);
 
 export function serializeMilestoneState(ms) {
+  // Synchronous immutable snapshot — callers continue mutating `ms` after this
+  // returns, so it must capture the state NOW. Prettier formatting (which is
+  // async in prettier v3) is applied later, inside the serialized queue, via
+  // formatMilestoneText(). Falls back to plain stringify if prettier is
+  // unavailable (observed live 2026-08-30: unformatted state PR #102 failed
+  // the format:check gate).
   return JSON.stringify(ms, null, 2) + '\n';
+}
+
+export async function formatMilestoneText(text) {
+  // Prettier collapses short arrays; raw JSON.stringify does not. Formatting
+  // state-landing content keeps the format:check gate green.
+  try {
+    const { format } = await import('prettier');
+    return await format(text, { filepath: 'current-milestone.json' });
+  } catch {
+    return text;
+  }
 }
 
 export function repoRoot() {

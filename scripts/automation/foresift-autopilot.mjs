@@ -104,7 +104,7 @@ import {
   discoverPendingReceipts,
   recoverPendingStateLandings,
 } from './state-landing.mjs';
-import { serializeMilestoneState } from './schema.mjs';
+import { serializeMilestoneState, formatMilestoneText } from './schema.mjs';
 import { auditGitHubProtection } from './audit-github-protection.mjs';
 import {
   createLaunchIntent,
@@ -367,14 +367,14 @@ function refreshMain() {
  * @param {string} message - commit message / PR title
  * @param {{ packageId?: string, fromStatus?: string, toStatus?: string }} [meta]
  */
-function requestMilestoneStateTransition(
+async function requestMilestoneStateTransition(
   ms,
   message,
   { packageId = null, fromStatus = null, toStatus = null } = {},
 ) {
   // Snapshot before enqueue: callers continue mutating milestone state while
   // the serialized Git queue waits, so the closure must contain immutable data.
-  const desiredContent = serializeMilestoneState(ms);
+  const desiredContent = await formatMilestoneText(serializeMilestoneState(ms));
   const transitionMeta = { packageId, fromStatus, toStatus, message };
   enqueue(async () => {
     const fileChanges = [
@@ -527,18 +527,18 @@ function launchIdentity(p) {
  * INVARIANT: canonical current-milestone.json is NEVER written to disk by this function.
  * The desired state is serialized in-memory and sent through the state-transition lane.
  */
-function persistMilestoneState(ms, message) {
-  requestMilestoneStateTransition(ms, message);
+async function persistMilestoneState(ms, message) {
+  await requestMilestoneStateTransition(ms, message);
 }
 
-function setPackageStatus(ms, packageId, status) {
+async function setPackageStatus(ms, packageId, status) {
   const pkg = findPackage(ms, packageId);
   if (!pkg || pkg.status === status) return false;
   const oldStatus = pkg.status;
   if (!ALLOWED_STATUS_TRANSITIONS.has(`${oldStatus}->${status}`))
     throw new Error(`disallowed package status transition: ${packageId} ${oldStatus}->${status}`);
   pkg.status = status;
-  requestMilestoneStateTransition(
+  await requestMilestoneStateTransition(
     ms,
     `chore(autopilot): ${ms.milestoneId}/${packageId} -> ${status}`,
     { packageId, fromStatus: oldStatus, toStatus: status },
@@ -936,7 +936,7 @@ async function finalizeCompletedRun(st, entry, get = null) {
   }
   refreshMain();
   const ms = loadCurrentMilestone(REPO);
-  setPackageStatus(ms, entry.packageId, 'PROVEN');
+  await setPackageStatus(ms, entry.packageId, 'PROVEN');
   record(st, 'package_proven', { packageId: entry.packageId, pr: mergedPr });
   return true;
 }
@@ -1411,7 +1411,7 @@ async function actOnEntry(st, entry) {
       try {
         const ms = loadCurrentMilestone(REPO);
         if (ms && findPackage(ms, entry.packageId)?.status === 'RUNNING')
-          setPackageStatus(ms, entry.packageId, 'PENDING');
+          await setPackageStatus(ms, entry.packageId, 'PENDING');
       } catch (err) {
         record(st, 'requeue_status_flip_failed', {
           packageId: entry.packageId,
@@ -1506,7 +1506,7 @@ async function actOnPendingAction(st, entry) {
         try {
           const ms = loadCurrentMilestone(REPO);
           if (ms && findPackage(ms, entry.packageId)?.status === 'PENDING') {
-            setPackageStatus(ms, entry.packageId, 'RUNNING');
+            await setPackageStatus(ms, entry.packageId, 'RUNNING');
             reconcileSeedAfterStateChore(st, entry.packageId, entry.branch);
           }
         } catch (err) {
@@ -1735,7 +1735,7 @@ export function selectionView(fileMs, committedMs) {
 }
 
 /** Launches performed by one selection pass (V3-B): drives adaptive handoff polling. */
-function selectAndLaunch(st) {
+async function selectAndLaunch(st) {
   // Corrupt roadmap/milestone JSON must fail closed (PAUSED_FATAL), never
   // crash-loop the tick or silently re-plan over damaged state.
   let roadmap;
@@ -1998,7 +1998,7 @@ function selectAndLaunch(st) {
       // lineage (re-read fresh: it may carry flips newer than the committed
       // selection view) — never the committed snapshot selection used.
       const fileNow = loadCurrentMilestone(REPO);
-      if (fileNow) setPackageStatus(fileNow, cand.id, 'RUNNING');
+      if (fileNow) await setPackageStatus(fileNow, cand.id, 'RUNNING');
       reconcileSeedAfterStateChore(st, cand.id, branch);
     }
     running.push(cand);
@@ -2332,7 +2332,7 @@ async function tick(st) {
     // (adopt its live run, or convert it to a tracked pause), never race a
     // second launch past the limit.
     reconcileStrandedPackages(st);
-    if (!st.pausedFatal) launched = selectAndLaunch(st);
+    if (!st.pausedFatal) launched = await selectAndLaunch(st);
   }
   // Post-chore seed reconciliation enqueues behind state-chore pushes on the
   // serialized git queue; drain it and persist whatever it recorded before
@@ -2585,7 +2585,7 @@ async function cmdRecoverFatal(positionalRunId) {
   // quota wall — the same in-flight window that protects automatic probes.
   entry.quotaProbeStartedAt = now();
   if (kind === 'package' && pkg.status === 'PENDING') {
-    setPackageStatus(ms, pkg.id, 'RUNNING');
+    await setPackageStatus(ms, pkg.id, 'RUNNING');
     reconcileSeedAfterStateChore(st, pkg.id, branch);
   }
   st.pausedFatal = null;
@@ -2771,7 +2771,7 @@ async function cmdFinalizeFromMain(packageId, opts = {}) {
     return 1;
   }
   const ms = loadCurrentMilestone(REPO);
-  setPackageStatus(ms, packageId, 'PROVEN');
+  await setPackageStatus(ms, packageId, 'PROVEN');
   if (verdict.evidence.terminalPauseRetired) st.pausedFatal = null;
   // Reconcile this package's own supervisor tracking rows — their run is
   // terminal (the evaluator refused any live one); retaining them would make
@@ -3049,8 +3049,8 @@ async function cmdRestartPackage(packageId, opts = {}) {
     toGeneration === fromGeneration && transitionFrom === fromGeneration - 1;
   if (!generationAlreadyPersisted) {
     pkg.generation = toGeneration;
-    if (!setPackageStatus(ms, packageId, 'PENDING'))
-      persistMilestoneState(
+    if (!(await setPackageStatus(ms, packageId, 'PENDING')))
+      await persistMilestoneState(
         ms,
         `chore(autopilot): ${ms.milestoneId}/${packageId} -> generation ${toGeneration} (fresh restart)`,
       );
@@ -3323,7 +3323,11 @@ async function main() {
       });
     }
 
-    const recoveryResults = recoverPendingStateLandings({ stateDir: STATE_DIR, cwd: REPO, log });
+    const recoveryResults = await recoverPendingStateLandings({
+      stateDir: STATE_DIR,
+      cwd: REPO,
+      log,
+    });
     if (recoveryResults.length > 0) {
       record(st, 'state_landing_crash_recovery', {
         count: recoveryResults.length,

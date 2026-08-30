@@ -26,13 +26,17 @@ const SCAN_EXTENSIONS = new Set(['.ts', '.tsx', '.mts', '.mjs', '.cjs', '.js']);
 
 /**
  * FIXTURE-CORPUS EXCLUSION RULE (documented in README.md): files under
- * tests/fixtures/sec/** intentionally CONTAIN prohibited-code text as
- * negative-acceptance fixtures; the scanner excludes them from its own
- * verdict while the parity test classifies those same fixtures explicitly.
+ * tests/fixtures/sec/** and tests/fixtures/mcp/** intentionally CONTAIN
+ * prohibited-code text as negative-acceptance fixtures (credential seeds,
+ * private-key-shaped payloads, mnemonic fixtures — all deterministic test
+ * constants, never real credentials); the scanner excludes them from its
+ * own verdict while the parity tests classify those same fixtures
+ * explicitly.
  */
 function isExcluded(relativePath) {
   return (
     relativePath.startsWith('tests/fixtures/sec/') ||
+    relativePath.startsWith('tests/fixtures/mcp/') ||
     relativePath === 'scripts/scan-prohibited-capabilities/catalog.json'
   );
 }

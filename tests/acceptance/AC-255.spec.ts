@@ -11,9 +11,11 @@ import {
   loadCanaryCatalog,
 } from '../../packages/security/src/negative-capability.ts';
 import { ProhibitedCapabilityScreen } from '../../packages/tool-core/src/prohibited.ts';
+import { MCP_EXPERT_PROVIDER_TOOLS } from '../../apps/api/src/mcp/tools.ts';
 
 const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 const CLEAN_DIR = path.join(REPO_ROOT, 'tests/fixtures/sec/clean');
+const GMGN_FIXTURES_DIR = path.join(REPO_ROOT, 'tests/fixtures/prov/gmgn');
 
 describe('AC-255: GMGN pair passes gates; forbidden pairs fail policy', () => {
   it('every admitted GMGN-shaped query passes the runtime policy gate', async () => {
@@ -45,6 +47,21 @@ describe('AC-255: GMGN pair passes gates; forbidden pairs fail policy', () => {
       path.join(REPO_ROOT, 'scripts/scan-prohibited-capabilities/cli.mjs')
     );
     expect(runScan({ root: CLEAN_DIR }).clean).toBe(true);
+  });
+
+  it('clean GMGN provider fixtures are scanner-silent', () => {
+    const canary = new NegativeCapabilityCanary(loadCanaryCatalog());
+    const gmgnCleanFiles = [
+      'token-pair-stats.clean.json',
+      'token-top-traders.clean.json',
+      'token-security.clean.json',
+    ];
+    for (const file of gmgnCleanFiles) {
+      const fullPath = path.join(GMGN_FIXTURES_DIR, file);
+      const text = readFileSync(fullPath, 'utf8');
+      const rel = `fixtures/prov/gmgn/${file}`;
+      expect(canary.scanSourceText(rel, text)).toEqual([]);
+    }
   });
 
   it('paired forbidden variants refuse at the RUNTIME-validation layer', async () => {
@@ -133,6 +150,49 @@ describe('AC-255 acceptance (tool-core substrate): permitted query fixtures pass
         now,
       );
       expect(verdict.ok, actionClass).toBe(true);
+    }
+  });
+
+  it('permits GMGN provider tools from apps/api catalog under EXTERNAL_READ', () => {
+    const gmgnTools = MCP_EXPERT_PROVIDER_TOOLS.filter((name) => name.startsWith('gmgn_'));
+    expect(gmgnTools.length).toBeGreaterThanOrEqual(6);
+
+    for (const toolName of gmgnTools) {
+      const verdict = screen.screenWithReport(
+        {
+          name: toolName,
+          title: toolName.replaceAll('_', ' '),
+          description: `Read-only GMGN intelligence: ${toolName}`,
+          inputSchemaJson: { type: 'object', properties: { address: { type: 'string' } } },
+          outputSchemaJson: { type: 'object' },
+          actionClass: ActionClass.EXTERNAL_READ,
+          toolVersion: '1.0.0',
+        },
+        now,
+      );
+      expect(verdict.ok, toolName).toBe(true);
+    }
+  });
+
+  it('permits clean definitions from core prohibited-definitions corpus', () => {
+    const raw = JSON.parse(
+      readFileSync(path.join(REPO_ROOT, 'tests/fixtures/core/prohibited-definitions.json'), 'utf8'),
+    ) as { clean: ReadonlyArray<Record<string, unknown>> };
+
+    for (const def of raw.clean) {
+      const verdict = screen.screenWithReport(
+        {
+          name: String(def.name),
+          title: String(def.title ?? ''),
+          description: String(def.description ?? ''),
+          inputSchemaJson: def.inputSchemaJson,
+          outputSchemaJson: def.outputSchemaJson,
+          actionClass: (def.actionClass as ActionClass) ?? ActionClass.EXTERNAL_READ,
+          toolVersion: '1.0.0',
+        },
+        now,
+      );
+      expect(verdict.ok, `clean fixture ${String(def.name)} must pass`).toBe(true);
     }
   });
 

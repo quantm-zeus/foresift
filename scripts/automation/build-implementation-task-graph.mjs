@@ -106,6 +106,7 @@ for (const line of lines) {
       body: m[2],
       executor: metadata.executor,
       kind: metadata.kind,
+      evidence: metadata.evidence,
     };
     continue;
   }

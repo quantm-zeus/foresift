@@ -116,6 +116,7 @@ import {
 import { advanceRepairRequest, discoverPendingRepairRequests } from './ci-repair-executor.mjs';
 import { admitPackageLaunch, releasePackageRuntime } from './runtime-admission.mjs';
 import { buildLaunchPreflight, exactCoRunCompatible } from './launch-preflight.mjs';
+import { buildReadyQueue, stealNext } from './ready-queue.mjs';
 import {
   classifyHostState,
   advanceGovernorRecovery,
@@ -2064,32 +2065,54 @@ async function selectAndLaunch(st) {
     }
   }
 
-  for (const cand of rankPendingPackages(ms)) {
-    if (barrier.state === 'CURRENT_PACKAGE' && cand.id !== testPolicy.barrierAfterPackage) continue;
-    // Never re-select a package that already has a tracked active launch or in-flight intent
-    if (st.activeRuns.some((r) => r.packageId === cand.id && !r.done)) continue;
-    if (isPackageLaunchInFlight(STATE_DIR, cand.id)) continue;
-    const elig = packageEligible(ms, cand);
-    if (!elig.eligible) continue;
-    const verdict = canStartPackage(roadmap, ms, cand, running);
-    if (!verdict.ok) {
-      // Maintainer observability: a pairwise concurrency refusal is evidence,
-      // not noise — record WHY an otherwise-eligible candidate was denied a
-      // slot. Once per process for the same package+reason; capacity-limit
-      // saturation is healthy and stays silent.
-      if (
-        !/concurrency limit/.test(verdict.reason) &&
-        !coRunDenialSeen.has(`${cand.id}|${verdict.reason}`)
-      ) {
-        coRunDenialSeen.add(`${cand.id}|${verdict.reason}`);
-        record(st, 'co_run_denied', {
-          packageId: cand.id,
-          reason: verdict.reason,
-          running: running.map((r) => r.id),
-        });
+  // H3 mission item 6: the candidate stream is the GLOBAL READY QUEUE — one
+  // priority-ordered, preflight-backed queue per selection pass (built from
+  // the same critical-path ranking the loop previously consumed inline).
+  // stealNext drives selection, so every eligibility check happens in queue
+  // priority order and skipped candidates stay queued for later capacity
+  // events. The 60s tick remains the poll fallback; HANDOFF_POLL_MS (§18/§49)
+  // is the capacity-event re-entry (launch/lane completion flips readyWork,
+  // which pins the loop at the fast rate).
+  const readyQueue = buildReadyQueue(rankPendingPackages(ms), (id) => readyPreflight(id));
+  record(st, 'ready_queue_built', {
+    candidates: readyQueue.entries.map((e) => e.packageId),
+  });
+  while (readyQueue.entries.length > 0) {
+    const claimed = stealNext(readyQueue, (entry) => {
+      const cand = entry.preflight?.packageId
+        ? findPackage(ms, entry.packageId)
+        : findPackage(ms, entry.packageId);
+      if (!cand) return null;
+      if (barrier.state === 'CURRENT_PACKAGE' && cand.id !== testPolicy.barrierAfterPackage)
+        return null;
+      // Never re-select a package that already has a tracked active launch or in-flight intent
+      if (st.activeRuns.some((r) => r.packageId === cand.id && !r.done)) return null;
+      if (isPackageLaunchInFlight(STATE_DIR, cand.id)) return null;
+      const elig = packageEligible(ms, cand);
+      if (!elig.eligible) return null;
+      const verdict = canStartPackage(roadmap, ms, cand, running);
+      if (!verdict.ok) {
+        // Maintainer observability: a pairwise concurrency refusal is evidence,
+        // not noise — record WHY an otherwise-eligible candidate was denied a
+        // slot. Once per process for the same package+reason; capacity-limit
+        // saturation is healthy and stays silent.
+        if (
+          !/concurrency limit/.test(verdict.reason) &&
+          !coRunDenialSeen.has(`${cand.id}|${verdict.reason}`)
+        ) {
+          coRunDenialSeen.add(`${cand.id}|${verdict.reason}`);
+          record(st, 'co_run_denied', {
+            packageId: cand.id,
+            reason: verdict.reason,
+            running: running.map((r) => r.id),
+          });
+        }
+        return null;
       }
-      continue;
-    }
+      return { cand };
+    });
+    if (!claimed) break; // every remaining candidate is blocked this tick
+    const cand = claimed.cand;
     const { generation, branch, message, workflow: wf, executionProfile } = launchIdentity(cand);
     // H3 P1-7 exact co-run gate: when BOTH sides carry derivable exact write
     // truth, an exact predicted-write overlap forbids the co-run even though
@@ -2146,6 +2169,8 @@ async function selectAndLaunch(st) {
           reason: admission.reason,
         });
       }
+      // Skipped, not consumed: a freed permit (quota reset, lane completion)
+      // must let this candidate win the next steal pass.
       continue;
     }
     // Two-Phase Launch Protocol: Phase A (Durable Launch Intent)

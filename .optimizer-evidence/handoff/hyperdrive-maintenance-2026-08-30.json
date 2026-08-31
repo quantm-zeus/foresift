@@ -87,6 +87,7 @@
     "archonValidate": "32 valid, 0 errors, 2 warnings",
     "fullCoordinatorReburn": "GREEN (exit 0): bunFiles 337, passed true, test-authority-result BUN_TEST; log /tmp/land-full-gate.log",
     "next": "after green coordinator: re-run package-final-land.mjs verbatim (package g0-mcp-surface, branch foresift/g0-mcp-surface, artifacts-dir /home/minhquan_eth/.archon/workspaces/quantm-zeus/foresift/artifacts/runs/8e2bf2578e3820b793e40b1d1b0a7081); lander burns its own FULL gate; then exact-head CI on PR #125, squash merge, autopilot --recover-fatal",
-    "landerRerun": "package-final-land.mjs re-invoked verbatim (bg b87egfz8k); attestation headSha 629d69e mismatches new head 397aaaf + baseMainSha f09ddb6 != 0893e1e, so lander correctly refused reuse and is burning ONE fresh FULL gate (pnpm foresift:gate)"
+    "landerRerun": "package-final-land.mjs re-invoked verbatim (bg b87egfz8k); attestation headSha 629d69e mismatches new head 397aaaf + baseMainSha f09ddb6 != 0893e1e, so lander correctly refused reuse and is burning ONE fresh FULL gate (pnpm foresift:gate)",
+    "pushAndCi": "pushed 397aaaf; CI run 33354838617 in_progress (classify+pure+fast-gates green; pglite+process running); lander waiting for CI at pinned head"
   }
 }

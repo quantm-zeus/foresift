@@ -94,16 +94,18 @@ export function evaluateGateEvidence(input: {
 export async function recordGateEvidence(engine: DatabaseEngine, record: GateEvidenceRecord) {
   assertRecord(record);
   await engine.query(
-    `INSERT INTO trace.gate_evidence (evidence_id,payload,payload_sha256,signature,gate_kind,approver,issued_at,expires_at,revoked_at,recorded_at) VALUES ($1,$2::jsonb,$3,$4,$5,$6,$7,$8,$9,$10)`,
+    `INSERT INTO trace.gate_evidence (evidence_id,payload,payload_sha256,signature,gate_kind,scope_refs,approver,issued_at,expires_at,revocation_ref,revoked_at,recorded_at) VALUES ($1,$2::jsonb,$3,$4,$5,$6::jsonb,$7,$8,$9,$10,$11,$12)`,
     [
       record.evidenceId,
       JSON.stringify(record.payload),
       record.payloadSha256,
       record.signature,
       record.gateKind,
+      JSON.stringify(record.scopeRefs),
       record.approver,
       record.issuedAt,
       record.expiresAt,
+      record.payload.revocationRef ?? null,
       record.revokedAt ?? null,
       record.recordedAt,
     ],

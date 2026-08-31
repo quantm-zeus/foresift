@@ -23,9 +23,11 @@ CREATE TABLE trace.gate_evidence (
   payload_sha256 text NOT NULL CHECK (payload_sha256 ~ '^[0-9a-f]{64}$'),
   signature text NOT NULL CHECK (signature ~ '^[0-9a-f]{64}$'),
   gate_kind text NOT NULL CHECK (gate_kind IN ('MANUAL', 'LEGAL', 'RIGHTS', 'STATISTICAL', 'OWNER_APPROVAL')),
+  scope_refs jsonb NOT NULL,
   approver text NOT NULL,
   issued_at timestamptz NOT NULL,
   expires_at timestamptz NOT NULL,
+  revocation_ref text,
   revoked_at timestamptz,
   recorded_at timestamptz NOT NULL,
   CHECK (expires_at > issued_at)

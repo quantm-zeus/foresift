@@ -6,6 +6,9 @@ import { join } from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { buildCodexExecArgs, CODEX_SERVICE_TIER } from './codex-routing.mjs';
 import { validateLaneOwnership } from './path-ownership.mjs';
+import { claimCompletedUnits, parseTaskGraph } from './writer-task-evidence.mjs';
+import { executeHandoffToClaude, isQuotaHandoffReason } from './engine-handoff.mjs';
+import { runClaudeLaneCore } from './claude-lane-core.mjs';
 import {
   acquireLanePermit,
   releaseLanePermit,
@@ -136,6 +139,42 @@ export function runCodexWriter(input) {
       join(resultDir, 'permit-denied.json'),
       `${JSON.stringify({ schema: 'foresift/lane-permit-denial@1', holder, provider: 'codex', reason: permit.reason, waitMs: permit.waitMs }, null, 2)}\n`,
     );
+    // H3 P0-4 engine handoff: TRUE quota exhaustion (latch) or an unavailable
+    // selected model hands the SAME logical lane to Claude; transient
+    // contention (POOL_AT_LIMIT / PROVIDER_BACKOFF) waits via the workflow's
+    // normal retry instead. The handoff releases codex ownership (none was
+    // ever held on a denied acquire), acquires the Claude permit under the
+    // SAME holder identity, and executes the identical brief/worktree —
+    // no duplicate generation, no dual owner, no duplicate commits.
+    if (isQuotaHandoffReason(permit.reason) && input['allow-engine-handoff'] !== 'false') {
+      const handoffTaskIds = route.taskIds;
+      return executeHandoffToClaude({
+        stateDir,
+        holder,
+        packageId: input.package,
+        generation,
+        laneId: input.lane,
+        runId: input['run-id'] ?? process.env.FORESIFT_RUN_ID ?? null,
+        resultDir,
+        releaseCodex: false, // a denied acquisition never held a codex permit
+        executeWithClaude: () =>
+          runClaudeLaneCore({
+            lane: input.lane,
+            briefPath: input.brief,
+            worktree: input.worktree,
+            resultsDir: resultDir,
+            packageId: input.package,
+            generation,
+            runId: input['run-id'] ?? process.env.FORESIFT_RUN_ID ?? null,
+            taskIds: handoffTaskIds,
+            taskGraphPath: input['task-graph'] ?? null,
+            stateDir,
+            holder,
+            handedOffFrom: 'CODEX',
+            timeoutMs: input['timeout-ms'],
+          }),
+      });
+    }
     throw new Error(`CODEX_WRITER_PERMIT_DENIED: ${permit.reason}`);
   }
   let run;
@@ -213,12 +252,34 @@ export function runCodexWriter(input) {
     if (commit.status !== 0) throw new Error(`CODEX_COMMIT_FAILED: ${commit.stderr}`);
   }
   const head = git(['rev-parse', 'HEAD'], input.worktree).stdout.trim();
+  // Evidence-backed completion (H3 P0-1): the old invariant — ANY commit ⇒
+  // EVERY route.taskIds complete — is removed. Nominations require
+  // predicted-write evidence in this lane's actual diff; everything else is
+  // reported deferred and stays OPEN at the coordinator.
+  const graphPath = input['task-graph'];
+  let evidence = { graph: null, unitsById: null };
+  if (graphPath) {
+    const parsed = parseTaskGraph(graphPath);
+    if (parsed) evidence = parsed;
+  }
+  const claims = claimCompletedUnits({
+    taskIds: route.taskIds,
+    changed: dirty,
+    unitsById: evidence.unitsById,
+    blockers: [],
+  });
+  const producedDiff = head !== before && dirty.length > 0;
   const result = {
     schema: 'foresift/writer-result@1',
     shardId: input.lane,
     role: 'implementation',
     engine: 'CODEX',
-    completed: head === before ? [] : route.taskIds,
+    // Evidence-backed nominations (H3 P0-1): only predicted-write-proven ids;
+    // an empty diff or a missing task graph nominates nothing (fail-closed).
+    completed: producedDiff ? claims.nominated : [],
+    deferredUnits: producedDiff
+      ? claims.deferred
+      : route.taskIds.map((taskId) => ({ taskId, reason: 'lane produced no diff' })),
     branch: git(['branch', '--show-current'], input.worktree).stdout.trim(),
     headSha: head,
     testsRun: [],

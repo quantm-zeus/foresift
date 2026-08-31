@@ -10,7 +10,11 @@ import {
 
 const GiB = 1024 * 1024 * 1024;
 const total = 15 * GiB; // the 15 GiB VPS that OOM-killed on 2026-08-28
-const sample = (available, heavyProcesses) => ({ total, available, heavyProcesses });
+const sample = (available: number, heavyProcesses: number) => ({
+  total,
+  available,
+  heavyProcesses,
+});
 
 describe('host classification (GREEN/YELLOW/ORANGE/RED)', () => {
   test('healthy host is GREEN', () => {

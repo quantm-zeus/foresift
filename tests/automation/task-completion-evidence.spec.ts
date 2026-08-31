@@ -136,7 +136,10 @@ describe('coordinator-side validation (fail-closed re-check)', () => {
     // T001/T003 remain unaccepted ⇒ stay open in canonical tasks.md.
     expect(validated.accepted).not.toContain('T001');
     expect(validated.accepted).not.toContain('T003');
-    expect(writerClaims.deferred.map((d) => d.taskId).sort()).toEqual(['T001', 'T003']);
+    expect(writerClaims.deferred.map((d: { taskId: string }) => d.taskId).sort()).toEqual([
+      'T001',
+      'T003',
+    ]);
   });
 });
 
@@ -155,7 +158,7 @@ describe('task-graph evidence plumbing', () => {
       );
       const parsed = parseTaskGraph(graphPath);
       expect(parsed).not.toBeNull();
-      expect(parsed.unitsById.get('T002').predictedWrites).toContain('src/feature-b.ts');
+      expect(parsed?.unitsById.get('T002')?.predictedWrites).toContain('src/feature-b.ts');
       // unreadable/missing graph parses to null (writers fall back to zero claims)
       expect(parseTaskGraph(join(dir, 'missing.json'))).toBeNull();
     } finally {

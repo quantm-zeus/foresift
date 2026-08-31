@@ -13,15 +13,13 @@ export declare function executeHandoffToClaude(input: {
   runId?: string | null;
   resultDir: string;
   releaseCodex?: boolean;
-  taskIds: string[];
-  taskGraphPath?: string | null;
-  worktree: string;
   executeWithClaude: () => unknown;
 }): unknown;
 export declare function handoffCompletionClaims(input: {
   taskIds: string[];
   changed: string[];
   taskGraphPath?: string | null;
+  unitsById?: Map<string, Record<string, unknown>> | null;
   blockers?: Array<string | { taskId: string }>;
 }): {
   nominated: string[];

@@ -71,7 +71,7 @@ describe('handoff choreography (real pool state)', () => {
     expect(codexAcquire.ok).toBe(false);
     expect(isQuotaHandoffReason(codexAcquire.reason)).toBe(true);
 
-    let codexHeldDuringClaude = null;
+    let codexHeldDuringClaude: number | null = null;
     const executed = executeHandoffToClaude({
       stateDir,
       holder: HOLDER,
@@ -89,7 +89,7 @@ describe('handoff choreography (real pool state)', () => {
       },
     });
     expect(executed).toEqual({ engine: 'CLAUDE', shardId: 'core', headSha: 'deadbeef' });
-    expect(codexHeldDuringClaude).toBe(0);
+    expect(codexHeldDuringClaude as unknown).toBe(0);
     // Handoff record persisted (durable execution truth).
     const record = JSON.parse(readFileSync(join(resultDir, 'engine-handoff.json'), 'utf8'));
     expect(record.schema).toBe('foresift/engine-handoff@1');
@@ -169,7 +169,7 @@ describe('handoff completion evidence (P0-1 protocol applies unchanged)', () => 
     expect(claims.deferred.map((d) => d.taskId)).toEqual(['T001']);
     // unitsById plumbing works via the shared graph index.
     const idx = unitsIndexFromGraph({ units });
-    expect(idx.get('T001').predictedWrites).toEqual(['src/a.ts']);
+    expect(idx.get('T001')?.predictedWrites).toEqual(['src/a.ts']);
     // Evidence-unavailable (no graph, no unitsById) ⇒ NOTHING is nominated.
     const unavailable = handoffCompletionClaims({
       taskIds: ['T001', 'T002'],

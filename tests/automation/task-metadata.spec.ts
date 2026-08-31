@@ -101,7 +101,7 @@ describe('graph-level coordinator exclusion (units index view)', () => {
       ],
     };
     const idx = unitsIndexFromGraph(graph);
-    expect(idx.get('T063').executor).toBe('COORDINATOR');
+    expect(idx.get('T063')?.executor).toBe('COORDINATOR');
     expect(isCoordinatorTask(idx.get('T063'))).toBe(true);
     expect(isCoordinatorTask(idx.get('T001'))).toBe(false);
   });

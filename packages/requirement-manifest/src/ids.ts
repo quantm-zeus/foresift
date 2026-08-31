@@ -51,7 +51,10 @@ export function checkStableOrdering(
 }
 export function validateSupersessionContract(input: {
   replacedIds?: readonly string[];
-  supersessionLedger?: readonly any[];
+  supersessionLedger?: readonly {
+    readonly replacedId?: string;
+    readonly replaced_id?: string;
+  }[];
   newItems?: readonly { id: string; text?: string }[];
   historicalReleasedIds?: ReadonlySet<string>;
 }) {

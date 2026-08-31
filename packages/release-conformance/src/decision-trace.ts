@@ -58,7 +58,23 @@ export async function recordDecisionTrace(engine: DatabaseEngine, trace: Decisio
     ],
   );
 }
-type Row = Record<string, any>;
+interface Row {
+  readonly trace_id: string;
+  readonly decision_ref: string;
+  readonly requirement_ids: string[];
+  readonly policy_versions: Record<string, string>;
+  readonly feature_versions: Record<string, string>;
+  readonly model_versions: Record<string, string>;
+  readonly tool_versions: Record<string, string>;
+  readonly provider_versions: Record<string, string>;
+  readonly adapter_versions: Record<string, string>;
+  readonly artifact_versions: Record<string, string>;
+  readonly test_release_id: string;
+  readonly conformance_release_id: string;
+  readonly manifest_sha256: string;
+  readonly release_report_id: string;
+  readonly recorded_at: string;
+}
 const fromRow = (r: Row): DecisionTraceRecord => ({
   traceId: r.trace_id,
   decisionRef: r.decision_ref,

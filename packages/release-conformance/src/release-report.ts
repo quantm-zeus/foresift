@@ -26,11 +26,24 @@ export interface ReleaseReport {
   readonly migrationHashes: Record<string, string>;
   readonly schemaHashes: Record<string, string>;
   readonly dependencySbomHash: string;
-  readonly conformanceResults: any;
-  readonly unresolvedDeviations: readonly any[];
-  readonly activationState: any;
+  readonly conformanceResults: Awaited<ReturnType<typeof evaluateConformance>>;
+  readonly unresolvedDeviations: readonly ReleaseDeviation[];
+  readonly activationState: ReleaseActivationState;
   readonly rollbackTarget: RollbackTarget;
   readonly generatedAt: string;
+}
+export interface ReleaseDeviation {
+  readonly id: string;
+  readonly rule: string;
+  readonly path: string;
+  readonly justification: string;
+  readonly expiryDate?: string;
+}
+export interface ReleaseActivationState {
+  readonly milestone: string;
+  readonly status: 'ACTIVE' | 'BLOCKED' | 'PENDING';
+  readonly activeGroups: readonly string[];
+  readonly gatesPassed: readonly string[];
 }
 export async function buildReleaseReport(options: {
   repoRoot: string;

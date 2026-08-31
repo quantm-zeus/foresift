@@ -336,15 +336,78 @@ if (args.planShards !== undefined) {
   }
   serial.length = 0;
   serial.push(...coreUnits);
+
+  // ── bounded lane-scope decomposition (H3 mission item 4) ─────────────────────
+  // A serial core carrying EVERY non-parallelizable unit concentrates the whole
+  // package's serial work in ONE lane: the writer spends its entire wall budget
+  // inside a single lane scope (live g0-traceability-conformance: 17 units,
+  // load 25, 56 write paths in one core lane) and everything past the timeout
+  // is deferred to another full wave. Split the dependency-ordered serial
+  // column into SEQUENTIAL batches of bounded estimated load; each batch is
+  // its own chained lane (core-batch-1..N, each branching on its parent's
+  // guarded head) so no lane scope exceeds the per-lane budget. One batch ⇒
+  // the legacy single `core` lane (byte-identical shape for small packages).
+  // Batches share one write-authority column (chainId 'core'): guards and the
+  // integrator treat same-chain lanes as sequential siblings, never as
+  // cross-lane collisions.
+  const CORE_BATCH_MAX_LOAD = 8;
+  const CORE_BATCH_MAX_LANES = 3; // wired in foresift-sharded-wave.yaml
+  // Stable topological order: repeatedly take the FIRST listed unit whose
+  // in-column dependencies are all placed. Dependencies on units outside the
+  // serial column (done units, parallel lanes) are not intra-lane ordering
+  // constraints. Fixes the listed-order dependency inversions the raw plan
+  // order can carry (g0-traceability: T005..T024 listed before T002/T004 yet
+  // depending on them).
+  const inColumn = new Set(serial.map((u) => u.id));
+  const placed = new Set();
+  const serialOrdered = [];
+  for (;;) {
+    const next = serial.find(
+      (u) => !placed.has(u.id) && u.dependsOn.every((d) => !inColumn.has(d) || placed.has(d)),
+    );
+    if (!next) break;
+    placed.add(next.id);
+    serialOrdered.push(next);
+  }
+  for (const u of serial) if (!placed.has(u.id)) serialOrdered.push(u); // defensive: cycles keep listed order
+  const unitLoad = unitSize;
+  const batches = [];
+  let cur = { units: [], load: 0 };
+  for (const u of serialOrdered) {
+    if (cur.units.length > 0 && cur.load + unitLoad(u) > CORE_BATCH_MAX_LOAD) {
+      batches.push(cur);
+      cur = { units: [], load: 0 };
+    }
+    cur.units.push(u.id);
+    cur.load += unitLoad(u);
+  }
+  if (cur.units.length > 0) batches.push(cur);
+  // Overflow beyond the wired lane count folds into the LAST batch — the
+  // alternative (dropping units) would silently unschedule work. The folded
+  // batch is flagged laneTooLarge so the canary evidence sees the residual.
+  while (batches.length > CORE_BATCH_MAX_LANES) {
+    const extra = batches.pop();
+    const last = batches[batches.length - 1];
+    last.units.push(...extra.units);
+    last.load += extra.load;
+    last.overflow = true;
+  }
   shards = [
-    ...(serial.length
-      ? [
-          {
-            id: 'core',
-            mode: 'serial',
-            units: serial.map((u) => u.id),
-          },
-        ]
+    ...(batches.length
+      ? batches.map((b, i) => ({
+          id: batches.length === 1 ? 'core' : `core-batch-${i + 1}`,
+          mode: 'serial',
+          ...(batches.length > 1
+            ? {
+                chainId: 'core',
+                batchIndex: i + 1,
+                batchOf: batches.length,
+                chainsFrom: i === 0 ? null : `core-batch-${i}`,
+                laneTooLarge: b.overflow === true,
+              }
+            : {}),
+          units: b.units,
+        }))
       : []),
     ...groups
       .filter((g) => g.units.length > 0)
@@ -359,15 +422,26 @@ if (args.planShards !== undefined) {
         units: g.units,
       })),
   ];
-  // allowedWritePaths per shard: union of member predictedWrites (parallel
-  // shards carry only in-scope paths; the core shard may additionally carry
-  // recorded scope exceptions).
+  // allowedWritePaths per shard: parallel shards carry the union of member
+  // predictedWrites only; SERIAL lanes carry the WHOLE serial column's union
+  // (a chained batch legitimately revisits column paths — e.g. a generated
+  // docs glob two batches apart) plus the column's recorded scope exceptions.
+  // estimatedSize stays the lane's OWN load (the per-lane work truth).
+  const columnUnits = serial.slice();
+  const columnWrites = [...new Set(columnUnits.flatMap(writesFor))].sort();
+  const columnExceptions = [...new Set(columnUnits.flatMap((u) => u.outOfScopeWrites))].sort();
   for (const s of shards) {
+    if (s.mode === 'serial') {
+      s.allowedWritePaths = [...columnWrites, ...columnExceptions].sort();
+      s.estimatedSize = s.units
+        .map((uid) => unitLoad(open.find((x) => x.id === uid)))
+        .reduce((acc, n) => n + acc, 0);
+      continue;
+    }
     const writes = new Set();
     for (const uid of s.units) {
       const u = open.find((x) => x.id === uid);
       for (const p of writesFor(u)) writes.add(p);
-      if (s.mode === 'serial') for (const p of u.outOfScopeWrites) writes.add(p);
     }
     s.allowedWritePaths = [...writes].sort();
     s.estimatedSize = s.units

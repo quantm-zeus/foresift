@@ -28,6 +28,7 @@ import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { repoRoot, loadCurrentMilestone, validateMilestoneState, findPackage } from './schema.mjs';
 import { classifyOwnedPath } from './path-ownership.mjs';
+import { resolveTaskMetadata, isCoordinatorTask } from './task-metadata.mjs';
 import {
   implementationEngineForProfile,
   resolveExecutionProfile,
@@ -92,12 +93,19 @@ for (const line of lines) {
     flush();
     const idTok = m[2].split(/\s+/).find((t) => UNIT_ID.test(t));
     if (!idTok) continue; // non-numbered checkbox: not a schedulable unit
+    // Explicit executor/kind metadata (H3 P0-5): [executor: X] / [kind: Y]
+    // markers parsed and validated fail-closed — an UNKNOWN executor value is
+    // a hard error here, never a silent writer dispatch. Legacy plans without
+    // markers default to PRODUCT/IMPLEMENTATION.
+    const metadata = resolveTaskMetadata(m[2]);
     cur = {
       id: idTok,
       done: m[1] === 'x',
       parallelizable: /\[P\]/.test(m[2]),
       phase: heading,
       body: m[2],
+      executor: metadata.executor,
+      kind: metadata.kind,
     };
     continue;
   }
@@ -190,6 +198,13 @@ for (const u of units)
 for (const u of units) u.dependsOn.sort();
 
 const open = units.filter((u) => !u.done);
+// Zero-AI coordinator tasks are NEVER writer-assignable: they are excluded
+// from every shard and every test lane at graph build time (the wave
+// coordinator executes them mechanically post-integration; P0-5). The
+// explicit [executor: COORDINATOR] marker replaced the old body-string
+// manifest-path matcher — unknown executor values already failed closed
+// above at parse time.
+const coordinatorOpenIds = new Set(open.filter(isCoordinatorTask).map((u) => u.id));
 
 // ── central migration registry duty (fail-closed, pre-writer cost) ───────────
 // packages/persistence/test/migrator.spec.ts asserts EXACTLY the full G0
@@ -223,7 +238,9 @@ const CENTRAL_MIGRATION_SUITE = 'packages/persistence/test/migrator.spec.ts';
 // ── shard planning ────────────────────────────────────────────────────────────
 let shards = null;
 if (args.planShards !== undefined) {
-  const productOpen = args.executionProfile ? open.filter((u) => u.productWork) : open;
+  const productOpen = args.executionProfile
+    ? open.filter((u) => u.productWork && !isCoordinatorTask(u))
+    : open.filter((u) => !isCoordinatorTask(u));
   // Units whose predicted writes leave binding writeScopes are demoted to the
   // serial core shard; their paths are recorded as explicit scope exceptions.
   const scopeDemoted = productOpen.filter((u) => u.outOfScopeWrites.length > 0);
@@ -327,10 +344,11 @@ if (executionProfile && shards) {
 const testUnits = executionProfile
   ? open.filter(
       (u) =>
-        u.testWrites.length > 0 ||
-        u.testRefs.length > 0 ||
-        u.acceptanceCriteria.length > 0 ||
-        /\b(?:test|regression|fixture|fuzz|property)\b/i.test(u.body),
+        !isCoordinatorTask(u) &&
+        (u.testWrites.length > 0 ||
+          u.testRefs.length > 0 ||
+          u.acceptanceCriteria.length > 0 ||
+          /\b(?:test|regression|fixture|fuzz|property)\b/i.test(u.body)),
     )
   : [];
 const testLanes = testUnits.length
@@ -363,8 +381,13 @@ const graph = {
     done: units.filter((u) => u.done).length,
     open: open.length,
     openParallelizable: open.filter((u) => u.parallelizable).length,
+    openCoordinator: coordinatorOpenIds.size,
   },
   units,
+  // Explicit zero-AI coordinator duty list (P0-5): the wave coordinator
+  // executes these mechanically post-integration (manifest regen, coverage
+  // assertion, bookkeeping commits) — never an AI writer.
+  coordinatorUnits: [...coordinatorOpenIds].sort(),
   ...(executionProfile
     ? {
         executionProfile,

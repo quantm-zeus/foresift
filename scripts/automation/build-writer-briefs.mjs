@@ -12,6 +12,7 @@ import { readFileSync, mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { repoRoot } from './schema.mjs';
+import { isCoordinatorTask } from './task-metadata.mjs';
 
 function fail(msg) {
   console.error(`writer-briefs: ${msg}`);
@@ -55,15 +56,15 @@ mkdirSync(args.out, { recursive: true });
 const written = [];
 for (const shard of [...(graph.shards ?? []), ...(graph.testLanes ?? [])]) {
   const allUnits = shard.units.map((uid) => graph.units.find((u) => u.id === uid)).filter(Boolean);
-  // Mechanical bookkeeping units (their body names the coordinator test
-  // manifest) are executed as a zero-AI wave-prep step on the canonical
-  // branch and are EXCLUDED from every writer brief — the AGY product
-  // ownership guard legally refuses any writer that touches
+  // Coordinator tasks (explicit [executor: COORDINATOR] metadata — H3 P0-5)
+  // are zero-AI mechanical bookkeeping executed by the wave coordinator
+  // post-integration and are EXCLUDED from every writer brief — the AGY
+  // product ownership guard legally refuses any writer that touches
   // evidence/bun-migration/ (observed live 2026-08-29/30, runs 9cf2bf57 and
   // 0b4838ae). If such a unit is still open, the brief says so explicitly
-  // instead of handing the writer an unwritable task.
-  const isMechanicalBookkeeping = (u) =>
-    (u.body ?? '').includes('evidence/bun-migration/bun-migration-manifest.json');
+  // instead of handing the writer an unwritable task. The body-string
+  // manifest-path matcher this replaces was the last string-classified duty.
+  const isMechanicalBookkeeping = (u) => isCoordinatorTask(u);
   const units = allUnits.filter((u) => !isMechanicalBookkeeping(u));
   const skippedMechanical = allUnits.filter(isMechanicalBookkeeping).map((u) => u.id);
   const reqs = [...new Set(units.flatMap((u) => u.requirements))].sort();

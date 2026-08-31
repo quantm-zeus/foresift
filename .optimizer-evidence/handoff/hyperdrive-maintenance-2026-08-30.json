@@ -1,6 +1,6 @@
 {
   "schema": "foresift/maintenance-handoff@1",
-  "capturedAt": "2026-08-30T22:05:00Z",
+  "capturedAt": "2026-08-31T02:20:00Z",
   "mainSha": "f09ddb607d931d3b771b2d736f60fd3bd23c55f7",
   "milestone": "G0",
   "packages": {
@@ -17,46 +17,63 @@
       "runId": "8e2bf2578e3820b793e40b1d1b0a7081",
       "executionProfile": "HYBRID_AGY",
       "state": "wave completed; landing in progress via mechanical lander",
-      "landingBranch": "foresift/g0-mcp-surface @ 4f0cb4f (4e0bed3 wave integration + mechanical prettier commit)",
-      "landingWorktree": "/home/minhquan_eth/foresift-mcp-land"
+      "landingBranch": "foresift/g0-mcp-surface @ 629d69e (wave integration 4e0bed3 + prettier 4f0cb4f + lint 54287c5 + audit-vocab 011f654 + admission-pipeline-restore 629d69e)",
+      "landingWorktree": "/home/minhquan_eth/foresift-mcp-land",
+      "landingTreeFullCoordinatorTest": "GREEN (b7z1a6o6s predecessor run: {ok:true}, 335 files, 0 fail)",
+      "previousLanderAttempt": "22:39Z FULL gate RED TESTS category on stale worktree state; superseded — do NOT reuse that full-gate-result.json"
     },
     "pending": ["g0-traceability-conformance"]
   },
   "openMaintenancePr": {
     "number": 124,
     "branch": "perf/h2-writer-permit-wiring",
-    "headSha": "886cf5036200ce858416ee1ea0acfd7f85a55c19",
-    "ci": "ALL GREEN (run 33336225900): Fast Gates, Pure, Process&Meta, PGlite, Verify — Process/Meta timeout ROOT-CAUSED (GNU /usr/bin/time -v wrapper corrupts bun 1.4.0 under coordinator concurrency; reproduced 2/6-7/8 locally; wrapper removed, evidence fields null, containment timeout kept)",
+    "headSha": "19227e527779c7253520a1ca34fb3a295e3b41a0",
+    "ci": "run 33349708756 pending at push time (19227e5); previous head 886cf50 was ALL GREEN",
+    "review": {
+      "agent": "independent general-purpose review of f09ddb6..886cf50 (completed)",
+      "criticalsFixed": [
+        "C1: exec-claude-writer completed:[] always-empty — Claude nodes now pass --task-ids from routing.json; writer claims them on diff",
+        "C2: run-level admission reservations double-counted lane permits — admitPackageLaunch now probes Claude (no hold), keeps codex reservation only for CODEX_AGY",
+        "C3: EXHAUSTED/RESET_WAIT permanent latch — acquirePermitLocked self-heals past resetAt + bounded 2h latch TTL for parse-less EXHAUSTED"
+      ],
+      "importantsFixed": [
+        "I4: autopilot tick runs reconcileLaneHolders each cycle + journals lane_holders_reconciled",
+        "I5: alreadyHeld re-binds pid/runId/at under lock (retry relaunch keeps live attempt identity)",
+        "I6: codex-repair permit now precedes git worktree add; released on worktree-add failure",
+        "I7: codex/agy/repair writers pass packageId/generation/laneId/runId identity opts (FORESIFT_RUN_ID env or --run-id)"
+      ],
+      "minorsFixed": "shared validateGeneration in claude writer, normalized generation in holders, anchored pressure regexes both engines, HOME-less resolvePoolStateDir throws, legacy NUL-key holders fail-closed unknown, holderRegistryView doc",
+      "notFixed": "13 (detached/group-kill spawnSync in writers) — robustness-only, deferred to H2 P1 backlog"
+    },
     "pendingSteps": [
-      "independent code review of f09ddb6..886cf50 running",
-      "fix any Critical/Important findings",
-      "merge with gh pr merge 124 --squash --delete-branch --match-head-commit <exact green head>",
-      "verify merged-main CI green"
+      "wait for PR 124 CI green at 19227e5 (monitor task b9qaljlb1)",
+      "merge: gh pr merge 124 --squash --delete-branch --match-head-commit 19227e527779c7253520a1ca34fb3a295e3b41a0",
+      "verify merged-main CI green, git fetch origin --prune"
     ]
   },
   "autopilot": {
     "service": "foresift-autopilot.service active (PID 196166) — EXACTLY ONE supervisor",
-    "recoveredAt": "2026-08-30T21:35Z via --recover-fatal (stop service → recover → start)",
-    "previousFatal": "run ee60c4b2 exhausted SIGTERM-recovery after its AGY test-author node failed 3x (agy ran 16m then exited nonzero, no artifacts; transient provider pressure — agy healthy on probe 21:31Z)"
+    "state": "paused_fatal: landing pending for run 8e2bf257 (expected — lander runs supervised by maintainer, not autopilot)",
+    "note": "after g0-mcp-surface landing PR merges: systemctl --user stop foresift-autopilot; node scripts/automation/foresift-autopilot.mjs --recover-fatal; systemctl --user start foresift-autopilot. Fresh continuation re-enters admission gate; already-landed short-circuit records PROVEN. G0 becomes 7/8."
   },
   "providerPoolState": {
-    "holdersFile": "~/.local/state/foresift/provider-pools.holders.json",
-    "note": "PR #124 adds atomic acquireLanePermit, durable holder records (pid+runId), reconcileLaneHolders (fail-closed UNKNOWN), holderRegistryView, Claude lane permits via exec-claude-writer.mjs, Codex repair permits"
+    "holdersFile": "~/.local/state/foresift/provider-pools.holders.json (currently {} — clean)",
+    "poolsFile": "~/.local/state/foresift/provider-pools.json (claude limit 3, codex limit 1 HEALTHY, agy 3 — all active 0)",
+    "note": "19227e5 adds: admission lane-permit decoupling (lanes own runtime counts), quota self-heal, tick reconciliation, retry re-bind, repair permit-before-worktree, writer identity opts, anchored pressure regexes"
   },
   "lastCompletedActions": [
-    "PR #124 CI green at 886cf50 (Process/Meta root cause fixed + all P0 review findings)",
-    "g0-mcp-surface recovered from paused_fatal to active run 8e2bf257",
-    "run 8e2bf257 wave completed (test-author 6m1s, guards green); landing refused FORMAT-only",
-    "mechanical prettier fix committed on foresift/g0-mcp-surface (4f0cb4f); lander running",
-    "landing branch advanced: 54287c5 (lint dead-symbols), 011f654 (audit vocab §35.9 alignment), 629d69e (admission pipeline construction restored)",
-    "mechanical lander (package-final-land.mjs) driven from /home/minhquan_eth/foresift-mcp-land — the worktree holding foresift/g0-mcp-surface, which ALSO makes the autopilot tick lander (findWorktreeHoldingBranch) pick the right tree"
+    "PR #124 pushed at 19227e5 with ALL review findings (3 Critical + 4 Important + minors) fixed; CI run 33349708756 launched",
+    "independent review agent returned 3C+4I+7minor verdict; every Critical/Important fixed with regression tests",
+    "local full coordinator test re-running on new HEAD (monitor bacqibuyh)",
+    "landing tree (629d69e) full coordinator test GREEN earlier; lander re-run pending after #124 merges (base-drift guard requires landing branch to contain new main)",
+    "NOTE: landing branch 629d69e contains f09ddb6 but NOT PR #124 content — after #124 merges, merge origin/main into foresift/g0-mcp-surface in the landing worktree before re-running the lander (the only overlapping file is evidence/bun-migration/bun-migration-manifest.json; landing has 16 additional MIGRATED entries + PR124 adds 2 test files + flips 50 VERIFIED→MIGRATED carryover; regenerate with --previous after merge)"
   ],
   "nextSafeActions": [
-    "await full coordinator test in landing tree (task b9hydwjqq) then lander run — fix any remaining TESTS category failures mechanically or via AGY repair",
-    "merge PR #124 FIRST (green at 886cf50), then git fetch; landing branch contains f09ddb6 so re-merge main if base-drift after #124",
-    "after landing PR merges: autopilot is paused_fatal 'landing pending' — run --recover-fatal (fresh continuation discovers completed units from disk; landing short-circuit records PROVEN)",
-    "then continue H2 P1: post-integration manifest duty, coordinator task metadata, exact-write preflight"
+    "merge PR 124 when CI green (exact-head 19227e5), verify merged-main CI",
+    "cd /home/minhquan_eth/foresift-mcp-land && git merge origin/main (resolve manifest via bun-migration-manifest.mjs --previous regen) && re-run package-final-land.mjs with same artifacts-dir",
+    "after landing PR merges: autopilot --recover-fatal cycle (see autopilot.note) → G0 7/8 PROVEN",
+    "then H2 P1 backlog: post-integration manifest duty ordering, coordinator task metadata, exact-write preflight, exact-lease scheduling, shared-surface lane, global ready queue/work stealing, resource governor"
   ],
   "blockers": [],
-  "resourceState": "15GiB RAM, 13Gi free; disk 84G free — GREEN"
+  "resourceState": "15GiB RAM ~12Gi free; disk 84G free — GREEN"
 }

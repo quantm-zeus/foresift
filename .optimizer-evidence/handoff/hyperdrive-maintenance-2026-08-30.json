@@ -54,7 +54,18 @@
   "autopilot": {
     "service": "foresift-autopilot.service active (PID 196166) — EXACTLY ONE supervisor",
     "state": "paused_fatal: landing pending for run 8e2bf257 (expected — lander runs supervised by maintainer, not autopilot)",
-    "note": "after g0-mcp-surface landing PR merges: systemctl --user stop foresift-autopilot; node scripts/automation/foresift-autopilot.mjs --recover-fatal; systemctl --user start foresift-autopilot. Fresh continuation re-enters admission gate; already-landed short-circuit records PROVEN. G0 becomes 7/8."
+    "note": "after g0-mcp-surface landing PR merges: systemctl --user stop foresift-autopilot; node scripts/automation/foresift-autopilot.mjs --recover-fatal; systemctl --user start foresift-autopilot. Fresh continuation re-enters admission gate; already-landed short-circuit records PROVEN. G0 becomes 7/8.",
+    "g0Resolution": {
+      "at": "2026-08-31T04:45:39Z",
+      "outcome": "G0 = 7/8 PROVEN — g0-mcp-surface PROVEN (PR #125 merge 4186f5d, state PR #126 merged d7f8f02)",
+      "sequence": [
+        "recover-fatal round 2 (501712ec) wave-land refused base-drift again (main had moved to d7f8f02 = state PR #126 mid-flight); run completed",
+        "supervisor recorded package_proven for g0-mcp-surface (PR #125) — the milestone state chore itself had landed via PR #126",
+        "residual tracked fatal pause (RUNNING-orphan conversion of completed run 501712ec) retired via --clear-fatal (orphan guard passed: package already PROVEN, not RUNNING)",
+        "service restarted clean: pausedFatal null, activeRuns 0 → selection immediately launched g0-traceability-conformance planning (run 8122d6ae, foresift-package-planning-bootstrap, HYBRID_AGY)"
+      ],
+      "g0Status": "7 PROVEN (contracts-data-truth, security-perimeter, tool-core, provider-lifecycle, cost-capacity, first-party-observation, mcp-surface) / 1 PENDING (traceability-conformance — planning now running)"
+    }
   },
   "providerPoolState": {
     "holdersFile": "~/.local/state/foresift/provider-pools.holders.json (currently {} — clean)",

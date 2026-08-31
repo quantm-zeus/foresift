@@ -539,6 +539,10 @@ describe('foresift-sharded-wave workflow contract', () => {
         /retry:\s*\{\s*max_attempts:\s*2,\s*delay_ms:\s*10000,\s*on_error:\s*all\s*\}/,
       );
       expect(codex?.[0]).toContain(`exec-codex-writer.mjs --lane ${lane}`);
+      // H3 (2026-08-31): lanes get a 55m provider timeout inside the 60m node
+      // budget — the silent 45m claude-lane-core default killed a HIGH-risk
+      // core lane mid-implementation (run c38c2e1b) and lost all its work.
+      expect(codex?.[0]).toContain('--timeout-ms 3300000');
       expect(codex?.[0]).toContain(`--brief "$ARTIFACTS_DIR/briefs/${lane}-brief.md"`);
       expect(codex?.[0]).toContain(`--worktree "$ARTIFACTS_DIR/wt/${lane}"`);
       expect(codex?.[0]).toContain(`--routing "$ARTIFACTS_DIR/routing.json"`);
@@ -559,7 +563,9 @@ describe('foresift-sharded-wave workflow contract', () => {
       expect(claude?.[0]).toMatch(
         /retry:\s*\{\s*max_attempts:\s*2,\s*delay_ms:\s*10000,\s*on_error:\s*all\s*\}/,
       );
-      expect(claude?.[0]).toContain(`exec-claude-writer.mjs \\\n        --lane ${lane}`);
+      expect(claude?.[0]).toContain(
+        `exec-claude-writer.mjs \\\n        --timeout-ms 3300000 \\\n        --lane ${lane}`,
+      );
       expect(claude?.[0]).toContain(`--brief "$ARTIFACTS_DIR/briefs/${lane}-brief.md"`);
       expect(claude?.[0]).toContain(`--worktree "$ARTIFACTS_DIR/wt/${lane}"`);
       expect(claude?.[0]).toContain(`--results-dir "$ARTIFACTS_DIR/writer-results/${lane}"`);

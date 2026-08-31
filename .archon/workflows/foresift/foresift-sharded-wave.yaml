@@ -187,6 +187,7 @@ nodes:
     timeout: 3600000
     bash: |
       node scripts/automation/exec-codex-writer.mjs --lane core \
+        --timeout-ms 3300000 \
         --brief "$ARTIFACTS_DIR/briefs/core-brief.md" \
         --worktree "$ARTIFACTS_DIR/wt/core" \
         --routing "$ARTIFACTS_DIR/routing.json" \
@@ -200,6 +201,7 @@ nodes:
     timeout: 3600000
     bash: |
       node scripts/automation/exec-codex-writer.mjs --lane shard-1 \
+        --timeout-ms 3300000 \
         --brief "$ARTIFACTS_DIR/briefs/shard-1-brief.md" \
         --worktree "$ARTIFACTS_DIR/wt/shard-1" \
         --routing "$ARTIFACTS_DIR/routing.json" \
@@ -213,6 +215,7 @@ nodes:
     timeout: 3600000
     bash: |
       node scripts/automation/exec-codex-writer.mjs --lane shard-2 \
+        --timeout-ms 3300000 \
         --brief "$ARTIFACTS_DIR/briefs/shard-2-brief.md" \
         --worktree "$ARTIFACTS_DIR/wt/shard-2" \
         --routing "$ARTIFACTS_DIR/routing.json" \
@@ -228,6 +231,7 @@ nodes:
     bash: |
       TASKS="$(node -e 'const r=require(process.argv[1]);process.stdout.write(((r.lanes??[]).find(l=>l.lane==="core")?.taskIds??[]).join(","))' "$ARTIFACTS_DIR/routing.json")"
       node scripts/automation/exec-claude-writer.mjs \
+        --timeout-ms 3300000 \
         --lane core \
         --brief "$ARTIFACTS_DIR/briefs/core-brief.md" \
         --worktree "$ARTIFACTS_DIR/wt/core" \
@@ -243,6 +247,7 @@ nodes:
     bash: |
       TASKS="$(node -e 'const r=require(process.argv[1]);process.stdout.write(((r.lanes??[]).find(l=>l.lane==="shard-1")?.taskIds??[]).join(","))' "$ARTIFACTS_DIR/routing.json")"
       node scripts/automation/exec-claude-writer.mjs \
+        --timeout-ms 3300000 \
         --lane shard-1 \
         --brief "$ARTIFACTS_DIR/briefs/shard-1-brief.md" \
         --worktree "$ARTIFACTS_DIR/wt/shard-1" \
@@ -258,6 +263,7 @@ nodes:
     bash: |
       TASKS="$(node -e 'const r=require(process.argv[1]);process.stdout.write(((r.lanes??[]).find(l=>l.lane==="shard-2")?.taskIds??[]).join(","))' "$ARTIFACTS_DIR/routing.json")"
       node scripts/automation/exec-claude-writer.mjs \
+        --timeout-ms 3300000 \
         --lane shard-2 \
         --brief "$ARTIFACTS_DIR/briefs/shard-2-brief.md" \
         --worktree "$ARTIFACTS_DIR/wt/shard-2" \

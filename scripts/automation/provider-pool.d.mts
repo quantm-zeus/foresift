@@ -1,5 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 export const PROVIDER_POOL_SCHEMA: string;
+export const CODEX_EXHAUSTED_LATCH_TTL_MS: number;
 export declare const CODEX_QUOTA_STATES: readonly string[];
 export declare function createProviderPools(policy?: Record<string, unknown>): Record<string, any>;
 export declare function acquirePermit(

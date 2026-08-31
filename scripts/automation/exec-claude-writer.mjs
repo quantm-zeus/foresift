@@ -18,6 +18,7 @@ import {
   observeClaudeOutcome,
   resolvePoolStateDir,
 } from './provider-pool.mjs';
+import { validateGeneration } from './exec-codex-writer.mjs';
 
 function fail(message, code = 1) {
   console.error(`claude-writer: ${message}`);
@@ -41,7 +42,11 @@ export function claudeProviderEvent(classification, detail) {
   if (classification === 'SUCCESS') return { healthy: true };
   const text = detail ?? '';
   const retryAfter = /retry[- ]after\D{0,20}(\d{1,5})\s*(s|sec|seconds)?/i.exec(text);
-  if (/429|rate.?limit|overloaded|529/i.test(text)) {
+  // Anchored pressure match (review finding 12): a bare "429" anywhere in a
+  // model transcript (diff hunk numbers, echoed logs) must not halve the AIMD
+  // limit — require provider-shaped tokens: HTTP status framing or the named
+  // pressure words.
+  if (/\b(?:HTTP\s*)?429\b|rate.?limit|overloaded|\b529\b|service unavailable/i.test(text)) {
     const seconds = retryAfter ? Number(retryAfter[1]) : null;
     return {
       healthy: false,
@@ -55,14 +60,10 @@ export function runClaudeWriter(input) {
   for (const field of ['lane', 'brief', 'worktree', 'results-dir'])
     if (!input[field]) throw new Error(`CLAUDE_WRITER_ARGUMENT_MISSING: ${field}`);
   // Lane-permit identity (H2 §2): fail closed on missing identity, accept
-  // generation 0 (integer >= 0 — never a falsy-zero rejection).
+  // generation 0 (integer >= 0 — never a falsy-zero rejection). Shared
+  // validator with the Codex/AGY writers (review finding 11 — no drift).
   if (!input.package) throw new Error('CLAUDE_WRITER_ARGUMENT_MISSING: package/generation');
-  if (
-    typeof input.generation !== 'string' ||
-    !/^\d+$/.test(input.generation.trim()) ||
-    !Number.isSafeInteger(Number(input.generation))
-  )
-    throw new Error(`CLAUDE_WRITER_INVALID_GENERATION: ${String(input.generation)}`);
+  const generation = validateGeneration(input.generation ?? '');
   const resultDir = input['results-dir'];
   mkdirSync(resultDir, { recursive: true });
   const brief = readFileSync(input.brief, 'utf8');
@@ -79,13 +80,14 @@ export function runClaudeWriter(input) {
   ].join('\n');
   const started = Date.now();
   const stateDir = resolvePoolStateDir();
-  const holder = `${input.package}:${Number(input.generation)}:${input.lane}`;
+  const holder = `${input.package}:${generation}:${input.lane}`;
   // Acquire immediately BEFORE the provider invocation (H2 §2). On refusal
   // the provider is NOT dispatched; the refusal is recorded verbatim.
   const permit = acquireLanePermit(stateDir, holder, 'claude', {
     packageId: input.package,
-    generation: Number(input.generation),
+    generation,
     laneId: input.lane,
+    runId: input['run-id'] ?? process.env.FORESIFT_RUN_ID ?? null,
   });
   if (!permit.ok) {
     writeFileSync(
@@ -131,14 +133,16 @@ export function runClaudeWriter(input) {
     releaseLanePermit(stateDir, holder, 'claude');
   }
   const detail = `${run?.stderr ?? ''}\n${run?.stdout ?? ''}`;
+  // Single canonical mapping (review finding 12): the anchored pressure regex
+  // in claudeProviderEvent decides TRANSIENT vs SEMANTIC — no second copy.
   const classification =
     run?.error?.code === 'ETIMEDOUT'
       ? 'TIMEOUT'
       : run?.status === 0
         ? 'SUCCESS'
-        : /429|rate.?limit|overloaded|529/i.test(detail)
-          ? 'TRANSIENT_PROVIDER_FAILURE'
-          : 'SEMANTIC_OR_PROVIDER_FAILURE';
+        : claudeProviderEvent('PROBE', detail).healthy
+          ? 'SEMANTIC_OR_PROVIDER_FAILURE'
+          : 'TRANSIENT_PROVIDER_FAILURE';
   // Engine-specific attribution (H2 §5/§6): feed ONLY the Claude pool.
   try {
     observeClaudeOutcome(stateDir, claudeProviderEvent(classification, detail));
@@ -200,7 +204,10 @@ export function runClaudeWriter(input) {
     shardId: input.lane,
     role: 'implementation',
     engine: 'CLAUDE',
-    completed: head === before ? [] : [],
+    // Claimed units (review finding 1): integration rejects a lane claiming
+    // zero completed units, so a productive Claude lane must carry its task
+    // ids. Empty when the lane produced no diff — never fabricated.
+    completed: head === before ? [] : (input['task-ids'] ?? '').split(',').filter(Boolean),
     branch: git(['branch', '--show-current'], input.worktree).stdout.trim(),
     headSha: head,
     testsRun: [],

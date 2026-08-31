@@ -226,11 +226,13 @@ nodes:
     retry: { max_attempts: 2, delay_ms: 10000, on_error: all }
     timeout: 3600000
     bash: |
+      TASKS="$(node -e 'const r=require(process.argv[1]);process.stdout.write(((r.lanes??[]).find(l=>l.lane==="core")?.taskIds??[]).join(","))' "$ARTIFACTS_DIR/routing.json")"
       node scripts/automation/exec-claude-writer.mjs \
         --lane core \
         --brief "$ARTIFACTS_DIR/briefs/core-brief.md" \
         --worktree "$ARTIFACTS_DIR/wt/core" \
         --results-dir "$ARTIFACTS_DIR/writer-results/core" \
+        --task-ids "$TASKS" \
         --package "${ARGUMENTS%%@g*}" \
         --generation "$(case "$ARGUMENTS" in *@g*) echo "${ARGUMENTS##*@g}";; *) echo 0;; esac)"
   - id: writer-shard-1-claude
@@ -239,11 +241,13 @@ nodes:
     retry: { max_attempts: 2, delay_ms: 10000, on_error: all }
     timeout: 3600000
     bash: |
+      TASKS="$(node -e 'const r=require(process.argv[1]);process.stdout.write(((r.lanes??[]).find(l=>l.lane==="shard-1")?.taskIds??[]).join(","))' "$ARTIFACTS_DIR/routing.json")"
       node scripts/automation/exec-claude-writer.mjs \
         --lane shard-1 \
         --brief "$ARTIFACTS_DIR/briefs/shard-1-brief.md" \
         --worktree "$ARTIFACTS_DIR/wt/shard-1" \
         --results-dir "$ARTIFACTS_DIR/writer-results/shard-1" \
+        --task-ids "$TASKS" \
         --package "${ARGUMENTS%%@g*}" \
         --generation "$(case "$ARGUMENTS" in *@g*) echo "${ARGUMENTS##*@g}";; *) echo 0;; esac)"
   - id: writer-shard-2-claude
@@ -252,11 +256,13 @@ nodes:
     retry: { max_attempts: 2, delay_ms: 10000, on_error: all }
     timeout: 3600000
     bash: |
+      TASKS="$(node -e 'const r=require(process.argv[1]);process.stdout.write(((r.lanes??[]).find(l=>l.lane==="shard-2")?.taskIds??[]).join(","))' "$ARTIFACTS_DIR/routing.json")"
       node scripts/automation/exec-claude-writer.mjs \
         --lane shard-2 \
         --brief "$ARTIFACTS_DIR/briefs/shard-2-brief.md" \
         --worktree "$ARTIFACTS_DIR/wt/shard-2" \
         --results-dir "$ARTIFACTS_DIR/writer-results/shard-2" \
+        --task-ids "$TASKS" \
         --package "${ARGUMENTS%%@g*}" \
         --generation "$(case "$ARGUMENTS" in *@g*) echo "${ARGUMENTS##*@g}";; *) echo 0;; esac)"
 

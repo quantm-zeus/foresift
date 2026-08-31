@@ -31,6 +31,12 @@ import {
 import { dirname, join } from 'node:path';
 
 export const PROVIDER_POOL_SCHEMA = 'foresift/provider-pool@1';
+// Review finding 3: bounded latch for a parse-less EXHAUSTED observation. One
+// heuristic "quota" match (no parseable reset time) may suppress Codex for at
+// most this long — after it, the next acquire self-heals to HEALTHY and the
+// provider truth is re-observed. 2 h covers observed daily-wall probe cycles
+// without holding a false positive across a whole workday.
+export const CODEX_EXHAUSTED_LATCH_TTL_MS = 2 * 60 * 60_000;
 
 export const CODEX_QUOTA_STATES = Object.freeze([
   'HEALTHY',
@@ -205,6 +211,26 @@ function acquirePermitLocked(stateDir, provider, { now = Date.now() } = {}) {
   invariant(['claude', 'codex', 'agy'].includes(provider), 'UNKNOWN_PROVIDER', provider);
   const pools = loadPools(stateDir);
   const pool = pools[provider];
+  // Time-based quota self-heal (review finding 3): EXHAUSTED/RESET_WAIT must
+  // never be a permanent latch. A reset time that has passed recovers to
+  // HEALTHY inside the same acquire; a false-positive EXHAUSTED (no parseable
+  // reset) decays after a bounded latch TTL so one heuristic "quota" match
+  // cannot take Codex offline forever. Both recover to UNKNOWN-grade HEALTHY —
+  // the next real outcome re-observes the truth.
+  if (provider === 'codex' && pool.quotaState === 'RESET_WAIT') {
+    if (pool.resetAt && pool.resetAt <= now) {
+      pool.quotaState = 'HEALTHY';
+      pool.quotaStateSince = now;
+      pool.resetAt = null;
+    }
+  } else if (provider === 'codex' && pool.quotaState === 'EXHAUSTED') {
+    const latchedMs = now - (pool.quotaStateSince ?? now);
+    if (latchedMs >= CODEX_EXHAUSTED_LATCH_TTL_MS) {
+      pool.quotaState = 'HEALTHY';
+      pool.quotaStateSince = now;
+      pool.resetAt = null;
+    }
+  }
   if (provider === 'codex' && ['EXHAUSTED', 'RESET_WAIT'].includes(pool.quotaState)) {
     savePools(stateDir, pools);
     const waitMs = pool.resetAt ? Math.max(0, pool.resetAt - now) : 60 * 60_000;
@@ -383,7 +409,27 @@ export function acquireLanePermit(stateDir, holder, provider, opts = {}) {
   return withPoolLock(stateDir, () => {
     const key = holderKey(provider, holder);
     const holders = loadHolders(stateDir);
-    if (holders[key]) return { ok: true, alreadyHeld: true, waitMs: 0, holder };
+    if (holders[key]) {
+      // Retry re-bind (review finding 5): an archon retry relaunches the node
+      // as a NEW process with the SAME holder string. The registration must
+      // track the live attempt's identity, or reconciliation would later
+      // prove attempt-1's dead pid and free the permit under attempt-2's
+      // running provider. Refresh under the same lock — still one transaction,
+      // still no double-increment (the pool.active increment is NOT repeated).
+      const prior = holders[key];
+      holders[key] = {
+        ...prior,
+        at: new Date().toISOString(),
+        pid: Number.isInteger(opts.pid) ? opts.pid : process.pid,
+        runId: opts.runId ?? prior.runId ?? null,
+        packageId: opts.packageId ?? prior.packageId ?? null,
+        generation: opts.generation ?? prior.generation ?? null,
+        laneId: opts.laneId ?? prior.laneId ?? null,
+        rebinds: (prior.rebinds ?? 0) + 1,
+      };
+      saveHolders(stateDir, holders);
+      return { ok: true, alreadyHeld: true, waitMs: 0, holder };
+    }
     const r = acquirePermitLocked(stateDir, provider, opts);
     if (!r.ok) return r;
     holders[key] = {
@@ -446,6 +492,14 @@ export function reconcileLaneHolders(stateDir, liveProofFn = null) {
     const unknown = [];
     const proof = liveProofFn ?? ((record) => (record?.pid ? pidAlive(record.pid) : null));
     for (const [key, record] of Object.entries(holders)) {
+      // Legacy-shape guard (review finding 10): NUL-keyed records from the
+      // pre-886cf50 build carry no pid and a key the provider fallback cannot
+      // parse — releasing them mid-loop after a save would abort with registry
+      // and pool drift. They are fail-closed UNKNOWN, never touched here.
+      if (typeof key !== 'string' || !key.includes(' ') || record?.provider == null) {
+        unknown.push(key);
+        continue;
+      }
       let verdict;
       try {
         verdict = proof(record, key);
@@ -457,8 +511,7 @@ export function reconcileLaneHolders(stateDir, liveProofFn = null) {
       } else if (verdict === false) {
         delete holders[key];
         saveHolders(stateDir, holders);
-        const provider = record?.provider ?? key.split(' ')[0];
-        releasePermitLocked(stateDir, provider);
+        releasePermitLocked(stateDir, record.provider);
         saveHolders(stateDir, holders);
         released.push(key);
       } else {
@@ -470,9 +523,10 @@ export function reconcileLaneHolders(stateDir, liveProofFn = null) {
 }
 
 /**
- * Read-only holder registry view for supervisors/incidents: holder records
- * plus the admission view, so an operator can see WHO holds capacity and
- * WHAT staleness reconciliation would decide without mutating anything.
+ * Read-only holder registry view for supervisors/incidents: the durable
+ * holder records plus a computed liveness verdict (true/false/null), so an
+ * operator can see WHO holds capacity and what staleness reconciliation
+ * would decide — without mutating anything.
  */
 export function holderRegistryView(stateDir, liveProofFn = null) {
   return withPoolLock(stateDir, () => {
@@ -497,11 +551,22 @@ export function holderRegistryView(stateDir, liveProofFn = null) {
  * as independent lane processes outside the supervisor, so they must land on
  * the SAME durable pools file the supervisor's admission gate mutates.
  * FORESIFT_PROVIDER_POOL_STATE_DIR > FORESIFT_AUTOPILOT_STATE_DIR > XDG default.
+ * Review finding 9: a HOME-less environment must fail loudly here rather than
+ * silently resolve a CWD-relative `.local/state/foresift` that splits writers
+ * and the supervisor onto two different pool files.
  */
 export function resolvePoolStateDir(env = process.env) {
-  return (
+  const resolved =
     env.FORESIFT_PROVIDER_POOL_STATE_DIR ??
     env.FORESIFT_AUTOPILOT_STATE_DIR ??
-    join(env.HOME ?? '', '.local', 'state', 'foresift')
-  );
+    (env.HOME ? join(env.HOME, '.local', 'state', 'foresift') : null);
+  if (!resolved) {
+    // Review finding 9: a HOME-less environment must fail loudly instead of
+    // silently resolving a CWD-relative `.local/state/foresift` that would
+    // split writers and the supervisor onto two different pool files.
+    throw new Error(
+      'PROVIDER_POOL_STATE_DIR_UNRESOLVABLE: set FORESIFT_PROVIDER_POOL_STATE_DIR or HOME',
+    );
+  }
+  return resolved;
 }

@@ -5,7 +5,7 @@ import { basename, join } from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { buildCodexExecArgs, CODEX_SERVICE_TIER, escalateCodexRoute } from './codex-routing.mjs';
 import { validateLaneOwnership } from './path-ownership.mjs';
-import { codexProviderEvent } from './exec-codex-writer.mjs';
+import { codexProviderEvent, validateGeneration } from './exec-codex-writer.mjs';
 import {
   acquireLanePermit,
   releaseLanePermit,
@@ -79,13 +79,30 @@ export function runCodexRepair(input) {
   if (route.serviceTier !== CODEX_SERVICE_TIER) throw new Error('INVALID_CODEX_SERVICE_TIER');
 
   const base = git(['rev-parse', 'HEAD'], input.canonical).stdout.trim();
+  // Permit BEFORE the worktree (review finding 6): acquiring after
+  // `git worktree add` meant every permit-denied repair attempt still
+  // orphaned a worktree + branch. The provider is never dispatched on
+  // denial, so nothing but the permit decides whether the repair proceeds.
+  const stateDir = resolvePoolStateDir();
+  const generation = validateGeneration(String(input.generation ?? 0));
+  const holder = `${input.package}:${generation}:repair`;
+  const permit = acquireLanePermit(stateDir, holder, 'codex', {
+    packageId: input.package,
+    generation,
+    laneId: 'repair',
+    runId: input['run-id'] ?? process.env.FORESIFT_RUN_ID ?? null,
+  });
+  if (!permit.ok) throw new Error(`CODEX_REPAIR_PERMIT_DENIED: ${permit.reason}`);
   const token = `${basename(input.artifacts)
     .replace(/[^a-zA-Z0-9]/g, '')
     .slice(-8)}-${Date.now()}`;
   const branch = `foresift/wave-repair/${base.slice(0, 10)}-${token}`;
   const worktree = join(input.artifacts, 'wt', `repair-${token}`);
   const addWt = git(['worktree', 'add', '-b', branch, worktree, base], input.canonical);
-  if (addWt.status !== 0) throw new Error(`CODEX_REPAIR_WORKTREE_FAILED: ${addWt.stderr}`);
+  if (addWt.status !== 0) {
+    releaseLanePermit(stateDir, holder, 'codex');
+    throw new Error(`CODEX_REPAIR_WORKTREE_FAILED: ${addWt.stderr}`);
+  }
   const logFile = join(input.artifacts, 'wave-fast.log');
   const logTail = (() => {
     try {
@@ -106,13 +123,6 @@ export function runCodexRepair(input) {
   ].join('\n');
   const command = buildCodexExecArgs(route, { worktree });
   const started = Date.now();
-  // ONE Codex process = ONE lane permit (H2 §2), same as the writers. The
-  // repair lane is a real Codex invocation and must be attributed/held
-  // exactly like an implementation lane.
-  const stateDir = resolvePoolStateDir();
-  const holder = `${input.package}:${input.generation ?? 0}:repair`;
-  const permit = acquireLanePermit(stateDir, holder, 'codex');
-  if (!permit.ok) throw new Error(`CODEX_REPAIR_PERMIT_DENIED: ${permit.reason}`);
   let run;
   try {
     run = spawnSync(command[0], command.slice(1), {
@@ -123,6 +133,8 @@ export function runCodexRepair(input) {
       maxBuffer: 64 * 1024 * 1024,
     });
   } finally {
+    // Finally-equivalent release: success, failure, timeout, and cancellation
+    // all flow through here (worktree/branch cleanup below is success-path).
     releaseLanePermit(stateDir, holder, 'codex');
   }
   // Engine-specific attribution (H2 §5/§6): the repair outcome feeds ONLY

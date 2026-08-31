@@ -11,6 +11,7 @@ import {
   observeCodexOutcome,
   providerAdmissionView,
   CODEX_QUOTA_STATES,
+  CODEX_EXHAUSTED_LATCH_TTL_MS,
 } from '../../scripts/automation/provider-pool.mjs';
 
 let stateDir: string;
@@ -141,6 +142,35 @@ describe('Codex quota state machine (§19/§20/§68)', () => {
     observeCodexOutcome(stateDir, { event: 'unknown' });
     expect(providerAdmissionView(stateDir).codex.state).toBe('UNKNOWN');
     expect(acquirePermit(stateDir, 'codex').ok).toBe(true);
+  });
+
+  test('RESET_WAIT self-heals to HEALTHY once the reset time passes (review finding 3)', () => {
+    // No external reset_elapsed emission is required: the next acquire after
+    // the stored resetAt recovers the pool inside the same critical section.
+    const now = 1_000_000;
+    const resetAt = now + 60_000;
+    observeCodexOutcome(stateDir, { event: 'exhausted', resetAt, now });
+    expect(acquirePermit(stateDir, 'codex', { now: now + 30_000 }).ok).toBe(false);
+    const p = acquirePermit(stateDir, 'codex', { now: resetAt + 1 });
+    expect(p.ok).toBe(true);
+    expect(providerAdmissionView(stateDir, { now: resetAt + 1 }).codex.state).toBe('HEALTHY');
+    releasePermit(stateDir, 'codex');
+  });
+
+  test('EXHAUSTED (no parseable reset) decays after the bounded latch TTL (review finding 3)', () => {
+    // A heuristic "quota" match without a usable reset time must not latch
+    // Codex offline forever: after CODEX_EXHAUSTED_LATCH_TTL_MS the next
+    // acquire self-heals and the provider truth is re-observed.
+    const now = Date.now();
+    observeCodexOutcome(stateDir, { event: 'exhausted', resetAt: null, now });
+    expect(acquirePermit(stateDir, 'codex', { now: now + 60_000 }).ok).toBe(false);
+    expect(
+      acquirePermit(stateDir, 'codex', { now: now + CODEX_EXHAUSTED_LATCH_TTL_MS - 1 }).ok,
+    ).toBe(false);
+    const healed = acquirePermit(stateDir, 'codex', { now: now + CODEX_EXHAUSTED_LATCH_TTL_MS });
+    expect(healed.ok).toBe(true);
+    expect(providerAdmissionView(stateDir).codex.state).toBe('HEALTHY');
+    releasePermit(stateDir, 'codex');
   });
 });
 

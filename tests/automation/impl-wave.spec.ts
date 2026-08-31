@@ -563,6 +563,11 @@ describe('foresift-sharded-wave workflow contract', () => {
       expect(claude?.[0]).toContain(`--brief "$ARTIFACTS_DIR/briefs/${lane}-brief.md"`);
       expect(claude?.[0]).toContain(`--worktree "$ARTIFACTS_DIR/wt/${lane}"`);
       expect(claude?.[0]).toContain(`--results-dir "$ARTIFACTS_DIR/writer-results/${lane}"`);
+      // Claimed units must reach the writer (review finding 1): integration
+      // rejects a zero-completed result, so each Claude node extracts its
+      // lane's task ids from routing.json and passes --task-ids.
+      expect(claude?.[0]).toContain(`--task-ids "$TASKS" \\\n        --package`);
+      expect(claude?.[0]).toContain(`find(l=>l.lane==="${lane}")`);
       expect(claude?.[0]).toContain('--generation "$(');
     }
 

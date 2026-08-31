@@ -167,6 +167,34 @@ describe('permit lifecycle around a provider invocation (H2 §2)', () => {
     expect(providerAdmissionView(stateDir).codex.active).toBe(0);
   });
 
+  test('retry re-bind refreshes the live pid under the same holder (review finding 5)', () => {
+    // Archon retries relaunch a node as a NEW process with the SAME holder
+    // string. The registration must track the live attempt, or pid-proof
+    // reconciliation would free the permit while attempt-2's provider runs.
+    const holder = 'pkg-rebind:0:core';
+    const policy = JSON.stringify({
+      codex: { initial: 1, normalTarget: 1, burstTarget: 1, hardCap: 1 },
+    });
+    writeFileSync(join(stateDir, 'provider-pools.policy.json'), policy);
+    expect(acquireLanePermit(stateDir, holder, 'codex', { pid: 999_999_999 }).ok).toBe(true);
+    // Attempt-2 (this live process) re-acquires: pid refreshed, no second
+    // increment, and the dead attempt-1 pid is gone from the record.
+    const again = acquireLanePermit(stateDir, holder, 'codex', {
+      packageId: 'pkg-rebind',
+      generation: 0,
+      laneId: 'core',
+    });
+    expect(again.ok).toBe(true);
+    expect(again.alreadyHeld).toBe(true);
+    expect(providerAdmissionView(stateDir).codex.active).toBe(1);
+    // Reconciliation with the default pid proof now proves the holder LIVE.
+    const rec = reconcileLaneHolders(stateDir);
+    expect(rec.kept).toHaveLength(1);
+    expect(rec.released).toHaveLength(0);
+    expect(providerAdmissionView(stateDir).codex.active).toBe(1);
+    releaseLanePermit(stateDir, holder, 'codex');
+  });
+
   test('crash between increment and registration is impossible (atomicity)', () => {
     // With acquirePermitLocked under one lock, any observable state has
     // active === holder-count per provider. Simulate the old crash window's

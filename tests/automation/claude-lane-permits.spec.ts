@@ -30,6 +30,18 @@ describe('engine-specific attribution (H2 §5/§6: Claude events stay on Claude)
     expect(ev.retryAfterMs).toBe(45_000);
   });
 
+  test('pressure match is anchored: incidental 429 in model output is not pressure (review finding 12)', () => {
+    // Diff-hunk numbers / echoed log text containing "429" must not halve the
+    // AIMD limit — provider-shaped tokens are required.
+    const noise = claudeProviderEvent('SEMANTIC_OR_PROVIDER_FAILURE', 'src/a.ts:429 changed');
+    expect(noise.healthy).toBe(false);
+    expect(noise.retryAfterMs).toBeNull();
+    const named = claudeProviderEvent('SEMANTIC_OR_PROVIDER_FAILURE', 'rate limit exceeded');
+    expect(named.healthy).toBe(false);
+    // providerAdmissionView is untouched: observeClaudeOutcome never ran.
+    expect(providerAdmissionView(stateDir).claude.blocked).toBe(false);
+  });
+
   test('Claude pressure feeds ONLY the Claude pool', async () => {
     const { observeClaudeOutcome } = await import('../../scripts/automation/provider-pool.mjs');
     observeClaudeOutcome(stateDir, { healthy: false, retryAfterMs: 60_000 });

@@ -1,0 +1,62 @@
+{
+  "schema": "foresift/maintenance-handoff@1",
+  "capturedAt": "2026-08-30T22:05:00Z",
+  "mainSha": "f09ddb607d931d3b771b2d736f60fd3bd23c55f7",
+  "milestone": "G0",
+  "packages": {
+    "proven": [
+      "g0-contracts-data-truth",
+      "g0-security-perimeter",
+      "g0-tool-core",
+      "g0-provider-lifecycle",
+      "g0-cost-capacity",
+      "g0-first-party-observation"
+    ],
+    "running": {
+      "id": "g0-mcp-surface",
+      "runId": "8e2bf2578e3820b793e40b1d1b0a7081",
+      "executionProfile": "HYBRID_AGY",
+      "state": "wave completed; landing in progress via mechanical lander",
+      "landingBranch": "foresift/g0-mcp-surface @ 4f0cb4f (4e0bed3 wave integration + mechanical prettier commit)",
+      "landingWorktree": "/home/minhquan_eth/foresift-mcp-land"
+    },
+    "pending": ["g0-traceability-conformance"]
+  },
+  "openMaintenancePr": {
+    "number": 124,
+    "branch": "perf/h2-writer-permit-wiring",
+    "headSha": "886cf5036200ce858416ee1ea0acfd7f85a55c19",
+    "ci": "ALL GREEN (run 33336225900): Fast Gates, Pure, Process&Meta, PGlite, Verify — Process/Meta timeout ROOT-CAUSED (GNU /usr/bin/time -v wrapper corrupts bun 1.4.0 under coordinator concurrency; reproduced 2/6-7/8 locally; wrapper removed, evidence fields null, containment timeout kept)",
+    "pendingSteps": [
+      "independent code review of f09ddb6..886cf50 running",
+      "fix any Critical/Important findings",
+      "merge with gh pr merge 124 --squash --delete-branch --match-head-commit <exact green head>",
+      "verify merged-main CI green"
+    ]
+  },
+  "autopilot": {
+    "service": "foresift-autopilot.service active (PID 196166) — EXACTLY ONE supervisor",
+    "recoveredAt": "2026-08-30T21:35Z via --recover-fatal (stop service → recover → start)",
+    "previousFatal": "run ee60c4b2 exhausted SIGTERM-recovery after its AGY test-author node failed 3x (agy ran 16m then exited nonzero, no artifacts; transient provider pressure — agy healthy on probe 21:31Z)"
+  },
+  "providerPoolState": {
+    "holdersFile": "~/.local/state/foresift/provider-pools.holders.json",
+    "note": "PR #124 adds atomic acquireLanePermit, durable holder records (pid+runId), reconcileLaneHolders (fail-closed UNKNOWN), holderRegistryView, Claude lane permits via exec-claude-writer.mjs, Codex repair permits"
+  },
+  "lastCompletedActions": [
+    "PR #124 CI green at 886cf50 (Process/Meta root cause fixed + all P0 review findings)",
+    "g0-mcp-surface recovered from paused_fatal to active run 8e2bf257",
+    "run 8e2bf257 wave completed (test-author 6m1s, guards green); landing refused FORMAT-only",
+    "mechanical prettier fix committed on foresift/g0-mcp-surface (4f0cb4f); lander running",
+    "landing branch advanced: 54287c5 (lint dead-symbols), 011f654 (audit vocab §35.9 alignment), 629d69e (admission pipeline construction restored)",
+    "mechanical lander (package-final-land.mjs) driven from /home/minhquan_eth/foresift-mcp-land — the worktree holding foresift/g0-mcp-surface, which ALSO makes the autopilot tick lander (findWorktreeHoldingBranch) pick the right tree"
+  ],
+  "nextSafeActions": [
+    "await full coordinator test in landing tree (task b9hydwjqq) then lander run — fix any remaining TESTS category failures mechanically or via AGY repair",
+    "merge PR #124 FIRST (green at 886cf50), then git fetch; landing branch contains f09ddb6 so re-merge main if base-drift after #124",
+    "after landing PR merges: autopilot is paused_fatal 'landing pending' — run --recover-fatal (fresh continuation discovers completed units from disk; landing short-circuit records PROVEN)",
+    "then continue H2 P1: post-integration manifest duty, coordinator task metadata, exact-write preflight"
+  ],
+  "blockers": [],
+  "resourceState": "15GiB RAM, 13Gi free; disk 84G free — GREEN"
+}

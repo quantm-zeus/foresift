@@ -72,7 +72,6 @@ export function runAgyTestWriter(input) {
   // packageId:generation:laneId. Missing identity fails closed. Generation
   // 0 is accepted (validateGeneration enforces integer >= 0).
   if (!input.package) throw new Error('AGY_TEST_ARGUMENT_MISSING: package/generation');
-  validateGeneration(input.generation ?? '');
   if (!existsSync(input.brief)) throw new Error(`AGY_TEST_BRIEF_MISSING: ${input.brief}`);
   if (!existsSync(input.routing)) throw new Error(`AGY_TEST_ROUTING_MISSING: ${input.routing}`);
   const routing = JSON.parse(readFileSync(input.routing, 'utf8'));
@@ -119,10 +118,19 @@ export function runAgyTestWriter(input) {
   ];
   const runAgy = (promptText) => {
     const stateDir = resolvePoolStateDir();
-    const holder = `${input.package}:${input.generation}:${input.lane}`;
+    // Normalized holder identity (review finding 8): validateGeneration
+    // returns the integer, so `pkg@g07` and `pkg@g7` map to ONE holder.
+    const generation = validateGeneration(input.generation ?? '');
+    const holder = `${input.package}:${generation}:${input.lane}`;
     // Acquire immediately BEFORE the AGY invocation (H2 §2); on refusal the
-    // provider is NOT dispatched. Released in the finally below.
-    const permit = acquireLanePermit(stateDir, holder, 'agy');
+    // provider is NOT dispatched. Released in the finally below. Identity
+    // opts (review finding 7) keep the durable record run-truth-bearing.
+    const permit = acquireLanePermit(stateDir, holder, 'agy', {
+      packageId: input.package,
+      generation,
+      laneId: input.lane,
+      runId: input['run-id'] ?? process.env.FORESIFT_RUN_ID ?? null,
+    });
     if (!permit.ok) {
       writeFileSync(
         join(resultDir, 'permit-denied.json'),

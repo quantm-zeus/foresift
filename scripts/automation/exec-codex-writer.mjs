@@ -63,8 +63,15 @@ export function codexProviderEvent(classification, detail) {
     const resetAt = Number(resetMatch[1]);
     return { event: 'exhausted', resetAt: resetAt < 1e12 ? resetAt * 1000 : resetAt };
   }
-  if (/usage.?limit|quota|exhaust/i.test(text)) return { event: 'exhausted' };
-  if (/429|rate.?limit|503|overloaded/i.test(text)) return { event: 'near_limit' };
+  // Pressure tokens are anchored (review finding 12 analog): incidental
+  // "429"/"quota" substrings inside the model transcript (diff hunks, echoed
+  // logs) must not latch quota states — require word-shaped or provider-
+  // phrased tokens. The pool's bounded EXHAUSTED latch (finding 3) bounds the
+  // blast radius even for a false positive.
+  if (/\b(?:HTTP\s*)?429\b|\brate.?limit\b|\b503\b|\boverloaded\b/i.test(text))
+    return { event: 'near_limit' };
+  if (/\busage.?limit\b|\bquota\b|\bexhaust(?:ed|ion)\b|\busage limit reached\b/i.test(text))
+    return { event: 'exhausted' };
   return { event: 'unknown' };
 }
 
@@ -92,7 +99,6 @@ export function runCodexWriter(input) {
   // unattributable writer may not consume a provider permit. Generation 0
   // is accepted (validateGeneration enforces integer >= 0).
   if (!input.package) throw new Error('CODEX_WRITER_ARGUMENT_MISSING: package/generation');
-  validateGeneration(input.generation ?? '');
   const routing = JSON.parse(readFileSync(input.routing, 'utf8'));
   const route = codexRouteForLane(routing, input.lane);
   const brief = readFileSync(input.brief, 'utf8');
@@ -112,10 +118,19 @@ export function runCodexWriter(input) {
   const command = buildCodexExecArgs(route, { worktree: input.worktree });
   const started = Date.now();
   const stateDir = resolvePoolStateDir();
-  const holder = `${input.package}:${input.generation}:${input.lane}`;
+  const generation = validateGeneration(input.generation ?? '');
+  const holder = `${input.package}:${generation}:${input.lane}`;
   // Acquire immediately BEFORE the provider invocation (H2 §2). On refusal
   // the provider is NOT dispatched; the refusal is recorded verbatim.
-  const permit = acquireLanePermit(stateDir, holder, 'codex');
+  // Identity opts (review finding 7): the durable holder record must carry
+  // package/generation/lane/run truth, not nulls — run-truth reconciliation
+  // can only decide holders it can identify.
+  const permit = acquireLanePermit(stateDir, holder, 'codex', {
+    packageId: input.package,
+    generation,
+    laneId: input.lane,
+    runId: input['run-id'] ?? process.env.FORESIFT_RUN_ID ?? null,
+  });
   if (!permit.ok) {
     writeFileSync(
       join(resultDir, 'permit-denied.json'),

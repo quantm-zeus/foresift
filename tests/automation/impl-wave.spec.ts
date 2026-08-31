@@ -171,6 +171,59 @@ describe('implementation task graph', () => {
     writeFileSync(join(fx.root, 'specs', 'pkg-x', 'tasks.md'), TASKS);
   });
 
+  it('never duplicates a unit that qualifies for both coreSeed lists (live 95c45071 bug)', () => {
+    // A non-[P] unit whose writes leave writeScopes entered coreSeed TWICE
+    // (once via nonP, once via scopeDemoted), so core carried duplicate ids
+    // and over-broad union write authority.
+    const tasks2 = TASKS.replace(
+      '- [ ] T102 Implement alpha in `packages/x/src/alpha.ts` with care.',
+      '- [ ] T102 Implement alpha in `packages/x/src/alpha.ts` with care, syncing `packages/persistence/src/migrator.ts`.',
+    );
+    writeFileSync(join(fx.root, 'specs', 'pkg-x', 'tasks.md'), tasks2);
+    const out = join(fx.artifacts, 'graph-dup.json');
+    const r = spawnSync(
+      process.execPath,
+      [GRAPH, '--package', 'pkg-x', '--root', fx.root, '--plan-shards', '3', '--out', out],
+      { encoding: 'utf8' },
+    );
+    expect(r.status).toBe(0);
+    const g = JSON.parse(readFileSync(out, 'utf8'));
+    const core = g.shards.find((s: { id: string }) => s.id === 'core');
+    expect(core.units.filter((u: string) => u === 'T102')).toHaveLength(1);
+    // restore canonical fixture text
+    writeFileSync(join(fx.root, 'specs', 'pkg-x', 'tasks.md'), TASKS);
+  });
+
+  it('closure-demotes group units that collide with core after demotion (live 95c45071 guard refusal)', () => {
+    // T017-shape: a [P] unit depends on core units, is demoted to core, and
+    // shares a predicted write with a parallel group unit (T004-shape owned
+    // `packages/shared-schemas/src/trace.ts`). The old planner left the
+    // collision in place and the wave guard refused the lane — the run failed.
+    const tasks2 = TASKS.replace(
+      '- [ ] T103 [P] Write spec `tests/x/a.spec.ts` exercising\n      `packages/x/src/alpha.ts`. Traces: FR-X-001 (AC-201).',
+      '- [ ] T103 [P] Write spec `tests/x/a.spec.ts` exercising\n      `packages/x/src/alpha.ts`. Depends on T102 groundwork. Traces: FR-X-001 (AC-201).\n- [ ] T105 [P] Extend the trace schema in `packages/x/src/alpha.ts` after T103. Depends on T103. Traces: FR-X-002.',
+    );
+    writeFileSync(join(fx.root, 'specs', 'pkg-x', 'tasks.md'), tasks2);
+    const out = join(fx.artifacts, 'graph-closure.json');
+    const r = spawnSync(
+      process.execPath,
+      [GRAPH, '--package', 'pkg-x', '--root', fx.root, '--plan-shards', '2', '--out', out],
+      { encoding: 'utf8' },
+    );
+    expect(r.status).toBe(0);
+    const g = JSON.parse(readFileSync(out, 'utf8'));
+    // Pairwise write-disjointness across ALL lanes is the invariant.
+    const owner = new Map<string, string>();
+    const collisions: string[] = [];
+    for (const s of g.shards as Array<{ id: string; allowedWritePaths: string[] }>)
+      for (const p of s.allowedWritePaths) {
+        if (owner.has(p)) collisions.push(p);
+        owner.set(p, s.id);
+      }
+    expect(collisions).toEqual([]);
+    writeFileSync(join(fx.root, 'specs', 'pkg-x', 'tasks.md'), TASKS);
+  });
+
   it('records the root workspace lockfile as a recordable scope exception (live guard-refusal fix)', () => {
     // Live finding 2026-08-25: scaffolding a package mechanically updates
     // pnpm-lock.yaml, but the collector only accepted scoped prefixes, so the

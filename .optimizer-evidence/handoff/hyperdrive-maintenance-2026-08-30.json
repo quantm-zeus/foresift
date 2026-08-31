@@ -88,6 +88,13 @@
     "fullCoordinatorReburn": "GREEN (exit 0): bunFiles 337, passed true, test-authority-result BUN_TEST; log /tmp/land-full-gate.log",
     "next": "after green coordinator: re-run package-final-land.mjs verbatim (package g0-mcp-surface, branch foresift/g0-mcp-surface, artifacts-dir /home/minhquan_eth/.archon/workspaces/quantm-zeus/foresift/artifacts/runs/8e2bf2578e3820b793e40b1d1b0a7081); lander burns its own FULL gate; then exact-head CI on PR #125, squash merge, autopilot --recover-fatal",
     "landerRerun": "package-final-land.mjs re-invoked verbatim (bg b87egfz8k); attestation headSha 629d69e mismatches new head 397aaaf + baseMainSha f09ddb6 != 0893e1e, so lander correctly refused reuse and is burning ONE fresh FULL gate (pnpm foresift:gate)",
-    "pushAndCi": "pushed 397aaaf; CI run 33354838617 in_progress (classify+pure+fast-gates green; pglite+process running); lander waiting for CI at pinned head"
+    "pushAndCi": "pushed 397aaaf; CI run 33354838617 in_progress (classify+pure+fast-gates green; pglite+process running); lander waiting for CI at pinned head",
+    "ciFlake2": {
+      "run": "33354838617 at 397aaaf",
+      "outcome": "Process/Meta GROUP TIMEOUT process-7 (17m SIGTERM) — same signature as PR #124 flake: (pass) lines streaming, deadbeef negative-test stderr, killed 1 dangling process; pure+pglite+fast-gates all green",
+      "evidence": "identical head passes locally: full coordinator GREEN at 397aaaf (337 files exit 0); prior run 33342051937 at 629d69e Process job took only 64s total; no code change between 629d69e and 397aaaf touches process-7 files",
+      "action": "gh run rerun 33354838617 --failed (evidence-based flake rerun, not timeout increase)",
+      "landerBehavior": "lander correctly refused merge on red CI (ci-red, TEST_DISPUTE escalated, exit 4) — no premature merge"
+    }
   }
 }

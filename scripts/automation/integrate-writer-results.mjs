@@ -15,6 +15,7 @@ import { readFileSync, readdirSync, existsSync, writeFileSync } from 'node:fs';
 import { join, basename, dirname } from 'node:path';
 import { repoRoot } from './schema.mjs';
 import { validateLaneOwnership } from './path-ownership.mjs';
+import { validateLaneNominations, unitsIndexFromGraph } from './task-completion-evidence.mjs';
 
 function fail(msg) {
   console.error(`integrate-writers: ${msg}`);
@@ -65,6 +66,7 @@ const report = {
   package: args.package,
   integrated: [],
   rejected: [],
+  completionRejections: [],
 };
 
 if (!existsSync(args.resultsDir)) fail(`results dir not found: ${args.resultsDir}`);
@@ -162,8 +164,35 @@ for (const filePath of resultFiles) {
       continue;
     }
   }
-  if ((res.completed ?? []).length === 0) {
-    report.rejected.push({ shardId: sid, reason: 'writer reported zero completed units' });
+  // Evidence-backed completion validation (H3 P0-1, fail-closed): the
+  // coordinator re-validates every nominated ID against ITS OWN recomputed
+  // diff (this script's git truth above, `diffNames`), lane membership from
+  // the task graph, and the writer's declared blockers. Missing/ambiguous
+  // evidence ⇒ the task stays OPEN. One accepted nomination never implies
+  // sibling tasks are complete; a model merely saying "done" completes
+  // nothing. A lane that produced a real diff but nominated nothing is a
+  // completion-protocol refusal (never merged blindly as fully-done).
+  const claimedUnits = Array.isArray(res.completed) ? res.completed : [];
+  const laneUnits = new Set(shard.units ?? []);
+  const unitsById = unitsIndexFromGraph(graph);
+  const validated = validateLaneNominations({
+    laneTaskIds: [...laneUnits],
+    unitsById,
+    changedFiles: diffNames.out.split('\n').filter(Boolean),
+    nominatedTaskIds: claimedUnits,
+    blockers: res.blockers ?? [],
+  });
+  if (validated.rejected.length > 0) {
+    report.completionRejections.push({ shardId: sid, rejected: validated.rejected });
+  }
+  if (validated.accepted.length === 0) {
+    report.rejected.push({
+      shardId: sid,
+      reason: validated.rejected.length
+        ? 'no nomination carried predicted-write evidence (tasks stay open)'
+        : 'writer reported zero completed units',
+      deferredEvidence: validated.rejected,
+    });
     continue;
   }
 
@@ -182,7 +211,7 @@ for (const filePath of resultFiles) {
   report.integrated.push({
     shardId: sid,
     role: shard.role ?? 'implementation',
-    units: res.completed,
+    units: validated.accepted,
     baselineClassifications: res.baselineClassifications ?? [],
     branch: res.branch,
     beforeHead,
@@ -190,7 +219,11 @@ for (const filePath of resultFiles) {
   });
 }
 
-// ── canonical bookkeeping: mark completed units in tasks.md ───────────────────
+// ── canonical bookkeeping: mark evidence-accepted units in tasks.md ──────────
+// Only coordinator-VALIDATED nominations (predicted-write evidence in the
+// recomputed diff) reach this point, so the checkbox flip is authoritative.
+// One accepted task never flips its siblings: whatever the writer deferred
+// stays an open `- [ ]` line in the canonical tasks.md.
 const completedUnits = new Set(
   report.integrated.filter((r) => r.role === 'implementation').flatMap((r) => r.units),
 );

@@ -19,6 +19,7 @@ import {
   resolvePoolStateDir,
 } from './provider-pool.mjs';
 import { validateGeneration } from './exec-codex-writer.mjs';
+import { parseTaskGraph } from './writer-task-evidence.mjs';
 
 function fail(message, code = 1) {
   console.error(`claude-writer: ${message}`);
@@ -67,7 +68,6 @@ export function runClaudeWriter(input) {
   const resultDir = input['results-dir'];
   mkdirSync(resultDir, { recursive: true });
   const brief = readFileSync(input.brief, 'utf8');
-  const before = git(['rev-parse', 'HEAD'], input.worktree).stdout.trim();
   const prompt = [
     brief,
     '',
@@ -199,15 +199,36 @@ export function runClaudeWriter(input) {
     if (commit.status !== 0) throw new Error(`CLAUDE_COMMIT_FAILED: ${commit.stderr}`);
   }
   const head = git(['rev-parse', 'HEAD'], input.worktree).stdout.trim();
+  // Evidence-backed completion (H3 P0-1): nominate ONLY tasks whose predicted
+  // writes appear in this lane's actual diff. The old invariant — ANY diff ⇒
+  // ALL --task-ids complete — is removed: a productive lane that finished
+  // part of its assignment now reports the rest as deferred (still OPEN),
+  // with the coordinator re-validating every nomination.
+  const assigned = (input['task-ids'] ?? '').split(',').filter(Boolean);
+  let evidence = { graph: null, unitsById: null };
+  const graphPath = input['task-graph'];
+  if (graphPath) {
+    const parsed = parseTaskGraph(graphPath);
+    if (parsed) evidence = parsed;
+  }
+  const claims = claimCompletedUnits({
+    taskIds: assigned,
+    changed: dirty,
+    unitsById: evidence.unitsById,
+    blockers: [],
+  });
   const result = {
     schema: 'foresift/writer-result@1',
     shardId: input.lane,
     role: 'implementation',
     engine: 'CLAUDE',
-    // Claimed units (review finding 1): integration rejects a lane claiming
-    // zero completed units, so a productive Claude lane must carry its task
-    // ids. Empty when the lane produced no diff — never fabricated.
-    completed: head === before ? [] : (input['task-ids'] ?? '').split(',').filter(Boolean),
+    // Evidence-backed nominations (H3 P0-1): only predicted-write-proven ids.
+    // A diff without the task graph still nominates nothing (fail-closed).
+    completed: dirty.length > 0 ? claims.nominated : [],
+    deferredUnits:
+      dirty.length > 0
+        ? claims.deferred
+        : assigned.map((taskId) => ({ taskId, reason: 'lane produced no diff' })),
     branch: git(['branch', '--show-current'], input.worktree).stdout.trim(),
     headSha: head,
     testsRun: [],

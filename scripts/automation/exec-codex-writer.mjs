@@ -6,6 +6,7 @@ import { join } from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { buildCodexExecArgs, CODEX_SERVICE_TIER } from './codex-routing.mjs';
 import { validateLaneOwnership } from './path-ownership.mjs';
+import { claimCompletedUnits, parseTaskGraph } from './writer-task-evidence.mjs';
 import {
   acquireLanePermit,
   releaseLanePermit,
@@ -213,12 +214,34 @@ export function runCodexWriter(input) {
     if (commit.status !== 0) throw new Error(`CODEX_COMMIT_FAILED: ${commit.stderr}`);
   }
   const head = git(['rev-parse', 'HEAD'], input.worktree).stdout.trim();
+  // Evidence-backed completion (H3 P0-1): the old invariant — ANY commit ⇒
+  // EVERY route.taskIds complete — is removed. Nominations require
+  // predicted-write evidence in this lane's actual diff; everything else is
+  // reported deferred and stays OPEN at the coordinator.
+  const graphPath = input['task-graph'];
+  let evidence = { graph: null, unitsById: null };
+  if (graphPath) {
+    const parsed = parseTaskGraph(graphPath);
+    if (parsed) evidence = parsed;
+  }
+  const claims = claimCompletedUnits({
+    taskIds: route.taskIds,
+    changed: dirty,
+    unitsById: evidence.unitsById,
+    blockers: [],
+  });
+  const producedDiff = head !== before && dirty.length > 0;
   const result = {
     schema: 'foresift/writer-result@1',
     shardId: input.lane,
     role: 'implementation',
     engine: 'CODEX',
-    completed: head === before ? [] : route.taskIds,
+    // Evidence-backed nominations (H3 P0-1): only predicted-write-proven ids;
+    // an empty diff or a missing task graph nominates nothing (fail-closed).
+    completed: producedDiff ? claims.nominated : [],
+    deferredUnits: producedDiff
+      ? claims.deferred
+      : route.taskIds.map((taskId) => ({ taskId, reason: 'lane produced no diff' })),
     branch: git(['branch', '--show-current'], input.worktree).stdout.trim(),
     headSha: head,
     testsRun: [],

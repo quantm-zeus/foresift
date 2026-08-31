@@ -43,7 +43,17 @@ export function selectRepairRoute(routing) {
     let route = candidates.sort(
       (a, b) => (ranked[b.complexityTier] ?? 0) - (ranked[a.complexityTier] ?? 0),
     )[0];
-    if (route.complexityTier !== 'HIGH') route = escalateCodexRoute(route);
+    // H3 P2-9: repair dispatch on a non-HIGH route is the ONE bounded
+    // evidence-driven escalation to Sol/high. An already-escalated route
+    // (escalation >= 1) stays at its current model/reasoning — the escalation
+    // budget is spent, retry without a second burn.
+    if (route.complexityTier !== 'HIGH') {
+      try {
+        route = escalateCodexRoute(route);
+      } catch (error) {
+        if (!/CODEX_ESCALATION_BUDGET_EXHAUSTED/.test(String(error?.message ?? error))) throw error;
+      }
+    }
     return route;
   }
   return {

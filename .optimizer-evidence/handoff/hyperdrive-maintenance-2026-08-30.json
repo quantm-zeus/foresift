@@ -15,11 +15,11 @@
       "completedUnits": "core lane committed 3 units (189b790/678d743/ef4af2d on foresift/wave/0ed9a3e2f3-d2f24429d0-core)"
     },
     "openMaintenancePr": {
-      "number": 139,
-      "branch": "fix/h3-maintenance",
-      "headSha": "917731a",
-      "title": "governor launch gate + upward-recovery hysteresis + ready-queue wiring + reason classes + exact-write override",
-      "ci": "pending at push time; earlier heads green except process-7 GROUP TIMEOUT flake (root-caused and fixed in 917731a)"
+      "number": 141,
+      "branch": "fix/core-batch-decomposition",
+      "headSha": "cc04eb8",
+      "title": "bounded lane-scope decomposition — chained core-batch lanes (mission item 4)",
+      "ci": "pending at push time"
     },
     "providerState": "claude limit 1 (backoff to 15:47Z), codex limit 1 HEALTHY, agy 3 — all active 0",
     "resourceState": "15GiB host, MemAvailable ~14.1GiB (0.86) — GREEN",

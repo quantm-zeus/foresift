@@ -27,17 +27,22 @@
 // Zero AI: admission is deterministic arithmetic over durable state files.
 
 import { acquireLeases, releaseLeases, SHARED_SURFACE_FILES } from './exact-leases.mjs';
-import { acquirePermit, releasePermit } from './provider-pool.mjs';
+import { acquirePermit, releasePermit, providerAdmissionView } from './provider-pool.mjs';
 
-/** Providers a launch of `profile` may dispatch, in acquisition order. */
+/**
+ * Providers a launch of `profile` may dispatch, in acquisition order. Claude
+ * is listed where the profile's lanes may legitimately fall back to it (§20)
+ * — but listing is descriptive ONLY: runtime capacity is owned by LANE
+ * permits (acquireLanePermit at dispatch time), never by package-level
+ * reservations, and NO profile requires an unrelated provider to be healthy
+ * at admission (H3 P0-3 provider independence: CODEX_AGY launches without
+ * Claude headroom; CLAUDE_AGY launches without Codex capacity; HYBRID_AGY
+ * refuses only when NO compatible product engine can service ready work).
+ */
 export function providersForProfile(profile) {
   switch (profile) {
-    // Claude first in every profile: it is the §20 fallback engine, so its
-    // health gates every launch. Codex and AGY are the writer/test pools —
-    // under the H2 lane-permit model their runtime counts live in per-lane
-    // permits, not in package-level reservations.
     case 'CODEX_AGY':
-      return ['claude', 'codex', 'agy'];
+      return ['codex', 'agy'];
     case 'CLAUDE_AGY':
       return ['claude', 'agy'];
     case 'HYBRID_AGY':
@@ -48,22 +53,38 @@ export function providersForProfile(profile) {
 }
 
 /**
- * Providers the SUPERVISOR admits for the package-level gate. Lane-bearing
- * engines are NOT reserved at package level (review finding 2): every writer
- * and repair lane acquires its OWN lane permit from the same global pool
- * immediately before its provider invocation, so a run-level reservation for
- * claude/codex would double-count against the lanes and — under default
- * policy (claude 3, codex 1) with up to 3 concurrent lanes — deny lanes
- * deterministically (POOL_AT_LIMIT) and fail the wave. Only CODEX_AGY keeps
- * a run-level codex reservation: the legacy Codex-only wave dispatches one
- * serialized codex stream that is the run itself.
+ * Providers the SUPERVISOR reserves at the package-level gate: NONE, ever
+ * (H3 P0-2 — CODEX_AGY double-count removal). Lane-bearing engines are NOT
+ * reserved at package level: every writer and repair lane acquires its OWN
+ * lane permit from the same global pool immediately before its provider
+ * invocation (ONE actual provider invocation = ONE permit, never a package
+ * permit + a lane permit). A run-level reservation would double-count
+ * against the launch's own lanes and — under default policy (codex 1) —
+ * deterministically deny the first Codex lane (POOL_AT_LIMIT) and fail the
+ * wave. Kept as a documented constant-return API for the supervisor's
+ * bookkeeping; returns no held providers for any profile.
  */
-export function supervisorProvidersForProfile(profile) {
-  // CODEX_AGY: the legacy Codex-only wave dispatches one serialized codex
-  // stream that IS the run, so its codex permit is held at package level.
-  // Every other engine dispatches per-lane writers that hold their own lane
-  // permits — no run-level reservation (review finding 2).
-  return providersForProfile(profile).filter((p) => p === 'codex' && profile === 'CODEX_AGY');
+export function supervisorProvidersForProfile() {
+  return [];
+}
+
+/**
+ * Compatible PRODUCT engines for a profile (the engines its lanes may
+ * actually dispatch): CODEX_AGY ⇒ codex; CLAUDE_AGY ⇒ claude; HYBRID_AGY ⇒
+ * claude + codex. AGY is the test engine and never gates a launch. Used for
+ * the H3 P0-3 provider-independence admission check.
+ */
+export function productEnginesForProfile(profile) {
+  switch (profile) {
+    case 'CODEX_AGY':
+      return ['codex'];
+    case 'CLAUDE_AGY':
+      return ['claude'];
+    case 'HYBRID_AGY':
+      return ['claude', 'codex'];
+    default:
+      throw new Error(`UNKNOWN_EXECUTION_PROFILE: ${String(profile)}`);
+  }
 }
 
 /**
@@ -71,66 +92,65 @@ export function supervisorProvidersForProfile(profile) {
  * { ok, providers, fallback, reason } — ok:false leaves NO partial state
  * (leases granted before a later failure are released again).
  *
- *   providers — every provider permit HELD for the run (only CODEX_AGY's
- *               codex reservation today; lane-bearing engines hold none)
+ *   providers — every provider permit HELD for the run (always [] since the
+ *               H3 P0-2 change: lane permits own ALL runtime capacity)
  *   fallback  — providers skipped because the pool reroutes their work
  *               (Codex exhausted under HYBRID/CLAUDE_AGY ⇒ Claude fallback)
+ *
+ * Provider independence (H3 P0-3): an explicit profile requires only ITS OWN
+ * compatible product engine to have headroom. CODEX_AGY does not probe
+ * Claude; CLAUDE_AGY does not probe Codex. HYBRID_AGY refuses only when NO
+ * compatible product engine (claude OR codex) can service ready work — one
+ * pressured provider never fails the launch while the other has headroom.
+ * Capacity decisions stay close to actual lane dispatch: the probe is
+ * acquire+release against the SAME pool the lanes use, so capacity freed by
+ * lane completion is immediately visible to the lanes themselves; quota
+ * latches (CODEX_QUOTA_*) are lane-level facts observed per invocation and
+ * reroute/hand off at the lane, never at the package gate.
  */
 export function admitPackageLaunch(stateDir, pkg, executionProfile, opts = {}) {
   if (!pkg?.id) return { ok: false, providers: [], fallback: [], reason: 'INVALID_PACKAGE' };
-  const acquired = [];
   // Profile validation first (fail closed before touching any pool state).
+  let productEngines;
   try {
-    providersForProfile(executionProfile);
+    productEngines = productEnginesForProfile(executionProfile);
   } catch {
     return { ok: false, providers: [], fallback: [], reason: 'INVALID_PROFILE' };
   }
-  // Claude admission PROBE (review finding 2): acquire+release against the
-  // SAME pool the lanes do, holding nothing. Claude is the §20 fallback
-  // engine, so a launch is refused when the Claude pool has zero headroom or
-  // is in pressure backoff — but no run-level permit is held, and capacity
-  // freed by lane completion is immediately visible to the lanes themselves.
-  try {
-    const claudeProbe = acquirePermit(stateDir, 'claude', { now: opts.now ?? Date.now() });
-    if (claudeProbe.ok) {
-      releasePermit(stateDir, 'claude');
-    } else {
-      return {
-        ok: false,
-        providers: [],
-        fallback: [],
-        reason: `${claudeProbe.reason ?? 'POOL_AT_LIMIT'}: provider claude`,
-      };
+  // Provider-independence admission probe: acquire+release against the SAME
+  // pool the lanes do, holding nothing. The launch is refused ONLY when
+  // EVERY compatible product engine is unusable right now (zero headroom,
+  // backoff, or quota latch). A single healthy engine admits the launch —
+  // its lanes that prefer the other engine reroute or hand off at dispatch.
+  // A quota LATCH is never a launch refusal for a profile whose lanes can
+  // hand off (H3 P0-4): the latch self-heals at its bounded reset, and lane
+  // dispatch observes it per invocation — so a latched codex still counts as
+  // "serviceable" for the profile's engine-mix check; transient capacity
+  // (POOL_AT_LIMIT/PROVIDER_BACKOFF) DOES count as unserviceable here.
+  const now = opts.now ?? Date.now();
+  const quotaLatched = (stateDir2, engine, at) => {
+    if (engine !== 'codex') return false;
+    const view = providerAdmissionView(stateDir2, { now: at });
+    return ['EXHAUSTED', 'RESET_WAIT'].includes(view.codex?.state ?? '');
+  };
+  const anyEngineServiceable = productEngines.some((engine) => {
+    try {
+      const probe = acquirePermit(stateDir, engine, { now });
+      if (probe.ok) {
+        releasePermit(stateDir, engine);
+        return true;
+      }
+      return quotaLatched(stateDir, engine, now);
+    } catch {
+      return false;
     }
-  } catch (err) {
+  });
+  if (!anyEngineServiceable) {
     return {
       ok: false,
       providers: [],
       fallback: [],
-      reason: `CLAUDE_PROBE_ERROR: ${String(err?.message ?? err)}`,
-    };
-  }
-  // Run-level reservations: ONLY the run-is-the-stream engines that do not
-  // dispatch per-lane writers (CODEX_AGY's serialized codex stream). See
-  // supervisorProvidersForProfile.
-  const runLevel = supervisorProvidersForProfile(executionProfile).filter((p) => p === 'codex');
-  for (const provider of runLevel) {
-    const permit = acquirePermit(stateDir, provider, { now: opts.now ?? Date.now() });
-    if (permit.ok) {
-      acquired.push(provider);
-      continue;
-    }
-    // Fail-closed unwind: a non-admitted launch never leaks permits.
-    for (const held of acquired) {
-      try {
-        releasePermit(stateDir, held);
-      } catch {}
-    }
-    return {
-      ok: false,
-      providers: [],
-      fallback: [],
-      reason: `${permit.reason ?? 'POOL_AT_LIMIT'}: provider ${provider}`,
+      reason: `${executionProfile}_NO_PRODUCT_ENGINE_SERVICEABLE: ${productEngines.join('|')}`,
     };
   }
   // Exact-file leases: the supervisor cannot know per-lane exact writes

@@ -248,7 +248,11 @@ if (args.planShards !== undefined) {
   // neither writes a core path nor depends on a core unit; otherwise it is
   // demoted into the core lane (conservative cross-lane disjointness).
   const nonP = productOpen.filter((u) => !u.parallelizable);
-  const coreSeed = [...nonP, ...scopeDemoted];
+  // Dedupe by id: a non-[P] unit whose writes leave writeScopes qualifies for
+  // BOTH lists, and the duplicate made core.units carry the same task twice
+  // (observed live 2026-08-31, run 95c45071: core carried T001/T003/T005/
+  // T009/T012/T015/T024 twice each).
+  const coreSeed = [...new Map([...nonP, ...scopeDemoted].map((u) => [u.id, u])).values()];
   const coreIds = new Set(coreSeed.map((u) => u.id));
   const writesFor = (u) => (args.executionProfile ? u.productWrites : u.predictedWrites);
   const coreWriteSet = new Set(coreSeed.flatMap(writesFor));
@@ -291,6 +295,46 @@ if (args.planShards !== undefined) {
     for (const p of writesFor(u)) target.writes.add(p);
     target.load += unitSize(u);
   }
+  // Cross-lane disjointness closure (observed live 2026-08-31, run 95c45071):
+  // a parallel unit that clashes the core is demoted to core AFTER groups are
+  // formed — but its writes may still collide with a group's writes (T017
+  // depended on core units, was demoted to core, and still predicted
+  // `packages/shared-schemas/src/trace.ts` which shard-1's T004 owned). The
+  // wave guard correctly refused the lane, failing the run. Iterate: any
+  // group unit whose writes collide with core's (or with another group's, or
+  // whose dependency sits in core after demotion) is pulled into core until
+  // the plan is provably pairwise write-disjoint again.
+  const coreUnits = [...serial];
+  const coreSet = new Set(coreUnits.map((u) => u.id));
+  for (;;) {
+    const coreWrites = new Set(coreUnits.flatMap((u) => writesFor(u)));
+    const pulled = [];
+    for (const g of groups) {
+      for (const uid of [...g.units]) {
+        const u = g.units.map((x) => x).length ? par.find((p) => p.id === uid) : null;
+        if (!u) continue;
+        const writeClash = writesFor(u).some(
+          (p) => coreWrites.has(p) || [...groups].some((h) => h !== g && h.writes.has(p)),
+        );
+        const depClash =
+          u.dependsOn.some((d) => coreSet.has(d)) ||
+          u.dependsOn.some((d) => groups.some((h) => h !== g && h.units.includes(d)));
+        if (writeClash || depClash) pulled.push({ g, uid, u });
+      }
+    }
+    if (pulled.length === 0) break;
+    for (const { g, uid, u } of pulled) {
+      g.units.splice(g.units.indexOf(uid), 1);
+      for (const p of writesFor(u)) g.writes.delete(p);
+      g.load -= unitSize(u);
+      if (!coreSet.has(uid)) {
+        coreUnits.push(u);
+        coreSet.add(uid);
+      }
+    }
+  }
+  serial.length = 0;
+  serial.push(...coreUnits);
   shards = [
     ...(serial.length
       ? [

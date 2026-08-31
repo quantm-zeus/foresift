@@ -5,6 +5,7 @@ import { join } from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { classifyOwnedPath, validateLaneOwnership } from './path-ownership.mjs';
 import { acquireLanePermit, releaseLanePermit, resolvePoolStateDir } from './provider-pool.mjs';
+import { claimCompletedUnits, parseTaskGraph } from './writer-task-evidence.mjs';
 
 function fail(message) {
   console.error(`agy-test-writer: ${message}`);
@@ -277,6 +278,23 @@ export function runAgyTestWriter(input) {
       );
     typeRepair.remaining = [];
   }
+  // Evidence-backed completion (H3 P0-1): the AGY test author previously
+  // claimed EVERY --task-ids unconditionally. Nominations now require
+  // predicted-write evidence in the lane's own diff; the writer's declared
+  // blockers keep their tasks OPEN.
+  const assigned = (input['task-ids'] ?? '').split(',').filter(Boolean);
+  let evidence = { graph: null, unitsById: null };
+  if (input['task-graph']) {
+    const parsed = parseTaskGraph(input['task-graph']);
+    if (parsed) evidence = parsed;
+  }
+  const writerBlockers = Array.isArray(agentResult.blockers) ? agentResult.blockers : [];
+  const claims = claimCompletedUnits({
+    taskIds: assigned,
+    changed: changedPaths,
+    unitsById: evidence.unitsById,
+    blockers: writerBlockers,
+  });
   const result = {
     schema: 'foresift/writer-result@1',
     shardId: input.lane,
@@ -286,7 +304,13 @@ export function runAgyTestWriter(input) {
     reasoning: route.reasoning,
     providerTimeout: route.providerTimeout,
     baseHead,
-    completed: (input['task-ids'] ?? '').split(',').filter(Boolean),
+    // Evidence-backed nominations (H3 P0-1): diff-proven ids only; an empty
+    // diff or a missing task graph nominates nothing (fail-closed).
+    completed: changedPaths.length > 0 ? claims.nominated : [],
+    deferredUnits:
+      changedPaths.length > 0
+        ? claims.deferred
+        : assigned.map((taskId) => ({ taskId, reason: 'lane produced no diff' })),
     branch: git(['branch', '--show-current'], input.worktree).stdout.trim(),
     headSha: head,
     changedPaths,
@@ -294,7 +318,7 @@ export function runAgyTestWriter(input) {
     testsRun: Array.isArray(agentResult.testsRun) ? agentResult.testsRun : [],
     testResults: agentResult.testResults ?? 'unknown',
     baselineClassifications: agentResult.baselineClassifications,
-    blockers: Array.isArray(agentResult.blockers) ? agentResult.blockers : [],
+    blockers: writerBlockers,
     typeRepair,
   };
   writeFileSync(join(resultDir, 'result.json'), `${JSON.stringify(result, null, 2)}\n`);

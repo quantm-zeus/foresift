@@ -1,7 +1,6 @@
 export declare function providersForProfile(profile: string): Array<'claude' | 'codex' | 'agy'>;
-export declare function supervisorProvidersForProfile(
-  profile: string,
-): Array<'claude' | 'codex' | 'agy'>;
+export declare function supervisorProvidersForProfile(): Array<never>;
+export declare function productEnginesForProfile(profile: string): Array<'claude' | 'codex'>;
 export declare function admitPackageLaunch(
   stateDir: string,
   pkg: { id: string; writeScopes?: string[] } | null | undefined,

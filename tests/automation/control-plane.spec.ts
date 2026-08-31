@@ -250,6 +250,20 @@ describe('failure classification', () => {
     // Plain burst throttling without daily-quota evidence stays TRANSIENT.
     expect(classifyFailure('429 too many requests, slow down')).toBe('TRANSIENT');
     expect(classifyFailure('rate limit exceeded, retry shortly')).toBe('TRANSIENT');
+    // Machine-shaped H3 provider reasons: quota latches are QUOTA_DAILY (the
+    // durable probe pause), pool contention is TRANSIENT (ordinary retry).
+    expect(
+      classifyFailure(
+        "codex-writer: CODEX_WRITER_PERMIT_DENIED: CODEX_QUOTA_EXHAUSTED; 'writer-shard-1': Bash node failed",
+      ),
+    ).toBe('QUOTA_DAILY');
+    expect(
+      classifyFailure('codex-repair: CODEX_REPAIR_PERMIT_DENIED: CODEX_QUOTA_RESET_WAIT'),
+    ).toBe('QUOTA_DAILY');
+    expect(
+      classifyFailure('codex-writer: ENGINE_HANDOFF_CLAUDE_PERMIT_DENIED: PROVIDER_BACKOFF'),
+    ).toBe('TRANSIENT');
+    expect(classifyFailure('claude lane acquire refused: POOL_AT_LIMIT')).toBe('TRANSIENT');
     // Fatal evidence still wins when both appear.
     expect(classifyFailure('403 forbidden: quota exhausted')).toBe('FATAL');
   });

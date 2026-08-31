@@ -59,6 +59,12 @@
       "at": "2026-08-31T04:15:44Z",
       "sequence": "service stopped → --recover-fatal (operator_recovery_retired_dead_run: old run 8e2bf257 already terminal/completed; abandoned refused benign) → operator_recovery_fresh_launch HYBRID_AGY → operator_recovery_complete: tracked as run a027bed32b014c6ac072368e57aef958, pause cleared → service restarted (MainPID 324356, exactly one supervisor)",
       "freshRun": "detached archon run cli-1788149741301-74wwaa started; when_conditions skipped all writer lanes (work already landed), test-author lane started — expect already-landed short-circuit → PROVEN, G0 7/8"
+    },
+    "recoveryRound2": {
+      "at": "2026-08-31T04:20:43Z",
+      "event": "recover-fatal round 2: fresh run 501712ec605f7ec8bd0c2735bab5ca0a (cli-1788150040770-51zsjh)",
+      "finding": "first fresh continuation (a027bed3) completed with wave-land base-drift refusal: archon task worktree branch archon/task-foresift-g0-mcp-surface @ 4e0bed3 did not contain new main 4186f5d → lander correctly refused. Fixed by merging origin/main 4186f5d into the task worktree (11 files theirs=main canonical incl. all mcp src/tests; AC-255 theirs; manifest regen --previous; commit cacc633). Task branch now contains main.",
+      "state": "service restarted (MainPID 326783); run 501712ec at integrate-and-fast; expect wave-land to now pass base admission → already-merged short-circuit → PROVEN → G0 7/8"
     }
   },
   "providerPoolState": {

@@ -2,7 +2,7 @@
 // §41/§73): global permits + exact-file leases join the supervisor's launch
 // path, and every terminal path (PROVEN, cancelled, fatal pause) releases.
 import { describe, test, expect, beforeEach, afterEach } from 'bun:test';
-import { mkdtempSync, rmSync, existsSync } from 'node:fs';
+import { mkdtempSync, rmSync, existsSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import {
@@ -10,7 +10,11 @@ import {
   releasePackageRuntime,
   providersForProfile,
 } from '../../scripts/automation/runtime-admission.mjs';
-import { observeCodexOutcome } from '../../scripts/automation/provider-pool.mjs';
+import {
+  observeCodexOutcome,
+  acquireLanePermit,
+  releaseLanePermit,
+} from '../../scripts/automation/provider-pool.mjs';
 import { activeLeases } from '../../scripts/automation/exact-leases.mjs';
 
 let stateDir: string;
@@ -42,12 +46,13 @@ describe('profile → provider sets', () => {
 });
 
 describe('launch admission (§17 global pool, §41 leases)', () => {
-  test('admitted launch holds claude permit; co-runner with distinct scopes co-admits', () => {
+  test('admitted launch holds no run-level permits (lane permits own runtime counts); co-runner with distinct scopes co-admits', () => {
     const a = admitPackageLaunch(stateDir, PKG, 'HYBRID_AGY');
     expect(a.ok).toBe(true);
-    expect(a.providers).toContain('claude');
-    // HYBRID per-lane Codex truth lives in routing, not in a package-wide codex permit
-    expect(a.providers).not.toContain('codex');
+    // Review finding 2: writers hold their own lane permits at dispatch — a
+    // package-level claude/codex reservation would double-count and deny the
+    // third concurrent lane under default policy.
+    expect(a.providers).toEqual([]);
     // Disjoint scopes co-run against the same global pools.
     const c = admitPackageLaunch(
       stateDir,
@@ -84,32 +89,37 @@ describe('launch admission (§17 global pool, §41 leases)', () => {
     releasePackageRuntime(stateDir, { providers: c.providers, packageId: 'pkg-other' });
   });
 
-  test('claude pool saturation denies every profile (fallback engine unavailable)', () => {
-    for (let i = 0; i < 3; i++)
-      expect(
-        admitPackageLaunch(
-          stateDir,
-          { id: `p${i}`, writeScopes: [`packages/p${i}/**`] },
-          'CLAUDE_AGY',
-        ).ok,
-      ).toBe(true);
+  test('claude pool saturation denies every profile (fallback engine unavailable) — probe sees lanes too', () => {
+    // Review finding 2: the admission probe acquires against the SAME pool
+    // the lanes do, so three admitted lanes saturate a limit-3 pool and the
+    // next launch is refused even though nothing is held at package level.
+    const policy = JSON.stringify({
+      claude: { initial: 3, normalTarget: 5, burstTarget: 8, hardCap: 10 },
+    });
+    writeFileSync(join(stateDir, 'provider-pools.policy.json'), policy);
+    const lanes = ['l1', 'l2', 'l3'].map((l) =>
+      acquireLanePermit(stateDir, `pkg-a:0:${l}`, 'claude'),
+    );
+    for (const p of lanes) expect(p.ok).toBe(true);
     const denied = admitPackageLaunch(stateDir, PKG, 'CLAUDE_AGY');
     expect(denied.ok).toBe(false);
     expect(denied.reason).toContain('POOL_AT_LIMIT');
-    // denied admission unwound its leases: the surface is free again
-    expect(activeLeases(stateDir).filter((l) => l.holder === 'pkg-a')).toHaveLength(0);
-    for (let i = 0; i < 3; i++)
-      releasePackageRuntime(stateDir, { providers: ['claude', 'agy'], packageId: `p${i}` });
+    for (const l of ['l1', 'l2', 'l3']) releaseLanePermit(stateDir, `pkg-a:0:${l}`, 'claude');
+    const admitted = admitPackageLaunch(stateDir, PKG, 'CLAUDE_AGY');
+    expect(admitted.ok).toBe(true);
+    releasePackageRuntime(stateDir, { providers: admitted.providers, packageId: 'pkg-a' });
   });
 
-  test('§20: Codex exhaustion still admits HYBRID (Codex rides per-lane routing) but denies CODEX_AGY', () => {
+  test('§20: Codex exhaustion still admits HYBRID (Codex rides per-lane routing); CODEX_AGY keeps run-level codex permit', () => {
     observeCodexOutcome(stateDir, { event: 'exhausted', resetAt: Date.now() + 3_600_000 });
     const hybrid = admitPackageLaunch(stateDir, PKG, 'HYBRID_AGY');
     expect(hybrid.ok).toBe(true);
-    expect(hybrid.providers).toContain('claude');
-    expect(hybrid.providers).not.toContain('codex');
+    // Lane-bearing engines hold nothing at run level (review finding 2) —
+    // HYBRID admission proceeds; per-lane codex writers will be denied by
+    // the quota state and reroute to Claude via routing.
+    expect(hybrid.providers).toEqual([]);
     releasePackageRuntime(stateDir, { providers: hybrid.providers, packageId: 'pkg-a' });
-    // Codex-only profiles hold a package-level codex permit: exhausted quota denies them outright.
+    // CODEX_AGY holds a package-level codex permit: exhausted quota denies it outright.
     const codexOnly = admitPackageLaunch(stateDir, PKG, 'CODEX_AGY');
     expect(codexOnly.ok).toBe(false);
     expect(codexOnly.reason).toContain('CODEX_QUOTA_');

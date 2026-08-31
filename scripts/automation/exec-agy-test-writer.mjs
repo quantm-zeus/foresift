@@ -4,6 +4,7 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { classifyOwnedPath, validateLaneOwnership } from './path-ownership.mjs';
+import { acquireLanePermit, releaseLanePermit, resolvePoolStateDir } from './provider-pool.mjs';
 
 function fail(message) {
   console.error(`agy-test-writer: ${message}`);
@@ -54,9 +55,23 @@ export function validateBaselineClassifications(items) {
   return true;
 }
 
+export function validateGeneration(generation) {
+  if (
+    typeof generation !== 'string' ||
+    !/^\d+$/.test(generation.trim()) ||
+    !Number.isSafeInteger(Number(generation))
+  )
+    throw new Error(`AGY_TEST_INVALID_GENERATION: ${String(generation)}`);
+  return Number(generation);
+}
+
 export function runAgyTestWriter(input) {
   for (const field of ['lane', 'brief', 'worktree', 'routing', 'results-dir'])
     if (!input[field]) throw new Error(`AGY_TEST_ARGUMENT_MISSING: ${field}`);
+  // Lane-permit identity (H2 §2): ONE AGY process = ONE permit, keyed to
+  // packageId:generation:laneId. Missing identity fails closed. Generation
+  // 0 is accepted (validateGeneration enforces integer >= 0).
+  if (!input.package) throw new Error('AGY_TEST_ARGUMENT_MISSING: package/generation');
   if (!existsSync(input.brief)) throw new Error(`AGY_TEST_BRIEF_MISSING: ${input.brief}`);
   if (!existsSync(input.routing)) throw new Error(`AGY_TEST_ROUTING_MISSING: ${input.routing}`);
   const routing = JSON.parse(readFileSync(input.routing, 'utf8'));
@@ -101,15 +116,41 @@ export function runAgyTestWriter(input) {
     '--print-timeout',
     route.providerTimeout,
   ];
-  const runAgy = (promptText) =>
-    spawnSync('agy', agyArgs, {
-      shell: false,
-      cwd: input.worktree,
-      input: `${JSON.stringify({ event: 'user', message: { role: 'user', content: promptText } })}\n`,
-      encoding: 'utf8',
-      timeout: Number(input['timeout-ms'] ?? 45 * 60_000),
-      maxBuffer: 64 * 1024 * 1024,
+  const runAgy = (promptText) => {
+    const stateDir = resolvePoolStateDir();
+    // Normalized holder identity (review finding 8): validateGeneration
+    // returns the integer, so `pkg@g07` and `pkg@g7` map to ONE holder.
+    const generation = validateGeneration(input.generation ?? '');
+    const holder = `${input.package}:${generation}:${input.lane}`;
+    // Acquire immediately BEFORE the AGY invocation (H2 §2); on refusal the
+    // provider is NOT dispatched. Released in the finally below. Identity
+    // opts (review finding 7) keep the durable record run-truth-bearing.
+    const permit = acquireLanePermit(stateDir, holder, 'agy', {
+      packageId: input.package,
+      generation,
+      laneId: input.lane,
+      runId: input['run-id'] ?? process.env.FORESIFT_RUN_ID ?? null,
     });
+    if (!permit.ok) {
+      writeFileSync(
+        join(resultDir, 'permit-denied.json'),
+        `${JSON.stringify({ schema: 'foresift/lane-permit-denial@1', holder, provider: 'agy', reason: permit.reason, waitMs: permit.waitMs }, null, 2)}\n`,
+      );
+      throw new Error(`AGY_TEST_PERMIT_DENIED: ${permit.reason}`);
+    }
+    try {
+      return spawnSync('agy', agyArgs, {
+        shell: false,
+        cwd: input.worktree,
+        input: `${JSON.stringify({ event: 'user', message: { role: 'user', content: promptText } })}\n`,
+        encoding: 'utf8',
+        timeout: Number(input['timeout-ms'] ?? 45 * 60_000),
+        maxBuffer: 64 * 1024 * 1024,
+      });
+    } finally {
+      releaseLanePermit(stateDir, holder, 'agy');
+    }
+  };
   const run = runAgy(prompt);
   writeFileSync(join(resultDir, 'agy-run.jsonl'), run.stdout ?? '');
   if (run.error) throw new Error(`AGY_TEST_SPAWN_FAILED: ${run.error.message}`);

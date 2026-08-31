@@ -5,6 +5,13 @@ import { basename, join } from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { buildCodexExecArgs, CODEX_SERVICE_TIER, escalateCodexRoute } from './codex-routing.mjs';
 import { validateLaneOwnership } from './path-ownership.mjs';
+import { codexProviderEvent, validateGeneration } from './exec-codex-writer.mjs';
+import {
+  acquireLanePermit,
+  releaseLanePermit,
+  observeCodexOutcome,
+  resolvePoolStateDir,
+} from './provider-pool.mjs';
 
 function parseArgs(argv) {
   const out = {};
@@ -56,7 +63,14 @@ export function runCodexRepair(input) {
   for (const field of ['canonical', 'artifacts', 'routing', 'package'])
     if (!input[field]) throw new Error(`CODEX_REPAIR_ARGUMENT_MISSING: ${field}`);
   const routing = JSON.parse(readFileSync(input.routing, 'utf8'));
-  if (routing.executionProfile !== 'CODEX_AGY') throw new Error('CODEX_REPAIR_PROFILE_MISMATCH');
+  // HYBRID_AGY waves route their implementation lanes to CODEX exactly like
+  // CODEX_AGY waves (codex-routing classifyCodexLane), so the engine-specific
+  // repairer is the same Codex tool. Runs 165799b9/5579a4c7 (2026-08-30) died
+  // deterministically in fast-repair-loop: the workflow's repair nodes are
+  // when-gated to CODEX_AGY/CLAUDE_AGY only, so a HYBRID_AGY wave with a red
+  // FAST had NO repair lane and the loop exhausted in milliseconds.
+  if (!['CODEX_AGY', 'HYBRID_AGY'].includes(routing.executionProfile))
+    throw new Error('CODEX_REPAIR_PROFILE_MISMATCH');
   const repairDir = join(input.artifacts, 'repair');
   mkdirSync(repairDir, { recursive: true });
   const priorRepairs = readdirSync(repairDir).filter((name) => name.endsWith('.json')).length;
@@ -65,13 +79,30 @@ export function runCodexRepair(input) {
   if (route.serviceTier !== CODEX_SERVICE_TIER) throw new Error('INVALID_CODEX_SERVICE_TIER');
 
   const base = git(['rev-parse', 'HEAD'], input.canonical).stdout.trim();
+  // Permit BEFORE the worktree (review finding 6): acquiring after
+  // `git worktree add` meant every permit-denied repair attempt still
+  // orphaned a worktree + branch. The provider is never dispatched on
+  // denial, so nothing but the permit decides whether the repair proceeds.
+  const stateDir = resolvePoolStateDir();
+  const generation = validateGeneration(String(input.generation ?? 0));
+  const holder = `${input.package}:${generation}:repair`;
+  const permit = acquireLanePermit(stateDir, holder, 'codex', {
+    packageId: input.package,
+    generation,
+    laneId: 'repair',
+    runId: input['run-id'] ?? process.env.FORESIFT_RUN_ID ?? null,
+  });
+  if (!permit.ok) throw new Error(`CODEX_REPAIR_PERMIT_DENIED: ${permit.reason}`);
   const token = `${basename(input.artifacts)
     .replace(/[^a-zA-Z0-9]/g, '')
     .slice(-8)}-${Date.now()}`;
   const branch = `foresift/wave-repair/${base.slice(0, 10)}-${token}`;
   const worktree = join(input.artifacts, 'wt', `repair-${token}`);
   const addWt = git(['worktree', 'add', '-b', branch, worktree, base], input.canonical);
-  if (addWt.status !== 0) throw new Error(`CODEX_REPAIR_WORKTREE_FAILED: ${addWt.stderr}`);
+  if (addWt.status !== 0) {
+    releaseLanePermit(stateDir, holder, 'codex');
+    throw new Error(`CODEX_REPAIR_WORKTREE_FAILED: ${addWt.stderr}`);
+  }
   const logFile = join(input.artifacts, 'wave-fast.log');
   const logTail = (() => {
     try {
@@ -92,13 +123,36 @@ export function runCodexRepair(input) {
   ].join('\n');
   const command = buildCodexExecArgs(route, { worktree });
   const started = Date.now();
-  const run = spawnSync(command[0], command.slice(1), {
-    cwd: worktree,
-    input: `${prompt}\n`,
-    encoding: 'utf8',
-    timeout: Number(input['timeout-ms'] ?? 30 * 60_000),
-    maxBuffer: 64 * 1024 * 1024,
-  });
+  let run;
+  try {
+    run = spawnSync(command[0], command.slice(1), {
+      cwd: worktree,
+      input: `${prompt}\n`,
+      encoding: 'utf8',
+      timeout: Number(input['timeout-ms'] ?? 30 * 60_000),
+      maxBuffer: 64 * 1024 * 1024,
+    });
+  } finally {
+    // Finally-equivalent release: success, failure, timeout, and cancellation
+    // all flow through here (worktree/branch cleanup below is success-path).
+    releaseLanePermit(stateDir, holder, 'codex');
+  }
+  // Engine-specific attribution (H2 §5/§6): the repair outcome feeds ONLY
+  // the Codex pool — same canonical event mapping as the writers.
+  try {
+    const detail = `${run?.stderr ?? ''}\n${run?.stdout ?? ''}`;
+    const classification =
+      run?.error?.code === 'ETIMEDOUT'
+        ? 'TIMEOUT'
+        : run?.status === 0
+          ? 'SUCCESS'
+          : /429|rate.?limit|usage.?limit|quota|exhaust|overload/i.test(detail)
+            ? 'TRANSIENT_PROVIDER_FAILURE'
+            : 'SEMANTIC_OR_PROVIDER_FAILURE';
+    observeCodexOutcome(stateDir, codexProviderEvent(classification, detail));
+  } catch {
+    /* attribution is best-effort telemetry; never mask the repair verdict */
+  }
   writeFileSync(join(repairDir, `${token}.jsonl`), run.stdout ?? '');
   if (run.error || run.status !== 0)
     throw new Error(`CODEX_REPAIR_FAILED: ${run.error?.message ?? (run.stderr ?? '').slice(-500)}`);
@@ -155,7 +209,7 @@ export function runCodexRepair(input) {
     `${JSON.stringify(
       {
         schema: 'foresift/codex-repair@1',
-        profile: 'CODEX_AGY',
+        profile: routing.executionProfile,
         package: input.package,
         baseHead: base,
         repairHead: head,

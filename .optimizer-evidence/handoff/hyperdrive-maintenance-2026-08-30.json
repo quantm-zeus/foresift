@@ -69,8 +69,8 @@
     "6_readyQueueWiring": "DONE — #139 (buildReadyQueue+stealNext authoritative stream; capacity-event re-entry via §49 fast cadence)",
     "7_exactWriteOverride": "DONE — #139 (reason classes + WRITE_SCOPE_CONFLICT-only upgrade with exact truth both sides)",
     "8_handoffSnapshot": "DONE — this file: currentSnapshot/history separated, single currentSnapshot enforced by structure",
-    "9_aiInvocationAudit": "PENDING — inventory test needed",
-    "10_evidenceKinds": "PENDING — non-file evidence kinds (VERIFICATION_ONLY etc.); currently zero-predicted-write tasks stay open forever by design",
+    "9_aiInvocationAudit": "DONE — #140 (inventory test: pool wiring, upstream gates, workflow-yaml allowlist, pool surface, claude-lane-core release)",
+    "10_evidenceKinds": "DONE — #140 ([evidence:] vocabulary, fail-closed TASK_EVIDENCE_UNKNOWN, COORDINATOR_ARTIFACT coordinator-only, non-file kinds never completable by a lane diff)",
     "11_g1Canary": "BLOCKED until 4/5/6 runtime-proven on real waves"
   },
   "runtimeProofs": {

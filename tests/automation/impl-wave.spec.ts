@@ -563,7 +563,9 @@ describe('foresift-sharded-wave workflow contract', () => {
       expect(claude?.[0]).toMatch(
         /retry:\s*\{\s*max_attempts:\s*2,\s*delay_ms:\s*10000,\s*on_error:\s*all\s*\}/,
       );
-      expect(claude?.[0]).toContain(`exec-claude-writer.mjs \\\n        --timeout-ms 3300000 \\\n        --lane ${lane}`);
+      expect(claude?.[0]).toContain(
+        `exec-claude-writer.mjs \\\n        --timeout-ms 3300000 \\\n        --lane ${lane}`,
+      );
       expect(claude?.[0]).toContain(`--brief "$ARTIFACTS_DIR/briefs/${lane}-brief.md"`);
       expect(claude?.[0]).toContain(`--worktree "$ARTIFACTS_DIR/wt/${lane}"`);
       expect(claude?.[0]).toContain(`--results-dir "$ARTIFACTS_DIR/writer-results/${lane}"`);

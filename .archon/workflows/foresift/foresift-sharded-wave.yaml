@@ -201,6 +201,7 @@ nodes:
     timeout: 3600000
     bash: |
       node scripts/automation/exec-codex-writer.mjs --lane shard-1 \
+        --timeout-ms 3300000 \
         --brief "$ARTIFACTS_DIR/briefs/shard-1-brief.md" \
         --worktree "$ARTIFACTS_DIR/wt/shard-1" \
         --routing "$ARTIFACTS_DIR/routing.json" \
@@ -214,6 +215,7 @@ nodes:
     timeout: 3600000
     bash: |
       node scripts/automation/exec-codex-writer.mjs --lane shard-2 \
+        --timeout-ms 3300000 \
         --brief "$ARTIFACTS_DIR/briefs/shard-2-brief.md" \
         --worktree "$ARTIFACTS_DIR/wt/shard-2" \
         --routing "$ARTIFACTS_DIR/routing.json" \

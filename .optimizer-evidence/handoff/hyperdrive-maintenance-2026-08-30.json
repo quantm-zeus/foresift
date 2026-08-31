@@ -54,7 +54,12 @@
   "autopilot": {
     "service": "foresift-autopilot.service active (PID 196166) — EXACTLY ONE supervisor",
     "state": "paused_fatal: landing pending for run 8e2bf257 (expected — lander runs supervised by maintainer, not autopilot)",
-    "note": "after g0-mcp-surface landing PR merges: systemctl --user stop foresift-autopilot; node scripts/automation/foresift-autopilot.mjs --recover-fatal; systemctl --user start foresift-autopilot. Fresh continuation re-enters admission gate; already-landed short-circuit records PROVEN. G0 becomes 7/8."
+    "note": "after g0-mcp-surface landing PR merges: systemctl --user stop foresift-autopilot; node scripts/automation/foresift-autopilot.mjs --recover-fatal; systemctl --user start foresift-autopilot. Fresh continuation re-enters admission gate; already-landed short-circuit records PROVEN. G0 becomes 7/8.",
+    "recoveryExecuted": {
+      "at": "2026-08-31T04:15:44Z",
+      "sequence": "service stopped → --recover-fatal (operator_recovery_retired_dead_run: old run 8e2bf257 already terminal/completed; abandoned refused benign) → operator_recovery_fresh_launch HYBRID_AGY → operator_recovery_complete: tracked as run a027bed32b014c6ac072368e57aef958, pause cleared → service restarted (MainPID 324356, exactly one supervisor)",
+      "freshRun": "detached archon run cli-1788149741301-74wwaa started; when_conditions skipped all writer lanes (work already landed), test-author lane started — expect already-landed short-circuit → PROVEN, G0 7/8"
+    }
   },
   "providerPoolState": {
     "holdersFile": "~/.local/state/foresift/provider-pools.holders.json (currently {} — clean)",

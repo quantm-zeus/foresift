@@ -86,5 +86,46 @@
     "then H2 P1 backlog: post-integration manifest duty ordering, coordinator task metadata, exact-write preflight, exact-lease scheduling, shared-surface lane, global ready queue/work stealing, resource governor"
   ],
   "blockers": [],
-  "resourceState": "15GiB RAM ~12Gi free; disk 84G free — GREEN"
+  "resourceState": "15GiB RAM ~12Gi free; disk 84G free — GREEN",
+  "newMission": {
+    "receivedAt": "2026-08-31T04:55:00Z",
+    "title": "HYPERDRIVE FINAL CORRECTNESS + G1 SCALE READINESS DELTA",
+    "constraint": "do NOT touch healthy g0-traceability-conformance run (8122d6ae, planning-bootstrap running, state PR #127 already flipped RUNNING); develop in isolated worktree /home/minhquan_eth/foresift-h3 branch hyperdrive/h3-correctness from origin/main 292dcf6",
+    "p0": [
+      "evidence-backed task completion (kill ANY_DIFF=>ALL_COMPLETE in codex/claude/agy writers + coordinator validation + MCP-incident regression)",
+      "CODEX_AGY run-level permit double-count removal + hermetic limit-1/limit-3 tests",
+      "provider independence in admission (no Claude probe requirement for CODEX_AGY; HYBRID fails only when no compatible engine)",
+      "real Codex->Claude lane handoff on true quota exhaustion (persist, release, re-acquire, same identity, no duplicates)",
+      "post-integration manifest duties systemic + executor/kind task metadata (zero-AI coordinator, fail-closed unknown executor)"
+    ],
+    "p1": [
+      "exact-lease preflight primitive (disjoint co-run; shared-surface serial lane; keep conservative fallback; no traceability identity change)",
+      "global ready queue + work stealing",
+      "host resource governor GREEN/YELLOW/ORANGE/RED before concurrency increase"
+    ],
+    "p2": [
+      "codex cost policy tiers (Terra/Sol, reasoning by risk/complexity separation)",
+      "adaptive lane count / AGY parallelism"
+    ],
+    "completionGate": "P0 correctness + resource-safe scheduling authoritative BEFORE G1 large-scale parallel execution; Hyperdrive not complete until runtime proves the 9-item completion claim"
+  },
+  "h3Progress": {
+    "branch": "hyperdrive/h3-correctness (worktree /home/minhquan_eth/foresift-h3, base 292dcf6)",
+    "commits": {
+      "6731371": "typecheck debt",
+      "739a930": "P0-1 evidence-backed task completion (writers nominate, coordinator validates, MCP-incident regression)",
+      "c6e6110": "P0-2 CODEX_AGY permit double-count removal + P0-3 provider independence (productEnginesForProfile, any-engine-serviceable admission)",
+      "51dcf46": "P0-4 real Codex→Claude engine handoff (engine-handoff.mjs + claude-lane-core.mjs, 7 runtime tests)",
+      "2d78332": "P0-5 explicit executor/kind task metadata + wave-coordinator-duties.mjs (manifest regen→coverage→commit, zero-AI)",
+      "d7a97ca": "P1-8 resource governor GREEN/YELLOW/ORANGE/RED (live host GREEN 84%)"
+    },
+    "remaining": [
+      "P1-6 exact-lease preflight",
+      "P1-7 global ready queue + work stealing",
+      "P2-9 codex cost policy",
+      "P2-10 adaptive lane count",
+      "full gate burn + PR"
+    ],
+    "productRun": "g0-traceability-conformance planning still running (8122d6ae), untouched"
+  }
 }

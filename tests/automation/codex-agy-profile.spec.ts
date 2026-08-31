@@ -417,7 +417,7 @@ describe('Foresift V4 CODEX_AGY execution profile test matrix (A through AH)', (
   });
 
   describe('Matrix N: Complexity tier model and reasoning effort policy', () => {
-    it('assigns gpt-5.6-terra to LOW/MEDIUM, gpt-5.6-sol to HIGH, medium reasoning everywhere', async () => {
+    it('assigns gpt-5.6-terra to LOW/MEDIUM, gpt-5.6-sol to HIGH; LOW reasoning low, MEDIUM/HIGH medium (H3 P2-9 cost policy)', async () => {
       const mod = await loadCodexRoutingModule();
 
       const lowRoute = mod.routeCodexLane({
@@ -429,7 +429,7 @@ describe('Foresift V4 CODEX_AGY execution profile test matrix (A through AH)', (
       });
       expect(lowRoute.complexityTier).toBe('LOW');
       expect(lowRoute.model).toBe('gpt-5.6-terra');
-      expect(lowRoute.reasoning).toBe('medium');
+      expect(lowRoute.reasoning).toBe('low');
 
       const medRoute = mod.routeCodexLane({
         lane: 'shard-med',
@@ -627,7 +627,7 @@ describe('Foresift V4 CODEX_AGY execution profile test matrix (A through AH)', (
       expect(highRetryTwice.reasoning).toBe('medium');
     });
 
-    it('escalations climb LOW→MEDIUM→HIGH with a monotone counter and medium ceiling', async () => {
+    it('escalations climb LOW→MEDIUM→HIGH with a monotone counter; the ONE bounded escalation reaches Sol/high, further burns refuse (H3 P2-9)', async () => {
       const mod = await loadCodexRoutingModule();
       let route = mod.routeCodexLane({
         lane: 'core',
@@ -635,27 +635,24 @@ describe('Foresift V4 CODEX_AGY execution profile test matrix (A through AH)', (
         complexityTier: 'LOW',
         taskIds: ['t1'],
       });
+      // FIRST dispatch never burns high reasoning (LOW tier → low).
+      expect(route.reasoning).toBe('low');
       route = mod.escalateCodexRoute(route);
       expect(route.complexityTier).toBe('MEDIUM');
       expect(route.model).toBe('gpt-5.6-terra');
       expect(route.escalation).toBe(1);
-      route = mod.escalateCodexRoute(route);
-      expect(route.complexityTier).toBe('HIGH');
-      expect(route.model).toBe('gpt-5.6-sol');
-      expect(route.escalation).toBe(2);
-      route = mod.escalateCodexRoute(route);
-      expect(route.model).toBe('gpt-5.6-sol');
-      expect(route.escalation).toBe(3);
-      // Sol never automatically moves to high/xhigh reasoning.
-      expect(route.reasoning).toBe('medium');
+      expect(route.reasoning).toBe('high');
+      // Escalation budget: ONE evidence-driven Sol/high. The next burn refuses.
+      expect(() => mod.escalateCodexRoute(route)).toThrow(/CODEX_ESCALATION_BUDGET_EXHAUSTED/);
     });
 
-    it('reasoning is pinned to medium across every route, retry, and escalation', async () => {
+    it('reasoning is pinned to low/medium across every route and retry; never high outside the bounded escalation', async () => {
       const mod = await loadCodexRoutingModule();
       let route = mod.routeCodexLane({ lane: 'core', risk: 'CRITICAL', taskIds: ['t1'] });
+      expect(route.reasoning).toBe('medium');
       for (let i = 0; i < 4; i++) {
-        expect(route.reasoning).toBe('medium');
         route = mod.retryCodexRoute(route);
+        expect(route.reasoning).toBe('medium');
       }
       expect(route.reasoning).toBe('medium');
     });
@@ -1946,7 +1943,7 @@ process.exit(${JSON.stringify(options.exitCode ?? 0)});
   });
 
   describe('Matrix AI: repair route selection for lane-less waves', () => {
-    it('picks the highest-tier implementation lane and escalates it to HIGH', async () => {
+    it('picks the highest-tier implementation lane and escalates it to HIGH via the ONE bounded Sol/high escalation (H3 P2-9)', async () => {
       const mod = await loadCodexRepairModule();
       const route = mod.selectRepairRoute({
         lanes: [
@@ -1955,7 +1952,8 @@ process.exit(${JSON.stringify(options.exitCode ?? 0)});
       });
       expect(route.complexityTier).toBe('HIGH');
       expect(route.model).toBe('gpt-5.6-sol');
-      expect(route.reasoning).toBe('medium');
+      expect(route.reasoning).toBe('high');
+      expect(route.escalation).toBe(1);
       expect(route.synthesizedForLaneLessWave).toBeUndefined();
     });
 
@@ -1973,6 +1971,25 @@ process.exit(${JSON.stringify(options.exitCode ?? 0)});
       expect(route.serviceTier).toBe('standard');
       expect(route.cliServiceTier).toBe('default');
       expect(route.synthesizedForLaneLessWave).toBe(true);
+    });
+
+    it('an already-escalated route is NOT escalated twice (escalation budget exhausted)', async () => {
+      const mod = await loadCodexRepairModule();
+      const route = mod.selectRepairRoute({
+        lanes: [
+          {
+            lane: 'core',
+            role: 'implementation',
+            engine: 'CODEX',
+            complexityTier: 'HIGH',
+            model: 'gpt-5.6-sol',
+            reasoning: 'high',
+            escalation: 1,
+          },
+        ],
+      });
+      expect(route.escalation).toBe(1);
+      expect(route.reasoning).toBe('high');
     });
   });
 

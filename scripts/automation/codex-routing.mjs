@@ -88,7 +88,12 @@ export function routeCodexLane(input = {}, availability = Object.values(CODEX_MO
   const availabilityList = availability?.availableModels ?? availability;
   const available = availabilityList instanceof Set ? availabilityList : new Set(availabilityList);
   if (!available.has(model)) throw new Error(`REQUIRED_HIGH_MODEL_UNAVAILABLE: ${model}`);
-  const reasoning = 'medium';
+  // Cost policy (H3 P2-9): reasoning burn tracks the lane's tier — LOW lanes
+  // (only reached on Codex under an explicit operator profile; HYBRID routes
+  // LOW to Claude) run the cheapest effort, MEDIUM and HIGH run medium.
+  // HIGH reasoning is reachable ONLY through the single bounded semantic-
+  // repair escalation (escalateCodexRoute), never on first dispatch.
+  const reasoning = classification.complexityTier === 'LOW' ? 'low' : 'medium';
   return {
     lane: input.lane ?? 'core',
     taskIds: [...(input.taskIds ?? (input.units ?? []).map((u) => u.id).filter(Boolean))],
@@ -128,6 +133,13 @@ export function retryCodexRoute(route) {
 }
 
 export function escalateCodexRoute(route, availability = Object.values(CODEX_MODELS)) {
+  // Bounded HARD semantic-repair escalation (H3 P2-9): exactly ONE — a route
+  // may burn Sol/high at most once over its lifetime; further escalations
+  // refuse instead of silently re-burning. Callers treat the thrown refusal
+  // as "escalation budget exhausted" and route to TEST_DISPUTE / smaller
+  // decomposition / maintainer escalation.
+  if ((route.escalation ?? 0) >= 1)
+    throw new Error('CODEX_ESCALATION_BUDGET_EXHAUSTED: one evidence-driven Sol/high allowed');
   const next = CODEX_ESCALATION_LADDER[route.complexityTier] ?? 'HIGH';
   const model = CODEX_MODELS[next] ?? CODEX_MODELS.HIGH;
   const availabilityList = availability?.availableModels ?? availability;
@@ -137,7 +149,7 @@ export function escalateCodexRoute(route, availability = Object.values(CODEX_MOD
     ...route,
     complexityTier: next,
     model,
-    reasoning: 'medium',
+    reasoning: 'high',
     serviceTier: CODEX_SERVICE_TIER,
     cliServiceTier: CODEX_CLI_SERVICE_TIER,
     escalation: (route.escalation ?? 0) + 1,

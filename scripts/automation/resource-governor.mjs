@@ -65,9 +65,13 @@ function heavyProcessCount() {
 
 /**
  * Classify the host. `sample` injection makes the classification pure and
- * hermetically testable; production callers omit it.
+ * hermetically testable; production callers omit it. FORESIFT_GOVERNOR_STATE
+ * forces the verdict (operator drill + hermetic supervisor wiring tests) —
+ * the live sample is still computed first so the returned shape carries real
+ * numbers, but the STATE is the forced one.
  */
 export function classifyHostState(sample = null) {
+  const forced = process.env.FORESIFT_GOVERNOR_STATE;
   const { total, available, heavyProcesses } =
     sample ??
     (() => {
@@ -76,12 +80,21 @@ export function classifyHostState(sample = null) {
     })();
   if (!total || total <= 0)
     return {
-      state: 'YELLOW',
+      state: forced ?? 'YELLOW',
       availableFrac: 0,
       heavyProcesses,
-      reason: 'unreadable memory info — conservative floor',
+      reason: forced
+        ? `FORESIFT_GOVERNOR_STATE=${forced} override`
+        : 'unreadable memory info — conservative floor',
     };
   const availableFrac = available / total;
+  if (forced)
+    return {
+      state: forced,
+      availableFrac,
+      heavyProcesses,
+      reason: `FORESIFT_GOVERNOR_STATE=${forced} override`,
+    };
   const d = RESOURCE_GOVERNOR_DEFAULTS;
   if (availableFrac < d.redMemoryFrac || heavyProcesses >= d.redHeavyProcesses)
     return {

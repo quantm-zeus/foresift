@@ -84,5 +84,15 @@
     "evidence": "spec:verify 13 checks OK; prettier/eslint/typecheck clean; PR CI green at exact head",
     "mergedMainCi": "run 33379379901 GREEN at 54e8bd3 — scheduling layer authoritative on main",
     "remaining": "P1-7 supervisor-tick wiring of stealNext into capacity events (primitive landed); H3 completion proofs checklist continues"
+  },
+  "waveTimeoutFix": {
+    "at": "2026-08-31T10:55Z",
+    "incident": "Run c38c2e1b: both Claude handoff lanes hit the silent 45m claude-lane-core default at 2700s (106 tool uses, mid-implementation); all work lost; the retry's handoff acquire was denied PROVIDER_BACKOFF (AIMD degraded after timeouts) and recovery policy exhausted into paused_fatal.",
+    "fixes": [
+      "PR #131 (merge 39259d3): all six writer lanes in foresift-sharded-wave.yaml pass --timeout-ms 3300000 (55m) inside the 60m DAG node budget; impl-wave contract test pins the flag",
+      "PR #132 (merge 5771b95): classifyFailure maps CODEX_QUOTA_EXHAUSTED/CODEX_QUOTA_RESET_WAIT to QUOTA_DAILY (durable probe pause) and PROVIDER_BACKOFF/POOL_AT_LIMIT to TRANSIENT"
+    ],
+    "recovery": "recover-fatal at 10:51Z launched run 95c45071; base pinned 0ed9a3e (raced the worktree absorb) but the DAG reads the FIXED workflow from the main repo so lanes get 55m explicitly; worktree absorbed to a5376e9 mid-run; claude pool AIMD-degraded to limit 1 (recovers via healthy streaks)",
+    "pr131FlakeNote": "PR #131 CI: first run's process-7 GROUP TIMEOUT + two formatting-gate misses (impl-wave.spec.ts, handoff JSON) — fixed and re-run green at exact head b004dba; BEHIND main after #132 required a main merge + fresh CI at 0164c93 before merge"
   }
 }

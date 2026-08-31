@@ -274,6 +274,27 @@ ${Array.from(
     expect(serial[0].chainId).toBeUndefined();
   });
 
+  it('folds parallel units into the core when plan-shards 1 leaves no parallel slots', () => {
+    // --plan-shards 1 (governor YELLOW path: adaptive lanes resolve to 1) used
+    // to crash the planner: extra=0 → groups=[] → `target ?? groups[0]` was
+    // undefined and `target.units.push` threw. The surviving [P] unit must be
+    // demoted into the serial column instead — the plan never drops work.
+    const out = join(fx.artifacts, 'graph-plan-shards-1.json');
+    const r = spawnSync(
+      process.execPath,
+      [GRAPH, '--package', 'pkg-x', '--root', fx.root, '--plan-shards', '1', '--out', out],
+      { encoding: 'utf8' },
+    );
+    expect(r.status).toBe(0);
+    const g = JSON.parse(readFileSync(out, 'utf8'));
+    expect(g.shards).toHaveLength(1); // core only, no parallel slots exist
+    const core = g.shards[0];
+    expect(core.mode).toBe('serial');
+    expect(core.id).toBe('core');
+    // T104 (the [P] unit with a core-disjoint write) rides in the core column
+    expect(core.units).toEqual(expect.arrayContaining(['T102', 'T104']));
+  });
+
   it('closure-demotes group units that collide with core after demotion (live 95c45071 guard refusal)', () => {
     // T017-shape: a [P] unit depends on core units, is demoted to core, and
     // shares a predicted write with a parallel group unit (T004-shape owned

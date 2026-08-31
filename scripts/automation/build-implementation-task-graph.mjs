@@ -277,25 +277,32 @@ if (args.planShards !== undefined) {
   const SIZE_W = { small: 1, medium: 2, large: 4 };
   const groups = Array.from({ length: extra }, () => ({ units: [], writes: new Set(), load: 0 }));
   const unitSize = (u) => SIZE_W[u.estimatedSize] ?? 2;
-  for (const u of par) {
-    // Compatible = write-disjoint AND dependency-disjoint; among those prefer
-    // the least-loaded shard so work spreads instead of piling onto shard-1.
-    const compatible = groups.filter(
-      (g) =>
-        g.units.length > 0 &&
-        !writesFor(u).some((p) => g.writes.has(p)) &&
-        !u.dependsOn.some((d) => g.units.some((x) => x.id === d)),
-    );
-    // An unused group is also a candidate — otherwise the first group hoovers
-    // up every unit even when another writer slot sits idle.
-    const empty = groups.find((g) => g.units.length === 0);
-    const pool = [...compatible, ...(empty ? [empty] : [])];
-    const target =
-      pool.sort((a, b) => a.load - b.load || a.units.length - b.units.length)[0] ?? groups[0];
-    target.units.push(u.id);
-    for (const p of writesFor(u)) target.writes.add(p);
-    target.load += unitSize(u);
-  }
+  // plan-shards 1 has NO parallel slots: leftover [P] units previously crashed
+  // the plan (`target ?? groups[0]` is undefined — observed on the governor's
+  // YELLOW path where adaptive lanes resolve to 1 and the wave prep then runs
+  // the planner with --plan-shards 1). Demote them into the serial column
+  // instead: the plan never drops work, and batching executes them serially.
+  if (groups.length === 0) serial.push(...par);
+  else
+    for (const u of par) {
+      // Compatible = write-disjoint AND dependency-disjoint; among those prefer
+      // the least-loaded shard so work spreads instead of piling onto shard-1.
+      const compatible = groups.filter(
+        (g) =>
+          g.units.length > 0 &&
+          !writesFor(u).some((p) => g.writes.has(p)) &&
+          !u.dependsOn.some((d) => g.units.some((x) => x.id === d)),
+      );
+      // An unused group is also a candidate — otherwise the first group hoovers
+      // up every unit even when another writer slot sits idle.
+      const empty = groups.find((g) => g.units.length === 0);
+      const pool = [...compatible, ...(empty ? [empty] : [])];
+      const target =
+        pool.sort((a, b) => a.load - b.load || a.units.length - b.units.length)[0] ?? groups[0];
+      target.units.push(u.id);
+      for (const p of writesFor(u)) target.writes.add(p);
+      target.load += unitSize(u);
+    }
   // Cross-lane disjointness closure (observed live 2026-08-31, run 95c45071):
   // a parallel unit that clashes the core is demoted to core AFTER groups are
   // formed — but its writes may still collide with a group's writes (T017

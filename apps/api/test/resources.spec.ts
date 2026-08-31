@@ -7,7 +7,6 @@ import { describe, expect, it } from 'bun:test';
 import {
   MCP_MALICIOUS_RESOURCE_URIS,
   MCP_SSRF_RESOURCE_URIS,
-  STANDARD_DISCOVERY_CREDENTIAL,
 } from '../../../tests/fixtures/mcp/index.ts';
 
 async function loadResourcesModule() {
@@ -103,7 +102,8 @@ describe('T016: MCP resources & per-access authorization (AC-252, FR-MCP-010)', 
   it('sanitizes browser-rendered content preventing active scripts', async () => {
     const { sanitizeResourceContent } = await loadResourcesModule();
 
-    const unsanitized = '<script>alert(1)</script><p>Clean Text</p><img src="x" onerror="steal()"/>';
+    const unsanitized =
+      '<script>alert(1)</script><p>Clean Text</p><img src="x" onerror="steal()"/>';
     const sanitized = sanitizeResourceContent(unsanitized);
 
     expect(sanitized).not.toContain('<script>');

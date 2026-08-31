@@ -29,7 +29,6 @@ async function loadMaintainerIncidentModule() {
 }
 
 async function loadAgyTestWriterModule() {
-  // @ts-expect-error untyped dynamic import for module concurrently authored in codex lane
   return await import('../../scripts/automation/exec-agy-test-writer.mjs');
 }
 
@@ -1546,6 +1545,8 @@ process.exit(${JSON.stringify(options.exitCode ?? 0)});
       // Missing routing argument
       expect(() =>
         mod.runAgyTestWriter({
+          package: 'pkg-test',
+          generation: '0',
           lane: 'test-author',
           brief: fx.brief,
           worktree: fx.wt,
@@ -1556,6 +1557,8 @@ process.exit(${JSON.stringify(options.exitCode ?? 0)});
       // Non-existent routing file
       expect(() =>
         mod.runAgyTestWriter({
+          package: 'pkg-test',
+          generation: '0',
           lane: 'test-author',
           brief: fx.brief,
           worktree: fx.wt,
@@ -1569,6 +1572,8 @@ process.exit(${JSON.stringify(options.exitCode ?? 0)});
       writeFileSync(emptyRoutingPath, JSON.stringify({ lanes: [] }));
       expect(() =>
         mod.runAgyTestWriter({
+          package: 'pkg-test',
+          generation: '0',
           lane: 'test-author',
           brief: fx.brief,
           worktree: fx.wt,
@@ -1587,6 +1592,8 @@ process.exit(${JSON.stringify(options.exitCode ?? 0)});
       );
       expect(() =>
         mod.runAgyTestWriter({
+          package: 'pkg-test',
+          generation: '0',
           lane: 'test-author',
           brief: fx.brief,
           worktree: fx.wt,
@@ -1610,6 +1617,8 @@ process.exit(${JSON.stringify(options.exitCode ?? 0)});
         writeFileSync(invalidPath, JSON.stringify({ lanes: [invalidRoute] }));
         expect(() =>
           mod.runAgyTestWriter({
+            package: 'pkg-test',
+            generation: '0',
             lane: 'test-author',
             brief: fx.brief,
             worktree: fx.wt,
@@ -1649,6 +1658,8 @@ process.exit(${JSON.stringify(options.exitCode ?? 0)});
         process.env.PATH = `${fx.binDir}:${prevPath}`;
 
         const result = mod.runAgyTestWriter({
+          package: 'pkg-test',
+          generation: '0',
           lane: 'test-author',
           brief: fx.brief,
           worktree: fx.wt,
@@ -1749,6 +1760,8 @@ process.exit(${JSON.stringify(options.exitCode ?? 0)});
         process.env.PATH = `${fx.binDir}:${prevPath}`;
         expect(() =>
           mod.runAgyTestWriter({
+            package: 'pkg-test',
+            generation: '0',
             lane: 'test-author',
             brief: fx.brief,
             worktree: fx.wt,
@@ -1776,6 +1789,8 @@ process.exit(${JSON.stringify(options.exitCode ?? 0)});
         process.env.PATH = `${fxInvalid.binDir}:${prevPath}`;
         expect(() =>
           mod.runAgyTestWriter({
+            package: 'pkg-test',
+            generation: '0',
             lane: 'test-author',
             brief: fxInvalid.brief,
             worktree: fxInvalid.wt,
@@ -1798,6 +1813,8 @@ process.exit(${JSON.stringify(options.exitCode ?? 0)});
         process.env.PATH = `${fxEmpty.binDir}:${prevPath}`;
         expect(() =>
           mod.runAgyTestWriter({
+            package: 'pkg-test',
+            generation: '0',
             lane: 'test-author',
             brief: fxEmpty.brief,
             worktree: fxEmpty.wt,
@@ -1822,6 +1839,8 @@ process.exit(${JSON.stringify(options.exitCode ?? 0)});
         process.env.PATH = `${fxFail.binDir}:${prevPath}`;
         expect(() =>
           mod.runAgyTestWriter({
+            package: 'pkg-test',
+            generation: '0',
             lane: 'test-author',
             brief: fxFail.brief,
             worktree: fxFail.wt,
@@ -1840,6 +1859,8 @@ process.exit(${JSON.stringify(options.exitCode ?? 0)});
         process.env.PATH = `${fxNoResult.binDir}:${prevPath}`;
         expect(() =>
           mod.runAgyTestWriter({
+            package: 'pkg-test',
+            generation: '0',
             lane: 'test-author',
             brief: fxNoResult.brief,
             worktree: fxNoResult.wt,
@@ -2037,6 +2058,8 @@ writeFileSync(${JSON.stringify(join(resultsDir, 'agent-result.json'))}, JSON.str
       process.env.PATH = `${fx.dir}/bin:${prevPath}`;
       try {
         const result = mod.runAgyTestWriter({
+          package: 'pkg-test',
+          generation: '0',
           lane: 'test-author',
           brief: fx.briefPath,
           worktree: fx.wt,

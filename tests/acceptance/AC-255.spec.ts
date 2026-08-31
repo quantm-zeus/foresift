@@ -265,7 +265,11 @@ describe('AC-255 acceptance (tool-core substrate): permitted query fixtures pass
       },
       data: {
         holders: [
-          { address: '7xKXtg2CW87d97TXJSDpbD5jBkheTqA83TZRuJosgAsU', balance: 50000, percentage: 5.0 },
+          {
+            address: '7xKXtg2CW87d97TXJSDpbD5jBkheTqA83TZRuJosgAsU',
+            balance: 50000,
+            percentage: 5.0,
+          },
         ],
       },
     };

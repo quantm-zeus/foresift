@@ -45,7 +45,7 @@ describe('T014: MCP tools catalog and profile binding (AC-001, FR-MCP-002)', () 
     let toolCoreCalled = false;
 
     const mockToolCore = {
-      execute: async (req: unknown) => {
+      execute: async (_req: unknown) => {
         toolCoreCalled = true;
         return {
           data: { result: 'ok' },

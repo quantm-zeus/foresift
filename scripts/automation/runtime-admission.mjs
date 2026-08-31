@@ -4,16 +4,25 @@
 //
 // Contract:
 //   - ONE global pool per provider across all concurrent packages (§17) — a
-//     launch acquires its permits from the SAME pool every other launch uses.
+//     launch probes/admits against the SAME pool every other launch uses.
+//   - Runtime provider concurrency is owned by LANE PERMITS (provider-pool
+//     acquireLanePermit): ONE actual provider invocation = ONE permit, held
+//     exactly for the invocation's lifetime by the lane wrapper. The
+//     supervisor holds NO run-level reservations for lane-bearing engines —
+//     a package-level reservation would double-count against its own lanes
+//     and deterministically deny lanes under default pool policy (review
+//     finding 2).
 //   - Claude is required in every profile: it is the fallback engine (§20),
-//     so a Claude-blocked pool denies the launch outright. Codex-blocked only
-//     denies CODEX_AGY launches; HYBRID/CLAUDE_AGY proceed Claude-only and
-//     the wave's routing reroutes Codex lanes to Claude (quota fallback).
+//     so a launch is refused when the Claude pool has zero headroom — probed
+//     acquire+release, nothing held. Codex quota health is observed per-lane
+//     (observeCodexOutcome); a CODEX_QUOTA_* latched pool reroutes compatible
+//     work to Claude via the wave's routing.
 //   - Unknown/empty exact write sets fail closed to a conservative scope
 //     lease over the package's declared writeScopes (§41).
-//   - Release is idempotent and total: permits + leases always travel
-//     together through releasePackageRuntime so a terminal run can never leak
-//     a permit or strand a lease across a supervisor restart.
+//   - Release is idempotent and total: leases always travel through
+//     releasePackageRuntime so a terminal run can never strand a lease across
+//     a supervisor restart. (Held provider permits no longer exist at run
+//     level; releasePackageRuntime stays compatible with old entries.)
 //
 // Zero AI: admission is deterministic arithmetic over durable state files.
 
@@ -24,9 +33,9 @@ import { acquirePermit, releasePermit } from './provider-pool.mjs';
 export function providersForProfile(profile) {
   switch (profile) {
     // Claude first in every profile: it is the §20 fallback engine, so its
-    // permit is the one prerequisite no launch may proceed without. AGY is
-    // the TEST-writer pool — its single permit is held by the RUN (test lanes
-    // dispatch per wave), so it rides along here as a run-level reservation.
+    // health gates every launch. Codex and AGY are the writer/test pools —
+    // under the H2 lane-permit model their runtime counts live in per-lane
+    // permits, not in package-level reservations.
     case 'CODEX_AGY':
       return ['claude', 'codex', 'agy'];
     case 'CLAUDE_AGY':
@@ -39,74 +48,92 @@ export function providersForProfile(profile) {
 }
 
 /**
- * Providers the SUPERVISOR admits for the package-level gate. Codex is not
- * among them unless the profile is Codex-only: under HYBRID the per-lane
- * router owns which lanes consume Codex inside the wave, and reserving a
- * package-wide Codex permit here would both over-block (one lane ≠ one
- * package) and under-observe (the pool never sees release until the whole
- * package ends).
+ * Providers the SUPERVISOR admits for the package-level gate. Lane-bearing
+ * engines are NOT reserved at package level (review finding 2): every writer
+ * and repair lane acquires its OWN lane permit from the same global pool
+ * immediately before its provider invocation, so a run-level reservation for
+ * claude/codex would double-count against the lanes and — under default
+ * policy (claude 3, codex 1) with up to 3 concurrent lanes — deny lanes
+ * deterministically (POOL_AT_LIMIT) and fail the wave. Only CODEX_AGY keeps
+ * a run-level codex reservation: the legacy Codex-only wave dispatches one
+ * serialized codex stream that is the run itself.
  */
 export function supervisorProvidersForProfile(profile) {
-  return providersForProfile(profile).filter((p) => p !== 'codex' || profile === 'CODEX_AGY');
+  // CODEX_AGY: the legacy Codex-only wave dispatches one serialized codex
+  // stream that IS the run, so its codex permit is held at package level.
+  // Every other engine dispatches per-lane writers that hold their own lane
+  // permits — no run-level reservation (review finding 2).
+  return providersForProfile(profile).filter((p) => p === 'codex' && profile === 'CODEX_AGY');
 }
 
 /**
  * Deterministic pre-launch admission for ONE package. Returns
  * { ok, providers, fallback, reason } — ok:false leaves NO partial state
- * (permits acquired before a later failure are released again).
+ * (leases granted before a later failure are released again).
  *
- *   providers — every provider a permit was acquired for (held for the run)
+ *   providers — every provider permit HELD for the run (only CODEX_AGY's
+ *               codex reservation today; lane-bearing engines hold none)
  *   fallback  — providers skipped because the pool reroutes their work
  *               (Codex exhausted under HYBRID/CLAUDE_AGY ⇒ Claude fallback)
  */
 export function admitPackageLaunch(stateDir, pkg, executionProfile, opts = {}) {
   if (!pkg?.id) return { ok: false, providers: [], fallback: [], reason: 'INVALID_PACKAGE' };
-  let wantedAll;
+  const acquired = [];
+  // Profile validation first (fail closed before touching any pool state).
   try {
-    wantedAll = providersForProfile(executionProfile);
+    providersForProfile(executionProfile);
   } catch {
     return { ok: false, providers: [], fallback: [], reason: 'INVALID_PROFILE' };
   }
-  // Supervisor gate: Claude (mandatory fallback engine) + AGY; Codex rides
-  // the package gate only for Codex-only profiles. HYBRID waves consume
-  // Codex per-lane inside the run, observed via observeCodexOutcome.
-  const wanted =
-    executionProfile === 'CODEX_AGY' ? wantedAll : wantedAll.filter((p) => p !== 'codex');
-  const acquired = [];
-  const fallback = [];
-  const unwind = () => {
-    // Fail-closed: a non-admitted launch must not leak permits it grabbed.
-    for (const provider of acquired) {
-      try {
-        releasePermit(stateDir, provider);
-      } catch {}
+  // Claude admission PROBE (review finding 2): acquire+release against the
+  // SAME pool the lanes do, holding nothing. Claude is the §20 fallback
+  // engine, so a launch is refused when the Claude pool has zero headroom or
+  // is in pressure backoff — but no run-level permit is held, and capacity
+  // freed by lane completion is immediately visible to the lanes themselves.
+  try {
+    const claudeProbe = acquirePermit(stateDir, 'claude', { now: opts.now ?? Date.now() });
+    if (claudeProbe.ok) {
+      releasePermit(stateDir, 'claude');
+    } else {
+      return {
+        ok: false,
+        providers: [],
+        fallback: [],
+        reason: `${claudeProbe.reason ?? 'POOL_AT_LIMIT'}: provider claude`,
+      };
     }
-  };
-  for (const provider of wanted) {
+  } catch (err) {
+    return {
+      ok: false,
+      providers: [],
+      fallback: [],
+      reason: `CLAUDE_PROBE_ERROR: ${String(err?.message ?? err)}`,
+    };
+  }
+  // Run-level reservations: ONLY the run-is-the-stream engines that do not
+  // dispatch per-lane writers (CODEX_AGY's serialized codex stream). See
+  // supervisorProvidersForProfile.
+  const runLevel = supervisorProvidersForProfile(executionProfile).filter((p) => p === 'codex');
+  for (const provider of runLevel) {
     const permit = acquirePermit(stateDir, provider, { now: opts.now ?? Date.now() });
     if (permit.ok) {
       acquired.push(provider);
       continue;
     }
-    const codexFallback =
-      provider === 'codex' &&
-      executionProfile !== 'CODEX_AGY' &&
-      String(permit.reason ?? '').startsWith('CODEX_QUOTA_');
-    if (codexFallback) {
-      // §20: quota exhaustion is provider capacity, never a product failure
-      // — compatible work reroutes to Claude (which every profile already
-      // holds a permit for) via the wave's per-lane CLAUDE tokens.
-      fallback.push(provider);
-      continue;
+    // Fail-closed unwind: a non-admitted launch never leaks permits.
+    for (const held of acquired) {
+      try {
+        releasePermit(stateDir, held);
+      } catch {}
     }
-    unwind();
     return {
       ok: false,
       providers: [],
-      fallback,
+      fallback: [],
       reason: `${permit.reason ?? 'POOL_AT_LIMIT'}: provider ${provider}`,
     };
-  } // Exact-file leases: the supervisor cannot know per-lane exact writes
+  }
+  // Exact-file leases: the supervisor cannot know per-lane exact writes
   // before the wave's task graph exists, so it leases ONLY the root/shared
   // surfaces the package's scopes name (single-holder serialization where it
   // is provably needed) — package-level scope leases would serialize every
@@ -122,20 +149,19 @@ export function admitPackageLaunch(stateDir, pkg, executionProfile, opts = {}) {
       ? acquireLeases(stateDir, pkg.id, sharedSurfaces)
       : { ok: true, granted: [], conflicts: [] };
   } catch (err) {
-    unwind();
+    releaseLeases(stateDir, pkg.id, { reason: 'admission refused (lease error)' });
     return {
       ok: false,
       providers: [],
-      fallback,
+      fallback: [],
       reason: `LEASE_ERROR: ${String(err?.message ?? err)}`,
     };
   }
   if (!leases.ok) {
-    unwind();
     const heldBy = (leases.conflicts ?? []).map((c) => `${c.file} (${c.heldBy})`).join(', ');
-    return { ok: false, providers: [], fallback, reason: `LEASE_CONFLICT: ${heldBy}` };
+    return { ok: false, providers: [], fallback: [], reason: `LEASE_CONFLICT: ${heldBy}` };
   }
-  return { ok: true, providers: acquired, fallback, reason: 'admitted', leases: sharedSurfaces };
+  return { ok: true, providers: [], fallback: [], reason: 'admitted', leases: sharedSurfaces };
 }
 
 /** Does a package-level glob scope (e.g. `packages/a/**`) name `path`? */

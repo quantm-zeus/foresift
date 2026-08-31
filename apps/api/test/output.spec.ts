@@ -95,7 +95,9 @@ describe('T015: MCP output contract & prohibited payload scrub (AC-002, AC-004, 
     const cleanData = {
       token: 'SOL',
       marketCapUsd: 75000000000,
-      holderDistribution: [{ address: 'So11111111111111111111111111111111111111112', percentage: 4.2 }],
+      holderDistribution: [
+        { address: 'So11111111111111111111111111111111111111112', percentage: 4.2 },
+      ],
     };
 
     expect(() => scrubProhibitedPayloads(cleanData)).not.toThrow();

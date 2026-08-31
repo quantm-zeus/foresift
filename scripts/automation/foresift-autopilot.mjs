@@ -115,7 +115,11 @@ import {
 } from './launch-intent.mjs';
 import { advanceRepairRequest, discoverPendingRepairRequests } from './ci-repair-executor.mjs';
 import { admitPackageLaunch, releasePackageRuntime } from './runtime-admission.mjs';
-import { observeClaudeOutcome, observeCodexOutcome } from './provider-pool.mjs';
+import {
+  observeClaudeOutcome,
+  observeCodexOutcome,
+  reconcileLaneHolders,
+} from './provider-pool.mjs';
 
 // Overridable for hermetic selftests (sandboxed fixture repo + state dir).
 const REPO = process.env.FORESIFT_AUTOPILOT_REPO ?? join(import.meta.dirname, '..', '..');
@@ -2361,6 +2365,25 @@ function failRestartUsage(why) {
 async function tick(st) {
   let launched = 0;
   refreshMain();
+  // Lane-holder reconciliation (review finding 4): a writer killed between
+  // its acquire and release (OOM/SIGKILL bypasses every finally) strands a
+  // holder and eats pool capacity forever. Reconcile every tick with the
+  // default pid-liveness proof — pid is advisory only, so a record whose pid
+  // is dead is provably stale and freed; unknown/ambiguous holders fail
+  // closed into the journal for operator adjudication. Best-effort: pool
+  // state problems must never break the supervisory cycle.
+  try {
+    const rec = reconcileLaneHolders(STATE_DIR);
+    if (rec.released.length > 0 || rec.unknown.length > 0) {
+      record(st, 'lane_holders_reconciled', {
+        released: rec.released,
+        kept: rec.kept.length,
+        unknown: rec.unknown,
+      });
+    }
+  } catch {
+    /* pool files unreadable/corrupt: reconciliation retries next tick */
+  }
   // refreshMain ENQUEUES its fetch+ff-pull on the serialized git queue; every
   // decision below (stranded reconciliation, selection, launch identity) reads
   // the working-tree milestone. Selection must never run against the snapshot

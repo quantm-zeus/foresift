@@ -546,6 +546,11 @@ describe('foresift-sharded-wave workflow contract', () => {
     }
 
     // 2. CLAUDE_AGY fallback variants for core, shard-1, shard-2
+    // H2 §10: Claude lanes run through exec-claude-writer.mjs (bash node), so
+    // ONE actual Claude provider invocation = ONE Claude lane permit — the
+    // permit is acquired/released around the `claude --print` process inside
+    // the wrapper, covering success/failure/timeout/cancellation. Prompt
+    // nodes cannot guarantee release and are therefore forbidden for lanes.
     for (const lane of productLanes) {
       const claude = yaml.match(new RegExp(`- id: writer-${lane}-claude[\\s\\S]*?(?=\\n  - id:)`));
       expect(claude?.[0]).toBeTruthy();
@@ -554,11 +559,16 @@ describe('foresift-sharded-wave workflow contract', () => {
       expect(claude?.[0]).toMatch(
         /retry:\s*\{\s*max_attempts:\s*2,\s*delay_ms:\s*10000,\s*on_error:\s*all\s*\}/,
       );
-      expect(claude?.[0]).toContain('effort: high');
-      expect(claude?.[0]).toMatch(
-        /prompt:\s*\|[\s\S]*?CLAUDE_AGY fallback product implementation lane/,
-      );
-      expect(claude?.[0]).toContain(`$brief-${lane}.output`);
+      expect(claude?.[0]).toContain(`exec-claude-writer.mjs \\\n        --lane ${lane}`);
+      expect(claude?.[0]).toContain(`--brief "$ARTIFACTS_DIR/briefs/${lane}-brief.md"`);
+      expect(claude?.[0]).toContain(`--worktree "$ARTIFACTS_DIR/wt/${lane}"`);
+      expect(claude?.[0]).toContain(`--results-dir "$ARTIFACTS_DIR/writer-results/${lane}"`);
+      // Claimed units must reach the writer (review finding 1): integration
+      // rejects a zero-completed result, so each Claude node extracts its
+      // lane's task ids from routing.json and passes --task-ids.
+      expect(claude?.[0]).toContain(`--task-ids "$TASKS" \\\n        --package`);
+      expect(claude?.[0]).toContain(`find(l=>l.lane==="${lane}")`);
+      expect(claude?.[0]).toContain('--generation "$(');
     }
 
     // 3. AGY test-author only (and NO product AGY writers)
@@ -578,10 +588,11 @@ describe('foresift-sharded-wave workflow contract', () => {
     expect(agyTest?.[0]).toContain('--routing "$ARTIFACTS_DIR/routing.json"');
     expect(agyTest?.[0]).toContain('--results-dir "$ARTIFACTS_DIR/writer-results/test-author"');
 
-    // 4. All implementation prompts forbid test edits
+    // 4. Implementation writers carry the test-edit prohibition in their
+    // briefs (brief-shaping source), and no Claude lane is a prompt node.
     for (const lane of productLanes) {
       const claude = yaml.match(new RegExp(`- id: writer-${lane}-claude[\\s\\S]*?(?=\\n  - id:)`));
-      expect(claude?.[0]).toMatch(/prompt:\s*\|[\s\S]*?Never edit tests/);
+      expect(claude?.[0]).not.toMatch(/prompt:\s*\|/); // wrapper bash node, never a prompt node
     }
     expect(yaml).toMatch(/Never edit tests in any implementation\s+#?\s*lane/);
   });

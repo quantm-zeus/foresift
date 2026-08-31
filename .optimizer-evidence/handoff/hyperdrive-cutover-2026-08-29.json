@@ -1,0 +1,52 @@
+{
+  "schema": "foresift/maintenance-handoff@1",
+  "capturedAt": "2026-08-29T22:10:00Z",
+  "phase": "H1A_LANDED + CHECKPOINT_RESTORED + OPTIMIZED_RUNNER_ACTIVE",
+  "hyperdriveLanded": {
+    "pr": 97,
+    "prHeadSha": "bdd64871b70388cf5e9382a52721b7cffefa71f7",
+    "mergeSha": "125e60031e950fe0afeebe69a649125e342269a6",
+    "exactHeadCi": "Verify (spec, format, lint, types, tests) @ app 15368 = success on PR head AND merged main",
+    "contents": [
+      "installedCodexModels slug-prefix normalization (REQUIRED_HIGH_MODEL_UNAVAILABLE root cause)",
+      "mechanical zero-AI test-manifest regen in wave prep (AGY product-ownership violation root cause)",
+      "wave-guard stamps lane role/engine on writer verdicts",
+      "Matrix AK/AL control-plane tests"
+    ]
+  },
+  "checkpointRestore": {
+    "resumedBranch": "checkpoint/resume-g0fpo-hyperdrive (pushed)",
+    "resumeTip": "568a5609530b1b2c389b85ca8cddcc2614b9654b",
+    "resumedOnMainSha": "125e60031e950fe0afeebe69a649125e342269a6",
+    "resumedFromCheckpointSha": "ee96c440b2023e756244c76bd8a772801d13e87c",
+    "resumedFromRunId": "9cf2bf57b8046a73cd196a4332933d0c",
+    "laneMerges": "core d9c57a5 + shard-1 30db5e7 + shard-2 dd7b47a + test-author 454bd01 — all clean, zero conflicts",
+    "reuseClassification": {
+      "STILL_VALID": "64 lane files, 152 distinct paths — all adopted",
+      "NEEDS_ADAPTATION": "collector-core capacity.ts + lifecycle.ts (missing modules), transport.ts validateTransportMessage, decoder-registry resolveDecoder, AC-110 branded timestamp, AC-237.negative exactOptionalPropertyTypes, unused imports",
+      "CONFLICTING": "migration-family names (brief-era planned vs landed scripts) — deterministic reconciliation applied to central migrator.spec + 7 package migration specs",
+      "SUPERSEDED": "untracked specs in task worktree (identical to PR #96) — discarded"
+    },
+    "packageBranch": "foresift/g0-first-party-observation -> 568a560 (pushed to origin, adopted by wave)",
+    "verification": "pnpm spec:verify OK; pnpm test (coordinator, 314 files incl. 52 new) passed:true; format/lint/typecheck/node-compat clean; prohibited-capability scan clean:true"
+  },
+  "newRunner": {
+    "service": "foresift-autopilot.service",
+    "active": true,
+    "runId": "4e7698e86c36ec1d16e090f03dc39975",
+    "workflow": "foresift-sharded-wave",
+    "branchAdoption": "ADOPTED_SEED at 568a560 (checkpoint carry confirmed in lane worktrees)",
+    "executionProfile": "CODEX_AGY",
+    "lanes": {
+      "core": "CODEX gpt-5.6-sol medium",
+      "shard-1": "CODEX gpt-5.6-sol medium (already committing)",
+      "shard-2": "CODEX gpt-5.6-sol medium (already committing)",
+      "test-author": "AGY gemini-3.7-flash-high high (30 units completed in 3m25s)"
+    }
+  },
+  "notes": [
+    "runner events are watched via persistent monitor on journalctl + wave log",
+    "canonical checkout /home/minhquan_eth/foresift is on main; archon workspace symlink normalized back to it",
+    "H2 deeper items (exact-lease scheduler, critical-path multi-package, work stealing) deferred pending G0 completion evidence — ADR-0017 law: revisit at maxParallelCodingPackages >= 2"
+  ]
+}

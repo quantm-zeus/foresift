@@ -13,7 +13,7 @@
 //      15min + 1min/file; policy override via bunGroupTimeoutMs). A Bun
 //      per-test timeout cannot bound a wedged Bun process; spawnSync's
 //      timeout + detached process group kill terminates the whole tree
-//      (bun workers + any /usr/bin/time wrapper).
+//      (bun workers).
 //   3. GHA test-process-meta carries timeout-minutes: 45 as the final layer.
 //
 // Also removes the genuine packages/persistence <-> packages/object-store
@@ -34,14 +34,27 @@ describe('test-runtime hang containment', () => {
     const src = readFileSync(join(REPO, 'scripts/automation/bun-test-coordinator.mjs'), 'utf8');
     expect(src).toContain('`[coordinator] START ${group.id} (${group.workload})');
     // The START log must precede the spawnSync in the loop body.
-    expect(src.indexOf('[coordinator] START')).toBeLessThan(src.indexOf('spawnSync(command'));
+    expect(src.indexOf('[coordinator] START')).toBeLessThan(src.indexOf('spawnSync(bun, args'));
+  });
+
+  it('the coordinator never wraps groups in /usr/bin/time (flaky-exit root cause)', () => {
+    // GNU time -v under concurrent coordinator load provably flips bun 1.4.0
+    // runs to exit 1 with "0 fail" summaries and coincided with the CI
+    // process-7 group producing zero bytes for 17m (run 33325019718). The
+    // wrapper is removed; evidence fields report null and the group timeout
+    // still bounds the wall.
+    const src = readFileSync(join(REPO, 'scripts/automation/bun-test-coordinator.mjs'), 'utf8');
+    expect(src).not.toContain("existsSync('/usr/bin/time')");
+    expect(src).toContain('spawnSync(bun, args');
+    expect(src).toContain('peakRssBytes: null');
+    expect(src).toContain('cpuSeconds: null');
   });
 
   it('every group spawn is bounded by a process timeout that kills the tree', () => {
     const src = readFileSync(join(REPO, 'scripts/automation/bun-test-coordinator.mjs'), 'utf8');
     expect(src).toContain('timeout: timeoutMs');
-    // detached => POSIX process-group kill reaches bun workers and the time
-    // wrapper, not only the direct child.
+    // detached => POSIX process-group kill reaches bun workers, not only the
+    // direct child.
     expect(src).toContain("detached: process.platform !== 'win32'");
     expect(src).toContain('killSignal:');
     // The timeout default scales with group size and is policy-overridable.

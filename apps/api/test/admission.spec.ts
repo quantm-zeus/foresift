@@ -4,7 +4,6 @@
  */
 import { describe, expect, it } from 'bun:test';
 import {
-  ALLOWED_ORIGINS,
   MAXIMUM_REQUEST_BYTES,
   STANDARD_DISCOVERY_CREDENTIAL,
   ACTIVE_SESSION_FIXTURE,
@@ -95,6 +94,7 @@ describe('T006: MCP normative admission pipeline (AC-251, INV-037)', () => {
 
   it('Stage 3: protocol revision or method violation short-circuits before auth side effects', async () => {
     const { McpAdmissionPipeline } = await loadAdmissionModule();
+    const pipeline = new McpAdmissionPipeline();
     const badMethodInput = {
       ...defaultValidAdmissionInput,
       method: 'GET',
@@ -141,6 +141,7 @@ describe('T006: MCP normative admission pipeline (AC-251, INV-037)', () => {
 
   it('Stage 5: session binding mismatch refuses before rate allocation', async () => {
     const { McpAdmissionPipeline } = await loadAdmissionModule();
+    const pipeline = new McpAdmissionPipeline();
     const mismatchedSessionInput = {
       ...defaultValidAdmissionInput,
       headers: {

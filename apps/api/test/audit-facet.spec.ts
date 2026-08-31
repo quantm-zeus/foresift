@@ -38,18 +38,18 @@ describe('T017: MCP audit facet (DATABASE_PGLITE, AC-259, FR-MCP-010)', () => {
     const toolEvent = await chain.append({
       occurredAt: at('2026-08-01T10:00:00Z'),
       actor: 'analyst@foresift.io',
-      actionClass: 'EXTERNAL_READ',
+      actionClass: 'TOOL_RESOURCE_ACCESS',
       subject: 'mcp:tool:discover_candidates',
       payload: { toolName: 'discover_candidates', arguments: { limit: 10 } },
     });
     expect(toolEvent.seq).toBeGreaterThanOrEqual(1);
-    expect(toolEvent.actionClass).toBe('EXTERNAL_READ');
+    expect(toolEvent.actionClass).toBe('TOOL_RESOURCE_ACCESS');
 
     // 2. Resource read audit event
     const resourceEvent = await chain.append({
       occurredAt: at('2026-08-01T10:00:05Z'),
       actor: 'analyst@foresift.io',
-      actionClass: 'EXTERNAL_READ',
+      actionClass: 'TOOL_RESOURCE_ACCESS',
       subject: 'mcp:resource:evidence://ev-001',
       payload: { uri: 'evidence://ev-001', bytesDelivered: 1024 },
     });
@@ -78,7 +78,7 @@ describe('T017: MCP audit facet (DATABASE_PGLITE, AC-259, FR-MCP-010)', () => {
     const e1 = await chain.append({
       occurredAt: at('2026-08-01T11:00:00Z'),
       actor: 'user1@foresift.io',
-      actionClass: 'EXTERNAL_READ',
+      actionClass: 'TOOL_RESOURCE_ACCESS',
       subject: 'mcp:tool:get_asset_identity',
       payload: { address: 'So11111111111111111111111111111111111111112' },
     });
@@ -86,7 +86,7 @@ describe('T017: MCP audit facet (DATABASE_PGLITE, AC-259, FR-MCP-010)', () => {
     const e2 = await chain.append({
       occurredAt: at('2026-08-01T11:01:00Z'),
       actor: 'user1@foresift.io',
-      actionClass: 'EXTERNAL_READ',
+      actionClass: 'TOOL_RESOURCE_ACCESS',
       subject: 'mcp:resource:candidate://cand-001',
       payload: { uri: 'candidate://cand-001' },
     });

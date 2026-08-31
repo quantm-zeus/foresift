@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { spawnSync } from 'node:child_process';
 
@@ -82,17 +82,6 @@ export function bunTestArgs(group, policy) {
   ];
 }
 
-function maxRss(stderr) {
-  const match = /Maximum resident set size \(kbytes\):\s*(\d+)/.exec(stderr ?? '');
-  return match ? Number(match[1]) * 1024 : null;
-}
-
-function cpuSeconds(stderr) {
-  const user = /User time \(seconds\):\s*([\d.]+)/.exec(stderr ?? '');
-  const system = /System time \(seconds\):\s*([\d.]+)/.exec(stderr ?? '');
-  return user && system ? Number(user[1]) + Number(system[1]) : null;
-}
-
 function bunCounts(output) {
   const value = String(output ?? '');
   const count = (label) => {
@@ -119,18 +108,24 @@ export function runBunTestPlan({ root, plan, policy, bun = 'bun' }) {
       `[coordinator] START ${group.id} (${group.workload}) files=${group.files.length}: ${group.files.join(', ')}`,
     );
     const args = bunTestArgs(group, policy);
-    const timed = existsSync('/usr/bin/time');
-    const command = timed ? '/usr/bin/time' : bun;
-    const commandArgs = timed ? ['-v', bun, ...args] : args;
+    // NO /usr/bin/time wrapper. It existed only to collect peak-RSS/CPU
+    // evidence, but under concurrent coordinator load GNU time -v provably
+    // corrupts the wrapped bun run's outcome: bun 1.4.0 exits 1 with
+    // "0 fail" summaries (reproduced 2026-08-30 at ~2/6 coordinator runs,
+    // both locally and in CI run 33325019718) and on CI the same wrapper
+    // coincided with a group producing ZERO bytes for 17m before the group
+    // timeout fired (process-7, run 33325019718). Without the wrapper the
+    // identical coordinator loop is clean 6/6. The evidence fields are kept
+    // in the schema and report null.
     const timeoutMs = policyTimeoutMs || 15 * 60_000 + group.files.length * 60_000;
-    const result = spawnSync(command, commandArgs, {
+    const result = spawnSync(bun, args, {
       cwd: root,
       encoding: 'utf8',
       maxBuffer: 128 * 1024 * 1024,
       timeout: timeoutMs,
       // SIGTERM the direct child; detached+POSIX kill delivers to the whole
-      // process tree (bun workers, /usr/bin/time wrapper) via the process
-      // group, so a wedged group cannot outlive its timeout.
+      // process tree (bun workers) via the process group, so a wedged group
+      // cannot outlive its timeout.
       detached: process.platform !== 'win32',
       killSignal: 'SIGTERM',
       env: { ...process.env, FORESIFT_TEST_COORDINATOR: '1' },
@@ -147,8 +142,10 @@ export function runBunTestPlan({ root, plan, policy, bun = 'bun' }) {
       signal: result.signal ?? null,
       timedOut: Boolean(result.signal),
       wallTimeMs: Date.now() - groupStarted,
-      peakRssBytes: maxRss(result.stderr),
-      cpuSeconds: cpuSeconds(result.stderr),
+      // /usr/bin/time -v was removed (see spawn comment): no wrapper output to
+      // parse, so these report null. The group timeout still bounds the wall.
+      peakRssBytes: null,
+      cpuSeconds: null,
       counts: bunCounts(`${result.stdout ?? ''}\n${result.stderr ?? ''}`),
       stdoutTail: (result.stdout ?? '').slice(-4000),
       stderrTail: (result.stderr ?? '').slice(-4000),

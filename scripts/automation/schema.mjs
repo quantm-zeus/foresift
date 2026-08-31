@@ -204,6 +204,14 @@ export function classifyFailure(message = '') {
     'daily limit',
     'quota exhausted',
     'quota exceeded',
+    // Machine-shaped provider-quota reasons (H3): the writer/permit layer
+    // throws CODEX_QUOTA_EXHAUSTED / CODEX_QUOTA_RESET_WAIT verbatim — the
+    // run-level error text carries the underscored token, not the prose
+    // phrase, so the prose-only patterns above misclassified quota walls as
+    // UNKNOWN and burned the ordinary restart budget on a durable pause
+    // condition (observed live 2026-08-31, runs 5e7edab9/e01c8427).
+    'codex_quota_exhausted',
+    'codex_quota_reset_wait',
   ];
   const transient = [
     'timeout',
@@ -221,6 +229,11 @@ export function classifyFailure(message = '') {
     'sigterm',
     'fetch failed',
     'temporarily unavailable',
+    // Machine-shaped transient contention reasons (H3): a handoff denied by
+    // pool backoff/pressure is a wait-and-retry condition, never a quota wall
+    // (observed live 2026-08-31, run c38c2e1b).
+    'provider_backoff',
+    'pool_at_limit',
   ];
   if (fatal.some((p) => m.includes(p))) return 'FATAL';
   if (quotaDaily.some((p) => m.includes(p))) return 'QUOTA_DAILY';

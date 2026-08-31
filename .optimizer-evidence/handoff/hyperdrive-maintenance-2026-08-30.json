@@ -75,5 +75,14 @@
     "then H2 P1 backlog: post-integration manifest duty ordering, coordinator task metadata, exact-write preflight, exact-lease scheduling, shared-surface lane, global ready queue/work stealing, resource governor"
   ],
   "blockers": [],
-  "resourceState": "15GiB RAM ~12Gi free; disk 84G free — GREEN"
+  "resourceState": "15GiB RAM ~12Gi free; disk 84G free — GREEN",
+  "h3Scheduling": {
+    "at": "2026-08-31T09:45Z",
+    "pr": 130,
+    "merged": "PR #130 MERGED as 54e8bd3 (exact-head 0287c74b, trusted green CI run 33378911135)",
+    "coverage": "P1-6 launch preflight, P1-7 ready queue + work stealing, P2-9 Codex cost policy (tier-tracked reasoning + ONE bounded Sol/high repair escalation), P2-10 adaptive lane count (governor + permit caps)",
+    "evidence": "spec:verify 13 checks OK; prettier/eslint/typecheck clean; PR CI green at exact head",
+    "mergedMainCi": "run 33379379901 GREEN at 54e8bd3 — scheduling layer authoritative on main",
+    "remaining": "P1-7 supervisor-tick wiring of stealNext into capacity events (primitive landed); H3 completion proofs checklist continues"
+  }
 }

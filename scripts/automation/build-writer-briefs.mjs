@@ -146,6 +146,9 @@ for (const shard of [...(graph.shards ?? []), ...(graph.testLanes ?? [])]) {
   lines.push('');
   lines.push('- Commit coherent slices inside your worktree as you go.');
   lines.push(
+    '- BUDGET LAW (observed live 2026-08-31): a lane that spends its whole time reading and writes nothing at the end loses EVERYTHING to the lane timeout. Read at most ~10 minutes, then START WRITING: implement the FIRST unit completely, `git add` + `git commit` it in your worktree, then move to the next unit. One commit per completed unit — partial work surviving a timeout is real progress; an unwritten plan is not.',
+  );
+  lines.push(
     `- On finish write \`$ARTIFACTS_DIR/writer-results/${shard.id}/result.json\` with: {"schema":"foresift/writer-result@1", shardId, role, engine, units, completed, branch, headSha, testsRun, testResults, baselineClassifications, blockers}.`,
   );
   lines.push('- List EVERY unit you finished; list unfinished ones under blockers.');

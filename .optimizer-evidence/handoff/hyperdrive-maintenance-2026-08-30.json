@@ -95,6 +95,12 @@
       "evidence": "identical head passes locally: full coordinator GREEN at 397aaaf (337 files exit 0); prior run 33342051937 at 629d69e Process job took only 64s total; no code change between 629d69e and 397aaaf touches process-7 files",
       "action": "gh run rerun 33354838617 --failed (evidence-based flake rerun, not timeout increase)",
       "landerBehavior": "lander correctly refused merge on red CI (ci-red, TEST_DISPUTE escalated, exit 4) — no premature merge"
+    },
+    "merge": {
+      "outcome": "PR #125 MERGED — squash commit 4186f5d at 2026-08-31T04:08:05Z (g0-mcp-surface landed on main)",
+      "landerSequence": "attempt 1 ci-red (process-7 flake, lander correctly refused + escalated TEST_DISPUTE) → rerun --failed → ALL GREEN at 397aaaf → attempt 2: ci-green confirmed, merge executed; lander exit 4 was cosmetic — the squash merge succeeded (branch deleted server-side, hence attempt-2 trace shows lander-exit-1 AFTER merge when drift-guard re-fetch found the branch gone)",
+      "mergedMainCi": "run 33356037281 at 4186f5d in_progress",
+      "next": "verify merged-main CI green; then autopilot --recover-fatal cycle → G0 7/8 PROVEN"
     }
   }
 }

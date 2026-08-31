@@ -2092,6 +2092,33 @@ async function selectAndLaunch(st) {
       if (!elig.eligible) return null;
       const verdict = canStartPackage(roadmap, ms, cand, running);
       if (!verdict.ok) {
+        // H3 mission item 7 — exact-write override of ONLY broad write-scope
+        // false conflicts. A WRITE_SCOPE_CONFLICT refusal may be upgraded when
+        // BOTH sides carry derivable exact predicted-write truth and the exact
+        // writes are disjoint (no dependency edge, no CRITICAL/serial law, no
+        // global surface, no unknown write truth on either side — every other
+        // reason class is hard law and never upgraded). Anything unknown
+        // degrades to the broad refusal.
+        if (exactCoRunPreflightEnabled && verdict.reasonClass === 'WRITE_SCOPE_CONFLICT') {
+          const candPf = readyPreflight(cand.id);
+          if (candPf?.exact) {
+            let overridden = true;
+            for (const run of running) {
+              const compat = exactCoRunCompatible(candPf, readyPreflight(run.id));
+              if (compat.compatible !== true) {
+                overridden = false;
+                break;
+              }
+            }
+            if (overridden && running.length > 0) {
+              record(st, 'co_run_upgraded_exact_writes', {
+                packageId: cand.id,
+                broadReason: verdict.reason,
+              });
+              return { cand };
+            }
+          }
+        }
         // Maintainer observability: a pairwise concurrency refusal is evidence,
         // not noise — record WHY an otherwise-eligible candidate was denied a
         // slot. Once per process for the same package+reason; capacity-limit

@@ -1,0 +1,37 @@
+{
+  "family": "FR-SOC",
+  "implementationRefs": [
+    "packages/social-capability/** @requirement FR-SOC-001",
+    "packages/social-capability/** @requirement FR-SOC-002",
+    "packages/social-capability/** @requirement FR-SOC-003",
+    "packages/social-capability/** @requirement FR-SOC-004"
+  ],
+  "requirementIds": [
+    "FR-SOC-001",
+    "FR-SOC-002",
+    "FR-SOC-003",
+    "FR-SOC-004"
+  ],
+  "resolvedImplementationPaths": [
+    "packages/social-capability/**"
+  ],
+  "schemaRefs": [
+    "packages/shared-schemas/src/soc.ts"
+  ],
+  "surfaceRefs": [
+    "docs/generated/soc-surfaces.json"
+  ],
+  "telemetryRefs": [
+    "telemetry/soc.*"
+  ],
+  "testRefs": [
+    "tests/acceptance/AC-140.spec.ts",
+    "tests/acceptance/AC-141.spec.ts",
+    "tests/acceptance/AC-142.spec.ts",
+    "tests/acceptance/AC-143.spec.ts",
+    "tests/negative/AC-140.negative.spec.ts",
+    "tests/negative/AC-141.negative.spec.ts",
+    "tests/negative/AC-142.negative.spec.ts",
+    "tests/negative/AC-143.negative.spec.ts"
+  ]
+}

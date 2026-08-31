@@ -1,0 +1,63 @@
+{
+  "family": "FR-WPI",
+  "implementationRefs": [
+    "packages/winning-pattern-intelligence/** @requirement FR-WPI-001",
+    "packages/winning-pattern-intelligence/** @requirement FR-WPI-002",
+    "packages/winning-pattern-intelligence/** @requirement FR-WPI-003",
+    "packages/winning-pattern-intelligence/** @requirement FR-WPI-004",
+    "packages/winning-pattern-intelligence/** @requirement FR-WPI-005",
+    "packages/winning-pattern-intelligence/** @requirement FR-WPI-006",
+    "packages/winning-pattern-intelligence/** @requirement FR-WPI-007",
+    "packages/winning-pattern-intelligence/** @requirement FR-WPI-008",
+    "packages/winning-pattern-intelligence/** @requirement FR-WPI-009",
+    "packages/winning-pattern-intelligence/** @requirement FR-WPI-010",
+    "packages/winning-pattern-intelligence/** @requirement FR-WPI-011"
+  ],
+  "requirementIds": [
+    "FR-WPI-001",
+    "FR-WPI-002",
+    "FR-WPI-003",
+    "FR-WPI-004",
+    "FR-WPI-005",
+    "FR-WPI-006",
+    "FR-WPI-007",
+    "FR-WPI-008",
+    "FR-WPI-009",
+    "FR-WPI-010",
+    "FR-WPI-011"
+  ],
+  "resolvedImplementationPaths": [
+    "packages/winning-pattern-intelligence/**"
+  ],
+  "schemaRefs": [
+    "packages/shared-schemas/src/wpi.ts"
+  ],
+  "surfaceRefs": [
+    "docs/generated/wpi-surfaces.json"
+  ],
+  "telemetryRefs": [
+    "telemetry/wpi.*"
+  ],
+  "testRefs": [
+    "tests/acceptance/AC-160.spec.ts",
+    "tests/acceptance/AC-161.spec.ts",
+    "tests/acceptance/AC-162.spec.ts",
+    "tests/acceptance/AC-163.spec.ts",
+    "tests/acceptance/AC-164.spec.ts",
+    "tests/acceptance/AC-165.spec.ts",
+    "tests/acceptance/AC-166.spec.ts",
+    "tests/acceptance/AC-167.spec.ts",
+    "tests/acceptance/AC-168.spec.ts",
+    "tests/acceptance/AC-169.spec.ts",
+    "tests/negative/AC-160.negative.spec.ts",
+    "tests/negative/AC-161.negative.spec.ts",
+    "tests/negative/AC-162.negative.spec.ts",
+    "tests/negative/AC-163.negative.spec.ts",
+    "tests/negative/AC-164.negative.spec.ts",
+    "tests/negative/AC-165.negative.spec.ts",
+    "tests/negative/AC-166.negative.spec.ts",
+    "tests/negative/AC-167.negative.spec.ts",
+    "tests/negative/AC-168.negative.spec.ts",
+    "tests/negative/AC-169.negative.spec.ts"
+  ]
+}

@@ -1,0 +1,33 @@
+{
+  "family": "FR-ANA",
+  "implementationRefs": [
+    "packages/analog-finder/** @requirement FR-ANA-001",
+    "packages/analog-finder/** @requirement FR-ANA-002",
+    "packages/analog-finder/** @requirement FR-ANA-003"
+  ],
+  "requirementIds": [
+    "FR-ANA-001",
+    "FR-ANA-002",
+    "FR-ANA-003"
+  ],
+  "resolvedImplementationPaths": [
+    "packages/analog-finder/**"
+  ],
+  "schemaRefs": [
+    "packages/shared-schemas/src/ana.ts"
+  ],
+  "surfaceRefs": [
+    "docs/generated/ana-surfaces.json"
+  ],
+  "telemetryRefs": [
+    "telemetry/ana.*"
+  ],
+  "testRefs": [
+    "tests/acceptance/AC-081.spec.ts",
+    "tests/acceptance/AC-082.spec.ts",
+    "tests/acceptance/AC-090.spec.ts",
+    "tests/negative/AC-081.negative.spec.ts",
+    "tests/negative/AC-082.negative.spec.ts",
+    "tests/negative/AC-090.negative.spec.ts"
+  ]
+}

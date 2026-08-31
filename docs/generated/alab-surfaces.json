@@ -1,0 +1,52 @@
+{
+  "family": "FR-ALAB",
+  "implementationRefs": [
+    "packages/alpha-artifact-store/** @requirement FR-ALAB-001",
+    "packages/alpha-artifact-store/** @requirement FR-ALAB-002",
+    "packages/alpha-artifact-store/** @requirement FR-ALAB-003",
+    "packages/alpha-artifact-store/** @requirement FR-ALAB-004",
+    "packages/alpha-artifact-store/** @requirement FR-ALAB-005",
+    "packages/alpha-artifact-store/** @requirement FR-ALAB-006",
+    "packages/offline-alpha-lab/** @requirement FR-ALAB-001",
+    "packages/offline-alpha-lab/** @requirement FR-ALAB-002",
+    "packages/offline-alpha-lab/** @requirement FR-ALAB-003",
+    "packages/offline-alpha-lab/** @requirement FR-ALAB-004",
+    "packages/offline-alpha-lab/** @requirement FR-ALAB-005",
+    "packages/offline-alpha-lab/** @requirement FR-ALAB-006"
+  ],
+  "requirementIds": [
+    "FR-ALAB-001",
+    "FR-ALAB-002",
+    "FR-ALAB-003",
+    "FR-ALAB-004",
+    "FR-ALAB-005",
+    "FR-ALAB-006"
+  ],
+  "resolvedImplementationPaths": [
+    "packages/alpha-artifact-store/**",
+    "packages/offline-alpha-lab/**"
+  ],
+  "schemaRefs": [
+    "packages/shared-schemas/src/alab.ts"
+  ],
+  "surfaceRefs": [
+    "docs/generated/alab-surfaces.json"
+  ],
+  "telemetryRefs": [
+    "telemetry/alab.*"
+  ],
+  "testRefs": [
+    "tests/acceptance/AC-214.spec.ts",
+    "tests/acceptance/AC-215.spec.ts",
+    "tests/acceptance/AC-216.spec.ts",
+    "tests/acceptance/AC-217.spec.ts",
+    "tests/acceptance/AC-218.spec.ts",
+    "tests/acceptance/AC-219.spec.ts",
+    "tests/negative/AC-214.negative.spec.ts",
+    "tests/negative/AC-215.negative.spec.ts",
+    "tests/negative/AC-216.negative.spec.ts",
+    "tests/negative/AC-217.negative.spec.ts",
+    "tests/negative/AC-218.negative.spec.ts",
+    "tests/negative/AC-219.negative.spec.ts"
+  ]
+}

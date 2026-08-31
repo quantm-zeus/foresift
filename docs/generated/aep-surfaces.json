@@ -1,0 +1,37 @@
+{
+  "family": "FR-AEP",
+  "implementationRefs": [
+    "packages/agent-runtime/** @requirement FR-AEP-001",
+    "packages/alpha-artifact-store/** @requirement FR-AEP-001"
+  ],
+  "requirementIds": [
+    "FR-AEP-001"
+  ],
+  "resolvedImplementationPaths": [
+    "packages/agent-runtime/**",
+    "packages/alpha-artifact-store/**"
+  ],
+  "schemaRefs": [
+    "packages/shared-schemas/src/aep.ts"
+  ],
+  "surfaceRefs": [
+    "docs/generated/aep-surfaces.json"
+  ],
+  "telemetryRefs": [
+    "telemetry/aep.*"
+  ],
+  "testRefs": [
+    "tests/acceptance/AC-214.spec.ts",
+    "tests/acceptance/AC-215.spec.ts",
+    "tests/acceptance/AC-216.spec.ts",
+    "tests/acceptance/AC-217.spec.ts",
+    "tests/acceptance/AC-218.spec.ts",
+    "tests/acceptance/AC-219.spec.ts",
+    "tests/negative/AC-214.negative.spec.ts",
+    "tests/negative/AC-215.negative.spec.ts",
+    "tests/negative/AC-216.negative.spec.ts",
+    "tests/negative/AC-217.negative.spec.ts",
+    "tests/negative/AC-218.negative.spec.ts",
+    "tests/negative/AC-219.negative.spec.ts"
+  ]
+}

@@ -1,0 +1,45 @@
+{
+  "family": "FR-TRD",
+  "implementationRefs": [
+    "packages/economic-trade-normalizer/** @requirement FR-TRD-001",
+    "packages/economic-trade-normalizer/** @requirement FR-TRD-002",
+    "packages/economic-trade-normalizer/** @requirement FR-TRD-003",
+    "packages/economic-trade-normalizer/** @requirement FR-TRD-004"
+  ],
+  "requirementIds": [
+    "FR-TRD-001",
+    "FR-TRD-002",
+    "FR-TRD-003",
+    "FR-TRD-004"
+  ],
+  "resolvedImplementationPaths": [
+    "packages/economic-trade-normalizer/**"
+  ],
+  "schemaRefs": [
+    "packages/shared-schemas/src/trd.ts"
+  ],
+  "surfaceRefs": [
+    "docs/generated/trd-surfaces.json"
+  ],
+  "telemetryRefs": [
+    "telemetry/trd.*"
+  ],
+  "testRefs": [
+    "tests/acceptance/AC-130.spec.ts",
+    "tests/acceptance/AC-131.spec.ts",
+    "tests/acceptance/AC-132.spec.ts",
+    "tests/acceptance/AC-133.spec.ts",
+    "tests/acceptance/AC-134.spec.ts",
+    "tests/acceptance/AC-135.spec.ts",
+    "tests/acceptance/AC-136.spec.ts",
+    "tests/acceptance/AC-233.spec.ts",
+    "tests/negative/AC-130.negative.spec.ts",
+    "tests/negative/AC-131.negative.spec.ts",
+    "tests/negative/AC-132.negative.spec.ts",
+    "tests/negative/AC-133.negative.spec.ts",
+    "tests/negative/AC-134.negative.spec.ts",
+    "tests/negative/AC-135.negative.spec.ts",
+    "tests/negative/AC-136.negative.spec.ts",
+    "tests/negative/AC-233.negative.spec.ts"
+  ]
+}

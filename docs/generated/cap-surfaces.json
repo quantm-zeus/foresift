@@ -1,0 +1,43 @@
+{
+  "family": "FR-CAP",
+  "implementationRefs": [
+    "packages/capability-registry/** @requirement FR-CAP-001",
+    "packages/capability-registry/** @requirement FR-CAP-002",
+    "packages/capability-registry/** @requirement FR-CAP-003",
+    "packages/capability-registry/** @requirement FR-CAP-004"
+  ],
+  "requirementIds": [
+    "FR-CAP-001",
+    "FR-CAP-002",
+    "FR-CAP-003",
+    "FR-CAP-004"
+  ],
+  "resolvedImplementationPaths": [
+    "packages/capability-registry/**"
+  ],
+  "schemaRefs": [
+    "packages/shared-schemas/src/cap.ts"
+  ],
+  "surfaceRefs": [
+    "docs/generated/cap-surfaces.json"
+  ],
+  "telemetryRefs": [
+    "telemetry/cap.*"
+  ],
+  "testRefs": [
+    "tests/acceptance/AC-083.spec.ts",
+    "tests/acceptance/AC-084.spec.ts",
+    "tests/acceptance/AC-085.spec.ts",
+    "tests/acceptance/AC-086.spec.ts",
+    "tests/acceptance/AC-087.spec.ts",
+    "tests/acceptance/AC-088.spec.ts",
+    "tests/acceptance/AC-089.spec.ts",
+    "tests/negative/AC-083.negative.spec.ts",
+    "tests/negative/AC-084.negative.spec.ts",
+    "tests/negative/AC-085.negative.spec.ts",
+    "tests/negative/AC-086.negative.spec.ts",
+    "tests/negative/AC-087.negative.spec.ts",
+    "tests/negative/AC-088.negative.spec.ts",
+    "tests/negative/AC-089.negative.spec.ts"
+  ]
+}

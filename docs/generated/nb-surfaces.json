@@ -1,0 +1,39 @@
+{
+  "family": "FR-NB",
+  "implementationRefs": [
+    "packages/research-notebook/** @requirement FR-NB-001",
+    "packages/research-notebook/** @requirement FR-NB-002"
+  ],
+  "requirementIds": [
+    "FR-NB-001",
+    "FR-NB-002"
+  ],
+  "resolvedImplementationPaths": [
+    "packages/research-notebook/**"
+  ],
+  "schemaRefs": [
+    "packages/shared-schemas/src/nb.ts"
+  ],
+  "surfaceRefs": [
+    "docs/generated/nb-surfaces.json"
+  ],
+  "telemetryRefs": [
+    "telemetry/nb.*"
+  ],
+  "testRefs": [
+    "tests/acceptance/AC-083.spec.ts",
+    "tests/acceptance/AC-084.spec.ts",
+    "tests/acceptance/AC-085.spec.ts",
+    "tests/acceptance/AC-086.spec.ts",
+    "tests/acceptance/AC-087.spec.ts",
+    "tests/acceptance/AC-088.spec.ts",
+    "tests/acceptance/AC-089.spec.ts",
+    "tests/negative/AC-083.negative.spec.ts",
+    "tests/negative/AC-084.negative.spec.ts",
+    "tests/negative/AC-085.negative.spec.ts",
+    "tests/negative/AC-086.negative.spec.ts",
+    "tests/negative/AC-087.negative.spec.ts",
+    "tests/negative/AC-088.negative.spec.ts",
+    "tests/negative/AC-089.negative.spec.ts"
+  ]
+}

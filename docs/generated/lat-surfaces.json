@@ -1,0 +1,29 @@
+{
+  "family": "FR-LAT",
+  "implementationRefs": [
+    "packages/latency-profiler/** @requirement FR-LAT-001",
+    "packages/latency-profiler/** @requirement FR-LAT-002"
+  ],
+  "requirementIds": [
+    "FR-LAT-001",
+    "FR-LAT-002"
+  ],
+  "resolvedImplementationPaths": [
+    "packages/latency-profiler/**"
+  ],
+  "schemaRefs": [
+    "packages/shared-schemas/src/lat.ts"
+  ],
+  "surfaceRefs": [
+    "docs/generated/lat-surfaces.json"
+  ],
+  "telemetryRefs": [
+    "telemetry/lat.*"
+  ],
+  "testRefs": [
+    "tests/acceptance/AC-080.spec.ts",
+    "tests/acceptance/AC-226.spec.ts",
+    "tests/negative/AC-080.negative.spec.ts",
+    "tests/negative/AC-226.negative.spec.ts"
+  ]
+}

@@ -1,0 +1,33 @@
+{
+  "family": "FR-WHY",
+  "implementationRefs": [
+    "packages/thesis/** @requirement FR-WHY-001",
+    "packages/thesis/** @requirement FR-WHY-002"
+  ],
+  "requirementIds": [
+    "FR-WHY-001",
+    "FR-WHY-002"
+  ],
+  "resolvedImplementationPaths": [
+    "packages/thesis/**"
+  ],
+  "schemaRefs": [
+    "packages/shared-schemas/src/why.ts"
+  ],
+  "surfaceRefs": [
+    "docs/generated/why-surfaces.json"
+  ],
+  "telemetryRefs": [
+    "telemetry/why.*"
+  ],
+  "testRefs": [
+    "tests/acceptance/AC-070.spec.ts",
+    "tests/acceptance/AC-071.spec.ts",
+    "tests/acceptance/AC-072.spec.ts",
+    "tests/acceptance/AC-073.spec.ts",
+    "tests/negative/AC-070.negative.spec.ts",
+    "tests/negative/AC-071.negative.spec.ts",
+    "tests/negative/AC-072.negative.spec.ts",
+    "tests/negative/AC-073.negative.spec.ts"
+  ]
+}

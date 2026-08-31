@@ -1,0 +1,74 @@
+{
+  "family": "FR-AGT",
+  "implementationRefs": [
+    "packages/agent-runtime/** @requirement FR-AGT-001",
+    "packages/agent-runtime/** @requirement FR-AGT-002",
+    "packages/agent-runtime/** @requirement FR-AGT-003",
+    "packages/agent-runtime/** @requirement FR-AGT-004",
+    "packages/agent-runtime/** @requirement FR-AGT-005",
+    "packages/agent-runtime/** @requirement FR-AGT-006",
+    "packages/agent-runtime/** @requirement FR-AGT-007",
+    "packages/agent-runtime/** @requirement FR-AGT-008",
+    "packages/agent-runtime/** @requirement FR-AGT-009",
+    "packages/agent-runtime/** @requirement FR-AGT-010",
+    "packages/agent-runtime/** @requirement FR-AGT-011",
+    "packages/agent-runtime/** @requirement FR-AGT-012",
+    "packages/evidence/** @requirement FR-AGT-001",
+    "packages/evidence/** @requirement FR-AGT-002",
+    "packages/evidence/** @requirement FR-AGT-003",
+    "packages/evidence/** @requirement FR-AGT-004",
+    "packages/evidence/** @requirement FR-AGT-005",
+    "packages/evidence/** @requirement FR-AGT-006",
+    "packages/evidence/** @requirement FR-AGT-007",
+    "packages/evidence/** @requirement FR-AGT-008",
+    "packages/evidence/** @requirement FR-AGT-009",
+    "packages/evidence/** @requirement FR-AGT-010",
+    "packages/evidence/** @requirement FR-AGT-011",
+    "packages/evidence/** @requirement FR-AGT-012"
+  ],
+  "requirementIds": [
+    "FR-AGT-001",
+    "FR-AGT-002",
+    "FR-AGT-003",
+    "FR-AGT-004",
+    "FR-AGT-005",
+    "FR-AGT-006",
+    "FR-AGT-007",
+    "FR-AGT-008",
+    "FR-AGT-009",
+    "FR-AGT-010",
+    "FR-AGT-011",
+    "FR-AGT-012"
+  ],
+  "resolvedImplementationPaths": [
+    "packages/agent-runtime/**",
+    "packages/evidence/**"
+  ],
+  "schemaRefs": [
+    "packages/shared-schemas/src/agt.ts"
+  ],
+  "surfaceRefs": [
+    "docs/generated/agt-surfaces.json"
+  ],
+  "telemetryRefs": [
+    "telemetry/agt.*"
+  ],
+  "testRefs": [
+    "tests/acceptance/AC-030.spec.ts",
+    "tests/acceptance/AC-031.spec.ts",
+    "tests/acceptance/AC-032.spec.ts",
+    "tests/acceptance/AC-033.spec.ts",
+    "tests/acceptance/AC-034.spec.ts",
+    "tests/acceptance/AC-242.spec.ts",
+    "tests/acceptance/AC-243.spec.ts",
+    "tests/acceptance/AC-244.spec.ts",
+    "tests/negative/AC-030.negative.spec.ts",
+    "tests/negative/AC-031.negative.spec.ts",
+    "tests/negative/AC-032.negative.spec.ts",
+    "tests/negative/AC-033.negative.spec.ts",
+    "tests/negative/AC-034.negative.spec.ts",
+    "tests/negative/AC-242.negative.spec.ts",
+    "tests/negative/AC-243.negative.spec.ts",
+    "tests/negative/AC-244.negative.spec.ts"
+  ]
+}

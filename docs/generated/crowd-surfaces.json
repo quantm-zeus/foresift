@@ -1,0 +1,41 @@
+{
+  "family": "FR-CROWD",
+  "implementationRefs": [
+    "packages/crowding/** @requirement FR-CROWD-001",
+    "packages/crowding/** @requirement FR-CROWD-002",
+    "packages/crowding/** @requirement FR-CROWD-003",
+    "packages/crowding/** @requirement FR-CROWD-004",
+    "packages/crowding/** @requirement FR-CROWD-005"
+  ],
+  "requirementIds": [
+    "FR-CROWD-001",
+    "FR-CROWD-002",
+    "FR-CROWD-003",
+    "FR-CROWD-004",
+    "FR-CROWD-005"
+  ],
+  "resolvedImplementationPaths": [
+    "packages/crowding/**"
+  ],
+  "schemaRefs": [
+    "packages/shared-schemas/src/crowd.ts"
+  ],
+  "surfaceRefs": [
+    "docs/generated/crowd-surfaces.json"
+  ],
+  "telemetryRefs": [
+    "telemetry/crowd.*"
+  ],
+  "testRefs": [
+    "tests/acceptance/AC-074.spec.ts",
+    "tests/acceptance/AC-075.spec.ts",
+    "tests/acceptance/AC-076.spec.ts",
+    "tests/acceptance/AC-091.spec.ts",
+    "tests/acceptance/AC-092.spec.ts",
+    "tests/negative/AC-074.negative.spec.ts",
+    "tests/negative/AC-075.negative.spec.ts",
+    "tests/negative/AC-076.negative.spec.ts",
+    "tests/negative/AC-091.negative.spec.ts",
+    "tests/negative/AC-092.negative.spec.ts"
+  ]
+}

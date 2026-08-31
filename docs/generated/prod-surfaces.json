@@ -1,0 +1,86 @@
+{
+  "family": "FR-PROD",
+  "implementationRefs": [
+    "packages/capability-registry/** @requirement FR-PROD-001",
+    "packages/capability-registry/** @requirement FR-PROD-002",
+    "packages/capability-registry/** @requirement FR-PROD-003",
+    "packages/capability-registry/** @requirement FR-PROD-004",
+    "packages/capability-registry/** @requirement FR-PROD-005",
+    "packages/capability-registry/** @requirement FR-PROD-006",
+    "packages/capability-registry/** @requirement FR-PROD-007",
+    "packages/capability-registry/** @requirement FR-PROD-008",
+    "packages/capability-registry/** @requirement FR-PROD-009",
+    "packages/capability-registry/** @requirement FR-PROD-010",
+    "packages/capability-registry/** @requirement FR-PROD-011",
+    "packages/capability-registry/** @requirement FR-PROD-012",
+    "packages/release-conformance/** @requirement FR-PROD-001",
+    "packages/release-conformance/** @requirement FR-PROD-002",
+    "packages/release-conformance/** @requirement FR-PROD-003",
+    "packages/release-conformance/** @requirement FR-PROD-004",
+    "packages/release-conformance/** @requirement FR-PROD-005",
+    "packages/release-conformance/** @requirement FR-PROD-006",
+    "packages/release-conformance/** @requirement FR-PROD-007",
+    "packages/release-conformance/** @requirement FR-PROD-008",
+    "packages/release-conformance/** @requirement FR-PROD-009",
+    "packages/release-conformance/** @requirement FR-PROD-010",
+    "packages/release-conformance/** @requirement FR-PROD-011",
+    "packages/release-conformance/** @requirement FR-PROD-012"
+  ],
+  "requirementIds": [
+    "FR-PROD-001",
+    "FR-PROD-002",
+    "FR-PROD-003",
+    "FR-PROD-004",
+    "FR-PROD-005",
+    "FR-PROD-006",
+    "FR-PROD-007",
+    "FR-PROD-008",
+    "FR-PROD-009",
+    "FR-PROD-010",
+    "FR-PROD-011",
+    "FR-PROD-012"
+  ],
+  "resolvedImplementationPaths": [
+    "packages/capability-registry/**",
+    "packages/release-conformance/**"
+  ],
+  "schemaRefs": [
+    "packages/shared-schemas/src/prod.ts"
+  ],
+  "surfaceRefs": [
+    "docs/generated/prod-surfaces.json"
+  ],
+  "telemetryRefs": [
+    "telemetry/prod.*"
+  ],
+  "testRefs": [
+    "tests/acceptance/AC-144.spec.ts",
+    "tests/acceptance/AC-150.spec.ts",
+    "tests/acceptance/AC-151.spec.ts",
+    "tests/acceptance/AC-152.spec.ts",
+    "tests/acceptance/AC-153.spec.ts",
+    "tests/acceptance/AC-154.spec.ts",
+    "tests/acceptance/AC-272.spec.ts",
+    "tests/acceptance/AC-273.spec.ts",
+    "tests/acceptance/AC-274.spec.ts",
+    "tests/acceptance/AC-275.spec.ts",
+    "tests/acceptance/AC-276.spec.ts",
+    "tests/acceptance/AC-277.spec.ts",
+    "tests/acceptance/AC-278.spec.ts",
+    "tests/acceptance/AC-279.spec.ts",
+    "tests/negative/AC-144.negative.spec.ts",
+    "tests/negative/AC-150.negative.spec.ts",
+    "tests/negative/AC-151.negative.spec.ts",
+    "tests/negative/AC-152.negative.spec.ts",
+    "tests/negative/AC-153.negative.spec.ts",
+    "tests/negative/AC-154.negative.spec.ts",
+    "tests/negative/AC-272.negative.spec.ts",
+    "tests/negative/AC-273.negative.spec.ts",
+    "tests/negative/AC-274.negative.spec.ts",
+    "tests/negative/AC-275.negative.spec.ts",
+    "tests/negative/AC-276.negative.spec.ts",
+    "tests/negative/AC-277.negative.spec.ts",
+    "tests/negative/AC-278.negative.spec.ts",
+    "tests/negative/AC-279.negative.spec.ts"
+  ]
+}

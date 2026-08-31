@@ -1,0 +1,51 @@
+{
+  "family": "FR-DFD",
+  "implementationRefs": [
+    "packages/deployer-funder-dna/** @requirement FR-DFD-001",
+    "packages/deployer-funder-dna/** @requirement FR-DFD-002",
+    "packages/deployer-funder-dna/** @requirement FR-DFD-003",
+    "packages/deployer-funder-dna/** @requirement FR-DFD-004",
+    "packages/deployer-funder-dna/** @requirement FR-DFD-005"
+  ],
+  "requirementIds": [
+    "FR-DFD-001",
+    "FR-DFD-002",
+    "FR-DFD-003",
+    "FR-DFD-004",
+    "FR-DFD-005"
+  ],
+  "resolvedImplementationPaths": [
+    "packages/deployer-funder-dna/**"
+  ],
+  "schemaRefs": [
+    "packages/shared-schemas/src/dfd.ts"
+  ],
+  "surfaceRefs": [
+    "docs/generated/dfd-surfaces.json"
+  ],
+  "telemetryRefs": [
+    "telemetry/dfd.*"
+  ],
+  "testRefs": [
+    "tests/acceptance/AC-160.spec.ts",
+    "tests/acceptance/AC-161.spec.ts",
+    "tests/acceptance/AC-162.spec.ts",
+    "tests/acceptance/AC-163.spec.ts",
+    "tests/acceptance/AC-164.spec.ts",
+    "tests/acceptance/AC-165.spec.ts",
+    "tests/acceptance/AC-166.spec.ts",
+    "tests/acceptance/AC-167.spec.ts",
+    "tests/acceptance/AC-168.spec.ts",
+    "tests/acceptance/AC-169.spec.ts",
+    "tests/negative/AC-160.negative.spec.ts",
+    "tests/negative/AC-161.negative.spec.ts",
+    "tests/negative/AC-162.negative.spec.ts",
+    "tests/negative/AC-163.negative.spec.ts",
+    "tests/negative/AC-164.negative.spec.ts",
+    "tests/negative/AC-165.negative.spec.ts",
+    "tests/negative/AC-166.negative.spec.ts",
+    "tests/negative/AC-167.negative.spec.ts",
+    "tests/negative/AC-168.negative.spec.ts",
+    "tests/negative/AC-169.negative.spec.ts"
+  ]
+}

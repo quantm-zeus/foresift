@@ -1,0 +1,37 @@
+{
+  "family": "FR-POL",
+  "implementationRefs": [
+    "packages/policy-compiler/** @requirement FR-POL-001",
+    "packages/policy-compiler/** @requirement FR-POL-002",
+    "packages/policy-compiler/** @requirement FR-POL-003",
+    "packages/policy-compiler/** @requirement FR-POL-004",
+    "packages/policy-compiler/** @requirement FR-POL-005"
+  ],
+  "requirementIds": [
+    "FR-POL-001",
+    "FR-POL-002",
+    "FR-POL-003",
+    "FR-POL-004",
+    "FR-POL-005"
+  ],
+  "resolvedImplementationPaths": [
+    "packages/policy-compiler/**"
+  ],
+  "schemaRefs": [
+    "packages/shared-schemas/src/pol.ts"
+  ],
+  "surfaceRefs": [
+    "docs/generated/pol-surfaces.json"
+  ],
+  "telemetryRefs": [
+    "telemetry/pol.*"
+  ],
+  "testRefs": [
+    "tests/acceptance/AC-077.spec.ts",
+    "tests/acceptance/AC-078.spec.ts",
+    "tests/acceptance/AC-079.spec.ts",
+    "tests/negative/AC-077.negative.spec.ts",
+    "tests/negative/AC-078.negative.spec.ts",
+    "tests/negative/AC-079.negative.spec.ts"
+  ]
+}

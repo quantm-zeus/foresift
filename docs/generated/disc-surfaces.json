@@ -1,0 +1,84 @@
+{
+  "family": "FR-DISC",
+  "implementationRefs": [
+    "packages/cheap-monitor/** @requirement FR-DISC-001",
+    "packages/cheap-monitor/** @requirement FR-DISC-002",
+    "packages/cheap-monitor/** @requirement FR-DISC-003",
+    "packages/cheap-monitor/** @requirement FR-DISC-004",
+    "packages/cheap-monitor/** @requirement FR-DISC-005",
+    "packages/cheap-monitor/** @requirement FR-DISC-006",
+    "packages/cheap-monitor/** @requirement FR-DISC-007",
+    "packages/cheap-monitor/** @requirement FR-DISC-008",
+    "packages/cheap-monitor/** @requirement FR-DISC-009",
+    "packages/cheap-monitor/** @requirement FR-DISC-010",
+    "packages/cheap-monitor/** @requirement FR-DISC-011",
+    "packages/cheap-monitor/** @requirement FR-DISC-012",
+    "packages/cheap-monitor/** @requirement FR-DISC-013",
+    "packages/cheap-monitor/** @requirement FR-DISC-014",
+    "packages/discovery-universe/** @requirement FR-DISC-001",
+    "packages/discovery-universe/** @requirement FR-DISC-002",
+    "packages/discovery-universe/** @requirement FR-DISC-003",
+    "packages/discovery-universe/** @requirement FR-DISC-004",
+    "packages/discovery-universe/** @requirement FR-DISC-005",
+    "packages/discovery-universe/** @requirement FR-DISC-006",
+    "packages/discovery-universe/** @requirement FR-DISC-007",
+    "packages/discovery-universe/** @requirement FR-DISC-008",
+    "packages/discovery-universe/** @requirement FR-DISC-009",
+    "packages/discovery-universe/** @requirement FR-DISC-010",
+    "packages/discovery-universe/** @requirement FR-DISC-011",
+    "packages/discovery-universe/** @requirement FR-DISC-012",
+    "packages/discovery-universe/** @requirement FR-DISC-013",
+    "packages/discovery-universe/** @requirement FR-DISC-014"
+  ],
+  "requirementIds": [
+    "FR-DISC-001",
+    "FR-DISC-002",
+    "FR-DISC-003",
+    "FR-DISC-004",
+    "FR-DISC-005",
+    "FR-DISC-006",
+    "FR-DISC-007",
+    "FR-DISC-008",
+    "FR-DISC-009",
+    "FR-DISC-010",
+    "FR-DISC-011",
+    "FR-DISC-012",
+    "FR-DISC-013",
+    "FR-DISC-014"
+  ],
+  "resolvedImplementationPaths": [
+    "packages/cheap-monitor/**",
+    "packages/discovery-universe/**"
+  ],
+  "schemaRefs": [
+    "packages/shared-schemas/src/disc.ts"
+  ],
+  "surfaceRefs": [
+    "docs/generated/disc-surfaces.json"
+  ],
+  "telemetryRefs": [
+    "telemetry/disc.*"
+  ],
+  "testRefs": [
+    "tests/acceptance/AC-110.spec.ts",
+    "tests/acceptance/AC-111.spec.ts",
+    "tests/acceptance/AC-112.spec.ts",
+    "tests/acceptance/AC-113.spec.ts",
+    "tests/acceptance/AC-224.spec.ts",
+    "tests/acceptance/AC-225.spec.ts",
+    "tests/acceptance/AC-226.spec.ts",
+    "tests/acceptance/AC-227.spec.ts",
+    "tests/acceptance/AC-228.spec.ts",
+    "tests/acceptance/AC-229.spec.ts",
+    "tests/negative/AC-110.negative.spec.ts",
+    "tests/negative/AC-111.negative.spec.ts",
+    "tests/negative/AC-112.negative.spec.ts",
+    "tests/negative/AC-113.negative.spec.ts",
+    "tests/negative/AC-224.negative.spec.ts",
+    "tests/negative/AC-225.negative.spec.ts",
+    "tests/negative/AC-226.negative.spec.ts",
+    "tests/negative/AC-227.negative.spec.ts",
+    "tests/negative/AC-228.negative.spec.ts",
+    "tests/negative/AC-229.negative.spec.ts"
+  ]
+}

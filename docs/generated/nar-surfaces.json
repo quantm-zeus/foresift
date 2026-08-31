@@ -1,0 +1,35 @@
+{
+  "family": "FR-NAR",
+  "implementationRefs": [
+    "packages/narrative-intelligence/** @requirement FR-NAR-001",
+    "packages/narrative-intelligence/** @requirement FR-NAR-002"
+  ],
+  "requirementIds": [
+    "FR-NAR-001",
+    "FR-NAR-002"
+  ],
+  "resolvedImplementationPaths": [
+    "packages/narrative-intelligence/**"
+  ],
+  "schemaRefs": [
+    "packages/shared-schemas/src/nar.ts"
+  ],
+  "surfaceRefs": [
+    "docs/generated/nar-surfaces.json"
+  ],
+  "telemetryRefs": [
+    "telemetry/nar.*"
+  ],
+  "testRefs": [
+    "tests/acceptance/AC-074.spec.ts",
+    "tests/acceptance/AC-075.spec.ts",
+    "tests/acceptance/AC-076.spec.ts",
+    "tests/acceptance/AC-091.spec.ts",
+    "tests/acceptance/AC-092.spec.ts",
+    "tests/negative/AC-074.negative.spec.ts",
+    "tests/negative/AC-075.negative.spec.ts",
+    "tests/negative/AC-076.negative.spec.ts",
+    "tests/negative/AC-091.negative.spec.ts",
+    "tests/negative/AC-092.negative.spec.ts"
+  ]
+}

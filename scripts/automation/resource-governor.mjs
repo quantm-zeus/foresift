@@ -38,6 +38,16 @@ const HEAVY_PROCESS_PATTERNS = [
   /postgres|pglite/i,
 ];
 
+// Shell wrappers whose ARGV merely CONTAINS a heavy command's text (e.g. the
+// `bash -c 'cd … && bun test …'` wrapper a test runner sits under, or a
+// monitoring eval) are NOT heavy processes — counting them made the governor
+// classify any host running a supervised test as YELLOW and refuse the very
+// launches the tests exist to exercise (observed live 2026-08-31: v3 fixture
+// ticks saw heavy=3 from wrapper+bun+wrapper and refused). Match the wrapper
+// line only when the heavy invocation is the process's OWN program (starts
+// the line), which is what /proc/<pid>/cmdline argv[0] looks like in `ps`.
+const WRAPPER_FALSE_POSITIVE = /^\s*(?:\/bin\/(?:ba)?sh|bash|sh)\s+-c\s/;
+
 function memInfo() {
   const text = readFileSync('/proc/meminfo', 'utf8');
   const field = (name) => {
@@ -60,7 +70,10 @@ function heavyProcessCount() {
   return out
     .split('\n')
     .filter(Boolean)
-    .filter((line) => HEAVY_PROCESS_PATTERNS.some((re) => re.test(line))).length;
+    .filter(
+      (line) =>
+        HEAVY_PROCESS_PATTERNS.some((re) => re.test(line)) && !WRAPPER_FALSE_POSITIVE.test(line),
+    ).length;
 }
 
 /**

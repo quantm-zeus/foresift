@@ -1,88 +1,86 @@
 {
-  "schema": "foresift/maintenance-handoff@1",
-  "capturedAt": "2026-08-31T02:20:00Z",
-  "mainSha": "f09ddb607d931d3b771b2d736f60fd3bd23c55f7",
-  "milestone": "G0",
-  "packages": {
-    "proven": [
-      "g0-contracts-data-truth",
-      "g0-security-perimeter",
-      "g0-tool-core",
-      "g0-provider-lifecycle",
-      "g0-cost-capacity",
-      "g0-first-party-observation"
-    ],
-    "running": {
-      "id": "g0-mcp-surface",
-      "runId": "8e2bf2578e3820b793e40b1d1b0a7081",
+  "schema": "foresift/maintenance-handoff@2",
+  "currentSnapshot": {
+    "capturedAt": "2026-08-31T18:05:00Z",
+    "mainSha": "c995c4b407e5683d34c4c52e691b0f00d44ea7d1",
+    "mainCi": "GREEN (run 33398648706 at c995c4b — #138 merged-main)",
+    "milestone": "G0",
+    "activePackage": {
+      "id": "g0-traceability-conformance",
+      "status": "RUNNING",
+      "generation": 0,
+      "runId": "95c45071b74d0ebb1a5c01d2f24429d0",
       "executionProfile": "HYBRID_AGY",
-      "state": "wave completed; landing in progress via mechanical lander",
-      "landingBranch": "foresift/g0-mcp-surface @ 629d69e (wave integration 4e0bed3 + prettier 4f0cb4f + lint 54287c5 + audit-vocab 011f654 + admission-pipeline-restore 629d69e)",
-      "landingWorktree": "/home/minhquan_eth/foresift-mcp-land",
-      "landingTreeFullCoordinatorTest": "GREEN (b7z1a6o6s predecessor run: {ok:true}, 335 files, 0 fail)",
-      "previousLanderAttempt": "22:39Z FULL gate RED TESTS category on stale worktree state; superseded — do NOT reuse that full-gate-result.json"
+      "stage": "paused_fatal — run exhausted recovery policy after guard refusal (planner defect, fixed by #138); needs --recover-fatal once PR #139 lands",
+      "completedUnits": "core lane committed 3 units (189b790/678d743/ef4af2d on foresift/wave/0ed9a3e2f3-d2f24429d0-core)"
     },
-    "pending": ["g0-traceability-conformance"]
-  },
-  "openMaintenancePr": {
-    "number": 124,
-    "branch": "perf/h2-writer-permit-wiring",
-    "headSha": "19227e527779c7253520a1ca34fb3a295e3b41a0",
-    "ci": "run 33349708756 pending at push time (19227e5); previous head 886cf50 was ALL GREEN",
-    "review": {
-      "agent": "independent general-purpose review of f09ddb6..886cf50 (completed)",
-      "criticalsFixed": [
-        "C1: exec-claude-writer completed:[] always-empty — Claude nodes now pass --task-ids from routing.json; writer claims them on diff",
-        "C2: run-level admission reservations double-counted lane permits — admitPackageLaunch now probes Claude (no hold), keeps codex reservation only for CODEX_AGY",
-        "C3: EXHAUSTED/RESET_WAIT permanent latch — acquirePermitLocked self-heals past resetAt + bounded 2h latch TTL for parse-less EXHAUSTED"
-      ],
-      "importantsFixed": [
-        "I4: autopilot tick runs reconcileLaneHolders each cycle + journals lane_holders_reconciled",
-        "I5: alreadyHeld re-binds pid/runId/at under lock (retry relaunch keeps live attempt identity)",
-        "I6: codex-repair permit now precedes git worktree add; released on worktree-add failure",
-        "I7: codex/agy/repair writers pass packageId/generation/laneId/runId identity opts (FORESIFT_RUN_ID env or --run-id)"
-      ],
-      "minorsFixed": "shared validateGeneration in claude writer, normalized generation in holders, anchored pressure regexes both engines, HOME-less resolvePoolStateDir throws, legacy NUL-key holders fail-closed unknown, holderRegistryView doc",
-      "notFixed": "13 (detached/group-kill spawnSync in writers) — robustness-only, deferred to H2 P1 backlog"
+    "openMaintenancePr": {
+      "number": 139,
+      "branch": "fix/h3-maintenance",
+      "headSha": "917731a",
+      "title": "governor launch gate + upward-recovery hysteresis + ready-queue wiring + reason classes + exact-write override",
+      "ci": "pending at push time; earlier heads green except process-7 GROUP TIMEOUT flake (root-caused and fixed in 917731a)"
     },
-    "pendingSteps": [
-      "wait for PR 124 CI green at 19227e5 (monitor task b9qaljlb1)",
-      "merge: gh pr merge 124 --squash --delete-branch --match-head-commit 19227e527779c7253520a1ca34fb3a295e3b41a0",
-      "verify merged-main CI green, git fetch origin --prune"
-    ]
+    "providerState": "claude limit 1 (backoff to 15:47Z), codex limit 1 HEALTHY, agy 3 — all active 0",
+    "resourceState": "15GiB host, MemAvailable ~14.1GiB (0.86) — GREEN",
+    "blockers": [
+      "g0-traceability paused_fatal: recover-fatal must run AFTER #139 merges (needs the #138 planner fix + #139 governor/queue wiring authoritative on main and the worktree re-pinned)"
+    ],
+    "nextSafeAction": "merge #139 (exact-head 917731a) → verify merged-main CI → systemctl --user stop foresift-autopilot; node scripts/automation/foresift-autopilot.mjs --recover-fatal; systemctl --user start foresift-autopilot"
   },
-  "autopilot": {
-    "service": "foresift-autopilot.service active (PID 196166) — EXACTLY ONE supervisor",
-    "state": "paused_fatal: landing pending for run 8e2bf257 (expected — lander runs supervised by maintainer, not autopilot)",
-    "note": "after g0-mcp-surface landing PR merges: systemctl --user stop foresift-autopilot; node scripts/automation/foresift-autopilot.mjs --recover-fatal; systemctl --user start foresift-autopilot. Fresh continuation re-enters admission gate; already-landed short-circuit records PROVEN. G0 becomes 7/8."
-  },
-  "providerPoolState": {
-    "holdersFile": "~/.local/state/foresift/provider-pools.holders.json (currently {} — clean)",
-    "poolsFile": "~/.local/state/foresift/provider-pools.json (claude limit 3, codex limit 1 HEALTHY, agy 3 — all active 0)",
-    "note": "19227e5 adds: admission lane-permit decoupling (lanes own runtime counts), quota self-heal, tick reconciliation, retry re-bind, repair permit-before-worktree, writer identity opts, anchored pressure regexes"
-  },
-  "lastCompletedActions": [
-    "PR #124 pushed at 19227e5 with ALL review findings (3 Critical + 4 Important + minors) fixed; CI run 33349708756 launched",
-    "independent review agent returned 3C+4I+7minor verdict; every Critical/Important fixed with regression tests",
-    "local full coordinator test re-running on new HEAD (monitor bacqibuyh)",
-    "landing tree (629d69e) full coordinator test GREEN earlier; lander re-run pending after #124 merges (base-drift guard requires landing branch to contain new main)",
-    "NOTE: landing branch 629d69e contains f09ddb6 but NOT PR #124 content — after #124 merges, merge origin/main into foresift/g0-mcp-surface in the landing worktree before re-running the lander (the only overlapping file is evidence/bun-migration/bun-migration-manifest.json; landing has 16 additional MIGRATED entries + PR124 adds 2 test files + flips 50 VERIFIED→MIGRATED carryover; regenerate with --previous after merge)"
+  "history": [
+    {
+      "at": "2026-08-31T13:28Z",
+      "event": "PR #137 merged (a83501c)",
+      "detail": "adaptive lanes consume real work truth: ready counts + exact shardNeed from launch preflight; resolves 45–51min single-lane waves"
+    },
+    {
+      "at": "2026-08-31T14:05Z",
+      "event": "PR #135 merged (8744517)",
+      "detail": "writer briefs budget law — commit each completed unit so timeouts preserve partial work"
+    },
+    {
+      "at": "2026-08-31T16:44Z",
+      "event": "PR #138 merged (c995c4b)",
+      "detail": "planner write-disjointness closure + coreSeed dedupe (fixes run 95c45071 guard refusal); PR #136 superseded/recreated clean"
+    },
+    {
+      "at": "2026-08-31T17:55Z",
+      "event": "governor flake root-caused",
+      "detail": "heavyProcessCount matched bash -c WRAPPER argv text as heavy bun processes → supervised fixture ticks self-classified YELLOW → launch_denied_governor → CI process-7 GROUP TIMEOUT flake class; fixed in 917731a"
+    },
+    {
+      "at": "2026-08-31 (earlier)",
+      "event": "run 95c45071 recovery",
+      "detail": "2 fatal pauses recovered; attempt-1 45m timeout (fixed by #131), attempt-2 guard refusal on trace.ts (fixed by #138); P0-4 engine handoff proven in production (c38c2e1b)"
+    },
+    {
+      "at": "2026-08-30/31",
+      "event": "PRs #130–#133 merged",
+      "detail": "scheduling layer: launch preflight, ready queue/work stealing primitives, Codex cost policy, adaptive lanes, supervisor wiring, exact co-run gate"
+    }
   ],
-  "nextSafeActions": [
-    "merge PR 124 when CI green (exact-head 19227e5), verify merged-main CI",
-    "cd /home/minhquan_eth/foresift-mcp-land && git merge origin/main (resolve manifest via bun-migration-manifest.mjs --previous regen) && re-run package-final-land.mjs with same artifacts-dir",
-    "after landing PR merges: autopilot --recover-fatal cycle (see autopilot.note) → G0 7/8 PROVEN",
-    "then H2 P1 backlog: post-integration manifest duty ordering, coordinator task metadata, exact-write preflight, exact-lease scheduling, shared-surface lane, global ready queue/work stealing, resource governor"
-  ],
-  "blockers": [],
-  "resourceState": "15GiB RAM ~12Gi free; disk 84G free — GREEN",
-  "h3Scheduling": {
-    "at": "2026-08-31T09:45Z",
-    "pr": 130,
-    "merged": "PR #130 MERGED as 54e8bd3 (exact-head 0287c74b, trusted green CI run 33378911135)",
-    "coverage": "P1-6 launch preflight, P1-7 ready queue + work stealing, P2-9 Codex cost policy (tier-tracked reasoning + ONE bounded Sol/high repair escalation), P2-10 adaptive lane count (governor + permit caps)",
-    "evidence": "spec:verify 13 checks OK; prettier/eslint/typecheck clean; PR CI green at exact head",
-    "mergedMainCi": "run 33379379901 GREEN at 54e8bd3 — scheduling layer authoritative on main",
-    "remaining": "P1-7 supervisor-tick wiring of stealNext into capacity events (primitive landed); H3 completion proofs checklist continues"
+  "h3MissionChecklist": {
+    "1_cleanPrHistory": "DONE — #134 closed, #135 recreated from fresh origin/main; branch hygiene: retire branches after squash merges",
+    "2_budgetLaw": "DONE — #135",
+    "3_adaptiveLaneWorkTruth": "DONE — #137 (readyTaskCount/parallelizableReadyCount/shardNeed + regressions)",
+    "4_boundedLaneScope": "PENDING — sequential core-batch-N decomposition; LANE_COUNT_LIMITS.max=3 caps parallel lanes but a 17-unit serial core still needs batching",
+    "5_resourceGovernorGate": "DONE — #139 (launch gate + hysteresis; wrapper false-positive fixed)",
+    "6_readyQueueWiring": "DONE — #139 (buildReadyQueue+stealNext authoritative stream; capacity-event re-entry via §49 fast cadence)",
+    "7_exactWriteOverride": "DONE — #139 (reason classes + WRITE_SCOPE_CONFLICT-only upgrade with exact truth both sides)",
+    "8_handoffSnapshot": "DONE — this file: currentSnapshot/history separated, single currentSnapshot enforced by structure",
+    "9_aiInvocationAudit": "PENDING — inventory test needed",
+    "10_evidenceKinds": "PENDING — non-file evidence kinds (VERIFICATION_ONLY etc.); currently zero-predicted-write tasks stay open forever by design",
+    "11_g1Canary": "BLOCKED until 4/5/6 runtime-proven on real waves"
+  },
+  "runtimeProofs": {
+    "proof1_adaptiveLanes": "landed (regressions green); production proof pending next wave",
+    "proof2_governorBlocks": "landed (regressions green); production proof pending next wave",
+    "proof3_exactDisjointCoRun": "landed; production proof pending next wave",
+    "proof4_dependencySerial": "landed (existing tests + new reason classes)",
+    "proof5_readyQueueSteal": "landed (stealNext wired); production proof pending next wave",
+    "proof6_noProviderBypass": "proven earlier (P0-4 engine handoff + pool wiring)",
+    "proof7_completionEvidence": "landed (P0-1 protocol); non-file kinds pending (item 10)",
+    "proof8_handoffReconstruct": "this snapshot + autopilot state capsule"
   }
 }

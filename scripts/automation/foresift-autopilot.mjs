@@ -116,7 +116,11 @@ import {
 import { advanceRepairRequest, discoverPendingRepairRequests } from './ci-repair-executor.mjs';
 import { admitPackageLaunch, releasePackageRuntime } from './runtime-admission.mjs';
 import { buildLaunchPreflight, exactCoRunCompatible } from './launch-preflight.mjs';
-import { classifyHostState } from './resource-governor.mjs';
+import {
+  classifyHostState,
+  advanceGovernorRecovery,
+  GOVERNOR_RECOVERY_CONFIRMATIONS,
+} from './resource-governor.mjs';
 import { resolveAdaptiveLaneCount } from './adaptive-lanes.mjs';
 import {
   observeClaudeOutcome,
@@ -316,6 +320,7 @@ function loadState() {
     state.maintenanceRuns ??= [];
     state.testMigration ??= { status: 'BUN_MIGRATION_REQUIRED' };
     state.history ??= [];
+    state.governorTracker ??= null;
     return state;
   } catch {
     return {
@@ -325,6 +330,7 @@ function loadState() {
       testMigration: { status: 'BUN_MIGRATION_REQUIRED' },
       pausedFatal: null,
       history: [],
+      governorTracker: null,
     };
   }
 }
@@ -1990,10 +1996,17 @@ async function selectAndLaunch(st) {
 
   // H3 P1-8: host governor sampled once per selection pass (never per
   // candidate — /proc sampling is cheap but the verdict must be one snapshot
-  // for the whole tick).
+  // for the whole tick). Upward recovery is hyteresis-gated
+  // (GOVERNOR_RECOVERY_CONFIRMATIONS consecutive healthy samples) so one
+  // transiently-free /proc sample cannot re-open expansion between waves;
+  // pressure entry is always immediate.
   const governorSample = classifyHostState();
-  const governorState = governorSample.state;
-  const governorReason = governorSample.reason ?? governorSample.state;
+  st.governorTracker = advanceGovernorRecovery(governorSample.state, st.governorTracker ?? null);
+  const governorState = st.governorTracker.state;
+  const governorReason =
+    st.governorTracker.recovered || governorSample.state === 'GREEN'
+      ? (governorSample.reason ?? governorSample.state)
+      : `hysteresis ${governorState} (recovery streak ${st.governorTracker.streak}/${GOVERNOR_RECOVERY_CONFIRMATIONS}); sample: ${governorSample.reason ?? governorSample.state}`;
 
   // B. MAIN RED GLOBAL BLOCK (V4 Invariant): ONLY verified GREEN origin/main required CI
   // permits a NEW product coding package launch. Everything else fails closed.

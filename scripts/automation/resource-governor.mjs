@@ -137,3 +137,46 @@ export function admitUnderGovernor(hostState, action) {
       return { allow: false, reason: 'RED: no new launches' };
   }
 }
+
+// ── Upward-recovery hysteresis (H3 mission item 5) ───────────────────────────
+// A single healthy sample must NOT re-open concurrency expansion: load and
+// heavy-process counts oscillate naturally between waves (a finished test
+// process frees memory for one /proc sample, then the next wave re-occupies
+// it). Without hysteresis the supervisor oscillates GREEN↔YELLOW every tick —
+// launching into pressure, backing off, launching again. Upward recovery
+// requires GOVERNOR_RECOVERY_CONFIRMATIONS consecutive healthy observations;
+// any degraded observation resets the streak. Downward transitions (GREEN →
+// worse) are always immediate — never hysteresis on entering pressure.
+export const GOVERNOR_RECOVERY_CONFIRMATIONS = 3;
+
+/**
+ * Advance the recovery streak with one observation. Returns the EFFECTIVE
+ * state: a freshly recovered GREEN is only reported after enough consecutive
+ * healthy samples; until then the effective state stays at the degraded floor
+ * of the recent past. Pure bookkeeping — no I/O.
+ *
+ * @param {string} observedState the classifyHostState verdict for this tick
+ * @param {{state: string, streak: number}} prior previous tracker (null ⇒ fresh)
+ * @param {number} [confirmations=GOVERNOR_RECOVERY_CONFIRMATIONS]
+ * @returns {{state: string, streak: number, recovered: boolean}}
+ */
+export function advanceGovernorRecovery(
+  observedState,
+  prior = null,
+  confirmations = GOVERNOR_RECOVERY_CONFIRMATIONS,
+) {
+  const observed = String(observedState ?? 'GREEN').toUpperCase();
+  const prev = prior ?? { state: observed, streak: 0 };
+  if (observed === 'GREEN') {
+    if (prev.state === 'GREEN') return { state: 'GREEN', streak: prev.streak + 1, recovered: true };
+    // Still climbing out of pressure: count consecutive healthy samples.
+    const streak = prev.streak + 1;
+    const recovered = streak >= confirmations;
+    return recovered
+      ? { state: 'GREEN', streak, recovered: true }
+      : { state: prev.state, streak, recovered: false };
+  }
+  // Any degraded observation: the effective state drops IMMEDIATELY and the
+  // streak resets (pressure entry is never smoothed).
+  return { state: observed, streak: 0, recovered: false };
+}

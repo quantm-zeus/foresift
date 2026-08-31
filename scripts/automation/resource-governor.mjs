@@ -38,6 +38,16 @@ const HEAVY_PROCESS_PATTERNS = [
   /postgres|pglite/i,
 ];
 
+// Shell wrappers whose ARGV merely CONTAINS a heavy command's text (e.g. the
+// `bash -c 'cd … && bun test …'` wrapper a test runner sits under, or a
+// monitoring eval) are NOT heavy processes — counting them made the governor
+// classify any host running a supervised test as YELLOW and refuse the very
+// launches the tests exist to exercise (observed live 2026-08-31: v3 fixture
+// ticks saw heavy=3 from wrapper+bun+wrapper and refused). Match the wrapper
+// line only when the heavy invocation is the process's OWN program (starts
+// the line), which is what /proc/<pid>/cmdline argv[0] looks like in `ps`.
+const WRAPPER_FALSE_POSITIVE = /^\s*(?:\/bin\/(?:ba)?sh|bash|sh)\s+-c\s/;
+
 function memInfo() {
   const text = readFileSync('/proc/meminfo', 'utf8');
   const field = (name) => {
@@ -60,14 +70,21 @@ function heavyProcessCount() {
   return out
     .split('\n')
     .filter(Boolean)
-    .filter((line) => HEAVY_PROCESS_PATTERNS.some((re) => re.test(line))).length;
+    .filter(
+      (line) =>
+        HEAVY_PROCESS_PATTERNS.some((re) => re.test(line)) && !WRAPPER_FALSE_POSITIVE.test(line),
+    ).length;
 }
 
 /**
  * Classify the host. `sample` injection makes the classification pure and
- * hermetically testable; production callers omit it.
+ * hermetically testable; production callers omit it. FORESIFT_GOVERNOR_STATE
+ * forces the verdict (operator drill + hermetic supervisor wiring tests) —
+ * the live sample is still computed first so the returned shape carries real
+ * numbers, but the STATE is the forced one.
  */
 export function classifyHostState(sample = null) {
+  const forced = process.env.FORESIFT_GOVERNOR_STATE;
   const { total, available, heavyProcesses } =
     sample ??
     (() => {
@@ -76,12 +93,21 @@ export function classifyHostState(sample = null) {
     })();
   if (!total || total <= 0)
     return {
-      state: 'YELLOW',
+      state: forced ?? 'YELLOW',
       availableFrac: 0,
       heavyProcesses,
-      reason: 'unreadable memory info — conservative floor',
+      reason: forced
+        ? `FORESIFT_GOVERNOR_STATE=${forced} override`
+        : 'unreadable memory info — conservative floor',
     };
   const availableFrac = available / total;
+  if (forced)
+    return {
+      state: forced,
+      availableFrac,
+      heavyProcesses,
+      reason: `FORESIFT_GOVERNOR_STATE=${forced} override`,
+    };
   const d = RESOURCE_GOVERNOR_DEFAULTS;
   if (availableFrac < d.redMemoryFrac || heavyProcesses >= d.redHeavyProcesses)
     return {
@@ -123,4 +149,47 @@ export function admitUnderGovernor(hostState, action) {
     default:
       return { allow: false, reason: 'RED: no new launches' };
   }
+}
+
+// ── Upward-recovery hysteresis (H3 mission item 5) ───────────────────────────
+// A single healthy sample must NOT re-open concurrency expansion: load and
+// heavy-process counts oscillate naturally between waves (a finished test
+// process frees memory for one /proc sample, then the next wave re-occupies
+// it). Without hysteresis the supervisor oscillates GREEN↔YELLOW every tick —
+// launching into pressure, backing off, launching again. Upward recovery
+// requires GOVERNOR_RECOVERY_CONFIRMATIONS consecutive healthy observations;
+// any degraded observation resets the streak. Downward transitions (GREEN →
+// worse) are always immediate — never hysteresis on entering pressure.
+export const GOVERNOR_RECOVERY_CONFIRMATIONS = 3;
+
+/**
+ * Advance the recovery streak with one observation. Returns the EFFECTIVE
+ * state: a freshly recovered GREEN is only reported after enough consecutive
+ * healthy samples; until then the effective state stays at the degraded floor
+ * of the recent past. Pure bookkeeping — no I/O.
+ *
+ * @param {string} observedState the classifyHostState verdict for this tick
+ * @param {{state: string, streak: number}} prior previous tracker (null ⇒ fresh)
+ * @param {number} [confirmations=GOVERNOR_RECOVERY_CONFIRMATIONS]
+ * @returns {{state: string, streak: number, recovered: boolean}}
+ */
+export function advanceGovernorRecovery(
+  observedState,
+  prior = null,
+  confirmations = GOVERNOR_RECOVERY_CONFIRMATIONS,
+) {
+  const observed = String(observedState ?? 'GREEN').toUpperCase();
+  const prev = prior ?? { state: observed, streak: 0 };
+  if (observed === 'GREEN') {
+    if (prev.state === 'GREEN') return { state: 'GREEN', streak: prev.streak + 1, recovered: true };
+    // Still climbing out of pressure: count consecutive healthy samples.
+    const streak = prev.streak + 1;
+    const recovered = streak >= confirmations;
+    return recovered
+      ? { state: 'GREEN', streak, recovered: true }
+      : { state: prev.state, streak, recovered: false };
+  }
+  // Any degraded observation: the effective state drops IMMEDIATELY and the
+  // streak resets (pressure entry is never smoothed).
+  return { state: observed, streak: 0, recovered: false };
 }

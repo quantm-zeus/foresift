@@ -84,3 +84,25 @@ describe('launchDetached adaptive lane wiring', () => {
     expect(line).toContain('WRITERS=unset');
   });
 });
+
+describe('governor override (FORESIFT_GOVERNOR_STATE)', () => {
+  test('forced non-GREEN state is reported by classifyHostState', async () => {
+    process.env.FORESIFT_GOVERNOR_STATE = 'ORANGE';
+    const mod = await import('../../scripts/automation/resource-governor.mjs');
+    const s = mod.classifyHostState();
+    expect(s.state).toBe('ORANGE');
+    expect(s.reason).toContain('FORESIFT_GOVERNOR_STATE=ORANGE');
+    delete process.env.FORESIFT_GOVERNOR_STATE;
+    expect(mod.classifyHostState().state).toBe('GREEN');
+  });
+
+  test('selection-loop governor gate wiring: non-GREEN refuses new launches', async () => {
+    process.env.FORESIFT_GOVERNOR_STATE = 'RED';
+    const mod = await import('../../scripts/automation/resource-governor.mjs');
+    const s = mod.classifyHostState();
+    const verdict = mod.admitUnderGovernor(s, { heavy: false });
+    expect(verdict.allow).toBe(false);
+    expect(verdict.reason).toBe('RED: no new launches');
+    delete process.env.FORESIFT_GOVERNOR_STATE;
+  });
+});

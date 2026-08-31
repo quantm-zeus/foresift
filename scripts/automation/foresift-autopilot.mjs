@@ -116,7 +116,12 @@ import {
 import { advanceRepairRequest, discoverPendingRepairRequests } from './ci-repair-executor.mjs';
 import { admitPackageLaunch, releasePackageRuntime } from './runtime-admission.mjs';
 import { buildLaunchPreflight, exactCoRunCompatible } from './launch-preflight.mjs';
-import { classifyHostState } from './resource-governor.mjs';
+import { buildReadyQueue, stealNext } from './ready-queue.mjs';
+import {
+  classifyHostState,
+  advanceGovernorRecovery,
+  GOVERNOR_RECOVERY_CONFIRMATIONS,
+} from './resource-governor.mjs';
 import { resolveAdaptiveLaneCount } from './adaptive-lanes.mjs';
 import {
   observeClaudeOutcome,
@@ -316,6 +321,7 @@ function loadState() {
     state.maintenanceRuns ??= [];
     state.testMigration ??= { status: 'BUN_MIGRATION_REQUIRED' };
     state.history ??= [];
+    state.governorTracker ??= null;
     return state;
   } catch {
     return {
@@ -325,6 +331,7 @@ function loadState() {
       testMigration: { status: 'BUN_MIGRATION_REQUIRED' },
       pausedFatal: null,
       history: [],
+      governorTracker: null,
     };
   }
 }
@@ -1988,6 +1995,20 @@ async function selectAndLaunch(st) {
     return preflightCache.get(packageId);
   };
 
+  // H3 P1-8: host governor sampled once per selection pass (never per
+  // candidate — /proc sampling is cheap but the verdict must be one snapshot
+  // for the whole tick). Upward recovery is hyteresis-gated
+  // (GOVERNOR_RECOVERY_CONFIRMATIONS consecutive healthy samples) so one
+  // transiently-free /proc sample cannot re-open expansion between waves;
+  // pressure entry is always immediate.
+  const governorSample = classifyHostState();
+  st.governorTracker = advanceGovernorRecovery(governorSample.state, st.governorTracker ?? null);
+  const governorState = st.governorTracker.state;
+  const governorReason =
+    st.governorTracker.recovered || governorSample.state === 'GREEN'
+      ? (governorSample.reason ?? governorSample.state)
+      : `hysteresis ${governorState} (recovery streak ${st.governorTracker.streak}/${GOVERNOR_RECOVERY_CONFIRMATIONS}); sample: ${governorSample.reason ?? governorSample.state}`;
+
   // B. MAIN RED GLOBAL BLOCK (V4 Invariant): ONLY verified GREEN origin/main required CI
   // permits a NEW product coding package launch. Everything else fails closed.
   const mainCi = getMainCiStatus({ cwd: REPO });
@@ -2044,32 +2065,81 @@ async function selectAndLaunch(st) {
     }
   }
 
-  for (const cand of rankPendingPackages(ms)) {
-    if (barrier.state === 'CURRENT_PACKAGE' && cand.id !== testPolicy.barrierAfterPackage) continue;
-    // Never re-select a package that already has a tracked active launch or in-flight intent
-    if (st.activeRuns.some((r) => r.packageId === cand.id && !r.done)) continue;
-    if (isPackageLaunchInFlight(STATE_DIR, cand.id)) continue;
-    const elig = packageEligible(ms, cand);
-    if (!elig.eligible) continue;
-    const verdict = canStartPackage(roadmap, ms, cand, running);
-    if (!verdict.ok) {
-      // Maintainer observability: a pairwise concurrency refusal is evidence,
-      // not noise — record WHY an otherwise-eligible candidate was denied a
-      // slot. Once per process for the same package+reason; capacity-limit
-      // saturation is healthy and stays silent.
-      if (
-        !/concurrency limit/.test(verdict.reason) &&
-        !coRunDenialSeen.has(`${cand.id}|${verdict.reason}`)
-      ) {
-        coRunDenialSeen.add(`${cand.id}|${verdict.reason}`);
-        record(st, 'co_run_denied', {
-          packageId: cand.id,
-          reason: verdict.reason,
-          running: running.map((r) => r.id),
-        });
+  // H3 mission item 6: the candidate stream is the GLOBAL READY QUEUE — one
+  // priority-ordered, preflight-backed queue per selection pass (built from
+  // the same critical-path ranking the loop previously consumed inline).
+  // stealNext drives selection, so every eligibility check happens in queue
+  // priority order and skipped candidates stay queued for later capacity
+  // events. The 60s tick remains the poll fallback; HANDOFF_POLL_MS (§18/§49)
+  // is the capacity-event re-entry (launch/lane completion flips readyWork,
+  // which pins the loop at the fast rate).
+  const readyQueue = buildReadyQueue(rankPendingPackages(ms), (id) => readyPreflight(id));
+  record(st, 'ready_queue_built', {
+    candidates: readyQueue.entries.map((e) => e.packageId),
+  });
+  while (readyQueue.entries.length > 0) {
+    const claimed = stealNext(readyQueue, (entry) => {
+      const cand = entry.preflight?.packageId
+        ? findPackage(ms, entry.packageId)
+        : findPackage(ms, entry.packageId);
+      if (!cand) return null;
+      if (barrier.state === 'CURRENT_PACKAGE' && cand.id !== testPolicy.barrierAfterPackage)
+        return null;
+      // Never re-select a package that already has a tracked active launch or in-flight intent
+      if (st.activeRuns.some((r) => r.packageId === cand.id && !r.done)) return null;
+      if (isPackageLaunchInFlight(STATE_DIR, cand.id)) return null;
+      const elig = packageEligible(ms, cand);
+      if (!elig.eligible) return null;
+      const verdict = canStartPackage(roadmap, ms, cand, running);
+      if (!verdict.ok) {
+        // H3 mission item 7 — exact-write override of ONLY broad write-scope
+        // false conflicts. A WRITE_SCOPE_CONFLICT refusal may be upgraded when
+        // BOTH sides carry derivable exact predicted-write truth and the exact
+        // writes are disjoint (no dependency edge, no CRITICAL/serial law, no
+        // global surface, no unknown write truth on either side — every other
+        // reason class is hard law and never upgraded). Anything unknown
+        // degrades to the broad refusal.
+        if (exactCoRunPreflightEnabled && verdict.reasonClass === 'WRITE_SCOPE_CONFLICT') {
+          const candPf = readyPreflight(cand.id);
+          if (candPf?.exact) {
+            let overridden = true;
+            for (const run of running) {
+              const compat = exactCoRunCompatible(candPf, readyPreflight(run.id));
+              if (compat.compatible !== true) {
+                overridden = false;
+                break;
+              }
+            }
+            if (overridden && running.length > 0) {
+              record(st, 'co_run_upgraded_exact_writes', {
+                packageId: cand.id,
+                broadReason: verdict.reason,
+              });
+              return { cand };
+            }
+          }
+        }
+        // Maintainer observability: a pairwise concurrency refusal is evidence,
+        // not noise — record WHY an otherwise-eligible candidate was denied a
+        // slot. Once per process for the same package+reason; capacity-limit
+        // saturation is healthy and stays silent.
+        if (
+          !/concurrency limit/.test(verdict.reason) &&
+          !coRunDenialSeen.has(`${cand.id}|${verdict.reason}`)
+        ) {
+          coRunDenialSeen.add(`${cand.id}|${verdict.reason}`);
+          record(st, 'co_run_denied', {
+            packageId: cand.id,
+            reason: verdict.reason,
+            running: running.map((r) => r.id),
+          });
+        }
+        return null;
       }
-      continue;
-    }
+      return { cand };
+    });
+    if (!claimed) break; // every remaining candidate is blocked this tick
+    const cand = claimed.cand;
     const { generation, branch, message, workflow: wf, executionProfile } = launchIdentity(cand);
     // H3 P1-7 exact co-run gate: when BOTH sides carry derivable exact write
     // truth, an exact predicted-write overlap forbids the co-run even though
@@ -2097,6 +2167,21 @@ async function selectAndLaunch(st) {
         }
       }
     }
+    // H3 P1-8 launch-time resource governor: a non-GREEN host refuses NEW
+    // package launches (existing work continues). Sampled once per selection
+    // pass; unreadable samples already fail closed inside classifyHostState.
+    if (governorState !== 'GREEN') {
+      const key = `governor_${governorState}|${cand.id}`;
+      if (!coRunDenialSeen.has(key)) {
+        coRunDenialSeen.add(key);
+        record(st, 'launch_denied_governor', {
+          packageId: cand.id,
+          state: governorState,
+          reason: governorReason,
+        });
+      }
+      continue;
+    }
     // H2 admission bridge (§17/§20/§41): global provider permits + exact-file
     // leases BEFORE any launch. Denied candidates are skipped this tick (the
     // same reason is recorded once per process; a full pool is healthy
@@ -2111,6 +2196,8 @@ async function selectAndLaunch(st) {
           reason: admission.reason,
         });
       }
+      // Skipped, not consumed: a freed permit (quota reset, lane completion)
+      // must let this candidate win the next steal pass.
       continue;
     }
     // Two-Phase Launch Protocol: Phase A (Durable Launch Intent)

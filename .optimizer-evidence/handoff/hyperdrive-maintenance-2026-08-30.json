@@ -1,7 +1,7 @@
 {
   "schema": "foresift/maintenance-handoff@1",
-  "capturedAt": "2026-08-31T02:20:00Z",
-  "mainSha": "f09ddb607d931d3b771b2d736f60fd3bd23c55f7",
+  "capturedAt": "2026-08-31T03:30:00Z",
+  "mainSha": "0893e1eeb897db9c9c5cbccb5dd27c3d27354333",
   "milestone": "G0",
   "packages": {
     "proven": [
@@ -52,9 +52,9 @@
     ]
   },
   "autopilot": {
-    "service": "foresift-autopilot.service active (PID 196166) — EXACTLY ONE supervisor",
-    "state": "paused_fatal: landing pending for run 8e2bf257 (expected — lander runs supervised by maintainer, not autopilot)",
-    "note": "after g0-mcp-surface landing PR merges: systemctl --user stop foresift-autopilot; node scripts/automation/foresift-autopilot.mjs --recover-fatal; systemctl --user start foresift-autopilot. Fresh continuation re-enters admission gate; already-landed short-circuit records PROVEN. G0 becomes 7/8."
+    "service": "active (PID held), paused_fatal awaiting landing completion",
+    "pausedFatalReason": "run 8e2bf2578e3820b793e40b1d1b0a7081 (g0-mcp-surface) exhausted recovery policy: wave landing pending",
+    "recovery": "after PR #125 merges: systemctl --user stop foresift-autopilot; node scripts/automation/foresift-autopilot.mjs --recover-fatal; systemctl --user start foresift-autopilot; expect fresh continuation re-enters admission gate, already-landed short-circuit records PROVEN, G0 -> 7/8"
   },
   "providerPoolState": {
     "holdersFile": "~/.local/state/foresift/provider-pools.holders.json (currently {} — clean)",
@@ -75,5 +75,17 @@
     "then H2 P1 backlog: post-integration manifest duty ordering, coordinator task metadata, exact-write preflight, exact-lease scheduling, shared-surface lane, global ready queue/work stealing, resource governor"
   ],
   "blockers": [],
-  "resourceState": "15GiB RAM ~12Gi free; disk 84G free — GREEN"
+  "resourceState": "15GiB RAM ~12Gi free; disk 84G free — GREEN",
+  "pr124": "MERGED as 0893e1e at 2026-08-31T03:06:51Z; merged-main CI run 33352776332 green",
+  "landing": {
+    "branch": "foresift/g0-mcp-surface",
+    "worktree": "/home/minhquan_eth/foresift-mcp-land",
+    "pr": 125,
+    "mergeCommit": "397aaaf",
+    "mergeNote": "origin/main 0893e1e merged into landing base; single conflict evidence/bun-migration/bun-migration-manifest.json resolved by bun-migration-manifest.mjs regen with --previous (bc153e8 version): 337 files, counts MIGRATED 287 / VERIFIED 50 (carryovers preserved), PR-124 specs claude-lane-permits + writer-lane-permits present as ALREADY_MIGRATED/MIGRATED, prettier-clean",
+    "baseDrift": "PASS — merge-base origin/main == 0893e1e is ancestor of HEAD",
+    "archonValidate": "32 valid, 0 errors, 2 warnings",
+    "fullCoordinatorReburn": "in flight (CI=true pnpm test, log /tmp/land-full-gate.log)",
+    "next": "after green coordinator: re-run package-final-land.mjs verbatim (package g0-mcp-surface, branch foresift/g0-mcp-surface, artifacts-dir /home/minhquan_eth/.archon/workspaces/quantm-zeus/foresift/artifacts/runs/8e2bf2578e3820b793e40b1d1b0a7081); lander burns its own FULL gate; then exact-head CI on PR #125, squash merge, autopilot --recover-fatal"
+  }
 }

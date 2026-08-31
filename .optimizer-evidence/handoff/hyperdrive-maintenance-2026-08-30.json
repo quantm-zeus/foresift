@@ -84,5 +84,16 @@
     "evidence": "spec:verify 13 checks OK; prettier/eslint/typecheck clean; PR CI green at exact head",
     "mergedMainCi": "run 33379379901 GREEN at 54e8bd3 — scheduling layer authoritative on main",
     "remaining": "P1-7 supervisor-tick wiring of stealNext into capacity events (primitive landed); H3 completion proofs checklist continues"
+  },
+  "supervisorWiring": {
+    "at": "2026-08-31T11:50Z",
+    "pr": 133,
+    "merged": "PR #133 MERGED as 7585a3f (exact-head trusted CI; process-meta flake adjudicated via rerun — group v2-throughput+v3-generations timed out on CI runner 3x today but green locally + on main)",
+    "content": "Exact co-run gate in selection (memoized launch preflights, exact predicted-write overlap refuses co-run, co_run_denied_exact_writes event, FORESIFT_EXACT_CORUN=false escape hatch) + adaptive FORESIFT_WRITERS at sharded-wave launch (governor + permits, override wins, env restored)",
+    "mergedMainCi": "run 33388171095 queued at 7585a3f",
+    "followUps": [
+      "claude-lane-core incremental commit checkpoints (2 lanes lost 45m+55m of read/analysis work to timeouts without partial writes persisting)",
+      "stealNext wiring into capacity events (permit release, lane completion, pool reset) — primitive landed in #130"
+    ]
   }
 }

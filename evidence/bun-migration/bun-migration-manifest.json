@@ -1,21 +1,251 @@
 {
   "schema": "foresift/bun-migration-manifest@1",
   "migrationId": "bun-test-authority-v1",
-  "generatedAt": "2026-08-30T21:02:49.031Z",
+  "generatedAt": "2026-08-31T03:14:16.518Z",
   "root": ".",
-  "totalTestFiles": 321,
+  "totalTestFiles": 337,
   "counts": {
     "CODEMOD_READY": 0,
     "AGY_REQUIRED": 0,
-    "MIGRATED": 271,
+    "MIGRATED": 287,
     "VERIFIED": 50,
     "BLOCKED": 0
   },
   "parity": {
-    "previousTotal": 320,
+    "previousTotal": 321,
     "disappeared": []
   },
   "files": [
+    {
+      "path": "apps/api/test/admission.spec.ts",
+      "package": "root",
+      "bytes": 5838,
+      "lines": 171,
+      "sha256": "0cc0f8c1e21880fa3e37c18668c743256ff722eb38b243aa3d8bfd1c799dbb98",
+      "imports": ["bun:test", "../../../tests/fixtures/mcp/index.ts"],
+      "vitestImports": [],
+      "features": ["dynamic-import"],
+      "workload": "PURE",
+      "migrationType": "ALREADY_MIGRATED",
+      "fixturesAndHelpers": ["../../../tests/fixtures/mcp/index.ts"],
+      "sourceAnchors": ["../../../tests/fixtures/mcp/index.ts"],
+      "state": "MIGRATED"
+    },
+    {
+      "path": "apps/api/test/audit-facet.spec.ts",
+      "package": "root",
+      "bytes": 3417,
+      "lines": 100,
+      "sha256": "92c17e9a13bdfa02e0109fd478adf24c0cdb258f5325561ab1f7c4c14769eb1e",
+      "imports": [
+        "bun:test",
+        "../../../packages/domain/src/index.ts",
+        "../../../packages/security/src/audit-chain.ts",
+        "../../../tests/acceptance/helpers.ts"
+      ],
+      "vitestImports": [],
+      "features": ["dynamic-import"],
+      "workload": "PURE",
+      "migrationType": "ALREADY_MIGRATED",
+      "fixturesAndHelpers": ["../../../tests/acceptance/helpers.ts"],
+      "sourceAnchors": [
+        "../../../packages/domain/src/index.ts",
+        "../../../packages/security/src/audit-chain.ts",
+        "../../../tests/acceptance/helpers.ts"
+      ],
+      "state": "MIGRATED"
+    },
+    {
+      "path": "apps/api/test/bearer-auth.spec.ts",
+      "package": "root",
+      "bytes": 4879,
+      "lines": 124,
+      "sha256": "13c18a924fd48aca831b13c18a2dcda241d8e8e744cff355d4b91af03743dcd3",
+      "imports": ["bun:test", "../../../tests/fixtures/mcp/index.ts"],
+      "vitestImports": [],
+      "features": ["dynamic-import"],
+      "workload": "PURE",
+      "migrationType": "ALREADY_MIGRATED",
+      "fixturesAndHelpers": ["../../../tests/fixtures/mcp/index.ts"],
+      "sourceAnchors": ["../../../tests/fixtures/mcp/index.ts"],
+      "state": "MIGRATED"
+    },
+    {
+      "path": "apps/api/test/config.spec.ts",
+      "package": "root",
+      "bytes": 4004,
+      "lines": 104,
+      "sha256": "5243bdd4016ecd50a580bd986af564b8fa3943449ee8f7edd9be69001389ca8e",
+      "imports": ["bun:test", "../../../tests/fixtures/mcp/index.ts"],
+      "vitestImports": [],
+      "features": ["dynamic-import"],
+      "workload": "PURE",
+      "migrationType": "ALREADY_MIGRATED",
+      "fixturesAndHelpers": ["../../../tests/fixtures/mcp/index.ts"],
+      "sourceAnchors": ["../../../tests/fixtures/mcp/index.ts"],
+      "state": "MIGRATED"
+    },
+    {
+      "path": "apps/api/test/origin-wiring.spec.ts",
+      "package": "root",
+      "bytes": 5749,
+      "lines": 156,
+      "sha256": "0a156ace4af7877cab30bc0865daafe2cd1f4f5e0d531e9b2e34ccaa7f8468a5",
+      "imports": ["bun:test", "../../../tests/fixtures/mcp/index.ts"],
+      "vitestImports": [],
+      "features": ["dynamic-import"],
+      "workload": "PURE",
+      "migrationType": "ALREADY_MIGRATED",
+      "fixturesAndHelpers": ["../../../tests/fixtures/mcp/index.ts"],
+      "sourceAnchors": ["../../../tests/fixtures/mcp/index.ts"],
+      "state": "MIGRATED"
+    },
+    {
+      "path": "apps/api/test/output.spec.ts",
+      "package": "root",
+      "bytes": 4030,
+      "lines": 106,
+      "sha256": "6b8b3ed942503090aa1a0ea3b3d2e6f95584552aee9844f6cd5a494f23459177",
+      "imports": ["bun:test", "../../../tests/fixtures/mcp/index.ts"],
+      "vitestImports": [],
+      "features": ["dynamic-import"],
+      "workload": "PURE",
+      "migrationType": "ALREADY_MIGRATED",
+      "fixturesAndHelpers": ["../../../tests/fixtures/mcp/index.ts"],
+      "sourceAnchors": ["../../../tests/fixtures/mcp/index.ts"],
+      "state": "MIGRATED"
+    },
+    {
+      "path": "apps/api/test/prompts.spec.ts",
+      "package": "root",
+      "bytes": 3743,
+      "lines": 93,
+      "sha256": "eeab075468d618435251b8aa1f6fa8581e07157f561233bcdbbf8edb9bba481e",
+      "imports": ["bun:test", "../../../tests/fixtures/mcp/index.ts"],
+      "vitestImports": [],
+      "features": ["dynamic-import"],
+      "workload": "PURE",
+      "migrationType": "ALREADY_MIGRATED",
+      "fixturesAndHelpers": ["../../../tests/fixtures/mcp/index.ts"],
+      "sourceAnchors": ["../../../tests/fixtures/mcp/index.ts"],
+      "state": "MIGRATED"
+    },
+    {
+      "path": "apps/api/test/protocol-wiring.spec.ts",
+      "package": "root",
+      "bytes": 6568,
+      "lines": 175,
+      "sha256": "a8952caf0446afb86f57d29c1b9e5a73d7728556ef82331a2c3ba2ccaed2f9de",
+      "imports": [
+        "bun:test",
+        "../../../packages/shared-schemas/src/index.ts",
+        "../../../tests/fixtures/mcp/index.ts"
+      ],
+      "vitestImports": [],
+      "features": ["dynamic-import"],
+      "workload": "PURE",
+      "migrationType": "ALREADY_MIGRATED",
+      "fixturesAndHelpers": ["../../../tests/fixtures/mcp/index.ts"],
+      "sourceAnchors": [
+        "../../../packages/shared-schemas/src/index.ts",
+        "../../../tests/fixtures/mcp/index.ts"
+      ],
+      "state": "MIGRATED"
+    },
+    {
+      "path": "apps/api/test/rate-limits.spec.ts",
+      "package": "root",
+      "bytes": 3824,
+      "lines": 118,
+      "sha256": "2513a1ba1f40460129029d10f317457ffeae93482bfa03f8cd22ae530ec8695b",
+      "imports": ["bun:test"],
+      "vitestImports": [],
+      "features": ["dynamic-import"],
+      "workload": "PURE",
+      "migrationType": "ALREADY_MIGRATED",
+      "fixturesAndHelpers": [],
+      "sourceAnchors": [],
+      "state": "MIGRATED"
+    },
+    {
+      "path": "apps/api/test/resources.spec.ts",
+      "package": "root",
+      "bytes": 4086,
+      "lines": 114,
+      "sha256": "1df1ed20cc59c9ee16923f2bb02d9e809aa3f9ffafb70d00c6c6a3da2110fe6b",
+      "imports": ["bun:test", "../../../tests/fixtures/mcp/index.ts"],
+      "vitestImports": [],
+      "features": ["dynamic-import"],
+      "workload": "PURE",
+      "migrationType": "ALREADY_MIGRATED",
+      "fixturesAndHelpers": ["../../../tests/fixtures/mcp/index.ts"],
+      "sourceAnchors": ["../../../tests/fixtures/mcp/index.ts"],
+      "state": "MIGRATED"
+    },
+    {
+      "path": "apps/api/test/server.spec.ts",
+      "package": "root",
+      "bytes": 6500,
+      "lines": 174,
+      "sha256": "2f8acccfa1a47cb54e33b26b5f40be9281c4e1e49a9a491cc4a51b9f68331c83",
+      "imports": [
+        "bun:test",
+        "../../../packages/domain/src/index.ts",
+        "../../../packages/shared-schemas/src/index.ts",
+        "../../../tests/fixtures/mcp/index.ts"
+      ],
+      "vitestImports": [],
+      "features": ["dynamic-import"],
+      "workload": "PURE",
+      "migrationType": "ALREADY_MIGRATED",
+      "fixturesAndHelpers": ["../../../tests/fixtures/mcp/index.ts"],
+      "sourceAnchors": [
+        "../../../packages/domain/src/index.ts",
+        "../../../packages/shared-schemas/src/index.ts",
+        "../../../tests/fixtures/mcp/index.ts"
+      ],
+      "state": "MIGRATED"
+    },
+    {
+      "path": "apps/api/test/session-store.spec.ts",
+      "package": "root",
+      "bytes": 5790,
+      "lines": 160,
+      "sha256": "63c83f2e00a1cbca95bf91a49fb05770ce5c03ab54de3b1dbb4703d57cfbbb9d",
+      "imports": [
+        "bun:test",
+        "../../../tests/acceptance/helpers.ts",
+        "../../../tests/fixtures/mcp/index.ts"
+      ],
+      "vitestImports": [],
+      "features": ["dynamic-import"],
+      "workload": "DATABASE_PGLITE",
+      "migrationType": "ALREADY_MIGRATED",
+      "fixturesAndHelpers": [
+        "../../../tests/acceptance/helpers.ts",
+        "../../../tests/fixtures/mcp/index.ts"
+      ],
+      "sourceAnchors": [
+        "../../../tests/acceptance/helpers.ts",
+        "../../../tests/fixtures/mcp/index.ts"
+      ],
+      "state": "MIGRATED"
+    },
+    {
+      "path": "apps/api/test/tools.spec.ts",
+      "package": "root",
+      "bytes": 3567,
+      "lines": 104,
+      "sha256": "610b2e0ab4d66fd3f41b2d2d4a3830d6799329decca68c24de7c15984c5bd5f7",
+      "imports": ["bun:test", "../../../packages/domain/src/index.ts"],
+      "vitestImports": [],
+      "features": ["dynamic-import"],
+      "workload": "PURE",
+      "migrationType": "ALREADY_MIGRATED",
+      "fixturesAndHelpers": [],
+      "sourceAnchors": ["../../../packages/domain/src/index.ts"],
+      "state": "MIGRATED"
+    },
     {
       "path": "packages/capacity-planner/test/degrade-policy.spec.ts",
       "package": "@foresift/capacity-planner",
@@ -1121,9 +1351,9 @@
     {
       "path": "packages/persistence/test/migrator.spec.ts",
       "package": "@foresift/persistence",
-      "bytes": 19792,
-      "lines": 494,
-      "sha256": "ca703a9aac1e34f1a1ff3509c766b5c094e73b907b1c9f3305c3e4305634be76",
+      "bytes": 19916,
+      "lines": 498,
+      "sha256": "857464955e8c97812f73395f06cf8f41e99256428ee1b1a4dff6e7d56956a5d3",
       "imports": [
         "bun:test",
         "@electric-sql/pglite",
@@ -2419,6 +2649,21 @@
       "state": "MIGRATED"
     },
     {
+      "path": "packages/shared-schemas/test/mcp.spec.ts",
+      "package": "@foresift/shared-schemas",
+      "bytes": 8720,
+      "lines": 254,
+      "sha256": "aaaa0153bf4850e5fdf36bb937e7835a2b7ffb6779cc5ec0b5d53e65d22b1560",
+      "imports": ["bun:test", "../src/mcp.ts", "../../../tests/fixtures/mcp/index.ts"],
+      "vitestImports": [],
+      "features": [],
+      "workload": "PURE",
+      "migrationType": "ALREADY_MIGRATED",
+      "fixturesAndHelpers": ["../../../tests/fixtures/mcp/index.ts"],
+      "sourceAnchors": ["../src/mcp.ts", "../../../tests/fixtures/mcp/index.ts"],
+      "state": "MIGRATED"
+    },
+    {
       "path": "packages/shared-schemas/test/prov.spec.ts",
       "package": "@foresift/shared-schemas",
       "bytes": 29115,
@@ -2737,9 +2982,9 @@
     {
       "path": "tests/acceptance/AC-001.spec.ts",
       "package": "acceptance",
-      "bytes": 7339,
-      "lines": 181,
-      "sha256": "e7dcc5e5baf87bbc88778b6300e8b17bb158a26481c73a9879e38f7335599ac1",
+      "bytes": 12691,
+      "lines": 339,
+      "sha256": "f7d10f7a25582877f7b0b32ae00dca00eba5eb44c89a2345c1fc8391e6fa43bb",
       "imports": [
         "bun:test",
         "@foresift/domain",
@@ -2944,25 +3189,39 @@
     {
       "path": "tests/acceptance/AC-050.spec.ts",
       "package": "acceptance",
-      "bytes": 4085,
-      "lines": 99,
-      "sha256": "e022f678435c2913876d43ae1458f690984a41d24eeaa68061721cf5abab22cd",
+      "bytes": 11989,
+      "lines": 285,
+      "sha256": "ceee4295f1c5f45b196ae621f54e8b1c7812af33a45bf23836509e8ebf0ed82c",
       "imports": [
         "node:fs",
         "node:path",
         "node:url",
         "bun:test",
+        "@foresift/domain",
         "../../packages/security/src/negative-capability.ts",
-        "../../packages/tool-core/src/prohibited.ts"
+        "../../packages/tool-core/src/prohibited.ts",
+        "../../apps/api/src/mcp/tools.ts",
+        "../../apps/api/src/mcp/resources.ts",
+        "../../apps/api/src/mcp/prompts.ts",
+        "../../apps/api/src/config.ts",
+        "../../apps/api/src/mcp/output.ts",
+        "../fixtures/mcp/index.ts"
       ],
       "vitestImports": [],
       "features": ["dynamic-import"],
       "workload": "PURE",
       "migrationType": "ALREADY_MIGRATED",
-      "fixturesAndHelpers": [],
+      "fixturesAndHelpers": ["../fixtures/mcp/index.ts"],
       "sourceAnchors": [
+        "@foresift/domain",
         "../../packages/security/src/negative-capability.ts",
-        "../../packages/tool-core/src/prohibited.ts"
+        "../../packages/tool-core/src/prohibited.ts",
+        "../../apps/api/src/mcp/tools.ts",
+        "../../apps/api/src/mcp/resources.ts",
+        "../../apps/api/src/mcp/prompts.ts",
+        "../../apps/api/src/config.ts",
+        "../../apps/api/src/mcp/output.ts",
+        "../fixtures/mcp/index.ts"
       ],
       "state": "MIGRATED"
     },
@@ -3301,6 +3560,30 @@
       "migrationType": "ALREADY_MIGRATED",
       "fixturesAndHelpers": ["../fixtures/disc/index.ts"],
       "sourceAnchors": ["../fixtures/disc/index.ts"],
+      "state": "MIGRATED"
+    },
+    {
+      "path": "tests/acceptance/AC-144.spec.ts",
+      "package": "acceptance",
+      "bytes": 8310,
+      "lines": 268,
+      "sha256": "51222ef9fa96972eb95d7fbbfcc3719695c4632b88f059604127070c913bd8d3",
+      "imports": [
+        "bun:test",
+        "@foresift/shared-schemas",
+        "../../packages/security/src/mcp-protocol-guard.ts",
+        "../fixtures/mcp/index.ts"
+      ],
+      "vitestImports": [],
+      "features": ["table-driven-each"],
+      "workload": "PURE",
+      "migrationType": "ALREADY_MIGRATED",
+      "fixturesAndHelpers": ["../fixtures/mcp/index.ts"],
+      "sourceAnchors": [
+        "@foresift/shared-schemas",
+        "../../packages/security/src/mcp-protocol-guard.ts",
+        "../fixtures/mcp/index.ts"
+      ],
       "state": "MIGRATED"
     },
     {
@@ -3802,34 +4085,42 @@
     {
       "path": "tests/acceptance/AC-254.spec.ts",
       "package": "acceptance",
-      "bytes": 5417,
-      "lines": 139,
-      "sha256": "68f62f93c1f39a1654d3564509ca4108b3158e53f748c4b15c6eb763b31c3d2c",
+      "bytes": 10784,
+      "lines": 264,
+      "sha256": "d44f767456a41748e9370f13ad4badcf2598f965c2ba90e236bdca1a9aa5bc72",
       "imports": [
         "node:fs",
         "node:path",
         "node:url",
         "bun:test",
         "../../packages/security/src/negative-capability.ts",
-        "../../packages/security/src/supply-chain.ts"
+        "../../packages/security/src/supply-chain.ts",
+        "../../apps/api/src/mcp/tools.ts",
+        "../../apps/api/src/mcp/resources.ts",
+        "../../apps/api/src/mcp/prompts.ts",
+        "../../apps/api/src/config.ts"
       ],
       "vitestImports": [],
-      "features": [],
+      "features": ["dynamic-import"],
       "workload": "PURE",
       "migrationType": "ALREADY_MIGRATED",
       "fixturesAndHelpers": [],
       "sourceAnchors": [
         "../../packages/security/src/negative-capability.ts",
-        "../../packages/security/src/supply-chain.ts"
+        "../../packages/security/src/supply-chain.ts",
+        "../../apps/api/src/mcp/tools.ts",
+        "../../apps/api/src/mcp/resources.ts",
+        "../../apps/api/src/mcp/prompts.ts",
+        "../../apps/api/src/config.ts"
       ],
       "state": "MIGRATED"
     },
     {
       "path": "tests/acceptance/AC-255.spec.ts",
       "package": "acceptance",
-      "bytes": 5380,
-      "lines": 139,
-      "sha256": "88242fce2871dc659bc65499086891791b3ca88332167228ed5f6ac21dbd5843",
+      "bytes": 10324,
+      "lines": 279,
+      "sha256": "4684454942cf5340e405d619a9d68b389f7bfbc24fb3559892c0eea694780478",
       "imports": [
         "node:fs",
         "node:path",
@@ -3837,7 +4128,8 @@
         "bun:test",
         "@foresift/domain",
         "../../packages/security/src/negative-capability.ts",
-        "../../packages/tool-core/src/prohibited.ts"
+        "../../packages/tool-core/src/prohibited.ts",
+        "../../apps/api/src/mcp/tools.ts"
       ],
       "vitestImports": [],
       "features": ["dynamic-import"],
@@ -3847,7 +4139,8 @@
       "sourceAnchors": [
         "@foresift/domain",
         "../../packages/security/src/negative-capability.ts",
-        "../../packages/tool-core/src/prohibited.ts"
+        "../../packages/tool-core/src/prohibited.ts",
+        "../../apps/api/src/mcp/tools.ts"
       ],
       "state": "MIGRATED"
     },
@@ -4402,9 +4695,9 @@
     {
       "path": "tests/automation/claude-lane-permits.spec.ts",
       "package": "automation",
-      "bytes": 3039,
-      "lines": 71,
-      "sha256": "bb9e197c44afbc3f53be8beaba3fe3dd6c20575dc311e105bef43f95a7ec6f31",
+      "bytes": 3754,
+      "lines": 83,
+      "sha256": "f3696d32b588a4d5c55fe7e9905a447e97f8847bb0e50d53138c91c63f91e23e",
       "imports": [
         "bun:test",
         "node:fs",
@@ -4596,9 +4889,9 @@
     {
       "path": "tests/automation/impl-wave.spec.ts",
       "package": "automation",
-      "bytes": 38837,
-      "lines": 889,
-      "sha256": "61f7d7174e7d942e499a97d72fef613d159e7da4a196f34a548ba8d40a899fda",
+      "bytes": 39205,
+      "lines": 894,
+      "sha256": "11ab05ae9461934a14461d53ea4919cb24b480cc088810dbaf7a136a46301b9c",
       "imports": ["bun:test", "node:child_process", "node:fs", "node:os", "node:path", "node:url"],
       "vitestImports": [],
       "features": ["dynamic-import"],
@@ -4693,9 +4986,9 @@
     {
       "path": "tests/automation/provider-pool.spec.ts",
       "package": "automation",
-      "bytes": 6295,
-      "lines": 155,
-      "sha256": "34714f5ffa3e491f208071c64f62436d8fae242a38cd2275cd6fe4e6dda189ee",
+      "bytes": 7919,
+      "lines": 185,
+      "sha256": "a0b9a4f9a42c453dace76c661be3a80a3629bec80ba11bef317826d5534289fc",
       "imports": [
         "bun:test",
         "node:fs",
@@ -4714,9 +5007,9 @@
     {
       "path": "tests/automation/runtime-admission.spec.ts",
       "package": "automation",
-      "bytes": 6434,
-      "lines": 151,
-      "sha256": "e379c7342c4eec3605cabfb64476b2fbf77aef0d1584f079a22d0511c2b8b770",
+      "bytes": 7166,
+      "lines": 161,
+      "sha256": "4c130f3e506fe939e2b1619b4629712291ad73da210a83287b3e945c819b3003",
       "imports": [
         "bun:test",
         "node:fs",
@@ -5235,9 +5528,9 @@
     {
       "path": "tests/automation/writer-lane-permits.spec.ts",
       "package": "automation",
-      "bytes": 11296,
-      "lines": 236,
-      "sha256": "f506481ba287459f9e5be6171ebc02de5b547eef393284857bef3d05239dbe91",
+      "bytes": 12705,
+      "lines": 264,
+      "sha256": "121f6fc225bd8c75b078dc4d8976cfceef85b500999be7e8bffaf0b6bbc4429d",
       "imports": [
         "bun:test",
         "node:fs",
@@ -5260,9 +5553,9 @@
     {
       "path": "tests/negative/AC-001.negative.spec.ts",
       "package": "negative",
-      "bytes": 4527,
-      "lines": 110,
-      "sha256": "7ce274ea0f149a66bdc0d993e9792dee462d5a03eb375c2be86f1acaa6c3404f",
+      "bytes": 7303,
+      "lines": 179,
+      "sha256": "fc72a23c2dc6bb0dae1f33e2895f871d5e530eb7ac366aa986daaa3e7f047fa3",
       "imports": [
         "bun:test",
         "@foresift/shared-schemas",
@@ -5450,9 +5743,9 @@
     {
       "path": "tests/negative/AC-050.negative.spec.ts",
       "package": "negative",
-      "bytes": 4822,
-      "lines": 127,
-      "sha256": "e7a195676daaa6ff4c354e539f1de2f4f962fc7b69663956d552cfcc7658b879",
+      "bytes": 11404,
+      "lines": 290,
+      "sha256": "ae71145019d01b8a5a4cc64c02851f59feedce8f503019a255d472f54dfa09a9",
       "imports": [
         "node:fs",
         "node:path",
@@ -5460,7 +5753,8 @@
         "bun:test",
         "@foresift/domain",
         "../../packages/security/src/negative-capability.ts",
-        "../../packages/tool-core/src/prohibited.ts"
+        "../../packages/tool-core/src/prohibited.ts",
+        "../../apps/api/src/mcp/output.ts"
       ],
       "vitestImports": [],
       "features": [],
@@ -5470,7 +5764,8 @@
       "sourceAnchors": [
         "@foresift/domain",
         "../../packages/security/src/negative-capability.ts",
-        "../../packages/tool-core/src/prohibited.ts"
+        "../../packages/tool-core/src/prohibited.ts",
+        "../../apps/api/src/mcp/output.ts"
       ],
       "state": "MIGRATED"
     },
@@ -5824,6 +6119,30 @@
       "migrationType": "ALREADY_MIGRATED",
       "fixturesAndHelpers": [],
       "sourceAnchors": [],
+      "state": "MIGRATED"
+    },
+    {
+      "path": "tests/negative/AC-144.negative.spec.ts",
+      "package": "negative",
+      "bytes": 6478,
+      "lines": 177,
+      "sha256": "aaafe989dad9dca8d563c7fc9d465806663e2a56d733ed69931d0adcf13a4143",
+      "imports": [
+        "bun:test",
+        "@foresift/shared-schemas",
+        "../../packages/security/src/mcp-protocol-guard.ts",
+        "../fixtures/mcp/index.ts"
+      ],
+      "vitestImports": [],
+      "features": [],
+      "workload": "PURE",
+      "migrationType": "ALREADY_MIGRATED",
+      "fixturesAndHelpers": ["../fixtures/mcp/index.ts"],
+      "sourceAnchors": [
+        "@foresift/shared-schemas",
+        "../../packages/security/src/mcp-protocol-guard.ts",
+        "../fixtures/mcp/index.ts"
+      ],
       "state": "MIGRATED"
     },
     {
@@ -6309,13 +6628,16 @@
     {
       "path": "tests/negative/AC-254.negative.spec.ts",
       "package": "negative",
-      "bytes": 3763,
-      "lines": 102,
-      "sha256": "158ac27aa50f2afa05b4bc45b4bd62c8772dcfa6bf9cb2607b10e6cdb4a098b3",
+      "bytes": 8728,
+      "lines": 225,
+      "sha256": "b185cda18560cd2faeef3c776ac07be5526b9a2978dfec37199f149113d1a62e",
       "imports": [
         "bun:test",
+        "@foresift/domain",
         "../../packages/security/src/negative-capability.ts",
-        "../../packages/security/src/supply-chain.ts"
+        "../../packages/security/src/supply-chain.ts",
+        "../../packages/tool-core/src/prohibited.ts",
+        "../../apps/api/src/mcp/output.ts"
       ],
       "vitestImports": [],
       "features": [],
@@ -6323,17 +6645,20 @@
       "migrationType": "ALREADY_MIGRATED",
       "fixturesAndHelpers": [],
       "sourceAnchors": [
+        "@foresift/domain",
         "../../packages/security/src/negative-capability.ts",
-        "../../packages/security/src/supply-chain.ts"
+        "../../packages/security/src/supply-chain.ts",
+        "../../packages/tool-core/src/prohibited.ts",
+        "../../apps/api/src/mcp/output.ts"
       ],
       "state": "MIGRATED"
     },
     {
       "path": "tests/negative/AC-255.negative.spec.ts",
       "package": "negative",
-      "bytes": 6886,
-      "lines": 179,
-      "sha256": "34a23f18024b9c8bd2648d6120ac714333ed1abe7fd3d61df2e505cad77ab659",
+      "bytes": 11449,
+      "lines": 302,
+      "sha256": "8468287741e107bdba3b8b5b61372fe7e9a4d8d37c6313566efc3da7697fc9c4",
       "imports": [
         "node:fs",
         "node:path",
@@ -6344,7 +6669,7 @@
         "../../packages/tool-core/src/prohibited.ts"
       ],
       "vitestImports": [],
-      "features": [],
+      "features": ["dynamic-import"],
       "workload": "PURE",
       "migrationType": "ALREADY_MIGRATED",
       "fixturesAndHelpers": [],

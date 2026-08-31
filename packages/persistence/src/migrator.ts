@@ -45,7 +45,7 @@ export const SCHEMA_MIGRATION_LEASES_TABLE = '_foresift_schema_migration_leases'
 // `cost` (cost, quota, and capacity controls).
 // Unknown families stay refused fail-closed.
 const MIGRATION_FILE_PATTERN =
-  /^g\d+_(data|dr|sec|prov|core|cost|col|disc|mcp)_\d{4}_[a-z0-9_]+\.sql$/;
+  /^g\d+_(data|dr|sec|prov|core|cost|col|disc|mcp|trace)_\d{4}_[a-z0-9_]+\.sql$/;
 
 const MIGRATION_LEASE_KEY = 'schema-migrations-apply';
 

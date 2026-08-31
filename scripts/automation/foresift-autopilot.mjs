@@ -796,20 +796,43 @@ export function launchDetached(st, workflow, branch, message, executionProfile =
   // H3 P2-10: the wave's writer-lane count is resolved adaptively (work truth
   // + governor + permits) at launch time. An explicit env override (set by the
   // operator or a test) always wins — resolveAdaptiveLaneCount is only consulted
-  // when the caller did not pin a count.
+  // when the caller did not pin a count. The work truth comes from the SAME
+  // launch preflight record the selection loop uses (one authoritative view —
+  // never a weaker recomputation), carrying openTaskCount,
+  // parallelizableReadyCount, and disjointShardNeed when derivable.
   const previousWriters = process.env.FORESIFT_WRITERS;
   let adaptiveLanes = null;
   if (workflow === 'foresift-sharded-wave' && previousWriters === undefined) {
     try {
       const pools = providerAdmissionView(STATE_DIR);
       const governor = classifyHostState();
-      adaptiveLanes = resolveAdaptiveLaneCount({
+      const packageId = branch.replace(/^foresift\//, '');
+      let preflight = null;
+      try {
+        preflight = buildLaunchPreflight(packageId, REPO);
+      } catch {
+        preflight = null;
+      }
+      const inputs = {
         governorState: governor.state,
         codexLimit: pools.codex?.limit ?? null,
         claudeLimit: pools.claude?.limit ?? null,
-      });
+        openTaskCount: preflight?.openTaskCount ?? 0,
+        parallelizableReadyCount: preflight?.parallelizableReadyCount ?? 0,
+        disjointShardNeed:
+          preflight?.exact && preflight?.shardNeed != null ? preflight.shardNeed : null,
+      };
+      adaptiveLanes = resolveAdaptiveLaneCount(inputs);
       process.env.FORESIFT_WRITERS = String(adaptiveLanes.lanes);
-      if (st) record(st, 'adaptive_lanes_resolved', { branch, ...adaptiveLanes });
+      if (st)
+        record(st, 'adaptive_lanes_resolved', {
+          branch,
+          ...adaptiveLanes,
+          openTaskCount: inputs.openTaskCount,
+          parallelizableReadyCount: inputs.parallelizableReadyCount,
+          providerCap: Math.max((pools.codex?.limit ?? 0) + (pools.claude?.limit ?? 0), 1),
+          resourceCap: governor.state,
+        });
     } catch {
       /* policy file/pool unreadable: keep the workflow's default count */
     }

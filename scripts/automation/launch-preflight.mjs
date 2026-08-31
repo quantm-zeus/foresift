@@ -18,6 +18,7 @@ import { existsSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { repoRoot } from './schema.mjs';
 import { SHARED_SURFACE_FILES } from './exact-leases.mjs';
+import { LANE_COUNT_LIMITS } from './adaptive-lanes.mjs';
 
 const PREFLIGHT_SCHEMA = 'foresift/launch-preflight@1';
 
@@ -52,6 +53,9 @@ export function buildLaunchPreflight(packageId, rootDir = root) {
     productWrites: [],
     migrationDuties: [],
     openTaskCount: 0,
+    readyTaskCount: 0,
+    parallelizableReadyCount: 0,
+    shardNeed: null,
     reason: null,
   };
   const tasksPath = join(rootDir, 'specs', packageId, 'tasks.md');
@@ -89,12 +93,53 @@ export function buildLaunchPreflight(packageId, rootDir = root) {
     /^migrations\/g0_[a-z]+_\d+.*\.sql$/.test(p),
   );
 
+  // READY work truth (H3 P0): a unit is ready when none of its declared
+  // dependencies is still open — dependency/phase-blocked units must NOT be
+  // counted as immediately parallel-ready. This is the input the adaptive
+  // lane resolver consumes; absent it the resolver wrongly sees zero open
+  // work and collapses the wave to one lane.
+  const openIds = new Set(open.map((u) => u.id));
+  const ready = open.filter((u) => (u.dependsOn ?? []).every((d) => !openIds.has(d)));
+  const parallelizableReady = ready.filter((u) => u.parallelizable);
+
   if (predictedWrites.length === 0)
     return {
       ...base,
       openTaskCount: open.length,
+      readyTaskCount: ready.length,
+      parallelizableReadyCount: parallelizableReady.length,
       reason: 'no predicted writes derivable from open tasks',
     };
+
+  // Disjoint-shard need (H3 P0): one deterministic probe of the graph builder
+  // at the policy ceiling. The planner's cross-lane closure demotes every unit
+  // that cannot sit beside the core into the serial shard, so the number of
+  // non-empty planned shards is the exact number of lanes the work can
+  // actually occupy. Missing/failed planning keeps shardNeed null — the lane
+  // resolver then falls back to its ready-count heuristic, never expands.
+  let shardNeed = null;
+  try {
+    const probe = spawnSync(
+      process.execPath,
+      [
+        join(import.meta.dirname, 'build-implementation-task-graph.mjs'),
+        '--package',
+        packageId,
+        '--root',
+        rootDir,
+        '--plan-shards',
+        String(Math.max(1, LANE_COUNT_LIMITS.max)),
+      ],
+      { encoding: 'utf8', timeout: 60_000 },
+    );
+    if (probe.status === 0 && probe.stdout) {
+      const planned = JSON.parse(probe.stdout);
+      const shards = (planned.shards ?? []).filter((s) => (s.units ?? []).length > 0);
+      shardNeed = Math.max(1, shards.length);
+    }
+  } catch {
+    shardNeed = null;
+  }
 
   // A shared surface counts as an exact predicted write only when a task
   // actually names it — otherwise the package does not touch it.
@@ -110,6 +155,9 @@ export function buildLaunchPreflight(packageId, rootDir = root) {
     sharedSurfaces,
     migrationDuties,
     openTaskCount: open.length,
+    readyTaskCount: ready.length,
+    parallelizableReadyCount: parallelizableReady.length,
+    shardNeed,
     reason: null,
   };
 }

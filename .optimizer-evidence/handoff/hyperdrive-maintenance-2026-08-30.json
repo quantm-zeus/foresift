@@ -22,7 +22,9 @@
       "landingTreeFullCoordinatorTest": "GREEN (b7z1a6o6s predecessor run: {ok:true}, 335 files, 0 fail)",
       "previousLanderAttempt": "22:39Z FULL gate RED TESTS category on stale worktree state; superseded — do NOT reuse that full-gate-result.json"
     },
-    "pending": ["g0-traceability-conformance"]
+    "pending": [
+      "g0-traceability-conformance"
+    ]
   },
   "openMaintenancePr": {
     "number": 124,
@@ -136,6 +138,7 @@
     "coverage": "P0-1..P0-5 + P1-8 complete; P1-6/P1-7/P2-9/P2-10 deferred to next PRs",
     "gate": "local full coordinator GREEN (342 files), spec:verify/format/lint/typecheck OK",
     "next": "review PR #129, exact-head squash merge with trusted CI, then continue P1/P2",
-    "merged": "PR #129 MERGED as ce20085 at 2026-08-31T07:45:03Z (exact-head d5bf524, trusted green CI); merged-main CI run 33369750670 in flight"
+    "merged": "PR #129 MERGED as ce20085 at 2026-08-31T07:45:03Z (exact-head d5bf524, trusted green CI); merged-main CI run 33369750670 in flight",
+    "mergedMainCi": "run 33369750670 GREEN at ce20085 — P0 correctness delta authoritative on main"
   }
 }

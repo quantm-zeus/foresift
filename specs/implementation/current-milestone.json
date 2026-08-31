@@ -320,7 +320,7 @@
         "test -d packages/release-conformance && pnpm --filter @foresift/release-conformance test",
         "pnpm spec:verify"
       ],
-      "status": "PENDING"
+      "status": "RUNNING"
     }
   ]
 }

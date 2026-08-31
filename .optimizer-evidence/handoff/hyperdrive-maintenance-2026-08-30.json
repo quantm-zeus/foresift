@@ -22,9 +22,7 @@
       "landingTreeFullCoordinatorTest": "GREEN (b7z1a6o6s predecessor run: {ok:true}, 335 files, 0 fail)",
       "previousLanderAttempt": "22:39Z FULL gate RED TESTS category on stale worktree state; superseded — do NOT reuse that full-gate-result.json"
     },
-    "pending": [
-      "g0-traceability-conformance"
-    ]
+    "pending": ["g0-traceability-conformance"]
   },
   "openMaintenancePr": {
     "number": 124,

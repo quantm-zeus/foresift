@@ -42,9 +42,7 @@ export function resolveAdaptiveLaneCount(input = {}) {
   // be counted as immediately parallel-ready. parallelizableCount alone (the
   // raw [P] population) stays supported for callers that pre-filter, but the
   // authoritative input is parallelizableReadyCount.
-  const parallelizableCount = num(
-    input.parallelizableReadyCount ?? input.parallelizableCount,
-  );
+  const parallelizableCount = num(input.parallelizableReadyCount ?? input.parallelizableCount);
   const disjointShardNeed = input.disjointShardNeed == null ? null : num(input.disjointShardNeed);
   const governorState = String(input.governorState ?? 'GREEN').toUpperCase();
   const codexLimit = num(input.codexLimit, 0);

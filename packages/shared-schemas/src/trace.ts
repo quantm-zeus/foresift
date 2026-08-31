@@ -1,5 +1,11 @@
 /** Shared FR-TRACE record vocabulary. Runtime validation lives in release-conformance. */
-export const TRACE_GATE_KINDS = ['MANUAL', 'LEGAL', 'RIGHTS', 'STATISTICAL', 'OWNER_APPROVAL'] as const;
+export const TRACE_GATE_KINDS = [
+  'MANUAL',
+  'LEGAL',
+  'RIGHTS',
+  'STATISTICAL',
+  'OWNER_APPROVAL',
+] as const;
 export type TraceGateKind = (typeof TRACE_GATE_KINDS)[number];
 
 export interface TraceGateEvidencePayload {
@@ -43,4 +49,9 @@ export interface DecisionTraceRecord {
   readonly releaseReportId: string;
   readonly recordedAt: string;
 }
-export const TRACE_TELEMETRY_FIELDS = ['eventName', 'requirementRefs', 'contractStatus', 'recoveryDataClass'] as const;
+export const TRACE_TELEMETRY_FIELDS = [
+  'eventName',
+  'requirementRefs',
+  'contractStatus',
+  'recoveryDataClass',
+] as const;

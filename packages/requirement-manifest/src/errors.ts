@@ -10,12 +10,17 @@ export const RequirementManifestErrorCode = {
   ID_REUSE_FORBIDDEN: 'ID_REUSE_FORBIDDEN',
   SUPERSESSION_LINK_REQUIRED: 'SUPERSESSION_LINK_REQUIRED',
 } as const;
-export type RequirementManifestErrorCode = (typeof RequirementManifestErrorCode)[keyof typeof RequirementManifestErrorCode];
+export type RequirementManifestErrorCode =
+  (typeof RequirementManifestErrorCode)[keyof typeof RequirementManifestErrorCode];
 
 export class RequirementManifestError extends Error {
   readonly code: RequirementManifestErrorCode;
   readonly detail: Readonly<Record<string, unknown>>;
-  constructor(code: RequirementManifestErrorCode, message: string, detail: Readonly<Record<string, unknown>> = {}) {
+  constructor(
+    code: RequirementManifestErrorCode,
+    message: string,
+    detail: Readonly<Record<string, unknown>> = {},
+  ) {
     super(`${code}: ${message}`);
     this.name = 'RequirementManifestError';
     this.code = code;

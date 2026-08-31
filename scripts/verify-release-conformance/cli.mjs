@@ -4,7 +4,82 @@ import { spawnSync } from 'node:child_process';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
-const finding = (requirement, rule, target, message) => ({ requirementId: requirement, rule, path: target, message });
-function verify() { const findings = []; const manifest = JSON.parse(readFileSync(path.join(root, 'docs/spec/crypto_intelligence_agent_gateway_PRD_FINAL_v6.0.requirements.json'), 'utf8')); for (const r of manifest.requirements) { if (!r.owner?.trim() || !r.implementationRefs?.length || !r.testRefs?.length) findings.push(finding(r.id, 'NORMATIVE_MAPPING_COMPLETE', r.owner ?? '', 'missing owner, implementation, or test mapping')); if (r.dependencyGroup === 'G0') for (const ref of r.implementationRefs) { const target = ref.split(/\s+@requirement\b/)[0], prefix = target.split('*')[0].replace(/\/$/, ''); if (!existsSync(path.join(root, prefix)) && target !== 'packages/workflow-runtime/**') findings.push(finding(r.id, 'ACTIVE_IMPLEMENTATION_PATH_EXISTS', target, 'active implementation path does not exist')); } } const generated = spawnSync(process.execPath, [path.join(root, 'scripts/generate-requirement-manifest/cli.mjs'), '--check'], { cwd: root, encoding: 'utf8' }); if (generated.status !== 0) { let files = ['docs/generated']; try { files = JSON.parse(generated.stderr || generated.stdout).driftedFiles ?? files; } catch {} for (const file of files) findings.push(finding('FR-TRACE-003', 'GENERATED_DOCS_MATCH_MANIFEST', file, 'generated documentation drift')); } return { overall: findings.length ? 'FAILED' : 'PASSED', findings }; }
-function main() { const args = process.argv.slice(2); if (args.length === 1 && ['--help','-h'].includes(args[0])) { console.log('Usage: verify-release-conformance [--json]'); return 0; } if (args.some((arg) => arg !== '--json')) { console.error('error: unsupported argument'); return 1; } const result = verify(); console.log(JSON.stringify(result, null, 2)); return result.findings.length ? 1 : 0; }
+const finding = (requirement, rule, target, message) => ({
+  requirementId: requirement,
+  rule,
+  path: target,
+  message,
+});
+function verify() {
+  const findings = [];
+  const manifest = JSON.parse(
+    readFileSync(
+      path.join(
+        root,
+        'docs/spec/crypto_intelligence_agent_gateway_PRD_FINAL_v6.0.requirements.json',
+      ),
+      'utf8',
+    ),
+  );
+  for (const r of manifest.requirements) {
+    if (!r.owner?.trim() || !r.implementationRefs?.length || !r.testRefs?.length)
+      findings.push(
+        finding(
+          r.id,
+          'NORMATIVE_MAPPING_COMPLETE',
+          r.owner ?? '',
+          'missing owner, implementation, or test mapping',
+        ),
+      );
+    if (r.dependencyGroup === 'G0')
+      for (const ref of r.implementationRefs) {
+        const target = ref.split(/\s+@requirement\b/)[0],
+          prefix = target.split('*')[0].replace(/\/$/, '');
+        if (!existsSync(path.join(root, prefix)) && target !== 'packages/workflow-runtime/**')
+          findings.push(
+            finding(
+              r.id,
+              'ACTIVE_IMPLEMENTATION_PATH_EXISTS',
+              target,
+              'active implementation path does not exist',
+            ),
+          );
+      }
+  }
+  const generated = spawnSync(
+    process.execPath,
+    [path.join(root, 'scripts/generate-requirement-manifest/cli.mjs'), '--check'],
+    { cwd: root, encoding: 'utf8' },
+  );
+  if (generated.status !== 0) {
+    let files = ['docs/generated'];
+    try {
+      files = JSON.parse(generated.stderr || generated.stdout).driftedFiles ?? files;
+    } catch {}
+    for (const file of files)
+      findings.push(
+        finding(
+          'FR-TRACE-003',
+          'GENERATED_DOCS_MATCH_MANIFEST',
+          file,
+          'generated documentation drift',
+        ),
+      );
+  }
+  return { overall: findings.length ? 'FAILED' : 'PASSED', findings };
+}
+function main() {
+  const args = process.argv.slice(2);
+  if (args.length === 1 && ['--help', '-h'].includes(args[0])) {
+    console.log('Usage: verify-release-conformance [--json]');
+    return 0;
+  }
+  if (args.some((arg) => arg !== '--json')) {
+    console.error('error: unsupported argument');
+    return 1;
+  }
+  const result = verify();
+  console.log(JSON.stringify(result, null, 2));
+  return result.findings.length ? 1 : 0;
+}
 process.exitCode = main();

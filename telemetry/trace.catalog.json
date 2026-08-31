@@ -1,12 +1,54 @@
 {
   "schemaVersion": "1.0.0",
   "events": [
-    { "eventName": "trace.manifest.integrity_checked", "requirementRefs": ["FR-TRACE-001"], "contractStatus": "DECLARATIVE_CONTRACT_ONLY", "emitterWiring": "G2", "recoveryDataClass": "CRITICAL_METADATA" },
-    { "eventName": "trace.ids.superseded", "requirementRefs": ["FR-TRACE-002"], "contractStatus": "DECLARATIVE_CONTRACT_ONLY", "emitterWiring": "G2", "recoveryDataClass": "CRITICAL_METADATA" },
-    { "eventName": "trace.conformance.finding", "requirementRefs": ["FR-TRACE-003"], "contractStatus": "DECLARATIVE_CONTRACT_ONLY", "emitterWiring": "G2", "recoveryDataClass": "CRITICAL_METADATA" },
-    { "eventName": "trace.gate.evidence_recorded", "requirementRefs": ["FR-TRACE-004"], "contractStatus": "DECLARATIVE_CONTRACT_ONLY", "emitterWiring": "G2", "recoveryDataClass": "CRITICAL_METADATA" },
-    { "eventName": "trace.gate.evidence_refused", "requirementRefs": ["FR-TRACE-004"], "contractStatus": "DECLARATIVE_CONTRACT_ONLY", "emitterWiring": "G2", "recoveryDataClass": "CRITICAL_METADATA" },
-    { "eventName": "trace.decision.trace_recorded", "requirementRefs": ["FR-TRACE-005"], "contractStatus": "DECLARATIVE_CONTRACT_ONLY", "emitterWiring": "G2", "recoveryDataClass": "CRITICAL_METADATA" },
-    { "eventName": "trace.release.report_emitted", "requirementRefs": ["FR-TRACE-006"], "contractStatus": "DECLARATIVE_CONTRACT_ONLY", "emitterWiring": "G2", "recoveryDataClass": "CRITICAL_METADATA" }
+    {
+      "eventName": "trace.manifest.integrity_checked",
+      "requirementRefs": ["FR-TRACE-001"],
+      "contractStatus": "DECLARATIVE_CONTRACT_ONLY",
+      "emitterWiring": "G2",
+      "recoveryDataClass": "CRITICAL_METADATA"
+    },
+    {
+      "eventName": "trace.ids.superseded",
+      "requirementRefs": ["FR-TRACE-002"],
+      "contractStatus": "DECLARATIVE_CONTRACT_ONLY",
+      "emitterWiring": "G2",
+      "recoveryDataClass": "CRITICAL_METADATA"
+    },
+    {
+      "eventName": "trace.conformance.finding",
+      "requirementRefs": ["FR-TRACE-003"],
+      "contractStatus": "DECLARATIVE_CONTRACT_ONLY",
+      "emitterWiring": "G2",
+      "recoveryDataClass": "CRITICAL_METADATA"
+    },
+    {
+      "eventName": "trace.gate.evidence_recorded",
+      "requirementRefs": ["FR-TRACE-004"],
+      "contractStatus": "DECLARATIVE_CONTRACT_ONLY",
+      "emitterWiring": "G2",
+      "recoveryDataClass": "CRITICAL_METADATA"
+    },
+    {
+      "eventName": "trace.gate.evidence_refused",
+      "requirementRefs": ["FR-TRACE-004"],
+      "contractStatus": "DECLARATIVE_CONTRACT_ONLY",
+      "emitterWiring": "G2",
+      "recoveryDataClass": "CRITICAL_METADATA"
+    },
+    {
+      "eventName": "trace.decision.trace_recorded",
+      "requirementRefs": ["FR-TRACE-005"],
+      "contractStatus": "DECLARATIVE_CONTRACT_ONLY",
+      "emitterWiring": "G2",
+      "recoveryDataClass": "CRITICAL_METADATA"
+    },
+    {
+      "eventName": "trace.release.report_emitted",
+      "requirementRefs": ["FR-TRACE-006"],
+      "contractStatus": "DECLARATIVE_CONTRACT_ONLY",
+      "emitterWiring": "G2",
+      "recoveryDataClass": "CRITICAL_METADATA"
+    }
   ]
 }

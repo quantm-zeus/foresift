@@ -1,9 +1,9 @@
 {
   "schema": "foresift/maintenance-handoff@2",
   "currentSnapshot": {
-    "capturedAt": "2026-08-31T18:05:00Z",
-    "mainSha": "c995c4b407e5683d34c4c52e691b0f00d44ea7d1",
-    "mainCi": "GREEN (run 33398648706 at c995c4b — #138 merged-main)",
+    "capturedAt": "2026-08-31T18:40:00Z",
+    "mainSha": "ba1409f5a1a5d740fdc721d789b886e2e5cdb22a",
+    "mainCi": "GREEN (run 33433216978 at ba1409f — #140 merged-main)",
     "milestone": "G0",
     "activePackage": {
       "id": "g0-traceability-conformance",
@@ -17,16 +17,16 @@
     "openMaintenancePr": {
       "number": 141,
       "branch": "fix/core-batch-decomposition",
-      "headSha": "cc04eb8",
+      "headSha": "99bae0f",
       "title": "bounded lane-scope decomposition — chained core-batch lanes (mission item 4)",
-      "ci": "pending at push time"
+      "ci": "pending at push time (run 33450356153); head now stacks the plan-shards-1 [P]-fold fix on cc04eb8/7b0e8bf"
     },
     "providerState": "claude limit 1 (backoff to 15:47Z), codex limit 1 HEALTHY, agy 3 — all active 0",
     "resourceState": "15GiB host, MemAvailable ~14.1GiB (0.86) — GREEN",
     "blockers": [
-      "g0-traceability paused_fatal: recover-fatal must run AFTER #139 merges (needs the #138 planner fix + #139 governor/queue wiring authoritative on main and the worktree re-pinned)"
+      "g0-traceability paused_fatal: recover-fatal must run AFTER #141 merges (needs bounded lane-scope decomposition + plan-shards-1 fix authoritative on main and the worktree re-pinned)"
     ],
-    "nextSafeAction": "merge #139 (exact-head 917731a) → verify merged-main CI → systemctl --user stop foresift-autopilot; node scripts/automation/foresift-autopilot.mjs --recover-fatal; systemctl --user start foresift-autopilot"
+    "nextSafeAction": "merge #141 (exact-head 99bae0f) -> verify merged-main CI -> systemctl --user stop foresift-autopilot; node scripts/automation/foresift-autopilot.mjs --recover-fatal; systemctl --user start foresift-autopilot; verify worktree branch re-pin"
   },
   "history": [
     {

@@ -243,13 +243,15 @@ ${Array.from(
       for (const s of serial as Array<{ estimatedSize: number; laneTooLarge?: boolean }>)
         expect(s.estimatedSize <= 8 || s.laneTooLarge === true).toBe(true);
       // 4. topological: no unit depends on a same-column unit scheduled LATER
-      const units = new Map(g.units.map((u: { id: string }) => [u.id, u]));
+      const units = new Map<string, { id: string; dependsOn: string[] }>(
+        g.units.map((u: { id: string; dependsOn: string[] }) => [u.id, u]),
+      );
       const pos = new Map<string, number>();
       serial.forEach((s: { units: string[] }) =>
         s.units.forEach((u: string) => pos.set(u, pos.size)),
       );
       for (const [uid, p] of pos)
-        for (const d of units.get(uid).dependsOn)
+        for (const d of units.get(uid)!.dependsOn)
           if (pos.has(d)) expect(pos.get(d)!).toBeLessThan(p);
       // 5. write authority: serial batches share the column union; parallel
       // lanes never share a path with the column

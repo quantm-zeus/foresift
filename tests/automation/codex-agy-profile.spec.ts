@@ -1704,7 +1704,12 @@ process.exit(${JSON.stringify(options.exitCode ?? 0)});
         expect(result.model).toBe('gemini-3.7-flash-high');
         expect(result.reasoning).toBe('high');
         expect(result.providerTimeout).toBe('40m');
-        expect(result.completed).toEqual(['T103']);
+        // H3 P0-1 evidence-backed completion: the fixture's task graph is not
+        // supplied to the writer (--task-graph absent ⇒ evidence unavailable),
+        // so the writer nominates NOTHING for T103 (fail-closed) — the old
+        // unconditional claim of every --task-ids is gone.
+        expect(result.completed).toEqual([]);
+        expect(result.deferredUnits).toEqual([{ taskId: 'T103', reason: 'unknown unit T103' }]);
         expect(result.baselineClassifications).toEqual(['REGRESSION_RED']);
         expect(result.testsRun).toEqual(['tests/x/a.spec.ts']);
 

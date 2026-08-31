@@ -127,5 +127,14 @@
       "full gate burn + PR"
     ],
     "productRun": "g0-traceability-conformance planning still running (8122d6ae), untouched"
+  },
+  "h3PR": {
+    "pr": 129,
+    "branch": "hyperdrive/h3-correctness",
+    "head": "d5bf524 (merged planning-seed main 8c153d2)",
+    "ci": "run 33369264777 in_progress",
+    "coverage": "P0-1..P0-5 + P1-8 complete; P1-6/P1-7/P2-9/P2-10 deferred to next PRs",
+    "gate": "local full coordinator GREEN (342 files), spec:verify/format/lint/typecheck OK",
+    "next": "review PR #129, exact-head squash merge with trusted CI, then continue P1/P2"
   }
 }

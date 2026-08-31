@@ -22,7 +22,9 @@
       "landingTreeFullCoordinatorTest": "GREEN (b7z1a6o6s predecessor run: {ok:true}, 335 files, 0 fail)",
       "previousLanderAttempt": "22:39Z FULL gate RED TESTS category on stale worktree state; superseded — do NOT reuse that full-gate-result.json"
     },
-    "pending": ["g0-traceability-conformance"]
+    "pending": [
+      "g0-traceability-conformance"
+    ]
   },
   "openMaintenancePr": {
     "number": 124,
@@ -82,7 +84,7 @@
     "merged": "PR #130 MERGED as 54e8bd3 (exact-head 0287c74b, trusted green CI run 33378911135)",
     "coverage": "P1-6 launch preflight, P1-7 ready queue + work stealing, P2-9 Codex cost policy (tier-tracked reasoning + ONE bounded Sol/high repair escalation), P2-10 adaptive lane count (governor + permit caps)",
     "evidence": "spec:verify 13 checks OK; prettier/eslint/typecheck clean; PR CI green at exact head",
-    "mergedMainCi": "run 33379379901 at 54e8bd3 (in flight at handoff write time)",
+    "mergedMainCi": "run 33379379901 GREEN at 54e8bd3 — scheduling layer authoritative on main",
     "remaining": "P1-7 supervisor-tick wiring of stealNext into capacity events (primitive landed); H3 completion proofs checklist continues"
   }
 }

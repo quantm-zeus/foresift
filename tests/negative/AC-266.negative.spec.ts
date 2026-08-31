@@ -8,12 +8,8 @@
 import { describe, expect, it } from 'bun:test';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import {
-  evaluateConformance,
-  checkMappingCompleteness,
-  checkActiveImplementationPaths,
-} from '@foresift/release-conformance';
-import { detectOrphanSources } from '@foresift/release-conformance';
+// @ts-expect-error TS2307: module not yet implemented by implementation author
+import { evaluateConformance, checkMappingCompleteness, checkActiveImplementationPaths, detectOrphanSources } from '@foresift/release-conformance';
 
 const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 

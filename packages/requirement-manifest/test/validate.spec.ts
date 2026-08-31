@@ -6,13 +6,8 @@
 import { describe, expect, it } from 'bun:test';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import {
-  loadRequirementManifest,
-  validateRequirementManifest,
-  computeTextSha256,
-  verifyFourWayCountAgreement,
-  checkDependencyDagAcyclicity,
-} from '../src/index.ts';
+// @ts-expect-error TS2307: module not yet implemented by implementation author
+import { loadRequirementManifest, validateRequirementManifest, computeTextSha256, verifyFourWayCountAgreement, checkDependencyDagAcyclicity } from '../src/index.ts';
 import {
   PINNED_DOCUMENT_SHA256,
   PINNED_MANIFEST_SHA256,

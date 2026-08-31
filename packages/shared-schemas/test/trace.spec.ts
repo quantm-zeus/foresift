@@ -3,18 +3,8 @@
  * Every `.strict()` schema must refuse unknown keys fail-closed (ADR-0013).
  */
 import { describe, expect, it } from 'bun:test';
-import {
-  TRACE_SCHEMA_REGISTRY_VERSION,
-  TRACE_SCHEMAS,
-  RequirementRefSchema,
-  TraceIdPatternSchema,
-  SupersessionLinkSchema,
-  GateEvidenceRecordSchema,
-  DecisionTraceRecordSchema,
-  ReleaseReportRecordSchema,
-  parseTraceSchema,
-  type TraceSchemaName,
-} from '../src/trace.ts';
+// @ts-expect-error TS2307: module not yet implemented by implementation author
+import { TRACE_SCHEMA_REGISTRY_VERSION, TRACE_SCHEMAS, RequirementRefSchema, TraceIdPatternSchema, SupersessionLinkSchema, GateEvidenceRecordSchema, DecisionTraceRecordSchema, ReleaseReportRecordSchema, parseTraceSchema, type TraceSchemaName } from '../src/trace.ts';
 import {
   VALID_GATE_RECORDS,
   VALID_DECISION_TRACE_RECORD,

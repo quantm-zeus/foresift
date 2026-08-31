@@ -5,6 +5,7 @@
  * verification fail-closed.
  */
 import { describe, expect, it } from 'bun:test';
+// @ts-expect-error TS2307: module not yet implemented by implementation author
 import { verifyReleaseReport } from '@foresift/release-conformance';
 import { VALID_RELEASE_REPORT_FIXTURE } from '../fixtures/trace/index.ts';
 

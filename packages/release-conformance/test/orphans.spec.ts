@@ -4,11 +4,8 @@
 import { describe, expect, it } from 'bun:test';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import {
-  detectOrphanSources,
-  loadOrphanExceptions,
-  validateOrphanExceptionLedger,
-} from '../src/index.ts';
+// @ts-expect-error TS2307: module not yet implemented by implementation author
+import { detectOrphanSources, loadOrphanExceptions, validateOrphanExceptionLedger } from '../src/index.ts';
 
 const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../..');
 const EXCEPTIONS_PATH = path.join(
@@ -72,7 +69,7 @@ describe('orphan source detection and exception ledger (FR-TRACE-003, AC-266)', 
 
     it('passes when an unmapped file matches an allowed exception pattern', () => {
       const mockProductFiles = ['packages/object-store/src/driver.ts'];
-      const mockImplementationRefs = [];
+      const mockImplementationRefs: string[] = [];
       const mockExceptions = [
         {
           pathPattern: 'packages/object-store/src/**',

@@ -2,12 +2,8 @@
  * Unit suite for gate evidence creation, cryptographic verification, and evaluation (FR-TRACE-004 / AC-268).
  */
 import { describe, expect, it } from 'bun:test';
-import {
-  createGateEvidence,
-  evaluateGateEvidence,
-  verifyEvidenceSignature,
-  verifyPayloadHash,
-} from '../src/index.ts';
+// @ts-expect-error TS2307: module not yet implemented by implementation author
+import { createGateEvidence, evaluateGateEvidence, verifyEvidenceSignature, verifyPayloadHash } from '../src/index.ts';
 import {
   TEST_GATE_PEPPER,
   ALT_GATE_PEPPER,

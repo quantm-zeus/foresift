@@ -5,6 +5,7 @@
  * dimension named; no dimension is ever defaulted.
  */
 import { describe, expect, it } from 'bun:test';
+// @ts-expect-error TS2307: module not yet implemented by implementation author
 import { assembleDecisionTrace } from '@foresift/release-conformance';
 import {
   VALID_DECISION_TRACE_INPUT,

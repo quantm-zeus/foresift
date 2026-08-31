@@ -4,13 +4,8 @@
 import { describe, expect, it } from 'bun:test';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import {
-  validateIdGrammar,
-  checkGlobalIdUniqueness,
-  validateSupersessionContract,
-  checkStableOrdering,
-  loadRequirementManifest,
-} from '../src/index.ts';
+// @ts-expect-error TS2307: module not yet implemented by implementation author
+import { validateIdGrammar, checkGlobalIdUniqueness, validateSupersessionContract, checkStableOrdering, loadRequirementManifest } from '../src/index.ts';
 
 const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../..');
 const MANIFEST_PATH = path.join(

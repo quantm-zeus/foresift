@@ -6,11 +6,8 @@
  * pool adapter, evidence, and alpha artifact versions."
  */
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
-import {
-  assembleDecisionTrace,
-  recordDecisionTrace,
-  fetchDecisionTraceByRef,
-} from '@foresift/release-conformance';
+// @ts-expect-error TS2307: module not yet implemented by implementation author
+import { assembleDecisionTrace, recordDecisionTrace, fetchDecisionTraceByRef } from '@foresift/release-conformance';
 import {
   closeTestDatabase,
   makeTestDatabase,

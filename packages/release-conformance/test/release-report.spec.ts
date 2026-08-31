@@ -4,11 +4,8 @@
 import { describe, expect, it } from 'bun:test';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import {
-  generateSbomFromLockfile,
-  buildReleaseReport,
-  verifyReleaseReport,
-} from '../src/index.ts';
+// @ts-expect-error TS2307: module not yet implemented by implementation author
+import { generateSbomFromLockfile, buildReleaseReport, verifyReleaseReport } from '../src/index.ts';
 import {
   VALID_RELEASE_REPORT_FIXTURE,
   VALID_SBOM_FIXTURE,

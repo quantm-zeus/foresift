@@ -11,12 +11,8 @@ import {
 } from '@foresift/persistence';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import {
-  assembleDecisionTrace,
-  recordDecisionTrace,
-  fetchDecisionTraceByRef,
-  fetchDecisionTraceById,
-} from '../src/index.ts';
+// @ts-expect-error TS2307: module not yet implemented by implementation author
+import { assembleDecisionTrace, recordDecisionTrace, fetchDecisionTraceByRef, fetchDecisionTraceById } from '../src/index.ts';
 import {
   VALID_DECISION_TRACE_INPUT,
   VALID_DECISION_TRACE_RECORD,

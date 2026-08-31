@@ -63,9 +63,17 @@ export declare function packageEligible(
   ms: MilestoneState,
   pkg: WorkPackage | null,
 ): { eligible: boolean; reason: string };
+export declare const CAN_START_REASON_CLASSES: Readonly<{
+  DEPENDENCY_BLOCK: 'DEPENDENCY_BLOCK';
+  CRITICAL_SERIAL: 'CRITICAL_SERIAL';
+  GLOBAL_SURFACE_SERIAL: 'GLOBAL_SURFACE_SERIAL';
+  PARALLEL_POLICY_BLOCK: 'PARALLEL_POLICY_BLOCK';
+  WRITE_SCOPE_CONFLICT: 'WRITE_SCOPE_CONFLICT';
+  UNKNOWN_WRITE_TRUTH: 'UNKNOWN_WRITE_TRUTH';
+}>;
 export declare function canStartPackage(
   roadmap: Roadmap,
   ms: MilestoneState,
   candidate: WorkPackage,
   runningPackages: WorkPackage[],
-): { ok: boolean; reason: string };
+): { ok: boolean; reason: string; reasonClass?: string };

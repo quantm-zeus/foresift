@@ -5,6 +5,8 @@ import { describe, test, expect } from 'bun:test';
 import {
   classifyHostState,
   admitUnderGovernor,
+  advanceGovernorRecovery,
+  GOVERNOR_RECOVERY_CONFIRMATIONS,
   RESOURCE_GOVERNOR_DEFAULTS,
 } from '../../scripts/automation/resource-governor.mjs';
 
@@ -80,5 +82,45 @@ describe('launch admission under the governor', () => {
     const verdict = admitUnderGovernor(s, { heavy: false });
     expect(verdict.allow).toBe(false);
     expect(verdict.reason).toContain('RED');
+  });
+});
+
+describe('upward-recovery hysteresis (mission item 5)', () => {
+  test('a single healthy sample does NOT re-open expansion after pressure', () => {
+    // ORANGE host → one GREEN sample → still held at the degraded floor.
+    const t = advanceGovernorRecovery('ORANGE', null);
+    expect(t.state).toBe('ORANGE');
+    const after = advanceGovernorRecovery('GREEN', t);
+    expect(after.state).toBe('ORANGE');
+    expect(after.recovered).toBe(false);
+    expect(admitUnderGovernor({ state: after.state }, { heavy: true }).allow).toBe(false);
+  });
+
+  test('several consecutive healthy observations recover GREEN', () => {
+    let t = advanceGovernorRecovery('RED', null);
+    for (let i = 0; i < GOVERNOR_RECOVERY_CONFIRMATIONS; i++)
+      t = advanceGovernorRecovery('GREEN', t);
+    expect(t.state).toBe('GREEN');
+    expect(t.recovered).toBe(true);
+    expect(t.streak).toBe(GOVERNOR_RECOVERY_CONFIRMATIONS);
+  });
+
+  test('any degraded observation resets the streak and drops IMMEDIATELY', () => {
+    let t = advanceGovernorRecovery('YELLOW', null);
+    t = advanceGovernorRecovery('GREEN', t);
+    expect(t.state).toBe('YELLOW');
+    // Climbing streak interrupted by worse pressure: instant drop, no smoothing.
+    t = advanceGovernorRecovery('GREEN', t);
+    t = advanceGovernorRecovery('RED', t);
+    expect(t.state).toBe('RED');
+    expect(t.streak).toBe(0);
+  });
+
+  test('steady GREEN stays GREEN (no oscillation penalty)', () => {
+    let t = advanceGovernorRecovery('GREEN', null);
+    expect(t.state).toBe('GREEN');
+    t = advanceGovernorRecovery('GREEN', t);
+    expect(t.state).toBe('GREEN');
+    expect(t.recovered).toBe(true);
   });
 });

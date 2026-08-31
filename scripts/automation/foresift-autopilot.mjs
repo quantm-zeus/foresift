@@ -115,10 +115,19 @@ import {
 } from './launch-intent.mjs';
 import { advanceRepairRequest, discoverPendingRepairRequests } from './ci-repair-executor.mjs';
 import { admitPackageLaunch, releasePackageRuntime } from './runtime-admission.mjs';
+import { buildLaunchPreflight, exactCoRunCompatible } from './launch-preflight.mjs';
+import { buildReadyQueue, stealNext } from './ready-queue.mjs';
+import {
+  classifyHostState,
+  advanceGovernorRecovery,
+  GOVERNOR_RECOVERY_CONFIRMATIONS,
+} from './resource-governor.mjs';
+import { resolveAdaptiveLaneCount } from './adaptive-lanes.mjs';
 import {
   observeClaudeOutcome,
   observeCodexOutcome,
   reconcileLaneHolders,
+  providerAdmissionView,
 } from './provider-pool.mjs';
 
 // Overridable for hermetic selftests (sandboxed fixture repo + state dir).
@@ -312,6 +321,7 @@ function loadState() {
     state.maintenanceRuns ??= [];
     state.testMigration ??= { status: 'BUN_MIGRATION_REQUIRED' };
     state.history ??= [];
+    state.governorTracker ??= null;
     return state;
   } catch {
     return {
@@ -321,6 +331,7 @@ function loadState() {
       testMigration: { status: 'BUN_MIGRATION_REQUIRED' },
       pausedFatal: null,
       history: [],
+      governorTracker: null,
     };
   }
 }
@@ -769,7 +780,7 @@ function ensureGenerationSeedCurrent(branch) {
   };
 }
 
-function launchDetached(st, workflow, branch, message, executionProfile = null) {
+export function launchDetached(st, workflow, branch, message, executionProfile = null) {
   if (st && executionProfile) {
     record(st, 'execution_profile_selected', {
       workflow,
@@ -789,6 +800,50 @@ function launchDetached(st, workflow, branch, message, executionProfile = null) 
   if (seed && !seed.skipped) record(st, 'generation_seed_reconciled', { branch, ...seed });
   const previous = process.env.FORESIFT_EXECUTION_PROFILE;
   if (executionProfile) process.env.FORESIFT_EXECUTION_PROFILE = executionProfile;
+  // H3 P2-10: the wave's writer-lane count is resolved adaptively (work truth
+  // + governor + permits) at launch time. An explicit env override (set by the
+  // operator or a test) always wins — resolveAdaptiveLaneCount is only consulted
+  // when the caller did not pin a count. The work truth comes from the SAME
+  // launch preflight record the selection loop uses (one authoritative view —
+  // never a weaker recomputation), carrying openTaskCount,
+  // parallelizableReadyCount, and disjointShardNeed when derivable.
+  const previousWriters = process.env.FORESIFT_WRITERS;
+  let adaptiveLanes = null;
+  if (workflow === 'foresift-sharded-wave' && previousWriters === undefined) {
+    try {
+      const pools = providerAdmissionView(STATE_DIR);
+      const governor = classifyHostState();
+      const packageId = branch.replace(/^foresift\//, '');
+      let preflight = null;
+      try {
+        preflight = buildLaunchPreflight(packageId, REPO);
+      } catch {
+        preflight = null;
+      }
+      const inputs = {
+        governorState: governor.state,
+        codexLimit: pools.codex?.limit ?? null,
+        claudeLimit: pools.claude?.limit ?? null,
+        openTaskCount: preflight?.openTaskCount ?? 0,
+        parallelizableReadyCount: preflight?.parallelizableReadyCount ?? 0,
+        disjointShardNeed:
+          preflight?.exact && preflight?.shardNeed != null ? preflight.shardNeed : null,
+      };
+      adaptiveLanes = resolveAdaptiveLaneCount(inputs);
+      process.env.FORESIFT_WRITERS = String(adaptiveLanes.lanes);
+      if (st)
+        record(st, 'adaptive_lanes_resolved', {
+          branch,
+          ...adaptiveLanes,
+          openTaskCount: inputs.openTaskCount,
+          parallelizableReadyCount: inputs.parallelizableReadyCount,
+          providerCap: Math.max((pools.codex?.limit ?? 0) + (pools.claude?.limit ?? 0), 1),
+          resourceCap: governor.state,
+        });
+    } catch {
+      /* policy file/pool unreadable: keep the workflow's default count */
+    }
+  }
   let ack;
   try {
     ack = archonJson(
@@ -797,6 +852,10 @@ function launchDetached(st, workflow, branch, message, executionProfile = null) 
   } finally {
     if (previous === undefined) delete process.env.FORESIFT_EXECUTION_PROFILE;
     else process.env.FORESIFT_EXECUTION_PROFILE = previous;
+    if (adaptiveLanes !== null) {
+      if (previousWriters === undefined) delete process.env.FORESIFT_WRITERS;
+      else process.env.FORESIFT_WRITERS = previousWriters;
+    }
   }
   return ack;
 }
@@ -1923,6 +1982,33 @@ async function selectAndLaunch(st) {
   let launched = 0;
   const running = st.activeRuns.map((r) => findPackage(ms, r.packageId)).filter(Boolean);
 
+  // H3 P1-7: memoized exact-write preflight cache for the selection loop.
+  // Exact truth is expensive (task-graph spawn) and stable within a tick, so
+  // every candidate/running package is derived at most once; unreadable truth
+  // (exact:false) degrades to broad scopes at the pair check. Gated by env so
+  // the historical behavior stays reachable for A/B adjudication.
+  const exactCoRunPreflightEnabled = process.env.FORESIFT_EXACT_CORUN !== 'false';
+  const preflightCache = new Map();
+  const readyPreflight = (packageId) => {
+    if (!preflightCache.has(packageId))
+      preflightCache.set(packageId, buildLaunchPreflight(packageId, REPO));
+    return preflightCache.get(packageId);
+  };
+
+  // H3 P1-8: host governor sampled once per selection pass (never per
+  // candidate — /proc sampling is cheap but the verdict must be one snapshot
+  // for the whole tick). Upward recovery is hyteresis-gated
+  // (GOVERNOR_RECOVERY_CONFIRMATIONS consecutive healthy samples) so one
+  // transiently-free /proc sample cannot re-open expansion between waves;
+  // pressure entry is always immediate.
+  const governorSample = classifyHostState();
+  st.governorTracker = advanceGovernorRecovery(governorSample.state, st.governorTracker ?? null);
+  const governorState = st.governorTracker.state;
+  const governorReason =
+    st.governorTracker.recovered || governorSample.state === 'GREEN'
+      ? (governorSample.reason ?? governorSample.state)
+      : `hysteresis ${governorState} (recovery streak ${st.governorTracker.streak}/${GOVERNOR_RECOVERY_CONFIRMATIONS}); sample: ${governorSample.reason ?? governorSample.state}`;
+
   // B. MAIN RED GLOBAL BLOCK (V4 Invariant): ONLY verified GREEN origin/main required CI
   // permits a NEW product coding package launch. Everything else fails closed.
   const mainCi = getMainCiStatus({ cwd: REPO });
@@ -1979,33 +2065,123 @@ async function selectAndLaunch(st) {
     }
   }
 
-  for (const cand of rankPendingPackages(ms)) {
-    if (barrier.state === 'CURRENT_PACKAGE' && cand.id !== testPolicy.barrierAfterPackage) continue;
-    // Never re-select a package that already has a tracked active launch or in-flight intent
-    if (st.activeRuns.some((r) => r.packageId === cand.id && !r.done)) continue;
-    if (isPackageLaunchInFlight(STATE_DIR, cand.id)) continue;
-    const elig = packageEligible(ms, cand);
-    if (!elig.eligible) continue;
-    const verdict = canStartPackage(roadmap, ms, cand, running);
-    if (!verdict.ok) {
-      // Maintainer observability: a pairwise concurrency refusal is evidence,
-      // not noise — record WHY an otherwise-eligible candidate was denied a
-      // slot. Once per process for the same package+reason; capacity-limit
-      // saturation is healthy and stays silent.
-      if (
-        !/concurrency limit/.test(verdict.reason) &&
-        !coRunDenialSeen.has(`${cand.id}|${verdict.reason}`)
-      ) {
-        coRunDenialSeen.add(`${cand.id}|${verdict.reason}`);
-        record(st, 'co_run_denied', {
+  // H3 mission item 6: the candidate stream is the GLOBAL READY QUEUE — one
+  // priority-ordered, preflight-backed queue per selection pass (built from
+  // the same critical-path ranking the loop previously consumed inline).
+  // stealNext drives selection, so every eligibility check happens in queue
+  // priority order and skipped candidates stay queued for later capacity
+  // events. The 60s tick remains the poll fallback; HANDOFF_POLL_MS (§18/§49)
+  // is the capacity-event re-entry (launch/lane completion flips readyWork,
+  // which pins the loop at the fast rate).
+  const readyQueue = buildReadyQueue(rankPendingPackages(ms), (id) => readyPreflight(id));
+  record(st, 'ready_queue_built', {
+    candidates: readyQueue.entries.map((e) => e.packageId),
+  });
+  while (readyQueue.entries.length > 0) {
+    const claimed = stealNext(readyQueue, (entry) => {
+      const cand = entry.preflight?.packageId
+        ? findPackage(ms, entry.packageId)
+        : findPackage(ms, entry.packageId);
+      if (!cand) return null;
+      if (barrier.state === 'CURRENT_PACKAGE' && cand.id !== testPolicy.barrierAfterPackage)
+        return null;
+      // Never re-select a package that already has a tracked active launch or in-flight intent
+      if (st.activeRuns.some((r) => r.packageId === cand.id && !r.done)) return null;
+      if (isPackageLaunchInFlight(STATE_DIR, cand.id)) return null;
+      const elig = packageEligible(ms, cand);
+      if (!elig.eligible) return null;
+      const verdict = canStartPackage(roadmap, ms, cand, running);
+      if (!verdict.ok) {
+        // H3 mission item 7 — exact-write override of ONLY broad write-scope
+        // false conflicts. A WRITE_SCOPE_CONFLICT refusal may be upgraded when
+        // BOTH sides carry derivable exact predicted-write truth and the exact
+        // writes are disjoint (no dependency edge, no CRITICAL/serial law, no
+        // global surface, no unknown write truth on either side — every other
+        // reason class is hard law and never upgraded). Anything unknown
+        // degrades to the broad refusal.
+        if (exactCoRunPreflightEnabled && verdict.reasonClass === 'WRITE_SCOPE_CONFLICT') {
+          const candPf = readyPreflight(cand.id);
+          if (candPf?.exact) {
+            let overridden = true;
+            for (const run of running) {
+              const compat = exactCoRunCompatible(candPf, readyPreflight(run.id));
+              if (compat.compatible !== true) {
+                overridden = false;
+                break;
+              }
+            }
+            if (overridden && running.length > 0) {
+              record(st, 'co_run_upgraded_exact_writes', {
+                packageId: cand.id,
+                broadReason: verdict.reason,
+              });
+              return { cand };
+            }
+          }
+        }
+        // Maintainer observability: a pairwise concurrency refusal is evidence,
+        // not noise — record WHY an otherwise-eligible candidate was denied a
+        // slot. Once per process for the same package+reason; capacity-limit
+        // saturation is healthy and stays silent.
+        if (
+          !/concurrency limit/.test(verdict.reason) &&
+          !coRunDenialSeen.has(`${cand.id}|${verdict.reason}`)
+        ) {
+          coRunDenialSeen.add(`${cand.id}|${verdict.reason}`);
+          record(st, 'co_run_denied', {
+            packageId: cand.id,
+            reason: verdict.reason,
+            running: running.map((r) => r.id),
+          });
+        }
+        return null;
+      }
+      return { cand };
+    });
+    if (!claimed) break; // every remaining candidate is blocked this tick
+    const cand = claimed.cand;
+    const { generation, branch, message, workflow: wf, executionProfile } = launchIdentity(cand);
+    // H3 P1-7 exact co-run gate: when BOTH sides carry derivable exact write
+    // truth, an exact predicted-write overlap forbids the co-run even though
+    // the broad writeScopes were disjoint. Unknown truth (exact:false) keeps
+    // the broad verdict — never upgrades safety away. One recorded refusal per
+    // package+peer pair per process.
+    if (exactCoRunPreflightEnabled) {
+      const candPf = readyPreflight(cand.id);
+      if (candPf?.exact) {
+        let refusal = null;
+        for (const run of running) {
+          const verdict = exactCoRunCompatible(candPf, readyPreflight(run.id));
+          if (verdict.compatible === false) {
+            refusal = `exact write overlap with ${run.id}: ${verdict.reason}`;
+            break;
+          }
+        }
+        if (refusal) {
+          const key = `${cand.id}|${refusal}`;
+          if (!coRunDenialSeen.has(key)) {
+            coRunDenialSeen.add(key);
+            record(st, 'co_run_denied_exact_writes', { packageId: cand.id, reason: refusal });
+          }
+          continue;
+        }
+      }
+    }
+    // H3 P1-8 launch-time resource governor: a non-GREEN host refuses NEW
+    // package launches (existing work continues). Sampled once per selection
+    // pass; unreadable samples already fail closed inside classifyHostState.
+    if (governorState !== 'GREEN') {
+      const key = `governor_${governorState}|${cand.id}`;
+      if (!coRunDenialSeen.has(key)) {
+        coRunDenialSeen.add(key);
+        record(st, 'launch_denied_governor', {
           packageId: cand.id,
-          reason: verdict.reason,
-          running: running.map((r) => r.id),
+          state: governorState,
+          reason: governorReason,
         });
       }
       continue;
     }
-    const { generation, branch, message, workflow: wf, executionProfile } = launchIdentity(cand);
     // H2 admission bridge (§17/§20/§41): global provider permits + exact-file
     // leases BEFORE any launch. Denied candidates are skipped this tick (the
     // same reason is recorded once per process; a full pool is healthy
@@ -2020,6 +2196,8 @@ async function selectAndLaunch(st) {
           reason: admission.reason,
         });
       }
+      // Skipped, not consumed: a freed permit (quota reset, lane completion)
+      // must let this candidate win the next steal pass.
       continue;
     }
     // Two-Phase Launch Protocol: Phase A (Durable Launch Intent)

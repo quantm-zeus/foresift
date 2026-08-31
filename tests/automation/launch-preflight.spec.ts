@@ -25,6 +25,21 @@ describe('buildLaunchPreflight (deterministic task-graph derivation)', () => {
     expect(p.exact).toBe(false);
     expect(p.reason).toBeTruthy();
     expect(p.predictedWrites).toEqual([]);
+    expect(p.shardNeed).toBeNull();
+  });
+
+  test('ready counts exclude dependency-blocked units; shardNeed matches planned shards', () => {
+    const p = buildLaunchPreflight('g0-traceability-conformance');
+    // Ready truth: a unit counts as ready only when every declared dependency
+    // is closed — dependency/phase-blocked units must never inflate the
+    // parallelizable-ready count the adaptive lane resolver consumes.
+    expect(p.readyTaskCount).toBeLessThanOrEqual(p.openTaskCount);
+    expect(p.parallelizableReadyCount).toBeLessThanOrEqual(p.readyTaskCount);
+    // Exact shard need: the deterministic planner probe at the policy ceiling
+    // returns the number of non-empty planned shards (serial core + parallel
+    // shards after cross-lane closure demotion).
+    expect(p.shardNeed).toBeGreaterThanOrEqual(1);
+    expect(p.shardNeed).toBeLessThanOrEqual(3);
   });
 });
 

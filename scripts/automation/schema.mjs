@@ -357,7 +357,35 @@ function knownWriteScopes(pkg) {
  * - neither side may claim a root/shared mechanical surface (global
  *   serialization claim ⇒ deny);
  * - effective writeScopes must be disjoint.
+ *
+ * Structured reason classes (H3 mission item 7): every refusal carries a
+ * machine-readable `reasonClass` so scheduling layers can distinguish
+ * hard serialization law (never overridable) from a broad-scope false
+ * conflict (upgradeable ONLY by exact write truth):
+ *
+ *   DEPENDENCY_BLOCK        — packageEligible / canStartPackage dependency law
+ *   CRITICAL_SERIAL         — CRITICAL risk serializes unconditionally
+ *   GLOBAL_SURFACE_SERIAL   — root/shared mechanical surface claim
+ *   PARALLEL_POLICY_BLOCK   — parallelizability / concurrency-limit policy
+ *   WRITE_SCOPE_CONFLICT    — broad writeScopes overlap (possibly false)
+ *   UNKNOWN_WRITE_TRUTH     — missing scope declarations fail closed
+ *
+ * No refusal class other than WRITE_SCOPE_CONFLICT is ever upgraded by
+ * exact truth, dependency truth, capacity, or anything else — the override
+ * path (launch-preflight.exactCoRunCompatible) only ever relaxes a broad
+ * writeScopes overlap when BOTH sides carry exact predicted writes that are
+ * provably disjoint, and never for CRITICAL/serial/global-surface/dependency
+ * or unknown write truth.
  */
+export const CAN_START_REASON_CLASSES = Object.freeze({
+  DEPENDENCY_BLOCK: 'DEPENDENCY_BLOCK',
+  CRITICAL_SERIAL: 'CRITICAL_SERIAL',
+  GLOBAL_SURFACE_SERIAL: 'GLOBAL_SURFACE_SERIAL',
+  PARALLEL_POLICY_BLOCK: 'PARALLEL_POLICY_BLOCK',
+  WRITE_SCOPE_CONFLICT: 'WRITE_SCOPE_CONFLICT',
+  UNKNOWN_WRITE_TRUTH: 'UNKNOWN_WRITE_TRUTH',
+});
+
 export function canStartPackage(roadmap, ms, candidate, runningPackages) {
   const foundation = roadmap.policy.foundationMilestones.includes(ms.milestoneId);
   const max = foundation
@@ -367,31 +395,60 @@ export function canStartPackage(roadmap, ms, candidate, runningPackages) {
     return {
       ok: false,
       reason: `concurrency limit ${max} reached (${foundation ? 'foundation' : 'standard'} policy)`,
+      reasonClass: CAN_START_REASON_CLASSES.PARALLEL_POLICY_BLOCK,
     };
   if (candidate.risk === 'CRITICAL' && runningPackages.length > 0)
-    return { ok: false, reason: 'CRITICAL packages always run serially' };
+    return {
+      ok: false,
+      reason: 'CRITICAL packages always run serially',
+      reasonClass: CAN_START_REASON_CLASSES.CRITICAL_SERIAL,
+    };
   if (candidate.risk === 'CRITICAL') return { ok: true, reason: 'serial CRITICAL start' };
   for (const run of runningPackages) {
     if (run.risk === 'CRITICAL')
-      return { ok: false, reason: `cannot co-run with CRITICAL package ${run.id}` };
+      return {
+        ok: false,
+        reason: `cannot co-run with CRITICAL package ${run.id}`,
+        reasonClass: CAN_START_REASON_CLASSES.CRITICAL_SERIAL,
+      };
     if (!run.parallelizable || !candidate.parallelizable)
-      return { ok: false, reason: `co-run with ${run.id} requires both parallelizable` };
+      return {
+        ok: false,
+        reason: `co-run with ${run.id} requires both parallelizable`,
+        reasonClass: CAN_START_REASON_CLASSES.PARALLEL_POLICY_BLOCK,
+      };
     if (
       dependsTransitively(ms, candidate.id, run.id) ||
       dependsTransitively(ms, run.id, candidate.id)
     )
-      return { ok: false, reason: `dependency relationship with ${run.id}` };
+      return {
+        ok: false,
+        reason: `dependency relationship with ${run.id}`,
+        reasonClass: CAN_START_REASON_CLASSES.DEPENDENCY_BLOCK,
+      };
     // Fail closed on unknown scope truth: a pair may only co-run when BOTH
     // sides declare provably disjoint ownership. Missing/empty declarations
     // are UNKNOWN, never safe-by-default.
     if (!knownWriteScopes(candidate) || !knownWriteScopes(run))
-      return { ok: false, reason: `unknown write-scope truth vs ${run.id}` };
+      return {
+        ok: false,
+        reason: `unknown write-scope truth vs ${run.id}`,
+        reasonClass: CAN_START_REASON_CLASSES.UNKNOWN_WRITE_TRUTH,
+      };
     // Either side claiming a root/shared mechanical surface serializes the
     // whole system — co-run denied regardless of package-scope disjointness.
     if (declaresRootSharedSurface(candidate) || declaresRootSharedSurface(run))
-      return { ok: false, reason: `root/shared surface serialization with ${run.id}` };
+      return {
+        ok: false,
+        reason: `root/shared surface serialization with ${run.id}`,
+        reasonClass: CAN_START_REASON_CLASSES.GLOBAL_SURFACE_SERIAL,
+      };
     if (scopesOverlap(candidate.writeScopes, run.writeScopes))
-      return { ok: false, reason: `writeScopes overlap with ${run.id}` };
+      return {
+        ok: false,
+        reason: `writeScopes overlap with ${run.id}`,
+        reasonClass: CAN_START_REASON_CLASSES.WRITE_SCOPE_CONFLICT,
+      };
   }
   return { ok: true, reason: 'co-run permitted' };
 }

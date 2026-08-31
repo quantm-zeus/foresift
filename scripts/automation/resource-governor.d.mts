@@ -32,3 +32,12 @@ export declare function admitUnderGovernor(
   hostState: { state: string },
   action?: { heavy?: boolean },
 ): { allow: boolean; reason: string };
+
+// Upward-recovery hysteresis: a recovered GREEN requires this many
+// consecutive healthy observations; any degraded observation resets.
+export declare const GOVERNOR_RECOVERY_CONFIRMATIONS: number;
+export declare function advanceGovernorRecovery(
+  observedState: string,
+  prior?: { state: string; streak: number } | null,
+  confirmations?: number,
+): { state: 'GREEN' | 'YELLOW' | 'ORANGE' | 'RED'; streak: number; recovered: boolean };

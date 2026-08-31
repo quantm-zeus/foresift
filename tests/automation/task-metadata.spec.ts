@@ -9,6 +9,7 @@
 //     mechanical commit, all zero-AI, fail-closed on coverage misses.
 import { describe, test, expect } from 'bun:test';
 import {
+  TASK_EVIDENCE_KINDS,
   parseTaskMetadata,
   resolveTaskMetadata,
   isCoordinatorTask,
@@ -35,6 +36,7 @@ describe('task metadata parsing + fail-closed validation', () => {
     expect(resolveTaskMetadata('- [ ] T001 [executor: Product2] x')).toEqual({
       executor: 'PRODUCT',
       kind: 'IMPLEMENTATION',
+      evidence: 'FILE_OUTPUT',
     });
   });
 
@@ -55,10 +57,12 @@ describe('task metadata parsing + fail-closed validation', () => {
     expect(resolveTaskMetadata('- [ ] T001 implement the thing')).toEqual({
       executor: 'PRODUCT',
       kind: 'IMPLEMENTATION',
+      evidence: 'FILE_OUTPUT',
     });
     expect(resolveTaskMetadata('- [ ] T002 [P] write tests')).toEqual({
       executor: 'PRODUCT',
       kind: 'IMPLEMENTATION',
+      evidence: 'FILE_OUTPUT',
     });
   });
 
@@ -66,10 +70,12 @@ describe('task metadata parsing + fail-closed validation', () => {
     expect(resolveTaskMetadata('- [ ] T063 [executor: COORDINATOR] manifest regen')).toEqual({
       executor: 'COORDINATOR',
       kind: 'MECHANICAL_BOOKKEEPING',
+      evidence: 'FILE_OUTPUT',
     });
     expect(resolveTaskMetadata('- [ ] T070 [executor: TEST] author suites')).toEqual({
       executor: 'TEST',
       kind: 'TEST_AUTHORING',
+      evidence: 'FILE_OUTPUT',
     });
     expect([...TASK_EXECUTORS]).toEqual(['PRODUCT', 'TEST', 'COORDINATOR']);
   });
@@ -78,6 +84,35 @@ describe('task metadata parsing + fail-closed validation', () => {
     expect(isCoordinatorTask({ executor: 'COORDINATOR' })).toBe(true);
     expect(isCoordinatorTask({ executor: 'PRODUCT' })).toBe(false);
     expect(isCoordinatorTask(null)).toBe(false);
+  });
+
+  test('evidence kinds: unknown fails closed; COORDINATOR_ARTIFACT needs COORDINATOR; default is FILE_OUTPUT', () => {
+    // Unknown evidence vocabulary is a hard graph-build error, never silent.
+    expect(() => resolveTaskMetadata('- [ ] T001 [evidence: VIBES] x')).toThrow(
+      /TASK_EVIDENCE_UNKNOWN/,
+    );
+    // COORDINATOR_ARTIFACT is coordinator-only.
+    expect(() =>
+      resolveTaskMetadata('- [ ] T001 [executor: PRODUCT] [evidence: COORDINATOR_ARTIFACT] x'),
+    ).toThrow(/TASK_EVIDENCE_INVALID_FOR_EXECUTOR/);
+    expect(
+      resolveTaskMetadata(
+        '- [ ] T063 [executor: COORDINATOR] [evidence: COORDINATOR_ARTIFACT] regen',
+      ).evidence,
+    ).toBe('COORDINATOR_ARTIFACT');
+    // Non-file kinds parse for AI executors too (proof routed by the owner).
+    expect(
+      resolveTaskMetadata('- [ ] T016 [evidence: VERIFICATION_ONLY] run the gate').evidence,
+    ).toBe('VERIFICATION_ONLY');
+    // The full vocabulary is the contract (mission item 10).
+    expect([...TASK_EVIDENCE_KINDS]).toEqual([
+      'FILE_OUTPUT',
+      'TEST_PROOF',
+      'VERIFICATION_ONLY',
+      'COORDINATOR_ARTIFACT',
+      'NO_OP_ALREADY_SATISFIED',
+      'SHARED_SURFACE_OUTPUT',
+    ]);
   });
 });
 

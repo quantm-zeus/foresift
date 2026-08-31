@@ -1988,6 +1988,13 @@ async function selectAndLaunch(st) {
     return preflightCache.get(packageId);
   };
 
+  // H3 P1-8: host governor sampled once per selection pass (never per
+  // candidate — /proc sampling is cheap but the verdict must be one snapshot
+  // for the whole tick).
+  const governorSample = classifyHostState();
+  const governorState = governorSample.state;
+  const governorReason = governorSample.reason ?? governorSample.state;
+
   // B. MAIN RED GLOBAL BLOCK (V4 Invariant): ONLY verified GREEN origin/main required CI
   // permits a NEW product coding package launch. Everything else fails closed.
   const mainCi = getMainCiStatus({ cwd: REPO });
@@ -2096,6 +2103,21 @@ async function selectAndLaunch(st) {
           continue;
         }
       }
+    }
+    // H3 P1-8 launch-time resource governor: a non-GREEN host refuses NEW
+    // package launches (existing work continues). Sampled once per selection
+    // pass; unreadable samples already fail closed inside classifyHostState.
+    if (governorState !== 'GREEN') {
+      const key = `governor_${governorState}|${cand.id}`;
+      if (!coRunDenialSeen.has(key)) {
+        coRunDenialSeen.add(key);
+        record(st, 'launch_denied_governor', {
+          packageId: cand.id,
+          state: governorState,
+          reason: governorReason,
+        });
+      }
+      continue;
     }
     // H2 admission bridge (§17/§20/§41): global provider permits + exact-file
     // leases BEFORE any launch. Denied candidates are skipped this tick (the

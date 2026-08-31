@@ -17,6 +17,9 @@ export declare function buildLaunchPreflight(
   sharedSurfaces: string[];
   migrationDuties: string[];
   openTaskCount: number;
+  readyTaskCount: number;
+  parallelizableReadyCount: number;
+  shardNeed: number | null;
   reason: string | null;
 };
 export declare function exactCoRunCompatible(

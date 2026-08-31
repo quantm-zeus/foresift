@@ -23,7 +23,10 @@ export const LANE_COUNT_LIMITS = Object.freeze({ min: 1, max: 3, default: 3 });
  *
  * @param {object} input
  * @param {number} [input.openTaskCount]          open units in the graph
- * @param {number} [input.parallelizableCount]    [P] open units (disjoint claim)
+ * @param {number} [input.parallelizableReadyCount] [P] open units whose
+ *   dependencies are satisfied (authoritative)
+ * @param {number} [input.parallelizableCount]    raw [P] open units (legacy
+ *   alias for parallelizableReadyCount when the caller pre-filters)
  * @param {number} [input.disjointShardNeed]      shard count already proven
  *   necessary by an exact preflight (optional refinement)
  * @param {string} [input.governorState]          GREEN|YELLOW|ORANGE|RED
@@ -34,19 +37,28 @@ export const LANE_COUNT_LIMITS = Object.freeze({ min: 1, max: 3, default: 3 });
 export function resolveAdaptiveLaneCount(input = {}) {
   const num = (v, fallback = 0) => (Number.isFinite(Number(v)) ? Number(v) : fallback);
   const openTaskCount = num(input.openTaskCount);
-  const parallelizableCount = num(input.parallelizableCount);
+  // READY work truth (H3 P0): parallelizability is judged over units whose
+  // dependencies are satisfied — dependency/phase-blocked units must never
+  // be counted as immediately parallel-ready. parallelizableCount alone (the
+  // raw [P] population) stays supported for callers that pre-filter, but the
+  // authoritative input is parallelizableReadyCount.
+  const parallelizableCount = num(
+    input.parallelizableReadyCount ?? input.parallelizableCount,
+  );
   const disjointShardNeed = input.disjointShardNeed == null ? null : num(input.disjointShardNeed);
   const governorState = String(input.governorState ?? 'GREEN').toUpperCase();
   const codexLimit = num(input.codexLimit, 0);
   const claudeLimit = num(input.claudeLimit, 0);
 
-  // Base need: the serial core always exists when there is ANY product work;
-  // an additional lane earns its slot only when MORE than one genuinely
-  // parallel unit exists (a single [P] unit runs beside the core without a
-  // dedicated lane). Disjoint-shard truth (exact preflight) overrides the
-  // heuristic when derivable.
+  // Base need: the serial core always exists when there is READY product
+  // work; an additional lane earns its slot only when MORE than one genuinely
+  // parallel-READY unit exists (a single [P] unit runs beside the core
+  // without a dedicated lane). Zero open work (openTaskCount 0 with no ready
+  // units) collapses to the minimum — a wave over an empty graph plans
+  // nothing. Disjoint-shard truth (exact preflight) overrides the heuristic
+  // when derivable.
   const heuristicNeed =
-    openTaskCount === 0
+    openTaskCount === 0 && parallelizableCount === 0
       ? 0
       : 1 + Math.min(Math.max(parallelizableCount - 1, 0), LANE_COUNT_LIMITS.max - 1);
   const need =

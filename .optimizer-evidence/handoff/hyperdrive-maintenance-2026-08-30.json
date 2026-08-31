@@ -75,5 +75,15 @@
     "then H2 P1 backlog: post-integration manifest duty ordering, coordinator task metadata, exact-write preflight, exact-lease scheduling, shared-surface lane, global ready queue/work stealing, resource governor"
   ],
   "blockers": [],
-  "resourceState": "15GiB RAM ~12Gi free; disk 84G free — GREEN"
+  "resourceState": "15GiB RAM ~12Gi free; disk 84G free — GREEN",
+  "traceabilityRun": {
+    "at": "2026-08-31T09:16-09:20Z",
+    "incident": "Two wave runs (5e7edab9, e01c8427) failed: archon task worktree had diverged from main (its 8 unique wave commits incl. real test-author work) so advanceArchonTaskWorktree skipped it; runs executed the PRE-H3 exec-codex-writer (no engine handoff) from the stale worktree; codex quota exhaustion then failed both implementation lanes; supervisor classified UNKNOWN (CODEX_QUOTA_EXHAUSTED does not match classifyFailure's 'quota exhausted' pattern), burned restart budget, paused_fatal.",
+    "resolution": [
+      "Merged origin/main ce20085 into the archon task worktree (absorption pattern proven on g0-mcp-surface); removed byte-identical untracked duplicate of promoted planning artifacts first; pushed archon/task-foresift-g0-traceability-conformance",
+      "--recover-fatal via supported protocol (stop service, recover, start): fresh continuation run c38c2e1b launched at merged worktree head 0ed9a3e"
+    ],
+    "productionProof": "P0-4 ENGINE HANDOFF PROVEN IN PRODUCTION: with codex pool latched EXHAUSTED, both implementation lanes (core, shard-1) were denied CODEX_QUOTA_EXHAUSTED and handed off to Claude via foresift/engine-handoff@1 records; claude permits acquired under same holder identity; claude --print processes executing the same logical lanes (pids 409806/409818). Test-author AGY lane also running.",
+    "knownGap": "classifyFailure does not map CODEX_QUOTA_EXHAUSTED → QUOTA_DAILY (candidate H3 follow-up so quota walls use the durable quota-pause path instead of burning UNKNOWN restarts)."
+  }
 }

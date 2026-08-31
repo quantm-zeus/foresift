@@ -85,3 +85,15 @@ export declare function advanceArchonTaskWorktree(
   branch: string,
   cwd?: string,
 ): Record<string, unknown> | null;
+
+/** H3 P2-10/P1-7: launch a detached archon workflow run. For the sharded wave
+ *  the writer-lane count is resolved adaptively (work truth + governor +
+ *  permits) and exported as FORESIFT_WRITERS unless the operator pinned one;
+ *  the env is restored after the launch. */
+export declare function launchDetached(
+  st: unknown,
+  workflow: string,
+  branch: string,
+  message: string,
+  executionProfile?: string | null,
+): unknown;

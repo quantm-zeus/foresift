@@ -115,10 +115,14 @@ import {
 } from './launch-intent.mjs';
 import { advanceRepairRequest, discoverPendingRepairRequests } from './ci-repair-executor.mjs';
 import { admitPackageLaunch, releasePackageRuntime } from './runtime-admission.mjs';
+import { buildLaunchPreflight, exactCoRunCompatible } from './launch-preflight.mjs';
+import { classifyHostState } from './resource-governor.mjs';
+import { resolveAdaptiveLaneCount } from './adaptive-lanes.mjs';
 import {
   observeClaudeOutcome,
   observeCodexOutcome,
   reconcileLaneHolders,
+  providerAdmissionView,
 } from './provider-pool.mjs';
 
 // Overridable for hermetic selftests (sandboxed fixture repo + state dir).
@@ -769,7 +773,7 @@ function ensureGenerationSeedCurrent(branch) {
   };
 }
 
-function launchDetached(st, workflow, branch, message, executionProfile = null) {
+export function launchDetached(st, workflow, branch, message, executionProfile = null) {
   if (st && executionProfile) {
     record(st, 'execution_profile_selected', {
       workflow,
@@ -789,6 +793,27 @@ function launchDetached(st, workflow, branch, message, executionProfile = null) 
   if (seed && !seed.skipped) record(st, 'generation_seed_reconciled', { branch, ...seed });
   const previous = process.env.FORESIFT_EXECUTION_PROFILE;
   if (executionProfile) process.env.FORESIFT_EXECUTION_PROFILE = executionProfile;
+  // H3 P2-10: the wave's writer-lane count is resolved adaptively (work truth
+  // + governor + permits) at launch time. An explicit env override (set by the
+  // operator or a test) always wins — resolveAdaptiveLaneCount is only consulted
+  // when the caller did not pin a count.
+  const previousWriters = process.env.FORESIFT_WRITERS;
+  let adaptiveLanes = null;
+  if (workflow === 'foresift-sharded-wave' && previousWriters === undefined) {
+    try {
+      const pools = providerAdmissionView(STATE_DIR);
+      const governor = classifyHostState();
+      adaptiveLanes = resolveAdaptiveLaneCount({
+        governorState: governor.state,
+        codexLimit: pools.codex?.limit ?? null,
+        claudeLimit: pools.claude?.limit ?? null,
+      });
+      process.env.FORESIFT_WRITERS = String(adaptiveLanes.lanes);
+      if (st) record(st, 'adaptive_lanes_resolved', { branch, ...adaptiveLanes });
+    } catch {
+      /* policy file/pool unreadable: keep the workflow's default count */
+    }
+  }
   let ack;
   try {
     ack = archonJson(
@@ -797,6 +822,10 @@ function launchDetached(st, workflow, branch, message, executionProfile = null) 
   } finally {
     if (previous === undefined) delete process.env.FORESIFT_EXECUTION_PROFILE;
     else process.env.FORESIFT_EXECUTION_PROFILE = previous;
+    if (adaptiveLanes !== null) {
+      if (previousWriters === undefined) delete process.env.FORESIFT_WRITERS;
+      else process.env.FORESIFT_WRITERS = previousWriters;
+    }
   }
   return ack;
 }
@@ -1923,6 +1952,19 @@ async function selectAndLaunch(st) {
   let launched = 0;
   const running = st.activeRuns.map((r) => findPackage(ms, r.packageId)).filter(Boolean);
 
+  // H3 P1-7: memoized exact-write preflight cache for the selection loop.
+  // Exact truth is expensive (task-graph spawn) and stable within a tick, so
+  // every candidate/running package is derived at most once; unreadable truth
+  // (exact:false) degrades to broad scopes at the pair check. Gated by env so
+  // the historical behavior stays reachable for A/B adjudication.
+  const exactCoRunPreflightEnabled = process.env.FORESIFT_EXACT_CORUN !== 'false';
+  const preflightCache = new Map();
+  const readyPreflight = (packageId) => {
+    if (!preflightCache.has(packageId))
+      preflightCache.set(packageId, buildLaunchPreflight(packageId, REPO));
+    return preflightCache.get(packageId);
+  };
+
   // B. MAIN RED GLOBAL BLOCK (V4 Invariant): ONLY verified GREEN origin/main required CI
   // permits a NEW product coding package launch. Everything else fails closed.
   const mainCi = getMainCiStatus({ cwd: REPO });
@@ -2006,6 +2048,32 @@ async function selectAndLaunch(st) {
       continue;
     }
     const { generation, branch, message, workflow: wf, executionProfile } = launchIdentity(cand);
+    // H3 P1-7 exact co-run gate: when BOTH sides carry derivable exact write
+    // truth, an exact predicted-write overlap forbids the co-run even though
+    // the broad writeScopes were disjoint. Unknown truth (exact:false) keeps
+    // the broad verdict — never upgrades safety away. One recorded refusal per
+    // package+peer pair per process.
+    if (exactCoRunPreflightEnabled) {
+      const candPf = readyPreflight(cand.id);
+      if (candPf?.exact) {
+        let refusal = null;
+        for (const run of running) {
+          const verdict = exactCoRunCompatible(candPf, readyPreflight(run.id));
+          if (verdict.compatible === false) {
+            refusal = `exact write overlap with ${run.id}: ${verdict.reason}`;
+            break;
+          }
+        }
+        if (refusal) {
+          const key = `${cand.id}|${refusal}`;
+          if (!coRunDenialSeen.has(key)) {
+            coRunDenialSeen.add(key);
+            record(st, 'co_run_denied_exact_writes', { packageId: cand.id, reason: refusal });
+          }
+          continue;
+        }
+      }
+    }
     // H2 admission bridge (§17/§20/§41): global provider permits + exact-file
     // leases BEFORE any launch. Denied candidates are skipped this tick (the
     // same reason is recorded once per process; a full pool is healthy

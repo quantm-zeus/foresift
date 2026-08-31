@@ -1,0 +1,13 @@
+{
+  "schemaVersion": "1.0.0",
+  "exceptions": [
+    { "pathPattern": "packages/object-store/src/**", "servingRequirementIds": ["FR-DATA-005", "FR-DR-002"], "justification": "Data-truth artifact and object substrate shared by the g0-contracts-data-truth package." },
+    { "pathPattern": "packages/collector-checkpoints/src/**", "servingRequirementIds": ["FR-COL-006", "INV-009"], "justification": "Collector checkpoint continuity and fencing substrate from the g0-first-party-observation continuity plan." },
+    { "pathPattern": "packages/collector-gap-recovery/src/**", "servingRequirementIds": ["FR-COL-006", "INV-009"], "justification": "Collector gap recovery substrate from the g0-first-party-observation continuity plan." },
+    { "pathPattern": "apps/api/src/main.ts", "servingRequirementIds": ["FR-MCP-001"], "justification": "Application wiring composes the MCP surfaces declared under apps/api/src/mcp." },
+    { "pathPattern": "apps/api/src/index.ts", "servingRequirementIds": ["FR-MCP-001"], "justification": "Application export wiring composes the MCP surfaces." },
+    { "pathPattern": "apps/api/src/config.ts", "servingRequirementIds": ["FR-MCP-001", "FR-SEC-001"], "justification": "Runtime configuration wiring for the MCP surface." },
+    { "pathPattern": "apps/api/src/auth/bearer.ts", "servingRequirementIds": ["FR-MCP-001", "FR-SEC-001"], "justification": "Authentication wiring for the MCP surface." },
+    { "pathPattern": "apps/api/src/auth/client-context.ts", "servingRequirementIds": ["FR-MCP-001", "FR-SEC-001"], "justification": "Authorized client context wiring for the MCP surface." }
+  ]
+}

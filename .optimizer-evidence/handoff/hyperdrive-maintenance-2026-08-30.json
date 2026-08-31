@@ -85,7 +85,8 @@
     "mergeNote": "origin/main 0893e1e merged into landing base; single conflict evidence/bun-migration/bun-migration-manifest.json resolved by bun-migration-manifest.mjs regen with --previous (bc153e8 version): 337 files, counts MIGRATED 287 / VERIFIED 50 (carryovers preserved), PR-124 specs claude-lane-permits + writer-lane-permits present as ALREADY_MIGRATED/MIGRATED, prettier-clean",
     "baseDrift": "PASS — merge-base origin/main == 0893e1e is ancestor of HEAD",
     "archonValidate": "32 valid, 0 errors, 2 warnings",
-    "fullCoordinatorReburn": "in flight (CI=true pnpm test, log /tmp/land-full-gate.log)",
-    "next": "after green coordinator: re-run package-final-land.mjs verbatim (package g0-mcp-surface, branch foresift/g0-mcp-surface, artifacts-dir /home/minhquan_eth/.archon/workspaces/quantm-zeus/foresift/artifacts/runs/8e2bf2578e3820b793e40b1d1b0a7081); lander burns its own FULL gate; then exact-head CI on PR #125, squash merge, autopilot --recover-fatal"
+    "fullCoordinatorReburn": "GREEN (exit 0): bunFiles 337, passed true, test-authority-result BUN_TEST; log /tmp/land-full-gate.log",
+    "next": "after green coordinator: re-run package-final-land.mjs verbatim (package g0-mcp-surface, branch foresift/g0-mcp-surface, artifacts-dir /home/minhquan_eth/.archon/workspaces/quantm-zeus/foresift/artifacts/runs/8e2bf2578e3820b793e40b1d1b0a7081); lander burns its own FULL gate; then exact-head CI on PR #125, squash merge, autopilot --recover-fatal",
+    "landerRerun": "package-final-land.mjs re-invoked verbatim (bg b87egfz8k); attestation headSha 629d69e mismatches new head 397aaaf + baseMainSha f09ddb6 != 0893e1e, so lander correctly refused reuse and is burning ONE fresh FULL gate (pnpm foresift:gate)"
   }
 }

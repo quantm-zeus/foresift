@@ -6,7 +6,11 @@ import { join } from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { buildCodexExecArgs, CODEX_SERVICE_TIER } from './codex-routing.mjs';
 import { validateLaneOwnership } from './path-ownership.mjs';
-import { claimCompletedUnits, parseTaskGraph } from './writer-task-evidence.mjs';
+import {
+  claimCompletedUnits,
+  parseTaskGraph,
+  requireTaskGraphForCompletionEvidence,
+} from './writer-task-evidence.mjs';
 import { executeHandoffToClaude, isQuotaHandoffReason } from './engine-handoff.mjs';
 import { runClaudeLaneCore } from './claude-lane-core.mjs';
 import {
@@ -104,6 +108,16 @@ export function runCodexWriter(input) {
   if (!input.package) throw new Error('CODEX_WRITER_ARGUMENT_MISSING: package/generation');
   const routing = JSON.parse(readFileSync(input.routing, 'utf8'));
   const route = codexRouteForLane(routing, input.lane);
+  // P0 hardening: the evidence protocol needs the task graph BEFORE any
+  // provider spend (live 89c4b2b9 — 40m of green writer work died at
+  // integration because the wiring omitted --task-graph). Fail closed before
+  // permit acquisition; nothing below runs without a valid evidence graph.
+  requireTaskGraphForCompletionEvidence({
+    graphPath: input['task-graph'],
+    taskIds: route.taskIds,
+    engine: 'CODEX',
+    lane: input.lane,
+  });
   const brief = readFileSync(input.brief, 'utf8');
   const resultDir = input['results-dir'];
   mkdirSync(resultDir, { recursive: true });

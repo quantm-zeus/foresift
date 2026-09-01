@@ -12,7 +12,11 @@ import { spawnSync } from 'node:child_process';
 import { validateLaneOwnership } from './path-ownership.mjs';
 import { releaseLanePermit, observeClaudeOutcome } from './provider-pool.mjs';
 import { claudeProviderEvent } from './exec-claude-writer.mjs';
-import { claimCompletedUnits, parseTaskGraph } from './writer-task-evidence.mjs';
+import {
+  claimCompletedUnits,
+  parseTaskGraph,
+  requireTaskGraphForCompletionEvidence,
+} from './writer-task-evidence.mjs';
 
 function git(args, cwd) {
   return spawnSync('git', args, { cwd, encoding: 'utf8' });
@@ -28,6 +32,16 @@ function git(args, cwd) {
  *     it first.
  */
 export function runClaudeLaneCore(input) {
+  // P0 hardening: the engine-handoff path executes the SAME evidence-backed
+  // brief — it must satisfy the identical task-graph gate BEFORE any provider
+  // spawn (the handoff releases no codex permit here, so failing here leaks
+  // nothing).
+  requireTaskGraphForCompletionEvidence({
+    graphPath: input.taskGraphPath,
+    taskIds: input.taskIds,
+    engine: input.handedOffFrom === 'CODEX' ? 'CODEX->CLAUDE' : 'CLAUDE',
+    lane: input.lane,
+  });
   const brief = readFileSync(input.briefPath, 'utf8');
   const resultDir = input.resultsDir;
   mkdirSync(resultDir, { recursive: true });

@@ -1,6 +1,6 @@
 /** Release-blocking conformance rules for FR-TRACE-003. */
 import { constants } from 'node:fs';
-import { access, readFile, readdir, stat } from 'node:fs/promises';
+import { access, readFile, readdir } from 'node:fs/promises';
 import path from 'node:path';
 
 export const CONFORMANCE_RULES = {
@@ -104,7 +104,10 @@ export function checkMappingCompleteness(
 
 /** Remove the trace annotation while retaining the exact repository path/glob. */
 export function implementationPath(implementationRef: string): string {
-  return implementationRef.replace(/\s+@requirement\s+\S+\s*$/, '').trim().replaceAll('\\', '/');
+  return implementationRef
+    .replace(/\s+@requirement\s+\S+\s*$/, '')
+    .trim()
+    .replaceAll('\\', '/');
 }
 
 function globStaticPrefix(pattern: string): string {
@@ -194,7 +197,8 @@ export async function checkNoPrematureImplementations(
 ): Promise<PrematurePathVerdict> {
   const requirements = await resolveRequirements(options);
   const activeNumber = dependencyGroupNumber(options.activeGroup);
-  if (activeNumber === undefined) throw new TypeError(`invalid dependency group: ${options.activeGroup}`);
+  if (activeNumber === undefined)
+    throw new TypeError(`invalid dependency group: ${options.activeGroup}`);
 
   // A shared product path is legitimately open when any active requirement maps it.
   const openedPaths = new Set(
@@ -276,7 +280,8 @@ export async function checkGeneratedDocsDrift(
   const generatedRoot = path.join(options.repoRoot, 'docs/generated');
   const actualPaths = await filesRecursively(generatedRoot);
   let expected = options.expectedFiles;
-  if (expected === undefined && options.regenerate !== undefined) expected = await options.regenerate();
+  if (expected === undefined && options.regenerate !== undefined)
+    expected = await options.regenerate();
 
   // Until a canonical generator is present, an absent generated tree regenerates to an
   // empty tree. Once either side has files, callers must provide regeneration bytes.
@@ -297,17 +302,17 @@ export async function checkGeneratedDocsDrift(
       continue;
     }
     const expectedBytes =
-      typeof expectedValue === 'string' ? Buffer.from(expectedValue, 'utf8') : Buffer.from(expectedValue);
+      typeof expectedValue === 'string'
+        ? Buffer.from(expectedValue, 'utf8')
+        : Buffer.from(expectedValue);
     if (!actual.equals(expectedBytes)) driftedFiles.push(relativePath);
   }
-  const findings = driftedFiles.map(
-    (driftedPath): ConformanceFinding => ({
-      requirementId: 'FR-TRACE-003',
-      rule: CONFORMANCE_RULES.generated,
-      path: `docs/generated/${driftedPath}`,
-      message: `generated document differs byte-for-byte from deterministic regeneration: docs/generated/${driftedPath}`,
-    }),
-  );
+  const findings = driftedFiles.map((driftedPath): ConformanceFinding => ({
+    requirementId: 'FR-TRACE-003',
+    rule: CONFORMANCE_RULES.generated,
+    path: `docs/generated/${driftedPath}`,
+    message: `generated document differs byte-for-byte from deterministic regeneration: docs/generated/${driftedPath}`,
+  }));
   return { passed: findings.length === 0, driftedFiles, findings };
 }
 
@@ -329,8 +334,7 @@ export interface ConformanceOptions {
   readonly requirements?: readonly RequirementMapping[];
   readonly expectedGeneratedFiles?: GeneratedDocumentSnapshot;
   readonly regenerateGeneratedDocs?: () =>
-    | GeneratedDocumentSnapshot
-    | Promise<GeneratedDocumentSnapshot>;
+    GeneratedDocumentSnapshot | Promise<GeneratedDocumentSnapshot>;
 }
 
 export interface ConformanceResult {

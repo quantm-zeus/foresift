@@ -65,7 +65,8 @@ export function validateOrphanExceptionLedger(ledger: unknown): LedgerValidation
       !Array.isArray(entry.servingRequirementIds) ||
       entry.servingRequirementIds.length === 0 ||
       entry.servingRequirementIds.some(
-        (requirementId) => typeof requirementId !== 'string' || !REQUIREMENT_ID.test(requirementId),
+        (requirementId: unknown) =>
+          typeof requirementId !== 'string' || !REQUIREMENT_ID.test(requirementId),
       )
     ) {
       errors.push(`${prefix}.servingRequirementIds must contain valid requirement IDs`);

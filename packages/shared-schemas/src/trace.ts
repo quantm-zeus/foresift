@@ -16,17 +16,21 @@ const NonEmptyVersionMapSchema = z
   .refine((value) => Object.keys(value).length > 0, { message: 'version map must not be empty' });
 
 /** Stable normative-document namespaces. */
-export const RequirementRefSchema = z.string().regex(
-  /^(?:FR-[A-Z][A-Z0-9]*(?:-[A-Z0-9]+)*-\d{3}|AC-\d{3}|INV-\d{3}|ADR-\d{4})$/,
-  { message: 'must be an FR, AC, INV, or ADR identifier' },
-);
+export const RequirementRefSchema = z
+  .string()
+  .regex(/^(?:FR-[A-Z][A-Z0-9]*(?:-[A-Z0-9]+)*-\d{3}|AC-\d{3}|INV-\d{3}|ADR-\d{4})$/, {
+    message: 'must be an FR, AC, INV, or ADR identifier',
+  });
 export type RequirementRef = z.infer<typeof RequirementRefSchema>;
 
 /** Runtime identifiers that participate in global traceability. */
-export const TraceIdPatternSchema = z.string().trim().min(1).regex(
-  /^(?:feature|schema|api|tool|policy|artifact|test):\S+$/,
-  { message: 'must use a registered trace ID namespace' },
-);
+export const TraceIdPatternSchema = z
+  .string()
+  .trim()
+  .min(1)
+  .regex(/^(?:feature|schema|api|tool|policy|artifact|test):\S+$/, {
+    message: 'must use a registered trace ID namespace',
+  });
 export type TraceIdPattern = z.infer<typeof TraceIdPatternSchema>;
 
 export const TRACE_ID_NAMESPACES = [
@@ -57,13 +61,7 @@ export const SupersessionLinkSchema = z
   });
 export type SupersessionLink = z.infer<typeof SupersessionLinkSchema>;
 
-export const GATE_KINDS = [
-  'MANUAL',
-  'LEGAL',
-  'RIGHTS',
-  'STATISTICAL',
-  'OWNER_APPROVAL',
-] as const;
+export const GATE_KINDS = ['MANUAL', 'LEGAL', 'RIGHTS', 'STATISTICAL', 'OWNER_APPROVAL'] as const;
 export const GateKindSchema = z.enum(GATE_KINDS);
 
 export const GateEvidencePayloadSchema = z
@@ -97,13 +95,25 @@ export const GateEvidenceRecordSchema = z
   .strict()
   .superRefine((value, context) => {
     if (value.gateKind !== value.payload.gateKind) {
-      context.addIssue({ code: z.ZodIssueCode.custom, path: ['gateKind'], message: 'must match payload' });
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['gateKind'],
+        message: 'must match payload',
+      });
     }
     if (value.approver !== value.payload.approver) {
-      context.addIssue({ code: z.ZodIssueCode.custom, path: ['approver'], message: 'must match payload' });
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['approver'],
+        message: 'must match payload',
+      });
     }
     if (new Date(value.expiresAt).getTime() <= new Date(value.issuedAt).getTime()) {
-      context.addIssue({ code: z.ZodIssueCode.custom, path: ['expiresAt'], message: 'must follow issuedAt' });
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['expiresAt'],
+        message: 'must follow issuedAt',
+      });
     }
   });
 export type GateEvidenceRecord = z.infer<typeof GateEvidenceRecordSchema>;
@@ -240,13 +250,7 @@ export const TRACE_TELEMETRY_FIELDS = {
     'expiresAt',
     'recordedAt',
   ],
-  'gate.evidence_refused': [
-    'evidenceId',
-    'gateKind',
-    'requiredScope',
-    'reason',
-    'evaluatedAt',
-  ],
+  'gate.evidence_refused': ['evidenceId', 'gateKind', 'requiredScope', 'reason', 'evaluatedAt'],
   'decision.trace_recorded': [
     'traceId',
     'decisionRef',

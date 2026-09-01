@@ -283,9 +283,16 @@ export async function checkGeneratedDocsDrift(
   if (expected === undefined && options.regenerate !== undefined)
     expected = await options.regenerate();
 
-  // Until a canonical generator is present, an absent generated tree regenerates to an
-  // empty tree. Once either side has files, callers must provide regeneration bytes.
-  if (expected === undefined) expected = {};
+  if (expected === undefined) {
+    // The central generator is the authority for docs/generated. Import it
+    // lazily so injected unit checks remain repository-independent and the
+    // normal live-tree verdict performs a real in-memory regeneration.
+    const generator = (await import('../../../scripts/generate-requirement-manifest/cli.mjs')) as {
+      generateOutputs(root: string): Promise<ReadonlyMap<string, string>>;
+    };
+    expected = Object.fromEntries(await generator.generateOutputs(options.repoRoot));
+  }
+
   const allPaths = [...new Set([...actualPaths, ...Object.keys(expected)])].sort();
   const driftedFiles: string[] = [];
   for (const relativePath of allPaths) {

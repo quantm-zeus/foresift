@@ -22,8 +22,10 @@ function sha256(value: string): string {
 
 function unquote(value: string): string {
   const trimmed = value.trim();
-  if ((trimmed.startsWith("'") && trimmed.endsWith("'")) ||
-      (trimmed.startsWith('"') && trimmed.endsWith('"'))) {
+  if (
+    (trimmed.startsWith("'") && trimmed.endsWith("'")) ||
+    (trimmed.startsWith('"') && trimmed.endsWith('"'))
+  ) {
     return trimmed.slice(1, -1).replace(/''/g, "'");
   }
   return trimmed;
@@ -70,10 +72,11 @@ export async function generateSbomFromLockfile(lockfilePath: string): Promise<Sb
     components.push({ ...coordinate, integrity, type: 'npm' });
   }
 
-  components.sort((left, right) =>
-    left.name.localeCompare(right.name) ||
-    left.version.localeCompare(right.version) ||
-    left.integrity.localeCompare(right.integrity),
+  components.sort(
+    (left, right) =>
+      left.name.localeCompare(right.name) ||
+      left.version.localeCompare(right.version) ||
+      left.integrity.localeCompare(right.integrity),
   );
   const canonicalInventory = JSON.stringify(components);
   return {

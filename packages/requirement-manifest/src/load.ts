@@ -1,10 +1,7 @@
 import { readFile } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import {
-  RequirementManifestError,
-  RequirementManifestErrorCode,
-} from './errors.ts';
+import { RequirementManifestError, RequirementManifestErrorCode } from './errors.ts';
 import { validateRequirementManifest, type ValidationPaths } from './validate.ts';
 
 export interface ManifestTextItem {
@@ -19,10 +16,25 @@ export interface RequirementItem extends ManifestTextItem {
   readonly acceptanceCriteria: readonly string[];
   readonly dependencyGroup: string;
   readonly securityRightsCostControls: readonly string[];
+  readonly family: string;
+  readonly owner: string;
+  readonly status: string;
+  readonly implementationRefs: readonly string[];
+  readonly schemaRefs: readonly string[];
+  readonly persistenceRefs: readonly string[];
+  readonly apiToolUiRefs: readonly string[];
+  readonly telemetryRefs: readonly string[];
+  readonly fixtureRefs: readonly string[];
+  readonly testRefs: readonly string[];
+  readonly activationGateRefs: readonly string[];
+  readonly rollbackRefs: readonly string[];
 }
 
 export interface AcceptanceCriterionItem extends ManifestTextItem {
   readonly requirementRefs: readonly string[];
+  readonly positiveTestRef: string;
+  readonly negativeOrFailureTestRef: string;
+  readonly evidenceOwner: string;
 }
 
 export interface AdrItem {
@@ -126,7 +138,11 @@ export async function loadRequirementManifest(
 ): Promise<RequirementManifest> {
   const manifestPath = options.manifestPath ?? DEFAULT_MANIFEST_PATH;
   const manifest = await readManifestFile(manifestPath);
-  if (options.auditPath !== undefined || options.prdPath !== undefined || options.sha256sumsPath !== undefined) {
+  if (
+    options.auditPath !== undefined ||
+    options.prdPath !== undefined ||
+    options.sha256sumsPath !== undefined
+  ) {
     await validateRequirementManifest({
       manifestData: manifest,
       manifestPath,
@@ -135,5 +151,15 @@ export async function loadRequirementManifest(
       ...(options.sha256sumsPath === undefined ? {} : { sha256sumsPath: options.sha256sumsPath }),
     });
   }
-  return manifest;
+  // The PRD artifact retains its historical three-digit ADR inventory keys,
+  // while the released ADR namespace and filenames are four-digit. Expose the
+  // canonical public IDs without mutating the authoritative bytes that were
+  // validated above.
+  return {
+    ...manifest,
+    adrs: manifest.adrs.map((adr) => ({
+      ...adr,
+      id: /^ADR-\d{3}$/.test(adr.id) ? `ADR-0${adr.id.slice(4)}` : adr.id,
+    })),
+  };
 }

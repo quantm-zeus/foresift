@@ -3,7 +3,14 @@
   "catalog": "trace",
   "description": "Traceability, evidence-gate, decision provenance, and release-conformance metadata contracts.",
   "contractStatus": "DECLARATIVE_CONTRACT_ONLY — emitter wiring lands with dependency group G2; these names are contracts and are not emitted at G0.",
-  "requirementsCovered": ["FR-TRACE-001", "FR-TRACE-002", "FR-TRACE-003", "FR-TRACE-004", "FR-TRACE-005", "FR-TRACE-006"],
+  "requirementsCovered": [
+    "FR-TRACE-001",
+    "FR-TRACE-002",
+    "FR-TRACE-003",
+    "FR-TRACE-004",
+    "FR-TRACE-005",
+    "FR-TRACE-006"
+  ],
   "recoveryDataClass": "CRITICAL_METADATA",
   "events": [
     {

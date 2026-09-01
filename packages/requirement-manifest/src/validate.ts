@@ -1,10 +1,7 @@
 import { createHash } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
 import path from 'node:path';
-import {
-  RequirementManifestError,
-  RequirementManifestErrorCode,
-} from './errors.ts';
+import { RequirementManifestError, RequirementManifestErrorCode } from './errors.ts';
 import {
   assertManifestShape,
   readManifestFile,
@@ -58,7 +55,10 @@ function refuse(
 
 function requireObject(value: unknown, label: string): Record<string, unknown> {
   if (typeof value !== 'object' || value === null || Array.isArray(value)) {
-    return refuse(RequirementManifestErrorCode.MANIFEST_SHAPE_INVALID, `${label} must be an object`);
+    return refuse(
+      RequirementManifestErrorCode.MANIFEST_SHAPE_INVALID,
+      `${label} must be an object`,
+    );
   }
   return value as Record<string, unknown>;
 }
@@ -80,11 +80,9 @@ function validateTextHashes(manifest: RequirementManifest): void {
     ...manifest.invariants,
   ]) {
     if (typeof item.text !== 'string' || computeTextSha256(item.text) !== item.textSha256) {
-      refuse(
-        RequirementManifestErrorCode.TEXT_HASH_MISMATCH,
-        `text hash mismatch for ${item.id}`,
-        { id: item.id },
-      );
+      refuse(RequirementManifestErrorCode.TEXT_HASH_MISMATCH, `text hash mismatch for ${item.id}`, {
+        id: item.id,
+      });
     }
   }
 
@@ -98,11 +96,9 @@ function validateTextHashes(manifest: RequirementManifest): void {
       adr.decision.trim() === '' ||
       !/^[0-9a-f]{64}$/.test(adr.textSha256)
     ) {
-      refuse(
-        RequirementManifestErrorCode.ADR_FORMAT_INVALID,
-        `ADR format invalid for ${adr.id}`,
-        { id: adr.id },
-      );
+      refuse(RequirementManifestErrorCode.ADR_FORMAT_INVALID, `ADR format invalid for ${adr.id}`, {
+        id: adr.id,
+      });
     }
   }
 }
@@ -165,7 +161,10 @@ function validateReferences(manifest: RequirementManifest): void {
       );
     }
     if (requirement.acceptanceCriteria.length === 0) {
-      refuse(RequirementManifestErrorCode.ORPHAN_REFERENCE, `${requirement.id} has no acceptance criterion`);
+      refuse(
+        RequirementManifestErrorCode.ORPHAN_REFERENCE,
+        `${requirement.id} has no acceptance criterion`,
+      );
     }
     for (const criterionId of requirement.acceptanceCriteria) {
       const criterion = criteria.get(criterionId);
@@ -301,7 +300,11 @@ export async function verifyFourWayCountAgreement(options: {
     },
     {
       requirements: numericField(release, 'requirementCount', 'manifest.releaseConformance'),
-      acceptanceCriteria: numericField(release, 'acceptanceCriteriaCount', 'manifest.releaseConformance'),
+      acceptanceCriteria: numericField(
+        release,
+        'acceptanceCriteriaCount',
+        'manifest.releaseConformance',
+      ),
       invariants: numericField(release, 'invariantCount', 'manifest.releaseConformance'),
       adrs: numericField(release, 'adrCount', 'manifest.releaseConformance'),
     },
@@ -335,7 +338,11 @@ async function validateAnchors(manifest: RequirementManifest, prdPath: string): 
     ...manifest.invariants,
     ...manifest.adrs,
   ]) {
-    if (!Number.isInteger(item.line) || item.line <= 0 || !lines[item.line - 1]?.includes(item.id)) {
+    if (
+      !Number.isInteger(item.line) ||
+      item.line <= 0 ||
+      !lines[item.line - 1]?.includes(item.id)
+    ) {
       refuse(
         RequirementManifestErrorCode.ANCHOR_UNRESOLVED,
         `PRD line anchor ${item.line} does not resolve to ${item.id}`,
@@ -346,7 +353,9 @@ async function validateAnchors(manifest: RequirementManifest, prdPath: string): 
 }
 
 async function verifyChecksums(
-  options: Required<Pick<ValidationPaths, 'manifestPath' | 'auditPath' | 'prdPath' | 'sha256sumsPath'>>,
+  options: Required<
+    Pick<ValidationPaths, 'manifestPath' | 'auditPath' | 'prdPath' | 'sha256sumsPath'>
+  >,
 ): Promise<ManifestValidationResult['hashes']> {
   const sums = new Map<string, string>();
   for (const line of (await readFile(options.sha256sumsPath, 'utf8')).split(/\r?\n/)) {

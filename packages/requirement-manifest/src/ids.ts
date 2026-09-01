@@ -8,43 +8,84 @@ const GRAMMARS: readonly [IdNamespace, RegExp][] = [
   ['adr', /^ADR-\d{3,4}$/],
 ];
 
-export function validateIdGrammar(id: unknown): { valid: boolean; namespace?: IdNamespace; error?: string } {
+export function validateIdGrammar(id: unknown): {
+  valid: boolean;
+  namespace?: IdNamespace;
+  error?: string;
+} {
   if (typeof id !== 'string') return { valid: false, error: 'ID must be a string' };
   const match = GRAMMARS.find(([, grammar]) => grammar.test(id));
-  return match ? { valid: true, namespace: match[0] } : { valid: false, error: `ID_SHAPE_INVALID: ${id}` };
+  return match
+    ? { valid: true, namespace: match[0] }
+    : { valid: false, error: `ID_SHAPE_INVALID: ${id}` };
 }
 
-function normativeCollections(manifest: any): any[][] {
-  return [manifest?.requirements ?? [], manifest?.acceptanceCriteria ?? [], manifest?.invariants ?? [], manifest?.adrs ?? []];
+interface ManifestIdItem {
+  readonly id?: unknown;
+  readonly line?: unknown;
 }
 
-export function checkGlobalIdUniqueness(manifest: any): {
-  isUnique: boolean; duplicates: string[]; invalidIds: string[]; totalIds: number;
+interface ManifestIdCollections {
+  readonly requirements?: readonly ManifestIdItem[];
+  readonly acceptanceCriteria?: readonly ManifestIdItem[];
+  readonly invariants?: readonly ManifestIdItem[];
+  readonly adrs?: readonly ManifestIdItem[];
+}
+
+function manifestCollections(manifest: unknown): ManifestIdCollections {
+  return typeof manifest === 'object' && manifest !== null
+    ? (manifest as ManifestIdCollections)
+    : {};
+}
+
+function normativeCollections(manifest: unknown): readonly (readonly ManifestIdItem[])[] {
+  const collections = manifestCollections(manifest);
+  return [
+    collections.requirements ?? [],
+    collections.acceptanceCriteria ?? [],
+    collections.invariants ?? [],
+    collections.adrs ?? [],
+  ];
+}
+
+export function checkGlobalIdUniqueness(manifest: unknown): {
+  isUnique: boolean;
+  duplicates: string[];
+  invalidIds: string[];
+  totalIds: number;
 } {
-  const ids = normativeCollections(manifest).flat().map((item) => item?.id);
+  const ids = normativeCollections(manifest)
+    .flat()
+    .map((item) => item.id);
   const seen = new Set<string>();
   const duplicates = new Set<string>();
   const invalidIds = new Set<string>();
   for (const id of ids) {
     if (!validateIdGrammar(id).valid) invalidIds.add(String(id));
-    if (seen.has(id)) duplicates.add(id); else seen.add(id);
+    const stableId = String(id);
+    if (seen.has(stableId)) duplicates.add(stableId);
+    else seen.add(stableId);
   }
   return {
     isUnique: duplicates.size === 0 && invalidIds.size === 0,
-    duplicates: [...duplicates].sort(), invalidIds: [...invalidIds].sort(), totalIds: ids.length,
+    duplicates: [...duplicates].sort(),
+    invalidIds: [...invalidIds].sort(),
+    totalIds: ids.length,
   };
 }
 
-export function checkStableOrdering(manifest: any): {
-  isStable: boolean; unstableNamespaces: string[];
+export function checkStableOrdering(manifest: unknown): {
+  isStable: boolean;
+  unstableNamespaces: string[];
 } {
-  const names = ['requirements', 'acceptanceCriteria', 'invariants', 'adrs'];
+  const collections = manifestCollections(manifest);
+  const names = ['requirements', 'acceptanceCriteria', 'invariants', 'adrs'] as const;
   const unstableNamespaces = names.filter((name) => {
-    const items = manifest?.[name] ?? [];
+    const items = collections[name] ?? [];
     // The authoritative document line is the primary order. Synthetic inputs without anchors
     // use lexical IDs, which makes the rule independently testable.
-    const anchored = items.every((item: any) => Number.isInteger(item?.line));
-    const keys = items.map((item: any) => anchored ? item.line : item.id);
+    const anchored = items.every((item) => Number.isInteger(item.line));
+    const keys = items.map((item) => (anchored ? Number(item.line) : String(item.id)));
     return keys.some((key: number | string, index: number) => index > 0 && key < keys[index - 1]);
   });
   return { isStable: unstableNamespaces.length === 0, unstableNamespaces };
@@ -70,10 +111,12 @@ export function validateSupersessionContract(options: {
     if (!link || !link.supersededById || !link.reason?.trim()) {
       throw new Error(`SUPERSESSION_LINK_REQUIRED: ${replacedId}`);
     }
-    if (link.supersededById === replacedId) throw new Error(`SUPERSESSION_LINK_INVALID: ${replacedId} cannot supersede itself`);
+    if (link.supersededById === replacedId)
+      throw new Error(`SUPERSESSION_LINK_INVALID: ${replacedId} cannot supersede itself`);
   }
-  for (const item of options.newItems ?? []) if (options.historicalReleasedIds?.has(item.id)) {
-    throw new Error(`ID_REUSE_FORBIDDEN: re-use of released ID ${item.id}`);
-  }
+  for (const item of options.newItems ?? [])
+    if (options.historicalReleasedIds?.has(item.id)) {
+      throw new Error(`ID_REUSE_FORBIDDEN: re-use of released ID ${item.id}`);
+    }
   return { valid: true };
 }

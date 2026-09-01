@@ -185,14 +185,15 @@ export type GateEvidenceFailureReason =
 export type GateEvidenceEvaluation =
   | {
       readonly isValid: true;
-      readonly gateKind: GateKind;
+      readonly gateKind: string;
       readonly approver: string;
       readonly evidenceId: string;
+      readonly reason?: undefined;
     }
   | {
       readonly isValid: false;
       readonly reason: GateEvidenceFailureReason;
-      readonly gateKind?: GateKind;
+      readonly gateKind?: string;
       readonly approver?: string;
       readonly evidenceId?: string;
     };

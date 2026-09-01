@@ -90,8 +90,22 @@ const allowed = [
 // self-collision observed live (runs 831d0819/99e8e23b, 2026-08-30): the plan
 // handed the file to the test lane, then the guard rejected the same lane for
 // touching it — every restart of that package failed identically.
+//
+// Chained serial batches (mission item 4) share one write column BY DESIGN:
+// core-batch-N lanes all carry the serial column's union, so a path predicted
+// by another batch is a plan-sanctioned revisit (batch 2 legitimately touches a
+// file batch 1 created), not a cross-lane conflict. Only lanes OUTSIDE the
+// batch's chain count as "others" (live self-collision: run e44f577a, 2026-09-01
+// — guard-serial-1 refused T004/T005/T006/T007-class paths that core-batch-2/3
+// merely inherited from the shared column).
+const chainMates =
+  shard?.chainId != null
+    ? new Set(allLanes.filter((s) => s.chainId === shard.chainId).map((s) => s.id))
+    : null;
 const othersPredicted = new Set(
-  allLanes.filter((s) => s.id !== args.shard).flatMap((s) => s.allowedWritePaths ?? []),
+  allLanes
+    .filter((s) => s.id !== args.shard && !(chainMates?.has(s.id) ?? false))
+    .flatMap((s) => s.allowedWritePaths ?? []),
 );
 const exceptions = new Set(graph.scopeExceptions ?? []);
 const violations = changed.filter(

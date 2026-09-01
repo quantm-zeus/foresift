@@ -194,6 +194,109 @@ describe('implementation task graph', () => {
     writeFileSync(join(fx.root, 'specs', 'pkg-x', 'tasks.md'), TASKS);
   });
 
+  it('decomposes a heavy serial core into bounded sequential batches (mission item 4)', () => {
+    // A package with many non-[P] units must not hand ONE lane the whole
+    // serial column: the planner splits it into dependency-ordered
+    // core-batch-N lanes of bounded estimated load, each chained to its
+    // parent (chainId 'core'). Small packages keep the exact legacy `core`
+    // shape (a single batch is emitted as `core`).
+    const bigTasks = `# Tasks: pkg-x
+
+## Phase A — foundation (blocks everything)
+
+- [x] T101 Setup.
+${Array.from(
+  { length: 14 },
+  (_, i) =>
+    `- [ ] T1${(i + 1).toString().padStart(2, '0')} Implement module ${i + 1} in \`packages/x/src/mod${i + 1}.ts\` covering the module contract.\n      Traces: FR-X-001. Depends on T101 groundwork.`,
+).join('\n')}
+
+## Phase B — parallel surface
+
+- [ ] T199 [P] Write guide \`docs/x-guide.md\`. Traces: FR-X-002 (AC-202).
+`;
+    writeFileSync(join(fx.root, 'specs', 'pkg-x', 'tasks.md'), bigTasks);
+    try {
+      const out = join(fx.artifacts, 'graph-batches.json');
+      const r = spawnSync(
+        process.execPath,
+        [GRAPH, '--package', 'pkg-x', '--root', fx.root, '--plan-shards', '3', '--out', out],
+        { encoding: 'utf8' },
+      );
+      expect(r.status).toBe(0);
+      const g = JSON.parse(readFileSync(out, 'utf8'));
+      const serial = g.shards.filter((s: { mode: string }) => s.mode === 'serial');
+      expect(serial.length).toBeGreaterThan(1); // decomposition actually happened
+      expect(serial.length).toBeLessThanOrEqual(3); // wired lane ceiling
+      // 1. every unit is covered exactly once across the chain
+      const all = serial.flatMap((s: { units: string[] }) => s.units);
+      expect(new Set(all).size).toBe(all.length);
+      // 2. chain wiring: batch i>1 chains from batch i-1, one chainId
+      serial.forEach(
+        (s: { chainId?: string; chainsFrom?: string | null; batchIndex?: number }, i: number) => {
+          expect(s.chainId).toBe('core');
+          expect(s.batchIndex).toBe(i + 1);
+          expect(s.chainsFrom).toBe(i === 0 ? null : serial[i - 1].id);
+        },
+      );
+      // 3. bounded load: no batch exceeds the per-lane load budget + slack
+      for (const s of serial as Array<{ estimatedSize: number; laneTooLarge?: boolean }>)
+        expect(s.estimatedSize <= 8 || s.laneTooLarge === true).toBe(true);
+      // 4. topological: no unit depends on a same-column unit scheduled LATER
+      const units = new Map<string, { id: string; dependsOn: string[] }>(
+        g.units.map((u: { id: string; dependsOn: string[] }) => [u.id, u]),
+      );
+      const pos = new Map<string, number>();
+      serial.forEach((s: { units: string[] }) =>
+        s.units.forEach((u: string) => pos.set(u, pos.size)),
+      );
+      for (const [uid, p] of pos)
+        for (const d of units.get(uid)!.dependsOn)
+          if (pos.has(d)) expect(pos.get(d)!).toBeLessThan(p);
+      // 5. write authority: serial batches share the column union; parallel
+      // lanes never share a path with the column
+      const column = new Set(
+        serial.flatMap((s: { allowedWritePaths: string[] }) => s.allowedWritePaths),
+      );
+      for (const par of g.shards.filter((s: { mode: string }) => s.mode === 'parallel') as Array<{
+        allowedWritePaths: string[];
+      }>)
+        for (const p of par.allowedWritePaths) expect(column.has(p)).toBe(false);
+    } finally {
+      writeFileSync(join(fx.root, 'specs', 'pkg-x', 'tasks.md'), TASKS);
+    }
+  });
+
+  it('keeps the single-batch core byte-identical to the legacy shape', () => {
+    const g = JSON.parse(readFileSync(fx.graphPath, 'utf8'));
+    const serial = g.shards.filter((s: { mode: string }) => s.mode === 'serial');
+    expect(serial).toHaveLength(1);
+    expect(serial[0].id).toBe('core'); // NOT core-batch-1
+    expect(serial[0].mode).toBe('serial');
+    expect(serial[0].chainId).toBeUndefined();
+  });
+
+  it('folds parallel units into the core when plan-shards 1 leaves no parallel slots', () => {
+    // --plan-shards 1 (governor YELLOW path: adaptive lanes resolve to 1) used
+    // to crash the planner: extra=0 → groups=[] → `target ?? groups[0]` was
+    // undefined and `target.units.push` threw. The surviving [P] unit must be
+    // demoted into the serial column instead — the plan never drops work.
+    const out = join(fx.artifacts, 'graph-plan-shards-1.json');
+    const r = spawnSync(
+      process.execPath,
+      [GRAPH, '--package', 'pkg-x', '--root', fx.root, '--plan-shards', '1', '--out', out],
+      { encoding: 'utf8' },
+    );
+    expect(r.status).toBe(0);
+    const g = JSON.parse(readFileSync(out, 'utf8'));
+    expect(g.shards).toHaveLength(1); // core only, no parallel slots exist
+    const core = g.shards[0];
+    expect(core.mode).toBe('serial');
+    expect(core.id).toBe('core');
+    // T104 (the [P] unit with a core-disjoint write) rides in the core column
+    expect(core.units).toEqual(expect.arrayContaining(['T102', 'T104']));
+  });
+
   it('closure-demotes group units that collide with core after demotion (live 95c45071 guard refusal)', () => {
     // T017-shape: a [P] unit depends on core units, is demoted to core, and
     // shares a predicted write with a parallel group unit (T004-shape owned
@@ -580,10 +683,15 @@ describe('foresift-sharded-wave workflow contract', () => {
   });
 
   it('enforces CODEX product writers, CLAUDE_AGY fallbacks, AGY test-author only, and forbidden test edits in implementation prompts', () => {
-    const productLanes = ['core', 'shard-1', 'shard-2'];
+    // H3 mission item 4: serial slots are graph-resolved (`writer-serial-N`), so
+    // lane ids like `core` or `core-batch-2` are runtime truth — the yaml
+    // contract asserts the STRUCTURE (lane var plumbing, per-slot wiring), not
+    // a hardcoded lane name.
+    const serialSlots = [1, 2, 3];
+    const parallelLanes = ['shard-1', 'shard-2'];
 
-    // 1. CODEX product writers for core, shard-1, shard-2
-    for (const lane of productLanes) {
+    // 1. CODEX product writers for serial slots + shard-1, shard-2
+    for (const lane of parallelLanes) {
       const codex = yaml.match(new RegExp(`- id: writer-${lane}[\\s\\S]*?(?=\\n  - id:)`));
       expect(codex?.[0]).toBeTruthy();
       expect(codex?.[0]).toContain(`depends_on: [brief-${lane}, exec-${lane}]`);
@@ -601,14 +709,35 @@ describe('foresift-sharded-wave workflow contract', () => {
       expect(codex?.[0]).toContain(`--routing "$ARTIFACTS_DIR/routing.json"`);
       expect(codex?.[0]).toContain(`--results-dir "$ARTIFACTS_DIR/writer-results/${lane}"`);
     }
+    for (const slot of serialSlots) {
+      const codex = yaml.match(
+        new RegExp(
+          `- id: writer-serial-${slot}[\\s\\S]*?(?=\\n  - id: writer-serial-${slot}-claude)`,
+        ),
+      );
+      expect(codex?.[0]).toBeTruthy();
+      expect(codex?.[0]).toContain(
+        `depends_on: [brief-serial-${slot}, exec-serial-${slot}${slot > 1 ? `, guard-serial-${slot - 1}` : ''}]`,
+      );
+      expect(codex?.[0]).toContain(`when: "$exec-serial-${slot}.output == 'CODEX'`);
+      expect(codex?.[0]).toMatch(
+        /retry:\s*\{\s*max_attempts:\s*2,\s*delay_ms:\s*10000,\s*on_error:\s*all\s*\}/,
+      );
+      expect(codex?.[0]).toContain('exec-codex-writer.mjs --lane "$LANE"');
+      expect(codex?.[0]).toContain('--timeout-ms 3300000');
+      expect(codex?.[0]).toContain('--brief "$ARTIFACTS_DIR/briefs/$LANE-brief.md"');
+      expect(codex?.[0]).toContain('--worktree "$ARTIFACTS_DIR/wt/$LANE"');
+      expect(codex?.[0]).toContain('--routing "$ARTIFACTS_DIR/routing.json"');
+      expect(codex?.[0]).toContain('--results-dir "$ARTIFACTS_DIR/writer-results/$LANE"');
+    }
 
-    // 2. CLAUDE_AGY fallback variants for core, shard-1, shard-2
+    // 2. CLAUDE_AGY fallback variants for serial slots + shard-1, shard-2
     // H2 §10: Claude lanes run through exec-claude-writer.mjs (bash node), so
     // ONE actual Claude provider invocation = ONE Claude lane permit — the
     // permit is acquired/released around the `claude --print` process inside
     // the wrapper, covering success/failure/timeout/cancellation. Prompt
     // nodes cannot guarantee release and are therefore forbidden for lanes.
-    for (const lane of productLanes) {
+    for (const lane of parallelLanes) {
       const claude = yaml.match(new RegExp(`- id: writer-${lane}-claude[\\s\\S]*?(?=\\n  - id:)`));
       expect(claude?.[0]).toBeTruthy();
       expect(claude?.[0]).toContain(`depends_on: [brief-${lane}, exec-${lane}]`);
@@ -629,11 +758,27 @@ describe('foresift-sharded-wave workflow contract', () => {
       expect(claude?.[0]).toContain(`find(l=>l.lane==="${lane}")`);
       expect(claude?.[0]).toContain('--generation "$(');
     }
+    for (const slot of serialSlots) {
+      const claude = yaml.match(
+        new RegExp(`- id: writer-serial-${slot}-claude[\\s\\S]*?(?=\\n  - id:)`),
+      );
+      expect(claude?.[0]).toBeTruthy();
+      expect(claude?.[0]).toContain(
+        `depends_on: [brief-serial-${slot}, exec-serial-${slot}${slot > 1 ? `, guard-serial-${slot - 1}` : ''}]`,
+      );
+      expect(claude?.[0]).toContain(`when: "$exec-serial-${slot}.output == 'CLAUDE'`);
+      expect(claude?.[0]).toContain('exec-claude-writer.mjs');
+      expect(claude?.[0]).toContain('--timeout-ms 3300000');
+      expect(claude?.[0]).toContain('--lane "$LANE"');
+      expect(claude?.[0]).toContain('--task-ids "$TASKS"');
+      expect(claude?.[0]).toContain('--generation "$(');
+    }
 
     // 3. AGY test-author only (and NO product AGY writers)
-    for (const lane of productLanes) {
+    for (const lane of [...parallelLanes]) {
       expect(yaml).not.toContain(`- id: writer-${lane}-agy`);
     }
+    expect(yaml).not.toMatch(/- id: writer-serial-\d+-agy/);
     const agyTest = yaml.match(/- id: writer-test-author-agy[\s\S]*?(?=\n  - id:)/);
     expect(agyTest?.[0]).toBeTruthy();
     expect(agyTest?.[0]).toContain('depends_on: [brief-test-author, exec-test-author]');
@@ -649,7 +794,7 @@ describe('foresift-sharded-wave workflow contract', () => {
 
     // 4. Implementation writers carry the test-edit prohibition in their
     // briefs (brief-shaping source), and no Claude lane is a prompt node.
-    for (const lane of productLanes) {
+    for (const lane of parallelLanes) {
       const claude = yaml.match(new RegExp(`- id: writer-${lane}-claude[\\s\\S]*?(?=\\n  - id:)`));
       expect(claude?.[0]).not.toMatch(/prompt:\s*\|/); // wrapper bash node, never a prompt node
     }
@@ -657,26 +802,19 @@ describe('foresift-sharded-wave workflow contract', () => {
   });
 
   it('when-gates every lane so empty shards dispatch zero providers across CODEX, CLAUDE fallbacks, and AGY test-author', () => {
-    // Exact persisted routing tokens emitted per lane
-    const allLanes = ['core', 'shard-1', 'shard-2', 'test-author'];
-    for (const lane of allLanes) {
+    // Parallel + test lanes keep exact persisted routing tokens per lane
+    for (const lane of ['shard-1', 'shard-2', 'test-author']) {
       const emit = yaml.match(new RegExp(`- id: exec-${lane}[\\s\\S]*?(?=\\n  - id:)`));
       expect(emit?.[0]).toBeTruthy();
       expect(emit?.[0]).toContain(`cat "$ARTIFACTS_DIR/engine-${lane}.txt"`);
     }
 
     // Brief emitters output deterministic sentinels when absent
-    expect(yaml).toMatch(/- id: brief-core[\s\S]*?NO CORE SHARD THIS WAVE/);
     expect(yaml).toMatch(/- id: brief-shard-1[\s\S]*?NO SHARD-1 THIS WAVE/);
     expect(yaml).toMatch(/- id: brief-shard-2[\s\S]*?NO SHARD-2 THIS WAVE/);
     expect(yaml).toMatch(/- id: brief-test-author[\s\S]*?NO TEST-AUTHOR THIS WAVE/);
 
     // Guards are when-gated to skip absent shards and bridge both active and fallback engines
-    const guardCore = yaml.match(/- id: guard-core[\s\S]*?(?=\n  - id:)/);
-    expect(guardCore?.[0]).toContain('depends_on: [brief-core, writer-core, writer-core-claude]');
-    expect(guardCore?.[0]).toContain('when: "$brief-core.output != \'NO CORE SHARD THIS WAVE\'"');
-    expect(guardCore?.[0]).toContain('trigger_rule: none_failed_min_one_success');
-
     for (const shard of ['shard-1', 'shard-2']) {
       const guard = yaml.match(new RegExp(`- id: guard-${shard}[\\s\\S]*?(?=\\n  - id:)`));
       expect(guard?.[0]).toContain(
@@ -695,11 +833,45 @@ describe('foresift-sharded-wave workflow contract', () => {
     );
     expect(guardTest?.[0]).toContain('trigger_rule: none_failed_min_one_success');
 
-    // Integrator depends on all 4 guards
+    // Integrator depends on all serial + parallel + test guards
     const integrator = yaml.match(/- id: integrate-and-fast[\s\S]*?(?=\n  - id:)/);
     expect(integrator?.[0]).toContain(
-      'depends_on: [guard-core, guard-shard-1, guard-shard-2, guard-test-author]',
+      'depends_on: [guard-serial-1, guard-serial-2, guard-serial-3, guard-shard-1, guard-shard-2, guard-test-author]',
     );
+  });
+
+  it('decomposes the serial core into bounded sequential batches when the graph plans them (mission item 4)', () => {
+    // The graph (not yaml) decides the batch count: slots 1..3 resolve their
+    // lane id from task-graph.json at runtime, so an unbatched package keeps
+    // the exact legacy `core` shape and a batched one needs no yaml edits.
+    for (const slot of [1, 2, 3]) {
+      const brief = yaml.match(new RegExp(`- id: brief-serial-${slot}[\\s\\S]*?(?=\\n  - id:)`));
+      expect(brief?.[0]).toContain('filter(x=>x.mode==="serial")');
+      const exec = yaml.match(new RegExp(`- id: exec-serial-${slot}[\\s\\S]*?(?=\\n  - id:)`));
+      expect(exec?.[0]).toContain('engine-$LANE.txt');
+      const guard = yaml.match(new RegExp(`- id: guard-serial-${slot}[\\s\\S]*?(?=\\n  - id:)`));
+      expect(guard?.[0]).toContain('--shard "$LANE"');
+    }
+    // Sequential chaining: batch 2 and 3 writers depend on the PARENT batch's
+    // GUARD (a serial column never runs two batches concurrently) and
+    // fast-forward to the parent's guarded head before dispatching.
+    for (const slot of [2, 3]) {
+      const writer = yaml.match(
+        new RegExp(
+          `- id: writer-serial-${slot}[\\s\\S]*?(?=\\n  - id: writer-serial-${slot}-claude)`,
+        ),
+      );
+      expect(writer?.[0]).toContain(`guard-serial-${slot - 1}`);
+      expect(writer?.[0]).toContain('"merge","--ff-only"');
+      const claude = yaml.match(
+        new RegExp(`- id: writer-serial-${slot}-claude[\\s\\S]*?(?=\\n  - id:)`),
+      );
+      expect(claude?.[0]).toContain(`guard-serial-${slot - 1}`);
+    }
+    // The per-lane ceiling is UNCHANGED (bounded scope, not a bigger timeout).
+    const timeouts = [...yaml.matchAll(/--timeout-ms 3300000/g)].length;
+    expect(timeouts).toBeGreaterThanOrEqual(6); // serial slots 1..3 x codex/claude
+    expect(yaml).not.toMatch(/timeout-ms (?!3300000)\d+/); // no raised ceiling anywhere
   });
 
   it('never lets a fully-rejected wave settle green over zero progress (defect #12)', () => {

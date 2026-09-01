@@ -31,13 +31,24 @@ export function buildBunTestPlan(manifest, policy, requestedPaths = null, worklo
     requestedPaths?.filter((path) => !entries.some((entry) => entry.path === path)) ?? [];
   if (missing.length) throw new Error(`BUN_TEST_UNMIGRATED_REQUEST: ${missing.join(',')}`);
   const pure = entries.filter((entry) => entry.workload === 'PURE').map((entry) => entry.path);
+  // PROCESS groups: pack by descending manifest-declared weight, then split
+  // round-robin so the heaviest files never share one group (live 2026-09-01,
+  // five process-7 GROUP TIMEOUTs on 2-core CI runners: the two heaviest spec
+  // files — v2-throughput + v3-generations, ~84 tests — packed into ONE group
+  // that starved at 17m while lighter groups finished in minutes; locally the
+  // same pair runs in ~13s). The manifest's weight hint (optional `weight`,
+  // default 1) spreads heavy files across groups deterministically — same
+  // files, same grouping, every run.
   const processFiles = entries
     .filter((entry) => entry.workload === 'PROCESS')
+    .sort((a, b) => Number(b.weight ?? 1) - Number(a.weight ?? 1) || a.path.localeCompare(b.path))
     .map((entry) => entry.path);
   const pglite = entries
     .filter((entry) => entry.workload === 'DATABASE_PGLITE')
     .map((entry) => entry.path);
   const meta = entries.filter((entry) => entry.workload === 'META_GATE').map((entry) => entry.path);
+  const processGroups = Array.from({ length: Math.ceil(processFiles.length / 2) }, () => []);
+  processFiles.forEach((path, index) => processGroups[index % processGroups.length].push(path));
   return [
     ...chunks(pure, 50).map((files, index) => ({
       id: `pure-${index + 1}`,
@@ -46,7 +57,7 @@ export function buildBunTestPlan(manifest, policy, requestedPaths = null, worklo
       fileWorkers: policy.bunPureFileWorkers ?? 2,
       testConcurrency: policy.bunPureTestConcurrency ?? 8,
     })),
-    ...chunks(processFiles, 2).map((files, index) => ({
+    ...processGroups.map((files, index) => ({
       id: `process-${index + 1}`,
       workload: 'PROCESS',
       files,

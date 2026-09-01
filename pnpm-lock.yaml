@@ -332,6 +332,10 @@ importers:
         specifier: workspace:*
         version: link:../shared-schemas
 
+  packages/release-conformance: {}
+
+  packages/requirement-manifest: {}
+
   packages/security:
     dependencies:
       '@foresift/domain':

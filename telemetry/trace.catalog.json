@@ -1,0 +1,100 @@
+{
+  "$schema": "https://foresift.dev/schemas/telemetry-catalog-v1.json",
+  "catalog": "trace",
+  "description": "Traceability, evidence-gate, decision provenance, and release-conformance metadata contracts.",
+  "contractStatus": "DECLARATIVE_CONTRACT_ONLY — emitter wiring lands with dependency group G2; these names are contracts and are not emitted at G0.",
+  "requirementsCovered": ["FR-TRACE-001", "FR-TRACE-002", "FR-TRACE-003", "FR-TRACE-004", "FR-TRACE-005", "FR-TRACE-006"],
+  "recoveryDataClass": "CRITICAL_METADATA",
+  "events": [
+    {
+      "name": "manifest.integrity_checked",
+      "requirementRefs": ["FR-TRACE-001", "FR-TRACE-003"],
+      "tier": "CRITICAL_METADATA",
+      "fields": [
+        { "name": "manifestSha256", "type": "string<sha256>", "required": true },
+        { "name": "documentSha256", "type": "string<sha256>", "required": true },
+        { "name": "normalizedSha256", "type": "string<sha256>", "required": true },
+        { "name": "verdict", "type": "string(VALID|INVALID)", "required": true },
+        { "name": "findingCount", "type": "integer", "required": true }
+      ]
+    },
+    {
+      "name": "ids.superseded",
+      "requirementRefs": ["FR-TRACE-002"],
+      "tier": "CRITICAL_METADATA",
+      "fields": [
+        { "name": "replacedId", "type": "string", "required": true },
+        { "name": "supersededById", "type": "string", "required": true },
+        { "name": "namespace", "type": "string", "required": true },
+        { "name": "recordedAt", "type": "string<utc-timestamp>", "required": true },
+        { "name": "reason", "type": "string", "required": true }
+      ]
+    },
+    {
+      "name": "conformance.finding",
+      "requirementRefs": ["FR-TRACE-003"],
+      "tier": "CRITICAL_METADATA",
+      "fields": [
+        { "name": "requirementId", "type": "string", "required": true },
+        { "name": "rule", "type": "string", "required": true },
+        { "name": "path", "type": "string", "required": true },
+        { "name": "message", "type": "string", "required": true }
+      ]
+    },
+    {
+      "name": "gate.evidence_recorded",
+      "requirementRefs": ["FR-TRACE-004"],
+      "tier": "CRITICAL_METADATA",
+      "fields": [
+        { "name": "evidenceId", "type": "string", "required": true },
+        { "name": "payloadSha256", "type": "string<sha256>", "required": true },
+        { "name": "gateKind", "type": "string", "required": true },
+        { "name": "approver", "type": "string", "required": true },
+        { "name": "scopeRefs", "type": "array<string>", "required": true },
+        { "name": "issuedAt", "type": "string<utc-timestamp>", "required": true },
+        { "name": "expiresAt", "type": "string<utc-timestamp>", "required": true },
+        { "name": "recordedAt", "type": "string<utc-timestamp>", "required": true }
+      ]
+    },
+    {
+      "name": "gate.evidence_refused",
+      "requirementRefs": ["FR-TRACE-004"],
+      "tier": "CRITICAL_METADATA",
+      "fields": [
+        { "name": "evidenceId", "type": "string", "required": true },
+        { "name": "gateKind", "type": "string", "required": true },
+        { "name": "requiredScope", "type": "string", "required": true },
+        { "name": "reason", "type": "string", "required": true },
+        { "name": "evaluatedAt", "type": "string<utc-timestamp>", "required": true }
+      ]
+    },
+    {
+      "name": "decision.trace_recorded",
+      "requirementRefs": ["FR-TRACE-005"],
+      "tier": "CRITICAL_METADATA",
+      "fields": [
+        { "name": "traceId", "type": "string", "required": true },
+        { "name": "decisionRef", "type": "string", "required": true },
+        { "name": "requirementIds", "type": "array<string>", "required": true },
+        { "name": "manifestSha256", "type": "string<sha256>", "required": true },
+        { "name": "releaseReportId", "type": "string", "required": true },
+        { "name": "recordedAt", "type": "string<utc-timestamp>", "required": true }
+      ]
+    },
+    {
+      "name": "release.report_emitted",
+      "requirementRefs": ["FR-TRACE-006"],
+      "tier": "CRITICAL_METADATA",
+      "fields": [
+        { "name": "reportId", "type": "string", "required": true },
+        { "name": "documentHash", "type": "string<sha256>", "required": true },
+        { "name": "manifestHash", "type": "string<sha256>", "required": true },
+        { "name": "normalizedHash", "type": "string<sha256>", "required": true },
+        { "name": "dependencySbomHash", "type": "string<sha256>", "required": true },
+        { "name": "activationState", "type": "object", "required": true },
+        { "name": "rollbackTarget", "type": "object", "required": true },
+        { "name": "generatedAt", "type": "string<utc-timestamp>", "required": true }
+      ]
+    }
+  ]
+}

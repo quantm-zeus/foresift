@@ -77,6 +77,11 @@
       "at": "2026-09-01T01:2xZ",
       "event": "PROOF: chain-mate exemption passes live guard (mission item 4)",
       "detail": "Run 89c4b2b9: writer-serial-1 completed 10m52s; guard-serial-1 PASSED (331ms) — the identical lane+graph that deterministically refused in e44f577a. Chained batch writer-serial-2 dispatched behind the guard. Bounded decomposition + chaining + shared column now all proven on real work."
+    },
+    {
+      "at": "2026-09-01T02:0xZ",
+      "event": "MISSION ITEM 4 RUNTIME PROOF COMPLETE (run 89c4b2b9)",
+      "detail": "All three chained batches green: writer-serial-1 10m52s + guard 331ms PASS; ff-only chain -> writer-serial-2 13m51s + guard 153ms PASS; -> writer-serial-3 15m13s + guard 158ms PASS. Total serial column wall ~40m in 3 bounded scopes vs 55m single-lane ceiling — no batch approached the timeout, guards all pass with chain-mate exemption (#142). P50/P95 per-batch ~11-15m/15m, well under the 55m ceiling. fast-repair loop entered (trigger checking)."
     }
   ],
   "h3MissionChecklist": {

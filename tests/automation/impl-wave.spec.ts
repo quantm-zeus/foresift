@@ -792,6 +792,21 @@ describe('foresift-sharded-wave workflow contract', () => {
     expect(agyTest?.[0]).toContain('--routing "$ARTIFACTS_DIR/routing.json"');
     expect(agyTest?.[0]).toContain('--results-dir "$ARTIFACTS_DIR/writer-results/test-author"');
 
+    // 3b. EVERY writer dispatch carries --task-graph (H3 live 89c4b2b9): the
+    // P0-1 evidence protocol needs parsed predicted writes; without the graph
+    // the writer nominates ZERO units, the integrator rejects every lane
+    // ("writer reported zero completed units"), and the wave dies red with an
+    // unrepairable integration_empty. Structural pin, all 11 dispatches.
+    const dispatchRe =
+      /node scripts\/automation\/exec-(?:codex-writer|claude-writer|agy-test-writer)\.mjs[^\n]*/g;
+    const dispatches = yaml.match(dispatchRe) ?? [];
+    expect(dispatches.length).toBe(11);
+    for (const d of dispatches) {
+      const start = yaml.indexOf(d);
+      const block = yaml.slice(start, start + 900);
+      expect(block).toContain('--task-graph "$ARTIFACTS_DIR/task-graph.json"');
+    }
+
     // 4. Implementation writers carry the test-edit prohibition in their
     // briefs (brief-shaping source), and no Claude lane is a prompt node.
     for (const lane of parallelLanes) {

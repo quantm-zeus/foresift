@@ -1,7 +1,7 @@
 {
   "schema": "foresift/maintenance-handoff@2",
   "currentSnapshot": {
-    "capturedAt": "2026-09-01T01:10:00Z",
+    "capturedAt": "2026-09-01T01:00:00Z",
     "mainSha": "4f8df2a2f",
     "mainCi": "GREEN (merged-main verified after #141 squash)",
     "milestone": "G0",
@@ -18,9 +18,9 @@
     "providerState": "claude limit 1 (backoff to 15:47Z), codex limit 1 HEALTHY, agy 3 — all active 0",
     "resourceState": "15GiB host, MemAvailable ~14.1GiB (0.86) — GREEN",
     "blockers": [
-      "g0-traceability paused_fatal (run e44f577a): the #142 fix WAS NOT in that run — guard-serial-3 also refused (same chain-mate class) after guard-serial-1. Root cause fixed and merged as PR #142 (4f8df2a). Recovery path: merge main into the task worktree, then recover-fatal."
+      "g0-traceability running as run 89c4b2b9 (recovered 00:52Z with #142 chain-mate fix in worktree 607f441d): healthy bounded-batch wave; no action while healthy."
     ],
-    "nextSafeAction": "after merged-main CI green at 4f8df2a: merge origin/main into task worktree (probe first) -> systemctl --user stop foresift-autopilot; --recover-fatal; start -> verify the relaunched wave passes guard-serial-1..3 with chain-mate exemption"
+    "nextSafeAction": "monitor 89c4b2b9 to wave-settled -> confirm guard-serial-1..3 pass with chain-mate exemption -> P50/P95 batch-wall evidence (item 4) -> runtime proofs 3/5/6 -> G1 canary 2->3->4"
   },
   "history": [
     {

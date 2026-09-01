@@ -332,6 +332,12 @@ importers:
         specifier: workspace:*
         version: link:../shared-schemas
 
+  packages/release-conformance:
+    dependencies:
+      '@foresift/persistence':
+        specifier: workspace:*
+        version: link:../persistence
+
   packages/security:
     dependencies:
       '@foresift/domain':

@@ -172,3 +172,79 @@ describe('task-graph evidence plumbing', () => {
     expect(taskEvidence('NOPE', unitsById, ['src/feature-a.ts']).evidencable).toBe(false);
   });
 });
+
+describe('glob-output evidence matching (G0 final correctness delta, directive 8)', () => {
+  const globUnits = [
+    {
+      id: 'T016',
+      done: false,
+      parallelizable: false,
+      phase: 'Phase G',
+      body: 'generate manifests',
+      requirements: [],
+      acceptanceCriteria: [],
+      predictedWrites: ['docs/generated/requirements.json', 'docs/generated/**'],
+      productWrites: ['docs/generated/requirements.json', 'docs/generated/**'],
+      testWrites: [],
+      testOnly: false,
+      productWork: true,
+      outOfScopeWrites: [],
+      testRefs: [],
+      dependsOn: [],
+      estimatedSize: 'medium',
+    },
+  ];
+  const globIndex = new Map(globUnits.map((u) => [u.id, u]));
+
+  test('a glob output matches concrete produced files (T016 class, live 89c4b2b9)', () => {
+    const ev = taskEvidence('T016', globIndex, [
+      'scripts/generate-requirement-manifest/cli.mjs',
+      'docs/generated/requirements.json',
+      'docs/generated/trace-surfaces.json',
+      'docs/generated/abc-surfaces.json',
+    ]);
+    expect(ev.evidencable).toBe(true);
+    expect(ev.evidence).toContain('docs/generated/requirements.json'); // literal hit
+    expect(ev.evidence).toContain('docs/generated/trace-surfaces.json'); // glob hit
+    expect(ev.evidence).toContain('docs/generated/abc-surfaces.json');
+    expect(ev.evidence).not.toContain('scripts/generate-requirement-manifest/cli.mjs'); // not an output
+  });
+
+  test('a glob NEVER matches a foreign prefix and an empty diff proves nothing', () => {
+    expect(taskEvidence('T016', globIndex, ['docs/other/requirements.json']).evidencable).toBe(
+      false,
+    );
+    expect(taskEvidence('T016', globIndex, []).evidencable).toBe(false);
+    expect(taskEvidence('T016', globIndex, ['docs/generated-sub/x.json']).evidencable).toBe(false);
+  });
+
+  test('unsafe glob `**` refuses closed rather than proving unrelated files', () => {
+    const units = [
+      {
+        ...globUnits[0],
+        id: 'T099',
+        predictedWrites: ['**'],
+        productWrites: ['**'],
+      },
+    ];
+    const idx = new Map(units.map((u) => [u.id, u]));
+    const ev = taskEvidence('T099', idx, ['packages/anything/here.ts']);
+    expect(ev.evidencable).toBe(false);
+    expect(ev.reason).toContain('unsafe glob');
+  });
+
+  test('single-star glob stays within one path segment', () => {
+    const units = [
+      {
+        ...globUnits[0],
+        id: 'T098',
+        predictedWrites: ['docs/generated/*.json'],
+        productWrites: ['docs/generated/*.json'],
+      },
+    ];
+    const idx = new Map(units.map((u) => [u.id, u]));
+    expect(taskEvidence('T098', idx, ['docs/generated/a.json']).evidencable).toBe(true);
+    // nested path does NOT match a single star
+    expect(taskEvidence('T098', idx, ['docs/generated/sub/a.json']).evidencable).toBe(false);
+  });
+});

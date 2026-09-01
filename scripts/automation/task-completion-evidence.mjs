@@ -66,13 +66,56 @@ export function taskEvidence(taskId, unitsById, changedFiles) {
   const writes = evidenceKind === 'TEST_PROOF' ? (unit.testWrites ?? []) : predicted;
   if (!Array.isArray(writes) || writes.length === 0)
     return { evidencable: false, reason: `no predicted writes recorded for ${taskId}` };
-  const evidence = writes.filter((p) => changed.has(p));
+  // Glob-aware matching (G0 final correctness delta, directive 8): predicted
+  // outputs may be globs (`docs/generated/**`). A literal Set.has comparison
+  // can never match a glob against a concrete file, so a generator task that
+  // really produced its outputs starved of evidence. Same matcher semantics
+  // as the write-authority guard (globToRegExp): `**/` spans directories,
+  // `*` stays within one segment. A glob that matches NOTHING concrete in a
+  // NON-EMPTY diff proves nothing (fail-closed); a glob never matches the
+  // empty diff. `**` alone is rejected — it would silently prove unrelated
+  // files.
+  const evidence = [];
+  for (const w of writes) {
+    if (changed.has(w)) {
+      evidence.push(w);
+      continue;
+    }
+    if (!GLOB_CHARS.test(w)) continue;
+    if (w === '**')
+      return {
+        evidencable: false,
+        reason: `task ${taskId} declares unsafe glob '${w}' — refuses closed`,
+      };
+    const re = globToRegExp(w);
+    const concrete = changedFiles.filter((p) => re.test(p));
+    evidence.push(...concrete);
+  }
   if (evidence.length === 0)
     return {
       evidencable: false,
       reason: `none of ${taskId}'s predicted writes appear in the lane diff`,
     };
   return { evidencable: true, evidence, reason: null };
+}
+
+const GLOB_CHARS = /\*/;
+
+// Same matcher semantics as the write-authority guard (wave-guard.mjs
+// globToRegExp): `**/` spans directories, `**` alone is unsafe (rejected by
+// the caller), `*` stays within one path segment.
+function globToRegExp(glob) {
+  let re = '';
+  for (let i = 0; i < glob.length; i++) {
+    const c = glob[i];
+    if (c === '*') {
+      if (glob[i + 1] === '*') {
+        re += glob[i + 2] === '/' ? '(?:[^/]+/)*' : '.*';
+        i += glob[i + 2] === '/' ? 2 : 1;
+      } else re += '[^/]*';
+    } else re += c.replace(/[.+?^${}()|[\]\\]/g, '\\$&');
+  }
+  return new RegExp('^' + re + '$');
 }
 
 function isBlocked(taskId, blockers) {

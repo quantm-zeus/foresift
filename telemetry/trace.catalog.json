@@ -1,0 +1,123 @@
+{
+  "$schema": "https://foresift.dev/schemas/telemetry-catalog-v1.json",
+  "catalog": "trace",
+  "description": "Traceability, signed gate evidence, decision authorization, conformance, and deterministic release-report events.",
+  "contractStatus": "DECLARATIVE_CONTRACT_ONLY — emitter wiring lands with dependency group G2; these names and fields are contracts and are not emitted yet.",
+  "requirementsCovered": [
+    "FR-TRACE-001",
+    "FR-TRACE-002",
+    "FR-TRACE-003",
+    "FR-TRACE-004",
+    "FR-TRACE-005",
+    "FR-TRACE-006"
+  ],
+  "recoveryDataClass": "CRITICAL_METADATA",
+  "events": [
+    {
+      "name": "manifest.integrity_checked",
+      "description": "The source manifest, document, normalized document, and audit provenance were checked.",
+      "requirementRefs": ["FR-TRACE-001", "FR-TRACE-002"],
+      "tier": "CRITICAL_METADATA",
+      "fields": [
+        { "name": "manifestSha256", "type": "string<sha256>", "required": true },
+        { "name": "documentSha256", "type": "string<sha256>", "required": true },
+        { "name": "normalizedDocumentSha256", "type": "string<sha256>", "required": true },
+        { "name": "verdict", "type": "string(PASS|FAIL)", "required": true },
+        { "name": "checkedAt", "type": "string<utc-timestamp>", "required": true }
+      ]
+    },
+    {
+      "name": "ids.superseded",
+      "description": "A released normative ID was replaced through an explicit immutable link.",
+      "requirementRefs": ["FR-TRACE-002"],
+      "tier": "CRITICAL_METADATA",
+      "fields": [
+        { "name": "replacedId", "type": "string", "required": true },
+        { "name": "supersededById", "type": "string", "required": true },
+        { "name": "namespace", "type": "string", "required": true },
+        { "name": "reason", "type": "string", "required": true },
+        { "name": "recordedAt", "type": "string<utc-timestamp>", "required": true }
+      ]
+    },
+    {
+      "name": "conformance.finding",
+      "description": "A release-blocking conformance rule reported an exact requirement and path.",
+      "requirementRefs": ["FR-TRACE-003"],
+      "tier": "CRITICAL_METADATA",
+      "fields": [
+        { "name": "requirementId", "type": "string", "required": true },
+        { "name": "rule", "type": "string", "required": true },
+        { "name": "path", "type": "string", "required": true },
+        { "name": "message", "type": "string", "required": true },
+        { "name": "conformanceReleaseId", "type": "string", "required": true },
+        { "name": "foundAt", "type": "string<utc-timestamp>", "required": true }
+      ]
+    },
+    {
+      "name": "gate.evidence_recorded",
+      "description": "Signed and hashed evidence was admitted for a scoped activation gate.",
+      "requirementRefs": ["FR-TRACE-004"],
+      "tier": "CRITICAL_METADATA",
+      "fields": [
+        { "name": "evidenceId", "type": "string", "required": true },
+        {
+          "name": "gateKind",
+          "type": "string(MANUAL|LEGAL|RIGHTS|STATISTICAL|OWNER_APPROVAL)",
+          "required": true
+        },
+        { "name": "approver", "type": "string", "required": true },
+        { "name": "scopeRefs", "type": "array<string>", "required": true },
+        { "name": "expiresAt", "type": "string<utc-timestamp>", "required": true },
+        { "name": "payloadSha256", "type": "string<sha256>", "required": true },
+        { "name": "signature", "type": "string", "required": true },
+        { "name": "recordedAt", "type": "string<utc-timestamp>", "required": true }
+      ]
+    },
+    {
+      "name": "gate.evidence_refused",
+      "description": "Gate evidence was refused with a typed integrity, scope, expiry, revocation, or signature reason.",
+      "requirementRefs": ["FR-TRACE-004"],
+      "tier": "CRITICAL_METADATA",
+      "fields": [
+        { "name": "evidenceId", "type": "string", "required": true },
+        {
+          "name": "gateKind",
+          "type": "string(MANUAL|LEGAL|RIGHTS|STATISTICAL|OWNER_APPROVAL)",
+          "required": true
+        },
+        { "name": "requiredScope", "type": "string", "required": true },
+        { "name": "reason", "type": "string", "required": true },
+        { "name": "refusedAt", "type": "string<utc-timestamp>", "required": true }
+      ]
+    },
+    {
+      "name": "decision.trace_recorded",
+      "description": "A complete content-addressed production decision authorization trace was persisted.",
+      "requirementRefs": ["FR-TRACE-005"],
+      "tier": "CRITICAL_METADATA",
+      "fields": [
+        { "name": "traceId", "type": "string", "required": true },
+        { "name": "decisionRef", "type": "string", "required": true },
+        { "name": "manifestSha256", "type": "string<sha256>", "required": true },
+        { "name": "releaseReportId", "type": "string", "required": true },
+        { "name": "recordedAt", "type": "string<utc-timestamp>", "required": true }
+      ]
+    },
+    {
+      "name": "release.report_emitted",
+      "description": "A deterministic release report was emitted with its authorization and rollback identity.",
+      "requirementRefs": ["FR-TRACE-006"],
+      "tier": "CRITICAL_METADATA",
+      "fields": [
+        { "name": "reportId", "type": "string", "required": true },
+        { "name": "documentSha256", "type": "string<sha256>", "required": true },
+        { "name": "manifestSha256", "type": "string<sha256>", "required": true },
+        { "name": "dependencySbomSha256", "type": "string<sha256>", "required": true },
+        { "name": "conformanceOverall", "type": "string(PASSED|FAILED)", "required": true },
+        { "name": "activationStatus", "type": "string(ACTIVE|BLOCKED|PENDING)", "required": true },
+        { "name": "rollbackReportId", "type": "string", "required": true },
+        { "name": "emittedAt", "type": "string<utc-timestamp>", "required": true }
+      ]
+    }
+  ]
+}

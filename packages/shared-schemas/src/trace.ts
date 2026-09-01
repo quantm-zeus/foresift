@@ -11,10 +11,12 @@ const Sha256RefSchema = z
 const NonEmptyStringSchema = z.string().trim().min(1);
 
 /** PRD normative identifier namespaces. */
-export const RequirementRefSchema = z.string().regex(
-  /^(?:FR-[A-Z0-9]+-[0-9]{3,}|AC-[0-9]{3,}|INV-[0-9]{3,}|ADR-[0-9]{4})$/,
-  'invalid requirement, acceptance, invariant, or ADR reference',
-);
+export const RequirementRefSchema = z
+  .string()
+  .regex(
+    /^(?:FR-[A-Z0-9]+-[0-9]{3,}|AC-[0-9]{3,}|INV-[0-9]{3,}|ADR-[0-9]{4})$/,
+    'invalid requirement, acceptance, invariant, or ADR reference',
+  );
 export type RequirementRef = z.infer<typeof RequirementRefSchema>;
 
 /** Runtime identifiers mapped by FR-TRACE-002. */
@@ -52,13 +54,7 @@ export const SupersessionLinkSchema = z
   });
 export type SupersessionLink = z.infer<typeof SupersessionLinkSchema>;
 
-export const GATE_KINDS = [
-  'MANUAL',
-  'LEGAL',
-  'RIGHTS',
-  'STATISTICAL',
-  'OWNER_APPROVAL',
-] as const;
+export const GATE_KINDS = ['MANUAL', 'LEGAL', 'RIGHTS', 'STATISTICAL', 'OWNER_APPROVAL'] as const;
 
 export const GateEvidencePayloadSchema = z
   .object({

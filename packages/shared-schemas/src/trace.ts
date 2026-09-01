@@ -218,3 +218,51 @@ export function parseTraceSchema<T extends TraceSchemaName>(
 ): z.infer<(typeof TRACE_SCHEMAS)[T]> {
   return TRACE_SCHEMAS[name].parse(payload) as z.infer<(typeof TRACE_SCHEMAS)[T]>;
 }
+
+/** Field inventory consumed by telemetry-catalog parity checks. */
+export const TRACE_TELEMETRY_FIELDS = {
+  'manifest.integrity_checked': [
+    'manifestSha256',
+    'documentSha256',
+    'normalizedSha256',
+    'verdict',
+    'findingCount',
+  ],
+  'ids.superseded': ['replacedId', 'supersededById', 'namespace', 'recordedAt', 'reason'],
+  'conformance.finding': ['requirementId', 'rule', 'path', 'message'],
+  'gate.evidence_recorded': [
+    'evidenceId',
+    'payloadSha256',
+    'gateKind',
+    'approver',
+    'scopeRefs',
+    'issuedAt',
+    'expiresAt',
+    'recordedAt',
+  ],
+  'gate.evidence_refused': [
+    'evidenceId',
+    'gateKind',
+    'requiredScope',
+    'reason',
+    'evaluatedAt',
+  ],
+  'decision.trace_recorded': [
+    'traceId',
+    'decisionRef',
+    'requirementIds',
+    'manifestSha256',
+    'releaseReportId',
+    'recordedAt',
+  ],
+  'release.report_emitted': [
+    'reportId',
+    'documentHash',
+    'manifestHash',
+    'normalizedHash',
+    'dependencySbomHash',
+    'activationState',
+    'rollbackTarget',
+    'generatedAt',
+  ],
+} as const;

@@ -45,7 +45,7 @@ export const PINNED_FR_TRACE_REQUIREMENTS: readonly RequirementExcerpt[] = [
     family: 'FR-TRACE',
     line: 6506,
     text: 'A machine-readable requirement manifest is generated from this PRD and is the release-blocking source for every requirement, acceptance criterion, invariant, ADR, dependency group, implementation owner, schema, test, surface, telemetry, and activation/rollback mapping.',
-    textSha256: 'a1b72e505a7daee3ea2e77e2ff4c5770ca995ddadff48c08ecfeee61329dc330',
+    textSha256: '70ed69312044dd82404119ed56df297e3575db4bd66a17747eefde3892eeddf4',
     dependencyGroup: 'G0',
     owner: 'packages/requirement-manifest',
     implementationRefs: [
@@ -77,7 +77,7 @@ export const PINNED_FR_TRACE_REQUIREMENTS: readonly RequirementExcerpt[] = [
     family: 'FR-TRACE',
     line: 6507,
     text: 'Requirement, acceptance, invariant, ADR, feature, schema, API, tool, policy, artifact, and test IDs are globally unique, stable, immutable once released, and replaced only through explicit deprecation/supersession links.',
-    textSha256: 'e86b2bbbb192bb3b2da7e53f1917f35b6432e1858a74e50259e87baee1fe94cf',
+    textSha256: '0c1a96b5c59ba06dc3d5b4e4b30d0b3854f16130160ad5f1ac67f69e3f5f6c8a',
     dependencyGroup: 'G0',
     owner: 'packages/requirement-manifest',
     implementationRefs: [
@@ -256,7 +256,7 @@ export const PINNED_AC_TRACE_CRITERIA: readonly AcceptanceCriterionExcerpt[] = [
     id: 'AC-266',
     line: 6793,
     text: 'Adding, deleting, duplicating, renumbering, or changing a normative item without a matching manifest/test update fails CI.',
-    textSha256: '45dcf317ba9779df52c505342a12ca6717a6a4220b334a17ce33fa58a697669d',
+    textSha256: 'e9d289c3353b564a4d0e3590e612f5c42497c43d2dd910bcca2145e59c842dc4',
     requirementRefs: [
       'FR-TRACE-001',
       'FR-TRACE-002',
@@ -273,7 +273,7 @@ export const PINNED_AC_TRACE_CRITERIA: readonly AcceptanceCriterionExcerpt[] = [
     id: 'AC-267',
     line: 6794,
     text: 'Every production decision/alert can be traced to exact document/manifest hash, release, migration, policy, feature, model, tool, provider, pool adapter, evidence, and alpha artifact versions.',
-    textSha256: 'b2aa86f87498c8cb8bf6025255476a6b8ef206f4776e0339dcf282542a20b784',
+    textSha256: '76ea010a099eef39fb8d1ae80edbdf647b1ca7058451ff8c7ac4b533578e6f2c',
     requirementRefs: [
       'FR-TRACE-001',
       'FR-TRACE-002',
@@ -290,7 +290,7 @@ export const PINNED_AC_TRACE_CRITERIA: readonly AcceptanceCriterionExcerpt[] = [
     id: 'AC-268',
     line: 6795,
     text: 'Manual/legal/rights/statistical/owner approvals require signed or hashed evidence with scope, approver, expiry, and revocation; an unchecked database boolean cannot satisfy a release gate.',
-    textSha256: 'd5696d744f475b7bdfd92fdf1cc65b40cf7cf68e4c7ba640d2fb6435c24e6ffb',
+    textSha256: 'fe271d550b887d8826d9b8a8f667d89c7a3d376571fcca492d3fc4b17fc72ff8',
     requirementRefs: [
       'FR-TRACE-001',
       'FR-TRACE-002',
@@ -307,7 +307,7 @@ export const PINNED_AC_TRACE_CRITERIA: readonly AcceptanceCriterionExcerpt[] = [
     id: 'AC-269',
     line: 6796,
     text: 'Release conformance reports document hash, manifest hash, SBOM/dependency hash, migration/schema hashes, all test results, deviations, current activation scope, and tested rollback target.',
-    textSha256: 'be523c93ee65e236314f3b60c4062eeb6289b88cf1e8cb85145b23d9435b62b7',
+    textSha256: '8764449d42211610b4c9f55f50916ecb2af4814ace3812f85c4141040cb8fb0d',
     requirementRefs: [
       'FR-TRACE-001',
       'FR-TRACE-002',

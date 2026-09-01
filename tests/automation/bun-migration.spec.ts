@@ -1029,6 +1029,33 @@ describe('Contract 7: Bun test coordinator concurrency and workload isolation', 
     ]);
   });
 
+  it('round-robin packs PROCESS groups so heavy files never share a group', () => {
+    // Live 2026-09-01: five process-7 GROUP TIMEOUTs on 2-core CI runners —
+    // v2-throughput + v3-generations (the two heaviest specs) packed into ONE
+    // group that starved at 17m while locally the pair runs in ~13s. The
+    // round-robin split interleaves the sorted list, so the heaviest files
+    // land in DIFFERENT groups deterministically.
+    const manifest = {
+      schema: BUN_MIGRATION_MANIFEST_SCHEMA,
+      files: Array.from({ length: 8 }, (_, i) => ({
+        path: `tests/z${String(8 - i).padStart(2, '0')}-heavy-${i === 0 || i === 1 ? 'a' : 'b'}.spec.ts`,
+        workload: 'PROCESS',
+        state: 'VERIFIED',
+      })),
+    };
+    const plan = buildBunTestPlan(manifest, DEFAULT_POLICY);
+    const procGroups = plan.filter((g) => g.workload === 'PROCESS');
+    expect(procGroups.length).toBe(4); // ceil(8/2)
+    for (const g of procGroups) expect(g.files.length).toBe(2);
+    // sorted descending name order interleaved: z08-heavy-a and z07-heavy-a
+    // (the two "heaviest" markers) must land in different groups
+    const ga = procGroups.find((g) => g.files.includes('tests/z08-heavy-a.spec.ts'));
+    const gb = procGroups.find((g) => g.files.includes('tests/z07-heavy-a.spec.ts'));
+    expect(ga?.id).not.toBe(gb?.id);
+    // total coverage unchanged
+    expect(plan.flatMap((g) => g.files).length).toBe(8);
+  });
+
   it('refuses unmigrated requested paths fail-closed', () => {
     expect(() =>
       buildBunTestPlan(sampleManifest, DEFAULT_POLICY, ['tests/unmigrated.spec.ts']),

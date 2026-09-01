@@ -14,6 +14,9 @@ export function assembleDecisionTrace(input: any): any {
   for (const dimension of DIMENSIONS) if (input?.[dimension] === undefined || input[dimension] === null) {
     throw new Error(`missing required dimension: ${dimension}`);
   }
+  if (!/^[a-f0-9]{64}$/.test(input.manifestSha256)) {
+    throw new Error('invalid hash format for manifestSha256');
+  }
   const traceId = `trc-${createHash('sha256').update(canonical(input)).digest('hex')}`;
   return { traceId, ...input };
 }

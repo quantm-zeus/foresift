@@ -1,0 +1,9 @@
+{
+  "schemaVersion": "foresift/orphan-exceptions@1",
+  "exceptions": [
+    { "pathPattern": "packages/object-store/src/**", "servingRequirementIds": ["FR-DATA-005"], "justification": "Shared content-addressed storage substrate." },
+    { "pathPattern": "packages/collector-checkpoints/src/**", "servingRequirementIds": ["FR-COL-001"], "justification": "Collector continuity infrastructure." },
+    { "pathPattern": "packages/collector-gap-recovery/src/**", "servingRequirementIds": ["FR-COL-003"], "justification": "Collector recovery infrastructure." },
+    { "pathPattern": "apps/api/src/**", "servingRequirementIds": ["FR-MCP-001"], "justification": "API composition and wiring surface." }
+  ]
+}

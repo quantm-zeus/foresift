@@ -994,8 +994,12 @@ describe('Foresift V4 CODEX_AGY execution profile test matrix (A through AH)', (
       expect(content).toContain('integrate-and-fast');
       expect(content).toContain('wave-guard.mjs');
 
-      // 4. Maximum three writer lanes
-      expect(content).toContain('writer-core');
+      // 4. Maximum three writer lanes (H3 mission item 4: serial lanes are
+      // graph-resolved writer-serial-1..3 slots — a single core OR chained
+      // core-batch-N — so the three-slot ceiling is structural, not name-based)
+      expect(content).toContain('writer-serial-1');
+      expect(content).toContain('writer-serial-2');
+      expect(content).toContain('writer-serial-3');
       expect(content).toContain('writer-shard-1');
       expect(content).toContain('writer-shard-2');
 

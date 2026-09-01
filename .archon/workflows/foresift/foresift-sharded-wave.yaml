@@ -82,12 +82,18 @@ nodes:
         --base-head "$BASE" --routing "$ARTIFACTS_DIR/routing.json" \
         --out "$ARTIFACTS_DIR/execution-identity.json"
       # Exact engine tokens are persisted from routing before any writer runs.
+      # Serial lanes are enumerated from the graph (single `core` OR chained
+      # `core-batch-N` decomposition — H3 mission item 4), so a batched core
+      # needs no yaml edits and unbatched packages keep the legacy ids.
       node -e '
         const fs=require("node:fs"), d=process.env.ARTIFACTS_DIR;
+        const g=JSON.parse(fs.readFileSync(d+"/task-graph.json","utf8"));
         const r=JSON.parse(fs.readFileSync(d+"/routing.json","utf8"));
-        for (const id of ["core","shard-1","shard-2","test-author"]) {
+        const serial=(g.shards??[]).filter(s=>s.mode==="serial").map(s=>s.id);
+        const ids=[...serial,"shard-1","shard-2","test-author"];
+        for (const id of ids) {
           const lane=(r.lanes??[]).find(x=>x.lane===id);
-          fs.writeFileSync(d+"/engine-"+id+".txt", lane?.engine ?? ("NO "+id.toUpperCase()+" THIS WAVE"));
+          fs.writeFileSync(d+"/engine-"+id+".txt", lane?.engine ?? ("NO "+id.toUpperCase().replace(/-/g," ")+" THIS WAVE"));
         }
       '
       node scripts/automation/check-writer-admission.mjs \
@@ -144,9 +150,25 @@ nodes:
   # A PROVIDER (zero executable units → zero AI invocations). The exact-match
   # sentinel pattern is the same proven gating style as $gate-router.output in
   # the optimized package flow (archon v0.9 condition evaluator supports ==/!=).
-  - id: brief-core
+  # Serial brief emitters are graph-enumerated (single `core` OR chained
+  # `core-batch-N`): each batch's brief exists only when its lane was planned,
+  # and the sentinel names the lane id exactly, so a batched wave dispatches
+  # ONLY the planned batches — no hardcoded lane count anywhere.
+  - id: brief-serial-1
     depends_on: [prep]
-    bash: cat "$ARTIFACTS_DIR/briefs/core-brief.md" 2>/dev/null || echo "NO CORE SHARD THIS WAVE"
+    bash: |
+      LANE="$(node -e 'const g=require(process.env.ARTIFACTS_DIR+"/task-graph.json");const s=(g.shards??[]).filter(x=>x.mode==="serial");process.stdout.write(s[0]?.id??"")')"
+      [ -n "$LANE" ] && cat "$ARTIFACTS_DIR/briefs/$LANE-brief.md" || echo "NO CORE SHARD THIS WAVE"
+  - id: brief-serial-2
+    depends_on: [prep]
+    bash: |
+      LANE="$(node -e 'const g=require(process.env.ARTIFACTS_DIR+"/task-graph.json");const s=(g.shards??[]).filter(x=>x.mode==="serial");process.stdout.write(s[1]?.id??"")')"
+      [ -n "$LANE" ] && cat "$ARTIFACTS_DIR/briefs/$LANE-brief.md" || echo "NO CORE-BATCH-2 THIS WAVE"
+  - id: brief-serial-3
+    depends_on: [prep]
+    bash: |
+      LANE="$(node -e 'const g=require(process.env.ARTIFACTS_DIR+"/task-graph.json");const s=(g.shards??[]).filter(x=>x.mode==="serial");process.stdout.write(s[2]?.id??"")')"
+      [ -n "$LANE" ] && cat "$ARTIFACTS_DIR/briefs/$LANE-brief.md" || echo "NO CORE-BATCH-3 THIS WAVE"
   - id: brief-shard-1
     depends_on: [prep]
     bash: cat "$ARTIFACTS_DIR/briefs/shard-1-brief.md" 2>/dev/null || echo "NO SHARD-1 THIS WAVE"
@@ -159,9 +181,21 @@ nodes:
 
   # Engine emitters are exact persisted routing tokens. Fresh profiles ignore
   # legacy FORESIFT_AGY_LANES, so AGY can never become a product writer.
-  - id: exec-core
+  - id: exec-serial-1
     depends_on: [prep]
-    bash: cat "$ARTIFACTS_DIR/engine-core.txt"
+    bash: |
+      LANE="$(node -e 'const g=require(process.env.ARTIFACTS_DIR+"/task-graph.json");const s=(g.shards??[]).filter(x=>x.mode==="serial");process.stdout.write(s[0]?.id??"")')"
+      [ -n "$LANE" ] && cat "$ARTIFACTS_DIR/engine-$LANE.txt" || echo "NO CORE SHARD THIS WAVE"
+  - id: exec-serial-2
+    depends_on: [prep]
+    bash: |
+      LANE="$(node -e 'const g=require(process.env.ARTIFACTS_DIR+"/task-graph.json");const s=(g.shards??[]).filter(x=>x.mode==="serial");process.stdout.write(s[1]?.id??"")')"
+      [ -n "$LANE" ] && cat "$ARTIFACTS_DIR/engine-$LANE.txt" || echo "NO CORE-BATCH-2 THIS WAVE"
+  - id: exec-serial-3
+    depends_on: [prep]
+    bash: |
+      LANE="$(node -e 'const g=require(process.env.ARTIFACTS_DIR+"/task-graph.json");const s=(g.shards??[]).filter(x=>x.mode==="serial");process.stdout.write(s[2]?.id??"")')"
+      [ -n "$LANE" ] && cat "$ARTIFACTS_DIR/engine-$LANE.txt" || echo "NO CORE-BATCH-3 THIS WAVE"
   - id: exec-shard-1
     depends_on: [prep]
     bash: cat "$ARTIFACTS_DIR/engine-shard-1.txt"
@@ -180,18 +214,42 @@ nodes:
   # `default`), and approval/sandbox prompts disabled. Claude variants run only
   # for the explicit CLAUDE_AGY fallback. Never edit tests in any implementation
   # lane; the deterministic wave guard rejects actual test-path mutations.
-  - id: writer-core
-    depends_on: [brief-core, exec-core]
-    when: "$exec-core.output == 'CODEX'"
+  # Serial writer dispatch (single `core` OR chained `core-batch-1..3`).
+  # Serial slot 1: when the graph batches the core, batch-1 runs FIRST and
+  # batches 2/3 are CHAINED behind their parent's GUARDED head (serial
+  # siblings in the same write column, never concurrent). Same 55m ceiling —
+  # the bounded per-lane scope is what keeps P50/P95 under it; the timeout is
+  # never raised.
+  - id: writer-serial-1
+    depends_on: [brief-serial-1, exec-serial-1]
+    when: "$exec-serial-1.output == 'CODEX'"
     retry: { max_attempts: 2, delay_ms: 10000, on_error: all }
     timeout: 3600000
     bash: |
-      node scripts/automation/exec-codex-writer.mjs --lane core \
+      LANE="$(node -e 'const g=require(process.env.ARTIFACTS_DIR+"/task-graph.json");const s=(g.shards??[]).filter(x=>x.mode==="serial");process.stdout.write(s[0]?.id??"")')"
+      node scripts/automation/exec-codex-writer.mjs --lane "$LANE" \
         --timeout-ms 3300000 \
-        --brief "$ARTIFACTS_DIR/briefs/core-brief.md" \
-        --worktree "$ARTIFACTS_DIR/wt/core" \
+        --brief "$ARTIFACTS_DIR/briefs/$LANE-brief.md" \
+        --worktree "$ARTIFACTS_DIR/wt/$LANE" \
         --routing "$ARTIFACTS_DIR/routing.json" \
-        --results-dir "$ARTIFACTS_DIR/writer-results/core" \
+        --results-dir "$ARTIFACTS_DIR/writer-results/$LANE" \
+        --package "${ARGUMENTS%%@g*}" \
+        --generation "$(case "$ARGUMENTS" in *@g*) echo "${ARGUMENTS##*@g}";; *) echo 0;; esac)"
+  - id: writer-serial-1-claude
+    depends_on: [brief-serial-1, exec-serial-1]
+    when: "$exec-serial-1.output == 'CLAUDE'"
+    retry: { max_attempts: 2, delay_ms: 10000, on_error: all }
+    timeout: 3600000
+    bash: |
+      LANE="$(node -e 'const g=require(process.env.ARTIFACTS_DIR+"/task-graph.json");const s=(g.shards??[]).filter(x=>x.mode==="serial");process.stdout.write(s[0]?.id??"")')"
+      TASKS="$(node -e 'const r=require(process.argv[1]);process.stdout.write(((r.lanes??[]).find(l=>l.lane===process.env.SERIAL_LANE)?.taskIds??[]).join(","))' "$ARTIFACTS_DIR/routing.json" 2>/dev/null || true)"
+      SERIAL_LANE="$LANE" TASKS="$TASKS" node scripts/automation/exec-claude-writer.mjs \
+        --timeout-ms 3300000 \
+        --lane "$LANE" \
+        --brief "$ARTIFACTS_DIR/briefs/$LANE-brief.md" \
+        --worktree "$ARTIFACTS_DIR/wt/$LANE" \
+        --results-dir "$ARTIFACTS_DIR/writer-results/$LANE" \
+        --task-ids "$TASKS" \
         --package "${ARGUMENTS%%@g*}" \
         --generation "$(case "$ARGUMENTS" in *@g*) echo "${ARGUMENTS##*@g}";; *) echo 0;; esac)"
   - id: writer-shard-1
@@ -223,19 +281,118 @@ nodes:
         --package "${ARGUMENTS%%@g*}" \
         --generation "$(case "$ARGUMENTS" in *@g*) echo "${ARGUMENTS##*@g}";; *) echo 0;; esac)"
 
-  - id: writer-core-claude
-    depends_on: [brief-core, exec-core]
-    when: "$exec-core.output == 'CLAUDE'"
+  - id: writer-serial-2
+    depends_on: [brief-serial-2, exec-serial-2, guard-serial-1]
+    trigger_rule: none_failed_min_one_success
+    when: "$exec-serial-2.output == 'CODEX' && $exec-serial-2.output != 'NO CORE-BATCH-2 THIS WAVE'"
     retry: { max_attempts: 2, delay_ms: 10000, on_error: all }
     timeout: 3600000
     bash: |
-      TASKS="$(node -e 'const r=require(process.argv[1]);process.stdout.write(((r.lanes??[]).find(l=>l.lane==="core")?.taskIds??[]).join(","))' "$ARTIFACTS_DIR/routing.json")"
-      node scripts/automation/exec-claude-writer.mjs \
+      LANE="$(node -e 'const g=require(process.env.ARTIFACTS_DIR+"/task-graph.json");const s=(g.shards??[]).filter(x=>x.mode==="serial");process.stdout.write(s[1]?.id??"")')"
+      PARENT="$(node -e 'const g=require(process.env.ARTIFACTS_DIR+"/task-graph.json");const s=(g.shards??[]).filter(x=>x.mode==="serial");process.stdout.write(s[1]?.chainsFrom??"")')"
+      # Chained batch: fast-forward the parent's worktree branch to its GUARDED
+      # head before this writer starts (serial siblings, one write column).
+      node -e '
+        const {spawnSync}=require("node:child_process");
+        const d=process.env.ARTIFACTS_DIR;
+        const meta=JSON.parse(require("node:fs").readFileSync(d+"/shard-meta.json","utf8"));
+        const parent=meta[process.env.PARENT_LANE], wt=meta[process.env.THIS_LANE];
+        const head=spawnSync("git",{args:["-C",parent.worktree,"rev-parse","HEAD"],encoding:"utf8"}).stdout.trim();
+        const ff=spawnSync("git",{args:["-C",wt.worktree,"merge","--ff-only",head],encoding:"utf8"});
+        if(ff.status!==0)throw new Error("batch chain ff failed: "+ff.stderr);
+        console.log("CHAINED",process.env.THIS_LANE,"to",head.slice(0,10));
+      '
+      PARENT_LANE="$PARENT" THIS_LANE="$LANE" node scripts/automation/exec-codex-writer.mjs --lane "$LANE" \
         --timeout-ms 3300000 \
-        --lane core \
-        --brief "$ARTIFACTS_DIR/briefs/core-brief.md" \
-        --worktree "$ARTIFACTS_DIR/wt/core" \
-        --results-dir "$ARTIFACTS_DIR/writer-results/core" \
+        --brief "$ARTIFACTS_DIR/briefs/$LANE-brief.md" \
+        --worktree "$ARTIFACTS_DIR/wt/$LANE" \
+        --routing "$ARTIFACTS_DIR/routing.json" \
+        --results-dir "$ARTIFACTS_DIR/writer-results/$LANE" \
+        --package "${ARGUMENTS%%@g*}" \
+        --generation "$(case "$ARGUMENTS" in *@g*) echo "${ARGUMENTS##*@g}";; *) echo 0;; esac)"
+  - id: writer-serial-2-claude
+    depends_on: [brief-serial-2, exec-serial-2, guard-serial-1]
+    trigger_rule: none_failed_min_one_success
+    when: "$exec-serial-2.output == 'CLAUDE' && $exec-serial-2.output != 'NO CORE-BATCH-2 THIS WAVE'"
+    retry: { max_attempts: 2, delay_ms: 10000, on_error: all }
+    timeout: 3600000
+    bash: |
+      LANE="$(node -e 'const g=require(process.env.ARTIFACTS_DIR+"/task-graph.json");const s=(g.shards??[]).filter(x=>x.mode==="serial");process.stdout.write(s[1]?.id??"")')"
+      PARENT="$(node -e 'const g=require(process.env.ARTIFACTS_DIR+"/task-graph.json");const s=(g.shards??[]).filter(x=>x.mode==="serial");process.stdout.write(s[1]?.chainsFrom??"")')"
+      node -e '
+        const {spawnSync}=require("node:child_process");
+        const d=process.env.ARTIFACTS_DIR;
+        const meta=JSON.parse(require("node:fs").readFileSync(d+"/shard-meta.json","utf8"));
+        const parent=meta[process.env.PARENT_LANE], wt=meta[process.env.THIS_LANE];
+        const head=spawnSync("git",{args:["-C",parent.worktree,"rev-parse","HEAD"],encoding:"utf8"}).stdout.trim();
+        const ff=spawnSync("git",{args:["-C",wt.worktree,"merge","--ff-only",head],encoding:"utf8"});
+        if(ff.status!==0)throw new Error("batch chain ff failed: "+ff.stderr);
+        console.log("CHAINED",process.env.THIS_LANE,"to",head.slice(0,10));
+      '
+      TASKS="$(node -e 'const r=require(process.argv[1]);const env=process.env.SERIAL_LANE;process.stdout.write(((r.lanes??[]).find(l=>l.lane===env)?.taskIds??[]).join(","))' "$ARTIFACTS_DIR/routing.json")"
+      SERIAL_LANE="$LANE" PARENT_LANE="$PARENT" THIS_LANE="$LANE" node scripts/automation/exec-claude-writer.mjs \
+        --timeout-ms 3300000 \
+        --lane "$LANE" \
+        --brief "$ARTIFACTS_DIR/briefs/$LANE-brief.md" \
+        --worktree "$ARTIFACTS_DIR/wt/$LANE" \
+        --results-dir "$ARTIFACTS_DIR/writer-results/$LANE" \
+        --task-ids "$TASKS" \
+        --package "${ARGUMENTS%%@g*}" \
+        --generation "$(case "$ARGUMENTS" in *@g*) echo "${ARGUMENTS##*@g}";; *) echo 0;; esac)"
+  # Serial slot 3: chained behind batch-2's guard; same law.
+  - id: writer-serial-3
+    depends_on: [brief-serial-3, exec-serial-3, guard-serial-2]
+    trigger_rule: none_failed_min_one_success
+    when: "$exec-serial-3.output == 'CODEX' && $exec-serial-3.output != 'NO CORE-BATCH-3 THIS WAVE'"
+    retry: { max_attempts: 2, delay_ms: 10000, on_error: all }
+    timeout: 3600000
+    bash: |
+      LANE="$(node -e 'const g=require(process.env.ARTIFACTS_DIR+"/task-graph.json");const s=(g.shards??[]).filter(x=>x.mode==="serial");process.stdout.write(s[2]?.id??"")')"
+      PARENT="$(node -e 'const g=require(process.env.ARTIFACTS_DIR+"/task-graph.json");const s=(g.shards??[]).filter(x=>x.mode==="serial");process.stdout.write(s[2]?.chainsFrom??"")')"
+      node -e '
+        const {spawnSync}=require("node:child_process");
+        const d=process.env.ARTIFACTS_DIR;
+        const meta=JSON.parse(require("node:fs").readFileSync(d+"/shard-meta.json","utf8"));
+        const parent=meta[process.env.PARENT_LANE], wt=meta[process.env.THIS_LANE];
+        const head=spawnSync("git",{args:["-C",parent.worktree,"rev-parse","HEAD"],encoding:"utf8"}).stdout.trim();
+        const ff=spawnSync("git",{args:["-C",wt.worktree,"merge","--ff-only",head],encoding:"utf8"});
+        if(ff.status!==0)throw new Error("batch chain ff failed: "+ff.stderr);
+        console.log("CHAINED",process.env.THIS_LANE,"to",head.slice(0,10));
+      '
+      PARENT_LANE="$PARENT" THIS_LANE="$LANE" node scripts/automation/exec-codex-writer.mjs --lane "$LANE" \
+        --timeout-ms 3300000 \
+        --brief "$ARTIFACTS_DIR/briefs/$LANE-brief.md" \
+        --worktree "$ARTIFACTS_DIR/wt/$LANE" \
+        --routing "$ARTIFACTS_DIR/routing.json" \
+        --results-dir "$ARTIFACTS_DIR/writer-results/$LANE" \
+        --package "${ARGUMENTS%%@g*}" \
+        --generation "$(case "$ARGUMENTS" in *@g*) echo "${ARGUMENTS##*@g}";; *) echo 0;; esac)"
+  - id: writer-serial-3-claude
+    depends_on: [brief-serial-3, exec-serial-3, guard-serial-2]
+    trigger_rule: none_failed_min_one_success
+    when: "$exec-serial-3.output == 'CLAUDE' && $exec-serial-3.output != 'NO CORE-BATCH-3 THIS WAVE'"
+    retry: { max_attempts: 2, delay_ms: 10000, on_error: all }
+    timeout: 3600000
+    bash: |
+      LANE="$(node -e 'const g=require(process.env.ARTIFACTS_DIR+"/task-graph.json");const s=(g.shards??[]).filter(x=>x.mode==="serial");process.stdout.write(s[2]?.id??"")')"
+      PARENT="$(node -e 'const g=require(process.env.ARTIFACTS_DIR+"/task-graph.json");const s=(g.shards??[]).filter(x=>x.mode==="serial");process.stdout.write(s[2]?.chainsFrom??"")')"
+      node -e '
+        const {spawnSync}=require("node:child_process");
+        const d=process.env.ARTIFACTS_DIR;
+        const meta=JSON.parse(require("node:fs").readFileSync(d+"/shard-meta.json","utf8"));
+        const parent=meta[process.env.PARENT_LANE], wt=meta[process.env.THIS_LANE];
+        const head=spawnSync("git",{args:["-C",parent.worktree,"rev-parse","HEAD"],encoding:"utf8"}).stdout.trim();
+        const ff=spawnSync("git",{args:["-C",wt.worktree,"merge","--ff-only",head],encoding:"utf8"});
+        if(ff.status!==0)throw new Error("batch chain ff failed: "+ff.stderr);
+        console.log("CHAINED",process.env.THIS_LANE,"to",head.slice(0,10));
+      '
+      TASKS="$(node -e 'const r=require(process.argv[1]);const env=process.env.SERIAL_LANE;process.stdout.write(((r.lanes??[]).find(l=>l.lane===env)?.taskIds??[]).join(","))' "$ARTIFACTS_DIR/routing.json")"
+      SERIAL_LANE="$LANE" PARENT_LANE="$PARENT" THIS_LANE="$LANE" node scripts/automation/exec-claude-writer.mjs \
+        --timeout-ms 3300000 \
+        --lane "$LANE" \
+        --brief "$ARTIFACTS_DIR/briefs/$LANE-brief.md" \
+        --worktree "$ARTIFACTS_DIR/wt/$LANE" \
+        --results-dir "$ARTIFACTS_DIR/writer-results/$LANE" \
         --task-ids "$TASKS" \
         --package "${ARGUMENTS%%@g*}" \
         --generation "$(case "$ARGUMENTS" in *@g*) echo "${ARGUMENTS##*@g}";; *) echo 0;; esac)"
@@ -298,13 +455,36 @@ nodes:
   # writer was SKIPPED-empty OR succeeded, and stays BLOCKED when the writer
   # genuinely FAILED (a failed lane must surface, not vanish). The identical
   # `when` gate keeps truly-empty lanes from executing any guard logic at all.
-  - id: guard-core
-    depends_on: [brief-core, writer-core, writer-core-claude]
+  # Serial guards: one per serial slot, bridged on its own writers. Each runs
+  # the guard with the ACTUAL lane id resolved from the graph (core or
+  # core-batch-N). When the lane is absent the brief emitter printed the
+  # sentinel and the `when` gate skips the guard entirely.
+  - id: guard-serial-1
+    depends_on: [brief-serial-1, writer-serial-1, writer-serial-1-claude]
     trigger_rule: none_failed_min_one_success
-    when: "$brief-core.output != 'NO CORE SHARD THIS WAVE'"
+    when: "$brief-serial-1.output != 'NO CORE SHARD THIS WAVE'"
     bash: |
       set -euo pipefail
-      node scripts/automation/wave-guard.mjs --shard core \
+      LANE="$(node -e 'const g=require(process.env.ARTIFACTS_DIR+"/task-graph.json");const s=(g.shards??[]).filter(x=>x.mode==="serial");process.stdout.write(s[0]?.id??"")')"
+      node scripts/automation/wave-guard.mjs --shard "$LANE" \
+        --artifacts "$ARTIFACTS_DIR" --graph "$ARTIFACTS_DIR/task-graph.json"
+  - id: guard-serial-2
+    depends_on: [brief-serial-2, writer-serial-2, writer-serial-2-claude]
+    trigger_rule: none_failed_min_one_success
+    when: "$brief-serial-2.output != 'NO CORE-BATCH-2 THIS WAVE'"
+    bash: |
+      set -euo pipefail
+      LANE="$(node -e 'const g=require(process.env.ARTIFACTS_DIR+"/task-graph.json");const s=(g.shards??[]).filter(x=>x.mode==="serial");process.stdout.write(s[1]?.id??"")')"
+      node scripts/automation/wave-guard.mjs --shard "$LANE" \
+        --artifacts "$ARTIFACTS_DIR" --graph "$ARTIFACTS_DIR/task-graph.json"
+  - id: guard-serial-3
+    depends_on: [brief-serial-3, writer-serial-3, writer-serial-3-claude]
+    trigger_rule: none_failed_min_one_success
+    when: "$brief-serial-3.output != 'NO CORE-BATCH-3 THIS WAVE'"
+    bash: |
+      set -euo pipefail
+      LANE="$(node -e 'const g=require(process.env.ARTIFACTS_DIR+"/task-graph.json");const s=(g.shards??[]).filter(x=>x.mode==="serial");process.stdout.write(s[2]?.id??"")')"
+      node scripts/automation/wave-guard.mjs --shard "$LANE" \
         --artifacts "$ARTIFACTS_DIR" --graph "$ARTIFACTS_DIR/task-graph.json"
   - id: guard-shard-1
     depends_on: [brief-shard-1, writer-shard-1, writer-shard-1-claude]
@@ -343,7 +523,7 @@ nodes:
   # checkpoint fires only through the green path (wave-settled bridge), so no
   # false green and no checkpoint after red (override §14/§15 acceptance).
   - id: integrate-and-fast
-    depends_on: [guard-core, guard-shard-1, guard-shard-2, guard-test-author]
+    depends_on: [guard-serial-1, guard-serial-2, guard-serial-3, guard-shard-1, guard-shard-2, guard-test-author]
     trigger_rule: none_failed_min_one_success   # guards fail closed per-lane
     timeout: 3600000
     bash: |

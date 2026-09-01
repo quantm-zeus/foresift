@@ -4,8 +4,8 @@
  * Refusals proven: expired/revoked/out-of-scope/tampered/wrong-key evidence refuse AND
  * an unchecked boolean cannot be presented to the evaluator at all.
  */
+/* eslint-disable @typescript-eslint/no-explicit-any -- salvaged lane tests: mock objects cast against a runtime-typed surface (see tests/automation/state-authority-v2.spec.ts convention) */
 import { describe, expect, it } from 'bun:test';
-// @ts-expect-error TS2307: module not yet implemented by implementation author
 import { evaluateGateEvidence } from '@foresift/release-conformance';
 import {
   TEST_GATE_PEPPER,

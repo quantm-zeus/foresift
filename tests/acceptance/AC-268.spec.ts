@@ -6,7 +6,6 @@
  * unchecked database boolean cannot satisfy a release gate."
  */
 import { describe, expect, it } from 'bun:test';
-// @ts-expect-error TS2307: module not yet implemented by implementation author
 import { evaluateGateEvidence } from '@foresift/release-conformance';
 import {
   TEST_GATE_PEPPER,

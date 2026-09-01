@@ -4,8 +4,8 @@
  * Refusals proven: each missing dimension (and a wrong-format hash) refuses with the
  * dimension named; no dimension is ever defaulted.
  */
+/* eslint-disable @typescript-eslint/no-explicit-any -- salvaged lane tests: mock objects cast against a runtime-typed surface (see tests/automation/state-authority-v2.spec.ts convention) */
 import { describe, expect, it } from 'bun:test';
-// @ts-expect-error TS2307: module not yet implemented by implementation author
 import { assembleDecisionTrace } from '@foresift/release-conformance';
 import { VALID_DECISION_TRACE_INPUT, MISSING_DIMENSION_FIXTURES } from '../fixtures/trace/index.ts';
 

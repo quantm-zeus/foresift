@@ -10,7 +10,6 @@
 import { describe, expect, it } from 'bun:test';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-// @ts-expect-error TS2307: module not yet implemented by implementation author
 import { evaluateConformance } from '@foresift/release-conformance';
 
 const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');

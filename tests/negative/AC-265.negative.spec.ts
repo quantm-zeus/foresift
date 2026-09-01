@@ -4,10 +4,10 @@
  * Refusals proven: corrupted text hash, duplicated id across namespaces, renumbered order,
  * dangling reference, and unresolved anchor each produce a typed refusal fail-closed.
  */
+/* eslint-disable @typescript-eslint/no-explicit-any -- salvaged lane tests: mock objects cast against a runtime-typed surface (see tests/automation/state-authority-v2.spec.ts convention) */
 import { describe, expect, it } from 'bun:test';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-// @ts-expect-error TS2307: module not yet implemented by implementation author
 import {
   loadRequirementManifest,
   validateRequirementManifest,

@@ -1,10 +1,10 @@
 /**
  * Unit suite for gate evidence creation, cryptographic verification, and evaluation (FR-TRACE-004 / AC-268).
  */
+/* eslint-disable @typescript-eslint/no-explicit-any -- salvaged lane tests: mock objects cast against a runtime-typed surface (see tests/automation/state-authority-v2.spec.ts convention) */
 import { describe, expect, it } from 'bun:test';
-// @ts-expect-error TS2307: module not yet implemented by implementation author
 import {
-  createGateEvidence,
+  createGateEvidence as _createGateEvidence,
   evaluateGateEvidence,
   verifyEvidenceSignature,
   verifyPayloadHash,

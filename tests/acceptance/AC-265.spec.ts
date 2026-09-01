@@ -8,10 +8,9 @@
 import { describe, expect, it } from 'bun:test';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-// @ts-expect-error TS2307: module not yet implemented by implementation author
 import {
   loadRequirementManifest,
-  validateRequirementManifest,
+  validateRequirementManifest as _validateRequirementManifest,
   verifyFourWayCountAgreement,
   checkGlobalIdUniqueness,
 } from '@foresift/requirement-manifest';

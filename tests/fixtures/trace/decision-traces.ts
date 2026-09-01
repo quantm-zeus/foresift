@@ -73,16 +73,38 @@ export const VALID_DECISION_TRACE_RECORD: DecisionTraceRecord = {
  * Fixture variants where exactly one required FR-TRACE-005 dimension is omitted.
  */
 export const MISSING_DIMENSION_FIXTURES: Record<string, Partial<DecisionTraceRecord>> = {
-  requirementIds: (({ requirementIds, ...rest }) => rest)(VALID_DECISION_TRACE_RECORD),
-  policyVersions: (({ policyVersions, ...rest }) => rest)(VALID_DECISION_TRACE_RECORD),
-  featureVersions: (({ featureVersions, ...rest }) => rest)(VALID_DECISION_TRACE_RECORD),
-  modelVersions: (({ modelVersions, ...rest }) => rest)(VALID_DECISION_TRACE_RECORD),
-  toolVersions: (({ toolVersions, ...rest }) => rest)(VALID_DECISION_TRACE_RECORD),
-  providerVersions: (({ providerVersions, ...rest }) => rest)(VALID_DECISION_TRACE_RECORD),
-  adapterVersions: (({ adapterVersions, ...rest }) => rest)(VALID_DECISION_TRACE_RECORD),
-  artifactVersions: (({ artifactVersions, ...rest }) => rest)(VALID_DECISION_TRACE_RECORD),
-  testReleaseId: (({ testReleaseId, ...rest }) => rest)(VALID_DECISION_TRACE_RECORD),
-  conformanceReleaseId: (({ conformanceReleaseId, ...rest }) => rest)(VALID_DECISION_TRACE_RECORD),
-  manifestSha256: (({ manifestSha256, ...rest }) => rest)(VALID_DECISION_TRACE_RECORD),
-  releaseReportId: (({ releaseReportId, ...rest }) => rest)(VALID_DECISION_TRACE_RECORD),
+  requirementIds: (({ requirementIds: _requirementIds, ...rest }) => rest)(
+    VALID_DECISION_TRACE_RECORD,
+  ),
+  policyVersions: (({ policyVersions: _policyVersions, ...rest }) => rest)(
+    VALID_DECISION_TRACE_RECORD,
+  ),
+  featureVersions: (({ featureVersions: _featureVersions, ...rest }) => rest)(
+    VALID_DECISION_TRACE_RECORD,
+  ),
+  modelVersions: (({ modelVersions: _modelVersions, ...rest }) => rest)(
+    VALID_DECISION_TRACE_RECORD,
+  ),
+  toolVersions: (({ toolVersions: _toolVersions, ...rest }) => rest)(VALID_DECISION_TRACE_RECORD),
+  providerVersions: (({ providerVersions: _providerVersions, ...rest }) => rest)(
+    VALID_DECISION_TRACE_RECORD,
+  ),
+  adapterVersions: (({ adapterVersions: _adapterVersions, ...rest }) => rest)(
+    VALID_DECISION_TRACE_RECORD,
+  ),
+  artifactVersions: (({ artifactVersions: _artifactVersions, ...rest }) => rest)(
+    VALID_DECISION_TRACE_RECORD,
+  ),
+  testReleaseId: (({ testReleaseId: _testReleaseId, ...rest }) => rest)(
+    VALID_DECISION_TRACE_RECORD,
+  ),
+  conformanceReleaseId: (({ conformanceReleaseId: _conformanceReleaseId, ...rest }) => rest)(
+    VALID_DECISION_TRACE_RECORD,
+  ),
+  manifestSha256: (({ manifestSha256: _manifestSha256, ...rest }) => rest)(
+    VALID_DECISION_TRACE_RECORD,
+  ),
+  releaseReportId: (({ releaseReportId: _releaseReportId, ...rest }) => rest)(
+    VALID_DECISION_TRACE_RECORD,
+  ),
 };

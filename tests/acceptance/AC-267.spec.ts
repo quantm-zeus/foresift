@@ -6,7 +6,6 @@
  * pool adapter, evidence, and alpha artifact versions."
  */
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
-// @ts-expect-error TS2307: module not yet implemented by implementation author
 import {
   assembleDecisionTrace,
   recordDecisionTrace,

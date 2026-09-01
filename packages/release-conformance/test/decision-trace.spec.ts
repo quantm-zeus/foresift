@@ -1,6 +1,7 @@
 /**
  * Unit suite for decision trace store, fail-closed assembly, and point-in-time retrieval (FR-TRACE-005 / AC-267).
  */
+/* eslint-disable @typescript-eslint/no-explicit-any -- salvaged lane tests: mock objects cast against a runtime-typed surface (see tests/automation/state-authority-v2.spec.ts convention) */
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 import { PGlite } from '@electric-sql/pglite';
 import {
@@ -11,7 +12,6 @@ import {
 } from '@foresift/persistence';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-// @ts-expect-error TS2307: module not yet implemented by implementation author
 import {
   assembleDecisionTrace,
   recordDecisionTrace,
@@ -20,7 +20,7 @@ import {
 } from '../src/index.ts';
 import {
   VALID_DECISION_TRACE_INPUT,
-  VALID_DECISION_TRACE_RECORD,
+  VALID_DECISION_TRACE_RECORD as _VALID_DECISION_TRACE_RECORD,
   MISSING_DIMENSION_FIXTURES,
 } from '../../../tests/fixtures/trace/index.ts';
 

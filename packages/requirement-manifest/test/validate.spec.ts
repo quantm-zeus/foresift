@@ -3,10 +3,10 @@
  * Validates manifest parsing, checksums, line anchors, reference integrity, DAG acyclicity,
  * and four-way count agreement against real and fixture artifacts.
  */
+/* eslint-disable @typescript-eslint/no-explicit-any -- salvaged lane tests: mock objects cast against a runtime-typed surface (see tests/automation/state-authority-v2.spec.ts convention) */
 import { describe, expect, it } from 'bun:test';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-// @ts-expect-error TS2307: module not yet implemented by implementation author
 import {
   loadRequirementManifest,
   validateRequirementManifest,
@@ -88,15 +88,15 @@ describe('requirement manifest load and validate (FR-TRACE-001, AC-265)', () => 
       for (const pinned of PINNED_FR_TRACE_REQUIREMENTS) {
         const found = manifest.requirements.find((r: any) => r.id === pinned.id);
         expect(found).toBeDefined();
-        expect(found.text).toBe(pinned.text);
-        expect(computeTextSha256(found.text)).toBe(pinned.textSha256);
+        expect(found!.text).toBe(pinned.text);
+        expect(computeTextSha256(found!.text)).toBe(pinned.textSha256);
       }
 
       for (const pinned of PINNED_AC_TRACE_CRITERIA) {
         const found = manifest.acceptanceCriteria.find((a: any) => a.id === pinned.id);
         expect(found).toBeDefined();
-        expect(found.text).toBe(pinned.text);
-        expect(computeTextSha256(found.text)).toBe(pinned.textSha256);
+        expect(found!.text).toBe(pinned.text);
+        expect(computeTextSha256(found!.text)).toBe(pinned.textSha256);
       }
     });
 

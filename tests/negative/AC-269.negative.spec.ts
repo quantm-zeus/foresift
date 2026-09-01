@@ -4,8 +4,8 @@
  * Refusals proven: missing field or drifting recorded hash refuses release report
  * verification fail-closed.
  */
+/* eslint-disable @typescript-eslint/no-explicit-any -- salvaged lane tests: mock objects cast against a runtime-typed surface (see tests/automation/state-authority-v2.spec.ts convention) */
 import { describe, expect, it } from 'bun:test';
-// @ts-expect-error TS2307: module not yet implemented by implementation author
 import { verifyReleaseReport } from '@foresift/release-conformance';
 import { VALID_RELEASE_REPORT_FIXTURE } from '../fixtures/trace/index.ts';
 

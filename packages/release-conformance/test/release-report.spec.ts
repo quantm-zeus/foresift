@@ -1,14 +1,14 @@
 /**
  * Unit suite for SBOM projection and release report builder / verifier (FR-TRACE-006 / AC-269).
  */
+/* eslint-disable @typescript-eslint/no-explicit-any -- salvaged lane tests: mock objects cast against a runtime-typed surface (see tests/automation/state-authority-v2.spec.ts convention) */
 import { describe, expect, it } from 'bun:test';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-// @ts-expect-error TS2307: module not yet implemented by implementation author
 import { generateSbomFromLockfile, buildReleaseReport, verifyReleaseReport } from '../src/index.ts';
 import {
   VALID_RELEASE_REPORT_FIXTURE,
-  VALID_SBOM_FIXTURE,
+  VALID_SBOM_FIXTURE as _VALID_SBOM_FIXTURE,
 } from '../../../tests/fixtures/trace/index.ts';
 
 const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../..');

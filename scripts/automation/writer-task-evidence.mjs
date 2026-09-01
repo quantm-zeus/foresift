@@ -20,6 +20,42 @@ export function parseTaskGraph(graphPath) {
 }
 
 /**
+ * P0 hardening (live 89c4b2b9, 2026-09-01): a writer expected to produce
+ * evidence-backed task completion MUST possess a valid task graph BEFORE any
+ * provider spend. Without it the P0-1 arithmetic has no predicted writes to
+ * match, the writer nominates zero units, the integrator rejects every lane
+ * ("writer reported zero completed units"), and 10-55 minutes of provider work
+ * dies at integration — the defect was wiring, and only THIS gate makes the
+ * omission impossible to burn tokens on. Fail closed BEFORE permit
+ * acquisition / provider spawn:
+ *   - no --task-graph argument          → refuse
+ *   - unreadable / malformed graph      → refuse
+ *   - graph without a units array       → refuse
+ *   - no assigned task ids              → refuse
+ * Callers invoke this before acquireLanePermit. Only a caller that
+ * deliberately completes NO tasks (not applicable today) may bypass.
+ */
+export function requireTaskGraphForCompletionEvidence({ graphPath, taskIds, engine, lane }) {
+  const fail = (reason) => {
+    throw new Error(`TASK_GRAPH_REQUIRED_FOR_COMPLETION_EVIDENCE: ${reason}`);
+  };
+  if (!graphPath) fail(`${engine} lane ${lane} has no --task-graph argument`);
+  const parsed = parseTaskGraph(graphPath);
+  if (!parsed) fail(`${engine} lane ${lane}: task graph unreadable or malformed at ${graphPath}`);
+  if (!Array.isArray(parsed.graph.units) || parsed.graph.units.length === 0)
+    fail(`${engine} lane ${lane}: task graph carries no units`);
+  const assigned = (taskIds ?? []).filter(Boolean);
+  if (assigned.length === 0)
+    fail(`${engine} lane ${lane}: no assigned task ids — nothing can ever be evidenced`);
+  const known = assigned.filter((id) => parsed.unitsById.has(id));
+  if (known.length === 0)
+    fail(
+      `${engine} lane ${lane}: assigned task ids ${assigned.join(',')} are absent from the graph's units`,
+    );
+  return parsed;
+}
+
+/**
  * Deterministic completion claims for a finished lane (evidence-backed).
  *
  *   taskIds    — the lane's assigned task ids (routing/graph)

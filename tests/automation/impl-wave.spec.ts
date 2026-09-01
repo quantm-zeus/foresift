@@ -792,20 +792,24 @@ describe('foresift-sharded-wave workflow contract', () => {
     expect(agyTest?.[0]).toContain('--routing "$ARTIFACTS_DIR/routing.json"');
     expect(agyTest?.[0]).toContain('--results-dir "$ARTIFACTS_DIR/writer-results/test-author"');
 
-    // 3b. EVERY writer dispatch carries --task-graph (H3 live 89c4b2b9): the
-    // P0-1 evidence protocol needs parsed predicted writes; without the graph
-    // the writer nominates ZERO units, the integrator rejects every lane
-    // ("writer reported zero completed units"), and the wave dies red with an
-    // unrepairable integration_empty. Structural pin, all 11 dispatches.
-    const dispatchRe =
-      /node scripts\/automation\/exec-(?:codex-writer|claude-writer|agy-test-writer)\.mjs[^\n]*/g;
-    const dispatches = yaml.match(dispatchRe) ?? [];
-    expect(dispatches.length).toBe(11);
-    for (const d of dispatches) {
-      const start = yaml.indexOf(d);
-      const block = yaml.slice(start, start + 900);
-      expect(block).toContain('--task-graph "$ARTIFACTS_DIR/task-graph.json"');
+    // 3b. EVERY writer node's OWN command carries --task-graph (H3 live
+    // 89c4b2b9): the P0-1 evidence protocol needs parsed predicted writes;
+    // without the graph the writer nominates ZERO units, the integrator
+    // rejects every lane ("writer reported zero completed units"), and the
+    // wave dies red with an unrepairable integration_empty. The executor-level
+    // TASK_GRAPH_REQUIRED_FOR_COMPLETION_EVIDENCE gate is the primary defense;
+    // this structural assertion walks the actual node graph (no brittle
+    // dispatch count) and each node's command block ONLY (no cross-node
+    // bleed).
+    const writerNodeRe = /- id: (writer-[a-z0-9-]+)[\s\S]*?(?=\n  - id: |$)/g;
+    let writerNodes = 0;
+    for (const m of yaml.matchAll(writerNodeRe)) {
+      const node = m[0];
+      if (!/exec-(codex-writer|claude-writer|agy-test-writer)\.mjs/.test(node)) continue;
+      writerNodes += 1;
+      expect(node).toContain('--task-graph "$ARTIFACTS_DIR/task-graph.json"');
     }
+    expect(writerNodes).toBeGreaterThanOrEqual(11);
 
     // 4. Implementation writers carry the test-edit prohibition in their
     // briefs (brief-shaping source), and no Claude lane is a prompt node.

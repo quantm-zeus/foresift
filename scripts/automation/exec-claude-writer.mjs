@@ -19,7 +19,7 @@ import {
   resolvePoolStateDir,
 } from './provider-pool.mjs';
 import { validateGeneration } from './exec-codex-writer.mjs';
-import { parseTaskGraph } from './writer-task-evidence.mjs';
+import { parseTaskGraph, requireTaskGraphForCompletionEvidence } from './writer-task-evidence.mjs';
 
 function fail(message, code = 1) {
   console.error(`claude-writer: ${message}`);
@@ -68,6 +68,14 @@ export function runClaudeWriter(input) {
   const resultDir = input['results-dir'];
   mkdirSync(resultDir, { recursive: true });
   const brief = readFileSync(input.brief, 'utf8');
+  // P0 hardening: evidence-backed completion requires a valid task graph
+  // BEFORE permit acquisition / provider spawn (live 89c4b2b9 root cause).
+  requireTaskGraphForCompletionEvidence({
+    graphPath: input['task-graph'],
+    taskIds: (input['task-ids'] ?? '').split(',').filter(Boolean),
+    engine: 'CLAUDE',
+    lane: input.lane,
+  });
   const prompt = [
     brief,
     '',

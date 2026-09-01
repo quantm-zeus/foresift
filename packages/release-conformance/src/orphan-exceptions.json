@@ -1,0 +1,29 @@
+{
+  "schemaVersion": "1.0.0",
+  "exceptions": [
+    {
+      "pathPattern": "packages/object-store/src/**",
+      "servingRequirementIds": ["FR-DATA-005", "FR-OBJ-001"],
+      "justification": "Shared content-addressed storage substrate serves mapped persistence and artifact requirements.",
+      "expiresAt": "2027-08-31T00:00:00.000Z"
+    },
+    {
+      "pathPattern": "packages/collector-checkpoints/src/**",
+      "servingRequirementIds": ["FR-COL-001", "FR-DATA-007"],
+      "justification": "Collector checkpoint wiring is shared by collection and gap-recovery mappings.",
+      "expiresAt": "2027-08-31T00:00:00.000Z"
+    },
+    {
+      "pathPattern": "packages/collector-gap-recovery/src/**",
+      "servingRequirementIds": ["FR-COL-002", "FR-DR-001"],
+      "justification": "Gap recovery is infrastructure shared across collector families.",
+      "expiresAt": "2027-08-31T00:00:00.000Z"
+    },
+    {
+      "pathPattern": "apps/api/src/**",
+      "servingRequirementIds": ["FR-MCP-001", "FR-CORE-001"],
+      "justification": "API composition and transport wiring serves mapped tool and MCP requirements.",
+      "expiresAt": "2027-08-31T00:00:00.000Z"
+    }
+  ]
+}

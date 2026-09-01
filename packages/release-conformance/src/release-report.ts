@@ -109,6 +109,29 @@ export async function buildReleaseReport(options: BuildOptions): Promise<Release
     failureCount: 0,
     findings: [],
   };
+  let unresolvedDeviations = options.unresolvedDeviations;
+  if (unresolvedDeviations === undefined) {
+    try {
+      const ledger = JSON.parse(
+        await readFile(
+          path.join(options.repoRoot, 'packages/release-conformance/src/orphan-exceptions.json'),
+          'utf8',
+        ),
+      ) as {
+        exceptions?: { pathPattern: string; justification: string; expiresAt?: string }[];
+      };
+      unresolvedDeviations = (ledger.exceptions ?? []).map((entry, index) => ({
+        id: `orphan-exception-${String(index + 1).padStart(3, '0')}`,
+        rule: 'ORPHAN_SOURCE_MAPPING_EXCEPTION',
+        path: entry.pathPattern,
+        justification: entry.justification,
+        ...(entry.expiresAt ? { expiryDate: entry.expiresAt } : {}),
+      }));
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error;
+      unresolvedDeviations = [];
+    }
+  }
   const gates = options.evaluatedGateEvidence ?? [];
   const invalidGate = gates.some((gate) => !gate.isValid);
   const activationState = {
@@ -131,7 +154,7 @@ export async function buildReleaseReport(options: BuildOptions): Promise<Release
       schemaHashes,
       dependencySbomHash: sbom.inventoryHash,
       conformanceResults,
-      unresolvedDeviations: options.unresolvedDeviations ?? [],
+      unresolvedDeviations,
       activationState,
       rollbackTarget: options.previousReport,
     }),
@@ -146,7 +169,7 @@ export async function buildReleaseReport(options: BuildOptions): Promise<Release
     schemaHashes,
     dependencySbomHash: sbom.inventoryHash,
     conformanceResults,
-    unresolvedDeviations: [...(options.unresolvedDeviations ?? [])],
+    unresolvedDeviations: [...unresolvedDeviations],
     activationState,
     rollbackTarget: { ...options.previousReport },
     generatedAt: new Date(`${audit.auditDate ?? '1970-01-01'}T00:00:00.000Z`).toISOString(),
@@ -198,12 +221,38 @@ export function verifyReleaseReport(report: unknown): { isValid: boolean; errors
   }
   if (!Array.isArray(value.unresolvedDeviations))
     errors.push('unresolvedDeviations must be an array');
+  else {
+    for (const [index, deviation] of value.unresolvedDeviations.entries()) {
+      const item = deviation as Record<string, unknown>;
+      for (const field of ['id', 'rule', 'path', 'justification']) {
+        if (!item?.[field]) errors.push(`unresolvedDeviations[${index}].${field} is required`);
+      }
+      if (item.expiryDate !== undefined && Number.isNaN(Date.parse(String(item.expiryDate))))
+        errors.push(`unresolvedDeviations[${index}].expiryDate is invalid`);
+    }
+  }
   if (typeof value.generatedAt !== 'string' || Number.isNaN(Date.parse(value.generatedAt))) {
     errors.push('generatedAt must be an ISO timestamp');
   }
   const rollback = value.rollbackTarget as Record<string, unknown> | undefined;
   for (const field of ['previousReportId', 'previousDocumentHash', 'previousManifestHash']) {
     if (!rollback || !rollback[field]) errors.push(`rollbackTarget.${field} is required`);
+  }
+  const conformance = value.conformanceResults as Record<string, unknown> | undefined;
+  for (const field of [
+    'overall',
+    'totalRulesEvaluated',
+    'passedCount',
+    'failureCount',
+    'findings',
+  ]) {
+    if (!conformance || conformance[field] === undefined)
+      errors.push(`conformanceResults.${field} is required`);
+  }
+  const activation = value.activationState as Record<string, unknown> | undefined;
+  for (const field of ['milestone', 'status', 'activeGroups', 'gatesPassed']) {
+    if (!activation || activation[field] === undefined)
+      errors.push(`activationState.${field} is required`);
   }
   return { isValid: errors.length === 0, errors };
 }

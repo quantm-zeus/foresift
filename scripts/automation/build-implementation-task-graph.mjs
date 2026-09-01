@@ -29,6 +29,7 @@ import { join } from 'node:path';
 import { repoRoot, loadCurrentMilestone, validateMilestoneState, findPackage } from './schema.mjs';
 import { classifyOwnedPath } from './path-ownership.mjs';
 import { resolveTaskMetadata, isCoordinatorTask } from './task-metadata.mjs';
+import { assertEvidenceOwnership } from './evidence-owner-registry.mjs';
 import {
   implementationEngineForProfile,
   resolveExecutionProfile,
@@ -212,6 +213,17 @@ const open = units.filter((u) => !u.done);
 // manifest-path matcher — unknown executor values already failed closed
 // above at parse time.
 const coordinatorOpenIds = new Set(open.filter(isCoordinatorTask).map((u) => u.id));
+
+// ── evidence-owner coverage (fail-closed, pre-writer cost) ────────────────────
+// EVERY OPEN TASK HAS A REAL DETERMINISTIC COMPLETION OWNER. An open unit
+// declaring a non-file evidence kind whose runtime consumer is not registered
+// can never be completed — it would either block the package forever or tempt
+// a manual/AI checkbox flip (forbidden). The registry assertion aborts the
+// build here, before any writer/provider work is spent (G0 final delta,
+// directive 4; live T025 case: COORDINATOR_ARTIFACT with no consumer).
+assertEvidenceOwnership({
+  units: open.map((u) => ({ id: u.id, done: false, evidence: u.evidence, executor: u.executor })),
+});
 
 // ── central migration registry duty (fail-closed, pre-writer cost) ───────────
 // packages/persistence/test/migrator.spec.ts asserts EXACTLY the full G0

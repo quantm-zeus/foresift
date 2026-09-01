@@ -1,9 +1,9 @@
 {
   "schema": "foresift/maintenance-handoff@2",
   "currentSnapshot": {
-    "capturedAt": "2026-08-31T18:40:00Z",
-    "mainSha": "ba1409f5a1a5d740fdc721d789b886e2e5cdb22a",
-    "mainCi": "GREEN (run 33433216978 at ba1409f — #140 merged-main)",
+    "capturedAt": "2026-09-01T00:45:00Z",
+    "mainSha": "20ae4d220",
+    "mainCi": "GREEN (merged-main verified after #141 squash)",
     "milestone": "G0",
     "activePackage": {
       "id": "g0-traceability-conformance",
@@ -15,18 +15,18 @@
       "completedUnits": "core lane committed 3 units (189b790/678d743/ef4af2d on foresift/wave/0ed9a3e2f3-d2f24429d0-core)"
     },
     "openMaintenancePr": {
-      "number": 141,
-      "branch": "fix/core-batch-decomposition",
-      "headSha": "99bae0f",
-      "title": "bounded lane-scope decomposition — chained core-batch lanes (mission item 4)",
-      "ci": "pending at push time (run 33450356153); head now stacks the plan-shards-1 [P]-fold fix on cc04eb8/7b0e8bf"
+      "number": 142,
+      "branch": "fix/chained-lane-guard-collision",
+      "headSha": "a4bf7b4",
+      "title": "chain-mate cross-lane exemption (live e44f577a guard refusal)",
+      "ci": "pending"
     },
     "providerState": "claude limit 1 (backoff to 15:47Z), codex limit 1 HEALTHY, agy 3 — all active 0",
     "resourceState": "15GiB host, MemAvailable ~14.1GiB (0.86) — GREEN",
     "blockers": [
-      "g0-traceability paused_fatal: recover-fatal must run AFTER #141 merges (needs bounded lane-scope decomposition + plan-shards-1 fix authoritative on main and the worktree re-pinned)"
+      "g0-traceability run e44f577a: guard-serial-1 refused core-batch-1 (6 paths predicted by chain mates core-batch-2/3 — column union inherited BY DESIGN). Root-caused: guard/integrator cross-lane clause lacks chain-mate exemption. PR #142 open; run continues (writer-serial-3 in flight) and will need recovery/repair after #142 lands — do NOT recover-fatal before merging #142 or the next wave hits the identical refusal."
     ],
-    "nextSafeAction": "merge #141 (exact-head 99bae0f) -> verify merged-main CI -> systemctl --user stop foresift-autopilot; node scripts/automation/foresift-autopilot.mjs --recover-fatal; systemctl --user start foresift-autopilot; verify worktree branch re-pin"
+    "nextSafeAction": "merge #142 (exact-head a4bf7b4) -> verify merged-main CI -> merge main into task worktree (probe first) -> recover-fatal to relaunch the batched wave with the fixed guard"
   },
   "history": [
     {
@@ -58,6 +58,21 @@
       "at": "2026-08-30/31",
       "event": "PRs #130–#133 merged",
       "detail": "scheduling layer: launch preflight, ready queue/work stealing primitives, Codex cost policy, adaptive lanes, supervisor wiring, exact co-run gate"
+    },
+    {
+      "at": "2026-08-31T23:37Z",
+      "event": "recover-fatal attempt on 95c45071 launched fresh run 95dbd50e",
+      "detail": "worktree advance skipped 'diverged' (branch has wave commits) so the fresh wave replanned from the stale PRE-#138/#140/#141 planner and crashed on the plan-shards-1 [P]-fold edge (TypeError at groups[0], adaptive lanes resolved 1) — paused_fatal again. Root cause understood: supervisor's advanceArchonTaskWorktree is strict ff-only and can't absorb main over diverged branches; recovery after #141 lands requires a one-time manual merge of main into the task worktree (no conflicts: merge-tree probe clean) OR retiring the branch. 95dbd50e left abandoned."
+    },
+    {
+      "at": "2026-08-31T23:5xZ",
+      "event": "PR #141 CI adjudication",
+      "detail": "99bae0f run: targeted-router-e2e green-verdict failure (not reproducible on fresh main 3x, not reproducible in h3 worktree 3x, file unchanged since #99 — env flake). 76a54b8 run 33451217502: process-7 GROUP TIMEOUT (v2-throughput+v3-generations, 17m) — same 2-core-runner starvation class as #140; adjudicated via gh run rerun --failed backed by local green (84/84 in 15.6s on 4-core VPS)."
+    },
+    {
+      "at": "2026-09-01T00:06Z",
+      "event": "PR #141 MERGED (squash 20ae4d2) + g0-traceability recovered",
+      "detail": "Exact-head merge at 76a54b8 after adjudicated rerun green; merged-main CI green; branch recycled to fix/h3-maintenance from fresh main. Task worktree manually merged origin/main (ed524fc -> 39d29171) so recover-fatal's ff-only advance skipped 'current'; fresh launch run e44f577a replanned 25 units into core-batch-1(5u,load8)/core-batch-2(4u,load7,chains core-batch-1)/core-batch-3(8u,load10,chains core-batch-2) + parallel shards — mission item 4 now executing on real work."
     }
   ],
   "h3MissionChecklist": {

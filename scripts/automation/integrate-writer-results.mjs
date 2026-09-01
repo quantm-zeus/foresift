@@ -127,8 +127,18 @@ for (const filePath of resultFiles) {
     ...shard.allowedWritePaths.map(globToRegExp),
     ...(graph.package.writeScopes ?? []).map(globToRegExp),
   ];
+  // Chained serial batches (mission item 4) share one write column BY DESIGN:
+  // core-batch-N lanes all carry the serial column's union, so a path predicted
+  // by another batch is a plan-sanctioned revisit, never a cross-lane conflict
+  // (mirrors wave-guard.mjs; live self-collision run e44f577a, 2026-09-01).
+  const chainMates =
+    shard.chainId != null
+      ? new Set(allLanes.filter((s) => s.chainId === shard.chainId).map((s) => s.id))
+      : null;
   const othersPredicted = new Set(
-    allLanes.filter((s) => s.id !== sid).flatMap((s) => s.allowedWritePaths ?? []),
+    allLanes
+      .filter((s) => s.id !== sid && !(chainMates?.has(s.id) ?? false))
+      .flatMap((s) => s.allowedWritePaths ?? []),
   );
   // Cross-lane exclusion must not fire on graph-recorded scope exceptions:
   // the central migration registry is a plan-sanctioned duty both sides may

@@ -276,6 +276,31 @@ ${Array.from(
     expect(serial[0].chainId).toBeUndefined();
   });
 
+  it('skips command-tail backticks when deriving predicted writes (T016 class)', () => {
+    // `scripts/x/cli.mjs generate` is a COMMAND, not a writable path: recording
+    // it as a predicted write made the evidence matcher compare a diff against
+    // a string that can never be a filename (live T016, run 89c4b2b9).
+    const tasks3 = TASKS.replace(
+      '- [ ] T104 [P] Write guide `docs/x-guide.md`. Traces: FR-X-002 (AC-202).',
+      '- [ ] T104 [P] Run `scripts/generate/guide.mjs generate` to emit `docs/x-guide.md`. Traces: FR-X-002 (AC-202).',
+    );
+    writeFileSync(join(fx.root, 'specs', 'pkg-x', 'tasks.md'), tasks3);
+    try {
+      const out = join(fx.artifacts, 'graph-cmd-tail.json');
+      const r = spawnSync(
+        process.execPath,
+        [GRAPH, '--package', 'pkg-x', '--root', fx.root, '--plan-shards', '2', '--out', out],
+        { encoding: 'utf8' },
+      );
+      expect(r.status).toBe(0);
+      const g = JSON.parse(readFileSync(out, 'utf8'));
+      const t104 = g.units.find((u: { id: string }) => u.id === 'T104');
+      expect(t104.predictedWrites).toEqual(['docs/x-guide.md']); // command tail excluded
+    } finally {
+      writeFileSync(join(fx.root, 'specs', 'pkg-x', 'tasks.md'), TASKS);
+    }
+  });
+
   it('folds parallel units into the core when plan-shards 1 leaves no parallel slots', () => {
     // --plan-shards 1 (governor YELLOW path: adaptive lanes resolve to 1) used
     // to crash the planner: extra=0 → groups=[] → `target ?? groups[0]` was

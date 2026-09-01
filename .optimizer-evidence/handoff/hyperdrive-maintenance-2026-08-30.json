@@ -1,7 +1,7 @@
 {
   "schema": "foresift/maintenance-handoff@2",
   "currentSnapshot": {
-    "capturedAt": "2026-09-01T00:12:00Z",
+    "capturedAt": "2026-09-01T00:45:00Z",
     "mainSha": "20ae4d220",
     "mainCi": "GREEN (merged-main verified after #141 squash)",
     "milestone": "G0",
@@ -14,13 +14,19 @@
       "stage": "paused_fatal — run exhausted recovery policy after guard refusal (planner defect, fixed by #138); needs --recover-fatal once PR #139 lands",
       "completedUnits": "core lane committed 3 units (189b790/678d743/ef4af2d on foresift/wave/0ed9a3e2f3-d2f24429d0-core)"
     },
-    "openMaintenancePr": null,
+    "openMaintenancePr": {
+      "number": 142,
+      "branch": "fix/chained-lane-guard-collision",
+      "headSha": "a4bf7b4",
+      "title": "chain-mate cross-lane exemption (live e44f577a guard refusal)",
+      "ci": "pending"
+    },
     "providerState": "claude limit 1 (backoff to 15:47Z), codex limit 1 HEALTHY, agy 3 — all active 0",
     "resourceState": "15GiB host, MemAvailable ~14.1GiB (0.86) — GREEN",
     "blockers": [
-      "g0-traceability running as run e44f577a (HYBRID_AGY, lanes=2): production proof of mission item 4 — first bounded-batch wave (core-batch-1 load 8 / core-batch-2 load 7 / core-batch-3 load 10 laneTooLarge-eligible, chained via guard+ff-only). No action while healthy."
+      "g0-traceability run e44f577a: guard-serial-1 refused core-batch-1 (6 paths predicted by chain mates core-batch-2/3 — column union inherited BY DESIGN). Root-caused: guard/integrator cross-lane clause lacks chain-mate exemption. PR #142 open; run continues (writer-serial-3 in flight) and will need recovery/repair after #142 lands — do NOT recover-fatal before merging #142 or the next wave hits the identical refusal."
     ],
-    "nextSafeAction": "monitor run e44f577a to wave-settled -> verify batch chaining executed (merge --ff-only between core-batch worktrees) + guard verdicts -> P50/P95 evidence for item 4 -> then runtime proofs 3/5/6 -> G1 canary 2->3->4"
+    "nextSafeAction": "merge #142 (exact-head a4bf7b4) -> verify merged-main CI -> merge main into task worktree (probe first) -> recover-fatal to relaunch the batched wave with the fixed guard"
   },
   "history": [
     {

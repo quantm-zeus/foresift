@@ -12,7 +12,12 @@ import {
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 // @ts-expect-error TS2307: module not yet implemented by implementation author
-import { assembleDecisionTrace, recordDecisionTrace, fetchDecisionTraceByRef, fetchDecisionTraceById } from '../src/index.ts';
+import {
+  assembleDecisionTrace,
+  recordDecisionTrace,
+  fetchDecisionTraceByRef,
+  fetchDecisionTraceById,
+} from '../src/index.ts';
 import {
   VALID_DECISION_TRACE_INPUT,
   VALID_DECISION_TRACE_RECORD,
@@ -97,10 +102,13 @@ describe('decision trace assembly and point-in-time store (FR-TRACE-005, AC-267)
 
       // Mutating should be refused by refuse_mutation trigger
       await expect(
-        engine.query('UPDATE trace.decision_traces SET manifest_sha256 = $1 WHERE decision_ref = $2', [
-          '0000000000000000000000000000000000000000000000000000000000000000',
-          'dec-immutable-check',
-        ]),
+        engine.query(
+          'UPDATE trace.decision_traces SET manifest_sha256 = $1 WHERE decision_ref = $2',
+          [
+            '0000000000000000000000000000000000000000000000000000000000000000',
+            'dec-immutable-check',
+          ],
+        ),
       ).rejects.toThrow();
 
       await expect(

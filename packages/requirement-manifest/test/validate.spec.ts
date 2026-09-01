@@ -7,7 +7,13 @@ import { describe, expect, it } from 'bun:test';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 // @ts-expect-error TS2307: module not yet implemented by implementation author
-import { loadRequirementManifest, validateRequirementManifest, computeTextSha256, verifyFourWayCountAgreement, checkDependencyDagAcyclicity } from '../src/index.ts';
+import {
+  loadRequirementManifest,
+  validateRequirementManifest,
+  computeTextSha256,
+  verifyFourWayCountAgreement,
+  checkDependencyDagAcyclicity,
+} from '../src/index.ts';
 import {
   PINNED_DOCUMENT_SHA256,
   PINNED_MANIFEST_SHA256,
@@ -141,7 +147,9 @@ describe('requirement manifest load and validate (FR-TRACE-001, AC-265)', () => 
       const corrupted = {
         ...manifest,
         acceptanceCriteria: manifest.acceptanceCriteria.map((a: any) =>
-          a.id === 'AC-265' ? { ...a, requirementRefs: [...a.requirementRefs, 'FR-NONEXISTENT-999'] } : a,
+          a.id === 'AC-265'
+            ? { ...a, requirementRefs: [...a.requirementRefs, 'FR-NONEXISTENT-999'] }
+            : a,
         ),
       };
 

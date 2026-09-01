@@ -10,9 +10,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 // @ts-expect-error TS2307: module not yet implemented by implementation author
 import { buildReleaseReport, verifyReleaseReport } from '@foresift/release-conformance';
-import {
-  VALID_RELEASE_REPORT_FIXTURE,
-} from '../fixtures/trace/index.ts';
+import { VALID_RELEASE_REPORT_FIXTURE } from '../fixtures/trace/index.ts';
 
 const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 

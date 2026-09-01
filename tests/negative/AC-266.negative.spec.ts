@@ -9,7 +9,12 @@ import { describe, expect, it } from 'bun:test';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 // @ts-expect-error TS2307: module not yet implemented by implementation author
-import { evaluateConformance, checkMappingCompleteness, checkActiveImplementationPaths, detectOrphanSources } from '@foresift/release-conformance';
+import {
+  evaluateConformance,
+  checkMappingCompleteness,
+  checkActiveImplementationPaths,
+  detectOrphanSources,
+} from '@foresift/release-conformance';
 
 const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 
@@ -59,6 +64,8 @@ describe('AC-266 negative (conformance failures on uncoordinated changes)', () =
     });
 
     expect(orphanResult.passed).toBe(false);
-    expect(orphanResult.unexemptedOrphans).toContain('packages/unmapped-experiment/src/untraced.ts');
+    expect(orphanResult.unexemptedOrphans).toContain(
+      'packages/unmapped-experiment/src/untraced.ts',
+    );
   });
 });

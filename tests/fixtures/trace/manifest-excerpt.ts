@@ -34,10 +34,14 @@ export interface AcceptanceCriterionExcerpt {
   readonly evidenceOwner: string;
 }
 
-export const PINNED_DOCUMENT_SHA256 = 'baa521d9c67e67a86d7ddb111c793b67462ed4c7acc89cec34ab9f5ade077299';
-export const PINNED_NORMALIZED_SHA256 = '1f9b6590c8331dd52ae63c51a93e8e6b631b3a70c37df3e619486e1779e2db8e';
-export const PINNED_MANIFEST_SHA256 = 'e0f9f1284473fe097fde591138d16984ae8580feaf13333e22594717eec690ff';
-export const PINNED_AUDIT_SHA256 = 'ab4be13b6aeac998f13daa89ae08f4b9f5d6280b4018bd171b7b128b412a47f8';
+export const PINNED_DOCUMENT_SHA256 =
+  'baa521d9c67e67a86d7ddb111c793b67462ed4c7acc89cec34ab9f5ade077299';
+export const PINNED_NORMALIZED_SHA256 =
+  '1f9b6590c8331dd52ae63c51a93e8e6b631b3a70c37df3e619486e1779e2db8e';
+export const PINNED_MANIFEST_SHA256 =
+  'e0f9f1284473fe097fde591138d16984ae8580feaf13333e22594717eec690ff';
+export const PINNED_AUDIT_SHA256 =
+  'ab4be13b6aeac998f13daa89ae08f4b9f5d6280b4018bd171b7b128b412a47f8';
 
 export const PINNED_FR_TRACE_REQUIREMENTS: readonly RequirementExcerpt[] = [
   {

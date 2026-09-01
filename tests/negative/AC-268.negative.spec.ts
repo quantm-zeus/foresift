@@ -38,11 +38,9 @@ describe('AC-268 negative (refusal of invalid evidence and boolean bypass)', () 
   });
 
   it('refuses revoked evidence', () => {
-    const revokedRecord = createSignedGateEvidence(
-      VALID_GATE_PAYLOADS.LEGAL,
-      TEST_GATE_PEPPER,
-      { revokedAt: '2026-08-01T00:00:00.000Z' },
-    );
+    const revokedRecord = createSignedGateEvidence(VALID_GATE_PAYLOADS.LEGAL, TEST_GATE_PEPPER, {
+      revokedAt: '2026-08-01T00:00:00.000Z',
+    });
 
     const verdict = evaluateGateEvidence({
       record: revokedRecord,
@@ -88,10 +86,7 @@ describe('AC-268 negative (refusal of invalid evidence and boolean bypass)', () 
   });
 
   it('refuses invalid HMAC signature under wrong pepper', () => {
-    const wrongSigRecord = createSignedGateEvidence(
-      VALID_GATE_PAYLOADS.RIGHTS,
-      ALT_GATE_PEPPER,
-    );
+    const wrongSigRecord = createSignedGateEvidence(VALID_GATE_PAYLOADS.RIGHTS, ALT_GATE_PEPPER);
 
     const verdict = evaluateGateEvidence({
       record: wrongSigRecord,

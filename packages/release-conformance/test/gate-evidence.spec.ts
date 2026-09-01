@@ -3,7 +3,12 @@
  */
 import { describe, expect, it } from 'bun:test';
 // @ts-expect-error TS2307: module not yet implemented by implementation author
-import { createGateEvidence, evaluateGateEvidence, verifyEvidenceSignature, verifyPayloadHash } from '../src/index.ts';
+import {
+  createGateEvidence,
+  evaluateGateEvidence,
+  verifyEvidenceSignature,
+  verifyPayloadHash,
+} from '../src/index.ts';
 import {
   TEST_GATE_PEPPER,
   ALT_GATE_PEPPER,
@@ -104,10 +109,7 @@ describe('gate evidence evaluation and cryptographic verification (FR-TRACE-004,
     });
 
     it('refuses signature signed under different pepper (SIGNATURE_INVALID)', () => {
-      const wrongKeyRecord = createSignedGateEvidence(
-        VALID_GATE_PAYLOADS.RIGHTS,
-        ALT_GATE_PEPPER,
-      );
+      const wrongKeyRecord = createSignedGateEvidence(VALID_GATE_PAYLOADS.RIGHTS, ALT_GATE_PEPPER);
 
       const result = evaluateGateEvidence({
         record: wrongKeyRecord,

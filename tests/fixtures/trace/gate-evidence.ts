@@ -6,13 +6,7 @@ import { createHmac, createHash } from 'node:crypto';
 export const TEST_GATE_PEPPER = 'trace-pepper-fixed-0123456789abcdef0123456789abcdef';
 export const ALT_GATE_PEPPER = 'alt-pepper-mismatch-fedcba9876543210fedcba9876543210';
 
-export const GATE_KINDS = [
-  'MANUAL',
-  'LEGAL',
-  'RIGHTS',
-  'STATISTICAL',
-  'OWNER_APPROVAL',
-] as const;
+export const GATE_KINDS = ['MANUAL', 'LEGAL', 'RIGHTS', 'STATISTICAL', 'OWNER_APPROVAL'] as const;
 
 export type GateKind = (typeof GATE_KINDS)[number];
 
@@ -53,7 +47,9 @@ export function canonicalJson(value: unknown): string {
     return '[' + value.map(canonicalJson).join(',') + ']';
   }
   const keys = Object.keys(value as Record<string, unknown>).sort();
-  const pairs = keys.map((k) => JSON.stringify(k) + ':' + canonicalJson((value as Record<string, unknown>)[k]));
+  const pairs = keys.map(
+    (k) => JSON.stringify(k) + ':' + canonicalJson((value as Record<string, unknown>)[k]),
+  );
   return '{' + pairs.join(',') + '}';
 }
 
@@ -67,7 +63,10 @@ export function computePayloadSha256(payload: GateEvidencePayload): string {
 /**
  * Compute HMAC-SHA256 signature using injected pepper.
  */
-export function computeEvidenceSignature(payload: GateEvidencePayload, pepper: string = TEST_GATE_PEPPER): string {
+export function computeEvidenceSignature(
+  payload: GateEvidencePayload,
+  pepper: string = TEST_GATE_PEPPER,
+): string {
   return createHmac('sha256', pepper).update(canonicalJson(payload)).digest('hex');
 }
 

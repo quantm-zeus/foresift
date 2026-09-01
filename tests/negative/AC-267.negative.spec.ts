@@ -7,17 +7,12 @@
 import { describe, expect, it } from 'bun:test';
 // @ts-expect-error TS2307: module not yet implemented by implementation author
 import { assembleDecisionTrace } from '@foresift/release-conformance';
-import {
-  VALID_DECISION_TRACE_INPUT,
-  MISSING_DIMENSION_FIXTURES,
-} from '../fixtures/trace/index.ts';
+import { VALID_DECISION_TRACE_INPUT, MISSING_DIMENSION_FIXTURES } from '../fixtures/trace/index.ts';
 
 describe('AC-267 negative (fail-closed refusal on incomplete decision traces)', () => {
   for (const [missingDim, fixture] of Object.entries(MISSING_DIMENSION_FIXTURES)) {
     it(`refuses trace missing '${missingDim}', naming the missing dimension`, () => {
-      expect(() => assembleDecisionTrace(fixture as any)).toThrow(
-        new RegExp(missingDim, 'i'),
-      );
+      expect(() => assembleDecisionTrace(fixture as any)).toThrow(new RegExp(missingDim, 'i'));
     });
   }
 
@@ -27,8 +22,6 @@ describe('AC-267 negative (fail-closed refusal on incomplete decision traces)', 
       manifestSha256: 'not-a-valid-sha256-hex-digest',
     };
 
-    expect(() => assembleDecisionTrace(badHashInput)).toThrow(
-      /manifestSha256|invalid hash/i,
-    );
+    expect(() => assembleDecisionTrace(badHashInput)).toThrow(/manifestSha256|invalid hash/i);
   });
 });

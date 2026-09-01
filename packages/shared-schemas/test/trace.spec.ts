@@ -4,7 +4,18 @@
  */
 import { describe, expect, it } from 'bun:test';
 // @ts-expect-error TS2307: module not yet implemented by implementation author
-import { TRACE_SCHEMA_REGISTRY_VERSION, TRACE_SCHEMAS, RequirementRefSchema, TraceIdPatternSchema, SupersessionLinkSchema, GateEvidenceRecordSchema, DecisionTraceRecordSchema, ReleaseReportRecordSchema, parseTraceSchema, type TraceSchemaName } from '../src/trace.ts';
+import {
+  TRACE_SCHEMA_REGISTRY_VERSION,
+  TRACE_SCHEMAS,
+  RequirementRefSchema,
+  TraceIdPatternSchema,
+  SupersessionLinkSchema,
+  GateEvidenceRecordSchema,
+  DecisionTraceRecordSchema,
+  ReleaseReportRecordSchema,
+  parseTraceSchema,
+  type TraceSchemaName,
+} from '../src/trace.ts';
 import {
   VALID_GATE_RECORDS,
   VALID_DECISION_TRACE_RECORD,
@@ -116,16 +127,24 @@ describe('trace schema registry (FR-TRACE-001…006, ADR-0013)', () => {
     });
 
     it('refuses missing replacedId or supersededById', () => {
-      expect(SupersessionLinkSchema.safeParse({ ...validLink, replacedId: undefined }).success).toBe(false);
-      expect(SupersessionLinkSchema.safeParse({ ...validLink, supersededById: undefined }).success).toBe(false);
+      expect(
+        SupersessionLinkSchema.safeParse({ ...validLink, replacedId: undefined }).success,
+      ).toBe(false);
+      expect(
+        SupersessionLinkSchema.safeParse({ ...validLink, supersededById: undefined }).success,
+      ).toBe(false);
     });
 
     it('refuses invalid namespace', () => {
-      expect(SupersessionLinkSchema.safeParse({ ...validLink, namespace: 'unvetted_namespace' }).success).toBe(false);
+      expect(
+        SupersessionLinkSchema.safeParse({ ...validLink, namespace: 'unvetted_namespace' }).success,
+      ).toBe(false);
     });
 
     it('refuses extra unknown keys (strict mode)', () => {
-      expect(SupersessionLinkSchema.safeParse({ ...validLink, rogueKey: 'unauthorized' }).success).toBe(false);
+      expect(
+        SupersessionLinkSchema.safeParse({ ...validLink, rogueKey: 'unauthorized' }).success,
+      ).toBe(false);
     });
   });
 
@@ -147,10 +166,12 @@ describe('trace schema registry (FR-TRACE-001…006, ADR-0013)', () => {
 
     it('refuses missing approver or scopeRefs', () => {
       expect(
-        GateEvidenceRecordSchema.safeParse({ ...VALID_GATE_RECORDS.MANUAL, approver: undefined }).success,
+        GateEvidenceRecordSchema.safeParse({ ...VALID_GATE_RECORDS.MANUAL, approver: undefined })
+          .success,
       ).toBe(false);
       expect(
-        GateEvidenceRecordSchema.safeParse({ ...VALID_GATE_RECORDS.MANUAL, scopeRefs: undefined }).success,
+        GateEvidenceRecordSchema.safeParse({ ...VALID_GATE_RECORDS.MANUAL, scopeRefs: undefined })
+          .success,
       ).toBe(false);
     });
 
@@ -162,7 +183,8 @@ describe('trace schema registry (FR-TRACE-001…006, ADR-0013)', () => {
 
     it('refuses unknown keys (strict mode)', () => {
       expect(
-        GateEvidenceRecordSchema.safeParse({ ...VALID_GATE_RECORDS.MANUAL, unvetted: true }).success,
+        GateEvidenceRecordSchema.safeParse({ ...VALID_GATE_RECORDS.MANUAL, unvetted: true })
+          .success,
       ).toBe(false);
     });
   });

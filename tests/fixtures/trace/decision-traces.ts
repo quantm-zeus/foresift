@@ -22,9 +22,7 @@ export interface DecisionTraceRecord {
   readonly recordedAt: string;
 }
 
-export function computeDecisionTraceId(
-  input: Omit<DecisionTraceRecord, 'traceId'>,
-): string {
+export function computeDecisionTraceId(input: Omit<DecisionTraceRecord, 'traceId'>): string {
   const content = canonicalJson(input);
   return 'trc-' + createHash('sha256').update(content).digest('hex');
 }
@@ -44,8 +42,8 @@ export const VALID_DECISION_TRACE_INPUT: Omit<DecisionTraceRecord, 'traceId'> = 
     'claude-3-7-sonnet': '2026-02-24',
   },
   toolVersions: {
-    'analyze_solana_asset': '1.0.0',
-    'fetch_holder_distribution': '1.0.0',
+    analyze_solana_asset: '1.0.0',
+    fetch_holder_distribution: '1.0.0',
   },
   providerVersions: {
     'helius-rpc': 'v0',
@@ -74,10 +72,7 @@ export const VALID_DECISION_TRACE_RECORD: DecisionTraceRecord = {
 /**
  * Fixture variants where exactly one required FR-TRACE-005 dimension is omitted.
  */
-export const MISSING_DIMENSION_FIXTURES: Record<
-  string,
-  Partial<DecisionTraceRecord>
-> = {
+export const MISSING_DIMENSION_FIXTURES: Record<string, Partial<DecisionTraceRecord>> = {
   requirementIds: (({ requirementIds, ...rest }) => rest)(VALID_DECISION_TRACE_RECORD),
   policyVersions: (({ policyVersions, ...rest }) => rest)(VALID_DECISION_TRACE_RECORD),
   featureVersions: (({ featureVersions, ...rest }) => rest)(VALID_DECISION_TRACE_RECORD),

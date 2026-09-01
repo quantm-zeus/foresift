@@ -7,15 +7,13 @@
  */
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 // @ts-expect-error TS2307: module not yet implemented by implementation author
-import { assembleDecisionTrace, recordDecisionTrace, fetchDecisionTraceByRef } from '@foresift/release-conformance';
 import {
-  closeTestDatabase,
-  makeTestDatabase,
-  type TestDatabase,
-} from './helpers.ts';
-import {
-  VALID_DECISION_TRACE_INPUT,
-} from '../fixtures/trace/index.ts';
+  assembleDecisionTrace,
+  recordDecisionTrace,
+  fetchDecisionTraceByRef,
+} from '@foresift/release-conformance';
+import { closeTestDatabase, makeTestDatabase, type TestDatabase } from './helpers.ts';
+import { VALID_DECISION_TRACE_INPUT } from '../fixtures/trace/index.ts';
 
 let tdb: TestDatabase;
 

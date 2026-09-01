@@ -8,7 +8,13 @@ import { describe, expect, it } from 'bun:test';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 // @ts-expect-error TS2307: module not yet implemented by implementation author
-import { loadRequirementManifest, validateRequirementManifest, validateIdGrammar, checkGlobalIdUniqueness, validateSupersessionContract } from '@foresift/requirement-manifest';
+import {
+  loadRequirementManifest,
+  validateRequirementManifest,
+  validateIdGrammar,
+  checkGlobalIdUniqueness,
+  validateSupersessionContract,
+} from '@foresift/requirement-manifest';
 
 const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 const MANIFEST_PATH = path.join(

@@ -5,7 +5,11 @@ import { describe, expect, it } from 'bun:test';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 // @ts-expect-error TS2307: module not yet implemented by implementation author
-import { detectOrphanSources, loadOrphanExceptions, validateOrphanExceptionLedger } from '../src/index.ts';
+import {
+  detectOrphanSources,
+  loadOrphanExceptions,
+  validateOrphanExceptionLedger,
+} from '../src/index.ts';
 
 const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../..');
 const EXCEPTIONS_PATH = path.join(
@@ -40,7 +44,12 @@ describe('orphan source detection and exception ledger (FR-TRACE-003, AC-266)', 
       const patterns = ledger.exceptions.map((e: any) => e.pathPattern);
 
       expect(patterns.some((p: string) => p.includes('packages/object-store'))).toBe(true);
-      expect(patterns.some((p: string) => p.includes('collector-checkpoints') || p.includes('collector-gap-recovery'))).toBe(true);
+      expect(
+        patterns.some(
+          (p: string) =>
+            p.includes('collector-checkpoints') || p.includes('collector-gap-recovery'),
+        ),
+      ).toBe(true);
       expect(patterns.some((p: string) => p.includes('apps/api'))).toBe(true);
     });
   });

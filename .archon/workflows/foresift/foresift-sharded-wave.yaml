@@ -233,6 +233,7 @@ nodes:
         --worktree "$ARTIFACTS_DIR/wt/$LANE" \
         --routing "$ARTIFACTS_DIR/routing.json" \
         --results-dir "$ARTIFACTS_DIR/writer-results/$LANE" \
+        --task-graph "$ARTIFACTS_DIR/task-graph.json" \
         --package "${ARGUMENTS%%@g*}" \
         --generation "$(case "$ARGUMENTS" in *@g*) echo "${ARGUMENTS##*@g}";; *) echo 0;; esac)"
   - id: writer-serial-1-claude
@@ -250,6 +251,7 @@ nodes:
         --worktree "$ARTIFACTS_DIR/wt/$LANE" \
         --results-dir "$ARTIFACTS_DIR/writer-results/$LANE" \
         --task-ids "$TASKS" \
+        --task-graph "$ARTIFACTS_DIR/task-graph.json" \
         --package "${ARGUMENTS%%@g*}" \
         --generation "$(case "$ARGUMENTS" in *@g*) echo "${ARGUMENTS##*@g}";; *) echo 0;; esac)"
   - id: writer-shard-1
@@ -264,6 +266,7 @@ nodes:
         --worktree "$ARTIFACTS_DIR/wt/shard-1" \
         --routing "$ARTIFACTS_DIR/routing.json" \
         --results-dir "$ARTIFACTS_DIR/writer-results/shard-1" \
+        --task-graph "$ARTIFACTS_DIR/task-graph.json" \
         --package "${ARGUMENTS%%@g*}" \
         --generation "$(case "$ARGUMENTS" in *@g*) echo "${ARGUMENTS##*@g}";; *) echo 0;; esac)"
   - id: writer-shard-2
@@ -278,6 +281,7 @@ nodes:
         --worktree "$ARTIFACTS_DIR/wt/shard-2" \
         --routing "$ARTIFACTS_DIR/routing.json" \
         --results-dir "$ARTIFACTS_DIR/writer-results/shard-2" \
+        --task-graph "$ARTIFACTS_DIR/task-graph.json" \
         --package "${ARGUMENTS%%@g*}" \
         --generation "$(case "$ARGUMENTS" in *@g*) echo "${ARGUMENTS##*@g}";; *) echo 0;; esac)"
 
@@ -308,6 +312,7 @@ nodes:
         --worktree "$ARTIFACTS_DIR/wt/$LANE" \
         --routing "$ARTIFACTS_DIR/routing.json" \
         --results-dir "$ARTIFACTS_DIR/writer-results/$LANE" \
+        --task-graph "$ARTIFACTS_DIR/task-graph.json" \
         --package "${ARGUMENTS%%@g*}" \
         --generation "$(case "$ARGUMENTS" in *@g*) echo "${ARGUMENTS##*@g}";; *) echo 0;; esac)"
   - id: writer-serial-2-claude
@@ -337,6 +342,7 @@ nodes:
         --worktree "$ARTIFACTS_DIR/wt/$LANE" \
         --results-dir "$ARTIFACTS_DIR/writer-results/$LANE" \
         --task-ids "$TASKS" \
+        --task-graph "$ARTIFACTS_DIR/task-graph.json" \
         --package "${ARGUMENTS%%@g*}" \
         --generation "$(case "$ARGUMENTS" in *@g*) echo "${ARGUMENTS##*@g}";; *) echo 0;; esac)"
   # Serial slot 3: chained behind batch-2's guard; same law.
@@ -365,6 +371,7 @@ nodes:
         --worktree "$ARTIFACTS_DIR/wt/$LANE" \
         --routing "$ARTIFACTS_DIR/routing.json" \
         --results-dir "$ARTIFACTS_DIR/writer-results/$LANE" \
+        --task-graph "$ARTIFACTS_DIR/task-graph.json" \
         --package "${ARGUMENTS%%@g*}" \
         --generation "$(case "$ARGUMENTS" in *@g*) echo "${ARGUMENTS##*@g}";; *) echo 0;; esac)"
   - id: writer-serial-3-claude
@@ -394,6 +401,7 @@ nodes:
         --worktree "$ARTIFACTS_DIR/wt/$LANE" \
         --results-dir "$ARTIFACTS_DIR/writer-results/$LANE" \
         --task-ids "$TASKS" \
+        --task-graph "$ARTIFACTS_DIR/task-graph.json" \
         --package "${ARGUMENTS%%@g*}" \
         --generation "$(case "$ARGUMENTS" in *@g*) echo "${ARGUMENTS##*@g}";; *) echo 0;; esac)"
   - id: writer-shard-1-claude
@@ -409,6 +417,7 @@ nodes:
         --brief "$ARTIFACTS_DIR/briefs/shard-1-brief.md" \
         --worktree "$ARTIFACTS_DIR/wt/shard-1" \
         --results-dir "$ARTIFACTS_DIR/writer-results/shard-1" \
+        --task-graph "$ARTIFACTS_DIR/task-graph.json" \
         --task-ids "$TASKS" \
         --package "${ARGUMENTS%%@g*}" \
         --generation "$(case "$ARGUMENTS" in *@g*) echo "${ARGUMENTS##*@g}";; *) echo 0;; esac)"
@@ -425,6 +434,7 @@ nodes:
         --brief "$ARTIFACTS_DIR/briefs/shard-2-brief.md" \
         --worktree "$ARTIFACTS_DIR/wt/shard-2" \
         --results-dir "$ARTIFACTS_DIR/writer-results/shard-2" \
+        --task-graph "$ARTIFACTS_DIR/task-graph.json" \
         --task-ids "$TASKS" \
         --package "${ARGUMENTS%%@g*}" \
         --generation "$(case "$ARGUMENTS" in *@g*) echo "${ARGUMENTS##*@g}";; *) echo 0;; esac)"
@@ -441,6 +451,7 @@ nodes:
         --worktree "$ARTIFACTS_DIR/wt/test-author" \
         --routing "$ARTIFACTS_DIR/routing.json" \
         --results-dir "$ARTIFACTS_DIR/writer-results/test-author" \
+        --task-graph "$ARTIFACTS_DIR/task-graph.json" \
         --task-ids "$TASKS" \
         --package "${ARGUMENTS%%@g*}" \
         --generation "$(case "$ARGUMENTS" in *@g*) echo "${ARGUMENTS##*@g}";; *) echo 0;; esac)"

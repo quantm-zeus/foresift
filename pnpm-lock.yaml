@@ -332,6 +332,15 @@ importers:
         specifier: workspace:*
         version: link:../shared-schemas
 
+  packages/release-conformance:
+    devDependencies:
+      '@electric-sql/pglite':
+        specifier: ^0.5.6
+        version: 0.5.6
+      '@foresift/persistence':
+        specifier: workspace:*
+        version: link:../persistence
+
   packages/security:
     dependencies:
       '@foresift/domain':

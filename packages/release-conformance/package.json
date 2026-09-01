@@ -1,0 +1,23 @@
+{
+  "name": "@foresift/release-conformance",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Fail-closed release conformance and traceability services.",
+  "exports": {
+    ".": {
+      "types": "./src/index.ts",
+      "default": "./src/index.ts"
+    }
+  },
+  "scripts": {
+    "test": "bun test"
+  },
+  "dependencies": {
+    "@foresift/domain": "workspace:*",
+    "@foresift/persistence": "workspace:*",
+    "@foresift/requirement-manifest": "workspace:*",
+    "@foresift/shared-schemas": "workspace:*"
+  },
+  "devDependencies": {}
+}

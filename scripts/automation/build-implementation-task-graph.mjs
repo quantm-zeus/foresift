@@ -144,6 +144,12 @@ for (const u of units) {
   const paths = [];
   for (const bt of u.body.matchAll(BACKTICK_PATH)) {
     const p = bt[1].replace(/^\.\//, '');
+    // A backticked token containing whitespace is a COMMAND (e.g.
+    // `scripts/x/cli.mjs generate`), not a writable path — recording it as a
+    // predicted write made the evidence matcher compare a diff against a
+    // string that can never be a filename (observed live on T016, run
+    // 89c4b2b9). Commands are prose, never evidence paths.
+    if (/\s/.test(p)) continue;
     // `pnpm-lock.yaml` and root `package.json` are collectible at the repo
     // root: the lockfile mechanically follows every workspace package scaffold,
     // and acceptance suites run under the root unit project, whose

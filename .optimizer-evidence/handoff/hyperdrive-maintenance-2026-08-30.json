@@ -72,6 +72,11 @@
       "at": "2026-09-01T00:39Z",
       "event": "run e44f577a fatal: chained-column guard collision found live",
       "detail": "First production bounded-batch wave: guard-serial-1 refused core-batch-1 for 6 paths, guard-serial-3 refused core-batch-3 for 17 paths — all predicted by chain mates that inherit the column union BY DESIGN (mission item 4). Root-caused and fixed by PR #142 (chain-mate cross-lane exemption in wave-guard + integrator, two-way regressions); merged 4f8df2a. Both batch writers (core-batch-1 10m52s, core-batch-3) produced real committed work; the work is preserved on wave branches and the relaunch replans from the same tasks.md."
+    },
+    {
+      "at": "2026-09-01T01:2xZ",
+      "event": "PROOF: chain-mate exemption passes live guard (mission item 4)",
+      "detail": "Run 89c4b2b9: writer-serial-1 completed 10m52s; guard-serial-1 PASSED (331ms) — the identical lane+graph that deterministically refused in e44f577a. Chained batch writer-serial-2 dispatched behind the guard. Bounded decomposition + chaining + shared column now all proven on real work."
     }
   ],
   "h3MissionChecklist": {

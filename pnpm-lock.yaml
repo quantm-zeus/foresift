@@ -29,6 +29,9 @@ importers:
       '@foresift/provider-lifecycle':
         specifier: workspace:*
         version: link:packages/provider-lifecycle
+      '@foresift/release-conformance':
+        specifier: workspace:*
+        version: link:packages/release-conformance
       '@foresift/security':
         specifier: workspace:*
         version: link:packages/security

@@ -1,9 +1,9 @@
 {
   "schema": "foresift/maintenance-handoff@2",
   "currentSnapshot": {
-    "capturedAt": "2026-08-31T23:55:00Z",
-    "mainSha": "ba1409f5a1a5d740fdc721d789b886e2e5cdb22a",
-    "mainCi": "GREEN (run 33433216978 at ba1409f — #140 merged-main)",
+    "capturedAt": "2026-09-01T00:12:00Z",
+    "mainSha": "20ae4d220",
+    "mainCi": "GREEN (merged-main verified after #141 squash)",
     "milestone": "G0",
     "activePackage": {
       "id": "g0-traceability-conformance",
@@ -14,20 +14,13 @@
       "stage": "paused_fatal — run exhausted recovery policy after guard refusal (planner defect, fixed by #138); needs --recover-fatal once PR #139 lands",
       "completedUnits": "core lane committed 3 units (189b790/678d743/ef4af2d on foresift/wave/0ed9a3e2f3-d2f24429d0-core)"
     },
-    "openMaintenancePr": {
-      "number": 141,
-      "branch": "fix/core-batch-decomposition",
-      "headSha": "99bae0f",
-      "title": "bounded lane-scope decomposition — chained core-batch lanes (mission item 4)",
-      "ci": "pending at push time (run 33450356153); head now stacks the plan-shards-1 [P]-fold fix on cc04eb8/7b0e8bf"
-    },
+    "openMaintenancePr": null,
     "providerState": "claude limit 1 (backoff to 15:47Z), codex limit 1 HEALTHY, agy 3 — all active 0",
     "resourceState": "15GiB host, MemAvailable ~14.1GiB (0.86) — GREEN",
     "blockers": [
-      "g0-traceability paused_fatal AGAIN (run 95dbd50e): fresh recovery launch replanned from the diverged task worktree whose planner predates #138/#140/#141 and crashed on the plan-shards-1 [P]-fold edge. Fix path: merge #141 to main, then one-time manual merge of main into the task worktree (merge-tree probe clean), then recover-fatal again. Supervisor advanceArchonTaskWorktree is ff-only and skipped 'diverged' — that is correct behavior, not a defect.",
-      "PR #141 CI: process-7 GROUP TIMEOUT (2-core runner starvation, same class as #140) adjudicated with gh run rerun --failed; local green evidence 84/84 in 15.6s."
+      "g0-traceability running as run e44f577a (HYBRID_AGY, lanes=2): production proof of mission item 4 — first bounded-batch wave (core-batch-1 load 8 / core-batch-2 load 7 / core-batch-3 load 10 laneTooLarge-eligible, chained via guard+ff-only). No action while healthy."
     ],
-    "nextSafeAction": "await PR141 rerun verdict -> exact-head merge #141 (76a54b8) -> verify merged-main CI -> merge origin/main into task worktree foresift/g0-traceability-conformance (one-time, conflict probe clean) -> systemctl --user stop foresift-autopilot; --recover-fatal; start service -> verify worktree now replans with bounded lanes"
+    "nextSafeAction": "monitor run e44f577a to wave-settled -> verify batch chaining executed (merge --ff-only between core-batch worktrees) + guard verdicts -> P50/P95 evidence for item 4 -> then runtime proofs 3/5/6 -> G1 canary 2->3->4"
   },
   "history": [
     {
@@ -69,6 +62,11 @@
       "at": "2026-08-31T23:5xZ",
       "event": "PR #141 CI adjudication",
       "detail": "99bae0f run: targeted-router-e2e green-verdict failure (not reproducible on fresh main 3x, not reproducible in h3 worktree 3x, file unchanged since #99 — env flake). 76a54b8 run 33451217502: process-7 GROUP TIMEOUT (v2-throughput+v3-generations, 17m) — same 2-core-runner starvation class as #140; adjudicated via gh run rerun --failed backed by local green (84/84 in 15.6s on 4-core VPS)."
+    },
+    {
+      "at": "2026-09-01T00:06Z",
+      "event": "PR #141 MERGED (squash 20ae4d2) + g0-traceability recovered",
+      "detail": "Exact-head merge at 76a54b8 after adjudicated rerun green; merged-main CI green; branch recycled to fix/h3-maintenance from fresh main. Task worktree manually merged origin/main (ed524fc -> 39d29171) so recover-fatal's ff-only advance skipped 'current'; fresh launch run e44f577a replanned 25 units into core-batch-1(5u,load8)/core-batch-2(4u,load7,chains core-batch-1)/core-batch-3(8u,load10,chains core-batch-2) + parallel shards — mission item 4 now executing on real work."
     }
   ],
   "h3MissionChecklist": {

@@ -12,3 +12,12 @@ export declare function claimCompletedUnits(input: {
   nominated: string[];
   deferred: Array<{ taskId: string; reason: string }>;
 };
+export declare function requireTaskGraphForCompletionEvidence(input: {
+  graphPath: string | undefined | null;
+  taskIds: Array<string | undefined | null>;
+  engine: string;
+  lane: string;
+}): {
+  graph: Record<string, unknown>;
+  unitsById: Map<string, Record<string, unknown>>;
+};

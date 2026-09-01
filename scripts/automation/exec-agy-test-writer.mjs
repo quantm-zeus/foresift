@@ -5,7 +5,11 @@ import { join } from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { classifyOwnedPath, validateLaneOwnership } from './path-ownership.mjs';
 import { acquireLanePermit, releaseLanePermit, resolvePoolStateDir } from './provider-pool.mjs';
-import { claimCompletedUnits, parseTaskGraph } from './writer-task-evidence.mjs';
+import {
+  claimCompletedUnits,
+  parseTaskGraph,
+  requireTaskGraphForCompletionEvidence,
+} from './writer-task-evidence.mjs';
 
 function fail(message) {
   console.error(`agy-test-writer: ${message}`);
@@ -83,6 +87,14 @@ export function runAgyTestWriter(input) {
   for (const field of ['model', 'reasoning', 'providerTimeout'])
     if (typeof route[field] !== 'string' || !route[field])
       throw new Error(`AGY_TEST_ROUTE_INVALID: ${input.lane}.${field}`);
+  // P0 hardening: evidence-backed completion requires a valid task graph
+  // BEFORE permit acquisition / provider spawn (live 89c4b2b9 root cause).
+  requireTaskGraphForCompletionEvidence({
+    graphPath: input['task-graph'],
+    taskIds: (input['task-ids'] ?? '').split(',').filter(Boolean),
+    engine: 'AGY',
+    lane: input.lane,
+  });
   const resultDir = input['results-dir'];
   mkdirSync(resultDir, { recursive: true });
   const baseHead = git(['rev-parse', 'HEAD'], input.worktree).stdout.trim();

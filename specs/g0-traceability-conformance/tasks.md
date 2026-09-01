@@ -187,13 +187,13 @@
 
 ## Phase 7 — Convergence: full gate + traceability matrix
 
-- [ ] T024 Run the full gate: `pnpm --filter @foresift/requirement-manifest test`,
+- [ ] T024 [evidence: VERIFICATION_ONLY] Run the full gate: `pnpm --filter @foresift/requirement-manifest test`,
       `pnpm --filter @foresift/release-conformance test`,
       `packages/persistence/test/migrator.spec.ts` green with the extended registry,
       `scripts/verify-release-conformance/cli.mjs` exit 0, `docs/generated` `--check` green,
       then `pnpm verify` and `pnpm spec:verify` at HEAD; fix all findings additively (no amend,
       no rebase). — **FR-TRACE-001**, **FR-TRACE-003** — AC-265, AC-266
-- [ ] T025 Close the traceability matrix below; confirm the material decisions of this plan
+- [ ] T025 [executor: COORDINATOR] [evidence: COORDINATOR_ARTIFACT] Close the traceability matrix below; confirm the material decisions of this plan
       (proposed ADR texts: read-only manifest consumption, keyed-hash gate evidence with
       structurally inexpressible booleans, normalized-hash provenance) are carried into the ADR
       process through convergence review, not as predicted writes of this package. —

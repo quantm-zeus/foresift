@@ -46,6 +46,7 @@
     "@foresift/object-store": "workspace:*",
     "@foresift/persistence": "workspace:*",
     "@foresift/provider-lifecycle": "workspace:*",
+    "@foresift/requirement-manifest": "workspace:*",
     "@foresift/security": "workspace:*",
     "@foresift/shared-schemas": "workspace:*",
     "@types/bun": "1.4.0",

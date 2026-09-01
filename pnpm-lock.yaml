@@ -29,6 +29,9 @@ importers:
       '@foresift/provider-lifecycle':
         specifier: workspace:*
         version: link:packages/provider-lifecycle
+      '@foresift/requirement-manifest':
+        specifier: workspace:*
+        version: link:packages/requirement-manifest
       '@foresift/security':
         specifier: workspace:*
         version: link:packages/security
@@ -331,6 +334,8 @@ importers:
       '@foresift/shared-schemas':
         specifier: workspace:*
         version: link:../shared-schemas
+
+  packages/requirement-manifest: {}
 
   packages/security:
     dependencies:

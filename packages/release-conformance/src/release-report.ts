@@ -2,6 +2,7 @@
 import { createHash } from 'node:crypto';
 import { readdir, readFile } from 'node:fs/promises';
 import path from 'node:path';
+import { ReleaseReportRecordSchema } from '@foresift/shared-schemas';
 import { generateSbomFromLockfile } from './sbom.ts';
 
 const HASH = /^[a-f0-9]{64}$/;
@@ -192,6 +193,13 @@ export function verifyReleaseReport(
 ): { isValid: boolean; errors: string[] } {
   const errors: string[] = [];
   if (!record(input)) return { isValid: false, errors: ['report must be an object'] };
+  const schemaResult = ReleaseReportRecordSchema.safeParse(input);
+  if (!schemaResult.success) {
+    for (const issue of schemaResult.error.issues) {
+      const field = issue.path.length === 0 ? 'report' : issue.path.join('.');
+      errors.push(`${field}: ${issue.message}`);
+    }
+  }
   const required = [
     'reportId',
     'documentHash',

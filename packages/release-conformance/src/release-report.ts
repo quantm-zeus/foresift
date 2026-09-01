@@ -232,8 +232,13 @@ export function verifyReleaseReport(
     if (!record(input[field])) errors.push(`${field} must be an object`);
     else
       for (const [name, hash] of Object.entries(input[field])) {
-        if (!name || typeof hash !== 'string' || !PREFIXED_HASH.test(hash))
-          errors.push(`${field}.${name} must be a sha256: hash`);
+        if (
+          !name ||
+          typeof hash !== 'string' ||
+          !PREFIXED_HASH.test(hash) ||
+          /^sha256:0+$/.test(hash)
+        )
+          errors.push(`${field}.${name} must be a non-zero sha256: hash`);
       }
   }
   if (!record(input.conformanceResults)) errors.push('conformanceResults must be an object');
@@ -264,9 +269,15 @@ export function verifyReleaseReport(
         errors.push(`activationState.${key} is required`);
     }
   if (!record(input.rollbackTarget)) errors.push('rollbackTarget must be an object');
-  else
+  else {
     for (const key of ['previousReportId', 'previousDocumentHash', 'previousManifestHash']) {
       if (input.rollbackTarget[key] === undefined) errors.push(`rollbackTarget.${key} is required`);
     }
+    for (const key of ['previousDocumentHash', 'previousManifestHash']) {
+      const value = input.rollbackTarget[key];
+      if (typeof value !== 'string' || !HASH.test(value) || /^0+$/.test(value))
+        errors.push(`rollbackTarget.${key} must be a non-zero SHA-256 hash`);
+    }
+  }
   return { isValid: errors.length === 0, errors };
 }

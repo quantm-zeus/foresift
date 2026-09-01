@@ -1,8 +1,8 @@
 {
   "schema": "foresift/maintenance-handoff@2",
   "currentSnapshot": {
-    "capturedAt": "2026-09-01T00:45:00Z",
-    "mainSha": "20ae4d220",
+    "capturedAt": "2026-09-01T01:10:00Z",
+    "mainSha": "4f8df2a2f",
     "mainCi": "GREEN (merged-main verified after #141 squash)",
     "milestone": "G0",
     "activePackage": {
@@ -14,19 +14,13 @@
       "stage": "paused_fatal — run exhausted recovery policy after guard refusal (planner defect, fixed by #138); needs --recover-fatal once PR #139 lands",
       "completedUnits": "core lane committed 3 units (189b790/678d743/ef4af2d on foresift/wave/0ed9a3e2f3-d2f24429d0-core)"
     },
-    "openMaintenancePr": {
-      "number": 142,
-      "branch": "fix/chained-lane-guard-collision",
-      "headSha": "a4bf7b4",
-      "title": "chain-mate cross-lane exemption (live e44f577a guard refusal)",
-      "ci": "pending"
-    },
+    "openMaintenancePr": null,
     "providerState": "claude limit 1 (backoff to 15:47Z), codex limit 1 HEALTHY, agy 3 — all active 0",
     "resourceState": "15GiB host, MemAvailable ~14.1GiB (0.86) — GREEN",
     "blockers": [
-      "g0-traceability run e44f577a: guard-serial-1 refused core-batch-1 (6 paths predicted by chain mates core-batch-2/3 — column union inherited BY DESIGN). Root-caused: guard/integrator cross-lane clause lacks chain-mate exemption. PR #142 open; run continues (writer-serial-3 in flight) and will need recovery/repair after #142 lands — do NOT recover-fatal before merging #142 or the next wave hits the identical refusal."
+      "g0-traceability paused_fatal (run e44f577a): the #142 fix WAS NOT in that run — guard-serial-3 also refused (same chain-mate class) after guard-serial-1. Root cause fixed and merged as PR #142 (4f8df2a). Recovery path: merge main into the task worktree, then recover-fatal."
     ],
-    "nextSafeAction": "merge #142 (exact-head a4bf7b4) -> verify merged-main CI -> merge main into task worktree (probe first) -> recover-fatal to relaunch the batched wave with the fixed guard"
+    "nextSafeAction": "after merged-main CI green at 4f8df2a: merge origin/main into task worktree (probe first) -> systemctl --user stop foresift-autopilot; --recover-fatal; start -> verify the relaunched wave passes guard-serial-1..3 with chain-mate exemption"
   },
   "history": [
     {
@@ -73,6 +67,11 @@
       "at": "2026-09-01T00:06Z",
       "event": "PR #141 MERGED (squash 20ae4d2) + g0-traceability recovered",
       "detail": "Exact-head merge at 76a54b8 after adjudicated rerun green; merged-main CI green; branch recycled to fix/h3-maintenance from fresh main. Task worktree manually merged origin/main (ed524fc -> 39d29171) so recover-fatal's ff-only advance skipped 'current'; fresh launch run e44f577a replanned 25 units into core-batch-1(5u,load8)/core-batch-2(4u,load7,chains core-batch-1)/core-batch-3(8u,load10,chains core-batch-2) + parallel shards — mission item 4 now executing on real work."
+    },
+    {
+      "at": "2026-09-01T00:39Z",
+      "event": "run e44f577a fatal: chained-column guard collision found live",
+      "detail": "First production bounded-batch wave: guard-serial-1 refused core-batch-1 for 6 paths, guard-serial-3 refused core-batch-3 for 17 paths — all predicted by chain mates that inherit the column union BY DESIGN (mission item 4). Root-caused and fixed by PR #142 (chain-mate cross-lane exemption in wave-guard + integrator, two-way regressions); merged 4f8df2a. Both batch writers (core-batch-1 10m52s, core-batch-3) produced real committed work; the work is preserved on wave branches and the relaunch replans from the same tasks.md."
     }
   ],
   "h3MissionChecklist": {

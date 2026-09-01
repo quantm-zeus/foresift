@@ -1536,7 +1536,39 @@ process.exit(${JSON.stringify(options.exitCode ?? 0)});
       };
       writeFileSync(routingPath, JSON.stringify(routing, null, 2));
 
-      return { dir, binDir, wt, brief, routingPath, resultsDir, routing, recordPath };
+      // P0 hardening: the evidence gate requires a valid task graph before
+      // any AGY spawn. The fixture graph carries T103 with the test writes
+      // the mock writer produces.
+      const graphPath = join(dir, 'task-graph.json');
+      writeFileSync(
+        graphPath,
+        JSON.stringify({
+          schema: 'foresift/impl-task-graph@1',
+          units: [
+            {
+              id: 'T103',
+              done: false,
+              parallelizable: true,
+              phase: 'Phase B',
+              body: 'author tests',
+              requirements: [],
+              acceptanceCriteria: [],
+              predictedWrites: [],
+              productWrites: [],
+              testWrites: ['tests/a.spec.ts'],
+              testOnly: true,
+              productWork: false,
+              outOfScopeWrites: [],
+              testRefs: ['tests/a.spec.ts'],
+              dependsOn: [],
+              evidence: 'TEST_PROOF',
+              estimatedSize: 'small',
+            },
+          ],
+        }),
+      );
+
+      return { dir, binDir, wt, brief, routingPath, resultsDir, routing, recordPath, graphPath };
     }
 
     it('fails closed when --routing argument or file is missing or invalid', async () => {
@@ -1546,6 +1578,8 @@ process.exit(${JSON.stringify(options.exitCode ?? 0)});
       // Missing routing argument
       expect(() =>
         mod.runAgyTestWriter({
+          'task-ids': 'T103',
+          'task-graph': fx.graphPath,
           package: 'pkg-test',
           generation: '0',
           lane: 'test-author',
@@ -1558,6 +1592,8 @@ process.exit(${JSON.stringify(options.exitCode ?? 0)});
       // Non-existent routing file
       expect(() =>
         mod.runAgyTestWriter({
+          'task-ids': 'T103',
+          'task-graph': fx.graphPath,
           package: 'pkg-test',
           generation: '0',
           lane: 'test-author',
@@ -1573,6 +1609,8 @@ process.exit(${JSON.stringify(options.exitCode ?? 0)});
       writeFileSync(emptyRoutingPath, JSON.stringify({ lanes: [] }));
       expect(() =>
         mod.runAgyTestWriter({
+          'task-ids': 'T103',
+          'task-graph': fx.graphPath,
           package: 'pkg-test',
           generation: '0',
           lane: 'test-author',
@@ -1593,6 +1631,8 @@ process.exit(${JSON.stringify(options.exitCode ?? 0)});
       );
       expect(() =>
         mod.runAgyTestWriter({
+          'task-ids': 'T103',
+          'task-graph': fx.graphPath,
           package: 'pkg-test',
           generation: '0',
           lane: 'test-author',
@@ -1618,6 +1658,8 @@ process.exit(${JSON.stringify(options.exitCode ?? 0)});
         writeFileSync(invalidPath, JSON.stringify({ lanes: [invalidRoute] }));
         expect(() =>
           mod.runAgyTestWriter({
+            'task-ids': 'T103',
+            'task-graph': fx.graphPath,
             package: 'pkg-test',
             generation: '0',
             lane: 'test-author',
@@ -1667,6 +1709,7 @@ process.exit(${JSON.stringify(options.exitCode ?? 0)});
           routing: fx.routingPath,
           'results-dir': fx.resultsDir,
           'task-ids': 'T103',
+          'task-graph': fx.graphPath,
         });
 
         expect(existsSync(fx.recordPath)).toBe(true);
@@ -1705,12 +1748,11 @@ process.exit(${JSON.stringify(options.exitCode ?? 0)});
         expect(result.model).toBe('gemini-3.7-flash-high');
         expect(result.reasoning).toBe('high');
         expect(result.providerTimeout).toBe('40m');
-        // H3 P0-1 evidence-backed completion: the fixture's task graph is not
-        // supplied to the writer (--task-graph absent ⇒ evidence unavailable),
-        // so the writer nominates NOTHING for T103 (fail-closed) — the old
-        // unconditional claim of every --task-ids is gone.
-        expect(result.completed).toEqual([]);
-        expect(result.deferredUnits).toEqual([{ taskId: 'T103', reason: 'unknown unit T103' }]);
+        // H3 P0-1 evidence-backed completion: the writer now receives the
+        // fixture graph; T103 is TEST_PROOF and its testWrites ARE in the
+        // mock lane's diff, so the nomination is PROVEN rather than absent.
+        expect(result.completed).toEqual(['T103']);
+        expect(result.deferredUnits).toEqual([]);
         expect(result.baselineClassifications).toEqual(['REGRESSION_RED']);
         expect(result.testsRun).toEqual(['tests/x/a.spec.ts']);
 
@@ -1766,6 +1808,8 @@ process.exit(${JSON.stringify(options.exitCode ?? 0)});
         process.env.PATH = `${fx.binDir}:${prevPath}`;
         expect(() =>
           mod.runAgyTestWriter({
+            'task-ids': 'T103',
+            'task-graph': fx.graphPath,
             package: 'pkg-test',
             generation: '0',
             lane: 'test-author',
@@ -1795,6 +1839,8 @@ process.exit(${JSON.stringify(options.exitCode ?? 0)});
         process.env.PATH = `${fxInvalid.binDir}:${prevPath}`;
         expect(() =>
           mod.runAgyTestWriter({
+            'task-ids': 'T103',
+            'task-graph': fxInvalid.graphPath,
             package: 'pkg-test',
             generation: '0',
             lane: 'test-author',
@@ -1819,6 +1865,8 @@ process.exit(${JSON.stringify(options.exitCode ?? 0)});
         process.env.PATH = `${fxEmpty.binDir}:${prevPath}`;
         expect(() =>
           mod.runAgyTestWriter({
+            'task-ids': 'T103',
+            'task-graph': fxEmpty.graphPath,
             package: 'pkg-test',
             generation: '0',
             lane: 'test-author',
@@ -1845,6 +1893,8 @@ process.exit(${JSON.stringify(options.exitCode ?? 0)});
         process.env.PATH = `${fxFail.binDir}:${prevPath}`;
         expect(() =>
           mod.runAgyTestWriter({
+            'task-ids': 'T103',
+            'task-graph': fxFail.graphPath,
             package: 'pkg-test',
             generation: '0',
             lane: 'test-author',
@@ -1865,6 +1915,8 @@ process.exit(${JSON.stringify(options.exitCode ?? 0)});
         process.env.PATH = `${fxNoResult.binDir}:${prevPath}`;
         expect(() =>
           mod.runAgyTestWriter({
+            'task-ids': 'T103',
+            'task-graph': fxNoResult.graphPath,
             package: 'pkg-test',
             generation: '0',
             lane: 'test-author',
@@ -2074,7 +2126,36 @@ writeFileSync(${JSON.stringify(join(resultsDir, 'agent-result.json'))}, JSON.str
           ],
         }),
       );
-      return { dir, wt, resultsDir, routingPath, briefPath, recordPath };
+      // P0 hardening: evidence gate needs a valid graph with T006 (TEST_PROOF).
+      const graphPath = join(dir, 'task-graph.json');
+      writeFileSync(
+        graphPath,
+        JSON.stringify({
+          schema: 'foresift/impl-task-graph@1',
+          units: [
+            {
+              id: 'T006',
+              done: false,
+              parallelizable: true,
+              phase: 'Phase B',
+              body: 'author tests',
+              requirements: [],
+              acceptanceCriteria: [],
+              predictedWrites: [],
+              productWrites: [],
+              testWrites: ['tests/a.spec.ts'],
+              testOnly: true,
+              productWork: false,
+              outOfScopeWrites: [],
+              testRefs: ['tests/a.spec.ts'],
+              dependsOn: [],
+              evidence: 'TEST_PROOF',
+              estimatedSize: 'small',
+            },
+          ],
+        }),
+      );
+      return { dir, wt, resultsDir, routingPath, briefPath, recordPath, graphPath };
     }
 
     it('re-invokes AGY to fix type errors in its own files and completes', async () => {
@@ -2091,6 +2172,8 @@ writeFileSync(${JSON.stringify(join(resultsDir, 'agent-result.json'))}, JSON.str
           worktree: fx.wt,
           routing: fx.routingPath,
           'results-dir': fx.resultsDir,
+          'task-ids': 'T006',
+          'task-graph': fx.graphPath,
         });
         expect(result.typeRepair.attempted).toBe(true);
         expect(result.typeRepair.remaining).toEqual([]);

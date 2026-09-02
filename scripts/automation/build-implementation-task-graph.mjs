@@ -169,9 +169,28 @@ for (const u of units) {
   // exception (e.g. a guard task that merely names an out-of-scope file) is
   // recorded separately and DEMOTES the unit to serial execution — it never
   // widens what a parallel writer may touch.
+  //
+  // Directory tokens (live T001/T002 class, run aa3e8015): a scaffold task
+  // names its package DIRECTORY (`packages/requirement-manifest`), but the
+  // binding scope is `packages/requirement-manifest/**` — `**/` requires a
+  // trailing slash, so the bare directory never matched and the task's whole
+  // write set fell to outOfScopeWrites. A token that IS the directory prefix
+  // of some scope glob is squarely inside that scope (writing the directory
+  // means writing its contents): normalize it to the scope's directory form
+  // for classification. Nothing here widens any scope — the token must be a
+  // strict prefix of a scope's literal part.
+  const scopeDirs = (pkg.writeScopes ?? [])
+    .map((g) => g.replace(/\*\*.*$/, '').replace(/\*.*$/, ''))
+    .filter((d) => d.endsWith('/'))
+    .map((d) => d.slice(0, -1));
+  const classifyPath = (p) =>
+    scopeRes.some((re) => re.test(p)) ||
+    scopeDirs.some(
+      (d) => p === d || (p.startsWith(d + '/') && !p.slice(d.length + 1).includes('/')),
+    );
   const inScope = [];
   const outOfScope = [];
-  for (const p of paths) (scopeRes.some((re) => re.test(p)) ? inScope : outOfScope).push(p);
+  for (const p of paths) (classifyPath(p) ? inScope : outOfScope).push(p);
   const words = u.body.split(/\s+/).filter(Boolean).length;
   u.requirements = reqs;
   u.acceptanceCriteria = acs;

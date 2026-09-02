@@ -20,6 +20,10 @@ function sha256(value: string): string {
   return createHash('sha256').update(value).digest('hex');
 }
 
+function compareText(left: string, right: string): number {
+  return left < right ? -1 : left > right ? 1 : 0;
+}
+
 function unquote(value: string): string {
   const trimmed = value.trim();
   if (
@@ -72,17 +76,25 @@ export async function generateSbomFromLockfile(lockfilePath: string): Promise<Sb
     components.push({ ...coordinate, integrity, type: 'npm' });
   }
 
-  components.sort(
+  const uniqueComponents = [
+    ...new Map(
+      components.map((component) => [
+        `${component.name}\u0000${component.version}\u0000${component.integrity}`,
+        component,
+      ]),
+    ).values(),
+  ];
+  uniqueComponents.sort(
     (left, right) =>
-      left.name.localeCompare(right.name) ||
-      left.version.localeCompare(right.version) ||
-      left.integrity.localeCompare(right.integrity),
+      compareText(left.name, right.name) ||
+      compareText(left.version, right.version) ||
+      compareText(left.integrity, right.integrity),
   );
-  const canonicalInventory = JSON.stringify(components);
+  const canonicalInventory = JSON.stringify(uniqueComponents);
   return {
     bomFormat: 'CycloneDX',
     specVersion: '1.5',
-    components,
+    components: uniqueComponents,
     inventoryHash: sha256(canonicalInventory),
   };
 }

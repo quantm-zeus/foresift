@@ -5,7 +5,7 @@ const GRAMMARS: readonly [IdNamespace, RegExp][] = [
   ['requirement', /^FR-[A-Z][A-Z0-9]*-\d{3}$/],
   ['acceptance', /^AC-\d{3}$/],
   ['invariant', /^INV-\d{3}$/],
-  ['adr', /^ADR-\d{3,4}$/],
+  ['adr', /^ADR-\d{4}$/],
 ];
 
 export function validateIdGrammar(id: unknown): {
@@ -105,7 +105,26 @@ export function validateSupersessionContract(options: {
   readonly newItems?: readonly { id: string; text?: string }[];
   readonly historicalReleasedIds?: ReadonlySet<string>;
 }): { valid: true } {
-  const links = new Map((options.supersessionLedger ?? []).map((link) => [link.replacedId, link]));
+  const links = new Map<string, SupersessionLink>();
+  for (const link of options.supersessionLedger ?? []) {
+    if (links.has(link.replacedId)) {
+      throw new Error(`SUPERSESSION_LINK_INVALID: duplicate link for ${link.replacedId}`);
+    }
+    const replacedGrammar = validateIdGrammar(link.replacedId);
+    const replacementGrammar = validateIdGrammar(link.supersededById);
+    if (
+      !replacedGrammar.valid ||
+      !replacementGrammar.valid ||
+      replacedGrammar.namespace !== replacementGrammar.namespace ||
+      link.namespace !== replacedGrammar.namespace ||
+      !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?Z$/.test(link.recordedAt) ||
+      Number.isNaN(Date.parse(link.recordedAt)) ||
+      !link.reason?.trim()
+    ) {
+      throw new Error(`SUPERSESSION_LINK_INVALID: malformed link for ${link.replacedId}`);
+    }
+    links.set(link.replacedId, link);
+  }
   for (const replacedId of options.replacedIds ?? []) {
     const link = links.get(replacedId);
     if (!link || !link.supersededById || !link.reason?.trim()) {

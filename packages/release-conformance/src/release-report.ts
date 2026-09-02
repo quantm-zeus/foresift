@@ -4,6 +4,7 @@ import { readdir, readFile } from 'node:fs/promises';
 import path from 'node:path';
 import { ReleaseReportRecordSchema } from '@foresift/shared-schemas';
 import { generateSbomFromLockfile } from './sbom.ts';
+import { loadOrphanExceptions } from './orphans.ts';
 
 const HASH = /^[a-f0-9]{64}$/;
 const PREFIXED_HASH = /^sha256:[a-f0-9]{64}$/;
@@ -57,13 +58,24 @@ export interface BuildReleaseReportOptions {
   readonly previousReport: ReleaseReportRecord['rollbackTarget'];
   readonly conformanceResults?: ReleaseReportRecord['conformanceResults'];
   readonly deviations?: ReleaseReportRecord['unresolvedDeviations'];
-  readonly gateEvidence?: readonly { gateKind?: string; isValid?: boolean }[];
+  readonly gateEvidence?: readonly {
+    gateKind?: string;
+    evidenceId?: string;
+    isValid?: boolean;
+    reason?: string;
+  }[];
+  /** Override the reviewed exception ledger, primarily for isolated repository projections. */
+  readonly exceptionLedgerPath?: string;
   /** Deterministic clock override for reproducibility checks and historical rebuilds. */
   readonly fixedTimestamp?: string;
 }
 
 function sha256(content: string | Uint8Array): string {
   return createHash('sha256').update(content).digest('hex');
+}
+
+function compareText(left: string, right: string): number {
+  return left < right ? -1 : left > right ? 1 : 0;
 }
 
 async function hashFiles(root: string, directory: string, predicate: (name: string) => boolean) {
@@ -104,14 +116,19 @@ export async function buildReleaseReport(
     options.repoRoot,
     'docs/spec/crypto_intelligence_agent_gateway_PRD_FINAL_v6.0.audit.json',
   );
-  const [document, manifest, audit, sbom, migrationHashes, schemaHashes] = await Promise.all([
-    readFile(documentPath),
-    readFile(manifestPath),
-    readJson(auditPath),
-    generateSbomFromLockfile(path.join(options.repoRoot, 'pnpm-lock.yaml')),
-    hashFiles(options.repoRoot, 'migrations', (name) => name.endsWith('.sql')),
-    hashFiles(options.repoRoot, 'packages/shared-schemas/src', (name) => name.endsWith('.ts')),
-  ]);
+  const exceptionLedgerPath =
+    options.exceptionLedgerPath ??
+    path.join(options.repoRoot, 'packages/release-conformance/src/orphan-exceptions.json');
+  const [document, manifest, audit, sbom, migrationHashes, schemaHashes, exceptionLedger] =
+    await Promise.all([
+      readFile(documentPath),
+      readFile(manifestPath),
+      readJson(auditPath),
+      generateSbomFromLockfile(path.join(options.repoRoot, 'pnpm-lock.yaml')),
+      hashFiles(options.repoRoot, 'migrations', (name) => name.endsWith('.sql')),
+      hashFiles(options.repoRoot, 'packages/shared-schemas/src', (name) => name.endsWith('.ts')),
+      loadOrphanExceptions(exceptionLedgerPath),
+    ]);
   const documentHash = sha256(document);
   const manifestHash = sha256(manifest);
   const auditRecord = record(audit) ? audit : {};
@@ -136,11 +153,37 @@ export async function buildReleaseReport(
     findings: [],
   };
   const conformanceResults = options.conformanceResults ?? defaultConformance;
-  const gatesPassed = (options.gateEvidence ?? [])
+  const gateEvidence = options.gateEvidence ?? [];
+  const gatesPassed = gateEvidence
     .filter((item) => item.isValid && item.gateKind)
     .map((item) => `gate:${item.gateKind!.toLowerCase().replace('_', '-')}`)
-    .sort();
-  const status = conformanceResults.overall === 'FAILED' ? 'BLOCKED' : 'ACTIVE';
+    .sort(compareText);
+  const ledgerDeviations: ReleaseReportRecord['unresolvedDeviations'] =
+    exceptionLedger.exceptions.map((exception) => ({
+      id: `orphan-exception:${exception.pathPattern}`,
+      rule: 'ORPHAN_EXCEPTION',
+      path: exception.pathPattern,
+      justification: exception.justification,
+    }));
+  const refusedEvidence: ReleaseReportRecord['unresolvedDeviations'] = gateEvidence
+    .filter((evidence) => !evidence.isValid)
+    .map((evidence, index) => ({
+      id: evidence.evidenceId ?? `gate-evidence:${index}`,
+      rule: 'GATE_EVIDENCE_REFUSED',
+      path: evidence.gateKind ? `gate:${evidence.gateKind}` : 'gate:unknown',
+      justification: evidence.reason ?? 'gate evidence did not pass evaluation',
+    }));
+  const unresolvedDeviations = [
+    ...ledgerDeviations,
+    ...refusedEvidence,
+    ...(options.deviations ?? []),
+  ].sort((left, right) => compareText(left.id, right.id) || compareText(left.path, right.path));
+  const status: ReleaseReportRecord['activationState']['status'] =
+    conformanceResults.overall === 'FAILED' || gateEvidence.some((item) => !item.isValid)
+      ? 'BLOCKED'
+      : gateEvidence.length === 0
+        ? 'PENDING'
+        : 'ACTIVE';
   const stableIdentity = sha256(
     JSON.stringify({
       milestone: options.milestone,
@@ -151,7 +194,7 @@ export async function buildReleaseReport(
       schemaHashes,
       dependencySbomHash: sbom.inventoryHash,
       conformanceResults,
-      deviations: options.deviations ?? [],
+      deviations: unresolvedDeviations,
       gatesPassed,
       rollbackTarget: options.previousReport,
     }),
@@ -165,7 +208,7 @@ export async function buildReleaseReport(
     schemaHashes,
     dependencySbomHash: sbom.inventoryHash,
     conformanceResults,
-    unresolvedDeviations: [...(options.deviations ?? [])].sort((a, b) => a.id.localeCompare(b.id)),
+    unresolvedDeviations,
     activationState: {
       milestone: options.milestone,
       status,

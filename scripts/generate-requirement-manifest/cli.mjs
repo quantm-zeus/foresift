@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /** @requirement FR-TRACE-001 FR-TRACE-003 @acceptance AC-265 AC-266 */
 import { createHash } from 'node:crypto';
-import { access, mkdir, readFile, readdir, writeFile } from 'node:fs/promises';
+import { access, mkdir, readFile, readdir, unlink, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 
 const SOURCE_NAME = 'crypto_intelligence_agent_gateway_PRD_FINAL_v6.0.requirements.json';
@@ -26,6 +26,14 @@ function sha256(value) {
   return createHash('sha256').update(value).digest('hex');
 }
 
+function compareText(left, right) {
+  return left < right ? -1 : left > right ? 1 : 0;
+}
+
+function sortedUnique(values) {
+  return [...new Set(values.filter((value) => typeof value === 'string'))].sort(compareText);
+}
+
 async function exists(file) {
   try {
     await access(file);
@@ -43,7 +51,7 @@ async function walk(root, directory = '') {
   } catch {
     return result;
   }
-  for (const entry of entries.sort((a, b) => a.name.localeCompare(b.name))) {
+  for (const entry of entries.sort((a, b) => compareText(a.name, b.name))) {
     if (entry.name === '.git' || entry.name === 'node_modules' || entry.name === 'docs/generated')
       continue;
     const relative = path.posix.join(directory, entry.name);
@@ -80,14 +88,16 @@ function resolveRefs(refs, allFiles) {
         return allFiles.filter((file) => matcher.test(file));
       }),
     ),
-  ].sort();
+  ].sort(compareText);
 }
 
 async function loadTelemetry(root) {
   const telemetryRoot = path.join(root, 'telemetry');
   let names = [];
   try {
-    names = (await readdir(telemetryRoot)).filter((name) => name.endsWith('.catalog.json')).sort();
+    names = (await readdir(telemetryRoot))
+      .filter((name) => name.endsWith('.catalog.json'))
+      .sort(compareText);
   } catch {}
   const catalogs = [];
   for (const name of names) {
@@ -110,27 +120,32 @@ function telemetryEntriesFor(requirement, catalogs) {
         JSON.stringify(value).includes(requirement.id),
     )
     .map(({ path: catalogPath }) => catalogPath)
-    .sort();
+    .sort(compareText);
 }
 
 function validate(manifest, audit, sourceBytes) {
   const findings = [];
-  const namespaces = [
-    manifest.requirements,
-    manifest.acceptanceCriteria,
-    manifest.invariants,
-    manifest.adrs,
-  ];
-  const ids = namespaces.flat().map((item) => item.id);
+  const collectionNames = ['requirements', 'acceptanceCriteria', 'invariants', 'adrs'];
+  for (const name of collectionNames) {
+    if (!Array.isArray(manifest?.[name]))
+      findings.push({ rule: 'NORMATIVE_COLLECTION_REQUIRED', path: name });
+  }
+  const namespaces = collectionNames.map((name) =>
+    Array.isArray(manifest?.[name]) ? manifest[name] : [],
+  );
+  const ids = namespaces
+    .flat()
+    .map((item) => item.id)
+    .filter((id) => typeof id === 'string');
   const duplicateIds = ids.filter((id, index) => ids.indexOf(id) !== index);
   if (duplicateIds.length)
     findings.push({ rule: 'GLOBAL_ID_UNIQUENESS', ids: [...new Set(duplicateIds)].sort() });
   const expected = audit?.manifest ?? {};
   const counts = {
-    requirements: manifest.requirements.length,
-    acceptanceCriteria: manifest.acceptanceCriteria.length,
-    invariants: manifest.invariants.length,
-    adrs: manifest.adrs.length,
+    requirements: manifest.requirements?.length ?? 0,
+    acceptanceCriteria: manifest.acceptanceCriteria?.length ?? 0,
+    invariants: manifest.invariants?.length ?? 0,
+    adrs: manifest.adrs?.length ?? 0,
   };
   const auditCounts = {
     requirements: expected.requirements,
@@ -161,9 +176,10 @@ export async function generateOutputs(root) {
   const outputs = new Map();
   outputs.set('requirements.json', bytes(manifest));
 
-  const families = [...new Set(manifest.requirements.map((item) => item.family))].sort();
+  const sourceRequirements = Array.isArray(manifest.requirements) ? manifest.requirements : [];
+  const families = [...new Set(sourceRequirements.map((item) => item.family))].sort(compareText);
   for (const family of families) {
-    const requirements = manifest.requirements
+    const requirements = sourceRequirements
       .filter((item) => item.family === family)
       .map((item) => ({
         id: item.id,
@@ -185,11 +201,20 @@ export async function generateOutputs(root) {
         activationGateRefs: item.activationGateRefs,
         rollbackRefs: item.rollbackRefs,
       }));
+    const aggregate = (field) => sortedUnique(requirements.flatMap((item) => item[field] ?? []));
     outputs.set(
       `${family.replace(/^FR-/, '').toLowerCase()}-surfaces.json`,
       bytes({
         schemaVersion: 'foresift/requirement-surfaces@1',
         family,
+        surfaceRefs: aggregate('apiToolUiRefs'),
+        implementationRefs: aggregate('implementationRefs'),
+        resolvedImplementationPaths: aggregate('resolvedImplementationPaths'),
+        testRefs: aggregate('testRefs'),
+        telemetryRefs: aggregate('telemetryRefs'),
+        telemetryCatalogs: aggregate('telemetryCatalogs'),
+        schemaRefs: aggregate('schemaRefs'),
+        resolvedSchemaPaths: aggregate('resolvedSchemaPaths'),
         requirements,
       }),
     );
@@ -206,7 +231,7 @@ export async function generateOutputs(root) {
         normalizedDocumentSha256: manifest.document.normalizedSha256,
         canonicalProjectionSha256: sha256(outputs.get('requirements.json')),
       },
-      generatedFiles: [...outputs.keys(), 'requirement-manifest.integrity.json'].sort(),
+      generatedFiles: [...outputs.keys(), 'requirement-manifest.integrity.json'].sort(compareText),
     }),
   );
   return outputs;
@@ -226,8 +251,31 @@ async function run() {
   const root = process.cwd();
   const outputRoot = path.join(root, 'docs/generated');
   const outputs = await generateOutputs(root);
+  const integrity = JSON.parse(outputs.get('requirement-manifest.integrity.json'));
+  if (integrity.verdict !== 'VALID') {
+    console.error(
+      JSON.stringify({
+        error: 'requirement manifest validation failed',
+        findings: integrity.findings,
+      }),
+    );
+    process.exitCode = 1;
+    return;
+  }
   if (args[0] === 'generate') {
     await mkdir(outputRoot, { recursive: true });
+    const expectedNames = new Set(outputs.keys());
+    const existingNames = await readdir(outputRoot);
+    for (const name of existingNames) {
+      if (
+        !expectedNames.has(name) &&
+        (name.endsWith('-surfaces.json') ||
+          name === 'requirements.json' ||
+          name === 'requirement-manifest.integrity.json')
+      ) {
+        await unlink(path.join(outputRoot, name));
+      }
+    }
     for (const [name, content] of outputs) await writeFile(path.join(outputRoot, name), content);
     console.log(
       `generated ${outputs.size} deterministic files in docs/generated (requirements.json plus surfaces and integrity)`,
@@ -246,6 +294,20 @@ async function run() {
     }
     if (actual !== expected)
       drift.push({ path: `docs/generated/${name}`, reason: 'byte mismatch' });
+  }
+  let generatedNames = [];
+  try {
+    generatedNames = await readdir(outputRoot);
+  } catch {}
+  for (const name of generatedNames.sort(compareText)) {
+    if (
+      !outputs.has(name) &&
+      (name.endsWith('-surfaces.json') ||
+        name === 'requirements.json' ||
+        name === 'requirement-manifest.integrity.json')
+    ) {
+      drift.push({ path: `docs/generated/${name}`, reason: 'unexpected generated file' });
+    }
   }
   if (drift.length) {
     console.error(JSON.stringify({ error: 'generated documentation drift', findings: drift }));

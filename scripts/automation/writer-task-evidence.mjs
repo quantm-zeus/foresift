@@ -5,6 +5,7 @@
 // a writer may only nominate exact task IDs whose predicted writes actually
 // appear in the lane's own diff. Any DIFF never implies ALL assigned tasks.
 import { readFileSync } from 'node:fs';
+import { spawnSync } from 'node:child_process';
 import { nominateCompletedUnits, unitsIndexFromGraph } from './task-completion-evidence.mjs';
 
 /** Parse a task-graph JSON file into a unitsById index. Throws unreadable. */
@@ -76,4 +77,42 @@ export function claimCompletedUnits({ taskIds, changed, unitsById, blockers = []
     changedFiles: changed,
     blockers,
   });
+}
+
+/**
+ * Lane evidence paths (live run 7c98e02e, 2026-09-02): a lane's evidence
+ * diff is NOT just its uncommitted worktree status. Agents are instructed to
+ * "commit coherent production changes before exit" and frequently do —
+ * leaving the tree clean — so a `git status --porcelain`-only reading sees
+ * zero changed paths for a lane that made four real commits (run 7c98e02e
+ * core-batch-1: migrations + schema + manifest validation all committed, yet
+ * `dirty=[]` nominated nothing and the wave died integration-empty). The
+ * authoritative lane diff is base..HEAD (the same recomputation the guard
+ * and integrator use) UNION the still-uncommitted paths, so:
+ *   - committed-only work → the commit diff carries the evidence;
+ *   - uncommitted-only work → status carries it (and the caller's add/commit
+ *     block still sweeps it);
+ *   - mixed → both halves are seen, deduplicated.
+ * Paths are repo-relative in both halves, matching predictedWrites. A
+ * failed base resolution returns null — callers fall back to status-only
+ * rather than fabricating an empty evidence claim.
+ */
+export function laneEvidencePaths({ worktree, before }) {
+  const statusPaths = gitOut(['status', '--porcelain=v1', '-uall'], worktree)
+    .split('\n')
+    .filter(Boolean)
+    .map((line) => line.slice(3).split(' -> ').at(-1))
+    .filter(Boolean);
+  if (!before) return statusPaths;
+  const head = gitOut(['rev-parse', 'HEAD'], worktree);
+  if (!head) return statusPaths;
+  const committed = gitOut(['diff', '--name-only', `${before}..${head}`], worktree)
+    .split('\n')
+    .filter(Boolean);
+  return [...new Set([...committed, ...statusPaths])];
+}
+
+function gitOut(args, cwd) {
+  const r = spawnSync('git', args, { cwd, encoding: 'utf8' });
+  return r.status === 0 ? (r.stdout ?? '').trim() : null;
 }

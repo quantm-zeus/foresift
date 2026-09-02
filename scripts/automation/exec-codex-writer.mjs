@@ -8,6 +8,7 @@ import { buildCodexExecArgs, CODEX_SERVICE_TIER } from './codex-routing.mjs';
 import { validateLaneOwnership } from './path-ownership.mjs';
 import {
   claimCompletedUnits,
+  laneEvidencePaths,
   parseTaskGraph,
   requireTaskGraphForCompletionEvidence,
 } from './writer-task-evidence.mjs';
@@ -237,14 +238,13 @@ export function runCodexWriter(input) {
   if (classification !== 'SUCCESS')
     throw new Error(`CODEX_WRITER_${classification}: ${(run.stderr ?? '').slice(-500)}`);
 
-  const dirty = git(['status', '--porcelain=v1'], input.worktree)
-    .stdout.split('\n')
-    .filter(Boolean)
-    .map((line) => line.slice(3).split(' -> ').at(-1));
+  // Lane evidence diff (live 7c98e02e): committed work counts — status alone
+  // saw a clean tree after the agent's own commits and nominated nothing.
+  const evidencePaths = laneEvidencePaths({ worktree: input.worktree, before });
   const ownership = validateLaneOwnership({
     engine: 'CODEX',
     role: 'implementation',
-    changedPaths: dirty,
+    changedPaths: evidencePaths,
   });
   if (!ownership.ok)
     throw new Error(`${ownership.violationCode}: ${ownership.violatingPaths.join(',')}`);
@@ -268,8 +268,9 @@ export function runCodexWriter(input) {
   const head = git(['rev-parse', 'HEAD'], input.worktree).stdout.trim();
   // Evidence-backed completion (H3 P0-1): the old invariant — ANY commit ⇒
   // EVERY route.taskIds complete — is removed. Nominations require
-  // predicted-write evidence in this lane's actual diff; everything else is
-  // reported deferred and stays OPEN at the coordinator.
+  // predicted-write evidence in this lane's actual diff (committed ∪
+  // uncommitted); everything else is reported deferred and stays OPEN at the
+  // coordinator.
   const graphPath = input['task-graph'];
   let evidence = { graph: null, unitsById: null };
   if (graphPath) {
@@ -278,11 +279,11 @@ export function runCodexWriter(input) {
   }
   const claims = claimCompletedUnits({
     taskIds: route.taskIds,
-    changed: dirty,
+    changed: evidencePaths,
     unitsById: evidence.unitsById,
     blockers: [],
   });
-  const producedDiff = head !== before && dirty.length > 0;
+  const producedDiff = head !== before && evidencePaths.length > 0;
   const result = {
     schema: 'foresift/writer-result@1',
     shardId: input.lane,

@@ -13,6 +13,8 @@ import {
   validateRequirementManifest,
   validateIdGrammar,
   checkGlobalIdUniqueness,
+  checkStableOrdering,
+  checkDependencyDagAcyclicity,
   validateSupersessionContract,
 } from '@foresift/requirement-manifest';
 
@@ -79,4 +81,30 @@ describe('AC-265 negative (refusals)', () => {
       }),
     ).toThrow(/SUPERSESSION_LINK_REQUIRED|supersession link/i);
   });
+
+  it('refuses renumbered or out-of-order items across namespaces', () => {
+    const disorderedManifest = {
+      requirements: [
+        { id: 'FR-CORE-002', line: 200 },
+        { id: 'FR-CORE-001', line: 100 },
+      ],
+      acceptanceCriteria: [],
+      invariants: [],
+      adrs: [],
+    };
+    const ordering = checkStableOrdering(disorderedManifest as any);
+    expect(ordering.isStable).toBe(false);
+    expect(ordering.unstableNamespaces).toContain('requirements');
+  });
+
+  it('refuses cyclic dependency groups', () => {
+    const cyclicGroups = [
+      { id: 'G0', dependsOn: ['G1'] },
+      { id: 'G1', dependsOn: ['G0'] },
+    ];
+    const dagResult = checkDependencyDagAcyclicity(cyclicGroups as any);
+    expect(dagResult.isAcyclic).toBe(false);
+    expect(dagResult.cycles.length).toBeGreaterThan(0);
+  });
 });
+

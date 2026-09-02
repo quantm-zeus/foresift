@@ -81,6 +81,18 @@ export function taskEvidence(taskId, unitsById, changedFiles) {
       evidence.push(w);
       continue;
     }
+    // Directory predicted-write (live T001/T002 scaffold class, run aa3e8015):
+    // the graph builder normalizes a backticked package-directory token to the
+    // unit's predicted write. The lane diff contains FILES under it, never the
+    // directory itself, so an exact-match-only reading starves the scaffold
+    // task of evidence forever. A trailing-slash-free write that IS a real
+    // directory prefix proves any diff path strictly under it — same semantics
+    // the guard applies to scope directories.
+    const under = changedFiles.filter((p) => p.startsWith(w + '/'));
+    if (under.length > 0) {
+      evidence.push(...under);
+      continue;
+    }
     if (!GLOB_CHARS.test(w)) continue;
     if (w === '**')
       return {

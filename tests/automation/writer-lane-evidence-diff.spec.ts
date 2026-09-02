@@ -12,7 +12,10 @@ import { describe, test, expect, beforeEach, afterEach } from 'bun:test';
 import { spawnSync } from 'node:child_process';
 import { mkdtempSync, rmSync, writeFileSync, mkdirSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { join, dirname } from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+const repoRoot = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
 import {
   laneEvidencePaths,
   claimCompletedUnits,
@@ -142,5 +145,25 @@ describe('lane evidence diff = committed base..HEAD ∪ uncommitted status', () 
       .stdout.split('\n')
       .filter(Boolean);
     expect(laneEvidencePaths({ worktree: root, before }).sort()).toEqual(viaGit.sort());
+  });
+});
+
+describe('writer sources: uncommitted-sweep defined before use (live aa3e8015 ReferenceError)', () => {
+  const read = (p: string) => require('node:fs').readFileSync(p, 'utf8');
+
+  test('every writer defines `dirty` before any `dirty.length` reference', () => {
+    for (const rel of [
+      'scripts/automation/exec-codex-writer.mjs',
+      'scripts/automation/exec-claude-writer.mjs',
+      'scripts/automation/claude-lane-core.mjs',
+      'scripts/automation/exec-agy-test-writer.mjs',
+    ]) {
+      const src = read(join(repoRoot, rel));
+      const def = src.indexOf('const dirty =');
+      const use = src.indexOf('dirty.length');
+      expect(def, `${rel} defines dirty`).toBeGreaterThan(-1);
+      expect(use, `${rel} uses dirty`).toBeGreaterThan(-1);
+      expect(def, `${rel} dirty must precede its first use`).toBeLessThan(use);
+    }
   });
 });

@@ -566,8 +566,14 @@ nodes:
           > "$ARTIFACTS_DIR/wave-integration-empty.log" 2>&1
         printf '{"schema":"foresift/wave-fast-verdict@1","exitCode":90,"reason":"integration_empty"}\n' \
           > "$ARTIFACTS_DIR/wave-fast-verdict.json"
-        echo "WAVE_FAST_RED"
-        exit 0
+        # DISTINCT token (root cause run e9af6ec0): integration_empty is a
+        # deterministic control-plane condition, never an AI-repairable FAST
+        # product failure. The distinct token keeps the repair loop's when-gate
+        # from matching, and the NONZERO exit FAILS the node so wave-settled
+        # cannot bridge an empty wave to landing — the supervisor's recovery
+        # policy owns the replay decision (no provider spend, no false green).
+        echo "WAVE_INTEGRATION_EMPTY"
+        exit 90
       fi
       # ONE TRUE combined package FAST for the whole integrated wave.
       set +e
@@ -579,6 +585,16 @@ nodes:
       printf '{"schema":"foresift/wave-fast-verdict@1","exitCode":%d}\n' "$code" \
         > "$ARTIFACTS_DIR/wave-fast-verdict.json"
       if [ "$code" -eq 0 ]; then
+        # Non-file evidence completion (evidence-owner registry): FAST green
+        # means the canonical tree is verified — the owning context for
+        # VERIFICATION_ONLY / COORDINATOR_ARTIFACT units runs its deterministic
+        # commands/artifact checks here and flips those units via the
+        # coordinator-commit path. RED verification leaves units OPEN.
+        node scripts/automation/evidence-owner-registry.mjs \
+          --package "$PKG" \
+          --graph "$ARTIFACTS_DIR/task-graph.json" \
+          > "$ARTIFACTS_DIR/evidence-owner-report.json" 2>&1 || true
+        cat "$ARTIFACTS_DIR/evidence-owner-report.json" >&2 || true
         echo "WAVE_FAST_GREEN"
       else
         echo "WAVE_FAST_RED"
@@ -602,6 +618,13 @@ nodes:
   # wave-fast-verdict.json; this guard stays a sub-second verdict read fed by
   # archon's bare-form $ARTIFACTS_DIR textual substitution (process.env is NOT
   # exported into until_bash — probe-verified contract, ADR-0004 family).
+  # ── FAST RED: BOUNDED TARGETED REPAIR (override §14 — red really fails) ─────
+  # Runs ONLY on WAVE_FAST_RED from a REAL FAST run. integration_empty emits
+  # its own token (WAVE_INTEGRATION_EMPTY, live root cause run e9af6ec0: three
+  # AI repair rounds burned against a nonexistent FAST manifest because empty
+  # integration echoed WAVE_FAST_RED) so a deterministic control-plane
+  # condition NEVER opens AI repair; the supervisor's recovery policy owns the
+  # empty-integration replay decision.
   - id: fast-repair-loop
     depends_on: [integrate-and-fast]
     when: "$integrate-and-fast.output == 'WAVE_FAST_RED'"
@@ -672,7 +695,7 @@ nodes:
             integrated=$(node -e 'const r=JSON.parse(require("fs").readFileSync(process.argv[1],"utf8"));console.log((r.integrated??[]).length)' "$ARTIFACTS_DIR/integration-report.json")
             if [ "$dispatched" -gt 0 ] && [ "$integrated" -eq 0 ]; then
               code=90
-              echo "recheck held: integration still empty ($dispatched dispatched, none integrated)"
+              echo "WAVE_INTEGRATION_EMPTY (recheck held: integration still empty — $dispatched dispatched, none integrated)"
             else
               node scripts/automation/package-fast-verify.mjs --package "${ARGUMENTS%%@g*}" \
                 --artifacts-dir "$ARTIFACTS_DIR" \

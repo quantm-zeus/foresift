@@ -190,5 +190,10 @@ if (argCheck) {
   console.log(JSON.stringify(summary, null, 2));
   process.exit(missing.length === 0 ? 0 : 1);
 }
+// --init (seeding) path: exit 0 once the durable progress artifact is written.
+// Completeness is the AUDIT LOOP's business — decided by --check above, never
+// by the seeding pass. Live root cause (runs cca85aa2/944441a4, 2026-09-02):
+// --init exited 1 on a fresh skeleton (0/N audited is the EXPECTED initial
+// state), so `set -e` killed the milestone verify-repo node right after its
+// gate had passed — every AUDIT-mode run failed before its loop could start.
 console.log(JSON.stringify(summary, null, 2));
-process.exit(missing.length === 0 ? 0 : 1);

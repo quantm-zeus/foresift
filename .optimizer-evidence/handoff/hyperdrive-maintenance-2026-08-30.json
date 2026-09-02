@@ -1,10 +1,10 @@
 {
   "schema": "foresift/maintainer-snapshot@1",
   "updatedAt": "2026-09-02T10:05:00Z",
-  "mission": "Persistent maintainer — minimize authoritative project critical-path wall clock",
+  "mission": "Persistent maintainer \u2014 minimize authoritative project critical-path wall clock",
   "currentSnapshot": {
     "milestone": "G0",
-    "g0Progress": "8/8 PROVEN — milestone complete",
+    "g0Progress": "8/8 PROVEN \u2014 milestone complete",
     "packages": {
       "g0-contracts-data-truth": "PROVEN",
       "g0-security-perimeter": "PROVEN",
@@ -15,23 +15,27 @@
       "g0-mcp-surface": "PROVEN",
       "g0-traceability-conformance": "PROVEN (main 2b82882, PR #160 chore merged through protected exact-head path; product PRs #153/#157/#158; suite #155, planner #154, evidence #151)"
     },
-    "mainSha": "2b8288206e2f93eaf6e25097de316339a804019f",
-    "mainCi": "Fast Gates/Classify/State-Control-Plane green at merge time; Verify full check monitored to completion (confirm via gh run list --branch main --headSha 2b82882)",
-    "supervisor": "foresift-autopilot.service ACTIVE singleton; fatal pause cleared (--clear-fatal, no RUNNING packages orphaned); no active runs; optimization FROZEN until G0 durable",
+    "mainSha": "f3fe014aea9e6e774ef3168c4cb41d36b11693f8",
+    "mainCi": "Verify-green merged-main monitored through 2b82882/63fd648/cbbba40; f3fe014 monitored in flight",
+    "supervisor": "ACTIVE singleton; milestone-control run 9a061d3e (G0 AUDIT mode) executing verify-repo under no contention; pausedFatal cleared",
     "taskWorktree": "/home/minhquan_eth/.archon/workspaces/quantm-zeus/foresift/worktrees/archon/task-foresift-g0-traceability-conformance (branch alive for archon lifecycle; remote deleted after squash merges)",
     "openEvidenceChain": "All 25 tasks closed deterministically: 15 via PR #153 integration, 5 test-author via #157, T024 VERIFICATION_ONLY via evidence-owner TRACEABILITY_FULL_CONVERGENCE, T001/T002 via already-satisfied directory-write audit pass 2; checkbox flips committed by wave-coordinator identity (6e9ebd6, 418887f), never hand-edited"
   },
   "blockers": [],
   "nextActions": [
-    "Confirm merged-main CI green on 2b82882 (Verify full check) — GitHub Actions authority",
+    "Confirm merged-main CI green on 2b82882 (Verify full check) \u2014 GitHub Actions authority",
     "G0 8/8 durable confirmation: pnpm verify + pnpm spec:verify at HEAD (in flight at snapshot time)",
-    "Post-G0 queue (now UNFROZEN candidate — confirm with operator): reboot-resilient maintainer, stale-control-plane decoupling, Archon migration review, measured G1 scale work",
+    "Post-G0 queue (now UNFROZEN candidate \u2014 confirm with operator): reboot-resilient maintainer, stale-control-plane decoupling, Archon migration review, measured G1 scale work",
     "Land later if needed: state-landing base-drift self-update (state branch BEHIND required operator merge; live PR #160), missing 'state-only' label creation (live #160), mergeStateStatus=BEHIND retry loop retryCount accounting"
   ],
   "history": [
     {
       "ts": "2026-09-02T10:00:00Z",
-      "event": "G0 8/8 PROVEN on main 2b82882. Chain: #156 lander ancestor fix → #157 test-author surface (ee35e84) → preflight hermetic fixture fix (#158, 3cd7c88, full-gate TESTS refusal root-caused: live-tree openTaskCount assertion broke on package completion) → #159 lander --delete-branch worktree exit-1 fix (root cause: gh deletes remote then fails local ref in checked-out worktree, exit 1 AFTER successful merge — explains #153/#157/#158 bookkeeping lies) → finalize-from-main → state chore #160 (operator merged state branch forward past #159 base-drift; label state-only created) → PROVEN. Spec:verify 13 checks OK; release conformance PASSED at PROVEN main."
+      "event": "G0 8/8 PROVEN on main 2b82882. Chain: #156 lander ancestor fix \u2192 #157 test-author surface (ee35e84) \u2192 preflight hermetic fixture fix (#158, 3cd7c88, full-gate TESTS refusal root-caused: live-tree openTaskCount assertion broke on package completion) \u2192 #159 lander --delete-branch worktree exit-1 fix (root cause: gh deletes remote then fails local ref in checked-out worktree, exit 1 AFTER successful merge \u2014 explains #153/#157/#158 bookkeeping lies) \u2192 finalize-from-main \u2192 state chore #160 (operator merged state branch forward past #159 base-drift; label state-only created) \u2192 PROVEN. Spec:verify 13 checks OK; release conformance PASSED at PROVEN main."
+    },
+    {
+      "ts": "2026-09-02T11:40:00Z",
+      "event": "Post-G0 hardening wave: #162 (recover-fatal INVALID_PROFILE for milestone-kind, live 30b32583) and #163 (ADR-0021 discovery-root YAML authority) merged. 30b32583 verify-repo failures root-caused to 4-core starvation from concurrent local full suites (gate passes clean twice-verified); relaunch 9a061d3e in flight. Reboot-resilience audited: linger+Restart=on-failure+proc-lock self-heal already sufficient. Remaining queue: state-landing base-drift self-update, state-only label creation (done ad hoc for #160), G1 scale planning."
     }
   ]
 }

@@ -60,20 +60,25 @@ function memInfo() {
 function heavyProcessCount() {
   let out;
   try {
-    out = execFileSync('sh', ['-c', 'ps -eo args 2>/dev/null || true'], {
+    out = execFileSync('sh', ['-c', 'ps -eo pid=,args= 2>/dev/null || true'], {
       encoding: 'utf8',
       timeout: 5000,
     });
   } catch {
     return 0;
   }
-  return out
-    .split('\n')
-    .filter(Boolean)
-    .filter(
-      (line) =>
-        HEAVY_PROCESS_PATTERNS.some((re) => re.test(line)) && !WRAPPER_FALSE_POSITIVE.test(line),
-    ).length;
+  return (
+    out
+      .split('\n')
+      .map((line) => /^\s*(\d+)\s+(.*)$/.exec(line))
+      // Sampling must not add the observer itself to the pressure it measures.
+      .filter((match) => match && Number(match[1]) !== process.pid)
+      .map((match) => match[2])
+      .filter(
+        (line) =>
+          HEAVY_PROCESS_PATTERNS.some((re) => re.test(line)) && !WRAPPER_FALSE_POSITIVE.test(line),
+      ).length
+  );
 }
 
 /**

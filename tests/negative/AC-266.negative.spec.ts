@@ -102,4 +102,3 @@ describe('AC-266 negative (conformance failures on uncoordinated changes)', () =
     expect(verdict.findings.some((f) => f.rule === 'GENERATED_DOCUMENT_DRIFT')).toBe(true);
   });
 });
-

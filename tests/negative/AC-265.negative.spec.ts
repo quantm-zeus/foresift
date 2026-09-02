@@ -107,4 +107,3 @@ describe('AC-265 negative (refusals)', () => {
     expect(dagResult.cycles.length).toBeGreaterThan(0);
   });
 });
-

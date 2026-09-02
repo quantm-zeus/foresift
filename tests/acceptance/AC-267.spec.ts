@@ -63,4 +63,3 @@ describe('AC-267 acceptance (positive)', () => {
     expect(fetchedAsOf?.traceId).toBe(trace.traceId);
   });
 });
-

@@ -650,10 +650,28 @@ nodes:
             on_error: all
           timeout: 3600000
           bash: |
+            set +e
             node scripts/automation/exec-codex-repair.mjs \
               --canonical . --artifacts "$ARTIFACTS_DIR" \
               --routing "$ARTIFACTS_DIR/routing.json" \
-              --package "${ARGUMENTS%%@g*}"
+              --package "${ARGUMENTS%%@g*}" 2> "$ARTIFACTS_DIR/fast-repair-codex.err"
+            code=$?
+            if [ "$code" -eq 0 ]; then exit 0; fi
+            # Repair-budget exhaustion (CODEX_REPAIR_EXHAUSTED) is a
+            # deterministic control-plane condition, not a failed repair: the
+            # recheck node owns the convergence verdict, and the loop's
+            # until_bash reads the (possibly already green) verdict file. A
+            # resume that re-enters this loop on a stale RED when-gate with a
+            # green canonical tree must reach that recheck, not die here (live
+            # runs 7c98e02e ×3: budget exhaustion aborted the iteration before
+            # until_bash could observe the green verdict). Any OTHER failure
+            # still fails the node loudly.
+            if grep -q "CODEX_REPAIR_EXHAUSTED" "$ARTIFACTS_DIR/fast-repair-codex.err" 2>/dev/null; then
+              echo "WAVE_REPAIR_BUDGET_EXHAUSTED — deferring verdict to fast-recheck"
+              exit 0
+            fi
+            cat "$ARTIFACTS_DIR/fast-repair-codex.err" >&2 || true
+            exit "$code"
         - id: fast-repair
           when: "$profile.output == 'CLAUDE_AGY'"
           command: foresift-wave-fast-repair
@@ -676,10 +694,22 @@ nodes:
             on_error: all
           timeout: 3600000
           bash: |
+            set +e
             node scripts/automation/exec-codex-repair.mjs \
               --canonical . --artifacts "$ARTIFACTS_DIR" \
               --routing "$ARTIFACTS_DIR/routing.json" \
-              --package "${ARGUMENTS%%@g*}"
+              --package "${ARGUMENTS%%@g*}" 2> "$ARTIFACTS_DIR/fast-repair-hybrid.err"
+            code=$?
+            if [ "$code" -eq 0 ]; then exit 0; fi
+            # Same budget-exhaustion deferral as fast-repair-codex: exhaustion
+            # is deterministic, the recheck owns the verdict, and a stale-RED
+            # resume must reach the until_bash (see the codex sibling note).
+            if grep -q "CODEX_REPAIR_EXHAUSTED" "$ARTIFACTS_DIR/fast-repair-hybrid.err" 2>/dev/null; then
+              echo "WAVE_REPAIR_BUDGET_EXHAUSTED — deferring verdict to fast-recheck"
+              exit 0
+            fi
+            cat "$ARTIFACTS_DIR/fast-repair-hybrid.err" >&2 || true
+            exit "$code"
         - id: fast-recheck
           depends_on: [fast-repair-codex, fast-repair, fast-repair-hybrid]
           trigger_rule: none_failed_min_one_success

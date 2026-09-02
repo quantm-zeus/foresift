@@ -1,25 +1,34 @@
 {
   "schema": "foresift/maintenance-handoff@2",
   "currentSnapshot": {
-    "capturedAt": "2026-09-02T04:35:00Z",
-    "mainSha": "b8af25211",
-    "mainCi": "GREEN (merged-main run 33586523111, #150 landing)",
-    "milestone": "G0 — 7/8 packages PROVEN; g0-traceability-conformance paused_fatal (run 7c98e02e integration_empty — writer evidence-diff defect root-caused, fix in flight)",
+    "capturedAt": "2026-09-02T06:25:00Z",
+    "mainSha": "f83e3104b0c92ef216d40a14e894b0a51b15f674",
+    "mainCi": "GREEN (merged-main run 33592599247, #151 landing)",
+    "milestone": "G0 — 7/8 packages PROVEN; g0-traceability-conformance wave GREEN + integrated; converging landing (repair-loop resume defect fixed)",
     "activePackage": {
       "id": "g0-traceability-conformance",
-      "state": "paused_fatal — fix PR in flight",
+      "state": "wave integrated (14 units) + FAST GREEN; loop convergence fix landing",
       "runId": "7c98e02edea19f8e37ac1d6b60e7f11e",
-      "generation": "gen 0 (resumeCount 3)"
+      "generation": "gen 0"
     },
     "openMaintenancePr": null,
-    "providerState": "autopilot paused_fatal (recovery policy exhausted); no provider lanes active; supervisor service alive",
+    "providerState": "supervisor alive (pid 1142555, singleton); archon resume of 7c98e02e dispatched",
     "resourceState": "15GiB host: 1.7Gi used / 13Gi avail post-reboot; no OOM pressure",
     "blockers": [
-      "ROOT CAUSE (run 7c98e02e): writers computed evidence diff from `git status --porcelain` (uncommitted only); agents COMMIT their own work → clean tree → zero nominations → integration_empty despite 4 real commits per lane (core-batch-1 bb5a95a..2fec445; core-batch-3 66 files). Fix branch fix/writer-evidence-diff: laneEvidencePaths = diff base..HEAD ∪ status; regressions prove committed work nominates.",
-      "After PR lands + merged-main CI green: reconcile task worktree with post-fix main, then ONE recover-fatal (same package/generation)."
+      "SALVAGE PROVEN: 14 units integrated from preserved lane commits (no writer rerun); tasks.md flips authoritative via coordinator validation.",
+      "FAST GREEN (full 372-file coordinator suite, exit 0) after two deterministic fixes on the canonical branch: hermetic governor test samples (7f3549f) + structural resolveMappings types (f002a5b) — five real TS errors in salvaged core-batch-2 work fixed.",
+      "Repair-loop resume defect found+fixed: budget exhaustion aborted iterations before the recheck/verdict read; fix (c60fe47) must be in the DISCOVERY ROOT (primary tree) to affect the engine — landing as PR before final resume."
     ],
-    "nextSafeAction": "land fix/writer-evidence-diff PR (exact-head) → merged-main CI → task-worktree reconcile → recover-fatal run → monitor to FAST-green → evidence-owner pass → wave-land → G0 8/8",
+    "nextSafeAction": "merge repair-loop PR → resume run → wave-settled → checkpoint → wave-land → full gate PR → G0 8/8",
     "history": [
+      {
+        "at": "2026-09-02T06:15:00Z",
+        "event": "Run 7c98e02e: salvage integration SUCCEEDED (3 lanes, 14 units, coordinator-validated); FAST reached GREEN after governor-test hermetic fix + salvaged-code type fixes; 3 resumes blocked by repair-loop budget-exhaustion aborting before recheck — root-caused to stale RED when-gate + node-fatal exhaustion; structural fix committed."
+      },
+      {
+        "at": "2026-09-02T05:00:00Z",
+        "event": "#151 landed exact-head (bb9dba6, run 33592230625 GREEN) + merged-main GREEN (f83e310, run 33592599247). Writer evidence diff now = committed base..HEAD ∪ uncommitted status. Run 7c98e02e resumed with 23 cached nodes — salvage-by-resume preserves all three implementation lanes' committed work (no writer rerun)."
+      },
       {
         "at": "2026-09-02T04:20:00Z",
         "event": "RUN 7c98e02e paused fatal — integrate-and-fast exit 90 WAVE_INTEGRATION_EMPTY (integrated=0 rejected=4). ROOT CAUSE: writer evidence diff used uncommitted status only while agents committed their own work (4 commits/lane present in base..HEAD). No AI repair burned (distinct token held). Fix: laneEvidencePaths (committed ∪ uncommitted) in all writers."

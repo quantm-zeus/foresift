@@ -198,7 +198,34 @@ export function runFinalLand(a, deps = {}) {
     );
     if (already.status === 0) {
       const list = JSON.parse(already.stdout || '[]');
-      if (list.length > 0) {
+      // An ancestor check decides: a merged PR for this branch name proves
+      // THIS landing only when the local head is already contained in that
+      // merge. A continuation wave reusing the branch name after its PR was
+      // squash-merged (branch then deleted, worktree advanced with new wave
+      // output — live run aa3e8015) would otherwise short-circuit here and
+      // silently strand the new work unlanded.
+      const gitHere = (args) => spawnSync('git', args, { encoding: 'utf8' });
+      const localHead = gitHere(['rev-parse', 'HEAD']).stdout?.trim();
+      let mergedHeadContained = false;
+      if (list.length > 0 && localHead && list[0].number != null) {
+        const mc = spawnSync(
+          'gh',
+          ['pr', 'view', String(list[0].number), '--json', 'mergeCommit'],
+          {
+            encoding: 'utf8',
+          },
+        );
+        try {
+          const mergeSha = JSON.parse(mc.stdout || '{}')?.mergeCommit?.oid;
+          if (mergeSha) {
+            mergedHeadContained =
+              gitHere(['merge-base', '--is-ancestor', localHead, mergeSha]).status === 0;
+          }
+        } catch {
+          /* fall through to the normal landing flow */
+        }
+      }
+      if (list.length > 0 && mergedHeadContained) {
         console.log(`LAND ▸ already merged: ${list[0].url ?? `PR #${list[0].number}`}`);
         record(true, 'already-merged', { gateMode: 'ALREADY_MERGED' });
         return { ok: true };

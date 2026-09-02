@@ -19,7 +19,11 @@ import {
   resolvePoolStateDir,
 } from './provider-pool.mjs';
 import { validateGeneration } from './exec-codex-writer.mjs';
-import { parseTaskGraph, requireTaskGraphForCompletionEvidence } from './writer-task-evidence.mjs';
+import {
+  parseTaskGraph,
+  requireTaskGraphForCompletionEvidence,
+  laneEvidencePaths,
+} from './writer-task-evidence.mjs';
 
 function fail(message, code = 1) {
   console.error(`claude-writer: ${message}`);
@@ -178,14 +182,18 @@ export function runClaudeWriter(input) {
   if (classification !== 'SUCCESS')
     throw new Error(`CLAUDE_WRITER_${classification}: ${(run.stderr ?? '').slice(-500)}`);
 
+  // Lane evidence diff (live 7c98e02e): committed work counts — status alone
+  // sees a clean tree after the agent's own commits.
+  const before = git(['rev-parse', 'HEAD'], input.worktree).stdout.trim();
   const dirty = git(['status', '--porcelain=v1'], input.worktree)
     .stdout.split('\n')
     .filter(Boolean)
     .map((line) => line.slice(3).split(' -> ').at(-1));
+  const evidencePaths = laneEvidencePaths({ worktree: input.worktree, before });
   const ownership = validateLaneOwnership({
     engine: 'CLAUDE',
     role: 'implementation',
-    changedPaths: dirty,
+    changedPaths: evidencePaths,
   });
   if (!ownership.ok)
     throw new Error(`${ownership.violationCode}: ${ownership.violatingPaths.join(',')}`);
@@ -208,10 +216,11 @@ export function runClaudeWriter(input) {
   }
   const head = git(['rev-parse', 'HEAD'], input.worktree).stdout.trim();
   // Evidence-backed completion (H3 P0-1): nominate ONLY tasks whose predicted
-  // writes appear in this lane's actual diff. The old invariant — ANY diff ⇒
-  // ALL --task-ids complete — is removed: a productive lane that finished
-  // part of its assignment now reports the rest as deferred (still OPEN),
-  // with the coordinator re-validating every nomination.
+  // writes appear in this lane's actual diff (committed ∪ uncommitted). The
+  // old invariant — ANY diff ⇒ ALL --task-ids complete — is removed: a
+  // productive lane that finished part of its assignment now reports the rest
+  // as deferred (still OPEN), with the coordinator re-validating every
+  // nomination.
   const assigned = (input['task-ids'] ?? '').split(',').filter(Boolean);
   let evidence = { graph: null, unitsById: null };
   const graphPath = input['task-graph'];
@@ -221,7 +230,7 @@ export function runClaudeWriter(input) {
   }
   const claims = claimCompletedUnits({
     taskIds: assigned,
-    changed: dirty,
+    changed: evidencePaths,
     unitsById: evidence.unitsById,
     blockers: [],
   });
@@ -232,9 +241,9 @@ export function runClaudeWriter(input) {
     engine: 'CLAUDE',
     // Evidence-backed nominations (H3 P0-1): only predicted-write-proven ids.
     // A diff without the task graph still nominates nothing (fail-closed).
-    completed: dirty.length > 0 ? claims.nominated : [],
+    completed: evidencePaths.length > 0 ? claims.nominated : [],
     deferredUnits:
-      dirty.length > 0
+      evidencePaths.length > 0
         ? claims.deferred
         : assigned.map((taskId) => ({ taskId, reason: 'lane produced no diff' })),
     branch: git(['branch', '--show-current'], input.worktree).stdout.trim(),

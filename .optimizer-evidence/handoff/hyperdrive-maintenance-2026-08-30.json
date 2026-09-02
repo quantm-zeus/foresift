@@ -1,53 +1,30 @@
 {
   "schema": "foresift/maintenance-handoff@2",
   "currentSnapshot": {
-    "capturedAt": "2026-09-01T11:20:00Z",
-    "mainSha": "f7769eecc20d67a324621d2524a2",
-    "mainCi": "GREEN (merged-main run 33500869157, #149 landing)",
-    "milestone": "G0 — 7/8 packages PROVEN; g0-traceability-conformance RUNNING (paused_fatal, run 89c4b2b9)",
+    "capturedAt": "2026-09-02T04:35:00Z",
+    "mainSha": "b8af25211",
+    "mainCi": "GREEN (merged-main run 33586523111, #150 landing)",
+    "milestone": "G0 — 7/8 packages PROVEN; g0-traceability-conformance paused_fatal (run 7c98e02e integration_empty — writer evidence-diff defect root-caused, fix in flight)",
     "activePackage": {
       "id": "g0-traceability-conformance",
-      "state": "RUNNING — recovered",
-      "runId": "e9af6ec04d121e3b7aa69f300d897ddd",
-      "generation": "gen 0",
-      "salvageTruth": {
-        "verdict": "SALVAGE_SAFE",
-        "laneHeads": {
-          "core-batch-1": "00258da15",
-          "core-batch-2": "964e27d72",
-          "core-batch-3": "9f1940c5f"
-        },
-        "base": "607f441d40",
-        "integratedCommit": "20f6c20 (15 units marked via integrate-writer-results, glob-aware re-nomination)",
-        "followups": [
-          "03473bf re-pin 6 stale fixture textSha256 pins",
-          "a0e4312 prettier lane-authored files",
-          "7b00b12 lint/type remediation",
-          "507626a docs/generated prettierignore"
-        ],
-        "remainingOpen": [
-          "T001",
-          "T002",
-          "T013",
-          "T018",
-          "T019",
-          "T020",
-          "T021",
-          "T022",
-          "T023",
-          "T025"
-        ],
-        "note": "T024 flipped by salvage integration (15 units incl. T024); T001/T002 lack predictedWrites (scaffolding done in-lane, outOfScopeWrites only); T013/T018/T019-T023 artifacts EXIST in worktree (commits b5af2ed/68bdfce/c5e0acb) but were never checkbox-flipped by any wave — evidence-owner/duty gap now fixed by #149."
-      }
+      "state": "paused_fatal — fix PR in flight",
+      "runId": "7c98e02edea19f8e37ac1d6b60e7f11e",
+      "generation": "gen 0 (resumeCount 3)"
     },
     "openMaintenancePr": null,
     "providerState": "autopilot paused_fatal (recovery policy exhausted); no provider lanes active; supervisor service alive",
     "resourceState": "15GiB host: 1.7Gi used / 13Gi avail post-reboot; no OOM pressure",
     "blockers": [
-      "PR #149 CI green + merged-main required before recovery (control-plane must contain the evidence-owner fix)",
-      "task worktree control-plane still at 3f36c54+salvage; needs merge of post-#149 main before next wave"
+      "ROOT CAUSE (run 7c98e02e): writers computed evidence diff from `git status --porcelain` (uncommitted only); agents COMMIT their own work → clean tree → zero nominations → integration_empty despite 4 real commits per lane (core-batch-1 bb5a95a..2fec445; core-batch-3 66 files). Fix branch fix/writer-evidence-diff: laneEvidencePaths = diff base..HEAD ∪ status; regressions prove committed work nominates.",
+      "After PR lands + merged-main CI green: reconcile task worktree with post-fix main, then ONE recover-fatal (same package/generation)."
     ],
-    "nextSafeAction": "monitor run e9af6ec0 through guards/integration/FAST/landing; evidence-owner pass flips T024/T025 at FAST-green; wave-land -> full gate -> PR -> G0 8/8"
+    "nextSafeAction": "land fix/writer-evidence-diff PR (exact-head) → merged-main CI → task-worktree reconcile → recover-fatal run → monitor to FAST-green → evidence-owner pass → wave-land → G0 8/8",
+    "history": [
+      {
+        "at": "2026-09-02T04:20:00Z",
+        "event": "RUN 7c98e02e paused fatal — integrate-and-fast exit 90 WAVE_INTEGRATION_EMPTY (integrated=0 rejected=4). ROOT CAUSE: writer evidence diff used uncommitted status only while agents committed their own work (4 commits/lane present in base..HEAD). No AI repair burned (distinct token held). Fix: laneEvidencePaths (committed ∪ uncommitted) in all writers."
+      }
+    ]
   },
   "history": [
     {
@@ -129,6 +106,15 @@
         "pr149": "exact-head merged at cdcb7dd05 (merged-main f7769eecc GREEN run 33500869157): evidence-owner registry + deterministic VERIFICATION_ONLY/COORDINATOR_ARTIFACT completion + graph-build fail-closed coverage assertion",
         "recovery": "recover-fatal retired dead run 89c4b2b9 (cancelled) and relaunched same package/generation/branch as run e9af6ec04d (single-fresh-continuation, HYBRID_AGY, 2 lanes provider-capped); task worktree advanced to 01e8ad0394 (contains #143-#149 control plane + all salvaged product work)",
         "supervisor": "exactly ONE foresift-autopilot process (service active)"
+      }
+    },
+    {
+      "at": "2026-09-02T03:30:00Z",
+      "event": "PR #150 merged + run 7c98e02e recovered",
+      "detail": {
+        "pr150": "exact-head merged at eabdf668c (merged-main b8af25211 GREEN run 33586523111)",
+        "reconciliation": "task worktree head 3b49f3d (post-#150); T024 open with TRACEABILITY_FULL_CONVERGENCE marker; T025 closed on matrix-closure proof",
+        "recovery": "run 7c98e02edea same package/generation, one supervisor"
       }
     }
   ],

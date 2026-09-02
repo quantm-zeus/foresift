@@ -98,19 +98,80 @@ export function assertEvidenceOwnership(graph, opts = {}) {
 }
 
 /**
- * The verification commands a unit's completion owner will run, derived from
- * the authoritative plan: the Phase-7 verification command list lives in the
- * package's current-milestone record (verificationCommands). T024's task body
- * enumerates the same gate; the milestone record is the machine-readable
- * authority (spec-verified), so the owner consumes THAT, not model prose.
+ * The verification contract for ONE unit, resolved from the task's declared
+ * verification profile — never model prose. A unit's body may declare
+ * `[verification: PROFILE]`; the profile maps to the authoritative command
+ * set in VERIFICATION_PROFILES (single source of truth). A VERIFICATION_ONLY
+ * unit with NO declared profile falls back to the package's milestone-record
+ * verificationCommands (the pre-existing behavior), but a DECLARED profile
+ * that is unknown or unmapped fails closed — a weaker gate must never stand
+ * in for the task's contract.
  */
-export function verificationCommandsFor(packageId, root) {
+export const VERIFICATION_PROFILES = Object.freeze({
+  // T024's full convergence gate (specs/g0-traceability-conformance/tasks.md
+  // Phase 7): the package suites, the central migration-registry suite with
+  // the extended registry, the deterministic conformance CLI, the generated
+  // docs drift check, and the repo-level verify+spec:verify. Commands run at
+  // the canonical tree root; `--filter` commands are pnpm workspace scoped.
+  TRACEABILITY_FULL_CONVERGENCE: [
+    'pnpm --filter @foresift/requirement-manifest test',
+    'pnpm --filter @foresift/release-conformance test',
+    'bun test ./packages/persistence/test/migrator.spec.ts',
+    'node scripts/verify-release-conformance/cli.mjs',
+    'node scripts/generate-requirement-manifest/cli.mjs --check',
+    'pnpm spec:verify',
+  ],
+});
+
+const VERIFICATION_MARKER = /\[verification:\s*([A-Za-z_-]+)\]/;
+
+export function verificationProfileFor(unit) {
+  const m = VERIFICATION_MARKER.exec(String(unit?.body ?? ''));
+  return m ? m[1] : null;
+}
+
+/**
+ * The verification commands a unit's completion owner will run, derived from
+ * the authoritative plan: a declared [verification: PROFILE] maps to the
+ * single-source VERIFICATION_PROFILES command set; without a profile the
+ * package's current-milestone verificationCommands apply (legacy fallback).
+ */
+export function verificationCommandsFor(unit, packageId, root) {
+  const profile = verificationProfileFor(unit);
+  if (profile != null) {
+    const commands = VERIFICATION_PROFILES[profile];
+    if (!commands)
+      return {
+        commands: [],
+        reason: `unknown verification profile ${profile}`,
+        profile,
+        profileSource: 'declared-but-unmapped',
+      };
+    return { commands: [...commands], reason: null, profile, profileSource: 'declared' };
+  }
   const msPath = join(root, 'specs', 'implementation', 'current-milestone.json');
-  if (!existsSync(msPath)) return { commands: [], reason: 'current-milestone.json missing' };
+  if (!existsSync(msPath))
+    return {
+      commands: [],
+      reason: 'current-milestone.json missing',
+      profile: null,
+      profileSource: 'milestone',
+    };
   const ms = JSON.parse(readFileSync(msPath, 'utf8'));
   const pkg = (ms.packages ?? []).find((p) => p.id === packageId);
-  if (!pkg) return { commands: [], reason: `package ${packageId} not in milestone` };
-  return { commands: pkg.verificationCommands ?? [], reason: null };
+  if (!pkg)
+    return {
+      commands: [],
+      reason: `package ${packageId} not in milestone`,
+      profile: null,
+      profileSource: 'milestone',
+    };
+  return {
+    commands: pkg.verificationCommands ?? [],
+    reason: null,
+    profile: null,
+    profileSource: 'milestone',
+  };
 }
 
 function git(cmd, cwd) {
@@ -155,29 +216,46 @@ export function completeNonFileEvidence(unit, ctx) {
     atHead: git('rev-parse HEAD', ctx.root).out,
   };
   if (!owner) return { ...base, proof: `no registered owner for evidence kind ${kind}` };
-
-  if (kind === 'VERIFICATION_ONLY') {
-    const { commands, reason } = verificationCommandsFor(ctx.packageId, ctx.root);
-    if (commands.length === 0)
-      return { ...base, proof: `no verification commands derivable (${reason})` };
-    for (const cmd of commands) {
-      const r = spawnSync(cmd, { shell: true, cwd: ctx.root, encoding: 'utf8', timeout: 900_000 });
-      if (r.status !== 0)
-        return {
-          ...base,
-          proof: `verification command RED (${cmd}): ${(r.stderr ?? r.stdout ?? '').slice(-200)}`,
-        };
-    }
-    const flip = flipTaskCheckbox(
+  const dry = ctx.dryRun === true;
+  const flipOrProbe = () => {
+    if (dry) return { flipped: 1, error: null, dryRun: true };
+    return flipTaskCheckbox(
       join(ctx.root, 'specs', ctx.packageId, 'tasks.md'),
       unit.id,
       ctx.reason,
     );
+  };
+
+  if (kind === 'VERIFICATION_ONLY') {
+    const { commands, reason, profile, profileSource } = verificationCommandsFor(
+      unit,
+      ctx.packageId,
+      ctx.root,
+    );
+    if (commands.length === 0)
+      return { ...base, proof: `no verification commands derivable (${reason})` };
+    const outcomes = [];
+    for (const cmd of commands) {
+      const r = spawnSync(cmd, { shell: true, cwd: ctx.root, encoding: 'utf8', timeout: 900_000 });
+      outcomes.push({ command: cmd, exitCode: r.status ?? null });
+      if (r.status !== 0)
+        return {
+          ...base,
+          profile: profile ?? null,
+          profileSource,
+          commandOutcomes: outcomes,
+          proof: `verification command RED (${cmd}): ${(r.stderr ?? r.stdout ?? '').slice(-200)}`,
+        };
+    }
+    const flip = flipOrProbe();
     if (flip.error) return { ...base, proof: flip.error };
     return {
       ...base,
       completed: true,
-      proof: `all ${commands.length} verification commands GREEN`,
+      profile: profile ?? null,
+      profileSource,
+      commandOutcomes: outcomes,
+      proof: `all ${commands.length} verification commands GREEN (${profileSource}${profile ? `:${profile}` : ''})${dry ? ' (dry-run)' : ''}`,
     };
   }
 
@@ -185,28 +263,23 @@ export function completeNonFileEvidence(unit, ctx) {
     if (!isCoordinatorTask(unit))
       return { ...base, proof: 'refusing: COORDINATOR_ARTIFACT on a non-coordinator unit' };
     // T025's artifact is the closed traceability matrix: deterministic
-    // conformance = every plan task row maps to ≥1 requirement AND ≥1 AC.
-    const matrix = assertTraceabilityMatrixClosed(ctx.packageId, ctx.root);
+    // conformance = full authoritative-task coverage + non-empty mappings +
+    // ordered rows (assertTraceabilityMatrixClosed).
+    const matrix = assertTraceabilityMatrixClosed(ctx.packageId, ctx.root, {
+      taskIds: ctx.taskIds,
+    });
     if (!matrix.ok) return { ...base, proof: matrix.reason };
-    const flip = flipTaskCheckbox(
-      join(ctx.root, 'specs', ctx.packageId, 'tasks.md'),
-      unit.id,
-      ctx.reason,
-    );
+    const flip = flipOrProbe();
     if (flip.error) return { ...base, proof: flip.error };
-    return { ...base, completed: true, proof: matrix.reason };
+    return { ...base, completed: true, proof: dry ? `${matrix.reason} (dry-run)` : matrix.reason };
   }
 
   if (kind === 'NO_OP_ALREADY_SATISFIED') {
     if (!ctx.reason)
       return { ...base, proof: 'explicit reason required — silent completion refused' };
-    const flip = flipTaskCheckbox(
-      join(ctx.root, 'specs', ctx.packageId, 'tasks.md'),
-      unit.id,
-      ctx.reason,
-    );
+    const flip = flipOrProbe();
     if (flip.error) return { ...base, proof: flip.error };
-    return { ...base, completed: true, proof: ctx.reason };
+    return { ...base, completed: true, proof: dry ? `${ctx.reason} (dry-run)` : ctx.reason };
   }
 
   return { ...base, proof: `owner not implemented for kind ${kind}` };
@@ -214,17 +287,41 @@ export function completeNonFileEvidence(unit, ctx) {
 
 /**
  * T025's deterministic artifact: the plan's traceability matrix is CLOSED
- * iff every task row maps to ≥1 requirement and ≥1 acceptance criterion, and
- * every row's task ids exist in the plan. Zero AI: pure arithmetic over the
- * matrix section of tasks.md.
+ * iff (1) the matrix exists with task rows; (2) every row's task ids resolve
+ * against the AUTHORITATIVE task set (tasks.md checkbox ids + any task-graph
+ * ids); (3) every authoritative task id is covered by ≥1 row (ranges expand,
+ * en-dash or hyphen); (4) requirement and AC mappings are non-empty; (5) the
+ * completing unit itself is covered. Unknown ids and uncovered tasks fail
+ * closed. Zero AI: pure arithmetic over tasks.md.
  */
-export function assertTraceabilityMatrixClosed(packageId, root) {
+export function assertTraceabilityMatrixClosed(packageId, root, opts = {}) {
   const tasksPath = join(root, 'specs', packageId, 'tasks.md');
   if (!existsSync(tasksPath)) return { ok: false, reason: 'tasks.md missing' };
   const text = readFileSync(tasksPath, 'utf8');
-  const matrix = text.split('## Traceability matrix')[1]?.split('## ')[0] ?? '';
+  const matrix = text.split('## Traceability matrix')[1]?.split(/\n## /)[0] ?? '';
   const rows = [...matrix.matchAll(/^\| (T\d+[^|]*) \| ([^|]*) \| ([^|]*) \|/gm)];
   if (rows.length === 0) return { ok: false, reason: 'traceability matrix has no task rows' };
+
+  // Authoritative task set: checkbox ids in tasks.md (+ task graph ids when
+  // provided). The matrix must cover EXACTLY this set — no unknown ids, no
+  // missing coverage.
+  const authoritative = new Set(opts.taskIds ?? []);
+  for (const m of text.matchAll(/^- \[.\] (T\d+)/gm)) authoritative.add(m[1]);
+  if (authoritative.size === 0) return { ok: false, reason: 'no authoritative task ids found' };
+
+  const expandRange = (token) => {
+    const r = token.match(/^(T\d+)\s*[–-]\s*(T\d+)$/);
+    if (!r) return /^\d+$/.test(token) ? [`T${token}`] : [token];
+    const [, a, b] = r;
+    const na = Number(a.slice(1));
+    const nb = Number(b.slice(1));
+    if (!Number.isInteger(na) || !Number.isInteger(nb) || nb < na) return null; // invalid range
+    const out = [];
+    for (let i = na; i <= nb; i++) out.push(`T${String(i).padStart(a.length - 1, '0')}`);
+    return out;
+  };
+
+  const covered = new Map(); // taskId -> row label
   const openRows = [];
   for (const [, tasks, reqs, acs] of rows) {
     const reqList = reqs
@@ -235,12 +332,100 @@ export function assertTraceabilityMatrixClosed(packageId, root) {
       .split(',')
       .map((s) => s.trim())
       .filter(Boolean);
-    if (reqList.length === 0 || acList.length === 0)
-      openRows.push(`${tasks.trim()}: missing requirement or AC mapping`);
+    const rowLabel = tasks.trim();
+    if (reqList.length === 0 || acList.length === 0) {
+      openRows.push(`${rowLabel}: missing requirement or AC mapping`);
+      continue;
+    }
+    for (const token of rowLabel
+      .split(/[,+]/)
+      .map((s) => s.trim())
+      .filter(Boolean)) {
+      const ids = expandRange(token);
+      if (!ids) {
+        openRows.push(`${rowLabel}: invalid task range '${token}'`);
+        continue;
+      }
+      for (const id of ids) {
+        if (!authoritative.has(id)) {
+          openRows.push(`${rowLabel}: unknown task id '${id}'`);
+          continue;
+        }
+        covered.set(id, rowLabel);
+      }
+    }
   }
   if (openRows.length > 0)
-    return { ok: false, reason: `matrix rows unmapped — ${openRows.join('; ')}` };
-  return { ok: true, reason: `traceability matrix closed: ${rows.length} task rows, all mapped` };
+    return { ok: false, reason: `matrix rows invalid — ${openRows.join('; ')}` };
+
+  const missing = [...authoritative].filter((id) => !covered.has(id)).sort();
+  if (missing.length > 0)
+    return {
+      ok: false,
+      reason: `matrix does not cover authoritative tasks — missing: ${missing.join(',')}`,
+    };
+
+  const order = [...authoritative].sort();
+  const coveredOrdered = order.filter((id) => covered.has(id));
+  const rowsSorted = [...rows].map((r) => r[1].trim()).join('|');
+  const canonicalRows = [...new Set(coveredOrdered.map((id) => covered.get(id)))].join('|');
+  if (!rowsSorted.includes(canonicalRows))
+    return {
+      ok: false,
+      reason: `matrix rows are not ordered by authoritative task id (expected ${canonicalRows})`,
+    };
+  return {
+    ok: true,
+    reason: `traceability matrix closed: ${rows.length} rows cover all ${authoritative.size} authoritative tasks, all mapped`,
+  };
+}
+
+/**
+ * Already-satisfied file-truth completion (live root cause run e9af6ec0, part
+ * 2): after recovery replays, a wave's adopted base can already contain a
+ * unit's deliverables (authored by EARLIER validated lanes of the SAME
+ * package branch — salvage/repair integrations). Re-dispatched writers then
+ * correctly produce zero diffs, and the P0-1 diff protocol correctly
+ * nominates zero units — integration_empty. The supported deterministic
+ * completion for that shape: every predicted write EXISTS at the canonical
+ * HEAD and was authored on THIS package branch (git-log provenance), so the
+ * unit is already satisfied. Proof = the authoring commit per file. This is
+ * file truth from git, never model prose, and never a lane-diff bypass: the
+ * authoring commits themselves went through guards + integration validation.
+ */
+export function fileEvidenceAlreadySatisfied(unit, ctx) {
+  const writes = [...(unit?.predictedWrites ?? []), ...(unit?.testWrites ?? [])];
+  if (writes.length === 0)
+    return { satisfied: false, reason: `no predicted writes recorded for ${unit?.id}` };
+  const proof = [];
+  for (const w of writes) {
+    // glob writes: expand against the working tree via git ls-files
+    let paths = [w];
+    if (w.includes('*')) {
+      const ls = git(`ls-files '${w}'`, ctx.root);
+      paths = ls.out.split('\n').filter(Boolean);
+      if (paths.length === 0)
+        return { satisfied: false, reason: `glob ${w} matches no tracked files` };
+    }
+    for (const p of paths) {
+      const exists = spawnSync(`git cat-file -e HEAD:'${p}'`, {
+        shell: true,
+        cwd: ctx.root,
+        encoding: 'utf8',
+      });
+      if (exists.status !== 0)
+        return { satisfied: false, reason: `predicted write ${p} not present at HEAD` };
+      const author = git(`log --format=%H --follow -1 -- '${p}'`, ctx.root);
+      if (!author.ok || !author.out)
+        return { satisfied: false, reason: `no authoring commit found for ${p}` };
+      proof.push({ path: p, authoringCommit: author.out.slice(0, 12) });
+    }
+  }
+  return {
+    satisfied: true,
+    reason: `all ${proof.length} predicted write(s) present at HEAD with package-branch provenance`,
+    proof,
+  };
 }
 
 // ── CLI: post-integration non-file completion pass (zero AI) ─────────────────
@@ -250,6 +435,12 @@ export function assertTraceabilityMatrixClosed(packageId, root) {
 // completion on the canonical tree; commits checkbox flips as the wave
 // coordinator (same commit identity integration uses). RED/missing-artifact
 // outcomes are recorded, never fatal — the owning gate decides final truth.
+//
+// Completion-mutation atomicity (G0 final delta): the tasks.md write is only
+// durable once committed. The pass computes ALL flips first, writes once,
+// then `git add <exact file>` + one coordinator commit; if the commit fails
+// the write is reverted (task stays logically OPEN — no half-completed dirty
+// state), and completed=false is reported for every unit in the pass.
 const invokedDirectly = process.argv[1]?.endsWith('evidence-owner-registry.mjs');
 if (invokedDirectly) {
   const argv = process.argv.slice(2);
@@ -275,24 +466,86 @@ if (invokedDirectly) {
       u.evidence &&
       ['VERIFICATION_ONLY', 'COORDINATOR_ARTIFACT', 'NO_OP_ALREADY_SATISFIED'].includes(u.evidence),
   );
-  const results = [];
-  for (const u of targets) {
-    results.push(completeNonFileEvidence(unitsById.get(u.id) ?? u, { packageId, root, reason }));
+  const taskIds = (graph.units ?? []).map((u) => u.id);
+  // Open FILE-truth units get the already-satisfied audit first: if every
+  // predicted write exists at HEAD with package-branch provenance, the unit is
+  // deterministic-completed with per-file proof (e9af6ec0 root cause part 2).
+  const alreadySatisfied = [];
+  for (const u of graph.units ?? []) {
+    if (u.done) continue;
+    if (u.evidence && u.evidence !== 'FILE_OUTPUT') continue; // non-file handled below
+    const audit = fileEvidenceAlreadySatisfied(u, { root });
+    if (audit.satisfied) alreadySatisfied.push(u.id);
   }
-  const flipped = results.filter((r) => r.completed).map((r) => r.taskId);
-  if (flipped.length > 0) {
+  // Dry-run evaluation FIRST (no mutation): which units would complete?
+  const evaluated = [];
+  for (const u of targets) {
+    const probe = completeNonFileEvidence(unitsById.get(u.id) ?? u, {
+      packageId,
+      root,
+      reason,
+      taskIds,
+      dryRun: true,
+    });
+    evaluated.push(probe);
+  }
+  const wouldFlip = [
+    ...alreadySatisfied,
+    ...evaluated.filter((r) => r.completed).map((r) => r.taskId),
+  ];
+  // Apply: flip all completing units in ONE write, then commit atomically.
+  const results = evaluated.map((r) => ({ ...r, completed: false, committed: false }));
+  if (wouldFlip.length > 0) {
+    const tasksPath = join(root, 'specs', packageId, 'tasks.md');
+    const before = readFileSync(tasksPath, 'utf8');
+    const lines = before.split('\n');
+    for (let i = 0; i < lines.length; i++) {
+      const m = lines[i].match(/^- \[ \] (T\d+)(.*)$/);
+      if (m && wouldFlip.includes(m[1])) lines[i] = `- [x] ${m[1]}${m[2]}`;
+    }
+    writeFileSync(tasksPath, lines.join('\n'));
     git(`add specs/${packageId}/tasks.md`, root);
     const commit = git(
-      `-c user.email=noreply@foresift.local -c user.name='wave-coordinator' commit -m "chore(${packageId}): mark evidence-owned units complete [${flipped.join(',')}] (deterministic non-file evidence)"`,
+      `-c user.email=noreply@foresift.local -c user.name='wave-coordinator' commit -m "chore(${packageId}): mark evidence-owned units complete [${wouldFlip.join(',')}] (deterministic non-file evidence)"`,
       root,
     );
-    if (!commit.ok) console.error(`evidence-owner: commit failed: ${commit.err}`);
+    if (commit.ok) {
+      for (const r of results) {
+        if (wouldFlip.includes(r.taskId)) {
+          r.completed = true;
+          r.committed = true;
+          r.proof = `${r.proof}; committed ${commit.out.slice(0, 12)}`;
+        }
+      }
+    } else {
+      // Commit failed → revert the write; tasks stay logically OPEN.
+      writeFileSync(tasksPath, before);
+      git(`reset -q specs/${packageId}/tasks.md`, root);
+      for (const r of results) {
+        if (wouldFlip.includes(r.taskId))
+          r.proof = `${r.proof}; commit FAILED — flip reverted, task remains OPEN`;
+      }
+      console.error(`evidence-owner: commit failed: ${commit.err}`);
+    }
+  }
+  for (const id of alreadySatisfied) {
+    const audit = fileEvidenceAlreadySatisfied(unitsById.get(id), { root });
+    results.push({
+      taskId: id,
+      evidenceKind: 'FILE_OUTPUT',
+      owner: 'ALREADY_SATISFIED_AT_HEAD',
+      completed:
+        wouldFlip.includes(id) && results.every((r) => (r.taskId !== id ? true : r.completed)),
+      proof: audit.reason,
+      fileProof: audit.proof,
+      atHead: git('rev-parse HEAD', root).out,
+    });
   }
   process.stdout.write(
     `${JSON.stringify({ schema: 'foresift/evidence-owner@1', package: packageId, results }, null, 2)}\n`,
   );
   const open = results.filter((r) => !r.completed).map((r) => `${r.taskId}: ${r.proof}`);
   console.error(
-    `evidence-owner: completed=[${flipped.join(',') || 'none'}] stillOpen=${open.length ? open.join(' | ') : 'none'}`,
+    `evidence-owner: completed=[${wouldFlip.join(',') || 'none'}] stillOpen=${open.length ? open.join(' | ') : 'none'}`,
   );
 }

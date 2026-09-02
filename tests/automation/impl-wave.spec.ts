@@ -976,7 +976,7 @@ describe('foresift-sharded-wave workflow contract', () => {
     expect(bareEchoes.length).toBeGreaterThanOrEqual(2);
     for (const e of bareEchoes) {
       const token = e.replace(/^echo\s+/, '').trim();
-      expect(['"WAVE_FAST_GREEN"', '"WAVE_FAST_RED"']).toContain(token);
+      expect(['"WAVE_FAST_GREEN"', '"WAVE_FAST_RED"', '"WAVE_INTEGRATION_EMPTY"']).toContain(token);
     }
     // no report/log dump may reach stdout from this node at all
     expect(body).not.toContain('cat "$ARTIFACTS_DIR/integration-report.json"');

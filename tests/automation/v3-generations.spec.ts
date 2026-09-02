@@ -1541,6 +1541,58 @@ describe('cross-generation recover refusal', () => {
   });
 });
 
+// Milestone-kind recovery must NOT pass through package launch admission:
+// foresift-milestone-control launches carry no execution profile, so
+// productEnginesForProfile(null) would refuse INVALID_PROFILE and a failed
+// milestone run could never take the fresh-continuation route (live run
+// 30b32583, 2026-09-02 — the operator had to --clear-fatal and relaunch).
+describe('milestone-kind recover-fatal skips package admission', () => {
+  it('advances past the admission gate for a milestone pause (no INVALID_PROFILE refusal)', () => {
+    const sb = restartSandbox('recover-milestone-kind');
+    writeFileSync(
+      join(sb.stateDir, 'autopilot-state.json'),
+      JSON.stringify({
+        activeRuns: [],
+        // The tracked milestone row is required for the pause to be
+        // recognized as recoverable (cmdRecoverFatal's early-recovery form).
+        milestoneRuns: [
+          {
+            kind: 'milestone',
+            workflow: 'foresift-milestone-control',
+            runId: null,
+            packageId: null,
+            branch: 'foresift/milestone-planning',
+            message: 'plan-or-audit-current-milestone',
+            startedAt: Date.now() - 1000,
+            resumeCount: 1,
+            restartCount: 1,
+            paused: 'fatal',
+            lastPauseReason: 'exhausted recovery policy',
+          },
+        ],
+        pausedFatal: {
+          reason: 'run 30b32583 (milestone) exhausted recovery policy',
+          runId: null,
+          kind: 'milestone',
+          packageId: null,
+          workflow: 'foresift-milestone-control',
+          branch: 'foresift/milestone-planning',
+          message: 'plan-or-audit-current-milestone',
+          since: Date.now() - 1000,
+        },
+        history: [],
+      }),
+    );
+    const r = runRestartCli(sb, ['--recover-fatal']);
+    // The INVALID_PROFILE refusal is the defect under test: it fired before
+    // any launch attempt. With the fix the flow proceeds past admission —
+    // the sandbox's stub archon acks the detach, and recovery completes (or
+    // fails only on sandbox-specific launch mechanics, never on profile).
+    expect(r.stderr).not.toMatch(/INVALID_PROFILE/);
+    expect(r.stderr).not.toMatch(/REFUSED: recovery admission denied/);
+  });
+});
+
 function invSummary(path: string) {
   return (JSON.parse(readFileSync(path, 'utf8')) as { summary: unknown }).summary;
 }

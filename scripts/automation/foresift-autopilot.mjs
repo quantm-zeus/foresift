@@ -2798,8 +2798,18 @@ async function cmdRecoverFatal(positionalRunId) {
   if (!resumed) {
     // H2: a fresh continuation re-enters through the global admission gate —
     // recovery must not bypass pool/lease truth the ordinary path honors.
+    // Milestone/maintenance runs carry NO execution profile (their launch
+    // path passes none, and a bare-id workflow needs no product engine), so
+    // package admission cannot apply: productEnginesForProfile(null) refuses
+    // INVALID_PROFILE and milestone recovery could NEVER take the fresh-
+    // continuation route (live run 30b32583, 2026-09-02 — recover-fatal
+    // dead-ended while --clear-fatal + relaunch was the only way through).
+    // Package admission stays package-kind-only, exactly mirroring launch.
     const pkgForAdmission = kind === 'package' ? (pkg ?? { id: message }) : { id: `__${kind}` };
-    const admission = admitPackageLaunch(STATE_DIR, pkgForAdmission, executionProfile);
+    const admission =
+      kind === 'package'
+        ? admitPackageLaunch(STATE_DIR, pkgForAdmission, executionProfile)
+        : { ok: true, providers: [], fallback: [] };
     if (!admission.ok) {
       console.error(
         `REFUSED: recovery admission denied (${admission.reason}); retry once pools/leases clear`,

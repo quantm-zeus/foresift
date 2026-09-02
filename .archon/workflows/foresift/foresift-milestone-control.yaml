@@ -214,7 +214,18 @@ nodes:
   - id: verify-repo
     bash: |
       set -euo pipefail
-      pnpm foresift:gate --milestone
+      # Persist the gate transcript (live run 9a061d3e, 2026-09-02): archon
+      # bash nodes keep only a truncated stderr tail, and the gate's failure
+      # detail (the coordinator's FAILED GROUP block) is stdout — without a
+      # durable tee, a transient suite failure is UNDIAGNOSABLE from the run
+      # record. foresift-work-package.yaml already tees (gate-log.txt); the
+      # milestone node was the only gate caller that didn't.
+      pnpm foresift:gate --milestone > "$ARTIFACTS_DIR/verify-repo.log" 2>&1 || {
+        code=$?
+        echo "GATE FAILED (exit $code) — full transcript: $ARTIFACTS_DIR/verify-repo.log"
+        tail -40 "$ARTIFACTS_DIR/verify-repo.log" >&2 || true
+        exit "$code"
+      }
       # Deterministically seed the durable audit-progress artifact before any
       # auditor iteration runs (scope computed from the authoritative manifest).
       node scripts/automation/audit-progress.mjs --init

@@ -1,5 +1,13 @@
 import { spawnSync } from 'node:child_process';
-import { mkdtempSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
+import {
+  existsSync,
+  mkdtempSync,
+  readdirSync,
+  readFileSync,
+  rmSync,
+  statSync,
+  writeFileSync,
+} from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, it } from 'bun:test';
@@ -115,6 +123,22 @@ describe('audit-progress artifacts-dir contract (ADR-0004)', () => {
       // on the missing environment variable.
       expect(r.status).not.toBe(0);
       expect(r.out).not.toContain(MISSING_MSG);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it('--init seeds a fresh skeleton and exits 0 (live cca85aa2/944441a4: init exit-1 killed verify-repo after a green gate)', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'foresift-guard-init-'));
+    try {
+      const r = run('audit-progress.mjs', ['--init', '--artifacts-dir', dir], {
+        ARTIFACTS_DIR: '',
+      });
+      // 0/N audited is the EXPECTED initial state — seeding is not a verdict.
+      // Only --check may exit 1 on incompleteness.
+      expect(r.status).toBe(0);
+      expect(r.out).toContain('"complete": false');
+      expect(existsSync(join(dir, 'milestone-audit-progress.json'))).toBe(true);
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }

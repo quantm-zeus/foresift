@@ -16,13 +16,13 @@
       "neither modifies root/shared architecture surfaces"
     ]
   },
-  "currentMilestoneId": "G0",
+  "currentMilestoneId": null,
   "milestones": [
     {
       "id": "G0",
       "name": "Data Truth, Capability, Security, Collector, Cost and Traceability Foundation",
       "dependsOn": [],
-      "status": "ACTIVE"
+      "status": "PROVEN"
     },
     {
       "id": "G1",

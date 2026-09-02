@@ -1,8 +1,9 @@
 {
   "schemaVersion": "1.0.0",
   "milestoneId": "G0",
-  "status": "ACTIVE",
+  "status": "PROVEN",
   "plannedAt": "2026-08-22",
+  "archivedAt": "2026-09-02",
   "description": "Data Truth, Capability, Security, Collector, Cost and Traceability Foundation decomposed into eight outcome-oriented work packages. Every requirement whose dependencyGroup is G0 in docs/spec/crypto_intelligence_agent_gateway_PRD_FINAL_v6.0.requirements.json is assigned to exactly one package. Foundation milestone: the concurrency policy permits at most one coding package in flight, so every package is conservatively parallelizable=false and writeScope overlap between packages is safe. Plan-level decisions recorded at review repair: (1) G0 delivers FR-DR-001/002 through packages/persistence/** (the manifest owner); their packages/workflow-runtime/** and packages/release-conformance/** implementation mappings are reconciled by g0-traceability-conformance, the only legal writer of manifest-derived mappings, at milestone convergence. (2) All docs/generated/<family>-surfaces.json artifacts are generated centrally by g0-traceability-conformance at milestone convergence; per-family telemetry/<family>.* definitions are owned where each family is implemented.",
   "packages": [
     {
@@ -322,5 +323,66 @@
       ],
       "status": "PROVEN"
     }
-  ]
+  ],
+  "audit": {
+    "auditedAt": "2026-09-02",
+    "mode": "AUDIT",
+    "isFinal": false,
+    "verdict": "PASS",
+    "requirementsAudited": 79,
+    "requirementsRequired": 79,
+    "gaps": [],
+    "acceptanceCriteriaCovered": 75,
+    "auditedPerPackage": {
+      "g0-first-party-observation": 17,
+      "g0-tool-core": 8,
+      "g0-contracts-data-truth": 8,
+      "g0-cost-capacity": 10,
+      "g0-provider-lifecycle": 10,
+      "g0-security-perimeter": 12,
+      "g0-mcp-surface": 8,
+      "g0-traceability-conformance": 6
+    },
+    "turns": [
+      {
+        "turn": 1,
+        "date": "2026-09-02",
+        "range": "FR-COL-001..012, FR-DISC-001..005",
+        "result": "17 PASS, 0 GAP",
+        "scope": "g0-first-party-observation"
+      },
+      {
+        "turn": 2,
+        "date": "2026-09-02",
+        "range": "FR-DATA-001..006, FR-DR-001..002, FR-CORE-001..008",
+        "result": "16 PASS, 0 GAP",
+        "scope": "g0-contracts-data-truth, g0-tool-core"
+      },
+      {
+        "turn": 3,
+        "date": "2026-09-02",
+        "range": "FR-COST-001..010, FR-PROV-001..010, FR-SEC-001..012, FR-MCP-001..005+008..010, FR-TRACE-001..006",
+        "result": "46 PASS, 0 GAP — completes G0 coverage (79/79)",
+        "scope": "g0-cost-capacity, g0-provider-lifecycle, g0-security-perimeter, g0-mcp-surface, g0-traceability-conformance"
+      }
+    ],
+    "crossCutting": {
+      "prohibitedCapabilityScan": "CLEAN — 0 findings, 240 schemas inventoried (run each turn)",
+      "specIntegrity": "pnpm spec:verify OK — 13 checks passed (run each turn)",
+      "releaseConformanceAtAuditTime": "PASSED — 0 findings (evaluated while milestone ACTIVE)",
+      "docsSpecUntouched": "audit made no code or spec changes; nothing under docs/spec/** modified"
+    },
+    "auditHeadSha": "b4689dec94727fa79c06aa45e702b6e9d3fd9f0d",
+    "originMainShaAtConclusion": "b4689dec94727fa79c06aa45e702b6e9d3fd9f0d",
+    "freezeLawSatisfied": true
+  },
+  "evidenceIndex": {
+    "runArtifactsDir": "/home/minhquan_eth/.archon/workspaces/quantm-zeus/foresift/artifacts/runs/ad816c054f5d3931b2072f20569340e4",
+    "auditReport": "milestone-audit-report.md (per-requirement findings, 3 turns)",
+    "auditProgress": "milestone-audit-progress.json (79/79 audited verdicts with evidence)",
+    "milestoneGate": "verify-repo.log — MILESTONE GATE PASSED (spec, format, lint, typecheck, 372-file bun-test authority suite)",
+    "testExecutions": {
+      "test-run-2026-09-02": "Collector+discovery package sweep: 111 pass / 0 fail across 38 files (bun test over packages/{collector-core,collector-solana,collector-checkpoints,collector-gap-recovery,program-decoders,discovery-universe,cheap-monitor}/test); shared-schemas col+disc: 38 pass; release-conformance+requirement-manifest: 92 pass / 0 fail; declared AC suites AC-110..113, AC-224..231, AC-237 positive+negative: all pass; prohibited-capability CLI clean; pnpm spec:verify OK (13 checks)"
+    }
+  }
 }

@@ -10,6 +10,7 @@ import {
   assembleDecisionTrace,
   recordDecisionTrace,
   fetchDecisionTraceByRef,
+  fetchDecisionTraceById,
 } from '@foresift/release-conformance';
 import { closeTestDatabase, makeTestDatabase, type TestDatabase } from './helpers.ts';
 import { VALID_DECISION_TRACE_INPUT } from '../fixtures/trace/index.ts';
@@ -36,6 +37,7 @@ describe('AC-267 acceptance (positive)', () => {
     const fetched = await fetchDecisionTraceByRef(tdb.engine, 'dec-ac267-acceptance-001');
 
     expect(fetched).toBeDefined();
+    expect(fetched?.traceId).toBe(trace.traceId);
     expect(fetched?.decisionRef).toBe('dec-ac267-acceptance-001');
     expect(fetched?.manifestSha256).toBe(VALID_DECISION_TRACE_INPUT.manifestSha256);
     expect(fetched?.requirementIds).toEqual(VALID_DECISION_TRACE_INPUT.requirementIds);
@@ -49,5 +51,15 @@ describe('AC-267 acceptance (positive)', () => {
     expect(fetched?.testReleaseId).toBe(VALID_DECISION_TRACE_INPUT.testReleaseId);
     expect(fetched?.conformanceReleaseId).toBe(VALID_DECISION_TRACE_INPUT.conformanceReleaseId);
     expect(fetched?.releaseReportId).toBe(VALID_DECISION_TRACE_INPUT.releaseReportId);
+
+    const fetchedById = await fetchDecisionTraceById(tdb.engine, trace.traceId);
+    expect(fetchedById).toEqual(fetched);
+
+    const fetchedAsOf = await fetchDecisionTraceByRef(
+      tdb.engine,
+      'dec-ac267-acceptance-001',
+      '2026-08-31T09:00:00.000Z',
+    );
+    expect(fetchedAsOf?.traceId).toBe(trace.traceId);
   });
 });

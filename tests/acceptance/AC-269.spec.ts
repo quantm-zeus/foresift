@@ -24,10 +24,12 @@ describe('AC-269 acceptance (positive)', () => {
     expect(report).toBeDefined();
     expect(report.documentHash).toBeDefined();
     expect(report.manifestHash).toBeDefined();
+    expect(report.normalizedHash).toBeDefined();
     expect(report.dependencySbomHash).toBeDefined();
     expect(report.migrationHashes).toBeDefined();
     expect(report.schemaHashes).toBeDefined();
     expect(report.conformanceResults).toBeDefined();
+    expect(report.unresolvedDeviations).toBeDefined();
     expect(report.activationState).toBeDefined();
     expect(report.rollbackTarget).toBeDefined();
 

@@ -82,14 +82,22 @@ export const GATE_E2E_NESTED = 'FORESIFT_GATE_E2E_NESTED';
  *     convergence router regardless of checkbox state.
  * Returns null when nothing qualifies (milestone fully landed); the fixtures
  * skip themselves rather than asserting against a vanished scenario.
+ *
+ * The read degrades to null (not a throw) when there is no current milestone
+ * at all — milestone control is stateless between milestones by design: the
+ * audit-conclude contract deletes current-milestone.json after archiving
+ * (live PR #168: with G0 archived, these module-top-level reads threw ENOENT
+ * between tests and failed the process-meta workload before any test ran).
  */
 export function unlandedFixturePackages(): {
   redGatePkg: string;
   absentSpecPkg: string;
 } | null {
-  const ms = JSON.parse(
-    readFileSync(join(REPO, 'specs', 'implementation', 'current-milestone.json'), 'utf8'),
-  ) as { packages?: Array<{ id: string; verificationCommands?: string[] }> };
+  const msFile = join(REPO, 'specs', 'implementation', 'current-milestone.json');
+  if (!existsSync(msFile)) return null;
+  const ms = JSON.parse(readFileSync(msFile, 'utf8')) as {
+    packages?: Array<{ id: string; verificationCommands?: string[] }>;
+  };
   const packages = ms.packages ?? [];
   const redGatePkg = packages.find((p) =>
     (p.verificationCommands ?? []).some((cmd) => {

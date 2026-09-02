@@ -6,9 +6,10 @@
 // tasking's five benchmark cases; wall-clock §26 numbers live in
 // .optimizer-evidence/v2-second-pass-final-report.md.
 //
-// `PKG` must be a REAL current-milestone package id because attestation
-// identity resolves risk/profile from the authoritative milestone (cwd-based
-// load); the disposable git fixture supplies only HEAD movement and hashes.
+// `PKG` must resolve in the fixture milestone (attestation identity resolves
+// risk/profile from the authoritative milestone via FORESIFT_REPO_ROOT, which
+// gitFixture's template seeds); the disposable git fixture supplies HEAD
+// movement and hashes.
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -63,6 +64,7 @@ const gateManifest = (passed: boolean, failedCategories: string[] = []) =>
 describe('CASE A — clean package', () => {
   it('one FULL gate, zero convergence/create-PR/landing AI, attestation reuse', () => {
     const repo = gitFixture('case-a');
+    repo.withMilestoneRoot();
     const h1 = repo.baseSha();
     const dir = art('case-a');
     // Exactly ONE local FULL gate ran and it was green at h1 (this manifest is
@@ -145,6 +147,7 @@ describe('CASE B — gate repair package', () => {
 describe('CASE C — review finding package', () => {
   it('HEAD change invalidates the old attestation and forces repair/convergence', () => {
     const repo = gitFixture('case-c');
+    repo.withMilestoneRoot();
     const h1 = repo.baseSha();
     repo.writeFile('packages/c/code.ts', 'export {};\n');
     repo.commitAll('review fix moves HEAD');
@@ -195,6 +198,7 @@ describe('CASE D — unknown impact', () => {
 describe('CASE E — clean final landing', () => {
   it('zero AI between attestation validation and squash merge', () => {
     const repo = gitFixture('case-e');
+    repo.withMilestoneRoot();
     const dir = art('case-e');
     writeFileSync(join(dir, 'full-gate-result.json'), gateManifest(true));
     // runFinalLand IS the deterministic lander: injected deps record every

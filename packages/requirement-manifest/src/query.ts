@@ -135,8 +135,7 @@ export type ResolveMappingsManifest = {
   readonly requirements:
     | readonly (Pick<QueryableRequirement, 'id'> & {
         readonly [K in MappingField | 'testRefs' | 'activationGateRefs' | 'rollbackRefs']?:
-          | readonly string[]
-          | undefined;
+          readonly string[] | undefined;
       })[]
     | undefined;
 };

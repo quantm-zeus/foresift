@@ -254,10 +254,7 @@ export function detectOrphanSources(
         ),
         mappings,
       ]).then(([ledger, manifestMappings]) => {
-        const validation = validateOrphanExceptionLedger(
-          ledger,
-          manifestMappings.requirementIds,
-        );
+        const validation = validateOrphanExceptionLedger(ledger, manifestMappings.requirementIds);
         if (!validation.valid) {
           throw new Error(`invalid orphan exception ledger: ${validation.errors.join('; ')}`);
         }

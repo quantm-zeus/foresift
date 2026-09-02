@@ -34,7 +34,10 @@ export interface LedgerValidation {
 
 const REQUIREMENT_ID = /^(?:FR-[A-Z][A-Z0-9]*-\d{3}|INV-\d{3})$/;
 
-export function validateOrphanExceptionLedger(ledger: unknown): LedgerValidation {
+export function validateOrphanExceptionLedger(
+  ledger: unknown,
+  knownRequirementIds?: ReadonlySet<string>,
+): LedgerValidation {
   const errors: string[] = [];
   if (ledger === null || typeof ledger !== 'object') {
     return { valid: false, errors: ['ledger must be an object'] };
@@ -70,6 +73,16 @@ export function validateOrphanExceptionLedger(ledger: unknown): LedgerValidation
       )
     ) {
       errors.push(`${prefix}.servingRequirementIds must contain valid requirement IDs`);
+    } else if (
+      knownRequirementIds !== undefined &&
+      entry.servingRequirementIds.some((requirementId) => !knownRequirementIds.has(requirementId))
+    ) {
+      const unknownIds = entry.servingRequirementIds.filter(
+        (requirementId) => !knownRequirementIds.has(requirementId),
+      );
+      errors.push(
+        `${prefix}.servingRequirementIds names unknown requirements: ${unknownIds.join(', ')}`,
+      );
     }
     if (typeof entry.justification !== 'string' || entry.justification.trim().length === 0) {
       errors.push(`${prefix}.justification must be non-empty`);
@@ -141,7 +154,12 @@ async function collectProductFiles(repoRoot: string): Promise<readonly string[]>
   return result.sort();
 }
 
-async function loadImplementationRefs(repoRoot: string): Promise<readonly string[]> {
+interface ManifestTraceMappings {
+  readonly implementationRefs: readonly string[];
+  readonly requirementIds: ReadonlySet<string>;
+}
+
+async function loadManifestTraceMappings(repoRoot: string): Promise<ManifestTraceMappings> {
   const manifestPath = path.join(
     repoRoot,
     'docs/spec/crypto_intelligence_agent_gateway_PRD_FINAL_v6.0.requirements.json',
@@ -150,7 +168,12 @@ async function loadImplementationRefs(repoRoot: string): Promise<readonly string
     readonly requirements?: readonly RequirementMapping[];
   };
   if (!Array.isArray(manifest.requirements)) throw new Error('manifest requirements are missing');
-  return manifest.requirements.flatMap((requirement) => requirement.implementationRefs ?? []);
+  return {
+    implementationRefs: manifest.requirements.flatMap(
+      (requirement) => requirement.implementationRefs ?? [],
+    ),
+    requirementIds: new Set(manifest.requirements.map((requirement) => requirement.id)),
+  };
 }
 
 export interface DetectOrphanOptions {
@@ -218,14 +241,21 @@ export function detectOrphanSources(
       'repoRoot or all of productFiles, implementationRefs, and exceptions is required',
     );
   }
+  const mappings = loadManifestTraceMappings(options.repoRoot);
   return Promise.all([
     options.productFiles ?? collectProductFiles(options.repoRoot),
-    options.implementationRefs ?? loadImplementationRefs(options.repoRoot),
+    options.implementationRefs ?? mappings.then((value) => value.implementationRefs),
     options.exceptions ??
-      loadOrphanExceptions(
-        path.join(options.repoRoot, 'packages/release-conformance/src/orphan-exceptions.json'),
-      ).then((ledger) => {
-        const validation = validateOrphanExceptionLedger(ledger);
+      Promise.all([
+        loadOrphanExceptions(
+          path.join(options.repoRoot, 'packages/release-conformance/src/orphan-exceptions.json'),
+        ),
+        mappings,
+      ]).then(([ledger, manifestMappings]) => {
+        const validation = validateOrphanExceptionLedger(
+          ledger,
+          manifestMappings.requirementIds,
+        );
         if (!validation.valid) {
           throw new Error(`invalid orphan exception ledger: ${validation.errors.join('; ')}`);
         }

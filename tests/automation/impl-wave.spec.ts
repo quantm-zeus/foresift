@@ -405,6 +405,35 @@ ${Array.from(
     // restore canonical fixture text
     writeFileSync(join(fx.root, 'specs', 'pkg-x', 'tasks.md'), TASKS);
   });
+
+  it('a backticked package-DIRECTORY token is an in-scope predicted write (live T001/T002 scaffold class, run aa3e8015)', () => {
+    // A scaffold task names its package directory (`packages/requirement-x`),
+    // but the binding scope is `packages/x/**`-style: `**/` requires a
+    // trailing slash, so the bare directory never matched, the whole write
+    // set fell to outOfScopeWrites, and the task could never carry evidence —
+    // its files (written UNDER the directory) starved of a matching write.
+    const tasks2 = TASKS.replace(
+      '- [ ] T104 [P] Write guide `docs/x-guide.md`. Traces: FR-X-002 (AC-202).',
+      '- [ ] T104 [P] Scaffold the `packages/x` workspace package: `package.json`,' +
+        ' `tsconfig.json`, and `src/index.ts`. Traces: FR-X-002 (AC-202).',
+    );
+    writeFileSync(join(fx.root, 'specs', 'pkg-x', 'tasks.md'), tasks2);
+    const out = join(fx.artifacts, 'graph-dirtoken.json');
+    const r = spawnSync(
+      process.execPath,
+      [GRAPH, '--package', 'pkg-x', '--root', fx.root, '--plan-shards', '2', '--out', out],
+      { encoding: 'utf8' },
+    );
+    expect(r.status).toBe(0);
+    const g = JSON.parse(readFileSync(out, 'utf8'));
+    const t104 = g.units.find((u: { id: string }) => u.id === 'T104');
+    expect(t104.predictedWrites).toContain('packages/x');
+    expect(t104.outOfScopeWrites).not.toContain('packages/x');
+    // root bookkeeping stays a recorded exception (demote, never widen)
+    expect(t104.outOfScopeWrites).toContain('package.json');
+    // restore canonical fixture text
+    writeFileSync(join(fx.root, 'specs', 'pkg-x', 'tasks.md'), TASKS);
+  });
 });
 
 // Real multi-worktree wave fixture: two writer branches + one violating branch.

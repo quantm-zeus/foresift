@@ -247,4 +247,31 @@ describe('glob-output evidence matching (G0 final correctness delta, directive 8
     // nested path does NOT match a single star
     expect(taskEvidence('T098', idx, ['docs/generated/sub/a.json']).evidencable).toBe(false);
   });
+
+  test('directory predicted-write proves diff files strictly under it (T001/T002 scaffold class, run aa3e8015)', () => {
+    const dirUnits = [
+      {
+        ...globUnits[0],
+        id: 'T001',
+        predictedWrites: ['packages/requirement-manifest'],
+        productWrites: ['packages/requirement-manifest'],
+      },
+    ];
+    const idx = new Map(dirUnits.map((u) => [u.id, u]));
+    // files UNDER the directory prove the scaffold task
+    const hit = taskEvidence('T001', idx, [
+      'packages/requirement-manifest/package.json',
+      'packages/requirement-manifest/src/index.ts',
+    ]);
+    expect(hit.evidencable).toBe(true);
+    expect(hit.evidence).toContain('packages/requirement-manifest/package.json');
+    // sibling-prefix trap refuses: a different package sharing the prefix
+    expect(taskEvidence('T001', idx, ['packages/requirement-manifest-evil/x.ts']).evidencable).toBe(
+      false,
+    );
+    // foreign file refuses; the bare directory itself in a diff proves nothing new
+    expect(taskEvidence('T001', idx, ['packages/other/x.ts']).evidencable).toBe(false);
+    // empty diff still nominates nothing
+    expect(taskEvidence('T001', idx, []).evidencable).toBe(false);
+  });
 });

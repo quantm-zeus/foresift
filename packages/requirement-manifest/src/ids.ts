@@ -86,7 +86,10 @@ export function checkStableOrdering(manifest: unknown): {
     // use lexical IDs, which makes the rule independently testable.
     const anchored = items.every((item) => Number.isInteger(item.line));
     const keys = items.map((item) => (anchored ? Number(item.line) : String(item.id)));
-    return keys.some((key: number | string, index: number) => index > 0 && key < keys[index - 1]);
+    return keys.some((key: number | string, index: number) => {
+      const previous = keys[index - 1];
+      return previous !== undefined && key < previous;
+    });
   });
   return { isStable: unstableNamespaces.length === 0, unstableNamespaces };
 }

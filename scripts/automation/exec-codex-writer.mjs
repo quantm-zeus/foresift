@@ -241,6 +241,10 @@ export function runCodexWriter(input) {
   // Lane evidence diff (live 7c98e02e): committed work counts — status alone
   // saw a clean tree after the agent's own commits and nominated nothing.
   const evidencePaths = laneEvidencePaths({ worktree: input.worktree, before });
+  const dirty = git(['status', '--porcelain=v1'], input.worktree)
+    .stdout.split('\n')
+    .filter(Boolean)
+    .map((line) => line.slice(3).split(' -> ').at(-1));
   const ownership = validateLaneOwnership({
     engine: 'CODEX',
     role: 'implementation',

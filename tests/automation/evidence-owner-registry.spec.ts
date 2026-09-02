@@ -19,6 +19,7 @@ import {
   assertTraceabilityMatrixClosed,
   completeNonFileEvidence,
   evidenceOwnerRegistry,
+  fileEvidenceAlreadySatisfied,
   verificationCommandsFor,
 } from '../../scripts/automation/evidence-owner-registry.mjs';
 import { TASK_EVIDENCE_KINDS } from '../../scripts/automation/task-metadata.mjs';
@@ -532,6 +533,56 @@ describe('atomic non-file completion commit (directive 7)', () => {
         encoding: 'utf8',
       });
       expect(committed).toContain('- [x] T024');
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+});
+
+describe('already-satisfied file-truth completion (e9af6ec0 root cause part 2)', () => {
+  test('unit with no predicted writes => not satisfied', () => {
+    const root = scratch();
+    try {
+      const r = fileEvidenceAlreadySatisfied(
+        { id: 'T001', predictedWrites: [], testWrites: [] },
+        { root },
+      );
+      expect(r.satisfied).toBe(false);
+      expect(r.reason).toContain('no predicted writes');
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  test('predicted write absent at HEAD => not satisfied', () => {
+    const root = scratch();
+    try {
+      execSync('git init -q', { cwd: root });
+      const r = fileEvidenceAlreadySatisfied(
+        { id: 'T001', predictedWrites: ['packages/x/src/a.ts'], testWrites: [] },
+        { root },
+      );
+      expect(r.satisfied).toBe(false);
+      expect(r.reason).toContain('not present at HEAD');
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  test('predicted write present at HEAD with authoring commit => satisfied with per-file proof', () => {
+    const root = scratch();
+    try {
+      execSync('git init -q && git config user.email t@t && git config user.name t', { cwd: root });
+      mkdirSync(join(root, 'packages/x/src'), { recursive: true });
+      writeFileSync(join(root, 'packages/x/src/a.ts'), 'export const a = 1;');
+      execSync('git add -A && git commit -qm author', { cwd: root });
+      const r = fileEvidenceAlreadySatisfied(
+        { id: 'T001', predictedWrites: ['packages/x/src/a.ts'], testWrites: [] },
+        { root },
+      );
+      expect(r.satisfied).toBe(true);
+      expect(r.proof?.[0].path).toBe('packages/x/src/a.ts');
+      expect(r.proof?.[0].authoringCommit).toMatch(/^[0-9a-f]{12}$/);
     } finally {
       rmSync(root, { recursive: true, force: true });
     }

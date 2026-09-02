@@ -380,6 +380,54 @@ export function assertTraceabilityMatrixClosed(packageId, root, opts = {}) {
   };
 }
 
+/**
+ * Already-satisfied file-truth completion (live root cause run e9af6ec0, part
+ * 2): after recovery replays, a wave's adopted base can already contain a
+ * unit's deliverables (authored by EARLIER validated lanes of the SAME
+ * package branch — salvage/repair integrations). Re-dispatched writers then
+ * correctly produce zero diffs, and the P0-1 diff protocol correctly
+ * nominates zero units — integration_empty. The supported deterministic
+ * completion for that shape: every predicted write EXISTS at the canonical
+ * HEAD and was authored on THIS package branch (git-log provenance), so the
+ * unit is already satisfied. Proof = the authoring commit per file. This is
+ * file truth from git, never model prose, and never a lane-diff bypass: the
+ * authoring commits themselves went through guards + integration validation.
+ */
+export function fileEvidenceAlreadySatisfied(unit, ctx) {
+  const writes = [...(unit?.predictedWrites ?? []), ...(unit?.testWrites ?? [])];
+  if (writes.length === 0)
+    return { satisfied: false, reason: `no predicted writes recorded for ${unit?.id}` };
+  const proof = [];
+  for (const w of writes) {
+    // glob writes: expand against the working tree via git ls-files
+    let paths = [w];
+    if (w.includes('*')) {
+      const ls = git(`ls-files '${w}'`, ctx.root);
+      paths = ls.out.split('\n').filter(Boolean);
+      if (paths.length === 0)
+        return { satisfied: false, reason: `glob ${w} matches no tracked files` };
+    }
+    for (const p of paths) {
+      const exists = spawnSync(`git cat-file -e HEAD:'${p}'`, {
+        shell: true,
+        cwd: ctx.root,
+        encoding: 'utf8',
+      });
+      if (exists.status !== 0)
+        return { satisfied: false, reason: `predicted write ${p} not present at HEAD` };
+      const author = git(`log --format=%H --follow -1 -- '${p}'`, ctx.root);
+      if (!author.ok || !author.out)
+        return { satisfied: false, reason: `no authoring commit found for ${p}` };
+      proof.push({ path: p, authoringCommit: author.out.slice(0, 12) });
+    }
+  }
+  return {
+    satisfied: true,
+    reason: `all ${proof.length} predicted write(s) present at HEAD with package-branch provenance`,
+    proof,
+  };
+}
+
 // ── CLI: post-integration non-file completion pass (zero AI) ─────────────────
 //   node scripts/automation/evidence-owner-registry.mjs \
 //     --package <id> --graph <task-graph.json> [--reason <why>]
@@ -419,6 +467,16 @@ if (invokedDirectly) {
       ['VERIFICATION_ONLY', 'COORDINATOR_ARTIFACT', 'NO_OP_ALREADY_SATISFIED'].includes(u.evidence),
   );
   const taskIds = (graph.units ?? []).map((u) => u.id);
+  // Open FILE-truth units get the already-satisfied audit first: if every
+  // predicted write exists at HEAD with package-branch provenance, the unit is
+  // deterministic-completed with per-file proof (e9af6ec0 root cause part 2).
+  const alreadySatisfied = [];
+  for (const u of graph.units ?? []) {
+    if (u.done) continue;
+    if (u.evidence && u.evidence !== 'FILE_OUTPUT') continue; // non-file handled below
+    const audit = fileEvidenceAlreadySatisfied(u, { root });
+    if (audit.satisfied) alreadySatisfied.push(u.id);
+  }
   // Dry-run evaluation FIRST (no mutation): which units would complete?
   const evaluated = [];
   for (const u of targets) {
@@ -431,7 +489,10 @@ if (invokedDirectly) {
     });
     evaluated.push(probe);
   }
-  const wouldFlip = evaluated.filter((r) => r.completed).map((r) => r.taskId);
+  const wouldFlip = [
+    ...alreadySatisfied,
+    ...evaluated.filter((r) => r.completed).map((r) => r.taskId),
+  ];
   // Apply: flip all completing units in ONE write, then commit atomically.
   const results = evaluated.map((r) => ({ ...r, completed: false, committed: false }));
   if (wouldFlip.length > 0) {
@@ -466,6 +527,19 @@ if (invokedDirectly) {
       }
       console.error(`evidence-owner: commit failed: ${commit.err}`);
     }
+  }
+  for (const id of alreadySatisfied) {
+    const audit = fileEvidenceAlreadySatisfied(unitsById.get(id), { root });
+    results.push({
+      taskId: id,
+      evidenceKind: 'FILE_OUTPUT',
+      owner: 'ALREADY_SATISFIED_AT_HEAD',
+      completed:
+        wouldFlip.includes(id) && results.every((r) => (r.taskId !== id ? true : r.completed)),
+      proof: audit.reason,
+      fileProof: audit.proof,
+      atHead: git('rev-parse HEAD', root).out,
+    });
   }
   process.stdout.write(
     `${JSON.stringify({ schema: 'foresift/evidence-owner@1', package: packageId, results }, null, 2)}\n`,

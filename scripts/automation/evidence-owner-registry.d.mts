@@ -43,3 +43,15 @@ export declare function assertTraceabilityMatrixClosed(
   root: string,
   opts?: { taskIds?: string[] },
 ): { ok: boolean; reason: string };
+export declare function fileEvidenceAlreadySatisfied(
+  unit: {
+    id: string;
+    predictedWrites?: string[];
+    testWrites?: string[];
+  } | null,
+  ctx: { root: string },
+): {
+  satisfied: boolean;
+  reason: string;
+  proof?: Array<{ path: string; authoringCommit: string }>;
+};

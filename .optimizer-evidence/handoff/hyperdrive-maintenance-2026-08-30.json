@@ -1,168 +1,37 @@
 {
-  "schema": "foresift/maintenance-handoff@2",
+  "schema": "foresift/maintainer-snapshot@1",
+  "updatedAt": "2026-09-02T10:05:00Z",
+  "mission": "Persistent maintainer — minimize authoritative project critical-path wall clock",
   "currentSnapshot": {
-    "capturedAt": "2026-09-02T08:20:00Z",
-    "mainSha": "329a94d64a362a46e402d6ecd2febd53cb24ecc5",
-    "mainCi": "GREEN (merged-main run 33606890002, #155 landing)",
-    "milestone": "G0 — 7/8 PROVEN; g0-traceability-conformance: 9/10 open tasks already-satisfied at worktree head (audit-proven); T024 remains",
-    "activePackage": {
-      "id": "g0-traceability-conformance",
-      "state": "test-author surface landing in flight (lander fix #156 in CI); then closing wave T024",
-      "runId": "aa3e80155ae9e9219c4fc28b9272b0bc (output landing)"
+    "milestone": "G0",
+    "g0Progress": "8/8 PROVEN — milestone complete",
+    "packages": {
+      "g0-contracts-data-truth": "PROVEN",
+      "g0-security-perimeter": "PROVEN",
+      "g0-tool-core": "PROVEN",
+      "g0-provider-lifecycle": "PROVEN",
+      "g0-cost-capacity": "PROVEN",
+      "g0-first-party-observation": "PROVEN",
+      "g0-mcp-surface": "PROVEN",
+      "g0-traceability-conformance": "PROVEN (main 2b82882, PR #160 chore merged through protected exact-head path; product PRs #153/#157/#158; suite #155, planner #154, evidence #151)"
     },
-    "openMaintenancePr": null,
-    "providerState": "supervisor alive (singleton, restarted post-recovery); wave in progress",
-    "resourceState": "15GiB host: 1.7Gi used / 13Gi avail post-reboot; no OOM pressure",
-    "blockers": [
-      "Worktree canonical (e08ba79) carries test-author surface + integration; already-satisfied audit proves T001,T002,T013,T018-T023 there (9 units) — only T024 (TRACEABILITY_FULL_CONVERGENCE) remains.",
-      "Lander already-merged short-circuit bug fixed (#156 in CI) — was silently stranding continuation wave output.",
-      "Sequence: land #156 → merge worktree branch PR (test-author surface) → recover-fatal → closing wave runs T024 gate at FAST-green → G0 8/8."
-    ],
-    "nextSafeAction": "#156 merge → land worktree PR → recover-fatal → closing wave (T024) → milestone convergence → G0 8/8",
-    "history": [
-      {
-        "at": "2026-09-02T08:10:00Z",
-        "event": "#155 landed (writer dirty-ref fix + structural regression). Lander already-merged short-circuit bug found (continuation wave output stranded) — fix #156 opened. Audit proves 9/10 open tasks already-satisfied at worktree head."
-      },
-      {
-        "at": "2026-09-02T07:45:00Z",
-        "event": "Continuation wave aa3e8015: test-author integrated 5 coordinator-validated units (T013/T019-T021/T023) + FAST green + repair; core lane crashed post-spawn (writer ReferenceError, my #151 refactor regression) — core agent work committed on lane branch but unreached. #154 landed the T001/T002 scaffold-evidence fix."
-      },
-      {
-        "at": "2026-09-02T07:26:00Z",
-        "event": "Recovery: merged-main CI GREEN for #153 (c2539fb); supervisor stopped → --recover-fatal → fresh continuation run aa3e8015 (single-fresh-continuation mode, admission passed, task worktree advanced to landed main); supervisor restarted (singleton verified)."
-      },
-      {
-        "at": "2026-09-02T07:05:00Z",
-        "event": "PR #153 MERGED (c2539fb): g0-traceability implementation wave landed — salvage-proven 14 units, full gate GREEN, exact-head CI GREEN, squash merge. Lander exit-1 was post-merge bookkeeping (gh quirk), PR state MERGED is authoritative."
-      },
-      {
-        "at": "2026-09-02T06:15:00Z",
-        "event": "Run 7c98e02e: salvage integration SUCCEEDED (3 lanes, 14 units, coordinator-validated); FAST reached GREEN after governor-test hermetic fix + salvaged-code type fixes; 3 resumes blocked by repair-loop budget-exhaustion aborting before recheck — root-caused to stale RED when-gate + node-fatal exhaustion; structural fix committed."
-      },
-      {
-        "at": "2026-09-02T05:00:00Z",
-        "event": "#151 landed exact-head (bb9dba6, run 33592230625 GREEN) + merged-main GREEN (f83e310, run 33592599247). Writer evidence diff now = committed base..HEAD ∪ uncommitted status. Run 7c98e02e resumed with 23 cached nodes — salvage-by-resume preserves all three implementation lanes' committed work (no writer rerun)."
-      },
-      {
-        "at": "2026-09-02T04:20:00Z",
-        "event": "RUN 7c98e02e paused fatal — integrate-and-fast exit 90 WAVE_INTEGRATION_EMPTY (integrated=0 rejected=4). ROOT CAUSE: writer evidence diff used uncommitted status only while agents committed their own work (4 commits/lane present in base..HEAD). No AI repair burned (distinct token held). Fix: laneEvidencePaths (committed ∪ uncommitted) in all writers."
-      }
-    ]
+    "mainSha": "2b8288206e2f93eaf6e25097de316339a804019f",
+    "mainCi": "Fast Gates/Classify/State-Control-Plane green at merge time; Verify full check monitored to completion (confirm via gh run list --branch main --headSha 2b82882)",
+    "supervisor": "foresift-autopilot.service ACTIVE singleton; fatal pause cleared (--clear-fatal, no RUNNING packages orphaned); no active runs; optimization FROZEN until G0 durable",
+    "taskWorktree": "/home/minhquan_eth/.archon/workspaces/quantm-zeus/foresift/worktrees/archon/task-foresift-g0-traceability-conformance (branch alive for archon lifecycle; remote deleted after squash merges)",
+    "openEvidenceChain": "All 25 tasks closed deterministically: 15 via PR #153 integration, 5 test-author via #157, T024 VERIFICATION_ONLY via evidence-owner TRACEABILITY_FULL_CONVERGENCE, T001/T002 via already-satisfied directory-write audit pass 2; checkbox flips committed by wave-coordinator identity (6e9ebd6, 418887f), never hand-edited"
   },
+  "blockers": [],
+  "nextActions": [
+    "Confirm merged-main CI green on 2b82882 (Verify full check) — GitHub Actions authority",
+    "G0 8/8 durable confirmation: pnpm verify + pnpm spec:verify at HEAD (in flight at snapshot time)",
+    "Post-G0 queue (now UNFROZEN candidate — confirm with operator): reboot-resilient maintainer, stale-control-plane decoupling, Archon migration review, measured G1 scale work",
+    "Land later if needed: state-landing base-drift self-update (state branch BEHIND required operator merge; live PR #160), missing 'state-only' label creation (live #160), mergeStateStatus=BEHIND retry loop retryCount accounting"
+  ],
   "history": [
     {
-      "at": "2026-08-31T13:28Z",
-      "event": "PR #137 merged (a83501c)",
-      "detail": "adaptive lanes consume real work truth: ready counts + exact shardNeed from launch preflight; resolves 45–51min single-lane waves"
-    },
-    {
-      "at": "2026-08-31T14:05Z",
-      "event": "PR #135 merged (8744517)",
-      "detail": "writer briefs budget law — commit each completed unit so timeouts preserve partial work"
-    },
-    {
-      "at": "2026-08-31T16:44Z",
-      "event": "PR #138 merged (c995c4b)",
-      "detail": "planner write-disjointness closure + coreSeed dedupe (fixes run 95c45071 guard refusal); PR #136 superseded/recreated clean"
-    },
-    {
-      "at": "2026-08-31T17:55Z",
-      "event": "governor flake root-caused",
-      "detail": "heavyProcessCount matched bash -c WRAPPER argv text as heavy bun processes → supervised fixture ticks self-classified YELLOW → launch_denied_governor → CI process-7 GROUP TIMEOUT flake class; fixed in 917731a"
-    },
-    {
-      "at": "2026-08-31 (earlier)",
-      "event": "run 95c45071 recovery",
-      "detail": "2 fatal pauses recovered; attempt-1 45m timeout (fixed by #131), attempt-2 guard refusal on trace.ts (fixed by #138); P0-4 engine handoff proven in production (c38c2e1b)"
-    },
-    {
-      "at": "2026-08-30/31",
-      "event": "PRs #130–#133 merged",
-      "detail": "scheduling layer: launch preflight, ready queue/work stealing primitives, Codex cost policy, adaptive lanes, supervisor wiring, exact co-run gate"
-    },
-    {
-      "at": "2026-08-31T23:37Z",
-      "event": "recover-fatal attempt on 95c45071 launched fresh run 95dbd50e",
-      "detail": "worktree advance skipped 'diverged' (branch has wave commits) so the fresh wave replanned from the stale PRE-#138/#140/#141 planner and crashed on the plan-shards-1 [P]-fold edge (TypeError at groups[0], adaptive lanes resolved 1) — paused_fatal again. Root cause understood: supervisor's advanceArchonTaskWorktree is strict ff-only and can't absorb main over diverged branches; recovery after #141 lands requires a one-time manual merge of main into the task worktree (no conflicts: merge-tree probe clean) OR retiring the branch. 95dbd50e left abandoned."
-    },
-    {
-      "at": "2026-08-31T23:5xZ",
-      "event": "PR #141 CI adjudication",
-      "detail": "99bae0f run: targeted-router-e2e green-verdict failure (not reproducible on fresh main 3x, not reproducible in h3 worktree 3x, file unchanged since #99 — env flake). 76a54b8 run 33451217502: process-7 GROUP TIMEOUT (v2-throughput+v3-generations, 17m) — same 2-core-runner starvation class as #140; adjudicated via gh run rerun --failed backed by local green (84/84 in 15.6s on 4-core VPS)."
-    },
-    {
-      "at": "2026-09-01T00:06Z",
-      "event": "PR #141 MERGED (squash 20ae4d2) + g0-traceability recovered",
-      "detail": "Exact-head merge at 76a54b8 after adjudicated rerun green; merged-main CI green; branch recycled to fix/h3-maintenance from fresh main. Task worktree manually merged origin/main (ed524fc -> 39d29171) so recover-fatal's ff-only advance skipped 'current'; fresh launch run e44f577a replanned 25 units into core-batch-1(5u,load8)/core-batch-2(4u,load7,chains core-batch-1)/core-batch-3(8u,load10,chains core-batch-2) + parallel shards — mission item 4 now executing on real work."
-    },
-    {
-      "at": "2026-09-01T00:39Z",
-      "event": "run e44f577a fatal: chained-column guard collision found live",
-      "detail": "First production bounded-batch wave: guard-serial-1 refused core-batch-1 for 6 paths, guard-serial-3 refused core-batch-3 for 17 paths — all predicted by chain mates that inherit the column union BY DESIGN (mission item 4). Root-caused and fixed by PR #142 (chain-mate cross-lane exemption in wave-guard + integrator, two-way regressions); merged 4f8df2a. Both batch writers (core-batch-1 10m52s, core-batch-3) produced real committed work; the work is preserved on wave branches and the relaunch replans from the same tasks.md."
-    },
-    {
-      "at": "2026-09-01T01:2xZ",
-      "event": "PROOF: chain-mate exemption passes live guard (mission item 4)",
-      "detail": "Run 89c4b2b9: writer-serial-1 completed 10m52s; guard-serial-1 PASSED (331ms) — the identical lane+graph that deterministically refused in e44f577a. Chained batch writer-serial-2 dispatched behind the guard. Bounded decomposition + chaining + shared column now all proven on real work."
-    },
-    {
-      "at": "2026-09-01T02:0xZ",
-      "event": "MISSION ITEM 4 RUNTIME PROOF COMPLETE (run 89c4b2b9)",
-      "detail": "All three chained batches green: writer-serial-1 10m52s + guard 331ms PASS; ff-only chain -> writer-serial-2 13m51s + guard 153ms PASS; -> writer-serial-3 15m13s + guard 158ms PASS. Total serial column wall ~40m in 3 bounded scopes vs 55m single-lane ceiling — no batch approached the timeout, guards all pass with chain-mate exemption (#142). P50/P95 per-batch ~11-15m/15m, well under the 55m ceiling. fast-repair loop entered (trigger checking)."
-    },
-    {
-      "at": "2026-09-01T07:30:00Z",
-      "event": "post-restart maintainer recovery + #148 landed + salvage completed",
-      "detail": {
-        "reboot": "VPS reboot killed prior maintainer tmux; durable state (autopilot, worktrees, runs) survived; services restarted healthy",
-        "pr148": "exact-head merged at 940865cbb (merged-main 1c9e893 GREEN run 33479602509); real-plan proof: v2-throughput -> process-3, v3-generations -> process-4; all manifest weights still 1 (round-robin path-sort, NOT duration-aware LPT — documented)",
-        "pr147": "exact-head merged at 73ebec16d (merged-main 3f36c547b)",
-        "salvage89c4b2b9": "SALVAGE_SAFE executed: receipts matched lane heads; glob-aware nominateCompletedUnits recomputed 15/17 units from git-diff truth; integrate-writer-results.mjs re-validated and flipped tasks.md (commit 20f6c20); followups 03473bf/a0e4312/7b00b12/507626a",
-        "pr149": "opened for evidence-owner registry + deterministic non-file completion (directive 4): VERIFICATION_ONLY/COORDINATOR_ARTIFACT/NO_OP consumers + graph-build fail-closed coverage assertion",
-        "openUnitTruth": "T013/T018/T019-T023 artifacts already exist on the worktree (b5af2ed, 68bdfce, c5e0acb) — never checkbox-flipped by any wave; post-#149 the evidence-owner pass + integration validation is the supported completion path"
-      }
-    },
-    {
-      "at": "2026-09-01T11:20:00Z",
-      "event": "PR #149 landed + recover-fatal executed",
-      "detail": {
-        "pr149": "exact-head merged at cdcb7dd05 (merged-main f7769eecc GREEN run 33500869157): evidence-owner registry + deterministic VERIFICATION_ONLY/COORDINATOR_ARTIFACT completion + graph-build fail-closed coverage assertion",
-        "recovery": "recover-fatal retired dead run 89c4b2b9 (cancelled) and relaunched same package/generation/branch as run e9af6ec04d (single-fresh-continuation, HYBRID_AGY, 2 lanes provider-capped); task worktree advanced to 01e8ad0394 (contains #143-#149 control plane + all salvaged product work)",
-        "supervisor": "exactly ONE foresift-autopilot process (service active)"
-      }
-    },
-    {
-      "at": "2026-09-02T03:30:00Z",
-      "event": "PR #150 merged + run 7c98e02e recovered",
-      "detail": {
-        "pr150": "exact-head merged at eabdf668c (merged-main b8af25211 GREEN run 33586523111)",
-        "reconciliation": "task worktree head 3b49f3d (post-#150); T024 open with TRACEABILITY_FULL_CONVERGENCE marker; T025 closed on matrix-closure proof",
-        "recovery": "run 7c98e02edea same package/generation, one supervisor"
-      }
+      "ts": "2026-09-02T10:00:00Z",
+      "event": "G0 8/8 PROVEN on main 2b82882. Chain: #156 lander ancestor fix → #157 test-author surface (ee35e84) → preflight hermetic fixture fix (#158, 3cd7c88, full-gate TESTS refusal root-caused: live-tree openTaskCount assertion broke on package completion) → #159 lander --delete-branch worktree exit-1 fix (root cause: gh deletes remote then fails local ref in checked-out worktree, exit 1 AFTER successful merge — explains #153/#157/#158 bookkeeping lies) → finalize-from-main → state chore #160 (operator merged state branch forward past #159 base-drift; label state-only created) → PROVEN. Spec:verify 13 checks OK; release conformance PASSED at PROVEN main."
     }
-  ],
-  "h3MissionChecklist": {
-    "1_cleanPrHistory": "DONE — #134 closed, #135 recreated from fresh origin/main; branch hygiene: retire branches after squash merges",
-    "2_budgetLaw": "DONE — #135",
-    "3_adaptiveLaneWorkTruth": "DONE — #137 (readyTaskCount/parallelizableReadyCount/shardNeed + regressions)",
-    "4_boundedLaneScope": "PENDING — sequential core-batch-N decomposition; LANE_COUNT_LIMITS.max=3 caps parallel lanes but a 17-unit serial core still needs batching",
-    "5_resourceGovernorGate": "DONE — #139 (launch gate + hysteresis; wrapper false-positive fixed)",
-    "6_readyQueueWiring": "DONE — #139 (buildReadyQueue+stealNext authoritative stream; capacity-event re-entry via §49 fast cadence)",
-    "7_exactWriteOverride": "DONE — #139 (reason classes + WRITE_SCOPE_CONFLICT-only upgrade with exact truth both sides)",
-    "8_handoffSnapshot": "DONE — this file: currentSnapshot/history separated, single currentSnapshot enforced by structure",
-    "9_aiInvocationAudit": "DONE — #140 (inventory test: pool wiring, upstream gates, workflow-yaml allowlist, pool surface, claude-lane-core release)",
-    "10_evidenceKinds": "DONE — #140 ([evidence:] vocabulary, fail-closed TASK_EVIDENCE_UNKNOWN, COORDINATOR_ARTIFACT coordinator-only, non-file kinds never completable by a lane diff)",
-    "11_g1Canary": "BLOCKED until 4/5/6 runtime-proven on real waves"
-  },
-  "runtimeProofs": {
-    "proof1_adaptiveLanes": "landed (regressions green); production proof pending next wave",
-    "proof2_governorBlocks": "landed (regressions green); production proof pending next wave",
-    "proof3_exactDisjointCoRun": "landed; production proof pending next wave",
-    "proof4_dependencySerial": "landed (existing tests + new reason classes)",
-    "proof5_readyQueueSteal": "landed (stealNext wired); production proof pending next wave",
-    "proof6_noProviderBypass": "proven earlier (P0-4 engine handoff + pool wiring)",
-    "proof7_completionEvidence": "landed (P0-1 protocol); non-file kinds pending (item 10)",
-    "proof8_handoffReconstruct": "this snapshot + autopilot state capsule"
-  }
+  ]
 }

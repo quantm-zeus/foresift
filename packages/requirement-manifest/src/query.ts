@@ -33,7 +33,7 @@ type QueryableRequirement = RequirementItem & {
 };
 
 function requirements(
-  manifest: Pick<RequirementManifest, 'requirements'>,
+  manifest: Pick<RequirementManifest, 'requirements'> | ResolveMappingsManifest,
 ): readonly QueryableRequirement[] {
   return Array.isArray(manifest.requirements)
     ? (manifest.requirements as readonly QueryableRequirement[])
@@ -107,7 +107,7 @@ export function queryRequirementsByAc(
 
 /** The canonical mapping resolver shared by generation and conformance consumers. */
 export function resolveMappings(
-  manifest: Pick<RequirementManifest, 'requirements'>,
+  manifest: ResolveMappingsManifest,
   requirementId: string,
 ): RequirementMappings {
   const requirement = requirements(manifest).find((item) => item.id === requirementId);
@@ -123,3 +123,20 @@ export function resolveMappings(
   }
   return Object.freeze(result) as RequirementMappings;
 }
+
+/**
+ * Structural input for {@link resolveMappings}: only `id` plus the optional
+ * mapping fields are read. Accepting the narrow shape (instead of a full
+ * `RequirementItem`) lets conformance consumers resolve mappings over their
+ * own lightweight `RequirementMapping` records — the resolver never needs the
+ * manifest's acceptance-criteria/cost-control surfaces.
+ */
+export type ResolveMappingsManifest = {
+  readonly requirements:
+    | readonly (Pick<QueryableRequirement, 'id'> & {
+        readonly [K in MappingField | 'testRefs' | 'activationGateRefs' | 'rollbackRefs']?:
+          | readonly string[]
+          | undefined;
+      })[]
+    | undefined;
+};

@@ -75,10 +75,12 @@ export function validateOrphanExceptionLedger(
       errors.push(`${prefix}.servingRequirementIds must contain valid requirement IDs`);
     } else if (
       knownRequirementIds !== undefined &&
-      entry.servingRequirementIds.some((requirementId) => !knownRequirementIds.has(requirementId))
+      entry.servingRequirementIds.some(
+        (requirementId: string) => !knownRequirementIds.has(requirementId),
+      )
     ) {
       const unknownIds = entry.servingRequirementIds.filter(
-        (requirementId) => !knownRequirementIds.has(requirementId),
+        (requirementId: string) => !knownRequirementIds.has(requirementId),
       );
       errors.push(
         `${prefix}.servingRequirementIds names unknown requirements: ${unknownIds.join(', ')}`,

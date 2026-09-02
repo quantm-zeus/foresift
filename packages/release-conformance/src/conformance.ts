@@ -121,12 +121,44 @@ async function pathRefExists(repoRoot: string, refPath: string): Promise<boolean
   if (prefix.length === 0 || path.isAbsolute(refPath) || refPath.split('/').includes('..')) {
     return false;
   }
+  const hasGlob = /[?*[{]/.test(refPath);
   try {
-    await access(path.join(repoRoot, prefix), constants.F_OK);
-    return true;
+    if (!hasGlob) {
+      await access(path.join(repoRoot, refPath), constants.F_OK);
+      return true;
+    }
+
+    // Merely finding the static directory prefix is insufficient: a stale
+    // mapping such as `packages/example/src/*.ts` must fail when the directory
+    // exists but contains no matching source. Search only below the static
+    // prefix so repository dependencies (notably node_modules) are never
+    // traversed.
+    const searchRoot = prefix.includes('/') ? path.posix.dirname(prefix) : '';
+    await access(path.join(repoRoot, searchRoot), constants.F_OK);
+    const matcher = repositoryGlobRegex(refPath);
+    const candidates = await filesRecursively(path.join(repoRoot, searchRoot));
+    return candidates.some((candidate) => {
+      const repositoryPath = path.posix.join(searchRoot, candidate.replaceAll('\\', '/'));
+      return matcher.test(repositoryPath);
+    });
   } catch {
     return false;
   }
+}
+
+function repositoryGlobRegex(pattern: string): RegExp {
+  let source = '^';
+  for (let index = 0; index < pattern.length; index += 1) {
+    const character = pattern[index] as string;
+    if (character === '*') {
+      if (pattern[index + 1] === '*') {
+        index += 1;
+        source += '.*';
+      } else source += '[^/]*';
+    } else if (character === '?') source += '[^/]';
+    else source += /[\\^$.[\]{}()+|]/.test(character) ? `\\${character}` : character;
+  }
+  return new RegExp(`${source}$`);
 }
 
 /**

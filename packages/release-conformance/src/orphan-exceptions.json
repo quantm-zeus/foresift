@@ -1,0 +1,45 @@
+{
+  "schemaVersion": "1.0.0",
+  "exceptions": [
+    {
+      "pathPattern": "packages/object-store/src/**",
+      "servingRequirementIds": ["FR-DATA-002", "FR-DATA-003"],
+      "justification": "Provides the immutable raw-artifact and point-in-time object substrate used by the G0 data-truth persistence implementation."
+    },
+    {
+      "pathPattern": "packages/collector-checkpoints/src/**",
+      "servingRequirementIds": ["FR-COL-004"],
+      "justification": "Provides durable monotonic collector checkpoints and committed continuity watermarks."
+    },
+    {
+      "pathPattern": "packages/collector-gap-recovery/src/**",
+      "servingRequirementIds": ["FR-COL-004", "FR-COL-005"],
+      "justification": "Provides recorded-gap planning and non-backdating bounded recovery for collector continuity."
+    },
+    {
+      "pathPattern": "apps/api/src/main.ts",
+      "servingRequirementIds": ["FR-MCP-001", "FR-MCP-009"],
+      "justification": "Composes the read-only MCP Streamable HTTP server and transport lifecycle."
+    },
+    {
+      "pathPattern": "apps/api/src/index.ts",
+      "servingRequirementIds": ["FR-MCP-001"],
+      "justification": "Exports the API application wiring around the requirement-mapped MCP surface modules."
+    },
+    {
+      "pathPattern": "apps/api/src/config.ts",
+      "servingRequirementIds": ["FR-MCP-008", "FR-MCP-009"],
+      "justification": "Loads and validates the exact-origin and bounded-transport configuration consumed by MCP admission."
+    },
+    {
+      "pathPattern": "apps/api/src/auth/bearer.ts",
+      "servingRequirementIds": ["FR-MCP-005"],
+      "justification": "Wires personal bearer authentication into the MCP request boundary."
+    },
+    {
+      "pathPattern": "apps/api/src/auth/client-context.ts",
+      "servingRequirementIds": ["FR-MCP-004", "FR-MCP-010"],
+      "justification": "Builds the per-client authorization context re-evaluated by MCP tools and resources."
+    }
+  ]
+}

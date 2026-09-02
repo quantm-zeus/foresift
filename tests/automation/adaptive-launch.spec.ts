@@ -87,19 +87,26 @@ describe('launchDetached adaptive lane wiring', () => {
 
 describe('governor override (FORESIFT_GOVERNOR_STATE)', () => {
   test('forced non-GREEN state is reported by classifyHostState', async () => {
+    // Hermetic samples (classifyHostState's designed seam). A live probe
+    // inside a FAST wave sees the wave's own bun processes (≥3 heavy ⇒ ORANGE)
+    // and would make the post-override GREEN assertion host-load-dependent —
+    // the test must classify a KNOWN sample, not the machine it happens to
+    // run on (observed live: run 7c98e02e repair recheck).
+    const healthy = { total: 16_000_000_000, available: 14_000_000_000, heavyProcesses: 0 };
     process.env.FORESIFT_GOVERNOR_STATE = 'ORANGE';
     const mod = await import('../../scripts/automation/resource-governor.mjs');
-    const s = mod.classifyHostState();
+    const s = mod.classifyHostState(healthy);
     expect(s.state).toBe('ORANGE');
     expect(s.reason).toContain('FORESIFT_GOVERNOR_STATE=ORANGE');
     delete process.env.FORESIFT_GOVERNOR_STATE;
-    expect(mod.classifyHostState().state).toBe('GREEN');
+    expect(mod.classifyHostState(healthy).state).toBe('GREEN');
   });
 
   test('selection-loop governor gate wiring: non-GREEN refuses new launches', async () => {
+    const sample = { total: 16_000_000_000, available: 14_000_000_000, heavyProcesses: 0 };
     process.env.FORESIFT_GOVERNOR_STATE = 'RED';
     const mod = await import('../../scripts/automation/resource-governor.mjs');
-    const s = mod.classifyHostState();
+    const s = mod.classifyHostState(sample);
     const verdict = mod.admitUnderGovernor(s, { heavy: false });
     expect(verdict.allow).toBe(false);
     expect(verdict.reason).toBe('RED: no new launches');

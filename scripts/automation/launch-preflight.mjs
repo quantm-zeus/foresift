@@ -38,6 +38,26 @@ if (invokedDirectly && !args.package) fail('missing --package <id>');
 
 const root = args.root ?? repoRoot();
 
+function buildTaskGraph(packageId, rootDir, extraArgs = []) {
+  const command = [
+    join(import.meta.dirname, 'build-implementation-task-graph.mjs'),
+    '--package',
+    packageId,
+    '--root',
+    rootDir,
+    ...extraArgs,
+  ];
+  let last;
+  // FAST can launch multiple pure groups together. A single transient process
+  // creation/exit failure must not erase otherwise exact write truth for the
+  // whole scheduling tick; retry once, still bounded and deterministic.
+  for (let attempt = 0; attempt < 2; attempt++) {
+    last = spawnSync(process.execPath, command, { encoding: 'utf8', timeout: 60_000 });
+    if (last.status === 0 && last.stdout) return last;
+  }
+  return last;
+}
+
 /**
  * Build the preflight record for ONE package. Deterministic; throws nothing
  * for the expected not-derivable cases (returns exact:false instead).
@@ -64,17 +84,7 @@ export function buildLaunchPreflight(packageId, rootDir = root) {
   // Deterministic graph build over the CURRENT tree (no shard planning — we
   // only need per-unit predicted writes). The builder fails closed itself on
   // corrupt milestone/tasks; catch and degrade conservatively.
-  const out = spawnSync(
-    process.execPath,
-    [
-      join(import.meta.dirname, 'build-implementation-task-graph.mjs'),
-      '--package',
-      packageId,
-      '--root',
-      rootDir,
-    ],
-    { encoding: 'utf8', timeout: 60_000 },
-  );
+  const out = buildTaskGraph(packageId, rootDir);
   if (out.status !== 0 || !out.stdout)
     return { ...base, reason: `task graph unavailable: ${(out.stderr ?? '').slice(0, 160)}` };
 
@@ -86,9 +96,13 @@ export function buildLaunchPreflight(packageId, rootDir = root) {
   }
   const units = graph.units ?? [];
   const open = units.filter((u) => !u.done);
-  const predictedWrites = [...new Set(open.flatMap((u) => u.predictedWrites ?? []))].sort();
-  const testWrites = [...new Set(open.flatMap((u) => u.testWrites ?? []))].sort();
-  const productWrites = [...new Set(open.flatMap((u) => u.productWrites ?? []))].sort();
+  // The exact lease footprint belongs to the package plan, not only to the
+  // tasks that remain unchecked. A partially completed wave can still be
+  // repaired or regenerated before launch, so dropping completed units here
+  // would silently forget their product, test, and migration paths.
+  const predictedWrites = [...new Set(units.flatMap((u) => u.predictedWrites ?? []))].sort();
+  const testWrites = [...new Set(units.flatMap((u) => u.testWrites ?? []))].sort();
+  const productWrites = [...new Set(units.flatMap((u) => u.productWrites ?? []))].sort();
   const migrationDuties = predictedWrites.filter((p) =>
     /^migrations\/g0_[a-z]+_\d+.*\.sql$/.test(p),
   );
@@ -119,19 +133,10 @@ export function buildLaunchPreflight(packageId, rootDir = root) {
   // resolver then falls back to its ready-count heuristic, never expands.
   let shardNeed = null;
   try {
-    const probe = spawnSync(
-      process.execPath,
-      [
-        join(import.meta.dirname, 'build-implementation-task-graph.mjs'),
-        '--package',
-        packageId,
-        '--root',
-        rootDir,
-        '--plan-shards',
-        String(Math.max(1, LANE_COUNT_LIMITS.max)),
-      ],
-      { encoding: 'utf8', timeout: 60_000 },
-    );
+    const probe = buildTaskGraph(packageId, rootDir, [
+      '--plan-shards',
+      String(Math.max(1, LANE_COUNT_LIMITS.max)),
+    ]);
     if (probe.status === 0 && probe.stdout) {
       const planned = JSON.parse(probe.stdout);
       const shards = (planned.shards ?? []).filter((s) => (s.units ?? []).length > 0);

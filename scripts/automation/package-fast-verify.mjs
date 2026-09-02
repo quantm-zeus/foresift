@@ -35,6 +35,7 @@ import { resolveSliceChangeset } from './slice-changeset.mjs';
 import { classifyImpact, planFastChecks } from './fast-impact.mjs';
 import { repositorySourcePaths, selectAffectedTests } from './bun-affected-tests.mjs';
 import { buildBunTestPlan, runBunTestPlan } from './bun-test-coordinator.mjs';
+import { analyzeTestFile } from './bun-migration-manifest.mjs';
 
 const TEST_RUNTIME_POLICY = JSON.parse(
   readFileSync(
@@ -141,6 +142,10 @@ export function runAffectedTestsStep(step, deps = {}) {
   }
   if (TEST_RUNTIME_POLICY.currentAuthority === 'BUN_TEST') {
     const manifest = JSON.parse(readFileSync(BUN_MANIFEST, 'utf8'));
+    const inventoried = new Set(manifest.files.map((entry) => entry.path));
+    for (const path of selection.tests) {
+      if (!inventoried.has(path)) manifest.files.push(analyzeTestFile(repoRoot, path));
+    }
     const plan = buildBunTestPlan(manifest, TEST_RUNTIME_POLICY, selection.tests);
     const evidence = runBunTestPlan({ root: repoRoot, plan, policy: TEST_RUNTIME_POLICY });
     return {

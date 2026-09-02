@@ -1,25 +1,29 @@
 {
   "schema": "foresift/maintenance-handoff@2",
   "currentSnapshot": {
-    "capturedAt": "2026-09-02T08:05:00Z",
-    "mainSha": "5e86a0f9e217047882cb8931f66b83a91f6b40ec",
-    "mainCi": "GREEN (merged-main run 33601824751, #153 landing)",
-    "milestone": "G0 — 7/8 PROVEN; g0-traceability-conformance: test-author surface LANDED via continuation wave (5 units); remaining T001/T002 (scaffold proof via #154 audit) + T024 (full-convergence gate)",
+    "capturedAt": "2026-09-02T08:20:00Z",
+    "mainSha": "329a94d64a362a46e402d6ecd2febd53cb24ecc5",
+    "mainCi": "GREEN (merged-main run 33606890002, #155 landing)",
+    "milestone": "G0 — 7/8 PROVEN; g0-traceability-conformance: 9/10 open tasks already-satisfied at worktree head (audit-proven); T024 remains",
     "activePackage": {
       "id": "g0-traceability-conformance",
-      "state": "continuation wave partially landed; next wave closes T001/T002/T024",
-      "runId": "aa3e80155ae9e9219c4fc28b9272b0bc (failed — writer ReferenceError, fixed)"
+      "state": "test-author surface landing in flight (lander fix #156 in CI); then closing wave T024",
+      "runId": "aa3e80155ae9e9219c4fc28b9272b0bc (output landing)"
     },
     "openMaintenancePr": null,
     "providerState": "supervisor alive (singleton, restarted post-recovery); wave in progress",
     "resourceState": "15GiB host: 1.7Gi used / 13Gi avail post-reboot; no OOM pressure",
     "blockers": [
-      "#154 landed: directory-token writes now in-scope + provable; T001/T002 already-satisfied audit will complete them deterministically at next FAST-green.",
-      "Writer ReferenceError (aa3e8015, writer-serial-1 ×3) fixed on this branch with structural regression.",
-      "Next wave: serial core re-dispatches T001/T002/T024; T024 completes via TRACEABILITY_FULL_CONVERGENCE evidence-owner pass."
+      "Worktree canonical (e08ba79) carries test-author surface + integration; already-satisfied audit proves T001,T002,T013,T018-T023 there (9 units) — only T024 (TRACEABILITY_FULL_CONVERGENCE) remains.",
+      "Lander already-merged short-circuit bug fixed (#156 in CI) — was silently stranding continuation wave output.",
+      "Sequence: land #156 → merge worktree branch PR (test-author surface) → recover-fatal → closing wave runs T024 gate at FAST-green → G0 8/8."
     ],
-    "nextSafeAction": "land dirty-ref PR → merged-main CI → recover-fatal → closing wave (T001/T002/T024) → milestone convergence → G0 8/8",
+    "nextSafeAction": "#156 merge → land worktree PR → recover-fatal → closing wave (T024) → milestone convergence → G0 8/8",
     "history": [
+      {
+        "at": "2026-09-02T08:10:00Z",
+        "event": "#155 landed (writer dirty-ref fix + structural regression). Lander already-merged short-circuit bug found (continuation wave output stranded) — fix #156 opened. Audit proves 9/10 open tasks already-satisfied at worktree head."
+      },
       {
         "at": "2026-09-02T07:45:00Z",
         "event": "Continuation wave aa3e8015: test-author integrated 5 coordinator-validated units (T013/T019-T021/T023) + FAST green + repair; core lane crashed post-spawn (writer ReferenceError, my #151 refactor regression) — core agent work committed on lane branch but unreached. #154 landed the T001/T002 scaffold-evidence fix."

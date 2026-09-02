@@ -81,6 +81,27 @@ function assertPayload(payload: unknown): asserts payload is GateEvidencePayload
   if (Date.parse(value.expiresAt) <= Date.parse(value.issuedAt)) {
     throw new TypeError('invalid gate evidence payload: expiresAt must follow issuedAt');
   }
+  if (
+    value.reason !== undefined &&
+    (typeof value.reason !== 'string' || value.reason.trim().length === 0)
+  ) {
+    throw new TypeError('invalid gate evidence payload: reason must be non-empty when supplied');
+  }
+  if (
+    value.revocationRef !== undefined &&
+    value.revocationRef !== null &&
+    (typeof value.revocationRef !== 'string' || value.revocationRef.trim().length === 0)
+  ) {
+    throw new TypeError(
+      'invalid gate evidence payload: revocationRef must be non-empty when supplied',
+    );
+  }
+  if (
+    value.metadata !== undefined &&
+    (value.metadata === null || typeof value.metadata !== 'object' || Array.isArray(value.metadata))
+  ) {
+    throw new TypeError('invalid gate evidence payload: metadata must be an object when supplied');
+  }
 }
 
 export interface CreateGateEvidenceOptions {
@@ -159,11 +180,15 @@ function assertEvidenceRecord(record: unknown): asserts record is GateEvidenceRe
   }
   if (
     typeof value.evidenceId !== 'string' ||
+    value.evidenceId.trim().length === 0 ||
     !isHexDigest(value.payloadSha256) ||
     !isHexDigest(value.signature) ||
     !GATE_KINDS.includes(value.gateKind as GateKind) ||
     !Array.isArray(value.scopeRefs) ||
+    value.scopeRefs.length === 0 ||
+    value.scopeRefs.some((scope) => typeof scope !== 'string' || scope.trim().length === 0) ||
     typeof value.approver !== 'string' ||
+    value.approver.trim().length === 0 ||
     !isIsoInstant(value.issuedAt) ||
     !isIsoInstant(value.expiresAt) ||
     !isIsoInstant(value.recordedAt) ||
@@ -171,6 +196,16 @@ function assertEvidenceRecord(record: unknown): asserts record is GateEvidenceRe
   ) {
     throw new TypeError('invalid evidence record: missing required fields');
   }
+}
+
+function payloadRecordMatches(record: GateEvidenceRecord): boolean {
+  return (
+    record.gateKind === record.payload.gateKind &&
+    record.approver === record.payload.approver &&
+    record.issuedAt === record.payload.issuedAt &&
+    record.expiresAt === record.payload.expiresAt &&
+    canonicalJson(record.scopeRefs) === canonicalJson(record.payload.scopeRefs)
+  );
 }
 
 export type GateEvidenceFailureReason =
@@ -224,13 +259,7 @@ export function evaluateGateEvidence(options: EvaluateGateEvidenceOptions): Gate
   const { record } = options;
   if (!verifyPayloadHash(record)) return refusal(record, 'HASH_MISMATCH');
   if (!verifyEvidenceSignature(record, options.pepper)) return refusal(record, 'SIGNATURE_INVALID');
-  if (
-    record.gateKind !== record.payload.gateKind ||
-    record.approver !== record.payload.approver ||
-    record.issuedAt !== record.payload.issuedAt ||
-    record.expiresAt !== record.payload.expiresAt ||
-    canonicalJson(record.scopeRefs) !== canonicalJson(record.payload.scopeRefs)
-  ) {
+  if (!payloadRecordMatches(record)) {
     return refusal(record, 'PAYLOAD_RECORD_MISMATCH');
   }
   if (record.revokedAt !== undefined && record.revokedAt !== null) {
@@ -259,6 +288,12 @@ export async function recordGateEvidence(
   record: GateEvidenceRecord,
 ): Promise<void> {
   assertEvidenceRecord(record);
+  if (!verifyPayloadHash(record)) {
+    throw new TypeError('cannot persist gate evidence: payload hash mismatch');
+  }
+  if (!payloadRecordMatches(record)) {
+    throw new TypeError('cannot persist gate evidence: payload and indexed fields mismatch');
+  }
   await engine.query(
     `INSERT INTO trace.gate_evidence
        (evidence_id, payload, payload_sha256, signature, gate_kind, approver,

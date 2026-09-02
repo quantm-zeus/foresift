@@ -1,0 +1,322 @@
+{
+  "schemaVersion": "1.0.0",
+  "milestoneId": "G1",
+  "status": "ACTIVE",
+  "plannedAt": "2026-09-02",
+  "description": "Deterministic Signal, Execution, Outcome and Objective Foundation decomposed into eight outcome-oriented work packages. Every requirement whose dependencyGroup is G1 in docs/spec/crypto_intelligence_agent_gateway_PRD_FINAL_v6.0.requirements.json (98 requirements, 0 superseded) is assigned to exactly one package; G0-family members of shared families (FR-DATA-001..006, FR-COST-001..010, FR-DISC-001..005) remain G0-PROVEN and are deliberately NOT reassigned. Serialization law: every package adds migrations/g1_<family>_*.sql and therefore must extend the central migration registry packages/persistence/test/migrator.spec.ts (ADR-0019 duty, generation-agnostic per ADR-0022: the graph-build guard CENTRAL_MIGRATION_SUITE_UNREFERENCED fires for g1_* predictions exactly as it did for g0_*), and every package extends the shared packages/shared-schemas barrel plus tests/acceptance and telemetry catalogs — shared write surfaces that make co-run pairs unsafe. All packages are therefore conservatively parallelizable=false per the G0 precedent, leaving the roadmap maxParallelCodingPackages=2 allowance unused. Plan-level decisions recorded at planning: (1) each migration-adding package carries the plan-sanctioned scope exception to extend packages/persistence/test/migrator.spec.ts (exact path only) beyond its listed writeScopes, and each catalog-adding package carries the same class of exception to extend the central telemetry parity suite tests/telemetry-catalog.spec.ts (exact path only, decision 4) — both exceptions must be named by work-package planners so the task-graph builder records them instead of refusing at graph build; (2) docs/generated/<family>-surfaces.json for all G1 families already exist from the G0 central generation, so G1 writeScopes deliberately exclude docs/generated/** and implementation-mapping reconciliation stays with packages/release-conformance/**; (3) FR-DATA G1 scope is the decision-time extensions (FR-DATA-007..016) delivered through packages/persistence/** and packages/evidence/**, the manifest-declared implementation surfaces; (4) tests/telemetry-catalog.spec.ts is the central parity authority for every telemetry catalog: packages adding a catalog extend it in place (same sanctioned-exception mechanism as the migration registry) rather than spawning per-catalog spec files, so catalog parity stays centrally pinned; (5) shared closed vocabularies live in packages/domain and are imported, not restated, by packages/shared-schemas (compile-parity law of shared-schemas/src/data.ts), so the packages that G1 charges with introducing or altering closed vocabularies own packages/domain/** in their writeScopes per the ADR-0018 precedent — the concrete case is FR-DATA-011's ten-state acquisition vocabulary versus the G0-proven §13.8 AcquisitionState in packages/domain/src/acquisition.ts: the reconciliation is a recorded decision for g1-data-truth-extensions decomposition, and the PRD's §13.8 (ten states, CAPABILITY_UNAVAILABLE/TIMED_OUT/INVALID_RESPONSE) versus §18.5 ingestion-outcome vocabulary (RETURNED_VALID/PARTIAL, FAILED_RETRYABLE/TERMINAL, SCHEMA_REJECTED, ...) tension is resolved as two distinct planes — FR-DATA-011 governs the evidence-acquisition DECISION state vocabulary (§13.8 record, unchanged authority), while §18.5 ingestion outcomes remain the separate ingestion persistence vocabulary; any member-level mapping between the planes must be delivered by an ADR recorded during g1-data-truth-extensions work-package planning, never by silently restating divergent lists in shared-schemas; (6) FR-OBJ-010's guaranteed-profit language prohibition is delivered in G1 as the objective/agent-output vocabulary and constraint data plus the G1 acceptance/negative tests over the G1-owned surfaces (packages/objective-governance/**, packages/shadow-portfolio/**, packages/shared-schemas/**); the product/UI/API/export/notification language enforcement surfaces do not exist in G1 and their machine-enforcement home scripts/scan-prohibited-capabilities/** is G0-owned, so full cross-surface proof lands with the milestones that own those surfaces — FR-OBJ-010 is therefore claimed by g1-objective-governance with this partial-claim boundary recorded, not PROVEN beyond G1's deliverable surfaces at Mode-B audit.",
+  "packages": [
+    {
+      "id": "g1-data-truth-extensions",
+      "objective": "Extend the proven data-truth foundation with G1 decision-time semantics and market-event truth: backfilled observations storing retrieved_as_backfill, original event coordinates, actual fetched_at/available_at and the reason the record was unavailable earlier with event time never substituting for availability time; historical simulations excluding retrospective-only data before actual availability and separately labeling oracle, hindsight, cross-fitted and realizable replay modes; full candidate decision timelines (decision_ready_at, policy_decided_at, workflow_completed_at, delivery_eligible_at, delivered_at, versioned counterfactual_delivery_at); field-level availability from the latest valid authorized-and-obtainable revision with separate explicit current-view and historical-replay query semantics; the ten distinct evidence-acquisition states kept apart from substantive negative evidence with acquisition records storing policy version, candidate state, requested fields, expected value of information, estimated/actual cost, assignment probability/seed, timestamps, result state, evidence IDs and decision influence; declared and empirically estimated source-dependence edges with validity interval, method, evidence, confidence and effect on effective independent-evidence count, empirical evaluation of correlated values/errors, update/first-seen timing, outages, schema/rounding fingerprints, common missingness and known upstream relationships, point-in-time independence that never uses future provider behavior to change historical evidence counts outside explicitly labeled retrospective diagnostics, and provider-conflict preservation distinguishing benign latency/rounding variance, common-upstream duplication, material disagreement and unresolved decision-critical conflict; normalization of raw swaps, transfer routes and aggregator hops into economic trade events built on net actor deltas that avoid route/hop double counting, separating arbitrage, round trips and inventory-neutral activity from organic demand and reducing feature quality and ranking contribution under economic-actor uncertainty; and circulating supply and market cap exposing source, method, excluded supply and confidence so low-confidence market cap can never be the sole hard-rejection reason when approved liquidity/activity fallbacks exist. Strictly read-only: no trading, custody, wallet-signing, private-key, or transaction-submission capability.",
+      "requirementIds": [
+        "FR-DATA-007",
+        "FR-DATA-008",
+        "FR-DATA-009",
+        "FR-DATA-010",
+        "FR-DATA-011",
+        "FR-DATA-012",
+        "FR-DATA-013",
+        "FR-DATA-014",
+        "FR-DATA-015",
+        "FR-DATA-016",
+        "FR-TRD-001",
+        "FR-TRD-002",
+        "FR-TRD-003",
+        "FR-TRD-004",
+        "FR-SUP-001",
+        "FR-SUP-002"
+      ],
+      "dependencies": [],
+      "risk": "HIGH",
+      "parallelizable": false,
+      "writeScopes": [
+        "packages/persistence/**",
+        "packages/evidence/**",
+        "packages/economic-trade-normalizer/**",
+        "packages/supply-confidence/**",
+        "packages/shared-schemas/**",
+        "packages/domain/**",
+        "migrations/g1_data_*.sql",
+        "migrations/g1_trd_*.sql",
+        "migrations/g1_sup_*.sql",
+        "tests/fixtures/data/**",
+        "tests/fixtures/trd/**",
+        "tests/fixtures/sup/**",
+        "tests/acceptance/**",
+        "tests/negative/**",
+        "telemetry/data.*",
+        "telemetry/trd.*",
+        "telemetry/sup.*"
+      ],
+      "verificationCommands": [
+        "test -d packages/persistence && pnpm --filter @foresift/persistence test",
+        "test -d packages/evidence && pnpm --filter @foresift/evidence test",
+        "test -d packages/economic-trade-normalizer && pnpm --filter @foresift/economic-trade-normalizer test",
+        "test -d packages/supply-confidence && pnpm --filter @foresift/supply-confidence test"
+      ],
+      "status": "PENDING"
+    },
+    {
+      "id": "g1-capacity-contracts",
+      "objective": "Operate the G1 capacity governance layer over the proven free-first cost plane: budget policy split into DATA_PROVIDER, MODEL, COMPUTE_WORKFLOW, DATABASE_STORAGE, OBJECT_STORAGE_EGRESS and NOTIFICATION dimensions where free in one dimension never implies zero total cost; every active schedule/profile combination referencing a versioned Sustainable Capacity Contract covering at least 30 days of expected, peak and failure-retry workload and declaring candidate/event rates, operation calls and credits, streamed bytes, model tokens, workflow steps, database writes/rows, object bytes, egress, notifications, concurrency, retry allowance, protected reserves and safety margin; admission control forecasting the entire resolved configuration before activation and rejecting or reducing workload when expected or stress consumption exceeds verified plan, rate, storage, egress or monetary caps; the deterministic versioned degradation order preserving critical risk monitoring, alert verification, outcome observation, collector continuity and the interactive emergency reserve before social, analog, wallet-history, exploration or broad-scan depth; capacity forecasts reconciled against actual consumption by operation/workload/candidate/run/module with automatic incidents on material underestimation or reserve breach; and total and marginal resource cost reported per researched candidate, mature outcome, useful alert, prevented risk event and portfolio-utility unit without hiding owner-supplied model or infrastructure spend. Strictly read-only: no trading, custody, wallet-signing, private-key, or transaction-submission capability.",
+      "requirementIds": [
+        "FR-COST-011",
+        "FR-COST-012",
+        "FR-COST-013",
+        "FR-COST-014",
+        "FR-COST-015",
+        "FR-COST-016",
+        "FR-COST-017"
+      ],
+      "dependencies": [],
+      "risk": "HIGH",
+      "parallelizable": false,
+      "writeScopes": [
+        "packages/cost-router/**",
+        "packages/capacity-planner/**",
+        "packages/quota-forecast/**",
+        "packages/shared-schemas/**",
+        "packages/domain/**",
+        "migrations/g1_cost_*.sql",
+        "tests/fixtures/cost/**",
+        "tests/acceptance/**",
+        "tests/negative/**",
+        "telemetry/cost.*"
+      ],
+      "verificationCommands": [
+        "test -d packages/cost-router && pnpm --filter @foresift/cost-router test",
+        "test -d packages/capacity-planner && pnpm --filter @foresift/capacity-planner test",
+        "test -d packages/quota-forecast && pnpm --filter @foresift/quota-forecast test"
+      ],
+      "status": "PENDING"
+    },
+    {
+      "id": "g1-solana-security",
+      "objective": "Deliver deterministic Solana program and pool security analysis independent of external security providers: versioned SPL/Token-2022 program, authority and extension analysis with mint, freeze, permanent-delegate, transfer-fee, transfer-hook, close, metadata/update, default-state and non-transferable controls recorded as versioned evidence where applicable; pool/LP control, migration, withdrawal-authority and liquidity-removal risk assessment; fail-closed blocking of profiles requiring complete execution modeling when transfer semantics are unknown; external security provider reports consumed strictly as independent evidence that can never override deterministic known risk; and a versioned system-address registry preventing infrastructure accounts from becoming false wallet-owner/funder evidence. Strictly read-only: no trading, custody, wallet-signing, private-key, or transaction-submission capability.",
+      "requirementIds": [
+        "FR-SOLSEC-001",
+        "FR-SOLSEC-002",
+        "FR-SOLSEC-003",
+        "FR-SOLSEC-004",
+        "FR-SOLSEC-005",
+        "FR-SOLSEC-006"
+      ],
+      "dependencies": ["g1-data-truth-extensions"],
+      "risk": "HIGH",
+      "parallelizable": false,
+      "writeScopes": [
+        "packages/solana-security/**",
+        "packages/shared-schemas/**",
+        "packages/domain/**",
+        "migrations/g1_solsec_*.sql",
+        "tests/fixtures/solsec/**",
+        "tests/acceptance/**",
+        "tests/negative/**",
+        "telemetry/solsec.*"
+      ],
+      "verificationCommands": [
+        "test -d packages/solana-security && pnpm --filter @foresift/solana-security test"
+      ],
+      "status": "PENDING"
+    },
+    {
+      "id": "g1-discovery-coverage",
+      "objective": "Close the discovery honesty loop over the proven first-party observation foundation: discovery coverage reported only for named populations such as SUPPORTED_PROGRAM_UNIVERSE, PROSPECTIVELY_OBSERVED_UNIVERSE, AGGREGATE_PROVIDER_UNIVERSE or probability-sampled retrospective universes; recall and missed-gem claims requiring independent first-party observation, independent provider lineage or valid known inclusion probabilities with no universe generated by the evaluated source establishing its own recall; every discovery source storing source-specific first-seen, normalized identity, upstream dependence, query/filter version, coverage scope, rights and the reason an asset entered the universe; measurement of unique discovery yield, overlap, lead/lag, stale/late discovery, identity failures, unsupported-program exclusions and price extension at first system availability per source; retrospective or prospective independent-universe enumeration estimating discovery recall without relying only on the same upstream lineage as live aggregate discovery; measurable provider lateness, source coverage loss and extended-at-first-seen rates; direct-chain/indexer access as selective verification/backfill by default that cannot silently become broad paid ingestion; and collector gaps, decoder outages, unverified program versions and provider unavailability constraining population claims rather than being silently counted as negative outcomes, with full-market, all-Solana and universal-recall language prohibited unless the exact coverage and sampling contract establishes it. Strictly read-only: no trading, custody, wallet-signing, private-key, or transaction-submission capability.",
+      "requirementIds": [
+        "FR-DISC-006",
+        "FR-DISC-007",
+        "FR-DISC-008",
+        "FR-DISC-009",
+        "FR-DISC-010",
+        "FR-DISC-011",
+        "FR-DISC-012",
+        "FR-DISC-013",
+        "FR-DISC-014"
+      ],
+      "dependencies": ["g1-data-truth-extensions"],
+      "risk": "HIGH",
+      "parallelizable": false,
+      "writeScopes": [
+        "packages/discovery-universe/**",
+        "packages/cheap-monitor/**",
+        "packages/shared-schemas/**",
+        "packages/domain/**",
+        "migrations/g1_disc_*.sql",
+        "tests/fixtures/disc/**",
+        "tests/acceptance/**",
+        "tests/negative/**",
+        "telemetry/disc.*"
+      ],
+      "verificationCommands": [
+        "test -d packages/discovery-universe && pnpm --filter @foresift/discovery-universe test",
+        "test -d packages/cheap-monitor && pnpm --filter @foresift/cheap-monitor test"
+      ],
+      "status": "PENDING"
+    },
+    {
+      "id": "g1-execution-simulation",
+      "objective": "Build the read-only execution simulation foundation: opportunity profiles defining signal and tradable outcome semantics; simulation over versioned notionals, action delays, entry/exit policies, price impact, partial fills and available liquidity; net return including pool fees, token transfer fees, priority/network fees and execution impact; target touch requiring executable volume or configured target-duration support so an isolated wick cannot automatically count as tradable success; permanent read-only enforcement with no transaction construction or submission anywhere in the simulator; SIGNAL_SUCCESS never rendered as profit when TRADABLE_SUCCESS is absent or failed; tradability blocking CONFIRMED_OPPORTUNITY while preserving diagnostic signal labels; alert content exposing configured notional, delay, modeled impact, assumptions and expiry; multiple exit policies evaluated only as pre-registered separate experiments and never retrospectively best-picked for the primary result; replay manifests freezing execution assumptions and code versions; finite selective outcome-observation plans for promoted/alerted/control-sample candidates where insufficient temporal/liquidity resolution cannot prove tradable success; production tradability under versioned conservative stress assumptions for quote latency, adverse selection/MEV, fee volatility and liquidity deterioration; versioned PoolMathAdapter/TransferSemanticsAdapter resolution keyed by chain, program, program version, curve type and account-layout version with historical execution storing the exact slot/block, raw account-state hashes, reserves, ticks/bin arrays/curve state, fee configuration, oracle/quote inputs, token extensions, route, adapter version and state-completeness assessment per simulation; generic constant-product math only for verified constant-product pools with concentrated-liquidity, discrete-bin, stable-swap, dynamic-fee, bonding-curve, virtual-reserve and unknown designs requiring their own adapter or returning EXECUTION_UNAVAILABLE; every active adapter passing deterministic unit/property tests, protocol fixtures, historical observed-trade parity, current reference-quote parity when available, boundary/overflow tests and version-specific tolerance gates; required base, p50-delay, p90-delay and conservative latency/adverse-selection/liquidity-drawdown/fee-volatility/route-degradation/failed-partial-fill scenarios declared per active profile; entry/exit modeling of token transfer fees/hooks, account creation/rent, network/priority fees, aggregator and pool fees, minimum output, failed attempts, partial fills, retry latency, route capacity and unexecutable residual inventory; concurrent shadow positions sharing pool, route, quote asset, liquidity source, deployer cluster or correlated exit window aggregating impact and capacity so isolated fills cannot each consume the same depth; quote/reference sources as evidence-not-truth with exposed uncertainty that blocks confirmed tradability when the bound crosses policy limits; automatic tradability degradation on adapter deprecation, program upgrade, parity drift or unknown extension re-evaluating active alerts/watchlists without rewriting historical simulations; and route selection never retrospectively choosing a route or pool unavailable at action time with migration routing following only transitions known and executable at that time. Internal staging order for deterministic task sharding: shared-schemas/domain vocabularies first, then adapters, then the simulator core, then replay manifests, then parity gates, then stress scenarios and degradation. Strictly read-only: no trading, custody, wallet-signing, private-key, or transaction-submission capability.",
+      "requirementIds": [
+        "FR-EXEC-001",
+        "FR-EXEC-002",
+        "FR-EXEC-003",
+        "FR-EXEC-004",
+        "FR-EXEC-005",
+        "FR-EXEC-006",
+        "FR-EXEC-007",
+        "FR-EXEC-008",
+        "FR-EXEC-009",
+        "FR-EXEC-010",
+        "FR-EXEC-011",
+        "FR-EXEC-012",
+        "FR-EXEC-013",
+        "FR-EXEC-014",
+        "FR-EXEC-015",
+        "FR-EXEC-016",
+        "FR-EXEC-017",
+        "FR-EXEC-018",
+        "FR-EXEC-019",
+        "FR-EXEC-020",
+        "FR-EXEC-021",
+        "FR-EXEC-022"
+      ],
+      "dependencies": ["g1-data-truth-extensions", "g1-solana-security"],
+      "risk": "HIGH",
+      "parallelizable": false,
+      "writeScopes": [
+        "packages/execution-simulator/**",
+        "packages/pool-math/**",
+        "packages/transfer-semantics/**",
+        "packages/shared-schemas/**",
+        "packages/domain/**",
+        "migrations/g1_exec_*.sql",
+        "tests/fixtures/exec/**",
+        "tests/acceptance/**",
+        "tests/negative/**",
+        "telemetry/exec.*"
+      ],
+      "verificationCommands": [
+        "test -d packages/execution-simulator && pnpm --filter @foresift/execution-simulator test",
+        "test -d packages/pool-math && pnpm --filter @foresift/pool-math test",
+        "test -d packages/transfer-semantics && pnpm --filter @foresift/transfer-semantics test"
+      ],
+      "status": "PENDING"
+    },
+    {
+      "id": "g1-signal-registry",
+      "objective": "Stand up the versioned Feature Registry and the deterministic signal baseline that Appendix I requires before any learned ranking: the versioned Feature Registry with candidate funnel and independent Opportunity/Risk/DataQuality/Urgency/Novelty/Tradability/SourceIndependence vectors; reproducible research-priority ranking; diversity and exploration sampling; candidate lifecycle with risk separation so tradability can block confirmed opportunities while preserving diagnostic signal labels; adaptive rechecks operating with finite budget, information-value selection, starvation limits and explicit expiry; and every numeric feature defining minimum denominator/sample, stability transform, outlier/null policy, shrinkage, capped contribution and cohort fallback — with the Appendix H baseline formulas (volume acceleration, volume persistence, price extension, unique-buyer growth with economic-actor deduplication, buy/sell imbalance) computed over event time with no LLM anywhere in the deterministic path. Strictly read-only: no trading, custody, wallet-signing, private-key, or transaction-submission capability.",
+      "requirementIds": [
+        "FR-SIG-001",
+        "FR-SIG-002",
+        "FR-SIG-003",
+        "FR-SIG-004",
+        "FR-SIG-005",
+        "FR-SIG-006",
+        "FR-SIG-009"
+      ],
+      "dependencies": ["g1-data-truth-extensions", "g1-execution-simulation"],
+      "risk": "HIGH",
+      "parallelizable": false,
+      "writeScopes": [
+        "packages/signal-intelligence/**",
+        "packages/shared-schemas/**",
+        "packages/domain/**",
+        "migrations/g1_sig_*.sql",
+        "tests/fixtures/sig/**",
+        "tests/acceptance/**",
+        "tests/negative/**",
+        "telemetry/sig.*"
+      ],
+      "verificationCommands": [
+        "test -d packages/signal-intelligence && pnpm --filter @foresift/signal-intelligence test"
+      ],
+      "status": "PENDING"
+    },
+    {
+      "id": "g1-outcome-evaluation",
+      "objective": "Deliver honest outcome maturity and the deterministic evaluation baseline that lets the system measure signal, tradable and portfolio outcomes without a model: explicit maturity state for every profile/horizon/scenario outcome with pending and partially matured outcomes excluded from final denominators; explicit censoring and invalid-data reasons that cannot be silently mapped to failure; negative-control tests detecting leakage and spurious lift; clustered/block confidence intervals for correlated token groups reporting effective independent sample size; subjective user utility stored separately from objective signal and tradable market outcomes; sampled high-resolution outcomes storing inclusion probability/stratum with valid weighted estimators or explicitly limited population claims; TRADABLE_SUCCESS used for production promotion requiring fully matured high-resolution execution evidence for the exact notional, delay policy, adapter, route and exit policy so coarse signal data cannot substitute; the adverse feasible order reported when target and invalidation/stop are both feasible within a coarse interval with optimistic sensitivity only as secondary analysis; outcome denominators disclosing invalid, censored, partial, low-resolution, rights-blocked and unobserved cases so policies cannot improve measured performance by reducing outcome collection; alert expiry/cancellation and thesis invalidation as time-stamped shadow-model side effects with post-expiry gains never counting as actionable success; capacity-limited opportunities reporting maximum executable notional and total deployable portfolio capacity so small-notional success cannot be generalized to larger capital without simulation; plus versioned outcome profiles, time-based frozen replay, precision/recall/ranking/lead-time/risk/cost metrics, baseline comparison, the Missed Opportunity Analyzer, exploration/control samples, champion–challenger evaluation, drift and calibration controls, and multiple-testing control with experiment registry and selection-bias diagnostics. Strictly read-only: no trading, custody, wallet-signing, private-key, or transaction-submission capability.",
+      "requirementIds": [
+        "FR-MAT-001",
+        "FR-MAT-002",
+        "FR-MAT-003",
+        "FR-MAT-004",
+        "FR-MAT-005",
+        "FR-MAT-006",
+        "FR-MAT-007",
+        "FR-MAT-008",
+        "FR-MAT-009",
+        "FR-MAT-010",
+        "FR-MAT-011",
+        "FR-MAT-012",
+        "FR-EVAL-001",
+        "FR-EVAL-002",
+        "FR-EVAL-003",
+        "FR-EVAL-004",
+        "FR-EVAL-005",
+        "FR-EVAL-006",
+        "FR-EVAL-007",
+        "FR-EVAL-008",
+        "FR-EVAL-009"
+      ],
+      "dependencies": ["g1-signal-registry", "g1-execution-simulation"],
+      "risk": "HIGH",
+      "parallelizable": false,
+      "writeScopes": [
+        "packages/outcome-maturity/**",
+        "packages/evaluation/**",
+        "packages/eval-cli/**",
+        "packages/shared-schemas/**",
+        "packages/domain/**",
+        "migrations/g1_mat_*.sql",
+        "migrations/g1_eval_*.sql",
+        "tests/fixtures/mat/**",
+        "tests/fixtures/eval/**",
+        "tests/acceptance/**",
+        "tests/negative/**",
+        "telemetry/mat.*",
+        "telemetry/eval.*"
+      ],
+      "verificationCommands": [
+        "test -d packages/outcome-maturity && pnpm --filter @foresift/outcome-maturity test",
+        "test -d packages/evaluation && pnpm --filter @foresift/evaluation test",
+        "test -d packages/eval-cli && pnpm --filter @foresift/eval-cli test"
+      ],
+      "status": "PENDING"
+    },
+    {
+      "id": "g1-objective-governance",
+      "objective": "Govern the primary production objective and every performance claim: the conservative lower confidence bound of net shadow-portfolio utility per capital-day under fixed capital, concurrency, execution, latency, liquidity, risk and opportunity-cost assumptions as the governing objective; objective comparison only across identical candidate universes, population claims, capital, time windows, execution scenarios, delay policies, data cutoffs and correlated-exposure constraints with incomparable runs labeled exploratory and barred from promoting a policy; critical security, execution, rights, leakage, public-claim, capacity and tail-risk constraints applied as hard constraints before utility optimization that no weighted score may compensate for; objective reports decomposing gross return, execution costs, failed/partial fills, drawdown, CVaR, capital utilization, turnover, opportunity cost, concentration, shared-liquidity impact, provider/model/infrastructure cost and uncertainty; per-alert precision, tradable-success rate, recall and alerts-per-researched-candidate retained strictly as diagnostics that never replace portfolio utility, discovery coverage or false-rejection measurement; objective-integrity detection of denominator gaming, selective-universe changes, reduced exploration, delayed outcome omission, horizon switching, scenario cherry-picking and repeated holdout inspection with any detected failure blocking promotion; every objective or performance claim identifying the exact supported population, profile, policy, execution scenario, delay distribution, calendar interval, market regimes, capability state, sample size, cluster effective sample size and uncertainty method; a configurable action-delay distribution with at least p50, p90 and conservative-tail scenarios where the active opportunity policy must pass its declared robust-delay gate rather than a single favorable fixed delay; utility sensitivity to capital, notional, concurrency, route capacity, alert latency, exit policy and risk-aversion coefficients without rewriting the frozen primary experiment; and guaranteed-profit language prohibited across product, agent, UI, API, exports and notifications with opportunity outputs always stated as evidence-backed research signals whose realized outcome remains uncertain. G1 delivers this requirement's objective/agent-output vocabulary, constraint data, and acceptance/negative tests over the G1-owned surfaces (per plan-level decision 6); the product/UI/API/export/notification enforcement surfaces do not exist in G1, so full cross-surface proof lands with the milestones that own those surfaces. Strictly read-only: no trading, custody, wallet-signing, private-key, or transaction-submission capability.",
+      "requirementIds": [
+        "FR-OBJ-001",
+        "FR-OBJ-002",
+        "FR-OBJ-003",
+        "FR-OBJ-004",
+        "FR-OBJ-005",
+        "FR-OBJ-006",
+        "FR-OBJ-007",
+        "FR-OBJ-008",
+        "FR-OBJ-009",
+        "FR-OBJ-010"
+      ],
+      "dependencies": ["g1-capacity-contracts", "g1-execution-simulation", "g1-outcome-evaluation"],
+      "risk": "HIGH",
+      "parallelizable": false,
+      "writeScopes": [
+        "packages/objective-governance/**",
+        "packages/shadow-portfolio/**",
+        "packages/shared-schemas/**",
+        "packages/domain/**",
+        "migrations/g1_obj_*.sql",
+        "tests/fixtures/obj/**",
+        "tests/acceptance/**",
+        "tests/negative/**",
+        "telemetry/obj.*"
+      ],
+      "verificationCommands": [
+        "test -d packages/objective-governance && pnpm --filter @foresift/objective-governance test",
+        "test -d packages/shadow-portfolio && pnpm --filter @foresift/shadow-portfolio test"
+      ],
+      "status": "PENDING"
+    }
+  ]
+}

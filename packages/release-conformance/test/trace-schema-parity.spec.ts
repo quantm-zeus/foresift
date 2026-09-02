@@ -55,10 +55,12 @@ const EXPECTED_TRACE_TABLES: Record<string, TableInventory> = {
       { name: 'payload_sha256', dataType: 'text', isNullable: false },
       { name: 'signature', dataType: 'text', isNullable: false },
       { name: 'gate_kind', dataType: 'text', isNullable: false },
+      { name: 'scope_refs', dataType: 'jsonb', isNullable: false },
       { name: 'approver', dataType: 'text', isNullable: false },
       { name: 'issued_at', dataType: 'timestamp with time zone', isNullable: false },
       { name: 'expires_at', dataType: 'timestamp with time zone', isNullable: false },
       { name: 'revoked_at', dataType: 'timestamp with time zone', isNullable: true },
+      { name: 'revocation_ref', dataType: 'text', isNullable: true },
       { name: 'recorded_at', dataType: 'timestamp with time zone', isNullable: false },
     ],
   },
@@ -139,6 +141,7 @@ describe('trace schema SQL parity (FR-TRACE-002, AC-266)', () => {
         ]),
       );
 
+      expect(sqlColumns.rows.length).toBe(expected.columns.length);
       for (const col of expected.columns) {
         expect(colMap.has(col.name)).toBe(true);
         const actual = colMap.get(col.name)!;

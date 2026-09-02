@@ -1,4 +1,5 @@
 -- Immutable, point-in-time production decision provenance (FR-TRACE-005).
+-- Rollback: DROP TABLE trace.decision_traces.
 CREATE TABLE trace.decision_traces (
     trace_id                text PRIMARY KEY CHECK (trace_id ~ '^trc-[a-f0-9]{64}$'),
     decision_ref            text NOT NULL CHECK (length(btrim(decision_ref)) > 0),

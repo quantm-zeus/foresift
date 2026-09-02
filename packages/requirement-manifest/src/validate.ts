@@ -74,15 +74,29 @@ function requireStringArray(value: unknown, label: string): readonly string[] {
 }
 
 function validateTextHashes(manifest: RequirementManifest): void {
-  for (const item of [
-    ...manifest.requirements,
-    ...manifest.acceptanceCriteria,
-    ...manifest.invariants,
-  ]) {
-    if (typeof item.text !== 'string' || computeTextSha256(item.text) !== item.textSha256) {
-      refuse(RequirementManifestErrorCode.TEXT_HASH_MISMATCH, `text hash mismatch for ${item.id}`, {
-        id: item.id,
-      });
+  const textCollections = [
+    ['requirement', manifest.requirements, /^FR-[A-Z0-9]+-\d{3}$/],
+    ['acceptance criterion', manifest.acceptanceCriteria, /^AC-\d{3}$/],
+    ['invariant', manifest.invariants, /^INV-\d{3}$/],
+  ] as const;
+  for (const [kind, items, idPattern] of textCollections) {
+    for (const item of items) {
+      if (!idPattern.test(item.id)) {
+        refuse(
+          RequirementManifestErrorCode.MANIFEST_SHAPE_INVALID,
+          `${kind} ID has invalid shape: ${item.id}`,
+          { id: item.id },
+        );
+      }
+      if (typeof item.text !== 'string' || computeTextSha256(item.text) !== item.textSha256) {
+        refuse(
+          RequirementManifestErrorCode.TEXT_HASH_MISMATCH,
+          `text hash mismatch for ${item.id}`,
+          {
+            id: item.id,
+          },
+        );
+      }
     }
   }
 
@@ -128,6 +142,22 @@ function validateReferences(manifest: RequirementManifest): void {
   const groups = new Set(manifest.dependencyGroups.map((group) => group.id));
   const invariants = new Set(manifest.invariants.map((item) => item.id));
 
+  if (groups.size !== manifest.dependencyGroups.length) {
+    refuse(RequirementManifestErrorCode.ORPHAN_REFERENCE, 'duplicate dependency-group ID');
+  }
+  for (const group of manifest.dependencyGroups) {
+    const dependencies = group.dependsOn ?? group.dependencies ?? [];
+    for (const dependency of dependencies) {
+      if (!groups.has(dependency)) {
+        refuse(
+          RequirementManifestErrorCode.DANGLING_REFERENCE,
+          `${group.id} references missing dependency group ${dependency}`,
+          { from: group.id, to: dependency },
+        );
+      }
+    }
+  }
+
   for (const criterion of manifest.acceptanceCriteria) {
     const refs = requireStringArray(criterion.requirementRefs, `${criterion.id}.requirementRefs`);
     if (refs.length === 0) {
@@ -142,7 +172,11 @@ function validateReferences(manifest: RequirementManifest): void {
           { from: criterion.id, to: requirementId },
         );
       }
-      if (!requirement.acceptanceCriteria.includes(criterion.id)) {
+      const reverseRefs = requireStringArray(
+        requirement.acceptanceCriteria,
+        `${requirement.id}.acceptanceCriteria`,
+      );
+      if (!reverseRefs.includes(criterion.id)) {
         refuse(
           RequirementManifestErrorCode.DANGLING_REFERENCE,
           `${criterion.id} and ${requirementId} do not reference each other`,
@@ -153,6 +187,14 @@ function validateReferences(manifest: RequirementManifest): void {
   }
 
   for (const requirement of manifest.requirements) {
+    const acceptanceCriteria = requireStringArray(
+      requirement.acceptanceCriteria,
+      `${requirement.id}.acceptanceCriteria`,
+    );
+    const controlRefs = requireStringArray(
+      requirement.securityRightsCostControls,
+      `${requirement.id}.securityRightsCostControls`,
+    );
     if (!groups.has(requirement.dependencyGroup)) {
       refuse(
         RequirementManifestErrorCode.DANGLING_REFERENCE,
@@ -160,13 +202,13 @@ function validateReferences(manifest: RequirementManifest): void {
         { from: requirement.id, to: requirement.dependencyGroup },
       );
     }
-    if (requirement.acceptanceCriteria.length === 0) {
+    if (acceptanceCriteria.length === 0) {
       refuse(
         RequirementManifestErrorCode.ORPHAN_REFERENCE,
         `${requirement.id} has no acceptance criterion`,
       );
     }
-    for (const criterionId of requirement.acceptanceCriteria) {
+    for (const criterionId of acceptanceCriteria) {
       const criterion = criteria.get(criterionId);
       if (criterion === undefined || !criterion.requirementRefs.includes(requirement.id)) {
         refuse(
@@ -176,7 +218,7 @@ function validateReferences(manifest: RequirementManifest): void {
         );
       }
     }
-    for (const ref of requirement.securityRightsCostControls ?? []) {
+    for (const ref of controlRefs) {
       if (ref.startsWith('INV-') && !invariants.has(ref)) {
         refuse(
           RequirementManifestErrorCode.DANGLING_REFERENCE,

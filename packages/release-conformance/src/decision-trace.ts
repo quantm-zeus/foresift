@@ -191,7 +191,7 @@ function parseJson<T>(value: T | string): T {
 }
 
 function fromRow(row: DecisionTraceRow): DecisionTraceRecord {
-  return {
+  const record: DecisionTraceRecord = {
     traceId: row.trace_id,
     decisionRef: row.decision_ref,
     requirementIds: parseJson(row.requirement_ids),
@@ -208,6 +208,14 @@ function fromRow(row: DecisionTraceRow): DecisionTraceRecord {
     releaseReportId: row.release_report_id,
     recordedAt: row.recorded_at,
   };
+  // SQL constraints protect the normal path, but callers may inject any
+  // DatabaseEngine implementation. Never allow a malformed row to become an
+  // apparently authorized production trace at this boundary.
+  assertDecisionTraceInput(record);
+  if (!/^trc-[a-f0-9]{64}$/.test(record.traceId)) {
+    missingDimension('traceId', 'stored value is not a content address');
+  }
+  return record;
 }
 
 const TRACE_COLUMNS = `trace_id, decision_ref, requirement_ids, policy_versions,
@@ -220,6 +228,9 @@ export async function fetchDecisionTraceByRef(
   decisionRef: string,
   asOf?: string,
 ): Promise<DecisionTraceRecord | undefined> {
+  if (typeof decisionRef !== 'string' || decisionRef.trim().length === 0) {
+    missingDimension('decisionRef');
+  }
   if (asOf !== undefined && !isIsoInstant(asOf))
     throw new TypeError('asOf must be an ISO UTC instant');
   const result = await engine.query<DecisionTraceRow>(
@@ -236,6 +247,9 @@ export async function fetchDecisionTraceById(
   engine: DatabaseEngine,
   traceId: string,
 ): Promise<DecisionTraceRecord | undefined> {
+  if (!/^trc-[a-f0-9]{64}$/.test(traceId)) {
+    missingDimension('traceId', 'expected a content-addressed trace ID');
+  }
   const result = await engine.query<DecisionTraceRow>(
     `SELECT ${TRACE_COLUMNS} FROM trace.decision_traces WHERE trace_id = $1`,
     [traceId],

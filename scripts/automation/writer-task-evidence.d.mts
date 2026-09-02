@@ -21,3 +21,12 @@ export declare function requireTaskGraphForCompletionEvidence(input: {
   graph: Record<string, unknown>;
   unitsById: Map<string, Record<string, unknown>>;
 };
+/**
+ * Lane evidence diff = committed base..HEAD paths ∪ uncommitted status paths
+ * (repo-relative). A clean tree after agent-side commits still yields the
+ * commit diff; a failed `before`/HEAD probe falls back to status-only.
+ */
+export declare function laneEvidencePaths(input: {
+  worktree: string;
+  before?: string | null;
+}): string[];

@@ -7,6 +7,7 @@ import { classifyOwnedPath, validateLaneOwnership } from './path-ownership.mjs';
 import { acquireLanePermit, releaseLanePermit, resolvePoolStateDir } from './provider-pool.mjs';
 import {
   claimCompletedUnits,
+  laneEvidencePaths,
   parseTaskGraph,
   requireTaskGraphForCompletionEvidence,
 } from './writer-task-evidence.mjs';
@@ -293,17 +294,20 @@ export function runAgyTestWriter(input) {
   // Evidence-backed completion (H3 P0-1): the AGY test author previously
   // claimed EVERY --task-ids unconditionally. Nominations now require
   // predicted-write evidence in the lane's own diff; the writer's declared
-  // blockers keep their tasks OPEN.
+  // blockers keep their tasks OPEN. Evidence diff = committed base..HEAD ∪
+  // uncommitted status (live 7c98e02e class: agent-side commits alone must
+  // still nominate).
   const assigned = (input['task-ids'] ?? '').split(',').filter(Boolean);
   let evidence = { graph: null, unitsById: null };
   if (input['task-graph']) {
     const parsed = parseTaskGraph(input['task-graph']);
     if (parsed) evidence = parsed;
   }
+  const evidencePaths = laneEvidencePaths({ worktree: input.worktree, before: baseHead });
   const writerBlockers = Array.isArray(agentResult.blockers) ? agentResult.blockers : [];
   const claims = claimCompletedUnits({
     taskIds: assigned,
-    changed: changedPaths,
+    changed: evidencePaths,
     unitsById: evidence.unitsById,
     blockers: writerBlockers,
   });
@@ -318,9 +322,9 @@ export function runAgyTestWriter(input) {
     baseHead,
     // Evidence-backed nominations (H3 P0-1): diff-proven ids only; an empty
     // diff or a missing task graph nominates nothing (fail-closed).
-    completed: changedPaths.length > 0 ? claims.nominated : [],
+    completed: evidencePaths.length > 0 ? claims.nominated : [],
     deferredUnits:
-      changedPaths.length > 0
+      evidencePaths.length > 0
         ? claims.deferred
         : assigned.map((taskId) => ({ taskId, reason: 'lane produced no diff' })),
     branch: git(['branch', '--show-current'], input.worktree).stdout.trim(),

@@ -14,6 +14,7 @@ import { releaseLanePermit, observeClaudeOutcome } from './provider-pool.mjs';
 import { claudeProviderEvent } from './exec-claude-writer.mjs';
 import {
   claimCompletedUnits,
+  laneEvidencePaths,
   parseTaskGraph,
   requireTaskGraphForCompletionEvidence,
 } from './writer-task-evidence.mjs';
@@ -56,6 +57,7 @@ export function runClaudeLaneCore(input) {
     'Commit coherent production changes before exit.',
   ].join('\n');
   const started = Date.now();
+  const before = git(['rev-parse', 'HEAD'], input.worktree).stdout.trim();
   let run;
   try {
     run = spawnSync(
@@ -119,14 +121,17 @@ export function runClaudeLaneCore(input) {
   if (classification !== 'SUCCESS')
     throw new Error(`CLAUDE_LANE_CORE_${classification}: ${(run.stderr ?? '').slice(-500)}`);
 
+  // Lane evidence diff (live 7c98e02e): committed work counts — status alone
+  // sees a clean tree after the agent's own commits.
   const dirty = git(['status', '--porcelain=v1'], input.worktree)
     .stdout.split('\n')
     .filter(Boolean)
     .map((line) => line.slice(3).split(' -> ').at(-1));
+  const evidencePaths = laneEvidencePaths({ worktree: input.worktree, before });
   const ownership = validateLaneOwnership({
     engine: 'CLAUDE',
     role: 'implementation',
-    changedPaths: dirty,
+    changedPaths: evidencePaths,
   });
   if (!ownership.ok)
     throw new Error(`${ownership.violationCode}: ${ownership.violatingPaths.join(',')}`);
@@ -148,7 +153,8 @@ export function runClaudeLaneCore(input) {
     if (commit.status !== 0) throw new Error(`CLAUDE_COMMIT_FAILED: ${commit.stderr}`);
   }
   const head = git(['rev-parse', 'HEAD'], input.worktree).stdout.trim();
-  // Evidence-backed nominations (H3 P0-1) over the handoff's actual diff.
+  // Evidence-backed nominations (H3 P0-1) over the handoff's actual diff
+  // (committed ∪ uncommitted).
   let evidence = { graph: null, unitsById: null };
   if (input.taskGraphPath) {
     const parsed = parseTaskGraph(input.taskGraphPath);
@@ -156,7 +162,7 @@ export function runClaudeLaneCore(input) {
   }
   const claims = claimCompletedUnits({
     taskIds: input.taskIds ?? [],
-    changed: dirty,
+    changed: evidencePaths,
     unitsById: evidence.unitsById,
     blockers: [],
   });
@@ -166,9 +172,9 @@ export function runClaudeLaneCore(input) {
     role: 'implementation',
     engine: 'CLAUDE',
     handedOffFrom: input.handedOffFrom ?? null,
-    completed: dirty.length > 0 ? claims.nominated : [],
+    completed: evidencePaths.length > 0 ? claims.nominated : [],
     deferredUnits:
-      dirty.length > 0
+      evidencePaths.length > 0
         ? claims.deferred
         : (input.taskIds ?? []).map((taskId) => ({ taskId, reason: 'lane produced no diff' })),
     branch: git(['branch', '--show-current'], input.worktree).stdout.trim(),

@@ -1,6 +1,8 @@
 import { spawnSync } from 'node:child_process';
 import {
+  copyFileSync,
   existsSync,
+  mkdirSync,
   mkdtempSync,
   readdirSync,
   readFileSync,
@@ -25,6 +27,7 @@ import { describe, expect, it } from 'bun:test';
 const ROOT = join(import.meta.dirname, '../..');
 const AUTOMATION = join(ROOT, 'scripts/automation');
 const WORKFLOW_ROOT = join(ROOT, '.archon/workflows');
+const MANIFEST_NAME = 'crypto_intelligence_agent_gateway_PRD_FINAL_v6.0.requirements.json';
 
 function run(
   script: string,
@@ -129,10 +132,45 @@ describe('audit-progress artifacts-dir contract (ADR-0004)', () => {
   });
 
   it('--init seeds a fresh skeleton and exits 0 (live cca85aa2/944441a4: init exit-1 killed verify-repo after a green gate)', () => {
+    // Fixture repo: audit-progress computes its audit scope from
+    // current-milestone.json, which the audit-conclude contract DELETES once
+    // a milestone is archived (live PR #168: with no active milestone in the
+    // checkout, --init exited 2 and turned the state PR red). The script
+    // honors the FORESIFT_REPO_ROOT seam (same as milestone-mode.mjs), so the
+    // seeding contract is exercised against a self-contained repo with an
+    // active milestone regardless of the live checkout's milestone state.
+    const fx = mkdtempSync(join(tmpdir(), 'foresift-guard-init-repo-'));
+    mkdirSync(join(fx, 'specs', 'implementation'), { recursive: true });
+    mkdirSync(join(fx, 'docs', 'spec'), { recursive: true });
+    copyFileSync(
+      join(ROOT, 'specs', 'implementation', 'roadmap.json'),
+      join(fx, 'specs', 'implementation', 'roadmap.json'),
+    );
+    copyFileSync(
+      join(ROOT, 'docs', 'spec', MANIFEST_NAME),
+      join(fx, 'docs', 'spec', MANIFEST_NAME),
+    );
+    const pkg = (id: string, rid: string) =>
+      JSON.stringify({
+        id,
+        objective: 'an outcome-oriented objective sentence',
+        requirementIds: [rid],
+        dependencies: [],
+        risk: 'HIGH',
+        parallelizable: true,
+        writeScopes: [`packages/${id}/**`],
+        verificationCommands: ['pnpm test'],
+        status: 'PROVEN',
+      });
+    writeFileSync(
+      join(fx, 'specs', 'implementation', 'current-milestone.json'),
+      `{"schemaVersion":"1.0.0","milestoneId":"G0","status":"ACTIVE","packages":[${pkg('g0-a', 'FR-CORE-001')},${pkg('g0-b', 'FR-CORE-002')}]}`,
+    );
     const dir = mkdtempSync(join(tmpdir(), 'foresift-guard-init-'));
     try {
       const r = run('audit-progress.mjs', ['--init', '--artifacts-dir', dir], {
         ARTIFACTS_DIR: '',
+        FORESIFT_REPO_ROOT: fx,
       });
       // 0/N audited is the EXPECTED initial state — seeding is not a verdict.
       // Only --check may exit 1 on incompleteness.
@@ -141,6 +179,7 @@ describe('audit-progress artifacts-dir contract (ADR-0004)', () => {
       expect(existsSync(join(dir, 'milestone-audit-progress.json'))).toBe(true);
     } finally {
       rmSync(dir, { recursive: true, force: true });
+      rmSync(fx, { recursive: true, force: true });
     }
   });
 });

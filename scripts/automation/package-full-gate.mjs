@@ -105,7 +105,7 @@ function toolchainVersions(repoRoot) {
  * could change what "the FULL gate passed at HEAD" means rides in here.
  */
 export function attestationIdentity({ packageId, repoRoot, resolveBaseMain } = {}) {
-  const ms = loadCurrentMilestone();
+  const ms = loadCurrentMilestone(process.env.FORESIFT_REPO_ROOT);
   const pkg = findPackage(ms, packageId);
   if (!pkg) throw new Error(`package '${packageId}' not found in current milestone`);
   const git = (args) => execFileSync('git', args, { cwd: repoRoot, encoding: 'utf8' }).trim();

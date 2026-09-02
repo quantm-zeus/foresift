@@ -14,7 +14,7 @@ import { execFileSync, spawn, spawnSync } from 'node:child_process';
 import { chmodSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { afterAll, describe, expect, it } from 'bun:test';
+import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 import {
   BASE_DRIFT_REASON,
   landingAdmission,
@@ -136,6 +136,62 @@ describe('isShallowCheckout', () => {
 // ── 2. attestation base identity ─────────────────────────────────────────────
 
 describe('FULL-gate attestation records baseMainSha (V3-D §11.1)', () => {
+  // attestationIdentity resolves the package from current-milestone.json,
+  // which the audit-conclude contract deletes once a milestone is archived
+  // (live PR #168). Pin a fixture milestone through the FORESIFT_REPO_ROOT
+  // seam so the base-drift contract holds in any milestone state.
+  let identityRoot: string;
+  beforeAll(() => {
+    identityRoot = mkdtempSync(join(tmpdir(), 'foresift-basedrift-repo-'));
+    mkdirSync(join(identityRoot, 'specs', 'implementation'), { recursive: true });
+    writeFileSync(
+      join(identityRoot, 'specs', 'implementation', 'roadmap.json'),
+      JSON.stringify({
+        schemaVersion: '1.0.0',
+        policy: {},
+        currentMilestoneId: 'G0',
+        milestones: [{ id: 'G0', name: 'g0', dependsOn: [], status: 'ACTIVE' }],
+      }),
+    );
+    writeFileSync(
+      join(identityRoot, 'specs', 'implementation', 'current-milestone.json'),
+      JSON.stringify({
+        schemaVersion: '1.0.0',
+        milestoneId: 'G0',
+        status: 'ACTIVE',
+        packages: [
+          {
+            id: 'g0-contracts-data-truth',
+            objective: 'an outcome-oriented objective sentence',
+            requirementIds: ['FR-DATA-001'],
+            dependencies: [],
+            risk: 'CRITICAL',
+            parallelizable: false,
+            writeScopes: ['packages/domain/**'],
+            verificationCommands: ['pnpm test'],
+            status: 'PROVEN',
+          },
+          {
+            id: 'g0-second',
+            objective: 'another outcome-oriented objective sentence',
+            requirementIds: ['FR-DATA-002'],
+            dependencies: [],
+            risk: 'HIGH',
+            parallelizable: false,
+            writeScopes: ['packages/second/**'],
+            verificationCommands: ['pnpm test'],
+            status: 'PROVEN',
+          },
+        ],
+      }),
+    );
+    process.env.FORESIFT_REPO_ROOT = identityRoot;
+  });
+  afterAll(() => {
+    delete process.env.FORESIFT_REPO_ROOT;
+    rmSync(identityRoot, { recursive: true, force: true });
+  });
+
   it('identity includes baseMainSha from the injected resolver', () => {
     const id = attestationIdentity({
       packageId: 'g0-contracts-data-truth',

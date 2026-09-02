@@ -38,7 +38,7 @@ if (!artifactsDir) {
   process.exit(2);
 }
 const FILE = join(artifactsDir, 'milestone-audit-progress.json');
-const root = repoRoot();
+const root = process.env.FORESIFT_REPO_ROOT ?? repoRoot(); // test seam; default = script's own repo
 
 function loadManifest() {
   return JSON.parse(

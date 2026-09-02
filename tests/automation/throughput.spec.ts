@@ -6,7 +6,7 @@
 
 import { execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
-import { mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { copyFileSync, mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
@@ -163,6 +163,59 @@ describe('14. durable implementation checkpoint', () => {
 });
 
 describe('15. FULL-gate attestation identity', () => {
+  // attestationIdentity resolves the package's risk from
+  // specs/implementation/current-milestone.json. That file is stateless
+  // between milestones (the audit-conclude contract deletes it on archive;
+  // live PR #168), so these tests pin their own fixture milestone through the
+  // FORESIFT_REPO_ROOT seam (same pattern as milestone-mode.mjs) instead of
+  // depending on which milestone the live checkout happens to be in.
+  let identityRoot: string;
+  beforeAll(() => {
+    identityRoot = mkdtempSync(join(tmpdir(), 'foresift-identity-repo-'));
+    mkdirSync(join(identityRoot, 'specs', 'implementation'), { recursive: true });
+    copyFileSync(
+      join(REPO, 'specs', 'implementation', 'roadmap.json'),
+      join(identityRoot, 'specs', 'implementation', 'roadmap.json'),
+    );
+    writeFileSync(
+      join(identityRoot, 'specs', 'implementation', 'current-milestone.json'),
+      JSON.stringify({
+        schemaVersion: '1.0.0',
+        milestoneId: 'G0',
+        status: 'ACTIVE',
+        packages: [
+          {
+            id: 'g0-contracts-data-truth',
+            objective: 'an outcome-oriented objective sentence',
+            requirementIds: ['FR-DATA-001'],
+            dependencies: [],
+            risk: 'CRITICAL',
+            parallelizable: false,
+            writeScopes: ['packages/domain/**'],
+            verificationCommands: ['pnpm test'],
+            status: 'PROVEN',
+          },
+          {
+            id: 'g0-second',
+            objective: 'another outcome-oriented objective sentence',
+            requirementIds: ['FR-DATA-002'],
+            dependencies: [],
+            risk: 'HIGH',
+            parallelizable: false,
+            writeScopes: ['packages/second/**'],
+            verificationCommands: ['pnpm test'],
+            status: 'PROVEN',
+          },
+        ],
+      }),
+    );
+    process.env.FORESIFT_REPO_ROOT = identityRoot;
+  });
+  afterAll(() => {
+    delete process.env.FORESIFT_REPO_ROOT;
+    rmSync(identityRoot, { recursive: true, force: true });
+  });
+
   it('identity is complete: head, risk, lock, authorities, gate code, toolchain', () => {
     const id = attestationIdentity({
       packageId: 'g0-contracts-data-truth',
@@ -171,7 +224,8 @@ describe('15. FULL-gate attestation identity', () => {
     expect(id.headSha).toMatch(/^[0-9a-f]{40}$/);
     expect(id.risk).toBeDefined();
     expect(id.pnpmLockHash).toMatch(/^[0-9a-f]{64}$/);
-    for (const v of Object.values(id.authorityHashes)) expect(v).toMatch(/^([0-9a-f]{64}|null)$/);
+    for (const v of Object.values(id.authorityHashes))
+      expect(String(v)).toMatch(/^([0-9a-f]{64}|null)$/);
     for (const v of Object.values(id.gateImplementationHashes)) expect(v).toMatch(/^[0-9a-f]{64}$/);
     expect(Object.keys(id.toolchain)).toContain('node');
   });

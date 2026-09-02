@@ -138,11 +138,19 @@ export async function loadRequirementManifest(
 ): Promise<RequirementManifest> {
   const manifestPath = options.manifestPath ?? DEFAULT_MANIFEST_PATH;
   const manifest = await readManifestFile(manifestPath);
-  if (
+  const companionPathsWereSupplied =
     options.auditPath !== undefined ||
     options.prdPath !== undefined ||
-    options.sha256sumsPath !== undefined
-  ) {
+    options.sha256sumsPath !== undefined;
+  if (options.manifestPath === undefined && !companionPathsWereSupplied) {
+    await validateRequirementManifest({
+      manifestData: manifest,
+      manifestPath,
+      auditPath: DEFAULT_AUDIT_PATH,
+      prdPath: DEFAULT_PRD_PATH,
+      sha256sumsPath: DEFAULT_SHA256SUMS_PATH,
+    });
+  } else if (companionPathsWereSupplied) {
     await validateRequirementManifest({
       manifestData: manifest,
       manifestPath,
@@ -150,6 +158,8 @@ export async function loadRequirementManifest(
       ...(options.prdPath === undefined ? {} : { prdPath: options.prdPath }),
       ...(options.sha256sumsPath === undefined ? {} : { sha256sumsPath: options.sha256sumsPath }),
     });
+  } else {
+    validateRequirementManifest({ manifestData: manifest });
   }
   // The PRD artifact retains its historical three-digit ADR inventory keys,
   // while the released ADR namespace and filenames are four-digit. Expose the

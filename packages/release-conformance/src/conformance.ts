@@ -116,7 +116,13 @@ function globStaticPrefix(pattern: string): string {
   return prefix.replace(/\/+$/, '');
 }
 
-async function pathRefExists(repoRoot: string, refPath: string): Promise<boolean> {
+type FileScanCache = Map<string, Promise<readonly string[]>>;
+
+async function pathRefExists(
+  repoRoot: string,
+  refPath: string,
+  scanCache: FileScanCache = new Map(),
+): Promise<boolean> {
   const prefix = globStaticPrefix(refPath);
   if (prefix.length === 0 || path.isAbsolute(refPath) || refPath.split('/').includes('..')) {
     return false;
@@ -133,10 +139,21 @@ async function pathRefExists(repoRoot: string, refPath: string): Promise<boolean
     // exists but contains no matching source. Search only below the static
     // prefix so repository dependencies (notably node_modules) are never
     // traversed.
-    const searchRoot = prefix.includes('/') ? path.posix.dirname(prefix) : '';
+    const wildcardIndex = refPath.search(/[?*[{]/);
+    const staticPart = refPath.slice(0, wildcardIndex);
+    const searchRoot = staticPart.endsWith('/')
+      ? prefix
+      : prefix.includes('/')
+        ? path.posix.dirname(prefix)
+        : '';
     await access(path.join(repoRoot, searchRoot), constants.F_OK);
     const matcher = repositoryGlobRegex(refPath);
-    const candidates = await filesRecursively(path.join(repoRoot, searchRoot));
+    let candidatesPromise = scanCache.get(searchRoot);
+    if (candidatesPromise === undefined) {
+      candidatesPromise = filesRecursively(path.join(repoRoot, searchRoot));
+      scanCache.set(searchRoot, candidatesPromise);
+    }
+    const candidates = await candidatesPromise;
     return candidates.some((candidate) => {
       const repositoryPath = path.posix.join(searchRoot, candidate.replaceAll('\\', '/'));
       return matcher.test(repositoryPath);
@@ -188,14 +205,16 @@ export async function checkActiveImplementationPaths(
 ): Promise<ActivePathVerdict> {
   const requirements = await resolveRequirements(options);
   const findings: ConformanceFinding[] = [];
+  const scanCache: FileScanCache = new Map();
   for (const requirement of requirements) {
     if (requirement.dependencyGroup !== options.activeGroup) continue;
     for (const ref of requirement.implementationRefs ?? []) {
       const exactPath = implementationPath(ref);
       const reconciledPath = reconciledMilestonePath(requirement.id, exactPath);
       const exists =
-        (await pathRefExists(options.repoRoot, exactPath)) ||
-        (reconciledPath !== undefined && (await pathRefExists(options.repoRoot, reconciledPath)));
+        (await pathRefExists(options.repoRoot, exactPath, scanCache)) ||
+        (reconciledPath !== undefined &&
+          (await pathRefExists(options.repoRoot, reconciledPath, scanCache)));
       if (!exists) {
         findings.push({
           requirementId: requirement.id,
@@ -241,13 +260,14 @@ export async function checkNoPrematureImplementations(
       .map(implementationPath),
   );
   const findings: ConformanceFinding[] = [];
+  const scanCache: FileScanCache = new Map();
   for (const requirement of requirements) {
     const groupNumber = dependencyGroupNumber(requirement.dependencyGroup);
     if (groupNumber === undefined || groupNumber <= activeNumber) continue;
     for (const ref of requirement.implementationRefs ?? []) {
       const exactPath = implementationPath(ref);
       if (!/^(apps|packages)\//.test(exactPath) || openedPaths.has(exactPath)) continue;
-      if (await pathRefExists(options.repoRoot, exactPath)) {
+      if (await pathRefExists(options.repoRoot, exactPath, scanCache)) {
         findings.push({
           requirementId: requirement.id,
           rule: CONFORMANCE_RULES.premature,

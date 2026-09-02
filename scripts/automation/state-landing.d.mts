@@ -56,6 +56,9 @@ export interface StateTransitionReceipt {
   retryClass: 'RETRYABLE' | 'AUTHORITY_REFUSAL' | 'TERMINAL_CORRUPTION' | null;
   retryCount: number;
   nextRetryAt: string | null;
+  /** Base-drift self-update (PR #160 class): times main was merged into the state branch while CI waited. */
+  baseUpdateCount?: number;
+  baseUpdatedAt?: string | null;
   mergedSha: string | null;
   failedReason: string | null;
   createdAt: string;

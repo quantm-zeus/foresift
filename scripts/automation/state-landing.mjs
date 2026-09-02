@@ -987,6 +987,79 @@ export async function advanceStateTransition({
       };
     }
 
+    // Base-drift self-update (live PR #160, 2026-09-02): when origin/main
+    // moved past the transition's source while this PR waited, branch
+    // protection ("required up-to-date") blocks the merge FOREVER — the
+    // machine looped WAITING_CI ↔ CI_AUTHORIZED against a BEHIND head and
+    // only an operator merge of main into the state branch broke the loop.
+    // The machine can do that update itself: the state worktree still exists
+    // at this point, the desired-file content is unchanged, and the new head
+    // re-earns its own CI authorization before any merge. Rate-limited by
+    // receipt.baseUpdateCount (max 3) so a pathological main cannot loop.
+    if (
+      (verdict.state === 'PENDING' || verdict.state === 'RUNNING') &&
+      worktreePath &&
+      existsSync(worktreePath) &&
+      receipt.prNumber
+    ) {
+      const mainFetch = gitFn(['fetch', 'origin', 'main', '--quiet'], { cwd: repoDir });
+      if (mainFetch.ok) {
+        const mainShaRes = gitFn(['rev-parse', 'origin/main'], { cwd: repoDir });
+        const mainSha = mainShaRes.ok ? mainShaRes.stdout.trim() : null;
+        if (mainSha && mainSha !== receipt.sourceMainSha) {
+          const stillBased = gitFn(
+            ['merge-base', '--is-ancestor', receipt.sourceMainSha, mainSha],
+            { cwd: repoDir },
+          );
+          const prView = ghFn(
+            [
+              'pr',
+              'view',
+              String(receipt.prNumber),
+              '--json',
+              'mergeStateStatus',
+              '--jq',
+              '.mergeStateStatus',
+            ],
+            { cwd: repoDir },
+          );
+          const mss = prView.ok ? prView.stdout.trim() : '';
+          if (
+            stillBased.ok &&
+            (mss === 'BEHIND' || stillBased.ok) &&
+            (receipt.baseUpdateCount ?? 0) < 3
+          ) {
+            const mergeRes = gitFn(
+              [
+                '-c',
+                'user.name=Foresift Autopilot',
+                '-c',
+                'user.email=autopilot@foresift.local',
+                'merge',
+                '--no-edit',
+                'origin/main',
+              ],
+              { cwd: worktreePath },
+            );
+            if (mergeRes.ok) {
+              const pushRes = gitFn(
+                ['push', 'origin', stateBranch, '--quiet', '--force-with-lease'],
+                { cwd: repoDir },
+              );
+              if (pushRes.ok) {
+                receipt.baseUpdateCount = (receipt.baseUpdateCount ?? 0) + 1;
+                receipt.baseUpdatedAt = new Date().toISOString();
+                writeReceipt(stateDir, receipt);
+                log(
+                  `state branch rebased onto moved main (${mainSha.slice(0, 10)}); CI re-runs at the new head (update #${receipt.baseUpdateCount})`,
+                );
+              }
+            }
+          }
+        }
+      }
+    }
+
     // Still pending / running — mark WAITING_CI and return immediately (NO BLOCKING)
     receipt.status = RECEIPT_STATUSES.WAITING_CI;
     receipt.nextRetryAt = new Date(Date.now() + 15_000).toISOString();

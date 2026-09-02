@@ -10,7 +10,7 @@
 // uncommitted status. Agent-side commits alone MUST still nominate.
 import { describe, test, expect, beforeEach, afterEach } from 'bun:test';
 import { spawnSync } from 'node:child_process';
-import { mkdtempSync, rmSync, writeFileSync, mkdirSync } from 'node:fs';
+import { mkdtempSync, rmSync, writeFileSync, mkdirSync, readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -149,7 +149,7 @@ describe('lane evidence diff = committed base..HEAD ∪ uncommitted status', () 
 });
 
 describe('writer sources: uncommitted-sweep defined before use (live aa3e8015 ReferenceError)', () => {
-  const read = (p: string) => require('node:fs').readFileSync(p, 'utf8');
+  const read = (p: string) => readFileSync(p, 'utf8');
 
   test('every writer defines `dirty` before any `dirty.length` reference', () => {
     for (const rel of [

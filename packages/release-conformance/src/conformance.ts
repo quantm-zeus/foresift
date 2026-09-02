@@ -2,6 +2,7 @@
 import { constants } from 'node:fs';
 import { access, readFile, readdir } from 'node:fs/promises';
 import path from 'node:path';
+import { resolveMappings } from '@foresift/requirement-manifest';
 
 export const CONFORMANCE_RULES = {
   mapping: 'NORMATIVE_MAPPING_COMPLETE',
@@ -158,7 +159,8 @@ export async function checkActiveImplementationPaths(
   const findings: ConformanceFinding[] = [];
   for (const requirement of requirements) {
     if (requirement.dependencyGroup !== options.activeGroup) continue;
-    for (const ref of requirement.implementationRefs ?? []) {
+    const mappings = resolveMappings({ requirements }, requirement.id);
+    for (const ref of mappings.implementationRefs) {
       const exactPath = implementationPath(ref);
       const reconciledPath = reconciledMilestonePath(requirement.id, exactPath);
       const exists =
@@ -205,14 +207,15 @@ export async function checkNoPrematureImplementations(
     requirements
       .filter((item) => dependencyGroupNumber(item.dependencyGroup) !== undefined)
       .filter((item) => (dependencyGroupNumber(item.dependencyGroup) as number) <= activeNumber)
-      .flatMap((item) => item.implementationRefs ?? [])
+      .flatMap((item) => resolveMappings({ requirements }, item.id).implementationRefs)
       .map(implementationPath),
   );
   const findings: ConformanceFinding[] = [];
   for (const requirement of requirements) {
     const groupNumber = dependencyGroupNumber(requirement.dependencyGroup);
     if (groupNumber === undefined || groupNumber <= activeNumber) continue;
-    for (const ref of requirement.implementationRefs ?? []) {
+    const mappings = resolveMappings({ requirements }, requirement.id);
+    for (const ref of mappings.implementationRefs) {
       const exactPath = implementationPath(ref);
       if (!/^(apps|packages)\//.test(exactPath) || openedPaths.has(exactPath)) continue;
       if (await pathRefExists(options.repoRoot, exactPath)) {

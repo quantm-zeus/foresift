@@ -47,6 +47,23 @@ function by(
   return requirements(manifest).filter(predicate);
 }
 
+function mappingValues(
+  requirementId: string,
+  field: keyof RequirementMappings,
+  value: unknown,
+): readonly string[] {
+  if (value === undefined) return Object.freeze([]);
+  if (
+    !Array.isArray(value) ||
+    value.some((item) => typeof item !== 'string' || item.trim().length === 0)
+  ) {
+    throw new TypeError(
+      `MAPPING_INVALID: ${requirementId}.${field} must contain non-empty strings`,
+    );
+  }
+  return Object.freeze([...new Set(value as readonly string[])]);
+}
+
 export function queryByFamily(
   manifest: Pick<RequirementManifest, 'requirements'>,
   family: string,
@@ -102,8 +119,7 @@ export function resolveMappings(
     'activationGateRefs',
     'rollbackRefs',
   ] as const) {
-    const values = requirement[field];
-    result[field] = Array.isArray(values) ? [...values] : [];
+    result[field] = mappingValues(requirement.id, field, requirement[field]);
   }
-  return result as RequirementMappings;
+  return Object.freeze(result) as RequirementMappings;
 }

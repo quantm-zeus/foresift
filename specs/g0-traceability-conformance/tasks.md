@@ -7,13 +7,13 @@
 
 ## Phase 1 — Foundation: package scaffolds, schemas, migration registry (blocks later phases)
 
-- [ ] T001 Scaffold the `packages/requirement-manifest` workspace package: `package.json`
+- [x] T001 Scaffold the `packages/requirement-manifest` workspace package: `package.json`
       (`@foresift/requirement-manifest`, private, type module, `"test": "bun test"`, zero
       production dependencies), `tsconfig.json` (extends `../../tsconfig.base.json`, globs
       `src/**` + `test/**`), and `src/index.ts` entrypoint. Root `package.json` +
       `pnpm-lock.yaml` workspace linkage (mechanical bookkeeping per ADR-0020). —
       **FR-TRACE-001** — AC-265
-- [ ] T002 [P] Scaffold the `packages/release-conformance` workspace package the same way:
+- [x] T002 [P] Scaffold the `packages/release-conformance` workspace package the same way:
       `package.json` (workspace deps on `@foresift/requirement-manifest`,
       `@foresift/shared-schemas`, `@foresift/persistence`, `@foresift/domain`), `tsconfig.json`,
       `src/index.ts`. — **FR-TRACE-006** — AC-269

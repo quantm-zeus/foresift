@@ -7,13 +7,13 @@
 
 ## Phase 1 — Foundation: package scaffolds, schemas, migration registry (blocks later phases)
 
-- [x] T001 Scaffold the `packages/requirement-manifest` workspace package: `package.json`
+- [ ] T001 Scaffold the `packages/requirement-manifest` workspace package: `package.json`
       (`@foresift/requirement-manifest`, private, type module, `"test": "bun test"`, zero
       production dependencies), `tsconfig.json` (extends `../../tsconfig.base.json`, globs
       `src/**` + `test/**`), and `src/index.ts` entrypoint. Root `package.json` +
       `pnpm-lock.yaml` workspace linkage (mechanical bookkeeping per ADR-0020). —
       **FR-TRACE-001** — AC-265
-- [x] T002 [P] Scaffold the `packages/release-conformance` workspace package the same way:
+- [ ] T002 [P] Scaffold the `packages/release-conformance` workspace package the same way:
       `package.json` (workspace deps on `@foresift/requirement-manifest`,
       `@foresift/shared-schemas`, `@foresift/persistence`, `@foresift/domain`), `tsconfig.json`,
       `src/index.ts`. — **FR-TRACE-006** — AC-269
@@ -111,7 +111,7 @@
       identical rebuild from identical inputs; a report verifier refuses any report with a
       missing field or disagreeing hash. Suite
       `packages/release-conformance/test/release-report.spec.ts`. — **FR-TRACE-006** — AC-269
-- [x] T013 Add `packages/release-conformance/test/trace-schema-parity.spec.ts`: the Drizzle-free
+- [ ] T013 Add `packages/release-conformance/test/trace-schema-parity.spec.ts`: the Drizzle-free
       parity check enumerating `information_schema` for `table_schema = 'trace'` against a
       package-local table-shape inventory (columns, nullability, type classes, PKs) — the
       `packages/security` sec-schema precedent; `packages/persistence`'s public-schema parity
@@ -148,7 +148,7 @@
       package-local parity test asserting trace-catalog field names mirror
       `packages/shared-schemas/src/trace.ts` (root telemetry-catalog suite is outside this
       package's writeScopes). — **FR-TRACE-004**, **FR-TRACE-005** — AC-268, AC-267
-- [x] T018 [P] Create `tests/fixtures/trace/`: `manifest-excerpt.ts` (pinned FR/AC/INV text +
+- [ ] T018 [P] Create `tests/fixtures/trace/`: `manifest-excerpt.ts` (pinned FR/AC/INV text +
       textSha256 fixtures copied from the authoritative manifest), `gate-evidence.ts`
       (deterministic HMAC test peppers, complete/incomplete evidence payloads), `decision-traces.ts`
       (complete trace + one fixture per missing dimension), `surfaces.ts` (expected surfaces-file
@@ -157,29 +157,29 @@
 
 ## Phase 6 — Acceptance and negative suites (AC-265..269)
 
-- [x] T019 [P] Author `tests/acceptance/AC-265.spec.ts` + `tests/negative/AC-265.negative.spec.ts`:
+- [ ] T019 [P] Author `tests/acceptance/AC-265.spec.ts` + `tests/negative/AC-265.negative.spec.ts`:
       the manifest contains every normative FR/AC/INV/ADR exactly once with document anchor,
       dependency group, owner, code/schema/surface/test/telemetry mapping, activation gate, and
       rollback target (positive, through the loader+validator against the REAL artifacts);
       negative — corrupted text hash, duplicated id, renumbered order, dangling ref, unresolved
       anchor each produce a typed refusal. — **FR-TRACE-001**, **FR-TRACE-002** — AC-265
-- [x] T020 [P] Author `tests/acceptance/AC-266.spec.ts` + `tests/negative/AC-266.negative.spec.ts`:
+- [ ] T020 [P] Author `tests/acceptance/AC-266.spec.ts` + `tests/negative/AC-266.negative.spec.ts`:
       adding/deleting/duplicating/renumbering/changing a normative item WITH matching
       manifest/test updates passes the verifier against a fixture tree; each mutation class
       WITHOUT the matching update fails CI (exit 1) naming the drifted item and the missing
       counterpart. — **FR-TRACE-003** — AC-266
-- [x] T021 [P] Author `tests/acceptance/AC-267.spec.ts` + `tests/negative/AC-267.negative.spec.ts`:
+- [ ] T021 [P] Author `tests/acceptance/AC-267.spec.ts` + `tests/negative/AC-267.negative.spec.ts`:
       every seeded decision/alert trace resolves to exact document/manifest hash, release,
       migration, policy, feature, model, tool, provider, pool adapter, evidence, and artifact
       versions through the store's point-in-time fetch; negative — each missing dimension (and a
       wrong-format hash) refuses with the dimension named. — **FR-TRACE-005** — AC-267
-- [x] T022 [P] Author `tests/acceptance/AC-268.spec.ts` + `tests/negative/AC-268.negative.spec.ts`:
+- [ ] T022 [P] Author `tests/acceptance/AC-268.spec.ts` + `tests/negative/AC-268.negative.spec.ts`:
       manual/legal/rights/statistical/owner approvals accepted only from signed-or-hashed
       evidence carrying scope, approver, expiry, and revocation (all five gate kinds); negative —
       expired/revoked/out-of-scope/tampered/wrong-key evidence refuse AND an unchecked boolean
       cannot be presented to the evaluator at all (no boolean input path; type-level and
       runtime-level proof). — **FR-TRACE-004** — AC-268
-- [x] T023 [P] Author `tests/acceptance/AC-269.spec.ts` + `tests/negative/AC-269.negative.spec.ts`:
+- [ ] T023 [P] Author `tests/acceptance/AC-269.spec.ts` + `tests/negative/AC-269.negative.spec.ts`:
       the release report documents hash, manifest hash, SBOM/dependency hash, migration/schema
       hashes, all test results, deviations, current activation scope, and tested rollback target,
       and rebuilds byte-identically; negative — missing field or drifting recorded hash refuses
@@ -187,7 +187,7 @@
 
 ## Phase 7 — Convergence: full gate + traceability matrix
 
-- [x] T024 [evidence: VERIFICATION_ONLY] [verification: TRACEABILITY_FULL_CONVERGENCE] Run the full gate: `pnpm --filter @foresift/requirement-manifest test`,
+- [ ] T024 [evidence: VERIFICATION_ONLY] [verification: TRACEABILITY_FULL_CONVERGENCE] Run the full gate: `pnpm --filter @foresift/requirement-manifest test`,
       `pnpm --filter @foresift/release-conformance test`,
       `packages/persistence/test/migrator.spec.ts` green with the extended registry,
       `scripts/verify-release-conformance/cli.mjs` exit 0, `docs/generated` `--check` green,

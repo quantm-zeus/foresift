@@ -1,15 +1,26 @@
 // Hyperdrive H3 P1-6 — launch preflight regressions: exact truth from the
 // deterministic task graph, conservative degradation, exact co-run decision,
 // shared-surface extraction.
+//
+// The g0-traceability-conformance assertions read a HERMETIC fixture root
+// (tests/fixtures/preflight-g0: a two-package milestone + the traceability
+// plan with its original 10 open tasks), never the live specs/ tree. Live-tree
+// pinning broke the moment the package legitimately completed (run
+// aa3e8015 → PR #157: every task closed by deterministic evidence, so
+// openTaskCount hit 0 and the suite went RED on a healthy product) — package
+// lifecycle state is not a test input.
+import { join } from 'node:path';
 import { describe, test, expect } from 'bun:test';
 import {
   buildLaunchPreflight,
   exactCoRunCompatible,
 } from '../../scripts/automation/launch-preflight.mjs';
 
+const FIXTURE_ROOT = join(import.meta.dir, '..', 'fixtures', 'preflight-g0');
+
 describe('buildLaunchPreflight (deterministic task-graph derivation)', () => {
   test('g0-traceability-conformance derives exact predicted writes from its seeded plan', () => {
-    const p = buildLaunchPreflight('g0-traceability-conformance');
+    const p = buildLaunchPreflight('g0-traceability-conformance', FIXTURE_ROOT);
     expect(p.exact).toBe(true);
     expect(p.openTaskCount).toBeGreaterThan(0);
     expect(p.predictedWrites.length).toBeGreaterThan(0);
@@ -29,7 +40,7 @@ describe('buildLaunchPreflight (deterministic task-graph derivation)', () => {
   });
 
   test('ready counts exclude dependency-blocked units; shardNeed matches planned shards', () => {
-    const p = buildLaunchPreflight('g0-traceability-conformance');
+    const p = buildLaunchPreflight('g0-traceability-conformance', FIXTURE_ROOT);
     // Ready truth: a unit counts as ready only when every declared dependency
     // is closed — dependency/phase-blocked units must never inflate the
     // parallelizable-ready count the adaptive lane resolver consumes.
@@ -66,7 +77,7 @@ describe('exactCoRunCompatible (exact write-truth co-run decision)', () => {
 
   test('shared-surface writes are surfaced for lease serialization, not silent co-run', () => {
     const manifest = 'evidence/bun-migration/bun-migration-manifest.json';
-    const a = buildLaunchPreflight('g0-traceability-conformance');
+    const a = buildLaunchPreflight('g0-traceability-conformance', FIXTURE_ROOT);
     // The traceability plan does not name a shared surface; a synthetic
     // record that does must expose it for the lease path.
     const b = { exact: true, predictedWrites: [manifest], sharedSurfaces: [manifest] };

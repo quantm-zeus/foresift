@@ -1,0 +1,65 @@
+{
+  "schemaVersion": "1.0.0",
+  "milestoneId": "fixture-g0-preflight",
+  "status": "ACTIVE",
+  "packages": [
+    {
+      "id": "g0-traceability-conformance",
+      "objective": "Close the milestone with release-blocking traceability: the machine-readable requirement manifest kept authoritative and integrity-checked, globally unique and stable requirement/acceptance/invariant/artifact IDs with explicit supersession links, CI conformance that fails on unmapped normative items, orphaned code paths, or implementations outside their dependency gate, signed and hashed evidence artifacts for manual/legal/rights/approval gates, per-decision requirement/policy/model/tool/version traceability, and reproducible release reports with document, manifest, migration, SBOM hashes, conformance results, activation state, and rollback target. This package is also the central generator of all docs/generated/<family>-surfaces.json surface mappings and reconciles telemetry/surface mapping ownership across the milestone at convergence.",
+      "requirementIds": [
+        "FR-TRACE-001",
+        "FR-TRACE-002",
+        "FR-TRACE-003",
+        "FR-TRACE-004",
+        "FR-TRACE-005",
+        "FR-TRACE-006"
+      ],
+      "dependencies": [],
+      "risk": "HIGH",
+      "parallelizable": false,
+      "writeScopes": [
+        "packages/requirement-manifest/**",
+        "packages/release-conformance/**",
+        "packages/shared-schemas/**",
+        "scripts/generate-requirement-manifest/**",
+        "scripts/verify-release-conformance/**",
+        "docs/generated/**",
+        "migrations/g0_trace_*.sql",
+        "tests/fixtures/trace/**",
+        "tests/acceptance/**",
+        "tests/negative/**",
+        "telemetry/**"
+      ],
+      "verificationCommands": [
+        "test -d packages/requirement-manifest && pnpm --filter @foresift/requirement-manifest test",
+        "test -d packages/release-conformance && pnpm --filter @foresift/release-conformance test",
+        "pnpm spec:verify"
+      ],
+      "status": "PENDING",
+      "generation": 0
+    },
+    {
+      "id": "g0-fixture-sibling",
+      "objective": "Fixture sibling package to satisfy the two-package milestone invariant in hermetic tests.",
+      "requirementIds": [
+        "FR-TRACE-001",
+        "FR-TRACE-002",
+        "FR-TRACE-003",
+        "FR-TRACE-004",
+        "FR-TRACE-005",
+        "FR-TRACE-006"
+      ],
+      "dependencies": [],
+      "risk": "HIGH",
+      "parallelizable": false,
+      "writeScopes": ["packages/fixture-sibling/**"],
+      "verificationCommands": [
+        "test -d packages/requirement-manifest && pnpm --filter @foresift/requirement-manifest test",
+        "test -d packages/release-conformance && pnpm --filter @foresift/release-conformance test",
+        "pnpm spec:verify"
+      ],
+      "status": "PENDING",
+      "generation": 0
+    }
+  ]
+}

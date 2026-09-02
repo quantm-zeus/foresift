@@ -424,7 +424,17 @@ function main() {
     );
     process.exit(1);
   }
-  sh('gh', ['pr', 'merge', prNum, '--squash', '--delete-branch', '--match-head-commit', pinSha]);
+  // NO --delete-branch (live root cause #153/#157/#158): the lander runs from
+  // INSIDE the package worktree whose branch is checked out. gh merges the PR
+  // and deletes the remote branch, then fails to delete the LOCAL ref (git
+  // refuses: checked out in a worktree) and exits non-zero AFTER a successful
+  // merge — execFileSync threw, the lander exited 1, and package-final-land
+  // recorded merged:false / lander-exit-1 for an actually-merged PR. Branch
+  // deletion is bookkeeping, never merge truth: the remote branch is deleted
+  // server-side by the squash merge itself when the PR head goes away via
+  // --delete-branch=false and cleanup happens where the branch is not checked
+  // out (supervisor finalize). Merge authority = PR state on GitHub.
+  sh('gh', ['pr', 'merge', prNum, '--squash', '--match-head-commit', pinSha]);
   step('merged', `PR #${prNum} squash-merged at pinned head ${pinSha}`);
   console.log(
     JSON.stringify(

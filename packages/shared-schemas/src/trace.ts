@@ -18,7 +18,7 @@ const NonEmptyVersionMapSchema = z
 /** Stable normative-document namespaces. */
 export const RequirementRefSchema = z
   .string()
-  .regex(/^(?:FR-[A-Z][A-Z0-9]*(?:-[A-Z0-9]+)*-\d{3}|AC-\d{3}|INV-\d{3}|ADR-\d{4})$/, {
+  .regex(/^(?:FR-[A-Z][A-Z0-9]*-\d{3}|AC-\d{3}|INV-\d{3}|ADR-\d{4})$/, {
     message: 'must be an FR, AC, INV, or ADR identifier',
   });
 export type RequirementRef = z.infer<typeof RequirementRefSchema>;
@@ -56,8 +56,36 @@ export const SupersessionLinkSchema = z
     reason: NonEmptyStringSchema,
   })
   .strict()
-  .refine((value) => value.replacedId !== value.supersededById, {
-    message: 'an identifier cannot supersede itself',
+  .superRefine((value, context) => {
+    if (value.replacedId === value.supersededById) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'an identifier cannot supersede itself',
+      });
+    }
+    const namespacePatterns: Record<(typeof TRACE_ID_NAMESPACES)[number], RegExp> = {
+      requirement: /^FR-[A-Z][A-Z0-9]*-\d{3}$/,
+      acceptance: /^AC-\d{3}$/,
+      invariant: /^INV-\d{3}$/,
+      adr: /^ADR-\d{4}$/,
+      feature: /^feature:\S+$/,
+      schema: /^schema:\S+$/,
+      api: /^api:\S+$/,
+      tool: /^tool:\S+$/,
+      policy: /^policy:\S+$/,
+      artifact: /^artifact:\S+$/,
+      test: /^test:\S+$/,
+    };
+    const expected = namespacePatterns[value.namespace];
+    for (const field of ['replacedId', 'supersededById'] as const) {
+      if (!expected.test(value[field])) {
+        context.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: [field],
+          message: `must match the ${value.namespace} namespace`,
+        });
+      }
+    }
   });
 export type SupersessionLink = z.infer<typeof SupersessionLinkSchema>;
 
@@ -107,6 +135,22 @@ export const GateEvidenceRecordSchema = z
         path: ['approver'],
         message: 'must match payload',
       });
+    }
+    if (JSON.stringify(value.scopeRefs) !== JSON.stringify(value.payload.scopeRefs)) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['scopeRefs'],
+        message: 'must match payload',
+      });
+    }
+    for (const field of ['issuedAt', 'expiresAt'] as const) {
+      if (value[field] !== value.payload[field]) {
+        context.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: [field],
+          message: 'must match payload',
+        });
+      }
     }
     if (new Date(value.expiresAt).getTime() <= new Date(value.issuedAt).getTime()) {
       context.addIssue({

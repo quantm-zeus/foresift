@@ -17,7 +17,7 @@
       `package.json` (workspace deps on `@foresift/requirement-manifest`,
       `@foresift/shared-schemas`, `@foresift/persistence`, `@foresift/domain`), `tsconfig.json`,
       `src/index.ts`. — **FR-TRACE-006** — AC-269
-- [ ] T003 Add `migrations/g0_trace_0001_trace_schema.sql` (CREATE SCHEMA trace;
+- [x] T003 Add `migrations/g0_trace_0001_trace_schema.sql` (CREATE SCHEMA trace;
       `trace.id_supersessions` insert-only ledger with namespace CHECK + single-supersession PK;
       `trace.gate_evidence` insert-only evidence rows with gate_kind/scope/approver/hash/
       signature/expiry/revocation-ref columns; `trace.refuse_mutation()` trigger on UPDATE/
@@ -28,7 +28,7 @@
       AND update the central expected-script registry in
       `packages/persistence/test/migrator.spec.ts` (all assertion sites) — the plan-sanctioned
       scope exception per ADR-0019. — **FR-TRACE-002**, **FR-TRACE-004** — AC-266, AC-268
-- [ ] T004 [P] Add `packages/shared-schemas/src/trace.ts`: `TRACE_SCHEMA_REGISTRY_VERSION`,
+- [x] T004 [P] Add `packages/shared-schemas/src/trace.ts`: `TRACE_SCHEMA_REGISTRY_VERSION`,
       `.strict()` Zod schemas — `RequirementRefSchema` (ID-shape grammar for
       requirement/acceptance/invariant/adr namespaces), `TraceIdPatternSchema` (runtime ID
       families: feature, schema, API, tool, policy, artifact, test IDs), `SupersessionLinkSchema`,
@@ -41,7 +41,7 @@
 
 ## Phase 2 — Manifest library: load, validate, IDs, query
 
-- [ ] T005 Implement `packages/requirement-manifest/src/load.ts` + `src/validate.ts`: load
+- [x] T005 Implement `packages/requirement-manifest/src/load.ts` + `src/validate.ts`: load
       `docs/spec/crypto_intelligence_agent_gateway_PRD_FINAL_v6.0.requirements.json` and the
       audit artifact; verify SHA256SUMS agreement, text hashes (FR/AC/INV recomputed; ADR format
       check), PRD line anchors resolving to lines containing each ID, reference integrity
@@ -50,13 +50,13 @@
       releaseConformance). Typed refusals in `src/errors.ts` (ForesiftError-style, domain enum
       untouched). Suite `packages/requirement-manifest/test/validate.spec.ts`. —
       **FR-TRACE-001** — AC-265
-- [ ] T006 [P] Implement `packages/requirement-manifest/src/ids.ts`: global uniqueness across
+- [x] T006 [P] Implement `packages/requirement-manifest/src/ids.ts`: global uniqueness across
       the FR/AC/INV/ADR union, stable ordering (lexicographic id arrays match document order),
       ID-shape grammar per namespace, and the supersession contract — a replaced ID MUST appear
       in the `trace.id_supersessions` ledger or validation refuses (`SUPERSESSION_LINK_REQUIRED`);
       re-use of a released ID is a failure. Suite
       `packages/requirement-manifest/test/ids.spec.ts`. — **FR-TRACE-002** — AC-265, AC-266
-- [ ] T007 [P] Implement `packages/requirement-manifest/src/query.ts`: queries by family,
+- [x] T007 [P] Implement `packages/requirement-manifest/src/query.ts`: queries by family,
       dependency group, owner, status; AC reverse lookup; and mapping resolution for
       implementationRefs/schemaRefs/persistenceRefs/apiToolUiRefs/telemetryRefs/fixtureRefs —
       the single mapping resolver the generators and conformance checks both consume. Suite
@@ -64,7 +64,7 @@
 
 ## Phase 3 — Conformance library: verdicts, evidence, traces, reports, SBOM
 
-- [ ] T008 Implement `packages/release-conformance/src/conformance.ts`: FR-TRACE-003 verdicts —
+- [x] T008 Implement `packages/release-conformance/src/conformance.ts`: FR-TRACE-003 verdicts —
       (a) every normative item has non-empty implementation/test/owner mapping;
       (b) every implementationRef whose dependency group is ACTIVE (from
       `specs/implementation/current-milestone.json`) resolves to an existing code path;
@@ -72,7 +72,7 @@
       (d) `docs/generated/**` matches deterministic regeneration (byte comparison). Each finding
       carries the requirement id, the failing rule, and the exact path. Suite
       `packages/release-conformance/test/conformance.spec.ts`. — **FR-TRACE-003** — AC-266
-- [ ] T009 Implement `packages/release-conformance/src/orphans.ts`: orphan detection (product
+- [x] T009 Implement `packages/release-conformance/src/orphans.ts`: orphan detection (product
       sources matched by no implementationRef) evaluated against the requirement-traced
       exception ledger `packages/release-conformance/src/orphan-exceptions.json` — initial
       entries for `packages/object-store/src/**` (serves the data-truth artifact/object
@@ -83,7 +83,7 @@
       additive-only; every entry names its serving requirement IDs (referenced in the ledger
       FILE, not in this task text) and a justification. Suite
       `packages/release-conformance/test/orphans.spec.ts`. — **FR-TRACE-003** — AC-266
-- [ ] T010 Implement `packages/release-conformance/src/gate-evidence.ts`: FR-TRACE-004
+- [x] T010 Implement `packages/release-conformance/src/gate-evidence.ts`: FR-TRACE-004
       evidence artifacts — canonical-JSON payload (approver, gateKind, scopeRefs, subject,
       issuedAt, expiresAt), SHA-256 artifact hash, HMAC-SHA256 signature under an injected
       server-side pepper, verify/evaluate API (`evaluateGateEvidence`) accepting ONLY valid
@@ -92,7 +92,7 @@
       input type is the evidence record — no boolean path exists. Persistence through
       `trace.gate_evidence` (insert-only). Suite
       `packages/release-conformance/test/gate-evidence.spec.ts`. — **FR-TRACE-004** — AC-268
-- [ ] T011 Implement `packages/release-conformance/src/decision-trace.ts`: FR-TRACE-005 store —
+- [x] T011 Implement `packages/release-conformance/src/decision-trace.ts`: FR-TRACE-005 store —
       assemble a `DecisionTraceRecord` fail-closed (a record missing requirement ids, policy/
       feature/provider/adapter/artifact version maps, tool name+version, manifest hash, or
       release id is REFUSED with the missing dimension named, never defaulted), content-
@@ -100,7 +100,7 @@
       `trace.decision_traces`, and point-in-time fetch by decision_ref. Suite
       `packages/release-conformance/test/decision-trace.spec.ts` (DATABASE_PGLITE via
       coordinator). — **FR-TRACE-005** — AC-267
-- [ ] T012 Implement `packages/release-conformance/src/sbom.ts` +
+- [x] T012 Implement `packages/release-conformance/src/sbom.ts` +
       `src/release-report.ts`: deterministic CycloneDX-shaped SBOM projection of
       `pnpm-lock.yaml` (component name/version/hash list, sorted, no timestamps) with a
       component-inventory hash; the FR-TRACE-006 report builder recording document hash, manifest
@@ -119,7 +119,7 @@
 
 ## Phase 4 — Generators and CLIs: docs/generated/** + conformance entrypoints
 
-- [ ] T014 Implement `scripts/generate-requirement-manifest/cli.mjs` (zero runtime deps,
+- [x] T014 Implement `scripts/generate-requirement-manifest/cli.mjs` (zero runtime deps,
       plain node): `generate` writes `docs/generated/requirements.json` (canonical manifest
       projection — every requirement/AC/invariant/ADR exactly once with anchor, group, owner,
       mappings, activation gate, rollback target), all 58 `docs/generated/<family>-surfaces.json`
@@ -129,18 +129,18 @@
       `--check` mode regenerates in-memory and fails (exit 1) on any byte difference. Suite
       `packages/requirement-manifest/test/cli-contract.spec.ts` drives the CLI as a child
       process against fixture trees. — **FR-TRACE-001**, **FR-TRACE-003** — AC-265, AC-266
-- [ ] T015 Implement `scripts/verify-release-conformance/cli.mjs` (zero runtime deps): runs the
+- [x] T015 Implement `scripts/verify-release-conformance/cli.mjs` (zero runtime deps): runs the
       conformance verdicts (T008/T009) + `docs/generated` drift check + release-report
       verification against the live tree; exit 0 green / exit 1 with a findings JSON naming
       requirement, rule, and path. Suite
       `packages/release-conformance/test/cli-contract.spec.ts`. — **FR-TRACE-003** — AC-266
-- [ ] T016 Run `scripts/generate-requirement-manifest/cli.mjs generate` to produce the real
+- [x] T016 Run `scripts/generate-requirement-manifest/cli.mjs generate` to produce the real
       `docs/generated/**` set (requirements.json, 58 surfaces files, integrity snapshot) and
       verify `--check` is green on the committed output. — **FR-TRACE-001** — AC-265
 
 ## Phase 5 — Telemetry catalog + fixtures
 
-- [ ] T017 [P] Add `telemetry/trace.catalog.json` (declarative catalog: `trace.*` events —
+- [x] T017 [P] Add `telemetry/trace.catalog.json` (declarative catalog: `trace.*` events —
       manifest.integrity_checked, ids.superseded, conformance.finding, gate.evidence_recorded,
       gate.evidence_refused, decision.trace_recorded, release.report_emitted — with
       requirementRefs to the FR-TRACE assignments, `contractStatus` declaring

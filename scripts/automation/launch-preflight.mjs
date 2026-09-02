@@ -86,9 +86,13 @@ export function buildLaunchPreflight(packageId, rootDir = root) {
   }
   const units = graph.units ?? [];
   const open = units.filter((u) => !u.done);
-  const predictedWrites = [...new Set(open.flatMap((u) => u.predictedWrites ?? []))].sort();
-  const testWrites = [...new Set(open.flatMap((u) => u.testWrites ?? []))].sort();
-  const productWrites = [...new Set(open.flatMap((u) => u.productWrites ?? []))].sort();
+  // The exact lease footprint belongs to the package plan, not only to the
+  // tasks that remain unchecked. A partially completed wave can still be
+  // repaired or regenerated before launch, so dropping completed units here
+  // would silently forget their product, test, and migration paths.
+  const predictedWrites = [...new Set(units.flatMap((u) => u.predictedWrites ?? []))].sort();
+  const testWrites = [...new Set(units.flatMap((u) => u.testWrites ?? []))].sort();
+  const productWrites = [...new Set(units.flatMap((u) => u.productWrites ?? []))].sort();
   const migrationDuties = predictedWrites.filter((p) =>
     /^migrations\/g0_[a-z]+_\d+.*\.sql$/.test(p),
   );

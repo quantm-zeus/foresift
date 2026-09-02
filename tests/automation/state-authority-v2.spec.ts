@@ -622,6 +622,79 @@ describe('State Authority V2 Core Correctness', () => {
   });
 
   // J. F1 UNBOUND SYMBOL
+  test('§K: BASE-DRIFT SELF-UPDATE - WAITING_CI merges moved main into the state branch (live PR #160 class)', async () => {
+    fix.writeFile('specs/implementation/current-milestone.json', '{}');
+    fix.commitAll('init');
+    fix.g(['push', 'origin', 'main']);
+    const fileChanges = [
+      { path: 'specs/implementation/current-milestone.json', content: '{"a": 1}' },
+    ];
+
+    // Create transition + push the state branch (REQUESTED→BRANCH_READY→BRANCH_PUSHED→PR_READY)
+    let res = await advanceStateTransition({
+      fileChanges,
+      message: 'chore',
+      stateDir,
+      repoDir: fix.root,
+      ghFn: fakeGh.ghFn,
+      gitFn: makeGitFn(fix),
+    });
+    res = await advanceStateTransition({
+      receipt: res.receipt!,
+      fileChanges: [],
+      message: '',
+      stateDir,
+      repoDir: fix.root,
+      ghFn: fakeGh.ghFn,
+      gitFn: makeGitFn(fix),
+    });
+    res = await advanceStateTransition({
+      receipt: res.receipt!,
+      fileChanges: [],
+      message: '',
+      stateDir,
+      repoDir: fix.root,
+      ghFn: fakeGh.ghFn,
+      gitFn: makeGitFn(fix),
+    });
+    expect(res.receipt!.prNumber).not.toBeNull();
+
+    // Simulate CI pending (an in-progress check run on the state branch head)
+    // AND main moving forward. CI pending routes to the WAITING_CI return,
+    // which now self-updates onto the moved base.
+    const stateHead = fix.g(['rev-parse', `origin/${res.receipt!.stateBranch}`]).trim();
+    fakeGh.state.checkRuns.set(stateHead, [
+      {
+        name: 'Verify (spec, format, lint, types, tests)',
+        status: 'in_progress',
+        conclusion: null,
+        app_id: 15368,
+      },
+    ]);
+    fix.writeFile('sibling.txt', 'moved');
+    fix.commitAll('sibling landing moved main');
+    fix.g(['push', 'origin', 'main']);
+
+    const res2 = await advanceStateTransition({
+      receipt: res.receipt!,
+      fileChanges: [],
+      message: '',
+      stateDir,
+      repoDir: fix.root,
+      ghFn: fakeGh.ghFn,
+      gitFn: makeGitFn(fix),
+    });
+
+    // The step recorded the base update on the receipt…
+    expect(res2.receipt!.baseUpdateCount ?? 0).toBe(1);
+    expect(res2.step).toBe('WAITING_CI');
+    // …and the state branch now CONTAINS the moved main (operator-merge
+    // equivalent: branch protection's required-up-to-date is satisfiable).
+    const originStateBranch = fix.g(['rev-parse', `origin/${res2.receipt!.stateBranch}`]).trim();
+    const contains = fix.g(['merge-base', '--is-ancestor', 'origin/main', originStateBranch]);
+    expect(contains.trim()).toBe('');
+  });
+
   test('§J: F1 UNBOUND SYMBOL - import foresift-autopilot.mjs successfully', async () => {
     const mod = await import('../../scripts/automation/foresift-autopilot.mjs');
     expect(mod).toBeDefined();

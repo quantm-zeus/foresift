@@ -1,0 +1,148 @@
+{
+  "$comment": "System address registry exclusion and refusal vectors (FR-SOLSEC-006, AC-132, Appendix Q.2).",
+  "entries": [
+    {
+      "name": "known Jupiter router account excluded from actor attribution",
+      "chainId": "solana:5eykt4UsFv8P8NJdTREpY1vzqKqZKvdp",
+      "address": "JUP6LkbZbjS1jKKwapdHNy74zcZ3tLUZoi5QNyVTaV4",
+      "role": "ROUTER",
+      "validFrom": "2024-01-01T00:00:00Z",
+      "validTo": null,
+      "source": "first-party-program-curation",
+      "confidence": 0.99,
+      "reviewState": "APPROVED",
+      "expectedIsExcludable": true,
+      "expectedExclusionDecision": "EXCLUSION_APPLIED",
+      "expectedQualityCodes": [
+        "VALID"
+      ]
+    },
+    {
+      "name": "known Binance exchange hot wallet excluded from insider coordination",
+      "chainId": "solana:5eykt4UsFv8P8NJdTREpY1vzqKqZKvdp",
+      "address": "BinanceHotWallet111111111111111111111111111",
+      "role": "EXCHANGE_SERVICE",
+      "validFrom": "2024-01-01T00:00:00Z",
+      "validTo": null,
+      "source": "first-party-exchange-registry",
+      "confidence": 0.95,
+      "reviewState": "APPROVED",
+      "expectedIsExcludable": true,
+      "expectedExclusionDecision": "EXCLUSION_APPLIED",
+      "expectedQualityCodes": [
+        "VALID"
+      ]
+    },
+    {
+      "name": "known Pump launchpad authority excluded from creator funding",
+      "chainId": "solana:5eykt4UsFv8P8NJdTREpY1vzqKqZKvdp",
+      "address": "6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P",
+      "role": "LAUNCHPAD",
+      "validFrom": "2024-01-01T00:00:00Z",
+      "validTo": null,
+      "source": "first-party-launchpad-curation",
+      "confidence": 0.98,
+      "reviewState": "APPROVED",
+      "expectedIsExcludable": true,
+      "expectedExclusionDecision": "EXCLUSION_APPLIED",
+      "expectedQualityCodes": [
+        "VALID"
+      ]
+    },
+    {
+      "name": "known protocol fee collector excluded from actor clusters",
+      "chainId": "solana:5eykt4UsFv8P8NJdTREpY1vzqKqZKvdp",
+      "address": "FeeCollectorRaydium111111111111111111111111",
+      "role": "FEE_COLLECTOR",
+      "validFrom": "2024-01-01T00:00:00Z",
+      "validTo": null,
+      "source": "protocol-verified-docs",
+      "confidence": 0.9,
+      "reviewState": "APPROVED",
+      "expectedIsExcludable": true,
+      "expectedExclusionDecision": "EXCLUSION_APPLIED",
+      "expectedQualityCodes": [
+        "VALID"
+      ]
+    },
+    {
+      "name": "low confidence system address refuses exclusion and degrades quality",
+      "chainId": "solana:5eykt4UsFv8P8NJdTREpY1vzqKqZKvdp",
+      "address": "UnconfirmedRouterCandidate111111111111111111",
+      "role": "ROUTER",
+      "validFrom": "2025-01-01T00:00:00Z",
+      "validTo": null,
+      "source": "unverified-social-tag",
+      "confidence": 0.45,
+      "reviewState": "APPROVED",
+      "expectedIsExcludable": false,
+      "expectedExclusionDecision": "REFUSAL_SUB_FLOOR_CONFIDENCE",
+      "expectedQualityCodes": [
+        "SYSTEM_ADDRESS_UNCERTAIN"
+      ]
+    },
+    {
+      "name": "pending review system address refuses exclusion and degrades quality",
+      "chainId": "solana:5eykt4UsFv8P8NJdTREpY1vzqKqZKvdp",
+      "address": "PendingReviewBridge1111111111111111111111111",
+      "role": "BRIDGE",
+      "validFrom": "2025-01-01T00:00:00Z",
+      "validTo": null,
+      "source": "community-submission",
+      "confidence": 0.9,
+      "reviewState": "PENDING_REVIEW",
+      "expectedIsExcludable": false,
+      "expectedExclusionDecision": "REFUSAL_PENDING_REVIEW",
+      "expectedQualityCodes": [
+        "SYSTEM_ADDRESS_UNCERTAIN"
+      ]
+    },
+    {
+      "name": "rejected system address refuses exclusion and degrades quality",
+      "chainId": "solana:5eykt4UsFv8P8NJdTREpY1vzqKqZKvdp",
+      "address": "RejectedFakeMarketMaker111111111111111111111",
+      "role": "MARKET_MAKER",
+      "validFrom": "2025-01-01T00:00:00Z",
+      "validTo": null,
+      "source": "disputed-claim",
+      "confidence": 0.95,
+      "reviewState": "REJECTED",
+      "expectedIsExcludable": false,
+      "expectedExclusionDecision": "REFUSAL_REJECTED",
+      "expectedQualityCodes": [
+        "SYSTEM_ADDRESS_UNCERTAIN"
+      ]
+    },
+    {
+      "name": "unknown infrastructure role refuses exclusion and degrades quality",
+      "chainId": "solana:5eykt4UsFv8P8NJdTREpY1vzqKqZKvdp",
+      "address": "GenericInfraAddress1111111111111111111111111",
+      "role": "UNKNOWN_INFRASTRUCTURE",
+      "validFrom": "2025-01-01T00:00:00Z",
+      "validTo": null,
+      "source": "heuristic-clustering",
+      "confidence": 0.95,
+      "reviewState": "APPROVED",
+      "expectedIsExcludable": false,
+      "expectedExclusionDecision": "REFUSAL_UNKNOWN_ROLE",
+      "expectedQualityCodes": [
+        "SYSTEM_ADDRESS_UNCERTAIN"
+      ]
+    },
+    {
+      "name": "revision forward: historical query at T1 is unaffected by registry update at T2",
+      "chainId": "solana:5eykt4UsFv8P8NJdTREpY1vzqKqZKvdp",
+      "address": "DynamicRouterRotatedKey111111111111111111111",
+      "role": "ROUTER",
+      "validFrom": "2025-06-01T00:00:00Z",
+      "validTo": "2025-12-31T23:59:59Z",
+      "source": "router-rotation-log",
+      "confidence": 0.95,
+      "reviewState": "APPROVED",
+      "historicalQueryTime": "2025-08-01T12:00:00Z",
+      "futureQueryTime": "2026-02-01T12:00:00Z",
+      "expectedIsExcludableAtT1": true,
+      "expectedIsExcludableAtT2": false
+    }
+  ]
+}

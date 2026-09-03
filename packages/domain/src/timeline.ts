@@ -51,3 +51,22 @@ export function validateCounterfactualArm(input: CounterfactualArmLike): boolean
     compare(input.counterfactualDeliveryAt, input.deliveryEligibleAt) >= 0
   );
 }
+
+export interface DecisionDeliveryTimelineLike extends DecisionTimelineLike, CounterfactualArmLike {}
+
+/** Validate the complete delivered/non-delivered arm contract as one predicate. */
+export function isDecisionDeliveryTimelineValid(input: DecisionDeliveryTimelineLike): boolean {
+  return isTimelineMonotonic(input) && validateCounterfactualArm(input);
+}
+
+/**
+ * AC-240 comparison substrate: a non-delivered arm may enter no earlier than
+ * its valid, versioned counterfactual delivery instant.
+ */
+export function nonDeliveredArmMayEnterAt(input: CounterfactualArmLike, entryAt: string): boolean {
+  return (
+    input.deliveredAt === null &&
+    validateCounterfactualArm(input) &&
+    compare(entryAt, input.counterfactualDeliveryAt!) >= 0
+  );
+}

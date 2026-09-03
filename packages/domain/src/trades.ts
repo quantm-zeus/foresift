@@ -40,8 +40,9 @@ const ACTOR_RESOLUTION_WEIGHTS: Readonly<Record<ActorResolutionState, number>> =
 };
 
 export function actorUncertaintyFactor(state: ActorResolutionState, confidence: number): number {
+  const parsedState = actorResolutionState(state);
   if (!Number.isFinite(confidence) || confidence < 0 || confidence > 1) {
     throw new RangeError('actor confidence must lie in [0,1]');
   }
-  return ACTOR_RESOLUTION_WEIGHTS[state] * confidence;
+  return ACTOR_RESOLUTION_WEIGHTS[parsedState] * confidence;
 }

@@ -23,7 +23,13 @@ import { DATA_SCHEMAS, parseCoreSchema, type ToolResultEnvelope } from '@foresif
 import { appendObservation, replayObservations } from '@foresift/persistence';
 import { freezeBundle, resolveEvidenceAt } from '@foresift/evidence';
 import { recordCandidateDecisionTimeline } from '../../packages/persistence/src/repos/timeline.ts';
-import { closeTestDatabase, expectForesiftError, makeTestDatabase, seedPool, type TestDatabase } from './helpers.ts';
+import {
+  closeTestDatabase,
+  expectForesiftError,
+  makeTestDatabase,
+  seedPool,
+  type TestDatabase,
+} from './helpers.ts';
 
 const T = (iso: string): UtcTimestamp => utcTimestamp(iso);
 
@@ -219,7 +225,11 @@ describe('AC-240 G1 extensions: candidate decision timeline & counterfactual sym
       validUntil: T('2026-06-10T12:00:00Z'),
     });
 
-    const rows = await tdb.engine.query<{ candidate_id: string; delivered_at: string | null; counterfactual_delivery_at: string | null }>(
+    const rows = await tdb.engine.query<{
+      candidate_id: string;
+      delivered_at: string | null;
+      counterfactual_delivery_at: string | null;
+    }>(
       'SELECT candidate_id, delivered_at, counterfactual_delivery_at FROM candidate_decision_timelines WHERE candidate_id LIKE $1 ORDER BY candidate_id',
       ['cand/ac240-%'],
     );

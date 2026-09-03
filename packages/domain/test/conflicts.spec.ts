@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'bun:test';
 import * as DomainModule from '../src/index.ts';
 
-const Domain = DomainModule as any;
+const Domain = DomainModule;
 const ALL_PROVIDER_CONFLICT_CLASSES = Domain.ALL_PROVIDER_CONFLICT_CLASSES ?? [];
-const ProviderConflictClass = Domain.ProviderConflictClass ?? {};
+const ProviderConflictClass = Domain.ProviderConflictClass;
 const classifyConflict = Domain.classifyConflict;
 const providerConflictClass = Domain.providerConflictClass;
 
@@ -15,7 +15,7 @@ describe('Provider conflict classification (FR-DATA-016, AC-245)', () => {
       'MATERIAL_DISAGREEMENT',
       'UNRESOLVED_DECISION_CRITICAL',
     ].sort();
-    expect([...ALL_PROVIDER_CONFLICT_CLASSES].sort()).toEqual(expected as any);
+    expect([...ALL_PROVIDER_CONFLICT_CLASSES].sort()).toEqual(expected as never);
   });
 
   it('parses valid conflict classes fail-closed', () => {
@@ -46,8 +46,16 @@ describe('Provider conflict classification (FR-DATA-016, AC-245)', () => {
 
   it('classifies common upstream duplication', () => {
     const conflict = classifyConflict({
-      obsA: { value: '100.50', fetchedAt: '2026-05-01T12:00:00Z', upstreamLineage: 'src/node-main' },
-      obsB: { value: '100.50', fetchedAt: '2026-05-01T12:00:01Z', upstreamLineage: 'src/node-main' },
+      obsA: {
+        value: '100.50',
+        fetchedAt: '2026-05-01T12:00:00Z',
+        upstreamLineage: 'src/node-main',
+      },
+      obsB: {
+        value: '100.50',
+        fetchedAt: '2026-05-01T12:00:01Z',
+        upstreamLineage: 'src/node-main',
+      },
       latencyDeltaMs: 1000,
       roundingFingerprintMatch: true,
       sharedUpstream: true,

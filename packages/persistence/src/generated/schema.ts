@@ -146,6 +146,8 @@ export const observations = pgTable('observations', {
   collectorOrProviderCursor: text('collector_or_provider_cursor'),
   qualityCodes: text('quality_codes').array().notNull(),
   receiptHash: text('receipt_hash').notNull(),
+  retrievedAsBackfill: boolean('retrieved_as_backfill').notNull(),
+  unavailabilityReason: text('unavailability_reason'),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull(),
 });
 
@@ -258,6 +260,12 @@ export const sourceDependenceEdges = pgTable('source_dependence_edges', {
   fingerprintSimilarity: doublePrecision('fingerprint_similarity').notNull(),
   label: text('label').notNull(),
   availableAt: timestamp('available_at', { withTimezone: true }).notNull(),
+  validFrom: timestamp('valid_from', { withTimezone: true }).notNull(),
+  validUntil: timestamp('valid_until', { withTimezone: true }),
+  method: text('method').notNull(),
+  evidenceIds: text('evidence_ids').array().notNull(),
+  confidence: doublePrecision('confidence').notNull(),
+  effectiveIndependenceMultiplier: doublePrecision('effective_independence_multiplier').notNull(),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull(),
 });
 
@@ -301,6 +309,13 @@ export const evidenceAcquisitionDecisions = pgTable('evidence_acquisition_decisi
   actualDecisionChanged: boolean('actual_decision_changed'),
   evidenceIds: text('evidence_ids').array().notNull(),
   impactRecordedAt: timestamp('impact_recorded_at', { withTimezone: true }),
+  candidateStateAtRequest: text('candidate_state_at_request'),
+  requestedFields: text('requested_fields').array().notNull(),
+  expectedValueOfInformation: doublePrecision('expected_value_of_information'),
+  estimatedCost: numeric('estimated_cost'),
+  actualCost: numeric('actual_cost'),
+  failureKind: text('failure_kind'),
+  acquisitionSeed: text('acquisition_seed'),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull(),
 });
 
@@ -487,3 +502,133 @@ export const g0McpRateState = pgTable(
   },
   (t) => [primaryKey({ columns: [t.credentialId, t.rateLimitClass] })],
 );
+
+// --- g1_data_0001_decision_semantics -----------------------------------------
+
+export const candidateDecisionTimelines = pgTable(
+  'candidate_decision_timelines',
+  {
+    candidateId: text('candidate_id').notNull(),
+    policyVersion: text('policy_version').notNull(),
+    decisionReadyAt: timestamp('decision_ready_at', { withTimezone: true }).notNull(),
+    policyDecidedAt: timestamp('policy_decided_at', { withTimezone: true }).notNull(),
+    workflowCompletedAt: timestamp('workflow_completed_at', { withTimezone: true }).notNull(),
+    deliveryEligibleAt: timestamp('delivery_eligible_at', { withTimezone: true }).notNull(),
+    deliveredAt: timestamp('delivered_at', { withTimezone: true }),
+    counterfactualDeliveryVersion: text('counterfactual_delivery_version'),
+    counterfactualDeliveryAt: timestamp('counterfactual_delivery_at', { withTimezone: true }),
+    validUntil: timestamp('valid_until', { withTimezone: true }).notNull(),
+    expiredAt: timestamp('expired_at', { withTimezone: true }),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull(),
+  },
+  (t) => [
+    primaryKey({
+      columns: [t.candidateId, t.policyVersion, t.decisionReadyAt],
+    }),
+  ],
+);
+
+// --- g1_data_0002_dependence_conflicts ---------------------------------------
+
+export const empiricalDependenceObservations = pgTable('empirical_dependence_observations', {
+  observationId: text('observation_id').primaryKey(),
+  sourceA: text('source_a').notNull(),
+  sourceB: text('source_b').notNull(),
+  correlatedValues: doublePrecision('correlated_values').notNull(),
+  correlatedErrors: doublePrecision('correlated_errors').notNull(),
+  updateTimingSync: doublePrecision('update_timing_sync').notNull(),
+  firstSeenSync: doublePrecision('first_seen_sync').notNull(),
+  outageOverlap: doublePrecision('outage_overlap').notNull(),
+  schemaFingerprintSimilarity: doublePrecision('schema_fingerprint_similarity').notNull(),
+  commonMissingness: doublePrecision('common_missingness').notNull(),
+  declaredUpstreamRelationship: text('declared_upstream_relationship').notNull(),
+  estimatedAt: timestamp('estimated_at', { withTimezone: true }).notNull(),
+  estimatedFrom: timestamp('estimated_from', { withTimezone: true }).notNull(),
+  estimatedTo: timestamp('estimated_to', { withTimezone: true }).notNull(),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull(),
+});
+
+export const providerConflicts = pgTable('provider_conflicts', {
+  conflictId: text('conflict_id').primaryKey(),
+  subjectObservationIds: text('subject_observation_ids').array().notNull(),
+  conflictClass: text('conflict_class').notNull(),
+  fieldPath: text('field_path').notNull(),
+  resolvedByRule: text('resolved_by_rule'),
+  qualityCode: text('quality_code').notNull(),
+  availableAt: timestamp('available_at', { withTimezone: true }).notNull(),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull(),
+});
+
+// --- g1_sup_0001_supply_assessments ------------------------------------------
+
+export const supplyAssessments = pgTable('supply_assessments', {
+  assessmentId: text('assessment_id').primaryKey(),
+  assetRepresentationId: text('asset_representation_id').notNull(),
+  asOf: timestamp('as_of', { withTimezone: true }).notNull(),
+  totalSupplyRaw: text('total_supply_raw').notNull(),
+  estimatedCirculatingSupplyRaw: text('estimated_circulating_supply_raw'),
+  excludedSupplyRaw: text('excluded_supply_raw'),
+  source: text('source').notNull(),
+  method: text('method').notNull(),
+  confidence: doublePrecision('confidence').notNull(),
+  exclusionEvidenceIds: text('exclusion_evidence_ids').array().notNull(),
+  qualityCodes: text('quality_codes').array().notNull(),
+  marketCapBasis: text('market_cap_basis').notNull(),
+  availableAt: timestamp('available_at', { withTimezone: true }).notNull(),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull(),
+});
+
+export const marketCapFallbackDecisions = pgTable('market_cap_fallback_decisions', {
+  decisionId: text('decision_id').primaryKey(),
+  assessmentId: text('assessment_id').notNull(),
+  candidateId: text('candidate_id').notNull(),
+  lowConfidenceMarketCap: boolean('low_confidence_market_cap').notNull(),
+  hardRejected: boolean('hard_rejected').notNull(),
+  marketCapIsSoleHardRejection: boolean('market_cap_is_sole_hard_rejection').notNull(),
+  approvedLiquidityFallbackAvailable: boolean('approved_liquidity_fallback_available').notNull(),
+  approvedActivityFallbackAvailable: boolean('approved_activity_fallback_available').notNull(),
+  appliedFallback: text('applied_fallback'),
+  policyVersion: text('policy_version').notNull(),
+  decidedAt: timestamp('decided_at', { withTimezone: true }).notNull(),
+  rationale: text('rationale').notNull(),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull(),
+});
+
+// --- g1_trd_0001_economic_trade_events ---------------------------------------
+
+export const economicTradeEvents = pgTable('economic_trade_events', {
+  eventId: text('event_id').primaryKey(),
+  chainId: text('chain_id').notNull(),
+  transactionHash: text('transaction_hash').notNull(),
+  actorEntityId: text('actor_entity_id'),
+  actorResolutionState: text('actor_resolution_state').notNull(),
+  actorResolutionConfidence: doublePrecision('actor_resolution_confidence').notNull(),
+  actorUncertaintyFactor: doublePrecision('actor_uncertainty_factor').notNull(),
+  contributionFactor: doublePrecision('contribution_factor').notNull(),
+  assetRepresentationId: text('asset_representation_id').notNull(),
+  netAssetDeltaRaw: text('net_asset_delta_raw').notNull(),
+  netQuoteDeltaUsd: text('net_quote_delta_usd'),
+  side: text('side').notNull(),
+  routeLegIds: text('route_leg_ids').array().notNull(),
+  classificationConfidence: doublePrecision('classification_confidence').notNull(),
+  eventAt: timestamp('event_at', { withTimezone: true }).notNull(),
+  availableAt: timestamp('available_at', { withTimezone: true }).notNull(),
+  qualityCodes: text('quality_codes').array().notNull(),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull(),
+});
+
+export const economicRouteLegs = pgTable('economic_route_legs', {
+  routeLegId: text('route_leg_id').primaryKey(),
+  eventId: text('event_id').notNull(),
+  legIndex: integer('leg_index').notNull(),
+  kind: text('kind').notNull(),
+  fromAccount: text('from_account'),
+  toAccount: text('to_account'),
+  assetRepresentationId: text('asset_representation_id').notNull(),
+  netAssetDeltaRaw: text('net_asset_delta_raw').notNull(),
+  rawObservationIds: text('raw_observation_ids').array().notNull(),
+  eventAt: timestamp('event_at', { withTimezone: true }).notNull(),
+  availableAt: timestamp('available_at', { withTimezone: true }).notNull(),
+  qualityCodes: text('quality_codes').array().notNull(),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull(),
+});

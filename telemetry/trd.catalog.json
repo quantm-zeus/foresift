@@ -16,11 +16,23 @@
         { "name": "chainId", "type": "string<caip-2>", "required": true },
         { "name": "transactionHash", "type": "string", "required": true },
         { "name": "actorEntityId", "type": "string|undefined", "required": false },
-        { "name": "actorResolutionState", "type": "string(RESOLVED|PARTIALLY_RESOLVED|UNRESOLVED)", "required": true },
+        {
+          "name": "actorResolutionState",
+          "type": "string(RESOLVED|PARTIALLY_RESOLVED|UNRESOLVED)",
+          "required": true
+        },
         { "name": "assetRepresentationId", "type": "string", "required": true },
         { "name": "netAssetDeltaRaw", "type": "string<signed-decimal>", "required": true },
-        { "name": "netQuoteDeltaUsd", "type": "string<signed-decimal>|undefined", "required": false },
-        { "name": "side", "type": "string(BUY|SELL|ROUND_TRIP|INVENTORY_NEUTRAL|UNKNOWN)", "required": true },
+        {
+          "name": "netQuoteDeltaUsd",
+          "type": "string<signed-decimal>|undefined",
+          "required": false
+        },
+        {
+          "name": "side",
+          "type": "string(BUY|SELL|ROUND_TRIP|INVENTORY_NEUTRAL|UNKNOWN)",
+          "required": true
+        },
         { "name": "routeLegIds", "type": "array<string>", "required": true },
         { "name": "classificationConfidence", "type": "number[0,1]", "required": true },
         { "name": "eventAt", "type": "string<utc-timestamp>", "required": true },
@@ -36,7 +48,11 @@
       "fields": [
         { "name": "eventId", "type": "string", "required": true },
         { "name": "netAssetDeltaRaw", "type": "string<signed-decimal>", "required": true },
-        { "name": "side", "type": "string(BUY|SELL|ROUND_TRIP|INVENTORY_NEUTRAL|UNKNOWN)", "required": true },
+        {
+          "name": "side",
+          "type": "string(BUY|SELL|ROUND_TRIP|INVENTORY_NEUTRAL|UNKNOWN)",
+          "required": true
+        },
         { "name": "classificationConfidence", "type": "number[0,1]", "required": true },
         { "name": "availableAt", "type": "string<utc-timestamp>", "required": true }
       ]
@@ -49,7 +65,11 @@
       "fields": [
         { "name": "eventId", "type": "string", "required": true },
         { "name": "actorEntityId", "type": "string|undefined", "required": false },
-        { "name": "actorResolutionState", "type": "string(PARTIALLY_RESOLVED|UNRESOLVED)", "required": true },
+        {
+          "name": "actorResolutionState",
+          "type": "string(PARTIALLY_RESOLVED|UNRESOLVED)",
+          "required": true
+        },
         { "name": "classificationConfidence", "type": "number[0,1]", "required": true },
         { "name": "qualityCodes", "type": "array<string>", "required": true },
         { "name": "availableAt", "type": "string<utc-timestamp>", "required": true }

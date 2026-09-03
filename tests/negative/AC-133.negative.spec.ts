@@ -35,9 +35,7 @@ describe('AC-133 negative: Double count refusal on routed swaps', () => {
       { token: '0xweth', delta: '300000000000000000' }, // Intermediate token leaked!
       { token: '0xfoo', delta: '50000000000000000000000' },
     ];
-    const intermediateLeaked = invalidDeltas.some(
-      (d) => d.token === '0xweth' && d.delta !== '0',
-    );
+    const intermediateLeaked = invalidDeltas.some((d) => d.token === '0xweth' && d.delta !== '0');
     expect(intermediateLeaked).toBe(true);
   });
 });

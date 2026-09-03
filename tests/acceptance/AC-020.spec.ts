@@ -22,7 +22,13 @@ import { freezeBundle } from '@foresift/evidence';
 import type { CacheKeyComponents } from '@foresift/shared-schemas';
 import { computeExactCacheKey } from '../../packages/tool-core/src/cache-key.ts';
 import { CacheStageChain } from '../../packages/tool-core/src/stages/cache.ts';
-import { closeTestDatabase, expectForesiftError, makeTestDatabase, seedPool, type TestDatabase } from './helpers.ts';
+import {
+  closeTestDatabase,
+  expectForesiftError,
+  makeTestDatabase,
+  seedPool,
+  type TestDatabase,
+} from './helpers.ts';
 
 const T = (iso: string): UtcTimestamp => utcTimestamp(iso);
 
@@ -278,9 +284,10 @@ describe('AC-020 G1 extensions: backfill availability and no-event-time-substitu
       retrieved_as_backfill: boolean;
       unavailability_reason: string;
       fetched_at: Date | string;
-    }>('SELECT retrieved_as_backfill, unavailability_reason, fetched_at FROM observations WHERE observation_id = $1', [
-      'ac20-bf-coords',
-    ]);
+    }>(
+      'SELECT retrieved_as_backfill, unavailability_reason, fetched_at FROM observations WHERE observation_id = $1',
+      ['ac20-bf-coords'],
+    );
     expect(rows.rows[0]?.retrieved_as_backfill).toBe(true);
     expect(rows.rows[0]?.unavailability_reason).toBe('COLLECTOR_OUTAGE_RECOVERY');
   });

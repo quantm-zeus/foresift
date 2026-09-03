@@ -1,24 +1,22 @@
 import { describe, expect, it } from 'bun:test';
 import * as DomainModule from '../src/index.ts';
 
-const Domain = DomainModule as any;
+const Domain = DomainModule;
 const ALL_MARKET_CAP_BASES = Domain.ALL_MARKET_CAP_BASES ?? [];
 const ALL_SUPPLY_METHODS = Domain.ALL_SUPPLY_METHODS ?? [];
-const MarketCapBasis = Domain.MarketCapBasis ?? {};
-const SupplyMethod = Domain.SupplyMethod ?? {};
-const marketCapBasis = Domain.marketCapBasis;
+const SupplyMethod = Domain.SupplyMethod;
 const marketCapMayHardReject = Domain.marketCapMayHardReject;
 const supplyMethod = Domain.supplyMethod;
 
 describe('Supply vocabulary and market cap fallback predicate (FR-SUP-001, FR-SUP-002, AC-135)', () => {
   it('declares the SupplyMethod vocabulary', () => {
     const expected = ['TOTAL', 'PROVIDER_CIRCULATING', 'ESTIMATED_CIRCULATING'].sort();
-    expect([...ALL_SUPPLY_METHODS].sort()).toEqual(expected as any);
+    expect([...ALL_SUPPLY_METHODS].sort()).toEqual(expected as never);
   });
 
   it('declares the MarketCapBasis vocabulary', () => {
     const expected = ['TOTAL', 'PROVIDER_CIRCULATING', 'ESTIMATED_CIRCULATING'].sort();
-    expect([...ALL_MARKET_CAP_BASES].sort()).toEqual(expected as any);
+    expect([...ALL_MARKET_CAP_BASES].sort()).toEqual(expected as never);
   });
 
   it('parses valid supply methods fail-closed', () => {

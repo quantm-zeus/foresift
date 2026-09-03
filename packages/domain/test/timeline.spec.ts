@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'bun:test';
 import * as DomainModule from '../src/index.ts';
 
-const Domain = DomainModule as any;
+const Domain = DomainModule;
 const computeDeliveryEligibleAt = Domain.computeDeliveryEligibleAt;
 const isTimelineMonotonic = Domain.isTimelineMonotonic;
 const validateCounterfactualArm = Domain.validateCounterfactualArm;

@@ -36,7 +36,8 @@ describe('AC-135 negative: Refusal of hard rejection with fallback available', (
     };
     // Constraint check: CHECK (NOT (decision = 'HARD_REJECTED' AND fallback_approved = TRUE))
     const violatesConstraint =
-      invalidDecisionRow.decision === 'HARD_REJECTED' && invalidDecisionRow.fallbackApproved === true;
+      invalidDecisionRow.decision === 'HARD_REJECTED' &&
+      invalidDecisionRow.fallbackApproved === true;
     expect(violatesConstraint).toBe(true);
   });
 });

@@ -40,8 +40,6 @@ describe('AC-233: Fee legs inclusion in economic net actor deltas', () => {
     expect(tradeSummary.netDeltas.find((d) => d.token === '0xfoo')?.delta).toBe(
       '49500000000000000000000',
     );
-    expect(tradeSummary.netDeltas.find((d) => d.token === 'sol:native')?.delta).toBe(
-      '-2000000',
-    );
+    expect(tradeSummary.netDeltas.find((d) => d.token === 'sol:native')?.delta).toBe('-2000000');
   });
 });

@@ -1,10 +1,10 @@
 import { describe, expect, it } from 'bun:test';
 import * as DomainModule from '../src/index.ts';
 
-const Domain = DomainModule as any;
-const AcquisitionState = Domain.AcquisitionState ?? {};
+const Domain = DomainModule;
+const AcquisitionState = Domain.AcquisitionState;
 const ALL_ACQUISITION_STATES = Domain.ALL_ACQUISITION_STATES ?? [];
-const AcquisitionFailureKind = Domain.AcquisitionFailureKind ?? {};
+const AcquisitionFailureKind = Domain.AcquisitionFailureKind;
 const acquisitionFailureKind = Domain.acquisitionFailureKind;
 const acquisitionState = Domain.acquisitionState;
 const isRetrievalFailure = Domain.isRetrievalFailure;
@@ -26,7 +26,7 @@ describe('Reconciled ten-state acquisition vocabulary (FR-DATA-011, FR-DATA-012,
       'RETURNED',
     ].sort();
 
-    expect([...ALL_ACQUISITION_STATES].sort()).toEqual(expected as any);
+    expect([...ALL_ACQUISITION_STATES].sort()).toEqual(expected as never);
   });
 
   it('parses valid acquisition states fail-closed', () => {
@@ -44,7 +44,9 @@ describe('Reconciled ten-state acquisition vocabulary (FR-DATA-011, FR-DATA-012,
 
   it('parses AcquisitionFailureKind fail-closed', () => {
     expect(acquisitionFailureKind('TIMED_OUT')).toBe(AcquisitionFailureKind.TIMED_OUT);
-    expect(acquisitionFailureKind('INVALID_RESPONSE')).toBe(AcquisitionFailureKind.INVALID_RESPONSE);
+    expect(acquisitionFailureKind('INVALID_RESPONSE')).toBe(
+      AcquisitionFailureKind.INVALID_RESPONSE,
+    );
     expect(() => acquisitionFailureKind('NETWORK_DISCONNECT')).toThrow();
   });
 

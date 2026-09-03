@@ -1,11 +1,10 @@
 import { describe, expect, it } from 'bun:test';
 import * as DomainModule from '../src/index.ts';
 
-const Domain = DomainModule as any;
+const Domain = DomainModule;
 const ALL_REPLAY_MODES = Domain.ALL_REPLAY_MODES ?? [];
-const ReplayMode = Domain.ReplayMode ?? {};
+const ReplayMode = Domain.ReplayMode;
 const isRetrospectiveDataAllowed = Domain.isRetrospectiveDataAllowed;
-const parseReplayMode = Domain.parseReplayMode;
 const replayMode = Domain.replayMode;
 const shouldExcludeObservationAtBoundary = Domain.shouldExcludeObservationAtBoundary;
 
@@ -17,7 +16,7 @@ describe('G1 replay-modes vocabulary and visibility contracts (FR-DATA-008, FR-D
       'HINDSIGHT',
       'COUNTERFACTUAL_DATA_AVAILABILITY_RESEARCH',
     ].sort();
-    expect([...ALL_REPLAY_MODES].sort()).toEqual(expected as any);
+    expect([...ALL_REPLAY_MODES].sort()).toEqual(expected as never);
   });
 
   it('parses valid replay modes fail-closed', () => {
@@ -39,9 +38,9 @@ describe('G1 replay-modes vocabulary and visibility contracts (FR-DATA-008, FR-D
     expect(isRetrospectiveDataAllowed(ReplayMode.REALIZABLE_REPLAY)).toBe(false);
     expect(isRetrospectiveDataAllowed(ReplayMode.ORACLE)).toBe(true);
     expect(isRetrospectiveDataAllowed(ReplayMode.HINDSIGHT)).toBe(true);
-    expect(
-      isRetrospectiveDataAllowed(ReplayMode.COUNTERFACTUAL_DATA_AVAILABILITY_RESEARCH),
-    ).toBe(true);
+    expect(isRetrospectiveDataAllowed(ReplayMode.COUNTERFACTUAL_DATA_AVAILABILITY_RESEARCH)).toBe(
+      true,
+    );
   });
 
   it('excludes retrospective-only data whose available_at exceeds boundary in realizable mode', () => {

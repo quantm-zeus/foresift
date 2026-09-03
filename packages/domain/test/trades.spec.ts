@@ -1,11 +1,11 @@
 import { describe, expect, it } from 'bun:test';
 import * as DomainModule from '../src/index.ts';
 
-const Domain = DomainModule as any;
+const Domain = DomainModule;
 const ALL_ACTOR_RESOLUTION_STATES = Domain.ALL_ACTOR_RESOLUTION_STATES ?? [];
 const ALL_TRADE_SIDES = Domain.ALL_TRADE_SIDES ?? [];
-const ActorResolutionState = Domain.ActorResolutionState ?? {};
-const TradeSide = Domain.TradeSide ?? {};
+const ActorResolutionState = Domain.ActorResolutionState;
+const TradeSide = Domain.TradeSide;
 const actorResolutionState = Domain.actorResolutionState;
 const actorUncertaintyFactor = Domain.actorUncertaintyFactor;
 const tradeSide = Domain.tradeSide;
@@ -13,12 +13,12 @@ const tradeSide = Domain.tradeSide;
 describe('Trade vocabularies and actor uncertainty reduction (FR-TRD-003, FR-TRD-004, AC-133, AC-134, AC-136)', () => {
   it('declares the complete TradeSide vocabulary', () => {
     const expected = ['BUY', 'SELL', 'ROUND_TRIP', 'INVENTORY_NEUTRAL', 'UNKNOWN'].sort();
-    expect([...ALL_TRADE_SIDES].sort()).toEqual(expected as any);
+    expect([...ALL_TRADE_SIDES].sort()).toEqual(expected as never);
   });
 
   it('declares the ActorResolutionState vocabulary', () => {
     const expected = ['RESOLVED', 'PARTIAL', 'UNRESOLVED'].sort();
-    expect([...ALL_ACTOR_RESOLUTION_STATES].sort()).toEqual(expected as any);
+    expect([...ALL_ACTOR_RESOLUTION_STATES].sort()).toEqual(expected as never);
   });
 
   it('parses valid trade sides fail-closed', () => {

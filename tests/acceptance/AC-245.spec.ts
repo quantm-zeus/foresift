@@ -27,10 +27,7 @@ import {
   type DependenceThresholds,
   type SourceDependenceEdgeLike,
 } from '@foresift/domain';
-import {
-  dependenceEdgesForPair,
-  registerSourceIdentity,
-} from '@foresift/persistence';
+import { dependenceEdgesForPair, registerSourceIdentity } from '@foresift/persistence';
 import { parseDataSchema } from '@foresift/shared-schemas';
 import { closeTestDatabase, makeTestDatabase, type TestDatabase } from './helpers.ts';
 

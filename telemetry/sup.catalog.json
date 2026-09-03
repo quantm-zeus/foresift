@@ -15,14 +15,22 @@
         { "name": "assetRepresentationId", "type": "string", "required": true },
         { "name": "asOf", "type": "string<utc-timestamp>", "required": true },
         { "name": "totalSupplyRaw", "type": "string<digits>", "required": true },
-        { "name": "estimatedCirculatingSupplyRaw", "type": "string<digits>|undefined", "required": false },
+        {
+          "name": "estimatedCirculatingSupplyRaw",
+          "type": "string<digits>|undefined",
+          "required": false
+        },
         { "name": "excludedSupplyRaw", "type": "string<digits>|undefined", "required": false },
         { "name": "source", "type": "string", "required": true },
         { "name": "method", "type": "string", "required": true },
         { "name": "confidence", "type": "number[0,1]", "required": true },
         { "name": "exclusionEvidenceIds", "type": "array<string>", "required": true },
         { "name": "qualityCodes", "type": "array<string>", "required": true },
-        { "name": "marketCapBasis", "type": "string(TOTAL_SUPPLY|PROVIDER_CIRCULATING_SUPPLY|ESTIMATED_CIRCULATING_SUPPLY)", "required": true }
+        {
+          "name": "marketCapBasis",
+          "type": "string(TOTAL_SUPPLY|PROVIDER_CIRCULATING_SUPPLY|ESTIMATED_CIRCULATING_SUPPLY)",
+          "required": true
+        }
       ]
     },
     {

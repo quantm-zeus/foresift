@@ -3,7 +3,16 @@
   "catalog": "data",
   "description": "Data-truth telemetry events for canonical identity, immutable observations/revisions, point-in-time replay, backfill receipts, field-quality flags, acquisition decisions, and source-dependence lineage. Every event carries the instant fields and evidence references its requirement demands; no event ever reports a fabricated success state.",
   "contractStatus": "DECLARATIVE_CONTRACT_ONLY — this file defines the event contracts the requirement manifest maps to (telemetry/data.*); emitter wiring lands with the observability milestone (dependency group G2), so nothing publishes these event names yet. Field lists mirror the authoritative schemas/repos exactly.",
-  "requirementsCovered": ["FR-DATA-002", "FR-DATA-003", "FR-DATA-005", "FR-DATA-006", "FR-DATA-007", "FR-DATA-009", "FR-DATA-013", "FR-DATA-016"],
+  "requirementsCovered": [
+    "FR-DATA-002",
+    "FR-DATA-003",
+    "FR-DATA-005",
+    "FR-DATA-006",
+    "FR-DATA-007",
+    "FR-DATA-009",
+    "FR-DATA-013",
+    "FR-DATA-016"
+  ],
   "recoveryDataClass": "CRITICAL_METADATA",
   "events": [
     {
@@ -182,7 +191,11 @@
         { "name": "subjectPoolId", "type": "string|undefined", "required": false },
         { "name": "subjectAssetId", "type": "string|undefined", "required": false },
         { "name": "retrievedAsBackfill", "type": "literal<true>", "required": true },
-        { "name": "originalCoordinates", "type": "object<OriginalEventCoordinatesSchema>", "required": true },
+        {
+          "name": "originalCoordinates",
+          "type": "object<OriginalEventCoordinatesSchema>",
+          "required": true
+        },
         { "name": "eventAt", "type": "string<utc-timestamp>", "required": true },
         { "name": "fetchedAt", "type": "string<utc-timestamp>", "required": true },
         { "name": "availableAt", "type": "string<utc-timestamp>", "required": true },
@@ -203,7 +216,11 @@
         { "name": "workflowCompletedAt", "type": "string<utc-timestamp>", "required": true },
         { "name": "deliveryEligibleAt", "type": "string<utc-timestamp>", "required": true },
         { "name": "deliveredAt", "type": "string<utc-timestamp>|null", "required": true },
-        { "name": "counterfactualDeliveryAt", "type": "string<utc-timestamp>|null", "required": true },
+        {
+          "name": "counterfactualDeliveryAt",
+          "type": "string<utc-timestamp>|null",
+          "required": true
+        },
         { "name": "counterfactualVersion", "type": "integer|string|null", "required": true },
         { "name": "validUntil", "type": "string<utc-timestamp>|undefined", "required": false },
         { "name": "expiredAt", "type": "string<utc-timestamp>|null|undefined", "required": false }
@@ -232,7 +249,11 @@
       "tier": "CRITICAL_OBSERVATIONS_CHECKPOINTS",
       "fields": [
         { "name": "conflictId", "type": "string", "required": true },
-        { "name": "conflictClass", "type": "string(BENIGN_LATENCY_ROUNDING_VARIANCE|COMMON_UPSTREAM_DUPLICATION|MATERIAL_DISAGREEMENT|UNRESOLVED_DECISION_CRITICAL)", "required": true },
+        {
+          "name": "conflictClass",
+          "type": "string(BENIGN_LATENCY_ROUNDING_VARIANCE|COMMON_UPSTREAM_DUPLICATION|MATERIAL_DISAGREEMENT|UNRESOLVED_DECISION_CRITICAL)",
+          "required": true
+        },
         { "name": "observationIds", "type": "array<string>", "required": true },
         { "name": "fieldPath", "type": "string|undefined", "required": false },
         { "name": "resolvedByRule", "type": "string|null|undefined", "required": false },

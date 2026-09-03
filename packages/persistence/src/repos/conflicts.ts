@@ -87,7 +87,7 @@ export async function appendProviderConflict(
   });
 }
 
-export interface StoredProviderConflict extends ProviderConflictWrite {}
+export type StoredProviderConflict = ProviderConflictWrite;
 
 /** Historical conflict view; future classifications and observations cannot leak in. */
 export async function providerConflictsAt(

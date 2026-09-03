@@ -184,7 +184,7 @@ outside the listed writeScopes.
       STRICTLY read-only: consumes persisted swap/transfer observations;
       constructs nothing. Traces: FR-TRD-001, FR-TRD-002, FR-TRD-003,
       AC-133, AC-134.
-- [ ] T018 Wire the FR-TRD-004 reduction: economic events carry
+- [x] T018 Wire the FR-TRD-004 reduction: economic events carry
       actor_resolution_state; the `actorUncertaintyFactor` function
       (domain T005) maps state+confidence to a deterministic feature-quality
       reduction consumed downstream via quality codes and a capped

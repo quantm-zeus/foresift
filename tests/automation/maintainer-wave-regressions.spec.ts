@@ -27,7 +27,14 @@ const GRAPH = join(
   'automation',
   'build-implementation-task-graph.mjs',
 );
-const PREFLIGHT = join(import.meta.dir, '..', '..', 'scripts', 'automation', 'launch-preflight.mjs');
+const PREFLIGHT = join(
+  import.meta.dir,
+  '..',
+  '..',
+  'scripts',
+  'automation',
+  'launch-preflight.mjs',
+);
 
 function scratchRepo() {
   const root = mkdtempSync(join(tmpdir(), 'maintainer-wave-fx-'));
@@ -96,7 +103,9 @@ describe('maintainer wave 2026-09-03 regressions', () => {
     writeTasks(root, TWO_DISJOINT_TEST_UNITS);
     const g = buildGraph(root);
     expect(g.testLanes.map((t) => t.id).sort()).toEqual(['test-author-1', 'test-author-2']);
-    const laneUnits = g.testLanes.map((t) => t.units.sort()).sort((a, b) => a[0].localeCompare(b[0]));
+    const laneUnits = g.testLanes
+      .map((t) => t.units.sort())
+      .sort((a, b) => a[0].localeCompare(b[0]));
     expect(laneUnits).toEqual([['T101'], ['T102']]);
     for (const lane of g.testLanes) {
       expect(lane.role).toBe('test');
@@ -153,11 +162,9 @@ describe('maintainer wave 2026-09-03 regressions', () => {
         '',
       ].join('\n'),
     );
-    const r = spawnSync(
-      process.execPath,
-      [PREFLIGHT, '--package', 'pkg-t', '--root', root],
-      { encoding: 'utf8' },
-    );
+    const r = spawnSync(process.execPath, [PREFLIGHT, '--package', 'pkg-t', '--root', root], {
+      encoding: 'utf8',
+    });
     if (r.status !== 0) throw new Error(r.stderr.slice(0, 300));
     const record = JSON.parse(r.stdout);
     expect(record.exact).toBe(true);
@@ -178,11 +185,9 @@ describe('maintainer wave 2026-09-03 regressions', () => {
         '',
       ].join('\n'),
     );
-    const r = spawnSync(
-      process.execPath,
-      [PREFLIGHT, '--package', 'pkg-t', '--root', root],
-      { encoding: 'utf8' },
-    );
+    const r = spawnSync(process.execPath, [PREFLIGHT, '--package', 'pkg-t', '--root', root], {
+      encoding: 'utf8',
+    });
     const record = JSON.parse(r.stdout);
     expect(record.migrationDuties).toContain('migrations/g0_t_0001_fixtures.sql');
   });

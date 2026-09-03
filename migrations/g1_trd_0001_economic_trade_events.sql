@@ -87,4 +87,3 @@ CREATE TRIGGER economic_route_legs_immutable
 CREATE TRIGGER economic_route_legs_immutable_truncate
     BEFORE TRUNCATE ON economic_route_legs
     FOR EACH STATEMENT EXECUTE FUNCTION foresift_refuse_mutation();
-

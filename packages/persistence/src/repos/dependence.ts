@@ -10,8 +10,7 @@ export const DependenceEdgeMethod = {
   DECLARED_UPSTREAM: 'DECLARED_UPSTREAM',
   EMPIRICAL: 'EMPIRICAL',
 } as const;
-export type DependenceEdgeMethod =
-  (typeof DependenceEdgeMethod)[keyof typeof DependenceEdgeMethod];
+export type DependenceEdgeMethod = (typeof DependenceEdgeMethod)[keyof typeof DependenceEdgeMethod];
 
 export interface EmpiricalDependenceSignals {
   readonly valueCorrelation: number;
@@ -226,4 +225,3 @@ export async function resolveEffectiveIndependenceCredit(
     appliedEdgeIds: rows.rows.map((row) => row.edge_id),
   };
 }
-

@@ -82,4 +82,3 @@ CREATE TRIGGER market_cap_fallback_decisions_immutable
 CREATE TRIGGER market_cap_fallback_decisions_immutable_truncate
     BEFORE TRUNCATE ON market_cap_fallback_decisions
     FOR EACH STATEMENT EXECUTE FUNCTION foresift_refuse_mutation();
-

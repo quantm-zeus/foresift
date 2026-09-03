@@ -43,27 +43,29 @@ interface ReplayResultBase<T, M extends ReplayMode> {
   readonly excludedEntryIds: readonly string[];
 }
 
-export interface RealizableReplayResult<T>
-  extends ReplayResultBase<T, typeof ReplayMode.REALIZABLE> {
+export interface RealizableReplayResult<T> extends ReplayResultBase<
+  T,
+  typeof ReplayMode.REALIZABLE
+> {
   readonly retrospectiveDiagnostic: false;
   readonly permitsFutureAvailability: false;
 }
 
-export interface OracleReplayResult<T>
-  extends ReplayResultBase<T, typeof ReplayMode.ORACLE> {
+export interface OracleReplayResult<T> extends ReplayResultBase<T, typeof ReplayMode.ORACLE> {
   readonly retrospectiveDiagnostic: true;
   readonly permitsFutureAvailability: true;
 }
 
-export interface HindsightReplayResult<T>
-  extends ReplayResultBase<T, typeof ReplayMode.HINDSIGHT> {
+export interface HindsightReplayResult<T> extends ReplayResultBase<T, typeof ReplayMode.HINDSIGHT> {
   readonly retrospectiveDiagnostic: true;
   readonly permitsFutureAvailability: true;
   readonly evaluationAt: UtcTimestamp;
 }
 
-export interface CrossFittedResearchReplayResult<T>
-  extends ReplayResultBase<T, typeof ReplayMode.CROSS_FITTED_RESEARCH> {
+export interface CrossFittedResearchReplayResult<T> extends ReplayResultBase<
+  T,
+  typeof ReplayMode.CROSS_FITTED_RESEARCH
+> {
   readonly retrospectiveDiagnostic: true;
   readonly permitsFutureAvailability: true;
   readonly targetFold: string;
@@ -90,9 +92,7 @@ export type ReplayModeRequest =
     };
 
 function stableEntries<T>(entries: readonly ReplayModeEntry<T>[]): ReplayModeEntry<T>[] {
-  return [...entries].sort((a, b) =>
-    a.entryId < b.entryId ? -1 : a.entryId > b.entryId ? 1 : 0,
-  );
+  return [...entries].sort((a, b) => (a.entryId < b.entryId ? -1 : a.entryId > b.entryId ? 1 : 0));
 }
 
 function partition<T>(
@@ -210,4 +210,3 @@ export async function resolveRealizableEvidenceReplay(
 
 /** Alias matching callers that describe a collection rather than a mode. */
 export const resolveReplayEntries = resolveReplayMode;
-

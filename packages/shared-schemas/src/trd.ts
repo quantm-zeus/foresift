@@ -1,10 +1,6 @@
 /** Runtime contracts for §66 economic-trade normalization (FR-TRD-001/002). */
 import { z } from 'zod';
-import {
-  ChainIdSchema,
-  QualityCodesSchema,
-  UtcTimestampSchema,
-} from './data.ts';
+import { ChainIdSchema, QualityCodesSchema, UtcTimestampSchema } from './data.ts';
 
 /** Canonical signed decimal. Raw net deltas may be negative; exponent notation is forbidden. */
 export const SignedDecimalStringSchema = z
@@ -22,11 +18,7 @@ export const EconomicTradeSideSchema = z.enum([
 export type EconomicTradeSide = z.infer<typeof EconomicTradeSideSchema>;
 
 /** Whether infrastructure/token accounts could be attributed to one economic actor. */
-export const ActorResolutionStateSchema = z.enum([
-  'RESOLVED',
-  'PARTIALLY_RESOLVED',
-  'UNRESOLVED',
-]);
+export const ActorResolutionStateSchema = z.enum(['RESOLVED', 'PARTIALLY_RESOLVED', 'UNRESOLVED']);
 export type ActorResolutionState = z.infer<typeof ActorResolutionStateSchema>;
 
 /** Auditable raw swap/transfer/aggregator hop retained behind one economic event. */
@@ -71,8 +63,7 @@ export const EconomicTradeEventSchema = z
   })
   .strict()
   .refine(
-    (value) =>
-      value.actorResolutionState !== 'RESOLVED' || value.actorEntityId !== undefined,
+    (value) => value.actorResolutionState !== 'RESOLVED' || value.actorEntityId !== undefined,
     { message: 'resolved actor state requires actorEntityId' },
   )
   .refine((value) => Date.parse(value.availableAt) >= Date.parse(value.eventAt), {
@@ -91,4 +82,3 @@ export function parseTradeSchema<T extends keyof typeof TRADE_SCHEMAS>(
 ): z.infer<(typeof TRADE_SCHEMAS)[T]> {
   return TRADE_SCHEMAS[name].parse(payload) as z.infer<(typeof TRADE_SCHEMAS)[T]>;
 }
-

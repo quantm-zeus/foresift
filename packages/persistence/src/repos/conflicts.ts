@@ -41,8 +41,7 @@ export async function appendProviderConflict(
     throw new RangeError('provider conflict requires at least two raw observations');
   }
   if (
-    input.classification ===
-      ProviderConflictClassification.UNRESOLVED_DECISION_CRITICAL_CONFLICT &&
+    input.classification === ProviderConflictClassification.UNRESOLVED_DECISION_CRITICAL_CONFLICT &&
     !input.decisionCritical
   ) {
     throw new RangeError('unresolved decision-critical classification must be decision critical');
@@ -148,4 +147,3 @@ export async function providerConflictsAt(
   }
   return output;
 }
-

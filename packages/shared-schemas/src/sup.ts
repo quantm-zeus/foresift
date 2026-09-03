@@ -38,8 +38,7 @@ export const SupplyAssessmentSchema = z
     { message: 'estimated circulating supply cannot exceed total supply' },
   )
   .refine(
-    (value) =>
-      value.excludedSupplyRaw === undefined || value.exclusionEvidenceIds.length > 0,
+    (value) => value.excludedSupplyRaw === undefined || value.exclusionEvidenceIds.length > 0,
     { message: 'excluded supply requires exclusion evidence' },
   )
   .refine(
@@ -58,4 +57,3 @@ export function parseSupplySchema<T extends keyof typeof SUPPLY_SCHEMAS>(
 ): z.infer<(typeof SUPPLY_SCHEMAS)[T]> {
   return SUPPLY_SCHEMAS[name].parse(payload) as z.infer<(typeof SUPPLY_SCHEMAS)[T]>;
 }
-

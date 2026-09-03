@@ -556,7 +556,10 @@ export const VersionedSourceDependenceEdgeSchema = z
   .strict()
   .refine((v) => v.sourceIdA !== v.sourceIdB, { message: 'dependence edge requires two sources' })
   .refine(
-    (v) => v.validUntil === undefined || v.validUntil === null || compareStamps(v.validFrom, v.validUntil) <= 0,
+    (v) =>
+      v.validUntil === undefined ||
+      v.validUntil === null ||
+      compareStamps(v.validFrom, v.validUntil) <= 0,
     { message: 'dependence validity interval is inverted' },
   );
 
@@ -616,10 +619,9 @@ export const ProviderConflictSchema = z
   .refine((v) => new Set(v.observationIds).size === v.observationIds.length, {
     message: 'conflict observations must be distinct',
   })
-  .refine(
-    (v) => v.availableAt === undefined || compareStamps(v.detectedAt, v.availableAt) <= 0,
-    { message: 'conflict availability cannot precede detection' },
-  );
+  .refine((v) => v.availableAt === undefined || compareStamps(v.detectedAt, v.availableAt) <= 0, {
+    message: 'conflict availability cannot precede detection',
+  });
 
 // ---------------------------------------------------------------------------
 // Features (FR-DATA-004)
@@ -731,7 +733,7 @@ export const EvidenceAcquisitionDecisionSchema = z
   .refine((v) => v.state === 'FAILED' || v.failureKind === undefined || v.failureKind === null, {
     message: 'failure kind is only valid for FAILED acquisition results',
   })
-  .refine((v) => v.state !== 'FAILED' || v.failureKind !== undefined && v.failureKind !== null, {
+  .refine((v) => v.state !== 'FAILED' || (v.failureKind !== undefined && v.failureKind !== null), {
     message: 'FAILED acquisition results require a failure kind',
   })
   .refine((v) => v.completedAt === undefined || v.requestedAt !== undefined, {
@@ -799,9 +801,7 @@ export const CandidateDecisionTimelineSchema = z
 const replayModeValues = [...ALL_REPLAY_MODES] as [ReplayMode, ...ReplayMode[]];
 
 export const ReplayQuerySemanticsSchema = z.discriminatedUnion('queryShape', [
-  z
-    .object({ queryShape: z.literal('CURRENT_VIEW'), mode: z.literal('CURRENT_VIEW') })
-    .strict(),
+  z.object({ queryShape: z.literal('CURRENT_VIEW'), mode: z.literal('CURRENT_VIEW') }).strict(),
   z
     .object({
       queryShape: z.literal('HISTORICAL_REPLAY'),

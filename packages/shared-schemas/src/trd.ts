@@ -1,5 +1,6 @@
 /** Runtime contracts for §66 economic-trade normalization (FR-TRD-001/002). */
 import { z } from 'zod';
+import { actorUncertaintyFactor } from '@foresift/domain';
 import { ChainIdSchema, QualityCodesSchema, UtcTimestampSchema } from './data.ts';
 
 /** Canonical signed decimal. Raw net deltas may be negative; exponent notation is forbidden. */
@@ -18,7 +19,7 @@ export const EconomicTradeSideSchema = z.enum([
 export type EconomicTradeSide = z.infer<typeof EconomicTradeSideSchema>;
 
 /** Whether infrastructure/token accounts could be attributed to one economic actor. */
-export const ActorResolutionStateSchema = z.enum(['RESOLVED', 'PARTIALLY_RESOLVED', 'UNRESOLVED']);
+export const ActorResolutionStateSchema = z.enum(['RESOLVED', 'PARTIAL', 'UNRESOLVED']);
 export type ActorResolutionState = z.infer<typeof ActorResolutionStateSchema>;
 
 /** Auditable raw swap/transfer/aggregator hop retained behind one economic event. */
@@ -51,6 +52,11 @@ export const EconomicTradeEventSchema = z
     transactionHash: z.string().min(1),
     actorEntityId: z.string().min(1).optional(),
     actorResolutionState: ActorResolutionStateSchema,
+    actorResolutionConfidence: z.number().finite().min(0).max(1),
+    /** Deterministic quality reduction derived from actor resolution and confidence. */
+    actorUncertaintyFactor: z.number().finite().min(0).max(1),
+    /** Capped multiplier that downstream ranking features may consume. */
+    contributionFactor: z.number().finite().min(0).max(1),
     assetRepresentationId: z.string().min(1),
     netAssetDeltaRaw: SignedDecimalStringSchema,
     netQuoteDeltaUsd: SignedDecimalStringSchema.optional(),
@@ -65,6 +71,26 @@ export const EconomicTradeEventSchema = z
   .refine(
     (value) => value.actorResolutionState !== 'RESOLVED' || value.actorEntityId !== undefined,
     { message: 'resolved actor state requires actorEntityId' },
+  )
+  .refine(
+    (value) =>
+      value.actorUncertaintyFactor ===
+      actorUncertaintyFactor(value.actorResolutionState, value.actorResolutionConfidence),
+    { message: 'actor uncertainty factor must match actor resolution state and confidence' },
+  )
+  .refine((value) => value.contributionFactor === value.actorUncertaintyFactor, {
+    message: 'contribution factor must equal the capped actor uncertainty factor',
+  })
+  .refine(
+    (value) =>
+      value.actorResolutionState !== 'PARTIAL' || value.qualityCodes.includes('PARTIAL'),
+    { message: 'partial actor resolution requires PARTIAL quality' },
+  )
+  .refine(
+    (value) =>
+      value.actorResolutionState !== 'UNRESOLVED' ||
+      value.qualityCodes.includes('SYSTEM_ADDRESS_UNCERTAIN'),
+    { message: 'unresolved actor resolution requires SYSTEM_ADDRESS_UNCERTAIN quality' },
   )
   .refine((value) => Date.parse(value.availableAt) >= Date.parse(value.eventAt), {
     message: 'economic event cannot be available before its event time',

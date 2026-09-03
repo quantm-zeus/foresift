@@ -1,10 +1,10 @@
 {
   "schema": "foresift/maintainer-snapshot@1",
-  "updatedAt": "2026-09-03T11:05:00Z",
+  "updatedAt": "2026-09-03T22:10:00Z",
   "mission": "Persistent maintainer — minimize authoritative project critical-path wall clock",
   "currentSnapshot": {
     "milestone": "G1",
-    "g1Progress": "ACTIVE — 1 of 8 packages in execution (g1-data-truth-extensions); planning artifacts seeded by #171",
+    "g1Progress": "G1 first package PROVEN — chore #177 (31e0534) marked g1-data-truth-extensions PROVEN on main; PR #176 (this handoff) rebased on top",
     "packages": {
       "g0-contracts-data-truth": "PROVEN",
       "g0-security-perimeter": "PROVEN",
@@ -14,23 +14,23 @@
       "g0-first-party-observation": "PROVEN",
       "g0-mcp-surface": "PROVEN",
       "g0-traceability-conformance": "PROVEN",
-      "g1-planning": "PLAN merged (#169 squash c8d75f2, 98/98 reqs covered) + decompose (#170) + seed (#171); g1-data-truth-extensions RUNNING",
-      "g1-data-truth-extensions": "RUNNING — run 486a44d0 (fresh continuation, adopted launch branch cc5bd28 carrying 20/30 units done + main 09c339bb); 7 remaining units in flight (T018 core + T021-T026 test-author); T029 coordinator-owned (ADR-0020)"
+      "g1-planning": "PLAN merged (#169 squash c8d75f2, 98/98 reqs covered) + decompose (#170) + seed (#171)",
+      "g1-data-truth-extensions": "PROVEN — PR #175 squash 32c4673 + state chore #177 (31e0534)"
     },
-    "mainSha": "09c339bbe122bda523f2fee9fde698fb75e98524",
-    "mainCi": "GREEN (merged-main Verify run 33745664489 completed success at 09c339bb, PR #172 squash)",
-    "supervisor": "ACTIVE singleton (restarted 10:49Z after operator recover-fatal cleared paused_fatal from run 12dd974a); adaptive lanes resolved 2 (provider capacity cap: codex 1 + claude 1)",
-    "taskWorktree": "/home/minhquan_eth/.archon/workspaces/quantm-zeus/foresift/worktrees/archon/task-foresift-g1-data-truth-extensions (branch archon/task-foresift-g1-data-truth-extensions @ cc5bd28; pushed to origin as launch branch foresift/g1-data-truth-extensions for ADOPTED_SEED)",
-    "openEvidenceChain": "Wave 1 e3ccffb5: 3× CODEX POOL_AT_LIMIT starved serial-2/3 lanes (codex limit=1 never grows — 4 codex lanes over-assigned); FAST RED from dependency inversion (batch-2 atop starved batch-1); repair converged except G0-pinned vocabulary tests. Run 258232f3: 3× AGY_PRODUCT_OWNERSHIP_VIOLATION on T029 (mechanical manifest write assigned to AGY brief pre-[executor: COORDINATOR] fix). Both runs retired via operator --recover-fatal (service stopped first per lock law)."
+    "mainSha": "31e05345dbfc9ea89b9e728e35282ee27789e99e",
+    "mainCi": "GREEN (PR #174 squash aa301d0 — symlink evidence law)",
+    "supervisor": "ACTIVE; last fatal was run db4ed53f landing-pending (empty-wave topology: 0 executable writer units → integrate-and-fast trigger skipped → wave settled by supervisor's lander path, which refused twice on full-gate-red before a manual direct run at 20:35Z produced the green attestation + PR #175)",
+    "taskWorktree": "/home/minhquan_eth/.archon/workspaces/quantm-zeus/foresift/worktrees/archon/task-foresift-g1-data-truth-extensions (branch foresift/g1-data-truth-extensions @ f240571, == origin tip == PR #175 head)"
   },
   "blockers": [],
   "nextActions": [
-    "Let run 486a44d0 proceed (guards → integrate → FAST → settle → land); do not interrupt unless a NEW deterministic failure appears",
+    "Verify PR #175 merged-main CI GREEN, then squash-merge with --match-head-commit f240571979e70d507d39d63331e5df5a92d9fd43 (never --delete-branch, defect #159 law)",
+    "After merge: finalize-from-main + state chore → mark g1-data-truth-extensions PROVEN; memory updates",
     "Land maintainer Part D (planning parallelism-quality rule: disjoint independent product tasks must carry [P] or SERIAL_REASON; PARALLELISM_OPPORTUNITY_MISSED surfaced pre-implementation) — future plans only",
     "Part K: event-driven maintainer incident wake contract (durable incident record, fingerprint dedupe, never two maintainers, intentionalStop honored, bounded backoff)",
     "Part I: preplan g1-capacity-contracts concurrently (deterministic preplanning receipt; no product write authority)",
     "Part J: shared-surface lane design for package concurrency (canary two G1 roots, cap 2)",
-    "Surface plan coverage gap: packages/release-conformance Rule (c) test hard-pins activeGroup 'G0' — no G1 task owns it",
+    "Defect ledger (see history 21:15Z): file-existing-at-base no-diff nomination trap; integrator marks only role==='implementation'; lander artifacts-dir ENOENT crash after full-gate failure; empty-wave DAG completes 'clean' but lands nothing",
     "Codex pool starvation: MAX_CODEX_WRITERS reporting vs enforcement mismatch; POOL_AT_LIMIT is not a quota-handoff reason — fix via PR when lane topology next bites"
   ],
   "history": [
@@ -48,11 +48,35 @@
     },
     {
       "ts": "2026-09-03T10:41:00Z",
-      "event": "PR #172 wave-hardening landed (squash 09c339bb, merged-main CI run 33745664489 GREEN): immutable --lane-base logical-lane evidence baseline (Part A4, all 4 writer executors + wave prep); write-disjoint AGY test sharding test-author-1/2 canary cap 2 with graph-enumerated yaml dispatch (Part E); gen-agnostic preflight migration-duty regex g\\d+ (Part G, ADR-0022); adaptive-lanes.d.mts parallelizableReadyCount declaration; 7 regression tests. Six CI rounds: prettier → eslint/Matrix AC → tsc implicit-any → same tsc red under TARGETED e2e → pass → yaml single-quoted node -e apostrophe fix (attempt's inside 'node -e' comment swallowed the quote → node SyntaxError; all multi-line node -e blocks node --check validated)."
+      "event": "PR #172 wave-hardening landed (squash 09c339bb): immutable --lane-base logical-lane evidence baseline (Part A4); write-disjoint AGY test sharding test-author-1/2 canary cap 2 (Part E); gen-agnostic preflight migration-duty regex (Part G, ADR-0022); adaptive-lanes.d.mts parallelizableReadyCount; 7 regression tests."
     },
     {
       "ts": "2026-09-03T10:54:00Z",
-      "event": "Operator recovery complete: runs 32917dda (T029 ownership ×3 burn) and 12dd974a (prep yaml syntax) retired via --recover-fatal; fresh continuation run 486a44d0 ADOPTED_SEED foresift/g1-data-truth-extensions @ cc5bd28 (task branch merged with main 09c339bb, pushed as launch branch). T029 executor=COORDINATOR excluded from testLanes — verified live in run graph."
+      "event": "Operator recovery: runs 32917dda (T029 ownership ×3) and 12dd974a (prep yaml syntax) retired; run 486a44d0 ADOPTED_SEED @ cc5bd28. T029 executor=COORDINATOR excluded from testLanes — verified live."
+    },
+    {
+      "ts": "2026-09-03T14:30:00Z",
+      "event": "Wave cycles 1–5 (runs 4dddf7f0, f42d3e76, 757e881b + Codex provider 404 outage): root-caused run_worktree_reset discarding UNPUSHED local commits (67f8d3e T018 repair lost) — LAW: always push the launch branch before --recover-fatal. Established no-diff/no-nomination trap: T021–T026 files already existed at lane base (evidence-integrated by wave e3ccffb5) so writers nominated zero units while integrator filter role==='implementation' never marked test-role units. Manual maintainer landings: 67f8d3e→eb0b630 cherry-pick, d75eead T021–T025 closure + T026 body, 932a28d lint, 2517c9b/0ffcac3/f59c23c wave integration marks, 46e2dec convergence fixes (sources.ts G1 NOT NULL defaults mirroring g1_data_0002, ADR-1 sentinel fixes, conformance active-milestone resolution, docs/generated regen)."
+    },
+    {
+      "ts": "2026-09-03T17:05:00Z",
+      "event": "Cycle 8 (run 2c1aa231): writer-test-author-agy legitimately nominated ZERO (T026 fully landed, 137 pass/0 fail baseline) — closed T026 as coordinator-integrated (3fc20b4). Empty-wave DAG finished anyFailed=false but wave-settled/land/checkpoint all trigger-skipped; supervisor lander refused: FULL gate RED on 13-file prettier drift + 19 eslint any-casts in domain tests + drizzle mirror missing all G1 columns/tables + stale TIMED_OUT/INVALID_RESPONSE in parity extraction + migrator 40→44 counts + provider-lifecycle prov_% wildcard sweeping in provider_conflicts + writer-lane-evidence-diff dirty.length literal vs #174 commitable sweep. All fixed in f240571; FULL gate re-proven GREEN locally (spec/format/lint/types/suite)."
+    },
+    {
+      "ts": "2026-09-03T21:15:00Z",
+      "event": "Defect ledger for next hardening PR: (1) laneEvidencePaths nomination is evidence-blind to units whose predicted files already exist at base — structural no-op, needs coordinator-side authorship verification or file-hash baseline; (2) integrate-writer-results.mjs:250 marks only role==='implementation' — test lanes stay checkbox-open forever; (3) package-full-gate --run crashes ENOENT writing full-gate-result.json when artifactsDir does not exist (final-land creates it, but the direct-run path must mkdir); (4) empty-wave topology (all COORDINATOR units left) completes DAG cleanly and lands nothing — wave or supervisor must route coordinator-tail packages to landing mechanically."
+    },
+    {
+      "ts": "2026-09-03T21:20:00Z",
+      "event": "PR #175 opened by direct lander run (pre-created artifacts dir): full-gate GREEN at f240571 (attestation headSha=f240571979 baseMainSha=aa301d0b36), branch pushed, PR discovered/created #175. CI: Classify + Fast Gates + Pure + Process/Meta green; PGlite workload running. Merge law: gh pr merge 175 --squash --match-head-commit f240571979e70d507d39d63331e5df5a92d9fd43 after merged-main GREEN."
+    },
+    {
+      "ts": "2026-09-03T21:40:00Z",
+      "event": "PR #175 MERGED via exact-head squash (--match-head-commit f240571..., no --delete-branch). Merge commit 32c4673. Handoff ledger chore rebased onto merged main for the protected-PR path."
+    },
+    {
+      "ts": "2026-09-03T22:05:00Z",
+      "event": "State chore #177 (31e0534): g1-data-truth-extensions PROVEN on main. First G1 package landed. Remaining 7 G1 packages queued; next cycle preplanning per Parts I/J."
     }
   ]
 }

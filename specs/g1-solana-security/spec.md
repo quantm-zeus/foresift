@@ -331,6 +331,7 @@ Everything below is OUT OF SCOPE for this package:
 
 <!-- Seeded normative content ends here. Planner-owned sections (integration notes,
      invariants, open points resolved from authoritative sources) go below this line. -->
+
 ## Planner-owned integration notes
 
 The sections below are planner-owned elaborations resolved from the authoritative
@@ -456,7 +457,7 @@ load in this package:
    minimum confidence — structurally enforced, not convention.
 5. `pnpm verify` and `pnpm spec:verify` pass at the pushed HEAD; the milestone
    verification command (`test -d packages/solana-security && pnpm --filter
-   @foresift/solana-security test`) is green.
+@foresift/solana-security test`) is green.
 
 ## Assumptions
 

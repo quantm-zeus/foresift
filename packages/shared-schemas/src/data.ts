@@ -381,6 +381,11 @@ export const BackfillReceiptSchema = z
         liveReceiptRef: z.string().min(1).optional(),
       })
       .strict(),
+    retrievedAsBackfill: z.literal(true).optional(),
+    originalEventCoordinates: z.record(z.unknown()).optional(),
+    fetchedAt: UtcTimestampSchema.optional(),
+    earliestAvailableAt: UtcTimestampSchema.optional(),
+    earlierUnavailabilityReason: z.string().min(1).optional(),
   })
   .strict()
   .refine(
@@ -603,6 +608,42 @@ export const DecisionActionTimestampsSchema = z
   })
   .strict();
 
+/** G1 persisted timeline: delivered and counterfactual arms are disjoint. */
+export const CandidateDecisionTimelineSchema = z
+  .object({
+    decisionId: z.string().min(1),
+    candidateId: z.string().min(1),
+    decisionReadyAt: UtcTimestampSchema,
+    policyDecidedAt: UtcTimestampSchema,
+    workflowCompletedAt: UtcTimestampSchema,
+    deliveryEligibleAt: UtcTimestampSchema,
+    deliveredAt: UtcTimestampSchema.nullable(),
+    counterfactualDeliveryAt: UtcTimestampSchema.optional(),
+    counterfactualDeliveryVersion: z.string().min(1).optional(),
+    comparisonEntryAt: UtcTimestampSchema.optional(),
+  })
+  .strict()
+  .superRefine((v, ctx) => {
+    const ordered =
+      compareStamps(v.policyDecidedAt, v.decisionReadyAt) >= 0 &&
+      compareStamps(v.workflowCompletedAt, v.policyDecidedAt) >= 0 &&
+      compareStamps(v.deliveryEligibleAt, v.workflowCompletedAt) >= 0;
+    if (!ordered) ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'timeline is not monotonic' });
+    if (v.deliveredAt !== null) {
+      if (v.counterfactualDeliveryAt !== undefined || v.counterfactualDeliveryVersion !== undefined || v.comparisonEntryAt !== undefined)
+        ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'delivered arms carry no counterfactual lifecycle' });
+      if (compareStamps(v.deliveredAt, v.deliveryEligibleAt) < 0)
+        ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'delivery precedes eligibility' });
+      return;
+    }
+    if (v.counterfactualDeliveryAt === undefined || v.counterfactualDeliveryVersion === undefined || v.comparisonEntryAt === undefined) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'non-delivered arm requires versioned counterfactual and entry time' });
+      return;
+    }
+    if (compareStamps(v.counterfactualDeliveryAt, v.deliveryEligibleAt) < 0 || compareStamps(v.comparisonEntryAt, v.counterfactualDeliveryAt) < 0)
+      ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'non-delivered arm enters before counterfactual delivery' });
+  });
+
 /**
  * Collector continuity records mirroring the SQL truth of
  * `g0_data_0007_checkpoints_gaps.sql` (§34.7, INV-009): fenced per-shard
@@ -682,6 +723,7 @@ export const DATA_SCHEMAS = {
   FeatureValue: FeatureValueSchema,
   EvidenceAcquisitionDecision: EvidenceAcquisitionDecisionSchema,
   DecisionActionTimestamps: DecisionActionTimestampsSchema,
+  CandidateDecisionTimeline: CandidateDecisionTimelineSchema,
   CollectorCheckpoint: CollectorCheckpointSchema,
   CollectorGap: CollectorGapSchema,
 } as const;

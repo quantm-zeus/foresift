@@ -33,6 +33,16 @@ export interface BackfillReceiptInput {
   readonly proofMethod:
     'LIVE_RECEIPT_REFERENCE' | 'RECOVERY_FETCH_COMMIT' | 'MANUAL_IMPORT_RECEIPT';
   readonly liveReceiptRef?: string;
+  /** Always true for this repository; exposed so telemetry cannot lose the fact. */
+  readonly retrievedAsBackfill?: true;
+  /** Exact source coordinates as observed, preserved without normalization loss. */
+  readonly originalEventCoordinates?: Readonly<Record<string, unknown>>;
+  /** Actual retrieval completion. Defaults only to the legacy retrievedAt alias. */
+  readonly fetchedAt?: UtcTimestamp;
+  /** Actual first system availability. Defaults only to the legacy availableAt alias. */
+  readonly earliestAvailableAt?: UtcTimestamp;
+  /** Why the observation could not have been available sooner. */
+  readonly earlierUnavailabilityReason?: string;
 }
 
 /**
@@ -78,9 +88,26 @@ export async function recordBackfillReceipt(
   engine: DatabaseEngine,
   input: BackfillReceiptInput,
 ): Promise<void> {
+  const fetchedAt = input.fetchedAt ?? input.retrievedAt;
+  const earliestAvailableAt = input.earliestAvailableAt ?? input.availableAt;
+  const earlierUnavailabilityReason = input.earlierUnavailabilityReason ?? input.backfillReason;
+  if (earlierUnavailabilityReason.trim().length === 0) {
+    throw new ForesiftError(
+      ErrorCode.CONTRACT_INVARIANT_VIOLATED,
+      'backfill requires an earlier-unavailability reason',
+      { backfillReceiptId: input.backfillReceiptId },
+    );
+  }
+  if (compareTimestamps(input.historicalEventAt, earliestAvailableAt) > 0) {
+    throw new ForesiftError(
+      ErrorCode.AVAILABLE_AT_INFERRED_FROM_EVENT_AT,
+      'event time cannot substitute for actual earliest availability',
+      { backfillReceiptId: input.backfillReceiptId },
+    );
+  }
   assertNoBackdating({
-    availableAt: input.availableAt,
-    retrievedAt: input.retrievedAt,
+    availableAt: earliestAvailableAt,
+    retrievedAt: fetchedAt,
     proofMethod: input.proofMethod,
     ...(input.liveReceiptRef === undefined ? {} : { liveReceiptRef: input.liveReceiptRef }),
   });
@@ -107,19 +134,26 @@ export async function recordBackfillReceipt(
          backfill_receipt_id, backfill_job_id, backfill_reason,
          historical_event_at, retrieved_at, available_at,
          retrospective_only, would_have_been_observable_live,
-         availability_proof_method, live_receipt_ref)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)`,
+         availability_proof_method, live_receipt_ref, retrieved_as_backfill,
+         original_event_coordinates, fetched_at, earliest_available_at,
+         earlier_unavailability_reason)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15)`,
       [
         input.backfillReceiptId,
         input.backfillJobId,
         input.backfillReason,
         input.historicalEventAt,
-        input.retrievedAt,
-        input.availableAt,
+        fetchedAt,
+        earliestAvailableAt,
         input.retrospectiveOnly,
         input.wouldHaveBeenObservableLive ?? null,
         input.proofMethod,
         input.liveReceiptRef ?? null,
+        true,
+        input.originalEventCoordinates ?? {},
+        fetchedAt,
+        earliestAvailableAt,
+        earlierUnavailabilityReason,
       ],
     );
   });

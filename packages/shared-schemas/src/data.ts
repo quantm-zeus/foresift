@@ -20,9 +20,13 @@
  */
 import { z } from 'zod';
 import {
+  ALL_ACQUISITION_FAILURE_KINDS,
   ALL_ACQUISITION_STATES,
   ALL_AVAILABILITY_PROVENANCE_CLASSES,
+  ALL_DEPENDENCE_METHODS,
+  ALL_PROVIDER_CONFLICT_CLASSES,
   ALL_QUALITY_CODES,
+  ALL_REPLAY_MODES,
   ChainMappingQuality,
   compareTimestamps,
   DecimalsResolutionState,
@@ -37,8 +41,12 @@ import {
   isValidUtcTimestamp,
   nullRequiresExplicitCode,
   type AcquisitionState,
+  type AcquisitionFailureKind,
   type AvailabilityProvenanceClass,
+  type DependenceMethod,
+  type ProviderConflictClass,
   type QualityCode,
+  type ReplayMode,
   type UtcTimestamp,
 } from '@foresift/domain';
 
@@ -52,7 +60,7 @@ function compareStamps(a: string, b: string): number {
 }
 
 /** Registry version — bumped only on breaking shape changes, never silently. */
-export const DATA_SCHEMA_REGISTRY_VERSION = 1;
+export const DATA_SCHEMA_REGISTRY_VERSION = 2;
 
 // ---------------------------------------------------------------------------
 // Building blocks
@@ -399,6 +407,54 @@ export const BackfillReceiptSchema = z
     message: 'historical event time cannot follow its availability',
   });
 
+/** Original chain coordinates retained when an observation is fetched retrospectively. */
+export const OriginalEventCoordinatesSchema = z
+  .object({
+    chainId: ChainIdSchema,
+    blockNumberOrSlot: DigitStringSchema.optional(),
+    blockHash: z.string().min(1).optional(),
+    parentBlockHashOrParentSlot: z.string().min(1).optional(),
+    transactionHash: z.string().min(1).optional(),
+    transactionIndex: z.number().int().min(0).optional(),
+    instructionIndex: z.number().int().min(0).optional(),
+    innerInstructionIndex: z.number().int().min(0).optional(),
+    collectorOrProviderCursor: z.string().min(1).optional(),
+  })
+  .strict()
+  .refine(
+    (v) =>
+      v.blockNumberOrSlot !== undefined ||
+      v.blockHash !== undefined ||
+      v.transactionHash !== undefined ||
+      v.collectorOrProviderCursor !== undefined,
+    { message: 'at least one original event coordinate is required' },
+  );
+
+/**
+ * FR-DATA-007 backfill provenance. The availability boundary is the actual
+ * fetch/commit boundary; the historical event instant is retained only as an
+ * event coordinate and can never be substituted for availability.
+ */
+export const BackfilledObservationSchema = z
+  .object({
+    observationId: z.string().min(1),
+    subjectPoolId: z.string().min(1).optional(),
+    subjectAssetId: z.string().min(1).optional(),
+    retrievedAsBackfill: z.literal(true),
+    originalCoordinates: OriginalEventCoordinatesSchema,
+    eventAt: UtcTimestampSchema,
+    fetchedAt: UtcTimestampSchema,
+    availableAt: UtcTimestampSchema,
+    unavailabilityReason: z.string().min(1),
+  })
+  .strict()
+  .refine((v) => compareStamps(v.eventAt, v.availableAt) <= 0, {
+    message: 'event time cannot follow availability time',
+  })
+  .refine((v) => compareStamps(v.fetchedAt, v.availableAt) <= 0, {
+    message: 'backfill availability cannot precede the actual fetch',
+  });
+
 /** §13.5 watermark state keyed by provider/operation/shard/program-version/chain. */
 export const WatermarkStateSchema = z
   .object({
@@ -464,7 +520,7 @@ export const DependenceObservationInputsSchema = z
   })
   .strict();
 
-export const SourceDependenceEdgeSchema = z
+const LegacySourceDependenceEdgeSchema = z
   .object({
     sourceA: z.string().min(1),
     sourceB: z.string().min(1),
@@ -479,6 +535,93 @@ export const SourceDependenceEdgeSchema = z
     availableAt: UtcTimestampSchema,
   })
   .strict();
+
+const dependenceMethodValues = [...ALL_DEPENDENCE_METHODS] as [
+  DependenceMethod,
+  ...DependenceMethod[],
+];
+
+/** FR-DATA-013 versioned declared/empirical dependence edge. */
+export const VersionedSourceDependenceEdgeSchema = z
+  .object({
+    sourceIdA: z.string().min(1),
+    sourceIdB: z.string().min(1),
+    method: z.enum(dependenceMethodValues),
+    validFrom: UtcTimestampSchema,
+    validUntil: UtcTimestampSchema.nullable().optional(),
+    evidenceIds: z.array(z.string().min(1)),
+    confidence: z.number().min(0).max(1),
+    effectiveIndependenceMultiplier: z.number().min(0).max(1),
+  })
+  .strict()
+  .refine((v) => v.sourceIdA !== v.sourceIdB, { message: 'dependence edge requires two sources' })
+  .refine(
+    (v) =>
+      v.validUntil === undefined ||
+      v.validUntil === null ||
+      compareStamps(v.validFrom, v.validUntil) <= 0,
+    { message: 'dependence validity interval is inverted' },
+  );
+
+/** Backward-compatible registry boundary while persisted G0 edges are upgraded. */
+export const SourceDependenceEdgeSchema = z.union([
+  VersionedSourceDependenceEdgeSchema,
+  LegacySourceDependenceEdgeSchema,
+]);
+
+/** App. O.8 inputs, constrained to information available at estimation time. */
+export const EmpiricalDependenceObservationSchema = z
+  .object({
+    observationId: z.string().min(1),
+    sourceIdA: z.string().min(1),
+    sourceIdB: z.string().min(1),
+    correlatedValues: z.number().min(-1).max(1),
+    correlatedErrors: z.number().min(-1).max(1),
+    updateTimingSync: z.number().min(0).max(1),
+    firstSeenSync: z.number().min(0).max(1),
+    outageOverlap: z.number().min(0).max(1),
+    schemaFingerprintSimilarity: z.number().min(0).max(1),
+    commonMissingness: z.number().min(0).max(1),
+    declaredUpstreamRelationship: z.string().min(1),
+    estimatedAt: UtcTimestampSchema,
+    estimatedFrom: UtcTimestampSchema,
+    estimatedTo: UtcTimestampSchema,
+  })
+  .strict()
+  .refine((v) => v.sourceIdA !== v.sourceIdB, {
+    message: 'empirical dependence requires two distinct sources',
+  })
+  .refine((v) => compareStamps(v.estimatedFrom, v.estimatedTo) <= 0, {
+    message: 'estimation window is inverted',
+  })
+  .refine((v) => compareStamps(v.estimatedTo, v.estimatedAt) <= 0, {
+    message: 'estimation cannot use future provider behavior',
+  });
+
+const providerConflictClassValues = [...ALL_PROVIDER_CONFLICT_CLASSES] as [
+  ProviderConflictClass,
+  ...ProviderConflictClass[],
+];
+
+/** FR-DATA-016 conflict record retaining every contributing raw observation. */
+export const ProviderConflictSchema = z
+  .object({
+    conflictId: z.string().min(1),
+    conflictClass: z.enum(providerConflictClassValues),
+    observationIds: z.array(z.string().min(1)).min(2),
+    fieldPath: z.string().min(1).optional(),
+    resolvedByRule: z.string().min(1).nullable().optional(),
+    detectedAt: UtcTimestampSchema,
+    availableAt: UtcTimestampSchema.optional(),
+    details: z.record(z.unknown()),
+  })
+  .strict()
+  .refine((v) => new Set(v.observationIds).size === v.observationIds.length, {
+    message: 'conflict observations must be distinct',
+  })
+  .refine((v) => v.availableAt === undefined || compareStamps(v.detectedAt, v.availableAt) <= 0, {
+    message: 'conflict availability cannot precede detection',
+  });
 
 // ---------------------------------------------------------------------------
 // Features (FR-DATA-004)
@@ -547,6 +690,15 @@ const acquisitionStateValues = [...ALL_ACQUISITION_STATES] as [
   ...AcquisitionState[],
 ];
 
+const acquisitionFailureKindValues = [...ALL_ACQUISITION_FAILURE_KINDS] as [
+  AcquisitionFailureKind,
+  ...AcquisitionFailureKind[],
+];
+
+const AcquisitionCostSchema = z
+  .object({ amount: DecimalStringSchema, token: z.string().min(1) })
+  .strict();
+
 export const EvidenceAcquisitionDecisionSchema = z
   .object({
     id: z.string().min(1),
@@ -554,6 +706,13 @@ export const EvidenceAcquisitionDecisionSchema = z
     evidenceFamily: z.string().min(1),
     policyVersion: z.string().min(1),
     state: z.enum(acquisitionStateValues),
+    candidateStateAtRequest: z.string().min(1).optional(),
+    requestedFields: z.array(z.string().min(1)).default([]),
+    expectedValueOfInformation: z.number().min(0).max(1).optional(),
+    estimatedCost: AcquisitionCostSchema.optional(),
+    actualCost: AcquisitionCostSchema.optional(),
+    failureKind: z.enum(acquisitionFailureKindValues).nullable().optional(),
+    acquisitionSeed: z.string().min(1).optional(),
     requestedAt: UtcTimestampSchema.optional(),
     completedAt: UtcTimestampSchema.optional(),
     assignmentProbability: z.number().gt(0).lt(1).optional(),
@@ -571,6 +730,12 @@ export const EvidenceAcquisitionDecisionSchema = z
         v.assignmentProbability === undefined),
     { message: 'NOT_REQUESTED_BY_POLICY carries no retrieval lifecycle fields' },
   )
+  .refine((v) => v.state === 'FAILED' || v.failureKind === undefined || v.failureKind === null, {
+    message: 'failure kind is only valid for FAILED acquisition results',
+  })
+  .refine((v) => v.state !== 'FAILED' || (v.failureKind !== undefined && v.failureKind !== null), {
+    message: 'FAILED acquisition results require a failure kind',
+  })
   .refine((v) => v.completedAt === undefined || v.requestedAt !== undefined, {
     message: 'completion requires a prior request time',
   })
@@ -583,6 +748,65 @@ export const EvidenceAcquisitionDecisionSchema = z
       message: 'completion cannot precede request',
     },
   );
+
+// ---------------------------------------------------------------------------
+// Candidate decision timelines and explicit replay query semantics (G1)
+// ---------------------------------------------------------------------------
+
+export const CandidateDecisionTimelineSchema = z
+  .object({
+    decisionId: z.string().min(1),
+    candidateId: z.string().min(1),
+    policyVersion: z.string().min(1).optional(),
+    decisionReadyAt: UtcTimestampSchema,
+    policyDecidedAt: UtcTimestampSchema,
+    workflowCompletedAt: UtcTimestampSchema,
+    deliveryEligibleAt: UtcTimestampSchema,
+    deliveredAt: UtcTimestampSchema.nullable(),
+    counterfactualDeliveryAt: UtcTimestampSchema.nullable(),
+    counterfactualVersion: z.union([z.number().int().positive(), z.string().min(1)]).nullable(),
+    validUntil: UtcTimestampSchema.optional(),
+    expiredAt: UtcTimestampSchema.nullable().optional(),
+  })
+  .strict()
+  .refine(
+    (v) =>
+      v.deliveryEligibleAt ===
+      (compareStamps(v.decisionReadyAt, v.policyDecidedAt) >= 0
+        ? v.decisionReadyAt
+        : v.policyDecidedAt),
+    { message: 'delivery eligibility must equal max(decision ready, policy decided)' },
+  )
+  .refine((v) => compareStamps(v.decisionReadyAt, v.policyDecidedAt) <= 0, {
+    message: 'policy decision cannot precede decision readiness',
+  })
+  .refine(
+    (v) =>
+      v.deliveredAt === null
+        ? v.counterfactualDeliveryAt !== null && v.counterfactualVersion !== null
+        : v.counterfactualDeliveryAt === null && v.counterfactualVersion === null,
+    { message: 'delivered and counterfactual arms must be symmetric and exclusive' },
+  )
+  .refine(
+    (v) =>
+      (v.deliveredAt === null || compareStamps(v.deliveryEligibleAt, v.deliveredAt) <= 0) &&
+      (v.counterfactualDeliveryAt === null ||
+        compareStamps(v.deliveryEligibleAt, v.counterfactualDeliveryAt) <= 0),
+    { message: 'delivery cannot precede eligibility' },
+  );
+
+const replayModeValues = [...ALL_REPLAY_MODES] as [ReplayMode, ...ReplayMode[]];
+
+export const ReplayQuerySemanticsSchema = z.discriminatedUnion('queryShape', [
+  z.object({ queryShape: z.literal('CURRENT_VIEW'), mode: z.literal('CURRENT_VIEW') }).strict(),
+  z
+    .object({
+      queryShape: z.literal('HISTORICAL_REPLAY'),
+      mode: z.enum(replayModeValues),
+      boundaryTimestamp: UtcTimestampSchema,
+    })
+    .strict(),
+]);
 
 // ---------------------------------------------------------------------------
 // Decision/action timestamps (§13.7), checkpoints and gaps (DR substrate)
@@ -673,14 +897,19 @@ export const DATA_SCHEMAS = {
   ObservationRevision: ObservationRevisionSchema,
   CompensatingEvent: CompensatingEventSchema,
   BackfillReceipt: BackfillReceiptSchema,
+  BackfilledObservation: BackfilledObservationSchema,
   WatermarkState: WatermarkStateSchema,
   SourceIdentity: SourceIdentitySchema,
   IndependenceGroup: IndependenceGroupSchema,
   SourceGroupMembership: SourceGroupMembershipSchema,
   SourceDependenceEdge: SourceDependenceEdgeSchema,
+  EmpiricalDependenceObservation: EmpiricalDependenceObservationSchema,
+  ProviderConflict: ProviderConflictSchema,
   FeatureDefinition: FeatureDefinitionSchema,
   FeatureValue: FeatureValueSchema,
   EvidenceAcquisitionDecision: EvidenceAcquisitionDecisionSchema,
+  CandidateDecisionTimeline: CandidateDecisionTimelineSchema,
+  ReplayQuerySemantics: ReplayQuerySemanticsSchema,
   DecisionActionTimestamps: DecisionActionTimestampsSchema,
   CollectorCheckpoint: CollectorCheckpointSchema,
   CollectorGap: CollectorGapSchema,

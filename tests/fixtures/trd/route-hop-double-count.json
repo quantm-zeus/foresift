@@ -1,0 +1,45 @@
+{
+  "$comment": "Route hop double-count test vectors (FR-TRD-001, FR-TRD-002, AC-133, AC-233). Multi-pool routed swap normalizes into exactly one economic trade based on net actor deltas, avoiding route-leg double counting.",
+  "routedSwaps": [
+    {
+      "name": "two-hop swap USDC -> WETH -> FOO produces single economic trade with net actor deltas",
+      "transactionHash": "0xaaa1111111111111111111111111111111111111111111111111111111111111",
+      "chainId": "eip155:1",
+      "actorAddress": "0x1111111111111111111111111111111111111111",
+      "routerAddress": "0x3333333333333333333333333333333333333333",
+      "rawLegs": [
+        {
+          "legIndex": 0,
+          "poolAddress": "0xpool_usdc_weth",
+          "dexId": "uniswap-v2",
+          "tokenIn": "0xusdc",
+          "tokenOut": "0xweth",
+          "amountIn": "1000000000",
+          "amountOut": "300000000000000000"
+        },
+        {
+          "legIndex": 1,
+          "poolAddress": "0xpool_weth_foo",
+          "dexId": "uniswap-v3",
+          "tokenIn": "0xweth",
+          "tokenOut": "0xfoo",
+          "amountIn": "300000000000000000",
+          "amountOut": "50000000000000000000000"
+        }
+      ],
+      "expectedEconomicTrade": {
+        "tradeSide": "BUY",
+        "actorResolutionState": "RESOLVED",
+        "netDeltas": [
+          { "token": "0xusdc", "delta": "-1000000000" },
+          { "token": "0xweth", "delta": "0" },
+          { "token": "0xfoo", "delta": "50000000000000000000000" }
+        ],
+        "intermediateHopVolumeExcluded": "300000000000000000",
+        "economicNotionalUsd": "1000.00",
+        "rawLegSummedVolumeUsd": "2000.00",
+        "doubleCountPrevented": true
+      }
+    }
+  ]
+}

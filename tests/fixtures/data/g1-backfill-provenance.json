@@ -1,0 +1,92 @@
+{
+  "$comment": "G1 backfill provenance vectors (FR-DATA-007 §13.5, AC-020, AC-021). Backfilled observations store retrieved_as_backfill, original event coordinates, actual fetched_at, actual earliest available_at, and unavailability reason. Event time cannot substitute for availability time.",
+  "validObservations": [
+    {
+      "name": "collector outage backfill preserves original event coordinates and distinct fetched_at/available_at",
+      "observationId": "obs-bf-001",
+      "subjectPoolId": "pool-eth-usdc",
+      "retrievedAsBackfill": true,
+      "eventAt": "2026-05-01T10:00:00Z",
+      "originalCoordinates": {
+        "chainId": "eip155:1",
+        "blockNumber": 20001000,
+        "transactionHash": "0x1111111111111111111111111111111111111111111111111111111111111111",
+        "logIndex": 42
+      },
+      "fetchedAt": "2026-05-01T14:30:00Z",
+      "availableAt": "2026-05-01T14:30:00Z",
+      "unavailabilityReason": "COLLECTOR_OUTAGE_WINDOW",
+      "availabilityProvenance": "HISTORICAL_QUERY_FETCHED_LATER",
+      "rawAmount": "1500000000",
+      "decimals": 6
+    },
+    {
+      "name": "reorg recovery backfill with upstream delay explanation",
+      "observationId": "obs-bf-002",
+      "subjectPoolId": "pool-sol-usdc",
+      "retrievedAsBackfill": true,
+      "eventAt": "2026-05-02T08:15:00Z",
+      "originalCoordinates": {
+        "chainId": "solana:5eykt4UsFv8P8NJdTREpY1vzqKqZKvdp",
+        "slot": 280005000,
+        "signature": "5HxK...sig123",
+        "instructionIndex": 3
+      },
+      "fetchedAt": "2026-05-02T11:00:00Z",
+      "availableAt": "2026-05-02T11:00:00Z",
+      "unavailabilityReason": "REORG_RECONCILIATION",
+      "availabilityProvenance": "HISTORICAL_QUERY_FETCHED_LATER",
+      "rawAmount": "250000000000",
+      "decimals": 9
+    },
+    {
+      "name": "prospective live observation has retrievedAsBackfill false and no unavailability reason",
+      "observationId": "obs-live-001",
+      "subjectPoolId": "pool-eth-usdc",
+      "retrievedAsBackfill": false,
+      "eventAt": "2026-05-03T12:00:00Z",
+      "originalCoordinates": {
+        "chainId": "eip155:1",
+        "blockNumber": 20002500,
+        "transactionHash": "0x2222222222222222222222222222222222222222222222222222222222222222",
+        "logIndex": 12
+      },
+      "fetchedAt": "2026-05-03T12:00:02Z",
+      "availableAt": "2026-05-03T12:00:02Z",
+      "unavailabilityReason": null,
+      "availabilityProvenance": "PROVIDER_LIVE_RESPONSE",
+      "rawAmount": "500000000",
+      "decimals": 6
+    }
+  ],
+  "invalidObservations": [
+    {
+      "name": "reject: event time substituted for availability time on backfill",
+      "retrievedAsBackfill": true,
+      "eventAt": "2026-05-01T10:00:00Z",
+      "fetchedAt": "2026-05-01T14:30:00Z",
+      "availableAt": "2026-05-01T10:00:00Z",
+      "unavailabilityReason": "COLLECTOR_OUTAGE_WINDOW",
+      "expectedErrorCode": "EVENT_TIME_SUBSTITUTION_FORBIDDEN"
+    },
+    {
+      "name": "reject: backfilled observation missing unavailability reason",
+      "retrievedAsBackfill": true,
+      "eventAt": "2026-05-01T10:00:00Z",
+      "fetchedAt": "2026-05-01T14:30:00Z",
+      "availableAt": "2026-05-01T14:30:00Z",
+      "unavailabilityReason": null,
+      "expectedErrorCode": "UNAVAILABILITY_REASON_REQUIRED"
+    },
+    {
+      "name": "reject: backfilled observation missing original event coordinates",
+      "retrievedAsBackfill": true,
+      "eventAt": "2026-05-01T10:00:00Z",
+      "originalCoordinates": null,
+      "fetchedAt": "2026-05-01T14:30:00Z",
+      "availableAt": "2026-05-01T14:30:00Z",
+      "unavailabilityReason": "UPSTREAM_INGESTION_LAG",
+      "expectedErrorCode": "ORIGINAL_COORDINATES_REQUIRED"
+    }
+  ]
+}

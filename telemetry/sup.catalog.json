@@ -1,0 +1,43 @@
+{
+  "$schema": "https://foresift.dev/schemas/telemetry-catalog-v1.json",
+  "catalog": "sup",
+  "description": "Supply-confidence and market-cap fallback telemetry contracts.",
+  "contractStatus": "DECLARATIVE_CONTRACT_ONLY — this file defines the event contracts the requirement manifest maps to (telemetry/sup.*); emitter wiring lands with the observability milestone (dependency group G2), so nothing publishes these event names yet. Assessment fields mirror the authoritative schema in packages/shared-schemas/src/sup.ts exactly.",
+  "requirementsCovered": ["FR-SUP-001", "FR-SUP-002"],
+  "recoveryDataClass": "CRITICAL_METADATA",
+  "events": [
+    {
+      "name": "supply.assessed",
+      "description": "A circulating-supply and market-cap assessment recorded its source, method, excluded supply, and confidence.",
+      "requirementRefs": ["FR-SUP-001"],
+      "tier": "CRITICAL_OBSERVATIONS_CHECKPOINTS",
+      "fields": [
+        { "name": "assetRepresentationId", "type": "string", "required": true },
+        { "name": "asOf", "type": "string<utc-timestamp>", "required": true },
+        { "name": "totalSupplyRaw", "type": "string<digits>", "required": true },
+        { "name": "estimatedCirculatingSupplyRaw", "type": "string<digits>|undefined", "required": false },
+        { "name": "excludedSupplyRaw", "type": "string<digits>|undefined", "required": false },
+        { "name": "source", "type": "string", "required": true },
+        { "name": "method", "type": "string", "required": true },
+        { "name": "confidence", "type": "number[0,1]", "required": true },
+        { "name": "exclusionEvidenceIds", "type": "array<string>", "required": true },
+        { "name": "qualityCodes", "type": "array<string>", "required": true },
+        { "name": "marketCapBasis", "type": "string(TOTAL_SUPPLY|PROVIDER_CIRCULATING_SUPPLY|ESTIMATED_CIRCULATING_SUPPLY)", "required": true }
+      ]
+    },
+    {
+      "name": "supply.fallback_decided",
+      "description": "A low-confidence market-cap hard-rejection was blocked because an approved liquidity or activity fallback exists.",
+      "requirementRefs": ["FR-SUP-002"],
+      "tier": "CRITICAL_METADATA",
+      "fields": [
+        { "name": "assetRepresentationId", "type": "string", "required": true },
+        { "name": "confidence", "type": "number[0,1]", "required": true },
+        { "name": "qualityCodes", "type": "array<string>", "required": true },
+        { "name": "approvedFallbackAvailable", "type": "boolean", "required": true },
+        { "name": "marketCapMayHardReject", "type": "boolean", "required": true },
+        { "name": "decidedAt", "type": "string<utc-timestamp>", "required": true }
+      ]
+    }
+  ]
+}

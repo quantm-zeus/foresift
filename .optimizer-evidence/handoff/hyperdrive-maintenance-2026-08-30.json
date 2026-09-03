@@ -1,10 +1,10 @@
 {
   "schema": "foresift/maintainer-snapshot@1",
-  "updatedAt": "2026-09-02T10:05:00Z",
-  "mission": "Persistent maintainer \u2014 minimize authoritative project critical-path wall clock",
+  "updatedAt": "2026-09-03T11:05:00Z",
+  "mission": "Persistent maintainer — minimize authoritative project critical-path wall clock",
   "currentSnapshot": {
-    "milestone": "G0",
-    "g0Progress": "8/8 PROVEN \u2014 milestone complete",
+    "milestone": "G1",
+    "g1Progress": "ACTIVE — 1 of 8 packages in execution (g1-data-truth-extensions); planning artifacts seeded by #171",
     "packages": {
       "g0-contracts-data-truth": "PROVEN",
       "g0-security-perimeter": "PROVEN",
@@ -13,29 +13,46 @@
       "g0-cost-capacity": "PROVEN",
       "g0-first-party-observation": "PROVEN",
       "g0-mcp-surface": "PROVEN",
-      "g0-traceability-conformance": "PROVEN (main 2b82882, PR #160 chore merged through protected exact-head path; product PRs #153/#157/#158; suite #155, planner #154, evidence #151)"
+      "g0-traceability-conformance": "PROVEN",
+      "g1-planning": "PLAN merged (#169 squash c8d75f2, 98/98 reqs covered) + decompose (#170) + seed (#171); g1-data-truth-extensions RUNNING",
+      "g1-data-truth-extensions": "RUNNING — run 486a44d0 (fresh continuation, adopted launch branch cc5bd28 carrying 20/30 units done + main 09c339bb); 7 remaining units in flight (T018 core + T021-T026 test-author); T029 coordinator-owned (ADR-0020)"
     },
-    "mainSha": "f3fe014aea9e6e774ef3168c4cb41d36b11693f8",
-    "mainCi": "Verify-green merged-main monitored through 2b82882/63fd648/cbbba40; f3fe014 monitored in flight",
-    "supervisor": "ACTIVE singleton; milestone-control run 9a061d3e (G0 AUDIT mode) executing verify-repo under no contention; pausedFatal cleared",
-    "taskWorktree": "/home/minhquan_eth/.archon/workspaces/quantm-zeus/foresift/worktrees/archon/task-foresift-g0-traceability-conformance (branch alive for archon lifecycle; remote deleted after squash merges)",
-    "openEvidenceChain": "All 25 tasks closed deterministically: 15 via PR #153 integration, 5 test-author via #157, T024 VERIFICATION_ONLY via evidence-owner TRACEABILITY_FULL_CONVERGENCE, T001/T002 via already-satisfied directory-write audit pass 2; checkbox flips committed by wave-coordinator identity (6e9ebd6, 418887f), never hand-edited"
+    "mainSha": "09c339bbe122bda523f2fee9fde698fb75e98524",
+    "mainCi": "GREEN (merged-main Verify run 33745664489 completed success at 09c339bb, PR #172 squash)",
+    "supervisor": "ACTIVE singleton (restarted 10:49Z after operator recover-fatal cleared paused_fatal from run 12dd974a); adaptive lanes resolved 2 (provider capacity cap: codex 1 + claude 1)",
+    "taskWorktree": "/home/minhquan_eth/.archon/workspaces/quantm-zeus/foresift/worktrees/archon/task-foresift-g1-data-truth-extensions (branch archon/task-foresift-g1-data-truth-extensions @ cc5bd28; pushed to origin as launch branch foresift/g1-data-truth-extensions for ADOPTED_SEED)",
+    "openEvidenceChain": "Wave 1 e3ccffb5: 3× CODEX POOL_AT_LIMIT starved serial-2/3 lanes (codex limit=1 never grows — 4 codex lanes over-assigned); FAST RED from dependency inversion (batch-2 atop starved batch-1); repair converged except G0-pinned vocabulary tests. Run 258232f3: 3× AGY_PRODUCT_OWNERSHIP_VIOLATION on T029 (mechanical manifest write assigned to AGY brief pre-[executor: COORDINATOR] fix). Both runs retired via operator --recover-fatal (service stopped first per lock law)."
   },
   "blockers": [],
   "nextActions": [
-    "Confirm merged-main CI green on 2b82882 (Verify full check) \u2014 GitHub Actions authority",
-    "G0 8/8 durable confirmation: pnpm verify + pnpm spec:verify at HEAD (in flight at snapshot time)",
-    "Post-G0 queue (now UNFROZEN candidate \u2014 confirm with operator): reboot-resilient maintainer, stale-control-plane decoupling, Archon migration review, measured G1 scale work",
-    "Land later if needed: state-landing base-drift self-update (state branch BEHIND required operator merge; live PR #160), missing 'state-only' label creation (live #160), mergeStateStatus=BEHIND retry loop retryCount accounting"
+    "Let run 486a44d0 proceed (guards → integrate → FAST → settle → land); do not interrupt unless a NEW deterministic failure appears",
+    "Land maintainer Part D (planning parallelism-quality rule: disjoint independent product tasks must carry [P] or SERIAL_REASON; PARALLELISM_OPPORTUNITY_MISSED surfaced pre-implementation) — future plans only",
+    "Part K: event-driven maintainer incident wake contract (durable incident record, fingerprint dedupe, never two maintainers, intentionalStop honored, bounded backoff)",
+    "Part I: preplan g1-capacity-contracts concurrently (deterministic preplanning receipt; no product write authority)",
+    "Part J: shared-surface lane design for package concurrency (canary two G1 roots, cap 2)",
+    "Surface plan coverage gap: packages/release-conformance Rule (c) test hard-pins activeGroup 'G0' — no G1 task owns it",
+    "Codex pool starvation: MAX_CODEX_WRITERS reporting vs enforcement mismatch; POOL_AT_LIMIT is not a quota-handoff reason — fix via PR when lane topology next bites"
   ],
   "history": [
     {
       "ts": "2026-09-02T10:00:00Z",
-      "event": "G0 8/8 PROVEN on main 2b82882. Chain: #156 lander ancestor fix \u2192 #157 test-author surface (ee35e84) \u2192 preflight hermetic fixture fix (#158, 3cd7c88, full-gate TESTS refusal root-caused: live-tree openTaskCount assertion broke on package completion) \u2192 #159 lander --delete-branch worktree exit-1 fix (root cause: gh deletes remote then fails local ref in checked-out worktree, exit 1 AFTER successful merge \u2014 explains #153/#157/#158 bookkeeping lies) \u2192 finalize-from-main \u2192 state chore #160 (operator merged state branch forward past #159 base-drift; label state-only created) \u2192 PROVEN. Spec:verify 13 checks OK; release conformance PASSED at PROVEN main."
+      "event": "G0 8/8 PROVEN on main 2b82882. Chain: #156 lander ancestor fix → #157 test-author surface (ee35e84) → preflight hermetic fixture fix (#158, 3cd7c88) → #159 lander --delete-branch worktree exit-1 fix → finalize-from-main → state chore #160 → PROVEN."
     },
     {
       "ts": "2026-09-02T11:40:00Z",
-      "event": "Post-G0 hardening wave: #162 (recover-fatal INVALID_PROFILE for milestone-kind, live 30b32583) and #163 (ADR-0021 discovery-root YAML authority) merged. 30b32583 verify-repo failures root-caused to 4-core starvation from concurrent local full suites (gate passes clean twice-verified); relaunch 9a061d3e in flight. Reboot-resilience audited: linger+Restart=on-failure+proc-lock self-heal already sufficient. Remaining queue: state-landing base-drift self-update, state-only label creation (done ad hoc for #160), G1 scale planning."
+      "event": "Post-G0 hardening wave: #162 (recover-fatal INVALID_PROFILE) and #163 (ADR-0021 discovery-root YAML authority) merged."
+    },
+    {
+      "ts": "2026-09-03T09:00:00Z",
+      "event": "G1 execution begins: #169 G1 plan (98/98), #170 decompose to 8 packages, #171 seed planning artifacts; main 5a86a28 → ad53201. Outcome B in force: package-level serial (shared-surface law); HYBRID_AGY profile."
+    },
+    {
+      "ts": "2026-09-03T10:41:00Z",
+      "event": "PR #172 wave-hardening landed (squash 09c339bb, merged-main CI run 33745664489 GREEN): immutable --lane-base logical-lane evidence baseline (Part A4, all 4 writer executors + wave prep); write-disjoint AGY test sharding test-author-1/2 canary cap 2 with graph-enumerated yaml dispatch (Part E); gen-agnostic preflight migration-duty regex g\\d+ (Part G, ADR-0022); adaptive-lanes.d.mts parallelizableReadyCount declaration; 7 regression tests. Six CI rounds: prettier → eslint/Matrix AC → tsc implicit-any → same tsc red under TARGETED e2e → pass → yaml single-quoted node -e apostrophe fix (attempt's inside 'node -e' comment swallowed the quote → node SyntaxError; all multi-line node -e blocks node --check validated)."
+    },
+    {
+      "ts": "2026-09-03T10:54:00Z",
+      "event": "Operator recovery complete: runs 32917dda (T029 ownership ×3 burn) and 12dd974a (prep yaml syntax) retired via --recover-fatal; fresh continuation run 486a44d0 ADOPTED_SEED foresift/g1-data-truth-extensions @ cc5bd28 (task branch merged with main 09c339bb, pushed as launch branch). T029 executor=COORDINATOR excluded from testLanes — verified live in run graph."
     }
   ]
 }

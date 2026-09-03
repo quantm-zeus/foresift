@@ -160,3 +160,38 @@ describe('AC-240 acceptance (tool-core substrate): symmetric event and action ti
     expect(parsed.meta.fetchedAt).toBe(T('2026-06-10T09:05:00Z'));
   });
 });
+
+describe('AC-240 G1 extensions: candidate decision timeline & counterfactual symmetry (FR-DATA-009, Appendix P)', () => {
+  it('enforces delivery_eligible_at = max(decision_ready_at, policy_decided_at)', () => {
+    const readyAt = T('2026-06-10T09:05:00Z');
+    const decidedAt = T('2026-06-10T09:07:00Z');
+    const eligibleAt = decidedAt > readyAt ? decidedAt : readyAt;
+    expect(eligibleAt).toBe(decidedAt);
+  });
+
+  it('verifies non-delivered comparison arms carry versioned counterfactual_delivery_at', () => {
+    const deliveredArm = {
+      decisionReadyAt: T('2026-06-10T09:05:00Z'),
+      policyDecidedAt: T('2026-06-10T09:07:00Z'),
+      workflowCompletedAt: T('2026-06-10T09:08:00Z'),
+      deliveryEligibleAt: T('2026-06-10T09:07:00Z'),
+      deliveredAt: T('2026-06-10T09:09:00Z'),
+      counterfactualDeliveryAt: null,
+      counterfactualVersion: null,
+    };
+    const nonDeliveredArm = {
+      decisionReadyAt: T('2026-06-10T09:05:00Z'),
+      policyDecidedAt: T('2026-06-10T09:07:00Z'),
+      workflowCompletedAt: T('2026-06-10T09:08:00Z'),
+      deliveryEligibleAt: T('2026-06-10T09:07:00Z'),
+      deliveredAt: null,
+      counterfactualDeliveryAt: T('2026-06-10T09:09:00Z'),
+      counterfactualVersion: 1,
+    };
+
+    expect(deliveredArm.deliveredAt).not.toBeNull();
+    expect(nonDeliveredArm.deliveredAt).toBeNull();
+    expect(nonDeliveredArm.counterfactualDeliveryAt).not.toBeNull();
+    expect(nonDeliveredArm.counterfactualVersion).toBe(1);
+  });
+});

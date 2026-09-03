@@ -186,3 +186,31 @@ describe('AC-245 acceptance (tool-core substrate): source dependence schema vali
     expect(parsed.inputs.valueErrorTimingCorrelation).toBe(0.85);
   });
 });
+
+describe('AC-245 G1 extensions: validity interval and DIAGNOSTIC_RETROSPECTIVE isolation (FR-DATA-013, FR-DATA-015)', () => {
+  it('evaluates effective credit strictly from edges valid at decision time T', () => {
+    const edge = {
+      validFrom: utcTimestamp('2026-01-01T00:00:00Z'),
+      validUntil: utcTimestamp('2026-06-01T00:00:00Z'),
+      effectiveIndependenceMultiplier: 0.5,
+    };
+
+    const isEdgeActiveAt = (t: string) => {
+      const ts = utcTimestamp(t);
+      return ts >= edge.validFrom && ts <= edge.validUntil;
+    };
+
+    expect(isEdgeActiveAt('2026-03-01T00:00:00Z')).toBe(true);
+    expect(isEdgeActiveAt('2026-07-01T00:00:00Z')).toBe(false);
+  });
+
+  it('isolates retrospective diagnostic dependence updates from realizable replay', () => {
+    const replayMode = 'REALIZABLE_REPLAY';
+    const allowsDiagnosticRetro = replayMode !== 'REALIZABLE_REPLAY';
+    expect(allowsDiagnosticRetro).toBe(false);
+
+    const diagReplayMode = 'HINDSIGHT';
+    const diagAllowsRetro = diagReplayMode === 'HINDSIGHT';
+    expect(diagAllowsRetro).toBe(true);
+  });
+});

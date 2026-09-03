@@ -231,3 +231,26 @@ describe('AC-020 acceptance (tool-core substrate): exact-cache lookups enforce p
     expect(keyEarly.cacheKeyHash).not.toBe(keyLate.cacheKeyHash);
   });
 });
+
+describe('AC-020 G1 extensions: backfill availability and no-event-time-substitution (FR-DATA-007)', () => {
+  it('excludes backfilled observations before their actual availability timestamp', async () => {
+    // obs_backfill: event at 08:00, but only available at 15:00
+    await appendObservation(tdb.engine, {
+      observationId: 'ac20-backfill-g1',
+      subjectPoolId: poolId,
+      eventAt: T('2026-06-01T08:00:00Z'),
+      availableAt: T('2026-06-01T15:00:00Z'),
+      availabilityProvenance: 'HISTORICAL_QUERY_FETCHED_LATER',
+      rawAmount: '300',
+      decimals: 2,
+    });
+
+    // Replay at 12:00 -> MUST NOT see ac20-backfill-g1
+    const replay12 = await replayObservations(tdb.engine, T('2026-06-01T12:00:00Z'));
+    expect(replay12.map((o) => o.observationId)).not.toContain('ac20-backfill-g1');
+
+    // Replay at 16:00 -> MUST see ac20-backfill-g1
+    const replay16 = await replayObservations(tdb.engine, T('2026-06-01T16:00:00Z'));
+    expect(replay16.map((o) => o.observationId)).toContain('ac20-backfill-g1');
+  });
+});

@@ -1,4 +1,7 @@
-/** Public surface for deterministic Solana security analyzers. */
+/**
+ * Public, read-only surface for deterministic Solana security analyzers,
+ * independent provider evidence, and point-in-time infrastructure exclusions.
+ */
 export * from './token-assessment.ts';
 export * from './transfer-semantics.ts';
 export * from './pool-security.ts';

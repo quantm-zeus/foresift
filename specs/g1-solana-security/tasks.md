@@ -17,7 +17,7 @@ extended by this package even though they sit outside the listed writeScopes.
 
 ## Phase 1 — Foundations: domain vocabularies and shared schemas (blocks later phases)
 
-- [ ] T001 Create `packages/domain/src/solsec.ts`: `TokenControl` (MINT, FREEZE,
+- [x] T001 Create `packages/domain/src/solsec.ts`: `TokenControl` (MINT, FREEZE,
       PERMANENT_DELEGATE, TRANSFER_FEE, TRANSFER_HOOK, CLOSE, METADATA_UPDATE,
       DEFAULT_STATE, NON_TRANSFERABLE, CONFIDENTIAL_TRANSFER, UNKNOWN_EXTENSION —
       the §65.2 control list), `TokenControlState` (KNOWN_RISK,
@@ -39,9 +39,9 @@ extended by this package even though they sit outside the listed writeScopes.
       the Appendix Q.2 accepted-role + minimum-confidence floor. Add
       colocated `packages/domain/test/` fail-closed vocabulary tests. Traces:
       FR-SOLSEC-001, FR-SOLSEC-002, FR-SOLSEC-003, FR-SOLSEC-004, FR-SOLSEC-006.
-- [ ] T002 Extend `packages/domain/src/index.ts` exports for the new solsec
+- [x] T002 Extend `packages/domain/src/index.ts` exports for the new solsec
       module. Traces: FR-SOLSEC-001…006.
-- [ ] T003 Create `packages/shared-schemas/src/solsec.ts`: Zod schemas for
+- [x] T003 Create `packages/shared-schemas/src/solsec.ts`: Zod schemas for
       `TokenProgramAssessment`, `TokenControlFinding`, `TokenExtensionSupport`,
       `PoolSecurityAssessment`, `SecurityProviderReport`, `SecurityConflict`,
       `SystemAddressRegistryEntry`, `SystemAddressExclusionApplied` — importing
@@ -55,7 +55,7 @@ extended by this package even though they sit outside the listed writeScopes.
 
 ## Phase 2 — Persistence: migration family + migrator extension (blocks repos)
 
-- [ ] T004 Create `migrations/g1_solsec_0001_token_assessments.sql`:
+- [x] T004 Create `migrations/g1_solsec_0001_token_assessments.sql`:
       `token_program_assessments`, `token_control_findings` (UNIQUE per
       assessment+control; severity nullable except where control_state
       requires it; extension data as keyed hash), `token_extension_support`
@@ -64,7 +64,7 @@ extended by this package even though they sit outside the listed writeScopes.
       rows; quality_codes constrained to the §13.9 vocabulary (G1 TRD
       precedent CHECK form). Traces: FR-SOLSEC-001, FR-SOLSEC-002,
       FR-SOLSEC-004.
-- [ ] T005 Create `migrations/g1_solsec_0002_pool_security.sql`:
+- [x] T005 Create `migrations/g1_solsec_0002_pool_security.sql`:
       `pool_security_assessments` with `adapter_support_state`
       (RESOLVED/DEGRADED_UNSUPPORTED/UNABLE_TO_VERIFY), LP-control,
       withdrawal-authority, liquidity-removal, quote-parity, and
@@ -73,14 +73,14 @@ extended by this package even though they sit outside the listed writeScopes.
       row structurally cannot carry resolved-state fields (plan ADR-5,
       AC-230 law); availability-order CHECK; append-only trigger. Traces:
       FR-SOLSEC-003.
-- [ ] T006 Create `migrations/g1_solsec_0003_provider_evidence.sql`:
+- [x] T006 Create `migrations/g1_solsec_0003_provider_evidence.sql`:
       `security_provider_reports` (source FK to source_identities, verdict
       vocabulary, raw_payload_ref — never secret material) and
       `security_conflicts` (conflict_class CHECK including
       PROVIDER_OPTIMISM_OVERRIDDEN; deterministic finding ids required
       non-empty; resolution always names the deterministic side); append-only
       triggers. Traces: FR-SOLSEC-005.
-- [ ] T007 Create `migrations/g1_solsec_0004_system_addresses.sql`:
+- [x] T007 Create `migrations/g1_solsec_0004_system_addresses.sql`:
       `system_address_registry` (role CHECK per Appendix Q.2, valid_from/until,
       confidence, review_state, registry_version, UNIQUE per
       chain+address+version+valid_from) with the
@@ -101,7 +101,7 @@ extended by this package even though they sit outside the listed writeScopes.
 
 ## Phase 3 — Core analyzers: the solana-security package (blocks AC suites)
 
-- [ ] T009 Scaffold `packages/solana-security` (package.json
+- [x] T009 Scaffold `packages/solana-security` (package.json
       `@foresift/solana-security` with workspace `*` deps on
       domain/persistence/shared-schemas, `bun test` script, tsconfig extending
       tsconfig.base.json, no per-package runner config — G0/G1 scaffold

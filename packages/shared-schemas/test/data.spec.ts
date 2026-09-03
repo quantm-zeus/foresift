@@ -645,7 +645,8 @@ describe('G1 Data Schema extensions (FR-DATA-007..016, AC-242, AC-245)', () => {
       unavailabilityReason: 'COLLECTOR_OUTAGE_WINDOW',
       eventAt: at('2026-05-01T10:00:00Z'),
     };
-    const schemas = DATA_SCHEMAS as Record<string, any>;
+    const schemas: Record<string, { safeParse: (v: unknown) => { success: boolean } }> =
+      DATA_SCHEMAS;
     if (schemas.BackfilledObservation) {
       expect(schemas.BackfilledObservation.safeParse(valid).success).toBe(true);
 
@@ -667,7 +668,8 @@ describe('G1 Data Schema extensions (FR-DATA-007..016, AC-242, AC-245)', () => {
       counterfactualDeliveryAt: null,
       counterfactualVersion: null,
     };
-    const schemas = DATA_SCHEMAS as Record<string, any>;
+    const schemas: Record<string, { safeParse: (v: unknown) => { success: boolean } }> =
+      DATA_SCHEMAS;
     if (schemas.CandidateDecisionTimeline) {
       expect(schemas.CandidateDecisionTimeline.safeParse(validTimeline).success).toBe(true);
     }
@@ -693,7 +695,8 @@ describe('G1 Data Schema extensions (FR-DATA-007..016, AC-242, AC-245)', () => {
       actualDecisionChanged: false,
       evidenceIds: [],
     };
-    const schemas = DATA_SCHEMAS as Record<string, any>;
+    const schemas: Record<string, { safeParse: (v: unknown) => { success: boolean } }> =
+      DATA_SCHEMAS;
     if (schemas.EvidenceAcquisitionDecision) {
       expect(schemas.EvidenceAcquisitionDecision.safeParse(validAcquisition).success).toBe(true);
     }
@@ -710,7 +713,8 @@ describe('G1 Data Schema extensions (FR-DATA-007..016, AC-242, AC-245)', () => {
       confidence: 0.9,
       effectiveIndependenceMultiplier: 0.35,
     };
-    const schemas = DATA_SCHEMAS as Record<string, any>;
+    const schemas: Record<string, { safeParse: (v: unknown) => { success: boolean } }> =
+      DATA_SCHEMAS;
     if (schemas.SourceDependenceEdge) {
       expect(schemas.SourceDependenceEdge.safeParse(validEdge).success).toBe(true);
     }
@@ -724,7 +728,8 @@ describe('G1 Data Schema extensions (FR-DATA-007..016, AC-242, AC-245)', () => {
       detectedAt: at('2026-05-01T12:00:00Z'),
       details: { priceDifferencePercent: 15.5 },
     };
-    const schemas = DATA_SCHEMAS as Record<string, any>;
+    const schemas: Record<string, { safeParse: (v: unknown) => { success: boolean } }> =
+      DATA_SCHEMAS;
     if (schemas.ProviderConflict) {
       expect(schemas.ProviderConflict.safeParse(validConflict).success).toBe(true);
     }
@@ -736,7 +741,8 @@ describe('G1 Data Schema extensions (FR-DATA-007..016, AC-242, AC-245)', () => {
       mode: 'REALIZABLE_REPLAY',
       boundaryTimestamp: at('2026-05-01T12:00:00Z'),
     };
-    const schemas = DATA_SCHEMAS as Record<string, any>;
+    const schemas: Record<string, { safeParse: (v: unknown) => { success: boolean } }> =
+      DATA_SCHEMAS;
     if (schemas.ReplayQuerySemantics) {
       expect(schemas.ReplayQuerySemantics.safeParse(validQuery).success).toBe(true);
     }

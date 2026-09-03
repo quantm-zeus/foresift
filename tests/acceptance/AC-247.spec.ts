@@ -15,7 +15,6 @@ import {
   DependenceInputAvailability,
   DependenceLabel,
   edgeMayAffectCreditAt,
-  isEdgeValidAtTimestamp,
   utcTimestamp,
   type SourceDependenceEdgeLike,
   type UtcTimestamp,

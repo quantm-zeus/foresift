@@ -777,12 +777,9 @@ export const CandidateDecisionTimelineSchema = z
         : v.policyDecidedAt),
     { message: 'delivery eligibility must equal max(decision ready, policy decided)' },
   )
-  .refine(
-    (v) =>
-      compareStamps(v.decisionReadyAt, v.workflowCompletedAt) <= 0 &&
-      compareStamps(v.policyDecidedAt, v.workflowCompletedAt) <= 0,
-    { message: 'workflow completion cannot precede decision readiness or policy decision' },
-  )
+  .refine((v) => compareStamps(v.decisionReadyAt, v.policyDecidedAt) <= 0, {
+    message: 'policy decision cannot precede decision readiness',
+  })
   .refine(
     (v) =>
       v.deliveredAt === null

@@ -36,8 +36,6 @@ CREATE TABLE candidate_decision_timelines (
         CHECK (delivery_eligible_at = GREATEST(decision_ready_at, policy_decided_at)),
     CONSTRAINT cdt_monotonic
         CHECK (decision_ready_at <= policy_decided_at
-            AND policy_decided_at <= workflow_completed_at
-            AND delivery_eligible_at <= workflow_completed_at
             AND (delivered_at IS NULL OR delivery_eligible_at <= delivered_at)
             AND (counterfactual_delivery_at IS NULL
                 OR delivery_eligible_at <= counterfactual_delivery_at)),

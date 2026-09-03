@@ -113,14 +113,14 @@ describe("Solana Security domain vocabularies and fail-closed parsing (FR-SOLSEC
   });
 
   it("declares the LpControlState vocabulary", () => {
-    const expected = ["BURNED", "LOCKED", "OPEN", "UNABLE_TO_VERIFY"].sort();
+    const expected = ["BURNED", "LOCKED_WITH_EVIDENCE", "OPEN_CONTROL", "UNABLE_TO_VERIFY"].sort();
     expect([...ALL_LP_CONTROL_STATES].sort()).toEqual(expected as never);
   });
 
   it("declares the WithdrawalAuthorityState vocabulary", () => {
     const expected = [
       "REVOKED",
-      "PRESENT",
+      "PRESENT_OPEN",
       "PRESENT_WITH_OBSERVED_ABUSE",
       "UNABLE_TO_VERIFY",
     ].sort();
@@ -128,7 +128,7 @@ describe("Solana Security domain vocabularies and fail-closed parsing (FR-SOLSEC
   });
 
   it("declares the LiquidityRemovalRisk vocabulary", () => {
-    const expected = ["LOW", "MEDIUM", "HIGH", "CRITICAL", "UNKNOWN"].sort();
+    const expected = ["NONE_EVIDENCED", "POSSIBLE", "OBSERVED", "UNABLE_TO_VERIFY"].sort();
     expect([...ALL_LIQUIDITY_REMOVAL_RISKS].sort()).toEqual(expected as never);
   });
 
@@ -138,7 +138,7 @@ describe("Solana Security domain vocabularies and fail-closed parsing (FR-SOLSEC
   });
 
   it("declares the StateCompleteness vocabulary", () => {
-    const expected = ["COMPLETE", "INCOMPLETE", "DEGRADED"].sort();
+    const expected = ["COMPLETE", "INCOMPLETE_BLOCKING"].sort();
     expect([...ALL_STATE_COMPLETENESSES].sort()).toEqual(expected as never);
   });
 
@@ -159,7 +159,7 @@ describe("Solana Security domain vocabularies and fail-closed parsing (FR-SOLSEC
   });
 
   it("declares the SystemAddressReviewState vocabulary", () => {
-    const expected = ["APPROVED", "PENDING_REVIEW", "REJECTED"].sort();
+    const expected = ["REVIEWED", "PENDING_REVIEW", "REJECTED"].sort();
     expect([...ALL_SYSTEM_ADDRESS_REVIEW_STATES].sort()).toEqual(expected as never);
   });
 
@@ -171,9 +171,8 @@ describe("Solana Security domain vocabularies and fail-closed parsing (FR-SOLSEC
   it("declares the SecurityConflictClass vocabulary", () => {
     const expected = [
       "PROVIDER_OPTIMISM_OVERRIDDEN",
-      "UNRESOLVED_PROVIDER_RISK",
-      "CORROBORATED_RISK",
-      "NO_CONFLICT",
+      "PROVIDER_RISK_NO_DETERMINISTIC_CORROBORATION",
+      "UNABLE_TO_VERIFY",
     ].sort();
     expect([...ALL_SECURITY_CONFLICT_CLASSES].sort()).toEqual(expected as never);
   });
@@ -232,22 +231,22 @@ describe("Solana Security pure predicates (FR-SOLSEC-004, FR-SOLSEC-006)", () =>
 
   it("evaluates isExcludableSystemAddress against Appendix Q.2 minimum-confidence floor and accepted roles", () => {
     if (typeof isExcludableSystemAddress === "function") {
-      expect(isExcludableSystemAddress("ROUTER", 0.95, "APPROVED")).toBe(true);
-      expect(isExcludableSystemAddress("POOL", 0.9, "APPROVED")).toBe(true);
-      expect(isExcludableSystemAddress("PROGRAM", 0.85, "APPROVED")).toBe(true);
-      expect(isExcludableSystemAddress("FEE_COLLECTOR", 0.8, "APPROVED")).toBe(true);
+      expect(isExcludableSystemAddress("ROUTER", 0.95, "REVIEWED")).toBe(true);
+      expect(isExcludableSystemAddress("POOL", 0.9, "REVIEWED")).toBe(true);
+      expect(isExcludableSystemAddress("PROGRAM", 0.85, "REVIEWED")).toBe(true);
+      expect(isExcludableSystemAddress("FEE_COLLECTOR", 0.8, "REVIEWED")).toBe(true);
 
-      expect(isExcludableSystemAddress("ROUTER", 0.79, "APPROVED")).toBe(false);
-      expect(isExcludableSystemAddress("ROUTER", 0.4, "APPROVED")).toBe(false);
+      expect(isExcludableSystemAddress("ROUTER", 0.79, "REVIEWED")).toBe(false);
+      expect(isExcludableSystemAddress("ROUTER", 0.4, "REVIEWED")).toBe(false);
 
       expect(isExcludableSystemAddress("ROUTER", 0.95, "PENDING_REVIEW")).toBe(false);
       expect(isExcludableSystemAddress("ROUTER", 0.95, "REJECTED")).toBe(false);
 
-      expect(isExcludableSystemAddress("UNKNOWN_INFRASTRUCTURE", 0.99, "APPROVED")).toBe(false);
+      expect(isExcludableSystemAddress("UNKNOWN_INFRASTRUCTURE", 0.99, "REVIEWED")).toBe(false);
 
-      expect(() => isExcludableSystemAddress("ROUTER", -0.1, "APPROVED")).toThrow();
-      expect(() => isExcludableSystemAddress("ROUTER", 1.5, "APPROVED")).toThrow();
-      expect(() => isExcludableSystemAddress("INVALID_ROLE", 0.9, "APPROVED")).toThrow();
+      expect(() => isExcludableSystemAddress("ROUTER", -0.1, "REVIEWED")).toThrow();
+      expect(() => isExcludableSystemAddress("ROUTER", 1.5, "REVIEWED")).toThrow();
+      expect(() => isExcludableSystemAddress("INVALID_ROLE", 0.9, "REVIEWED")).toThrow();
     } else {
       expect(typeof isExcludableSystemAddress).toBe("function");
     }

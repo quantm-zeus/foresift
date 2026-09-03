@@ -14,7 +14,7 @@ CREATE TABLE system_address_registry (
     source_id            text NOT NULL REFERENCES source_identities(source_id),
     confidence           double precision NOT NULL CHECK (confidence BETWEEN 0 AND 1),
     review_state         text NOT NULL CHECK (review_state IN (
-                             'PENDING', 'REVIEWED', 'REJECTED')),
+                             'REVIEWED', 'PENDING_REVIEW', 'REJECTED')),
     registry_version     integer NOT NULL CHECK (registry_version > 0),
     evidence_ids         text[] NOT NULL CHECK (cardinality(evidence_ids) > 0),
     created_at           timestamptz NOT NULL DEFAULT now(),

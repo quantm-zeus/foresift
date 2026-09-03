@@ -58,46 +58,40 @@ export type PoolSupportState = (typeof PoolSupportState)[keyof typeof PoolSuppor
 
 export const LpControlState = {
   BURNED: 'BURNED',
-  LOCKED: 'LOCKED',
-  DISTRIBUTED: 'DISTRIBUTED',
-  CONCENTRATED_CONTROL: 'CONCENTRATED_CONTROL',
+  LOCKED_WITH_EVIDENCE: 'LOCKED_WITH_EVIDENCE',
+  OPEN_CONTROL: 'OPEN_CONTROL',
   UNABLE_TO_VERIFY: 'UNABLE_TO_VERIFY',
 } as const;
 export type LpControlState = (typeof LpControlState)[keyof typeof LpControlState];
 
 export const WithdrawalAuthorityState = {
-  NONE: 'NONE',
   REVOKED: 'REVOKED',
-  ACTIVE: 'ACTIVE',
+  PRESENT_OPEN: 'PRESENT_OPEN',
+  PRESENT_WITH_OBSERVED_ABUSE: 'PRESENT_WITH_OBSERVED_ABUSE',
   UNABLE_TO_VERIFY: 'UNABLE_TO_VERIFY',
 } as const;
 export type WithdrawalAuthorityState =
   (typeof WithdrawalAuthorityState)[keyof typeof WithdrawalAuthorityState];
 
 export const LiquidityRemovalRisk = {
-  CRITICAL: 'CRITICAL',
-  HIGH: 'HIGH',
-  MEDIUM: 'MEDIUM',
-  LOW: 'LOW',
-  NONE: 'NONE',
+  NONE_EVIDENCED: 'NONE_EVIDENCED',
+  POSSIBLE: 'POSSIBLE',
+  OBSERVED: 'OBSERVED',
   UNABLE_TO_VERIFY: 'UNABLE_TO_VERIFY',
 } as const;
 export type LiquidityRemovalRisk =
   (typeof LiquidityRemovalRisk)[keyof typeof LiquidityRemovalRisk];
 
 export const QuoteParityState = {
-  PASSED: 'PASSED',
-  FAILED: 'FAILED',
-  NOT_APPLICABLE: 'NOT_APPLICABLE',
+  PASS: 'PASS',
+  FAIL: 'FAIL',
   UNABLE_TO_VERIFY: 'UNABLE_TO_VERIFY',
 } as const;
 export type QuoteParityState = (typeof QuoteParityState)[keyof typeof QuoteParityState];
 
 export const StateCompleteness = {
   COMPLETE: 'COMPLETE',
-  PARTIAL: 'PARTIAL',
-  INCOMPLETE: 'INCOMPLETE',
-  UNABLE_TO_VERIFY: 'UNABLE_TO_VERIFY',
+  INCOMPLETE_BLOCKING: 'INCOMPLETE_BLOCKING',
 } as const;
 export type StateCompleteness = (typeof StateCompleteness)[keyof typeof StateCompleteness];
 
@@ -117,8 +111,8 @@ export const SystemAddressRole = {
 export type SystemAddressRole = (typeof SystemAddressRole)[keyof typeof SystemAddressRole];
 
 export const SystemAddressReviewState = {
-  PENDING: 'PENDING',
   REVIEWED: 'REVIEWED',
+  PENDING_REVIEW: 'PENDING_REVIEW',
   REJECTED: 'REJECTED',
 } as const;
 export type SystemAddressReviewState =
@@ -134,9 +128,8 @@ export type ProviderVerdict = (typeof ProviderVerdict)[keyof typeof ProviderVerd
 /** Conflict classes from the Solana-security conflict-resolution ADR. */
 export const SecurityConflictClass = {
   PROVIDER_OPTIMISM_OVERRIDDEN: 'PROVIDER_OPTIMISM_OVERRIDDEN',
-  PROVIDER_RISK_UNCONFIRMED: 'PROVIDER_RISK_UNCONFIRMED',
-  PROVIDER_REPORTS_DISAGREE: 'PROVIDER_REPORTS_DISAGREE',
-  DETERMINISTIC_EVIDENCE_DISAGREES: 'DETERMINISTIC_EVIDENCE_DISAGREES',
+  PROVIDER_RISK_NO_DETERMINISTIC_CORROBORATION: 'PROVIDER_RISK_NO_DETERMINISTIC_CORROBORATION',
+  UNABLE_TO_VERIFY: 'UNABLE_TO_VERIFY',
 } as const;
 export type SecurityConflictClass =
   (typeof SecurityConflictClass)[keyof typeof SecurityConflictClass];
@@ -188,6 +181,8 @@ export const ALL_TOKEN_CONTROL_STATES: readonly TokenControlState[] = Object.val
 export const ALL_SECURITY_SEVERITIES: readonly SecuritySeverity[] = Object.values(SecuritySeverity);
 export const ALL_TRANSFER_SEMANTICS_SUPPORT: readonly TransferSemanticsSupport[] =
   Object.values(TransferSemanticsSupport);
+export const ALL_TRANSFER_SEMANTICS_SUPPORTS: readonly TransferSemanticsSupport[] =
+  ALL_TRANSFER_SEMANTICS_SUPPORT;
 export const ALL_POOL_SUPPORT_STATES: readonly PoolSupportState[] = Object.values(PoolSupportState);
 export const ALL_LP_CONTROL_STATES: readonly LpControlState[] = Object.values(LpControlState);
 export const ALL_WITHDRAWAL_AUTHORITY_STATES: readonly WithdrawalAuthorityState[] =
@@ -197,6 +192,8 @@ export const ALL_LIQUIDITY_REMOVAL_RISKS: readonly LiquidityRemovalRisk[] =
 export const ALL_QUOTE_PARITY_STATES: readonly QuoteParityState[] = Object.values(QuoteParityState);
 export const ALL_STATE_COMPLETENESS_STATES: readonly StateCompleteness[] =
   Object.values(StateCompleteness);
+export const ALL_STATE_COMPLETENESSES: readonly StateCompleteness[] =
+  ALL_STATE_COMPLETENESS_STATES;
 export const ALL_SYSTEM_ADDRESS_ROLES: readonly SystemAddressRole[] = Object.values(SystemAddressRole);
 export const ALL_SYSTEM_ADDRESS_REVIEW_STATES: readonly SystemAddressReviewState[] =
   Object.values(SystemAddressReviewState);
@@ -255,10 +252,23 @@ export const securityConflictClass = (value: unknown): SecurityConflictClass =>
 
 /** FR-SOLSEC-004 blocking substrate: unknown required semantics always block. */
 export function profileRequiresCompleteExecutionModeling(
-  support: TransferSemanticsSupport,
+  support:
+    | TransferSemanticsSupport
+    | { readonly supportState: TransferSemanticsSupport }
+    | readonly TransferSemanticsSupport[],
 ): boolean {
-  return transferSemanticsSupport(support) === TransferSemanticsSupport.UNKNOWN_REQUIRED;
+  if (Array.isArray(support)) {
+    return support.some(
+      (member) => transferSemanticsSupport(member) === TransferSemanticsSupport.UNKNOWN_REQUIRED,
+    );
+  }
+  const resolved =
+    typeof support === 'string' ? support : (support as { supportState: TransferSemanticsSupport }).supportState;
+  return transferSemanticsSupport(resolved) === TransferSemanticsSupport.UNKNOWN_REQUIRED;
 }
+
+/** Alias: blocking form of the gate substrate. */
+export const blocksCompleteExecutionModeling = profileRequiresCompleteExecutionModeling;
 
 export const SYSTEM_ADDRESS_EXCLUSION_MIN_CONFIDENCE = 0.8;
 
@@ -270,7 +280,12 @@ export function isExcludableSystemAddress(
 ): boolean {
   const parsedRole = systemAddressRole(role);
   const parsedReviewState = systemAddressReviewState(reviewState);
-  if (!Number.isFinite(confidence) || confidence < 0 || confidence > 1) return false;
+  if (!Number.isFinite(confidence) || confidence < 0 || confidence > 1) {
+    throw new SolsecVocabularyError(
+      SolsecErrorCode.SYSTEM_ADDRESS_REVIEW_STATE_UNKNOWN,
+      confidence,
+    );
+  }
   return (
     parsedRole !== SystemAddressRole.UNKNOWN_INFRASTRUCTURE &&
     parsedReviewState === SystemAddressReviewState.REVIEWED &&

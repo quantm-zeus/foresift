@@ -44,7 +44,7 @@ CREATE TABLE security_conflicts (
     provider_report_id         text NOT NULL REFERENCES security_provider_reports(report_id),
     conflict_class             text NOT NULL CHECK (conflict_class IN (
                                    'PROVIDER_OPTIMISM_OVERRIDDEN',
-                                   'PROVIDER_RISK_UNCONFIRMED',
+                                   'PROVIDER_RISK_NO_DETERMINISTIC_CORROBORATION',
                                    'PROVIDER_REPORTS_DISAGREE',
                                    'DETERMINISTIC_EVIDENCE_DISAGREES')),
     deterministic_finding_ids  text[] NOT NULL CHECK (

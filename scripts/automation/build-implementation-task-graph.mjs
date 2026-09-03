@@ -528,10 +528,9 @@ const testUnits = executionProfile
  * overlapping writes, shared fixture/manifest/parity-suite paths) collapses
  * back to the single historical `test-author` lane — never splits on
  * filenames alone. AGY test lanes never gain product write authority: role
- * stays 'test' and the path-ownership guard is unchanged.
+ * stays 'test' and the path-ownership guard is unchanged. The canary cap is
+ * hard-wired at 2 lanes below (test-author-1/test-author-2).
  */
-const MAX_AGY_TEST_LANES = 2;
-
 function shardTestLanes(units, engine) {
   const lane = (id, us) => ({
     id,

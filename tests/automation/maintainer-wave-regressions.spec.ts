@@ -14,7 +14,7 @@
 //      overrides both. Pinned here so the boundary behavior stays explicit.
 import { describe, expect, it } from 'bun:test';
 import { spawnSync } from 'node:child_process';
-import { mkdtempSync, mkdirSync, writeFileSync, readFileSync } from 'node:fs';
+import { mkdtempSync, mkdirSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { resolveAdaptiveLaneCount } from '../../scripts/automation/adaptive-lanes.mjs';

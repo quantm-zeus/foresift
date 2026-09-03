@@ -1009,9 +1009,11 @@ describe('Foresift V4 CODEX_AGY execution profile test matrix (A through AH)', (
       expect(content).toContain('fast-recheck');
 
       // 6. AGY test author receives persisted routing artifact
+      // (maintainer Part E: lane id is graph-derived, testLanes[n])
       const agyNode = content.match(/- id: writer-test-author-agy[\s\S]*?(?=\n  - id:)/);
       expect(agyNode).toBeTruthy();
-      expect(agyNode?.[0]).toContain('exec-agy-test-writer.mjs --lane test-author');
+      expect(agyNode?.[0]).toContain('exec-agy-test-writer.mjs --lane "$TL_ID"');
+      expect(agyNode?.[0]).toContain('g.testLanes?.[0]?.id');
       expect(agyNode?.[0]).toContain('--routing "$ARTIFACTS_DIR/routing.json"');
     });
   });

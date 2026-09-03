@@ -918,9 +918,17 @@ export const DATA_SCHEMAS = {
 export type DataSchemaName = keyof typeof DATA_SCHEMAS;
 
 /** Parse-by-name entrypoint for generic boundary code. Throws ZodError on failure. */
+export function parseDataSchema(
+  name: 'SourceDependenceEdge',
+  payload: z.input<typeof LegacySourceDependenceEdgeSchema>,
+): z.output<typeof LegacySourceDependenceEdgeSchema>;
 export function parseDataSchema<T extends DataSchemaName>(
   name: T,
   payload: unknown,
-): z.infer<(typeof DATA_SCHEMAS)[T]> {
-  return DATA_SCHEMAS[name].parse(payload) as z.infer<(typeof DATA_SCHEMAS)[T]>;
+): z.infer<(typeof DATA_SCHEMAS)[T]>;
+export function parseDataSchema(
+  name: DataSchemaName,
+  payload: unknown,
+): z.infer<(typeof DATA_SCHEMAS)[DataSchemaName]> {
+  return DATA_SCHEMAS[name].parse(payload) as z.infer<(typeof DATA_SCHEMAS)[DataSchemaName]>;
 }

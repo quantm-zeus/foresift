@@ -423,7 +423,7 @@ export async function evaluateConformance(options: ConformanceOptions): Promise<
     checkNoPrematureImplementations({
       repoRoot: options.repoRoot,
       activeGroup,
-      requirements,
+      ...(options.requirements === undefined ? {} : { requirements }),
     }),
     checkGeneratedDocsDrift({
       repoRoot: options.repoRoot,

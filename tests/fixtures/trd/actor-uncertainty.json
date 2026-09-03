@@ -1,0 +1,37 @@
+{
+  "$comment": "Actor uncertainty factor reduction test vectors (FR-TRD-004 §66.3 rule 7, AC-136). Unresolved/partial actor state reduces feature quality and ranking contribution deterministically without dropping evidence.",
+  "uncertaintyVectors": [
+    {
+      "name": "resolved actor with high confidence provides full feature contribution",
+      "actorResolutionState": "RESOLVED",
+      "actorResolutionConfidence": 1.0,
+      "expectedUncertaintyFactor": 1.0,
+      "expectedQualityCodes": ["VALID"],
+      "expectedRankingReduction": 0.0
+    },
+    {
+      "name": "resolved actor with 0.8 confidence provides proportional contribution",
+      "actorResolutionState": "RESOLVED",
+      "actorResolutionConfidence": 0.8,
+      "expectedUncertaintyFactor": 0.8,
+      "expectedQualityCodes": ["VALID"],
+      "expectedRankingReduction": 0.2
+    },
+    {
+      "name": "partially resolved actor (contract call without internal transfer clarity) receives discounted contribution",
+      "actorResolutionState": "PARTIAL",
+      "actorResolutionConfidence": 0.8,
+      "expectedUncertaintyFactor": 0.4,
+      "expectedQualityCodes": ["PARTIAL"],
+      "expectedRankingReduction": 0.6
+    },
+    {
+      "name": "unresolved actor yields minimal baseline contribution with degraded quality code",
+      "actorResolutionState": "UNRESOLVED",
+      "actorResolutionConfidence": 0.0,
+      "expectedUncertaintyFactor": 0.0,
+      "expectedQualityCodes": ["SYSTEM_ADDRESS_UNCERTAIN"],
+      "expectedRankingReduction": 1.0
+    }
+  ]
+}

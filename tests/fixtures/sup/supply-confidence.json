@@ -1,0 +1,57 @@
+{
+  "$comment": "Supply confidence and market-cap fallback vectors (FR-SUP-001, FR-SUP-002, AC-135). Circulating supply exposes source, method, excluded supply, confidence; low-confidence market cap cannot hard-reject when approved liquidity fallback exists.",
+  "assessments": [
+    {
+      "name": "high confidence circulating supply assessment from token-lock inspection",
+      "assetId": "solana:5eykt4UsFv8P8NJdTREpY1vzqKqZKvdp/mint/DezXAZ8z7PnrnRJjz3wXBoRgixCa6xjnB7YaB1pPB263",
+      "source": "first-party-spl-indexer",
+      "method": "ESTIMATED_CIRCULATING",
+      "marketCapBasis": "ESTIMATED_CIRCULATING",
+      "totalSupply": "100000000000000",
+      "excludedSupply": "30000000000000",
+      "circulatingSupply": "70000000000000",
+      "confidence": 0.95,
+      "exclusionEvidence": [
+        { "category": "TEAM_TIMELOCK", "amount": "20000000000000", "holder": "7xKX...lock1" },
+        { "category": "UNMINTED_RESERVE", "amount": "10000000000000", "holder": "3vZZ...lock2" }
+      ],
+      "qualityCodes": ["VALID"],
+      "approvedFallbackAvailable": false,
+      "expectedMayHardReject": true
+    },
+    {
+      "name": "low confidence circulating supply with approved 24h volume/liquidity fallback prevents hard rejection",
+      "assetId": "eip155:1/token/0x111111111117dc0aa78b770fa6a738034120c302",
+      "source": "unverified-aggregator",
+      "method": "PROVIDER_CIRCULATING",
+      "marketCapBasis": "PROVIDER_CIRCULATING",
+      "totalSupply": "1000000000",
+      "excludedSupply": "0",
+      "circulatingSupply": "1000000000",
+      "confidence": 0.35,
+      "exclusionEvidence": [],
+      "qualityCodes": ["SUPPLY_UNCERTAIN"],
+      "approvedFallbackAvailable": true,
+      "expectedMayHardReject": false,
+      "expectedFallbackDecision": "FALLBACK_APPROVED",
+      "expectedAuditPersisted": true
+    },
+    {
+      "name": "low confidence circulating supply WITHOUT approved fallback permits hard rejection",
+      "assetId": "eip155:1/token/0x2222222222222222222222222222222222222222",
+      "source": "unverified-aggregator",
+      "method": "PROVIDER_CIRCULATING",
+      "marketCapBasis": "PROVIDER_CIRCULATING",
+      "totalSupply": "1000000000",
+      "excludedSupply": "0",
+      "circulatingSupply": "1000000000",
+      "confidence": 0.2,
+      "exclusionEvidence": [],
+      "qualityCodes": ["SUPPLY_UNCERTAIN"],
+      "approvedFallbackAvailable": false,
+      "expectedMayHardReject": true,
+      "expectedFallbackDecision": "HARD_REJECTED",
+      "expectedAuditPersisted": true
+    }
+  ]
+}

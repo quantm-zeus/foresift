@@ -98,7 +98,18 @@ export function runAgyTestWriter(input) {
   });
   const resultDir = input['results-dir'];
   mkdirSync(resultDir, { recursive: true });
-  const baseHead = git(['rev-parse', 'HEAD'], input.worktree).stdout.trim();
+  // LOGICAL-LANE evidence baseline (maintainer Part A4, 2026-09-03): the
+  // evidence range must cover the LANE, not the retry attempt. --lane-base is
+  // the immutable worktree base persisted once by wave prep; on a workflow
+  // retry the worktree HEAD already carries earlier attempts' valid commits,
+  // and deriving the baseline from HEAD would silently drop them from the
+  // ownership/scope evidence scan. Fail closed when absent: a missing lane
+  // base falls back to the attempt-start HEAD (legacy behavior) — the
+  // ownership guard then still scans the union with uncommitted paths, so
+  // unknown-truth degrades conservatively, never permissively.
+  const baseHead = input['lane-base']
+    ? String(input['lane-base']).trim()
+    : git(['rev-parse', 'HEAD'], input.worktree).stdout.trim();
   const allowedPaths = input['allowed-paths']
     ? new Set(JSON.parse(readFileSync(input['allowed-paths'], 'utf8')))
     : null;

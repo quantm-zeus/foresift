@@ -183,8 +183,13 @@ export function runClaudeWriter(input) {
     throw new Error(`CLAUDE_WRITER_${classification}: ${(run.stderr ?? '').slice(-500)}`);
 
   // Lane evidence diff (live 7c98e02e): committed work counts — status alone
-  // sees a clean tree after the agent's own commits.
-  const before = git(['rev-parse', 'HEAD'], input.worktree).stdout.trim();
+  // sees a clean tree after the agent's own commits. LOGICAL-LANE baseline
+  // (maintainer Part A4, 2026-09-03): prefer the immutable --lane-base over
+  // the attempt-start HEAD so retries keep earlier attempts' commits inside
+  // the evidence range; absent --lane-base falls back to attempt-start HEAD.
+  const before = input['lane-base']
+    ? String(input['lane-base']).trim()
+    : git(['rev-parse', 'HEAD'], input.worktree).stdout.trim();
   const dirty = git(['status', '--porcelain=v1'], input.worktree)
     .stdout.split('\n')
     .filter(Boolean)

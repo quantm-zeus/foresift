@@ -1,7 +1,10 @@
 /** Runtime contracts for §66 economic-trade normalization (FR-TRD-001/002). */
 import { z } from 'zod';
 import { ChainIdSchema, QualityCodesSchema, UtcTimestampSchema } from './data.ts';
-import { ActorResolutionState, actorUncertaintyFactor } from '@foresift/domain';
+import {
+  ActorResolutionState as DomainActorResolutionState,
+  actorUncertaintyFactor,
+} from '@foresift/domain';
 
 /** Canonical signed decimal. Raw net deltas may be negative; exponent notation is forbidden. */
 export const SignedDecimalStringSchema = z
@@ -84,7 +87,7 @@ export const EconomicTradeEventSchema = z
   })
   .refine(
     (value) =>
-      value.actorResolutionState !== ActorResolutionState.UNRESOLVED ||
+      value.actorResolutionState !== DomainActorResolutionState.UNRESOLVED ||
       (value.qualityCodes.includes('SYSTEM_ADDRESS_UNCERTAIN') &&
         !value.qualityCodes.includes('VALID')),
     { message: 'unresolved actor evidence requires degraded quality without VALID' },

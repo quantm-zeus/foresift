@@ -520,24 +520,67 @@ const testUnits = executionProfile
           /\b(?:test|regression|fixture|fuzz|property)\b/i.test(u.body)),
     )
   : [];
+/**
+ * Bounded write-disjoint AGY test sharding (maintainer Part E, 2026-09-03):
+ * split test-bearing units into AT MOST MAX_AGY_TEST_LANES lanes ONLY when the
+ * exact testWrites sets are provably disjoint across every lane pair AND no
+ * unit shares a write with another lane's set. Anything ambiguous (unknown or
+ * overlapping writes, shared fixture/manifest/parity-suite paths) collapses
+ * back to the single historical `test-author` lane — never splits on
+ * filenames alone. AGY test lanes never gain product write authority: role
+ * stays 'test' and the path-ownership guard is unchanged.
+ */
+const MAX_AGY_TEST_LANES = 2;
+
+function shardTestLanes(units, engine) {
+  const lane = (id, us) => ({
+    id,
+    mode: 'parallel',
+    role: 'test',
+    engine,
+    units: us.map((u) => u.id),
+    allowedWritePaths: [...new Set(us.flatMap((u) => u.testWrites))].sort(),
+    baselineClassifications: [
+      'NEW_BEHAVIOR_RED',
+      'REGRESSION_RED',
+      'NEGATIVE_RED',
+      'CHARACTERIZATION_GREEN',
+      'REFACTOR_GUARD_GREEN',
+    ],
+  });
+  // Only units with EXACTLY known testWrites participate in a split; a single
+  // unknown write set forces the whole column into one lane (fail closed).
+  const exact = units.filter((u) => (u.testWrites ?? []).length > 0);
+  if (exact.length !== units.length || units.length < 2) return [lane('test-author', units)];
+  const disjoint = (a, b) => {
+    const aSet = new Set(a.testWrites);
+    return (b.testWrites ?? []).every((p) => !aSet.has(p));
+  };
+  // Deterministic collision-clustered 2-way split in task order: a unit joins
+  // bin A while it is disjoint from A; the FIRST unit that collides with A
+  // seeds bin B (every later unit joins B only while disjoint from B). The
+  // split is emitted only when A and B are each internally disjoint and
+  // A∩B = ∅; any cross-bin collision collapses to the single lane.
+  const a = [];
+  const b = [];
+  for (const u of units) {
+    const fitsA = a.length === 0 || a.every((x) => disjoint(x, u));
+    const fitsB = b.length === 0 || b.every((x) => disjoint(x, u));
+    if (fitsA && (a.length <= b.length || !fitsB)) a.push(u);
+    else if (fitsB) b.push(u);
+    else return [lane('test-author', units)]; // fits neither bin — collapse
+  }
+  if (!a.length || !b.length) return [lane('test-author', units)];
+  for (const x of a) {
+    for (const y of b) {
+      if (!disjoint(x, y)) return [lane('test-author', units)];
+    }
+  }
+  return [lane('test-author-1', a), lane('test-author-2', b)];
+}
+
 const testLanes = testUnits.length
-  ? [
-      {
-        id: 'test-author',
-        mode: 'parallel',
-        role: 'test',
-        engine: testEngineForProfile(executionProfile),
-        units: testUnits.map((u) => u.id),
-        allowedWritePaths: [...new Set(testUnits.flatMap((u) => u.testWrites))].sort(),
-        baselineClassifications: [
-          'NEW_BEHAVIOR_RED',
-          'REGRESSION_RED',
-          'NEGATIVE_RED',
-          'CHARACTERIZATION_GREEN',
-          'REFACTOR_GUARD_GREEN',
-        ],
-      },
-    ]
+  ? shardTestLanes(testUnits, testEngineForProfile(executionProfile))
   : [];
 
 // ── emit ──────────────────────────────────────────────────────────────────────

@@ -122,7 +122,15 @@ export function runCodexWriter(input) {
   const brief = readFileSync(input.brief, 'utf8');
   const resultDir = input['results-dir'];
   mkdirSync(resultDir, { recursive: true });
-  const before = git(['rev-parse', 'HEAD'], input.worktree).stdout.trim();
+  // LOGICAL-LANE evidence baseline (maintainer Part A4, 2026-09-03): prefer
+  // the immutable --lane-base persisted by wave prep over the attempt-start
+  // HEAD, so a workflow retry's evidence scan still covers earlier attempts'
+  // valid commits in the same lane worktree. Absent --lane-base, fall back
+  // to the attempt-start HEAD (legacy behavior; conservative union with
+  // uncommitted paths keeps the evidence scan fail-closed).
+  const before = input['lane-base']
+    ? String(input['lane-base']).trim()
+    : git(['rev-parse', 'HEAD'], input.worktree).stdout.trim();
   const prompt = [
     brief,
     '',

@@ -57,7 +57,12 @@ export function runClaudeLaneCore(input) {
     'Commit coherent production changes before exit.',
   ].join('\n');
   const started = Date.now();
-  const before = git(['rev-parse', 'HEAD'], input.worktree).stdout.trim();
+  // LOGICAL-LANE evidence baseline (maintainer Part A4, 2026-09-03): prefer
+  // the immutable --lane-base over the attempt-start HEAD (retry-safe
+  // evidence range); absent --lane-base falls back to attempt-start HEAD.
+  const before = input['lane-base']
+    ? String(input['lane-base']).trim()
+    : git(['rev-parse', 'HEAD'], input.worktree).stdout.trim();
   let run;
   try {
     run = spawnSync(

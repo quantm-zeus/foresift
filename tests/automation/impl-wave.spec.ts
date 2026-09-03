@@ -840,11 +840,27 @@ describe('foresift-sharded-wave workflow contract', () => {
     expect(agyTest?.[0]).toMatch(
       /retry:\s*\{\s*max_attempts:\s*2,\s*delay_ms:\s*10000,\s*on_error:\s*all\s*\}/,
     );
-    expect(agyTest?.[0]).toContain('exec-agy-test-writer.mjs --lane test-author');
-    expect(agyTest?.[0]).toContain('--brief "$ARTIFACTS_DIR/briefs/test-author-brief.md"');
-    expect(agyTest?.[0]).toContain('--worktree "$ARTIFACTS_DIR/wt/test-author"');
+    // Graph-derived AGY test-lane dispatch (maintainer Part E, 2026-09-03):
+    // lane id/units come from g.testLanes[n], so the sharded test-author-1/2
+    // pair needs no yaml edits; the legacy single lane stays index 0.
+    expect(agyTest?.[0]).toContain('exec-agy-test-writer.mjs --lane "$TL_ID"');
+    expect(agyTest?.[0]).toContain('g.testLanes?.[0]?.id');
+    expect(agyTest?.[0]).toContain('g.testLanes?.[0]?.units');
+    expect(agyTest?.[0]).toContain('--brief "$ARTIFACTS_DIR/briefs/$TL_ID-brief.md"');
+    expect(agyTest?.[0]).toContain('--worktree "$ARTIFACTS_DIR/wt/$TL_ID"');
     expect(agyTest?.[0]).toContain('--routing "$ARTIFACTS_DIR/routing.json"');
-    expect(agyTest?.[0]).toContain('--results-dir "$ARTIFACTS_DIR/writer-results/test-author"');
+    expect(agyTest?.[0]).toContain('--results-dir "$ARTIFACTS_DIR/writer-results/$TL_ID"');
+    expect(agyTest?.[0]).toContain('--lane-base "$(cat "$ARTIFACTS_DIR/base-head.txt")"');
+    // Canary cap 2: the second sharded lane pair mirrors lane 1 and
+    // dispatches only when the graph actually produced testLanes[1].
+    const agyTest2 = yaml.match(/- id: writer-test-author-2-agy[\s\S]*?(?=\n  - id:)/);
+    expect(agyTest2?.[0]).toBeTruthy();
+    expect(agyTest2?.[0]).toContain('depends_on: [brief-test-author-2, exec-test-author-2]');
+    expect(agyTest2?.[0]).toContain('when: "$exec-test-author-2.output == \'AGY\'"');
+    expect(agyTest2?.[0]).toContain('exec-agy-test-writer.mjs --lane "$TL_ID"');
+    expect(agyTest2?.[0]).toContain('g.testLanes?.[1]?.id');
+    expect(agyTest2?.[0]).toContain('g.testLanes?.[1]?.units');
+    expect(agyTest2?.[0]).toContain('--lane-base "$(cat "$ARTIFACTS_DIR/base-head.txt")"');
 
     // 3b. EVERY writer node's OWN command carries --task-graph (H3 live
     // 89c4b2b9): the P0-1 evidence protocol needs parsed predicted writes;
@@ -876,10 +892,21 @@ describe('foresift-sharded-wave workflow contract', () => {
 
   it('when-gates every lane so empty shards dispatch zero providers across CODEX, CLAUDE fallbacks, and AGY test-author', () => {
     // Parallel + test lanes keep exact persisted routing tokens per lane
-    for (const lane of ['shard-1', 'shard-2', 'test-author']) {
+    for (const lane of ['shard-1', 'shard-2']) {
       const emit = yaml.match(new RegExp(`- id: exec-${lane}[\\s\\S]*?(?=\\n  - id:)`));
       expect(emit?.[0]).toBeTruthy();
       expect(emit?.[0]).toContain(`cat "$ARTIFACTS_DIR/engine-${lane}.txt"`);
+    }
+    // AGY test lanes are graph-enumerated (maintainer Part E): the emitter
+    // resolves the lane id from g.testLanes[n] and cats its engine token.
+    for (const [node, idx, name] of [
+      ['exec-test-author', 0, 'NO TEST-AUTHOR THIS WAVE'],
+      ['exec-test-author-2', 1, 'NO TEST-AUTHOR-2 THIS WAVE'],
+    ] as const) {
+      const emit = yaml.match(new RegExp(`- id: ${node}[\\s\\S]*?(?=\\n  - id:)`));
+      expect(emit?.[0]).toBeTruthy();
+      expect(emit?.[0]).toContain(`g.testLanes?.[${idx}]?.id`);
+      expect(emit?.[0]).toContain(name);
     }
 
     // Brief emitters output deterministic sentinels when absent
@@ -906,10 +933,11 @@ describe('foresift-sharded-wave workflow contract', () => {
     );
     expect(guardTest?.[0]).toContain('trigger_rule: none_failed_min_one_success');
 
-    // Integrator depends on all serial + parallel + test guards
+    // Integrator depends on all serial + parallel + test guards (both AGY
+    // test lanes, Part E cap 2)
     const integrator = yaml.match(/- id: integrate-and-fast[\s\S]*?(?=\n  - id:)/);
     expect(integrator?.[0]).toContain(
-      'depends_on: [guard-serial-1, guard-serial-2, guard-serial-3, guard-shard-1, guard-shard-2, guard-test-author]',
+      'depends_on: [guard-serial-1, guard-serial-2, guard-serial-3, guard-shard-1, guard-shard-2, guard-test-author, guard-test-author-2]',
     );
   });
 
@@ -1035,14 +1063,20 @@ describe('foresift-sharded-wave workflow contract', () => {
     expect(checkpoint?.[0]).toContain('package-checkpoint.mjs --build');
   });
 
-  it('passes routing.json artifact to AGY test-author executor node', () => {
+  it('passes routing.json artifact to AGY test-author executor nodes (both sharded lanes)', () => {
     const agyNode = yaml.match(/- id: writer-test-author-agy[\s\S]*?(?=\n  - id:)/);
     expect(agyNode).toBeTruthy();
-    expect(agyNode?.[0]).toContain('exec-agy-test-writer.mjs --lane test-author');
+    expect(agyNode?.[0]).toContain('exec-agy-test-writer.mjs --lane "$TL_ID"');
+    expect(agyNode?.[0]).toContain('g.testLanes?.[0]?.id');
     expect(agyNode?.[0]).toContain('--routing "$ARTIFACTS_DIR/routing.json"');
-    expect(agyNode?.[0]).toContain('--brief "$ARTIFACTS_DIR/briefs/test-author-brief.md"');
-    expect(agyNode?.[0]).toContain('--worktree "$ARTIFACTS_DIR/wt/test-author"');
-    expect(agyNode?.[0]).toContain('--results-dir "$ARTIFACTS_DIR/writer-results/test-author"');
+    expect(agyNode?.[0]).toContain('--brief "$ARTIFACTS_DIR/briefs/$TL_ID-brief.md"');
+    expect(agyNode?.[0]).toContain('--worktree "$ARTIFACTS_DIR/wt/$TL_ID"');
+    expect(agyNode?.[0]).toContain('--results-dir "$ARTIFACTS_DIR/writer-results/$TL_ID"');
+    const agyNode2 = yaml.match(/- id: writer-test-author-2-agy[\s\S]*?(?=\n  - id:)/);
+    expect(agyNode2).toBeTruthy();
+    expect(agyNode2?.[0]).toContain('exec-agy-test-writer.mjs --lane "$TL_ID"');
+    expect(agyNode2?.[0]).toContain('g.testLanes?.[1]?.id');
+    expect(agyNode2?.[0]).toContain('--routing "$ARTIFACTS_DIR/routing.json"');
   });
 });
 

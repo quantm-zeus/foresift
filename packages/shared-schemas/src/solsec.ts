@@ -77,7 +77,61 @@ export const TokenExtensionSupportSchema = z
   });
 export type TokenExtensionSupport = z.infer<typeof TokenExtensionSupportSchema>;
 
+export const PoolSecurityAssessmentSchema = z
+  .object({
+    assessmentId: z.string().min(1),
+    poolId: z.string().min(1),
+    state: z.enum(['COMPLETE', 'PARTIAL', 'DEGRADED_UNSUPPORTED']),
+    protocolFamily: z.string().min(1).nullable(),
+    decoderVersion: z.string().min(1).nullable(),
+    poolOwner: z.string().min(1).nullable(),
+    positionControl: z
+      .enum(['BURNED', 'LOCKED_WITH_EVIDENCE', 'OPEN', 'UNABLE_TO_VERIFY'])
+      .nullable(),
+    lockEvidenceRef: z.string().min(1).nullable(),
+    withdrawalAuthority: z
+      .enum(['REVOKED', 'PRESENT', 'PRESENT_WITH_OBSERVED_ABUSE', 'UNABLE_TO_VERIFY'])
+      .nullable(),
+    migrationLineageRef: z.string().min(1).nullable(),
+    quoteParityPassed: z.boolean().nullable(),
+    liquidityConcentration: z.number().min(0).max(1).nullable(),
+    recentLiquidityAddsRaw: z.string().regex(/^\d+$/).nullable(),
+    recentLiquidityRemovalsRaw: z.string().regex(/^\d+$/).nullable(),
+    largeSellImpactBps: z.number().nonnegative().nullable(),
+    stateComplete: z.boolean(),
+    qualityCodes: z.array(z.string().min(1)).min(1),
+    analyzerVersion: z.string().min(1),
+    policyVersion: z.string().min(1),
+    evidenceRef: z.string().min(1),
+    observedAt: UtcTimestampSchema,
+    availableAt: UtcTimestampSchema,
+  })
+  .strict()
+  .refine((value) => Date.parse(value.availableAt) >= Date.parse(value.observedAt), {
+    message: 'availableAt cannot precede observedAt',
+  })
+  .refine(
+    (value) =>
+      value.state !== 'DEGRADED_UNSUPPORTED' ||
+      (value.protocolFamily === null &&
+        value.decoderVersion === null &&
+        value.poolOwner === null &&
+        value.positionControl === null &&
+        value.lockEvidenceRef === null &&
+        value.withdrawalAuthority === null &&
+        value.migrationLineageRef === null &&
+        value.quoteParityPassed === null &&
+        value.liquidityConcentration === null &&
+        value.recentLiquidityAddsRaw === null &&
+        value.recentLiquidityRemovalsRaw === null &&
+        value.largeSellImpactBps === null &&
+        !value.stateComplete),
+    { message: 'unsupported pool designs cannot contain resolved-state fields' },
+  );
+export type PoolSecurityAssessment = z.infer<typeof PoolSecurityAssessmentSchema>;
+
 export const SOLSEC_SCHEMAS = {
   TokenControlFinding: TokenControlFindingSchema,
   TokenExtensionSupport: TokenExtensionSupportSchema,
+  PoolSecurityAssessment: PoolSecurityAssessmentSchema,
 } as const;

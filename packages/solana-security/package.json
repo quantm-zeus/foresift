@@ -16,6 +16,7 @@
   "dependencies": {
     "@foresift/domain": "workspace:*",
     "@foresift/persistence": "workspace:*",
+    "@foresift/program-decoders": "workspace:*",
     "@foresift/shared-schemas": "workspace:*"
   }
 }

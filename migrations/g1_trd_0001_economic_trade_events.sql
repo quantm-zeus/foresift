@@ -7,7 +7,13 @@ CREATE TABLE economic_trade_events (
     transaction_hash         text NOT NULL,
     actor_entity_id          text,
     actor_resolution_state   text NOT NULL CHECK (actor_resolution_state IN (
-                                  'RESOLVED', 'PARTIALLY_RESOLVED', 'UNRESOLVED')),
+                                  'RESOLVED', 'PARTIAL', 'UNRESOLVED')),
+    actor_resolution_confidence double precision NOT NULL
+                                  CHECK (actor_resolution_confidence BETWEEN 0 AND 1),
+    actor_uncertainty_factor double precision NOT NULL
+                                  CHECK (actor_uncertainty_factor BETWEEN 0 AND 1),
+    contribution_factor      double precision NOT NULL
+                                  CHECK (contribution_factor BETWEEN 0 AND 1),
     asset_representation_id  text NOT NULL,
     net_asset_delta_raw      text NOT NULL CHECK (
                                   net_asset_delta_raw ~ '^-?(0|[1-9][0-9]*)(\.[0-9]+)?$'
@@ -30,6 +36,11 @@ CREATE TABLE economic_trade_events (
         CHECK (available_at >= event_at),
     CONSTRAINT economic_trade_events_resolved_actor_present
         CHECK (actor_resolution_state <> 'RESOLVED' OR actor_entity_id IS NOT NULL),
+    CONSTRAINT economic_trade_events_unresolved_actor_reduced
+        CHECK (actor_resolution_state <> 'UNRESOLVED' OR contribution_factor < 1),
+    CONSTRAINT economic_trade_events_unresolved_actor_quality
+        CHECK (actor_resolution_state <> 'UNRESOLVED'
+               OR 'SYSTEM_ADDRESS_UNCERTAIN' = ANY (quality_codes)),
     CONSTRAINT economic_trade_events_quality_nonempty
         CHECK (cardinality(quality_codes) > 0),
     CONSTRAINT economic_trade_events_quality_known

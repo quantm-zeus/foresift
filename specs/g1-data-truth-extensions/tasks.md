@@ -215,14 +215,14 @@ outside the listed writeScopes.
 
 ## Phase 4 — Fixtures, acceptance and negative suites (blocks Phase 5)
 
-- [ ] T021 Author `tests/fixtures/data/g1-backfill-provenance.json` and
+- [x] T021 Author `tests/fixtures/data/g1-backfill-provenance.json` and
       `tests/fixtures/data/g1-replay-modes.json` (FR-DATA-007
       no-substitution vectors incl. backdating refusals and original
       coordinate preservation; FR-DATA-008 mode vectors incl. the §13.6
       COUNTERFACTUAL_DATA_AVAILABILITY_RESEARCH labeling) — extending
       G0 fixture conventions. Traces: FR-DATA-007, FR-DATA-008, AC-020,
       AC-021.
-- [ ] T022 [P] Author `tests/fixtures/trd/route-hop-double-count.json`
+- [x] T022 [P] Author `tests/fixtures/trd/route-hop-double-count.json`
       (multi-pool routed swap → one economic trade, no hop-volume double
       count), `tests/fixtures/trd/arbitrage-inventory-neutral.json`
       (arbitrage/round-trip/inventory-neutral separation from organic
@@ -231,7 +231,7 @@ outside the listed writeScopes.
       (source/method/excluded-supply/confidence exposure + fallback
       scenarios). Traces: FR-TRD-001, FR-TRD-002, FR-TRD-003, FR-TRD-004,
       FR-SUP-001, FR-SUP-002, AC-133, AC-134, AC-135, AC-136.
-- [ ] T023 Author `tests/acceptance/AC-133.spec.ts`,
+- [x] T023 Author `tests/acceptance/AC-133.spec.ts`,
       `tests/acceptance/AC-134.spec.ts`,
       `tests/acceptance/AC-136.spec.ts` and
       `tests/acceptance/AC-233.spec.ts` scoped per spec I4 — AC-133: routed
@@ -243,13 +243,13 @@ outside the listed writeScopes.
       as delta components) on the economic-event side. G0 suite conventions
       (`tests/acceptance/helpers.ts`, PGlite). Traces: FR-TRD-001…004,
       AC-133, AC-134, AC-136, AC-233.
-- [ ] T024 [P] Author `tests/acceptance/AC-135.spec.ts`: low-confidence
+- [x] T024 [P] Author `tests/acceptance/AC-135.spec.ts`: low-confidence
       circulating supply cannot act as the sole hard gate under an approved
       fallback profile — the gate persists a fallback decision and
       evaluation proceeds; supply assessments expose source, method,
       excluded supply, and confidence end to end. Traces: FR-SUP-001,
       FR-SUP-002, AC-135.
-- [ ] T025 Author the matching negative suites
+- [x] T025 Author the matching negative suites
       `tests/negative/AC-133.negative.spec.ts`,
       `tests/negative/AC-134.negative.spec.ts`,
       `tests/negative/AC-135.negative.spec.ts`,
@@ -265,14 +265,21 @@ outside the listed writeScopes.
       `tests/acceptance/AC-020.spec.ts` + negative (backfilled row invisible
       before actual availability; no event-time substitution),
       `tests/acceptance/AC-240.spec.ts` + negative (timeline monotonicity +
-      counterfactual symmetry through the repo), `tests/acceptance/AC-242` /
-      `AC-243` suites stay green under the reconciled vocabulary
+      counterfactual symmetry through the repo), `tests/acceptance/AC-242.spec.ts` /
+      `tests/acceptance/AC-243.spec.ts` suites stay green under the reconciled vocabulary
       (regression lock) with new positive cases for requestedFields/seed
-      persistence before retrieval, and `tests/acceptance/AC-245`/`AC-247`
+      persistence before retrieval, and `tests/acceptance/AC-245.spec.ts`/`tests/acceptance/AC-247.spec.ts`
       cases for validity-interval credit resolution and
-      DIAGNOSTIC_RETROSPECTIVE isolation. Traces: FR-DATA-007, FR-DATA-009,
-      FR-DATA-011, FR-DATA-012, FR-DATA-015, AC-020, AC-240, AC-242, AC-243,
-      AC-245, AC-247.
+      DIAGNOSTIC_RETROSPECTIVE isolation (the validity-interval G1 cases use the
+      persistence G1 edge writer writeDependenceEdge from
+      packages/persistence/src/repos/dependence.ts, not the G0
+      sources.ts path). Also reconcile the two G0-era substrate suites with plan
+      ADR-1's vocabulary: `packages/domain/test/vocabulary.spec.ts` (reconciled
+      ten-state list with `RETURNED_EMPTY` valid) and
+      `packages/shared-schemas/test/data.spec.ts` (registry version 2 at both
+      assertions; negative fixtures carry only reconciled states). Traces:
+      FR-DATA-007, FR-DATA-009, FR-DATA-011, FR-DATA-012, FR-DATA-015, AC-020,
+      AC-240, AC-242, AC-243, AC-245, AC-247.
 
 ## Phase 5 — Telemetry catalogs, manifest regen, full verification
 

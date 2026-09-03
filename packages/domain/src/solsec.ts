@@ -265,6 +265,9 @@ export function profileRequiresCompleteExecutionModeling(
   return transferSemanticsSupport(value) === TransferSemanticsSupport.UNKNOWN_REQUIRED;
 }
 
+/** FR-SOLSEC-004 gate-oriented name for the same fail-closed predicate. */
+export const blocksCompleteExecutionModeling = profileRequiresCompleteExecutionModeling;
+
 export const SYSTEM_ADDRESS_EXCLUSION_MIN_CONFIDENCE = 0.8;
 
 /** Appendix Q.2/ADR-3 exclusion rule. Invalid confidence fails closed. */

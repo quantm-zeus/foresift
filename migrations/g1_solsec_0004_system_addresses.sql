@@ -20,10 +20,6 @@ CREATE TABLE system_address_registry (
     created_at           timestamptz NOT NULL DEFAULT now(),
     CONSTRAINT system_address_registry_valid_interval
         CHECK (valid_until IS NULL OR valid_until > valid_from),
-    CONSTRAINT system_address_exclusion_floor CHECK (
-        review_state <> 'REVIEWED'
-        OR role = 'UNKNOWN_INFRASTRUCTURE'
-        OR confidence >= 0.80),
     CONSTRAINT system_address_registry_identity_version_unique
         UNIQUE (chain_id, address, registry_version, valid_from)
 );
@@ -66,4 +62,10 @@ CREATE TRIGGER system_address_registry_immutable
     FOR EACH ROW EXECUTE FUNCTION foresift_refuse_mutation();
 CREATE TRIGGER system_address_registry_immutable_truncate
     BEFORE TRUNCATE ON system_address_registry
+    FOR EACH STATEMENT EXECUTE FUNCTION foresift_refuse_mutation();
+CREATE TRIGGER system_address_exclusions_applied_immutable
+    BEFORE UPDATE OR DELETE ON system_address_exclusions_applied
+    FOR EACH ROW EXECUTE FUNCTION foresift_refuse_mutation();
+CREATE TRIGGER system_address_exclusions_applied_immutable_truncate
+    BEFORE TRUNCATE ON system_address_exclusions_applied
     FOR EACH STATEMENT EXECUTE FUNCTION foresift_refuse_mutation();

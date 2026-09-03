@@ -28,7 +28,7 @@ export const SUPPORTED_TOKEN_PROGRAM_LAYOUTS: readonly SupportedTokenProgramLayo
   { programId: TOKEN_2022_PROGRAM_ID, programVersion: '1.0.0', layoutVersion: 'mint-tlv-v1' },
 ];
 export interface TokenExtensionSnapshot {
-  readonly type: string;
+  readonly type: string | number;
   readonly data?: Readonly<Record<string, unknown>>;
 }
 export interface TokenAssessmentInput {
@@ -80,10 +80,13 @@ const ALIASES: Readonly<Record<string, TokenControl>> = {
 const normalize = (value: string): TokenControl | undefined =>
   ALIASES[value.replaceAll(/[^a-zA-Z0-9]/g, '').toLowerCase()];
 const hash = (value: unknown): string => sha256Text(canonicalJson(value));
-function authorityState(value: unknown): TokenControlState {
+function authorityState(
+  value: unknown,
+  activeState: TokenControlState = TokenControlState.ADMINISTRATIVE_CONTROL,
+): TokenControlState {
   if (value === null) return TokenControlState.REVOKED_AUTHORITY;
-  return typeof value === 'string' && value.length > 0
-    ? TokenControlState.ADMINISTRATIVE_CONTROL
+  return typeof value === 'string' && value.trim().length > 0
+    ? activeState
     : TokenControlState.UNABLE_TO_VERIFY;
 }
 function field(data: Readonly<Record<string, unknown>>, ...keys: string[]): unknown {
@@ -91,8 +94,11 @@ function field(data: Readonly<Record<string, unknown>>, ...keys: string[]): unkn
   return undefined;
 }
 function assertInput(input: TokenAssessmentInput): void {
-  if (Date.parse(input.availableAt) < Date.parse(input.observedAt))
-    throw new Error('AVAILABLE_AT_PRECEDES_OBSERVED_AT');
+  const observedAt = Date.parse(input.observedAt);
+  const availableAt = Date.parse(input.availableAt);
+  if (!Number.isFinite(observedAt) || !Number.isFinite(availableAt))
+    throw new Error('INVALID_ASSESSMENT_TIMESTAMP');
+  if (availableAt < observedAt) throw new Error('AVAILABLE_AT_PRECEDES_OBSERVED_AT');
   if (!Number.isInteger(input.decimals) || input.decimals < 0 || input.decimals > 255)
     throw new Error('INVALID_DECIMALS');
   if (!/^\d+$/.test(input.totalSupplyRaw)) throw new Error('INVALID_TOTAL_SUPPLY');
@@ -103,7 +109,7 @@ export function assessTokenControls(input: TokenAssessmentInput): TokenAssessmen
   assertInput(input);
   const analyzerVersion = input.analyzerVersion ?? TOKEN_ASSESSMENT_ANALYZER_VERSION;
   const policyVersion = input.policyVersion ?? TOKEN_ASSESSMENT_POLICY_VERSION;
-  const assessmentId = `token-assessment:${[input.assetRepresentationId, input.programId, input.programVersion, input.layoutVersion, analyzerVersion, input.availableAt].map(encodeURIComponent).join(':')}`;
+  const assessmentId = `token-assessment:${[input.assetRepresentationId, input.programId, input.programVersion, input.layoutVersion, analyzerVersion, policyVersion, input.availableAt].map(encodeURIComponent).join(':')}`;
   const programSupported = (input.supportedProgramLayouts ?? SUPPORTED_TOKEN_PROGRAM_LAYOUTS).some(
     (entry) =>
       entry.programId === input.programId &&
@@ -119,6 +125,9 @@ export function assessTokenControls(input: TokenAssessmentInput): TokenAssessmen
     authority: unknown,
     data: unknown,
     codes: readonly QualityCode[] = ['VALID'],
+    severity: SecuritySeverity = state === TokenControlState.KNOWN_RISK
+      ? SecuritySeverity.HIGH
+      : SecuritySeverity.NONE,
   ): void => {
     for (const code of codes) if (code !== 'VALID') quality.add(code);
     findings.set(control, {
@@ -126,9 +135,12 @@ export function assessTokenControls(input: TokenAssessmentInput): TokenAssessmen
       assessmentId,
       control,
       controlState: state,
-      severity: state === TokenControlState.KNOWN_RISK ? SecuritySeverity.HIGH : null,
+      severity,
       authorityAddress: typeof authority === 'string' && authority.length > 0 ? authority : null,
       extensionDataHash: data === undefined ? null : hash(data),
+      evidenceRef: input.evidenceRef,
+      analyzerVersion,
+      policyVersion,
       evidenceIds: [input.evidenceRef, `analyzer:${analyzerVersion}`, `policy:${policyVersion}`],
       observedAt: input.observedAt,
       availableAt: input.availableAt,
@@ -171,27 +183,32 @@ export function assessTokenControls(input: TokenAssessmentInput): TokenAssessmen
       'UNSUPPORTED_PROGRAM_VERSION',
     ]);
   } else {
+    const mintState = authorityState(input.mintAuthority);
     addFinding(
       TokenControl.MINT,
-      authorityState(input.mintAuthority),
+      mintState,
       input.mintAuthority,
       undefined,
       input.mintAuthority === undefined ? ['PARTIAL'] : ['VALID'],
+      mintState === TokenControlState.ADMINISTRATIVE_CONTROL
+        ? SecuritySeverity.MEDIUM
+        : SecuritySeverity.NONE,
     );
     addFinding(
       TokenControl.FREEZE,
-      authorityState(input.freezeAuthority),
+      authorityState(input.freezeAuthority, TokenControlState.KNOWN_RISK),
       input.freezeAuthority,
       undefined,
       input.freezeAuthority === undefined ? ['PARTIAL'] : ['VALID'],
     );
     const unknown: TokenExtensionSnapshot[] = [];
     for (const extension of input.extensions ?? []) {
-      const control = normalize(extension.type);
+      const extensionType = String(extension.type);
+      const control = normalize(extensionType);
       const data = extension.data ?? {};
       if (control === undefined) {
         unknown.push(extension);
-        addSupport(extension.type, extension, TransferSemanticsSupport.UNKNOWN_REQUIRED, [
+        addSupport(extensionType, extension, TransferSemanticsSupport.UNKNOWN_REQUIRED, [
           'TOKEN_EXTENSION_UNKNOWN',
         ]);
         continue;
@@ -213,17 +230,54 @@ export function assessTokenControls(input: TokenAssessmentInput): TokenAssessmen
       if (control === TokenControl.CLOSE) authority = field(data, 'closeAuthority', 'authority');
       if (control === TokenControl.METADATA_UPDATE)
         authority = field(data, 'updateAuthority', 'metadataAuthority', 'authority');
-      const authorityControls: readonly TokenControl[] = [
-        TokenControl.PERMANENT_DELEGATE,
-        TokenControl.TRANSFER_FEE,
-        TokenControl.TRANSFER_HOOK,
-        TokenControl.CLOSE,
-        TokenControl.METADATA_UPDATE,
-      ];
-      let state = authorityControls.includes(control)
-        ? authorityState(authority)
-        : TokenControlState.NEUTRAL_CONFIGURATION;
-      if (control === TokenControl.NON_TRANSFERABLE) state = TokenControlState.KNOWN_RISK;
+      let state: TokenControlState = TokenControlState.NEUTRAL_CONFIGURATION;
+      let severity: SecuritySeverity = SecuritySeverity.NONE;
+      if (control === TokenControl.PERMANENT_DELEGATE) {
+        state = authorityState(authority, TokenControlState.KNOWN_RISK);
+        severity =
+          state === TokenControlState.KNOWN_RISK ? SecuritySeverity.HIGH : SecuritySeverity.NONE;
+      }
+      if (control === TokenControl.TRANSFER_FEE) {
+        const basisPoints = field(data, 'feeBasisPoints', 'transferFeeBasisPoints');
+        const maximumFee = field(data, 'maxFee', 'maximumFee');
+        const zeroFee =
+          (basisPoints === 0 || basisPoints === '0') &&
+          (maximumFee === undefined || maximumFee === 0 || maximumFee === '0');
+        state = zeroFee ? TokenControlState.NEUTRAL_CONFIGURATION : authorityState(authority);
+        severity =
+          state === TokenControlState.ADMINISTRATIVE_CONTROL
+            ? SecuritySeverity.MEDIUM
+            : SecuritySeverity.NONE;
+      }
+      if (control === TokenControl.TRANSFER_HOOK) {
+        state =
+          authority === null
+            ? TokenControlState.NEUTRAL_CONFIGURATION
+            : authorityState(authority, TokenControlState.KNOWN_RISK);
+        severity =
+          state === TokenControlState.KNOWN_RISK
+            ? SecuritySeverity.CRITICAL
+            : SecuritySeverity.NONE;
+      }
+      if (control === TokenControl.CLOSE) {
+        state = authorityState(authority);
+        severity =
+          state === TokenControlState.ADMINISTRATIVE_CONTROL
+            ? SecuritySeverity.MEDIUM
+            : SecuritySeverity.NONE;
+      }
+      if (control === TokenControl.METADATA_UPDATE) {
+        state = authorityState(authority);
+        severity =
+          state === TokenControlState.ADMINISTRATIVE_CONTROL
+            ? SecuritySeverity.LOW
+            : SecuritySeverity.NONE;
+      }
+      if (control === TokenControl.NON_TRANSFERABLE) {
+        state = TokenControlState.KNOWN_RISK;
+        severity = SecuritySeverity.CRITICAL;
+      }
+      if (control === TokenControl.CONFIDENTIAL_TRANSFER) severity = SecuritySeverity.LOW;
       if (control === TokenControl.DEFAULT_STATE) {
         const value = field(data, 'state', 'defaultState');
         state =
@@ -232,8 +286,10 @@ export function assessTokenControls(input: TokenAssessmentInput): TokenAssessmen
             : value === undefined
               ? TokenControlState.UNABLE_TO_VERIFY
               : TokenControlState.NEUTRAL_CONFIGURATION;
+        severity =
+          state === TokenControlState.KNOWN_RISK ? SecuritySeverity.HIGH : SecuritySeverity.NONE;
       }
-      addFinding(control, state, authority, { extensionType: extension.type, ...data });
+      addFinding(control, state, authority, { extensionType, ...data }, ['VALID'], severity);
     }
     if (unknown.length > 0)
       addFinding(
@@ -242,6 +298,7 @@ export function assessTokenControls(input: TokenAssessmentInput): TokenAssessmen
         undefined,
         unknown,
         ['TOKEN_EXTENSION_UNKNOWN'],
+        SecuritySeverity.HIGH,
       );
   }
   const qualityCodes: QualityCode[] = quality.size === 0 ? ['VALID'] : [...quality];

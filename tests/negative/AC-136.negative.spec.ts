@@ -18,12 +18,13 @@ afterAll(async () => {
 
 describe('AC-136 negative: Refusal of full quality on unresolved actors', () => {
   it('refuses 1.0 uncertainty factor when actor resolution state is UNRESOLVED', () => {
+    const computeFactor = (state: string, conf: number) => (state === 'RESOLVED' ? conf : 0.0);
     const actorState = 'UNRESOLVED';
     const confidence = 0.0;
     const naiveFactor = 1.0;
 
     // UNRESOLVED cannot have full factor 1.0
-    const resolvedFactor = actorState === 'RESOLVED' ? confidence : 0.0;
+    const resolvedFactor = computeFactor(actorState, confidence);
     expect(resolvedFactor).not.toBe(naiveFactor);
     expect(resolvedFactor).toBe(0.0);
   });

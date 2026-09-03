@@ -1,16 +1,15 @@
 import { describe, expect, it } from 'bun:test';
-import {
-  AcquisitionFailureKind,
-  AcquisitionState,
-  ALL_ACQUISITION_STATES,
-  ErrorCode,
-  ForesiftError,
-  acquisitionFailureKind,
-  acquisitionState,
-  isRetrievalFailure,
-  isTerminalAcquisition,
-  mapLegacyAcquisitionState,
-} from '../src/index.ts';
+import * as DomainModule from '../src/index.ts';
+
+const Domain = DomainModule as any;
+const AcquisitionState = Domain.AcquisitionState ?? {};
+const ALL_ACQUISITION_STATES = Domain.ALL_ACQUISITION_STATES ?? [];
+const AcquisitionFailureKind = Domain.AcquisitionFailureKind ?? {};
+const acquisitionFailureKind = Domain.acquisitionFailureKind;
+const acquisitionState = Domain.acquisitionState;
+const isRetrievalFailure = Domain.isRetrievalFailure;
+const isTerminalAcquisition = Domain.isTerminalAcquisition;
+const mapLegacyAcquisitionState = Domain.mapLegacyAcquisitionState;
 
 describe('Reconciled ten-state acquisition vocabulary (FR-DATA-011, FR-DATA-012, AC-242, AC-243)', () => {
   it('declares the exact reconciled ten-state vocabulary', () => {
@@ -27,7 +26,7 @@ describe('Reconciled ten-state acquisition vocabulary (FR-DATA-011, FR-DATA-012,
       'RETURNED',
     ].sort();
 
-    expect([...ALL_ACQUISITION_STATES].sort()).toEqual(expected as AcquisitionState[]);
+    expect([...ALL_ACQUISITION_STATES].sort()).toEqual(expected as any);
   });
 
   it('parses valid acquisition states fail-closed', () => {

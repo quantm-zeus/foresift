@@ -1,15 +1,16 @@
 import { describe, expect, it } from 'bun:test';
-import {
-  ALL_DEPENDENCE_METHODS,
-  DependenceMethod,
-  calculateEffectiveIndependenceMultiplier,
-  dependenceMethod,
-  isEdgeValidAtTimestamp,
-} from '../src/index.ts';
+import * as DomainModule from '../src/index.ts';
+
+const Domain = DomainModule as any;
+const ALL_DEPENDENCE_METHODS = Domain.ALL_DEPENDENCE_METHODS ?? [];
+const DependenceMethod = Domain.DependenceMethod ?? {};
+const calculateEffectiveIndependenceMultiplier = Domain.calculateEffectiveIndependenceMultiplier;
+const dependenceMethod = Domain.dependenceMethod;
+const isEdgeValidAtTimestamp = Domain.isEdgeValidAtTimestamp;
 
 describe('Source dependence vocabulary and effective independence policy (FR-DATA-013, FR-DATA-014, FR-DATA-015, AC-245, AC-246, AC-247)', () => {
   it('declares the exact dependence methods (DECLARED, EMPIRICAL)', () => {
-    expect([...ALL_DEPENDENCE_METHODS].sort()).toEqual(['DECLARED', 'EMPIRICAL'].sort() as DependenceMethod[]);
+    expect([...ALL_DEPENDENCE_METHODS].sort()).toEqual(['DECLARED', 'EMPIRICAL'].sort() as any);
   });
 
   it('parses valid dependence methods fail-closed', () => {

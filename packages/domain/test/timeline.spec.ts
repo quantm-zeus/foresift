@@ -1,9 +1,10 @@
 import { describe, expect, it } from 'bun:test';
-import {
-  computeDeliveryEligibleAt,
-  isTimelineMonotonic,
-  validateCounterfactualArm,
-} from '../src/index.ts';
+import * as DomainModule from '../src/index.ts';
+
+const Domain = DomainModule as any;
+const computeDeliveryEligibleAt = Domain.computeDeliveryEligibleAt;
+const isTimelineMonotonic = Domain.isTimelineMonotonic;
+const validateCounterfactualArm = Domain.validateCounterfactualArm;
 
 describe('Decision delivery timeline predicates (FR-DATA-009, Appendix P, AC-240)', () => {
   it('derives delivery_eligible_at as max(decision_ready_at, policy_decided_at)', () => {

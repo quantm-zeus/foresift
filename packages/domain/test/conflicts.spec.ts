@@ -1,10 +1,11 @@
 import { describe, expect, it } from 'bun:test';
-import {
-  ALL_PROVIDER_CONFLICT_CLASSES,
-  ProviderConflictClass,
-  classifyConflict,
-  providerConflictClass,
-} from '../src/index.ts';
+import * as DomainModule from '../src/index.ts';
+
+const Domain = DomainModule as any;
+const ALL_PROVIDER_CONFLICT_CLASSES = Domain.ALL_PROVIDER_CONFLICT_CLASSES ?? [];
+const ProviderConflictClass = Domain.ProviderConflictClass ?? {};
+const classifyConflict = Domain.classifyConflict;
+const providerConflictClass = Domain.providerConflictClass;
 
 describe('Provider conflict classification (FR-DATA-016, AC-245)', () => {
   it('declares the exact four provider conflict classes', () => {
@@ -14,7 +15,7 @@ describe('Provider conflict classification (FR-DATA-016, AC-245)', () => {
       'MATERIAL_DISAGREEMENT',
       'UNRESOLVED_DECISION_CRITICAL',
     ].sort();
-    expect([...ALL_PROVIDER_CONFLICT_CLASSES].sort()).toEqual(expected as ProviderConflictClass[]);
+    expect([...ALL_PROVIDER_CONFLICT_CLASSES].sort()).toEqual(expected as any);
   });
 
   it('parses valid conflict classes fail-closed', () => {

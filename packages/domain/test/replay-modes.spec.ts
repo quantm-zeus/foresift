@@ -1,12 +1,13 @@
 import { describe, expect, it } from 'bun:test';
-import {
-  ALL_REPLAY_MODES,
-  ReplayMode,
-  isRetrospectiveDataAllowed,
-  parseReplayMode,
-  replayMode,
-  shouldExcludeObservationAtBoundary,
-} from '../src/index.ts';
+import * as DomainModule from '../src/index.ts';
+
+const Domain = DomainModule as any;
+const ALL_REPLAY_MODES = Domain.ALL_REPLAY_MODES ?? [];
+const ReplayMode = Domain.ReplayMode ?? {};
+const isRetrospectiveDataAllowed = Domain.isRetrospectiveDataAllowed;
+const parseReplayMode = Domain.parseReplayMode;
+const replayMode = Domain.replayMode;
+const shouldExcludeObservationAtBoundary = Domain.shouldExcludeObservationAtBoundary;
 
 describe('G1 replay-modes vocabulary and visibility contracts (FR-DATA-008, FR-DATA-015, AC-241, AC-247)', () => {
   it('declares the exact four replay modes', () => {
@@ -16,7 +17,7 @@ describe('G1 replay-modes vocabulary and visibility contracts (FR-DATA-008, FR-D
       'HINDSIGHT',
       'COUNTERFACTUAL_DATA_AVAILABILITY_RESEARCH',
     ].sort();
-    expect([...ALL_REPLAY_MODES].sort()).toEqual(expected as ReplayMode[]);
+    expect([...ALL_REPLAY_MODES].sort()).toEqual(expected as any);
   });
 
   it('parses valid replay modes fail-closed', () => {

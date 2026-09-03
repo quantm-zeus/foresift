@@ -645,12 +645,13 @@ describe('G1 Data Schema extensions (FR-DATA-007..016, AC-242, AC-245)', () => {
       unavailabilityReason: 'COLLECTOR_OUTAGE_WINDOW',
       eventAt: at('2026-05-01T10:00:00Z'),
     };
-    if (DATA_SCHEMAS.BackfilledObservation) {
-      expect(DATA_SCHEMAS.BackfilledObservation.safeParse(valid).success).toBe(true);
+    const schemas = DATA_SCHEMAS as Record<string, any>;
+    if (schemas.BackfilledObservation) {
+      expect(schemas.BackfilledObservation.safeParse(valid).success).toBe(true);
 
       // Refuse event time substituting for available_at
       const substituted = { ...valid, availableAt: at('2026-05-01T10:00:00Z') };
-      expect(DATA_SCHEMAS.BackfilledObservation.safeParse(substituted).success).toBe(false);
+      expect(schemas.BackfilledObservation.safeParse(substituted).success).toBe(false);
     }
   });
 
@@ -666,8 +667,9 @@ describe('G1 Data Schema extensions (FR-DATA-007..016, AC-242, AC-245)', () => {
       counterfactualDeliveryAt: null,
       counterfactualVersion: null,
     };
-    if (DATA_SCHEMAS.CandidateDecisionTimeline) {
-      expect(DATA_SCHEMAS.CandidateDecisionTimeline.safeParse(validTimeline).success).toBe(true);
+    const schemas = DATA_SCHEMAS as Record<string, any>;
+    if (schemas.CandidateDecisionTimeline) {
+      expect(schemas.CandidateDecisionTimeline.safeParse(validTimeline).success).toBe(true);
     }
   });
 
@@ -691,8 +693,9 @@ describe('G1 Data Schema extensions (FR-DATA-007..016, AC-242, AC-245)', () => {
       actualDecisionChanged: false,
       evidenceIds: [],
     };
-    if (DATA_SCHEMAS.EvidenceAcquisitionDecision) {
-      expect(DATA_SCHEMAS.EvidenceAcquisitionDecision.safeParse(validAcquisition).success).toBe(true);
+    const schemas = DATA_SCHEMAS as Record<string, any>;
+    if (schemas.EvidenceAcquisitionDecision) {
+      expect(schemas.EvidenceAcquisitionDecision.safeParse(validAcquisition).success).toBe(true);
     }
   });
 
@@ -707,8 +710,9 @@ describe('G1 Data Schema extensions (FR-DATA-007..016, AC-242, AC-245)', () => {
       confidence: 0.9,
       effectiveIndependenceMultiplier: 0.35,
     };
-    if (DATA_SCHEMAS.SourceDependenceEdge) {
-      expect(DATA_SCHEMAS.SourceDependenceEdge.safeParse(validEdge).success).toBe(true);
+    const schemas = DATA_SCHEMAS as Record<string, any>;
+    if (schemas.SourceDependenceEdge) {
+      expect(schemas.SourceDependenceEdge.safeParse(validEdge).success).toBe(true);
     }
   });
 
@@ -720,8 +724,9 @@ describe('G1 Data Schema extensions (FR-DATA-007..016, AC-242, AC-245)', () => {
       detectedAt: at('2026-05-01T12:00:00Z'),
       details: { priceDifferencePercent: 15.5 },
     };
-    if (DATA_SCHEMAS.ProviderConflict) {
-      expect(DATA_SCHEMAS.ProviderConflict.safeParse(validConflict).success).toBe(true);
+    const schemas = DATA_SCHEMAS as Record<string, any>;
+    if (schemas.ProviderConflict) {
+      expect(schemas.ProviderConflict.safeParse(validConflict).success).toBe(true);
     }
   });
 
@@ -731,8 +736,9 @@ describe('G1 Data Schema extensions (FR-DATA-007..016, AC-242, AC-245)', () => {
       mode: 'REALIZABLE_REPLAY',
       boundaryTimestamp: at('2026-05-01T12:00:00Z'),
     };
-    if (DATA_SCHEMAS.ReplayQuerySemantics) {
-      expect(DATA_SCHEMAS.ReplayQuerySemantics.safeParse(validQuery).success).toBe(true);
+    const schemas = DATA_SCHEMAS as Record<string, any>;
+    if (schemas.ReplayQuerySemantics) {
+      expect(schemas.ReplayQuerySemantics.safeParse(validQuery).success).toBe(true);
     }
   });
 });

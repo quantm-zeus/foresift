@@ -39,8 +39,10 @@ export async function makeTestDatabase(): Promise<TestDatabase> {
   return { db, engine };
 }
 
-export async function closeTestDatabase(tdb: TestDatabase): Promise<void> {
-  await tdb.db.close();
+export async function closeTestDatabase(tdb?: TestDatabase): Promise<void> {
+  if (tdb?.db) {
+    await tdb.db.close();
+  }
 }
 
 /**

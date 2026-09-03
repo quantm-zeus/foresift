@@ -246,7 +246,7 @@ extended by this package even though they sit outside the listed writeScopes.
 
 ## Phase 5 — Telemetry contract, manifest regen, and gates
 
-- [ ] T025 Create `telemetry/solsec.catalog.json` (DECLARATIVE_CONTRACT_ONLY
+- [x] T025 Create `telemetry/solsec.catalog.json` (DECLARATIVE_CONTRACT_ONLY
       header, fields mirroring `packages/shared-schemas/src/solsec.ts`
       exactly, requirementRefs per event): `token.assessed`,
       `token.extension_parsed`, `token.transfer_semantics_verdict`,

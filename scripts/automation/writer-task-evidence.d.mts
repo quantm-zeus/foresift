@@ -30,3 +30,12 @@ export declare function laneEvidencePaths(input: {
   worktree: string;
   before?: string | null;
 }): string[];
+/**
+ * Commit-safety filter (live 486a44d0): split raw path lists into
+ * symlink-free paths to stage/scan (`clean`) and symlinked tooling plumbing
+ * to never commit (`symlinked`).
+ */
+export declare function splitSymlinks(
+  worktree: string,
+  paths: string[],
+): { clean: string[]; symlinked: string[] };

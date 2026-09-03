@@ -11,7 +11,7 @@
 //     [--canonical <checkout-path>] [--branch <name>] [--root <repo>] \
 //     [--out <report.json>]
 import { spawnSync } from 'node:child_process';
-import { readFileSync, readdirSync, existsSync, writeFileSync } from 'node:fs';
+import { readFileSync, readdirSync, existsSync, writeFileSync, lstatSync } from 'node:fs';
 import { join, basename, dirname } from 'node:path';
 import { repoRoot } from './schema.mjs';
 import { validateLaneOwnership } from './path-ownership.mjs';
@@ -121,6 +121,21 @@ for (const filePath of resultFiles) {
     report.rejected.push({ shardId: sid, reason: `cannot diff base..head: ${diffNames.err}` });
     continue;
   }
+  // Symlinks are tooling plumbing, never authorship (live 486a44d0: a lane
+  // agent's node_modules reuse symlink was swallowed into a lane commit
+  // because gitignore's `node_modules/` matches directories, not a symlink
+  // blob). Filtered before legality/ownership/nomination checks.
+  const resultDir = join(args.resultsDir, sid);
+  const changedPaths = diffNames.out
+    .split('\n')
+    .filter(Boolean)
+    .filter((p) => {
+      try {
+        return !lstatSync(join(resultDir, '..', '..', 'wt', sid, p)).isSymbolicLink();
+      } catch {
+        return true; // absent from the worktree (renamed/deleted) — keep in evidence
+      }
+    });
   // Authority: package scopes (+ recorded exceptions) for legality, plus strict
   // cross-lane ownership — files predicted by ANOTHER shard may not appear here.
   const allowed = [
@@ -143,14 +158,11 @@ for (const filePath of resultFiles) {
   // Cross-lane exclusion must not fire on graph-recorded scope exceptions:
   // the central migration registry is a plan-sanctioned duty both sides may
   // write (mirrors wave-guard.mjs; live self-collision runs 831d0819/99e8e23b).
-  const violations = diffNames.out
-    .split('\n')
-    .filter(Boolean)
-    .filter(
-      (p) =>
-        (!allowed.some((re) => re.test(p)) && !scopeExceptions.has(p)) ||
-        (othersPredicted.has(p) && !scopeExceptions.has(p)),
-    );
+  const violations = changedPaths.filter(
+    (p) =>
+      (!allowed.some((re) => re.test(p)) && !scopeExceptions.has(p)) ||
+      (othersPredicted.has(p) && !scopeExceptions.has(p)),
+  );
   if (violations.length > 0) {
     report.rejected.push({
       shardId: sid,
@@ -163,7 +175,7 @@ for (const filePath of resultFiles) {
     const ownership = validateLaneOwnership({
       engine: shard.engine,
       role: shard.role,
-      changedPaths: diffNames.out.split('\n').filter(Boolean),
+      changedPaths,
     });
     if (!ownership.ok) {
       report.rejected.push({
@@ -188,7 +200,7 @@ for (const filePath of resultFiles) {
   const validated = validateLaneNominations({
     laneTaskIds: [...laneUnits],
     unitsById,
-    changedFiles: diffNames.out.split('\n').filter(Boolean),
+    changedFiles: changedPaths,
     nominatedTaskIds: claimedUnits,
     blockers: res.blockers ?? [],
   });

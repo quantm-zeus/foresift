@@ -1,0 +1,65 @@
+{
+  "$schema": "https://foresift.dev/schemas/telemetry-catalog-v1.json",
+  "catalog": "trd",
+  "description": "Declarative economic-trade normalization contracts projected from EconomicTradeEventSchema.",
+  "contractStatus": "DECLARATIVE_CONTRACT_ONLY — emitter wiring is deferred to G2 observability.",
+  "requirementsCovered": ["FR-TRD-001", "FR-TRD-002", "FR-TRD-003", "FR-TRD-004"],
+  "recoveryDataClass": "CRITICAL_METADATA",
+  "events": [
+    {
+      "name": "trade.normalized",
+      "requirementRefs": ["FR-TRD-001", "FR-TRD-002"],
+      "tier": "CRITICAL_METADATA",
+      "fields": [
+        { "name": "eventId", "type": "string<sha256>", "required": true },
+        { "name": "economicTransactionId", "type": "string", "required": true },
+        { "name": "chainId", "type": "string", "required": true },
+        { "name": "transactionHash", "type": "string", "required": true },
+        { "name": "eventAt", "type": "string<utc-timestamp>", "required": true },
+        { "name": "availableAt", "type": "string<utc-timestamp>", "required": true },
+        { "name": "actorResolution", "type": "object", "required": true },
+        { "name": "actorResolutionState", "type": "string", "required": true },
+        { "name": "netActorDeltas", "type": "array<object>", "required": true },
+        { "name": "classification", "type": "string", "required": true },
+        { "name": "rawLegs", "type": "array<object>", "required": true },
+        { "name": "blockedDuplicateLegIds", "type": "array<string>", "required": true },
+        { "name": "qualityCodes", "type": "array<string>", "required": true },
+        { "name": "actorUncertaintyFactor", "type": "number[0,1]", "required": true },
+        { "name": "cappedContributionFactor", "type": "number[0,1]", "required": true }
+      ]
+    },
+    {
+      "name": "trade.side_classified",
+      "requirementRefs": ["FR-TRD-003"],
+      "tier": "CRITICAL_METADATA",
+      "fields": [
+        { "name": "eventId", "type": "string<sha256>", "required": true },
+        { "name": "netActorDeltas", "type": "array<object>", "required": true },
+        { "name": "classification", "type": "string", "required": true }
+      ]
+    },
+    {
+      "name": "trade.actor_downgraded",
+      "requirementRefs": ["FR-TRD-004"],
+      "tier": "CRITICAL_METADATA",
+      "fields": [
+        { "name": "eventId", "type": "string<sha256>", "required": true },
+        { "name": "actorResolution", "type": "object", "required": true },
+        { "name": "actorResolutionState", "type": "string", "required": true },
+        { "name": "qualityCodes", "type": "array<string>", "required": true },
+        { "name": "actorUncertaintyFactor", "type": "number[0,1]", "required": true },
+        { "name": "cappedContributionFactor", "type": "number[0,1]", "required": true }
+      ]
+    },
+    {
+      "name": "trade.double_count_blocked",
+      "requirementRefs": ["FR-TRD-001", "FR-TRD-002"],
+      "tier": "CRITICAL_METADATA",
+      "fields": [
+        { "name": "eventId", "type": "string<sha256>", "required": true },
+        { "name": "rawLegs", "type": "array<object>", "required": true },
+        { "name": "blockedDuplicateLegIds", "type": "array<string>", "required": true }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,45 @@
+{
+  "$schema": "https://foresift.dev/schemas/telemetry-catalog-v1.json",
+  "catalog": "sup",
+  "description": "Declarative supply assessment and market-cap fallback audit contracts.",
+  "contractStatus": "DECLARATIVE_CONTRACT_ONLY — emitter wiring is deferred to G2 observability.",
+  "requirementsCovered": ["FR-SUP-001", "FR-SUP-002"],
+  "recoveryDataClass": "CRITICAL_METADATA",
+  "events": [
+    {
+      "name": "supply.assessed",
+      "requirementRefs": ["FR-SUP-001"],
+      "tier": "CRITICAL_METADATA",
+      "fields": [
+        { "name": "assessmentId", "type": "string", "required": true },
+        { "name": "assetId", "type": "string", "required": true },
+        { "name": "source", "type": "string", "required": true },
+        { "name": "method", "type": "string", "required": true },
+        { "name": "circulatingSupply", "type": "string<decimal>", "required": true },
+        { "name": "excludedSupply", "type": "array<object>", "required": true },
+        { "name": "confidence", "type": "number[0,1]", "required": true },
+        { "name": "exclusionEvidenceIds", "type": "array<string>", "required": true },
+        { "name": "qualityCodes", "type": "array<string>", "required": true },
+        { "name": "marketCapBasis", "type": "object", "required": true },
+        { "name": "assessedAt", "type": "string<utc-timestamp>", "required": true }
+      ]
+    },
+    {
+      "name": "supply.fallback_decided",
+      "requirementRefs": ["FR-SUP-002"],
+      "tier": "CRITICAL_METADATA",
+      "fields": [
+        { "name": "decisionId", "type": "string", "required": true },
+        { "name": "assessmentId", "type": "string", "required": true },
+        { "name": "marketCapConfidence", "type": "number[0,1]", "required": true },
+        { "name": "minimumConfidence", "type": "number[0,1]", "required": true },
+        { "name": "approvedLiquidityFallback", "type": "boolean", "required": true },
+        { "name": "approvedActivityFallback", "type": "boolean", "required": true },
+        { "name": "outcome", "type": "string", "required": true },
+        { "name": "reason", "type": "string", "required": true },
+        { "name": "decidedAt", "type": "string<utc-timestamp>", "required": true },
+        { "name": "policyVersion", "type": "string", "required": true }
+      ]
+    }
+  ]
+}

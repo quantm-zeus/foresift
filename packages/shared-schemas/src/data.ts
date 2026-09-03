@@ -28,6 +28,9 @@ import {
   DecimalsResolutionState,
   DependenceLabel,
   CollectionMethod,
+  ActorResolutionState,
+  EconomicTradeClassification,
+  ProviderConflictClassification,
   FeatureStoreClass,
   LineageStatus,
   VerifiedEquivalence,
@@ -659,6 +662,123 @@ export const CandidateDecisionTimelineSchema = z
       ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'non-delivered arm enters before counterfactual delivery' });
   });
 
+export const BackfillProvenanceRecordSchema = z
+  .object({
+    backfillReceiptId: z.string().min(1),
+    backfillJobId: z.string().min(1),
+    retrievedAsBackfill: z.literal(true),
+    originalEventCoordinates: z.record(z.unknown()),
+    historicalEventAt: UtcTimestampSchema,
+    fetchedAt: UtcTimestampSchema,
+    earliestAvailableAt: UtcTimestampSchema,
+    earlierUnavailabilityReason: z.string().min(1),
+    retrospectiveOnly: z.boolean(),
+  })
+  .strict()
+  .refine((v) => compareStamps(v.historicalEventAt, v.earliestAvailableAt) <= 0, {
+    message: 'event time cannot substitute for availability time',
+  });
+
+export const DependenceEdgeValiditySchema = z
+  .object({
+    edgeId: z.string().min(1),
+    sourceA: z.string().min(1),
+    sourceB: z.string().min(1),
+    dependenceKind: z.enum(['DECLARED', 'EMPIRICAL']),
+    validFrom: UtcTimestampSchema,
+    validUntil: UtcTimestampSchema.nullable(),
+    method: z.string().min(1),
+    evidenceIds: z.array(z.string().min(1)),
+    confidence: z.number().min(0).max(1),
+    effectiveIndependentCountDelta: z.number().max(0),
+    availableAt: UtcTimestampSchema,
+  })
+  .strict()
+  .refine((v) => v.sourceA < v.sourceB, { message: 'source pair must use canonical order' })
+  .refine((v) => v.validUntil === null || compareStamps(v.validUntil, v.validFrom) > 0, {
+    message: 'validity interval must be positive',
+  });
+
+export const ProviderConflictSchema = z
+  .object({
+    conflictId: z.string().min(1),
+    observationIds: z.array(z.string().min(1)).min(2),
+    classification: z.enum(
+      Object.values(ProviderConflictClassification) as [
+        (typeof ProviderConflictClassification)[keyof typeof ProviderConflictClassification],
+        ...(typeof ProviderConflictClassification)[keyof typeof ProviderConflictClassification][],
+      ],
+    ),
+    decisionCritical: z.boolean(),
+    rationale: z.string().min(1),
+    classifiedAt: UtcTimestampSchema,
+    classifierVersion: z.string().min(1),
+  })
+  .strict()
+  .refine(
+    (v) =>
+      (v.classification === 'UNRESOLVED_DECISION_CRITICAL') === v.decisionCritical,
+    { message: 'decision-critical flag must match unresolved critical classification' },
+  );
+
+const ActorResolutionSchema = z.object({
+  state: z.enum(Object.values(ActorResolutionState) as [ActorResolutionState, ...ActorResolutionState[]]),
+  actorAddress: z.string().min(1).nullable(),
+  routerAddresses: z.array(z.string().min(1)),
+  confidence: z.number().min(0).max(1),
+  method: z.string().min(1),
+}).strict();
+
+export const EconomicTradeEventSchema = z.object({
+  eventId: z.string().regex(/^sha256:[0-9a-f]{64}$/),
+  economicTransactionId: z.string().min(1),
+  chainId: z.string().min(1),
+  transactionHash: z.string().min(1),
+  eventAt: UtcTimestampSchema,
+  availableAt: UtcTimestampSchema,
+  actorResolution: ActorResolutionSchema,
+  actorResolutionState: z.enum(Object.values(ActorResolutionState) as [ActorResolutionState, ...ActorResolutionState[]]),
+  netActorDeltas: z.array(z.object({ assetId: z.string().min(1), rawAmount: z.string().regex(/^-?(0|[1-9][0-9]*)$/) }).strict()),
+  classification: z.enum(Object.values(EconomicTradeClassification) as [EconomicTradeClassification, ...EconomicTradeClassification[]]),
+  rawLegs: z.array(z.object({
+    legId: z.string().min(1), observationId: z.string().min(1),
+    kind: z.enum(['SWAP', 'TRANSFER', 'AGGREGATOR_HOP']),
+    fromAddress: z.string().min(1), toAddress: z.string().min(1),
+    assetId: z.string().min(1), rawAmount: DigitStringSchema,
+    poolId: z.string().min(1).optional(), routeIndex: z.number().int().nonnegative().optional(),
+    migrationEquivalenceKey: z.string().min(1).optional(),
+  }).strict()),
+  blockedDuplicateLegIds: z.array(z.string().min(1)),
+  qualityCodes: QualityCodesSchema,
+  actorUncertaintyFactor: z.number().min(0).max(1),
+  cappedContributionFactor: z.number().min(0).max(1),
+}).strict().refine((v) => v.actorResolution.state === v.actorResolutionState, {
+  message: 'actor resolution state projections disagree',
+}).refine((v) => v.cappedContributionFactor <= v.actorUncertaintyFactor, {
+  message: 'contribution cannot exceed actor uncertainty factor',
+});
+
+export const SupplyAssessmentSchema = z.object({
+  assessmentId: z.string().min(1), assetId: z.string().min(1),
+  source: z.string().min(1), method: z.string().min(1),
+  circulatingSupply: DecimalStringSchema,
+  excludedSupply: z.array(z.object({ category: z.string().min(1), amount: DecimalStringSchema, reason: z.string().min(1) }).strict()),
+  confidence: z.number().min(0).max(1),
+  exclusionEvidenceIds: z.array(z.string().min(1)), qualityCodes: QualityCodesSchema,
+  marketCapBasis: z.object({ priceSource: z.string().min(1), price: DecimalStringSchema, supply: DecimalStringSchema, currency: z.string().min(1), methodVersion: z.string().min(1) }).strict(),
+  assessedAt: UtcTimestampSchema,
+}).strict();
+
+export const SupplyFallbackDecisionSchema = z.object({
+  decisionId: z.string().min(1), assessmentId: z.string().min(1),
+  marketCapConfidence: z.number().min(0).max(1), minimumConfidence: z.number().min(0).max(1),
+  approvedLiquidityFallback: z.boolean(), approvedActivityFallback: z.boolean(),
+  outcome: z.enum(['MARKET_CAP_ACCEPTED', 'APPROVED_FALLBACK_USED', 'HARD_REJECTED']),
+  reason: z.string().min(1), decidedAt: UtcTimestampSchema, policyVersion: z.string().min(1),
+}).strict().refine((v) => v.outcome !== 'HARD_REJECTED' || (!v.approvedLiquidityFallback && !v.approvedActivityFallback), {
+  message: 'approved fallback forbids hard rejection',
+});
+
 /**
  * Collector continuity records mirroring the SQL truth of
  * `g0_data_0007_checkpoints_gaps.sql` (§34.7, INV-009): fenced per-shard
@@ -739,6 +859,12 @@ export const DATA_SCHEMAS = {
   EvidenceAcquisitionDecision: EvidenceAcquisitionDecisionSchema,
   DecisionActionTimestamps: DecisionActionTimestampsSchema,
   CandidateDecisionTimeline: CandidateDecisionTimelineSchema,
+  BackfillProvenanceRecord: BackfillProvenanceRecordSchema,
+  DependenceEdgeValidity: DependenceEdgeValiditySchema,
+  ProviderConflict: ProviderConflictSchema,
+  EconomicTradeEvent: EconomicTradeEventSchema,
+  SupplyAssessment: SupplyAssessmentSchema,
+  SupplyFallbackDecision: SupplyFallbackDecisionSchema,
   CollectorCheckpoint: CollectorCheckpointSchema,
   CollectorGap: CollectorGapSchema,
 } as const;

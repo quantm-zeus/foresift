@@ -3,7 +3,7 @@
   "catalog": "data",
   "description": "Data-truth telemetry events for canonical identity, immutable observations/revisions, point-in-time replay, backfill receipts, field-quality flags, acquisition decisions, and source-dependence lineage. Every event carries the instant fields and evidence references its requirement demands; no event ever reports a fabricated success state.",
   "contractStatus": "DECLARATIVE_CONTRACT_ONLY — this file defines the event contracts the requirement manifest maps to (telemetry/data.*); emitter wiring lands with the observability milestone (dependency group G2), so nothing publishes these event names yet. Field lists mirror the authoritative schemas/repos exactly.",
-  "requirementsCovered": ["FR-DATA-002", "FR-DATA-003", "FR-DATA-005", "FR-DATA-006"],
+  "requirementsCovered": ["FR-DATA-002", "FR-DATA-003", "FR-DATA-005", "FR-DATA-006", "FR-DATA-007", "FR-DATA-008", "FR-DATA-009", "FR-DATA-010", "FR-DATA-011", "FR-DATA-012", "FR-DATA-013", "FR-DATA-014", "FR-DATA-015", "FR-DATA-016"],
   "recoveryDataClass": "CRITICAL_METADATA",
   "events": [
     {
@@ -170,6 +170,75 @@
           "required": true
         },
         { "name": "availableAt", "type": "string<utc-timestamp>", "required": true }
+      ]
+    },
+    {
+      "name": "backfill.provenance_recorded",
+      "description": "Actual retrospective retrieval and earliest availability were persisted without substituting event time.",
+      "requirementRefs": ["FR-DATA-007"],
+      "tier": "CRITICAL_OBSERVATIONS_CHECKPOINTS",
+      "fields": [
+        { "name": "backfillReceiptId", "type": "string", "required": true },
+        { "name": "backfillJobId", "type": "string", "required": true },
+        { "name": "retrievedAsBackfill", "type": "boolean(true)", "required": true },
+        { "name": "originalEventCoordinates", "type": "object", "required": true },
+        { "name": "historicalEventAt", "type": "string<utc-timestamp>", "required": true },
+        { "name": "fetchedAt", "type": "string<utc-timestamp>", "required": true },
+        { "name": "earliestAvailableAt", "type": "string<utc-timestamp>", "required": true },
+        { "name": "earlierUnavailabilityReason", "type": "string", "required": true },
+        { "name": "retrospectiveOnly", "type": "boolean", "required": true }
+      ]
+    },
+    {
+      "name": "decision.timeline_recorded",
+      "description": "The immutable monotonic decision and delivery timeline was recorded for a delivered or comparison arm.",
+      "requirementRefs": ["FR-DATA-009"],
+      "tier": "CRITICAL_METADATA",
+      "fields": [
+        { "name": "decisionId", "type": "string", "required": true },
+        { "name": "candidateId", "type": "string", "required": true },
+        { "name": "decisionReadyAt", "type": "string<utc-timestamp>", "required": true },
+        { "name": "policyDecidedAt", "type": "string<utc-timestamp>", "required": true },
+        { "name": "workflowCompletedAt", "type": "string<utc-timestamp>", "required": true },
+        { "name": "deliveryEligibleAt", "type": "string<utc-timestamp>", "required": true },
+        { "name": "deliveredAt", "type": "string<utc-timestamp>|null", "required": true },
+        { "name": "counterfactualDeliveryAt", "type": "string<utc-timestamp>|undefined", "required": false },
+        { "name": "counterfactualDeliveryVersion", "type": "string|undefined", "required": false },
+        { "name": "comparisonEntryAt", "type": "string<utc-timestamp>|undefined", "required": false }
+      ]
+    },
+    {
+      "name": "dependence.edge_validity_updated",
+      "description": "A declared or empirical dependence edge validity interval and count effect was persisted.",
+      "requirementRefs": ["FR-DATA-013"],
+      "tier": "CRITICAL_METADATA",
+      "fields": [
+        { "name": "edgeId", "type": "string", "required": true },
+        { "name": "sourceA", "type": "string", "required": true },
+        { "name": "sourceB", "type": "string", "required": true },
+        { "name": "dependenceKind", "type": "string(DECLARED|EMPIRICAL)", "required": true },
+        { "name": "validFrom", "type": "string<utc-timestamp>", "required": true },
+        { "name": "validUntil", "type": "string<utc-timestamp>|null", "required": true },
+        { "name": "method", "type": "string", "required": true },
+        { "name": "evidenceIds", "type": "array<string>", "required": true },
+        { "name": "confidence", "type": "number[0,1]", "required": true },
+        { "name": "effectiveIndependentCountDelta", "type": "number<=0", "required": true },
+        { "name": "availableAt", "type": "string<utc-timestamp>", "required": true }
+      ]
+    },
+    {
+      "name": "conflict.classified",
+      "description": "A conflict classification references every preserved raw observation.",
+      "requirementRefs": ["FR-DATA-016"],
+      "tier": "CRITICAL_METADATA",
+      "fields": [
+        { "name": "conflictId", "type": "string", "required": true },
+        { "name": "observationIds", "type": "array<string>", "required": true },
+        { "name": "classification", "type": "string(BENIGN_LATENCY_OR_ROUNDING|COMMON_UPSTREAM_DUPLICATION|MATERIAL_DISAGREEMENT|UNRESOLVED_DECISION_CRITICAL)", "required": true },
+        { "name": "decisionCritical", "type": "boolean", "required": true },
+        { "name": "rationale", "type": "string", "required": true },
+        { "name": "classifiedAt", "type": "string<utc-timestamp>", "required": true },
+        { "name": "classifierVersion", "type": "string", "required": true }
       ]
     }
   ]

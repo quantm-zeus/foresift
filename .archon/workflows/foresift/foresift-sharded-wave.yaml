@@ -144,10 +144,10 @@ nodes:
           // 2026-09-03): created ONCE per lane at worktree creation and reused
           // across every retry of the writer node. A retry re-enters the same
           // worktree whose HEAD already carries attempt-1 commits; deriving
-          // the evidence range from the attempt's starting HEAD would silently
-          // shrink LOGICAL LANE EVIDENCE = immutableLaneBase..currentHEAD ∪
+          // the evidence range from the attempt-start HEAD would silently
+          // shrink LOGICAL LANE EVIDENCE = immutableLaneBase..currentHEAD union
           // uncommitted valid paths down to attemptStart..currentHEAD and hide
-          // the earlier attempt's valid work. Writers receive it as
+          // the earlier attempt valid work. Writers receive it as
           // --lane-base and must never derive their own baseline from HEAD.
           meta[s.id] = { branch: br, worktree: wt, laneBase: base };
         }

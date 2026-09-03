@@ -45,8 +45,10 @@ export const SCHEMA_MIGRATION_LEASES_TABLE = '_foresift_schema_migration_leases'
 // `cost` (cost, quota, and capacity controls), `trd` (economic trades), and
 // `solsec` (Solana security), and `sup` (supply confidence).
 // Unknown families stay refused fail-closed.
-const MIGRATION_FILE_PATTERN =
-  /^g\d+_(data|dr|sec|prov|core|cost|col|disc|mcp|trace|solsec|trd|sup)_\d{4}_[a-z0-9_]+\.sql$/;
+const MIGRATION_FAMILIES = 'data|dr|sec|prov|core|cost|col|disc|mcp|trace|solsec|trd|sup';
+const MIGRATION_FILE_PATTERN = new RegExp(
+  `^g\\d+_(${MIGRATION_FAMILIES})_\\d{4}_[a-z0-9_]+\\.sql$`,
+);
 
 const MIGRATION_LEASE_KEY = 'schema-migrations-apply';
 
@@ -123,7 +125,7 @@ export async function discoverMigrations(
   if (unknown.length > 0) {
     throw new ForesiftError(
       ErrorCode.MIGRATION_FILENAME_UNKNOWN,
-      `migration directory ${dir} contains .sql files matching no known g<generation>_(data|dr|sec|prov|core|cost|col|disc|mcp|trace|solsec|trd|sup)_<seq>_<name> family: ${unknown.sort().join(', ')}`,
+      `migration directory ${dir} contains .sql files matching no known g<generation>_(${MIGRATION_FAMILIES})_<seq>_<name> family: ${unknown.sort().join(', ')}`,
       { dir, unknown: unknown.sort().join(',') },
     );
   }

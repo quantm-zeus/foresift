@@ -1,7 +1,7 @@
 {
   "schema": "foresift/bun-migration-manifest@1",
   "migrationId": "bun-test-authority-v1",
-  "generatedAt": "2026-09-03T06:52:48.227Z",
+  "generatedAt": "2026-09-03T06:57:12.220Z",
   "root": ".",
   "totalTestFiles": 389,
   "counts": {

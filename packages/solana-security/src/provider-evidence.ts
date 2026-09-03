@@ -2,6 +2,7 @@ import {
   ProviderVerdict,
   SecurityConflictClass,
   SecuritySeverity,
+  securitySeverity,
   type QualityCode,
 } from '@foresift/domain';
 import type { DatabaseEngine } from '@foresift/persistence';
@@ -85,12 +86,21 @@ export const persistSecurityProviderReport = recordSecurityProviderReport;
  * and absent/unavailable provider data preserves the deterministic severity unchanged.
  */
 export function resolveSecurityConflict(input: SecurityConflictInput): SecurityConflictResolution {
+  if (input.assessmentId.trim().length === 0)
+    throw new RangeError('assessmentId must be non-empty');
+  const deterministicSeverity = securitySeverity(input.deterministicSeverity);
   const findingIds = requireFindingIds(input.deterministicFindingIds);
-  const report = input.providerReport;
+  const report =
+    input.providerReport === undefined
+      ? undefined
+      : parseSolsecSchema('SecurityProviderReport', input.providerReport);
+  if (report !== undefined && report.assessmentId !== input.assessmentId) {
+    throw new RangeError('provider report and deterministic findings must share an assessment');
+  }
 
   if (report === undefined || report.verdict === ProviderVerdict.UNABLE_TO_VERIFY) {
     return {
-      effectiveSeverity: input.deterministicSeverity,
+      effectiveSeverity: deterministicSeverity,
       resolutionSide: 'DETERMINISTIC',
       providerEvidenceDisposition: 'ABSENT',
       providerAbsent: true,
@@ -99,15 +109,15 @@ export function resolveSecurityConflict(input: SecurityConflictInput): SecurityC
     };
   }
 
-  const knownSevereRisk = SEVERITY_RANK[input.deterministicSeverity] >= SEVERITY_RANK.HIGH;
+  const knownSevereRisk = SEVERITY_RANK[deterministicSeverity] >= SEVERITY_RANK.HIGH;
   const optimismConflict = report.verdict === ProviderVerdict.SAFE && knownSevereRisk;
   const uncorroboratedProviderRisk =
     report.verdict === ProviderVerdict.RISK_DETECTED &&
-    SEVERITY_RANK[input.deterministicSeverity] < SEVERITY_RANK.HIGH;
+    SEVERITY_RANK[deterministicSeverity] < SEVERITY_RANK.HIGH;
 
   if (!optimismConflict && !uncorroboratedProviderRisk) {
     return {
-      effectiveSeverity: input.deterministicSeverity,
+      effectiveSeverity: deterministicSeverity,
       resolutionSide: 'DETERMINISTIC',
       providerEvidenceDisposition: 'INDEPENDENT_SUPPORTING_EVIDENCE',
       providerAbsent: false,
@@ -133,7 +143,7 @@ export function resolveSecurityConflict(input: SecurityConflictInput): SecurityC
     availableAt,
   });
   return {
-    effectiveSeverity: input.deterministicSeverity,
+    effectiveSeverity: deterministicSeverity,
     resolutionSide: optimismConflict ? 'DETERMINISTIC' : 'UNRESOLVED_INDEPENDENT_EVIDENCE',
     providerEvidenceDisposition: optimismConflict
       ? 'INDEPENDENT_SUPPORTING_EVIDENCE'

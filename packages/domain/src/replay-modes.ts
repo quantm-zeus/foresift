@@ -21,8 +21,48 @@ export function replayMode(value: string): ReplayMode {
 
 export const parseReplayMode = replayMode;
 
+export const ReplayDiagnosticLabel = {
+  REALIZABLE: 'REALIZABLE',
+  ORACLE_RETROSPECTIVE_DIAGNOSTIC: 'ORACLE_RETROSPECTIVE_DIAGNOSTIC',
+  HINDSIGHT_RETROSPECTIVE_DIAGNOSTIC: 'HINDSIGHT_RETROSPECTIVE_DIAGNOSTIC',
+  COUNTERFACTUAL_DATA_AVAILABILITY_RESEARCH:
+    'COUNTERFACTUAL_DATA_AVAILABILITY_RESEARCH',
+} as const;
+
+export type ReplayDiagnosticLabel =
+  (typeof ReplayDiagnosticLabel)[keyof typeof ReplayDiagnosticLabel];
+
+/** Explicit result labeling prevents a retrospective view masquerading as realizable replay. */
+export function replayDiagnosticLabel(mode: ReplayMode): ReplayDiagnosticLabel {
+  switch (replayMode(mode)) {
+    case ReplayMode.REALIZABLE_REPLAY:
+      return ReplayDiagnosticLabel.REALIZABLE;
+    case ReplayMode.ORACLE:
+      return ReplayDiagnosticLabel.ORACLE_RETROSPECTIVE_DIAGNOSTIC;
+    case ReplayMode.HINDSIGHT:
+      return ReplayDiagnosticLabel.HINDSIGHT_RETROSPECTIVE_DIAGNOSTIC;
+    case ReplayMode.COUNTERFACTUAL_DATA_AVAILABILITY_RESEARCH:
+      return ReplayDiagnosticLabel.COUNTERFACTUAL_DATA_AVAILABILITY_RESEARCH;
+  }
+}
+
+export interface ReplayModeDiagnostics {
+  readonly mode: ReplayMode;
+  readonly label: ReplayDiagnosticLabel;
+  readonly retrospective: boolean;
+}
+
+export function replayModeDiagnostics(mode: ReplayMode): ReplayModeDiagnostics {
+  const parsed = replayMode(mode);
+  return {
+    mode: parsed,
+    label: replayDiagnosticLabel(parsed),
+    retrospective: parsed !== ReplayMode.REALIZABLE_REPLAY,
+  };
+}
+
 export function isRetrospectiveDataAllowed(mode: ReplayMode): boolean {
-  return replayMode(mode) !== ReplayMode.REALIZABLE_REPLAY;
+  return replayModeDiagnostics(mode).retrospective;
 }
 
 export interface ReplayBoundaryObservation {

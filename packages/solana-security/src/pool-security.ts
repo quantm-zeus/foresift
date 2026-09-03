@@ -25,10 +25,7 @@ export interface PoolResolvedState {
   readonly positionControl?:
     | 'BURNED'
     | 'LOCKED_WITH_EVIDENCE'
-    | 'LOCKED'
-    | 'OPEN'
-    | 'DISTRIBUTED'
-    | 'CONCENTRATED_CONTROL'
+    | 'OPEN_CONTROL'
     | 'UNABLE_TO_VERIFY';
   readonly lockEvidenceRef?: string;
   readonly withdrawalAuthorityAddress?: string | null;
@@ -136,13 +133,11 @@ function parity(state: PoolResolvedState): QuoteParityState {
 function lpState(state: PoolResolvedState): LpControlState {
   if (state.lpControlState !== undefined) return state.lpControlState;
   if (state.positionControl === 'BURNED') return LpControlState.BURNED;
-  if (state.positionControl === 'LOCKED' || state.positionControl === 'LOCKED_WITH_EVIDENCE')
+  if (state.positionControl === 'LOCKED_WITH_EVIDENCE')
     return state.lockEvidenceRef === undefined
       ? LpControlState.UNABLE_TO_VERIFY
-      : LpControlState.LOCKED;
-  if (state.positionControl === 'DISTRIBUTED') return LpControlState.OPEN;
-  if (state.positionControl === 'OPEN' || state.positionControl === 'CONCENTRATED_CONTROL')
-    return LpControlState.OPEN;
+      : LpControlState.LOCKED_WITH_EVIDENCE;
+  if (state.positionControl === 'OPEN_CONTROL') return LpControlState.OPEN_CONTROL;
   return LpControlState.UNABLE_TO_VERIFY;
 }
 function withdrawal(state: PoolResolvedState): WithdrawalAuthorityState {
@@ -151,21 +146,23 @@ function withdrawal(state: PoolResolvedState): WithdrawalAuthorityState {
   if (state.withdrawalAuthorityAddress === null) return WithdrawalAuthorityState.REVOKED;
   return state.withdrawalAuthorityObservedAbuse === true
     ? WithdrawalAuthorityState.PRESENT_WITH_OBSERVED_ABUSE
-    : WithdrawalAuthorityState.PRESENT;
+    : WithdrawalAuthorityState.PRESENT_OPEN;
 }
 function risk(
   state: PoolResolvedState,
   lp: LpControlState,
   auth: WithdrawalAuthorityState,
 ): LiquidityRemovalRisk {
-  if (state.withdrawalAuthorityObservedAbuse === true) return LiquidityRemovalRisk.CRITICAL;
   if (auth === WithdrawalAuthorityState.UNABLE_TO_VERIFY || lp === LpControlState.UNABLE_TO_VERIFY)
-    return LiquidityRemovalRisk.UNKNOWN;
-  if (auth === WithdrawalAuthorityState.PRESENT_WITH_OBSERVED_ABUSE)
-    return LiquidityRemovalRisk.HIGH;
-  if (auth === WithdrawalAuthorityState.PRESENT || (state.largeSellImpactBps ?? 0) >= 2_000)
-    return LiquidityRemovalRisk.MEDIUM;
-  return LiquidityRemovalRisk.LOW;
+    return LiquidityRemovalRisk.UNABLE_TO_VERIFY;
+  if (
+    auth === WithdrawalAuthorityState.PRESENT_WITH_OBSERVED_ABUSE ||
+    (auth === WithdrawalAuthorityState.PRESENT_OPEN && lp === LpControlState.OPEN_CONTROL)
+  )
+    return LiquidityRemovalRisk.OBSERVED;
+  if (auth === WithdrawalAuthorityState.PRESENT_OPEN || (state.largeSellImpactBps ?? 0) >= 2_000)
+    return LiquidityRemovalRisk.POSSIBLE;
+  return LiquidityRemovalRisk.NONE_EVIDENCED;
 }
 
 /** Resolves an exact signed-manifest tuple before inspecting any supplied pool state. */
@@ -217,7 +214,9 @@ export function assessPoolSecurity(input: PoolSecurityInput): PoolSecurityAssess
     withdrawalAuthorityState: auth,
     liquidityRemovalRisk: risk(input.state, lp, auth),
     quoteParityState: quote,
-    stateCompleteness: complete ? StateCompleteness.COMPLETE : StateCompleteness.INCOMPLETE,
+    stateCompleteness: complete
+      ? StateCompleteness.COMPLETE
+      : StateCompleteness.INCOMPLETE_BLOCKING,
     migrationLineageId: edge?.migrationId ?? null,
     liquidityConcentration:
       concentration !== undefined && concentration >= 0 && concentration <= 1

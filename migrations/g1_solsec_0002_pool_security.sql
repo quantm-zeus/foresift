@@ -10,20 +10,18 @@ CREATE TABLE pool_security_assessments (
                                    'RESOLVED', 'DEGRADED_UNSUPPORTED',
                                    'UNABLE_TO_VERIFY')),
     lp_control_state           text CHECK (lp_control_state IN (
-                                   'BURNED', 'LOCKED', 'DISTRIBUTED',
-                                   'CONCENTRATED_CONTROL', 'UNABLE_TO_VERIFY')),
-    withdrawal_authority_state text CHECK (withdrawal_authority_state IN (
-                                   'NONE', 'REVOKED', 'ACTIVE',
+                                   'BURNED', 'LOCKED_WITH_EVIDENCE', 'OPEN_CONTROL',
                                    'UNABLE_TO_VERIFY')),
+    withdrawal_authority_state text CHECK (withdrawal_authority_state IN (
+                                   'REVOKED', 'PRESENT_OPEN',
+                                   'PRESENT_WITH_OBSERVED_ABUSE', 'UNABLE_TO_VERIFY')),
     liquidity_removal_risk     text CHECK (liquidity_removal_risk IN (
-                                   'CRITICAL', 'HIGH', 'MEDIUM', 'LOW', 'NONE',
+                                   'NONE_EVIDENCED', 'POSSIBLE', 'OBSERVED',
                                    'UNABLE_TO_VERIFY')),
     quote_parity_state         text CHECK (quote_parity_state IN (
-                                   'PASSED', 'FAILED', 'NOT_APPLICABLE',
-                                   'UNABLE_TO_VERIFY')),
-    state_completeness         text CHECK (state_completeness IN (
-                                   'COMPLETE', 'PARTIAL', 'INCOMPLETE',
-                                   'UNABLE_TO_VERIFY')),
+                                   'PASS', 'FAIL', 'UNABLE_TO_VERIFY')),
+    state_completeness         text NOT NULL CHECK (state_completeness IN (
+                                   'COMPLETE', 'INCOMPLETE_BLOCKING')),
     migration_lineage_id       text,
     liquidity_concentration    text CHECK (
                                    liquidity_concentration IS NULL OR (

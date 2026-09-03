@@ -78,10 +78,7 @@ const conflictClassValues = [...ALL_SECURITY_CONFLICT_CLASSES] as [
   SecurityConflictClass,
   ...SecurityConflictClass[],
 ];
-const systemRoleValues = [...ALL_SYSTEM_ADDRESS_ROLES] as [
-  SystemAddressRole,
-  ...SystemAddressRole[],
-];
+const systemRoleValues = [...ALL_SYSTEM_ADDRESS_ROLES] as [SystemAddressRole, ...SystemAddressRole[]];
 const reviewStateValues = [...ALL_SYSTEM_ADDRESS_REVIEW_STATES] as [
   SystemAddressReviewState,
   ...SystemAddressReviewState[],
@@ -187,7 +184,8 @@ export const PoolSecurityAssessmentSchema = z
   .strict()
   .refine(availableAfterObserved, { message: 'availableAt must not precede observedAt' })
   .refine(
-    (value) => value.liquidityConcentration === null || Number(value.liquidityConcentration) <= 1,
+    (value) =>
+      value.liquidityConcentration === null || Number(value.liquidityConcentration) <= 1,
     { message: 'liquidityConcentration must be at most 1' },
   )
   .refine(
@@ -244,9 +242,10 @@ export const SecurityConflictSchema = z
     availableAt: UtcTimestampSchema,
   })
   .strict()
-  .refine((value) => Date.parse(value.availableAt) >= Date.parse(value.resolvedAt), {
-    message: 'availableAt must not precede resolvedAt',
-  })
+  .refine(
+    (value) => Date.parse(value.availableAt) >= Date.parse(value.resolvedAt),
+    { message: 'availableAt must not precede resolvedAt' },
+  )
   .refine(
     (value) =>
       value.conflictClass !== SecurityConflictClass.PROVIDER_OPTIMISM_OVERRIDDEN ||
@@ -271,8 +270,7 @@ export const SystemAddressRegistryEntrySchema = z
   })
   .strict()
   .refine(
-    (value) =>
-      value.validUntil === null || Date.parse(value.validUntil) > Date.parse(value.validFrom),
+    (value) => value.validUntil === null || Date.parse(value.validUntil) > Date.parse(value.validFrom),
     { message: 'validUntil must be later than validFrom' },
   )
   .refine(

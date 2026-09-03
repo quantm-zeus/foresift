@@ -127,11 +127,11 @@ function parity(state: PoolResolvedState): QuoteParityState {
     return QuoteParityState.UNABLE_TO_VERIFY;
   const actual = BigInt(state.calculatedQuoteOutputRaw);
   const reference = BigInt(state.referenceQuoteOutputRaw);
-  if (reference === 0n) return actual === 0n ? QuoteParityState.PASSED : QuoteParityState.FAILED;
+  if (reference === 0n) return actual === 0n ? QuoteParityState.PASS : QuoteParityState.FAIL;
   const delta = actual > reference ? actual - reference : reference - actual;
   return delta * 10_000n <= reference * BigInt(state.quoteToleranceBps)
-    ? QuoteParityState.PASSED
-    : QuoteParityState.FAILED;
+    ? QuoteParityState.PASS
+    : QuoteParityState.FAIL;
 }
 function lpState(state: PoolResolvedState): LpControlState {
   if (state.lpControlState !== undefined) return state.lpControlState;
@@ -140,17 +140,18 @@ function lpState(state: PoolResolvedState): LpControlState {
     return state.lockEvidenceRef === undefined
       ? LpControlState.UNABLE_TO_VERIFY
       : LpControlState.LOCKED;
-  if (state.positionControl === 'DISTRIBUTED') return LpControlState.DISTRIBUTED;
+  if (state.positionControl === 'DISTRIBUTED') return LpControlState.OPEN;
   if (state.positionControl === 'OPEN' || state.positionControl === 'CONCENTRATED_CONTROL')
-    return LpControlState.CONCENTRATED_CONTROL;
+    return LpControlState.OPEN;
   return LpControlState.UNABLE_TO_VERIFY;
 }
 function withdrawal(state: PoolResolvedState): WithdrawalAuthorityState {
   if (state.withdrawalAuthorityAddress === undefined)
     return WithdrawalAuthorityState.UNABLE_TO_VERIFY;
-  return state.withdrawalAuthorityAddress === null
-    ? WithdrawalAuthorityState.REVOKED
-    : WithdrawalAuthorityState.ACTIVE;
+  if (state.withdrawalAuthorityAddress === null) return WithdrawalAuthorityState.REVOKED;
+  return state.withdrawalAuthorityObservedAbuse === true
+    ? WithdrawalAuthorityState.PRESENT_WITH_OBSERVED_ABUSE
+    : WithdrawalAuthorityState.PRESENT;
 }
 function risk(
   state: PoolResolvedState,
@@ -159,14 +160,12 @@ function risk(
 ): LiquidityRemovalRisk {
   if (state.withdrawalAuthorityObservedAbuse === true) return LiquidityRemovalRisk.CRITICAL;
   if (auth === WithdrawalAuthorityState.UNABLE_TO_VERIFY || lp === LpControlState.UNABLE_TO_VERIFY)
-    return LiquidityRemovalRisk.UNABLE_TO_VERIFY;
-  if (auth === WithdrawalAuthorityState.ACTIVE && lp === LpControlState.CONCENTRATED_CONTROL)
+    return LiquidityRemovalRisk.UNKNOWN;
+  if (auth === WithdrawalAuthorityState.PRESENT_WITH_OBSERVED_ABUSE)
     return LiquidityRemovalRisk.HIGH;
-  if (auth === WithdrawalAuthorityState.ACTIVE || (state.largeSellImpactBps ?? 0) >= 2_000)
+  if (auth === WithdrawalAuthorityState.PRESENT || (state.largeSellImpactBps ?? 0) >= 2_000)
     return LiquidityRemovalRisk.MEDIUM;
-  return lp === LpControlState.BURNED || lp === LpControlState.LOCKED
-    ? LiquidityRemovalRisk.NONE
-    : LiquidityRemovalRisk.LOW;
+  return LiquidityRemovalRisk.LOW;
 }
 
 /** Resolves an exact signed-manifest tuple before inspecting any supplied pool state. */
@@ -189,7 +188,7 @@ export function assessPoolSecurity(input: PoolSecurityInput): PoolSecurityAssess
     input.state.poolOwner !== undefined &&
     lp !== LpControlState.UNABLE_TO_VERIFY &&
     auth !== WithdrawalAuthorityState.UNABLE_TO_VERIFY &&
-    quote === QuoteParityState.PASSED &&
+    quote === QuoteParityState.PASS &&
     concentration !== undefined &&
     concentration >= 0 &&
     concentration <= 1 &&
@@ -198,7 +197,7 @@ export function assessPoolSecurity(input: PoolSecurityInput): PoolSecurityAssess
     input.state.largeSellImpactBps !== undefined &&
     input.state.largeSellImpactBps >= 0;
   const qualityCodes: QualityCode[] =
-    quote === QuoteParityState.FAILED
+    quote === QuoteParityState.FAIL
       ? ['QUOTE_PARITY_FAILED']
       : complete
         ? ['VALID']
@@ -218,7 +217,7 @@ export function assessPoolSecurity(input: PoolSecurityInput): PoolSecurityAssess
     withdrawalAuthorityState: auth,
     liquidityRemovalRisk: risk(input.state, lp, auth),
     quoteParityState: quote,
-    stateCompleteness: complete ? StateCompleteness.COMPLETE : StateCompleteness.PARTIAL,
+    stateCompleteness: complete ? StateCompleteness.COMPLETE : StateCompleteness.INCOMPLETE,
     migrationLineageId: edge?.migrationId ?? null,
     liquidityConcentration:
       concentration !== undefined && concentration >= 0 && concentration <= 1
@@ -239,7 +238,7 @@ export function blocksPoolExecutionModeling(assessment: PoolSecurityAssessment):
   return (
     assessment.adapterSupportState !== PoolSupportState.RESOLVED ||
     assessment.stateCompleteness !== StateCompleteness.COMPLETE ||
-    assessment.quoteParityState !== QuoteParityState.PASSED
+    assessment.quoteParityState !== QuoteParityState.PASS
   );
 }
 export const analyzePoolSecurity = assessPoolSecurity;

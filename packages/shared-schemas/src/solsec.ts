@@ -8,12 +8,12 @@ import {
   ALL_QUOTE_PARITY_STATES,
   ALL_SECURITY_CONFLICT_CLASSES,
   ALL_SECURITY_SEVERITIES,
-  ALL_STATE_COMPLETENESS_STATES,
+  ALL_STATE_COMPLETENESSES,
   ALL_SYSTEM_ADDRESS_REVIEW_STATES,
   ALL_SYSTEM_ADDRESS_ROLES,
   ALL_TOKEN_CONTROLS,
   ALL_TOKEN_CONTROL_STATES,
-  ALL_TRANSFER_SEMANTICS_SUPPORT,
+  ALL_TRANSFER_SEMANTICS_SUPPORTS,
   ALL_WITHDRAWAL_AUTHORITY_STATES,
   PoolSupportState,
   SecurityConflictClass,
@@ -54,7 +54,7 @@ const securitySeverityValues = [...ALL_SECURITY_SEVERITIES] as [
   SecuritySeverity,
   ...SecuritySeverity[],
 ];
-const transferSupportValues = [...ALL_TRANSFER_SEMANTICS_SUPPORT] as [
+const transferSupportValues = [...ALL_TRANSFER_SEMANTICS_SUPPORTS] as [
   TransferSemanticsSupport,
   ...TransferSemanticsSupport[],
 ];
@@ -69,7 +69,7 @@ const liquidityRiskValues = [...ALL_LIQUIDITY_REMOVAL_RISKS] as [
   ...LiquidityRemovalRisk[],
 ];
 const quoteParityValues = [...ALL_QUOTE_PARITY_STATES] as [QuoteParityState, ...QuoteParityState[]];
-const completenessValues = [...ALL_STATE_COMPLETENESS_STATES] as [
+const completenessValues = [...ALL_STATE_COMPLETENESSES] as [
   StateCompleteness,
   ...StateCompleteness[],
 ];
@@ -78,7 +78,10 @@ const conflictClassValues = [...ALL_SECURITY_CONFLICT_CLASSES] as [
   SecurityConflictClass,
   ...SecurityConflictClass[],
 ];
-const systemRoleValues = [...ALL_SYSTEM_ADDRESS_ROLES] as [SystemAddressRole, ...SystemAddressRole[]];
+const systemRoleValues = [...ALL_SYSTEM_ADDRESS_ROLES] as [
+  SystemAddressRole,
+  ...SystemAddressRole[],
+];
 const reviewStateValues = [...ALL_SYSTEM_ADDRESS_REVIEW_STATES] as [
   SystemAddressReviewState,
   ...SystemAddressReviewState[],
@@ -184,8 +187,7 @@ export const PoolSecurityAssessmentSchema = z
   .strict()
   .refine(availableAfterObserved, { message: 'availableAt must not precede observedAt' })
   .refine(
-    (value) =>
-      value.liquidityConcentration === null || Number(value.liquidityConcentration) <= 1,
+    (value) => value.liquidityConcentration === null || Number(value.liquidityConcentration) <= 1,
     { message: 'liquidityConcentration must be at most 1' },
   )
   .refine(
@@ -242,10 +244,9 @@ export const SecurityConflictSchema = z
     availableAt: UtcTimestampSchema,
   })
   .strict()
-  .refine(
-    (value) => Date.parse(value.availableAt) >= Date.parse(value.resolvedAt),
-    { message: 'availableAt must not precede resolvedAt' },
-  )
+  .refine((value) => Date.parse(value.availableAt) >= Date.parse(value.resolvedAt), {
+    message: 'availableAt must not precede resolvedAt',
+  })
   .refine(
     (value) =>
       value.conflictClass !== SecurityConflictClass.PROVIDER_OPTIMISM_OVERRIDDEN ||
@@ -270,15 +271,16 @@ export const SystemAddressRegistryEntrySchema = z
   })
   .strict()
   .refine(
-    (value) => value.validUntil === null || Date.parse(value.validUntil) > Date.parse(value.validFrom),
+    (value) =>
+      value.validUntil === null || Date.parse(value.validUntil) > Date.parse(value.validFrom),
     { message: 'validUntil must be later than validFrom' },
   )
   .refine(
     (value) =>
-      value.reviewState !== SystemAddressReviewState.REVIEWED ||
+      value.reviewState !== SystemAddressReviewState.APPROVED ||
       value.role === SystemAddressRole.UNKNOWN_INFRASTRUCTURE ||
       value.confidence >= 0.8,
-    { message: 'reviewed known roles require confidence of at least 0.80' },
+    { message: 'approved known roles require confidence of at least 0.80' },
   );
 export type SystemAddressRegistryEntry = z.infer<typeof SystemAddressRegistryEntrySchema>;
 

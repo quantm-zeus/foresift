@@ -12,7 +12,7 @@
 //   node scripts/automation/wave-guard.mjs --shard <id> \
 //     --artifacts <dir> --graph <task-graph.json> [--root <repo>]
 import { spawnSync } from 'node:child_process';
-import { readFileSync, writeFileSync, mkdirSync, existsSync } from 'node:fs';
+import { readFileSync, writeFileSync, mkdirSync, existsSync, lstatSync } from 'node:fs';
 import { join } from 'node:path';
 import { repoRoot } from './schema.mjs';
 import { validateLaneOwnership } from './path-ownership.mjs';
@@ -56,11 +56,24 @@ if (!headR.ok) fail(`branch ${shardMeta.branch} missing: ${headR.err}`);
 const headSha = headR.out;
 
 // Actual changed files base..head (recomputed here, never taken from claims).
+// Symlinks are tooling plumbing, never authorship (live 486a44d0: a lane
+// agent's node_modules reuse symlink was swallowed into a lane commit because
+// gitignore's `node_modules/` matches directories, not a symlink blob — the
+// guard must not count it against the lane).
 let changed = [];
 if (headSha !== baseSha) {
   const d = git(`diff --name-only ${baseSha}..${headSha}`);
   if (!d.ok) fail(`cannot diff base..head: ${d.err}`);
-  changed = d.out.split('\n').filter(Boolean);
+  changed = d.out
+    .split('\n')
+    .filter(Boolean)
+    .filter((p) => {
+      try {
+        return !lstatSync(join(shardMeta.worktree, p)).isSymbolicLink();
+      } catch {
+        return true; // path absent from the worktree (renamed/deleted) — keep it in evidence
+      }
+    });
 }
 
 function globToRegExp(glob) {

@@ -10,6 +10,7 @@ import {
   laneEvidencePaths,
   parseTaskGraph,
   requireTaskGraphForCompletionEvidence,
+  splitSymlinks,
 } from './writer-task-evidence.mjs';
 
 function fail(message) {
@@ -188,8 +189,13 @@ export function runAgyTestWriter(input) {
     .stdout.split('\n')
     .filter(Boolean)
     .map((line) => line.slice(3).split(' -> ').at(-1));
-  if (dirty.length) {
-    git(['add', '--all'], input.worktree);
+  // Symlink commit-safety (live 486a44d0): the lane agent symlinked
+  // node_modules; `add --all` staged the symlink blob (gitignore's
+  // `node_modules/` matches directories, not symlinks) and the ownership
+  // guard then refused the whole lane. Commit ONLY real files.
+  const { clean: commitable } = splitSymlinks(input.worktree, dirty);
+  if (commitable.length) {
+    git(['add', '--', ...commitable], input.worktree);
     const commit = git(
       [
         '-c',
@@ -208,6 +214,8 @@ export function runAgyTestWriter(input) {
   let changedPaths = git(['diff', '--name-only', `${baseHead}..${head}`], input.worktree)
     .stdout.split('\n')
     .filter(Boolean);
+  // Symlinks are tooling plumbing, never authorship evidence (live 486a44d0).
+  changedPaths = splitSymlinks(input.worktree, changedPaths).clean;
   const ownership = validateLaneOwnership({ engine: 'AGY', role: 'test', changedPaths });
   if (!ownership.ok)
     throw new Error(`${ownership.violationCode}: ${ownership.violatingPaths.join(',')}`);
@@ -290,6 +298,7 @@ export function runAgyTestWriter(input) {
     changedPaths = git(['diff', '--name-only', `${baseHead}..${head}`], input.worktree)
       .stdout.split('\n')
       .filter(Boolean);
+    changedPaths = splitSymlinks(input.worktree, changedPaths).clean;
     const ownership2 = validateLaneOwnership({ engine: 'AGY', role: 'test', changedPaths });
     if (!ownership2.ok)
       throw new Error(`${ownership2.violationCode}: ${ownership2.violatingPaths.join(',')}`);

@@ -23,6 +23,7 @@ import {
   parseTaskGraph,
   requireTaskGraphForCompletionEvidence,
   laneEvidencePaths,
+  splitSymlinks,
 } from './writer-task-evidence.mjs';
 
 function fail(message, code = 1) {
@@ -203,21 +204,27 @@ export function runClaudeWriter(input) {
   if (!ownership.ok)
     throw new Error(`${ownership.violationCode}: ${ownership.violatingPaths.join(',')}`);
   if (dirty.length) {
-    const add = git(['add', '--all'], input.worktree);
-    if (add.status !== 0) throw new Error(`CLAUDE_GIT_ADD_FAILED: ${add.stderr}`);
-    const commit = git(
-      [
-        '-c',
-        'user.name=Foresift Claude Writer',
-        '-c',
-        'user.email=noreply@foresift.local',
-        'commit',
-        '-m',
-        `feat: Claude implementation lane ${input.lane}`,
-      ],
-      input.worktree,
-    );
-    if (commit.status !== 0) throw new Error(`CLAUDE_COMMIT_FAILED: ${commit.stderr}`);
+    // Symlink commit-safety (live 486a44d0): never stage symlinked paths —
+    // tooling plumbing, not authorship; a committed symlink poisons the
+    // ownership scan for the whole lane.
+    const { clean: commitable } = splitSymlinks(input.worktree, dirty);
+    if (commitable.length) {
+      const add = git(['add', '--', ...commitable], input.worktree);
+      if (add.status !== 0) throw new Error(`CLAUDE_GIT_ADD_FAILED: ${add.stderr}`);
+      const commit = git(
+        [
+          '-c',
+          'user.name=Foresift Claude Writer',
+          '-c',
+          'user.email=noreply@foresift.local',
+          'commit',
+          '-m',
+          `feat: Claude implementation lane ${input.lane}`,
+        ],
+        input.worktree,
+      );
+      if (commit.status !== 0) throw new Error(`CLAUDE_COMMIT_FAILED: ${commit.stderr}`);
+    }
   }
   const head = git(['rev-parse', 'HEAD'], input.worktree).stdout.trim();
   // Evidence-backed completion (H3 P0-1): nominate ONLY tasks whose predicted

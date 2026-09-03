@@ -14,10 +14,11 @@
 //      overrides both. Pinned here so the boundary behavior stays explicit.
 import { describe, expect, it } from 'bun:test';
 import { spawnSync } from 'node:child_process';
-import { mkdtempSync, mkdirSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, mkdirSync, writeFileSync, symlinkSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { resolveAdaptiveLaneCount } from '../../scripts/automation/adaptive-lanes.mjs';
+import { splitSymlinks } from '../../scripts/automation/writer-task-evidence.mjs';
 
 const GRAPH = join(
   import.meta.dir,
@@ -217,6 +218,21 @@ describe('maintainer wave 2026-09-03 regressions', () => {
     const laneUnits = g.testLanes.flatMap((t) => t.units);
     expect(laneUnits).not.toContain('T103');
     expect(laneUnits).toContain('T101');
+  });
+
+  it('lane evidence never counts a symlink as authorship (live 486a44d0 node_modules law)', () => {
+    const root = scratchRepo();
+    // Real lane work + a tooling symlink (the exact live shape: node_modules
+    // reused from the task worktree; gitignore `node_modules/` matches the
+    // DIRECTORY but not a symlink blob, so `git add --all` swallowed it).
+    symlinkSync('/nonexistent/target-for-fixture', join(root, 'node_modules'));
+    mkdirSync(join(root, 'tests'), { recursive: true });
+    writeFileSync(join(root, 'tests', 'authored.spec.ts'), 'it("x", () => {});\n');
+    // laneEvidencePaths is diff/status driven; exercise splitSymlinks — the
+    // commit-safety filter every writer's add/commit path must use.
+    const { clean, symlinked } = splitSymlinks(root, ['node_modules', 'tests/authored.spec.ts']);
+    expect(symlinked).toEqual(['node_modules']);
+    expect(clean).toEqual(['tests/authored.spec.ts']);
   });
 
   it('adaptive lanes: core + one independent [P] unit stays explicit and capacity-capped', () => {

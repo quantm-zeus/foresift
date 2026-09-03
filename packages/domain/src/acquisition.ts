@@ -73,7 +73,7 @@ const NOT_RETRIEVED_BY_CHOICE: readonly AcquisitionState[] = [
  * Rendering the first sub-kind as provider missingness is
  * exactly the confusion AC-242 guards against.
  */
-const RETRIEVAL_FAILED_STATES: readonly AcquisitionState[] = [
+export const RETRIEVAL_FAILED_STATES: readonly AcquisitionState[] = [
   AcquisitionState.COST_BLOCKED,
   AcquisitionState.QUOTA_BLOCKED,
   AcquisitionState.UNSUPPORTED,
@@ -110,20 +110,50 @@ export function acquisitionFailureKind(value: string): AcquisitionFailureKind {
   return value as AcquisitionFailureKind;
 }
 
-type LegacyAcquisitionState =
+export type LegacyAcquisitionState =
   'CAPABILITY_UNAVAILABLE' | 'TIMED_OUT' | 'INVALID_RESPONSE' | AcquisitionState;
+
+export interface ReconciledAcquisitionMember {
+  readonly state: AcquisitionState;
+  readonly failureKind: AcquisitionFailureKind | null;
+}
+
+/**
+ * Lossless ADR-1 mapping. Callers migrating stored members must use this
+ * helper rather than changing only the state column: the two retired failure
+ * members carry their former diagnostic meaning into `failureKind`.
+ */
+export function reconcileLegacyAcquisitionMember(
+  value: LegacyAcquisitionState,
+): ReconciledAcquisitionMember {
+  switch (value) {
+    case 'CAPABILITY_UNAVAILABLE':
+      return { state: AcquisitionState.UNSUPPORTED, failureKind: null };
+    case 'TIMED_OUT':
+      return {
+        state: AcquisitionState.FAILED,
+        failureKind: AcquisitionFailureKind.TIMED_OUT,
+      };
+    case 'INVALID_RESPONSE':
+      return {
+        state: AcquisitionState.FAILED,
+        failureKind: AcquisitionFailureKind.INVALID_RESPONSE,
+      };
+    default:
+      return { state: acquisitionState(value), failureKind: null };
+  }
+}
 
 /** Explicit member-level migration required by the reconciled G1 vocabulary. */
 export function mapLegacyAcquisitionState(value: LegacyAcquisitionState): AcquisitionState {
-  switch (value) {
-    case 'CAPABILITY_UNAVAILABLE':
-      return AcquisitionState.UNSUPPORTED;
-    case 'TIMED_OUT':
-    case 'INVALID_RESPONSE':
-      return AcquisitionState.FAILED;
-    default:
-      return acquisitionState(value);
-  }
+  return reconcileLegacyAcquisitionMember(value).state;
+}
+
+/** Return the failure-kind channel produced by the ADR-1 member mapping. */
+export function mapLegacyAcquisitionFailureKind(
+  value: LegacyAcquisitionState,
+): AcquisitionFailureKind | null {
+  return reconcileLegacyAcquisitionMember(value).failureKind;
 }
 
 /** True iff the family was never requested by policy (AC-242 semantics). */

@@ -135,17 +135,31 @@ describe('AC-245: reduced independence credit despite distinct provider ids', ()
     const [sourceA, sourceB] = correlated.sources;
     if (!sourceA || !sourceB) throw new Error('fixture pair lost a source');
 
-    await recordDependenceEdge(tdb.engine, {
-      edgeId: 'ac245-edge-fixture-driven',
-      edge: {
-        sourceA: sourceA.id as never,
-        sourceB: sourceB.id as never,
-        sharedUpstreamLineageKeys: correlated.edge.sharedUpstreamLineageKeys,
-        inputs: correlated.edge.inputs,
-        label: DependenceLabel.AVAILABLE_AT_THE_TIME,
-        availableAt: utcTimestamp(correlated.edge.availableAt),
-      },
-    });
+    const [a, b] = sourceA.id < sourceB.id ? [sourceA.id, sourceB.id] : [sourceB.id, sourceA.id];
+    await tdb.engine.query(
+      `INSERT INTO source_dependence_edges (
+         edge_id, source_a, source_b, shared_upstream_lineage_keys,
+         value_error_timing_correlation, outage_overlap, first_seen_lag_agreement,
+         fingerprint_similarity, label, available_at,
+         valid_from, method, confidence, effective_independence_multiplier)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)`,
+      [
+        'ac245-edge-fixture-driven',
+        a,
+        b,
+        correlated.edge.sharedUpstreamLineageKeys,
+        correlated.edge.inputs.valueErrorTimingCorrelation,
+        correlated.edge.inputs.outageOverlap,
+        correlated.edge.inputs.firstSeenLagAgreement,
+        correlated.edge.inputs.fingerprintSimilarity,
+        DependenceLabel.AVAILABLE_AT_THE_TIME,
+        utcTimestamp(correlated.edge.availableAt),
+        utcTimestamp(correlated.edge.availableAt),
+        'EMPIRICAL',
+        1,
+        0.5,
+      ],
+    );
     const stored = await dependenceEdgesForPair(
       tdb.engine,
       sourceB.id as never,

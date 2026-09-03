@@ -1,7 +1,7 @@
 {
   "schema": "foresift/bun-migration-manifest@1",
   "migrationId": "bun-test-authority-v1",
-  "generatedAt": "2026-09-03T06:46:01.715Z",
+  "generatedAt": "2026-09-03T06:52:48.227Z",
   "root": ".",
   "totalTestFiles": 389,
   "counts": {
@@ -4203,9 +4203,9 @@
     {
       "path": "tests/acceptance/AC-242.spec.ts",
       "package": "acceptance",
-      "bytes": 6811,
-      "lines": 187,
-      "sha256": "8631fd65aaeea879bff6638a7697699ba2c251972ef9efcf1913ac10566d5a22",
+      "bytes": 6888,
+      "lines": 188,
+      "sha256": "7bc5b24daebaad3ef3b44b4cecf902880dd7a1b9f6d5059909fb0437b639d851",
       "imports": [
         "bun:test",
         "@foresift/domain",
@@ -4281,9 +4281,9 @@
     {
       "path": "tests/acceptance/AC-245.spec.ts",
       "package": "acceptance",
-      "bytes": 8184,
-      "lines": 217,
-      "sha256": "d68e60ddbee391a9078033b68f12f2e2b5b170fc640184c385e6f9f208143212",
+      "bytes": 8812,
+      "lines": 231,
+      "sha256": "c04740848cb60d5a296f7b57e135b3ed3d2e9853384865656aec6778e0fc562d",
       "imports": [
         "node:fs",
         "node:path",

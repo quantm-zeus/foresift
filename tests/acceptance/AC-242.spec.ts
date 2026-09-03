@@ -176,11 +176,12 @@ describe('AC-242 G1 extensions: FR-DATA-012 field set and seed provenance (FR-DA
     });
 
     const rows = await tdb.engine.query<Record<string, unknown>>(
-      'SELECT * FROM evidence_acquisition_decisions WHERE decision_id = $1',
+      'SELECT * FROM probe_assignments WHERE decision_id = $1',
       ['ac242-seed-test'],
     );
     const row = rows.rows[0];
     expect(row).toBeDefined();
-    expect(row?.assignment_seed).toBe('seed/g1-prng-42');
+    expect(row?.seed_provenance).toBe('seed/g1-prng-42');
+    expect(row?.requested_fields).toEqual(['holder_distribution', 'developer_activity']);
   });
 });

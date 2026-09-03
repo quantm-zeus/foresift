@@ -88,6 +88,13 @@ export async function recordBackfillReceipt(
   engine: DatabaseEngine,
   input: BackfillReceiptInput,
 ): Promise<void> {
+  if (input.retrievedAsBackfill !== undefined && input.retrievedAsBackfill !== true) {
+    throw new ForesiftError(
+      ErrorCode.CONTRACT_INVARIANT_VIOLATED,
+      'backfill repository only accepts retrieved_as_backfill=true',
+      { backfillReceiptId: input.backfillReceiptId },
+    );
+  }
   const fetchedAt = input.fetchedAt ?? input.retrievedAt;
   const earliestAvailableAt = input.earliestAvailableAt ?? input.availableAt;
   const earlierUnavailabilityReason = input.earlierUnavailabilityReason ?? input.backfillReason;

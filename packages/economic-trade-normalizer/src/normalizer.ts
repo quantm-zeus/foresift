@@ -177,7 +177,7 @@ export function normalizeEconomicTrade(
     economicTransactionId,
     chainId: first.chainId,
     transactionHash: first.transactionHash,
-    eventAt: first.eventAt,
+    eventAt: earliest(guarded.retained.map((leg) => leg.eventAt)),
     availableAt,
     actorResolution,
     actorResolutionState: actorResolution.state,
@@ -231,6 +231,10 @@ function resolution(
 
 function latest(values: readonly string[]): ReturnType<typeof utcTimestamp> {
   return utcTimestamp([...values].sort((a, b) => Date.parse(b) - Date.parse(a))[0]!);
+}
+
+function earliest(values: readonly string[]): ReturnType<typeof utcTimestamp> {
+  return utcTimestamp([...values].sort((a, b) => Date.parse(a) - Date.parse(b))[0]!);
 }
 
 function toAuditLeg(leg: PersistedTradeLeg): RawEconomicLegAudit {

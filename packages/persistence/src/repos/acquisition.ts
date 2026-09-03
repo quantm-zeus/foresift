@@ -159,6 +159,13 @@ export async function recordProbeAssignment(
         { decisionId: input.decisionId },
       );
     }
+    if (d.state === AcquisitionState.NOT_REQUESTED_BY_POLICY) {
+      throw new ForesiftError(
+        LIFECYCLE_CODE,
+        'probe assignment cannot be attached to NOT_REQUESTED_BY_POLICY',
+        { decisionId: input.decisionId },
+      );
+    }
     await tx.query(
       `INSERT INTO probe_assignments (
          decision_id, eligibility_stratum, assignment_probability,
@@ -213,6 +220,11 @@ export async function completeRetrieval(
   input: RetrievalCompletionInput,
 ): Promise<void> {
   const state = acquisitionState(input.state);
+  if (state === AcquisitionState.REQUESTED) {
+    throw new ForesiftError(LIFECYCLE_CODE, 'retrieval completion requires a terminal result state', {
+      decisionId: input.decisionId,
+    });
+  }
   if (input.actualCost !== undefined && input.actualCost < 0) {
     throw new ForesiftError(LIFECYCLE_CODE, 'actual cost must be nonnegative', {
       decisionId: input.decisionId,

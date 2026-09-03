@@ -119,7 +119,8 @@ function stableRowId(prefix: string, input: TokenAssessmentInput, suffix: string
 function assertTemporalInput(input: TokenAssessmentInput): void {
   const observed = Date.parse(input.observedAt);
   const available = Date.parse(input.availableAt);
-  if (!Number.isFinite(observed) || !Number.isFinite(available)) throw new Error('INVALID_TIMESTAMP');
+  if (!Number.isFinite(observed) || !Number.isFinite(available))
+    throw new Error('INVALID_TIMESTAMP');
   if (available < observed) throw new Error('AVAILABLE_AT_PRECEDES_OBSERVED_AT');
 }
 
@@ -187,7 +188,11 @@ export function assessTokenControls(input: TokenAssessmentInput): TokenAssessmen
     programSupported
       ? TokenControlClassification.NEUTRAL_CONFIGURATION
       : TokenControlClassification.UNABLE_TO_VERIFY,
-    { programId: input.programId, programVersion: input.programVersion, layoutVersion: input.layoutVersion },
+    {
+      programId: input.programId,
+      programVersion: input.programVersion,
+      layoutVersion: input.layoutVersion,
+    },
     programSupported ? ['VALID'] : ['UNSUPPORTED_PROGRAM_VERSION'],
   );
 
@@ -215,7 +220,9 @@ export function assessTokenControls(input: TokenAssessmentInput): TokenAssessmen
   );
   addFinding(
     TokenControlKind.DECIMALS,
-    Number.isInteger(input.decimals) && (input.decimals ?? -1) >= 0 && (input.decimals ?? 256) <= 255
+    Number.isInteger(input.decimals) &&
+      (input.decimals ?? -1) >= 0 &&
+      (input.decimals ?? 256) <= 255
       ? TokenControlClassification.NEUTRAL_CONFIGURATION
       : TokenControlClassification.UNABLE_TO_VERIFY,
     input.decimals,
@@ -249,8 +256,17 @@ export function assessTokenControls(input: TokenAssessmentInput): TokenAssessmen
       const value = authorityValue(data, 'delegate', 'authority', 'permanentDelegate');
       addFinding(TokenControlKind.PERMANENT_DELEGATE, authorityClassification(value), value);
     } else if (canonical === 'TRANSFER_FEE_CONFIGURATION') {
-      const configAuthority = authorityValue(data, 'configAuthority', 'transferFeeConfigAuthority', 'authority');
-      const withheldAuthority = authorityValue(data, 'withdrawWithheldAuthority', 'withheldAuthority');
+      const configAuthority = authorityValue(
+        data,
+        'configAuthority',
+        'transferFeeConfigAuthority',
+        'authority',
+      );
+      const withheldAuthority = authorityValue(
+        data,
+        'withdrawWithheldAuthority',
+        'withheldAuthority',
+      );
       addFinding(
         TokenControlKind.TRANSFER_FEE_CONFIGURATION,
         authorityClassification(configAuthority),
@@ -279,11 +295,7 @@ export function assessTokenControls(input: TokenAssessmentInput): TokenAssessmen
       const value = authorityValue(data, 'closeAuthority', 'authority');
       addFinding(TokenControlKind.CLOSE_AUTHORITY, authorityClassification(value), value);
     } else if (canonical === 'NON_TRANSFERABLE') {
-      addFinding(
-        TokenControlKind.NON_TRANSFERABLE,
-        TokenControlClassification.KNOWN_RISK,
-        data,
-      );
+      addFinding(TokenControlKind.NON_TRANSFERABLE, TokenControlClassification.KNOWN_RISK, data);
     } else if (canonical === 'CONFIDENTIAL_TRANSFER') {
       const value = authorityValue(data, 'authority', 'confidentialTransferAuthority');
       addFinding(

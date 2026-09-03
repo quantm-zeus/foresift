@@ -1,7 +1,4 @@
-import {
-  TransferExtensionVerdict,
-  type TokenExtensionSupport,
-} from '@foresift/domain';
+import { TransferExtensionVerdict, type TokenExtensionSupport } from '@foresift/domain';
 import {
   SPL_TOKEN_PROGRAM_ID,
   TOKEN_2022_PROGRAM_ID,
@@ -14,9 +11,7 @@ export interface TransferSemanticsPolicy {
   readonly version: string;
   readonly programVersions: Readonly<Record<string, readonly string[]>>;
   /** Canonical extension name -> modeled status when present. */
-  readonly extensionVerdicts: Readonly<
-    Record<string, 'KNOWN_MODELED' | 'KNOWN_UNMODELED'>
-  >;
+  readonly extensionVerdicts: Readonly<Record<string, 'KNOWN_MODELED' | 'KNOWN_UNMODELED'>>;
 }
 
 export const DEFAULT_TRANSFER_SEMANTICS_POLICY: TransferSemanticsPolicy = {
@@ -136,7 +131,8 @@ export function evaluateTransferSemantics(
 ): readonly TokenExtensionSupport[] {
   const observed = Date.parse(input.observedAt);
   const available = Date.parse(input.availableAt);
-  if (!Number.isFinite(observed) || !Number.isFinite(available)) throw new Error('INVALID_TIMESTAMP');
+  if (!Number.isFinite(observed) || !Number.isFinite(available))
+    throw new Error('INVALID_TIMESTAMP');
   if (available < observed) throw new Error('AVAILABLE_AT_PRECEDES_OBSERVED_AT');
 
   const policies = input.policies ?? [DEFAULT_TRANSFER_SEMANTICS_POLICY];

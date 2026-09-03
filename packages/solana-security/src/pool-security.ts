@@ -126,9 +126,9 @@ function quoteParity(state: PoolResolvedState): boolean | null {
   return difference * 10_000n <= reference * BigInt(state.quoteToleranceBps);
 }
 
-function resolveMetadata(resolution: PoolDecoderResolution):
-  | { protocolFamily: string; decoderVersion: string }
-  | undefined {
+function resolveMetadata(
+  resolution: PoolDecoderResolution,
+): { protocolFamily: string; decoderVersion: string } | undefined {
   if ('state' in resolution) {
     return resolution.state === 'SUPPORTED'
       ? {
@@ -172,7 +172,8 @@ function migrationReference(
 export function assessPoolSecurity(input: PoolSecurityInput): PoolSecurityAssessment {
   const observed = Date.parse(input.observedAt);
   const available = Date.parse(input.availableAt);
-  if (!Number.isFinite(observed) || !Number.isFinite(available)) throw new Error('INVALID_TIMESTAMP');
+  if (!Number.isFinite(observed) || !Number.isFinite(available))
+    throw new Error('INVALID_TIMESTAMP');
   if (available < observed) throw new Error('AVAILABLE_AT_PRECEDES_OBSERVED_AT');
 
   const resolution = (input.decoderResolver ?? resolveDecoder)({

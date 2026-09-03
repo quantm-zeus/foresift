@@ -84,8 +84,7 @@ export const PositionControlState = {
   OPEN: 'OPEN',
   UNABLE_TO_VERIFY: 'UNABLE_TO_VERIFY',
 } as const;
-export type PositionControlState =
-  (typeof PositionControlState)[keyof typeof PositionControlState];
+export type PositionControlState = (typeof PositionControlState)[keyof typeof PositionControlState];
 
 export const WithdrawalAuthorityState = {
   REVOKED: 'REVOKED',

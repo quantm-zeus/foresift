@@ -1,0 +1,71 @@
+{
+  "$schema": "https://foresift.dev/schemas/telemetry-catalog-v1.json",
+  "catalog": "trd",
+  "description": "Economic-trade normalization telemetry contracts. Raw routes remain auditable, while market and wallet features consume one net economic event per actor.",
+  "contractStatus": "DECLARATIVE_CONTRACT_ONLY — this file defines the event contracts the requirement manifest maps to (telemetry/trd.*); emitter wiring lands with the observability milestone (dependency group G2), so nothing publishes these event names yet. Field lists mirror the authoritative schemas in packages/shared-schemas/src/trd.ts exactly.",
+  "requirementsCovered": ["FR-TRD-001", "FR-TRD-002", "FR-TRD-004"],
+  "recoveryDataClass": "CRITICAL_METADATA",
+  "events": [
+    {
+      "name": "trade.normalized",
+      "description": "Raw swaps, transfers, and aggregator hops were normalized into one economic trade event before feature computation.",
+      "requirementRefs": ["FR-TRD-001", "FR-TRD-002"],
+      "tier": "CRITICAL_OBSERVATIONS_CHECKPOINTS",
+      "fields": [
+        { "name": "eventId", "type": "string", "required": true },
+        { "name": "chainId", "type": "string<caip-2>", "required": true },
+        { "name": "transactionHash", "type": "string", "required": true },
+        { "name": "actorEntityId", "type": "string|undefined", "required": false },
+        { "name": "actorResolutionState", "type": "string(RESOLVED|PARTIALLY_RESOLVED|UNRESOLVED)", "required": true },
+        { "name": "assetRepresentationId", "type": "string", "required": true },
+        { "name": "netAssetDeltaRaw", "type": "string<signed-decimal>", "required": true },
+        { "name": "netQuoteDeltaUsd", "type": "string<signed-decimal>|undefined", "required": false },
+        { "name": "side", "type": "string(BUY|SELL|ROUND_TRIP|INVENTORY_NEUTRAL|UNKNOWN)", "required": true },
+        { "name": "routeLegIds", "type": "array<string>", "required": true },
+        { "name": "classificationConfidence", "type": "number[0,1]", "required": true },
+        { "name": "eventAt", "type": "string<utc-timestamp>", "required": true },
+        { "name": "availableAt", "type": "string<utc-timestamp>", "required": true },
+        { "name": "qualityCodes", "type": "array<string>", "required": true }
+      ]
+    },
+    {
+      "name": "trade.side_classified",
+      "description": "An economic event received a side derived from its net actor delta, not from individual route hops.",
+      "requirementRefs": ["FR-TRD-002"],
+      "tier": "CRITICAL_METADATA",
+      "fields": [
+        { "name": "eventId", "type": "string", "required": true },
+        { "name": "netAssetDeltaRaw", "type": "string<signed-decimal>", "required": true },
+        { "name": "side", "type": "string(BUY|SELL|ROUND_TRIP|INVENTORY_NEUTRAL|UNKNOWN)", "required": true },
+        { "name": "classificationConfidence", "type": "number[0,1]", "required": true },
+        { "name": "availableAt", "type": "string<utc-timestamp>", "required": true }
+      ]
+    },
+    {
+      "name": "trade.actor_downgraded",
+      "description": "Uncertain economic-actor attribution reduced the event's feature quality and ranking contribution.",
+      "requirementRefs": ["FR-TRD-004"],
+      "tier": "CRITICAL_METADATA",
+      "fields": [
+        { "name": "eventId", "type": "string", "required": true },
+        { "name": "actorEntityId", "type": "string|undefined", "required": false },
+        { "name": "actorResolutionState", "type": "string(PARTIALLY_RESOLVED|UNRESOLVED)", "required": true },
+        { "name": "classificationConfidence", "type": "number[0,1]", "required": true },
+        { "name": "qualityCodes", "type": "array<string>", "required": true },
+        { "name": "availableAt", "type": "string<utc-timestamp>", "required": true }
+      ]
+    },
+    {
+      "name": "trade.double_count_blocked",
+      "description": "A route or hop was prevented from contributing a second economic trade after net-delta normalization.",
+      "requirementRefs": ["FR-TRD-002"],
+      "tier": "CRITICAL_METADATA",
+      "fields": [
+        { "name": "eventId", "type": "string", "required": true },
+        { "name": "routeLegIds", "type": "array<string>", "required": true },
+        { "name": "netAssetDeltaRaw", "type": "string<signed-decimal>", "required": true },
+        { "name": "availableAt", "type": "string<utc-timestamp>", "required": true }
+      ]
+    }
+  ]
+}

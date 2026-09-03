@@ -188,7 +188,12 @@ outside the listed writeScopes.
       actor_resolution_state; the `actorUncertaintyFactor` function
       (domain T005) maps state+confidence to a deterministic feature-quality
       reduction consumed downstream via quality codes and a capped
-      contribution factor exported on the event. Colocated suite proves
+      contribution factor exported on the event. Extend
+      `migrations/g1_trd_0001_economic_trade_events.sql` with the
+      actor_resolution_state column truth and
+      `packages/shared-schemas/src/trd.ts` with the reduction's schema
+      surface (plan-sanctioned paths: plan §g1_trd_0001, shared-schemas
+      trd module). Colocated suite proves
       monotone reduction and UNRESOLVED → degraded quality (never silently
       dropped evidence). Traces: FR-TRD-004, AC-134, AC-136.
 - [x] T019 [P] Scaffold `packages/supply-confidence` (G0 scaffold pattern) and

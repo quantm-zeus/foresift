@@ -261,7 +261,7 @@ outside the listed writeScopes.
       yield full-quality contribution; fee-leg omission fails parity.
       Traces: FR-TRD-001…004, FR-SUP-002, AC-133, AC-134, AC-135, AC-136,
       AC-233.
-- [ ] T026 Extend the shared suites in place with G1 cases:
+- [x] T026 Extend the shared suites in place with G1 cases:
       `tests/acceptance/AC-020.spec.ts` + negative (backfilled row invisible
       before actual availability; no event-time substitution),
       `tests/acceptance/AC-240.spec.ts` + negative (timeline monotonicity +

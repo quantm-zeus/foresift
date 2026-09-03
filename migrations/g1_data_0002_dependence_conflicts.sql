@@ -73,3 +73,46 @@ CREATE TABLE provider_conflicts (
     created_at                  timestamptz NOT NULL DEFAULT now(),
     CHECK ((classification = 'UNRESOLVED_DECISION_CRITICAL') = decision_critical)
 );
+
+-- FR-SUP-001/002: assessments retain their basis and every market-cap gate
+-- evaluation leaves an immutable audit decision, including fallback use.
+CREATE TABLE supply_assessments (
+    assessment_id              text PRIMARY KEY,
+    asset_id                   text NOT NULL,
+    source                     text NOT NULL,
+    method                     text NOT NULL,
+    circulating_supply         text NOT NULL CHECK (circulating_supply ~ '^(0|[1-9][0-9]*)(\.[0-9]+)?$'),
+    excluded_supply            jsonb NOT NULL CHECK (jsonb_typeof(excluded_supply) = 'array'),
+    confidence                 double precision NOT NULL CHECK (confidence BETWEEN 0 AND 1),
+    exclusion_evidence_ids     text[] NOT NULL DEFAULT ARRAY[]::text[],
+    quality_codes              text[] NOT NULL DEFAULT ARRAY[]::text[],
+    market_cap_basis           jsonb NOT NULL CHECK (jsonb_typeof(market_cap_basis) = 'object'),
+    assessed_at                timestamptz NOT NULL,
+    created_at                 timestamptz NOT NULL DEFAULT now()
+);
+
+CREATE TABLE supply_fallback_decisions (
+    decision_id                text PRIMARY KEY,
+    assessment_id              text NOT NULL REFERENCES supply_assessments(assessment_id),
+    market_cap_confidence      double precision NOT NULL CHECK (market_cap_confidence BETWEEN 0 AND 1),
+    minimum_confidence         double precision NOT NULL CHECK (minimum_confidence BETWEEN 0 AND 1),
+    approved_liquidity_fallback boolean NOT NULL,
+    approved_activity_fallback boolean NOT NULL,
+    outcome                    text NOT NULL CHECK (outcome IN (
+      'MARKET_CAP_ACCEPTED', 'APPROVED_FALLBACK_USED', 'HARD_REJECTED')),
+    reason                     text NOT NULL,
+    decided_at                 timestamptz NOT NULL,
+    policy_version             text NOT NULL,
+    created_at                 timestamptz NOT NULL DEFAULT now(),
+    CHECK (outcome <> 'HARD_REJECTED'
+           OR NOT approved_liquidity_fallback AND NOT approved_activity_fallback),
+    CHECK (outcome <> 'APPROVED_FALLBACK_USED'
+           OR approved_liquidity_fallback OR approved_activity_fallback)
+);
+
+CREATE TRIGGER supply_assessments_immutable
+    BEFORE UPDATE OR DELETE ON supply_assessments
+    FOR EACH ROW EXECUTE FUNCTION foresift_refuse_mutation();
+CREATE TRIGGER supply_fallback_decisions_immutable
+    BEFORE UPDATE OR DELETE ON supply_fallback_decisions
+    FOR EACH ROW EXECUTE FUNCTION foresift_refuse_mutation();

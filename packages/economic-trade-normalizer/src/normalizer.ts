@@ -1,5 +1,7 @@
 import {
   EconomicTradeClassification,
+  actorResolutionQualityCodes,
+  actorUncertaintyFactor,
   type ActorResolution,
   type EconomicTradeEvent,
   type NetActorDelta,
@@ -149,6 +151,13 @@ export function normalizeEconomicTrade(
   const actorResolution = resolveEconomicActor(economicTransactionId, guarded.retained, options);
   const netActorDeltas = computeNetActorDeltas(guarded.retained, actorResolution.actorAddress);
   const classification = classifyEconomicActivity(guarded.retained, netActorDeltas);
+  const uncertaintyFactor = actorUncertaintyFactor(
+    actorResolution.state,
+    actorResolution.confidence,
+  );
+  const contributionCap = options.maximumContributionFactor ?? 1;
+  if (!Number.isFinite(contributionCap) || contributionCap < 0 || contributionCap > 1)
+    throw new RangeError('maximumContributionFactor must lie in [0,1]');
   const availableAt = latest(guarded.retained.map((leg) => leg.availableAt));
   const retainedAuditLegs: RawEconomicLegAudit[] = guarded.retained.map(toAuditLeg);
   // Audit preservation is deliberately wider than calculation input: blocked
@@ -176,9 +185,9 @@ export function normalizeEconomicTrade(
     classification,
     rawLegs: auditLegs,
     blockedDuplicateLegIds: guarded.blockedLegIds,
-    qualityCodes: [],
-    actorUncertaintyFactor: 1,
-    cappedContributionFactor: Math.min(1, options.maximumContributionFactor ?? 1),
+    qualityCodes: actorResolutionQualityCodes(actorResolution.state),
+    actorUncertaintyFactor: uncertaintyFactor,
+    cappedContributionFactor: Math.min(uncertaintyFactor, contributionCap),
   };
 }
 

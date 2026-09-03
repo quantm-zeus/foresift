@@ -1,5 +1,5 @@
 /** Economic-trade truth shared by normalization and downstream features. */
-import type { QualityCode } from './quality.ts';
+import { QualityCode, type QualityCode as QualityCodeValue } from './quality.ts';
 import type { UtcTimestamp } from './timestamps.ts';
 
 export const ActorResolutionState = {
@@ -60,7 +60,46 @@ export interface EconomicTradeEvent {
   readonly classification: EconomicTradeClassification;
   readonly rawLegs: readonly RawEconomicLegAudit[];
   readonly blockedDuplicateLegIds: readonly string[];
-  readonly qualityCodes: readonly QualityCode[];
+  readonly qualityCodes: readonly QualityCodeValue[];
   readonly actorUncertaintyFactor: number;
   readonly cappedContributionFactor: number;
+}
+
+const ACTOR_FACTOR_BOUNDS: Readonly<
+  Record<ActorResolutionState, readonly [floor: number, ceiling: number]>
+> = {
+  RESOLVED: [0.8, 1],
+  ROUTER_RESOLVED: [0.55, 0.85],
+  PARTIALLY_RESOLVED: [0.3, 0.6],
+  UNRESOLVED: [0.1, 0.25],
+};
+
+/**
+ * Deterministic FR-TRD-004 reduction. The positive floor keeps unresolved
+ * evidence visible while the disjoint ceilings guarantee monotone downgrade.
+ */
+export function actorUncertaintyFactor(
+  state: ActorResolutionState,
+  confidence: number,
+): number {
+  if (!Number.isFinite(confidence) || confidence < 0 || confidence > 1) {
+    throw new RangeError('actor confidence must lie in [0,1]');
+  }
+  const [floor, ceiling] = ACTOR_FACTOR_BOUNDS[state];
+  return floor + (ceiling - floor) * confidence;
+}
+
+export function actorResolutionQualityCodes(
+  state: ActorResolutionState,
+): readonly QualityCodeValue[] {
+  switch (state) {
+    case ActorResolutionState.RESOLVED:
+      return [QualityCode.VALID];
+    case ActorResolutionState.ROUTER_RESOLVED:
+      return [QualityCode.ESTIMATED];
+    case ActorResolutionState.PARTIALLY_RESOLVED:
+      return [QualityCode.PARTIAL, QualityCode.SYSTEM_ADDRESS_UNCERTAIN];
+    case ActorResolutionState.UNRESOLVED:
+      return [QualityCode.SYSTEM_ADDRESS_UNCERTAIN, QualityCode.ESTIMATED];
+  }
 }

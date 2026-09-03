@@ -1195,3 +1195,71 @@ describe('central migration registry duty enforcement', () => {
     }
   });
 });
+
+describe('central migration registry duty enforcement (generation-agnostic)', () => {
+  function buildG1ScratchRepo(tasksMd: string): string {
+    const root = mkdtempSync(join(tmpdir(), 'mig-duty-g1-fx-'));
+    mkdirSync(join(root, 'specs', 'pkg-g1'), { recursive: true });
+    mkdirSync(join(root, 'specs', 'implementation'), { recursive: true });
+    writeFileSync(join(root, 'specs', 'pkg-g1', 'tasks.md'), tasksMd);
+    const ms = {
+      schemaVersion: '1.0.0',
+      milestoneId: 'MM',
+      status: 'ACTIVE',
+      packages: [
+        {
+          id: 'pkg-g1',
+          objective: 'Deliver a new g1-generation migration family with full registry convergence.',
+          requirementIds: ['FR-M-001'],
+          dependencies: [],
+          risk: 'MEDIUM',
+          parallelizable: false,
+          writeScopes: ['packages/m/**', 'migrations/g1_m_*.sql', 'tests/acceptance/**'],
+          verificationCommands: ['pnpm test'],
+          status: 'RUNNING',
+        },
+        {
+          id: 'pkg-g1-b',
+          objective: 'Inert companion package required by the 2-8 package decomposition rule.',
+          requirementIds: ['FR-M-002'],
+          dependencies: ['pkg-g1'],
+          risk: 'LOW',
+          parallelizable: true,
+          writeScopes: ['packages/mb/**'],
+          verificationCommands: ['pnpm test'],
+          status: 'PENDING',
+        },
+      ],
+    };
+    writeFileSync(
+      join(root, 'specs', 'implementation', 'current-milestone.json'),
+      JSON.stringify(ms),
+    );
+    sh('git init -q', root);
+    sh('git config user.email t@t', root);
+    sh('git config user.name t', root);
+    sh('git add -A', root);
+    sh('git commit -qm base', root);
+    return root;
+  }
+
+  const G1_MIGRATION_TASKS_BODY = `
+- [ ] T301 Write \`migrations/g1_m_0001_ledgers.sql\` — next-generation family scripts. Traces: FR-M-001.
+`;
+
+  it('refuses at graph build when NEW g1 migration scripts never name the central suite', () => {
+    const root = buildG1ScratchRepo(`# Tasks: pkg-g1\n${G1_MIGRATION_TASKS_BODY}`);
+    try {
+      const r = spawnSync(
+        process.execPath,
+        [GRAPH, '--package', 'pkg-g1', '--root', root, '--plan-shards', '2'],
+        { encoding: 'utf8' },
+      );
+      expect(r.status).not.toBe(0);
+      expect(`${r.stderr ?? ''}`).toContain('CENTRAL_MIGRATION_SUITE_UNREFERENCED');
+      expect(`${r.stderr ?? ''}`).toContain('packages/persistence/test/migrator.spec.ts');
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+});

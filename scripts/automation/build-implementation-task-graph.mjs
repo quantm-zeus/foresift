@@ -245,17 +245,23 @@ assertEvidenceOwnership({
 });
 
 // ── central migration registry duty (fail-closed, pre-writer cost) ───────────
-// packages/persistence/test/migrator.spec.ts asserts EXACTLY the full G0
-// migration script set (lexicographic, checksum-pinned). Any package whose
-// tasks predict NEW migration scripts must also name that central suite as a
+// packages/persistence/test/migrator.spec.ts asserts EXACTLY the full
+// migration script set across ALL generations (lexicographic,
+// checksum-pinned). Any package whose tasks predict NEW migration scripts —
+// g0_* or g1_* or any future g<N>_* — must also name that central suite as a
 // (plan-sanctioned, scope-exception) write — the g0-provider-lifecycle
-// precedent. When the duty is missing, the wave guard legally refuses every
+// precedent. The pattern is generation-agnostic (ADR-0019 amendment): a G0-
+// pinned `g0_` regex let every G1 task sail through graph build with the duty
+// unrecorded, deferring the failure to a deterministic persistence test
+// failure inside package verification — the exact late, repair-budget-
+// burning mode the guard exists to prevent. When the duty is missing, the
+// wave guard legally refuses every
 // repair that touches the central suite and the run exhausts its bounded
 // repair budget deterministically (observed live 2026-08-28 on
-// g0-cost-capacity). Refuse at graph build time so no writer cost is burned.
+// g0-cost-capacity). Refuse at graph build so no writer cost is burned.
 const CENTRAL_MIGRATION_SUITE = 'packages/persistence/test/migrator.spec.ts';
 {
-  const migrationWriteRe = /^migrations\/g0_[a-z]+_\d+.*\.sql$/;
+  const migrationWriteRe = /^migrations\/g\d+_[a-z]+_\d+.*\.sql$/;
   const predictsNewMigrationScript = (u) =>
     (u.outOfScopeWrites ?? []).some(
       (p) => migrationWriteRe.test(p) && !existsSync(join(root, p)),
@@ -268,7 +274,7 @@ const CENTRAL_MIGRATION_SUITE = 'packages/persistence/test/migrator.spec.ts';
     !units.some(referencesCentralSuite)
   ) {
     fail(
-      `CENTRAL_MIGRATION_SUITE_UNREFERENCED: tasks predict new migrations/g0_*.sql scripts but never name ${CENTRAL_MIGRATION_SUITE} — the central expected-script registry must be updated in the same package (plan-sanctioned scope exception)`,
+      `CENTRAL_MIGRATION_SUITE_UNREFERENCED: tasks predict new migrations/g*_*.sql scripts but never name ${CENTRAL_MIGRATION_SUITE} — the central expected-script registry must be updated in the same package (plan-sanctioned scope exception)`,
     );
   }
 }

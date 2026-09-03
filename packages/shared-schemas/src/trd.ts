@@ -1,6 +1,7 @@
 /** Runtime contracts for §66 economic-trade normalization (FR-TRD-001/002). */
 import { z } from 'zod';
 import { ChainIdSchema, QualityCodesSchema, UtcTimestampSchema } from './data.ts';
+import { ActorResolutionState, actorUncertaintyFactor } from '@foresift/domain';
 
 /** Canonical signed decimal. Raw net deltas may be negative; exponent notation is forbidden. */
 export const SignedDecimalStringSchema = z
@@ -18,8 +19,11 @@ export const EconomicTradeSideSchema = z.enum([
 export type EconomicTradeSide = z.infer<typeof EconomicTradeSideSchema>;
 
 /** Whether infrastructure/token accounts could be attributed to one economic actor. */
-export const ActorResolutionStateSchema = z.enum(['RESOLVED', 'PARTIALLY_RESOLVED', 'UNRESOLVED']);
+export const ActorResolutionStateSchema = z.enum(['RESOLVED', 'PARTIAL', 'UNRESOLVED']);
 export type ActorResolutionState = z.infer<typeof ActorResolutionStateSchema>;
+
+/** Bounded multiplier exported to consumers after actor-attribution uncertainty reduction. */
+export const ContributionFactorSchema = z.number().finite().min(0).max(1);
 
 /** Auditable raw swap/transfer/aggregator hop retained behind one economic event. */
 export const EconomicRouteLegSchema = z
@@ -51,6 +55,9 @@ export const EconomicTradeEventSchema = z
     transactionHash: z.string().min(1),
     actorEntityId: z.string().min(1).optional(),
     actorResolutionState: ActorResolutionStateSchema,
+    actorResolutionConfidence: z.number().finite().min(0).max(1),
+    actorUncertaintyFactor: ContributionFactorSchema,
+    contributionFactor: ContributionFactorSchema,
     assetRepresentationId: z.string().min(1),
     netAssetDeltaRaw: SignedDecimalStringSchema,
     netQuoteDeltaUsd: SignedDecimalStringSchema.optional(),
@@ -65,6 +72,22 @@ export const EconomicTradeEventSchema = z
   .refine(
     (value) => value.actorResolutionState !== 'RESOLVED' || value.actorEntityId !== undefined,
     { message: 'resolved actor state requires actorEntityId' },
+  )
+  .refine(
+    (value) =>
+      value.actorUncertaintyFactor ===
+      actorUncertaintyFactor(value.actorResolutionState, value.actorResolutionConfidence),
+    { message: 'actor uncertainty factor must match the deterministic state/confidence reduction' },
+  )
+  .refine((value) => value.contributionFactor <= value.actorUncertaintyFactor, {
+    message: 'contribution factor cannot exceed actor uncertainty factor',
+  })
+  .refine(
+    (value) =>
+      value.actorResolutionState !== ActorResolutionState.UNRESOLVED ||
+      (value.qualityCodes.includes('SYSTEM_ADDRESS_UNCERTAIN') &&
+        !value.qualityCodes.includes('VALID')),
+    { message: 'unresolved actor evidence requires degraded quality without VALID' },
   )
   .refine((value) => Date.parse(value.availableAt) >= Date.parse(value.eventAt), {
     message: 'economic event cannot be available before its event time',

@@ -104,7 +104,9 @@ export function buildLaunchPreflight(packageId, rootDir = root) {
   const testWrites = [...new Set(units.flatMap((u) => u.testWrites ?? []))].sort();
   const productWrites = [...new Set(units.flatMap((u) => u.productWrites ?? []))].sort();
   const migrationDuties = predictedWrites.filter((p) =>
-    /^migrations\/g0_[a-z]+_\d+.*\.sql$/.test(p),
+    // Generation-agnostic (ADR-0022): g0_* was G0-pinned and silently dropped
+    // every g1_*/g2_* prediction from the preflight's migration-duty record.
+    /^migrations\/g\d+_[a-z]+_\d+.*\.sql$/.test(p),
   );
 
   // READY work truth (H3 P0): a unit is ready when none of its declared

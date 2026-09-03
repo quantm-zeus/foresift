@@ -90,7 +90,11 @@ nodes:
         const g=JSON.parse(fs.readFileSync(d+"/task-graph.json","utf8"));
         const r=JSON.parse(fs.readFileSync(d+"/routing.json","utf8"));
         const serial=(g.shards??[]).filter(s=>s.mode==="serial").map(s=>s.id);
-        const ids=[...serial,"shard-1","shard-2","test-author"];
+        // Test lanes are enumerated from the graph so write-disjoint AGY test
+        // sharding (test-author-1/2, canary cap 2) needs no yaml edits; the
+        // legacy single "test-author" id stays covered by the graph itself.
+        const testLaneIds=(g.testLanes??[]).map(t=>t.id);
+        const ids=[...serial,"shard-1","shard-2",...testLaneIds];
         for (const id of ids) {
           const lane=(r.lanes??[]).find(x=>x.lane===id);
           fs.writeFileSync(d+"/engine-"+id+".txt", lane?.engine ?? ("NO "+id.toUpperCase().replace(/-/g," ")+" THIS WAVE"));
@@ -136,7 +140,16 @@ nodes:
           const r = spawnSync("git worktree add -b \"" + br + "\" \"" + wt + "\" \"" + base + "\"",
             { shell: true });
           if (r.status !== 0) throw new Error("worktree add failed for " + s.id + ": " + r.stderr);
-          meta[s.id] = { branch: br, worktree: wt };
+          // Immutable LOGICAL-LANE evidence baseline (maintainer Part A4,
+          // 2026-09-03): created ONCE per lane at worktree creation and reused
+          // across every retry of the writer node. A retry re-enters the same
+          // worktree whose HEAD already carries attempt-1 commits; deriving
+          // the evidence range from the attempt-start HEAD would silently
+          // shrink LOGICAL LANE EVIDENCE = immutableLaneBase..currentHEAD union
+          // uncommitted valid paths down to attemptStart..currentHEAD and hide
+          // the earlier attempt valid work. Writers receive it as
+          // --lane-base and must never derive their own baseline from HEAD.
+          meta[s.id] = { branch: br, worktree: wt, laneBase: base };
         }
         fs.writeFileSync(dir + "/shard-meta.json", JSON.stringify(meta, null, 2));
         console.log("SHARDS_READY " + Object.keys(meta).join(","));
@@ -178,6 +191,13 @@ nodes:
   - id: brief-test-author
     depends_on: [prep]
     bash: cat "$ARTIFACTS_DIR/briefs/test-author-brief.md" 2>/dev/null || echo "NO TEST-AUTHOR THIS WAVE"
+  # Sharded AGY test lane 2 (maintainer Part E, canary cap 2): brief/writer/
+  # guard mirror lane 1 with graph-derived ids (testLanes[1]) so the pair
+  # dispatches only when build-implementation-task-graph actually produced a
+  # second write-disjoint lane.
+  - id: brief-test-author-2
+    depends_on: [prep]
+    bash: cat "$ARTIFACTS_DIR/briefs/test-author-2-brief.md" 2>/dev/null || echo "NO TEST-AUTHOR-2 THIS WAVE"
 
   # Engine emitters are exact persisted routing tokens. Fresh profiles ignore
   # legacy FORESIFT_AGY_LANES, so AGY can never become a product writer.
@@ -204,7 +224,14 @@ nodes:
     bash: cat "$ARTIFACTS_DIR/engine-shard-2.txt"
   - id: exec-test-author
     depends_on: [prep]
-    bash: cat "$ARTIFACTS_DIR/engine-test-author.txt"
+    bash: |
+      LANE="$(node -e 'const g=require(process.env.ARTIFACTS_DIR+"/task-graph.json");process.stdout.write(g.testLanes?.[0]?.id??"")')"
+      [ -n "$LANE" ] && cat "$ARTIFACTS_DIR/engine-$LANE.txt" || echo "NO TEST-AUTHOR THIS WAVE"
+  - id: exec-test-author-2
+    depends_on: [prep]
+    bash: |
+      LANE="$(node -e 'const g=require(process.env.ARTIFACTS_DIR+"/task-graph.json");process.stdout.write(g.testLanes?.[1]?.id??"")')"
+      [ -n "$LANE" ] && cat "$ARTIFACTS_DIR/engine-$LANE.txt" || echo "NO TEST-AUTHOR-2 THIS WAVE"
   - id: profile
     depends_on: [prep]
     bash: node -e 'const r=require(process.argv[1]);process.stdout.write(r.executionProfile)' "$ARTIFACTS_DIR/execution-profile.json"
@@ -231,6 +258,7 @@ nodes:
         --timeout-ms 3300000 \
         --brief "$ARTIFACTS_DIR/briefs/$LANE-brief.md" \
         --worktree "$ARTIFACTS_DIR/wt/$LANE" \
+        --lane-base "$(cat "$ARTIFACTS_DIR/base-head.txt")" \
         --routing "$ARTIFACTS_DIR/routing.json" \
         --results-dir "$ARTIFACTS_DIR/writer-results/$LANE" \
         --task-graph "$ARTIFACTS_DIR/task-graph.json" \
@@ -249,6 +277,7 @@ nodes:
         --lane "$LANE" \
         --brief "$ARTIFACTS_DIR/briefs/$LANE-brief.md" \
         --worktree "$ARTIFACTS_DIR/wt/$LANE" \
+        --lane-base "$(cat "$ARTIFACTS_DIR/base-head.txt")" \
         --results-dir "$ARTIFACTS_DIR/writer-results/$LANE" \
         --task-ids "$TASKS" \
         --task-graph "$ARTIFACTS_DIR/task-graph.json" \
@@ -264,6 +293,7 @@ nodes:
         --timeout-ms 3300000 \
         --brief "$ARTIFACTS_DIR/briefs/shard-1-brief.md" \
         --worktree "$ARTIFACTS_DIR/wt/shard-1" \
+        --lane-base "$(cat "$ARTIFACTS_DIR/base-head.txt")" \
         --routing "$ARTIFACTS_DIR/routing.json" \
         --results-dir "$ARTIFACTS_DIR/writer-results/shard-1" \
         --task-graph "$ARTIFACTS_DIR/task-graph.json" \
@@ -279,6 +309,7 @@ nodes:
         --timeout-ms 3300000 \
         --brief "$ARTIFACTS_DIR/briefs/shard-2-brief.md" \
         --worktree "$ARTIFACTS_DIR/wt/shard-2" \
+        --lane-base "$(cat "$ARTIFACTS_DIR/base-head.txt")" \
         --routing "$ARTIFACTS_DIR/routing.json" \
         --results-dir "$ARTIFACTS_DIR/writer-results/shard-2" \
         --task-graph "$ARTIFACTS_DIR/task-graph.json" \
@@ -310,6 +341,7 @@ nodes:
         --timeout-ms 3300000 \
         --brief "$ARTIFACTS_DIR/briefs/$LANE-brief.md" \
         --worktree "$ARTIFACTS_DIR/wt/$LANE" \
+        --lane-base "$(cat "$ARTIFACTS_DIR/base-head.txt")" \
         --routing "$ARTIFACTS_DIR/routing.json" \
         --results-dir "$ARTIFACTS_DIR/writer-results/$LANE" \
         --task-graph "$ARTIFACTS_DIR/task-graph.json" \
@@ -340,6 +372,7 @@ nodes:
         --lane "$LANE" \
         --brief "$ARTIFACTS_DIR/briefs/$LANE-brief.md" \
         --worktree "$ARTIFACTS_DIR/wt/$LANE" \
+        --lane-base "$(cat "$ARTIFACTS_DIR/base-head.txt")" \
         --results-dir "$ARTIFACTS_DIR/writer-results/$LANE" \
         --task-ids "$TASKS" \
         --task-graph "$ARTIFACTS_DIR/task-graph.json" \
@@ -369,6 +402,7 @@ nodes:
         --timeout-ms 3300000 \
         --brief "$ARTIFACTS_DIR/briefs/$LANE-brief.md" \
         --worktree "$ARTIFACTS_DIR/wt/$LANE" \
+        --lane-base "$(cat "$ARTIFACTS_DIR/base-head.txt")" \
         --routing "$ARTIFACTS_DIR/routing.json" \
         --results-dir "$ARTIFACTS_DIR/writer-results/$LANE" \
         --task-graph "$ARTIFACTS_DIR/task-graph.json" \
@@ -399,6 +433,7 @@ nodes:
         --lane "$LANE" \
         --brief "$ARTIFACTS_DIR/briefs/$LANE-brief.md" \
         --worktree "$ARTIFACTS_DIR/wt/$LANE" \
+        --lane-base "$(cat "$ARTIFACTS_DIR/base-head.txt")" \
         --results-dir "$ARTIFACTS_DIR/writer-results/$LANE" \
         --task-ids "$TASKS" \
         --task-graph "$ARTIFACTS_DIR/task-graph.json" \
@@ -416,6 +451,7 @@ nodes:
         --lane shard-1 \
         --brief "$ARTIFACTS_DIR/briefs/shard-1-brief.md" \
         --worktree "$ARTIFACTS_DIR/wt/shard-1" \
+        --lane-base "$(cat "$ARTIFACTS_DIR/base-head.txt")" \
         --results-dir "$ARTIFACTS_DIR/writer-results/shard-1" \
         --task-graph "$ARTIFACTS_DIR/task-graph.json" \
         --task-ids "$TASKS" \
@@ -433,6 +469,7 @@ nodes:
         --lane shard-2 \
         --brief "$ARTIFACTS_DIR/briefs/shard-2-brief.md" \
         --worktree "$ARTIFACTS_DIR/wt/shard-2" \
+        --lane-base "$(cat "$ARTIFACTS_DIR/base-head.txt")" \
         --results-dir "$ARTIFACTS_DIR/writer-results/shard-2" \
         --task-graph "$ARTIFACTS_DIR/task-graph.json" \
         --task-ids "$TASKS" \
@@ -445,12 +482,40 @@ nodes:
     retry: { max_attempts: 2, delay_ms: 10000, on_error: all }
     timeout: 3600000
     bash: |
-      TASKS="$(node -e 'const g=require(process.argv[1]);process.stdout.write((g.testLanes?.[0]?.units??[]).join(","))' "$ARTIFACTS_DIR/task-graph.json")"
-      node scripts/automation/exec-agy-test-writer.mjs --lane test-author \
-        --brief "$ARTIFACTS_DIR/briefs/test-author-brief.md" \
-        --worktree "$ARTIFACTS_DIR/wt/test-author" \
+      # Write-disjoint AGY test sharding (maintainer Part E, canary cap 2):
+      # each enumerated test lane dispatches its OWN worktree/brief/results —
+      # exactly-disjoint writes only (graph-side fail-closed collapse covers
+      # any overlap). The legacy single test-author lane stays id 0.
+      TL_INDEX=0
+      TL_ID="$(node -e 'const g=require(process.env.ARTIFACTS_DIR+"/task-graph.json");process.stdout.write(g.testLanes?.[0]?.id??"")')"
+      TASKS="$(node -e 'const g=require(process.env.ARTIFACTS_DIR+"/task-graph.json");process.stdout.write((g.testLanes?.[0]?.units??[]).join(","))')"
+      [ -n "$TL_ID" ] || { echo "NO TEST-AUTHOR THIS WAVE"; exit 0; }
+      node scripts/automation/exec-agy-test-writer.mjs --lane "$TL_ID" \
+        --brief "$ARTIFACTS_DIR/briefs/$TL_ID-brief.md" \
+        --worktree "$ARTIFACTS_DIR/wt/$TL_ID" \
+        --lane-base "$(cat "$ARTIFACTS_DIR/base-head.txt")" \
         --routing "$ARTIFACTS_DIR/routing.json" \
-        --results-dir "$ARTIFACTS_DIR/writer-results/test-author" \
+        --results-dir "$ARTIFACTS_DIR/writer-results/$TL_ID" \
+        --task-graph "$ARTIFACTS_DIR/task-graph.json" \
+        --task-ids "$TASKS" \
+        --package "${ARGUMENTS%%@g*}" \
+        --generation "$(case "$ARGUMENTS" in *@g*) echo "${ARGUMENTS##*@g}";; *) echo 0;; esac)"
+
+  - id: writer-test-author-2-agy
+    depends_on: [brief-test-author-2, exec-test-author-2]
+    when: "$exec-test-author-2.output == 'AGY'"
+    retry: { max_attempts: 2, delay_ms: 10000, on_error: all }
+    timeout: 3600000
+    bash: |
+      TL_ID="$(node -e 'const g=require(process.env.ARTIFACTS_DIR+"/task-graph.json");process.stdout.write(g.testLanes?.[1]?.id??"")')"
+      TASKS="$(node -e 'const g=require(process.env.ARTIFACTS_DIR+"/task-graph.json");process.stdout.write((g.testLanes?.[1]?.units??[]).join(","))')"
+      [ -n "$TL_ID" ] || { echo "NO TEST-AUTHOR-2 THIS WAVE"; exit 0; }
+      node scripts/automation/exec-agy-test-writer.mjs --lane "$TL_ID" \
+        --brief "$ARTIFACTS_DIR/briefs/$TL_ID-brief.md" \
+        --worktree "$ARTIFACTS_DIR/wt/$TL_ID" \
+        --lane-base "$(cat "$ARTIFACTS_DIR/base-head.txt")" \
+        --routing "$ARTIFACTS_DIR/routing.json" \
+        --results-dir "$ARTIFACTS_DIR/writer-results/$TL_ID" \
         --task-graph "$ARTIFACTS_DIR/task-graph.json" \
         --task-ids "$TASKS" \
         --package "${ARGUMENTS%%@g*}" \
@@ -519,7 +584,17 @@ nodes:
     when: "$brief-test-author.output != 'NO TEST-AUTHOR THIS WAVE'"
     bash: |
       set -euo pipefail
-      node scripts/automation/wave-guard.mjs --shard test-author \
+      LANE="$(node -e 'const g=require(process.env.ARTIFACTS_DIR+"/task-graph.json");process.stdout.write(g.testLanes?.[0]?.id??"test-author")')"
+      node scripts/automation/wave-guard.mjs --shard "$LANE" \
+        --artifacts "$ARTIFACTS_DIR" --graph "$ARTIFACTS_DIR/task-graph.json"
+  - id: guard-test-author-2
+    depends_on: [brief-test-author-2, writer-test-author-2-agy]
+    trigger_rule: none_failed_min_one_success
+    when: "$brief-test-author-2.output != 'NO TEST-AUTHOR-2 THIS WAVE'"
+    bash: |
+      set -euo pipefail
+      LANE="$(node -e 'const g=require(process.env.ARTIFACTS_DIR+"/task-graph.json");process.stdout.write(g.testLanes?.[1]?.id??"test-author-2")')"
+      node scripts/automation/wave-guard.mjs --shard "$LANE" \
         --artifacts "$ARTIFACTS_DIR" --graph "$ARTIFACTS_DIR/task-graph.json"
 
   # ── INTEGRATE + ONE TRUE COMBINED FAST (serial join, override §16/§17) ───────
@@ -534,7 +609,7 @@ nodes:
   # checkpoint fires only through the green path (wave-settled bridge), so no
   # false green and no checkpoint after red (override §14/§15 acceptance).
   - id: integrate-and-fast
-    depends_on: [guard-serial-1, guard-serial-2, guard-serial-3, guard-shard-1, guard-shard-2, guard-test-author]
+    depends_on: [guard-serial-1, guard-serial-2, guard-serial-3, guard-shard-1, guard-shard-2, guard-test-author, guard-test-author-2]
     trigger_rule: none_failed_min_one_success   # guards fail closed per-lane
     timeout: 3600000
     bash: |

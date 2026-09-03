@@ -22,7 +22,7 @@ export function replayMode(value: string): ReplayMode {
 export const parseReplayMode = replayMode;
 
 export function isRetrospectiveDataAllowed(mode: ReplayMode): boolean {
-  return mode !== ReplayMode.REALIZABLE_REPLAY;
+  return replayMode(mode) !== ReplayMode.REALIZABLE_REPLAY;
 }
 
 export interface ReplayBoundaryObservation {

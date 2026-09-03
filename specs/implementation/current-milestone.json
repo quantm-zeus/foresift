@@ -54,7 +54,7 @@
         "test -d packages/economic-trade-normalizer && pnpm --filter @foresift/economic-trade-normalizer test",
         "test -d packages/supply-confidence && pnpm --filter @foresift/supply-confidence test"
       ],
-      "status": "RUNNING"
+      "status": "PROVEN"
     },
     {
       "id": "g1-capacity-contracts",

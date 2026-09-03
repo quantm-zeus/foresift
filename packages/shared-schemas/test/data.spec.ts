@@ -101,7 +101,7 @@ const acquisitionFixture: EvidenceAcquisitionDecision = {
 
 describe('data schema registry', () => {
   it('is versioned and non-empty', () => {
-    expect(DATA_SCHEMA_REGISTRY_VERSION).toBe(1);
+    expect(DATA_SCHEMA_REGISTRY_VERSION).toBe(2);
     expect(Object.keys(DATA_SCHEMAS).length).toBeGreaterThanOrEqual(20);
   });
 });
@@ -365,7 +365,7 @@ describe('negative fixtures fail validation ', () => {
   it('refuses unknown acquisition states and lifecycle violations', () => {
     mustFail(
       'EvidenceAcquisitionDecision',
-      { ...acquisitionFixture, state: 'RETURNED_EMPTY' },
+      { ...acquisitionFixture, state: 'DEFINITELY_UNKNOWN_STATE' },
       'state outside the §13.8 vocabulary',
     );
     mustFail(

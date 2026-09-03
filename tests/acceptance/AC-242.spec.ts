@@ -181,6 +181,7 @@ describe('AC-242 G1 extensions: FR-DATA-012 field set and seed provenance (FR-DA
     );
     const row = rows.rows[0];
     expect(row).toBeDefined();
-    expect(row?.assignment_seed).toBe('seed/g1-prng-42');
+    expect(row?.acquisition_seed).toBe('seed/g1-prng-42');
+    expect(row?.requested_fields).toEqual(['holder_distribution', 'developer_activity']);
   });
 });

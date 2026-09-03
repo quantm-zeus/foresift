@@ -82,12 +82,12 @@ describe('§13.8 acquisition-state vocabulary (AC-242 substrate)', () => {
         'REQUESTED',
         'COST_BLOCKED',
         'QUOTA_BLOCKED',
-        'CAPABILITY_UNAVAILABLE',
         'RIGHTS_BLOCKED',
+        'UNSUPPORTED',
         'PROVIDER_UNAVAILABLE',
-        'TIMED_OUT',
+        'FAILED',
+        'RETURNED_EMPTY',
         'RETURNED',
-        'INVALID_RESPONSE',
       ].sort() as AcquisitionState[],
     );
   });
@@ -99,17 +99,22 @@ describe('§13.8 acquisition-state vocabulary (AC-242 substrate)', () => {
   });
 
   it('classifies retrieval failures and terminal states', () => {
-    expect(isRetrievalFailure(AcquisitionState.TIMED_OUT)).toBe(true);
+    expect(isRetrievalFailure(AcquisitionState.FAILED)).toBe(true);
     expect(isRetrievalFailure(AcquisitionState.RIGHTS_BLOCKED)).toBe(true);
     expect(isRetrievalFailure(AcquisitionState.REQUESTED)).toBe(false);
     expect(isTerminalAcquisition(AcquisitionState.RETURNED)).toBe(true);
+    expect(isTerminalAcquisition(AcquisitionState.RETURNED_EMPTY)).toBe(true);
     expect(isTerminalAcquisition(AcquisitionState.COST_BLOCKED)).toBe(true);
     expect(isTerminalAcquisition(AcquisitionState.REQUESTED)).toBe(false);
   });
 
+  it('admits RETURNED_EMPTY as a valid acquisition state', () => {
+    expect(acquisitionState('RETURNED_EMPTY')).toBe(AcquisitionState.RETURNED_EMPTY);
+  });
+
   it('refuses unknown states fail-closed', () => {
     try {
-      acquisitionState('RETURNED_EMPTY');
+      acquisitionState('DEFINITELY_UNKNOWN_STATE');
       expect.unreachable();
     } catch (e) {
       expect((e as ForesiftError).code).toBe(ErrorCode.ACQUISITION_STATE_UNKNOWN);

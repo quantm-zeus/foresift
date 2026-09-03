@@ -10,18 +10,19 @@
  * resolution respects it.
  */
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
-import { utcTimestamp, type UtcTimestamp } from '@foresift/domain';
+import { ErrorCode, utcTimestamp, type UtcTimestamp } from '@foresift/domain';
 import {
   appendObservation,
   appendRevision,
   currentObservations,
+  recordBackfilledObservation,
   replayObservations,
 } from '@foresift/persistence';
 import { freezeBundle } from '@foresift/evidence';
 import type { CacheKeyComponents } from '@foresift/shared-schemas';
 import { computeExactCacheKey } from '../../packages/tool-core/src/cache-key.ts';
 import { CacheStageChain } from '../../packages/tool-core/src/stages/cache.ts';
-import { closeTestDatabase, makeTestDatabase, seedPool, type TestDatabase } from './helpers.ts';
+import { closeTestDatabase, expectForesiftError, makeTestDatabase, seedPool, type TestDatabase } from './helpers.ts';
 
 const T = (iso: string): UtcTimestamp => utcTimestamp(iso);
 
@@ -252,5 +253,67 @@ describe('AC-020 G1 extensions: backfill availability and no-event-time-substitu
     // Replay at 16:00 -> MUST see ac20-backfill-g1
     const replay16 = await replayObservations(tdb.engine, T('2026-06-01T16:00:00Z'));
     expect(replay16.map((o) => o.observationId)).toContain('ac20-backfill-g1');
+  });
+
+  it('persists backfilled observation with original coordinates, actual fetched_at, and unavailability reason', async () => {
+    const result = await recordBackfilledObservation(tdb.engine, {
+      observationId: 'ac20-bf-coords',
+      subjectPoolId: poolId,
+      eventAt: T('2026-06-01T07:00:00Z'),
+      originalCoordinates: {
+        chainId: 'eip155:1',
+        blockNumber: '19500000',
+        transactionHash: '0x1111222233334444555566667777888899990000aaaabbbbccccddddeeeeffff',
+      },
+      fetchedAt: T('2026-06-01T14:30:00Z'),
+      availableAt: T('2026-06-01T14:30:05Z'),
+      unavailabilityReason: 'COLLECTOR_OUTAGE_RECOVERY',
+      availabilityProvenance: 'HISTORICAL_QUERY_FETCHED_LATER',
+      rawAmount: '450',
+      decimals: 2,
+    });
+    expect(result.receiptHash).toBeDefined();
+
+    const rows = await tdb.engine.query<{
+      retrieved_as_backfill: boolean;
+      unavailability_reason: string;
+      fetched_at: Date | string;
+    }>('SELECT retrieved_as_backfill, unavailability_reason, fetched_at FROM observations WHERE observation_id = $1', [
+      'ac20-bf-coords',
+    ]);
+    expect(rows.rows[0]?.retrieved_as_backfill).toBe(true);
+    expect(rows.rows[0]?.unavailability_reason).toBe('COLLECTOR_OUTAGE_RECOVERY');
+  });
+
+  it('negative: refuses event-time-for-availability substitution where available_at precedes fetched_at', async () => {
+    await expectForesiftError(
+      recordBackfilledObservation(tdb.engine, {
+        observationId: 'ac20-bf-subst-fail',
+        subjectPoolId: poolId,
+        eventAt: T('2026-06-01T06:00:00Z'),
+        originalCoordinates: { chainId: 'eip155:1', blockNumber: '19400000' },
+        fetchedAt: T('2026-06-01T14:00:00Z'),
+        availableAt: T('2026-06-01T06:00:00Z'), // substituting event time!
+        unavailabilityReason: 'MISSED_STREAM_WINDOW',
+        availabilityProvenance: 'HISTORICAL_QUERY_FETCHED_LATER',
+      }),
+      ErrorCode.AVAILABLE_AT_INFERRED_FROM_EVENT_AT,
+    );
+  });
+
+  it('negative: refuses backfilled observation with empty unavailability reason', async () => {
+    await expectForesiftError(
+      recordBackfilledObservation(tdb.engine, {
+        observationId: 'ac20-bf-no-reason',
+        subjectPoolId: poolId,
+        eventAt: T('2026-06-01T06:00:00Z'),
+        originalCoordinates: { chainId: 'eip155:1', blockNumber: '19400000' },
+        fetchedAt: T('2026-06-01T14:00:00Z'),
+        availableAt: T('2026-06-01T14:00:05Z'),
+        unavailabilityReason: '   ',
+        availabilityProvenance: 'HISTORICAL_QUERY_FETCHED_LATER',
+      }),
+      ErrorCode.CONTRACT_INVARIANT_VIOLATED,
+    );
   });
 });

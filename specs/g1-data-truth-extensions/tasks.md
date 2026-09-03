@@ -18,7 +18,7 @@ outside the listed writeScopes.
 
 ## Phase 1 — Foundations: domain vocabularies and shared schemas (blocks later phases)
 
-- [ ] T001 Extend `packages/domain/src/acquisition.ts` to the reconciled
+- [x] T001 Extend `packages/domain/src/acquisition.ts` to the reconciled
       ten-state decision vocabulary (FR-DATA-011): `UNSUPPORTED` replaces
       `CAPABILITY_UNAVAILABLE`; `FAILED` (with `AcquisitionFailureKind` =
       `TIMED_OUT` | `INVALID_RESPONSE`) replaces `TIMED_OUT`/`INVALID_RESPONSE`;
@@ -30,7 +30,7 @@ outside the listed writeScopes.
       acquisitionSeed provenance); add stable ErrorCodes for unknown failure
       kinds. Implement the member-level mapping helpers of plan ADR-1.
       Traces: FR-DATA-011, FR-DATA-012, AC-242, AC-243.
-- [ ] T002 Create `packages/domain/src/replay-modes.ts`: `ReplayMode` =
+- [x] T002 Create `packages/domain/src/replay-modes.ts`: `ReplayMode` =
       REALIZABLE_REPLAY | ORACLE | HINDSIGHT |
       COUNTERFACTUAL_DATA_AVAILABILITY_RESEARCH (FR-DATA-008, §13.6 rule 2)
       with fail-closed parse; retrospective-only data visibility is a function
@@ -38,7 +38,7 @@ outside the listed writeScopes.
       `retrieved_as_backfill`/retrospective-only provenance postdates the
       boundary; labeled modes carry explicit diagnostics labeling. Traces:
       FR-DATA-008, FR-DATA-015, AC-241, AC-247.
-- [ ] T003 Create `packages/domain/src/dependence.ts`: `DependenceMethod`
+- [x] T003 Create `packages/domain/src/dependence.ts`: `DependenceMethod`
       (DECLARED | EMPIRICAL), edge validity-interval types (validFrom,
       validUntil), confidence + `effectiveIndependenceMultiplier` policy
       (threshold table over the App. O.8 observation inputs, monotonic
@@ -47,7 +47,7 @@ outside the listed writeScopes.
       AVAILABLE_AT_THE_TIME edges whose validity interval contains T
       (plan ADR-3). Traces: FR-DATA-013, FR-DATA-014, FR-DATA-015, AC-245,
       AC-246, AC-247.
-- [ ] T004 Create `packages/domain/src/conflicts.ts`: `ProviderConflictClass`
+- [x] T004 Create `packages/domain/src/conflicts.ts`: `ProviderConflictClass`
       = BENIGN_LATENCY_ROUNDING_VARIANCE | COMMON_UPSTREAM_DUPLICATION |
       MATERIAL_DISAGREEMENT | UNRESOLVED_DECISION_CRITICAL and the
       deterministic `classifyConflict` function over observed values, latency
@@ -55,7 +55,7 @@ outside the listed writeScopes.
       criticality (FR-DATA-016, §15.10 — conflicts are separate evidence
       resolved only by versioned deterministic rule or explicit CONFLICTING
       state). Traces: FR-DATA-016, AC-245.
-- [ ] T005 Create `packages/domain/src/trades.ts` (TradeSide =
+- [x] T005 Create `packages/domain/src/trades.ts` (TradeSide =
       BUY | SELL | ROUND_TRIP | INVENTORY_NEUTRAL | UNKNOWN;
       ActorResolutionState = RESOLVED | PARTIAL | UNRESOLVED; pure
       deterministic `actorUncertaintyFactor` reducing feature-quality
@@ -65,7 +65,7 @@ outside the listed writeScopes.
       policy_decided_at) per Appendix P; counterfactual versioning;
       non-delivered arms never enter earlier — AC-240 substrate). Traces:
       FR-TRD-003, FR-TRD-004, FR-DATA-009, AC-133, AC-134, AC-240.
-- [ ] T006 Create `packages/domain/src/supply.ts`: `SupplyMethod`
+- [x] T006 Create `packages/domain/src/supply.ts`: `SupplyMethod`
       vocabulary, market-cap basis (TOTAL | PROVIDER_CIRCULATING |
       ESTIMATED_CIRCULATING per §65.6), and the pure
       `marketCapMayHardReject(assessment, approvedFallbackAvailable)`
@@ -141,7 +141,7 @@ outside the listed writeScopes.
       `g1_data_*`, `g1_trd_*`, `g1_sup_*` scripts in lexicographic order.
       Traces: FR-DATA-007, FR-DATA-009, FR-DATA-011, FR-DATA-013, FR-TRD-001,
       FR-SUP-001 (migration substrate for every assigned requirement).
-- [ ] T014 Extend `packages/persistence/src/repos/backfill.ts` + create
+- [x] T014 Extend `packages/persistence/src/repos/backfill.ts` + create
       `packages/persistence/src/repos/timeline.ts`: backfill writes persist
       retrieved_as_backfill, original event coordinates, actual fetched_at,
       actual earliest available_at, and the earlier-unavailability reason —
@@ -152,7 +152,7 @@ outside the listed writeScopes.
       non-delivered arm entering earlier than its counterfactual
       (FR-DATA-009, AC-240). Colocated suites. Traces: FR-DATA-007,
       FR-DATA-009, AC-240.
-- [ ] T015 Extend `packages/persistence/src/repos/acquisition.ts` to the
+- [x] T015 Extend `packages/persistence/src/repos/acquisition.ts` to the
       reconciled vocabulary and FR-DATA-012 record: requested fields,
       expected value of information, estimated/actual cost,
       candidate-state-at-request, failure kinds, seed provenance —
@@ -173,7 +173,7 @@ outside the listed writeScopes.
 
 ## Phase 3 — New packages (blocks Phase 4–5)
 
-- [ ] T017 Scaffold `packages/economic-trade-normalizer` (package.json,
+- [x] T017 Scaffold `packages/economic-trade-normalizer` (package.json,
       tsconfig.json, src/index.ts, `bun test` script — G0 scaffold pattern,
       zero root-config edits) and implement the deterministic normalizer per
       plan module layout: legs grouping within one economic transaction,
@@ -191,7 +191,7 @@ outside the listed writeScopes.
       contribution factor exported on the event. Colocated suite proves
       monotone reduction and UNRESOLVED → degraded quality (never silently
       dropped evidence). Traces: FR-TRD-004, AC-134, AC-136.
-- [ ] T019 [P] Scaffold `packages/supply-confidence` (G0 scaffold pattern) and
+- [x] T019 [P] Scaffold `packages/supply-confidence` (G0 scaffold pattern) and
       implement the §65.6 SupplyAssessment persistence/exposure (source,
       method, excluded supply, confidence, exclusion evidence, quality codes,
       market-cap basis) plus the market-cap fallback gate consuming the
@@ -271,7 +271,7 @@ outside the listed writeScopes.
 
 ## Phase 5 — Telemetry catalogs, manifest regen, full verification
 
-- [ ] T027 Extend `telemetry/data.catalog.json` (backfill.provenance_recorded,
+- [x] T027 Extend `telemetry/data.catalog.json` (backfill.provenance_recorded,
       decision.timeline_recorded, dependence.edge_validity_updated,
       conflict.classified — fields mirroring the authoritative schemas, with
       requirementRefs FR-DATA-007…016) and create

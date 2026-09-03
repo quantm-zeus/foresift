@@ -32,16 +32,61 @@ export interface ConflictClassificationInput {
   readonly affectsDecisionThreshold: boolean;
 }
 
-export function classifyConflict(input: ConflictClassificationInput): ProviderConflictClass {
+export interface ConflictClassificationRule {
+  readonly version: string;
+  readonly relativeRoundingTolerance: number;
+  readonly maxBenignLatencyDeltaMs: number;
+}
+
+export const DEFAULT_CONFLICT_CLASSIFICATION_RULE: ConflictClassificationRule = {
+  version: 'provider-conflict/v1',
+  relativeRoundingTolerance: 0.000001,
+  maxBenignLatencyDeltaMs: 60_000,
+};
+
+export interface ClassifiedConflict {
+  readonly conflictClass: ProviderConflictClass;
+  /** Non-null only when a deterministic rule resolved the conflict class. */
+  readonly resolvedByRule: string | null;
+  readonly qualityCode: 'CONFLICTING' | 'BENIGN_VARIANCE';
+}
+
+export function classifyConflictWithRule(
+  input: ConflictClassificationInput,
+  rule: ConflictClassificationRule = DEFAULT_CONFLICT_CLASSIFICATION_RULE,
+): ClassifiedConflict {
+  utcTimestamp(input.obsA.fetchedAt);
+  utcTimestamp(input.obsB.fetchedAt);
+  if (
+    input.obsA.value.length === 0 ||
+    input.obsB.value.length === 0 ||
+    !Number.isFinite(input.latencyDeltaMs) ||
+    input.latencyDeltaMs < 0 ||
+    !Number.isFinite(rule.relativeRoundingTolerance) ||
+    rule.relativeRoundingTolerance < 0 ||
+    !Number.isFinite(rule.maxBenignLatencyDeltaMs) ||
+    rule.maxBenignLatencyDeltaMs < 0 ||
+    rule.version.trim().length === 0
+  ) {
+    throw new RangeError('invalid provider-conflict classification input or rule');
+  }
   if (input.affectsDecisionThreshold) {
-    return ProviderConflictClass.UNRESOLVED_DECISION_CRITICAL;
+    return {
+      conflictClass: ProviderConflictClass.UNRESOLVED_DECISION_CRITICAL,
+      resolvedByRule: null,
+      qualityCode: 'CONFLICTING',
+    };
   }
   if (
     input.sharedUpstream ||
     (input.obsA.upstreamLineage !== undefined &&
       input.obsA.upstreamLineage === input.obsB.upstreamLineage)
   ) {
-    return ProviderConflictClass.COMMON_UPSTREAM_DUPLICATION;
+    return {
+      conflictClass: ProviderConflictClass.COMMON_UPSTREAM_DUPLICATION,
+      resolvedByRule: rule.version,
+      qualityCode: 'CONFLICTING',
+    };
   }
 
   const a = Number(input.obsA.value);
@@ -50,11 +95,23 @@ export function classifyConflict(input: ConflictClassificationInput): ProviderCo
   const roundingVariance =
     Number.isFinite(a) &&
     Number.isFinite(b) &&
-    Math.abs(a - b) / scale <= 0.000001 &&
+    Math.abs(a - b) / scale <= rule.relativeRoundingTolerance &&
     input.roundingFingerprintMatch &&
-    Number.isFinite(input.latencyDeltaMs) &&
-    input.latencyDeltaMs >= 0;
+    input.latencyDeltaMs <= rule.maxBenignLatencyDeltaMs;
   return roundingVariance
-    ? ProviderConflictClass.BENIGN_LATENCY_ROUNDING_VARIANCE
-    : ProviderConflictClass.MATERIAL_DISAGREEMENT;
+    ? {
+        conflictClass: ProviderConflictClass.BENIGN_LATENCY_ROUNDING_VARIANCE,
+        resolvedByRule: rule.version,
+        qualityCode: 'BENIGN_VARIANCE',
+      }
+    : {
+        conflictClass: ProviderConflictClass.MATERIAL_DISAGREEMENT,
+        resolvedByRule: rule.version,
+        qualityCode: 'CONFLICTING',
+      };
 }
+
+export function classifyConflict(input: ConflictClassificationInput): ProviderConflictClass {
+  return classifyConflictWithRule(input).conflictClass;
+}
+import { utcTimestamp } from './timestamps.ts';

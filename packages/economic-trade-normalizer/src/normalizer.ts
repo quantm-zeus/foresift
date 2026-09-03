@@ -2,6 +2,7 @@ import { createHash } from 'node:crypto';
 import {
   ActorResolutionState,
   TradeSide,
+  actorUncertaintyFactor,
   compareTimestamps,
   type UtcTimestamp,
 } from '@foresift/domain';
@@ -71,6 +72,32 @@ function actorResolution(
     return ActorResolutionState.PARTIAL;
   }
   return ActorResolutionState.UNRESOLVED;
+}
+
+export interface ActorQualityReduction {
+  readonly actorUncertaintyFactor: number;
+  readonly contributionFactor: number;
+  readonly qualityCodes: readonly string[];
+}
+
+/** FR-TRD-004 adapter from the domain predicate to feature-facing quality. */
+export function reduceForActorUncertainty(
+  state: ActorResolutionState,
+  confidence: number,
+  inputQualityCodes: readonly string[],
+): ActorQualityReduction {
+  const factor = actorUncertaintyFactor(state, confidence);
+  const qualityCodes = new Set(inputQualityCodes);
+  if (state === ActorResolutionState.PARTIAL) qualityCodes.add('PARTIAL');
+  if (state === ActorResolutionState.UNRESOLVED) {
+    qualityCodes.delete('VALID');
+    qualityCodes.add('SYSTEM_ADDRESS_UNCERTAIN');
+  }
+  return {
+    actorUncertaintyFactor: factor,
+    contributionFactor: Math.max(0, Math.min(1, factor)),
+    qualityCodes: [...qualityCodes].sort(),
+  };
 }
 
 /** Normalize exactly one chain transaction; no network or construction capability exists here. */
@@ -149,8 +176,14 @@ export function normalizeEconomicTrade(
 
   const state = actorResolution(context, uniqueLegs);
   const quality = new Set(uniqueLegs.flatMap((leg) => [...(leg.qualityCodes ?? ['VALID'])]));
-  if (state === ActorResolutionState.PARTIAL) quality.add('PARTIAL');
-  if (state === ActorResolutionState.UNRESOLVED) quality.add('SYSTEM_ADDRESS_UNCERTAIN');
+  const actorConfidence =
+    context.actorResolutionConfidence ??
+    (state === ActorResolutionState.RESOLVED
+      ? 1
+      : state === ActorResolutionState.PARTIAL
+        ? 0.5
+        : 0);
+  const actorReduction = reduceForActorUncertainty(state, actorConfidence, [...quality]);
   const routeLegs: AuditableEconomicRouteLeg[] = uniqueLegs.map((leg) => ({
     routeLegId: leg.routeLegId ?? contentId({ transactionHash, observationId: leg.observationId }),
     legIndex: leg.legIndex,
@@ -171,15 +204,20 @@ export function normalizeEconomicTrade(
       assetRepresentationId,
       deltaRaw: delta.toString(),
     }));
+  const classificationConfidence = Math.max(0, Math.min(1, context.classificationConfidence ?? 1));
   const identity = {
     chainId,
     transactionHash,
     actorEntityId: context.actorEntityId ?? null,
     actorResolutionState: state,
+    actorResolutionConfidence: actorConfidence,
+    actorUncertaintyFactor: actorReduction.actorUncertaintyFactor,
+    contributionFactor: actorReduction.contributionFactor,
     targetAssetRepresentationId: target,
-    rawObservationIds: uniqueLegs.map((leg) => leg.observationId).sort(),
+    routeLegs,
     netActorDeltas,
     side,
+    classificationConfidence,
   };
   return {
     eventId: contentId(identity),
@@ -187,14 +225,17 @@ export function normalizeEconomicTrade(
     transactionHash,
     ...(context.actorEntityId === undefined ? {} : { actorEntityId: context.actorEntityId }),
     actorResolutionState: state,
+    actorResolutionConfidence: actorConfidence,
+    actorUncertaintyFactor: actorReduction.actorUncertaintyFactor,
+    contributionFactor: actorReduction.contributionFactor,
     assetRepresentationId: target,
     netAssetDeltaRaw: targetDelta.toString(),
     side,
     routeLegIds: routeLegs.map((leg) => leg.routeLegId),
-    classificationConfidence: Math.max(0, Math.min(1, context.classificationConfidence ?? 1)),
+    classificationConfidence,
     eventAt: minTimestamp(uniqueLegs.map((leg) => leg.eventAt)),
     availableAt: maxTimestamp(uniqueLegs.map((leg) => leg.availableAt)),
-    qualityCodes: [...quality].sort(),
+    qualityCodes: actorReduction.qualityCodes,
     netActorDeltas,
     rawLegs: routeLegs,
     isOrganicDemand: side === TradeSide.BUY || side === TradeSide.SELL,

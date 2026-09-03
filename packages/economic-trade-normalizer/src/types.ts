@@ -34,6 +34,8 @@ export interface EconomicTradeContext {
   readonly actorEntityId?: string;
   readonly actorAccounts?: readonly string[];
   readonly knownRouterAccounts?: readonly string[];
+  /** Confidence in the actor attribution, independently bounded in [0,1]. */
+  readonly actorResolutionConfidence?: number;
   readonly targetAssetRepresentationId: string;
   readonly quoteAssetRepresentationIds?: readonly string[];
   readonly classificationConfidence?: number;
@@ -63,6 +65,10 @@ export interface NormalizedEconomicTradeEvent {
   readonly transactionHash: string;
   readonly actorEntityId?: string;
   readonly actorResolutionState: ActorResolutionState;
+  readonly actorResolutionConfidence: number;
+  readonly actorUncertaintyFactor: number;
+  /** Maximum multiplier downstream ranking features may receive from this event. */
+  readonly contributionFactor: number;
   readonly assetRepresentationId: string;
   readonly netAssetDeltaRaw: string;
   readonly side: TradeSide;

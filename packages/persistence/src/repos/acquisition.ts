@@ -24,6 +24,7 @@ import {
   compareTimestamps,
   utcTimestamp,
   type EvidenceAcquisitionDecision,
+  type AcquisitionFailureKind,
   type ProbeAssignment,
   type UtcTimestamp,
 } from '@foresift/domain';
@@ -36,10 +37,14 @@ export interface CreateDecisionInput {
   readonly candidateId: string;
   readonly evidenceFamily: string;
   readonly policyVersion: string;
+  readonly candidateStateAtRequest?: Readonly<Record<string, unknown>> | undefined;
   readonly state: AcquisitionState;
+  readonly requestedFields?: readonly string[] | undefined;
   readonly requestedAt?: UtcTimestamp | undefined;
   readonly estimatedDecisionImpact?: number | undefined;
   readonly estimatedInformationValue?: number | undefined;
+  readonly estimatedCost?: number | undefined;
+  readonly failureKind?: AcquisitionFailureKind | undefined;
 }
 
 /** Open an acquisition record. Completion happens only via completeRetrieval. */
@@ -54,6 +59,16 @@ export async function recordAcquisitionDecision(
       'NOT_REQUESTED_BY_POLICY carries no lifecycle timestamps',
       { decisionId: input.decisionId },
     );
+  }
+  if (
+    state === AcquisitionState.NOT_REQUESTED_BY_POLICY &&
+    ((input.requestedFields?.length ?? 0) > 0 ||
+      input.estimatedCost !== undefined ||
+      input.failureKind !== undefined)
+  ) {
+    throw new ForesiftError(LIFECYCLE_CODE, 'NOT_REQUESTED_BY_POLICY carries no lifecycle fields', {
+      decisionId: input.decisionId,
+    });
   }
   if (
     input.estimatedDecisionImpact !== undefined &&
@@ -71,11 +86,18 @@ export async function recordAcquisitionDecision(
       decisionId: input.decisionId,
     });
   }
+  if (input.estimatedCost !== undefined && input.estimatedCost < 0) {
+    throw new ForesiftError(LIFECYCLE_CODE, 'estimated cost must be nonnegative', {
+      decisionId: input.decisionId,
+    });
+  }
   await engine.query(
     `INSERT INTO evidence_acquisition_decisions (
        decision_id, candidate_id, evidence_family, policy_version, state,
-       requested_at, estimated_decision_impact, estimated_information_value)
-     VALUES ($1,$2,$3,$4,$5,$6,$7,$8)`,
+       requested_at, estimated_decision_impact, estimated_information_value,
+       candidate_state_at_request, requested_fields, expected_value_of_information,
+       estimated_cost, failure_kind)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$8,$11,$12)`,
     [
       input.decisionId,
       input.candidateId,
@@ -85,6 +107,10 @@ export async function recordAcquisitionDecision(
       input.requestedAt ?? null,
       input.estimatedDecisionImpact ?? null,
       input.estimatedInformationValue ?? null,
+      input.candidateStateAtRequest ?? null,
+      [...(input.requestedFields ?? [])],
+      input.estimatedCost ?? null,
+      input.failureKind ?? failureKindForState(state),
     ],
   );
 }
@@ -151,13 +177,17 @@ export async function recordProbeAssignment(
       `UPDATE evidence_acquisition_decisions
        SET assignment_probability = $2,
            estimated_decision_impact = COALESCE($3, estimated_decision_impact),
-           impact_recorded_at = COALESCE(impact_recorded_at, $4)
+           impact_recorded_at = COALESCE(impact_recorded_at, $4),
+           requested_fields = $5,
+           seed_provenance = $6
        WHERE decision_id = $1`,
       [
         input.decisionId,
         assignment.assignmentProbability,
         input.estimatedDecisionImpact ?? null,
         assignment.selectionAt,
+        [...assignment.requestedFields],
+        assignment.seedProvenance,
       ],
     );
   });
@@ -170,6 +200,8 @@ export interface RetrievalCompletionInput {
   readonly state: AcquisitionState;
   readonly evidenceIds?: readonly string[];
   readonly actualDecisionChanged?: boolean | undefined;
+  readonly actualCost?: number | undefined;
+  readonly failureKind?: AcquisitionFailureKind | undefined;
 }
 
 /**
@@ -181,6 +213,16 @@ export async function completeRetrieval(
   input: RetrievalCompletionInput,
 ): Promise<void> {
   const state = acquisitionState(input.state);
+  if (input.actualCost !== undefined && input.actualCost < 0) {
+    throw new ForesiftError(LIFECYCLE_CODE, 'actual cost must be nonnegative', {
+      decisionId: input.decisionId,
+    });
+  }
+  if (state === AcquisitionState.RETURNED_EMPTY && (input.evidenceIds?.length ?? 0) > 0) {
+    throw new ForesiftError(LIFECYCLE_CODE, 'RETURNED_EMPTY cannot carry evidence ids', {
+      decisionId: input.decisionId,
+    });
+  }
   await engine.transaction(async (tx) => {
     const rows = await tx.query<{
       requested_at: string | null;
@@ -189,7 +231,7 @@ export async function completeRetrieval(
       impact_recorded_at: string | null;
     }>(
       `SELECT requested_at, completed_at, assignment_probability, impact_recorded_at
-       FROM evidence_acquisition_decisions WHERE decision_id = $1`,
+       FROM evidence_acquisition_decisions WHERE decision_id = $1 FOR UPDATE`,
       [input.decisionId],
     );
     const d = rows.rows[0];
@@ -251,7 +293,7 @@ export async function completeRetrieval(
     await tx.query(
       `UPDATE evidence_acquisition_decisions
        SET completed_at = $2, state = $3, evidence_ids = $4,
-           actual_decision_changed = $5
+           actual_decision_changed = $5, actual_cost = $6, failure_kind = $7
        WHERE decision_id = $1`,
       [
         input.decisionId,
@@ -259,6 +301,8 @@ export async function completeRetrieval(
         state,
         [...(input.evidenceIds ?? [])],
         input.actualDecisionChanged ?? null,
+        input.actualCost ?? null,
+        input.failureKind ?? failureKindForState(state),
       ],
     );
   });
@@ -278,12 +322,22 @@ export function toDomainDecision(row: {
   estimated_information_value: number | null;
   actual_decision_changed: boolean | null;
   evidence_ids: string[];
+  candidate_state_at_request?: Readonly<Record<string, unknown>> | null;
+  requested_fields?: string[];
+  expected_value_of_information?: number | null;
+  estimated_cost?: number | null;
+  actual_cost?: number | null;
+  seed_provenance?: string | null;
+  failure_kind?: AcquisitionFailureKind | null;
 }): EvidenceAcquisitionDecision {
   return {
     id: row.decision_id,
     candidateId: row.candidate_id,
     evidenceFamily: row.evidence_family,
     policyVersion: row.policy_version,
+    ...(row.candidate_state_at_request == null
+      ? {}
+      : { candidateStateAtRequest: row.candidate_state_at_request }),
     state: acquisitionState(row.state),
     ...(row.requested_at === null ? {} : { requestedAt: toIso(row.requested_at) }),
     ...(row.completed_at === null ? {} : { completedAt: toIso(row.completed_at) }),
@@ -296,6 +350,11 @@ export function toDomainDecision(row: {
     ...(row.estimated_information_value === null
       ? {}
       : { estimatedInformationValue: row.estimated_information_value }),
+    ...(row.requested_fields === undefined ? {} : { requestedFields: row.requested_fields }),
+    ...(row.estimated_cost == null ? {} : { estimatedCost: row.estimated_cost }),
+    ...(row.actual_cost == null ? {} : { actualCost: row.actual_cost }),
+    ...(row.seed_provenance == null ? {} : { seedProvenance: row.seed_provenance }),
+    ...(row.failure_kind == null ? {} : { failureKind: row.failure_kind }),
     ...(row.actual_decision_changed === null
       ? {}
       : { actualDecisionChanged: row.actual_decision_changed }),
@@ -305,6 +364,27 @@ export function toDomainDecision(row: {
 
 function toIso(value: Date | string): string {
   return typeof value === 'string' ? value : value.toISOString().replace('.000Z', 'Z');
+}
+
+function failureKindForState(state: AcquisitionState): AcquisitionFailureKind | null {
+  switch (state) {
+    case AcquisitionState.COST_BLOCKED:
+      return 'COST_LIMIT';
+    case AcquisitionState.QUOTA_BLOCKED:
+      return 'QUOTA_LIMIT';
+    case AcquisitionState.RIGHTS_BLOCKED:
+      return 'RIGHTS_POLICY';
+    case AcquisitionState.UNSUPPORTED:
+      return 'UNSUPPORTED_CAPABILITY';
+    case AcquisitionState.PROVIDER_UNAVAILABLE:
+      return 'PROVIDER_UNAVAILABLE';
+    case AcquisitionState.FAILED:
+      return 'REQUEST_FAILED';
+    case AcquisitionState.RETURNED_EMPTY:
+      return 'EMPTY_RESULT';
+    default:
+      return null;
+  }
 }
 
 // --- Frozen counts (AC-247) -------------------------------------------------

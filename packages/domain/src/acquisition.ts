@@ -16,17 +16,34 @@ export const AcquisitionState = {
   REQUESTED: 'REQUESTED',
   COST_BLOCKED: 'COST_BLOCKED',
   QUOTA_BLOCKED: 'QUOTA_BLOCKED',
-  CAPABILITY_UNAVAILABLE: 'CAPABILITY_UNAVAILABLE',
   RIGHTS_BLOCKED: 'RIGHTS_BLOCKED',
+  UNSUPPORTED: 'UNSUPPORTED',
   PROVIDER_UNAVAILABLE: 'PROVIDER_UNAVAILABLE',
-  TIMED_OUT: 'TIMED_OUT',
+  FAILED: 'FAILED',
+  RETURNED_EMPTY: 'RETURNED_EMPTY',
   RETURNED: 'RETURNED',
-  INVALID_RESPONSE: 'INVALID_RESPONSE',
+  /** @deprecated Reconciled into UNSUPPORTED. */
+  CAPABILITY_UNAVAILABLE: 'UNSUPPORTED',
+  /** @deprecated Reconciled into FAILED. */
+  TIMED_OUT: 'FAILED',
+  /** @deprecated Reconciled into FAILED. */
+  INVALID_RESPONSE: 'FAILED',
 } as const;
 
 export type AcquisitionState = (typeof AcquisitionState)[keyof typeof AcquisitionState];
 
-export const ALL_ACQUISITION_STATES: readonly AcquisitionState[] = Object.values(AcquisitionState);
+export const ALL_ACQUISITION_STATES: readonly AcquisitionState[] = [
+  'NOT_REQUESTED_BY_POLICY',
+  'REQUESTED',
+  'COST_BLOCKED',
+  'QUOTA_BLOCKED',
+  'RIGHTS_BLOCKED',
+  'UNSUPPORTED',
+  'PROVIDER_UNAVAILABLE',
+  'FAILED',
+  'RETURNED_EMPTY',
+  'RETURNED',
+];
 
 /** Fail-closed resolution of an external state string. */
 export function acquisitionState(value: string): AcquisitionState {
@@ -49,24 +66,37 @@ const NOT_RETRIEVED_BY_CHOICE: readonly AcquisitionState[] = [
 /**
  * States where no usable output was produced — covering BOTH sub-kinds:
  * pre-flight refusals decided by this system before dispatch
- * (COST_BLOCKED, QUOTA_BLOCKED, CAPABILITY_UNAVAILABLE, RIGHTS_BLOCKED are
+ * (COST_BLOCKED, QUOTA_BLOCKED, UNSUPPORTED, RIGHTS_BLOCKED are
  * self-imposed budget/rights/capacity choices, NOT provider failures) and
- * genuine attempted-retrieval failures (PROVIDER_UNAVAILABLE, TIMED_OUT,
- * INVALID_RESPONSE). Rendering the first sub-kind as provider missingness is
+ * genuine attempted-retrieval failures (PROVIDER_UNAVAILABLE, FAILED,
+ * RETURNED_EMPTY). Rendering the first sub-kind as provider missingness is
  * exactly the confusion AC-242 guards against.
  */
 const RETRIEVAL_FAILED_STATES: readonly AcquisitionState[] = [
   AcquisitionState.COST_BLOCKED,
   AcquisitionState.QUOTA_BLOCKED,
-  AcquisitionState.CAPABILITY_UNAVAILABLE,
+  AcquisitionState.UNSUPPORTED,
   AcquisitionState.RIGHTS_BLOCKED,
   AcquisitionState.PROVIDER_UNAVAILABLE,
-  AcquisitionState.TIMED_OUT,
-  AcquisitionState.INVALID_RESPONSE,
+  AcquisitionState.FAILED,
+  AcquisitionState.RETURNED_EMPTY,
 ];
 
 /** States where retrieval completed successfully enough to attach evidence. */
 export const RETRIEVAL_SUCCEEDED_STATES: readonly AcquisitionState[] = [AcquisitionState.RETURNED];
+
+export const AcquisitionFailureKind = {
+  COST_LIMIT: 'COST_LIMIT',
+  QUOTA_LIMIT: 'QUOTA_LIMIT',
+  RIGHTS_POLICY: 'RIGHTS_POLICY',
+  UNSUPPORTED_CAPABILITY: 'UNSUPPORTED_CAPABILITY',
+  PROVIDER_UNAVAILABLE: 'PROVIDER_UNAVAILABLE',
+  REQUEST_FAILED: 'REQUEST_FAILED',
+  EMPTY_RESULT: 'EMPTY_RESULT',
+} as const;
+
+export type AcquisitionFailureKind =
+  (typeof AcquisitionFailureKind)[keyof typeof AcquisitionFailureKind];
 
 /** True iff the family was never requested by policy (AC-242 semantics). */
 export function acquisitionIsNotRequestedByPolicy(state: AcquisitionState): boolean {
@@ -100,12 +130,18 @@ export interface EvidenceAcquisitionDecision {
   readonly candidateId: string;
   readonly evidenceFamily: string;
   readonly policyVersion: string;
+  readonly candidateStateAtRequest?: Readonly<Record<string, unknown>>;
   readonly state: AcquisitionState;
+  readonly requestedFields?: readonly string[];
   readonly requestedAt?: string;
   readonly completedAt?: string;
   readonly assignmentProbability?: number;
   readonly estimatedDecisionImpact?: number;
   readonly estimatedInformationValue?: number;
+  readonly estimatedCost?: number;
+  readonly actualCost?: number;
+  readonly seedProvenance?: string;
+  readonly failureKind?: AcquisitionFailureKind;
   readonly actualDecisionChanged?: boolean;
   readonly evidenceIds: readonly string[];
 }

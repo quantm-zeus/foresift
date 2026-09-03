@@ -558,12 +558,21 @@ export const EvidenceAcquisitionDecisionSchema = z
     candidateId: z.string().min(1),
     evidenceFamily: z.string().min(1),
     policyVersion: z.string().min(1),
+    candidateStateAtRequest: z.record(z.unknown()).optional(),
     state: z.enum(acquisitionStateValues),
+    requestedFields: z.array(z.string().min(1)).optional(),
     requestedAt: UtcTimestampSchema.optional(),
     completedAt: UtcTimestampSchema.optional(),
     assignmentProbability: z.number().gt(0).lt(1).optional(),
     estimatedDecisionImpact: z.number().min(0).max(1).optional(),
     estimatedInformationValue: z.number().min(0).max(1).optional(),
+    estimatedCost: z.number().nonnegative().optional(),
+    actualCost: z.number().nonnegative().optional(),
+    seedProvenance: z.string().min(1).optional(),
+    failureKind: z.enum([
+      'COST_LIMIT', 'QUOTA_LIMIT', 'RIGHTS_POLICY', 'UNSUPPORTED_CAPABILITY',
+      'PROVIDER_UNAVAILABLE', 'REQUEST_FAILED', 'EMPTY_RESULT',
+    ]).optional(),
     actualDecisionChanged: z.boolean().optional(),
     evidenceIds: z.array(z.string().min(1)),
   })
@@ -573,7 +582,10 @@ export const EvidenceAcquisitionDecisionSchema = z
       v.state !== 'NOT_REQUESTED_BY_POLICY' ||
       (v.requestedAt === undefined &&
         v.completedAt === undefined &&
-        v.assignmentProbability === undefined),
+        v.assignmentProbability === undefined &&
+        (v.requestedFields === undefined || v.requestedFields.length === 0) &&
+        v.estimatedCost === undefined && v.actualCost === undefined &&
+        v.seedProvenance === undefined && v.failureKind === undefined),
     { message: 'NOT_REQUESTED_BY_POLICY carries no retrieval lifecycle fields' },
   )
   .refine((v) => v.completedAt === undefined || v.requestedAt !== undefined, {
@@ -587,7 +599,10 @@ export const EvidenceAcquisitionDecisionSchema = z
     {
       message: 'completion cannot precede request',
     },
-  );
+  )
+  .refine((v) => v.state !== 'RETURNED_EMPTY' || v.evidenceIds.length === 0, {
+    message: 'RETURNED_EMPTY cannot carry evidence ids',
+  });
 
 // ---------------------------------------------------------------------------
 // Decision/action timestamps (§13.7), checkpoints and gaps (DR substrate)

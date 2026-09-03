@@ -3,6 +3,7 @@
  */
 /* eslint-disable @typescript-eslint/no-explicit-any -- salvaged lane tests: mock objects cast against a runtime-typed surface (see tests/automation/state-authority-v2.spec.ts convention) */
 import { describe, expect, it } from 'bun:test';
+import { readFile } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
@@ -75,9 +76,22 @@ describe('release conformance evaluation (FR-TRACE-003, AC-266)', () => {
 
   describe('Rule (c): No premature implementations for future dependency groups', () => {
     it('verifies that no product path for later dependency groups (e.g. G1/G2) exists before their gate opens', async () => {
+      // Repository-backed checks resolve the ACTIVE milestone from
+      // specs/implementation/current-milestone.json; a hard-pinned group went
+      // stale the moment G1 opened (the premature scan must evaluate the
+      // milestone that is actually active, or every future group's product
+      // code looks premature forever).
+      const activeGroup = (
+        JSON.parse(
+          await readFile(
+            path.join(REPO_ROOT, 'specs/implementation/current-milestone.json'),
+            'utf8',
+          ),
+        ) as { milestoneId: string }
+      ).milestoneId;
       const verdict = await checkNoPrematureImplementations({
         repoRoot: REPO_ROOT,
-        activeGroup: 'G0',
+        activeGroup,
       });
       expect(verdict.passed).toBe(true);
       expect(verdict.prematurePaths).toEqual([]);

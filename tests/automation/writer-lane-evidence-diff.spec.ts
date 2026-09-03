@@ -156,7 +156,6 @@ describe('writer sources: uncommitted-sweep defined before use (live aa3e8015 Re
       'scripts/automation/exec-codex-writer.mjs',
       'scripts/automation/exec-claude-writer.mjs',
       'scripts/automation/claude-lane-core.mjs',
-      'scripts/automation/exec-agy-test-writer.mjs',
     ]) {
       const src = read(join(repoRoot, rel));
       const def = src.indexOf('const dirty =');
@@ -165,5 +164,17 @@ describe('writer sources: uncommitted-sweep defined before use (live aa3e8015 Re
       expect(use, `${rel} uses dirty`).toBeGreaterThan(-1);
       expect(def, `${rel} dirty must precede its first use`).toBeLessThan(use);
     }
+  });
+
+  // PR #174: the AGY test writer commits the symlink-free remainder
+  // (`commitable` via splitSymlinks), never `dirty` directly — its sweep
+  // contract is `const dirty =` defined before the first commit-gate use.
+  test('agy test writer defines `dirty` before its commitable sweep uses it', () => {
+    const src = read(join(repoRoot, 'scripts/automation/exec-agy-test-writer.mjs'));
+    const def = src.indexOf('const dirty =');
+    const use = src.indexOf('.length', src.indexOf('const { clean: commitable }'));
+    expect(def, 'agy test writer defines dirty').toBeGreaterThan(-1);
+    expect(use, 'agy test writer uses the cleaned sweep').toBeGreaterThan(-1);
+    expect(def, 'dirty must precede its first use').toBeLessThan(use);
   });
 });

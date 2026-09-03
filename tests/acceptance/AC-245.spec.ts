@@ -16,17 +16,18 @@ import { fileURLToPath } from 'node:url';
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 import {
   DEFAULT_DEPENDENCE_THRESHOLDS,
+  DependenceInputAvailability,
   DependenceLabel,
+  calculateEffectiveIndependenceMultiplier,
+  edgeMayAffectCreditAt,
   inputsJustifyReducedIndependence,
+  isEdgeValidAtTimestamp,
   utcTimestamp,
   type DependenceObservationInputs,
   type DependenceThresholds,
+  type SourceDependenceEdgeLike,
 } from '@foresift/domain';
-import {
-  dependenceEdgesForPair,
-  recordDependenceEdge,
-  registerSourceIdentity,
-} from '@foresift/persistence';
+import { dependenceEdgesForPair, registerSourceIdentity } from '@foresift/persistence';
 import { parseDataSchema } from '@foresift/shared-schemas';
 import { closeTestDatabase, makeTestDatabase, type TestDatabase } from './helpers.ts';
 
@@ -135,17 +136,33 @@ describe('AC-245: reduced independence credit despite distinct provider ids', ()
     const [sourceA, sourceB] = correlated.sources;
     if (!sourceA || !sourceB) throw new Error('fixture pair lost a source');
 
-    await recordDependenceEdge(tdb.engine, {
-      edgeId: 'ac245-edge-fixture-driven',
-      edge: {
-        sourceA: sourceA.id as never,
-        sourceB: sourceB.id as never,
-        sharedUpstreamLineageKeys: correlated.edge.sharedUpstreamLineageKeys,
-        inputs: correlated.edge.inputs,
-        label: DependenceLabel.AVAILABLE_AT_THE_TIME,
-        availableAt: utcTimestamp(correlated.edge.availableAt),
-      },
-    });
+    const [a, b] = sourceA.id < sourceB.id ? [sourceA.id, sourceB.id] : [sourceB.id, sourceA.id];
+    await tdb.engine.query(
+      `INSERT INTO source_dependence_edges (
+         edge_id, source_a, source_b, shared_upstream_lineage_keys,
+         value_error_timing_correlation, outage_overlap, first_seen_lag_agreement,
+         fingerprint_similarity, label, available_at,
+         valid_from, valid_until, method, evidence_ids, confidence, effective_independence_multiplier)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16)`,
+      [
+        'ac245-edge-fixture-driven',
+        a,
+        b,
+        correlated.edge.sharedUpstreamLineageKeys,
+        correlated.edge.inputs.valueErrorTimingCorrelation,
+        correlated.edge.inputs.outageOverlap,
+        correlated.edge.inputs.firstSeenLagAgreement,
+        correlated.edge.inputs.fingerprintSimilarity,
+        DependenceLabel.AVAILABLE_AT_THE_TIME,
+        utcTimestamp(correlated.edge.availableAt),
+        utcTimestamp(correlated.edge.availableAt),
+        null,
+        'EMPIRICAL',
+        [],
+        1.0,
+        0.5,
+      ],
+    );
     const stored = await dependenceEdgesForPair(
       tdb.engine,
       sourceB.id as never,
@@ -184,5 +201,60 @@ describe('AC-245 acceptance (tool-core substrate): source dependence schema vali
       availableAt: utcTimestamp('2026-06-20T00:00:00Z'),
     });
     expect(parsed.inputs.valueErrorTimingCorrelation).toBe(0.85);
+  });
+});
+
+describe('AC-245 G1 extensions: validity interval and DIAGNOSTIC_RETROSPECTIVE isolation (FR-DATA-013, FR-DATA-015)', () => {
+  it('evaluates effective credit strictly from edges valid at decision time T', () => {
+    const edge = {
+      validFrom: utcTimestamp('2026-01-01T00:00:00Z'),
+      validUntil: utcTimestamp('2026-06-01T00:00:00Z'),
+      confidence: 0.95,
+      effectiveIndependenceMultiplier: 0.5,
+      inputAvailability: DependenceInputAvailability.AVAILABLE_AT_THE_TIME,
+    };
+
+    expect(isEdgeValidAtTimestamp(edge, '2026-03-01T00:00:00Z')).toBe(true);
+    expect(isEdgeValidAtTimestamp(edge, '2026-01-01T00:00:00Z')).toBe(true);
+    expect(isEdgeValidAtTimestamp(edge, '2026-06-01T00:00:00Z')).toBe(true);
+    expect(isEdgeValidAtTimestamp(edge, '2026-07-01T00:00:00Z')).toBe(false);
+    expect(isEdgeValidAtTimestamp(edge, '2025-12-31T23:59:59Z')).toBe(false);
+
+    expect(edgeMayAffectCreditAt(edge, '2026-03-01T00:00:00Z')).toBe(true);
+    expect(edgeMayAffectCreditAt(edge, '2026-07-01T00:00:00Z')).toBe(false);
+  });
+
+  it('computes monotonic effective independence multiplier reductions from empirical signals', () => {
+    const highDep = calculateEffectiveIndependenceMultiplier({
+      sharedUpstreamLineage: false,
+      valueErrorTimingCorrelation: 0.95,
+      outageOverlap: 0.8,
+      firstSeenLagAgreement: 0.85,
+      fingerprintSimilarity: 0.95,
+    });
+    expect(highDep).toBeLessThan(1.0);
+    expect(highDep).toBeGreaterThanOrEqual(0.0);
+
+    const noDep = calculateEffectiveIndependenceMultiplier({
+      sharedUpstreamLineage: false,
+      valueErrorTimingCorrelation: 0.1,
+      outageOverlap: 0.1,
+      firstSeenLagAgreement: 0.1,
+      fingerprintSimilarity: 0.1,
+    });
+    expect(noDep).toBe(1.0);
+  });
+
+  it('isolates retrospective diagnostic dependence updates from realizable replay', () => {
+    const retroEdge: SourceDependenceEdgeLike = {
+      validFrom: utcTimestamp('2026-01-01T00:00:00Z'),
+      validUntil: utcTimestamp('2026-12-31T23:59:59Z'),
+      confidence: 0.9,
+      effectiveIndependenceMultiplier: 0.4,
+      inputAvailability: DependenceInputAvailability.DIAGNOSTIC_RETROSPECTIVE,
+    };
+
+    // Diagnostic retrospective estimates never affect credit in realizable replay
+    expect(edgeMayAffectCreditAt(retroEdge, '2026-06-01T00:00:00Z')).toBe(false);
   });
 });

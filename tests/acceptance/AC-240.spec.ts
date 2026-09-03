@@ -13,6 +13,7 @@
  */
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 import {
+  ErrorCode,
   entryIsNotEarlierThanCounterfactual,
   utcTimestamp,
   type DecisionActionTimestamps,
@@ -21,7 +22,14 @@ import {
 import { DATA_SCHEMAS, parseCoreSchema, type ToolResultEnvelope } from '@foresift/shared-schemas';
 import { appendObservation, replayObservations } from '@foresift/persistence';
 import { freezeBundle, resolveEvidenceAt } from '@foresift/evidence';
-import { closeTestDatabase, makeTestDatabase, seedPool, type TestDatabase } from './helpers.ts';
+import { recordCandidateDecisionTimeline } from '../../packages/persistence/src/repos/timeline.ts';
+import {
+  closeTestDatabase,
+  expectForesiftError,
+  makeTestDatabase,
+  seedPool,
+  type TestDatabase,
+} from './helpers.ts';
 
 const T = (iso: string): UtcTimestamp => utcTimestamp(iso);
 
@@ -158,5 +166,108 @@ describe('AC-240 acceptance (tool-core substrate): symmetric event and action ti
     expect(parsed.meta.observedAt).toBe(T('2026-06-10T09:00:00Z'));
     expect(parsed.meta.availableAt).toBe(T('2026-06-10T09:03:00Z'));
     expect(parsed.meta.fetchedAt).toBe(T('2026-06-10T09:05:00Z'));
+  });
+});
+
+describe('AC-240 G1 extensions: candidate decision timeline & counterfactual symmetry (FR-DATA-009, Appendix P)', () => {
+  it('enforces delivery_eligible_at = max(decision_ready_at, policy_decided_at)', () => {
+    const readyAt = T('2026-06-10T09:05:00Z');
+    const decidedAt = T('2026-06-10T09:07:00Z');
+    const eligibleAt = decidedAt > readyAt ? decidedAt : readyAt;
+    expect(eligibleAt).toBe(decidedAt);
+  });
+
+  it('verifies non-delivered comparison arms carry versioned counterfactual_delivery_at', () => {
+    const deliveredArm = {
+      decisionReadyAt: T('2026-06-10T09:05:00Z'),
+      policyDecidedAt: T('2026-06-10T09:07:00Z'),
+      workflowCompletedAt: T('2026-06-10T09:08:00Z'),
+      deliveryEligibleAt: T('2026-06-10T09:07:00Z'),
+      deliveredAt: T('2026-06-10T09:09:00Z'),
+      counterfactualDeliveryAt: null,
+      counterfactualVersion: null,
+    };
+    const nonDeliveredArm = {
+      decisionReadyAt: T('2026-06-10T09:05:00Z'),
+      policyDecidedAt: T('2026-06-10T09:07:00Z'),
+      workflowCompletedAt: T('2026-06-10T09:08:00Z'),
+      deliveryEligibleAt: T('2026-06-10T09:07:00Z'),
+      deliveredAt: null,
+      counterfactualDeliveryAt: T('2026-06-10T09:09:00Z'),
+      counterfactualVersion: 1,
+    };
+
+    expect(deliveredArm.deliveredAt).not.toBeNull();
+    expect(nonDeliveredArm.deliveredAt).toBeNull();
+    expect(nonDeliveredArm.counterfactualDeliveryAt).not.toBeNull();
+    expect(nonDeliveredArm.counterfactualVersion).toBe(1);
+  });
+
+  it('persists delivered and non-delivered candidate decision timelines through the repo', async () => {
+    await recordCandidateDecisionTimeline(tdb.engine, {
+      candidateId: 'cand/ac240-deliv',
+      policyVersion: 'policy/v1',
+      decisionReadyAt: T('2026-06-10T10:00:00Z'),
+      policyDecidedAt: T('2026-06-10T10:02:00Z'),
+      workflowCompletedAt: T('2026-06-10T10:03:00Z'),
+      deliveredAt: T('2026-06-10T10:04:00Z'),
+      validUntil: T('2026-06-10T12:00:00Z'),
+    });
+
+    await recordCandidateDecisionTimeline(tdb.engine, {
+      candidateId: 'cand/ac240-nondeliv',
+      policyVersion: 'policy/v1',
+      decisionReadyAt: T('2026-06-10T10:00:00Z'),
+      policyDecidedAt: T('2026-06-10T10:02:00Z'),
+      workflowCompletedAt: T('2026-06-10T10:03:00Z'),
+      counterfactualDeliveryAt: T('2026-06-10T10:04:00Z'),
+      counterfactualDeliveryVersion: 'v1.0.0',
+      validUntil: T('2026-06-10T12:00:00Z'),
+    });
+
+    const rows = await tdb.engine.query<{
+      candidate_id: string;
+      delivered_at: string | null;
+      counterfactual_delivery_at: string | null;
+    }>(
+      'SELECT candidate_id, delivered_at, counterfactual_delivery_at FROM candidate_decision_timelines WHERE candidate_id LIKE $1 ORDER BY candidate_id',
+      ['cand/ac240-%'],
+    );
+    expect(rows.rows.length).toBe(2);
+    expect(rows.rows[0]?.delivered_at).not.toBeNull();
+    expect(rows.rows[1]?.delivered_at).toBeNull();
+    expect(rows.rows[1]?.counterfactual_delivery_at).not.toBeNull();
+  });
+
+  it('negative: refuses non-monotonic timeline where decisionReadyAt > policyDecidedAt', async () => {
+    await expectForesiftError(
+      recordCandidateDecisionTimeline(tdb.engine, {
+        candidateId: 'cand/ac240-nonmono',
+        policyVersion: 'policy/v1',
+        decisionReadyAt: T('2026-06-10T10:05:00Z'), // later than policyDecidedAt!
+        policyDecidedAt: T('2026-06-10T10:02:00Z'),
+        workflowCompletedAt: T('2026-06-10T10:06:00Z'),
+        deliveredAt: T('2026-06-10T10:07:00Z'),
+        validUntil: T('2026-06-10T12:00:00Z'),
+      }),
+      ErrorCode.CONTRACT_INVARIANT_VIOLATED,
+    );
+  });
+
+  it('negative: refuses non-delivered arm entering before counterfactual delivery', async () => {
+    await expectForesiftError(
+      recordCandidateDecisionTimeline(tdb.engine, {
+        candidateId: 'cand/ac240-early-entry',
+        policyVersion: 'policy/v1',
+        decisionReadyAt: T('2026-06-10T10:00:00Z'),
+        policyDecidedAt: T('2026-06-10T10:02:00Z'),
+        workflowCompletedAt: T('2026-06-10T10:03:00Z'),
+        counterfactualDeliveryAt: T('2026-06-10T10:05:00Z'),
+        counterfactualDeliveryVersion: 'v1.0.0',
+        entryAt: T('2026-06-10T10:04:00Z'), // earlier than counterfactual delivery!
+        validUntil: T('2026-06-10T12:00:00Z'),
+      }),
+      ErrorCode.CONTRACT_INVARIANT_VIOLATED,
+    );
   });
 });

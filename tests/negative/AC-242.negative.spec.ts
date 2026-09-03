@@ -69,7 +69,7 @@ describe('AC-242 negative: policy-not-requested is never a retrieval outcome', (
         candidateId: 'cand/ac242n',
         evidenceFamily: 'swaps',
         policyVersion: 'policy/v1',
-        state: 'RETURNED_EMPTY' as AcquisitionState, // not in the §13.8 vocabulary
+        state: 'DEFINITELY_UNKNOWN_STATE' as AcquisitionState, // not in the reconciled vocabulary (ADR-1)
       }),
       ErrorCode.ACQUISITION_STATE_UNKNOWN,
     );

@@ -18,7 +18,7 @@ outside the listed writeScopes.
 
 ## Phase 1 — Foundations: domain vocabularies and shared schemas (blocks later phases)
 
-- [ ] T001 Extend `packages/domain/src/acquisition.ts` to the reconciled
+- [x] T001 Extend `packages/domain/src/acquisition.ts` to the reconciled
       ten-state decision vocabulary (FR-DATA-011): `UNSUPPORTED` replaces
       `CAPABILITY_UNAVAILABLE`; `FAILED` (with `AcquisitionFailureKind` =
       `TIMED_OUT` | `INVALID_RESPONSE`) replaces `TIMED_OUT`/`INVALID_RESPONSE`;
@@ -30,7 +30,7 @@ outside the listed writeScopes.
       acquisitionSeed provenance); add stable ErrorCodes for unknown failure
       kinds. Implement the member-level mapping helpers of plan ADR-1.
       Traces: FR-DATA-011, FR-DATA-012, AC-242, AC-243.
-- [ ] T002 Create `packages/domain/src/replay-modes.ts`: `ReplayMode` =
+- [x] T002 Create `packages/domain/src/replay-modes.ts`: `ReplayMode` =
       REALIZABLE_REPLAY | ORACLE | HINDSIGHT |
       COUNTERFACTUAL_DATA_AVAILABILITY_RESEARCH (FR-DATA-008, §13.6 rule 2)
       with fail-closed parse; retrospective-only data visibility is a function
@@ -38,7 +38,7 @@ outside the listed writeScopes.
       `retrieved_as_backfill`/retrospective-only provenance postdates the
       boundary; labeled modes carry explicit diagnostics labeling. Traces:
       FR-DATA-008, FR-DATA-015, AC-241, AC-247.
-- [ ] T003 Create `packages/domain/src/dependence.ts`: `DependenceMethod`
+- [x] T003 Create `packages/domain/src/dependence.ts`: `DependenceMethod`
       (DECLARED | EMPIRICAL), edge validity-interval types (validFrom,
       validUntil), confidence + `effectiveIndependenceMultiplier` policy
       (threshold table over the App. O.8 observation inputs, monotonic
@@ -47,7 +47,7 @@ outside the listed writeScopes.
       AVAILABLE_AT_THE_TIME edges whose validity interval contains T
       (plan ADR-3). Traces: FR-DATA-013, FR-DATA-014, FR-DATA-015, AC-245,
       AC-246, AC-247.
-- [ ] T004 Create `packages/domain/src/conflicts.ts`: `ProviderConflictClass`
+- [x] T004 Create `packages/domain/src/conflicts.ts`: `ProviderConflictClass`
       = BENIGN_LATENCY_ROUNDING_VARIANCE | COMMON_UPSTREAM_DUPLICATION |
       MATERIAL_DISAGREEMENT | UNRESOLVED_DECISION_CRITICAL and the
       deterministic `classifyConflict` function over observed values, latency
@@ -55,7 +55,7 @@ outside the listed writeScopes.
       criticality (FR-DATA-016, §15.10 — conflicts are separate evidence
       resolved only by versioned deterministic rule or explicit CONFLICTING
       state). Traces: FR-DATA-016, AC-245.
-- [ ] T005 Create `packages/domain/src/trades.ts` (TradeSide =
+- [x] T005 Create `packages/domain/src/trades.ts` (TradeSide =
       BUY | SELL | ROUND_TRIP | INVENTORY_NEUTRAL | UNKNOWN;
       ActorResolutionState = RESOLVED | PARTIAL | UNRESOLVED; pure
       deterministic `actorUncertaintyFactor` reducing feature-quality
@@ -65,21 +65,21 @@ outside the listed writeScopes.
       policy_decided_at) per Appendix P; counterfactual versioning;
       non-delivered arms never enter earlier — AC-240 substrate). Traces:
       FR-TRD-003, FR-TRD-004, FR-DATA-009, AC-133, AC-134, AC-240.
-- [ ] T006 Create `packages/domain/src/supply.ts`: `SupplyMethod`
+- [x] T006 Create `packages/domain/src/supply.ts`: `SupplyMethod`
       vocabulary, market-cap basis (TOTAL | PROVIDER_CIRCULATING |
       ESTIMATED_CIRCULATING per §65.6), and the pure
       `marketCapMayHardReject(assessment, approvedFallbackAvailable)`
       predicate refusing hard rejection on low-confidence market cap when an
       approved liquidity/activity fallback exists (FR-SUP-002, plan ADR-4).
       Traces: FR-SUP-001, FR-SUP-002, AC-135.
-- [ ] T007 Extend `packages/domain/src/index.ts` exports for the new modules;
+- [x] T007 Extend `packages/domain/src/index.ts` exports for the new modules;
       add colocated domain tests `packages/domain/test/` for every new
       vocabulary's fail-closed parse and pure-function contracts (unknown
       replay mode, unknown conflict class, unknown trade side, unknown supply
       method, unknown failure kind all throw; monotonicity predicates hold at
       boundaries). Traces: FR-DATA-008, FR-DATA-009, FR-DATA-011, FR-DATA-013,
       FR-DATA-016, FR-TRD-004, FR-SUP-002, AC-240, AC-245, AC-135.
-- [ ] T008 Extend `packages/shared-schemas/src/data.ts`: BackfilledObservation
+- [x] T008 Extend `packages/shared-schemas/src/data.ts`: BackfilledObservation
       fields (retrievedAsBackfill, original coordinates, fetchedAt,
       availableAt, unavailabilityReason — event time never substituting for
       availability, FR-DATA-007), CandidateDecisionTimeline schema
@@ -96,7 +96,7 @@ outside the listed writeScopes.
       `packages/shared-schemas/test/data.spec.ts`. Traces: FR-DATA-007,
       FR-DATA-008, FR-DATA-009, FR-DATA-010, FR-DATA-011, FR-DATA-012,
       FR-DATA-013, FR-DATA-014, FR-DATA-016, AC-242, AC-245.
-- [ ] T009 [P] Create `packages/shared-schemas/src/trd.ts` (EconomicTradeEvent + EconomicRouteLeg schemas mirroring §66.2 exactly: net deltas as
+- [x] T009 [P] Create `packages/shared-schemas/src/trd.ts` (EconomicTradeEvent + EconomicRouteLeg schemas mirroring §66.2 exactly: net deltas as
       decimal strings, side enum, classification confidence, route leg refs,
       eventAt/availableAt, quality codes, actor-resolution state) and
       `packages/shared-schemas/src/sup.ts` (SupplyAssessment mirroring §65.6
@@ -107,7 +107,7 @@ outside the listed writeScopes.
 
 ## Phase 2 — Persistence: migrations and repos (blocks Phase 3–5 verification)
 
-- [ ] T010 Author `migrations/g1_data_0001_decision_semantics.sql` exactly per
+- [x] T010 Author `migrations/g1_data_0001_decision_semantics.sql` exactly per
       plan data-model: `observations` gains retrieved_as_backfill +
       unavailability_reason with the no-event-time-substitution CHECKs
       (FR-DATA-007); `candidate_decision_timelines` table with monotonicity,
@@ -117,7 +117,7 @@ outside the listed writeScopes.
       guard that aborts if any row holds a retired member (plan ADR-1).
       Traces: FR-DATA-007, FR-DATA-009, FR-DATA-011, FR-DATA-012, AC-240,
       AC-242, AC-243.
-- [ ] T011 Author `migrations/g1_data_0002_dependence_conflicts.sql`:
+- [x] T011 Author `migrations/g1_data_0002_dependence_conflicts.sql`:
       `source_dependence_edges` gains valid_from/valid_until/method/
       evidence_ids/confidence/effective_independence_multiplier
       (FR-DATA-013); `empirical_dependence_observations` table with the App.
@@ -125,13 +125,13 @@ outside the listed writeScopes.
       append-only `provider_conflicts` table with the four-class CHECK and
       raw-observation preservation (FR-DATA-016). Traces: FR-DATA-013,
       FR-DATA-014, FR-DATA-016, AC-245, AC-246.
-- [ ] T012 [P] Author `migrations/g1_trd_0001_economic_trade_events.sql`
+- [x] T012 [P] Author `migrations/g1_trd_0001_economic_trade_events.sql`
       (economic_trade_events + economic_route_legs per plan data-model,
       §66.2/§66.3) and `migrations/g1_sup_0001_supply_assessments.sql`
       (supply_assessments + market_cap_fallback_decisions with the
       structural no-hard-rejection-with-fallback CHECK, plan ADR-4).
       Traces: FR-TRD-001, FR-TRD-002, FR-SUP-001, FR-SUP-002, AC-133, AC-135.
-- [ ] T013 Extend the migrator family pattern and the central migration
+- [x] T013 Extend the migrator family pattern and the central migration
       registry: add `trd|sup` to MIGRATION_FILE_PATTERN in
       `packages/persistence/src/migrator.ts` (fail-closed discovery of the
       new families) and extend
@@ -141,7 +141,7 @@ outside the listed writeScopes.
       `g1_data_*`, `g1_trd_*`, `g1_sup_*` scripts in lexicographic order.
       Traces: FR-DATA-007, FR-DATA-009, FR-DATA-011, FR-DATA-013, FR-TRD-001,
       FR-SUP-001 (migration substrate for every assigned requirement).
-- [ ] T014 Extend `packages/persistence/src/repos/backfill.ts` + create
+- [x] T014 Extend `packages/persistence/src/repos/backfill.ts` + create
       `packages/persistence/src/repos/timeline.ts`: backfill writes persist
       retrieved_as_backfill, original event coordinates, actual fetched_at,
       actual earliest available_at, and the earlier-unavailability reason —
@@ -152,7 +152,7 @@ outside the listed writeScopes.
       non-delivered arm entering earlier than its counterfactual
       (FR-DATA-009, AC-240). Colocated suites. Traces: FR-DATA-007,
       FR-DATA-009, AC-240.
-- [ ] T015 Extend `packages/persistence/src/repos/acquisition.ts` to the
+- [x] T015 Extend `packages/persistence/src/repos/acquisition.ts` to the
       reconciled vocabulary and FR-DATA-012 record: requested fields,
       expected value of information, estimated/actual cost,
       candidate-state-at-request, failure kinds, seed provenance —
@@ -161,7 +161,7 @@ outside the listed writeScopes.
       still carries no lifecycle fields — AC-242 lock; RETURNED_EMPTY never
       conflated with NOT_REQUESTED_BY_POLICY). Colocated suites. Traces:
       FR-DATA-011, FR-DATA-012, AC-242, AC-243, AC-247.
-- [ ] T016 [P] Create `packages/persistence/src/repos/dependence.ts`
+- [x] T016 [P] Create `packages/persistence/src/repos/dependence.ts`
       (validity-interval edge writes, empirical observation records, the
       point-in-time effective-credit resolver of plan ADR-3, automatic
       material-dependence credit reduction) and
@@ -173,7 +173,7 @@ outside the listed writeScopes.
 
 ## Phase 3 — New packages (blocks Phase 4–5)
 
-- [ ] T017 Scaffold `packages/economic-trade-normalizer` (package.json,
+- [x] T017 Scaffold `packages/economic-trade-normalizer` (package.json,
       tsconfig.json, src/index.ts, `bun test` script — G0 scaffold pattern,
       zero root-config edits) and implement the deterministic normalizer per
       plan module layout: legs grouping within one economic transaction,
@@ -184,14 +184,19 @@ outside the listed writeScopes.
       STRICTLY read-only: consumes persisted swap/transfer observations;
       constructs nothing. Traces: FR-TRD-001, FR-TRD-002, FR-TRD-003,
       AC-133, AC-134.
-- [ ] T018 Wire the FR-TRD-004 reduction: economic events carry
+- [x] T018 Wire the FR-TRD-004 reduction: economic events carry
       actor_resolution_state; the `actorUncertaintyFactor` function
       (domain T005) maps state+confidence to a deterministic feature-quality
       reduction consumed downstream via quality codes and a capped
-      contribution factor exported on the event. Colocated suite proves
+      contribution factor exported on the event. Extend
+      `migrations/g1_trd_0001_economic_trade_events.sql` with the
+      actor_resolution_state column truth and
+      `packages/shared-schemas/src/trd.ts` with the reduction's schema
+      surface (plan-sanctioned paths: plan §g1_trd_0001, shared-schemas
+      trd module). Colocated suite proves
       monotone reduction and UNRESOLVED → degraded quality (never silently
       dropped evidence). Traces: FR-TRD-004, AC-134, AC-136.
-- [ ] T019 [P] Scaffold `packages/supply-confidence` (G0 scaffold pattern) and
+- [x] T019 [P] Scaffold `packages/supply-confidence` (G0 scaffold pattern) and
       implement the §65.6 SupplyAssessment persistence/exposure (source,
       method, excluded supply, confidence, exclusion evidence, quality codes,
       market-cap basis) plus the market-cap fallback gate consuming the
@@ -199,7 +204,7 @@ outside the listed writeScopes.
       alone is refused whenever an approved liquidity/activity fallback
       exists, and every gate outcome persists a decision row for audit.
       Colocated suites. Traces: FR-SUP-001, FR-SUP-002, AC-135.
-- [ ] T020 [P] Extend `packages/evidence/src/replay-modes.ts` + barrel:
+- [x] T020 [P] Extend `packages/evidence/src/replay-modes.ts` + barrel:
       replay-mode resolution over the evidence substrate — realizable mode
       excludes retrospective-only entries before their actual availability
       and returns separately labeled shapes for oracle/hindsight/
@@ -210,14 +215,14 @@ outside the listed writeScopes.
 
 ## Phase 4 — Fixtures, acceptance and negative suites (blocks Phase 5)
 
-- [ ] T021 Author `tests/fixtures/data/g1-backfill-provenance.json` and
+- [x] T021 Author `tests/fixtures/data/g1-backfill-provenance.json` and
       `tests/fixtures/data/g1-replay-modes.json` (FR-DATA-007
       no-substitution vectors incl. backdating refusals and original
       coordinate preservation; FR-DATA-008 mode vectors incl. the §13.6
       COUNTERFACTUAL_DATA_AVAILABILITY_RESEARCH labeling) — extending
       G0 fixture conventions. Traces: FR-DATA-007, FR-DATA-008, AC-020,
       AC-021.
-- [ ] T022 [P] Author `tests/fixtures/trd/route-hop-double-count.json`
+- [x] T022 [P] Author `tests/fixtures/trd/route-hop-double-count.json`
       (multi-pool routed swap → one economic trade, no hop-volume double
       count), `tests/fixtures/trd/arbitrage-inventory-neutral.json`
       (arbitrage/round-trip/inventory-neutral separation from organic
@@ -226,7 +231,7 @@ outside the listed writeScopes.
       (source/method/excluded-supply/confidence exposure + fallback
       scenarios). Traces: FR-TRD-001, FR-TRD-002, FR-TRD-003, FR-TRD-004,
       FR-SUP-001, FR-SUP-002, AC-133, AC-134, AC-135, AC-136.
-- [ ] T023 Author `tests/acceptance/AC-133.spec.ts`,
+- [x] T023 Author `tests/acceptance/AC-133.spec.ts`,
       `tests/acceptance/AC-134.spec.ts`,
       `tests/acceptance/AC-136.spec.ts` and
       `tests/acceptance/AC-233.spec.ts` scoped per spec I4 — AC-133: routed
@@ -238,13 +243,13 @@ outside the listed writeScopes.
       as delta components) on the economic-event side. G0 suite conventions
       (`tests/acceptance/helpers.ts`, PGlite). Traces: FR-TRD-001…004,
       AC-133, AC-134, AC-136, AC-233.
-- [ ] T024 [P] Author `tests/acceptance/AC-135.spec.ts`: low-confidence
+- [x] T024 [P] Author `tests/acceptance/AC-135.spec.ts`: low-confidence
       circulating supply cannot act as the sole hard gate under an approved
       fallback profile — the gate persists a fallback decision and
       evaluation proceeds; supply assessments expose source, method,
       excluded supply, and confidence end to end. Traces: FR-SUP-001,
       FR-SUP-002, AC-135.
-- [ ] T025 Author the matching negative suites
+- [x] T025 Author the matching negative suites
       `tests/negative/AC-133.negative.spec.ts`,
       `tests/negative/AC-134.negative.spec.ts`,
       `tests/negative/AC-135.negative.spec.ts`,
@@ -256,22 +261,29 @@ outside the listed writeScopes.
       yield full-quality contribution; fee-leg omission fails parity.
       Traces: FR-TRD-001…004, FR-SUP-002, AC-133, AC-134, AC-135, AC-136,
       AC-233.
-- [ ] T026 Extend the shared suites in place with G1 cases:
+- [x] T026 Extend the shared suites in place with G1 cases:
       `tests/acceptance/AC-020.spec.ts` + negative (backfilled row invisible
       before actual availability; no event-time substitution),
       `tests/acceptance/AC-240.spec.ts` + negative (timeline monotonicity +
-      counterfactual symmetry through the repo), `tests/acceptance/AC-242` /
-      `AC-243` suites stay green under the reconciled vocabulary
+      counterfactual symmetry through the repo), `tests/acceptance/AC-242.spec.ts` /
+      `tests/acceptance/AC-243.spec.ts` suites stay green under the reconciled vocabulary
       (regression lock) with new positive cases for requestedFields/seed
-      persistence before retrieval, and `tests/acceptance/AC-245`/`AC-247`
+      persistence before retrieval, and `tests/acceptance/AC-245.spec.ts`/`tests/acceptance/AC-247.spec.ts`
       cases for validity-interval credit resolution and
-      DIAGNOSTIC_RETROSPECTIVE isolation. Traces: FR-DATA-007, FR-DATA-009,
-      FR-DATA-011, FR-DATA-012, FR-DATA-015, AC-020, AC-240, AC-242, AC-243,
-      AC-245, AC-247.
+      DIAGNOSTIC_RETROSPECTIVE isolation (the validity-interval G1 cases use the
+      persistence G1 edge writer writeDependenceEdge from
+      packages/persistence/src/repos/dependence.ts, not the G0
+      sources.ts path). Also reconcile the two G0-era substrate suites with plan
+      ADR-1's vocabulary: `packages/domain/test/vocabulary.spec.ts` (reconciled
+      ten-state list with `RETURNED_EMPTY` valid) and
+      `packages/shared-schemas/test/data.spec.ts` (registry version 2 at both
+      assertions; negative fixtures carry only reconciled states). Traces:
+      FR-DATA-007, FR-DATA-009, FR-DATA-011, FR-DATA-012, FR-DATA-015, AC-020,
+      AC-240, AC-242, AC-243, AC-245, AC-247.
 
 ## Phase 5 — Telemetry catalogs, manifest regen, full verification
 
-- [ ] T027 Extend `telemetry/data.catalog.json` (backfill.provenance_recorded,
+- [x] T027 Extend `telemetry/data.catalog.json` (backfill.provenance_recorded,
       decision.timeline_recorded, dependence.edge_validity_updated,
       conflict.classified — fields mirroring the authoritative schemas, with
       requirementRefs FR-DATA-007…016) and create
@@ -294,12 +306,15 @@ packages/supply-confidence && pnpm --filter
 @foresift/supply-confidence test`. All green required. Traces:
       FR-DATA-007…016, FR-TRD-001…004, FR-SUP-001…002 (package-gate proof of
       every assigned requirement's substrate).
-- [ ] T029 Regenerate the coordinator test manifest
+- [ ] T029 [executor: COORDINATOR] Regenerate the coordinator test manifest
       (`node scripts/automation/bun-migration-manifest.mjs --out
 evidence/bun-migration/bun-migration-manifest.json`) after all new test
       files exist so `pnpm test`/`test:all` collect and classify them
       (PGlite-backed suites → DATABASE_PGLITE; OOM-safe per the test runtime
-      contract). Mechanical bookkeeping. Traces: FR-DATA-007…016,
+      contract). Mechanical bookkeeping (ADR-0020: coordinator-owned, zero-AI;
+      the wave prep node regenerates the manifest mechanically — a writer
+      touching `evidence/bun-migration/` is an ownership violation by law).
+      Traces: FR-DATA-007…016,
       FR-TRD-001…004, FR-SUP-001…002 (verification substrate for every
       assigned requirement).
 - [ ] T030 [executor: COORDINATOR] [evidence: VERIFICATION_ONLY] Run the full

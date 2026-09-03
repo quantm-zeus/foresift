@@ -7,6 +7,7 @@
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 import { PGlite } from '@electric-sql/pglite';
 import {
+  ALL_ACQUISITION_FAILURE_KINDS,
   ALL_ACQUISITION_STATES,
   ALL_AVAILABILITY_PROVENANCE_CLASSES,
   ALL_QUALITY_CODES,
@@ -230,6 +231,7 @@ describe('§13.9 quality-code vocabulary parity (SQL truth ↔ domain)', () => {
       table: string;
       column: string;
       expected: readonly string[];
+      extraLiterals?: readonly string[];
     }[] = [
       {
         table: 'observations',
@@ -246,6 +248,17 @@ describe('§13.9 quality-code vocabulary parity (SQL truth ↔ domain)', () => {
         column: 'state',
         expected: ALL_ACQUISITION_STATES,
       },
+      // ADR-1 reconciliation: FAILED's failure_kind vocabulary lives in its
+      // own G1 CHECK; the state constraint text no longer lists the retired
+      // TIMED_OUT/INVALID_RESPONSE spellings. The composite
+      // acquisition_failure_kind_valid CHECK also pins `state = 'FAILED'`,
+      // so strip the comparison column's own literals before diffing.
+      {
+        table: 'evidence_acquisition_decisions',
+        column: 'failure_kind',
+        expected: ALL_ACQUISITION_FAILURE_KINDS,
+        extraLiterals: ['FAILED'],
+      },
       { table: 'recovery_tiers', column: 'data_class', expected: Object.values(RecoveryDataClass) },
       {
         table: 'protected_assets',
@@ -254,12 +267,24 @@ describe('§13.9 quality-code vocabulary parity (SQL truth ↔ domain)', () => {
       },
     ];
     for (const c of cases) {
+      // Match only the constraint that IS the column's own IN-list registry —
+      // `pg_get_constraintdef` renders it as `<col> = ANY (ARRAY[...])` or
+      // `<col> IN (...)`. Composite constraints that merely REFERENCE the
+      // column (e.g. the G1 acquisition_failure_kind_valid CHECK mentions
+      // both `state` and `failure_kind`, carrying the retired
+      // TIMED_OUT/INVALID_RESPONSE spellings as failure_kind vocabulary)
+      // must not pollute the state registry extraction.
       const checks = await engine.query<{ def: string }>(
         `SELECT pg_get_constraintdef(oid) AS def FROM pg_constraint
          WHERE contype = 'c'
            AND conrelid::regclass::text = $1
-           AND pg_get_constraintdef(oid) LIKE '%${c.column}%'`,
-        [c.table],
+           AND pg_get_constraintdef(oid) LIKE ('%' || $2 || ' = ANY (ARRAY[%')
+         UNION
+         SELECT pg_get_constraintdef(oid) FROM pg_constraint
+         WHERE contype = 'c'
+           AND conrelid::regclass::text = $1
+           AND pg_get_constraintdef(oid) LIKE ('%' || $2 || ' IN (%')`,
+        [c.table, c.column],
       );
       expect(
         checks.rows.length,
@@ -273,7 +298,7 @@ describe('§13.9 quality-code vocabulary parity (SQL truth ↔ domain)', () => {
       }
       // The IN-list values are a subset of the constraint text; compare only
       // when this table's own list is complete (skip composite constraints).
-      const fullList = [...listed].sort();
+      const fullList = [...listed].filter((v) => !(c.extraLiterals ?? []).includes(v)).sort();
       expect(fullList.length > 0, `${c.table}.${c.column}: extracted values`).toBe(true);
       expect([...c.expected].sort(), `${c.table}.${c.column} drifts from domain registry`).toEqual(
         fullList,

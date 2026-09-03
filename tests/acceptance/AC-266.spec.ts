@@ -16,6 +16,12 @@ const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..
 
 describe('AC-266 acceptance (positive)', () => {
   it('passes release conformance when all normative items and code paths match perfectly', async () => {
+    // Pin the positive evaluation to the PROVEN milestone (G0): its surface
+    // set is complete, so "all normative items and code paths match perfectly"
+    // is actually assertable. The premature-implementation rule resolves the
+    // repository's ACTIVE gate itself (G1), so in-flight G1 code is not
+    // flagged; mid-flight evaluation of the live active milestone would
+    // assertably fail on the not-yet-landed G1 packages' paths.
     const verdict = await evaluateConformance({
       repoRoot: REPO_ROOT,
       milestone: 'G0',

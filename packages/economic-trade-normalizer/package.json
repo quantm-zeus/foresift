@@ -1,0 +1,20 @@
+{
+  "name": "@foresift/economic-trade-normalizer",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Deterministic read-only normalization of persisted route legs into auditable economic trade events.",
+  "exports": {
+    ".": {
+      "types": "./src/index.ts",
+      "default": "./src/index.ts"
+    }
+  },
+  "scripts": {
+    "test": "bun test"
+  },
+  "dependencies": {
+    "@foresift/domain": "workspace:*"
+  },
+  "devDependencies": {}
+}

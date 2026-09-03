@@ -219,6 +219,12 @@ importers:
 
   packages/domain: {}
 
+  packages/economic-trade-normalizer:
+    dependencies:
+      '@foresift/domain':
+        specifier: workspace:*
+        version: link:../domain
+
   packages/evidence:
     dependencies:
       '@foresift/domain':
@@ -385,6 +391,18 @@ importers:
       zod:
         specifier: ^3.25.76
         version: 3.25.76
+
+  packages/supply-confidence:
+    dependencies:
+      '@foresift/domain':
+        specifier: workspace:*
+        version: link:../domain
+      '@foresift/persistence':
+        specifier: workspace:*
+        version: link:../persistence
+      '@foresift/shared-schemas':
+        specifier: workspace:*
+        version: link:../shared-schemas
 
   packages/tenant-isolation:
     dependencies:

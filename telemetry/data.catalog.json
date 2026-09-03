@@ -3,7 +3,16 @@
   "catalog": "data",
   "description": "Data-truth telemetry events for canonical identity, immutable observations/revisions, point-in-time replay, backfill receipts, field-quality flags, acquisition decisions, and source-dependence lineage. Every event carries the instant fields and evidence references its requirement demands; no event ever reports a fabricated success state.",
   "contractStatus": "DECLARATIVE_CONTRACT_ONLY — this file defines the event contracts the requirement manifest maps to (telemetry/data.*); emitter wiring lands with the observability milestone (dependency group G2), so nothing publishes these event names yet. Field lists mirror the authoritative schemas/repos exactly.",
-  "requirementsCovered": ["FR-DATA-002", "FR-DATA-003", "FR-DATA-005", "FR-DATA-006"],
+  "requirementsCovered": [
+    "FR-DATA-002",
+    "FR-DATA-003",
+    "FR-DATA-005",
+    "FR-DATA-006",
+    "FR-DATA-007",
+    "FR-DATA-009",
+    "FR-DATA-013",
+    "FR-DATA-016"
+  ],
   "recoveryDataClass": "CRITICAL_METADATA",
   "events": [
     {
@@ -170,6 +179,87 @@
           "required": true
         },
         { "name": "availableAt", "type": "string<utc-timestamp>", "required": true }
+      ]
+    },
+    {
+      "name": "backfill.provenance_recorded",
+      "description": "A retrospectively fetched observation recorded its immutable original coordinates and actual retrieval/availability boundary; historical event time is never used as availability time.",
+      "requirementRefs": ["FR-DATA-007"],
+      "tier": "CRITICAL_OBSERVATIONS_CHECKPOINTS",
+      "fields": [
+        { "name": "observationId", "type": "string", "required": true },
+        { "name": "subjectPoolId", "type": "string|undefined", "required": false },
+        { "name": "subjectAssetId", "type": "string|undefined", "required": false },
+        { "name": "retrievedAsBackfill", "type": "literal<true>", "required": true },
+        {
+          "name": "originalCoordinates",
+          "type": "object<OriginalEventCoordinatesSchema>",
+          "required": true
+        },
+        { "name": "eventAt", "type": "string<utc-timestamp>", "required": true },
+        { "name": "fetchedAt", "type": "string<utc-timestamp>", "required": true },
+        { "name": "availableAt", "type": "string<utc-timestamp>", "required": true },
+        { "name": "unavailabilityReason", "type": "string", "required": true }
+      ]
+    },
+    {
+      "name": "decision.timeline_recorded",
+      "description": "A candidate decision timeline recorded the complete delivery lifecycle, including the exclusive versioned counterfactual arm for a non-delivery.",
+      "requirementRefs": ["FR-DATA-009"],
+      "tier": "CRITICAL_METADATA",
+      "fields": [
+        { "name": "decisionId", "type": "string", "required": true },
+        { "name": "candidateId", "type": "string", "required": true },
+        { "name": "policyVersion", "type": "string|undefined", "required": false },
+        { "name": "decisionReadyAt", "type": "string<utc-timestamp>", "required": true },
+        { "name": "policyDecidedAt", "type": "string<utc-timestamp>", "required": true },
+        { "name": "workflowCompletedAt", "type": "string<utc-timestamp>", "required": true },
+        { "name": "deliveryEligibleAt", "type": "string<utc-timestamp>", "required": true },
+        { "name": "deliveredAt", "type": "string<utc-timestamp>|null", "required": true },
+        {
+          "name": "counterfactualDeliveryAt",
+          "type": "string<utc-timestamp>|null",
+          "required": true
+        },
+        { "name": "counterfactualVersion", "type": "integer|string|null", "required": true },
+        { "name": "validUntil", "type": "string<utc-timestamp>|undefined", "required": false },
+        { "name": "expiredAt", "type": "string<utc-timestamp>|null|undefined", "required": false }
+      ]
+    },
+    {
+      "name": "dependence.edge_validity_updated",
+      "description": "A declared or empirical source-dependence edge recorded its validity interval, evidence, confidence, and effective independent-evidence multiplier.",
+      "requirementRefs": ["FR-DATA-013"],
+      "tier": "CRITICAL_METADATA",
+      "fields": [
+        { "name": "sourceIdA", "type": "string", "required": true },
+        { "name": "sourceIdB", "type": "string", "required": true },
+        { "name": "method", "type": "string(DECLARED|EMPIRICAL)", "required": true },
+        { "name": "validFrom", "type": "string<utc-timestamp>", "required": true },
+        { "name": "validUntil", "type": "string<utc-timestamp>|null|undefined", "required": false },
+        { "name": "evidenceIds", "type": "array<string>", "required": true },
+        { "name": "confidence", "type": "number[0,1]", "required": true },
+        { "name": "effectiveIndependenceMultiplier", "type": "number[0,1]", "required": true }
+      ]
+    },
+    {
+      "name": "conflict.classified",
+      "description": "A provider conflict classified all contributing raw observations as benign variance, common-upstream duplication, material disagreement, or unresolved decision-critical conflict.",
+      "requirementRefs": ["FR-DATA-016"],
+      "tier": "CRITICAL_OBSERVATIONS_CHECKPOINTS",
+      "fields": [
+        { "name": "conflictId", "type": "string", "required": true },
+        {
+          "name": "conflictClass",
+          "type": "string(BENIGN_LATENCY_ROUNDING_VARIANCE|COMMON_UPSTREAM_DUPLICATION|MATERIAL_DISAGREEMENT|UNRESOLVED_DECISION_CRITICAL)",
+          "required": true
+        },
+        { "name": "observationIds", "type": "array<string>", "required": true },
+        { "name": "fieldPath", "type": "string|undefined", "required": false },
+        { "name": "resolvedByRule", "type": "string|null|undefined", "required": false },
+        { "name": "detectedAt", "type": "string<utc-timestamp>", "required": true },
+        { "name": "availableAt", "type": "string<utc-timestamp>|undefined", "required": false },
+        { "name": "details", "type": "record<string,unknown>", "required": true }
       ]
     }
   ]

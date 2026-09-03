@@ -1,14 +1,17 @@
 import {
-  PoolAssessmentState,
-  PositionControlState,
+  LiquidityRemovalRisk,
+  LpControlState,
+  PoolSupportState,
+  QuoteParityState,
+  StateCompleteness,
   WithdrawalAuthorityState,
-  type PoolSecurityAssessment,
+  type QualityCode,
 } from '@foresift/domain';
 import { resolveDecoder } from '@foresift/program-decoders';
+import type { PoolSecurityAssessment } from '@foresift/shared-schemas';
 
 export const POOL_SECURITY_ANALYZER_VERSION = 'solsec-pool-security@1';
 export const POOL_SECURITY_POLICY_VERSION = 'solsec-pool-controls@1';
-
 export interface MigrationEdgeEvidence {
   readonly migrationId: string;
   readonly launchPoolId: string;
@@ -16,10 +19,17 @@ export interface MigrationEdgeEvidence {
   readonly status: 'CONFIRMED' | 'AMBIGUOUS';
   readonly migratedAt?: string;
 }
-
 export interface PoolResolvedState {
   readonly poolOwner?: string;
-  readonly positionControl?: 'BURNED' | 'LOCKED_WITH_EVIDENCE' | 'OPEN' | 'UNABLE_TO_VERIFY';
+  readonly lpControlState?: LpControlState;
+  readonly positionControl?:
+    | 'BURNED'
+    | 'LOCKED_WITH_EVIDENCE'
+    | 'LOCKED'
+    | 'OPEN'
+    | 'DISTRIBUTED'
+    | 'CONCENTRATED_CONTROL'
+    | 'UNABLE_TO_VERIFY';
   readonly lockEvidenceRef?: string;
   readonly withdrawalAuthorityAddress?: string | null;
   readonly withdrawalAuthorityObservedAbuse?: boolean;
@@ -31,7 +41,6 @@ export interface PoolResolvedState {
   readonly referenceQuoteOutputRaw?: string;
   readonly quoteToleranceBps?: number;
 }
-
 export type PoolDecoderResolution =
   | {
       readonly status: 'RESOLVED';
@@ -49,7 +58,6 @@ export type PoolDecoderResolution =
       readonly qualityCode?: 'UNSUPPORTED_PROGRAM_VERSION';
       readonly reason: string;
     };
-
 export interface PoolSecurityInput {
   readonly poolId: string;
   readonly programId: string;
@@ -62,211 +70,176 @@ export interface PoolSecurityInput {
   readonly evidenceRef: string;
   readonly observedAt: string;
   readonly availableAt: string;
-  /** Injection exists for a populated DecoderRegistry; production defaults to its public resolver. */
   readonly decoderResolver?: (query: {
     programId: string;
     programVersion: string;
     layoutHash: string;
   }) => PoolDecoderResolution;
 }
-
-function assessmentId(input: PoolSecurityInput): string {
-  return `pool-assessment:${[
-    input.poolId,
-    input.programId,
-    input.programVersion,
-    input.layoutHash,
-    input.policyVersion ?? POOL_SECURITY_POLICY_VERSION,
-    input.availableAt,
-  ]
-    .map((value) => encodeURIComponent(value))
-    .join(':')}`;
+function id(input: PoolSecurityInput): string {
+  return `pool-assessment:${[input.poolId, input.programId, input.programVersion, input.layoutHash, input.policyVersion ?? POOL_SECURITY_POLICY_VERSION, input.availableAt].map(encodeURIComponent).join(':')}`;
 }
-
-function unsupported(input: PoolSecurityInput): PoolSecurityAssessment {
+function metadata(
+  resolution: PoolDecoderResolution,
+): { adapterId: string; adapterVersion: string } | undefined {
+  if ('state' in resolution)
+    return resolution.state === 'SUPPORTED'
+      ? {
+          adapterId: resolution.decoder.protocolFamily,
+          adapterVersion: resolution.decoder.decoderVersion,
+        }
+      : undefined;
+  if (resolution.status !== 'RESOLVED') return undefined;
   return {
-    assessmentId: assessmentId(input),
-    poolId: input.poolId,
-    state: PoolAssessmentState.DEGRADED_UNSUPPORTED,
-    protocolFamily: null,
-    decoderVersion: null,
-    poolOwner: null,
-    positionControl: null,
-    lockEvidenceRef: null,
-    withdrawalAuthority: null,
-    migrationLineageRef: null,
-    quoteParityPassed: null,
-    liquidityConcentration: null,
-    recentLiquidityAddsRaw: null,
-    recentLiquidityRemovalsRaw: null,
-    largeSellImpactBps: null,
-    stateComplete: false,
-    qualityCodes: ['POOL_MATH_UNSUPPORTED', 'UNSUPPORTED_PROGRAM_VERSION'],
-    analyzerVersion: input.analyzerVersion ?? POOL_SECURITY_ANALYZER_VERSION,
-    policyVersion: input.policyVersion ?? POOL_SECURITY_POLICY_VERSION,
-    evidenceRef: input.evidenceRef,
-    observedAt: input.observedAt,
-    availableAt: input.availableAt,
+    adapterId: resolution.protocolFamily ?? resolution.decoderId ?? 'SIGNED_MANIFEST',
+    adapterVersion: resolution.decoderVersion ?? resolution.decoderId ?? 'SIGNED_MANIFEST',
   };
 }
-
-function quoteParity(state: PoolResolvedState): boolean | null {
+function unsupported(input: PoolSecurityInput): PoolSecurityAssessment {
+  return {
+    assessmentId: id(input),
+    poolId: input.poolId,
+    adapterId: input.programId,
+    adapterVersion: `${input.programVersion}/${input.layoutHash}`,
+    adapterSupportState: PoolSupportState.DEGRADED_UNSUPPORTED,
+    lpControlState: null,
+    withdrawalAuthorityState: null,
+    liquidityRemovalRisk: null,
+    quoteParityState: null,
+    stateCompleteness: null,
+    migrationLineageId: null,
+    liquidityConcentration: null,
+    observedAt: input.observedAt,
+    availableAt: input.availableAt,
+    evidenceIds: [input.evidenceRef],
+    qualityCodes: ['POOL_MATH_UNSUPPORTED', 'UNSUPPORTED_PROGRAM_VERSION'],
+    schemaRegistryVersion: 1,
+  };
+}
+function parity(state: PoolResolvedState): QuoteParityState {
   if (
     state.calculatedQuoteOutputRaw === undefined ||
     state.referenceQuoteOutputRaw === undefined ||
     state.quoteToleranceBps === undefined
   )
-    return null;
+    return QuoteParityState.UNABLE_TO_VERIFY;
   if (!/^\d+$/.test(state.calculatedQuoteOutputRaw) || !/^\d+$/.test(state.referenceQuoteOutputRaw))
-    return null;
+    return QuoteParityState.UNABLE_TO_VERIFY;
   const actual = BigInt(state.calculatedQuoteOutputRaw);
   const reference = BigInt(state.referenceQuoteOutputRaw);
-  if (reference === 0n) return actual === 0n;
-  const difference = actual > reference ? actual - reference : reference - actual;
-  return difference * 10_000n <= reference * BigInt(state.quoteToleranceBps);
+  if (reference === 0n) return actual === 0n ? QuoteParityState.PASSED : QuoteParityState.FAILED;
+  const delta = actual > reference ? actual - reference : reference - actual;
+  return delta * 10_000n <= reference * BigInt(state.quoteToleranceBps)
+    ? QuoteParityState.PASSED
+    : QuoteParityState.FAILED;
 }
-
-function resolveMetadata(
-  resolution: PoolDecoderResolution,
-): { protocolFamily: string; decoderVersion: string } | undefined {
-  if ('state' in resolution) {
-    return resolution.state === 'SUPPORTED'
-      ? {
-          protocolFamily: resolution.decoder.protocolFamily,
-          decoderVersion: resolution.decoder.decoderVersion,
-        }
-      : undefined;
-  }
-  if (resolution.status !== 'RESOLVED') return undefined;
-  return {
-    protocolFamily: resolution.protocolFamily ?? 'SIGNED_MANIFEST_RESOLVED',
-    decoderVersion: resolution.decoderVersion ?? resolution.decoderId ?? 'SIGNED_MANIFEST',
-  };
+function lpState(state: PoolResolvedState): LpControlState {
+  if (state.lpControlState !== undefined) return state.lpControlState;
+  if (state.positionControl === 'BURNED') return LpControlState.BURNED;
+  if (state.positionControl === 'LOCKED' || state.positionControl === 'LOCKED_WITH_EVIDENCE')
+    return state.lockEvidenceRef === undefined
+      ? LpControlState.UNABLE_TO_VERIFY
+      : LpControlState.LOCKED;
+  if (state.positionControl === 'DISTRIBUTED') return LpControlState.DISTRIBUTED;
+  if (state.positionControl === 'OPEN' || state.positionControl === 'CONCENTRATED_CONTROL')
+    return LpControlState.CONCENTRATED_CONTROL;
+  return LpControlState.UNABLE_TO_VERIFY;
 }
-
-function withdrawalState(state: PoolResolvedState): PoolSecurityAssessment['withdrawalAuthority'] {
+function withdrawal(state: PoolResolvedState): WithdrawalAuthorityState {
   if (state.withdrawalAuthorityAddress === undefined)
     return WithdrawalAuthorityState.UNABLE_TO_VERIFY;
-  if (state.withdrawalAuthorityAddress === null) return WithdrawalAuthorityState.REVOKED;
-  return state.withdrawalAuthorityObservedAbuse === true
-    ? WithdrawalAuthorityState.PRESENT_WITH_OBSERVED_ABUSE
-    : WithdrawalAuthorityState.PRESENT;
+  return state.withdrawalAuthorityAddress === null
+    ? WithdrawalAuthorityState.REVOKED
+    : WithdrawalAuthorityState.ACTIVE;
+}
+function risk(
+  state: PoolResolvedState,
+  lp: LpControlState,
+  auth: WithdrawalAuthorityState,
+): LiquidityRemovalRisk {
+  if (state.withdrawalAuthorityObservedAbuse === true) return LiquidityRemovalRisk.CRITICAL;
+  if (auth === WithdrawalAuthorityState.UNABLE_TO_VERIFY || lp === LpControlState.UNABLE_TO_VERIFY)
+    return LiquidityRemovalRisk.UNABLE_TO_VERIFY;
+  if (auth === WithdrawalAuthorityState.ACTIVE && lp === LpControlState.CONCENTRATED_CONTROL)
+    return LiquidityRemovalRisk.HIGH;
+  if (auth === WithdrawalAuthorityState.ACTIVE || (state.largeSellImpactBps ?? 0) >= 2_000)
+    return LiquidityRemovalRisk.MEDIUM;
+  return lp === LpControlState.BURNED || lp === LpControlState.LOCKED
+    ? LiquidityRemovalRisk.NONE
+    : LiquidityRemovalRisk.LOW;
 }
 
-function migrationReference(
-  poolId: string,
-  edges: readonly MigrationEdgeEvidence[],
-): string | null {
-  const edge = edges.find(
-    (candidate) =>
-      candidate.status === 'CONFIRMED' &&
-      (candidate.launchPoolId === poolId || candidate.migratedPoolId === poolId),
-  );
-  return edge?.migrationId ?? null;
-}
-
-/**
- * Assess pool control only after exact signed-manifest decoder resolution. The
- * supplied state is never interpreted when resolution fails.
- */
+/** Resolves an exact signed-manifest tuple before inspecting any supplied pool state. */
 export function assessPoolSecurity(input: PoolSecurityInput): PoolSecurityAssessment {
-  const observed = Date.parse(input.observedAt);
-  const available = Date.parse(input.availableAt);
-  if (!Number.isFinite(observed) || !Number.isFinite(available))
-    throw new Error('INVALID_TIMESTAMP');
-  if (available < observed) throw new Error('AVAILABLE_AT_PRECEDES_OBSERVED_AT');
-
-  const resolution = (input.decoderResolver ?? resolveDecoder)({
-    programId: input.programId,
-    programVersion: input.programVersion,
-    layoutHash: input.layoutHash,
-  });
-  const metadata = resolveMetadata(resolution);
-  if (metadata === undefined) return unsupported(input);
-
-  const parity = quoteParity(input.state);
-  let positionControl = input.state.positionControl ?? PositionControlState.UNABLE_TO_VERIFY;
-  if (
-    positionControl === PositionControlState.LOCKED_WITH_EVIDENCE &&
-    input.state.lockEvidenceRef === undefined
-  )
-    positionControl = PositionControlState.UNABLE_TO_VERIFY;
-
-  const qualityCodes = new Set<string>();
-  if (parity === false) qualityCodes.add('QUOTE_PARITY_FAILED');
-  if (parity === null) qualityCodes.add('EXECUTION_PARTIAL');
-  if (input.state.poolOwner === undefined) qualityCodes.add('EXECUTION_PARTIAL');
-  if (positionControl === PositionControlState.UNABLE_TO_VERIFY)
-    qualityCodes.add('EXECUTION_PARTIAL');
-  const withdrawalAuthority = withdrawalState(input.state);
-  if (withdrawalAuthority === WithdrawalAuthorityState.UNABLE_TO_VERIFY)
-    qualityCodes.add('EXECUTION_PARTIAL');
-  if (
-    input.state.liquidityConcentration === undefined ||
-    input.state.liquidityConcentration < 0 ||
-    input.state.liquidityConcentration > 1 ||
-    input.state.recentLiquidityAddsRaw === undefined ||
-    !/^\d+$/.test(input.state.recentLiquidityAddsRaw) ||
-    input.state.recentLiquidityRemovalsRaw === undefined ||
-    !/^\d+$/.test(input.state.recentLiquidityRemovalsRaw) ||
-    input.state.largeSellImpactBps === undefined ||
-    !Number.isFinite(input.state.largeSellImpactBps) ||
-    input.state.largeSellImpactBps < 0
-  )
-    qualityCodes.add('EXECUTION_PARTIAL');
-
-  const stateComplete = qualityCodes.size === 0;
+  if (Date.parse(input.availableAt) < Date.parse(input.observedAt))
+    throw new Error('AVAILABLE_AT_PRECEDES_OBSERVED_AT');
+  const resolved = metadata(
+    (input.decoderResolver ?? resolveDecoder)({
+      programId: input.programId,
+      programVersion: input.programVersion,
+      layoutHash: input.layoutHash,
+    }),
+  );
+  if (resolved === undefined) return unsupported(input);
+  const lp = lpState(input.state);
+  const auth = withdrawal(input.state);
+  const quote = parity(input.state);
+  const concentration = input.state.liquidityConcentration;
+  const complete =
+    input.state.poolOwner !== undefined &&
+    lp !== LpControlState.UNABLE_TO_VERIFY &&
+    auth !== WithdrawalAuthorityState.UNABLE_TO_VERIFY &&
+    quote === QuoteParityState.PASSED &&
+    concentration !== undefined &&
+    concentration >= 0 &&
+    concentration <= 1 &&
+    /^\d+$/.test(input.state.recentLiquidityAddsRaw ?? '') &&
+    /^\d+$/.test(input.state.recentLiquidityRemovalsRaw ?? '') &&
+    input.state.largeSellImpactBps !== undefined &&
+    input.state.largeSellImpactBps >= 0;
+  const qualityCodes: QualityCode[] =
+    quote === QuoteParityState.FAILED
+      ? ['QUOTE_PARITY_FAILED']
+      : complete
+        ? ['VALID']
+        : ['EXECUTION_PARTIAL'];
+  const edge = (input.migrationEdges ?? []).find(
+    (item) =>
+      item.status === 'CONFIRMED' &&
+      (item.launchPoolId === input.poolId || item.migratedPoolId === input.poolId),
+  );
   return {
-    assessmentId: assessmentId(input),
+    assessmentId: id(input),
     poolId: input.poolId,
-    state: stateComplete ? PoolAssessmentState.COMPLETE : PoolAssessmentState.PARTIAL,
-    protocolFamily: metadata.protocolFamily,
-    decoderVersion: metadata.decoderVersion,
-    poolOwner: input.state.poolOwner ?? null,
-    positionControl,
-    lockEvidenceRef: input.state.lockEvidenceRef ?? null,
-    withdrawalAuthority,
-    migrationLineageRef: migrationReference(input.poolId, input.migrationEdges ?? []),
-    quoteParityPassed: parity,
+    adapterId: resolved.adapterId,
+    adapterVersion: resolved.adapterVersion,
+    adapterSupportState: PoolSupportState.RESOLVED,
+    lpControlState: lp,
+    withdrawalAuthorityState: auth,
+    liquidityRemovalRisk: risk(input.state, lp, auth),
+    quoteParityState: quote,
+    stateCompleteness: complete ? StateCompleteness.COMPLETE : StateCompleteness.PARTIAL,
+    migrationLineageId: edge?.migrationId ?? null,
     liquidityConcentration:
-      input.state.liquidityConcentration !== undefined &&
-      input.state.liquidityConcentration >= 0 &&
-      input.state.liquidityConcentration <= 1
-        ? input.state.liquidityConcentration
+      concentration !== undefined && concentration >= 0 && concentration <= 1
+        ? String(concentration)
         : null,
-    recentLiquidityAddsRaw:
-      input.state.recentLiquidityAddsRaw !== undefined &&
-      /^\d+$/.test(input.state.recentLiquidityAddsRaw)
-        ? input.state.recentLiquidityAddsRaw
-        : null,
-    recentLiquidityRemovalsRaw:
-      input.state.recentLiquidityRemovalsRaw !== undefined &&
-      /^\d+$/.test(input.state.recentLiquidityRemovalsRaw)
-        ? input.state.recentLiquidityRemovalsRaw
-        : null,
-    largeSellImpactBps:
-      input.state.largeSellImpactBps !== undefined &&
-      Number.isFinite(input.state.largeSellImpactBps) &&
-      input.state.largeSellImpactBps >= 0
-        ? input.state.largeSellImpactBps
-        : null,
-    stateComplete,
-    qualityCodes: stateComplete ? ['VALID'] : [...qualityCodes],
-    analyzerVersion: input.analyzerVersion ?? POOL_SECURITY_ANALYZER_VERSION,
-    policyVersion: input.policyVersion ?? POOL_SECURITY_POLICY_VERSION,
-    evidenceRef: input.evidenceRef,
     observedAt: input.observedAt,
     availableAt: input.availableAt,
+    evidenceIds: [
+      input.evidenceRef,
+      `analyzer:${input.analyzerVersion ?? POOL_SECURITY_ANALYZER_VERSION}`,
+      `policy:${input.policyVersion ?? POOL_SECURITY_POLICY_VERSION}`,
+    ],
+    qualityCodes,
+    schemaRegistryVersion: 1,
   };
 }
-
-/** Confirmed execution modeling requires fully resolved, parity-proven state. */
 export function blocksPoolExecutionModeling(assessment: PoolSecurityAssessment): boolean {
   return (
-    assessment.state !== PoolAssessmentState.COMPLETE ||
-    !assessment.stateComplete ||
-    assessment.quoteParityPassed !== true
+    assessment.adapterSupportState !== PoolSupportState.RESOLVED ||
+    assessment.stateCompleteness !== StateCompleteness.COMPLETE ||
+    assessment.quoteParityState !== QuoteParityState.PASSED
   );
 }
-
 export const analyzePoolSecurity = assessPoolSecurity;

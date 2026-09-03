@@ -1,10 +1,17 @@
 import {
-  TokenControlClassification,
-  TokenControlKind,
-  TransferExtensionVerdict,
-  type TokenControlFinding,
-  type TokenExtensionSupport,
+  parseChainId,
+  SecuritySeverity,
+  TokenControl,
+  TokenControlState,
+  TransferSemanticsSupport,
+  type QualityCode,
 } from '@foresift/domain';
+import { canonicalJson, sha256Text } from '@foresift/persistence';
+import type {
+  TokenControlFinding,
+  TokenExtensionSupport,
+  TokenProgramAssessment,
+} from '@foresift/shared-schemas';
 
 export const SPL_TOKEN_PROGRAM_ID = 'TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA';
 export const TOKEN_2022_PROGRAM_ID = 'TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb';
@@ -16,27 +23,24 @@ export interface SupportedTokenProgramLayout {
   readonly programVersion: string;
   readonly layoutVersion: string;
 }
-
-/** The built-in matrix is deliberately exact. Callers must register any new layout explicitly. */
 export const SUPPORTED_TOKEN_PROGRAM_LAYOUTS: readonly SupportedTokenProgramLayout[] = [
   { programId: SPL_TOKEN_PROGRAM_ID, programVersion: '1.0.0', layoutVersion: 'mint-v1' },
   { programId: TOKEN_2022_PROGRAM_ID, programVersion: '1.0.0', layoutVersion: 'mint-tlv-v1' },
 ];
-
 export interface TokenExtensionSnapshot {
   readonly type: string;
   readonly data?: Readonly<Record<string, unknown>>;
 }
-
 export interface TokenAssessmentInput {
   readonly assetRepresentationId: string;
+  readonly chainId?: string;
   readonly programId: string;
   readonly programVersion: string;
   readonly layoutVersion: string;
   readonly mintAuthority?: string | null;
   readonly freezeAuthority?: string | null;
-  readonly decimals?: number;
-  readonly totalSupplyRaw?: string;
+  readonly decimals: number;
+  readonly totalSupplyRaw: string;
   readonly extensions?: readonly TokenExtensionSnapshot[];
   readonly analyzerVersion?: string;
   readonly policyVersion?: string;
@@ -45,291 +49,231 @@ export interface TokenAssessmentInput {
   readonly availableAt: string;
   readonly supportedProgramLayouts?: readonly SupportedTokenProgramLayout[];
 }
-
 export interface TokenAssessmentResult {
+  readonly assessment: TokenProgramAssessment;
   readonly findings: readonly TokenControlFinding[];
   readonly supportRows: readonly TokenExtensionSupport[];
   readonly qualityCodes: readonly string[];
   readonly programSupported: boolean;
 }
 
-type MutableFinding = Omit<TokenControlFinding, 'findingId' | 'qualityCodes'> & {
-  qualityCodes: readonly string[];
+const ALIASES: Readonly<Record<string, TokenControl>> = {
+  permanentdelegate: TokenControl.PERMANENT_DELEGATE,
+  transferfeeconfig: TokenControl.TRANSFER_FEE,
+  transferfeeconfiguration: TokenControl.TRANSFER_FEE,
+  transferhook: TokenControl.TRANSFER_HOOK,
+  transferhookprogram: TokenControl.TRANSFER_HOOK,
+  defaultaccountstate: TokenControl.DEFAULT_STATE,
+  mintcloseauthority: TokenControl.CLOSE,
+  closeauthority: TokenControl.CLOSE,
+  nontransferable: TokenControl.NON_TRANSFERABLE,
+  nontransferableaccount: TokenControl.NON_TRANSFERABLE,
+  confidentialtransfermint: TokenControl.CONFIDENTIAL_TRANSFER,
+  confidentialtransferaccount: TokenControl.CONFIDENTIAL_TRANSFER,
+  confidentialtransferfeeconfig: TokenControl.CONFIDENTIAL_TRANSFER,
+  confidentialtransferfeeamount: TokenControl.CONFIDENTIAL_TRANSFER,
+  confidentialmintburn: TokenControl.CONFIDENTIAL_TRANSFER,
+  metadatapointer: TokenControl.METADATA_UPDATE,
+  tokenmetadata: TokenControl.METADATA_UPDATE,
+  metadata: TokenControl.METADATA_UPDATE,
 };
-
-const EXTENSION_ALIASES: Readonly<Record<string, string>> = {
-  permanentdelegate: 'PERMANENT_DELEGATE',
-  transferfeeconfig: 'TRANSFER_FEE_CONFIGURATION',
-  transferfeeconfiguration: 'TRANSFER_FEE_CONFIGURATION',
-  transferhook: 'TRANSFER_HOOK_PROGRAM',
-  transferhookprogram: 'TRANSFER_HOOK_PROGRAM',
-  defaultaccountstate: 'DEFAULT_ACCOUNT_STATE',
-  mintcloseauthority: 'CLOSE_AUTHORITY',
-  closeauthority: 'CLOSE_AUTHORITY',
-  nontransferable: 'NON_TRANSFERABLE',
-  nontransferableaccount: 'NON_TRANSFERABLE',
-  confidentialtransfermint: 'CONFIDENTIAL_TRANSFER',
-  confidentialtransferaccount: 'CONFIDENTIAL_TRANSFER',
-  confidentialtransferfeeconfig: 'CONFIDENTIAL_TRANSFER',
-  confidentialtransferfeeamount: 'CONFIDENTIAL_TRANSFER',
-  confidentialmintburn: 'CONFIDENTIAL_TRANSFER',
-  metadatapointer: 'METADATA_AUTHORITY',
-  tokenmetadata: 'METADATA_AUTHORITY',
-  metadata: 'METADATA_AUTHORITY',
-};
-
-function normalizeExtensionName(value: string): string | undefined {
-  return EXTENSION_ALIASES[value.replaceAll(/[^a-zA-Z0-9]/g, '').toLowerCase()];
+const normalize = (value: string): TokenControl | undefined =>
+  ALIASES[value.replaceAll(/[^a-zA-Z0-9]/g, '').toLowerCase()];
+const hash = (value: unknown): string => sha256Text(canonicalJson(value));
+function authorityState(value: unknown): TokenControlState {
+  if (value === null) return TokenControlState.REVOKED_AUTHORITY;
+  return typeof value === 'string' && value.length > 0
+    ? TokenControlState.ADMINISTRATIVE_CONTROL
+    : TokenControlState.UNABLE_TO_VERIFY;
+}
+function field(data: Readonly<Record<string, unknown>>, ...keys: string[]): unknown {
+  for (const key of keys) if (Object.hasOwn(data, key)) return data[key];
+  return undefined;
+}
+function assertInput(input: TokenAssessmentInput): void {
+  if (Date.parse(input.availableAt) < Date.parse(input.observedAt))
+    throw new Error('AVAILABLE_AT_PRECEDES_OBSERVED_AT');
+  if (!Number.isInteger(input.decimals) || input.decimals < 0 || input.decimals > 255)
+    throw new Error('INVALID_DECIMALS');
+  if (!/^\d+$/.test(input.totalSupplyRaw)) throw new Error('INVALID_TOTAL_SUPPLY');
 }
 
-function tupleSupported(input: TokenAssessmentInput): boolean {
-  const matrix = input.supportedProgramLayouts ?? SUPPORTED_TOKEN_PROGRAM_LAYOUTS;
-  return matrix.some(
+/** Deterministically analyzes decoded SPL/Token-2022 state without provider input. */
+export function assessTokenControls(input: TokenAssessmentInput): TokenAssessmentResult {
+  assertInput(input);
+  const analyzerVersion = input.analyzerVersion ?? TOKEN_ASSESSMENT_ANALYZER_VERSION;
+  const policyVersion = input.policyVersion ?? TOKEN_ASSESSMENT_POLICY_VERSION;
+  const assessmentId = `token-assessment:${[input.assetRepresentationId, input.programId, input.programVersion, input.layoutVersion, analyzerVersion, input.availableAt].map(encodeURIComponent).join(':')}`;
+  const programSupported = (input.supportedProgramLayouts ?? SUPPORTED_TOKEN_PROGRAM_LAYOUTS).some(
     (entry) =>
       entry.programId === input.programId &&
       entry.programVersion === input.programVersion &&
       entry.layoutVersion === input.layoutVersion,
   );
-}
-
-function authorityValue(data: Readonly<Record<string, unknown>>, ...keys: string[]): unknown {
-  for (const key of keys) if (Object.hasOwn(data, key)) return data[key];
-  return undefined;
-}
-
-function authorityClassification(value: unknown): TokenControlFinding['classification'] {
-  if (value === null) return TokenControlClassification.REVOKED_AUTHORITY;
-  if (typeof value === 'string' && value.length > 0)
-    return TokenControlClassification.ADMINISTRATIVE_CONTROL;
-  return TokenControlClassification.UNABLE_TO_VERIFY;
-}
-
-function stableRowId(prefix: string, input: TokenAssessmentInput, suffix: string): string {
-  const parts = [
-    input.assetRepresentationId,
-    input.programId,
-    input.programVersion,
-    input.layoutVersion,
-    input.availableAt,
-    suffix,
-  ];
-  return `${prefix}:${parts.map((part) => encodeURIComponent(part)).join(':')}`;
-}
-
-function assertTemporalInput(input: TokenAssessmentInput): void {
-  const observed = Date.parse(input.observedAt);
-  const available = Date.parse(input.availableAt);
-  if (!Number.isFinite(observed) || !Number.isFinite(available))
-    throw new Error('INVALID_TIMESTAMP');
-  if (available < observed) throw new Error('AVAILABLE_AT_PRECEDES_OBSERVED_AT');
-}
-
-/**
- * Parse one already-decoded mint snapshot. No provider claims or inferred extension
- * behavior participate in this function; unknown data is retained and fails closed.
- */
-export function assessTokenControls(input: TokenAssessmentInput): TokenAssessmentResult {
-  assertTemporalInput(input);
-  const analyzerVersion = input.analyzerVersion ?? TOKEN_ASSESSMENT_ANALYZER_VERSION;
-  const policyVersion = input.policyVersion ?? TOKEN_ASSESSMENT_POLICY_VERSION;
-  const findings: TokenControlFinding[] = [];
+  const quality = new Set<QualityCode>();
+  const findings = new Map<TokenControl, TokenControlFinding>();
   const supportRows: TokenExtensionSupport[] = [];
-  const topLevelQuality = new Set<string>();
-
   const addFinding = (
-    control: TokenControlFinding['control'],
-    classification: TokenControlFinding['classification'],
-    value: unknown,
-    qualityCodes: readonly string[] = ['VALID'],
-    discriminator: string = control,
+    control: TokenControl,
+    state: TokenControlState,
+    authority: unknown,
+    data: unknown,
+    codes: readonly QualityCode[] = ['VALID'],
   ): void => {
-    const row: MutableFinding = {
-      assetRepresentationId: input.assetRepresentationId,
-      programId: input.programId,
-      programVersion: input.programVersion,
-      layoutVersion: input.layoutVersion,
+    for (const code of codes) if (code !== 'VALID') quality.add(code);
+    findings.set(control, {
+      findingId: `token-finding:${encodeURIComponent(assessmentId)}:${control}`,
+      assessmentId,
       control,
-      classification,
-      value,
-      analyzerVersion,
-      policyVersion,
-      evidenceRef: input.evidenceRef,
+      controlState: state,
+      severity: state === TokenControlState.KNOWN_RISK ? SecuritySeverity.HIGH : null,
+      authorityAddress: typeof authority === 'string' && authority.length > 0 ? authority : null,
+      extensionDataHash: data === undefined ? null : hash(data),
+      evidenceIds: [input.evidenceRef, `analyzer:${analyzerVersion}`, `policy:${policyVersion}`],
       observedAt: input.observedAt,
       availableAt: input.availableAt,
-      qualityCodes,
-    };
-    findings.push({
-      ...row,
-      findingId: stableRowId('token-finding', input, discriminator),
+      qualityCodes: [...codes],
     });
-    for (const code of qualityCodes) if (code !== 'VALID') topLevelQuality.add(code);
   };
-
-  const addSupport = (extension: string, verdict: TokenExtensionSupport['verdict']): void => {
+  const addSupport = (
+    type: string,
+    data: unknown,
+    support: TransferSemanticsSupport,
+    codes: readonly QualityCode[],
+  ): void => {
     supportRows.push({
-      supportId: stableRowId('token-support', input, `${policyVersion}:${extension}`),
-      assetRepresentationId: input.assetRepresentationId,
-      programId: input.programId,
-      programVersion: input.programVersion,
-      layoutVersion: input.layoutVersion,
-      extension,
-      verdict,
+      assessmentId,
+      extensionType: type,
+      extensionDataHash: hash(data),
+      support,
       verdictPolicyVersion: policyVersion,
-      analyzerVersion,
-      evidenceRef: input.evidenceRef,
       observedAt: input.observedAt,
       availableAt: input.availableAt,
+      qualityCodes: [...codes],
     });
   };
-
-  const programSupported = tupleSupported(input);
-  addFinding(
-    TokenControlKind.PROGRAM_OWNER,
-    programSupported
-      ? TokenControlClassification.NEUTRAL_CONFIGURATION
-      : TokenControlClassification.UNABLE_TO_VERIFY,
-    {
-      programId: input.programId,
-      programVersion: input.programVersion,
-      layoutVersion: input.layoutVersion,
-    },
-    programSupported ? ['VALID'] : ['UNSUPPORTED_PROGRAM_VERSION'],
-  );
 
   if (!programSupported) {
-    addSupport('PROGRAM_OR_LAYOUT', TransferExtensionVerdict.UNKNOWN_REQUIRED);
-    return {
-      findings,
-      supportRows,
-      qualityCodes: [...topLevelQuality],
-      programSupported: false,
+    quality.add('UNSUPPORTED_PROGRAM_VERSION');
+    const tuple = {
+      programId: input.programId,
+      programVersion: input.programVersion,
+      layoutVersion: input.layoutVersion,
     };
-  }
-
-  addFinding(
-    TokenControlKind.MINT_AUTHORITY,
-    authorityClassification(input.mintAuthority),
-    input.mintAuthority,
-    input.mintAuthority === undefined ? ['PARTIAL'] : ['VALID'],
-  );
-  addFinding(
-    TokenControlKind.FREEZE_AUTHORITY,
-    authorityClassification(input.freezeAuthority),
-    input.freezeAuthority,
-    input.freezeAuthority === undefined ? ['PARTIAL'] : ['VALID'],
-  );
-  addFinding(
-    TokenControlKind.DECIMALS,
-    Number.isInteger(input.decimals) &&
-      (input.decimals ?? -1) >= 0 &&
-      (input.decimals ?? 256) <= 255
-      ? TokenControlClassification.NEUTRAL_CONFIGURATION
-      : TokenControlClassification.UNABLE_TO_VERIFY,
-    input.decimals,
-    input.decimals === undefined ? ['DECIMAL_UNCERTAIN'] : ['VALID'],
-  );
-  addFinding(
-    TokenControlKind.TOTAL_SUPPLY,
-    typeof input.totalSupplyRaw === 'string' && /^\d+$/.test(input.totalSupplyRaw)
-      ? TokenControlClassification.NEUTRAL_CONFIGURATION
-      : TokenControlClassification.UNABLE_TO_VERIFY,
-    input.totalSupplyRaw,
-    input.totalSupplyRaw === undefined ? ['SUPPLY_UNCERTAIN'] : ['VALID'],
-  );
-
-  for (const [index, extension] of (input.extensions ?? []).entries()) {
-    const canonical = normalizeExtensionName(extension.type);
-    const data = extension.data ?? {};
-    if (canonical === undefined) {
+    addFinding(
+      TokenControl.UNKNOWN_EXTENSION,
+      TokenControlState.UNABLE_TO_VERIFY,
+      undefined,
+      tuple,
+      ['UNSUPPORTED_PROGRAM_VERSION'],
+    );
+    addSupport('PROGRAM_OR_LAYOUT', tuple, TransferSemanticsSupport.UNKNOWN_REQUIRED, [
+      'UNSUPPORTED_PROGRAM_VERSION',
+    ]);
+  } else {
+    addFinding(
+      TokenControl.MINT,
+      authorityState(input.mintAuthority),
+      input.mintAuthority,
+      undefined,
+      input.mintAuthority === undefined ? ['PARTIAL'] : ['VALID'],
+    );
+    addFinding(
+      TokenControl.FREEZE,
+      authorityState(input.freezeAuthority),
+      input.freezeAuthority,
+      undefined,
+      input.freezeAuthority === undefined ? ['PARTIAL'] : ['VALID'],
+    );
+    const unknown: TokenExtensionSnapshot[] = [];
+    for (const extension of input.extensions ?? []) {
+      const control = normalize(extension.type);
+      const data = extension.data ?? {};
+      if (control === undefined) {
+        unknown.push(extension);
+        addSupport(extension.type, extension, TransferSemanticsSupport.UNKNOWN_REQUIRED, [
+          'TOKEN_EXTENSION_UNKNOWN',
+        ]);
+        continue;
+      }
+      let authority: unknown;
+      if (control === TokenControl.PERMANENT_DELEGATE)
+        authority = field(data, 'delegate', 'authority', 'permanentDelegate');
+      if (control === TokenControl.TRANSFER_FEE)
+        authority = field(
+          data,
+          'withdrawWithheldAuthority',
+          'withheldAuthority',
+          'configAuthority',
+          'transferFeeConfigAuthority',
+          'authority',
+        );
+      if (control === TokenControl.TRANSFER_HOOK)
+        authority = field(data, 'programId', 'hookProgramId', 'authority');
+      if (control === TokenControl.CLOSE) authority = field(data, 'closeAuthority', 'authority');
+      if (control === TokenControl.METADATA_UPDATE)
+        authority = field(data, 'updateAuthority', 'metadataAuthority', 'authority');
+      const authorityControls: readonly TokenControl[] = [
+        TokenControl.PERMANENT_DELEGATE,
+        TokenControl.TRANSFER_FEE,
+        TokenControl.TRANSFER_HOOK,
+        TokenControl.CLOSE,
+        TokenControl.METADATA_UPDATE,
+      ];
+      let state = authorityControls.includes(control)
+        ? authorityState(authority)
+        : TokenControlState.NEUTRAL_CONFIGURATION;
+      if (control === TokenControl.NON_TRANSFERABLE) state = TokenControlState.KNOWN_RISK;
+      if (control === TokenControl.DEFAULT_STATE) {
+        const value = field(data, 'state', 'defaultState');
+        state =
+          value === 'Frozen'
+            ? TokenControlState.KNOWN_RISK
+            : value === undefined
+              ? TokenControlState.UNABLE_TO_VERIFY
+              : TokenControlState.NEUTRAL_CONFIGURATION;
+      }
+      addFinding(control, state, authority, { extensionType: extension.type, ...data });
+    }
+    if (unknown.length > 0)
       addFinding(
-        TokenControlKind.UNKNOWN_EXTENSION,
-        TokenControlClassification.UNABLE_TO_VERIFY,
-        { extensionType: extension.type, data },
+        TokenControl.UNKNOWN_EXTENSION,
+        TokenControlState.UNABLE_TO_VERIFY,
+        undefined,
+        unknown,
         ['TOKEN_EXTENSION_UNKNOWN'],
-        `UNKNOWN_EXTENSION:${index}:${extension.type}`,
       );
-      addSupport(extension.type, TransferExtensionVerdict.UNKNOWN_REQUIRED);
-      continue;
-    }
-
-    if (canonical === 'PERMANENT_DELEGATE') {
-      const value = authorityValue(data, 'delegate', 'authority', 'permanentDelegate');
-      addFinding(TokenControlKind.PERMANENT_DELEGATE, authorityClassification(value), value);
-    } else if (canonical === 'TRANSFER_FEE_CONFIGURATION') {
-      const configAuthority = authorityValue(
-        data,
-        'configAuthority',
-        'transferFeeConfigAuthority',
-        'authority',
-      );
-      const withheldAuthority = authorityValue(
-        data,
-        'withdrawWithheldAuthority',
-        'withheldAuthority',
-      );
-      addFinding(
-        TokenControlKind.TRANSFER_FEE_CONFIGURATION,
-        authorityClassification(configAuthority),
-        data,
-      );
-      addFinding(
-        TokenControlKind.TRANSFER_FEE_WITHHELD_AUTHORITY,
-        authorityClassification(withheldAuthority),
-        withheldAuthority,
-      );
-    } else if (canonical === 'TRANSFER_HOOK_PROGRAM') {
-      const value = authorityValue(data, 'programId', 'hookProgramId', 'authority');
-      addFinding(TokenControlKind.TRANSFER_HOOK_PROGRAM, authorityClassification(value), value);
-    } else if (canonical === 'DEFAULT_ACCOUNT_STATE') {
-      const value = authorityValue(data, 'state', 'defaultState');
-      addFinding(
-        TokenControlKind.DEFAULT_ACCOUNT_STATE,
-        value === 'Frozen'
-          ? TokenControlClassification.KNOWN_RISK
-          : value === undefined
-            ? TokenControlClassification.UNABLE_TO_VERIFY
-            : TokenControlClassification.NEUTRAL_CONFIGURATION,
-        value,
-      );
-    } else if (canonical === 'CLOSE_AUTHORITY') {
-      const value = authorityValue(data, 'closeAuthority', 'authority');
-      addFinding(TokenControlKind.CLOSE_AUTHORITY, authorityClassification(value), value);
-    } else if (canonical === 'NON_TRANSFERABLE') {
-      addFinding(TokenControlKind.NON_TRANSFERABLE, TokenControlClassification.KNOWN_RISK, data);
-    } else if (canonical === 'CONFIDENTIAL_TRANSFER') {
-      const value = authorityValue(data, 'authority', 'confidentialTransferAuthority');
-      addFinding(
-        TokenControlKind.CONFIDENTIAL_TRANSFER,
-        value === undefined
-          ? TokenControlClassification.NEUTRAL_CONFIGURATION
-          : authorityClassification(value),
-        { extensionType: extension.type, ...data },
-      );
-    } else {
-      const metadataAuthority = authorityValue(data, 'authority', 'metadataAuthority');
-      const updateAuthority = authorityValue(data, 'updateAuthority');
-      addFinding(
-        TokenControlKind.METADATA_AUTHORITY,
-        authorityClassification(metadataAuthority),
-        metadataAuthority,
-      );
-      addFinding(
-        TokenControlKind.UPDATE_AUTHORITY,
-        authorityClassification(updateAuthority),
-        updateAuthority,
-      );
-    }
   }
-
+  const qualityCodes: QualityCode[] = quality.size === 0 ? ['VALID'] : [...quality];
+  const assessment: TokenProgramAssessment = {
+    assessmentId,
+    assetRepresentationId: input.assetRepresentationId,
+    chainId: parseChainId(input.chainId ?? 'solana:mainnet'),
+    programOwner: input.programId,
+    programVersion: `${input.programVersion}/${input.layoutVersion}`,
+    analyzerVersion,
+    decimals: input.decimals,
+    totalSupplyRaw: input.totalSupplyRaw,
+    transferSemanticsSupport: supportRows.some(
+      (row) => row.support === TransferSemanticsSupport.UNKNOWN_REQUIRED,
+    )
+      ? TransferSemanticsSupport.UNKNOWN_REQUIRED
+      : TransferSemanticsSupport.KNOWN_MODELED,
+    deterministicEvidenceIds: [input.evidenceRef],
+    observedAt: input.observedAt,
+    availableAt: input.availableAt,
+    qualityCodes,
+    schemaRegistryVersion: 1,
+  };
   return {
-    findings,
+    assessment,
+    findings: [...findings.values()],
     supportRows,
-    qualityCodes: topLevelQuality.size === 0 ? ['VALID'] : [...topLevelQuality],
-    programSupported: true,
+    qualityCodes,
+    programSupported,
   };
 }
 
-/** Point-in-time read helper: future-available evidence is invisible to a replay. */
 export function tokenFindingsAvailableAt(
   findings: readonly TokenControlFinding[],
   replayAt: string,
@@ -338,5 +282,4 @@ export function tokenFindingsAvailableAt(
   if (!Number.isFinite(cutoff)) throw new Error('INVALID_REPLAY_TIMESTAMP');
   return findings.filter((finding) => Date.parse(finding.availableAt) <= cutoff);
 }
-
 export const analyzeTokenAssessment = assessTokenControls;

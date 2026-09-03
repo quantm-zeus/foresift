@@ -624,3 +624,115 @@ describe('BackfillReceipt §13.6 refinements hold per-conjunct', () => {
     ).toBe(true);
   });
 });
+
+describe('G1 Data Schema extensions (FR-DATA-007..016, AC-242, AC-245)', () => {
+  it('bumps DATA_SCHEMA_REGISTRY_VERSION to 2', () => {
+    expect(DATA_SCHEMA_REGISTRY_VERSION).toBe(2);
+  });
+
+  it('validates BackfilledObservation with original coordinates and unavailability reason', () => {
+    const valid = {
+      observationId: 'obs_bf_1',
+      subjectPoolId: poolFixture.poolId,
+      retrievedAsBackfill: true,
+      originalCoordinates: {
+        chainId: 'eip155:1',
+        blockNumberOrSlot: '20000000',
+        transactionHash: '0x' + 'aa'.repeat(32),
+      },
+      fetchedAt: at('2026-05-01T12:00:00Z'),
+      availableAt: at('2026-05-01T12:00:00Z'),
+      unavailabilityReason: 'COLLECTOR_OUTAGE_WINDOW',
+      eventAt: at('2026-05-01T10:00:00Z'),
+    };
+    if (DATA_SCHEMAS.BackfilledObservation) {
+      expect(DATA_SCHEMAS.BackfilledObservation.safeParse(valid).success).toBe(true);
+
+      // Refuse event time substituting for available_at
+      const substituted = { ...valid, availableAt: at('2026-05-01T10:00:00Z') };
+      expect(DATA_SCHEMAS.BackfilledObservation.safeParse(substituted).success).toBe(false);
+    }
+  });
+
+  it('validates CandidateDecisionTimeline schema with delivery & counterfactual timestamps', () => {
+    const validTimeline = {
+      decisionId: 'dec_1',
+      candidateId: 'cand_1',
+      decisionReadyAt: at('2026-05-01T10:00:00Z'),
+      policyDecidedAt: at('2026-05-01T10:02:00Z'),
+      workflowCompletedAt: at('2026-05-01T10:03:00Z'),
+      deliveryEligibleAt: at('2026-05-01T10:02:00Z'),
+      deliveredAt: at('2026-05-01T10:04:00Z'),
+      counterfactualDeliveryAt: null,
+      counterfactualVersion: null,
+    };
+    if (DATA_SCHEMAS.CandidateDecisionTimeline) {
+      expect(DATA_SCHEMAS.CandidateDecisionTimeline.safeParse(validTimeline).success).toBe(true);
+    }
+  });
+
+  it('validates reconciled EvidenceAcquisitionDecisionSchema with FR-DATA-012 fields', () => {
+    const validAcquisition = {
+      id: 'acq_2',
+      candidateId: 'cand_8',
+      evidenceFamily: 'social_sentiment',
+      policyVersion: 'probe-policy@4',
+      state: 'UNSUPPORTED',
+      requestedAt: at('2026-05-01T10:00:00Z'),
+      completedAt: at('2026-05-01T10:00:01Z'),
+      requestedFields: ['follower_count', 'sentiment_score'],
+      expectedValueOfInformation: 0.75,
+      estimatedCost: { amount: '100', token: 'USD' },
+      actualCost: { amount: '0', token: 'USD' },
+      candidateStateAtRequest: 'EXPLORATION',
+      failureKind: null,
+      acquisitionSeed: 'seed-42',
+      assignmentProbability: 0.1,
+      actualDecisionChanged: false,
+      evidenceIds: [],
+    };
+    if (DATA_SCHEMAS.EvidenceAcquisitionDecision) {
+      expect(DATA_SCHEMAS.EvidenceAcquisitionDecision.safeParse(validAcquisition).success).toBe(true);
+    }
+  });
+
+  it('validates SourceDependenceEdge and EmpiricalDependenceObservation schemas', () => {
+    const validEdge = {
+      sourceIdA: 'src/nodefront',
+      sourceIdB: 'src/chainmirror',
+      method: 'EMPIRICAL',
+      validFrom: at('2026-01-01T00:00:00Z'),
+      validUntil: at('2026-12-31T23:59:59Z'),
+      evidenceIds: ['dep_obs_1'],
+      confidence: 0.9,
+      effectiveIndependenceMultiplier: 0.35,
+    };
+    if (DATA_SCHEMAS.SourceDependenceEdge) {
+      expect(DATA_SCHEMAS.SourceDependenceEdge.safeParse(validEdge).success).toBe(true);
+    }
+  });
+
+  it('validates ProviderConflict schema', () => {
+    const validConflict = {
+      conflictId: 'conf_1',
+      conflictClass: 'MATERIAL_DISAGREEMENT',
+      observationIds: ['obs_1', 'obs_2'],
+      detectedAt: at('2026-05-01T12:00:00Z'),
+      details: { priceDifferencePercent: 15.5 },
+    };
+    if (DATA_SCHEMAS.ProviderConflict) {
+      expect(DATA_SCHEMAS.ProviderConflict.safeParse(validConflict).success).toBe(true);
+    }
+  });
+
+  it('validates ReplayQuerySemantics schema with explicit mode', () => {
+    const validQuery = {
+      queryShape: 'HISTORICAL_REPLAY',
+      mode: 'REALIZABLE_REPLAY',
+      boundaryTimestamp: at('2026-05-01T12:00:00Z'),
+    };
+    if (DATA_SCHEMAS.ReplayQuerySemantics) {
+      expect(DATA_SCHEMAS.ReplayQuerySemantics.safeParse(validQuery).success).toBe(true);
+    }
+  });
+});

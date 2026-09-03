@@ -294,12 +294,15 @@ packages/supply-confidence && pnpm --filter
 @foresift/supply-confidence test`. All green required. Traces:
       FR-DATA-007…016, FR-TRD-001…004, FR-SUP-001…002 (package-gate proof of
       every assigned requirement's substrate).
-- [ ] T029 Regenerate the coordinator test manifest
+- [ ] T029 [executor: COORDINATOR] Regenerate the coordinator test manifest
       (`node scripts/automation/bun-migration-manifest.mjs --out
 evidence/bun-migration/bun-migration-manifest.json`) after all new test
       files exist so `pnpm test`/`test:all` collect and classify them
       (PGlite-backed suites → DATABASE_PGLITE; OOM-safe per the test runtime
-      contract). Mechanical bookkeeping. Traces: FR-DATA-007…016,
+      contract). Mechanical bookkeeping (ADR-0020: coordinator-owned, zero-AI;
+      the wave prep node regenerates the manifest mechanically — a writer
+      touching `evidence/bun-migration/` is an ownership violation by law).
+      Traces: FR-DATA-007…016,
       FR-TRD-001…004, FR-SUP-001…002 (verification substrate for every
       assigned requirement).
 - [ ] T030 [executor: COORDINATOR] [evidence: VERIFICATION_ONLY] Run the full

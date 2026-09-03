@@ -259,14 +259,14 @@ extended by this package even though they sit outside the listed writeScopes.
       FR-SOLSEC-006.
 - [ ] T026 [executor: COORDINATOR] [evidence: VERIFICATION_ONLY] Run the
       milestone verification command on the canonical tree: `test -d
-    packages/solana-security && pnpm --filter @foresift/solana-security
-    test`; plus the extended central suites (`pnpm --filter
-    @foresift/persistence test`; `tests/telemetry-catalog.spec.ts`;
+  packages/solana-security && pnpm --filter @foresift/solana-security
+  test`; plus the extended central suites (`pnpm --filter
+  @foresift/persistence test`; `tests/telemetry-catalog.spec.ts`;
       AC-130/131/132 files). All green required. Traces: FR-SOLSEC-001…006
       (package-gate proof of every assigned requirement's substrate).
 - [ ] T027 [executor: COORDINATOR] Regenerate the coordinator test manifest
       (`node scripts/automation/bun-migration-manifest.mjs --out
-    evidence/bun-migration/bun-migration-manifest.json`) after all new test
+  evidence/bun-migration/bun-migration-manifest.json`) after all new test
       files exist so `pnpm test`/`test:all` collect and classify them
       (PGlite-backed suites → DATABASE_PGLITE; OOM-safe per the test runtime
       contract). Mechanical bookkeeping (ADR-0020: coordinator-owned,

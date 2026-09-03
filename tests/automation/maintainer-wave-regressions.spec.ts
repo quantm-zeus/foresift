@@ -36,14 +36,14 @@ const PREFLIGHT = join(
   'launch-preflight.mjs',
 );
 
-function scratchRepo() {
+function scratchRepo(): string {
   const root = mkdtempSync(join(tmpdir(), 'maintainer-wave-fx-'));
   mkdirSync(join(root, 'specs', 'pkg-t'), { recursive: true });
   mkdirSync(join(root, 'specs', 'implementation'), { recursive: true });
   return root;
 }
 
-function writeTasks(root, body) {
+function writeTasks(root: string, body: string) {
   writeFileSync(join(root, 'specs', 'pkg-t', 'tasks.md'), body);
   writeFileSync(
     join(root, 'specs', 'implementation', 'current-milestone.json'),
@@ -79,14 +79,22 @@ function writeTasks(root, body) {
   );
 }
 
-function buildGraph(root, profile = 'HYBRID_AGY') {
+function buildGraph(root: string, profile = 'HYBRID_AGY') {
   const r = spawnSync(
     process.execPath,
     [GRAPH, '--package', 'pkg-t', '--root', root, '--execution-profile', profile],
     { encoding: 'utf8' },
   );
-  if (r.status !== 0) throw new Error(r.stderr.slice(0, 300));
-  return JSON.parse(r.stdout);
+  if (r.status !== 0) throw new Error((r.stderr ?? '').slice(0, 300));
+  return JSON.parse(r.stdout) as {
+    testLanes: Array<{
+      id: string;
+      units: string[];
+      role: string;
+      engine: string;
+      allowedWritePaths: string[];
+    }>;
+  };
 }
 
 const TWO_DISJOINT_TEST_UNITS = [

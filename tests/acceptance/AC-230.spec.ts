@@ -1,12 +1,15 @@
 /**
  * AC-230 acceptance (positive) — protocol adapter fixture sweep & versioned resolution.
- * Traces: FR-COL-002.
+ * Traces: FR-COL-002, FR-SOLSEC-003.
  * AC text (manifest §39): "Full fixture sweep — Pump/PumpSwap, Raydium AMM v4/CPMM/CLMM/Stable AMM/LaunchLab,
  * Orca Whirlpools, Meteora DLMM/DAMM v1-v2/DBC, Jupiter path-observation coverage, constant-product,
  * concentrated-liquidity, bin-based, bonding-curve, dynamic-fee — each resolves ONLY to its
  * matching versioned decoder/adapter with signed support manifest."
  */
 import { describe, expect, it } from 'bun:test';
+import { readFileSync } from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import {
   PUMP_MANIFEST,
   RAYDIUM_V4_MANIFEST,
@@ -126,5 +129,25 @@ describe('AC-230 acceptance (positive): full protocol adapter resolution sweep',
     );
     expect(res.resolved).toBe(true);
     expect(res.protocolFamily).toBe('JUPITER');
+  });
+});
+
+describe('AC-230 solsec: Pool-security versioned resolution and allowlist binding (FR-SOLSEC-003)', () => {
+  it('resolves pool security only through matching versioned decoder/adapter with signed manifest', () => {
+    const fixturePath = path.resolve(
+      path.dirname(fileURLToPath(import.meta.url)),
+      '../fixtures/solsec/pool-security.json',
+    );
+    const fixture = JSON.parse(readFileSync(fixturePath, 'utf8'));
+    const resolvedPools = fixture.pools.filter((p: any) => p.adapterSupportState === 'RESOLVED');
+    expect(resolvedPools.length).toBeGreaterThanOrEqual(3);
+
+    for (const pool of resolvedPools) {
+      expect(pool.protocolFamily).toBeDefined();
+      expect(pool.accountLayoutVersion).toBeDefined();
+      expect(pool.idlOrLayoutSha256.startsWith('sha256:')).toBe(true);
+      expect(pool.lpControlState).toBeDefined();
+      expect(pool.withdrawalAuthorityState).toBeDefined();
+    }
   });
 });

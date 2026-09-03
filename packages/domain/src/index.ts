@@ -22,3 +22,4 @@ export * from './conflicts.ts';
 export * from './trades.ts';
 export * from './timeline.ts';
 export * from './supply.ts';
+export * from './solsec.ts';

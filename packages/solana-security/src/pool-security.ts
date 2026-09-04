@@ -23,12 +23,7 @@ export interface PoolResolvedState {
   readonly poolOwner?: string;
   readonly lpControlState?: LpControlState;
   readonly positionControl?:
-    | 'BURNED'
-    | 'LOCKED'
-    | 'LOCKED_WITH_EVIDENCE'
-    | 'OPEN'
-    | 'OPEN_CONTROL'
-    | 'UNABLE_TO_VERIFY';
+    'BURNED' | 'LOCKED' | 'LOCKED_WITH_EVIDENCE' | 'OPEN' | 'OPEN_CONTROL' | 'UNABLE_TO_VERIFY';
   readonly lockEvidenceRef?: string;
   readonly withdrawalAuthorityAddress?: string | null;
   readonly withdrawalAuthorityObservedAbuse?: boolean;

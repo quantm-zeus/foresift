@@ -193,9 +193,7 @@ export function assessTokenControls(input: TokenAssessmentInput): TokenAssessmen
       input.mintAuthority,
       undefined,
       input.mintAuthority === undefined ? ['PARTIAL'] : ['VALID'],
-      mintState === TokenControlState.ADMINISTRATIVE_CONTROL
-        ? SecuritySeverity.MEDIUM
-        : null,
+      mintState === TokenControlState.ADMINISTRATIVE_CONTROL ? SecuritySeverity.MEDIUM : null,
     );
     addFinding(
       TokenControl.FREEZE,

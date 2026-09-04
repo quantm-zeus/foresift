@@ -1,10 +1,13 @@
 /**
  * AC-230 negative (failure) — protocol adapter fixture sweep.
- * Traces: FR-COL-002.
+ * Traces: FR-COL-002, FR-SOLSEC-003, AC-230, T024.
  * Tests rejection of unknown or mismatched designs; structural prohibition against
  * substituting generic constant-product formulas or inferring support from symbols.
  */
 import { describe, expect, it } from 'bun:test';
+import { readFileSync } from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { DEGRADED_MANIFEST, PUMP_MANIFEST } from '../fixtures/col/index.ts';
 
 function resolveAdapterStrict(params: {
@@ -45,5 +48,24 @@ describe('AC-230 negative: unknown/mismatched design returns UNSUPPORTED, never 
 
     expect(res.status).toBe('DEGRADED');
     expect(res.reason).toBe('IDL_OR_LAYOUT_MISMATCH');
+  });
+});
+
+describe('AC-230 solsec negative: Unknown/mismatched pool returns DEGRADED_UNSUPPORTED, never generic CPMM fallback', () => {
+  it('returns explicit DEGRADED_UNSUPPORTED on unsupported pool design without generic CPMM substitution', () => {
+    const fixturePath = path.resolve(
+      path.dirname(fileURLToPath(import.meta.url)),
+      '../fixtures/solsec/pool-security.json',
+    );
+    const fixture = JSON.parse(readFileSync(fixturePath, 'utf8'));
+    const degradedPool = fixture.pools.find(
+      (p: Record<string, unknown>) => p.adapterSupportState === 'DEGRADED_UNSUPPORTED',
+    );
+    expect(degradedPool).toBeDefined();
+    expect(degradedPool.adapterSupportState).toBe('DEGRADED_UNSUPPORTED');
+    expect(degradedPool.lpControlState).toBeNull();
+    expect(degradedPool.withdrawalAuthorityState).toBeNull();
+    expect(degradedPool.quoteParityState).toBeNull();
+    expect(degradedPool.qualityCodes).toContain('POOL_MATH_UNSUPPORTED');
   });
 });

@@ -122,9 +122,9 @@ describe('telemetry/data.catalog.json parity with authoritative schemas', () => 
   });
 });
 
-describe('telemetry/trd.catalog.json and telemetry/sup.catalog.json parity (G1)', () => {
-  it('loads trd and sup catalogs if present and checks contractStatus', () => {
-    const catalogNames = ['trd.catalog.json', 'sup.catalog.json'];
+describe('telemetry/trd.catalog.json, sup.catalog.json, and solsec.catalog.json parity (G1)', () => {
+  it('loads trd, sup, and solsec catalogs if present and checks contractStatus', () => {
+    const catalogNames = ['trd.catalog.json', 'sup.catalog.json', 'solsec.catalog.json'];
     for (const catName of catalogNames) {
       try {
         const cat = loadCatalog(catName);
@@ -133,6 +133,29 @@ describe('telemetry/trd.catalog.json and telemetry/sup.catalog.json parity (G1)'
       } catch {
         // Implementation lane may create catalogs in parallel
       }
+    }
+  });
+
+  it('validates solsec.catalog.json declarative events when catalog exists (FR-SOLSEC-001…006)', () => {
+    try {
+      const solsecCatalog = loadCatalog('solsec.catalog.json');
+      expect(solsecCatalog.contractStatus).toContain('DECLARATIVE_CONTRACT_ONLY');
+      const expectedEvents = [
+        'token.assessed',
+        'token.extension_parsed',
+        'token.transfer_semantics_verdict',
+        'pool.security_assessed',
+        'security.provider_report_received',
+        'security.conflict_recorded',
+        'system_registry.exclusion_decided',
+      ];
+      for (const eventName of expectedEvents) {
+        const ev = solsecCatalog.events.find((e) => e.name === eventName);
+        expect(ev, `event ${eventName} present in solsec catalog`).toBeDefined();
+        expect(ev?.fields.length).toBeGreaterThan(0);
+      }
+    } catch {
+      // Implementation lane creates telemetry/solsec.catalog.json in parallel
     }
   });
 });

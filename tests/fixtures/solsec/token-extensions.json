@@ -1,0 +1,221 @@
+{
+  "$comment": "Golden vectors for all §65.2 controls on synthetic SPL and Token-2022 programs (FR-SOLSEC-001, FR-SOLSEC-002, FR-SOLSEC-004, AC-130, T017).",
+  "programIds": {
+    "splToken": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+    "token2022": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb"
+  },
+  "vectors": [
+    {
+      "name": "active mint authority creates administrative control finding",
+      "programId": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+      "mint": "MintActiveMintAuth11111111111111111111111111",
+      "control": "MINT",
+      "authority": "7xKXtg2CW87d97TXJSDpbD5jBkheTqA83TZRuJosgAsU",
+      "expectedControlState": "ADMINISTRATIVE_CONTROL",
+      "expectedSeverity": "MEDIUM",
+      "supportState": "KNOWN_MODELED",
+      "qualityCodes": ["VALID"]
+    },
+    {
+      "name": "revoked mint authority yields revoked finding",
+      "programId": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+      "mint": "MintRevokedMintAuth111111111111111111111111",
+      "control": "MINT",
+      "authority": null,
+      "expectedControlState": "REVOKED_AUTHORITY",
+      "expectedSeverity": "NONE",
+      "supportState": "KNOWN_MODELED",
+      "qualityCodes": ["VALID"]
+    },
+    {
+      "name": "active freeze authority creates known risk finding",
+      "programId": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+      "mint": "MintActiveFreezeAuth111111111111111111111111",
+      "control": "FREEZE",
+      "authority": "7xKXtg2CW87d97TXJSDpbD5jBkheTqA83TZRuJosgAsU",
+      "expectedControlState": "KNOWN_RISK",
+      "expectedSeverity": "HIGH",
+      "supportState": "KNOWN_MODELED",
+      "qualityCodes": ["VALID"]
+    },
+    {
+      "name": "revoked freeze authority yields revoked finding",
+      "programId": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+      "mint": "MintRevokedFreezeAuth11111111111111111111111",
+      "control": "FREEZE",
+      "authority": null,
+      "expectedControlState": "REVOKED_AUTHORITY",
+      "expectedSeverity": "NONE",
+      "supportState": "KNOWN_MODELED",
+      "qualityCodes": ["VALID"]
+    },
+    {
+      "name": "active permanent delegate creates known risk finding",
+      "programId": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+      "mint": "MintActivePermDelegate1111111111111111111111",
+      "control": "PERMANENT_DELEGATE",
+      "authority": "7xKXtg2CW87d97TXJSDpbD5jBkheTqA83TZRuJosgAsU",
+      "expectedControlState": "KNOWN_RISK",
+      "expectedSeverity": "HIGH",
+      "supportState": "KNOWN_MODELED",
+      "qualityCodes": ["VALID"]
+    },
+    {
+      "name": "revoked permanent delegate yields revoked finding",
+      "programId": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+      "mint": "MintRevokedPermDelegate111111111111111111111",
+      "control": "PERMANENT_DELEGATE",
+      "authority": null,
+      "expectedControlState": "REVOKED_AUTHORITY",
+      "expectedSeverity": "NONE",
+      "supportState": "KNOWN_MODELED",
+      "qualityCodes": ["VALID"]
+    },
+    {
+      "name": "transfer fee configured with withheld authority creates administrative finding",
+      "programId": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+      "mint": "MintTransferFeeConfig11111111111111111111111",
+      "control": "TRANSFER_FEE",
+      "authority": "7xKXtg2CW87d97TXJSDpbD5jBkheTqA83TZRuJosgAsU",
+      "feeBasisPoints": 250,
+      "maxFee": "5000000",
+      "expectedControlState": "ADMINISTRATIVE_CONTROL",
+      "expectedSeverity": "MEDIUM",
+      "supportState": "KNOWN_MODELED",
+      "qualityCodes": ["VALID"]
+    },
+    {
+      "name": "zero transfer fee yields neutral configuration finding",
+      "programId": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+      "mint": "MintTransferFeeZero1111111111111111111111111",
+      "control": "TRANSFER_FEE",
+      "authority": null,
+      "feeBasisPoints": 0,
+      "maxFee": "0",
+      "expectedControlState": "NEUTRAL_CONFIGURATION",
+      "expectedSeverity": "NONE",
+      "supportState": "KNOWN_MODELED",
+      "qualityCodes": ["VALID"]
+    },
+    {
+      "name": "active transfer hook blocking exit creates critical risk finding",
+      "programId": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+      "mint": "MintTransferHookBlocking11111111111111111111",
+      "control": "TRANSFER_HOOK",
+      "hookProgramId": "HookBlockingExit111111111111111111111111111",
+      "expectedControlState": "KNOWN_RISK",
+      "expectedSeverity": "CRITICAL",
+      "supportState": "KNOWN_MODELED",
+      "qualityCodes": ["VALID"]
+    },
+    {
+      "name": "revoked transfer hook yields neutral finding",
+      "programId": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+      "mint": "MintTransferHookNone111111111111111111111111",
+      "control": "TRANSFER_HOOK",
+      "hookProgramId": null,
+      "expectedControlState": "NEUTRAL_CONFIGURATION",
+      "expectedSeverity": "NONE",
+      "supportState": "KNOWN_MODELED",
+      "qualityCodes": ["VALID"]
+    },
+    {
+      "name": "active close authority creates administrative finding",
+      "programId": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+      "mint": "MintActiveCloseAuth1111111111111111111111111",
+      "control": "CLOSE",
+      "authority": "7xKXtg2CW87d97TXJSDpbD5jBkheTqA83TZRuJosgAsU",
+      "expectedControlState": "ADMINISTRATIVE_CONTROL",
+      "expectedSeverity": "MEDIUM",
+      "supportState": "KNOWN_MODELED",
+      "qualityCodes": ["VALID"]
+    },
+    {
+      "name": "revoked close authority yields revoked finding",
+      "programId": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+      "mint": "MintRevokedCloseAuth111111111111111111111111",
+      "control": "CLOSE",
+      "authority": null,
+      "expectedControlState": "REVOKED_AUTHORITY",
+      "expectedSeverity": "NONE",
+      "supportState": "KNOWN_MODELED",
+      "qualityCodes": ["VALID"]
+    },
+    {
+      "name": "mutable metadata update authority creates administrative finding",
+      "programId": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+      "mint": "MintMutableMetadata1111111111111111111111111",
+      "control": "METADATA_UPDATE",
+      "authority": "7xKXtg2CW87d97TXJSDpbD5jBkheTqA83TZRuJosgAsU",
+      "expectedControlState": "ADMINISTRATIVE_CONTROL",
+      "expectedSeverity": "LOW",
+      "supportState": "KNOWN_MODELED",
+      "qualityCodes": ["VALID"]
+    },
+    {
+      "name": "immutable metadata yields revoked finding",
+      "programId": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+      "mint": "MintImmutableMetadata11111111111111111111111",
+      "control": "METADATA_UPDATE",
+      "authority": null,
+      "expectedControlState": "REVOKED_AUTHORITY",
+      "expectedSeverity": "NONE",
+      "supportState": "KNOWN_MODELED",
+      "qualityCodes": ["VALID"]
+    },
+    {
+      "name": "frozen default account state creates known risk finding",
+      "programId": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+      "mint": "MintDefaultFrozenState1111111111111111111111",
+      "control": "DEFAULT_STATE",
+      "defaultState": "Frozen",
+      "expectedControlState": "KNOWN_RISK",
+      "expectedSeverity": "HIGH",
+      "supportState": "KNOWN_MODELED",
+      "qualityCodes": ["VALID"]
+    },
+    {
+      "name": "initialized default account state yields neutral configuration",
+      "programId": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+      "mint": "MintDefaultInitState111111111111111111111111",
+      "control": "DEFAULT_STATE",
+      "defaultState": "Initialized",
+      "expectedControlState": "NEUTRAL_CONFIGURATION",
+      "expectedSeverity": "NONE",
+      "supportState": "KNOWN_MODELED",
+      "qualityCodes": ["VALID"]
+    },
+    {
+      "name": "non-transferable extension creates critical known risk finding",
+      "programId": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+      "mint": "MintNonTransferable1111111111111111111111111",
+      "control": "NON_TRANSFERABLE",
+      "expectedControlState": "KNOWN_RISK",
+      "expectedSeverity": "CRITICAL",
+      "supportState": "KNOWN_MODELED",
+      "qualityCodes": ["VALID"]
+    },
+    {
+      "name": "confidential transfer extension yields neutral configuration finding",
+      "programId": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+      "mint": "MintConfidentialTransfer11111111111111111111",
+      "control": "CONFIDENTIAL_TRANSFER",
+      "authority": "7xKXtg2CW87d97TXJSDpbD5jBkheTqA83TZRuJosgAsU",
+      "expectedControlState": "NEUTRAL_CONFIGURATION",
+      "expectedSeverity": "LOW",
+      "supportState": "KNOWN_MODELED",
+      "qualityCodes": ["VALID"]
+    },
+    {
+      "name": "unknown extension yields UNKNOWN_EXTENSION with UNKNOWN_REQUIRED support",
+      "programId": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+      "mint": "MintUnknownExtension111111111111111111111111",
+      "control": "UNKNOWN_EXTENSION",
+      "rawExtensionType": 9999,
+      "expectedControlState": "UNABLE_TO_VERIFY",
+      "expectedSeverity": "HIGH",
+      "supportState": "UNKNOWN_REQUIRED",
+      "qualityCodes": ["TOKEN_EXTENSION_UNKNOWN"]
+    }
+  ]
+}

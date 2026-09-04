@@ -1,0 +1,98 @@
+{
+  "$comment": "Resolved pool and unsupported design security vectors (FR-SOLSEC-003, AC-130, AC-230, T018).",
+  "pools": [
+    {
+      "name": "resolved pool with LP burned and revoked withdrawal authority",
+      "poolId": "solana:5eykt4UsFv8P8NJdTREpY1vzqKqZKvdp/pool/PoolBurnedLpRevokedAuth111111111111111111",
+      "protocolFamily": "RAYDIUM_V4",
+      "accountLayoutVersion": "1.0.0",
+      "idlOrLayoutSha256": "sha256:raydium_v4_layout_hash",
+      "adapterSupportState": "RESOLVED",
+      "lpControlState": "BURNED",
+      "lpBurnPercentage": 100,
+      "withdrawalAuthorityState": "REVOKED",
+      "withdrawalAuthority": null,
+      "migrationLineage": {
+        "sourcePoolId": null,
+        "migrationEdgeType": "NONE"
+      },
+      "quoteParityState": "PASS",
+      "quoteParityDeltaBps": 12,
+      "liquidityConcentration": 0.05,
+      "liquidityRemovalRisk": "LOW",
+      "largeSellImpactBps": 50,
+      "expectedSeverity": "NONE",
+      "qualityCodes": ["VALID"]
+    },
+    {
+      "name": "resolved pool with LP locked with verifiable timelock evidence",
+      "poolId": "solana:5eykt4UsFv8P8NJdTREpY1vzqKqZKvdp/pool/PoolLockedLpPresentAuth11111111111111111",
+      "protocolFamily": "ORCA_WHIRLPOOL",
+      "accountLayoutVersion": "1.0.0",
+      "idlOrLayoutSha256": "sha256:orca_whirlpools_layout_hash",
+      "adapterSupportState": "RESOLVED",
+      "lpControlState": "LOCKED",
+      "lpLockEvidence": {
+        "lockerAddress": "StreamflowLocker11111111111111111111111111111",
+        "unlockAt": "2028-01-01T00:00:00Z",
+        "lockedPercentage": 99.5
+      },
+      "withdrawalAuthorityState": "PRESENT",
+      "withdrawalAuthority": "7xKXtg2CW87d97TXJSDpbD5jBkheTqA83TZRuJosgAsU",
+      "migrationLineage": {
+        "sourcePoolId": "solana:5eykt4UsFv8P8NJdTREpY1vzqKqZKvdp/pool/PumpBondingCurveOrigin1111111111111",
+        "migrationEdgeType": "PUMP_TO_RAYDIUM"
+      },
+      "quoteParityState": "PASS",
+      "quoteParityDeltaBps": 25,
+      "liquidityConcentration": 0.45,
+      "liquidityRemovalRisk": "MEDIUM",
+      "largeSellImpactBps": 250,
+      "expectedSeverity": "MEDIUM",
+      "qualityCodes": ["VALID"]
+    },
+    {
+      "name": "resolved pool with open LP and withdrawal authority with observed abuse",
+      "poolId": "solana:5eykt4UsFv8P8NJdTREpY1vzqKqZKvdp/pool/PoolOpenLpAbusedAuth1111111111111111111",
+      "protocolFamily": "METEORA_DLMM",
+      "accountLayoutVersion": "1.0.0",
+      "idlOrLayoutSha256": "sha256:meteora_dlmm_layout_hash",
+      "adapterSupportState": "RESOLVED",
+      "lpControlState": "OPEN",
+      "lpBurnPercentage": 0,
+      "withdrawalAuthorityState": "PRESENT_WITH_OBSERVED_ABUSE",
+      "withdrawalAuthority": "MaliciousDeployer111111111111111111111111111",
+      "migrationLineage": {
+        "sourcePoolId": null,
+        "migrationEdgeType": "NONE"
+      },
+      "quoteParityState": "FAIL",
+      "quoteParityDeltaBps": 1200,
+      "liquidityConcentration": 0.95,
+      "liquidityRemovalRisk": "CRITICAL",
+      "largeSellImpactBps": 4500,
+      "expectedSeverity": "CRITICAL",
+      "qualityCodes": ["VALID"]
+    },
+    {
+      "name": "unsupported pool design returns DEGRADED_UNSUPPORTED with NULL resolved fields",
+      "poolId": "solana:5eykt4UsFv8P8NJdTREpY1vzqKqZKvdp/pool/PoolUnsupportedDesign1111111111111111",
+      "protocolFamily": "UNKNOWN_CUSTOM_AMM",
+      "accountLayoutVersion": "9.9.9",
+      "idlOrLayoutSha256": "sha256:unknown_experimental_layout",
+      "adapterSupportState": "DEGRADED_UNSUPPORTED",
+      "lpControlState": null,
+      "lpBurnPercentage": null,
+      "withdrawalAuthorityState": null,
+      "withdrawalAuthority": null,
+      "migrationLineage": null,
+      "quoteParityState": null,
+      "quoteParityDeltaBps": null,
+      "liquidityConcentration": null,
+      "liquidityRemovalRisk": "UNKNOWN",
+      "largeSellImpactBps": null,
+      "expectedSeverity": "HIGH",
+      "qualityCodes": ["POOL_MATH_UNSUPPORTED", "UNSUPPORTED_PROGRAM_VERSION"]
+    }
+  ]
+}

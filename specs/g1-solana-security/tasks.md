@@ -17,7 +17,7 @@ extended by this package even though they sit outside the listed writeScopes.
 
 ## Phase 1 — Foundations: domain vocabularies and shared schemas (blocks later phases)
 
-- [ ] T001 Create `packages/domain/src/solsec.ts`: `TokenControl` (MINT, FREEZE,
+- [x] T001 Create `packages/domain/src/solsec.ts`: `TokenControl` (MINT, FREEZE,
       PERMANENT_DELEGATE, TRANSFER_FEE, TRANSFER_HOOK, CLOSE, METADATA_UPDATE,
       DEFAULT_STATE, NON_TRANSFERABLE, CONFIDENTIAL_TRANSFER, UNKNOWN_EXTENSION —
       the §65.2 control list), `TokenControlState` (KNOWN_RISK,
@@ -39,9 +39,9 @@ extended by this package even though they sit outside the listed writeScopes.
       the Appendix Q.2 accepted-role + minimum-confidence floor. Add
       colocated `packages/domain/test/` fail-closed vocabulary tests. Traces:
       FR-SOLSEC-001, FR-SOLSEC-002, FR-SOLSEC-003, FR-SOLSEC-004, FR-SOLSEC-006.
-- [ ] T002 Extend `packages/domain/src/index.ts` exports for the new solsec
+- [x] T002 Extend `packages/domain/src/index.ts` exports for the new solsec
       module. Traces: FR-SOLSEC-001…006.
-- [ ] T003 Create `packages/shared-schemas/src/solsec.ts`: Zod schemas for
+- [x] T003 Create `packages/shared-schemas/src/solsec.ts`: Zod schemas for
       `TokenProgramAssessment`, `TokenControlFinding`, `TokenExtensionSupport`,
       `PoolSecurityAssessment`, `SecurityProviderReport`, `SecurityConflict`,
       `SystemAddressRegistryEntry`, `SystemAddressExclusionApplied` — importing
@@ -55,7 +55,7 @@ extended by this package even though they sit outside the listed writeScopes.
 
 ## Phase 2 — Persistence: migration family + migrator extension (blocks repos)
 
-- [ ] T004 Create `migrations/g1_solsec_0001_token_assessments.sql`:
+- [x] T004 Create `migrations/g1_solsec_0001_token_assessments.sql`:
       `token_program_assessments`, `token_control_findings` (UNIQUE per
       assessment+control; severity nullable except where control_state
       requires it; extension data as keyed hash), `token_extension_support`
@@ -64,7 +64,7 @@ extended by this package even though they sit outside the listed writeScopes.
       rows; quality_codes constrained to the §13.9 vocabulary (G1 TRD
       precedent CHECK form). Traces: FR-SOLSEC-001, FR-SOLSEC-002,
       FR-SOLSEC-004.
-- [ ] T005 Create `migrations/g1_solsec_0002_pool_security.sql`:
+- [x] T005 Create `migrations/g1_solsec_0002_pool_security.sql`:
       `pool_security_assessments` with `adapter_support_state`
       (RESOLVED/DEGRADED_UNSUPPORTED/UNABLE_TO_VERIFY), LP-control,
       withdrawal-authority, liquidity-removal, quote-parity, and
@@ -73,14 +73,14 @@ extended by this package even though they sit outside the listed writeScopes.
       row structurally cannot carry resolved-state fields (plan ADR-5,
       AC-230 law); availability-order CHECK; append-only trigger. Traces:
       FR-SOLSEC-003.
-- [ ] T006 Create `migrations/g1_solsec_0003_provider_evidence.sql`:
+- [x] T006 Create `migrations/g1_solsec_0003_provider_evidence.sql`:
       `security_provider_reports` (source FK to source_identities, verdict
       vocabulary, raw_payload_ref — never secret material) and
       `security_conflicts` (conflict_class CHECK including
       PROVIDER_OPTIMISM_OVERRIDDEN; deterministic finding ids required
       non-empty; resolution always names the deterministic side); append-only
       triggers. Traces: FR-SOLSEC-005.
-- [ ] T007 Create `migrations/g1_solsec_0004_system_addresses.sql`:
+- [x] T007 Create `migrations/g1_solsec_0004_system_addresses.sql`:
       `system_address_registry` (role CHECK per Appendix Q.2, valid_from/until,
       confidence, review_state, registry_version, UNIQUE per
       chain+address+version+valid_from) with the
@@ -89,7 +89,7 @@ extended by this package even though they sit outside the listed writeScopes.
       `system_address_exclusions_applied` audit rows (excluded boolean,
       raw_flow_ref so raw flows remain auditable); append-only trigger on the
       registry. Traces: FR-SOLSEC-006.
-- [ ] T008 Extend `packages/persistence/src/migrator.ts`
+- [x] T008 Extend `packages/persistence/src/migrator.ts`
       MIGRATION_FILE_PATTERN with the `solsec` family AND extend the central
       expected-script registry `packages/persistence/test/migrator.spec.ts`
       with `g1_solsec_0001_token_assessments`,
@@ -101,12 +101,12 @@ extended by this package even though they sit outside the listed writeScopes.
 
 ## Phase 3 — Core analyzers: the solana-security package (blocks AC suites)
 
-- [ ] T009 Scaffold `packages/solana-security` (package.json
+- [x] T009 Scaffold `packages/solana-security` (package.json
       `@foresift/solana-security` with workspace `*` deps on
       domain/persistence/shared-schemas, `bun test` script, tsconfig extending
       tsconfig.base.json, no per-package runner config — G0/G1 scaffold
       pattern). Traces: FR-SOLSEC-001…006.
-- [ ] T010 Implement `src/token-assessment.ts`: deterministic
+- [x] T010 Implement `src/token-assessment.ts`: deterministic
       SPL/Token-2022 program, authority, and extension analysis keyed by
       program id + program/layout version (FR-SOLSEC-001) — parse the §65.2
       control list (mint/freeze authorities, permanent delegate, transfer-fee
@@ -122,7 +122,7 @@ extended by this package even though they sit outside the listed writeScopes.
       Add colocated tests with golden vectors (fail-closed unknown extension,
       revoked vs active authority distinction, point-in-time availability).
       Traces: FR-SOLSEC-001, FR-SOLSEC-002, FR-SOLSEC-004, AC-130.
-- [ ] T011 Implement `src/transfer-semantics.ts`: the versioned support
+- [x] T011 Implement `src/transfer-semantics.ts`: the versioned support
       verdict function over (program, program version, extension set,
       verdict-policy version) emitting `token_extension_support` rows
       (KNOWN_MODELED / KNOWN_UNMODELED / UNKNOWN_REQUIRED / NOT_PRESENT) and
@@ -132,7 +132,7 @@ extended by this package even though they sit outside the listed writeScopes.
       zero cost never assumed). Colocated tests: full truth table,
       fail-closed on unknown inputs, policy-version row separation (no
       historical rewrite). Traces: FR-SOLSEC-004, AC-130.
-- [ ] T012 Implement `src/pool-security.ts`: pool/LP security assessment
+- [x] T012 Implement `src/pool-security.ts`: pool/LP security assessment
       (§65.3) resolving the pool ONLY through the proven decoder-registry
       resolution surface (family + layout version + signed manifest — the
       `@foresift/program-decoders` public API is consumed read-only; no write
@@ -146,7 +146,7 @@ extended by this package even though they sit outside the listed writeScopes.
       (`POOL_MATH_UNSUPPORTED`/`UNSUPPORTED_PROGRAM_VERSION`). Colocated
       tests including the unsupported-design case and state-completeness
       blocking. Traces: FR-SOLSEC-003, FR-SOLSEC-001, AC-130, AC-230.
-- [ ] T013 Implement `src/provider-evidence.ts`: security-provider report
+- [x] T013 Implement `src/provider-evidence.ts`: security-provider report
       persistence (§65.7 — one independent evidence group; verdict
       SAFE/RISK_DETECTED/UNABLE_TO_VERIFY; raw payload stored as evidence
       reference) and the comparison gate `resolveSecurityConflict(...)`:
@@ -157,7 +157,7 @@ extended by this package even though they sit outside the listed writeScopes.
       tests: override refused, conflict recorded, provider risk without
       corroboration stored as UNRESOLVED-class evidence (never promoted to
       deterministic severity). Traces: FR-SOLSEC-005, AC-131.
-- [ ] T014 Implement `src/severity.ts`: the Appendix Q.1-derived severity
+- [x] T014 Implement `src/severity.ts`: the Appendix Q.1-derived severity
       mapping as a versioned pure policy over deterministic findings (known
       non-transferability/transfer hook blocking modeled exit, malicious
       program owner, active authority with observed abuse, unusable/
@@ -169,7 +169,7 @@ extended by this package even though they sit outside the listed writeScopes.
       revocation ability and context are evidence inputs. Colocated tests:
       deterministic, versioned, pure. Traces: FR-SOLSEC-001, FR-SOLSEC-002,
       FR-SOLSEC-003, AC-131.
-- [ ] T015 Implement `src/system-registry.ts`: registry persistence +
+- [x] T015 Implement `src/system-registry.ts`: registry persistence +
       point-in-time exclusion queries (validity interval contains T) and
       `decideExclusion(...)` producing `system_address_exclusions_applied`
       audit rows for BOTH exclusions and refusals, with raw flow references
@@ -182,7 +182,7 @@ extended by this package even though they sit outside the listed writeScopes.
       revision-forward behavior (a registry revision never rewrites
       historical attribution inputs — §37.3 chaos case). Traces:
       FR-SOLSEC-006, AC-132.
-- [ ] T016 Implement `src/index.ts` exports; run the prohibited-capability
+- [x] T016 Implement `src/index.ts` exports; run the prohibited-capability
       scanner (`node scripts/scan-prohibited-capabilities/cli.mjs`) to
       confirm the read-only boundary holds across the new package (no
       transaction construction, signing, key material, or submission
@@ -190,27 +190,27 @@ extended by this package even though they sit outside the listed writeScopes.
 
 ## Phase 4 — Fixtures and acceptance/negative suites (blocks gates)
 
-- [ ] T017 Author `tests/fixtures/solsec/token-extensions.json`: golden
+- [x] T017 Author `tests/fixtures/solsec/token-extensions.json`: golden
       vectors for all §65.2 controls on synthetic SPL and Token-2022
       programs — active/revoked authority pairs per control, unknown
       extension case, expected control_state + severity per vector.
       Traces: FR-SOLSEC-001, FR-SOLSEC-002, AC-130.
-- [ ] T018 Author `tests/fixtures/solsec/pool-security.json`: resolved-pool
+- [x] T018 Author `tests/fixtures/solsec/pool-security.json`: resolved-pool
       vectors (LP burned/locked/open, withdrawal authority states, migration
       lineage, quote parity pass/fail, concentration, removals, large-sell)
       plus the unsupported-design vector expecting DEGRADED_UNSUPPORTED with
       NULL resolved fields. Traces: FR-SOLSEC-003, AC-130, AC-230.
-- [ ] T019 Author `tests/fixtures/solsec/provider-override.json`:
+- [x] T019 Author `tests/fixtures/solsec/provider-override.json`:
       deterministic-CRITICAL × provider-SAFE override vectors (expected
       conflict class, resolution side, preserved provider evidence),
       provider-risk-uncorroborated vectors, and missing-provider vectors
       (severity unchanged). Traces: FR-SOLSEC-005, AC-131.
-- [ ] T020 Author `tests/fixtures/solsec/system-registry.json`: router/
+- [x] T020 Author `tests/fixtures/solsec/system-registry.json`: router/
       exchange/launchpad/fee-collector/program exclusion vectors at accepted
       role+confidence; low-confidence, pending-review, rejected, and
       unknown-role refusal vectors; a revision-forward vector (historical
       attribution inputs unchanged). Traces: FR-SOLSEC-006, AC-132.
-- [ ] T021 Author `tests/acceptance/AC-130.spec.ts` +
+- [x] T021 Author `tests/acceptance/AC-130.spec.ts` +
       `tests/negative/AC-130.negative.spec.ts`: positive — SPL/Token-2022
       fixtures correctly detect supported authorities/extensions with
       versioned evidence rows and pool fixture resolves LP/withdrawal/
@@ -220,7 +220,7 @@ extended by this package even though they sit outside the listed writeScopes.
       unsupported pool design refuses resolved fields, fabricated/malformed
       control rows are refused by schema. Traces: FR-SOLSEC-001, FR-SOLSEC-002,
       FR-SOLSEC-003, FR-SOLSEC-004, AC-130.
-- [ ] T022 Author `tests/acceptance/AC-131.spec.ts` +
+- [x] T022 Author `tests/acceptance/AC-131.spec.ts` +
       `tests/negative/AC-131.negative.spec.ts`: positive — deterministic
       critical authority/transfer risk stands when external providers report
       safe/no-risk, conflict recorded and exposed, provider report preserved
@@ -228,7 +228,7 @@ extended by this package even though they sit outside the listed writeScopes.
       downgrades or clears deterministic severity is structurally refused;
       missing provider data cannot reduce risk as if evidence were negative.
       Traces: FR-SOLSEC-005, AC-131.
-- [ ] T023 Author `tests/acceptance/AC-132.spec.ts` +
+- [x] T023 Author `tests/acceptance/AC-132.spec.ts` +
       `tests/negative/AC-132.negative.spec.ts`: positive — known router,
       exchange, launchpad, fee collector, and program accounts do not create
       false common-funder/insider edges in actor attribution outputs (fed
@@ -236,7 +236,7 @@ extended by this package even though they sit outside the listed writeScopes.
       negative — sub-floor registry rows (low confidence, pending review,
       rejected, unknown role) are not excludable and instead degrade quality
       codes. Traces: FR-SOLSEC-006, AC-132.
-- [ ] T024 Extend `tests/acceptance/AC-230.spec.ts` +
+- [x] T024 Extend `tests/acceptance/AC-230.spec.ts` +
       `tests/negative/AC-230.negative.spec.ts` ADDITIVELY with a
       solsec-scoped describe block: pool-security assessment resolves only
       through the matching versioned decoder/adapter + signed manifest;
@@ -246,7 +246,7 @@ extended by this package even though they sit outside the listed writeScopes.
 
 ## Phase 5 — Telemetry contract, manifest regen, and gates
 
-- [ ] T025 Create `telemetry/solsec.catalog.json` (DECLARATIVE_CONTRACT_ONLY
+- [x] T025 Create `telemetry/solsec.catalog.json` (DECLARATIVE_CONTRACT_ONLY
       header, fields mirroring `packages/shared-schemas/src/solsec.ts`
       exactly, requirementRefs per event): `token.assessed`,
       `token.extension_parsed`, `token.transfer_semantics_verdict`,
@@ -257,7 +257,7 @@ extended by this package even though they sit outside the listed writeScopes.
       pinning the new catalog to the authoritative schemas. Traces:
       FR-SOLSEC-001, FR-SOLSEC-002, FR-SOLSEC-003, FR-SOLSEC-005,
       FR-SOLSEC-006.
-- [ ] T026 [executor: COORDINATOR] [evidence: VERIFICATION_ONLY] Run the
+- [x] T026 [executor: COORDINATOR] [evidence: VERIFICATION_ONLY] Run the
       milestone verification command on the canonical tree: `test -d
 packages/solana-security && pnpm --filter @foresift/solana-security
 test`; plus the extended central suites (`pnpm --filter
@@ -272,7 +272,7 @@ evidence/bun-migration/bun-migration-manifest.json`) after all new test
       contract). Mechanical bookkeeping (ADR-0020: coordinator-owned,
       zero-AI). Traces: FR-SOLSEC-001…006 (verification substrate for every
       assigned requirement).
-- [ ] T028 [executor: COORDINATOR] [evidence: VERIFICATION_ONLY] Run the full
+- [x] T028 [executor: COORDINATOR] [evidence: VERIFICATION_ONLY] Run the full
       aggregate gate `pnpm verify` and the integrity gate `pnpm spec:verify`
       at the pushed HEAD; require green (the complete Bun suite runs ONLY
       through the coordinator — never a bare `bun test` over the tree). If

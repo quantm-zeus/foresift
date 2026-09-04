@@ -1,0 +1,104 @@
+{
+  "$comment": "Provider override, conflict recording, and preserved evidence vectors (FR-SOLSEC-005, AC-131, T019). External provider SAFE output cannot override deterministic risk.",
+  "cases": [
+    {
+      "name": "deterministic CRITICAL transfer-hook blocking exit with provider reporting SAFE",
+      "assetId": "solana:5eykt4UsFv8P8NJdTREpY1vzqKqZKvdp/mint/MintWithMaliciousHook11111111111111111",
+      "deterministicFinding": {
+        "control": "TRANSFER_HOOK",
+        "controlState": "KNOWN_RISK",
+        "severity": "CRITICAL",
+        "evidenceRef": "first-party-ast-transfer-hook-analysis"
+      },
+      "providerEvidence": [
+        {
+          "provider": "goplus",
+          "verdict": "SAFE",
+          "rawPayloadRef": "goplus-report-sha256:abc123safe",
+          "qualityCodes": ["VALID"]
+        }
+      ],
+      "expectedConflictClass": "PROVIDER_OPTIMISM_OVERRIDDEN",
+      "expectedResolutionSide": "DETERMINISTIC",
+      "effectiveSeverity": "CRITICAL",
+      "providerOptimismOverridden": true,
+      "providerEvidencePreserved": true
+    },
+    {
+      "name": "deterministic CRITICAL active freeze authority with multiple external providers reporting SAFE",
+      "assetId": "solana:5eykt4UsFv8P8NJdTREpY1vzqKqZKvdp/mint/MintActiveFreezeFakeSafe111111111111111",
+      "deterministicFinding": {
+        "control": "FREEZE",
+        "controlState": "KNOWN_RISK",
+        "severity": "HIGH",
+        "evidenceRef": "spl-mint-account-header-freeze-present"
+      },
+      "providerEvidence": [
+        {
+          "provider": "goplus",
+          "verdict": "SAFE",
+          "rawPayloadRef": "goplus-report-sha256:def456safe",
+          "qualityCodes": ["VALID"]
+        },
+        {
+          "provider": "gmgn",
+          "verdict": "SAFE",
+          "rawPayloadRef": "gmgn-report-sha256:789ghisafe",
+          "qualityCodes": ["VALID"]
+        }
+      ],
+      "expectedConflictClass": "PROVIDER_OPTIMISM_OVERRIDDEN",
+      "expectedResolutionSide": "DETERMINISTIC",
+      "effectiveSeverity": "HIGH",
+      "providerOptimismOverridden": true,
+      "providerEvidencePreserved": true
+    },
+    {
+      "name": "provider reports RISK_DETECTED without deterministic corroboration",
+      "assetId": "solana:5eykt4UsFv8P8NJdTREpY1vzqKqZKvdp/mint/MintCleanSplProviderRisk1111111111111111",
+      "deterministicFinding": {
+        "control": "MINT",
+        "controlState": "REVOKED_AUTHORITY",
+        "severity": "NONE",
+        "evidenceRef": "spl-mint-account-authorities-revoked"
+      },
+      "providerEvidence": [
+        {
+          "provider": "goplus",
+          "verdict": "RISK_DETECTED",
+          "reportedIssues": ["honeypot_risk_heuristic"],
+          "rawPayloadRef": "goplus-report-sha256:risk789",
+          "qualityCodes": ["VALID"]
+        }
+      ],
+      "expectedConflictClass": "UNRESOLVED_PROVIDER_RISK",
+      "expectedResolutionSide": "UNRESOLVED_INDEPENDENT_EVIDENCE",
+      "effectiveSeverity": "NONE",
+      "providerOptimismOverridden": false,
+      "providerEvidencePreserved": true
+    },
+    {
+      "name": "missing provider data preserves deterministic severity without reduction",
+      "assetId": "solana:5eykt4UsFv8P8NJdTREpY1vzqKqZKvdp/mint/MintAdminControlMissingProvider1111111",
+      "deterministicFinding": {
+        "control": "MINT",
+        "controlState": "ADMINISTRATIVE_CONTROL",
+        "severity": "MEDIUM",
+        "evidenceRef": "spl-mint-account-active-mint-auth"
+      },
+      "providerEvidence": [
+        {
+          "provider": "goplus",
+          "verdict": "UNABLE_TO_VERIFY",
+          "rawPayloadRef": "goplus-timeout-sha256:timeout000",
+          "qualityCodes": ["PROVIDER_DATA_MISSING"]
+        }
+      ],
+      "expectedConflictClass": "NO_CONFLICT",
+      "expectedResolutionSide": "DETERMINISTIC",
+      "effectiveSeverity": "MEDIUM",
+      "providerOptimismOverridden": false,
+      "providerEvidencePreserved": true
+    }
+  ]
+}

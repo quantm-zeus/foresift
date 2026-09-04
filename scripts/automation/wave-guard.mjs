@@ -16,6 +16,7 @@ import { readFileSync, writeFileSync, mkdirSync, existsSync, lstatSync } from 'n
 import { join } from 'node:path';
 import { repoRoot } from './schema.mjs';
 import { validateLaneOwnership } from './path-ownership.mjs';
+import { lockfileWorkspaceRegistrationOnly } from './wave-guard-lockfile.mjs';
 
 function fail(reason) {
   console.error(`wave-guard: ${reason}`);
@@ -121,11 +122,26 @@ const othersPredicted = new Set(
     .flatMap((s) => s.allowedWritePaths ?? []),
 );
 const exceptions = new Set(graph.scopeExceptions ?? []);
-const violations = changed.filter(
+let violations = changed.filter(
   (p) =>
     (!allowed.some((re) => re.test(p)) && !exceptions.has(p)) ||
     (othersPredicted.has(p) && !exceptions.has(p)),
 );
+// Narrow root-lockfile carve-out: only pure workspace-importer registrations
+// mirroring an existing package.json are plumbing, not authorship (see
+// wave-guard-lockfile.mjs). Applied AFTER the scope check so every other
+// classification (allowed paths, exceptions, cross-lane ownership) still runs.
+if (violations.includes('pnpm-lock.yaml')) {
+  const diffR = git(`diff ${baseSha}..${headSha} -- pnpm-lock.yaml`);
+  const registrationOnly =
+    diffR.ok && lockfileWorkspaceRegistrationOnly(diffR.out, shardMeta.worktree);
+  if (registrationOnly) {
+    violations = violations.filter((p) => p !== 'pnpm-lock.yaml');
+    console.error(
+      'wave-guard: pnpm-lock.yaml admitted as workspace-importer registration (root-lockfile carve-out)',
+    );
+  }
+}
 const ownership = shard.role
   ? validateLaneOwnership({ engine: shard.engine, role: shard.role, changedPaths: changed })
   : { ok: true, violations: [] };

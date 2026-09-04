@@ -1027,11 +1027,12 @@ describe('foresift-sharded-wave workflow contract', () => {
     );
     expect(guardTest?.[0]).toContain('trigger_rule: none_failed_min_one_success');
 
-    // Integrator depends on all serial + parallel + test guards (both AGY
-    // test lanes, Part E cap 2)
+    // Integrator depends on prep (the empty-wave min-one-success anchor,
+    // directive §8 — live run 2c1aa231) plus all serial + parallel + test
+    // guards (both AGY test lanes, Part E cap 2)
     const integrator = yaml.match(/- id: integrate-and-fast[\s\S]*?(?=\n  - id:)/);
     expect(integrator?.[0]).toContain(
-      'depends_on: [guard-serial-1, guard-serial-2, guard-serial-3, guard-shard-1, guard-shard-2, guard-test-author, guard-test-author-2]',
+      'depends_on: [prep, guard-serial-1, guard-serial-2, guard-serial-3, guard-shard-1, guard-shard-2, guard-test-author, guard-test-author-2]',
     );
   });
 

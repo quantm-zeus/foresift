@@ -150,6 +150,15 @@ export function runCodexWriter(input) {
     'tests. If a test conflicts with authoritative requirements, do not edit it;',
     'write TEST_DISPUTE evidence under the result artifact directory instead.',
     'Use non-interactive tools. Commit coherent production changes before exit.',
+    // Live run e32031f rider: dependency state is pre-installed. Package-manager
+    // invocations are workspace-registration authorship the write scopes never
+    // sanctioned (bun install created a root bun.lock + workspaces field in the
+    // claude lane core's run — guard-rejected). Never install, never lockfile.
+    'This repository uses pnpm (pnpm-workspace.yaml). Never run bun install,',
+    'npm install, or yarn; never create, modify, or commit any lockfile',
+    '(pnpm-lock.yaml, bun.lock, package-lock.json); never add a workspaces',
+    'field to any package.json. Dependencies are already installed — if a',
+    'build or test needs a missing dependency, report it as a blocker.',
   ].join('\n');
   const command = buildCodexExecArgs(route, { worktree: input.worktree });
   const started = Date.now();

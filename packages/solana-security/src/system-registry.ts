@@ -1,7 +1,4 @@
-import {
-  SystemAddressReviewState,
-  isExcludableSystemAddress,
-} from '@foresift/domain';
+import { SystemAddressReviewState, isExcludableSystemAddress } from '@foresift/domain';
 import { canonicalJson, sha256Text, type DatabaseEngine } from '@foresift/persistence';
 import {
   parseSolsecSchema,
@@ -222,7 +219,11 @@ export async function resolveRegistryEntryAt(
         AND valid_from <= $3 AND (valid_until IS NULL OR valid_until >= $3)
       ORDER BY valid_from DESC, registry_version DESC
       LIMIT 1`,
-    [query.chainId, query.address, new Date(requireTimestamp(query.queryAt, 'queryAt')).toISOString()],
+    [
+      query.chainId,
+      query.address,
+      new Date(requireTimestamp(query.queryAt, 'queryAt')).toISOString(),
+    ],
   );
   const row = rows.rows[0];
   if (row === undefined) return null;
@@ -288,7 +289,8 @@ export async function resolveAndRecordExclusion(
   },
 ): Promise<ExclusionResolution | null> {
   const entry =
-    input.entry ?? (await resolveRegistryEntryAt(engine, {
+    input.entry ??
+    (await resolveRegistryEntryAt(engine, {
       chainId: (input as { chainId?: string }).chainId ?? '',
       address: (input as { address?: string }).address ?? '',
       queryAt: input.queryAt,

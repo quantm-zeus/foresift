@@ -6,10 +6,7 @@ import {
   TokenControl,
   TokenControlState,
 } from '@foresift/domain';
-import type {
-  PoolSecurityAssessment,
-  TokenControlFinding,
-} from '@foresift/shared-schemas';
+import type { PoolSecurityAssessment, TokenControlFinding } from '@foresift/shared-schemas';
 
 /**
  * Appendix Q.1 severity baseline as a versioned pure policy over
@@ -132,10 +129,8 @@ export function computeFindingSeverity(
  * incomplete-coverage MEDIUM.
  */
 export function poolAssessmentSeverity(pool: PoolSecurityAssessment): SecuritySeverity {
-  if (pool.liquidityRemovalRisk === LiquidityRemovalRisk.OBSERVED)
-    return SecuritySeverity.CRITICAL;
-  if (pool.liquidityRemovalRisk === LiquidityRemovalRisk.POSSIBLE)
-    return SecuritySeverity.CRITICAL;
+  if (pool.liquidityRemovalRisk === LiquidityRemovalRisk.OBSERVED) return SecuritySeverity.CRITICAL;
+  if (pool.liquidityRemovalRisk === LiquidityRemovalRisk.POSSIBLE) return SecuritySeverity.CRITICAL;
   if (
     pool.liquidityRemovalRisk === LiquidityRemovalRisk.UNABLE_TO_VERIFY ||
     pool.adapterSupportState !== PoolSupportState.RESOLVED ||

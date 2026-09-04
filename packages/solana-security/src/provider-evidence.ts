@@ -84,7 +84,9 @@ export function resolveSecurityConflict(
       throw new RangeError('deterministic findings must share the resolution assessment');
     return parsed;
   });
-  const evaluatedFindingIds = [...new Set(parsedFindings.map((finding) => finding.findingId))].sort();
+  const evaluatedFindingIds = [
+    ...new Set(parsedFindings.map((finding) => finding.findingId)),
+  ].sort();
   let severity: SecuritySeverity = SecuritySeverity.NONE;
   for (const finding of parsedFindings) {
     if (finding.severity !== null && SEVERITY_RANK[finding.severity] > SEVERITY_RANK[severity])
@@ -132,11 +134,7 @@ export function resolveSecurityConflict(
       if (SEVERITY_RANK[severity] >= SEVERITY_RANK[SecuritySeverity.HIGH]) {
         providerOptimismOverridden = true;
         conflicts.push(
-          makeConflict(
-            report,
-            SecurityConflictClass.PROVIDER_OPTIMISM_OVERRIDDEN,
-            establishingIds,
-          ),
+          makeConflict(report, SecurityConflictClass.PROVIDER_OPTIMISM_OVERRIDDEN, establishingIds),
         );
       }
       continue;

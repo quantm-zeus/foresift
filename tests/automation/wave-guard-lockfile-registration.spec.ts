@@ -16,11 +16,8 @@ import { describe, test, expect, afterEach } from 'bun:test';
 import { spawnSync } from 'node:child_process';
 import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join, dirname } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { join } from 'node:path';
 import { lockfileWorkspaceRegistrationOnly } from '../../scripts/automation/wave-guard-lockfile.mjs';
-
-const here = dirname(fileURLToPath(import.meta.url));
 
 function makeGit(root: string) {
   return (cmd: string) => {
@@ -73,34 +70,38 @@ function fixture() {
 
 // The exact importer-block diff shape observed live (run 8f4aaa6d, commit
 // 96c6829 "chore(lockfile): record solana-security workspace importer links").
-function registrationDiff(overrides: {
-  importer?: string;
-  specifier?: string;
-  link?: string;
-  extra?: string;
-} = {}) {
+function registrationDiff(
+  overrides: {
+    importer?: string;
+    specifier?: string;
+    link?: string;
+    extra?: string;
+  } = {},
+) {
   const importer = overrides.importer ?? 'packages/solana-security';
   const spec = overrides.specifier ?? 'workspace:*';
   const link = overrides.link ?? 'link:../domain';
   const extra = overrides.extra ?? '';
-  return [
-    '@@ -392,6 +392,16 @@ importers:',
-    '+  packages/solana-security:',
-    '+    dependencies:',
-    "+      '@foresift/domain':",
-    '+        specifier: workspace:*',
-    '+        version: link:../domain',
-    "+      '@foresift/shared-schemas':",
-    `+        specifier: ${spec}`,
-    '+        version: link:../shared-schemas',
-    '+',
-    ...extra.split('\n').filter(Boolean),
-    '',
-  ]
-    .join('\n')
-    .replace('workspace:*', spec)
-    .replace('link:../domain', link)
-    .replace('packages/solana-security:', `${importer}:`) + '\n';
+  return (
+    [
+      '@@ -392,6 +392,16 @@ importers:',
+      '+  packages/solana-security:',
+      '+    dependencies:',
+      "+      '@foresift/domain':",
+      '+        specifier: workspace:*',
+      '+        version: link:../domain',
+      "+      '@foresift/shared-schemas':",
+      `+        specifier: ${spec}`,
+      '+        version: link:../shared-schemas',
+      '+',
+      ...extra.split('\n').filter(Boolean),
+      '',
+    ]
+      .join('\n')
+      .replace('workspace:*', spec)
+      .replace('link:../domain', link)
+      .replace('packages/solana-security:', `${importer}:`) + '\n'
+  );
 }
 
 describe('root-lockfile workspace-registration carve-out (run 8f4aaa6d regression)', () => {
@@ -147,11 +148,7 @@ describe('root-lockfile workspace-registration carve-out (run 8f4aaa6d regressio
   test('rejects non-workspace specifiers (dependency authorship)', () => {
     const fx = fixture();
     expect(
-      lockfileWorkspaceRegistrationOnly(
-        registrationDiff({ specifier: '^9.9.9' }),
-        fx.root,
-        fx.git,
-      ),
+      lockfileWorkspaceRegistrationOnly(registrationDiff({ specifier: '^9.9.9' }), fx.root, fx.git),
     ).toBe(false);
   });
 

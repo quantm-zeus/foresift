@@ -13,7 +13,10 @@ import {
   providerAdmissionView,
   resolvePoolStateDir,
 } from '../../scripts/automation/provider-pool.mjs';
-import { codexProviderEvent } from '../../scripts/automation/exec-codex-writer.mjs';
+import {
+  codexProviderEvent,
+  writerSummaryFor,
+} from '../../scripts/automation/exec-codex-writer.mjs';
 
 let stateDir: string;
 
@@ -115,6 +118,45 @@ describe('engine-specific attribution (H2 §5: Codex events stay on Codex)', () 
       const ev = codexProviderEvent(classification, '429 rate limit');
       expect(Object.keys(ev)).not.toContain('healthy');
     }
+  });
+});
+
+describe('writer final summary shapes (run be13c346 regression)', () => {
+  test('CODEX shape { ok, route, result } summarizes from route', () => {
+    const s = writerSummaryFor({
+      ok: true,
+      route: { lane: 'core', model: 'gpt-5.6-sol', reasoning: 'medium', serviceTier: 'standard' },
+      result: { headSha: 'a'.repeat(40) },
+    });
+    expect(s).toEqual({
+      ok: true,
+      lane: 'core',
+      model: 'gpt-5.6-sol',
+      reasoning: 'medium',
+      serviceTier: 'standard',
+      headSha: 'a'.repeat(40),
+    });
+  });
+
+  test('HANDOFF shape { ok, lane, result } does NOT crash reading .route', () => {
+    // Live be13c346: the codex→claude handoff lane SUCCEEDED (68 minutes,
+    // result.json nominating T013, two commits) and the CLI summary then
+    // threw "Cannot read properties of undefined (reading 'lane')" — the
+    // node failed AFTER the real work and the workflow retried a finished
+    // lane. The summary must tolerate the core's return shape.
+    const s = writerSummaryFor({
+      ok: true,
+      lane: 'core-batch-1',
+      result: { headSha: 'b'.repeat(40), engine: 'CLAUDE' },
+    });
+    expect(s).toEqual({
+      ok: true,
+      lane: 'core-batch-1',
+      model: 'CLAUDE',
+      reasoning: null,
+      serviceTier: null,
+      headSha: 'b'.repeat(40),
+    });
   });
 });
 

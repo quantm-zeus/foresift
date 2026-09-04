@@ -25,7 +25,9 @@ export interface TransferSemanticsInput {
   readonly assessmentId: string;
   readonly programId: string;
   readonly programVersion: string;
-  readonly extensions: readonly (string | { readonly type: string; readonly data?: unknown })[];
+  readonly extensions: readonly (
+    string | number | { readonly type: string | number; readonly data?: unknown }
+  )[];
   readonly verdictPolicyVersion: string;
   readonly observedAt: string;
   readonly availableAt: string;
@@ -47,6 +49,8 @@ const NAMES: Readonly<Record<string, string>> = {
   confidentialtransferfeeconfig: 'CONFIDENTIAL_TRANSFER',
   confidentialtransferfeeamount: 'CONFIDENTIAL_TRANSFER',
   confidentialmintburn: 'CONFIDENTIAL_TRANSFER',
+  transferfeeamount: 'TRANSFER_FEE',
+  transferhookaccount: 'TRANSFER_HOOK',
 };
 const normalize = (value: string): string | undefined =>
   NAMES[value.replaceAll(/[^a-zA-Z0-9]/g, '').toLowerCase()];
@@ -69,22 +73,30 @@ export function transferExtensionVerdict(params: {
   )
     return TransferSemanticsSupport.UNKNOWN_REQUIRED;
   const canonical = normalize(params.extension);
-  return canonical === undefined
-    ? TransferSemanticsSupport.UNKNOWN_REQUIRED
-    : (policy.extensionVerdicts[canonical] ?? TransferSemanticsSupport.UNKNOWN_REQUIRED);
+  if (canonical === undefined) return TransferSemanticsSupport.UNKNOWN_REQUIRED;
+  const verdict = policy.extensionVerdicts[canonical];
+  return verdict === TransferSemanticsSupport.KNOWN_MODELED ||
+    verdict === TransferSemanticsSupport.KNOWN_UNMODELED
+    ? verdict
+    : TransferSemanticsSupport.UNKNOWN_REQUIRED;
 }
 
 export function evaluateTransferSemantics(
   input: TransferSemanticsInput,
 ): readonly TokenExtensionSupport[] {
-  if (Date.parse(input.availableAt) < Date.parse(input.observedAt))
-    throw new Error('AVAILABLE_AT_PRECEDES_OBSERVED_AT');
+  const observedAt = Date.parse(input.observedAt);
+  const availableAt = Date.parse(input.availableAt);
+  if (!Number.isFinite(observedAt) || !Number.isFinite(availableAt))
+    throw new Error('INVALID_VERDICT_TIMESTAMP');
+  if (availableAt < observedAt) throw new Error('AVAILABLE_AT_PRECEDES_OBSERVED_AT');
   const policies = input.policies ?? [DEFAULT_TRANSFER_SEMANTICS_POLICY];
+  if (new Set(policies.map(({ version }) => version)).size !== policies.length)
+    throw new Error('DUPLICATE_VERDICT_POLICY_VERSION');
   const policy = policies.find((item) => item.version === input.verdictPolicyVersion);
   const raw = input.extensions.map((extension) =>
-    typeof extension === 'string'
-      ? { type: extension, data: extension }
-      : { type: extension.type, data: extension.data ?? extension },
+    typeof extension === 'object'
+      ? { type: String(extension.type), data: extension.data ?? extension }
+      : { type: String(extension), data: extension },
   );
   const names =
     raw.length === 0 && policy === undefined
@@ -165,8 +177,15 @@ export function blocksCompleteExecutionModeling(verdict: TransferVerdictInput): 
   const value =
     typeof verdict === 'string'
       ? verdict
-      : (verdict as Pick<TokenExtensionSupport, 'support'>).support;
-  return value === TransferSemanticsSupport.UNKNOWN_REQUIRED;
+      : verdict !== null && typeof verdict === 'object' && 'support' in verdict
+        ? verdict.support
+        : undefined;
+  if (value === TransferSemanticsSupport.UNKNOWN_REQUIRED) return true;
+  return (
+    value !== TransferSemanticsSupport.KNOWN_MODELED &&
+    value !== TransferSemanticsSupport.KNOWN_UNMODELED &&
+    value !== TransferSemanticsSupport.NOT_PRESENT
+  );
 }
 export const buildTokenExtensionSupportRows = evaluateTransferSemantics;
 export const getTransferExtensionVerdict = transferExtensionVerdict;

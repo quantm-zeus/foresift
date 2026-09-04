@@ -117,7 +117,7 @@
       "verificationCommands": [
         "test -d packages/solana-security && pnpm --filter @foresift/solana-security test"
       ],
-      "status": "RUNNING"
+      "status": "PROVEN"
     },
     {
       "id": "g1-discovery-coverage",

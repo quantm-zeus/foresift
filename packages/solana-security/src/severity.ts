@@ -110,7 +110,7 @@ export function computeFindingSeverity(
   finding: TokenControlFinding,
   context?: SeverityEvidenceContext,
 ): SecuritySeverity {
-  let severity = baseFindingSeverity(finding.control, finding.controlState);
+  let severity: SecuritySeverity = baseFindingSeverity(finding.control, finding.controlState);
   if (context === undefined) return severity;
   const active =
     finding.controlState === TokenControlState.ADMINISTRATIVE_CONTROL ||
@@ -156,7 +156,7 @@ export interface CompositeSeverityInput {
  * NONE). Provider evidence never participates here.
  */
 export function evaluateCompositeSeverity(input: CompositeSeverityInput): SecuritySeverity {
-  let severity = SecuritySeverity.NONE;
+  let severity: SecuritySeverity = SecuritySeverity.NONE;
   for (const finding of input.findings ?? []) {
     const candidate = computeFindingSeverity(finding);
     if (SEVERITY_RANK[candidate] > SEVERITY_RANK[severity]) severity = candidate;

@@ -79,6 +79,15 @@ export function codexProviderEvent(classification, detail) {
   // blast radius even for a false positive.
   if (/\b(?:HTTP\s*)?429\b|\brate.?limit\b|\b503\b|\boverloaded\b/i.test(text))
     return { event: 'near_limit' };
+  // TRUE credit exhaustion (live b20e5ea8): "Your workspace is out of
+  // credits. Add credits to continue." arrives as a stream-JSON error in
+  // STDOUT (stderr empty), so the earlier classification saw
+  // SEMANTIC_OR_PROVIDER_FAILURE and the quota handoff never fired — every
+  // retry burned an identical writer attempt. The provider-voiced phrase is
+  // unambiguous (no transcript-diff false-positive shape) and latching it
+  // makes the NEXT acquire in the same wave deny with CODEX_QUOTA_EXHAUSTED,
+  // which hands the lane to Claude (H3 P0-4) instead of dying again.
+  if (/\bout of credits\b|\badd credits to continue\b/i.test(text)) return { event: 'exhausted' };
   if (/\busage.?limit\b|\bquota\b|\bexhaust(?:ed|ion)\b|\busage limit reached\b/i.test(text))
     return { event: 'exhausted' };
   return { event: 'unknown' };

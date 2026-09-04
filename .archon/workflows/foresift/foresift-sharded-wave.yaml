@@ -336,8 +336,8 @@ nodes:
         const d=process.env.ARTIFACTS_DIR;
         const meta=JSON.parse(require("node:fs").readFileSync(d+"/shard-meta.json","utf8"));
         const parent=meta[process.env.PARENT_LANE], wt=meta[process.env.THIS_LANE];
-        const head=spawnSync("git",{args:["-C",parent.worktree,"rev-parse","HEAD"],encoding:"utf8"}).stdout.trim();
-        const ff=spawnSync("git",{args:["-C",wt.worktree,"merge","--ff-only",head],encoding:"utf8"});
+        const head=spawnSync("git",["-C",parent.worktree,"rev-parse","HEAD"],{encoding:"utf8"}).stdout.trim();
+        const ff=spawnSync("git",["-C",wt.worktree,"merge","--ff-only",head],{encoding:"utf8"});
         if(ff.status!==0)throw new Error("batch chain ff failed: "+ff.stderr);
         console.log("CHAINED",process.env.THIS_LANE,"to",head.slice(0,10));
       '
@@ -369,8 +369,8 @@ nodes:
         const d=process.env.ARTIFACTS_DIR;
         const meta=JSON.parse(require("node:fs").readFileSync(d+"/shard-meta.json","utf8"));
         const parent=meta[process.env.PARENT_LANE], wt=meta[process.env.THIS_LANE];
-        const head=spawnSync("git",{args:["-C",parent.worktree,"rev-parse","HEAD"],encoding:"utf8"}).stdout.trim();
-        const ff=spawnSync("git",{args:["-C",wt.worktree,"merge","--ff-only",head],encoding:"utf8"});
+        const head=spawnSync("git",["-C",parent.worktree,"rev-parse","HEAD"],{encoding:"utf8"}).stdout.trim();
+        const ff=spawnSync("git",["-C",wt.worktree,"merge","--ff-only",head],{encoding:"utf8"});
         if(ff.status!==0)throw new Error("batch chain ff failed: "+ff.stderr);
         console.log("CHAINED",process.env.THIS_LANE,"to",head.slice(0,10));
       '
@@ -405,8 +405,8 @@ nodes:
         const d=process.env.ARTIFACTS_DIR;
         const meta=JSON.parse(require("node:fs").readFileSync(d+"/shard-meta.json","utf8"));
         const parent=meta[process.env.PARENT_LANE], wt=meta[process.env.THIS_LANE];
-        const head=spawnSync("git",{args:["-C",parent.worktree,"rev-parse","HEAD"],encoding:"utf8"}).stdout.trim();
-        const ff=spawnSync("git",{args:["-C",wt.worktree,"merge","--ff-only",head],encoding:"utf8"});
+        const head=spawnSync("git",["-C",parent.worktree,"rev-parse","HEAD"],{encoding:"utf8"}).stdout.trim();
+        const ff=spawnSync("git",["-C",wt.worktree,"merge","--ff-only",head],{encoding:"utf8"});
         if(ff.status!==0)throw new Error("batch chain ff failed: "+ff.stderr);
         console.log("CHAINED",process.env.THIS_LANE,"to",head.slice(0,10));
       '
@@ -438,8 +438,8 @@ nodes:
         const d=process.env.ARTIFACTS_DIR;
         const meta=JSON.parse(require("node:fs").readFileSync(d+"/shard-meta.json","utf8"));
         const parent=meta[process.env.PARENT_LANE], wt=meta[process.env.THIS_LANE];
-        const head=spawnSync("git",{args:["-C",parent.worktree,"rev-parse","HEAD"],encoding:"utf8"}).stdout.trim();
-        const ff=spawnSync("git",{args:["-C",wt.worktree,"merge","--ff-only",head],encoding:"utf8"});
+        const head=spawnSync("git",["-C",parent.worktree,"rev-parse","HEAD"],{encoding:"utf8"}).stdout.trim();
+        const ff=spawnSync("git",["-C",wt.worktree,"merge","--ff-only",head],{encoding:"utf8"});
         if(ff.status!==0)throw new Error("batch chain ff failed: "+ff.stderr);
         console.log("CHAINED",process.env.THIS_LANE,"to",head.slice(0,10));
       '

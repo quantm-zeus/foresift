@@ -172,7 +172,7 @@ for (const u of units) {
     // joined path must land inside a binding write scope, so this never
     // widens authority — it only re-roots what the plan already named.
     const rooted =
-      /^(?:packages|tests|telemetry|migrations|docs|scripts)\//.test(p) ||
+      /^(?:packages|tests|telemetry|migrations|docs|scripts|evidence)\//.test(p) ||
       p === 'pnpm-lock.yaml' ||
       p === 'package.json';
     // Relative re-rooting candidates must look like a PATH, not a bare

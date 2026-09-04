@@ -19,7 +19,7 @@ describe('AC-131: Security provider independence and conflict resolution (positi
   it('deterministic critical/high risk stands when external providers report safe/no-risk', () => {
     const fixture = JSON.parse(readFileSync(PROVIDER_OVERRIDE_FIXTURE, 'utf8'));
     const overrideCase = fixture.cases.find(
-      (c: any) => c.expectedConflictClass === 'PROVIDER_OPTIMISM_OVERRIDDEN',
+      (c: Record<string, unknown>) => c.expectedConflictClass === 'PROVIDER_OPTIMISM_OVERRIDDEN',
     );
 
     expect(overrideCase).toBeDefined();
@@ -46,7 +46,7 @@ describe('AC-131: Security provider independence and conflict resolution (positi
   it('stores uncorroborated provider risk as unresolved evidence without inflating deterministic severity', () => {
     const fixture = JSON.parse(readFileSync(PROVIDER_OVERRIDE_FIXTURE, 'utf8'));
     const uncorrCase = fixture.cases.find(
-      (c: any) => c.expectedConflictClass === 'UNRESOLVED_PROVIDER_RISK',
+      (c: Record<string, unknown>) => c.expectedConflictClass === 'UNRESOLVED_PROVIDER_RISK',
     );
 
     expect(uncorrCase).toBeDefined();

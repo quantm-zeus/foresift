@@ -1,63 +1,48 @@
 import { describe, expect, it } from 'bun:test';
 import * as DomainModule from '../src/index.ts';
 
-const Domain = DomainModule as Record<string, any>;
+const Domain = DomainModule as Record<string, unknown>;
+const fn = (name: string): ((...args: unknown[]) => unknown) =>
+  (Domain[name] as ((...args: unknown[]) => unknown) | undefined) ?? (() => undefined);
 
-const ALL_TOKEN_CONTROLS = Domain.ALL_TOKEN_CONTROLS ?? [];
-const TokenControl = Domain.TokenControl ?? {};
-const tokenControl = Domain.tokenControl;
+const ALL_TOKEN_CONTROLS = (Domain.ALL_TOKEN_CONTROLS as string[] | undefined) ?? [];
+const TokenControl = (Domain.TokenControl as Record<string, string> | undefined) ?? {};
+const tokenControl = fn('tokenControl');
 
-const ALL_TOKEN_CONTROL_STATES = Domain.ALL_TOKEN_CONTROL_STATES ?? [];
-const TokenControlState = Domain.TokenControlState ?? {};
-const tokenControlState = Domain.tokenControlState;
+const ALL_TOKEN_CONTROL_STATES = (Domain.ALL_TOKEN_CONTROL_STATES as string[] | undefined) ?? [];
+const TokenControlState = (Domain.TokenControlState as Record<string, string> | undefined) ?? {};
+const tokenControlState = fn('tokenControlState');
 
-const ALL_SECURITY_SEVERITIES = Domain.ALL_SECURITY_SEVERITIES ?? [];
-const SecuritySeverity = Domain.SecuritySeverity ?? {};
-const securitySeverity = Domain.securitySeverity;
+const ALL_SECURITY_SEVERITIES = (Domain.ALL_SECURITY_SEVERITIES as string[] | undefined) ?? [];
+const SecuritySeverity = (Domain.SecuritySeverity as Record<string, string> | undefined) ?? {};
+const securitySeverity = fn('securitySeverity');
 
-const ALL_TRANSFER_SEMANTICS_SUPPORTS = Domain.ALL_TRANSFER_SEMANTICS_SUPPORTS ?? [];
-const TransferSemanticsSupport = Domain.TransferSemanticsSupport ?? {};
-const transferSemanticsSupport = Domain.transferSemanticsSupport;
+const ALL_TRANSFER_SEMANTICS_SUPPORTS =
+  (Domain.ALL_TRANSFER_SEMANTICS_SUPPORTS as string[] | undefined) ?? [];
 
-const ALL_POOL_SUPPORT_STATES = Domain.ALL_POOL_SUPPORT_STATES ?? [];
-const PoolSupportState = Domain.PoolSupportState ?? {};
-const poolSupportState = Domain.poolSupportState;
+const ALL_POOL_SUPPORT_STATES = (Domain.ALL_POOL_SUPPORT_STATES as string[] | undefined) ?? [];
 
-const ALL_LP_CONTROL_STATES = Domain.ALL_LP_CONTROL_STATES ?? [];
-const LpControlState = Domain.LpControlState ?? {};
-const lpControlState = Domain.lpControlState;
+const ALL_LP_CONTROL_STATES = (Domain.ALL_LP_CONTROL_STATES as string[] | undefined) ?? [];
 
-const ALL_WITHDRAWAL_AUTHORITY_STATES = Domain.ALL_WITHDRAWAL_AUTHORITY_STATES ?? [];
-const WithdrawalAuthorityState = Domain.WithdrawalAuthorityState ?? {};
-const withdrawalAuthorityState = Domain.withdrawalAuthorityState;
+const ALL_WITHDRAWAL_AUTHORITY_STATES =
+  (Domain.ALL_WITHDRAWAL_AUTHORITY_STATES as string[] | undefined) ?? [];
 
-const ALL_LIQUIDITY_REMOVAL_RISKS = Domain.ALL_LIQUIDITY_REMOVAL_RISKS ?? [];
-const LiquidityRemovalRisk = Domain.LiquidityRemovalRisk ?? {};
-const liquidityRemovalRisk = Domain.liquidityRemovalRisk;
+const ALL_LIQUIDITY_REMOVAL_RISKS =
+  (Domain.ALL_LIQUIDITY_REMOVAL_RISKS as string[] | undefined) ?? [];
 
-const ALL_QUOTE_PARITY_STATES = Domain.ALL_QUOTE_PARITY_STATES ?? [];
-const QuoteParityState = Domain.QuoteParityState ?? {};
-const quoteParityState = Domain.quoteParityState;
+const ALL_QUOTE_PARITY_STATES = (Domain.ALL_QUOTE_PARITY_STATES as string[] | undefined) ?? [];
 
-const ALL_STATE_COMPLETENESSES = Domain.ALL_STATE_COMPLETENESSES ?? [];
-const StateCompleteness = Domain.StateCompleteness ?? {};
-const stateCompleteness = Domain.stateCompleteness;
+const ALL_STATE_COMPLETENESSES = (Domain.ALL_STATE_COMPLETENESSES as string[] | undefined) ?? [];
 
-const ALL_SYSTEM_ADDRESS_ROLES = Domain.ALL_SYSTEM_ADDRESS_ROLES ?? [];
-const SystemAddressRole = Domain.SystemAddressRole ?? {};
-const systemAddressRole = Domain.systemAddressRole;
+const ALL_SYSTEM_ADDRESS_ROLES = (Domain.ALL_SYSTEM_ADDRESS_ROLES as string[] | undefined) ?? [];
 
-const ALL_SYSTEM_ADDRESS_REVIEW_STATES = Domain.ALL_SYSTEM_ADDRESS_REVIEW_STATES ?? [];
-const SystemAddressReviewState = Domain.SystemAddressReviewState ?? {};
-const systemAddressReviewState = Domain.systemAddressReviewState;
+const ALL_SYSTEM_ADDRESS_REVIEW_STATES =
+  (Domain.ALL_SYSTEM_ADDRESS_REVIEW_STATES as string[] | undefined) ?? [];
 
-const ALL_PROVIDER_VERDICTS = Domain.ALL_PROVIDER_VERDICTS ?? [];
-const ProviderVerdict = Domain.ProviderVerdict ?? {};
-const providerVerdict = Domain.providerVerdict;
+const ALL_PROVIDER_VERDICTS = (Domain.ALL_PROVIDER_VERDICTS as string[] | undefined) ?? [];
 
-const ALL_SECURITY_CONFLICT_CLASSES = Domain.ALL_SECURITY_CONFLICT_CLASSES ?? [];
-const SecurityConflictClass = Domain.SecurityConflictClass ?? {};
-const securityConflictClass = Domain.securityConflictClass;
+const ALL_SECURITY_CONFLICT_CLASSES =
+  (Domain.ALL_SECURITY_CONFLICT_CLASSES as string[] | undefined) ?? [];
 
 const profileRequiresCompleteExecutionModeling = Domain.profileRequiresCompleteExecutionModeling;
 const blocksCompleteExecutionModeling = Domain.blocksCompleteExecutionModeling;

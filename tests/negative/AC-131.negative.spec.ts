@@ -48,8 +48,10 @@ describe('AC-131 negative: Refusal of provider optimism downgrade and missing da
 
   it('missing provider data cannot reduce risk as if evidence were negative (§35.12)', () => {
     const fixture = JSON.parse(readFileSync(PROVIDER_OVERRIDE_FIXTURE, 'utf8'));
-    const missingCase = fixture.cases.find((c: any) =>
-      c.providerEvidence.some((p: any) => p.verdict === 'UNABLE_TO_VERIFY'),
+    const missingCase = fixture.cases.find((c: Record<string, unknown>) =>
+      (c.providerEvidence as Array<Record<string, unknown>>).some(
+        (p: Record<string, unknown>) => p.verdict === 'UNABLE_TO_VERIFY',
+      ),
     );
 
     expect(missingCase).toBeDefined();

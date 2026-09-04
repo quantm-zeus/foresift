@@ -23,7 +23,9 @@ const POOL_SEC_FIXTURE = path.resolve(
 describe('AC-130 negative: Transfer semantics blocking, unsupported pool refusal, and schema integrity', () => {
   it('blocks profiles requiring complete execution modeling when extension support is UNKNOWN_REQUIRED', () => {
     const fixture = JSON.parse(readFileSync(TOKEN_EXT_FIXTURE, 'utf8'));
-    const unknownExtVector = fixture.vectors.find((v: any) => v.control === 'UNKNOWN_EXTENSION');
+    const unknownExtVector = fixture.vectors.find(
+      (v: Record<string, unknown>) => v.control === 'UNKNOWN_EXTENSION',
+    );
 
     expect(unknownExtVector).toBeDefined();
     expect(unknownExtVector.supportState).toBe('UNKNOWN_REQUIRED');
@@ -41,7 +43,7 @@ describe('AC-130 negative: Transfer semantics blocking, unsupported pool refusal
   it('structurally refuses resolved-state fields when pool adapter support is DEGRADED_UNSUPPORTED', () => {
     const fixture = JSON.parse(readFileSync(POOL_SEC_FIXTURE, 'utf8'));
     const degradedPool = fixture.pools.find(
-      (p: any) => p.adapterSupportState === 'DEGRADED_UNSUPPORTED',
+      (p: Record<string, unknown>) => p.adapterSupportState === 'DEGRADED_UNSUPPORTED',
     );
 
     expect(degradedPool).toBeDefined();

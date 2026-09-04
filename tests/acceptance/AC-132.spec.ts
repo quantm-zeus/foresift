@@ -18,11 +18,13 @@ const SYSTEM_REGISTRY_FIXTURE = path.resolve(
 describe('AC-132: Versioned system-address registry and actor exclusion (positive)', () => {
   it('excludes known infrastructure accounts (router, exchange, launchpad, fee collector) from actor attribution', () => {
     const fixture = JSON.parse(readFileSync(SYSTEM_REGISTRY_FIXTURE, 'utf8'));
-    const excludables = fixture.entries.filter((e: any) => e.expectedIsExcludable === true);
+    const excludables = fixture.entries.filter(
+      (e: Record<string, unknown>) => e.expectedIsExcludable === true,
+    );
 
     expect(excludables.length).toBeGreaterThanOrEqual(4);
 
-    const roles = excludables.map((e: any) => e.role);
+    const roles = excludables.map((e: Record<string, unknown>) => e.role);
     expect(roles).toContain('ROUTER');
     expect(roles).toContain('EXCHANGE_SERVICE');
     expect(roles).toContain('LAUNCHPAD');
@@ -38,7 +40,9 @@ describe('AC-132: Versioned system-address registry and actor exclusion (positiv
 
   it('evaluates point-in-time exclusion validity intervals correctly', () => {
     const fixture = JSON.parse(readFileSync(SYSTEM_REGISTRY_FIXTURE, 'utf8'));
-    const revisionCase = fixture.entries.find((e: any) => e.historicalQueryTime !== undefined);
+    const revisionCase = fixture.entries.find(
+      (e: Record<string, unknown>) => e.historicalQueryTime !== undefined,
+    );
 
     expect(revisionCase).toBeDefined();
     expect(revisionCase.expectedIsExcludableAtT1).toBe(true);

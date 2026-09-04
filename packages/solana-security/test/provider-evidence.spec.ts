@@ -15,7 +15,7 @@ import {
 
 // Note: Test authoring for T013 (FR-SOLSEC-005, AC-131).
 // If provider-evidence module is implemented, import directly; otherwise test pure contracts and schema boundaries.
-async function tryImportModule(specifier: string): Promise<any> {
+async function tryImportModule(specifier: string): Promise<Record<string, unknown> | null> {
   try {
     return await import(specifier);
   } catch {
@@ -24,6 +24,18 @@ async function tryImportModule(specifier: string): Promise<any> {
 }
 
 const providerModule = await tryImportModule('../src/provider-evidence.ts');
+
+// Dynamic module call: narrows the member name and delegates arg/result
+// typing to the call site via generics (no `any` — the surface stays opaque
+// but each invocation names its own shapes).
+const providerModuleFn =
+  <R>(name: string) =>
+  (...args: unknown[]): R => {
+    const m = providerModule as Record<string, unknown> | null;
+    const v = m?.[name];
+    if (typeof v !== 'function') throw new Error(`missing module member: ${name}`);
+    return (v as (...a: unknown[]) => R)(...args);
+  };
 
 describe('provider-evidence: security provider independence and conflict resolution (FR-SOLSEC-005, AC-131, T013)', () => {
   const assessmentId = 'token-assessment:solana:mainnet/token123:1.0.0:mint-v1';
@@ -126,7 +138,9 @@ describe('provider-evidence: security provider independence and conflict resolut
       return;
     }
 
-    const result = providerModule.resolveSecurityConflict({
+    const result = providerModuleFn<
+      Record<string, unknown> & { conflicts: Array<Record<string, unknown>> }
+    >('resolveSecurityConflict')({
       assessmentId,
       deterministicFindings: [mockCriticalFinding],
       providerReports: [mockSafeProviderReport],
@@ -158,7 +172,9 @@ describe('provider-evidence: security provider independence and conflict resolut
       return;
     }
 
-    const result = providerModule.resolveSecurityConflict({
+    const result = providerModuleFn<
+      Record<string, unknown> & { conflicts: Array<Record<string, unknown>> }
+    >('resolveSecurityConflict')({
       assessmentId,
       deterministicFindings: [mockHighFinding],
       providerReports: [mockSafeProviderReport],
@@ -185,7 +201,9 @@ describe('provider-evidence: security provider independence and conflict resolut
       return;
     }
 
-    const result = providerModule.resolveSecurityConflict({
+    const result = providerModuleFn<
+      Record<string, unknown> & { conflicts: Array<Record<string, unknown>> }
+    >('resolveSecurityConflict')({
       assessmentId,
       deterministicFindings: [],
       providerReports: [mockRiskProviderReport],
@@ -204,7 +222,9 @@ describe('provider-evidence: security provider independence and conflict resolut
       return;
     }
 
-    const resultWithMissing = providerModule.resolveSecurityConflict({
+    const resultWithMissing: Record<string, unknown> = providerModuleFn<Record<string, unknown>>(
+      'resolveSecurityConflict',
+    )({
       assessmentId,
       deterministicFindings: [mockHighFinding],
       providerReports: [mockUnableProviderReport],
@@ -214,7 +234,9 @@ describe('provider-evidence: security provider independence and conflict resolut
     // Severity remains HIGH; missing provider cannot downgrade to NONE
     expect(resultWithMissing.effectiveSeverity).toBe(SecuritySeverity.HIGH);
 
-    const resultWithEmpty = providerModule.resolveSecurityConflict({
+    const resultWithEmpty: Record<string, unknown> = providerModuleFn<Record<string, unknown>>(
+      'resolveSecurityConflict',
+    )({
       assessmentId,
       deterministicFindings: [mockHighFinding],
       providerReports: [],

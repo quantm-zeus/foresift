@@ -3,7 +3,7 @@ import { SecuritySeverity, TokenControl, TokenControlState } from '@foresift/dom
 import { parseSolsecSchema, type TokenControlFinding } from '@foresift/shared-schemas';
 
 // Note: Test authoring for T014 (FR-SOLSEC-001, FR-SOLSEC-002, FR-SOLSEC-003, AC-131).
-async function tryImportModule(specifier: string): Promise<any> {
+async function tryImportModule(specifier: string): Promise<Record<string, unknown> | null> {
   try {
     return await import(specifier);
   } catch {
@@ -12,6 +12,18 @@ async function tryImportModule(specifier: string): Promise<any> {
 }
 
 const severityModule = await tryImportModule('../src/severity.ts');
+
+// Dynamic module call: narrows the member name and delegates arg/result
+// typing to the call site via generics (no `any` — the surface stays opaque
+// but each invocation names its own shapes).
+const severityModuleFn =
+  <R>(name: string) =>
+  (...args: unknown[]): R => {
+    const m = severityModule as Record<string, unknown> | null;
+    const v = m?.[name];
+    if (typeof v !== 'function') throw new Error(`missing module member: ${name}`);
+    return (v as (...a: unknown[]) => R)(...args);
+  };
 
 describe('severity: Appendix Q.1-derived deterministic severity mapping policy (T014, AC-131)', () => {
   const assessmentId = 'token-assessment:test:token001';
@@ -55,7 +67,7 @@ describe('severity: Appendix Q.1-derived deterministic severity mapping policy (
     expect(() => parseSolsecSchema('TokenControlFinding', hookFinding)).not.toThrow();
 
     if (severityModule) {
-      const sev = severityModule.computeFindingSeverity(nonXferFinding);
+      const sev = severityModuleFn<unknown>('computeFindingSeverity')(nonXferFinding);
       expect(sev).toBe(SecuritySeverity.CRITICAL);
     }
   });
@@ -90,7 +102,7 @@ describe('severity: Appendix Q.1-derived deterministic severity mapping policy (
     expect(mintFinding.controlState).toBe(TokenControlState.ADMINISTRATIVE_CONTROL);
 
     if (severityModule) {
-      const sev = severityModule.computeFindingSeverity(mintFinding);
+      const sev = severityModuleFn<unknown>('computeFindingSeverity')(mintFinding);
       expect(sev).toBe(SecuritySeverity.MEDIUM);
     }
   });
@@ -113,8 +125,12 @@ describe('severity: Appendix Q.1-derived deterministic severity mapping policy (
     expect(revokedFreeze.controlState).toBe(TokenControlState.REVOKED_AUTHORITY);
 
     if (severityModule) {
-      expect(severityModule.computeFindingSeverity(revokedMint)).toBe(SecuritySeverity.NONE);
-      expect(severityModule.computeFindingSeverity(revokedFreeze)).toBe(SecuritySeverity.NONE);
+      expect(severityModuleFn<unknown>('computeFindingSeverity')(revokedMint)).toBe(
+        SecuritySeverity.NONE,
+      );
+      expect(severityModuleFn<unknown>('computeFindingSeverity')(revokedFreeze)).toBe(
+        SecuritySeverity.NONE,
+      );
     }
   });
 
@@ -129,7 +145,7 @@ describe('severity: Appendix Q.1-derived deterministic severity mapping policy (
       makeFinding(TokenControl.CLOSE, TokenControlState.REVOKED_AUTHORITY, null), // NONE
     ];
 
-    const compositeSev = severityModule.evaluateCompositeSeverity({
+    const compositeSev = severityModuleFn<unknown>('evaluateCompositeSeverity')({
       findings: mixedFindings,
     });
     expect(compositeSev).toBe(SecuritySeverity.HIGH);

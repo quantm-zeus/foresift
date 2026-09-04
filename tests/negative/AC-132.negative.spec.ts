@@ -18,7 +18,8 @@ describe('AC-132 negative: System address refusal and quality code degradation',
   it('refuses exclusion on low confidence and degrades quality codes', () => {
     const fixture = JSON.parse(readFileSync(SYSTEM_REGISTRY_FIXTURE, 'utf8'));
     const lowConfCase = fixture.entries.find(
-      (e: any) => e.expectedExclusionDecision === 'REFUSAL_SUB_FLOOR_CONFIDENCE',
+      (e: Record<string, unknown>) =>
+        e.expectedExclusionDecision === 'REFUSAL_SUB_FLOOR_CONFIDENCE',
     );
 
     expect(lowConfCase).toBeDefined();
@@ -30,10 +31,10 @@ describe('AC-132 negative: System address refusal and quality code degradation',
   it('refuses exclusion on pending review or rejected review state', () => {
     const fixture = JSON.parse(readFileSync(SYSTEM_REGISTRY_FIXTURE, 'utf8'));
     const pendingCase = fixture.entries.find(
-      (e: any) => e.expectedExclusionDecision === 'REFUSAL_PENDING_REVIEW',
+      (e: Record<string, unknown>) => e.expectedExclusionDecision === 'REFUSAL_PENDING_REVIEW',
     );
     const rejectedCase = fixture.entries.find(
-      (e: any) => e.expectedExclusionDecision === 'REFUSAL_REJECTED',
+      (e: Record<string, unknown>) => e.expectedExclusionDecision === 'REFUSAL_REJECTED',
     );
 
     expect(pendingCase).toBeDefined();
@@ -48,7 +49,7 @@ describe('AC-132 negative: System address refusal and quality code degradation',
   it('refuses exclusion on unknown infrastructure role', () => {
     const fixture = JSON.parse(readFileSync(SYSTEM_REGISTRY_FIXTURE, 'utf8'));
     const unknownRoleCase = fixture.entries.find(
-      (e: any) => e.expectedExclusionDecision === 'REFUSAL_UNKNOWN_ROLE',
+      (e: Record<string, unknown>) => e.expectedExclusionDecision === 'REFUSAL_UNKNOWN_ROLE',
     );
 
     expect(unknownRoleCase).toBeDefined();

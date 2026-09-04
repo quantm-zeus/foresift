@@ -139,7 +139,9 @@ describe('AC-230 solsec: Pool-security versioned resolution and allowlist bindin
       '../fixtures/solsec/pool-security.json',
     );
     const fixture = JSON.parse(readFileSync(fixturePath, 'utf8'));
-    const resolvedPools = fixture.pools.filter((p: any) => p.adapterSupportState === 'RESOLVED');
+    const resolvedPools = fixture.pools.filter(
+      (p: Record<string, unknown>) => p.adapterSupportState === 'RESOLVED',
+    );
     expect(resolvedPools.length).toBeGreaterThanOrEqual(3);
 
     for (const pool of resolvedPools) {

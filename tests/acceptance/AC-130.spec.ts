@@ -28,8 +28,12 @@ describe('AC-130: Deterministic token program and pool security analysis (positi
     expect(vectors.length).toBeGreaterThanOrEqual(10);
 
     // Active vs Revoked Freeze Authority
-    const activeFreeze = vectors.find((v: any) => v.control === 'FREEZE' && v.authority !== null);
-    const revokedFreeze = vectors.find((v: any) => v.control === 'FREEZE' && v.authority === null);
+    const activeFreeze = vectors.find(
+      (v: Record<string, unknown>) => v.control === 'FREEZE' && v.authority !== null,
+    );
+    const revokedFreeze = vectors.find(
+      (v: Record<string, unknown>) => v.control === 'FREEZE' && v.authority === null,
+    );
 
     expect(activeFreeze).toBeDefined();
     expect(activeFreeze.expectedControlState).toBe('KNOWN_RISK');
@@ -41,20 +45,22 @@ describe('AC-130: Deterministic token program and pool security analysis (positi
 
     // Active Permanent Delegate
     const permDelegate = vectors.find(
-      (v: any) => v.control === 'PERMANENT_DELEGATE' && v.authority !== null,
+      (v: Record<string, unknown>) => v.control === 'PERMANENT_DELEGATE' && v.authority !== null,
     );
     expect(permDelegate.expectedControlState).toBe('KNOWN_RISK');
     expect(permDelegate.expectedSeverity).toBe('HIGH');
 
     // Active Transfer Hook blocking exit
     const transferHook = vectors.find(
-      (v: any) => v.control === 'TRANSFER_HOOK' && v.hookProgramId !== null,
+      (v: Record<string, unknown>) => v.control === 'TRANSFER_HOOK' && v.hookProgramId !== null,
     );
     expect(transferHook.expectedControlState).toBe('KNOWN_RISK');
     expect(transferHook.expectedSeverity).toBe('CRITICAL');
 
     // Non-transferable token
-    const nonTransferable = vectors.find((v: any) => v.control === 'NON_TRANSFERABLE');
+    const nonTransferable = vectors.find(
+      (v: Record<string, unknown>) => v.control === 'NON_TRANSFERABLE',
+    );
     expect(nonTransferable.expectedControlState).toBe('KNOWN_RISK');
     expect(nonTransferable.expectedSeverity).toBe('CRITICAL');
   });
@@ -63,14 +69,14 @@ describe('AC-130: Deterministic token program and pool security analysis (positi
     const fixture = JSON.parse(readFileSync(POOL_SEC_FIXTURE, 'utf8'));
     const pools = fixture.pools;
 
-    const burnedLpPool = pools.find((p: any) => p.lpControlState === 'BURNED');
+    const burnedLpPool = pools.find((p: Record<string, unknown>) => p.lpControlState === 'BURNED');
     expect(burnedLpPool).toBeDefined();
     expect(burnedLpPool.adapterSupportState).toBe('RESOLVED');
     expect(burnedLpPool.withdrawalAuthorityState).toBe('REVOKED');
     expect(burnedLpPool.lpBurnPercentage).toBe(100.0);
     expect(burnedLpPool.expectedSeverity).toBe('NONE');
 
-    const lockedLpPool = pools.find((p: any) => p.lpControlState === 'LOCKED');
+    const lockedLpPool = pools.find((p: Record<string, unknown>) => p.lpControlState === 'LOCKED');
     expect(lockedLpPool).toBeDefined();
     expect(lockedLpPool.adapterSupportState).toBe('RESOLVED');
     expect(lockedLpPool.withdrawalAuthorityState).toBe('PRESENT');
@@ -78,7 +84,9 @@ describe('AC-130: Deterministic token program and pool security analysis (positi
     expect(lockedLpPool.migrationLineage.migrationEdgeType).toBe('PUMP_TO_RAYDIUM');
     expect(lockedLpPool.expectedSeverity).toBe('MEDIUM');
 
-    const openLpAbusedPool = pools.find((p: any) => p.lpControlState === 'OPEN');
+    const openLpAbusedPool = pools.find(
+      (p: Record<string, unknown>) => p.lpControlState === 'OPEN',
+    );
     expect(openLpAbusedPool).toBeDefined();
     expect(openLpAbusedPool.adapterSupportState).toBe('RESOLVED');
     expect(openLpAbusedPool.withdrawalAuthorityState).toBe('PRESENT_WITH_OBSERVED_ABUSE');

@@ -84,7 +84,7 @@ describe('sec-schema Drizzle mirror parity with SQL truth (ADR-001)', () => {
     const publicTables = await engine.query<{ table_name: string }>(
       `SELECT table_name FROM information_schema.tables
        WHERE table_schema = 'public' AND table_name LIKE '%credential%'
-         OR table_schema = 'public' AND table_name LIKE 'sec_%'
+         OR table_schema = 'public' AND table_name LIKE 'sec\\_%'
          OR table_schema = 'public' AND table_name LIKE 'import_%'
          OR table_schema = 'public' AND table_name LIKE 'capability_%'
          OR table_schema = 'public' AND table_name LIKE 'activation_%'`,

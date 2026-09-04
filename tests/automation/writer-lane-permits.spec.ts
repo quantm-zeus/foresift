@@ -88,6 +88,18 @@ describe('engine-specific attribution (H2 §5: Codex events stay on Codex)', () 
     );
   });
 
+  test('TRUE credit exhaustion (stream-JSON stdout voice, live b20e5ea8) latches exhausted', () => {
+    // The exact provider error text from codex-run.jsonl on run b20e5ea8:
+    // stderr was empty, so the event must be recoverable from stdout alone.
+    const detail =
+      '{"type":"error","message":"Your workspace is out of credits. Add credits to continue."}';
+    expect(codexProviderEvent('SEMANTIC_OR_PROVIDER_FAILURE', detail).event).toBe('exhausted');
+    // anchored-token law: incidental "credits" prose does NOT latch
+    expect(
+      codexProviderEvent('SEMANTIC_OR_PROVIDER_FAILURE', 'course credits for the syllabus').event,
+    ).toBe('unknown');
+  });
+
   test('Codex exhausted feeds ONLY the Codex pool (§22-F/G)', () => {
     observeCodexOutcome(stateDir, {
       event: 'exhausted',

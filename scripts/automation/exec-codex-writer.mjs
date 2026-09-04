@@ -333,19 +333,31 @@ export function runCodexWriter(input) {
   return { ok: true, route, result };
 }
 
+/**
+ * Final stdout summary for ONE writer invocation. Two success shapes arrive:
+ * the CODEX path returns { ok, route, result }; the codex→claude HANDOFF
+ * path returns the claude lane core's { ok, lane, result }. Live run
+ * be13c346: the handoff lane SUCCEEDED (result.json nominating T013, two
+ * commits on the lane branch) and then the summary crashed reading `.route`
+ * of the core's shape — the node failed AFTER 68 minutes of real work and
+ * the workflow retried a finished lane. Tolerates both shapes, fail-closed
+ * to nulls (never fabricates route fields the path did not produce).
+ */
+export function writerSummaryFor(result) {
+  return {
+    ok: true,
+    lane: result.route?.lane ?? result.lane,
+    model: result.route?.model ?? result.result?.engine ?? null,
+    reasoning: result.route?.reasoning ?? null,
+    serviceTier: result.route?.serviceTier ?? null,
+    headSha: result.result?.headSha,
+  };
+}
+
 if (process.argv[1]?.endsWith('exec-codex-writer.mjs')) {
   try {
     const result = runCodexWriter(parseArgs(process.argv.slice(2)));
-    console.log(
-      JSON.stringify({
-        ok: true,
-        lane: result.route.lane,
-        model: result.route.model,
-        reasoning: result.route.reasoning,
-        serviceTier: result.route.serviceTier,
-        headSha: result.result.headSha,
-      }),
-    );
+    console.log(JSON.stringify(writerSummaryFor(result)));
   } catch (error) {
     fail(error.message);
   }

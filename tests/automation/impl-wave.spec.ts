@@ -610,6 +610,100 @@ describe('wave guard + integrator (real git)', () => {
     expect(r.status).toBe(0); // coordinator reports; rejection is per-lane
     void r;
   });
+
+  it('marks TEST-role lane nominations in tasks.md too (test-role completion bookkeeping, directive §5)', () => {
+    // Live defect (g1-solana-security, runs 7d49dce0/9b798cf0): a validated
+    // AGY test-author lane's nominations were merged into the canonical
+    // branch, but completedUnits filtered on role === 'implementation' —
+    // test-role checkboxes NEVER flipped even when every validation passed
+    // (lane membership, predicted-write evidence, blockers, ownership).
+    // A test lane may only mark tasks THAT BELONG TO ITS LANE with TEST-only
+    // writes — both guarantees are enforced by validateLaneNominations and
+    // validateLaneOwnership before this bookkeeping step.
+    const meta = JSON.parse(readFileSync(join(fx.artifacts, 'shard-meta.json'), 'utf8'));
+    meta['test-author'] = {
+      branch: 'foresift/wave/test-author',
+      worktree: join(fx.artifacts, 'wt-foresift-wave-test-author'),
+    };
+    writeFileSync(join(fx.artifacts, 'shard-meta.json'), JSON.stringify(meta));
+    // T103 is the fixture's test-bearing unit; give it its OWN test write
+    // (tests/x/b.spec.ts — core never touched b) so the lane diff carries
+    // T103 evidence without colliding with core's a.spec.ts merge.
+    const g = JSON.parse(readFileSync(fx.graphPath, 'utf8'));
+    const t103 = g.units.find((u: { id: string }) => u.id === 'T103');
+    t103.predictedWrites = ['tests/x/b.spec.ts'];
+    t103.testWrites = ['tests/x/b.spec.ts'];
+    const testLane = {
+      id: 'test-author',
+      mode: 'parallel',
+      role: 'test',
+      engine: 'AGY',
+      units: [t103.id],
+      allowedWritePaths: ['tests/x/b.spec.ts'],
+    };
+    writeFileSync(fx.graphPath, JSON.stringify({ ...g, testLanes: [testLane] }));
+
+    commitBranch('foresift/wave/test-author', 'tests/x/b.spec.ts', "test('b', () => {});\n");
+    const d = laneDir('test-author');
+    writeFileSync(
+      join(d, 'result.json'),
+      JSON.stringify({
+        schema: 'foresift/writer-result@1',
+        shardId: 'test-author',
+        completed: [t103.id],
+        branch: 'foresift/wave/test-author',
+        headSha: rev(join(fx.artifacts, 'wt-foresift-wave-test-author')),
+        baseSha: fx.baseSha,
+      }),
+    );
+    // T104's predicted write (docs/x-guide.md) must NOT be claimable by this lane.
+    writeFileSync(
+      join(d, 'bogus-claim.json'),
+      JSON.stringify({
+        schema: 'foresift/writer-result@1',
+        shardId: 'test-author',
+        completed: ['T104'],
+        branch: 'foresift/wave/test-author',
+        headSha: rev(join(fx.artifacts, 'wt-foresift-wave-test-author')),
+        baseSha: fx.baseSha,
+      }),
+    );
+    const before = rev(fx.root);
+    const r = spawnSync(
+      process.execPath,
+      [
+        INTEGRATE,
+        '--package',
+        'pkg-x',
+        '--graph',
+        fx.graphPath,
+        '--results-dir',
+        join(fx.artifacts, 'writer-results'),
+        '--canonical',
+        fx.root,
+        '--out',
+        join(fx.artifacts, 'integration-report-test-role.json'),
+      ],
+      { encoding: 'utf8' },
+    );
+    expect(r.status).toBe(0);
+    const report = JSON.parse(
+      readFileSync(join(fx.artifacts, 'integration-report-test-role.json'), 'utf8'),
+    );
+    const integrated = report.integrated.find(
+      (i: { shardId: string }) => i.shardId === 'test-author',
+    );
+    expect(integrated).toBeDefined();
+    expect(integrated.role).toBe('test');
+    // The out-of-lane claim (T104 — a docs product write) is not part of the
+    // integrated units: validateLaneNominations refuses IDs outside the lane's
+    // membership, so the test lane marks exactly its own test-bearing task.
+    expect(integrated.units).toEqual([t103.id]);
+    // THE FIX UNDER TEST: the test-role unit's checkbox flips in tasks.md.
+    const tasks = readFileSync(join(fx.root, 'specs', 'pkg-x', 'tasks.md'), 'utf8');
+    expect(tasks).toContain('- [x] T103');
+    expect(rev(fx.root)).not.toBe(before);
+  });
 });
 
 describe('writer admission function', () => {

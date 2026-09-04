@@ -13,17 +13,10 @@ import {
   type TokenControlFinding,
 } from '@foresift/shared-schemas';
 
-// Note: Test authoring for T013 (FR-SOLSEC-005, AC-131).
-// If provider-evidence module is implemented, import directly; otherwise test pure contracts and schema boundaries.
-async function tryImportModule(specifier: string): Promise<any> {
-  try {
-    return await import(specifier);
-  } catch {
-    return null;
-  }
-}
-
-const providerModule = await tryImportModule('../src/provider-evidence.ts');
+import {
+  resolveSecurityConflict,
+  PROVIDER_EVIDENCE_POLICY_VERSION,
+} from '../src/provider-evidence.ts';
 
 describe('provider-evidence: security provider independence and conflict resolution (FR-SOLSEC-005, AC-131, T013)', () => {
   const assessmentId = 'token-assessment:solana:mainnet/token123:1.0.0:mint-v1';
@@ -104,27 +97,11 @@ describe('provider-evidence: security provider independence and conflict resolut
     expect(() => parseSolsecSchema('SecurityProviderReport', mockSafeProviderReport)).not.toThrow();
     expect(() => parseSolsecSchema('SecurityProviderReport', mockRiskProviderReport)).not.toThrow();
     expect(() => parseSolsecSchema('SecurityProviderReport', mockUnableProviderReport)).not.toThrow();
+    expect(PROVIDER_EVIDENCE_POLICY_VERSION).toBe('solsec-provider-evidence@1');
   });
 
   it('records PROVIDER_OPTIMISM_OVERRIDDEN when provider reports SAFE against CRITICAL deterministic finding', () => {
-    if (!providerModule) {
-      // Contract expectation check against schema
-      const conflict: SecurityConflict = {
-        conflictId: 'conflict:001',
-        assessmentId,
-        providerReportId: mockSafeProviderReport.providerReportId,
-        conflictClass: SecurityConflictClass.PROVIDER_OPTIMISM_OVERRIDDEN,
-        deterministicFindingIds: [mockCriticalFinding.findingId],
-        resolution: 'DETERMINISTIC',
-        resolvedAt: observedAt,
-        availableAt,
-      };
-      expect(() => parseSolsecSchema('SecurityConflict', conflict)).not.toThrow();
-      expect(conflict.resolution).toBe('DETERMINISTIC');
-      return;
-    }
-
-    const result = providerModule.resolveSecurityConflict({
+    const result = resolveSecurityConflict({
       assessmentId,
       deterministicFindings: [mockCriticalFinding],
       providerReports: [mockSafeProviderReport],
@@ -139,22 +116,7 @@ describe('provider-evidence: security provider independence and conflict resolut
   });
 
   it('records PROVIDER_OPTIMISM_OVERRIDDEN when provider reports SAFE against HIGH deterministic finding', () => {
-    if (!providerModule) {
-      const conflict: SecurityConflict = {
-        conflictId: 'conflict:002',
-        assessmentId,
-        providerReportId: mockSafeProviderReport.providerReportId,
-        conflictClass: SecurityConflictClass.PROVIDER_OPTIMISM_OVERRIDDEN,
-        deterministicFindingIds: [mockHighFinding.findingId],
-        resolution: 'DETERMINISTIC',
-        resolvedAt: observedAt,
-        availableAt,
-      };
-      expect(() => parseSolsecSchema('SecurityConflict', conflict)).not.toThrow();
-      return;
-    }
-
-    const result = providerModule.resolveSecurityConflict({
+    const result = resolveSecurityConflict({
       assessmentId,
       deterministicFindings: [mockHighFinding],
       providerReports: [mockSafeProviderReport],
@@ -166,22 +128,7 @@ describe('provider-evidence: security provider independence and conflict resolut
   });
 
   it('stores uncorroborated provider risk as independent evidence without inflating deterministic severity', () => {
-    if (!providerModule) {
-      const conflict: SecurityConflict = {
-        conflictId: 'conflict:003',
-        assessmentId,
-        providerReportId: mockRiskProviderReport.providerReportId,
-        conflictClass: SecurityConflictClass.PROVIDER_RISK_NO_DETERMINISTIC_CORROBORATION,
-        deterministicFindingIds: ['finding:clean-mint'],
-        resolution: 'DETERMINISTIC',
-        resolvedAt: observedAt,
-        availableAt,
-      };
-      expect(() => parseSolsecSchema('SecurityConflict', conflict)).not.toThrow();
-      return;
-    }
-
-    const result = providerModule.resolveSecurityConflict({
+    const result = resolveSecurityConflict({
       assessmentId,
       deterministicFindings: [],
       providerReports: [mockRiskProviderReport],
@@ -191,16 +138,11 @@ describe('provider-evidence: security provider independence and conflict resolut
     // Uncorroborated external risk does NOT inflate deterministic severity to CRITICAL/HIGH
     expect(result.effectiveSeverity).not.toBe(SecuritySeverity.CRITICAL);
     expect(result.effectiveSeverity).not.toBe(SecuritySeverity.HIGH);
+    expect(result.unresolvedProviderRisk.length).toBe(1);
   });
 
   it('missing provider data (absence) never reduces deterministic severity (§35.12)', () => {
-    if (!providerModule) {
-      // Schema and invariant check
-      expect(mockUnableProviderReport.verdict).toBe(ProviderVerdict.UNABLE_TO_VERIFY);
-      return;
-    }
-
-    const resultWithMissing = providerModule.resolveSecurityConflict({
+    const resultWithMissing = resolveSecurityConflict({
       assessmentId,
       deterministicFindings: [mockHighFinding],
       providerReports: [mockUnableProviderReport],
@@ -210,7 +152,7 @@ describe('provider-evidence: security provider independence and conflict resolut
     // Severity remains HIGH; missing provider cannot downgrade to NONE
     expect(resultWithMissing.effectiveSeverity).toBe(SecuritySeverity.HIGH);
 
-    const resultWithEmpty = providerModule.resolveSecurityConflict({
+    const resultWithEmpty = resolveSecurityConflict({
       assessmentId,
       deterministicFindings: [mockHighFinding],
       providerReports: [],

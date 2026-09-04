@@ -9,16 +9,13 @@ import {
   type TokenControlFinding,
 } from '@foresift/shared-schemas';
 
-// Note: Test authoring for T014 (FR-SOLSEC-001, FR-SOLSEC-002, FR-SOLSEC-003, AC-131).
-async function tryImportModule(specifier: string): Promise<any> {
-  try {
-    return await import(specifier);
-  } catch {
-    return null;
-  }
-}
-
-const severityModule = await tryImportModule('../src/severity.ts');
+import {
+  baseFindingSeverity,
+  computeFindingSeverity,
+  poolAssessmentSeverity,
+  evaluateCompositeSeverity,
+  SEVERITY_POLICY_VERSION,
+} from '../src/severity.ts';
 
 describe('severity: Appendix Q.1-derived deterministic severity mapping policy (T014, AC-131)', () => {
   const assessmentId = 'token-assessment:test:token001';
@@ -44,6 +41,10 @@ describe('severity: Appendix Q.1-derived deterministic severity mapping policy (
     severity,
   });
 
+  it('exposes SEVERITY_POLICY_VERSION', () => {
+    expect(SEVERITY_POLICY_VERSION).toBe('solsec-severity@1');
+  });
+
   it('maps non-transferability and transfer hook blocking exit to CRITICAL severity', () => {
     const nonXferFinding = makeFinding(
       TokenControl.NON_TRANSFERABLE,
@@ -61,10 +62,11 @@ describe('severity: Appendix Q.1-derived deterministic severity mapping policy (
     );
     expect(() => parseSolsecSchema('TokenControlFinding', hookFinding)).not.toThrow();
 
-    if (severityModule) {
-      const sev = severityModule.computeFindingSeverity(nonXferFinding);
-      expect(sev).toBe(SecuritySeverity.CRITICAL);
-    }
+    const sevNonXfer = computeFindingSeverity(nonXferFinding);
+    expect(sevNonXfer).toBe(SecuritySeverity.CRITICAL);
+
+    const sevHook = computeFindingSeverity(hookFinding);
+    expect(sevHook).toBe(SecuritySeverity.CRITICAL);
   });
 
   it('maps active freeze authority and permanent delegate to HIGH severity', () => {
@@ -83,6 +85,9 @@ describe('severity: Appendix Q.1-derived deterministic severity mapping policy (
       SecuritySeverity.HIGH,
     );
     expect(() => parseSolsecSchema('TokenControlFinding', permDelFinding)).not.toThrow();
+
+    expect(computeFindingSeverity(freezeFinding)).toBe(SecuritySeverity.HIGH);
+    expect(computeFindingSeverity(permDelFinding)).toBe(SecuritySeverity.HIGH);
   });
 
   it('maps active mint authority without observed abuse to MEDIUM severity (Appendix Q.1 non-malice caveat)', () => {
@@ -96,10 +101,12 @@ describe('severity: Appendix Q.1-derived deterministic severity mapping policy (
     );
     expect(mintFinding.controlState).toBe(TokenControlState.ADMINISTRATIVE_CONTROL);
 
-    if (severityModule) {
-      const sev = severityModule.computeFindingSeverity(mintFinding);
-      expect(sev).toBe(SecuritySeverity.MEDIUM);
-    }
+    const sev = computeFindingSeverity(mintFinding);
+    expect(sev).toBe(SecuritySeverity.MEDIUM);
+
+    // Escalation with observed abuse raises active authority to CRITICAL
+    const sevAbuse = computeFindingSeverity(mintFinding, { observedAbuse: true });
+    expect(sevAbuse).toBe(SecuritySeverity.CRITICAL);
   });
 
   it('maps revoked authorities to NONE severity', () => {
@@ -119,15 +126,14 @@ describe('severity: Appendix Q.1-derived deterministic severity mapping policy (
     expect(revokedMint.controlState).toBe(TokenControlState.REVOKED_AUTHORITY);
     expect(revokedFreeze.controlState).toBe(TokenControlState.REVOKED_AUTHORITY);
 
-    if (severityModule) {
-      expect(severityModule.computeFindingSeverity(revokedMint)).toBe(SecuritySeverity.NONE);
-      expect(severityModule.computeFindingSeverity(revokedFreeze)).toBe(SecuritySeverity.NONE);
-    }
+    expect(computeFindingSeverity(revokedMint)).toBe(SecuritySeverity.NONE);
+    expect(computeFindingSeverity(revokedFreeze)).toBe(SecuritySeverity.NONE);
+    expect(baseFindingSeverity(TokenControl.MINT, TokenControlState.REVOKED_AUTHORITY)).toBe(
+      SecuritySeverity.NONE,
+    );
   });
 
   it('evaluates composite severity deterministically across findings and pool assessment', () => {
-    if (!severityModule) return;
-
     // Highest severity across findings wins deterministically:
     // CRITICAL > HIGH > MEDIUM > LOW > NONE
     const mixedFindings: TokenControlFinding[] = [
@@ -136,7 +142,7 @@ describe('severity: Appendix Q.1-derived deterministic severity mapping policy (
       makeFinding(TokenControl.CLOSE, TokenControlState.REVOKED_AUTHORITY, null), // NONE
     ];
 
-    const compositeSev = severityModule.evaluateCompositeSeverity({
+    const compositeSev = evaluateCompositeSeverity({
       findings: mixedFindings,
     });
     expect(compositeSev).toBe(SecuritySeverity.HIGH);

@@ -412,6 +412,72 @@ describe('fileEvidenceAlreadySatisfied trusted-ancestry proof (directive §6)', 
       rmSync(root, { recursive: true, force: true });
     }
   });
+
+  test('re-seeded branch law: pre-seed package-side authorship satisfies (run b20e5ea8)', () => {
+    const root = gitRepo();
+    try {
+      // Package work authored BEFORE the recovery wave's seed merge — the
+      // wave adopts the branch by merging main INTO it, so the trusted base
+      // (the seed merge) postdates genuine package authorship. The mainline
+      // branches FIRST (base fixture only); the package commit then happens
+      // ONLY on the package side, so it is unreachable from origin/main.
+      mkdirSync(join(root, 'packages/base'), { recursive: true });
+      writeFileSync(join(root, 'packages/base/keep.txt'), 'base\n');
+      commit(root, 'base');
+      execSync('git checkout -qb mainline', { cwd: root });
+      mkdirSync(join(root, 'packages/other'), { recursive: true });
+      writeFileSync(join(root, 'packages/other/keep.txt'), 'main\n');
+      execSync('git add -A && git commit -qm "main: unrelated fixture"', { cwd: root });
+      const mainSideSha = execSync('git rev-parse HEAD', { cwd: root }).toString().trim();
+      execSync('git checkout -qb pkg', { cwd: root });
+      mkdirSync(join(root, 'packages/x/src'), { recursive: true });
+      writeFileSync(join(root, 'packages/x/src/alpha.ts'), 'export const alpha = 1;\n');
+      commit(root, 'feat(x): prior wave authors alpha.ts');
+      execSync('git merge -q --no-ff mainline -m "chore(generation): absorb main"', {
+        cwd: root,
+      });
+      const trustedBase = execSync('git rev-parse HEAD', { cwd: root }).toString().trim();
+      // origin/main must resolve to the main-side parent for the audit.
+      execSync(`git update-ref refs/remotes/origin/main ${mainSideSha}`, { cwd: root });
+      const unit = { id: 'T010', predictedWrites: ['packages/x/src/alpha.ts'] };
+      const audit = fileEvidenceAlreadySatisfied(unit, { root, trustedBase });
+      expect(audit.satisfied).toBe(true);
+      expect(audit.proof?.[0]?.authoringCommit).toBeDefined();
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  test('re-seeded branch law: a main-side fixture authored ONLY on main still stays OPEN (§6 CASE 1 preserved)', () => {
+    const root = gitRepo();
+    try {
+      // A file authored ONLY on the main lineage (branched first), then
+      // absorbed by the seed merge on the package side.
+      mkdirSync(join(root, 'packages/base'), { recursive: true });
+      writeFileSync(join(root, 'packages/base/keep.txt'), 'base\n');
+      commit(root, 'base');
+      execSync('git checkout -qb mainline', { cwd: root });
+      mkdirSync(join(root, 'packages/y/src'), { recursive: true });
+      writeFileSync(join(root, 'packages/y/src/fixture.ts'), 'export {};\n');
+      execSync('git add -A && git commit -qm "main fixture"', { cwd: root });
+      const mainSideSha = execSync('git rev-parse HEAD', { cwd: root }).toString().trim();
+      execSync('git checkout -qb pkg', { cwd: root });
+      mkdirSync(join(root, 'packages/x'), { recursive: true });
+      writeFileSync(join(root, 'packages/x/keep.txt'), 'x\n');
+      execSync('git add -A && git commit -qm "pkg: unrelated commit"', { cwd: root });
+      execSync('git merge -q --no-ff mainline -m "chore(generation): absorb main"', {
+        cwd: root,
+      });
+      execSync(`git update-ref refs/remotes/origin/main ${mainSideSha}`, { cwd: root });
+      const trustedBase = execSync('git rev-parse HEAD', { cwd: root }).toString().trim();
+      const unit = { id: 'T010', predictedWrites: ['packages/y/src/fixture.ts'] };
+      const audit = fileEvidenceAlreadySatisfied(unit, { root, trustedBase });
+      expect(audit.satisfied).toBe(false);
+      expect(audit.reason).toContain('existed at trusted base');
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
 });
 
 describe('T024 verification profile (full convergence gate, not the weaker milestone subset)', () => {

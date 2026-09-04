@@ -1,10 +1,10 @@
 {
   "schema": "foresift/maintainer-snapshot@1",
-  "updatedAt": "2026-09-04T03:20:00Z",
-  "mission": "Persistent maintainer \u2014 minimize authoritative project critical-path wall clock",
+  "updatedAt": "2026-09-04T07:37:46.213Z",
+  "mission": "Persistent maintainer — minimize authoritative project critical-path wall clock",
   "currentSnapshot": {
     "milestone": "G1",
-    "g1Progress": "G1 1/8 PROVEN \u2014 g1-solana-security RUNNING on durable branch foresift/g1-solana-security (39 product commits, remote tip preserved); paused_fatal pending maintenance-PR landing",
+    "g1Progress": "G1 1/8 PROVEN — g1-solana-security RUNNING on durable branch foresift/g1-solana-security (seed d442848 = 803b2f9+main 9bfca5c, test-author lane a384384 pushed); recovery run b20e5ea8 root-caused (3 defects fixed on maint/recovery-truth-chain)",
     "packages": {
       "g0-contracts-data-truth": "PROVEN",
       "g0-security-perimeter": "PROVEN",
@@ -15,25 +15,29 @@
       "g0-mcp-surface": "PROVEN",
       "g0-traceability-conformance": "PROVEN",
       "g1-planning": "PLAN merged (#169 squash c8d75f2, 98/98 reqs covered) + decompose (#170) + seed (#171)",
-      "g1-data-truth-extensions": "PROVEN \u2014 PR #175 squash 32c4673 + state chore #177 (31e0534)"
+      "g1-data-truth-extensions": "PROVEN — PR #175 squash 32c4673 + state chore #177 (31e0534)",
+      "g1-solana-security": "RUNNING — product branch 38+ commits durable/pushed; T013/T014/T015 (provider-evidence/severity/system-registry srcs) genuinely open; T026–T028 coordinator tail; codex TRUE credit exhaustion blocks CODEX serial lanes (\"Your workspace is out of credits\" — owner action required, not latch self-heal)"
     },
-    "mainSha": "SET-BY-MERGE-COMMIT (branch maint/test-role-completion: \u00a75/\u00a76/\u00a78 completion-truth fixes)",
-    "mainCi": "GREEN at cf7ef7c (PR #180); branch CI gate pending at PR-open time",
-    "supervisor": "PAUSED_FATAL run 9b798cf0 (g1-solana-security): fast-repair-loop exhausted 3\u00d7 on the same deterministic plan-vs-code vocabulary drift; root-caused 2026-09-04 \u2014 same-failure law confirmed, no further AI repair",
-    "taskWorktree": "/home/minhquan_eth/.archon/workspaces/quantm-zeus/foresift/worktrees/archon/task-foresift-g1-solana-security (branch foresift/g1-solana-security @ da51226, pushed; realignment cherry-pick + docs regen committed)"
+    "mainSha": "9bfca5cd0147705d6a0b1081fa2aa7cf199d5185 (PR #182 landed)",
+    "mainCi": "GREEN at 9bfca5c (merged-main Verify)",
+    "supervisor": "PAUSED_FATAL run 9b798cf0 (g1-solana-security): fast-repair-loop exhausted 3× on the same deterministic plan-vs-code vocabulary drift; root-caused 2026-09-04 — same-failure law confirmed, no further AI repair",
+    "taskWorktree": "/home/minhquan_eth/.archon/workspaces/quantm-zeus/foresift/worktrees/archon/task-foresift-g1-solana-security (branch foresift/g1-solana-security @ da51226, pushed; realignment cherry-pick + docs regen committed)",
+    "maintainerContinuity": "watcher + dedicated tmux socket (foresift-maintainer) live; 00:00 agy-remote-control-update.timer kill mechanism proven and isolated (PR #182)"
   },
-  "blockers": [],
+  "blockers": [
+    "codex TRUE credit exhaustion — \"Your workspace is out of credits. Add credits to continue.\" Requires owner top-up; pool latch/QUOTA states cannot self-heal real credits"
+  ],
   "nextActions": [
-    "Land maint/test-role-completion PR (test-role completion bookkeeping \u00a75, trusted-ancestry already-satisfied proof \u00a76, empty-wave coordinator-tail routing \u00a78); require merged-main GREEN",
+    "Land maint/test-role-completion PR (test-role completion bookkeeping §5, trusted-ancestry already-satisfied proof §6, empty-wave coordinator-tail routing §8); require merged-main GREEN",
     "Reconcile merged main into foresift/g1-solana-security via branch-adoption; singleton-safe recover-fatal; recover SAME logical package/generation",
-    "Wave resumes against adopted branch: T013/T014/T015 genuinely incomplete (provider-evidence.ts, severity.ts, system-registry.ts); T008/T010-T012/T016-T024 deliverables exist with bookkeeping lag \u2014 audit via \u00a76 trusted-ancestry pass",
-    "Part D/K/I/J of Directive 3 after package 2 lands; Part K now includes maintainer continuity contract (\u00a712/\u00a713): root-cause the ~00:00 tmux/Claude death BEFORE wrapping another layer",
+    "Wave resumes against adopted branch: T013/T014/T015 genuinely incomplete (provider-evidence.ts, severity.ts, system-registry.ts); T008/T010-T012/T016-T024 deliverables exist with bookkeeping lag — audit via §6 trusted-ancestry pass",
+    "Part D/K/I/J of Directive 3 after package 2 lands; Part K now includes maintainer continuity contract (§12/§13): root-cause the ~00:00 tmux/Claude death BEFORE wrapping another layer",
     "Codex pool starvation ledger (MAX_CODEX_WRITERS reporting vs enforcement) after package 2"
   ],
   "history": [
     {
       "ts": "2026-09-02T10:00:00Z",
-      "event": "G0 8/8 PROVEN on main 2b82882. Chain: #156 lander ancestor fix \u2192 #157 test-author surface (ee35e84) \u2192 preflight hermetic fixture fix (#158, 3cd7c88) \u2192 #159 lander --delete-branch worktree exit-1 fix \u2192 finalize-from-main \u2192 state chore #160 \u2192 PROVEN."
+      "event": "G0 8/8 PROVEN on main 2b82882. Chain: #156 lander ancestor fix → #157 test-author surface (ee35e84) → preflight hermetic fixture fix (#158, 3cd7c88) → #159 lander --delete-branch worktree exit-1 fix → finalize-from-main → state chore #160 → PROVEN."
     },
     {
       "ts": "2026-09-02T11:40:00Z",
@@ -41,7 +45,7 @@
     },
     {
       "ts": "2026-09-03T09:00:00Z",
-      "event": "G1 execution begins: #169 G1 plan (98/98), #170 decompose to 8 packages, #171 seed planning artifacts; main 5a86a28 \u2192 ad53201. Outcome B in force: package-level serial (shared-surface law); HYBRID_AGY profile."
+      "event": "G1 execution begins: #169 G1 plan (98/98), #170 decompose to 8 packages, #171 seed planning artifacts; main 5a86a28 → ad53201. Outcome B in force: package-level serial (shared-surface law); HYBRID_AGY profile."
     },
     {
       "ts": "2026-09-03T10:41:00Z",
@@ -49,19 +53,19 @@
     },
     {
       "ts": "2026-09-03T10:54:00Z",
-      "event": "Operator recovery: runs 32917dda (T029 ownership \u00d73) and 12dd974a (prep yaml syntax) retired; run 486a44d0 ADOPTED_SEED @ cc5bd28. T029 executor=COORDINATOR excluded from testLanes \u2014 verified live."
+      "event": "Operator recovery: runs 32917dda (T029 ownership ×3) and 12dd974a (prep yaml syntax) retired; run 486a44d0 ADOPTED_SEED @ cc5bd28. T029 executor=COORDINATOR excluded from testLanes — verified live."
     },
     {
       "ts": "2026-09-03T14:30:00Z",
-      "event": "Wave cycles 1\u20135 (runs 4dddf7f0, f42d3e76, 757e881b + Codex provider 404 outage): root-caused run_worktree_reset discarding UNPUSHED local commits (67f8d3e T018 repair lost) \u2014 LAW: always push the launch branch before --recover-fatal. Established no-diff/no-nomination trap: T021\u2013T026 files already existed at lane base (evidence-integrated by wave e3ccffb5) so writers nominated zero units while integrator filter role==='implementation' never marked test-role units. Manual maintainer landings: 67f8d3e\u2192eb0b630 cherry-pick, d75eead T021\u2013T025 closure + T026 body, 932a28d lint, 2517c9b/0ffcac3/f59c23c wave integration marks, 46e2dec convergence fixes (sources.ts G1 NOT NULL defaults mirroring g1_data_0002, ADR-1 sentinel fixes, conformance active-milestone resolution, docs/generated regen)."
+      "event": "Wave cycles 1–5 (runs 4dddf7f0, f42d3e76, 757e881b + Codex provider 404 outage): root-caused run_worktree_reset discarding UNPUSHED local commits (67f8d3e T018 repair lost) — LAW: always push the launch branch before --recover-fatal. Established no-diff/no-nomination trap: T021–T026 files already existed at lane base (evidence-integrated by wave e3ccffb5) so writers nominated zero units while integrator filter role==='implementation' never marked test-role units. Manual maintainer landings: 67f8d3e→eb0b630 cherry-pick, d75eead T021–T025 closure + T026 body, 932a28d lint, 2517c9b/0ffcac3/f59c23c wave integration marks, 46e2dec convergence fixes (sources.ts G1 NOT NULL defaults mirroring g1_data_0002, ADR-1 sentinel fixes, conformance active-milestone resolution, docs/generated regen)."
     },
     {
       "ts": "2026-09-03T17:05:00Z",
-      "event": "Cycle 8 (run 2c1aa231): writer-test-author-agy legitimately nominated ZERO (T026 fully landed, 137 pass/0 fail baseline) \u2014 closed T026 as coordinator-integrated (3fc20b4). Empty-wave DAG finished anyFailed=false but wave-settled/land/checkpoint all trigger-skipped; supervisor lander refused: FULL gate RED on 13-file prettier drift + 19 eslint any-casts in domain tests + drizzle mirror missing all G1 columns/tables + stale TIMED_OUT/INVALID_RESPONSE in parity extraction + migrator 40\u219244 counts + provider-lifecycle prov_% wildcard sweeping in provider_conflicts + writer-lane-evidence-diff dirty.length literal vs #174 commitable sweep. All fixed in f240571; FULL gate re-proven GREEN locally (spec/format/lint/types/suite)."
+      "event": "Cycle 8 (run 2c1aa231): writer-test-author-agy legitimately nominated ZERO (T026 fully landed, 137 pass/0 fail baseline) — closed T026 as coordinator-integrated (3fc20b4). Empty-wave DAG finished anyFailed=false but wave-settled/land/checkpoint all trigger-skipped; supervisor lander refused: FULL gate RED on 13-file prettier drift + 19 eslint any-casts in domain tests + drizzle mirror missing all G1 columns/tables + stale TIMED_OUT/INVALID_RESPONSE in parity extraction + migrator 40→44 counts + provider-lifecycle prov_% wildcard sweeping in provider_conflicts + writer-lane-evidence-diff dirty.length literal vs #174 commitable sweep. All fixed in f240571; FULL gate re-proven GREEN locally (spec/format/lint/types/suite)."
     },
     {
       "ts": "2026-09-03T21:15:00Z",
-      "event": "Defect ledger for next hardening PR: (1) laneEvidencePaths nomination is evidence-blind to units whose predicted files already exist at base \u2014 structural no-op, needs coordinator-side authorship verification or file-hash baseline; (2) integrate-writer-results.mjs:250 marks only role==='implementation' \u2014 test lanes stay checkbox-open forever; (3) package-full-gate --run crashes ENOENT writing full-gate-result.json when artifactsDir does not exist (final-land creates it, but the direct-run path must mkdir); (4) empty-wave topology (all COORDINATOR units left) completes DAG cleanly and lands nothing \u2014 wave or supervisor must route coordinator-tail packages to landing mechanically."
+      "event": "Defect ledger for next hardening PR: (1) laneEvidencePaths nomination is evidence-blind to units whose predicted files already exist at base — structural no-op, needs coordinator-side authorship verification or file-hash baseline; (2) integrate-writer-results.mjs:250 marks only role==='implementation' — test lanes stay checkbox-open forever; (3) package-full-gate --run crashes ENOENT writing full-gate-result.json when artifactsDir does not exist (final-land creates it, but the direct-run path must mkdir); (4) empty-wave topology (all COORDINATOR units left) completes DAG cleanly and lands nothing — wave or supervisor must route coordinator-tail packages to landing mechanically."
     },
     {
       "ts": "2026-09-03T21:20:00Z",
@@ -77,7 +81,11 @@
     },
     {
       "ts": "2026-09-04T03:20:00Z",
-      "event": "Root-caused run 9b798cf0 fatal: repair loop burned 3 attempts on deterministic vocabulary drift (plan SQL CHECK vs implementation domain vs test expectations \u2014 three-way); same-failure law applies. Authoritative realignment landed on the package branch (cherry-pick to plan SQL CHECK vocab) + docs surfaces regen (AC-266 green). Completion-truth maintenance branch maint/test-role-completion: \u00a75 test-role checkbox fix + regression, \u00a76 trusted-ancestry already-satisfied proof (base-fixture trap stays OPEN), \u00a78 empty-wave coordinator-tail routing (prep parent + zero-AI tail; open==0 \u2192 GREEN, else exit 90) + serial-2/3 chain-ff env-order fix (parent.worktree TypeError burned every serial-2/3 turn)."
+      "event": "Root-caused run 9b798cf0 fatal: repair loop burned 3 attempts on deterministic vocabulary drift (plan SQL CHECK vs implementation domain vs test expectations — three-way); same-failure law applies. Authoritative realignment landed on the package branch (cherry-pick to plan SQL CHECK vocab) + docs surfaces regen (AC-266 green). Completion-truth maintenance branch maint/test-role-completion: §5 test-role checkbox fix + regression, §6 trusted-ancestry already-satisfied proof (base-fixture trap stays OPEN), §8 empty-wave coordinator-tail routing (prep parent + zero-AI tail; open==0 → GREEN, else exit 90) + serial-2/3 chain-ff env-order fix (parent.worktree TypeError burned every serial-2/3 turn)."
+    },
+    {
+      "ts": "2026-09-04T07:37:46.214Z",
+      "event": "Run b20e5ea8 root-caused: (1) task-graph builder dropped relative backticks (`src/...`) → T010-T016 predictedWrites empty → serial lanes unrunnable/unintegratable; (2) chain-ff spawnSync(\"git\",{args}) options-args bug; (3) §6 trusted-ancestry audit kept pre-seed package authorship open forever on re-seeded branch. All three fixed + regression-tested on maint/recovery-truth-chain; PR follows. Codex true-quota (credits) remains the writer-lane blocker."
     }
   ]
 }

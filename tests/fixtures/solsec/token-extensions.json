@@ -1,5 +1,5 @@
 {
-  "$comment": "Golden vectors for all §65.2 controls on synthetic SPL and Token-2022 programs (FR-SOLSEC-001, FR-SOLSEC-002, FR-SOLSEC-004, AC-130).",
+  "$comment": "Golden vectors for all §65.2 controls on synthetic SPL and Token-2022 programs (FR-SOLSEC-001, FR-SOLSEC-002, FR-SOLSEC-004, AC-130, T017).",
   "programIds": {
     "splToken": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
     "token2022": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb"

@@ -106,7 +106,7 @@ extended by this package even though they sit outside the listed writeScopes.
       domain/persistence/shared-schemas, `bun test` script, tsconfig extending
       tsconfig.base.json, no per-package runner config — G0/G1 scaffold
       pattern). Traces: FR-SOLSEC-001…006.
-- [ ] T010 Implement `src/token-assessment.ts`: deterministic
+- [x] T010 Implement `src/token-assessment.ts`: deterministic
       SPL/Token-2022 program, authority, and extension analysis keyed by
       program id + program/layout version (FR-SOLSEC-001) — parse the §65.2
       control list (mint/freeze authorities, permanent delegate, transfer-fee
@@ -132,7 +132,7 @@ extended by this package even though they sit outside the listed writeScopes.
       zero cost never assumed). Colocated tests: full truth table,
       fail-closed on unknown inputs, policy-version row separation (no
       historical rewrite). Traces: FR-SOLSEC-004, AC-130.
-- [ ] T012 Implement `src/pool-security.ts`: pool/LP security assessment
+- [x] T012 Implement `src/pool-security.ts`: pool/LP security assessment
       (§65.3) resolving the pool ONLY through the proven decoder-registry
       resolution surface (family + layout version + signed manifest — the
       `@foresift/program-decoders` public API is consumed read-only; no write
@@ -146,7 +146,7 @@ extended by this package even though they sit outside the listed writeScopes.
       (`POOL_MATH_UNSUPPORTED`/`UNSUPPORTED_PROGRAM_VERSION`). Colocated
       tests including the unsupported-design case and state-completeness
       blocking. Traces: FR-SOLSEC-003, FR-SOLSEC-001, AC-130, AC-230.
-- [ ] T013 Implement `src/provider-evidence.ts`: security-provider report
+- [x] T013 Implement `src/provider-evidence.ts`: security-provider report
       persistence (§65.7 — one independent evidence group; verdict
       SAFE/RISK_DETECTED/UNABLE_TO_VERIFY; raw payload stored as evidence
       reference) and the comparison gate `resolveSecurityConflict(...)`:
@@ -169,7 +169,7 @@ extended by this package even though they sit outside the listed writeScopes.
       revocation ability and context are evidence inputs. Colocated tests:
       deterministic, versioned, pure. Traces: FR-SOLSEC-001, FR-SOLSEC-002,
       FR-SOLSEC-003, AC-131.
-- [ ] T015 Implement `src/system-registry.ts`: registry persistence +
+- [x] T015 Implement `src/system-registry.ts`: registry persistence +
       point-in-time exclusion queries (validity interval contains T) and
       `decideExclusion(...)` producing `system_address_exclusions_applied`
       audit rows for BOTH exclusions and refusals, with raw flow references

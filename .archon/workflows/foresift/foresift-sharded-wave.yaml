@@ -244,18 +244,22 @@ nodes:
   # Serial writer dispatch (single `core` OR chained `core-batch-1..3`).
   # Serial slot 1: when the graph batches the core, batch-1 runs FIRST and
   # batches 2/3 are CHAINED behind their parent's GUARDED head (serial
-  # siblings in the same write column, never concurrent). Same 55m ceiling —
-  # the bounded per-lane scope is what keeps P50/P95 under it; the timeout is
-  # never raised.
+  # siblings in the same write column, never concurrent). Lane ceiling is
+  # 90m (5400000) as of run 0c17388d: router-routed Claude lanes on 4-unit
+  # serial briefs measured >55m with zero output at the old 55m ceiling —
+  # still BOUNDED (node timeout 2h; retry delay 60s = archon max, so a
+  # provider-backoff denial from a timed-out attempt mostly clears before
+  # the next attempt; a second denial fails the node and the supervisor
+  # owns the replay).
   - id: writer-serial-1
     depends_on: [brief-serial-1, exec-serial-1]
     when: "$exec-serial-1.output == 'CODEX'"
-    retry: { max_attempts: 2, delay_ms: 10000, on_error: all }
-    timeout: 3600000
+    retry: { max_attempts: 2, delay_ms: 60000, on_error: all }
+    timeout: 7200000
     bash: |
       LANE="$(node -e 'const g=require(process.env.ARTIFACTS_DIR+"/task-graph.json");const s=(g.shards??[]).filter(x=>x.mode==="serial");process.stdout.write(s[0]?.id??"")')"
       node scripts/automation/exec-codex-writer.mjs --lane "$LANE" \
-        --timeout-ms 3300000 \
+        --timeout-ms 5400000 \
         --brief "$ARTIFACTS_DIR/briefs/$LANE-brief.md" \
         --worktree "$ARTIFACTS_DIR/wt/$LANE" \
         --lane-base "$(cat "$ARTIFACTS_DIR/base-head.txt")" \
@@ -267,13 +271,13 @@ nodes:
   - id: writer-serial-1-claude
     depends_on: [brief-serial-1, exec-serial-1]
     when: "$exec-serial-1.output == 'CLAUDE'"
-    retry: { max_attempts: 2, delay_ms: 10000, on_error: all }
-    timeout: 3600000
+    retry: { max_attempts: 2, delay_ms: 60000, on_error: all }
+    timeout: 7200000
     bash: |
       LANE="$(node -e 'const g=require(process.env.ARTIFACTS_DIR+"/task-graph.json");const s=(g.shards??[]).filter(x=>x.mode==="serial");process.stdout.write(s[0]?.id??"")')"
       TASKS="$(node -e 'const r=require(process.argv[1]);process.stdout.write(((r.lanes??[]).find(l=>l.lane===process.env.SERIAL_LANE)?.taskIds??[]).join(","))' "$ARTIFACTS_DIR/routing.json" 2>/dev/null || true)"
       SERIAL_LANE="$LANE" TASKS="$TASKS" node scripts/automation/exec-claude-writer.mjs \
-        --timeout-ms 3300000 \
+        --timeout-ms 5400000 \
         --lane "$LANE" \
         --brief "$ARTIFACTS_DIR/briefs/$LANE-brief.md" \
         --worktree "$ARTIFACTS_DIR/wt/$LANE" \
@@ -286,11 +290,11 @@ nodes:
   - id: writer-shard-1
     depends_on: [brief-shard-1, exec-shard-1]
     when: "$exec-shard-1.output == 'CODEX'"
-    retry: { max_attempts: 2, delay_ms: 10000, on_error: all }
-    timeout: 3600000
+    retry: { max_attempts: 2, delay_ms: 60000, on_error: all }
+    timeout: 7200000
     bash: |
       node scripts/automation/exec-codex-writer.mjs --lane shard-1 \
-        --timeout-ms 3300000 \
+        --timeout-ms 5400000 \
         --brief "$ARTIFACTS_DIR/briefs/shard-1-brief.md" \
         --worktree "$ARTIFACTS_DIR/wt/shard-1" \
         --lane-base "$(cat "$ARTIFACTS_DIR/base-head.txt")" \
@@ -302,11 +306,11 @@ nodes:
   - id: writer-shard-2
     depends_on: [brief-shard-2, exec-shard-2]
     when: "$exec-shard-2.output == 'CODEX'"
-    retry: { max_attempts: 2, delay_ms: 10000, on_error: all }
-    timeout: 3600000
+    retry: { max_attempts: 2, delay_ms: 60000, on_error: all }
+    timeout: 7200000
     bash: |
       node scripts/automation/exec-codex-writer.mjs --lane shard-2 \
-        --timeout-ms 3300000 \
+        --timeout-ms 5400000 \
         --brief "$ARTIFACTS_DIR/briefs/shard-2-brief.md" \
         --worktree "$ARTIFACTS_DIR/wt/shard-2" \
         --lane-base "$(cat "$ARTIFACTS_DIR/base-head.txt")" \
@@ -320,8 +324,8 @@ nodes:
     depends_on: [brief-serial-2, exec-serial-2, guard-serial-1]
     trigger_rule: none_failed_min_one_success
     when: "$exec-serial-2.output == 'CODEX' && $exec-serial-2.output != 'NO CORE-BATCH-2 THIS WAVE'"
-    retry: { max_attempts: 2, delay_ms: 10000, on_error: all }
-    timeout: 3600000
+    retry: { max_attempts: 2, delay_ms: 60000, on_error: all }
+    timeout: 7200000
     bash: |
       LANE="$(node -e 'const g=require(process.env.ARTIFACTS_DIR+"/task-graph.json");const s=(g.shards??[]).filter(x=>x.mode==="serial");process.stdout.write(s[1]?.id??"")')"
       PARENT="$(node -e 'const g=require(process.env.ARTIFACTS_DIR+"/task-graph.json");const s=(g.shards??[]).filter(x=>x.mode==="serial");process.stdout.write(s[1]?.chainsFrom??"")')"
@@ -342,7 +346,7 @@ nodes:
         console.log("CHAINED",process.env.THIS_LANE,"to",head.slice(0,10));
       '
       PARENT_LANE="$PARENT" THIS_LANE="$LANE" node scripts/automation/exec-codex-writer.mjs --lane "$LANE" \
-        --timeout-ms 3300000 \
+        --timeout-ms 5400000 \
         --brief "$ARTIFACTS_DIR/briefs/$LANE-brief.md" \
         --worktree "$ARTIFACTS_DIR/wt/$LANE" \
         --lane-base "$(cat "$ARTIFACTS_DIR/base-head.txt")" \
@@ -355,8 +359,8 @@ nodes:
     depends_on: [brief-serial-2, exec-serial-2, guard-serial-1]
     trigger_rule: none_failed_min_one_success
     when: "$exec-serial-2.output == 'CLAUDE' && $exec-serial-2.output != 'NO CORE-BATCH-2 THIS WAVE'"
-    retry: { max_attempts: 2, delay_ms: 10000, on_error: all }
-    timeout: 3600000
+    retry: { max_attempts: 2, delay_ms: 60000, on_error: all }
+    timeout: 7200000
     bash: |
       LANE="$(node -e 'const g=require(process.env.ARTIFACTS_DIR+"/task-graph.json");const s=(g.shards??[]).filter(x=>x.mode==="serial");process.stdout.write(s[1]?.id??"")')"
       PARENT="$(node -e 'const g=require(process.env.ARTIFACTS_DIR+"/task-graph.json");const s=(g.shards??[]).filter(x=>x.mode==="serial");process.stdout.write(s[1]?.chainsFrom??"")')"
@@ -376,7 +380,7 @@ nodes:
       '
       TASKS="$(node -e 'const r=require(process.argv[1]);const env=process.env.SERIAL_LANE;process.stdout.write(((r.lanes??[]).find(l=>l.lane===env)?.taskIds??[]).join(","))' "$ARTIFACTS_DIR/routing.json")"
       SERIAL_LANE="$LANE" PARENT_LANE="$PARENT" THIS_LANE="$LANE" node scripts/automation/exec-claude-writer.mjs \
-        --timeout-ms 3300000 \
+        --timeout-ms 5400000 \
         --lane "$LANE" \
         --brief "$ARTIFACTS_DIR/briefs/$LANE-brief.md" \
         --worktree "$ARTIFACTS_DIR/wt/$LANE" \
@@ -391,8 +395,8 @@ nodes:
     depends_on: [brief-serial-3, exec-serial-3, guard-serial-2]
     trigger_rule: none_failed_min_one_success
     when: "$exec-serial-3.output == 'CODEX' && $exec-serial-3.output != 'NO CORE-BATCH-3 THIS WAVE'"
-    retry: { max_attempts: 2, delay_ms: 10000, on_error: all }
-    timeout: 3600000
+    retry: { max_attempts: 2, delay_ms: 60000, on_error: all }
+    timeout: 7200000
     bash: |
       LANE="$(node -e 'const g=require(process.env.ARTIFACTS_DIR+"/task-graph.json");const s=(g.shards??[]).filter(x=>x.mode==="serial");process.stdout.write(s[2]?.id??"")')"
       PARENT="$(node -e 'const g=require(process.env.ARTIFACTS_DIR+"/task-graph.json");const s=(g.shards??[]).filter(x=>x.mode==="serial");process.stdout.write(s[2]?.chainsFrom??"")')"
@@ -411,7 +415,7 @@ nodes:
         console.log("CHAINED",process.env.THIS_LANE,"to",head.slice(0,10));
       '
       PARENT_LANE="$PARENT" THIS_LANE="$LANE" node scripts/automation/exec-codex-writer.mjs --lane "$LANE" \
-        --timeout-ms 3300000 \
+        --timeout-ms 5400000 \
         --brief "$ARTIFACTS_DIR/briefs/$LANE-brief.md" \
         --worktree "$ARTIFACTS_DIR/wt/$LANE" \
         --lane-base "$(cat "$ARTIFACTS_DIR/base-head.txt")" \
@@ -424,8 +428,8 @@ nodes:
     depends_on: [brief-serial-3, exec-serial-3, guard-serial-2]
     trigger_rule: none_failed_min_one_success
     when: "$exec-serial-3.output == 'CLAUDE' && $exec-serial-3.output != 'NO CORE-BATCH-3 THIS WAVE'"
-    retry: { max_attempts: 2, delay_ms: 10000, on_error: all }
-    timeout: 3600000
+    retry: { max_attempts: 2, delay_ms: 60000, on_error: all }
+    timeout: 7200000
     bash: |
       LANE="$(node -e 'const g=require(process.env.ARTIFACTS_DIR+"/task-graph.json");const s=(g.shards??[]).filter(x=>x.mode==="serial");process.stdout.write(s[2]?.id??"")')"
       PARENT="$(node -e 'const g=require(process.env.ARTIFACTS_DIR+"/task-graph.json");const s=(g.shards??[]).filter(x=>x.mode==="serial");process.stdout.write(s[2]?.chainsFrom??"")')"
@@ -445,7 +449,7 @@ nodes:
       '
       TASKS="$(node -e 'const r=require(process.argv[1]);const env=process.env.SERIAL_LANE;process.stdout.write(((r.lanes??[]).find(l=>l.lane===env)?.taskIds??[]).join(","))' "$ARTIFACTS_DIR/routing.json")"
       SERIAL_LANE="$LANE" PARENT_LANE="$PARENT" THIS_LANE="$LANE" node scripts/automation/exec-claude-writer.mjs \
-        --timeout-ms 3300000 \
+        --timeout-ms 5400000 \
         --lane "$LANE" \
         --brief "$ARTIFACTS_DIR/briefs/$LANE-brief.md" \
         --worktree "$ARTIFACTS_DIR/wt/$LANE" \
@@ -458,12 +462,12 @@ nodes:
   - id: writer-shard-1-claude
     depends_on: [brief-shard-1, exec-shard-1]
     when: "$exec-shard-1.output == 'CLAUDE'"
-    retry: { max_attempts: 2, delay_ms: 10000, on_error: all }
-    timeout: 3600000
+    retry: { max_attempts: 2, delay_ms: 60000, on_error: all }
+    timeout: 7200000
     bash: |
       TASKS="$(node -e 'const r=require(process.argv[1]);process.stdout.write(((r.lanes??[]).find(l=>l.lane==="shard-1")?.taskIds??[]).join(","))' "$ARTIFACTS_DIR/routing.json")"
       node scripts/automation/exec-claude-writer.mjs \
-        --timeout-ms 3300000 \
+        --timeout-ms 5400000 \
         --lane shard-1 \
         --brief "$ARTIFACTS_DIR/briefs/shard-1-brief.md" \
         --worktree "$ARTIFACTS_DIR/wt/shard-1" \
@@ -476,12 +480,12 @@ nodes:
   - id: writer-shard-2-claude
     depends_on: [brief-shard-2, exec-shard-2]
     when: "$exec-shard-2.output == 'CLAUDE'"
-    retry: { max_attempts: 2, delay_ms: 10000, on_error: all }
-    timeout: 3600000
+    retry: { max_attempts: 2, delay_ms: 60000, on_error: all }
+    timeout: 7200000
     bash: |
       TASKS="$(node -e 'const r=require(process.argv[1]);process.stdout.write(((r.lanes??[]).find(l=>l.lane==="shard-2")?.taskIds??[]).join(","))' "$ARTIFACTS_DIR/routing.json")"
       node scripts/automation/exec-claude-writer.mjs \
-        --timeout-ms 3300000 \
+        --timeout-ms 5400000 \
         --lane shard-2 \
         --brief "$ARTIFACTS_DIR/briefs/shard-2-brief.md" \
         --worktree "$ARTIFACTS_DIR/wt/shard-2" \
@@ -495,8 +499,8 @@ nodes:
   - id: writer-test-author-agy
     depends_on: [brief-test-author, exec-test-author]
     when: "$exec-test-author.output == 'AGY'"
-    retry: { max_attempts: 2, delay_ms: 10000, on_error: all }
-    timeout: 3600000
+    retry: { max_attempts: 2, delay_ms: 60000, on_error: all }
+    timeout: 7200000
     bash: |
       # Write-disjoint AGY test sharding (maintainer Part E, canary cap 2):
       # each enumerated test lane dispatches its OWN worktree/brief/results —
@@ -520,8 +524,8 @@ nodes:
   - id: writer-test-author-2-agy
     depends_on: [brief-test-author-2, exec-test-author-2]
     when: "$exec-test-author-2.output == 'AGY'"
-    retry: { max_attempts: 2, delay_ms: 10000, on_error: all }
-    timeout: 3600000
+    retry: { max_attempts: 2, delay_ms: 60000, on_error: all }
+    timeout: 7200000
     bash: |
       TL_ID="$(node -e 'const g=require(process.env.ARTIFACTS_DIR+"/task-graph.json");process.stdout.write(g.testLanes?.[1]?.id??"")')"
       TASKS="$(node -e 'const g=require(process.env.ARTIFACTS_DIR+"/task-graph.json");process.stdout.write((g.testLanes?.[1]?.units??[]).join(","))')"

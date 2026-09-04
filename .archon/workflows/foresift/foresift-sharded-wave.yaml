@@ -667,6 +667,31 @@ nodes:
       dispatched=$(find "$ARTIFACTS_DIR/writer-results" -name result.json 2>/dev/null | wc -l)
       integrated=$(node -e 'const r=JSON.parse(require("fs").readFileSync(process.argv[1],"utf8"));console.log((r.integrated??[]).length)' "$ARTIFACTS_DIR/integration-report.json")
       if [ "$dispatched" -gt 0 ] && [ "$integrated" -eq 0 ]; then
+        # §6 already-satisfied audit BEFORE declaring zero progress (live
+        # 8f4aaa6d class): a recovery wave whose units were completed by
+        # PRIOR validated waves (work merged into the adopted branch) yields
+        # lanes with legitimately EMPTY diffs — no lane can nominate, yet the
+        # coordinator DOES own deterministic progress via the trusted-ancestry
+        # audit. Run it; if it closes ≥1 open task, the wave proceeds to the
+        # FAST verdict (which re-verifies the whole tree — never vacuous: the
+        # audit's checkbox commits are a real diff-vs-base). Only a wave where
+        # the audit closes NOTHING fails as integration-empty.
+        node scripts/automation/evidence-owner-registry.mjs \
+          --package "$PKG" \
+          --graph "$ARTIFACTS_DIR/task-graph.json" \
+          > "$ARTIFACTS_DIR/evidence-owner-report.json" 2>&1 || true
+        before_open=$(node -e '
+          const g=require(process.env.ARTIFACTS_DIR+"/task-graph.json");
+          console.log((g.units??[]).filter(u=>!u.done).length);
+        ')
+        after_open=$(grep -c '^- \[ \] ' "specs/$PKG/tasks.md" || true)
+        echo "integration-empty audit: open $before_open -> ${after_open:-0} (report: $ARTIFACTS_DIR/evidence-owner-report.json)" >&2
+        if [ "${after_open:-0}" -lt "$before_open" ]; then
+          echo "coordinator audit closed $((before_open - ${after_open:-0})) task(s); proceeding to FAST" >&2
+          integrated=1  # coordinator-owned progress — not an empty wave
+        fi
+      fi
+      if [ "$dispatched" -gt 0 ] && [ "$integrated" -eq 0 ]; then
         echo "wave integration empty: $dispatched dispatched lane(s), none integrated; full report: $ARTIFACTS_DIR/integration-report.json" \
           > "$ARTIFACTS_DIR/wave-integration-empty.log" 2>&1
         printf '{"schema":"foresift/wave-fast-verdict@1","exitCode":90,"reason":"integration_empty"}\n' \

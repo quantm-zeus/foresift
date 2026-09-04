@@ -1,10 +1,10 @@
 {
   "schema": "foresift/maintainer-snapshot@1",
-  "updatedAt": "2026-09-04T07:37:46.213Z",
+  "updatedAt": "2026-09-04T08:33:00.461Z",
   "mission": "Persistent maintainer — minimize authoritative project critical-path wall clock",
   "currentSnapshot": {
     "milestone": "G1",
-    "g1Progress": "G1 1/8 PROVEN — g1-solana-security RUNNING on durable branch foresift/g1-solana-security (seed d442848 = 803b2f9+main 9bfca5c, test-author lane a384384 pushed); recovery run b20e5ea8 root-caused (3 defects fixed on maint/recovery-truth-chain)",
+    "g1Progress": "G1 1/8 PROVEN — g1-solana-security paused_fatal, recovery ready post-#183: branch tip 06a9514 (d442848 + test-author lane a384384 merged), PR #184 (g1cc preplan) in flight",
     "packages": {
       "g0-contracts-data-truth": "PROVEN",
       "g0-security-perimeter": "PROVEN",
@@ -18,8 +18,8 @@
       "g1-data-truth-extensions": "PROVEN — PR #175 squash 32c4673 + state chore #177 (31e0534)",
       "g1-solana-security": "RUNNING — product branch 38+ commits durable/pushed; T013/T014/T015 (provider-evidence/severity/system-registry srcs) genuinely open; T026–T028 coordinator tail; codex TRUE credit exhaustion blocks CODEX serial lanes (\"Your workspace is out of credits\" — owner action required, not latch self-heal)"
     },
-    "mainSha": "9bfca5cd0147705d6a0b1081fa2aa7cf199d5185 (PR #182 landed)",
-    "mainCi": "GREEN at 9bfca5c (merged-main Verify)",
+    "mainSha": "863b0c3b0079924658eff4b99525dd43c7a5f27f (PR #183 squash)",
+    "mainCi": "merged-main CI in flight at 863b0c3 (recovery proceeds only on GREEN)",
     "supervisor": "PAUSED_FATAL run 9b798cf0 (g1-solana-security): fast-repair-loop exhausted 3× on the same deterministic plan-vs-code vocabulary drift; root-caused 2026-09-04 — same-failure law confirmed, no further AI repair",
     "taskWorktree": "/home/minhquan_eth/.archon/workspaces/quantm-zeus/foresift/worktrees/archon/task-foresift-g1-solana-security (branch foresift/g1-solana-security @ da51226, pushed; realignment cherry-pick + docs regen committed)",
     "maintainerContinuity": "watcher + dedicated tmux socket (foresift-maintainer) live; 00:00 agy-remote-control-update.timer kill mechanism proven and isolated (PR #182)"
@@ -86,6 +86,10 @@
     {
       "ts": "2026-09-04T07:37:46.214Z",
       "event": "Run b20e5ea8 root-caused: (1) task-graph builder dropped relative backticks (`src/...`) → T010-T016 predictedWrites empty → serial lanes unrunnable/unintegratable; (2) chain-ff spawnSync(\"git\",{args}) options-args bug; (3) §6 trusted-ancestry audit kept pre-seed package authorship open forever on re-seeded branch. All three fixed + regression-tested on maint/recovery-truth-chain; PR follows. Codex true-quota (credits) remains the writer-lane blocker."
+    },
+    {
+      "ts": "2026-09-04T08:33:00.462Z",
+      "event": "PR #183 MERGED exact-head (04115bc→863b0c3): builder primary-scope re-rooting, §6 re-seed audit law, chain-ff spawnSync, credit-exhaustion latch, evidence/ prefix. Recovery sim green: §6 closes T008/T010/T011/T012/T016 at tip 06a9514; T013-T015 = serial writer; test-author lane work merged into package branch (06a9514) preserving validated AGY effort. PR #184 g1cc preplan opened. Awaiting merged-main CI then --recover-fatal."
     }
   ]
 }

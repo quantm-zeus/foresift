@@ -845,13 +845,13 @@ describe('foresift-sharded-wave workflow contract', () => {
       expect(codex?.[0]).toContain(`depends_on: [brief-${lane}, exec-${lane}]`);
       expect(codex?.[0]).toContain(`when: "$exec-${lane}.output == 'CODEX'"`);
       expect(codex?.[0]).toMatch(
-        /retry:\s*\{\s*max_attempts:\s*2,\s*delay_ms:\s*10000,\s*on_error:\s*all\s*\}/,
+        /retry:\s*\{\s*max_attempts:\s*2,\s*delay_ms:\s*60000,\s*on_error:\s*all\s*\}/,
       );
       expect(codex?.[0]).toContain(`exec-codex-writer.mjs --lane ${lane}`);
       // H3 (2026-08-31): lanes get a 55m provider timeout inside the 60m node
       // budget — the silent 45m claude-lane-core default killed a HIGH-risk
       // core lane mid-implementation (run c38c2e1b) and lost all its work.
-      expect(codex?.[0]).toContain('--timeout-ms 3300000');
+      expect(codex?.[0]).toContain('--timeout-ms 5400000');
       expect(codex?.[0]).toContain(`--brief "$ARTIFACTS_DIR/briefs/${lane}-brief.md"`);
       expect(codex?.[0]).toContain(`--worktree "$ARTIFACTS_DIR/wt/${lane}"`);
       expect(codex?.[0]).toContain(`--routing "$ARTIFACTS_DIR/routing.json"`);
@@ -869,10 +869,10 @@ describe('foresift-sharded-wave workflow contract', () => {
       );
       expect(codex?.[0]).toContain(`when: "$exec-serial-${slot}.output == 'CODEX'`);
       expect(codex?.[0]).toMatch(
-        /retry:\s*\{\s*max_attempts:\s*2,\s*delay_ms:\s*10000,\s*on_error:\s*all\s*\}/,
+        /retry:\s*\{\s*max_attempts:\s*2,\s*delay_ms:\s*60000,\s*on_error:\s*all\s*\}/,
       );
       expect(codex?.[0]).toContain('exec-codex-writer.mjs --lane "$LANE"');
-      expect(codex?.[0]).toContain('--timeout-ms 3300000');
+      expect(codex?.[0]).toContain('--timeout-ms 5400000');
       expect(codex?.[0]).toContain('--brief "$ARTIFACTS_DIR/briefs/$LANE-brief.md"');
       expect(codex?.[0]).toContain('--worktree "$ARTIFACTS_DIR/wt/$LANE"');
       expect(codex?.[0]).toContain('--routing "$ARTIFACTS_DIR/routing.json"');
@@ -891,10 +891,10 @@ describe('foresift-sharded-wave workflow contract', () => {
       expect(claude?.[0]).toContain(`depends_on: [brief-${lane}, exec-${lane}]`);
       expect(claude?.[0]).toContain(`when: "$exec-${lane}.output == 'CLAUDE'"`);
       expect(claude?.[0]).toMatch(
-        /retry:\s*\{\s*max_attempts:\s*2,\s*delay_ms:\s*10000,\s*on_error:\s*all\s*\}/,
+        /retry:\s*\{\s*max_attempts:\s*2,\s*delay_ms:\s*60000,\s*on_error:\s*all\s*\}/,
       );
       expect(claude?.[0]).toContain(
-        `exec-claude-writer.mjs \\\n        --timeout-ms 3300000 \\\n        --lane ${lane}`,
+        `exec-claude-writer.mjs \\\n        --timeout-ms 5400000 \\\n        --lane ${lane}`,
       );
       expect(claude?.[0]).toContain(`--brief "$ARTIFACTS_DIR/briefs/${lane}-brief.md"`);
       expect(claude?.[0]).toContain(`--worktree "$ARTIFACTS_DIR/wt/${lane}"`);
@@ -916,7 +916,7 @@ describe('foresift-sharded-wave workflow contract', () => {
       );
       expect(claude?.[0]).toContain(`when: "$exec-serial-${slot}.output == 'CLAUDE'`);
       expect(claude?.[0]).toContain('exec-claude-writer.mjs');
-      expect(claude?.[0]).toContain('--timeout-ms 3300000');
+      expect(claude?.[0]).toContain('--timeout-ms 5400000');
       expect(claude?.[0]).toContain('--lane "$LANE"');
       expect(claude?.[0]).toContain('--task-ids "$TASKS"');
       expect(claude?.[0]).toContain('--generation "$(');
@@ -932,7 +932,7 @@ describe('foresift-sharded-wave workflow contract', () => {
     expect(agyTest?.[0]).toContain('depends_on: [brief-test-author, exec-test-author]');
     expect(agyTest?.[0]).toContain('when: "$exec-test-author.output == \'AGY\'"');
     expect(agyTest?.[0]).toMatch(
-      /retry:\s*\{\s*max_attempts:\s*2,\s*delay_ms:\s*10000,\s*on_error:\s*all\s*\}/,
+      /retry:\s*\{\s*max_attempts:\s*2,\s*delay_ms:\s*60000,\s*on_error:\s*all\s*\}/,
     );
     // Graph-derived AGY test-lane dispatch (maintainer Part E, 2026-09-03):
     // lane id/units come from g.testLanes[n], so the sharded test-author-1/2
@@ -1065,9 +1065,9 @@ describe('foresift-sharded-wave workflow contract', () => {
       expect(claude?.[0]).toContain(`guard-serial-${slot - 1}`);
     }
     // The per-lane ceiling is UNCHANGED (bounded scope, not a bigger timeout).
-    const timeouts = [...yaml.matchAll(/--timeout-ms 3300000/g)].length;
+    const timeouts = [...yaml.matchAll(/--timeout-ms 5400000/g)].length;
     expect(timeouts).toBeGreaterThanOrEqual(6); // serial slots 1..3 x codex/claude
-    expect(yaml).not.toMatch(/timeout-ms (?!3300000)\d+/); // no raised ceiling anywhere
+    expect(yaml).not.toMatch(/timeout-ms (?!5400000)\d+/); // no raised ceiling anywhere
   });
 
   it('never lets a fully-rejected wave settle green over zero progress (defect #12)', () => {

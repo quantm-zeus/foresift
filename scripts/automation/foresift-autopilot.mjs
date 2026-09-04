@@ -199,8 +199,16 @@ const BACKOFF_CAP_MS = 15 * 60_000;
 // Dedupes co_run_denied observability events within one supervisor process.
 const coRunDenialSeen = new Set();
 // A "running" Archon row proves nothing about liveness; if a run shows no
-// activity for this long we treat it as orphaned (§17).
-const STALE_RUN_MS = 90 * 60_000;
+// activity for this long we treat it as orphaned (§17). Live 2026-09-04 (run
+// 0eaa1e85): Archon's runs-row `last_activity_at` does NOT advance during
+// detached bash-node execution — it stayed frozen at launch time while the
+// serial-2 writer ran a healthy 60m24s — so the probe read "90 minutes idle"
+// and abandoned the run 15 minutes BEFORE the writer completed, cancelling a
+// fully productive wave (defect 6). The ceiling must exceed the WORST healthy
+// node path: a 2h writer-node timeout + two 60s retry gaps + margin = 3h.
+// A genuinely dead detached run shows no log growth for hours; §17 reaping
+// stays real, just never fires inside a legitimate long node.
+const STALE_RUN_MS = 3 * 60 * 60_000;
 // Detach acks carry no run id; discovery polls the runs table this often/at most.
 const DISCOVERY_RETRY_MS = 30_000;
 const DISCOVERY_LIMIT = 5;

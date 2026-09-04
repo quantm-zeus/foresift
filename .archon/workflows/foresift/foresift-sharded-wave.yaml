@@ -327,7 +327,11 @@ nodes:
       PARENT="$(node -e 'const g=require(process.env.ARTIFACTS_DIR+"/task-graph.json");const s=(g.shards??[]).filter(x=>x.mode==="serial");process.stdout.write(s[1]?.chainsFrom??"")')"
       # Chained batch: fast-forward the parent's worktree branch to its GUARDED
       # head before this writer starts (serial siblings, one write column).
-      node -e '
+      # PARENT_LANE/THIS_LANE are exported HERE — the exec-writer invocation
+      # below re-exports them for its own use (live 7d49dce0/9b798cf0: the
+      # chain-ff ran before any export, parent read undefined, and every
+      # serial-2/3 wave burned its writer turn without the ff).
+      PARENT_LANE="$PARENT" THIS_LANE="$LANE" node -e '
         const {spawnSync}=require("node:child_process");
         const d=process.env.ARTIFACTS_DIR;
         const meta=JSON.parse(require("node:fs").readFileSync(d+"/shard-meta.json","utf8"));
@@ -356,7 +360,11 @@ nodes:
     bash: |
       LANE="$(node -e 'const g=require(process.env.ARTIFACTS_DIR+"/task-graph.json");const s=(g.shards??[]).filter(x=>x.mode==="serial");process.stdout.write(s[1]?.id??"")')"
       PARENT="$(node -e 'const g=require(process.env.ARTIFACTS_DIR+"/task-graph.json");const s=(g.shards??[]).filter(x=>x.mode==="serial");process.stdout.write(s[1]?.chainsFrom??"")')"
-      node -e '
+      # PARENT_LANE/THIS_LANE are exported HERE — the exec-writer invocation
+      # below re-exports them for its own use (live 7d49dce0/9b798cf0: the
+      # chain-ff ran before any export, parent read undefined, and every
+      # serial-2/3 wave burned its writer turn without the ff).
+      PARENT_LANE="$PARENT" THIS_LANE="$LANE" node -e '
         const {spawnSync}=require("node:child_process");
         const d=process.env.ARTIFACTS_DIR;
         const meta=JSON.parse(require("node:fs").readFileSync(d+"/shard-meta.json","utf8"));
@@ -388,7 +396,11 @@ nodes:
     bash: |
       LANE="$(node -e 'const g=require(process.env.ARTIFACTS_DIR+"/task-graph.json");const s=(g.shards??[]).filter(x=>x.mode==="serial");process.stdout.write(s[2]?.id??"")')"
       PARENT="$(node -e 'const g=require(process.env.ARTIFACTS_DIR+"/task-graph.json");const s=(g.shards??[]).filter(x=>x.mode==="serial");process.stdout.write(s[2]?.chainsFrom??"")')"
-      node -e '
+      # PARENT_LANE/THIS_LANE are exported HERE — the exec-writer invocation
+      # below re-exports them for its own use (live 7d49dce0/9b798cf0: the
+      # chain-ff ran before any export, parent read undefined, and every
+      # serial-2/3 wave burned its writer turn without the ff).
+      PARENT_LANE="$PARENT" THIS_LANE="$LANE" node -e '
         const {spawnSync}=require("node:child_process");
         const d=process.env.ARTIFACTS_DIR;
         const meta=JSON.parse(require("node:fs").readFileSync(d+"/shard-meta.json","utf8"));
@@ -417,7 +429,11 @@ nodes:
     bash: |
       LANE="$(node -e 'const g=require(process.env.ARTIFACTS_DIR+"/task-graph.json");const s=(g.shards??[]).filter(x=>x.mode==="serial");process.stdout.write(s[2]?.id??"")')"
       PARENT="$(node -e 'const g=require(process.env.ARTIFACTS_DIR+"/task-graph.json");const s=(g.shards??[]).filter(x=>x.mode==="serial");process.stdout.write(s[2]?.chainsFrom??"")')"
-      node -e '
+      # PARENT_LANE/THIS_LANE are exported HERE — the exec-writer invocation
+      # below re-exports them for its own use (live 7d49dce0/9b798cf0: the
+      # chain-ff ran before any export, parent read undefined, and every
+      # serial-2/3 wave burned its writer turn without the ff).
+      PARENT_LANE="$PARENT" THIS_LANE="$LANE" node -e '
         const {spawnSync}=require("node:child_process");
         const d=process.env.ARTIFACTS_DIR;
         const meta=JSON.parse(require("node:fs").readFileSync(d+"/shard-meta.json","utf8"));
@@ -609,8 +625,18 @@ nodes:
   # checkpoint fires only through the green path (wave-settled bridge), so no
   # false green and no checkpoint after red (override §14/§15 acceptance).
   - id: integrate-and-fast
-    depends_on: [guard-serial-1, guard-serial-2, guard-serial-3, guard-shard-1, guard-shard-2, guard-test-author, guard-test-author-2]
-    trigger_rule: none_failed_min_one_success   # guards fail closed per-lane
+    # Empty-wave routing (directive §8, live run 2c1aa231): when only
+    # coordinator/already-satisfied tasks remain, EVERY writer lane is
+    # sentinel-skipped and every guard with it — so this node had zero
+    # successful parents, was trigger-skipped itself, and wave-settled/land/
+    # checkpoint all skipped (package landed nowhere). `prep` is added as a
+    # always-present successful parent: it guarantees min-one-success in a
+    # fully empty wave while the none_failed_min_one_success rule still
+    # blocks on any genuinely FAILED guard. The bash decides below whether
+    # an all-skipped wave is a completed package (open==0 → settle/land) or
+    # a halted one (open>0 → exit 90, supervisor owns the replay decision).
+    depends_on: [prep, guard-serial-1, guard-serial-2, guard-serial-3, guard-shard-1, guard-shard-2, guard-test-author, guard-test-author-2]
+    trigger_rule: none_failed_min_one_success
     timeout: 3600000
     bash: |
       set -uo pipefail
@@ -647,6 +673,33 @@ nodes:
         # from matching, and the NONZERO exit FAILS the node so wave-settled
         # cannot bridge an empty wave to landing — the supervisor's recovery
         # policy owns the replay decision (no provider spend, no false green).
+        echo "WAVE_INTEGRATION_EMPTY"
+        exit 90
+      fi
+      if [ "$dispatched" -eq 0 ] && [ "$integrated" -eq 0 ]; then
+        # Empty-wave coordinator tail (directive §8, zero AI): every lane was
+        # sentinel-skipped, so the only remaining work can be coordinator-owned
+        # (verification/artifact/already-satisfied duties). Run the deterministic
+        # evidence-owner pass; if it closes the LAST open task, the package is
+        # genuinely complete with an empty diff — settle/land proceed and the
+        # FULL gate at package-final-land re-verifies everything. Open tasks
+        # remaining means progress halted: fail the node (exit 90) so the
+        # supervisor decides, exactly like a dispatched-but-unintegrated wave.
+        node scripts/automation/evidence-owner-registry.mjs \
+          --package "$PKG" \
+          --graph "$ARTIFACTS_DIR/task-graph.json" \
+          > "$ARTIFACTS_DIR/evidence-owner-report.json" 2>&1 || true
+        open=$(grep -c '^- \[ \] ' "specs/$PKG/tasks.md" || true)
+        if [ "${open:-0}" -eq 0 ]; then
+          printf '{"schema":"foresift/wave-fast-verdict@1","exitCode":0,"reason":"empty_wave_coordinator_tail_complete"}\n' \
+            > "$ARTIFACTS_DIR/wave-fast-verdict.json"
+          echo "WAVE_FAST_GREEN"
+          exit 0
+        fi
+        echo "empty wave with $open open task(s) the coordinator tail cannot close; report: $ARTIFACTS_DIR/evidence-owner-report.json" \
+          > "$ARTIFACTS_DIR/wave-integration-empty.log" 2>&1
+        printf '{"schema":"foresift/wave-fast-verdict@1","exitCode":90,"reason":"empty_wave_open_tasks"}\n' \
+          > "$ARTIFACTS_DIR/wave-fast-verdict.json"
         echo "WAVE_INTEGRATION_EMPTY"
         exit 90
       fi

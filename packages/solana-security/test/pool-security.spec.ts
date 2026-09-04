@@ -12,8 +12,6 @@ import {
   assessPoolSecurity,
   analyzePoolSecurity,
   blocksPoolExecutionModeling,
-  POOL_SECURITY_ANALYZER_VERSION,
-  POOL_SECURITY_POLICY_VERSION,
   type PoolSecurityInput,
   type PoolResolvedState,
 } from '../src/index.ts';
@@ -103,7 +101,6 @@ describe('pool-security: deterministic LP and pool security assessment (FR-SOLSE
       state: {
         ...fullResolvedState,
         positionControl: 'LOCKED_WITH_EVIDENCE',
-        lockEvidenceRef: undefined, // missing evidence
       },
     });
 

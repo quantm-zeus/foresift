@@ -13,7 +13,6 @@ import {
   SPL_TOKEN_PROGRAM_ID,
   TOKEN_2022_PROGRAM_ID,
   TOKEN_ASSESSMENT_ANALYZER_VERSION,
-  TOKEN_ASSESSMENT_POLICY_VERSION,
   type TokenAssessmentInput,
 } from '../src/token-assessment.ts';
 
@@ -80,11 +79,8 @@ describe('token-assessment: deterministic SPL/Token-2022 control analysis (FR-SO
   });
 
   it('marks undefined authorities as UNABLE_TO_VERIFY with PARTIAL quality code', () => {
-    const result = assessTokenControls({
-      ...baseInput,
-      mintAuthority: undefined,
-      freezeAuthority: undefined,
-    });
+    const { mintAuthority: _m, freezeAuthority: _f, ...inputWithoutAuthorities } = baseInput;
+    const result = assessTokenControls(inputWithoutAuthorities);
 
     const mintFinding = result.findings.find((f) => f.control === TokenControl.MINT);
     expect(mintFinding!.controlState).toBe(TokenControlState.UNABLE_TO_VERIFY);

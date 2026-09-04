@@ -9,7 +9,6 @@ import {
   blocksCompleteExecutionModeling,
   DEFAULT_TRANSFER_SEMANTICS_POLICY,
   TRANSFER_VERDICT_POLICY_VERSION,
-  SPL_TOKEN_PROGRAM_ID,
   TOKEN_2022_PROGRAM_ID,
   type TransferSemanticsPolicy,
   type TransferSemanticsInput,

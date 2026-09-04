@@ -1,25 +1,24 @@
 import { describe, expect, it } from 'bun:test';
 import {
-  LiquidityRemovalRisk,
-  LpControlState,
   SecuritySeverity,
   TokenControl,
   TokenControlState,
-  WithdrawalAuthorityState,
 } from '@foresift/domain';
 import {
   parseSolsecSchema,
   type TokenControlFinding,
-  type PoolSecurityAssessment,
 } from '@foresift/shared-schemas';
 
 // Note: Test authoring for T014 (FR-SOLSEC-001, FR-SOLSEC-002, FR-SOLSEC-003, AC-131).
-let severityModule: any;
-try {
-  severityModule = await import('../src/severity.ts');
-} catch {
-  severityModule = null;
+async function tryImportModule(specifier: string): Promise<any> {
+  try {
+    return await import(specifier);
+  } catch {
+    return null;
+  }
 }
+
+const severityModule = await tryImportModule('../src/severity.ts');
 
 describe('severity: Appendix Q.1-derived deterministic severity mapping policy (T014, AC-131)', () => {
   const assessmentId = 'token-assessment:test:token001';

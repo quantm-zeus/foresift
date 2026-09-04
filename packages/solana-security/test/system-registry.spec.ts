@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'bun:test';
 import {
+  parseChainId,
   isExcludableSystemAddress,
   SystemAddressReviewState,
   SystemAddressRole,
-  SYSTEM_ADDRESS_EXCLUSION_MIN_CONFIDENCE,
 } from '@foresift/domain';
 import {
   parseSolsecSchema,
@@ -11,17 +11,10 @@ import {
   type SystemAddressExclusionApplied,
 } from '@foresift/shared-schemas';
 
-let systemRegistryModule: any;
-try {
-  systemRegistryModule = await import('../src/system-registry.ts');
-} catch {
-  systemRegistryModule = null;
-}
-
 describe('system-registry: versioned address registry & actor exclusion audit (FR-SOLSEC-006, AC-132, T015)', () => {
   const mockRouterEntry: SystemAddressRegistryEntry = {
     registryEntryId: 'sys-reg:solana:mainnet:jupiter-router-v6',
-    chainId: 'solana:mainnet',
+    chainId: parseChainId('solana:mainnet'),
     address: 'JUP6LkbZbjS1jKKwapdHNy74zcZ3tLUZoi5QNyVTaV4',
     role: SystemAddressRole.ROUTER,
     validFrom: '2025-01-01T00:00:00.000Z',
@@ -35,7 +28,7 @@ describe('system-registry: versioned address registry & actor exclusion audit (F
 
   const mockPendingEntry: SystemAddressRegistryEntry = {
     registryEntryId: 'sys-reg:solana:mainnet:unverified-pump-pool',
-    chainId: 'solana:mainnet',
+    chainId: parseChainId('solana:mainnet'),
     address: 'PumpPoolUnverified1111111111111111111111111',
     role: SystemAddressRole.POOL,
     validFrom: '2026-01-01T00:00:00.000Z',
@@ -49,7 +42,7 @@ describe('system-registry: versioned address registry & actor exclusion audit (F
 
   const mockRetiredEntry: SystemAddressRegistryEntry = {
     registryEntryId: 'sys-reg:solana:mainnet:legacy-dex-router',
-    chainId: 'solana:mainnet',
+    chainId: parseChainId('solana:mainnet'),
     address: 'LegacyRouter1111111111111111111111111111111',
     role: SystemAddressRole.ROUTER,
     validFrom: '2025-01-01T00:00:00.000Z',

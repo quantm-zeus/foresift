@@ -15,13 +15,15 @@ import {
 
 // Note: Test authoring for T013 (FR-SOLSEC-005, AC-131).
 // If provider-evidence module is implemented, import directly; otherwise test pure contracts and schema boundaries.
-let providerModule: any;
-try {
-  providerModule = await import('../src/provider-evidence.ts');
-} catch {
-  // Expected RED baseline until product author implements provider-evidence.ts
-  providerModule = null;
+async function tryImportModule(specifier: string): Promise<any> {
+  try {
+    return await import(specifier);
+  } catch {
+    return null;
+  }
 }
+
+const providerModule = await tryImportModule('../src/provider-evidence.ts');
 
 describe('provider-evidence: security provider independence and conflict resolution (FR-SOLSEC-005, AC-131, T013)', () => {
   const assessmentId = 'token-assessment:solana:mainnet/token123:1.0.0:mint-v1';

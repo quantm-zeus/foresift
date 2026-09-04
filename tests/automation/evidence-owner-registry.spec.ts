@@ -299,6 +299,121 @@ describe('NO_OP_ALREADY_SATISFIED completion owner', () => {
   });
 });
 
+describe('fileEvidenceAlreadySatisfied trusted-ancestry proof (directive §6)', () => {
+  // Real git fixture: base commit (trusted) authors the deliverable, then an
+  // UNTRUSTED later commit authors a second predicted write. Only the first
+  // satisfies the audit when trustedBase is pinned to the base.
+  function gitRepo() {
+    const root = scratch();
+    execSync('git init -q', { cwd: root });
+    execSync('git config user.email t@t', { cwd: root });
+    execSync('git config user.name t', { cwd: root });
+    return root;
+  }
+  const commit = (root: string, msg: string) =>
+    execSync(`git add -A && git commit -qm "${msg}"`, { cwd: root }).toString().trim();
+
+  test('CASE 2: output authored in trusted history + no blockers → satisfies', () => {
+    const root = gitRepo();
+    try {
+      mkdirSync(join(root, 'packages/x/src'), { recursive: true });
+      writeFileSync(join(root, 'packages/x/src/alpha.ts'), 'export const alpha = 1;\n');
+      commit(root, 'authoritative: author alpha.ts');
+      const trustedBase = execSync('git rev-parse HEAD', { cwd: root }).toString().trim();
+      // post-base commit (a prior validated wave) touches the tree again
+      writeFileSync(join(root, 'packages/x/src/alpha.ts'), 'export const alpha = 2;\n');
+      commit(root, 'prior validated wave revisits alpha.ts');
+      const unit = { id: 'T010', predictedWrites: ['packages/x/src/alpha.ts'] };
+      const audit = fileEvidenceAlreadySatisfied(unit, { root, trustedBase });
+      expect(audit.satisfied).toBe(true);
+      expect(audit.proof[0].authoringCommit).toBeDefined();
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  test('CASE 1: output predates the trusted base (base fixture matches a predicted path) → stays OPEN', () => {
+    const root = gitRepo();
+    try {
+      mkdirSync(join(root, 'packages/x/src'), { recursive: true });
+      // the base repo already carries a file that merely MATCHES the task's
+      // predicted write — no package authorship ever touched it after base
+      writeFileSync(join(root, 'packages/x/src/alpha.ts'), 'export {};\n');
+      commit(root, 'base fixture');
+      const trustedBase = execSync('git rev-parse HEAD', { cwd: root }).toString().trim();
+      mkdirSync(join(root, 'packages/other'), { recursive: true });
+      writeFileSync(join(root, 'packages/other/keep.txt'), 'x\n');
+      commit(root, 'unrelated later commit');
+      const unit = { id: 'T010', predictedWrites: ['packages/x/src/alpha.ts'] };
+      const audit = fileEvidenceAlreadySatisfied(unit, { root, trustedBase });
+      expect(audit.satisfied).toBe(false);
+      expect(audit.reason).toContain('existed at trusted base');
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  test('post-base authorship by a prior wave satisfies (recovered package work shape)', () => {
+    const root = gitRepo();
+    try {
+      mkdirSync(join(root, 'packages/x/src'), { recursive: true });
+      writeFileSync(join(root, 'packages/x/src/placeholder.ts'), 'export {};\n');
+      commit(root, 'base');
+      const trustedBase = execSync('git rev-parse HEAD', { cwd: root }).toString().trim();
+      // The "lane diff" from a PRIOR VALIDATED wave authored the deliverable
+      // after the trusted base — legitimate already-satisfied work.
+      writeFileSync(join(root, 'packages/x/src/alpha.ts'), 'export const alpha = 1;\n');
+      commit(root, 'prior wave authors alpha.ts');
+      const unit = { id: 'T010', predictedWrites: ['packages/x/src/alpha.ts'] };
+      const audit = fileEvidenceAlreadySatisfied(unit, { root, trustedBase });
+      expect(audit.satisfied).toBe(true);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  test('CASE 3: partial predicted outputs → stays OPEN', () => {
+    const root = gitRepo();
+    try {
+      mkdirSync(join(root, 'packages/x/src'), { recursive: true });
+      writeFileSync(join(root, 'packages/x/src/placeholder.ts'), 'export {};\n');
+      commit(root, 'base');
+      const trustedBase = execSync('git rev-parse HEAD', { cwd: root }).toString().trim();
+      writeFileSync(join(root, 'packages/x/src/alpha.ts'), 'export const alpha = 1;\n');
+      commit(root, 'prior wave authors alpha.ts only');
+      execSync('git rm -q packages/x/src/placeholder.ts', { cwd: root }).toString();
+      commit(root, 'tree only carries alpha.ts');
+      const unit = {
+        id: 'T010',
+        predictedWrites: ['packages/x/src/alpha.ts', 'packages/x/src/beta.ts'],
+      };
+      const audit = fileEvidenceAlreadySatisfied(unit, { root, trustedBase });
+      expect(audit.satisfied).toBe(false);
+      expect(audit.reason).toContain('not present at HEAD');
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  test('unrelated pre-existing file that matches a predicted glob has base provenance but the unit still needs ITS writes', () => {
+    const root = gitRepo();
+    try {
+      mkdirSync(join(root, 'packages/x/src'), { recursive: true });
+      writeFileSync(join(root, 'packages/x/src/unrelated.ts'), 'export {};\n');
+      commit(root, 'base with unrelated file');
+      const trustedBase = execSync('git rev-parse HEAD', { cwd: root }).toString().trim();
+      // The unit's predicted write (beta.ts) does not exist — the unrelated
+      // file matching a broad glob cannot fabricate satisfaction.
+      const unit = { id: 'T010', predictedWrites: ['packages/x/src/beta.ts'] };
+      const audit = fileEvidenceAlreadySatisfied(unit, { root, trustedBase });
+      expect(audit.satisfied).toBe(false);
+      expect(audit.reason).toContain('not present at HEAD');
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+});
+
 describe('T024 verification profile (full convergence gate, not the weaker milestone subset)', () => {
   test('declared profile maps to the authoritative convergence command set', () => {
     const root = scratch();

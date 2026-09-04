@@ -190,27 +190,27 @@ extended by this package even though they sit outside the listed writeScopes.
 
 ## Phase 4 — Fixtures and acceptance/negative suites (blocks gates)
 
-- [ ] T017 Author `tests/fixtures/solsec/token-extensions.json`: golden
+- [x] T017 Author `tests/fixtures/solsec/token-extensions.json`: golden
       vectors for all §65.2 controls on synthetic SPL and Token-2022
       programs — active/revoked authority pairs per control, unknown
       extension case, expected control_state + severity per vector.
       Traces: FR-SOLSEC-001, FR-SOLSEC-002, AC-130.
-- [ ] T018 Author `tests/fixtures/solsec/pool-security.json`: resolved-pool
+- [x] T018 Author `tests/fixtures/solsec/pool-security.json`: resolved-pool
       vectors (LP burned/locked/open, withdrawal authority states, migration
       lineage, quote parity pass/fail, concentration, removals, large-sell)
       plus the unsupported-design vector expecting DEGRADED_UNSUPPORTED with
       NULL resolved fields. Traces: FR-SOLSEC-003, AC-130, AC-230.
-- [ ] T019 Author `tests/fixtures/solsec/provider-override.json`:
+- [x] T019 Author `tests/fixtures/solsec/provider-override.json`:
       deterministic-CRITICAL × provider-SAFE override vectors (expected
       conflict class, resolution side, preserved provider evidence),
       provider-risk-uncorroborated vectors, and missing-provider vectors
       (severity unchanged). Traces: FR-SOLSEC-005, AC-131.
-- [ ] T020 Author `tests/fixtures/solsec/system-registry.json`: router/
+- [x] T020 Author `tests/fixtures/solsec/system-registry.json`: router/
       exchange/launchpad/fee-collector/program exclusion vectors at accepted
       role+confidence; low-confidence, pending-review, rejected, and
       unknown-role refusal vectors; a revision-forward vector (historical
       attribution inputs unchanged). Traces: FR-SOLSEC-006, AC-132.
-- [ ] T021 Author `tests/acceptance/AC-130.spec.ts` +
+- [x] T021 Author `tests/acceptance/AC-130.spec.ts` +
       `tests/negative/AC-130.negative.spec.ts`: positive — SPL/Token-2022
       fixtures correctly detect supported authorities/extensions with
       versioned evidence rows and pool fixture resolves LP/withdrawal/
@@ -220,7 +220,7 @@ extended by this package even though they sit outside the listed writeScopes.
       unsupported pool design refuses resolved fields, fabricated/malformed
       control rows are refused by schema. Traces: FR-SOLSEC-001, FR-SOLSEC-002,
       FR-SOLSEC-003, FR-SOLSEC-004, AC-130.
-- [ ] T022 Author `tests/acceptance/AC-131.spec.ts` +
+- [x] T022 Author `tests/acceptance/AC-131.spec.ts` +
       `tests/negative/AC-131.negative.spec.ts`: positive — deterministic
       critical authority/transfer risk stands when external providers report
       safe/no-risk, conflict recorded and exposed, provider report preserved
@@ -228,7 +228,7 @@ extended by this package even though they sit outside the listed writeScopes.
       downgrades or clears deterministic severity is structurally refused;
       missing provider data cannot reduce risk as if evidence were negative.
       Traces: FR-SOLSEC-005, AC-131.
-- [ ] T023 Author `tests/acceptance/AC-132.spec.ts` +
+- [x] T023 Author `tests/acceptance/AC-132.spec.ts` +
       `tests/negative/AC-132.negative.spec.ts`: positive — known router,
       exchange, launchpad, fee collector, and program accounts do not create
       false common-funder/insider edges in actor attribution outputs (fed
@@ -236,7 +236,7 @@ extended by this package even though they sit outside the listed writeScopes.
       negative — sub-floor registry rows (low confidence, pending review,
       rejected, unknown role) are not excludable and instead degrade quality
       codes. Traces: FR-SOLSEC-006, AC-132.
-- [ ] T024 Extend `tests/acceptance/AC-230.spec.ts` +
+- [x] T024 Extend `tests/acceptance/AC-230.spec.ts` +
       `tests/negative/AC-230.negative.spec.ts` ADDITIVELY with a
       solsec-scoped describe block: pool-security assessment resolves only
       through the matching versioned decoder/adapter + signed manifest;

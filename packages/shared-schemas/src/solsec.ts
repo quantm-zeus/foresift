@@ -277,10 +277,10 @@ export const SystemAddressRegistryEntrySchema = z
   )
   .refine(
     (value) =>
-      value.reviewState !== SystemAddressReviewState.APPROVED ||
+      value.reviewState !== SystemAddressReviewState.REVIEWED ||
       value.role === SystemAddressRole.UNKNOWN_INFRASTRUCTURE ||
       value.confidence >= 0.8,
-    { message: 'approved known roles require confidence of at least 0.80' },
+    { message: 'reviewed known roles require confidence of at least 0.80' },
   );
 export type SystemAddressRegistryEntry = z.infer<typeof SystemAddressRegistryEntrySchema>;
 

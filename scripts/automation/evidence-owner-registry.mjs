@@ -397,8 +397,11 @@ export function assertTraceabilityMatrixClosed(packageId, root, opts = {}) {
  * Already-satisfied audit for open FILE-truth units (directive §6):
  * every predicted write must exist at HEAD with package authorship —
  * its latest authoring commit postdates ctx.trustedBase (the adopted
- * launch head) and is a descendant of it. A base-commit author means a
- * pre-existing fixture (stays OPEN unless opts.allowBaseFiles).
+ * launch head) and is a descendant of it, OR (re-seeded branch law,
+ * run b20e5ea8) predates the base while living on the package-side
+ * lineage (not reachable from the seed's main-side parent). A base-commit
+ * or main-side author means a pre-existing fixture (stays OPEN unless
+ * opts.allowBaseFiles).
  *
  * @param unit graph unit (id, predictedWrites, testWrites)
  * @param ctx  { root, trustedBase?, allowBaseFiles? } — trustedBase = the
@@ -443,16 +446,40 @@ export function fileEvidenceAlreadySatisfied(unit, ctx) {
         const authoredSinceBase =
           author.out !== ctx.trustedBase &&
           git(`merge-base --is-ancestor ${ctx.trustedBase} ${author.out}`, ctx.root).ok;
-        if (!authoredSinceBase && !ctx.allowBaseFiles) {
-          // CASE 1 guard (directive §6): the file's latest authoring commit is
-          // the trusted base itself — a base fixture that merely matches a
-          // predicted path carries no package authorship since adoption.
-          // Completion via base existence needs the caller's explicit opt-in
-          // (allowBaseFiles), never silent trust.
-          return {
-            satisfied: false,
-            reason: `predicted write ${p} existed at trusted base ${String(ctx.trustedBase).slice(0, 12)} with no package authorship since`,
-          };
+        if (!authoredSinceBase) {
+          // Re-seeded branch law (live g1-solana-security, run b20e5ea8): a
+          // recovery wave adopts the package branch by merging current main
+          // INTO it, so the trusted base (the seed merge) POSTDATES the
+          // package's genuine authorship. Pre-seed authorship is still
+          // package authorship when the commit is NOT reachable from the
+          // main side of the seed (merge-base(trustedBase, origin/main)):
+          // main fixtures are ancestors of that main-side commit, while
+          // package-wave commits live only on the branch-side lineage. The
+          // unrelated-pre-existing-file trap (§6 CASE 1) is preserved — such
+          // a file's latest author IS main-side and stays OPEN. When the
+          // main side cannot be derived (no origin/main ref, shallow
+          // checkout), keep the strict post-base rule (fail-closed).
+          let authoredInPackageLineage = false;
+          if (git(`merge-base --is-ancestor ${author.out} ${ctx.trustedBase}`, ctx.root).ok) {
+            const mainSide = git(`merge-base ${ctx.trustedBase} origin/main`, ctx.root);
+            if (mainSide.ok && /^[0-9a-f]{40}$/.test(mainSide.out)) {
+              authoredInPackageLineage = !git(
+                `merge-base --is-ancestor ${author.out} ${mainSide.out.trim()}`,
+                ctx.root,
+              ).ok;
+            }
+          }
+          if (!authoredInPackageLineage && !ctx.allowBaseFiles) {
+            // CASE 1 guard (directive §6): the file's latest authoring commit
+            // is the trusted base itself (or a main-side ancestor) — a base
+            // fixture that merely matches a predicted path carries no
+            // package authorship. Completion via base existence needs the
+            // caller's explicit opt-in (allowBaseFiles), never silent trust.
+            return {
+              satisfied: false,
+              reason: `predicted write ${p} existed at trusted base ${String(ctx.trustedBase).slice(0, 12)} with no package authorship since`,
+            };
+          }
         }
       }
       proof.push({ path: p, authoringCommit: author.out.slice(0, 12) });

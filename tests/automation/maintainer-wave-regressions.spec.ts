@@ -267,4 +267,39 @@ describe('maintainer wave 2026-09-03 regressions', () => {
     expect(capacityCapped.lanes).toBe(2);
     expect(capacityCapped.capped).toBe(true);
   });
+
+  it('re-roots package-relative backticks into scope-resolved predicted writes (run b20e5ea8)', () => {
+    // Live defect: bodies naming package files RELATIVELY (`src/foo.ts`,
+    // `package.json`) were dropped by the repo-rooted prefix filter, so whole
+    // serial columns derived ZERO predicted writes — empty lane write
+    // columns, no evidence nominations, §6 audit starvation. Re-rooting must
+    // land inside a binding scope and must NOT explode prose symbols.
+    const root = scratchRepo();
+    writeTasks(
+      root,
+      [
+        '# Tasks: pkg-t',
+        '',
+        '- [ ] T201 Implement `src/tokenizer.ts` with helper `TokenKind` and',
+        '      call `parse(...)`; see `@scope/thing` and `dotted.symbol`. Also',
+        '      extend the root `package.json`. Traces: FR-X-001.',
+        '',
+      ].join('\n'),
+    );
+    const g = buildGraph(root) as unknown as {
+      units: Array<{ id: string; predictedWrites: string[] }>;
+    };
+    const u = g.units.find((x) => x.id === 'T201');
+    // `src/token-assessment.ts`-style shorthand resolves against the package
+    // scope dir `packages/t/` — and ONLY packages/* roots (tests/** would
+    // fabricate test writes the plan never named).
+    expect(u?.predictedWrites).toEqual(['packages/t/src/tokenizer.ts']);
+    // Prose symbols never become pseudo-paths.
+    for (const w of u?.predictedWrites ?? []) {
+      expect(w).not.toContain('TokenKind');
+      expect(w).not.toContain('dotted.symbol');
+      expect(w).not.toContain('@scope/thing');
+      expect(w).not.toContain('parse(');
+    }
+  });
 });

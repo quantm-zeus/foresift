@@ -137,6 +137,18 @@ function globToRegExp(glob) {
   return new RegExp('^' + re + '$');
 }
 const scopeRes = (pkg.writeScopes ?? []).map(globToRegExp);
+// Package scope directories (scope globs stripped to their literal dir part):
+// the re-rooting targets for package-relative backtick tokens, and the
+// directory-form membership rule for bare directory tokens.
+const scopeDirs = (pkg.writeScopes ?? [])
+  .map((g) => g.replace(/\*\*.*$/, '').replace(/\*.*$/, ''))
+  .filter((d) => d.endsWith('/'))
+  .map((d) => d.slice(0, -1));
+const classifyPath = (p) =>
+  scopeRes.some((re) => re.test(p)) ||
+  scopeDirs.some(
+    (d) => p === d || (p.startsWith(d + '/') && !p.slice(d.length + 1).includes('/')),
+  );
 
 for (const u of units) {
   const idsInBody = [...u.body.matchAll(/\bT\d+\b/g)].map((m) => m[0]);
@@ -151,43 +163,47 @@ for (const u of units) {
     // string that can never be a filename (observed live on T016, run
     // 89c4b2b9). Commands are prose, never evidence paths.
     if (/\s/.test(p)) continue;
-    // `pnpm-lock.yaml` and root `package.json` are collectible at the repo
-    // root: the lockfile mechanically follows every workspace package scaffold,
-    // and acceptance suites run under the root unit project, whose
-    // devDependencies link each package exactly like every prior G0 package.
-    // A unit that triggers either must be able to RECORD it as an out-of-scope
-    // write exception instead of tripping the lane guard at integration time.
-    if (
-      (/^(packages|tests|telemetry|migrations|docs|scripts)\//.test(p) ||
-        p === 'pnpm-lock.yaml' ||
-        p === 'package.json') &&
-      !paths.includes(p)
-    )
-      paths.push(p);
+    // Package-relative backticks (live g1-solana-security, run b20e5ea8): a
+    // task body may name its package's files RELATIVELY (`src/token-assessment.ts`,
+    // `package.json`) — plan shorthand for "inside this package's root". The
+    // repo-rooted prefix filter below silently dropped every such token, so
+    // whole serial columns derived ZERO predicted writes: lanes launched with
+    // empty write columns, evidence nomination could never fire, and the §6
+    // already-satisfied audit also starved ("no predicted writes recorded").
+    // Resolve a relative token against the package's scope directories; the
+    // joined path must land inside a binding write scope, so this never
+    // widens authority — it only re-roots what the plan already named.
+    const rooted =
+      /^(?:packages|tests|telemetry|migrations|docs|scripts)\//.test(p) ||
+      p === 'pnpm-lock.yaml' ||
+      p === 'package.json';
+    // Relative re-rooting candidates must look like a PATH, not a bare
+    // identifier: the final segment carries a real file extension
+    // (`src/token-assessment.ts`, `package.json`). A backticked package name
+    // (`@foresift/program-decoders`), dotted symbol
+    // (`EconomicTradeContext.knownRouterAccounts`), or call shape
+    // (`resolveSecurityConflict(...)`) is prose — exploding it into per-scope
+    // pseudo-paths would poison every write column and cross-lane ownership
+    // check. Re-rooting targets ONLY packages/* scope roots: the shorthand
+    // means "inside this package's root", and tests/** or migrations/**
+    // would fabricate test/pseudo writes the plan never named.
+    const FILE_EXT = /\.(?:ts|mts|cts|js|mjs|cjs|json|sql|md|yaml|yml|txt|jsonl)$/;
+    const looksLikePath = rooted || FILE_EXT.test(p.split('/').at(-1));
+    const reRooted =
+      rooted || !looksLikePath
+        ? []
+        : scopeDirs
+            .filter((d) => d.startsWith('packages/'))
+            .map((d) => `${d}/${p}`)
+            .filter((q) => classifyPath(q));
+    for (const q of reRooted.length > 0 ? reRooted : rooted ? [p] : []) {
+      if (!paths.includes(q)) paths.push(q);
+    }
   }
   // Paths are classified against binding writeScopes: a plan-sanctioned
   // exception (e.g. a guard task that merely names an out-of-scope file) is
   // recorded separately and DEMOTES the unit to serial execution — it never
   // widens what a parallel writer may touch.
-  //
-  // Directory tokens (live T001/T002 class, run aa3e8015): a scaffold task
-  // names its package DIRECTORY (`packages/requirement-manifest`), but the
-  // binding scope is `packages/requirement-manifest/**` — `**/` requires a
-  // trailing slash, so the bare directory never matched and the task's whole
-  // write set fell to outOfScopeWrites. A token that IS the directory prefix
-  // of some scope glob is squarely inside that scope (writing the directory
-  // means writing its contents): normalize it to the scope's directory form
-  // for classification. Nothing here widens any scope — the token must be a
-  // strict prefix of a scope's literal part.
-  const scopeDirs = (pkg.writeScopes ?? [])
-    .map((g) => g.replace(/\*\*.*$/, '').replace(/\*.*$/, ''))
-    .filter((d) => d.endsWith('/'))
-    .map((d) => d.slice(0, -1));
-  const classifyPath = (p) =>
-    scopeRes.some((re) => re.test(p)) ||
-    scopeDirs.some(
-      (d) => p === d || (p.startsWith(d + '/') && !p.slice(d.length + 1).includes('/')),
-    );
   const inScope = [];
   const outOfScope = [];
   for (const p of paths) (classifyPath(p) ? inScope : outOfScope).push(p);

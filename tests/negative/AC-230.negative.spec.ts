@@ -1,6 +1,6 @@
 /**
  * AC-230 negative (failure) — protocol adapter fixture sweep.
- * Traces: FR-COL-002, FR-SOLSEC-003.
+ * Traces: FR-COL-002, FR-SOLSEC-003, AC-230, T024.
  * Tests rejection of unknown or mismatched designs; structural prohibition against
  * substituting generic constant-product formulas or inferring support from symbols.
  */

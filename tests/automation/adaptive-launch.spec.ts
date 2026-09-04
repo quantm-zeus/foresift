@@ -53,17 +53,28 @@ afterEach(() => {
 
 describe('launchDetached adaptive lane wiring', () => {
   test('sharded-wave launch sets FORESIFT_WRITERS adaptively and restores the env afterwards', async () => {
+    // Hermetic governor (designed seam, same as the governor tests below):
+    // a live /proc probe inside a concurrently running group sees the wave's
+    // own heavy processes and can transiently throw or reclassify — the
+    // assertion must judge the ADAPTIVE WIRING, not the machine's load
+    // (observed live: wave 30a52c6a FAST recheck, 2026-09-04).
+    process.env.FORESIFT_GOVERNOR_STATE = 'GREEN';
     const mod = await import('../../scripts/automation/foresift-autopilot.mjs');
     const ack = mod.launchDetached(null, 'foresift-sharded-wave', 'b', 'm', null) as {
       ok?: boolean;
     };
+    delete process.env.FORESIFT_GOVERNOR_STATE;
     expect(ack?.ok).toBeTruthy();
     // The env must be restored after the call — no leakage into the process.
     expect(process.env.FORESIFT_WRITERS).toBeUndefined();
-    // And the stub observed a positive integer lane count (governor GREEN on
-    // the host, pools materialize with codex/claude limits ≥ 1).
+    // And the stub observed a positive integer lane count (governor GREEN by
+    // the hermetic override; pools materialize with codex/claude limits ≥ 1).
     const line = readFileSync(join(fxRoot, 'env.log'), 'utf8').trim();
     const writers = /WRITERS=(\d+)/.exec(line)?.[1];
+    expect(
+      writers,
+      `stub env log expected a numeric WRITERS, got: ${line}`,
+    ).toBeDefined();
     expect(Number(writers)).toBeGreaterThanOrEqual(1);
   });
 

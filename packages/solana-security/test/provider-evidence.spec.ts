@@ -103,7 +103,9 @@ describe('provider-evidence: security provider independence and conflict resolut
   it('verifies provider report schema invariants and raw payload ref preservation', () => {
     expect(() => parseSolsecSchema('SecurityProviderReport', mockSafeProviderReport)).not.toThrow();
     expect(() => parseSolsecSchema('SecurityProviderReport', mockRiskProviderReport)).not.toThrow();
-    expect(() => parseSolsecSchema('SecurityProviderReport', mockUnableProviderReport)).not.toThrow();
+    expect(() =>
+      parseSolsecSchema('SecurityProviderReport', mockUnableProviderReport),
+    ).not.toThrow();
   });
 
   it('records PROVIDER_OPTIMISM_OVERRIDDEN when provider reports SAFE against CRITICAL deterministic finding', () => {
@@ -134,7 +136,9 @@ describe('provider-evidence: security provider independence and conflict resolut
     expect(result.effectiveSeverity).toBe(SecuritySeverity.CRITICAL);
     expect(result.providerOptimismOverridden).toBe(true);
     expect(result.conflicts.length).toBe(1);
-    expect(result.conflicts[0].conflictClass).toBe(SecurityConflictClass.PROVIDER_OPTIMISM_OVERRIDDEN);
+    expect(result.conflicts[0].conflictClass).toBe(
+      SecurityConflictClass.PROVIDER_OPTIMISM_OVERRIDDEN,
+    );
     expect(result.conflicts[0].resolution).toBe('DETERMINISTIC');
   });
 

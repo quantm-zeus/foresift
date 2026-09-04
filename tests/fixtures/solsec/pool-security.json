@@ -22,9 +22,7 @@
       "liquidityRemovalRisk": "LOW",
       "largeSellImpactBps": 50,
       "expectedSeverity": "NONE",
-      "qualityCodes": [
-        "VALID"
-      ]
+      "qualityCodes": ["VALID"]
     },
     {
       "name": "resolved pool with LP locked with verifiable timelock evidence",
@@ -51,9 +49,7 @@
       "liquidityRemovalRisk": "MEDIUM",
       "largeSellImpactBps": 250,
       "expectedSeverity": "MEDIUM",
-      "qualityCodes": [
-        "VALID"
-      ]
+      "qualityCodes": ["VALID"]
     },
     {
       "name": "resolved pool with open LP and withdrawal authority with observed abuse",
@@ -76,9 +72,7 @@
       "liquidityRemovalRisk": "CRITICAL",
       "largeSellImpactBps": 4500,
       "expectedSeverity": "CRITICAL",
-      "qualityCodes": [
-        "VALID"
-      ]
+      "qualityCodes": ["VALID"]
     },
     {
       "name": "unsupported pool design returns DEGRADED_UNSUPPORTED with NULL resolved fields",
@@ -98,10 +92,7 @@
       "liquidityRemovalRisk": "UNKNOWN",
       "largeSellImpactBps": null,
       "expectedSeverity": "HIGH",
-      "qualityCodes": [
-        "POOL_MATH_UNSUPPORTED",
-        "UNSUPPORTED_PROGRAM_VERSION"
-      ]
+      "qualityCodes": ["POOL_MATH_UNSUPPORTED", "UNSUPPORTED_PROGRAM_VERSION"]
     }
   ]
 }

@@ -15,9 +15,7 @@
           "provider": "goplus",
           "verdict": "SAFE",
           "rawPayloadRef": "goplus-report-sha256:abc123safe",
-          "qualityCodes": [
-            "VALID"
-          ]
+          "qualityCodes": ["VALID"]
         }
       ],
       "expectedConflictClass": "PROVIDER_OPTIMISM_OVERRIDDEN",
@@ -40,17 +38,13 @@
           "provider": "goplus",
           "verdict": "SAFE",
           "rawPayloadRef": "goplus-report-sha256:def456safe",
-          "qualityCodes": [
-            "VALID"
-          ]
+          "qualityCodes": ["VALID"]
         },
         {
           "provider": "gmgn",
           "verdict": "SAFE",
           "rawPayloadRef": "gmgn-report-sha256:789ghisafe",
-          "qualityCodes": [
-            "VALID"
-          ]
+          "qualityCodes": ["VALID"]
         }
       ],
       "expectedConflictClass": "PROVIDER_OPTIMISM_OVERRIDDEN",
@@ -72,13 +66,9 @@
         {
           "provider": "goplus",
           "verdict": "RISK_DETECTED",
-          "reportedIssues": [
-            "honeypot_risk_heuristic"
-          ],
+          "reportedIssues": ["honeypot_risk_heuristic"],
           "rawPayloadRef": "goplus-report-sha256:risk789",
-          "qualityCodes": [
-            "VALID"
-          ]
+          "qualityCodes": ["VALID"]
         }
       ],
       "expectedConflictClass": "UNRESOLVED_PROVIDER_RISK",
@@ -101,9 +91,7 @@
           "provider": "goplus",
           "verdict": "UNABLE_TO_VERIFY",
           "rawPayloadRef": "goplus-timeout-sha256:timeout000",
-          "qualityCodes": [
-            "PROVIDER_DATA_MISSING"
-          ]
+          "qualityCodes": ["PROVIDER_DATA_MISSING"]
         }
       ],
       "expectedConflictClass": "NO_CONFLICT",

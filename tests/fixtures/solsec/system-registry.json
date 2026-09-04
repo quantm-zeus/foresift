@@ -13,9 +13,7 @@
       "reviewState": "APPROVED",
       "expectedIsExcludable": true,
       "expectedExclusionDecision": "EXCLUSION_APPLIED",
-      "expectedQualityCodes": [
-        "VALID"
-      ]
+      "expectedQualityCodes": ["VALID"]
     },
     {
       "name": "known Binance exchange hot wallet excluded from insider coordination",
@@ -29,9 +27,7 @@
       "reviewState": "APPROVED",
       "expectedIsExcludable": true,
       "expectedExclusionDecision": "EXCLUSION_APPLIED",
-      "expectedQualityCodes": [
-        "VALID"
-      ]
+      "expectedQualityCodes": ["VALID"]
     },
     {
       "name": "known Pump launchpad authority excluded from creator funding",
@@ -45,9 +41,7 @@
       "reviewState": "APPROVED",
       "expectedIsExcludable": true,
       "expectedExclusionDecision": "EXCLUSION_APPLIED",
-      "expectedQualityCodes": [
-        "VALID"
-      ]
+      "expectedQualityCodes": ["VALID"]
     },
     {
       "name": "known protocol fee collector excluded from actor clusters",
@@ -61,9 +55,7 @@
       "reviewState": "APPROVED",
       "expectedIsExcludable": true,
       "expectedExclusionDecision": "EXCLUSION_APPLIED",
-      "expectedQualityCodes": [
-        "VALID"
-      ]
+      "expectedQualityCodes": ["VALID"]
     },
     {
       "name": "low confidence system address refuses exclusion and degrades quality",
@@ -77,9 +69,7 @@
       "reviewState": "APPROVED",
       "expectedIsExcludable": false,
       "expectedExclusionDecision": "REFUSAL_SUB_FLOOR_CONFIDENCE",
-      "expectedQualityCodes": [
-        "SYSTEM_ADDRESS_UNCERTAIN"
-      ]
+      "expectedQualityCodes": ["SYSTEM_ADDRESS_UNCERTAIN"]
     },
     {
       "name": "pending review system address refuses exclusion and degrades quality",
@@ -93,9 +83,7 @@
       "reviewState": "PENDING_REVIEW",
       "expectedIsExcludable": false,
       "expectedExclusionDecision": "REFUSAL_PENDING_REVIEW",
-      "expectedQualityCodes": [
-        "SYSTEM_ADDRESS_UNCERTAIN"
-      ]
+      "expectedQualityCodes": ["SYSTEM_ADDRESS_UNCERTAIN"]
     },
     {
       "name": "rejected system address refuses exclusion and degrades quality",
@@ -109,9 +97,7 @@
       "reviewState": "REJECTED",
       "expectedIsExcludable": false,
       "expectedExclusionDecision": "REFUSAL_REJECTED",
-      "expectedQualityCodes": [
-        "SYSTEM_ADDRESS_UNCERTAIN"
-      ]
+      "expectedQualityCodes": ["SYSTEM_ADDRESS_UNCERTAIN"]
     },
     {
       "name": "unknown infrastructure role refuses exclusion and degrades quality",
@@ -125,9 +111,7 @@
       "reviewState": "APPROVED",
       "expectedIsExcludable": false,
       "expectedExclusionDecision": "REFUSAL_UNKNOWN_ROLE",
-      "expectedQualityCodes": [
-        "SYSTEM_ADDRESS_UNCERTAIN"
-      ]
+      "expectedQualityCodes": ["SYSTEM_ADDRESS_UNCERTAIN"]
     },
     {
       "name": "revision forward: historical query at T1 is unaffected by registry update at T2",

@@ -202,18 +202,24 @@ describe('token-assessment: deterministic SPL/Token-2022 control analysis (FR-SO
 
     expect(result.qualityCodes).toContain('TOKEN_EXTENSION_UNKNOWN');
 
-    const unknownFinding = result.findings.find((f) => f.control === TokenControl.UNKNOWN_EXTENSION);
+    const unknownFinding = result.findings.find(
+      (f) => f.control === TokenControl.UNKNOWN_EXTENSION,
+    );
     expect(unknownFinding).toBeDefined();
     expect(unknownFinding!.controlState).toBe(TokenControlState.UNABLE_TO_VERIFY);
     expect(unknownFinding!.qualityCodes).toContain('TOKEN_EXTENSION_UNKNOWN');
 
     expect(result.supportRows.length).toBeGreaterThan(0);
-    const unkSupport = result.supportRows.find((r) => r.extensionType === 'futureExoticExtensionV9');
+    const unkSupport = result.supportRows.find(
+      (r) => r.extensionType === 'futureExoticExtensionV9',
+    );
     expect(unkSupport).toBeDefined();
     expect(unkSupport!.support).toBe(TransferSemanticsSupport.UNKNOWN_REQUIRED);
     expect(unkSupport!.qualityCodes).toContain('TOKEN_EXTENSION_UNKNOWN');
 
-    expect(result.assessment.transferSemanticsSupport).toBe(TransferSemanticsSupport.UNKNOWN_REQUIRED);
+    expect(result.assessment.transferSemanticsSupport).toBe(
+      TransferSemanticsSupport.UNKNOWN_REQUIRED,
+    );
   });
 
   it('handles unsupported program or layout version fail-closed', () => {
@@ -227,7 +233,9 @@ describe('token-assessment: deterministic SPL/Token-2022 control analysis (FR-SO
     expect(result.programSupported).toBe(false);
     expect(result.qualityCodes).toContain('UNSUPPORTED_PROGRAM_VERSION');
 
-    const unknownFinding = result.findings.find((f) => f.control === TokenControl.UNKNOWN_EXTENSION);
+    const unknownFinding = result.findings.find(
+      (f) => f.control === TokenControl.UNKNOWN_EXTENSION,
+    );
     expect(unknownFinding).toBeDefined();
     expect(unknownFinding!.qualityCodes).toContain('UNSUPPORTED_PROGRAM_VERSION');
 

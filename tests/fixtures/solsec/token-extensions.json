@@ -14,9 +14,7 @@
       "expectedControlState": "ADMINISTRATIVE_CONTROL",
       "expectedSeverity": "MEDIUM",
       "supportState": "KNOWN_MODELED",
-      "qualityCodes": [
-        "VALID"
-      ]
+      "qualityCodes": ["VALID"]
     },
     {
       "name": "revoked mint authority yields revoked finding",
@@ -27,9 +25,7 @@
       "expectedControlState": "REVOKED_AUTHORITY",
       "expectedSeverity": "NONE",
       "supportState": "KNOWN_MODELED",
-      "qualityCodes": [
-        "VALID"
-      ]
+      "qualityCodes": ["VALID"]
     },
     {
       "name": "active freeze authority creates known risk finding",
@@ -40,9 +36,7 @@
       "expectedControlState": "KNOWN_RISK",
       "expectedSeverity": "HIGH",
       "supportState": "KNOWN_MODELED",
-      "qualityCodes": [
-        "VALID"
-      ]
+      "qualityCodes": ["VALID"]
     },
     {
       "name": "revoked freeze authority yields revoked finding",
@@ -53,9 +47,7 @@
       "expectedControlState": "REVOKED_AUTHORITY",
       "expectedSeverity": "NONE",
       "supportState": "KNOWN_MODELED",
-      "qualityCodes": [
-        "VALID"
-      ]
+      "qualityCodes": ["VALID"]
     },
     {
       "name": "active permanent delegate creates known risk finding",
@@ -66,9 +58,7 @@
       "expectedControlState": "KNOWN_RISK",
       "expectedSeverity": "HIGH",
       "supportState": "KNOWN_MODELED",
-      "qualityCodes": [
-        "VALID"
-      ]
+      "qualityCodes": ["VALID"]
     },
     {
       "name": "revoked permanent delegate yields revoked finding",
@@ -79,9 +69,7 @@
       "expectedControlState": "REVOKED_AUTHORITY",
       "expectedSeverity": "NONE",
       "supportState": "KNOWN_MODELED",
-      "qualityCodes": [
-        "VALID"
-      ]
+      "qualityCodes": ["VALID"]
     },
     {
       "name": "transfer fee configured with withheld authority creates administrative finding",
@@ -94,9 +82,7 @@
       "expectedControlState": "ADMINISTRATIVE_CONTROL",
       "expectedSeverity": "MEDIUM",
       "supportState": "KNOWN_MODELED",
-      "qualityCodes": [
-        "VALID"
-      ]
+      "qualityCodes": ["VALID"]
     },
     {
       "name": "zero transfer fee yields neutral configuration finding",
@@ -109,9 +95,7 @@
       "expectedControlState": "NEUTRAL_CONFIGURATION",
       "expectedSeverity": "NONE",
       "supportState": "KNOWN_MODELED",
-      "qualityCodes": [
-        "VALID"
-      ]
+      "qualityCodes": ["VALID"]
     },
     {
       "name": "active transfer hook blocking exit creates critical risk finding",
@@ -122,9 +106,7 @@
       "expectedControlState": "KNOWN_RISK",
       "expectedSeverity": "CRITICAL",
       "supportState": "KNOWN_MODELED",
-      "qualityCodes": [
-        "VALID"
-      ]
+      "qualityCodes": ["VALID"]
     },
     {
       "name": "revoked transfer hook yields neutral finding",
@@ -135,9 +117,7 @@
       "expectedControlState": "NEUTRAL_CONFIGURATION",
       "expectedSeverity": "NONE",
       "supportState": "KNOWN_MODELED",
-      "qualityCodes": [
-        "VALID"
-      ]
+      "qualityCodes": ["VALID"]
     },
     {
       "name": "active close authority creates administrative finding",
@@ -148,9 +128,7 @@
       "expectedControlState": "ADMINISTRATIVE_CONTROL",
       "expectedSeverity": "MEDIUM",
       "supportState": "KNOWN_MODELED",
-      "qualityCodes": [
-        "VALID"
-      ]
+      "qualityCodes": ["VALID"]
     },
     {
       "name": "revoked close authority yields revoked finding",
@@ -161,9 +139,7 @@
       "expectedControlState": "REVOKED_AUTHORITY",
       "expectedSeverity": "NONE",
       "supportState": "KNOWN_MODELED",
-      "qualityCodes": [
-        "VALID"
-      ]
+      "qualityCodes": ["VALID"]
     },
     {
       "name": "mutable metadata update authority creates administrative finding",
@@ -174,9 +150,7 @@
       "expectedControlState": "ADMINISTRATIVE_CONTROL",
       "expectedSeverity": "LOW",
       "supportState": "KNOWN_MODELED",
-      "qualityCodes": [
-        "VALID"
-      ]
+      "qualityCodes": ["VALID"]
     },
     {
       "name": "immutable metadata yields revoked finding",
@@ -187,9 +161,7 @@
       "expectedControlState": "REVOKED_AUTHORITY",
       "expectedSeverity": "NONE",
       "supportState": "KNOWN_MODELED",
-      "qualityCodes": [
-        "VALID"
-      ]
+      "qualityCodes": ["VALID"]
     },
     {
       "name": "frozen default account state creates known risk finding",
@@ -200,9 +172,7 @@
       "expectedControlState": "KNOWN_RISK",
       "expectedSeverity": "HIGH",
       "supportState": "KNOWN_MODELED",
-      "qualityCodes": [
-        "VALID"
-      ]
+      "qualityCodes": ["VALID"]
     },
     {
       "name": "initialized default account state yields neutral configuration",
@@ -213,9 +183,7 @@
       "expectedControlState": "NEUTRAL_CONFIGURATION",
       "expectedSeverity": "NONE",
       "supportState": "KNOWN_MODELED",
-      "qualityCodes": [
-        "VALID"
-      ]
+      "qualityCodes": ["VALID"]
     },
     {
       "name": "non-transferable extension creates critical known risk finding",
@@ -225,9 +193,7 @@
       "expectedControlState": "KNOWN_RISK",
       "expectedSeverity": "CRITICAL",
       "supportState": "KNOWN_MODELED",
-      "qualityCodes": [
-        "VALID"
-      ]
+      "qualityCodes": ["VALID"]
     },
     {
       "name": "confidential transfer extension yields neutral configuration finding",
@@ -238,9 +204,7 @@
       "expectedControlState": "NEUTRAL_CONFIGURATION",
       "expectedSeverity": "LOW",
       "supportState": "KNOWN_MODELED",
-      "qualityCodes": [
-        "VALID"
-      ]
+      "qualityCodes": ["VALID"]
     },
     {
       "name": "unknown extension yields UNKNOWN_EXTENSION with UNKNOWN_REQUIRED support",
@@ -251,9 +215,7 @@
       "expectedControlState": "UNABLE_TO_VERIFY",
       "expectedSeverity": "HIGH",
       "supportState": "UNKNOWN_REQUIRED",
-      "qualityCodes": [
-        "TOKEN_EXTENSION_UNKNOWN"
-      ]
+      "qualityCodes": ["TOKEN_EXTENSION_UNKNOWN"]
     }
   ]
 }

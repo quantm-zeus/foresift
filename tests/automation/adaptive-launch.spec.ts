@@ -71,10 +71,7 @@ describe('launchDetached adaptive lane wiring', () => {
     // the hermetic override; pools materialize with codex/claude limits ≥ 1).
     const line = readFileSync(join(fxRoot, 'env.log'), 'utf8').trim();
     const writers = /WRITERS=(\d+)/.exec(line)?.[1];
-    expect(
-      writers,
-      `stub env log expected a numeric WRITERS, got: ${line}`,
-    ).toBeDefined();
+    expect(writers, `stub env log expected a numeric WRITERS, got: ${line}`).toBeDefined();
     expect(Number(writers)).toBeGreaterThanOrEqual(1);
   });
 

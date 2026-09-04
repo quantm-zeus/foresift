@@ -58,7 +58,9 @@ describe('AC-230 solsec negative: Unknown/mismatched pool returns DEGRADED_UNSUP
       '../fixtures/solsec/pool-security.json',
     );
     const fixture = JSON.parse(readFileSync(fixturePath, 'utf8'));
-    const degradedPool = fixture.pools.find((p: any) => p.adapterSupportState === 'DEGRADED_UNSUPPORTED');
+    const degradedPool = fixture.pools.find(
+      (p: any) => p.adapterSupportState === 'DEGRADED_UNSUPPORTED',
+    );
     expect(degradedPool).toBeDefined();
     expect(degradedPool.adapterSupportState).toBe('DEGRADED_UNSUPPORTED');
     expect(degradedPool.lpControlState).toBeNull();

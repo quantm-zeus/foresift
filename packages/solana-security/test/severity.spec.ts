@@ -1,13 +1,6 @@
 import { describe, expect, it } from 'bun:test';
-import {
-  SecuritySeverity,
-  TokenControl,
-  TokenControlState,
-} from '@foresift/domain';
-import {
-  parseSolsecSchema,
-  type TokenControlFinding,
-} from '@foresift/shared-schemas';
+import { SecuritySeverity, TokenControl, TokenControlState } from '@foresift/domain';
+import { parseSolsecSchema, type TokenControlFinding } from '@foresift/shared-schemas';
 
 // Note: Test authoring for T014 (FR-SOLSEC-001, FR-SOLSEC-002, FR-SOLSEC-003, AC-131).
 async function tryImportModule(specifier: string): Promise<any> {

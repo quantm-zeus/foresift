@@ -62,11 +62,7 @@ describe('system-registry: versioned address registry & actor exclusion audit (F
 
   it('excludes known, high-confidence, reviewed infrastructure accounts (ROUTER, EXCHANGE, LAUNCHPAD, FEE_COLLECTOR)', () => {
     expect(
-      isExcludableSystemAddress(
-        SystemAddressRole.ROUTER,
-        1.0,
-        SystemAddressReviewState.REVIEWED,
-      ),
+      isExcludableSystemAddress(SystemAddressRole.ROUTER, 1.0, SystemAddressReviewState.REVIEWED),
     ).toBe(true);
 
     expect(
@@ -97,11 +93,7 @@ describe('system-registry: versioned address registry & actor exclusion audit (F
   it('refuses low confidence, pending review, or unknown infrastructure roles fail-closed', () => {
     // Low confidence floor (< 0.8)
     expect(
-      isExcludableSystemAddress(
-        SystemAddressRole.ROUTER,
-        0.79,
-        SystemAddressReviewState.REVIEWED,
-      ),
+      isExcludableSystemAddress(SystemAddressRole.ROUTER, 0.79, SystemAddressReviewState.REVIEWED),
     ).toBe(false);
 
     // Pending review
@@ -115,11 +107,7 @@ describe('system-registry: versioned address registry & actor exclusion audit (F
 
     // Rejected
     expect(
-      isExcludableSystemAddress(
-        SystemAddressRole.ROUTER,
-        1.0,
-        SystemAddressReviewState.REJECTED,
-      ),
+      isExcludableSystemAddress(SystemAddressRole.ROUTER, 1.0, SystemAddressReviewState.REJECTED),
     ).toBe(false);
 
     // Unknown infrastructure

@@ -79,8 +79,7 @@ export const LiquidityRemovalRisk = {
   OBSERVED: 'OBSERVED',
   UNABLE_TO_VERIFY: 'UNABLE_TO_VERIFY',
 } as const;
-export type LiquidityRemovalRisk =
-  (typeof LiquidityRemovalRisk)[keyof typeof LiquidityRemovalRisk];
+export type LiquidityRemovalRisk = (typeof LiquidityRemovalRisk)[keyof typeof LiquidityRemovalRisk];
 
 export const QuoteParityState = {
   PASS: 'PASS',
@@ -177,7 +176,8 @@ function parseVocabulary<T extends string>(
 }
 
 export const ALL_TOKEN_CONTROLS: readonly TokenControl[] = Object.values(TokenControl);
-export const ALL_TOKEN_CONTROL_STATES: readonly TokenControlState[] = Object.values(TokenControlState);
+export const ALL_TOKEN_CONTROL_STATES: readonly TokenControlState[] =
+  Object.values(TokenControlState);
 export const ALL_SECURITY_SEVERITIES: readonly SecuritySeverity[] = Object.values(SecuritySeverity);
 export const ALL_TRANSFER_SEMANTICS_SUPPORT: readonly TransferSemanticsSupport[] =
   Object.values(TransferSemanticsSupport);
@@ -192,9 +192,9 @@ export const ALL_LIQUIDITY_REMOVAL_RISKS: readonly LiquidityRemovalRisk[] =
 export const ALL_QUOTE_PARITY_STATES: readonly QuoteParityState[] = Object.values(QuoteParityState);
 export const ALL_STATE_COMPLETENESS_STATES: readonly StateCompleteness[] =
   Object.values(StateCompleteness);
-export const ALL_STATE_COMPLETENESSES: readonly StateCompleteness[] =
-  ALL_STATE_COMPLETENESS_STATES;
-export const ALL_SYSTEM_ADDRESS_ROLES: readonly SystemAddressRole[] = Object.values(SystemAddressRole);
+export const ALL_STATE_COMPLETENESSES: readonly StateCompleteness[] = ALL_STATE_COMPLETENESS_STATES;
+export const ALL_SYSTEM_ADDRESS_ROLES: readonly SystemAddressRole[] =
+  Object.values(SystemAddressRole);
 export const ALL_SYSTEM_ADDRESS_REVIEW_STATES: readonly SystemAddressReviewState[] =
   Object.values(SystemAddressReviewState);
 export const ALL_PROVIDER_VERDICTS: readonly ProviderVerdict[] = Object.values(ProviderVerdict);
@@ -263,7 +263,9 @@ export function profileRequiresCompleteExecutionModeling(
     );
   }
   const resolved =
-    typeof support === 'string' ? support : (support as { supportState: TransferSemanticsSupport }).supportState;
+    typeof support === 'string'
+      ? support
+      : (support as { supportState: TransferSemanticsSupport }).supportState;
   return transferSemanticsSupport(resolved) === TransferSemanticsSupport.UNKNOWN_REQUIRED;
 }
 

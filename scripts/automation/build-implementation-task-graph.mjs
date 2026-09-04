@@ -146,9 +146,7 @@ const scopeDirs = (pkg.writeScopes ?? [])
   .map((d) => d.slice(0, -1));
 const classifyPath = (p) =>
   scopeRes.some((re) => re.test(p)) ||
-  scopeDirs.some(
-    (d) => p === d || (p.startsWith(d + '/') && !p.slice(d.length + 1).includes('/')),
-  );
+  scopeDirs.some((d) => p === d || (p.startsWith(d + '/') && !p.slice(d.length + 1).includes('/')));
 
 for (const u of units) {
   const idsInBody = [...u.body.matchAll(/\bT\d+\b/g)].map((m) => m[0]);

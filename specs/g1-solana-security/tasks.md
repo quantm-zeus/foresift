@@ -89,7 +89,7 @@ extended by this package even though they sit outside the listed writeScopes.
       `system_address_exclusions_applied` audit rows (excluded boolean,
       raw_flow_ref so raw flows remain auditable); append-only trigger on the
       registry. Traces: FR-SOLSEC-006.
-- [ ] T008 Extend `packages/persistence/src/migrator.ts`
+- [x] T008 Extend `packages/persistence/src/migrator.ts`
       MIGRATION_FILE_PATTERN with the `solsec` family AND extend the central
       expected-script registry `packages/persistence/test/migrator.spec.ts`
       with `g1_solsec_0001_token_assessments`,
@@ -122,7 +122,7 @@ extended by this package even though they sit outside the listed writeScopes.
       Add colocated tests with golden vectors (fail-closed unknown extension,
       revoked vs active authority distinction, point-in-time availability).
       Traces: FR-SOLSEC-001, FR-SOLSEC-002, FR-SOLSEC-004, AC-130.
-- [ ] T011 Implement `src/transfer-semantics.ts`: the versioned support
+- [x] T011 Implement `src/transfer-semantics.ts`: the versioned support
       verdict function over (program, program version, extension set,
       verdict-policy version) emitting `token_extension_support` rows
       (KNOWN_MODELED / KNOWN_UNMODELED / UNKNOWN_REQUIRED / NOT_PRESENT) and
@@ -157,7 +157,7 @@ extended by this package even though they sit outside the listed writeScopes.
       tests: override refused, conflict recorded, provider risk without
       corroboration stored as UNRESOLVED-class evidence (never promoted to
       deterministic severity). Traces: FR-SOLSEC-005, AC-131.
-- [ ] T014 Implement `src/severity.ts`: the Appendix Q.1-derived severity
+- [x] T014 Implement `src/severity.ts`: the Appendix Q.1-derived severity
       mapping as a versioned pure policy over deterministic findings (known
       non-transferability/transfer hook blocking modeled exit, malicious
       program owner, active authority with observed abuse, unusable/
@@ -182,7 +182,7 @@ extended by this package even though they sit outside the listed writeScopes.
       revision-forward behavior (a registry revision never rewrites
       historical attribution inputs — §37.3 chaos case). Traces:
       FR-SOLSEC-006, AC-132.
-- [ ] T016 Implement `src/index.ts` exports; run the prohibited-capability
+- [x] T016 Implement `src/index.ts` exports; run the prohibited-capability
       scanner (`node scripts/scan-prohibited-capabilities/cli.mjs`) to
       confirm the read-only boundary holds across the new package (no
       transaction construction, signing, key material, or submission
@@ -257,7 +257,7 @@ extended by this package even though they sit outside the listed writeScopes.
       pinning the new catalog to the authoritative schemas. Traces:
       FR-SOLSEC-001, FR-SOLSEC-002, FR-SOLSEC-003, FR-SOLSEC-005,
       FR-SOLSEC-006.
-- [ ] T026 [executor: COORDINATOR] [evidence: VERIFICATION_ONLY] Run the
+- [x] T026 [executor: COORDINATOR] [evidence: VERIFICATION_ONLY] Run the
       milestone verification command on the canonical tree: `test -d
 packages/solana-security && pnpm --filter @foresift/solana-security
 test`; plus the extended central suites (`pnpm --filter
@@ -272,7 +272,7 @@ evidence/bun-migration/bun-migration-manifest.json`) after all new test
       contract). Mechanical bookkeeping (ADR-0020: coordinator-owned,
       zero-AI). Traces: FR-SOLSEC-001…006 (verification substrate for every
       assigned requirement).
-- [ ] T028 [executor: COORDINATOR] [evidence: VERIFICATION_ONLY] Run the full
+- [x] T028 [executor: COORDINATOR] [evidence: VERIFICATION_ONLY] Run the full
       aggregate gate `pnpm verify` and the integrity gate `pnpm spec:verify`
       at the pushed HEAD; require green (the complete Bun suite runs ONLY
       through the coordinator — never a bare `bun test` over the tree). If

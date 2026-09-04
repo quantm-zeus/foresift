@@ -29,7 +29,7 @@ const MIGRATIONS_DIR = path.resolve(
  */
 const RUN_TAG = `${process.pid}-${Math.random().toString(36).slice(2, 8)}`;
 
-describe('migration suite shape (+AC-243 probe assignments)', () => {
+describe('migration suite shape (+AC-243 probe assignments + solsec migrations)', () => {
   it('discovers exactly the G0 scripts in lexicographic order', async () => {
     const migrations = await discoverMigrations(MIGRATIONS_DIR);
     expect(migrations.map((m) => m.id)).toEqual([

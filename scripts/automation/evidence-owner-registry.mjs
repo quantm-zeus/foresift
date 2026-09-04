@@ -393,6 +393,17 @@ export function assertTraceabilityMatrixClosed(packageId, root, opts = {}) {
  * file truth from git, never model prose, and never a lane-diff bypass: the
  * authoring commits themselves went through guards + integration validation.
  */
+/**
+ * Already-satisfied audit for open FILE-truth units (directive §6):
+ * every predicted write must exist at HEAD with package authorship —
+ * its latest authoring commit postdates ctx.trustedBase (the adopted
+ * launch head) and is a descendant of it. A base-commit author means a
+ * pre-existing fixture (stays OPEN unless opts.allowBaseFiles).
+ *
+ * @param unit graph unit (id, predictedWrites, testWrites)
+ * @param ctx  { root, trustedBase?, allowBaseFiles? } — trustedBase = the
+ *             package's trusted launch/adoption commit (graph.bound.mainHeadSha)
+ */
 export function fileEvidenceAlreadySatisfied(unit, ctx) {
   const writes = [...(unit?.predictedWrites ?? []), ...(unit?.testWrites ?? [])];
   if (writes.length === 0)

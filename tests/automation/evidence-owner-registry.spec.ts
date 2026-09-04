@@ -326,7 +326,7 @@ describe('fileEvidenceAlreadySatisfied trusted-ancestry proof (directive §6)', 
       const unit = { id: 'T010', predictedWrites: ['packages/x/src/alpha.ts'] };
       const audit = fileEvidenceAlreadySatisfied(unit, { root, trustedBase });
       expect(audit.satisfied).toBe(true);
-      expect(audit.proof[0].authoringCommit).toBeDefined();
+      expect(audit.proof?.[0]?.authoringCommit).toBeDefined();
     } finally {
       rmSync(root, { recursive: true, force: true });
     }

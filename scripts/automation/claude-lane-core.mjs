@@ -55,6 +55,21 @@ export function runClaudeLaneCore(input) {
     'test helpers, *.test.*, *.spec.*, or __tests__ paths. You may read and run',
     'tests. If a test conflicts with authoritative requirements, do not edit it;',
     'write TEST_DISPUTE evidence under the result artifact directory instead.',
+    // Live run e32031f (2026-09-04): the lane agent ran `bun install`, which
+    // does not read pnpm-workspace.yaml — it appended a root "workspaces"
+    // field to package.json and created a 727-line bun.lock. Both are
+    // tooling plumbing outside every write scope: the guard correctly
+    // rejected the lane (WRITE-AUTHORITY VIOLATION: bun.lock, package.json).
+    // The package manager is pnpm; never run bun install / npm install /
+    // yarn, never create lockfiles, and never register workspaces. If
+    // dependencies are already linked, nothing needs installing.
+    'This repository uses pnpm (pnpm-workspace.yaml). Never run bun install,',
+    'npm install, or yarn; never create, modify, or commit any lockfile',
+    '(pnpm-lock.yaml, bun.lock, package-lock.json); never add a workspaces',
+    'field to any package.json. Dependencies are already installed in the',
+    'worktree — if a build or test needs a dependency, verify node_modules',
+    'first and treat a missing dependency as a blocker, not something to',
+    'install.',
     'Commit coherent production changes before exit.',
   ].join('\n');
   const started = Date.now();

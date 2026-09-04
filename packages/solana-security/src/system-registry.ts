@@ -1,4 +1,8 @@
-import { SystemAddressReviewState, isExcludableSystemAddress } from '@foresift/domain';
+import {
+  SystemAddressReviewState,
+  isExcludableSystemAddress,
+  SYSTEM_ADDRESS_EXCLUSION_MIN_CONFIDENCE,
+} from '@foresift/domain';
 import { canonicalJson, sha256Text, type DatabaseEngine } from '@foresift/persistence';
 import {
   parseSolsecSchema,
@@ -85,7 +89,8 @@ export function classifyExclusion(
   if (entry.reviewState === SystemAddressReviewState.PENDING_REVIEW)
     reason = 'REFUSAL_PENDING_REVIEW';
   else if (entry.reviewState === SystemAddressReviewState.REJECTED) reason = 'REFUSAL_REJECTED';
-  else if (entry.confidence < 0.8) reason = 'REFUSAL_SUB_FLOOR_CONFIDENCE';
+  else if (entry.confidence < SYSTEM_ADDRESS_EXCLUSION_MIN_CONFIDENCE)
+    reason = 'REFUSAL_SUB_FLOOR_CONFIDENCE';
   else reason = 'REFUSAL_UNKNOWN_ROLE';
   return { decision: reason, excluded: false, qualityCodes: [SYSTEM_ADDRESS_UNCERTAIN] };
 }
@@ -326,8 +331,12 @@ export async function registryExclusionSet(
         AND valid_from <= $2 AND (valid_until IS NULL OR valid_until >= $2)
         AND role <> 'UNKNOWN_INFRASTRUCTURE'
         AND review_state = 'REVIEWED'
-        AND confidence >= 0.80`,
-    [chainId, new Date(requireTimestamp(queryAt, 'queryAt')).toISOString()],
+        AND confidence >= $3`,
+    [
+      chainId,
+      new Date(requireTimestamp(queryAt, 'queryAt')).toISOString(),
+      SYSTEM_ADDRESS_EXCLUSION_MIN_CONFIDENCE,
+    ],
   );
   return [...new Set(rows.rows.map((row) => row.address))].sort();
 }

@@ -392,6 +392,21 @@ importers:
         specifier: ^3.25.76
         version: 3.25.76
 
+  packages/solana-security:
+    dependencies:
+      '@foresift/domain':
+        specifier: workspace:*
+        version: link:../domain
+      '@foresift/persistence':
+        specifier: workspace:*
+        version: link:../persistence
+      '@foresift/program-decoders':
+        specifier: workspace:*
+        version: link:../program-decoders
+      '@foresift/shared-schemas':
+        specifier: workspace:*
+        version: link:../shared-schemas
+
   packages/supply-confidence:
     dependencies:
       '@foresift/domain':

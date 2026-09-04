@@ -168,32 +168,26 @@ for (const u of units) {
     // whole serial columns derived ZERO predicted writes: lanes launched with
     // empty write columns, evidence nomination could never fire, and the §6
     // already-satisfied audit also starved ("no predicted writes recorded").
-    // Resolve a relative token against the package's scope directories; the
-    // joined path must land inside a binding write scope, so this never
-    // widens authority — it only re-roots what the plan already named.
+    // Resolve a relative token against the package's PRIMARY scope — the
+    // packages/* scope whose leaf matches the package id (g1-<name> →
+    // packages/<name>) — and only when that exact scope exists. Re-rooting
+    // against EVERY packages/* scope the package merely touches (domain,
+    // shared-schemas) fabricated cross-package pseudo-writes the plan never
+    // named (live recovery sim: T010 predicted the same analyzer under three
+    // roots, one of which cannot exist). A package without a namesake scope
+    // gets NO re-rooting — its plan must use full repo paths (every G1 plan
+    // except solsec already does).
+    const FILE_EXT = /\.(?:ts|mts|cts|js|mjs|cjs|json|sql|md|yaml|yml|txt|jsonl)$/;
     const rooted =
       /^(?:packages|tests|telemetry|migrations|docs|scripts|evidence)\//.test(p) ||
       p === 'pnpm-lock.yaml' ||
       p === 'package.json';
-    // Relative re-rooting candidates must look like a PATH, not a bare
-    // identifier: the final segment carries a real file extension
-    // (`src/token-assessment.ts`, `package.json`). A backticked package name
-    // (`@foresift/program-decoders`), dotted symbol
-    // (`EconomicTradeContext.knownRouterAccounts`), or call shape
-    // (`resolveSecurityConflict(...)`) is prose — exploding it into per-scope
-    // pseudo-paths would poison every write column and cross-lane ownership
-    // check. Re-rooting targets ONLY packages/* scope roots: the shorthand
-    // means "inside this package's root", and tests/** or migrations/**
-    // would fabricate test/pseudo writes the plan never named.
-    const FILE_EXT = /\.(?:ts|mts|cts|js|mjs|cjs|json|sql|md|yaml|yml|txt|jsonl)$/;
     const looksLikePath = rooted || FILE_EXT.test(p.split('/').at(-1));
+    const primaryScopeDir = `packages/${args.package.replace(/^g\d+-/, '')}`;
     const reRooted =
-      rooted || !looksLikePath
+      rooted || !looksLikePath || !scopeDirs.includes(primaryScopeDir)
         ? []
-        : scopeDirs
-            .filter((d) => d.startsWith('packages/'))
-            .map((d) => `${d}/${p}`)
-            .filter((q) => classifyPath(q));
+        : [`${primaryScopeDir}/${p}`].filter((q) => classifyPath(q));
     for (const q of reRooted.length > 0 ? reRooted : rooted ? [p] : []) {
       if (!paths.includes(q)) paths.push(q);
     }

@@ -272,13 +272,51 @@ describe('maintainer wave 2026-09-03 regressions', () => {
     // Live defect: bodies naming package files RELATIVELY (`src/foo.ts`,
     // `package.json`) were dropped by the repo-rooted prefix filter, so whole
     // serial columns derived ZERO predicted writes — empty lane write
-    // columns, no evidence nominations, §6 audit starvation. Re-rooting must
-    // land inside a binding scope and must NOT explode prose symbols.
+    // columns, no evidence nominations, §6 audit starvation. Re-rooting
+    // targets the package's PRIMARY scope (namesake `packages/<pkg-leaf>`,
+    // leaf = id with the generation prefix stripped) and must NOT explode
+    // prose symbols or fabricate cross-package writes.
     const root = scratchRepo();
-    writeTasks(
-      root,
+    // Dedicated inline milestone: package id `g1-t` (generation prefix
+    // stripped → leaf `t`) whose binding scope IS `packages/t/**` — the
+    // namesake shape the rule resolves against.
+    mkdirSync(join(root, 'specs', 'g1-t'), { recursive: true });
+    writeFileSync(
+      join(root, 'specs', 'implementation', 'current-milestone.json'),
+      JSON.stringify({
+        schemaVersion: '1.0.0',
+        milestoneId: 'MX2',
+        status: 'ACTIVE',
+        packages: [
+          {
+            id: 'g1-t',
+            objective: 'Implement fixture subsystem t end to end with full evidence coverage.',
+            requirementIds: ['FR-X-001'],
+            dependencies: [],
+            risk: 'MEDIUM',
+            parallelizable: false,
+            writeScopes: ['packages/t/**', 'tests/**', 'migrations/'],
+            verificationCommands: ['pnpm test'],
+            status: 'RUNNING',
+          },
+          {
+            id: 'g1-t2',
+            objective: 'Implement independent fixture subsystem t2 behind its own boundary.',
+            requirementIds: ['FR-X-002'],
+            dependencies: ['g1-t'],
+            risk: 'LOW',
+            parallelizable: true,
+            writeScopes: ['packages/t2/**'],
+            verificationCommands: ['pnpm test'],
+            status: 'PENDING',
+          },
+        ],
+      }),
+    );
+    writeFileSync(
+      join(root, 'specs', 'g1-t', 'tasks.md'),
       [
-        '# Tasks: pkg-t',
+        '# Tasks: g1-t',
         '',
         '- [ ] T201 Implement `src/tokenizer.ts` with helper `TokenKind` and',
         '      call `parse(...)`; see `@scope/thing` and `dotted.symbol`. Also',
@@ -286,13 +324,21 @@ describe('maintainer wave 2026-09-03 regressions', () => {
         '',
       ].join('\n'),
     );
-    const g = buildGraph(root) as unknown as {
+    const r = spawnSync(
+      process.execPath,
+      [GRAPH, '--package', 'g1-t', '--root', root, '--execution-profile', 'HYBRID_AGY'],
+      { encoding: 'utf8' },
+    );
+    if (r.status !== 0) throw new Error((r.stderr ?? '').slice(0, 300));
+    const g = JSON.parse(r.stdout) as {
       units: Array<{ id: string; predictedWrites: string[] }>;
     };
     const u = g.units.find((x) => x.id === 'T201');
-    // `src/token-assessment.ts`-style shorthand resolves against the package
-    // scope dir `packages/t/` — and ONLY packages/* roots (tests/** would
-    // fabricate test writes the plan never named).
+    // `src/tokenizer.ts` resolves against the PRIMARY scope `packages/t/`
+    // only — never against other packages/* scopes the package merely
+    // touches (live recovery sim: multi-root re-rooting predicted the same
+    // analyzer under packages/domain and packages/shared-schemas, roots
+    // whose files cannot exist).
     expect(u?.predictedWrites).toEqual(['packages/t/src/tokenizer.ts']);
     // Prose symbols never become pseudo-paths.
     for (const w of u?.predictedWrites ?? []) {

@@ -1,5 +1,5 @@
 {
-  "$comment": "System address registry exclusion and refusal vectors (FR-SOLSEC-006, AC-132, Appendix Q.2).",
+  "$comment": "System address registry exclusion and refusal vectors (FR-SOLSEC-006, AC-132, Appendix Q.2, T020).",
   "entries": [
     {
       "name": "known Jupiter router account excluded from actor attribution",

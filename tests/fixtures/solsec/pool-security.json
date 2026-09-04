@@ -1,5 +1,5 @@
 {
-  "$comment": "Resolved pool and unsupported design security vectors (FR-SOLSEC-003, AC-130, AC-230).",
+  "$comment": "Resolved pool and unsupported design security vectors (FR-SOLSEC-003, AC-130, AC-230, T018).",
   "pools": [
     {
       "name": "resolved pool with LP burned and revoked withdrawal authority",

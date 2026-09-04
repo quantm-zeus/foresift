@@ -1,6 +1,6 @@
 /**
  * AC-230 acceptance (positive) — protocol adapter fixture sweep & versioned resolution.
- * Traces: FR-COL-002, FR-SOLSEC-003.
+ * Traces: FR-COL-002, FR-SOLSEC-003, AC-230, T024.
  * AC text (manifest §39): "Full fixture sweep — Pump/PumpSwap, Raydium AMM v4/CPMM/CLMM/Stable AMM/LaunchLab,
  * Orca Whirlpools, Meteora DLMM/DAMM v1-v2/DBC, Jupiter path-observation coverage, constant-product,
  * concentrated-liquidity, bin-based, bonding-curve, dynamic-fee — each resolves ONLY to its

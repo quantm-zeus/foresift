@@ -1,6 +1,6 @@
 /**
  * AC-131 negative / failure-path.
- * Traces: FR-SOLSEC-005, AC-131.
+ * Traces: FR-SOLSEC-005, AC-131, T022.
  * Refuses provider optimism overriding deterministic severity, refuses missing
  * provider data reducing severity, and refuses malformed conflict classifications.
  */

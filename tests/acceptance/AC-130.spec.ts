@@ -1,6 +1,6 @@
 /**
  * AC-130 acceptance (positive).
- * Traces: FR-SOLSEC-001, FR-SOLSEC-002, FR-SOLSEC-003, FR-SOLSEC-004, AC-130.
+ * Traces: FR-SOLSEC-001, FR-SOLSEC-002, FR-SOLSEC-003, FR-SOLSEC-004, AC-130, T021.
  * AC text (manifest §39): "SPL and Token-2022 programs, authorities, and extensions
  * are analyzed deterministically; pool/LP control, migration lineage, and withdrawal
  * authorities are resolved through allowlisted adapters with versioned evidence."

@@ -1,5 +1,5 @@
 {
-  "$comment": "Provider override, conflict recording, and preserved evidence vectors (FR-SOLSEC-005, AC-131). External provider SAFE output cannot override deterministic risk.",
+  "$comment": "Provider override, conflict recording, and preserved evidence vectors (FR-SOLSEC-005, AC-131, T019). External provider SAFE output cannot override deterministic risk.",
   "cases": [
     {
       "name": "deterministic CRITICAL transfer-hook blocking exit with provider reporting SAFE",

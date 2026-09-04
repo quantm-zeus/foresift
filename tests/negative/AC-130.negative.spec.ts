@@ -1,6 +1,6 @@
 /**
  * AC-130 negative / failure-path.
- * Traces: FR-SOLSEC-001, FR-SOLSEC-002, FR-SOLSEC-003, FR-SOLSEC-004, AC-130.
+ * Traces: FR-SOLSEC-001, FR-SOLSEC-002, FR-SOLSEC-003, FR-SOLSEC-004, AC-130, T021.
  * Verifies that unknown required transfer semantics BLOCK execution modeling,
  * unsupported pool designs structurally refuse resolved-state fields, and
  * malformed control findings are refused fail-closed.

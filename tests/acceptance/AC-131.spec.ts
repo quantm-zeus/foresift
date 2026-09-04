@@ -1,6 +1,6 @@
 /**
  * AC-131 acceptance (positive).
- * Traces: FR-SOLSEC-005, AC-131.
+ * Traces: FR-SOLSEC-005, AC-131, T022.
  * AC text (manifest §39): "External security provider reports are stored as independent
  * evidence; deterministic critical/high risks take precedence over provider safe outputs,
  * and security conflicts are recorded and exposed."

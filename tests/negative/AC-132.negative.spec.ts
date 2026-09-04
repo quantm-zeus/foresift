@@ -1,6 +1,6 @@
 /**
  * AC-132 negative / failure-path.
- * Traces: FR-SOLSEC-006, AC-132.
+ * Traces: FR-SOLSEC-006, AC-132, T023.
  * Tests refusal of sub-floor registry rows (low confidence, pending review,
  * rejected, unknown role) and quality degradation to SYSTEM_ADDRESS_UNCERTAIN.
  */

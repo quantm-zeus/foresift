@@ -1,6 +1,6 @@
 /**
  * AC-132 acceptance (positive).
- * Traces: FR-SOLSEC-006, AC-132.
+ * Traces: FR-SOLSEC-006, AC-132, T023.
  * AC text (manifest §39): "A versioned system-address registry identifies known routers,
  * exchanges, launchpads, fee collectors, and programs; verified infrastructure accounts
  * are excluded from actor attribution graphs while raw flows remain auditable."

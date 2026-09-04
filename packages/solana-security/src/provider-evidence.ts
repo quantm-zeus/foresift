@@ -42,6 +42,8 @@ export interface SecurityConflictResolutionInput {
 
 export interface SecurityConflictResolution {
   readonly assessmentId: string;
+  /** Versioned comparison policy identity (FR-SOLSEC-002 evidence law). */
+  readonly policyVersion: string;
   /** Deterministic severity after comparison — providers never move it. */
   readonly effectiveSeverity: SecuritySeverity;
   readonly providerOptimismOverridden: boolean;
@@ -165,6 +167,7 @@ export function resolveSecurityConflict(
 
   return {
     assessmentId: input.assessmentId,
+    policyVersion: PROVIDER_EVIDENCE_POLICY_VERSION,
     effectiveSeverity: severity,
     providerOptimismOverridden,
     conflicts,

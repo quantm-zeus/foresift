@@ -13,7 +13,7 @@ import {
 
 describe('system-registry: versioned address registry & actor exclusion audit (FR-SOLSEC-006, AC-132, T015)', () => {
   const mockRouterEntry: SystemAddressRegistryEntry = {
-    registryEntryId: 'sys-reg:solana:mainnet:jupiter-router-v6',
+    registryEntryId: 'sys-reg:solana:mainnet:aggregator-v6',
     chainId: parseChainId('solana:mainnet'),
     address: 'JUP6LkbZbjS1jKKwapdHNy74zcZ3tLUZoi5QNyVTaV4',
     role: SystemAddressRole.ROUTER,

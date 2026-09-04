@@ -632,3 +632,129 @@ export const economicRouteLegs = pgTable('economic_route_legs', {
   qualityCodes: text('quality_codes').array().notNull(),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull(),
 });
+
+// ── G1 solsec (migrations/g1_solsec_*.sql) — Solana security analyzer ───────
+
+export const tokenProgramAssessments = pgTable('token_program_assessments', {
+  assessmentId: text('assessment_id').primaryKey(),
+  assetRepresentationId: text('asset_representation_id').notNull(),
+  chainId: text('chain_id').notNull(),
+  programOwner: text('program_owner').notNull(),
+  programVersion: text('program_version').notNull(),
+  analyzerVersion: text('analyzer_version').notNull(),
+  decimals: integer('decimals').notNull(),
+  totalSupplyRaw: text('total_supply_raw').notNull(),
+  transferSemanticsSupport: text('transfer_semantics_support').notNull(),
+  deterministicEvidenceIds: text('deterministic_evidence_ids').array().notNull(),
+  observedAt: timestamp('observed_at', { withTimezone: true }).notNull(),
+  availableAt: timestamp('available_at', { withTimezone: true }).notNull(),
+  qualityCodes: text('quality_codes').array().notNull(),
+  schemaRegistryVersion: integer('schema_registry_version').notNull(),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull(),
+});
+
+export const tokenControlFindings = pgTable('token_control_findings', {
+  findingId: text('finding_id').primaryKey(),
+  assessmentId: text('assessment_id').notNull(),
+  control: text('control').notNull(),
+  controlState: text('control_state').notNull(),
+  severity: text('severity'),
+  authorityAddress: text('authority_address'),
+  extensionDataHash: text('extension_data_hash'),
+  evidenceIds: text('evidence_ids').array().notNull(),
+  observedAt: timestamp('observed_at', { withTimezone: true }).notNull(),
+  availableAt: timestamp('available_at', { withTimezone: true }).notNull(),
+  qualityCodes: text('quality_codes').array().notNull(),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull(),
+});
+
+export const tokenExtensionSupport = pgTable(
+  'token_extension_support',
+  {
+    assessmentId: text('assessment_id').notNull(),
+    extensionType: text('extension_type').notNull(),
+    extensionDataHash: text('extension_data_hash').notNull(),
+    support: text('support').notNull(),
+    verdictPolicyVersion: text('verdict_policy_version').notNull(),
+    observedAt: timestamp('observed_at', { withTimezone: true }).notNull(),
+    availableAt: timestamp('available_at', { withTimezone: true }).notNull(),
+    qualityCodes: text('quality_codes').array().notNull(),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull(),
+  },
+  (t) => [primaryKey({ columns: [t.assessmentId, t.extensionType, t.verdictPolicyVersion] })],
+);
+
+export const poolSecurityAssessments = pgTable('pool_security_assessments', {
+  assessmentId: text('assessment_id').primaryKey(),
+  poolId: text('pool_id').notNull(),
+  adapterId: text('adapter_id').notNull(),
+  adapterVersion: text('adapter_version').notNull(),
+  adapterSupportState: text('adapter_support_state').notNull(),
+  lpControlState: text('lp_control_state'),
+  withdrawalAuthorityState: text('withdrawal_authority_state'),
+  liquidityRemovalRisk: text('liquidity_removal_risk'),
+  quoteParityState: text('quote_parity_state'),
+  stateCompleteness: text('state_completeness').notNull(),
+  migrationLineageId: text('migration_lineage_id'),
+  liquidityConcentration: text('liquidity_concentration'),
+  evidenceIds: text('evidence_ids').array().notNull(),
+  observedAt: timestamp('observed_at', { withTimezone: true }).notNull(),
+  availableAt: timestamp('available_at', { withTimezone: true }).notNull(),
+  qualityCodes: text('quality_codes').array().notNull(),
+  schemaRegistryVersion: integer('schema_registry_version').notNull(),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull(),
+});
+
+export const securityProviderReports = pgTable('security_provider_reports', {
+  reportId: text('report_id').primaryKey(),
+  assessmentId: text('assessment_id').notNull(),
+  sourceId: text('source_id').notNull(),
+  providerReportId: text('provider_report_id').notNull(),
+  providerVersion: text('provider_version').notNull(),
+  verdict: text('verdict').notNull(),
+  rawPayloadRef: text('raw_payload_ref').notNull(),
+  findingIds: text('finding_ids').array().notNull(),
+  observedAt: timestamp('observed_at', { withTimezone: true }).notNull(),
+  availableAt: timestamp('available_at', { withTimezone: true }).notNull(),
+  qualityCodes: text('quality_codes').array().notNull(),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull(),
+});
+
+export const securityConflicts = pgTable('security_conflicts', {
+  conflictId: text('conflict_id').primaryKey(),
+  assessmentId: text('assessment_id').notNull(),
+  providerReportId: text('provider_report_id').notNull(),
+  conflictClass: text('conflict_class').notNull(),
+  deterministicFindingIds: text('deterministic_finding_ids').array().notNull(),
+  resolution: text('resolution').notNull(),
+  resolvedAt: timestamp('resolved_at', { withTimezone: true }).notNull(),
+  availableAt: timestamp('available_at', { withTimezone: true }).notNull(),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull(),
+});
+
+export const systemAddressRegistry = pgTable('system_address_registry', {
+  registryEntryId: text('registry_entry_id').primaryKey(),
+  chainId: text('chain_id').notNull(),
+  address: text('address').notNull(),
+  role: text('role').notNull(),
+  validFrom: timestamp('valid_from', { withTimezone: true }).notNull(),
+  validUntil: timestamp('valid_until', { withTimezone: true }),
+  sourceId: text('source_id').notNull(),
+  confidence: doublePrecision('confidence').notNull(),
+  reviewState: text('review_state').notNull(),
+  registryVersion: integer('registry_version').notNull(),
+  evidenceIds: text('evidence_ids').array().notNull(),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull(),
+});
+
+export const systemAddressExclusionsApplied = pgTable('system_address_exclusions_applied', {
+  exclusionId: text('exclusion_id').primaryKey(),
+  registryEntryId: text('registry_entry_id').notNull(),
+  economicEventId: text('economic_event_id').notNull(),
+  excluded: boolean('excluded').notNull(),
+  rawFlowRef: text('raw_flow_ref').notNull(),
+  appliedAt: timestamp('applied_at', { withTimezone: true }).notNull(),
+  registryVersion: integer('registry_version').notNull(),
+  qualityCodes: text('quality_codes').array().notNull(),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull(),
+});

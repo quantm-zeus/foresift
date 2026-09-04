@@ -246,9 +246,16 @@ for (const filePath of resultFiles) {
 // recomputed diff) reach this point, so the checkbox flip is authoritative.
 // One accepted task never flips its siblings: whatever the writer deferred
 // stays an open `- [ ]` line in the canonical tasks.md.
-const completedUnits = new Set(
-  report.integrated.filter((r) => r.role === 'implementation').flatMap((r) => r.units),
-);
+//
+// Role does not gate the flip — evidence ownership does (directive §5, live
+// g1-solana-security defect): a validated TEST-role lane's nominations carry
+// the same guarantees (lane membership from the task graph, predicted/
+// testWrite evidence in the recomputed diff, no declared blockers) plus the
+// TEST-only path-ownership guard, so a test lane can mark exactly its own
+// test-bearing tasks and nothing else. Filtering on role === 'implementation'
+// left every AGY test-author checkbox permanently open while its (validated)
+// files were already merged into the canonical branch.
+const completedUnits = new Set(report.integrated.flatMap((r) => r.units));
 if (completedUnits.size > 0) {
   const tasksPath = join(canonical, 'specs', args.package, 'tasks.md');
   if (existsSync(tasksPath)) {

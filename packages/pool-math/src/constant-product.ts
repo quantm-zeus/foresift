@@ -95,16 +95,59 @@ export function constantProductIn(
   return (numerator + denominator - 1n) / denominator;
 }
 
+/** Upper bound on deliverable net output for a direction (the output reserve). */
+function maxOutputReserve(
+  curve: ConstantProductCurveState,
+  direction: ConstantProductDirection,
+): bigint {
+  return direction === 'ZERO_TO_ONE' ? curve.reserveOneRaw : curve.reserveZeroRaw;
+}
+
+/**
+ * Closed-form first estimate of the gross input for `exactOut`: invert the
+ * fee, then require the pool to net-produce that gross output. This can
+ * under-quote by a few raw units (two floor divisions lose value), so
+ * `quoteExactOut` walks forward from here until the executed path delivers
+ * at least the requested amount.
+ */
+function grossRequiredEstimate(
+  netOut: bigint,
+  feeBps: number,
+  reserveIn: bigint,
+  reserveOut: bigint,
+): bigint {
+  const bps = BigInt(feeBps);
+  const grossForNet =
+    (netOut * 10_000n) / (10_000n - bps) +
+    ((netOut * 10_000n) % (10_000n - bps) === 0n ? 0n : 1n);
+  return constantProductIn(grossForNet, reserveIn, reserveOut);
+}
+
 export function priceImpactBpsBeforeAfter(
   reserveIn: bigint,
   reserveOut: bigint,
   amountInAfterFee: bigint,
 ): number {
-  const spotBefore = Number(reserveOut) / Number(reserveIn);
+  // Boundary guard (FR-EXEC-015): raw reserves beyond the double range would
+  // project to 0/Infinity and silently understate or corrupt the impact
+  // reading. Amounts stay exact BigInt; the impact projection refuses instead
+  // of reporting a number that cannot be trusted.
+  const nReserveIn = Number(reserveIn);
+  const nReserveOut = Number(reserveOut);
   const newIn = reserveIn + amountInAfterFee;
   const newOut = reserveOut - constantProductOut(amountInAfterFee, reserveIn, reserveOut);
-  const spotAfter = Number(newOut) / Number(newIn);
-  if (spotBefore === 0) return 0;
+  const nNewIn = Number(newIn);
+  const nNewOut = Number(newOut);
+  if (
+    !Number.isFinite(nReserveIn) ||
+    !Number.isFinite(nReserveOut) ||
+    !Number.isFinite(nNewIn) ||
+    !Number.isFinite(nNewOut)
+  ) {
+    throw new RangeError('price impact is not representable: reserves exceed the double range');
+  }
+  const spotBefore = nReserveOut / nReserveIn;
+  const spotAfter = nNewOut / nNewIn;
   return Math.max(0, ((spotBefore - spotAfter) / spotBefore) * 10_000);
 }
 
@@ -239,23 +282,33 @@ export class ConstantProductAdapter implements PoolMathAdapter {
     const direction = quoteDirection(input, input.poolState);
     const feeBps = feeBpsOf(input.poolState);
     requirePositive(input.rawAmountOut, 'rawAmountOut');
+    if (input.rawAmountOut >= maxOutputReserve(curve, direction)) {
+      throw new RangeError('requested output at or above the output reserve');
+    }
     const [reserveIn, reserveOut] =
       direction === 'ZERO_TO_ONE'
         ? [curve.reserveZeroRaw, curve.reserveOneRaw]
         : [curve.reserveOneRaw, curve.reserveZeroRaw];
-    const grossOut = input.rawAmountOut;
-    // The net output the trader demands; the pool must produce
-    // out/(1-fee) gross so that the trader receives the requested amount.
-    const grossRequired =
-      (grossOut * 10_000n) / (10_000n - BigInt(feeBps)) +
-      ((grossOut * 10_000n) % (10_000n - BigInt(feeBps)) === 0n ? 0n : 1n);
-    const inRequired = constantProductIn(grossRequired, reserveIn, reserveOut);
+    // The net output the trader demands. Because both the fee (floor) and the
+    // output rounding (floor) lose value, a closed-form gross estimate
+    // under-quotes: executing it would deliver LESS than the requested
+    // amount. The conservative law requires the trader to receive at least
+    // rawAmountOut, so resolve the smallest input whose full executed path
+    // applyFee -> constantProductOut delivers >= the requested amount.
+    let candidateIn = grossRequiredEstimate(input.rawAmountOut, feeBps, reserveIn, reserveOut);
+    while (
+      constantProductOut(applyFee(candidateIn, feeBps), reserveIn, reserveOut) < input.rawAmountOut
+    ) {
+      candidateIn += 1n;
+    }
+    const afterFee = applyFee(candidateIn, feeBps);
+    const modeledOut = constantProductOut(afterFee, reserveIn, reserveOut);
     return {
-      rawAmountIn: inRequired,
-      rawAmountOut: grossOut,
-      feeRawAmount: grossRequired - grossOut,
-      priceImpactBps: priceImpactBpsBeforeAfter(reserveIn, reserveOut, grossRequired),
-      minimumOutputRaw: grossOut,
+      rawAmountIn: candidateIn,
+      rawAmountOut: modeledOut,
+      feeRawAmount: candidateIn - afterFee,
+      priceImpactBps: priceImpactBpsBeforeAfter(reserveIn, reserveOut, afterFee),
+      minimumOutputRaw: input.rawAmountOut,
     };
   }
 

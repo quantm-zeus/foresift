@@ -47,7 +47,9 @@ export const EXEC_SCHEMA_REGISTRY_VERSION = 1;
 
 const nonEmptyId = z.string().min(1);
 
-export const Sha256RefSchema = z
+// Named `ExecSha256RefSchema` (not `Sha256RefSchema`) to avoid a star-export
+// ambiguity with the identical solsec-family schema in the package barrel.
+export const ExecSha256RefSchema = z
   .string()
   .regex(/^sha256:[0-9a-f]{64}$/, 'expected sha256:<64 lowercase hex characters>');
 
@@ -244,7 +246,7 @@ export const ReplayManifestSchema = z
     asOf: UtcTimestampSchema,
     datasetVersion: nonEmptyId,
     populationClaim: nonEmptyId,
-    candidateUniverseHash: Sha256RefSchema,
+    candidateUniverseHash: ExecSha256RefSchema,
     observationCutoff: UtcTimestampSchema,
     collectorCoverageManifestId: nonEmptyId,
     providerDependenceVersion: nonEmptyId,
@@ -262,7 +264,7 @@ export const ReplayManifestSchema = z
     executionScenarioVersions: z.array(nonEmptyId).min(1),
     artifactIds: z.array(nonEmptyId),
     holdoutExposureSnapshotId: nonEmptyId,
-    codeAndDependencyHash: Sha256RefSchema,
+    codeAndDependencyHash: ExecSha256RefSchema,
   })
   .strict();
 export type ReplayManifest = z.infer<typeof ReplayManifestSchema>;
@@ -335,7 +337,7 @@ export const AdapterRegistryEntrySchema = z
     accountLayoutVersion: nonEmptyId,
     supportState: AdapterSupportStateSchema,
     parityGateVersion: nonEmptyId.nullable(),
-    fixtureBundleHash: Sha256RefSchema.nullable(),
+    fixtureBundleHash: ExecSha256RefSchema.nullable(),
   })
   .strict()
   .refine(
@@ -363,7 +365,7 @@ export const ExecutionStateSnapshotSchema = z
     slot: DigitStringSchema,
     blockHash: nonEmptyId,
     finality: z.enum(['PROCESSED', 'CONFIRMED', 'FINALIZED']),
-    rawAccountStateHashes: z.array(Sha256RefSchema).min(1),
+    rawAccountStateHashes: z.array(ExecSha256RefSchema).min(1),
     reserveVaultState: z.record(z.unknown()),
     tickArrays: z.record(z.unknown()).nullable(),
     binArrays: z.record(z.unknown()).nullable(),
@@ -422,7 +424,7 @@ export const StressScenarioResultSchema = z
     netReturn: NetReturnBreakdownSchema,
     fillFraction: z.number().finite().min(0).max(1),
     passed: z.boolean(),
-    assumptionsHash: Sha256RefSchema,
+    assumptionsHash: ExecSha256RefSchema,
   })
   .strict();
 export type StressScenarioResult = z.infer<typeof StressScenarioResultSchema>;
@@ -565,7 +567,7 @@ export const AlertExecutionContentSchema = z
     modeledEntryImpact: z.number().finite().min(0),
     modeledExitImpact: z.number().finite().min(0),
     assumptions: z.array(nonEmptyId).min(1),
-    assumptionsHash: Sha256RefSchema,
+    assumptionsHash: ExecSha256RefSchema,
     validUntil: UtcTimestampSchema,
     renderedAt: UtcTimestampSchema,
   })
@@ -591,10 +593,11 @@ export const ConcurrentShadowAggregateSchema = z
   })
   .strict()
   .refine(
-    (value) =>
-      BigInt(value.aggregatedRequestedExitsUsd.split('.')[0]) <=
-        BigInt(value.preExitDepthUsd.split('.')[0]) ||
-      value.aggregatedFillFraction < 1,
+    (value) => {
+      const requested = value.aggregatedRequestedExitsUsd.split('.')[0] ?? '0';
+      const depth = value.preExitDepthUsd.split('.')[0] ?? '0';
+      return BigInt(requested) <= BigInt(depth) || value.aggregatedFillFraction < 1;
+    },
     { message: 'aggregate impact and fill competition reduce or reject fills deterministically' },
   );
 export type ConcurrentShadowAggregate = z.infer<typeof ConcurrentShadowAggregateSchema>;

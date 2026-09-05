@@ -1,0 +1,55 @@
+{
+  "$comment": "Target touch and resolution floor vectors (FR-EXEC-004, FR-EXEC-011, AC-122, AC-126, §64.13, §64.14).",
+  "cases": [
+    {
+      "caseId": "target_touch_isolated_wick",
+      "description": "Single-slot price wick touching target price but with zero executable depth / duration",
+      "targetPriceUsd": 2.50,
+      "wickHighPriceUsd": 2.55,
+      "wickDurationSlots": 1,
+      "wickExecutableVolumeUsd": 0.0,
+      "requiredNotionalUsd": 500.0,
+      "minRequiredDurationSlots": 3,
+      "signalOutcome": "SIGNAL_SUCCESS",
+      "tradableOutcome": "TRADABLE_FAILURE",
+      "verdict": "UNTRADABLE_SIGNAL_WIN",
+      "reason": "ISOLATED_WICK_INSUFFICIENT_VOLUME_OR_DURATION"
+    },
+    {
+      "caseId": "target_touch_sustained_depth",
+      "description": "Multi-slot sustained target presence with depth sufficient to absorb configured notional",
+      "targetPriceUsd": 2.50,
+      "sustainedHighPriceUsd": 2.54,
+      "touchDurationSlots": 6,
+      "executableVolumeUsd": 50000.0,
+      "requiredNotionalUsd": 500.0,
+      "minRequiredDurationSlots": 3,
+      "signalOutcome": "SIGNAL_SUCCESS",
+      "tradableOutcome": "TRADABLE_SUCCESS",
+      "verdict": "CONFIRMED_OPPORTUNITY",
+      "reason": "EXECUTABLE_TARGET_SATISFIED"
+    },
+    {
+      "caseId": "target_touch_low_resolution_snapshot",
+      "description": "Low temporal resolution (15m candle) snapshot without granular sub-interval liquidity observation",
+      "snapshotIntervalSeconds": 900,
+      "resolutionFloorSeconds": 1,
+      "hasObservationPlan": false,
+      "signalOutcome": "SIGNAL_SUCCESS",
+      "tradableOutcome": "INSUFFICIENT_DATA",
+      "verdict": "SIGNAL_ONLY_LOW_RESOLUTION",
+      "reason": "RESOLUTION_BELOW_FLOOR_REQUIRES_OBSERVATION_PLAN"
+    },
+    {
+      "caseId": "target_touch_observed_with_plan",
+      "description": "Target touch monitored via high-resolution finite observation plan",
+      "snapshotIntervalSeconds": 1,
+      "resolutionFloorSeconds": 1,
+      "hasObservationPlan": true,
+      "signalOutcome": "SIGNAL_SUCCESS",
+      "tradableOutcome": "TRADABLE_SUCCESS",
+      "verdict": "CONFIRMED_OPPORTUNITY",
+      "reason": "HIGH_RESOLUTION_OBSERVATION_SATISFIED"
+    }
+  ]
+}

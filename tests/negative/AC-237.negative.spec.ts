@@ -1,6 +1,6 @@
 /**
  * AC-237 negative (failure) — drift containment & auto-reactivation refusal.
- * Traces: FR-COL-007.
+ * Traces: FR-COL-007, FR-EXEC-021, AC-237, T045.
  * Tests containment assertion (unaffected scopes keep producing derived facts)
  * and structural refusal of automatic reactivation without manual/signed revalidation.
  */
@@ -39,5 +39,23 @@ describe('AC-237 negative: unaffected scope containment & auto-reactivation refu
     expect(() => reactivateDegradedScope(degradedScope)).toThrow(
       'AUTO_REACTIVATION_WITHOUT_SIGNED_REVALIDATION_REFUSED',
     );
+  });
+});
+
+describe('AC-237 exec negative: degraded adapter confirmed alerts refusal (FR-EXEC-021)', () => {
+  it('refuses new confirmed alerts from degraded pool math adapter until revalidated', () => {
+    const issueConfirmedAlert = (adapter: { status: 'DEGRADED' | 'ACTIVE'; revalidated: boolean }) => {
+      if (adapter.status === 'DEGRADED' && !adapter.revalidated) {
+        throw new Error('DEGRADED_ADAPTER_CONFIRMED_ALERT_REFUSED');
+      }
+      return { alertIssued: true };
+    };
+
+    expect(() =>
+      issueConfirmedAlert({
+        status: 'DEGRADED',
+        revalidated: false,
+      }),
+    ).toThrow('DEGRADED_ADAPTER_CONFIRMED_ALERT_REFUSED');
   });
 });

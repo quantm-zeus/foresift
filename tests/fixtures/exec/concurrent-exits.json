@@ -1,0 +1,36 @@
+{
+  "$comment": "Concurrent shadow positions sharing liquidity depth and deterministic fill competition (FR-EXEC-019, AC-236, §64.15).",
+  "scenarios": [
+    {
+      "scenarioId": "concurrent_two_shadow_exits_same_pool",
+      "description": "Two simultaneous exit orders competing for finite pool liquidity",
+      "poolId": "solana:5eykt4UsFv8P8NJdTREpY1vzqKqZKvdp/pool/RaydiumCpmmVerified1111111111111111111111",
+      "poolStartingReserveQuote": 50000.0,
+      "poolStartingReserveBase": 1000000.0,
+      "positions": [
+        {
+          "registrationId": "pos_alpha_001",
+          "notionalUsd": 30000.0,
+          "isolatedExpectedReturnUsd": 25000.0,
+          "isolatedPriceImpactBps": 600
+        },
+        {
+          "registrationId": "pos_beta_002",
+          "notionalUsd": 30000.0,
+          "isolatedExpectedReturnUsd": 25000.0,
+          "isolatedPriceImpactBps": 600
+        }
+      ],
+      "isolatedSumExpectedReturnUsd": 50000.0,
+      "concurrentAggregated": {
+        "executionOrder": ["pos_alpha_001", "pos_beta_002"],
+        "pos_alpha_001_filledUsd": 25000.0,
+        "pos_alpha_001_actualImpactBps": 600,
+        "pos_beta_002_filledUsd": 12500.0,
+        "pos_beta_002_actualImpactBps": 1800,
+        "totalActualReturnedUsd": 37500.0,
+        "depthCollisionDetected": true
+      }
+    }
+  ]
+}

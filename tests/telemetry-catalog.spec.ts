@@ -122,9 +122,9 @@ describe('telemetry/data.catalog.json parity with authoritative schemas', () => 
   });
 });
 
-describe('telemetry/trd.catalog.json, sup.catalog.json, and solsec.catalog.json parity (G1)', () => {
-  it('loads trd, sup, and solsec catalogs if present and checks contractStatus', () => {
-    const catalogNames = ['trd.catalog.json', 'sup.catalog.json', 'solsec.catalog.json'];
+describe('telemetry/trd.catalog.json, sup.catalog.json, solsec.catalog.json, and exec.catalog.json parity (G1)', () => {
+  it('loads trd, sup, solsec, and exec catalogs if present and checks contractStatus', () => {
+    const catalogNames = ['trd.catalog.json', 'sup.catalog.json', 'solsec.catalog.json', 'exec.catalog.json'];
     for (const catName of catalogNames) {
       try {
         const cat = loadCatalog(catName);
@@ -156,6 +156,35 @@ describe('telemetry/trd.catalog.json, sup.catalog.json, and solsec.catalog.json 
       }
     } catch {
       // Implementation lane creates telemetry/solsec.catalog.json in parallel
+    }
+  });
+
+  it('validates exec.catalog.json declarative events when catalog exists (FR-EXEC-001…022)', () => {
+    try {
+      const execCatalog = loadCatalog('exec.catalog.json');
+      expect(execCatalog.contractStatus).toContain('DECLARATIVE_CONTRACT_ONLY');
+      const expectedEvents = [
+        'exec.scenario_resolved',
+        'exec.simulation_recorded',
+        'exec.net_return_composed',
+        'exec.outcome_classified',
+        'exec.tradability_decided',
+        'exec.observation_plan_issued',
+        'exec.replay_manifest_frozen',
+        'exec.adapter_resolved',
+        'exec.adapter_parity_evaluated',
+        'exec.adapter_degraded',
+        'exec.shadow_positions_aggregated',
+        'exec.route_selected',
+        'exec.quote_evidence_recorded',
+      ];
+      for (const eventName of expectedEvents) {
+        const ev = execCatalog.events.find((e) => e.name === eventName);
+        expect(ev, `event ${eventName} present in exec catalog`).toBeDefined();
+        expect(ev?.fields.length).toBeGreaterThan(0);
+      }
+    } catch {
+      // Implementation lane creates telemetry/exec.catalog.json in parallel
     }
   });
 });

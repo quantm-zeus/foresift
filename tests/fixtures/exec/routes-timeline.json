@@ -1,0 +1,52 @@
+{
+  "$comment": "Point-in-time route selection and migration timeline vectors (FR-EXEC-022, AC-234, §64.5).",
+  "timelineCases": [
+    {
+      "caseId": "retrospective_pool_creation_refusal",
+      "actionTimeUtc": "2026-09-01T12:00:00.000Z",
+      "actionSlot": 284100000,
+      "candidateRoutes": [
+        {
+          "routeId": "route_origin_bonding_curve",
+          "poolId": "solana:5eykt4UsFv8P8NJdTREpY1vzqKqZKvdp/pool/PumpOriginPool1111111111111111111111111",
+          "poolCreatedAtUtc": "2026-09-01T11:00:00.000Z",
+          "poolCreatedSlot": 284090000,
+          "isAvailableAtActionTime": true,
+          "eligibleForSelection": true
+        },
+        {
+          "routeId": "route_future_raydium_pool",
+          "poolId": "solana:5eykt4UsFv8P8NJdTREpY1vzqKqZKvdp/pool/FutureRaydiumPool111111111111111111111",
+          "poolCreatedAtUtc": "2026-09-01T12:05:00.000Z",
+          "poolCreatedSlot": 284100750,
+          "isAvailableAtActionTime": false,
+          "eligibleForSelection": false,
+          "refusalReason": "POOL_CREATED_AFTER_ACTION_TIME"
+        }
+      ]
+    },
+    {
+      "caseId": "migration_edge_transition_timing",
+      "actionSlot": 284200000,
+      "migrationEdges": [
+        {
+          "edgeId": "edge_pump_to_raydium",
+          "sourcePool": "solana:5eykt4UsFv8P8NJdTREpY1vzqKqZKvdp/pool/PumpOriginPool1111111111111111111111111",
+          "targetPool": "solana:5eykt4UsFv8P8NJdTREpY1vzqKqZKvdp/pool/GraduatedRaydiumPool11111111111111111",
+          "migrationCompletedSlot": 284195000,
+          "isExecutableAtActionSlot": true,
+          "validForRouting": true
+        },
+        {
+          "edgeId": "edge_unexecuted_future_migration",
+          "sourcePool": "solana:5eykt4UsFv8P8NJdTREpY1vzqKqZKvdp/pool/PumpOriginPool2222222222222222222222222",
+          "targetPool": "solana:5eykt4UsFv8P8NJdTREpY1vzqKqZKvdp/pool/UnmigratedRaydiumPool22222222222222222",
+          "migrationCompletedSlot": 284210000,
+          "isExecutableAtActionSlot": false,
+          "validForRouting": false,
+          "refusalReason": "MIGRATION_NOT_COMPLETED_AT_ACTION_SLOT"
+        }
+      ]
+    }
+  ]
+}

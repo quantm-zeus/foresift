@@ -1,0 +1,55 @@
+{
+  "$comment": "Historical observed trade and reference quote parity vectors (FR-EXEC-016, AC-231, §64.11).",
+  "trades": [
+    {
+      "tradeId": "trade_cpmm_observed_001",
+      "poolId": "solana:5eykt4UsFv8P8NJdTREpY1vzqKqZKvdp/pool/RaydiumCpmmVerified1111111111111111111111",
+      "slot": 284000100,
+      "direction": "EXACT_IN",
+      "inputAmount": "1000000000",
+      "observedOutputAmount": "48780487",
+      "simulatedOutputAmount": "48780487",
+      "toleranceBps": 5,
+      "discrepancyBps": 0,
+      "parityState": "PASS"
+    },
+    {
+      "tradeId": "trade_clmm_whirlpool_002",
+      "poolId": "solana:5eykt4UsFv8P8NJdTREpY1vzqKqZKvdp/pool/OrcaWhirlpoolClmm1111111111111111111111",
+      "slot": 284000200,
+      "direction": "EXACT_IN",
+      "inputAmount": "500000000",
+      "observedOutputAmount": "24925000",
+      "simulatedOutputAmount": "24924950",
+      "toleranceBps": 10,
+      "discrepancyBps": 2,
+      "parityState": "PASS"
+    },
+    {
+      "tradeId": "trade_tolerance_breach_fail_003",
+      "poolId": "solana:5eykt4UsFv8P8NJdTREpY1vzqKqZKvdp/pool/BreachedParityPool11111111111111111111111",
+      "slot": 284000300,
+      "direction": "EXACT_IN",
+      "inputAmount": "1000000000",
+      "observedOutputAmount": "50000000",
+      "simulatedOutputAmount": "45000000",
+      "toleranceBps": 10,
+      "discrepancyBps": 1000,
+      "parityState": "FAIL",
+      "failureReason": "PARITY_TOLERANCE_EXCEEDED"
+    }
+  ],
+  "referenceQuotes": [
+    {
+      "quoteId": "quote_jupiter_reference_reconciled",
+      "route": "SOL -> USDC via Raydium CPMM",
+      "inputAmount": "1000000000",
+      "providerQuotedOut": "150000000",
+      "venueSimulatedOut": "149980000",
+      "discrepancyBps": 1.3,
+      "maxAllowedToleranceBps": 10,
+      "reconciled": true,
+      "isPoolMathAuthority": false
+    }
+  ]
+}

@@ -864,6 +864,8 @@ export const replayManifests = pgTable('replay_manifests', {
   policyVersion: text('policy_version').notNull(),
   deliveryLatencyPolicyVersion: text('delivery_latency_policy_version').notNull(),
   capacityContractVersion: text('capacity_contract_version').notNull(),
+  assumptionsHash: text('assumptions_hash').notNull(),
+  scenarioPayloads: jsonb('scenario_payloads').notNull(),
   poolMathAdapterVersions: text('pool_math_adapter_versions').array().notNull(),
   executionScenarioVersions: text('execution_scenario_versions').array().notNull(),
   artifactIds: text('artifact_ids').array().notNull(),

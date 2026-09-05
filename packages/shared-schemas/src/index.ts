@@ -15,3 +15,4 @@ export * from './trace.ts';
 export * from './trd.ts';
 export * from './sup.ts';
 export * from './solsec.ts';
+export * from './exec.ts';

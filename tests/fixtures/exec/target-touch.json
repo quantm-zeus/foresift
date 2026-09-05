@@ -1,0 +1,67 @@
+{
+  "$comment": "Executable target touch, target-duration, isolated-wick, and resolution-floor vectors (§64.13, §64.14, FR-EXEC-004, FR-EXEC-011, AC-122, AC-126).",
+  "touchCases": [
+    {
+      "caseId": "wick_single_slot_shallow_volume",
+      "description": "Single-slot price spike touching target price with only $150 executable volume against $5000 notional",
+      "targetPrice": 2.0,
+      "peakPriceObserved": 2.05,
+      "touchDurationSlots": 1,
+      "touchDurationMs": 400,
+      "requiredNotionalUsd": 5000.0,
+      "executableVolumeAtTargetUsd": 150.0,
+      "minTargetDurationRequiredSlots": 3,
+      "signalSuccess": true,
+      "tradableSuccess": false,
+      "verdict": "UNTRADABLE_SIGNAL_WIN",
+      "rejectionReason": "INSUFFICIENT_EXECUTABLE_VOLUME_AND_DURATION",
+      "isolatedWickDetected": true
+    },
+    {
+      "caseId": "wick_single_slot_deep_volume",
+      "description": "Single-slot spike with massive $250,000 executable liquidity pool at target price satisfying $5000 notional",
+      "targetPrice": 2.0,
+      "peakPriceObserved": 2.05,
+      "touchDurationSlots": 1,
+      "touchDurationMs": 400,
+      "requiredNotionalUsd": 5000.0,
+      "executableVolumeAtTargetUsd": 250000.0,
+      "minTargetDurationRequiredSlots": 1,
+      "signalSuccess": true,
+      "tradableSuccess": true,
+      "verdict": "TRADABLE_SUCCESS",
+      "rejectionReason": null,
+      "isolatedWickDetected": false
+    },
+    {
+      "caseId": "target_sustained_duration_supported",
+      "description": "Target price sustained across 8 consecutive slots with moderate volume",
+      "targetPrice": 1.5,
+      "peakPriceObserved": 1.55,
+      "touchDurationSlots": 8,
+      "touchDurationMs": 3200,
+      "requiredNotionalUsd": 1000.0,
+      "executableVolumeAtTargetUsd": 15000.0,
+      "minTargetDurationRequiredSlots": 3,
+      "signalSuccess": true,
+      "tradableSuccess": true,
+      "verdict": "TRADABLE_SUCCESS",
+      "rejectionReason": null,
+      "isolatedWickDetected": false
+    },
+    {
+      "caseId": "low_res_snapshot_oracle_floor_violation",
+      "description": "Low-frequency 60-second snapshot indicates price reached target, but temporal resolution violates resolution floor",
+      "targetPrice": 3.0,
+      "peakPriceObserved": 3.2,
+      "snapshotResolutionSeconds": 60,
+      "resolutionFloorSeconds": 1,
+      "observationPlanPresent": false,
+      "signalSuccess": true,
+      "tradableSuccess": false,
+      "verdict": "UNTRADABLE_SIGNAL_WIN",
+      "rejectionReason": "TEMPORAL_RESOLUTION_BELOW_FLOOR_WITHOUT_OBSERVATION_PLAN",
+      "isolatedWickDetected": false
+    }
+  ]
+}

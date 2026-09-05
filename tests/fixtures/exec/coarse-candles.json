@@ -1,0 +1,59 @@
+{
+  "$comment": "Coarse candle target/invalidation reachability and ordering vectors (§64.7, FR-EXEC-002, FR-EXEC-018, AC-238).",
+  "candles": [
+    {
+      "candleId": "candle_ambiguous_both_reachable",
+      "description": "5-minute coarse candle where both target price ($1.20) and stop-loss invalidation ($0.90) fall inside [low, high]",
+      "openPrice": 1.0,
+      "highPrice": 1.25,
+      "lowPrice": 0.85,
+      "closePrice": 1.1,
+      "entryPrice": 1.0,
+      "targetPrice": 1.2,
+      "invalidationPrice": 0.9,
+      "targetReachable": true,
+      "invalidationReachable": true,
+      "candleIntervalSeconds": 300,
+      "pathAmbiguity": true,
+      "primaryOrdering": "ADVERSE_FEASIBLE",
+      "expectedPrimaryOutcome": "TRADABLE_FAILURE",
+      "optimisticOrderingSecondary": "TRADABLE_SUCCESS"
+    },
+    {
+      "candleId": "candle_unambiguous_target_only",
+      "description": "5-minute coarse candle where only target price ($1.20) is reached; low stays well above invalidation ($0.90)",
+      "openPrice": 1.0,
+      "highPrice": 1.25,
+      "lowPrice": 0.98,
+      "closePrice": 1.22,
+      "entryPrice": 1.0,
+      "targetPrice": 1.2,
+      "invalidationPrice": 0.9,
+      "targetReachable": true,
+      "invalidationReachable": false,
+      "candleIntervalSeconds": 300,
+      "pathAmbiguity": false,
+      "primaryOrdering": "UNAMBIGUOUS",
+      "expectedPrimaryOutcome": "TRADABLE_SUCCESS",
+      "optimisticOrderingSecondary": "TRADABLE_SUCCESS"
+    },
+    {
+      "candleId": "candle_unambiguous_invalidation_only",
+      "description": "5-minute coarse candle where price dumps through invalidation ($0.90) without ever reaching target ($1.20)",
+      "openPrice": 1.0,
+      "highPrice": 1.02,
+      "lowPrice": 0.82,
+      "closePrice": 0.84,
+      "entryPrice": 1.0,
+      "targetPrice": 1.2,
+      "invalidationPrice": 0.9,
+      "targetReachable": false,
+      "invalidationReachable": true,
+      "candleIntervalSeconds": 300,
+      "pathAmbiguity": false,
+      "primaryOrdering": "UNAMBIGUOUS",
+      "expectedPrimaryOutcome": "TRADABLE_FAILURE",
+      "optimisticOrderingSecondary": "TRADABLE_FAILURE"
+    }
+  ]
+}

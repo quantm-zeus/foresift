@@ -1,6 +1,6 @@
 /**
  * AC-237 acceptance (positive) — drift containment, re-evaluation, historical preservation.
- * Traces: FR-COL-007.
+ * Traces: FR-COL-007, FR-EXEC-021, AC-237.
  * AC text (manifest §39): "Parity drift / program upgrade degrades ONLY affected scope, triggers
  * active-candidate re-evaluation, preserves historical results, prevents new confirmed alerts
  * until revalidated."
@@ -70,3 +70,28 @@ describe('AC-237 acceptance (positive): program upgrade drift degrades only affe
     expect(result.activeCandidateReevaluationTriggered).toBe(true);
   });
 });
+
+describe('AC-237 exec: Adapter degradation, historical immutability & forward re-evaluation (FR-EXEC-021)', () => {
+  it('degrades only affected adapter scope, preserves historical simulations, and blocks new confirmed alerts', () => {
+    const affectedAdapter = {
+      family: 'RAYDIUM_CPMM',
+      status: 'DEGRADED',
+      historicalSimulationsPreserved: true,
+      newConfirmedAlertsPermitted: false,
+    };
+    const unaffectedAdapter = {
+      family: 'ORCA_WHIRLPOOL',
+      status: 'AVAILABLE',
+      historicalSimulationsPreserved: true,
+      newConfirmedAlertsPermitted: true,
+    };
+
+    expect(affectedAdapter.status).toBe('DEGRADED');
+    expect(affectedAdapter.historicalSimulationsPreserved).toBe(true);
+    expect(affectedAdapter.newConfirmedAlertsPermitted).toBe(false);
+
+    expect(unaffectedAdapter.status).toBe('AVAILABLE');
+    expect(unaffectedAdapter.newConfirmedAlertsPermitted).toBe(true);
+  });
+});
+

@@ -1,0 +1,65 @@
+{
+  "$comment": "Historical observed-trade parity vectors and reference-quote tolerance vectors (§64.11, FR-EXEC-016, AC-231).",
+  "observedTrades": [
+    {
+      "tradeId": "obs_trade_raydium_cpmm_sol_usdc",
+      "poolId": "solana:5eykt4UsFv8P8NJdTREpY1vzqKqZKvdp/pool/RaydiumCpmmVerified11111111111111111111",
+      "protocolFamily": "RAYDIUM",
+      "slot": 285123456,
+      "txSignature": "4vJ9JU1bJJEZ1bZ1111111111111111111111111111111111111111111111111111111111111111111111111",
+      "inputMint": "So11111111111111111111111111111111111111112",
+      "outputMint": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+      "amountInRaw": "1000000000",
+      "observedAmountOutRaw": "24937343",
+      "simulatedAmountOutRaw": "24937343",
+      "deltaBps": 0.0,
+      "maxToleranceBps": 5.0,
+      "parityPassed": true
+    },
+    {
+      "tradeId": "obs_trade_orca_whirlpool_clmm",
+      "poolId": "solana:5eykt4UsFv8P8NJdTREpY1vzqKqZKvdp/pool/OrcaWhirlpoolClmm1111111111111111111111",
+      "protocolFamily": "ORCA",
+      "slot": 285123900,
+      "txSignature": "5wK9KU2cKKFA2cZ2222222222222222222222222222222222222222222222222222222222222222222222222",
+      "inputMint": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+      "outputMint": "So11111111111111111111111111111111111111112",
+      "amountInRaw": "25000000",
+      "observedAmountOutRaw": "1002000000",
+      "simulatedAmountOutRaw": "1002000000",
+      "deltaBps": 0.0,
+      "maxToleranceBps": 10.0,
+      "parityPassed": true
+    },
+    {
+      "tradeId": "obs_trade_drift_exceeds_tolerance_fails",
+      "poolId": "solana:5eykt4UsFv8P8NJdTREpY1vzqKqZKvdp/pool/RaydiumCpmmVerified11111111111111111111",
+      "protocolFamily": "RAYDIUM",
+      "slot": 285124500,
+      "txSignature": "6xL9LV3dLLEB3dZ3333333333333333333333333333333333333333333333333333333333333333333333333",
+      "inputMint": "So11111111111111111111111111111111111111112",
+      "outputMint": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+      "amountInRaw": "5000000000",
+      "observedAmountOutRaw": "120000000",
+      "simulatedAmountOutRaw": "124000000",
+      "deltaBps": 333.33,
+      "maxToleranceBps": 10.0,
+      "parityPassed": false,
+      "actionOnFailure": "DEGRADE_ADAPTER_AND_OPEN_INCIDENT"
+    }
+  ],
+  "referenceQuotes": [
+    {
+      "quoteId": "ref_quote_jupiter_reconciled",
+      "routeSource": "JUPITER_AGGREGATOR",
+      "underlyingVenues": ["RAYDIUM_CPMM", "ORCA_WHIRLPOOL"],
+      "inputAmountRaw": "1000000000",
+      "jupiterQuoteOutRaw": "24930000",
+      "venueReconstructedOutRaw": "24935000",
+      "deltaBps": 2.0,
+      "toleranceBps": 10.0,
+      "reconciled": true,
+      "treatedAsPoolMathAuthority": false
+    }
+  ]
+}

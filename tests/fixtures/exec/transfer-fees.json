@@ -1,0 +1,66 @@
+{
+  "$comment": "Token transfer fee, hook, rent, and unknown-required blocking vectors (§64.9, FR-EXEC-013, FR-EXEC-018, AC-121, AC-233).",
+  "tokens": [
+    {
+      "tokenMint": "Token2022WithTransferFee111111111111111111111",
+      "tokenProgram": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+      "verdict": "KNOWN_MODELED",
+      "transferFeeConfig": {
+        "feeBasisPoints": 200,
+        "maxFeeRaw": "5000000000",
+        "withholdingAuthority": "WithholdAuth11111111111111111111111111111111"
+      },
+      "transferHookConfig": null,
+      "accountRentExemptionLamports": 2039280,
+      "testTransfers": [
+        {
+          "transferAmountRaw": "10000000000",
+          "expectedFeeRaw": "200000000",
+          "expectedNetReceivedRaw": "9800000000",
+          "symmetricEntryExit": true
+        },
+        {
+          "transferAmountRaw": "500000000000",
+          "expectedFeeRaw": "5000000000",
+          "expectedNetReceivedRaw": "495000000000",
+          "cappedByMaxFee": true
+        }
+      ]
+    },
+    {
+      "tokenMint": "Token2022WithTransferHookAndFee1111111111111",
+      "tokenProgram": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+      "verdict": "KNOWN_MODELED",
+      "transferFeeConfig": {
+        "feeBasisPoints": 100,
+        "maxFeeRaw": "1000000000",
+        "withholdingAuthority": "WithholdAuth22222222222222222222222222222222"
+      },
+      "transferHookConfig": {
+        "hookProgramId": "HookProgram1111111111111111111111111111111111",
+        "extraAccountMetasAccount": "ExtraMetas111111111111111111111111111111111",
+        "extraComputeUnitsRequired": 45000,
+        "extraPriorityFeeUsd": 0.05
+      },
+      "accountRentExemptionLamports": 2039280,
+      "testTransfers": [
+        {
+          "transferAmountRaw": "10000000000",
+          "expectedFeeRaw": "100000000",
+          "expectedHookExecutionFeeUsd": 0.05,
+          "expectedNetReceivedRaw": "9900000000"
+        }
+      ]
+    },
+    {
+      "tokenMint": "Token2022UnknownExtensionBlocked1111111111111",
+      "tokenProgram": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+      "verdict": "UNKNOWN_REQUIRED",
+      "transferFeeConfig": null,
+      "transferHookConfig": null,
+      "expectedStatus": "INSUFFICIENT_DATA",
+      "blocksExecution": true,
+      "zeroCostAssumed": false
+    }
+  ]
+}

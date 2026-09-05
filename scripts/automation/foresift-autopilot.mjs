@@ -1740,24 +1740,104 @@ function findRecentRunRow(workflow, message) {
  * The supervisor must never settle into `package=RUNNING ∧ activeRuns=[] ∧
  * pausedFatal=null` — no such stranded state survives a tick.
  */
-function reconcileStrandedPackages(st) {
-  if (st.pausedFatal) return;
+// Terminal state-landing receipt statuses (mirrors state-landing.mjs
+// TERMINAL_STATUSES, which is intentionally not exported).
+const TERMINAL_RECEIPT_STATUSES = new Set(['MERGED', 'FAILED']);
+
+/**
+ * A ->PROVEN state-landing receipt for packageId that is IN FLIGHT (any
+ * non-terminal status) or already MERGED (canonical milestone may lag the
+ * protected merge by a tick). FAILED is terminal failure — it never proves
+ * durable success.
+ */
+export function findProvenLandingReceipt(receipts, packageId) {
+  return receipts.find(
+    (r) =>
+      r?.packageId === packageId &&
+      r?.toStatus === 'PROVEN' &&
+      (r?.status === 'MERGED' || !TERMINAL_RECEIPT_STATUSES.has(r?.status)),
+  );
+}
+
+/**
+ * Stranded-package reconciliation (§17 invariant guard), made state-landing
+ * aware after the 2026-09-05 false pausedFatal (g1-solana-security): the
+ * finalize path requests the protected ->PROVEN transition ASYNCHRONOUSLY and
+ * returns before the canonical milestone lands, so `RUNNING` + no tracked run
+ * is ALSO the expected mid-landing shape of a package that has authoritatively
+ * completed. Cases:
+ *   A. RUNNING + no run + NO proven-landing receipt => genuine stranded => fatal (fail-closed).
+ *   B. RUNNING + no run + in-flight/MERGED ->PROVEN receipt => awaiting-state-landing (NO fatal;
+ *      the receipt carries the control-plane identity until landing resolves).
+ *   C. stale pausedFatal for a package now PROVEN on committed main with no live run => retired
+ *      (durable success supersedes the pause; the terminal run is NEVER resumed).
+ * deps seams exist for hermetic tests; production uses the real loaders.
+ */
+export function reconcileStrandedPackages(st, deps = {}) {
+  const {
+    loadMilestone = () => loadCurrentMilestone(REPO),
+    loadReceipts = () => discoverPendingReceipts(STATE_DIR),
+    findRunRow = findRecentRunRow,
+    record: recordEvent = record,
+  } = deps;
   let ms;
   try {
-    ms = loadCurrentMilestone(REPO);
+    ms = loadMilestone();
     if (!ms || validateMilestoneState(ms).length > 0) return; // corrupt-state path pauses elsewhere
   } catch {
     return;
   }
+  // Case C first: a stale fatal must not survive contact with durable truth.
+  if (st.pausedFatal?.packageId) {
+    const proven = ms.packages.find(
+      (p) => p.id === st.pausedFatal.packageId && p.status === 'PROVEN',
+    );
+    if (proven) {
+      const { workflow: wf, message } = launchIdentity(proven);
+      const row = findRunRow(wf, message);
+      const live = row && ['running', 'pending'].includes(String(row.status));
+      if (!live) {
+        const retired = [...st.activeRuns, ...st.milestoneRuns, ...st.maintenanceRuns].filter(
+          (e) => e.packageId === st.pausedFatal.packageId && e.paused === 'fatal',
+        );
+        st.activeRuns = st.activeRuns.filter(
+          (e) => !(e.packageId === st.pausedFatal.packageId && e.paused === 'fatal'),
+        );
+        st.milestoneRuns = st.milestoneRuns.filter(
+          (e) => !(e.packageId === st.pausedFatal.packageId && e.paused === 'fatal'),
+        );
+        st.maintenanceRuns = st.maintenanceRuns.filter(
+          (e) => !(e.packageId === st.pausedFatal.packageId && e.paused === 'fatal'),
+        );
+        try {
+          releasePackageRuntime(STATE_DIR, { packageId: st.pausedFatal.packageId });
+        } catch {}
+        recordEvent(st, 'fatal_pause_retired_by_durable_success', {
+          packageId: st.pausedFatal.packageId,
+          retiredEntries: retired.length,
+        });
+        st.pausedFatal = null;
+      }
+    }
+  }
+  if (st.pausedFatal) return; // an un-retired fatal still owns the loop
+  const receipts = loadReceipts();
   for (const p of ms.packages) {
     if (p.status !== 'RUNNING') continue;
     if (st.activeRuns.some((r) => r.packageId === p.id && !r.done)) continue; // tracked (live run or paused-with-identity) — invariant holds
+    // Case B: the package's ->PROVEN state landing is in flight (or just
+    // merged and the canonical flip has not landed yet). Protected PR/CI
+    // latency is expected behavior — never a human-recovery condition.
+    if (findProvenLandingReceipt(receipts, p.id)) {
+      recordEvent(st, 'stranded_awaiting_state_landing', { packageId: p.id });
+      continue;
+    }
     // Generation-aware identity: only rows matching the CURRENT generation's
     // correlation message are adoptable. A retired generation's runs — under
     // the legacy bare-id message or an older @gN suffix — can never be
     // re-adopted by a newer generation (V3 §6).
     const { branch, message, workflow: wf, executionProfile } = launchIdentity(p);
-    const row = findRecentRunRow(wf, message);
+    const row = findRunRow(wf, message);
     if (row && ['running', 'pending'].includes(String(row.status))) {
       st.activeRuns.push({
         kind: 'package',
@@ -1773,7 +1853,11 @@ function reconcileStrandedPackages(st) {
         discoveryAttempts: 0,
         executionProfile,
       });
-      record(st, 'stranded_run_adopted', { packageId: p.id, runId: row.id, status: row.status });
+      recordEvent(st, 'stranded_run_adopted', {
+        packageId: p.id,
+        runId: row.id,
+        status: row.status,
+      });
       continue;
     }
     const entry = {

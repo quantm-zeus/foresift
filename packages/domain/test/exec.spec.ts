@@ -194,10 +194,10 @@ describe('T001: Execution pure laws (§8.2, §64, FR-EXEC-004…020)', () => {
       signalOutcome: 'SIGNAL_SUCCESS',
       tradableOutcome: 'TRADABLE_FAILURE',
       targetVerdict: 'CONFIRMED_OPPORTUNITY',
-    });
+    }) as { verdict?: string; diagnosticSignalLabel?: string } | undefined;
 
-    expect(res.verdict).not.toBe('CONFIRMED_OPPORTUNITY');
-    expect(res.diagnosticSignalLabel).toBe('SIGNAL_SUCCESS');
+    expect(res?.verdict).not.toBe('CONFIRMED_OPPORTUNITY');
+    expect(res?.diagnosticSignalLabel).toBe('SIGNAL_SUCCESS');
   });
 
   it('enforces §64.13 / FR-EXEC-004 executableTargetSatisfied (isolated wick never sufficient)', () => {

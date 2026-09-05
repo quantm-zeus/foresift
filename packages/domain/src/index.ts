@@ -23,3 +23,4 @@ export * from './trades.ts';
 export * from './timeline.ts';
 export * from './supply.ts';
 export * from './solsec.ts';
+export * from './exec.ts';

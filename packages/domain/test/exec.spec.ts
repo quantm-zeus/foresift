@@ -195,7 +195,11 @@ describe('T001: Execution Simulation pure laws truth-tables (§8.2, §64, FR-EXE
     const verdict = tradabilityBlocksConfirmedOpportunity({
       signalOutcome: 'SIGNAL_SUCCESS',
       tradableStatus: 'EXECUTION_UNAVAILABLE',
-    });
+    }) as {
+      opportunityPromotionBlocked: boolean;
+      diagnosticSignalLabel: string;
+      tradabilityVerdict: string;
+    };
     expect(verdict.opportunityPromotionBlocked).toBe(true);
     expect(verdict.diagnosticSignalLabel).toBe('SIGNAL_SUCCESS');
     expect(verdict.tradabilityVerdict).toBe('UNTRADABLE_SIGNAL_WIN');

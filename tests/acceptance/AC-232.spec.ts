@@ -42,7 +42,7 @@ describe('AC-232: Incomplete pool state detection and confirmed tradability bloc
   it('detects missing CLMM ticks and blocks confirmed tradability without assuming uniform liquidity', () => {
     const fixture = JSON.parse(readFileSync(POOL_STATES_FIXTURE, 'utf8'));
     const missingTicksPool = fixture.pools.find(
-      (p: Record<string, unknown>) => p.poolId.includes('OrcaWhirlpoolMissingTicks'),
+      (p: { poolId: string; [key: string]: unknown }) => p.poolId.includes('OrcaWhirlpoolMissingTicks'),
     );
 
     expect(missingTicksPool).toBeDefined();
@@ -56,7 +56,7 @@ describe('AC-232: Incomplete pool state detection and confirmed tradability bloc
   it('detects missing DLMM bin arrays and blocks confirmed tradability', () => {
     const fixture = JSON.parse(readFileSync(POOL_STATES_FIXTURE, 'utf8'));
     const missingBinsPool = fixture.pools.find(
-      (p: Record<string, unknown>) => p.poolId.includes('MeteoraDlmmMissingBinArrays'),
+      (p: { poolId: string; [key: string]: unknown }) => p.poolId.includes('MeteoraDlmmMissingBinArrays'),
     );
 
     expect(missingBinsPool).toBeDefined();
@@ -68,7 +68,7 @@ describe('AC-232: Incomplete pool state detection and confirmed tradability bloc
   it('detects missing CPMM vault token account data and blocks confirmed tradability', () => {
     const fixture = JSON.parse(readFileSync(POOL_STATES_FIXTURE, 'utf8'));
     const missingVaultPool = fixture.pools.find(
-      (p: Record<string, unknown>) => p.poolId.includes('RaydiumCpmmMissingVaultState'),
+      (p: { poolId: string; [key: string]: unknown }) => p.poolId.includes('RaydiumCpmmMissingVaultState'),
     );
 
     expect(missingVaultPool).toBeDefined();

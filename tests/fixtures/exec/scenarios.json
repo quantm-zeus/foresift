@@ -1,0 +1,125 @@
+{
+  "$comment": "Execution scenario vectors with action-delay distributions and profile pass matrices (FR-EXEC-001, FR-EXEC-002, FR-EXEC-017, AC-235, §64.2, §64.8).",
+  "scenarios": [
+    {
+      "scenarioId": "scenario_base_case_default",
+      "kind": "BASE_CASE",
+      "delayMs": 0,
+      "delayPercentile": "REFERENCE",
+      "slippageBps": 50,
+      "adverseSelectionBps": 0,
+      "liquidityDrawdownFraction": 0.0,
+      "feeMultiplier": 1.0,
+      "routeDegraded": false,
+      "description": "Deterministic zero-delay optimistic reference scenario"
+    },
+    {
+      "scenarioId": "scenario_p50_delay",
+      "kind": "P50_DELAY",
+      "delayMs": 400,
+      "delayPercentile": "P50_DELAY",
+      "slippageBps": 100,
+      "adverseSelectionBps": 20,
+      "liquidityDrawdownFraction": 0.05,
+      "feeMultiplier": 1.0,
+      "routeDegraded": false,
+      "description": "Median execution delay scenario with mild adverse selection"
+    },
+    {
+      "scenarioId": "scenario_p90_delay",
+      "kind": "P90_DELAY",
+      "delayMs": 1200,
+      "delayPercentile": "P90_DELAY",
+      "slippageBps": 250,
+      "adverseSelectionBps": 60,
+      "liquidityDrawdownFraction": 0.15,
+      "feeMultiplier": 1.5,
+      "routeDegraded": false,
+      "description": "90th percentile congestion delay with elevated adverse selection and fee volatility"
+    },
+    {
+      "scenarioId": "scenario_conservative_latency_adverse_selection",
+      "kind": "CONSERVATIVE_LATENCY_ADVERSE_SELECTION",
+      "delayMs": 2500,
+      "delayPercentile": "CONSERVATIVE_LATENCY_ADVERSE_SELECTION",
+      "slippageBps": 500,
+      "adverseSelectionBps": 150,
+      "liquidityDrawdownFraction": 0.25,
+      "feeMultiplier": 2.0,
+      "routeDegraded": false,
+      "description": "High adverse selection scenario required for confirmed opportunities"
+    },
+    {
+      "scenarioId": "scenario_liquidity_drawdown",
+      "kind": "LIQUIDITY_DRAWDOWN",
+      "delayMs": 800,
+      "delayPercentile": "P50_DELAY",
+      "slippageBps": 300,
+      "adverseSelectionBps": 40,
+      "liquidityDrawdownFraction": 0.50,
+      "feeMultiplier": 1.0,
+      "routeDegraded": false,
+      "description": "50% liquidity removal stress scenario"
+    },
+    {
+      "scenarioId": "scenario_fee_volatility",
+      "kind": "FEE_VOLATILITY",
+      "delayMs": 600,
+      "delayPercentile": "P50_DELAY",
+      "slippageBps": 150,
+      "adverseSelectionBps": 30,
+      "liquidityDrawdownFraction": 0.10,
+      "feeMultiplier": 5.0,
+      "routeDegraded": false,
+      "description": "High fee volatility / priority spike scenario"
+    },
+    {
+      "scenarioId": "scenario_route_degradation",
+      "kind": "ROUTE_DEGRADATION",
+      "delayMs": 1500,
+      "delayPercentile": "P90_DELAY",
+      "slippageBps": 400,
+      "adverseSelectionBps": 100,
+      "liquidityDrawdownFraction": 0.30,
+      "feeMultiplier": 1.5,
+      "routeDegraded": true,
+      "description": "Primary route degraded falling back to higher-impact secondary routes"
+    },
+    {
+      "scenarioId": "scenario_failed_partial_fill",
+      "kind": "FAILED_PARTIAL_FILL",
+      "delayMs": 1000,
+      "delayPercentile": "P90_DELAY",
+      "slippageBps": 350,
+      "adverseSelectionBps": 80,
+      "liquidityDrawdownFraction": 0.20,
+      "feeMultiplier": 1.2,
+      "routeDegraded": false,
+      "partialFillFraction": 0.4,
+      "description": "Partial fill execution scenario with residual inventory"
+    }
+  ],
+  "profiles": [
+    {
+      "profileId": "profile_strict_confirmed_opportunity",
+      "requiredPassMatrix": [
+        "BASE_CASE",
+        "P50_DELAY",
+        "P90_DELAY",
+        "CONSERVATIVE_LATENCY_ADVERSE_SELECTION"
+      ],
+      "requiresConservativePass": true,
+      "minNotionalUsd": 100,
+      "maxUncertainty": 0.15
+    },
+    {
+      "profileId": "profile_exploratory_watch",
+      "requiredPassMatrix": [
+        "BASE_CASE"
+      ],
+      "requiresConservativePass": false,
+      "minNotionalUsd": 10,
+      "maxUncertainty": 0.50
+    }
+  ]
+}

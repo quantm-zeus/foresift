@@ -1,0 +1,55 @@
+{
+  "$comment": "Full stress scenario matrix evaluation vectors with optimistic-only and conservative-default enforcement (§64.10, FR-EXEC-012, FR-EXEC-017, AC-127, AC-235).",
+  "candidates": [
+    {
+      "candidateId": "cand_optimistic_only_fragile",
+      "symbol": "FRAGILE_WIN",
+      "baseNotionalUsd": 1000.0,
+      "scenarioResults": {
+        "BASE_CASE": { "netProfitUsd": 150.0, "netReturnFraction": 0.15, "passed": true },
+        "P50_DELAY": { "netProfitUsd": 20.0, "netReturnFraction": 0.02, "passed": true },
+        "P90_DELAY": { "netProfitUsd": -15.0, "netReturnFraction": -0.015, "passed": false },
+        "CONSERVATIVE_LATENCY_ADVERSE_SELECTION": { "netProfitUsd": -40.0, "netReturnFraction": -0.04, "passed": false },
+        "LIQUIDITY_DRAWDOWN": { "netProfitUsd": -55.0, "netReturnFraction": -0.055, "passed": false },
+        "FEE_VOLATILITY": { "netProfitUsd": 5.0, "netReturnFraction": 0.005, "passed": true },
+        "ROUTE_DEGRADATION": { "netProfitUsd": -25.0, "netReturnFraction": -0.025, "passed": false },
+        "FAILED_PARTIAL_FILL": { "netProfitUsd": 10.0, "netReturnFraction": 0.01, "passed": true }
+      },
+      "profileEvaluations": {
+        "CONFIRMED_OPPORTUNITY_DEFAULT": {
+          "eligible": false,
+          "rejectionReason": "FAILED_REQUIRED_SCENARIO_CONSERVATIVE_LATENCY_ADVERSE_SELECTION"
+        },
+        "EARLY_WATCH_EXPLORATORY": {
+          "eligible": true,
+          "rejectionReason": null
+        }
+      }
+    },
+    {
+      "candidateId": "cand_robust_all_stress_pass",
+      "symbol": "ROBUST_GEM",
+      "baseNotionalUsd": 1000.0,
+      "scenarioResults": {
+        "BASE_CASE": { "netProfitUsd": 400.0, "netReturnFraction": 0.40, "passed": true },
+        "P50_DELAY": { "netProfitUsd": 350.0, "netReturnFraction": 0.35, "passed": true },
+        "P90_DELAY": { "netProfitUsd": 220.0, "netReturnFraction": 0.22, "passed": true },
+        "CONSERVATIVE_LATENCY_ADVERSE_SELECTION": { "netProfitUsd": 110.0, "netReturnFraction": 0.11, "passed": true },
+        "LIQUIDITY_DRAWDOWN": { "netProfitUsd": 80.0, "netReturnFraction": 0.08, "passed": true },
+        "FEE_VOLATILITY": { "netProfitUsd": 290.0, "netReturnFraction": 0.29, "passed": true },
+        "ROUTE_DEGRADATION": { "netProfitUsd": 180.0, "netReturnFraction": 0.18, "passed": true },
+        "FAILED_PARTIAL_FILL": { "netProfitUsd": 200.0, "netReturnFraction": 0.20, "passed": true }
+      },
+      "profileEvaluations": {
+        "CONFIRMED_OPPORTUNITY_DEFAULT": {
+          "eligible": true,
+          "rejectionReason": null
+        },
+        "DEEP_RESEARCH_STRESS_ALL": {
+          "eligible": true,
+          "rejectionReason": null
+        }
+      }
+    }
+  ]
+}

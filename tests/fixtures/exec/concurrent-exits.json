@@ -1,0 +1,41 @@
+{
+  "$comment": "Concurrent shadow exits and shared pool depth competition vectors (FR-EXEC-019, AC-236).",
+  "poolUnderStress": {
+    "poolId": "solana:5eykt4UsFv8P8NJdTREpY1vzqKqZKvdp/pool/SharedDepthPool1111111111111111111111111",
+    "initialReserveA": "10000000000",
+    "initialReserveB": "100000000000",
+    "availableDepthUsd": 10000.0
+  },
+  "concurrentExits": [
+    {
+      "registrationId": "reg_0001_alpha",
+      "positionId": "pos_alpha",
+      "requestedNotionalUsd": 6000.0,
+      "exitTimestamp": "2026-09-01T12:00:00.000Z",
+      "isolatedExpectedFillUsd": 6000.0,
+      "isolatedExpectedImpactBps": 60,
+      "concurrentAggregatedFillUsd": 6000.0,
+      "concurrentEffectiveImpactBps": 60,
+      "fillStatus": "FULL_FILL"
+    },
+    {
+      "registrationId": "reg_0002_beta",
+      "positionId": "pos_beta",
+      "requestedNotionalUsd": 6000.0,
+      "exitTimestamp": "2026-09-01T12:00:00.000Z",
+      "isolatedExpectedFillUsd": 6000.0,
+      "isolatedExpectedImpactBps": 60,
+      "concurrentAggregatedFillUsd": 4000.0,
+      "concurrentEffectiveImpactBps": 160,
+      "residualUnfilledUsd": 2000.0,
+      "fillStatus": "PARTIAL_FILL",
+      "rejectionReason": "SHARED_DEPTH_EXHAUSTED"
+    }
+  ],
+  "invariants": {
+    "totalDepthConsumedUsd": 10000.0,
+    "maxAvailableDepthUsd": 10000.0,
+    "deterministicOrderingKey": "registrationId",
+    "isolatedSimultaneousAssumptionProhibited": true
+  }
+}

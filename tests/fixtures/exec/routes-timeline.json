@@ -1,0 +1,36 @@
+{
+  "$comment": "Point-in-time route selection and migration edge availability vectors (FR-EXEC-022, AC-234).",
+  "timelineCases": [
+    {
+      "caseId": "route_created_before_action_time_permitted",
+      "description": "Route created at T=100 is available for execution action initiated at T_user_action=120",
+      "poolId": "solana:5eykt4UsFv8P8NJdTREpY1vzqKqZKvdp/pool/PoolEarlyCreated11111111111111111111",
+      "poolCreatedAt": "2026-09-01T10:00:00.000Z",
+      "userActionTime": "2026-09-01T10:20:00.000Z",
+      "permitted": true,
+      "rejectionReason": null
+    },
+    {
+      "caseId": "route_created_after_action_time_retrospectively_refused",
+      "description": "Route created at T=130 cannot be selected retrospectively for user action at T_user_action=120",
+      "poolId": "solana:5eykt4UsFv8P8NJdTREpY1vzqKqZKvdp/pool/PoolFutureCreated111111111111111111",
+      "poolCreatedAt": "2026-09-01T10:30:00.000Z",
+      "userActionTime": "2026-09-01T10:20:00.000Z",
+      "permitted": false,
+      "rejectionReason": "RETROSPECTIVE_ROUTE_SELECTION_PROHIBITED"
+    },
+    {
+      "caseId": "migration_transition_not_yet_executed_at_action_time",
+      "description": "Migration from bonding curve to Raydium completes at T=150. Action at T=120 cannot route via Raydium pool",
+      "tokenMint": "TokenMigratingPumpToRaydium11111111111111111",
+      "pumpCurvePoolId": "solana:5eykt4UsFv8P8NJdTREpY1vzqKqZKvdp/pool/PumpOriginPool1111111111111111111",
+      "raydiumMigratedPoolId": "solana:5eykt4UsFv8P8NJdTREpY1vzqKqZKvdp/pool/RaydiumTargetPool111111111111111",
+      "migrationCompletedAt": "2026-09-01T10:50:00.000Z",
+      "userActionTime": "2026-09-01T10:20:00.000Z",
+      "allowedRoutePoolId": "solana:5eykt4UsFv8P8NJdTREpY1vzqKqZKvdp/pool/PumpOriginPool1111111111111111111",
+      "prohibitedRoutePoolId": "solana:5eykt4UsFv8P8NJdTREpY1vzqKqZKvdp/pool/RaydiumTargetPool111111111111111",
+      "permitted": true,
+      "rejectionReason": null
+    }
+  ]
+}

@@ -126,10 +126,7 @@ export function selectRouteAtActionTime(input: RouteSelectionInput): RouteSelect
       const edge = edges.find(
         (e: { toProgramVersion: string }) => e.toProgramVersion === input.requireMigrationToVersion,
       );
-      if (
-        edge === undefined ||
-        edge.migrationCompletedSlot > actionSlot
-      ) {
+      if (edge === undefined || edge.migrationCompletedSlot > actionSlot) {
         refusals.push({
           routeId: candidate.routeId,
           reason: 'MIGRATION_NOT_COMPLETED_AT_ACTION_SLOT',

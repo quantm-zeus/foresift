@@ -23,10 +23,7 @@ export type { NetReturnBreakdown };
 
 /** Where the entry route's pricing evidence came from (§64.6). */
 export type EntryRouteUncertainty =
-  | 'NONE'
-  | 'STALE_QUOTE'
-  | 'INCOMPLETE_STATE'
-  | 'ROUTE_UNVERIFIED';
+  'NONE' | 'STALE_QUOTE' | 'INCOMPLETE_STATE' | 'ROUTE_UNVERIFIED';
 
 export interface EntryFillInput {
   readonly fillId: string;
@@ -144,7 +141,7 @@ export function modelEntryFill(input: EntryFillInput): EntryFillResult {
   }
 
   const fillFraction =
-    requestedValue === 0n ? 0 : Number(filledValue * 10_000n / requestedValue) / 10_000;
+    requestedValue === 0n ? 0 : Number((filledValue * 10_000n) / requestedValue) / 10_000;
   if (input.status === ExecutionStatus.EXECUTED_FULL && fillFraction !== 1) {
     throw new ExecVocabularyError(ExecErrorCode.EXEC_LABEL_CLAUSES_INVALID, {
       refused: 'ENTRY_FULL_STATUS_WITH_PARTIAL_FILL',

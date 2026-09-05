@@ -139,10 +139,7 @@ export function composeNetReturn(input: NetReturnInput): NetReturnBreakdown {
     }
   }
 
-  const scale = Math.max(
-    scaleOf(gross),
-    ...COST_LEGS.map((leg) => scaleOf(legs[leg])),
-  );
+  const scale = Math.max(scaleOf(gross), ...COST_LEGS.map((leg) => scaleOf(legs[leg])));
   let net = toScaled(gross, scale);
   for (const leg of COST_LEGS) {
     net -= toScaled(legs[leg], scale);

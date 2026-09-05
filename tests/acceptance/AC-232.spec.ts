@@ -17,11 +17,11 @@ describe('AC-232 acceptance (positive): incomplete state blocks confirmed tradab
     );
     const fixture = JSON.parse(readFileSync(fixturePath, 'utf8'));
 
-    const completePool = fixture.pools.find(
-      (p: { poolId: string }) => p.poolId.includes('OrcaWhirlpoolClmm'),
+    const completePool = fixture.pools.find((p: { poolId: string }) =>
+      p.poolId.includes('OrcaWhirlpoolClmm'),
     );
-    const incompletePool = fixture.pools.find(
-      (p: { poolId: string }) => p.poolId.includes('OrcaIncompleteTickState'),
+    const incompletePool = fixture.pools.find((p: { poolId: string }) =>
+      p.poolId.includes('OrcaIncompleteTickState'),
     );
 
     expect(completePool.stateCompleteness).toBe('COMPLETE');

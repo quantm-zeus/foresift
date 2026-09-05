@@ -124,7 +124,12 @@ describe('telemetry/data.catalog.json parity with authoritative schemas', () => 
 
 describe('telemetry/trd.catalog.json, sup.catalog.json, solsec.catalog.json, and exec.catalog.json parity (G1)', () => {
   it('loads trd, sup, solsec, and exec catalogs if present and checks contractStatus', () => {
-    const catalogNames = ['trd.catalog.json', 'sup.catalog.json', 'solsec.catalog.json', 'exec.catalog.json'];
+    const catalogNames = [
+      'trd.catalog.json',
+      'sup.catalog.json',
+      'solsec.catalog.json',
+      'exec.catalog.json',
+    ];
     for (const catName of catalogNames) {
       try {
         const cat = loadCatalog(catName);

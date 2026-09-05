@@ -39,9 +39,7 @@ export interface RenderAlertContentInput {
  * follow the render time, impacts are finite non-negative numbers, and the
  * assumption set is non-empty with a well-formed hash.
  */
-export function renderAlertExecutionContent(
-  input: RenderAlertContentInput,
-): AlertExecutionContent {
+export function renderAlertExecutionContent(input: RenderAlertContentInput): AlertExecutionContent {
   if (input === null || typeof input !== 'object') {
     throw new ExecVocabularyError(ExecErrorCode.EXEC_LABEL_CLAUSES_INVALID, input);
   }
@@ -56,7 +54,10 @@ export function renderAlertExecutionContent(
       });
     }
   }
-  if (typeof input.configuredNotionalUsd !== 'string' || !DECIMAL.test(input.configuredNotionalUsd)) {
+  if (
+    typeof input.configuredNotionalUsd !== 'string' ||
+    !DECIMAL.test(input.configuredNotionalUsd)
+  ) {
     throw new ExecVocabularyError(ExecErrorCode.EXEC_LABEL_CLAUSES_INVALID, {
       refused: 'ALERT_FIELD_INVALID',
       field: 'configuredNotionalUsd',

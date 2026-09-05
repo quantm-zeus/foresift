@@ -13,7 +13,10 @@ function selectRoutePointInTime(params: {
   if (params.poolCreatedSlot > params.actionSlot) {
     throw new Error('RETROSPECTIVE_ROUTE_SELECTION_REFUSED');
   }
-  if (params.migrationCompletedSlot !== undefined && params.migrationCompletedSlot > params.actionSlot) {
+  if (
+    params.migrationCompletedSlot !== undefined &&
+    params.migrationCompletedSlot > params.actionSlot
+  ) {
     throw new Error('POST_ACTION_MIGRATION_TRANSITION_REFUSED');
   }
   return true;

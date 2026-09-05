@@ -30,7 +30,9 @@ interface DenominatorDisclosureReport {
   };
 }
 
-function generateDenominatorDisclosure(records: CandidateOutcomeRecord[]): DenominatorDisclosureReport {
+function generateDenominatorDisclosure(
+  records: CandidateOutcomeRecord[],
+): DenominatorDisclosureReport {
   let tradableSuccess = 0;
   let tradableFailure = 0;
 
@@ -64,14 +66,86 @@ function generateDenominatorDisclosure(records: CandidateOutcomeRecord[]): Denom
 describe('AC-239 acceptance (positive): TRADABLE_SUCCESS denominator disclosure reports separate excluded categories', () => {
   it('correctly partitions and reports every excluded category separately from the pure tradable denominator', () => {
     const dataset: CandidateOutcomeRecord[] = [
-      { id: '1', outcomeClass: 'TRADABLE_SUCCESS', isSignalOnly: false, isLowResolution: false, isPartialMatured: false, isCensored: false, isInvalidData: false, isScenarioMismatched: false },
-      { id: '2', outcomeClass: 'TRADABLE_FAILURE', isSignalOnly: false, isLowResolution: false, isPartialMatured: false, isCensored: false, isInvalidData: false, isScenarioMismatched: false },
-      { id: '3', outcomeClass: 'SIGNAL_SUCCESS', isSignalOnly: true, isLowResolution: false, isPartialMatured: false, isCensored: false, isInvalidData: false, isScenarioMismatched: false },
-      { id: '4', outcomeClass: 'PENDING', isSignalOnly: false, isLowResolution: true, isPartialMatured: false, isCensored: false, isInvalidData: false, isScenarioMismatched: false },
-      { id: '5', outcomeClass: 'PENDING', isSignalOnly: false, isLowResolution: false, isPartialMatured: true, isCensored: false, isInvalidData: false, isScenarioMismatched: false },
-      { id: '6', outcomeClass: 'CENSORED', isSignalOnly: false, isLowResolution: false, isPartialMatured: false, isCensored: true, isInvalidData: false, isScenarioMismatched: false },
-      { id: '7', outcomeClass: 'INVALID_DATA', isSignalOnly: false, isLowResolution: false, isPartialMatured: false, isCensored: false, isInvalidData: true, isScenarioMismatched: false },
-      { id: '8', outcomeClass: 'TRADABLE_FAILURE', isSignalOnly: false, isLowResolution: false, isPartialMatured: false, isCensored: false, isInvalidData: false, isScenarioMismatched: true },
+      {
+        id: '1',
+        outcomeClass: 'TRADABLE_SUCCESS',
+        isSignalOnly: false,
+        isLowResolution: false,
+        isPartialMatured: false,
+        isCensored: false,
+        isInvalidData: false,
+        isScenarioMismatched: false,
+      },
+      {
+        id: '2',
+        outcomeClass: 'TRADABLE_FAILURE',
+        isSignalOnly: false,
+        isLowResolution: false,
+        isPartialMatured: false,
+        isCensored: false,
+        isInvalidData: false,
+        isScenarioMismatched: false,
+      },
+      {
+        id: '3',
+        outcomeClass: 'SIGNAL_SUCCESS',
+        isSignalOnly: true,
+        isLowResolution: false,
+        isPartialMatured: false,
+        isCensored: false,
+        isInvalidData: false,
+        isScenarioMismatched: false,
+      },
+      {
+        id: '4',
+        outcomeClass: 'PENDING',
+        isSignalOnly: false,
+        isLowResolution: true,
+        isPartialMatured: false,
+        isCensored: false,
+        isInvalidData: false,
+        isScenarioMismatched: false,
+      },
+      {
+        id: '5',
+        outcomeClass: 'PENDING',
+        isSignalOnly: false,
+        isLowResolution: false,
+        isPartialMatured: true,
+        isCensored: false,
+        isInvalidData: false,
+        isScenarioMismatched: false,
+      },
+      {
+        id: '6',
+        outcomeClass: 'CENSORED',
+        isSignalOnly: false,
+        isLowResolution: false,
+        isPartialMatured: false,
+        isCensored: true,
+        isInvalidData: false,
+        isScenarioMismatched: false,
+      },
+      {
+        id: '7',
+        outcomeClass: 'INVALID_DATA',
+        isSignalOnly: false,
+        isLowResolution: false,
+        isPartialMatured: false,
+        isCensored: false,
+        isInvalidData: true,
+        isScenarioMismatched: false,
+      },
+      {
+        id: '8',
+        outcomeClass: 'TRADABLE_FAILURE',
+        isSignalOnly: false,
+        isLowResolution: false,
+        isPartialMatured: false,
+        isCensored: false,
+        isInvalidData: false,
+        isScenarioMismatched: true,
+      },
     ];
 
     const report = generateDenominatorDisclosure(dataset);

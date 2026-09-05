@@ -56,7 +56,7 @@
       "delayPercentile": "P50_DELAY",
       "slippageBps": 300,
       "adverseSelectionBps": 40,
-      "liquidityDrawdownFraction": 0.50,
+      "liquidityDrawdownFraction": 0.5,
       "feeMultiplier": 1.0,
       "routeDegraded": false,
       "description": "50% liquidity removal stress scenario"
@@ -68,7 +68,7 @@
       "delayPercentile": "P50_DELAY",
       "slippageBps": 150,
       "adverseSelectionBps": 30,
-      "liquidityDrawdownFraction": 0.10,
+      "liquidityDrawdownFraction": 0.1,
       "feeMultiplier": 5.0,
       "routeDegraded": false,
       "description": "High fee volatility / priority spike scenario"
@@ -80,7 +80,7 @@
       "delayPercentile": "P90_DELAY",
       "slippageBps": 400,
       "adverseSelectionBps": 100,
-      "liquidityDrawdownFraction": 0.30,
+      "liquidityDrawdownFraction": 0.3,
       "feeMultiplier": 1.5,
       "routeDegraded": true,
       "description": "Primary route degraded falling back to higher-impact secondary routes"
@@ -92,7 +92,7 @@
       "delayPercentile": "P90_DELAY",
       "slippageBps": 350,
       "adverseSelectionBps": 80,
-      "liquidityDrawdownFraction": 0.20,
+      "liquidityDrawdownFraction": 0.2,
       "feeMultiplier": 1.2,
       "routeDegraded": false,
       "partialFillFraction": 0.4,
@@ -114,12 +114,10 @@
     },
     {
       "profileId": "profile_exploratory_watch",
-      "requiredPassMatrix": [
-        "BASE_CASE"
-      ],
+      "requiredPassMatrix": ["BASE_CASE"],
       "requiresConservativePass": false,
       "minNotionalUsd": 10,
-      "maxUncertainty": 0.50
+      "maxUncertainty": 0.5
     }
   ]
 }

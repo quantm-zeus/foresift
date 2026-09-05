@@ -14,19 +14,12 @@
  *
  * Traces: FR-EXEC-021, AC-237.
  */
-import {
-  AdapterSupportState,
-  ExecErrorCode,
-  ExecVocabularyError,
-} from '@foresift/domain';
+import { AdapterSupportState, ExecErrorCode, ExecVocabularyError } from '@foresift/domain';
 import { detectUpgradeChange } from '@foresift/program-decoders';
 
 /** Why a scope degraded. */
 export type DegradationCause =
-  | 'ADAPTER_DEPRECATED'
-  | 'PROGRAM_UPGRADE'
-  | 'PARITY_DRIFT'
-  | 'UNKNOWN_EXTENSION';
+  'ADAPTER_DEPRECATED' | 'PROGRAM_UPGRADE' | 'PARITY_DRIFT' | 'UNKNOWN_EXTENSION';
 
 /** The narrow scope a degradation applies to (§64.3 binding coordinates). */
 export interface DegradationScope {
@@ -57,7 +50,8 @@ export interface DegradationRecord {
   readonly scope: DegradationScope;
   readonly adapterId: string;
   readonly adapterVersion: string;
-  readonly supportState: typeof AdapterSupportState.DEGRADED | typeof AdapterSupportState.UNAVAILABLE;
+  readonly supportState:
+    typeof AdapterSupportState.DEGRADED | typeof AdapterSupportState.UNAVAILABLE;
   readonly detectedAt: string;
   readonly evidenceRef: string;
   readonly revalidatedAt: string | null;
@@ -199,9 +193,7 @@ export class DegradationLedger {
       revalidatedAt: input.revalidatedAt,
       revalidationRef: input.revalidationRef,
     };
-    const index = this.records.findIndex(
-      (r) => r.degradationId === input.degradationId,
-    );
+    const index = this.records.findIndex((r) => r.degradationId === input.degradationId);
     if (index >= 0) this.records[index] = cleared;
     this.byId.set(input.degradationId, cleared);
     return cleared;
@@ -244,9 +236,7 @@ export class DegradationLedger {
  * degradation cause. Returns the cause when an upgrade/degradation is
  * present, or null when nothing changed.
  */
-export function upgradeFindingsToCause(
-  findings: readonly string[],
-): DegradationCause | null {
+export function upgradeFindingsToCause(findings: readonly string[]): DegradationCause | null {
   if (!Array.isArray(findings)) {
     throw new ExecVocabularyError(ExecErrorCode.EXEC_LABEL_CLAUSES_INVALID, findings);
   }

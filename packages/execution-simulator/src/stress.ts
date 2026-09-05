@@ -179,10 +179,7 @@ export function buildScenarioPassMatrix(input: BuildMatrixInput): BuildMatrixRes
       refused: 'MATRIX_TIMESTAMP_INVALID',
     });
   }
-  if (
-    !Array.isArray(input.requiredKinds) ||
-    input.requiredKinds.length === 0
-  ) {
+  if (!Array.isArray(input.requiredKinds) || input.requiredKinds.length === 0) {
     throw new ExecVocabularyError(ExecErrorCode.EXEC_LABEL_CLAUSES_INVALID, {
       refused: 'MATRIX_REQUIRED_KINDS_INVALID',
     });

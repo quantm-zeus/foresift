@@ -135,7 +135,10 @@ export function modelExit(input: ExitModelInput): ExitModelResult {
     throw new ExecVocabularyError(ExecErrorCode.EXEC_LABEL_CLAUSES_INVALID, input);
   }
   const policyKind = exitPolicyKind(input.policy.kind);
-  if (typeof input.policy.exitPolicyVersionId !== 'string' || input.policy.exitPolicyVersionId.length === 0) {
+  if (
+    typeof input.policy.exitPolicyVersionId !== 'string' ||
+    input.policy.exitPolicyVersionId.length === 0
+  ) {
     throw new ExecVocabularyError(ExecErrorCode.EXEC_LABEL_CLAUSES_INVALID, {
       refused: 'EXIT_FIELD_INVALID',
       field: 'exitPolicyVersionId',
@@ -163,8 +166,7 @@ export function modelExit(input: ExitModelInput): ExitModelResult {
     });
   }
   const triggerCompletionOrderValid =
-    input.completionSlot >= input.triggerSlot &&
-    Date.parse(completedAt) >= Date.parse(triggeredAt);
+    input.completionSlot >= input.triggerSlot && Date.parse(completedAt) >= Date.parse(triggeredAt);
   if (!triggerCompletionOrderValid) {
     // §64.7: trigger and completion are separate instants; an exit recorded
     // as completing before it triggered is an invalid record, refused.
@@ -192,7 +194,8 @@ export function modelExit(input: ExitModelInput): ExitModelResult {
       requested,
     });
   }
-  const fillFraction = requestedValue === 0n ? 0 : Number(filledValue * 10_000n / requestedValue) / 10_000;
+  const fillFraction =
+    requestedValue === 0n ? 0 : Number((filledValue * 10_000n) / requestedValue) / 10_000;
 
   // §64.7 / FR-MAT-009: adverse-feasible primary ordering with the
   // path-ambiguity flag; optimistic ordering is secondary only.

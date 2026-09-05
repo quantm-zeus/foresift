@@ -8,7 +8,12 @@ import { describe, expect, it } from 'bun:test';
 
 interface ObservationPlan {
   planId: string;
-  triggerClass: 'DEEP_RESEARCH' | 'EARLY_WATCH' | 'CONFIRMED_OPPORTUNITY' | 'CONTROL_SAMPLE' | 'SHADOW_PORTFOLIO';
+  triggerClass:
+    | 'DEEP_RESEARCH'
+    | 'EARLY_WATCH'
+    | 'CONFIRMED_OPPORTUNITY'
+    | 'CONTROL_SAMPLE'
+    | 'SHADOW_PORTFOLIO';
   inclusionProbability: number;
   stratum: string;
   populationLimits: {

@@ -87,10 +87,7 @@ export function renderUncertainty(input: UncertaintyRenderingInput): Uncertainty
   if (input === null || typeof input !== 'object') {
     throw new ExecVocabularyError(ExecErrorCode.EXEC_UNCERTAINTY_INPUT_INVALID, input);
   }
-  if (
-    input.stateCompleteness !== 'COMPLETE' &&
-    input.stateCompleteness !== 'INCOMPLETE_BLOCKING'
-  ) {
+  if (input.stateCompleteness !== 'COMPLETE' && input.stateCompleteness !== 'INCOMPLETE_BLOCKING') {
     throw new ExecVocabularyError(ExecErrorCode.EXEC_UNCERTAINTY_INPUT_INVALID, {
       refused: 'UNCERTAINTY_STATE_COMPLETENESS_INVALID',
       value: input.stateCompleteness,
@@ -124,15 +121,17 @@ export function renderUncertainty(input: UncertaintyRenderingInput): Uncertainty
   const incompleteState = input.stateCompleteness === 'INCOMPLETE_BLOCKING';
   const boundValue: number | null =
     incompleteState &&
-    (typeof input.relativeUncertainty !== 'number' ||
-      !Number.isFinite(input.relativeUncertainty))
+    (typeof input.relativeUncertainty !== 'number' || !Number.isFinite(input.relativeUncertainty))
       ? // Incomplete state must state a bound — unknown uncertainty is
         // rendered as maximal (1.0) rather than left absent.
         1
       : input.relativeUncertainty;
   if (
     boundValue !== null &&
-    (typeof boundValue !== 'number' || !Number.isFinite(boundValue) || boundValue < 0 || boundValue > 1)
+    (typeof boundValue !== 'number' ||
+      !Number.isFinite(boundValue) ||
+      boundValue < 0 ||
+      boundValue > 1)
   ) {
     throw new ExecVocabularyError(ExecErrorCode.EXEC_UNCERTAINTY_INPUT_INVALID, {
       refused: 'UNCERTAINTY_BOUND_OUT_OF_BOUNDS',
@@ -179,7 +178,8 @@ export function renderUncertainty(input: UncertaintyRenderingInput): Uncertainty
 
   const assessment: UncertaintyAssessment = {
     stateComplete: input.stateCompleteness === 'COMPLETE',
-    parityVerified: input.stateCompleteness === 'COMPLETE' && input.unsupportedAssumptions.length === 0,
+    parityVerified:
+      input.stateCompleteness === 'COMPLETE' && input.unsupportedAssumptions.length === 0,
     uncertaintyBound: boundValue,
     policyLimit: input.policyLimit,
   };

@@ -14,11 +14,7 @@
  *
  * Traces: FR-EXEC-004, FR-EXEC-007, AC-122, AC-126, AC-235.
  */
-import {
-  ExecErrorCode,
-  ExecVocabularyError,
-  executableTargetSatisfied,
-} from '@foresift/domain';
+import { ExecErrorCode, ExecVocabularyError, executableTargetSatisfied } from '@foresift/domain';
 import type { ExecutableTargetInput } from '@foresift/domain';
 
 export type { ExecutableTargetInput };
@@ -132,10 +128,7 @@ export function evaluateTargetTouch(input: TargetTouchInput): TargetTouchResult 
   const durationSufficient = input.targetDurationSeconds >= floor.minimumTargetDurationSeconds;
 
   const isolatedWick =
-    input.touched &&
-    distinctSlots.size === 1 &&
-    !volumeSufficient &&
-    !durationSufficient;
+    input.touched && distinctSlots.size === 1 && !volumeSufficient && !durationSufficient;
 
   const domainInput: ExecutableTargetInput = {
     touched: input.touched,
@@ -148,9 +141,7 @@ export function evaluateTargetTouch(input: TargetTouchInput): TargetTouchResult 
   // AC-126: below the resolution floor the evidence supports signal labels
   // only — never a tradable confirmation.
   const resolutionBelowFloor =
-    distinctSlots.size < floor.minimumSlotTouches ||
-    !volumeSufficient ||
-    !durationSufficient;
+    distinctSlots.size < floor.minimumSlotTouches || !volumeSufficient || !durationSufficient;
 
   let refusal: string | null = null;
   if (!input.touched) refusal = 'TARGET_NEVER_TOUCHED';
@@ -176,7 +167,5 @@ export function renderingPolicyFor(
   result: TargetTouchResult,
 ): 'SIGNAL_ONLY_LOW_RESOLUTION' | 'TRADABLE_EVIDENCE' | 'NO_EVIDENCE' {
   if (!result.satisfied) return 'NO_EVIDENCE';
-  return result.resolutionBelowFloor
-    ? 'SIGNAL_ONLY_LOW_RESOLUTION'
-    : 'TRADABLE_EVIDENCE';
+  return result.resolutionBelowFloor ? 'SIGNAL_ONLY_LOW_RESOLUTION' : 'TRADABLE_EVIDENCE';
 }

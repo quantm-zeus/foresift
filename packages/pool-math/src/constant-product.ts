@@ -190,9 +190,7 @@ export class ConstantProductAdapter implements PoolMathAdapter {
       adapterId: this.adapterId,
       adapterVersion: this.version,
       reserves: Object.fromEntries(
-        Object.entries(
-          ((input as unknown as { reserves?: Record<string, string> }).reserves ?? {}),
-        ),
+        Object.entries((input as unknown as { reserves?: Record<string, string> }).reserves ?? {}),
       ),
       curveState: { kind: 'CONSTANT_PRODUCT' },
       feeConfiguration: {},
@@ -248,7 +246,8 @@ export class ConstantProductAdapter implements PoolMathAdapter {
     const grossOut = input.rawAmountOut;
     // The net output the trader demands; the pool must produce
     // out/(1-fee) gross so that the trader receives the requested amount.
-    const grossRequired = (grossOut * 10_000n) / (10_000n - BigInt(feeBps)) +
+    const grossRequired =
+      (grossOut * 10_000n) / (10_000n - BigInt(feeBps)) +
       ((grossOut * 10_000n) % (10_000n - BigInt(feeBps)) === 0n ? 0n : 1n);
     const inRequired = constantProductIn(grossRequired, reserveIn, reserveOut);
     return {
@@ -268,7 +267,9 @@ export class ConstantProductAdapter implements PoolMathAdapter {
       throw new RangeError('liquidity mutations use non-negative raw amounts');
     }
     const zero =
-      input.mutation === 'ADD' ? curve.reserveZeroRaw + zeroDelta : curve.reserveZeroRaw - zeroDelta;
+      input.mutation === 'ADD'
+        ? curve.reserveZeroRaw + zeroDelta
+        : curve.reserveZeroRaw - zeroDelta;
     const one =
       input.mutation === 'ADD' ? curve.reserveOneRaw + oneDelta : curve.reserveOneRaw - oneDelta;
     if (zero <= 0n || one <= 0n) {

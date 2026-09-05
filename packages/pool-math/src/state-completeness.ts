@@ -12,13 +12,7 @@ import { ExecErrorCode, ExecVocabularyError } from '@foresift/domain';
 import type { CoverageAssessment, DecodedPoolState } from './adapter-contract.ts';
 
 /** Families whose absence materially affects any fill (AC-232). */
-const ALWAYS_MATERIAL_FAMILIES: readonly string[] = [
-  'Pool',
-  'Vault0',
-  'Vault1',
-  'Mint0',
-  'Mint1',
-];
+const ALWAYS_MATERIAL_FAMILIES: readonly string[] = ['Pool', 'Vault0', 'Vault1', 'Mint0', 'Mint1'];
 
 /** CLMM/DLMM families that are material only for those designs. */
 const CONDITIONALLY_MATERIAL_FAMILIES: readonly string[] = [
@@ -42,9 +36,7 @@ export interface AssessStateCompletenessInput {
  * §64.4 coverage assessment: missing required accounts or unsupported
  * program/layout is reported as incomplete — never silently downgraded.
  */
-export function assessStateCompleteness(
-  input: AssessStateCompletenessInput,
-): CoverageAssessment {
+export function assessStateCompleteness(input: AssessStateCompletenessInput): CoverageAssessment {
   if (input === null || typeof input !== 'object') {
     throw new ExecVocabularyError(ExecErrorCode.EXEC_UNCERTAINTY_INPUT_INVALID, input);
   }
@@ -59,7 +51,8 @@ export function assessStateCompleteness(
       if (!available.has(family)) missing.push(family);
     }
   }
-  const incomplete = missing.length > 0 || input.decoded.stateCompleteness === 'INCOMPLETE_BLOCKING';
+  const incomplete =
+    missing.length > 0 || input.decoded.stateCompleteness === 'INCOMPLETE_BLOCKING';
   return {
     stateCompleteness: incomplete ? 'INCOMPLETE_BLOCKING' : 'COMPLETE',
     missingAccountFamilies: missing,

@@ -16,7 +16,9 @@ function aggregateConcurrentFills(params: {
   }
 
   // Deterministic tie-break by registrationId
-  const sorted = [...params.positions].sort((a, b) => a.registrationId.localeCompare(b.registrationId));
+  const sorted = [...params.positions].sort((a, b) =>
+    a.registrationId.localeCompare(b.registrationId),
+  );
 
   let remainingDepth = params.poolAvailableDepthUsd;
   const results: Record<string, number> = {};

@@ -17,7 +17,6 @@ const ExecutionStatus = (Domain.ExecutionStatus as Record<string, string>) ?? {}
 const StressScenarioKind = (Domain.StressScenarioKind as Record<string, string>) ?? {};
 const ExitPolicyKind = (Domain.ExitPolicyKind as Record<string, string>) ?? {};
 const PrimaryOrdering = (Domain.PrimaryOrdering as Record<string, string>) ?? {};
-const TradabilityVerdict = (Domain.TradabilityVerdict as Record<string, string>) ?? {};
 const ObservationPlanTriggerClass =
   (Domain.ObservationPlanTriggerClass as Record<string, string>) ?? {};
 const ExecErrorCode = (Domain.ExecErrorCode as Record<string, string>) ?? {};
@@ -32,15 +31,29 @@ const exitPolicyKind = fn('exitPolicyKind');
 const primaryOrdering = fn('primaryOrdering');
 const tradabilityVerdict = fn('tradabilityVerdict');
 const observationPlanTriggerClass = fn('observationPlanTriggerClass');
-const outcomeLabelPrecedence = fn('outcomeLabelPrecedence');
-const signalCannotRenderProfit = fn('signalCannotRenderProfit');
-const tradabilityBlocksConfirmedOpportunity = fn('tradabilityBlocksConfirmedOpportunity');
-const executableTargetSatisfied = fn('executableTargetSatisfied');
-const uncertaintyBlocksTradability = fn('uncertaintyBlocksTradability');
-const robustDelayGate = fn('robustDelayGate');
-const adverseOrderingRequired = fn('adverseOrderingRequired');
+const outcomeLabelPrecedence = fn('outcomeLabelPrecedence') as (
+  input: unknown,
+) => ReturnType<typeof DomainModule.outcomeLabelPrecedence>;
+const signalCannotRenderProfit = fn(
+  'signalCannotRenderProfit',
+) as typeof DomainModule.signalCannotRenderProfit;
+const tradabilityBlocksConfirmedOpportunity = fn(
+  'tradabilityBlocksConfirmedOpportunity',
+) as typeof DomainModule.tradabilityBlocksConfirmedOpportunity;
+const executableTargetSatisfied = fn(
+  'executableTargetSatisfied',
+) as typeof DomainModule.executableTargetSatisfied;
+const uncertaintyBlocksTradability = fn(
+  'uncertaintyBlocksTradability',
+) as typeof DomainModule.uncertaintyBlocksTradability;
+const robustDelayGate = fn('robustDelayGate') as (
+  input: unknown,
+) => ReturnType<typeof DomainModule.robustDelayGate>;
+const adverseOrderingRequired = fn('adverseOrderingRequired') as (
+  input: unknown,
+) => ReturnType<typeof DomainModule.adverseOrderingRequired>;
 
-const OC = OutcomeClass as Record<string, string>;
+const OC = DomainModule.OutcomeClass;
 const OM = OutcomeMaturity as Record<string, string>;
 
 function expectTypedError(fnCall: () => unknown, code: string): void {
@@ -157,31 +170,19 @@ describe('Exec domain vocabularies (§64, §8, §12.8)', () => {
     expectTypedError(() => outcomeClass('TRADABLE_WIN'), ExecErrorCode.OUTCOME_CLASS_UNKNOWN);
     expectTypedError(() => outcomeClass(null), ExecErrorCode.OUTCOME_CLASS_UNKNOWN);
     expectTypedError(() => outcomeMaturity('MATURE'), ExecErrorCode.OUTCOME_MATURITY_UNKNOWN);
-    expectTypedError(
-      () => adapterFamily('GENERIC_AMM'),
-      ExecErrorCode.ADAPTER_FAMILY_UNKNOWN,
-    );
+    expectTypedError(() => adapterFamily('GENERIC_AMM'), ExecErrorCode.ADAPTER_FAMILY_UNKNOWN);
     expectTypedError(
       () => adapterSupportState('BEST_EFFORT'),
       ExecErrorCode.ADAPTER_SUPPORT_STATE_UNKNOWN,
     );
-    expectTypedError(
-      () => executionStatus('EXECUTED'),
-      ExecErrorCode.EXECUTION_STATUS_UNKNOWN,
-    );
+    expectTypedError(() => executionStatus('EXECUTED'), ExecErrorCode.EXECUTION_STATUS_UNKNOWN);
     expectTypedError(
       () => stressScenarioKind('OPTIMISTIC'),
       ExecErrorCode.STRESS_SCENARIO_KIND_UNKNOWN,
     );
     expectTypedError(() => exitPolicyKind('BEST_OF'), ExecErrorCode.EXIT_POLICY_KIND_UNKNOWN);
-    expectTypedError(
-      () => primaryOrdering('OPTIMISTIC'),
-      ExecErrorCode.PRIMARY_ORDERING_UNKNOWN,
-    );
-    expectTypedError(
-      () => tradabilityVerdict('MAYBE'),
-      ExecErrorCode.TRADABILITY_VERDICT_UNKNOWN,
-    );
+    expectTypedError(() => primaryOrdering('OPTIMISTIC'), ExecErrorCode.PRIMARY_ORDERING_UNKNOWN);
+    expectTypedError(() => tradabilityVerdict('MAYBE'), ExecErrorCode.TRADABILITY_VERDICT_UNKNOWN);
     expectTypedError(
       () => observationPlanTriggerClass('EVERYTHING'),
       ExecErrorCode.OBSERVATION_PLAN_TRIGGER_CLASS_UNKNOWN,
@@ -197,8 +198,8 @@ describe('outcomeLabelPrecedence law (§8.2)', () => {
       tradableSuccess: true,
       signalSuccess: true,
     });
-    expect(result.tradableLabel).toBe(OC.INVALID_DATA);
-    expect(result.signalLabel).toBe(OC.SIGNAL_SUCCESS);
+    expect(result.tradableLabel).toBe(OC.INVALID_DATA as never);
+    expect(result.signalLabel).toBe(OC.SIGNAL_SUCCESS as never);
   });
 
   it('ranks CENSORED above all terminal tradable labels', () => {
@@ -209,7 +210,7 @@ describe('outcomeLabelPrecedence law (§8.2)', () => {
       censored: true,
       signalFailure: true,
     });
-    expect(result.tradableLabel).toBe(OC.CENSORED);
+    expect(result.tradableLabel).toBe(OC.CENSORED as never);
   });
 
   it('maps PENDING and PARTIALLY_MATURED maturity to the PENDING label', () => {
@@ -219,7 +220,7 @@ describe('outcomeLabelPrecedence law (§8.2)', () => {
         maturity,
         tradableSuccess: true,
       });
-      expect(result.tradableLabel).toBe(OC.PENDING);
+      expect(result.tradableLabel).toBe(OC.PENDING as never);
     }
   });
 
@@ -229,10 +230,10 @@ describe('outcomeLabelPrecedence law (§8.2)', () => {
       tradableSecurityOrLiquidityFailure: true,
       signalSuccess: true,
     });
-    expect(result.tradableLabel).toBe(OC.TRADABLE_FAILURE);
+    expect(result.tradableLabel).toBe(OC.TRADABLE_FAILURE as never);
     expect(result.tradableFailureReason).toBe('SECURITY_OR_LIQUIDITY');
     // Signal label preserved on its own axis — not collapsed into tradable.
-    expect(result.signalLabel).toBe(OC.SIGNAL_SUCCESS);
+    expect(result.signalLabel).toBe(OC.SIGNAL_SUCCESS as never);
   });
 
   it('ranks TRADABLE_SUCCESS above explicit failure', () => {
@@ -241,12 +242,12 @@ describe('outcomeLabelPrecedence law (§8.2)', () => {
       tradableSuccess: true,
       tradableFailure: true,
     });
-    expect(result.tradableLabel).toBe(OC.TRADABLE_SUCCESS);
+    expect(result.tradableLabel).toBe(OC.TRADABLE_SUCCESS as never);
   });
 
   it('falls through to TRADABLE_NEUTRAL for a fully matured, uneventful outcome', () => {
     const result = outcomeLabelPrecedence({ ...maturedClauses });
-    expect(result.tradableLabel).toBe(OC.TRADABLE_NEUTRAL);
+    expect(result.tradableLabel).toBe(OC.TRADABLE_NEUTRAL as never);
   });
 
   it('keeps the signal label on a separate axis (AC-120 substrate)', () => {
@@ -255,8 +256,8 @@ describe('outcomeLabelPrecedence law (§8.2)', () => {
       tradableFailure: true,
       signalSuccess: true,
     });
-    expect(result.tradableLabel).toBe(OC.TRADABLE_FAILURE);
-    expect(result.signalLabel).toBe(OC.SIGNAL_SUCCESS);
+    expect(result.tradableLabel).toBe(OC.TRADABLE_FAILURE as never);
+    expect(result.signalLabel).toBe(OC.SIGNAL_SUCCESS as never);
   });
 
   it('fails closed on malformed clause sets', () => {
@@ -327,11 +328,17 @@ describe('signalCannotRenderProfit law (FR-EXEC-006 / INV-011)', () => {
 
   it('rejects non-signal axis labels and malformed input', () => {
     expectTypedError(
-      () => signalCannotRenderProfit({ signalLabel: OC.TRADABLE_SUCCESS, tradableLabel: null, renderProfit: true }),
+      () =>
+        signalCannotRenderProfit({
+          signalLabel: OC.TRADABLE_SUCCESS,
+          tradableLabel: null,
+          renderProfit: true,
+        }),
       ExecErrorCode.EXEC_PROFIT_RENDERING_INPUT_INVALID,
     );
     expectTypedError(
-      () => signalCannotRenderProfit({ signalLabel: OC.SIGNAL_SUCCESS, renderProfit: 'yes' }),
+      () =>
+        signalCannotRenderProfit({ signalLabel: OC.SIGNAL_SUCCESS, renderProfit: 'yes' } as never),
       ExecErrorCode.EXEC_PROFIT_RENDERING_INPUT_INVALID,
     );
   });
@@ -345,18 +352,13 @@ describe('tradabilityBlocksConfirmedOpportunity law (FR-EXEC-007)', () => {
     });
     expect(ok.confirmedOpportunity).toBe(true);
     expect(ok.blockReason).toBe(null);
-    expect(ok.preservedSignalLabel).toBe(OC.SIGNAL_SUCCESS);
+    expect(ok.preservedSignalLabel).toBe(OC.SIGNAL_SUCCESS as never);
   });
 
   it('blocks on every other verdict while keeping the signal label unchanged', () => {
-    for (const verdict of [
-      'UNCERTAINTY_BLOCKED',
-      'TARGET_NOT_EXECUTABLE',
-      'STATE_INCOMPLETE',
-      'EXECUTION_UNAVAILABLE',
-      'POOL_MATH_UNSUPPORTED',
-      'INSUFFICIENT_DATA',
-    ]) {
+    for (const verdict of DomainModule.ALL_TRADABILITY_VERDICTS.filter(
+      (v) => v !== DomainModule.TradabilityVerdict.TRADABLE,
+    )) {
       const blocked = tradabilityBlocksConfirmedOpportunity({
         signalLabel: OC.SIGNAL_SUCCESS,
         verdict,
@@ -365,7 +367,7 @@ describe('tradabilityBlocksConfirmedOpportunity law (FR-EXEC-007)', () => {
       expect(blocked.blockReason).toBe(verdict);
       // FR-EXEC-007: diagnostic labels preserved — a blocked confirmation
       // must not rewrite SIGNAL_SUCCESS.
-      expect(blocked.preservedSignalLabel).toBe(OC.SIGNAL_SUCCESS);
+      expect(blocked.preservedSignalLabel).toBe(OC.SIGNAL_SUCCESS as never);
     }
   });
 });
@@ -420,7 +422,7 @@ describe('executableTargetSatisfied law (§64.13 / FR-EXEC-004 / AC-122)', () =>
       }),
     ).toBe(false);
     expectTypedError(
-      () => executableTargetSatisfied({ touched: true, executableVolumeObserved: 'yes' }),
+      () => executableTargetSatisfied({ touched: true, executableVolumeObserved: 'yes' } as never),
       ExecErrorCode.EXEC_TARGET_INPUT_INVALID,
     );
   });
@@ -475,18 +477,30 @@ describe('uncertaintyBlocksTradability law (FR-EXEC-020)', () => {
 
   it('fails closed on out-of-domain bounds and non-boolean clauses', () => {
     expectTypedError(
-      () => uncertaintyBlocksTradability({ stateComplete: true, parityVerified: true, uncertaintyBound: 1.5, policyLimit: 2 }),
+      () =>
+        uncertaintyBlocksTradability({
+          stateComplete: true,
+          parityVerified: true,
+          uncertaintyBound: 1.5,
+          policyLimit: 2,
+        }),
       ExecErrorCode.EXEC_UNCERTAINTY_INPUT_INVALID,
     );
     expectTypedError(
-      () => uncertaintyBlocksTradability({ stateComplete: 'yes', parityVerified: true, uncertaintyBound: 0.1, policyLimit: 0.2 }),
+      () =>
+        uncertaintyBlocksTradability({
+          stateComplete: 'yes',
+          parityVerified: true,
+          uncertaintyBound: 0.1,
+          policyLimit: 0.2,
+        } as never),
       ExecErrorCode.EXEC_UNCERTAINTY_INPUT_INVALID,
     );
   });
 });
 
 describe('robustDelayGate law (§64.8 / FR-EXEC-017)', () => {
-  const KINDS = StressScenarioKind as Record<string, string>;
+  const KINDS = DomainModule.StressScenarioKind;
 
   it('passes only when every required scenario explicitly passed', () => {
     const result = robustDelayGate({
@@ -536,13 +550,25 @@ describe('adverseOrderingRequired law (§64.7 / FR-MAT-009)', () => {
 
   it('stays unambiguous when the ordering is known or only one trigger is feasible', () => {
     expect(
-      adverseOrderingRequired({ favorableReachable: true, adverseReachable: true, orderingKnown: true }),
+      adverseOrderingRequired({
+        favorableReachable: true,
+        adverseReachable: true,
+        orderingKnown: true,
+      }),
     ).toEqual({ primaryOrdering: 'UNAMBIGUOUS', pathAmbiguous: false });
     expect(
-      adverseOrderingRequired({ favorableReachable: true, adverseReachable: false, orderingKnown: false }),
+      adverseOrderingRequired({
+        favorableReachable: true,
+        adverseReachable: false,
+        orderingKnown: false,
+      }),
     ).toEqual({ primaryOrdering: 'UNAMBIGUOUS', pathAmbiguous: false });
     expect(
-      adverseOrderingRequired({ favorableReachable: false, adverseReachable: true, orderingKnown: false }),
+      adverseOrderingRequired({
+        favorableReachable: false,
+        adverseReachable: true,
+        orderingKnown: false,
+      }),
     ).toEqual({ primaryOrdering: 'UNAMBIGUOUS', pathAmbiguous: false });
   });
 });

@@ -209,7 +209,10 @@ export function evaluateTradabilityGate(input: TradabilityGateInput): Tradabilit
       const recorded = resultsByKind.get(requireKind(kind));
       delayRecords(delayResults, kind, recorded !== undefined && recorded.passed);
     }
-    const delayGate = robustDelayGate({ profileRequires: input.requiresDelayKinds, results: delayResults });
+    const delayGate = robustDelayGate({
+      profileRequires: input.requiresDelayKinds,
+      results: delayResults,
+    });
     if (!delayGate.robust && verdict === TradabilityVerdict.TRADABLE) {
       verdict = TradabilityVerdict.INSUFFICIENT_DATA;
       refusal = 'FAILS_REQUIRED_STRESS_PASS_MATRIX';

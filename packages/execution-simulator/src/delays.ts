@@ -84,9 +84,7 @@ function buildPoint(
  * maximumSupportedDelay; the deterministic reference may sit anywhere at or
  * below p50 (it is the reproducibility anchor, not a robustness claim).
  */
-export function resolveActionDelayProfile(
-  input: ResolveDelayProfileInput,
-): ActionDelayProfile {
+export function resolveActionDelayProfile(input: ResolveDelayProfileInput): ActionDelayProfile {
   if (typeof input.profileVersion !== 'string' || input.profileVersion.length === 0) {
     throw new ExecVocabularyError(ExecErrorCode.EXEC_UNCERTAINTY_INPUT_INVALID, {
       refused: 'DELAY_PROFILE_VERSION_INVALID',

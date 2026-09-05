@@ -56,8 +56,7 @@ export const AdapterSupportState = {
   DEGRADED: 'DEGRADED',
   UNAVAILABLE: 'UNAVAILABLE',
 } as const;
-export type AdapterSupportState =
-  (typeof AdapterSupportState)[keyof typeof AdapterSupportState];
+export type AdapterSupportState = (typeof AdapterSupportState)[keyof typeof AdapterSupportState];
 
 export const ExecutionStatus = {
   EXECUTED_FULL: 'EXECUTED_FULL',
@@ -357,10 +356,7 @@ export function outcomeLabelPrecedence(clauses: OutcomeLabelClauses): OutcomeLab
     };
   }
   // 3. PENDING / PARTIALLY_MATURED — not yet matured, no terminal event.
-  if (
-    maturity === OutcomeMaturity.PENDING ||
-    maturity === OutcomeMaturity.PARTIALLY_MATURED
-  ) {
+  if (maturity === OutcomeMaturity.PENDING || maturity === OutcomeMaturity.PARTIALLY_MATURED) {
     return {
       tradableLabel: OutcomeClass.PENDING,
       tradableFailureReason: null,

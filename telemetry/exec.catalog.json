@@ -46,7 +46,11 @@
         { "name": "maximumFillDurationSeconds", "type": "integer>=0", "required": true },
         { "name": "feePolicyVersionId", "type": "string", "required": true },
         { "name": "conservativeStressPolicyId", "type": "string", "required": true },
-        { "name": "requiredPoolAdapterCoverage", "type": "string(COMPLETE|BOUNDED_APPROXIMATION)", "required": true },
+        {
+          "name": "requiredPoolAdapterCoverage",
+          "type": "string(COMPLETE|BOUNDED_APPROXIMATION)",
+          "required": true
+        },
         { "name": "registeredHash", "type": "string<sha256-ref>", "required": true }
       ]
     },
@@ -64,11 +68,27 @@
         { "name": "outcomeProfileVersion", "type": "string", "required": true },
         { "name": "entry", "type": "EntryFillResult", "required": true },
         { "name": "exit", "type": "ExitFillResult|null", "required": true },
-        { "name": "tradabilityVerdict", "type": "string(TRADABLE|UNCERTAINTY_BLOCKED|TARGET_NOT_EXECUTABLE|STATE_INCOMPLETE|EXECUTION_UNAVAILABLE|POOL_MATH_UNSUPPORTED|INSUFFICIENT_DATA)", "required": true },
-        { "name": "tradableFailureReason", "type": "string(SECURITY_OR_LIQUIDITY|EXPLICIT_FAILURE_CLAUSE)|null", "required": true },
-        { "name": "signalLabel", "type": "string(SIGNAL_SUCCESS|SIGNAL_FAILURE)|null", "required": true },
+        {
+          "name": "tradabilityVerdict",
+          "type": "string(TRADABLE|UNCERTAINTY_BLOCKED|TARGET_NOT_EXECUTABLE|STATE_INCOMPLETE|EXECUTION_UNAVAILABLE|POOL_MATH_UNSUPPORTED|INSUFFICIENT_DATA)",
+          "required": true
+        },
+        {
+          "name": "tradableFailureReason",
+          "type": "string(SECURITY_OR_LIQUIDITY|EXPLICIT_FAILURE_CLAUSE)|null",
+          "required": true
+        },
+        {
+          "name": "signalLabel",
+          "type": "string(SIGNAL_SUCCESS|SIGNAL_FAILURE)|null",
+          "required": true
+        },
         { "name": "tradableLabel", "type": "string<outcome-class>|null", "required": true },
-        { "name": "outcomeMaturity", "type": "string(PENDING|PARTIALLY_MATURED|FULLY_MATURED|CENSORED|INVALID_DATA)", "required": true },
+        {
+          "name": "outcomeMaturity",
+          "type": "string(PENDING|PARTIALLY_MATURED|FULLY_MATURED|CENSORED|INVALID_DATA)",
+          "required": true
+        },
         { "name": "stateSnapshotId", "type": "string", "required": true },
         { "name": "replayManifestId", "type": "string", "required": true },
         { "name": "pathAmbiguity", "type": "{primaryOrdering, ambiguous}", "required": true },
@@ -111,9 +131,21 @@
         { "name": "simulationId", "type": "string", "required": true },
         { "name": "candidateId", "type": "string", "required": true },
         { "name": "tradableLabel", "type": "string<outcome-class>", "required": true },
-        { "name": "signalLabel", "type": "string(SIGNAL_SUCCESS|SIGNAL_FAILURE)|null", "required": true },
-        { "name": "outcomeMaturity", "type": "string(PENDING|PARTIALLY_MATURED|FULLY_MATURED|CENSORED|INVALID_DATA)", "required": true },
-        { "name": "tradableFailureReason", "type": "string(SECURITY_OR_LIQUIDITY|EXPLICIT_FAILURE_CLAUSE)|null", "required": true },
+        {
+          "name": "signalLabel",
+          "type": "string(SIGNAL_SUCCESS|SIGNAL_FAILURE)|null",
+          "required": true
+        },
+        {
+          "name": "outcomeMaturity",
+          "type": "string(PENDING|PARTIALLY_MATURED|FULLY_MATURED|CENSORED|INVALID_DATA)",
+          "required": true
+        },
+        {
+          "name": "tradableFailureReason",
+          "type": "string(SECURITY_OR_LIQUIDITY|EXPLICIT_FAILURE_CLAUSE)|null",
+          "required": true
+        },
         { "name": "censorReason", "type": "string|null", "required": true },
         { "name": "invalidReason", "type": "string|null", "required": true },
         { "name": "untradableSignalWin", "type": "boolean", "required": true },
@@ -136,14 +168,22 @@
         { "name": "candidateId", "type": "string", "required": true },
         { "name": "matrixId", "type": "string", "required": true },
         { "name": "outcomeProfileVersion", "type": "string", "required": true },
-        { "name": "requiredKinds", "type": "array<string<stress-scenario-kind>>", "required": true },
+        {
+          "name": "requiredKinds",
+          "type": "array<string<stress-scenario-kind>>",
+          "required": true
+        },
         { "name": "results", "type": "array<StressScenarioResult>", "required": true },
         { "name": "conservativeStressPolicyId", "type": "string", "required": true },
         { "name": "tradabilityVerdict", "type": "string<tradability-verdict>", "required": true },
         { "name": "blockReason", "type": "string<tradability-verdict>|null", "required": true },
         { "name": "preservedSignalLabel", "type": "string<outcome-class>|null", "required": true },
         { "name": "confirmedOpportunity", "type": "boolean", "required": true },
-        { "name": "uncertaintyBound", "type": "{stateCompleteness, relativeUncertainty, policyLimit, qualityCodes}|null", "required": true },
+        {
+          "name": "uncertaintyBound",
+          "type": "{stateCompleteness, relativeUncertainty, policyLimit, qualityCodes}|null",
+          "required": true
+        },
         { "name": "evaluatedAt", "type": "string<utc-timestamp>", "required": true }
       ]
     },
@@ -157,14 +197,22 @@
         { "name": "planId", "type": "string", "required": true },
         { "name": "planVersion", "type": "string", "required": true },
         { "name": "candidateId", "type": "string", "required": true },
-        { "name": "triggerClass", "type": "string(DEEP_RESEARCH|EARLY_WATCH|CONFIRMED_OPPORTUNITY|CONTROL_SAMPLE|SHADOW_PORTFOLIO)", "required": true },
+        {
+          "name": "triggerClass",
+          "type": "string(DEEP_RESEARCH|EARLY_WATCH|CONFIRMED_OPPORTUNITY|CONTROL_SAMPLE|SHADOW_PORTFOLIO)",
+          "required": true
+        },
         { "name": "cadenceSeconds", "type": "integer>=1", "required": true },
         { "name": "observedFields", "type": "array<string>", "required": true },
         { "name": "providerSourceIds", "type": "array<string>", "required": true },
         { "name": "durationSeconds", "type": "integer>=1", "required": true },
         { "name": "quotaCeiling", "type": "object", "required": true },
         { "name": "degradationPolicyId", "type": "string", "required": true },
-        { "name": "resolutionFloor", "type": "{temporalSeconds, poolStateComplete, liquidityDepthMinUsd}", "required": true },
+        {
+          "name": "resolutionFloor",
+          "type": "{temporalSeconds, poolStateComplete, liquidityDepthMinUsd}",
+          "required": true
+        },
         { "name": "inclusionProbability", "type": "number[0,1]|null", "required": true },
         { "name": "stratum", "type": "string|null", "required": true },
         { "name": "populationLimit", "type": "string|null", "required": true },
@@ -218,7 +266,11 @@
         { "name": "curveTypes", "type": "array<string>", "required": true },
         { "name": "family", "type": "string<adapter-family>", "required": true },
         { "name": "accountLayoutVersion", "type": "string", "required": true },
-        { "name": "supportState", "type": "string(AVAILABLE|DEGRADED|UNAVAILABLE)", "required": true },
+        {
+          "name": "supportState",
+          "type": "string(AVAILABLE|DEGRADED|UNAVAILABLE)",
+          "required": true
+        },
         { "name": "parityGateVersion", "type": "string|null", "required": true },
         { "name": "fixtureBundleHash", "type": "string<sha256-ref>|null", "required": true }
       ]
@@ -240,7 +292,11 @@
         { "name": "observedTradeFailures", "type": "array<string>", "required": true },
         { "name": "toleranceBps", "type": "integer>=0", "required": true },
         { "name": "passed", "type": "boolean", "required": true },
-        { "name": "incidentCause", "type": "string(PARITY_DRIFT|PROGRAM_UPGRADE)|null", "required": true },
+        {
+          "name": "incidentCause",
+          "type": "string(PARITY_DRIFT|PROGRAM_UPGRADE)|null",
+          "required": true
+        },
         { "name": "evaluatedAt", "type": "string<utc-timestamp>", "required": true }
       ]
     },
@@ -252,7 +308,11 @@
       "tier": "CRITICAL_METADATA",
       "fields": [
         { "name": "degradationId", "type": "string", "required": true },
-        { "name": "cause", "type": "string(ADAPTER_DEPRECATED|PROGRAM_UPGRADE|PARITY_DRIFT|UNKNOWN_EXTENSION)", "required": true },
+        {
+          "name": "cause",
+          "type": "string(ADAPTER_DEPRECATED|PROGRAM_UPGRADE|PARITY_DRIFT|UNKNOWN_EXTENSION)",
+          "required": true
+        },
         { "name": "chainId", "type": "string<caip-2>", "required": true },
         { "name": "programId", "type": "string", "required": true },
         { "name": "programVersion", "type": "string", "required": true },
@@ -310,7 +370,11 @@
       "fields": [
         { "name": "quoteId", "type": "string", "required": true },
         { "name": "sourceId", "type": "string", "required": true },
-        { "name": "sourceKind", "type": "string(OFFICIAL_PROGRAM_READ|INDEPENDENT_AGGREGATOR|OBSERVED_TRADE)", "required": true },
+        {
+          "name": "sourceKind",
+          "type": "string(OFFICIAL_PROGRAM_READ|INDEPENDENT_AGGREGATOR|OBSERVED_TRADE)",
+          "required": true
+        },
         { "name": "inTokenMint", "type": "string", "required": true },
         { "name": "outTokenMint", "type": "string", "required": true },
         { "name": "inAmount", "type": "string<decimal>", "required": true },

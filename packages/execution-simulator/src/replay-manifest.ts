@@ -169,7 +169,10 @@ export function freezeReplayManifest(input: FreezeManifestInput): ReplayManifest
       refused: 'MANIFEST_OBSERVATION_CUTOFF_AFTER_AS_OF',
     });
   }
-  if (!Array.isArray(input.artifactIds) || input.artifactIds.some((a) => typeof a !== 'string' || a.length === 0)) {
+  if (
+    !Array.isArray(input.artifactIds) ||
+    input.artifactIds.some((a) => typeof a !== 'string' || a.length === 0)
+  ) {
     throw new ExecVocabularyError(ExecErrorCode.EXEC_LABEL_CLAUSES_INVALID, {
       refused: 'MANIFEST_FIELD_INVALID',
       field: 'artifactIds',

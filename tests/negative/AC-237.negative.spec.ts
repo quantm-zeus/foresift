@@ -44,7 +44,10 @@ describe('AC-237 negative: unaffected scope containment & auto-reactivation refu
 
 describe('AC-237 exec negative: degraded adapter confirmed alerts refusal (FR-EXEC-021)', () => {
   it('refuses new confirmed alerts from degraded pool math adapter until revalidated', () => {
-    const issueConfirmedAlert = (adapter: { status: 'DEGRADED' | 'ACTIVE'; revalidated: boolean }) => {
+    const issueConfirmedAlert = (adapter: {
+      status: 'DEGRADED' | 'ACTIVE';
+      revalidated: boolean;
+    }) => {
       if (adapter.status === 'DEGRADED' && !adapter.revalidated) {
         throw new Error('DEGRADED_ADAPTER_CONFIRMED_ALERT_REFUSED');
       }

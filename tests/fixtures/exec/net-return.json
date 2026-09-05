@@ -27,13 +27,13 @@
       "priceImpactBps": 200,
       "poolFeeBps": 30,
       "tokenTransferFeeBps": 500,
-      "networkPriorityFeeUsd": 2.50,
+      "networkPriorityFeeUsd": 2.5,
       "fillFraction": 1.0,
       "grossExitValueUsd": 5400.0,
       "exitPriceImpactBps": 220,
       "exitPoolFeeBps": 30,
       "exitTokenTransferFeeBps": 500,
-      "expectedNetReturnUsd": -372.60,
+      "expectedNetReturnUsd": -372.6,
       "expectedNetRoiFraction": -0.07452,
       "outcomeClass": "TRADABLE_FAILURE"
     },
@@ -46,13 +46,13 @@
       "poolFeeBps": 25,
       "tokenTransferFeeBps": 0,
       "networkPriorityFeeUsd": 1.0,
-      "fillFraction": 0.60,
+      "fillFraction": 0.6,
       "unfilledCapitalUsd": 4000.0,
       "grossExitValueUsd": 6450.0,
       "exitPriceImpactBps": 180,
       "exitPoolFeeBps": 25,
       "exitTokenTransferFeeBps": 0,
-      "expectedNetReturnUsd": 313.10,
+      "expectedNetReturnUsd": 313.1,
       "expectedNetRoiFraction": 0.03131,
       "outcomeClass": "TRADABLE_SUCCESS"
     },
@@ -70,8 +70,8 @@
       "exitPriceImpactBps": 700,
       "exitPoolFeeBps": 100,
       "exitTokenTransferFeeBps": 100,
-      "expectedNetReturnUsd": -258.00,
-      "expectedNetRoiFraction": -0.1290,
+      "expectedNetReturnUsd": -258.0,
+      "expectedNetRoiFraction": -0.129,
       "outcomeClass": "TRADABLE_FAILURE"
     }
   ]

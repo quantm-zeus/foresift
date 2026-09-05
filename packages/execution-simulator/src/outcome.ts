@@ -43,8 +43,7 @@ export const CensorInvalidReason = {
   ADAPTER_CORRECTNESS_UNVERIFIABLE: 'ADAPTER_CORRECTNESS_UNVERIFIABLE',
   EVIDENCE_INTEGRITY_FAILURE: 'EVIDENCE_INTEGRITY_FAILURE',
 } as const;
-export type CensorInvalidReason =
-  (typeof CensorInvalidReason)[keyof typeof CensorInvalidReason];
+export type CensorInvalidReason = (typeof CensorInvalidReason)[keyof typeof CensorInvalidReason];
 
 const CENSOR_REASONS: readonly string[] = [
   CensorInvalidReason.HORIZON_NOT_ELAPSED,
@@ -59,11 +58,7 @@ const INVALID_REASONS: readonly string[] = [
   CensorInvalidReason.EVIDENCE_INTEGRITY_FAILURE,
 ];
 
-function requireReason(
-  value: unknown,
-  allowed: readonly string[],
-  refused: string,
-): string {
+function requireReason(value: unknown, allowed: readonly string[], refused: string): string {
   if (typeof value !== 'string' || !allowed.includes(value)) {
     throw new ExecVocabularyError(ExecErrorCode.EXEC_LABEL_CLAUSES_INVALID, {
       refused,
@@ -153,8 +148,7 @@ export function classifyOutcome(input: ClassifyOutcomeInput): ClassifyOutcomeRes
 
   const profitRenderRefused = signalCannotRenderProfit({
     signalLabel:
-      signalLabel === OutcomeClass.SIGNAL_SUCCESS ||
-      signalLabel === OutcomeClass.SIGNAL_FAILURE
+      signalLabel === OutcomeClass.SIGNAL_SUCCESS || signalLabel === OutcomeClass.SIGNAL_FAILURE
         ? signalLabel
         : OutcomeClass.SIGNAL_FAILURE,
     tradableLabel: resolution.tradableLabel,

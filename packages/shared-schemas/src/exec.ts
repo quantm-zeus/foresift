@@ -70,9 +70,7 @@ export const StressScenarioKindSchema = domainEnum(ALL_STRESS_SCENARIO_KINDS);
 export const ExitPolicyKindSchema = domainEnum(ALL_EXIT_POLICY_KINDS);
 export const PrimaryOrderingSchema = domainEnum(ALL_PRIMARY_ORDERINGS);
 export const TradabilityVerdictSchema = domainEnum(ALL_TRADABILITY_VERDICTS);
-export const ObservationPlanTriggerClassSchema = domainEnum(
-  ALL_OBSERVATION_PLAN_TRIGGER_CLASSES,
-);
+export const ObservationPlanTriggerClassSchema = domainEnum(ALL_OBSERVATION_PLAN_TRIGGER_CLASSES);
 export const TradableFailureReasonSchema = domainEnum(ALL_TRADABLE_FAILURE_REASONS);
 
 // ---------------------------------------------------------------------------
@@ -104,10 +102,9 @@ export const ExecutionScenarioSchema = z
     requiredPoolAdapterCoverage: z.enum(['COMPLETE', 'BOUNDED_APPROXIMATION']),
   })
   .strict()
-  .refine(
-    (value) => value.allowPartialFill || value.minimumFillFraction >= 1,
-    { message: 'partial fills disallowed implies minimumFillFraction of 1' },
-  );
+  .refine((value) => value.allowPartialFill || value.minimumFillFraction >= 1, {
+    message: 'partial fills disallowed implies minimumFillFraction of 1',
+  });
 export type ExecutionScenario = z.infer<typeof ExecutionScenarioSchema>;
 
 /**
@@ -127,10 +124,9 @@ export const ExitPolicyExperimentSchema = z
     parameters: z.record(z.unknown()),
   })
   .strict()
-  .refine(
-    (value) => value.isPrimary || Object.keys(value.parameters).length >= 0,
-    { message: 'secondary experiments carry their pre-registered parameters' },
-  );
+  .refine((value) => value.isPrimary || Object.keys(value.parameters).length >= 0, {
+    message: 'secondary experiments carry their pre-registered parameters',
+  });
 export type ExitPolicyExperiment = z.infer<typeof ExitPolicyExperimentSchema>;
 
 // ---------------------------------------------------------------------------
@@ -194,17 +190,17 @@ export const EntryFillResultSchema = z
   })
   .strict()
   .refine(
-    (value) => value.completionSlot >= value.startSlot && Date.parse(value.completedAt) >= Date.parse(value.startedAt),
+    (value) =>
+      value.completionSlot >= value.startSlot &&
+      Date.parse(value.completedAt) >= Date.parse(value.startedAt),
     { message: 'completion cannot precede start' },
   )
-  .refine(
-    (value) => value.status !== 'EXECUTED_FULL' || value.fillFraction === 1,
-    { message: 'EXECUTED_FULL requires fillFraction 1' },
-  )
+  .refine((value) => value.status !== 'EXECUTED_FULL' || value.fillFraction === 1, {
+    message: 'EXECUTED_FULL requires fillFraction 1',
+  })
   .refine(
     (value) =>
-      value.status !== 'EXECUTION_PARTIAL' ||
-      (value.fillFraction < 1 && value.fillFraction > 0),
+      value.status !== 'EXECUTION_PARTIAL' || (value.fillFraction < 1 && value.fillFraction > 0),
     { message: 'EXECUTION_PARTIAL requires a partial (0,1) fill fraction' },
   );
 export type EntryFillResult = z.infer<typeof EntryFillResultSchema>;
@@ -226,7 +222,7 @@ export const ExitFillResultSchema = z
   .refine(
     (value) =>
       value.triggerCompletionOrderValid ||
-      (Date.parse(value.completedAt) >= Date.parse(value.triggerAt)),
+      Date.parse(value.completedAt) >= Date.parse(value.triggerAt),
     { message: 'exit completion cannot precede its trigger (§64.7)' },
   );
 export type ExitFillResult = z.infer<typeof ExitFillResultSchema>;
@@ -450,9 +446,7 @@ export const ScenarioPassMatrixSchema = z
   )
   .refine(
     (value) => {
-      const passed = new Set(
-        value.results.filter((r) => r.passed).map((r) => r.stressKind),
-      );
+      const passed = new Set(value.results.filter((r) => r.passed).map((r) => r.stressKind));
       return value.requiredKinds.every((kind) => passed.has(kind));
     },
     { message: 'active policy enforces its declared pass matrix — required kinds must pass' },
@@ -512,21 +506,17 @@ export const ExecutionSimulationSchema = z
     { message: 'tradable label must come from the §8.2 tradable axis, never a signal label' },
   )
   .refine(
-    (value) =>
-      value.tradableFailureReason === null ||
-      value.tradableLabel === 'TRADABLE_FAILURE',
+    (value) => value.tradableFailureReason === null || value.tradableLabel === 'TRADABLE_FAILURE',
     { message: 'a tradable failure reason requires the TRADABLE_FAILURE label' },
   )
   .refine(
     (value) =>
-      value.tradableLabel !== 'TRADABLE_SUCCESS' ||
-      value.tradabilityVerdict === 'TRADABLE',
+      value.tradableLabel !== 'TRADABLE_SUCCESS' || value.tradabilityVerdict === 'TRADABLE',
     { message: 'TRADABLE_SUCCESS requires the TRADABLE verdict' },
   )
-  .refine(
-    (value) => Date.parse(value.availableAt) >= Date.parse(value.observedAt),
-    { message: 'availableAt must not precede observedAt' },
-  )
+  .refine((value) => Date.parse(value.availableAt) >= Date.parse(value.observedAt), {
+    message: 'availableAt must not precede observedAt',
+  })
   .refine(
     (value) =>
       // Incomplete state cannot confirm tradable success (§64.4/AC-232/INV-011).
@@ -549,7 +539,9 @@ export const ExecutionSimulationSchema = z
         !value.entry.netReturn.grossReturnUsd.startsWith('-') &&
         value.entry.netReturn.grossReturnUsd !== '0'
       ),
-    { message: 'SIGNAL_SUCCESS cannot render profit when TRADABLE_SUCCESS is absent (FR-EXEC-006)' },
+    {
+      message: 'SIGNAL_SUCCESS cannot render profit when TRADABLE_SUCCESS is absent (FR-EXEC-006)',
+    },
   );
 export type ExecutionSimulation = z.infer<typeof ExecutionSimulationSchema>;
 
@@ -572,10 +564,9 @@ export const AlertExecutionContentSchema = z
     renderedAt: UtcTimestampSchema,
   })
   .strict()
-  .refine(
-    (value) => Date.parse(value.validUntil) > Date.parse(value.renderedAt),
-    { message: 'alert expiry must be after render time' },
-  );
+  .refine((value) => Date.parse(value.validUntil) > Date.parse(value.renderedAt), {
+    message: 'alert expiry must be after render time',
+  });
 export type AlertExecutionContent = z.infer<typeof AlertExecutionContentSchema>;
 
 /** FR-EXEC-019: concurrent shadow positions sharing a pool/route aggregate. */

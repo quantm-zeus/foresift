@@ -17,7 +17,10 @@ function evaluateProfilePass(profile: {
   return true;
 }
 
-function verifyFrozenReplay(original: { assumptionHash: string }, replayed: { assumptionHash: string }) {
+function verifyFrozenReplay(
+  original: { assumptionHash: string },
+  replayed: { assumptionHash: string },
+) {
   if (original.assumptionHash !== replayed.assumptionHash) {
     throw new Error('FROZEN_REPLAY_ASSUMPTION_HASH_MISMATCH_REFUSED');
   }

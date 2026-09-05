@@ -11,6 +11,7 @@ import {
   ExecutionStatus,
   OutcomeClass,
   OutcomeMaturity,
+  QualityCode,
   StressScenarioKind,
 } from '@foresift/domain';
 import {
@@ -59,7 +60,7 @@ const baseNetReturn = {
   quoteConversionDepegUsd: '0.00',
   accountCreationRentUsd: '0.00',
   netReturnUsd: '46.34',
-  qualityCodes: ['VALID'],
+  qualityCodes: [QualityCode.VALID],
 };
 
 const baseEntry = {
@@ -74,7 +75,7 @@ const baseEntry = {
   completionSlot: 1002,
   startedAt: '2026-09-05T00:00:00Z',
   completedAt: '2026-09-05T00:01:00Z',
-  status: 'EXECUTED_FULL',
+  status: ExecutionStatus.EXECUTED_FULL,
   netReturn: baseNetReturn,
 };
 
@@ -87,7 +88,7 @@ const baseExit = {
   filledQuantity: '1000.00',
   fillFraction: 1,
   averageExecutionPrice: '1.10',
-  status: 'EXECUTED_FULL',
+  status: ExecutionStatus.EXECUTED_FULL,
   netReturn: baseNetReturn,
 };
 
@@ -109,7 +110,7 @@ const baseSimulation: ExecutionSimulation = {
   pathAmbiguity: { primaryOrdering: 'UNAMBIGUOUS', ambiguous: false },
   observedAt: '2026-09-05T00:00:00Z',
   availableAt: '2026-09-05T00:00:01Z',
-  qualityCodes: ['VALID'],
+  qualityCodes: [QualityCode.VALID],
   schemaRegistryVersion: EXEC_SCHEMA_REGISTRY_VERSION,
 };
 
@@ -137,14 +138,18 @@ describe('ExecutionScenario schema (§64.2 exact field set)', () => {
     expect(() => ExecutionScenarioSchema.parse({ ...baseScenario, notionalUsd: 1000 })).toThrow(
       z.ZodError,
     );
-    expect(() =>
-      ExecutionScenarioSchema.parse({ ...baseScenario, notionalUsd: '1e3' }),
-    ).toThrow(z.ZodError);
+    expect(() => ExecutionScenarioSchema.parse({ ...baseScenario, notionalUsd: '1e3' })).toThrow(
+      z.ZodError,
+    );
   });
 
   it('enforces partial-fill coherence', () => {
     expect(() =>
-      ExecutionScenarioSchema.parse({ ...baseScenario, allowPartialFill: false, minimumFillFraction: 0.5 }),
+      ExecutionScenarioSchema.parse({
+        ...baseScenario,
+        allowPartialFill: false,
+        minimumFillFraction: 0.5,
+      }),
     ).toThrow(z.ZodError);
   });
 });
@@ -238,9 +243,9 @@ describe('payload-layer refinement law (FR-EXEC-006 / §64.4 / AC-232)', () => {
   });
 
   it('rejects unknown keys and enforces availability order', () => {
-    expect(() =>
-      ExecutionSimulationSchema.parse({ ...baseSimulation, retrofitted: true }),
-    ).toThrow(z.ZodError);
+    expect(() => ExecutionSimulationSchema.parse({ ...baseSimulation, retrofitted: true })).toThrow(
+      z.ZodError,
+    );
     expect(() =>
       ExecutionSimulationSchema.parse({
         ...baseSimulation,
@@ -262,8 +267,7 @@ describe('AdapterRegistryEntry and QuoteEvidence boundaries (§64.3 / §64.5)', 
     accountLayoutVersion: 'layout-v3',
     supportState: AdapterSupportState.AVAILABLE,
     parityGateVersion: 'parity-v1',
-    fixtureBundleHash:
-      'sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+    fixtureBundleHash: 'sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
   };
 
   it('requires parity and fixture references for AVAILABLE adapters', () => {
@@ -299,7 +303,7 @@ describe('AdapterRegistryEntry and QuoteEvidence boundaries (§64.3 / §64.5)', 
       observedAt: '2026-09-05T00:00:01Z',
       routeLegs: [{ pool: 'pool-1' }],
       transactionPayloadRef: null,
-      qualityCodes: ['VALID'],
+      qualityCodes: [QualityCode.VALID],
     };
     expect(QuoteEvidenceSchema.parse(quote).quoteId).toBe('q-001');
     expect(() =>
@@ -354,8 +358,7 @@ describe('OutcomeObservationPlan and ScenarioPassMatrix boundaries (§64.14 / FR
     netReturn: baseNetReturn,
     fillFraction: 1,
     passed: true,
-    assumptionsHash:
-      'sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb',
+    assumptionsHash: 'sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb',
   };
 
   it('rejects pass matrices with missing or failed required kinds', () => {
@@ -364,23 +367,23 @@ describe('OutcomeObservationPlan and ScenarioPassMatrix boundaries (§64.14 / FR
       candidateId: 'cand-001',
       outcomeProfileVersion: 'HG-EM-1@1',
       requiredKinds: [StressScenarioKind.BASE_CASE, StressScenarioKind.P90_DELAY],
-      results: [
-        baseResult,
-        { ...baseResult, stressKind: StressScenarioKind.P90_DELAY },
-      ],
+      results: [baseResult, { ...baseResult, stressKind: StressScenarioKind.P90_DELAY }],
       conservativeStressPolicyId: 'stress-v1',
       evaluatedAt: '2026-09-05T00:00:00Z',
     };
     expect(ScenarioPassMatrixSchema.parse(matrix).matrixId).toBe('mx-001');
     // Missing result for a required kind.
-    expect(() =>
-      ScenarioPassMatrixSchema.parse({ ...matrix, results: [baseResult] }),
-    ).toThrow(z.ZodError);
+    expect(() => ScenarioPassMatrixSchema.parse({ ...matrix, results: [baseResult] })).toThrow(
+      z.ZodError,
+    );
     // Failed required kind.
     expect(() =>
       ScenarioPassMatrixSchema.parse({
         ...matrix,
-        results: [baseResult, { ...baseResult, stressKind: StressScenarioKind.P90_DELAY, passed: false }],
+        results: [
+          baseResult,
+          { ...baseResult, stressKind: StressScenarioKind.P90_DELAY, passed: false },
+        ],
       }),
     ).toThrow(z.ZodError);
   });
@@ -396,8 +399,7 @@ describe('AlertExecutionContent and ReplayManifest boundaries (FR-EXEC-008 / FR-
       modeledEntryImpact: 0.01,
       modeledExitImpact: 0.01,
       assumptions: ['fee-v1', 'stress-v1'],
-      assumptionsHash:
-        'sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc',
+      assumptionsHash: 'sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc',
       validUntil: '2026-09-05T01:00:00Z',
       renderedAt: '2026-09-05T00:00:00Z',
     };

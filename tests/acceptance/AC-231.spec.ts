@@ -74,6 +74,8 @@ describe('AC-231 exec acceptance: observed-trade & reference-quote parity tolera
     const reconciledQuote = fixture.referenceQuotes[0];
     expect(reconciledQuote.reconciled).toBe(true);
     expect(reconciledQuote.isPoolMathAuthority).toBe(false);
-    expect(reconciledQuote.discrepancyBps).toBeLessThanOrEqual(reconciledQuote.maxAllowedToleranceBps);
+    expect(reconciledQuote.discrepancyBps).toBeLessThanOrEqual(
+      reconciledQuote.maxAllowedToleranceBps,
+    );
   });
 });

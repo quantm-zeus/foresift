@@ -10,7 +10,10 @@ function confirmOpportunity(params: {
   assumedUniformLiquidityFallback?: boolean;
   proposedVerdict: 'CONFIRMED_OPPORTUNITY' | 'UNTRADABLE_SIGNAL_WIN' | 'REJECTED_UNTRADABLE';
 }) {
-  if (params.stateCompleteness === 'INCOMPLETE_BLOCKING' && params.proposedVerdict === 'CONFIRMED_OPPORTUNITY') {
+  if (
+    params.stateCompleteness === 'INCOMPLETE_BLOCKING' &&
+    params.proposedVerdict === 'CONFIRMED_OPPORTUNITY'
+  ) {
     throw new Error('INCOMPLETE_BLOCKING_CANNOT_CONFIRM_TRADABILITY_REFUSED');
   }
   if (params.assumedUniformLiquidityFallback) {

@@ -145,9 +145,9 @@ export function competeForDepth(input: {
   }
 
   const scale = Math.max(
-    preExitDepthUsd.includes('.') ? preExitDepthUsd.split('.')[1]?.length ?? 0 : 0,
-    ...input.positions.map(
-      (p) => (p.requestedExitUsd.includes('.') ? p.requestedExitUsd.split('.')[1]?.length ?? 0 : 0),
+    preExitDepthUsd.includes('.') ? (preExitDepthUsd.split('.')[1]?.length ?? 0) : 0,
+    ...input.positions.map((p) =>
+      p.requestedExitUsd.includes('.') ? (p.requestedExitUsd.split('.')[1]?.length ?? 0) : 0,
     ),
   );
   let remaining = scaled(preExitDepthUsd, scale);
@@ -176,8 +176,7 @@ export function competeForDepth(input: {
     if (priorConsumption > 0n && requested > 0n && filled < requested) collision = true;
     remaining -= filled;
     filledTotal += filled;
-    const fillFraction =
-      requested === 0n ? 0 : Number((filled * 10_000n) / requested) / 10_000;
+    const fillFraction = requested === 0n ? 0 : Number((filled * 10_000n) / requested) / 10_000;
     outcomes.push({
       registrationId: position.registrationId,
       positionId: position.positionId,

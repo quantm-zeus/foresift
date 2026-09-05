@@ -6,12 +6,14 @@
  */
 import { describe, expect, it } from 'bun:test';
 
-function assertPureTradableDenominator(records: {
-  id: string;
-  isExcludedClass: boolean;
-  excludedReason?: string;
-  foldedIntoTradableDenominator?: boolean;
-}[]) {
+function assertPureTradableDenominator(
+  records: {
+    id: string;
+    isExcludedClass: boolean;
+    excludedReason?: string;
+    foldedIntoTradableDenominator?: boolean;
+  }[],
+) {
   for (const r of records) {
     if (r.isExcludedClass && r.foldedIntoTradableDenominator) {
       throw new Error('EXCLUDED_CLASS_SILENTLY_FOLDED_INTO_TRADABLE_DENOMINATOR_REFUSED');
@@ -24,7 +26,12 @@ describe('AC-239 negative: silent folding of excluded classes into denominator r
   it('throws when signal-only outcome is folded into tradable denominator', () => {
     expect(() =>
       assertPureTradableDenominator([
-        { id: '1', isExcludedClass: true, excludedReason: 'SIGNAL_ONLY', foldedIntoTradableDenominator: true },
+        {
+          id: '1',
+          isExcludedClass: true,
+          excludedReason: 'SIGNAL_ONLY',
+          foldedIntoTradableDenominator: true,
+        },
       ]),
     ).toThrow('EXCLUDED_CLASS_SILENTLY_FOLDED_INTO_TRADABLE_DENOMINATOR_REFUSED');
   });
@@ -32,7 +39,12 @@ describe('AC-239 negative: silent folding of excluded classes into denominator r
   it('throws when censored or low-resolution outcome is folded into tradable denominator', () => {
     expect(() =>
       assertPureTradableDenominator([
-        { id: '2', isExcludedClass: true, excludedReason: 'LOW_RESOLUTION', foldedIntoTradableDenominator: true },
+        {
+          id: '2',
+          isExcludedClass: true,
+          excludedReason: 'LOW_RESOLUTION',
+          foldedIntoTradableDenominator: true,
+        },
       ]),
     ).toThrow('EXCLUDED_CLASS_SILENTLY_FOLDED_INTO_TRADABLE_DENOMINATOR_REFUSED');
   });

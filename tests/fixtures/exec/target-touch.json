@@ -4,7 +4,7 @@
     {
       "caseId": "target_touch_isolated_wick",
       "description": "Single-slot price wick touching target price but with zero executable depth / duration",
-      "targetPriceUsd": 2.50,
+      "targetPriceUsd": 2.5,
       "wickHighPriceUsd": 2.55,
       "wickDurationSlots": 1,
       "wickExecutableVolumeUsd": 0.0,
@@ -18,7 +18,7 @@
     {
       "caseId": "target_touch_sustained_depth",
       "description": "Multi-slot sustained target presence with depth sufficient to absorb configured notional",
-      "targetPriceUsd": 2.50,
+      "targetPriceUsd": 2.5,
       "sustainedHighPriceUsd": 2.54,
       "touchDurationSlots": 6,
       "executableVolumeUsd": 50000.0,

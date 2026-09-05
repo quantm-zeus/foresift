@@ -21,7 +21,10 @@ export function buildAdapterRegistry(
 ): PoolMathAdapterRegistry {
   const prepared: AdapterBinding[] = bindings.map((binding) => {
     const { manifest, adapter } = binding;
-    if (manifest.poolMathAdapterVersion !== undefined && manifest.poolMathAdapterVersion !== adapter.version) {
+    if (
+      manifest.poolMathAdapterVersion !== undefined &&
+      manifest.poolMathAdapterVersion !== adapter.version
+    ) {
       throw new ExecVocabularyError(ExecErrorCode.EXEC_LABEL_CLAUSES_INVALID, {
         manifestId: manifest.manifestId,
         manifestAdapterVersion: manifest.poolMathAdapterVersion,

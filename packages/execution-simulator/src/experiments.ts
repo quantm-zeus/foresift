@@ -236,9 +236,7 @@ export function issueObservationPlan(input: IssueObservationPlanInput): OutcomeO
     });
   }
 
-  const sampled =
-    input.inclusionProbability !== null &&
-    input.inclusionProbability !== undefined;
+  const sampled = input.inclusionProbability !== null && input.inclusionProbability !== undefined;
   if (sampled) {
     const p = input.inclusionProbability as number;
     if (typeof p !== 'number' || !Number.isFinite(p) || p < 0 || p > 1) {
@@ -305,9 +303,7 @@ export function resolutionCeilingFor(
   const [di, df = ''] = depth.split('.');
   const [mi, mf = ''] = minimum.split('.');
   const scale = Math.max(df.length, mf.length);
-  if (
-    BigInt(di + df.padEnd(scale, '0')) < BigInt(mi + mf.padEnd(scale, '0'))
-  ) {
+  if (BigInt(di + df.padEnd(scale, '0')) < BigInt(mi + mf.padEnd(scale, '0'))) {
     return 'SIGNAL_ONLY';
   }
   return 'TRADABLE_SUCCESS_PROVABLE';

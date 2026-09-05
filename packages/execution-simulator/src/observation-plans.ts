@@ -5,10 +5,7 @@
  *
  * Traces: FR-EXEC-011, AC-128.
  */
-export {
-  issueObservationPlan,
-  resolutionCeilingFor,
-} from './experiments.ts';
+export { issueObservationPlan, resolutionCeilingFor } from './experiments.ts';
 export type {
   ExitPolicyExperiment,
   IssueObservationPlanInput,

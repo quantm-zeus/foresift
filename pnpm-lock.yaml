@@ -238,6 +238,30 @@ importers:
         specifier: ^0.5.6
         version: 0.5.6
 
+  packages/execution-simulator:
+    dependencies:
+      '@foresift/domain':
+        specifier: workspace:*
+        version: link:../domain
+      '@foresift/persistence':
+        specifier: workspace:*
+        version: link:../persistence
+      '@foresift/pool-math':
+        specifier: workspace:*
+        version: link:../pool-math
+      '@foresift/program-decoders':
+        specifier: workspace:*
+        version: link:../program-decoders
+      '@foresift/shared-schemas':
+        specifier: workspace:*
+        version: link:../shared-schemas
+      '@foresift/solana-security':
+        specifier: workspace:*
+        version: link:../solana-security
+      '@foresift/transfer-semantics':
+        specifier: workspace:*
+        version: link:../transfer-semantics
+
   packages/object-store:
     dependencies:
       '@foresift/domain':
@@ -272,6 +296,24 @@ importers:
       '@foresift/object-store':
         specifier: workspace:*
         version: link:../object-store
+
+  packages/pool-math:
+    dependencies:
+      '@foresift/domain':
+        specifier: workspace:*
+        version: link:../domain
+      '@foresift/persistence':
+        specifier: workspace:*
+        version: link:../persistence
+      '@foresift/program-decoders':
+        specifier: workspace:*
+        version: link:../program-decoders
+      '@foresift/shared-schemas':
+        specifier: workspace:*
+        version: link:../shared-schemas
+      '@foresift/solana-security':
+        specifier: workspace:*
+        version: link:../solana-security
 
   packages/program-decoders:
     dependencies:
@@ -407,60 +449,6 @@ importers:
         specifier: workspace:*
         version: link:../shared-schemas
 
-  packages/pool-math:
-    dependencies:
-      '@foresift/domain':
-        specifier: workspace:*
-        version: link:../domain
-      '@foresift/persistence':
-        specifier: workspace:*
-        version: link:../persistence
-      '@foresift/program-decoders':
-        specifier: workspace:*
-        version: link:../program-decoders
-      '@foresift/shared-schemas':
-        specifier: workspace:*
-        version: link:../shared-schemas
-      '@foresift/solana-security':
-        specifier: workspace:*
-        version: link:../solana-security
-
-  packages/transfer-semantics:
-    dependencies:
-      '@foresift/domain':
-        specifier: workspace:*
-        version: link:../domain
-      '@foresift/persistence':
-        specifier: workspace:*
-        version: link:../persistence
-      '@foresift/program-decoders':
-        specifier: workspace:*
-        version: link:../program-decoders
-      '@foresift/shared-schemas':
-        specifier: workspace:*
-        version: link:../shared-schemas
-      '@foresift/solana-security':
-        specifier: workspace:*
-        version: link:../solana-security
-
-  packages/execution-simulator:
-    dependencies:
-      '@foresift/domain':
-        specifier: workspace:*
-        version: link:../domain
-      '@foresift/persistence':
-        specifier: workspace:*
-        version: link:../persistence
-      '@foresift/shared-schemas':
-        specifier: workspace:*
-        version: link:../shared-schemas
-      '@foresift/pool-math':
-        specifier: workspace:*
-        version: link:../pool-math
-      '@foresift/transfer-semantics':
-        specifier: workspace:*
-        version: link:../transfer-semantics
-
   packages/supply-confidence:
     dependencies:
       '@foresift/domain':
@@ -513,6 +501,24 @@ importers:
       '@electric-sql/pglite':
         specifier: ^0.5.6
         version: 0.5.6
+
+  packages/transfer-semantics:
+    dependencies:
+      '@foresift/domain':
+        specifier: workspace:*
+        version: link:../domain
+      '@foresift/persistence':
+        specifier: workspace:*
+        version: link:../persistence
+      '@foresift/program-decoders':
+        specifier: workspace:*
+        version: link:../program-decoders
+      '@foresift/shared-schemas':
+        specifier: workspace:*
+        version: link:../shared-schemas
+      '@foresift/solana-security':
+        specifier: workspace:*
+        version: link:../solana-security
 
 packages:
 

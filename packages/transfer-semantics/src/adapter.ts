@@ -21,11 +21,7 @@ import {
   evaluateTransferSemantics,
   type TransferSemanticsPolicy,
 } from '@foresift/solana-security';
-import type {
-  AccountCreationCost,
-  FeeModelResult,
-  TransferFeeConfiguration,
-} from './fee-model.ts';
+import type { AccountCreationCost, FeeModelResult, TransferFeeConfiguration } from './fee-model.ts';
 import { applyOutTransferFee, composeTransferCosts } from './fee-model.ts';
 
 export { applyOutTransferFee, composeTransferCosts } from './fee-model.ts';
@@ -185,9 +181,7 @@ export class TransferSemanticsRegistry {
 
   constructor(adapters: readonly TransferSemanticsAdapter[]) {
     const keys = new Set(
-      adapters.map(
-        (a) => `${a.chainId}:${a.programId}:${a.accountLayoutVersion}:${a.version}`,
-      ),
+      adapters.map((a) => `${a.chainId}:${a.programId}:${a.accountLayoutVersion}:${a.version}`),
     );
     if (keys.size !== adapters.length) {
       throw new ExecVocabularyError(ExecErrorCode.EXEC_LABEL_CLAUSES_INVALID, {
@@ -302,9 +296,7 @@ export function evaluateFillTransferCosts(
     extensionEvidence: [...inRows, ...outRows],
     ...(input.accountCreations !== undefined ? { accountCreations: input.accountCreations } : {}),
     ...(input.hookCostRaw !== undefined ? { hookCostRaw: input.hookCostRaw } : {}),
-    ...(input.aggregatorFeeRaw !== undefined
-      ? { aggregatorFeeRaw: input.aggregatorFeeRaw }
-      : {}),
+    ...(input.aggregatorFeeRaw !== undefined ? { aggregatorFeeRaw: input.aggregatorFeeRaw } : {}),
   });
   if (!result.sufficientData) {
     return {

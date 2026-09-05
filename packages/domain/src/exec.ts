@@ -278,10 +278,6 @@ export interface OutcomeLabelResult {
   readonly maturity: OutcomeMaturity;
 }
 
-function isStrictBoolean(value: unknown): value is boolean {
-  return typeof value === 'boolean';
-}
-
 /**
  * §8.2 common outcome-label precedence, applied in order:
  * INVALID_DATA → CENSORED → PENDING (PENDING/PARTIALLY_MATURED maturity) →

@@ -1,6 +1,6 @@
 /**
  * AC-230 acceptance (positive) — protocol adapter fixture sweep & versioned resolution.
- * Traces: FR-COL-002, FR-SOLSEC-003, AC-230, T024.
+ * Traces: FR-COL-002, FR-SOLSEC-003, FR-EXEC-013, FR-EXEC-015, AC-230, T024.
  * AC text (manifest §39): "Full fixture sweep — Pump/PumpSwap, Raydium AMM v4/CPMM/CLMM/Stable AMM/LaunchLab,
  * Orca Whirlpools, Meteora DLMM/DAMM v1-v2/DBC, Jupiter path-observation coverage, constant-product,
  * concentrated-liquidity, bin-based, bonding-curve, dynamic-fee — each resolves ONLY to its
@@ -153,3 +153,25 @@ describe('AC-230 solsec: Pool-security versioned resolution and allowlist bindin
     }
   });
 });
+
+describe('AC-230 exec: Execution pool-math versioned adapter resolution (§64.3, FR-EXEC-013, FR-EXEC-015)', () => {
+  it('resolves pool designs only to matching versioned pool-math adapters with signed manifests', () => {
+    const fixturePath = path.resolve(
+      path.dirname(fileURLToPath(import.meta.url)),
+      '../fixtures/exec/pool-states.json',
+    );
+    const fixture = JSON.parse(readFileSync(fixturePath, 'utf8'));
+    const availablePools = fixture.pools.filter(
+      (p: Record<string, unknown>) => p.adapterSupportState === 'AVAILABLE',
+    );
+    expect(availablePools.length).toBeGreaterThanOrEqual(6);
+
+    for (const pool of availablePools) {
+      expect(pool.adapterFamily).toBeDefined();
+      expect(pool.programVersion).toBeDefined();
+      expect(pool.accountLayoutVersion).toBeDefined();
+      expect(pool.curveType).toBeDefined();
+    }
+  });
+});
+

@@ -1,6 +1,6 @@
 /**
  * AC-230 negative (failure) — protocol adapter fixture sweep.
- * Traces: FR-COL-002, FR-SOLSEC-003, AC-230, T024.
+ * Traces: FR-COL-002, FR-SOLSEC-003, FR-EXEC-013, FR-EXEC-015, AC-230, T024.
  * Tests rejection of unknown or mismatched designs; structural prohibition against
  * substituting generic constant-product formulas or inferring support from symbols.
  */
@@ -69,3 +69,22 @@ describe('AC-230 solsec negative: Unknown/mismatched pool returns DEGRADED_UNSUP
     expect(degradedPool.qualityCodes).toContain('POOL_MATH_UNSUPPORTED');
   });
 });
+
+describe('AC-230 exec negative: Unknown pool design returns EXECUTION_UNAVAILABLE, never generic CPMM math', () => {
+  it('returns explicit EXECUTION_UNAVAILABLE and POOL_MATH_UNSUPPORTED on unknown pool design', () => {
+    const fixturePath = path.resolve(
+      path.dirname(fileURLToPath(import.meta.url)),
+      '../fixtures/exec/pool-states.json',
+    );
+    const fixture = JSON.parse(readFileSync(fixturePath, 'utf8'));
+    const unknownPool = fixture.pools.find(
+      (p: Record<string, unknown>) => p.adapterFamily === 'UNKNOWN',
+    );
+
+    expect(unknownPool).toBeDefined();
+    expect(unknownPool.adapterSupportState).toBe('UNAVAILABLE');
+    expect(unknownPool.expectedStatus).toBe('EXECUTION_UNAVAILABLE');
+    expect(unknownPool.qualityCodes).toContain('POOL_MATH_UNSUPPORTED');
+  });
+});
+

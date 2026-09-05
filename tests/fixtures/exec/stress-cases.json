@@ -1,0 +1,56 @@
+{
+  "$comment": "Stress scenario matrix and frozen replay reproduction vectors (FR-EXEC-010, FR-EXEC-012, FR-EXEC-017, AC-127, AC-235, §64.10).",
+  "stressMatrixCandidates": [
+    {
+      "candidateId": "cand_optimistic_only_fragile",
+      "name": "Candidate profitable only under zero delay and zero slippage",
+      "scenarioResults": {
+        "BASE_CASE": { "netRoi": 0.05, "tradableOutcome": "TRADABLE_SUCCESS" },
+        "P50_DELAY": { "netRoi": 0.005, "tradableOutcome": "TRADABLE_SUCCESS" },
+        "P90_DELAY": { "netRoi": -0.04, "tradableOutcome": "TRADABLE_FAILURE" },
+        "CONSERVATIVE_LATENCY_ADVERSE_SELECTION": { "netRoi": -0.12, "tradableOutcome": "TRADABLE_FAILURE" },
+        "LIQUIDITY_DRAWDOWN": { "netRoi": -0.15, "tradableOutcome": "TRADABLE_FAILURE" },
+        "FEE_VOLATILITY": { "netRoi": -0.03, "tradableOutcome": "TRADABLE_FAILURE" },
+        "ROUTE_DEGRADATION": { "netRoi": -0.08, "tradableOutcome": "TRADABLE_FAILURE" },
+        "FAILED_PARTIAL_FILL": { "netRoi": -0.06, "tradableOutcome": "TRADABLE_FAILURE" }
+      },
+      "conservativePass": false,
+      "confirmedOpportunityPermitted": false,
+      "untradableReason": "FAILS_CONSERVATIVE_STRESS_SCENARIOS"
+    },
+    {
+      "candidateId": "cand_robust_high_conviction",
+      "name": "Robust candidate profitable across all stress scenarios",
+      "scenarioResults": {
+        "BASE_CASE": { "netRoi": 0.45, "tradableOutcome": "TRADABLE_SUCCESS" },
+        "P50_DELAY": { "netRoi": 0.38, "tradableOutcome": "TRADABLE_SUCCESS" },
+        "P90_DELAY": { "netRoi": 0.25, "tradableOutcome": "TRADABLE_SUCCESS" },
+        "CONSERVATIVE_LATENCY_ADVERSE_SELECTION": { "netRoi": 0.15, "tradableOutcome": "TRADABLE_SUCCESS" },
+        "LIQUIDITY_DRAWDOWN": { "netRoi": 0.10, "tradableOutcome": "TRADABLE_SUCCESS" },
+        "FEE_VOLATILITY": { "netRoi": 0.22, "tradableOutcome": "TRADABLE_SUCCESS" },
+        "ROUTE_DEGRADATION": { "netRoi": 0.18, "tradableOutcome": "TRADABLE_SUCCESS" },
+        "FAILED_PARTIAL_FILL": { "netRoi": 0.12, "tradableOutcome": "TRADABLE_SUCCESS" }
+      },
+      "conservativePass": true,
+      "confirmedOpportunityPermitted": true
+    }
+  ],
+  "frozenReplayVectors": [
+    {
+      "manifestId": "replay_manifest_frozen_001",
+      "assumptionHash": "sha256:frozen_assumptions_v1_hash",
+      "codeVersions": {
+        "poolMath": "1.0.0",
+        "transferSemantics": "1.0.0",
+        "executionSimulator": "1.0.0"
+      },
+      "exactPayload": {
+        "candidateId": "cand_robust_high_conviction",
+        "scenarioKind": "CONSERVATIVE_LATENCY_ADVERSE_SELECTION"
+      },
+      "expectedOutcome": "TRADABLE_SUCCESS",
+      "expectedNetRoi": 0.15,
+      "isDeterministic": true
+    }
+  ]
+}

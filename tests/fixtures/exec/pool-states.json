@@ -1,0 +1,195 @@
+{
+  "$comment": "Decoded pool states across all adapter families and incomplete-state cases (§64.3, §64.4, FR-EXEC-013, FR-EXEC-015, FR-EXEC-020, AC-230, AC-232).",
+  "pools": [
+    {
+      "poolId": "solana:5eykt4UsFv8P8NJdTREpY1vzqKqZKvdp/pool/RaydiumCpmmVerified11111111111111111111",
+      "programId": "CPMMoo8L3F4NbTegBCKVNunggL7H1ZpdTHKxQB5qKP1C",
+      "programVersion": "1.0.0",
+      "accountLayoutVersion": "1.0.0",
+      "curveType": "CONSTANT_PRODUCT",
+      "adapterFamily": "CONSTANT_PRODUCT_AMM",
+      "adapterSupportState": "AVAILABLE",
+      "stateCompleteness": "COMPLETE",
+      "state": {
+        "reserveA": "1000000000000",
+        "reserveB": "25000000000000",
+        "feeBps": 25,
+        "tokenAMint": "So11111111111111111111111111111111111111112",
+        "tokenBMint": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+        "vaultA": "VaultAccountA11111111111111111111111111111111",
+        "vaultB": "VaultAccountB11111111111111111111111111111111"
+      }
+    },
+    {
+      "poolId": "solana:5eykt4UsFv8P8NJdTREpY1vzqKqZKvdp/pool/OrcaWhirlpoolClmm1111111111111111111111",
+      "programId": "whirLbMiicVdio4qvUfM5KAg6Ct8VwpYzGff3uctyCc",
+      "programVersion": "1.0.0",
+      "accountLayoutVersion": "1.0.0",
+      "curveType": "CONCENTRATED_LIQUIDITY",
+      "adapterFamily": "CONCENTRATED_LIQUIDITY_AMM",
+      "adapterSupportState": "AVAILABLE",
+      "stateCompleteness": "COMPLETE",
+      "state": {
+        "sqrtPrice": "79228162514264337593543950336",
+        "liquidity": "50000000000000000",
+        "currentTick": -23040,
+        "tickSpacing": 64,
+        "feeRate": 3000,
+        "ticks": [
+          { "index": -23104, "liquidityGross": "25000000000000000", "liquidityNet": "25000000000000000" },
+          { "index": -22976, "liquidityGross": "25000000000000000", "liquidityNet": "-25000000000000000" }
+        ]
+      }
+    },
+    {
+      "poolId": "solana:5eykt4UsFv8P8NJdTREpY1vzqKqZKvdp/pool/MeteoraDlmmBins11111111111111111111111",
+      "programId": "LBUZKhRxPF3XUpBCjp4YzTKgLccjZhTSDM9YuVaPwxo",
+      "programVersion": "1.1.0",
+      "accountLayoutVersion": "1.0.0",
+      "curveType": "DISCRETE_LIQUIDITY_BIN",
+      "adapterFamily": "DISCRETE_LIQUIDITY_BIN_AMM",
+      "adapterSupportState": "AVAILABLE",
+      "stateCompleteness": "COMPLETE",
+      "state": {
+        "activeId": 1200,
+        "binStep": 10,
+        "baseFeeBps": 15,
+        "binArrays": [
+          { "index": 0, "bins": [{ "binId": 1200, "amountX": "100000000", "amountY": "2500000000" }] }
+        ]
+      }
+    },
+    {
+      "poolId": "solana:5eykt4UsFv8P8NJdTREpY1vzqKqZKvdp/pool/PumpFunBondingCurve11111111111111111111",
+      "programId": "6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P",
+      "programVersion": "1.0.0",
+      "accountLayoutVersion": "1.0.0",
+      "curveType": "BONDING_CURVE",
+      "adapterFamily": "BONDING_CURVE",
+      "adapterSupportState": "AVAILABLE",
+      "stateCompleteness": "COMPLETE",
+      "state": {
+        "virtualTokenReserves": "1073000000000000",
+        "virtualSolReserves": "30000000000",
+        "realTokenReserves": "793100000000000",
+        "realSolReserves": "0",
+        "tokenTotalSupply": "1000000000000000",
+        "complete": false
+      }
+    },
+    {
+      "poolId": "solana:5eykt4UsFv8P8NJdTREpY1vzqKqZKvdp/pool/RaydiumStableCurve111111111111111111111",
+      "programId": "5quBtoiQq8rwRtFsSyPBb91SJF8RdBdMpQuqRxobm212",
+      "programVersion": "1.0.0",
+      "accountLayoutVersion": "1.0.0",
+      "curveType": "STABLE_SWAP",
+      "adapterFamily": "STABLE_CURVE",
+      "adapterSupportState": "AVAILABLE",
+      "stateCompleteness": "COMPLETE",
+      "state": {
+        "reserveA": "50000000000000",
+        "reserveB": "50000000000000",
+        "ampFactor": 100,
+        "feeBps": 4
+      }
+    },
+    {
+      "poolId": "solana:5eykt4UsFv8P8NJdTREpY1vzqKqZKvdp/pool/MeteoraDynamicFeeAmm1111111111111111111",
+      "programId": "Eo7WjKq67rjJQSZxS6z3YkapzY3eMj6Xy8VD5EQgnGwU",
+      "programVersion": "1.0.0",
+      "accountLayoutVersion": "1.0.0",
+      "curveType": "DYNAMIC_FEE",
+      "adapterFamily": "DYNAMIC_FEE_AMM",
+      "adapterSupportState": "AVAILABLE",
+      "stateCompleteness": "COMPLETE",
+      "state": {
+        "reserveA": "2000000000000",
+        "reserveB": "40000000000000",
+        "baseFeeBps": 20,
+        "dynamicFeeState": { "volatilityAccumulator": 140, "variableFeeBps": 30 }
+      }
+    },
+    {
+      "poolId": "solana:5eykt4UsFv8P8NJdTREpY1vzqKqZKvdp/pool/VirtualReserveAMM1111111111111111111111",
+      "programId": "VIRTUAL111111111111111111111111111111111111",
+      "programVersion": "1.0.0",
+      "accountLayoutVersion": "1.0.0",
+      "curveType": "VIRTUAL_RESERVE",
+      "adapterFamily": "VIRTUAL_RESERVE",
+      "adapterSupportState": "AVAILABLE",
+      "stateCompleteness": "COMPLETE",
+      "state": {
+        "virtualQuoteReserve": "50000000000",
+        "virtualBaseReserve": "1000000000000000"
+      }
+    },
+    {
+      "poolId": "solana:5eykt4UsFv8P8NJdTREpY1vzqKqZKvdp/pool/UnknownDesignDex11111111111111111111111",
+      "programId": "UnknownDexProgram111111111111111111111111111",
+      "programVersion": "0.1.0",
+      "accountLayoutVersion": "unknown",
+      "curveType": "CUSTOM_PROPRIETARY",
+      "adapterFamily": "UNKNOWN",
+      "adapterSupportState": "UNAVAILABLE",
+      "stateCompleteness": "INCOMPLETE_BLOCKING",
+      "expectedStatus": "EXECUTION_UNAVAILABLE",
+      "qualityCodes": ["POOL_MATH_UNSUPPORTED"],
+      "state": {}
+    },
+    {
+      "poolId": "solana:5eykt4UsFv8P8NJdTREpY1vzqKqZKvdp/pool/OrcaWhirlpoolMissingTicks1111111111111",
+      "programId": "whirLbMiicVdio4qvUfM5KAg6Ct8VwpYzGff3uctyCc",
+      "programVersion": "1.0.0",
+      "accountLayoutVersion": "1.0.0",
+      "curveType": "CONCENTRATED_LIQUIDITY",
+      "adapterFamily": "CONCENTRATED_LIQUIDITY_AMM",
+      "adapterSupportState": "AVAILABLE",
+      "stateCompleteness": "INCOMPLETE_BLOCKING",
+      "missingField": "ticks",
+      "qualityCodes": ["PARTIAL", "ESTIMATED"],
+      "state": {
+        "sqrtPrice": "79228162514264337593543950336",
+        "liquidity": "50000000000000000",
+        "currentTick": -23040,
+        "tickSpacing": 64,
+        "feeRate": 3000,
+        "ticks": null
+      }
+    },
+    {
+      "poolId": "solana:5eykt4UsFv8P8NJdTREpY1vzqKqZKvdp/pool/MeteoraDlmmMissingBinArrays11111111111",
+      "programId": "LBUZKhRxPF3XUpBCjp4YzTKgLccjZhTSDM9YuVaPwxo",
+      "programVersion": "1.1.0",
+      "accountLayoutVersion": "1.0.0",
+      "curveType": "DISCRETE_LIQUIDITY_BIN",
+      "adapterFamily": "DISCRETE_LIQUIDITY_BIN_AMM",
+      "adapterSupportState": "AVAILABLE",
+      "stateCompleteness": "INCOMPLETE_BLOCKING",
+      "missingField": "binArrays",
+      "qualityCodes": ["PARTIAL"],
+      "state": {
+        "activeId": 1200,
+        "binStep": 10,
+        "baseFeeBps": 15,
+        "binArrays": []
+      }
+    },
+    {
+      "poolId": "solana:5eykt4UsFv8P8NJdTREpY1vzqKqZKvdp/pool/RaydiumCpmmMissingVaultState1111111111",
+      "programId": "CPMMoo8L3F4NbTegBCKVNunggL7H1ZpdTHKxQB5qKP1C",
+      "programVersion": "1.0.0",
+      "accountLayoutVersion": "1.0.0",
+      "curveType": "CONSTANT_PRODUCT",
+      "adapterFamily": "CONSTANT_PRODUCT_AMM",
+      "adapterSupportState": "AVAILABLE",
+      "stateCompleteness": "INCOMPLETE_BLOCKING",
+      "missingField": "vaultA_account_data",
+      "qualityCodes": ["GAP_AFFECTED"],
+      "state": {
+        "reserveA": null,
+        "reserveB": "25000000000000",
+        "feeBps": 25
+      }
+    }
+  ]
+}

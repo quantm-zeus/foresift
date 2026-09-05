@@ -1,0 +1,140 @@
+{
+  "$comment": "Execution scenario vectors, delay policies, and pass matrices (§64.2, §64.8, §64.10, FR-EXEC-001, FR-EXEC-002, FR-EXEC-017, AC-235).",
+  "scenarios": [
+    {
+      "scenarioId": "scen_base_reference",
+      "name": "Base reference execution (zero synthetic delay / contemporaneous state)",
+      "scenarioKind": "BASE_CASE",
+      "delayMs": 0,
+      "delaySlots": 0,
+      "adverseSelectionBps": 0,
+      "liquidityDrawdownFraction": 0.0,
+      "feeVolatilityMultiplier": 1.0,
+      "partialFillAllowed": false,
+      "conservativeStress": false
+    },
+    {
+      "scenarioId": "scen_p50_delay",
+      "name": "Median network delay execution (p50 empirical measurement)",
+      "scenarioKind": "P50_DELAY",
+      "delayMs": 400,
+      "delaySlots": 1,
+      "adverseSelectionBps": 10,
+      "liquidityDrawdownFraction": 0.05,
+      "feeVolatilityMultiplier": 1.0,
+      "partialFillAllowed": true,
+      "conservativeStress": false
+    },
+    {
+      "scenarioId": "scen_p90_delay",
+      "name": "Tail network delay execution (p90 empirical measurement)",
+      "scenarioKind": "P90_DELAY",
+      "delayMs": 1200,
+      "delaySlots": 3,
+      "adverseSelectionBps": 35,
+      "liquidityDrawdownFraction": 0.15,
+      "feeVolatilityMultiplier": 1.5,
+      "partialFillAllowed": true,
+      "conservativeStress": false
+    },
+    {
+      "scenarioId": "scen_conservative_stress",
+      "name": "Conservative latency & adverse selection stress case",
+      "scenarioKind": "CONSERVATIVE_LATENCY_ADVERSE_SELECTION",
+      "delayMs": 2000,
+      "delaySlots": 5,
+      "adverseSelectionBps": 75,
+      "liquidityDrawdownFraction": 0.25,
+      "feeVolatilityMultiplier": 2.0,
+      "partialFillAllowed": true,
+      "conservativeStress": true
+    },
+    {
+      "scenarioId": "scen_liquidity_drawdown",
+      "name": "Severe liquidity drawdown stress case (35% depth removal)",
+      "scenarioKind": "LIQUIDITY_DRAWDOWN",
+      "delayMs": 800,
+      "delaySlots": 2,
+      "adverseSelectionBps": 50,
+      "liquidityDrawdownFraction": 0.35,
+      "feeVolatilityMultiplier": 1.2,
+      "partialFillAllowed": true,
+      "conservativeStress": true
+    },
+    {
+      "scenarioId": "scen_fee_volatility",
+      "name": "Extreme priority fee surge and congestion stress case",
+      "scenarioKind": "FEE_VOLATILITY",
+      "delayMs": 1500,
+      "delaySlots": 4,
+      "adverseSelectionBps": 30,
+      "liquidityDrawdownFraction": 0.1,
+      "feeVolatilityMultiplier": 4.0,
+      "partialFillAllowed": true,
+      "conservativeStress": true
+    },
+    {
+      "scenarioId": "scen_route_degradation",
+      "name": "Route degradation with primary hop unavailable",
+      "scenarioKind": "ROUTE_DEGRADATION",
+      "delayMs": 1000,
+      "delaySlots": 2,
+      "adverseSelectionBps": 60,
+      "liquidityDrawdownFraction": 0.2,
+      "feeVolatilityMultiplier": 1.5,
+      "partialFillAllowed": true,
+      "conservativeStress": true
+    },
+    {
+      "scenarioId": "scen_failed_partial_fill",
+      "name": "Partial fill rejection scenario with capped residual fill",
+      "scenarioKind": "FAILED_PARTIAL_FILL",
+      "delayMs": 600,
+      "delaySlots": 1,
+      "adverseSelectionBps": 20,
+      "liquidityDrawdownFraction": 0.1,
+      "feeVolatilityMultiplier": 1.0,
+      "maxFillFraction": 0.6,
+      "partialFillAllowed": true,
+      "conservativeStress": true
+    }
+  ],
+  "profiles": [
+    {
+      "profileId": "CONFIRMED_OPPORTUNITY_DEFAULT",
+      "triggerClass": "CONFIRMED_OPPORTUNITY",
+      "requiredPassMatrix": [
+        "BASE_CASE",
+        "P50_DELAY",
+        "CONSERVATIVE_LATENCY_ADVERSE_SELECTION"
+      ],
+      "conservativeDefaultEnforced": true,
+      "maxAllowedUncertaintyScore": 0.05
+    },
+    {
+      "profileId": "EARLY_WATCH_EXPLORATORY",
+      "triggerClass": "EARLY_WATCH",
+      "requiredPassMatrix": [
+        "BASE_CASE"
+      ],
+      "conservativeDefaultEnforced": false,
+      "maxAllowedUncertaintyScore": 0.20
+    },
+    {
+      "profileId": "DEEP_RESEARCH_STRESS_ALL",
+      "triggerClass": "DEEP_RESEARCH",
+      "requiredPassMatrix": [
+        "BASE_CASE",
+        "P50_DELAY",
+        "P90_DELAY",
+        "CONSERVATIVE_LATENCY_ADVERSE_SELECTION",
+        "LIQUIDITY_DRAWDOWN",
+        "FEE_VOLATILITY",
+        "ROUTE_DEGRADATION",
+        "FAILED_PARTIAL_FILL"
+      ],
+      "conservativeDefaultEnforced": true,
+      "maxAllowedUncertaintyScore": 0.02
+    }
+  ]
+}

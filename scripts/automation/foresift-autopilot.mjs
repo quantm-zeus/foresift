@@ -58,6 +58,7 @@ import {
   readdirSync,
   renameSync,
   rmSync,
+  statSync,
   writeFileSync,
   unlinkSync,
 } from 'node:fs';
@@ -1281,6 +1282,7 @@ function planningBootstrapHandoff(st, entry, get) {
     awaitingDiscovery: !runId,
     discoveryAttempts: 0,
     executionProfile,
+    logPath: ack?.logPath ?? null,
   });
   if (runId) {
     // Mirror selectAndLaunch's durable-association discipline: RUNNING was
@@ -1510,6 +1512,32 @@ async function actOnEntry(st, entry) {
     entry.activityTsUnparsable = false;
     const activityMs = now() - lastActivity;
     if (Number.isNaN(activityMs) || activityMs > STALE_RUN_MS) {
+      // Stale BOOKKEEPING is not stale WORK: the runs-row timestamp is
+      // launch-frozen during detached bash nodes (0eaa1e85, d32ff2cb,
+      // 1c294b3c), and a sharded wave legitimately runs many 50-90 minute
+      // lanes back-to-back. Before abandoning a run whose timestamps froze,
+      // consult its detached-run log — the DAG executor writes a line for
+      // every node start/complete, so log mtime is the run's real pulse.
+      // Fail-closed: a silent log (or an unreadable one) keeps the original
+      // abandon behavior; only VERIFIABLE growth stays the hand.
+      const logCheck = detachedRunLogFreshness({
+        logPath: entry.logPath ?? null,
+        startedAt: normalizeTimestampMs(entry.startedAt) ?? 0,
+        logBornAfter: (normalizeTimestampMs(entry.startedAt) ?? 0) - 2 * 60_000,
+        windowMs: STALE_RUN_MS,
+      });
+      if (logCheck.fresh) {
+        if (!entry.logLivenessRecorded) {
+          entry.logLivenessRecorded = true;
+          record(st, 'stale_run_bookkeeping_but_log_active', {
+            runId: entry.runId,
+            branch: entry.branch,
+            idleMinutes: Math.round(activityMs / 60000),
+            logPath: logCheck.logPath,
+          });
+        }
+        return false; // alive by product activity — keep waiting
+      }
       // Orphaned: preserve worktree/git state; use supported lifecycle ops only.
       archonJson(`workflow abandon ${entry.runId} --json`);
       entry.failureClass = 'UNKNOWN';
@@ -1518,6 +1546,8 @@ async function actOnEntry(st, entry) {
       record(st, 'stale_run_abandoned_restart_scheduled', {
         branch: entry.branch,
         idleMinutes: Math.round(activityMs / 60000),
+        logPath: entry.logPath ?? logCheck.logPath ?? null,
+        logError: logCheck.error ?? null,
       });
       return false;
     }
@@ -1757,6 +1787,58 @@ export function findProvenLandingReceipt(receipts, packageId) {
       r?.toStatus === 'PROVEN' &&
       (r?.status === 'MERGED' || !TERMINAL_RECEIPT_STATUSES.has(r?.status)),
   );
+}
+
+// Archon's detached-run log directory; every `workflow run --detach` streams
+// its DAG executor output (one line per node start/complete) here.
+const ARCHON_LOGS_DIR = `${process.env.HOME ?? ''}/.archon/logs`;
+
+/**
+ * Wave liveness from detached-run LOG freshness (incidents 2026-09-05, runs
+ * d32ff2cb and 1c294b3c): archon's runs-row last_activity_at stays
+ * LAUNCH-FROZEN during detached bash-node execution, while a sharded wave
+ * legitimately runs many 50-90 minute lanes back-to-back — so the
+ * STALE_RUN_MS ceiling, sized for ONE 2h node, fired at exactly 3h after
+ * launch and abandoned fully-productive waves twice in one day. The DAG
+ * executor writes its log continuously, so log mtime is the run's real pulse.
+ *
+ * Returns { fresh, logPath?, error? }:
+ *   - fresh=true  => the run has verifiable product activity; NOT stale.
+ *   - fresh=false => no liveness opinion (absent/stale/error) — callers keep
+ *     whatever fail-closed behavior they had (abandon on frozen bookkeeping).
+ * statOverride is a test seam (production uses fs.statSync).
+ */
+export function detachedRunLogFreshness({
+  logsDir = ARCHON_LOGS_DIR,
+  logPath = null,
+  startedAt = 0,
+  windowMs,
+  logBornAfter = Math.max(startedAt - 2 * 60_000, 0),
+  statOverride = null,
+}) {
+  const freshInWindow = (st) => Date.now() - st.mtimeMs <= windowMs;
+  try {
+    if (logPath) {
+      const st = statOverride
+        ? statOverride(logPath)
+        : statSync(logPath, { throwIfNoEntry: false });
+      if (st) return { fresh: freshInWindow(st), logPath };
+      // Captured path missing (rotated/cleaned): fall through to discovery.
+    }
+    if (!existsSync(logsDir)) return { fresh: false };
+    for (const name of readdirSync(logsDir)) {
+      if (!name.startsWith('detached-run-') || !name.endsWith('.log')) continue;
+      const candidate = join(logsDir, name);
+      const st = statOverride
+        ? statOverride(candidate)
+        : statSync(candidate, { throwIfNoEntry: false });
+      if (!st || st.birthtimeMs < logBornAfter || !freshInWindow(st)) continue;
+      return { fresh: true, logPath: candidate };
+    }
+    return { fresh: false };
+  } catch (err) {
+    return { fresh: false, error: String(err?.message ?? err).slice(0, 120) };
+  }
 }
 
 /**
@@ -2337,6 +2419,10 @@ async function selectAndLaunch(st) {
       discoveryAttempts: 0,
       executionProfile,
       providers: admission.providers,
+      // Detached-run log path (from the ack): the run's real liveness pulse —
+      // consulted before any stale-run abandon (runs-row timestamps are
+      // launch-frozen during detached bash nodes).
+      logPath: ack?.logPath ?? null,
     });
     if (runId) {
       // Durable run id already in hand → RUNNING now; otherwise it is flipped

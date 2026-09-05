@@ -135,3 +135,24 @@ export declare function reconcileStrandedPackages(
   st: Record<string, unknown>,
   deps?: StrandedDeps,
 ): void;
+
+/** Detached-run log freshness verdict: verifiable liveness pulse for a wave run. */
+export interface DetachedRunLogFreshness {
+  fresh: boolean;
+  logPath?: string | null;
+  error?: string;
+}
+
+/**
+ * Wave liveness from detached-run log mtime (DAG executor writes a line per
+ * node start/complete). fresh=false means no opinion — callers keep their
+ * fail-closed behavior. See detachedRunLogFreshness in foresift-autopilot.mjs.
+ */
+export declare function detachedRunLogFreshness(input: {
+  logsDir?: string;
+  logPath?: string | null;
+  startedAt?: number;
+  windowMs: number;
+  logBornAfter?: number;
+  statOverride?: ((path: string) => { mtimeMs: number; birthtimeMs: number }) | null;
+}): DetachedRunLogFreshness;

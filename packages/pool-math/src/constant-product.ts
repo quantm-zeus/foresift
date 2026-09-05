@@ -10,7 +10,7 @@
  * Traces: FR-EXEC-002, FR-EXEC-013, FR-EXEC-015, FR-EXEC-016, AC-230, AC-231.
  */
 import { AdapterFamily } from '@foresift/domain';
-import {
+import type {
   AccountRequirement,
   CoverageAssessment,
   DecodedPoolState,

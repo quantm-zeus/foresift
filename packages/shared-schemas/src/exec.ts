@@ -47,7 +47,9 @@ export const EXEC_SCHEMA_REGISTRY_VERSION = 1;
 
 const nonEmptyId = z.string().min(1);
 
-export const Sha256RefSchema = z
+/** Module-private: `solsec.ts` exports the same-named contract; keep the
+ * exec boundary self-contained without an ambiguous barrel re-export. */
+const Sha256RefSchema = z
   .string()
   .regex(/^sha256:[0-9a-f]{64}$/, 'expected sha256:<64 lowercase hex characters>');
 
@@ -591,10 +593,14 @@ export const ConcurrentShadowAggregateSchema = z
   })
   .strict()
   .refine(
-    (value) =>
-      BigInt(value.aggregatedRequestedExitsUsd.split('.')[0]) <=
-        BigInt(value.preExitDepthUsd.split('.')[0]) ||
-      value.aggregatedFillFraction < 1,
+    (value) => {
+      const requestedIntegerPart = value.aggregatedRequestedExitsUsd.split('.')[0] ?? '0';
+      const depthIntegerPart = value.preExitDepthUsd.split('.')[0] ?? '0';
+      return (
+        BigInt(requestedIntegerPart) <= BigInt(depthIntegerPart) ||
+        value.aggregatedFillFraction < 1
+      );
+    },
     { message: 'aggregate impact and fill competition reduce or reject fills deterministically' },
   );
 export type ConcurrentShadowAggregate = z.infer<typeof ConcurrentShadowAggregateSchema>;

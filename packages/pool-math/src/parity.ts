@@ -4,10 +4,9 @@
  * to DEGRADED and opens an incident (FR-EXEC-021). Tolerance is
  * version-specific and predeclared — never chosen after observing output.
  */
-import type { QuoteResult } from '@foresift/program-decoders';
 import { detectUpgradeChange } from '@foresift/program-decoders';
 import { AdapterSupportState } from '@foresift/domain';
-import type { PoolMathAdapter } from './adapter-contract.ts';
+import type { PoolMathAdapter, QuoteResult } from './adapter-contract.ts';
 
 export { detectUpgradeChange };
 

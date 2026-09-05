@@ -174,7 +174,7 @@ export class TransferSemanticsAdapter {
       verdictPolicyVersion: this.verdictPolicyVersion,
       observedAt: input.observedAt,
       availableAt: input.availableAt,
-      policies: this.policies.length > 0 ? this.policies : undefined,
+      ...(this.policies.length > 0 ? { policies: this.policies } : {}),
     });
   }
 }
@@ -300,9 +300,11 @@ export function evaluateFillTransferCosts(
     inTokenTransferFee: input.inTokenTransferFee,
     outTokenTransferFee: input.outTokenTransferFee,
     extensionEvidence: [...inRows, ...outRows],
-    accountCreations: input.accountCreations,
-    hookCostRaw: input.hookCostRaw,
-    aggregatorFeeRaw: input.aggregatorFeeRaw,
+    ...(input.accountCreations !== undefined ? { accountCreations: input.accountCreations } : {}),
+    ...(input.hookCostRaw !== undefined ? { hookCostRaw: input.hookCostRaw } : {}),
+    ...(input.aggregatorFeeRaw !== undefined
+      ? { aggregatorFeeRaw: input.aggregatorFeeRaw }
+      : {}),
   });
   if (!result.sufficientData) {
     return {

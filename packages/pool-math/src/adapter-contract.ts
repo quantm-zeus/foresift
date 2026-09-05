@@ -24,7 +24,7 @@ export interface RawAccountStateBundle {
   readonly programVersion: string;
   readonly accountLayoutVersion: string;
   readonly slot: string;
-  readonly accounts: readonly {
+  readonly accounts: {
     readonly owner: string;
     readonly layoutFamily: string;
     readonly dataHash: string;

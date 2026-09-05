@@ -1,0 +1,25 @@
+{
+  "name": "@foresift/execution-simulator",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Read-only execution-aware simulation: scenarios, entry/exit modeling, net return, tradability gates — never transaction construction.",
+  "exports": {
+    ".": {
+      "types": "./src/index.ts",
+      "default": "./src/index.ts"
+    }
+  },
+  "scripts": {
+    "test": "bun test"
+  },
+  "dependencies": {
+    "@foresift/domain": "workspace:*",
+    "@foresift/persistence": "workspace:*",
+    "@foresift/pool-math": "workspace:*",
+    "@foresift/program-decoders": "workspace:*",
+    "@foresift/shared-schemas": "workspace:*",
+    "@foresift/solana-security": "workspace:*",
+    "@foresift/transfer-semantics": "workspace:*"
+  }
+}

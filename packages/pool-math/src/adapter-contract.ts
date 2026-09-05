@@ -24,11 +24,11 @@ export interface RawAccountStateBundle {
   readonly programVersion: string;
   readonly accountLayoutVersion: string;
   readonly slot: string;
-  readonly accounts: readonly {
+  readonly accounts: Readonly<{
     readonly owner: string;
     readonly layoutFamily: string;
     readonly dataHash: string;
-  };
+  }>;
 }
 
 /** Decoded, versioned pool state handed to adapters and completeness checks. */

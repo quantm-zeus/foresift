@@ -10,7 +10,8 @@
 import { AdapterSupportState, ExecErrorCode, ExecVocabularyError } from '@foresift/domain';
 import type { ProgramSupportManifest } from '@foresift/shared-schemas';
 import type { PoolMathAdapter } from './adapter-contract.ts';
-import { AdapterBinding, PoolMathAdapterRegistry } from './adapter-contract.ts';
+import type { AdapterBinding } from './adapter-contract.ts';
+import { PoolMathAdapterRegistry } from './adapter-contract.ts';
 
 export function buildAdapterRegistry(
   bindings: readonly {

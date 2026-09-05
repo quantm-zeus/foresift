@@ -21,9 +21,8 @@ import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-const { reconcileStrandedPackages, findProvenLandingReceipt } = await import(
-  '../../scripts/automation/foresift-autopilot.mjs'
-);
+const { reconcileStrandedPackages, findProvenLandingReceipt } =
+  await import('../../scripts/automation/foresift-autopilot.mjs');
 
 interface ProvenLandingReceipt {
   transitionId?: string;
@@ -44,7 +43,9 @@ interface StrandedDeps {
 
 const FIXTURES = mkdtempSync(join(tmpdir(), 'stranded-race-'));
 
-function milestoneState(overrides: { a?: Record<string, unknown>; b?: Record<string, unknown> } = {}) {
+function milestoneState(
+  overrides: { a?: Record<string, unknown>; b?: Record<string, unknown> } = {},
+) {
   return {
     schemaVersion: '1.0.0',
     milestoneId: 'G1',
@@ -98,7 +99,11 @@ function supervisorState(): SupervisorState {
 
 // The autopilot's record() pushes {event, ts}; the test state records into a
 // plain array for assertions.
-function record(st: { events: Array<Record<string, unknown>> }, event: string, detail: Record<string, unknown> = {}) {
+function record(
+  st: { events: Array<Record<string, unknown>> },
+  event: string,
+  detail: Record<string, unknown> = {},
+) {
   st.events.push({ event, ...detail });
 }
 

@@ -1,0 +1,23 @@
+{
+  "name": "@foresift/transfer-semantics",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Versioned transfer-semantics adapters: transfer fees, hooks, account creation/rent — zero cost is never assumed.",
+  "exports": {
+    ".": {
+      "types": "./src/index.ts",
+      "default": "./src/index.ts"
+    }
+  },
+  "scripts": {
+    "test": "bun test"
+  },
+  "dependencies": {
+    "@foresift/domain": "workspace:*",
+    "@foresift/persistence": "workspace:*",
+    "@foresift/program-decoders": "workspace:*",
+    "@foresift/shared-schemas": "workspace:*",
+    "@foresift/solana-security": "workspace:*"
+  }
+}

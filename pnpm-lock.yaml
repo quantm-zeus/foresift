@@ -407,6 +407,60 @@ importers:
         specifier: workspace:*
         version: link:../shared-schemas
 
+  packages/pool-math:
+    dependencies:
+      '@foresift/domain':
+        specifier: workspace:*
+        version: link:../domain
+      '@foresift/persistence':
+        specifier: workspace:*
+        version: link:../persistence
+      '@foresift/program-decoders':
+        specifier: workspace:*
+        version: link:../program-decoders
+      '@foresift/shared-schemas':
+        specifier: workspace:*
+        version: link:../shared-schemas
+      '@foresift/solana-security':
+        specifier: workspace:*
+        version: link:../solana-security
+
+  packages/transfer-semantics:
+    dependencies:
+      '@foresift/domain':
+        specifier: workspace:*
+        version: link:../domain
+      '@foresift/persistence':
+        specifier: workspace:*
+        version: link:../persistence
+      '@foresift/program-decoders':
+        specifier: workspace:*
+        version: link:../program-decoders
+      '@foresift/shared-schemas':
+        specifier: workspace:*
+        version: link:../shared-schemas
+      '@foresift/solana-security':
+        specifier: workspace:*
+        version: link:../solana-security
+
+  packages/execution-simulator:
+    dependencies:
+      '@foresift/domain':
+        specifier: workspace:*
+        version: link:../domain
+      '@foresift/persistence':
+        specifier: workspace:*
+        version: link:../persistence
+      '@foresift/shared-schemas':
+        specifier: workspace:*
+        version: link:../shared-schemas
+      '@foresift/pool-math':
+        specifier: workspace:*
+        version: link:../pool-math
+      '@foresift/transfer-semantics':
+        specifier: workspace:*
+        version: link:../transfer-semantics
+
   packages/supply-confidence:
     dependencies:
       '@foresift/domain':

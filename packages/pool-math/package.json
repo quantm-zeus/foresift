@@ -1,0 +1,23 @@
+{
+  "name": "@foresift/pool-math",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Versioned pool-math adapters and fail-closed registry for the execution-aware tradability engine.",
+  "exports": {
+    ".": {
+      "types": "./src/index.ts",
+      "default": "./src/index.ts"
+    }
+  },
+  "scripts": {
+    "test": "bun test"
+  },
+  "dependencies": {
+    "@foresift/domain": "workspace:*",
+    "@foresift/persistence": "workspace:*",
+    "@foresift/program-decoders": "workspace:*",
+    "@foresift/shared-schemas": "workspace:*",
+    "@foresift/solana-security": "workspace:*"
+  }
+}

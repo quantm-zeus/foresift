@@ -200,7 +200,7 @@
         "test -d packages/pool-math && pnpm --filter @foresift/pool-math test",
         "test -d packages/transfer-semantics && pnpm --filter @foresift/transfer-semantics test"
       ],
-      "status": "RUNNING"
+      "status": "PENDING"
     },
     {
       "id": "g1-signal-registry",

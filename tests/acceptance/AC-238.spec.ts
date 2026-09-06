@@ -1,6 +1,6 @@
 /**
  * AC-238 acceptance (positive) — coarse candle ordering ambiguity & adverse feasible primary (§64.7).
- * Traces: FR-EXEC-002, FR-EXEC-018, AC-238.
+ * Traces: FR-EXEC-002, FR-EXEC-018, AC-238, T041.
  * AC text: "A coarse price candle whose target and invalidation are both reachable yields
  * the adverse feasible primary ordering and a path-ambiguity flag, with the optimistic ordering secondary only."
  */

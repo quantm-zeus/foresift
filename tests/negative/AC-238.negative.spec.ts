@@ -1,6 +1,6 @@
 /**
  * AC-238 negative (failure) — optimistic primary ordering under coarse ambiguity is refused.
- * Traces: FR-EXEC-002, FR-EXEC-018, AC-238.
+ * Traces: FR-EXEC-002, FR-EXEC-018, AC-238, T041.
  * Refusal: Setting primary ordering to OPTIMISTIC when both target and invalidation are reachable within coarse candle bounds,
  * or failing to flag path ambiguity, is refused.
  */

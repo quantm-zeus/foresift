@@ -1,6 +1,6 @@
 /**
  * AC-127 acceptance (positive) — stress scenario enforcement and frozen replay reproduction (FR-EXEC-010, FR-EXEC-012, FR-EXEC-017).
- * Traces: FR-EXEC-010, FR-EXEC-012, FR-EXEC-017, AC-127.
+ * Traces: FR-EXEC-010, FR-EXEC-012, FR-EXEC-017, AC-127, T035.
  * AC text: "A candidate profitable only under the optimistic case fails a profile requiring
  * the conservative stress scenario, and stress assumptions reproduce in frozen replay."
  */

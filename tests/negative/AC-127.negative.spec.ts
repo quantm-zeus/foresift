@@ -1,6 +1,6 @@
 /**
  * AC-127 negative (failure) — optimistic-only passing refused & mutated replay reproduction failure.
- * Traces: FR-EXEC-010, FR-EXEC-012, FR-EXEC-017, AC-127.
+ * Traces: FR-EXEC-010, FR-EXEC-012, FR-EXEC-017, AC-127, T035.
  * Refusal: Permitting a candidate to pass a conservative profile when failing stress scenarios is refused;
  * replay with mutated assumption hash fails reproduction verification.
  */

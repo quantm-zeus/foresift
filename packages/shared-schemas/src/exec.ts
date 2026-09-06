@@ -261,6 +261,13 @@ export const ReplayManifestSchema = z
     artifactIds: z.array(nonEmptyId),
     holdoutExposureSnapshotId: nonEmptyId,
     codeAndDependencyHash: ExecSha256RefSchema,
+    /**
+     * FR-EXEC-010/AC-127: sha256 over the canonical frozen assumption set
+     * (pre-registered scenario payloads, policy versions). Optional at the
+     * boundary for manifests frozen before hash recording; a frozen replay
+     * that carries one verifies assumption equality, not just version lists.
+     */
+    assumptionsHash: ExecSha256RefSchema.optional(),
   })
   .strict();
 export type ReplayManifest = z.infer<typeof ReplayManifestSchema>;

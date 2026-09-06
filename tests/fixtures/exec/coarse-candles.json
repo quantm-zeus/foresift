@@ -1,5 +1,5 @@
 {
-  "$comment": "Coarse candle target/invalidation ordering ambiguity vectors (FR-EXEC-002, FR-EXEC-018, AC-238, §64.7).",
+  "$comment": "Coarse candle target/invalidation ordering ambiguity vectors (FR-EXEC-002, FR-EXEC-018, AC-238, §64.7, T025).",
   "candles": [
     {
       "candleId": "candle_ambiguous_both_touched",

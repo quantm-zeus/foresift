@@ -1,5 +1,5 @@
 {
-  "$comment": "Target touch and resolution floor vectors (FR-EXEC-004, FR-EXEC-011, AC-122, AC-126, §64.13, §64.14).",
+  "$comment": "Target touch and resolution floor vectors (FR-EXEC-004, FR-EXEC-011, AC-122, AC-126, §64.13, §64.14, T025).",
   "cases": [
     {
       "caseId": "target_touch_isolated_wick",

@@ -248,7 +248,12 @@ export function buildScenarioPassMatrix(input: BuildMatrixInput): BuildMatrixRes
     });
   }
 
-  const missingKinds = requiredKinds.filter((kind) => !seenKinds.has(kind));
+  // FR-EXEC-017 evaluation floor: production tradability EVALUATES all eight
+  // scenario kinds — the profile only declares which must pass. A candidate
+  // whose recorded set omits any kind (including unrequired ones) never
+  // satisfies the matrix; optimistic-only promotion cannot hide behind a
+  // narrow required set that was never fully evaluated.
+  const missingKinds = ALL_KINDS.filter((kind) => !seenKinds.has(kind));
   const failedKinds = requiredKinds.filter((kind) => {
     const result = results.find((r) => r.stressKind === kind);
     return result === undefined || !result.passed;

@@ -51,6 +51,8 @@ export interface ParityGateResult {
   readonly resultingSupportState: AdapterSupportState;
   /** FR-EXEC-021: failure opens an incident; this is its machine cause. */
   readonly incidentCause: 'PARITY_DRIFT' | 'PROGRAM_UPGRADE' | 'FIXTURE_FAILURE' | null;
+  /** Cases actually evaluated — an empty suite must not read as a pass. */
+  readonly evaluatedCases: number;
 }
 
 function withinTolerance(actual: bigint, expected: bigint, toleranceBps: number): boolean {
@@ -79,6 +81,11 @@ export interface RunParityGateInput {
  * Run the full parity gate. Deterministic vectors must match exactly;
  * observed-trade and reference-quote parity use the predeclared per-case
  * tolerance bands. Any failure degrades the adapter (§64.11).
+ *
+ * §64.11 fail-closed law: tolerance must be predeclared and non-negative —
+ * a negative or non-integer band is itself a gate failure, never silently
+ * permissive; every suite run records the fixture counts it evaluated, so
+ * an empty suite cannot masquerade as a passing one.
  */
 export function runParityGate(input: RunParityGateInput): ParityGateResult {
   const failures: ParityFailureCause[] = [];
@@ -99,6 +106,11 @@ export function runParityGate(input: RunParityGateInput): ParityGateResult {
 
   for (const trade of input.observedTrades) {
     try {
+      if (!Number.isInteger(trade.toleranceBps) || trade.toleranceBps < 0) {
+        failures.push('TOLERANCE_GATE_EXCEEDED');
+        failingCaseIds.push(trade.caseId);
+        continue;
+      }
       const quote = input.quoteForObservedTrade(trade.caseId);
       if (!withinTolerance(quote.rawAmountOut, trade.observedOutRaw, trade.toleranceBps)) {
         failures.push('OBSERVED_TRADE_PARITY_DRIFT');
@@ -111,6 +123,11 @@ export function runParityGate(input: RunParityGateInput): ParityGateResult {
   }
 
   for (const ref of input.referenceQuotes) {
+    if (!Number.isInteger(ref.toleranceBps) || ref.toleranceBps < 0) {
+      failures.push('TOLERANCE_GATE_EXCEEDED');
+      failingCaseIds.push(ref.caseId);
+      continue;
+    }
     if (!withinTolerance(ref.quote.rawAmountOut, ref.referenceOutRaw, ref.toleranceBps)) {
       failures.push('REFERENCE_QUOTE_PARITY_DRIFT');
       failingCaseIds.push(ref.caseId);
@@ -144,5 +161,7 @@ export function runParityGate(input: RunParityGateInput): ParityGateResult {
     failingCaseIds: [...new Set(failingCaseIds)],
     resultingSupportState: passed ? AdapterSupportState.AVAILABLE : AdapterSupportState.DEGRADED,
     incidentCause,
+    evaluatedCases:
+      input.vectors.length + input.observedTrades.length + input.referenceQuotes.length,
   };
 }

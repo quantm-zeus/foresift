@@ -1,6 +1,6 @@
 /**
  * Exec domain vocabularies and pure laws (§64, §8, FR-EXEC-001/004/006/007/013/
- * 015/017/020, AC-120, AC-122) — fail-closed parsing and truth tables.
+ * 015/017/020, AC-120, AC-122, T001) — fail-closed parsing and truth tables.
  */
 import { describe, expect, it } from 'bun:test';
 import * as DomainModule from '../src/index.ts';

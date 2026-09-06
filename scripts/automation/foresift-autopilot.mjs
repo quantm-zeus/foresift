@@ -3048,6 +3048,10 @@ async function cmdRecoverFatal(positionalRunId) {
     awaitingDiscovery: !runId,
     discoveryAttempts: entry.awaitingDiscovery ? (entry.discoveryAttempts ?? 0) : 0,
     executionProfile: entry.executionProfile ?? persistedExecutionProfile,
+    // The retained entry may carry a STALE logPath from the dead run. A fresh
+    // continuation's ack carries the new log path; a resumed run keeps none
+    // (the discovery fallback scopes by log birthtime vs entry.startedAt).
+    logPath: freshAdmission ? (ack?.logPath ?? null) : null,
     ...(freshAdmission ? { providers: freshAdmission.providers } : {}),
   });
   delete entry.done;

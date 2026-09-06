@@ -1,5 +1,5 @@
 {
-  "$comment": "Point-in-time route selection and migration timeline vectors (FR-EXEC-022, AC-234, §64.5).",
+  "$comment": "Point-in-time route selection and migration timeline vectors (FR-EXEC-022, AC-234, §64.5, T027).",
   "timelineCases": [
     {
       "caseId": "retrospective_pool_creation_refusal",

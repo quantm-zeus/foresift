@@ -1,5 +1,5 @@
 {
-  "$comment": "Stress scenario matrix and frozen replay reproduction vectors (FR-EXEC-010, FR-EXEC-012, FR-EXEC-017, AC-127, AC-235, §64.10).",
+  "$comment": "Stress scenario matrix and frozen replay reproduction vectors (FR-EXEC-010, FR-EXEC-012, FR-EXEC-017, AC-127, AC-235, §64.10, T027).",
   "stressMatrixCandidates": [
     {
       "candidateId": "cand_optimistic_only_fragile",

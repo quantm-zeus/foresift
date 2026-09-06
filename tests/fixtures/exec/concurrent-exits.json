@@ -1,5 +1,5 @@
 {
-  "$comment": "Concurrent shadow positions sharing liquidity depth and deterministic fill competition (FR-EXEC-019, AC-236, §64.15).",
+  "$comment": "Concurrent shadow positions sharing liquidity depth and deterministic fill competition (FR-EXEC-019, AC-236, §64.15, T027).",
   "scenarios": [
     {
       "scenarioId": "concurrent_two_shadow_exits_same_pool",

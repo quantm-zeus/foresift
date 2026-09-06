@@ -1,6 +1,6 @@
 /**
  * AC-124 negative (failure) — censored/invalid without reason or silently mapped to failure refused.
- * Traces: FR-EXEC-006, FR-EXEC-011, AC-124.
+ * Traces: FR-EXEC-006, FR-EXEC-011, AC-124, T032.
  * Refusal: CENSORED/INVALID_DATA without recorded reason or silent reclassification to TRADABLE_FAILURE is refused.
  */
 import { describe, expect, it } from 'bun:test';

@@ -1,6 +1,6 @@
 /**
  * AC-124 acceptance (positive) — censored and invalid outcome reason retention (§8.2).
- * Traces: FR-EXEC-006, FR-EXEC-011, AC-124.
+ * Traces: FR-EXEC-006, FR-EXEC-011, AC-124, T032.
  * AC text: "Censored and invalid outcomes retain explicit reasons and never silently become failures."
  */
 import { describe, expect, it } from 'bun:test';

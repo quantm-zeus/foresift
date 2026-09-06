@@ -1,6 +1,6 @@
 /**
  * AC-125 negative (failure) — subjective input mutating objective label is structurally refused.
- * Traces: FR-EXEC-001, FR-EXEC-006, AC-125.
+ * Traces: FR-EXEC-001, FR-EXEC-006, AC-125, T033.
  * Refusal: Any pathway where subjective operator/user ratings alter the objective mathematical outcome label is refused.
  */
 import { describe, expect, it } from 'bun:test';

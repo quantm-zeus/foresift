@@ -1,6 +1,6 @@
 /**
  * AC-125 acceptance (positive) — owner-subjective usefulness is schema-separate (§64.12).
- * Traces: FR-EXEC-001, FR-EXEC-006, AC-125.
+ * Traces: FR-EXEC-001, FR-EXEC-006, AC-125, T033.
  * AC text: "Owner-subjective usefulness is schema-separate and the objective outcome label
  * is a pure function that ignores it."
  */

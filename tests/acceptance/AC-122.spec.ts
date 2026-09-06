@@ -1,6 +1,6 @@
 /**
  * AC-122 acceptance (positive) — target touch executable volume and duration (§64.13).
- * Traces: FR-EXEC-004, AC-122.
+ * Traces: FR-EXEC-004, AC-122, T030.
  * AC text: "A one-slot target wick without executable volume or duration does not satisfy tradable success."
  */
 import { describe, expect, it } from 'bun:test';

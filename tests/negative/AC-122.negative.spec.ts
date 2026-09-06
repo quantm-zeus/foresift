@@ -1,6 +1,6 @@
 /**
  * AC-122 negative (failure) — isolated wick classified TRADABLE_SUCCESS is refused.
- * Traces: FR-EXEC-004, AC-122.
+ * Traces: FR-EXEC-004, AC-122, T030.
  * Refusal: Structural refusal of classifying an isolated wick as TRADABLE_SUCCESS.
  */
 import { describe, expect, it } from 'bun:test';

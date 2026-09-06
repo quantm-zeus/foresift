@@ -154,7 +154,7 @@ describe('AC-230 solsec: Pool-security versioned resolution and allowlist bindin
   });
 });
 
-describe('AC-230 exec: pool-math adapter versioned resolution & design specificity (FR-EXEC-013, FR-EXEC-015)', () => {
+describe('AC-230 exec: pool-math adapter versioned resolution & design specificity (FR-EXEC-013, FR-EXEC-015, T043)', () => {
   it('resolves each fixture pool design ONLY to its matching versioned pool-math adapter family', () => {
     const fixturePath = path.resolve(
       path.dirname(fileURLToPath(import.meta.url)),

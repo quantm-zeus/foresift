@@ -70,7 +70,7 @@ describe('AC-230 solsec negative: Unknown/mismatched pool returns DEGRADED_UNSUP
   });
 });
 
-describe('AC-230 exec negative: unknown pool design returns EXECUTION_UNAVAILABLE, never generic CPMM fallback (FR-EXEC-015)', () => {
+describe('AC-230 exec negative: unknown pool design returns EXECUTION_UNAVAILABLE, never generic CPMM fallback (FR-EXEC-015, T043)', () => {
   it('returns explicit EXECUTION_UNAVAILABLE on unknown exotic pool without generic CPMM substitution', () => {
     const fixturePath = path.resolve(
       path.dirname(fileURLToPath(import.meta.url)),

@@ -115,7 +115,10 @@ export class TransferSemanticsAdapter {
         resolution: 'REFUSED',
         executionStatus: ExecutionStatus.EXECUTION_UNAVAILABLE,
         refusal: 'UNSUPPORTED_PROGRAM',
-        qualityCodes: ['POOL_MATH_UNSUPPORTED'],
+        // Closed-vocabulary quality codes only (must satisfy QualityCodesSchema
+        // at the shared-schemas boundary); the transfer plane has no pool-math
+        // involvement, so a program mismatch is plain EXECUTION_UNAVAILABLE.
+        qualityCodes: ['EXECUTION_UNAVAILABLE'],
       };
     }
     if (!this.supportedProgramVersions.includes(query.programVersion)) {
@@ -131,7 +134,7 @@ export class TransferSemanticsAdapter {
         resolution: 'REFUSED',
         executionStatus: ExecutionStatus.EXECUTION_UNAVAILABLE,
         refusal: 'UNSUPPORTED_PROGRAM_VERSION',
-        qualityCodes: ['ACCOUNT_LAYOUT_VERSION_UNSUPPORTED'],
+        qualityCodes: ['UNSUPPORTED_PROGRAM_VERSION'],
       };
     }
     return {
@@ -196,11 +199,13 @@ export class TransferSemanticsRegistry {
       const resolution = adapter.resolve(query);
       if (resolution.resolution === 'BOUND') return resolution;
     }
+    // §64.9/FR-EXEC-013: no adapter covers this chain/program/version/layout
+    // pair — explicit refusal, never a generic SPL approximation.
     return {
       resolution: 'REFUSED',
       executionStatus: ExecutionStatus.EXECUTION_UNAVAILABLE,
-      refusal: 'UNSUPPORTED_PROGRAM_VERSION',
-      qualityCodes: ['UNSUPPORTED_PROGRAM_VERSION'],
+      refusal: 'UNSUPPORTED_PROGRAM',
+      qualityCodes: ['UNSUPPORTED_PROGRAM_VERSION', 'EXECUTION_UNAVAILABLE'],
     };
   }
 }
@@ -231,6 +236,8 @@ export interface EvaluateFillTransferCostsInput {
   readonly aggregatorFeeRaw?: bigint;
   /** Pool-side gross output, for output-side transfer-fee application. */
   readonly poolOutputRaw?: bigint;
+  /** Fill direction — entry and exit MUST be modeled with the same law. */
+  readonly direction?: 'ENTRY' | 'EXIT';
 }
 
 export type FillTransferCosts =
@@ -239,17 +246,29 @@ export type FillTransferCosts =
       readonly result: FeeModelResult;
       /** Net output after the output-side transfer fee, when requested. */
       readonly netPoolOutput: bigint | null;
+      /** Fill direction the costs were modeled for (symmetry evidence). */
+      readonly direction: 'ENTRY' | 'EXIT' | null;
+      /** Verdict policy version the consumed rows were resolved against. */
+      readonly verdictPolicyVersion: string;
     }
   | {
       readonly outcome: 'INSUFFICIENT_DATA';
       readonly reasons: readonly string[];
       readonly qualityCodes: readonly string[];
+      /** Fill direction the blocking was evaluated for (symmetry evidence). */
+      readonly direction: 'ENTRY' | 'EXIT' | null;
+      readonly verdictPolicyVersion: string;
     };
 
 /**
  * End-to-end fill transfer-cost evaluation: resolve verdicts through the
  * adapter (solsec substrate), compose costs with explicit evidence only,
  * and block on unknown required semantics (§64.9, FR-SOLSEC-004).
+ *
+ * Entry/exit symmetry: the same adapter, verdict policy version, and fee
+ * model apply to both fill directions — `direction` is recorded on every
+ * cost-bearing result so the simulator cannot apply asymmetric assumptions
+ * to entry versus exit without producing visibly different evidence rows.
  */
 export function evaluateFillTransferCosts(
   input: EvaluateFillTransferCostsInput,
@@ -260,6 +279,7 @@ export function evaluateFillTransferCosts(
       field: 'rawAmountIn',
     });
   }
+  const direction = input.direction ?? null;
   const inRows = input.adapter.extensionEvidence({
     assessmentId: input.assessmentId,
     programVersion: input.programVersion,
@@ -285,6 +305,8 @@ export function evaluateFillTransferCosts(
       outcome: 'INSUFFICIENT_DATA',
       reasons: insufficient,
       qualityCodes: ['INSUFFICIENT_DATA'],
+      direction,
+      verdictPolicyVersion: input.adapter.verdictPolicyVersion,
     };
   }
   const result = composeTransferCosts({
@@ -303,13 +325,21 @@ export function evaluateFillTransferCosts(
       outcome: 'INSUFFICIENT_DATA',
       reasons: result.insufficientReasons,
       qualityCodes: ['INSUFFICIENT_DATA'],
+      direction,
+      verdictPolicyVersion: input.adapter.verdictPolicyVersion,
     };
   }
   const netPoolOutput =
     input.poolOutputRaw === undefined
       ? null
       : applyOutTransferFee(input.poolOutputRaw, input.outTokenTransferFee).net;
-  return { outcome: 'MODELED', result, netPoolOutput };
+  return {
+    outcome: 'MODELED',
+    result,
+    netPoolOutput,
+    direction,
+    verdictPolicyVersion: input.adapter.verdictPolicyVersion,
+  };
 }
 
 /** Convenience re-export of the NOT_PRESENT gate used by callers. */

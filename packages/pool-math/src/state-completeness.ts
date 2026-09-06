@@ -35,10 +35,36 @@ export interface AssessStateCompletenessInput {
 /**
  * §64.4 coverage assessment: missing required accounts or unsupported
  * program/layout is reported as incomplete — never silently downgraded.
+ *
+ * Fail-closed input law: the decoded record must carry its adapter identity
+ * and a valid completeness verdict; `notionalUsd` must be a decimal digit
+ * string (AC-232 blocking applies at every notional — tiny notionals still
+ * need reserves, so the amount can never downgrade a missing family).
  */
 export function assessStateCompleteness(input: AssessStateCompletenessInput): CoverageAssessment {
   if (input === null || typeof input !== 'object') {
     throw new ExecVocabularyError(ExecErrorCode.EXEC_UNCERTAINTY_INPUT_INVALID, input);
+  }
+  if (typeof input.decoded !== 'object' || input.decoded === null) {
+    throw new ExecVocabularyError(ExecErrorCode.EXEC_UNCERTAINTY_INPUT_INVALID, input.decoded);
+  }
+  if (
+    input.decoded.stateCompleteness !== 'COMPLETE' &&
+    input.decoded.stateCompleteness !== 'INCOMPLETE_BLOCKING'
+  ) {
+    throw new ExecVocabularyError(
+      ExecErrorCode.EXEC_UNCERTAINTY_INPUT_INVALID,
+      input.decoded.stateCompleteness,
+    );
+  }
+  if (!/^(0|[1-9][0-9]*)(\.[0-9]+)?$/.test(input.notionalUsd)) {
+    throw new ExecVocabularyError(ExecErrorCode.EXEC_UNCERTAINTY_INPUT_INVALID, input.notionalUsd);
+  }
+  if (!Array.isArray(input.availableAccountFamilies)) {
+    throw new ExecVocabularyError(
+      ExecErrorCode.EXEC_UNCERTAINTY_INPUT_INVALID,
+      input.availableAccountFamilies,
+    );
   }
   const available = new Set(input.availableAccountFamilies);
   const missing: string[] = [];
@@ -100,6 +126,17 @@ export interface EvaluateRouteInput {
   readonly transactionPayloadFromProvider?: unknown;
 }
 
+function requireLegField(value: unknown, label: string, legId: string): string {
+  if (typeof value !== 'string' || value.length === 0) {
+    throw new ExecVocabularyError(ExecErrorCode.EXEC_LABEL_CLAUSES_INVALID, {
+      refused: 'ROUTE_LEG_FIELD_INVALID',
+      field: label,
+      legId,
+    });
+  }
+  return value;
+}
+
 function detectSharedVaults(legs: readonly RouteLeg[]): string[] {
   const seen = new Map<string, number>();
   for (const leg of legs) {
@@ -134,7 +171,70 @@ export function evaluateRoute(input: EvaluateRouteInput): RouteEvaluation {
       refused: 'TRANSACTION_PAYLOAD_FROM_QUOTE_PROVIDER',
     });
   }
+  if (input === null || typeof input !== 'object' || !Array.isArray(input.legs)) {
+    throw new ExecVocabularyError(ExecErrorCode.EXEC_LABEL_CLAUSES_INVALID, input);
+  }
   const maxLegs = input.maxLegs ?? 5;
+  if (!Number.isInteger(maxLegs) || maxLegs < 1) {
+    throw new ExecVocabularyError(ExecErrorCode.EXEC_LABEL_CLAUSES_INVALID, {
+      refused: 'ROUTE_COMPLEXITY_CAP_INVALID',
+      maxLegs,
+    });
+  }
+  for (const leg of input.legs) {
+    if (leg === null || typeof leg !== 'object') {
+      throw new ExecVocabularyError(ExecErrorCode.EXEC_LABEL_CLAUSES_INVALID, leg);
+    }
+    requireLegField(leg.legId, 'legId', String(leg.legId));
+    requireLegField(leg.poolId, 'poolId', leg.legId);
+    requireLegField(leg.inTokenMint, 'inTokenMint', leg.legId);
+    requireLegField(leg.outTokenMint, 'outTokenMint', leg.legId);
+    if (!Array.isArray(leg.vaultIds) || leg.vaultIds.length === 0) {
+      throw new ExecVocabularyError(ExecErrorCode.EXEC_LABEL_CLAUSES_INVALID, {
+        refused: 'ROUTE_LEG_VAULTS_REQUIRED',
+        legId: leg.legId,
+      });
+    }
+    if (
+      !Number.isInteger(leg.feeBps) ||
+      leg.feeBps < 0 ||
+      !Number.isInteger(leg.priceImpactBps) ||
+      leg.priceImpactBps < 0
+    ) {
+      throw new ExecVocabularyError(ExecErrorCode.EXEC_LABEL_CLAUSES_INVALID, {
+        refused: 'ROUTE_LEG_BPS_INVALID',
+        legId: leg.legId,
+        feeBps: leg.feeBps,
+        priceImpactBps: leg.priceImpactBps,
+      });
+    }
+  }
+  if (input.quoteConversion !== undefined) {
+    const qc = input.quoteConversion;
+    if (
+      qc === null ||
+      typeof qc !== 'object' ||
+      typeof qc.sourceId !== 'string' ||
+      qc.sourceId.length === 0 ||
+      typeof qc.quotedAt !== 'string' ||
+      !/Z$/.test(qc.quotedAt) ||
+      !['NONE', 'WATCH', 'DEPEGGED'].includes(qc.depegState)
+    ) {
+      throw new ExecVocabularyError(ExecErrorCode.EXEC_LABEL_CLAUSES_INVALID, {
+        refused: 'QUOTE_CONVERSION_INVALID',
+        quoteConversion: qc,
+      });
+    }
+    if (qc.depegState === 'DEPEGGED') {
+      // §64.5: a depegged quote asset cannot serve a fill decision — the
+      // conversion difference is unbounded until the depeg resolves.
+      throw new ExecVocabularyError(ExecErrorCode.EXEC_LABEL_CLAUSES_INVALID, {
+        refused: 'QUOTE_ASSET_DEPEGGED',
+        sourceId: qc.sourceId,
+        quotedAt: qc.quotedAt,
+      });
+    }
+  }
   if (input.legs.length === 0) {
     throw new ExecVocabularyError(ExecErrorCode.EXEC_LABEL_CLAUSES_INVALID, {
       refused: 'EMPTY_ROUTE',

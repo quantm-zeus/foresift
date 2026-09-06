@@ -1,5 +1,5 @@
 {
-  "$comment": "Decoded pool states covering constant-product, CLMM, DLMM, bonding curve, dynamic fee, virtual reserve, unknown designs, and incomplete state (FR-EXEC-013, FR-EXEC-015, AC-230, AC-232, §64.3, §64.4).",
+  "$comment": "Decoded pool states covering constant-product, CLMM, DLMM, bonding curve, dynamic fee, virtual reserve, unknown designs, and incomplete state (FR-EXEC-013, FR-EXEC-015, AC-230, AC-232, §64.3, §64.4, T024).",
   "pools": [
     {
       "poolId": "solana:5eykt4UsFv8P8NJdTREpY1vzqKqZKvdp/pool/RaydiumCpmmVerified1111111111111111111111",

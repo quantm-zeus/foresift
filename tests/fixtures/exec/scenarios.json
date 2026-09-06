@@ -1,5 +1,5 @@
 {
-  "$comment": "Execution scenario vectors with action-delay distributions and profile pass matrices (FR-EXEC-001, FR-EXEC-002, FR-EXEC-017, AC-235, §64.2, §64.8).",
+  "$comment": "Execution scenario vectors with action-delay distributions and profile pass matrices (FR-EXEC-001, FR-EXEC-002, FR-EXEC-017, AC-235, §64.2, §64.8, T024).",
   "scenarios": [
     {
       "scenarioId": "scenario_base_case_default",

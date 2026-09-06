@@ -1,6 +1,6 @@
 /**
  * AC-121 negative (failure) — assumed-zero costs and omitted legs refused.
- * Traces: FR-EXEC-002, FR-EXEC-003, FR-EXEC-018, AC-121.
+ * Traces: FR-EXEC-002, FR-EXEC-003, FR-EXEC-018, AC-121, T029.
  * Refusal: Omitting any modeled leg (fees, slippage, transfer tax) or assuming zero cost for unknown fees is refused.
  */
 import { describe, expect, it } from 'bun:test';

@@ -1,6 +1,6 @@
 /**
  * AC-121 acceptance (positive) — net return multi-leg modeling (§64.6, §64.7, §64.9).
- * Traces: FR-EXEC-002, FR-EXEC-003, FR-EXEC-018, AC-121.
+ * Traces: FR-EXEC-002, FR-EXEC-003, FR-EXEC-018, AC-121, T029.
  * AC text: "Entry delay, price impact, pool/token/network fees, partial fills,
  * and exit liquidity each change net outcome exactly as the fixtures define."
  */

@@ -23,6 +23,16 @@ CREATE TABLE replay_manifests (
     delivery_latency_policy_version text NOT NULL,
     capacity_contract_version       text NOT NULL,
     -- FR-EXEC-010: execution assumptions and code versions are frozen here.
+    -- assumptions_hash is the sha256 over the canonical frozen assumption set
+    -- (pre-registered scenario payloads, policy versions — the same hash the
+    -- simulator records per stress result); scenario_payloads is the exact
+    -- §64.2 payload set the hash was computed over. Together they make the
+    -- manifest self-verifying: a replay re-hashes the payloads and refuses
+    -- on drift.
+    assumptions_hash                text NOT NULL CHECK (
+                                        assumptions_hash ~ '^sha256:[0-9a-f]{64}$'),
+    scenario_payloads               jsonb NOT NULL CHECK (
+                                        jsonb_typeof(scenario_payloads) = 'object'),
     pool_math_adapter_versions      text[] NOT NULL CHECK (cardinality(pool_math_adapter_versions) > 0),
     execution_scenario_versions     text[] NOT NULL CHECK (cardinality(execution_scenario_versions) > 0),
     artifact_ids                    text[] NOT NULL DEFAULT ARRAY[]::text[],

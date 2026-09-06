@@ -200,7 +200,11 @@ export function registerScenario(input: {
   };
 }
 
-/** Timestamp of the single universal actionable instant (§64.6). */
+/**
+ * Delay in seconds from the signal instant to the single universal
+ * actionable instant (§64.6): every simulation acts at the pre-registered
+ * deterministic action delay, never at a per-candidate chosen time.
+ */
 export function actionableAt(scenario: ExecutionScenario): number {
   return scenario.deterministicActionDelaySeconds;
 }

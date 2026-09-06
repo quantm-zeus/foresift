@@ -1,6 +1,6 @@
 /**
  * AC-120 negative (failure) — profit rendering from signal win without tradability is structurally refused.
- * Traces: FR-EXEC-001, FR-EXEC-006, FR-EXEC-007, AC-120.
+ * Traces: FR-EXEC-001, FR-EXEC-006, FR-EXEC-007, AC-120, T028.
  * Refusal: SIGNAL_SUCCESS cannot render profit when TRADABLE_SUCCESS is absent or failed.
  */
 import { describe, expect, it } from 'bun:test';

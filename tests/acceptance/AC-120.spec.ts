@@ -1,6 +1,6 @@
 /**
  * AC-120 acceptance (positive) — signal vs tradable outcome separation (§64.12, §8.2).
- * Traces: FR-EXEC-001, FR-EXEC-006, FR-EXEC-007, AC-120.
+ * Traces: FR-EXEC-001, FR-EXEC-006, FR-EXEC-007, AC-120, T028.
  * AC text: "A token rising above target that cannot fill/exit the configured notional
  * is SIGNAL_SUCCESS but cannot be TRADABLE_SUCCESS (UNTRADABLE_SIGNAL_WIN)."
  */

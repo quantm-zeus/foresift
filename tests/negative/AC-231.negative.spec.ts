@@ -46,7 +46,7 @@ describe('AC-231 negative: parity beyond tolerance fails family; undetected layo
   });
 });
 
-describe('AC-231 exec negative: observed-trade tolerance breach and unverified manifest refusal (FR-EXEC-016)', () => {
+describe('AC-231 exec negative: observed-trade tolerance breach and unverified manifest refusal (FR-EXEC-016, T044)', () => {
   it('identifies breached parity trade vector and flags failure in fixture', () => {
     const fixturePath = path.resolve(
       path.dirname(fileURLToPath(import.meta.url)),

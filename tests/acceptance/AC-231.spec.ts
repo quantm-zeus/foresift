@@ -54,7 +54,7 @@ describe('AC-231 acceptance (positive): active decoder layout verification & par
   });
 });
 
-describe('AC-231 exec acceptance: observed-trade & reference-quote parity tolerance gates (FR-EXEC-016)', () => {
+describe('AC-231 exec acceptance: observed-trade & reference-quote parity tolerance gates (FR-EXEC-016, T044)', () => {
   it('passes observed-trade parity across active pool adapters within tolerance', () => {
     const fixturePath = path.resolve(
       path.dirname(fileURLToPath(import.meta.url)),

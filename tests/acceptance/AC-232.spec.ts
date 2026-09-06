@@ -1,6 +1,6 @@
 /**
  * AC-232 acceptance (positive) — state completeness & missing tick/bin blocking (§64.4, FR-EXEC-020).
- * Traces: FR-EXEC-013, FR-EXEC-014, FR-EXEC-020, AC-232.
+ * Traces: FR-EXEC-013, FR-EXEC-014, FR-EXEC-020, AC-232, T037.
  * AC text: "Missing tick/bin/curve/account state that can materially affect a fill
  * marks state incomplete and blocks confirmed tradability rather than assuming uniform liquidity."
  */

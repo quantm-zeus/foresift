@@ -1,6 +1,6 @@
 /**
  * AC-232 negative (failure) — INCOMPLETE_BLOCKING simulation confirming tradability is refused.
- * Traces: FR-EXEC-013, FR-EXEC-014, FR-EXEC-020, AC-232.
+ * Traces: FR-EXEC-013, FR-EXEC-014, FR-EXEC-020, AC-232, T037.
  * Refusal: A simulation with INCOMPLETE_BLOCKING state cannot confirm tradability or assume uniform liquidity.
  */
 import { describe, expect, it } from 'bun:test';

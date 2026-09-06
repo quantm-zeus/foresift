@@ -62,10 +62,17 @@ CREATE TABLE execution_state_snapshots (
     reserve_vault_state             jsonb NOT NULL CHECK (jsonb_typeof(reserve_vault_state) = 'object'),
     tick_arrays                     jsonb,
     bin_arrays                      jsonb,
+    -- FR-EXEC-014: the design-family curve state as observed (stable-swap amp
+    -- factors, CLMM sqrt-price/curvature, virtual-reserve offsets). Bonding
+    -- curves keep their dedicated record in bonding_curve_state below.
+    curve_state                     jsonb,
     positions                       jsonb,
     bonding_curve_state             jsonb,
     fee_configuration               jsonb NOT NULL CHECK (jsonb_typeof(fee_configuration) = 'object'),
     dynamic_fee_parameters          jsonb,
+    -- FR-EXEC-014: the exact oracle/quote inputs used for the simulation,
+    -- recorded as evidence next to their source (quote_conversion_source/at).
+    oracle_quote_inputs             jsonb,
     transfer_fee_semantics          jsonb,
     transfer_hook_semantics         jsonb,
     default_account_state           jsonb,

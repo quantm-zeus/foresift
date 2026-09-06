@@ -132,7 +132,7 @@ manifests, then parity gates, then stress scenarios and degradation.
       consumers, `bun test` scripts, tsconfig extending tsconfig.base.json,
       no per-package runner config — G0/G1 scaffold pattern). Traces:
       FR-EXEC-001…022.
-- [ ] T010 Implement `packages/pool-math/src/adapter-contract.ts` +
+- [x] T010 Implement `packages/pool-math/src/adapter-contract.ts` +
       `src/registry.ts`: the §64.3 `PoolMathAdapter` contract
       (decodeState, validateStateCompleteness, quoteExactIn, quoteExactOut,
       modelLiquidityMutation, requiredAccounts) and the fail-closed resolution
@@ -154,7 +154,7 @@ manifests, then parity gates, then stress scenarios and degradation.
       vectors, monotonicity + conservation property tests, zero/tiny/huge
       amount boundaries, overflow refusals, fee-tier fixtures. Traces:
       FR-EXEC-002, FR-EXEC-013, FR-EXEC-015, FR-EXEC-016, AC-230, AC-231.
-- [ ] T012 Implement `packages/pool-math/src/state-completeness.ts` +
+- [x] T012 Implement `packages/pool-math/src/state-completeness.ts` +
       `src/route-aggregation.ts`: §64.4 coverage assessment — missing
       tick/bin/curve/account state that can materially affect a fill marks
       state incomplete and blocks confirmed tradability rather than assuming
@@ -165,7 +165,7 @@ manifests, then parity gates, then stress scenarios and degradation.
       (§64.5). Colocated tests: incomplete-state blocking matrix, shared-vault
       double-count fixtures, route-loop/cap refusals, payload refusal.
       Traces: FR-EXEC-002, FR-EXEC-005, FR-EXEC-014, FR-EXEC-020, AC-232.
-- [ ] T013 Implement `packages/transfer-semantics/src/adapter.ts` +
+- [x] T013 Implement `packages/transfer-semantics/src/adapter.ts` +
       `src/fee-model.ts`: the versioned `TransferSemanticsAdapter` keyed by
       chain/program/program-version/layout-version consuming the PROVEN
       `@foresift/solana-security` verdict substrate (KNOWN_MODELED /
@@ -180,7 +180,7 @@ manifests, then parity gates, then stress scenarios and degradation.
 
 ## Phase 4 — Simulator core (blocks replay manifests, parity, stress, degradation)
 
-- [ ] T014 Implement `packages/execution-simulator/src/scenario.ts` +
+- [x] T014 Implement `packages/execution-simulator/src/scenario.ts` +
       `src/delays.ts`: §64.2 scenario identity resolution with
       pre-registration enforcement, §64.8 action-delay distribution
       (deterministic reference, p50, p90, maximum supported; measurement
@@ -247,7 +247,7 @@ manifests, then parity gates, then stress scenarios and degradation.
 
 ## Phase 5 — Replay manifests, parity gates, stress scenarios, degradation (final PRD staging order)
 
-- [ ] T019 Implement `packages/execution-simulator/src/replay-manifest.ts` +
+- [x] T019 Implement `packages/execution-simulator/src/replay-manifest.ts` +
       `src/experiments.ts` + `src/observation-plans.ts`: FR-EXEC-010 replay
       manifests freezing execution assumptions and code versions (assumption
       hash, exact scenario payload, adapter versions, code versions, policy
@@ -273,7 +273,7 @@ manifests, then parity gates, then stress scenarios and degradation.
       opening an incident. Colocated tests: parity pass/fail transitions,
       tolerance-gate bands, incident emission, degraded adapter refuses new
       confirmed quotes. Traces: FR-EXEC-016, FR-EXEC-021, AC-231.
-- [ ] T021 Implement `packages/execution-simulator/src/stress.ts` + fixtures
+- [x] T021 Implement `packages/execution-simulator/src/stress.ts` + fixtures
       wiring for the §64.10/FR-EXEC-012/FR-EXEC-017 scenario matrix: BASE,
       p50-delay, p90-delay, conservative latency/adverse-selection,
       liquidity-drawdown, fee-volatility, route-degradation, failed/

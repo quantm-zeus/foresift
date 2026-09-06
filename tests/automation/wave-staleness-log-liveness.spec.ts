@@ -143,7 +143,11 @@ describe('staleness wiring: log liveness consulted before any stale-run abandon'
     expect(branch).toContain('stale_run_bookkeeping_but_log_active');
   });
 
-  test('both package launch sites capture ack.logPath on the tracked entry', () => {
+  test('both package launch sites + the operator-recovery path capture/refresh logPath', () => {
+    // two direct launch sites use the plain ack form...
     expect(SRC.match(/logPath: ack\?\.logPath \?\? null/g)?.length).toBe(2);
+    // ...and --recover-fatal's fresh continuation refreshes it (a retained
+    // entry otherwise carries the DEAD run's stale logPath).
+    expect(SRC).toContain('logPath: freshAdmission ? (ack?.logPath ?? null) : null');
   });
 });

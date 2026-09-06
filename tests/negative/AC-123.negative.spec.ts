@@ -1,6 +1,6 @@
 /**
  * AC-123 negative (failure) — denominator including pending/partial rows is refused.
- * Traces: FR-EXEC-001, FR-EXEC-011, AC-123.
+ * Traces: FR-EXEC-001, FR-EXEC-011, AC-123, T031.
  * Refusal: Building an evaluated metric denominator that includes immature (PENDING / PARTIALLY_MATURED) rows is refused.
  */
 import { describe, expect, it } from 'bun:test';

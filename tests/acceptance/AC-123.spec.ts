@@ -1,6 +1,6 @@
 /**
  * AC-123 acceptance (positive) — pending/partially matured exclusion from evaluated denominators (§8.2, INV-012).
- * Traces: FR-EXEC-001, FR-EXEC-011, AC-123.
+ * Traces: FR-EXEC-001, FR-EXEC-011, AC-123, T031.
  * AC text: "PENDING/PARTIALLY_MATURED outcomes are excluded from final precision/failure/calibration
  * denominator INPUTS at the classification seam and disclosed separately."
  */

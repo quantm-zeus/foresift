@@ -71,7 +71,7 @@ describe('AC-237 acceptance (positive): program upgrade drift degrades only affe
   });
 });
 
-describe('AC-237 exec acceptance: pool-math adapter degradation & scope isolation (FR-EXEC-021)', () => {
+describe('AC-237 exec acceptance: pool-math adapter degradation & scope isolation (FR-EXEC-021, T045)', () => {
   it('isolates degradation to affected pool adapter, preserving historical simulation records and blocking new confirmed alerts', () => {
     const adapterScopes = [
       {

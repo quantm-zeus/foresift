@@ -1,6 +1,6 @@
 /**
  * AC-128 acceptance (positive) — observation plan finite selective parameters and population limits (§64.14).
- * Traces: FR-EXEC-011, AC-128.
+ * Traces: FR-EXEC-011, AC-128, T036.
  * AC text: "Observation plans store inclusion probability/stratum/population limits
  * and selected-only samples carry explicit population limits."
  */

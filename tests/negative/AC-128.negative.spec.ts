@@ -1,6 +1,6 @@
 /**
  * AC-128 negative (failure) — invalid probability, missing population limits, universe-wide claims refused.
- * Traces: FR-EXEC-011, AC-128.
+ * Traces: FR-EXEC-011, AC-128, T036.
  * Refusal: Out-of-range inclusion probability, missing population limits, or asserting universe-wide claims
  * from selected-only observation samples is refused.
  */

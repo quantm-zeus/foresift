@@ -1,6 +1,6 @@
 /**
  * AC-234 negative (failure) — retrospective route selection and future migration routing refused.
- * Traces: FR-EXEC-022, AC-234.
+ * Traces: FR-EXEC-022, AC-234, T038.
  * Refusal: Selecting a route/pool or using a migration transition that did not exist at action time is refused.
  */
 import { describe, expect, it } from 'bun:test';

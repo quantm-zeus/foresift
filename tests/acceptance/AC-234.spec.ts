@@ -1,6 +1,6 @@
 /**
  * AC-234 acceptance (positive) — point-in-time route selection & migration timing (FR-EXEC-022).
- * Traces: FR-EXEC-022, AC-234.
+ * Traces: FR-EXEC-022, AC-234, T038.
  * AC text: "A route or pool created after T_user_action cannot be selected by historical execution,
  * and migration routing uses only transitions and state available at the action time."
  */

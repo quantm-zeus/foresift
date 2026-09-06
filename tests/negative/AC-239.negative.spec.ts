@@ -1,6 +1,6 @@
 /**
  * AC-239 negative (failure) — silent folding of excluded classes into TRADABLE_SUCCESS denominator refused.
- * Traces: FR-EXEC-001, FR-EXEC-006, FR-EXEC-011, AC-239.
+ * Traces: FR-EXEC-001, FR-EXEC-006, FR-EXEC-011, AC-239, T042.
  * Refusal: Silently folding signal-only, low-resolution, partial, censored, or invalid rows into the
  * TRADABLE_SUCCESS evaluation denominator is refused.
  */

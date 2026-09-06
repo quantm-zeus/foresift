@@ -1,6 +1,6 @@
 /**
  * AC-239 acceptance (positive) — TRADABLE_SUCCESS denominator disclosure & excluded classes (INV-012).
- * Traces: FR-EXEC-001, FR-EXEC-006, FR-EXEC-011, AC-239.
+ * Traces: FR-EXEC-001, FR-EXEC-006, FR-EXEC-011, AC-239, T042.
  * AC text: "The TRADABLE_SUCCESS denominator disclosure excludes and separately reports signal-only,
  * low-resolution, partial, censored, invalid, and scenario-mismatched outcomes."
  */

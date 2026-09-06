@@ -88,13 +88,13 @@ manifests, then parity gates, then stress scenarios and degradation.
       `incomplete_state_cannot_confirm_tradable` CHECK, availability-order
       CHECK); append-only triggers (G0 pattern). Traces: FR-EXEC-001,
       FR-EXEC-002, FR-EXEC-004, FR-EXEC-006, FR-EXEC-007, FR-EXEC-009.
-- [ ] T005 Create `migrations/g1_exec_0002_replay_observation.sql`:
+- [x] T005 Create `migrations/g1_exec_0002_replay_observation.sql`:
       `replay_manifests` (frozen assumptions hash, scenario JSON, adapter +
       code versions, policy versions — FR-EXEC-010) and
       `outcome_observation_plans` (trigger classes, cadence, quota ceiling,
       inclusion probability/stratum/population limits, resolution floor —
       FR-EXEC-011); append-only triggers. Traces: FR-EXEC-010, FR-EXEC-011.
-- [ ] T006 Create `migrations/g1_exec_0003_adapter_registry_state.sql`:
+- [x] T006 Create `migrations/g1_exec_0003_adapter_registry_state.sql`:
       `pool_math_adapter_registry` (family-keyed UNIQUE, support states, the
       cp_only_for_cp CHECK implementing FR-EXEC-015 at the persistence layer),
       `execution_state_snapshots` (§64.4 record per simulation —
@@ -123,7 +123,7 @@ manifests, then parity gates, then stress scenarios and degradation.
 
 ## Phase 3 — Adapter plane: pool-math and transfer-semantics packages (blocks simulator core)
 
-- [ ] T009 Scaffold `packages/pool-math` and `packages/transfer-semantics`
+- [x] T009 Scaffold `packages/pool-math` and `packages/transfer-semantics`
       and `packages/execution-simulator` (package.json
       `@foresift/pool-math`, `@foresift/transfer-semantics`,
       `@foresift/execution-simulator` with workspace `*` deps on
@@ -145,7 +145,7 @@ manifests, then parity gates, then stress scenarios and degradation.
       family-key resolution truth table, unknown-design refusal, version
       mismatch refusal, deprecated/unverified manifest refusal. Traces:
       FR-EXEC-013, FR-EXEC-015, AC-230, AC-231.
-- [ ] T011 Implement `packages/pool-math/src/constant-product.ts`: exact
+- [x] T011 Implement `packages/pool-math/src/constant-product.ts`: exact
       deterministic constant-product math on BigInt raw amounts with a fixed
       rounding-direction law (conservative for output), fee application per
       pool configuration, minimum output, boundary/overflow guards, and
@@ -467,7 +467,7 @@ manifests, then parity gates, then stress scenarios and degradation.
 
 ## Phase 7 — Telemetry contract, manifest regen, and gates
 
-- [ ] T046 Create `telemetry/exec.catalog.json` (DECLARATIVE_CONTRACT_ONLY
+- [x] T046 Create `telemetry/exec.catalog.json` (DECLARATIVE_CONTRACT_ONLY
       header, fields mirroring `packages/shared-schemas/src/exec.ts` exactly,
       requirementRefs per event): `exec.scenario_resolved`,
       `exec.simulation_recorded`, `exec.net_return_composed`,

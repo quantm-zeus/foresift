@@ -81,25 +81,27 @@ export function runClaudeLaneCore(input) {
     : git(['rev-parse', 'HEAD'], input.worktree).stdout.trim();
   let run;
   try {
-    run = spawnSync(
-      'claude',
-      [
-        '--print',
-        '--model',
-        input.model ?? 'claude-opus-4-8',
-        '--disallowedTools',
-        'Bash(git push:*)',
-        '--add-dir',
-        input.worktree,
-      ],
-      {
-        cwd: input.worktree,
-        input: `${prompt}\n`,
-        encoding: 'utf8',
-        timeout: Number(input.timeoutMs ?? 45 * 60_000),
-        maxBuffer: 64 * 1024 * 1024,
-      },
-    );
+    run = input['claude-invoker']
+      ? input['claude-invoker']() // test seam; production spawns the real CLI
+      : spawnSync(
+          'claude',
+          [
+            '--print',
+            '--model',
+            input.model ?? 'claude-opus-4-8',
+            '--disallowedTools',
+            'Bash(git push:*)',
+            '--add-dir',
+            input.worktree,
+          ],
+          {
+            cwd: input.worktree,
+            input: `${prompt}\n`,
+            encoding: 'utf8',
+            timeout: Number(input.timeoutMs ?? 45 * 60_000),
+            maxBuffer: 64 * 1024 * 1024,
+          },
+        );
   } finally {
     // Finally-equivalent release immediately AFTER lane termination (H2 §2).
     // The handoff acquired the claude permit before calling this core.

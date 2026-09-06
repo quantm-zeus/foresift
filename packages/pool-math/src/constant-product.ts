@@ -255,9 +255,10 @@ export class ConstantProductAdapter implements PoolMathAdapter {
     const direction = quoteDirection(input, input.poolState);
     const feeBps = feeBpsOf(input.poolState);
     requirePositive(input.rawAmountOut, 'rawAmountOut');
-    if (input.rawAmountOut >= (direction === 'ZERO_TO_ONE'
-      ? curve.reserveOneRaw
-      : curve.reserveZeroRaw)) {
+    if (
+      input.rawAmountOut >=
+      (direction === 'ZERO_TO_ONE' ? curve.reserveOneRaw : curve.reserveZeroRaw)
+    ) {
       throw new RangeError('requested output at or above the output reserve');
     }
     const [reserveIn, reserveOut] =

@@ -86,8 +86,10 @@ export interface AccountRequirement {
 }
 
 /**
- * §64.3 adapter contract. Implementations are versioned and immutable;
- * `quoteExactIn`/`quoteExactOut` are pure functions of state.
+ * §64.3/FR-EXEC-013 adapter contract. Implementations are versioned and
+ * immutable; `quoteExactIn`/`quoteExactOut` are pure functions of state and
+ * `validateStateCompleteness` FAILS CLOSED — a quote must never be derived
+ * from incomplete state (AC-232).
  */
 export interface PoolMathAdapter {
   readonly adapterId: string;
@@ -103,6 +105,23 @@ export interface PoolMathAdapter {
   quoteExactOut(input: QuoteExactOutInput): QuoteResult;
   modelLiquidityMutation(input: LiquidityMutationInput): DecodedPoolState;
   requiredAccounts(input: { readonly programId: string }): readonly AccountRequirement[];
+}
+
+/**
+ * Fail-closed guard enforced by every quoting path: incomplete pool state
+ * can never serve a fill decision (§64.4, AC-232) — callers must block
+ * tradability on the returned coverage instead of assuming uniform liquidity.
+ */
+export function requireCompleteState(state: DecodedPoolState): DecodedPoolState {
+  if (state.stateCompleteness !== 'COMPLETE') {
+    throw new ExecVocabularyError(ExecErrorCode.EXEC_LABEL_CLAUSES_INVALID, {
+      refused: 'INCOMPLETE_BLOCKING_CANNOT_CONFIRM_TRADABILITY',
+      stateCompleteness: state.stateCompleteness,
+      adapterId: state.adapterId,
+      adapterVersion: state.adapterVersion,
+    });
+  }
+  return state;
 }
 
 /** Explicit refusal instead of a guessed adapter (fail-closed). */
@@ -164,11 +183,26 @@ export class PoolMathAdapterRegistry {
   }
 
   resolve(query: ResolveAdapterInput): AdapterResolution {
+    // §64.3: resolution is keyed by the full family — chain, program,
+    // program version, curve type, account-layout version. The manifest
+    // must be within its signed validity window at resolution time.
     for (const binding of this.bindings) {
       const m = binding.manifest;
       if (m.chainId !== query.chainId) continue;
       if (m.programId !== query.programId) continue;
       if (m.accountLayoutVersion !== query.accountLayoutVersion) continue;
+      // §64.11/FR-EXEC-021: a manifest whose signed validity window has
+      // closed (or has not opened) is not confirmable evidence — the
+      // adapter does not resolve on stale support.
+      const nowMs = Date.now();
+      if (Date.parse(m.validFrom) > nowMs || Date.parse(m.validUntil ?? m.validFrom) < nowMs) {
+        return {
+          resolved: false,
+          executionStatus: 'EXECUTION_UNAVAILABLE',
+          qualityCodes: ['DEPRECATED_OPERATION'],
+          reason: `program support manifest ${m.manifestId} validity window is closed (validUntil=${m.validUntil ?? 'unset'})`,
+        };
+      }
       // Program version must be explicitly supported by the adapter.
       if (!binding.adapter.supportedProgramVersions.includes(query.programVersion)) {
         return {

@@ -2,7 +2,7 @@
   "$schema": "https://foresift.dev/schemas/telemetry-catalog-v1.json",
   "catalog": "exec",
   "description": "Read-only execution simulation telemetry contracts: scenario resolution, simulation recording, net-return composition, outcome classification, tradability decision, observation plans, frozen replay manifests, adapter resolution/parity/degradation, concurrent shadow aggregation, point-in-time route selection, and quote-evidence recording.",
-  "contractStatus": "DECLARATIVE_CONTRACT_ONLY — this file defines the event contracts the requirement manifest maps to (telemetry/exec.*); emitter wiring lands with the observability milestone (dependency group G2), so nothing publishes these event names yet. Field lists mirror the authoritative schemas in packages/shared-schemas/src/exec.ts exactly.",
+  "contractStatus": "DECLARATIVE_CONTRACT_ONLY — this file defines the event contracts the requirement manifest maps to (telemetry/exec.*); emitter wiring lands with the observability milestone (dependency group G2), so nothing publishes these event names yet. Field lists are exact mirrors of the authoritative schemas in packages/shared-schemas/src/exec.ts where the event payload is that schema record (exec.simulation_recorded, exec.net_return_composed, exec.replay_manifest_frozen, exec.adapter_resolved, exec.shadow_positions_aggregated, exec.quote_evidence_recorded, exec.observation_plan_issued); the remaining events extend the declared schema with the result fields of the read-only domain computation that fires them (scenario hash-pinning, §8.2 classification, tradability gate decision, parity evaluation, degradation record, route selection) — every listed field is produced by the corresponding code path (packages/execution-simulator, packages/pool-math), and no field is listed that a code path cannot populate.",
   "requirementsCovered": [
     "FR-EXEC-001",
     "FR-EXEC-002",
@@ -51,6 +51,7 @@
           "type": "string(COMPLETE|BOUNDED_APPROXIMATION)",
           "required": true
         },
+        { "name": "empiricalActionDelayPolicyId", "type": "string|undefined", "required": false },
         { "name": "registeredHash", "type": "string<sha256-ref>", "required": true }
       ]
     },

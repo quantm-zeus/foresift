@@ -100,10 +100,26 @@ export function priceImpactBpsBeforeAfter(
   reserveOut: bigint,
   amountInAfterFee: bigint,
 ): number {
-  const spotBefore = Number(reserveOut) / Number(reserveIn);
+  // Boundary guard (FR-EXEC-015): raw reserves beyond the double range would
+  // project to 0/Infinity and silently understate or corrupt the impact
+  // reading. Amounts stay exact BigInt; the impact projection refuses instead
+  // of reporting a number that cannot be trusted.
+  const nReserveIn = Number(reserveIn);
+  const nReserveOut = Number(reserveOut);
   const newIn = reserveIn + amountInAfterFee;
   const newOut = reserveOut - constantProductOut(amountInAfterFee, reserveIn, reserveOut);
-  const spotAfter = Number(newOut) / Number(newIn);
+  const nNewIn = Number(newIn);
+  const nNewOut = Number(newOut);
+  if (
+    !Number.isFinite(nReserveIn) ||
+    !Number.isFinite(nReserveOut) ||
+    !Number.isFinite(nNewIn) ||
+    !Number.isFinite(nNewOut)
+  ) {
+    throw new RangeError('price impact is not representable: reserves exceed the double range');
+  }
+  const spotBefore = nReserveOut / nReserveIn;
+  const spotAfter = nNewOut / nNewIn;
   if (spotBefore === 0) return 0;
   return Math.max(0, ((spotBefore - spotAfter) / spotBefore) * 10_000);
 }
@@ -239,23 +255,39 @@ export class ConstantProductAdapter implements PoolMathAdapter {
     const direction = quoteDirection(input, input.poolState);
     const feeBps = feeBpsOf(input.poolState);
     requirePositive(input.rawAmountOut, 'rawAmountOut');
+    if (input.rawAmountOut >= (direction === 'ZERO_TO_ONE'
+      ? curve.reserveOneRaw
+      : curve.reserveZeroRaw)) {
+      throw new RangeError('requested output at or above the output reserve');
+    }
     const [reserveIn, reserveOut] =
       direction === 'ZERO_TO_ONE'
         ? [curve.reserveZeroRaw, curve.reserveOneRaw]
         : [curve.reserveOneRaw, curve.reserveZeroRaw];
-    const grossOut = input.rawAmountOut;
-    // The net output the trader demands; the pool must produce
-    // out/(1-fee) gross so that the trader receives the requested amount.
+    // Exact minimal input for the demanded net output. constantProductIn
+    // yields the minimum POST-FEE input aMin whose pool output reaches the
+    // demand; the gross input is the ceiling of aMin grossed back over the
+    // fee. applyFee floors its operand, but the ceiling guarantees the
+    // floored result still covers aMin, so the executed path
+    // applyFee -> constantProductOut delivers AT LEAST the requested amount
+    // (conservative law) and no smaller input can (minimal law). The
+    // delivered amount is reported as executed, never as the raw demand.
+    const afterFeeNeeded = constantProductIn(input.rawAmountOut, reserveIn, reserveOut);
+    const bps = BigInt(requireBps(feeBps));
+    if (bps === 10_000n) {
+      throw new RangeError('pool fee consumes the entire input; no exact-out trade can execute');
+    }
     const grossRequired =
-      (grossOut * 10_000n) / (10_000n - BigInt(feeBps)) +
-      ((grossOut * 10_000n) % (10_000n - BigInt(feeBps)) === 0n ? 0n : 1n);
-    const inRequired = constantProductIn(grossRequired, reserveIn, reserveOut);
+      (afterFeeNeeded * 10_000n) / (10_000n - bps) +
+      ((afterFeeNeeded * 10_000n) % (10_000n - bps) === 0n ? 0n : 1n);
+    const afterFee = applyFee(grossRequired, feeBps);
+    const modeledOut = constantProductOut(afterFee, reserveIn, reserveOut);
     return {
-      rawAmountIn: inRequired,
-      rawAmountOut: grossOut,
-      feeRawAmount: grossRequired - grossOut,
-      priceImpactBps: priceImpactBpsBeforeAfter(reserveIn, reserveOut, grossRequired),
-      minimumOutputRaw: grossOut,
+      rawAmountIn: grossRequired,
+      rawAmountOut: modeledOut,
+      feeRawAmount: grossRequired - afterFee,
+      priceImpactBps: priceImpactBpsBeforeAfter(reserveIn, reserveOut, afterFee),
+      minimumOutputRaw: input.rawAmountOut,
     };
   }
 

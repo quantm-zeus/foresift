@@ -1,6 +1,6 @@
 /**
  * AC-235 acceptance (positive) — full stress scenario matrix recording and pass matrix enforcement (FR-EXEC-017).
- * Traces: FR-EXEC-012, FR-EXEC-017, AC-235.
+ * Traces: FR-EXEC-012, FR-EXEC-017, AC-235, T039.
  * AC text: "Base, p50, p90, conservative latency/adverse-selection, liquidity drawdown,
  * fee volatility, and route-degradation scenarios are all recorded and the active policy enforces its declared pass matrix."
  */

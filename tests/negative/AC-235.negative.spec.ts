@@ -1,6 +1,6 @@
 /**
  * AC-235 negative (failure) — passing incomplete matrix or silently weakened matrix is refused.
- * Traces: FR-EXEC-012, FR-EXEC-017, AC-235.
+ * Traces: FR-EXEC-012, FR-EXEC-017, AC-235, T039.
  * Refusal: Attempting to confirm tradability when the scenario matrix is incomplete or missing required pass keys is refused.
  */
 import { describe, expect, it } from 'bun:test';

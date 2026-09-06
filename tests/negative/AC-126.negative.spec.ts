@@ -1,6 +1,6 @@
 /**
  * AC-126 negative (failure) — tradable success from below-floor-resolution snapshot is refused.
- * Traces: FR-EXEC-004, FR-EXEC-011, AC-126.
+ * Traces: FR-EXEC-004, FR-EXEC-011, AC-126, T034.
  * Refusal: Attempting to prove TRADABLE_SUCCESS from a snapshot below the required resolution floor without an active plan is refused.
  */
 import { describe, expect, it } from 'bun:test';

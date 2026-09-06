@@ -1,6 +1,6 @@
 /**
  * AC-126 acceptance (positive) — low-resolution price snapshot supports signal label only (§64.14, FR-EXEC-011).
- * Traces: FR-EXEC-004, FR-EXEC-011, AC-126.
+ * Traces: FR-EXEC-004, FR-EXEC-011, AC-126, T034.
  * AC text: "A low-resolution price snapshot supports a signal label but cannot establish a short-lived
  * executable target or tradable success without the required observation plan."
  */

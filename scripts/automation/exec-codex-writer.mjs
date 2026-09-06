@@ -52,6 +52,12 @@ export function classifyCodexExit(result) {
   if (result?.error?.code === 'ETIMEDOUT') return 'TIMEOUT';
   if (result?.status === 0) return 'SUCCESS';
   const detail = `${result?.stderr ?? ''}\n${result?.stdout ?? ''}`;
+  // Provider auth death (live 56ff5563/e9631c56: 401 Unauthorized + refresh
+  // token already used) is a PROVIDER failure, never a semantic one — the
+  // old classification cleared the pool latch and burned retry churn on a
+  // dead credential.
+  if (/\b401\b|\bunauthorized\b|refresh token was already used|please log (?:out|in)/i.test(detail))
+    return 'AUTH_PROVIDER_FAILURE';
   if (/429|rate.?limit|temporar|connection|timeout|unavailable/i.test(detail))
     return 'TRANSIENT_PROVIDER_FAILURE';
   return 'SEMANTIC_OR_PROVIDER_FAILURE';
@@ -90,6 +96,13 @@ export function codexProviderEvent(classification, detail) {
   if (/\bout of credits\b|\badd credits to continue\b/i.test(text)) return { event: 'exhausted' };
   if (/\busage.?limit\b|\bquota\b|\bexhaust(?:ed|ion)\b|\busage limit reached\b/i.test(text))
     return { event: 'exhausted' };
+  // Auth death (401/refresh-token reuse): the provider is UNAVAILABLE for
+  // every subsequent call until re-credentialing — latch it so the next
+  // acquire denies and the lane hands off, instead of 'unknown' clearing
+  // the latch and retry-churning a dead credential.
+  if (classification === 'AUTH_PROVIDER_FAILURE') return { event: 'unavailable' };
+  if (/\b401\b|\bunauthorized\b|refresh token was already used/i.test(text))
+    return { event: 'unavailable' };
   return { event: 'unknown' };
 }
 
@@ -219,27 +232,68 @@ export function runCodexWriter(input) {
     }
     throw new Error(`CODEX_WRITER_PERMIT_DENIED: ${permit.reason}`);
   }
+  const invokeCodex = input['codex-invoker'] ?? null; // test seam; production undefined
   let run;
   try {
-    run = spawnSync(command[0], command.slice(1), {
-      cwd: input.worktree,
-      input: `${prompt}\n`,
-      encoding: 'utf8',
-      timeout: Number(input['timeout-ms'] ?? 45 * 60_000),
-      maxBuffer: 64 * 1024 * 1024,
-    });
+    run = invokeCodex
+      ? invokeCodex()
+      : spawnSync(command[0], command.slice(1), {
+          cwd: input.worktree,
+          input: `${prompt}\n`,
+          encoding: 'utf8',
+          timeout: Number(input['timeout-ms'] ?? 45 * 60_000),
+          maxBuffer: 64 * 1024 * 1024,
+        });
   } finally {
     // Finally-equivalent release immediately AFTER lane termination (H2 §2).
     releaseLanePermit(stateDir, holder, 'codex');
   }
   const classification = classifyCodexExit(run);
+  const providerDetail = `${run?.stderr ?? ''}\n${run?.stdout ?? ''}`;
   // Engine-specific attribution (H2 §5/§6): healthy outcomes feed the Codex
   // quota machine; failures feed ONLY the Codex pool. Claude is untouched.
   try {
-    const event = codexProviderEvent(classification, `${run?.stderr ?? ''}\n${run?.stdout ?? ''}`);
+    const event = codexProviderEvent(classification, providerDetail);
     observeCodexOutcome(stateDir, event);
   } catch {
     /* attribution is best-effort telemetry; never mask the lane verdict */
+  }
+  // In-flight handoff (directive §8, live 56ff5563/e9631c56): when THIS
+  // invocation itself proved provider death — daily quota exhaustion or
+  // auth failure — do NOT throw the whole wave into a package-level
+  // QUOTA_DAILY park. Hand the SAME logical lane to Claude here: identical
+  // brief/worktree/task ids, no duplicate generation, no dual permits (the
+  // codex permit was already released above; executeHandoffToClaude only
+  // acquires the Claude permit under the same holder).
+  if (classification === 'AUTH_PROVIDER_FAILURE' && input['allow-engine-handoff'] !== 'false') {
+    return executeHandoffToClaude({
+      stateDir,
+      holder,
+      packageId: input.package,
+      generation,
+      laneId: input.lane,
+      runId: input['run-id'] ?? process.env.FORESIFT_RUN_ID ?? null,
+      resultDir,
+      releaseCodex: false, // released above; never double-release
+      handoffReason: `codex provider dead in-flight: ${providerDetail.slice(0, 160)}`,
+      executeWithClaude: () =>
+        runClaudeLaneCore({
+          lane: input.lane,
+          briefPath: input.brief,
+          worktree: input.worktree,
+          resultsDir: resultDir,
+          packageId: input.package,
+          generation,
+          runId: input['run-id'] ?? process.env.FORESIFT_RUN_ID ?? null,
+          taskIds: route.taskIds,
+          taskGraphPath: input['task-graph'] ?? null,
+          stateDir,
+          holder,
+          handedOffFrom: 'CODEX',
+          timeoutMs: input['timeout-ms'],
+          'claude-invoker': input['claude-invoker'] ?? null,
+        }),
+    });
   }
   writeFileSync(join(resultDir, 'codex-run.jsonl'), run.stdout ?? '');
   writeFileSync(

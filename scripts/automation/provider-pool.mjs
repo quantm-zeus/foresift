@@ -331,6 +331,14 @@ export function observeCodexOutcome(stateDir, { event, resetAt = null, now = Dat
       case 'unknown':
         next = prev === 'HEALTHY' ? 'UNKNOWN' : prev;
         break;
+      // Provider auth death (401/credential invalidation): unavailable for
+      // every subsequent call until re-credentialing. Latch EXHAUSTED (no
+      // resetAt) so the next acquire denies with CODEX_QUOTA_EXHAUSTED and
+      // the lane hands off to the healthy fallback instead of retry-churning
+      // a dead credential.
+      case 'unavailable':
+        next = 'EXHAUSTED';
+        break;
       default:
         invariant(false, 'UNKNOWN_CODEX_EVENT', String(event));
     }

@@ -2915,7 +2915,10 @@ async function cmdRecoverFatal(positionalRunId) {
     branch =
       kind === 'maintenance' ? testRuntimePolicy.migrationBranch : 'foresift/milestone-planning';
   }
-  // No duplicate product run may exist for this logical package.
+  // No duplicate product run may exist for this logical package — unless the
+  // paused run is terminal and the live sibling IS the continuation: adopt it
+  // (live 2026-09-06: a quota-paused package sat behind a healthy fresh run
+  // because the guard refused recovery that would have adopted it).
   const list = archonJson('workflow runs --json --limit 20');
   const rows = Array.isArray(list) ? list : (list?.runs ?? []);
   const others = rows.filter(
@@ -2925,10 +2928,22 @@ async function cmdRecoverFatal(positionalRunId) {
       String(r.status) === 'running' &&
       r.id !== runId,
   );
-  if (others.length > 0)
+  const pausedRunTerminal =
+    runId && ['failed', 'paused', 'cancelled', 'completed'].includes(String(row?.status));
+  if (others.length > 0 && !(pausedRunTerminal && others.length === 1))
     return fail(
       `another running workflow (${others[0].id}) already exists for ${message} — resolve it first to avoid duplicates`,
     );
+  if (others.length === 1 && pausedRunTerminal) {
+    // Adopt the live sibling as the recovery identity (adoption, not launch).
+    const adopted = others[0];
+    record(st, 'operator_recovery_adopted_live_run', {
+      deadRunId: runId,
+      adoptedRunId: adopted.id,
+    });
+    runId = adopted.id;
+    row = { ...adopted, id: adopted.id, status: String(adopted.status) };
+  }
   // Exactly one continuation: resume the same run when possible.
   let resumed = false;
   let freshAdmission = null;

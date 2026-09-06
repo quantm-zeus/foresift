@@ -1,6 +1,6 @@
 /**
  * AC-236 negative (failure) — independent full-depth consumption and permutation non-determinism refused.
- * Traces: FR-EXEC-019, AC-236.
+ * Traces: FR-EXEC-019, AC-236, T040.
  * Refusal: Permitting simultaneous shadow positions to independently consume the same pool depth without aggregate impact,
  * or non-deterministic execution ordering across runs, is refused.
  */

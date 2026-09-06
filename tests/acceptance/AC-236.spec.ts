@@ -1,6 +1,6 @@
 /**
  * AC-236 acceptance (positive) — concurrent shadow position depth aggregation & fill competition (FR-EXEC-019).
- * Traces: FR-EXEC-019, AC-236.
+ * Traces: FR-EXEC-019, AC-236, T040.
  * AC text: "Two simultaneous shadow exits sharing one pool cannot each consume the full pre-exit depth;
  * aggregate impact and fill competition reduce or reject fills deterministically."
  */

@@ -1,5 +1,5 @@
 {
-  "$comment": "Transfer fees, hooks, rent, and unknown-required semantics vectors (FR-EXEC-013, FR-EXEC-018, AC-121, AC-233, §64.9).",
+  "$comment": "Transfer fees, hooks, rent, and unknown-required semantics vectors (FR-EXEC-013, FR-EXEC-018, AC-121, AC-233, §64.9, T026).",
   "tokens": [
     {
       "tokenMint": "solana:5eykt4UsFv8P8NJdTREpY1vzqKqZKvdp/token/Token2022StandardFee1111111111111111111",

@@ -1,5 +1,5 @@
 {
-  "$comment": "Historical observed trade and reference quote parity vectors (FR-EXEC-016, AC-231, §64.11).",
+  "$comment": "Historical observed trade and reference quote parity vectors (FR-EXEC-016, AC-231, §64.11, T026).",
   "trades": [
     {
       "tradeId": "trade_cpmm_observed_001",

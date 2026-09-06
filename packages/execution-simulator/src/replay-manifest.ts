@@ -180,7 +180,6 @@ export function freezeReplayManifest(input: FreezeManifestInput): ReplayManifest
   }
 
   const hash = assumptionsHash(input.assumptions);
-  void hash;
   return {
     replayId: input.replayId,
     asOf: input.asOf,
@@ -205,6 +204,10 @@ export function freezeReplayManifest(input: FreezeManifestInput): ReplayManifest
     artifactIds: [...input.artifactIds],
     holdoutExposureSnapshotId: input.holdoutExposureSnapshotId,
     codeAndDependencyHash: input.codeAndDependencyHash,
+    // FR-EXEC-010: the frozen assumption hash is recorded on the manifest so
+    // a frozen replay verifies assumption equality (AC-127), not just
+    // version-list membership.
+    assumptionsHash: hash,
   };
 }
 
@@ -236,6 +239,15 @@ export function verifyReproduction(input: {
   }
   if (manifest.outcomeProfileVersion !== input.evaluatingAssumptions.outcomeProfileVersion) {
     return { reproduces: false, reason: 'OUTCOME_PROFILE_DRIFT' };
+  }
+  // AC-127: when the frozen manifest carries the assumptions hash, the
+  // evaluating run must hash-identify the identical assumption set —
+  // same version lists with different payloads is drift, not reproduction.
+  if (manifest.assumptionsHash !== undefined) {
+    const evaluating = assumptionsHash(input.evaluatingAssumptions);
+    if (evaluating !== manifest.assumptionsHash) {
+      return { reproduces: false, reason: 'ASSUMPTIONS_HASH_DRIFT' };
+    }
   }
   return { reproduces: true, reason: null };
 }

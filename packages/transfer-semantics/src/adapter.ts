@@ -115,7 +115,10 @@ export class TransferSemanticsAdapter {
         resolution: 'REFUSED',
         executionStatus: ExecutionStatus.EXECUTION_UNAVAILABLE,
         refusal: 'UNSUPPORTED_PROGRAM',
-        qualityCodes: ['POOL_MATH_UNSUPPORTED'],
+        // Closed-vocabulary quality codes only (must satisfy QualityCodesSchema
+        // at the shared-schemas boundary); the transfer plane has no pool-math
+        // involvement, so a program mismatch is plain EXECUTION_UNAVAILABLE.
+        qualityCodes: ['EXECUTION_UNAVAILABLE'],
       };
     }
     if (!this.supportedProgramVersions.includes(query.programVersion)) {
@@ -131,7 +134,7 @@ export class TransferSemanticsAdapter {
         resolution: 'REFUSED',
         executionStatus: ExecutionStatus.EXECUTION_UNAVAILABLE,
         refusal: 'UNSUPPORTED_PROGRAM_VERSION',
-        qualityCodes: ['ACCOUNT_LAYOUT_VERSION_UNSUPPORTED'],
+        qualityCodes: ['UNSUPPORTED_PROGRAM_VERSION'],
       };
     }
     return {

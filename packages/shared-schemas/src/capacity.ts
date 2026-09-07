@@ -302,3 +302,22 @@ export const BorrowedReserveSchema = z
     message: 'borrowedByClass must differ from reserveClass',
   });
 export type BorrowedReserve = z.infer<typeof BorrowedReserveSchema>;
+
+/**
+ * A budget-dimension cost denial (FR-COST-011 audit law): the refused
+ * dimension and the full §62.12 rendered classes at refusal time, so a
+ * denial can never launder a nonzero class into a "zero total" story.
+ */
+export const BudgetDimensionDenialRecordSchema = z
+  .object({
+    denialId: z.string().min(1).optional(),
+    dimension: BudgetDimensionSchema,
+    candidate: z.string().min(1),
+    caller: z.string().min(1),
+    reason: z.string().min(1),
+    alternative: z.string().min(1),
+    renderedClasses: RenderedSpendClassesSchema,
+    occurredAt: UtcTimestampSchema.optional(),
+  })
+  .strict();
+export type BudgetDimensionDenialRecord = z.infer<typeof BudgetDimensionDenialRecordSchema>;

@@ -6,6 +6,7 @@ import {
   BudgetConsumptionTotalsSchema,
   BudgetPolicySchema,
   BorrowedReserveSchema,
+  BudgetDimensionDenialRecordSchema,
   CostAttributionSchema,
   DegradationOrderStepSchema,
   DegradationPolicyRowSchema,
@@ -227,6 +228,7 @@ export const COST_SCHEMAS = {
   ForecastReconciliation: ForecastReconciliationSchema,
   CostAttribution: CostAttributionSchema,
   BorrowedReserve: BorrowedReserveSchema,
+  BudgetDimensionDenialRecord: BudgetDimensionDenialRecordSchema,
 } as const;
 export type CostSchemaName = keyof typeof COST_SCHEMAS;
 export function parseCostSchema<T extends CostSchemaName>(

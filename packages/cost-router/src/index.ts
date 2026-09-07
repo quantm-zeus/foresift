@@ -6,3 +6,5 @@ export * from './batch-coalescer.ts';
 export * from './cost-audit.ts';
 export * from './paid-policy.ts';
 export * from './quota-adapter.ts';
+export * from './budget-policy.ts';
+export * from './composition.ts';

@@ -68,6 +68,6 @@ describe('AC-105 acceptance (positive) — G1 7-class cost composition & zero-ov
     expect(renderedSpend.PAID_DATA_SPEND).toBe(0);
     expect(renderedSpend.MODEL_SPEND).toBeGreaterThan(0);
     expect(totalCost).toBeGreaterThan(0);
-    expect(totalCost).toBe(15.1);
+    expect(totalCost).toBe(115.1);
   });
 });

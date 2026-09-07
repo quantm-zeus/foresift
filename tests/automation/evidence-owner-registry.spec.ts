@@ -645,9 +645,11 @@ describe('production wiring (directive 3): the wave pipeline actually invokes th
     expect(fastGreen).toContain('evidence-owner-registry.mjs');
     expect(fastGreen).toContain('--package "$PKG"');
     expect(fastGreen).toContain('--graph "$ARTIFACTS_DIR/task-graph.json"');
-    // the invocation sits inside the FAST-green branch (after the exit-code
-    // capture, before the green echo)
-    expect(fastGreen.indexOf('evidence-owner-registry.mjs')).toBeGreaterThan(
+    // the invocation sits inside the integrate-and-fast node BEFORE the
+    // wave-fast-verdict capture: the registry is the §6 already-satisfied
+    // audit PRE-pass (PR #190) that can close coordinator units and flip
+    // integration-empty into coordinator-owned progress before FAST runs.
+    expect(fastGreen.indexOf('evidence-owner-registry.mjs')).toBeLessThan(
       fastGreen.indexOf('wave-fast-verdict.json'),
     );
   });

@@ -10,8 +10,11 @@
  * re-attempted or counted as filled.
  *
  * Fail-closed: quantities are decimal strings (never JS numbers), fractions
- * are finite [0,1], and an EXECUTED_FULL result with a non-1 fill fraction is
- * refused.
+ * are finite [0,1], an EXECUTED_FULL result with a non-1 fill fraction is
+ * refused, and a modeled impact above the scenario's pre-registered
+ * `maximumEntryImpact` (§64.2) is refused — a target counts for tradable
+ * success only when the modeled entry executes within the impact limit
+ * (§64.13), so the limit is a required input, never optional.
  *
  * Traces: FR-EXEC-002, FR-EXEC-003, FR-EXEC-018, AC-121.
  */
@@ -50,6 +53,12 @@ export interface EntryFillInput {
   readonly routeUncertainty: EntryRouteUncertainty;
   /** Partial-fill policy: minimum fill fraction the scenario accepts. */
   readonly minimumFillFraction: number;
+  /**
+   * Scenario impact ceiling (§64.2 `maximumEntryImpact`, fraction [0,1]).
+   * The modeled entry must execute within it — a fill above the
+   * pre-registered limit cannot satisfy the executable-target law (§64.13).
+   */
+  readonly maximumImpact: number;
   /** Net-return cost legs for this entry (§64.9). */
   readonly netReturn: NetReturnInput;
 }
@@ -73,6 +82,10 @@ export interface EntryFillResult {
   readonly completedAt: string;
   readonly status: ExecutionStatus;
   readonly routeUncertainty: EntryRouteUncertainty;
+  /** The scenario impact ceiling the fill was modeled against (§64.2). */
+  readonly maximumImpact: number;
+  /** True when both impact legs stayed at or under the scenario ceiling. */
+  readonly withinImpactLimit: boolean;
   readonly netReturn: NetReturnBreakdown;
 }
 
@@ -126,6 +139,7 @@ export function modelEntryFill(input: EntryFillInput): EntryFillResult {
   const marginal = requireFraction(input.marginalPriceImpact, 'marginalPriceImpact');
   const average = requireFraction(input.averagePriceImpact, 'averagePriceImpact');
   const minimumFillFraction = requireFraction(input.minimumFillFraction, 'minimumFillFraction');
+  const maximumImpact = requireFraction(input.maximumImpact, 'maximumImpact');
   requireSlotOrder(input.startSlot, input.completionSlot);
 
   const requestedValue = BigInt(requested.split('.')[0] ?? '0');
@@ -163,6 +177,19 @@ export function modelEntryFill(input: EntryFillInput): EntryFillResult {
     });
   }
 
+  // §64.2/§64.13: the modeled entry must execute within the scenario's
+  // pre-registered impact ceiling — a fill whose marginal or average impact
+  // exceeds it is refused, never silently recorded as executable.
+  const withinImpactLimit = marginal <= maximumImpact && average <= maximumImpact;
+  if (!withinImpactLimit) {
+    throw new ExecVocabularyError(ExecErrorCode.EXEC_LABEL_CLAUSES_INVALID, {
+      refused: 'ENTRY_IMPACT_EXCEEDS_SCENARIO_LIMIT',
+      marginalPriceImpact: marginal,
+      averagePriceImpact: average,
+      maximumImpact,
+    });
+  }
+
   const unfilledValue = requestedValue - filledValue - failedValue;
   return {
     fillId: input.fillId,
@@ -182,6 +209,8 @@ export function modelEntryFill(input: EntryFillInput): EntryFillResult {
     completedAt: input.completedAt,
     status: input.status,
     routeUncertainty: input.routeUncertainty,
+    maximumImpact,
+    withinImpactLimit,
     netReturn: composeNetReturn(input.netReturn),
   };
 }

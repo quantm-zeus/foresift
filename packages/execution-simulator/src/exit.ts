@@ -11,6 +11,10 @@
  * the path-ambiguity flag set; the optimistic ordering is secondary
  * analysis only and is never the primary record.
  *
+ * The modeled exit must also execute within the scenario's pre-registered
+ * impact ceiling (§64.2 `maximumExitImpact`, §64.13) — the ceiling is a
+ * required input, and a fill above it is refused, never silently recorded.
+ *
  * Traces: FR-EXEC-002, FR-EXEC-003, FR-EXEC-018, AC-238.
  */
 import {
@@ -61,6 +65,13 @@ export interface ExitModelInput {
   readonly requestedQuantity: string;
   readonly filledQuantity: string;
   readonly averageExecutionPrice: string;
+  /** Volume-weighted modeled price impact of the exit fill, fraction [0,1]. */
+  readonly modeledPriceImpact: number;
+  /**
+   * Scenario impact ceiling (§64.2 `maximumExitImpact`, fraction [0,1]).
+   * The modeled exit must execute within it (§64.13).
+   */
+  readonly maximumImpact: number;
   readonly status: ExecutionStatus;
   /** Net-return cost legs for this exit (§64.9). */
   readonly netReturn: NetReturnInput;
@@ -92,6 +103,12 @@ export interface ExitModelResult {
   readonly filledQuantity: string;
   readonly fillFraction: number;
   readonly averageExecutionPrice: string;
+  /** Volume-weighted modeled price impact of the exit fill (§64.6/§64.7). */
+  readonly modeledPriceImpact: number;
+  /** The scenario impact ceiling the fill was modeled against (§64.2). */
+  readonly maximumImpact: number;
+  /** True when the modeled exit impact stayed at or under the ceiling. */
+  readonly withinImpactLimit: boolean;
   readonly status: ExecutionStatus;
   readonly netReturn: NetReturnBreakdown;
   /** Primary ordering: ADVERSE_FEASIBLE when ambiguous (never optimistic). */
@@ -116,6 +133,17 @@ function requireDecimal(value: string, label: string): string {
 
 function requireIsoZ(value: string, label: string): string {
   if (typeof value !== 'string' || !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d+)?Z$/.test(value)) {
+    throw new ExecVocabularyError(ExecErrorCode.EXEC_LABEL_CLAUSES_INVALID, {
+      refused: 'EXIT_FIELD_INVALID',
+      field: label,
+      value,
+    });
+  }
+  return value;
+}
+
+function requireFraction(value: number, label: string): number {
+  if (typeof value !== 'number' || !Number.isFinite(value) || value < 0 || value > 1) {
     throw new ExecVocabularyError(ExecErrorCode.EXEC_LABEL_CLAUSES_INVALID, {
       refused: 'EXIT_FIELD_INVALID',
       field: label,
@@ -185,6 +213,8 @@ export function modelExit(input: ExitModelInput): ExitModelResult {
   const requested = requireDecimal(input.requestedQuantity, 'requestedQuantity');
   const filled = requireDecimal(input.filledQuantity, 'filledQuantity');
   requireDecimal(input.averageExecutionPrice, 'averageExecutionPrice');
+  const maximumImpact = requireFraction(input.maximumImpact, 'maximumImpact');
+  const modeledPriceImpact = requireFraction(input.modeledPriceImpact, 'modeledPriceImpact');
   const requestedValue = BigInt(requested.split('.')[0] ?? '0');
   const filledValue = BigInt(filled.split('.')[0] ?? '0');
   if (filledValue > requestedValue) {
@@ -196,6 +226,19 @@ export function modelExit(input: ExitModelInput): ExitModelResult {
   }
   const fillFraction =
     requestedValue === 0n ? 0 : Number((filledValue * 10_000n) / requestedValue) / 10_000;
+
+  // §64.2/§64.13: the modeled exit must execute within the scenario's
+  // pre-registered impact ceiling — the modeled price impact of the fill
+  // may not exceed it. An over-limit exit is refused rather than silently
+  // recorded as an executable exit.
+  const withinImpactLimit = modeledPriceImpact <= maximumImpact;
+  if (!withinImpactLimit) {
+    throw new ExecVocabularyError(ExecErrorCode.EXEC_LABEL_CLAUSES_INVALID, {
+      refused: 'EXIT_IMPACT_EXCEEDS_SCENARIO_LIMIT',
+      modeledPriceImpact,
+      maximumImpact,
+    });
+  }
 
   // §64.7 / FR-MAT-009: adverse-feasible primary ordering with the
   // path-ambiguity flag; optimistic ordering is secondary only.
@@ -230,6 +273,9 @@ export function modelExit(input: ExitModelInput): ExitModelResult {
     filledQuantity: filled,
     fillFraction,
     averageExecutionPrice: input.averageExecutionPrice,
+    modeledPriceImpact,
+    maximumImpact,
+    withinImpactLimit,
     status: input.status,
     netReturn: composeNetReturn(input.netReturn),
     primaryOrdering: ordering.primaryOrdering,

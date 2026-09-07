@@ -244,7 +244,7 @@ describe('production wiring: wave prep runs the pass before ANY provider can be 
       units: [graphUnit('T040', ['packages/z.ts'])],
       bound: { mainHeadSha: git('rev-parse', 'trusted-base').out },
     };
-    const report = preProviderReconciliation(graph, {
+    preProviderReconciliation(graph, {
       root: ROOT,
       packageId: 'pkg-x',
       reportPath: join(ROOT, 'reconciliation-report.json'),

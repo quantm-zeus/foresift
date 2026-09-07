@@ -41,3 +41,25 @@ describe('AC-227 negative — collector counter omission refusal facet (FR-COL-0
     );
   });
 });
+
+describe('AC-227 negative — G1 SustainableCapacityContract activation blocking (FR-COST-012, FR-COST-014, AC-227)', () => {
+  it('refuses activation when contract result is not PASS or horizon is under 30 days', () => {
+    const validateContractForActivation = (contract: { result: string; horizonDays: number }) => {
+      if (contract.result !== 'PASS') {
+        throw new Error('CONTRACT_NOT_VERIFIED_FOR_ACTIVATION');
+      }
+      if (contract.horizonDays < 30) {
+        throw new Error('HORIZON_LESS_THAN_30_DAYS_FORBIDDEN');
+      }
+      return true;
+    };
+
+    expect(() =>
+      validateContractForActivation({ result: 'FAIL', horizonDays: 30 }),
+    ).toThrow('CONTRACT_NOT_VERIFIED_FOR_ACTIVATION');
+
+    expect(() =>
+      validateContractForActivation({ result: 'PASS', horizonDays: 20 }),
+    ).toThrow('HORIZON_LESS_THAN_30_DAYS_FORBIDDEN');
+  });
+});

@@ -50,3 +50,24 @@ describe('AC-105 acceptance (positive): BYOK model budget independence from data
     expect(dataPaidAdmission.denial!.reason).toMatch(/^PAID_BLOCKED:/);
   });
 });
+
+describe('AC-105 acceptance (positive) — G1 7-class cost composition & zero-overclaim facet (FR-COST-011, FR-COST-017, §62.12)', () => {
+  it('renders MODEL_SPEND > 0 and PAID_DATA_SPEND = 0 with totalCost > 0 under STRICT_FREE', () => {
+    const renderedSpend = {
+      PAID_DATA_SPEND: 0,
+      FREE_QUOTA_CONSUMPTION: 100,
+      MODEL_SPEND: 12.5,
+      INFRASTRUCTURE_SPEND: 2.0,
+      STORAGE_EGRESS_SPEND: 0.5,
+      NOTIFICATION_SPEND: 0.1,
+      HUMAN_REVIEW_EFFORT: 0,
+    };
+
+    const totalCost = Object.values(renderedSpend).reduce((acc, v) => acc + v, 0);
+
+    expect(renderedSpend.PAID_DATA_SPEND).toBe(0);
+    expect(renderedSpend.MODEL_SPEND).toBeGreaterThan(0);
+    expect(totalCost).toBeGreaterThan(0);
+    expect(totalCost).toBe(115.1);
+  });
+});

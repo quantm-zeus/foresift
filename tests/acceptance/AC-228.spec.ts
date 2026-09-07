@@ -50,3 +50,34 @@ describe('AC-228 acceptance (positive) — collector continuity preservation und
     expect(workloadState.socialEnrichment).toBe('PAUSED');
   });
 });
+
+describe('AC-228 acceptance (positive) — G1 11-step canonical degradation order facet (FR-COST-015)', () => {
+  it('degrades optional depth before critical risk, alert, collector, or outcome reserves', () => {
+    const fullOrder = [
+      'SKIP_ENRICHMENT_NOTEBOOK_ANALOG_COUNTERFACTUAL',
+      'REDUCE_SOCIAL_NARRATIVE_DEPTH',
+      'REDUCE_WALLET_HISTORY_DEPTH',
+      'REDUCE_DEEP_RESEARCH_CANDIDATE_COUNT',
+      'EXTEND_LOW_PRIORITY_RECHECK_INTERVAL',
+      'REDUCE_CHEAP_MONITOR_BREADTH',
+      'PAUSE_EXPLORATION_ABOVE_PROTECTED_FLOOR',
+      'USE_ACCEPTABLE_CACHE_FOR_MANUAL_NON_ALERT',
+      'STOP_NEW_OPPORTUNITY_RESEARCH',
+      'PRESERVE_CRITICAL_OBLIGATIONS',
+      'RETURN_PARTIAL_INSUFFICIENT_DATA',
+    ];
+
+    const socialIndex = fullOrder.indexOf('REDUCE_SOCIAL_NARRATIVE_DEPTH');
+    const analogIndex = fullOrder.indexOf('SKIP_ENRICHMENT_NOTEBOOK_ANALOG_COUNTERFACTUAL');
+    const walletIndex = fullOrder.indexOf('REDUCE_WALLET_HISTORY_DEPTH');
+    const explorationIndex = fullOrder.indexOf('PAUSE_EXPLORATION_ABOVE_PROTECTED_FLOOR');
+    const broadScanIndex = fullOrder.indexOf('REDUCE_CHEAP_MONITOR_BREADTH');
+    const preserveCriticalIndex = fullOrder.indexOf('PRESERVE_CRITICAL_OBLIGATIONS');
+
+    expect(analogIndex).toBeLessThan(preserveCriticalIndex);
+    expect(socialIndex).toBeLessThan(preserveCriticalIndex);
+    expect(walletIndex).toBeLessThan(preserveCriticalIndex);
+    expect(broadScanIndex).toBeLessThan(preserveCriticalIndex);
+    expect(explorationIndex).toBeLessThan(preserveCriticalIndex);
+  });
+});

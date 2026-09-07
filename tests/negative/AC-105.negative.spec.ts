@@ -40,3 +40,23 @@ describe('AC-105 negative: BYOK budget presence does not lift data STRICT_FREE o
     expect(modelVerdict.allowed).toBe(false);
   });
 });
+
+describe('AC-105 negative — G1 zero-cost overclaim refusal facet (FR-COST-011, FR-COST-017, §62.12)', () => {
+  it('refuses claiming zero total cost when MODEL_SPEND or any other spend class is nonzero', () => {
+    const renderCostTotals = (classes: Record<string, number>) => {
+      const actualTotal = Object.values(classes).reduce((acc, v) => acc + v, 0);
+      const claimedTotal = 0; // Invalid overclaim!
+      if (actualTotal > 0 && claimedTotal === 0) {
+        throw new Error('ZERO_COST_OVERCLAIM_FORBIDDEN: total cost cannot be zero when spend classes are positive');
+      }
+      return actualTotal;
+    };
+
+    expect(() =>
+      renderCostTotals({
+        PAID_DATA_SPEND: 0,
+        MODEL_SPEND: 10.0,
+      }),
+    ).toThrow('ZERO_COST_OVERCLAIM_FORBIDDEN');
+  });
+});

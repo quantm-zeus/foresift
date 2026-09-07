@@ -66,3 +66,81 @@ describe('quota-forecast migrations on PGlite', () => {
     ).rejects.toThrow();
   });
 });
+
+describe('g1_cost_0003_degradation_reconciliation SQL migration (FR-COST-016, FR-COST-017, AC-229)', () => {
+  it('enforces forecast_reconciliations symmetry and dimension constraints', async () => {
+    // Valid without breach
+    await engine.query(
+      `INSERT INTO cost.forecast_reconciliations
+         (reconciliation_id, contract_id, dimension, subject_id, forecast_value, actual_value, tolerance_fraction, breach_kind, incident_id, reconciled_at)
+       VALUES ('rec_valid_1', 'contract_valid_1', 'WORKLOAD', 'workload_discovery', 1000, 1050, 0.1, NULL, NULL, now())
+       ON CONFLICT (reconciliation_id) DO NOTHING`,
+    );
+
+    // Valid with breach
+    await engine.query(
+      `INSERT INTO cost.forecast_reconciliations
+         (reconciliation_id, contract_id, dimension, subject_id, forecast_value, actual_value, tolerance_fraction, breach_kind, incident_id, reconciled_at)
+       VALUES ('rec_valid_2', 'contract_valid_1', 'OPERATION', 'op_helius', 1000, 1500, 0.1, 'MATERIAL_UNDERESTIMATION', 'inc_123', now())
+       ON CONFLICT (reconciliation_id) DO NOTHING`,
+    );
+
+    // Refuses breach without incident (symmetry CHECK)
+    await expect(
+      engine.query(
+        `INSERT INTO cost.forecast_reconciliations
+           (reconciliation_id, contract_id, dimension, subject_id, forecast_value, actual_value, tolerance_fraction, breach_kind, incident_id, reconciled_at)
+         VALUES ('rec_bad_1', 'contract_valid_1', 'OPERATION', 'op_helius', 1000, 1500, 0.1, 'MATERIAL_UNDERESTIMATION', NULL, now())`,
+      ),
+    ).rejects.toThrow();
+
+    // Refuses incident without breach (symmetry CHECK)
+    await expect(
+      engine.query(
+        `INSERT INTO cost.forecast_reconciliations
+           (reconciliation_id, contract_id, dimension, subject_id, forecast_value, actual_value, tolerance_fraction, breach_kind, incident_id, reconciled_at)
+         VALUES ('rec_bad_2', 'contract_valid_1', 'OPERATION', 'op_helius', 1000, 900, 0.1, NULL, 'inc_orphan', now())`,
+      ),
+    ).rejects.toThrow();
+
+    // Refuses invalid dimension
+    await expect(
+      engine.query(
+        `INSERT INTO cost.forecast_reconciliations
+           (reconciliation_id, contract_id, dimension, subject_id, forecast_value, actual_value, tolerance_fraction, breach_kind, incident_id, reconciled_at)
+         VALUES ('rec_bad_3', 'contract_valid_1', 'INVALID_DIM', 'op_helius', 1000, 900, 0.1, NULL, NULL, now())`,
+      ),
+    ).rejects.toThrow();
+  });
+
+  it('enforces cost_attributions unit_kind constraint', async () => {
+    const renderedJson = JSON.stringify({
+      PAID_DATA_SPEND: 0,
+      FREE_QUOTA_CONSUMPTION: 100,
+      MODEL_SPEND: 1.0,
+      INFRASTRUCTURE_SPEND: 0.5,
+      STORAGE_EGRESS_SPEND: 0.1,
+      NOTIFICATION_SPEND: 0.0,
+      HUMAN_REVIEW_EFFORT: 0,
+    });
+
+    // Valid attribution
+    await engine.query(
+      `INSERT INTO cost.cost_attributions
+         (attribution_id, contract_id, unit_kind, subject_id, marginal_cost, total_cost, rendered_classes, attributed_at)
+       VALUES ('attr_valid_1', 'contract_valid_1', 'RESEARCHED_CANDIDATE', 'cand_123', 0.05, 1.6, $1, now())
+       ON CONFLICT (attribution_id) DO NOTHING`,
+      [renderedJson],
+    );
+
+    // Refuses invalid unit_kind
+    await expect(
+      engine.query(
+        `INSERT INTO cost.cost_attributions
+           (attribution_id, contract_id, unit_kind, subject_id, marginal_cost, total_cost, rendered_classes, attributed_at)
+         VALUES ('attr_bad_unit', 'contract_valid_1', 'INVALID_UNIT_KIND', 'cand_123', 0.05, 1.6, $1, now())`,
+        [renderedJson],
+      ),
+    ).rejects.toThrow();
+  });
+});

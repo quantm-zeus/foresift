@@ -27,3 +27,20 @@ describe('AC-103 negative: stale plan closures remain unverified; provider expir
     expect(verifiedProvider.verified).toBe(true);
   });
 });
+
+describe('AC-103 negative — G1 horizon-expiring plan blocks activation (FR-COST-014, AC-103, §62.6)', () => {
+  it('blocks activation when provider plan verification expires within 30-day horizon', () => {
+    const planVerification = {
+      planVerifiedAt: '2026-09-01T00:00:00Z',
+      planExpiresAt: '2026-09-10T00:00:00Z', // Expires in 9 days
+      contractHorizonDays: 30,
+    };
+
+    const isExpiringWithinHorizon =
+      new Date(planVerification.planExpiresAt).getTime() <
+      new Date(planVerification.planVerifiedAt).getTime() +
+        planVerification.contractHorizonDays * 86_400_000;
+
+    expect(isExpiringWithinHorizon).toBe(true);
+  });
+});

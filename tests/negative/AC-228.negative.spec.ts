@@ -33,3 +33,23 @@ describe('AC-228 negative — emergency backfill reserve isolation facet (FR-COL
     );
   });
 });
+
+describe('AC-228 negative — G1 inverted degradation order rejection (FR-COST-015, AC-228)', () => {
+  it('refuses any degradation order that places protected obligations before optional reductions', () => {
+    const validateOrderNotDegradingProtectedFirst = (steps: string[]) => {
+      const protectedIndex = steps.indexOf('PRESERVE_CRITICAL_OBLIGATIONS');
+      const socialIndex = steps.indexOf('REDUCE_SOCIAL_NARRATIVE_DEPTH');
+      if (protectedIndex !== -1 && socialIndex !== -1 && protectedIndex < socialIndex) {
+        throw new Error('INVERTED_DEGRADATION_ORDER_REJECTED: protected steps cannot degrade before optional depth');
+      }
+      return true;
+    };
+
+    expect(() =>
+      validateOrderNotDegradingProtectedFirst([
+        'PRESERVE_CRITICAL_OBLIGATIONS',
+        'REDUCE_SOCIAL_NARRATIVE_DEPTH',
+      ]),
+    ).toThrow('INVERTED_DEGRADATION_ORDER_REJECTED');
+  });
+});

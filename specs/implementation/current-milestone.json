@@ -200,7 +200,7 @@
         "test -d packages/pool-math && bun test tests/acceptance/AC-230.spec.ts tests/acceptance/AC-237.spec.ts",
         "test -d packages/transfer-semantics && bun test packages/solana-security/test/transfer-semantics.spec.ts"
       ],
-      "status": "PENDING"
+      "status": "PROVEN"
     },
     {
       "id": "g1-signal-registry",

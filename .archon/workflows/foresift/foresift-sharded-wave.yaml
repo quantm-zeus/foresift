@@ -946,6 +946,14 @@ nodes:
     depends_on: [integrate-and-fast, fast-repair-loop]
     trigger_rule: none_failed_min_one_success   # blocks iff repair genuinely FAILED
     bash: |
+      # Phase-split timing telemetry (directive 2026-09-06 §6, zero AI): join
+      # the run's artifacts into ONE wall-clock phase table (prep,
+      # reconciliation, parallelism audit, per-lane provider time, FAST) so
+      # "where did the wall clock go" is answerable per run. Advisory only —
+      # never gates the settled verdict.
+      node scripts/automation/wave-timing-report.mjs \
+        --artifacts "$ARTIFACTS_DIR" \
+        --out "$ARTIFACTS_DIR/wave-timing.json" || true
       echo "WAVE_PHASE_SETTLED"
   # ── LANDING: push + discover-or-create exactly ONE PR (zero AI) ─────────────
   # The sharded wave is an implementation-only topology: its job ends with a

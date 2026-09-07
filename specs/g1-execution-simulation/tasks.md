@@ -484,10 +484,13 @@ manifests, then parity gates, then stress scenarios and degradation.
       FR-EXEC-022.
 - [ ] T047 [executor: COORDINATOR] [evidence: VERIFICATION_ONLY] Run the
       milestone verification commands on the canonical tree: `test -d
-packages/execution-simulator && pnpm --filter
-@foresift/execution-simulator test`; `test -d packages/pool-math && pnpm
---filter @foresift/pool-math test`; `test -d packages/transfer-semantics &&
-pnpm --filter @foresift/transfer-semantics test`; plus the extended central
+packages/execution-simulator && bun test
+packages/domain/test/exec.spec.ts packages/shared-schemas/test/exec.spec.ts`;
+      `test -d packages/pool-math && bun test
+tests/acceptance/AC-230.spec.ts tests/acceptance/AC-237.spec.ts`;
+      `test -d packages/transfer-semantics && bun test
+packages/solana-security/test/transfer-semantics.spec.ts`; plus the
+      extended central
       suites (`pnpm --filter @foresift/persistence test`;
       `tests/telemetry-catalog.spec.ts`) and the authored AC files
       (AC-120…128, AC-232, AC-234…236, AC-238, AC-239). All green required.

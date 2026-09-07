@@ -21,7 +21,7 @@ manifests, then parity gates, then stress scenarios and degradation.
 
 ## Phase 1 — Foundations: domain vocabularies and shared schemas (blocks later phases)
 
-- [ ] T001 Create `packages/domain/src/exec.ts`: `OutcomeClass` (SIGNAL_SUCCESS,
+- [x] T001 Create `packages/domain/src/exec.ts`: `OutcomeClass` (SIGNAL_SUCCESS,
       SIGNAL_FAILURE, TRADABLE_SUCCESS, TRADABLE_FAILURE, TRADABLE_NEUTRAL,
       NEUTRAL, PENDING, CENSORED, INVALID_DATA — §64.12), `OutcomeMaturity`
       (PENDING, PARTIALLY_MATURED, FULLY_MATURED, CENSORED, INVALID_DATA —
@@ -54,9 +54,9 @@ manifests, then parity gates, then stress scenarios and degradation.
       `packages/domain/test/` fail-closed vocabulary + law truth-table tests.
       Traces: FR-EXEC-001, FR-EXEC-004, FR-EXEC-006, FR-EXEC-007, FR-EXEC-013,
       FR-EXEC-015, FR-EXEC-017, FR-EXEC-020, AC-120, AC-122.
-- [ ] T002 Extend `packages/domain/src/index.ts` exports for the new exec
+- [x] T002 Extend `packages/domain/src/index.ts` exports for the new exec
       module. Traces: FR-EXEC-001…022.
-- [ ] T003 Create `packages/shared-schemas/src/exec.ts`: Zod schemas for
+- [x] T003 Create `packages/shared-schemas/src/exec.ts`: Zod schemas for
       `ExecutionScenario` (§64.2 exact field set), `ExitPolicyExperiment`,
       `ExecutionSimulation`, `NetReturnBreakdown` (pool fees, aggregator fees,
       token transfer fees, priority/network fees, execution impact, failed
@@ -80,7 +80,7 @@ manifests, then parity gates, then stress scenarios and degradation.
 
 ## Phase 2 — Persistence: migration family + migrator extension (blocks repos and PGlite suites)
 
-- [ ] T004 Create `migrations/g1_exec_0001_scenarios_simulations.sql`:
+- [x] T004 Create `migrations/g1_exec_0001_scenarios_simulations.sql`:
       `execution_scenarios` (§64.2 field set, pre-registration law CHECK),
       `exit_policy_experiments` (FR-EXEC-009 single pre-registered primary per
       scenario), `execution_simulations` (§8.2 outcome classes + maturity +
@@ -101,7 +101,7 @@ manifests, then parity gates, then stress scenarios and degradation.
       FR-EXEC-014), `adapter_incidents` (parity drift/upgrade/deprecation/
       unknown-extension causes — FR-EXEC-016/021); append-only triggers.
       Traces: FR-EXEC-013, FR-EXEC-014, FR-EXEC-015, FR-EXEC-016, FR-EXEC-021.
-- [ ] T007 Create `migrations/g1_exec_0004_quotes_gates.sql`:
+- [x] T007 Create `migrations/g1_exec_0004_quotes_gates.sql`:
       `quote_evidence` (evidence-not-truth payloads with uncertainty bounds +
       transaction_construction_refused — FR-EXEC-020/005),
       `tradability_gate_decisions` (scenario matrix vs required pass matrix,
@@ -111,7 +111,7 @@ manifests, then parity gates, then stress scenarios and degradation.
       FR-EXEC-019); append-only triggers on gate decisions. Traces:
       FR-EXEC-005, FR-EXEC-007, FR-EXEC-012, FR-EXEC-017, FR-EXEC-019,
       FR-EXEC-020.
-- [ ] T008 Extend `packages/persistence/src/migrator.ts`
+- [x] T008 Extend `packages/persistence/src/migrator.ts`
       MIGRATION_FAMILIES with the `exec` family AND extend the central
       expected-script registry `packages/persistence/test/migrator.spec.ts`
       with `g1_exec_0001_scenarios_simulations`,
@@ -189,7 +189,7 @@ manifests, then parity gates, then stress scenarios and degradation.
       short delay cannot pass a p90-requiring profile). Colocated tests:
       delay distribution resolution, conservative labeling, gate truth table.
       Traces: FR-EXEC-001, FR-EXEC-002, FR-EXEC-017, AC-235.
-- [ ] T015 Implement `packages/execution-simulator/src/entry.ts` +
+- [x] T015 Implement `packages/execution-simulator/src/entry.ts` +
       `src/exit.ts`: §64.6 entry modeling (requested/filled quantity,
       average execution price, marginal + average impact, pool/aggregator/
       token/network fees, failed/rejected amounts, start + completion time,
@@ -202,7 +202,7 @@ manifests, then parity gates, then stress scenarios and degradation.
       orderings; optimistic ordering secondary only). Colocated tests:
       entry fill fixtures, exit-policy fixtures, adverse-ordering vectors.
       Traces: FR-EXEC-002, FR-EXEC-003, FR-EXEC-018, AC-121, AC-238.
-- [ ] T016 Implement `packages/execution-simulator/src/net-return.ts` +
+- [x] T016 Implement `packages/execution-simulator/src/net-return.ts` +
       `src/outcome.ts`: §64.9 net return assembly (pool fees, dynamic fee
       state, Token-2022 transfer fee + withheld behavior, transfer hooks,
       priority/network fees + volatility, stablecoin/quote conversion +
@@ -215,7 +215,7 @@ manifests, then parity gates, then stress scenarios and degradation.
       return fixture law (AC-121 vectors), precedence truth table, censor/
       invalid reason enforcement, subjective-input isolation. Traces:
       FR-EXEC-003, FR-EXEC-006, FR-EXEC-018, AC-121, AC-124, AC-125.
-- [ ] T017 Implement `packages/execution-simulator/src/target-touch.ts` +
+- [x] T017 Implement `packages/execution-simulator/src/target-touch.ts` +
       `src/tradability.ts` + `src/uncertainty.ts`: §64.13/FR-EXEC-004
       executable-target law (modeled exit must execute within impact, fill,
       duration, state-completeness and survival limits; profiles MAY require
@@ -233,7 +233,7 @@ manifests, then parity gates, then stress scenarios and degradation.
       uncertainty-bound blocking, label preservation. Traces: FR-EXEC-004,
       FR-EXEC-007, FR-EXEC-012, FR-EXEC-017, FR-EXEC-020, AC-122, AC-126,
       AC-127, AC-235.
-- [ ] T018 Implement `packages/execution-simulator/src/concurrency.ts` +
+- [x] T018 Implement `packages/execution-simulator/src/concurrency.ts` +
       `src/routes.ts`: FR-EXEC-019 concurrent shadow-position aggregation
       over sharing keys (pool, route, quote asset, liquidity source,
       deployer cluster, correlated exit window) with deterministic fill
@@ -263,7 +263,7 @@ manifests, then parity gates, then stress scenarios and degradation.
       reproduction, experiment plurality refusal, plan finiteness +
       resolution-floor blocking. Traces: FR-EXEC-009, FR-EXEC-010,
       FR-EXEC-011, AC-127, AC-128.
-- [ ] T020 Implement `packages/pool-math/src/parity.ts`: the §64.11/
+- [x] T020 Implement `packages/pool-math/src/parity.ts`: the §64.11/
       FR-EXEC-016 gate suite over the proven `@foresift/program-decoders`
       parity seam — deterministic vectors, historical observed-trade parity
       (fixture-encoded economic events), current reference-quote parity when
@@ -285,7 +285,7 @@ manifests, then parity gates, then stress scenarios and degradation.
       tests: full matrix recording, optimistic-only candidate refusal,
       conservative default enforcement. Traces: FR-EXEC-012, FR-EXEC-017,
       AC-127, AC-235.
-- [ ] T022 Implement `packages/execution-simulator/src/degradation.ts`:
+- [x] T022 Implement `packages/execution-simulator/src/degradation.ts`:
       FR-EXEC-021 automatic tradability degradation on adapter deprecation,
       program upgrade, parity drift, or unknown extension — degrade ONLY
       affected scope, trigger re-evaluation of active alerts/watchlists,
@@ -294,7 +294,7 @@ manifests, then parity gates, then stress scenarios and degradation.
       `@foresift/program-decoders` `detectUpgradeChange` (read-only).
       Colocated tests: scope isolation, forward re-evaluation, history
       immutability, revalidation gate. Traces: FR-EXEC-021, AC-237.
-- [ ] T023 Implement `packages/execution-simulator/src/alert-content.ts` +
+- [x] T023 Implement `packages/execution-simulator/src/alert-content.ts` +
       `src/read-only-guard.ts` + `src/index.ts`: FR-EXEC-008 alert
       execution content exposing configured notional, delay, modeled impact,
       assumptions, and expiry (§64.15 rendering set + valid_until); the
@@ -309,7 +309,7 @@ manifests, then parity gates, then stress scenarios and degradation.
 
 ## Phase 6 — Fixtures and acceptance/negative suites (blocks gates)
 
-- [ ] T024 Author `tests/fixtures/exec/scenarios.json` +
+- [x] T024 Author `tests/fixtures/exec/scenarios.json` +
       `tests/fixtures/exec/pool-states.json`: §64.2 scenario vectors with
       delay policies and pass matrices; decoded verified-CP pools plus
       concentrated-liquidity, discrete-bin, stable-swap, dynamic-fee,
@@ -317,46 +317,46 @@ manifests, then parity gates, then stress scenarios and degradation.
       incomplete-state cases (missing tick/bin/curve/account data).
       Traces: FR-EXEC-001, FR-EXEC-002, FR-EXEC-013, FR-EXEC-015, FR-EXEC-017,
       AC-230, AC-232, AC-235.
-- [ ] T025 Author `tests/fixtures/exec/net-return.json` +
+- [x] T025 Author `tests/fixtures/exec/net-return.json` +
       `tests/fixtures/exec/target-touch.json` + `tests/fixtures/exec/coarse-candles.json`:
       AC-121 fee/impact/partial-fill/exit-liquidity vectors with exact
       expected net outcomes; AC-122/AC-126 executable-volume, target-duration,
       isolated-wick, and resolution-floor vectors; AC-238 coarse-candle
       target/invalidation-reachable vectors. Traces: FR-EXEC-003, FR-EXEC-004,
       FR-EXEC-011, FR-EXEC-018, AC-121, AC-122, AC-126, AC-238.
-- [ ] T026 Author `tests/fixtures/exec/observed-trades.json` +
+- [x] T026 Author `tests/fixtures/exec/observed-trades.json` +
       `tests/fixtures/exec/transfer-fees.json`: historical observed-trade
       parity vectors (fixture-encoded economic trades) + reference-quote
       vectors with tolerances; transfer-fee/hook/rent modeling vectors
       including the unknown-required case. Traces: FR-EXEC-016, FR-EXEC-018,
       AC-231.
-- [ ] T027 Author `tests/fixtures/exec/concurrent-exits.json` +
+- [x] T027 Author `tests/fixtures/exec/concurrent-exits.json` +
       `tests/fixtures/exec/routes-timeline.json` + `tests/fixtures/exec/stress-cases.json`:
       shared-depth competition vectors (two simultaneous exits on one pool);
       route/pool creation vs T_user_action and migration-transition timing
       vectors; the full stress matrix with optimistic-only candidates and
       conservative-default cases. Traces: FR-EXEC-012, FR-EXEC-017,
       FR-EXEC-019, FR-EXEC-022, AC-127, AC-234, AC-235, AC-236.
-- [ ] T028 Author `tests/acceptance/AC-120.spec.ts` +
+- [x] T028 Author `tests/acceptance/AC-120.spec.ts` +
       `tests/negative/AC-120.negative.spec.ts`: positive — a token rising
       above target that cannot fill/exit the configured notional is
       SIGNAL_SUCCESS but cannot be TRADABLE_SUCCESS (UNTRADABLE_SIGNAL_WIN,
       §64.12); negative — any rendering of profit from signal success without
       tradable completion is structurally refused (SQL CHECK + pure law).
       Traces: FR-EXEC-001, FR-EXEC-006, FR-EXEC-007, AC-120.
-- [ ] T029 Author `tests/acceptance/AC-121.spec.ts` +
+- [x] T029 Author `tests/acceptance/AC-121.spec.ts` +
       `tests/negative/AC-121.negative.spec.ts`: positive — entry delay, price
       impact, pool/token/network fees, partial fills, and exit liquidity each
       change net outcome exactly as the fixtures define (§64.6/64.7/64.9);
       negative — omitting any modeled leg diverges from the fixture and
       fails; assumed-zero costs refused. Traces: FR-EXEC-002, FR-EXEC-003,
       FR-EXEC-018, AC-121.
-- [ ] T030 Author `tests/acceptance/AC-122.spec.ts` +
+- [x] T030 Author `tests/acceptance/AC-122.spec.ts` +
       `tests/negative/AC-122.negative.spec.ts`: positive — a one-slot target
       wick without executable volume or duration does not satisfy tradable
       success (§64.13); negative — an isolated wick classified
       TRADABLE_SUCCESS is refused. Traces: FR-EXEC-004, AC-122.
-- [ ] T031 Author `tests/acceptance/AC-123.spec.ts` +
+- [x] T031 Author `tests/acceptance/AC-123.spec.ts` +
       `tests/negative/AC-123.negative.spec.ts`: positive —
       PENDING/PARTIALLY_MATURED outcomes are excluded from final
       precision/failure/calibration denominator INPUTS at the classification
@@ -364,33 +364,33 @@ manifests, then parity gates, then stress scenarios and degradation.
       g1-outcome-evaluation); negative — a denominator composition including
       pending/partial rows is refused. Traces: FR-EXEC-001, FR-EXEC-011,
       AC-123.
-- [ ] T032 Author `tests/acceptance/AC-124.spec.ts` +
+- [x] T032 Author `tests/acceptance/AC-124.spec.ts` +
       `tests/negative/AC-124.negative.spec.ts`: positive — censored and
       invalid outcomes retain explicit reasons and never silently become
       failures (§8.2); negative — CENSORED/INVALID_DATA without a recorded
       reason is schema-refused; silent mapping to TRADABLE_FAILURE refused.
       Traces: FR-EXEC-006, FR-EXEC-011, AC-124.
-- [ ] T033 Author `tests/acceptance/AC-125.spec.ts` +
+- [x] T033 Author `tests/acceptance/AC-125.spec.ts` +
       `tests/negative/AC-125.negative.spec.ts`: positive — owner-subjective
       usefulness is schema-separate and the objective outcome label is a pure
       function that ignores it (§64.12); negative — a path where subjective
       input mutates an objective label is structurally refused. Traces:
       FR-EXEC-001, FR-EXEC-006, AC-125.
-- [ ] T034 Author `tests/acceptance/AC-126.spec.ts` +
+- [x] T034 Author `tests/acceptance/AC-126.spec.ts` +
       `tests/negative/AC-126.negative.spec.ts`: positive — a low-resolution
       price snapshot supports a signal label but cannot establish a
       short-lived executable target or tradable success without the required
       observation plan (§64.14/FR-EXEC-011); negative — tradable success from
       a below-floor-resolution snapshot is refused. Traces: FR-EXEC-004,
       FR-EXEC-011, AC-126.
-- [ ] T035 Author `tests/acceptance/AC-127.spec.ts` +
+- [x] T035 Author `tests/acceptance/AC-127.spec.ts` +
       `tests/negative/AC-127.negative.spec.ts`: positive — a candidate
       profitable only under the optimistic case fails a profile requiring the
       conservative stress scenario, and stress assumptions reproduce in
       frozen replay (FR-EXEC-010/012); negative — optimistic-only passing is
       refused; replay with mutated assumptions fails reproduction. Traces:
       FR-EXEC-010, FR-EXEC-012, FR-EXEC-017, AC-127.
-- [ ] T036 Author `tests/acceptance/AC-128.spec.ts` +
+- [x] T036 Author `tests/acceptance/AC-128.spec.ts` +
       `tests/negative/AC-128.negative.spec.ts`: positive — observation plans
       store inclusion probability/stratum/population limits and selected-only
       samples carry explicit population limits (§64.14; weighted estimators
@@ -398,7 +398,7 @@ manifests, then parity gates, then stress scenarios and degradation.
       probability or missing population limits refused; universe-wide claims
       from selected-only samples blocked at the plan seam. Traces:
       FR-EXEC-011, AC-128.
-- [ ] T037 Author `tests/acceptance/AC-232.spec.ts` +
+- [x] T037 Author `tests/acceptance/AC-232.spec.ts` +
       `tests/negative/AC-232.negative.spec.ts`: positive — missing tick/bin/
       curve/account state that can materially affect a fill marks state
       incomplete and blocks confirmed tradability rather than assuming
@@ -406,49 +406,49 @@ manifests, then parity gates, then stress scenarios and degradation.
       INCOMPLETE_BLOCKING simulation confirming tradability is refused
       (SQL CHECK + pure law). Traces: FR-EXEC-013, FR-EXEC-014, FR-EXEC-020,
       AC-232.
-- [ ] T038 Author `tests/acceptance/AC-234.spec.ts` +
+- [x] T038 Author `tests/acceptance/AC-234.spec.ts` +
       `tests/negative/AC-234.negative.spec.ts`: positive — a route or pool
       created after T_user_action cannot be selected by historical execution,
       and migration routing uses only transitions and state available at the
       action time (FR-EXEC-022); negative — retrospective route selection and
       post-action migration transitions are structurally refused. Traces:
       FR-EXEC-022, AC-234.
-- [ ] T039 Author `tests/acceptance/AC-235.spec.ts` +
+- [x] T039 Author `tests/acceptance/AC-235.spec.ts` +
       `tests/negative/AC-235.negative.spec.ts`: positive — base, p50, p90,
       conservative latency/adverse-selection, liquidity drawdown, fee
       volatility, and route-degradation scenarios are all recorded and the
       active policy enforces its declared pass matrix (FR-EXEC-017); negative
       — passing an undeclared/incomplete matrix or a silently weakened
       matrix is refused. Traces: FR-EXEC-012, FR-EXEC-017, AC-235.
-- [ ] T040 Author `tests/acceptance/AC-236.spec.ts` +
+- [x] T040 Author `tests/acceptance/AC-236.spec.ts` +
       `tests/negative/AC-236.negative.spec.ts`: positive — two simultaneous
       shadow exits sharing one pool cannot each consume the full pre-exit
       depth; aggregate impact and fill competition reduce or reject fills
       deterministically (FR-EXEC-019); negative — isolated fills each
       consuming the same depth are refused; order-permutation non-
       determinism fails. Traces: FR-EXEC-019, AC-236.
-- [ ] T041 Author `tests/acceptance/AC-238.spec.ts` +
+- [x] T041 Author `tests/acceptance/AC-238.spec.ts` +
       `tests/negative/AC-238.negative.spec.ts`: positive — a coarse price
       candle whose target and invalidation are both reachable yields the
       adverse feasible primary ordering and a path-ambiguity flag, with the
       optimistic ordering secondary only (§64.7); negative — optimistic
       primary ordering under coarse-interval ambiguity is refused; missing
       flag fails. Traces: FR-EXEC-002, FR-EXEC-018, AC-238.
-- [ ] T042 Author `tests/acceptance/AC-239.spec.ts` +
+- [x] T042 Author `tests/acceptance/AC-239.spec.ts` +
       `tests/negative/AC-239.negative.spec.ts`: positive — the TRADABLE_SUCCESS
       denominator disclosure excludes and separately reports signal-only,
       low-resolution, partial, censored, invalid, and scenario-mismatched
       outcomes (INV-012); negative — silent folding of excluded classes into
       the TRADABLE_SUCCESS denominator is refused. Traces: FR-EXEC-001,
       FR-EXEC-006, FR-EXEC-011, AC-239.
-- [ ] T043 Extend `tests/acceptance/AC-230.spec.ts` +
+- [x] T043 Extend `tests/acceptance/AC-230.spec.ts` +
       `tests/negative/AC-230.negative.spec.ts` ADDITIVELY with an exec-scoped
       describe block: each fixture pool design resolves ONLY to its matching
       versioned pool-math adapter + signed manifest; unknown/mismatched
       design returns explicit EXECUTION_UNAVAILABLE — never generic
       constant-product output (existing content untouched, header trace list
       updated). Traces: FR-EXEC-013, FR-EXEC-015, AC-230.
-- [ ] T044 Extend `tests/acceptance/AC-231.spec.ts` +
+- [x] T044 Extend `tests/acceptance/AC-231.spec.ts` +
       `tests/negative/AC-231.negative.spec.ts` ADDITIVELY with an exec-scoped
       describe block: the active constant-product adapter passes deterministic
       vectors, property/boundary tests, historical observed-trade parity,
@@ -457,7 +457,7 @@ manifests, then parity gates, then stress scenarios and degradation.
       venue adapters rather than treated as pool-math authority; unverified/
       deprecated manifests refuse resolution (existing content untouched,
       header trace list updated). Traces: FR-EXEC-016, AC-231.
-- [ ] T045 Extend `tests/acceptance/AC-237.spec.ts` +
+- [x] T045 Extend `tests/acceptance/AC-237.spec.ts` +
       `tests/negative/AC-237.negative.spec.ts` ADDITIVELY with an exec-scoped
       describe block: adapter parity drift or a program upgrade degrades only
       affected exec scope, triggers re-evaluation of active candidates,

@@ -30,6 +30,7 @@ import { repoRoot, loadCurrentMilestone, validateMilestoneState, findPackage } f
 import { classifyOwnedPath } from './path-ownership.mjs';
 import { resolveTaskMetadata, isCoordinatorTask } from './task-metadata.mjs';
 import { assertEvidenceOwnership } from './evidence-owner-registry.mjs';
+import { assertImplementationAdmission } from './ownership-preflight.mjs';
 import {
   implementationEngineForProfile,
   resolveExecutionProfile,
@@ -240,6 +241,17 @@ const open = units.filter((u) => !u.done);
 // manifest-path matcher — unknown executor values already failed closed
 // above at parse time.
 const coordinatorOpenIds = new Set(open.filter(isCoordinatorTask).map((u) => u.id));
+
+// ── ownership admission (fail-closed, pre-provider cost, directive 2026-09-07)
+// The ownership guard legally refuses implementation lanes whose evidence diff
+// carries TEST-owned paths — but until now that refusal surfaced only AFTER
+// the provider spend was sunk (live b659eef0: writer-serial-1/2 died ×3 on
+// CLAUDE_TEST_OWNERSHIP_VIOLATION; core-batch-3 attempt-3 died at lane end on
+// tests/telemetry-catalog.spec.ts). A plan that routes test writes to an
+// implementation lane is unschedulable BY CONSTRUCTION: fail HERE, at build
+// time, with the split-the-test-work fix named. The audit needs the shard
+// plan, so it re-runs after planning below (see assertImplementationAdmission
+// call following shard emission).
 
 // ── evidence-owner coverage (fail-closed, pre-writer cost) ────────────────────
 // EVERY OPEN TASK HAS A REAL DETERMINISTIC COMPLETION OWNER. An open unit
@@ -589,6 +601,12 @@ function shardTestLanes(units, engine) {
 const testLanes = testUnits.length
   ? shardTestLanes(testUnits, testEngineForProfile(executionProfile))
   : [];
+
+// ── ownership admission (fail-closed, BEFORE emit/provider spend) ────────────
+// With the shard plan final, verify no implementation lane carries test-owned
+// writes (see the audit note above `open`). An unschedulable plan is a hard
+// build error — never a mid-wave guard refusal after provider spend.
+assertImplementationAdmission({ units, shards: shards ?? [] });
 
 // ── emit ──────────────────────────────────────────────────────────────────────
 const graph = {

@@ -178,6 +178,14 @@ nodes:
           const r = spawnSync("git worktree add -b \"" + br + "\" \"" + wt + "\" \"" + base + "\"",
             { shell: true });
           if (r.status !== 0) throw new Error("worktree add failed for " + s.id + ": " + r.stderr);
+          // Repo-local lane identity (directive 2026-09-07, live b659eef0):
+          // lane commits must never inherit the ambient host git config —
+          // pin the identity HERE so every commit in this worktree carries it.
+          for (const c of ["config user.name \"Foresift Wave Lane " + s.id + "\"",
+                           "config user.email \"noreply@foresift.local\""]) {
+            const rc = spawnSync("git -C \"" + wt + "\" " + c, { shell: true });
+            if (rc.status !== 0) throw new Error("identity pin failed for " + s.id + ": " + rc.stderr);
+          }
           // Immutable LOGICAL-LANE evidence baseline (maintainer Part A4,
           // 2026-09-03): created ONCE per lane at worktree creation and reused
           // across every retry of the writer node. A retry re-enters the same

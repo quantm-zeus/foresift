@@ -20,7 +20,7 @@
 //   5. Wire-blindness is forbidden: the wave-settled/land tail must invoke
 //      the generator and mirror the report (structural yaml proof).
 import { describe, test, expect, beforeEach, afterEach } from 'bun:test';
-import { mkdtempSync, rmSync, mkdirSync, writeFileSync, utimesSync } from 'node:fs';
+import { mkdtempSync, rmSync, mkdirSync, writeFileSync, utimesSync, readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -118,7 +118,6 @@ describe('waveTimingReport: phase-split wall-clock accounting', () => {
 
 describe('production wiring: the wave tail mirrors the timing report', () => {
   test('sharded-wave integrate-and-fast invokes wave-timing-report.mjs', () => {
-    const { readFileSync } = require('node:fs');
     const yaml = readFileSync(
       join(
         import.meta.dir,

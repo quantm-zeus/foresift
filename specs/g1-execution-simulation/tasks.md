@@ -482,7 +482,7 @@ manifests, then parity gates, then stress scenarios and degradation.
       FR-EXEC-003, FR-EXEC-006, FR-EXEC-007, FR-EXEC-010, FR-EXEC-011,
       FR-EXEC-013, FR-EXEC-016, FR-EXEC-019, FR-EXEC-020, FR-EXEC-021,
       FR-EXEC-022.
-- [ ] T047 [executor: COORDINATOR] [evidence: VERIFICATION_ONLY] Run the
+- [x] T047 [executor: COORDINATOR] [evidence: VERIFICATION_ONLY] Run the
       milestone verification commands on the canonical tree: `test -d
 packages/execution-simulator && bun test
 packages/domain/test/exec.spec.ts packages/shared-schemas/test/exec.spec.ts`;
@@ -504,7 +504,7 @@ evidence/bun-migration/bun-migration-manifest.json`) after all new test
       contract). Mechanical bookkeeping (ADR-0020: coordinator-owned,
       zero-AI). Traces: FR-EXEC-001…022 (verification substrate for every
       assigned requirement).
-- [ ] T049 [executor: COORDINATOR] [evidence: VERIFICATION_ONLY] Run the full
+- [x] T049 [executor: COORDINATOR] [evidence: VERIFICATION_ONLY] Run the full
       aggregate gate `pnpm verify` and the integrity gate `pnpm spec:verify`
       at the pushed HEAD; require green (the complete Bun suite runs ONLY
       through the coordinator — never a bare `bun test` over the tree). If

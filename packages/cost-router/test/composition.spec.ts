@@ -7,11 +7,8 @@
  * - marginalCostAttribution per AttributionUnitKind
  */
 import { describe, expect, it } from 'bun:test';
-import {
-  composeCostTotals,
-  marginalCostAttribution,
-  type RenderedSpendClasses,
-} from '../src/composition.ts';
+// @ts-expect-error - Product implementation pending in parallel wave (T010)
+import { composeCostTotals, marginalCostAttribution, type RenderedSpendClasses } from '../src/composition.ts';
 import { ForesiftError } from '@foresift/domain';
 
 const completeClasses: RenderedSpendClasses = {
@@ -80,21 +77,23 @@ describe('marginalCostAttribution per AttributionUnitKind (FR-COST-017)', () => 
     'PORTFOLIO_UTILITY_UNIT',
   ] as const;
 
-  it.each(unitKinds)('composes marginal cost attribution for %s', (unitKind) => {
-    const attribution = marginalCostAttribution({
-      contractId: 'cap_contract_v1_001',
-      unitKind,
-      subjectId: `subj_${unitKind.toLowerCase()}_001`,
-      marginalCost: 0.05,
-      totalCost: 15.0,
-      renderedClasses: completeClasses,
-      attributedAt: '2026-09-01T00:00:00Z',
-    });
+  for (const unitKind of unitKinds) {
+    it(`composes marginal cost attribution for ${unitKind}`, () => {
+      const attribution = marginalCostAttribution({
+        contractId: 'cap_contract_v1_001',
+        unitKind,
+        subjectId: `subj_${unitKind.toLowerCase()}_001`,
+        marginalCost: 0.05,
+        totalCost: 15.0,
+        renderedClasses: completeClasses,
+        attributedAt: '2026-09-01T00:00:00Z',
+      });
 
-    expect(attribution.unitKind).toBe(unitKind);
-    expect(attribution.marginalCost).toBe(0.05);
-    expect(attribution.renderedClasses).toEqual(completeClasses);
-  });
+      expect(attribution.unitKind).toBe(unitKind);
+      expect(attribution.marginalCost).toBe(0.05);
+      expect(attribution.renderedClasses).toEqual(completeClasses);
+    });
+  }
 
   it('refuses unknown attribution unit kind', () => {
     expect(() =>

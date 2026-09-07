@@ -3,6 +3,7 @@
  * Provides PASS/FAIL/UNVERIFIED contract fixtures, horizon-30 vectors,
  * reserve fraction vectors (sum <= 1 and §62.4 defaults), borrowing pairs, and stress envelopes.
  */
+// @ts-expect-error - Domain vocabulary pending in parallel wave (T002)
 import type { SustainableCapacityContract } from '@foresift/domain';
 
 export const DEFAULT_9_CLASS_RESERVES = {

@@ -7,11 +7,9 @@
  * - writeCostAttribution per operation/workload/candidate/run/module granularity
  */
 import { describe, expect, it } from 'bun:test';
-import {
-  reconcileForecast,
-  writeCostAttribution,
-  type ForecastReconciliationRequest,
-} from '../src/reconciliation.ts';
+// @ts-expect-error - Product implementation pending in parallel wave (T015)
+import { reconcileForecast, writeCostAttribution, type ForecastReconciliationRequest } from '../src/reconciliation.ts';
+// @ts-expect-error - Domain vocabulary pending in parallel wave (T002)
 import type { SustainableCapacityContract } from '@foresift/domain';
 
 const mockContract: SustainableCapacityContract = {

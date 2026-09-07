@@ -4,39 +4,10 @@
  * registry v2 bump, and G0 regression lock.
  */
 import { describe, expect, it } from 'bun:test';
-import {
-  ALL_ATTRIBUTION_UNIT_KINDS,
-  ALL_BUDGET_DIMENSIONS,
-  ALL_CONTRACT_RESULTS,
-  ALL_DEGRADATION_STEPS,
-  ALL_PROVIDER_MODES,
-  ALL_RECONCILIATION_BREACH_KINDS,
-  ALL_RECONCILIATION_DIMENSIONS,
-  ALL_RENDERED_SPEND_CLASSES,
-  ALL_RESERVE_CLASSES,
-} from '@foresift/domain';
-import {
-  AttributionUnitKindSchema,
-  BorrowedReserveSchema,
-  BudgetConsumptionTotalsSchema,
-  BudgetDimensionSchema,
-  BudgetPolicySchema,
-  CapacityCandidateLoadSchema,
-  CapacityProviderEnvelopeItemSchema,
-  CapacitySystemEnvelopeSchema,
-  ContractResultSchema,
-  CostAttributionSchema,
-  DegradationOrderStepSchema,
-  DegradationPolicyRowSchema,
-  DegradationStepSchema,
-  ForecastReconciliationSchema,
-  ProviderModeSchema,
-  ReconciliationBreachKindSchema,
-  ReconciliationDimensionSchema,
-  RenderedSpendClassSchema,
-  ReserveClassSchema,
-  SustainableCapacityContractSchema,
-} from '../src/capacity.ts';
+// @ts-expect-error - Domain vocabularies pending in parallel wave (T001)
+import { ALL_ATTRIBUTION_UNIT_KINDS, ALL_BUDGET_DIMENSIONS, ALL_CONTRACT_RESULTS, ALL_DEGRADATION_STEPS, ALL_PROVIDER_MODES, ALL_RECONCILIATION_BREACH_KINDS, ALL_RECONCILIATION_DIMENSIONS, ALL_RENDERED_SPEND_CLASSES, ALL_RESERVE_CLASSES } from '@foresift/domain';
+// @ts-expect-error - Product schemas pending in parallel wave (T004)
+import { AttributionUnitKindSchema, BorrowedReserveSchema, BudgetConsumptionTotalsSchema, BudgetDimensionSchema, BudgetPolicySchema, CapacityCandidateLoadSchema, CapacityProviderEnvelopeItemSchema, CapacitySystemEnvelopeSchema, ContractResultSchema, CostAttributionSchema, DegradationOrderStepSchema, DegradationPolicyRowSchema, DegradationStepSchema, ForecastReconciliationSchema, ProviderModeSchema, ReconciliationBreachKindSchema, ReconciliationDimensionSchema, RenderedSpendClassSchema, ReserveClassSchema, SustainableCapacityContractSchema } from '../src/capacity.ts';
 import {
   COST_SCHEMAS,
   COST_SCHEMA_REGISTRY_VERSION,
@@ -134,9 +105,11 @@ describe('capacity domain vocabulary mirrors match domain constants', () => {
     ['RenderedSpendClassSchema', RenderedSpendClassSchema, ALL_RENDERED_SPEND_CLASSES],
   ] as const;
 
-  it.each(parity)('%s accepts exactly the domain set', (_name, schema, all) => {
-    expect(schema.options).toEqual(all as never);
-  });
+  for (const [name, schema, all] of parity) {
+    it(`${name} accepts exactly the domain set`, () => {
+      expect((schema as { options: unknown }).options).toEqual(all as never);
+    });
+  }
 });
 
 describe('BudgetPolicySchema accept/refuse laws (ADR-1, FR-COST-011)', () => {

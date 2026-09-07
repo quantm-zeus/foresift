@@ -5,35 +5,8 @@
  * AttributionUnitKind, and RenderedSpendClass, as well as G0 ReserveId interop.
  */
 import { describe, expect, it } from 'bun:test';
-import {
-  ALL_ATTRIBUTION_UNIT_KINDS,
-  ALL_BUDGET_DIMENSIONS,
-  ALL_CONTRACT_RESULTS,
-  ALL_DEGRADATION_STEPS,
-  ALL_PROVIDER_MODES,
-  ALL_RECONCILIATION_BREACH_KINDS,
-  ALL_RECONCILIATION_DIMENSIONS,
-  ALL_RENDERED_SPEND_CLASSES,
-  ALL_RESERVE_CLASSES,
-  AttributionUnitKind,
-  attributionUnitKind,
-  BudgetDimension,
-  budgetDimension,
-  ContractResult,
-  contractResult,
-  DegradationStep,
-  degradationStep,
-  ProviderMode,
-  providerMode,
-  ReconciliationBreachKind,
-  reconciliationBreachKind,
-  ReconciliationDimension,
-  reconciliationDimension,
-  RenderedSpendClass,
-  renderedSpendClass,
-  ReserveClass,
-  reserveClass,
-} from '../src/capacity.ts';
+// @ts-expect-error - Product vocabulary implementation pending in parallel wave (T001)
+import { ALL_ATTRIBUTION_UNIT_KINDS, ALL_BUDGET_DIMENSIONS, ALL_CONTRACT_RESULTS, ALL_DEGRADATION_STEPS, ALL_PROVIDER_MODES, ALL_RECONCILIATION_BREACH_KINDS, ALL_RECONCILIATION_DIMENSIONS, ALL_RENDERED_SPEND_CLASSES, ALL_RESERVE_CLASSES, AttributionUnitKind, attributionUnitKind, BudgetDimension, budgetDimension, ContractResult, contractResult, DegradationStep, degradationStep, ProviderMode, providerMode, ReconciliationBreachKind, reconciliationBreachKind, ReconciliationDimension, reconciliationDimension, RenderedSpendClass, renderedSpendClass, ReserveClass, reserveClass } from '../src/capacity.ts';
 import { ALL_RESERVE_IDS, reserveId } from '../src/cost.ts';
 import { ForesiftError } from '../src/errors.ts';
 
@@ -50,28 +23,24 @@ const CAPACITY_VOCABULARIES = [
 ] as const;
 
 describe('capacity domain vocabulary resolution (fail-closed)', () => {
-  it.each(CAPACITY_VOCABULARIES)(
-    '%s resolves every member of its exact PRD vocabulary',
-    (_name, resolve, all) => {
-      for (const value of all) {
-        expect(resolve(value)).toBe(value);
+  for (const [name, resolve, all] of CAPACITY_VOCABULARIES) {
+    it(`${name} resolves every member of its exact PRD vocabulary`, () => {
+      for (const value of all as readonly string[]) {
+        expect((resolve as (v: string) => string)(value)).toBe(value);
       }
-    },
-  );
+    });
 
-  it.each(CAPACITY_VOCABULARIES)(
-    '%s refuses unknown values fail-closed with ForesiftError',
-    (_name, resolve, all) => {
-      expect(() => resolve('TOTALLY_UNKNOWN_VALUE')).toThrow(ForesiftError);
-      expect(() => resolve('')).toThrow(ForesiftError);
-      for (const value of all) {
+    it(`${name} refuses unknown values fail-closed with ForesiftError`, () => {
+      expect(() => (resolve as (v: string) => string)('TOTALLY_UNKNOWN_VALUE')).toThrow(ForesiftError);
+      expect(() => (resolve as (v: string) => string)('')).toThrow(ForesiftError);
+      for (const value of all as readonly string[]) {
         const drifted = value.toLowerCase();
-        if (!all.includes(drifted as never)) {
-          expect(() => resolve(drifted)).toThrow(ForesiftError);
+        if (!(all as readonly string[]).includes(drifted)) {
+          expect(() => (resolve as (v: string) => string)(drifted)).toThrow(ForesiftError);
         }
       }
-    },
-  );
+    });
+  }
 });
 
 describe('BudgetDimension exact PRD §62.2 specification (FR-COST-011)', () => {

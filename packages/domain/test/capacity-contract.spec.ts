@@ -10,11 +10,8 @@
  * - Non-negative envelope fields (all 13 systemEnvelope quantities)
  */
 import { describe, expect, it } from 'bun:test';
-import {
-  isContractActivatable,
-  type SustainableCapacityContract,
-  validateSustainableCapacityContract,
-} from '../src/capacity-contract.ts';
+// @ts-expect-error - Product implementation pending in parallel wave (T002)
+import { isContractActivatable, type SustainableCapacityContract, validateSustainableCapacityContract } from '../src/capacity-contract.ts';
 import { ForesiftError } from '../src/errors.ts';
 
 function makeValidContract(
@@ -292,15 +289,17 @@ describe('SustainableCapacityContract validation (FR-COST-012, FR-COST-013, AC-2
       'concurrency',
     ];
 
-    it.each(envelopeFields)('refuses negative %s in systemEnvelope', (fieldName) => {
-      const invalidEnvelope = makeValidContract({
-        systemEnvelope: {
-          ...makeValidContract().systemEnvelope,
-          [fieldName]: -1,
-        },
+    for (const fieldName of envelopeFields) {
+      it(`refuses negative ${String(fieldName)} in systemEnvelope`, () => {
+        const invalidEnvelope = makeValidContract({
+          systemEnvelope: {
+            ...makeValidContract().systemEnvelope,
+            [fieldName]: -1,
+          },
+        });
+        expect(() => validateSustainableCapacityContract(invalidEnvelope)).toThrow(ForesiftError);
       });
-      expect(() => validateSustainableCapacityContract(invalidEnvelope)).toThrow(ForesiftError);
-    });
+    }
   });
 
   describe('ContractResult activatable check (FR-COST-012)', () => {

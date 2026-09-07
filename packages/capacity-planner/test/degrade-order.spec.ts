@@ -7,16 +7,15 @@
  * - Mapping of G0 LOW_PRIORITY_DEGRADE_ORDER families into full order indices
  */
 import { describe, expect, it } from 'bun:test';
-import {
-  getDegradationStepForFamily,
-  loadDegradationOrder,
-  resolveNextDegradationStep,
-} from '../src/degrade-order.ts';
-import { DEFAULT_POLICY_V1, ForesiftError } from '@foresift/domain';
+// @ts-expect-error - Product implementation pending in parallel wave (T013)
+import { getDegradationStepForFamily, loadDegradationOrder, resolveNextDegradationStep } from '../src/degrade-order.ts';
+import { ForesiftError } from '@foresift/domain';
+// @ts-expect-error - Domain vocabulary pending in parallel wave (T003)
+import { DEFAULT_POLICY_V1 } from '@foresift/domain';
 
 describe('loadDegradationOrder & seed-parity check (FR-COST-015, ADR-4)', () => {
   it('loads seeded v1 order from database matching domain DEFAULT_POLICY_V1 exactly', async () => {
-    const mockRows = DEFAULT_POLICY_V1.map((stepName, index) => ({
+    const mockRows = (DEFAULT_POLICY_V1 as readonly string[]).map((stepName: string, index: number) => ({
       policy_version: 'v1',
       step_index: index + 1,
       step_name: stepName,
@@ -33,7 +32,7 @@ describe('loadDegradationOrder & seed-parity check (FR-COST-015, ADR-4)', () => 
 
     const loaded = await loadDegradationOrder(mockEngine, 'v1');
     expect(loaded.policyVersion).toBe('v1');
-    expect(loaded.steps.map((s) => s.stepName)).toEqual(DEFAULT_POLICY_V1);
+    expect(loaded.steps.map((s: { stepName: string }) => s.stepName)).toEqual(DEFAULT_POLICY_V1);
   });
 
   it('refuses drift between database order and domain DEFAULT_POLICY_V1', async () => {

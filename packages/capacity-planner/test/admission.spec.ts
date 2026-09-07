@@ -13,11 +13,9 @@
  * - Activation refused without active PASS contract
  */
 import { describe, expect, it } from 'bun:test';
-import {
-  admitConfiguration,
-  AdmissionBlockReason,
-  type AdmissionRequest,
-} from '../src/admission.ts';
+// @ts-expect-error - Product implementation pending in parallel wave (T012)
+import { admitConfiguration, AdmissionBlockReason, type AdmissionRequest } from '../src/admission.ts';
+// @ts-expect-error - Domain vocabulary pending in parallel wave (T002)
 import type { SustainableCapacityContract } from '@foresift/domain';
 
 function makeBaseContract(

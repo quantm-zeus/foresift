@@ -9,12 +9,8 @@
  * - free-in-one-dimension-never-implies-zero-total predicate
  */
 import { describe, expect, it } from 'bun:test';
-import {
-  freeInOneDimensionNeverImpliesZeroTotal,
-  resolveActiveBudgetPolicies,
-  type ActiveBudgetPolicies,
-  type DimensionBudgetPolicy,
-} from '../src/budget-policy.ts';
+// @ts-expect-error - Product implementation pending in parallel wave (T009)
+import { freeInOneDimensionNeverImpliesZeroTotal, resolveActiveBudgetPolicies, type ActiveBudgetPolicies, type DimensionBudgetPolicy } from '../src/budget-policy.ts';
 import { ForesiftError } from '@foresift/domain';
 
 describe('resolveActiveBudgetPolicies (FR-COST-011, ADR-1)', () => {

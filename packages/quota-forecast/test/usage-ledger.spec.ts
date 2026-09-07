@@ -5,6 +5,7 @@
  */
 import { describe, expect, it } from 'bun:test';
 import { UsageLedger } from '../src/usage-ledger.ts';
+// @ts-expect-error - Domain vocabulary pending in parallel wave (T001)
 import type { ReconciliationDimension } from '@foresift/domain';
 
 describe('UsageLedger multi-dimension aggregation (FR-COST-016, AC-226)', () => {
@@ -16,9 +17,8 @@ describe('UsageLedger multi-dimension aggregation (FR-COST-016, AC-226)', () => 
     'MODULE',
   ];
 
-  it.each(dimensions)(
-    'aggregates usage counters grouped by %s dimension',
-    async (dim) => {
+  for (const dim of dimensions) {
+    it(`aggregates usage counters grouped by ${dim} dimension`, async () => {
       const mockRows = [
         {
           dimension: dim,
@@ -39,6 +39,7 @@ describe('UsageLedger multi-dimension aggregation (FR-COST-016, AC-226)', () => 
       } as never;
 
       const ledger = new UsageLedger(mockEngine);
+      // @ts-expect-error - Product method extension pending in parallel wave (T016)
       const aggregates = await ledger.aggregateByDimension(dim, '2026-08-01T00:00:00Z');
 
       expect(aggregates.length).toBe(2);
@@ -46,8 +47,8 @@ describe('UsageLedger multi-dimension aggregation (FR-COST-016, AC-226)', () => 
       expect(aggregates[0]?.subjectId).toBe(`subj_${dim.toLowerCase()}_1`);
       expect(aggregates[0]?.totalUnits).toBe(500);
       expect(aggregates[0]?.eventCount).toBe(10);
-    },
-  );
+    });
+  }
 
   it('provides RUN-dimension granularity for latency and cost decomposition (AC-226)', async () => {
     const mockRunRows = [
@@ -64,6 +65,7 @@ describe('UsageLedger multi-dimension aggregation (FR-COST-016, AC-226)', () => 
     } as never;
 
     const ledger = new UsageLedger(mockEngine);
+    // @ts-expect-error - Product method extension pending in parallel wave (T016)
     const runAggregates = await ledger.aggregateByDimension('RUN', '2026-08-01T00:00:00Z');
 
     expect(runAggregates[0]?.dimension).toBe('RUN');

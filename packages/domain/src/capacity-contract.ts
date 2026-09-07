@@ -85,7 +85,8 @@ function fail(message: string, detail: ForesiftError['detail'] = {}): never {
 }
 
 function requireNonNegative(value: number, label: string): number {
-  if (!Number.isFinite(value) || value < 0) fail(`non-negative ${label} required`, { [label]: value });
+  if (!Number.isFinite(value) || value < 0)
+    fail(`non-negative ${label} required`, { [label]: value });
   return value;
 }
 
@@ -131,17 +132,26 @@ export function validateSustainableCapacityContract<T extends SustainableCapacit
   requireFractionBounds(contract.minimumHeadroomFraction, 'minimumHeadroomFraction');
   requireFractionBounds(contract.safetyMarginFraction, 'safetyMarginFraction');
 
-  if (typeof contract.degradationPolicyVersion !== 'string' || contract.degradationPolicyVersion.length === 0) {
+  if (
+    typeof contract.degradationPolicyVersion !== 'string' ||
+    contract.degradationPolicyVersion.length === 0
+  ) {
     fail('degradationPolicyVersion required');
   }
 
   const verifiedAt = Date.parse(contract.verifiedAt);
   const expiresAt = Date.parse(contract.expiresAt);
-  if (Number.isNaN(verifiedAt)) fail('verifiedAt must be an ISO timestamp', { verifiedAt: contract.verifiedAt });
-  if (Number.isNaN(expiresAt)) fail('expiresAt must be an ISO timestamp', { expiresAt: contract.expiresAt });
+  if (Number.isNaN(verifiedAt))
+    fail('verifiedAt must be an ISO timestamp', { verifiedAt: contract.verifiedAt });
+  if (Number.isNaN(expiresAt))
+    fail('expiresAt must be an ISO timestamp', { expiresAt: contract.expiresAt });
   if (expiresAt <= verifiedAt) fail('expiresAt must be after verifiedAt');
 
-  if (contract.result !== 'PASS' && contract.result !== 'FAIL' && contract.result !== 'UNVERIFIED') {
+  if (
+    contract.result !== 'PASS' &&
+    contract.result !== 'FAIL' &&
+    contract.result !== 'UNVERIFIED'
+  ) {
     fail('result must be PASS, FAIL, or UNVERIFIED', { result: contract.result });
   }
 
@@ -182,7 +192,9 @@ function validateProviderEnvelopeItem(item: CapacityProviderEnvelopeItem): void 
     requireNonNegative(item.streamedBytesExpected ?? 0, 'streamedBytesExpected');
     requireNonNegative(item.streamedBytesStress ?? 0, 'streamedBytesStress');
     if ((item.streamedBytesStress ?? 0) < (item.streamedBytesExpected ?? 0)) {
-      fail('streamedBytesStress must be >= streamedBytesExpected', { operationId: item.operationId });
+      fail('streamedBytesStress must be >= streamedBytesExpected', {
+        operationId: item.operationId,
+      });
     }
   }
   requireNonNegative(item.retryAllowance, 'retryAllowance');

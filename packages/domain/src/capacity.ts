@@ -56,8 +56,7 @@ export type ReserveClass = (typeof ReserveClass)[keyof typeof ReserveClass];
 export const ALL_RESERVE_CLASSES: readonly ReserveClass[] = Object.values(ReserveClass);
 
 export const DegradationStep = {
-  SKIP_ENRICHMENT_NOTEBOOK_ANALOG_COUNTERFACTUAL:
-    'SKIP_ENRICHMENT_NOTEBOOK_ANALOG_COUNTERFACTUAL',
+  SKIP_ENRICHMENT_NOTEBOOK_ANALOG_COUNTERFACTUAL: 'SKIP_ENRICHMENT_NOTEBOOK_ANALOG_COUNTERFACTUAL',
   REDUCE_SOCIAL_NARRATIVE_DEPTH: 'REDUCE_SOCIAL_NARRATIVE_DEPTH',
   REDUCE_WALLET_HISTORY_DEPTH: 'REDUCE_WALLET_HISTORY_DEPTH',
   REDUCE_DEEP_RESEARCH_CANDIDATE_COUNT: 'REDUCE_DEEP_RESEARCH_CANDIDATE_COUNT',
@@ -125,19 +124,34 @@ export type RenderedSpendClass = (typeof RenderedSpendClass)[keyof typeof Render
 export const ALL_RENDERED_SPEND_CLASSES: readonly RenderedSpendClass[] =
   Object.values(RenderedSpendClass);
 
-function parse<T extends string>(values: readonly T[], value: string, code: string, label: string): T {
+function parse<T extends string>(
+  values: readonly T[],
+  value: string,
+  code: string,
+  label: string,
+): T {
   if ((values as readonly string[]).includes(value)) return value as T;
   throw new ForesiftError(code as ErrorCode, `unknown ${label}`, { value });
 }
 
 export const budgetDimension = (value: string): BudgetDimension =>
-  parse(ALL_BUDGET_DIMENSIONS, value, CapacityErrorCode.BUDGET_DIMENSION_UNKNOWN, 'budget dimension');
+  parse(
+    ALL_BUDGET_DIMENSIONS,
+    value,
+    CapacityErrorCode.BUDGET_DIMENSION_UNKNOWN,
+    'budget dimension',
+  );
 export const providerMode = (value: string): ProviderMode =>
   parse(ALL_PROVIDER_MODES, value, CapacityErrorCode.BUDGET_DIMENSION_UNKNOWN, 'provider mode');
 export const reserveClass = (value: string): ReserveClass =>
   parse(ALL_RESERVE_CLASSES, value, CapacityErrorCode.RESERVE_CLASS_UNKNOWN, 'reserve class');
 export const degradationStep = (value: string): DegradationStep =>
-  parse(ALL_DEGRADATION_STEPS, value, CapacityErrorCode.DEGRADATION_STEP_UNKNOWN, 'degradation step');
+  parse(
+    ALL_DEGRADATION_STEPS,
+    value,
+    CapacityErrorCode.DEGRADATION_STEP_UNKNOWN,
+    'degradation step',
+  );
 export const contractResult = (value: string): ContractResult =>
   parse(ALL_CONTRACT_RESULTS, value, CapacityErrorCode.CONTRACT_RESULT_UNKNOWN, 'contract result');
 export const reconciliationDimension = (value: string): ReconciliationDimension =>
@@ -162,4 +176,9 @@ export const attributionUnitKind = (value: string): AttributionUnitKind =>
     'attribution unit kind',
   );
 export const renderedSpendClass = (value: string): RenderedSpendClass =>
-  parse(ALL_RENDERED_SPEND_CLASSES, value, CapacityErrorCode.SPEND_CLASS_UNKNOWN, 'rendered spend class');
+  parse(
+    ALL_RENDERED_SPEND_CLASSES,
+    value,
+    CapacityErrorCode.SPEND_CLASS_UNKNOWN,
+    'rendered spend class',
+  );

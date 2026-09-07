@@ -80,7 +80,7 @@ const HORIZON_MIN_DAYS = 30;
  */
 const FRACTION_SUM_EPSILON = 1e-9;
 
-function fail(message: string, detail: Record<string, unknown> = {}): never {
+function fail(message: string, detail: ForesiftError['detail'] = {}): never {
   throw new ForesiftError(CONTRACT_INVALID, message, detail);
 }
 

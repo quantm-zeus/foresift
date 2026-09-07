@@ -88,7 +88,7 @@
         "test -d packages/capacity-planner && pnpm --filter @foresift/capacity-planner test",
         "test -d packages/quota-forecast && pnpm --filter @foresift/quota-forecast test"
       ],
-      "status": "PENDING"
+      "status": "RUNNING"
     },
     {
       "id": "g1-solana-security",
@@ -200,7 +200,7 @@
         "test -d packages/pool-math && pnpm --filter @foresift/pool-math test",
         "test -d packages/transfer-semantics && pnpm --filter @foresift/transfer-semantics test"
       ],
-      "status": "RUNNING"
+      "status": "PENDING"
     },
     {
       "id": "g1-signal-registry",

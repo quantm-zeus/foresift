@@ -43,11 +43,14 @@ export const AdmissionBlockReason = {
   STORAGE_EGRESS_RETENTION_EXCEEDED: 'STORAGE_EGRESS_RETENTION_EXCEEDED',
   CRITICAL_STARVED: 'CRITICAL_STARVED',
 } as const;
-export type AdmissionBlockReason =
-  (typeof AdmissionBlockReason)[keyof typeof AdmissionBlockReason];
+export type AdmissionBlockReason = (typeof AdmissionBlockReason)[keyof typeof AdmissionBlockReason];
 
 export type AdmissionVerdict =
-  | { readonly decision: 'ADMIT'; readonly contractId: string; readonly reason: 'CONTRACT_PASS_REPLAY_CLEAN' }
+  | {
+      readonly decision: 'ADMIT';
+      readonly contractId: string;
+      readonly reason: 'CONTRACT_PASS_REPLAY_CLEAN';
+    }
   | {
       readonly decision: 'REDUCE';
       readonly contractId: string;
@@ -126,10 +129,7 @@ const replayInput = (
 
 /** Σ expected streamed bytes over the provider envelope (0 when none declared). */
 const providerStreamedBytesPerDay = (contract: SustainableCapacityContract): number =>
-  contract.providerEnvelope.reduce(
-    (acc, item) => acc + (item.streamedBytesExpected ?? 0),
-    0,
-  );
+  contract.providerEnvelope.reduce((acc, item) => acc + (item.streamedBytesExpected ?? 0), 0);
 
 /**
  * The protected-reserve floor in units: the §62.4 reserve fractions are
@@ -303,7 +303,10 @@ const isRetentionDimension = (name: string): boolean => RETENTION_DIMENSIONS.has
  * §62.6 condition 6: critical work is starved when the protected-reserve
  * floor itself would be consumed — that consumption is never reducible.
  */
-const starvesCritical = (usage: ConfigurationUsage, contract: SustainableCapacityContract): boolean =>
+const starvesCritical = (
+  usage: ConfigurationUsage,
+  contract: SustainableCapacityContract,
+): boolean =>
   usage.reserveUnitsUsed >= reserveFloorUnits(contract) ||
   stressUsage(usage).reserveUnitsUsed >= reserveFloorUnits(contract);
 

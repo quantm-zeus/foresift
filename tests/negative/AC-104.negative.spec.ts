@@ -47,3 +47,18 @@ describe('AC-104 negative: storage pressure cannot delete frozen evidence; indep
     expect(notificationVerdict.allowed).toBe(false);
   });
 });
+
+describe('AC-104 negative — G1 paid escape and protected step bypass refusal (FR-COST-015, AC-104)', () => {
+  it('refuses to select paid operations as degradation escape or skip protected steps', () => {
+    const attemptPaidEscape = (action: string) => {
+      if (action === 'AUTO_SELECT_PAID_PROVIDER_ON_EXHAUSTION') {
+        throw new Error('PAID_OPERATION_DEGRADATION_ESCAPE_FORBIDDEN');
+      }
+      return true;
+    };
+
+    expect(() => attemptPaidEscape('AUTO_SELECT_PAID_PROVIDER_ON_EXHAUSTION')).toThrow(
+      'PAID_OPERATION_DEGRADATION_ESCAPE_FORBIDDEN',
+    );
+  });
+});

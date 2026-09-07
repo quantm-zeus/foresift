@@ -80,9 +80,13 @@ export const BudgetPolicySchema = z
     supersededBy: z.string().min(1).nullable(),
   })
   .strict()
-  .refine((v) => v.providerMode === null || v.providerMode === undefined || v.dimension === 'DATA_PROVIDER', {
-    message: 'providerMode is only assignable to the DATA_PROVIDER dimension',
-  });
+  .refine(
+    (v) =>
+      v.providerMode === null || v.providerMode === undefined || v.dimension === 'DATA_PROVIDER',
+    {
+      message: 'providerMode is only assignable to the DATA_PROVIDER dimension',
+    },
+  );
 export type BudgetPolicy = z.infer<typeof BudgetPolicySchema>;
 
 /** Per-dimension consumption actuals; `renderedClasses` carries all 7 §62.12 classes. */
@@ -139,10 +143,9 @@ export const CapacityProviderEnvelopeItemSchema = z
   .refine((v) => v.callsStress >= v.callsExpected && v.quotaUnitsStress >= v.quotaUnitsExpected, {
     message: 'stress must be >= expected on calls and quota units',
   })
-  .refine(
-    (v) => (v.streamedBytesStress ?? 0) >= (v.streamedBytesExpected ?? 0),
-    { message: 'streamedBytesStress must be >= streamedBytesExpected' },
-  );
+  .refine((v) => (v.streamedBytesStress ?? 0) >= (v.streamedBytesExpected ?? 0), {
+    message: 'streamedBytesStress must be >= streamedBytesExpected',
+  });
 export type CapacityProviderEnvelopeItem = z.infer<typeof CapacityProviderEnvelopeItemSchema>;
 
 /** All 13 declared system quantities (FR-COST-013; `concurrency` included per ADR-3). */

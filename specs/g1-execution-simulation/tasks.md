@@ -496,7 +496,7 @@ packages/solana-security/test/transfer-semantics.spec.ts`; plus the
       (AC-120…128, AC-232, AC-234…236, AC-238, AC-239). All green required.
       Traces: FR-EXEC-001…022 (package-gate proof of every assigned
       requirement's substrate).
-- [ ] T048 [executor: COORDINATOR] Regenerate the coordinator test manifest
+- [x] T048 [executor: COORDINATOR] Regenerate the coordinator test manifest
       (`node scripts/automation/bun-migration-manifest.mjs --out
 evidence/bun-migration/bun-migration-manifest.json`) after all new test
       files exist so `pnpm test`/`test:all` collect and classify them

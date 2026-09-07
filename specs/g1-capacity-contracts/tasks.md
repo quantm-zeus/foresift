@@ -33,7 +33,7 @@ test author may invent, rename, or omit members:
 
 ## Phase 1 — Domain vocabularies and shared schemas (blocks later phases)
 
-- [ ] T001 Create `packages/domain/src/capacity.ts`: `BudgetDimension` = DATA_PROVIDER |
+- [x] T001 Create `packages/domain/src/capacity.ts`: `BudgetDimension` = DATA_PROVIDER |
       MODEL | COMPUTE_WORKFLOW | DATABASE_STORAGE | OBJECT_STORAGE_EGRESS | NOTIFICATION
       (6 members, plan vocabulary law); `ProviderMode` = STRICT_FREE | FREE_FIRST |
       PAID_ALLOWED (3 members); `ReserveClass` = RISK_MONITORING | ALERT_VERIFICATION |
@@ -60,7 +60,7 @@ test author may invent, rename, or omit members:
       `ReserveId` interop: the four legacy members parse identically through both
       vocabularies). Traces: FR-COST-011, FR-COST-013, FR-COST-015, FR-COST-016,
       FR-COST-017, AC-101, AC-105, AC-228.
-- [ ] T002 Create `packages/domain/src/capacity-contract.ts`: the
+- [x] T002 Create `packages/domain/src/capacity-contract.ts`: the
       `SustainableCapacityContract` type mirroring PRD §62.5 field-for-field
       (contractId, version, horizonDays ≥ 30, candidateLoad with the 7 rate fields
       newAssetsPerDayExpected / newAssetsPerDayStress / cheapMonitorRowsPerDay /
@@ -81,7 +81,7 @@ test author may invent, rename, or omit members:
       stress-≥-expected law, unknown reserveClass refusal, FAIL/UNVERIFIED contracts
       accepted as data but never activatable). Traces: FR-COST-012, FR-COST-013,
       AC-227.
-- [ ] T003 Create `packages/domain/src/degrade-order.ts`: `DEFAULT_POLICY_V1` — the
+- [x] T003 Create `packages/domain/src/degrade-order.ts`: `DEFAULT_POLICY_V1` — the
       §62.8 canonical order as an ordered array of the 11 DegradationStep literals
       EXACTLY as listed in plan.md's data model (SKIP_ENRICHMENT… first →
       RETURN_PARTIAL_INSUFFICIENT_DATA last, PRD §62.8 sequence), `PROTECTED_STEPS` =
@@ -92,7 +92,7 @@ test author may invent, rename, or omit members:
       (determinism, order integrity vs PRD sequence, protected-terminal law, versioned
       re-resolution). Extend `packages/domain/src/index.ts` exports. Traces: FR-COST-015,
       AC-228.
-- [ ] T004 Extend `packages/shared-schemas/src/capacity.ts` (NEW): Zod mirrors —
+- [x] T004 Extend `packages/shared-schemas/src/capacity.ts` (NEW): Zod mirrors —
       `BudgetPolicySchema` (dimension enum from domain; providerMode nullable and
       refine-gated to dimension === 'DATA_PROVIDER', plan ADR-1),
       `SustainableCapacityContractSchema` (§62.5 exact, strict, importing domain
@@ -163,7 +163,7 @@ test author may invent, rename, or omit members:
       gates ONLY the DATA_PROVIDER dimension via the proven G0 strict-free-guard /
       CostModePolicy seam (delegated, never duplicated — plan ADR-1). Unknown
       dimensions/modes fail closed. Traces: FR-COST-011, AC-100, AC-105.
-- [ ] T010 Create `packages/cost-router/src/composition.ts`: `composeCostTotals` —
+- [x] T010 Create `packages/cost-router/src/composition.ts`: `composeCostTotals` —
       refuses (typed throw) any input missing one of the 7 RenderedSpendClass keys,
       computes total = Σ classes, refuses total claims inconsistent with the class sum;
       `marginalCostAttribution` per AttributionUnitKind writing through the quota-
@@ -173,7 +173,7 @@ test author may invent, rename, or omit members:
       budget-dimension denials with dimension + rendered classes. Tests
       `packages/cost-router/test/composition.spec.ts`. Traces: FR-COST-011, FR-COST-017,
       AC-105.
-- [ ] T011 Extend `packages/cost-router/test/budget-policy.spec.ts` (NEW) and
+- [x] T011 Extend `packages/cost-router/test/budget-policy.spec.ts` (NEW) and
       `packages/cost-router/test/migrations.spec.ts`: six-dimension resolution vectors
       incl. HUMAN_ATTENTION render-only boundary (spec I2), provider-mode gating on
       DATA_PROVIDER only, STRICT_FREE delegation regression (AC-100 stays green), one-
@@ -182,7 +182,7 @@ test author may invent, rename, or omit members:
 
 ## Phase 4 — Capacity-planner: admission control and degradation (blocks Phase 5)
 
-- [ ] T012 Create `packages/capacity-planner/src/admission.ts`:
+- [x] T012 Create `packages/capacity-planner/src/admission.ts`:
       `admitConfiguration(contract, resolvedConfig, usage)` — whole-configuration
       forecast BEFORE activation returning ADMIT | REDUCE(nextStep) | REJECT(reason):
       the six §62.6 block conditions as typed reasons (STRESS_LIMIT_EXCEEDED,
@@ -194,7 +194,7 @@ test author may invent, rename, or omit members:
       the G0 planner path unchanged (only NEW activations require contracts — plan risk
       table). Tests `packages/capacity-planner/test/admission.spec.ts`. Traces:
       FR-COST-012, FR-COST-014, AC-227, AC-103.
-- [ ] T013 Create `packages/capacity-planner/src/degrade-order.ts`:
+- [x] T013 Create `packages/capacity-planner/src/degrade-order.ts`:
       `loadDegradationOrder(engine, version)` reading `cost.degradation_order_steps`,
       seed-parity assertion against domain DEFAULT_POLICY_V1 (drift refuses), and the
       admission-integration resolver: on quota exhaustion return the next REDUCE step;
@@ -204,7 +204,7 @@ test author may invent, rename, or omit members:
       BROAD_SCAN) into the full order's step indices (plan ADR-4). Tests
       `packages/capacity-planner/test/degrade-order.spec.ts`. Traces: FR-COST-015,
       AC-104, AC-228.
-- [ ] T014 Extend `packages/capacity-planner/test/migrations.spec.ts`: g1_cost_0002
+- [x] T014 Extend `packages/capacity-planner/test/migrations.spec.ts`: g1_cost_0002
       contract-table law (horizon < 30 refused, result CHECK, one-active, reserve
       nine-member CHECK live with G0 rows intact) and g1_cost_0003 seed law (11 rows,
       exact order, protected_class rows on the two terminal steps). Traces: FR-COST-012,
@@ -212,7 +212,7 @@ test author may invent, rename, or omit members:
 
 ## Phase 5 — Quota-forecast: reconciliation and attribution (blocks Phase 6)
 
-- [ ] T015 Create `packages/quota-forecast/src/reconciliation.ts`:
+- [x] T015 Create `packages/quota-forecast/src/reconciliation.ts`:
       `reconcileForecast(contract, dimension, subject, forecast, actual,
 toleranceFraction)` writing `cost.forecast_reconciliations`; raises
       MATERIAL_UNDERESTIMATION (actual > forecast·(1+tolerance)) or RESERVE_BREACH
@@ -224,7 +224,7 @@ toleranceFraction)` writing `cost.forecast_reconciliations`; raises
       operation/workload/candidate/run/module granularity (FR-COST-016/017). Tests
       `packages/quota-forecast/test/reconciliation.spec.ts`. Traces: FR-COST-016,
       FR-COST-017, AC-229.
-- [ ] T016 Extend `packages/quota-forecast/src/usage-ledger.ts` with read-side
+- [x] T016 Extend `packages/quota-forecast/src/usage-ledger.ts` with read-side
       aggregates by the five ReconciliationDimension values from
       `cost.cost_usage_counters` (G0 rows), feeding reconciliation; extend
       `packages/quota-forecast/test/usage-ledger.spec.ts` and
@@ -234,7 +234,7 @@ toleranceFraction)` writing `cost.forecast_reconciliations`; raises
 
 ## Phase 6 — Fixtures, acceptance and negative suites (blocks Phase 7)
 
-- [ ] T017 Author `tests/fixtures/cost/capacity-contracts.ts`: §62.5 contract fixtures
+- [x] T017 Author `tests/fixtures/cost/capacity-contracts.ts`: §62.5 contract fixtures
       (PASS/FAIL/UNVERIFIED; horizon-30 boundary vectors; reserve-fraction vectors sum
       ≤ 1 and the §62.4 defaults 0.20/0.15/0.10/0.10/0.10/0.15/0.10/0.05/0.05; borrowing
       pairs equal/higher-priority; protected-class exhaustion vectors; stress ≥
@@ -245,7 +245,7 @@ toleranceFraction)` writing `cost.forecast_reconciliations`; raises
       sequencing vectors, protected-preservation vectors, never-pay-silently refusals);
       extend `tests/fixtures/cost/index.ts`. Traces: FR-COST-011, FR-COST-012,
       FR-COST-013, FR-COST-015, AC-227, AC-228.
-- [ ] T018 Extend shared acceptance suites IN PLACE (facet convention, spec I4 — never
+- [x] T018 Extend shared acceptance suites IN PLACE (facet convention, spec I4 — never
       delete or weaken a G0 case): `tests/acceptance/AC-101.spec.ts` (broad-discovery
       exhaustion under six-dimension policies cannot consume protected
       RISK_MONITORING/ALERT_VERIFICATION reserve classes — reserve-router +
@@ -267,7 +267,7 @@ toleranceFraction)` writing `cost.forecast_reconciliations`; raises
       AC-225/AC-226 (recorded substrate boundary: data-plane/latency laws owned
       elsewhere; RUN-dimension cost attribution exercised as the cost facet). Traces:
       FR-COST-011…017, AC-100…105, AC-224…229.
-- [ ] T019 Author the matching negative extensions in the negative twins:
+- [x] T019 Author the matching negative extensions in the negative twins:
       `tests/negative/AC-101.negative.spec.ts` (protected-class consumption under broad
       discovery refused + audited), `tests/negative/AC-104.negative.spec.ts` (skipping
       protected steps / paid escape refused), `tests/negative/AC-105.negative.spec.ts`

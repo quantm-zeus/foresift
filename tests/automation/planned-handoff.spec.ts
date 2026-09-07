@@ -383,7 +383,11 @@ describe('launch seam (A: unplanned → planner-capable path · E: planned → d
   it('A: an unplanned wave-eligible package launches the planning-only bootstrap, never the wave prep', () => {
     const sb = makeSandbox('unplanned-launch', 'PENDING');
     installStub();
-    const r = tick(sb);
+    // The spawned autopilot samples the REAL host (launch-time governor, H3
+    // P1-8); mid-suite the suite's own bun workers can read non-GREEN and
+    // deny the launch for environmental reasons. Assert the WIRING, not the
+    // machine (same discipline as adaptive-launch.spec.ts / v3-generations).
+    const r = tick(sb, ['--once'], { env: { FORESIFT_GOVERNOR_STATE: 'GREEN' } });
     expect(r.status).toBe(0);
     const st = readState(sb);
     expect(st.history.map((h: { event: string }) => h.event)).toContain('work_package_launched');
@@ -397,7 +401,8 @@ describe('launch seam (A: unplanned → planner-capable path · E: planned → d
   it('E: a planned package at initial launch goes straight to the sharded wave', () => {
     const sb = makeSandbox('planned-launch', 'PENDING', { plannedOnMain: true });
     installStub();
-    const r = tick(sb);
+    // Governor pin: same environmental-isolation rationale as test A above.
+    const r = tick(sb, ['--once'], { env: { FORESIFT_GOVERNOR_STATE: 'GREEN' } });
     expect(r.status).toBe(0);
     const st = readState(sb);
     expect(st.activeRuns[0]?.workflow).toBe(WAVE_WF);

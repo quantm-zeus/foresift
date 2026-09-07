@@ -1,0 +1,60 @@
+{
+  "$comment": "Transfer fees, hooks, rent, and unknown-required semantics vectors (FR-EXEC-013, FR-EXEC-018, AC-121, AC-233, §64.9).",
+  "tokens": [
+    {
+      "tokenMint": "solana:5eykt4UsFv8P8NJdTREpY1vzqKqZKvdp/token/Token2022StandardFee1111111111111111111",
+      "name": "Token-2022 with 50 bps transfer fee",
+      "program": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+      "transferSemanticsSupport": "KNOWN_MODELED",
+      "feeConfig": {
+        "transferFeeBps": 50,
+        "maximumFee": "5000000000",
+        "withheldInRecipient": true
+      },
+      "transferHook": null,
+      "accountCreationRentLamports": "2039280",
+      "status": "VALID"
+    },
+    {
+      "tokenMint": "solana:5eykt4UsFv8P8NJdTREpY1vzqKqZKvdp/token/Token2022TransferHook111111111111111111",
+      "name": "Token-2022 with custom Transfer Hook program",
+      "program": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+      "transferSemanticsSupport": "KNOWN_MODELED",
+      "feeConfig": {
+        "transferFeeBps": 0,
+        "maximumFee": "0"
+      },
+      "transferHook": {
+        "hookProgramId": "HookProg1111111111111111111111111111111111111",
+        "extraComputeUnits": 50000,
+        "additionalFeeLamports": "100000"
+      },
+      "accountCreationRentLamports": "2039280",
+      "status": "VALID"
+    },
+    {
+      "tokenMint": "solana:5eykt4UsFv8P8NJdTREpY1vzqKqZKvdp/token/TokenUnknownExtensionRequired1111111111",
+      "name": "Token with unknown required transfer extension",
+      "program": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+      "transferSemanticsSupport": "UNKNOWN_REQUIRED",
+      "feeConfig": null,
+      "transferHook": null,
+      "executionStatus": "INSUFFICIENT_DATA",
+      "zeroCostAssumedAllowed": false,
+      "status": "BLOCKED_UNKNOWN_REQUIRED"
+    },
+    {
+      "tokenMint": "solana:5eykt4UsFv8P8NJdTREpY1vzqKqZKvdp/token/StandardSplTokenNoExtensions11111111111",
+      "name": "Standard SPL Token (no transfer fee extensions)",
+      "program": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+      "transferSemanticsSupport": "NOT_PRESENT",
+      "feeConfig": {
+        "transferFeeBps": 0,
+        "maximumFee": "0"
+      },
+      "transferHook": null,
+      "accountCreationRentLamports": "2039280",
+      "status": "VALID"
+    }
+  ]
+}

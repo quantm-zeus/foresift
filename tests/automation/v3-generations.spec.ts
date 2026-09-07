@@ -990,8 +990,10 @@ describe('first tick drains the queued main fast-forward before selection', () =
       join(stateDir, 'autopilot-state.json'),
       JSON.stringify({ activeRuns: [], milestoneRuns: [], pausedFatal: null, history: [] }),
     );
-    const r = runRestartCli({ fx, stateDir, baseSha: '' } as Sandbox, ['--once'], { rows: [] });
-
+    const r = runRestartCli({ fx, stateDir, baseSha: '' } as Sandbox, ['--once'], {
+      rows: [],
+      env: { FORESIFT_GOVERNOR_STATE: 'GREEN' },
+    });
     expect(r.status).toBe(0);
     const st = JSON.parse(readFileSync(join(stateDir, 'autopilot-state.json'), 'utf8'));
     // The retired-generation snapshot must never win: no fatal pause latched,
@@ -1132,7 +1134,18 @@ describe('fresh detached launches reset residue in the reused archon run worktre
       join(stateDir, 'autopilot-state.json'),
       JSON.stringify({ activeRuns: [], milestoneRuns: [], pausedFatal: null, history: [] }),
     );
-    const r = runRestartCli({ fx, stateDir, baseSha: '' } as Sandbox, ['--once'], { rows: [] });
+    // The spawned autopilot samples the REAL host (launch-time resource
+    // governor, H3 P1-8). Mid-suite that sample sees the suite's own bun
+    // workers plus sibling groups and can read YELLOW..RED — on a loaded
+    // machine the tick then records launch_denied_governor and the launch
+    // assertions below fail for environmental, not product, reasons
+    // (observed live 2026-09-07, direct pnpm test on the 15 GiB VPS). Pin
+    // the governor GREEN for the child exactly like adaptive-launch.spec.ts
+    // does for launchDetached: assert the WIRING, not the machine's load.
+    const r = runRestartCli({ fx, stateDir, baseSha: '' } as Sandbox, ['--once'], {
+      rows: [],
+      env: { FORESIFT_GOVERNOR_STATE: 'GREEN' },
+    });
     return { r, stateDir };
   };
 
@@ -1209,7 +1222,10 @@ describe('fresh launches reconcile stale generation seeds', () => {
       join(stateDir, 'autopilot-state.json'),
       JSON.stringify({ activeRuns: [], milestoneRuns: [], pausedFatal: null, history: [] }),
     );
-    const r = runRestartCli({ fx, stateDir, baseSha: '' } as Sandbox, ['--once'], { rows: [] });
+    const r = runRestartCli({ fx, stateDir, baseSha: '' } as Sandbox, ['--once'], {
+      rows: [],
+      env: { FORESIFT_GOVERNOR_STATE: 'GREEN' },
+    });
     expect(r.status).toBe(0);
     const st = JSON.parse(readFileSync(join(stateDir, 'autopilot-state.json'), 'utf8'));
     const evs = st.history.filter(
@@ -1268,7 +1284,10 @@ describe('fresh launches reconcile stale generation seeds', () => {
       join(stateDir, 'autopilot-state.json'),
       JSON.stringify({ activeRuns: [], milestoneRuns: [], pausedFatal: null, history: [] }),
     );
-    const r = runRestartCli({ fx, stateDir, baseSha: '' } as Sandbox, ['--once'], { rows: [] });
+    const r = runRestartCli({ fx, stateDir, baseSha: '' } as Sandbox, ['--once'], {
+      rows: [],
+      env: { FORESIFT_GOVERNOR_STATE: 'GREEN' },
+    });
     expect(r.status).toBe(0);
     const st = JSON.parse(readFileSync(join(stateDir, 'autopilot-state.json'), 'utf8'));
     const ev = st.history.find((h: { event: string }) => h.event === 'generation_seed_reconciled');

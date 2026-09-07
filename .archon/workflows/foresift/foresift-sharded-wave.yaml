@@ -84,6 +84,22 @@ nodes:
           --execution-profile "$PROFILE" \
           --out "$ARTIFACTS_DIR/task-graph.json"
       fi
+      # ── Parallelism quality gate (directive 2026-09-06 §5, advisory, zero AI)
+      # ── surfaces MISSED_PARALLELISM_OPPORTUNITY BEFORE any provider spend: a
+      # PRODUCT unit that is not [P], carries no [serial-reason: …] marker (the
+      # six-vocabulary law: SEMANTIC_DEPENDENCY | SHARED_FILE | ORDERED_MIGRATION |
+      # SHARED_INVARIANT | COORDINATOR_BOUNDARY | SAFETY_SERIALIZATION), and has
+      # a write-disjoint dependency-free sibling is reported to telemetry. An
+      # unknown serial-reason value fails the prep node (exit 3 — plan defect,
+      # fail closed). This never flips, dispatches, or edits anything: the PLAN
+      # is corrected between waves ([P] or an explicit serial-reason marker).
+      node scripts/automation/parallelism-audit.mjs \
+        --graph "$ARTIFACTS_DIR/task-graph.json" \
+        --report "$ARTIFACTS_DIR/parallelism-audit.json" || {
+        rc=$?
+        [ "$rc" -eq 3 ] && exit 3
+        exit 0
+      }
       TEST_LANES="$(node -e 'const g=require(process.argv[1]);process.stdout.write(String((g.testLanes??[]).length))' "$ARTIFACTS_DIR/task-graph.json")"
       if [ "$TEST_LANES" -gt 0 ] && ! command -v agy >/dev/null 2>&1; then
         echo "AGY_UNAVAILABLE_TEST_BEARING_WORK" >&2

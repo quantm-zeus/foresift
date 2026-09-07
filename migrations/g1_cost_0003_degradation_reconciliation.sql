@@ -1,5 +1,6 @@
 -- g1_cost_0003_degradation_reconciliation.sql
--- Apply and rollback as one transaction. Rollback: DROP the four tables.
+-- Apply and rollback as one transaction. Rollback: drop the capacity_contracts
+-- degradation-policy FK, then DROP the four tables.
 -- The versioned degradation order as DATA (FR-COST-015, §62.8, plan ADR-4),
 -- forecast reconciliation (FR-COST-016, §62.9/62.11, plan ADR-6), and cost
 -- attribution (FR-COST-017, §62.9/62.12).

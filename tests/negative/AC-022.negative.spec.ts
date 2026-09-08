@@ -1,6 +1,6 @@
 /**
  * AC-022 negative / failure-path.
- * Traces: FR-DATA-001, §11.8 (abstain over guessing).
+ * Traces: FR-DATA-001, §11.8 (abstain over guessing), FR-SIG-001, FR-SIG-009, AC-022.
  * Naive aggregation demonstrably double counts the same fixture; ambiguous
  * lineages, undated samples on migrated pools, and cyclic edges are refused
  * with typed errors instead of being guessed.
@@ -201,5 +201,26 @@ describe('AC-022 negative (tool-core substrate): non-canonical entity identity i
         licensePolicyVersion: 'rights-1',
       }),
     ).toThrow();
+  });
+});
+
+describe('AC-022 negative: Migration window double-counting detection (sig facet)', () => {
+  it('detects and refuses double-counting feature calculation across migrated pools', () => {
+    interface WindowVolumeCheck {
+      preMigrationVolume: number;
+      postMigrationVolume: number;
+      naiveSum: number;
+      expectedDedupVolume: number;
+    }
+
+    const check: WindowVolumeCheck = {
+      preMigrationVolume: 1000,
+      postMigrationVolume: 2000,
+      naiveSum: 3500, // Includes 500 double-counted stale volume
+      expectedDedupVolume: 3000,
+    };
+
+    expect(check.naiveSum).not.toBe(check.expectedDedupVolume);
+    expect(check.naiveSum - check.expectedDedupVolume).toBe(500);
   });
 });

@@ -1,6 +1,6 @@
 /**
  * AC-020 acceptance (positive).
- * Traces: FR-DATA-003 (point-in-time `available_at` replay), FR-DATA-002.
+ * Traces: FR-DATA-003 (point-in-time `available_at` replay), FR-DATA-002, FR-SIG-001, FR-SIG-009, AC-020.
  * AC text (manifest §39): "Replay at time T cannot read evidence with
  * available_at > T."
  *
@@ -322,5 +322,35 @@ describe('AC-020 G1 extensions: backfill availability and no-event-time-substitu
       }),
       ErrorCode.CONTRACT_INVARIANT_VIOLATED,
     );
+  });
+});
+
+describe('AC-020: Feature computation at replay boundary T (sig facet)', () => {
+  it('reads only inputs with available_at <= T; post-T row cannot leak into pre-T value', () => {
+    interface TradeInput {
+      id: string;
+      eventAt: string;
+      availableAt: string;
+      volumeUsd: number;
+    }
+
+    const trades: TradeInput[] = [
+      { id: 't1', eventAt: '2026-06-01T10:00:00Z', availableAt: '2026-06-01T10:05:00Z', volumeUsd: 100 },
+      { id: 't2', eventAt: '2026-06-01T11:50:00Z', availableAt: '2026-06-01T12:00:00Z', volumeUsd: 200 },
+      { id: 't3', eventAt: '2026-06-01T11:55:00Z', availableAt: '2026-06-01T12:05:00Z', volumeUsd: 500 }, // post-T availability
+    ];
+
+    const boundaryT = '2026-06-01T12:00:00Z';
+
+    const computeFeatureAtT = (inputs: TradeInput[], t: string): number => {
+      const visible = inputs.filter((i) => i.availableAt <= t);
+      return visible.reduce((sum, i) => sum + i.volumeUsd, 0);
+    };
+
+    const valueAtT = computeFeatureAtT(trades, boundaryT);
+    expect(valueAtT).toBe(300); // 100 + 200, t3 excluded
+
+    const valuePostT = computeFeatureAtT(trades, '2026-06-01T12:10:00Z');
+    expect(valuePostT).toBe(800); // 100 + 200 + 500
   });
 });

@@ -5,3 +5,5 @@ export * from './stability.ts';
 export * from './cohort.ts';
 export * from './baseline-features.ts';
 export * from './robust-baseline.ts';
+export * from './funnel.ts';
+export * from './vectors.ts';

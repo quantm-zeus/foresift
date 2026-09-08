@@ -117,6 +117,7 @@ import {
 import { advanceRepairRequest, discoverPendingRepairRequests } from './ci-repair-executor.mjs';
 import { admitPackageLaunch, releasePackageRuntime } from './runtime-admission.mjs';
 import { buildLaunchPreflight, exactCoRunCompatible } from './launch-preflight.mjs';
+import { missedParallelismOpportunities } from './parallelism-audit.mjs';
 import { buildReadyQueue, stealNext } from './ready-queue.mjs';
 import {
   classifyHostState,
@@ -530,6 +531,72 @@ function repoPlanningComplete(packageId) {
 }
 
 /**
+ * Planning-quality launch gate (directive 2026-09-08): a package may enter
+ * the IMPLEMENTATION-only sharded wave only when its committed plan carries
+ * BOTH deterministic planning laws — (a) the #218 parallelism quality
+ * objective (a PRODUCT unit that is not [P], has no valid [serial-reason]
+ * marker, and provably has a write-disjoint dependency-free sibling makes
+ * missed.length > 0) and (b) ownership admission (#220: no implementation-
+ * dispatched unit carries test-owned writes). The audit ALSO fails closed on
+ * an unknown serial-reason vocabulary value (it throws). Deterministic,
+ * zero-AI, read-only: it builds the task graph the wave prep itself would
+ * build. Refusal reason: LAUNCH_REFUSED_PLAN_QUALITY. No retroactive effect —
+ * already-landed legacy packages are PROVEN (0 open units → audit trivially
+ * passes) and legacy topologies never consult this gate.
+ */
+function planQualityForWaveLaunch(packageId) {
+  const reasons = [];
+  try {
+    const r = spawnSync(
+      process.execPath,
+      [
+        join(import.meta.dirname, 'build-implementation-task-graph.mjs'),
+        '--package',
+        packageId,
+        '--root',
+        REPO,
+        '--plan-shards',
+        '3',
+        '--execution-profile',
+        resolveExecutionProfile(),
+        '--allow-ownership-violations',
+      ],
+      { encoding: 'utf8', cwd: REPO, timeout: 60_000, maxBuffer: 32 * 1024 * 1024 },
+    );
+    if (r.status !== 0 || !r.stdout) {
+      // The graph builder fails closed on its own laws (ownership admission
+      // hard mode, corrupt milestone, unparseable tasks). That refusal IS the
+      // answer: this plan may not launch the wave.
+      reasons.push(
+        `task graph unavailable (plan is not schedulable): ${
+          (r.stderr ?? '').replace(/\s+/g, ' ').trim().slice(0, 240) || 'no output'
+        }`,
+      );
+    } else {
+      const graph = JSON.parse(r.stdout);
+      const admission = graph.ownershipAdmission ?? { schedulable: false, violations: [] };
+      if (admission.schedulable !== true)
+        reasons.push(
+          `ownership admission failed: ${(admission.violations ?? []).slice(0, 3).join(' | ')}`,
+        );
+      const missed = missedParallelismOpportunities(graph);
+      if (missed.length > 0) {
+        const ids = missed.slice(0, 6).map((m) => m.taskId);
+        reasons.push(
+          `MISSED_PARALLELISM_OPPORTUNITY: ${missed.length} product unit(s) provably parallelizable but marked serial without a valid reason (${ids.join(', ')}${missed.length > 6 ? ', …' : ''}) — mark them [P] or add a six-vocabulary [serial-reason]`,
+        );
+      }
+    }
+  } catch (err) {
+    // includes SERIAL_REASON_UNKNOWN from the audit — fail closed
+    reasons.push(
+      `plan-quality gate could not evaluate: ${String(err?.message ?? err).slice(0, 200)}`,
+    );
+  }
+  return { ok: reasons.length === 0, reason: reasons.join('; ') };
+}
+
+/**
  * Workflow variant per EXECUTION GENERATION (V3 ADR-0009) over the historical
  * throughput profile (ADR 0007): every package at generation >= 1 runs the
  * single final optimized topology regardless of the legacy profile table;
@@ -549,8 +616,22 @@ function repoPlanningComplete(packageId) {
 function workPackageWorkflow(pkgOrId) {
   const pkg = typeof pkgOrId === 'string' ? { id: pkgOrId } : pkgOrId;
   const selected = workPackageWorkflowFor(pkg);
-  const wf = admitWorkflowForLaunch(selected, repoPlanningComplete(pkg.id));
+  const planningComplete = repoPlanningComplete(pkg.id);
+  const wf = admitWorkflowForLaunch(selected, planningComplete);
   if (wf !== selected) log(`WAVE_ADMIT_DEFERRED ${pkg.id}: repo planning incomplete -> ${wf}`);
+  // Planning-quality gate (directive 2026-09-08): planning truth that is
+  // "complete" but law-invalid (all-serial without reasons, test writes in
+  // implementation lanes) must NOT enter the implementation wave. Fail-closed
+  // toward the planning-only bootstrap — whose planner loop re-runs the same
+  // deterministic guards — until the plan is corrected. Only the wave launch
+  // is gated; legacy/optimized topologies are untouched.
+  if (wf === selected && selected === 'foresift-sharded-wave') {
+    const quality = planQualityForWaveLaunch(pkg.id);
+    if (!quality.ok) {
+      log(`LAUNCH_REFUSED_PLAN_QUALITY ${pkg.id}: ${quality.reason}`);
+      return 'foresift-package-planning-bootstrap';
+    }
+  }
   return wf;
 }
 
@@ -1233,6 +1314,26 @@ function planningBootstrapHandoff(st, entry, get) {
       why: 'package record missing/invalid in current milestone',
     });
     attemptResume(st, entry, 'bootstrap completed but package record unusable');
+    return false;
+  }
+  // Planning-quality gate at the handoff seam (directive 2026-09-08), BEFORE
+  // launchIdentity: the freshly promoted plan must satisfy BOTH deterministic
+  // laws (#218 parallelism objective with the six-vocabulary serial reasons;
+  // #220 ownership admission) BEFORE the implementation continuation launches.
+  // Ordering is load-bearing — launchIdentity's own launch seam demotes a
+  // refused wave to the planning-only bootstrap, and adopting that demotion
+  // here would relaunch planning against an already-complete plan forever
+  // (an infinite plan loop) instead of surfacing the tracked refusal. The
+  // bootstrap entry stays tracked and the tick replays once the plan is
+  // corrected on main. Zero retroactive effect on landed packages.
+  const quality = planQualityForWaveLaunch(packageId);
+  if (!quality.ok) {
+    record(st, 'planning_handoff_refused_plan_quality', {
+      packageId,
+      runId: entry.runId,
+      reason: quality.reason.slice(0, 400),
+    });
+    attemptResume(st, entry, `plan-quality gate refused wave launch: ${quality.reason}`);
     return false;
   }
   const { generation, branch, message, workflow: wf, executionProfile } = launchIdentity(pkg);

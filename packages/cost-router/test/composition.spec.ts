@@ -7,7 +7,11 @@
  * - marginalCostAttribution per AttributionUnitKind
  */
 import { describe, expect, it } from 'bun:test';
-import { composeCostTotals, marginalCostAttribution, CostCompositionError } from '../src/composition.ts';
+import {
+  composeCostTotals,
+  marginalCostAttribution,
+  CostCompositionError,
+} from '../src/composition.ts';
 import { ForesiftError } from '@foresift/domain';
 import type { RenderedSpendClasses } from '@foresift/shared-schemas';
 

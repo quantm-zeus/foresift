@@ -71,7 +71,7 @@ telemetry and gates.
       FR-SIG-005, FR-SIG-006, FR-SIG-009, AC-136, AC-154.
 - [ ] T002 [serial-reason: SEMANTIC_DEPENDENCY] [P] Extend `packages/domain/src/index.ts` exports for the new sig
       module. Traces: FR-SIG-001…006, FR-SIG-009.
-- [ ] T003 [P] Create `packages/shared-schemas/src/sig.ts`: Zod schemas for
+- [x] T003 [P] Create `packages/shared-schemas/src/sig.ts`: Zod schemas for
       `FeatureDefinition` (§19.1 exact field set incl. minimumDenominator,
       stabilityTransform, shrinkagePolicy, cohortFallbackPolicyId,
       economicEventRequired; refinement: every numeric feature defines the
@@ -99,7 +99,7 @@ telemetry and gates.
 
 ## Phase 2 — Persistence: migration family + registry extensions (blocks repos and PGlite suites)
 
-- [ ] T004 [serial-reason: ORDERED_MIGRATION] Create `migrations/g1_sig_0001_feature_registry.sql`:
+- [x] T004 [serial-reason: ORDERED_MIGRATION] Create `migrations/g1_sig_0001_feature_registry.sql`:
       `sig.feature_definitions` (§19.1 field-for-field; numeric-feature
       §19.9 CHECK law: minimum_denominator ≥ 1, stability_transform,
       shrinkage_policy, cohort_fallback_policy_id, robust outlier policy all
@@ -110,7 +110,7 @@ telemetry and gates.
       §19.9 members, cohort_size, effective_sample_size, peer_percentile ∈
       [0,1], low_sample_warning). Traces: FR-SIG-001, FR-SIG-009, AC-021,
       AC-136.
-- [ ] T005 [serial-reason: ORDERED_MIGRATION] Create `migrations/g1_sig_0002_funnel_vectors_ranking.sql`:
+- [x] T005 [serial-reason: ORDERED_MIGRATION] Create `migrations/g1_sig_0002_funnel_vectors_ranking.sql`:
       `sig.candidate_funnel_stages` (§20.1 stages, §20.2 gate_code required on
       failure, profile_version), `sig.candidate_vectors` (seven VectorKind
       members, components JSON with explicit null+code honesty, algorithm
@@ -120,7 +120,7 @@ telemetry and gates.
       protected_allocations JSON, capacity_admission, algorithm_version,
       t_decision_ready). Traces: FR-SIG-002, FR-SIG-003, FR-SIG-004, AC-190,
       AC-192, AC-193.
-- [ ] T006 [serial-reason: ORDERED_MIGRATION] Create `migrations/g1_sig_0003_lifecycle_rechecks.sql`:
+- [x] T006 [serial-reason: ORDERED_MIGRATION] Create `migrations/g1_sig_0003_lifecycle_rechecks.sql`:
       `sig.candidate_lifecycle` (§21.1 states, from ≠ to CHECK,
       `sig_confirmed_requires_tradability` CHECK implementing the FR-SIG-005
       risk separation at the persistence layer, diagnostic_signal_labels
@@ -149,12 +149,12 @@ telemetry and gates.
 
 ## Phase 3 — Feature registry, stability, and Appendix H baseline computation (blocks vectors and selection)
 
-- [ ] T009 [serial-reason: SEMANTIC_DEPENDENCY] Scaffold `packages/signal-intelligence` (package.json
+- [x] T009 [serial-reason: SEMANTIC_DEPENDENCY] Scaffold `packages/signal-intelligence` (package.json
       `@foresift/signal-intelligence` with workspace `*` deps on domain,
       persistence, shared-schemas, evidence; `bun test` script; tsconfig
       extending tsconfig.base.json; no per-package runner config — G0/G1
       scaffold pattern). Traces: FR-SIG-001…006, FR-SIG-009.
-- [ ] T010 [serial-reason: SEMANTIC_DEPENDENCY] Implement `packages/signal-intelligence/src/registry.ts` +
+- [x] T010 [serial-reason: SEMANTIC_DEPENDENCY] Implement `packages/signal-intelligence/src/registry.ts` +
       `src/lineage.ts`: FR-SIG-001 registration law (§19.1 field-for-field,
       additive versioning — a change is a new version, never an edit;
       registration refuses drift of an existing version; independent-
@@ -168,7 +168,7 @@ telemetry and gates.
       drift refusal, lineage completeness, unavailable-at-decision-time
       refusal — authored by test-owned T037 (ownership law).
       Traces: FR-SIG-001, FR-SIG-009, AC-021.
-- [ ] T011 [serial-reason: SEMANTIC_DEPENDENCY] Implement `packages/signal-intelligence/src/stability.ts` +
+- [x] T011 [serial-reason: SEMANTIC_DEPENDENCY] Implement `packages/signal-intelligence/src/stability.ts` +
       `src/cohort.ts`: FR-SIG-009/§19.9 numerical stability — zero/one/
       low-sample denominator behavior, log1p-style stable transforms,
       winsorization/robust outlier policy, shrinkage toward an appropriate
@@ -184,7 +184,7 @@ telemetry and gates.
       truth table (all seven reachable and deterministic), shrinkage bounds,
       capped-contribution clamp, low-sample warnings — authored by test-owned
       T037 (ownership law). Traces: FR-SIG-009, FR-SIG-001, AC-136.
-- [ ] T012 [serial-reason: SEMANTIC_DEPENDENCY] Implement `packages/signal-intelligence/src/baseline-features.ts`:
+- [x] T012 [serial-reason: SEMANTIC_DEPENDENCY] Implement `packages/signal-intelligence/src/baseline-features.ts`:
       Appendix H.1–H.12 baseline formulas as versioned registered features
       computed over EVENT time through the proven replay-honest seam
       (`visibleAt`-resolved; exact decimal arithmetic; unquantified-event
@@ -202,7 +202,7 @@ telemetry and gates.
       window boundary fixtures, dedup threshold fixtures — authored by
       test-owned T037 (ownership law). Traces: FR-SIG-001, FR-SIG-009,
       AC-136, AC-020, AC-022, AC-023.
-- [ ] T013 [serial-reason: SEMANTIC_DEPENDENCY] Implement `packages/signal-intelligence/src/robust-baseline.ts`:
+- [x] T013 [serial-reason: SEMANTIC_DEPENDENCY] Implement `packages/signal-intelligence/src/robust-baseline.ts`:
       H.11 robust activity and change-point baseline — log1p transform, median
       center, 1.4826·MAD scale with epsilon floor, robust z, EWMA fast/slow
       (0.50/0.10 alphas), ewma_delta, emergence change-point requiring both
@@ -219,7 +219,7 @@ telemetry and gates.
 
 ## Phase 4 — Funnel, vectors, and deterministic selection (blocks diversity/lifecycle)
 
-- [ ] T014 [serial-reason: SEMANTIC_DEPENDENCY] Implement `packages/signal-intelligence/src/funnel.ts` +
+- [x] T014 [serial-reason: SEMANTIC_DEPENDENCY] Implement `packages/signal-intelligence/src/funnel.ts` +
       `src/vectors.ts`: FR-SIG-002 — §20.1 funnel stage vocabulary with
       profile-versioned, reason-coded §20.2 hard gates (invalid/ambiguous
       identity, unsupported chain/provider, liquidity below minimum, critical
@@ -239,7 +239,7 @@ telemetry and gates.
       reason-coding truth table, vector null-honesty, unknown-blocking,
       tradability consumption — authored by test-owned T037 (ownership law).
       Traces: FR-SIG-002, AC-020, AC-136.
-- [ ] T015 [serial-reason: SEMANTIC_DEPENDENCY] Implement `packages/signal-intelligence/src/selection.ts`:
+- [x] T015 [serial-reason: SEMANTIC_DEPENDENCY] Implement `packages/signal-intelligence/src/selection.ts`:
       FR-SIG-003 — the Appendix I deterministic selection algorithm steps 1–13
       as pure versioned functions over a FROZEN eligible universe: resolve
       identity/program/source/availability point-in-time (1); hard gates (2);
@@ -261,7 +261,7 @@ telemetry and gates.
       a–g ordering fixtures, frozen-universe drift refusal — authored by
       test-owned T037 (ownership law). Traces: FR-SIG-003, FR-SIG-002,
       AC-154, AC-190.
-- [ ] T016 [serial-reason: SEMANTIC_DEPENDENCY] Implement `packages/signal-intelligence/src/challenger-seam.ts`:
+- [x] T016 [serial-reason: SEMANTIC_DEPENDENCY] Implement `packages/signal-intelligence/src/challenger-seam.ts`:
       the AC-154/§20.4/Appendix-I closing law as structure — pre-proof the
       deterministic path structurally excludes learned input (registry rows +
       typed refusal), post-proof a challenger may only break ties or allocate
@@ -276,7 +276,7 @@ telemetry and gates.
 
 ## Phase 5 — Diversity, exploration, lifecycle, rechecks (blocks AC suites)
 
-- [ ] T017 [serial-reason: SEMANTIC_DEPENDENCY] Implement `packages/signal-intelligence/src/diversity.ts` +
+- [x] T017 [serial-reason: SEMANTIC_DEPENDENCY] Implement `packages/signal-intelligence/src/diversity.ts` +
       `src/exploration.ts`: FR-SIG-004 — §20.5 diversity constraints with the
       configurable defaults (max 2 per narrative, 1 per developer cluster,
       1 per funding cluster, 3 per launchpad) and explicit
@@ -298,7 +298,7 @@ telemetry and gates.
       any iteration order), corrupted-assignment exclusion, emergency-draw
       audit trail — authored by test-owned T037 (ownership law).
       Traces: FR-SIG-004, AC-192, AC-193, AC-190.
-- [ ] T018 [serial-reason: SEMANTIC_DEPENDENCY] Implement `packages/signal-intelligence/src/lifecycle.ts`:
+- [x] T018 [serial-reason: SEMANTIC_DEPENDENCY] Implement `packages/signal-intelligence/src/lifecycle.ts`:
       FR-SIG-005 — §21.1 lifecycle state machine (DISCOVERED, QUALIFIED,
       EMERGING, CONFIRMED, MONITORING, DECAYING, REJECTED, ARCHIVED) with
       entry-intent/default-action records; §21.3 transition hysteresis
@@ -315,7 +315,7 @@ telemetry and gates.
       tests: state-machine transition truth table, hysteresis asymmetry,
       dwell violations, CONFIRMED-without-tradable refusal, invalidation
       condition evaluation. Traces: FR-SIG-005, AC-154.
-- [ ] T019 [serial-reason: SEMANTIC_DEPENDENCY] Implement `packages/signal-intelligence/src/rechecks.ts` +
+- [x] T019 [serial-reason: SEMANTIC_DEPENDENCY] Implement `packages/signal-intelligence/src/rechecks.ts` +
       `src/read-only-guard.ts`: FR-SIG-006 — §21.2 adaptive rechecks with the
       exact budget fields (max_rechecks, max_recheck_provider_calls,
       max_recheck_model_cost, next_check_at, expires_at, backoff_factor,
@@ -338,7 +338,7 @@ telemetry and gates.
 
 ## Phase 6 — Fixtures and acceptance/negative suites (blocks gates)
 
-- [ ] T020 [P] Author `tests/fixtures/sig/feature-definitions.json` +
+- [x] T020 [P] Author `tests/fixtures/sig/feature-definitions.json` +
       `tests/fixtures/sig/baseline-features.json`: §19.1 registration vectors
       (complete numeric definitions and §19.9-incomplete refusals) and the
       Appendix H.1–H.12 golden vectors — volume acceleration with < 3 buckets
@@ -347,7 +347,7 @@ telemetry and gates.
       values, entropy one-bucket null, manipulation-indicator cases, H.11
       robust change-point emergence and no-promotion cases, H.12 coverage
       weights. Traces: FR-SIG-001, FR-SIG-009, AC-136, AC-020, AC-023.
-- [ ] T021 [P] Author `tests/fixtures/sig/cohort-fallback.json` +
+- [x] T021 [P] Author `tests/fixtures/sig/cohort-fallback.json` +
       `tests/fixtures/sig/diversity-exploration.json`: §19.9 fallback
       hierarchy vectors (all seven levels, stored fallback level + cohort
       size, effective sample size, low-sample warnings) and §20.5/§20.6/§20.8
@@ -356,7 +356,7 @@ telemetry and gates.
       corrupted assignments, emergency-policy draw audits, selection-arm
       partitions). Traces: FR-SIG-009, FR-SIG-004, FR-SIG-003, AC-136,
       AC-192, AC-193, AC-190.
-- [ ] T022 [P] Author `tests/fixtures/sig/funnel-selection.json` +
+- [x] T022 [P] Author `tests/fixtures/sig/funnel-selection.json` +
       `tests/fixtures/sig/lifecycle-rechecks.json`: frozen eligible universes
       with expected deterministic ranks (reproducibility), §20.2 hard-gate
       reason codes, Pareto/unknown-dimension cases, lexicographic a–g sort
@@ -365,7 +365,7 @@ telemetry and gates.
       exhaustion/starvation/expiry/backoff and §62.7 information-value
       ordering cases. Traces: FR-SIG-002, FR-SIG-003, FR-SIG-005, FR-SIG-006,
       AC-154, AC-190, AC-191.
-- [ ] T023 [P] Author `tests/acceptance/AC-154.spec.ts` +
+- [x] T023 [P] Author `tests/acceptance/AC-154.spec.ts` +
       `tests/negative/AC-154.negative.spec.ts`: positive — expected-net-utility
       ranking remains disabled before mature calibration (deterministic rank
       byte-identical with and without a challenger present); when a fixture
@@ -374,7 +374,7 @@ telemetry and gates.
       calibration/regime drift; negative — any pre-proof learned ordering
       input, hard-gate override, or missing automatic degradation is
       structurally refused. Traces: FR-SIG-003, AC-154.
-- [ ] T024 [P] Author `tests/acceptance/AC-190.spec.ts` +
+- [x] T024 [P] Author `tests/acceptance/AC-190.spec.ts` +
       `tests/negative/AC-190.negative.spec.ts`: positive — under quota
       pressure the information-value scheduler preserves
       risk/verification/outcome protected reserves (persisted
@@ -382,14 +382,14 @@ telemetry and gates.
       schedule consuming a protected reserve class to fund scans, or a
       reduction order touching protected classes first, is refused. Traces:
       FR-SIG-006, FR-SIG-003, AC-190.
-- [ ] T025 [P] Author `tests/acceptance/AC-191.spec.ts` +
+- [x] T025 [P] Author `tests/acceptance/AC-191.spec.ts` +
       `tests/negative/AC-191.negative.spec.ts`: positive — static-cadence and
       adaptive-scheduler replay over IDENTICAL fixture universes demonstrate
       measured information gained per quota unit without a higher
       missed-critical-event rate before promotion; negative — universe drift
       between replays, a higher missed-critical rate, or an unevidenced
       information-gain claim is refused. Traces: FR-SIG-006, AC-191.
-- [ ] T026 [P] Author `tests/acceptance/AC-192.spec.ts` +
+- [x] T026 [P] Author `tests/acceptance/AC-192.spec.ts` +
       `tests/negative/AC-192.negative.spec.ts`: positive — every exploration
       sample stores valid stratum and nonzero inclusion probability (plus
       policy version, seed provenance, inclusion timestamp) and corrupted
@@ -397,39 +397,39 @@ telemetry and gates.
       zero/out-of-range probability, missing stratum/seed, or a universe-wide
       weighted claim including corrupted assignments is refused. Traces:
       FR-SIG-004, AC-192.
-- [ ] T027 [P] Author `tests/acceptance/AC-193.spec.ts` +
+- [x] T027 [P] Author `tests/acceptance/AC-193.spec.ts` +
       `tests/negative/AC-193.negative.spec.ts`: positive — exploitation
       allocations preserve the configured exploration floor; a floor draw
       occurs only with a recorded audited emergency policy version and full
       audit trail; negative — floor reduction without an audited emergency
       policy is refused (SQL CHECK + pure law). Traces: FR-SIG-004, FR-SIG-003,
       AC-193.
-- [ ] T028 [P] Extend `tests/acceptance/AC-020.spec.ts` +
+- [x] T028 [P] Extend `tests/acceptance/AC-020.spec.ts` +
       `tests/negative/AC-020.negative.spec.ts` ADDITIVELY with a sig-scoped
       describe block: feature computation at replay boundary T reads only
       inputs with available_at ≤ T (no event-time substitution at the registry
       computation seam); a post-T row cannot leak into a pre-T replay value
       (existing content untouched, header trace list updated). Traces:
       FR-SIG-001, FR-SIG-009, AC-020.
-- [ ] T029 [P] Extend `tests/acceptance/AC-021.spec.ts` +
+- [x] T029 [P] Extend `tests/acceptance/AC-021.spec.ts` +
       `tests/negative/AC-021.negative.spec.ts` ADDITIVELY with a sig-scoped
       describe block: feature lineage preserves original observation
       coordinates and input hashes across revisions/reorgs — originals are
       never erased by recomputation (existing content untouched, header trace
       list updated). Traces: FR-SIG-001, AC-021.
-- [ ] T030 [P] Extend `tests/acceptance/AC-022.spec.ts` +
+- [x] T030 [P] Extend `tests/acceptance/AC-022.spec.ts` +
       `tests/negative/AC-022.negative.spec.ts` ADDITIVELY with a sig-scoped
       describe block: migration-aware feature windows avoid double counting in
       fixture tests (asset migration mid-window does not double-count volume/
       buyer features across pre/post segments) (existing content untouched,
       header trace list updated). Traces: FR-SIG-001, FR-SIG-009, AC-022.
-- [ ] T031 [P] Extend `tests/acceptance/AC-023.spec.ts` +
+- [x] T031 [P] Extend `tests/acceptance/AC-023.spec.ts` +
       `tests/negative/AC-023.negative.spec.ts` ADDITIVELY with a sig-scoped
       describe block: decimals and address normalization in feature inputs
       pass chain-specific golden fixtures; raw unnormalized keys are refused
       at the registry input seam (existing content untouched, header trace
       list updated). Traces: FR-SIG-001, AC-023.
-- [ ] T032 [P] Extend `tests/acceptance/AC-136.spec.ts` +
+- [x] T032 [P] Extend `tests/acceptance/AC-136.spec.ts` +
       `tests/negative/AC-136.negative.spec.ts` ADDITIVELY with a sig-scoped
       describe block: low-denominator growth (H.1 < 3 buckets), one-bucket
       entropy (H.9 → null + LOW_SAMPLE), robust change-point (H.11 no
@@ -463,7 +463,7 @@ telemetry and gates.
       (unknown enum rejection, refinement boundaries). Traces: FR-SIG-001,
       FR-SIG-002, FR-SIG-003, FR-SIG-004, FR-SIG-005, FR-SIG-006, FR-SIG-009,
       AC-136, AC-154.
-- [ ] T038 [P] [executor: TEST] Author
+- [x] T038 [P] [executor: TEST] Author
       `packages/shared-schemas/test/sig.spec.ts`: schema-mirror unit tests for
       the T003 schemas — unknown state/level/arm rejection, decimal-string and
       timestamp rules, hash-format rules, exploration-assignment nonzero
@@ -494,7 +494,7 @@ telemetry and gates.
 
 ## Phase 7 — Telemetry contract, manifest regen, and gates
 
-- [ ] T033 [P] Create `telemetry/sig.catalog.json` (DECLARATIVE_CONTRACT_ONLY
+- [x] T033 [P] Create `telemetry/sig.catalog.json` (DECLARATIVE_CONTRACT_ONLY
       header, fields mirroring `packages/shared-schemas/src/sig.ts` exactly,
       requirementRefs per event): `sig.feature_registered` (FR-SIG-001),
       `sig.feature_computed` (FR-SIG-001/009), `sig.cohort_resolved`

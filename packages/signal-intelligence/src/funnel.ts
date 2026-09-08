@@ -98,6 +98,16 @@ export function evaluateHardGates(
     throw new RangeError('minimumDataCoverage must lie in [0,1]');
   }
   finiteNonNegative(profile.maximumPriceExtension, 'maximumPriceExtension');
+  if (facts.liquidityUsd !== null) finiteNonNegative(facts.liquidityUsd, 'liquidityUsd');
+  if (
+    facts.dataCoverage !== null &&
+    (!Number.isFinite(facts.dataCoverage) || facts.dataCoverage < 0 || facts.dataCoverage > 1)
+  ) {
+    throw new RangeError('dataCoverage must lie in [0,1] or be null');
+  }
+  if (facts.priceExtension !== null && !Number.isFinite(facts.priceExtension)) {
+    throw new RangeError('priceExtension must be finite or null');
+  }
   const failures: HardGateCode[] = [];
   if (!facts.identityValidAndUnambiguous) failures.push('INVALID_OR_AMBIGUOUS_IDENTITY');
   if (!facts.chainProviderSupported) failures.push('UNSUPPORTED_CHAIN_PROVIDER');

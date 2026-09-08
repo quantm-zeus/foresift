@@ -135,7 +135,11 @@ export function priceExtension(
   firstAvailablePrice: string,
 ): BaselineValue {
   const now = nonNegativeDecimal(priceNow, 'priceNow');
-  const base = nonNegativeDecimal(priceSixHoursAgo ?? firstAvailablePrice, 'basePrice');
+  const first = nonNegativeDecimal(firstAvailablePrice, 'firstAvailablePrice');
+  const base =
+    priceSixHoursAgo === null
+      ? first
+      : maximum(nonNegativeDecimal(priceSixHoursAgo, 'priceSixHoursAgo'), first);
   return result(subtract(divide(now, maximum(base, rational(1n))), rational(1n)));
 }
 
@@ -151,7 +155,7 @@ function economicBuyerKey(observation: BuyerObservation, threshold: number): str
   if (
     state !== ActorResolutionState.UNRESOLVED &&
     observation.actorEntityId != null &&
-    observation.actorResolutionConfidence >= threshold
+    observation.actorResolutionConfidence > threshold
   ) {
     return `actor:${observation.actorEntityId}`;
   }
@@ -285,6 +289,29 @@ export function tradeSizeEntropy(nonemptyBucketCounts: readonly number[]): Basel
   };
 }
 
+/** Applies deterministic logarithmic bucketing before normalized Shannon entropy. */
+export function logarithmicTradeSizeEntropy(
+  tradeSizesUsd: readonly (number | string)[],
+  bucketBase = 10,
+): BaselineValue {
+  if (!Number.isFinite(bucketBase) || bucketBase <= 1) {
+    throw new RangeError('bucketBase must exceed one');
+  }
+  const counts = new Map<number, number>();
+  for (const raw of tradeSizesUsd) {
+    const value = typeof raw === 'string' ? toNumber(nonNegativeDecimal(raw, 'tradeSizeUsd')) : raw;
+    if (!Number.isFinite(value) || value < 0) {
+      throw new RangeError('trade sizes must be finite and non-negative');
+    }
+    const bucket =
+      value === 0 ? Number.NEGATIVE_INFINITY : Math.floor(Math.log(value) / Math.log(bucketBase));
+    counts.set(bucket, (counts.get(bucket) ?? 0) + 1);
+  }
+  return tradeSizeEntropy(
+    [...counts.entries()].sort(([a], [b]) => a - b).map(([, count]) => count),
+  );
+}
+
 export function manipulationIndicators(input: {
   readonly coordinatedOrSharedFunderBuyers: number;
   readonly uniqueBuyers: number;
@@ -357,7 +384,7 @@ export interface EventTimedObservation {
   readonly quantified?: boolean;
 }
 
-/** Half-open event window [start,end), resolved through the shared replay boundary. */
+/** Closed event window [start,end], resolved through the shared replay boundary. */
 export function eventTimeWindow<T extends EventTimedObservation>(
   observations: readonly T[],
   windowStart: UtcTimestamp,
@@ -371,7 +398,7 @@ export function eventTimeWindow<T extends EventTimedObservation>(
   }
   const selected = observations.filter((observation) => {
     const eventAt = Date.parse(observation.eventAt);
-    return eventAt >= start && eventAt < end && visibleAt(observation, resolvedAt);
+    return eventAt >= start && eventAt <= end && visibleAt(observation, resolvedAt);
   });
   return {
     observations: selected,

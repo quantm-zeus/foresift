@@ -120,13 +120,15 @@ export function shrinkTowardPrior(
     : (sampleValue * sampleSize + priorValue * priorStrength) / weight;
 }
 
-export function clampContribution(value: number, maximumAbsoluteContribution: number): number {
+export function clampContribution(value: number, maximumContribution: number): number {
   finite(value, 'value');
-  if (!Number.isFinite(maximumAbsoluteContribution) || maximumAbsoluteContribution <= 0) {
-    throw new RangeError('maximumAbsoluteContribution must be finite and positive');
+  if (!Number.isFinite(maximumContribution) || maximumContribution <= 0) {
+    throw new RangeError('maximumContribution must be finite and positive');
   }
-  return Math.max(-maximumAbsoluteContribution, Math.min(maximumAbsoluteContribution, value));
+  return Math.max(0, Math.min(maximumContribution, value));
 }
+
+export const clampCappedContribution = clampContribution;
 
 export interface ActorAdjustedContribution {
   readonly contribution: number;
@@ -172,14 +174,22 @@ export function stableRatio(
   const qualityCodes: Quality[] = [];
   if (observations < policy.minimumObservations) qualityCodes.push(QualityCode.LOW_SAMPLE);
   if (denominator === 0) {
-    return { value: null, effectiveSampleSize: observations, qualityCodes: [QualityCode.LOW_SAMPLE] };
+    return {
+      value: null,
+      effectiveSampleSize: observations,
+      qualityCodes: [QualityCode.LOW_SAMPLE],
+    };
   }
   const effectiveDenominator = Math.max(denominator, policy.minimumDenominator);
   if (denominator < policy.minimumDenominator && !qualityCodes.includes(QualityCode.LOW_SAMPLE)) {
     qualityCodes.push(QualityCode.LOW_SAMPLE);
   }
   if (qualityCodes.length === 0) qualityCodes.push(QualityCode.VALID);
-  return { value: numerator / effectiveDenominator, effectiveSampleSize: observations, qualityCodes };
+  return {
+    value: numerator / effectiveDenominator,
+    effectiveSampleSize: observations,
+    qualityCodes,
+  };
 }
 
 export function robustStableMean(
@@ -193,11 +203,7 @@ export function robustStableMean(
   if (observations.length === 0) {
     return { value: null, effectiveSampleSize: 0, qualityCodes: [QualityCode.LOW_SAMPLE] };
   }
-  const robust = winsorize(
-    observations,
-    policy.winsorLowerQuantile,
-    policy.winsorUpperQuantile,
-  );
+  const robust = winsorize(observations, policy.winsorLowerQuantile, policy.winsorUpperQuantile);
   const mean = robust.reduce((sum, value) => sum + value, 0) / robust.length;
   const value = shrinkTowardPrior(mean, robust.length, policy.priorMean, policy.priorStrength);
   return {

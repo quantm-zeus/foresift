@@ -13,7 +13,14 @@
     "FR-COST-007",
     "FR-COST-008",
     "FR-COST-009",
-    "FR-COST-010"
+    "FR-COST-010",
+    "FR-COST-011",
+    "FR-COST-012",
+    "FR-COST-013",
+    "FR-COST-014",
+    "FR-COST-015",
+    "FR-COST-016",
+    "FR-COST-017"
   ],
   "recoveryDataClass": "CRITICAL_METADATA",
   "events": [
@@ -161,6 +168,147 @@
         { "name": "breachedDimensions", "type": "array<string>", "required": true },
         { "name": "incidentId", "type": "string", "required": true },
         { "name": "recomputedAdmissionCaps", "type": "object<number>", "required": true }
+      ]
+    },
+    {
+      "name": "cost.budget_policy_activated",
+      "requirementRefs": ["FR-COST-011"],
+      "tier": "CRITICAL_METADATA",
+      "fields": [
+        { "name": "policyId", "type": "string", "required": true },
+        {
+          "name": "dimension",
+          "type": "string(DATA_PROVIDER|MODEL|COMPUTE_WORKFLOW|DATABASE_STORAGE|OBJECT_STORAGE_EGRESS|NOTIFICATION)",
+          "required": true
+        },
+        {
+          "name": "providerMode",
+          "type": "string(STRICT_FREE|FREE_FIRST|PAID_ALLOWED)|null",
+          "required": true
+        },
+        { "name": "capLimit", "type": "number", "required": true },
+        { "name": "currencyOrUnit", "type": "string", "required": true },
+        { "name": "version", "type": "string", "required": true },
+        { "name": "activatedAt", "type": "string<utc-timestamp>", "required": true }
+      ]
+    },
+    {
+      "name": "cost.capacity_contract_verified",
+      "requirementRefs": ["FR-COST-012", "FR-COST-013"],
+      "tier": "CRITICAL_METADATA",
+      "fields": [
+        { "name": "contractId", "type": "string", "required": true },
+        { "name": "version", "type": "string", "required": true },
+        { "name": "scheduleRef", "type": "string", "required": true },
+        { "name": "profileRef", "type": "string", "required": true },
+        { "name": "horizonDays", "type": "integer", "required": true },
+        { "name": "result", "type": "string(PASS|FAIL|UNVERIFIED)", "required": true },
+        { "name": "verifiedAt", "type": "string<utc-timestamp>", "required": true },
+        { "name": "expiresAt", "type": "string<utc-timestamp>", "required": true }
+      ]
+    },
+    {
+      "name": "cost.admission_blocked",
+      "requirementRefs": ["FR-COST-014"],
+      "tier": "CRITICAL_METADATA",
+      "fields": [
+        { "name": "contractId", "type": "string|null", "required": true },
+        { "name": "scheduleRef", "type": "string", "required": true },
+        { "name": "profileRef", "type": "string", "required": true },
+        {
+          "name": "reason",
+          "type": "string(STRESS_LIMIT_EXCEEDED|HEADROOM_NOT_PRESERVED|PROTECTED_RESERVE_EXHAUSTIBLE|PLAN_EXPIRES_WITHIN_HORIZON|STORAGE_EGRESS_RETENTION_EXCEEDED|CRITICAL_STARVED)",
+          "required": true
+        },
+        { "name": "decision", "type": "string(ADMIT|REDUCE|REJECT)", "required": true },
+        { "name": "exceededCeilings", "type": "array<string>", "required": true },
+        { "name": "blockedAt", "type": "string<utc-timestamp>", "required": true }
+      ]
+    },
+    {
+      "name": "cost.degradation_step_resolved",
+      "requirementRefs": ["FR-COST-015"],
+      "tier": "CRITICAL_METADATA",
+      "fields": [
+        { "name": "policyVersion", "type": "string", "required": true },
+        { "name": "stepIndex", "type": "integer", "required": true },
+        { "name": "stepName", "type": "string", "required": true },
+        {
+          "name": "protectedClass",
+          "type": "string(RISK_MONITORING|ALERT_VERIFICATION|INTERACTIVE_MCP|EMERGENCY_BACKFILL|OUTCOME_COLLECTION|SCHEDULED_CANDIDATE_VERIFICATION|DEEP_RESEARCH|FIRST_PARTY_COLLECTOR|EXPLORATION_PROBES)|null",
+          "required": true
+        },
+        { "name": "resolvedAt", "type": "string<utc-timestamp>", "required": true }
+      ]
+    },
+    {
+      "name": "cost.reserve_borrowed",
+      "requirementRefs": ["FR-COST-012"],
+      "tier": "CRITICAL_METADATA",
+      "fields": [
+        { "name": "borrowId", "type": "string", "required": true },
+        { "name": "contractId", "type": "string", "required": true },
+        {
+          "name": "reserveClass",
+          "type": "string(RISK_MONITORING|ALERT_VERIFICATION|INTERACTIVE_MCP|EMERGENCY_BACKFILL|OUTCOME_COLLECTION|SCHEDULED_CANDIDATE_VERIFICATION|DEEP_RESEARCH|FIRST_PARTY_COLLECTOR|EXPLORATION_PROBES)",
+          "required": true
+        },
+        {
+          "name": "borrowedByClass",
+          "type": "string(RISK_MONITORING|ALERT_VERIFICATION|INTERACTIVE_MCP|EMERGENCY_BACKFILL|OUTCOME_COLLECTION|SCHEDULED_CANDIDATE_VERIFICATION|DEEP_RESEARCH|FIRST_PARTY_COLLECTOR|EXPLORATION_PROBES)",
+          "required": true
+        },
+        { "name": "units", "type": "number", "required": true },
+        { "name": "policyVersion", "type": "string", "required": true },
+        { "name": "occurredAt", "type": "string<utc-timestamp>", "required": true }
+      ]
+    },
+    {
+      "name": "cost.forecast_reconciled",
+      "requirementRefs": ["FR-COST-016"],
+      "tier": "CRITICAL_METADATA",
+      "fields": [
+        { "name": "reconciliationId", "type": "string", "required": true },
+        { "name": "contractId", "type": "string", "required": true },
+        {
+          "name": "dimension",
+          "type": "string(OPERATION|WORKLOAD|CANDIDATE|RUN|MODULE)",
+          "required": true
+        },
+        { "name": "subjectId", "type": "string", "required": true },
+        { "name": "forecastValue", "type": "number", "required": true },
+        { "name": "actualValue", "type": "number", "required": true },
+        { "name": "toleranceFraction", "type": "number", "required": true },
+        {
+          "name": "breachKind",
+          "type": "string(MATERIAL_UNDERESTIMATION|RESERVE_BREACH)|null",
+          "required": true
+        },
+        { "name": "incidentId", "type": "string|null", "required": true },
+        { "name": "reconciledAt", "type": "string<utc-timestamp>", "required": true }
+      ]
+    },
+    {
+      "name": "cost.attribution_composed",
+      "requirementRefs": ["FR-COST-017"],
+      "tier": "CRITICAL_METADATA",
+      "fields": [
+        { "name": "attributionId", "type": "string", "required": true },
+        { "name": "contractId", "type": "string", "required": true },
+        {
+          "name": "unitKind",
+          "type": "string(RESEARCHED_CANDIDATE|MATURE_OUTCOME|USEFUL_ALERT|PREVENTED_RISK_EVENT|PORTFOLIO_UTILITY_UNIT)",
+          "required": true
+        },
+        { "name": "subjectId", "type": "string", "required": true },
+        { "name": "marginalCost", "type": "number", "required": true },
+        { "name": "totalCost", "type": "number", "required": true },
+        {
+          "name": "renderedClasses",
+          "type": "object<number(PAID_DATA_SPEND|FREE_QUOTA_CONSUMPTION|MODEL_SPEND|INFRASTRUCTURE_SPEND|STORAGE_EGRESS_SPEND|NOTIFICATION_SPEND|HUMAN_REVIEW_EFFORT)>",
+          "required": true
+        },
+        { "name": "attributedAt", "type": "string<utc-timestamp>", "required": true }
       ]
     }
   ]

@@ -44,6 +44,7 @@ interface CatalogField {
 interface Catalog {
   catalog: string;
   contractStatus?: string;
+  requirementsCovered?: string[];
   events: { name: string; fields: CatalogField[] }[];
 }
 
@@ -190,6 +191,139 @@ describe('telemetry/trd.catalog.json, sup.catalog.json, solsec.catalog.json, and
       }
     } catch {
       // Implementation lane creates telemetry/exec.catalog.json in parallel
+    }
+  });
+});
+
+describe('telemetry/cost.catalog.json G1 capacity-contract extension (FR-COST-011…017)', () => {
+  const costCatalog = loadCatalog('cost.catalog.json');
+
+  it('keeps the catalog a declarative contract (G2 wiring deferred)', () => {
+    expect(costCatalog.contractStatus).toContain('DECLARATIVE_CONTRACT_ONLY');
+  });
+
+  it('covers the full G1 cost requirement set FR-COST-001…017', () => {
+    for (const fr of [
+      'FR-COST-011',
+      'FR-COST-012',
+      'FR-COST-013',
+      'FR-COST-014',
+      'FR-COST-015',
+      'FR-COST-016',
+      'FR-COST-017',
+    ]) {
+      expect(
+        costCatalog.requirementsCovered ?? [],
+        `${fr} listed in cost.catalog requirementsCovered`,
+      ).toContain(fr);
+    }
+  });
+
+  const expectedEvents: Record<string, string[]> = {
+    // §62.2 budget policy split into six dimensions; mode carried by DATA_PROVIDER
+    'cost.budget_policy_activated': [
+      'policyId',
+      'dimension',
+      'providerMode',
+      'capLimit',
+      'currencyOrUnit',
+      'version',
+      'activatedAt',
+    ],
+    // §62.5 contract verification outcome (result PASS|FAIL|UNVERIFIED)
+    'cost.capacity_contract_verified': [
+      'contractId',
+      'version',
+      'scheduleRef',
+      'profileRef',
+      'horizonDays',
+      'result',
+      'verifiedAt',
+      'expiresAt',
+    ],
+    // §62.6 activation block conditions, as typed reasons
+    'cost.admission_blocked': [
+      'contractId',
+      'scheduleRef',
+      'profileRef',
+      'reason',
+      'decision',
+      'exceededCeilings',
+      'blockedAt',
+    ],
+    // §62.8 versioned degradation-order resolution
+    'cost.degradation_step_resolved': [
+      'policyVersion',
+      'stepIndex',
+      'stepName',
+      'protectedClass',
+      'resolvedAt',
+    ],
+    // §62.4 reserve borrowing audit (equal/higher-priority under a versioned policy)
+    'cost.reserve_borrowed': [
+      'borrowId',
+      'contractId',
+      'reserveClass',
+      'borrowedByClass',
+      'units',
+      'policyVersion',
+      'occurredAt',
+    ],
+    // §62.9/§62.11 reconciliation with breach⇔incident symmetry
+    'cost.forecast_reconciled': [
+      'reconciliationId',
+      'contractId',
+      'dimension',
+      'subjectId',
+      'forecastValue',
+      'actualValue',
+      'toleranceFraction',
+      'breachKind',
+      'incidentId',
+      'reconciledAt',
+    ],
+    // §62.12 marginal-cost attribution over the seven rendered classes
+    'cost.attribution_composed': [
+      'attributionId',
+      'contractId',
+      'unitKind',
+      'subjectId',
+      'marginalCost',
+      'totalCost',
+      'renderedClasses',
+      'attributedAt',
+    ],
+  };
+
+  for (const [eventName, fieldNames] of Object.entries(expectedEvents)) {
+    it(`pins ${eventName} fields to the capacity contract surfaces (${
+      Object.keys(expectedEvents).length
+    } G1 events)`, () => {
+      const ev = event(costCatalog, eventName);
+      expect(ev.fields.length).toBe(fieldNames.length);
+      for (const name of fieldNames) {
+        const f = field(ev, name);
+        expect(f.type.length).toBeGreaterThan(0);
+        expect(typeof f.required).toBe('boolean');
+      }
+    });
+  }
+
+  it('renders attribution totals only as the §62.12 class composition', () => {
+    const ev = event(costCatalog, 'cost.attribution_composed');
+    const rendered = field(ev, 'renderedClasses');
+    // The rendered-class object names all seven classes — a 6-class
+    // composition is refused and can never be rendered as "zero total cost".
+    for (const spendClass of [
+      'PAID_DATA_SPEND',
+      'FREE_QUOTA_CONSUMPTION',
+      'MODEL_SPEND',
+      'INFRASTRUCTURE_SPEND',
+      'STORAGE_EGRESS_SPEND',
+      'NOTIFICATION_SPEND',
+      'HUMAN_REVIEW_EFFORT',
+    ]) {
+      expect(rendered.type).toContain(spendClass);
     }
   });
 });

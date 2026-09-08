@@ -1,18 +1,18 @@
 {
   "schema": "foresift/bun-migration-manifest@1",
   "migrationId": "bun-test-authority-v1",
-  "generatedAt": "2026-09-07T03:35:14.377Z",
+  "generatedAt": "2026-09-08T10:05:17.511Z",
   "root": ".",
-  "totalTestFiles": 440,
+  "totalTestFiles": 450,
   "counts": {
     "CODEMOD_READY": 0,
     "AGY_REQUIRED": 0,
-    "MIGRATED": 392,
-    "VERIFIED": 48,
+    "MIGRATED": 450,
+    "VERIFIED": 0,
     "BLOCKED": 0
   },
   "parity": {
-    "previousTotal": 337,
+    "previousTotal": 450,
     "disappeared": []
   },
   "files": [
@@ -247,6 +247,36 @@
       "state": "MIGRATED"
     },
     {
+      "path": "packages/capacity-planner/test/admission.spec.ts",
+      "package": "@foresift/capacity-planner",
+      "bytes": 7614,
+      "lines": 213,
+      "sha256": "5b9b47229b7de9a5130c078515990f4b5f2dc9f999d988038f6bfa66ff6b83e7",
+      "imports": ["bun:test", "../src/admission.ts", "@foresift/domain", "@foresift/domain"],
+      "vitestImports": [],
+      "features": [],
+      "workload": "PURE",
+      "migrationType": "ALREADY_MIGRATED",
+      "fixturesAndHelpers": [],
+      "sourceAnchors": ["../src/admission.ts", "@foresift/domain", "@foresift/domain"],
+      "state": "MIGRATED"
+    },
+    {
+      "path": "packages/capacity-planner/test/degrade-order.spec.ts",
+      "package": "@foresift/capacity-planner",
+      "bytes": 3517,
+      "lines": 90,
+      "sha256": "788f401f4201fd6b01bc779ea7ab481da856ffc42c6d247b1d1a406c44a821a1",
+      "imports": ["bun:test", "../src/degrade-order.ts", "@foresift/domain"],
+      "vitestImports": [],
+      "features": [],
+      "workload": "PURE",
+      "migrationType": "ALREADY_MIGRATED",
+      "fixturesAndHelpers": [],
+      "sourceAnchors": ["../src/degrade-order.ts", "@foresift/domain"],
+      "state": "MIGRATED"
+    },
+    {
       "path": "packages/capacity-planner/test/degrade-policy.spec.ts",
       "package": "@foresift/capacity-planner",
       "bytes": 2078,
@@ -259,14 +289,14 @@
       "migrationType": "ALREADY_MIGRATED",
       "fixturesAndHelpers": [],
       "sourceAnchors": ["../src/degrade-policy.ts"],
-      "state": "VERIFIED"
+      "state": "MIGRATED"
     },
     {
       "path": "packages/capacity-planner/test/migrations.spec.ts",
       "package": "@foresift/capacity-planner",
-      "bytes": 2944,
-      "lines": 89,
-      "sha256": "fd7baa1ac35aa28bf2b84548f5cab9997e4cb3e3d873b150e371905c4ebf618a",
+      "bytes": 7442,
+      "lines": 183,
+      "sha256": "2152ce5d596b6d0e38e1930a84cb55a2956a01a01fb399c79b91ccfcf2ba69b6",
       "imports": [
         "bun:test",
         "@electric-sql/pglite",
@@ -280,7 +310,7 @@
       "migrationType": "ALREADY_MIGRATED",
       "fixturesAndHelpers": [],
       "sourceAnchors": ["@electric-sql/pglite", "@foresift/persistence"],
-      "state": "VERIFIED"
+      "state": "MIGRATED"
     },
     {
       "path": "packages/capacity-planner/test/planner.spec.ts",
@@ -307,7 +337,7 @@
         "../../../tests/fixtures/cost/paid-policies.ts",
         "../../../tests/fixtures/cost/operations.ts"
       ],
-      "state": "VERIFIED"
+      "state": "MIGRATED"
     },
     {
       "path": "packages/capacity-planner/test/resource-budgets.spec.ts",
@@ -329,7 +359,7 @@
         "../src/resource-budgets.ts",
         "../../../tests/fixtures/cost/paid-policies.ts"
       ],
-      "state": "VERIFIED"
+      "state": "MIGRATED"
     },
     {
       "path": "packages/cheap-monitor/test/migrations.spec.ts",
@@ -350,7 +380,7 @@
       "migrationType": "ALREADY_MIGRATED",
       "fixturesAndHelpers": [],
       "sourceAnchors": ["@electric-sql/pglite", "@foresift/persistence"],
-      "state": "VERIFIED"
+      "state": "MIGRATED"
     },
     {
       "path": "packages/cheap-monitor/test/monitor.spec.ts",
@@ -365,7 +395,7 @@
       "migrationType": "ALREADY_MIGRATED",
       "fixturesAndHelpers": ["../../../tests/fixtures/disc/index.ts"],
       "sourceAnchors": ["../../../tests/fixtures/disc/index.ts"],
-      "state": "VERIFIED"
+      "state": "MIGRATED"
     },
     {
       "path": "packages/cheap-monitor/test/promotion.spec.ts",
@@ -380,7 +410,7 @@
       "migrationType": "ALREADY_MIGRATED",
       "fixturesAndHelpers": ["../../../tests/fixtures/disc/index.ts"],
       "sourceAnchors": ["../../../tests/fixtures/disc/index.ts"],
-      "state": "VERIFIED"
+      "state": "MIGRATED"
     },
     {
       "path": "packages/collector-checkpoints/test/checkpoints.spec.ts",
@@ -395,7 +425,7 @@
       "migrationType": "ALREADY_MIGRATED",
       "fixturesAndHelpers": [],
       "sourceAnchors": [],
-      "state": "VERIFIED"
+      "state": "MIGRATED"
     },
     {
       "path": "packages/collector-checkpoints/test/migrations.spec.ts",
@@ -416,7 +446,7 @@
       "migrationType": "ALREADY_MIGRATED",
       "fixturesAndHelpers": [],
       "sourceAnchors": ["@electric-sql/pglite", "@foresift/persistence"],
-      "state": "VERIFIED"
+      "state": "MIGRATED"
     },
     {
       "path": "packages/collector-checkpoints/test/watermarks.spec.ts",
@@ -431,7 +461,7 @@
       "migrationType": "ALREADY_MIGRATED",
       "fixturesAndHelpers": [],
       "sourceAnchors": [],
-      "state": "VERIFIED"
+      "state": "MIGRATED"
     },
     {
       "path": "packages/collector-core/test/capacity.spec.ts",
@@ -446,7 +476,7 @@
       "migrationType": "ALREADY_MIGRATED",
       "fixturesAndHelpers": ["../../../tests/fixtures/col/index.ts"],
       "sourceAnchors": ["../../../tests/fixtures/col/index.ts"],
-      "state": "VERIFIED"
+      "state": "MIGRATED"
     },
     {
       "path": "packages/collector-core/test/dedupe.spec.ts",
@@ -461,7 +491,7 @@
       "migrationType": "ALREADY_MIGRATED",
       "fixturesAndHelpers": ["../../../tests/fixtures/col/index.ts"],
       "sourceAnchors": ["../../../tests/fixtures/col/index.ts"],
-      "state": "VERIFIED"
+      "state": "MIGRATED"
     },
     {
       "path": "packages/collector-core/test/first-seen.spec.ts",
@@ -476,7 +506,7 @@
       "migrationType": "ALREADY_MIGRATED",
       "fixturesAndHelpers": [],
       "sourceAnchors": [],
-      "state": "VERIFIED"
+      "state": "MIGRATED"
     },
     {
       "path": "packages/collector-core/test/health.spec.ts",
@@ -491,7 +521,7 @@
       "migrationType": "ALREADY_MIGRATED",
       "fixturesAndHelpers": [],
       "sourceAnchors": [],
-      "state": "VERIFIED"
+      "state": "MIGRATED"
     },
     {
       "path": "packages/collector-core/test/lifecycle.spec.ts",
@@ -506,7 +536,7 @@
       "migrationType": "ALREADY_MIGRATED",
       "fixturesAndHelpers": [],
       "sourceAnchors": [],
-      "state": "VERIFIED"
+      "state": "MIGRATED"
     },
     {
       "path": "packages/collector-core/test/migrations.spec.ts",
@@ -527,7 +557,7 @@
       "migrationType": "ALREADY_MIGRATED",
       "fixturesAndHelpers": [],
       "sourceAnchors": ["@electric-sql/pglite", "@foresift/persistence"],
-      "state": "VERIFIED"
+      "state": "MIGRATED"
     },
     {
       "path": "packages/collector-core/test/scope.spec.ts",
@@ -542,7 +572,7 @@
       "migrationType": "ALREADY_MIGRATED",
       "fixturesAndHelpers": ["../../../tests/fixtures/col/index.ts"],
       "sourceAnchors": ["../../../tests/fixtures/col/index.ts"],
-      "state": "VERIFIED"
+      "state": "MIGRATED"
     },
     {
       "path": "packages/collector-core/test/stream-records.spec.ts",
@@ -557,7 +587,7 @@
       "migrationType": "ALREADY_MIGRATED",
       "fixturesAndHelpers": ["../../../tests/fixtures/col/index.ts"],
       "sourceAnchors": ["../../../tests/fixtures/col/index.ts"],
-      "state": "VERIFIED"
+      "state": "MIGRATED"
     },
     {
       "path": "packages/collector-gap-recovery/test/backfill.spec.ts",
@@ -572,7 +602,7 @@
       "migrationType": "ALREADY_MIGRATED",
       "fixturesAndHelpers": [],
       "sourceAnchors": [],
-      "state": "VERIFIED"
+      "state": "MIGRATED"
     },
     {
       "path": "packages/collector-gap-recovery/test/gap-detector.spec.ts",
@@ -587,7 +617,7 @@
       "migrationType": "ALREADY_MIGRATED",
       "fixturesAndHelpers": ["../../../tests/fixtures/col/index.ts"],
       "sourceAnchors": ["../../../tests/fixtures/col/index.ts"],
-      "state": "VERIFIED"
+      "state": "MIGRATED"
     },
     {
       "path": "packages/collector-gap-recovery/test/migrations.spec.ts",
@@ -608,7 +638,7 @@
       "migrationType": "ALREADY_MIGRATED",
       "fixturesAndHelpers": [],
       "sourceAnchors": ["@electric-sql/pglite", "@foresift/persistence"],
-      "state": "VERIFIED"
+      "state": "MIGRATED"
     },
     {
       "path": "packages/collector-gap-recovery/test/waivers.spec.ts",
@@ -623,7 +653,7 @@
       "migrationType": "ALREADY_MIGRATED",
       "fixturesAndHelpers": ["../../../tests/fixtures/col/index.ts"],
       "sourceAnchors": ["../../../tests/fixtures/col/index.ts"],
-      "state": "VERIFIED"
+      "state": "MIGRATED"
     },
     {
       "path": "packages/collector-solana/test/egress.spec.ts",
@@ -638,7 +668,7 @@
       "migrationType": "ALREADY_MIGRATED",
       "fixturesAndHelpers": [],
       "sourceAnchors": [],
-      "state": "VERIFIED"
+      "state": "MIGRATED"
     },
     {
       "path": "packages/collector-solana/test/jupiter.spec.ts",
@@ -653,7 +683,7 @@
       "migrationType": "ALREADY_MIGRATED",
       "fixturesAndHelpers": ["../../../tests/fixtures/col/index.ts"],
       "sourceAnchors": ["../../../tests/fixtures/col/index.ts"],
-      "state": "VERIFIED"
+      "state": "MIGRATED"
     },
     {
       "path": "packages/collector-solana/test/migrations.spec.ts",
@@ -674,7 +704,7 @@
       "migrationType": "ALREADY_MIGRATED",
       "fixturesAndHelpers": [],
       "sourceAnchors": ["@electric-sql/pglite", "@foresift/persistence"],
-      "state": "VERIFIED"
+      "state": "MIGRATED"
     },
     {
       "path": "packages/collector-solana/test/registry.spec.ts",
@@ -689,7 +719,7 @@
       "migrationType": "ALREADY_MIGRATED",
       "fixturesAndHelpers": ["../../../tests/fixtures/col/index.ts"],
       "sourceAnchors": ["../../../tests/fixtures/col/index.ts"],
-      "state": "VERIFIED"
+      "state": "MIGRATED"
     },
     {
       "path": "packages/collector-solana/test/sharding.spec.ts",
@@ -704,7 +734,7 @@
       "migrationType": "ALREADY_MIGRATED",
       "fixturesAndHelpers": [],
       "sourceAnchors": [],
-      "state": "VERIFIED"
+      "state": "MIGRATED"
     },
     {
       "path": "packages/collector-solana/test/transport.spec.ts",
@@ -719,7 +749,7 @@
       "migrationType": "ALREADY_MIGRATED",
       "fixturesAndHelpers": [],
       "sourceAnchors": [],
-      "state": "VERIFIED"
+      "state": "MIGRATED"
     },
     {
       "path": "packages/cost-router/test/batch-coalescer.spec.ts",
@@ -738,7 +768,42 @@
       "migrationType": "ALREADY_MIGRATED",
       "fixturesAndHelpers": ["../../../tests/fixtures/cost/batches.ts"],
       "sourceAnchors": ["../src/batch-coalescer.ts", "../../../tests/fixtures/cost/batches.ts"],
-      "state": "VERIFIED"
+      "state": "MIGRATED"
+    },
+    {
+      "path": "packages/cost-router/test/budget-policy.spec.ts",
+      "package": "@foresift/cost-router",
+      "bytes": 8240,
+      "lines": 236,
+      "sha256": "35fbd3cee7164bc8cbdaf246e5baae01761482d0595e33333c420c2b48fad295",
+      "imports": ["bun:test", "../src/budget-policy.ts"],
+      "vitestImports": [],
+      "features": [],
+      "workload": "PURE",
+      "migrationType": "ALREADY_MIGRATED",
+      "fixturesAndHelpers": [],
+      "sourceAnchors": ["../src/budget-policy.ts"],
+      "state": "MIGRATED"
+    },
+    {
+      "path": "packages/cost-router/test/composition.spec.ts",
+      "package": "@foresift/cost-router",
+      "bytes": 4032,
+      "lines": 112,
+      "sha256": "37e5a1611088a5ee80240155d714773c424b1a208d35a7a1b5b6a6f9b9d707ab",
+      "imports": [
+        "bun:test",
+        "../src/composition.ts",
+        "@foresift/domain",
+        "@foresift/shared-schemas"
+      ],
+      "vitestImports": [],
+      "features": [],
+      "workload": "PURE",
+      "migrationType": "ALREADY_MIGRATED",
+      "fixturesAndHelpers": [],
+      "sourceAnchors": ["../src/composition.ts", "@foresift/domain", "@foresift/shared-schemas"],
+      "state": "MIGRATED"
     },
     {
       "path": "packages/cost-router/test/cost-declaration.spec.ts",
@@ -757,14 +822,14 @@
       "migrationType": "ALREADY_MIGRATED",
       "fixturesAndHelpers": ["../../../tests/fixtures/cost/operations.ts"],
       "sourceAnchors": ["../src/cost-declaration.ts", "../../../tests/fixtures/cost/operations.ts"],
-      "state": "VERIFIED"
+      "state": "MIGRATED"
     },
     {
       "path": "packages/cost-router/test/migrations.spec.ts",
       "package": "@foresift/cost-router",
-      "bytes": 4182,
-      "lines": 109,
-      "sha256": "c1439cc3f046ba7281c6147c797edd1e2b96a2a5dfe44b12d436c2f98360b8cf",
+      "bytes": 8039,
+      "lines": 203,
+      "sha256": "d463d3c740826a0e4ed71a3f00152b8d3a3426f5e3f556001bf07996c919ee7b",
       "imports": [
         "bun:test",
         "@electric-sql/pglite",
@@ -778,7 +843,7 @@
       "migrationType": "ALREADY_MIGRATED",
       "fixturesAndHelpers": [],
       "sourceAnchors": ["@electric-sql/pglite", "@foresift/persistence"],
-      "state": "VERIFIED"
+      "state": "MIGRATED"
     },
     {
       "path": "packages/cost-router/test/paid-policy.spec.ts",
@@ -797,7 +862,7 @@
       "migrationType": "ALREADY_MIGRATED",
       "fixturesAndHelpers": ["../../../tests/fixtures/cost/paid-policies.ts"],
       "sourceAnchors": ["../src/paid-policy.ts", "../../../tests/fixtures/cost/paid-policies.ts"],
-      "state": "VERIFIED"
+      "state": "MIGRATED"
     },
     {
       "path": "packages/cost-router/test/quota-adapter.spec.ts",
@@ -827,7 +892,7 @@
         "../src/quota-adapter.ts",
         "../../../tests/fixtures/cost/operations.ts"
       ],
-      "state": "VERIFIED"
+      "state": "MIGRATED"
     },
     {
       "path": "packages/cost-router/test/reserve-router.spec.ts",
@@ -846,7 +911,7 @@
       "migrationType": "ALREADY_MIGRATED",
       "fixturesAndHelpers": ["../../../tests/fixtures/cost/operations.ts"],
       "sourceAnchors": ["../src/reserve-router.ts", "../../../tests/fixtures/cost/operations.ts"],
-      "state": "VERIFIED"
+      "state": "MIGRATED"
     },
     {
       "path": "packages/cost-router/test/strict-free-guard.spec.ts",
@@ -868,7 +933,7 @@
         "../src/strict-free-guard.ts",
         "../../../tests/fixtures/cost/operations.ts"
       ],
-      "state": "VERIFIED"
+      "state": "MIGRATED"
     },
     {
       "path": "packages/discovery-universe/test/migrations.spec.ts",
@@ -889,7 +954,7 @@
       "migrationType": "ALREADY_MIGRATED",
       "fixturesAndHelpers": [],
       "sourceAnchors": ["@electric-sql/pglite", "@foresift/persistence"],
-      "state": "VERIFIED"
+      "state": "MIGRATED"
     },
     {
       "path": "packages/discovery-universe/test/populations.spec.ts",
@@ -904,7 +969,7 @@
       "migrationType": "ALREADY_MIGRATED",
       "fixturesAndHelpers": ["../../../tests/fixtures/disc/index.ts"],
       "sourceAnchors": ["../../../tests/fixtures/disc/index.ts"],
-      "state": "VERIFIED"
+      "state": "MIGRATED"
     },
     {
       "path": "packages/discovery-universe/test/registry.spec.ts",
@@ -919,7 +984,7 @@
       "migrationType": "ALREADY_MIGRATED",
       "fixturesAndHelpers": ["../../../tests/fixtures/disc/index.ts"],
       "sourceAnchors": ["../../../tests/fixtures/disc/index.ts"],
-      "state": "VERIFIED"
+      "state": "MIGRATED"
     },
     {
       "path": "packages/discovery-universe/test/retrospective.spec.ts",
@@ -934,7 +999,7 @@
       "migrationType": "ALREADY_MIGRATED",
       "fixturesAndHelpers": ["../../../tests/fixtures/disc/index.ts"],
       "sourceAnchors": ["../../../tests/fixtures/disc/index.ts"],
-      "state": "VERIFIED"
+      "state": "MIGRATED"
     },
     {
       "path": "packages/domain/test/acquisition.spec.ts",
@@ -964,7 +1029,37 @@
       "migrationType": "ALREADY_MIGRATED",
       "fixturesAndHelpers": [],
       "sourceAnchors": ["../src/index.ts"],
-      "state": "VERIFIED"
+      "state": "MIGRATED"
+    },
+    {
+      "path": "packages/domain/test/capacity-contract.spec.ts",
+      "package": "@foresift/domain",
+      "bytes": 11634,
+      "lines": 328,
+      "sha256": "56e2c8dd152af055d3528934aef76e5f3c8e74915952fb8c2a06410315645084",
+      "imports": ["bun:test", "../src/capacity-contract.ts", "../src/errors.ts"],
+      "vitestImports": [],
+      "features": [],
+      "workload": "PURE",
+      "migrationType": "ALREADY_MIGRATED",
+      "fixturesAndHelpers": [],
+      "sourceAnchors": ["../src/capacity-contract.ts", "../src/errors.ts"],
+      "state": "MIGRATED"
+    },
+    {
+      "path": "packages/domain/test/capacity.spec.ts",
+      "package": "@foresift/domain",
+      "bytes": 6225,
+      "lines": 176,
+      "sha256": "90304b9ef5b84b7557973e639a81ba2ef05fe5b95df90aff71e0d0b7aeb45b09",
+      "imports": ["bun:test", "../src/capacity.ts", "../src/cost.ts", "../src/errors.ts"],
+      "vitestImports": [],
+      "features": [],
+      "workload": "PURE",
+      "migrationType": "ALREADY_MIGRATED",
+      "fixturesAndHelpers": [],
+      "sourceAnchors": ["../src/capacity.ts", "../src/cost.ts", "../src/errors.ts"],
+      "state": "MIGRATED"
     },
     {
       "path": "packages/domain/test/conflicts.spec.ts",
@@ -994,7 +1089,22 @@
       "migrationType": "ALREADY_MIGRATED",
       "fixturesAndHelpers": [],
       "sourceAnchors": ["../src/cost.ts", "../src/errors.ts"],
-      "state": "VERIFIED"
+      "state": "MIGRATED"
+    },
+    {
+      "path": "packages/domain/test/degrade-order.spec.ts",
+      "package": "@foresift/domain",
+      "bytes": 5002,
+      "lines": 126,
+      "sha256": "b129ab114ed35f60bb6a2e9d08436bc80f1ff229609153b53074de55657eb2d1",
+      "imports": ["bun:test", "../src/degrade-order.ts", "../src/capacity.ts"],
+      "vitestImports": [],
+      "features": [],
+      "workload": "PURE",
+      "migrationType": "ALREADY_MIGRATED",
+      "fixturesAndHelpers": [],
+      "sourceAnchors": ["../src/degrade-order.ts", "../src/capacity.ts"],
+      "state": "MIGRATED"
     },
     {
       "path": "packages/domain/test/dependence.spec.ts",
@@ -1039,7 +1149,7 @@
       "migrationType": "ALREADY_MIGRATED",
       "fixturesAndHelpers": [],
       "sourceAnchors": ["../src/index.ts"],
-      "state": "VERIFIED"
+      "state": "MIGRATED"
     },
     {
       "path": "packages/domain/test/quantity.spec.ts",
@@ -1054,7 +1164,7 @@
       "migrationType": "ALREADY_MIGRATED",
       "fixturesAndHelpers": [],
       "sourceAnchors": ["../src/index.ts"],
-      "state": "VERIFIED"
+      "state": "MIGRATED"
     },
     {
       "path": "packages/domain/test/replay-modes.spec.ts",
@@ -1114,7 +1224,7 @@
       "migrationType": "ALREADY_MIGRATED",
       "fixturesAndHelpers": [],
       "sourceAnchors": ["../src/index.ts"],
-      "state": "VERIFIED"
+      "state": "MIGRATED"
     },
     {
       "path": "packages/domain/test/timeline.spec.ts",
@@ -1144,7 +1254,7 @@
       "migrationType": "ALREADY_MIGRATED",
       "fixturesAndHelpers": [],
       "sourceAnchors": ["../src/tool.ts", "../src/errors.ts"],
-      "state": "VERIFIED"
+      "state": "MIGRATED"
     },
     {
       "path": "packages/domain/test/trades.spec.ts",
@@ -1230,7 +1340,7 @@
         "@foresift/persistence",
         "../src/index.ts"
       ],
-      "state": "VERIFIED"
+      "state": "MIGRATED"
     },
     {
       "path": "packages/object-store/test/local-store.spec.ts",
@@ -1245,7 +1355,7 @@
       "migrationType": "ALREADY_MIGRATED",
       "fixturesAndHelpers": [],
       "sourceAnchors": ["../src/index.ts"],
-      "state": "VERIFIED"
+      "state": "MIGRATED"
     },
     {
       "path": "packages/object-store/test/staged-commit.spec.ts",
@@ -1275,7 +1385,7 @@
         "@foresift/persistence",
         "../src/index.ts"
       ],
-      "state": "VERIFIED"
+      "state": "MIGRATED"
     },
     {
       "path": "packages/persistence/test/acquisition.spec.ts",
@@ -1486,9 +1596,9 @@
     {
       "path": "packages/persistence/test/migrator.spec.ts",
       "package": "@foresift/persistence",
-      "bytes": 21079,
-      "lines": 526,
-      "sha256": "c59b2ca9cdc6d450183e729c73812df2bc610d809ac4e1c188ac32964f40d8e7",
+      "bytes": 21339,
+      "lines": 532,
+      "sha256": "dbdbe07709d729b3251aee6c55e0bfb024c09e62fbd5163790412f3380f0cd6e",
       "imports": [
         "bun:test",
         "@electric-sql/pglite",
@@ -2242,9 +2352,9 @@
     {
       "path": "packages/quota-forecast/test/migrations.spec.ts",
       "package": "@foresift/quota-forecast",
-      "bytes": 2638,
-      "lines": 69,
-      "sha256": "1b1ff2d828422af45169d9eb81e84fd2b1a0165eb7ef0de0eda4c378a9a1b645",
+      "bytes": 7592,
+      "lines": 163,
+      "sha256": "b6f74514c6aaf0c3877ae46c3d2076604195621df391c5aeab8a06ec71332ae8",
       "imports": [
         "bun:test",
         "@electric-sql/pglite",
@@ -2273,6 +2383,36 @@
       "migrationType": "ALREADY_MIGRATED",
       "fixturesAndHelpers": ["../../../tests/fixtures/cost/plans.ts"],
       "sourceAnchors": ["../src/plan-verifier.ts", "../../../tests/fixtures/cost/plans.ts"],
+      "state": "MIGRATED"
+    },
+    {
+      "path": "packages/quota-forecast/test/reconciliation.spec.ts",
+      "package": "@foresift/quota-forecast",
+      "bytes": 6474,
+      "lines": 201,
+      "sha256": "4ef3aeeccbb7f35f4bcfcacff202d8fdb17ae6c9ed4cc34206848c58947c1e72",
+      "imports": ["bun:test", "../src/reconciliation.ts", "@foresift/domain"],
+      "vitestImports": [],
+      "features": [],
+      "workload": "PURE",
+      "migrationType": "ALREADY_MIGRATED",
+      "fixturesAndHelpers": [],
+      "sourceAnchors": ["../src/reconciliation.ts", "@foresift/domain"],
+      "state": "MIGRATED"
+    },
+    {
+      "path": "packages/quota-forecast/test/usage-ledger.spec.ts",
+      "package": "@foresift/quota-forecast",
+      "bytes": 2620,
+      "lines": 77,
+      "sha256": "d1aea2f91ac595e85bf820308c212de3aa5cbfaddc66140e1f60be7195356adc",
+      "imports": ["bun:test", "../src/usage-ledger.ts", "@foresift/domain"],
+      "vitestImports": [],
+      "features": [],
+      "workload": "PURE",
+      "migrationType": "ALREADY_MIGRATED",
+      "fixturesAndHelpers": [],
+      "sourceAnchors": ["../src/usage-ledger.ts", "@foresift/domain"],
       "state": "MIGRATED"
     },
     {
@@ -2887,6 +3027,21 @@
         "../src/errors.ts",
         "../src/abuse-controls.ts"
       ],
+      "state": "MIGRATED"
+    },
+    {
+      "path": "packages/shared-schemas/test/capacity.spec.ts",
+      "package": "@foresift/shared-schemas",
+      "bytes": 13839,
+      "lines": 421,
+      "sha256": "2ecaddbc40d469143d03ceaaead8fecd4c76fb83356a1edc9e642399ddcd7c4c",
+      "imports": ["bun:test", "@foresift/domain", "../src/cost.ts", "../src/capacity.ts"],
+      "vitestImports": [],
+      "features": [],
+      "workload": "PURE",
+      "migrationType": "ALREADY_MIGRATED",
+      "fixturesAndHelpers": [],
+      "sourceAnchors": ["@foresift/domain", "../src/cost.ts", "../src/capacity.ts"],
       "state": "MIGRATED"
     },
     {
@@ -3847,9 +4002,9 @@
     {
       "path": "tests/acceptance/AC-101.spec.ts",
       "package": "acceptance",
-      "bytes": 2097,
-      "lines": 61,
-      "sha256": "52965e008b8a831eadcce12e363da08f214b3bc5c25473837805cd3866e8d440",
+      "bytes": 3108,
+      "lines": 88,
+      "sha256": "39dc466fe5f7d9f4f0cb62077ceb6e22d200b242010bb8af13ba3629872400cf",
       "imports": [
         "bun:test",
         "./helpers.ts",
@@ -3917,9 +4072,9 @@
     {
       "path": "tests/acceptance/AC-104.spec.ts",
       "package": "acceptance",
-      "bytes": 2000,
-      "lines": 49,
-      "sha256": "9bfc1d71529d8b199723f89fef02df9642351d23979c3a7d049e380ce45ad76a",
+      "bytes": 2836,
+      "lines": 68,
+      "sha256": "6001ebd8c54383430f3f9e7faf73a80fa437a88b5559fd4754a87c1425328dd1",
       "imports": [
         "bun:test",
         "../../packages/capacity-planner/src/resource-budgets.ts",
@@ -3939,9 +4094,9 @@
     {
       "path": "tests/acceptance/AC-105.spec.ts",
       "package": "acceptance",
-      "bytes": 2272,
-      "lines": 53,
-      "sha256": "e7e072d7d19f7d2d7fbcda2ae11348e7646dbcd84af77915556f2e3ba2ad1a11",
+      "bytes": 3043,
+      "lines": 74,
+      "sha256": "d5147fe65a9551bf8a3cbd60d7c6278aeb9ce09b8f6769a4b557b55ea5715f6d",
       "imports": [
         "bun:test",
         "../../packages/capacity-planner/src/resource-budgets.ts",
@@ -4350,9 +4505,9 @@
     {
       "path": "tests/acceptance/AC-227.spec.ts",
       "package": "acceptance",
-      "bytes": 2283,
-      "lines": 62,
-      "sha256": "018049aabb1195803b963b66be8898da7372618087bc977888106b45b45d28ff",
+      "bytes": 2952,
+      "lines": 79,
+      "sha256": "3e83d15e0c71bad47c80a06dc8cf70cecd53c469d0be8adf4be237b3294b71f9",
       "imports": [
         "bun:test",
         "../../packages/quota-forecast/src/capacity-replay.ts",
@@ -4372,9 +4527,9 @@
     {
       "path": "tests/acceptance/AC-228.spec.ts",
       "package": "acceptance",
-      "bytes": 2303,
-      "lines": 53,
-      "sha256": "e64ff175896f59c81ad9f175f614f685f3dc64843771fe19298f574de86eec36",
+      "bytes": 3852,
+      "lines": 84,
+      "sha256": "4347f156fd051ae4f32f00add34b81fe7b532f14e72ea21eb52d80a8ae128e9b",
       "imports": ["bun:test", "../../packages/capacity-planner/src/degrade-policy.ts"],
       "vitestImports": [],
       "features": [],
@@ -4387,9 +4542,9 @@
     {
       "path": "tests/acceptance/AC-229.spec.ts",
       "package": "acceptance",
-      "bytes": 2503,
-      "lines": 53,
-      "sha256": "4a43710a45d992e9651bb623e3e41a95700939c77db5ae6c4624b2c5aeba8535",
+      "bytes": 3584,
+      "lines": 79,
+      "sha256": "8e6a909943aebe7fbfc12e6b4ab5c8ff37f39bb4e7ea1308e77f7dcff2dfd411",
       "imports": [
         "bun:test",
         "../../packages/quota-forecast/src/forecast.ts",
@@ -5788,9 +5943,9 @@
     {
       "path": "tests/automation/evidence-owner-registry.spec.ts",
       "package": "automation",
-      "bytes": 33393,
-      "lines": 772,
-      "sha256": "af375ef6e89936395c7f71000539341e6de081933eee069be73a91c828f216fa",
+      "bytes": 33572,
+      "lines": 774,
+      "sha256": "b83b1e6d8a9096a58092e919f85887e73a7209762d12fac1d893f48757da2642",
       "imports": [
         "bun:test",
         "node:child_process",
@@ -6039,9 +6194,9 @@
     {
       "path": "tests/automation/planned-handoff.spec.ts",
       "package": "automation",
-      "bytes": 26517,
-      "lines": 665,
-      "sha256": "93506517f3ff6335d9c053ed654409673c110d4c26afbbcae31bc099118c81cb",
+      "bytes": 27019,
+      "lines": 670,
+      "sha256": "8fe40b8c19100b23542ead2a83221aef28668ae396f6ff122749a070a92332c7",
       "imports": [
         "node:child_process",
         "node:fs",
@@ -6475,9 +6630,9 @@
     {
       "path": "tests/automation/v3-generations.spec.ts",
       "package": "automation",
-      "bytes": 70467,
-      "lines": 1674,
-      "sha256": "7f21033b2254f95a4857309b1eda5df27783d72f7f7033c7c212e6aa819b3808",
+      "bytes": 71300,
+      "lines": 1693,
+      "sha256": "e886f42880a7f15abb00d3997f197826dc705e347e93a6651cf83ddc09275611",
       "imports": [
         "node:child_process",
         "node:fs",
@@ -7224,9 +7379,9 @@
     {
       "path": "tests/negative/AC-101.negative.spec.ts",
       "package": "negative",
-      "bytes": 1656,
-      "lines": 48,
-      "sha256": "c5c6e80ea33d605faabdaae1fdcfc900ce02f0c8930de6ad6e1cab8279757e19",
+      "bytes": 2116,
+      "lines": 62,
+      "sha256": "1c0a424d100dcf827eec4eabe03d6631027cc5bcd3ad200ad5e3967fcaf2afe7",
       "imports": [
         "bun:test",
         "../../packages/cost-router/src/reserve-router.ts",
@@ -7270,9 +7425,9 @@
     {
       "path": "tests/negative/AC-103.negative.spec.ts",
       "package": "negative",
-      "bytes": 1299,
-      "lines": 30,
-      "sha256": "c96a5e7e3b6195ffbe30cf679fe158a3bede4b15b24a2ddcbbdbdb568115c780",
+      "bytes": 1964,
+      "lines": 47,
+      "sha256": "da412bc756c978716be46b30a918dc641ab21e55b8169012887304b115ca6e0d",
       "imports": [
         "bun:test",
         "../../packages/quota-forecast/src/plan-verifier.ts",
@@ -7292,9 +7447,9 @@
     {
       "path": "tests/negative/AC-104.negative.spec.ts",
       "package": "negative",
-      "bytes": 1894,
-      "lines": 50,
-      "sha256": "50c75adee19cfb3d2feef6092355f689c72323f7e34507a471455a9db65b53a9",
+      "bytes": 2485,
+      "lines": 65,
+      "sha256": "939d95cd822cfb3e12e6ad4e7ff364483ee8f0930d17dde0c64d4ea99e5f7d1a",
       "imports": [
         "bun:test",
         "../../packages/capacity-planner/src/resource-budgets.ts",
@@ -7314,9 +7469,9 @@
     {
       "path": "tests/negative/AC-105.negative.spec.ts",
       "package": "negative",
-      "bytes": 1674,
-      "lines": 43,
-      "sha256": "e57cd8660c7e965c67d5322a0c6b8415730c045283ecd5738991da5dba190804",
+      "bytes": 2487,
+      "lines": 65,
+      "sha256": "3773b174b8756d9ef5a60fa80cc3a64bd58b95dfc94a0c1d7154992dcc4e0eff",
       "imports": [
         "bun:test",
         "../../packages/cost-router/src/strict-free-guard.ts",
@@ -7718,9 +7873,9 @@
     {
       "path": "tests/negative/AC-227.negative.spec.ts",
       "package": "negative",
-      "bytes": 1673,
-      "lines": 44,
-      "sha256": "ab3d28ac00b6cf373c15787e660a6b87c739a4d2e7adaa3882cffd4d61449e23",
+      "bytes": 2550,
+      "lines": 66,
+      "sha256": "50fdc83ec312faf1f280d71ccd743ee40ce5043625627b30b0d950e4a333bea2",
       "imports": [
         "bun:test",
         "../../packages/quota-forecast/src/capacity-replay.ts",
@@ -7740,9 +7895,9 @@
     {
       "path": "tests/negative/AC-228.negative.spec.ts",
       "package": "negative",
-      "bytes": 1581,
-      "lines": 36,
-      "sha256": "0d1ffd2ec9ec0f7685588b5188062a11870da6e9b3a01b3e3ba7afb016defe6e",
+      "bytes": 2501,
+      "lines": 58,
+      "sha256": "84603c8d382f255ff7f895fb246e5b3bf2d6ea6c4f34a0cf455b690b1220e192",
       "imports": ["bun:test", "../../packages/capacity-planner/src/degrade-policy.ts"],
       "vitestImports": [],
       "features": [],
@@ -7755,9 +7910,9 @@
     {
       "path": "tests/negative/AC-229.negative.spec.ts",
       "package": "negative",
-      "bytes": 2082,
-      "lines": 56,
-      "sha256": "9af920c3e911172110f44533dc81f5ee719571e82869e7bfcd47831aeb497e9b",
+      "bytes": 2718,
+      "lines": 74,
+      "sha256": "4a6843ec68cdd90c37cce71bd4ea1a13bb206d0120cef32eeeefd1f514352322",
       "imports": [
         "bun:test",
         "../../packages/quota-forecast/src/forecast.ts",
@@ -8839,9 +8994,9 @@
     {
       "path": "tests/telemetry-catalog.spec.ts",
       "package": "root",
-      "bytes": 7958,
-      "lines": 196,
-      "sha256": "ed09c0648c6129407479262eac33234600ed6b2bc471cb23c520e872f8a9cc49",
+      "bytes": 11808,
+      "lines": 330,
+      "sha256": "de3c835c0b0d786bafb7ca87a99d3b187404cc565cdeda41592c16fc84384182",
       "imports": ["node:fs", "node:path", "bun:test", "@foresift/shared-schemas"],
       "vitestImports": [],
       "features": [],
@@ -8852,1712 +9007,5 @@
       "state": "MIGRATED"
     }
   ],
-  "batches": [
-    {
-      "id": "verify-existing--foresift-capacity-planner-database-pglite-1",
-      "engine": "VERIFY_EXISTING",
-      "workload": "DATABASE_PGLITE",
-      "files": ["packages/capacity-planner/test/migrations.spec.ts"],
-      "state": "VERIFIED",
-      "verification": {
-        "ok": true,
-        "wallTimeMs": 7285,
-        "peakRssBytes": 0,
-        "cpuSeconds": 0,
-        "counts": {
-          "passed": 3,
-          "failed": 0,
-          "skipped": 0
-        },
-        "results": [
-          {
-            "id": "pglite-1",
-            "workload": "DATABASE_PGLITE",
-            "files": ["packages/capacity-planner/test/migrations.spec.ts"],
-            "fileWorkers": 1,
-            "testConcurrency": 1,
-            "command": [
-              "bun",
-              "test",
-              "--no-orphans",
-              "--isolate",
-              "--parallel=1",
-              "--max-concurrency=1",
-              "--timeout=30000",
-              "packages/capacity-planner/test/migrations.spec.ts"
-            ],
-            "status": 0,
-            "signal": null,
-            "timedOut": false,
-            "wallTimeMs": 7284,
-            "peakRssBytes": null,
-            "cpuSeconds": null,
-            "counts": {
-              "passed": 3,
-              "failed": 0,
-              "skipped": 0
-            },
-            "stdoutTail": "bun test v1.4.0 (34cbb9a40) 1x PARALLEL\n",
-            "stderrTail": "\n 3 pass\n 0 fail\n 5 expect() calls\nRan 3 tests across 1 file. [7.13s]\n"
-          }
-        ]
-      },
-      "codexCalls": 0,
-      "claudeCalls": 0,
-      "testedHead": "852e2fa4af01467fc841dbc510f6facce1ecce3f",
-      "checkpointHead": "56426b21fa6e91451400459f6dbd2e03532e66fc"
-    },
-    {
-      "id": "verify-existing--foresift-capacity-planner-pure-1",
-      "engine": "VERIFY_EXISTING",
-      "workload": "PURE",
-      "files": [
-        "packages/capacity-planner/test/degrade-policy.spec.ts",
-        "packages/capacity-planner/test/planner.spec.ts",
-        "packages/capacity-planner/test/resource-budgets.spec.ts"
-      ],
-      "state": "VERIFIED",
-      "verification": {
-        "ok": true,
-        "wallTimeMs": 154,
-        "peakRssBytes": 0,
-        "cpuSeconds": 0,
-        "counts": {
-          "passed": 11,
-          "failed": 0,
-          "skipped": 0
-        },
-        "results": [
-          {
-            "id": "pure-1",
-            "workload": "PURE",
-            "files": [
-              "packages/capacity-planner/test/degrade-policy.spec.ts",
-              "packages/capacity-planner/test/planner.spec.ts",
-              "packages/capacity-planner/test/resource-budgets.spec.ts"
-            ],
-            "fileWorkers": 2,
-            "testConcurrency": 8,
-            "command": [
-              "bun",
-              "test",
-              "--no-orphans",
-              "--isolate",
-              "--parallel=2",
-              "--max-concurrency=8",
-              "--timeout=30000",
-              "packages/capacity-planner/test/degrade-policy.spec.ts",
-              "packages/capacity-planner/test/planner.spec.ts",
-              "packages/capacity-planner/test/resource-budgets.spec.ts"
-            ],
-            "status": 0,
-            "signal": null,
-            "timedOut": false,
-            "wallTimeMs": 153,
-            "peakRssBytes": null,
-            "cpuSeconds": null,
-            "counts": {
-              "passed": 11,
-              "failed": 0,
-              "skipped": 0
-            },
-            "stdoutTail": "bun test v1.4.0 (34cbb9a40) 2x PARALLEL\n",
-            "stderrTail": "\n 11 pass\n 0 fail\n 16 expect() calls\nRan 11 tests across 3 files. [133.00ms]\n"
-          }
-        ]
-      },
-      "codexCalls": 0,
-      "claudeCalls": 0,
-      "testedHead": "56426b21fa6e91451400459f6dbd2e03532e66fc",
-      "checkpointHead": "07cd7a1b7591bacdefc1a6ee5646fa80cb4402dd"
-    },
-    {
-      "id": "verify-existing--foresift-cheap-monitor-database-pglite-1",
-      "engine": "VERIFY_EXISTING",
-      "workload": "DATABASE_PGLITE",
-      "files": ["packages/cheap-monitor/test/migrations.spec.ts"],
-      "state": "VERIFIED",
-      "verification": {
-        "ok": true,
-        "wallTimeMs": 5192,
-        "peakRssBytes": 0,
-        "cpuSeconds": 0,
-        "counts": {
-          "passed": 2,
-          "failed": 0,
-          "skipped": 0
-        },
-        "results": [
-          {
-            "id": "pglite-1",
-            "workload": "DATABASE_PGLITE",
-            "files": ["packages/cheap-monitor/test/migrations.spec.ts"],
-            "fileWorkers": 1,
-            "testConcurrency": 1,
-            "command": [
-              "bun",
-              "test",
-              "--no-orphans",
-              "--isolate",
-              "--parallel=1",
-              "--max-concurrency=1",
-              "--timeout=30000",
-              "packages/cheap-monitor/test/migrations.spec.ts"
-            ],
-            "status": 0,
-            "signal": null,
-            "timedOut": false,
-            "wallTimeMs": 5192,
-            "peakRssBytes": null,
-            "cpuSeconds": null,
-            "counts": {
-              "passed": 2,
-              "failed": 0,
-              "skipped": 0
-            },
-            "stdoutTail": "bun test v1.4.0 (34cbb9a40) 1x PARALLEL\n",
-            "stderrTail": "\n 2 pass\n 0 fail\n 2 expect() calls\nRan 2 tests across 1 file. [5.00s]\n"
-          }
-        ]
-      },
-      "codexCalls": 0,
-      "claudeCalls": 0,
-      "testedHead": "07cd7a1b7591bacdefc1a6ee5646fa80cb4402dd",
-      "checkpointHead": "fa657ec72683f6e92df796a925c5943509b0cbb2"
-    },
-    {
-      "id": "verify-existing--foresift-cheap-monitor-pure-1",
-      "engine": "VERIFY_EXISTING",
-      "workload": "PURE",
-      "files": [
-        "packages/cheap-monitor/test/monitor.spec.ts",
-        "packages/cheap-monitor/test/promotion.spec.ts"
-      ],
-      "state": "VERIFIED",
-      "verification": {
-        "ok": true,
-        "wallTimeMs": 64,
-        "peakRssBytes": 0,
-        "cpuSeconds": 0,
-        "counts": {
-          "passed": 5,
-          "failed": 0,
-          "skipped": 0
-        },
-        "results": [
-          {
-            "id": "pure-1",
-            "workload": "PURE",
-            "files": [
-              "packages/cheap-monitor/test/monitor.spec.ts",
-              "packages/cheap-monitor/test/promotion.spec.ts"
-            ],
-            "fileWorkers": 2,
-            "testConcurrency": 8,
-            "command": [
-              "bun",
-              "test",
-              "--no-orphans",
-              "--isolate",
-              "--parallel=2",
-              "--max-concurrency=8",
-              "--timeout=30000",
-              "packages/cheap-monitor/test/monitor.spec.ts",
-              "packages/cheap-monitor/test/promotion.spec.ts"
-            ],
-            "status": 0,
-            "signal": null,
-            "timedOut": false,
-            "wallTimeMs": 64,
-            "peakRssBytes": null,
-            "cpuSeconds": null,
-            "counts": {
-              "passed": 5,
-              "failed": 0,
-              "skipped": 0
-            },
-            "stdoutTail": "bun test v1.4.0 (34cbb9a40) 2x PARALLEL\n",
-            "stderrTail": "\n 5 pass\n 0 fail\n 11 expect() calls\nRan 5 tests across 2 files. [43.00ms]\n"
-          }
-        ]
-      },
-      "codexCalls": 0,
-      "claudeCalls": 0,
-      "testedHead": "fa657ec72683f6e92df796a925c5943509b0cbb2",
-      "checkpointHead": "f931e48c8739ac7383d57498f6d63313dfa4484a"
-    },
-    {
-      "id": "verify-existing--foresift-collector-checkpoints-database-pglite-1",
-      "engine": "VERIFY_EXISTING",
-      "workload": "DATABASE_PGLITE",
-      "files": ["packages/collector-checkpoints/test/migrations.spec.ts"],
-      "state": "VERIFIED",
-      "verification": {
-        "ok": true,
-        "wallTimeMs": 4803,
-        "peakRssBytes": 0,
-        "cpuSeconds": 0,
-        "counts": {
-          "passed": 2,
-          "failed": 0,
-          "skipped": 0
-        },
-        "results": [
-          {
-            "id": "pglite-1",
-            "workload": "DATABASE_PGLITE",
-            "files": ["packages/collector-checkpoints/test/migrations.spec.ts"],
-            "fileWorkers": 1,
-            "testConcurrency": 1,
-            "command": [
-              "bun",
-              "test",
-              "--no-orphans",
-              "--isolate",
-              "--parallel=1",
-              "--max-concurrency=1",
-              "--timeout=30000",
-              "packages/collector-checkpoints/test/migrations.spec.ts"
-            ],
-            "status": 0,
-            "signal": null,
-            "timedOut": false,
-            "wallTimeMs": 4803,
-            "peakRssBytes": null,
-            "cpuSeconds": null,
-            "counts": {
-              "passed": 2,
-              "failed": 0,
-              "skipped": 0
-            },
-            "stdoutTail": "bun test v1.4.0 (34cbb9a40) 1x PARALLEL\n",
-            "stderrTail": "\n 2 pass\n 0 fail\n 2 expect() calls\nRan 2 tests across 1 file. [4.62s]\n"
-          }
-        ]
-      },
-      "codexCalls": 0,
-      "claudeCalls": 0,
-      "testedHead": "f931e48c8739ac7383d57498f6d63313dfa4484a",
-      "checkpointHead": "59caf06a360cdcf9cfb99ec66b8a3686baba62a6"
-    },
-    {
-      "id": "verify-existing--foresift-collector-checkpoints-pure-1",
-      "engine": "VERIFY_EXISTING",
-      "workload": "PURE",
-      "files": [
-        "packages/collector-checkpoints/test/checkpoints.spec.ts",
-        "packages/collector-checkpoints/test/watermarks.spec.ts"
-      ],
-      "state": "VERIFIED",
-      "verification": {
-        "ok": true,
-        "wallTimeMs": 81,
-        "peakRssBytes": 0,
-        "cpuSeconds": 0,
-        "counts": {
-          "passed": 5,
-          "failed": 0,
-          "skipped": 0
-        },
-        "results": [
-          {
-            "id": "pure-1",
-            "workload": "PURE",
-            "files": [
-              "packages/collector-checkpoints/test/checkpoints.spec.ts",
-              "packages/collector-checkpoints/test/watermarks.spec.ts"
-            ],
-            "fileWorkers": 2,
-            "testConcurrency": 8,
-            "command": [
-              "bun",
-              "test",
-              "--no-orphans",
-              "--isolate",
-              "--parallel=2",
-              "--max-concurrency=8",
-              "--timeout=30000",
-              "packages/collector-checkpoints/test/checkpoints.spec.ts",
-              "packages/collector-checkpoints/test/watermarks.spec.ts"
-            ],
-            "status": 0,
-            "signal": null,
-            "timedOut": false,
-            "wallTimeMs": 81,
-            "peakRssBytes": null,
-            "cpuSeconds": null,
-            "counts": {
-              "passed": 5,
-              "failed": 0,
-              "skipped": 0
-            },
-            "stdoutTail": "bun test v1.4.0 (34cbb9a40) 2x PARALLEL\n",
-            "stderrTail": "\n 5 pass\n 0 fail\n 8 expect() calls\nRan 5 tests across 2 files. [56.00ms]\n"
-          }
-        ]
-      },
-      "codexCalls": 0,
-      "claudeCalls": 0,
-      "testedHead": "59caf06a360cdcf9cfb99ec66b8a3686baba62a6",
-      "checkpointHead": "188c1a602123db6df11b31dbe3199ef64a0a4986"
-    },
-    {
-      "id": "verify-existing--foresift-collector-core-database-pglite-1",
-      "engine": "VERIFY_EXISTING",
-      "workload": "DATABASE_PGLITE",
-      "files": ["packages/collector-core/test/migrations.spec.ts"],
-      "state": "VERIFIED",
-      "verification": {
-        "ok": true,
-        "wallTimeMs": 5362,
-        "peakRssBytes": 0,
-        "cpuSeconds": 0,
-        "counts": {
-          "passed": 2,
-          "failed": 0,
-          "skipped": 0
-        },
-        "results": [
-          {
-            "id": "pglite-1",
-            "workload": "DATABASE_PGLITE",
-            "files": ["packages/collector-core/test/migrations.spec.ts"],
-            "fileWorkers": 1,
-            "testConcurrency": 1,
-            "command": [
-              "bun",
-              "test",
-              "--no-orphans",
-              "--isolate",
-              "--parallel=1",
-              "--max-concurrency=1",
-              "--timeout=30000",
-              "packages/collector-core/test/migrations.spec.ts"
-            ],
-            "status": 0,
-            "signal": null,
-            "timedOut": false,
-            "wallTimeMs": 5361,
-            "peakRssBytes": null,
-            "cpuSeconds": null,
-            "counts": {
-              "passed": 2,
-              "failed": 0,
-              "skipped": 0
-            },
-            "stdoutTail": "bun test v1.4.0 (34cbb9a40) 1x PARALLEL\n",
-            "stderrTail": "\n 2 pass\n 0 fail\n 11 expect() calls\nRan 2 tests across 1 file. [5.21s]\n"
-          }
-        ]
-      },
-      "codexCalls": 0,
-      "claudeCalls": 0,
-      "testedHead": "188c1a602123db6df11b31dbe3199ef64a0a4986",
-      "checkpointHead": "ebe07e28e29e97ce87ef6baf794f7c85751bbccf"
-    },
-    {
-      "id": "verify-existing--foresift-collector-core-pure-1",
-      "engine": "VERIFY_EXISTING",
-      "workload": "PURE",
-      "files": [
-        "packages/collector-core/test/capacity.spec.ts",
-        "packages/collector-core/test/dedupe.spec.ts",
-        "packages/collector-core/test/first-seen.spec.ts",
-        "packages/collector-core/test/health.spec.ts",
-        "packages/collector-core/test/lifecycle.spec.ts",
-        "packages/collector-core/test/scope.spec.ts",
-        "packages/collector-core/test/stream-records.spec.ts"
-      ],
-      "state": "VERIFIED",
-      "verification": {
-        "ok": true,
-        "wallTimeMs": 193,
-        "peakRssBytes": 0,
-        "cpuSeconds": 0,
-        "counts": {
-          "passed": 14,
-          "failed": 0,
-          "skipped": 0
-        },
-        "results": [
-          {
-            "id": "pure-1",
-            "workload": "PURE",
-            "files": [
-              "packages/collector-core/test/capacity.spec.ts",
-              "packages/collector-core/test/dedupe.spec.ts",
-              "packages/collector-core/test/first-seen.spec.ts",
-              "packages/collector-core/test/health.spec.ts",
-              "packages/collector-core/test/lifecycle.spec.ts",
-              "packages/collector-core/test/scope.spec.ts",
-              "packages/collector-core/test/stream-records.spec.ts"
-            ],
-            "fileWorkers": 2,
-            "testConcurrency": 8,
-            "command": [
-              "bun",
-              "test",
-              "--no-orphans",
-              "--isolate",
-              "--parallel=2",
-              "--max-concurrency=8",
-              "--timeout=30000",
-              "packages/collector-core/test/capacity.spec.ts",
-              "packages/collector-core/test/dedupe.spec.ts",
-              "packages/collector-core/test/first-seen.spec.ts",
-              "packages/collector-core/test/health.spec.ts",
-              "packages/collector-core/test/lifecycle.spec.ts",
-              "packages/collector-core/test/scope.spec.ts",
-              "packages/collector-core/test/stream-records.spec.ts"
-            ],
-            "status": 0,
-            "signal": null,
-            "timedOut": false,
-            "wallTimeMs": 193,
-            "peakRssBytes": null,
-            "cpuSeconds": null,
-            "counts": {
-              "passed": 14,
-              "failed": 0,
-              "skipped": 0
-            },
-            "stdoutTail": "bun test v1.4.0 (34cbb9a40) 2x PARALLEL\n",
-            "stderrTail": "\n 14 pass\n 0 fail\n 38 expect() calls\nRan 14 tests across 7 files. [171.00ms]\n"
-          }
-        ]
-      },
-      "codexCalls": 0,
-      "claudeCalls": 0,
-      "testedHead": "ebe07e28e29e97ce87ef6baf794f7c85751bbccf",
-      "checkpointHead": "64a19bac93600eeeb1ac85adab563203af1ad9dc"
-    },
-    {
-      "id": "verify-existing--foresift-collector-gap-recovery-database-pglite-1",
-      "engine": "VERIFY_EXISTING",
-      "workload": "DATABASE_PGLITE",
-      "files": ["packages/collector-gap-recovery/test/migrations.spec.ts"],
-      "state": "VERIFIED",
-      "verification": {
-        "ok": true,
-        "wallTimeMs": 4921,
-        "peakRssBytes": 0,
-        "cpuSeconds": 0,
-        "counts": {
-          "passed": 2,
-          "failed": 0,
-          "skipped": 0
-        },
-        "results": [
-          {
-            "id": "pglite-1",
-            "workload": "DATABASE_PGLITE",
-            "files": ["packages/collector-gap-recovery/test/migrations.spec.ts"],
-            "fileWorkers": 1,
-            "testConcurrency": 1,
-            "command": [
-              "bun",
-              "test",
-              "--no-orphans",
-              "--isolate",
-              "--parallel=1",
-              "--max-concurrency=1",
-              "--timeout=30000",
-              "packages/collector-gap-recovery/test/migrations.spec.ts"
-            ],
-            "status": 0,
-            "signal": null,
-            "timedOut": false,
-            "wallTimeMs": 4920,
-            "peakRssBytes": null,
-            "cpuSeconds": null,
-            "counts": {
-              "passed": 2,
-              "failed": 0,
-              "skipped": 0
-            },
-            "stdoutTail": "bun test v1.4.0 (34cbb9a40) 1x PARALLEL\n",
-            "stderrTail": "\n 2 pass\n 0 fail\n 2 expect() calls\nRan 2 tests across 1 file. [4.71s]\n"
-          }
-        ]
-      },
-      "codexCalls": 0,
-      "claudeCalls": 0,
-      "testedHead": "64a19bac93600eeeb1ac85adab563203af1ad9dc",
-      "checkpointHead": "40f6747faf3984b486ccbc43a2ce9d700dffff47"
-    },
-    {
-      "id": "verify-existing--foresift-collector-gap-recovery-pure-1",
-      "engine": "VERIFY_EXISTING",
-      "workload": "PURE",
-      "files": [
-        "packages/collector-gap-recovery/test/backfill.spec.ts",
-        "packages/collector-gap-recovery/test/gap-detector.spec.ts",
-        "packages/collector-gap-recovery/test/waivers.spec.ts"
-      ],
-      "state": "VERIFIED",
-      "verification": {
-        "ok": true,
-        "wallTimeMs": 91,
-        "peakRssBytes": 0,
-        "cpuSeconds": 0,
-        "counts": {
-          "passed": 7,
-          "failed": 0,
-          "skipped": 0
-        },
-        "results": [
-          {
-            "id": "pure-1",
-            "workload": "PURE",
-            "files": [
-              "packages/collector-gap-recovery/test/backfill.spec.ts",
-              "packages/collector-gap-recovery/test/gap-detector.spec.ts",
-              "packages/collector-gap-recovery/test/waivers.spec.ts"
-            ],
-            "fileWorkers": 2,
-            "testConcurrency": 8,
-            "command": [
-              "bun",
-              "test",
-              "--no-orphans",
-              "--isolate",
-              "--parallel=2",
-              "--max-concurrency=8",
-              "--timeout=30000",
-              "packages/collector-gap-recovery/test/backfill.spec.ts",
-              "packages/collector-gap-recovery/test/gap-detector.spec.ts",
-              "packages/collector-gap-recovery/test/waivers.spec.ts"
-            ],
-            "status": 0,
-            "signal": null,
-            "timedOut": false,
-            "wallTimeMs": 90,
-            "peakRssBytes": null,
-            "cpuSeconds": null,
-            "counts": {
-              "passed": 7,
-              "failed": 0,
-              "skipped": 0
-            },
-            "stdoutTail": "bun test v1.4.0 (34cbb9a40) 2x PARALLEL\n",
-            "stderrTail": "\n 7 pass\n 0 fail\n 13 expect() calls\nRan 7 tests across 3 files. [61.00ms]\n"
-          }
-        ]
-      },
-      "codexCalls": 0,
-      "claudeCalls": 0,
-      "testedHead": "40f6747faf3984b486ccbc43a2ce9d700dffff47",
-      "checkpointHead": "1f445d91904fd706e9e2ab8b5a360e80e3113178"
-    },
-    {
-      "id": "verify-existing--foresift-collector-solana-database-pglite-1",
-      "engine": "VERIFY_EXISTING",
-      "workload": "DATABASE_PGLITE",
-      "files": ["packages/collector-solana/test/migrations.spec.ts"],
-      "state": "VERIFIED",
-      "verification": {
-        "ok": true,
-        "wallTimeMs": 5662,
-        "peakRssBytes": 0,
-        "cpuSeconds": 0,
-        "counts": {
-          "passed": 2,
-          "failed": 0,
-          "skipped": 0
-        },
-        "results": [
-          {
-            "id": "pglite-1",
-            "workload": "DATABASE_PGLITE",
-            "files": ["packages/collector-solana/test/migrations.spec.ts"],
-            "fileWorkers": 1,
-            "testConcurrency": 1,
-            "command": [
-              "bun",
-              "test",
-              "--no-orphans",
-              "--isolate",
-              "--parallel=1",
-              "--max-concurrency=1",
-              "--timeout=30000",
-              "packages/collector-solana/test/migrations.spec.ts"
-            ],
-            "status": 0,
-            "signal": null,
-            "timedOut": false,
-            "wallTimeMs": 5662,
-            "peakRssBytes": null,
-            "cpuSeconds": null,
-            "counts": {
-              "passed": 2,
-              "failed": 0,
-              "skipped": 0
-            },
-            "stdoutTail": "bun test v1.4.0 (34cbb9a40) 1x PARALLEL\n",
-            "stderrTail": "\n 2 pass\n 0 fail\n 2 expect() calls\nRan 2 tests across 1 file. [5.46s]\n"
-          }
-        ]
-      },
-      "codexCalls": 0,
-      "claudeCalls": 0,
-      "testedHead": "1f445d91904fd706e9e2ab8b5a360e80e3113178",
-      "checkpointHead": "f9f51271603853d596e0f9b8ad6fc1e4fa81ee15"
-    },
-    {
-      "id": "verify-existing--foresift-collector-solana-pure-1",
-      "engine": "VERIFY_EXISTING",
-      "workload": "PURE",
-      "files": [
-        "packages/collector-solana/test/egress.spec.ts",
-        "packages/collector-solana/test/jupiter.spec.ts",
-        "packages/collector-solana/test/registry.spec.ts",
-        "packages/collector-solana/test/sharding.spec.ts",
-        "packages/collector-solana/test/transport.spec.ts"
-      ],
-      "state": "VERIFIED",
-      "verification": {
-        "ok": true,
-        "wallTimeMs": 164,
-        "peakRssBytes": 0,
-        "cpuSeconds": 0,
-        "counts": {
-          "passed": 9,
-          "failed": 0,
-          "skipped": 0
-        },
-        "results": [
-          {
-            "id": "pure-1",
-            "workload": "PURE",
-            "files": [
-              "packages/collector-solana/test/egress.spec.ts",
-              "packages/collector-solana/test/jupiter.spec.ts",
-              "packages/collector-solana/test/registry.spec.ts",
-              "packages/collector-solana/test/sharding.spec.ts",
-              "packages/collector-solana/test/transport.spec.ts"
-            ],
-            "fileWorkers": 2,
-            "testConcurrency": 8,
-            "command": [
-              "bun",
-              "test",
-              "--no-orphans",
-              "--isolate",
-              "--parallel=2",
-              "--max-concurrency=8",
-              "--timeout=30000",
-              "packages/collector-solana/test/egress.spec.ts",
-              "packages/collector-solana/test/jupiter.spec.ts",
-              "packages/collector-solana/test/registry.spec.ts",
-              "packages/collector-solana/test/sharding.spec.ts",
-              "packages/collector-solana/test/transport.spec.ts"
-            ],
-            "status": 0,
-            "signal": null,
-            "timedOut": false,
-            "wallTimeMs": 164,
-            "peakRssBytes": null,
-            "cpuSeconds": null,
-            "counts": {
-              "passed": 9,
-              "failed": 0,
-              "skipped": 0
-            },
-            "stdoutTail": "bun test v1.4.0 (34cbb9a40) 2x PARALLEL\n",
-            "stderrTail": "\n 9 pass\n 0 fail\n 19 expect() calls\nRan 9 tests across 5 files. [134.00ms]\n"
-          }
-        ]
-      },
-      "codexCalls": 0,
-      "claudeCalls": 0,
-      "testedHead": "f9f51271603853d596e0f9b8ad6fc1e4fa81ee15",
-      "checkpointHead": "c8ab956a35be1c4122f9ab9e2471609d1c6194fd"
-    },
-    {
-      "id": "verify-existing--foresift-cost-router-database-pglite-1",
-      "engine": "VERIFY_EXISTING",
-      "workload": "DATABASE_PGLITE",
-      "files": [
-        "packages/cost-router/test/migrations.spec.ts",
-        "packages/cost-router/test/quota-adapter.spec.ts"
-      ],
-      "state": "VERIFIED",
-      "verification": {
-        "ok": true,
-        "wallTimeMs": 10536,
-        "peakRssBytes": 0,
-        "cpuSeconds": 0,
-        "counts": {
-          "passed": 8,
-          "failed": 0,
-          "skipped": 0
-        },
-        "results": [
-          {
-            "id": "pglite-1",
-            "workload": "DATABASE_PGLITE",
-            "files": [
-              "packages/cost-router/test/migrations.spec.ts",
-              "packages/cost-router/test/quota-adapter.spec.ts"
-            ],
-            "fileWorkers": 1,
-            "testConcurrency": 1,
-            "command": [
-              "bun",
-              "test",
-              "--no-orphans",
-              "--isolate",
-              "--parallel=1",
-              "--max-concurrency=1",
-              "--timeout=30000",
-              "packages/cost-router/test/migrations.spec.ts",
-              "packages/cost-router/test/quota-adapter.spec.ts"
-            ],
-            "status": 0,
-            "signal": null,
-            "timedOut": false,
-            "wallTimeMs": 10536,
-            "peakRssBytes": null,
-            "cpuSeconds": null,
-            "counts": {
-              "passed": 8,
-              "failed": 0,
-              "skipped": 0
-            },
-            "stdoutTail": "bun test v1.4.0 (34cbb9a40) 1x PARALLEL\n",
-            "stderrTail": "\n 8 pass\n 0 fail\n 18 expect() calls\nRan 8 tests across 2 files. [10.21s]\n"
-          }
-        ]
-      },
-      "codexCalls": 0,
-      "claudeCalls": 0,
-      "testedHead": "c8ab956a35be1c4122f9ab9e2471609d1c6194fd",
-      "checkpointHead": "ad33098a17305b38a5b2b42f6f3e185ae659b9f1"
-    },
-    {
-      "id": "verify-existing--foresift-cost-router-pure-1",
-      "engine": "VERIFY_EXISTING",
-      "workload": "PURE",
-      "files": [
-        "packages/cost-router/test/batch-coalescer.spec.ts",
-        "packages/cost-router/test/cost-declaration.spec.ts",
-        "packages/cost-router/test/paid-policy.spec.ts",
-        "packages/cost-router/test/reserve-router.spec.ts",
-        "packages/cost-router/test/strict-free-guard.spec.ts"
-      ],
-      "state": "VERIFIED",
-      "verification": {
-        "ok": true,
-        "wallTimeMs": 152,
-        "peakRssBytes": 0,
-        "cpuSeconds": 0,
-        "counts": {
-          "passed": 30,
-          "failed": 0,
-          "skipped": 0
-        },
-        "results": [
-          {
-            "id": "pure-1",
-            "workload": "PURE",
-            "files": [
-              "packages/cost-router/test/batch-coalescer.spec.ts",
-              "packages/cost-router/test/cost-declaration.spec.ts",
-              "packages/cost-router/test/paid-policy.spec.ts",
-              "packages/cost-router/test/reserve-router.spec.ts",
-              "packages/cost-router/test/strict-free-guard.spec.ts"
-            ],
-            "fileWorkers": 2,
-            "testConcurrency": 8,
-            "command": [
-              "bun",
-              "test",
-              "--no-orphans",
-              "--isolate",
-              "--parallel=2",
-              "--max-concurrency=8",
-              "--timeout=30000",
-              "packages/cost-router/test/batch-coalescer.spec.ts",
-              "packages/cost-router/test/cost-declaration.spec.ts",
-              "packages/cost-router/test/paid-policy.spec.ts",
-              "packages/cost-router/test/reserve-router.spec.ts",
-              "packages/cost-router/test/strict-free-guard.spec.ts"
-            ],
-            "status": 0,
-            "signal": null,
-            "timedOut": false,
-            "wallTimeMs": 152,
-            "peakRssBytes": null,
-            "cpuSeconds": null,
-            "counts": {
-              "passed": 30,
-              "failed": 0,
-              "skipped": 0
-            },
-            "stdoutTail": "bun test v1.4.0 (34cbb9a40) 2x PARALLEL\n",
-            "stderrTail": "\n 30 pass\n 0 fail\n 72 expect() calls\nRan 30 tests across 5 files. [130.00ms]\n"
-          }
-        ]
-      },
-      "codexCalls": 0,
-      "claudeCalls": 0,
-      "testedHead": "ad33098a17305b38a5b2b42f6f3e185ae659b9f1",
-      "checkpointHead": "a5e70aee0fcf1c5d3ddcba5d12a907a0010cdcd5"
-    },
-    {
-      "id": "verify-existing--foresift-discovery-universe-database-pglite-1",
-      "engine": "VERIFY_EXISTING",
-      "workload": "DATABASE_PGLITE",
-      "files": ["packages/discovery-universe/test/migrations.spec.ts"],
-      "state": "VERIFIED",
-      "verification": {
-        "ok": true,
-        "wallTimeMs": 4485,
-        "peakRssBytes": 0,
-        "cpuSeconds": 0,
-        "counts": {
-          "passed": 2,
-          "failed": 0,
-          "skipped": 0
-        },
-        "results": [
-          {
-            "id": "pglite-1",
-            "workload": "DATABASE_PGLITE",
-            "files": ["packages/discovery-universe/test/migrations.spec.ts"],
-            "fileWorkers": 1,
-            "testConcurrency": 1,
-            "command": [
-              "bun",
-              "test",
-              "--no-orphans",
-              "--isolate",
-              "--parallel=1",
-              "--max-concurrency=1",
-              "--timeout=30000",
-              "packages/discovery-universe/test/migrations.spec.ts"
-            ],
-            "status": 0,
-            "signal": null,
-            "timedOut": false,
-            "wallTimeMs": 4484,
-            "peakRssBytes": null,
-            "cpuSeconds": null,
-            "counts": {
-              "passed": 2,
-              "failed": 0,
-              "skipped": 0
-            },
-            "stdoutTail": "bun test v1.4.0 (34cbb9a40) 1x PARALLEL\n",
-            "stderrTail": "\n 2 pass\n 0 fail\n 8 expect() calls\nRan 2 tests across 1 file. [4.36s]\n"
-          }
-        ]
-      },
-      "codexCalls": 0,
-      "claudeCalls": 0,
-      "testedHead": "a5e70aee0fcf1c5d3ddcba5d12a907a0010cdcd5",
-      "checkpointHead": "8694eec2e26625485741e2d4e18a50aaae77f852"
-    },
-    {
-      "id": "verify-existing--foresift-discovery-universe-pure-1",
-      "engine": "VERIFY_EXISTING",
-      "workload": "PURE",
-      "files": [
-        "packages/discovery-universe/test/populations.spec.ts",
-        "packages/discovery-universe/test/registry.spec.ts",
-        "packages/discovery-universe/test/retrospective.spec.ts"
-      ],
-      "state": "VERIFIED",
-      "verification": {
-        "ok": true,
-        "wallTimeMs": 77,
-        "peakRssBytes": 0,
-        "cpuSeconds": 0,
-        "counts": {
-          "passed": 6,
-          "failed": 0,
-          "skipped": 0
-        },
-        "results": [
-          {
-            "id": "pure-1",
-            "workload": "PURE",
-            "files": [
-              "packages/discovery-universe/test/populations.spec.ts",
-              "packages/discovery-universe/test/registry.spec.ts",
-              "packages/discovery-universe/test/retrospective.spec.ts"
-            ],
-            "fileWorkers": 2,
-            "testConcurrency": 8,
-            "command": [
-              "bun",
-              "test",
-              "--no-orphans",
-              "--isolate",
-              "--parallel=2",
-              "--max-concurrency=8",
-              "--timeout=30000",
-              "packages/discovery-universe/test/populations.spec.ts",
-              "packages/discovery-universe/test/registry.spec.ts",
-              "packages/discovery-universe/test/retrospective.spec.ts"
-            ],
-            "status": 0,
-            "signal": null,
-            "timedOut": false,
-            "wallTimeMs": 77,
-            "peakRssBytes": null,
-            "cpuSeconds": null,
-            "counts": {
-              "passed": 6,
-              "failed": 0,
-              "skipped": 0
-            },
-            "stdoutTail": "bun test v1.4.0 (34cbb9a40) 2x PARALLEL\n",
-            "stderrTail": "\n 6 pass\n 0 fail\n 13 expect() calls\nRan 6 tests across 3 files. [58.00ms]\n"
-          }
-        ]
-      },
-      "codexCalls": 0,
-      "claudeCalls": 0,
-      "testedHead": "8694eec2e26625485741e2d4e18a50aaae77f852",
-      "checkpointHead": "eb4a3f200a4381d21e8e707b4e28d30db141ea97"
-    },
-    {
-      "id": "verify-existing--foresift-domain-pure-1",
-      "engine": "VERIFY_EXISTING",
-      "workload": "PURE",
-      "files": [
-        "packages/domain/test/address-chain.spec.ts",
-        "packages/domain/test/cost.spec.ts",
-        "packages/domain/test/lineage-source-recovery.spec.ts",
-        "packages/domain/test/quantity.spec.ts",
-        "packages/domain/test/temporal.spec.ts",
-        "packages/domain/test/tool.spec.ts",
-        "packages/domain/test/vocabulary.spec.ts"
-      ],
-      "state": "VERIFIED",
-      "verification": {
-        "ok": true,
-        "wallTimeMs": 178,
-        "peakRssBytes": 0,
-        "cpuSeconds": 0,
-        "counts": {
-          "passed": 120,
-          "failed": 0,
-          "skipped": 0
-        },
-        "results": [
-          {
-            "id": "pure-1",
-            "workload": "PURE",
-            "files": [
-              "packages/domain/test/address-chain.spec.ts",
-              "packages/domain/test/cost.spec.ts",
-              "packages/domain/test/lineage-source-recovery.spec.ts",
-              "packages/domain/test/quantity.spec.ts",
-              "packages/domain/test/temporal.spec.ts",
-              "packages/domain/test/tool.spec.ts",
-              "packages/domain/test/vocabulary.spec.ts"
-            ],
-            "fileWorkers": 2,
-            "testConcurrency": 8,
-            "command": [
-              "bun",
-              "test",
-              "--no-orphans",
-              "--isolate",
-              "--parallel=2",
-              "--max-concurrency=8",
-              "--timeout=30000",
-              "packages/domain/test/address-chain.spec.ts",
-              "packages/domain/test/cost.spec.ts",
-              "packages/domain/test/lineage-source-recovery.spec.ts",
-              "packages/domain/test/quantity.spec.ts",
-              "packages/domain/test/temporal.spec.ts",
-              "packages/domain/test/tool.spec.ts",
-              "packages/domain/test/vocabulary.spec.ts"
-            ],
-            "status": 0,
-            "signal": null,
-            "timedOut": false,
-            "wallTimeMs": 178,
-            "peakRssBytes": null,
-            "cpuSeconds": null,
-            "counts": {
-              "passed": 120,
-              "failed": 0,
-              "skipped": 0
-            },
-            "stdoutTail": "bun test v1.4.0 (34cbb9a40) 2x PARALLEL\n",
-            "stderrTail": "\n 120 pass\n 0 fail\n 915 expect() calls\nRan 120 tests across 7 files. [149.00ms]\n"
-          }
-        ]
-      },
-      "codexCalls": 0,
-      "claudeCalls": 0,
-      "testedHead": "eb4a3f200a4381d21e8e707b4e28d30db141ea97",
-      "checkpointHead": "8e140a9c19051915d1710459defc282cbf1ba898"
-    },
-    {
-      "id": "verify-existing--foresift-evidence-database-pglite-1",
-      "engine": "VERIFY_EXISTING",
-      "workload": "DATABASE_PGLITE",
-      "files": [
-        "packages/evidence/test/counts.spec.ts",
-        "packages/evidence/test/evidence-index-replay.spec.ts"
-      ],
-      "state": "VERIFIED",
-      "verification": {
-        "ok": true,
-        "wallTimeMs": 11217,
-        "peakRssBytes": 0,
-        "cpuSeconds": 0,
-        "counts": {
-          "passed": 9,
-          "failed": 0,
-          "skipped": 0
-        },
-        "results": [
-          {
-            "id": "pglite-1",
-            "workload": "DATABASE_PGLITE",
-            "files": [
-              "packages/evidence/test/counts.spec.ts",
-              "packages/evidence/test/evidence-index-replay.spec.ts"
-            ],
-            "fileWorkers": 1,
-            "testConcurrency": 1,
-            "command": [
-              "bun",
-              "test",
-              "--no-orphans",
-              "--isolate",
-              "--parallel=1",
-              "--max-concurrency=1",
-              "--timeout=30000",
-              "packages/evidence/test/counts.spec.ts",
-              "packages/evidence/test/evidence-index-replay.spec.ts"
-            ],
-            "status": 0,
-            "signal": null,
-            "timedOut": false,
-            "wallTimeMs": 11217,
-            "peakRssBytes": null,
-            "cpuSeconds": null,
-            "counts": {
-              "passed": 9,
-              "failed": 0,
-              "skipped": 0
-            },
-            "stdoutTail": "bun test v1.4.0 (34cbb9a40) 1x PARALLEL\n",
-            "stderrTail": "\n 9 pass\n 0 fail\n 25 expect() calls\nRan 9 tests across 2 files. [10.98s]\n"
-          }
-        ]
-      },
-      "codexCalls": 0,
-      "claudeCalls": 0,
-      "testedHead": "8e140a9c19051915d1710459defc282cbf1ba898",
-      "checkpointHead": "c51e0ddfa5023a43b4579f79a7f5eeafa429ace9"
-    },
-    {
-      "id": "verify-existing--foresift-object-store-database-pglite-1",
-      "engine": "VERIFY_EXISTING",
-      "workload": "DATABASE_PGLITE",
-      "files": ["packages/object-store/test/staged-commit.spec.ts"],
-      "state": "VERIFIED",
-      "verification": {
-        "ok": true,
-        "wallTimeMs": 4657,
-        "peakRssBytes": 0,
-        "cpuSeconds": 0,
-        "counts": {
-          "passed": 11,
-          "failed": 0,
-          "skipped": 0
-        },
-        "results": [
-          {
-            "id": "pglite-1",
-            "workload": "DATABASE_PGLITE",
-            "files": ["packages/object-store/test/staged-commit.spec.ts"],
-            "fileWorkers": 1,
-            "testConcurrency": 1,
-            "command": [
-              "bun",
-              "test",
-              "--no-orphans",
-              "--isolate",
-              "--parallel=1",
-              "--max-concurrency=1",
-              "--timeout=30000",
-              "packages/object-store/test/staged-commit.spec.ts"
-            ],
-            "status": 0,
-            "signal": null,
-            "timedOut": false,
-            "wallTimeMs": 4657,
-            "peakRssBytes": null,
-            "cpuSeconds": null,
-            "counts": {
-              "passed": 11,
-              "failed": 0,
-              "skipped": 0
-            },
-            "stdoutTail": "bun test v1.4.0 (34cbb9a40) 1x PARALLEL\n",
-            "stderrTail": "\n 11 pass\n 0 fail\n 24 expect() calls\nRan 11 tests across 1 file. [4.48s]\n"
-          }
-        ]
-      },
-      "codexCalls": 0,
-      "claudeCalls": 0,
-      "testedHead": "c51e0ddfa5023a43b4579f79a7f5eeafa429ace9",
-      "checkpointHead": "cdc495bda63fa16e0c0ba21c4fbbc957722ba29e"
-    },
-    {
-      "id": "verify-existing--foresift-object-store-pure-1",
-      "engine": "VERIFY_EXISTING",
-      "workload": "PURE",
-      "files": ["packages/object-store/test/local-store.spec.ts"],
-      "state": "VERIFIED",
-      "verification": {
-        "ok": true,
-        "wallTimeMs": 139,
-        "peakRssBytes": 0,
-        "cpuSeconds": 0,
-        "counts": {
-          "passed": 12,
-          "failed": 0,
-          "skipped": 0
-        },
-        "results": [
-          {
-            "id": "pure-1",
-            "workload": "PURE",
-            "files": ["packages/object-store/test/local-store.spec.ts"],
-            "fileWorkers": 2,
-            "testConcurrency": 8,
-            "command": [
-              "bun",
-              "test",
-              "--no-orphans",
-              "--isolate",
-              "--parallel=2",
-              "--max-concurrency=8",
-              "--timeout=30000",
-              "packages/object-store/test/local-store.spec.ts"
-            ],
-            "status": 0,
-            "signal": null,
-            "timedOut": false,
-            "wallTimeMs": 139,
-            "peakRssBytes": null,
-            "cpuSeconds": null,
-            "counts": {
-              "passed": 12,
-              "failed": 0,
-              "skipped": 0
-            },
-            "stdoutTail": "bun test v1.4.0 (34cbb9a40) 2x PARALLEL\n",
-            "stderrTail": "\n 12 pass\n 0 fail\n 34 expect() calls\nRan 12 tests across 1 file. [107.00ms]\n"
-          }
-        ]
-      },
-      "codexCalls": 0,
-      "claudeCalls": 0,
-      "testedHead": "cdc495bda63fa16e0c0ba21c4fbbc957722ba29e"
-    },
-    {
-      "id": "verify-existing--foresift-persistence-database-pglite-1",
-      "engine": "VERIFY_EXISTING",
-      "workload": "DATABASE_PGLITE",
-      "files": [
-        "packages/persistence/test/acquisition.spec.ts",
-        "packages/persistence/test/backfill-watermark.spec.ts",
-        "packages/persistence/test/backup-governance.spec.ts",
-        "packages/persistence/test/checkpoints.spec.ts",
-        "packages/persistence/test/drill-restore-rpo.spec.ts",
-        "packages/persistence/test/engine-transactions.spec.ts",
-        "packages/persistence/test/features-parity.spec.ts",
-        "packages/persistence/test/identity-repo.spec.ts",
-        "packages/persistence/test/migrator.spec.ts",
-        "packages/persistence/test/observations-revisions.spec.ts"
-      ],
-      "state": "PENDING"
-    },
-    {
-      "id": "verify-existing--foresift-persistence-database-pglite-2",
-      "engine": "VERIFY_EXISTING",
-      "workload": "DATABASE_PGLITE",
-      "files": [
-        "packages/persistence/test/pg-pool-wiring.spec.ts",
-        "packages/persistence/test/quality.spec.ts",
-        "packages/persistence/test/recovery-tiers.spec.ts",
-        "packages/persistence/test/replay.spec.ts",
-        "packages/persistence/test/schema-parity.spec.ts",
-        "packages/persistence/test/sources.spec.ts"
-      ],
-      "state": "PENDING"
-    },
-    {
-      "id": "verify-existing--foresift-persistence-pure-1",
-      "engine": "VERIFY_EXISTING",
-      "workload": "PURE",
-      "files": ["packages/persistence/test/canonical-json.spec.ts"],
-      "state": "PENDING"
-    },
-    {
-      "id": "verify-existing--foresift-program-decoders-database-pglite-1",
-      "engine": "VERIFY_EXISTING",
-      "workload": "DATABASE_PGLITE",
-      "files": ["packages/program-decoders/test/migrations.spec.ts"],
-      "state": "PENDING"
-    },
-    {
-      "id": "verify-existing--foresift-program-decoders-pure-1",
-      "engine": "VERIFY_EXISTING",
-      "workload": "PURE",
-      "files": [
-        "packages/program-decoders/test/decoder-registry.spec.ts",
-        "packages/program-decoders/test/meteora.spec.ts",
-        "packages/program-decoders/test/orca.spec.ts",
-        "packages/program-decoders/test/parity.spec.ts",
-        "packages/program-decoders/test/pump.spec.ts",
-        "packages/program-decoders/test/raydium.spec.ts",
-        "packages/program-decoders/test/upgrade-drift.spec.ts"
-      ],
-      "state": "PENDING"
-    },
-    {
-      "id": "verify-existing--foresift-provider-lifecycle-database-pglite-1",
-      "engine": "VERIFY_EXISTING",
-      "workload": "DATABASE_PGLITE",
-      "files": [
-        "packages/provider-lifecycle/test/deprecation-rules.spec.ts",
-        "packages/provider-lifecycle/test/migrations.spec.ts",
-        "packages/provider-lifecycle/test/schema-parity.spec.ts"
-      ],
-      "state": "PENDING"
-    },
-    {
-      "id": "verify-existing--foresift-provider-lifecycle-pure-1",
-      "engine": "VERIFY_EXISTING",
-      "workload": "PURE",
-      "files": [
-        "packages/provider-lifecycle/test/artifact-registry.spec.ts",
-        "packages/provider-lifecycle/test/lifecycle-machine.spec.ts",
-        "packages/provider-lifecycle/test/lifecycle-states.spec.ts",
-        "packages/provider-lifecycle/test/migration-exceptions.spec.ts",
-        "packages/provider-lifecycle/test/operation-registry.spec.ts",
-        "packages/provider-lifecycle/test/readiness.spec.ts",
-        "packages/provider-lifecycle/test/response-quarantine.spec.ts",
-        "packages/provider-lifecycle/test/rights-matrix.spec.ts",
-        "packages/provider-lifecycle/test/scaffold.spec.ts",
-        "packages/provider-lifecycle/test/source-fingerprints.spec.ts",
-        "packages/provider-lifecycle/test/verification-ttl.spec.ts"
-      ],
-      "state": "PENDING"
-    },
-    {
-      "id": "verify-existing--foresift-providers-database-pglite-1",
-      "engine": "VERIFY_EXISTING",
-      "workload": "DATABASE_PGLITE",
-      "files": ["packages/providers/test/registration.spec.ts"],
-      "state": "PENDING"
-    },
-    {
-      "id": "verify-existing--foresift-providers-pure-1",
-      "engine": "VERIFY_EXISTING",
-      "workload": "PURE",
-      "files": [
-        "packages/providers/test/adapter-contract.spec.ts",
-        "packages/providers/test/gmgn-adapter.spec.ts",
-        "packages/providers/test/helius-adapter.spec.ts",
-        "packages/providers/test/scaffold.spec.ts"
-      ],
-      "state": "PENDING"
-    },
-    {
-      "id": "verify-existing--foresift-quota-forecast-database-pglite-1",
-      "engine": "VERIFY_EXISTING",
-      "workload": "DATABASE_PGLITE",
-      "files": ["packages/quota-forecast/test/migrations.spec.ts"],
-      "state": "PENDING"
-    },
-    {
-      "id": "verify-existing--foresift-quota-forecast-pure-1",
-      "engine": "VERIFY_EXISTING",
-      "workload": "PURE",
-      "files": [
-        "packages/quota-forecast/test/capacity-replay.spec.ts",
-        "packages/quota-forecast/test/forecast.spec.ts",
-        "packages/quota-forecast/test/plan-verifier.spec.ts"
-      ],
-      "state": "PENDING"
-    },
-    {
-      "id": "verify-existing--foresift-security-database-pglite-1",
-      "engine": "VERIFY_EXISTING",
-      "workload": "DATABASE_PGLITE",
-      "files": [
-        "packages/security/test/action-gate.spec.ts",
-        "packages/security/test/audit-chain.spec.ts",
-        "packages/security/test/gate-pause.spec.ts",
-        "packages/security/test/import-gating.spec.ts",
-        "packages/security/test/incidents.spec.ts",
-        "packages/security/test/oauth-credentials.spec.ts",
-        "packages/security/test/schema-parity.spec.ts"
-      ],
-      "state": "PENDING"
-    },
-    {
-      "id": "verify-existing--foresift-security-process-1",
-      "engine": "VERIFY_EXISTING",
-      "workload": "PROCESS",
-      "files": ["packages/security/test/scanner-exit-contract.spec.ts"],
-      "state": "PENDING"
-    },
-    {
-      "id": "verify-existing--foresift-security-pure-1",
-      "engine": "VERIFY_EXISTING",
-      "workload": "PURE",
-      "files": [
-        "packages/security/test/audit-categories.spec.ts",
-        "packages/security/test/egress.spec.ts",
-        "packages/security/test/error-hierarchy.spec.ts",
-        "packages/security/test/mcp-origin-protocol.spec.ts",
-        "packages/security/test/negative-capability.spec.ts",
-        "packages/security/test/scaffold.spec.ts",
-        "packages/security/test/scan-traversal.spec.ts",
-        "packages/security/test/secrets-claims.spec.ts",
-        "packages/security/test/threat-model-register.spec.ts",
-        "packages/security/test/untrusted-content.spec.ts",
-        "packages/security/test/webhook-abuse.spec.ts"
-      ],
-      "state": "PENDING"
-    },
-    {
-      "id": "verify-existing--foresift-shared-schemas-pure-1",
-      "engine": "VERIFY_EXISTING",
-      "workload": "PURE",
-      "files": [
-        "packages/shared-schemas/test/col.spec.ts",
-        "packages/shared-schemas/test/core.spec.ts",
-        "packages/shared-schemas/test/cost.spec.ts",
-        "packages/shared-schemas/test/data.spec.ts",
-        "packages/shared-schemas/test/disc.spec.ts",
-        "packages/shared-schemas/test/dr.spec.ts",
-        "packages/shared-schemas/test/prov.spec.ts",
-        "packages/shared-schemas/test/sec.spec.ts"
-      ],
-      "state": "PENDING"
-    },
-    {
-      "id": "verify-existing--foresift-tenant-isolation-pure-1",
-      "engine": "VERIFY_EXISTING",
-      "workload": "PURE",
-      "files": [
-        "packages/tenant-isolation/test/scaffold.spec.ts",
-        "packages/tenant-isolation/test/tenant-isolation.spec.ts"
-      ],
-      "state": "PENDING"
-    },
-    {
-      "id": "verify-existing--foresift-tool-core-database-pglite-1",
-      "engine": "VERIFY_EXISTING",
-      "workload": "DATABASE_PGLITE",
-      "files": [
-        "packages/tool-core/test/cache-stage.spec.ts",
-        "packages/tool-core/test/migrations.spec.ts",
-        "packages/tool-core/test/quota-contract.spec.ts",
-        "packages/tool-core/test/registry.spec.ts",
-        "packages/tool-core/test/seam-stability.spec.ts",
-        "packages/tool-core/test/single-flight.spec.ts"
-      ],
-      "state": "PENDING"
-    },
-    {
-      "id": "verify-existing--foresift-tool-core-pure-1",
-      "engine": "VERIFY_EXISTING",
-      "workload": "PURE",
-      "files": [
-        "packages/tool-core/test/cache-key.spec.ts",
-        "packages/tool-core/test/freshness.spec.ts",
-        "packages/tool-core/test/license-contract.spec.ts",
-        "packages/tool-core/test/pipeline.spec.ts",
-        "packages/tool-core/test/profiles.spec.ts",
-        "packages/tool-core/test/prohibited.spec.ts"
-      ],
-      "state": "PENDING"
-    },
-    {
-      "id": "verify-existing-acceptance-database-pglite-1",
-      "engine": "VERIFY_EXISTING",
-      "workload": "DATABASE_PGLITE",
-      "files": [
-        "tests/acceptance/AC-053.spec.ts",
-        "tests/acceptance/AC-062.spec.ts",
-        "tests/acceptance/AC-259.spec.ts",
-        "tests/acceptance/AC-260.spec.ts",
-        "tests/acceptance/AC-263.spec.ts",
-        "tests/acceptance/AC-274.spec.ts",
-        "tests/acceptance/AC-278.spec.ts",
-        "tests/acceptance/AC-279.spec.ts"
-      ],
-      "state": "PENDING"
-    },
-    {
-      "id": "verify-existing-acceptance-pure-1",
-      "engine": "VERIFY_EXISTING",
-      "workload": "PURE",
-      "files": [
-        "tests/acceptance/AC-001.spec.ts",
-        "tests/acceptance/AC-002.spec.ts",
-        "tests/acceptance/AC-003.spec.ts",
-        "tests/acceptance/AC-004.spec.ts",
-        "tests/acceptance/AC-020.spec.ts",
-        "tests/acceptance/AC-021.spec.ts",
-        "tests/acceptance/AC-022.spec.ts",
-        "tests/acceptance/AC-023.spec.ts",
-        "tests/acceptance/AC-050.spec.ts",
-        "tests/acceptance/AC-051.spec.ts",
-        "tests/acceptance/AC-052.spec.ts",
-        "tests/acceptance/AC-060.spec.ts",
-        "tests/acceptance/AC-061.spec.ts",
-        "tests/acceptance/AC-100.spec.ts",
-        "tests/acceptance/AC-101.spec.ts",
-        "tests/acceptance/AC-102.spec.ts",
-        "tests/acceptance/AC-103.spec.ts",
-        "tests/acceptance/AC-104.spec.ts",
-        "tests/acceptance/AC-105.spec.ts",
-        "tests/acceptance/AC-110.spec.ts",
-        "tests/acceptance/AC-111.spec.ts",
-        "tests/acceptance/AC-112.spec.ts",
-        "tests/acceptance/AC-113.spec.ts",
-        "tests/acceptance/AC-224.spec.ts",
-        "tests/acceptance/AC-225.spec.ts",
-        "tests/acceptance/AC-226.spec.ts",
-        "tests/acceptance/AC-227.spec.ts",
-        "tests/acceptance/AC-228.spec.ts",
-        "tests/acceptance/AC-229.spec.ts",
-        "tests/acceptance/AC-230.spec.ts",
-        "tests/acceptance/AC-231.spec.ts",
-        "tests/acceptance/AC-237.spec.ts",
-        "tests/acceptance/AC-240.spec.ts",
-        "tests/acceptance/AC-241.spec.ts",
-        "tests/acceptance/AC-242.spec.ts",
-        "tests/acceptance/AC-243.spec.ts",
-        "tests/acceptance/AC-244.spec.ts",
-        "tests/acceptance/AC-245.spec.ts",
-        "tests/acceptance/AC-246.spec.ts",
-        "tests/acceptance/AC-247.spec.ts"
-      ],
-      "state": "PENDING"
-    },
-    {
-      "id": "verify-existing-acceptance-pure-2",
-      "engine": "VERIFY_EXISTING",
-      "workload": "PURE",
-      "files": [
-        "tests/acceptance/AC-248.spec.ts",
-        "tests/acceptance/AC-249.spec.ts",
-        "tests/acceptance/AC-250.spec.ts",
-        "tests/acceptance/AC-251.spec.ts",
-        "tests/acceptance/AC-252.spec.ts",
-        "tests/acceptance/AC-253.spec.ts",
-        "tests/acceptance/AC-254.spec.ts",
-        "tests/acceptance/AC-255.spec.ts",
-        "tests/acceptance/AC-256.spec.ts",
-        "tests/acceptance/AC-257.spec.ts",
-        "tests/acceptance/AC-258.spec.ts",
-        "tests/acceptance/AC-261.spec.ts",
-        "tests/acceptance/AC-262.spec.ts",
-        "tests/acceptance/AC-264.spec.ts",
-        "tests/acceptance/AC-270.spec.ts",
-        "tests/acceptance/AC-271.spec.ts",
-        "tests/acceptance/AC-272.spec.ts",
-        "tests/acceptance/AC-273.spec.ts",
-        "tests/acceptance/AC-275.spec.ts",
-        "tests/acceptance/AC-276.spec.ts",
-        "tests/acceptance/AC-277.spec.ts",
-        "tests/acceptance/tooling-globs.spec.ts"
-      ],
-      "state": "PENDING"
-    },
-    {
-      "id": "verify-existing-automation-database-pglite-1",
-      "engine": "VERIFY_EXISTING",
-      "workload": "DATABASE_PGLITE",
-      "files": ["tests/automation/bun-migration.spec.ts"],
-      "state": "PENDING"
-    },
-    {
-      "id": "verify-existing-automation-meta-gate-1",
-      "engine": "VERIFY_EXISTING",
-      "workload": "META_GATE",
-      "files": [
-        "tests/automation/gate-e2e-green.spec.ts",
-        "tests/automation/gate-e2e-red.spec.ts",
-        "tests/automation/planned-handoff.spec.ts",
-        "tests/automation/targeted-router-e2e.spec.ts",
-        "tests/automation/test-tiers.spec.ts",
-        "tests/automation/throughput.spec.ts",
-        "tests/automation/v2-gate-convergence.spec.ts",
-        "tests/automation/v2-second-pass-cases.spec.ts",
-        "tests/automation/v3-base-drift.spec.ts",
-        "tests/automation/workflow-node-budgets.spec.ts"
-      ],
-      "state": "PENDING"
-    },
-    {
-      "id": "verify-existing-automation-process-1",
-      "engine": "VERIFY_EXISTING",
-      "workload": "PROCESS",
-      "files": [
-        "tests/automation/archon-task-worktree-advance.spec.ts",
-        "tests/automation/claude-tooling-only.spec.ts",
-        "tests/automation/codex-agy-profile.spec.ts",
-        "tests/automation/control-plane.spec.ts",
-        "tests/automation/impl-wave.spec.ts",
-        "tests/automation/implement-completeness-clean-tree.spec.ts",
-        "tests/automation/lane-permits.spec.ts",
-        "tests/automation/plan-context-capsule.spec.ts",
-        "tests/automation/selection-committed-view.spec.ts",
-        "tests/automation/test-runtime-containment.spec.ts",
-        "tests/automation/until-bash-guards.spec.ts",
-        "tests/automation/v2-throughput.spec.ts",
-        "tests/automation/v3-generations.spec.ts",
-        "tests/automation/v3-mechanical-landing.spec.ts",
-        "tests/automation/v4-review-packet.spec.ts",
-        "tests/automation/wave-admission.spec.ts",
-        "tests/automation/wave-branch-adoption.spec.ts",
-        "tests/automation/wave-guard-exception.spec.ts"
-      ],
-      "state": "PENDING"
-    },
-    {
-      "id": "verify-existing-automation-pure-1",
-      "engine": "VERIFY_EXISTING",
-      "workload": "PURE",
-      "files": [
-        "tests/automation/ci-authority.spec.ts",
-        "tests/automation/exact-leases.spec.ts",
-        "tests/automation/finalize-from-main.spec.ts",
-        "tests/automation/hybrid-engine.spec.ts",
-        "tests/automation/provider-pool.spec.ts",
-        "tests/automation/runtime-admission.spec.ts",
-        "tests/automation/sharded-wave-rollout.spec.ts",
-        "tests/automation/v3-scheduler-runtime.spec.ts",
-        "tests/automation/v4-scheduler.spec.ts",
-        "tests/automation/workflow-node-resilience.spec.ts"
-      ],
-      "state": "PENDING"
-    },
-    {
-      "id": "verify-existing-negative-database-pglite-1",
-      "engine": "VERIFY_EXISTING",
-      "workload": "DATABASE_PGLITE",
-      "files": [
-        "tests/negative/AC-003.negative.spec.ts",
-        "tests/negative/AC-053.negative.spec.ts",
-        "tests/negative/AC-060.negative.spec.ts",
-        "tests/negative/AC-062.negative.spec.ts",
-        "tests/negative/AC-259.negative.spec.ts",
-        "tests/negative/AC-260.negative.spec.ts",
-        "tests/negative/AC-274.negative.spec.ts",
-        "tests/negative/AC-278.negative.spec.ts",
-        "tests/negative/AC-279.negative.spec.ts"
-      ],
-      "state": "PENDING"
-    },
-    {
-      "id": "verify-existing-negative-pure-1",
-      "engine": "VERIFY_EXISTING",
-      "workload": "PURE",
-      "files": [
-        "tests/negative/AC-001.negative.spec.ts",
-        "tests/negative/AC-002.negative.spec.ts",
-        "tests/negative/AC-004.negative.spec.ts",
-        "tests/negative/AC-020.negative.spec.ts",
-        "tests/negative/AC-021.negative.spec.ts",
-        "tests/negative/AC-022.negative.spec.ts",
-        "tests/negative/AC-023.negative.spec.ts",
-        "tests/negative/AC-050.negative.spec.ts",
-        "tests/negative/AC-051.negative.spec.ts",
-        "tests/negative/AC-052.negative.spec.ts",
-        "tests/negative/AC-061.negative.spec.ts",
-        "tests/negative/AC-100.negative.spec.ts",
-        "tests/negative/AC-101.negative.spec.ts",
-        "tests/negative/AC-102.negative.spec.ts",
-        "tests/negative/AC-103.negative.spec.ts",
-        "tests/negative/AC-104.negative.spec.ts",
-        "tests/negative/AC-105.negative.spec.ts",
-        "tests/negative/AC-110.negative.spec.ts",
-        "tests/negative/AC-111.negative.spec.ts",
-        "tests/negative/AC-112.negative.spec.ts",
-        "tests/negative/AC-113.negative.spec.ts",
-        "tests/negative/AC-224.negative.spec.ts",
-        "tests/negative/AC-225.negative.spec.ts",
-        "tests/negative/AC-226.negative.spec.ts",
-        "tests/negative/AC-227.negative.spec.ts",
-        "tests/negative/AC-228.negative.spec.ts",
-        "tests/negative/AC-229.negative.spec.ts",
-        "tests/negative/AC-230.negative.spec.ts",
-        "tests/negative/AC-231.negative.spec.ts",
-        "tests/negative/AC-237.negative.spec.ts",
-        "tests/negative/AC-240.negative.spec.ts",
-        "tests/negative/AC-241.negative.spec.ts",
-        "tests/negative/AC-242.negative.spec.ts",
-        "tests/negative/AC-243.negative.spec.ts",
-        "tests/negative/AC-244.negative.spec.ts",
-        "tests/negative/AC-245.negative.spec.ts",
-        "tests/negative/AC-246.negative.spec.ts",
-        "tests/negative/AC-247.negative.spec.ts",
-        "tests/negative/AC-248.negative.spec.ts",
-        "tests/negative/AC-249.negative.spec.ts"
-      ],
-      "state": "PENDING"
-    },
-    {
-      "id": "verify-existing-negative-pure-2",
-      "engine": "VERIFY_EXISTING",
-      "workload": "PURE",
-      "files": [
-        "tests/negative/AC-250.negative.spec.ts",
-        "tests/negative/AC-251.negative.spec.ts",
-        "tests/negative/AC-252.negative.spec.ts",
-        "tests/negative/AC-253.negative.spec.ts",
-        "tests/negative/AC-254.negative.spec.ts",
-        "tests/negative/AC-255.negative.spec.ts",
-        "tests/negative/AC-256.negative.spec.ts",
-        "tests/negative/AC-257.negative.spec.ts",
-        "tests/negative/AC-258.negative.spec.ts",
-        "tests/negative/AC-261.negative.spec.ts",
-        "tests/negative/AC-262.negative.spec.ts",
-        "tests/negative/AC-263.negative.spec.ts",
-        "tests/negative/AC-264.negative.spec.ts",
-        "tests/negative/AC-270.negative.spec.ts",
-        "tests/negative/AC-271.negative.spec.ts",
-        "tests/negative/AC-272.negative.spec.ts",
-        "tests/negative/AC-273.negative.spec.ts",
-        "tests/negative/AC-275.negative.spec.ts",
-        "tests/negative/AC-276.negative.spec.ts",
-        "tests/negative/AC-277.negative.spec.ts"
-      ],
-      "state": "PENDING"
-    },
-    {
-      "id": "verify-existing-root-process-1",
-      "engine": "VERIFY_EXISTING",
-      "workload": "PROCESS",
-      "files": ["tests/spec-verify.spec.ts"],
-      "state": "PENDING"
-    },
-    {
-      "id": "verify-existing-root-pure-1",
-      "engine": "VERIFY_EXISTING",
-      "workload": "PURE",
-      "files": ["tests/telemetry-catalog.spec.ts"],
-      "state": "PENDING"
-    }
-  ]
+  "batches": []
 }

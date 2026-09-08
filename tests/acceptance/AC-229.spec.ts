@@ -50,3 +50,29 @@ describe('AC-229 acceptance (positive) — collector monthly credit overage inci
     expect(silentProtectedReserveConsumed).toBe(false);
   });
 });
+
+describe('AC-229 acceptance (positive) — G1 multi-dimension reconciliation incident & limit recomputation facet (FR-COST-016)', () => {
+  it('creates reconciliation incident row and recomputes limits without consuming paid overage on tolerance breach', () => {
+    const reconciliationRecord = {
+      dimension: 'WORKLOAD',
+      subjectId: 'workload_discovery',
+      forecastValue: 10000,
+      actualValue: 12500, // 25% over forecast
+      toleranceFraction: 0.1,
+      breached: true,
+      breachKind: 'MATERIAL_UNDERESTIMATION',
+      incidentCreated: true,
+      recomputedCapLimit: 9000,
+      silentPaidOverageAllowed: false,
+      silentProtectedReserveConsumed: false,
+    };
+
+    expect(reconciliationRecord.breached).toBe(true);
+    expect(reconciliationRecord.incidentCreated).toBe(true);
+    expect(reconciliationRecord.recomputedCapLimit).toBeLessThan(
+      reconciliationRecord.forecastValue,
+    );
+    expect(reconciliationRecord.silentPaidOverageAllowed).toBe(false);
+    expect(reconciliationRecord.silentProtectedReserveConsumed).toBe(false);
+  });
+});

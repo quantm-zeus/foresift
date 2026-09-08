@@ -45,3 +45,17 @@ describe('AC-101 negative: broad scans cannot bypass degradation into reserves',
     expect(['QUOTA_EXHAUSTED', 'SKIP_LOW_PRIORITY', 'RETURN_CACHE']).toContain(action);
   });
 });
+
+describe('AC-101 negative — G1 9-class protected reserve access refusal under broad discovery (FR-COST-011, FR-COST-015)', () => {
+  it('refuses routing broad discovery into FIRST_PARTY_COLLECTOR or DEEP_RESEARCH reserves', () => {
+    const route = routeToReserve({
+      workloadClass: 'BACKFILL_LOW',
+      operation: {
+        ...FREE_QUOTA_OP,
+        protectedReserveEligible: true,
+      },
+    });
+
+    expect(route.reserveId).toBeNull();
+  });
+});

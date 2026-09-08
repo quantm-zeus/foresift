@@ -20,7 +20,7 @@ import { repoRoot } from './schema.mjs';
 import { SHARED_SURFACE_FILES } from './exact-leases.mjs';
 import { LANE_COUNT_LIMITS } from './adaptive-lanes.mjs';
 
-const PREFLIGHT_SCHEMA = 'foresift/launch-preflight@1';
+const PREFLIGHT_SCHEMA = 'foresift/launch-preflight@2';
 
 function fail(msg) {
   console.error(`launch-preflight: ${msg}`);
@@ -62,7 +62,7 @@ function buildTaskGraph(packageId, rootDir, extraArgs = []) {
  * Build the preflight record for ONE package. Deterministic; throws nothing
  * for the expected not-derivable cases (returns exact:false instead).
  */
-export function buildLaunchPreflight(packageId, rootDir = root) {
+export function buildLaunchPreflight(packageId, rootDir = root, opts = {}) {
   const base = {
     schema: PREFLIGHT_SCHEMA,
     packageId,
@@ -76,6 +76,7 @@ export function buildLaunchPreflight(packageId, rootDir = root) {
     readyTaskCount: 0,
     parallelizableReadyCount: 0,
     shardNeed: null,
+    ownershipAdmission: { schedulable: false, violations: [] },
     reason: null,
   };
   const tasksPath = join(rootDir, 'specs', packageId, 'tasks.md');
@@ -83,8 +84,14 @@ export function buildLaunchPreflight(packageId, rootDir = root) {
 
   // Deterministic graph build over the CURRENT tree (no shard planning — we
   // only need per-unit predicted writes). The builder fails closed itself on
-  // corrupt milestone/tasks; catch and degrade conservatively.
-  const out = buildTaskGraph(packageId, rootDir);
+  // corrupt milestone/tasks; catch and degrade conservatively. The reporter
+  // mode (opts.treatAllUnitsAsCoordinator) is a TEST-ONLY reading lens — it
+  // never reaches the wave prep path, which keeps the hard admission law.
+  const out = buildTaskGraph(
+    packageId,
+    rootDir,
+    opts.treatAllUnitsAsCoordinator ? ['--allow-ownership-violations'] : [],
+  );
   if (out.status !== 0 || !out.stdout)
     return { ...base, reason: `task graph unavailable: ${(out.stderr ?? '').slice(0, 160)}` };
 
@@ -133,16 +140,36 @@ export function buildLaunchPreflight(packageId, rootDir = root) {
   // non-empty planned shards is the exact number of lanes the work can
   // actually occupy. Missing/failed planning keeps shardNeed null — the lane
   // resolver then falls back to its ready-count heuristic, never expands.
+  // OWNERSHIP ADMISSION (directive 2026-09-07, live b659eef0): the probe also
+  // carries the plan's ownership verdict. When the probe fails on
+  // OWNERSHIP_ADMISSION_FAILED the violations are REPORTED here (never
+  // swallowed): the plan is unschedulable-as-routed — the wave prep will
+  // refuse it at build time before any provider spend — and shardNeed stays
+  // null with an explicit reason. A schedulable probe keeps every exact field.
   let shardNeed = null;
+  let ownershipAdmission = { schedulable: true, violations: [] };
+  let admissionReason = null;
   try {
     const probe = buildTaskGraph(packageId, rootDir, [
       '--plan-shards',
       String(Math.max(1, LANE_COUNT_LIMITS.max)),
+      ...(opts.treatAllUnitsAsCoordinator ? ['--allow-ownership-violations'] : []),
     ]);
     if (probe.status === 0 && probe.stdout) {
       const planned = JSON.parse(probe.stdout);
       const shards = (planned.shards ?? []).filter((s) => (s.units ?? []).length > 0);
       shardNeed = Math.max(1, shards.length);
+      ownershipAdmission = planned.ownershipAdmission ?? ownershipAdmission;
+    } else if (String(probe.stderr ?? '').includes('OWNERSHIP_ADMISSION_FAILED')) {
+      // The graph builder emits the violation list on stderr before exiting 1.
+      const violations = String(probe.stderr)
+        .split('\n')
+        .filter((l) => l.includes('IMPLEMENTATION_LANE_TEST_WRITES'))
+        .map((l) => l.trim());
+      ownershipAdmission = { schedulable: false, violations };
+      admissionReason =
+        'ownership admission failed: implementation-dispatched units carry test-owned writes — ' +
+        'plan must split test work into test-owned tasks before launch';
     }
   } catch {
     shardNeed = null;
@@ -165,7 +192,8 @@ export function buildLaunchPreflight(packageId, rootDir = root) {
     readyTaskCount: ready.length,
     parallelizableReadyCount: parallelizableReady.length,
     shardNeed,
-    reason: null,
+    ownershipAdmission,
+    reason: admissionReason,
   };
 }
 

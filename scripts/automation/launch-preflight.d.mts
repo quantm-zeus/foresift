@@ -3,10 +3,16 @@
 // upgrade from broad writeScopes overlap to exact predicted-write
 // disjointness; unknown truth degrades conservatively (exact:false).
 
+export interface LaunchPreflightOwnershipAdmission {
+  schedulable: boolean;
+  violations: string[];
+}
+
 export declare const PREFLIGHT_SCHEMA: string;
 export declare function buildLaunchPreflight(
   packageId: string,
   rootDir?: string,
+  opts?: { treatAllUnitsAsCoordinator?: boolean },
 ): {
   schema: string;
   packageId: string;
@@ -20,6 +26,7 @@ export declare function buildLaunchPreflight(
   readyTaskCount: number;
   parallelizableReadyCount: number;
   shardNeed: number | null;
+  ownershipAdmission: LaunchPreflightOwnershipAdmission;
   reason: string | null;
 };
 export declare function exactCoRunCompatible(

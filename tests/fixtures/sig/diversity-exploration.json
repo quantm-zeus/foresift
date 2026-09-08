@@ -1,0 +1,123 @@
+{
+  "schema": "foresift/sig-diversity-exploration@1",
+  "diversityConstraints": {
+    "defaultLimits": {
+      "NARRATIVE": 2,
+      "DEVELOPER_CLUSTER": 1,
+      "FUNDING_CLUSTER": 1,
+      "LAUNCHPAD": 3
+    },
+    "constraintScenarios": [
+      {
+        "name": "narrative_cap_exceeded",
+        "dimension": "NARRATIVE",
+        "key": "ai_meme_coins",
+        "limit": 2,
+        "candidateRanks": [
+          { "candidateId": "cand_ai_1", "rawRank": 1, "selected": true },
+          { "candidateId": "cand_ai_2", "rawRank": 2, "selected": true },
+          { "candidateId": "cand_ai_3", "rawRank": 3, "selected": false, "cutoffReason": "DIVERSITY_CONSTRAINT" }
+        ]
+      },
+      {
+        "name": "developer_cluster_cap_exceeded",
+        "dimension": "DEVELOPER_CLUSTER",
+        "key": "cluster_dev_serial_deployer",
+        "limit": 1,
+        "candidateRanks": [
+          { "candidateId": "cand_dev_1", "rawRank": 4, "selected": true },
+          { "candidateId": "cand_dev_2", "rawRank": 5, "selected": false, "cutoffReason": "DIVERSITY_CONSTRAINT" }
+        ]
+      },
+      {
+        "name": "g1_unavailable_dimension_explicit_record",
+        "dimension": "NARRATIVE",
+        "key": null,
+        "upstreamState": "UNAVAILABLE",
+        "expectedAdjustmentRecord": "CONSTRAINT_DIMENSION_UNAVAILABLE",
+        "explanation": "Absent G1 upstream dimensions degrade to explicit record rather than silent skip"
+      }
+    ]
+  },
+  "explorationSampling": {
+    "minimumFloorFraction": 0.05,
+    "strataDefinitions": [
+      { "stratumId": "LOW_RANK_TAIL_STRATUM", "minRank": 50, "maxRank": 200 }
+    ],
+    "validExplorationRecords": [
+      {
+        "assignmentId": "exp_assign_001",
+        "candidateId": "cand_tail_55",
+        "eligibilityUniverseRef": "univ_2026_06_01_solana_pump",
+        "stratum": "LOW_RANK_TAIL_STRATUM",
+        "policyVersion": "sig_exp_v1",
+        "assignmentProbability": 0.08,
+        "seedProvenance": "sha256:4a8b7c6d5e4f3a2b1c0d9e8f7a6b5c4d3e2f1a0b9c8d7e6f5a4b3c2d1e0f9a8b",
+        "inclusionTimestamp": "2026-06-01T12:00:00Z",
+        "selectionArm": "RANDOM_EXPLORATION",
+        "corrupted": false
+      },
+      {
+        "assignmentId": "exp_assign_002",
+        "candidateId": "cand_tail_89",
+        "eligibilityUniverseRef": "univ_2026_06_01_solana_pump",
+        "stratum": "LOW_RANK_TAIL_STRATUM",
+        "policyVersion": "sig_exp_v1",
+        "assignmentProbability": 0.08,
+        "seedProvenance": "sha256:4a8b7c6d5e4f3a2b1c0d9e8f7a6b5c4d3e2f1a0b9c8d7e6f5a4b3c2d1e0f9a8b",
+        "inclusionTimestamp": "2026-06-01T12:00:00Z",
+        "selectionArm": "OUTCOME_OBSERVATION_ONLY",
+        "corrupted": false
+      }
+    ],
+    "corruptedAssignments": [
+      {
+        "name": "zero_inclusion_probability",
+        "assignmentId": "exp_corrupt_zero_prob",
+        "candidateId": "cand_tail_99",
+        "stratum": "LOW_RANK_TAIL_STRATUM",
+        "policyVersion": "sig_exp_v1",
+        "assignmentProbability": 0.0,
+        "seedProvenance": "sha256:1111222233334444555566667777888899990000aaaabbbbccccddddeeeeffff",
+        "inclusionTimestamp": "2026-06-01T12:00:00Z",
+        "corrupted": true,
+        "corruptionReason": "PROBABILITY_OUT_OF_RANGE_ZERO",
+        "excludedFromWeightedEstimator": true
+      },
+      {
+        "name": "missing_seed_provenance",
+        "assignmentId": "exp_corrupt_no_seed",
+        "candidateId": "cand_tail_100",
+        "stratum": "LOW_RANK_TAIL_STRATUM",
+        "policyVersion": "sig_exp_v1",
+        "assignmentProbability": 0.05,
+        "seedProvenance": "",
+        "inclusionTimestamp": "2026-06-01T12:00:00Z",
+        "corrupted": true,
+        "corruptionReason": "MISSING_SEED_PROVENANCE",
+        "excludedFromWeightedEstimator": true
+      }
+    ],
+    "emergencyPolicyFloorDraws": [
+      {
+        "name": "authorized_emergency_draw",
+        "emergencyPolicyVersion": "EMERGENCY_QUOTA_COLLAPSE_2026_06",
+        "auditedReason": "Global provider rate limit exhaustion; preserving critical risk and outcome reserves only",
+        "authorizedBy": "OPERATOR_INCIDENT_RESOLVER",
+        "authorizedAt": "2026-06-01T14:00:00Z",
+        "originalFloor": 0.05,
+        "temporaryFloor": 0.01,
+        "valid": true
+      },
+      {
+        "name": "unauthorized_floor_breach_refused",
+        "emergencyPolicyVersion": null,
+        "auditedReason": "",
+        "originalFloor": 0.05,
+        "temporaryFloor": 0.02,
+        "valid": false,
+        "expectedError": "SIG_EXPLORATION_FLOOR_BREACH_WITHOUT_EMERGENCY_POLICY"
+      }
+    ]
+  }
+}

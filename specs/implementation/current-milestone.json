@@ -88,7 +88,7 @@
         "test -d packages/capacity-planner && pnpm --filter @foresift/capacity-planner test",
         "test -d packages/quota-forecast && pnpm --filter @foresift/quota-forecast test"
       ],
-      "status": "RUNNING"
+      "status": "PROVEN"
     },
     {
       "id": "g1-solana-security",

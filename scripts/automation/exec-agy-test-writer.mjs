@@ -4,6 +4,7 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { classifyOwnedPath, validateLaneOwnership } from './path-ownership.mjs';
+import { lockfileWorkspaceRegistrationOnly } from './wave-guard-lockfile.mjs';
 import { acquireLanePermit, releaseLanePermit, resolvePoolStateDir } from './provider-pool.mjs';
 import {
   claimCompletedUnits,
@@ -216,6 +217,29 @@ export function runAgyTestWriter(input) {
     .filter(Boolean);
   // Symlinks are tooling plumbing, never authorship evidence (live 486a44d0).
   changedPaths = splitSymlinks(input.worktree, changedPaths).clean;
+  // Root-lockfile carve-out (same law as wave-guard.mjs, live 38e80af1): a NEW
+  // workspace package created by an integrated implementation lane makes the
+  // lane's own `pnpm install` additively register the importer block in
+  // pnpm-lock.yaml. That registration is plumbing, not dependency authorship —
+  // filtered here ONLY when the diff is a pure workspace-importer registration
+  // mirroring an existing package.json (lockfileWorkspaceRegistrationOnly).
+  // Every other pnpm-lock.yaml shape stays a PRODUCT ownership violation.
+  const lockfileDiff = git(
+    ['diff', `${baseHead}..${head}`, '--', 'pnpm-lock.yaml'],
+    input.worktree,
+  );
+  if (
+    changedPaths.includes('pnpm-lock.yaml') &&
+    lockfileDiff.ok &&
+    lockfileWorkspaceRegistrationOnly(lockfileDiff.stdout, input.worktree, (cmd) =>
+      git(cmd.split(/\s+/), input.worktree),
+    )
+  ) {
+    changedPaths = changedPaths.filter((p) => p !== 'pnpm-lock.yaml');
+    console.error(
+      'agy-test-writer: pnpm-lock.yaml admitted as workspace-importer registration (root-lockfile carve-out)',
+    );
+  }
   const ownership = validateLaneOwnership({ engine: 'AGY', role: 'test', changedPaths });
   if (!ownership.ok)
     throw new Error(`${ownership.violationCode}: ${ownership.violatingPaths.join(',')}`);
@@ -299,6 +323,23 @@ export function runAgyTestWriter(input) {
       .stdout.split('\n')
       .filter(Boolean);
     changedPaths = splitSymlinks(input.worktree, changedPaths).clean;
+    // Same root-lockfile carve-out as the pre-repair check above: the lockfile
+    // shape cannot change from registration-only to authorship by a type
+    // repair (which only touches TEST-owned files), but the diff now spans
+    // base..repaired-head and must be re-evaluated against the same law.
+    const lockfileDiff2 = git(
+      ['diff', `${baseHead}..${head}`, '--', 'pnpm-lock.yaml'],
+      input.worktree,
+    );
+    if (
+      changedPaths.includes('pnpm-lock.yaml') &&
+      lockfileDiff2.ok &&
+      lockfileWorkspaceRegistrationOnly(lockfileDiff2.stdout, input.worktree, (cmd) =>
+        git(cmd.split(/\s+/), input.worktree),
+      )
+    ) {
+      changedPaths = changedPaths.filter((p) => p !== 'pnpm-lock.yaml');
+    }
     const ownership2 = validateLaneOwnership({ engine: 'AGY', role: 'test', changedPaths });
     if (!ownership2.ok)
       throw new Error(`${ownership2.violationCode}: ${ownership2.violatingPaths.join(',')}`);

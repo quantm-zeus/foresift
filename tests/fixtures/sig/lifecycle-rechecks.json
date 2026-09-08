@@ -1,0 +1,173 @@
+{
+  "schema": "foresift/sig-lifecycle-rechecks@1",
+  "lifecycleStates": [
+    "DISCOVERED",
+    "QUALIFIED",
+    "EMERGING",
+    "CONFIRMED",
+    "MONITORING",
+    "DECAYING",
+    "REJECTED",
+    "ARCHIVED"
+  ],
+  "hysteresisTransitions": [
+    {
+      "name": "qualified_to_emerging_promotion",
+      "fromState": "QUALIFIED",
+      "toState": "EMERGING",
+      "persistenceMeasure": 0.75,
+      "promotionThreshold": 0.70,
+      "minimumDwellSeconds": 300,
+      "actualDwellSeconds": 600,
+      "allowed": true,
+      "reason": "Volume persistence and buyer acceleration crossed emergence threshold"
+    },
+    {
+      "name": "emerging_to_qualified_demotion_requires_sustained_drop",
+      "fromState": "EMERGING",
+      "toState": "QUALIFIED",
+      "persistenceMeasure": 0.50,
+      "demotionThreshold": 0.45,
+      "consecutiveWindowsBelowThreshold": 1,
+      "requiredWindowsBelowThreshold": 2,
+      "minimumDwellSeconds": 300,
+      "actualDwellSeconds": 600,
+      "allowed": false,
+      "reason": "Single window dip to 0.50 does not demote (hysteresis requires < 0.45 for 2 windows)"
+    },
+    {
+      "name": "dwell_time_violation_refused",
+      "fromState": "QUALIFIED",
+      "toState": "EMERGING",
+      "persistenceMeasure": 0.85,
+      "promotionThreshold": 0.70,
+      "minimumDwellSeconds": 300,
+      "actualDwellSeconds": 60,
+      "allowed": false,
+      "expectedError": "SIG_LIFECYCLE_DWELL_VIOLATION"
+    },
+    {
+      "name": "confirmed_requires_tradable_verdict",
+      "fromState": "EMERGING",
+      "toState": "CONFIRMED",
+      "tradabilityVerdict": "UNTRADABLE",
+      "allowed": false,
+      "expectedError": "SIG_CONFIRMED_REQUIRES_TRADABLE_VERDICT",
+      "diagnosticSignalPreserved": true
+    },
+    {
+      "name": "confirmed_succeeds_with_tradable_verdict",
+      "fromState": "EMERGING",
+      "toState": "CONFIRMED",
+      "tradabilityVerdict": "TRADABLE",
+      "allowed": true,
+      "diagnosticSignalPreserved": true
+    }
+  ],
+  "thesisInvalidationConditions": [
+    {
+      "conditionId": "LIQUIDITY_DRAWDOWN_OVER_50_PCT",
+      "description": "Pool liquidity dropped by more than 50% from confirmation baseline",
+      "threshold": -0.50,
+      "action": "TRANSITION_TO_DECAYING"
+    },
+    {
+      "conditionId": "TOP_HOLDER_CONCENTRATION_SURGE",
+      "description": "Top 10 holder supply share increased by > 15%",
+      "threshold": 0.15,
+      "action": "TRANSITION_TO_REJECTED"
+    },
+    {
+      "conditionId": "DEVELOPER_WALLET_DUMP",
+      "description": "Deployer/creator wallet transferred > 20% of supply to liquidity pool",
+      "threshold": 0.20,
+      "action": "TRANSITION_TO_REJECTED"
+    }
+  ],
+  "recheckBudgetScenarios": [
+    {
+      "name": "recheck_scheduled_within_budget",
+      "budget": {
+        "candidateId": "cand_recheck_1",
+        "profileVersion": "sig_prof_v1",
+        "maxRechecks": 10,
+        "maxRecheckProviderCalls": 50,
+        "maxRecheckModelCost": 5.0,
+        "rechecksUsed": 3,
+        "providerCallsUsed": 15,
+        "modelCostUsed": 1.2,
+        "backoffFactor": 1.5,
+        "minimumExpectedInformationGain": 0.10,
+        "nextCheckAt": "2026-06-01T12:00:00Z",
+        "expiresAt": "2026-06-01T18:00:00Z",
+        "starvedSince": null
+      },
+      "currentTime": "2026-06-01T12:00:00Z",
+      "calculatedInformationValue": 0.45,
+      "expectedDecision": "RECHECK_NOW"
+    },
+    {
+      "name": "recheck_stopped_budget_exhausted",
+      "budget": {
+        "candidateId": "cand_recheck_2",
+        "profileVersion": "sig_prof_v1",
+        "maxRechecks": 5,
+        "maxRecheckProviderCalls": 25,
+        "maxRecheckModelCost": 2.5,
+        "rechecksUsed": 5,
+        "providerCallsUsed": 25,
+        "modelCostUsed": 2.5,
+        "backoffFactor": 1.5,
+        "minimumExpectedInformationGain": 0.10,
+        "nextCheckAt": "2026-06-01T12:00:00Z",
+        "expiresAt": "2026-06-01T18:00:00Z",
+        "starvedSince": null
+      },
+      "currentTime": "2026-06-01T12:00:00Z",
+      "calculatedInformationValue": 0.80,
+      "expectedDecision": "BUDGET_EXHAUSTED_STOP"
+    },
+    {
+      "name": "recheck_stopped_expired",
+      "budget": {
+        "candidateId": "cand_recheck_3",
+        "profileVersion": "sig_prof_v1",
+        "maxRechecks": 10,
+        "maxRecheckProviderCalls": 50,
+        "maxRecheckModelCost": 5.0,
+        "rechecksUsed": 2,
+        "providerCallsUsed": 10,
+        "modelCostUsed": 0.8,
+        "backoffFactor": 1.5,
+        "minimumExpectedInformationGain": 0.10,
+        "nextCheckAt": "2026-06-01T19:00:00Z",
+        "expiresAt": "2026-06-01T18:00:00Z",
+        "starvedSince": null
+      },
+      "currentTime": "2026-06-01T19:00:00Z",
+      "calculatedInformationValue": 0.50,
+      "expectedDecision": "EXPIRED_STOP"
+    },
+    {
+      "name": "recheck_skipped_info_value_below_floor",
+      "budget": {
+        "candidateId": "cand_recheck_4",
+        "profileVersion": "sig_prof_v1",
+        "maxRechecks": 10,
+        "maxRecheckProviderCalls": 50,
+        "maxRecheckModelCost": 5.0,
+        "rechecksUsed": 1,
+        "providerCallsUsed": 5,
+        "modelCostUsed": 0.4,
+        "backoffFactor": 1.5,
+        "minimumExpectedInformationGain": 0.25,
+        "nextCheckAt": "2026-06-01T12:00:00Z",
+        "expiresAt": "2026-06-01T18:00:00Z",
+        "starvedSince": null
+      },
+      "currentTime": "2026-06-01T12:00:00Z",
+      "calculatedInformationValue": 0.08,
+      "expectedDecision": "INFO_VALUE_BELOW_FLOOR_SKIP"
+    }
+  ]
+}

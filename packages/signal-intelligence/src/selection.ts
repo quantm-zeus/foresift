@@ -595,17 +595,18 @@ export function runDeterministicSelection(
       const hardPassed = passesHardGates(candidate);
       const robustPassed = passesRobustExecution(candidate, preparedCandidate.envelope);
       const exposure = constraints.get(candidate.candidateId) ?? [];
-      const cutoffReason = !hardPassed
-        ? 'HARD_GATE_FAILED'
-        : !robustPassed
-          ? 'ROBUST_EXECUTION_FAILED'
+      const cutoffReason =
+        !hardPassed || !robustPassed
+          ? 'HARD_GATE_FAILED'
           : status === 'DOMINATED'
             ? 'PARETO_DOMINATED'
             : exposure.some((record) => !record.admitted)
               ? 'DIVERSITY_CONSTRAINT'
               : arm === 'NOT_SELECTED'
                 ? 'BELOW_BUDGET_CUTOFF'
-                : 'SELECTED';
+                : arm === 'RANDOM_EXPLORATION' || arm === 'EVIDENCE_PROBE'
+                  ? 'EXPLORATION_ARM'
+                  : 'NOT_SELECTED_WITH_REASON';
       return {
         eligibleUniverse: universe,
         candidateId: candidate.candidateId,

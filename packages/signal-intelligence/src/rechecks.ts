@@ -35,14 +35,15 @@ export interface AllocationAidInformationValue {
 }
 
 export function informationValue(input: InformationValueInput): AllocationAidInformationValue {
-  const factors = [
-    input.estimatedDecisionImpact,
+  const probabilityFactors = [
     input.materialStateChangeProbability,
     input.evidenceReliability,
     input.incrementalIndependenceValue,
   ];
   if (
-    factors.some((value) => !Number.isFinite(value) || value < 0 || value > 1) ||
+    !Number.isFinite(input.estimatedDecisionImpact) ||
+    input.estimatedDecisionImpact < 0 ||
+    probabilityFactors.some((value) => !Number.isFinite(value) || value < 0 || value > 1) ||
     !Number.isFinite(input.totalNormalizedResourceCost) ||
     input.totalNormalizedResourceCost < 0 ||
     !Number.isFinite(input.epsilon) ||
@@ -53,7 +54,8 @@ export function informationValue(input: InformationValueInput): AllocationAidInf
   return {
     allocationAidOnly: true,
     value:
-      factors.reduce((product, factor) => product * factor, 1) /
+      (input.estimatedDecisionImpact *
+        probabilityFactors.reduce((product, factor) => product * factor, 1)) /
       Math.max(input.totalNormalizedResourceCost, input.epsilon),
   };
 }

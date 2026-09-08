@@ -412,6 +412,125 @@ describe('launch seam (A: unplanned → planner-capable path · E: planned → d
   });
 });
 
+// ── plan-quality gate (directive 2026-09-08): the wave launch is refused ────
+// until the committed plan carries BOTH deterministic laws — #218 parallelism
+// (every provably-parallel product unit is [P] or carries a valid six-
+// vocabulary [serial-reason]) and #220 ownership admission (no implementation-
+// dispatched unit carries test-owned writes). Deterministic, zero-AI,
+// pre-provider-spend.
+describe('plan-quality gate (K: all-serial disjoint plan refuses the wave until corrected)', () => {
+  const ALL_SERIAL_TASKS = [
+    '- [x] T101 Groundwork for `packages/a/src/base.ts`. Traces: FR-A-001.',
+    '- [ ] T102 Implement alpha in `packages/a/src/alpha.ts`. Traces: FR-A-001, FR-A-002.',
+    '- [ ] T103 Implement beta in `packages/a/src/beta.ts`. Traces: FR-A-002.',
+    '',
+  ].join('\n');
+
+  const PARALLEL_TASKS = [
+    '- [x] T101 Groundwork for `packages/a/src/base.ts`. Traces: FR-A-001.',
+    '- [ ] T102 [P] Implement alpha in `packages/a/src/alpha.ts`. Traces: FR-A-001, FR-A-002.',
+    '- [ ] T103 [P] Implement beta in `packages/a/src/beta.ts`. Traces: FR-A-002.',
+    '',
+  ].join('\n');
+
+  function plannedSandboxWith(name: string, tasks: string) {
+    const sb = makeSandbox(name, 'RUNNING');
+    installStub();
+    // Rewrite the planned tree's tasks with the variant under test, in BOTH
+    // the fixture main (committed planning truth) and the run worktree. The
+    // plain sandbox carries no specs/<pkg>/ on main — create the scoped dir.
+    for (const dir of [sb.fx.root, sb.wtDir]) {
+      mkdirSync(join(dir, 'specs', PKG), { recursive: true });
+      writeFileSync(join(dir, 'specs', PKG, 'spec.md'), SPEC);
+      writeFileSync(join(dir, 'specs', PKG, 'plan.md'), PLAN);
+      writeFileSync(join(dir, 'specs', PKG, 'tasks.md'), tasks);
+    }
+    sb.fx.commitAll('chore(autopilot): seed pkg-alpha planning artifacts');
+    sb.fx.g(['push', 'origin', 'main']);
+    seedState(sb, [bootstrapEntry()]);
+    return sb;
+  }
+
+  it('K1: an all-serial, write-disjoint plan refuses the implementation wave — no launch, tracked recovery', () => {
+    const sb = plannedSandboxWith('plan-quality-serial', ALL_SERIAL_TASKS);
+    const r = tick(sb, ['--once'], {
+      getMap: { 'boot-1': { id: 'boot-1', status: 'completed', working_path: sb.wtDir } },
+    });
+    expect(r.status).toBe(0);
+    const st = readState(sb);
+    const events = st.history.map((h: { event: string }) => h.event);
+    // The handoff refuses the WAVE launch with the plan-quality reason...
+    expect(events).toContain('planning_handoff_refused_plan_quality');
+    const refusal = st.history.find(
+      (h: { event: string }) => h.event === 'planning_handoff_refused_plan_quality',
+    );
+    expect(String(refusal?.reason ?? '')).toContain('MISSED_PARALLELISM_OPPORTUNITY');
+    // ...and NO implementation/provider launch of any kind occurs.
+    const log = archonLog(sb);
+    expect(log).not.toContain(`run ${WAVE_WF}`);
+    expect(log).not.toContain(`run ${OPTIMIZED_WF}`);
+    // The bootstrap entry stays tracked for ordinary recovery.
+    expect(st.activeRuns[0]?.packageId).toBe(PKG);
+    expect(st.activeRuns[0]?.workflow).toBe(BOOTSTRAP_WF);
+  });
+
+  it('K2: the same plan with [P] markers (or valid serial reasons) launches the wave', () => {
+    const sb = plannedSandboxWith('plan-quality-parallel', PARALLEL_TASKS);
+    const r = tick(sb, ['--once'], {
+      getMap: { 'boot-1': { id: 'boot-1', status: 'completed', working_path: sb.wtDir } },
+    });
+    expect(r.status).toBe(0);
+    const st = readState(sb);
+    expect(st.history.map((h: { event: string }) => h.event)).toContain(
+      'planning_handoff_complete',
+    );
+    const log = archonLog(sb);
+    expect(log).toContain(`run ${WAVE_WF} --detach`);
+  });
+
+  it('K3: test-owned writes in an implementation-dispatched unit refuse the wave (ownership admission)', () => {
+    const tasks = [
+      '- [x] T101 Groundwork for `packages/a/src/base.ts`. Traces: FR-A-001.',
+      '- [ ] T102 [P] Implement alpha in `packages/a/src/alpha.ts` and extend `tests/a/alpha.spec.ts`. Traces: FR-A-001.',
+      '',
+    ].join('\n');
+    const sb = plannedSandboxWith('plan-quality-ownership', tasks);
+    const r = tick(sb, ['--once'], {
+      getMap: { 'boot-1': { id: 'boot-1', status: 'completed', working_path: sb.wtDir } },
+    });
+    expect(r.status).toBe(0);
+    const st = readState(sb);
+    const refusal = st.history.find(
+      (h: { event: string }) => h.event === 'planning_handoff_refused_plan_quality',
+    );
+    expect(refusal).toBeDefined();
+    expect(String(refusal?.reason ?? '')).toContain('ownership admission failed');
+    const log = archonLog(sb);
+    expect(log).not.toContain(`run ${WAVE_WF}`);
+  });
+
+  it('K4: an unknown serial-reason vocabulary value fails closed (no wave launch)', () => {
+    const tasks = [
+      '- [x] T101 Groundwork for `packages/a/src/base.ts`. Traces: FR-A-001.',
+      '- [ ] T102 [serial-reason: BECAUSE_I_SAID_SO] Implement alpha in `packages/a/src/alpha.ts`. Traces: FR-A-001, FR-A-002.',
+      '- [ ] T103 [P] Implement beta in `packages/a/src/beta.ts`. Traces: FR-A-002.',
+      '',
+    ].join('\n');
+    const sb = plannedSandboxWith('plan-quality-vocab', tasks);
+    const r = tick(sb, ['--once'], {
+      getMap: { 'boot-1': { id: 'boot-1', status: 'completed', working_path: sb.wtDir } },
+    });
+    expect(r.status).toBe(0);
+    const st = readState(sb);
+    const refusal = st.history.find(
+      (h: { event: string }) => h.event === 'planning_handoff_refused_plan_quality',
+    );
+    expect(refusal).toBeDefined();
+    expect(String(refusal?.reason ?? '')).toContain('could not evaluate');
+    expect(archonLog(sb)).not.toContain(`run ${WAVE_WF}`);
+  });
+});
+
 // ── B/C/D: the completed-bootstrap handoff ───────────────────────────────────
 describe('planning handoff (B: zero impl calls · C: RUNNING preserved · D: immediate wave reselect)', () => {
   function handoffSandbox(name: string) {

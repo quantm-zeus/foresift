@@ -51,8 +51,7 @@ interface ConsumptionRow {
   rendered_classes: string;
 }
 
-const iso = (value: string | Date): string =>
-  value instanceof Date ? value.toISOString() : value;
+const iso = (value: string | Date): string => (value instanceof Date ? value.toISOString() : value);
 
 /**
  * The §62.12 free-in-one-dimension-never-implies-zero-total predicate, as a
@@ -179,15 +178,14 @@ export class BudgetPolicyRepository {
         dimension,
         atIso,
       ]);
-      const consumption = consumptionRows.rows[0] === undefined ? null : rowConsumption(consumptionRows.rows[0]);
+      const consumption =
+        consumptionRows.rows[0] === undefined ? null : rowConsumption(consumptionRows.rows[0]);
       states[dimension] = {
         dimension,
         policy,
         consumption,
         headroom:
-          policy === null
-            ? undefined
-            : Math.max(0, policy.capLimit - (consumption?.consumed ?? 0)),
+          policy === null ? undefined : Math.max(0, policy.capLimit - (consumption?.consumed ?? 0)),
         exhausted:
           policy !== null && consumption !== null && consumption.consumed >= policy.capLimit,
       };
@@ -198,7 +196,9 @@ export class BudgetPolicyRepository {
       at: atIso,
       states,
       dataProviderCostMode:
-        dataProviderMode === ProviderMode.PAID_ALLOWED ? CostMode.PAID_ENABLED : CostMode.STRICT_FREE,
+        dataProviderMode === ProviderMode.PAID_ALLOWED
+          ? CostMode.PAID_ENABLED
+          : CostMode.STRICT_FREE,
     };
   }
 }

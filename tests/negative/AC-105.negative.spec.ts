@@ -47,7 +47,9 @@ describe('AC-105 negative — G1 zero-cost overclaim refusal facet (FR-COST-011,
       const actualTotal = Object.values(classes).reduce((acc, v) => acc + v, 0);
       const claimedTotal = 0; // Invalid overclaim!
       if (actualTotal > 0 && claimedTotal === 0) {
-        throw new Error('ZERO_COST_OVERCLAIM_FORBIDDEN: total cost cannot be zero when spend classes are positive');
+        throw new Error(
+          'ZERO_COST_OVERCLAIM_FORBIDDEN: total cost cannot be zero when spend classes are positive',
+        );
       }
       return actualTotal;
     };

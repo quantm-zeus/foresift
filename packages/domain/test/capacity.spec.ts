@@ -5,8 +5,26 @@
  * AttributionUnitKind, and RenderedSpendClass, as well as G0 ReserveId interop.
  */
 import { describe, expect, it } from 'bun:test';
-// @ts-expect-error - Product vocabulary implementation pending in parallel wave (T001)
-import { ALL_ATTRIBUTION_UNIT_KINDS, ALL_BUDGET_DIMENSIONS, ALL_CONTRACT_RESULTS, ALL_DEGRADATION_STEPS, ALL_PROVIDER_MODES, ALL_RECONCILIATION_BREACH_KINDS, ALL_RECONCILIATION_DIMENSIONS, ALL_RENDERED_SPEND_CLASSES, ALL_RESERVE_CLASSES, AttributionUnitKind, attributionUnitKind, BudgetDimension, budgetDimension, ContractResult, contractResult, DegradationStep, degradationStep, ProviderMode, providerMode, ReconciliationBreachKind, reconciliationBreachKind, ReconciliationDimension, reconciliationDimension, RenderedSpendClass, renderedSpendClass, ReserveClass, reserveClass } from '../src/capacity.ts';
+import {
+  ALL_ATTRIBUTION_UNIT_KINDS,
+  ALL_BUDGET_DIMENSIONS,
+  ALL_CONTRACT_RESULTS,
+  ALL_DEGRADATION_STEPS,
+  ALL_PROVIDER_MODES,
+  ALL_RECONCILIATION_BREACH_KINDS,
+  ALL_RECONCILIATION_DIMENSIONS,
+  ALL_RENDERED_SPEND_CLASSES,
+  ALL_RESERVE_CLASSES,
+  attributionUnitKind,
+  budgetDimension,
+  contractResult,
+  degradationStep,
+  providerMode,
+  reconciliationBreachKind,
+  reconciliationDimension,
+  renderedSpendClass,
+  reserveClass,
+} from '../src/capacity.ts';
 import { ALL_RESERVE_IDS, reserveId } from '../src/cost.ts';
 import { ForesiftError } from '../src/errors.ts';
 
@@ -31,7 +49,9 @@ describe('capacity domain vocabulary resolution (fail-closed)', () => {
     });
 
     it(`${name} refuses unknown values fail-closed with ForesiftError`, () => {
-      expect(() => (resolve as (v: string) => string)('TOTALLY_UNKNOWN_VALUE')).toThrow(ForesiftError);
+      expect(() => (resolve as (v: string) => string)('TOTALLY_UNKNOWN_VALUE')).toThrow(
+        ForesiftError,
+      );
       expect(() => (resolve as (v: string) => string)('')).toThrow(ForesiftError);
       for (const value of all as readonly string[]) {
         const drifted = value.toLowerCase();
@@ -58,11 +78,7 @@ describe('BudgetDimension exact PRD §62.2 specification (FR-COST-011)', () => {
 
 describe('ProviderMode exact PRD §62.2 specification', () => {
   it('contains exactly the 3 data-provider modes', () => {
-    expect(ALL_PROVIDER_MODES).toEqual([
-      'STRICT_FREE',
-      'FREE_FIRST',
-      'PAID_ALLOWED',
-    ]);
+    expect(ALL_PROVIDER_MODES).toEqual(['STRICT_FREE', 'FREE_FIRST', 'PAID_ALLOWED']);
   });
 });
 
@@ -128,10 +144,7 @@ describe('ReconciliationDimension exact PRD §62.9 specification (FR-COST-016)',
 
 describe('ReconciliationBreachKind specification (FR-COST-016, ADR-6)', () => {
   it('contains MATERIAL_UNDERESTIMATION and RESERVE_BREACH', () => {
-    expect(ALL_RECONCILIATION_BREACH_KINDS).toEqual([
-      'MATERIAL_UNDERESTIMATION',
-      'RESERVE_BREACH',
-    ]);
+    expect(ALL_RECONCILIATION_BREACH_KINDS).toEqual(['MATERIAL_UNDERESTIMATION', 'RESERVE_BREACH']);
   });
 });
 

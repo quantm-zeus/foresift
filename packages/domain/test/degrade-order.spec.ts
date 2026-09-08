@@ -4,9 +4,13 @@
  * and pure deterministic resolution (resolveDegradation).
  */
 import { describe, expect, it } from 'bun:test';
-// @ts-expect-error - Product implementation pending in parallel wave (T003)
-import { DEFAULT_POLICY_V1, type DegradationState, isProtectedStep, PROTECTED_STEPS, resolveDegradation } from '../src/degrade-order.ts';
-// @ts-expect-error - Product vocabulary implementation pending in parallel wave (T001)
+import {
+  DEFAULT_POLICY_V1,
+  type DegradationState,
+  isProtectedStep,
+  PROTECTED_STEPS,
+  resolveDegradation,
+} from '../src/degrade-order.ts';
 import type { DegradationStep } from '../src/capacity.ts';
 
 describe('DEFAULT_POLICY_V1 canonical sequence (PRD §62.8, FR-COST-015, AC-228)', () => {

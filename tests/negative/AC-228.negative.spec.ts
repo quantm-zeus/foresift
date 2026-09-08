@@ -40,7 +40,9 @@ describe('AC-228 negative — G1 inverted degradation order rejection (FR-COST-0
       const protectedIndex = steps.indexOf('PRESERVE_CRITICAL_OBLIGATIONS');
       const socialIndex = steps.indexOf('REDUCE_SOCIAL_NARRATIVE_DEPTH');
       if (protectedIndex !== -1 && socialIndex !== -1 && protectedIndex < socialIndex) {
-        throw new Error('INVERTED_DEGRADATION_ORDER_REJECTED: protected steps cannot degrade before optional depth');
+        throw new Error(
+          'INVERTED_DEGRADATION_ORDER_REJECTED: protected steps cannot degrade before optional depth',
+        );
       }
       return true;
     };

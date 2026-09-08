@@ -3,7 +3,6 @@
  * Provides six-dimension policy fixtures, provider modes (STRICT_FREE/FREE_FIRST/PAID_ALLOWED),
  * and zero-overclaim composition vectors.
  */
-// @ts-expect-error - Domain vocabulary pending in parallel wave (T001)
 import type { BudgetDimension, ProviderMode } from '@foresift/domain';
 
 export interface BudgetPolicyFixture {

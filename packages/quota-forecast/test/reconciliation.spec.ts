@@ -1,15 +1,22 @@
 /**
  * Quota forecast reconciliation and cost attribution unit tests (FR-COST-016, FR-COST-017, AC-229).
  * Tests:
- * - reconcileForecast writing to cost.forecast_reconciliations
- * - MATERIAL_UNDERESTIMATION and RESERVE_BREACH incident creation
- * - Limits recomputation and refusal of silent overage
+ * - reconcileForecast writing to cost.forecast_reconciliations (breach⇔incident symmetric)
+ * - MATERIAL_UNDERESTIMATION and RESERVE_BREACH detection
+ * - Limits recomputation (cap-only-tighten) and refusal of silent overage
  * - writeCostAttribution per operation/workload/candidate/run/module granularity
+ *
+ * Aligned to the landed T015 product API (9978200): reconcileForecast takes
+ * positional (contract, dimension, subject, forecast, actual, tolerance,
+ * options) and returns a ReconciliationDecision; the breach handler is wired
+ * through options.onToleranceBreach (the G0 seam, plan ADR-6).
  */
 import { describe, expect, it } from 'bun:test';
-// @ts-expect-error - Product implementation pending in parallel wave (T015)
-import { reconcileForecast, writeCostAttribution, type ForecastReconciliationRequest } from '../src/reconciliation.ts';
-// @ts-expect-error - Domain vocabulary pending in parallel wave (T002)
+import {
+  reconcileForecast,
+  writeCostAttribution,
+  type ProtectedReserveFloor,
+} from '../src/reconciliation.ts';
 import type { SustainableCapacityContract } from '@foresift/domain';
 
 const mockContract: SustainableCapacityContract = {
@@ -65,76 +72,97 @@ const mockContract: SustainableCapacityContract = {
 
 describe('reconcileForecast (FR-COST-016, AC-229, plan ADR-6)', () => {
   it('returns no breach when actual usage is within forecast + tolerance', async () => {
-    let recordedRow: Record<string, unknown> | null = null;
+    const recordedParams: unknown[] = [];
     const mockEngine = {
       query: async (_sql: string, params: unknown[]) => {
-        recordedRow = { params };
+        recordedParams.push(params);
         return { rows: [] };
       },
     } as never;
 
-    const req: ForecastReconciliationRequest = {
-      contract: mockContract,
-      dimension: 'WORKLOAD',
-      subjectId: 'workload_discovery',
-      forecastValue: 1000,
-      actualValue: 1050,
-      toleranceFraction: 0.1, // 10% tolerance => threshold 1100
-    };
-
-    const result = await reconcileForecast(mockEngine, req);
-    expect(result.breached).toBe(false);
-    expect(result.incidentId).toBeNull();
-    expect(result.breachKind).toBeNull();
-    expect(recordedRow).toBeDefined();
+    const decision = await reconcileForecast(
+      mockContract,
+      'WORKLOAD',
+      'workload_discovery',
+      1000,
+      1050,
+      0.1, // 10% tolerance => threshold 1100
+      { engine: mockEngine },
+    );
+    expect(decision.breachKind).toBeNull();
+    expect(decision.incidentId).toBeNull();
+    expect(decision.reconciliation.breachKind).toBeNull();
+    expect(recordedParams.length).toBe(1); // row persisted
   });
 
-  it('creates incident and recomputes limits on MATERIAL_UNDERESTIMATION', async () => {
-    let recordedRow: Record<string, unknown> | null = null;
-    const mockEngine = {
-      query: async (_sql: string, params: unknown[]) => {
-        recordedRow = { params };
-        return { rows: [] };
-      },
-    } as never;
-
-    const req: ForecastReconciliationRequest = {
-      contract: mockContract,
-      dimension: 'OPERATION',
-      subjectId: 'op_helius_das',
-      forecastValue: 1000,
-      actualValue: 1250, // Exceeds 1000 * 1.10 = 1100!
-      toleranceFraction: 0.1,
-    };
-
-    const result = await reconcileForecast(mockEngine, req);
-    expect(result.breached).toBe(true);
-    expect(result.breachKind).toBe('MATERIAL_UNDERESTIMATION');
-    expect(result.incidentId).toBeDefined();
-    expect(result.incidentId?.startsWith('inc_')).toBe(true);
-    expect(result.recomputedAdmissionLimits).toBeDefined();
-    expect(result.silentOverageAllowed).toBe(false);
-  });
-
-  it('creates incident on RESERVE_BREACH when protected floor is crossed', async () => {
+  it('flags MATERIAL_UNDERESTIMATION and recomputes limits (breach requires incident seam)', async () => {
     const mockEngine = {
       query: async () => ({ rows: [] }),
     } as never;
 
-    const req: ForecastReconciliationRequest = {
-      contract: mockContract,
-      dimension: 'MODULE',
-      subjectId: 'module_risk_monitor',
-      forecastValue: 1000,
-      actualValue: 1050,
-      toleranceFraction: 0.1,
-      isReserveFloorBreached: true,
-    };
+    let seamRaised: { breachKind: string } | null = null;
+    const decision = await reconcileForecast(
+      mockContract,
+      'OPERATION',
+      'op_helius_das',
+      1000,
+      1250, // Exceeds 1000 * 1.10 = 1100
+      0.1,
+      {
+        engine: mockEngine,
+        onToleranceBreach: (raised) => {
+          seamRaised = { breachKind: raised.breachKind };
+          return 'inc_test_underestimation';
+        },
+      },
+    );
+    expect(decision.breachKind).toBe('MATERIAL_UNDERESTIMATION');
+    expect(decision.incidentId).toBe('inc_test_underestimation');
+    expect(seamRaised).not.toBeNull();
+    expect(decision.recomputedAdmissionLimits).toBeDefined();
+    expect(Object.keys(decision.recomputedAdmissionLimits).length).toBeGreaterThan(0);
+  });
 
-    const result = await reconcileForecast(mockEngine, req);
-    expect(result.breached).toBe(true);
-    expect(result.breachKind).toBe('RESERVE_BREACH');
-    expect(result.incidentId).toBeDefined();
+  it('refuses silent overage: a breach without an incident id throws (ADR-6 symmetry)', async () => {
+    const mockEngine = {
+      query: async () => ({ rows: [] }),
+    } as never;
+
+    expect(
+      reconcileForecast(mockContract, 'OPERATION', 'op_silent', 1000, 1250, 0.1, {
+        engine: mockEngine,
+        onToleranceBreach: () => '', // seam raises no incident id
+      }),
+    ).rejects.toThrow('RECONCILIATION_INCIDENT_REQUIRED');
+  });
+
+  it('creates RESERVE_BREACH when a protected floor is crossed', async () => {
+    const mockEngine = {
+      query: async () => ({ rows: [] }),
+    } as never;
+
+    const floors: ProtectedReserveFloor[] = [
+      { reserveClass: 'RISK_MONITORING', fraction: 0.2, totalUnits: 1000 },
+    ];
+
+    const decision = await reconcileForecast(
+      mockContract,
+      'MODULE',
+      'module_risk_monitor',
+      1000,
+      1050,
+      0.1,
+      {
+        engine: mockEngine,
+        protectedFloors: floors,
+        reserveUnitsUsed: 250, // floor is 200 (0.2 * 1000) → crossed
+        onToleranceBreach: () => 'inc_test_reserve',
+      },
+    );
+    expect(decision.breachKind).toBe('RESERVE_BREACH');
+    expect(decision.incidentId).toBe('inc_test_reserve');
+    // cap-only-tighten law: the crossed class' cap is floored at 0
+    expect(decision.recomputedAdmissionLimits['reserve:RISK_MONITORING']).toBe(0);
   });
 });
 
@@ -159,11 +187,11 @@ describe('writeCostAttribution (FR-COST-017)', () => {
     };
 
     await writeCostAttribution(mockEngine, {
+      attributionId: 'attr_test_001',
       contractId: 'cap_contract_v1_001',
       unitKind: 'RESEARCHED_CANDIDATE',
       subjectId: 'cand_sol_123',
-      marginalCost: 0.05,
-      totalCost: 2.1,
+      totalCost: 102.1, // Σ classes — never a hidden overclaim (§62.12)
       renderedClasses: completeClasses,
     });
 

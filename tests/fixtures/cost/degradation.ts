@@ -2,12 +2,15 @@
  * Degradation order and policy test fixtures (PRD §62.8, FR-COST-015, AC-104, AC-228).
  * Provides §62.8 sequencing vectors, protected preservation vectors, and never-pay-silently refusal fixtures.
  */
-// @ts-expect-error - Domain vocabulary & policy pending in parallel wave (T001/T003)
+// Domain vocabulary landed by wave T001/T003 (packages/domain/src/capacity.ts, degrade-order.ts)
 import { DEFAULT_POLICY_V1, PROTECTED_STEPS, type DegradationStep } from '@foresift/domain';
 
 export const CANONICAL_DEGRADATION_SEQUENCE: readonly DegradationStep[] = DEFAULT_POLICY_V1;
 
-export const NON_CRITICAL_DEGRADATION_STEPS: readonly DegradationStep[] = DEFAULT_POLICY_V1.slice(0, 9);
+export const NON_CRITICAL_DEGRADATION_STEPS: readonly DegradationStep[] = DEFAULT_POLICY_V1.slice(
+  0,
+  9,
+);
 
 export const CRITICAL_PROTECTED_STEPS: readonly DegradationStep[] = PROTECTED_STEPS;
 

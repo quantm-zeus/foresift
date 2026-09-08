@@ -4,16 +4,45 @@
  * registry v2 bump, and G0 regression lock.
  */
 import { describe, expect, it } from 'bun:test';
-// @ts-expect-error - Domain vocabularies pending in parallel wave (T001)
-import { ALL_ATTRIBUTION_UNIT_KINDS, ALL_BUDGET_DIMENSIONS, ALL_CONTRACT_RESULTS, ALL_DEGRADATION_STEPS, ALL_PROVIDER_MODES, ALL_RECONCILIATION_BREACH_KINDS, ALL_RECONCILIATION_DIMENSIONS, ALL_RENDERED_SPEND_CLASSES, ALL_RESERVE_CLASSES } from '@foresift/domain';
-// @ts-expect-error - Product schemas pending in parallel wave (T004)
-import { AttributionUnitKindSchema, BorrowedReserveSchema, BudgetConsumptionTotalsSchema, BudgetDimensionSchema, BudgetPolicySchema, CapacityCandidateLoadSchema, CapacityProviderEnvelopeItemSchema, CapacitySystemEnvelopeSchema, ContractResultSchema, CostAttributionSchema, DegradationOrderStepSchema, DegradationPolicyRowSchema, DegradationStepSchema, ForecastReconciliationSchema, ProviderModeSchema, ReconciliationBreachKindSchema, ReconciliationDimensionSchema, RenderedSpendClassSchema, ReserveClassSchema, SustainableCapacityContractSchema } from '../src/capacity.ts';
 import {
-  COST_SCHEMAS,
+  ALL_ATTRIBUTION_UNIT_KINDS,
+  ALL_BUDGET_DIMENSIONS,
+  ALL_CONTRACT_RESULTS,
+  ALL_DEGRADATION_STEPS,
+  ALL_PROVIDER_MODES,
+  ALL_RECONCILIATION_BREACH_KINDS,
+  ALL_RECONCILIATION_DIMENSIONS,
+  ALL_RENDERED_SPEND_CLASSES,
+  ALL_RESERVE_CLASSES,
+} from '@foresift/domain';
+// Product schemas landed by wave T004 (packages/shared-schemas/src/capacity.ts)
+import {
   COST_SCHEMA_REGISTRY_VERSION,
   OperationCostDeclarationSchema,
   PaidProviderPolicySchema,
 } from '../src/cost.ts';
+import {
+  AttributionUnitKindSchema,
+  BorrowedReserveSchema,
+  BudgetConsumptionTotalsSchema,
+  BudgetDimensionSchema,
+  BudgetPolicySchema,
+  CapacityCandidateLoadSchema,
+  CapacityProviderEnvelopeItemSchema,
+  CapacitySystemEnvelopeSchema,
+  ContractResultSchema,
+  CostAttributionSchema,
+  DegradationOrderStepSchema,
+  DegradationPolicyRowSchema,
+  DegradationStepSchema,
+  ForecastReconciliationSchema,
+  ProviderModeSchema,
+  ReconciliationBreachKindSchema,
+  ReconciliationDimensionSchema,
+  RenderedSpendClassSchema,
+  ReserveClassSchema,
+  SustainableCapacityContractSchema,
+} from '../src/capacity.ts';
 
 const validRenderedClasses = {
   PAID_DATA_SPEND: 0,
@@ -100,7 +129,11 @@ describe('capacity domain vocabulary mirrors match domain constants', () => {
     ['DegradationStepSchema', DegradationStepSchema, ALL_DEGRADATION_STEPS],
     ['ContractResultSchema', ContractResultSchema, ALL_CONTRACT_RESULTS],
     ['ReconciliationDimensionSchema', ReconciliationDimensionSchema, ALL_RECONCILIATION_DIMENSIONS],
-    ['ReconciliationBreachKindSchema', ReconciliationBreachKindSchema, ALL_RECONCILIATION_BREACH_KINDS],
+    [
+      'ReconciliationBreachKindSchema',
+      ReconciliationBreachKindSchema,
+      ALL_RECONCILIATION_BREACH_KINDS,
+    ],
     ['AttributionUnitKindSchema', AttributionUnitKindSchema, ALL_ATTRIBUTION_UNIT_KINDS],
     ['RenderedSpendClassSchema', RenderedSpendClassSchema, ALL_RENDERED_SPEND_CLASSES],
   ] as const;
@@ -161,7 +194,9 @@ describe('BudgetPolicySchema accept/refuse laws (ADR-1, FR-COST-011)', () => {
 
 describe('SustainableCapacityContractSchema strictness & envelope parsing (§62.5)', () => {
   it('parses valid SustainableCapacityContract successfully', () => {
-    expect(SustainableCapacityContractSchema.safeParse(validSustainableCapacityContract).success).toBe(true);
+    expect(
+      SustainableCapacityContractSchema.safeParse(validSustainableCapacityContract).success,
+    ).toBe(true);
   });
 
   it('refuses unknown keys on candidateLoad envelope', () => {

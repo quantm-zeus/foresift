@@ -69,7 +69,9 @@ describe('AC-229 acceptance (positive) — G1 multi-dimension reconciliation inc
 
     expect(reconciliationRecord.breached).toBe(true);
     expect(reconciliationRecord.incidentCreated).toBe(true);
-    expect(reconciliationRecord.recomputedCapLimit).toBeLessThan(reconciliationRecord.forecastValue);
+    expect(reconciliationRecord.recomputedCapLimit).toBeLessThan(
+      reconciliationRecord.forecastValue,
+    );
     expect(reconciliationRecord.silentPaidOverageAllowed).toBe(false);
     expect(reconciliationRecord.silentProtectedReserveConsumed).toBe(false);
   });

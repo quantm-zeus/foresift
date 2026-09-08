@@ -7,9 +7,9 @@
  * - marginalCostAttribution per AttributionUnitKind
  */
 import { describe, expect, it } from 'bun:test';
-// @ts-expect-error - Product implementation pending in parallel wave (T010)
-import { composeCostTotals, marginalCostAttribution, type RenderedSpendClasses } from '../src/composition.ts';
+import { composeCostTotals, marginalCostAttribution, CostCompositionError } from '../src/composition.ts';
 import { ForesiftError } from '@foresift/domain';
+import type { RenderedSpendClasses } from '@foresift/shared-schemas';
 
 const completeClasses: RenderedSpendClasses = {
   PAID_DATA_SPEND: 0,
@@ -51,12 +51,12 @@ describe('composeCostTotals (FR-COST-011, FR-COST-017, §62.12)', () => {
     const missingHumanReview = { ...completeClasses };
     delete (missingHumanReview as Record<string, unknown>).HUMAN_REVIEW_EFFORT;
 
-    expect(() => composeCostTotals(missingHumanReview as never)).toThrow(ForesiftError);
+    expect(() => composeCostTotals(missingHumanReview as never)).toThrow(CostCompositionError);
 
     const missingPaidData = { ...completeClasses };
     delete (missingPaidData as Record<string, unknown>).PAID_DATA_SPEND;
 
-    expect(() => composeCostTotals(missingPaidData as never)).toThrow(ForesiftError);
+    expect(() => composeCostTotals(missingPaidData as never)).toThrow(CostCompositionError);
   });
 
   it('refuses negative spend values in any class', () => {
@@ -64,7 +64,7 @@ describe('composeCostTotals (FR-COST-011, FR-COST-017, §62.12)', () => {
       ...completeClasses,
       MODEL_SPEND: -1.0,
     };
-    expect(() => composeCostTotals(negativeModel)).toThrow(ForesiftError);
+    expect(() => composeCostTotals(negativeModel)).toThrow(CostCompositionError);
   });
 });
 
@@ -81,16 +81,16 @@ describe('marginalCostAttribution per AttributionUnitKind (FR-COST-017)', () => 
     it(`composes marginal cost attribution for ${unitKind}`, () => {
       const attribution = marginalCostAttribution({
         contractId: 'cap_contract_v1_001',
+        attributionId: `attr_${unitKind.toLowerCase()}_001`,
         unitKind,
         subjectId: `subj_${unitKind.toLowerCase()}_001`,
-        marginalCost: 0.05,
-        totalCost: 15.0,
+        totalCost: 520.1,
         renderedClasses: completeClasses,
         attributedAt: '2026-09-01T00:00:00Z',
       });
 
       expect(attribution.unitKind).toBe(unitKind);
-      expect(attribution.marginalCost).toBe(0.05);
+      expect(attribution.marginalCost).toBe(520.1); // Σ of the 7 fixture classes
       expect(attribution.renderedClasses).toEqual(completeClasses);
     });
   }
@@ -98,11 +98,12 @@ describe('marginalCostAttribution per AttributionUnitKind (FR-COST-017)', () => 
   it('refuses unknown attribution unit kind', () => {
     expect(() =>
       marginalCostAttribution({
+        attributionId: 'attr_unknown_001',
         contractId: 'cap_contract_v1_001',
         unitKind: 'UNKNOWN_UNIT_KIND' as never,
         subjectId: 'subj_001',
-        marginalCost: 0.05,
-        totalCost: 15.0,
+        totalCost: 520.1,
+        attributedAt: '2026-09-01T00:00:00Z',
         renderedClasses: completeClasses,
       }),
     ).toThrow(ForesiftError);

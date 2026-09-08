@@ -54,12 +54,12 @@ describe('AC-227 negative — G1 SustainableCapacityContract activation blocking
       return true;
     };
 
-    expect(() =>
-      validateContractForActivation({ result: 'FAIL', horizonDays: 30 }),
-    ).toThrow('CONTRACT_NOT_VERIFIED_FOR_ACTIVATION');
+    expect(() => validateContractForActivation({ result: 'FAIL', horizonDays: 30 })).toThrow(
+      'CONTRACT_NOT_VERIFIED_FOR_ACTIVATION',
+    );
 
-    expect(() =>
-      validateContractForActivation({ result: 'PASS', horizonDays: 20 }),
-    ).toThrow('HORIZON_LESS_THAN_30_DAYS_FORBIDDEN');
+    expect(() => validateContractForActivation({ result: 'PASS', horizonDays: 20 })).toThrow(
+      'HORIZON_LESS_THAN_30_DAYS_FORBIDDEN',
+    );
   });
 });

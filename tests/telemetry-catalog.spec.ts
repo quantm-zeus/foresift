@@ -44,6 +44,7 @@ interface CatalogField {
 interface Catalog {
   catalog: string;
   contractStatus?: string;
+  requirementsCovered?: string[];
   events: { name: string; fields: CatalogField[] }[];
 }
 
@@ -212,7 +213,7 @@ describe('telemetry/cost.catalog.json G1 capacity-contract extension (FR-COST-01
       'FR-COST-017',
     ]) {
       expect(
-        costCatalog.requirementsCovered,
+        costCatalog.requirementsCovered ?? [],
         `${fr} listed in cost.catalog requirementsCovered`,
       ).toContain(fr);
     }

@@ -10,8 +10,11 @@
  * - Non-negative envelope fields (all 13 systemEnvelope quantities)
  */
 import { describe, expect, it } from 'bun:test';
-// @ts-expect-error - Product implementation pending in parallel wave (T002)
-import { isContractActivatable, type SustainableCapacityContract, validateSustainableCapacityContract } from '../src/capacity-contract.ts';
+import {
+  isContractActivatable,
+  type SustainableCapacityContract,
+  validateSustainableCapacityContract,
+} from '../src/capacity-contract.ts';
 import { ForesiftError } from '../src/errors.ts';
 
 function makeValidContract(

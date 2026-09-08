@@ -26,7 +26,9 @@ export const costDenial = shapeCostDenial;
  * the record so a denial can never be read as "zero total cost". Surplus and
  * secret fields are discarded exactly like the G0 cost denial.
  */
-export function shapeBudgetDimensionDenial(input: BudgetDimensionDenialRecord): BudgetDimensionDenial {
+export function shapeBudgetDimensionDenial(
+  input: BudgetDimensionDenialRecord,
+): BudgetDimensionDenial {
   return BudgetDimensionDenialRecordSchema.parse({
     ...(input.denialId === undefined ? {} : { denialId: input.denialId }),
     dimension: input.dimension,

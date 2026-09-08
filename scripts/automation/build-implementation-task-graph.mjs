@@ -30,6 +30,7 @@ import { repoRoot, loadCurrentMilestone, validateMilestoneState, findPackage } f
 import { classifyOwnedPath } from './path-ownership.mjs';
 import { resolveTaskMetadata, isCoordinatorTask } from './task-metadata.mjs';
 import { assertEvidenceOwnership } from './evidence-owner-registry.mjs';
+import { assertImplementationAdmission } from './ownership-preflight.mjs';
 import {
   implementationEngineForProfile,
   resolveExecutionProfile,
@@ -44,13 +45,22 @@ function fail(msg) {
 }
 
 const args = {};
-for (let i = 0; i < process.argv.length - 1; i++) {
-  if (process.argv[i] === '--package') args.package = process.argv[i + 1];
-  if (process.argv[i] === '--root') args.root = process.argv[i + 1];
-  if (process.argv[i] === '--tasks') args.tasks = process.argv[i + 1];
-  if (process.argv[i] === '--plan-shards') args.planShards = parseInt(process.argv[i + 1], 10);
-  if (process.argv[i] === '--execution-profile') args.executionProfile = process.argv[i + 1];
-  if (process.argv[i] === '--out') args.out = process.argv[i + 1];
+// NB: bound is argv.length (not length-1) so a terminal valueless flag
+// (--allow-ownership-violations) is still parsed — extraArgs are appended
+// last by callers, and a dropped flag silently re-arms a hard admission
+// failure the caller explicitly permitted.
+for (let i = 0; i < process.argv.length; i++) {
+  if (process.argv[i] === '--package' && i + 1 < process.argv.length)
+    args.package = process.argv[i + 1];
+  if (process.argv[i] === '--root' && i + 1 < process.argv.length) args.root = process.argv[i + 1];
+  if (process.argv[i] === '--tasks' && i + 1 < process.argv.length)
+    args.tasks = process.argv[i + 1];
+  if (process.argv[i] === '--plan-shards' && i + 1 < process.argv.length)
+    args.planShards = parseInt(process.argv[i + 1], 10);
+  if (process.argv[i] === '--execution-profile' && i + 1 < process.argv.length)
+    args.executionProfile = process.argv[i + 1];
+  if (process.argv[i] === '--allow-ownership-violations') args.allowOwnershipViolations = true;
+  if (process.argv[i] === '--out' && i + 1 < process.argv.length) args.out = process.argv[i + 1];
 }
 if (!args.package) fail('missing --package <id>');
 if (args.planShards !== undefined && (!Number.isInteger(args.planShards) || args.planShards < 1))
@@ -241,6 +251,17 @@ const open = units.filter((u) => !u.done);
 // above at parse time.
 const coordinatorOpenIds = new Set(open.filter(isCoordinatorTask).map((u) => u.id));
 
+// ── ownership admission (fail-closed, pre-provider cost, directive 2026-09-07)
+// The ownership guard legally refuses implementation lanes whose evidence diff
+// carries TEST-owned paths — but until now that refusal surfaced only AFTER
+// the provider spend was sunk (live b659eef0: writer-serial-1/2 died ×3 on
+// CLAUDE_TEST_OWNERSHIP_VIOLATION; core-batch-3 attempt-3 died at lane end on
+// tests/telemetry-catalog.spec.ts). A plan that routes test writes to an
+// implementation lane is unschedulable BY CONSTRUCTION: fail HERE, at build
+// time, with the split-the-test-work fix named. The audit needs the shard
+// plan, so it re-runs after planning below (see assertImplementationAdmission
+// call following shard emission).
+
 // ── evidence-owner coverage (fail-closed, pre-writer cost) ────────────────────
 // EVERY OPEN TASK HAS A REAL DETERMINISTIC COMPLETION OWNER. An open unit
 // declaring a non-file evidence kind whose runtime consumer is not registered
@@ -290,9 +311,16 @@ const CENTRAL_MIGRATION_SUITE = 'packages/persistence/test/migrator.spec.ts';
 // ── shard planning ────────────────────────────────────────────────────────────
 let shards = null;
 if (args.planShards !== undefined) {
+  // Implementation shards carry PRODUCT work only (ownership law, directive
+  // 2026-09-07): TEST-executor units are routed to the test lanes below, and
+  // a TEST-executor unit dispatched into an implementation shard is exactly
+  // the routing defect that made the ownership guard refuse whole lanes after
+  // provider spend (live b659eef0). Without an execution profile the legacy
+  // path has no test lanes — a TEST-executor unit stays out of every shard
+  // and the admission audit reports it if it would otherwise be dispatched.
   const productOpen = args.executionProfile
     ? open.filter((u) => u.productWork && !isCoordinatorTask(u))
-    : open.filter((u) => !isCoordinatorTask(u));
+    : open.filter((u) => !isCoordinatorTask(u) && u.executor !== 'TEST');
   // Units whose predicted writes leave binding writeScopes are demoted to the
   // serial core shard; their paths are recorded as explicit scope exceptions.
   const scopeDemoted = productOpen.filter((u) => u.outOfScopeWrites.length > 0);
@@ -590,6 +618,29 @@ const testLanes = testUnits.length
   ? shardTestLanes(testUnits, testEngineForProfile(executionProfile))
   : [];
 
+// ── ownership admission (fail-closed, BEFORE emit/provider spend) ────────────
+// With the shard plan final, verify no implementation lane carries test-owned
+// writes (see the audit note above `open`). An unschedulable plan is a hard
+// build error — never a mid-wave guard refusal after provider spend. The ONLY
+// escape hatch is --allow-ownership-violations, used exclusively by the
+// read-only launch-preflight reporter (which never spends providers and must
+// report plan defects as data); the wave prep path never passes it, so the
+// admission law stays hard where provider spend happens. When permitted, the
+// verdict is still computed and attached to the graph as ownershipAdmission.
+let ownershipAdmission = { schedulable: true, violations: [] };
+try {
+  assertImplementationAdmission({ units, shards: shards ?? [] });
+} catch (e) {
+  if (!args.allowOwnershipViolations) throw e;
+  ownershipAdmission = {
+    schedulable: false,
+    violations: String(e.message)
+      .split('\n')
+      .filter((l) => l.includes('IMPLEMENTATION_LANE_TEST_WRITES'))
+      .map((l) => l.trim()),
+  };
+}
+
 // ── emit ──────────────────────────────────────────────────────────────────────
 const graph = {
   schema: TASK_GRAPH_SCHEMA,
@@ -603,6 +654,7 @@ const graph = {
     openCoordinator: coordinatorOpenIds.size,
   },
   units,
+  ownershipAdmission,
   // Explicit zero-AI coordinator duty list (P0-5): the wave coordinator
   // executes these mechanically post-integration (manifest regen, coverage
   // assertion, bookkeeping commits) — never an AI writer.

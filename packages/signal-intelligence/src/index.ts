@@ -11,3 +11,4 @@ export * from './selection.ts';
 export * from './challenger-seam.ts';
 export * from './diversity.ts';
 export * from './exploration.ts';
+export * from './lifecycle.ts';

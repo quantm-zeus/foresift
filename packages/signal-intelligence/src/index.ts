@@ -9,3 +9,5 @@ export * from './funnel.ts';
 export * from './vectors.ts';
 export * from './selection.ts';
 export * from './challenger-seam.ts';
+export * from './diversity.ts';
+export * from './exploration.ts';

@@ -230,7 +230,7 @@
       "verificationCommands": [
         "test -d packages/signal-intelligence && pnpm --filter @foresift/signal-intelligence test"
       ],
-      "status": "PENDING"
+      "status": "RUNNING"
     },
     {
       "id": "g1-outcome-evaluation",

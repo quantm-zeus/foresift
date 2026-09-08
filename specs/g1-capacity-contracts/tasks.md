@@ -112,7 +112,7 @@ test author may invent, rename, or omit members:
 
 ## Phase 2 — Persistence: migrations and central registry (blocks Phase 3–4 verification)
 
-- [ ] T005 Author `migrations/g1_cost_0001_budget_dimensions.sql` exactly per plan
+- [x] T005 Author `migrations/g1_cost_0001_budget_dimensions.sql` exactly per plan
       data model: `cost.budget_policies` (dimension CHECK with the 6 budget-dimension
       literals; provider_mode CHECK with STRICT_FREE/FREE_FIRST/PAID_ALLOWED and
       `provider_mode IS NULL OR dimension = 'DATA_PROVIDER'`; one-active-per-dimension
@@ -120,7 +120,7 @@ test author may invent, rename, or omit members:
       `cost.budget_consumption_totals` (6-dimension CHECK, rendered_classes JSON with
       the 7 RenderedSpendClass keys pinned by test). Apply/rollback as one transaction;
       rollback = DROP the two tables. Traces: FR-COST-011, AC-105.
-- [ ] T006 Author `migrations/g1_cost_0002_capacity_contracts.sql` exactly per plan
+- [x] T006 Author `migrations/g1_cost_0002_capacity_contracts.sql` exactly per plan
       data model: the member-additive `cost.cost_reserve_buckets` reserve_id CHECK
       rebuild to the nine ReserveClass literals BEHIND a pre-migration guard that
       aborts if any existing reserve_id is outside the four G0 members (plan ADR-2) —
@@ -131,7 +131,7 @@ test author may invent, rename, or omit members:
       (9-member CHECKs on both class columns, borrowed_by_class ≠ reserve_class).
       Rollback = DROP new tables + restore the four-member CHECK (guard makes this safe
       on any state). Traces: FR-COST-012, FR-COST-013, AC-227.
-- [ ] T007 Author `migrations/g1_cost_0003_degradation_reconciliation.sql` exactly per
+- [x] T007 Author `migrations/g1_cost_0003_degradation_reconciliation.sql` exactly per
       plan data model: `cost.degradation_policies` + `cost.degradation_order_steps`
       (11-member step_name CHECK with the exact DegradationStep literals; PK
       (policy_version, step_index); UNIQUE (policy_version, step_name); protected_class
@@ -144,7 +144,7 @@ test author may invent, rename, or omit members:
       PREVENTED_RISK_EVENT/PORTFOLIO_UTILITY_UNIT; rendered_classes 7-class pin).
       Rollback = DROP the four tables. Traces: FR-COST-015, FR-COST-016, FR-COST-017,
       AC-228, AC-229.
-- [ ] T008 Extend `packages/persistence/test/migrator.spec.ts` — the plan-sanctioned
+- [x] T008 Extend `packages/persistence/test/migrator.spec.ts` — the plan-sanctioned
       central-registry exception (ADR-0019/0022 duty, g1-data-truth-extensions
       precedent) — adding `g1_cost_0001_budget_dimensions`,
       `g1_cost_0002_capacity_contracts`, `g1_cost_0003_degradation_reconciliation` to
@@ -155,7 +155,7 @@ test author may invent, rename, or omit members:
 
 ## Phase 3 — Cost-router: budget dimensions and composition (blocks Phase 4)
 
-- [ ] T009 Create `packages/cost-router/src/budget-policy.ts`:
+- [x] T009 Create `packages/cost-router/src/budget-policy.ts`:
       `resolveActiveBudgetPolicies(engine, at)` reading `cost.budget_policies` (one
       active row per dimension), per-dimension consumption read from
       `cost.budget_consumption_totals`, and the free-in-one-dimension-never-implies-
@@ -284,7 +284,7 @@ toleranceFraction)` writing `cost.forecast_reconciliations`; raises
 
 ## Phase 7 — Telemetry catalogs, manifest regen, full verification
 
-- [ ] T020 Extend `telemetry/cost.catalog.json`: events
+- [x] T020 Extend `telemetry/cost.catalog.json`: events
       cost.budget_policy_activated (FR-COST-011), cost.capacity_contract_verified
       (FR-COST-012/013), cost.admission_blocked (FR-COST-014),
       cost.degradation_step_resolved (FR-COST-015), cost.reserve_borrowed (§62.4),
@@ -295,14 +295,14 @@ toleranceFraction)` writing `cost.forecast_reconciliations`; raises
       (milestone plan-level decision 4 precedent) — pinning the extended catalog.
       Traces: FR-COST-011, FR-COST-012, FR-COST-013, FR-COST-014, FR-COST-015,
       FR-COST-016, FR-COST-017.
-- [ ] T021 [executor: COORDINATOR] [evidence: VERIFICATION_ONLY] Run the three
+- [x] T021 [executor: COORDINATOR] [evidence: VERIFICATION_ONLY] Run the three
       milestone verification commands on the canonical tree: `test -d
 packages/cost-router && pnpm --filter @foresift/cost-router test`, `test -d
 packages/capacity-planner && pnpm --filter @foresift/capacity-planner test`,
       `test -d packages/quota-forecast && pnpm --filter @foresift/quota-forecast test`.
       All green required. Traces: FR-COST-011…017 (package-gate proof of every assigned
       requirement's substrate).
-- [ ] T022 [executor: COORDINATOR] Regenerate the coordinator test manifest
+- [x] T022 [executor: COORDINATOR] Regenerate the coordinator test manifest
       (run `node scripts/automation/bun-migration-manifest.mjs --out
 evidence/bun-migration/bun-migration-manifest.json`) after all new test files
       exist so `pnpm test`/`test:all` collect and classify them (PGlite-backed suites →
@@ -310,7 +310,7 @@ evidence/bun-migration/bun-migration-manifest.json`) after all new test files
       (ADR-0020: coordinator-owned, zero-AI; a writer touching
       `evidence/bun-migration/` is an ownership violation by law). Traces:
       FR-COST-011…017 (verification substrate for every assigned requirement).
-- [ ] T023 [executor: COORDINATOR] [evidence: VERIFICATION_ONLY] Run the full aggregate
+- [x] T023 [executor: COORDINATOR] [evidence: VERIFICATION_ONLY] Run the full aggregate
       gate `pnpm verify` and the integrity gate `pnpm spec:verify` at the pushed HEAD;
       require green (the complete Bun suite runs ONLY through the coordinator — never a
       bare `bun test` over the tree). If anything turns red outside writeScopes,

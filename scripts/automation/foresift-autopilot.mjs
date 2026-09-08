@@ -2947,6 +2947,9 @@ async function cmdRecoverFatal(positionalRunId) {
   // Exactly one continuation: resume the same run when possible.
   let resumed = false;
   let freshAdmission = null;
+  // The fresh-continuation launch ack (below); also consulted at logPath
+  // capture time — declared here so the resume path skips it cleanly.
+  let ack = null;
   if (row && ['running', 'pending'].includes(String(row.status))) {
     resumed = true; // alive — re-adopt under supervisor tracking
   } else if (
@@ -3021,7 +3024,7 @@ async function cmdRecoverFatal(positionalRunId) {
     }
     // ONE fresh continuation on the SAME branch/worktree; prior work persists on
     // disk/git and completed tasks are discovered from there by the workflow.
-    const ack = launchDetached(st, workflow, branch, message, executionProfile);
+    ack = launchDetached(st, workflow, branch, message, executionProfile);
     record(st, 'operator_recovery_fresh_launch', {
       branch,
       executionProfile,

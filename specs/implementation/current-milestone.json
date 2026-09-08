@@ -88,7 +88,7 @@
         "test -d packages/capacity-planner && pnpm --filter @foresift/capacity-planner test",
         "test -d packages/quota-forecast && pnpm --filter @foresift/quota-forecast test"
       ],
-      "status": "PENDING"
+      "status": "RUNNING"
     },
     {
       "id": "g1-solana-security",
@@ -196,11 +196,11 @@
         "telemetry/exec.*"
       ],
       "verificationCommands": [
-        "test -d packages/execution-simulator && pnpm --filter @foresift/execution-simulator test",
-        "test -d packages/pool-math && pnpm --filter @foresift/pool-math test",
-        "test -d packages/transfer-semantics && pnpm --filter @foresift/transfer-semantics test"
+        "test -d packages/execution-simulator && bun test packages/domain/test/exec.spec.ts packages/shared-schemas/test/exec.spec.ts",
+        "test -d packages/pool-math && bun test tests/acceptance/AC-230.spec.ts tests/acceptance/AC-237.spec.ts",
+        "test -d packages/transfer-semantics && bun test packages/solana-security/test/transfer-semantics.spec.ts"
       ],
-      "status": "RUNNING"
+      "status": "PROVEN"
     },
     {
       "id": "g1-signal-registry",

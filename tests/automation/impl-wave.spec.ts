@@ -24,7 +24,9 @@ const TASKS = `# Tasks: pkg-x
 
 - [ ] T102 Implement alpha in \`packages/x/src/alpha.ts\` with care.
       Traces: FR-X-001, FR-X-002. Depends on T101 groundwork.
-- [ ] T103 [P] Write spec \`tests/x/a.spec.ts\` exercising
+- [ ] T103 [P] Extend \`packages/x/src/alpha.ts\` with the documented examples.
+      Traces: FR-X-001 (AC-201).
+- [ ] T106 [P] [executor: TEST] Write spec \`tests/x/a.spec.ts\` exercising
       \`packages/x/src/alpha.ts\`. Traces: FR-X-001 (AC-201).
 - [ ] T104 [P] Write guide \`docs/x-guide.md\`. Traces: FR-X-002 (AC-202).
 `;
@@ -117,7 +119,9 @@ describe('implementation task graph', () => {
   it('derives units, traces, predicted writes, and blocking-phase deps', () => {
     const g = JSON.parse(readFileSync(fx.graphPath, 'utf8'));
     expect(g.schema).toBe('foresift/impl-task-graph@1');
-    expect(g.totals).toMatchObject({ units: 4, done: 1, open: 3, openParallelizable: 2 });
+    // T106 joins the fixture as the test-owned task ([executor: TEST]) — the
+    // pkg-x plan stays law-valid under the 2026-09-07 ownership admission.
+    expect(g.totals).toMatchObject({ units: 5, done: 1, open: 4, openParallelizable: 3 });
     const t102 = g.units.find((u: { id: string }) => u.id === 'T102');
     expect(t102.done).toBe(false);
     expect(t102.parallelizable).toBe(false);
@@ -1279,6 +1283,13 @@ describe('central migration registry duty enforcement', () => {
 - [ ] T201 Write \`migrations/g0_m_0001_ledgers.sql\` — new family scripts. Traces: FR-M-001.
 `;
 
+  const MIGRATION_REGISTRY_TASKS_BODY = `
+- [ ] T201 Write \`migrations/g0_m_0001_ledgers.sql\` — new family scripts. Traces: FR-M-001.
+- [ ] T202 [executor: COORDINATOR] Extend the central registry
+      \`packages/persistence/test/migrator.spec.ts\` expected G0 script list with the
+      new family in lexicographic position. Traces: FR-M-001.
+`;
+
   it('refuses at graph build when new migration scripts never name the central suite', () => {
     const root = buildScratchRepo(`# Tasks: pkg-m\n${MIGRATION_TASKS_BODY}`);
     try {
@@ -1296,13 +1307,7 @@ describe('central migration registry duty enforcement', () => {
   });
 
   it('builds and records the plan-sanctioned exception when the central suite is named', () => {
-    const root = buildScratchRepo(
-      `# Tasks: pkg-m\n${MIGRATION_TASKS_BODY}
-- [ ] T202 Extend the central registry \`packages/persistence/test/migrator.spec.ts\`
-      expected G0 script list with the new family in lexicographic position.
-      Traces: FR-M-001.
-`,
-    );
+    const root = buildScratchRepo(`# Tasks: pkg-m\n${MIGRATION_REGISTRY_TASKS_BODY}`);
     const artifacts = mkdtempSync(join(tmpdir(), 'mig-duty-art-'));
     try {
       const graphPath = join(artifacts, 'task-graph.json');
@@ -1314,10 +1319,13 @@ describe('central migration registry duty enforcement', () => {
       expect(r.status).toBe(0);
       const g = JSON.parse(readFileSync(graphPath, 'utf8'));
       expect(g.scopeExceptions).toContain('packages/persistence/test/migrator.spec.ts');
-      // The central-suite unit is demoted into the serial core lane, whose
-      // allowedWritePaths carry the exception path.
+      // The central-suite edit is a zero-AI COORDINATOR duty: it is recorded
+      // for mechanical post-integration execution and never dispatched to an
+      // implementation writer (implementation lanes carry PRODUCT work only —
+      // 2026-09-07 ownership law, live b659eef0).
+      expect(g.coordinatorUnits).toContain('T202');
       const core = g.shards.find((s: { id: string }) => s.id === 'core');
-      expect(core.allowedWritePaths).toContain('packages/persistence/test/migrator.spec.ts');
+      expect(core.allowedWritePaths).not.toContain('packages/persistence/test/migrator.spec.ts');
     } finally {
       rmSync(root, { recursive: true, force: true });
       rmSync(artifacts, { recursive: true, force: true });

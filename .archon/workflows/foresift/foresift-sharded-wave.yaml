@@ -62,6 +62,44 @@ nodes:
         --package "$PKG" --plan-shards "${FORESIFT_WRITERS:-3}" \
         --execution-profile "$PROFILE" \
         --out "$ARTIFACTS_DIR/task-graph.json"
+      # ── Pre-provider already-satisfied reconciliation (directive 2026-09-06 §4,
+      # zero AI) ── runs the trusted-ancestry audit BEFORE any writer brief or
+      # provider gate: every OPEN FILE_OUTPUT unit whose predicted writes exist
+      # at HEAD with package-lineage provenance (fileEvidenceAlreadySatisfied,
+      # trustedBase = graph.bound.mainHeadSha) is checkbox-closed as
+      # NO_OP_ALREADY_SATISFIED in ONE coordinator commit. Fail-closed: missing
+      # output / no authoring commit / base-fixture authorship leaves the unit
+      # OPEN (blocked in the report) — mere file existence is never proof.
+      # After flips the graph is REBUILT against the reconciled tasks.md so the
+      # lane plan reflects the post-reconciliation open set (a fully-satisfied
+      # wave sentinel-skips every lane; zero providers are acquired). Report is
+      # mirrored for telemetry (productive vs reconciliation wall-clock split).
+      node scripts/automation/pre-provider-reconciliation.mjs \
+        --package "$PKG" \
+        --graph "$ARTIFACTS_DIR/task-graph.json" \
+        --report "$ARTIFACTS_DIR/pre-provider-reconciliation.json"
+      if node -e 'const r=require(process.env.ARTIFACTS_DIR+"/pre-provider-reconciliation.json");process.exit(r.reconciled.length>0?0:1)'; then
+        node scripts/automation/build-implementation-task-graph.mjs \
+          --package "$PKG" --plan-shards "${FORESIFT_WRITERS:-3}" \
+          --execution-profile "$PROFILE" \
+          --out "$ARTIFACTS_DIR/task-graph.json"
+      fi
+      # ── Parallelism quality gate (directive 2026-09-06 §5, advisory, zero AI)
+      # ── surfaces MISSED_PARALLELISM_OPPORTUNITY BEFORE any provider spend: a
+      # PRODUCT unit that is not [P], carries no [serial-reason: …] marker (the
+      # six-vocabulary law: SEMANTIC_DEPENDENCY | SHARED_FILE | ORDERED_MIGRATION |
+      # SHARED_INVARIANT | COORDINATOR_BOUNDARY | SAFETY_SERIALIZATION), and has
+      # a write-disjoint dependency-free sibling is reported to telemetry. An
+      # unknown serial-reason value fails the prep node (exit 3 — plan defect,
+      # fail closed). This never flips, dispatches, or edits anything: the PLAN
+      # is corrected between waves ([P] or an explicit serial-reason marker).
+      node scripts/automation/parallelism-audit.mjs \
+        --graph "$ARTIFACTS_DIR/task-graph.json" \
+        --report "$ARTIFACTS_DIR/parallelism-audit.json" || {
+        rc=$?
+        [ "$rc" -eq 3 ] && exit 3
+        exit 0
+      }
       TEST_LANES="$(node -e 'const g=require(process.argv[1]);process.stdout.write(String((g.testLanes??[]).length))' "$ARTIFACTS_DIR/task-graph.json")"
       if [ "$TEST_LANES" -gt 0 ] && ! command -v agy >/dev/null 2>&1; then
         echo "AGY_UNAVAILABLE_TEST_BEARING_WORK" >&2
@@ -140,6 +178,14 @@ nodes:
           const r = spawnSync("git worktree add -b \"" + br + "\" \"" + wt + "\" \"" + base + "\"",
             { shell: true });
           if (r.status !== 0) throw new Error("worktree add failed for " + s.id + ": " + r.stderr);
+          // Repo-local lane identity (directive 2026-09-07, live b659eef0):
+          // lane commits must never inherit the ambient host git config —
+          // pin the identity HERE so every commit in this worktree carries it.
+          for (const c of ["config user.name \"Foresift Wave Lane " + s.id + "\"",
+                           "config user.email \"noreply@foresift.local\""]) {
+            const rc = spawnSync("git -C \"" + wt + "\" " + c, { shell: true });
+            if (rc.status !== 0) throw new Error("identity pin failed for " + s.id + ": " + rc.stderr);
+          }
           // Immutable LOGICAL-LANE evidence baseline (maintainer Part A4,
           // 2026-09-03): created ONCE per lane at worktree creation and reused
           // across every retry of the writer node. A retry re-enters the same
@@ -908,6 +954,14 @@ nodes:
     depends_on: [integrate-and-fast, fast-repair-loop]
     trigger_rule: none_failed_min_one_success   # blocks iff repair genuinely FAILED
     bash: |
+      # Phase-split timing telemetry (directive 2026-09-06 §6, zero AI): join
+      # the run's artifacts into ONE wall-clock phase table (prep,
+      # reconciliation, parallelism audit, per-lane provider time, FAST) so
+      # "where did the wall clock go" is answerable per run. Advisory only —
+      # never gates the settled verdict.
+      node scripts/automation/wave-timing-report.mjs \
+        --artifacts "$ARTIFACTS_DIR" \
+        --out "$ARTIFACTS_DIR/wave-timing.json" || true
       echo "WAVE_PHASE_SETTLED"
   # ── LANDING: push + discover-or-create exactly ONE PR (zero AI) ─────────────
   # The sharded wave is an implementation-only topology: its job ends with a

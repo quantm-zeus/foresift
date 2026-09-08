@@ -151,7 +151,9 @@ export interface RankingAuditRecord {
   readonly adapterScenarioResults: readonly RequiredExecutionScenario[];
   readonly feasibilityEnvelope: FeasibilityEnvelope;
   readonly paretoStatus: ParetoStatus;
+  readonly diversityAdjustment: readonly ExposureConstraintResult[];
   readonly exposureConstraintResults: readonly ExposureConstraintResult[];
+  readonly explorationSelected: boolean;
   readonly protectedAllocations: readonly ProtectedAllocation[];
   readonly selectionArm: SelectionArm;
   readonly selectionProbability: number | null;
@@ -607,6 +609,10 @@ export function runDeterministicSelection(
                 : arm === 'RANDOM_EXPLORATION' || arm === 'EVIDENCE_PROBE'
                   ? 'EXPLORATION_ARM'
                   : 'NOT_SELECTED_WITH_REASON';
+      const randomized = arm === 'RANDOM_EXPLORATION' || arm === 'EVIDENCE_PROBE';
+      const selectionProbability = randomized
+        ? Math.min(1, policy.armBudgets[arm] / admitted.length)
+        : null;
       return {
         eligibleUniverse: universe,
         candidateId: candidate.candidateId,
@@ -620,10 +626,12 @@ export function runDeterministicSelection(
         adapterScenarioResults: [...candidate.executionScenarios],
         feasibilityEnvelope: preparedCandidate.envelope,
         paretoStatus: status,
+        diversityAdjustment: exposure,
         exposureConstraintResults: exposure,
+        explorationSelected: arm === 'RANDOM_EXPLORATION',
         protectedAllocations: [...policy.protectedAllocations],
         selectionArm: arm,
-        selectionProbability: null,
+        selectionProbability,
         cutoffReason,
         capacityAdmission: candidate.capacityAdmitted,
         algorithmVersion: universe.algorithmVersion,

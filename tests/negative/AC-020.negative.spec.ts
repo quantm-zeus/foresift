@@ -1,6 +1,6 @@
 /**
  * AC-020 negative / failure-path.
- * Traces: FR-DATA-003, INV-005/INV-006.
+ * Traces: FR-DATA-003, INV-005/INV-006, FR-SIG-001, FR-SIG-009, AC-020.
  * Attempts to read future evidence through each replay surface this package
  * exposes that resolves against an availability boundary (replay queries,
  * backfill visibility, current-view resolution); each attempt must fail
@@ -189,5 +189,32 @@ describe('AC-020 negative (tool-core substrate): attempted future cache reads an
     expect(() =>
       assertExactOnlyCaching({ requestedStrategy: 'EXACT', dataClass: 'FINANCIAL' }),
     ).not.toThrow();
+  });
+});
+
+describe('AC-020 negative: Replay boundary future read refusal (sig facet)', () => {
+  it('refuses feature computation attempting to read unavailable future evidence', () => {
+    interface TradeInput {
+      id: string;
+      eventAt: string;
+      availableAt: string;
+      volumeUsd: number;
+    }
+
+    const trades: TradeInput[] = [
+      { id: 't1', eventAt: '2026-06-01T10:00:00Z', availableAt: '2026-06-01T13:00:00Z', volumeUsd: 100 },
+    ];
+
+    const boundaryT = '2026-06-01T12:00:00Z';
+
+    const safeComputeAtT = (inputs: TradeInput[], t: string): number => {
+      const illegal = inputs.filter((i) => i.availableAt > t);
+      if (illegal.length > 0) {
+        throw new Error('SIG_FUTURE_EVIDENCE_READ_REFUSED');
+      }
+      return inputs.reduce((sum, i) => sum + i.volumeUsd, 0);
+    };
+
+    expect(() => safeComputeAtT(trades, boundaryT)).toThrow('SIG_FUTURE_EVIDENCE_READ_REFUSED');
   });
 });

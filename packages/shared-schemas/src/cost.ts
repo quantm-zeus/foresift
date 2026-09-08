@@ -2,8 +2,23 @@
 import { z } from 'zod';
 import { UtcTimestampSchema } from './data.ts';
 import { QuotaModelSchema } from './core.ts';
+import {
+  BudgetConsumptionTotalsSchema,
+  BudgetPolicySchema,
+  BorrowedReserveSchema,
+  BudgetDimensionDenialRecordSchema,
+  CostAttributionSchema,
+  DegradationOrderStepSchema,
+  DegradationPolicyRowSchema,
+  ForecastReconciliationSchema,
+  SustainableCapacityContractSchema,
+} from './capacity.ts';
 
-export const COST_SCHEMA_REGISTRY_VERSION = 1;
+/**
+ * Registry version 2 (G1, additive): the G1 capacity-governance schemas in
+ * `capacity.ts` joined the registry. Every G0 schema shape is unchanged.
+ */
+export const COST_SCHEMA_REGISTRY_VERSION = 2;
 export const CostClassSchema = z.enum([
   'FREE_UNMETERED',
   'FREE_QUOTA',
@@ -205,6 +220,15 @@ export const COST_SCHEMAS = {
   CostDenialRecord: CostDenialRecordSchema,
   BatchDescriptor: BatchDescriptorSchema,
   BatchCoalescedEvent: BatchCoalescedEventSchema,
+  BudgetPolicy: BudgetPolicySchema,
+  BudgetConsumptionTotals: BudgetConsumptionTotalsSchema,
+  SustainableCapacityContract: SustainableCapacityContractSchema,
+  DegradationPolicyRow: DegradationPolicyRowSchema,
+  DegradationOrderStep: DegradationOrderStepSchema,
+  ForecastReconciliation: ForecastReconciliationSchema,
+  CostAttribution: CostAttributionSchema,
+  BorrowedReserve: BorrowedReserveSchema,
+  BudgetDimensionDenialRecord: BudgetDimensionDenialRecordSchema,
 } as const;
 export type CostSchemaName = keyof typeof COST_SCHEMAS;
 export function parseCostSchema<T extends CostSchemaName>(

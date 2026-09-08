@@ -507,14 +507,13 @@ telemetry and gates.
       ownership law). Traces: FR-SIG-001, FR-SIG-002, FR-SIG-003,
       FR-SIG-004, FR-SIG-005, FR-SIG-006, FR-SIG-009.
 - [ ] T034 [executor: COORDINATOR] [evidence: VERIFICATION_ONLY] Run the
-      milestone verification command on the canonical tree: `test -d
-packages/signal-intelligence && pnpm --filter @foresift/signal-intelligence test`;
-      plus the extended central suites (`pnpm --filter @foresift/persistence
-test` for migrator + schema-parity; `tests/telemetry-catalog.spec.ts`)
-      and the authored/extended AC files (AC-154, AC-190, AC-191, AC-192,
-      AC-193, AC-020…023, AC-136). All green required. Traces: FR-SIG-001…006,
-      FR-SIG-009 (package-gate proof of every assigned requirement's
-      substrate).
+      milestone verification command on the canonical tree — the
+      signal-intelligence package suite plus the extended central suites
+      (persistence migrator and schema-parity via the workspace filter, and
+      the telemetry parity spec) — and the authored/extended AC files
+      (AC-154, AC-190, AC-191, AC-192, AC-193, AC-020…023, AC-136). All
+      green required. Traces: FR-SIG-001…006, FR-SIG-009 (package-gate proof
+      of every assigned requirement's substrate).
 - [ ] T035 [executor: COORDINATOR] Regenerate the coordinator test manifest
       (`node scripts/automation/bun-migration-manifest.mjs --out
 evidence/bun-migration/bun-migration-manifest.json`) after all new test

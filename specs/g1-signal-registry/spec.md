@@ -359,9 +359,9 @@ against the PRD:
   score" is a structural law, not a rendering preference.
 - **Reproducible research-priority ranking (FR-SIG-003)** = §20.4 (deterministic,
   versioned rank; Pareto/lexicographic before calibration) + §20.7 audit record
-  + Appendix I steps 1–13 as the normative algorithm. The deterministic rank is
-  a pure function of (frozen eligible universe, resolved inputs, versioned
-  policy); identical inputs reproduce identical rank output byte-for-byte.
+  - Appendix I steps 1–13 as the normative algorithm. The deterministic rank is
+    a pure function of (frozen eligible universe, resolved inputs, versioned
+    policy); identical inputs reproduce identical rank output byte-for-byte.
 - **Diversity and exploration sample (FR-SIG-004)** = §20.5 diversity
   constraints + §20.6 exploration/control sample (≥5% of otherwise eligible
   low-ranked candidates, randomly selected, outcome-only tracking, never
@@ -573,7 +573,7 @@ load in this package:
    structurally refused (AC-154).
 5. `pnpm verify` and `pnpm spec:verify` pass at the pushed HEAD; the milestone
    verification command (`test -d packages/signal-intelligence && pnpm --filter
-   @foresift/signal-intelligence test`) is green.
+@foresift/signal-intelligence test`) is green.
 6. No template placeholders remain in any scoped artifact; every task traces to
    an assigned requirement or its acceptance criteria.
 

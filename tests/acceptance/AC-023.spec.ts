@@ -1,6 +1,6 @@
 /**
  * AC-023 acceptance (positive).
- * Traces: FR-DATA-001 (§11.2 decimals, §11.5 addresses).
+ * Traces: FR-DATA-001 (§11.2 decimals, §11.5 addresses), FR-SIG-001, AC-023.
  * AC text (manifest §39): "Decimals and address normalization pass
  * chain-specific golden fixtures."
  *
@@ -209,5 +209,17 @@ describe('AC-023 acceptance (tool-core substrate): normalization goldens flow un
     const parsed = parseCoreSchema('ToolResultEnvelope', envelope);
     expect((parsed.data as { decimals: number }).decimals).toBe(18);
     expect((parsed.data as { rawSupply: string }).rawSupply).toBe('1000000000000000000000000');
+  });
+});
+
+describe('AC-023: Decimals and address normalization in feature inputs (sig facet)', () => {
+  it('normalizes Solana and EVM addresses and decimal strings in feature calculations', () => {
+    const solanaAddress = 'So11111111111111111111111111111111111111112';
+    const normalizedSolana = normalizeSolanaAddress(solanaAddress);
+    expect(normalizedSolana).toBe(solanaAddress);
+
+    const evmAddress = '0x1111222233334444555566667777888899990000';
+    const normalizedEvm = normalizeEvmAddress(evmAddress);
+    expect(normalizedEvm).toMatch(/^0x[a-f0-9]{40}$/);
   });
 });

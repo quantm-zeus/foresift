@@ -3,3 +3,4 @@ export * from './registry.ts';
 export * from './lineage.ts';
 export * from './stability.ts';
 export * from './cohort.ts';
+export * from './baseline-features.ts';

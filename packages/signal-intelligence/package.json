@@ -1,0 +1,23 @@
+{
+  "name": "@foresift/signal-intelligence",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Versioned signal feature registry, lineage, candidate vectors, deterministic research ranking, lifecycle, and finite rechecks.",
+  "exports": {
+    ".": {
+      "types": "./src/index.ts",
+      "default": "./src/index.ts"
+    }
+  },
+  "scripts": {
+    "test": "bun test"
+  },
+  "dependencies": {
+    "@foresift/domain": "workspace:*",
+    "@foresift/evidence": "workspace:*",
+    "@foresift/persistence": "workspace:*",
+    "@foresift/shared-schemas": "workspace:*"
+  },
+  "devDependencies": {}
+}

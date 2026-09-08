@@ -8,3 +8,4 @@ export * from './robust-baseline.ts';
 export * from './funnel.ts';
 export * from './vectors.ts';
 export * from './selection.ts';
+export * from './challenger-seam.ts';

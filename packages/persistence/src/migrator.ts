@@ -42,8 +42,9 @@ export const SCHEMA_MIGRATION_LEASES_TABLE = '_foresift_schema_migration_leases'
 
 // Filename families: `data` (identity/observations/features), `dr` (recovery),
 // `sec` (security perimeter), `core` (shared tool core state machines),
-// `cost` (cost, quota, and capacity controls), `trd` (economic trades), and
-// `solsec` (Solana security), and `sup` (supply confidence).
+// `cost` (cost, quota, and capacity controls), `sig` (signal registry),
+// `trd` (economic trades), `solsec` (Solana security), and `sup` (supply
+// confidence).
 // Unknown families stay refused fail-closed.
 const MIGRATION_FAMILIES = 'data|dr|sec|prov|core|cost|col|disc|mcp|trace|sig|solsec|trd|sup|exec';
 const MIGRATION_FILE_PATTERN = new RegExp(
@@ -113,7 +114,7 @@ function checksumOf(content: string): string {
 
 /**
  * Discover migration files in `dir` (lexicographic order). Every `.sql`
- * entry MUST belong to a known `<generation>_(data|dr|sec|prov|core|cost|col|disc|mcp|trace|solsec|trd|sup)_<4-digit-seq>_<name>`
+ * entry MUST belong to a known `<generation>_(data|dr|sec|prov|core|cost|col|disc|mcp|trace|sig|solsec|trd|sup)_<4-digit-seq>_<name>`
  * family — anything else is a loud refusal, so a renamed or foreign script
  * can never be silently skipped.
  */
@@ -140,7 +141,7 @@ export async function discoverMigrations(
 
 export interface MigratorOptions {
   readonly engine: DatabaseEngine;
-  /** Directory containing `g<generation>_(data|dr|sec|prov|core|cost|col|disc|mcp|trace|solsec|trd|sup)_*.sql` scripts. */
+  /** Directory containing `g<generation>_(data|dr|sec|prov|core|cost|col|disc|mcp|trace|sig|solsec|trd|sup)_*.sql` scripts. */
   readonly migrationsDir: string;
 }
 

@@ -12,3 +12,5 @@ export * from './challenger-seam.ts';
 export * from './diversity.ts';
 export * from './exploration.ts';
 export * from './lifecycle.ts';
+export * from './rechecks.ts';
+export * from './read-only-guard.ts';

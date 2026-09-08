@@ -36,7 +36,7 @@ telemetry and gates.
 
 ## Phase 1 — Foundations: domain vocabularies and shared schemas (blocks later phases)
 
-- [ ] T001 [P] Create `packages/domain/src/sig.ts`: `FunnelStage` (21 §20.1 stages,
+- [x] T001 [P] Create `packages/domain/src/sig.ts`: `FunnelStage` (21 §20.1 stages, — [evidence: NO_OP_ALREADY_SATISFIED] reconciled pre-provider (already satisfied at trusted base)
       UPPERCASE snake literals from FREE_DISCOVERY_UNIVERSE_ATTRIBUTION through
       ALERT_POLICY), `VectorKind` (OPPORTUNITY, RISK, DATA_QUALITY, URGENCY,
       NOVELTY, TRADABILITY, SOURCE_INDEPENDENCE — §20.3 + Appendix I step 3),
@@ -69,7 +69,7 @@ telemetry and gates.
       ownership law: implementation lanes carry product work only).
       Traces: FR-SIG-001, FR-SIG-002, FR-SIG-003, FR-SIG-004,
       FR-SIG-005, FR-SIG-006, FR-SIG-009, AC-136, AC-154.
-- [ ] T002 [serial-reason: SEMANTIC_DEPENDENCY] [P] Extend `packages/domain/src/index.ts` exports for the new sig
+- [x] T002 [serial-reason: SEMANTIC_DEPENDENCY] [P] Extend `packages/domain/src/index.ts` exports for the new sig — [evidence: NO_OP_ALREADY_SATISFIED] reconciled pre-provider (already satisfied at trusted base)
       module. Traces: FR-SIG-001…006, FR-SIG-009.
 - [x] T003 [P] Create `packages/shared-schemas/src/sig.ts`: Zod schemas for
       `FeatureDefinition` (§19.1 exact field set incl. minimumDenominator,
@@ -440,7 +440,7 @@ telemetry and gates.
 
 ## Phase 6b — Test-owned suites and central parity extensions (blocks gates)
 
-- [ ] T037 [P] [executor: TEST] Author the colocated unit suites under
+- [x] T037 [P] [executor: TEST] Author the colocated unit suites under — [evidence: NO_OP_ALREADY_SATISFIED] reconciled pre-provider (already satisfied at trusted base)
       `packages/signal-intelligence/test/` and `packages/domain/test/` named
       by T010-T019: registry drift refusal, lineage completeness,
       unavailable-at-decision-time refusal, fallback-level truth table,
@@ -470,14 +470,14 @@ telemetry and gates.
       probability refinement, unknown-cannot-dominate payload shape, strict
       unknown-key refusal. Traces: FR-SIG-001, FR-SIG-002, FR-SIG-003,
       FR-SIG-004, FR-SIG-005, FR-SIG-009.
-- [ ] T039 [P] [executor: TEST] Extend the central expected-script registry
+- [x] T039 [P] [executor: TEST] Extend the central expected-script registry — [evidence: NO_OP_ALREADY_SATISFIED] reconciled pre-provider (already satisfied at trusted base)
       `packages/persistence/test/migrator.spec.ts` with
       `g1_sig_0001_feature_registry`, `g1_sig_0002_funnel_vectors_ranking`,
       `g1_sig_0003_lifecycle_rechecks` (lexicographic, checksum-pinned) — the
       plan-sanctioned central-registry scope exception (plan-level decision 1;
       ADR-0019/0022 duty). Traces: FR-SIG-001, FR-SIG-002, FR-SIG-003,
       FR-SIG-004, FR-SIG-005, FR-SIG-006, FR-SIG-009.
-- [ ] T040 [P] [executor: TEST] Extend the central telemetry parity suite
+- [x] T040 [P] [executor: TEST] Extend the central telemetry parity suite — [evidence: NO_OP_ALREADY_SATISFIED] reconciled pre-provider (already satisfied at trusted base)
       with the sig catalog assertions — the plan-sanctioned central-parity
       scope exception (plan-level decision 4) — pinning the T033 declarative
       sig catalog to the authoritative schemas field-for-field (the exact

@@ -216,7 +216,7 @@ describe('AC-023: Decimals and address normalization in feature inputs (sig face
   it('normalizes Solana and EVM addresses and decimal strings in feature calculations', () => {
     const solanaAddress = 'So11111111111111111111111111111111111111112';
     const normalizedSolana = normalizeSolanaAddress(solanaAddress);
-    expect(normalizedSolana).toBe(solanaAddress);
+    expect(normalizedSolana as string).toBe(solanaAddress);
 
     const evmAddress = '0x1111222233334444555566667777888899990000';
     const normalizedEvm = normalizeEvmAddress(evmAddress);

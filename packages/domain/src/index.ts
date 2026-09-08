@@ -28,3 +28,4 @@ export * from './capacity.ts';
 export * from './capacity-contract.ts';
 export * from './degrade-order.ts';
 export * from './sig.ts';
+export { parseFunnelStage, parseVectorKind } from './sig.ts';

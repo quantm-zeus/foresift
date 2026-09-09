@@ -18,192 +18,690 @@
       "name": "sig.feature_registered",
       "description": "An immutable versioned feature definition passed the §19.1 and §19.9 registration laws.",
       "authoritativeSchema": "FeatureDefinitionSchema",
-      "requirementRefs": ["FR-SIG-001"],
+      "requirementRefs": [
+        "FR-SIG-001"
+      ],
       "tier": "CRITICAL_METADATA",
       "fields": [
-        { "name": "featureId", "type": "string", "required": true },
-        { "name": "version", "type": "integer>=1", "required": true },
-        { "name": "description", "type": "string", "required": true },
-        { "name": "formula", "type": "string", "required": true },
-        { "name": "inputFields", "type": "array<string>", "required": true },
-        { "name": "unit", "type": "string", "required": true },
-        { "name": "windows", "type": "array<string>", "required": true },
-        { "name": "minimumObservations", "type": "integer>=1", "required": true },
-        { "name": "nullPolicy", "type": "string", "required": true },
-        { "name": "outlierPolicy", "type": "string", "required": true },
-        { "name": "updatePolicy", "type": "string", "required": true },
-        { "name": "freshnessLimitSeconds", "type": "integer>=0", "required": true },
-        { "name": "cohortDefinitionId", "type": "string|null", "required": true },
-        { "name": "evidenceRequirements", "type": "array<string>", "required": true },
-        { "name": "isNumeric", "type": "boolean", "required": true },
-        { "name": "minimumDenominator", "type": "integer>=1|null", "required": true },
-        { "name": "stabilityTransform", "type": "string|null", "required": true },
-        { "name": "shrinkagePolicy", "type": "string|null", "required": true },
-        { "name": "cappedContribution", "type": "string<decimal>|null", "required": true },
-        { "name": "outlierPolicyIsRobust", "type": "boolean", "required": true },
-        { "name": "cohortFallbackPolicyId", "type": "string|null", "required": true },
-        { "name": "economicEventRequired", "type": "boolean", "required": true }
+        {
+          "name": "featureId",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "version",
+          "type": "integer>=1",
+          "required": true
+        },
+        {
+          "name": "description",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "formula",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "inputFields",
+          "type": "array<string>",
+          "required": true
+        },
+        {
+          "name": "unit",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "windows",
+          "type": "array<string>",
+          "required": true
+        },
+        {
+          "name": "minimumObservations",
+          "type": "integer>=1",
+          "required": true
+        },
+        {
+          "name": "nullPolicy",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "outlierPolicy",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "updatePolicy",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "freshnessLimitSeconds",
+          "type": "integer>=0",
+          "required": true
+        },
+        {
+          "name": "cohortDefinitionId",
+          "type": "string|null",
+          "required": true
+        },
+        {
+          "name": "evidenceRequirements",
+          "type": "array<string>",
+          "required": true
+        },
+        {
+          "name": "isNumeric",
+          "type": "boolean",
+          "required": true
+        },
+        {
+          "name": "minimumDenominator",
+          "type": "integer>=1|null",
+          "required": true
+        },
+        {
+          "name": "stabilityTransform",
+          "type": "string|null",
+          "required": true
+        },
+        {
+          "name": "shrinkagePolicy",
+          "type": "string|null",
+          "required": true
+        },
+        {
+          "name": "cappedContribution",
+          "type": "string<decimal>|null",
+          "required": true
+        },
+        {
+          "name": "outlierPolicyIsRobust",
+          "type": "boolean",
+          "required": true
+        },
+        {
+          "name": "cohortFallbackPolicyId",
+          "type": "string|null",
+          "required": true
+        },
+        {
+          "name": "economicEventRequired",
+          "type": "boolean",
+          "required": true
+        },
+        {
+          "name": "registeredAt",
+          "type": "string",
+          "required": true
+        }
       ]
     },
     {
       "name": "sig.feature_computed",
       "description": "A derived feature value was computed with reconstructable §19.10 lineage.",
       "authoritativeSchema": "FeatureLineageSchema",
-      "requirementRefs": ["FR-SIG-001", "FR-SIG-009"],
+      "requirementRefs": [
+        "FR-SIG-001",
+        "FR-SIG-009"
+      ],
       "tier": "CRITICAL_METADATA",
       "fields": [
-        { "name": "lineageId", "type": "string", "required": true },
-        { "name": "definitionId", "type": "string", "required": true },
-        { "name": "definitionVersion", "type": "integer>=1", "required": true },
-        { "name": "entityId", "type": "string", "required": true },
-        { "name": "profileId", "type": "string", "required": true },
-        { "name": "eventStart", "type": "string<utc-timestamp>|null", "required": true },
-        { "name": "eventEnd", "type": "string<utc-timestamp>", "required": true },
-        { "name": "windowStart", "type": "string<utc-timestamp>|null", "required": true },
-        { "name": "windowEnd", "type": "string<utc-timestamp>", "required": true },
-        { "name": "inputObservationIds", "type": "array<string>", "required": true },
-        { "name": "inputEvidenceIds", "type": "array<string>", "required": true },
-        { "name": "inputHashes", "type": "array<string<sha256-ref>>", "required": true },
-        { "name": "calculationCodeVersion", "type": "string", "required": true },
-        { "name": "calculatedAt", "type": "string<utc-timestamp>", "required": true },
-        { "name": "qualityCodes", "type": "array<string<quality-code>>", "required": true }
+        {
+          "name": "lineageId",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "definitionId",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "definitionVersion",
+          "type": "integer>=1",
+          "required": true
+        },
+        {
+          "name": "entityId",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "profileId",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "eventStart",
+          "type": "string<utc-timestamp>|null",
+          "required": true
+        },
+        {
+          "name": "eventEnd",
+          "type": "string<utc-timestamp>",
+          "required": true
+        },
+        {
+          "name": "windowStart",
+          "type": "string<utc-timestamp>|null",
+          "required": true
+        },
+        {
+          "name": "windowEnd",
+          "type": "string<utc-timestamp>",
+          "required": true
+        },
+        {
+          "name": "inputObservationIds",
+          "type": "array<string>",
+          "required": true
+        },
+        {
+          "name": "inputEvidenceIds",
+          "type": "array<string>",
+          "required": true
+        },
+        {
+          "name": "inputHashes",
+          "type": "array<string<sha256-ref>>",
+          "required": true
+        },
+        {
+          "name": "calculationCodeVersion",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "calculatedAt",
+          "type": "string<utc-timestamp>",
+          "required": true
+        },
+        {
+          "name": "qualityCodes",
+          "type": "array<string<quality-code>>",
+          "required": true
+        },
+        {
+          "name": "featureId",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "featureVersion",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "value",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "eventTimeResolvedAt",
+          "type": "string",
+          "required": true
+        }
       ]
     },
     {
       "name": "sig.cohort_resolved",
       "description": "A deterministic cohort fallback and peer percentile were resolved with sample quality.",
       "authoritativeSchema": "CohortSnapshotSchema",
-      "requirementRefs": ["FR-SIG-009"],
+      "requirementRefs": [
+        "FR-SIG-009"
+      ],
       "tier": "CRITICAL_METADATA",
       "fields": [
-        { "name": "snapshotId", "type": "string", "required": true },
-        { "name": "definitionId", "type": "string", "required": true },
-        { "name": "definitionVersion", "type": "integer>=1", "required": true },
-        { "name": "entityId", "type": "string", "required": true },
-        { "name": "fallbackLevel", "type": "string<cohort-fallback-level>", "required": true },
-        { "name": "cohortSize", "type": "integer>=0", "required": true },
-        { "name": "effectiveSampleSize", "type": "string<decimal>", "required": true },
-        { "name": "peerPercentile", "type": "string<decimal>|null", "required": true },
-        { "name": "lowSampleWarning", "type": "boolean", "required": true },
-        { "name": "computedAt", "type": "string<utc-timestamp>", "required": true }
+        {
+          "name": "snapshotId",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "definitionId",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "definitionVersion",
+          "type": "integer>=1",
+          "required": true
+        },
+        {
+          "name": "entityId",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "fallbackLevel",
+          "type": "string<cohort-fallback-level>",
+          "required": true
+        },
+        {
+          "name": "cohortSize",
+          "type": "integer>=0",
+          "required": true
+        },
+        {
+          "name": "effectiveSampleSize",
+          "type": "string<decimal>",
+          "required": true
+        },
+        {
+          "name": "peerPercentile",
+          "type": "string<decimal>|null",
+          "required": true
+        },
+        {
+          "name": "lowSampleWarning",
+          "type": "boolean",
+          "required": true
+        },
+        {
+          "name": "computedAt",
+          "type": "string<utc-timestamp>",
+          "required": true
+        },
+        {
+          "name": "featureId",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "featureVersion",
+          "type": "string",
+          "required": true
+        }
       ]
     },
     {
       "name": "sig.vector_built",
       "description": "One of seven independent candidate vectors was built with explicit component quality.",
       "authoritativeSchema": "CandidateVectorRecordSchema",
-      "requirementRefs": ["FR-SIG-002"],
+      "requirementRefs": [
+        "FR-SIG-002"
+      ],
       "tier": "CRITICAL_METADATA",
       "fields": [
-        { "name": "vectorId", "type": "string", "required": true },
-        { "name": "candidateId", "type": "string", "required": true },
-        { "name": "profileVersion", "type": "string", "required": true },
-        { "name": "asOf", "type": "string<utc-timestamp>", "required": true },
-        { "name": "vectorKind", "type": "string<vector-kind>", "required": true },
+        {
+          "name": "vectorId",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "candidateId",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "profileVersion",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "asOf",
+          "type": "string<utc-timestamp>",
+          "required": true
+        },
+        {
+          "name": "vectorKind",
+          "type": "string<vector-kind>",
+          "required": true
+        },
         {
           "name": "components",
           "type": "record<string,{value:string<decimal>|null,qualityCodes:array<string>}>",
           "required": true
         },
-        { "name": "algorithmVersion", "type": "string", "required": true },
-        { "name": "lineageRef", "type": "string", "required": true }
+        {
+          "name": "algorithmVersion",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "lineageRef",
+          "type": "string",
+          "required": true
+        }
       ]
     },
     {
       "name": "sig.ranking_recorded",
       "description": "A byte-reproducible Appendix-I ranking audit was persisted against its frozen universe.",
       "authoritativeSchema": "RankingAuditSchema",
-      "requirementRefs": ["FR-SIG-003"],
+      "requirementRefs": [
+        "FR-SIG-003"
+      ],
       "tier": "CRITICAL_METADATA",
       "fields": [
-        { "name": "auditId", "type": "string", "required": true },
-        { "name": "candidateId", "type": "string", "required": true },
-        { "name": "eligibleUniverse", "type": "array<string>", "required": true },
-        { "name": "rankAtTime", "type": "integer>=1", "required": true },
-        { "name": "rankingVersion", "type": "string", "required": true },
-        { "name": "profileVersion", "type": "string", "required": true },
-        { "name": "componentValues", "type": "record<string,vector-component>", "required": true },
-        { "name": "hardGateResults", "type": "record<string,boolean>", "required": true },
-        { "name": "sourceDependence", "type": "record<string,unknown>", "required": true },
-        { "name": "adapterScenarioResults", "type": "record<string,unknown>", "required": true },
-        { "name": "paretoStatus", "type": "string<pareto-status>", "required": true },
-        { "name": "diversityAdjustment", "type": "record<string,unknown>", "required": true },
-        { "name": "explorationSelected", "type": "boolean", "required": true },
-        { "name": "cutoffReason", "type": "string<cutoff-reason>", "required": true },
-        { "name": "selectionArm", "type": "string<selection-arm>", "required": true },
-        { "name": "selectionProbability", "type": "string<decimal>|null", "required": true },
+        {
+          "name": "auditId",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "candidateId",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "eligibleUniverse",
+          "type": "array<string>",
+          "required": true
+        },
+        {
+          "name": "rankAtTime",
+          "type": "integer>=1",
+          "required": true
+        },
+        {
+          "name": "rankingVersion",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "profileVersion",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "componentValues",
+          "type": "record<string,vector-component>",
+          "required": true
+        },
+        {
+          "name": "hardGateResults",
+          "type": "record<string,boolean>",
+          "required": true
+        },
+        {
+          "name": "sourceDependence",
+          "type": "record<string,unknown>",
+          "required": true
+        },
+        {
+          "name": "adapterScenarioResults",
+          "type": "record<string,unknown>",
+          "required": true
+        },
+        {
+          "name": "paretoStatus",
+          "type": "string<pareto-status>",
+          "required": true
+        },
+        {
+          "name": "diversityAdjustment",
+          "type": "record<string,unknown>",
+          "required": true
+        },
+        {
+          "name": "explorationSelected",
+          "type": "boolean",
+          "required": true
+        },
+        {
+          "name": "cutoffReason",
+          "type": "string<cutoff-reason>",
+          "required": true
+        },
+        {
+          "name": "selectionArm",
+          "type": "string<selection-arm>",
+          "required": true
+        },
+        {
+          "name": "selectionProbability",
+          "type": "string<decimal>|null",
+          "required": true
+        },
         {
           "name": "protectedAllocations",
           "type": "record<string<reserve-class>,string<decimal>>",
           "required": true
         },
-        { "name": "capacityAdmission", "type": "record<string,unknown>", "required": true },
-        { "name": "algorithmVersion", "type": "string", "required": true },
-        { "name": "tDecisionReady", "type": "string<utc-timestamp>", "required": true }
+        {
+          "name": "capacityAdmission",
+          "type": "record<string,unknown>",
+          "required": true
+        },
+        {
+          "name": "algorithmVersion",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "tDecisionReady",
+          "type": "string<utc-timestamp>",
+          "required": true
+        }
       ]
     },
     {
       "name": "sig.selection_decided",
       "description": "A candidate received a §20.8 selection arm with pre-outcome randomized-assignment metadata where applicable.",
       "authoritativeSchema": "SelectionDecisionSchema",
-      "requirementRefs": ["FR-SIG-003", "FR-SIG-004"],
+      "requirementRefs": [
+        "FR-SIG-003",
+        "FR-SIG-004"
+      ],
       "tier": "CRITICAL_METADATA",
       "fields": [
-        { "name": "candidateId", "type": "string", "required": true },
-        { "name": "eligibilityUniverse", "type": "string", "required": true },
-        { "name": "stratum", "type": "string|null", "required": true },
-        { "name": "policyVersion", "type": "string", "required": true },
-        { "name": "selectionArm", "type": "string<selection-arm>", "required": true },
-        { "name": "selectionProbability", "type": "string<decimal>|null", "required": true },
-        { "name": "seedProvenance", "type": "string|null", "required": true },
-        { "name": "inclusionTimestamp", "type": "string<utc-timestamp>", "required": true },
-        { "name": "notSelectedWithReason", "type": "string|null", "required": true },
-        { "name": "autoAlerted", "type": "boolean", "required": true }
+        {
+          "name": "candidateId",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "eligibilityUniverse",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "stratum",
+          "type": "string|null",
+          "required": true
+        },
+        {
+          "name": "policyVersion",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "selectionArm",
+          "type": "string<selection-arm>",
+          "required": true
+        },
+        {
+          "name": "selectionProbability",
+          "type": "string<decimal>|null",
+          "required": true
+        },
+        {
+          "name": "seedProvenance",
+          "type": "string|null",
+          "required": true
+        },
+        {
+          "name": "inclusionTimestamp",
+          "type": "string<utc-timestamp>",
+          "required": true
+        },
+        {
+          "name": "notSelectedWithReason",
+          "type": "string|null",
+          "required": true
+        },
+        {
+          "name": "autoAlerted",
+          "type": "boolean",
+          "required": true
+        },
+        {
+          "name": "profileVersion",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "cutoffReason",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "diversityAdjustment",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "decidedAt",
+          "type": "string",
+          "required": true
+        }
       ]
     },
     {
       "name": "sig.lifecycle_transitioned",
       "description": "A versioned hysteretic lifecycle transition retained risk separation and thesis invalidation conditions.",
       "authoritativeSchema": "LifecycleTransitionSchema",
-      "requirementRefs": ["FR-SIG-005"],
+      "requirementRefs": [
+        "FR-SIG-005"
+      ],
       "tier": "CRITICAL_METADATA",
       "fields": [
-        { "name": "transitionId", "type": "string", "required": true },
-        { "name": "candidateId", "type": "string", "required": true },
-        { "name": "profileVersion", "type": "string", "required": true },
-        { "name": "fromState", "type": "string<lifecycle-state>|null", "required": true },
-        { "name": "toState", "type": "string<lifecycle-state>", "required": true },
-        { "name": "reason", "type": "string", "required": true },
-        { "name": "persistenceMeasure", "type": "string<decimal>|null", "required": true },
-        { "name": "dwellSeconds", "type": "integer>=0|null", "required": true },
-        { "name": "policyVersion", "type": "string", "required": true },
+        {
+          "name": "transitionId",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "candidateId",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "profileVersion",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "fromState",
+          "type": "string<lifecycle-state>|null",
+          "required": true
+        },
+        {
+          "name": "toState",
+          "type": "string<lifecycle-state>",
+          "required": true
+        },
+        {
+          "name": "reason",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "persistenceMeasure",
+          "type": "string<decimal>|null",
+          "required": true
+        },
+        {
+          "name": "dwellSeconds",
+          "type": "integer>=0|null",
+          "required": true
+        },
+        {
+          "name": "policyVersion",
+          "type": "string",
+          "required": true
+        },
         {
           "name": "tradabilityVerdict",
           "type": "string<tradability-verdict>|null",
           "required": true
         },
-        { "name": "diagnosticSignalLabels", "type": "array<string>", "required": true },
-        { "name": "thesisInvalidationConditions", "type": "array<string>|null", "required": true },
-        { "name": "transitionedAt", "type": "string<utc-timestamp>", "required": true }
+        {
+          "name": "diagnosticSignalLabels",
+          "type": "array<string>",
+          "required": true
+        },
+        {
+          "name": "thesisInvalidationConditions",
+          "type": "array<string>|null",
+          "required": true
+        },
+        {
+          "name": "transitionedAt",
+          "type": "string<utc-timestamp>",
+          "required": true
+        }
       ]
     },
     {
       "name": "sig.recheck_decided",
       "description": "A finite adaptive-recheck decision recorded allocation-only information value and consumed resources.",
       "authoritativeSchema": "RecheckDecisionSchema",
-      "requirementRefs": ["FR-SIG-006"],
+      "requirementRefs": [
+        "FR-SIG-006"
+      ],
       "tier": "CRITICAL_METADATA",
       "fields": [
-        { "name": "decisionId", "type": "string", "required": true },
-        { "name": "candidateId", "type": "string", "required": true },
-        { "name": "profileVersion", "type": "string", "required": true },
-        { "name": "decidedAt", "type": "string<utc-timestamp>", "required": true },
-        { "name": "decision", "type": "string<recheck-decision>", "required": true },
-        { "name": "reason", "type": "string", "required": true },
-        { "name": "informationValue", "type": "string<decimal>|null", "required": true },
-        { "name": "providerCallsCosted", "type": "integer>=0", "required": true },
-        { "name": "modelCostCosted", "type": "string<decimal>", "required": true },
-        { "name": "protectedReserveClass", "type": "string<reserve-class>|null", "required": true }
+        {
+          "name": "decisionId",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "candidateId",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "profileVersion",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "decidedAt",
+          "type": "string<utc-timestamp>",
+          "required": true
+        },
+        {
+          "name": "decision",
+          "type": "string<recheck-decision>",
+          "required": true
+        },
+        {
+          "name": "reason",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "informationValue",
+          "type": "string<decimal>|null",
+          "required": true
+        },
+        {
+          "name": "providerCallsCosted",
+          "type": "integer>=0",
+          "required": true
+        },
+        {
+          "name": "modelCostCosted",
+          "type": "string<decimal>",
+          "required": true
+        },
+        {
+          "name": "protectedReserveClass",
+          "type": "string<reserve-class>|null",
+          "required": true
+        },
+        {
+          "name": "quotaCost",
+          "type": "string",
+          "required": true
+        }
       ]
     }
   ]

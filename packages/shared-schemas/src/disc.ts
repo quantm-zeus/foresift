@@ -233,6 +233,25 @@ export const RecallEstimateRecordSchema = z
   });
 export type RecallEstimateRecord = z.infer<typeof RecallEstimateRecordSchema>;
 
+export const ChainAccessDeclarationSchema = z
+  .object({
+    declarationId: z.string().min(1),
+    version: z.number().int().positive(),
+    purpose: z.enum(['VERIFICATION', 'RETROSPECTIVE_BACKFILL']),
+    chainId: z.string().min(1),
+    programIds: z.array(z.string().min(1)).min(1),
+    maxCandidates: z.number().int().positive(),
+    maxSlotsPerRun: z.number().int().positive(),
+    maxCallsPerDay: z.number().int().positive(),
+    maxWindowSeconds: z.number().int().positive(),
+    costClass: z.enum(['FREE_UNMETERED', 'FREE_QUOTA']),
+    paidFallbackAllowed: z.literal(false),
+    protectedReserveCompatible: z.literal(true),
+    tolerancePercent: z.number().int().min(1).max(100),
+  })
+  .strict();
+export type ChainAccessDeclaration = z.infer<typeof ChainAccessDeclarationSchema>;
+
 export const DISCOVERY_SCHEMAS = {
   DiscoveryUniverseEntry: DiscoveryUniverseEntrySchema,
   DiscoverySourceClass: DiscoverySourceClassSchema,
@@ -246,6 +265,7 @@ export const DISCOVERY_SCHEMAS = {
   UniverseEntryProvenance: UniverseEntryProvenanceSchema,
   DiscRecallVerdict: DiscRecallVerdictSchema,
   RecallEstimateRecord: RecallEstimateRecordSchema,
+  ChainAccessDeclaration: ChainAccessDeclarationSchema,
 } as const;
 export class DiscoverySchemaError extends Error {
   readonly code = 'DISCOVERY_SCHEMA_INVALID' as const;

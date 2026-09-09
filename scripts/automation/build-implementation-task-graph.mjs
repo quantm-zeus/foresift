@@ -318,8 +318,15 @@ if (args.planShards !== undefined) {
   // provider spend (live b659eef0). Without an execution profile the legacy
   // path has no test lanes — a TEST-executor unit stays out of every shard
   // and the admission audit reports it if it would otherwise be dispatched.
+  // Explicit [executor: TEST] is authoritative for lane membership: a TEST
+  // unit is never dispatched to an implementation shard, even when its body
+  // also names product paths (prose references gain no product-write authority;
+  // run 0a91cd86/T037 false-positive, 2026-09-09). Marker-less legacy units
+  // keep the historical behavior.
   const productOpen = args.executionProfile
-    ? open.filter((u) => u.productWork && !isCoordinatorTask(u))
+    ? open.filter(
+        (u) => u.productWork && !isCoordinatorTask(u) && !/\[executor:\s*TEST\]/i.test(u.body),
+      )
     : open.filter((u) => !isCoordinatorTask(u) && u.executor !== 'TEST');
   // Units whose predicted writes leave binding writeScopes are demoted to the
   // serial core shard; their paths are recorded as explicit scope exceptions.
@@ -549,24 +556,24 @@ if (executionProfile && shards) {
 const testUnits = executionProfile
   ? open.filter((u) => {
       if (isCoordinatorTask(u)) return false;
-      // Explicit executor markers are authoritative (fail-closed dispatch
-      // admission): a PRODUCT unit NEVER doubles into a test lane, even when
+      // Explicit markers are authoritative (fail-closed dispatch admission):
+      // an explicitly-PRODUCT unit NEVER doubles into a test lane, even when
       // its prose mentions tests — "the registry suite is extended by the
-      // test-owned task T039" is a pointer, not an authoring duty. Without
-      // this exclusion a product unit with zero testWrites was dispatched to
-      // the AGY lane with an EMPTY testWrites-derived allowlist, where every
+      // test-owned task T039" is a pointer, not an authoring duty. An
+      // explicitly-TEST unit ALWAYS belongs to a test lane (its writes remain
+      // ownership-validated: only TEST-classified paths enter testWrites).
+      // Marker-less units (legacy plans) fall back to the write-truth
+      // heuristic: a unit whose body backticks a PRODUCT path stays out of
+      // test lanes; units with test writes/refs/ACs or test words and no
+      // product backticks stay test units; anything ambiguous stays with the
+      // implementation lane (fail-closed toward PRODUCT). Without this
+      // hierarchy a product unit with zero testWrites was dispatched to the
+      // AGY lane with an EMPTY testWrites-derived allowlist, where every
       // write was a guaranteed WRITE-AUTHORITY VIOLATION (runs 0a91cd86/
-      // 38e80af1, g1-signal-registry, 2026-09-09; same empty-column class
-      // as b20e5ea8).
-      if (u.executor === 'PRODUCT') return false;
+      // 38e80af1, 2026-09-09; same empty-column class as b20e5ea8).
+      const explicitProduct = /\[executor:\s*PRODUCT\]/i.test(u.body);
+      if (explicitProduct) return false;
       if (u.executor === 'TEST') return true;
-      // No explicit marker (legacy plans): fall back to the write-truth
-      // heuristic, but only for units that name NO product paths in their
-      // body — a backticked product path (`packages/x/src/y.ts`) is an
-      // authoring duty for that path, never for tests. Legacy units with
-      // test writes/refs/ACs remain test units; pure-prose units with test
-      // words and no product backticks stay test units; anything ambiguous
-      // stays with the implementation lane (fail-closed toward PRODUCT).
       const bodyProductBacktick = [...u.body.matchAll(/`([^`\n]+)`/g)].some((m) => {
         const p = m[1].replace(/^\.\//, '');
         return !/\s/.test(p) && classifyOwnedPath(p) === 'PRODUCT';
@@ -651,11 +658,21 @@ const testLanes = testUnits.length
 // read-only reporter's flag) must NOT bypass this invariant: it relaxes the
 // IMPLEMENTATION-lane admission verdict reporting, never lane membership.
 for (const tu of testUnits) {
+  // Explicit [executor: TEST] is authoritative for lane MEMBERSHIP — its
+  // authored surface is still ownership-validated: only TEST-classified paths
+  // enter testWrites/allowlists (a TEST unit whose body names product paths
+  // gains no product write authority from them). The invariant therefore
+  // polices only units that are NOT explicitly TEST: an explicitly-PRODUCT
+  // unit or a marker-less unit whose body names a product path must never sit
+  // in a test lane.
+  const explicitTest = /\[executor:\s*TEST\]/i.test(tu.body);
+  if (explicitTest) continue;
   const bodyProductBacktick = [...tu.body.matchAll(/`([^`\n]+)`/g)].some((m) => {
     const p = m[1].replace(/^\.\//, '');
     return !/\s/.test(p) && classifyOwnedPath(p) === 'PRODUCT';
   });
-  if (tu.executor === 'PRODUCT' || bodyProductBacktick) {
+  const explicitProduct = /\[executor:\s*PRODUCT\]/i.test(tu.body);
+  if (explicitProduct || bodyProductBacktick) {
     throw new Error(
       `TEST_LANE_ADMISSION_FAILED: product unit ${tu.id} dispatched to a test lane ` +
         `(executor=${tu.executor}); test lanes may receive only explicitly TEST-owned units`,

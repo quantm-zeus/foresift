@@ -1539,4 +1539,32 @@ describe('TEST-lane dispatch admission (fail-closed)', () => {
       rmSync(root, { recursive: true, force: true });
     }
   });
+
+  it('accepts an explicit TEST unit whose prose also references product paths (T037 false-positive)', () => {
+    // T037 shape: [executor: TEST], authored surface is colocated TEST trees,
+    // but the body backticks product paths as PROSE REFERENCES. Explicit
+    // executor TEST is authoritative for membership; write ownership stays
+    // enforced by classification (only TEST-classified paths enter the
+    // allowlist).
+    const tasks = `# Tasks: pkg-x
+
+## Phase A
+
+- [ ] T221 [P] [executor: TEST] Author the colocated unit suites under
+      \`packages/x/test/\` and \`packages/y/test/\` exercising
+      \`packages/x/src/alpha.ts\`. Traces: FR-X-001.
+`;
+    const { root, out, r } = buildWith(tasks);
+    try {
+      expect(r.status).toBe(0);
+      const g = JSON.parse(readFileSync(out, 'utf8'));
+      const lane = (g.testLanes ?? [])[0];
+      expect(lane).toBeDefined();
+      expect(lane.units).toEqual(['T221']);
+      // product backticks in prose gain NO write authority
+      expect(lane.allowedWritePaths).toEqual(['packages/x/test/', 'packages/y/test/']);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
 });

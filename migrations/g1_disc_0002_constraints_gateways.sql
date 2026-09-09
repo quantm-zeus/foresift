@@ -83,11 +83,16 @@ CREATE TABLE IF NOT EXISTS disc.population_constraints (
     program_version     text,
     window_start        timestamptz,
     window_end          timestamptz,
+    window_start_slot   bigint CHECK (window_start_slot IS NULL OR window_start_slot >= 0),
+    window_end_slot     bigint,
     evidence_refs       text[] NOT NULL CHECK (cardinality(evidence_refs) > 0),
     recorded_at         timestamptz NOT NULL DEFAULT now(),
     resolved_at         timestamptz,
     CONSTRAINT disc_constraint_window CHECK (
         window_start IS NULL OR window_end IS NULL OR window_end > window_start),
+    CONSTRAINT disc_constraint_slot_window CHECK (
+        window_start_slot IS NULL OR window_end_slot IS NULL OR
+        window_end_slot >= window_start_slot),
     CONSTRAINT disc_constraint_resolution CHECK (
         resolved_at IS NULL OR resolved_at > recorded_at)
 );
@@ -96,7 +101,7 @@ CREATE INDEX IF NOT EXISTS population_constraints_manifest_idx
     ON disc.population_constraints (manifest_id, recorded_at);
 
 CREATE TABLE IF NOT EXISTS disc.chain_access_declarations (
-    declaration_id               text PRIMARY KEY,
+    declaration_id               text NOT NULL,
     version                      integer NOT NULL CHECK (version >= 1),
     purpose                      disc.disc_chain_access_purpose NOT NULL,
     chain_id                     text NOT NULL CHECK (length(chain_id) > 0),
@@ -113,24 +118,51 @@ CREATE TABLE IF NOT EXISTS disc.chain_access_declarations (
     tolerance_percent           integer NOT NULL CHECK (
                                      tolerance_percent BETWEEN 1 AND 100),
     created_at                  timestamptz NOT NULL DEFAULT now(),
-    CONSTRAINT chain_access_declaration_version UNIQUE (declaration_id, version)
+    PRIMARY KEY (declaration_id, version)
 );
 
 CREATE TABLE IF NOT EXISTS disc.chain_access_consumption (
     consumption_id     text PRIMARY KEY,
-    declaration_id     text NOT NULL REFERENCES
-                           disc.chain_access_declarations(declaration_id),
+    declaration_id     text NOT NULL,
+    declaration_version integer NOT NULL,
+    run_id             text NOT NULL CHECK (length(run_id) > 0),
     consumed_at        timestamptz NOT NULL,
     slots_scanned      bigint NOT NULL CHECK (slots_scanned >= 0),
     calls_made         integer NOT NULL CHECK (calls_made >= 0),
     candidates_touched integer NOT NULL CHECK (candidates_touched >= 0),
     incident_id        text,
+    FOREIGN KEY (declaration_id, declaration_version) REFERENCES
+        disc.chain_access_declarations(declaration_id, version),
+    UNIQUE (run_id, consumption_id),
     CONSTRAINT disc_consumption_positive CHECK (
         slots_scanned + calls_made + candidates_touched > 0)
 );
 
 CREATE INDEX IF NOT EXISTS chain_access_consumption_declaration_idx
-    ON disc.chain_access_consumption (declaration_id, consumed_at);
+    ON disc.chain_access_consumption (declaration_id, declaration_version, consumed_at);
+
+CREATE TABLE IF NOT EXISTS disc.chain_access_incidents (
+    incident_id                  text PRIMARY KEY,
+    consumption_id              text NOT NULL REFERENCES
+                                    disc.chain_access_consumption(consumption_id),
+    declaration_id              text NOT NULL,
+    declaration_version         integer NOT NULL,
+    reason                      text NOT NULL CHECK (
+                                    reason = 'FORECAST_TOLERANCE_EXCEEDED'),
+    effective_max_slots_per_run bigint NOT NULL CHECK (
+                                    effective_max_slots_per_run > 0),
+    effective_max_calls_per_day integer NOT NULL CHECK (
+                                    effective_max_calls_per_day > 0),
+    effective_max_candidates    integer NOT NULL CHECK (
+                                    effective_max_candidates > 0),
+    paid_overage_consumed       boolean NOT NULL DEFAULT false CHECK (
+                                    NOT paid_overage_consumed),
+    protected_reserve_consumed  boolean NOT NULL DEFAULT false CHECK (
+                                    NOT protected_reserve_consumed),
+    recorded_at                 timestamptz NOT NULL DEFAULT now(),
+    FOREIGN KEY (declaration_id, declaration_version) REFERENCES
+        disc.chain_access_declarations(declaration_id, version)
+);
 
 CREATE TABLE IF NOT EXISTS disc.recall_estimates (
     estimate_id                  text PRIMARY KEY,
@@ -184,3 +216,13 @@ CREATE OR REPLACE TRIGGER disc_recall_estimates_append_only
 CREATE OR REPLACE TRIGGER disc_recall_estimates_immutable_truncate
     BEFORE TRUNCATE ON disc.recall_estimates
     FOR EACH STATEMENT EXECUTE FUNCTION disc.refuse_mutation();
+
+CREATE OR REPLACE TRIGGER disc_chain_declarations_append_only
+    BEFORE UPDATE OR DELETE ON disc.chain_access_declarations
+    FOR EACH ROW EXECUTE FUNCTION disc.refuse_mutation();
+CREATE OR REPLACE TRIGGER disc_chain_consumption_append_only
+    BEFORE UPDATE OR DELETE ON disc.chain_access_consumption
+    FOR EACH ROW EXECUTE FUNCTION disc.refuse_mutation();
+CREATE OR REPLACE TRIGGER disc_chain_incidents_append_only
+    BEFORE UPDATE OR DELETE ON disc.chain_access_incidents
+    FOR EACH ROW EXECUTE FUNCTION disc.refuse_mutation();

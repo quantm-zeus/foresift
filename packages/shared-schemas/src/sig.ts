@@ -134,6 +134,17 @@ export const FeatureDefinitionSchema = z
         message: 'numeric feature stability field is required',
       });
     }
+    // Capped contribution is a (0,1] cap on the feature's ranking weight
+    // (PRD FR-SIG-009): a value above one is not a cap and must fail closed.
+    if (
+      value.cappedContribution !== null &&
+      !(Number(value.cappedContribution) > 0 && Number(value.cappedContribution) <= 1)
+    )
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['cappedContribution'],
+        message: 'cappedContribution must lie in (0,1]',
+      });
   });
 export type SigFeatureDefinition = z.infer<typeof FeatureDefinitionSchema>;
 
@@ -188,7 +199,12 @@ export const CohortSnapshotSchema = z
     lowSampleWarning: z.boolean(),
     computedAt: UtcTimestampSchema,
   })
-  .strict();
+  .strict()
+  // A percentile is a (0,1] fraction; out-of-range payloads are malformed and
+  // must fail closed (PRD §20 peer percentile).
+  .refine((value) => value.peerPercentile === null || Number(value.peerPercentile) <= 1, {
+    message: 'peerPercentile must lie in (0,1]',
+  });
 export type CohortSnapshot = z.infer<typeof CohortSnapshotSchema>;
 
 export const FunnelStageRecordSchema = z

@@ -151,7 +151,7 @@
         "test -d packages/discovery-universe && pnpm --filter @foresift/discovery-universe test",
         "test -d packages/cheap-monitor && pnpm --filter @foresift/cheap-monitor test"
       ],
-      "status": "PENDING"
+      "status": "RUNNING"
     },
     {
       "id": "g1-execution-simulation",
@@ -230,7 +230,7 @@
       "verificationCommands": [
         "test -d packages/signal-intelligence && pnpm --filter @foresift/signal-intelligence test"
       ],
-      "status": "RUNNING"
+      "status": "PROVEN"
     },
     {
       "id": "g1-outcome-evaluation",

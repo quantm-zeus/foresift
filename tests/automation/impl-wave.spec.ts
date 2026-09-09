@@ -708,6 +708,45 @@ describe('wave guard + integrator (real git)', () => {
     expect(tasks).toContain('- [x] T103');
     expect(rev(fx.root)).not.toBe(before);
   });
+
+  it('zero-writer wave: missing results dir yields a valid empty report, not exit 1 (run 279d96fd)', () => {
+    // Live defect (run 279d96fd, 2026-09-09): a wave whose every lane was
+    // sentinel-skipped never created writer-results/, so the integrator
+    // hard-failed "results dir not found", integration-report.json was never
+    // written, and the workflow's downstream guard comparisons degraded to
+    // "integer expression expected" noise while still routing GREEN.
+    // The deterministic contract: a zero-writer wave is a legal shape — the
+    // integrator must emit a valid empty report and exit 0 so the workflow's
+    // empty-wave routing (dispatched=0/integrated=0) decides cleanly.
+    const missingDir = join(fx.artifacts, 'writer-results-absent');
+    const before = rev(fx.root);
+    const r = spawnSync(
+      process.execPath,
+      [
+        INTEGRATE,
+        '--package',
+        'pkg-x',
+        '--graph',
+        fx.graphPath,
+        '--results-dir',
+        missingDir,
+        '--canonical',
+        fx.root,
+        '--out',
+        join(fx.artifacts, 'integration-report-zero.json'),
+      ],
+      { encoding: 'utf8' },
+    );
+    expect(r.status).toBe(0);
+    const report = JSON.parse(
+      readFileSync(join(fx.artifacts, 'integration-report-zero.json'), 'utf8'),
+    );
+    expect(report.schema).toBe('foresift/wave-integration@1');
+    expect(report.integrated).toEqual([]);
+    expect(report.rejected).toEqual([]);
+    // canonical tree untouched by an empty integration
+    expect(rev(fx.root)).toBe(before);
+  });
 });
 
 describe('writer admission function', () => {

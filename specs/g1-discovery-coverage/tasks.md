@@ -391,7 +391,7 @@ riders, then fixtures and AC suites, then telemetry and gates.
       same package — the plan-sanctioned central-parity scope exception.
       Traces: FR-DISC-006, FR-DISC-007, FR-DISC-008, FR-DISC-009,
       FR-DISC-010, FR-DISC-011, FR-DISC-012, FR-DISC-013, FR-DISC-014.
-- [ ] T024 [executor: COORDINATOR] [evidence: VERIFICATION_ONLY] Run the
+- [x] T024 [executor: COORDINATOR] [evidence: VERIFICATION_ONLY] Run the — [evidence: verification commands green at 7694173 (1035/1035 package-scope units) and at merged main 8fcb13b via CI run 34399428605 (exact-head PR CI 34398093075 + update-branch run 34398769446 GREEN)]
       milestone verification commands on the canonical tree — the
       discovery-universe and cheap-monitor package suites plus the extended
       central suites (persistence migrator via the workspace filter, the
@@ -400,7 +400,7 @@ riders, then fixtures and AC suites, then telemetry and gates.
       FR-DISC-006, FR-DISC-007, FR-DISC-008, FR-DISC-009, FR-DISC-010,
       FR-DISC-011, FR-DISC-012, FR-DISC-013, FR-DISC-014 (package-gate proof
       of every assigned requirement's substrate).
-- [ ] T025 [executor: COORDINATOR] Regenerate the coordinator test manifest
+- [x] T025 [executor: COORDINATOR] Regenerate the coordinator test manifest — [evidence: mechanical zero-AI manifest regen committed at 06ea4bc; carried through squash merge 8fcb13b]
       (`node scripts/automation/bun-migration-manifest.mjs --out
 evidence/bun-migration/bun-migration-manifest.json`) after all new test
       files exist so `pnpm test`/`test:all` collect and classify them
@@ -409,7 +409,7 @@ evidence/bun-migration/bun-migration-manifest.json`) after all new test
       zero-AI). Traces: FR-DISC-006, FR-DISC-007, FR-DISC-008, FR-DISC-009,
       FR-DISC-010, FR-DISC-011, FR-DISC-012, FR-DISC-013, FR-DISC-014
       (verification substrate for every assigned requirement).
-- [ ] T026 [executor: COORDINATOR] [evidence: VERIFICATION_ONLY] Run the full
+- [x] T026 [executor: COORDINATOR] [evidence: VERIFICATION_ONLY] Run the full — [evidence: pnpm verify scope: spec:verify OK (13 checks), prettier clean, eslint clean (25 errors fixed d7c7020), tsc clean, pnpm test PURE green at 7694173; full gate authority = merged-main CI 34399428605 GREEN at 8fcb13b]
       aggregate gate `pnpm verify` and the integrity gate `pnpm spec:verify`
       at the pushed HEAD; require green (the complete Bun suite runs ONLY
       through the coordinator — never a bare `bun test` over the tree). If

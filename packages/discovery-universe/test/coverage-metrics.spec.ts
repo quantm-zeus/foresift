@@ -24,11 +24,9 @@ import type { DiscoveryUniverseEntry } from '@foresift/shared-schemas';
 describe('Coverage Metric Calculations (FR-DISC-007, FR-DISC-012)', () => {
   const entries: DiscoveryUniverseEntry[] = [
     {
-      entryId: 'e1',
       assetRepresentationId: 'asset_A',
       sourceId: 'src_pump',
       sourceClass: 'FIRST_PARTY_SUPPORTED_PROGRAM_EVENT',
-      sightingId: 's1',
       sourceAvailableAt: '2026-08-20T10:00:00Z',
       firstIngestedAt: '2026-08-20T10:00:01Z',
       sourceMetadataHash: 'sha256:aaaa',
@@ -36,11 +34,9 @@ describe('Coverage Metric Calculations (FR-DISC-007, FR-DISC-012)', () => {
       qualityCodes: [],
     },
     {
-      entryId: 'e2',
       assetRepresentationId: 'asset_B',
       sourceId: 'src_pump',
       sourceClass: 'FIRST_PARTY_SUPPORTED_PROGRAM_EVENT',
-      sightingId: 's2',
       sourceAvailableAt: '2026-08-20T10:05:00Z',
       firstIngestedAt: '2026-08-20T10:05:01Z',
       sourceMetadataHash: 'sha256:bbbb',
@@ -48,11 +44,9 @@ describe('Coverage Metric Calculations (FR-DISC-007, FR-DISC-012)', () => {
       qualityCodes: [],
     },
     {
-      entryId: 'e3',
       assetRepresentationId: 'asset_B',
       sourceId: 'src_gmgn',
       sourceClass: 'FREE_AGGREGATE_DISCOVERY',
-      sightingId: 's3',
       sourceObservedAt: '2026-08-20T10:04:50Z',
       sourceAvailableAt: '2026-08-20T10:05:02Z',
       firstIngestedAt: '2026-08-20T10:05:04Z',
@@ -61,11 +55,9 @@ describe('Coverage Metric Calculations (FR-DISC-007, FR-DISC-012)', () => {
       qualityCodes: [],
     },
     {
-      entryId: 'e4',
       assetRepresentationId: 'asset_C',
       sourceId: 'src_gmgn',
       sourceClass: 'FREE_AGGREGATE_DISCOVERY',
-      sightingId: 's4',
       sourceObservedAt: '2026-08-20T10:10:00Z',
       sourceAvailableAt: '2026-08-20T10:10:05Z',
       firstIngestedAt: '2026-08-20T10:10:08Z',
@@ -216,28 +208,22 @@ describe('measureCoverageSnapshot Golden Vectors (FR-DISC-007, FR-DISC-009, FR-D
     manifest: {
       manifestId: 'man_test_001',
       populationClass: 'SUPPORTED_PROGRAM_UNIVERSE',
-      populationName: 'Pump Universe',
       sourceIds: ['src_pump', 'src_gmgn'],
       collectorScopeIds: ['col_solana_live'],
-      windowStart: '2026-08-20T10:00:00Z',
-      windowEnd: '2026-08-20T12:00:00Z',
+      startTime: '2026-08-20T10:00:00Z',
+      endTime: '2026-08-20T12:00:00Z',
       startSlot: '1000',
       endSlot: '2000',
       knownGapsCount: 0,
       rightsExclusions: [],
-      programVersions: ['6EF8@1.0.0'],
       sourceDependenceDisclosed: true,
       selectionProbabilities: {},
-      isSealed: true,
-      asOf: '2026-08-20T12:00:00Z',
     },
     entries: [
       {
-        entryId: 'e1',
         assetRepresentationId: 'asset_1',
         sourceId: 'src_pump',
         sourceClass: 'FIRST_PARTY_SUPPORTED_PROGRAM_EVENT',
-        sightingId: 's1',
         sourceAvailableAt: '2026-08-20T10:00:00Z',
         firstIngestedAt: '2026-08-20T10:00:01Z',
         sourceMetadataHash: 'sha256:1111',
@@ -245,11 +231,9 @@ describe('measureCoverageSnapshot Golden Vectors (FR-DISC-007, FR-DISC-009, FR-D
         qualityCodes: [],
       },
       {
-        entryId: 'e2',
         assetRepresentationId: 'asset_2',
         sourceId: 'src_pump',
         sourceClass: 'FIRST_PARTY_SUPPORTED_PROGRAM_EVENT',
-        sightingId: 's2',
         sourceAvailableAt: '2026-08-20T10:10:00Z',
         firstIngestedAt: '2026-08-20T10:10:01Z',
         sourceMetadataHash: 'sha256:2222',
@@ -257,6 +241,8 @@ describe('measureCoverageSnapshot Golden Vectors (FR-DISC-007, FR-DISC-009, FR-D
         qualityCodes: [],
       },
     ],
+    sourceOverlap: {},
+    uniqueYield: {},
   };
 
   const entryFacts: CoverageEntryFacts[] = [

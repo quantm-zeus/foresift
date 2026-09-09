@@ -242,12 +242,12 @@ describe('Recall Estimator & Verdict Truth Table (FR-DISC-006, FR-DISC-010)', ()
   it('weights retrospective miss classifications', () => {
     const weighted = classifyWeightedRetrospectiveMiss(
       {
-        assetRepresentationId: 'asset_1',
-        firstObservedOnChainAt: '2026-08-20T10:00:00Z',
-        sourceAvailableAt: '2026-08-20T10:00:05Z',
-        ingestedAt: '2026-08-20T10:00:10Z',
-        inScope: true,
-        programSupported: true,
+        subjectId: 'asset_1',
+        outcomeProfileMatched: true,
+        liveSourceIds: [],
+        retrospectiveUniversePresent: true,
+        lineageIndependenceDisclosed: true,
+        evidenceRefs: ['ev_1'],
       },
       0.25,
     );

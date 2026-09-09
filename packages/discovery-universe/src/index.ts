@@ -8,3 +8,4 @@ export * from './recall-estimator.ts';
 export * from './constraints.ts';
 export * from './chain-access-gate.ts';
 export * from './read-only-guard.ts';
+export * from './coverage-metrics.ts';

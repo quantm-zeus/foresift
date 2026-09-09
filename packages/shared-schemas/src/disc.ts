@@ -289,6 +289,7 @@ export type ChainAccessConsumptionRecord = z.infer<typeof ChainAccessConsumption
 export const DiscLatenessBasisSchema = enumSchema(ALL_DISC_LATENESS_BASES);
 const NullableCount = z.number().int().nonnegative().nullable();
 const NullableNumber = z.number().finite().nonnegative().nullable();
+const NullableFiniteNumber = z.number().finite().nullable();
 const NullableRate = z.number().finite().min(0).max(1).nullable();
 const DistributionSchema = z
   .object({
@@ -357,7 +358,7 @@ export const CoverageMetricSetSchema = z
     sourceManipulationBoostedDiscoveryShare: NullableRate,
     identityFailureRate: NullableRate,
     unsupportedProgramExclusions: NullableCount,
-    priceExtensionAtFirstSystemAvailability: NullableNumber,
+    priceExtensionAtFirstSystemAvailability: NullableFiniteNumber,
     qualityCodes: z.record(NonEmptyString, z.array(NonEmptyString).min(1)),
   })
   .strict()

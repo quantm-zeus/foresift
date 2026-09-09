@@ -131,6 +131,18 @@ export const METRIC_GOLDEN_DATASET: MetricGoldenVectorDataset = {
   description: 'Multi-source discovery dataset covering 10 tokens across first-party, aggregate, and webhook sources',
   entries: [
     {
+      assetRepresentationId: 'asset_rep_sol_token_000_unique_first_party',
+      sourceId: 'col_solana_pump_live',
+      sourceClass: 'FIRST_PARTY_SUPPORTED_PROGRAM_EVENT',
+      sourceObservedAt: '2026-08-20T09:55:00.000Z' as UtcTimestamp,
+      sourceAvailableAt: '2026-08-20T09:55:00.005Z' as UtcTimestamp,
+      firstIngestedAt: '2026-08-20T09:55:00.010Z' as UtcTimestamp,
+      sourceRank: 1,
+      sourceMetadataHash: 'sha256:hash_token_000_first_party',
+      discoveryPolicyVersion: '1.0.0',
+      qualityCodes: ['QUALITY_FIRST_PARTY_VERIFIED'],
+    },
+    {
       assetRepresentationId: 'asset_rep_sol_token_001',
       sourceId: 'col_solana_pump_live',
       sourceClass: 'FIRST_PARTY_SUPPORTED_PROGRAM_EVENT',

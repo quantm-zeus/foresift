@@ -339,7 +339,7 @@ riders, then fixtures and AC suites, then telemetry and gates.
 
 ## Phase 7b — Central registry extensions (blocks gates; plan-sanctioned scope exceptions)
 
-- [ ] T021 [P] [executor: TEST] Extend `tests/telemetry-catalog.spec.ts` — the
+- [x] T021 [P] [executor: TEST] Extend `tests/telemetry-catalog.spec.ts` — the — [evidence: NO_OP_ALREADY_SATISFIED] reconciled pre-provider (already satisfied at trusted base)
       plan-sanctioned central-parity scope exception (milestone plan-level
       decision 4, exact path) — with the extended `telemetry/disc.catalog.json`
       assertions pinning every new event's fields to the authoritative shared

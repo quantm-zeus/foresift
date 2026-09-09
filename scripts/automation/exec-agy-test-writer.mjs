@@ -380,6 +380,14 @@ export function runAgyTestWriter(input) {
     model: route.model,
     reasoning: route.reasoning,
     providerTimeout: route.providerTimeout,
+    // baseSha is the integrator-required field (integrate-writer-results.mjs
+    // rejects any result missing branch/headSha/baseSha). Live f02e8580,
+    // 2026-09-09: this writer emitted only `baseHead` — a naming divergence
+    // from wave-guard.mjs's result schema — so a fully successful AGY test
+    // lane (test-author-1, T006/T016/T020 complete) was deterministically
+    // rejected at integration and its verified work stranded on the lane
+    // branch. baseHead stays for artifact-compat with older capsules.
+    baseSha: baseHead,
     baseHead,
     // Evidence-backed nominations (H3 P0-1): diff-proven ids only; an empty
     // diff or a missing task graph nominates nothing (fail-closed).

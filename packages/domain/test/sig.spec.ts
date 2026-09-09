@@ -51,9 +51,6 @@ describe('packages/domain: sig vocabularies and pure laws', () => {
     'SOURCE_INDEPENDENCE',
   ];
 
-
-
-
   const CohortFallbackLevels = [
     'EXACT_COHORT',
     'REMOVE_NARRATIVE',
@@ -74,8 +71,6 @@ describe('packages/domain: sig vocabularies and pure laws', () => {
     'REJECTED',
     'ARCHIVED',
   ];
-
-
 
   it('enumerates all 21 FunnelStage members and parses fail-closed', () => {
     const parseFunnelStage = fn('parseFunnelStage');

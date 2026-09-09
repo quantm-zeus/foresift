@@ -83,11 +83,16 @@ CREATE TABLE IF NOT EXISTS disc.population_constraints (
     program_version     text,
     window_start        timestamptz,
     window_end          timestamptz,
+    window_start_slot   bigint CHECK (window_start_slot IS NULL OR window_start_slot >= 0),
+    window_end_slot     bigint,
     evidence_refs       text[] NOT NULL CHECK (cardinality(evidence_refs) > 0),
     recorded_at         timestamptz NOT NULL DEFAULT now(),
     resolved_at         timestamptz,
     CONSTRAINT disc_constraint_window CHECK (
         window_start IS NULL OR window_end IS NULL OR window_end > window_start),
+    CONSTRAINT disc_constraint_slot_window CHECK (
+        window_start_slot IS NULL OR window_end_slot IS NULL OR
+        window_end_slot >= window_start_slot),
     CONSTRAINT disc_constraint_resolution CHECK (
         resolved_at IS NULL OR resolved_at > recorded_at)
 );

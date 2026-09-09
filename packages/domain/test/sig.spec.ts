@@ -51,25 +51,8 @@ describe('packages/domain: sig vocabularies and pure laws', () => {
     'SOURCE_INDEPENDENCE',
   ];
 
-  const ParetoStatuses = ['EFFICIENT', 'DOMINATED', 'UNKNOWN_DIMENSION_BLOCKED'];
 
-  const SelectionArms = [
-    'EXPLOITATION',
-    'UNCERTAINTY',
-    'RANDOM_EXPLORATION',
-    'EVIDENCE_PROBE',
-    'OUTCOME_OBSERVATION_ONLY',
-    'NOT_SELECTED',
-  ];
 
-  const CutoffReasons = [
-    'BELOW_BUDGET_CUTOFF',
-    'HARD_GATE_FAILED',
-    'PARETO_DOMINATED',
-    'DIVERSITY_CONSTRAINT',
-    'EXPLORATION_ARM',
-    'NOT_SELECTED_WITH_REASON',
-  ];
 
   const CohortFallbackLevels = [
     'EXACT_COHORT',
@@ -92,21 +75,7 @@ describe('packages/domain: sig vocabularies and pure laws', () => {
     'ARCHIVED',
   ];
 
-  const RecheckDecisionKinds = [
-    'RECHECK_NOW',
-    'DEFER_BACKOFF',
-    'STARVED_SKIP',
-    'EXPIRED_STOP',
-    'BUDGET_EXHAUSTED_STOP',
-    'INFO_VALUE_BELOW_FLOOR_SKIP',
-  ];
 
-  const DiversityConstraintKinds = [
-    'NARRATIVE',
-    'DEVELOPER_CLUSTER',
-    'FUNDING_CLUSTER',
-    'LAUNCHPAD',
-  ];
 
   it('enumerates all 21 FunnelStage members and parses fail-closed', () => {
     const parseFunnelStage = fn('parseFunnelStage');

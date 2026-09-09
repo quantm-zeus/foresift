@@ -47,7 +47,7 @@ riders, then fixtures and AC suites, then telemetry and gates.
 
 ## Phase 1 — Domain vocabularies and error codes (blocks later phases)
 
-- [x] T001 [P] Create `packages/domain/src/disc.ts`: `DiscEntryReason` (8 members — [evidence: PRODUCT_UNIT_LANDED] packages/domain/src/disc.ts committed at HEAD (03ec979): 9 vocabularies re-exported, 9 fail-closed parse functions, 4 pure laws; T027 colocated suites now execute the REAL exports (46/46, 182 expects vs 32 vacuous baseline)
+- [x] T001 [P] Create `packages/domain/src/disc.ts`: `DiscEntryReason` (8 members — [evidence: NO_OP_ALREADY_SATISFIED] reconciled pre-provider: packages/domain/src/disc.ts committed at HEAD (03ec979): 9 vocabularies re-exported, 9 fail-closed parse functions, 4 pure laws; T027 colocated suites now execute the REAL exports (46/46, 182 expects vs 32 vacuous baseline)
       per vocabulary law), `DiscRightsBasis` (5), `DiscManipulationPolicy` (3),
       `DiscClaimBasis` (3), `DiscConstraintKind` (6), `DiscConstraintEffect`
       (3), `DiscChainAccessPurpose` (2), `DiscRecallVerdict` (4),
@@ -144,7 +144,7 @@ riders, then fixtures and AC suites, then telemetry and gates.
       only `disc.refuse_mutation` triggers on source profiles, entry
       provenance, constraints, and recall estimates. Traces: FR-DISC-006,
       FR-DISC-008, FR-DISC-010, FR-DISC-013, FR-DISC-014.
-- [x] T006 [P] [executor: TEST] Extend the colocated migration suites — [evidence: WAVE_SALVAGE_MERGE] completed by AGY test lane (commit 51ea511, verified 2026-09-09, suites green at merged HEAD)
+- [x] T006 [P] [executor: TEST] Extend the colocated migration suites — [evidence: NO_OP_ALREADY_SATISFIED] completed by AGY test lane (commit 51ea511, verified 2026-09-09, suites green at merged HEAD)
       `packages/discovery-universe/test/migrations.spec.ts` and
       `packages/cheap-monitor/test/migrations.spec.ts` (test-owned paths,
       2026-09-07 ownership law): g1_disc_0001/0002 discovery expectations,
@@ -279,7 +279,7 @@ riders, then fixtures and AC suites, then telemetry and gates.
       provenance vectors (all eight entry reasons; complete and
       claim-breaking-incomplete variants; first-party vs non-first-party
       flags). Traces: FR-DISC-011, AC-110.
-- [x] T016 [P] [executor: TEST] Author `tests/fixtures/disc/metric-inputs.ts` + — [evidence: WAVE_SALVAGE_MERGE] completed by AGY test lane (commit 09ca8fb, verified 2026-09-09, suites green at merged HEAD)
+- [x] T016 [P] [executor: TEST] Author `tests/fixtures/disc/metric-inputs.ts` + — [evidence: NO_OP_ALREADY_SATISFIED] completed by AGY test lane (commit 09ca8fb, verified 2026-09-09, suites green at merged HEAD)
       `tests/fixtures/disc/recall-samples.ts`: golden metric inputs (entries,
       dependence edges with proven multipliers, price observations, gap
       windows) covering every §63.8 metric bullet, and recall claim-basis
@@ -295,7 +295,7 @@ riders, then fixtures and AC suites, then telemetry and gates.
       (bounded valid, unbounded refusal, paid-fallback refusal,
       reserve-incompatible refusal, tolerance-breach incident, silent-widening
       refusal). Traces: FR-DISC-008, FR-DISC-013.
-- [x] T018 [P] [executor: TEST] Author colocated product-side suites under — [evidence: WAVE_SALVAGE_MERGE] completed by AGY test lane (commit e67f2c4, verified 2026-09-09, suites green at merged HEAD)
+- [x] T018 [P] [executor: TEST] Author colocated product-side suites under — [evidence: NO_OP_ALREADY_SATISFIED] completed by AGY test lane (commit e67f2c4, verified 2026-09-09, suites green at merged HEAD)
       `packages/discovery-universe/test/` (source-profiles.spec.ts,
       coverage-metrics.spec.ts, recall-estimator.spec.ts, constraints.spec.ts,
       claim-language.spec.ts, chain-access-gate.spec.ts,
@@ -317,7 +317,7 @@ riders, then fixtures and AC suites, then telemetry and gates.
       persistence and validation laws (rider-less promotion replay refusal,
       nonexistent manifest refusal, existing batch/promotion laws
       regression-locked). Traces: FR-DISC-009, FR-DISC-011, AC-112, AC-113.
-- [x] T020 [P] [executor: TEST] Extend shared AC suites IN PLACE (facet — [evidence: WAVE_SALVAGE_MERGE] completed by AGY test lane (commit 24e5b4f, verified 2026-09-09, suites green at merged HEAD)
+- [x] T020 [P] [executor: TEST] Extend shared AC suites IN PLACE (facet — [evidence: NO_OP_ALREADY_SATISFIED] completed by AGY test lane (commit 24e5b4f, verified 2026-09-09, suites green at merged HEAD)
       convention, spec file-ownership section — never rewrite or weaken
       existing cases): `tests/acceptance/AC-110.spec.ts` +
       `tests/negative/AC-110.negative.spec.ts` (per-source provenance
@@ -346,7 +346,7 @@ riders, then fixtures and AC suites, then telemetry and gates.
       schemas field-for-field. No product surface is authored here. Traces:
       FR-DISC-006, FR-DISC-007, FR-DISC-008, FR-DISC-009, FR-DISC-010,
       FR-DISC-011, FR-DISC-012, FR-DISC-013, FR-DISC-014.
-- [x] T022 [P] [executor: TEST] Extend the central expected-script registry — [evidence: WAVE_SALVAGE_MERGE] completed by AGY test lane (commit 686ef89, verified 2026-09-09, suites green at merged HEAD)
+- [x] T022 [P] [executor: TEST] Extend the central expected-script registry — [evidence: NO_OP_ALREADY_SATISFIED] completed by AGY test lane (commit 686ef89, verified 2026-09-09, suites green at merged HEAD)
       `packages/persistence/test/migrator.spec.ts` — the plan-sanctioned
       scope exception (ADR-0019/0022 duty, exact path): add
       `g1_disc_0001_source_profiles` and `g1_disc_0002_constraints_gateways`

@@ -434,6 +434,21 @@ importers:
         specifier: ^3.25.76
         version: 3.25.76
 
+  packages/signal-intelligence:
+    dependencies:
+      '@foresift/domain':
+        specifier: workspace:*
+        version: link:../domain
+      '@foresift/evidence':
+        specifier: workspace:*
+        version: link:../evidence
+      '@foresift/persistence':
+        specifier: workspace:*
+        version: link:../persistence
+      '@foresift/shared-schemas':
+        specifier: workspace:*
+        version: link:../shared-schemas
+
   packages/solana-security:
     dependencies:
       '@foresift/domain':

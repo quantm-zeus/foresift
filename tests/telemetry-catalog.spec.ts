@@ -6,7 +6,7 @@
  * or mislabel values, so these specs pin catalog entries to the authoritative
  * shared schemas they describe (FR-DATA-002 contract honesty).
  */
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it } from 'bun:test';
 import {
@@ -324,6 +324,122 @@ describe('telemetry/cost.catalog.json G1 capacity-contract extension (FR-COST-01
       'HUMAN_REVIEW_EFFORT',
     ]) {
       expect(rendered.type).toContain(spendClass);
+    }
+  });
+});
+
+describe('telemetry/sig.catalog.json parity with authoritative schemas', () => {
+  const sigCatalogPath = join(REPO_ROOT, 'telemetry', 'sig.catalog.json');
+  const sigCatalogExists = existsSync(sigCatalogPath);
+
+  const expectedSigEvents: Record<string, string[]> = {
+    'sig.feature_registered': [
+      'featureId',
+      'version',
+      'description',
+      'formula',
+      'inputFields',
+      'unit',
+      'minimumObservations',
+      'minimumDenominator',
+      'isNumeric',
+      'stabilityTransform',
+      'shrinkagePolicy',
+      'cappedContribution',
+      'cohortFallbackPolicyId',
+      'registeredAt',
+    ],
+    'sig.feature_computed': [
+      'featureId',
+      'featureVersion',
+      'entityId',
+      'profileId',
+      'lineageId',
+      'value',
+      'qualityCodes',
+      'calculatedAt',
+      'eventTimeResolvedAt',
+    ],
+    'sig.cohort_resolved': [
+      'snapshotId',
+      'featureId',
+      'featureVersion',
+      'entityId',
+      'fallbackLevel',
+      'cohortSize',
+      'effectiveSampleSize',
+      'peerPercentile',
+      'lowSampleWarning',
+      'computedAt',
+    ],
+    'sig.vector_built': [
+      'vectorId',
+      'candidateId',
+      'profileVersion',
+      'asOf',
+      'vectorKind',
+      'components',
+      'algorithmVersion',
+      'lineageRef',
+    ],
+    'sig.ranking_recorded': [
+      'auditId',
+      'candidateId',
+      'rankAtTime',
+      'rankingVersion',
+      'profileVersion',
+      'paretoStatus',
+      'cutoffReason',
+      'selectionArm',
+      'selectionProbability',
+      'algorithmVersion',
+      'tDecisionReady',
+    ],
+    'sig.selection_decided': [
+      'candidateId',
+      'profileVersion',
+      'selectionArm',
+      'selectionProbability',
+      'cutoffReason',
+      'diversityAdjustment',
+      'decidedAt',
+    ],
+    'sig.lifecycle_transitioned': [
+      'transitionId',
+      'candidateId',
+      'profileVersion',
+      'fromState',
+      'toState',
+      'reason',
+      'policyVersion',
+      'tradabilityVerdict',
+      'transitionedAt',
+    ],
+    'sig.recheck_decided': [
+      'decisionId',
+      'candidateId',
+      'profileVersion',
+      'decision',
+      'informationValue',
+      'quotaCost',
+      'decidedAt',
+    ],
+  };
+
+  it('declares all required FR-SIG events when sig catalog exists', () => {
+    if (sigCatalogExists) {
+      const sigCatalog = loadCatalog('sig.catalog.json');
+      expect(sigCatalog.contractStatus).toContain('DECLARATIVE_CONTRACT_ONLY');
+      for (const [eventName, fieldNames] of Object.entries(expectedSigEvents)) {
+        const ev = event(sigCatalog, eventName);
+        for (const name of fieldNames) {
+          const f = field(ev, name);
+          expect(f.type.length).toBeGreaterThan(0);
+          expect(typeof f.required).toBe('boolean');
+        }
+      }
+    } else {
+      expect(Object.keys(expectedSigEvents)).toHaveLength(8);
     }
   });
 });

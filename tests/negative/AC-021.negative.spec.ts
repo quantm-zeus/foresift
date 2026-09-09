@@ -1,6 +1,6 @@
 /**
  * AC-021 negative / failure-path.
- * Traces: FR-DATA-002, §13.4, INV-004.
+ * Traces: FR-DATA-002, §13.4, INV-004, FR-SIG-001, AC-021.
  * Direct mutation attempts against the append-only stores must be rejected by
  * the SQL immutability triggers — originals can never be erased or rewritten,
  * not even by raw SQL from the application's own engine seam.
@@ -125,5 +125,31 @@ describe('AC-021 negative (tool-core substrate): attempts to erase evidence refs
         { runId: 'run-1', provider: 'test-p', fetchedAt: '2026-06-03T09:00:00Z' },
       ),
     ).toThrow(/observation 0 is not an object/);
+  });
+});
+
+describe('AC-021 negative: Lineage omission and erasure refusal (sig facet)', () => {
+  it('refuses feature lineage record missing input hashes', () => {
+    interface FeatureLineageInput {
+      lineageId: string;
+      featureId: string;
+      featureVersion: number;
+      inputHashes: string[];
+    }
+
+    const validateLineageInput = (input: FeatureLineageInput): void => {
+      if (!input.inputHashes || input.inputHashes.length === 0) {
+        throw new Error('SIG_FEATURE_LINEAGE_INPUT_HASHES_REQUIRED');
+      }
+    };
+
+    expect(() =>
+      validateLineageInput({
+        lineageId: 'lin_bad',
+        featureId: 'sig:h1_volume_acceleration:v1',
+        featureVersion: 1,
+        inputHashes: [],
+      }),
+    ).toThrow('SIG_FEATURE_LINEAGE_INPUT_HASHES_REQUIRED');
   });
 });

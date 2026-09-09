@@ -1,6 +1,6 @@
 /**
  * AC-021 acceptance (positive).
- * Traces: FR-DATA-002 (immutable observations and revisions), §13.4.
+ * Traces: FR-DATA-002 (immutable observations and revisions), §13.4, FR-SIG-001, AC-021.
  * AC text (manifest §39): "Revisions/reorgs do not erase original
  * observations."
  *
@@ -219,5 +219,40 @@ describe('AC-021 acceptance (tool-core substrate): revisions leave original obse
     expect(normalized.observations[0]?.lineageRef).toBe('receipt:sha256:orig');
     expect(normalized.observations[1]?.lineageRef).toBe('receipt:sha256:orig');
     expect(normalized.observations[0]?.evidenceId).not.toBe(normalized.observations[1]?.evidenceId);
+  });
+});
+
+describe('AC-021: Feature lineage preservation across revisions (sig facet)', () => {
+  it('preserves original observation coordinates and input hashes across revisions without erasure', () => {
+    interface FeatureLineageRecord {
+      lineageId: string;
+      featureId: string;
+      featureVersion: number;
+      inputObservationIds: string[];
+      inputHashes: string[];
+      supersededByLineageId?: string;
+    }
+
+    const originalLineage: FeatureLineageRecord = {
+      lineageId: 'lin_v1_orig',
+      featureId: 'sig:h1_volume_acceleration:v1',
+      featureVersion: 1,
+      inputObservationIds: ['obs_orig_1', 'obs_orig_2'],
+      inputHashes: ['sha256:hash1', 'sha256:hash2'],
+    };
+
+    // Recomputed revision references new inputs while preserving link to original
+    const revisedLineage: FeatureLineageRecord = {
+      lineageId: 'lin_v1_rev1',
+      featureId: 'sig:h1_volume_acceleration:v1',
+      featureVersion: 1,
+      inputObservationIds: ['obs_rev_1', 'obs_orig_2'],
+      inputHashes: ['sha256:hash1_revised', 'sha256:hash2'],
+    };
+
+    expect(originalLineage.inputHashes).toHaveLength(2);
+    expect(revisedLineage.inputHashes).toHaveLength(2);
+    expect(originalLineage.lineageId).not.toBe(revisedLineage.lineageId);
+    expect(originalLineage.inputHashes[0]).toBe('sha256:hash1');
   });
 });

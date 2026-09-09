@@ -1,6 +1,7 @@
 /**
  * Drizzle mirror of SQL truth (ADR-001) — hand-maintained to match the tables
- * created by `migrations/g0_(data|dr)_*.sql` exactly.
+ * created by the versioned migration families, including the `sig` schema,
+ * exactly.
  *
  * This file NEVER defines schema semantics on its own: the SQL migrations are
  * the single source of truth and a parity test enumerates
@@ -12,13 +13,17 @@ import {
   boolean,
   doublePrecision,
   integer,
+  interval,
   jsonb,
   numeric,
+  pgSchema,
   pgTable,
   primaryKey,
   text,
   timestamp,
 } from 'drizzle-orm/pg-core';
+
+export const sigSchema = pgSchema('sig');
 
 // --- g0_data_0001_identity -------------------------------------------------
 
@@ -1030,5 +1035,185 @@ export const concurrentShadowPositions = pgTable('concurrent_shadow_positions', 
   rejected: boolean('rejected').notNull(),
   competitionResolutionVersion: text('competition_resolution_version').notNull(),
   recordedAt: timestamp('recorded_at', { withTimezone: true }).notNull(),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull(),
+});
+
+// --- g1_sig_0001_feature_registry ----------------------------------------
+
+export const sigFeatureDefinitions = sigSchema.table(
+  'feature_definitions',
+  {
+    featureId: text('feature_id').notNull(),
+    version: integer('version').notNull(),
+    description: text('description').notNull(),
+    formula: text('formula').notNull(),
+    inputFields: text('input_fields').array().notNull(),
+    unit: text('unit').notNull(),
+    windows: text('windows').array().notNull(),
+    minimumObservations: integer('minimum_observations').notNull(),
+    nullPolicy: text('null_policy').notNull(),
+    outlierPolicy: text('outlier_policy').notNull(),
+    updatePolicy: text('update_policy').notNull(),
+    freshnessLimitSeconds: integer('freshness_limit_seconds').notNull(),
+    cohortDefinitionId: text('cohort_definition_id'),
+    evidenceRequirements: text('evidence_requirements').array().notNull(),
+    minimumDenominator: integer('minimum_denominator'),
+    isNumeric: boolean('is_numeric').notNull(),
+    stabilityTransform: text('stability_transform'),
+    shrinkagePolicy: text('shrinkage_policy'),
+    cappedContribution: doublePrecision('capped_contribution'),
+    outlierPolicyIsRobust: boolean('outlier_policy_is_robust').notNull(),
+    cohortFallbackPolicyId: text('cohort_fallback_policy_id'),
+    economicEventRequired: boolean('economic_event_required').notNull(),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull(),
+  },
+  (t) => [primaryKey({ columns: [t.featureId, t.version] })],
+);
+
+export const sigFeatureLineage = sigSchema.table('feature_lineage', {
+  lineageId: text('lineage_id').primaryKey(),
+  featureId: text('feature_id').notNull(),
+  featureVersion: integer('feature_version').notNull(),
+  entityId: text('entity_id').notNull(),
+  profileId: text('profile_id').notNull(),
+  windowStart: timestamp('window_start', { withTimezone: true }),
+  windowEnd: timestamp('window_end', { withTimezone: true }).notNull(),
+  inputObservationIds: text('input_observation_ids').array().notNull(),
+  inputEvidenceIds: text('input_evidence_ids').array().notNull(),
+  inputHashes: text('input_hashes').array().notNull(),
+  calculationCodeVersion: text('calculation_code_version').notNull(),
+  calculatedAt: timestamp('calculated_at', { withTimezone: true }).notNull(),
+  qualityCodes: text('quality_codes').array().notNull(),
+  eventTimeResolvedAt: timestamp('event_time_resolved_at', { withTimezone: true }).notNull(),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull(),
+});
+
+export const sigCohortSnapshots = sigSchema.table('cohort_snapshots', {
+  snapshotId: text('snapshot_id').primaryKey(),
+  featureId: text('feature_id').notNull(),
+  featureVersion: integer('feature_version').notNull(),
+  entityId: text('entity_id').notNull(),
+  cohortChain: text('cohort_chain').notNull(),
+  cohortLaunchpad: text('cohort_launchpad'),
+  cohortAgeBand: text('cohort_age_band'),
+  cohortMarketCapBand: text('cohort_market_cap_band'),
+  cohortLiquidityBand: text('cohort_liquidity_band'),
+  cohortNarrative: text('cohort_narrative'),
+  cohortRegime: text('cohort_regime'),
+  fallbackLevel: text('fallback_level').notNull(),
+  cohortSize: integer('cohort_size').notNull(),
+  effectiveSampleSize: doublePrecision('effective_sample_size').notNull(),
+  peerPercentile: doublePrecision('peer_percentile'),
+  lowSampleWarning: boolean('low_sample_warning').notNull(),
+  computedAt: timestamp('computed_at', { withTimezone: true }).notNull(),
+});
+
+// --- g1_sig_0002_funnel_vectors_ranking ----------------------------------
+
+export const sigCandidateFunnelStages = sigSchema.table('candidate_funnel_stages', {
+  stageId: text('stage_id').primaryKey(),
+  candidateId: text('candidate_id').notNull(),
+  profileId: text('profile_id').notNull(),
+  profileVersion: text('profile_version').notNull(),
+  stage: text('stage').notNull(),
+  enteredAt: timestamp('entered_at', { withTimezone: true }).notNull(),
+  passed: boolean('passed').notNull(),
+  gateCode: text('gate_code'),
+  gateProfileVersion: text('gate_profile_version').notNull(),
+  evidenceRefs: text('evidence_refs').array().notNull(),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull(),
+});
+
+export const sigCandidateVectors = sigSchema.table('candidate_vectors', {
+  vectorId: text('vector_id').primaryKey(),
+  candidateId: text('candidate_id').notNull(),
+  profileVersion: text('profile_version').notNull(),
+  asOf: timestamp('as_of', { withTimezone: true }).notNull(),
+  vectorKind: text('vector_kind').notNull(),
+  components: jsonb('components').notNull(),
+  algorithmVersion: text('algorithm_version').notNull(),
+  lineageRef: text('lineage_ref').notNull(),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull(),
+});
+
+export const sigRankingAudits = sigSchema.table('ranking_audits', {
+  auditId: text('audit_id').primaryKey(),
+  candidateId: text('candidate_id').notNull(),
+  rankAtTime: integer('rank_at_time').notNull(),
+  rankingVersion: text('ranking_version').notNull(),
+  profileVersion: text('profile_version').notNull(),
+  componentValues: jsonb('component_values').notNull(),
+  hardGateResults: jsonb('hard_gate_results').notNull(),
+  paretoStatus: text('pareto_status').notNull(),
+  diversityAdjustment: jsonb('diversity_adjustment').notNull(),
+  explorationSelected: boolean('exploration_selected').notNull(),
+  cutoffReason: text('cutoff_reason').notNull(),
+  selectionArm: text('selection_arm').notNull(),
+  selectionProbability: doublePrecision('selection_probability'),
+  protectedAllocations: jsonb('protected_allocations').notNull(),
+  capacityAdmission: jsonb('capacity_admission').notNull(),
+  algorithmVersion: text('algorithm_version').notNull(),
+  tDecisionReady: timestamp('t_decision_ready', { withTimezone: true }).notNull(),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull(),
+});
+
+// --- g1_sig_0003_lifecycle_rechecks --------------------------------------
+
+export const sigCandidateLifecycle = sigSchema.table('candidate_lifecycle', {
+  transitionId: text('transition_id').primaryKey(),
+  candidateId: text('candidate_id').notNull(),
+  profileVersion: text('profile_version').notNull(),
+  fromState: text('from_state'),
+  toState: text('to_state').notNull(),
+  reason: text('reason').notNull(),
+  persistenceMeasure: doublePrecision('persistence_measure'),
+  dwellSincePriorTransition: interval('dwell_since_prior_transition'),
+  policyVersion: text('policy_version').notNull(),
+  tradabilityVerdict: text('tradability_verdict'),
+  diagnosticSignalLabels: text('diagnostic_signal_labels').array().notNull(),
+  thesisInvalidationConditions: jsonb('thesis_invalidation_conditions'),
+  transitionedAt: timestamp('transitioned_at', { withTimezone: true }).notNull(),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull(),
+});
+
+export const sigRecheckBudgets = sigSchema.table(
+  'recheck_budgets',
+  {
+    candidateId: text('candidate_id').notNull(),
+    profileVersion: text('profile_version').notNull(),
+    maxRechecks: integer('max_rechecks').notNull(),
+    maxRecheckProviderCalls: integer('max_recheck_provider_calls').notNull(),
+    maxRecheckModelCost: doublePrecision('max_recheck_model_cost').notNull(),
+    backoffFactor: doublePrecision('backoff_factor').notNull(),
+    minimumExpectedInformationGain: doublePrecision('minimum_expected_information_gain').notNull(),
+    nextCheckAt: timestamp('next_check_at', { withTimezone: true }).notNull(),
+    expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
+    rechecksUsed: integer('rechecks_used').notNull(),
+    providerCallsUsed: integer('provider_calls_used').notNull(),
+    modelCostUsed: doublePrecision('model_cost_used').notNull(),
+    starvedSince: timestamp('starved_since', { withTimezone: true }),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull(),
+  },
+  (t) => [primaryKey({ columns: [t.candidateId, t.profileVersion] })],
+);
+
+export const sigRecheckDecisions = sigSchema.table('recheck_decisions', {
+  decisionId: text('decision_id').primaryKey(),
+  candidateId: text('candidate_id').notNull(),
+  profileVersion: text('profile_version').notNull(),
+  decidedAt: timestamp('decided_at', { withTimezone: true }).notNull(),
+  decision: text('decision').notNull(),
+  expectedDecisionImpact: doublePrecision('expected_decision_impact'),
+  boundaryProximity: doublePrecision('boundary_proximity'),
+  expectedStateChange: doublePrecision('expected_state_change'),
+  informationGap: doublePrecision('information_gap'),
+  riskUrgency: doublePrecision('risk_urgency'),
+  candidateUtility: doublePrecision('candidate_utility'),
+  quotaCost: doublePrecision('quota_cost'),
+  informationValue: doublePrecision('information_value'),
+  providerCallsCosted: integer('provider_calls_costed').notNull(),
+  modelCostCosted: doublePrecision('model_cost_costed').notNull(),
+  protectedReserveClass: text('protected_reserve_class'),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull(),
 });

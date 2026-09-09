@@ -1,0 +1,267 @@
+{
+  "schema": "foresift/sig-baseline-features@1",
+  "h1VolumeAccelerationVectors": [
+    {
+      "name": "low_sample_less_than_3_buckets",
+      "populatedBucketsCount": 2,
+      "bucketVolumesUsd": [1500.0, 2200.0],
+      "trailingBaselineMeanUsd": 1800.0,
+      "expectedQualityCodes": ["LOW_SAMPLE"],
+      "expectedValue": null,
+      "explanation": "H.1 requires >= 3 populated 5m buckets; < 3 must return null with LOW_SAMPLE quality code"
+    },
+    {
+      "name": "sufficient_sample_accelerating",
+      "populatedBucketsCount": 4,
+      "bucketVolumesUsd": [5000.0, 8000.0, 12000.0, 15000.0],
+      "trailingBaselineMeanUsd": 4000.0,
+      "expectedQualityCodes": ["VALID"],
+      "expectedValue": 1.25276,
+      "tolerance": 0.001
+    }
+  ],
+  "h2VolumePersistenceVectors": [
+    {
+      "name": "high_persistence_10_of_12_buckets",
+      "totalBuckets": 12,
+      "activeBuckets": 10,
+      "expectedRatio": 0.8333,
+      "expectedQualityCodes": ["VALID"]
+    },
+    {
+      "name": "zero_persistence_idle",
+      "totalBuckets": 12,
+      "activeBuckets": 0,
+      "expectedRatio": 0.0,
+      "expectedQualityCodes": ["LOW_SAMPLE"]
+    }
+  ],
+  "h3PriceExtensionVectors": [
+    {
+      "name": "normal_extension",
+      "currentPriceUsd": 1.25,
+      "movingAveragePriceUsd": 1.0,
+      "expectedExtension": 0.25,
+      "expectedQualityCodes": ["VALID"]
+    },
+    {
+      "name": "extreme_price_spike_winsorized",
+      "currentPriceUsd": 10.0,
+      "movingAveragePriceUsd": 1.0,
+      "rawExtension": 9.0,
+      "winsorizedExtension": 3.0,
+      "expectedQualityCodes": ["VALID", "WINSORIZED"]
+    }
+  ],
+  "h4UniqueBuyerGrowthVectors": [
+    {
+      "name": "high_confidence_cluster_deduplicated",
+      "clusterConfidenceThreshold": 0.85,
+      "tradeRecords": [
+        { "buyer": "addr1", "clusterId": "cluster_sybil_1", "clusterConfidence": 0.95 },
+        { "buyer": "addr2", "clusterId": "cluster_sybil_1", "clusterConfidence": 0.92 },
+        { "buyer": "addr3", "clusterId": "cluster_sybil_1", "clusterConfidence": 0.9 },
+        { "buyer": "addr4", "clusterId": "cluster_organic_2", "clusterConfidence": 0.99 }
+      ],
+      "previousPeriodUniqueCount": 1,
+      "expectedCurrentUniqueCount": 2,
+      "expectedLogGrowth": 0.405465,
+      "expectedQualityCodes": ["VALID", "ECONOMIC_ACTOR_DEDUPED"]
+    },
+    {
+      "name": "low_confidence_cluster_retained_separate",
+      "clusterConfidenceThreshold": 0.85,
+      "tradeRecords": [
+        { "buyer": "addr1", "clusterId": "cluster_maybe_1", "clusterConfidence": 0.6 },
+        { "buyer": "addr2", "clusterId": "cluster_maybe_1", "clusterConfidence": 0.55 },
+        { "buyer": "addr3", "clusterId": null, "clusterConfidence": 0.0 }
+      ],
+      "previousPeriodUniqueCount": 1,
+      "expectedCurrentUniqueCount": 3,
+      "expectedLogGrowth": 0.693147,
+      "expectedQualityCodes": ["VALID"]
+    }
+  ],
+  "h5BuySellImbalanceVectors": [
+    {
+      "name": "balanced_flow",
+      "buyVolumeUsd": 10000.0,
+      "sellVolumeUsd": 10000.0,
+      "expectedImbalance": 0.0,
+      "expectedQualityCodes": ["VALID"]
+    },
+    {
+      "name": "pure_buy_flow",
+      "buyVolumeUsd": 50000.0,
+      "sellVolumeUsd": 0.0,
+      "expectedImbalance": 1.0,
+      "expectedQualityCodes": ["VALID"]
+    },
+    {
+      "name": "pure_sell_flow",
+      "buyVolumeUsd": 0.0,
+      "sellVolumeUsd": 50000.0,
+      "expectedImbalance": -1.0,
+      "expectedQualityCodes": ["VALID"]
+    },
+    {
+      "name": "zero_activity_idle",
+      "buyVolumeUsd": 0.0,
+      "sellVolumeUsd": 0.0,
+      "expectedImbalance": 0.0,
+      "expectedQualityCodes": ["LOW_SAMPLE"]
+    }
+  ],
+  "h6LiquidityGrowthVectors": [
+    {
+      "name": "liquidity_addition_20_percent",
+      "reservesUsdStart": 100000.0,
+      "reservesUsdEnd": 120000.0,
+      "expectedGrowthRatio": 0.2,
+      "expectedQualityCodes": ["VALID"]
+    },
+    {
+      "name": "liquidity_removal_50_percent",
+      "reservesUsdStart": 100000.0,
+      "reservesUsdEnd": 50000.0,
+      "expectedGrowthRatio": -0.5,
+      "expectedQualityCodes": ["VALID"]
+    }
+  ],
+  "h7Top10ConcentrationSlopeVectors": [
+    {
+      "name": "dispersion_negative_slope",
+      "top10ShareStart": 0.75,
+      "top10ShareEnd": 0.65,
+      "deltaHours": 4.0,
+      "expectedSlope": -0.025,
+      "expectedQualityCodes": ["VALID"]
+    },
+    {
+      "name": "accumulation_positive_slope",
+      "top10ShareStart": 0.5,
+      "top10ShareEnd": 0.7,
+      "deltaHours": 2.0,
+      "expectedSlope": 0.1,
+      "expectedQualityCodes": ["VALID"]
+    }
+  ],
+  "h8HolderLogGrowthVectors": [
+    {
+      "name": "holder_doubling",
+      "previousHolders": 100,
+      "currentHolders": 200,
+      "expectedLogGrowth": 0.68813,
+      "expectedQualityCodes": ["VALID"]
+    }
+  ],
+  "h9TradeSizeEntropyVectors": [
+    {
+      "name": "single_bucket_insufficient_sample",
+      "tradeSizesUsd": [100.0, 100.0, 100.0],
+      "k_bins": 5,
+      "expectedEntropy": null,
+      "expectedQualityCodes": ["LOW_SAMPLE"],
+      "explanation": "Single bucket / concentrated trades produce low sample entropy null"
+    },
+    {
+      "name": "uniform_distribution_max_entropy",
+      "tradeSizesUsd": [10.0, 50.0, 100.0, 500.0, 1000.0],
+      "k_bins": 5,
+      "expectedEntropy": 1.0,
+      "tolerance": 0.05,
+      "expectedQualityCodes": ["VALID"]
+    }
+  ],
+  "h10ManipulationIndicatorVectors": [
+    {
+      "name": "organic_low_risk",
+      "sharedFunderRatio": 0.05,
+      "roundTripRatio": 0.02,
+      "actorVolumeConcentration": 0.1,
+      "expectedRiskScore": 0.056,
+      "expectedQualityCodes": ["VALID"]
+    },
+    {
+      "name": "high_sybil_wash_trading_risk",
+      "sharedFunderRatio": 0.8,
+      "roundTripRatio": 0.7,
+      "actorVolumeConcentration": 0.85,
+      "expectedRiskScore": 0.785,
+      "expectedQualityCodes": ["VALID", "MANIPULATION_RISK_ELEVATED"]
+    }
+  ],
+  "h11RobustBaselineVectors": [
+    {
+      "name": "insufficient_baseline_sample_no_promotion",
+      "sampleBuckets": 8,
+      "minimumSampleRequired": 12,
+      "robustZScore": 4.5,
+      "fastEwma": 10000.0,
+      "slowEwma": 2000.0,
+      "cusumStatistic": 8.0,
+      "expectedEmergenceDecision": "NO_PROMOTION_INSUFFICIENT_SAMPLE",
+      "expectedQualityCodes": ["LOW_SAMPLE"]
+    },
+    {
+      "name": "emergence_detected_dual_criteria_met",
+      "sampleBuckets": 24,
+      "minimumSampleRequired": 12,
+      "robustZScore": 3.8,
+      "fastEwma": 15000.0,
+      "slowEwma": 3000.0,
+      "cusumStatistic": 6.2,
+      "cusumThreshold": 4.0,
+      "ewmaRatioThreshold": 2.5,
+      "expectedEmergenceDecision": "PROMOTED_EMERGING",
+      "expectedQualityCodes": ["VALID"]
+    }
+  ],
+  "h12DataCoverageVectors": [
+    {
+      "name": "full_coverage",
+      "expectedSeconds": 3600,
+      "coveredSeconds": 3600,
+      "expectedCoverage": 1.0,
+      "expectedQualityCodes": ["VALID"]
+    },
+    {
+      "name": "degraded_coverage_with_gap",
+      "expectedSeconds": 3600,
+      "coveredSeconds": 2700,
+      "expectedCoverage": 0.75,
+      "expectedQualityCodes": ["PARTIAL", "COLLECTOR_GAP_PRESENT"]
+    }
+  ],
+  "replayBoundaryVectors": [
+    {
+      "name": "replay_at_boundary_t",
+      "boundaryT": "2026-06-01T12:00:00Z",
+      "inputObservations": [
+        {
+          "id": "obs_pre_t",
+          "eventAt": "2026-06-01T11:00:00Z",
+          "availableAt": "2026-06-01T11:30:00Z",
+          "volumeUsd": 5000.0,
+          "shouldBeIncludedAtT": true
+        },
+        {
+          "id": "obs_exact_t",
+          "eventAt": "2026-06-01T11:55:00Z",
+          "availableAt": "2026-06-01T12:00:00Z",
+          "volumeUsd": 3000.0,
+          "shouldBeIncludedAtT": true
+        },
+        {
+          "id": "obs_post_t",
+          "eventAt": "2026-06-01T11:59:00Z",
+          "availableAt": "2026-06-01T12:05:00Z",
+          "volumeUsd": 10000.0,
+          "shouldBeIncludedAtT": false
+        }
+      ],
+      "expectedTotalVolumeAtT": 8000.0,
+      "expectedTotalVolumeAtFuture": 18000.0
+    }
+  ]
+}

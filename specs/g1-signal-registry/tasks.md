@@ -131,13 +131,13 @@ telemetry and gates.
       information_value stored as allocation aid, protected_reserve_class
       domain-ReserveClass members, FK to budget row). Traces: FR-SIG-005,
       FR-SIG-006, AC-190, AC-193.
-- [ ] T007 [P] Extend `packages/persistence/src/migrator.ts`
+- [x] T007 [P] Extend `packages/persistence/src/migrator.ts` — [evidence: NO_OP_ALREADY_SATISFIED] reconciled by coordinator 2026-09-09: MIGRATION_FAMILIES includes `sig` at canonical (3dc7edd lineage); registry suite green (13/13, migrator.spec.ts)
       MIGRATION_FAMILIES with the `sig` family (fail-closed pattern
       extension) — the plan-sanctioned scope exception (plan-level decision
       1). The central expected-script registry suite is extended by the
       test-owned task T039 in the same package (ADR-0019/0022 duty;
       2026-09-07 ownership law). Traces: FR-SIG-001…006, FR-SIG-009.
-- [ ] T008 [P] Extend `packages/persistence/src/generated/schema.ts` (the
+- [x] T008 [P] Extend `packages/persistence/src/generated/schema.ts` (the — [evidence: NO_OP_ALREADY_SATISFIED] reconciled by coordinator 2026-09-09: Drizzle mirror sigSchema + sig tables present in canonical; core lane run 0a91cd86 no-op (changedFiles=0, authorityOk=true)
       hand-maintained ADR-001 Drizzle mirror) with the sig.* tables from
       g1_sig_0001…0003 so the persistence schema-parity gate stays green —
       the plan-sanctioned mirror catch-up scope exception (exact precedent:
@@ -484,7 +484,7 @@ telemetry and gates.
       path is `tests/telemetry-catalog.spec.ts` (test-owned); no product
       surface is touched). Traces: FR-SIG-001, FR-SIG-002, FR-SIG-003,
       FR-SIG-004, FR-SIG-005, FR-SIG-006, FR-SIG-009.
-- [ ] T041 [executor: TEST] [serial-reason: SEMANTIC_DEPENDENCY] Author the fixtures/suite files this package
+- [x] T041 [executor: TEST] [serial-reason: SEMANTIC_DEPENDENCY] Author the fixtures/suite files this package — [evidence: FILE_OUTPUT] guard suite hardened (commit 5fbf8d6) and green (2/2, read-only-guard.spec.ts 2026-09-09); no-LLM scan verification recorded against the landed product surface
       owns outside the colocated trees: none are re-assigned from product
       tasks; T020-T032 (fixtures and AC/negative suite authoring) stay
       test-owned work executed by the test lanes under their own task ids.

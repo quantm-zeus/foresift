@@ -32,7 +32,7 @@ export interface RecallSampleVector {
   readonly evaluatedSourceId: string;
   readonly universeSourceId: string;
   readonly claimBasis: RecallClaimBasisType;
-  readonly inclusionProbability?: number;
+  readonly inclusionProbability?: number | undefined;
   readonly sharedLineageWithEvaluated: boolean;
   readonly selfGeneratedUniverse: boolean;
   readonly discoveredByEvaluatedSource: boolean;

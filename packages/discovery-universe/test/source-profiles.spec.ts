@@ -35,7 +35,11 @@ export interface ProvenanceRecord {
   readonly entryReason: string;
 }
 
-function validateProvenanceRecord(record: Partial<ProvenanceRecord>): {
+export type PartialProvenance = {
+  [K in keyof ProvenanceRecord]?: ProvenanceRecord[K] | undefined;
+};
+
+function validateProvenanceRecord(record: PartialProvenance): {
   valid: boolean;
   missingFields: string[];
 } {
@@ -138,7 +142,7 @@ describe('Provenance-Completeness Truth Table (FR-DISC-011)', () => {
   });
 
   it('truth table: rejects any record missing one or more required provenance dimensions', () => {
-    const testCases: { missingField: keyof ProvenanceRecord; partial: Partial<ProvenanceRecord> }[] = [
+    const testCases: { missingField: keyof ProvenanceRecord; partial: PartialProvenance }[] = [
       {
         missingField: 'sourceAvailableAt',
         partial: { ...completeProvenance, sourceAvailableAt: undefined },

@@ -547,14 +547,38 @@ if (executionProfile && shards) {
   }
 }
 const testUnits = executionProfile
-  ? open.filter(
-      (u) =>
-        !isCoordinatorTask(u) &&
+  ? open.filter((u) => {
+      if (isCoordinatorTask(u)) return false;
+      // Explicit executor markers are authoritative (fail-closed dispatch
+      // admission): a PRODUCT unit NEVER doubles into a test lane, even when
+      // its prose mentions tests — "the registry suite is extended by the
+      // test-owned task T039" is a pointer, not an authoring duty. Without
+      // this exclusion a product unit with zero testWrites was dispatched to
+      // the AGY lane with an EMPTY testWrites-derived allowlist, where every
+      // write was a guaranteed WRITE-AUTHORITY VIOLATION (runs 0a91cd86/
+      // 38e80af1, g1-signal-registry, 2026-09-09; same empty-column class
+      // as b20e5ea8).
+      if (u.executor === 'PRODUCT') return false;
+      if (u.executor === 'TEST') return true;
+      // No explicit marker (legacy plans): fall back to the write-truth
+      // heuristic, but only for units that name NO product paths in their
+      // body — a backticked product path (`packages/x/src/y.ts`) is an
+      // authoring duty for that path, never for tests. Legacy units with
+      // test writes/refs/ACs remain test units; pure-prose units with test
+      // words and no product backticks stay test units; anything ambiguous
+      // stays with the implementation lane (fail-closed toward PRODUCT).
+      const bodyProductBacktick = [...u.body.matchAll(/`([^`\n]+)`/g)].some((m) => {
+        const p = m[1].replace(/^\.\//, '');
+        return !/\s/.test(p) && classifyOwnedPath(p) === 'PRODUCT';
+      });
+      return (
+        !bodyProductBacktick &&
         (u.testWrites.length > 0 ||
           u.testRefs.length > 0 ||
           u.acceptanceCriteria.length > 0 ||
-          /\b(?:test|regression|fixture|fuzz|property)\b/i.test(u.body)),
-    )
+          /\b(?:test|regression|fixture|fuzz|property)\b/i.test(u.body))
+      );
+    })
   : [];
 /**
  * Bounded write-disjoint AGY test sharding (maintainer Part E, 2026-09-03):
@@ -617,6 +641,27 @@ function shardTestLanes(units, engine) {
 const testLanes = testUnits.length
   ? shardTestLanes(testUnits, testEngineForProfile(executionProfile))
   : [];
+
+// TEST-lane dispatch admission (fail-closed, BEFORE emit/provider spend):
+// every unit dispatched to an AI test lane must be explicitly TEST-owned.
+// A PRODUCT-executor unit (or a legacy unit whose body names a product path)
+// in a test lane is a hard build error — that routing produced empty test
+// allowlists and guaranteed WRITE-AUTHORITY refusals after provider spend
+// (runs 38e80af1/0a91cd86, 2026-09-09). --allow-ownership-violations (the
+// read-only reporter's flag) must NOT bypass this invariant: it relaxes the
+// IMPLEMENTATION-lane admission verdict reporting, never lane membership.
+for (const tu of testUnits) {
+  const bodyProductBacktick = [...tu.body.matchAll(/`([^`\n]+)`/g)].some((m) => {
+    const p = m[1].replace(/^\.\//, '');
+    return !/\s/.test(p) && classifyOwnedPath(p) === 'PRODUCT';
+  });
+  if (tu.executor === 'PRODUCT' || bodyProductBacktick) {
+    throw new Error(
+      `TEST_LANE_ADMISSION_FAILED: product unit ${tu.id} dispatched to a test lane ` +
+        `(executor=${tu.executor}); test lanes may receive only explicitly TEST-owned units`,
+    );
+  }
+}
 
 // ── ownership admission (fail-closed, BEFORE emit/provider spend) ────────────
 // With the shard plan final, verify no implementation lane carries test-owned

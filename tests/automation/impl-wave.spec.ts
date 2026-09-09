@@ -1400,3 +1400,143 @@ describe('central migration registry duty enforcement (generation-agnostic)', ()
     }
   });
 });
+
+// ── TEST-lane dispatch admission (run 0a91cd86 regression, 2026-09-09) ──────
+// The builder's testUnits heuristic previously dispatched PRODUCT units to the
+// AGY test lane whenever their prose mentioned tests ("the registry suite is
+// extended by the test-owned task T039"), producing an empty testWrites-
+// derived allowlist where every write was a guaranteed WRITE-AUTHORITY
+// VIOLATION after provider spend. The law now: explicit [executor: TEST] is
+// authoritative; a PRODUCT unit never doubles into a test lane; legacy
+// (marker-less) units with backticked PRODUCT paths stay out of test lanes.
+describe('TEST-lane dispatch admission (fail-closed)', () => {
+  function buildWith(tasks: string) {
+    const root = mkdtempSync(join(tmpdir(), 'impl-wave-route-'));
+    mkdirSync(join(root, 'specs', 'pkg-x'), { recursive: true });
+    mkdirSync(join(root, 'specs', 'implementation'), { recursive: true });
+    writeFileSync(join(root, 'specs', 'pkg-x', 'tasks.md'), tasks);
+    const ms = {
+      schemaVersion: '1.0.0',
+      milestoneId: 'MX',
+      status: 'ACTIVE',
+      packages: [
+        {
+          id: 'pkg-x',
+          objective: 'Implement subsystem x end to end with full evidence coverage.',
+          requirementIds: ['FR-X-001', 'FR-X-002'],
+          dependencies: [],
+          risk: 'MEDIUM',
+          parallelizable: false,
+          writeScopes: ['packages/x/**', 'tests/x/**', 'docs/x*'],
+          verificationCommands: ['pnpm test'],
+          status: 'RUNNING',
+        },
+        {
+          // Milestones decompose into 2-8 packages (schema law); y is a
+          // dependent sibling so pkg-x stays the only selectable candidate.
+          id: 'pkg-y',
+          objective: 'Implement subsystem y after x lands, with evidence coverage.',
+          requirementIds: ['FR-Y-001'],
+          dependencies: ['pkg-x'],
+          risk: 'LOW',
+          parallelizable: false,
+          writeScopes: ['packages/y/**'],
+          verificationCommands: ['pnpm test'],
+          status: 'PENDING',
+        },
+      ],
+    };
+    writeFileSync(
+      join(root, 'specs', 'implementation', 'current-milestone.json'),
+      JSON.stringify(ms),
+    );
+    sh('git init -q', root);
+    sh('git config user.email t@t && git config user.name t', root);
+    sh('git add -A', root);
+    sh('git commit -qm base', root);
+    const out = join(root, 'graph.json');
+    const r = spawnSync(
+      process.execPath,
+      [
+        GRAPH,
+        '--package',
+        'pkg-x',
+        '--root',
+        root,
+        '--plan-shards',
+        '2',
+        '--execution-profile',
+        'HYBRID_AGY',
+        '--out',
+        out,
+      ],
+      { encoding: 'utf8' },
+    );
+    return { root, out, r };
+  }
+
+  it('never routes PRODUCT units that mention tests into a test lane (run 0a91cd86)', () => {
+    // Exact 0a91cd86 shape: product units whose prose DELEGATES testing to a
+    // test-owned task, plus an explicit [executor: TEST] unit.
+    const tasks = `# Tasks: pkg-x
+
+## Phase A
+
+- [ ] T201 [P] Extend \`packages/x/src/migrator.ts\` MIGRATION_FAMILIES with the
+      \`sig\` family — the central registry suite is extended by the test-owned
+      task T203. Traces: FR-X-001.
+- [ ] T202 [P] Extend \`packages/x/src/generated/schema.ts\` with sig tables so
+      the parity suite stays green — the parity suite itself is test-owned; its
+      verification runs in T203's suite. Traces: FR-X-002.
+- [ ] T203 [P] [executor: TEST] Author the colocated guard suite
+      \`tests/x/guard.spec.ts\`. Traces: FR-X-001.
+`;
+    const { root, out, r } = buildWith(tasks);
+    try {
+      expect(r.status).toBe(0);
+      const g = JSON.parse(readFileSync(out, 'utf8'));
+      const testLaneUnits = (g.testLanes ?? []).flatMap((t: { units: string[] }) => t.units);
+      expect(testLaneUnits).toContain('T203'); // explicit TEST unit dispatches
+      expect(testLaneUnits).not.toContain('T201'); // PRODUCT unit never doubles
+      expect(testLaneUnits).not.toContain('T202');
+      // both PRODUCT units live in PRODUCT lanes (core or parallel shards) —
+      // the shard split between them is the planner's business, not the
+      // routing law's
+      const productLaneUnits = g.shards.flatMap((s: { units: string[] }) => s.units);
+      expect(productLaneUnits).toEqual(expect.arrayContaining(['T201', 'T202']));
+      // the test lane's allowlist is exactly its TEST unit's testWrites
+      const lane = (g.testLanes ?? [])[0];
+      expect(lane.allowedWritePaths).toEqual(['tests/x/guard.spec.ts']);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  it('fails closed when a legacy marker-less unit naming a product path would enter a test lane', () => {
+    // No executor marker at all: the body's backticked PRODUCT path keeps the
+    // unit out of test lanes; the TEST_LANE_ADMISSION invariant is the
+    // fail-closed backstop for any routing that ever tries.
+    const tasks = `# Tasks: pkg-x
+
+## Phase A
+
+- [ ] T211 Extend \`packages/x/src/migrator.ts\` MIGRATION_FAMILIES with the
+      \`sig\` family — the central registry suite is extended by the test-owned
+      task T213. Traces: FR-X-001.
+- [ ] T213 [P] [executor: TEST] Author the colocated guard suite
+      \`tests/x/guard.spec.ts\`. Traces: FR-X-001.
+`;
+    const { root, out, r } = buildWith(tasks);
+    try {
+      expect(r.status).toBe(0);
+      const g = JSON.parse(readFileSync(out, 'utf8'));
+      const testLaneUnits = (g.testLanes ?? []).flatMap((t: { units: string[] }) => t.units);
+      expect(testLaneUnits).toContain('T213');
+      expect(testLaneUnits).not.toContain('T211');
+      const core = g.shards.find((s: { id: string }) => s.id === 'core');
+      expect(core.units).toContain('T211');
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+});

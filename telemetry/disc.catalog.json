@@ -333,9 +333,9 @@
         { "name": "declarationVersion", "type": "positive-integer", "required": true },
         { "name": "runId", "type": "string", "required": true },
         { "name": "consumedAt", "type": "string<utc-timestamp>", "required": true },
-        { "name": "slotsScanned", "type": "nonnegative-integer", "required": true },
-        { "name": "callsMade", "type": "nonnegative-integer", "required": true },
-        { "name": "candidatesTouched", "type": "nonnegative-integer", "required": true },
+        { "name": "slotsScanned", "type": "positive-integer", "required": true },
+        { "name": "callsMade", "type": "positive-integer", "required": true },
+        { "name": "candidatesTouched", "type": "positive-integer", "required": true },
         { "name": "incidentId", "type": "string", "required": false }
       ]
     },

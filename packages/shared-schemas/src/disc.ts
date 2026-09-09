@@ -276,15 +276,12 @@ export const ChainAccessConsumptionSchema = z
     declarationVersion: z.number().int().positive(),
     runId: NonEmptyString,
     consumedAt: UtcTimestampSchema,
-    slotsScanned: z.number().int().nonnegative(),
-    callsMade: z.number().int().nonnegative(),
-    candidatesTouched: z.number().int().nonnegative(),
+    slotsScanned: z.number().int().positive(),
+    callsMade: z.number().int().positive(),
+    candidatesTouched: z.number().int().positive(),
     incidentId: NonEmptyString.optional(),
   })
-  .strict()
-  .refine((value) => value.slotsScanned + value.callsMade + value.candidatesTouched > 0, {
-    message: 'chain access consumption must contain a positive count',
-  });
+  .strict();
 export type ChainAccessConsumptionRecord = z.infer<typeof ChainAccessConsumptionSchema>;
 
 export const DiscLatenessBasisSchema = enumSchema(ALL_DISC_LATENESS_BASES);

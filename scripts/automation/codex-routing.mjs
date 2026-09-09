@@ -1,6 +1,7 @@
 import { readFileSync, writeFileSync } from 'node:fs';
 import { spawnSync } from 'node:child_process';
 import { EXECUTION_POLICY } from './execution-profile.mjs';
+import { providerAdmissionView, resolvePoolStateDir } from './provider-pool.mjs';
 
 export const CODEX_SERVICE_TIER = 'standard';
 // Codex CLI 0.149.1's supported wire value for the standard pricing/performance
@@ -216,6 +217,7 @@ export function buildWaveRouting(
   graph,
   executionProfile,
   availability = Object.values(CODEX_MODELS),
+  { codexPoolLimit = null, env = process.env } = {},
 ) {
   // HYBRID_AGY: per-lane engine selection. Each implementation shard is
   // independently classified by classifyCodexLane and routed CODEX when the
@@ -230,7 +232,23 @@ export function buildWaveRouting(
       : executionProfile === 'CLAUDE_AGY'
         ? 'CLAUDE'
         : 'HYBRID';
+  // Live-capacity admission (directive 2026-09-09, run f02e8580): routing is
+  // the ONLY place wave concurrency is decided, so it must honor the provider
+  // pool's live limit, not the static MAX_CODEX_WRITERS constant. The serial
+  // chain holds ONE codex permit at a time; every PARALLEL codex lane races
+  // it concurrently. Parallel codex capacity is therefore limit − 1 (floor 0
+  // — a limit of 1 admits a serial-only codex wave); overflow parallel lanes
+  // route to CLAUDE instead of deterministically POOL_AT_LIMIT-fatalizing
+  // useful work. When the pool truth is unreadable the router degrades to
+  // the historical static cap (never wider than it).
+  const livePoolLimit = resolveCodexPoolLimit({ codexPoolLimit, env });
+  const maxConcurrentCodex =
+    livePoolLimit === null
+      ? MAX_CODEX_WRITERS
+      : Math.max(1, Math.min(MAX_CODEX_WRITERS, livePoolLimit));
+  const parallelCodexBudget = Math.max(0, maxConcurrentCodex - 1);
   const lanes = [];
+  let parallelCodexUsed = 0;
   for (const shard of graph.shards ?? []) {
     const units = (shard.units ?? [])
       .map((id) => graph.units.find((u) => u.id === id))
@@ -241,12 +259,21 @@ export function buildWaveRouting(
       units,
       packageRisk: graph.package?.risk,
     });
-    const laneEngine =
+    const isParallel = shard.mode !== 'serial';
+    let laneEngine =
       implementationEngine === 'HYBRID'
         ? classification.complexityTier === 'LOW'
           ? 'CLAUDE'
           : 'CODEX'
         : implementationEngine;
+    // Capacity admission AFTER classification (HYBRID): a CODEX-wanted lane
+    // that exceeds the live parallel budget routes to CLAUDE. CODEX_AGY keeps
+    // uniform historical mapping (its waves predate the pool) but the routing
+    // record still carries the observed budget for downstream admission.
+    if (laneEngine === 'CODEX' && isParallel && parallelCodexUsed >= parallelCodexBudget) {
+      laneEngine = 'CLAUDE';
+    }
+    if (laneEngine === 'CODEX' && isParallel) parallelCodexUsed += 1;
     if (laneEngine === 'CODEX') {
       lanes.push({
         role: 'implementation',
@@ -291,6 +318,13 @@ export function buildWaveRouting(
     // downstream consumers that switch on CODEX/CLAUDE.
     testEngine: 'AGY',
     maxCodexWriters: MAX_CODEX_WRITERS,
+    // Live-capacity truth (directive 2026-09-09): the observed codex pool
+    // limit at routing time (null when the pool file was unreadable — the
+    // router then degraded to the static cap) and the concurrency budget the
+    // per-lane admission actually enforced. codexWriterCount keeps its
+    // historical meaning: the number of CODEX-routed implementation lanes.
+    codexPoolLimit: livePoolLimit,
+    parallelCodexBudget,
     codexWriterCount:
       implementationEngine === 'CODEX'
         ? codexWriterCount(graph)
@@ -299,6 +333,25 @@ export function buildWaveRouting(
           : 0,
     lanes,
   };
+}
+
+/**
+ * Live codex pool limit for routing-time capacity admission. Explicit
+ * override wins (tests / operator); otherwise read the SAME durable pool
+ * file the supervisor and lane permits mutate. An unreadable pool (no state
+ * dir, corrupt file) degrades to null — routing falls back to the static
+ * cap rather than fabricating a limit. Zero AI; never throws.
+ */
+export function resolveCodexPoolLimit({ codexPoolLimit = null, env = process.env } = {}) {
+  if (Number.isInteger(codexPoolLimit) && codexPoolLimit >= 0) return codexPoolLimit;
+  try {
+    const stateDir = resolvePoolStateDir(env);
+    const view = providerAdmissionView(stateDir);
+    const limit = view?.codex?.limit;
+    return Number.isInteger(limit) && limit >= 0 ? limit : null;
+  } catch {
+    return null;
+  }
 }
 
 function cli() {
@@ -312,14 +365,17 @@ function cli() {
     const profile = value('--profile');
     const availability =
       profile === 'CODEX_AGY' ? installedCodexModels() : Object.values(CODEX_MODELS);
-    const routing = buildWaveRouting(graph, profile, availability);
+    const codexPoolLimit = value('--codex-pool-limit');
+    const routing = buildWaveRouting(graph, profile, availability, {
+      codexPoolLimit: codexPoolLimit !== undefined ? Number(codexPoolLimit) : undefined,
+    });
     const out = value('--out');
     if (out) writeFileSync(out, JSON.stringify(routing, null, 2) + '\n');
     process.stdout.write(JSON.stringify(routing) + '\n');
     return;
   }
   console.error(
-    'usage: codex-routing.mjs --build-wave --graph file --profile PROFILE [--out file]',
+    'usage: codex-routing.mjs --build-wave --graph file --profile PROFILE [--out file] [--codex-pool-limit N]',
   );
   process.exit(2);
 }

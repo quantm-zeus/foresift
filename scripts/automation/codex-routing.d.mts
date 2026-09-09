@@ -14,6 +14,10 @@ export declare function escalateCodexRoute(
   availability?: Iterable<string>,
 ): Record<string, any>;
 export declare function codexWriterCount(graph?: Record<string, any>): number;
+export declare function resolveCodexPoolLimit(input?: {
+  codexPoolLimit?: number | null;
+  env?: NodeJS.ProcessEnv;
+}): number | null;
 export declare function buildCodexExecArgs(
   route: Record<string, any>,
   input: { worktree: string },
@@ -23,4 +27,10 @@ export declare function buildWaveRouting(
   graph: Record<string, any>,
   executionProfile: string,
   availability?: Iterable<string>,
+  capacity?: {
+    /** Explicit codex pool limit override (tests / operator); wins over the pool file. */
+    codexPoolLimit?: number | null;
+    /** Environment used to resolve the pool state dir (default: process.env). */
+    env?: NodeJS.ProcessEnv;
+  },
 ): Record<string, any>;

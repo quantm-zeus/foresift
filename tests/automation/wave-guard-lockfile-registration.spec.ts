@@ -185,3 +185,73 @@ describe('root-lockfile workspace-registration carve-out (run 8f4aaa6d regressio
     ).toBe(false);
   });
 });
+
+// ── writer-seam parity (run 38e80af1 regression, 2026-09-08) ─────────────────
+// The carve-out law previously existed ONLY at the shard-guard seam
+// (wave-guard.mjs). The AGY test writer's own ownership pre-flight
+// (exec-agy-test-writer.mjs) re-classified the RAW changed paths with no
+// carve-out, so a test lane whose `pnpm install` additively registered the
+// workspace importer of a NEW package (created by an integrated
+// implementation lane) was killed with AGY_PRODUCT_OWNERSHIP_VIOLATION —
+// deterministically, on every retry. The law must hold at BOTH seams.
+describe('writer-seam parity: AGY test lane admits a pure workspace-importer registration (run 38e80af1)', () => {
+  test('the live failing diff shape passes the carve-out the writer seam now applies', () => {
+    const fx = fixture();
+    // Exactly the run 38e80af1 diff: packages/signal-intelligence importer
+    // with four workspace links, no removals, no dependency bumps.
+    const diff = [
+      '@@ -434,6 +434,21 @@ importers:',
+      '+  packages/signal-intelligence:',
+      '+    dependencies:',
+      "+      '@foresift/domain':",
+      '+        specifier: workspace:*',
+      '+        version: link:../domain',
+      "+      '@foresift/evidence':",
+      '+        specifier: workspace:*',
+      '+        version: link:../evidence',
+      "+      '@foresift/persistence':",
+      '+        specifier: workspace:*',
+      '+        version: link:../persistence',
+      "+      '@foresift/shared-schemas':",
+      '+        specifier: workspace:*',
+      '+        version: link:../shared-schemas',
+      '+',
+      '',
+    ].join('\n');
+    // The fixture only carries packages/solana-security/package.json, so the
+    // registration-only grammar itself cannot verify signal-intelligence
+    // here — this test pins the WRITER-SEAM POLARITY instead: with the
+    // registered package present the carve-out admits the diff, and the
+    // ownership classification of the filtered path set is clean.
+    mkdirSync(join(fx.root, 'packages/signal-intelligence'), { recursive: true });
+    writeFileSync(
+      join(fx.root, 'packages/signal-intelligence/package.json'),
+      JSON.stringify(
+        {
+          name: '@foresift/signal-intelligence',
+          dependencies: {
+            '@foresift/domain': 'workspace:*',
+            '@foresift/evidence': 'workspace:*',
+            '@foresift/persistence': 'workspace:*',
+            '@foresift/shared-schemas': 'workspace:*',
+          },
+        },
+        null,
+        2,
+      ) + '\n',
+    );
+    fx.git(`add -A && git commit -qm "register signal-intelligence workspace importer"`);
+    expect(lockfileWorkspaceRegistrationOnly(diff, fx.root, fx.git)).toBe(true);
+  });
+
+  test('a dependency bump in the lockfile is still refused at the writer seam', () => {
+    const fx = fixture();
+    const diff = [
+      '@@ -900,7 +900,7 @@ importers:',
+      '-        version: 3.25.76',
+      '+        version: 3.26.0',
+      '',
+    ].join('\n');
+    expect(lockfileWorkspaceRegistrationOnly(diff, fx.root, fx.git)).toBe(false);
+  });
+});

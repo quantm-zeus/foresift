@@ -4,17 +4,30 @@
 # only when: no live maintainer exists, intentionalStop != true, and the
 # receipt names an active project state. Bounded: one start attempt per probe
 # (systemd timer cadence provides the backoff); flock guarantees singleton.
+#
+# 2026-09-08 incident (P2): with remain-on-exit on, a dead pane keeps the
+# SESSION alive — `has-session` succeeds while pane_dead=1, and send-keys to
+# a dead pane is a SILENT NO-OP. The watcher then logged a "relaunch" every
+# probe for 2h35m (21:00→23:25) while no Claude existed. The watcher must
+# (a) treat pane_dead=1 as absence, (b) respawn via `respawn-pane` (which
+# replaces the dead pane's process directly, no tty typing), and (c) verify
+# a Claude child actually materialized before logging success.
 set -euo pipefail
 RECEIPT="$HOME/.local/state/foresift/maintainer/receipt.json"
 LOCK="/run/user/$(id -u)/foresift-maintainer-watcher.lock"
 SESSION="foresift-maintainer"
+LOG="$HOME/.local/state/foresift/maintainer/watcher.log"
 # Dedicated socket: the maintainer tmux server lives in its OWN systemd unit
 # cgroup (foresift-maintainer-tmux.service) — never inside the agy daemon's
 # control group, whose midnight update restart killed the server (and every
 # Claude maintainer in it) three nights running.
-TMUX="tmux -L foresift-maintainer"
+# Socket overridable ONLY for hermetic selftests (FORESIFT_MAINTAINER_TMUX_SOCKET);
+# production default is the dedicated maintainer socket.
+TMUX="tmux -L ${FORESIFT_MAINTAINER_TMUX_SOCKET:-foresift-maintainer}"
 exec 9>"$LOCK"
 flock -n 9 || exit 0  # another probe is running
+
+note() { echo "$(date -u +%FT%TZ) watcher: $*" >> "$LOG"; }
 
 [ -f "$RECEIPT" ] || exit 0
 INTENTIONAL_STOP=$(jq -r '.intentionalStop // false' "$RECEIPT")
@@ -25,26 +38,54 @@ REPO=$(jq -r '.repo' "$RECEIPT")
 # Project has active/pending work? (milestone JSON on the checkout decides)
 MS="$REPO/specs/implementation/current-milestone.json"
 [ -f "$MS" ] || exit 0
-PROVEN=$(grep -o '"status": *"PROVEN"' "$MS" | wc -l)
-TOTAL=$(grep -o '"id": *"g[01]-' "$MS" | wc -l)
+# grep exits 1 when it matches nothing (a milestone with zero PROVEN packages
+# is a legal pre-proven state) — neutralize so pipefail doesn't kill the probe.
+PROVEN=$(grep -o '"status": *"PROVEN"' "$MS" | wc -l || true)
+TOTAL=$(grep -o '"id": *"g[01]-' "$MS" | wc -l || true)
 if [ -n "$TOTAL" ] && [ "$TOTAL" -gt 0 ] && [ "$PROVEN" -eq "$TOTAL" ]; then
   exit 0  # milestone complete — never respawn
 fi
 
-# Live maintainer already exists? (claude process resuming the session id)
+# Live maintainer already exists? (claude process resuming the session id —
+# anywhere on the host; this is the no-duplicate-maintainer proof)
 if pgrep -f "claude --resume $SESSION_ID" >/dev/null 2>&1; then
   exit 0
 fi
-# Session alive in tmux but Claude died inside? Recreate the window.
+
 if ! $TMUX has-session -t "$SESSION" 2>/dev/null; then
   $TMUX new-session -d -s "$SESSION" -c "$REPO" -x 160 -y 50 \
     "claude --resume $SESSION_ID"
-  # Persist a wake receipt line (append; fingerprint dedupe upstream)
-  echo "$(date -u +%FT%TZ) watcher: recreated tmux $SESSION resuming $SESSION_ID" \
-    >> "$HOME/.local/state/foresift/maintainer/watcher.log"
+  note "recreated tmux $SESSION resuming $SESSION_ID"
   exit 0
 fi
-# tmux exists but no claude in it: launch claude into the live session
-$TMUX send-keys -t "$SESSION" "claude --resume $SESSION_ID" C-m 2>/dev/null || true
-echo "$(date -u +%FT%TZ) watcher: relaunched claude $SESSION_ID into live $SESSION" \
-  >> "$HOME/.local/state/foresift/maintainer/watcher.log"
+
+# Session exists. A pane dead under remain-on-exit makes send-keys a silent
+# no-op (2026-09-08: 2h35m of no-op relaunches) — detect and respawn the pane
+# process instead of typing into a corpse. A LIVE pane with no Claude inside
+# (e.g. sitting at a shell) still gets send-keys, but with post-launch
+# verification.
+PANE="$SESSION:0.0"
+DEAD=$($TMUX display-message -p -t "$PANE" '#{pane_dead}' 2>/dev/null || echo 1)
+if [ "$DEAD" = "1" ]; then
+  $TMUX respawn-pane -k -t "$PANE" -c "$REPO" "claude --resume $SESSION_ID" 2>/dev/null \
+    || $TMUX respawn-pane -k -t "$PANE" "claude --resume $SESSION_ID" 2>/dev/null || {
+      note "respawn-pane FAILED for dead pane $PANE — operator inspection needed"
+      exit 1
+    }
+  note "respawned dead pane $PANE resuming $SESSION_ID (pane_dead=1)"
+else
+  $TMUX send-keys -t "$PANE" "claude --resume $SESSION_ID" C-m 2>/dev/null || true
+  note "relaunched claude $SESSION_ID into live $SESSION"
+fi
+
+# Post-launch verification (bounded): a Claude child must materialize, else
+# the failure is logged LOUDLY instead of being reported as success.
+for _ in 1 2 3 4 5 6; do
+  sleep 5
+  if pgrep -f "claude --resume $SESSION_ID" >/dev/null 2>&1; then
+    note "verified: claude $SESSION_ID is up"
+    exit 0
+  fi
+done
+note "VERIFY FAILED: no claude --resume $SESSION_ID 30s after launch attempt"
+exit 1

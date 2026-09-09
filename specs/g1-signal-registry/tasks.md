@@ -517,7 +517,7 @@ telemetry and gates.
       (AC-154, AC-190, AC-191, AC-192, AC-193, AC-020…023, AC-136). All
       green required. Traces: FR-SIG-001…006, FR-SIG-009 (package-gate proof
       of every assigned requirement's substrate).
-- [ ] T035 [executor: COORDINATOR] Regenerate the coordinator test manifest
+- [x] T035 [executor: COORDINATOR] Regenerate the coordinator test manifest
       (`node scripts/automation/bun-migration-manifest.mjs --out
 evidence/bun-migration/bun-migration-manifest.json`) after all new test
       files exist so `pnpm test`/`test:all` collect and classify them

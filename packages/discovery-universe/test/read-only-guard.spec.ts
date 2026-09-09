@@ -52,11 +52,21 @@ describe('Discovery Universe Read-Only Structural Guard (FR-DISC-006, FR-DISC-00
   });
 
   it('detects prohibited execution and transaction signing capabilities', () => {
+    // Probe source assembled at RUNTIME (repo law, mirrors
+    // packages/security/test/scan-traversal.spec.ts): this spec file's own
+    // text is swept by the repository-wide prohibited-capability scanner
+    // (sg-call, live AC-255 red 2026-09-09), so a literal
+    // sign-transaction call inside a template literal turns the root scan
+    // RED and fails two AC-255 parity/exit-contract tests.
+    const capabilityIdentifier = DISCOVERY_UNIVERSE_PROHIBITED_CAPABILITY_IDENTIFIERS.find(
+      (identifier) => identifier.startsWith('sign') && identifier.endsWith('Transaction'),
+    );
+    expect(capabilityIdentifier).toBeDefined();
     const prohibitedCapabilitySources = {
       'signer.ts': `
         export function doSign() {
           const key = privateKey;
-          signTransaction(key);
+          ${capabilityIdentifier}(key);
         }
       `,
     };

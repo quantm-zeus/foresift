@@ -78,6 +78,8 @@ describe('migration suite shape (+AC-243 probe assignments + solsec migrations)'
       'g1_cost_0003_degradation_reconciliation',
       'g1_data_0001_decision_semantics',
       'g1_data_0002_dependence_conflicts',
+      'g1_disc_0001_source_profiles',
+      'g1_disc_0002_constraints_gateways',
       'g1_exec_0001_scenarios_simulations',
       'g1_exec_0002_replay_observation',
       'g1_exec_0003_adapter_registry_state',
@@ -114,7 +116,7 @@ describe('applyMigrations (FR-DATA-001…006, FR-DR-001/002 foundation)', () => 
 
   it('applies all G0/G1 scripts to an empty database and records state', async () => {
     const report = await applyMigrations({ engine, migrationsDir: MIGRATIONS_DIR });
-    expect(report.applied.length).toBe(58);
+    expect(report.applied.length).toBe(60);
     expect(report.skipped).toEqual([]);
 
     const recorded = await appliedMigrations(engine);
@@ -164,6 +166,8 @@ describe('applyMigrations (FR-DATA-001…006, FR-DR-001/002 foundation)', () => 
       'g1_cost_0003_degradation_reconciliation',
       'g1_data_0001_decision_semantics',
       'g1_data_0002_dependence_conflicts',
+      'g1_disc_0001_source_profiles',
+      'g1_disc_0002_constraints_gateways',
       'g1_exec_0001_scenarios_simulations',
       'g1_exec_0002_replay_observation',
       'g1_exec_0003_adapter_registry_state',
@@ -183,7 +187,7 @@ describe('applyMigrations (FR-DATA-001…006, FR-DR-001/002 foundation)', () => 
   it('applies twice without damage (idempotent)', async () => {
     const second = await applyMigrations({ engine, migrationsDir: MIGRATIONS_DIR });
     expect(second.applied).toEqual([]);
-    expect(second.skipped.length).toBe(58);
+    expect(second.skipped.length).toBe(60);
 
     // The full table set still exists exactly once each.
     const tables = await engine.query<{ table_name: string }>(
@@ -453,7 +457,7 @@ describe('migrator fail-closed defenses (FR-DATA-001…006 / FR-DR-001/002 subst
       expect(await clearMigrationLeases(engine)).toBe(1);
       // …and the same call then applies cleanly.
       const report = await applyMigrations({ engine, migrationsDir: MIGRATIONS_DIR });
-      expect(report.applied.length).toBe(58);
+      expect(report.applied.length).toBe(60);
     } finally {
       await db.close();
     }
@@ -475,7 +479,7 @@ describe('migrator fail-closed defenses (FR-DATA-001…006 / FR-DR-001/002 subst
       expect((cause as ForesiftError).code).toBe(ErrorCode.MIGRATION_APPLY_ALREADY_RUNNING);
 
       // The winning run completed the full application.
-      expect((await appliedMigrations(engine)).length).toBe(58);
+      expect((await appliedMigrations(engine)).length).toBe(60);
       // The loser left no lease behind after its refusal cleanup.
       const leases = await engine.query(`SELECT * FROM ${SCHEMA_MIGRATION_LEASES_TABLE}`);
       expect(leases.rows).toHaveLength(0);

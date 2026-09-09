@@ -1,13 +1,13 @@
 {
   "schema": "foresift/bun-migration-manifest@1",
   "migrationId": "bun-test-authority-v1",
-  "generatedAt": "2026-09-09T08:44:54.323Z",
+  "generatedAt": "2026-09-09T18:11:47.811Z",
   "root": ".",
-  "totalTestFiles": 478,
+  "totalTestFiles": 487,
   "counts": {
     "CODEMOD_READY": 0,
     "AGY_REQUIRED": 0,
-    "MIGRATED": 478,
+    "MIGRATED": 487,
     "VERIFIED": 0,
     "BLOCKED": 0
   },
@@ -364,9 +364,9 @@
     {
       "path": "packages/cheap-monitor/test/migrations.spec.ts",
       "package": "@foresift/cheap-monitor",
-      "bytes": 1493,
-      "lines": 50,
-      "sha256": "4a9aa771ee1dfd5ceeed2a2be3138eea171448b048b2ddc21cb16fc248acc23b",
+      "bytes": 7265,
+      "lines": 178,
+      "sha256": "a18ae377424e1c9f56c0e2e8cdfe47454370c7e65362aea18ff7fddfee91b8e7",
       "imports": [
         "bun:test",
         "@electric-sql/pglite",
@@ -395,6 +395,34 @@
       "migrationType": "ALREADY_MIGRATED",
       "fixturesAndHelpers": ["../../../tests/fixtures/disc/index.ts"],
       "sourceAnchors": ["../../../tests/fixtures/disc/index.ts"],
+      "state": "MIGRATED"
+    },
+    {
+      "path": "packages/cheap-monitor/test/population-riders.spec.ts",
+      "package": "@foresift/cheap-monitor",
+      "bytes": 8048,
+      "lines": 216,
+      "sha256": "9a2178ace400b92c30e0dde354194d9d28f9f3a73e024d58b16129b0846a96d2",
+      "imports": [
+        "bun:test",
+        "../../../tests/fixtures/disc/index.ts",
+        "../../../tests/fixtures/disc/source-profiles.ts",
+        "../../../tests/fixtures/disc/entry-provenance.ts"
+      ],
+      "vitestImports": [],
+      "features": [],
+      "workload": "PURE",
+      "migrationType": "ALREADY_MIGRATED",
+      "fixturesAndHelpers": [
+        "../../../tests/fixtures/disc/index.ts",
+        "../../../tests/fixtures/disc/source-profiles.ts",
+        "../../../tests/fixtures/disc/entry-provenance.ts"
+      ],
+      "sourceAnchors": [
+        "../../../tests/fixtures/disc/index.ts",
+        "../../../tests/fixtures/disc/source-profiles.ts",
+        "../../../tests/fixtures/disc/entry-provenance.ts"
+      ],
       "state": "MIGRATED"
     },
     {
@@ -936,11 +964,107 @@
       "state": "MIGRATED"
     },
     {
+      "path": "packages/discovery-universe/test/chain-access-gate.spec.ts",
+      "package": "@foresift/discovery-universe",
+      "bytes": 6830,
+      "lines": 205,
+      "sha256": "3cb3ed7811eedcffa0b7e818eb0c7630b46eff07413971d14213b7ab8c3b2e47",
+      "imports": [
+        "bun:test",
+        "@electric-sql/pglite",
+        "@foresift/persistence",
+        "@foresift/domain",
+        "node:path",
+        "node:url",
+        "../src/chain-access-gate.ts",
+        "@foresift/shared-schemas"
+      ],
+      "vitestImports": [],
+      "features": [],
+      "workload": "DATABASE_PGLITE",
+      "migrationType": "ALREADY_MIGRATED",
+      "fixturesAndHelpers": [],
+      "sourceAnchors": [
+        "@electric-sql/pglite",
+        "@foresift/persistence",
+        "@foresift/domain",
+        "../src/chain-access-gate.ts",
+        "@foresift/shared-schemas"
+      ],
+      "state": "MIGRATED"
+    },
+    {
+      "path": "packages/discovery-universe/test/claim-language.spec.ts",
+      "package": "@foresift/discovery-universe",
+      "bytes": 8565,
+      "lines": 268,
+      "sha256": "8f17a894f574c6920cc91ac674c1e8cb7d8866cf4110578b7c523803d8a42c24",
+      "imports": [
+        "bun:test",
+        "@foresift/domain",
+        "../src/claim-language.ts",
+        "@foresift/shared-schemas"
+      ],
+      "vitestImports": [],
+      "features": [],
+      "workload": "PURE",
+      "migrationType": "ALREADY_MIGRATED",
+      "fixturesAndHelpers": [],
+      "sourceAnchors": ["@foresift/domain", "../src/claim-language.ts", "@foresift/shared-schemas"],
+      "state": "MIGRATED"
+    },
+    {
+      "path": "packages/discovery-universe/test/constraints.spec.ts",
+      "package": "@foresift/discovery-universe",
+      "bytes": 9500,
+      "lines": 239,
+      "sha256": "b478269a09ece9d87b2c696df136ed574c23bfc38fd72e1aacba2318b01e38a4",
+      "imports": [
+        "bun:test",
+        "@electric-sql/pglite",
+        "@foresift/persistence",
+        "node:path",
+        "node:url",
+        "../src/constraints.ts"
+      ],
+      "vitestImports": [],
+      "features": [],
+      "workload": "DATABASE_PGLITE",
+      "migrationType": "ALREADY_MIGRATED",
+      "fixturesAndHelpers": [],
+      "sourceAnchors": ["@electric-sql/pglite", "@foresift/persistence", "../src/constraints.ts"],
+      "state": "MIGRATED"
+    },
+    {
+      "path": "packages/discovery-universe/test/coverage-metrics.spec.ts",
+      "package": "@foresift/discovery-universe",
+      "bytes": 10508,
+      "lines": 307,
+      "sha256": "e22ed0b8c399d3fe75583f3f61b0c9a4e5abc35f9c49b5f37377804a83faa683",
+      "imports": [
+        "bun:test",
+        "../src/coverage-metrics.ts",
+        "../src/universe-registry.ts",
+        "@foresift/shared-schemas"
+      ],
+      "vitestImports": [],
+      "features": [],
+      "workload": "PURE",
+      "migrationType": "ALREADY_MIGRATED",
+      "fixturesAndHelpers": [],
+      "sourceAnchors": [
+        "../src/coverage-metrics.ts",
+        "../src/universe-registry.ts",
+        "@foresift/shared-schemas"
+      ],
+      "state": "MIGRATED"
+    },
+    {
       "path": "packages/discovery-universe/test/migrations.spec.ts",
       "package": "@foresift/discovery-universe",
-      "bytes": 1711,
-      "lines": 54,
-      "sha256": "71a8e85f94ee3649286002700b64ecd20ba960bdac4fded93a3db2a2f0acb4d1",
+      "bytes": 8473,
+      "lines": 243,
+      "sha256": "a0443efc36830af811509c70d76ec5d05a89c5323108f652550deac354a04f74",
       "imports": [
         "bun:test",
         "@electric-sql/pglite",
@@ -972,6 +1096,49 @@
       "state": "MIGRATED"
     },
     {
+      "path": "packages/discovery-universe/test/read-only-guard.spec.ts",
+      "package": "@foresift/discovery-universe",
+      "bytes": 3327,
+      "lines": 84,
+      "sha256": "99415bf38a9c15f987e7e21ff601d249c63e074091b7ba6b6ef85feb1cf7430e",
+      "imports": ["bun:test", "node:fs", "node:path", "node:url", "../src/read-only-guard.ts"],
+      "vitestImports": [],
+      "features": [],
+      "workload": "PURE",
+      "migrationType": "ALREADY_MIGRATED",
+      "fixturesAndHelpers": [],
+      "sourceAnchors": ["../src/read-only-guard.ts"],
+      "state": "MIGRATED"
+    },
+    {
+      "path": "packages/discovery-universe/test/recall-estimator.spec.ts",
+      "package": "@foresift/discovery-universe",
+      "bytes": 9003,
+      "lines": 262,
+      "sha256": "42461ec23c583a5b87a619bf055ab7ec1661c223acc859b03255e90b1b0c1e2e",
+      "imports": [
+        "bun:test",
+        "@electric-sql/pglite",
+        "@foresift/persistence",
+        "node:path",
+        "node:url",
+        "../src/recall-estimator.ts",
+        "@foresift/shared-schemas"
+      ],
+      "vitestImports": [],
+      "features": [],
+      "workload": "DATABASE_PGLITE",
+      "migrationType": "ALREADY_MIGRATED",
+      "fixturesAndHelpers": [],
+      "sourceAnchors": [
+        "@electric-sql/pglite",
+        "@foresift/persistence",
+        "../src/recall-estimator.ts",
+        "@foresift/shared-schemas"
+      ],
+      "state": "MIGRATED"
+    },
+    {
       "path": "packages/discovery-universe/test/registry.spec.ts",
       "package": "@foresift/discovery-universe",
       "bytes": 1777,
@@ -999,6 +1166,34 @@
       "migrationType": "ALREADY_MIGRATED",
       "fixturesAndHelpers": ["../../../tests/fixtures/disc/index.ts"],
       "sourceAnchors": ["../../../tests/fixtures/disc/index.ts"],
+      "state": "MIGRATED"
+    },
+    {
+      "path": "packages/discovery-universe/test/source-profiles.spec.ts",
+      "package": "@foresift/discovery-universe",
+      "bytes": 8135,
+      "lines": 213,
+      "sha256": "58e7512f7bc04884a9e2656f3de721e556819ea98f752d173292e5dc734453cf",
+      "imports": [
+        "bun:test",
+        "@electric-sql/pglite",
+        "@foresift/persistence",
+        "@foresift/domain",
+        "node:path",
+        "node:url",
+        "../src/index.ts"
+      ],
+      "vitestImports": [],
+      "features": [],
+      "workload": "DATABASE_PGLITE",
+      "migrationType": "ALREADY_MIGRATED",
+      "fixturesAndHelpers": [],
+      "sourceAnchors": [
+        "@electric-sql/pglite",
+        "@foresift/persistence",
+        "@foresift/domain",
+        "../src/index.ts"
+      ],
       "state": "MIGRATED"
     },
     {
@@ -1122,6 +1317,21 @@
       "state": "MIGRATED"
     },
     {
+      "path": "packages/domain/test/disc.spec.ts",
+      "package": "@foresift/domain",
+      "bytes": 13757,
+      "lines": 380,
+      "sha256": "38b6e813df58a9abf11032718d34e131650d794812b0549361fbd2465678412d",
+      "imports": ["bun:test", "../src/index.ts"],
+      "vitestImports": [],
+      "features": [],
+      "workload": "PURE",
+      "migrationType": "ALREADY_MIGRATED",
+      "fixturesAndHelpers": [],
+      "sourceAnchors": ["../src/index.ts"],
+      "state": "MIGRATED"
+    },
+    {
       "path": "packages/domain/test/exec.spec.ts",
       "package": "@foresift/domain",
       "bytes": 19921,
@@ -1184,9 +1394,9 @@
     {
       "path": "packages/domain/test/sig.spec.ts",
       "package": "@foresift/domain",
-      "bytes": 7816,
-      "lines": 257,
-      "sha256": "9dd4817b6b06c86c7b8ffd5d7140b6a173482c8e2f6edd176d286a97134d8a5f",
+      "bytes": 7048,
+      "lines": 221,
+      "sha256": "ff3c39f52c257db3e303c33a2014e3161b6acffef32328e727e473b6859b7a24",
       "imports": ["bun:test"],
       "vitestImports": [],
       "features": ["dynamic-import"],
@@ -1611,9 +1821,9 @@
     {
       "path": "packages/persistence/test/migrator.spec.ts",
       "package": "@foresift/persistence",
-      "bytes": 21583,
-      "lines": 538,
-      "sha256": "cc022c73083848b96487ff6d5a148831cd922dd85add5cba8cf11903b9b8fa81",
+      "bytes": 21745,
+      "lines": 542,
+      "sha256": "7a40eef97bc8c47f81aa25c1c595809362afb227d7fa9e2f4eb519b7617da0f4",
       "imports": [
         "bun:test",
         "@electric-sql/pglite",
@@ -1737,9 +1947,9 @@
     {
       "path": "packages/persistence/test/schema-parity.spec.ts",
       "package": "@foresift/persistence",
-      "bytes": 12319,
-      "lines": 309,
-      "sha256": "2ca37b494cf5fac329cbfff6cba7b4880c1e64dbc7c49da6177f0f5aa0fc3e75",
+      "bytes": 13443,
+      "lines": 332,
+      "sha256": "35f857df85ae87a5b2e7c17c6edef699fc9e07592bcdb29aee2e89c51fd3a5a4",
       "imports": [
         "bun:test",
         "@electric-sql/pglite",
@@ -3122,16 +3332,39 @@
     {
       "path": "packages/shared-schemas/test/disc.spec.ts",
       "package": "@foresift/shared-schemas",
-      "bytes": 6634,
-      "lines": 166,
-      "sha256": "4eac42db5ee87463c4ef8b806e6e7cbbd80ac78469f921f449ab4363c2f3fe57",
-      "imports": ["bun:test", "../src/disc.ts", "../../../tests/fixtures/disc/index.ts"],
+      "bytes": 18921,
+      "lines": 464,
+      "sha256": "b4ad07b4d80d35949d48a9786e422b41aa52a3ac211b7f29e94df1f0acb93696",
+      "imports": [
+        "bun:test",
+        "../src/disc.ts",
+        "../src/disc.ts",
+        "../../../tests/fixtures/disc/index.ts",
+        "../../../tests/fixtures/disc/source-profiles.ts",
+        "../../../tests/fixtures/disc/entry-provenance.ts",
+        "../../../tests/fixtures/disc/constraints.ts",
+        "../../../tests/fixtures/disc/chain-access.ts"
+      ],
       "vitestImports": [],
       "features": [],
       "workload": "PURE",
       "migrationType": "ALREADY_MIGRATED",
-      "fixturesAndHelpers": ["../../../tests/fixtures/disc/index.ts"],
-      "sourceAnchors": ["../src/disc.ts", "../../../tests/fixtures/disc/index.ts"],
+      "fixturesAndHelpers": [
+        "../../../tests/fixtures/disc/index.ts",
+        "../../../tests/fixtures/disc/source-profiles.ts",
+        "../../../tests/fixtures/disc/entry-provenance.ts",
+        "../../../tests/fixtures/disc/constraints.ts",
+        "../../../tests/fixtures/disc/chain-access.ts"
+      ],
+      "sourceAnchors": [
+        "../src/disc.ts",
+        "../src/disc.ts",
+        "../../../tests/fixtures/disc/index.ts",
+        "../../../tests/fixtures/disc/source-profiles.ts",
+        "../../../tests/fixtures/disc/entry-provenance.ts",
+        "../../../tests/fixtures/disc/constraints.ts",
+        "../../../tests/fixtures/disc/chain-access.ts"
+      ],
       "state": "MIGRATED"
     },
     {
@@ -3212,9 +3445,9 @@
     {
       "path": "packages/shared-schemas/test/sig.spec.ts",
       "package": "@foresift/shared-schemas",
-      "bytes": 8409,
-      "lines": 212,
-      "sha256": "72d9703c5b7d004c540cbcc5ff0e33daeaf90f5fb181940c6062f07294e656fa",
+      "bytes": 8917,
+      "lines": 219,
+      "sha256": "3ce9952377dc1e58ff0135208428bfd889773a326defdac6e36ecf64e259244a",
       "imports": ["bun:test", "zod"],
       "vitestImports": [],
       "features": ["dynamic-import"],
@@ -3272,9 +3505,9 @@
     {
       "path": "packages/signal-intelligence/test/diversity-exploration.spec.ts",
       "package": "@foresift/signal-intelligence",
-      "bytes": 2232,
-      "lines": 57,
-      "sha256": "7fc2b1e4e3a358d8d91569e556e056135aa09031e862d8d183a8f95b97bff0a8",
+      "bytes": 2239,
+      "lines": 61,
+      "sha256": "eda3bd7aef1db788208697c7fe9fcb72087ff8dbe2fa84a0256e2303b3f0dd4e",
       "imports": ["bun:test", "node:fs", "node:path", "node:url"],
       "vitestImports": [],
       "features": [],
@@ -3287,9 +3520,9 @@
     {
       "path": "packages/signal-intelligence/test/funnel-vectors.spec.ts",
       "package": "@foresift/signal-intelligence",
-      "bytes": 2971,
-      "lines": 78,
-      "sha256": "f9026bc9005fa1e4c47c0b29b3ed86cef893fa8ce479af78df8bd7305aba461d",
+      "bytes": 2981,
+      "lines": 80,
+      "sha256": "7d3c12c47516db8d419450a802bd348c61992f6f2e5a0bdfefdd0de475662a83",
       "imports": ["bun:test", "node:fs", "node:path", "node:url"],
       "vitestImports": [],
       "features": [],
@@ -3302,9 +3535,9 @@
     {
       "path": "packages/signal-intelligence/test/lifecycle.spec.ts",
       "package": "@foresift/signal-intelligence",
-      "bytes": 2393,
+      "bytes": 2392,
       "lines": 62,
-      "sha256": "4f7ffa0832af96e3b0c9451b7402694e2726b3ef251fdef669a2b13d564a8fe1",
+      "sha256": "616fe6b6510e3156660f27965cbb76e41131bb78244727d6968e88c433fb4557",
       "imports": ["bun:test", "node:fs", "node:path", "node:url"],
       "vitestImports": [],
       "features": [],
@@ -3317,9 +3550,9 @@
     {
       "path": "packages/signal-intelligence/test/read-only-guard.spec.ts",
       "package": "@foresift/signal-intelligence",
-      "bytes": 2131,
-      "lines": 63,
-      "sha256": "55196756b2d95f7403963ef2daa7e065aa7b469a4f7e2eab09940f01ab38639f",
+      "bytes": 2124,
+      "lines": 60,
+      "sha256": "2390177959133f1e938df63ef5012e95427dcb6b5df71483468d8da654e62e0c",
       "imports": ["bun:test", "node:fs", "node:path", "node:url"],
       "vitestImports": [],
       "features": [],
@@ -3377,9 +3610,9 @@
     {
       "path": "packages/signal-intelligence/test/selection.spec.ts",
       "package": "@foresift/signal-intelligence",
-      "bytes": 2595,
-      "lines": 75,
-      "sha256": "f9dbc19ff3835af579530627d885659ad36d0ef6124eefb184f681d694284d40",
+      "bytes": 2592,
+      "lines": 77,
+      "sha256": "22e60c6ce884e421f4c719681cf72f1bc679bc26acfb3c6b17665bea6acb8a62",
       "imports": ["bun:test", "node:fs", "node:path", "node:url"],
       "vitestImports": [],
       "features": [],
@@ -3392,9 +3625,9 @@
     {
       "path": "packages/signal-intelligence/test/stability-cohort.spec.ts",
       "package": "@foresift/signal-intelligence",
-      "bytes": 2910,
-      "lines": 75,
-      "sha256": "c704c8ddb1690940cb96c5da2abf231583f77cfead77ebb3792415920d4b20fa",
+      "bytes": 2919,
+      "lines": 80,
+      "sha256": "3b4a92860ba8144b40beb8fab6a2bdeef3f90dbc1866c6b9138554e77ec0e0ca",
       "imports": ["bun:test", "node:fs", "node:path", "node:url"],
       "vitestImports": [],
       "features": [],
@@ -3878,9 +4111,9 @@
     {
       "path": "tests/acceptance/AC-020.spec.ts",
       "package": "acceptance",
-      "bytes": 13863,
-      "lines": 357,
-      "sha256": "a5a4f80e3eb09712c9f02a107a5ab2a3759c158699de95689f1692d4a1648779",
+      "bytes": 13980,
+      "lines": 372,
+      "sha256": "396ca9ce3d95b7fea2e9ce8d2ecac1f061956410bb8bb312eff7c40c87790dbd",
       "imports": [
         "bun:test",
         "@foresift/domain",
@@ -3938,9 +4171,9 @@
     {
       "path": "tests/acceptance/AC-022.spec.ts",
       "package": "acceptance",
-      "bytes": 9930,
+      "bytes": 9929,
       "lines": 268,
-      "sha256": "123d5bfdc29a89f86276806c45eda5d84968d979188a55162bb152f5f4ca7ac9",
+      "sha256": "798d1cecd28141ef582d37df40845e709c437b6434ba297b334e563f2e94a314",
       "imports": [
         "bun:test",
         "@foresift/domain",
@@ -4315,16 +4548,33 @@
     {
       "path": "tests/acceptance/AC-110.spec.ts",
       "package": "acceptance",
-      "bytes": 2540,
-      "lines": 58,
-      "sha256": "bcaf6700716156019f0f4cc97e3ad81dcb8812198770c4f7e85e9edc523c23bc",
-      "imports": ["bun:test", "../fixtures/disc/index.ts"],
+      "bytes": 7056,
+      "lines": 159,
+      "sha256": "c7136959263bda2944a776e839b43c3c878a3cf3aed67f1d04df8a0f6fb856ff",
+      "imports": [
+        "bun:test",
+        "../fixtures/disc/index.ts",
+        "../fixtures/disc/entry-provenance.ts",
+        "../fixtures/disc/source-profiles.ts",
+        "../../packages/discovery-universe/src/source-profiles.ts",
+        "../../packages/shared-schemas/src/disc.ts"
+      ],
       "vitestImports": [],
       "features": [],
       "workload": "PURE",
       "migrationType": "ALREADY_MIGRATED",
-      "fixturesAndHelpers": ["../fixtures/disc/index.ts"],
-      "sourceAnchors": ["../fixtures/disc/index.ts"],
+      "fixturesAndHelpers": [
+        "../fixtures/disc/index.ts",
+        "../fixtures/disc/entry-provenance.ts",
+        "../fixtures/disc/source-profiles.ts"
+      ],
+      "sourceAnchors": [
+        "../fixtures/disc/index.ts",
+        "../fixtures/disc/entry-provenance.ts",
+        "../fixtures/disc/source-profiles.ts",
+        "../../packages/discovery-universe/src/source-profiles.ts",
+        "../../packages/shared-schemas/src/disc.ts"
+      ],
       "state": "MIGRATED"
     },
     {
@@ -4639,9 +4889,9 @@
     {
       "path": "tests/acceptance/AC-154.spec.ts",
       "package": "acceptance",
-      "bytes": 6152,
-      "lines": 166,
-      "sha256": "34fc8629b64f0e010efb0f1f3cb0a94a71e32da616dc0531a67cd2d6b3d0ca03",
+      "bytes": 6136,
+      "lines": 164,
+      "sha256": "1873b64fd078c04ad027f4a5e75ac6c7464ddde1d97129d9ab9eeb9b1738512e",
       "imports": ["bun:test", "node:fs", "node:path", "node:url"],
       "vitestImports": [],
       "features": [],
@@ -4654,9 +4904,9 @@
     {
       "path": "tests/acceptance/AC-190.spec.ts",
       "package": "acceptance",
-      "bytes": 4893,
-      "lines": 144,
-      "sha256": "a0ecc0d83c124ba311d26c618da0d22dccc821d0ad6d64cf71c1e09319721a78",
+      "bytes": 4903,
+      "lines": 146,
+      "sha256": "da81476669726fa13843bd62f2dd619cfd60a31de90ca708a0ca04860177fcbf",
       "imports": ["bun:test"],
       "vitestImports": [],
       "features": [],
@@ -4669,9 +4919,9 @@
     {
       "path": "tests/acceptance/AC-191.spec.ts",
       "package": "acceptance",
-      "bytes": 3817,
-      "lines": 90,
-      "sha256": "b4ee60001c7321b117bd4d9c5f48c6989ac55292fc434e8cd556fe1551eab824",
+      "bytes": 3854,
+      "lines": 99,
+      "sha256": "4f4331f9e5ec3aacbf0efb78a7c89d1e79a6a84d14af2257cf1fae72098611cd",
       "imports": ["bun:test"],
       "vitestImports": [],
       "features": [],
@@ -4684,9 +4934,9 @@
     {
       "path": "tests/acceptance/AC-192.spec.ts",
       "package": "acceptance",
-      "bytes": 3413,
-      "lines": 88,
-      "sha256": "7f58a18a898dcc1fce3e0618f9611bc5b86ac406ae48090d269eeabf38c638d3",
+      "bytes": 3434,
+      "lines": 91,
+      "sha256": "579eb319d051ecb36aec3e0ad6a32996ec5e459facfeae198adc6b82bd4cac57",
       "imports": ["bun:test", "node:fs", "node:path", "node:url"],
       "vitestImports": [],
       "features": [],
@@ -6349,9 +6599,9 @@
     {
       "path": "tests/automation/impl-wave.spec.ts",
       "package": "automation",
-      "bytes": 64600,
-      "lines": 1403,
-      "sha256": "b08fbdc6a7a941ce2f6825aa0881c1df8cac4441cfccbbbc85297f34eab1fcae",
+      "bytes": 73178,
+      "lines": 1610,
+      "sha256": "01fd53052c73cee1013c20b2f72da77c0e55aa30ae592ebcf1ee1ab267a3860c",
       "imports": ["bun:test", "node:child_process", "node:fs", "node:os", "node:path", "node:url"],
       "vitestImports": [],
       "features": ["dynamic-import"],
@@ -6423,9 +6673,9 @@
     {
       "path": "tests/automation/maintainer-wave-regressions.spec.ts",
       "package": "automation",
-      "bytes": 13337,
+      "bytes": 13456,
       "lines": 352,
-      "sha256": "fcbb6dfb149a046cc97339f99980539dfd50cda6c6ddf05b2bb6966048cb925b",
+      "sha256": "608abd61c8f9215015af0ea036f5231a321a8c262029f81fa684d4d59852cb43",
       "imports": [
         "bun:test",
         "node:child_process",
@@ -6509,9 +6759,9 @@
     {
       "path": "tests/automation/planned-handoff.spec.ts",
       "package": "automation",
-      "bytes": 27019,
-      "lines": 670,
-      "sha256": "8fe40b8c19100b23542ead2a83221aef28668ae396f6ff122749a070a92332c7",
+      "bytes": 32738,
+      "lines": 789,
+      "sha256": "93eb0f296ad1d851be85849e0bfc5172df927161823eee6a7c39d8006b5904ef",
       "imports": [
         "node:child_process",
         "node:fs",
@@ -7151,9 +7401,9 @@
     {
       "path": "tests/automation/wave-guard-lockfile-registration.spec.ts",
       "package": "automation",
-      "bytes": 6881,
-      "lines": 188,
-      "sha256": "5332c6186fae3ec33e24b8aa5ce96894aa6be7fbd3a52e64cb62480e73eabbe2",
+      "bytes": 10011,
+      "lines": 258,
+      "sha256": "949ffb09634be4e5b40f654d77ae661421b5b8c12c7f41b31efc550bcb8e6b61",
       "imports": [
         "bun:test",
         "node:child_process",
@@ -7404,9 +7654,9 @@
     {
       "path": "tests/negative/AC-020.negative.spec.ts",
       "package": "negative",
-      "bytes": 8071,
-      "lines": 221,
-      "sha256": "9cee5c0b5172508ad5f8d27a1a0c9aa631efd38bfe26a8e2448c723d5b87ea8e",
+      "bytes": 8110,
+      "lines": 226,
+      "sha256": "bb0468a04a80a601ce25ee08ae0b4d7467cbc54e0e40e65bdfa7edfce15b4ff4",
       "imports": [
         "bun:test",
         "@foresift/domain",
@@ -7840,16 +8090,33 @@
     {
       "path": "tests/negative/AC-110.negative.spec.ts",
       "package": "negative",
-      "bytes": 1333,
-      "lines": 34,
-      "sha256": "a75bf2c735432dc40ff364e88150eacf9a1048bb30fabd6b103bc8644c66aef8",
-      "imports": ["bun:test", "../fixtures/disc/index.ts"],
+      "bytes": 6559,
+      "lines": 152,
+      "sha256": "ee19b84c7cf3cc2aa5330ce0cd7e289506b556f40d16a36edf1e45d72fb3ba14",
+      "imports": [
+        "bun:test",
+        "../fixtures/disc/index.ts",
+        "../fixtures/disc/entry-provenance.ts",
+        "../fixtures/disc/source-profiles.ts",
+        "../../packages/discovery-universe/src/source-profiles.ts",
+        "../../packages/shared-schemas/src/disc.ts"
+      ],
       "vitestImports": [],
       "features": [],
       "workload": "PURE",
       "migrationType": "ALREADY_MIGRATED",
-      "fixturesAndHelpers": ["../fixtures/disc/index.ts"],
-      "sourceAnchors": ["../fixtures/disc/index.ts"],
+      "fixturesAndHelpers": [
+        "../fixtures/disc/index.ts",
+        "../fixtures/disc/entry-provenance.ts",
+        "../fixtures/disc/source-profiles.ts"
+      ],
+      "sourceAnchors": [
+        "../fixtures/disc/index.ts",
+        "../fixtures/disc/entry-provenance.ts",
+        "../fixtures/disc/source-profiles.ts",
+        "../../packages/discovery-universe/src/source-profiles.ts",
+        "../../packages/shared-schemas/src/disc.ts"
+      ],
       "state": "MIGRATED"
     },
     {
@@ -8194,9 +8461,9 @@
     {
       "path": "tests/negative/AC-191.negative.spec.ts",
       "package": "negative",
-      "bytes": 1675,
+      "bytes": 1677,
       "lines": 47,
-      "sha256": "e8651fe54ec0624adee17b919fd703f57948a266743f006512570790934ecd8d",
+      "sha256": "740ec9404408f327cd09dcf41bfac98306b9c010a29f4f92bb5f066a58ebf2c7",
       "imports": ["bun:test"],
       "vitestImports": [],
       "features": [],
@@ -9414,16 +9681,16 @@
     {
       "path": "tests/telemetry-catalog.spec.ts",
       "package": "root",
-      "bytes": 14711,
-      "lines": 446,
-      "sha256": "899fef4da6c9d61b8a30af71926a339b57f758ade8e41a7a07eff324dcaa441d",
-      "imports": ["node:fs", "node:path", "bun:test", "@foresift/shared-schemas"],
+      "bytes": 19983,
+      "lines": 619,
+      "sha256": "354b57789e87a5bb4d3b8d8a1e1e411c60232a40642c1a0b40510955a86f9ad0",
+      "imports": ["node:fs", "node:path", "bun:test", "../packages/shared-schemas/src/index.ts"],
       "vitestImports": [],
       "features": [],
       "workload": "PURE",
       "migrationType": "ALREADY_MIGRATED",
       "fixturesAndHelpers": [],
-      "sourceAnchors": ["@foresift/shared-schemas"],
+      "sourceAnchors": ["../packages/shared-schemas/src/index.ts"],
       "state": "MIGRATED"
     }
   ],

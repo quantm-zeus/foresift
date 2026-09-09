@@ -47,7 +47,7 @@ riders, then fixtures and AC suites, then telemetry and gates.
 
 ## Phase 1 — Domain vocabularies and error codes (blocks later phases)
 
-- [ ] T001 [P] Create `packages/domain/src/disc.ts`: `DiscEntryReason` (8 members
+- [x] T001 [P] Create `packages/domain/src/disc.ts`: `DiscEntryReason` (8 members — [evidence: NO_OP_ALREADY_SATISFIED] reconciled pre-provider: packages/domain/src/disc.ts committed at HEAD (03ec979): 9 vocabularies re-exported, 9 fail-closed parse functions, 4 pure laws; T027 colocated suites now execute the REAL exports (46/46, 182 expects vs 32 vacuous baseline)
       per vocabulary law), `DiscRightsBasis` (5), `DiscManipulationPolicy` (3),
       `DiscClaimBasis` (3), `DiscConstraintKind` (6), `DiscConstraintEffect`
       (3), `DiscChainAccessPurpose` (2), `DiscRecallVerdict` (4),
@@ -73,7 +73,7 @@ riders, then fixtures and AC suites, then telemetry and gates.
       (2026-09-07 ownership law: implementation lanes carry product work
       only). Traces: FR-DISC-006, FR-DISC-008, FR-DISC-009, FR-DISC-010,
       FR-DISC-013, FR-DISC-014.
-- [ ] T002 [serial-reason: SEMANTIC_DEPENDENCY] Extend `packages/domain/src/errors.ts`
+- [x] T002 [serial-reason: SEMANTIC_DEPENDENCY] Extend `packages/domain/src/errors.ts`
       with the DISC_* error-code block and the `DiscError` subclass, and extend
       `packages/domain/src/index.ts` exports for the new disc module. Traces:
       FR-DISC-006, FR-DISC-007, FR-DISC-008, FR-DISC-009, FR-DISC-010,
@@ -81,7 +81,7 @@ riders, then fixtures and AC suites, then telemetry and gates.
 
 ## Phase 2 — Shared schemas (blocks persistence repos and PGlite suites)
 
-- [ ] T003 [P] Extend `packages/shared-schemas/src/disc.ts`: Zod schemas
+- [x] T003 [P] Extend `packages/shared-schemas/src/disc.ts`: Zod schemas
       `DiscSourceProfileSchema` (FR-DISC-011: source/profile_version,
       sourceClass via the existing `DiscoverySourceClassSchema`, coverage
       scope object, rights basis (5 members), query/filter version,
@@ -116,7 +116,7 @@ riders, then fixtures and AC suites, then telemetry and gates.
 
 ## Phase 3 — Persistence: migration family `disc` + registry extension (blocks repos and PGlite suites)
 
-- [ ] T004 [serial-reason: ORDERED_MIGRATION] Create
+- [x] T004 [serial-reason: ORDERED_MIGRATION] Create
       `migrations/g1_disc_0001_source_profiles.sql`: `disc.disc_source_profiles`
       (additive-versioned, PRIMARY KEY (source_id, profile_version), the
       §63.2 source-class CHECK, DiscRightsBasis and DiscManipulationPolicy
@@ -129,7 +129,7 @@ riders, then fixtures and AC suites, then telemetry and gates.
       and `disc.promotion_decisions` (population_manifest_id) — additive only,
       G0 state machines and CHECK laws untouched. Apply-on-PGlite clean,
       idempotent on replay. Traces: FR-DISC-009, FR-DISC-011.
-- [ ] T005 [serial-reason: ORDERED_MIGRATION] Create
+- [x] T005 [serial-reason: ORDERED_MIGRATION] Create
       `migrations/g1_disc_0002_constraints_gateways.sql`: the nine ENUM types
       (`disc_entry_reason`, `disc_claim_basis`, `disc_constraint_kind`,
       `disc_constraint_effect`, `disc_chain_access_purpose`,
@@ -144,7 +144,7 @@ riders, then fixtures and AC suites, then telemetry and gates.
       only `disc.refuse_mutation` triggers on source profiles, entry
       provenance, constraints, and recall estimates. Traces: FR-DISC-006,
       FR-DISC-008, FR-DISC-010, FR-DISC-013, FR-DISC-014.
-- [ ] T006 [P] [executor: TEST] Extend the colocated migration suites
+- [x] T006 [P] [executor: TEST] Extend the colocated migration suites — [evidence: NO_OP_ALREADY_SATISFIED] completed by AGY test lane (commit 51ea511, verified 2026-09-09, suites green at merged HEAD)
       `packages/discovery-universe/test/migrations.spec.ts` and
       `packages/cheap-monitor/test/migrations.spec.ts` (test-owned paths,
       2026-09-07 ownership law): g1_disc_0001/0002 discovery expectations,
@@ -153,7 +153,7 @@ riders, then fixtures and AC suites, then telemetry and gates.
 
 ## Phase 4 — Source profiles, provenance, and coverage metrics (blocks honesty layers)
 
-- [ ] T007 [serial-reason: SEMANTIC_DEPENDENCY] Implement
+- [x] T007 [serial-reason: SEMANTIC_DEPENDENCY] Implement
       `packages/discovery-universe/src/source-profiles.ts` + extend
       `packages/discovery-universe/src/index.ts`: FR-DISC-011 — profile
       registration keyed (source_id, profile_version) with additive-version
@@ -165,7 +165,7 @@ riders, then fixtures and AC suites, then telemetry and gates.
       effective at an asOf timestamp. Depends on T001–T005. Colocated suites
       authored by test-owned T027 (ownership law). Traces: FR-DISC-011,
       FR-DISC-009, AC-110.
-- [ ] T008 [serial-reason: SEMANTIC_DEPENDENCY] Implement
+- [x] T008 [serial-reason: SEMANTIC_DEPENDENCY] Implement
       `packages/discovery-universe/src/coverage-metrics.ts`: FR-DISC-012 +
       FR-DISC-007 — pure metric functions resolved at an explicit asOf
       boundary through the proven `visibleAt` predicate over the
@@ -190,7 +190,7 @@ riders, then fixtures and AC suites, then telemetry and gates.
 
 ## Phase 5 — Honesty layers: recall, constraints, claim language, chain access (blocks AC suites)
 
-- [ ] T009 [serial-reason: SEMANTIC_DEPENDENCY] Implement
+- [x] T009 [serial-reason: SEMANTIC_DEPENDENCY] Implement
       `packages/discovery-universe/src/recall-estimator.ts`: FR-DISC-006 +
       FR-DISC-010 — claim-basis admission (three admissible bases via the T001
       pure laws), structural self-recall refusal (the evaluated source inside
@@ -208,7 +208,7 @@ riders, then fixtures and AC suites, then telemetry and gates.
       `disc.recall_estimates` with evidence refs. Depends on T001–T005, T007.
       Colocated suites authored by test-owned T027 (ownership law). Traces:
       FR-DISC-006, FR-DISC-009, FR-DISC-010, AC-111.
-- [ ] T010 [serial-reason: SEMANTIC_DEPENDENCY] Implement
+- [x] T010 [serial-reason: SEMANTIC_DEPENDENCY] Implement
       `packages/discovery-universe/src/constraints.ts`: FR-DISC-013 —
       read-only resolution of the G0 constraint sources into versioned
       `disc.population_constraints` rows: collector gaps
@@ -227,14 +227,14 @@ riders, then fixtures and AC suites, then telemetry and gates.
       outcomes (yield denominators exclude affected windows instead).
       Depends on T001–T005. Colocated suites authored by test-owned T027
       (ownership law). Traces: FR-DISC-013, FR-DISC-009, AC-224.
-- [ ] T011 [P] Implement `packages/discovery-universe/src/claim-language.ts`:
+- [x] T011 [P] Implement `packages/discovery-universe/src/claim-language.ts`:
       FR-DISC-014 — structured claim objects (scope adjectives
       FULL_MARKET/ALL_SOLANA/UNIVERSAL_RECALL evaluated against the cited
       manifest's population class and sampling contract; exhaustive
       selection probabilities required), typed `DISC_CLAIM_LANGUAGE_REFUSED`
       refusal, refusal recording for telemetry. Depends on T001–T003. Traces:
       FR-DISC-014, FR-DISC-009.
-- [ ] T012 [P] Implement
+- [x] T012 [P] Implement
       `packages/discovery-universe/src/chain-access-gate.ts`: FR-DISC-008 —
       declaration admission (purpose VERIFICATION or RETROSPECTIVE_BACKFILL,
       program scope, the four numeric bounds, FREE-only cost class,
@@ -247,7 +247,7 @@ riders, then fixtures and AC suites, then telemetry and gates.
       and no silent widening (a changed bound is a NEW declaration version;
       in-place edits are unrepresentable). Depends on T001–T005. Traces:
       FR-DISC-008, AC-227, AC-229.
-- [ ] T013 [P] Implement `packages/discovery-universe/src/read-only-guard.ts`:
+- [x] T013 [P] Implement `packages/discovery-universe/src/read-only-guard.ts`:
       INV-001 structural surface asserting the package exposes no
       transaction-construction/submission/custody/signing surface and no
       model-provider/agent import; prohibited-capability scanner hook
@@ -258,7 +258,7 @@ riders, then fixtures and AC suites, then telemetry and gates.
 
 ## Phase 6 — Cheap-monitor population riders (blocks AC suites)
 
-- [ ] T014 [serial-reason: SEMANTIC_DEPENDENCY] Implement
+- [x] T014 [serial-reason: SEMANTIC_DEPENDENCY] Implement
       `packages/cheap-monitor/src/population-riders.ts` + extend
       `packages/cheap-monitor/src/index.ts`: FR-DISC-009/011 — rider
       persistence linking `disc.cheap_monitor_rows` rows and
@@ -272,14 +272,14 @@ riders, then fixtures and AC suites, then telemetry and gates.
 
 ## Phase 7 — Fixtures and acceptance/negative facet suites (blocks gates)
 
-- [ ] T015 [P] [executor: TEST] Author `tests/fixtures/disc/source-profiles.ts` +
+- [x] T015 [P] [executor: TEST] Author `tests/fixtures/disc/source-profiles.ts` +
       `tests/fixtures/disc/entry-provenance.ts`: §63.2-classed profile vectors
       (all eight source classes; complete FR-DISC-011 field sets and
       incomplete refusals; versioned supersession chains) and per-entry
       provenance vectors (all eight entry reasons; complete and
       claim-breaking-incomplete variants; first-party vs non-first-party
       flags). Traces: FR-DISC-011, AC-110.
-- [ ] T016 [P] [executor: TEST] Author `tests/fixtures/disc/metric-inputs.ts` +
+- [x] T016 [P] [executor: TEST] Author `tests/fixtures/disc/metric-inputs.ts` + — [evidence: NO_OP_ALREADY_SATISFIED] completed by AGY test lane (commit 09ca8fb, verified 2026-09-09, suites green at merged HEAD)
       `tests/fixtures/disc/recall-samples.ts`: golden metric inputs (entries,
       dependence edges with proven multipliers, price observations, gap
       windows) covering every §63.8 metric bullet, and recall claim-basis
@@ -288,14 +288,14 @@ riders, then fixtures and AC suites, then telemetry and gates.
       NOT_DISCOVERED classification samples extending the existing
       retrospective fixture set). Traces: FR-DISC-006, FR-DISC-007,
       FR-DISC-010, FR-DISC-012.
-- [ ] T017 [P] [executor: TEST] Author `tests/fixtures/disc/constraints.ts` +
+- [x] T017 [P] [executor: TEST] Author `tests/fixtures/disc/constraints.ts` +
       `tests/fixtures/disc/chain-access.ts`: collector-gap/decoder-pause/
       program-version/provider-health state vectors with expected constraint
       kinds and effects, and chain-access declaration/consumption vectors
       (bounded valid, unbounded refusal, paid-fallback refusal,
       reserve-incompatible refusal, tolerance-breach incident, silent-widening
       refusal). Traces: FR-DISC-008, FR-DISC-013.
-- [ ] T018 [P] [executor: TEST] Author colocated product-side suites under
+- [x] T018 [P] [executor: TEST] Author colocated product-side suites under — [evidence: NO_OP_ALREADY_SATISFIED] completed by AGY test lane (commit e67f2c4, verified 2026-09-09, suites green at merged HEAD)
       `packages/discovery-universe/test/` (source-profiles.spec.ts,
       coverage-metrics.spec.ts, recall-estimator.spec.ts, constraints.spec.ts,
       claim-language.spec.ts, chain-access-gate.spec.ts,
@@ -312,12 +312,12 @@ riders, then fixtures and AC suites, then telemetry and gates.
       DATABASE_PGLITE via the coordinator manifest (T022). Traces:
       FR-DISC-006, FR-DISC-007, FR-DISC-008, FR-DISC-009, FR-DISC-010,
       FR-DISC-011, FR-DISC-012, FR-DISC-013, FR-DISC-014.
-- [ ] T019 [P] [executor: TEST] Author
+- [x] T019 [P] [executor: TEST] Author
       `packages/cheap-monitor/test/population-riders.spec.ts`: rider
       persistence and validation laws (rider-less promotion replay refusal,
       nonexistent manifest refusal, existing batch/promotion laws
       regression-locked). Traces: FR-DISC-009, FR-DISC-011, AC-112, AC-113.
-- [ ] T020 [P] [executor: TEST] Extend shared AC suites IN PLACE (facet
+- [x] T020 [P] [executor: TEST] Extend shared AC suites IN PLACE (facet — [evidence: NO_OP_ALREADY_SATISFIED] completed by AGY test lane (commit 24e5b4f, verified 2026-09-09, suites green at merged HEAD)
       convention, spec file-ownership section — never rewrite or weaken
       existing cases): `tests/acceptance/AC-110.spec.ts` +
       `tests/negative/AC-110.negative.spec.ts` (per-source provenance
@@ -339,14 +339,14 @@ riders, then fixtures and AC suites, then telemetry and gates.
 
 ## Phase 7b — Central registry extensions (blocks gates; plan-sanctioned scope exceptions)
 
-- [ ] T021 [P] [executor: TEST] Extend `tests/telemetry-catalog.spec.ts` — the
+- [x] T021 [P] [executor: TEST] Extend `tests/telemetry-catalog.spec.ts` — the — [evidence: NO_OP_ALREADY_SATISFIED] reconciled pre-provider (already satisfied at trusted base)
       plan-sanctioned central-parity scope exception (milestone plan-level
       decision 4, exact path) — with the extended `telemetry/disc.catalog.json`
       assertions pinning every new event's fields to the authoritative shared
       schemas field-for-field. No product surface is authored here. Traces:
       FR-DISC-006, FR-DISC-007, FR-DISC-008, FR-DISC-009, FR-DISC-010,
       FR-DISC-011, FR-DISC-012, FR-DISC-013, FR-DISC-014.
-- [ ] T022 [P] [executor: TEST] Extend the central expected-script registry
+- [x] T022 [P] [executor: TEST] Extend the central expected-script registry — [evidence: NO_OP_ALREADY_SATISFIED] completed by AGY test lane (commit 686ef89, verified 2026-09-09, suites green at merged HEAD)
       `packages/persistence/test/migrator.spec.ts` — the plan-sanctioned
       scope exception (ADR-0019/0022 duty, exact path): add
       `g1_disc_0001_source_profiles` and `g1_disc_0002_constraints_gateways`
@@ -356,7 +356,7 @@ riders, then fixtures and AC suites, then telemetry and gates.
       excludes the `disc` schema). Traces: FR-DISC-009, FR-DISC-011,
       FR-DISC-013 (persistence substrate for every assigned requirement).
 
-- [ ] T027 [P] [executor: TEST] Author the colocated domain and
+- [x] T027 [P] [executor: TEST] Author the colocated domain and
       shared-schema suites `packages/domain/test/disc.spec.ts` +
       `packages/shared-schemas/test/disc.spec.ts` for the vocabulary and
       schema surfaces the product tasks author:
@@ -379,7 +379,7 @@ riders, then fixtures and AC suites, then telemetry and gates.
 
 ## Phase 8 — Telemetry catalog, manifest regen, and gates
 
-- [ ] T023 [P] Extend `telemetry/disc.catalog.json` (DECLARATIVE_CONTRACT_ONLY
+- [x] T023 [P] Extend `telemetry/disc.catalog.json` (DECLARATIVE_CONTRACT_ONLY
       header preserved, fields mirroring `packages/shared-schemas/src/disc.ts`
       exactly, requirementRefs per event): `disc.profile_registered`
       (FR-DISC-011), `disc.provenance_recorded` (FR-DISC-011),

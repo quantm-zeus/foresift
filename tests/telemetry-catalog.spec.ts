@@ -12,7 +12,12 @@ import { describe, expect, it } from 'bun:test';
 import {
   EvidenceAcquisitionDecisionSchema,
   ObservationRevisionSchema,
-} from '@foresift/shared-schemas';
+  DiscoveryUniverseEntrySchema,
+  CheapMonitorRowSchema,
+  MonitorBatchDescriptorSchema,
+  PromotionDecisionSchema,
+  CoveragePopulationManifestSchema,
+} from '../packages/shared-schemas/src/index.ts';
 
 const REPO_ROOT = join(import.meta.dirname, '..');
 
@@ -440,6 +445,174 @@ describe('telemetry/sig.catalog.json parity with authoritative schemas', () => {
       }
     } else {
       expect(Object.keys(expectedSigEvents)).toHaveLength(8);
+    }
+  });
+});
+
+describe('telemetry/disc.catalog.json parity with authoritative schemas (FR-DISC-006…014)', () => {
+  const discCatalog = loadCatalog('disc.catalog.json');
+
+  it('keeps the disc catalog a declarative contract (G2 wiring deferred)', () => {
+    expect(discCatalog.contractStatus).toBeDefined();
+    expect(discCatalog.contractStatus).toContain('DECLARATIVE_CONTRACT_ONLY');
+  });
+
+  it('declares CRITICAL_METADATA recovery data class for disc telemetry', () => {
+    expect((discCatalog as { recoveryDataClass?: string }).recoveryDataClass).toBe(
+      'CRITICAL_METADATA',
+    );
+  });
+
+  const expectedDiscEvents: Record<string, string[]> = {
+    entry_recorded: [
+      'assetRepresentationId',
+      'sourceId',
+      'sourceClass',
+      'sourceObservedAt',
+      'sourcePublishedAt',
+      'sourceAvailableAt',
+      'firstFetchedAt',
+      'firstReceivedAt',
+      'firstIngestedAt',
+      'chainCoordinates',
+      'sourceRank',
+      'sourceMetadataHash',
+      'discoveryPolicyVersion',
+      'collectorCoverageManifestId',
+      'qualityCodes',
+    ],
+    attribution_appended: [
+      'assetRepresentationId',
+      'sourceId',
+      'sourceClass',
+      'sourceObservedAt',
+      'sourcePublishedAt',
+      'sourceAvailableAt',
+      'firstFetchedAt',
+      'firstReceivedAt',
+      'firstIngestedAt',
+      'chainCoordinates',
+      'sourceRank',
+      'sourceMetadataHash',
+      'discoveryPolicyVersion',
+      'collectorCoverageManifestId',
+      'qualityCodes',
+    ],
+    batch_executed: [
+      'batchId',
+      'batchSize',
+      'candidateIds',
+      'providerId',
+      'operationId',
+      'scheduledAt',
+    ],
+    monitor_decision: ['decision'],
+    promoted: [
+      'decisionId',
+      'candidateId',
+      'policyVersion',
+      'featureSnapshotVersion',
+      'inputsHash',
+      'decisionVersion',
+      'decision',
+      'rationale',
+      'decidedAt',
+    ],
+    monitor_expired: [
+      'candidateId',
+      'assetRepresentationId',
+      'state',
+      'checkCount',
+      'maxChecks',
+      'backoffSeconds',
+      'lastCheckedAt',
+      'nextCheckDueAt',
+      'expiresAt',
+      'stalenessLimitSeconds',
+      'decisionHistory',
+    ],
+    coverage_measured: [
+      'manifestId',
+      'populationClass',
+      'collectorScopeIds',
+      'sourceIds',
+      'startSlot',
+      'endSlot',
+      'startTime',
+      'endTime',
+      'knownGapsCount',
+      'rightsExclusions',
+      'selectionProbabilities',
+      'sourceDependenceDisclosed',
+    ],
+  };
+
+  for (const [eventName, fieldNames] of Object.entries(expectedDiscEvents)) {
+    it(`pins ${eventName} fields to authoritative discovery contracts (${fieldNames.length} fields)`, () => {
+      const ev = event(discCatalog, eventName);
+      expect(ev.fields.length).toBe(fieldNames.length);
+      for (const name of fieldNames) {
+        const f = field(ev, name);
+        expect(f.type.length).toBeGreaterThan(0);
+        expect(typeof f.required).toBe('boolean');
+      }
+    });
+  }
+
+  it('pins entry_recorded and attribution_appended fields field-for-field to DiscoveryUniverseEntrySchema', () => {
+    const entryShape = shapeOf(DiscoveryUniverseEntrySchema);
+    for (const eventName of ['entry_recorded', 'attribution_appended']) {
+      const ev = event(discCatalog, eventName);
+      for (const f of ev.fields) {
+        expect(
+          Object.hasOwn(entryShape, f.name),
+          `${eventName}.${f.name} must exist on DiscoveryUniverseEntrySchema`,
+        ).toBe(true);
+      }
+    }
+  });
+
+  it('pins batch_executed fields field-for-field to MonitorBatchDescriptorSchema', () => {
+    const batchShape = shapeOf(MonitorBatchDescriptorSchema);
+    const ev = event(discCatalog, 'batch_executed');
+    for (const f of ev.fields) {
+      expect(
+        Object.hasOwn(batchShape, f.name),
+        `batch_executed.${f.name} must exist on MonitorBatchDescriptorSchema`,
+      ).toBe(true);
+    }
+  });
+
+  it('pins promoted fields field-for-field to PromotionDecisionSchema', () => {
+    const promotionShape = shapeOf(PromotionDecisionSchema);
+    const ev = event(discCatalog, 'promoted');
+    for (const f of ev.fields) {
+      expect(
+        Object.hasOwn(promotionShape, f.name),
+        `promoted.${f.name} must exist on PromotionDecisionSchema`,
+      ).toBe(true);
+    }
+  });
+
+  it('pins monitor_expired fields field-for-field to CheapMonitorRowSchema', () => {
+    const rowShape = shapeOf(CheapMonitorRowSchema);
+    const ev = event(discCatalog, 'monitor_expired');
+    for (const f of ev.fields) {
+      expect(
+        Object.hasOwn(rowShape, f.name),
+        `monitor_expired.${f.name} must exist on CheapMonitorRowSchema`,
+      ).toBe(true);
+    }
+  });
+
+  it('pins coverage_measured fields field-for-field to CoveragePopulationManifestSchema', () => {
+    const popShape = shapeOf(CoveragePopulationManifestSchema);
+    const ev = event(discCatalog, 'coverage_measured');
+    for (const f of ev.fields) {
+      expect(
+        Object.hasOwn(popShape, f.name),
+        `coverage_measured.${f.name} must exist on CoveragePopulationManifestSchema`,
+      ).toBe(true);
     }
   });
 });

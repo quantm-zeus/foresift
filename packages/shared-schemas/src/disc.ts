@@ -1,7 +1,21 @@
 import { z } from 'zod';
+import {
+  ALL_DISC_CHAIN_ACCESS_PURPOSES,
+  ALL_DISC_CLAIM_BASES,
+  ALL_DISC_CONSTRAINT_EFFECTS,
+  ALL_DISC_CONSTRAINT_KINDS,
+  ALL_DISC_ENTRY_REASONS,
+  ALL_DISC_LATENESS_BASES,
+  ALL_DISC_MANIPULATION_POLICIES,
+  ALL_DISC_RECALL_VERDICTS,
+  ALL_DISC_RIGHTS_BASES,
+} from '@foresift/domain';
 import { UtcTimestampSchema } from './data.ts';
 
-const ContentAddressSchema = z.string().regex(/^sha256:.+$/);
+export const DISC_SCHEMA_REGISTRY_VERSION = 1 as const;
+const NonEmptyString = z.string().trim().min(1);
+const ContentAddressSchema = z.string().regex(/^sha256:[0-9a-f]{64}$/);
+const enumSchema = <T extends string>(values: readonly T[]) => z.enum([...values] as [T, ...T[]]);
 export const DiscoverySourceClassSchema = z.enum([
   'FIRST_PARTY_SUPPORTED_PROGRAM_EVENT',
   'FREE_AGGREGATE_DISCOVERY',
@@ -127,11 +141,7 @@ export const CoveragePopulationManifestSchema = z
   );
 export type CoveragePopulationManifest = z.infer<typeof CoveragePopulationManifestSchema>;
 
-export const DiscClaimBasisSchema = z.enum([
-  'INDEPENDENT_FIRST_PARTY_OBSERVATION',
-  'INDEPENDENT_PROVIDER_LINEAGE',
-  'KNOWN_INCLUSION_PROBABILITIES',
-]);
+export const DiscClaimBasisSchema = enumSchema(ALL_DISC_CLAIM_BASES);
 export type DiscClaimBasis = z.infer<typeof DiscClaimBasisSchema>;
 
 export const DiscSourceProfileSchema = z
@@ -140,21 +150,11 @@ export const DiscSourceProfileSchema = z
     profileVersion: z.number().int().positive(),
     sourceClass: DiscoverySourceClassSchema,
     coverageScope: z.record(z.string(), z.unknown()),
-    rightsBasis: z.enum([
-      'FIRST_PARTY_COLLECTOR',
-      'AUTHORIZED_FEED_CONTRACT',
-      'FREE_PUBLIC_TERMS',
-      'USER_PROVIDED',
-      'EXCLUDED',
-    ]),
+    rightsBasis: enumSchema(ALL_DISC_RIGHTS_BASES),
     queryFilterVersion: z.string().min(1),
     upstreamDependence: z.record(z.string(), z.unknown()),
     upstreamLineageKeys: z.array(z.string().min(1)),
-    manipulationPolicy: z.enum([
-      'LABEL_AND_RETAIN',
-      'LABEL_AND_DOWNWEIGHT',
-      'EXCLUDE_PAID_PLACEMENTS',
-    ]),
+    manipulationPolicy: enumSchema(ALL_DISC_MANIPULATION_POLICIES),
     collectorScopeIds: z.array(z.string().min(1)),
     effectiveFrom: UtcTimestampSchema,
     supersededAt: UtcTimestampSchema.optional(),
@@ -171,36 +171,16 @@ export const UniverseEntryProvenanceSchema = z
   .object({
     entryId: z.string().min(1),
     normalizedIdentityId: z.string().min(1),
-    entryReason: z.enum([
-      'FIRST_PARTY_SUPPORTED_PROGRAM_EVENT',
-      'FREE_AGGREGATE_OBSERVATION',
-      'AUTHORIZED_LAUNCH_NOTIFICATION',
-      'USER_WATCHLIST_ADDITION',
-      'AUTHORIZED_SOCIAL_MENTION',
-      'SELECTIVE_VERIFICATION_HIT',
-      'RETROSPECTIVE_ENUMERATION_HIT',
-      'STRATIFIED_SAMPLE_DRAW',
-    ]),
+    entryReason: enumSchema(ALL_DISC_ENTRY_REASONS),
     coverageScopeRef: z.string().min(1),
-    rightsRecord: z.enum([
-      'FIRST_PARTY_COLLECTOR',
-      'AUTHORIZED_FEED_CONTRACT',
-      'FREE_PUBLIC_TERMS',
-      'USER_PROVIDED',
-      'EXCLUDED',
-    ]),
+    rightsRecord: enumSchema(ALL_DISC_RIGHTS_BASES),
     queryFilterVersion: z.string().min(1),
     upstreamDependenceDisclosed: z.record(z.string(), z.unknown()),
     firstPartyObserved: z.boolean(),
   })
   .strict();
 
-export const DiscRecallVerdictSchema = z.enum([
-  'INDEPENDENT_ESTIMATE',
-  'DEPENDENT_DISCLOSED',
-  'SELF_RECALL_REFUSED',
-  'NO_ADMISSIBLE_BASIS',
-]);
+export const DiscRecallVerdictSchema = enumSchema(ALL_DISC_RECALL_VERDICTS);
 export type DiscRecallVerdict = z.infer<typeof DiscRecallVerdictSchema>;
 
 export const RecallEstimateRecordSchema = z
@@ -232,12 +212,48 @@ export const RecallEstimateRecordSchema = z
     }
   });
 export type RecallEstimateRecord = z.infer<typeof RecallEstimateRecordSchema>;
+export const RecallEstimateSchema = RecallEstimateRecordSchema;
+
+export const PopulationConstraintSchema = z
+  .object({
+    constraintId: NonEmptyString,
+    manifestId: NonEmptyString,
+    kind: enumSchema(ALL_DISC_CONSTRAINT_KINDS),
+    effect: enumSchema(ALL_DISC_CONSTRAINT_EFFECTS),
+    sourceId: NonEmptyString.optional(),
+    collectorScopeId: NonEmptyString.optional(),
+    programVersion: NonEmptyString.optional(),
+    windowStart: UtcTimestampSchema.optional(),
+    windowEnd: UtcTimestampSchema.optional(),
+    windowStartSlot: z.string().regex(/^\d+$/).optional(),
+    windowEndSlot: z.string().regex(/^\d+$/).optional(),
+    evidenceRefs: z.array(NonEmptyString).min(1),
+    resolvedAt: UtcTimestampSchema.optional(),
+  })
+  .strict()
+  .superRefine((value, context) => {
+    if (
+      value.windowStart !== undefined &&
+      value.windowEnd !== undefined &&
+      Date.parse(value.windowEnd) <= Date.parse(value.windowStart)
+    ) {
+      context.addIssue({ code: 'custom', message: 'constraint time window is inverted' });
+    }
+    if (
+      value.windowStartSlot !== undefined &&
+      value.windowEndSlot !== undefined &&
+      BigInt(value.windowEndSlot) < BigInt(value.windowStartSlot)
+    ) {
+      context.addIssue({ code: 'custom', message: 'constraint slot window is inverted' });
+    }
+  });
+export type PopulationConstraintRecord = z.infer<typeof PopulationConstraintSchema>;
 
 export const ChainAccessDeclarationSchema = z
   .object({
     declarationId: z.string().min(1),
     version: z.number().int().positive(),
-    purpose: z.enum(['VERIFICATION', 'RETROSPECTIVE_BACKFILL']),
+    purpose: enumSchema(ALL_DISC_CHAIN_ACCESS_PURPOSES),
     chainId: z.string().min(1),
     programIds: z.array(z.string().min(1)).min(1),
     maxCandidates: z.number().int().positive(),
@@ -252,6 +268,115 @@ export const ChainAccessDeclarationSchema = z
   .strict();
 export type ChainAccessDeclaration = z.infer<typeof ChainAccessDeclarationSchema>;
 
+export const ChainAccessConsumptionSchema = z
+  .object({
+    consumptionId: NonEmptyString,
+    declarationId: NonEmptyString,
+    declarationVersion: z.number().int().positive(),
+    runId: NonEmptyString,
+    consumedAt: UtcTimestampSchema,
+    slotsScanned: z.number().int().nonnegative(),
+    callsMade: z.number().int().nonnegative(),
+    candidatesTouched: z.number().int().nonnegative(),
+    incidentId: NonEmptyString.optional(),
+  })
+  .strict()
+  .refine((value) => value.slotsScanned + value.callsMade + value.candidatesTouched > 0, {
+    message: 'chain access consumption must contain a positive count',
+  });
+export type ChainAccessConsumptionRecord = z.infer<typeof ChainAccessConsumptionSchema>;
+
+export const DiscLatenessBasisSchema = enumSchema(ALL_DISC_LATENESS_BASES);
+const NullableCount = z.number().int().nonnegative().nullable();
+const NullableNumber = z.number().finite().nonnegative().nullable();
+const NullableRate = z.number().finite().min(0).max(1).nullable();
+const DistributionSchema = z
+  .object({
+    count: z.number().int().nonnegative(),
+    min: z.number().finite(),
+    p50: z.number().finite(),
+    p95: z.number().finite(),
+    max: z.number().finite(),
+  })
+  .strict()
+  .refine((value) => value.min <= value.p50 && value.p50 <= value.p95 && value.p95 <= value.max, {
+    message: 'distribution quantiles are not ordered',
+  });
+
+const COVERAGE_METRIC_FIELDS = [
+  'uniqueDiscoveryYield',
+  'pairwiseOverlap',
+  'effectiveIndependentYield',
+  'firstSeenLeadLagSeconds',
+  'sourceEventToSystemLatencySeconds',
+  'supportedProgramEventRecall',
+  'sourceCoverageLossWindows',
+  'extendedAtFirstSeenRate',
+  'usefulTradableOutcomeYield',
+  'falsePositiveYield',
+  'cheapRejectYield',
+  'costPerUsefulDiscovery',
+  'creditsPerUsefulDiscovery',
+  'bytesPerUsefulDiscovery',
+  'collectorGapMisses',
+  'unsupportedLayoutMisses',
+  'retrospectiveNotDiscoveredCount',
+  'sourceManipulationBoostedDiscoveryShare',
+  'identityFailureRate',
+  'unsupportedProgramExclusions',
+  'priceExtensionAtFirstSystemAvailability',
+] as const;
+
+export const CoverageMetricSetSchema = z
+  .object({
+    metricSetId: NonEmptyString,
+    manifestId: NonEmptyString,
+    populationClass: CoveragePopulationSchema,
+    sourceId: NonEmptyString,
+    profileVersion: z.number().int().positive().nullable(),
+    collectorScopeIds: z.array(NonEmptyString),
+    asOf: UtcTimestampSchema,
+    uniqueDiscoveryYield: NullableCount,
+    pairwiseOverlap: z.record(NonEmptyString, z.number().int().nonnegative()).nullable(),
+    effectiveIndependentYield: NullableNumber,
+    firstSeenLeadLagSeconds: DistributionSchema.nullable(),
+    sourceEventToSystemLatencySeconds: DistributionSchema.nullable(),
+    providerLatenessBasis: DiscLatenessBasisSchema.nullable(),
+    supportedProgramEventRecall: NullableRate,
+    sourceCoverageLossWindows: NullableCount,
+    extendedAtFirstSeenRate: NullableRate,
+    usefulTradableOutcomeYield: NullableRate,
+    falsePositiveYield: NullableRate,
+    cheapRejectYield: NullableRate,
+    costPerUsefulDiscovery: NullableNumber,
+    creditsPerUsefulDiscovery: NullableNumber,
+    bytesPerUsefulDiscovery: NullableNumber,
+    collectorGapMisses: NullableCount,
+    unsupportedLayoutMisses: NullableCount,
+    retrospectiveNotDiscoveredCount: NullableCount,
+    sourceManipulationBoostedDiscoveryShare: NullableRate,
+    identityFailureRate: NullableRate,
+    unsupportedProgramExclusions: NullableCount,
+    priceExtensionAtFirstSystemAvailability: NullableNumber,
+    qualityCodes: z.record(NonEmptyString, z.array(NonEmptyString).min(1)),
+  })
+  .strict()
+  .superRefine((value, context) => {
+    for (const field of COVERAGE_METRIC_FIELDS) {
+      if (value[field] === null && (value.qualityCodes[field]?.length ?? 0) === 0) {
+        context.addIssue({
+          code: 'custom',
+          path: ['qualityCodes', field],
+          message: `null metric ${field} requires a quality code`,
+        });
+      }
+    }
+    if (value.sourceEventToSystemLatencySeconds === null && value.providerLatenessBasis !== null) {
+      context.addIssue({ code: 'custom', message: 'lateness basis requires a latency metric' });
+    }
+  });
+export type CoverageMetricSet = z.infer<typeof CoverageMetricSetSchema>;
+
 export const DISCOVERY_SCHEMAS = {
   DiscoveryUniverseEntry: DiscoveryUniverseEntrySchema,
   DiscoverySourceClass: DiscoverySourceClassSchema,
@@ -265,7 +390,11 @@ export const DISCOVERY_SCHEMAS = {
   UniverseEntryProvenance: UniverseEntryProvenanceSchema,
   DiscRecallVerdict: DiscRecallVerdictSchema,
   RecallEstimateRecord: RecallEstimateRecordSchema,
+  RecallEstimate: RecallEstimateSchema,
+  PopulationConstraint: PopulationConstraintSchema,
   ChainAccessDeclaration: ChainAccessDeclarationSchema,
+  ChainAccessConsumption: ChainAccessConsumptionSchema,
+  CoverageMetricSet: CoverageMetricSetSchema,
 } as const;
 export class DiscoverySchemaError extends Error {
   readonly code = 'DISCOVERY_SCHEMA_INVALID' as const;

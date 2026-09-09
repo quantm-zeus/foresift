@@ -13,10 +13,7 @@ import {
   DISCOVERY_UNIVERSE_PROHIBITED_CAPABILITY_IDENTIFIERS,
 } from '../src/read-only-guard.ts';
 
-const SRC_DIR = path.resolve(
-  path.dirname(fileURLToPath(import.meta.url)),
-  '../src',
-);
+const SRC_DIR = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../src');
 
 describe('Discovery Universe Read-Only Structural Guard (FR-DISC-006, FR-DISC-008)', () => {
   it('exposes prohibited import and capability lists', () => {

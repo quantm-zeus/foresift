@@ -20,10 +20,7 @@ export const ALL_CHAIN_ACCESS_MODES: readonly ChainAccessMode[] = [
 ];
 
 export type ChainAccessCostClass =
-  | 'FREE_UNMETERED'
-  | 'FREE_QUOTA'
-  | 'PAID_EXPLICIT'
-  | 'UNKNOWN_COST';
+  'FREE_UNMETERED' | 'FREE_QUOTA' | 'PAID_EXPLICIT' | 'UNKNOWN_COST';
 
 export const ALL_CHAIN_ACCESS_COST_CLASSES: readonly ChainAccessCostClass[] = [
   'FREE_UNMETERED',

@@ -115,7 +115,12 @@ describe('Population Riders & Promotion Validation Laws (FR-DISC-009, FR-DISC-01
         manifestId: 'cov_man_phantom_unknown_id',
       };
       expect(() =>
-        evaluatePromotionWithRider('cand_001', candidateFeatures, PROMOTION_POLICY_V1, phantomManifest),
+        evaluatePromotionWithRider(
+          'cand_001',
+          candidateFeatures,
+          PROMOTION_POLICY_V1,
+          phantomManifest,
+        ),
       ).toThrow('PROMOTION_RIDER_NONEXISTENT_MANIFEST_REFUSAL');
     });
 

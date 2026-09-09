@@ -215,11 +215,9 @@ describe('Publication Gate & Constrained Window Filtering (FR-DISC-013)', () => 
       { id: 'obs_3', time: '2026-08-20T11:15:00Z' }, // After window -> Kept
     ];
 
-    const filtered = excludeConstrainedWindows(
-      observations,
-      (obs) => obs.time,
-      [excludeWindowConstraint],
-    );
+    const filtered = excludeConstrainedWindows(observations, (obs) => obs.time, [
+      excludeWindowConstraint,
+    ]);
 
     expect(filtered.map((o) => o.id)).toEqual(['obs_1', 'obs_3']);
   });

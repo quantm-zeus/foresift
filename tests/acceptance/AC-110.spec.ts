@@ -137,9 +137,7 @@ describe('AC-110 acceptance (positive) — per-source provenance & source profil
     expect(PUMP_FIRST_PARTY_SOURCE_PROFILE_V2.supersedesVersion).toBe(
       PUMP_FIRST_PARTY_SOURCE_PROFILE_V1.version,
     );
-    expect(
-      new Date(PUMP_FIRST_PARTY_SOURCE_PROFILE_V2.registeredAt).getTime(),
-    ).toBeGreaterThan(
+    expect(new Date(PUMP_FIRST_PARTY_SOURCE_PROFILE_V2.registeredAt).getTime()).toBeGreaterThan(
       new Date(PUMP_FIRST_PARTY_SOURCE_PROFILE_V1.registeredAt).getTime(),
     );
   });

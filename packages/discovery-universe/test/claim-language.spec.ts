@@ -71,11 +71,7 @@ describe('Claim Basis Vocabulary & Admission (FR-DISC-010)', () => {
 
 describe('Structured Discovery Claim Refusal Matrix (FR-DISC-014)', () => {
   it('exposes the strong scope adjective vocabulary', () => {
-    expect(DISC_SCOPE_ADJECTIVES).toEqual([
-      'FULL_MARKET',
-      'ALL_SOLANA',
-      'UNIVERSAL_RECALL',
-    ]);
+    expect(DISC_SCOPE_ADJECTIVES).toEqual(['FULL_MARKET', 'ALL_SOLANA', 'UNIVERSAL_RECALL']);
   });
 
   const validManifest: CoveragePopulationManifest = {
@@ -208,8 +204,11 @@ describe('Structured Discovery Claim Refusal Matrix (FR-DISC-014)', () => {
     };
 
     expect(() =>
-      admitStructuredDiscoveryClaim(incompleteProbabilitiesClaim, validManifest, validEvidence, (r) =>
-        refusals.push(r),
+      admitStructuredDiscoveryClaim(
+        incompleteProbabilitiesClaim,
+        validManifest,
+        validEvidence,
+        (r) => refusals.push(r),
       ),
     ).toThrow(DiscError);
 
@@ -260,9 +259,7 @@ describe('Structured Discovery Claim Refusal Matrix (FR-DISC-014)', () => {
     const noEvidence: ClaimBasisEvidence = { knownInclusionProbabilities: false };
 
     expect(() =>
-      admitStructuredDiscoveryClaim(validClaim, validManifest, noEvidence, (r) =>
-        refusals.push(r),
-      ),
+      admitStructuredDiscoveryClaim(validClaim, validManifest, noEvidence, (r) => refusals.push(r)),
     ).toThrow(DiscError);
 
     expect(refusals[0]?.reason).toBe('CLAIM_BASIS_INADMISSIBLE');

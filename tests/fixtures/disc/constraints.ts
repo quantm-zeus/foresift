@@ -7,10 +7,7 @@
 import type { UtcTimestamp } from '@foresift/domain';
 
 export type PopulationConstraintKind =
-  | 'COLLECTOR_GAP'
-  | 'DECODER_PAUSE'
-  | 'PROGRAM_VERSION_UNVERIFIED'
-  | 'PROVIDER_HEALTH_UNAVAILABLE';
+  'COLLECTOR_GAP' | 'DECODER_PAUSE' | 'PROGRAM_VERSION_UNVERIFIED' | 'PROVIDER_HEALTH_UNAVAILABLE';
 
 export const ALL_POPULATION_CONSTRAINT_KINDS: readonly PopulationConstraintKind[] = [
   'COLLECTOR_GAP',
@@ -86,7 +83,8 @@ export const UNVERIFIED_PROGRAM_VERSION_CONSTRAINT_FIXTURE: PopulationConstraint
   targetPopulationManifestId: 'cov_man_pump_raydium_2026q3',
   sourceId: 'col_solana_raydium_live',
   blocksPublication: true,
-  detail: 'Raydium CPMM program upgrade detected without live-chain verification; capability degraded',
+  detail:
+    'Raydium CPMM program upgrade detected without live-chain verification; capability degraded',
   recordedAt: '2026-08-20T12:00:00Z' as UtcTimestamp,
 };
 
@@ -99,7 +97,8 @@ export const PROVIDER_HEALTH_UNAVAILABLE_CONSTRAINT_FIXTURE: PopulationConstrain
   startTime: '2026-08-20T13:00:00Z' as UtcTimestamp,
   endTime: '2026-08-20T13:30:00Z' as UtcTimestamp,
   blocksPublication: true,
-  detail: 'Aggregate provider 30-minute outage; first-party observation spine maintained independently',
+  detail:
+    'Aggregate provider 30-minute outage; first-party observation spine maintained independently',
   recordedAt: '2026-08-20T13:00:10Z' as UtcTimestamp,
 };
 

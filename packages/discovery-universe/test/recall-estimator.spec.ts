@@ -225,7 +225,12 @@ describe('Recall Estimator & Verdict Truth Table (FR-DISC-006, FR-DISC-010)', ()
       },
     ];
 
-    const inside = resolveLineageIndependence('src_eval', ['src_univ'], edges, '2026-08-15T00:00:00Z');
+    const inside = resolveLineageIndependence(
+      'src_eval',
+      ['src_univ'],
+      edges,
+      '2026-08-15T00:00:00Z',
+    );
     expect(inside.independent).toBe(true);
     expect(inside.appliedEdgeIds).toEqual(['e1']);
 

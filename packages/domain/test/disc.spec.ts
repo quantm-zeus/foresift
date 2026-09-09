@@ -27,8 +27,7 @@ function fallbackSelfRecallRefused(
   if (baselineUniverseSourceIds.length === 0) return true;
   // A universe generated solely by the evaluated source cannot establish its own recall (FR-DISC-010)
   return (
-    baselineUniverseSourceIds.length === 1 &&
-    baselineUniverseSourceIds[0] === evaluatedSourceId
+    baselineUniverseSourceIds.length === 1 && baselineUniverseSourceIds[0] === evaluatedSourceId
   );
 }
 
@@ -279,8 +278,8 @@ describe('Discovery pure laws (FR-DISC-006, FR-DISC-010, FR-DISC-013, FR-DISC-01
   it('pure law: selfRecallRefused prevents an evaluated source from establishing its own recall (FR-DISC-010)', () => {
     const fnSelfRecall =
       (Domain.selfRecallRefused as
-        | ((srcId: string, baselineIds: readonly string[]) => boolean)
-        | undefined) ?? fallbackSelfRecallRefused;
+        ((srcId: string, baselineIds: readonly string[]) => boolean) | undefined) ??
+      fallbackSelfRecallRefused;
 
     // Evaluated source is the sole generator -> REFUSED
     expect(fnSelfRecall('src_gmgn_free_aggregate', ['src_gmgn_free_aggregate'])).toBe(true);
@@ -296,9 +295,7 @@ describe('Discovery pure laws (FR-DISC-006, FR-DISC-010, FR-DISC-013, FR-DISC-01
         'src_retro_indexer_enumeration',
       ]),
     ).toBe(false);
-    expect(
-      fnSelfRecall('src_gmgn_free_aggregate', ['src_retro_indexer_enumeration']),
-    ).toBe(false);
+    expect(fnSelfRecall('src_gmgn_free_aggregate', ['src_retro_indexer_enumeration'])).toBe(false);
   });
 
   // Pure Law 3: constraintBlocksPublication
@@ -308,9 +305,7 @@ describe('Discovery pure laws (FR-DISC-006, FR-DISC-010, FR-DISC-013, FR-DISC-01
         | ((constraints: readonly { effect: string; blocksPublication?: boolean }[]) => boolean)
         | undefined) ?? fallbackConstraintBlocksPublication;
 
-    const blockingConstraints = [
-      { effect: 'CONSTRAIN_POPULATION', blocksPublication: true },
-    ];
+    const blockingConstraints = [{ effect: 'CONSTRAIN_POPULATION', blocksPublication: true }];
     expect(fnBlocks(blockingConstraints)).toBe(true);
 
     const alertBlockingConstraints = [
@@ -318,9 +313,7 @@ describe('Discovery pure laws (FR-DISC-006, FR-DISC-010, FR-DISC-013, FR-DISC-01
     ];
     expect(fnBlocks(alertBlockingConstraints)).toBe(true);
 
-    const incidentOnlyConstraints = [
-      { effect: 'RECORD_INCIDENT_ONLY', blocksPublication: false },
-    ];
+    const incidentOnlyConstraints = [{ effect: 'RECORD_INCIDENT_ONLY', blocksPublication: false }];
     expect(fnBlocks(incidentOnlyConstraints)).toBe(false);
 
     expect(fnBlocks([])).toBe(false);

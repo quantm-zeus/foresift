@@ -616,4 +616,3 @@ describe('telemetry/disc.catalog.json parity with authoritative schemas (FR-DISC
     }
   });
 });
-

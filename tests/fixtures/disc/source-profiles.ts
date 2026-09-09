@@ -49,11 +49,7 @@ export const PUMP_FIRST_PARTY_SOURCE_PROFILE_V1: DiscSourceProfileFixture = {
   queryFilterVersion: 'qf_pump_curve_v1',
   coverageScope: ['scope_solana_pump_fun_v1'],
   rightsPolicy: 'FIRST_PARTY_OBSERVATION_FULL_COMMERCIAL',
-  allowedEntryReasons: [
-    'BONDING_CURVE_INITIALIZE',
-    'LIQUIDITY_POOL_CREATE',
-    'TOKEN_MIGRATION',
-  ],
+  allowedEntryReasons: ['BONDING_CURVE_INITIALIZE', 'LIQUIDITY_POOL_CREATE', 'TOKEN_MIGRATION'],
   metadataHash: 'sha256:pump_first_party_profile_meta_v1',
   registeredAt: '2026-08-01T00:00:00Z' as UtcTimestamp,
 };

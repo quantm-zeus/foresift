@@ -149,4 +149,3 @@ describe('AC-110 negative (failure) — per-source provenance & source profile r
     expect(resInverted.success).toBe(false);
   });
 });
-

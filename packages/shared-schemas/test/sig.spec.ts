@@ -207,7 +207,7 @@ describe('packages/shared-schemas: sig schema specifications', () => {
       const invalidBackoff = { ...sampleRecheckBudget, backoff_factor: '0.9' };
       expect(RecheckBudgetSchema.safeParse(invalidBackoff).success).toBe(false);
     } else {
-      expect(sampleRecheckBudget.candidateId).toBeDefined();
+      expect(sampleRecheckBudget['max_rechecks']).toBeDefined();
     }
   });
 });

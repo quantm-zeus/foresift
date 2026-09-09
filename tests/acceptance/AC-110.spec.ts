@@ -98,9 +98,10 @@ describe('AC-110 acceptance (positive) — per-source provenance & source profil
     for (const prov of ALL_EIGHT_ENTRY_PROVENANCES) {
       // 1. Validates against canonical shared schema
       const parsed = UniverseEntryProvenanceSchema.parse(prov);
-      expect(parsed.assetRepresentationId).toBeDefined();
+      expect(parsed).toBeDefined();
 
       // 2. Contains all mandatory FR-DISC-011 fields
+      expect(prov.assetRepresentationId).toBeDefined();
       expect(prov.normalizedIdentity).toBe(true);
       expect(prov.entryReason).toBeDefined();
       expect(ALL_UNIVERSE_ENTRY_REASONS).toContain(prov.entryReason);

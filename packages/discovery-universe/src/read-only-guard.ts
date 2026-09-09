@@ -53,11 +53,14 @@ export function scanDiscoveryUniverseSources(
     const source = executableSource(rawSource);
     for (const match of source.matchAll(importPattern)) {
       const specifier = match[1] as string;
-      if (DISCOVERY_UNIVERSE_PROHIBITED_IMPORT_PATTERNS.some((pattern) => pattern.test(specifier))) {
+      if (
+        DISCOVERY_UNIVERSE_PROHIBITED_IMPORT_PATTERNS.some((pattern) => pattern.test(specifier))
+      ) {
         findings.push({ modulePath, kind: 'PROHIBITED_IMPORT', evidence: specifier });
       }
     }
-    for (const match of source.matchAll(capabilityPattern)) {
+    const identifiersOnly = source.replace(/'(?:\\.|[^'\\])*'|"(?:\\.|[^"\\])*"/g, '');
+    for (const match of identifiersOnly.matchAll(capabilityPattern)) {
       findings.push({
         modulePath,
         kind: 'PROHIBITED_CAPABILITY',
@@ -68,9 +71,7 @@ export function scanDiscoveryUniverseSources(
   return findings;
 }
 
-export function assertDiscoveryUniverseReadOnly(
-  sources: Readonly<Record<string, string>>,
-): void {
+export function assertDiscoveryUniverseReadOnly(sources: Readonly<Record<string, string>>): void {
   const findings = scanDiscoveryUniverseSources(sources);
   if (findings.length > 0) {
     throw new Error(`DISCOVERY_READ_ONLY_SURFACE_VIOLATION:${JSON.stringify(findings)}`);

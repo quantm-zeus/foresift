@@ -9,6 +9,7 @@ import {
   ALL_DISC_MANIPULATION_POLICIES,
   ALL_DISC_RECALL_VERDICTS,
   ALL_DISC_RIGHTS_BASES,
+  ALL_QUALITY_CODES,
 } from '@foresift/domain';
 import { UtcTimestampSchema } from './data.ts';
 
@@ -291,6 +292,7 @@ const NullableCount = z.number().int().nonnegative().nullable();
 const NullableNumber = z.number().finite().nonnegative().nullable();
 const NullableFiniteNumber = z.number().finite().nullable();
 const NullableRate = z.number().finite().min(0).max(1).nullable();
+const DiscQualityCodeSchema = enumSchema(ALL_QUALITY_CODES);
 const DistributionSchema = z
   .object({
     count: z.number().int().nonnegative(),
@@ -359,7 +361,7 @@ export const CoverageMetricSetSchema = z
     identityFailureRate: NullableRate,
     unsupportedProgramExclusions: NullableCount,
     priceExtensionAtFirstSystemAvailability: NullableFiniteNumber,
-    qualityCodes: z.record(NonEmptyString, z.array(NonEmptyString).min(1)),
+    qualityCodes: z.record(NonEmptyString, z.array(DiscQualityCodeSchema).min(1)),
   })
   .strict()
   .superRefine((value, context) => {

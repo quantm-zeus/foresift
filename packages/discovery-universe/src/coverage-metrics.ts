@@ -250,7 +250,7 @@ function nullQualityCodes(metric: Readonly<Record<string, unknown>>): Record<str
   return Object.fromEntries(
     Object.entries(metric)
       .filter(([, value]) => value === null)
-      .map(([field]) => [field, ['INSUFFICIENT_OBSERVATIONS']]),
+      .map(([field]) => [field, ['LOW_SAMPLE']]),
   );
 }
 

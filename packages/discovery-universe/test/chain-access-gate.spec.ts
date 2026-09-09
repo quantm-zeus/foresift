@@ -16,7 +16,6 @@ import { fileURLToPath } from 'node:url';
 import {
   ChainAccessGate,
   admitChainAccessDeclaration,
-  admitChainAccessOperation,
   type ChainAccessOperation,
   type ChainAccessConsumption,
 } from '../src/chain-access-gate.ts';

@@ -24,11 +24,9 @@ import {
 } from '../fixtures/disc/entry-provenance.ts';
 import {
   INVALID_SELF_SUPERSEDING_PROFILE,
-  INVALID_FORWARD_SUPERSEDING_PROFILE,
   INCOMPLETE_PROFILE_MISSING_SOURCE_CLASS,
   INCOMPLETE_PROFILE_MISSING_VERSION,
   INCOMPLETE_PROFILE_MISSING_RIGHTS,
-  INCOMPLETE_PROFILE_UNDISCLOSED_UPSTREAM,
   INVALID_UNKNOWN_SOURCE_CLASS_PROFILE,
 } from '../fixtures/disc/source-profiles.ts';
 import { provenanceSupportsClaim } from '../../packages/discovery-universe/src/source-profiles.ts';

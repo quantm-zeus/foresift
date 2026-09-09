@@ -9,7 +9,6 @@ import type {
   RecallEstimateInput,
   RecallObservation,
   RecallDependenceEdge,
-  RecallEstimateResult,
 } from '../../../packages/discovery-universe/src/recall-estimator.ts';
 import type {
   RetrospectiveEvidence,

@@ -9,7 +9,7 @@ import {
   PRECISION_RETAINING_TIMESTAMP_PARSERS,
   type DatabaseEngine,
 } from '@foresift/persistence';
-import { DiscError, ErrorCode } from '@foresift/domain';
+import { DiscError } from '@foresift/domain';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {

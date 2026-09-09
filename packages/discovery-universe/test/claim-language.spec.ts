@@ -141,7 +141,8 @@ describe('Structured Discovery Claim Refusal Matrix (FR-DISC-014)', () => {
       ...validClaim,
       samplingContract: {
         ...validClaim.samplingContract,
-        populationClass: 'SUPPORTED_PROGRAM_UNIVERSE' as any,
+        populationClass:
+          'SUPPORTED_PROGRAM_UNIVERSE' as CoveragePopulationManifest['populationClass'],
       },
     };
 
@@ -180,7 +181,7 @@ describe('Structured Discovery Claim Refusal Matrix (FR-DISC-014)', () => {
       ...validClaim,
       samplingContract: {
         ...validClaim.samplingContract,
-        exhaustive: false as any,
+        exhaustive: false as unknown as true,
       },
     };
 

@@ -79,4 +79,36 @@ ALTER TABLE disc.cheap_monitor_rows
     ADD COLUMN IF NOT EXISTS entry_provenance_id text;
 
 ALTER TABLE disc.promotion_decisions
-    ADD COLUMN IF NOT EXISTS population_manifest_id text;
+    ADD COLUMN IF NOT EXISTS population_manifest_id text,
+    ADD COLUMN IF NOT EXISTS entry_provenance_id text;
+
+-- Riders are separate append-only truth so the G0 scheduler and promotion
+-- state machines need no mutation. The compatibility columns above remain
+-- nullable projections for older readers.
+CREATE TABLE IF NOT EXISTS disc.cheap_monitor_population_riders (
+    monitor_id             text PRIMARY KEY REFERENCES disc.cheap_monitor_rows(monitor_id),
+    population_manifest_id text NOT NULL REFERENCES
+                               disc.coverage_population_manifests(manifest_id),
+    entry_provenance_id    text NOT NULL REFERENCES
+                               disc.universe_entry_provenance(entry_id),
+    recorded_at            timestamptz NOT NULL DEFAULT now()
+);
+
+CREATE TABLE IF NOT EXISTS disc.promotion_population_riders (
+    promotion_decision_id  text PRIMARY KEY REFERENCES
+                               disc.promotion_decisions(promotion_decision_id),
+    population_manifest_id text NOT NULL REFERENCES
+                               disc.coverage_population_manifests(manifest_id),
+    entry_provenance_id    text NOT NULL REFERENCES
+                               disc.universe_entry_provenance(entry_id),
+    monitor_id             text NOT NULL REFERENCES
+                               disc.cheap_monitor_population_riders(monitor_id),
+    recorded_at            timestamptz NOT NULL DEFAULT now()
+);
+
+CREATE OR REPLACE TRIGGER disc_monitor_riders_append_only
+    BEFORE UPDATE OR DELETE ON disc.cheap_monitor_population_riders
+    FOR EACH ROW EXECUTE FUNCTION disc.refuse_mutation();
+CREATE OR REPLACE TRIGGER disc_promotion_riders_append_only
+    BEFORE UPDATE OR DELETE ON disc.promotion_population_riders
+    FOR EACH ROW EXECUTE FUNCTION disc.refuse_mutation();

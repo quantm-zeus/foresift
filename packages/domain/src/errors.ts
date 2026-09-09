@@ -112,6 +112,9 @@ export const ErrorCode = {
   DISC_RECALL_VERDICT_UNKNOWN: 'DISC_RECALL_VERDICT_UNKNOWN',
   DISC_LATENESS_BASIS_UNKNOWN: 'DISC_LATENESS_BASIS_UNKNOWN',
   DISC_CLAIM_LANGUAGE_REFUSED: 'DISC_CLAIM_LANGUAGE_REFUSED',
+  DISC_POPULATION_MANIFEST_MISSING: 'DISC_POPULATION_MANIFEST_MISSING',
+  DISC_ENTRY_PROVENANCE_MISSING: 'DISC_ENTRY_PROVENANCE_MISSING',
+  DISC_POPULATION_RIDER_MISSING: 'DISC_POPULATION_RIDER_MISSING',
   // --- cost, quota, and capacity (FR-COST-001…010)
   COST_CLASS_UNKNOWN: 'COST_CLASS_UNKNOWN',
   RESET_POLICY_KIND_UNKNOWN: 'RESET_POLICY_KIND_UNKNOWN',
@@ -206,10 +209,7 @@ export class RecoveryError extends subclass(
   ErrorCode.RESTORE_VERIFICATION_FAILED,
 ) {}
 /** FR-DISC-006…014 discovery coverage, provenance, and claim refusals. */
-export class DiscError extends subclass(
-  'DiscError',
-  ErrorCode.DISC_CLAIM_BASIS_UNKNOWN,
-) {}
+export class DiscError extends subclass('DiscError', ErrorCode.DISC_CLAIM_BASIS_UNKNOWN) {}
 
 /** Narrowing guard for Foresift errors. */
 export function isForesiftError(value: unknown): value is ForesiftError {

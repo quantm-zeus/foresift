@@ -488,9 +488,12 @@ telemetry and gates.
       owns outside the colocated trees: none are re-assigned from product
       tasks; T020-T032 (fixtures and AC/negative suite authoring) stay
       test-owned work executed by the test lanes under their own task ids.
-      This task exists as the single test-author completion record for the
-      read-only-guard no-LLM scan verification (T019's scan) executed against
-      the landed product surface. Traces: FR-SIG-006, FR-SIG-003, AC-154.
+      The authored surface of this task is the colocated guard suite
+      `packages/signal-intelligence/test/read-only-guard.spec.ts` (its no-LLM
+      import-scan hardening). This task exists as the single test-author
+      completion record for the read-only-guard no-LLM scan verification
+      (T019's scan) executed against the landed product surface.
+      Traces: FR-SIG-006, FR-SIG-003, AC-154.
 
 ## Phase 7 — Telemetry contract, manifest regen, and gates
 

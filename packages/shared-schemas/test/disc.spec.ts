@@ -69,7 +69,7 @@ import {
   SILENT_WIDENING_REFUSAL_ACCESS,
 } from '../../../tests/fixtures/disc/chain-access.ts';
 
-const DiscSchemas = DiscSchemasModule as Record<string, { safeParse: (v: unknown) => { success: boolean; data?: unknown; error?: unknown } } | undefined>;
+const DiscSchemas = DiscSchemasModule as unknown as Record<string, { safeParse: (v: unknown) => { success: boolean; data?: unknown; error?: unknown } } | undefined>;
 
 describe('Discovery schemas (FR-DISC-001…005, ADR-0013)', () => {
   describe('DiscoverySourceClassSchema (§63.2)', () => {

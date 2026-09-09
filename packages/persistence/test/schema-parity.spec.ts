@@ -83,9 +83,7 @@ describe('Drizzle mirror parity with SQL truth (ADR-001)', () => {
          AND table_name NOT LIKE '_foresift%'
        ORDER BY table_schema, table_name`,
     );
-    const sqlNames = sqlTables.rows
-      .map((r) => QUALIFIED(r.table_schema, r.table_name))
-      .sort();
+    const sqlNames = sqlTables.rows.map((r) => QUALIFIED(r.table_schema, r.table_name)).sort();
 
     const mirrorNames = Object.values(mirror)
       .map((v) => {
@@ -157,7 +155,11 @@ describe('Drizzle mirror parity with SQL truth (ADR-001)', () => {
   });
 
   it('matches primary keys on every table', async () => {
-    const sqlPks = await engine.query<{ table_schema: string; table_name: string; pk_cols: string[] }>(
+    const sqlPks = await engine.query<{
+      table_schema: string;
+      table_name: string;
+      pk_cols: string[];
+    }>(
       `SELECT tc.table_schema,
               tc.table_name,
               ARRAY_AGG(kcu.column_name ORDER BY kcu.ordinal_position) AS pk_cols

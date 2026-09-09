@@ -13,7 +13,12 @@ const COHORT_FIXTURE_PATH = path.resolve(
   '../../../tests/fixtures/sig/cohort-fallback.json',
 );
 
-function applyShrinkage(sampleValue: number, sampleSize: number, priorMean: number, priorWeight: number): number {
+function applyShrinkage(
+  sampleValue: number,
+  sampleSize: number,
+  priorMean: number,
+  priorWeight: number,
+): number {
   return (sampleSize * sampleValue + priorWeight * priorMean) / (sampleSize + priorWeight);
 }
 
@@ -66,7 +71,7 @@ describe('packages/signal-intelligence: Numerical Stability & Cohort Fallback', 
 
   it('capped contribution clamps ranking feature influence to (0, maxCap]', () => {
     const cap = 0.25;
-    expect(clampCappedContribution(0.10, cap)).toBe(0.10);
+    expect(clampCappedContribution(0.1, cap)).toBe(0.1);
     expect(clampCappedContribution(0.25, cap)).toBe(0.25);
     expect(clampCappedContribution(0.85, cap)).toBe(0.25); // clamped
     expect(clampCappedContribution(-0.5, cap)).toBe(0.0);

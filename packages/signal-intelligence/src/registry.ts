@@ -91,7 +91,10 @@ export function assertFeatureDefinitionComplete(definition: SignalFeatureDefinit
   ] as const) {
     if (!nonEmpty(value)) invalid(definition, `${field} is required`);
   }
-  if (definition.inputFields.length === 0 || definition.inputFields.some((field) => !nonEmpty(field))) {
+  if (
+    definition.inputFields.length === 0 ||
+    definition.inputFields.some((field) => !nonEmpty(field))
+  ) {
     invalid(definition, 'inputFields must identify every required input');
   }
   if (!Number.isInteger(definition.minimumObservations) || definition.minimumObservations < 1) {

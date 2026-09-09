@@ -10,7 +10,10 @@ export const FeatureLineageErrorCode = {
 export class FeatureLineageError extends Error {
   readonly code: (typeof FeatureLineageErrorCode)[keyof typeof FeatureLineageErrorCode];
 
-  constructor(code: (typeof FeatureLineageErrorCode)[keyof typeof FeatureLineageErrorCode], message: string) {
+  constructor(
+    code: (typeof FeatureLineageErrorCode)[keyof typeof FeatureLineageErrorCode],
+    message: string,
+  ) {
     super(message);
     this.name = 'FeatureLineageError';
     this.code = code;
@@ -60,7 +63,8 @@ export function assertFeatureLineageComplete(lineage: SignalFeatureLineage): voi
       `lineage ${lineage.lineageId || '<missing>'} does not identify and hash every required input`,
     );
   }
-  const windowStart = lineage.windowStart === undefined ? undefined : timestamp(lineage.windowStart);
+  const windowStart =
+    lineage.windowStart === undefined ? undefined : timestamp(lineage.windowStart);
   const windowEnd = timestamp(lineage.windowEnd);
   const calculatedAt = timestamp(lineage.calculatedAt);
   const resolvedAt = timestamp(lineage.eventTimeResolvedAt);

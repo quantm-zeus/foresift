@@ -33,14 +33,14 @@ describe('AC-191 negative: Adaptive vs static scheduler comparison validity', ()
   });
 
   it('refuses adaptive policy that produces higher missed critical events rate', () => {
-    expect(() =>
-      assertReplayValidity('sha256:same', 'sha256:same', 0.15, 0.0, 10.0, 10.0),
-    ).toThrow('SIG_ADAPTIVE_MISSED_CRITICAL_RATE_ELEVATED');
+    expect(() => assertReplayValidity('sha256:same', 'sha256:same', 0.15, 0.0, 10.0, 10.0)).toThrow(
+      'SIG_ADAPTIVE_MISSED_CRITICAL_RATE_ELEVATED',
+    );
   });
 
   it('refuses unevidenced information gain claim', () => {
-    expect(() =>
-      assertReplayValidity('sha256:same', 'sha256:same', 0.0, 0.0, 5.0, 10.0),
-    ).toThrow('SIG_UNEVIDENCED_INFORMATION_GAIN_CLAIM_REFUSED');
+    expect(() => assertReplayValidity('sha256:same', 'sha256:same', 0.0, 0.0, 5.0, 10.0)).toThrow(
+      'SIG_UNEVIDENCED_INFORMATION_GAIN_CLAIM_REFUSED',
+    );
   });
 });

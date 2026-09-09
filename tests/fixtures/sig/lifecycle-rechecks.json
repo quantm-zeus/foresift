@@ -16,7 +16,7 @@
       "fromState": "QUALIFIED",
       "toState": "EMERGING",
       "persistenceMeasure": 0.75,
-      "promotionThreshold": 0.70,
+      "promotionThreshold": 0.7,
       "minimumDwellSeconds": 300,
       "actualDwellSeconds": 600,
       "allowed": true,
@@ -26,7 +26,7 @@
       "name": "emerging_to_qualified_demotion_requires_sustained_drop",
       "fromState": "EMERGING",
       "toState": "QUALIFIED",
-      "persistenceMeasure": 0.50,
+      "persistenceMeasure": 0.5,
       "demotionThreshold": 0.45,
       "consecutiveWindowsBelowThreshold": 1,
       "requiredWindowsBelowThreshold": 2,
@@ -40,7 +40,7 @@
       "fromState": "QUALIFIED",
       "toState": "EMERGING",
       "persistenceMeasure": 0.85,
-      "promotionThreshold": 0.70,
+      "promotionThreshold": 0.7,
       "minimumDwellSeconds": 300,
       "actualDwellSeconds": 60,
       "allowed": false,
@@ -68,7 +68,7 @@
     {
       "conditionId": "LIQUIDITY_DRAWDOWN_OVER_50_PCT",
       "description": "Pool liquidity dropped by more than 50% from confirmation baseline",
-      "threshold": -0.50,
+      "threshold": -0.5,
       "action": "TRANSITION_TO_DECAYING"
     },
     {
@@ -80,7 +80,7 @@
     {
       "conditionId": "DEVELOPER_WALLET_DUMP",
       "description": "Deployer/creator wallet transferred > 20% of supply to liquidity pool",
-      "threshold": 0.20,
+      "threshold": 0.2,
       "action": "TRANSITION_TO_REJECTED"
     }
   ],
@@ -97,7 +97,7 @@
         "providerCallsUsed": 15,
         "modelCostUsed": 1.2,
         "backoffFactor": 1.5,
-        "minimumExpectedInformationGain": 0.10,
+        "minimumExpectedInformationGain": 0.1,
         "nextCheckAt": "2026-06-01T12:00:00Z",
         "expiresAt": "2026-06-01T18:00:00Z",
         "starvedSince": null
@@ -118,13 +118,13 @@
         "providerCallsUsed": 25,
         "modelCostUsed": 2.5,
         "backoffFactor": 1.5,
-        "minimumExpectedInformationGain": 0.10,
+        "minimumExpectedInformationGain": 0.1,
         "nextCheckAt": "2026-06-01T12:00:00Z",
         "expiresAt": "2026-06-01T18:00:00Z",
         "starvedSince": null
       },
       "currentTime": "2026-06-01T12:00:00Z",
-      "calculatedInformationValue": 0.80,
+      "calculatedInformationValue": 0.8,
       "expectedDecision": "BUDGET_EXHAUSTED_STOP"
     },
     {
@@ -139,13 +139,13 @@
         "providerCallsUsed": 10,
         "modelCostUsed": 0.8,
         "backoffFactor": 1.5,
-        "minimumExpectedInformationGain": 0.10,
+        "minimumExpectedInformationGain": 0.1,
         "nextCheckAt": "2026-06-01T19:00:00Z",
         "expiresAt": "2026-06-01T18:00:00Z",
         "starvedSince": null
       },
       "currentTime": "2026-06-01T19:00:00Z",
-      "calculatedInformationValue": 0.50,
+      "calculatedInformationValue": 0.5,
       "expectedDecision": "EXPIRED_STOP"
     },
     {

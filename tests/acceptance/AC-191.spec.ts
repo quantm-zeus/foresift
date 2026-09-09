@@ -23,7 +23,10 @@ interface ReplayResult {
   informationPerQuotaUnit: number;
 }
 
-function simulateStaticReplay(events: CandidateEvent[], fixedIntervalQuotaCost: number): ReplayResult {
+function simulateStaticReplay(
+  events: CandidateEvent[],
+  fixedIntervalQuotaCost: number,
+): ReplayResult {
   // Static checks every candidate at rigid intervals regardless of activity
   const quota = events.length * fixedIntervalQuotaCost;
   const critical = events.filter((e) => e.isCriticalStateChange);
@@ -46,7 +49,9 @@ function simulateAdaptiveReplay(
   infoFloor: number,
 ): ReplayResult {
   // Adaptive checks only when estimated information gain >= floor
-  const relevantEvents = events.filter((e) => e.informationContent >= infoFloor || e.isCriticalStateChange);
+  const relevantEvents = events.filter(
+    (e) => e.informationContent >= infoFloor || e.isCriticalStateChange,
+  );
   const quota = relevantEvents.length * unitQuotaCost;
   const critical = events.filter((e) => e.isCriticalStateChange);
   const observedCritical = relevantEvents.filter((e) => e.isCriticalStateChange).length;
@@ -69,21 +74,25 @@ describe('AC-191: Static vs adaptive scheduler replay over identical universe', 
       candidateId: `cand_${i % 10}`,
       timestamp: `2026-06-01T12:${String(i).padStart(2, '0')}:00Z`,
       isCriticalStateChange: i % 10 === 0, // 5 critical events (i = 0, 10, 20, 30, 40)
-      informationContent: i % 10 === 0 ? 0.90 : (i % 3 === 0 ? 0.40 : 0.02),
+      informationContent: i % 10 === 0 ? 0.9 : i % 3 === 0 ? 0.4 : 0.02,
     }));
 
     const staticResult = simulateStaticReplay(fixtureEvents, 1.0);
-    const adaptiveResult = simulateAdaptiveReplay(fixtureEvents, 1.0, 0.20);
+    const adaptiveResult = simulateAdaptiveReplay(fixtureEvents, 1.0, 0.2);
 
     // 1. Same identical universe was used
     expect(staticResult.totalCriticalEvents).toBe(adaptiveResult.totalCriticalEvents);
 
     // 2. Adaptive scheduler uses significantly less quota for high efficiency
     expect(adaptiveResult.totalQuotaSpent).toBeLessThan(staticResult.totalQuotaSpent);
-    expect(adaptiveResult.informationPerQuotaUnit).toBeGreaterThan(staticResult.informationPerQuotaUnit);
+    expect(adaptiveResult.informationPerQuotaUnit).toBeGreaterThan(
+      staticResult.informationPerQuotaUnit,
+    );
 
     // 3. Missed critical rate is not higher (0 missed in both)
-    expect(adaptiveResult.missedCriticalEventsRate).toBeLessThanOrEqual(staticResult.missedCriticalEventsRate);
+    expect(adaptiveResult.missedCriticalEventsRate).toBeLessThanOrEqual(
+      staticResult.missedCriticalEventsRate,
+    );
     expect(adaptiveResult.criticalEventsObserved).toBe(staticResult.criticalEventsObserved);
   });
 });

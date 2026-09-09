@@ -47,7 +47,7 @@
             "URGENCY": { "imbalance": 0.6 },
             "NOVELTY": { "holderGrowth": 0.7 },
             "TRADABILITY": { "verdict": "TRADABLE", "margin": 0.12 },
-            "SOURCE_INDEPENDENCE": { "groupWeight": 0.90 }
+            "SOURCE_INDEPENDENCE": { "groupWeight": 0.9 }
           },
           "expectedParetoStatus": "EFFICIENT",
           "expectedRank": 2,
@@ -66,11 +66,15 @@
           "vectors": {
             "OPPORTUNITY": { "volumeAccel": 2.0, "priceExtension": null, "growth": null },
             "RISK": { "manipulationScore": null, "concentration": 0.3 },
-            "DATA_QUALITY": { "coverage": 0.5, "hasMissingDimensions": true, "qualityCode": "DIMENSION_MISSING" },
+            "DATA_QUALITY": {
+              "coverage": 0.5,
+              "hasMissingDimensions": true,
+              "qualityCode": "DIMENSION_MISSING"
+            },
             "URGENCY": { "imbalance": 0.9 },
             "NOVELTY": { "holderGrowth": null },
-            "TRADABILITY": { "verdict": "TRADABLE", "margin": 0.10 },
-            "SOURCE_INDEPENDENCE": { "groupWeight": 0.50 }
+            "TRADABILITY": { "verdict": "TRADABLE", "margin": 0.1 },
+            "SOURCE_INDEPENDENCE": { "groupWeight": 0.5 }
           },
           "expectedParetoStatus": "UNKNOWN_DIMENSION_BLOCKED",
           "expectedRank": 3,

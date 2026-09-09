@@ -7,10 +7,7 @@ import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-const PACKAGE_SRC = path.resolve(
-  path.dirname(fileURLToPath(import.meta.url)),
-  '../src',
-);
+const PACKAGE_SRC = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../src');
 
 describe('packages/signal-intelligence: Read-Only Guard & No-LLM Structural Scan', () => {
   it('strictly contains no model-provider, prompt, or agent imports anywhere in src', () => {

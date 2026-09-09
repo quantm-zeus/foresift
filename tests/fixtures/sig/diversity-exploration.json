@@ -16,7 +16,12 @@
         "candidateRanks": [
           { "candidateId": "cand_ai_1", "rawRank": 1, "selected": true },
           { "candidateId": "cand_ai_2", "rawRank": 2, "selected": true },
-          { "candidateId": "cand_ai_3", "rawRank": 3, "selected": false, "cutoffReason": "DIVERSITY_CONSTRAINT" }
+          {
+            "candidateId": "cand_ai_3",
+            "rawRank": 3,
+            "selected": false,
+            "cutoffReason": "DIVERSITY_CONSTRAINT"
+          }
         ]
       },
       {
@@ -26,7 +31,12 @@
         "limit": 1,
         "candidateRanks": [
           { "candidateId": "cand_dev_1", "rawRank": 4, "selected": true },
-          { "candidateId": "cand_dev_2", "rawRank": 5, "selected": false, "cutoffReason": "DIVERSITY_CONSTRAINT" }
+          {
+            "candidateId": "cand_dev_2",
+            "rawRank": 5,
+            "selected": false,
+            "cutoffReason": "DIVERSITY_CONSTRAINT"
+          }
         ]
       },
       {
@@ -41,9 +51,7 @@
   },
   "explorationSampling": {
     "minimumFloorFraction": 0.05,
-    "strataDefinitions": [
-      { "stratumId": "LOW_RANK_TAIL_STRATUM", "minRank": 50, "maxRank": 200 }
-    ],
+    "strataDefinitions": [{ "stratumId": "LOW_RANK_TAIL_STRATUM", "minRank": 50, "maxRank": 200 }],
     "validExplorationRecords": [
       {
         "assignmentId": "exp_assign_001",

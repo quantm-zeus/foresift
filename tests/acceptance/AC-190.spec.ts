@@ -8,7 +8,8 @@ import { describe, expect, it } from 'bun:test';
 
 interface AllocationRequest {
   workloadId: string;
-  reserveClass: 'RISK_MONITORING' | 'ALERT_VERIFICATION' | 'OUTCOME_COLLECTION' | 'GENERAL_BROAD_SCAN';
+  reserveClass:
+    'RISK_MONITORING' | 'ALERT_VERIFICATION' | 'OUTCOME_COLLECTION' | 'GENERAL_BROAD_SCAN';
   unitsRequested: number;
   informationValue: number;
 }
@@ -38,7 +39,8 @@ function scheduleUnderQuotaPressure(
     const minProtected = protectedReserves[req.reserveClass] ?? 0;
     if (minProtected > 0) {
       const protectedUnits = Math.min(req.unitsRequested, minProtected, quotaRemaining);
-      protectedAllocations[req.reserveClass] = (protectedAllocations[req.reserveClass] ?? 0) + protectedUnits;
+      protectedAllocations[req.reserveClass] =
+        (protectedAllocations[req.reserveClass] ?? 0) + protectedUnits;
       allocations[req.workloadId] = {
         allocatedUnits: protectedUnits,
         admitted: protectedUnits > 0,
@@ -90,7 +92,7 @@ describe('AC-190: Information-value scheduler preserves protected reserves under
         workloadId: 'req_alert_verification',
         reserveClass: 'ALERT_VERIFICATION',
         unitsRequested: 15,
-        informationValue: 0.90,
+        informationValue: 0.9,
       },
       {
         workloadId: 'req_outcome_collection',
@@ -102,7 +104,7 @@ describe('AC-190: Information-value scheduler preserves protected reserves under
         workloadId: 'req_high_val_scan',
         reserveClass: 'GENERAL_BROAD_SCAN',
         unitsRequested: 10,
-        informationValue: 0.60,
+        informationValue: 0.6,
       },
       {
         workloadId: 'req_low_val_scan_1',

@@ -37,7 +37,7 @@ describe('packages/signal-intelligence: Lifecycle State Machine & Hysteresis', (
       (t: { name: string }) => t.name === 'emerging_to_qualified_demotion_requires_sustained_drop',
     );
 
-    expect(promo.promotionThreshold).toBe(0.70);
+    expect(promo.promotionThreshold).toBe(0.7);
     expect(demo.demotionThreshold).toBe(0.45);
     expect(demo.demotionThreshold).toBeLessThan(promo.promotionThreshold);
     expect(demo.allowed).toBe(false); // 1 window drop to 0.50 does not trigger demotion

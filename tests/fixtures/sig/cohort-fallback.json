@@ -123,7 +123,7 @@
       "expectedCohortSize": 25,
       "expectedEffectiveSampleSize": 21.0,
       "expectedLowSampleWarning": false,
-      "peerPercentile": 0.40
+      "peerPercentile": 0.4
     },
     {
       "name": "level_7_own_history_anomaly_isolated_asset",
@@ -143,24 +143,24 @@
       "expectedCohortSize": 1,
       "expectedEffectiveSampleSize": 1.0,
       "expectedLowSampleWarning": true,
-      "peerPercentile": 0.50
+      "peerPercentile": 0.5
     }
   ],
   "shrinkageVectors": [
     {
       "name": "small_sample_heavy_shrinkage_to_prior",
-      "sampleValue": 0.90,
+      "sampleValue": 0.9,
       "sampleSize": 2,
-      "cohortPriorMean": 0.20,
+      "cohortPriorMean": 0.2,
       "priorWeight": 10,
       "expectedShrunkValue": 0.31667,
       "tolerance": 0.001
     },
     {
       "name": "large_sample_minimal_shrinkage",
-      "sampleValue": 0.90,
+      "sampleValue": 0.9,
       "sampleSize": 100,
-      "cohortPriorMean": 0.20,
+      "cohortPriorMean": 0.2,
       "priorWeight": 10,
       "expectedShrunkValue": 0.83636,
       "tolerance": 0.001

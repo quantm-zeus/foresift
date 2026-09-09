@@ -60,7 +60,7 @@
       "tradeRecords": [
         { "buyer": "addr1", "clusterId": "cluster_sybil_1", "clusterConfidence": 0.95 },
         { "buyer": "addr2", "clusterId": "cluster_sybil_1", "clusterConfidence": 0.92 },
-        { "buyer": "addr3", "clusterId": "cluster_sybil_1", "clusterConfidence": 0.90 },
+        { "buyer": "addr3", "clusterId": "cluster_sybil_1", "clusterConfidence": 0.9 },
         { "buyer": "addr4", "clusterId": "cluster_organic_2", "clusterConfidence": 0.99 }
       ],
       "previousPeriodUniqueCount": 1,
@@ -72,7 +72,7 @@
       "name": "low_confidence_cluster_retained_separate",
       "clusterConfidenceThreshold": 0.85,
       "tradeRecords": [
-        { "buyer": "addr1", "clusterId": "cluster_maybe_1", "clusterConfidence": 0.60 },
+        { "buyer": "addr1", "clusterId": "cluster_maybe_1", "clusterConfidence": 0.6 },
         { "buyer": "addr2", "clusterId": "cluster_maybe_1", "clusterConfidence": 0.55 },
         { "buyer": "addr3", "clusterId": null, "clusterConfidence": 0.0 }
       ],
@@ -117,14 +117,14 @@
       "name": "liquidity_addition_20_percent",
       "reservesUsdStart": 100000.0,
       "reservesUsdEnd": 120000.0,
-      "expectedGrowthRatio": 0.20,
+      "expectedGrowthRatio": 0.2,
       "expectedQualityCodes": ["VALID"]
     },
     {
       "name": "liquidity_removal_50_percent",
       "reservesUsdStart": 100000.0,
       "reservesUsdEnd": 50000.0,
-      "expectedGrowthRatio": -0.50,
+      "expectedGrowthRatio": -0.5,
       "expectedQualityCodes": ["VALID"]
     }
   ],
@@ -139,10 +139,10 @@
     },
     {
       "name": "accumulation_positive_slope",
-      "top10ShareStart": 0.50,
-      "top10ShareEnd": 0.70,
+      "top10ShareStart": 0.5,
+      "top10ShareEnd": 0.7,
       "deltaHours": 2.0,
-      "expectedSlope": 0.10,
+      "expectedSlope": 0.1,
       "expectedQualityCodes": ["VALID"]
     }
   ],
@@ -178,14 +178,14 @@
       "name": "organic_low_risk",
       "sharedFunderRatio": 0.05,
       "roundTripRatio": 0.02,
-      "actorVolumeConcentration": 0.10,
+      "actorVolumeConcentration": 0.1,
       "expectedRiskScore": 0.056,
       "expectedQualityCodes": ["VALID"]
     },
     {
       "name": "high_sybil_wash_trading_risk",
-      "sharedFunderRatio": 0.80,
-      "roundTripRatio": 0.70,
+      "sharedFunderRatio": 0.8,
+      "roundTripRatio": 0.7,
       "actorVolumeConcentration": 0.85,
       "expectedRiskScore": 0.785,
       "expectedQualityCodes": ["VALID", "MANIPULATION_RISK_ELEVATED"]

@@ -115,7 +115,8 @@ describe('packages/shared-schemas: sig schema specifications', () => {
   // SigFeatureDefinitionSchema because the data family already exports a
   // FeatureDefinitionSchema. The renamed export is the schema under test.
   it('validates FeatureDefinitionSchema structure and numeric completeness refinement', () => {
-    const FeatureDefinitionSchema = (sigModule as Record<string, z.ZodTypeAny> | null)?.SigFeatureDefinitionSchema;
+    const FeatureDefinitionSchema = (sigModule as Record<string, z.ZodTypeAny> | null)
+      ?.SigFeatureDefinitionSchema;
     if (FeatureDefinitionSchema) {
       // Valid numeric feature
       const parsed = FeatureDefinitionSchema.safeParse(sampleValidNumericFeature);
@@ -140,7 +141,8 @@ describe('packages/shared-schemas: sig schema specifications', () => {
   });
 
   it('validates FeatureLineageSchema sha256 input hashes and timestamp rules', () => {
-    const FeatureLineageSchema = (sigModule as Record<string, z.ZodTypeAny> | null)?.FeatureLineageSchema;
+    const FeatureLineageSchema = (sigModule as Record<string, z.ZodTypeAny> | null)
+      ?.FeatureLineageSchema;
     if (FeatureLineageSchema) {
       expect(FeatureLineageSchema.safeParse(sampleValidLineage).success).toBe(true);
 
@@ -157,7 +159,8 @@ describe('packages/shared-schemas: sig schema specifications', () => {
   });
 
   it('validates CohortSnapshotSchema 7-level fallback hierarchy members', () => {
-    const CohortSnapshotSchema = (sigModule as Record<string, z.ZodTypeAny> | null)?.CohortSnapshotSchema;
+    const CohortSnapshotSchema = (sigModule as Record<string, z.ZodTypeAny> | null)
+      ?.CohortSnapshotSchema;
     if (CohortSnapshotSchema) {
       expect(CohortSnapshotSchema.safeParse(sampleCohortSnapshot).success).toBe(true);
 
@@ -174,7 +177,8 @@ describe('packages/shared-schemas: sig schema specifications', () => {
   });
 
   it('validates RankingAuditSchema selection probability refinement', () => {
-    const RankingAuditSchema = (sigModule as Record<string, z.ZodTypeAny> | null)?.RankingAuditSchema;
+    const RankingAuditSchema = (sigModule as Record<string, z.ZodTypeAny> | null)
+      ?.RankingAuditSchema;
     if (RankingAuditSchema) {
       expect(RankingAuditSchema.safeParse(sampleRankingAudit).success).toBe(true);
 
@@ -191,7 +195,8 @@ describe('packages/shared-schemas: sig schema specifications', () => {
   });
 
   it('validates RecheckBudgetSchema expiry order invariant', () => {
-    const RecheckBudgetSchema = (sigModule as Record<string, z.ZodTypeAny> | null)?.RecheckBudgetSchema;
+    const RecheckBudgetSchema = (sigModule as Record<string, z.ZodTypeAny> | null)
+      ?.RecheckBudgetSchema;
     if (RecheckBudgetSchema) {
       expect(RecheckBudgetSchema.safeParse(sampleRecheckBudget).success).toBe(true);
 

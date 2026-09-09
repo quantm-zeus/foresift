@@ -13,8 +13,8 @@ try {
 }
 
 const fn = (name: string): ((...args: unknown[]) => unknown) =>
-  ((domainModule as Record<string, unknown> | null)?.[name] as ((...args: unknown[]) => unknown) | undefined) ??
-  (() => undefined);
+  ((domainModule as Record<string, unknown> | null)?.[name] as
+    ((...args: unknown[]) => unknown) | undefined) ?? (() => undefined);
 
 describe('packages/domain: sig vocabularies and pure laws', () => {
   const FunnelStages = [
@@ -190,15 +190,15 @@ describe('packages/domain: sig vocabularies and pure laws', () => {
       if (!def.isNumeric) return true;
       return Boolean(
         def.minimumDenominator &&
-          def.minimumDenominator >= 1 &&
-          def.stabilityTransform &&
-          def.shrinkagePolicy &&
-          def.cohortFallbackPolicyId &&
-          def.outlierPolicyIsRobust &&
-          def.cappedContribution !== undefined &&
-          def.cappedContribution !== null &&
-          def.cappedContribution > 0 &&
-          def.cappedContribution <= 1.0,
+        def.minimumDenominator >= 1 &&
+        def.stabilityTransform &&
+        def.shrinkagePolicy &&
+        def.cohortFallbackPolicyId &&
+        def.outlierPolicyIsRobust &&
+        def.cappedContribution !== undefined &&
+        def.cappedContribution !== null &&
+        def.cappedContribution > 0 &&
+        def.cappedContribution <= 1.0,
       );
     };
 

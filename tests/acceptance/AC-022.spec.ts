@@ -245,7 +245,7 @@ describe('AC-022: Migration-aware feature windows avoid double counting (sig fac
 
     const trades: PoolTrade[] = [
       { poolId: poolLaunch, volumeUsd: 1000, tradeAt: '2026-06-01T11:00:00Z' }, // pre-migration on launch pool (valid)
-      { poolId: poolLaunch, volumeUsd: 500, tradeAt: '2026-06-01T13:00:00Z' },  // post-migration on launch pool (stale/superseded)
+      { poolId: poolLaunch, volumeUsd: 500, tradeAt: '2026-06-01T13:00:00Z' }, // post-migration on launch pool (stale/superseded)
       { poolId: poolMigrated, volumeUsd: 2000, tradeAt: '2026-06-01T13:00:00Z' }, // post-migration on raydium (valid)
     ];
 

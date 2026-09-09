@@ -44,7 +44,7 @@
       "isNumeric": true,
       "stabilityTransform": "LINEAR_RATIO",
       "shrinkagePolicy": "SHRINK_TO_PRIOR_0_5",
-      "cappedContribution": 0.20,
+      "cappedContribution": 0.2,
       "outlierPolicyIsRobust": true,
       "cohortFallbackPolicyId": "fallback:standard_7_level",
       "economicEventRequired": true
@@ -78,7 +78,11 @@
       "version": 1,
       "description": "H.4 Deduplicated unique economic buyer log growth",
       "formula": "log1p(count(distinct_dedup_economic_buyers_t)) - log1p(count(distinct_dedup_economic_buyers_t_prev))",
-      "inputFields": ["swaps.buyer_address", "economic_actors.cluster_id", "economic_actors.confidence"],
+      "inputFields": [
+        "swaps.buyer_address",
+        "economic_actors.cluster_id",
+        "economic_actors.confidence"
+      ],
       "unit": "log_growth",
       "windows": ["1h", "24h"],
       "minimumObservations": 10,
@@ -92,7 +96,7 @@
       "isNumeric": true,
       "stabilityTransform": "LOG1P",
       "shrinkagePolicy": "EMPIRICAL_BAYES_SHRINK_TO_COHORT_PRIOR",
-      "cappedContribution": 0.30,
+      "cappedContribution": 0.3,
       "outlierPolicyIsRobust": true,
       "cohortFallbackPolicyId": "fallback:standard_7_level",
       "economicEventRequired": true
@@ -116,7 +120,7 @@
       "isNumeric": true,
       "stabilityTransform": "BOUNDED_RATIO",
       "shrinkagePolicy": "SHRINK_TO_ZERO",
-      "cappedContribution": 0.20,
+      "cappedContribution": 0.2,
       "outlierPolicyIsRobust": true,
       "cohortFallbackPolicyId": "fallback:standard_7_level",
       "economicEventRequired": true
@@ -164,7 +168,7 @@
       "isNumeric": true,
       "stabilityTransform": "LINEAR_DELTA",
       "shrinkagePolicy": "SHRINK_TO_ZERO",
-      "cappedContribution": 0.20,
+      "cappedContribution": 0.2,
       "outlierPolicyIsRobust": true,
       "cohortFallbackPolicyId": "fallback:standard_7_level",
       "economicEventRequired": false
@@ -222,7 +226,11 @@
       "version": 1,
       "description": "H.10 Composite score of shared funder, round-trip and actor volume concentration",
       "formula": "0.4 * shared_funder_ratio + 0.3 * round_trip_ratio + 0.3 * top_actor_volume_share",
-      "inputFields": ["actor_funding.shared_funder_ratio", "trades.round_trip_ratio", "trades.actor_volume_concentration"],
+      "inputFields": [
+        "actor_funding.shared_funder_ratio",
+        "trades.round_trip_ratio",
+        "trades.actor_volume_concentration"
+      ],
       "unit": "risk_composite_score",
       "windows": ["1h", "4h"],
       "minimumObservations": 5,
@@ -260,7 +268,7 @@
       "isNumeric": true,
       "stabilityTransform": "LOG1P_ROBUST_Z",
       "shrinkagePolicy": "SHRINK_TO_ZERO",
-      "cappedContribution": 0.30,
+      "cappedContribution": 0.3,
       "outlierPolicyIsRobust": true,
       "cohortFallbackPolicyId": "fallback:standard_7_level",
       "economicEventRequired": true
@@ -284,7 +292,7 @@
       "isNumeric": true,
       "stabilityTransform": "BOUNDED_0_1",
       "shrinkagePolicy": "CONSERVATIVE_LOWER_BOUND",
-      "cappedContribution": 0.10,
+      "cappedContribution": 0.1,
       "outlierPolicyIsRobust": true,
       "cohortFallbackPolicyId": "fallback:standard_7_level",
       "economicEventRequired": false

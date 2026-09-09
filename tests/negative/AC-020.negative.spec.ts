@@ -202,7 +202,12 @@ describe('AC-020 negative: Replay boundary future read refusal (sig facet)', () 
     }
 
     const trades: TradeInput[] = [
-      { id: 't1', eventAt: '2026-06-01T10:00:00Z', availableAt: '2026-06-01T13:00:00Z', volumeUsd: 100 },
+      {
+        id: 't1',
+        eventAt: '2026-06-01T10:00:00Z',
+        availableAt: '2026-06-01T13:00:00Z',
+        volumeUsd: 100,
+      },
     ];
 
     const boundaryT = '2026-06-01T12:00:00Z';

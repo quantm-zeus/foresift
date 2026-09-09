@@ -99,7 +99,9 @@ export function resolveCohortFallback(
       level === 'OWN_HISTORY_ANOMALY'
         ? observations.filter((observation) => observation.ownHistory === true)
         : observations.filter((observation) =>
-            includedDimensions(level).every((dimension) => same(observation[dimension], target[dimension])),
+            includedDimensions(level).every((dimension) =>
+              same(observation[dimension], target[dimension]),
+            ),
           ),
     );
     last = cohort;
@@ -165,8 +167,7 @@ export function compareWithCohort(input: {
   if (qualityCodes.length === 0) qualityCodes.push(QualityCode.VALID);
   return {
     ...resolution,
-    ownHistoryAnomaly:
-      input.ownHistoryCenter == null ? null : input.value - input.ownHistoryCenter,
+    ownHistoryAnomaly: input.ownHistoryCenter == null ? null : input.value - input.ownHistoryCenter,
     peerPercentile: percentile,
     sampleSize: resolution.cohortSize,
     lowSampleWarning,

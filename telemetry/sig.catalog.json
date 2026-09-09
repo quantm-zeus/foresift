@@ -18,9 +18,7 @@
       "name": "sig.feature_registered",
       "description": "An immutable versioned feature definition passed the §19.1 and §19.9 registration laws.",
       "authoritativeSchema": "FeatureDefinitionSchema",
-      "requirementRefs": [
-        "FR-SIG-001"
-      ],
+      "requirementRefs": ["FR-SIG-001"],
       "tier": "CRITICAL_METADATA",
       "fields": [
         {
@@ -144,10 +142,7 @@
       "name": "sig.feature_computed",
       "description": "A derived feature value was computed with reconstructable §19.10 lineage.",
       "authoritativeSchema": "FeatureLineageSchema",
-      "requirementRefs": [
-        "FR-SIG-001",
-        "FR-SIG-009"
-      ],
+      "requirementRefs": ["FR-SIG-001", "FR-SIG-009"],
       "tier": "CRITICAL_METADATA",
       "fields": [
         {
@@ -251,9 +246,7 @@
       "name": "sig.cohort_resolved",
       "description": "A deterministic cohort fallback and peer percentile were resolved with sample quality.",
       "authoritativeSchema": "CohortSnapshotSchema",
-      "requirementRefs": [
-        "FR-SIG-009"
-      ],
+      "requirementRefs": ["FR-SIG-009"],
       "tier": "CRITICAL_METADATA",
       "fields": [
         {
@@ -322,9 +315,7 @@
       "name": "sig.vector_built",
       "description": "One of seven independent candidate vectors was built with explicit component quality.",
       "authoritativeSchema": "CandidateVectorRecordSchema",
-      "requirementRefs": [
-        "FR-SIG-002"
-      ],
+      "requirementRefs": ["FR-SIG-002"],
       "tier": "CRITICAL_METADATA",
       "fields": [
         {
@@ -373,9 +364,7 @@
       "name": "sig.ranking_recorded",
       "description": "A byte-reproducible Appendix-I ranking audit was persisted against its frozen universe.",
       "authoritativeSchema": "RankingAuditSchema",
-      "requirementRefs": [
-        "FR-SIG-003"
-      ],
+      "requirementRefs": ["FR-SIG-003"],
       "tier": "CRITICAL_METADATA",
       "fields": [
         {
@@ -484,10 +473,7 @@
       "name": "sig.selection_decided",
       "description": "A candidate received a §20.8 selection arm with pre-outcome randomized-assignment metadata where applicable.",
       "authoritativeSchema": "SelectionDecisionSchema",
-      "requirementRefs": [
-        "FR-SIG-003",
-        "FR-SIG-004"
-      ],
+      "requirementRefs": ["FR-SIG-003", "FR-SIG-004"],
       "tier": "CRITICAL_METADATA",
       "fields": [
         {
@@ -566,9 +552,7 @@
       "name": "sig.lifecycle_transitioned",
       "description": "A versioned hysteretic lifecycle transition retained risk separation and thesis invalidation conditions.",
       "authoritativeSchema": "LifecycleTransitionSchema",
-      "requirementRefs": [
-        "FR-SIG-005"
-      ],
+      "requirementRefs": ["FR-SIG-005"],
       "tier": "CRITICAL_METADATA",
       "fields": [
         {
@@ -642,9 +626,7 @@
       "name": "sig.recheck_decided",
       "description": "A finite adaptive-recheck decision recorded allocation-only information value and consumed resources.",
       "authoritativeSchema": "RecheckDecisionSchema",
-      "requirementRefs": [
-        "FR-SIG-006"
-      ],
+      "requirementRefs": ["FR-SIG-006"],
       "tier": "CRITICAL_METADATA",
       "fields": [
         {

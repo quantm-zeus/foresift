@@ -57,7 +57,8 @@ function computeWeightedPopulationEstimate(assignments: ExplorationAssignment[])
 describe('AC-192: Exploration sample validity and weighted estimation', () => {
   it('validates exploration assignments store stratum, seed provenance, and nonzero probability', () => {
     const fixture = JSON.parse(readFileSync(FIXTURE_PATH, 'utf8'));
-    const validRecords = fixture.explorationSampling.validExplorationRecords as ExplorationAssignment[];
+    const validRecords = fixture.explorationSampling
+      .validExplorationRecords as ExplorationAssignment[];
 
     for (const record of validRecords) {
       expect(isAssignmentValid(record)).toBe(true);
@@ -70,8 +71,10 @@ describe('AC-192: Exploration sample validity and weighted estimation', () => {
 
   it('excludes corrupted assignments from weighted population claims', () => {
     const fixture = JSON.parse(readFileSync(FIXTURE_PATH, 'utf8'));
-    const validRecords = fixture.explorationSampling.validExplorationRecords as ExplorationAssignment[];
-    const corruptedRecords = fixture.explorationSampling.corruptedAssignments as ExplorationAssignment[];
+    const validRecords = fixture.explorationSampling
+      .validExplorationRecords as ExplorationAssignment[];
+    const corruptedRecords = fixture.explorationSampling
+      .corruptedAssignments as ExplorationAssignment[];
 
     const withMetrics: ExplorationAssignment[] = [
       ...validRecords.map((r, i) => ({ ...r, outcomeMetric: 10 + i })),

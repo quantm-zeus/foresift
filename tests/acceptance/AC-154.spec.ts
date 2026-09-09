@@ -44,20 +44,18 @@ function evaluateDeterministicRank(
   challenger?: ChallengerState,
 ): { candidateId: string; rank: number; arm: string }[] {
   // 1. Filter hard gates
-  const eligible = candidates.filter((c) =>
-    Object.values(c.hardGates).every((g) => g.passed),
-  );
+  const eligible = candidates.filter((c) => Object.values(c.hardGates).every((g) => g.passed));
 
   // 2. Sort by lexicographic vectors
   const sorted = [...eligible].sort((a, b) => {
     // a. Opportunity
-    const oppA = (a.vectors.OPPORTUNITY.volumeAccel ?? 0);
-    const oppB = (b.vectors.OPPORTUNITY.volumeAccel ?? 0);
+    const oppA = a.vectors.OPPORTUNITY.volumeAccel ?? 0;
+    const oppB = b.vectors.OPPORTUNITY.volumeAccel ?? 0;
     if (oppA !== oppB) return oppB - oppA;
 
     // b. Risk
-    const riskA = (a.vectors.RISK.manipulationScore ?? 1);
-    const riskB = (b.vectors.RISK.manipulationScore ?? 1);
+    const riskA = a.vectors.RISK.manipulationScore ?? 1;
+    const riskB = b.vectors.RISK.manipulationScore ?? 1;
     if (riskA !== riskB) return riskA - riskB;
 
     // If tie and challenger is active & proven & not drifted -> challenger can break tie

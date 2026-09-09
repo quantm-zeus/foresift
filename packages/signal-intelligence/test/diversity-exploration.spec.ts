@@ -13,7 +13,11 @@ const FIXTURE_PATH = path.resolve(
   '../../../tests/fixtures/sig/diversity-exploration.json',
 );
 
-function deterministicSampleWithSeed(candidates: string[], sampleFraction: number, seed: number): string[] {
+function deterministicSampleWithSeed(
+  candidates: string[],
+  sampleFraction: number,
+  seed: number,
+): string[] {
   // Simple LCG PRNG for determinism test
   let state = seed;
   const nextRandom = () => {
@@ -48,8 +52,8 @@ describe('packages/signal-intelligence: Diversity & Exploration Sampling', () =>
     const tailUniverse = Array.from({ length: 50 }, (_, i) => `cand_tail_${i}`);
     const seed = 987654321;
 
-    const sample1 = deterministicSampleWithSeed(tailUniverse, 0.10, seed);
-    const sample2 = deterministicSampleWithSeed(tailUniverse, 0.10, seed);
+    const sample1 = deterministicSampleWithSeed(tailUniverse, 0.1, seed);
+    const sample2 = deterministicSampleWithSeed(tailUniverse, 0.1, seed);
 
     expect(sample1).toEqual(sample2);
   });

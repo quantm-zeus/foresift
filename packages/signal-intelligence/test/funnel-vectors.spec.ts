@@ -20,7 +20,9 @@ interface HardGateCheck {
 }
 
 function evaluateHardGates(gates: HardGateCheck[]): { passed: boolean; failureCodes: string[] } {
-  const failureCodes = gates.filter((g) => !g.passed).map((g) => g.gateCode || 'GATE_FAILURE_REASON_MISSING');
+  const failureCodes = gates
+    .filter((g) => !g.passed)
+    .map((g) => g.gateCode || 'GATE_FAILURE_REASON_MISSING');
   return {
     passed: failureCodes.length === 0,
     failureCodes,

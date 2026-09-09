@@ -335,9 +335,24 @@ describe('AC-020: Feature computation at replay boundary T (sig facet)', () => {
     }
 
     const trades: TradeInput[] = [
-      { id: 't1', eventAt: '2026-06-01T10:00:00Z', availableAt: '2026-06-01T10:05:00Z', volumeUsd: 100 },
-      { id: 't2', eventAt: '2026-06-01T11:50:00Z', availableAt: '2026-06-01T12:00:00Z', volumeUsd: 200 },
-      { id: 't3', eventAt: '2026-06-01T11:55:00Z', availableAt: '2026-06-01T12:05:00Z', volumeUsd: 500 }, // post-T availability
+      {
+        id: 't1',
+        eventAt: '2026-06-01T10:00:00Z',
+        availableAt: '2026-06-01T10:05:00Z',
+        volumeUsd: 100,
+      },
+      {
+        id: 't2',
+        eventAt: '2026-06-01T11:50:00Z',
+        availableAt: '2026-06-01T12:00:00Z',
+        volumeUsd: 200,
+      },
+      {
+        id: 't3',
+        eventAt: '2026-06-01T11:55:00Z',
+        availableAt: '2026-06-01T12:05:00Z',
+        volumeUsd: 500,
+      }, // post-T availability
     ];
 
     const boundaryT = '2026-06-01T12:00:00Z';

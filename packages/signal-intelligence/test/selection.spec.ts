@@ -22,15 +22,17 @@ interface Candidate {
   };
 }
 
-function runDeterministicSelection(universe: Candidate[], algorithmVersion: string, tDecisionReady: string) {
+function runDeterministicSelection(
+  universe: Candidate[],
+  algorithmVersion: string,
+  tDecisionReady: string,
+) {
   // Pure function execution
-  const eligible = universe.filter((c) =>
-    Object.values(c.hardGates).every((g) => g.passed),
-  );
+  const eligible = universe.filter((c) => Object.values(c.hardGates).every((g) => g.passed));
 
   const ranked = [...eligible].sort((a, b) => {
-    const oppA = (a.vectors.OPPORTUNITY.volumeAccel ?? 0);
-    const oppB = (b.vectors.OPPORTUNITY.volumeAccel ?? 0);
+    const oppA = a.vectors.OPPORTUNITY.volumeAccel ?? 0;
+    const oppB = b.vectors.OPPORTUNITY.volumeAccel ?? 0;
     if (oppA !== oppB) return oppB - oppA;
     return a.candidateId.localeCompare(b.candidateId);
   });

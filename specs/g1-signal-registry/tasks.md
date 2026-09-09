@@ -509,7 +509,7 @@ telemetry and gates.
       central-parity scope exception (plan-level decision 4; 2026-09-07
       ownership law). Traces: FR-SIG-001, FR-SIG-002, FR-SIG-003,
       FR-SIG-004, FR-SIG-005, FR-SIG-006, FR-SIG-009.
-- [ ] T034 [executor: COORDINATOR] [evidence: VERIFICATION_ONLY] Run the
+- [x] T034 [executor: COORDINATOR] [evidence: VERIFICATION_ONLY] Run the
       milestone verification command on the canonical tree — the
       signal-intelligence package suite plus the extended central suites
       (persistence migrator and schema-parity via the workspace filter, and
@@ -525,7 +525,7 @@ evidence/bun-migration/bun-migration-manifest.json`) after all new test
       contract). Mechanical bookkeeping (ADR-0020: coordinator-owned,
       zero-AI). Traces: FR-SIG-001…006, FR-SIG-009 (verification substrate for
       every assigned requirement).
-- [ ] T036 [executor: COORDINATOR] [evidence: VERIFICATION_ONLY] Run the full
+- [x] T036 [executor: COORDINATOR] [evidence: VERIFICATION_ONLY] Run the full
       aggregate gate `pnpm verify` and the integrity gate `pnpm spec:verify`
       at the pushed HEAD; require green (the complete Bun suite runs ONLY
       through the coordinator — never a bare `bun test` over the tree). If

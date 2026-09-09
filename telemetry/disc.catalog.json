@@ -8,7 +8,16 @@
     "FR-DISC-002",
     "FR-DISC-003",
     "FR-DISC-004",
-    "FR-DISC-005"
+    "FR-DISC-005",
+    "FR-DISC-006",
+    "FR-DISC-007",
+    "FR-DISC-008",
+    "FR-DISC-009",
+    "FR-DISC-010",
+    "FR-DISC-011",
+    "FR-DISC-012",
+    "FR-DISC-013",
+    "FR-DISC-014"
   ],
   "recoveryDataClass": "CRITICAL_METADATA",
   "events": [
@@ -140,6 +149,211 @@
         { "name": "rightsExclusions", "type": "array<string>", "required": true },
         { "name": "selectionProbabilities", "type": "object<number[0,1]>", "required": false },
         { "name": "sourceDependenceDisclosed", "type": "boolean", "required": true }
+      ]
+    },
+    {
+      "name": "disc.profile_registered",
+      "requirementRefs": ["FR-DISC-011"],
+      "tier": "CRITICAL_METADATA",
+      "fields": [
+        { "name": "sourceId", "type": "string", "required": true },
+        { "name": "profileVersion", "type": "positive-integer", "required": true },
+        { "name": "sourceClass", "type": "string(§63.2 vocabulary)", "required": true },
+        { "name": "coverageScope", "type": "object", "required": true },
+        { "name": "rightsBasis", "type": "string(disc-rights-basis)", "required": true },
+        { "name": "queryFilterVersion", "type": "string", "required": true },
+        { "name": "upstreamDependence", "type": "object", "required": true },
+        { "name": "upstreamLineageKeys", "type": "array<string>", "required": true },
+        {
+          "name": "manipulationPolicy",
+          "type": "string(disc-manipulation-policy)",
+          "required": true
+        },
+        { "name": "collectorScopeIds", "type": "array<string>", "required": true },
+        { "name": "effectiveFrom", "type": "string<utc-timestamp>", "required": true },
+        { "name": "supersededAt", "type": "string<utc-timestamp>", "required": false }
+      ]
+    },
+    {
+      "name": "disc.provenance_recorded",
+      "requirementRefs": ["FR-DISC-011"],
+      "tier": "CRITICAL_METADATA",
+      "fields": [
+        { "name": "entryId", "type": "string", "required": true },
+        { "name": "normalizedIdentityId", "type": "string", "required": true },
+        { "name": "entryReason", "type": "string(disc-entry-reason)", "required": true },
+        { "name": "coverageScopeRef", "type": "string", "required": true },
+        { "name": "rightsRecord", "type": "string(disc-rights-basis)", "required": true },
+        { "name": "queryFilterVersion", "type": "string", "required": true },
+        { "name": "upstreamDependenceDisclosed", "type": "object", "required": true },
+        { "name": "firstPartyObserved", "type": "boolean", "required": true }
+      ]
+    },
+    {
+      "name": "disc.coverage_measured_v2",
+      "requirementRefs": ["FR-DISC-007", "FR-DISC-012"],
+      "tier": "CRITICAL_METADATA",
+      "fields": [
+        { "name": "metricSetId", "type": "string", "required": true },
+        { "name": "manifestId", "type": "string", "required": true },
+        { "name": "populationClass", "type": "string(§63.7 vocabulary)", "required": true },
+        { "name": "sourceId", "type": "string", "required": true },
+        { "name": "profileVersion", "type": "positive-integer|null", "required": true },
+        { "name": "collectorScopeIds", "type": "array<string>", "required": true },
+        { "name": "asOf", "type": "string<utc-timestamp>", "required": true },
+        { "name": "uniqueDiscoveryYield", "type": "nonnegative-integer|null", "required": true },
+        { "name": "pairwiseOverlap", "type": "object<nonnegative-integer>|null", "required": true },
+        {
+          "name": "effectiveIndependentYield",
+          "type": "nonnegative-number|null",
+          "required": true
+        },
+        { "name": "firstSeenLeadLagSeconds", "type": "distribution|null", "required": true },
+        {
+          "name": "sourceEventToSystemLatencySeconds",
+          "type": "distribution|null",
+          "required": true
+        },
+        {
+          "name": "providerLatenessBasis",
+          "type": "string(disc-lateness-basis)|null",
+          "required": true
+        },
+        { "name": "supportedProgramEventRecall", "type": "number[0,1]|null", "required": true },
+        {
+          "name": "sourceCoverageLossWindows",
+          "type": "nonnegative-integer|null",
+          "required": true
+        },
+        { "name": "extendedAtFirstSeenRate", "type": "number[0,1]|null", "required": true },
+        { "name": "usefulTradableOutcomeYield", "type": "number[0,1]|null", "required": true },
+        { "name": "falsePositiveYield", "type": "number[0,1]|null", "required": true },
+        { "name": "cheapRejectYield", "type": "number[0,1]|null", "required": true },
+        { "name": "costPerUsefulDiscovery", "type": "nonnegative-number|null", "required": true },
+        {
+          "name": "creditsPerUsefulDiscovery",
+          "type": "nonnegative-number|null",
+          "required": true
+        },
+        { "name": "bytesPerUsefulDiscovery", "type": "nonnegative-number|null", "required": true },
+        { "name": "collectorGapMisses", "type": "nonnegative-integer|null", "required": true },
+        { "name": "unsupportedLayoutMisses", "type": "nonnegative-integer|null", "required": true },
+        {
+          "name": "retrospectiveNotDiscoveredCount",
+          "type": "nonnegative-integer|null",
+          "required": true
+        },
+        {
+          "name": "sourceManipulationBoostedDiscoveryShare",
+          "type": "number[0,1]|null",
+          "required": true
+        },
+        { "name": "identityFailureRate", "type": "number[0,1]|null", "required": true },
+        {
+          "name": "unsupportedProgramExclusions",
+          "type": "nonnegative-integer|null",
+          "required": true
+        },
+        {
+          "name": "priceExtensionAtFirstSystemAvailability",
+          "type": "finite-number|null",
+          "required": true
+        },
+        { "name": "qualityCodes", "type": "object<array<string>>", "required": true }
+      ]
+    },
+    {
+      "name": "disc.constraint_recorded",
+      "requirementRefs": ["FR-DISC-013"],
+      "tier": "CRITICAL_METADATA",
+      "fields": [
+        { "name": "constraintId", "type": "string", "required": true },
+        { "name": "manifestId", "type": "string", "required": true },
+        { "name": "kind", "type": "string(disc-constraint-kind)", "required": true },
+        { "name": "effect", "type": "string(disc-constraint-effect)", "required": true },
+        { "name": "sourceId", "type": "string", "required": false },
+        { "name": "collectorScopeId", "type": "string", "required": false },
+        { "name": "programVersion", "type": "string", "required": false },
+        { "name": "windowStart", "type": "string<utc-timestamp>", "required": false },
+        { "name": "windowEnd", "type": "string<utc-timestamp>", "required": false },
+        { "name": "windowStartSlot", "type": "string<digits>", "required": false },
+        { "name": "windowEndSlot", "type": "string<digits>", "required": false },
+        { "name": "evidenceRefs", "type": "nonempty-array<string>", "required": true },
+        { "name": "resolvedAt", "type": "string<utc-timestamp>", "required": false }
+      ]
+    },
+    {
+      "name": "disc.recall_estimated",
+      "requirementRefs": ["FR-DISC-006", "FR-DISC-009", "FR-DISC-010"],
+      "tier": "CRITICAL_METADATA",
+      "fields": [
+        { "name": "estimateId", "type": "string", "required": true },
+        { "name": "manifestId", "type": "string", "required": true },
+        { "name": "evaluatedSourceId", "type": "string", "required": true },
+        { "name": "claimBasis", "type": "string(disc-claim-basis)", "required": true },
+        { "name": "verdict", "type": "string(disc-recall-verdict)", "required": true },
+        { "name": "recallEstimate", "type": "number[0,1]", "required": false },
+        { "name": "inclusionProbabilitySource", "type": "string", "required": false },
+        { "name": "independenceEvidence", "type": "array<string>", "required": true },
+        { "name": "constraintIds", "type": "array<string>", "required": true },
+        { "name": "asOf", "type": "string<utc-timestamp>", "required": true }
+      ]
+    },
+    {
+      "name": "disc.chain_access_admitted",
+      "requirementRefs": ["FR-DISC-008"],
+      "tier": "CRITICAL_METADATA",
+      "fields": [
+        { "name": "declarationId", "type": "string", "required": true },
+        { "name": "version", "type": "positive-integer", "required": true },
+        {
+          "name": "purpose",
+          "type": "string(VERIFICATION|RETROSPECTIVE_BACKFILL)",
+          "required": true
+        },
+        { "name": "chainId", "type": "string", "required": true },
+        { "name": "programIds", "type": "nonempty-array<string>", "required": true },
+        { "name": "maxCandidates", "type": "positive-integer", "required": true },
+        { "name": "maxSlotsPerRun", "type": "positive-integer", "required": true },
+        { "name": "maxCallsPerDay", "type": "positive-integer", "required": true },
+        { "name": "maxWindowSeconds", "type": "positive-integer", "required": true },
+        { "name": "costClass", "type": "string(FREE_UNMETERED|FREE_QUOTA)", "required": true },
+        { "name": "paidFallbackAllowed", "type": "false", "required": true },
+        { "name": "protectedReserveCompatible", "type": "true", "required": true },
+        { "name": "tolerancePercent", "type": "integer[1,100]", "required": true }
+      ]
+    },
+    {
+      "name": "disc.chain_access_incident",
+      "requirementRefs": ["FR-DISC-008"],
+      "tier": "CRITICAL_METADATA",
+      "fields": [
+        { "name": "consumptionId", "type": "string", "required": true },
+        { "name": "declarationId", "type": "string", "required": true },
+        { "name": "declarationVersion", "type": "positive-integer", "required": true },
+        { "name": "runId", "type": "string", "required": true },
+        { "name": "consumedAt", "type": "string<utc-timestamp>", "required": true },
+        { "name": "slotsScanned", "type": "nonnegative-integer", "required": true },
+        { "name": "callsMade", "type": "nonnegative-integer", "required": true },
+        { "name": "candidatesTouched", "type": "nonnegative-integer", "required": true },
+        { "name": "incidentId", "type": "string", "required": false }
+      ]
+    },
+    {
+      "name": "disc.claim_language_refused",
+      "requirementRefs": ["FR-DISC-014"],
+      "tier": "CRITICAL_METADATA",
+      "fields": [
+        { "name": "claimId", "type": "string", "required": true },
+        { "name": "manifestId", "type": "string", "required": true },
+        {
+          "name": "scopeAdjective",
+          "type": "string(FULL_MARKET|ALL_SOLANA|UNIVERSAL_RECALL)",
+          "required": true
+        },
+        { "name": "populationClass", "type": "string(§63.7 vocabulary)", "required": true },
+        { "name": "reason", "type": "string(claim-refusal-reason)", "required": true },
+        { "name": "refusedAt", "type": "string<utc-timestamp>", "required": true }
       ]
     }
   ]

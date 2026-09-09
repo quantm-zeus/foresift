@@ -69,14 +69,28 @@ const report = {
   completionRejections: [],
 };
 
-if (!existsSync(args.resultsDir)) fail(`results dir not found: ${args.resultsDir}`);
+// A MISSING results dir is the legitimate zero-writer wave shape (every lane
+// sentinel-skipped — live run 279d96fd, 2026-09-09): the wave dispatched no
+// writer, so no lane ever wrote results. Emit a valid empty report instead of
+// exiting 1; the workflow's empty-wave routing then sees dispatched=0/
+// integrated=0 deterministically instead of crashing on an absent report.
+// An UNREADABLE dir (permissions, not-a-directory) remains fatal.
+let resultsDirExists = false;
+if (existsSync(args.resultsDir)) {
+  if (!lstatSync(args.resultsDir).isDirectory())
+    fail(`results dir is not a directory: ${args.resultsDir}`);
+  resultsDirExists = true;
+}
 // Results live at <resultsDir>/<lane>/result.json (as wave-guard writes them);
 // flat <lane>.json files are accepted too.
 const resultFiles = [];
-for (const e of readdirSync(args.resultsDir, { withFileTypes: true })) {
-  if (e.isDirectory() && existsSync(join(args.resultsDir, e.name, 'result.json')))
-    resultFiles.push(join(args.resultsDir, e.name, 'result.json'));
-  else if (e.isFile() && e.name.endsWith('.json')) resultFiles.push(join(args.resultsDir, e.name));
+if (resultsDirExists) {
+  for (const e of readdirSync(args.resultsDir, { withFileTypes: true })) {
+    if (e.isDirectory() && existsSync(join(args.resultsDir, e.name, 'result.json')))
+      resultFiles.push(join(args.resultsDir, e.name, 'result.json'));
+    else if (e.isFile() && e.name.endsWith('.json'))
+      resultFiles.push(join(args.resultsDir, e.name));
+  }
 }
 resultFiles.sort();
 

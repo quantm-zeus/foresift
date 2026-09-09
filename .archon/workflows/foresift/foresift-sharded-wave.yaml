@@ -710,8 +710,13 @@ nodes:
       # (its diff-vs-base is empty, so FAST would pass vacuously). Only a truly
       # empty wave (every lane sentinel-skipped — no result.json anywhere) or a
       # wave with ≥1 integrated lane proceeds to the FAST verdict.
+      # Zero-writer hardening (live run 279d96fd): a crashed upstream step must
+      # degrade to integer 0, never to an empty string that makes the [ -gt ]
+      # comparisons emit "integer expression expected" noise and misroute.
       dispatched=$(find "$ARTIFACTS_DIR/writer-results" -name result.json 2>/dev/null | wc -l)
-      integrated=$(node -e 'const r=JSON.parse(require("fs").readFileSync(process.argv[1],"utf8"));console.log((r.integrated??[]).length)' "$ARTIFACTS_DIR/integration-report.json")
+      dispatched=${dispatched:-0}
+      integrated=$(node -e 'try{const r=JSON.parse(require("fs").readFileSync(process.argv[1],"utf8"));console.log((r.integrated??[]).length)}catch{console.log(0)}' "$ARTIFACTS_DIR/integration-report.json")
+      integrated=${integrated:-0}
       if [ "$dispatched" -gt 0 ] && [ "$integrated" -eq 0 ]; then
         # §6 already-satisfied audit BEFORE declaring zero progress (live
         # 8f4aaa6d class): a recovery wave whose units were completed by
@@ -925,7 +930,9 @@ nodes:
             # (code=90) so an empty-integration wave can never convert its own
             # RED into a green exit. Exhaustion then fails the node loudly.
             dispatched=$(find "$ARTIFACTS_DIR/writer-results" -name result.json 2>/dev/null | wc -l)
-            integrated=$(node -e 'const r=JSON.parse(require("fs").readFileSync(process.argv[1],"utf8"));console.log((r.integrated??[]).length)' "$ARTIFACTS_DIR/integration-report.json")
+            dispatched=${dispatched:-0}
+            integrated=$(node -e 'try{const r=JSON.parse(require("fs").readFileSync(process.argv[1],"utf8"));console.log((r.integrated??[]).length)}catch{console.log(0)}' "$ARTIFACTS_DIR/integration-report.json")
+            integrated=${integrated:-0}
             if [ "$dispatched" -gt 0 ] && [ "$integrated" -eq 0 ]; then
               code=90
               echo "WAVE_INTEGRATION_EMPTY (recheck held: integration still empty — $dispatched dispatched, none integrated)"

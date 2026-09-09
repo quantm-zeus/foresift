@@ -101,8 +101,8 @@ function buildGraph(root: string, profile = 'HYBRID_AGY') {
 const TWO_DISJOINT_TEST_UNITS = [
   '# Tasks: pkg-t',
   '',
-  '- [ ] T101 Author `tests/a/one.spec.ts` covering FR-X-001. Traces: FR-X-001.',
-  '- [ ] T102 Author `tests/b/two.spec.ts` covering FR-X-001. Traces: FR-X-001.',
+  '- [ ] T101 [executor: TEST] Author `tests/a/one.spec.ts` covering FR-X-001. Traces: FR-X-001.',
+  '- [ ] T102 [executor: TEST] Author `tests/b/two.spec.ts` covering FR-X-001. Traces: FR-X-001.',
   '',
 ].join('\n');
 
@@ -131,8 +131,8 @@ describe('maintainer wave 2026-09-03 regressions', () => {
       [
         '# Tasks: pkg-t',
         '',
-        '- [ ] T101 Author `tests/shared.spec.ts` and `tests/a/one.spec.ts`. Traces: FR-X-001.',
-        '- [ ] T102 Author `tests/shared.spec.ts`. Traces: FR-X-001.',
+        '- [ ] T101 [executor: TEST] Author `tests/shared.spec.ts` and `tests/a/one.spec.ts`. Traces: FR-X-001.',
+        '- [ ] T102 [executor: TEST] Author `tests/shared.spec.ts`. Traces: FR-X-001.',
         '',
       ].join('\n'),
     );
@@ -148,8 +148,8 @@ describe('maintainer wave 2026-09-03 regressions', () => {
       [
         '# Tasks: pkg-t',
         '',
-        '- [ ] T101 Author `tests/a/one.spec.ts`. Traces: FR-X-001.',
-        '- [ ] T102 Verify the regression story for FR-X-001 and update the suite.',
+        '- [ ] T101 [executor: TEST] Author `tests/a/one.spec.ts`. Traces: FR-X-001.',
+        '- [ ] T102 [executor: TEST] Verify the regression story for FR-X-001 and update the suite.',
         '',
       ].join('\n'),
     );
@@ -210,7 +210,7 @@ describe('maintainer wave 2026-09-03 regressions', () => {
         '',
         '- [ ] T103 [executor: COORDINATOR] Regenerate the manifest at',
         '  `evidence/bun-migration/bun-migration-manifest.json`. Traces: FR-X-001.',
-        '- [ ] T101 Author `tests/a/one.spec.ts`. Traces: FR-X-001.',
+        '- [ ] T101 [executor: TEST] Author `tests/a/one.spec.ts`. Traces: FR-X-001.',
         '',
       ].join('\n'),
     );

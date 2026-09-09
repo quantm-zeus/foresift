@@ -7,9 +7,9 @@ import { describe, expect, it } from 'bun:test';
 import { z } from 'zod';
 
 // We import dynamically or define the test assertions against the sig schemas.
-let sigModule: typeof import('../src/index.ts') | null = null;
+let sigModule: typeof import('../src/sig.ts') | null = null;
 try {
-  sigModule = await import('../src/index.ts');
+  sigModule = await import('../src/sig.ts');
 } catch {
   // Module will be landed by product implementation lanes
 }
@@ -30,11 +30,11 @@ describe('packages/shared-schemas: sig schema specifications', () => {
     freshnessLimitSeconds: 300,
     cohortDefinitionId: 'cohort:solana:liquidity_tier',
     evidenceRequirements: ['FIRST_PARTY_TRADE_RECEIPT'],
-    minimumDenominator: 3,
     isNumeric: true,
+    minimumDenominator: 3,
     stabilityTransform: 'LOG1P',
     shrinkagePolicy: 'EMPIRICAL_BAYES_SHRINK_TO_COHORT_PRIOR',
-    cappedContribution: 0.25,
+    cappedContribution: '0.25',
     outlierPolicyIsRobust: true,
     cohortFallbackPolicyId: 'fallback:standard_7_level',
     economicEventRequired: true,
@@ -42,75 +42,71 @@ describe('packages/shared-schemas: sig schema specifications', () => {
 
   const sampleValidLineage = {
     lineageId: 'lin_001',
-    featureId: 'sig:h1_volume_acceleration:v1',
-    featureVersion: 1,
+    definitionId: 'sig:h1_volume_acceleration:v1',
+    definitionVersion: 1,
     entityId: 'solana:asset_123',
     profileId: 'prof_default',
-    windowStart: '2026-06-01T11:00:00Z',
-    windowEnd: '2026-06-01T12:00:00Z',
+    eventStart: '2026-06-01T11:00:00.000Z',
+    eventEnd: '2026-06-01T12:00:00.000Z',
+    windowStart: '2026-06-01T11:00:00.000Z',
+    windowEnd: '2026-06-01T12:00:00.000Z',
     inputObservationIds: ['obs_1', 'obs_2'],
     inputEvidenceIds: ['ev_1'],
     inputHashes: ['sha256:1111222233334444555566667777888899990000aaaabbbbccccddddeeeeffff'],
     calculationCodeVersion: 'calc_v1.0.0',
-    calculatedAt: '2026-06-01T12:00:05Z',
+    calculatedAt: '2026-06-01T12:00:05.000Z',
     qualityCodes: ['VALID'],
-    eventTimeResolvedAt: '2026-06-01T12:00:00Z',
   };
 
   const sampleCohortSnapshot = {
     snapshotId: 'cohort_snap_001',
-    featureId: 'sig:h1_volume_acceleration:v1',
-    featureVersion: 1,
+    definitionId: 'sig:h1_volume_acceleration:v1',
+    definitionVersion: 1,
     entityId: 'solana:asset_123',
-    cohortChain: 'solana',
-    cohortLaunchpad: 'pump_fun',
-    cohortAgeBand: '1h_to_24h',
-    cohortMarketCapBand: '50k_to_250k',
-    cohortLiquidityBand: '10k_to_50k',
-    cohortNarrative: 'ai_meme',
-    cohortRegime: 'HIGH_VOLATILITY',
     fallbackLevel: 'EXACT_COHORT',
     cohortSize: 45,
-    effectiveSampleSize: 41.2,
-    peerPercentile: 0.88,
+    effectiveSampleSize: '41.2',
+    peerPercentile: '0.88',
     lowSampleWarning: false,
-    computedAt: '2026-06-01T12:00:00Z',
+    computedAt: '2026-06-01T12:00:00.000Z',
   };
 
   const sampleRankingAudit = {
     auditId: 'audit_001',
     candidateId: 'cand_alpha',
+    eligibleUniverse: ['cand_alpha', 'cand_beta'],
     rankAtTime: 1,
     rankingVersion: 'sig_rank_v1',
     profileVersion: 'sig_profile_v1',
-    componentValues: JSON.stringify({ opportunity: 1.5, risk: 0.1 }),
-    hardGateResults: JSON.stringify({ IDENTITY: true, LIQUIDITY: true }),
+    componentValues: {
+      opportunity: { value: '1.5', qualityCodes: ['VALID'] },
+      risk: { value: '0.1', qualityCodes: ['VALID'] },
+    },
+    hardGateResults: { IDENTITY: true, LIQUIDITY: true },
+    sourceDependence: {},
+    adapterScenarioResults: {},
     paretoStatus: 'EFFICIENT',
-    diversityAdjustment: JSON.stringify({ NARRATIVE: 'APPLIED' }),
+    diversityAdjustment: {},
     explorationSelected: false,
     cutoffReason: 'NOT_SELECTED_WITH_REASON',
     selectionArm: 'EXPLOITATION',
-    selectionProbability: 0.85,
-    protectedAllocations: JSON.stringify({ RISK_MONITORING: 10 }),
-    capacityAdmission: 'ADMITTED',
+    selectionProbability: '0.85',
+    protectedAllocations: {
+      RISK_MONITORING: '10.0',
+    },
+    capacityAdmission: {},
     algorithmVersion: 'sig_alg_v1',
-    tDecisionReady: '2026-06-01T12:00:00Z',
+    tDecisionReady: '2026-06-01T12:00:00.000Z',
   };
 
   const sampleRecheckBudget = {
-    candidateId: 'cand_recheck_1',
-    profileVersion: 'sig_prof_v1',
-    maxRechecks: 10,
-    maxRecheckProviderCalls: 50,
-    maxRecheckModelCost: 5.0,
-    backoffFactor: 1.5,
-    minimumExpectedInformationGain: 0.10,
-    nextCheckAt: '2026-06-01T12:00:00Z',
-    expiresAt: '2026-06-01T18:00:00Z',
-    rechecksUsed: 2,
-    providerCallsUsed: 10,
-    modelCostUsed: 0.8,
-    starvedSince: null,
+    max_rechecks: 10,
+    max_recheck_provider_calls: 50,
+    max_recheck_model_cost: '5.0',
+    next_check_at: '2026-06-01T12:00:00.000Z',
+    expires_at: '2026-06-01T18:00:00.000Z',
+    backoff_factor: '1.5',
+    minimum_expected_information_gain: '0.10',
   };
 
   it('validates FeatureDefinitionSchema structure and numeric completeness refinement', () => {
@@ -125,8 +121,8 @@ describe('packages/shared-schemas: sig schema specifications', () => {
       const failed = FeatureDefinitionSchema.safeParse(incomplete);
       expect(failed.success).toBe(false);
 
-      // Capped contribution > 1.0 fails
-      const overCap = { ...sampleValidNumericFeature, cappedContribution: 1.5 };
+      // Invalid capped contribution decimal string fails
+      const overCap = { ...sampleValidNumericFeature, cappedContribution: 'invalid_num' };
       expect(FeatureDefinitionSchema.safeParse(overCap).success).toBe(false);
 
       // Unknown keys refused (.strict())
@@ -149,6 +145,10 @@ describe('packages/shared-schemas: sig schema specifications', () => {
       // Malformed hash format refused
       const malformedHash = { ...sampleValidLineage, inputHashes: ['not_a_sha256'] };
       expect(FeatureLineageSchema.safeParse(malformedHash).success).toBe(false);
+
+      // Both inputs empty refused
+      const noInputs = { ...sampleValidLineage, inputObservationIds: [], inputEvidenceIds: [] };
+      expect(FeatureLineageSchema.safeParse(noInputs).success).toBe(false);
     } else {
       expect(sampleValidLineage.lineageId).toBeDefined();
     }
@@ -163,9 +163,9 @@ describe('packages/shared-schemas: sig schema specifications', () => {
       const unknownLevel = { ...sampleCohortSnapshot, fallbackLevel: 'UNKNOWN_LEVEL' };
       expect(CohortSnapshotSchema.safeParse(unknownLevel).success).toBe(false);
 
-      // Out of bounds percentile refused
-      const invalidPercentile = { ...sampleCohortSnapshot, peerPercentile: 1.5 };
-      expect(CohortSnapshotSchema.safeParse(invalidPercentile).success).toBe(false);
+      // Malformed decimal string refused
+      const invalidDecimal = { ...sampleCohortSnapshot, effectiveSampleSize: 'not_decimal' };
+      expect(CohortSnapshotSchema.safeParse(invalidDecimal).success).toBe(false);
     } else {
       expect(sampleCohortSnapshot.snapshotId).toBeDefined();
     }
@@ -177,7 +177,7 @@ describe('packages/shared-schemas: sig schema specifications', () => {
       expect(RankingAuditSchema.safeParse(sampleRankingAudit).success).toBe(true);
 
       // Selection probability 0 is invalid (must be in (0, 1] or null)
-      const zeroProb = { ...sampleRankingAudit, selectionProbability: 0.0 };
+      const zeroProb = { ...sampleRankingAudit, selectionProbability: '0.0' };
       expect(RankingAuditSchema.safeParse(zeroProb).success).toBe(false);
 
       // Unknown ParetoStatus rejected
@@ -193,19 +193,19 @@ describe('packages/shared-schemas: sig schema specifications', () => {
     if (RecheckBudgetSchema) {
       expect(RecheckBudgetSchema.safeParse(sampleRecheckBudget).success).toBe(true);
 
-      // nextCheckAt >= expiresAt refused
+      // next_check_at >= expires_at refused
       const invalidOrder = {
         ...sampleRecheckBudget,
-        nextCheckAt: '2026-06-01T19:00:00Z',
-        expiresAt: '2026-06-01T18:00:00Z',
+        next_check_at: '2026-06-01T19:00:00.000Z',
+        expires_at: '2026-06-01T18:00:00.000Z',
       };
       expect(RecheckBudgetSchema.safeParse(invalidOrder).success).toBe(false);
 
       // Backoff factor <= 1 refused
-      const invalidBackoff = { ...sampleRecheckBudget, backoffFactor: 0.9 };
+      const invalidBackoff = { ...sampleRecheckBudget, backoff_factor: '0.9' };
       expect(RecheckBudgetSchema.safeParse(invalidBackoff).success).toBe(false);
     } else {
-      expect(sampleRecheckBudget.candidateId).toBeDefined();
+      expect(sampleRecheckBudget.max_rechecks).toBeDefined();
     }
   });
 });

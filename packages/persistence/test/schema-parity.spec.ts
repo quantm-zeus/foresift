@@ -50,6 +50,7 @@ const TYPE_CLASS: Record<string, string> = {
   'timestamp with time zone': 'date',
   jsonb: 'json',
   ARRAY: 'array',
+  interval: 'string',
 };
 
 let db: PGlite;
@@ -67,16 +68,19 @@ afterAll(async () => {
 
 describe('Drizzle mirror parity with SQL truth (ADR-001)', () => {
   it('mirrors exactly the table set created by the migrations', async () => {
-    const sqlTables = await engine.query<{ table_name: string }>(
-      `SELECT table_name FROM information_schema.tables
-       WHERE table_schema = 'public'
+    const sqlTables = await engine.query<{ table_schema: string; table_name: string }>(
+      `SELECT table_schema, table_name FROM information_schema.tables
+       WHERE table_schema IN ('public', 'sig')
          AND table_name NOT LIKE '_foresift%'
-       ORDER BY table_name`,
+       ORDER BY table_schema, table_name`,
     );
-    const sqlNames = sqlTables.rows.map((r) => r.table_name).sort();
+    const sqlNames = sqlTables.rows.map((r) => `${r.table_schema || 'public'}.${r.table_name}`).sort();
 
     const mirrorNames = Object.values(mirror)
-      .map((v) => asTable(v)?.name)
+      .map((v) => {
+        const cfg = asTable(v);
+        return cfg ? `${cfg.schema || 'public'}.${cfg.name}` : undefined;
+      })
       .filter((n): n is string => n !== undefined)
       .sort();
 
@@ -90,6 +94,7 @@ describe('Drizzle mirror parity with SQL truth (ADR-001)', () => {
     for (const entry of Object.values(mirror)) {
       const config = asTable(entry);
       if (!config) continue; // non-table export
+      const schemaName = config.schema || 'public';
       const sqlCols = await engine.query<{
         column_name: string;
         data_type: string;
@@ -98,12 +103,12 @@ describe('Drizzle mirror parity with SQL truth (ADR-001)', () => {
       }>(
         `SELECT column_name, data_type, is_nullable, udt_name
          FROM information_schema.columns
-         WHERE table_schema = 'public' AND table_name = $1
+         WHERE table_schema = $1 AND table_name = $2
          ORDER BY ordinal_position`,
-        [config.name],
+        [schemaName, config.name],
       );
       if (sqlCols.rows.length === 0) {
-        failures.push(`${config.name}: exists in mirror but not in SQL`);
+        failures.push(`${schemaName}.${config.name}: exists in mirror but not in SQL`);
         continue;
       }
 
@@ -113,26 +118,26 @@ describe('Drizzle mirror parity with SQL truth (ADR-001)', () => {
       for (const col of config.columns) {
         const sqlCol = byNameSql.get(col.name);
         if (!sqlCol) {
-          failures.push(`${config.name}.${col.name}: in mirror but missing in SQL`);
+          failures.push(`${schemaName}.${config.name}.${col.name}: in mirror but missing in SQL`);
           continue;
         }
         const expectedClass = TYPE_CLASS[sqlCol.data_type];
         if (expectedClass === undefined) {
-          failures.push(`${config.name}.${col.name}: unmapped SQL type ${sqlCol.data_type}`);
+          failures.push(`${schemaName}.${config.name}.${col.name}: unmapped SQL type ${sqlCol.data_type}`);
         } else if (col.dataType !== expectedClass) {
           failures.push(
-            `${config.name}.${col.name}: mirror type ${col.dataType} != SQL ${sqlCol.data_type} (${expectedClass})`,
+            `${schemaName}.${config.name}.${col.name}: mirror type ${col.dataType} != SQL ${sqlCol.data_type} (${expectedClass})`,
           );
         }
         if (col.notNull !== (sqlCol.is_nullable === 'NO')) {
           failures.push(
-            `${config.name}.${col.name}: nullability mismatch (mirror notNull=${String(col.notNull)}, SQL=${sqlCol.is_nullable})`,
+            `${schemaName}.${config.name}.${col.name}: nullability mismatch (mirror notNull=${String(col.notNull)}, SQL=${sqlCol.is_nullable})`,
           );
         }
       }
       for (const [name] of byNameSql) {
         if (!byNameMirror.has(name)) {
-          failures.push(`${config.name}.${name}: in SQL but missing in mirror`);
+          failures.push(`${schemaName}.${config.name}.${name}: in SQL but missing in mirror`);
         }
       }
     }
@@ -140,30 +145,34 @@ describe('Drizzle mirror parity with SQL truth (ADR-001)', () => {
   });
 
   it('matches primary keys on every table', async () => {
-    const sqlPks = await engine.query<{ table_name: string; pk_cols: string[] }>(
-      `SELECT tc.table_name,
+    const sqlPks = await engine.query<{ table_schema: string; table_name: string; pk_cols: string[] }>(
+      `SELECT tc.table_schema,
+              tc.table_name,
               ARRAY_AGG(kcu.column_name ORDER BY kcu.ordinal_position) AS pk_cols
        FROM information_schema.table_constraints tc
        JOIN information_schema.key_column_usage kcu
          ON tc.constraint_name = kcu.constraint_name
         AND tc.table_schema = kcu.table_schema
-       WHERE tc.table_schema = 'public' AND tc.constraint_type = 'PRIMARY KEY'
-       GROUP BY tc.table_name`,
+       WHERE tc.table_schema IN ('public', 'sig') AND tc.constraint_type = 'PRIMARY KEY'
+       GROUP BY tc.table_schema, tc.table_name`,
     );
-    const sqlPkMap = new Map(sqlPks.rows.map((r) => [r.table_name, [...r.pk_cols].sort()]));
+    const sqlPkMap = new Map(
+      sqlPks.rows.map((r) => [`${r.table_schema || 'public'}.${r.table_name}`, [...r.pk_cols].sort()]),
+    );
 
     for (const entry of Object.values(mirror)) {
       const config = asTable(entry);
       if (!config) continue;
+      const schemaName = config.schema || 'public';
       // Composite PKs come from the extra config; single-column .primaryKey()
       // defs are flagged on the column itself.
       const mirrorPk = [
         ...config.primaryKeys.flatMap((pk) => pk.columns.map((c) => c.name)),
         ...config.columns.filter((c) => c.primary).map((c) => c.name),
       ];
-      const expected = sqlPkMap.get(config.name);
-      expect(expected, `${config.name} missing PK in SQL`).toBeDefined();
-      expect([...mirrorPk].sort(), `${config.name} PK mismatch`).toEqual(expected!);
+      const expected = sqlPkMap.get(`${schemaName}.${config.name}`);
+      expect(expected, `${schemaName}.${config.name} missing PK in SQL`).toBeDefined();
+      expect([...mirrorPk].sort(), `${schemaName}.${config.name} PK mismatch`).toEqual(expected!);
     }
   });
 });

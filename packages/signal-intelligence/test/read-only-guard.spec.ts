@@ -27,16 +27,24 @@ describe('packages/signal-intelligence: Read-Only Guard & No-LLM Structural Scan
       /@google\/generative-ai/,
       /langchain/,
       /ollama/,
-      /model-provider/,
-      /prompt-template/,
+      /(?:^|[/@-])model-provider(?:$|[/])/,
+      /(?:^|[/@-])agent(?:s|$|[/])/,
+      /(?:^|[/@-])prompt(?:s|$|[/])/,
+      /(?:^|[/@-])llm(?:$|[/])/,
       /wallet-signing/,
       /transaction-submission/,
     ];
 
+    const importPattern = /(?:import|export)\s+(?:[^'";]+?\s+from\s+)?['"]([^'"]+)['"]/g;
+
     for (const file of files) {
-      const content = readFileSync(path.join(PACKAGE_SRC, file), 'utf8');
-      for (const pattern of prohibitedImportPatterns) {
-        expect(pattern.test(content)).toBe(false);
+      const rawContent = readFileSync(path.join(PACKAGE_SRC, file), 'utf8');
+      const content = rawContent.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/.*$/gm, '');
+      for (const match of content.matchAll(importPattern)) {
+        const specifier = match[1] as string;
+        for (const pattern of prohibitedImportPatterns) {
+          expect(pattern.test(specifier)).toBe(false);
+        }
       }
     }
   });

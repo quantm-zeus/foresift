@@ -47,7 +47,7 @@ riders, then fixtures and AC suites, then telemetry and gates.
 
 ## Phase 1 — Domain vocabularies and error codes (blocks later phases)
 
-- [ ] T001 [P] Create `packages/domain/src/disc.ts`: `DiscEntryReason` (8 members
+- [x] T001 [P] Create `packages/domain/src/disc.ts`: `DiscEntryReason` (8 members — [evidence: PRODUCT_UNIT_LANDED] packages/domain/src/disc.ts committed at HEAD (03ec979): 9 vocabularies re-exported, 9 fail-closed parse functions, 4 pure laws; T027 colocated suites now execute the REAL exports (46/46, 182 expects vs 32 vacuous baseline)
       per vocabulary law), `DiscRightsBasis` (5), `DiscManipulationPolicy` (3),
       `DiscClaimBasis` (3), `DiscConstraintKind` (6), `DiscConstraintEffect`
       (3), `DiscChainAccessPurpose` (2), `DiscRecallVerdict` (4),

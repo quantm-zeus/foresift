@@ -3,3 +3,5 @@ export * from './first-seen-attribution.ts';
 export * from './aggregate-path.ts';
 export * from './retrospective-classifier.ts';
 export * from './source-profiles.ts';
+export * from './claim-language.ts';
+export * from './recall-estimator.ts';

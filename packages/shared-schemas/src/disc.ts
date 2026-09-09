@@ -127,6 +127,112 @@ export const CoveragePopulationManifestSchema = z
   );
 export type CoveragePopulationManifest = z.infer<typeof CoveragePopulationManifestSchema>;
 
+export const DiscClaimBasisSchema = z.enum([
+  'INDEPENDENT_FIRST_PARTY_OBSERVATION',
+  'INDEPENDENT_PROVIDER_LINEAGE',
+  'KNOWN_INCLUSION_PROBABILITIES',
+]);
+export type DiscClaimBasis = z.infer<typeof DiscClaimBasisSchema>;
+
+export const DiscSourceProfileSchema = z
+  .object({
+    sourceId: z.string().min(1),
+    profileVersion: z.number().int().positive(),
+    sourceClass: DiscoverySourceClassSchema,
+    coverageScope: z.record(z.string(), z.unknown()),
+    rightsBasis: z.enum([
+      'FIRST_PARTY_COLLECTOR',
+      'AUTHORIZED_FEED_CONTRACT',
+      'FREE_PUBLIC_TERMS',
+      'USER_PROVIDED',
+      'EXCLUDED',
+    ]),
+    queryFilterVersion: z.string().min(1),
+    upstreamDependence: z.record(z.string(), z.unknown()),
+    upstreamLineageKeys: z.array(z.string().min(1)),
+    manipulationPolicy: z.enum([
+      'LABEL_AND_RETAIN',
+      'LABEL_AND_DOWNWEIGHT',
+      'EXCLUDE_PAID_PLACEMENTS',
+    ]),
+    collectorScopeIds: z.array(z.string().min(1)),
+    effectiveFrom: UtcTimestampSchema,
+    supersededAt: UtcTimestampSchema.optional(),
+  })
+  .strict()
+  .refine(
+    (value) =>
+      value.supersededAt === undefined ||
+      Date.parse(value.supersededAt) > Date.parse(value.effectiveFrom),
+    { message: 'source profile validity window is inverted' },
+  );
+
+export const UniverseEntryProvenanceSchema = z
+  .object({
+    entryId: z.string().min(1),
+    normalizedIdentityId: z.string().min(1),
+    entryReason: z.enum([
+      'FIRST_PARTY_SUPPORTED_PROGRAM_EVENT',
+      'FREE_AGGREGATE_OBSERVATION',
+      'AUTHORIZED_LAUNCH_NOTIFICATION',
+      'USER_WATCHLIST_ADDITION',
+      'AUTHORIZED_SOCIAL_MENTION',
+      'SELECTIVE_VERIFICATION_HIT',
+      'RETROSPECTIVE_ENUMERATION_HIT',
+      'STRATIFIED_SAMPLE_DRAW',
+    ]),
+    coverageScopeRef: z.string().min(1),
+    rightsRecord: z.enum([
+      'FIRST_PARTY_COLLECTOR',
+      'AUTHORIZED_FEED_CONTRACT',
+      'FREE_PUBLIC_TERMS',
+      'USER_PROVIDED',
+      'EXCLUDED',
+    ]),
+    queryFilterVersion: z.string().min(1),
+    upstreamDependenceDisclosed: z.record(z.string(), z.unknown()),
+    firstPartyObserved: z.boolean(),
+  })
+  .strict();
+
+export const DiscRecallVerdictSchema = z.enum([
+  'INDEPENDENT_ESTIMATE',
+  'DEPENDENT_DISCLOSED',
+  'SELF_RECALL_REFUSED',
+  'NO_ADMISSIBLE_BASIS',
+]);
+export type DiscRecallVerdict = z.infer<typeof DiscRecallVerdictSchema>;
+
+export const RecallEstimateRecordSchema = z
+  .object({
+    estimateId: z.string().min(1),
+    manifestId: z.string().min(1),
+    evaluatedSourceId: z.string().min(1),
+    claimBasis: DiscClaimBasisSchema,
+    verdict: DiscRecallVerdictSchema,
+    recallEstimate: z.number().min(0).max(1).optional(),
+    inclusionProbabilitySource: z.string().min(1).optional(),
+    independenceEvidence: z.array(z.string().min(1)),
+    constraintIds: z.array(z.string().min(1)),
+    asOf: UtcTimestampSchema,
+  })
+  .strict()
+  .superRefine((value, context) => {
+    if (value.verdict === 'INDEPENDENT_ESTIMATE' && value.recallEstimate === undefined) {
+      context.addIssue({ code: 'custom', message: 'an independent verdict requires an estimate' });
+    }
+    if (
+      (value.verdict === 'INDEPENDENT_ESTIMATE' || value.verdict === 'DEPENDENT_DISCLOSED') &&
+      value.independenceEvidence.length === 0
+    ) {
+      context.addIssue({
+        code: 'custom',
+        message: 'an evidentiary verdict requires evidence refs',
+      });
+    }
+  });
+export type RecallEstimateRecord = z.infer<typeof RecallEstimateRecordSchema>;
+
 export const DISCOVERY_SCHEMAS = {
   DiscoveryUniverseEntry: DiscoveryUniverseEntrySchema,
   DiscoverySourceClass: DiscoverySourceClassSchema,
@@ -135,6 +241,11 @@ export const DISCOVERY_SCHEMAS = {
   CheapMonitorDecision: CheapMonitorDecisionSchema,
   PromotionDecision: PromotionDecisionSchema,
   CoveragePopulationManifest: CoveragePopulationManifestSchema,
+  DiscClaimBasis: DiscClaimBasisSchema,
+  DiscSourceProfile: DiscSourceProfileSchema,
+  UniverseEntryProvenance: UniverseEntryProvenanceSchema,
+  DiscRecallVerdict: DiscRecallVerdictSchema,
+  RecallEstimateRecord: RecallEstimateRecordSchema,
 } as const;
 export class DiscoverySchemaError extends Error {
   readonly code = 'DISCOVERY_SCHEMA_INVALID' as const;

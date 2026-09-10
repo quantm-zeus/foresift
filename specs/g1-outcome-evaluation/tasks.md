@@ -125,7 +125,7 @@ then fixtures and AC suites, then telemetry and gates.
       Traces: FR-MAT-004, FR-MAT-005, FR-EVAL-002, FR-EVAL-003, FR-EVAL-009,
       AC-240, AC-242, AC-244, AC-248, AC-249.
 - [ ] T003 [serial-reason: SEMANTIC_DEPENDENCY] Extend
-      `packages/domain/src/errors.ts` with the MAT_*/EVAL_* error-code blocks
+      `packages/domain/src/errors.ts` with the MAT__/EVAL__ error-code blocks
       and the `MatError`/`EvalError` subclasses, and extend
       `packages/domain/src/index.ts` exports for the new mat and eval modules.
       Traces: FR-MAT-001…012, FR-EVAL-001…009.
@@ -196,7 +196,7 @@ then fixtures and AC suites, then telemetry and gates.
       partition CHECK (6), holdout_exposure CHECK (5), FINAL_HOLDOUT-frozen
       CHECK, sha256 universe hash, embargo bounds, leakage group keys),
       `evaluation_experiments` (FR-EVAL-009 §31.3 exact field set incl.
-      multiple_testing_family CHECK (8), pre-registration timestamp); 
+      multiple_testing_family CHECK (8), pre-registration timestamp);
       append-only triggers. Traces: FR-EVAL-001, FR-EVAL-009.
 - [ ] T008 [serial-reason: ORDERED_MIGRATION] Create
       `migrations/g1_eval_0002_runs_metrics_controls.sql`:
@@ -518,7 +518,7 @@ then fixtures and AC suites, then telemetry and gates.
       capacityDisclosureRequired, universalActionTime truth table,
       holdoutExposureGuards, weightingRequiresDiagnostics,
       populationClaimSupported, essGate, materialLiftDetector, horizonPurge),
-      the MAT_*/EVAL_* error-code blocks and error subclasses, and the
+      the MAT__/EVAL__ error-code blocks and error subclasses, and the
       shared-schema payload laws (censor-reason-required refinement,
       promotion-requires-mature-evidence, interval-order, lift-implies-
       incident, weighting-requires-diagnostics, unknown enum refusal, strict
@@ -646,9 +646,9 @@ then fixtures and AC suites, then telemetry and gates.
       milestone verification commands on the canonical tree: `test -d
 packages/outcome-maturity && pnpm --filter @foresift/outcome-maturity test`;
       `test -d packages/evaluation && pnpm --filter @foresift/evaluation
-      test`; `test -d packages/eval-cli && pnpm --filter @foresift/eval-cli
-      test`; plus the extended central suites (`pnpm --filter
-      @foresift/persistence test` incl. migrator + schema-parity,
+test`; `test -d packages/eval-cli && pnpm --filter @foresift/eval-cli
+test`; plus the extended central suites (`pnpm --filter
+@foresift/persistence test` incl. migrator + schema-parity,
       `tests/telemetry-catalog.spec.ts`) and the authored/extended AC files
       (AC-040…044, AC-120…128, AC-150…154, AC-240…249). All green required.
       Traces: FR-MAT-001…012, FR-EVAL-001…009 (package-gate proof of every
@@ -672,47 +672,47 @@ evidence/bun-migration/bun-migration-manifest.json`) after all new test
 
 ## Task → requirement coverage matrix
 
-| Task | Requirements | ACs | Key files |
-| ---- | ------------ | --- | --------- |
-| T001 | FR-MAT-001, FR-MAT-003, FR-MAT-006, FR-MAT-008, FR-MAT-009, FR-MAT-011, FR-MAT-012 | — | packages/domain/src/mat.ts (vocabulary law) |
-| T002 | FR-MAT-004, FR-MAT-005, FR-EVAL-002, FR-EVAL-003, FR-EVAL-009 | AC-240, AC-242, AC-244, AC-248, AC-249 | packages/domain/src/eval.ts (vocabulary law) |
-| T003 | FR-MAT-001…012, FR-EVAL-001…009 | — | packages/domain/src/errors.ts, index.ts |
-| T004 | FR-MAT-001…003, 006…012, FR-EVAL-001…003, 005, 007…009 | — | packages/shared-schemas/src/mat.ts, eval.ts |
-| T005 | FR-MAT-001, FR-MAT-002, FR-MAT-003, FR-MAT-006, FR-MAT-007, FR-MAT-010 | — | migrations/g1_mat_0001_maturity_ledger.sql |
-| T006 | FR-MAT-008, FR-MAT-009, FR-MAT-011, FR-MAT-012 | — | migrations/g1_mat_0002_promotion_evidence.sql |
-| T007 | FR-EVAL-001, FR-EVAL-009 | — | migrations/g1_eval_0001_profiles_datasets_registry.sql |
-| T008 | FR-MAT-004, FR-MAT-005, FR-EVAL-002, FR-EVAL-003, FR-EVAL-009 | — | migrations/g1_eval_0002_runs_metrics_controls.sql |
-| T009 | FR-EVAL-004, FR-EVAL-005, FR-EVAL-007, FR-EVAL-008, FR-EVAL-009 | — | migrations/g1_eval_0003_baseline_missed_controls.sql |
-| T010 | FR-MAT-001…012, FR-EVAL-001…009 | — | packages/persistence/src/migrator.ts (sanctioned exception) |
-| T011 | FR-MAT-001…012, FR-EVAL-001…009 | — | packages/persistence/src/generated/schema.ts (sanctioned exception) |
-| T012 | FR-MAT-001…012, FR-EVAL-001…009 | — | packages/outcome-maturity, packages/evaluation, packages/eval-cli scaffolds |
-| T013 | FR-MAT-001, FR-MAT-002 | AC-123 | packages/outcome-maturity/src/maturity-ledger.ts |
-| T014 | FR-MAT-006, FR-MAT-010 | AC-123, AC-125, AC-239 | packages/outcome-maturity/src/denominators.ts, label-separation.ts |
-| T015 | FR-MAT-007 | AC-128, AC-244 | packages/outcome-maturity/src/sampling.ts |
-| T016 | FR-MAT-008, FR-MAT-009, FR-MAT-011, FR-MAT-012 | AC-120, AC-126, AC-152 | packages/outcome-maturity/src/promotion-evidence.ts |
-| T017 | FR-MAT-001…012 | — | packages/outcome-maturity/src/read-only-guard.ts |
-| T018 | FR-EVAL-001, FR-EVAL-002 | AC-240, AC-241, AC-247 | packages/evaluation/src/profiles.ts, frozen-replay.ts, action-time.ts |
-| T019 | FR-EVAL-003, FR-EVAL-004 | AC-040, AC-041, AC-042, AC-123 | packages/evaluation/src/metrics.ts, baselines.ts |
-| T021 | FR-EVAL-005, FR-EVAL-006 | AC-041, AC-043 | packages/evaluation/src/missed-opportunity.ts, exploration.ts |
-| T022 | FR-MAT-004, FR-MAT-005 | AC-150, AC-151, AC-245, AC-246, AC-249 | packages/evaluation/src/controls.ts, intervals.ts, incident.ts |
-| T023 | FR-EVAL-007, FR-EVAL-008, FR-EVAL-009 | AC-154, AC-243, AC-244, AC-248, AC-249 | packages/evaluation/src/champion-challenger.ts, drift-calibration.ts, experiments.ts, selection-bias.ts |
-| T024 | FR-EVAL-001…009 | — | packages/evaluation/src/read-only-guard.ts |
-| T025 | FR-EVAL-001…009, FR-MAT-010 | — | packages/eval-cli/src/cli.ts |
-| T026 | FR-MAT-001, FR-MAT-002, FR-MAT-003, FR-MAT-010 | AC-123, AC-124 | tests/fixtures/mat/maturity-vectors.ts, denominator-vectors.ts |
-| T027 | FR-MAT-007, FR-MAT-008, FR-MAT-009, FR-MAT-011, FR-MAT-012 | AC-128, AC-152 | tests/fixtures/mat/sampling-vectors.ts, promotion-evidence-vectors.ts |
-| T028 | FR-EVAL-001, FR-EVAL-002, FR-EVAL-003 | AC-040 | tests/fixtures/eval/profiles.ts, datasets.ts, metrics-vectors.ts |
-| T029 | FR-EVAL-004, FR-EVAL-005, FR-MAT-004, FR-MAT-005 | AC-042, AC-150, AC-151 | tests/fixtures/eval/baselines.ts, missed-opportunities.ts, controls-vectors.ts, intervals-vectors.ts |
-| T030 | FR-MAT-001…012, FR-EVAL-001…009 | — | packages/domain/test/{mat,eval}.spec.ts, packages/shared-schemas/test/{mat,eval}.spec.ts |
-| T031 | FR-MAT-001…012, FR-EVAL-001…009 | AC-120…128, AC-154, AC-240…249 | packages/outcome-maturity/test/*.spec.ts, packages/evaluation/test/*.spec.ts |
-| T032 | FR-EVAL-001…009, FR-MAT-010 | — | packages/eval-cli/test/cli.spec.ts |
-| T033 | FR-MAT-001…012, FR-EVAL-001…009 | AC-040…044, AC-150…153 | tests/acceptance/AC-0{40…44}.spec.ts (+negative), AC-15{0…3}.spec.ts (+negative) |
-| T034 | FR-MAT-001…012, FR-EVAL-001…009 | AC-120…128, AC-154, AC-240…249 | tests/acceptance + tests/negative facet extends |
-| T035 | FR-MAT-001…012, FR-EVAL-001…009 | — | tests/telemetry-catalog.spec.ts (sanctioned exception) |
-| T036 | FR-MAT-001…012, FR-EVAL-001…009 | — | packages/persistence/test/migrator.spec.ts (sanctioned exception) |
-| T037 | FR-MAT-001…012, FR-EVAL-001…009 | — | telemetry/mat.catalog.json, telemetry/eval.catalog.json |
-| T038 | FR-MAT-001…012, FR-EVAL-001…009 | AC-040…044, AC-120…128, AC-150…154, AC-240…249 | — (verification) |
-| T039 | FR-MAT-001…012, FR-EVAL-001…009 | — | evidence/bun-migration/bun-migration-manifest.json (coordinator) |
-| T040 | FR-MAT-001…012, FR-EVAL-001…009 | — | — (verification) |
+| Task | Requirements                                                                       | ACs                                            | Key files                                                                                               |
+| ---- | ---------------------------------------------------------------------------------- | ---------------------------------------------- | ------------------------------------------------------------------------------------------------------- |
+| T001 | FR-MAT-001, FR-MAT-003, FR-MAT-006, FR-MAT-008, FR-MAT-009, FR-MAT-011, FR-MAT-012 | —                                              | packages/domain/src/mat.ts (vocabulary law)                                                             |
+| T002 | FR-MAT-004, FR-MAT-005, FR-EVAL-002, FR-EVAL-003, FR-EVAL-009                      | AC-240, AC-242, AC-244, AC-248, AC-249         | packages/domain/src/eval.ts (vocabulary law)                                                            |
+| T003 | FR-MAT-001…012, FR-EVAL-001…009                                                    | —                                              | packages/domain/src/errors.ts, index.ts                                                                 |
+| T004 | FR-MAT-001…003, 006…012, FR-EVAL-001…003, 005, 007…009                             | —                                              | packages/shared-schemas/src/mat.ts, eval.ts                                                             |
+| T005 | FR-MAT-001, FR-MAT-002, FR-MAT-003, FR-MAT-006, FR-MAT-007, FR-MAT-010             | —                                              | migrations/g1_mat_0001_maturity_ledger.sql                                                              |
+| T006 | FR-MAT-008, FR-MAT-009, FR-MAT-011, FR-MAT-012                                     | —                                              | migrations/g1_mat_0002_promotion_evidence.sql                                                           |
+| T007 | FR-EVAL-001, FR-EVAL-009                                                           | —                                              | migrations/g1_eval_0001_profiles_datasets_registry.sql                                                  |
+| T008 | FR-MAT-004, FR-MAT-005, FR-EVAL-002, FR-EVAL-003, FR-EVAL-009                      | —                                              | migrations/g1_eval_0002_runs_metrics_controls.sql                                                       |
+| T009 | FR-EVAL-004, FR-EVAL-005, FR-EVAL-007, FR-EVAL-008, FR-EVAL-009                    | —                                              | migrations/g1_eval_0003_baseline_missed_controls.sql                                                    |
+| T010 | FR-MAT-001…012, FR-EVAL-001…009                                                    | —                                              | packages/persistence/src/migrator.ts (sanctioned exception)                                             |
+| T011 | FR-MAT-001…012, FR-EVAL-001…009                                                    | —                                              | packages/persistence/src/generated/schema.ts (sanctioned exception)                                     |
+| T012 | FR-MAT-001…012, FR-EVAL-001…009                                                    | —                                              | packages/outcome-maturity, packages/evaluation, packages/eval-cli scaffolds                             |
+| T013 | FR-MAT-001, FR-MAT-002                                                             | AC-123                                         | packages/outcome-maturity/src/maturity-ledger.ts                                                        |
+| T014 | FR-MAT-006, FR-MAT-010                                                             | AC-123, AC-125, AC-239                         | packages/outcome-maturity/src/denominators.ts, label-separation.ts                                      |
+| T015 | FR-MAT-007                                                                         | AC-128, AC-244                                 | packages/outcome-maturity/src/sampling.ts                                                               |
+| T016 | FR-MAT-008, FR-MAT-009, FR-MAT-011, FR-MAT-012                                     | AC-120, AC-126, AC-152                         | packages/outcome-maturity/src/promotion-evidence.ts                                                     |
+| T017 | FR-MAT-001…012                                                                     | —                                              | packages/outcome-maturity/src/read-only-guard.ts                                                        |
+| T018 | FR-EVAL-001, FR-EVAL-002                                                           | AC-240, AC-241, AC-247                         | packages/evaluation/src/profiles.ts, frozen-replay.ts, action-time.ts                                   |
+| T019 | FR-EVAL-003, FR-EVAL-004                                                           | AC-040, AC-041, AC-042, AC-123                 | packages/evaluation/src/metrics.ts, baselines.ts                                                        |
+| T021 | FR-EVAL-005, FR-EVAL-006                                                           | AC-041, AC-043                                 | packages/evaluation/src/missed-opportunity.ts, exploration.ts                                           |
+| T022 | FR-MAT-004, FR-MAT-005                                                             | AC-150, AC-151, AC-245, AC-246, AC-249         | packages/evaluation/src/controls.ts, intervals.ts, incident.ts                                          |
+| T023 | FR-EVAL-007, FR-EVAL-008, FR-EVAL-009                                              | AC-154, AC-243, AC-244, AC-248, AC-249         | packages/evaluation/src/champion-challenger.ts, drift-calibration.ts, experiments.ts, selection-bias.ts |
+| T024 | FR-EVAL-001…009                                                                    | —                                              | packages/evaluation/src/read-only-guard.ts                                                              |
+| T025 | FR-EVAL-001…009, FR-MAT-010                                                        | —                                              | packages/eval-cli/src/cli.ts                                                                            |
+| T026 | FR-MAT-001, FR-MAT-002, FR-MAT-003, FR-MAT-010                                     | AC-123, AC-124                                 | tests/fixtures/mat/maturity-vectors.ts, denominator-vectors.ts                                          |
+| T027 | FR-MAT-007, FR-MAT-008, FR-MAT-009, FR-MAT-011, FR-MAT-012                         | AC-128, AC-152                                 | tests/fixtures/mat/sampling-vectors.ts, promotion-evidence-vectors.ts                                   |
+| T028 | FR-EVAL-001, FR-EVAL-002, FR-EVAL-003                                              | AC-040                                         | tests/fixtures/eval/profiles.ts, datasets.ts, metrics-vectors.ts                                        |
+| T029 | FR-EVAL-004, FR-EVAL-005, FR-MAT-004, FR-MAT-005                                   | AC-042, AC-150, AC-151                         | tests/fixtures/eval/baselines.ts, missed-opportunities.ts, controls-vectors.ts, intervals-vectors.ts    |
+| T030 | FR-MAT-001…012, FR-EVAL-001…009                                                    | —                                              | packages/domain/test/{mat,eval}.spec.ts, packages/shared-schemas/test/{mat,eval}.spec.ts                |
+| T031 | FR-MAT-001…012, FR-EVAL-001…009                                                    | AC-120…128, AC-154, AC-240…249                 | packages/outcome-maturity/test/_.spec.ts, packages/evaluation/test/_.spec.ts                            |
+| T032 | FR-EVAL-001…009, FR-MAT-010                                                        | —                                              | packages/eval-cli/test/cli.spec.ts                                                                      |
+| T033 | FR-MAT-001…012, FR-EVAL-001…009                                                    | AC-040…044, AC-150…153                         | tests/acceptance/AC-0{40…44}.spec.ts (+negative), AC-15{0…3}.spec.ts (+negative)                        |
+| T034 | FR-MAT-001…012, FR-EVAL-001…009                                                    | AC-120…128, AC-154, AC-240…249                 | tests/acceptance + tests/negative facet extends                                                         |
+| T035 | FR-MAT-001…012, FR-EVAL-001…009                                                    | —                                              | tests/telemetry-catalog.spec.ts (sanctioned exception)                                                  |
+| T036 | FR-MAT-001…012, FR-EVAL-001…009                                                    | —                                              | packages/persistence/test/migrator.spec.ts (sanctioned exception)                                       |
+| T037 | FR-MAT-001…012, FR-EVAL-001…009                                                    | —                                              | telemetry/mat.catalog.json, telemetry/eval.catalog.json                                                 |
+| T038 | FR-MAT-001…012, FR-EVAL-001…009                                                    | AC-040…044, AC-120…128, AC-150…154, AC-240…249 | — (verification)                                                                                        |
+| T039 | FR-MAT-001…012, FR-EVAL-001…009                                                    | —                                              | evidence/bun-migration/bun-migration-manifest.json (coordinator)                                        |
+| T040 | FR-MAT-001…012, FR-EVAL-001…009                                                    | —                                              | — (verification)                                                                                        |
 
 ## Cross-artifact consistency analysis (speckit-analyze, completed at planning)
 
@@ -729,7 +729,7 @@ evidence/bun-migration/bun-migration-manifest.json`) after all new test
 - **Traceability**: no task cites a requirement outside the package's
   assignment (validator-enforced: FR-EXEC/FR-SIG/FR-DATA/FR-DISC/FR-COST/
   FR-OBJ and every non-assigned ID are absent from tasks.md); every task
-  cites ≥1 FR-MAT-*/FR-EVAL-* ID or its AC.
+  cites ≥1 FR-MAT-_/FR-EVAL-_ ID or its AC.
 - **Scope**: every predicted write lands inside writeScopes except the four
   plan-sanctioned exceptions named by exact path (T010 migrator family-list
   extension, product-owned; T011 ADR-001 Drizzle mirror catch-up,
@@ -755,8 +755,8 @@ evidence/bun-migration/bun-migration-manifest.json`) after all new test
   Phase 2 schemas → Phase 3 persistence (migrations, migrator, mirror) →
   Phase 4 outcome-maturity core → Phase 5 evaluation engine → Phase 6 CLI →
   Phase 7 fixtures/suites → Phase 7b central extensions → Phase 8 telemetry
-  + gates. `(blocks` headings in phases add the blocking-phase dependency
-  edges the task-graph builder requires.
+  - gates. `(blocks` headings in phases add the blocking-phase dependency
+    edges the task-graph builder requires.
 - **Read-only law**: no task introduces trading/custody/signing/transaction-
   submission capability or any model/LLM surface; T017/T024 run the
   structural scan and the prohibited-capability scanner as explicit gates;

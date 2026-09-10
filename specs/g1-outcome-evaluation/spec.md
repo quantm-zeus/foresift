@@ -817,9 +817,9 @@ substrate. Resolved against the PRD:
   `empirical_dependence_observations` (cluster-definition inputs for
   FR-MAT-005), and provider-conflict preservation. Consumed read-only.
 - **g1-discovery-coverage (PROVEN)** supplies: `disc.discovery_universe_entries`
-  + coverage populations + `disc.coverage_population_manifests` (Missed
-  Opportunity Analyzer step 1/2 inputs and population-claim support), and the
-  constraint/claim-basis honesty vocabulary this package's reports must cite.
+  - coverage populations + `disc.coverage_population_manifests` (Missed
+    Opportunity Analyzer step 1/2 inputs and population-claim support), and the
+    constraint/claim-basis honesty vocabulary this package's reports must cite.
 - **G0 substrate**: `visibleAt` (THE replay visibility predicate — INV-005/006),
   `feature_definitions`/`feature_values`, economic observations and trade
   events, `QualityCode` vocabulary (OUTCOME_PENDING, OUTCOME_CENSORED, LOW_SAMPLE),
@@ -928,7 +928,7 @@ Gaps outside this boundary are recorded in the run's out-of-scope notes.
   cannot improve measured performance — every excluded class is disclosed;
   sampling-propensity invalidity creates an incident.
 - **No silent censoring-to-failure mapping** (FR-MAT-003): `censored_as_failure:
-  false` (G.11) is a structural SQL CHECK + pure law, never a rendering choice.
+false` (G.11) is a structural SQL CHECK + pure law, never a rendering choice.
 - **Population claims are manifest-backed** (§68.4, §7.8): every report
   declares exactly one population with inclusion mechanism, known exclusions,
   and source-dependence assessment; aggregate/selected samples are never
@@ -1007,7 +1007,7 @@ load in this package:
    milestone verification commands (outcome-maturity, evaluation, eval-cli
    package filters) are green.
 8. No template placeholders remain in any scoped artifact; every task traces
-   to an assigned requirement (FR-MAT-*/FR-EVAL-* only) or its acceptance
+   to an assigned requirement (FR-MAT-_/FR-EVAL-_ only) or its acceptance
    criteria.
 
 ## Assumptions

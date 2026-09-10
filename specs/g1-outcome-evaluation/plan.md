@@ -190,7 +190,7 @@ evaluation engine, or the CLI.
 - **IX. Provider abstraction**: evaluation touches providers only through the
   frozen replay surface; live network is denied for decision-quality runs
   (§31.5).
-- **X. Requirement traceability**: every task cites FR-MAT-*/FR-EVAL-* or
+- **X. Requirement traceability**: every task cites FR-MAT-_/FR-EVAL-_ or
   their ACs; no invented IDs.
 - **XI/XII. Deterministic + failure-path verification**: every AC gets
   positive AND negative proof at the manifest paths; determinism is proven by
@@ -991,7 +991,7 @@ exported APIs. `domain` and `shared-schemas` gain additive modules only.
 - **AC-suite extension volume (20 files)** — mitigated by the facet convention
   (describe blocks with facet-scope headers, existing content untouched) and
   by authoring all extensions as test-owned tasks.
-- **Scope creep into objective-governance (FR-OBJ-*)** — mitigated by the
+- **Scope creep into objective-governance (FR-OBJ-\*)** — mitigated by the
   explicit boundary: this package delivers the deterministic metric framework
   and statistical substrate; the shadow-portfolio objective, hard-constraint
   promotion policy, and utility optimization stay with `g1-objective-governance`
@@ -1016,13 +1016,13 @@ exported APIs. `domain` and `shared-schemas` gain additive modules only.
 ## Validation
 
 1. `node scripts/automation/package-plan-complete.mjs --package
-   g1-outcome-evaluation --artifacts-dir <ARTIFACTS_DIR>` → complete:true.
+g1-outcome-evaluation --artifacts-dir <ARTIFACTS_DIR>` → complete:true.
 2. `pnpm spec:verify` after artifacts land (manifest integrity unaffected;
    scoped artifacts only added).
 3. No placeholder markers in `specs/g1-outcome-evaluation/**`; every task
-   traces to FR-MAT-*/FR-EVAL-* or its ACs; validator rejects out-of-scope
+   traces to FR-MAT-_/FR-EVAL-_ or its ACs; validator rejects out-of-scope
    requirement tracing.
 4. Milestone verification commands present and executable:
    `test -d packages/outcome-maturity && pnpm --filter @foresift/outcome-maturity
-   test`, `test -d packages/evaluation && pnpm --filter @foresift/evaluation
-   test`, `test -d packages/eval-cli && pnpm --filter @foresift/eval-cli test`.
+test`, `test -d packages/evaluation && pnpm --filter @foresift/evaluation
+test`, `test -d packages/eval-cli && pnpm --filter @foresift/eval-cli test`.

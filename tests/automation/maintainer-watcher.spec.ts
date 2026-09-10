@@ -118,8 +118,8 @@ function runWatcher(opts: { home: string; extraEnv?: Record<string, string> }) {
 
 describe('maintainer watcher CLAUDE_BIN durability (Incident B)', () => {
   // Launch-path tests ride the watcher's 5s post-launch verification sleep —
-  // beyond bun's 5s default per-test timeout.
-  const LAUNCH_TIMEOUT = { timeout: 30000 };
+  // beyond bun's 5s default per-test timeout (third-arg timeout, jest-style —
+  // this repo's bun-types has no options-object overload).
 
   test('new-session uses the absolute $HOME/.local/bin fallback when PATH lacks claude', () => {
     const home = join(FX, 'home');
@@ -138,7 +138,7 @@ describe('maintainer watcher CLAUDE_BIN durability (Incident B)', () => {
     );
   });
 
-  test('dead-pane respawn uses the absolute binary, not a bare claude', LAUNCH_TIMEOUT, () => {
+  test('dead-pane respawn uses the absolute binary, not a bare claude', () => {
     const home = join(FX, 'home');
     const bin = plantClaude(home);
     const r = runWatcher({
@@ -149,9 +149,9 @@ describe('maintainer watcher CLAUDE_BIN durability (Incident B)', () => {
     expect(r.tmuxLog).toContain('respawn-pane');
     expect(r.tmuxLog).toContain(`${bin} --resume ${SESSION_ID}`);
     expect(r.watcherLog).toContain('respawned dead pane');
-  });
+  }, 30000);
 
-  test('live-pane send-keys types the absolute binary, not a bare claude', LAUNCH_TIMEOUT, () => {
+  test('live-pane send-keys types the absolute binary, not a bare claude', () => {
     const home = join(FX, 'home');
     const bin = plantClaude(home);
     const r = runWatcher({
@@ -162,7 +162,7 @@ describe('maintainer watcher CLAUDE_BIN durability (Incident B)', () => {
     expect(r.tmuxLog).toContain('send-keys');
     expect(r.tmuxLog).toContain(`${bin} --resume ${SESSION_ID}`);
     expect(r.watcherLog).toContain('relaunched claude');
-  });
+  }, 30000);
 
   test('explicit CLAUDE_BIN wins over the HOME fallback', () => {
     const home = join(FX, 'home');

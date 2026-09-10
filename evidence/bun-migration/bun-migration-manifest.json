@@ -1,7 +1,7 @@
 {
   "schema": "foresift/bun-migration-manifest@1",
   "migrationId": "bun-test-authority-v1",
-  "generatedAt": "2026-09-10T21:25:18.546Z",
+  "generatedAt": "2026-09-10T21:34:45.572Z",
   "root": ".",
   "totalTestFiles": 488,
   "counts": {
@@ -12,7 +12,7 @@
     "BLOCKED": 0
   },
   "parity": {
-    "previousTotal": 487,
+    "previousTotal": 488,
     "disappeared": []
   },
   "files": [
@@ -6673,9 +6673,9 @@
     {
       "path": "tests/automation/maintainer-watcher.spec.ts",
       "package": "automation",
-      "bytes": 8367,
+      "bytes": 8398,
       "lines": 205,
-      "sha256": "f549e11eed22f44f3e30d46f729ca73b4c7e6f9437129121efd6a86886b6b292",
+      "sha256": "e08d2c033b8a19689a85d35d13338967a402da19177751dd5e199555030d86be",
       "imports": ["bun:test", "node:child_process", "node:fs", "node:os", "node:path", "node:url"],
       "vitestImports": [],
       "features": [],

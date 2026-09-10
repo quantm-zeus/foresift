@@ -6,3 +6,6 @@ export * from './metrics.ts';
 export * from './baselines.ts';
 export * from './missed-opportunity.ts';
 export * from './exploration.ts';
+export * from './controls.ts';
+export * from './intervals.ts';
+export * from './incident.ts';

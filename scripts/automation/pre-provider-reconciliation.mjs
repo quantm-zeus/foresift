@@ -59,6 +59,29 @@ export function preProviderReconciliation(graph, ctx) {
   const flips = [];
   for (const u of graph.units ?? []) {
     if (u.done) continue;
+    // Reservation/no-op law (run 4e59191b/T020, 2026-09-10): a unit whose
+    // full task block carries [evidence: NO_OP_ALREADY_SATISFIED] (resolved
+    // over title + wrapped continuation lines at graph build) and predicts
+    // ZERO writes has nothing to prove on disk — the marker plus the empty
+    // write set IS the deterministic proof. Flip closed here, BEFORE any
+    // provider can be acquired, so the unit never reaches a writer lane.
+    // A NO_OP unit that still predicts writes is contradictory (claims
+    // no-op while naming deliverables) — it falls through to outOfScope
+    // below and stays OPEN, never silently skipped.
+    if (
+      u.evidence === 'NO_OP_ALREADY_SATISFIED' &&
+      (u.predictedWrites ?? []).length === 0 &&
+      (u.testWrites ?? []).length === 0
+    ) {
+      reconciled.push(u.id);
+      decisions.push({
+        taskId: u.id,
+        proof:
+          'NO_OP_ALREADY_SATISFIED block marker with zero predicted writes — nothing to author or verify on disk',
+      });
+      flips.push(u.id);
+      continue;
+    }
     if (!u.evidence || u.evidence === 'FILE_OUTPUT') {
       const audit = fileEvidenceAlreadySatisfied(u, { root, trustedBase });
       if (audit.satisfied) {

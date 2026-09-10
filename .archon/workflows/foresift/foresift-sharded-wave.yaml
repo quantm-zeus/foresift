@@ -741,6 +741,25 @@ nodes:
           echo "coordinator audit closed $((before_open - ${after_open:-0})) task(s); proceeding to FAST" >&2
           integrated=1  # coordinator-owned progress — not an empty wave
         fi
+        if [ "$integrated" -eq 0 ]; then
+          # NO_OP wave reconciliation (live run 4e59191b, 2026-09-10): every
+          # dispatched lane reported zero completed units because every
+          # dispatched unit is evidence-proven already-satisfied/no-op
+          # (closed in canonical tasks.md with NO_OP_ALREADY_SATISFIED) and
+          # no lane carries a unique writer diff. That is
+          # coordinator-reconciled progress, not an empty wave — proceed to
+          # the FAST verdict (which re-verifies the whole tree, never
+          # vacuously). Any still-open/unproven unit or any unique lane diff
+          # fails the audit and the exit-90 fatal below stands (fail-closed).
+          if node scripts/automation/noop-wave-reconciliation.mjs --package "$PKG" \
+            --graph "$ARTIFACTS_DIR/task-graph.json" \
+            --results-dir "$ARTIFACTS_DIR/writer-results" \
+            --canonical . \
+            --out "$ARTIFACTS_DIR/noop-wave-reconciliation.json" 2>&1; then
+            echo "coordinator no-op reconciliation valid; proceeding to FAST" >&2
+            integrated=1  # proven zero-work — not an empty wave
+          fi
+        fi
       fi
       if [ "$dispatched" -gt 0 ] && [ "$integrated" -eq 0 ]; then
         echo "wave integration empty: $dispatched dispatched lane(s), none integrated; full report: $ARTIFACTS_DIR/integration-report.json" \

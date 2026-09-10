@@ -13,3 +13,7 @@ export declare function resolveTaskMetadata(taskLine: string): {
   evidence: string;
 };
 export declare function isCoordinatorTask(unit: { executor?: string } | null | undefined): boolean;
+export declare function resolveBlockEvidence(
+  blockText: string,
+  opts?: { unitId?: string; executor?: string },
+): string;

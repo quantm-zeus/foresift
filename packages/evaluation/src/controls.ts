@@ -1,5 +1,10 @@
 /** Seeded deterministic negative-control harness (FR-MAT-004). */
-import { ControlKind, IncidentTrigger, materialLiftDetector, type ControlKind as Control } from '@foresift/domain';
+import {
+  ControlKind,
+  IncidentTrigger,
+  materialLiftDetector,
+  type ControlKind as Control,
+} from '@foresift/domain';
 
 export interface FrozenControlRow {
   readonly stableId: string;
@@ -60,12 +65,17 @@ export function runNegativeControl(input: {
   readonly materialLiftThreshold: number;
   readonly shiftMilliseconds?: number;
 }): NegativeControlResult {
-  const ordered = [...input.rows].sort((left, right) => left.stableId.localeCompare(right.stableId));
+  const ordered = [...input.rows].sort((left, right) =>
+    left.stableId.localeCompare(right.stableId),
+  );
   let transformed = ordered.map((row) => ({ ...row, features: { ...row.features } }));
   const detected = new Set<string>();
   switch (input.controlKind) {
     case ControlKind.OUTCOME_LABEL_PERMUTATION: {
-      const labels = shuffled(ordered.map((row) => row.label), input.seedProvenance);
+      const labels = shuffled(
+        ordered.map((row) => row.label),
+        input.seedProvenance,
+      );
       transformed = transformed.map((row, index) => ({ ...row, label: labels[index]! }));
       break;
     }
@@ -73,24 +83,37 @@ export function runNegativeControl(input: {
     case ControlKind.DELAYED_PROVIDER_PLACEBO:
     case ControlKind.BACKFILLED_AVAILABILITY_PLACEBO: {
       const shift = input.shiftMilliseconds ?? 86_400_000;
-      transformed = transformed.map((row) => ({ ...row, availableAt: new Date(Date.parse(row.availableAt) + shift).toISOString() }));
+      transformed = transformed.map((row) => ({
+        ...row,
+        availableAt: new Date(Date.parse(row.availableAt) + shift).toISOString(),
+      }));
       break;
     }
     case ControlKind.SYNTHETIC_NULL_FEATURES: {
       const random = generator(input.seedProvenance);
-      transformed = transformed.map((row) => ({ ...row, features: { ...row.features, syntheticNull: random() } }));
+      transformed = transformed.map((row) => ({
+        ...row,
+        features: { ...row.features, syntheticNull: random() },
+      }));
       break;
     }
     case ControlKind.FORBIDDEN_FUTURE_COLUMN_SCAN:
     case ControlKind.OUTCOME_COLUMN_SCAN:
       for (const row of ordered)
-        for (const key of Object.keys(row.features)) if (FORBIDDEN_COLUMN.test(key)) detected.add(key);
+        for (const key of Object.keys(row.features))
+          if (FORBIDDEN_COLUMN.test(key)) detected.add(key);
       break;
     case ControlKind.PROVIDER_ID_ONLY_PREDICTOR:
-      transformed = transformed.map((row) => ({ ...row, features: { providerId: row.providerId ?? null } }));
+      transformed = transformed.map((row) => ({
+        ...row,
+        features: { providerId: row.providerId ?? null },
+      }));
       break;
     case ControlKind.SOURCE_ID_ONLY_PREDICTOR:
-      transformed = transformed.map((row) => ({ ...row, features: { sourceId: row.sourceId ?? null } }));
+      transformed = transformed.map((row) => ({
+        ...row,
+        features: { sourceId: row.sourceId ?? null },
+      }));
       break;
     case ControlKind.SAME_ASSET_LEAKAGE_SCAN:
       for (const row of ordered) if (row.assetId) detected.add(`asset:${row.assetId}`);
@@ -104,11 +127,15 @@ export function runNegativeControl(input: {
     case ControlKind.RANDOMIZED_MODEL_OUTPUT_CONTROL:
     case ControlKind.RANDOMIZED_TOOL_SELECTION_CONTROL: {
       const random = generator(input.seedProvenance);
-      transformed = transformed.map((row) => ({ ...row, features: { randomizedControl: random() } }));
+      transformed = transformed.map((row) => ({
+        ...row,
+        features: { randomizedControl: random() },
+      }));
       break;
     }
   }
-  const lift = materialLiftDetector(input.observedLift, input.materialLiftThreshold);
+  const material = materialLiftDetector(input.observedLift, input.materialLiftThreshold);
+  const lift = { material, promotionBlocked: material, incidentRequired: material };
   const promotionBlocked = lift.promotionBlocked || detected.size > 0;
   return Object.freeze({
     controlKind: input.controlKind,

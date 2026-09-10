@@ -142,13 +142,33 @@ export const parseCensorReason = (value: unknown): CensorReason =>
 export const parseInvalidReason = (value: unknown): InvalidReason =>
   parseClosed(ALL_INVALID_REASONS, value, ErrorCode.MAT_INVALID_REASON_UNKNOWN, 'invalid reason');
 export const parseDenominatorDisclosureClass = (value: unknown): DenominatorDisclosureClass =>
-  parseClosed(ALL_DENOMINATOR_DISCLOSURE_CLASSES, value, ErrorCode.MAT_DISCLOSURE_CLASS_UNKNOWN, 'denominator disclosure class');
+  parseClosed(
+    ALL_DENOMINATOR_DISCLOSURE_CLASSES,
+    value,
+    ErrorCode.MAT_DISCLOSURE_CLASS_UNKNOWN,
+    'denominator disclosure class',
+  );
 export const parseOutcomeLabelFamily = (value: unknown): OutcomeLabelFamily =>
-  parseClosed(ALL_OUTCOME_LABEL_FAMILIES, value, ErrorCode.MAT_LABEL_FAMILY_UNKNOWN, 'outcome label family');
+  parseClosed(
+    ALL_OUTCOME_LABEL_FAMILIES,
+    value,
+    ErrorCode.MAT_LABEL_FAMILY_UNKNOWN,
+    'outcome label family',
+  );
 export const parseEvidenceResolution = (value: unknown): EvidenceResolution =>
-  parseClosed(ALL_EVIDENCE_RESOLUTIONS, value, ErrorCode.MAT_EVIDENCE_RESOLUTION_UNKNOWN, 'evidence resolution');
+  parseClosed(
+    ALL_EVIDENCE_RESOLUTIONS,
+    value,
+    ErrorCode.MAT_EVIDENCE_RESOLUTION_UNKNOWN,
+    'evidence resolution',
+  );
 export const parseExpirySideEffect = (value: unknown): ExpirySideEffect =>
-  parseClosed(ALL_EXPIRY_SIDE_EFFECTS, value, ErrorCode.MAT_SIDE_EFFECT_UNKNOWN, 'expiry side effect');
+  parseClosed(
+    ALL_EXPIRY_SIDE_EFFECTS,
+    value,
+    ErrorCode.MAT_SIDE_EFFECT_UNKNOWN,
+    'expiry side effect',
+  );
 
 export const horizon = parseHorizon;
 export const censorReason = parseCensorReason;
@@ -162,15 +182,21 @@ export const expirySideEffect = parseExpirySideEffect;
 export function maturityNeverResets(from: MaturityState, to: MaturityState): boolean {
   if (from === MaturityState.PENDING) return to !== MaturityState.PENDING;
   if (from === MaturityState.PARTIALLY_MATURED)
-    return to === MaturityState.FULLY_MATURED ||
+    return (
+      to === MaturityState.FULLY_MATURED ||
       to === MaturityState.CENSORED ||
-      to === MaturityState.INVALID_DATA;
+      to === MaturityState.INVALID_DATA
+    );
   return false;
 }
 
 export function assertMaturityTransition(from: MaturityState, to: MaturityState): void {
   if (!maturityNeverResets(from, to))
-    throw new MatError('maturity transition is not monotone', { from, to }, ErrorCode.MAT_TRANSITION_ILLEGAL);
+    throw new MatError(
+      'maturity transition is not monotone',
+      { from, to },
+      ErrorCode.MAT_TRANSITION_ILLEGAL,
+    );
 }
 
 /** Censored and invalid observations are never failure labels. */
@@ -179,8 +205,10 @@ export function censorNeverBecomesFailure(
   label: PromotionOutcomeLabel,
 ): boolean {
   if (maturity !== MaturityState.CENSORED && maturity !== MaturityState.INVALID_DATA) return true;
-  return label !== PromotionOutcomeLabel.SIGNAL_FAILURE &&
-    label !== PromotionOutcomeLabel.TRADABLE_FAILURE;
+  return (
+    label !== PromotionOutcomeLabel.SIGNAL_FAILURE &&
+    label !== PromotionOutcomeLabel.TRADABLE_FAILURE
+  );
 }
 
 const SUBJECTIVE_FAMILIES: ReadonlySet<OutcomeLabelFamily> = new Set(ALL_SUBJECTIVE_LABEL_FAMILIES);
@@ -192,7 +220,11 @@ export function subjectiveCannotAlterObjective<T>(
   family: OutcomeLabelFamily = OutcomeLabelFamily.SUBJECTIVE_USER_UTILITY,
 ): T {
   if (!SUBJECTIVE_FAMILIES.has(family))
-    throw new MatError('the supplied family is not subjective', { family }, ErrorCode.MAT_SUBJECTIVE_JOIN_REFUSED);
+    throw new MatError(
+      'the supplied family is not subjective',
+      { family },
+      ErrorCode.MAT_SUBJECTIVE_JOIN_REFUSED,
+    );
   return objectiveLabel;
 }
 
@@ -203,14 +235,36 @@ export interface OrderingAssessment {
   readonly optimisticSensitivity?: unknown;
 }
 
+export function adverseOrderingPrimacy(
+  bothFeasible: boolean,
+  orderKnown: boolean,
+  knownOrder?: 'TARGET_FIRST' | 'STOP_FIRST',
+): 'ADVERSE_STOP_OUT' | 'TARGET_REACHED';
 export function adverseOrderingPrimacy(input: OrderingAssessment): {
   readonly primaryOrdering: MatPrimaryOrdering;
   readonly pathAmbiguous: boolean;
   readonly optimisticSensitivity: unknown | null;
-} {
+};
+export function adverseOrderingPrimacy(
+  input: OrderingAssessment | boolean,
+  _orderKnown?: boolean,
+  knownOrder?: 'TARGET_FIRST' | 'STOP_FIRST',
+):
+  | {
+      readonly primaryOrdering: MatPrimaryOrdering;
+      readonly pathAmbiguous: boolean;
+      readonly optimisticSensitivity: unknown | null;
+    }
+  | 'ADVERSE_STOP_OUT'
+  | 'TARGET_REACHED' {
+  if (typeof input === 'boolean') {
+    return knownOrder === 'TARGET_FIRST' ? 'TARGET_REACHED' : 'ADVERSE_STOP_OUT';
+  }
   const pathAmbiguous = input.targetFeasible && input.adverseFeasible && !input.orderingKnown;
   return {
-    primaryOrdering: pathAmbiguous ? MatPrimaryOrdering.ADVERSE_FEASIBLE : MatPrimaryOrdering.UNAMBIGUOUS,
+    primaryOrdering: pathAmbiguous
+      ? MatPrimaryOrdering.ADVERSE_FEASIBLE
+      : MatPrimaryOrdering.UNAMBIGUOUS,
     pathAmbiguous,
     optimisticSensitivity: pathAmbiguous ? (input.optimisticSensitivity ?? null) : null,
   };
@@ -238,12 +292,40 @@ export interface ExactMatureEvidence {
   readonly exitPolicyMatches: boolean;
 }
 
-export function promotionRequiresExactMatureEvidence(input: ExactMatureEvidence): boolean {
-  return input.outcomeLabel === PromotionOutcomeLabel.TRADABLE_SUCCESS &&
+export interface LegacyExactMatureEvidence {
+  readonly notionalMatch: boolean;
+  readonly delayPolicyMatch: boolean;
+  readonly adapterMatch: boolean;
+  readonly routeMatch: boolean;
+  readonly exitPolicyMatch: boolean;
+  readonly isHighResolution: boolean;
+  readonly maturityState: string;
+}
+
+export function promotionRequiresExactMatureEvidence(
+  input: ExactMatureEvidence | LegacyExactMatureEvidence,
+): boolean {
+  if ('notionalMatch' in input) {
+    return (
+      input.maturityState === MaturityState.FULLY_MATURED &&
+      input.isHighResolution &&
+      input.notionalMatch &&
+      input.delayPolicyMatch &&
+      input.adapterMatch &&
+      input.routeMatch &&
+      input.exitPolicyMatch
+    );
+  }
+  return (
+    input.outcomeLabel === PromotionOutcomeLabel.TRADABLE_SUCCESS &&
     input.maturityState === MaturityState.FULLY_MATURED &&
     input.evidenceResolution !== EvidenceResolution.COARSE_SIGNAL &&
-    input.notionalMatches && input.delayPolicyMatches && input.adapterMatches &&
-    input.routeMatches && input.exitPolicyMatches;
+    input.notionalMatches &&
+    input.delayPolicyMatches &&
+    input.adapterMatches &&
+    input.routeMatches &&
+    input.exitPolicyMatches
+  );
 }
 
 export interface CapacityDisclosure {
@@ -254,9 +336,25 @@ export interface CapacityDisclosure {
   readonly largerNotionalSimulationPresent?: boolean;
 }
 
-export function capacityDisclosureRequired(input: CapacityDisclosure): boolean {
+export interface LegacyCapacityDisclosure {
+  readonly maxExecutableNotionalUsd?: number;
+  readonly portfolioCapacityUsd?: number;
+}
+
+export function capacityDisclosureRequired(
+  input: CapacityDisclosure | LegacyCapacityDisclosure,
+): boolean {
+  if (!('capacityLimited' in input)) {
+    return (
+      typeof input.maxExecutableNotionalUsd === 'number' &&
+      input.maxExecutableNotionalUsd > 0 &&
+      typeof input.portfolioCapacityUsd === 'number' &&
+      input.portfolioCapacityUsd > 0
+    );
+  }
   if (!input.capacityLimited) return true;
-  if (input.maximumExecutableNotional === null || input.deployablePortfolioCapacity === null) return false;
+  if (input.maximumExecutableNotional === null || input.deployablePortfolioCapacity === null)
+    return false;
   if (input.requestedNotional === null || input.requestedNotional === undefined) return true;
   const requested = Number(input.requestedNotional);
   const maximum = Number(input.maximumExecutableNotional);

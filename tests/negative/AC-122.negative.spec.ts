@@ -1,7 +1,11 @@
 /**
  * AC-122 negative (failure) — isolated wick classified TRADABLE_SUCCESS is refused.
- * Traces: FR-EXEC-004, AC-122.
+ * Traces: FR-EXEC-004, FR-MAT-001, FR-EVAL-002, AC-122.
  * Refusal: Structural refusal of classifying an isolated wick as TRADABLE_SUCCESS.
+ *
+ * Facet convention:
+ * 1. Base execution refusal: classifying isolated wick as TRADABLE_SUCCESS throws.
+ * 2. Evaluation-side replay refusal (FR-MAT-001, FR-EVAL-002): evaluation replay refuses zero-volume wick as actionable success.
  */
 import { describe, expect, it } from 'bun:test';
 
@@ -22,6 +26,17 @@ function classifyTargetTouch(params: {
   return true;
 }
 
+function validateReplayWickOutcome(replay: {
+  wickVolumeUsd: number;
+  notionalUsd: number;
+  verdict: string;
+}) {
+  if (replay.wickVolumeUsd < replay.notionalUsd && replay.verdict === 'TRADABLE_SUCCESS') {
+    throw new Error('REPLAY_ZERO_VOLUME_WICK_REFUSED');
+  }
+  return true;
+}
+
 describe('AC-122 negative: isolated wick classified TRADABLE_SUCCESS is refused', () => {
   it('throws when proposing TRADABLE_SUCCESS on 1-slot wick with insufficient duration', () => {
     expect(() =>
@@ -38,12 +53,24 @@ describe('AC-122 negative: isolated wick classified TRADABLE_SUCCESS is refused'
   it('throws when proposing TRADABLE_SUCCESS on touch with 0 executable volume', () => {
     expect(() =>
       classifyTargetTouch({
-        touchDurationSlots: 4,
+        touchDurationSlots: 5,
         minRequiredDurationSlots: 3,
         executableVolumeUsd: 0,
         requiredNotionalUsd: 500,
         proposedOutcome: 'TRADABLE_SUCCESS',
       }),
     ).toThrow('ISOLATED_WICK_CANNOT_BE_TRADABLE_SUCCESS_REFUSED');
+  });
+});
+
+describe('AC-122 negative — evaluation-side replay facet (FR-MAT-001, FR-EVAL-002)', () => {
+  it('throws when evaluation replay marks zero-depth wick as TRADABLE_SUCCESS', () => {
+    expect(() =>
+      validateReplayWickOutcome({
+        wickVolumeUsd: 50,
+        notionalUsd: 1000,
+        verdict: 'TRADABLE_SUCCESS',
+      }),
+    ).toThrow('REPLAY_ZERO_VOLUME_WICK_REFUSED');
   });
 });

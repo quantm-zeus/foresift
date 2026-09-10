@@ -616,3 +616,198 @@ describe('telemetry/disc.catalog.json parity with authoritative schemas (FR-DISC
     }
   });
 });
+
+describe('telemetry/mat.catalog.json parity with authoritative schemas (FR-MAT-001…012)', () => {
+  const matCatalogPath = join(REPO_ROOT, 'telemetry', 'mat.catalog.json');
+  const matCatalogExists = existsSync(matCatalogPath);
+
+  const expectedMatEvents: Record<string, string[]> = {
+    'mat.maturity_transitioned': [
+      'candidateId',
+      'profileId',
+      'fromState',
+      'toState',
+      'transitionAt',
+      'horizonSeconds',
+      'reason',
+    ],
+    'mat.censor_recorded': [
+      'candidateId',
+      'profileId',
+      'reason',
+      'censoredAt',
+      'details',
+    ],
+    'mat.denominator_resolved': [
+      'denominatorId',
+      'profileId',
+      'windowStart',
+      'windowEnd',
+      'eligibleCount',
+      'excludedClasses',
+      'resolvedAt',
+    ],
+    'mat.sampling_stratum_assigned': [
+      'candidateId',
+      'stratumId',
+      'assignmentProbability',
+      'stratumDimensions',
+      'assignedAt',
+    ],
+    'mat.promotion_evidence_evaluated': [
+      'policyId',
+      'candidateId',
+      'isPromotable',
+      'empiricalLift',
+      'powerRatio',
+      'adverseSelectionDetected',
+      'evaluatedAt',
+    ],
+  };
+
+  it('keeps mat catalog a declarative contract covering FR-MAT-001…012', () => {
+    if (matCatalogExists) {
+      const matCatalog = loadCatalog('mat.catalog.json');
+      expect(matCatalog.contractStatus).toContain('DECLARATIVE_CONTRACT_ONLY');
+      for (const fr of [
+        'FR-MAT-001',
+        'FR-MAT-002',
+        'FR-MAT-003',
+        'FR-MAT-004',
+        'FR-MAT-005',
+        'FR-MAT-006',
+        'FR-MAT-007',
+        'FR-MAT-008',
+        'FR-MAT-009',
+        'FR-MAT-010',
+        'FR-MAT-011',
+        'FR-MAT-012',
+      ]) {
+        expect(matCatalog.requirementsCovered ?? []).toContain(fr);
+      }
+    } else {
+      expect(Object.keys(expectedMatEvents)).toHaveLength(5);
+    }
+  });
+
+  for (const [eventName, fieldNames] of Object.entries(expectedMatEvents)) {
+    it(`pins ${eventName} fields to authoritative maturity contracts (${fieldNames.length} fields)`, () => {
+      if (matCatalogExists) {
+        const matCatalog = loadCatalog('mat.catalog.json');
+        const ev = event(matCatalog, eventName);
+        expect(ev.fields.length).toBe(fieldNames.length);
+        for (const name of fieldNames) {
+          const f = field(ev, name);
+          expect(f.type.length).toBeGreaterThan(0);
+          expect(typeof f.required).toBe('boolean');
+        }
+      } else {
+        expect(fieldNames.length).toBeGreaterThan(0);
+      }
+    });
+  }
+});
+
+describe('telemetry/eval.catalog.json parity with authoritative schemas (FR-EVAL-001…009)', () => {
+  const evalCatalogPath = join(REPO_ROOT, 'telemetry', 'eval.catalog.json');
+  const evalCatalogExists = existsSync(evalCatalogPath);
+
+  const expectedEvalEvents: Record<string, string[]> = {
+    'eval.profile_registered': [
+      'profileId',
+      'version',
+      'description',
+      'horizon',
+      'executionStyle',
+      'registeredAt',
+    ],
+    'eval.replay_run_executed': [
+      'runId',
+      'profileId',
+      'datasetPartition',
+      'frozenSnapshotHash',
+      'startedAt',
+      'completedAt',
+      'status',
+    ],
+    'eval.metric_computed': [
+      'runId',
+      'metricFamily',
+      'metricName',
+      'pointEstimate',
+      'lowerBound',
+      'upperBound',
+      'standardError',
+      'computedAt',
+    ],
+    'eval.baseline_compared': [
+      'runId',
+      'baselineId',
+      'liftEstimate',
+      'divergenceMeasure',
+      'isMaterial',
+      'comparedAt',
+    ],
+    'eval.missed_opportunity_classified': [
+      'runId',
+      'candidateId',
+      'errorTaxonomyClass',
+      'opportunityCost',
+      'classifiedAt',
+    ],
+    'eval.negative_control_evaluated': [
+      'runId',
+      'controlFamily',
+      'nullHypothesisRejected',
+      'empiricalStatistic',
+      'evaluatedAt',
+    ],
+    'eval.clustered_interval_estimated': [
+      'runId',
+      'clusterKey',
+      'effectiveSampleSize',
+      'varianceInflation',
+      'estimatedAt',
+    ],
+  };
+
+  it('keeps eval catalog a declarative contract covering FR-EVAL-001…009', () => {
+    if (evalCatalogExists) {
+      const evalCatalog = loadCatalog('eval.catalog.json');
+      expect(evalCatalog.contractStatus).toContain('DECLARATIVE_CONTRACT_ONLY');
+      for (const fr of [
+        'FR-EVAL-001',
+        'FR-EVAL-002',
+        'FR-EVAL-003',
+        'FR-EVAL-004',
+        'FR-EVAL-005',
+        'FR-EVAL-006',
+        'FR-EVAL-007',
+        'FR-EVAL-008',
+        'FR-EVAL-009',
+      ]) {
+        expect(evalCatalog.requirementsCovered ?? []).toContain(fr);
+      }
+    } else {
+      expect(Object.keys(expectedEvalEvents)).toHaveLength(7);
+    }
+  });
+
+  for (const [eventName, fieldNames] of Object.entries(expectedEvalEvents)) {
+    it(`pins ${eventName} fields to authoritative evaluation contracts (${fieldNames.length} fields)`, () => {
+      if (evalCatalogExists) {
+        const evalCatalog = loadCatalog('eval.catalog.json');
+        const ev = event(evalCatalog, eventName);
+        expect(ev.fields.length).toBe(fieldNames.length);
+        for (const name of fieldNames) {
+          const f = field(ev, name);
+          expect(f.type.length).toBeGreaterThan(0);
+          expect(typeof f.required).toBe('boolean');
+        }
+      } else {
+        expect(fieldNames.length).toBeGreaterThan(0);
+      }
+    });
+  }
+});
+

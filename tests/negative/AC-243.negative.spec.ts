@@ -1,6 +1,6 @@
 /**
  * AC-243 negative / failure-path.
- * Traces: FR-DATA-005, §13.8, INV-004.
+ * Traces: FR-DATA-005, §13.8, INV-004, FR-MAT-007, AC-243.
  * Retrieval cannot outrun randomization: completing without a prior probe
  * assignment fails, degenerate probabilities are refused, late assignments
  * are refused, and an assignment without a recorded decision impact cannot
@@ -207,3 +207,54 @@ describe('AC-243 negative (tool-core substrate): degenerate probe payloads fail 
     ).toThrow();
   });
 });
+
+describe('AC-243 G1 extension negative: probe-probability-before-maturity ordering negative facet (FR-MAT-007, AC-243)', () => {
+  it('refuses maturity completion when probe assignment probability is retroactively updated after completion', async () => {
+    const { engine } = tdb;
+    const retroId = 'ac243n-retro-probe';
+    await recordAcquisitionDecision(engine, {
+      decisionId: retroId,
+      candidateId: 'cand/ac243n-retro',
+      evidenceFamily: 'swaps',
+      policyVersion: 'policy/v1',
+      state: AcquisitionState.REQUESTED,
+      requestedAt: T('2026-06-14T13:00:00Z'),
+    });
+
+    await recordProbeAssignment(engine, {
+      decisionId: retroId,
+      assignment: {
+        eligibilityStratum: 'stratum-a',
+        assignmentProbability: 0.5,
+        seedProvenance: 'seed/x',
+        selectionAt: T('2026-06-14T13:00:01Z'),
+        requestedFields: ['volume'],
+      },
+      estimatedDecisionImpact: 0.3,
+    });
+
+    await completeRetrieval(engine, {
+      decisionId: retroId,
+      completedAt: T('2026-06-14T14:00:00Z'),
+      state: AcquisitionState.RETURNED,
+      evidenceIds: ['ev/retro'],
+    });
+
+    // Attempting to re-record probe assignment after completion is refused
+    await expectForesiftError(
+      recordProbeAssignment(engine, {
+        decisionId: retroId,
+        assignment: {
+          eligibilityStratum: 'stratum-retro',
+          assignmentProbability: 0.1,
+          seedProvenance: 'seed/retro',
+          selectionAt: T('2026-06-14T14:30:00Z'),
+          requestedFields: ['volume'],
+        },
+        estimatedDecisionImpact: 0.1,
+      }),
+      ErrorCode.ACQUISITION_WRITE_BEFORE_RETRIEVAL_VIOLATED,
+    );
+  });
+});
+

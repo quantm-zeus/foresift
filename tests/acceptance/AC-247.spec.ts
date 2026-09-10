@@ -1,6 +1,6 @@
 /**
  * AC-247 acceptance (positive).
- * Traces: FR-DATA-006 (frozen historical counts, INV-005).
+ * Traces: FR-DATA-006 (frozen historical counts, INV-005), FR-EVAL-002, AC-247.
  * AC text (manifest §39, abridged): "A retrospective provider-dependence
  * estimate cannot alter a frozen historical evidence count in realizable
  * replay; it is labeled diagnostic unless the estimate was available then."
@@ -229,3 +229,24 @@ describe('AC-247 G1 extensions: point-in-time independence & retrospective diagn
     expect(edgeMayAffectCreditAt(diagnosticEdge, '2026-06-05T00:00:00Z')).toBe(false);
   });
 });
+
+describe('AC-247 G1 extension: frozen-count preservation in realizable replay facet (FR-EVAL-002, AC-247)', () => {
+  it('preserves exact point-in-time candidate count and state across repeated evaluations', async () => {
+    const boundary = T('2026-06-05T00:00:00Z');
+    // First evaluation of matured count at boundary
+    const countA = await maturedEvidenceCountAt(tdb.engine, {
+      candidateId: 'cand/ac247',
+      evidenceFamily: 'swaps',
+      t: boundary,
+    });
+    // Second evaluation of matured count at same boundary
+    const countB = await maturedEvidenceCountAt(tdb.engine, {
+      candidateId: 'cand/ac247',
+      evidenceFamily: 'swaps',
+      t: boundary,
+    });
+    expect(countA).toBe(2);
+    expect(countB).toBe(countA);
+  });
+});
+

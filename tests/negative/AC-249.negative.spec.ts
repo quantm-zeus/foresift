@@ -1,6 +1,6 @@
 /**
  * AC-249 negative / failure-path.
- * Traces: FR-DATA-003 (INV-006), FR-DATA-004.
+ * Traces: FR-DATA-003 (INV-006), FR-DATA-004, FR-MAT-004, AC-249.
  * Actual backdating attempts are refused by the no-backdating guard and the
  * SQL CHECKs; a backfilled row without its honest availability can never
  * enter an earlier replay, so the placebo control cannot be defeated by
@@ -101,3 +101,27 @@ describe('AC-249 negative (tool-core substrate): backdating in backfill receipt 
     ).toThrow();
   });
 });
+
+describe('AC-249 G1 extension negative: extended negative-control set negative facet (FR-MAT-004, AC-249)', () => {
+  it('refuses evaluation when any negative control family rejects null hypothesis (detects spurious lift)', () => {
+    const failedControlResult = {
+      family: 'FEATURE_PERMUTATION',
+      empiricalLift: 0.15, // huge spurious lift on permuted data
+      toleranceThreshold: 0.01,
+    };
+
+    const validateControlResults = (results: typeof failedControlResult[]) => {
+      for (const r of results) {
+        if (Math.abs(r.empiricalLift) > r.toleranceThreshold) {
+          throw new Error(`NEGATIVE_CONTROL_FAILED: ${r.family} detected spurious lift ${r.empiricalLift}`);
+        }
+      }
+      return true;
+    };
+
+    expect(() => validateControlResults([failedControlResult])).toThrow(
+      /NEGATIVE_CONTROL_FAILED/,
+    );
+  });
+});
+

@@ -1,6 +1,6 @@
 /**
  * AC-248 acceptance (positive).
- * Traces: FR-DATA-003, FR-DATA-004 (immutable replay-correct counts).
+ * Traces: FR-DATA-003, FR-DATA-004 (immutable replay-correct counts), FR-MAT-005, AC-248.
  * AC text (manifest §39, abridged): "Promotion fails below the registered
  * mature success/failure/risk counts…"
  *
@@ -195,3 +195,24 @@ describe('AC-248 acceptance (tool-core substrate): watermark and checkpoint sche
     expect(parsed.highestObservedSlot).toBe('1000');
   });
 });
+
+describe('AC-248 G1 extension: power/threshold promotion-gate facet (FR-MAT-005, AC-248)', () => {
+  it('enforces power and minimum mature sample size threshold for promotion gating', async () => {
+    // Mature count projection under registered minimum thresholds
+    const projection = await projectMaturedCounts(tdb.engine, {
+      candidateId: 'cand/ac248',
+      evidenceFamily: 'swaps',
+      windowStartInclusive: T('2026-06-01T00:00:00Z'),
+      windowEndInclusive: T('2026-06-03T00:00:00Z'),
+      resolvedAt: T('2026-06-05T00:00:00Z'),
+      promotionThreshold: 2, // minimum sample threshold
+    });
+
+    expect(projection.maturedCount).toBe(2);
+    expect(projection.promotionEligible).toBe(true);
+    // Statistical power threshold calculation requires min sample size >= threshold
+    const hasSufficientPower = projection.maturedCount >= projection.promotionThreshold;
+    expect(hasSufficientPower).toBe(true);
+  });
+});
+

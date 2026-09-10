@@ -427,7 +427,7 @@ export const SelectionBiasDiagnosticSchema = z
         path: ['diagnostics'],
         message: 'weighting requires valid diagnostics and a bounded maximum weight',
       });
-    if (!value.diagnosticsValid && value.claimRestriction !== 'OBSERVED_SUBSET_ONLY')
+    if (!value.diagnosticsValid && value.claimRestriction === 'DECLARED_UNIVERSE')
       context.addIssue({
         code: z.ZodIssueCode.custom,
         path: ['claimRestriction'],
@@ -435,7 +435,7 @@ export const SelectionBiasDiagnosticSchema = z
       });
     if (
       value.estimatorKind === 'OBSERVED_SUBSET_ONLY' &&
-      value.claimRestriction !== 'OBSERVED_SUBSET_ONLY'
+      value.claimRestriction !== 'RESTRICT_TO_OBSERVED_SUBSET'
     )
       context.addIssue({
         code: z.ZodIssueCode.custom,

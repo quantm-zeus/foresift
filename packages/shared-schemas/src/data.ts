@@ -794,6 +794,7 @@ export const CandidateDecisionTimelineSchema = z
         compareStamps(v.deliveryEligibleAt, v.counterfactualDeliveryAt) <= 0),
     { message: 'delivery cannot precede eligibility' },
   );
+export type CandidateDecisionTimeline = z.infer<typeof CandidateDecisionTimelineSchema>;
 
 const replayModeValues = [...ALL_REPLAY_MODES] as [ReplayMode, ...ReplayMode[]];
 

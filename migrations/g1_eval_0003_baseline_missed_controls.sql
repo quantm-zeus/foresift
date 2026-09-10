@@ -143,8 +143,8 @@ CREATE TABLE IF NOT EXISTS selection_bias_diagnostics (
                                         (maximum_weight > 0 AND maximum_weight <= 20)),
     diagnostics_valid             boolean NOT NULL,
     claim_restriction             text NOT NULL CHECK (claim_restriction IN (
-        'DECLARED_UNIVERSE', 'SUPPORTED_SAMPLED_UNIVERSE',
-        'OBSERVED_SUBSET_ONLY')),
+        'DECLARED_UNIVERSE', 'RESTRICT_TO_WEIGHTED_STRATA',
+        'RESTRICT_TO_OBSERVED_SUBSET')),
     population_claim              text NOT NULL CHECK (length(population_claim) > 0),
     computed_at                   timestamptz NOT NULL,
     created_at                    timestamptz NOT NULL DEFAULT now(),
@@ -152,10 +152,10 @@ CREATE TABLE IF NOT EXISTS selection_bias_diagnostics (
         estimator_kind NOT IN ('DESIGN_WEIGHTED', 'PROPENSITY_WEIGHTED', 'DOUBLY_ROBUST')
         OR (diagnostics_valid AND maximum_weight IS NOT NULL)),
     CONSTRAINT unsupported_weighting_restricts_claim CHECK (
-        diagnostics_valid OR claim_restriction = 'OBSERVED_SUBSET_ONLY'),
+        diagnostics_valid OR claim_restriction <> 'DECLARED_UNIVERSE'),
     CONSTRAINT observed_subset_estimator_restricts_claim CHECK (
         estimator_kind <> 'OBSERVED_SUBSET_ONLY'
-        OR claim_restriction = 'OBSERVED_SUBSET_ONLY')
+        OR claim_restriction = 'RESTRICT_TO_OBSERVED_SUBSET')
 );
 
 CREATE INDEX IF NOT EXISTS baseline_results_run_idx

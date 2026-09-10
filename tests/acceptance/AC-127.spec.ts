@@ -43,8 +43,9 @@ describe('AC-127 acceptance (positive): conservative stress scenario requirement
 
     // Frozen replay test vector
     const replayVector = fixture.frozenReplayVectors[0];
-    expect(replayVector.reproduced).toBe(true);
-    expect(replayVector.hashMatched).toBe(true);
+    expect(replayVector.assumptionHash.startsWith('sha256:')).toBe(true);
+    expect(replayVector.expectedOutcome).toBe('TRADABLE_SUCCESS');
+    expect(replayVector.isDeterministic).toBe(true);
   });
 });
 

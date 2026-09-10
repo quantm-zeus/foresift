@@ -14,7 +14,10 @@
 # a Claude child actually materialized before logging success.
 set -euo pipefail
 RECEIPT="$HOME/.local/state/foresift/maintainer/receipt.json"
-LOCK="/run/user/$(id -u)/foresift-maintainer-watcher.lock"
+# Lock overridable ONLY for hermetic selftests
+# (FORESIFT_MAINTAINER_WATCHER_LOCK); production default is the shared probe
+# lock, so concurrent probes still serialize through flock.
+LOCK="${FORESIFT_MAINTAINER_WATCHER_LOCK:-/run/user/$(id -u)/foresift-maintainer-watcher.lock}"
 SESSION="foresift-maintainer"
 LOG="$HOME/.local/state/foresift/maintainer/watcher.log"
 # Dedicated socket: the maintainer tmux server lives in its OWN systemd unit
@@ -24,10 +27,35 @@ LOG="$HOME/.local/state/foresift/maintainer/watcher.log"
 # Socket overridable ONLY for hermetic selftests (FORESIFT_MAINTAINER_TMUX_SOCKET);
 # production default is the dedicated maintainer socket.
 TMUX="tmux -L ${FORESIFT_MAINTAINER_TMUX_SOCKET:-foresift-maintainer}"
+
+# Incident B (2026-09-10): tmux panes inherit a minimal PATH WITHOUT
+# ~/.local/bin, so a bare `claude` respawn dies 127 (status "pane_dead") and
+# the watcher loop fails. Resolve the binary deterministically, ONCE, before
+# any spawn: explicit $CLAUDE_BIN wins, then PATH lookup, then the well-known
+# install path. Every candidate is validated executable; when NOTHING
+# resolves, fail LOUD (exit 1 + log line) instead of spawning a corpse pane.
+resolve_claude_bin() {
+  local candidate
+  for candidate in "${CLAUDE_BIN:-}" "$(command -v claude 2>/dev/null || true)" \
+    "$HOME/.local/bin/claude"; do
+    if [ -n "$candidate" ] && [ -x "$candidate" ]; then
+      printf '%s' "$candidate"
+      return 0
+    fi
+  done
+  return 1
+}
+CLAUDE_BIN_RESOLVED="$(resolve_claude_bin)" || true
+
 exec 9>"$LOCK"
 flock -n 9 || exit 0  # another probe is running
 
 note() { echo "$(date -u +%FT%TZ) watcher: $*" >> "$LOG"; }
+
+if [ -z "${CLAUDE_BIN_RESOLVED:-}" ]; then
+  note "FATAL: no executable claude binary (CLAUDE_BIN/command -v/\$HOME/.local/bin/claude) — refusing to spawn; operator inspection needed"
+  exit 1
+fi
 
 [ -f "$RECEIPT" ] || exit 0
 INTENTIONAL_STOP=$(jq -r '.intentionalStop // false' "$RECEIPT")
@@ -54,8 +82,8 @@ fi
 
 if ! $TMUX has-session -t "$SESSION" 2>/dev/null; then
   $TMUX new-session -d -s "$SESSION" -c "$REPO" -x 160 -y 50 \
-    "claude --resume $SESSION_ID"
-  note "recreated tmux $SESSION resuming $SESSION_ID"
+    "$CLAUDE_BIN_RESOLVED --resume $SESSION_ID"
+  note "recreated tmux $SESSION resuming $SESSION_ID via $CLAUDE_BIN_RESOLVED"
   exit 0
 fi
 
@@ -67,15 +95,15 @@ fi
 PANE="$SESSION:0.0"
 DEAD=$($TMUX display-message -p -t "$PANE" '#{pane_dead}' 2>/dev/null || echo 1)
 if [ "$DEAD" = "1" ]; then
-  $TMUX respawn-pane -k -t "$PANE" -c "$REPO" "claude --resume $SESSION_ID" 2>/dev/null \
-    || $TMUX respawn-pane -k -t "$PANE" "claude --resume $SESSION_ID" 2>/dev/null || {
+  $TMUX respawn-pane -k -t "$PANE" -c "$REPO" "$CLAUDE_BIN_RESOLVED --resume $SESSION_ID" 2>/dev/null \
+    || $TMUX respawn-pane -k -t "$PANE" "$CLAUDE_BIN_RESOLVED --resume $SESSION_ID" 2>/dev/null || {
       note "respawn-pane FAILED for dead pane $PANE — operator inspection needed"
       exit 1
     }
-  note "respawned dead pane $PANE resuming $SESSION_ID (pane_dead=1)"
+  note "respawned dead pane $PANE resuming $SESSION_ID via $CLAUDE_BIN_RESOLVED (pane_dead=1)"
 else
-  $TMUX send-keys -t "$PANE" "claude --resume $SESSION_ID" C-m 2>/dev/null || true
-  note "relaunched claude $SESSION_ID into live $SESSION"
+  $TMUX send-keys -t "$PANE" "$CLAUDE_BIN_RESOLVED --resume $SESSION_ID" C-m 2>/dev/null || true
+  note "relaunched claude $SESSION_ID into live $SESSION via $CLAUDE_BIN_RESOLVED"
 fi
 
 # Post-launch verification (bounded): a Claude child must materialize, else

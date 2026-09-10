@@ -1,13 +1,13 @@
 {
   "schema": "foresift/bun-migration-manifest@1",
   "migrationId": "bun-test-authority-v1",
-  "generatedAt": "2026-09-10T21:40:33.965Z",
+  "generatedAt": "2026-09-10T21:49:02.453Z",
   "root": ".",
-  "totalTestFiles": 487,
+  "totalTestFiles": 488,
   "counts": {
     "CODEMOD_READY": 0,
     "AGY_REQUIRED": 0,
-    "MIGRATED": 487,
+    "MIGRATED": 488,
     "VERIFIED": 0,
     "BLOCKED": 0
   },
@@ -6668,6 +6668,21 @@
       "migrationType": "ALREADY_MIGRATED",
       "fixturesAndHelpers": [],
       "sourceAnchors": ["../../scripts/automation/launch-preflight.mjs"],
+      "state": "MIGRATED"
+    },
+    {
+      "path": "tests/automation/maintainer-watcher.spec.ts",
+      "package": "automation",
+      "bytes": 8398,
+      "lines": 205,
+      "sha256": "e08d2c033b8a19689a85d35d13338967a402da19177751dd5e199555030d86be",
+      "imports": ["bun:test", "node:child_process", "node:fs", "node:os", "node:path", "node:url"],
+      "vitestImports": [],
+      "features": [],
+      "workload": "PROCESS",
+      "migrationType": "ALREADY_MIGRATED",
+      "fixturesAndHelpers": [],
+      "sourceAnchors": [],
       "state": "MIGRATED"
     },
     {

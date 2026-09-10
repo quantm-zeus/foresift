@@ -136,3 +136,54 @@ export function resolveTaskMetadata(taskLine) {
 export function isCoordinatorTask(unit) {
   return unit?.executor === 'COORDINATOR';
 }
+
+/**
+ * Resolve a unit's evidence kind from its FULL task block (checkbox line plus
+ * every wrapped continuation line), in document order.
+ *
+ * The checkbox-line-only parse (resolveTaskMetadata) misses a marker carried
+ * on a wrapped continuation line — live run 4e59191b (g1-outcome-evaluation
+ * T020, 2026-09-10): the block's `[evidence: NO_OP_ALREADY_SATISFIED]`
+ * reservation sat on a wrapped body line, the unit classified as
+ * PRODUCT/FILE_OUTPUT, and the launch graph dispatched it to BOTH the CODEX
+ * core lane and the AGY test lane before any provider spend. Both lanes
+ * reported zero completed units and the wave died integration_empty.
+ *
+ * Resolution law (fail-closed):
+ *   - an UNKNOWN evidence kind ANYWHERE in the block throws
+ *     TASK_EVIDENCE_UNKNOWN — a misspelled no-op marker must never silently
+ *     become product work;
+ *   - NO_OP_ALREADY_SATISFIED ANYWHERE in the block dominates: a unit
+ *     reserved as already-satisfied is never provider-dispatched, even when
+ *     its title line claims other evidence. (A prose cross-reference that
+ *     pastes another unit's no-op marker halts visibly as unscheduled-open
+ *     work, never as silent provider spend — the safe direction.)
+ *   - otherwise the title-line marker keeps authority, then the first body
+ *     marker; absent everywhere means FILE_OUTPUT (legacy default).
+ *   - COORDINATOR_ARTIFACT for a non-coordinator executor throws
+ *     TASK_EVIDENCE_INVALID_FOR_EXECUTOR (mirrors resolveTaskMetadata).
+ *
+ * @param blockText full task block text (checkbox remainder + continuations)
+ * @param opts { unitId?, executor? } — executor enables the cross-check
+ */
+export function resolveBlockEvidence(blockText, opts = {}) {
+  const text = String(blockText ?? '');
+  const unitId = opts.unitId ?? '?';
+  const found = [...text.matchAll(new RegExp(EVIDENCE_MARKER.source, 'g'))].map((m) =>
+    String(m[1]).toUpperCase(),
+  );
+  for (const kind of found) {
+    if (!TASK_EVIDENCE_KINDS.includes(kind))
+      throw new Error(
+        `TASK_EVIDENCE_UNKNOWN: unit ${unitId} block carries unknown evidence kind '${kind}' (legal: ${TASK_EVIDENCE_KINDS.join('/')})`,
+      );
+  }
+  const evidence = found.includes('NO_OP_ALREADY_SATISFIED')
+    ? 'NO_OP_ALREADY_SATISFIED'
+    : (found[0] ?? 'FILE_OUTPUT');
+  if (evidence === 'COORDINATOR_ARTIFACT' && opts.executor && opts.executor !== 'COORDINATOR')
+    throw new Error(
+      `TASK_EVIDENCE_INVALID_FOR_EXECUTOR: COORDINATOR_ARTIFACT requires [executor: COORDINATOR] (unit ${unitId})`,
+    );
+  return evidence;
+}

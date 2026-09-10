@@ -507,7 +507,7 @@ then fixtures and AC suites, then telemetry and gates.
       divergence, alternate-cluster sensitivity, ESS gate cases). Traces:
       FR-EVAL-004, FR-EVAL-005, FR-MAT-004, FR-MAT-005, AC-042, AC-150,
       AC-151.
-- [ ] T030 [P] [executor: TEST] Author the colocated product-side suites under
+- [x] T030 [P] [executor: TEST] Author the colocated product-side suites under — [evidence: NO_OP_ALREADY_SATISFIED] reconciled pre-provider (already satisfied at trusted base)
       `packages/domain/test/` (`mat.spec.ts`, `eval.spec.ts`) and
       `packages/shared-schemas/test/` (`mat.spec.ts`, `eval.spec.ts`): the
       18 vocabulary objects with fail-closed parse functions and stable
@@ -524,7 +524,7 @@ then fixtures and AC suites, then telemetry and gates.
       incident, weighting-requires-diagnostics, unknown enum refusal, strict
       unknown-key refusal, ISO-8601 timestamps, sha256 refs, decimal-string
       metric law). Traces: FR-MAT-001…012, FR-EVAL-001…009.
-- [ ] T031 [P] [executor: TEST] Author colocated package suites under
+- [x] T031 [P] [executor: TEST] Author colocated package suites under — [evidence: NO_OP_ALREADY_SATISFIED] reconciled pre-provider (already satisfied at trusted base)
       `packages/outcome-maturity/test/` (maturity-ledger.spec.ts,
       denominators.spec.ts, label-separation.spec.ts, sampling.spec.ts,
       promotion-evidence.spec.ts, read-only-guard.spec.ts) and
@@ -603,7 +603,7 @@ then fixtures and AC suites, then telemetry and gates.
 
 ## Phase 7b — Central registry extensions (blocks gates; plan-sanctioned scope exceptions)
 
-- [ ] T035 [P] [executor: TEST] Extend `tests/telemetry-catalog.spec.ts` — the
+- [x] T035 [P] [executor: TEST] Extend `tests/telemetry-catalog.spec.ts` — the — [evidence: NO_OP_ALREADY_SATISFIED] reconciled pre-provider (already satisfied at trusted base)
       plan-sanctioned central-parity scope exception (milestone plan-level
       decision 4, exact path) — with `telemetry/mat.catalog.json` and
       `telemetry/eval.catalog.json` assertions pinning every new event's

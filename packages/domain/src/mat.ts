@@ -247,7 +247,7 @@ export function adverseOrderingPrimacy(input: OrderingAssessment): {
 };
 export function adverseOrderingPrimacy(
   input: OrderingAssessment | boolean,
-  _orderKnown?: boolean,
+  orderKnown?: boolean,
   knownOrder?: 'TARGET_FIRST' | 'STOP_FIRST',
 ):
   | {
@@ -258,6 +258,7 @@ export function adverseOrderingPrimacy(
   | 'ADVERSE_STOP_OUT'
   | 'TARGET_REACHED' {
   if (typeof input === 'boolean') {
+    if (input && !orderKnown) return 'ADVERSE_STOP_OUT';
     return knownOrder === 'TARGET_FIRST' ? 'TARGET_REACHED' : 'ADVERSE_STOP_OUT';
   }
   const pathAmbiguous = input.targetFeasible && input.adverseFeasible && !input.orderingKnown;

@@ -1,2 +1,2 @@
 /** Deterministic, read-only outcome maturity public surface. */
-export {};
+export * from './maturity-ledger.ts';

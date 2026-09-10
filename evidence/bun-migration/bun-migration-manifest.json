@@ -1,7 +1,7 @@
 {
   "schema": "foresift/bun-migration-manifest@1",
   "migrationId": "bun-test-authority-v1",
-  "generatedAt": "2026-09-10T21:34:45.572Z",
+  "generatedAt": "2026-09-10T21:49:02.453Z",
   "root": ".",
   "totalTestFiles": 488,
   "counts": {
@@ -12,7 +12,7 @@
     "BLOCKED": 0
   },
   "parity": {
-    "previousTotal": 488,
+    "previousTotal": 487,
     "disappeared": []
   },
   "files": [
@@ -7029,16 +7029,21 @@
     {
       "path": "tests/automation/test-runtime-containment.spec.ts",
       "package": "automation",
-      "bytes": 5153,
-      "lines": 94,
-      "sha256": "c7c3647ce9487078f69e3fdff7d9381f4fd40e1c1c8a9e47d4ebd104395600a3",
-      "imports": ["bun:test", "node:fs", "node:path"],
+      "bytes": 13407,
+      "lines": 309,
+      "sha256": "b130cc93b30ec61889ebeba7095103257385b75bf78f5156bf872f6e2423abe6",
+      "imports": [
+        "bun:test",
+        "node:fs",
+        "node:path",
+        "../../scripts/automation/bun-test-coordinator.mjs"
+      ],
       "vitestImports": [],
       "features": [],
       "workload": "PROCESS",
       "migrationType": "ALREADY_MIGRATED",
       "fixturesAndHelpers": [],
-      "sourceAnchors": [],
+      "sourceAnchors": ["../../scripts/automation/bun-test-coordinator.mjs"],
       "state": "MIGRATED"
     },
     {

@@ -10,7 +10,9 @@ describe('Drift Calibration (AC-154)', () => {
     const regimeDriftScore = 0.45; // High drift
     const degradedUtility = baselineUtility * (1 - regimeDriftScore);
 
-    expect(degradedUtility).toBe(55.0);
+    // Float-exact: 100 * (1 - 0.45) is 55.00000000000001 in binary floating
+    // point, never exactly 55.0 — assert closeness, not identity.
+    expect(degradedUtility).toBeCloseTo(55.0, 10);
     expect(degradedUtility).toBeLessThan(baselineUtility);
   });
 });

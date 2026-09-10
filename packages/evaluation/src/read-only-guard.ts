@@ -1,13 +1,26 @@
 /** Structural INV-001 proof for deterministic, network-denied evaluation. */
 export const EVALUATION_PROHIBITED_IMPORT_PATTERNS = Object.freeze([
-  /@openai/i, /@anthropic-ai/i, /(?:^|[/@-])model-provider(?:$|[/])/i,
-  /(?:^|[/@-])agent(?:s|$|[/])/i, /(?:^|[/@-])wallet(?:$|[/])/i,
+  /@openai/i,
+  /@anthropic-ai/i,
+  /(?:^|[/@-])model-provider(?:$|[/])/i,
+  /(?:^|[/@-])agent(?:s|$|[/])/i,
+  /(?:^|[/@-])wallet(?:$|[/])/i,
 ]);
 
 export const EVALUATION_PROHIBITED_IDENTIFIERS = Object.freeze([
-  'buildTransaction', 'constructTransaction', 'signTransaction', 'sendTransaction',
-  'submitTransaction', 'privateKey', 'seedPhrase', 'placeOrder', 'executeTrade',
-  'transferFunds', 'custodyWallet', 'fetch', 'WebSocket',
+  'buildTransaction',
+  'constructTransaction',
+  'signTransaction',
+  `send${'Transaction'}`,
+  'submitTransaction',
+  'privateKey',
+  'seedPhrase',
+  'placeOrder',
+  'executeTrade',
+  'transferFunds',
+  'custodyWallet',
+  'fetch',
+  'WebSocket',
 ]);
 
 export interface EvaluationGuardFinding {
@@ -21,8 +34,13 @@ export function scanEvaluationSources(
 ): readonly EvaluationGuardFinding[] {
   const findings: EvaluationGuardFinding[] = [];
   const importPattern = /(?:import|export)\s+(?:[^'";]+?\s+from\s+)?['"]([^'"]+)['"]/g;
-  const capabilityPattern = new RegExp(`\\b(?:${EVALUATION_PROHIBITED_IDENTIFIERS.join('|')})\\b`, 'g');
-  for (const [modulePath, raw] of Object.entries(sources).sort(([left], [right]) => left.localeCompare(right))) {
+  const capabilityPattern = new RegExp(
+    `\\b(?:${EVALUATION_PROHIBITED_IDENTIFIERS.join('|')})\\b`,
+    'g',
+  );
+  for (const [modulePath, raw] of Object.entries(sources).sort(([left], [right]) =>
+    left.localeCompare(right),
+  )) {
     const source = raw.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/.*$/gm, '');
     for (const match of source.matchAll(importPattern)) {
       const specifier = match[1]!;

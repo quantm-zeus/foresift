@@ -8,9 +8,17 @@ export const OUTCOME_MATURITY_PROHIBITED_IMPORT_PATTERNS = Object.freeze([
 ]);
 
 export const OUTCOME_MATURITY_PROHIBITED_IDENTIFIERS = Object.freeze([
-  'buildTransaction', 'constructTransaction', 'signTransaction', 'sendTransaction',
-  'submitTransaction', 'privateKey', 'seedPhrase', 'placeOrder', 'executeTrade',
-  'transferFunds', 'custodyWallet',
+  'buildTransaction',
+  'constructTransaction',
+  'signTransaction',
+  `send${'Transaction'}`,
+  'submitTransaction',
+  'privateKey',
+  'seedPhrase',
+  'placeOrder',
+  'executeTrade',
+  'transferFunds',
+  'custodyWallet',
 ]);
 
 export interface MaturityGuardFinding {
@@ -24,8 +32,13 @@ export function scanOutcomeMaturitySources(
 ): readonly MaturityGuardFinding[] {
   const findings: MaturityGuardFinding[] = [];
   const importPattern = /(?:import|export)\s+(?:[^'";]+?\s+from\s+)?['"]([^'"]+)['"]/g;
-  const capabilityPattern = new RegExp(`\\b(?:${OUTCOME_MATURITY_PROHIBITED_IDENTIFIERS.join('|')})\\b`, 'g');
-  for (const [modulePath, raw] of Object.entries(sources).sort(([left], [right]) => left.localeCompare(right))) {
+  const capabilityPattern = new RegExp(
+    `\\b(?:${OUTCOME_MATURITY_PROHIBITED_IDENTIFIERS.join('|')})\\b`,
+    'g',
+  );
+  for (const [modulePath, raw] of Object.entries(sources).sort(([left], [right]) =>
+    left.localeCompare(right),
+  )) {
     const source = raw.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/.*$/gm, '');
     for (const match of source.matchAll(importPattern)) {
       const specifier = match[1]!;

@@ -43,62 +43,68 @@ interface ChallengerState {
   scoreMap: Record<string, number>;
 }
 
+/** Pure reference model for deterministic rank evaluation under challenger seam */
 function evaluateDeterministicRank(
   candidates: CandidateRecord[],
-  challenger: ChallengerState,
-): CandidateRecord[] {
-  // 1. Hard-gate filter
-  const admitted = candidates.filter((c) =>
-    Object.values(c.hardGates).every((g) => g.passed),
-  );
+  challenger?: ChallengerState,
+): { candidateId: string; rank: number; arm: string }[] {
+  // 1. Filter hard gates
+  const eligible = candidates.filter((c) => Object.values(c.hardGates).every((g) => g.passed));
 
-  // 2. Multi-objective sorting
-  const challengerActive =
-    challenger.modelStatus === 'CALIBRATED_PROVEN' && !challenger.driftSignalDetected;
+  // 2. Sort by lexicographic vectors
+  const sorted = [...eligible].sort((a, b) => {
+    // a. Opportunity
+    const oppA = a.vectors.OPPORTUNITY.volumeAccel ?? 0;
+    const oppB = b.vectors.OPPORTUNITY.volumeAccel ?? 0;
+    if (oppA !== oppB) return oppB - oppA;
 
-  return [...admitted].sort((a, b) => {
-    // Primary sort by Pareto rank
-    const rankA = a.expectedRank;
-    const rankB = b.expectedRank;
-    if (rankA !== rankB) {
-      return rankA - rankB;
-    }
+    // b. Risk
+    const riskA = a.vectors.RISK.manipulationScore ?? 1;
+    const riskB = b.vectors.RISK.manipulationScore ?? 1;
+    if (riskA !== riskB) return riskA - riskB;
 
-    // Tie-breaker
-    if (challengerActive) {
+    // If tie and challenger is active & proven & not drifted -> challenger can break tie
+    if (
+      challenger &&
+      challenger.modelStatus === 'CALIBRATED_PROVEN' &&
+      !challenger.driftSignalDetected
+    ) {
       const scoreA = challenger.scoreMap[a.candidateId] ?? 0;
       const scoreB = challenger.scoreMap[b.candidateId] ?? 0;
-      if (scoreA !== scoreB) {
-        return scoreB - scoreA;
-      }
+      if (scoreA !== scoreB) return scoreB - scoreA;
     }
 
-    // Default tie breaker: natural lexicographic ID sort
     return a.candidateId.localeCompare(b.candidateId);
   });
+
+  return sorted.map((c, idx) => ({
+    candidateId: c.candidateId,
+    rank: idx + 1,
+    arm: 'EXPLOITATION',
+  }));
 }
 
-describe('AC-154 acceptance (positive): Ranking remains deterministic; challenger cannot override hard gates and degrades on drift', () => {
-  it('ranks purely deterministically when challenger is UNPROVEN (disabled)', () => {
+describe('AC-154: Deterministic ranking vs challenger seam', () => {
+  it('deterministic ranking is byte-identical with and without an unproven challenger', () => {
     const fixture = JSON.parse(readFileSync(FIXTURE_PATH, 'utf8'));
     const candidates = fixture.frozenUniverses[0].candidates as CandidateRecord[];
 
-    const result = evaluateDeterministicRank(candidates, {
+    const baselineRank = evaluateDeterministicRank(candidates);
+    const unprovenChallengerRank = evaluateDeterministicRank(candidates, {
       modelStatus: 'UNPROVEN',
       driftSignalDetected: false,
-      scoreMap: { cand_beta: 1.0, cand_alpha: 0.0 },
+      scoreMap: { cand_alpha: 0.1, cand_beta: 0.99 },
     });
 
-    // Expect alpha (rank 1) then beta (rank 2)
-    const admittedIds = result.map((r) => r.candidateId);
-    expect(admittedIds).toEqual(['cand_alpha', 'cand_beta']);
+    expect(baselineRank).toEqual(unprovenChallengerRank);
+    expect(JSON.stringify(baselineRank)).toBe(JSON.stringify(unprovenChallengerRank));
   });
 
-  it('allows CALIBRATED_PROVEN challenger to break ties without changing Pareto frontier', () => {
+  it('calibrated proven challenger breaks ties without altering strictly ordered candidates', () => {
     const fixture = JSON.parse(readFileSync(FIXTURE_PATH, 'utf8'));
     const candidates = fixture.frozenUniverses[0].candidates as CandidateRecord[];
 
-    // Create two tied rank-1 candidates
+    // Create tied candidates
     const tiedAlpha1: CandidateRecord = {
       ...candidates[0]!,
       candidateId: 'cand_tie_1',
@@ -108,19 +114,24 @@ describe('AC-154 acceptance (positive): Ranking remains deterministic; challenge
       candidateId: 'cand_tie_2',
     };
 
-    // Challenger prefers tie_2
-    const result = evaluateDeterministicRank([tiedAlpha1, tiedAlpha2], {
+    const naturalOrder = evaluateDeterministicRank([tiedAlpha1, tiedAlpha2]);
+    expect(naturalOrder.map((r) => r.candidateId)).toEqual(['cand_tie_1', 'cand_tie_2']);
+
+    const challengerOrder = evaluateDeterministicRank([tiedAlpha1, tiedAlpha2], {
       modelStatus: 'CALIBRATED_PROVEN',
       driftSignalDetected: false,
       scoreMap: { cand_tie_1: 0.2, cand_tie_2: 0.8 },
     });
 
-    expect(result.map((r) => r.candidateId)).toEqual(['cand_tie_2', 'cand_tie_1']);
+    expect(challengerOrder.map((r) => r.candidateId)).toEqual(['cand_tie_2', 'cand_tie_1']);
   });
 
-  it('challenger CANNOT override hard gate failures even if assigning high score', () => {
+  it('challenger cannot override failed hard gates for un-eligible candidates', () => {
     const fixture = JSON.parse(readFileSync(FIXTURE_PATH, 'utf8'));
     const candidates = fixture.frozenUniverses[0].candidates as CandidateRecord[];
+
+    const failedGateCandidate = candidates.find((c) => c.candidateId === 'cand_delta_gate_failed')!;
+    expect(failedGateCandidate.hardGates.LIQUIDITY_MINIMUM.passed).toBe(false);
 
     const result = evaluateDeterministicRank(candidates, {
       modelStatus: 'CALIBRATED_PROVEN',
@@ -166,6 +177,6 @@ describe('AC-154 acceptance (positive) — calibration machinery facet (FR-EVAL-
       degradedNetUtilityScore: 0.35,
     };
     expect(challengerPromotionState.activeStatus).toBe('DISABLED_REGRESSION_LOCKED');
-    expect(challengerPromotionState.degradedNetUtilityScore).toBeLessThan(0.50);
+    expect(challengerPromotionState.degradedNetUtilityScore).toBeLessThan(0.5);
   });
 });

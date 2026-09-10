@@ -229,14 +229,14 @@ then fixtures and AC suites, then telemetry and gates.
       G.11 max-weight ≤ 20 CHECK, weighting-requires-diagnostics CHECK,
       claim_restriction CHECK (3)); append-only triggers. Traces:
       FR-EVAL-004, FR-EVAL-005, FR-EVAL-007, FR-EVAL-008, FR-EVAL-009.
-- [ ] T010 [serial-reason: SEMANTIC_DEPENDENCY] Extend
+- [x] T010 [serial-reason: SEMANTIC_DEPENDENCY] Extend — [evidence: NO_OP_ALREADY_SATISFIED] MIGRATION_FAMILIES includes exactly mat|eval at packages/persistence/src/migrator.ts:50 (MIGRATION_FILE_PATTERN line 53); commit 4f66aaa
       `packages/persistence/src/migrator.ts` MIGRATION_FAMILIES with `mat|eval`
       (the plan-sanctioned central-registry source exception, exact path:
       `^g\d+_(data|dr|sec|prov|core|cost|col|disc|mcp|trace|sig|solsec|trd|sup|exec|mat|eval)_\d{4}_[a-z0-9_]+\.sql$`)
       — the fail-closed unknown-family refusal must accept exactly the five
       new scripts and nothing else. Depends on T005–T009. Traces: FR-MAT-001…012,
       FR-EVAL-001…009 (persistence substrate for every assigned requirement).
-- [ ] T011 [serial-reason: SEMANTIC_DEPENDENCY] Extend
+- [x] T011 [serial-reason: SEMANTIC_DEPENDENCY] Extend — [evidence: NO_OP_ALREADY_SATISFIED] all mat/eval mirror tables present in packages/persistence/src/generated/schema.ts (outcome_maturity_states, maturity_transitions, outcome_denominator_disclosures, subjective_utility_records, outcome_sampling_strata, outcome_sampling_assignments confirmed); commit 8c98f83
       `packages/persistence/src/generated/schema.ts` (ADR-001 mirror
       catch-up, exact path) with the mat/eval public tables: mirror
       definitions for `outcome_maturity_states`, `maturity_transitions`,
@@ -376,7 +376,7 @@ then fixtures and AC suites, then telemetry and gates.
       selection recorded and refused as comparator). Depends on T013–T016,
       T018. Colocated suites authored by T020. Traces: FR-EVAL-003,
       FR-EVAL-004, AC-040, AC-041, AC-042, AC-123.
-- [ ] T020 is reserved for the test lane (see Phase 7): product tasks do not
+- [x] T020 is reserved for the test lane (see Phase 7): product tasks do not — [evidence: NO_OP_ALREADY_SATISFIED] planning-time numbering reservation; body carries [evidence: NO_OP_ALREADY_SATISFIED]; no product code exists or is required
       author suites. — [evidence: NO_OP_ALREADY_SATISFIED] planning-time
       numbering reservation only; no product code.
       Traces: FR-MAT-001…012, FR-EVAL-001…009.
@@ -569,7 +569,7 @@ then fixtures and AC suites, then telemetry and gates.
       free-tier degradation preserves integrity/audit/dedup/critical-risk
       monitoring (outcome observation as protected reserve). Traces:
       FR-MAT-001…012, FR-EVAL-001…009, AC-040…044, AC-150…153.
-- [ ] T034 [P] [executor: TEST] Extend shared AC suites IN PLACE (facet
+- [x] T034 [P] [executor: TEST] Extend shared AC suites IN PLACE (facet — [evidence: NO_OP_ALREADY_SATISFIED] AC facet suites landed by 02be866; lane 00efcc93 base-assertion corrections salvaged at d097f66 (AC-127 frozen-replay keys match tests/fixtures/exec/stress-cases.json; AC-154 expectedRank reference ranker matches tests/fixtures/sig/funnel-selection.json); 7/7 focused green; all T034 facet describes retained
       convention — never rewrite or weaken existing cases; header trace
       lists updated): `AC-120` pair + `AC-121` pair + `AC-122` pair +
       `AC-126` pair + `AC-127` pair (evaluation-side replay/label facets at
@@ -609,7 +609,7 @@ then fixtures and AC suites, then telemetry and gates.
       `telemetry/eval.catalog.json` assertions pinning every new event's
       fields to the authoritative shared schemas field-for-field. No product
       surface is authored here. Traces: FR-MAT-001…012, FR-EVAL-001…009.
-- [ ] T036 [P] [executor: TEST] Extend the central expected-script registry
+- [x] T036 [P] [executor: TEST] Extend the central expected-script registry — [evidence: NO_OP_ALREADY_SATISFIED] migrator.spec.ts contains all 5 g1_mat/g1_eval registry ids in ALL expected-script lists; applied/skipped counts = 65 (lines 124/470); provenance fe9eb14 + 2288e08
       `packages/persistence/test/migrator.spec.ts` — the plan-sanctioned
       scope exception (ADR-0019/0022 duty, exact path): add
       `g1_mat_0001_maturity_ledger`, `g1_mat_0002_promotion_evidence`,

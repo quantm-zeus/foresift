@@ -82,7 +82,11 @@ per-workload scripts (`test:pure`, `test:process-meta`, `test:pglite`). A bare
 `bun test` over the full tree runs in one process without isolation; the
 DATABASE_PGLITE suites accumulate PGlite instances across files and will OOM a
 15 GiB host (observed 2026-08-28). Targeted suites (e.g. `test:state-control-plane`,
-`bun test <specific files>`) are fine.
+`bun test <specific files>`) are fine. Coordinator groups run memory-bounded
+(`systemd-run --user --scope`, 6G/8G pane law, ADR-0023) where the host
+supports it: tmux panes live in unbounded per-pane transient scopes outside
+the tmux service's limits (Incident A, 2026-09-10), so the bound travels with
+the command — never raise limits to relieve pressure.
 
 ## Git history contract
 

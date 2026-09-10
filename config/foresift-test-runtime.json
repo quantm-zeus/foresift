@@ -17,5 +17,7 @@
   "bunPureTestConcurrency": 8,
   "bunHeavyFileWorkers": 1,
   "bunHeavyTestConcurrency": 1,
-  "testTimeoutMs": 30000
+  "testTimeoutMs": 30000,
+  "testMemoryHigh": "6G",
+  "testMemoryMax": "8G"
 }

@@ -72,24 +72,56 @@ describe('AC-241 negative: hidden current-data calls fail the replay', () => {
 
   it('replayObservations refuses non-UTC boundaries (no local-time leakage)', async () => {
     await expectForesiftError(
-      replayObservations(tdb.engine, {
-        poolId: 'any',
-        asOf: '2026-07-02 09:00:00' as never,
-      }),
+      replayObservations(tdb.engine, '2026-07-02T09:00:00+00:00' as never),
       ErrorCode.TIMESTAMP_INVALID,
     );
   });
 
-  it('CacheStageChain refuses computeExactKey without asOf (no floating-time caching)', () => {
-    const stage = new CacheStageChain();
-    const bad: CacheKeyComponents = {
-      toolName: 'pool-observer',
-      toolVersion: '1.0.0',
-      inputsHash: 'sha256:1111111111111111111111111111111111111111111111111111111111111111',
-      schemaHash: 'sha256:2222222222222222222222222222222222222222222222222222222222222222',
-      asOf: '' as never,
+  it('the current view stays unreachable through the replay surface', async () => {
+    // Data available long after any sane boundary can only appear through the
+    // explicit currentObservations path — never via resolveEvidenceAt/replay.
+    const far = utcTimestamp('2020-01-01T00:00:00Z');
+    const resolution = await resolveEvidenceAt(tdb.engine, { resolvedAt: far });
+    const replayed = await replayObservations(tdb.engine, far);
+    expect(resolution.observations).toEqual([]);
+    expect(resolution.bundles).toEqual([]);
+    expect(replayed).toEqual([]);
+  });
+});
+
+describe('AC-241 negative (tool-core substrate): cache lookup refuses future decision times or unpinned license versions', () => {
+  it('cache lookup with mismatched licensePolicyVersion misses even when stored at same instant', async () => {
+    const cacheChain = new CacheStageChain({
+      engine: tdb.engine,
+      now: () => '2026-07-02T09:00:00Z',
+    });
+
+    const componentsA: CacheKeyComponents = {
+      provider: 'first-party-dex-observer',
+      operation: 'get_asset_identity',
+      operationVersion: '1.0.0',
+      chain: 'eip155:1',
+      canonicalEntityIdentity: 'eip155:1:0x00000000000000000000000000000000000ac241',
+      normalizedArguments: { address: '0x00000000000000000000000000000000000ac241' },
+      fieldProjection: ['symbol'],
+      asOf: '2026-07-02T09:00:00Z',
+      licensePolicyVersion: 'policy-v1',
     };
-    expect(() => stage.computeExactKey(bad)).toThrow();
+
+    await cacheChain.storeIfPermitted({
+      components: componentsA,
+      payloadRef: 'obj://core-cache/ac241n-entry-1',
+      storedAt: '2026-07-02T09:00:00Z',
+      rightsAllowed: true,
+      policy: { cachingPermitted: true },
+    });
+
+    const lookupV2 = await cacheChain.lookup({
+      components: { ...componentsA, licensePolicyVersion: 'policy-v2' },
+      holderMode: 'MCP_MANUAL',
+      decisionTime: '2026-07-02T09:00:00Z',
+    });
+    expect(lookupV2.outcome).toBe('MISS');
   });
 });
 
@@ -103,3 +135,4 @@ describe('AC-241 negative — champion/challenger comparison refusal facet (FR-E
     ).toThrow('CHAMPION_CHALLENGER_REPLAY_CUTOFF_MISMATCH');
   });
 });
+

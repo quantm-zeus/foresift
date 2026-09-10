@@ -46,70 +46,112 @@ beforeAll(async () => {
     candidateId: 'cand/ac242',
     evidenceFamily: 'swaps',
     policyVersion: 'policy/v1',
+    state: AcquisitionState.REQUESTED,
+    requestedAt: T('2026-06-11T09:00:00Z'),
+  });
+  await recordProbeAssignment(engine, {
+    decisionId: 'ac242-provider-down',
+    assignment: {
+      eligibilityStratum: 'stratum-a',
+      assignmentProbability: 0.4,
+      seedProvenance: 'seed/deterministic-v1',
+      selectionAt: T('2026-06-11T09:00:01Z'),
+      requestedFields: ['volume'],
+    },
+    estimatedDecisionImpact: 0.2,
+  });
+  await completeRetrieval(engine, {
+    decisionId: 'ac242-provider-down',
+    completedAt: T('2026-06-11T09:05:00Z'),
     state: AcquisitionState.PROVIDER_UNAVAILABLE,
-    requestedAt: T('2026-06-12T09:00:00Z'),
-    failureReason: '503 Service Unavailable',
   });
   await recordAcquisitionDecision(engine, {
-    decisionId: 'ac242-empty',
+    decisionId: 'ac242-returned',
     candidateId: 'cand/ac242',
     evidenceFamily: 'swaps',
     policyVersion: 'policy/v1',
     state: AcquisitionState.REQUESTED,
-    requestedAt: T('2026-06-12T09:01:00Z'),
+    requestedAt: T('2026-06-11T10:00:00Z'),
+  });
+  await recordProbeAssignment(engine, {
+    decisionId: 'ac242-returned',
+    assignment: {
+      eligibilityStratum: 'stratum-a',
+      assignmentProbability: 0.4,
+      seedProvenance: 'seed/deterministic-v1',
+      selectionAt: T('2026-06-11T10:00:01Z'),
+      requestedFields: ['volume'],
+    },
+    estimatedDecisionImpact: 0.3,
   });
   await completeRetrieval(engine, {
-    decisionId: 'ac242-empty',
-    state: AcquisitionState.RETURNED_EMPTY,
-    completedAt: T('2026-06-12T09:01:02Z'),
-  });
-
-  // A probe assignment is an honest state alongside non-probe acquisition.
-  await recordProbeAssignment(engine, {
-    candidateId: 'cand/ac242-probe',
-    evidenceFamily: 'swaps',
-    policyVersion: 'policy/v1',
-    assignedAt: T('2026-06-12T09:00:00Z'),
-    probeProbability: '0.1000',
-    stratum: 'stratum-default',
-    decisionId: 'ac242-probe-dec',
+    decisionId: 'ac242-returned',
+    completedAt: T('2026-06-11T10:04:00Z'),
+    state: AcquisitionState.RETURNED,
+    evidenceIds: ['ev/ac242/1'],
   });
 });
 
 afterAll(() => closeTestDatabase(tdb));
 
-describe('AC-242 acceptance (positive): NOT_REQUESTED_BY_POLICY persistence & queries', () => {
-  it('persists NOT_REQUESTED_BY_POLICY without lifecycle fields', async () => {
-    const row = await tdb.engine.query<{
-      state: string;
-      requested_at: string | null;
-      completed_at: string | null;
-      failure_reason: string | null;
-    }>(`SELECT state, requested_at, completed_at, failure_reason FROM acquisition_decisions WHERE decision_id = 'ac242-not-requested'`);
-    expect(row.rows).toHaveLength(1);
-    expect(row.rows[0]?.state).toBe(AcquisitionState.NOT_REQUESTED_BY_POLICY);
-    expect(row.rows[0]?.requested_at).toBeNull();
-    expect(row.rows[0]?.completed_at).toBeNull();
-    expect(row.rows[0]?.failure_reason).toBeNull();
-  });
-
-  it('queries distinguish NOT_REQUESTED_BY_POLICY from PROVIDER_UNAVAILABLE and RETURNED_EMPTY', async () => {
-    const counts = await tdb.engine.query<{ state: string; count: string }>(
-      `SELECT state, COUNT(*)::text AS count FROM acquisition_decisions WHERE candidate_id = 'cand/ac242' GROUP BY state ORDER BY state`,
+describe('AC-242: NOT_REQUESTED_BY_POLICY storage semantics', () => {
+  it('persists the exact state with no retrieval lifecycle fields', async () => {
+    const rows = await tdb.engine.query<Record<string, unknown>>(
+      'SELECT * FROM evidence_acquisition_decisions WHERE decision_id = $1',
+      ['ac242-not-requested'],
     );
-    const map = new Map(counts.rows.map((r) => [r.state, Number(r.count)]));
-    expect(map.get(AcquisitionState.NOT_REQUESTED_BY_POLICY)).toBe(1);
-    expect(map.get(AcquisitionState.PROVIDER_UNAVAILABLE)).toBe(1);
-    expect(map.get(AcquisitionState.RETURNED_EMPTY)).toBe(1);
+    const row = rows.rows[0];
+    expect(row).toBeDefined();
+    expect(row?.state).toBe('NOT_REQUESTED_BY_POLICY');
+    expect(row?.requested_at).toBeNull();
+    expect(row?.completed_at).toBeNull();
+    expect(row?.assignment_probability).toBeNull();
   });
 
-  it('NOT_REQUESTED_BY_POLICY never increments maturedEvidenceCountAt', async () => {
-    const count = await maturedEvidenceCountAt(tdb.engine, {
+  it('each outcome state stays distinct and queryable', async () => {
+    const byState = await tdb.engine.query<{ state: string; n: string }>(
+      `SELECT state, COUNT(*)::text AS n FROM evidence_acquisition_decisions
+       WHERE candidate_id = 'cand/ac242' GROUP BY state ORDER BY state`,
+    );
+    expect(
+      Object.fromEntries(byState.rows.map((r): [string, number] => [r.state, Number(r.n)])),
+    ).toEqual({
+      NOT_REQUESTED_BY_POLICY: 1,
+      PROVIDER_UNAVAILABLE: 1,
+      RETURNED: 1,
+    });
+  });
+
+  it('policy-not-requested never counts as matured evidence', async () => {
+    const matured = await maturedEvidenceCountAt(tdb.engine, {
       candidateId: 'cand/ac242',
       evidenceFamily: 'swaps',
-      asOf: T('2026-06-12T10:00:00Z'),
+      t: T('2026-06-11T12:00:00Z'),
     });
-    expect(count).toBe(0);
+    expect(matured).toBe(1);
+  });
+
+  it('a NOT_REQUESTED decision carries no evidence ids to count', async () => {
+    const rows = await tdb.engine.query<{ evidence_ids: string[] }>(
+      'SELECT evidence_ids FROM evidence_acquisition_decisions WHERE decision_id = $1',
+      ['ac242-not-requested'],
+    );
+    expect(rows.rows[0]?.evidence_ids).toEqual([]);
+  });
+});
+
+describe('AC-242 acceptance (tool-core substrate): NOT_REQUESTED_BY_POLICY and blocked states persist distinctly', () => {
+  it('BlockedStatePayload schema validates NOT_REQUESTED_BY_POLICY payload', () => {
+    const payload: BlockedStatePayload = {
+      acquisitionState: 'NOT_REQUESTED_BY_POLICY',
+      machineReason: 'POLICY_EVALUATION_SKIPPED',
+      toolName: 'discover_candidates',
+      toolVersion: '1.0.0',
+      pipelineRunId: 'run-ac242-1',
+      at: T('2026-06-11T09:00:00Z'),
+    };
+    const validated = parseCoreSchema('BlockedStatePayload', payload);
+    expect(validated.acquisitionState).toBe('NOT_REQUESTED_BY_POLICY');
   });
 });
 

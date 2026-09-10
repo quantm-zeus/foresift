@@ -21,7 +21,7 @@ export interface IntervalEvaluationCase {
   totalTokenCount: number; // Naive N
   clusterCount: number; // K
   clusterDefinition: 'DEPLOYER_ENTITY' | 'FUNDING_WALLET_CLUSTER' | 'CALENDAR_NARRATIVE_WAVE';
-  alternateClusterDefinition: 'LAUNCHPAD_BATCH' | 'POOL_ROUTER';
+  alternateClusterDefinition: 'LAUNCHPAD_BATCH' | 'POOL_ROUTER' | 'FUNDING_WALLET_CLUSTER';
   observations: readonly TokenObservationInCluster[];
   naiveMetrics: {
     meanUtilityUsd: number;

@@ -53,26 +53,70 @@ describe('AC-242 negative: policy-not-requested is never a retrieval outcome', (
         state: AcquisitionState.NOT_REQUESTED_BY_POLICY,
         requestedAt: utcTimestamp('2026-06-12T09:00:00Z'),
       }),
-      ErrorCode.CONTRACT_INVARIANT_VIOLATED,
+      ErrorCode.ACQUISITION_WRITE_BEFORE_RETRIEVAL_VIOLATED,
     );
   });
 
-  it('refuses to complete a NOT_REQUESTED_BY_POLICY row (it was never requested)', async () => {
+  it('refuses recording a NOT_REQUESTED_BY_POLICY retrieval completion', async () => {
     await recordAcquisitionDecision(tdb.engine, {
-      decisionId: 'ac242n-to-complete',
-      candidateId: 'cand/ac242n-2',
+      decisionId: 'ac242n-clean',
+      candidateId: 'cand/ac242n',
+      evidenceFamily: 'swaps',
+      policyVersion: 'policy/v1',
+      state: AcquisitionState.REQUESTED,
+      requestedAt: utcTimestamp('2026-06-12T09:00:00Z'),
+    });
+    await expectForesiftError(
+      completeRetrieval(tdb.engine, {
+        decisionId: 'ac242n-clean',
+        completedAt: utcTimestamp('2026-06-12T09:05:00Z'),
+        state: AcquisitionState.NOT_REQUESTED_BY_POLICY,
+      }),
+      ErrorCode.ACQUISITION_WRITE_BEFORE_RETRIEVAL_VIOLATED,
+    );
+  });
+
+  it('refuses unknown acquisition states (no silent default)', async () => {
+    await expectForesiftError(
+      recordAcquisitionDecision(tdb.engine, {
+        decisionId: 'ac242n-unknown-state',
+        candidateId: 'cand/ac242n',
+        evidenceFamily: 'swaps',
+        policyVersion: 'policy/v1',
+        state: 'DEFINITELY_UNKNOWN_STATE' as AcquisitionState, // not in the reconciled vocabulary (ADR-1)
+      }),
+      ErrorCode.ACQUISITION_STATE_UNKNOWN,
+    );
+  });
+
+  it('a NOT_REQUESTED record never enters matured evidence counts', async () => {
+    await recordAcquisitionDecision(tdb.engine, {
+      decisionId: 'ac242n-only-not-requested',
+      candidateId: 'cand/ac242n-counts',
       evidenceFamily: 'swaps',
       policyVersion: 'policy/v1',
       state: AcquisitionState.NOT_REQUESTED_BY_POLICY,
     });
-    await expectForesiftError(
-      completeRetrieval(tdb.engine, {
-        decisionId: 'ac242n-to-complete',
-        state: AcquisitionState.RETURNED_PAYLOAD,
-        completedAt: utcTimestamp('2026-06-12T09:01:00Z'),
+    const matured = await maturedEvidenceCountAt(tdb.engine, {
+      candidateId: 'cand/ac242n-counts',
+      t: utcTimestamp('2026-06-12T23:00:00Z'),
+    });
+    expect(matured).toBe(0);
+  });
+});
+
+describe('AC-242 negative (tool-core substrate): invalid blocked states and empty conflations fail closed', () => {
+  it('BlockedStatePayload schema refuses unrecognized blocked state strings', () => {
+    expect(() =>
+      parseCoreSchema('BlockedStatePayload', {
+        acquisitionState: 'RETURNED_EMPTY',
+        machineReason: 'EMPTY_RESULT',
+        toolName: 'discover_candidates',
+        toolVersion: '1.0.0',
+        pipelineRunId: 'run-1',
+        at: '2026-06-12T09:00:00Z',
       }),
-      ErrorCode.CONTRACT_INVARIANT_VIOLATED,
-    );
+    ).toThrow();
   });
 });
 
@@ -86,3 +130,4 @@ describe('AC-242 negative — evaluation missingness imputation refusal facet (F
     ).toThrow('BLIND_IMPUTATION_OF_POLICY_NOT_REQUESTED_REFUSED');
   });
 });
+

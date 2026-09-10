@@ -54,33 +54,103 @@ beforeAll(async () => {
 
 afterAll(() => closeTestDatabase(tdb));
 
-describe('AC-241 acceptance (positive): frozen replay pure function', () => {
-  it('re-running the same replay boundary yields byte-identical bundles', async () => {
-    const r1 = await replayObservations(tdb.engine, {
-      poolId,
-      asOf: T('2026-07-01T09:30:00Z'),
-    });
-    const r2 = await replayObservations(tdb.engine, {
-      poolId,
-      asOf: T('2026-07-01T09:30:00Z'),
-    });
-    expect(r1.observations).toHaveLength(1);
-    expect(r1.observations[0]?.observationId).toBe('ac241-a');
-    expect(r1.observations).toEqual(r2.observations);
+describe('AC-241: frozen replay differs only via registered components', () => {
+  it('re-running the same frozen resolution is byte-identical', async () => {
+    const t = T('2026-07-01T10:00:00Z');
+    const first = await resolveEvidenceAt(tdb.engine, { resolvedAt: t });
+    const second = await resolveEvidenceAt(tdb.engine, { resolvedAt: t });
+    expect(second).toEqual(first);
+
+    const obsFirst = await replayObservations(tdb.engine, t);
+    const obsSecond = await replayObservations(tdb.engine, t);
+    expect(obsSecond).toEqual(obsFirst);
   });
 
-  it('tool-core cache stage produces deterministic key from frozen components', () => {
-    const stage = new CacheStageChain();
+  it('data arriving after the boundary never alters the earlier replay', async () => {
+    const boundary = T('2026-07-01T10:00:00Z');
+    const before = await resolveEvidenceAt(tdb.engine, { resolvedAt: boundary });
+
+    // Post-boundary arrivals: a new observation and a new bundle.
+    await appendObservation(tdb.engine, {
+      observationId: 'ac241-b',
+      subjectPoolId: poolId,
+      eventAt: T('2026-07-01T11:00:00Z'),
+      availableAt: T('2026-07-01T12:00:00Z'),
+      availabilityProvenance: 'PROVIDER_LIVE_RESPONSE',
+      rawAmount: '222',
+      decimals: 2,
+    });
+    await freezeBundle(tdb.engine, {
+      bundleId: 'ac241-bundle-late',
+      manifest: { family: 'swaps', note: 'frozen after the candidate acted' },
+      frozenAt: T('2026-07-01T12:30:00Z'),
+    });
+
+    const after = await resolveEvidenceAt(tdb.engine, { resolvedAt: boundary });
+    expect(after).toEqual(before);
+    expect(await replayObservations(tdb.engine, boundary)).toEqual(
+      await replayObservations(tdb.engine, boundary),
+    );
+  });
+
+  it('changing ONLY the registered boundary moves the view predictably', async () => {
+    const early = await resolveEvidenceAt(tdb.engine, { resolvedAt: T('2026-07-01T10:00:00Z') });
+    const late = await resolveEvidenceAt(tdb.engine, { resolvedAt: T('2026-07-01T13:00:00Z') });
+    // The delta is exactly the two post-boundary registrations, nothing else —
+    // asserted on BOTH halves: bundles and observations.
+    expect(early.bundles.map((b) => b.bundleId)).toEqual(['ac241-bundle']);
+    expect(early.observations.map((o) => o.observationId)).toEqual(['ac241-a']);
+    expect(late.bundles.map((b) => b.bundleId).sort()).toEqual([
+      'ac241-bundle',
+      'ac241-bundle-late',
+    ]);
+    expect(late.observations.map((o) => o.observationId).sort()).toEqual(['ac241-a', 'ac241-b']);
+    // Same persisted corpus both times; only resolvedAt differed.
+    expect(early.resolvedAt).toBe(T('2026-07-01T10:00:00Z'));
+    expect(late.resolvedAt).toBe(T('2026-07-01T13:00:00Z'));
+  });
+});
+
+describe('AC-241 acceptance (tool-core substrate): exact-cache point-in-time replay consistency', () => {
+  it('exact cache lookups at frozen decisionTime T return identical fresh hits', async () => {
+    const cacheChain = new CacheStageChain({
+      engine: tdb.engine,
+      now: () => '2026-07-01T10:00:00Z',
+    });
+
     const components: CacheKeyComponents = {
-      toolName: 'pool-observer',
-      toolVersion: '1.0.0',
-      inputsHash: 'sha256:1111111111111111111111111111111111111111111111111111111111111111',
-      schemaHash: 'sha256:2222222222222222222222222222222222222222222222222222222222222222',
-      asOf: T('2026-07-01T09:30:00Z'),
+      provider: 'first-party-dex-observer',
+      operation: 'get_asset_identity',
+      operationVersion: '1.0.0',
+      chain: 'eip155:1',
+      canonicalEntityIdentity: 'eip155:1:0x00000000000000000000000000000000000ac241',
+      normalizedArguments: { address: '0x00000000000000000000000000000000000ac241' },
+      fieldProjection: ['symbol'],
+      asOf: '2026-07-01T10:00:00Z',
+      licensePolicyVersion: 'rights-1',
     };
-    const k1 = stage.computeExactKey(components);
-    const k2 = stage.computeExactKey(components);
-    expect(k1).toBe(k2);
+
+    await cacheChain.storeIfPermitted({
+      components,
+      payloadRef: 'obj://core-cache/ac241-entry',
+      storedAt: '2026-07-01T10:00:00Z',
+      rightsAllowed: true,
+      policy: { cachingPermitted: true },
+    });
+
+    const first = await cacheChain.lookup({
+      components,
+      holderMode: 'MCP_MANUAL',
+      decisionTime: '2026-07-01T10:00:00Z',
+    });
+    const second = await cacheChain.lookup({
+      components,
+      holderMode: 'MCP_MANUAL',
+      decisionTime: '2026-07-01T10:00:00Z',
+    });
+    expect(first.outcome).toBe('HIT_FRESH');
+    expect(second.outcome).toBe('HIT_FRESH');
+    expect(first.payloadRef).toBe(second.payloadRef);
   });
 });
 
@@ -98,3 +168,4 @@ describe('AC-241 acceptance (positive) — champion/challenger frozen-replay fac
     expect(comparisonRun.challengerWinRate).toBeGreaterThan(comparisonRun.championWinRate);
   });
 });
+

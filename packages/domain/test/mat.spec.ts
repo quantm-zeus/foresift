@@ -34,7 +34,7 @@ function fallbackCensorNeverBecomesFailure(status: string, label: string): boole
 
 function fallbackSubjectiveCannotAlterObjective(
   objectiveLabel: string,
-  subjectiveUtility: string,
+  _subjectiveUtility: string,
 ): string {
   // Returns the objective label unchanged, guaranteeing isolation
   return objectiveLabel;

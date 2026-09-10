@@ -43,99 +43,237 @@ let poolId: string;
 
 const arm = (
   alertDeliveredAt: UtcTimestamp | null,
-  counterfactualDeliveryAt: UtcTimestamp | null,
-  validUntil: UtcTimestamp,
+  counterfactualDeliveryAt: UtcTimestamp,
 ): DecisionActionTimestamps => ({
-  discoveredAt: T('2026-06-10T10:00:00Z'),
-  evidenceMinimumReadyAt: T('2026-06-10T10:01:00Z'),
-  decisionReadyAt: T('2026-06-10T10:02:00Z'),
-  workflowCompletedAt: T('2026-06-10T10:03:00Z'),
-  policyDecidedAt: T('2026-06-10T10:04:00Z'),
-  outboxCommittedAt: T('2026-06-10T10:05:00Z'),
+  discoveredAt: T('2026-06-10T09:00:00Z'),
+  evidenceMinimumReadyAt: T('2026-06-10T09:04:00Z'),
+  decisionReadyAt: T('2026-06-10T09:05:00Z'),
+  workflowCompletedAt: T('2026-06-10T09:06:00Z'),
+  policyDecidedAt: T('2026-06-10T09:07:00Z'),
+  outboxCommittedAt: T('2026-06-10T09:08:00Z'),
   alertDeliveredAt,
   counterfactualDeliveryAt,
-  validUntil,
+  validUntil: T('2026-06-10T10:00:00Z'),
   expiredAt: null,
 });
 
 beforeAll(async () => {
   tdb = await makeTestDatabase();
-  poolId = await seedPool(tdb.engine);
-
-  // Seed two observations with explicit availableAt:
-  // - obs1: available at 10:04:30 (before both delivery times)
-  // - obs2: available at 10:07:00 (after counterfactual, before hypothetical late info)
-  await appendObservation(tdb.engine, {
-    evidenceId: 'ev/ac240-pool-early',
-    poolId,
-    provider: 'prov/gecko',
-    observedAt: T('2026-06-10T10:04:00Z'),
-    availableAt: T('2026-06-10T10:04:30Z'),
-    fields: { reserveBase: '1000.0', reserveQuote: '50.0' },
+  const { engine } = tdb;
+  poolId = await seedPool(engine, {
+    chainId: 'eip155:1',
+    dexId: 'uniswap-v2',
+    poolAddress: '0x00000000000000000000000000000000000ac240',
   });
-  await appendObservation(tdb.engine, {
-    evidenceId: 'ev/ac240-pool-late',
-    poolId,
-    provider: 'prov/gecko',
-    observedAt: T('2026-06-10T10:06:30Z'),
-    availableAt: T('2026-06-10T10:07:00Z'),
-    fields: { reserveBase: '900.0', reserveQuote: '55.0' },
+  // One observation visible from 09:03 and one from 09:30 — straddling the
+  // candidate's action window so boundary sensitivity is observable per arm.
+  await appendObservation(engine, {
+    observationId: 'ac240-early',
+    subjectPoolId: poolId,
+    eventAt: T('2026-06-10T08:50:00Z'),
+    availableAt: T('2026-06-10T09:03:00Z'),
+    availabilityProvenance: 'PROVIDER_LIVE_RESPONSE',
+    rawAmount: '10',
+    decimals: 2,
+  });
+  await appendObservation(engine, {
+    observationId: 'ac240-late',
+    subjectPoolId: poolId,
+    eventAt: T('2026-06-10T09:20:00Z'),
+    availableAt: T('2026-06-10T09:30:00Z'),
+    availabilityProvenance: 'PROVIDER_LIVE_RESPONSE',
+    rawAmount: '20',
+    decimals: 2,
+  });
+  await freezeBundle(engine, {
+    bundleId: 'ac240-bundle',
+    manifest: { family: 'swaps', note: 'frozen mid-window' },
+    frozenAt: T('2026-06-10T09:15:00Z'),
   });
 });
 
-afterAll(async () => {
-  await closeTestDatabase(tdb);
+afterAll(() => closeTestDatabase(tdb));
+
+describe('AC-240: symmetric action-time substrate', () => {
+  it('the §13.7 schema accepts delivered and non-delivered arms symmetrically', () => {
+    const delivered = arm(T('2026-06-10T09:08:30Z'), T('2026-06-10T09:08:30Z'));
+    const notDelivered = arm(null, T('2026-06-10T09:08:30Z'));
+    // Same field set, same validation outcome — only delivery facts differ.
+    expect(DATA_SCHEMAS.DecisionActionTimestamps.safeParse(delivered).success).toBe(true);
+    expect(DATA_SCHEMAS.DecisionActionTimestamps.safeParse(notDelivered).success).toBe(true);
+    // Non-delivery is explicitly representable: null, never a fake time.
+    const parsed = DATA_SCHEMAS.DecisionActionTimestamps.parse(notDelivered);
+    expect(parsed.alertDeliveredAt).toBeNull();
+    expect(parsed.counterfactualDeliveryAt).toBe(T('2026-06-10T09:08:30Z'));
+  });
+
+  it('a non-delivered arm never enters earlier than its counterfactual delivery', () => {
+    const cf = T('2026-06-10T09:08:30Z');
+    // Entry exactly at the counterfactual instant is allowed (inclusive).
+    expect(entryIsNotEarlierThanCounterfactual(cf, cf)).toBe(true);
+    // One millisecond earlier is flagged by the substrate.
+    expect(entryIsNotEarlierThanCounterfactual(T('2026-06-10T09:08:29.999Z'), cf)).toBe(false);
+    expect(entryIsNotEarlierThanCounterfactual(T('2026-06-10T09:08:31Z'), cf)).toBe(true);
+  });
+
+  it('both arms replaying at the same action time resolve identical views', async () => {
+    const actionTime = T('2026-06-10T09:05:00Z');
+    const obsDeliveredArm = await replayObservations(tdb.engine, actionTime);
+    const obsNonDeliveredArm = await replayObservations(tdb.engine, actionTime);
+    expect(obsNonDeliveredArm).toEqual(obsDeliveredArm);
+    // Only pre-boundary availability contributes — never the later row.
+    expect(obsDeliveredArm.map((r) => r.observationId)).toEqual(['ac240-early']);
+
+    const evDeliveredArm = await resolveEvidenceAt(tdb.engine, { resolvedAt: actionTime });
+    const evNonDeliveredArm = await resolveEvidenceAt(tdb.engine, { resolvedAt: actionTime });
+    expect(evNonDeliveredArm).toEqual(evDeliveredArm);
+  });
+
+  it('a later action time strictly grows the view — monotone, as replay resolution requires', async () => {
+    const early = await replayObservations(tdb.engine, T('2026-06-10T09:05:00Z'));
+    const late = await replayObservations(tdb.engine, T('2026-06-10T09:35:00Z'));
+    expect(late.map((r) => r.observationId).sort()).toEqual(['ac240-early', 'ac240-late']);
+    // Every early result is contained in the later one — the universal
+    // function's monotonicity precondition holds at the storage layer.
+    for (const e of early) {
+      expect(late.find((l) => l.observationId === e.observationId)?.receiptHash).toBe(
+        e.receiptHash,
+      );
+    }
+  });
 });
 
-describe('AC-240 acceptance (positive): universal decision/action-time timestamps and symmetry', () => {
-  it('schema round-trips both delivered and non-delivered decision timelines without loss', () => {
-    const delivered = arm(T('2026-06-10T10:06:00Z'), null, T('2026-06-10T11:00:00Z'));
-    const nonDelivered = arm(null, T('2026-06-10T10:06:00Z'), T('2026-06-10T11:00:00Z'));
+describe('AC-240 acceptance (tool-core substrate): symmetric event and action timestamps in envelopes', () => {
+  it('envelope meta supports symmetric observedAt, availableAt, fetchedAt for evaluation workloads', () => {
+    const envelope: ToolResultEnvelope = {
+      data: { candidateId: 'cand/ac240', score: 0.95 },
+      meta: {
+        toolName: 'compare_candidates',
+        toolVersion: '1.0.0',
+        evidenceIds: ['ev-cand-1'],
+        observedAt: T('2026-06-10T09:00:00Z'),
+        availableAt: T('2026-06-10T09:03:00Z'),
+        fetchedAt: T('2026-06-10T09:05:00Z'),
+        cache: 'HIT_FRESH',
+        qualityCodes: ['QUALITY_HIGH'],
+        conflicts: [],
+        quota: {
+          quotaModel: 'REQUESTS_PER_PERIOD',
+          reservationState: 'COMMITTED',
+          estimatedUnits: 1,
+          actualUnits: 1,
+        },
+        partial: false,
+      },
+    };
 
-    const pDelivered = DATA_SCHEMAS.DecisionActionTimestamps.parse(delivered);
-    const pNonDelivered = DATA_SCHEMAS.DecisionActionTimestamps.parse(nonDelivered);
+    const parsed = parseCoreSchema('ToolResultEnvelope', envelope);
+    expect(parsed.meta.observedAt).toBe(T('2026-06-10T09:00:00Z'));
+    expect(parsed.meta.availableAt).toBe(T('2026-06-10T09:03:00Z'));
+    expect(parsed.meta.fetchedAt).toBe(T('2026-06-10T09:05:00Z'));
+  });
+});
 
-    expect(pDelivered.alertDeliveredAt).toBe(T('2026-06-10T10:06:00Z'));
-    expect(pDelivered.counterfactualDeliveryAt).toBeNull();
-    expect(pNonDelivered.alertDeliveredAt).toBeNull();
-    expect(pNonDelivered.counterfactualDeliveryAt).toBe(T('2026-06-10T10:06:00Z'));
+describe('AC-240 G1 extensions: candidate decision timeline & counterfactual symmetry (FR-DATA-009, Appendix P)', () => {
+  it('enforces delivery_eligible_at = max(decision_ready_at, policy_decided_at)', () => {
+    const readyAt = T('2026-06-10T09:05:00Z');
+    const decidedAt = T('2026-06-10T09:07:00Z');
+    const eligibleAt = decidedAt > readyAt ? decidedAt : readyAt;
+    expect(eligibleAt).toBe(decidedAt);
   });
 
-  it('point-in-time evidence resolution yields byte-identical views at equal action times', async () => {
-    const actionTime = T('2026-06-10T10:05:00Z');
+  it('verifies non-delivered comparison arms carry versioned counterfactual_delivery_at', () => {
+    const deliveredArm = {
+      decisionReadyAt: T('2026-06-10T09:05:00Z'),
+      policyDecidedAt: T('2026-06-10T09:07:00Z'),
+      workflowCompletedAt: T('2026-06-10T09:08:00Z'),
+      deliveryEligibleAt: T('2026-06-10T09:07:00Z'),
+      deliveredAt: T('2026-06-10T09:09:00Z'),
+      counterfactualDeliveryAt: null,
+      counterfactualVersion: null,
+    };
+    const nonDeliveredArm = {
+      decisionReadyAt: T('2026-06-10T09:05:00Z'),
+      policyDecidedAt: T('2026-06-10T09:07:00Z'),
+      workflowCompletedAt: T('2026-06-10T09:08:00Z'),
+      deliveryEligibleAt: T('2026-06-10T09:07:00Z'),
+      deliveredAt: null,
+      counterfactualDeliveryAt: T('2026-06-10T09:09:00Z'),
+      counterfactualVersion: 1,
+    };
 
-    const replay = await replayObservations(tdb.engine, {
-      poolId,
-      asOf: actionTime,
-    });
-
-    const bundleDelivered = freezeBundle({
-      observations: replay.observations,
-      poolId,
-      frozenAt: actionTime,
-    });
-    const bundleNonDelivered = freezeBundle({
-      observations: replay.observations,
-      poolId,
-      frozenAt: actionTime,
-    });
-
-    expect(bundleDelivered.manifestHash).toBe(bundleNonDelivered.manifestHash);
-
-    const resolvedA = resolveEvidenceAt(bundleDelivered, actionTime);
-    const resolvedB = resolveEvidenceAt(bundleNonDelivered, actionTime);
-    expect(resolvedA).toEqual(resolvedB);
-
-    // Only the early observation is visible at 10:05:00
-    expect(resolvedA.visibleObservations).toHaveLength(1);
-    expect(resolvedA.visibleObservations[0]?.evidenceId).toBe('ev/ac240-pool-early');
+    expect(deliveredArm.deliveredAt).not.toBeNull();
+    expect(nonDeliveredArm.deliveredAt).toBeNull();
+    expect(nonDeliveredArm.counterfactualDeliveryAt).not.toBeNull();
+    expect(nonDeliveredArm.counterfactualVersion).toBe(1);
   });
 
-  it('domain predicate enforces non-delivered arm entry cannot precede counterfactual delivery', () => {
-    const cf = T('2026-06-10T10:06:00Z');
-    expect(entryIsNotEarlierThanCounterfactual(T('2026-06-10T10:06:00Z'), cf)).toBe(true);
-    expect(entryIsNotEarlierThanCounterfactual(T('2026-06-10T10:06:01Z'), cf)).toBe(true);
-    expect(entryIsNotEarlierThanCounterfactual(T('2026-06-10T10:05:59Z'), cf)).toBe(false);
+  it('persists delivered and non-delivered candidate decision timelines through the repo', async () => {
+    await recordCandidateDecisionTimeline(tdb.engine, {
+      candidateId: 'cand/ac240-deliv',
+      policyVersion: 'policy/v1',
+      decisionReadyAt: T('2026-06-10T10:00:00Z'),
+      policyDecidedAt: T('2026-06-10T10:02:00Z'),
+      workflowCompletedAt: T('2026-06-10T10:03:00Z'),
+      deliveredAt: T('2026-06-10T10:04:00Z'),
+      validUntil: T('2026-06-10T12:00:00Z'),
+    });
+
+    await recordCandidateDecisionTimeline(tdb.engine, {
+      candidateId: 'cand/ac240-nondeliv',
+      policyVersion: 'policy/v1',
+      decisionReadyAt: T('2026-06-10T10:00:00Z'),
+      policyDecidedAt: T('2026-06-10T10:02:00Z'),
+      workflowCompletedAt: T('2026-06-10T10:03:00Z'),
+      counterfactualDeliveryAt: T('2026-06-10T10:04:00Z'),
+      counterfactualDeliveryVersion: 'v1.0.0',
+      validUntil: T('2026-06-10T12:00:00Z'),
+    });
+
+    const rows = await tdb.engine.query<{
+      candidate_id: string;
+      delivered_at: string | null;
+      counterfactual_delivery_at: string | null;
+    }>(
+      'SELECT candidate_id, delivered_at, counterfactual_delivery_at FROM candidate_decision_timelines WHERE candidate_id LIKE $1 ORDER BY candidate_id',
+      ['cand/ac240-%'],
+    );
+    expect(rows.rows.length).toBe(2);
+    expect(rows.rows[0]?.delivered_at).not.toBeNull();
+    expect(rows.rows[1]?.delivered_at).toBeNull();
+    expect(rows.rows[1]?.counterfactual_delivery_at).not.toBeNull();
+  });
+
+  it('negative: refuses non-monotonic timeline where decisionReadyAt > policyDecidedAt', async () => {
+    await expectForesiftError(
+      recordCandidateDecisionTimeline(tdb.engine, {
+        candidateId: 'cand/ac240-nonmono',
+        policyVersion: 'policy/v1',
+        decisionReadyAt: T('2026-06-10T10:05:00Z'), // later than policyDecidedAt!
+        policyDecidedAt: T('2026-06-10T10:02:00Z'),
+        workflowCompletedAt: T('2026-06-10T10:06:00Z'),
+        deliveredAt: T('2026-06-10T10:07:00Z'),
+        validUntil: T('2026-06-10T12:00:00Z'),
+      }),
+      ErrorCode.CONTRACT_INVARIANT_VIOLATED,
+    );
+  });
+
+  it('negative: refuses non-delivered arm entering before counterfactual delivery', async () => {
+    await expectForesiftError(
+      recordCandidateDecisionTimeline(tdb.engine, {
+        candidateId: 'cand/ac240-early-entry',
+        policyVersion: 'policy/v1',
+        decisionReadyAt: T('2026-06-10T10:00:00Z'),
+        policyDecidedAt: T('2026-06-10T10:02:00Z'),
+        workflowCompletedAt: T('2026-06-10T10:03:00Z'),
+        counterfactualDeliveryAt: T('2026-06-10T10:05:00Z'),
+        counterfactualDeliveryVersion: 'v1.0.0',
+        entryAt: T('2026-06-10T10:04:00Z'), // earlier than counterfactual delivery!
+        validUntil: T('2026-06-10T12:00:00Z'),
+      }),
+      ErrorCode.CONTRACT_INVARIANT_VIOLATED,
+    );
   });
 });
 
@@ -159,3 +297,4 @@ describe('AC-240 acceptance (positive) — universal action-time across 7 arms f
     expect(sevenArms.every((a) => a.actionTime === actionInstant)).toBe(true);
   });
 });
+

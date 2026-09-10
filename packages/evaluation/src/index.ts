@@ -9,3 +9,7 @@ export * from './exploration.ts';
 export * from './controls.ts';
 export * from './intervals.ts';
 export * from './incident.ts';
+export * from './champion-challenger.ts';
+export * from './drift-calibration.ts';
+export * from './experiments.ts';
+export * from './selection-bias.ts';

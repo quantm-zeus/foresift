@@ -13,3 +13,4 @@ export * from './champion-challenger.ts';
 export * from './drift-calibration.ts';
 export * from './experiments.ts';
 export * from './selection-bias.ts';
+export * from './read-only-guard.ts';

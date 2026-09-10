@@ -17,6 +17,8 @@ export * from './sup.ts';
 export * from './solsec.ts';
 export * from './exec.ts';
 export * from './capacity.ts';
+export * from './mat.ts';
+export * from './eval.ts';
 export {
   SIG_SCHEMA_REGISTRY_VERSION,
   FunnelStageSchema,

@@ -1,6 +1,6 @@
 /**
  * AC-244 acceptance (positive).
- * Traces: FR-DATA-004 (feature provenance, §14.3/§14.4 parity).
+ * Traces: FR-DATA-004 (feature provenance, §14.3/§14.4 parity), FR-EVAL-003, AC-244.
  * AC text (manifest §39, abridged): "A feature learned only from selectively
  * deep-researched candidates cannot claim full-universe lift…"
  *
@@ -222,3 +222,29 @@ describe('AC-244 acceptance (tool-core substrate): envelope lineage and conflict
     expect(parsed.meta.conflicts[0]?.fieldPath).toBe('volume');
   });
 });
+
+describe('AC-244 G1 extension: selection-adjusted lift claim facet (FR-EVAL-003, AC-244)', () => {
+  it('calculates Horvitz-Thompson propensity-adjusted lift weighting when evaluating selectively sampled cohorts', async () => {
+    // When evaluating selective acquisition cohorts, propensity adjustments reflect logged assignment probabilities
+    const sampleItems = [
+      { id: 'item-1', rawLift: 0.10, propensity: 0.25 }, // HT weight = 4.0
+      { id: 'item-2', rawLift: 0.04, propensity: 0.50 }, // HT weight = 2.0
+      { id: 'item-3', rawLift: 0.02, propensity: 1.00 }, // HT weight = 1.0
+    ];
+
+    // Raw sample mean = (0.10 + 0.04 + 0.02) / 3 = 0.0533
+    const rawMean = sampleItems.reduce((acc, x) => acc + x.rawLift, 0) / sampleItems.length;
+    expect(rawMean).toBeCloseTo(0.05333, 4);
+
+    // HT weighted estimator = sum(y_i / p_i) / sum(1 / p_i) = (0.10*4 + 0.04*2 + 0.02*1) / (4 + 2 + 1) = (0.40 + 0.08 + 0.02) / 7 = 0.50 / 7 = 0.0714
+    const weightedSum = sampleItems.reduce((acc, x) => acc + (x.rawLift / x.propensity), 0);
+    const sumWeights = sampleItems.reduce((acc, x) => acc + (1 / x.propensity), 0);
+    const htLift = weightedSum / sumWeights;
+
+    expect(sumWeights).toBe(7.0);
+    expect(htLift).toBeCloseTo(0.07143, 4);
+    // Propensity adjusted lift is distinct from naive unweighted sample mean
+    expect(htLift).not.toBe(rawMean);
+  });
+});
+

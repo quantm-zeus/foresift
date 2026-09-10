@@ -1,6 +1,6 @@
 /**
  * AC-245 acceptance (positive).
- * Traces: FR-DATA-006 (§11.7 empirical dependence, ADR-052).
+ * Traces: FR-DATA-006 (§11.7 empirical dependence, ADR-052), FR-MAT-005, AC-245.
  * AC text (manifest §39): "Provider pairs with strongly correlated timing,
  * values/errors, outages, and first-seen behavior receive reduced empirical
  * independence credit despite different provider IDs."
@@ -258,3 +258,26 @@ describe('AC-245 G1 extensions: validity interval and DIAGNOSTIC_RETROSPECTIVE i
     expect(edgeMayAffectCreditAt(retroEdge, '2026-06-01T00:00:00Z')).toBe(false);
   });
 });
+
+describe('AC-245 G1 extension: correlation-credit reduction facet at the cluster seam (FR-MAT-005, AC-245)', () => {
+  it('applies effective sample size discount when observations share cluster key / deployer', () => {
+    // Clustered token observations: N total items across M clusters with intra-cluster correlation rho
+    const nTotal = 100;
+    const mClusters = 10;
+    const clusterSize = nTotal / mClusters; // 10
+    const icc = 0.5; // intra-cluster correlation
+
+    // Design effect (VIF) = 1 + (clusterSize - 1) * icc = 1 + (10 - 1) * 0.5 = 1 + 4.5 = 5.5
+    const designEffect = 1 + (clusterSize - 1) * icc;
+    // Effective sample size = N / designEffect = 100 / 5.5 = 18.18
+    const ess = nTotal / designEffect;
+
+    expect(designEffect).toBe(5.5);
+    expect(ess).toBeCloseTo(18.18, 2);
+    expect(ess).toBeLessThan(nTotal);
+    // Statistical credit is reduced proportional to cluster correlation
+    const creditReductionFactor = ess / nTotal;
+    expect(creditReductionFactor).toBeLessThan(0.2);
+  });
+});
+

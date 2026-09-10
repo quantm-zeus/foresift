@@ -1,6 +1,6 @@
 /**
  * AC-247 negative / failure-path.
- * Traces: FR-DATA-006, INV-005.
+ * Traces: FR-DATA-006, INV-005, FR-EVAL-002, AC-247.
  * A frozen historical evidence count cannot be moved by any later dependence
  * estimate, and the availability classifier refuses to bless late inputs as
  * available-at-the-time.
@@ -138,3 +138,49 @@ describe('AC-247 negative (tool-core substrate): invalid exact cache entry recor
     ).toThrow();
   });
 });
+
+describe('AC-247 G1 extension negative: frozen-count preservation negative facet (FR-EVAL-002, AC-247)', () => {
+  it('refuses to alter frozen replay counts when late-arriving outcomes are recorded', async () => {
+    // Attempting to evaluate frozen count before boundary remains unaffected by later records
+    const preCount = await maturedEvidenceCountAt(tdb.engine, {
+      candidateId: 'cand/ac247n',
+      t: BOUNDARY,
+    });
+    expect(preCount).toBe(1);
+
+    // Record an outcome maturing well after BOUNDARY
+    await recordAcquisitionDecision(tdb.engine, {
+      decisionId: 'ac247n-post-boundary',
+      candidateId: 'cand/ac247n',
+      evidenceFamily: 'swaps',
+      policyVersion: 'policy/v1',
+      state: AcquisitionState.REQUESTED,
+      requestedAt: utcTimestamp('2026-06-10T09:00:00Z'),
+    });
+    await recordProbeAssignment(tdb.engine, {
+      decisionId: 'ac247n-post-boundary',
+      assignment: {
+        eligibilityStratum: 'stratum-a',
+        assignmentProbability: 0.5,
+        seedProvenance: 'seed/x',
+        selectionAt: utcTimestamp('2026-06-10T09:00:01Z'),
+        requestedFields: ['volume'],
+      },
+      estimatedDecisionImpact: 0.3,
+    });
+    await completeRetrieval(tdb.engine, {
+      decisionId: 'ac247n-post-boundary',
+      completedAt: utcTimestamp('2026-06-10T10:00:00Z'),
+      state: AcquisitionState.RETURNED,
+      evidenceIds: ['ev/post-boundary'],
+    });
+
+    // Count at BOUNDARY must remain strictly 1
+    const postCount = await maturedEvidenceCountAt(tdb.engine, {
+      candidateId: 'cand/ac247n',
+      t: BOUNDARY,
+    });
+    expect(postCount).toBe(1);
+  });
+});
+

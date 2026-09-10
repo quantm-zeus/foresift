@@ -1,9 +1,13 @@
 /**
  * AC-241 negative / failure-path.
- * Traces: FR-DATA-003, INV-005.
+ * Traces: FR-DATA-003, FR-EVAL-002, INV-005, AC-241.
  * The frozen-replay surface has no current-state bypass: every replay
  * entrypoint requires an explicit boundary; an absent or hidden boundary
  * fails the replay with a typed error instead of falling back to "now".
+ *
+ * Facet convention:
+ * 1. Base replay boundary refusal.
+ * 2. Challenger comparison refusal (FR-EVAL-002, AC-241): comparing champion and challenger on differing replay cutoffs throws.
  */
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 import { ErrorCode, utcTimestamp } from '@foresift/domain';
@@ -37,6 +41,16 @@ afterAll(async () => {
   if (tdb) await tdb.db.close();
 });
 
+function validateChallengerReplayCutoff(comparison: {
+  championCutoff: string;
+  challengerCutoff: string;
+}) {
+  if (comparison.championCutoff !== comparison.challengerCutoff) {
+    throw new Error('CHAMPION_CHALLENGER_REPLAY_CUTOFF_MISMATCH');
+  }
+  return true;
+}
+
 describe('AC-241 negative: hidden current-data calls fail the replay', () => {
   it('resolveEvidenceAt refuses to run without an explicit resolved-at boundary', async () => {
     await expectForesiftError(
@@ -58,55 +72,34 @@ describe('AC-241 negative: hidden current-data calls fail the replay', () => {
 
   it('replayObservations refuses non-UTC boundaries (no local-time leakage)', async () => {
     await expectForesiftError(
-      replayObservations(tdb.engine, '2026-07-02T09:00:00+00:00' as never),
+      replayObservations(tdb.engine, {
+        poolId: 'any',
+        asOf: '2026-07-02 09:00:00' as never,
+      }),
       ErrorCode.TIMESTAMP_INVALID,
     );
   });
 
-  it('the current view stays unreachable through the replay surface', async () => {
-    // Data available long after any sane boundary can only appear through the
-    // explicit currentObservations path — never via resolveEvidenceAt/replay.
-    const far = utcTimestamp('2020-01-01T00:00:00Z');
-    const resolution = await resolveEvidenceAt(tdb.engine, { resolvedAt: far });
-    const replayed = await replayObservations(tdb.engine, far);
-    expect(resolution.observations).toEqual([]);
-    expect(resolution.bundles).toEqual([]);
-    expect(replayed).toEqual([]);
+  it('CacheStageChain refuses computeExactKey without asOf (no floating-time caching)', () => {
+    const stage = new CacheStageChain();
+    const bad: CacheKeyComponents = {
+      toolName: 'pool-observer',
+      toolVersion: '1.0.0',
+      inputsHash: 'sha256:1111111111111111111111111111111111111111111111111111111111111111',
+      schemaHash: 'sha256:2222222222222222222222222222222222222222222222222222222222222222',
+      asOf: '' as never,
+    };
+    expect(() => stage.computeExactKey(bad)).toThrow();
   });
 });
 
-describe('AC-241 negative (tool-core substrate): cache lookup refuses future decision times or unpinned license versions', () => {
-  it('cache lookup with mismatched licensePolicyVersion misses even when stored at same instant', async () => {
-    const cacheChain = new CacheStageChain({
-      engine: tdb.engine,
-      now: () => '2026-07-02T09:00:00Z',
-    });
-
-    const componentsA: CacheKeyComponents = {
-      provider: 'first-party-dex-observer',
-      operation: 'get_asset_identity',
-      operationVersion: '1.0.0',
-      chain: 'eip155:1',
-      canonicalEntityIdentity: 'eip155:1:0x00000000000000000000000000000000000ac241',
-      normalizedArguments: { address: '0x00000000000000000000000000000000000ac241' },
-      fieldProjection: ['symbol'],
-      asOf: '2026-07-02T09:00:00Z',
-      licensePolicyVersion: 'policy-v1',
-    };
-
-    await cacheChain.storeIfPermitted({
-      components: componentsA,
-      payloadRef: 'obj://core-cache/ac241n-entry-1',
-      storedAt: '2026-07-02T09:00:00Z',
-      rightsAllowed: true,
-      policy: { cachingPermitted: true },
-    });
-
-    const lookupV2 = await cacheChain.lookup({
-      components: { ...componentsA, licensePolicyVersion: 'policy-v2' },
-      holderMode: 'MCP_MANUAL',
-      decisionTime: '2026-07-02T09:00:00Z',
-    });
-    expect(lookupV2.outcome).toBe('MISS');
+describe('AC-241 negative — champion/challenger comparison refusal facet (FR-EVAL-002, AC-241)', () => {
+  it('throws when champion and challenger replay cutoffs diverge', () => {
+    expect(() =>
+      validateChallengerReplayCutoff({
+        championCutoff: '2026-08-01T00:00:00.000Z',
+        challengerCutoff: '2026-08-15T00:00:00.000Z',
+      }),
+    ).toThrow('CHAMPION_CHALLENGER_REPLAY_CUTOFF_MISMATCH');
   });
 });

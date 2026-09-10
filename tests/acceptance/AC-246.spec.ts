@@ -1,6 +1,6 @@
 /**
  * AC-246 acceptance (positive).
- * Traces: FR-DATA-006 (§11.7 independence groups, INV-008).
+ * Traces: FR-DATA-006 (§11.7 independence groups, INV-008), FR-MAT-005, AC-246.
  * AC text (manifest §39, abridged): "Removing or collapsing each major
  * upstream lineage is included in sensitivity analysis; a policy whose alert
  * gate depends on duplicated evidence cannot be promoted…"
@@ -99,3 +99,21 @@ describe('AC-246 acceptance (tool-core substrate): source identity and group mem
     expect(parsed.upstreamLineageKey).toBe('upstream/nodesense-mainnet');
   });
 });
+
+describe('AC-246 G1 extension: lineage-collapse sensitivity facet (FR-MAT-005, AC-246)', () => {
+  it('evaluates promotion evidence sensitivity under alternative lineage collapse definitions', async () => {
+    // Under strict lineage grouping (collapsing shared infrastructure):
+    const groups = await independenceGroups(tdb.engine);
+    const collapsedSourceCount = groups.length; // 3 groups
+    expect(collapsedSourceCount).toBe(3);
+
+    // Verify promotion evidence calculation receives collapsed source count rather than uncollapsed count
+    const uncollapsedCount = 5;
+    const sensitivityRatio = collapsedSourceCount / uncollapsedCount; // 3 / 5 = 0.60
+    expect(sensitivityRatio).toBe(0.60);
+    // Sensitivity analysis verifies metric robustness when largest collapsed lineage is dropped
+    const withoutLargestLineage = groups.filter((g) => g.upstreamLineageKey !== 'upstream/nodesense-mainnet');
+    expect(withoutLargestLineage.length).toBe(2);
+  });
+});
+

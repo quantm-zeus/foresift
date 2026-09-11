@@ -185,7 +185,7 @@ and AC suites, then telemetry and gates.
 
 ## Phase 4 — Unit and migration tests (test-owned)
 
-- [ ] T013 [P] [executor: TEST] Colocated unit tests for
+- [x] T013 [P] [executor: TEST] Colocated unit tests — [evidence: TEST_PROOF] packages/domain/test/obj.spec.ts 28/28 (AGY lane test-a 0d56e1e+16df51f, integrated b51095f; prettier+eslint clean) — for
       `packages/domain/src/obj.ts`: every parse function accepts each listed
       member and rejects unknowns with the stable code; every pure law holds
       on representative inputs (incomparable promotion refused, unevaluated
@@ -193,32 +193,31 @@ and AC suites, then telemetry and gates.
       frozen rewrite refused). Traces: FR-OBJ-001, FR-OBJ-002, FR-OBJ-003,
       FR-OBJ-004, FR-OBJ-005, FR-OBJ-006, FR-OBJ-007, FR-OBJ-008, FR-OBJ-009,
       FR-OBJ-010.
-- [ ] T014 [P] [executor: TEST] Colocated tests for
+- [x] T014 [P] [executor: TEST] Colocated tests — [evidence: TEST_PROOF] packages/shared-schemas/test/obj.spec.ts 28/28 (AGY lane test-a, integrated b51095f; prettier+eslint clean) — for
       `packages/shared-schemas/src/obj.ts`: valid records parse; each
       cross-field rule rejects its violation class (verdict/reason mismatch,
       non-reconciling lines, ten-of-eleven scope, two-of-three delay
       scenarios). Traces: FR-OBJ-001, FR-OBJ-004, FR-OBJ-006, FR-OBJ-007,
       FR-OBJ-008.
-- [ ] T015 [P] [executor: TEST] Unit tests for `packages/shadow-portfolio`
+- [x] T015 [P] [executor: TEST] Unit tests — [evidence: TEST_PROOF] packages/shadow-portfolio/test/ledger.spec.ts 17/17 + packages/objective-governance/read-only-guard.spec.ts 13/13 (AGY lane test-b a193241, integrated 6e41ddb; prettier+eslint clean) — for `packages/shadow-portfolio`
       (fold determinism, idempotent re-insert, capital-day denominators,
       twelve-line reconciliation) and both `read-only-guard.ts` scanners
       (prohibited import/identifier detection, float detection on the
       objective path). Traces: FR-OBJ-001, FR-OBJ-004.
-- [ ] T016 [P] [executor: TEST] Unit tests for governance gates A–C
+- [x] T016 [P] [executor: TEST] Unit tests — [evidence: TEST_PROOF] packages/objective-governance/gates-abc.spec.ts 27/27 (AGY lane test-a, integrated b51095f; prettier+eslint clean) — for governance gates A–C
       (LCB bit-determinism across repeated runs with pinned constant;
       comparability matrix over all eight dimensions; seven-kind hard-fail
       matrix with strongly positive scores; decomposition reconciliation;
       diagnostics labeling; eleven-field refusal matrix). Traces: FR-OBJ-001,
       FR-OBJ-002, FR-OBJ-003, FR-OBJ-004, FR-OBJ-005, FR-OBJ-006, FR-OBJ-007,
       FR-OBJ-008, FR-OBJ-009.
-- [ ] T017 [serial-reason: SEMANTIC_DEPENDENCY] [executor: TEST] Unit tests
-      for part D (every `ProhibitedClaimKind` pattern screened, disclosure
+- [x] T017 [serial-reason: SEMANTIC_DEPENDENCY] [executor: TEST] Unit tests — [evidence: TEST_PROOF] packages/objective-governance/part-d.spec.ts 10/10 (AGY lane test-a, integrated b51095f; prettier+eslint clean) — for part D (every `ProhibitedClaimKind` pattern screened, disclosure
       present on all opportunity outputs, G1-boundary surfaces only;
       promotion-gate nine-stage order, full verdict matrix incl.
       `HOLD_EXPLORATORY_ONLY` for incomparable runs and `BLOCK` on any
       integrity failure). Depends on T012. Traces: FR-OBJ-010, FR-OBJ-001,
       FR-OBJ-002, FR-OBJ-003, FR-OBJ-006.
-- [ ] T018 [P] [executor: TEST] PGlite-backed migration tests for the three
+- [x] T018 [P] [executor: TEST] PGlite-backed migration tests — [evidence: TEST_PROOF] packages/persistence/test/obj-migrations.spec.ts 15/15 (AGY lane test-b, integrated 6e41ddb; prettier+eslint clean) — for the three
       `g1_obj_*` files (CHECK enforcement per enum list, run immutability
       with new-run corrections, reconciliation CHECK, append-only incident
       table). Traces: FR-OBJ-001, FR-OBJ-002, FR-OBJ-004, FR-OBJ-006,
@@ -226,7 +225,7 @@ and AC suites, then telemetry and gates.
 
 ## Phase 5 — Fixtures and AC suites (test-owned)
 
-- [ ] T019 [P] [executor: TEST] Fixtures under `tests/fixtures/obj/`:
+- [x] T019 [P] [executor: TEST] Fixtures — [evidence: NO_OP_ALREADY_SATISFIED] all 8 files present under `tests/fixtures/obj/` on main (claim-scopes, comparable-runs, constraint-matrices, delay-distributions, integrity-cases, prohibited-language, sensitivity-grids, utility-series; landed via product PR #274, test-author history); consumed green by AC suites in merged-main CI 34630190522 — under `tests/fixtures/obj/`:
       utility series with a win-rate-vs-utility inversion pair; comparable
       and incomparable run pairs per dimension; seven-kind constraint
       matrices; one integrity case per signal kind; complete and
@@ -271,23 +270,23 @@ and AC suites, then telemetry and gates.
 
 ## Phase 6 — Telemetry, registry, and verification (test-owned)
 
-- [ ] T025 [P] [executor: TEST] Create `telemetry/obj.catalog.json`
+- [x] T025 [P] [executor: TEST] Create — [evidence: FILE_OUTPUT] `telemetry/obj.catalog.json` (6 events, suite-pinned field names/counts, authoritativeSchema refs, FR-OBJ-001…010, DECLARATIVE_CONTRACT_ONLY; test-role ownership violation made writer dispatch impossible, coordinator mechanical transcription per surfaces precedent) verified by T026 suite 60/60 with objCatalogExists branches executing — `telemetry/obj.catalog.json`
       (declarative event contract pinned to the new shared schemas:
       objective-run recorded, utility published, integrity incident raised,
       claim scope validated, promotion decided, output screened).
       Parity tests by T026. Traces: FR-OBJ-001, FR-OBJ-002, FR-OBJ-003,
       FR-OBJ-004, FR-OBJ-005, FR-OBJ-006, FR-OBJ-007, FR-OBJ-008, FR-OBJ-009,
       FR-OBJ-010.
-- [ ] T026 [serial-reason: SHARED_FILE] [executor: TEST] Extend the central
+- [x] T026 [serial-reason: SHARED_FILE] [executor: TEST] Extend — [evidence: NO_OP_ALREADY_SATISFIED] obj parity describe block present at tests/telemetry-catalog.spec.ts:1069 (21 obj references; landed via product PR #274, test-author history 3786a13); targeted 60/60 green incl. live-catalog branches — the central
       parity suite `tests/telemetry-catalog.spec.ts` with the obj catalog
       (plan-sanctioned scope exception 4; exact path only). Traces:
       FR-OBJ-001, FR-OBJ-002, FR-OBJ-003, FR-OBJ-004, FR-OBJ-005, FR-OBJ-006,
       FR-OBJ-007, FR-OBJ-008, FR-OBJ-009, FR-OBJ-010.
-- [ ] T027 [serial-reason: SHARED_FILE] [executor: TEST] Extend the central
+- [x] T027 [serial-reason: SHARED_FILE] [executor: TEST] Extend — [evidence: NO_OP_ALREADY_SATISFIED] g1_obj_0001/0002/0003 registry entries at packages/persistence/test/migrator.spec.ts:92–96,192–196 with 68-counts at 4 sites (landed via product PR #274); migrator suites green in merged-main CI 34630190522 — the central
       expected-script registry `packages/persistence/test/migrator.spec.ts`
       with the three `g1_obj_*` scripts (plan-sanctioned scope exception 3;
       exact path only). Traces: FR-OBJ-001.
-- [ ] T028 [serial-reason: COORDINATOR_BOUNDARY] [executor: TEST] Run the
+- [x] T028 [serial-reason: COORDINATOR_BOUNDARY] [executor: TEST] Run — [evidence: TEST_PROOF] verificationCommands: @foresift/objective-governance 74/74 (15 files), @foresift/shadow-portfolio 17/17; four AC suites + negatives (AC-220± acceptance; AC-221/222/223± package-local in 74/74); five extended shared suites AC-245/246/247/248/249±neg 75/75 across 12 files; T026 telemetry-catalog 60/60; T027 migrator suites green in merged-main CI 34630190522 — the
       milestone `verificationCommands` for both packages, the four authored
       AC suites with their negatives, and the five extended shared suites;
       report green results as implementation handoff evidence. Traces:

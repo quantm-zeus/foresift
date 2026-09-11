@@ -1,0 +1,145 @@
+{
+  "$schema": "https://foresift.dev/schemas/telemetry-catalog-v1.json",
+  "catalog": "obj",
+  "description": "Objective governance telemetry contracts: objective-run recording, per-capital-day utility publication, integrity incidents, claim-scope validation, promotion decisions, and output language screens.",
+  "contractStatus": "DECLARATIVE_CONTRACT_ONLY — emitter wiring is deferred to G2 observability. Field lists mirror packages/shared-schemas/src/obj.ts authoritative schemas.",
+  "requirementsCovered": [
+    "FR-OBJ-001",
+    "FR-OBJ-002",
+    "FR-OBJ-003",
+    "FR-OBJ-004",
+    "FR-OBJ-005",
+    "FR-OBJ-006",
+    "FR-OBJ-007",
+    "FR-OBJ-008",
+    "FR-OBJ-009",
+    "FR-OBJ-010"
+  ],
+  "recoveryDataClass": "CRITICAL_METADATA",
+  "events": [
+    {
+      "name": "obj.run_recorded",
+      "authoritativeSchema": "ObjectiveRunSchema",
+      "requirementRefs": ["FR-OBJ-001", "FR-OBJ-002"],
+      "tier": "CRITICAL_METADATA",
+      "fields": [
+        { "name": "runId", "type": "string", "required": true },
+        { "name": "strategy", "type": "string", "required": true },
+        { "name": "candidateUniverse", "type": "string", "required": true },
+        { "name": "populationClaim", "type": "string", "required": true },
+        { "name": "capital", "type": "string", "required": true },
+        { "name": "timeWindow", "type": "object", "required": true },
+        { "name": "executionScenario", "type": "string", "required": true },
+        { "name": "delayPolicy", "type": "string", "required": true },
+        { "name": "dataCutoff", "type": "string", "required": true },
+        { "name": "correlatedExposureConstraint", "type": "array", "required": true },
+        { "name": "recordedAt", "type": "string", "required": true },
+        { "name": "createdAt", "type": "string", "required": true }
+      ]
+    },
+    {
+      "name": "obj.utility_published",
+      "authoritativeSchema": "UtilityReportSchema",
+      "requirementRefs": ["FR-OBJ-001", "FR-OBJ-004"],
+      "tier": "CRITICAL_METADATA",
+      "fields": [
+        { "name": "utilityId", "type": "string", "required": true },
+        { "name": "runId", "type": "string", "required": true },
+        { "name": "dayIndex", "type": "number", "required": true },
+        { "name": "capitalDays", "type": "array", "required": true },
+        { "name": "grossReturn", "type": "string", "required": true },
+        { "name": "executionCost", "type": "string", "required": true },
+        { "name": "failedPartialFills", "type": "string", "required": true },
+        { "name": "drawdown", "type": "string", "required": true },
+        { "name": "cvar", "type": "string", "required": true },
+        { "name": "capitalUtilization", "type": "string", "required": true },
+        { "name": "turnover", "type": "string", "required": true },
+        { "name": "opportunityCost", "type": "string", "required": true },
+        { "name": "concentration", "type": "string", "required": true },
+        { "name": "sharedLiquidityImpact", "type": "string", "required": true },
+        { "name": "providerInfrastructureCost", "type": "string", "required": true },
+        { "name": "uncertaintyHaircut", "type": "string", "required": true },
+        { "name": "netUtility", "type": "string", "required": true },
+        { "name": "lcbUtilityPerCapitalDay", "type": "string", "required": true },
+        { "name": "publishedAt", "type": "string", "required": true },
+        { "name": "createdAt", "type": "string", "required": true }
+      ]
+    },
+    {
+      "name": "obj.integrity_incident_raised",
+      "authoritativeSchema": "IntegrityIncidentSchema",
+      "requirementRefs": ["FR-OBJ-006", "FR-OBJ-007"],
+      "tier": "CRITICAL_METADATA",
+      "fields": [
+        { "name": "incidentId", "type": "string", "required": true },
+        { "name": "runId", "type": "string", "required": true },
+        { "name": "signalKind", "type": "string", "required": true },
+        { "name": "evidence", "type": "array", "required": true },
+        { "name": "blocksPromotion", "type": "boolean", "required": true },
+        { "name": "raisedAt", "type": "string", "required": true },
+        { "name": "createdAt", "type": "string", "required": true }
+      ]
+    },
+    {
+      "name": "obj.claim_scope_validated",
+      "authoritativeSchema": "ClaimScopeSchema",
+      "requirementRefs": ["FR-OBJ-002"],
+      "tier": "CRITICAL_METADATA",
+      "fields": [
+        { "name": "scopeId", "type": "string", "required": true },
+        { "name": "runId", "type": "string", "required": true },
+        { "name": "supportedPopulation", "type": "string", "required": true },
+        { "name": "profile", "type": "string", "required": true },
+        { "name": "policy", "type": "string", "required": true },
+        { "name": "executionScenario", "type": "string", "required": true },
+        { "name": "delayDistribution", "type": "string", "required": true },
+        { "name": "calendarInterval", "type": "string", "required": true },
+        { "name": "marketRegimes", "type": "array", "required": true },
+        { "name": "capabilityState", "type": "string", "required": true },
+        { "name": "sampleSize", "type": "number", "required": true },
+        { "name": "clusterEffectiveSampleSize", "type": "number", "required": true },
+        { "name": "uncertaintyMethod", "type": "string", "required": true },
+        { "name": "isComplete", "type": "boolean", "required": true },
+        { "name": "validatedAt", "type": "string", "required": true },
+        { "name": "createdAt", "type": "string", "required": true }
+      ]
+    },
+    {
+      "name": "obj.promotion_decided",
+      "authoritativeSchema": "ObjectivePromotionDecisionSchema",
+      "requirementRefs": ["FR-OBJ-001", "FR-OBJ-003", "FR-OBJ-006"],
+      "tier": "CRITICAL_METADATA",
+      "fields": [
+        { "name": "decisionId", "type": "string", "required": true },
+        { "name": "candidateRunId", "type": "string", "required": true },
+        { "name": "baselineRunId", "type": "string", "required": true },
+        { "name": "verdict", "type": "string", "required": true },
+        { "name": "reason", "type": "string|null", "required": true },
+        { "name": "hardConstraintsPassed", "type": "boolean", "required": true },
+        { "name": "integritySignalsPassed", "type": "boolean", "required": true },
+        { "name": "isComparable", "type": "boolean", "required": true },
+        { "name": "robustDelayPassed", "type": "boolean", "required": true },
+        { "name": "scopeComplete", "type": "boolean", "required": true },
+        { "name": "netUtilityPerCapitalDay", "type": "string", "required": true },
+        { "name": "lcbUtilityPerCapitalDay", "type": "string", "required": true },
+        { "name": "decidedAt", "type": "string", "required": true },
+        { "name": "createdAt", "type": "string", "required": true }
+      ]
+    },
+    {
+      "name": "obj.output_screened",
+      "authoritativeSchema": "OutputLanguageScreenSchema",
+      "requirementRefs": ["FR-OBJ-010"],
+      "tier": "CRITICAL_METADATA",
+      "fields": [
+        { "name": "screenId", "type": "string", "required": true },
+        { "name": "outputRef", "type": "string", "required": true },
+        { "name": "prohibitedLanguageDetected", "type": "boolean", "required": true },
+        { "name": "prohibitedKinds", "type": "array", "required": true },
+        { "name": "hasMandatoryDisclosure", "type": "boolean", "required": true },
+        { "name": "screenedAt", "type": "string", "required": true },
+        { "name": "createdAt", "type": "string", "required": true }
+      ]
+    }
+  ]
+}

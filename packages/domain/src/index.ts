@@ -32,4 +32,3 @@ export { parseFunnelStage, parseVectorKind } from './sig.ts';
 export * from './disc.ts';
 export * from './mat.ts';
 export * from './eval.ts';
-export * from './obj.ts';

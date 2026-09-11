@@ -6,6 +6,10 @@ import {
   assembleDenominatorDisclosure,
   evaluatePromotionEvidence,
   samplingDiagnostics,
+  type DenominatorCase,
+  type PromotionEvidenceInput,
+  type ResolveMaturityInput,
+  type SamplingDiagnosticInput,
 } from '@foresift/outcome-maturity';
 import {
   analyzeMissedOpportunity,
@@ -15,6 +19,8 @@ import {
   freezeReplayManifest,
   runFrozenReplay,
   runNegativeControl,
+  type MetricSuiteInput,
+  type MissedOpportunityInput,
 } from '@foresift/evaluation';
 import { EvalCliExitCode, type EvalCliExitCode as ExitCode } from './exit-codes.ts';
 import { emitReport, type EvalCliReport } from './report.ts';
@@ -31,44 +37,62 @@ export const EVAL_COMMANDS = [
 ] as const;
 export type EvalCommand = (typeof EVAL_COMMANDS)[number];
 
+// The CLI boundary receives parsed JSON (statically unknown). Each branch
+// narrows the payload to the exact input contract of the callee it dispatches
+// to — explicit casts document the assumption, never `any`.
 interface CommandEnvelope {
   readonly populationClaim?: string;
   readonly denominatorDisclosures?: readonly unknown[];
-  readonly payload: any;
+  readonly payload: unknown;
 }
 
 export function executeEvalCommand(command: EvalCommand, envelope: CommandEnvelope): unknown {
   switch (command) {
     case 'maturity-sweep': {
       const ledger = new MaturityLedger();
-      return (envelope.payload as readonly any[]).map((item) => ledger.apply(item));
+      return (envelope.payload as readonly ResolveMaturityInput[]).map((item) =>
+        ledger.apply(item),
+      );
     }
-    case 'dataset-build':
-      return {
-        manifest: freezeReplayManifest(envelope.payload.manifest),
-        disclosure: assembleDenominatorDisclosure(
-          envelope.payload.denominatorCases,
-          envelope.payload.disclosureRef,
-        ),
-        sampling: samplingDiagnostics(envelope.payload.sampling),
+    case 'dataset-build': {
+      const dataset = envelope.payload as {
+        readonly manifest: Parameters<typeof freezeReplayManifest>[0];
+        readonly denominatorCases: readonly DenominatorCase[];
+        readonly disclosureRef?: string;
+        readonly sampling: SamplingDiagnosticInput;
       };
-    case 'replay-run':
-      return runFrozenReplay(envelope.payload);
-    case 'metric-report':
-      return computeMetricSuite(envelope.payload);
-    case 'baseline-compare':
-      return compareAgainstBaseline(envelope.payload);
-    case 'missed-scan':
-      return (envelope.payload as readonly any[]).map(analyzeMissedOpportunity);
-    case 'controls-run':
-      return (envelope.payload as readonly any[]).map(runNegativeControl);
-    case 'compare-challenger':
       return {
-        comparison: compareChampionChallenger(envelope.payload.comparison),
-        ...(envelope.payload.promotionEvidence
-          ? { promotionEvidence: evaluatePromotionEvidence(envelope.payload.promotionEvidence) }
+        manifest: freezeReplayManifest(dataset.manifest),
+        disclosure: assembleDenominatorDisclosure(dataset.denominatorCases, dataset.disclosureRef),
+        sampling: samplingDiagnostics(dataset.sampling),
+      };
+    }
+    case 'replay-run':
+      return runFrozenReplay(envelope.payload as Parameters<typeof runFrozenReplay>[0]);
+    case 'metric-report':
+      return computeMetricSuite(envelope.payload as MetricSuiteInput);
+    case 'baseline-compare':
+      return compareAgainstBaseline(
+        envelope.payload as Parameters<typeof compareAgainstBaseline>[0],
+      );
+    case 'missed-scan':
+      return (envelope.payload as readonly MissedOpportunityInput[]).map(analyzeMissedOpportunity);
+    case 'controls-run':
+      return (envelope.payload as readonly Parameters<typeof runNegativeControl>[0][]).map(
+        runNegativeControl,
+      );
+    case 'compare-challenger': {
+      const challenger = envelope.payload as {
+        readonly comparison: Parameters<typeof compareChampionChallenger>[0];
+        readonly promotionEvidence?: PromotionEvidenceInput;
+      };
+      return {
+        comparison: compareChampionChallenger(challenger.comparison),
+        ...(challenger.promotionEvidence
+          ? { promotionEvidence: evaluatePromotionEvidence(challenger.promotionEvidence) }
           : {}),
       };
+    }
   }
 }
 

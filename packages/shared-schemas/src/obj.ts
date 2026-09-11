@@ -219,7 +219,11 @@ export const DelayEvidenceSchema = z
     requireAll(ALL_DELAY_SCENARIOS, value.results, context, 'three delay scenarios required');
   });
 
-export const PromotionDecisionSchema = z
+// ObjectivePromotionDecision* (not PromotionDecision*): the discovery
+// package already lands PromotionDecisionSchema/PromotionDecision for the
+// cheap-monitor verdict, and the telemetry catalog pins promoted fields to
+// that shape — the obj run-verdict concept takes the Objective- prefix.
+export const ObjectivePromotionDecisionSchema = z
   .object({
     decisionId: id,
     runId: id,
@@ -257,11 +261,18 @@ export const PromotionDecisionSchema = z
 export const HardConstraintEvaluationSchema = z
   .object({
     runId: id,
-    evaluations: z.object(shapeFrom(ALL_HARD_CONSTRAINT_KINDS, () => domainEnum(ALL_HARD_CONSTRAINT_VERDICTS))).strict(),
+    evaluations: z
+      .object(shapeFrom(ALL_HARD_CONSTRAINT_KINDS, () => domainEnum(ALL_HARD_CONSTRAINT_VERDICTS)))
+      .strict(),
   })
   .strict()
   .superRefine((value, context) => {
-    requireAll(ALL_HARD_CONSTRAINT_KINDS, value.evaluations, context, 'seven hard constraints required');
+    requireAll(
+      ALL_HARD_CONSTRAINT_KINDS,
+      value.evaluations,
+      context,
+      'seven hard constraints required',
+    );
   });
 
 export const DiagnosticReportSchema = z
@@ -331,7 +342,11 @@ export const OutputLanguageScreenSchema = z
         path: ['screenPassed'],
         message: 'screens finding prohibited claims cannot pass',
       });
-    if (!value.screenPassed && value.prohibitedClaimsFound.length === 0 && value.disclosure.includes(UNCERTAINTY_DISCLOSURE_TEXT))
+    if (
+      !value.screenPassed &&
+      value.prohibitedClaimsFound.length === 0 &&
+      value.disclosure.includes(UNCERTAINTY_DISCLOSURE_TEXT)
+    )
       context.addIssue({
         code: z.ZodIssueCode.custom,
         path: ['screenPassed'],
@@ -353,7 +368,7 @@ export type UtilityReport = z.infer<typeof UtilityReportSchema>;
 export type IntegrityIncident = z.infer<typeof IntegrityIncidentSchema>;
 export type ClaimScopeRecord = z.infer<typeof ClaimScopeSchema>;
 export type DelayEvidence = z.infer<typeof DelayEvidenceSchema>;
-export type PromotionDecision = z.infer<typeof PromotionDecisionSchema>;
+export type ObjectivePromotionDecision = z.infer<typeof ObjectivePromotionDecisionSchema>;
 export type HardConstraintEvaluation = z.infer<typeof HardConstraintEvaluationSchema>;
 export type DiagnosticReport = z.infer<typeof DiagnosticReportSchema>;
 export type SensitivityGrid = z.infer<typeof SensitivityGridSchema>;

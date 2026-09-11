@@ -1,0 +1,48 @@
+{
+  "schema": "foresift/obj-sensitivity-grids-fixture@1",
+  "dimensions": [
+    "CAPITAL",
+    "NOTIONAL",
+    "CONCURRENCY",
+    "ROUTE_CAPACITY",
+    "ALERT_LATENCY",
+    "EXIT_POLICY",
+    "RISK_AVERSION_COEFFICIENT"
+  ],
+  "frozenPrimaryRun": {
+    "runId": "run-primary-frozen-2026",
+    "hash": "sha256:4a7b9c1d0e2f3a4b5c6d7e8f9a0b1c2d3e4f5a6b7c8d9e0f1a2b3c4d5e6f7a8b",
+    "frozenAt": "2026-06-30T23:59:59Z",
+    "isFrozen": true
+  },
+  "gridPoints": [
+    {
+      "dimension": "CAPITAL",
+      "values": ["50000.00", "100000.00", "250000.00", "500000.00"]
+    },
+    {
+      "dimension": "NOTIONAL",
+      "values": ["500.00", "1000.00", "2500.00", "5000.00"]
+    },
+    {
+      "dimension": "CONCURRENCY",
+      "values": [1, 5, 10, 25]
+    },
+    {
+      "dimension": "ROUTE_CAPACITY",
+      "values": ["10000.00", "50000.00", "100000.00"]
+    },
+    {
+      "dimension": "ALERT_LATENCY",
+      "values": [100, 250, 500, 1200]
+    },
+    {
+      "dimension": "EXIT_POLICY",
+      "values": ["EXIT_FIXED_5M", "EXIT_TRAILING_STOP", "EXIT_TARGET_OR_EXPIRY"]
+    },
+    {
+      "dimension": "RISK_AVERSION_COEFFICIENT",
+      "values": ["0.5", "1.0", "1.5", "2.0"]
+    }
+  ]
+}

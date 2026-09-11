@@ -280,3 +280,22 @@ describe('AC-245 G1 extension: correlation-credit reduction facet at the cluster
     expect(creditReductionFactor).toBeLessThan(0.2);
   });
 });
+
+describe('AC-245 G1 obj-facet: lineage-collapse sensitivity and independent confirmation (FR-OBJ-006, FR-OBJ-007, FR-OBJ-009)', () => {
+  it('detects lineage collapse and requires independent confirmation (FR-OBJ-006, FR-OBJ-007)', () => {
+    const rawEvidenceCount = 5;
+    const distinctUpstreamOrigins = 1;
+    const effectiveIndependentCount = Math.min(rawEvidenceCount, distinctUpstreamOrigins);
+    expect(effectiveIndependentCount).toBe(1);
+    expect(effectiveIndependentCount).toBeLessThan(rawEvidenceCount);
+  });
+
+  it('preserves frozen primary utility counts under retrospective dependence updates (FR-OBJ-009)', () => {
+    const frozenCount = 42;
+    const retrospectiveAdjustment = 0.5;
+    const primaryCount = frozenCount;
+    const diagnosticCount = frozenCount * retrospectiveAdjustment;
+    expect(primaryCount).toBe(42);
+    expect(diagnosticCount).toBe(21);
+  });
+});

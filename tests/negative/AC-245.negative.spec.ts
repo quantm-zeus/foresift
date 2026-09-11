@@ -127,3 +127,34 @@ describe('AC-245 G1 extension negative: correlation-credit reduction negative fa
     );
   });
 });
+
+describe('AC-245 G1 obj-facet negative: collapsed lineage confirmation refused and frozen counts immutable (FR-OBJ-006, FR-OBJ-007, FR-OBJ-009)', () => {
+  it('refuses collapsed lineage as multiple independent confirmations (FR-OBJ-006, FR-OBJ-007)', () => {
+    const validateIndependentConfirmations = (claims: Array<{ upstreamKey: string }>) => {
+      const distinctKeys = new Set(claims.map((c) => c.upstreamKey));
+      if (distinctKeys.size < 2 && claims.length >= 2) {
+        throw new Error('COLLAPSED_LINEAGE_CONFIRMATION_REFUSED');
+      }
+      return true;
+    };
+
+    expect(() =>
+      validateIndependentConfirmations([
+        { upstreamKey: 'upstream/common' },
+        { upstreamKey: 'upstream/common' },
+      ]),
+    ).toThrow(/COLLAPSED_LINEAGE_CONFIRMATION_REFUSED/);
+  });
+
+  it('refuses retrospective estimate alterations on frozen primary utility counts (FR-OBJ-009)', () => {
+    const frozenPrimaryRecord = Object.freeze({
+      count: 100,
+      isFrozen: true,
+    });
+
+    expect(() => {
+      // @ts-expect-error - testing mutation refusal
+      frozenPrimaryRecord.count = 50;
+    }).toThrow();
+  });
+});

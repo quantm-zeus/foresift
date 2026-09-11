@@ -19,6 +19,7 @@ export * from './exec.ts';
 export * from './capacity.ts';
 export * from './mat.ts';
 export * from './eval.ts';
+export * from './obj.ts';
 export {
   SIG_SCHEMA_REGISTRY_VERSION,
   FunnelStageSchema,

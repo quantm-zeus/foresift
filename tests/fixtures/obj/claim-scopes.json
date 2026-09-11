@@ -1,0 +1,49 @@
+{
+  "schema": "foresift/obj-claim-scopes-fixture@1",
+  "fields": [
+    "SUPPORTED_POPULATION",
+    "PROFILE",
+    "POLICY",
+    "EXECUTION_SCENARIO",
+    "DELAY_DISTRIBUTION",
+    "CALENDAR_INTERVAL",
+    "MARKET_REGIMES",
+    "CAPABILITY_STATE",
+    "SAMPLE_SIZE",
+    "CLUSTER_EFFECTIVE_SAMPLE_SIZE",
+    "UNCERTAINTY_METHOD"
+  ],
+  "validCompleteScope": {
+    "supportedPopulation": "SUPPORTED_PROGRAM_UNIVERSE_SOL",
+    "profile": "OPPORTUNITY_PROFILE_MOMENTUM_V1",
+    "policy": "POLICY_EXECUTION_STRICT_READONLY_V2",
+    "executionScenario": "EXEC_SCENARIO_P50_CONSERVATIVE",
+    "delayDistribution": {
+      "p50": 250,
+      "p90": 1200,
+      "conservativeTail": 5000
+    },
+    "calendarInterval": {
+      "startInclusive": "2026-01-01T00:00:00Z",
+      "endInclusive": "2026-06-30T23:59:59Z"
+    },
+    "marketRegimes": ["HIGH_VOLATILITY", "EXPANDING_LIQUIDITY"],
+    "capabilityState": "CAPABILITY_READONLY_NO_KEYS",
+    "sampleSize": 15420,
+    "clusterEffectiveSampleSize": 3240,
+    "uncertaintyMethod": "CLUSTER_BOOTSTRAP"
+  },
+  "droppedFieldCases": [
+    "supportedPopulation",
+    "profile",
+    "policy",
+    "executionScenario",
+    "delayDistribution",
+    "calendarInterval",
+    "marketRegimes",
+    "capabilityState",
+    "sampleSize",
+    "clusterEffectiveSampleSize",
+    "uncertaintyMethod"
+  ]
+}

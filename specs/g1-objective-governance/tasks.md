@@ -70,7 +70,7 @@ and AC suites, then telemetry and gates.
 
 ## Phase 1 — Domain vocabularies and pure laws (blocks later phases)
 
-- [ ] T001 [P] Create `packages/domain/src/obj.ts`: all fourteen const
+- [x] T001 [P] Create `packages/domain/src/obj.ts`: all fourteen const
       vocabularies above with fail-closed parse functions throwing typed
       `ObjError`s with stable `ObjErrorCode`s (OBJ_DIMENSION_UNKNOWN,
       OBJ_COMPARABILITY_UNKNOWN, OBJ_CONSTRAINT_KIND_UNKNOWN,
@@ -101,7 +101,7 @@ and AC suites, then telemetry and gates.
       test-owned task T013 (2026-09-07 ownership law). Traces: FR-OBJ-001,
       FR-OBJ-002, FR-OBJ-003, FR-OBJ-004, FR-OBJ-005, FR-OBJ-006, FR-OBJ-007,
       FR-OBJ-008, FR-OBJ-009, FR-OBJ-010.
-- [ ] T002 [P] Create `packages/shared-schemas/src/obj.ts`: Zod runtime
+- [x] T002 [P] Create `packages/shared-schemas/src/obj.ts`: Zod runtime
       mirrors importing every `ALL_*` list from `@foresift/domain`
       (compile-parity law; never restated), `OBJ_SCHEMA_REGISTRY_VERSION`,
       strict objects with `signedDecimal`/`unsignedDecimal` money conventions
@@ -115,12 +115,12 @@ and AC suites, then telemetry and gates.
 
 ## Phase 2 — Scaffolds and persistence
 
-- [ ] T003 [P] Create package scaffolds `packages/objective-governance/` and
+- [x] T003 [P] Create package scaffolds `packages/objective-governance/` and
       `packages/shadow-portfolio/` (`package.json` with workspace `*`
       dependencies and `bun test` script, `tsconfig.json` extending
       `tsconfig.base.json`, stub `src/index.ts` barrels). No other files.
       Traces: FR-OBJ-001, FR-OBJ-004.
-- [ ] T004 [P] Create `migrations/g1_obj_0001_objective_runs.sql`,
+- [x] T004 [P] Create `migrations/g1_obj_0001_objective_runs.sql`,
       `migrations/g1_obj_0002_utility_ledger.sql`, and
       `migrations/g1_obj_0003_integrity_claims.sql` per plan.md's data model
       (frozen `objective_runs` with eight dimension columns and
@@ -130,16 +130,16 @@ and AC suites, then telemetry and gates.
       `output_language_screens` with CHECK-pinned enum literals from the
       vocabulary law). Migration tests by test-owned T018. Traces:
       FR-OBJ-001, FR-OBJ-002, FR-OBJ-004, FR-OBJ-006, FR-OBJ-007.
-- [ ] T005 [P] Extend the fail-closed family list in
+- [x] T005 [P] Extend — [evidence: NO_OP_ALREADY_SATISFIED] MIGRATION_FAMILIES includes exactly obj at packages/persistence/src/migrator.ts:51 (MIGRATION_FILE_PATTERN line 52–54, doc patterns lines 3/15); core-lane commit 0363af1 (ancestor of task-worktree HEAD, integrated via salvage/integration); migrator.spec.ts asserts g1_obj_0001/0002/0003 discovery+application (lines 92–96, 192–196, 65→68 counts); fail-closed family list in
       `packages/persistence/src/migrator.ts` (`MIGRATION_FAMILIES` regex)
       with `obj` (plan-sanctioned scope exception 1; ADR-0019/0022 duty).
       Traces: FR-OBJ-001.
-- [ ] T006 [serial-reason: SEMANTIC_DEPENDENCY] Catch the hand-maintained
+- [x] T006 [serial-reason: SEMANTIC_DEPENDENCY] Catch — [evidence: FILE_OUTPUT] six obj tables mirrored in packages/persistence/src/generated/schema.ts (objective_runs, capital_day_utility composite-PK, integrity_incidents, claim_scope_records, promotion_decisions, output_language_screens) + capital_day date→text+CHECK in migrations/g1_obj_0002_utility_ledger.sql aligning SQL with UtilityReportSchema capitalDay string truth; commit d32bbbc; FAST round 6 (gov-fast6, full suite 546 files) PASS incl. schema-parity 7/7 — the hand-maintained
       ADR-001 Drizzle mirror
       `packages/persistence/src/generated/schema.ts` up to the three new SQL
       files (plan-sanctioned scope exception 2; content depends on T004).
       Traces: FR-OBJ-001.
-- [ ] T007 [serial-reason: SHARED_FILE] Export the new modules from the
+- [x] T007 [serial-reason: SHARED_FILE] Export the new modules from the
       existing barrels `packages/domain/src/index.ts` and
       `packages/shared-schemas/src/index.ts` (additive export lines only;
       shared files). Traces: FR-OBJ-001, FR-OBJ-002, FR-OBJ-003, FR-OBJ-004,
@@ -147,7 +147,7 @@ and AC suites, then telemetry and gates.
 
 ## Phase 3 — Utility ledger and governance gates (product)
 
-- [ ] T008 [P] Create `packages/shadow-portfolio/src/utility-ledger.ts`,
+- [x] T008 [P] Create `packages/shadow-portfolio/src/utility-ledger.ts`,
       `capital-day.ts`, and `read-only-guard.ts` (outcome-maturity scanner
       precedent: prohibited-import/identifier lists plus binary-float
       detection on the aggregation path): versioned fills fold into
@@ -156,24 +156,24 @@ and AC suites, then telemetry and gates.
       allocation policy, no portfolio comparison, no engine semantics beyond
       the twelve lines (G7 boundary stated in the module header). Unit tests
       by test-owned T015. Traces: FR-OBJ-001, FR-OBJ-004.
-- [ ] T009 [P] Create `packages/objective-governance/src/objective-function.ts`,
+- [x] T009 [P] Create `packages/objective-governance/src/objective-function.ts`,
       `comparability.ts`, and `hard-constraints.ts` per plan.md (float-free
       LCB core; eight-dimension pairwise equality with refusal on missing
       records; total seven-kind evaluation before utility). Unit tests by
       test-owned T016. Traces: FR-OBJ-001, FR-OBJ-002, FR-OBJ-003.
-- [ ] T010 [P] Create `packages/objective-governance/src/decomposition.ts`,
+- [x] T010 [P] Create `packages/objective-governance/src/decomposition.ts`,
       `diagnostics.ts`, and `claim-scope.ts` per plan.md (reconciling
       twelve-line reports; diagnostic computation with diagnostic-only
       labeling and verdict-type exclusion; eleven-field completeness with
       refusal). Unit tests by test-owned T016. Traces: FR-OBJ-004,
       FR-OBJ-005, FR-OBJ-007.
-- [ ] T011 [P] Create `packages/objective-governance/src/integrity.ts`,
+- [x] T011 [P] Create `packages/objective-governance/src/integrity.ts`,
       `delay-gate.ts`, and `sensitivity.ts` per plan.md (seven detectors over
       consumed frozen-run evidence; three-scenario distribution with declared
       robust-delay gate; seven-dimension grids derived from the frozen record
       with parent-hash references and mutation refusal). Unit tests by
       test-owned T016. Traces: FR-OBJ-006, FR-OBJ-008, FR-OBJ-009.
-- [ ] T012 [serial-reason: SEMANTIC_DEPENDENCY] Create
+- [x] T012 [serial-reason: SEMANTIC_DEPENDENCY] Create
       `packages/objective-governance/src/prohibited-language.ts`,
       `promotion-gate.ts`, and the full `src/index.ts` barrel per plan.md
       (four-kind deterministic screen with mandatory disclosure attachment
@@ -234,14 +234,14 @@ and AC suites, then telemetry and gates.
       seven-dimension sensitivity grids; prohibited-language samples per
       claim kind. Traces: FR-OBJ-001, FR-OBJ-002, FR-OBJ-003, FR-OBJ-004,
       FR-OBJ-005, FR-OBJ-006, FR-OBJ-007, FR-OBJ-008, FR-OBJ-009, FR-OBJ-010.
-- [ ] T020 [P] [executor: TEST] Author the four positive suites
+- [x] T020 [P] [executor: TEST] Author the four positive suites
       `tests/acceptance/AC-220.spec.ts`, `AC-221.spec.ts`, `AC-222.spec.ts`,
       and `AC-223.spec.ts` per plan.md's verification strategy (utility
       beats win rate; post-hoc change invalidates with incident; eleven-field
       views accepted; seven-kind hard fails refuse despite positive scores).
       Traces: FR-OBJ-001, FR-OBJ-002, FR-OBJ-003, FR-OBJ-005, FR-OBJ-006,
       FR-OBJ-007, FR-OBJ-009, FR-OBJ-010.
-- [ ] T021 [P] [executor: TEST] Author the four negative suites
+- [x] T021 [P] [executor: TEST] Author the four negative suites
       `tests/negative/AC-220.negative.spec.ts`,
       `AC-221.negative.spec.ts`, `AC-222.negative.spec.ts`, and
       `AC-223.negative.spec.ts` (diagnostic-only promotion attempt blocked;
@@ -249,19 +249,19 @@ and AC suites, then telemetry and gates.
       field refused; six-of-seven evaluation still refuses, score inputs
       unreachable). Traces: FR-OBJ-001, FR-OBJ-002, FR-OBJ-003, FR-OBJ-005,
       FR-OBJ-006, FR-OBJ-007, FR-OBJ-009, FR-OBJ-010.
-- [ ] T022 [serial-reason: SHARED_FILE] [executor: TEST] Additive obj-facet
+- [x] T022 [serial-reason: SHARED_FILE] [executor: TEST] Additive obj-facet
       `describe` blocks in `tests/acceptance/AC-245.spec.ts`,
       `AC-246.spec.ts`, and `AC-247.spec.ts` (existing content untouched):
       lineage-collapse sensitivity present; duplicated evidence cannot
       support independent confirmation; retrospective estimates never alter
       frozen utility counts. Traces: FR-OBJ-006, FR-OBJ-007, FR-OBJ-009.
-- [ ] T023 [serial-reason: SHARED_FILE] [executor: TEST] Additive obj-facet
+- [x] T023 [serial-reason: SHARED_FILE] [executor: TEST] Additive obj-facet
       `describe` blocks in `tests/negative/AC-245.negative.spec.ts`,
       `AC-246.negative.spec.ts`, and `AC-247.negative.spec.ts` (existing
       content untouched): collapsed-lineage confirmation refused; frozen
       counts immutable under retrospective estimates. Traces: FR-OBJ-006,
       FR-OBJ-007, FR-OBJ-009.
-- [ ] T024 [serial-reason: SHARED_FILE] [executor: TEST] Additive obj-facet
+- [x] T024 [serial-reason: SHARED_FILE] [executor: TEST] Additive obj-facet
       `describe` blocks in `tests/acceptance/AC-248.spec.ts`,
       `AC-249.spec.ts`, `tests/negative/AC-248.negative.spec.ts`, and
       `AC-249.negative.spec.ts` (existing content untouched): promotion fails

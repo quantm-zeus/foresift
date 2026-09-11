@@ -1608,3 +1608,113 @@ export const selectionBiasDiagnostics = pgTable('selection_bias_diagnostics', {
   computedAt: timestamp('computed_at', { withTimezone: true }).notNull(),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull(),
 });
+
+// --- g1_obj_0001_objective_runs --------------------------------------------
+
+export const objectiveRuns = pgTable('objective_runs', {
+  runId: text('run_id').primaryKey(),
+  configContentHash: text('config_content_hash').notNull(),
+  candidateUniverseId: text('candidate_universe_id').notNull(),
+  candidateUniverseHash: text('candidate_universe_hash').notNull(),
+  populationClaimId: text('population_claim_id').notNull(),
+  capitalMicros: bigint('capital_micros', { mode: 'number' }).notNull(),
+  windowStart: timestamp('window_start', { withTimezone: true }).notNull(),
+  windowEnd: timestamp('window_end', { withTimezone: true }).notNull(),
+  executionScenarioId: text('execution_scenario_id').notNull(),
+  executionScenarioVersion: text('execution_scenario_version').notNull(),
+  delayPolicyId: text('delay_policy_id').notNull(),
+  delayPolicyVersion: text('delay_policy_version').notNull(),
+  dataCutoff: timestamp('data_cutoff', { withTimezone: true }).notNull(),
+  correlatedExposureConstraints: text('correlated_exposure_constraints').array().notNull(),
+  comparability: text('comparability').notNull(),
+  exploratoryReason: text('exploratory_reason'),
+  schemaRegistryVersion: integer('schema_registry_version').notNull(),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull(),
+});
+
+// --- g1_obj_0002_utility_ledger --------------------------------------------
+
+export const capitalDayUtility = pgTable(
+  'capital_day_utility',
+  {
+    runId: text('run_id').notNull(),
+    capitalDay: text('capital_day').notNull(),
+    grossReturnMicros: bigint('gross_return_micros', { mode: 'number' }).notNull(),
+    executionCostsMicros: bigint('execution_costs_micros', { mode: 'number' }).notNull(),
+    failedPartialFillsMicros: bigint('failed_partial_fills_micros', {
+      mode: 'number',
+    }).notNull(),
+    drawdownMicros: bigint('drawdown_micros', { mode: 'number' }).notNull(),
+    cvarMicros: bigint('cvar_micros', { mode: 'number' }).notNull(),
+    capitalUtilizationMicros: bigint('capital_utilization_micros', {
+      mode: 'number',
+    }).notNull(),
+    turnoverMicros: bigint('turnover_micros', { mode: 'number' }).notNull(),
+    opportunityCostMicros: bigint('opportunity_cost_micros', { mode: 'number' }).notNull(),
+    concentrationMicros: bigint('concentration_micros', { mode: 'number' }).notNull(),
+    sharedLiquidityImpactMicros: bigint('shared_liquidity_impact_micros', {
+      mode: 'number',
+    }).notNull(),
+    providerModelInfraCostMicros: bigint('provider_model_infra_cost_micros', {
+      mode: 'number',
+    }).notNull(),
+    uncertaintyMicros: bigint('uncertainty_micros', { mode: 'number' }).notNull(),
+    dailyNetMicros: bigint('daily_net_micros', { mode: 'number' }).notNull(),
+    consumedEssReference: text('consumed_ess_reference').notNull(),
+    lowerBoundUtilityMicros: bigint('lower_bound_utility_micros', {
+      mode: 'number',
+    }).notNull(),
+    schemaRegistryVersion: integer('schema_registry_version').notNull(),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull(),
+  },
+  (t) => [primaryKey({ columns: [t.runId, t.capitalDay] })],
+);
+
+// --- g1_obj_0003_integrity_claims ------------------------------------------
+
+export const integrityIncidents = pgTable('integrity_incidents', {
+  incidentId: text('incident_id').primaryKey(),
+  runId: text('run_id').notNull(),
+  signal: text('signal').notNull(),
+  verdict: text('verdict').notNull(),
+  reason: text('reason'),
+  evidenceRefs: text('evidence_refs').array().notNull(),
+  recordedAt: timestamp('recorded_at', { withTimezone: true }).notNull(),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull(),
+});
+
+export const claimScopeRecords = pgTable('claim_scope_records', {
+  scopeId: text('scope_id').primaryKey(),
+  runId: text('run_id').notNull(),
+  supportedPopulation: text('supported_population').notNull(),
+  profile: text('profile').notNull(),
+  policy: text('policy').notNull(),
+  executionScenario: text('execution_scenario').notNull(),
+  delayDistribution: text('delay_distribution').notNull(),
+  calendarInterval: text('calendar_interval').notNull(),
+  marketRegimes: text('market_regimes').array().notNull(),
+  capabilityState: text('capability_state').notNull(),
+  sampleSize: integer('sample_size').notNull(),
+  clusterEffectiveSampleSize: numeric('cluster_effective_sample_size').notNull(),
+  uncertaintyMethod: text('uncertainty_method').notNull(),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull(),
+});
+
+export const promotionDecisions = pgTable('promotion_decisions', {
+  decisionId: text('decision_id').primaryKey(),
+  runId: text('run_id').notNull(),
+  verdict: text('verdict').notNull(),
+  gateTrail: jsonb('gate_trail').notNull(),
+  decidedAt: timestamp('decided_at', { withTimezone: true }).notNull(),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull(),
+});
+
+export const outputLanguageScreens = pgTable('output_language_screens', {
+  screenId: text('screen_id').primaryKey(),
+  outputId: text('output_id').notNull(),
+  prohibitedClaimsFound: text('prohibited_claims_found').array().notNull(),
+  disclosure: text('disclosure').notNull(),
+  screenPassed: boolean('screen_passed').notNull(),
+  screenedAt: timestamp('screened_at', { withTimezone: true }).notNull(),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull(),
+});

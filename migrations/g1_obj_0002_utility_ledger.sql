@@ -4,7 +4,11 @@
 
 CREATE TABLE IF NOT EXISTS capital_day_utility (
     run_id                           text NOT NULL REFERENCES objective_runs(run_id),
-    capital_day                      date NOT NULL,
+    -- ISO calendar day as text (matches UtilityReportSchema capitalDay
+    -- YYYY-MM-DD and every TS consumer's `capitalDay: string`; the central
+    -- schema-parity TYPE_CLASS admits text→string and has no date class).
+    capital_day                      text NOT NULL CHECK (
+                                         capital_day ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}$'),
     gross_return_micros              bigint NOT NULL,
     execution_costs_micros           bigint NOT NULL,
     failed_partial_fills_micros      bigint NOT NULL,

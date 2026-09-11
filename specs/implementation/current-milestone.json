@@ -281,7 +281,7 @@
         "test -d packages/evaluation && pnpm --filter @foresift/evaluation test",
         "test -d packages/eval-cli && pnpm --filter @foresift/eval-cli test"
       ],
-      "status": "RUNNING"
+      "status": "PROVEN"
     },
     {
       "id": "g1-objective-governance",

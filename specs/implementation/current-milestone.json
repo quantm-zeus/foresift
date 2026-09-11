@@ -316,7 +316,7 @@
         "test -d packages/objective-governance && pnpm --filter @foresift/objective-governance test",
         "test -d packages/shadow-portfolio && pnpm --filter @foresift/shadow-portfolio test"
       ],
-      "status": "RUNNING"
+      "status": "PROVEN"
     }
   ]
 }

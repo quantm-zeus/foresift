@@ -203,6 +203,40 @@ describe('preProviderReconciliation: already-satisfied units close BEFORE provid
       .filter((s) => s.includes('pre-provider reconciliation'));
     expect(commits).toHaveLength(1);
   });
+
+  test('NO_OP_ALREADY_SATISFIED with zero predicted writes flips closed with no disk proof required (run 4e59191b/T020)', () => {
+    // The T020 reservation shape: full-block NO_OP evidence (wrapped marker
+    // resolved at graph build) plus an empty write set — the marker plus the
+    // empty set IS the deterministic proof. No file fixtures needed.
+    seedTasks([['T020', false, 'is reserved for the test lane: planning-time numbering only']]);
+    const graph = {
+      units: [graphUnit('T020', [], { evidence: 'NO_OP_ALREADY_SATISFIED', testWrites: [] })],
+      bound: { mainHeadSha: git('rev-parse', 'trusted-base').out },
+    };
+    const report = preProviderReconciliation(graph, { root: ROOT, packageId: 'pkg-x' });
+
+    expect(report.reconciled).toEqual(['T020']);
+    expect(report.blocked).toEqual([]);
+    const tasks = readFileSync(join(ROOT, 'specs', 'pkg-x', 'tasks.md'), 'utf8');
+    expect(tasks).toMatch(/- \[x\] T020 /);
+    expect(tasks).toContain('NO_OP_ALREADY_SATISFIED');
+  });
+
+  test('fail closed: NO_OP unit that still predicts writes stays OPEN (contradictory claim)', () => {
+    // A no-op claim that names deliverables is contradictory — closing it
+    // would silently skip real work. It stays open for coordinator ownership.
+    seedTasks([['T021', false, 'does nothing but predicts packages/new.ts']]);
+    const graph = {
+      units: [graphUnit('T021', ['packages/new.ts'], { evidence: 'NO_OP_ALREADY_SATISFIED' })],
+      bound: { mainHeadSha: git('rev-parse', 'trusted-base').out },
+    };
+    const report = preProviderReconciliation(graph, { root: ROOT, packageId: 'pkg-x' });
+
+    expect(report.reconciled).toEqual([]);
+    expect(report.outOfScope).toContain('T021');
+    const tasks = readFileSync(join(ROOT, 'specs', 'pkg-x', 'tasks.md'), 'utf8');
+    expect(tasks).toMatch(/- \[ \] T021 /);
+  });
 });
 
 describe('production wiring: wave prep runs the pass before ANY provider can be acquired', () => {

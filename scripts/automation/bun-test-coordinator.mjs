@@ -18,6 +18,75 @@ function chunks(items, size) {
   return out;
 }
 
+// OOM containment (Incident A, 2026-09-10): a bare `bun test <dir>` in a
+// maintainer pane hit 9.55 GiB anon RSS and the kernel OOM-killed the host
+// path — the pane's MemoryHigh=6G/MemoryMax=8G SHOULD have contained it but
+// never applied. Root cause (journal-proven): tmux requests a TRANSIENT
+// per-pane scope (`tmux-spawn-<uuid>.scope`, Slice=app.slice,
+// MemoryMax=infinity) for every child pane, so pane processes are SIBLINGS
+// of the tmux service unit, never members of it — the oom-containment.conf
+// limits bind only the tmux SERVER (~6MB), never pane children. Containment
+// therefore belongs on the COMMAND, not the shell: every coordinator group
+// runs inside its own `systemd-run --user --scope` with the pane-law bounds
+// below, wherever the invoking shell happens to live. Full suites run ONLY
+// through the coordinator (CLAUDE.md test runtime contract), so this covers
+// every sanctioned heavy invocation. Bounds mirror the pane law exactly —
+// never higher (do NOT raise limits to "fix" pressure).
+export const TEST_MEMORY_HIGH_DEFAULT = '6G';
+export const TEST_MEMORY_MAX_DEFAULT = '8G';
+
+export function testMemoryBounds(policy = {}, env = process.env) {
+  return {
+    high: env.FORESIFT_TEST_MEMORY_HIGH ?? policy.testMemoryHigh ?? TEST_MEMORY_HIGH_DEFAULT,
+    max: env.FORESIFT_TEST_MEMORY_MAX ?? policy.testMemoryMax ?? TEST_MEMORY_MAX_DEFAULT,
+  };
+}
+
+/**
+ * Is a bounded user scope available on this host? (linux + systemd-run +
+ * reachable user bus.) Probed once per coordinator run; callers fall back to
+ * a direct spawn with a loud advisory when false (CI/macOS without a user
+ * bus keep working, unbounded).
+ */
+export function systemdUserScopeAvailable(run = spawnSync) {
+  try {
+    const r = run('systemd-run', ['--user', '--scope', '--quiet', 'true'], {
+      encoding: 'utf8',
+      timeout: 15000,
+    });
+    return r.status === 0;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Build the group command: bounded systemd-run scope when available, else
+ * the bare bun invocation. Pure function of its inputs (hermetic tests pin
+ * the shape without touching systemd).
+ */
+export function buildGroupCommand({ bun, args, bounds, scoped, unit }) {
+  if (!scoped) return { command: [bun, ...args], scoped: false, unit: null };
+  return {
+    command: [
+      'systemd-run',
+      '--user',
+      '--scope',
+      '--quiet',
+      `--unit=${unit}`,
+      '-p',
+      `MemoryHigh=${bounds.high}`,
+      '-p',
+      `MemoryMax=${bounds.max}`,
+      '--',
+      bun,
+      ...args,
+    ],
+    scoped: true,
+    unit,
+  };
+}
+
 export function buildBunTestPlan(manifest, policy, requestedPaths = null, workloads = null) {
   const requested = requestedPaths ? new Set(requestedPaths) : null;
   const allowedWorkloads = workloads ? new Set(workloads) : null;
@@ -102,9 +171,18 @@ function bunCounts(output) {
   return { passed: count('pass'), failed: count('fail'), skipped: count('skip') };
 }
 
-export function runBunTestPlan({ root, plan, policy, bun = 'bun' }) {
+export function runBunTestPlan({ root, plan, policy, bun = 'bun', spawn = null }) {
   const started = Date.now();
   const results = [];
+  // Memory-bounded scopes (Incident A): probe ONCE — every group inherits
+  // the verdict, so the run log shows exactly one scoping decision.
+  const doSpawn = spawn ?? ((cmd, cmdArgs, opts) => spawnSync(cmd, cmdArgs, opts));
+  const bounds = testMemoryBounds(policy);
+  const scoped = systemdUserScopeAvailable(doSpawn);
+  if (!scoped)
+    console.error(
+      '[coordinator] no systemd user scope on this host: groups run WITHOUT memory bounds (direct spawn)',
+    );
   // Per-group hard wall clock. A Bun per-test timeout cannot bound a Bun
   // process that never exits (wedged child, open handle, stdin/stdout pipe
   // stall — observed live in CI 2026-08-29 where a group produced zero bytes
@@ -129,7 +207,23 @@ export function runBunTestPlan({ root, plan, policy, bun = 'bun' }) {
     // identical coordinator loop is clean 6/6. The evidence fields are kept
     // in the schema and report null.
     const timeoutMs = policyTimeoutMs || 15 * 60_000 + group.files.length * 60_000;
-    const result = spawnSync(bun, args, {
+    // Incident A: the group runs inside a bounded user scope (MemoryHigh/
+    // MemoryMax from policy/env, pane-law defaults) wherever the invoking
+    // shell lives — tmux-spawn scopes escape the tmux service's limits, so
+    // the bound travels WITH the command. The unit name pins the coordinator
+    // PID so concurrent coordinators never collide on one transient scope.
+    // detached+process-group SIGTERM still reaches the whole tree: systemd-run
+    // does not re-group its scoped child, so the timeout kill below terminates
+    // bun workers exactly as before (the scope then drains and is collected).
+    const scope = buildGroupCommand({
+      bun,
+      args,
+      bounds,
+      scoped,
+      unit: `foresift-test-${group.id}-${process.pid}`,
+    });
+    const [cmd, ...cmdArgs] = scope.command;
+    const result = doSpawn(cmd, cmdArgs, {
       cwd: root,
       encoding: 'utf8',
       maxBuffer: 128 * 1024 * 1024,
@@ -148,7 +242,10 @@ export function runBunTestPlan({ root, plan, policy, bun = 'bun' }) {
     }
     const evidence = {
       ...group,
-      command: [bun, ...args],
+      command: scope.command,
+      memoryScoped: scope.scoped,
+      memoryBounds: scope.scoped ? { ...bounds } : null,
+      memoryUnit: scope.unit,
       status: result.status,
       signal: result.signal ?? null,
       timedOut: Boolean(result.signal),

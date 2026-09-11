@@ -28,7 +28,7 @@ import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { repoRoot, loadCurrentMilestone, validateMilestoneState, findPackage } from './schema.mjs';
 import { classifyOwnedPath } from './path-ownership.mjs';
-import { resolveTaskMetadata, isCoordinatorTask } from './task-metadata.mjs';
+import { resolveTaskMetadata, resolveBlockEvidence, isCoordinatorTask } from './task-metadata.mjs';
 import { assertEvidenceOwnership } from './evidence-owner-registry.mjs';
 import { assertImplementationAdmission } from './ownership-preflight.mjs';
 import {
@@ -95,7 +95,17 @@ const units = [];
 let heading = '';
 let cur = null;
 const flush = () => {
-  if (cur) units.push(cur);
+  if (cur) {
+    // NO_OP-anywhere law (run 4e59191b/T020, 2026-09-10): the checkbox-line
+    // parse above resolved evidence from the title remainder only, so a
+    // NO_OP_ALREADY_SATISFIED reservation on a wrapped continuation line was
+    // invisible and the unit dispatched to writer lanes before provider
+    // spend. Re-resolve over the COMPLETE block text (title + continuations)
+    // now that the block is whole: NO_OP anywhere dominates, unknown kinds
+    // fail closed, otherwise the title marker keeps authority.
+    cur.evidence = resolveBlockEvidence(cur.body, { unitId: cur.id, executor: cur.executor });
+    units.push(cur);
+  }
   cur = null;
 };
 for (const line of lines) {
@@ -323,11 +333,24 @@ if (args.planShards !== undefined) {
   // also names product paths (prose references gain no product-write authority;
   // run 0a91cd86/T037 false-positive, 2026-09-09). Marker-less legacy units
   // keep the historical behavior.
+  // NO_OP_ALREADY_SATISFIED units never enter ANY writer lane (run
+  // 4e59191b/T020, 2026-09-10): a reservation/no-op unit has no product work
+  // to author, so it is coordinator-reconciled, never provider-dispatched —
+  // in BOTH the profiled and the legacy path.
   const productOpen = args.executionProfile
     ? open.filter(
-        (u) => u.productWork && !isCoordinatorTask(u) && !/\[executor:\s*TEST\]/i.test(u.body),
+        (u) =>
+          u.productWork &&
+          !isCoordinatorTask(u) &&
+          u.evidence !== 'NO_OP_ALREADY_SATISFIED' &&
+          !/\[executor:\s*TEST\]/i.test(u.body),
       )
-    : open.filter((u) => !isCoordinatorTask(u) && u.executor !== 'TEST');
+    : open.filter(
+        (u) =>
+          !isCoordinatorTask(u) &&
+          u.executor !== 'TEST' &&
+          u.evidence !== 'NO_OP_ALREADY_SATISFIED',
+      );
   // Units whose predicted writes leave binding writeScopes are demoted to the
   // serial core shard; their paths are recorded as explicit scope exceptions.
   const scopeDemoted = productOpen.filter((u) => u.outOfScopeWrites.length > 0);
@@ -556,6 +579,11 @@ if (executionProfile && shards) {
 const testUnits = executionProfile
   ? open.filter((u) => {
       if (isCoordinatorTask(u)) return false;
+      // NO_OP_ALREADY_SATISFIED units never enter test lanes either (run
+      // 4e59191b/T020, 2026-09-10: the reservation unit was duplicated into
+      // the AGY test lane alongside core). Coordinator reconciliation owns
+      // them; the test lane never spends providers on no-op work.
+      if (u.evidence === 'NO_OP_ALREADY_SATISFIED') return false;
       // Explicit markers are authoritative (fail-closed dispatch admission):
       // an explicitly-PRODUCT unit NEVER doubles into a test lane, even when
       // its prose mentions tests — "the registry suite is extended by the

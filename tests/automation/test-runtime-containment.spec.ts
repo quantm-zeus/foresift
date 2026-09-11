@@ -26,6 +26,15 @@
 import { describe, expect, it } from 'bun:test';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
+import {
+  buildBunTestPlan,
+  buildGroupCommand,
+  runBunTestPlan,
+  systemdUserScopeAvailable,
+  testMemoryBounds,
+  TEST_MEMORY_HIGH_DEFAULT,
+  TEST_MEMORY_MAX_DEFAULT,
+} from '../../scripts/automation/bun-test-coordinator.mjs';
 
 const REPO = process.cwd();
 
@@ -33,8 +42,9 @@ describe('test-runtime hang containment', () => {
   it('coordinator logs group identity before spawning each group', () => {
     const src = readFileSync(join(REPO, 'scripts/automation/bun-test-coordinator.mjs'), 'utf8');
     expect(src).toContain('`[coordinator] START ${group.id} (${group.workload})');
-    // The START log must precede the spawnSync in the loop body.
-    expect(src.indexOf('[coordinator] START')).toBeLessThan(src.indexOf('spawnSync(bun, args'));
+    // The START log must precede the group spawn in the loop body
+    // (spawn seam is doSpawn since the Incident A memory-scope wrap).
+    expect(src.indexOf('[coordinator] START')).toBeLessThan(src.indexOf('doSpawn(cmd, cmdArgs, {'));
   });
 
   it('the coordinator never wraps groups in /usr/bin/time (flaky-exit root cause)', () => {
@@ -45,7 +55,11 @@ describe('test-runtime hang containment', () => {
     // still bounds the wall.
     const src = readFileSync(join(REPO, 'scripts/automation/bun-test-coordinator.mjs'), 'utf8');
     expect(src).not.toContain("existsSync('/usr/bin/time')");
-    expect(src).toContain('spawnSync(bun, args');
+    // Spawn seam is doSpawn since the Incident A memory-scope wrap: the
+    // group command is either bare bun (unscoped fallback) or the
+    // systemd-run scope built by buildGroupCommand — never a time wrapper.
+    expect(src).toContain('doSpawn(cmd, cmdArgs, {');
+    expect(src).toContain('buildGroupCommand({');
     expect(src).toContain('peakRssBytes: null');
     expect(src).toContain('cpuSeconds: null');
   });
@@ -73,6 +87,207 @@ describe('test-runtime hang containment', () => {
     const yaml = readFileSync(join(REPO, '.github/workflows/ci.yml'), 'utf8');
     const job = yaml.slice(yaml.indexOf('  test-process-meta:'), yaml.indexOf('  test-pglite:'));
     expect(job).toContain('timeout-minutes: 45');
+  });
+
+  describe('test-runtime memory containment (Incident A, 2026-09-10)', () => {
+    // Kernel OOM killed a bare `bun test <dir>` at 9.55 GiB anon RSS in a
+    // tmux-spawn scope: tmux requests a TRANSIENT per-pane scope
+    // (Slice=app.slice, MemoryMax=infinity) for every child pane, so panes are
+    // SIBLINGS of the tmux service unit — the oom-containment.conf limits bind
+    // only the tmux SERVER, never pane children. Containment therefore travels
+    // WITH the command: every coordinator group runs in a bounded
+    // `systemd-run --user --scope`, wherever the invoking shell lives.
+    it('memory bounds default to the pane law and never exceed it', () => {
+      expect(TEST_MEMORY_HIGH_DEFAULT).toBe('6G');
+      expect(TEST_MEMORY_MAX_DEFAULT).toBe('8G');
+      expect(testMemoryBounds()).toEqual({ high: '6G', max: '8G' });
+      expect(testMemoryBounds({ testMemoryHigh: '4G', testMemoryMax: '5G' })).toEqual({
+        high: '4G',
+        max: '5G',
+      });
+      expect(
+        testMemoryBounds({}, { FORESIFT_TEST_MEMORY_HIGH: '3G', FORESIFT_TEST_MEMORY_MAX: '4G' }),
+      ).toEqual({ high: '3G', max: '4G' });
+    });
+
+    it('policy file pins the pane-law bounds (config evidence)', () => {
+      const policy = JSON.parse(
+        readFileSync(join(REPO, 'config', 'foresift-test-runtime.json'), 'utf8'),
+      );
+      expect(policy.testMemoryHigh).toBe('6G');
+      expect(policy.testMemoryMax).toBe('8G');
+    });
+
+    it('unscoped command is the bare bun invocation (no wrapper)', () => {
+      const { command, scoped, unit } = buildGroupCommand({
+        bun: 'bun',
+        args: ['test', 'a.spec.ts'],
+        bounds: { high: '6G', max: '8G' },
+        scoped: false,
+        unit: 'foresift-test-x-1',
+      });
+      expect(scoped).toBe(false);
+      expect(unit).toBeNull();
+      expect(command).toEqual(['bun', 'test', 'a.spec.ts']);
+    });
+
+    it('scoped command wraps bun in a bounded user scope with a pinned unit', () => {
+      const { command, scoped, unit } = buildGroupCommand({
+        bun: 'bun',
+        args: ['test', '--isolate', 'a.spec.ts'],
+        bounds: { high: '6G', max: '8G' },
+        scoped: true,
+        unit: 'foresift-test-process-1-4242',
+      });
+      expect(scoped).toBe(true);
+      expect(unit).toBe('foresift-test-process-1-4242');
+      expect(command.slice(0, 8)).toEqual([
+        'systemd-run',
+        '--user',
+        '--scope',
+        '--quiet',
+        '--unit=foresift-test-process-1-4242',
+        '-p',
+        'MemoryHigh=6G',
+        '-p',
+      ]);
+      expect(command).toContain('MemoryMax=8G');
+      expect(command).toContain('--');
+      expect(command.slice(-3)).toEqual(['test', '--isolate', 'a.spec.ts']);
+      expect(command[command.indexOf('--') + 1]).toBe('bun');
+    });
+
+    it('concurrency stays bounded per workload (no unbounded fan-out)', () => {
+      const manifest = {
+        schema: 'foresift/bun-migration-manifest@1',
+        files: [
+          { path: 'a.spec.ts', workload: 'PURE', state: 'MIGRATED' },
+          { path: 'b.spec.ts', workload: 'PURE', state: 'MIGRATED' },
+          { path: 'c.spec.ts', workload: 'PROCESS', state: 'MIGRATED' },
+          { path: 'd.spec.ts', workload: 'DATABASE_PGLITE', state: 'MIGRATED' },
+          { path: 'e.spec.ts', workload: 'META_GATE', state: 'MIGRATED' },
+        ],
+      };
+      const plan = buildBunTestPlan(manifest, {});
+      for (const g of plan) {
+        if (g.workload === 'PURE') {
+          expect(g.fileWorkers).toBeLessThanOrEqual(2);
+          expect(g.testConcurrency).toBeLessThanOrEqual(8);
+        } else {
+          expect(g.fileWorkers).toBe(1);
+          expect(g.testConcurrency).toBe(1);
+        }
+      }
+    });
+
+    it('runBunTestPlan scopes every group when the user bus is available', () => {
+      const calls: Array<{ cmd: string; args: string[] }> = [];
+      const fakeSpawn = (cmd: string, args: string[], _opts?: unknown) => {
+        calls.push({ cmd, args });
+        if (cmd === 'systemd-run' && args.includes('true'))
+          return { status: 0, stdout: '', stderr: '' };
+        return { status: 0, signal: null, stdout: '1 pass\n0 fail\n', stderr: '' };
+      };
+      const plan = [
+        {
+          id: 'process-1',
+          workload: 'PROCESS',
+          files: ['tests/x/a.spec.ts'],
+          fileWorkers: 1,
+          testConcurrency: 1,
+        },
+      ];
+      const evidence = runBunTestPlan({
+        root: REPO,
+        plan,
+        policy: {},
+        bun: 'bun',
+        spawn: fakeSpawn,
+      });
+      expect(evidence.ok).toBe(true);
+      // first call is the scope probe; the group itself runs scoped.
+      expect(calls[0].cmd).toBe('systemd-run');
+      expect(calls[1].cmd).toBe('systemd-run');
+      expect(calls[1].args).toContain('--scope');
+      expect(calls[1].args).toContain('MemoryMax=8G');
+      expect(calls[1].args).toContain('bun');
+      const group = (
+        evidence.results as Array<{
+          memoryScoped: boolean;
+          memoryBounds: unknown;
+          command: string[];
+        }>
+      )[0];
+      expect(group.memoryScoped).toBe(true);
+      expect(group.memoryBounds).toEqual({ high: '6G', max: '8G' });
+      expect(group.command[0]).toBe('systemd-run');
+    });
+
+    it('runBunTestPlan degrades to a direct spawn (loudly unscoped) without a user bus', () => {
+      const calls: Array<{ cmd: string; args: string[] }> = [];
+      const fakeSpawn = (cmd: string, args: string[], _opts?: unknown) => {
+        calls.push({ cmd, args });
+        // no user bus: the scope probe fails, group spawns run direct.
+        if (cmd === 'systemd-run' && args.includes('true'))
+          return { status: 1, stdout: '', stderr: '' };
+        return { status: 0, signal: null, stdout: '1 pass\n0 fail\n', stderr: '' };
+      };
+      const plan = [
+        {
+          id: 'process-1',
+          workload: 'PROCESS',
+          files: ['tests/x/a.spec.ts'],
+          fileWorkers: 1,
+          testConcurrency: 1,
+        },
+      ];
+      const errors: string[] = [];
+      const origError = console.error;
+      console.error = (...a: unknown[]) => {
+        errors.push(a.map(String).join(' '));
+      };
+      try {
+        const evidence = runBunTestPlan({
+          root: REPO,
+          plan,
+          policy: {},
+          bun: 'bun',
+          spawn: fakeSpawn,
+        });
+        expect(evidence.ok).toBe(true);
+        // probe failed (status 1) → direct bun spawn, evidence marked unscoped.
+        expect(calls[1].cmd).toBe('bun');
+        const group = (
+          evidence.results as Array<{
+            memoryScoped: boolean;
+            memoryBounds: unknown;
+            command: string[];
+          }>
+        )[0];
+        expect(group.memoryScoped).toBe(false);
+        expect(group.memoryBounds).toBeNull();
+        expect(group.command[0]).toBe('bun');
+        expect(errors.join('\n')).toContain('WITHOUT memory bounds');
+      } finally {
+        console.error = origError;
+      }
+    });
+
+    it('systemdUserScopeAvailable is false when the probe fails or throws', () => {
+      expect(systemdUserScopeAvailable(() => ({ status: 1 }))).toBe(false);
+      expect(
+        systemdUserScopeAvailable(() => {
+          throw new Error('no bus');
+        }),
+      ).toBe(false);
+      expect(systemdUserScopeAvailable(() => ({ status: 0 }))).toBe(true);
+    });
+
+    it('the coordinator spawn path always travels through buildGroupCommand', () => {
+      const src = readFileSync(join(REPO, 'scripts/automation/bun-test-coordinator.mjs'), 'utf8');
+      expect(src).toContain('buildGroupCommand({');
+      expect(src).toContain('systemdUserScopeAvailable(doSpawn)');
+    });
   });
 
   it('the workspace has no cyclic package dependency (persistence <-> object-store)', () => {

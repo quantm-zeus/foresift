@@ -10,9 +10,9 @@ describe('AC-044 acceptance (positive): complete recording of all experiment ver
       experimentId: 'exp_044_registry',
       version: '1.2.0',
       attemptedConfigurations: [
-        { run: 1, lr: 0.01, threshold: 0.70, result: 0.65 },
+        { run: 1, lr: 0.01, threshold: 0.7, result: 0.65 },
         { run: 2, lr: 0.005, threshold: 0.75, result: 0.72 },
-        { run: 3, lr: 0.001, threshold: 0.80, result: 0.68 },
+        { run: 3, lr: 0.001, threshold: 0.8, result: 0.68 },
       ],
       selectedRun: 2,
     };

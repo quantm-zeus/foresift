@@ -20,8 +20,14 @@ import { EvalCliExitCode, type EvalCliExitCode as ExitCode } from './exit-codes.
 import { emitReport, type EvalCliReport } from './report.ts';
 
 export const EVAL_COMMANDS = [
-  'maturity-sweep', 'dataset-build', 'replay-run', 'metric-report',
-  'baseline-compare', 'missed-scan', 'controls-run', 'compare-challenger',
+  'maturity-sweep',
+  'dataset-build',
+  'replay-run',
+  'metric-report',
+  'baseline-compare',
+  'missed-scan',
+  'controls-run',
+  'compare-challenger',
 ] as const;
 export type EvalCommand = (typeof EVAL_COMMANDS)[number];
 
@@ -40,7 +46,10 @@ export function executeEvalCommand(command: EvalCommand, envelope: CommandEnvelo
     case 'dataset-build':
       return {
         manifest: freezeReplayManifest(envelope.payload.manifest),
-        disclosure: assembleDenominatorDisclosure(envelope.payload.denominatorCases, envelope.payload.disclosureRef),
+        disclosure: assembleDenominatorDisclosure(
+          envelope.payload.denominatorCases,
+          envelope.payload.disclosureRef,
+        ),
         sampling: samplingDiagnostics(envelope.payload.sampling),
       };
     case 'replay-run':
@@ -72,7 +81,8 @@ function parseArguments(argv: readonly string[]): {
   if (!EVAL_COMMANDS.includes(command)) throw new Error(`EVAL_COMMAND_UNKNOWN:${argv[0] ?? ''}`);
   const jsonIndex = argv.indexOf('--json');
   const outIndex = argv.indexOf('--out');
-  if (jsonIndex < 0 || argv[jsonIndex + 1] === undefined) throw new Error('EVAL_INPUT_JSON_REQUIRED');
+  if (jsonIndex < 0 || argv[jsonIndex + 1] === undefined)
+    throw new Error('EVAL_INPUT_JSON_REQUIRED');
   return {
     command,
     input: argv[jsonIndex + 1]!,
@@ -81,7 +91,8 @@ function parseArguments(argv: readonly string[]): {
 }
 
 function refusal(error: unknown): NonNullable<EvalCliReport['refusal']> {
-  const record = error !== null && typeof error === 'object' ? error as Record<string, unknown> : {};
+  const record =
+    error !== null && typeof error === 'object' ? (error as Record<string, unknown>) : {};
   return {
     code: typeof record.code === 'string' ? record.code : 'EVAL_CLI_REFUSED',
     message: error instanceof Error ? error.message : String(error),
@@ -98,22 +109,28 @@ export async function main(argv: readonly string[] = process.argv.slice(2)): Pro
     outPath = parsed.outPath;
     const envelope = JSON.parse(parsed.input) as CommandEnvelope;
     const result = executeEvalCommand(parsed.command, envelope);
-    await emitReport({
-      ok: true,
-      command: parsed.command,
-      populationClaim: envelope.populationClaim ?? null,
-      denominatorDisclosures: envelope.denominatorDisclosures ?? [],
-      result,
-    }, outPath);
+    await emitReport(
+      {
+        ok: true,
+        command: parsed.command,
+        populationClaim: envelope.populationClaim ?? null,
+        denominatorDisclosures: envelope.denominatorDisclosures ?? [],
+        result,
+      },
+      outPath,
+    );
     return EvalCliExitCode.SUCCESS;
   } catch (error) {
-    await emitReport({
-      ok: false,
-      command,
-      populationClaim: null,
-      denominatorDisclosures: [],
-      refusal: refusal(error),
-    }, outPath);
+    await emitReport(
+      {
+        ok: false,
+        command,
+        populationClaim: null,
+        denominatorDisclosures: [],
+        refusal: refusal(error),
+      },
+      outPath,
+    );
     return EvalCliExitCode.REFUSED;
   }
 }

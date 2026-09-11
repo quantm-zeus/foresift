@@ -15,7 +15,9 @@ import * as DomainModule from '../src/index.ts';
 const Domain = DomainModule as Record<string, unknown>;
 
 // Fallback pure laws for evaluation domain
-function fallbackUniversalActionTime(arms: readonly { armName: string; actionTimestamp: string }[]): boolean {
+function fallbackUniversalActionTime(
+  arms: readonly { armName: string; actionTimestamp: string }[],
+): boolean {
   if (arms.length < 2) return true;
   const firstTime = arms[0]?.actionTimestamp;
   return arms.every((arm) => arm.actionTimestamp === firstTime);
@@ -160,7 +162,9 @@ describe('Evaluation domain vocabularies and fail-closed parsing (FR-EVAL-001…
 
 describe('Evaluation pure laws (FR-EVAL-001…009)', () => {
   it('pure law: universalActionTime enforces action time symmetry across evaluated arms (§31.4)', () => {
-    const fn = (Domain['universalActionTime'] as typeof fallbackUniversalActionTime) ?? fallbackUniversalActionTime;
+    const fn =
+      (Domain['universalActionTime'] as typeof fallbackUniversalActionTime) ??
+      fallbackUniversalActionTime;
     const symmetricArms = [
       { armName: 'CHAMPION', actionTimestamp: '2026-08-20T10:00:00.000Z' },
       { armName: 'CHALLENGER', actionTimestamp: '2026-08-20T10:00:00.000Z' },
@@ -176,7 +180,9 @@ describe('Evaluation pure laws (FR-EVAL-001…009)', () => {
   });
 
   it('pure law: holdoutExposureGuards prevents evaluating exhausted holdouts (§31.2)', () => {
-    const fn = (Domain['holdoutExposureGuards'] as typeof fallbackHoldoutExposureGuards) ?? fallbackHoldoutExposureGuards;
+    const fn =
+      (Domain['holdoutExposureGuards'] as typeof fallbackHoldoutExposureGuards) ??
+      fallbackHoldoutExposureGuards;
     expect(
       fn({
         exposureCount: 0,
@@ -195,7 +201,9 @@ describe('Evaluation pure laws (FR-EVAL-001…009)', () => {
   });
 
   it('pure law: weightingRequiresDiagnostics enforces ESS and weight stability (§31.8)', () => {
-    const fn = (Domain['weightingRequiresDiagnostics'] as typeof fallbackWeightingRequiresDiagnostics) ?? fallbackWeightingRequiresDiagnostics;
+    const fn =
+      (Domain['weightingRequiresDiagnostics'] as typeof fallbackWeightingRequiresDiagnostics) ??
+      fallbackWeightingRequiresDiagnostics;
     expect(
       fn({
         effectiveSampleSize: 25.5,
@@ -222,7 +230,9 @@ describe('Evaluation pure laws (FR-EVAL-001…009)', () => {
   });
 
   it('pure law: populationClaimSupported rejects market-wide claims without contiguous coverage (§68.4)', () => {
-    const fn = (Domain['populationClaimSupported'] as typeof fallbackPopulationClaimSupported) ?? fallbackPopulationClaimSupported;
+    const fn =
+      (Domain['populationClaimSupported'] as typeof fallbackPopulationClaimSupported) ??
+      fallbackPopulationClaimSupported;
     expect(
       fn({
         declaredPopulation: 'MARKET_WIDE_ALL_SOLANA',
@@ -247,7 +257,9 @@ describe('Evaluation pure laws (FR-EVAL-001…009)', () => {
   });
 
   it('pure law: materialLiftDetector flags unexpected control performance as statistical incident (§68.5)', () => {
-    const fn = (Domain['materialLiftDetector'] as typeof fallbackMaterialLiftDetector) ?? fallbackMaterialLiftDetector;
+    const fn =
+      (Domain['materialLiftDetector'] as typeof fallbackMaterialLiftDetector) ??
+      fallbackMaterialLiftDetector;
     expect(fn(1.2, 10.0)).toBe(false); // Clean pass
     expect(fn(50.0, 10.0)).toBe(true); // Material lift detected!
   });

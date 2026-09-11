@@ -5,7 +5,10 @@
 import { describe, expect, it } from 'bun:test';
 import { GOLDEN_CONTROL_CASES } from '../fixtures/eval/controls-vectors.ts';
 
-function enforceControlPromotionGate(control: { hasMaterialLift: boolean; measuredLiftUsd: number }) {
+function enforceControlPromotionGate(control: {
+  hasMaterialLift: boolean;
+  measuredLiftUsd: number;
+}) {
   if (control.hasMaterialLift) {
     throw new Error('NEGATIVE_CONTROL_MATERIAL_LIFT_PROMOTION_BLOCKED');
   }

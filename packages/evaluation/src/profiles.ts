@@ -18,9 +18,15 @@ export class OutcomeProfileRegistry {
 
   register(profile: OutcomeProfile, requirements: ProfileRequirements): RegisteredOutcomeProfile {
     const parsed = OutcomeProfileSchema.parse(profile);
-    if (requirements.requiredStressScenarios.length === 0 ||
-        Object.keys(requirements.resolutionFloor).length === 0)
-      throw new EvalError('profile requires a stress matrix and resolution floor', { profileId: profile.profileId }, ErrorCode.EVAL_POPULATION_CLAIM_UNSUPPORTED);
+    if (
+      requirements.requiredStressScenarios.length === 0 ||
+      Object.keys(requirements.resolutionFloor).length === 0
+    )
+      throw new EvalError(
+        'profile requires a stress matrix and resolution floor',
+        { profileId: profile.profileId },
+        ErrorCode.EVAL_POPULATION_CLAIM_UNSUPPORTED,
+      );
     const key = this.key(parsed.profileId, parsed.version);
     const candidate = Object.freeze({
       profile: Object.freeze({ ...parsed }),
@@ -32,7 +38,11 @@ export class OutcomeProfileRegistry {
     const existing = this.#profiles.get(key);
     if (existing) {
       if (JSON.stringify(existing) !== JSON.stringify(candidate))
-        throw new EvalError('outcome profile versions are immutable', { profileId: parsed.profileId, version: parsed.version }, ErrorCode.EVAL_UNIVERSE_MISMATCH);
+        throw new EvalError(
+          'outcome profile versions are immutable',
+          { profileId: parsed.profileId, version: parsed.version },
+          ErrorCode.EVAL_UNIVERSE_MISMATCH,
+        );
       return existing;
     }
     this.#profiles.set(key, candidate);
@@ -42,13 +52,19 @@ export class OutcomeProfileRegistry {
   resolve(profileId: string, version: string): RegisteredOutcomeProfile {
     const profile = this.#profiles.get(this.key(profileId, version));
     if (!profile)
-      throw new EvalError('outcome profile version is not registered', { profileId, version }, ErrorCode.EVAL_POPULATION_CLAIM_UNSUPPORTED);
+      throw new EvalError(
+        'outcome profile version is not registered',
+        { profileId, version },
+        ErrorCode.EVAL_POPULATION_CLAIM_UNSUPPORTED,
+      );
     return profile;
   }
 
   list(): readonly RegisteredOutcomeProfile[] {
     return [...this.#profiles.values()].sort((left, right) =>
-      `${left.profile.profileId}:${left.profile.version}`.localeCompare(`${right.profile.profileId}:${right.profile.version}`),
+      `${left.profile.profileId}:${left.profile.version}`.localeCompare(
+        `${right.profile.profileId}:${right.profile.version}`,
+      ),
     );
   }
 

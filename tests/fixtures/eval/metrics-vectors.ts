@@ -64,7 +64,8 @@ export interface MetricScenarioExpectation {
 export const GOLDEN_METRIC_VECTORS: readonly MetricScenarioExpectation[] = [
   {
     scenarioId: 'metrics_top5_ranked_run',
-    description: 'Golden run of 10 ranked candidates evaluating Top-5 performance with 4 universe true gems',
+    description:
+      'Golden run of 10 ranked candidates evaluating Top-5 performance with 4 universe true gems',
     universeGemCount: 4,
     topK: 5,
     entries: [
@@ -140,7 +141,7 @@ export const GOLDEN_METRIC_VECTORS: readonly MetricScenarioExpectation[] = [
       {
         candidateId: 'cand_5',
         rank: 5,
-        score: 0.70,
+        score: 0.7,
         isTrueGem: false,
         isDiscoveredByAlert: true,
         leadTimeSeconds: 240,
@@ -189,7 +190,7 @@ export const GOLDEN_METRIC_VECTORS: readonly MetricScenarioExpectation[] = [
       {
         candidateId: 'cand_8',
         rank: 8,
-        score: 0.40,
+        score: 0.4,
         isTrueGem: false,
         isDiscoveredByAlert: false,
         leadTimeSeconds: 900,
@@ -205,7 +206,7 @@ export const GOLDEN_METRIC_VECTORS: readonly MetricScenarioExpectation[] = [
       {
         candidateId: 'cand_9',
         rank: 9,
-        score: 0.30,
+        score: 0.3,
         isTrueGem: false,
         isDiscoveredByAlert: false,
         leadTimeSeconds: 1200,
@@ -221,7 +222,7 @@ export const GOLDEN_METRIC_VECTORS: readonly MetricScenarioExpectation[] = [
       {
         candidateId: 'cand_10',
         rank: 10,
-        score: 0.10,
+        score: 0.1,
         isTrueGem: false,
         isDiscoveredByAlert: false,
         leadTimeSeconds: 1500,
@@ -238,7 +239,7 @@ export const GOLDEN_METRIC_VECTORS: readonly MetricScenarioExpectation[] = [
     expected: {
       // Top 5: candidates 1, 2, 3, 4, 5. True gems in top 5 = cand_1, cand_2, cand_4 (3 items)
       // precision@5 = 3 / 5 = 0.60
-      precisionAtK: 0.60,
+      precisionAtK: 0.6,
       // recall@5 = 3 gems found / 4 total gems in universe = 0.75
       recallAtK: 0.75,
       // DCG@5 = (2^1 - 1)/log2(2) + (2^1 - 1)/log2(3) + 0 + (2^1 - 1)/log2(5) + 0
@@ -260,8 +261,8 @@ export const GOLDEN_METRIC_VECTORS: readonly MetricScenarioExpectation[] = [
       meanMaePct: -27.0,
       // Survival rates top 5: 15m (5/5 = 1.0), 1h (3/5 = 0.60), 4h (3/5 = 0.60)
       survivalRate15m: 1.0,
-      survivalRate1h: 0.60,
-      survivalRate4h: 0.60,
+      survivalRate1h: 0.6,
+      survivalRate4h: 0.6,
       // Divergence (realized - expected) in top 5:
       // cand1: +10, cand2: +5, cand3: -80, cand4: +20, cand5: -80
       // mean = (10 + 5 - 80 + 20 - 80) / 5 = -125 / 5 = -25.0%

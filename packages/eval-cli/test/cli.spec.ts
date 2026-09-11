@@ -68,7 +68,7 @@ describe('Evaluation CLI Suite (FR-EVAL-001…009, FR-MAT-010)', () => {
       },
       metrics: {
         precisionAt5: 0.65,
-        recallAt5: 0.80,
+        recallAt5: 0.8,
         ndcgAt5: 0.92,
         deterministicExpectancyUsd: 1250.0,
       },

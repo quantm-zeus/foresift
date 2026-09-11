@@ -73,7 +73,10 @@ describe('AC-246 G1 extension negative: lineage-collapse sensitivity negative fa
     };
 
     const validatePromotionLineage = (evidence: typeof promotionEvidence) => {
-      if (evidence.assertedIndependentSources > evidence.actualCollapsedGroups && !evidence.lineageSensitivityChecked) {
+      if (
+        evidence.assertedIndependentSources > evidence.actualCollapsedGroups &&
+        !evidence.lineageSensitivityChecked
+      ) {
         throw new Error('DUPLICATED_LINEAGE_SOURCES_CLAIM_REFUSED');
       }
       return true;
@@ -84,4 +87,3 @@ describe('AC-246 G1 extension negative: lineage-collapse sensitivity negative fa
     );
   });
 });
-

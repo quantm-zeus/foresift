@@ -75,7 +75,9 @@ describe('AC-125 acceptance (positive) — objective/subjective evaluation isola
       { plane: 'SUBJECTIVE_USER_UTILITY', outcome: 'USER_SATISFIED', isWin: true },
     ];
 
-    const objectiveOnly = outcomePlaneRecords.filter((r) => r.plane === 'OBJECTIVE_TRADABLE_OUTCOME');
+    const objectiveOnly = outcomePlaneRecords.filter(
+      (r) => r.plane === 'OBJECTIVE_TRADABLE_OUTCOME',
+    );
     const objectivePrecision = objectiveOnly.filter((r) => r.isWin).length / objectiveOnly.length;
 
     expect(objectiveOnly.length).toBe(2);

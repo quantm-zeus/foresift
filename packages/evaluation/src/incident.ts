@@ -26,6 +26,8 @@ export class EvaluationIncidentLedger {
   }
 
   list(): readonly EvaluationIncident[] {
-    return [...this.#incidents.values()].sort((left, right) => left.openedAt.localeCompare(right.openedAt));
+    return [...this.#incidents.values()].sort((left, right) =>
+      left.openedAt.localeCompare(right.openedAt),
+    );
   }
 }

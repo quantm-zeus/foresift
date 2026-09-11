@@ -53,7 +53,8 @@ export interface DenominatorDatasetCase {
 export const GOLDEN_DENOMINATOR_DATASETS: readonly DenominatorDatasetCase[] = [
   {
     datasetId: 'denom_mixed_standard_100',
-    description: 'Mixed population of 100 registered outcomes across all 7 exclusion classes and fully matured items',
+    description:
+      'Mixed population of 100 registered outcomes across all 7 exclusion classes and fully matured items',
     totalRegistered: 100,
     records: [
       // 40 fully matured valid high-res tradable outcomes (the valid denominator)
@@ -192,20 +193,24 @@ export const GOLDEN_DENOMINATOR_DATASETS: readonly DenominatorDatasetCase[] = [
 
   {
     datasetId: 'denom_all_pending_refusal',
-    description: 'Dataset where all outcomes are still pending / partial — final metrics MUST refuse',
+    description:
+      'Dataset where all outcomes are still pending / partial — final metrics MUST refuse',
     totalRegistered: 25,
     records: Array.from({ length: 25 }, (_, i) => ({
       outcomeId: `out_pending_${i + 1}`,
       assetId: `asset_pending_${i + 1}`,
       profileId: 'HG-OG-1@1',
       horizon: '24h',
-      maturityState: (i % 2 === 0 ? 'PENDING' : 'PARTIALLY_MATURED') as 'PENDING' | 'PARTIALLY_MATURED',
+      maturityState: (i % 2 === 0 ? 'PENDING' : 'PARTIALLY_MATURED') as
+        'PENDING' | 'PARTIALLY_MATURED',
       resolution: 'HIGH_RESOLUTION' as const,
       rightsStatus: 'CLEAR' as const,
       observedState: 'OBSERVED' as const,
       labelPlane: 'OBJECTIVE_TRADABLE_OUTCOME' as const,
       isTradableSuccess: false,
-      exclusionClass: (i % 2 === 0 ? 'UNOBSERVED' : 'PARTIALLY_MATURED') as DenominatorExclusionClass,
+      exclusionClass: (i % 2 === 0
+        ? 'UNOBSERVED'
+        : 'PARTIALLY_MATURED') as DenominatorExclusionClass,
     })),
     expectedBreakdown: {
       INVALID_DATA: 0,

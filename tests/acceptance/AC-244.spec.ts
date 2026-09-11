@@ -227,9 +227,9 @@ describe('AC-244 G1 extension: selection-adjusted lift claim facet (FR-EVAL-003,
   it('calculates Horvitz-Thompson propensity-adjusted lift weighting when evaluating selectively sampled cohorts', async () => {
     // When evaluating selective acquisition cohorts, propensity adjustments reflect logged assignment probabilities
     const sampleItems = [
-      { id: 'item-1', rawLift: 0.10, propensity: 0.25 }, // HT weight = 4.0
-      { id: 'item-2', rawLift: 0.04, propensity: 0.50 }, // HT weight = 2.0
-      { id: 'item-3', rawLift: 0.02, propensity: 1.00 }, // HT weight = 1.0
+      { id: 'item-1', rawLift: 0.1, propensity: 0.25 }, // HT weight = 4.0
+      { id: 'item-2', rawLift: 0.04, propensity: 0.5 }, // HT weight = 2.0
+      { id: 'item-3', rawLift: 0.02, propensity: 1.0 }, // HT weight = 1.0
     ];
 
     // Raw sample mean = (0.10 + 0.04 + 0.02) / 3 = 0.0533
@@ -237,8 +237,8 @@ describe('AC-244 G1 extension: selection-adjusted lift claim facet (FR-EVAL-003,
     expect(rawMean).toBeCloseTo(0.05333, 4);
 
     // HT weighted estimator = sum(y_i / p_i) / sum(1 / p_i) = (0.10*4 + 0.04*2 + 0.02*1) / (4 + 2 + 1) = (0.40 + 0.08 + 0.02) / 7 = 0.50 / 7 = 0.0714
-    const weightedSum = sampleItems.reduce((acc, x) => acc + (x.rawLift / x.propensity), 0);
-    const sumWeights = sampleItems.reduce((acc, x) => acc + (1 / x.propensity), 0);
+    const weightedSum = sampleItems.reduce((acc, x) => acc + x.rawLift / x.propensity, 0);
+    const sumWeights = sampleItems.reduce((acc, x) => acc + 1 / x.propensity, 0);
     const htLift = weightedSum / sumWeights;
 
     expect(sumWeights).toBe(7.0);
@@ -247,4 +247,3 @@ describe('AC-244 G1 extension: selection-adjusted lift claim facet (FR-EVAL-003,
     expect(htLift).not.toBe(rawMean);
   });
 });
-

@@ -48,7 +48,8 @@ export const GOLDEN_BASELINE_CASES: readonly BaselineComparisonCase[] = [
   // 1. Valid fair comparison on identical frozen universe and cutoff
   {
     caseId: 'base_comp_valid_champion_vs_prev',
-    description: 'Fair comparison of Champion V2 against Baseline V0 on identical frozen Q3 universe',
+    description:
+      'Fair comparison of Champion V2 against Baseline V0 on identical frozen Q3 universe',
     championModelId: 'champ_v2_fast_meme',
     baselineComparator: 'PREVIOUS_CHAMPION_MODEL_V0',
     isIdenticalUniverse: true,
@@ -59,14 +60,14 @@ export const GOLDEN_BASELINE_CASES: readonly BaselineComparisonCase[] = [
     baselineCutoffTimestamp: '2026-08-31T23:59:59.999Z',
     championMetrics: {
       precision: 0.65,
-      recall: 0.80,
+      recall: 0.8,
       ndcg: 0.92,
       expectancyUsd: 1250.0,
     },
     baselineMetrics: {
-      precision: 0.40,
-      recall: 0.50,
-      ndcg: 0.70,
+      precision: 0.4,
+      recall: 0.5,
+      ndcg: 0.7,
       expectancyUsd: 400.0,
     },
     expectedMaterialLift: 850.0,
@@ -87,7 +88,7 @@ export const GOLDEN_BASELINE_CASES: readonly BaselineComparisonCase[] = [
     baselineCutoffTimestamp: '2026-08-31T23:59:59.999Z',
     championMetrics: {
       precision: 0.65,
-      recall: 0.80,
+      recall: 0.8,
       ndcg: 0.92,
       expectancyUsd: 1250.0,
     },
@@ -116,14 +117,14 @@ export const GOLDEN_BASELINE_CASES: readonly BaselineComparisonCase[] = [
     baselineCutoffTimestamp: '2026-08-15T00:00:00.000Z',
     championMetrics: {
       precision: 0.65,
-      recall: 0.80,
+      recall: 0.8,
       ndcg: 0.92,
       expectancyUsd: 1250.0,
     },
     baselineMetrics: {
-      precision: 0.10,
+      precision: 0.1,
       recall: 0.15,
-      ndcg: 0.30,
+      ndcg: 0.3,
       expectancyUsd: -100.0,
     },
     expectedMaterialLift: 1350.0,

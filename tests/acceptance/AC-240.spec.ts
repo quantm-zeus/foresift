@@ -297,4 +297,3 @@ describe('AC-240 acceptance (positive) — universal action-time across 7 arms f
     expect(sevenArms.every((a) => a.actionTime === actionInstant)).toBe(true);
   });
 });
-

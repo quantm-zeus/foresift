@@ -28,16 +28,30 @@ export function retainExplorationCase(input: {
   readonly scenarioDelayMilliseconds: number;
 }): RetainedExplorationCase {
   const { audit } = input;
-  if (!Number.isFinite(audit.selectionProbability) || audit.selectionProbability <= 0 || audit.selectionProbability > 1 ||
-      !audit.cutoffReason || !Number.isFinite(Date.parse(audit.selectedAt)))
-    throw new EvalError('exploration assignment lacks probability or cutoff provenance', { auditId: audit.auditId }, ErrorCode.EVAL_WEIGHTING_INVALID);
+  if (
+    !Number.isFinite(audit.selectionProbability) ||
+    audit.selectionProbability <= 0 ||
+    audit.selectionProbability > 1 ||
+    !audit.cutoffReason ||
+    !Number.isFinite(Date.parse(audit.selectedAt))
+  )
+    throw new EvalError(
+      'exploration assignment lacks probability or cutoff provenance',
+      { auditId: audit.auditId },
+      ErrorCode.EVAL_WEIGHTING_INVALID,
+    );
   if (audit.outcomeOnly && audit.externallyAlerted)
-    throw new EvalError('outcome-only controls cannot cause external alerts', { auditId: audit.auditId }, ErrorCode.EVAL_ACTION_TIME_ASYMMETRY);
-  const arm = audit.selectionArm === 'CONTROL'
-    ? EvaluationArm.CONTROL
-    : audit.selectionArm === 'OUTCOME_OBSERVATION_ONLY'
-      ? EvaluationArm.IGNORED
-      : EvaluationArm.WATCHED;
+    throw new EvalError(
+      'outcome-only controls cannot cause external alerts',
+      { auditId: audit.auditId },
+      ErrorCode.EVAL_ACTION_TIME_ASYMMETRY,
+    );
+  const arm =
+    audit.selectionArm === 'CONTROL'
+      ? EvaluationArm.CONTROL
+      : audit.selectionArm === 'OUTCOME_OBSERVATION_ONLY'
+        ? EvaluationArm.IGNORED
+        : EvaluationArm.WATCHED;
   const actionTime = candidateActionTime({
     arm,
     timeline: input.timeline,
@@ -45,9 +59,15 @@ export function retainExplorationCase(input: {
     executionStateAvailableAt: input.executionStateAvailableAt,
     securityEvidenceAvailableAt: input.securityEvidenceAvailableAt,
   });
-  return Object.freeze({ audit: Object.freeze({ ...audit }), retainedForOutcomeAnalysis: true, actionTime });
+  return Object.freeze({
+    audit: Object.freeze({ ...audit }),
+    retainedForOutcomeAnalysis: true,
+    actionTime,
+  });
 }
 
-export function retainExplorationSample(input: readonly Parameters<typeof retainExplorationCase>[0][]): readonly RetainedExplorationCase[] {
+export function retainExplorationSample(
+  input: readonly Parameters<typeof retainExplorationCase>[0][],
+): readonly RetainedExplorationCase[] {
   return Object.freeze(input.map(retainExplorationCase));
 }

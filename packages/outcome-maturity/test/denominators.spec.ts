@@ -7,7 +7,9 @@ import { GOLDEN_DENOMINATOR_DATASETS } from '../../../tests/fixtures/mat/denomin
 
 describe('Denominator Policy (FR-MAT-002, FR-MAT-010)', () => {
   it('excludes invalid, censored, partial, low-res, rights-blocked, unobserved, and signal-only outcomes', () => {
-    const mixedDataset = GOLDEN_DENOMINATOR_DATASETS.find((d) => d.datasetId === 'denom_mixed_standard_100');
+    const mixedDataset = GOLDEN_DENOMINATOR_DATASETS.find(
+      (d) => d.datasetId === 'denom_mixed_standard_100',
+    );
     expect(mixedDataset).toBeDefined();
     if (!mixedDataset) return;
 
@@ -24,7 +26,9 @@ describe('Denominator Policy (FR-MAT-002, FR-MAT-010)', () => {
   });
 
   it('refuses final denominator calculation when zero fully matured outcomes exist', () => {
-    const pendingDataset = GOLDEN_DENOMINATOR_DATASETS.find((d) => d.datasetId === 'denom_all_pending_refusal');
+    const pendingDataset = GOLDEN_DENOMINATOR_DATASETS.find(
+      (d) => d.datasetId === 'denom_all_pending_refusal',
+    );
     expect(pendingDataset).toBeDefined();
     if (!pendingDataset) return;
 

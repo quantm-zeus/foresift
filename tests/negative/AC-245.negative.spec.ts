@@ -110,7 +110,12 @@ describe('AC-245 negative (tool-core substrate): degenerate dependence inputs fa
 describe('AC-245 G1 extension negative: correlation-credit reduction negative facet (FR-MAT-005, AC-245)', () => {
   it('refuses unpenalized full-sample degrees of freedom assertion when clusters are correlated', () => {
     // Attempting to evaluate statistical significance assuming N independent samples when ICC > 0
-    const evaluateClusteredInference = (_nTotal: number, _mClusters: number, icc: number, unpenalized: boolean) => {
+    const evaluateClusteredInference = (
+      _nTotal: number,
+      _mClusters: number,
+      icc: number,
+      unpenalized: boolean,
+    ) => {
       if (icc > 0.1 && unpenalized) {
         throw new Error('CLUSTERED_CORRELATION_ESS_PENALTY_REQUIRED');
       }
@@ -122,4 +127,3 @@ describe('AC-245 G1 extension negative: correlation-credit reduction negative fa
     );
   });
 });
-

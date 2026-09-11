@@ -249,4 +249,3 @@ describe('AC-247 G1 extension: frozen-count preservation in realizable replay fa
     expect(countB).toBe(countA);
   });
 });
-

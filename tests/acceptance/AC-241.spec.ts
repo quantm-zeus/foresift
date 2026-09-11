@@ -160,7 +160,7 @@ describe('AC-241 acceptance (positive) — champion/challenger frozen-replay fac
       manifestHash: 'sha256:q3_frozen_canonical',
       championModel: 'champ_v1',
       challengerModel: 'chall_v2',
-      championWinRate: 0.60,
+      championWinRate: 0.6,
       challengerWinRate: 0.72,
       isFairComparison: true,
     };
@@ -168,4 +168,3 @@ describe('AC-241 acceptance (positive) — champion/challenger frozen-replay fac
     expect(comparisonRun.challengerWinRate).toBeGreaterThan(comparisonRun.championWinRate);
   });
 });
-

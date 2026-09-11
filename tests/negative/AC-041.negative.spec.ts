@@ -32,7 +32,7 @@ describe('AC-041 negative: standalone precision reporting without recall disclos
     expect(() =>
       validateEvaluationMetricReport({
         precision: 0.85,
-        recall: 0.70,
+        recall: 0.7,
         missedGemsEvaluated: false,
       }),
     ).toThrow('MISSED_GEMS_ANALYSIS_REQUIRED');

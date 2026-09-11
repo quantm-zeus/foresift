@@ -3,37 +3,156 @@
   "catalog": "mat",
   "description": "Outcome maturity, denominator, sampling, label separation, and promotion evidence contracts.",
   "contractStatus": "DECLARATIVE_CONTRACT_ONLY — emitter wiring is deferred to G2 observability. Field lists mirror packages/shared-schemas/src/mat.ts exactly.",
-  "requirementsCovered": ["FR-MAT-001", "FR-MAT-002", "FR-MAT-003", "FR-MAT-006", "FR-MAT-007", "FR-MAT-008", "FR-MAT-009", "FR-MAT-010", "FR-MAT-011", "FR-MAT-012"],
+  "requirementsCovered": [
+    "FR-MAT-001",
+    "FR-MAT-002",
+    "FR-MAT-003",
+    "FR-MAT-006",
+    "FR-MAT-007",
+    "FR-MAT-008",
+    "FR-MAT-009",
+    "FR-MAT-010",
+    "FR-MAT-011",
+    "FR-MAT-012"
+  ],
   "recoveryDataClass": "CRITICAL_METADATA",
   "events": [
     {
-      "name": "mat.maturity_resolved", "authoritativeSchema": "OutcomeMaturityStateSchema", "requirementRefs": ["FR-MAT-001"], "tier": "CRITICAL_METADATA", "fields": [
-        {"name":"maturityStateId","type":"string","required":true},{"name":"candidateId","type":"string","required":true},{"name":"outcomeProfileId","type":"string","required":true},{"name":"outcomeProfileVersion","type":"string","required":true},{"name":"horizon","type":"string","required":true},{"name":"scenarioId","type":"string","required":true},{"name":"scenarioVersion","type":"string","required":true},{"name":"maturityState","type":"string","required":true},{"name":"censorReason","type":"string|null","required":true},{"name":"invalidReason","type":"string|null","required":true},{"name":"maturedAt","type":"utc|null","required":true},{"name":"observedAt","type":"utc","required":true},{"name":"availableAt","type":"utc","required":true},{"name":"evidenceRefs","type":"array<string>","required":true},{"name":"createdAt","type":"utc","required":true}
+      "name": "mat.maturity_resolved",
+      "authoritativeSchema": "OutcomeMaturityStateSchema",
+      "requirementRefs": ["FR-MAT-001"],
+      "tier": "CRITICAL_METADATA",
+      "fields": [
+        { "name": "maturityStateId", "type": "string", "required": true },
+        { "name": "candidateId", "type": "string", "required": true },
+        { "name": "outcomeProfileId", "type": "string", "required": true },
+        { "name": "outcomeProfileVersion", "type": "string", "required": true },
+        { "name": "horizon", "type": "string", "required": true },
+        { "name": "scenarioId", "type": "string", "required": true },
+        { "name": "scenarioVersion", "type": "string", "required": true },
+        { "name": "maturityState", "type": "string", "required": true },
+        { "name": "censorReason", "type": "string|null", "required": true },
+        { "name": "invalidReason", "type": "string|null", "required": true },
+        { "name": "maturedAt", "type": "utc|null", "required": true },
+        { "name": "observedAt", "type": "utc", "required": true },
+        { "name": "availableAt", "type": "utc", "required": true },
+        { "name": "evidenceRefs", "type": "array<string>", "required": true },
+        { "name": "createdAt", "type": "utc", "required": true }
       ]
     },
     {
-      "name": "mat.transition_recorded", "authoritativeSchema": "MaturityTransitionSchema", "requirementRefs": ["FR-MAT-001", "FR-MAT-002"], "tier": "CRITICAL_METADATA", "fields": [
-        {"name":"transitionId","type":"string","required":true},{"name":"maturityStateId","type":"string","required":true},{"name":"fromState","type":"string","required":true},{"name":"toState","type":"string","required":true},{"name":"reason","type":"string","required":true},{"name":"evidenceRefs","type":"array<string>","required":true},{"name":"transitionedAt","type":"utc","required":true},{"name":"recordedAt","type":"utc","required":true}
+      "name": "mat.transition_recorded",
+      "authoritativeSchema": "MaturityTransitionSchema",
+      "requirementRefs": ["FR-MAT-001", "FR-MAT-002"],
+      "tier": "CRITICAL_METADATA",
+      "fields": [
+        { "name": "transitionId", "type": "string", "required": true },
+        { "name": "maturityStateId", "type": "string", "required": true },
+        { "name": "fromState", "type": "string", "required": true },
+        { "name": "toState", "type": "string", "required": true },
+        { "name": "reason", "type": "string", "required": true },
+        { "name": "evidenceRefs", "type": "array<string>", "required": true },
+        { "name": "transitionedAt", "type": "utc", "required": true },
+        { "name": "recordedAt", "type": "utc", "required": true }
       ]
     },
     {
-      "name": "mat.denominator_disclosed", "authoritativeSchema": "DenominatorDisclosureSchema", "requirementRefs": ["FR-MAT-010"], "tier": "CRITICAL_METADATA", "fields": [
-        {"name":"disclosureId","type":"string","required":true},{"name":"evaluationRunId","type":"string","required":true},{"name":"outcomeProfileId","type":"string","required":true},{"name":"outcomeProfileVersion","type":"string","required":true},{"name":"horizon","type":"string","required":true},{"name":"observationCollectionScope","type":"string","required":true},{"name":"reportScope","type":"string","required":true},{"name":"eligibleCount","type":"integer","required":true},{"name":"fullyMaturedValidCount","type":"integer","required":true},{"name":"pendingCount","type":"integer","required":true},{"name":"partiallyMaturedCount","type":"integer","required":true},{"name":"censoredCount","type":"integer","required":true},{"name":"invalidDataCount","type":"integer","required":true},{"name":"lowResolutionCount","type":"integer","required":true},{"name":"rightsBlockedCount","type":"integer","required":true},{"name":"unobservedCount","type":"integer","required":true},{"name":"disclosedAt","type":"utc","required":true},{"name":"createdAt","type":"utc","required":true}
+      "name": "mat.denominator_disclosed",
+      "authoritativeSchema": "DenominatorDisclosureSchema",
+      "requirementRefs": ["FR-MAT-010"],
+      "tier": "CRITICAL_METADATA",
+      "fields": [
+        { "name": "disclosureId", "type": "string", "required": true },
+        { "name": "evaluationRunId", "type": "string", "required": true },
+        { "name": "outcomeProfileId", "type": "string", "required": true },
+        { "name": "outcomeProfileVersion", "type": "string", "required": true },
+        { "name": "horizon", "type": "string", "required": true },
+        { "name": "observationCollectionScope", "type": "string", "required": true },
+        { "name": "reportScope", "type": "string", "required": true },
+        { "name": "eligibleCount", "type": "integer", "required": true },
+        { "name": "fullyMaturedValidCount", "type": "integer", "required": true },
+        { "name": "pendingCount", "type": "integer", "required": true },
+        { "name": "partiallyMaturedCount", "type": "integer", "required": true },
+        { "name": "censoredCount", "type": "integer", "required": true },
+        { "name": "invalidDataCount", "type": "integer", "required": true },
+        { "name": "lowResolutionCount", "type": "integer", "required": true },
+        { "name": "rightsBlockedCount", "type": "integer", "required": true },
+        { "name": "unobservedCount", "type": "integer", "required": true },
+        { "name": "disclosedAt", "type": "utc", "required": true },
+        { "name": "createdAt", "type": "utc", "required": true }
       ]
     },
     {
-      "name": "mat.sampling_assigned", "authoritativeSchema": "OutcomeSamplingAssignmentSchema", "requirementRefs": ["FR-MAT-007"], "tier": "CRITICAL_METADATA", "fields": [
-        {"name":"assignmentId","type":"string","required":true},{"name":"samplingPlanId","type":"string","required":true},{"name":"candidateId","type":"string","required":true},{"name":"stratumId","type":"string","required":true},{"name":"inclusionProbability","type":"number","required":true},{"name":"selected","type":"boolean","required":true},{"name":"selectionTime","type":"utc","required":true},{"name":"selectionReason","type":"string","required":true},{"name":"seedProvenance","type":"string","required":true},{"name":"createdAt","type":"utc","required":true}
+      "name": "mat.sampling_assigned",
+      "authoritativeSchema": "OutcomeSamplingAssignmentSchema",
+      "requirementRefs": ["FR-MAT-007"],
+      "tier": "CRITICAL_METADATA",
+      "fields": [
+        { "name": "assignmentId", "type": "string", "required": true },
+        { "name": "samplingPlanId", "type": "string", "required": true },
+        { "name": "candidateId", "type": "string", "required": true },
+        { "name": "stratumId", "type": "string", "required": true },
+        { "name": "inclusionProbability", "type": "number", "required": true },
+        { "name": "selected", "type": "boolean", "required": true },
+        { "name": "selectionTime", "type": "utc", "required": true },
+        { "name": "selectionReason", "type": "string", "required": true },
+        { "name": "seedProvenance", "type": "string", "required": true },
+        { "name": "createdAt", "type": "utc", "required": true }
       ]
     },
     {
-      "name": "mat.promotion_evidence_evaluated", "authoritativeSchema": "PromotionEvidenceRecordSchema", "requirementRefs": ["FR-MAT-008", "FR-MAT-009", "FR-MAT-011", "FR-MAT-012"], "tier": "CRITICAL_METADATA", "fields": [
-        {"name":"promotionEvidenceId","type":"string","required":true},{"name":"candidateId","type":"string","required":true},{"name":"outcomeProfileId","type":"string","required":true},{"name":"outcomeProfileVersion","type":"string","required":true},{"name":"scenarioId","type":"string","required":true},{"name":"scenarioVersion","type":"string","required":true},{"name":"outcomeLabel","type":"string","required":true},{"name":"outcomeMaturity","type":"string","required":true},{"name":"evidenceResolution","type":"string","required":true},{"name":"requiredNotional","type":"decimal","required":true},{"name":"requiredDelayPolicyId","type":"string","required":true},{"name":"requiredAdapterVersion","type":"string","required":true},{"name":"requiredRouteId","type":"string","required":true},{"name":"requiredExitPolicyId","type":"string","required":true},{"name":"exactConfigurationMatch","type":"boolean","required":true},{"name":"productionPromotionEligible","type":"boolean","required":true},{"name":"primaryOrdering","type":"string","required":true},{"name":"pathAmbiguous","type":"boolean","required":true},{"name":"optimisticSensitivity","type":"object|null","required":true},{"name":"expirySideEffect","type":"string|null","required":true},{"name":"expirySideEffectAt","type":"utc|null","required":true},{"name":"gainObservedAt","type":"utc|null","required":true},{"name":"postExpiryGainExcluded","type":"boolean","required":true},{"name":"capacityLimited","type":"boolean","required":true},{"name":"maximumExecutableNotional","type":"decimal|null","required":true},{"name":"totalDeployablePortfolioCapacity","type":"decimal|null","required":true},{"name":"largerCapitalSimulationRef","type":"string|null","required":true},{"name":"evidenceRefs","type":"array<string>","required":true},{"name":"recordedAt","type":"utc","required":true},{"name":"createdAt","type":"utc","required":true}
+      "name": "mat.promotion_evidence_evaluated",
+      "authoritativeSchema": "PromotionEvidenceRecordSchema",
+      "requirementRefs": ["FR-MAT-008", "FR-MAT-009", "FR-MAT-011", "FR-MAT-012"],
+      "tier": "CRITICAL_METADATA",
+      "fields": [
+        { "name": "promotionEvidenceId", "type": "string", "required": true },
+        { "name": "candidateId", "type": "string", "required": true },
+        { "name": "outcomeProfileId", "type": "string", "required": true },
+        { "name": "outcomeProfileVersion", "type": "string", "required": true },
+        { "name": "scenarioId", "type": "string", "required": true },
+        { "name": "scenarioVersion", "type": "string", "required": true },
+        { "name": "outcomeLabel", "type": "string", "required": true },
+        { "name": "outcomeMaturity", "type": "string", "required": true },
+        { "name": "evidenceResolution", "type": "string", "required": true },
+        { "name": "requiredNotional", "type": "decimal", "required": true },
+        { "name": "requiredDelayPolicyId", "type": "string", "required": true },
+        { "name": "requiredAdapterVersion", "type": "string", "required": true },
+        { "name": "requiredRouteId", "type": "string", "required": true },
+        { "name": "requiredExitPolicyId", "type": "string", "required": true },
+        { "name": "exactConfigurationMatch", "type": "boolean", "required": true },
+        { "name": "productionPromotionEligible", "type": "boolean", "required": true },
+        { "name": "primaryOrdering", "type": "string", "required": true },
+        { "name": "pathAmbiguous", "type": "boolean", "required": true },
+        { "name": "optimisticSensitivity", "type": "object|null", "required": true },
+        { "name": "expirySideEffect", "type": "string|null", "required": true },
+        { "name": "expirySideEffectAt", "type": "utc|null", "required": true },
+        { "name": "gainObservedAt", "type": "utc|null", "required": true },
+        { "name": "postExpiryGainExcluded", "type": "boolean", "required": true },
+        { "name": "capacityLimited", "type": "boolean", "required": true },
+        { "name": "maximumExecutableNotional", "type": "decimal|null", "required": true },
+        { "name": "totalDeployablePortfolioCapacity", "type": "decimal|null", "required": true },
+        { "name": "largerCapitalSimulationRef", "type": "string|null", "required": true },
+        { "name": "evidenceRefs", "type": "array<string>", "required": true },
+        { "name": "recordedAt", "type": "utc", "required": true },
+        { "name": "createdAt", "type": "utc", "required": true }
       ]
     },
     {
-      "name": "mat.subjective_utility_recorded", "authoritativeSchema": "SubjectiveUtilityRecordSchema", "requirementRefs": ["FR-MAT-006"], "tier": "CRITICAL_METADATA", "fields": [
-        {"name":"subjectiveUtilityId","type":"string","required":true},{"name":"subjectId","type":"string","required":true},{"name":"candidateId","type":"string","required":true},{"name":"labelFamily","type":"string","required":true},{"name":"utilityLabel","type":"string","required":true},{"name":"utilityValue","type":"decimal|null","required":true},{"name":"rationale","type":"string|null","required":true},{"name":"recordedAt","type":"utc","required":true},{"name":"createdAt","type":"utc","required":true}
+      "name": "mat.subjective_utility_recorded",
+      "authoritativeSchema": "SubjectiveUtilityRecordSchema",
+      "requirementRefs": ["FR-MAT-006"],
+      "tier": "CRITICAL_METADATA",
+      "fields": [
+        { "name": "subjectiveUtilityId", "type": "string", "required": true },
+        { "name": "subjectId", "type": "string", "required": true },
+        { "name": "candidateId", "type": "string", "required": true },
+        { "name": "labelFamily", "type": "string", "required": true },
+        { "name": "utilityLabel", "type": "string", "required": true },
+        { "name": "utilityValue", "type": "decimal|null", "required": true },
+        { "name": "rationale", "type": "string|null", "required": true },
+        { "name": "recordedAt", "type": "utc", "required": true },
+        { "name": "createdAt", "type": "utc", "required": true }
       ]
     }
   ]

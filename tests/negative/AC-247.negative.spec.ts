@@ -183,4 +183,3 @@ describe('AC-247 G1 extension negative: frozen-count preservation negative facet
     expect(postCount).toBe(1);
   });
 });
-

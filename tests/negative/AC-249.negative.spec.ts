@@ -110,18 +110,17 @@ describe('AC-249 G1 extension negative: extended negative-control set negative f
       toleranceThreshold: 0.01,
     };
 
-    const validateControlResults = (results: typeof failedControlResult[]) => {
+    const validateControlResults = (results: (typeof failedControlResult)[]) => {
       for (const r of results) {
         if (Math.abs(r.empiricalLift) > r.toleranceThreshold) {
-          throw new Error(`NEGATIVE_CONTROL_FAILED: ${r.family} detected spurious lift ${r.empiricalLift}`);
+          throw new Error(
+            `NEGATIVE_CONTROL_FAILED: ${r.family} detected spurious lift ${r.empiricalLift}`,
+          );
         }
       }
       return true;
     };
 
-    expect(() => validateControlResults([failedControlResult])).toThrow(
-      /NEGATIVE_CONTROL_FAILED/,
-    );
+    expect(() => validateControlResults([failedControlResult])).toThrow(/NEGATIVE_CONTROL_FAILED/);
   });
 });
-

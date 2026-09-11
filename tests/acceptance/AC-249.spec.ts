@@ -156,4 +156,3 @@ describe('AC-249 G1 extension: extended negative-control set facet (FR-MAT-004, 
     }
   });
 });
-

@@ -11,7 +11,7 @@ describe('Evaluation Metrics (FR-EVAL-003, AC-040, AC-041)', () => {
     expect(run).toBeDefined();
     if (!run) return;
 
-    expect(run.expected.precisionAtK).toBe(0.60);
+    expect(run.expected.precisionAtK).toBe(0.6);
     expect(run.expected.recallAtK).toBe(0.75);
     expect(run.expected.ndcgAtK).toBe(0.9675);
     expect(run.expected.medianLeadTimeSeconds).toBe(180.0);

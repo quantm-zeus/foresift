@@ -136,7 +136,8 @@ describe('AC-244 G1 extension negative: selection-adjusted lift claim negative f
       return true;
     };
 
-    expect(() => validateLiftClaim(selectiveSample)).toThrow(/SELECTION_BIAS_UNADJUSTED_LIFT_CLAIM_REFUSED/);
+    expect(() => validateLiftClaim(selectiveSample)).toThrow(
+      /SELECTION_BIAS_UNADJUSTED_LIFT_CLAIM_REFUSED/,
+    );
   });
 });
-

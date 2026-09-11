@@ -280,4 +280,3 @@ describe('AC-245 G1 extension: correlation-credit reduction facet at the cluster
     expect(creditReductionFactor).toBeLessThan(0.2);
   });
 });
-

@@ -36,16 +36,26 @@ export function candidateActionTime(input: CandidateActionTimeInput): CandidateA
   const counterfactual = input.timeline.deliveredAt === null;
   const deliveryAt = input.timeline.deliveredAt ?? input.timeline.counterfactualDeliveryAt;
   if (deliveryAt === null)
-    throw new EvalError('non-delivered arm requires counterfactual delivery', { candidateId: input.timeline.candidateId }, ErrorCode.EVAL_ACTION_TIME_ASYMMETRY);
+    throw new EvalError(
+      'non-delivered arm requires counterfactual delivery',
+      { candidateId: input.timeline.candidateId },
+      ErrorCode.EVAL_ACTION_TIME_ASYMMETRY,
+    );
   const actionableAt = universalActionTime({
     decisionReadyAt: input.timeline.decisionReadyAt,
     policyDecidedAt: input.timeline.policyDecidedAt,
     deliveryAt,
-    ...(input.scenarioDelayMilliseconds === undefined ? {} : { scenarioDelayMilliseconds: input.scenarioDelayMilliseconds }),
-    ...(input.scenarioDelaySeconds === undefined ? {} : { scenarioDelaySeconds: input.scenarioDelaySeconds }),
+    ...(input.scenarioDelayMilliseconds === undefined
+      ? {}
+      : { scenarioDelayMilliseconds: input.scenarioDelayMilliseconds }),
+    ...(input.scenarioDelaySeconds === undefined
+      ? {}
+      : { scenarioDelaySeconds: input.scenarioDelaySeconds }),
     executionStateAvailableAt: input.executionStateAvailableAt,
     securityEvidenceAvailableAt: input.securityEvidenceAvailableAt,
-    ...(input.requiredStateAvailableAt === undefined ? {} : { requiredStateAvailableAt: input.requiredStateAvailableAt }),
+    ...(input.requiredStateAvailableAt === undefined
+      ? {}
+      : { requiredStateAvailableAt: input.requiredStateAvailableAt }),
   });
   return Object.freeze({ arm: input.arm, deliveryAt, actionableAt, counterfactual });
 }
@@ -55,7 +65,11 @@ export function assertSymmetricActionTimes(results: readonly CandidateActionTime
   for (const result of results) {
     const prior = byDelivery.get(result.deliveryAt);
     if (prior !== undefined && prior !== result.actionableAt)
-      throw new EvalError('identical delivery inputs produced asymmetric action time', { deliveryAt: result.deliveryAt }, ErrorCode.EVAL_ACTION_TIME_ASYMMETRY);
+      throw new EvalError(
+        'identical delivery inputs produced asymmetric action time',
+        { deliveryAt: result.deliveryAt },
+        ErrorCode.EVAL_ACTION_TIME_ASYMMETRY,
+      );
     byDelivery.set(result.deliveryAt, result.actionableAt);
   }
 }

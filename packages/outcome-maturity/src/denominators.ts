@@ -78,9 +78,8 @@ export function assembleDenominatorDisclosure(
   const fullyMaturedValidCount = counts.FULLY_MATURED_VALID;
   const disclosedCount = Object.values(counts).reduce((sum, count) => sum + count, 0);
   const complete = disclosedCount === eligibleCount;
-  const finalSuccessRate = complete && fullyMaturedValidCount > 0
-    ? successCount / fullyMaturedValidCount
-    : null;
+  const finalSuccessRate =
+    complete && fullyMaturedValidCount > 0 ? successCount / fullyMaturedValidCount : null;
   return Object.freeze({
     eligibleCount,
     counts: Object.freeze(counts),
@@ -100,7 +99,10 @@ export function assertCompleteDenominatorDisclosure(
 ): asserts report is DenominatorDisclosureReport & { readonly complete: true } {
   const classes = Object.values(DenominatorDisclosureClass);
   const hasAllClasses = classes.every(
-    (value) => Object.hasOwn(report.counts, value) && Number.isInteger(report.counts[value]) && report.counts[value] >= 0,
+    (value) =>
+      Object.hasOwn(report.counts, value) &&
+      Number.isInteger(report.counts[value]) &&
+      report.counts[value] >= 0,
   );
   const total = classes.reduce((sum, value) => sum + (report.counts[value] ?? 0), 0);
   if (!report.complete || !hasAllClasses || total !== report.eligibleCount)
@@ -133,10 +135,12 @@ export function reducedCollectionCannotImprovePerformance(
 ): boolean {
   assertCompleteDenominatorDisclosure(before);
   assertCompleteDenominatorDisclosure(after);
-  return after.eligibleCount === before.eligibleCount &&
+  return (
+    after.eligibleCount === before.eligibleCount &&
     after.excludedCount >= before.excludedCount &&
     after.successCount <= before.successCount &&
-    after.eligiblePopulationSuccessRate <= before.eligiblePopulationSuccessRate;
+    after.eligiblePopulationSuccessRate <= before.eligiblePopulationSuccessRate
+  );
 }
 
 export const collectionReductionCannotImprove = reducedCollectionCannotImprovePerformance;

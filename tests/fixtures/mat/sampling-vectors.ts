@@ -228,7 +228,7 @@ export const GOLDEN_SAMPLING_VECTORS: readonly SamplingScenarioCase[] = [
     //                  = (50 + 0 + 100 + 100 + 0 + 0 + 100 + 0) / 800 = 350 / 800 = 0.4375
     // Weighted utility sum = 50*120 + 50*(-50) + 100*200 + 100*150 + 200*(-100) + 200*(-100) + 100*80 + 100*(-30)
     //                      = 6000 - 2500 + 20000 + 15000 - 20000 - 20000 + 8000 - 3000 = 3500 USD
-    expectedNaiveMean: 0.50,
+    expectedNaiveMean: 0.5,
     expectedHorvitzThompsonWeightedMean: 0.4375,
     expectedWeightedTotalUtility: 3500.0,
     hasWeightStabilityViolation: false,
@@ -291,7 +291,7 @@ export const GOLDEN_SAMPLING_VECTORS: readonly SamplingScenarioCase[] = [
         truncatedWeight: 100.0,
       },
     ],
-    expectedNaiveMean: 0.50,
+    expectedNaiveMean: 0.5,
     expectedHorvitzThompsonWeightedMean: 0.003976, // Dominated by unit 4 unweighted
     expectedWeightedTotalUtility: -999950.0,
     hasWeightStabilityViolation: true,

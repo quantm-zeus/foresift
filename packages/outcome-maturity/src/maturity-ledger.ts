@@ -59,7 +59,11 @@ export interface MaturityResolution {
 function instant(value: string, field: string): number {
   const parsed = Date.parse(value);
   if (!Number.isFinite(parsed))
-    throw new MatError('invalid maturity timestamp', { field, value }, ErrorCode.MAT_TRANSITION_ILLEGAL);
+    throw new MatError(
+      'invalid maturity timestamp',
+      { field, value },
+      ErrorCode.MAT_TRANSITION_ILLEGAL,
+    );
   return parsed;
 }
 
@@ -99,7 +103,8 @@ export function resolveMaturity(input: ResolveMaturityInput): MaturityResolution
     );
 
   const observations = input.observations.filter(
-    (observation) => observation.valid && instant(observation.availableAt, 'observation.availableAt') <= asOf,
+    (observation) =>
+      observation.valid && instant(observation.availableAt, 'observation.availableAt') <= asOf,
   );
   const observedFields = new Set(observations.map((observation) => observation.field));
   const plannedFields = new Set(input.observationPlan.observedFields);
@@ -161,7 +166,9 @@ export function maturityNaturalKey(dimension: MaturityDimension): string {
     dimension.horizon,
     dimension.scenarioId,
     dimension.scenarioVersion,
-  ].map(encodeURIComponent).join('|');
+  ]
+    .map(encodeURIComponent)
+    .join('|');
 }
 
 export interface MaturityLedgerStore {
@@ -184,7 +191,10 @@ export class InMemoryMaturityLedgerStore implements MaturityLedgerStore {
   insertInitial(naturalKey: string, record: OutcomeMaturityState): OutcomeMaturityState {
     const existing = this.#initial.get(naturalKey);
     if (existing) return existing;
-    this.#initial.set(naturalKey, Object.freeze({ ...record, evidenceRefs: [...record.evidenceRefs] }));
+    this.#initial.set(
+      naturalKey,
+      Object.freeze({ ...record, evidenceRefs: [...record.evidenceRefs] }),
+    );
     return record;
   }
 
@@ -251,7 +261,12 @@ export class MaturityLedger {
 
     assertMaturityTransition(currentState, resolution.maturityState);
     const transition = this.store.appendTransition({
-      transitionId: stableId('mat-transition', [initial.maturityStateId, currentState, resolution.maturityState, input.asOf]),
+      transitionId: stableId('mat-transition', [
+        initial.maturityStateId,
+        currentState,
+        resolution.maturityState,
+        input.asOf,
+      ]),
       maturityStateId: initial.maturityStateId,
       fromState: currentState,
       toState: resolution.maturityState,
@@ -270,8 +285,11 @@ export function isFinalDenominatorEligible(input: {
   readonly censorReason?: CensorReason | null;
   readonly invalidReason?: InvalidReason | null;
 }): boolean {
-  return input.maturityState === MaturityState.FULLY_MATURED &&
-    !input.censorReason && !input.invalidReason;
+  return (
+    input.maturityState === MaturityState.FULLY_MATURED &&
+    !input.censorReason &&
+    !input.invalidReason
+  );
 }
 
 export type MaturityReportScope = 'FINAL' | 'PROVISIONAL';

@@ -215,4 +215,3 @@ describe('AC-248 G1 extension: power/threshold promotion-gate facet (FR-MAT-005,
     expect(hasSufficientPower).toBe(true);
   });
 });
-

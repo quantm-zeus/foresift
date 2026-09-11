@@ -131,13 +131,15 @@ export const GOLDEN_INTERVAL_CASES: readonly IntervalEvaluationCase[] = [
     minRequiredEssForPromotion: 30.0,
     passesEssPromotionGate: false,
     promotionRefusalReason: 'INSUFFICIENT_EFFECTIVE_SAMPLE_SIZE_FOR_PROMOTION_CLAIM',
-    notes: 'FR-MAT-005: Low effective sample size (ESS=6.2 < 30) blocks promotion despite N=100 tokens',
+    notes:
+      'FR-MAT-005: Low effective sample size (ESS=6.2 < 30) blocks promotion despite N=100 tokens',
   },
 
   // 2. High ESS independent token case - PASSES GATE
   {
     caseId: 'int_high_ess_independent_clusters',
-    description: '200 tokens across 80 independent deployer clusters with low intra-cluster correlation',
+    description:
+      '200 tokens across 80 independent deployer clusters with low intra-cluster correlation',
     totalTokenCount: 200,
     clusterCount: 80,
     clusterDefinition: 'DEPLOYER_ENTITY',
@@ -175,6 +177,7 @@ export const GOLDEN_INTERVAL_CASES: readonly IntervalEvaluationCase[] = [
     divergenceFactor: 1.24,
     minRequiredEssForPromotion: 30.0,
     passesEssPromotionGate: true,
-    notes: 'High cluster dispersion yields adequate ESS (72.4 >= 30) and narrow robust confidence band',
+    notes:
+      'High cluster dispersion yields adequate ESS (72.4 >= 30) and narrow robust confidence band',
   },
 ];

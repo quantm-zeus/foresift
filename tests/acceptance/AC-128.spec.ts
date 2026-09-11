@@ -71,7 +71,9 @@ describe('AC-128 acceptance (positive): observation plans carry explicit strata,
 
 describe('AC-128 acceptance (positive) — Horvitz-Thompson weighted-estimate facet (FR-MAT-007, AC-128)', () => {
   it('reproduces population win rate via Horvitz-Thompson weighted estimator', () => {
-    const samplingCase = GOLDEN_SAMPLING_VECTORS.find((s) => s.scenarioId === 'sampling_valid_stratified_8dim');
+    const samplingCase = GOLDEN_SAMPLING_VECTORS.find(
+      (s) => s.scenarioId === 'sampling_valid_stratified_8dim',
+    );
     expect(samplingCase).toBeDefined();
     if (!samplingCase) return;
 

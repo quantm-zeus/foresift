@@ -23,11 +23,11 @@ function recordCensoredOrInvalid(params: {
   return true;
 }
 
-function validateDatasetReasonRetention(datasetRow: {
-  status: string;
-  retainedReason?: string;
-}) {
-  if ((datasetRow.status === 'CENSORED' || datasetRow.status === 'INVALID_DATA') && !datasetRow.retainedReason) {
+function validateDatasetReasonRetention(datasetRow: { status: string; retainedReason?: string }) {
+  if (
+    (datasetRow.status === 'CENSORED' || datasetRow.status === 'INVALID_DATA') &&
+    !datasetRow.retainedReason
+  ) {
     throw new Error('DATASET_REASON_RETENTION_REQUIRED');
   }
   return true;

@@ -65,7 +65,8 @@ export const GOLDEN_MISSED_OPPORTUNITY_CASES: readonly MissedOpportunityCase[] =
     optimalActionTime: '2026-08-20T10:00:00.000Z',
     counterfactualActionTime: '2026-08-20T10:00:00.050Z',
     counterfactualOutcomeMultiple: 4.2,
-    rootCauseDetails: 'Pre-filter dropped token because deployer had 0 prior history (naive zero-shot filter)',
+    rootCauseDetails:
+      'Pre-filter dropped token because deployer had 0 prior history (naive zero-shot filter)',
     actionableRemediation: 'Relax strict deployer history rule for bonding curve initializations',
   },
 
@@ -176,7 +177,8 @@ export const GOLDEN_MISSED_OPPORTUNITY_CASES: readonly MissedOpportunityCase[] =
     counterfactualActionTime: '2026-08-20T15:00:00.050Z',
     counterfactualOutcomeMultiple: 7.5,
     rootCauseDetails: 'Primary RPC dropped connection for 45 seconds; backfilled too late',
-    actionableRemediation: 'Add dual-stream redundant websocket ingestion with zero-lag deduplication',
+    actionableRemediation:
+      'Add dual-stream redundant websocket ingestion with zero-lag deduplication',
   },
 
   // 7. CAPACITY_BLOCKED: Portfolio max concurrent positions reached (5/5 positions open)

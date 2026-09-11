@@ -237,4 +237,3 @@ describe('AC-243 G1 extension: probe-probability-before-maturity ordering facet 
     expect(htWeight).toBe(5.0);
   });
 });
-

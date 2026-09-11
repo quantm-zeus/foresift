@@ -163,4 +163,3 @@ describe('AC-248 G1 extension negative: power/threshold promotion-gate negative 
     expect(projection.promotionEligible).toBe(false);
   });
 });
-

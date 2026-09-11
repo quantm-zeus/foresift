@@ -47,9 +47,15 @@ function isSubjective(family: LabelFamily): family is SubjectiveLabelFamily {
 /** Runtime boundary for dynamically constructed plans; typed callers cannot express this join. */
 export function assertObjectiveQueryPlan(input: {
   readonly labelFamilies: readonly LabelFamily[];
-  readonly joins?: readonly { readonly plane: 'OBJECTIVE' | 'SUBJECTIVE'; readonly source: string }[];
+  readonly joins?: readonly {
+    readonly plane: 'OBJECTIVE' | 'SUBJECTIVE';
+    readonly source: string;
+  }[];
 }): ObjectiveQueryPlan {
-  if (input.labelFamilies.some(isSubjective) || input.joins?.some((join) => join.plane === 'SUBJECTIVE'))
+  if (
+    input.labelFamilies.some(isSubjective) ||
+    input.joins?.some((join) => join.plane === 'SUBJECTIVE')
+  )
     throw new MatError(
       'objective metric paths cannot join subjective records',
       {},
@@ -58,7 +64,10 @@ export function assertObjectiveQueryPlan(input: {
   return Object.freeze({
     plane: 'OBJECTIVE',
     labelFamilies: [...input.labelFamilies] as ObjectiveLabelFamily[],
-    joins: (input.joins ?? []).map((join) => ({ plane: 'OBJECTIVE' as const, source: join.source })),
+    joins: (input.joins ?? []).map((join) => ({
+      plane: 'OBJECTIVE' as const,
+      source: join.source,
+    })),
   });
 }
 

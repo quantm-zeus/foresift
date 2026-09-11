@@ -46,7 +46,8 @@ export const GOLDEN_PROFILES: readonly OutcomeProfileDefinition[] = [
     version: '1.0.0',
     family: 'HIGH_GROWTH',
     populationScope: 'SOLANA_BONDING_CURVE_AND_NEW_POOLS',
-    description: 'Rapid upward movement in newly launched meme tokens within early lifecycle windows',
+    description:
+      'Rapid upward movement in newly launched meme tokens within early lifecycle windows',
     horizons: ['5m', '15m', '1h', '4h'],
     clauses: [
       {
@@ -112,9 +113,19 @@ export const GOLDEN_PROFILES: readonly OutcomeProfileDefinition[] = [
     ],
     stressPassMatrix: [
       { dimensionName: 'SLIPPAGE', baselineValue: 0.5, stressValue: 2.0, minPassRatePct: 85.0 },
-      { dimensionName: 'LATENCY_DELAY', baselineValue: 100, stressValue: 1000, minPassRatePct: 80.0 },
+      {
+        dimensionName: 'LATENCY_DELAY',
+        baselineValue: 100,
+        stressValue: 1000,
+        minPassRatePct: 80.0,
+      },
       { dimensionName: 'POOL_IMPACT', baselineValue: 0.2, stressValue: 1.5, minPassRatePct: 75.0 },
-      { dimensionName: 'FEE_SPIKE', baselineValue: 0.001, stressValue: 0.005, minPassRatePct: 90.0 },
+      {
+        dimensionName: 'FEE_SPIKE',
+        baselineValue: 0.001,
+        stressValue: 0.005,
+        minPassRatePct: 90.0,
+      },
     ],
     isVersionLocked: true,
   },
@@ -126,7 +137,8 @@ export const GOLDEN_PROFILES: readonly OutcomeProfileDefinition[] = [
     version: '1.0.0',
     family: 'HIGH_GROWTH',
     populationScope: 'ALL_SUPPORTED_SOLANA_TOKENS',
-    description: 'Clusters of distinct non-funded wallets building positions without coordinated dump',
+    description:
+      'Clusters of distinct non-funded wallets building positions without coordinated dump',
     horizons: ['4h', '24h', '48h'],
     clauses: [
       {
@@ -148,7 +160,12 @@ export const GOLDEN_PROFILES: readonly OutcomeProfileDefinition[] = [
     ],
     stressPassMatrix: [
       { dimensionName: 'SLIPPAGE', baselineValue: 1.0, stressValue: 3.0, minPassRatePct: 80.0 },
-      { dimensionName: 'LATENCY_DELAY', baselineValue: 100, stressValue: 500, minPassRatePct: 80.0 },
+      {
+        dimensionName: 'LATENCY_DELAY',
+        baselineValue: 100,
+        stressValue: 500,
+        minPassRatePct: 80.0,
+      },
       { dimensionName: 'POOL_IMPACT', baselineValue: 0.5, stressValue: 2.0, minPassRatePct: 75.0 },
       { dimensionName: 'FEE_SPIKE', baselineValue: 0.001, stressValue: 0.01, minPassRatePct: 85.0 },
     ],
@@ -186,7 +203,12 @@ export const GOLDEN_PROFILES: readonly OutcomeProfileDefinition[] = [
       { dimensionName: 'SLIPPAGE', baselineValue: 0.2, stressValue: 1.0, minPassRatePct: 90.0 },
       { dimensionName: 'LATENCY_DELAY', baselineValue: 50, stressValue: 200, minPassRatePct: 90.0 },
       { dimensionName: 'POOL_IMPACT', baselineValue: 0.1, stressValue: 0.5, minPassRatePct: 85.0 },
-      { dimensionName: 'FEE_SPIKE', baselineValue: 0.0005, stressValue: 0.002, minPassRatePct: 95.0 },
+      {
+        dimensionName: 'FEE_SPIKE',
+        baselineValue: 0.0005,
+        stressValue: 0.002,
+        minPassRatePct: 95.0,
+      },
     ],
     isVersionLocked: true,
   },
@@ -198,7 +220,8 @@ export const GOLDEN_PROFILES: readonly OutcomeProfileDefinition[] = [
     version: '1.0.0',
     family: 'RISK_WARNING',
     populationScope: 'ALL_SUPPORTED_SOLANA_TOKENS',
-    description: 'Detection of imminent malicious drain, hidden mint authority, or extreme sell restriction',
+    description:
+      'Detection of imminent malicious drain, hidden mint authority, or extreme sell restriction',
     horizons: ['5m', '15m', '1h', '24h'],
     clauses: [
       {

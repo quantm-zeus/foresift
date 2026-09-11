@@ -110,10 +110,11 @@ describe('AC-246 G1 extension: lineage-collapse sensitivity facet (FR-MAT-005, A
     // Verify promotion evidence calculation receives collapsed source count rather than uncollapsed count
     const uncollapsedCount = 5;
     const sensitivityRatio = collapsedSourceCount / uncollapsedCount; // 3 / 5 = 0.60
-    expect(sensitivityRatio).toBe(0.60);
+    expect(sensitivityRatio).toBe(0.6);
     // Sensitivity analysis verifies metric robustness when largest collapsed lineage is dropped
-    const withoutLargestLineage = groups.filter((g) => g.upstreamLineageKey !== 'upstream/nodesense-mainnet');
+    const withoutLargestLineage = groups.filter(
+      (g) => g.upstreamLineageKey !== 'upstream/nodesense-mainnet',
+    );
     expect(withoutLargestLineage.length).toBe(2);
   });
 });
-

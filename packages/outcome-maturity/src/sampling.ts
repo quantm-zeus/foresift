@@ -35,11 +35,17 @@ function present(value: string): boolean {
 export function admitSamplingAssignment(input: SamplingAssignment): Readonly<SamplingAssignment> {
   const dimensionValues = Object.values(input.dimensions);
   if (
-    !present(input.assignmentId) || !present(input.candidateId) || !present(input.stratumId) ||
-    dimensionValues.length !== 8 || dimensionValues.some((value) => !present(value)) ||
-    !Number.isFinite(input.inclusionProbability) || input.inclusionProbability <= 0 ||
-    input.inclusionProbability > 1 || !Number.isFinite(Date.parse(input.selectionTime)) ||
-    !present(input.selectionReason) || !present(input.seedProvenance) ||
+    !present(input.assignmentId) ||
+    !present(input.candidateId) ||
+    !present(input.stratumId) ||
+    dimensionValues.length !== 8 ||
+    dimensionValues.some((value) => !present(value)) ||
+    !Number.isFinite(input.inclusionProbability) ||
+    input.inclusionProbability <= 0 ||
+    input.inclusionProbability > 1 ||
+    !Number.isFinite(Date.parse(input.selectionTime)) ||
+    !present(input.selectionReason) ||
+    !present(input.seedProvenance) ||
     input.seedProvenance.startsWith('raw:')
   ) {
     throw new EvalError(
@@ -53,7 +59,11 @@ export function admitSamplingAssignment(input: SamplingAssignment): Readonly<Sam
 
 function decimalToFixed(value: string): bigint {
   if (!/^-?(0|[1-9][0-9]*)(\.[0-9]+)?$/.test(value))
-    throw new EvalError('estimator value is not a canonical decimal', { value }, ErrorCode.EVAL_WEIGHTING_INVALID);
+    throw new EvalError(
+      'estimator value is not a canonical decimal',
+      { value },
+      ErrorCode.EVAL_WEIGHTING_INVALID,
+    );
   const negative = value.startsWith('-');
   const unsigned = negative ? value.slice(1) : value;
   const [whole = '0', fraction = ''] = unsigned.split('.');
@@ -63,7 +73,11 @@ function decimalToFixed(value: string): bigint {
 
 function probabilityToFixed(value: number): bigint {
   if (!Number.isFinite(value) || value <= 0 || value > 1)
-    throw new EvalError('inclusion probability must be in (0,1]', { value }, ErrorCode.EVAL_WEIGHTING_INVALID);
+    throw new EvalError(
+      'inclusion probability must be in (0,1]',
+      { value },
+      ErrorCode.EVAL_WEIGHTING_INVALID,
+    );
   return BigInt(Math.round(value * Number(SCALE)));
 }
 
@@ -119,7 +133,10 @@ export function designWeightedEstimator(
 export const horvitzThompson = designWeightedEstimator;
 
 export interface SamplingDiagnosticInput {
-  readonly assignments: readonly Pick<SamplingAssignment, 'selected' | 'inclusionProbability' | 'stratumId'>[];
+  readonly assignments: readonly Pick<
+    SamplingAssignment,
+    'selected' | 'inclusionProbability' | 'stratumId'
+  >[];
   readonly eligibleStrata: readonly string[];
   readonly modelDiagnosticsValid: boolean;
   /** True when evaluation was built from selected rows without the full assignment frame. */
@@ -138,18 +155,25 @@ export interface SamplingDiagnostics {
 
 export function samplingDiagnostics(input: SamplingDiagnosticInput): SamplingDiagnostics {
   const probabilities = input.assignments.map((assignment) => assignment.inclusionProbability);
-  const positivity = probabilities.length > 0 && probabilities.every(
-    (probability) => Number.isFinite(probability) && probability > 0 && probability <= 1,
-  );
+  const positivity =
+    probabilities.length > 0 &&
+    probabilities.every(
+      (probability) => Number.isFinite(probability) && probability > 0 && probability <= 1,
+    );
   const selectedStrata = new Set(
-    input.assignments.filter((assignment) => assignment.selected).map((assignment) => assignment.stratumId),
+    input.assignments
+      .filter((assignment) => assignment.selected)
+      .map((assignment) => assignment.stratumId),
   );
-  const overlap = input.eligibleStrata.length > 0 && input.eligibleStrata.every((stratum) => selectedStrata.has(stratum));
+  const overlap =
+    input.eligibleStrata.length > 0 &&
+    input.eligibleStrata.every((stratum) => selectedStrata.has(stratum));
   const maximumWeight = positivity
     ? Math.max(...probabilities.map((probability) => 1 / probability))
     : Number.POSITIVE_INFINITY;
   const weightStable = maximumWeight <= MAXIMUM_SAMPLING_WEIGHT;
-  const valid = positivity && overlap && weightStable && input.modelDiagnosticsValid && !input.selectedOnly;
+  const valid =
+    positivity && overlap && weightStable && input.modelDiagnosticsValid && !input.selectedOnly;
   const claimRestriction = valid
     ? ClaimRestriction.DECLARED_UNIVERSE
     : positivity && overlap && weightStable

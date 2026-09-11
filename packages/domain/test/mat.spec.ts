@@ -17,7 +17,10 @@ const Domain = DomainModule as Record<string, unknown>;
 // Fallback pure law implementations for direct characterization and testing
 function fallbackMaturityNeverResets(fromState: string, toState: string): boolean {
   const terminalStates = ['FULLY_MATURED', 'CENSORED', 'INVALID_DATA'];
-  if (terminalStates.includes(fromState) && (toState === 'PENDING' || toState === 'PARTIALLY_MATURED')) {
+  if (
+    terminalStates.includes(fromState) &&
+    (toState === 'PENDING' || toState === 'PARTIALLY_MATURED')
+  ) {
     return false;
   }
   if (fromState === 'CENSORED' && toState !== 'CENSORED') return false;
@@ -179,7 +182,9 @@ describe('Maturity domain vocabularies and fail-closed parsing (FR-MAT-001…012
 
 describe('Maturity pure laws (FR-MAT-001…012)', () => {
   it('pure law: maturityNeverResets enforces irreversible terminal maturity states', () => {
-    const fn = (Domain['maturityNeverResets'] as typeof fallbackMaturityNeverResets) ?? fallbackMaturityNeverResets;
+    const fn =
+      (Domain['maturityNeverResets'] as typeof fallbackMaturityNeverResets) ??
+      fallbackMaturityNeverResets;
     expect(fn('PENDING', 'PARTIALLY_MATURED')).toBe(true);
     expect(fn('PARTIALLY_MATURED', 'FULLY_MATURED')).toBe(true);
     expect(fn('PENDING', 'CENSORED')).toBe(true);
@@ -190,7 +195,9 @@ describe('Maturity pure laws (FR-MAT-001…012)', () => {
   });
 
   it('pure law: censorNeverBecomesFailure prohibits silent mapping of censored data to failure (FR-MAT-003)', () => {
-    const fn = (Domain['censorNeverBecomesFailure'] as typeof fallbackCensorNeverBecomesFailure) ?? fallbackCensorNeverBecomesFailure;
+    const fn =
+      (Domain['censorNeverBecomesFailure'] as typeof fallbackCensorNeverBecomesFailure) ??
+      fallbackCensorNeverBecomesFailure;
     expect(fn('CENSORED', 'TRADABLE_FAILURE')).toBe(false);
     expect(fn('CENSORED', 'SIGNAL_FAILURE')).toBe(false);
     expect(fn('FULLY_MATURED', 'TRADABLE_FAILURE')).toBe(true);
@@ -198,21 +205,27 @@ describe('Maturity pure laws (FR-MAT-001…012)', () => {
   });
 
   it('pure law: subjectiveCannotAlterObjective preserves strict two-plane separation (§68.9)', () => {
-    const fn = (Domain['subjectiveCannotAlterObjective'] as typeof fallbackSubjectiveCannotAlterObjective) ?? fallbackSubjectiveCannotAlterObjective;
+    const fn =
+      (Domain['subjectiveCannotAlterObjective'] as typeof fallbackSubjectiveCannotAlterObjective) ??
+      fallbackSubjectiveCannotAlterObjective;
     const objective = 'OBJECTIVE_TRADABLE_OUTCOME';
     const subjective = 'NEGATIVE_USER_FEEDBACK_THUMBS_DOWN';
     expect(fn(objective, subjective)).toBe('OBJECTIVE_TRADABLE_OUTCOME');
   });
 
   it('pure law: adverseOrderingPrimacy resolves ambiguous intra-interval touches adversely (FR-MAT-009)', () => {
-    const fn = (Domain['adverseOrderingPrimacy'] as typeof fallbackAdverseOrderingPrimacy) ?? fallbackAdverseOrderingPrimacy;
+    const fn =
+      (Domain['adverseOrderingPrimacy'] as typeof fallbackAdverseOrderingPrimacy) ??
+      fallbackAdverseOrderingPrimacy;
     expect(fn(true, false)).toBe('ADVERSE_STOP_OUT');
     expect(fn(true, true, 'TARGET_FIRST')).toBe('TARGET_REACHED');
     expect(fn(true, true, 'STOP_FIRST')).toBe('ADVERSE_STOP_OUT');
   });
 
   it('pure law: postExpiryGainsExcluded excludes price increases that occur after alert expiry (FR-MAT-011)', () => {
-    const fn = (Domain['postExpiryGainsExcluded'] as typeof fallbackPostExpiryGainsExcluded) ?? fallbackPostExpiryGainsExcluded;
+    const fn =
+      (Domain['postExpiryGainsExcluded'] as typeof fallbackPostExpiryGainsExcluded) ??
+      fallbackPostExpiryGainsExcluded;
     const alertExpiry = 10000;
     const postExpiryPeak = 12000;
     expect(fn(alertExpiry, postExpiryPeak, false)).toBe(false);
@@ -220,7 +233,11 @@ describe('Maturity pure laws (FR-MAT-001…012)', () => {
   });
 
   it('pure law: promotionRequiresExactMatureEvidence enforces 5-dimension exact match and full maturity (FR-MAT-008)', () => {
-    const fn = (Domain['promotionRequiresExactMatureEvidence'] as typeof fallbackPromotionRequiresExactMatureEvidence) ?? fallbackPromotionRequiresExactMatureEvidence;
+    const fn =
+      (Domain[
+        'promotionRequiresExactMatureEvidence'
+      ] as typeof fallbackPromotionRequiresExactMatureEvidence) ??
+      fallbackPromotionRequiresExactMatureEvidence;
     expect(
       fn({
         notionalMatch: true,
@@ -274,7 +291,9 @@ describe('Maturity pure laws (FR-MAT-001…012)', () => {
   });
 
   it('pure law: capacityDisclosureRequired mandates notional and portfolio capacity disclosures (FR-MAT-012)', () => {
-    const fn = (Domain['capacityDisclosureRequired'] as typeof fallbackCapacityDisclosureRequired) ?? fallbackCapacityDisclosureRequired;
+    const fn =
+      (Domain['capacityDisclosureRequired'] as typeof fallbackCapacityDisclosureRequired) ??
+      fallbackCapacityDisclosureRequired;
     expect(
       fn({
         maxExecutableNotionalUsd: 500,

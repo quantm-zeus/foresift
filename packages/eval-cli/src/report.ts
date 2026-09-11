@@ -9,7 +9,8 @@ export interface EvalCliReport {
   readonly refusal?: { readonly code: string; readonly message: string; readonly detail: unknown };
 }
 
-export const serializeReport = (report: EvalCliReport): string => `${JSON.stringify(report, null, 2)}\n`;
+export const serializeReport = (report: EvalCliReport): string =>
+  `${JSON.stringify(report, null, 2)}\n`;
 
 export async function emitReport(report: EvalCliReport, outPath?: string): Promise<void> {
   const serialized = serializeReport(report);

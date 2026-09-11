@@ -22,7 +22,10 @@ function assertResolutionFloorForTradability(params: {
   return true;
 }
 
-function validateEvaluationReplayResolution(item: { isCoarse: boolean; isTradableSuccessClaim: boolean }) {
+function validateEvaluationReplayResolution(item: {
+  isCoarse: boolean;
+  isTradableSuccessClaim: boolean;
+}) {
   if (item.isCoarse && item.isTradableSuccessClaim) {
     throw new Error('COARSE_EVALUATION_CANNOT_CLAIM_TRADABLE_SUCCESS');
   }

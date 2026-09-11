@@ -24,15 +24,20 @@ export interface BaselineComparison {
 export function selectStrongestEligibleSimpleBaseline(
   baselines: readonly BaselineResult[],
 ): BaselineResult {
-  const eligible = baselines.filter((baseline) =>
-    baseline.eligible && baseline.simple && !baseline.weak && baseline.frozen,
+  const eligible = baselines.filter(
+    (baseline) => baseline.eligible && baseline.simple && !baseline.weak && baseline.frozen,
   );
-  const selected = [...eligible].sort((left, right) =>
-    right.strengthPriority - left.strengthPriority ||
-    left.baselineKind.localeCompare(right.baselineKind),
+  const selected = [...eligible].sort(
+    (left, right) =>
+      right.strengthPriority - left.strengthPriority ||
+      left.baselineKind.localeCompare(right.baselineKind),
   )[0];
   if (!selected)
-    throw new EvalError('no strong eligible simple baseline exists', {}, ErrorCode.EVAL_UNIVERSE_MISMATCH);
+    throw new EvalError(
+      'no strong eligible simple baseline exists',
+      {},
+      ErrorCode.EVAL_UNIVERSE_MISMATCH,
+    );
   return selected;
 }
 
@@ -44,10 +49,16 @@ export function compareAgainstBaseline(input: {
   readonly baselines: readonly BaselineResult[];
 }): BaselineComparison {
   const comparator = selectStrongestEligibleSimpleBaseline(input.baselines);
-  if (comparator.candidateUniverseHash !== input.candidateUniverseHash ||
-      comparator.observationCutoff !== input.observationCutoff ||
-      comparator.actionTimeSemanticsHash !== input.actionTimeSemanticsHash)
-    throw new EvalError('baseline universe, cutoff, or action-time semantics differ', { baselineKind: comparator.baselineKind }, ErrorCode.EVAL_UNIVERSE_MISMATCH);
+  if (
+    comparator.candidateUniverseHash !== input.candidateUniverseHash ||
+    comparator.observationCutoff !== input.observationCutoff ||
+    comparator.actionTimeSemanticsHash !== input.actionTimeSemanticsHash
+  )
+    throw new EvalError(
+      'baseline universe, cutoff, or action-time semantics differ',
+      { baselineKind: comparator.baselineKind },
+      ErrorCode.EVAL_UNIVERSE_MISMATCH,
+    );
   return Object.freeze({
     comparator,
     candidateMetricValue: input.candidateMetricValue,

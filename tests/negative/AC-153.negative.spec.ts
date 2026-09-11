@@ -4,9 +4,7 @@
  */
 import { describe, expect, it } from 'bun:test';
 
-function enforceProtectedReserveIntegrity(degradationPlan: {
-  throttledItems: readonly string[];
-}) {
+function enforceProtectedReserveIntegrity(degradationPlan: { throttledItems: readonly string[] }) {
   const protectedItems = [
     'OUTCOME_OBSERVATION',
     'AUDIT_CHAIN_INTEGRITY',

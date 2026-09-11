@@ -135,4 +135,3 @@ describe('AC-241 negative — champion/challenger comparison refusal facet (FR-E
     ).toThrow('CHAMPION_CHALLENGER_REPLAY_CUTOFF_MISMATCH');
   });
 });
-

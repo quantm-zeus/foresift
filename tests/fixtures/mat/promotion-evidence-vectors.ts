@@ -164,13 +164,14 @@ export interface PathOrderingCase {
 export const GOLDEN_PATH_ORDERING_CASES: readonly PathOrderingCase[] = [
   {
     caseId: 'path_ambiguity_adverse_primacy',
-    description: 'Coarse interval touches both target (+30%) and stop (-15%) without intra-interval timestamps',
+    description:
+      'Coarse interval touches both target (+30%) and stop (-15%) without intra-interval timestamps',
     intervalStart: '2026-08-20T10:00:00.000Z',
     intervalEnd: '2026-08-20T10:15:00.000Z',
-    targetPriceUsd: 1.30,
+    targetPriceUsd: 1.3,
     stopPriceUsd: 0.85,
-    intervalHighUsd: 1.40, // Target touched
-    intervalLowUsd: 0.80,  // Stop touched
+    intervalHighUsd: 1.4, // Target touched
+    intervalLowUsd: 0.8, // Stop touched
     bothFeasibleInInterval: true,
     exactTimestampOrderKnown: false,
     primaryVerdict: 'ADVERSE_STOP_OUT',
@@ -183,10 +184,10 @@ export const GOLDEN_PATH_ORDERING_CASES: readonly PathOrderingCase[] = [
     description: 'High-res ticks establish target was touched at 10:03 before stop at 10:12',
     intervalStart: '2026-08-20T10:00:00.000Z',
     intervalEnd: '2026-08-20T10:15:00.000Z',
-    targetPriceUsd: 1.30,
+    targetPriceUsd: 1.3,
     stopPriceUsd: 0.85,
-    intervalHighUsd: 1.40,
-    intervalLowUsd: 0.80,
+    intervalHighUsd: 1.4,
+    intervalLowUsd: 0.8,
     bothFeasibleInInterval: true,
     exactTimestampOrderKnown: true,
     actualFirstTouch: 'TARGET_FIRST',

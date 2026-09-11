@@ -49,7 +49,7 @@ describe('AC-121 acceptance (positive) — evaluation-side net utility facet (FR
       entryFeeUsd: 5.0,
       exitFeeUsd: 5.0,
       slippageImpactUsd: 15.0,
-      networkPriorityFeeUsd: 0.50,
+      networkPriorityFeeUsd: 0.5,
     };
     const expectedNetUtility =
       tradeLegs.grossProfitUsd -

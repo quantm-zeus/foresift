@@ -1,7 +1,16 @@
 // Hyperdrive H3 P1-8 — resource governor. Host states derive from real
 // memory/heavy-process samples (injected for hermeticity); admission rules
 // gate launches before project-wide scale-up.
-import { describe, test, expect } from 'bun:test';
+//
+// Env hygiene (live run 161f695c, 2026-09-11): the autopilot service carries
+// a bounded operator override (FORESIFT_GOVERNOR_STATE=GREEN drop-in) and
+// verify-repo gates inherit it through env — these classification tests
+// asserted threshold math, not the override, and 7 of 14 failed for
+// environmental, not product, reasons. Neutralize the override for THIS
+// process at import time (before any classifyHostState call) and restore it
+// in afterAll so a sibling suite in the same coordinator group still sees
+// the service environment unchanged.
+import { describe, test, expect, afterAll } from 'bun:test';
 import {
   classifyHostState,
   admitUnderGovernor,
@@ -9,6 +18,13 @@ import {
   GOVERNOR_RECOVERY_CONFIRMATIONS,
   RESOURCE_GOVERNOR_DEFAULTS,
 } from '../../scripts/automation/resource-governor.mjs';
+
+const SAVED_GOVERNOR_STATE = process.env.FORESIFT_GOVERNOR_STATE;
+delete process.env.FORESIFT_GOVERNOR_STATE; // assert threshold MATH, not the host's override
+afterAll(() => {
+  if (SAVED_GOVERNOR_STATE === undefined) delete process.env.FORESIFT_GOVERNOR_STATE;
+  else process.env.FORESIFT_GOVERNOR_STATE = SAVED_GOVERNOR_STATE;
+});
 
 const GiB = 1024 * 1024 * 1024;
 const total = 15 * GiB; // the 15 GiB VPS that OOM-killed on 2026-08-28

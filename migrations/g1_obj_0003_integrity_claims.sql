@@ -26,11 +26,11 @@ CREATE INDEX IF NOT EXISTS integrity_incidents_run_idx ON integrity_incidents (r
 DROP TRIGGER IF EXISTS integrity_incidents_no_update ON integrity_incidents;
 CREATE TRIGGER integrity_incidents_no_update
     BEFORE UPDATE OR DELETE ON integrity_incidents
-    FOR EACH ROW EXECUTE FUNCTION foresift_refuse_mutation();
+    FOR EACH ROW EXECUTE FUNCTION foresift_refuse_objective_mutation();
 DROP TRIGGER IF EXISTS integrity_incidents_no_truncate ON integrity_incidents;
 CREATE TRIGGER integrity_incidents_no_truncate
     BEFORE TRUNCATE ON integrity_incidents
-    FOR EACH STATEMENT EXECUTE FUNCTION foresift_refuse_mutation();
+    FOR EACH STATEMENT EXECUTE FUNCTION foresift_refuse_objective_mutation();
 
 CREATE TABLE IF NOT EXISTS claim_scope_records (
     scope_id                     text PRIMARY KEY,
@@ -60,11 +60,11 @@ CREATE INDEX IF NOT EXISTS claim_scope_records_run_idx ON claim_scope_records (r
 DROP TRIGGER IF EXISTS claim_scope_records_no_update ON claim_scope_records;
 CREATE TRIGGER claim_scope_records_no_update
     BEFORE UPDATE OR DELETE ON claim_scope_records
-    FOR EACH ROW EXECUTE FUNCTION foresift_refuse_mutation();
+    FOR EACH ROW EXECUTE FUNCTION foresift_refuse_objective_mutation();
 DROP TRIGGER IF EXISTS claim_scope_records_no_truncate ON claim_scope_records;
 CREATE TRIGGER claim_scope_records_no_truncate
     BEFORE TRUNCATE ON claim_scope_records
-    FOR EACH STATEMENT EXECUTE FUNCTION foresift_refuse_mutation();
+    FOR EACH STATEMENT EXECUTE FUNCTION foresift_refuse_objective_mutation();
 
 CREATE TABLE IF NOT EXISTS promotion_decisions (
     decision_id      text PRIMARY KEY,
@@ -83,11 +83,11 @@ CREATE INDEX IF NOT EXISTS promotion_decisions_run_idx ON promotion_decisions (r
 DROP TRIGGER IF EXISTS promotion_decisions_no_update ON promotion_decisions;
 CREATE TRIGGER promotion_decisions_no_update
     BEFORE UPDATE OR DELETE ON promotion_decisions
-    FOR EACH ROW EXECUTE FUNCTION foresift_refuse_mutation();
+    FOR EACH ROW EXECUTE FUNCTION foresift_refuse_objective_mutation();
 DROP TRIGGER IF EXISTS promotion_decisions_no_truncate ON promotion_decisions;
 CREATE TRIGGER promotion_decisions_no_truncate
     BEFORE TRUNCATE ON promotion_decisions
-    FOR EACH STATEMENT EXECUTE FUNCTION foresift_refuse_mutation();
+    FOR EACH STATEMENT EXECUTE FUNCTION foresift_refuse_objective_mutation();
 
 CREATE TABLE IF NOT EXISTS output_language_screens (
     screen_id                text PRIMARY KEY,
@@ -111,8 +111,8 @@ CREATE INDEX IF NOT EXISTS output_language_screens_output_idx ON output_language
 DROP TRIGGER IF EXISTS output_language_screens_no_update ON output_language_screens;
 CREATE TRIGGER output_language_screens_no_update
     BEFORE UPDATE OR DELETE ON output_language_screens
-    FOR EACH ROW EXECUTE FUNCTION foresift_refuse_mutation();
+    FOR EACH ROW EXECUTE FUNCTION foresift_refuse_objective_mutation();
 DROP TRIGGER IF EXISTS output_language_screens_no_truncate ON output_language_screens;
 CREATE TRIGGER output_language_screens_no_truncate
     BEFORE TRUNCATE ON output_language_screens
-    FOR EACH STATEMENT EXECUTE FUNCTION foresift_refuse_mutation();
+    FOR EACH STATEMENT EXECUTE FUNCTION foresift_refuse_objective_mutation();

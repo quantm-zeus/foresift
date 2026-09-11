@@ -2,7 +2,7 @@
 -- Frozen objective runs with eight comparability dimensions and append-only
 -- semantics (FR-OBJ-001, FR-OBJ-002). Corrections are new runs, never edits.
 
-CREATE OR REPLACE FUNCTION foresift_refuse_mutation() RETURNS trigger AS $fn$
+CREATE OR REPLACE FUNCTION foresift_refuse_objective_mutation() RETURNS trigger AS $fn$
 BEGIN
     RAISE EXCEPTION 'frozen objective records are immutable: corrections are new runs'
         USING ERRCODE = 'restrict_violation';
@@ -43,8 +43,8 @@ CREATE INDEX IF NOT EXISTS objective_runs_universe_idx ON objective_runs
 DROP TRIGGER IF EXISTS objective_runs_no_update ON objective_runs;
 CREATE TRIGGER objective_runs_no_update
     BEFORE UPDATE OR DELETE ON objective_runs
-    FOR EACH ROW EXECUTE FUNCTION foresift_refuse_mutation();
+    FOR EACH ROW EXECUTE FUNCTION foresift_refuse_objective_mutation();
 DROP TRIGGER IF EXISTS objective_runs_no_truncate ON objective_runs;
 CREATE TRIGGER objective_runs_no_truncate
     BEFORE TRUNCATE ON objective_runs
-    FOR EACH STATEMENT EXECUTE FUNCTION foresift_refuse_mutation();
+    FOR EACH STATEMENT EXECUTE FUNCTION foresift_refuse_objective_mutation();

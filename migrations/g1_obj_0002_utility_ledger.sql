@@ -38,8 +38,8 @@ CREATE INDEX IF NOT EXISTS capital_day_utility_run_idx ON capital_day_utility (r
 DROP TRIGGER IF EXISTS capital_day_utility_no_update ON capital_day_utility;
 CREATE TRIGGER capital_day_utility_no_update
     BEFORE UPDATE OR DELETE ON capital_day_utility
-    FOR EACH ROW EXECUTE FUNCTION foresift_refuse_mutation();
+    FOR EACH ROW EXECUTE FUNCTION foresift_refuse_objective_mutation();
 DROP TRIGGER IF EXISTS capital_day_utility_no_truncate ON capital_day_utility;
 CREATE TRIGGER capital_day_utility_no_truncate
     BEFORE TRUNCATE ON capital_day_utility
-    FOR EACH STATEMENT EXECUTE FUNCTION foresift_refuse_mutation();
+    FOR EACH STATEMENT EXECUTE FUNCTION foresift_refuse_objective_mutation();

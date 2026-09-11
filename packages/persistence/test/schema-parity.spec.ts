@@ -7,6 +7,7 @@
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 import { PGlite } from '@electric-sql/pglite';
 import {
+  ALL_ACQUISITION_FAILURE_KINDS,
   ALL_ACQUISITION_STATES,
   ALL_AVAILABILITY_PROVENANCE_CLASSES,
   ALL_QUALITY_CODES,
@@ -49,6 +50,7 @@ const TYPE_CLASS: Record<string, string> = {
   'timestamp with time zone': 'date',
   jsonb: 'json',
   ARRAY: 'array',
+  interval: 'string', // drizzle `interval` maps to string (ISO 8601 duration)
 };
 
 let db: PGlite;
@@ -65,17 +67,29 @@ afterAll(async () => {
 });
 
 describe('Drizzle mirror parity with SQL truth (ADR-001)', () => {
+  // The mirror covers every schema the migrations create (public + the
+  // dedicated `sig` signal-registry schema). Parity is checked per qualified
+  // name so a table in `sig` can never shadow or be shadowed by a public one.
+  const QUALIFIED = (schema: string | undefined, name: string) =>
+    `${schema ? `${schema}.` : ''}${name}`;
+  const tableSchemas = (config: ReturnType<typeof getTableConfig>) =>
+    // drizzle leaves `schema` undefined for the default public schema
+    (config as { schema?: string }).schema ?? 'public';
+
   it('mirrors exactly the table set created by the migrations', async () => {
-    const sqlTables = await engine.query<{ table_name: string }>(
-      `SELECT table_name FROM information_schema.tables
-       WHERE table_schema = 'public'
+    const sqlTables = await engine.query<{ table_schema: string; table_name: string }>(
+      `SELECT table_schema, table_name FROM information_schema.tables
+       WHERE table_schema IN ('public', 'sig')
          AND table_name NOT LIKE '_foresift%'
-       ORDER BY table_name`,
+       ORDER BY table_schema, table_name`,
     );
-    const sqlNames = sqlTables.rows.map((r) => r.table_name).sort();
+    const sqlNames = sqlTables.rows.map((r) => QUALIFIED(r.table_schema, r.table_name)).sort();
 
     const mirrorNames = Object.values(mirror)
-      .map((v) => asTable(v)?.name)
+      .map((v) => {
+        const config = asTable(v);
+        return config ? QUALIFIED(tableSchemas(config), config.name) : undefined;
+      })
       .filter((n): n is string => n !== undefined)
       .sort();
 
@@ -89,6 +103,8 @@ describe('Drizzle mirror parity with SQL truth (ADR-001)', () => {
     for (const entry of Object.values(mirror)) {
       const config = asTable(entry);
       if (!config) continue; // non-table export
+      const tableSchema = tableSchemas(config);
+      const qualified = QUALIFIED(tableSchema, config.name);
       const sqlCols = await engine.query<{
         column_name: string;
         data_type: string;
@@ -97,12 +113,12 @@ describe('Drizzle mirror parity with SQL truth (ADR-001)', () => {
       }>(
         `SELECT column_name, data_type, is_nullable, udt_name
          FROM information_schema.columns
-         WHERE table_schema = 'public' AND table_name = $1
+         WHERE table_schema = $2 AND table_name = $1
          ORDER BY ordinal_position`,
-        [config.name],
+        [config.name, tableSchema],
       );
       if (sqlCols.rows.length === 0) {
-        failures.push(`${config.name}: exists in mirror but not in SQL`);
+        failures.push(`${qualified}: exists in mirror but not in SQL`);
         continue;
       }
 
@@ -112,26 +128,26 @@ describe('Drizzle mirror parity with SQL truth (ADR-001)', () => {
       for (const col of config.columns) {
         const sqlCol = byNameSql.get(col.name);
         if (!sqlCol) {
-          failures.push(`${config.name}.${col.name}: in mirror but missing in SQL`);
+          failures.push(`${qualified}.${col.name}: in mirror but missing in SQL`);
           continue;
         }
         const expectedClass = TYPE_CLASS[sqlCol.data_type];
         if (expectedClass === undefined) {
-          failures.push(`${config.name}.${col.name}: unmapped SQL type ${sqlCol.data_type}`);
+          failures.push(`${qualified}.${col.name}: unmapped SQL type ${sqlCol.data_type}`);
         } else if (col.dataType !== expectedClass) {
           failures.push(
-            `${config.name}.${col.name}: mirror type ${col.dataType} != SQL ${sqlCol.data_type} (${expectedClass})`,
+            `${qualified}.${col.name}: mirror type ${col.dataType} != SQL ${sqlCol.data_type} (${expectedClass})`,
           );
         }
         if (col.notNull !== (sqlCol.is_nullable === 'NO')) {
           failures.push(
-            `${config.name}.${col.name}: nullability mismatch (mirror notNull=${String(col.notNull)}, SQL=${sqlCol.is_nullable})`,
+            `${qualified}.${col.name}: nullability mismatch (mirror notNull=${String(col.notNull)}, SQL=${sqlCol.is_nullable})`,
           );
         }
       }
       for (const [name] of byNameSql) {
         if (!byNameMirror.has(name)) {
-          failures.push(`${config.name}.${name}: in SQL but missing in mirror`);
+          failures.push(`${qualified}.${name}: in SQL but missing in mirror`);
         }
       }
     }
@@ -139,17 +155,24 @@ describe('Drizzle mirror parity with SQL truth (ADR-001)', () => {
   });
 
   it('matches primary keys on every table', async () => {
-    const sqlPks = await engine.query<{ table_name: string; pk_cols: string[] }>(
-      `SELECT tc.table_name,
+    const sqlPks = await engine.query<{
+      table_schema: string;
+      table_name: string;
+      pk_cols: string[];
+    }>(
+      `SELECT tc.table_schema,
+              tc.table_name,
               ARRAY_AGG(kcu.column_name ORDER BY kcu.ordinal_position) AS pk_cols
        FROM information_schema.table_constraints tc
        JOIN information_schema.key_column_usage kcu
          ON tc.constraint_name = kcu.constraint_name
         AND tc.table_schema = kcu.table_schema
-       WHERE tc.table_schema = 'public' AND tc.constraint_type = 'PRIMARY KEY'
-       GROUP BY tc.table_name`,
+       WHERE tc.table_schema IN ('public', 'sig') AND tc.constraint_type = 'PRIMARY KEY'
+       GROUP BY tc.table_schema, tc.table_name`,
     );
-    const sqlPkMap = new Map(sqlPks.rows.map((r) => [r.table_name, [...r.pk_cols].sort()]));
+    const sqlPkMap = new Map(
+      sqlPks.rows.map((r) => [QUALIFIED(r.table_schema, r.table_name), [...r.pk_cols].sort()]),
+    );
 
     for (const entry of Object.values(mirror)) {
       const config = asTable(entry);
@@ -160,9 +183,10 @@ describe('Drizzle mirror parity with SQL truth (ADR-001)', () => {
         ...config.primaryKeys.flatMap((pk) => pk.columns.map((c) => c.name)),
         ...config.columns.filter((c) => c.primary).map((c) => c.name),
       ];
-      const expected = sqlPkMap.get(config.name);
-      expect(expected, `${config.name} missing PK in SQL`).toBeDefined();
-      expect([...mirrorPk].sort(), `${config.name} PK mismatch`).toEqual(expected!);
+      const qualified = QUALIFIED(tableSchemas(config), config.name);
+      const expected = sqlPkMap.get(qualified);
+      expect(expected, `${qualified} missing PK in SQL`).toBeDefined();
+      expect([...mirrorPk].sort(), `${qualified} PK mismatch`).toEqual(expected!);
     }
   });
 });
@@ -230,6 +254,7 @@ describe('§13.9 quality-code vocabulary parity (SQL truth ↔ domain)', () => {
       table: string;
       column: string;
       expected: readonly string[];
+      extraLiterals?: readonly string[];
     }[] = [
       {
         table: 'observations',
@@ -246,6 +271,17 @@ describe('§13.9 quality-code vocabulary parity (SQL truth ↔ domain)', () => {
         column: 'state',
         expected: ALL_ACQUISITION_STATES,
       },
+      // ADR-1 reconciliation: FAILED's failure_kind vocabulary lives in its
+      // own G1 CHECK; the state constraint text no longer lists the retired
+      // TIMED_OUT/INVALID_RESPONSE spellings. The composite
+      // acquisition_failure_kind_valid CHECK also pins `state = 'FAILED'`,
+      // so strip the comparison column's own literals before diffing.
+      {
+        table: 'evidence_acquisition_decisions',
+        column: 'failure_kind',
+        expected: ALL_ACQUISITION_FAILURE_KINDS,
+        extraLiterals: ['FAILED'],
+      },
       { table: 'recovery_tiers', column: 'data_class', expected: Object.values(RecoveryDataClass) },
       {
         table: 'protected_assets',
@@ -254,12 +290,24 @@ describe('§13.9 quality-code vocabulary parity (SQL truth ↔ domain)', () => {
       },
     ];
     for (const c of cases) {
+      // Match only the constraint that IS the column's own IN-list registry —
+      // `pg_get_constraintdef` renders it as `<col> = ANY (ARRAY[...])` or
+      // `<col> IN (...)`. Composite constraints that merely REFERENCE the
+      // column (e.g. the G1 acquisition_failure_kind_valid CHECK mentions
+      // both `state` and `failure_kind`, carrying the retired
+      // TIMED_OUT/INVALID_RESPONSE spellings as failure_kind vocabulary)
+      // must not pollute the state registry extraction.
       const checks = await engine.query<{ def: string }>(
         `SELECT pg_get_constraintdef(oid) AS def FROM pg_constraint
          WHERE contype = 'c'
            AND conrelid::regclass::text = $1
-           AND pg_get_constraintdef(oid) LIKE '%${c.column}%'`,
-        [c.table],
+           AND pg_get_constraintdef(oid) LIKE ('%' || $2 || ' = ANY (ARRAY[%')
+         UNION
+         SELECT pg_get_constraintdef(oid) FROM pg_constraint
+         WHERE contype = 'c'
+           AND conrelid::regclass::text = $1
+           AND pg_get_constraintdef(oid) LIKE ('%' || $2 || ' IN (%')`,
+        [c.table, c.column],
       );
       expect(
         checks.rows.length,
@@ -273,7 +321,7 @@ describe('§13.9 quality-code vocabulary parity (SQL truth ↔ domain)', () => {
       }
       // The IN-list values are a subset of the constraint text; compare only
       // when this table's own list is complete (skip composite constraints).
-      const fullList = [...listed].sort();
+      const fullList = [...listed].filter((v) => !(c.extraLiterals ?? []).includes(v)).sort();
       expect(fullList.length > 0, `${c.table}.${c.column}: extracted values`).toBe(true);
       expect([...c.expected].sort(), `${c.table}.${c.column} drifts from domain registry`).toEqual(
         fullList,

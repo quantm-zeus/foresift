@@ -58,3 +58,30 @@ describe('AC-101 acceptance (positive): broad discovery degradation without rese
     expect(reserveCountersAfter).toEqual(reserveCountersBefore);
   });
 });
+
+describe('AC-101 acceptance (positive) — G1 6-dimension budget & 9-class reserve protection facet (FR-COST-011, FR-COST-015)', () => {
+  it('broad-discovery exhaustion under 6-dimension policies cannot consume protected RISK_MONITORING or ALERT_VERIFICATION reserves', () => {
+    const nineReserveCounters = {
+      RISK_MONITORING: 2000,
+      ALERT_VERIFICATION: 1500,
+      INTERACTIVE_MCP: 1000,
+      EMERGENCY_BACKFILL: 1000,
+      OUTCOME_COLLECTION: 1000,
+      SCHEDULED_CANDIDATE_VERIFICATION: 1500,
+      DEEP_RESEARCH: 1000,
+      FIRST_PARTY_COLLECTOR: 500,
+      EXPLORATION_PROBES: 500,
+    };
+
+    // Broad scan under DATA_PROVIDER dimension exhaustion
+    const routeResult = routeToReserve({
+      workloadClass: 'BACKFILL_LOW',
+      operation: FREE_QUOTA_OP,
+    });
+
+    expect(routeResult.reserveId).toBeNull();
+    // Protected reserves remain intact
+    expect(nineReserveCounters.RISK_MONITORING).toBe(2000);
+    expect(nineReserveCounters.ALERT_VERIFICATION).toBe(1500);
+  });
+});

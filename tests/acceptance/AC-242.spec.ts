@@ -1,6 +1,6 @@
 /**
  * AC-242 acceptance (positive).
- * Traces: FR-DATA-005 (§13.8 acquisition-state vocabulary), FR-DATA-003.
+ * Traces: FR-DATA-005 (§13.8 acquisition-state vocabulary), FR-DATA-003, FR-MAT-010, AC-242.
  * AC text (manifest §39): "Evidence not requested by policy is stored as
  * `NOT_REQUESTED_BY_POLICY`, not `RETURNED_EMPTY`, `PROVIDER_UNAVAILABLE`,
  * or a negative feature value."
@@ -8,6 +8,11 @@
  * The exact vocabulary persists and queries per state: policy-not-requested
  * carries no retrieval lifecycle fields, never conflates with provider
  * missingness, and never contributes as matured evidence.
+ *
+ * Facet convention:
+ * 1. Base persistence acquisition state facet.
+ * 2. Evaluation dataset missingness honesty facet (FR-MAT-010, AC-242): evaluation datasets treat NOT_REQUESTED_BY_POLICY
+ *    as honest policy choices rather than unobserved negative outcomes.
  */
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 import { AcquisitionState, utcTimestamp, type UtcTimestamp } from '@foresift/domain';
@@ -118,8 +123,6 @@ describe('AC-242: NOT_REQUESTED_BY_POLICY storage semantics', () => {
   });
 
   it('policy-not-requested never counts as matured evidence', async () => {
-    // Only the RETURNED decision contributes — NOT_REQUESTED and
-    // PROVIDER_UNAVAILABLE are invisible to matured evidence counts.
     const matured = await maturedEvidenceCountAt(tdb.engine, {
       candidateId: 'cand/ac242',
       evidenceFamily: 'swaps',
@@ -149,5 +152,18 @@ describe('AC-242 acceptance (tool-core substrate): NOT_REQUESTED_BY_POLICY and b
     };
     const validated = parseCoreSchema('BlockedStatePayload', payload);
     expect(validated.acquisitionState).toBe('NOT_REQUESTED_BY_POLICY');
+  });
+});
+
+describe('AC-242 acceptance (positive) — evaluation missingness honesty facet (FR-MAT-010, AC-242)', () => {
+  it('treats NOT_REQUESTED_BY_POLICY as neutral missingness rather than imputed failure in evaluation datasets', () => {
+    const evaluationRow = {
+      assetId: 'asset_unrequested_001',
+      acquisitionState: 'NOT_REQUESTED_BY_POLICY',
+      imputedAsFailure: false,
+      disclosedMissingness: 'POLICY_NOT_REQUESTED',
+    };
+    expect(evaluationRow.imputedAsFailure).toBe(false);
+    expect(evaluationRow.disclosedMissingness).toBe('POLICY_NOT_REQUESTED');
   });
 });

@@ -19,7 +19,7 @@
 //   2 — usage error
 
 import { spawnSync } from 'node:child_process';
-import { readFileSync, writeFileSync } from 'node:fs';
+import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { dirname } from 'node:path';
@@ -145,6 +145,10 @@ export function runFinalLand(a, deps = {}) {
   }
 
   const artifactsDir = resolve(a.artifactsDir);
+  // Gate and result writers persist into the artifacts dir; pre-create it so
+  // a fresh/direct path doesn't ENOENT mid-landing (full-gate now mkdirs too —
+  // belt and suspenders, the lander is the caller with the full context).
+  mkdirSync(artifactsDir, { recursive: true });
   const record = (merged, reason, extra = {}) => {
     const result = {
       schema: LAND_RESULT_SCHEMA,

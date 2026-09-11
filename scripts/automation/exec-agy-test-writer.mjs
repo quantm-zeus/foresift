@@ -4,12 +4,14 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { classifyOwnedPath, validateLaneOwnership } from './path-ownership.mjs';
+import { lockfileWorkspaceRegistrationOnly } from './wave-guard-lockfile.mjs';
 import { acquireLanePermit, releaseLanePermit, resolvePoolStateDir } from './provider-pool.mjs';
 import {
   claimCompletedUnits,
   laneEvidencePaths,
   parseTaskGraph,
   requireTaskGraphForCompletionEvidence,
+  splitSymlinks,
 } from './writer-task-evidence.mjs';
 
 function fail(message) {
@@ -98,7 +100,18 @@ export function runAgyTestWriter(input) {
   });
   const resultDir = input['results-dir'];
   mkdirSync(resultDir, { recursive: true });
-  const baseHead = git(['rev-parse', 'HEAD'], input.worktree).stdout.trim();
+  // LOGICAL-LANE evidence baseline (maintainer Part A4, 2026-09-03): the
+  // evidence range must cover the LANE, not the retry attempt. --lane-base is
+  // the immutable worktree base persisted once by wave prep; on a workflow
+  // retry the worktree HEAD already carries earlier attempts' valid commits,
+  // and deriving the baseline from HEAD would silently drop them from the
+  // ownership/scope evidence scan. Fail closed when absent: a missing lane
+  // base falls back to the attempt-start HEAD (legacy behavior) — the
+  // ownership guard then still scans the union with uncommitted paths, so
+  // unknown-truth degrades conservatively, never permissively.
+  const baseHead = input['lane-base']
+    ? String(input['lane-base']).trim()
+    : git(['rev-parse', 'HEAD'], input.worktree).stdout.trim();
   const allowedPaths = input['allowed-paths']
     ? new Set(JSON.parse(readFileSync(input['allowed-paths'], 'utf8')))
     : null;
@@ -177,8 +190,13 @@ export function runAgyTestWriter(input) {
     .stdout.split('\n')
     .filter(Boolean)
     .map((line) => line.slice(3).split(' -> ').at(-1));
-  if (dirty.length) {
-    git(['add', '--all'], input.worktree);
+  // Symlink commit-safety (live 486a44d0): the lane agent symlinked
+  // node_modules; `add --all` staged the symlink blob (gitignore's
+  // `node_modules/` matches directories, not symlinks) and the ownership
+  // guard then refused the whole lane. Commit ONLY real files.
+  const { clean: commitable } = splitSymlinks(input.worktree, dirty);
+  if (commitable.length) {
+    git(['add', '--', ...commitable], input.worktree);
     const commit = git(
       [
         '-c',
@@ -197,6 +215,31 @@ export function runAgyTestWriter(input) {
   let changedPaths = git(['diff', '--name-only', `${baseHead}..${head}`], input.worktree)
     .stdout.split('\n')
     .filter(Boolean);
+  // Symlinks are tooling plumbing, never authorship evidence (live 486a44d0).
+  changedPaths = splitSymlinks(input.worktree, changedPaths).clean;
+  // Root-lockfile carve-out (same law as wave-guard.mjs, live 38e80af1): a NEW
+  // workspace package created by an integrated implementation lane makes the
+  // lane's own `pnpm install` additively register the importer block in
+  // pnpm-lock.yaml. That registration is plumbing, not dependency authorship —
+  // filtered here ONLY when the diff is a pure workspace-importer registration
+  // mirroring an existing package.json (lockfileWorkspaceRegistrationOnly).
+  // Every other pnpm-lock.yaml shape stays a PRODUCT ownership violation.
+  const lockfileDiff = git(
+    ['diff', `${baseHead}..${head}`, '--', 'pnpm-lock.yaml'],
+    input.worktree,
+  );
+  if (
+    changedPaths.includes('pnpm-lock.yaml') &&
+    lockfileDiff.ok &&
+    lockfileWorkspaceRegistrationOnly(lockfileDiff.stdout, input.worktree, (cmd) =>
+      git(cmd.split(/\s+/), input.worktree),
+    )
+  ) {
+    changedPaths = changedPaths.filter((p) => p !== 'pnpm-lock.yaml');
+    console.error(
+      'agy-test-writer: pnpm-lock.yaml admitted as workspace-importer registration (root-lockfile carve-out)',
+    );
+  }
   const ownership = validateLaneOwnership({ engine: 'AGY', role: 'test', changedPaths });
   if (!ownership.ok)
     throw new Error(`${ownership.violationCode}: ${ownership.violatingPaths.join(',')}`);
@@ -279,6 +322,24 @@ export function runAgyTestWriter(input) {
     changedPaths = git(['diff', '--name-only', `${baseHead}..${head}`], input.worktree)
       .stdout.split('\n')
       .filter(Boolean);
+    changedPaths = splitSymlinks(input.worktree, changedPaths).clean;
+    // Same root-lockfile carve-out as the pre-repair check above: the lockfile
+    // shape cannot change from registration-only to authorship by a type
+    // repair (which only touches TEST-owned files), but the diff now spans
+    // base..repaired-head and must be re-evaluated against the same law.
+    const lockfileDiff2 = git(
+      ['diff', `${baseHead}..${head}`, '--', 'pnpm-lock.yaml'],
+      input.worktree,
+    );
+    if (
+      changedPaths.includes('pnpm-lock.yaml') &&
+      lockfileDiff2.ok &&
+      lockfileWorkspaceRegistrationOnly(lockfileDiff2.stdout, input.worktree, (cmd) =>
+        git(cmd.split(/\s+/), input.worktree),
+      )
+    ) {
+      changedPaths = changedPaths.filter((p) => p !== 'pnpm-lock.yaml');
+    }
     const ownership2 = validateLaneOwnership({ engine: 'AGY', role: 'test', changedPaths });
     if (!ownership2.ok)
       throw new Error(`${ownership2.violationCode}: ${ownership2.violatingPaths.join(',')}`);
@@ -319,6 +380,14 @@ export function runAgyTestWriter(input) {
     model: route.model,
     reasoning: route.reasoning,
     providerTimeout: route.providerTimeout,
+    // baseSha is the integrator-required field (integrate-writer-results.mjs
+    // rejects any result missing branch/headSha/baseSha). Live f02e8580,
+    // 2026-09-09: this writer emitted only `baseHead` — a naming divergence
+    // from wave-guard.mjs's result schema — so a fully successful AGY test
+    // lane (test-author-1, T006/T016/T020 complete) was deterministically
+    // rejected at integration and its verified work stranded on the lane
+    // branch. baseHead stays for artifact-compat with older capsules.
+    baseSha: baseHead,
     baseHead,
     // Evidence-backed nominations (H3 P0-1): diff-proven ids only; an empty
     // diff or a missing task graph nominates nothing (fail-closed).

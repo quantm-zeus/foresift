@@ -1,0 +1,208 @@
+{
+  "$schema": "https://foresift.dev/schemas/telemetry-catalog-v1.json",
+  "catalog": "solsec",
+  "description": "Deterministic Solana token, transfer-semantics, pool-security, provider-conflict, and system-address exclusion telemetry contracts.",
+  "contractStatus": "DECLARATIVE_CONTRACT_ONLY — this file defines the event contracts the requirement manifest maps to (telemetry/solsec.*); emitter wiring lands with the observability milestone (dependency group G2), so nothing publishes these event names yet. Field lists mirror the authoritative schemas in packages/shared-schemas/src/solsec.ts exactly.",
+  "requirementsCovered": [
+    "FR-SOLSEC-001",
+    "FR-SOLSEC-002",
+    "FR-SOLSEC-003",
+    "FR-SOLSEC-005",
+    "FR-SOLSEC-006"
+  ],
+  "recoveryDataClass": "CRITICAL_METADATA",
+  "events": [
+    {
+      "name": "token.assessed",
+      "description": "A versioned deterministic assessment identified a token program and its aggregate transfer-semantics support.",
+      "authoritativeSchema": "TokenProgramAssessmentSchema",
+      "requirementRefs": ["FR-SOLSEC-001", "FR-SOLSEC-002"],
+      "tier": "CRITICAL_METADATA",
+      "fields": [
+        { "name": "assessmentId", "type": "string", "required": true },
+        { "name": "assetRepresentationId", "type": "string", "required": true },
+        { "name": "chainId", "type": "string<caip-2>", "required": true },
+        { "name": "programOwner", "type": "string", "required": true },
+        { "name": "programVersion", "type": "string", "required": true },
+        { "name": "analyzerVersion", "type": "string", "required": true },
+        { "name": "decimals", "type": "integer[0,255]", "required": true },
+        { "name": "totalSupplyRaw", "type": "string<digits>", "required": true },
+        {
+          "name": "transferSemanticsSupport",
+          "type": "string(KNOWN_MODELED|KNOWN_UNMODELED|UNKNOWN_REQUIRED|NOT_PRESENT)",
+          "required": true
+        },
+        { "name": "deterministicEvidenceIds", "type": "array<string>", "required": true },
+        { "name": "observedAt", "type": "string<utc-timestamp>", "required": true },
+        { "name": "availableAt", "type": "string<utc-timestamp>", "required": true },
+        { "name": "qualityCodes", "type": "array<string>", "required": true },
+        { "name": "schemaRegistryVersion", "type": "integer(1)", "required": true }
+      ]
+    },
+    {
+      "name": "token.extension_parsed",
+      "description": "A token extension was parsed into a versioned support verdict with immutable extension data evidence.",
+      "authoritativeSchema": "TokenExtensionSupportSchema",
+      "requirementRefs": ["FR-SOLSEC-001", "FR-SOLSEC-002"],
+      "tier": "CRITICAL_METADATA",
+      "fields": [
+        { "name": "assessmentId", "type": "string", "required": true },
+        { "name": "extensionType", "type": "string", "required": true },
+        { "name": "extensionDataHash", "type": "string<sha256-ref>", "required": true },
+        {
+          "name": "support",
+          "type": "string(KNOWN_MODELED|KNOWN_UNMODELED|UNKNOWN_REQUIRED|NOT_PRESENT)",
+          "required": true
+        },
+        { "name": "verdictPolicyVersion", "type": "string", "required": true },
+        { "name": "observedAt", "type": "string<utc-timestamp>", "required": true },
+        { "name": "availableAt", "type": "string<utc-timestamp>", "required": true },
+        { "name": "qualityCodes", "type": "array<string>", "required": true }
+      ]
+    },
+    {
+      "name": "token.transfer_semantics_verdict",
+      "description": "A deterministic token control finding received its fail-closed state and policy severity.",
+      "authoritativeSchema": "TokenControlFindingSchema",
+      "requirementRefs": ["FR-SOLSEC-001", "FR-SOLSEC-002"],
+      "tier": "CRITICAL_METADATA",
+      "fields": [
+        { "name": "findingId", "type": "string", "required": true },
+        { "name": "assessmentId", "type": "string", "required": true },
+        {
+          "name": "control",
+          "type": "string(MINT|FREEZE|PERMANENT_DELEGATE|TRANSFER_FEE|TRANSFER_HOOK|CLOSE|METADATA_UPDATE|DEFAULT_STATE|NON_TRANSFERABLE|CONFIDENTIAL_TRANSFER|UNKNOWN_EXTENSION)",
+          "required": true
+        },
+        {
+          "name": "controlState",
+          "type": "string(KNOWN_RISK|ADMINISTRATIVE_CONTROL|NEUTRAL_CONFIGURATION|REVOKED_AUTHORITY|UNABLE_TO_VERIFY)",
+          "required": true
+        },
+        {
+          "name": "severity",
+          "type": "string(CRITICAL|HIGH|MEDIUM|LOW|NONE)|null",
+          "required": true
+        },
+        { "name": "authorityAddress", "type": "string|null", "required": true },
+        { "name": "extensionDataHash", "type": "string<sha256-ref>|null", "required": true },
+        { "name": "evidenceIds", "type": "array<string>", "required": true },
+        { "name": "observedAt", "type": "string<utc-timestamp>", "required": true },
+        { "name": "availableAt", "type": "string<utc-timestamp>", "required": true },
+        { "name": "qualityCodes", "type": "array<string>", "required": true }
+      ]
+    },
+    {
+      "name": "pool.security_assessed",
+      "description": "An allowlisted adapter produced a point-in-time assessment of LP control, withdrawal authority, migration lineage, and liquidity-removal risk.",
+      "authoritativeSchema": "PoolSecurityAssessmentSchema",
+      "requirementRefs": ["FR-SOLSEC-003"],
+      "tier": "CRITICAL_METADATA",
+      "fields": [
+        { "name": "assessmentId", "type": "string", "required": true },
+        { "name": "poolId", "type": "string", "required": true },
+        { "name": "adapterId", "type": "string", "required": true },
+        { "name": "adapterVersion", "type": "string", "required": true },
+        {
+          "name": "adapterSupportState",
+          "type": "string(RESOLVED|DEGRADED_UNSUPPORTED|UNABLE_TO_VERIFY)",
+          "required": true
+        },
+        {
+          "name": "lpControlState",
+          "type": "string(BURNED|LOCKED|DISTRIBUTED|CONCENTRATED_CONTROL|UNABLE_TO_VERIFY)|null",
+          "required": true
+        },
+        {
+          "name": "withdrawalAuthorityState",
+          "type": "string(NONE|REVOKED|ACTIVE|UNABLE_TO_VERIFY)|null",
+          "required": true
+        },
+        {
+          "name": "liquidityRemovalRisk",
+          "type": "string(CRITICAL|HIGH|MEDIUM|LOW|NONE|UNABLE_TO_VERIFY)|null",
+          "required": true
+        },
+        {
+          "name": "quoteParityState",
+          "type": "string(PASSED|FAILED|NOT_APPLICABLE|UNABLE_TO_VERIFY)|null",
+          "required": true
+        },
+        {
+          "name": "stateCompleteness",
+          "type": "string(COMPLETE|PARTIAL|INCOMPLETE|UNABLE_TO_VERIFY)|null",
+          "required": true
+        },
+        { "name": "migrationLineageId", "type": "string|null", "required": true },
+        { "name": "liquidityConcentration", "type": "string<decimal>|null", "required": true },
+        { "name": "observedAt", "type": "string<utc-timestamp>", "required": true },
+        { "name": "availableAt", "type": "string<utc-timestamp>", "required": true },
+        { "name": "evidenceIds", "type": "array<string>", "required": true },
+        { "name": "qualityCodes", "type": "array<string>", "required": true },
+        { "name": "schemaRegistryVersion", "type": "integer(1)", "required": true }
+      ]
+    },
+    {
+      "name": "security.provider_report_received",
+      "description": "An external provider report was retained as independent evidence without changing deterministic findings.",
+      "authoritativeSchema": "SecurityProviderReportSchema",
+      "requirementRefs": ["FR-SOLSEC-005"],
+      "tier": "CRITICAL_METADATA",
+      "fields": [
+        { "name": "reportId", "type": "string", "required": true },
+        { "name": "assessmentId", "type": "string", "required": true },
+        { "name": "sourceId", "type": "string", "required": true },
+        { "name": "providerReportId", "type": "string", "required": true },
+        { "name": "providerVersion", "type": "string", "required": true },
+        {
+          "name": "verdict",
+          "type": "string(SAFE|RISK_DETECTED|UNABLE_TO_VERIFY)",
+          "required": true
+        },
+        { "name": "rawPayloadRef", "type": "string<sha256-ref>", "required": true },
+        { "name": "findingIds", "type": "array<string>", "required": true },
+        { "name": "observedAt", "type": "string<utc-timestamp>", "required": true },
+        { "name": "availableAt", "type": "string<utc-timestamp>", "required": true },
+        { "name": "qualityCodes", "type": "array<string>", "required": true }
+      ]
+    },
+    {
+      "name": "security.conflict_recorded",
+      "description": "A provider/deterministic evidence conflict was resolved in favor of deterministic evidence and retained for audit.",
+      "authoritativeSchema": "SecurityConflictSchema",
+      "requirementRefs": ["FR-SOLSEC-001", "FR-SOLSEC-005"],
+      "tier": "CRITICAL_METADATA",
+      "fields": [
+        { "name": "conflictId", "type": "string", "required": true },
+        { "name": "assessmentId", "type": "string", "required": true },
+        { "name": "providerReportId", "type": "string", "required": true },
+        {
+          "name": "conflictClass",
+          "type": "string(PROVIDER_OPTIMISM_OVERRIDDEN|PROVIDER_RISK_UNCONFIRMED|PROVIDER_REPORTS_DISAGREE|DETERMINISTIC_EVIDENCE_DISAGREES)",
+          "required": true
+        },
+        { "name": "deterministicFindingIds", "type": "array<string>", "required": true },
+        { "name": "resolution", "type": "string(DETERMINISTIC)", "required": true },
+        { "name": "resolvedAt", "type": "string<utc-timestamp>", "required": true },
+        { "name": "availableAt", "type": "string<utc-timestamp>", "required": true }
+      ]
+    },
+    {
+      "name": "system_registry.exclusion_decided",
+      "description": "A registry-backed exclusion or refusal was audited while preserving the raw economic-flow reference.",
+      "authoritativeSchema": "SystemAddressExclusionAppliedSchema",
+      "requirementRefs": ["FR-SOLSEC-006"],
+      "tier": "CRITICAL_METADATA",
+      "fields": [
+        { "name": "exclusionId", "type": "string", "required": true },
+        { "name": "registryEntryId", "type": "string", "required": true },
+        { "name": "economicEventId", "type": "string", "required": true },
+        { "name": "excluded", "type": "boolean", "required": true },
+        { "name": "rawFlowRef", "type": "string<sha256-ref>", "required": true },
+        { "name": "appliedAt", "type": "string<utc-timestamp>", "required": true },
+        { "name": "registryVersion", "type": "integer", "required": true },
+        { "name": "qualityCodes", "type": "array<string>", "required": true }
+      ]
+    }
+  ]
+}

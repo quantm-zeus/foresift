@@ -4,7 +4,8 @@
 // exec-agy-test-writer so all three engines share ONE fail-closed protocol —
 // a writer may only nominate exact task IDs whose predicted writes actually
 // appear in the lane's own diff. Any DIFF never implies ALL assigned tasks.
-import { readFileSync } from 'node:fs';
+import { readFileSync, lstatSync } from 'node:fs';
+import { join } from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { nominateCompletedUnits, unitsIndexFromGraph } from './task-completion-evidence.mjs';
 
@@ -109,7 +110,43 @@ export function laneEvidencePaths({ worktree, before }) {
   const committed = gitOut(['diff', '--name-only', `${before}..${head}`], worktree)
     .split('\n')
     .filter(Boolean);
-  return [...new Set([...committed, ...statusPaths])];
+  // Symlink exclusion (live 486a44d0, 2026-09-03): the AGY lane symlinked
+  // node_modules to reuse the task worktree's installed workspace; the lane
+  // commit swallowed the symlink (gitignore's `node_modules/` matches
+  // directories, not a root symlink blob), and the ownership guard then
+  // refused the whole lane. A symlink is tooling plumbing, never authorship
+  // evidence — filter it from BOTH halves of the evidence union.
+  const isSymlink = (p) => {
+    try {
+      return lstatSync(join(worktree, p)).isSymbolicLink();
+    } catch {
+      return false;
+    }
+  };
+  return [...new Set([...committed, ...statusPaths])].filter((p) => !isSymlink(p));
+}
+
+/**
+ * Commit-safety filter (live 486a44d0): the dirty-path list a lane commits
+ * must exclude symlinks — they are tooling plumbing (a node_modules reuse
+ * link, a tmpdir link), never authorship, and once committed they poison
+ * every downstream diff scan and ownership check. `isSymlink` filters paths
+ * already known to git; `splitSymlinks` classifies a raw status/porcelain
+ * path list in one pass so callers can sweep only the clean remainder.
+ */
+export function splitSymlinks(worktree, paths) {
+  const clean = [];
+  const symlinked = [];
+  for (const p of paths) {
+    let sym = false;
+    try {
+      sym = lstatSync(join(worktree, p)).isSymbolicLink();
+    } catch {
+      sym = false; // unreadable/deleted between scan and filter ⇒ keep it; git add -- will simply no-op on it
+    }
+    (sym ? symlinked : clean).push(p);
+  }
+  return { clean, symlinked };
 }
 
 function gitOut(args, cwd) {

@@ -17,6 +17,7 @@ import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { repoRoot } from './schema.mjs';
 import { isCoordinatorTask } from './task-metadata.mjs';
+import { STATE_CONTROL_PLANE_SPECS } from './bun-migration-manifest.mjs';
 
 function fail(msg) {
   console.error(`wave-coordinator-duties: ${msg}`);
@@ -77,7 +78,12 @@ report.manifestRegenerated = true;
 // ── 2. manifest coverage assertion (fail-closed) ─────────────────────────────
 // Every new *.spec.ts/*.test.ts file on the canonical checkout must be
 // present in the regenerated manifest; a miss means `pnpm test` will never
-// see it and the wave would land invisible tests.
+// see it and the wave would land invisible tests. State-control-plane suites
+// (STATE_CONTROL_PLANE_SPECS) are excluded by design: the manifest generator
+// omits them because they run in the dedicated state-plane CI job, never via
+// the bun coordinator — demanding them here failed every duties run closed
+// (g1-outcome-evaluation T039, 2026-09-11) with MANIFEST_COVERAGE_MISSING for
+// files that must NOT be covered.
 const statusOut = spawnSync('git ls-files -co --exclude-standard', {
   shell: true,
   cwd: root,
@@ -90,7 +96,9 @@ const trackedTests = statusOut.stdout
 const manifestPaths = new Set(
   (JSON.parse(readFileSync(manifestPath, 'utf8')).files ?? []).map((f) => f.path),
 );
-const missing = trackedTests.filter((p) => !manifestPaths.has(p));
+const missing = trackedTests.filter(
+  (p) => !manifestPaths.has(p) && !STATE_CONTROL_PLANE_SPECS.includes(p),
+);
 if (missing.length > 0) fail(`MANIFEST_COVERAGE_MISSING: ${missing.join(', ')}`);
 report.manifestCoverage = { testFiles: trackedTests.length, missing: 0 };
 

@@ -1,0 +1,26 @@
+{
+  "name": "@foresift/evaluation",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Frozen deterministic evaluation, controls, baselines, and champion-challenger comparison.",
+  "exports": {
+    ".": {
+      "types": "./src/index.ts",
+      "default": "./src/index.ts"
+    }
+  },
+  "scripts": {
+    "test": "bun test"
+  },
+  "dependencies": {
+    "@foresift/discovery-universe": "workspace:*",
+    "@foresift/domain": "workspace:*",
+    "@foresift/evidence": "workspace:*",
+    "@foresift/execution-simulator": "workspace:*",
+    "@foresift/outcome-maturity": "workspace:*",
+    "@foresift/persistence": "workspace:*",
+    "@foresift/shared-schemas": "workspace:*",
+    "@foresift/signal-intelligence": "workspace:*"
+  }
+}

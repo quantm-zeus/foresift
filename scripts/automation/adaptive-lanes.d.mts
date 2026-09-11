@@ -9,6 +9,7 @@ export declare const LANE_COUNT_LIMITS: { min: number; max: number; default: num
 export declare function resolveAdaptiveLaneCount(input?: {
   openTaskCount?: number;
   parallelizableCount?: number;
+  parallelizableReadyCount?: number;
   disjointShardNeed?: number | null;
   governorState?: string;
   codexLimit?: number;

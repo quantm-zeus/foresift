@@ -1,0 +1,169 @@
+{
+  "schema": "foresift/sig-cohort-fallback@1",
+  "fallbackHierarchyOrder": [
+    "EXACT_COHORT",
+    "REMOVE_NARRATIVE",
+    "REMOVE_REGIME",
+    "WIDEN_MARKET_CAP_BAND",
+    "WIDEN_AGE_BAND",
+    "CHAIN_LAUNCHPAD",
+    "OWN_HISTORY_ANOMALY"
+  ],
+  "hierarchyResolutionVectors": [
+    {
+      "name": "level_1_exact_cohort_sufficient_sample",
+      "targetEntity": {
+        "chain": "solana",
+        "launchpad": "pump_fun",
+        "ageBand": "1h_to_24h",
+        "marketCapBand": "50k_to_250k",
+        "liquidityBand": "10k_to_50k",
+        "narrative": "ai_agents",
+        "regime": "HIGH_VOLATILITY"
+      },
+      "availablePeersCount": 45,
+      "minimumSampleThreshold": 20,
+      "expectedFallbackLevel": "EXACT_COHORT",
+      "expectedCohortSize": 45,
+      "expectedEffectiveSampleSize": 41.2,
+      "expectedLowSampleWarning": false,
+      "peerPercentile": 0.88
+    },
+    {
+      "name": "level_2_remove_narrative_when_exact_sparse",
+      "targetEntity": {
+        "chain": "solana",
+        "launchpad": "pump_fun",
+        "ageBand": "1h_to_24h",
+        "marketCapBand": "50k_to_250k",
+        "liquidityBand": "10k_to_50k",
+        "narrative": "obscure_niche",
+        "regime": "HIGH_VOLATILITY"
+      },
+      "availablePeersCountExact": 3,
+      "availablePeersWithoutNarrative": 38,
+      "minimumSampleThreshold": 20,
+      "expectedFallbackLevel": "REMOVE_NARRATIVE",
+      "expectedCohortSize": 38,
+      "expectedEffectiveSampleSize": 35.0,
+      "expectedLowSampleWarning": false,
+      "peerPercentile": 0.72
+    },
+    {
+      "name": "level_3_remove_regime_when_sparse",
+      "targetEntity": {
+        "chain": "solana",
+        "launchpad": "pump_fun",
+        "ageBand": "1h_to_24h",
+        "marketCapBand": "50k_to_250k",
+        "liquidityBand": "10k_to_50k",
+        "narrative": null,
+        "regime": "FLASH_CRASH_REGIME"
+      },
+      "availablePeersWithoutRegime": 40,
+      "minimumSampleThreshold": 20,
+      "expectedFallbackLevel": "REMOVE_REGIME",
+      "expectedCohortSize": 40,
+      "expectedEffectiveSampleSize": 37.5,
+      "expectedLowSampleWarning": false,
+      "peerPercentile": 0.65
+    },
+    {
+      "name": "level_4_widen_market_cap_band",
+      "targetEntity": {
+        "chain": "solana",
+        "launchpad": "pump_fun",
+        "ageBand": "1h_to_24h",
+        "marketCapBand": "10m_plus",
+        "liquidityBand": "10k_to_50k",
+        "narrative": null,
+        "regime": null
+      },
+      "availablePeersWiderMarketCap": 28,
+      "minimumSampleThreshold": 20,
+      "expectedFallbackLevel": "WIDEN_MARKET_CAP_BAND",
+      "expectedCohortSize": 28,
+      "expectedEffectiveSampleSize": 24.1,
+      "expectedLowSampleWarning": false,
+      "peerPercentile": 0.54
+    },
+    {
+      "name": "level_5_widen_age_band",
+      "targetEntity": {
+        "chain": "solana",
+        "launchpad": "raydium_cpmm",
+        "ageBand": "30d_plus",
+        "marketCapBand": "any",
+        "liquidityBand": "10k_to_50k",
+        "narrative": null,
+        "regime": null
+      },
+      "availablePeersWiderAge": 22,
+      "minimumSampleThreshold": 20,
+      "expectedFallbackLevel": "WIDEN_AGE_BAND",
+      "expectedCohortSize": 22,
+      "expectedEffectiveSampleSize": 19.8,
+      "expectedLowSampleWarning": true,
+      "peerPercentile": 0.49
+    },
+    {
+      "name": "level_6_chain_and_launchpad_only",
+      "targetEntity": {
+        "chain": "solana",
+        "launchpad": "moonshot",
+        "ageBand": "any",
+        "marketCapBand": "any",
+        "liquidityBand": "any",
+        "narrative": null,
+        "regime": null
+      },
+      "availablePeersChainLaunchpad": 25,
+      "minimumSampleThreshold": 20,
+      "expectedFallbackLevel": "CHAIN_LAUNCHPAD",
+      "expectedCohortSize": 25,
+      "expectedEffectiveSampleSize": 21.0,
+      "expectedLowSampleWarning": false,
+      "peerPercentile": 0.4
+    },
+    {
+      "name": "level_7_own_history_anomaly_isolated_asset",
+      "targetEntity": {
+        "chain": "solana",
+        "launchpad": "custom_pool",
+        "ageBand": "any",
+        "marketCapBand": "any",
+        "liquidityBand": "any",
+        "narrative": null,
+        "regime": null
+      },
+      "availablePeersChainLaunchpad": 1,
+      "ownHistoricalObservations": 30,
+      "minimumSampleThreshold": 20,
+      "expectedFallbackLevel": "OWN_HISTORY_ANOMALY",
+      "expectedCohortSize": 1,
+      "expectedEffectiveSampleSize": 1.0,
+      "expectedLowSampleWarning": true,
+      "peerPercentile": 0.5
+    }
+  ],
+  "shrinkageVectors": [
+    {
+      "name": "small_sample_heavy_shrinkage_to_prior",
+      "sampleValue": 0.9,
+      "sampleSize": 2,
+      "cohortPriorMean": 0.2,
+      "priorWeight": 10,
+      "expectedShrunkValue": 0.31667,
+      "tolerance": 0.001
+    },
+    {
+      "name": "large_sample_minimal_shrinkage",
+      "sampleValue": 0.9,
+      "sampleSize": 100,
+      "cohortPriorMean": 0.2,
+      "priorWeight": 10,
+      "expectedShrunkValue": 0.83636,
+      "tolerance": 0.001
+    }
+  ]
+}

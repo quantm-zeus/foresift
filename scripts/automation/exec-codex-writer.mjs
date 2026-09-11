@@ -11,6 +11,7 @@ import {
   laneEvidencePaths,
   parseTaskGraph,
   requireTaskGraphForCompletionEvidence,
+  splitSymlinks,
 } from './writer-task-evidence.mjs';
 import { executeHandoffToClaude, isQuotaHandoffReason } from './engine-handoff.mjs';
 import { runClaudeLaneCore } from './claude-lane-core.mjs';
@@ -51,6 +52,12 @@ export function classifyCodexExit(result) {
   if (result?.error?.code === 'ETIMEDOUT') return 'TIMEOUT';
   if (result?.status === 0) return 'SUCCESS';
   const detail = `${result?.stderr ?? ''}\n${result?.stdout ?? ''}`;
+  // Provider auth death (live 56ff5563/e9631c56: 401 Unauthorized + refresh
+  // token already used) is a PROVIDER failure, never a semantic one — the
+  // old classification cleared the pool latch and burned retry churn on a
+  // dead credential.
+  if (/\b401\b|\bunauthorized\b|refresh token was already used|please log (?:out|in)/i.test(detail))
+    return 'AUTH_PROVIDER_FAILURE';
   if (/429|rate.?limit|temporar|connection|timeout|unavailable/i.test(detail))
     return 'TRANSIENT_PROVIDER_FAILURE';
   return 'SEMANTIC_OR_PROVIDER_FAILURE';
@@ -78,8 +85,24 @@ export function codexProviderEvent(classification, detail) {
   // blast radius even for a false positive.
   if (/\b(?:HTTP\s*)?429\b|\brate.?limit\b|\b503\b|\boverloaded\b/i.test(text))
     return { event: 'near_limit' };
+  // TRUE credit exhaustion (live b20e5ea8): "Your workspace is out of
+  // credits. Add credits to continue." arrives as a stream-JSON error in
+  // STDOUT (stderr empty), so the earlier classification saw
+  // SEMANTIC_OR_PROVIDER_FAILURE and the quota handoff never fired — every
+  // retry burned an identical writer attempt. The provider-voiced phrase is
+  // unambiguous (no transcript-diff false-positive shape) and latching it
+  // makes the NEXT acquire in the same wave deny with CODEX_QUOTA_EXHAUSTED,
+  // which hands the lane to Claude (H3 P0-4) instead of dying again.
+  if (/\bout of credits\b|\badd credits to continue\b/i.test(text)) return { event: 'exhausted' };
   if (/\busage.?limit\b|\bquota\b|\bexhaust(?:ed|ion)\b|\busage limit reached\b/i.test(text))
     return { event: 'exhausted' };
+  // Auth death (401/refresh-token reuse): the provider is UNAVAILABLE for
+  // every subsequent call until re-credentialing — latch it so the next
+  // acquire denies and the lane hands off, instead of 'unknown' clearing
+  // the latch and retry-churning a dead credential.
+  if (classification === 'AUTH_PROVIDER_FAILURE') return { event: 'unavailable' };
+  if (/\b401\b|\bunauthorized\b|refresh token was already used/i.test(text))
+    return { event: 'unavailable' };
   return { event: 'unknown' };
 }
 
@@ -122,7 +145,15 @@ export function runCodexWriter(input) {
   const brief = readFileSync(input.brief, 'utf8');
   const resultDir = input['results-dir'];
   mkdirSync(resultDir, { recursive: true });
-  const before = git(['rev-parse', 'HEAD'], input.worktree).stdout.trim();
+  // LOGICAL-LANE evidence baseline (maintainer Part A4, 2026-09-03): prefer
+  // the immutable --lane-base persisted by wave prep over the attempt-start
+  // HEAD, so a workflow retry's evidence scan still covers earlier attempts'
+  // valid commits in the same lane worktree. Absent --lane-base, fall back
+  // to the attempt-start HEAD (legacy behavior; conservative union with
+  // uncommitted paths keeps the evidence scan fail-closed).
+  const before = input['lane-base']
+    ? String(input['lane-base']).trim()
+    : git(['rev-parse', 'HEAD'], input.worktree).stdout.trim();
   const prompt = [
     brief,
     '',
@@ -132,6 +163,15 @@ export function runCodexWriter(input) {
     'tests. If a test conflicts with authoritative requirements, do not edit it;',
     'write TEST_DISPUTE evidence under the result artifact directory instead.',
     'Use non-interactive tools. Commit coherent production changes before exit.',
+    // Live run e32031f rider: dependency state is pre-installed. Package-manager
+    // invocations are workspace-registration authorship the write scopes never
+    // sanctioned (bun install created a root bun.lock + workspaces field in the
+    // claude lane core's run — guard-rejected). Never install, never lockfile.
+    'This repository uses pnpm (pnpm-workspace.yaml). Never run bun install,',
+    'npm install, or yarn; never create, modify, or commit any lockfile',
+    '(pnpm-lock.yaml, bun.lock, package-lock.json); never add a workspaces',
+    'field to any package.json. Dependencies are already installed — if a',
+    'build or test needs a missing dependency, report it as a blocker.',
   ].join('\n');
   const command = buildCodexExecArgs(route, { worktree: input.worktree });
   const started = Date.now();
@@ -192,27 +232,68 @@ export function runCodexWriter(input) {
     }
     throw new Error(`CODEX_WRITER_PERMIT_DENIED: ${permit.reason}`);
   }
+  const invokeCodex = input['codex-invoker'] ?? null; // test seam; production undefined
   let run;
   try {
-    run = spawnSync(command[0], command.slice(1), {
-      cwd: input.worktree,
-      input: `${prompt}\n`,
-      encoding: 'utf8',
-      timeout: Number(input['timeout-ms'] ?? 45 * 60_000),
-      maxBuffer: 64 * 1024 * 1024,
-    });
+    run = invokeCodex
+      ? invokeCodex()
+      : spawnSync(command[0], command.slice(1), {
+          cwd: input.worktree,
+          input: `${prompt}\n`,
+          encoding: 'utf8',
+          timeout: Number(input['timeout-ms'] ?? 45 * 60_000),
+          maxBuffer: 64 * 1024 * 1024,
+        });
   } finally {
     // Finally-equivalent release immediately AFTER lane termination (H2 §2).
     releaseLanePermit(stateDir, holder, 'codex');
   }
   const classification = classifyCodexExit(run);
+  const providerDetail = `${run?.stderr ?? ''}\n${run?.stdout ?? ''}`;
   // Engine-specific attribution (H2 §5/§6): healthy outcomes feed the Codex
   // quota machine; failures feed ONLY the Codex pool. Claude is untouched.
   try {
-    const event = codexProviderEvent(classification, `${run?.stderr ?? ''}\n${run?.stdout ?? ''}`);
+    const event = codexProviderEvent(classification, providerDetail);
     observeCodexOutcome(stateDir, event);
   } catch {
     /* attribution is best-effort telemetry; never mask the lane verdict */
+  }
+  // In-flight handoff (directive §8, live 56ff5563/e9631c56): when THIS
+  // invocation itself proved provider death — daily quota exhaustion or
+  // auth failure — do NOT throw the whole wave into a package-level
+  // QUOTA_DAILY park. Hand the SAME logical lane to Claude here: identical
+  // brief/worktree/task ids, no duplicate generation, no dual permits (the
+  // codex permit was already released above; executeHandoffToClaude only
+  // acquires the Claude permit under the same holder).
+  if (classification === 'AUTH_PROVIDER_FAILURE' && input['allow-engine-handoff'] !== 'false') {
+    return executeHandoffToClaude({
+      stateDir,
+      holder,
+      packageId: input.package,
+      generation,
+      laneId: input.lane,
+      runId: input['run-id'] ?? process.env.FORESIFT_RUN_ID ?? null,
+      resultDir,
+      releaseCodex: false, // released above; never double-release
+      handoffReason: `codex provider dead in-flight: ${providerDetail.slice(0, 160)}`,
+      executeWithClaude: () =>
+        runClaudeLaneCore({
+          lane: input.lane,
+          briefPath: input.brief,
+          worktree: input.worktree,
+          resultsDir: resultDir,
+          packageId: input.package,
+          generation,
+          runId: input['run-id'] ?? process.env.FORESIFT_RUN_ID ?? null,
+          taskIds: route.taskIds,
+          taskGraphPath: input['task-graph'] ?? null,
+          stateDir,
+          holder,
+          handedOffFrom: 'CODEX',
+          timeoutMs: input['timeout-ms'],
+          'claude-invoker': input['claude-invoker'] ?? null,
+        }),
+    });
   }
   writeFileSync(join(resultDir, 'codex-run.jsonl'), run.stdout ?? '');
   writeFileSync(
@@ -253,21 +334,27 @@ export function runCodexWriter(input) {
   if (!ownership.ok)
     throw new Error(`${ownership.violationCode}: ${ownership.violatingPaths.join(',')}`);
   if (dirty.length) {
-    const add = git(['add', '--all'], input.worktree);
-    if (add.status !== 0) throw new Error(`CODEX_GIT_ADD_FAILED: ${add.stderr}`);
-    const commit = git(
-      [
-        '-c',
-        'user.name=Foresift Codex Writer',
-        '-c',
-        'user.email=noreply@foresift.local',
-        'commit',
-        '-m',
-        `feat: Codex implementation lane ${input.lane}`,
-      ],
-      input.worktree,
-    );
-    if (commit.status !== 0) throw new Error(`CODEX_COMMIT_FAILED: ${commit.stderr}`);
+    // Symlink commit-safety (live 486a44d0): never stage symlinked paths —
+    // tooling plumbing, not authorship; a committed symlink poisons the
+    // ownership scan for the whole lane.
+    const { clean: commitable } = splitSymlinks(input.worktree, dirty);
+    if (commitable.length) {
+      const add = git(['add', '--', ...commitable], input.worktree);
+      if (add.status !== 0) throw new Error(`CODEX_GIT_ADD_FAILED: ${add.stderr}`);
+      const commit = git(
+        [
+          '-c',
+          'user.name=Foresift Codex Writer',
+          '-c',
+          'user.email=noreply@foresift.local',
+          'commit',
+          '-m',
+          `feat: Codex implementation lane ${input.lane}`,
+        ],
+        input.worktree,
+      );
+      if (commit.status !== 0) throw new Error(`CODEX_COMMIT_FAILED: ${commit.stderr}`);
+    }
   }
   const head = git(['rev-parse', 'HEAD'], input.worktree).stdout.trim();
   // Evidence-backed completion (H3 P0-1): the old invariant — ANY commit ⇒
@@ -309,19 +396,31 @@ export function runCodexWriter(input) {
   return { ok: true, route, result };
 }
 
+/**
+ * Final stdout summary for ONE writer invocation. Two success shapes arrive:
+ * the CODEX path returns { ok, route, result }; the codex→claude HANDOFF
+ * path returns the claude lane core's { ok, lane, result }. Live run
+ * be13c346: the handoff lane SUCCEEDED (result.json nominating T013, two
+ * commits on the lane branch) and then the summary crashed reading `.route`
+ * of the core's shape — the node failed AFTER 68 minutes of real work and
+ * the workflow retried a finished lane. Tolerates both shapes, fail-closed
+ * to nulls (never fabricates route fields the path did not produce).
+ */
+export function writerSummaryFor(result) {
+  return {
+    ok: true,
+    lane: result.route?.lane ?? result.lane,
+    model: result.route?.model ?? result.result?.engine ?? null,
+    reasoning: result.route?.reasoning ?? null,
+    serviceTier: result.route?.serviceTier ?? null,
+    headSha: result.result?.headSha,
+  };
+}
+
 if (process.argv[1]?.endsWith('exec-codex-writer.mjs')) {
   try {
     const result = runCodexWriter(parseArgs(process.argv.slice(2)));
-    console.log(
-      JSON.stringify({
-        ok: true,
-        lane: result.route.lane,
-        model: result.route.model,
-        reasoning: result.route.reasoning,
-        serviceTier: result.route.serviceTier,
-        headSha: result.result.headSha,
-      }),
-    );
+    console.log(JSON.stringify(writerSummaryFor(result)));
   } catch (error) {
     fail(error.message);
   }

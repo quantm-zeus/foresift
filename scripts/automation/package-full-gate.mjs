@@ -17,7 +17,7 @@
 
 import { execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
-import { readFileSync, writeFileSync } from 'node:fs';
+import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { findPackage, loadCurrentMilestone, loadRoadmap } from './schema.mjs';
 import { throughputProfile } from './work-package-throughput-profile.mjs';
@@ -262,6 +262,10 @@ function main() {
   // --run: execute the FULL gate itself, then persist the PASS attestation.
   // The gate also writes a structured per-check manifest into the artifacts
   // dir (task spec §9) on BOTH outcomes, so repair can plan targeted work.
+  // Both --run outcomes persist structured evidence into the artifacts dir;
+  // pre-create it so direct operator runs don't crash on ENOENT (final-land
+  // pre-creates its own, but the derived/direct path must not depend on that).
+  mkdirSync(a.artifactsDir, { recursive: true });
   const resultFile = join(a.artifactsDir, GATE_RESULT_FILE);
   console.log(
     'FULL GATE ▸ foresift:gate (spec integrity + repository verification + package checks)',

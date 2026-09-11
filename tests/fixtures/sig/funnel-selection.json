@@ -1,0 +1,140 @@
+{
+  "schema": "foresift/sig-funnel-selection@1",
+  "frozenUniverses": [
+    {
+      "universeId": "univ_frozen_solana_20260601",
+      "asOf": "2026-06-01T12:00:00Z",
+      "profileVersion": "sig_profile_v1",
+      "rankingVersion": "sig_rank_v1",
+      "algorithmVersion": "sig_alg_v1",
+      "candidates": [
+        {
+          "candidateId": "cand_alpha",
+          "symbol": "ALPHA",
+          "hardGates": {
+            "IDENTITY_VALIDATION": { "passed": true, "gateCode": null },
+            "LIQUIDITY_MINIMUM": { "passed": true, "gateCode": null },
+            "SECURITY_HONEYPOT": { "passed": true, "gateCode": null },
+            "DATA_COVERAGE": { "passed": true, "gateCode": null }
+          },
+          "vectors": {
+            "OPPORTUNITY": { "volumeAccel": 1.5, "priceExtension": 0.2, "growth": 0.8 },
+            "RISK": { "manipulationScore": 0.1, "concentration": 0.2 },
+            "DATA_QUALITY": { "coverage": 1.0, "hasMissingDimensions": false },
+            "URGENCY": { "imbalance": 0.8 },
+            "NOVELTY": { "holderGrowth": 0.9 },
+            "TRADABILITY": { "verdict": "TRADABLE", "margin": 0.15 },
+            "SOURCE_INDEPENDENCE": { "groupWeight": 0.95 }
+          },
+          "expectedParetoStatus": "EFFICIENT",
+          "expectedRank": 1,
+          "expectedSelectionArm": "EXPLOITATION",
+          "expectedCutoffReason": "NOT_SELECTED_WITH_REASON"
+        },
+        {
+          "candidateId": "cand_beta",
+          "symbol": "BETA",
+          "hardGates": {
+            "IDENTITY_VALIDATION": { "passed": true, "gateCode": null },
+            "LIQUIDITY_MINIMUM": { "passed": true, "gateCode": null },
+            "SECURITY_HONEYPOT": { "passed": true, "gateCode": null },
+            "DATA_COVERAGE": { "passed": true, "gateCode": null }
+          },
+          "vectors": {
+            "OPPORTUNITY": { "volumeAccel": 1.2, "priceExtension": 0.1, "growth": 0.6 },
+            "RISK": { "manipulationScore": 0.15, "concentration": 0.25 },
+            "DATA_QUALITY": { "coverage": 1.0, "hasMissingDimensions": false },
+            "URGENCY": { "imbalance": 0.6 },
+            "NOVELTY": { "holderGrowth": 0.7 },
+            "TRADABILITY": { "verdict": "TRADABLE", "margin": 0.12 },
+            "SOURCE_INDEPENDENCE": { "groupWeight": 0.9 }
+          },
+          "expectedParetoStatus": "EFFICIENT",
+          "expectedRank": 2,
+          "expectedSelectionArm": "EXPLOITATION",
+          "expectedCutoffReason": "NOT_SELECTED_WITH_REASON"
+        },
+        {
+          "candidateId": "cand_gamma_unknown_dim",
+          "symbol": "GAMMA",
+          "hardGates": {
+            "IDENTITY_VALIDATION": { "passed": true, "gateCode": null },
+            "LIQUIDITY_MINIMUM": { "passed": true, "gateCode": null },
+            "SECURITY_HONEYPOT": { "passed": true, "gateCode": null },
+            "DATA_COVERAGE": { "passed": true, "gateCode": null }
+          },
+          "vectors": {
+            "OPPORTUNITY": { "volumeAccel": 2.0, "priceExtension": null, "growth": null },
+            "RISK": { "manipulationScore": null, "concentration": 0.3 },
+            "DATA_QUALITY": {
+              "coverage": 0.5,
+              "hasMissingDimensions": true,
+              "qualityCode": "DIMENSION_MISSING"
+            },
+            "URGENCY": { "imbalance": 0.9 },
+            "NOVELTY": { "holderGrowth": null },
+            "TRADABILITY": { "verdict": "TRADABLE", "margin": 0.1 },
+            "SOURCE_INDEPENDENCE": { "groupWeight": 0.5 }
+          },
+          "expectedParetoStatus": "UNKNOWN_DIMENSION_BLOCKED",
+          "expectedRank": 3,
+          "expectedSelectionArm": "UNCERTAINTY",
+          "explanation": "Missing dimensions cannot dominate candidates with known favorable evidence (§20.10)"
+        },
+        {
+          "candidateId": "cand_delta_gate_failed",
+          "symbol": "DELTA",
+          "hardGates": {
+            "IDENTITY_VALIDATION": { "passed": true, "gateCode": null },
+            "LIQUIDITY_MINIMUM": { "passed": false, "gateCode": "LIQUIDITY_BELOW_MINIMUM" },
+            "SECURITY_HONEYPOT": { "passed": true, "gateCode": null },
+            "DATA_COVERAGE": { "passed": true, "gateCode": null }
+          },
+          "vectors": {
+            "OPPORTUNITY": { "volumeAccel": 0.5, "priceExtension": 0.0, "growth": 0.1 },
+            "RISK": { "manipulationScore": 0.5, "concentration": 0.8 },
+            "DATA_QUALITY": { "coverage": 0.9, "hasMissingDimensions": false },
+            "URGENCY": { "imbalance": 0.1 },
+            "NOVELTY": { "holderGrowth": 0.1 },
+            "TRADABILITY": { "verdict": "UNTRADABLE", "margin": 0.0 },
+            "SOURCE_INDEPENDENCE": { "groupWeight": 0.5 }
+          },
+          "expectedParetoStatus": "DOMINATED",
+          "expectedRank": 4,
+          "expectedSelectionArm": "NOT_SELECTED",
+          "expectedCutoffReason": "HARD_GATE_FAILED"
+        }
+      ]
+    }
+  ],
+  "lexicographicSortKeysOrder": [
+    "a_opportunity_dominance",
+    "b_risk_mitigation",
+    "c_data_quality_completeness",
+    "d_urgency_imbalance",
+    "e_novelty_growth",
+    "f_tradability_margin",
+    "g_source_independence_weight"
+  ],
+  "auditRecordExpectations": {
+    "requiredFields": [
+      "auditId",
+      "candidateId",
+      "rankAtTime",
+      "rankingVersion",
+      "profileVersion",
+      "componentValues",
+      "hardGateResults",
+      "paretoStatus",
+      "diversityAdjustment",
+      "explorationSelected",
+      "cutoffReason",
+      "selectionArm",
+      "selectionProbability",
+      "protectedAllocations",
+      "capacityAdmission",
+      "algorithmVersion",
+      "tDecisionReady"
+    ]
+  }
+}

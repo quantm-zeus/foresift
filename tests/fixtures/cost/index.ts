@@ -5,3 +5,6 @@ export * from './operations.ts';
 export * from './batches.ts';
 export * from './plans.ts';
 export * from './paid-policies.ts';
+export * from './capacity-contracts.ts';
+export * from './budget-policies.ts';
+export * from './degradation.ts';

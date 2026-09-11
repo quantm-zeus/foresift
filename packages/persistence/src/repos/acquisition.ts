@@ -18,8 +18,10 @@
  */
 import {
   AcquisitionState,
+  AcquisitionFailureKind,
   ForesiftError,
   ErrorCode,
+  acquisitionFailureKind,
   acquisitionState,
   compareTimestamps,
   utcTimestamp,
@@ -38,6 +40,12 @@ export interface CreateDecisionInput {
   readonly policyVersion: string;
   readonly state: AcquisitionState;
   readonly requestedAt?: UtcTimestamp | undefined;
+  readonly candidateStateAtRequest?: string | undefined;
+  readonly requestedFields?: readonly string[] | undefined;
+  readonly expectedValueOfInformation?: number | undefined;
+  readonly estimatedCost?: number | string | { readonly amount: string; readonly token: string };
+  /** Seed provenance only; raw random material is forbidden. */
+  readonly acquisitionSeed?: string | undefined;
   readonly estimatedDecisionImpact?: number | undefined;
   readonly estimatedInformationValue?: number | undefined;
 }
@@ -48,13 +56,27 @@ export async function recordAcquisitionDecision(
   input: CreateDecisionInput,
 ): Promise<void> {
   const state = acquisitionState(input.state);
-  if (state === AcquisitionState.NOT_REQUESTED_BY_POLICY && input.requestedAt !== undefined) {
+  if (
+    state === AcquisitionState.NOT_REQUESTED_BY_POLICY &&
+    (input.requestedAt !== undefined ||
+      (input.requestedFields !== undefined && input.requestedFields.length > 0) ||
+      input.estimatedCost !== undefined ||
+      input.acquisitionSeed !== undefined)
+  ) {
     throw new ForesiftError(
       LIFECYCLE_CODE,
       'NOT_REQUESTED_BY_POLICY carries no lifecycle timestamps',
       { decisionId: input.decisionId },
     );
   }
+  const expectedValue = input.expectedValueOfInformation ?? input.estimatedInformationValue;
+  if (expectedValue !== undefined && (expectedValue < 0 || expectedValue > 1)) {
+    throw new ForesiftError(LIFECYCLE_CODE, 'expected value of information must lie in [0,1]', {
+      decisionId: input.decisionId,
+    });
+  }
+  const estimatedCost = costAmount(input.estimatedCost, input.decisionId, 'estimated');
+  assertSeedProvenance(input.acquisitionSeed, input.decisionId);
   if (
     input.estimatedDecisionImpact !== undefined &&
     (input.estimatedDecisionImpact < 0 || input.estimatedDecisionImpact > 1)
@@ -74,8 +96,10 @@ export async function recordAcquisitionDecision(
   await engine.query(
     `INSERT INTO evidence_acquisition_decisions (
        decision_id, candidate_id, evidence_family, policy_version, state,
-       requested_at, estimated_decision_impact, estimated_information_value)
-     VALUES ($1,$2,$3,$4,$5,$6,$7,$8)`,
+       requested_at, candidate_state_at_request, requested_fields,
+       expected_value_of_information, estimated_cost, acquisition_seed,
+       estimated_decision_impact, estimated_information_value)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)`,
     [
       input.decisionId,
       input.candidateId,
@@ -83,6 +107,11 @@ export async function recordAcquisitionDecision(
       input.policyVersion,
       state,
       input.requestedAt ?? null,
+      input.candidateStateAtRequest ?? null,
+      [...(input.requestedFields ?? [])],
+      expectedValue ?? null,
+      estimatedCost,
+      input.acquisitionSeed ?? null,
       input.estimatedDecisionImpact ?? null,
       input.estimatedInformationValue ?? null,
     ],
@@ -107,6 +136,12 @@ export async function recordProbeAssignment(
   input: ProbeAssignmentInput,
 ): Promise<void> {
   const { assignment } = input;
+  assertSeedProvenance(assignment.seedProvenance, input.decisionId);
+  if (assignment.requestedFields.length === 0) {
+    throw new ForesiftError(LIFECYCLE_CODE, 'randomized probe requires requested fields', {
+      decisionId: input.decisionId,
+    });
+  }
   if (!(assignment.assignmentProbability > 0)) {
     throw new ForesiftError(LIFECYCLE_CODE, 'assignment probability must be strictly positive', {
       decisionId: input.decisionId,
@@ -151,13 +186,17 @@ export async function recordProbeAssignment(
       `UPDATE evidence_acquisition_decisions
        SET assignment_probability = $2,
            estimated_decision_impact = COALESCE($3, estimated_decision_impact),
-           impact_recorded_at = COALESCE(impact_recorded_at, $4)
+           impact_recorded_at = COALESCE(impact_recorded_at, $4),
+           requested_fields = $5,
+           acquisition_seed = $6
        WHERE decision_id = $1`,
       [
         input.decisionId,
         assignment.assignmentProbability,
         input.estimatedDecisionImpact ?? null,
         assignment.selectionAt,
+        [...assignment.requestedFields],
+        assignment.seedProvenance,
       ],
     );
   });
@@ -168,6 +207,8 @@ export interface RetrievalCompletionInput {
   readonly completedAt: UtcTimestamp;
   /** Terminal outcome state of the retrieval attempt. */
   readonly state: AcquisitionState;
+  readonly actualCost?: number | string | { readonly amount: string; readonly token: string };
+  readonly failureKind?: AcquisitionFailureKind | undefined;
   readonly evidenceIds?: readonly string[];
   readonly actualDecisionChanged?: boolean | undefined;
 }
@@ -203,6 +244,21 @@ export async function completeRetrieval(
         { decisionId: input.decisionId },
       );
     }
+    if (state === AcquisitionState.REQUESTED) {
+      throw new ForesiftError(LIFECYCLE_CODE, 'retrieval completion requires a terminal state', {
+        decisionId: input.decisionId,
+      });
+    }
+    const failureKind =
+      input.failureKind === undefined ? null : acquisitionFailureKind(input.failureKind);
+    if ((state === AcquisitionState.FAILED) !== (failureKind !== null)) {
+      throw new ForesiftError(
+        LIFECYCLE_CODE,
+        'FAILED requires a failure kind and non-FAILED states forbid one',
+        { decisionId: input.decisionId },
+      );
+    }
+    const actualCost = costAmount(input.actualCost, input.decisionId, 'actual');
     if (state === AcquisitionState.NOT_REQUESTED_BY_POLICY) {
       throw new ForesiftError(
         LIFECYCLE_CODE,
@@ -251,7 +307,7 @@ export async function completeRetrieval(
     await tx.query(
       `UPDATE evidence_acquisition_decisions
        SET completed_at = $2, state = $3, evidence_ids = $4,
-           actual_decision_changed = $5
+           actual_decision_changed = $5, actual_cost = $6, failure_kind = $7
        WHERE decision_id = $1`,
       [
         input.decisionId,
@@ -259,6 +315,8 @@ export async function completeRetrieval(
         state,
         [...(input.evidenceIds ?? [])],
         input.actualDecisionChanged ?? null,
+        actualCost,
+        failureKind,
       ],
     );
   });
@@ -276,6 +334,13 @@ export function toDomainDecision(row: {
   assignment_probability: number | null;
   estimated_decision_impact: number | null;
   estimated_information_value: number | null;
+  candidate_state_at_request?: string | null;
+  requested_fields?: string[];
+  expected_value_of_information?: number | string | null;
+  estimated_cost?: number | string | null;
+  actual_cost?: number | string | null;
+  failure_kind?: string | null;
+  acquisition_seed?: string | null;
   actual_decision_changed: boolean | null;
   evidence_ids: string[];
 }): EvidenceAcquisitionDecision {
@@ -285,6 +350,21 @@ export function toDomainDecision(row: {
     evidenceFamily: row.evidence_family,
     policyVersion: row.policy_version,
     state: acquisitionState(row.state),
+    ...(row.candidate_state_at_request == null
+      ? {}
+      : { candidateStateAtRequest: row.candidate_state_at_request }),
+    ...(row.requested_fields === undefined ? {} : { requestedFields: row.requested_fields }),
+    ...(row.expected_value_of_information == null
+      ? {}
+      : { expectedValueOfInformation: Number(row.expected_value_of_information) }),
+    ...(row.estimated_cost == null
+      ? {}
+      : { estimatedCost: { amount: String(row.estimated_cost), token: 'USD' } }),
+    ...(row.actual_cost == null
+      ? {}
+      : { actualCost: { amount: String(row.actual_cost), token: 'USD' } }),
+    ...(row.failure_kind == null ? {} : { failureKind: acquisitionFailureKind(row.failure_kind) }),
+    ...(row.acquisition_seed == null ? {} : { acquisitionSeed: row.acquisition_seed }),
     ...(row.requested_at === null ? {} : { requestedAt: toIso(row.requested_at) }),
     ...(row.completed_at === null ? {} : { completedAt: toIso(row.completed_at) }),
     ...(row.assignment_probability === null
@@ -301,6 +381,30 @@ export function toDomainDecision(row: {
       : { actualDecisionChanged: row.actual_decision_changed }),
     evidenceIds: row.evidence_ids,
   };
+}
+
+function assertSeedProvenance(seed: string | undefined, decisionId: string): void {
+  if (seed !== undefined && (seed.trim().length === 0 || seed.startsWith('raw:'))) {
+    throw new ForesiftError(LIFECYCLE_CODE, 'acquisition seed must be non-secret provenance', {
+      decisionId,
+    });
+  }
+}
+
+function costAmount(
+  cost: number | string | { readonly amount: string; readonly token: string } | undefined,
+  decisionId: string,
+  kind: 'estimated' | 'actual',
+): string | number | null {
+  if (cost === undefined) return null;
+  const amount = typeof cost === 'object' ? cost.amount : cost;
+  const numeric = typeof amount === 'number' ? amount : Number(amount);
+  if (!Number.isFinite(numeric) || numeric < 0) {
+    throw new ForesiftError(LIFECYCLE_CODE, `${kind} cost must be a non-negative number`, {
+      decisionId,
+    });
+  }
+  return amount;
 }
 
 function toIso(value: Date | string): string {

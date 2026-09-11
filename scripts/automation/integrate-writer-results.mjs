@@ -11,7 +11,7 @@
 //     [--canonical <checkout-path>] [--branch <name>] [--root <repo>] \
 //     [--out <report.json>]
 import { spawnSync } from 'node:child_process';
-import { readFileSync, readdirSync, existsSync, writeFileSync } from 'node:fs';
+import { readFileSync, readdirSync, existsSync, writeFileSync, lstatSync } from 'node:fs';
 import { join, basename, dirname } from 'node:path';
 import { repoRoot } from './schema.mjs';
 import { validateLaneOwnership } from './path-ownership.mjs';
@@ -69,14 +69,28 @@ const report = {
   completionRejections: [],
 };
 
-if (!existsSync(args.resultsDir)) fail(`results dir not found: ${args.resultsDir}`);
+// A MISSING results dir is the legitimate zero-writer wave shape (every lane
+// sentinel-skipped — live run 279d96fd, 2026-09-09): the wave dispatched no
+// writer, so no lane ever wrote results. Emit a valid empty report instead of
+// exiting 1; the workflow's empty-wave routing then sees dispatched=0/
+// integrated=0 deterministically instead of crashing on an absent report.
+// An UNREADABLE dir (permissions, not-a-directory) remains fatal.
+let resultsDirExists = false;
+if (existsSync(args.resultsDir)) {
+  if (!lstatSync(args.resultsDir).isDirectory())
+    fail(`results dir is not a directory: ${args.resultsDir}`);
+  resultsDirExists = true;
+}
 // Results live at <resultsDir>/<lane>/result.json (as wave-guard writes them);
 // flat <lane>.json files are accepted too.
 const resultFiles = [];
-for (const e of readdirSync(args.resultsDir, { withFileTypes: true })) {
-  if (e.isDirectory() && existsSync(join(args.resultsDir, e.name, 'result.json')))
-    resultFiles.push(join(args.resultsDir, e.name, 'result.json'));
-  else if (e.isFile() && e.name.endsWith('.json')) resultFiles.push(join(args.resultsDir, e.name));
+if (resultsDirExists) {
+  for (const e of readdirSync(args.resultsDir, { withFileTypes: true })) {
+    if (e.isDirectory() && existsSync(join(args.resultsDir, e.name, 'result.json')))
+      resultFiles.push(join(args.resultsDir, e.name, 'result.json'));
+    else if (e.isFile() && e.name.endsWith('.json'))
+      resultFiles.push(join(args.resultsDir, e.name));
+  }
 }
 resultFiles.sort();
 
@@ -121,6 +135,21 @@ for (const filePath of resultFiles) {
     report.rejected.push({ shardId: sid, reason: `cannot diff base..head: ${diffNames.err}` });
     continue;
   }
+  // Symlinks are tooling plumbing, never authorship (live 486a44d0: a lane
+  // agent's node_modules reuse symlink was swallowed into a lane commit
+  // because gitignore's `node_modules/` matches directories, not a symlink
+  // blob). Filtered before legality/ownership/nomination checks.
+  const resultDir = join(args.resultsDir, sid);
+  const changedPaths = diffNames.out
+    .split('\n')
+    .filter(Boolean)
+    .filter((p) => {
+      try {
+        return !lstatSync(join(resultDir, '..', '..', 'wt', sid, p)).isSymbolicLink();
+      } catch {
+        return true; // absent from the worktree (renamed/deleted) — keep in evidence
+      }
+    });
   // Authority: package scopes (+ recorded exceptions) for legality, plus strict
   // cross-lane ownership — files predicted by ANOTHER shard may not appear here.
   const allowed = [
@@ -143,14 +172,11 @@ for (const filePath of resultFiles) {
   // Cross-lane exclusion must not fire on graph-recorded scope exceptions:
   // the central migration registry is a plan-sanctioned duty both sides may
   // write (mirrors wave-guard.mjs; live self-collision runs 831d0819/99e8e23b).
-  const violations = diffNames.out
-    .split('\n')
-    .filter(Boolean)
-    .filter(
-      (p) =>
-        (!allowed.some((re) => re.test(p)) && !scopeExceptions.has(p)) ||
-        (othersPredicted.has(p) && !scopeExceptions.has(p)),
-    );
+  const violations = changedPaths.filter(
+    (p) =>
+      (!allowed.some((re) => re.test(p)) && !scopeExceptions.has(p)) ||
+      (othersPredicted.has(p) && !scopeExceptions.has(p)),
+  );
   if (violations.length > 0) {
     report.rejected.push({
       shardId: sid,
@@ -163,7 +189,7 @@ for (const filePath of resultFiles) {
     const ownership = validateLaneOwnership({
       engine: shard.engine,
       role: shard.role,
-      changedPaths: diffNames.out.split('\n').filter(Boolean),
+      changedPaths,
     });
     if (!ownership.ok) {
       report.rejected.push({
@@ -188,7 +214,7 @@ for (const filePath of resultFiles) {
   const validated = validateLaneNominations({
     laneTaskIds: [...laneUnits],
     unitsById,
-    changedFiles: diffNames.out.split('\n').filter(Boolean),
+    changedFiles: changedPaths,
     nominatedTaskIds: claimedUnits,
     blockers: res.blockers ?? [],
   });
@@ -234,9 +260,16 @@ for (const filePath of resultFiles) {
 // recomputed diff) reach this point, so the checkbox flip is authoritative.
 // One accepted task never flips its siblings: whatever the writer deferred
 // stays an open `- [ ]` line in the canonical tasks.md.
-const completedUnits = new Set(
-  report.integrated.filter((r) => r.role === 'implementation').flatMap((r) => r.units),
-);
+//
+// Role does not gate the flip — evidence ownership does (directive §5, live
+// g1-solana-security defect): a validated TEST-role lane's nominations carry
+// the same guarantees (lane membership from the task graph, predicted/
+// testWrite evidence in the recomputed diff, no declared blockers) plus the
+// TEST-only path-ownership guard, so a test lane can mark exactly its own
+// test-bearing tasks and nothing else. Filtering on role === 'implementation'
+// left every AGY test-author checkbox permanently open while its (validated)
+// files were already merged into the canonical branch.
+const completedUnits = new Set(report.integrated.flatMap((r) => r.units));
 if (completedUnits.size > 0) {
   const tasksPath = join(canonical, 'specs', args.package, 'tasks.md');
   if (existsSync(tasksPath)) {

@@ -96,7 +96,15 @@ export interface ActorIdentity {
  * state except the two lifecycle states (REQUESTED/RETURNED) that only ever
  * describe successful progress. Matches BlockedStatePayloadSchema exactly.
  */
-export type RefusedAcquisitionState = Exclude<AcquisitionState, 'REQUESTED' | 'RETURNED'>;
+export type RefusedAcquisitionState =
+  | 'NOT_REQUESTED_BY_POLICY'
+  | 'COST_BLOCKED'
+  | 'QUOTA_BLOCKED'
+  | 'CAPABILITY_UNAVAILABLE'
+  | 'RIGHTS_BLOCKED'
+  | 'PROVIDER_UNAVAILABLE'
+  | 'TIMED_OUT'
+  | 'INVALID_RESPONSE';
 
 /** Which stage a blocked exit happened at, and why (machine-readable). */
 export interface BlockedExit {

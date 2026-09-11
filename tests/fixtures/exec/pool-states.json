@@ -1,0 +1,178 @@
+{
+  "$comment": "Decoded pool states covering constant-product, CLMM, DLMM, bonding curve, dynamic fee, virtual reserve, unknown designs, and incomplete state (FR-EXEC-013, FR-EXEC-015, AC-230, AC-232, §64.3, §64.4).",
+  "pools": [
+    {
+      "poolId": "solana:5eykt4UsFv8P8NJdTREpY1vzqKqZKvdp/pool/RaydiumCpmmVerified1111111111111111111111",
+      "name": "Raydium CPMM verified pool",
+      "chain": "solana",
+      "programId": "CPMDWBwJDtYax9qW7AyRuVC19Cc4L4Vcy4n2BHAbHkCW",
+      "programVersion": "1.0.0",
+      "accountLayoutVersion": "1.0.0",
+      "curveType": "CONSTANT_PRODUCT_AMM",
+      "adapterFamily": "CONSTANT_PRODUCT_AMM",
+      "adapterSupportState": "AVAILABLE",
+      "stateCompleteness": "COMPLETE",
+      "stateHash": "sha256:cpmm_complete_state_hash",
+      "reserves": {
+        "base": "1000000000000",
+        "quote": "50000000000"
+      },
+      "feeConfig": {
+        "tradeFeeBps": 25,
+        "protocolFeeBps": 5
+      },
+      "qualityCodes": ["VALID"]
+    },
+    {
+      "poolId": "solana:5eykt4UsFv8P8NJdTREpY1vzqKqZKvdp/pool/OrcaWhirlpoolClmm1111111111111111111111",
+      "name": "Orca Whirlpool Concentrated Liquidity pool",
+      "chain": "solana",
+      "programId": "whirLbMiicVdio4qvUfM5KAg6Ct8VwpYzGff3uctyCc",
+      "programVersion": "1.0.0",
+      "accountLayoutVersion": "1.0.0",
+      "curveType": "CONCENTRATED_LIQUIDITY_AMM",
+      "adapterFamily": "CONCENTRATED_LIQUIDITY_AMM",
+      "adapterSupportState": "AVAILABLE",
+      "stateCompleteness": "COMPLETE",
+      "stateHash": "sha256:orca_complete_state_hash",
+      "sqrtPriceX64": "18446744073709551616",
+      "tickCurrentIndex": 0,
+      "tickSpacing": 64,
+      "ticks": [
+        { "index": -64, "liquidityGross": "500000000", "liquidityNet": "500000000" },
+        { "index": 64, "liquidityGross": "500000000", "liquidityNet": "-500000000" }
+      ],
+      "feeConfig": { "tradeFeeBps": 30 },
+      "qualityCodes": ["VALID"]
+    },
+    {
+      "poolId": "solana:5eykt4UsFv8P8NJdTREpY1vzqKqZKvdp/pool/MeteoraDlmmBin111111111111111111111111",
+      "name": "Meteora DLMM Discrete Liquidity Bin pool",
+      "chain": "solana",
+      "programId": "LBUZKhRxPF3XUpBCjp4YzTKgLccjZhTSDM9YuVaPwxo",
+      "programVersion": "1.0.0",
+      "accountLayoutVersion": "1.0.0",
+      "curveType": "DISCRETE_LIQUIDITY_BIN_AMM",
+      "adapterFamily": "DISCRETE_LIQUIDITY_BIN_AMM",
+      "adapterSupportState": "AVAILABLE",
+      "stateCompleteness": "COMPLETE",
+      "stateHash": "sha256:meteora_complete_state_hash",
+      "activeBinId": 1000,
+      "binStep": 20,
+      "bins": [
+        { "binId": 999, "amountX": "0", "amountY": "500000000", "price": "0.98" },
+        { "binId": 1000, "amountX": "250000000", "amountY": "250000000", "price": "1.00" },
+        { "binId": 1001, "amountX": "500000000", "amountY": "0", "price": "1.02" }
+      ],
+      "feeConfig": { "baseFeeBps": 10, "variableFeeControl": 100 },
+      "qualityCodes": ["VALID"]
+    },
+    {
+      "poolId": "solana:5eykt4UsFv8P8NJdTREpY1vzqKqZKvdp/pool/PumpBondingCurve11111111111111111111111",
+      "name": "Pump Bonding Curve pool",
+      "chain": "solana",
+      "programId": "6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P",
+      "programVersion": "1.0.0",
+      "accountLayoutVersion": "1.0.0",
+      "curveType": "BONDING_CURVE",
+      "adapterFamily": "BONDING_CURVE",
+      "adapterSupportState": "AVAILABLE",
+      "stateCompleteness": "COMPLETE",
+      "stateHash": "sha256:pump_complete_state_hash",
+      "virtualTokenReserves": "1073000000000000",
+      "virtualSolReserves": "30000000000",
+      "realTokenReserves": "793100000000000",
+      "realSolReserves": "0",
+      "feeConfig": { "tradeFeeBps": 100 },
+      "qualityCodes": ["VALID"]
+    },
+    {
+      "poolId": "solana:5eykt4UsFv8P8NJdTREpY1vzqKqZKvdp/pool/SaberStableCurve1111111111111111111111",
+      "name": "Stable curve pool",
+      "chain": "solana",
+      "programId": "SSwpkTXnr3QBpTXegBmAUuNkgum2reUawqq13DM2xz4",
+      "programVersion": "1.0.0",
+      "accountLayoutVersion": "1.0.0",
+      "curveType": "STABLE_CURVE",
+      "adapterFamily": "STABLE_CURVE",
+      "adapterSupportState": "AVAILABLE",
+      "stateCompleteness": "COMPLETE",
+      "stateHash": "sha256:stable_complete_state_hash",
+      "ampFactor": 100,
+      "reserves": {
+        "base": "5000000000000",
+        "quote": "5000000000000"
+      },
+      "feeConfig": { "tradeFeeBps": 4 },
+      "qualityCodes": ["VALID"]
+    },
+    {
+      "poolId": "solana:5eykt4UsFv8P8NJdTREpY1vzqKqZKvdp/pool/DynamicFeeAmm111111111111111111111111",
+      "name": "Dynamic fee AMM pool",
+      "chain": "solana",
+      "programId": "Eo7WjKq67rjJQSZxS6z3YkapzY3eMj6Xy8X5EQVn5UaB",
+      "programVersion": "1.0.0",
+      "accountLayoutVersion": "1.0.0",
+      "curveType": "DYNAMIC_FEE_AMM",
+      "adapterFamily": "DYNAMIC_FEE_AMM",
+      "adapterSupportState": "AVAILABLE",
+      "stateCompleteness": "COMPLETE",
+      "stateHash": "sha256:dynamic_complete_state_hash",
+      "volatilityIndex": 120,
+      "reserves": {
+        "base": "200000000000",
+        "quote": "10000000000"
+      },
+      "feeConfig": { "minFeeBps": 15, "maxFeeBps": 200, "currentFeeBps": 45 },
+      "qualityCodes": ["VALID"]
+    },
+    {
+      "poolId": "solana:5eykt4UsFv8P8NJdTREpY1vzqKqZKvdp/pool/VirtualReservePool1111111111111111111",
+      "name": "Virtual reserve pool",
+      "chain": "solana",
+      "programId": "VirtuaLReserve11111111111111111111111111111",
+      "programVersion": "1.0.0",
+      "accountLayoutVersion": "1.0.0",
+      "curveType": "VIRTUAL_RESERVE",
+      "adapterFamily": "VIRTUAL_RESERVE",
+      "adapterSupportState": "AVAILABLE",
+      "stateCompleteness": "COMPLETE",
+      "stateHash": "sha256:virtual_complete_state_hash",
+      "virtualReserves": {
+        "base": "800000000000",
+        "quote": "40000000000"
+      },
+      "feeConfig": { "tradeFeeBps": 50 },
+      "qualityCodes": ["VALID"]
+    },
+    {
+      "poolId": "solana:5eykt4UsFv8P8NJdTREpY1vzqKqZKvdp/pool/UnknownExoticDesign111111111111111111",
+      "name": "Unknown exotic pool design",
+      "chain": "solana",
+      "programId": "ExoticCustomCurve1111111111111111111111111",
+      "programVersion": "1.0.0",
+      "accountLayoutVersion": "1.0.0",
+      "curveType": "UNKNOWN",
+      "adapterFamily": "UNKNOWN",
+      "adapterSupportState": "UNAVAILABLE",
+      "stateCompleteness": "COMPLETE",
+      "stateHash": "sha256:unknown_state_hash",
+      "qualityCodes": ["POOL_MATH_UNSUPPORTED"]
+    },
+    {
+      "poolId": "solana:5eykt4UsFv8P8NJdTREpY1vzqKqZKvdp/pool/OrcaIncompleteTickState111111111111",
+      "name": "Orca CLMM pool with missing tick array (incomplete state)",
+      "chain": "solana",
+      "programId": "whirLbMiicVdio4qvUfM5KAg6Ct8VwpYzGff3uctyCc",
+      "programVersion": "1.0.0",
+      "accountLayoutVersion": "1.0.0",
+      "curveType": "CONCENTRATED_LIQUIDITY_AMM",
+      "adapterFamily": "CONCENTRATED_LIQUIDITY_AMM",
+      "adapterSupportState": "DEGRADED",
+      "stateCompleteness": "INCOMPLETE_BLOCKING",
+      "stateHash": "sha256:orca_incomplete_state_hash",
+      "missingStateReason": "MISSING_TICK_ARRAY_INITIALIZATION",
+      "qualityCodes": ["INCOMPLETE_STATE", "CONFIRMED_TRADABILITY_BLOCKED"]
+    }
+  ]
+}

@@ -49,7 +49,13 @@ export declare function fileEvidenceAlreadySatisfied(
     predictedWrites?: string[];
     testWrites?: string[];
   } | null,
-  ctx: { root: string },
+  ctx: {
+    root: string;
+    /** trusted launch/adoption commit (graph.bound.mainHeadSha) — enables the directive §6 ancestry proof */
+    trustedBase?: string | null;
+    /** explicit opt-in: base-commit-authored files may satisfy (never default) */
+    allowBaseFiles?: boolean;
+  },
 ): {
   satisfied: boolean;
   reason: string;

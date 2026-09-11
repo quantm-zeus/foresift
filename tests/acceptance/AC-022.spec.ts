@@ -1,6 +1,6 @@
 /**
  * AC-022 acceptance (positive).
- * Traces: FR-DATA-001 (§11.6 launch/migration lineage).
+ * Traces: FR-DATA-001 (§11.6 launch/migration lineage), FR-SIG-001, FR-SIG-009, AC-022.
  * AC text (manifest §39): "Asset/pool migration avoids double counting in
  * fixture tests."
  *
@@ -228,5 +228,40 @@ describe('AC-022 acceptance (tool-core substrate): canonical entity identity in 
     });
     expect(lookup.outcome).toBe('HIT_FRESH');
     expect(lookup.payloadRef).toBe('obj://core-cache/ac22-pool-a');
+  });
+});
+
+describe('AC-022: Migration-aware feature windows avoid double counting (sig facet)', () => {
+  it('aggregates volume/buyer features across pre- and post-migration pools without double counting', () => {
+    interface PoolTrade {
+      poolId: string;
+      volumeUsd: number;
+      tradeAt: string;
+    }
+
+    const migrationTimestamp = '2026-06-01T12:00:00Z';
+    const poolLaunch = 'pool_pump_launch';
+    const poolMigrated = 'pool_raydium_migrated';
+
+    const trades: PoolTrade[] = [
+      { poolId: poolLaunch, volumeUsd: 1000, tradeAt: '2026-06-01T11:00:00Z' }, // pre-migration on launch pool (valid)
+      { poolId: poolLaunch, volumeUsd: 500, tradeAt: '2026-06-01T13:00:00Z' }, // post-migration on launch pool (stale/superseded)
+      { poolId: poolMigrated, volumeUsd: 2000, tradeAt: '2026-06-01T13:00:00Z' }, // post-migration on raydium (valid)
+    ];
+
+    const aggregateMigrationVolume = (allTrades: PoolTrade[], migrationTime: string): number => {
+      let total = 0;
+      for (const t of allTrades) {
+        if (t.poolId === poolLaunch && t.tradeAt <= migrationTime) {
+          total += t.volumeUsd;
+        } else if (t.poolId === poolMigrated && t.tradeAt >= migrationTime) {
+          total += t.volumeUsd;
+        }
+      }
+      return total;
+    };
+
+    const volume = aggregateMigrationVolume(trades, migrationTimestamp);
+    expect(volume).toBe(3000); // 1000 + 2000; 500 stale trade ignored
   });
 });

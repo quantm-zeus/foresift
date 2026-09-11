@@ -28,8 +28,9 @@ import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { repoRoot, loadCurrentMilestone, validateMilestoneState, findPackage } from './schema.mjs';
 import { classifyOwnedPath } from './path-ownership.mjs';
-import { resolveTaskMetadata, isCoordinatorTask } from './task-metadata.mjs';
+import { resolveTaskMetadata, resolveBlockEvidence, isCoordinatorTask } from './task-metadata.mjs';
 import { assertEvidenceOwnership } from './evidence-owner-registry.mjs';
+import { assertImplementationAdmission } from './ownership-preflight.mjs';
 import {
   implementationEngineForProfile,
   resolveExecutionProfile,
@@ -44,13 +45,22 @@ function fail(msg) {
 }
 
 const args = {};
-for (let i = 0; i < process.argv.length - 1; i++) {
-  if (process.argv[i] === '--package') args.package = process.argv[i + 1];
-  if (process.argv[i] === '--root') args.root = process.argv[i + 1];
-  if (process.argv[i] === '--tasks') args.tasks = process.argv[i + 1];
-  if (process.argv[i] === '--plan-shards') args.planShards = parseInt(process.argv[i + 1], 10);
-  if (process.argv[i] === '--execution-profile') args.executionProfile = process.argv[i + 1];
-  if (process.argv[i] === '--out') args.out = process.argv[i + 1];
+// NB: bound is argv.length (not length-1) so a terminal valueless flag
+// (--allow-ownership-violations) is still parsed — extraArgs are appended
+// last by callers, and a dropped flag silently re-arms a hard admission
+// failure the caller explicitly permitted.
+for (let i = 0; i < process.argv.length; i++) {
+  if (process.argv[i] === '--package' && i + 1 < process.argv.length)
+    args.package = process.argv[i + 1];
+  if (process.argv[i] === '--root' && i + 1 < process.argv.length) args.root = process.argv[i + 1];
+  if (process.argv[i] === '--tasks' && i + 1 < process.argv.length)
+    args.tasks = process.argv[i + 1];
+  if (process.argv[i] === '--plan-shards' && i + 1 < process.argv.length)
+    args.planShards = parseInt(process.argv[i + 1], 10);
+  if (process.argv[i] === '--execution-profile' && i + 1 < process.argv.length)
+    args.executionProfile = process.argv[i + 1];
+  if (process.argv[i] === '--allow-ownership-violations') args.allowOwnershipViolations = true;
+  if (process.argv[i] === '--out' && i + 1 < process.argv.length) args.out = process.argv[i + 1];
 }
 if (!args.package) fail('missing --package <id>');
 if (args.planShards !== undefined && (!Number.isInteger(args.planShards) || args.planShards < 1))
@@ -85,7 +95,17 @@ const units = [];
 let heading = '';
 let cur = null;
 const flush = () => {
-  if (cur) units.push(cur);
+  if (cur) {
+    // NO_OP-anywhere law (run 4e59191b/T020, 2026-09-10): the checkbox-line
+    // parse above resolved evidence from the title remainder only, so a
+    // NO_OP_ALREADY_SATISFIED reservation on a wrapped continuation line was
+    // invisible and the unit dispatched to writer lanes before provider
+    // spend. Re-resolve over the COMPLETE block text (title + continuations)
+    // now that the block is whole: NO_OP anywhere dominates, unknown kinds
+    // fail closed, otherwise the title marker keeps authority.
+    cur.evidence = resolveBlockEvidence(cur.body, { unitId: cur.id, executor: cur.executor });
+    units.push(cur);
+  }
   cur = null;
 };
 for (const line of lines) {
@@ -137,6 +157,16 @@ function globToRegExp(glob) {
   return new RegExp('^' + re + '$');
 }
 const scopeRes = (pkg.writeScopes ?? []).map(globToRegExp);
+// Package scope directories (scope globs stripped to their literal dir part):
+// the re-rooting targets for package-relative backtick tokens, and the
+// directory-form membership rule for bare directory tokens.
+const scopeDirs = (pkg.writeScopes ?? [])
+  .map((g) => g.replace(/\*\*.*$/, '').replace(/\*.*$/, ''))
+  .filter((d) => d.endsWith('/'))
+  .map((d) => d.slice(0, -1));
+const classifyPath = (p) =>
+  scopeRes.some((re) => re.test(p)) ||
+  scopeDirs.some((d) => p === d || (p.startsWith(d + '/') && !p.slice(d.length + 1).includes('/')));
 
 for (const u of units) {
   const idsInBody = [...u.body.matchAll(/\bT\d+\b/g)].map((m) => m[0]);
@@ -151,43 +181,41 @@ for (const u of units) {
     // string that can never be a filename (observed live on T016, run
     // 89c4b2b9). Commands are prose, never evidence paths.
     if (/\s/.test(p)) continue;
-    // `pnpm-lock.yaml` and root `package.json` are collectible at the repo
-    // root: the lockfile mechanically follows every workspace package scaffold,
-    // and acceptance suites run under the root unit project, whose
-    // devDependencies link each package exactly like every prior G0 package.
-    // A unit that triggers either must be able to RECORD it as an out-of-scope
-    // write exception instead of tripping the lane guard at integration time.
-    if (
-      (/^(packages|tests|telemetry|migrations|docs|scripts)\//.test(p) ||
-        p === 'pnpm-lock.yaml' ||
-        p === 'package.json') &&
-      !paths.includes(p)
-    )
-      paths.push(p);
+    // Package-relative backticks (live g1-solana-security, run b20e5ea8): a
+    // task body may name its package's files RELATIVELY (`src/token-assessment.ts`,
+    // `package.json`) — plan shorthand for "inside this package's root". The
+    // repo-rooted prefix filter below silently dropped every such token, so
+    // whole serial columns derived ZERO predicted writes: lanes launched with
+    // empty write columns, evidence nomination could never fire, and the §6
+    // already-satisfied audit also starved ("no predicted writes recorded").
+    // Resolve a relative token against the package's PRIMARY scope — the
+    // packages/* scope whose leaf matches the package id (g1-<name> →
+    // packages/<name>) — and only when that exact scope exists. Re-rooting
+    // against EVERY packages/* scope the package merely touches (domain,
+    // shared-schemas) fabricated cross-package pseudo-writes the plan never
+    // named (live recovery sim: T010 predicted the same analyzer under three
+    // roots, one of which cannot exist). A package without a namesake scope
+    // gets NO re-rooting — its plan must use full repo paths (every G1 plan
+    // except solsec already does).
+    const FILE_EXT = /\.(?:ts|mts|cts|js|mjs|cjs|json|sql|md|yaml|yml|txt|jsonl)$/;
+    const rooted =
+      /^(?:packages|tests|telemetry|migrations|docs|scripts|evidence)\//.test(p) ||
+      p === 'pnpm-lock.yaml' ||
+      p === 'package.json';
+    const looksLikePath = rooted || FILE_EXT.test(p.split('/').at(-1));
+    const primaryScopeDir = `packages/${args.package.replace(/^g\d+-/, '')}`;
+    const reRooted =
+      rooted || !looksLikePath || !scopeDirs.includes(primaryScopeDir)
+        ? []
+        : [`${primaryScopeDir}/${p}`].filter((q) => classifyPath(q));
+    for (const q of reRooted.length > 0 ? reRooted : rooted ? [p] : []) {
+      if (!paths.includes(q)) paths.push(q);
+    }
   }
   // Paths are classified against binding writeScopes: a plan-sanctioned
   // exception (e.g. a guard task that merely names an out-of-scope file) is
   // recorded separately and DEMOTES the unit to serial execution — it never
   // widens what a parallel writer may touch.
-  //
-  // Directory tokens (live T001/T002 class, run aa3e8015): a scaffold task
-  // names its package DIRECTORY (`packages/requirement-manifest`), but the
-  // binding scope is `packages/requirement-manifest/**` — `**/` requires a
-  // trailing slash, so the bare directory never matched and the task's whole
-  // write set fell to outOfScopeWrites. A token that IS the directory prefix
-  // of some scope glob is squarely inside that scope (writing the directory
-  // means writing its contents): normalize it to the scope's directory form
-  // for classification. Nothing here widens any scope — the token must be a
-  // strict prefix of a scope's literal part.
-  const scopeDirs = (pkg.writeScopes ?? [])
-    .map((g) => g.replace(/\*\*.*$/, '').replace(/\*.*$/, ''))
-    .filter((d) => d.endsWith('/'))
-    .map((d) => d.slice(0, -1));
-  const classifyPath = (p) =>
-    scopeRes.some((re) => re.test(p)) ||
-    scopeDirs.some(
-      (d) => p === d || (p.startsWith(d + '/') && !p.slice(d.length + 1).includes('/')),
-    );
   const inScope = [];
   const outOfScope = [];
   for (const p of paths) (classifyPath(p) ? inScope : outOfScope).push(p);
@@ -232,6 +260,17 @@ const open = units.filter((u) => !u.done);
 // manifest-path matcher — unknown executor values already failed closed
 // above at parse time.
 const coordinatorOpenIds = new Set(open.filter(isCoordinatorTask).map((u) => u.id));
+
+// ── ownership admission (fail-closed, pre-provider cost, directive 2026-09-07)
+// The ownership guard legally refuses implementation lanes whose evidence diff
+// carries TEST-owned paths — but until now that refusal surfaced only AFTER
+// the provider spend was sunk (live b659eef0: writer-serial-1/2 died ×3 on
+// CLAUDE_TEST_OWNERSHIP_VIOLATION; core-batch-3 attempt-3 died at lane end on
+// tests/telemetry-catalog.spec.ts). A plan that routes test writes to an
+// implementation lane is unschedulable BY CONSTRUCTION: fail HERE, at build
+// time, with the split-the-test-work fix named. The audit needs the shard
+// plan, so it re-runs after planning below (see assertImplementationAdmission
+// call following shard emission).
 
 // ── evidence-owner coverage (fail-closed, pre-writer cost) ────────────────────
 // EVERY OPEN TASK HAS A REAL DETERMINISTIC COMPLETION OWNER. An open unit
@@ -282,9 +321,36 @@ const CENTRAL_MIGRATION_SUITE = 'packages/persistence/test/migrator.spec.ts';
 // ── shard planning ────────────────────────────────────────────────────────────
 let shards = null;
 if (args.planShards !== undefined) {
+  // Implementation shards carry PRODUCT work only (ownership law, directive
+  // 2026-09-07): TEST-executor units are routed to the test lanes below, and
+  // a TEST-executor unit dispatched into an implementation shard is exactly
+  // the routing defect that made the ownership guard refuse whole lanes after
+  // provider spend (live b659eef0). Without an execution profile the legacy
+  // path has no test lanes — a TEST-executor unit stays out of every shard
+  // and the admission audit reports it if it would otherwise be dispatched.
+  // Explicit [executor: TEST] is authoritative for lane membership: a TEST
+  // unit is never dispatched to an implementation shard, even when its body
+  // also names product paths (prose references gain no product-write authority;
+  // run 0a91cd86/T037 false-positive, 2026-09-09). Marker-less legacy units
+  // keep the historical behavior.
+  // NO_OP_ALREADY_SATISFIED units never enter ANY writer lane (run
+  // 4e59191b/T020, 2026-09-10): a reservation/no-op unit has no product work
+  // to author, so it is coordinator-reconciled, never provider-dispatched —
+  // in BOTH the profiled and the legacy path.
   const productOpen = args.executionProfile
-    ? open.filter((u) => u.productWork && !isCoordinatorTask(u))
-    : open.filter((u) => !isCoordinatorTask(u));
+    ? open.filter(
+        (u) =>
+          u.productWork &&
+          !isCoordinatorTask(u) &&
+          u.evidence !== 'NO_OP_ALREADY_SATISFIED' &&
+          !/\[executor:\s*TEST\]/i.test(u.body),
+      )
+    : open.filter(
+        (u) =>
+          !isCoordinatorTask(u) &&
+          u.executor !== 'TEST' &&
+          u.evidence !== 'NO_OP_ALREADY_SATISFIED',
+      );
   // Units whose predicted writes leave binding writeScopes are demoted to the
   // serial core shard; their paths are recorded as explicit scope exceptions.
   const scopeDemoted = productOpen.filter((u) => u.outOfScopeWrites.length > 0);
@@ -511,34 +577,159 @@ if (executionProfile && shards) {
   }
 }
 const testUnits = executionProfile
-  ? open.filter(
-      (u) =>
-        !isCoordinatorTask(u) &&
+  ? open.filter((u) => {
+      if (isCoordinatorTask(u)) return false;
+      // NO_OP_ALREADY_SATISFIED units never enter test lanes either (run
+      // 4e59191b/T020, 2026-09-10: the reservation unit was duplicated into
+      // the AGY test lane alongside core). Coordinator reconciliation owns
+      // them; the test lane never spends providers on no-op work.
+      if (u.evidence === 'NO_OP_ALREADY_SATISFIED') return false;
+      // Explicit markers are authoritative (fail-closed dispatch admission):
+      // an explicitly-PRODUCT unit NEVER doubles into a test lane, even when
+      // its prose mentions tests — "the registry suite is extended by the
+      // test-owned task T039" is a pointer, not an authoring duty. An
+      // explicitly-TEST unit ALWAYS belongs to a test lane (its writes remain
+      // ownership-validated: only TEST-classified paths enter testWrites).
+      // Marker-less units (legacy plans) fall back to the write-truth
+      // heuristic: a unit whose body backticks a PRODUCT path stays out of
+      // test lanes; units with test writes/refs/ACs or test words and no
+      // product backticks stay test units; anything ambiguous stays with the
+      // implementation lane (fail-closed toward PRODUCT). Without this
+      // hierarchy a product unit with zero testWrites was dispatched to the
+      // AGY lane with an EMPTY testWrites-derived allowlist, where every
+      // write was a guaranteed WRITE-AUTHORITY VIOLATION (runs 0a91cd86/
+      // 38e80af1, 2026-09-09; same empty-column class as b20e5ea8).
+      const explicitProduct = /\[executor:\s*PRODUCT\]/i.test(u.body);
+      if (explicitProduct) return false;
+      if (u.executor === 'TEST') return true;
+      const bodyProductBacktick = [...u.body.matchAll(/`([^`\n]+)`/g)].some((m) => {
+        const p = m[1].replace(/^\.\//, '');
+        return !/\s/.test(p) && classifyOwnedPath(p) === 'PRODUCT';
+      });
+      return (
+        !bodyProductBacktick &&
         (u.testWrites.length > 0 ||
           u.testRefs.length > 0 ||
           u.acceptanceCriteria.length > 0 ||
-          /\b(?:test|regression|fixture|fuzz|property)\b/i.test(u.body)),
-    )
+          /\b(?:test|regression|fixture|fuzz|property)\b/i.test(u.body))
+      );
+    })
   : [];
+/**
+ * Bounded write-disjoint AGY test sharding (maintainer Part E, 2026-09-03):
+ * split test-bearing units into AT MOST MAX_AGY_TEST_LANES lanes ONLY when the
+ * exact testWrites sets are provably disjoint across every lane pair AND no
+ * unit shares a write with another lane's set. Anything ambiguous (unknown or
+ * overlapping writes, shared fixture/manifest/parity-suite paths) collapses
+ * back to the single historical `test-author` lane — never splits on
+ * filenames alone. AGY test lanes never gain product write authority: role
+ * stays 'test' and the path-ownership guard is unchanged. The canary cap is
+ * hard-wired at 2 lanes below (test-author-1/test-author-2).
+ */
+function shardTestLanes(units, engine) {
+  const lane = (id, us) => ({
+    id,
+    mode: 'parallel',
+    role: 'test',
+    engine,
+    units: us.map((u) => u.id),
+    allowedWritePaths: [...new Set(us.flatMap((u) => u.testWrites))].sort(),
+    baselineClassifications: [
+      'NEW_BEHAVIOR_RED',
+      'REGRESSION_RED',
+      'NEGATIVE_RED',
+      'CHARACTERIZATION_GREEN',
+      'REFACTOR_GUARD_GREEN',
+    ],
+  });
+  // Only units with EXACTLY known testWrites participate in a split; a single
+  // unknown write set forces the whole column into one lane (fail closed).
+  const exact = units.filter((u) => (u.testWrites ?? []).length > 0);
+  if (exact.length !== units.length || units.length < 2) return [lane('test-author', units)];
+  const disjoint = (a, b) => {
+    const aSet = new Set(a.testWrites);
+    return (b.testWrites ?? []).every((p) => !aSet.has(p));
+  };
+  // Deterministic collision-clustered 2-way split in task order: a unit joins
+  // bin A while it is disjoint from A; the FIRST unit that collides with A
+  // seeds bin B (every later unit joins B only while disjoint from B). The
+  // split is emitted only when A and B are each internally disjoint and
+  // A∩B = ∅; any cross-bin collision collapses to the single lane.
+  const a = [];
+  const b = [];
+  for (const u of units) {
+    const fitsA = a.length === 0 || a.every((x) => disjoint(x, u));
+    const fitsB = b.length === 0 || b.every((x) => disjoint(x, u));
+    if (fitsA && (a.length <= b.length || !fitsB)) a.push(u);
+    else if (fitsB) b.push(u);
+    else return [lane('test-author', units)]; // fits neither bin — collapse
+  }
+  if (!a.length || !b.length) return [lane('test-author', units)];
+  for (const x of a) {
+    for (const y of b) {
+      if (!disjoint(x, y)) return [lane('test-author', units)];
+    }
+  }
+  return [lane('test-author-1', a), lane('test-author-2', b)];
+}
+
 const testLanes = testUnits.length
-  ? [
-      {
-        id: 'test-author',
-        mode: 'parallel',
-        role: 'test',
-        engine: testEngineForProfile(executionProfile),
-        units: testUnits.map((u) => u.id),
-        allowedWritePaths: [...new Set(testUnits.flatMap((u) => u.testWrites))].sort(),
-        baselineClassifications: [
-          'NEW_BEHAVIOR_RED',
-          'REGRESSION_RED',
-          'NEGATIVE_RED',
-          'CHARACTERIZATION_GREEN',
-          'REFACTOR_GUARD_GREEN',
-        ],
-      },
-    ]
+  ? shardTestLanes(testUnits, testEngineForProfile(executionProfile))
   : [];
+
+// TEST-lane dispatch admission (fail-closed, BEFORE emit/provider spend):
+// every unit dispatched to an AI test lane must be explicitly TEST-owned.
+// A PRODUCT-executor unit (or a legacy unit whose body names a product path)
+// in a test lane is a hard build error — that routing produced empty test
+// allowlists and guaranteed WRITE-AUTHORITY refusals after provider spend
+// (runs 38e80af1/0a91cd86, 2026-09-09). --allow-ownership-violations (the
+// read-only reporter's flag) must NOT bypass this invariant: it relaxes the
+// IMPLEMENTATION-lane admission verdict reporting, never lane membership.
+for (const tu of testUnits) {
+  // Explicit [executor: TEST] is authoritative for lane MEMBERSHIP — its
+  // authored surface is still ownership-validated: only TEST-classified paths
+  // enter testWrites/allowlists (a TEST unit whose body names product paths
+  // gains no product write authority from them). The invariant therefore
+  // polices only units that are NOT explicitly TEST: an explicitly-PRODUCT
+  // unit or a marker-less unit whose body names a product path must never sit
+  // in a test lane.
+  const explicitTest = /\[executor:\s*TEST\]/i.test(tu.body);
+  if (explicitTest) continue;
+  const bodyProductBacktick = [...tu.body.matchAll(/`([^`\n]+)`/g)].some((m) => {
+    const p = m[1].replace(/^\.\//, '');
+    return !/\s/.test(p) && classifyOwnedPath(p) === 'PRODUCT';
+  });
+  const explicitProduct = /\[executor:\s*PRODUCT\]/i.test(tu.body);
+  if (explicitProduct || bodyProductBacktick) {
+    throw new Error(
+      `TEST_LANE_ADMISSION_FAILED: product unit ${tu.id} dispatched to a test lane ` +
+        `(executor=${tu.executor}); test lanes may receive only explicitly TEST-owned units`,
+    );
+  }
+}
+
+// ── ownership admission (fail-closed, BEFORE emit/provider spend) ────────────
+// With the shard plan final, verify no implementation lane carries test-owned
+// writes (see the audit note above `open`). An unschedulable plan is a hard
+// build error — never a mid-wave guard refusal after provider spend. The ONLY
+// escape hatch is --allow-ownership-violations, used exclusively by the
+// read-only launch-preflight reporter (which never spends providers and must
+// report plan defects as data); the wave prep path never passes it, so the
+// admission law stays hard where provider spend happens. When permitted, the
+// verdict is still computed and attached to the graph as ownershipAdmission.
+let ownershipAdmission = { schedulable: true, violations: [] };
+try {
+  assertImplementationAdmission({ units, shards: shards ?? [] });
+} catch (e) {
+  if (!args.allowOwnershipViolations) throw e;
+  ownershipAdmission = {
+    schedulable: false,
+    violations: String(e.message)
+      .split('\n')
+      .filter((l) => l.includes('IMPLEMENTATION_LANE_TEST_WRITES'))
+      .map((l) => l.trim()),
+  };
+}
 
 // ── emit ──────────────────────────────────────────────────────────────────────
 const graph = {
@@ -553,6 +744,7 @@ const graph = {
     openCoordinator: coordinatorOpenIds.size,
   },
   units,
+  ownershipAdmission,
   // Explicit zero-AI coordinator duty list (P0-5): the wave coordinator
   // executes these mechanically post-integration (manifest regen, coverage
   // assertion, bookkeeping commits) — never an AI writer.

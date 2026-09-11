@@ -59,17 +59,18 @@ beforeAll(async () => {
   await engine.query(
     `INSERT INTO evidence_acquisition_decisions
        (decision_id, candidate_id, evidence_family, policy_version, state,
-        requested_at, completed_at, assignment_probability, impact_recorded_at, evidence_ids)
+        requested_at, completed_at, assignment_probability, impact_recorded_at, evidence_ids,
+        failure_kind)
      VALUES
        ('pd-1','cand-x','DEX_TRADES','acq-policy/v1','RETURNED',
         '2026-03-01T00:00:00Z','2026-03-20T00:00:00Z',0.3,'2026-03-01T01:00:00Z',
-        ARRAY['fe-1','fe-2']),
+        ARRAY['fe-1','fe-2'], NULL),
        ('pd-2','cand-x','DEX_TRADES','acq-policy/v1','RETURNED',
         '2026-03-02T00:00:00Z','2026-03-25T00:00:00Z',0.3,'2026-03-02T01:00:00Z',
-        ARRAY['fe-2','fe-3']),
-       ('pd-3','cand-x','DEX_TRADES','acq-policy/v1','INVALID_RESPONSE',
+        ARRAY['fe-2','fe-3'], NULL),
+       ('pd-3','cand-x','DEX_TRADES','acq-policy/v1','FAILED',
         '2026-03-03T00:00:00Z','2026-03-26T00:00:00Z',0.3,'2026-03-03T01:00:00Z',
-        ARRAY['fe-4'])`,
+        ARRAY['fe-4'], 'INVALID_RESPONSE')`,
   );
 }, 120_000);
 

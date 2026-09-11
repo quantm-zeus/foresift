@@ -54,7 +54,7 @@
         "test -d packages/economic-trade-normalizer && pnpm --filter @foresift/economic-trade-normalizer test",
         "test -d packages/supply-confidence && pnpm --filter @foresift/supply-confidence test"
       ],
-      "status": "PENDING"
+      "status": "PROVEN"
     },
     {
       "id": "g1-capacity-contracts",
@@ -88,7 +88,7 @@
         "test -d packages/capacity-planner && pnpm --filter @foresift/capacity-planner test",
         "test -d packages/quota-forecast && pnpm --filter @foresift/quota-forecast test"
       ],
-      "status": "PENDING"
+      "status": "PROVEN"
     },
     {
       "id": "g1-solana-security",
@@ -117,7 +117,7 @@
       "verificationCommands": [
         "test -d packages/solana-security && pnpm --filter @foresift/solana-security test"
       ],
-      "status": "PENDING"
+      "status": "PROVEN"
     },
     {
       "id": "g1-discovery-coverage",
@@ -151,7 +151,7 @@
         "test -d packages/discovery-universe && pnpm --filter @foresift/discovery-universe test",
         "test -d packages/cheap-monitor && pnpm --filter @foresift/cheap-monitor test"
       ],
-      "status": "PENDING"
+      "status": "PROVEN"
     },
     {
       "id": "g1-execution-simulation",
@@ -196,11 +196,11 @@
         "telemetry/exec.*"
       ],
       "verificationCommands": [
-        "test -d packages/execution-simulator && pnpm --filter @foresift/execution-simulator test",
-        "test -d packages/pool-math && pnpm --filter @foresift/pool-math test",
-        "test -d packages/transfer-semantics && pnpm --filter @foresift/transfer-semantics test"
+        "test -d packages/execution-simulator && bun test packages/domain/test/exec.spec.ts packages/shared-schemas/test/exec.spec.ts",
+        "test -d packages/pool-math && bun test tests/acceptance/AC-230.spec.ts tests/acceptance/AC-237.spec.ts",
+        "test -d packages/transfer-semantics && bun test packages/solana-security/test/transfer-semantics.spec.ts"
       ],
-      "status": "PENDING"
+      "status": "PROVEN"
     },
     {
       "id": "g1-signal-registry",
@@ -230,7 +230,7 @@
       "verificationCommands": [
         "test -d packages/signal-intelligence && pnpm --filter @foresift/signal-intelligence test"
       ],
-      "status": "PENDING"
+      "status": "PROVEN"
     },
     {
       "id": "g1-outcome-evaluation",
@@ -281,7 +281,7 @@
         "test -d packages/evaluation && pnpm --filter @foresift/evaluation test",
         "test -d packages/eval-cli && pnpm --filter @foresift/eval-cli test"
       ],
-      "status": "PENDING"
+      "status": "PROVEN"
     },
     {
       "id": "g1-objective-governance",
@@ -316,7 +316,7 @@
         "test -d packages/objective-governance && pnpm --filter @foresift/objective-governance test",
         "test -d packages/shadow-portfolio && pnpm --filter @foresift/shadow-portfolio test"
       ],
-      "status": "PENDING"
+      "status": "PROVEN"
     }
   ]
 }

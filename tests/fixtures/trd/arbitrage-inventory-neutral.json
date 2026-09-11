@@ -1,0 +1,67 @@
+{
+  "$comment": "Arbitrage and inventory-neutral test vectors (FR-TRD-003, AC-134). Same-transaction round-trip arbitrage does not increase organic unique-buyer count or demand features.",
+  "arbitrageTransactions": [
+    {
+      "name": "cross-pool triangular arbitrage USDC -> WETH -> USDC returning net profit",
+      "transactionHash": "0xbbb2222222222222222222222222222222222222222222222222222222222222",
+      "chainId": "eip155:1",
+      "actorAddress": "0xbot_arbitrageur_1",
+      "rawLegs": [
+        {
+          "legIndex": 0,
+          "poolAddress": "0xpool_a_usdc_weth",
+          "tokenIn": "0xusdc",
+          "tokenOut": "0xweth",
+          "amountIn": "10000000000",
+          "amountOut": "3000000000000000000"
+        },
+        {
+          "legIndex": 1,
+          "poolAddress": "0xpool_b_weth_usdc",
+          "tokenIn": "0xweth",
+          "tokenOut": "0xusdc",
+          "amountIn": "3000000000000000000",
+          "amountOut": "10150000000"
+        }
+      ],
+      "expectedTradeSide": "INVENTORY_NEUTRAL",
+      "netDeltas": [
+        { "token": "0xusdc", "delta": "150000000" },
+        { "token": "0xweth", "delta": "0" }
+      ],
+      "isOrganicDemand": false,
+      "uniqueBuyerCountContribution": 0
+    },
+    {
+      "name": "round-trip market making sandwich returning zero net token balance",
+      "transactionHash": "0xccc3333333333333333333333333333333333333333333333333333333333333",
+      "chainId": "eip155:1",
+      "actorAddress": "0xbot_arbitrageur_2",
+      "rawLegs": [
+        {
+          "legIndex": 0,
+          "poolAddress": "0xpool_token_weth",
+          "tokenIn": "0xweth",
+          "tokenOut": "0xtoken",
+          "amountIn": "1000000000000000000",
+          "amountOut": "100000000000"
+        },
+        {
+          "legIndex": 1,
+          "poolAddress": "0xpool_token_weth",
+          "tokenIn": "0xtoken",
+          "tokenOut": "0xweth",
+          "amountIn": "100000000000",
+          "amountOut": "1005000000000000000"
+        }
+      ],
+      "expectedTradeSide": "ROUND_TRIP",
+      "netDeltas": [
+        { "token": "0xtoken", "delta": "0" },
+        { "token": "0xweth", "delta": "5000000000000000" }
+      ],
+      "isOrganicDemand": false,
+      "uniqueBuyerCountContribution": 0
+    }
+  ]
+}

@@ -74,6 +74,7 @@ export function executeHandoffToClaude({
   runId,
   resultDir,
   releaseCodex = true,
+  handoffReason = 'codex quota exhausted / model unavailable',
   executeWithClaude,
 }) {
   // 1. Durable trace FIRST (crash mid-handoff leaves an actionable record).
@@ -81,7 +82,7 @@ export function executeHandoffToClaude({
     from: 'CODEX',
     to: 'CLAUDE',
     holder,
-    reason: 'codex quota exhausted / model unavailable',
+    reason: handoffReason,
     at: new Date().toISOString(),
   });
   // 2. Atomically release codex ownership BEFORE acquiring claude (never two

@@ -12,6 +12,7 @@ import {
   TASK_EVIDENCE_KINDS,
   parseTaskMetadata,
   resolveTaskMetadata,
+  resolveBlockEvidence,
   isCoordinatorTask,
   TASK_EXECUTORS,
 } from '../../scripts/automation/task-metadata.mjs';
@@ -113,6 +114,75 @@ describe('task metadata parsing + fail-closed validation', () => {
       'NO_OP_ALREADY_SATISFIED',
       'SHARED_SURFACE_OUTPUT',
     ]);
+  });
+});
+
+describe('resolveBlockEvidence: full task-block evidence law (run 4e59191b/T020)', () => {
+  // Exact T020 shape at the 4e59191b launch base: the checkbox line carries
+  // NO marker; the NO_OP_ALREADY_SATISFIED reservation sits on a wrapped
+  // continuation line. Checkbox-line-only parsing classified it
+  // PRODUCT/FILE_OUTPUT and dispatched it to both writer lanes.
+  const T020_BLOCK = `T020 is reserved for the test lane (see Phase 7): product tasks do not
+      author suites. — [evidence: NO_OP_ALREADY_SATISFIED] planning-time
+      numbering reservation only; no product code.
+      Traces: FR-MAT-001…012, FR-EVAL-001…009.`;
+
+  test('a wrapped continuation-line marker is recognized', () => {
+    expect(resolveBlockEvidence(T020_BLOCK, { unitId: 'T020' })).toBe('NO_OP_ALREADY_SATISFIED');
+  });
+
+  test('NO_OP anywhere dominates even a title-line FILE_OUTPUT claim', () => {
+    const block = `T020 extend the thing [evidence: FILE_OUTPUT]
+      continuation prose — [evidence: NO_OP_ALREADY_SATISFIED] reservation`;
+    expect(resolveBlockEvidence(block, { unitId: 'T020' })).toBe('NO_OP_ALREADY_SATISFIED');
+  });
+
+  test('title-line marker keeps authority when the body carries none', () => {
+    expect(
+      resolveBlockEvidence('T001 implement [evidence: TEST_PROOF] the thing\nplain body', {
+        unitId: 'T001',
+      }),
+    ).toBe('TEST_PROOF');
+  });
+
+  test('first body marker wins when the title line is unmarked', () => {
+    expect(
+      resolveBlockEvidence('T001 implement the thing\nbody [evidence: VERIFICATION_ONLY] prose', {
+        unitId: 'T001',
+      }),
+    ).toBe('VERIFICATION_ONLY');
+  });
+
+  test('absent everywhere defaults to FILE_OUTPUT (legacy plans)', () => {
+    expect(resolveBlockEvidence('T001 implement the thing\nplain body', { unitId: 'T001' })).toBe(
+      'FILE_OUTPUT',
+    );
+  });
+
+  test('unknown kind ANYWHERE in the block fails closed (misspelled no-op never becomes product work)', () => {
+    expect(() =>
+      resolveBlockEvidence('T001 implement the thing\nbody [evidence: NOOP_SATISFIED] prose', {
+        unitId: 'T001',
+      }),
+    ).toThrow(/TASK_EVIDENCE_UNKNOWN/);
+    expect(() => resolveBlockEvidence('T001 [evidence: VIBES] x', { unitId: 'T001' })).toThrow(
+      /TASK_EVIDENCE_UNKNOWN/,
+    );
+  });
+
+  test('COORDINATOR_ARTIFACT still requires a coordinator executor', () => {
+    expect(() =>
+      resolveBlockEvidence('T001 regen [evidence: COORDINATOR_ARTIFACT]', {
+        unitId: 'T001',
+        executor: 'PRODUCT',
+      }),
+    ).toThrow(/TASK_EVIDENCE_INVALID_FOR_EXECUTOR/);
+    expect(
+      resolveBlockEvidence('T063 regen [evidence: COORDINATOR_ARTIFACT]', {
+        unitId: 'T063',
+        executor: 'COORDINATOR',
+      }),
+    ).toBe('COORDINATOR_ARTIFACT');
   });
 });
 

@@ -23,6 +23,8 @@ import {
   parseTaskGraph,
   requireTaskGraphForCompletionEvidence,
   laneEvidencePaths,
+  splitSymlinks,
+  claimCompletedUnits,
 } from './writer-task-evidence.mjs';
 
 function fail(message, code = 1) {
@@ -183,8 +185,13 @@ export function runClaudeWriter(input) {
     throw new Error(`CLAUDE_WRITER_${classification}: ${(run.stderr ?? '').slice(-500)}`);
 
   // Lane evidence diff (live 7c98e02e): committed work counts — status alone
-  // sees a clean tree after the agent's own commits.
-  const before = git(['rev-parse', 'HEAD'], input.worktree).stdout.trim();
+  // sees a clean tree after the agent's own commits. LOGICAL-LANE baseline
+  // (maintainer Part A4, 2026-09-03): prefer the immutable --lane-base over
+  // the attempt-start HEAD so retries keep earlier attempts' commits inside
+  // the evidence range; absent --lane-base falls back to attempt-start HEAD.
+  const before = input['lane-base']
+    ? String(input['lane-base']).trim()
+    : git(['rev-parse', 'HEAD'], input.worktree).stdout.trim();
   const dirty = git(['status', '--porcelain=v1'], input.worktree)
     .stdout.split('\n')
     .filter(Boolean)
@@ -198,21 +205,27 @@ export function runClaudeWriter(input) {
   if (!ownership.ok)
     throw new Error(`${ownership.violationCode}: ${ownership.violatingPaths.join(',')}`);
   if (dirty.length) {
-    const add = git(['add', '--all'], input.worktree);
-    if (add.status !== 0) throw new Error(`CLAUDE_GIT_ADD_FAILED: ${add.stderr}`);
-    const commit = git(
-      [
-        '-c',
-        'user.name=Foresift Claude Writer',
-        '-c',
-        'user.email=noreply@foresift.local',
-        'commit',
-        '-m',
-        `feat: Claude implementation lane ${input.lane}`,
-      ],
-      input.worktree,
-    );
-    if (commit.status !== 0) throw new Error(`CLAUDE_COMMIT_FAILED: ${commit.stderr}`);
+    // Symlink commit-safety (live 486a44d0): never stage symlinked paths —
+    // tooling plumbing, not authorship; a committed symlink poisons the
+    // ownership scan for the whole lane.
+    const { clean: commitable } = splitSymlinks(input.worktree, dirty);
+    if (commitable.length) {
+      const add = git(['add', '--', ...commitable], input.worktree);
+      if (add.status !== 0) throw new Error(`CLAUDE_GIT_ADD_FAILED: ${add.stderr}`);
+      const commit = git(
+        [
+          '-c',
+          'user.name=Foresift Claude Writer',
+          '-c',
+          'user.email=noreply@foresift.local',
+          'commit',
+          '-m',
+          `feat: Claude implementation lane ${input.lane}`,
+        ],
+        input.worktree,
+      );
+      if (commit.status !== 0) throw new Error(`CLAUDE_COMMIT_FAILED: ${commit.stderr}`);
+    }
   }
   const head = git(['rev-parse', 'HEAD'], input.worktree).stdout.trim();
   // Evidence-backed completion (H3 P0-1): nominate ONLY tasks whose predicted

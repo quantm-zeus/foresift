@@ -249,9 +249,15 @@ export async function checkNoPrematureImplementations(
   options: RepositoryOptions & { readonly repoRoot: string; readonly activeGroup: string },
 ): Promise<PrematurePathVerdict> {
   const requirements = await resolveRequirements(options);
-  const activeNumber = dependencyGroupNumber(options.activeGroup);
-  if (activeNumber === undefined)
-    throw new TypeError(`invalid dependency group: ${options.activeGroup}`);
+  // Repository-backed checks must use the authoritative activation state. The
+  // explicit group remains useful for callers evaluating an injected manifest
+  // snapshot, but must not make an ACTIVE repository milestone look unopened.
+  const activeGroup =
+    options.requirements === undefined
+      ? await activeMilestone(options.repoRoot)
+      : options.activeGroup;
+  const activeNumber = dependencyGroupNumber(activeGroup);
+  if (activeNumber === undefined) throw new TypeError(`invalid dependency group: ${activeGroup}`);
 
   // A shared product path is legitimately open when any active requirement maps it.
   const openedPaths = new Set(
@@ -417,7 +423,7 @@ export async function evaluateConformance(options: ConformanceOptions): Promise<
     checkNoPrematureImplementations({
       repoRoot: options.repoRoot,
       activeGroup,
-      requirements,
+      ...(options.requirements === undefined ? {} : { requirements }),
     }),
     checkGeneratedDocsDrift({
       repoRoot: options.repoRoot,

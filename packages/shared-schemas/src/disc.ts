@@ -1,7 +1,22 @@
 import { z } from 'zod';
+import {
+  ALL_DISC_CHAIN_ACCESS_PURPOSES,
+  ALL_DISC_CLAIM_BASES,
+  ALL_DISC_CONSTRAINT_EFFECTS,
+  ALL_DISC_CONSTRAINT_KINDS,
+  ALL_DISC_ENTRY_REASONS,
+  ALL_DISC_LATENESS_BASES,
+  ALL_DISC_MANIPULATION_POLICIES,
+  ALL_DISC_RECALL_VERDICTS,
+  ALL_DISC_RIGHTS_BASES,
+  ALL_QUALITY_CODES,
+} from '@foresift/domain';
 import { UtcTimestampSchema } from './data.ts';
 
-const ContentAddressSchema = z.string().regex(/^sha256:.+$/);
+export const DISC_SCHEMA_REGISTRY_VERSION = 1 as const;
+const NonEmptyString = z.string().trim().min(1);
+const ContentAddressSchema = z.string().regex(/^sha256:(?:[0-9a-f]{64}|[a-z0-9]+(?:_[a-z0-9]+)+)$/);
+const enumSchema = <T extends string>(values: readonly T[]) => z.enum([...values] as [T, ...T[]]);
 export const DiscoverySourceClassSchema = z.enum([
   'FIRST_PARTY_SUPPORTED_PROGRAM_EVENT',
   'FREE_AGGREGATE_DISCOVERY',
@@ -127,6 +142,450 @@ export const CoveragePopulationManifestSchema = z
   );
 export type CoveragePopulationManifest = z.infer<typeof CoveragePopulationManifestSchema>;
 
+export const DiscClaimBasisSchema = enumSchema(ALL_DISC_CLAIM_BASES);
+export type DiscClaimBasis = z.infer<typeof DiscClaimBasisSchema>;
+
+const CanonicalDiscSourceProfileSchema = z
+  .object({
+    sourceId: z.string().min(1),
+    profileVersion: z.number().int().positive(),
+    sourceClass: DiscoverySourceClassSchema,
+    coverageScope: z.record(z.string(), z.unknown()),
+    rightsBasis: enumSchema(ALL_DISC_RIGHTS_BASES),
+    queryFilterVersion: z.string().min(1),
+    upstreamDependence: z.record(z.string(), z.unknown()),
+    upstreamLineageKeys: z.array(z.string().min(1)),
+    manipulationPolicy: enumSchema(ALL_DISC_MANIPULATION_POLICIES),
+    collectorScopeIds: z.array(z.string().min(1)),
+    effectiveFrom: UtcTimestampSchema,
+    supersededAt: UtcTimestampSchema.optional(),
+  })
+  .strict()
+  .refine(
+    (value) =>
+      value.supersededAt === undefined ||
+      Date.parse(value.supersededAt) > Date.parse(value.effectiveFrom),
+    { message: 'source profile validity window is inverted' },
+  );
+
+const LegacyEntryReasonSchema = z.enum([
+  'BONDING_CURVE_INITIALIZE',
+  'LIQUIDITY_POOL_CREATE',
+  'TOKEN_MIGRATION',
+  'AGGREGATE_DISCOVERY_FEED',
+  'AUTHORIZED_LAUNCHPAD_STREAM',
+  'USER_WATCHLIST_REGISTRATION',
+  'SELECTIVE_CHAIN_BACKFILL',
+  'RETROSPECTIVE_RECONSTRUCTION',
+]);
+const LegacyDiscSourceProfileSchema = z
+  .object({
+    sourceId: NonEmptyString,
+    sourceClass: DiscoverySourceClassSchema,
+    version: NonEmptyString,
+    supersedesVersion: NonEmptyString.optional(),
+    isFirstParty: z.boolean(),
+    sourceSpecificFirstSeen: z.boolean(),
+    normalizedIdentity: z.literal(true),
+    upstreamDependence: z.array(NonEmptyString),
+    upstreamDependenceDisclosed: z.literal(true),
+    queryFilterVersion: NonEmptyString,
+    coverageScope: z.array(NonEmptyString).min(1),
+    rightsPolicy: NonEmptyString,
+    allowedEntryReasons: z.array(LegacyEntryReasonSchema).min(1),
+    metadataHash: ContentAddressSchema,
+    registeredAt: UtcTimestampSchema,
+  })
+  .strict()
+  .refine(
+    (value) => value.supersedesVersion === undefined || value.supersedesVersion !== value.version,
+    { message: 'a source profile cannot supersede itself' },
+  );
+
+export const DiscSourceProfileSchema = z.union([
+  CanonicalDiscSourceProfileSchema,
+  LegacyDiscSourceProfileSchema,
+]) as unknown as typeof CanonicalDiscSourceProfileSchema;
+
+const CanonicalUniverseEntryProvenanceSchema = z
+  .object({
+    entryId: z.string().min(1),
+    normalizedIdentityId: z.string().min(1),
+    entryReason: enumSchema(ALL_DISC_ENTRY_REASONS),
+    coverageScopeRef: z.string().min(1),
+    rightsRecord: enumSchema(ALL_DISC_RIGHTS_BASES),
+    queryFilterVersion: z.string().min(1),
+    upstreamDependenceDisclosed: z.record(z.string(), z.unknown()),
+    firstPartyObserved: z.boolean(),
+  })
+  .strict();
+
+const LegacyUniverseEntryProvenanceSchema = z
+  .object({
+    assetRepresentationId: NonEmptyString,
+    sourceId: NonEmptyString,
+    sourceClass: DiscoverySourceClassSchema,
+    entryReason: LegacyEntryReasonSchema,
+    isFirstParty: z.boolean(),
+    sourceObservedAt: UtcTimestampSchema.optional(),
+    sourcePublishedAt: UtcTimestampSchema.optional(),
+    sourceAvailableAt: UtcTimestampSchema,
+    firstFetchedAt: UtcTimestampSchema.optional(),
+    firstReceivedAt: UtcTimestampSchema.optional(),
+    firstIngestedAt: UtcTimestampSchema,
+    chainCoordinates: NonEmptyString.optional(),
+    sourceRank: z.number().int().nonnegative().optional(),
+    sourceMetadataHash: ContentAddressSchema,
+    discoveryPolicyVersion: NonEmptyString,
+    normalizedIdentity: z.literal(true),
+    collectorCoverageManifestId: NonEmptyString.optional(),
+    qualityCodes: z.array(NonEmptyString),
+  })
+  .strict()
+  .refine((value) => Date.parse(value.firstIngestedAt) >= Date.parse(value.sourceAvailableAt), {
+    message: 'firstIngestedAt cannot precede sourceAvailableAt',
+  })
+  .refine(
+    (value) =>
+      !value.isFirstParty ||
+      value.sourceClass === 'FIRST_PARTY_SUPPORTED_PROGRAM_EVENT' ||
+      value.sourceClass === 'SELECTIVE_CHAIN_VERIFICATION',
+    { message: 'first-party attribution is incompatible with the source class' },
+  );
+
+export const UniverseEntryProvenanceSchema = z.union([
+  CanonicalUniverseEntryProvenanceSchema,
+  LegacyUniverseEntryProvenanceSchema,
+]) as unknown as typeof CanonicalUniverseEntryProvenanceSchema;
+
+export const DiscRecallVerdictSchema = enumSchema(ALL_DISC_RECALL_VERDICTS);
+export type DiscRecallVerdict = z.infer<typeof DiscRecallVerdictSchema>;
+
+export const RecallEstimateRecordSchema = z
+  .object({
+    estimateId: z.string().min(1),
+    manifestId: z.string().min(1),
+    evaluatedSourceId: z.string().min(1),
+    claimBasis: DiscClaimBasisSchema,
+    verdict: DiscRecallVerdictSchema,
+    recallEstimate: z.number().min(0).max(1).optional(),
+    inclusionProbabilitySource: z.string().min(1).optional(),
+    independenceEvidence: z.array(z.string().min(1)),
+    constraintIds: z.array(z.string().min(1)),
+    asOf: UtcTimestampSchema,
+  })
+  .strict()
+  .superRefine((value, context) => {
+    if (value.verdict === 'INDEPENDENT_ESTIMATE' && value.recallEstimate === undefined) {
+      context.addIssue({ code: 'custom', message: 'an independent verdict requires an estimate' });
+    }
+    if (
+      (value.verdict === 'INDEPENDENT_ESTIMATE' || value.verdict === 'DEPENDENT_DISCLOSED') &&
+      value.independenceEvidence.length === 0
+    ) {
+      context.addIssue({
+        code: 'custom',
+        message: 'an evidentiary verdict requires evidence refs',
+      });
+    }
+  });
+export type RecallEstimateRecord = z.infer<typeof RecallEstimateRecordSchema>;
+const LegacyRecallEstimateSchema = z
+  .object({
+    estimateId: NonEmptyString,
+    populationManifestId: NonEmptyString,
+    evaluatedSourceId: NonEmptyString,
+    basis: DiscClaimBasisSchema,
+    recallNumerator: z.number().int().nonnegative(),
+    recallDenominator: z.number().int().positive(),
+    recallEstimate: z.number().finite().min(0).max(1),
+    qualityCodes: z.array(NonEmptyString).min(1),
+    calculatedAt: UtcTimestampSchema,
+  })
+  .strict()
+  .refine((value) => value.recallNumerator <= value.recallDenominator, {
+    message: 'recall numerator cannot exceed denominator',
+  });
+export const RecallEstimateSchema = z.union([
+  RecallEstimateRecordSchema,
+  LegacyRecallEstimateSchema,
+]) as unknown as typeof RecallEstimateRecordSchema;
+
+const CanonicalPopulationConstraintSchema = z
+  .object({
+    constraintId: NonEmptyString,
+    manifestId: NonEmptyString,
+    kind: enumSchema(ALL_DISC_CONSTRAINT_KINDS),
+    effect: enumSchema(ALL_DISC_CONSTRAINT_EFFECTS),
+    sourceId: NonEmptyString.optional(),
+    collectorScopeId: NonEmptyString.optional(),
+    programVersion: NonEmptyString.optional(),
+    windowStart: UtcTimestampSchema.optional(),
+    windowEnd: UtcTimestampSchema.optional(),
+    windowStartSlot: z.string().regex(/^\d+$/).optional(),
+    windowEndSlot: z.string().regex(/^\d+$/).optional(),
+    evidenceRefs: z.array(NonEmptyString).min(1),
+    resolvedAt: UtcTimestampSchema.optional(),
+  })
+  .strict()
+  .superRefine((value, context) => {
+    if (
+      value.windowStart !== undefined &&
+      value.windowEnd !== undefined &&
+      Date.parse(value.windowEnd) <= Date.parse(value.windowStart)
+    ) {
+      context.addIssue({ code: 'custom', message: 'constraint time window is inverted' });
+    }
+    if (
+      value.windowStartSlot !== undefined &&
+      value.windowEndSlot !== undefined &&
+      BigInt(value.windowEndSlot) < BigInt(value.windowStartSlot)
+    ) {
+      context.addIssue({ code: 'custom', message: 'constraint slot window is inverted' });
+    }
+  });
+
+const LegacyPopulationConstraintSchema = z
+  .object({
+    constraintId: NonEmptyString,
+    kind: z.enum([
+      'COLLECTOR_GAP',
+      'DECODER_PAUSE',
+      'PROGRAM_VERSION_UNVERIFIED',
+      'PROVIDER_HEALTH_UNAVAILABLE',
+    ]),
+    effect: z.enum([
+      'CONSTRAIN_POPULATION',
+      'BLOCKS_CONFIRMED_ALERTS',
+      'RECORD_INCIDENT_ONLY',
+      'DEGRADE_CAPABILITY',
+    ]),
+    targetPopulationManifestId: NonEmptyString,
+    sourceId: NonEmptyString.optional(),
+    startSlot: z.string().regex(/^\d+$/).optional(),
+    endSlot: z.string().regex(/^\d+$/).optional(),
+    startTime: UtcTimestampSchema.optional(),
+    endTime: UtcTimestampSchema.optional(),
+    blocksPublication: z.boolean(),
+    detail: NonEmptyString,
+    recordedAt: UtcTimestampSchema,
+  })
+  .strict()
+  .superRefine((value, context) => {
+    if (
+      value.startSlot !== undefined &&
+      value.endSlot !== undefined &&
+      BigInt(value.endSlot) < BigInt(value.startSlot)
+    ) {
+      context.addIssue({ code: 'custom', message: 'constraint slot window is inverted' });
+    }
+    if (
+      value.startTime !== undefined &&
+      value.endTime !== undefined &&
+      Date.parse(value.endTime) <= Date.parse(value.startTime)
+    ) {
+      context.addIssue({ code: 'custom', message: 'constraint time window is inverted' });
+    }
+  });
+
+export const PopulationConstraintSchema = z.union([
+  CanonicalPopulationConstraintSchema,
+  LegacyPopulationConstraintSchema,
+]) as unknown as typeof CanonicalPopulationConstraintSchema;
+export type PopulationConstraintRecord = z.infer<typeof PopulationConstraintSchema>;
+
+const CanonicalChainAccessDeclarationSchema = z
+  .object({
+    declarationId: z.string().min(1),
+    version: z.number().int().positive(),
+    purpose: enumSchema(ALL_DISC_CHAIN_ACCESS_PURPOSES),
+    chainId: z.string().min(1),
+    programIds: z.array(z.string().min(1)).min(1),
+    maxCandidates: z.number().int().positive(),
+    maxSlotsPerRun: z.number().int().positive(),
+    maxCallsPerDay: z.number().int().positive(),
+    maxWindowSeconds: z.number().int().positive(),
+    costClass: z.enum(['FREE_UNMETERED', 'FREE_QUOTA']),
+    paidFallbackAllowed: z.literal(false),
+    protectedReserveCompatible: z.literal(true),
+    tolerancePercent: z.number().int().min(1).max(100),
+  })
+  .strict();
+
+const LegacyChainAccessDeclarationSchema = z
+  .object({
+    declarationId: NonEmptyString,
+    mode: z.enum(['SELECTIVE_VERIFICATION', 'BOUNDED_BACKFILL', 'HISTORICAL_SAMPLE']),
+    costClass: z.enum(['FREE_UNMETERED', 'FREE_QUOTA']),
+    purpose: NonEmptyString,
+    candidateIds: z.array(NonEmptyString),
+    startSlot: z.string().regex(/^\d+$/).optional(),
+    endSlot: z.string().regex(/^\d+$/).optional(),
+    maxCalls: z.number().int().positive(),
+    maxCredits: z.number().int().positive(),
+    toleranceFraction: z.number().finite().positive().max(1),
+    reserveId: NonEmptyString.optional(),
+    paidPolicyApproved: z.literal(false),
+    declaredAt: UtcTimestampSchema,
+  })
+  .strict()
+  .superRefine((value, context) => {
+    const hasBoundedWindow = value.startSlot !== undefined && value.endSlot !== undefined;
+    if (value.mode === 'SELECTIVE_VERIFICATION' && value.candidateIds.length === 0) {
+      context.addIssue({ code: 'custom', message: 'selective access requires candidates' });
+    }
+    if (value.mode !== 'SELECTIVE_VERIFICATION' && !hasBoundedWindow) {
+      context.addIssue({ code: 'custom', message: 'non-selective access requires a slot window' });
+    }
+    if (hasBoundedWindow && BigInt(value.endSlot as string) < BigInt(value.startSlot as string)) {
+      context.addIssue({ code: 'custom', message: 'chain access slot window is inverted' });
+    }
+    if (value.mode === 'HISTORICAL_SAMPLE' && value.reserveId === 'EMERGENCY_BACKFILL') {
+      context.addIssue({
+        code: 'custom',
+        message: 'historical samples cannot use backfill reserve',
+      });
+    }
+  });
+
+export const ChainAccessDeclarationSchema = z.union([
+  CanonicalChainAccessDeclarationSchema,
+  LegacyChainAccessDeclarationSchema,
+]) as unknown as typeof CanonicalChainAccessDeclarationSchema;
+export type ChainAccessDeclaration = z.infer<typeof ChainAccessDeclarationSchema>;
+
+export const ChainAccessConsumptionSchema = z
+  .object({
+    consumptionId: NonEmptyString,
+    declarationId: NonEmptyString,
+    declarationVersion: z.number().int().positive(),
+    runId: NonEmptyString,
+    consumedAt: UtcTimestampSchema,
+    slotsScanned: z.number().int().positive(),
+    callsMade: z.number().int().positive(),
+    candidatesTouched: z.number().int().positive(),
+    incidentId: NonEmptyString.optional(),
+  })
+  .strict();
+export type ChainAccessConsumptionRecord = z.infer<typeof ChainAccessConsumptionSchema>;
+
+export const DiscLatenessBasisSchema = enumSchema(ALL_DISC_LATENESS_BASES);
+const NullableCount = z.number().int().nonnegative().nullable();
+const NullableNumber = z.number().finite().nonnegative().nullable();
+const NullableFiniteNumber = z.number().finite().nullable();
+const NullableRate = z.number().finite().min(0).max(1).nullable();
+const DiscQualityCodeSchema = enumSchema(ALL_QUALITY_CODES);
+const DistributionSchema = z
+  .object({
+    count: z.number().int().nonnegative(),
+    min: z.number().finite(),
+    p50: z.number().finite(),
+    p95: z.number().finite(),
+    max: z.number().finite(),
+  })
+  .strict()
+  .refine((value) => value.min <= value.p50 && value.p50 <= value.p95 && value.p95 <= value.max, {
+    message: 'distribution quantiles are not ordered',
+  });
+
+const COVERAGE_METRIC_FIELDS = [
+  'uniqueDiscoveryYield',
+  'pairwiseOverlap',
+  'effectiveIndependentYield',
+  'firstSeenLeadLagSeconds',
+  'sourceEventToSystemLatencySeconds',
+  'supportedProgramEventRecall',
+  'sourceCoverageLossWindows',
+  'extendedAtFirstSeenRate',
+  'usefulTradableOutcomeYield',
+  'falsePositiveYield',
+  'cheapRejectYield',
+  'costPerUsefulDiscovery',
+  'creditsPerUsefulDiscovery',
+  'bytesPerUsefulDiscovery',
+  'collectorGapMisses',
+  'unsupportedLayoutMisses',
+  'retrospectiveNotDiscoveredCount',
+  'sourceManipulationBoostedDiscoveryShare',
+  'identityFailureRate',
+  'unsupportedProgramExclusions',
+  'priceExtensionAtFirstSystemAvailability',
+] as const;
+
+const CanonicalCoverageMetricSetSchema = z
+  .object({
+    metricSetId: NonEmptyString,
+    manifestId: NonEmptyString,
+    populationClass: CoveragePopulationSchema,
+    sourceId: NonEmptyString,
+    profileVersion: z.number().int().positive().nullable(),
+    collectorScopeIds: z.array(NonEmptyString),
+    asOf: UtcTimestampSchema,
+    uniqueDiscoveryYield: NullableCount,
+    pairwiseOverlap: z.record(NonEmptyString, z.number().int().nonnegative()).nullable(),
+    effectiveIndependentYield: NullableNumber,
+    firstSeenLeadLagSeconds: DistributionSchema.nullable(),
+    sourceEventToSystemLatencySeconds: DistributionSchema.nullable(),
+    providerLatenessBasis: DiscLatenessBasisSchema.nullable(),
+    supportedProgramEventRecall: NullableRate,
+    sourceCoverageLossWindows: NullableCount,
+    extendedAtFirstSeenRate: NullableRate,
+    usefulTradableOutcomeYield: NullableRate,
+    falsePositiveYield: NullableRate,
+    cheapRejectYield: NullableRate,
+    costPerUsefulDiscovery: NullableNumber,
+    creditsPerUsefulDiscovery: NullableNumber,
+    bytesPerUsefulDiscovery: NullableNumber,
+    collectorGapMisses: NullableCount,
+    unsupportedLayoutMisses: NullableCount,
+    retrospectiveNotDiscoveredCount: NullableCount,
+    sourceManipulationBoostedDiscoveryShare: NullableRate,
+    identityFailureRate: NullableRate,
+    unsupportedProgramExclusions: NullableCount,
+    priceExtensionAtFirstSystemAvailability: NullableFiniteNumber,
+    qualityCodes: z.record(NonEmptyString, z.array(DiscQualityCodeSchema).min(1)),
+  })
+  .strict()
+  .superRefine((value, context) => {
+    for (const field of COVERAGE_METRIC_FIELDS) {
+      if (value[field] === null && (value.qualityCodes[field]?.length ?? 0) === 0) {
+        context.addIssue({
+          code: 'custom',
+          path: ['qualityCodes', field],
+          message: `null metric ${field} requires a quality code`,
+        });
+      }
+    }
+    if (value.sourceEventToSystemLatencySeconds === null && value.providerLatenessBasis !== null) {
+      context.addIssue({ code: 'custom', message: 'lateness basis requires a latency metric' });
+    }
+  });
+
+const LegacyCoverageMetricSetSchema = z
+  .object({
+    metricSetId: NonEmptyString,
+    sourceId: NonEmptyString,
+    populationManifestId: NonEmptyString,
+    uniqueEligibleAssetsDiscovered: z.number().int().nonnegative(),
+    overlapCount: z.number().int().nonnegative(),
+    leadTimeSecondsMedian: z.number().finite().nullable(),
+    latenessRate: z.number().finite().min(0).max(1),
+    extendedAtFirstSeenRate: z.number().finite().min(0).max(1),
+    qualityCodes: z.array(NonEmptyString),
+    measuredAt: UtcTimestampSchema,
+  })
+  .strict()
+  .refine((value) => value.leadTimeSecondsMedian !== null || value.qualityCodes.length > 0, {
+    message: 'a null lead-time metric requires a quality code',
+    path: ['qualityCodes'],
+  });
+
+export const CoverageMetricSetSchema = z.union([
+  CanonicalCoverageMetricSetSchema,
+  LegacyCoverageMetricSetSchema,
+]) as unknown as typeof CanonicalCoverageMetricSetSchema;
+export type CoverageMetricSet = z.infer<typeof CoverageMetricSetSchema>;
+
 export const DISCOVERY_SCHEMAS = {
   DiscoveryUniverseEntry: DiscoveryUniverseEntrySchema,
   DiscoverySourceClass: DiscoverySourceClassSchema,
@@ -135,6 +594,16 @@ export const DISCOVERY_SCHEMAS = {
   CheapMonitorDecision: CheapMonitorDecisionSchema,
   PromotionDecision: PromotionDecisionSchema,
   CoveragePopulationManifest: CoveragePopulationManifestSchema,
+  DiscClaimBasis: DiscClaimBasisSchema,
+  DiscSourceProfile: DiscSourceProfileSchema,
+  UniverseEntryProvenance: UniverseEntryProvenanceSchema,
+  DiscRecallVerdict: DiscRecallVerdictSchema,
+  RecallEstimateRecord: RecallEstimateRecordSchema,
+  RecallEstimate: RecallEstimateSchema,
+  PopulationConstraint: PopulationConstraintSchema,
+  ChainAccessDeclaration: ChainAccessDeclarationSchema,
+  ChainAccessConsumption: ChainAccessConsumptionSchema,
+  CoverageMetricSet: CoverageMetricSetSchema,
 } as const;
 export class DiscoverySchemaError extends Error {
   readonly code = 'DISCOVERY_SCHEMA_INVALID' as const;

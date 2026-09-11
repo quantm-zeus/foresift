@@ -1,6 +1,6 @@
 /**
  * AC-023 negative / failure-path.
- * Traces: FR-DATA-001, §11.8 (explicit quality states, never guesses).
+ * Traces: FR-DATA-001, §11.8 (explicit quality states, never guesses), FR-SIG-001, AC-023.
  * Invalid chain ids / addresses are refused with typed errors; invalid
  * decimal strings are refused by the quantity contract; a conflicting
  * decimals history leaves the representation explicitly unusable (null),
@@ -248,5 +248,12 @@ describe('AC-023 negative (tool-core substrate): stage-16/17 normalizer and inva
     );
 
     expect(problems.some((p) => p.includes('observedAt exceeds availableAt'))).toBe(true);
+  });
+});
+
+describe('AC-023 negative: Normalization refusal on raw invalid inputs (sig facet)', () => {
+  it('refuses unnormalized raw Solana address at the feature input boundary', () => {
+    const invalidSolanaAddress = 'not-a-base58-address';
+    expect(() => normalizeAddressForNamespace('solana', invalidSolanaAddress)).toThrow();
   });
 });

@@ -106,3 +106,97 @@ describe('g0_cost_* SQL migrations on PGlite', () => {
     ).rejects.toThrow(/PAID_POLICY_IMMUTABLE/);
   });
 });
+
+describe('g1_cost_0001_budget_dimensions SQL migration on PGlite (FR-COST-011, AC-105)', () => {
+  it('discovers g1_cost_0001_budget_dimensions script with sha256 checksum', async () => {
+    const all = await discoverMigrations(MIGRATIONS_DIR);
+    const g1Cost1 = all.find((m) => m.id === 'g1_cost_0001_budget_dimensions');
+    expect(g1Cost1).toBeDefined();
+    expect(g1Cost1?.checksum.startsWith('sha256:')).toBe(true);
+  });
+
+  it('enforces budget_policies dimension and provider_mode constraints', async () => {
+    // Valid DATA_PROVIDER with provider_mode
+    await engine.query(
+      `INSERT INTO cost.budget_policies
+         (policy_id, dimension, provider_mode, cap_limit, currency_or_unit, version, active, activated_at)
+       VALUES ('pol_dp_valid', 'DATA_PROVIDER', 'STRICT_FREE', 1000, 'USD', 'v1', true, now())
+       ON CONFLICT (policy_id) DO NOTHING`,
+    );
+
+    // Valid MODEL with null provider_mode
+    await engine.query(
+      `INSERT INTO cost.budget_policies
+         (policy_id, dimension, provider_mode, cap_limit, currency_or_unit, version, active, activated_at)
+       VALUES ('pol_model_valid', 'MODEL', NULL, 500, 'USD', 'v1', true, now())
+       ON CONFLICT (policy_id) DO NOTHING`,
+    );
+
+    // Refuses invalid dimension
+    await expect(
+      engine.query(
+        `INSERT INTO cost.budget_policies
+           (policy_id, dimension, provider_mode, cap_limit, currency_or_unit, version, active, activated_at)
+         VALUES ('pol_bad_dim', 'HUMAN_ATTENTION', NULL, 100, 'HOURS', 'v1', false, NULL)`,
+      ),
+    ).rejects.toThrow();
+
+    // Refuses provider_mode on non-DATA_PROVIDER dimension
+    await expect(
+      engine.query(
+        `INSERT INTO cost.budget_policies
+           (policy_id, dimension, provider_mode, cap_limit, currency_or_unit, version, active, activated_at)
+         VALUES ('pol_bad_mode', 'MODEL', 'STRICT_FREE', 100, 'USD', 'v1', false, NULL)`,
+      ),
+    ).rejects.toThrow();
+
+    // Refuses multiple active policies on same dimension
+    await expect(
+      engine.query(
+        `INSERT INTO cost.budget_policies
+           (policy_id, dimension, provider_mode, cap_limit, currency_or_unit, version, active, activated_at)
+         VALUES ('pol_dp_second_active', 'DATA_PROVIDER', 'FREE_FIRST', 2000, 'USD', 'v2', true, now())`,
+      ),
+    ).rejects.toThrow();
+  });
+
+  it('enforces budget_consumption_totals constraints and rendered_classes JSON storage', async () => {
+    const renderedJson = JSON.stringify({
+      PAID_DATA_SPEND: 0,
+      FREE_QUOTA_CONSUMPTION: 100,
+      MODEL_SPEND: 5.0,
+      INFRASTRUCTURE_SPEND: 1.0,
+      STORAGE_EGRESS_SPEND: 0.5,
+      NOTIFICATION_SPEND: 0.1,
+      HUMAN_REVIEW_EFFORT: 0,
+    });
+
+    await engine.query(
+      `INSERT INTO cost.budget_consumption_totals
+         (dimension, period_window_start, period_reset_at, cap_limit, consumed, rendered_classes)
+       VALUES ('DATA_PROVIDER', '2026-09-01T00:00:00Z', '2026-09-02T00:00:00Z', 1000, 100, $1)
+       ON CONFLICT (dimension, period_window_start) DO NOTHING`,
+      [renderedJson],
+    );
+
+    // Refuses invalid dimension
+    await expect(
+      engine.query(
+        `INSERT INTO cost.budget_consumption_totals
+           (dimension, period_window_start, period_reset_at, cap_limit, consumed, rendered_classes)
+         VALUES ('INVALID_DIM', '2026-09-01T00:00:00Z', '2026-09-02T00:00:00Z', 1000, 100, $1)`,
+        [renderedJson],
+      ),
+    ).rejects.toThrow();
+
+    // Refuses period_reset_at <= period_window_start
+    await expect(
+      engine.query(
+        `INSERT INTO cost.budget_consumption_totals
+           (dimension, period_window_start, period_reset_at, cap_limit, consumed, rendered_classes)
+         VALUES ('MODEL', '2026-09-02T00:00:00Z', '2026-09-01T00:00:00Z', 1000, 100, $1)`,
+        [renderedJson],
+      ),
+    ).rejects.toThrow();
+  });
+});

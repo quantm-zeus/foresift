@@ -17,6 +17,7 @@ import {
   laneEvidencePaths,
   parseTaskGraph,
   requireTaskGraphForCompletionEvidence,
+  splitSymlinks,
 } from './writer-task-evidence.mjs';
 
 function git(args, cwd) {
@@ -54,31 +55,53 @@ export function runClaudeLaneCore(input) {
     'test helpers, *.test.*, *.spec.*, or __tests__ paths. You may read and run',
     'tests. If a test conflicts with authoritative requirements, do not edit it;',
     'write TEST_DISPUTE evidence under the result artifact directory instead.',
+    // Live run e32031f (2026-09-04): the lane agent ran `bun install`, which
+    // does not read pnpm-workspace.yaml — it appended a root "workspaces"
+    // field to package.json and created a 727-line bun.lock. Both are
+    // tooling plumbing outside every write scope: the guard correctly
+    // rejected the lane (WRITE-AUTHORITY VIOLATION: bun.lock, package.json).
+    // The package manager is pnpm; never run bun install / npm install /
+    // yarn, never create lockfiles, and never register workspaces. If
+    // dependencies are already linked, nothing needs installing.
+    'This repository uses pnpm (pnpm-workspace.yaml). Never run bun install,',
+    'npm install, or yarn; never create, modify, or commit any lockfile',
+    '(pnpm-lock.yaml, bun.lock, package-lock.json); never add a workspaces',
+    'field to any package.json. Dependencies are already installed in the',
+    'worktree — if a build or test needs a dependency, verify node_modules',
+    'first and treat a missing dependency as a blocker, not something to',
+    'install.',
     'Commit coherent production changes before exit.',
   ].join('\n');
   const started = Date.now();
-  const before = git(['rev-parse', 'HEAD'], input.worktree).stdout.trim();
+  // LOGICAL-LANE evidence baseline (maintainer Part A4, 2026-09-03): prefer
+  // the immutable --lane-base over the attempt-start HEAD (retry-safe
+  // evidence range); absent --lane-base falls back to attempt-start HEAD.
+  const before = input['lane-base']
+    ? String(input['lane-base']).trim()
+    : git(['rev-parse', 'HEAD'], input.worktree).stdout.trim();
   let run;
   try {
-    run = spawnSync(
-      'claude',
-      [
-        '--print',
-        '--model',
-        input.model ?? 'claude-opus-4-8',
-        '--disallowedTools',
-        'Bash(git push:*)',
-        '--add-dir',
-        input.worktree,
-      ],
-      {
-        cwd: input.worktree,
-        input: `${prompt}\n`,
-        encoding: 'utf8',
-        timeout: Number(input.timeoutMs ?? 45 * 60_000),
-        maxBuffer: 64 * 1024 * 1024,
-      },
-    );
+    run = input['claude-invoker']
+      ? input['claude-invoker']() // test seam; production spawns the real CLI
+      : spawnSync(
+          'claude',
+          [
+            '--print',
+            '--model',
+            input.model ?? 'claude-opus-4-8',
+            '--disallowedTools',
+            'Bash(git push:*)',
+            '--add-dir',
+            input.worktree,
+          ],
+          {
+            cwd: input.worktree,
+            input: `${prompt}\n`,
+            encoding: 'utf8',
+            timeout: Number(input.timeoutMs ?? 45 * 60_000),
+            maxBuffer: 64 * 1024 * 1024,
+          },
+        );
   } finally {
     // Finally-equivalent release immediately AFTER lane termination (H2 §2).
     // The handoff acquired the claude permit before calling this core.
@@ -136,21 +159,27 @@ export function runClaudeLaneCore(input) {
   if (!ownership.ok)
     throw new Error(`${ownership.violationCode}: ${ownership.violatingPaths.join(',')}`);
   if (dirty.length) {
-    const add = git(['add', '--all'], input.worktree);
-    if (add.status !== 0) throw new Error(`CLAUDE_GIT_ADD_FAILED: ${add.stderr}`);
-    const commit = git(
-      [
-        '-c',
-        'user.name=Foresift Claude Writer',
-        '-c',
-        'user.email=noreply@foresift.local',
-        'commit',
-        '-m',
-        `feat: Claude implementation lane ${input.lane} (engine handoff from Codex)`,
-      ],
-      input.worktree,
-    );
-    if (commit.status !== 0) throw new Error(`CLAUDE_COMMIT_FAILED: ${commit.stderr}`);
+    // Symlink commit-safety (live 486a44d0): never stage symlinked paths —
+    // tooling plumbing, not authorship; a committed symlink poisons the
+    // ownership scan for the whole lane.
+    const { clean: commitable } = splitSymlinks(input.worktree, dirty);
+    if (commitable.length) {
+      const add = git(['add', '--', ...commitable], input.worktree);
+      if (add.status !== 0) throw new Error(`CLAUDE_GIT_ADD_FAILED: ${add.stderr}`);
+      const commit = git(
+        [
+          '-c',
+          'user.name=Foresift Claude Writer',
+          '-c',
+          'user.email=noreply@foresift.local',
+          'commit',
+          '-m',
+          `feat: Claude implementation lane ${input.lane} (engine handoff from Codex)`,
+        ],
+        input.worktree,
+      );
+      if (commit.status !== 0) throw new Error(`CLAUDE_COMMIT_FAILED: ${commit.stderr}`);
+    }
   }
   const head = git(['rev-parse', 'HEAD'], input.worktree).stdout.trim();
   // Evidence-backed nominations (H3 P0-1) over the handoff's actual diff

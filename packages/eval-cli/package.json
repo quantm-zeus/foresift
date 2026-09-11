@@ -1,0 +1,23 @@
+{
+  "name": "@foresift/eval-cli",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Deterministic command-line reporting for outcome maturity and evaluation.",
+  "bin": {
+    "foresift-eval": "./src/cli.ts"
+  },
+  "exports": {
+    ".": {
+      "types": "./src/index.ts",
+      "default": "./src/index.ts"
+    }
+  },
+  "scripts": {
+    "test": "bun test"
+  },
+  "dependencies": {
+    "@foresift/evaluation": "workspace:*",
+    "@foresift/outcome-maturity": "workspace:*"
+  }
+}

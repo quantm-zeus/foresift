@@ -1,6 +1,6 @@
 /**
  * AC-247 acceptance (positive).
- * Traces: FR-DATA-006 (frozen historical counts, INV-005).
+ * Traces: FR-DATA-006 (frozen historical counts, INV-005), FR-EVAL-002, AC-247.
  * AC text (manifest §39, abridged): "A retrospective provider-dependence
  * estimate cannot alter a frozen historical evidence count in realizable
  * replay; it is labeled diagnostic unless the estimate was available then."
@@ -12,8 +12,11 @@
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 import {
   AcquisitionState,
+  DependenceInputAvailability,
   DependenceLabel,
+  edgeMayAffectCreditAt,
   utcTimestamp,
+  type SourceDependenceEdgeLike,
   type UtcTimestamp,
 } from '@foresift/domain';
 import {
@@ -21,7 +24,6 @@ import {
   maturedEvidenceCountAt,
   completeRetrieval,
   recordAcquisitionDecision,
-  recordDependenceEdge,
   recordProbeAssignment,
   registerSourceIdentity,
 } from '@foresift/persistence';
@@ -80,22 +82,32 @@ beforeAll(async () => {
 
   // A dependence estimate computed LONG after the boundary from data that was
   // not available then.
-  await recordDependenceEdge(engine, {
-    edgeId: 'ac247-edge-retro',
-    edge: {
-      sourceA: 'src/rpc-a' as never,
-      sourceB: 'src/explorer-b' as never,
-      sharedUpstreamLineageKeys: [],
-      inputs: {
-        valueErrorTimingCorrelation: 0.95,
-        outageOverlap: 0.8,
-        firstSeenLagAgreement: 0.9,
-        fingerprintSimilarity: 0.92,
-      },
-      label: DependenceLabel.DIAGNOSTIC_RETROSPECTIVE,
-      availableAt: T('2026-07-15T00:00:00Z'),
-    },
-  });
+  await engine.query(
+    `INSERT INTO source_dependence_edges (
+       edge_id, source_a, source_b, shared_upstream_lineage_keys,
+       value_error_timing_correlation, outage_overlap, first_seen_lag_agreement,
+       fingerprint_similarity, label, available_at,
+       valid_from, valid_until, method, evidence_ids, confidence, effective_independence_multiplier)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16)`,
+    [
+      'ac247-edge-retro',
+      'src/explorer-b',
+      'src/rpc-a',
+      [],
+      0.95,
+      0.8,
+      0.9,
+      0.92,
+      DependenceLabel.DIAGNOSTIC_RETROSPECTIVE,
+      T('2026-07-15T00:00:00Z'),
+      T('2026-07-15T00:00:00Z'),
+      null,
+      'EMPIRICAL',
+      [],
+      1.0,
+      0.5,
+    ],
+  );
 });
 
 afterAll(() => closeTestDatabase(tdb));
@@ -192,5 +204,48 @@ describe('AC-247 acceptance (tool-core substrate): exact-cache entry record sche
       rightsPermitted: true,
     });
     expect(parsed.rightsPermitted).toBe(true);
+  });
+});
+
+describe('AC-247 G1 extensions: point-in-time independence & retrospective diagnostic isolation (FR-DATA-015)', () => {
+  it('point-in-time independence estimates cannot use future provider behavior to alter evidence counts', async () => {
+    const boundary = T('2026-06-05T00:00:00Z');
+    const frozenCount = await maturedEvidenceCountAt(tdb.engine, {
+      candidateId: 'cand/ac247',
+      t: boundary,
+    });
+    expect(frozenCount).toBe(2);
+  });
+
+  it('validates that DIAGNOSTIC_RETROSPECTIVE labeled estimates are excluded from realizable replay credit', () => {
+    const diagnosticEdge: SourceDependenceEdgeLike = {
+      validFrom: T('2026-01-01T00:00:00Z'),
+      validUntil: T('2026-12-31T23:59:59Z'),
+      confidence: 1.0,
+      effectiveIndependenceMultiplier: 0.25,
+      inputAvailability: DependenceInputAvailability.DIAGNOSTIC_RETROSPECTIVE,
+    };
+
+    expect(edgeMayAffectCreditAt(diagnosticEdge, '2026-06-05T00:00:00Z')).toBe(false);
+  });
+});
+
+describe('AC-247 G1 extension: frozen-count preservation in realizable replay facet (FR-EVAL-002, AC-247)', () => {
+  it('preserves exact point-in-time candidate count and state across repeated evaluations', async () => {
+    const boundary = T('2026-06-05T00:00:00Z');
+    // First evaluation of matured count at boundary
+    const countA = await maturedEvidenceCountAt(tdb.engine, {
+      candidateId: 'cand/ac247',
+      evidenceFamily: 'swaps',
+      t: boundary,
+    });
+    // Second evaluation of matured count at same boundary
+    const countB = await maturedEvidenceCountAt(tdb.engine, {
+      candidateId: 'cand/ac247',
+      evidenceFamily: 'swaps',
+      t: boundary,
+    });
+    expect(countA).toBe(2);
+    expect(countB).toBe(countA);
   });
 });

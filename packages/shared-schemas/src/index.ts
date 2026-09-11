@@ -12,3 +12,46 @@ export * from './cost.ts';
 export * from './col.ts';
 export * from './disc.ts';
 export * from './trace.ts';
+export * from './trd.ts';
+export * from './sup.ts';
+export * from './solsec.ts';
+export * from './exec.ts';
+export * from './capacity.ts';
+export * from './mat.ts';
+export * from './eval.ts';
+export * from './obj.ts';
+export {
+  SIG_SCHEMA_REGISTRY_VERSION,
+  FunnelStageSchema,
+  VectorKindSchema,
+  ParetoStatusSchema,
+  SelectionArmSchema,
+  CutoffReasonSchema,
+  CohortFallbackLevelSchema,
+  LifecycleStateSchema,
+  RecheckDecisionKindSchema,
+  FeatureDefinitionSchema as SigFeatureDefinitionSchema,
+  FeatureLineageSchema,
+  CohortSnapshotSchema,
+  FunnelStageRecordSchema,
+  CandidateVectorComponentSchema,
+  CandidateVectorRecordSchema,
+  RankingAuditSchema,
+  SelectionDecisionSchema,
+  LifecycleTransitionSchema,
+  RecheckBudgetSchema,
+  RecheckDecisionSchema,
+  SigSchemaRegistry,
+  parseSigSchema,
+  type SigFeatureDefinition,
+  type FeatureLineage as SigFeatureLineage,
+  type CohortSnapshot as SigCohortSnapshot,
+  type FunnelStageRecord as SigFunnelStageRecord,
+  type CandidateVectorRecord as SigCandidateVectorRecord,
+  type RankingAudit as SigRankingAudit,
+  type SelectionDecision as SigSelectionDecision,
+  type LifecycleTransition as SigLifecycleTransition,
+  type RecheckBudget as SigRecheckBudget,
+  type RecheckDecision as SigRecheckDecision,
+  type SigSchemaName,
+} from './sig.ts';

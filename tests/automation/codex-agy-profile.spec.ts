@@ -1009,9 +1009,11 @@ describe('Foresift V4 CODEX_AGY execution profile test matrix (A through AH)', (
       expect(content).toContain('fast-recheck');
 
       // 6. AGY test author receives persisted routing artifact
+      // (maintainer Part E: lane id is graph-derived, testLanes[n])
       const agyNode = content.match(/- id: writer-test-author-agy[\s\S]*?(?=\n  - id:)/);
       expect(agyNode).toBeTruthy();
-      expect(agyNode?.[0]).toContain('exec-agy-test-writer.mjs --lane test-author');
+      expect(agyNode?.[0]).toContain('exec-agy-test-writer.mjs --lane "$TL_ID"');
+      expect(agyNode?.[0]).toContain('g.testLanes?.[0]?.id');
       expect(agyNode?.[0]).toContain('--routing "$ARTIFACTS_DIR/routing.json"');
     });
   });
@@ -1763,6 +1765,16 @@ process.exit(${JSON.stringify(options.exitCode ?? 0)});
         expect(savedResult.model).toBe('gemini-3.7-flash-high');
         expect(savedResult.reasoning).toBe('high');
         expect(savedResult.providerTimeout).toBe('40m');
+        // Integrator-required metadata (directive 2026-09-09, run f02e8580):
+        // a successful AGY test lane must carry the SAME result schema
+        // wave-guard.mjs emits — branch/headSha/baseSha — or
+        // integrate-writer-results.mjs rejects the lane as
+        // "result missing branch/headSha/baseSha" and strands verified work.
+        // baseSha pins the lane base (=== the legacy baseHead field).
+        expect(savedResult.branch).toBeTypeOf('string');
+        expect(savedResult.headSha).toMatch(/^[0-9a-f]{40}$/);
+        expect(savedResult.baseSha).toMatch(/^[0-9a-f]{40}$/);
+        expect(savedResult.baseSha).toBe(savedResult.baseHead);
 
         const telemetryPath = join(fx.resultsDir, 'telemetry.json');
         expect(existsSync(telemetryPath)).toBe(true);
@@ -2361,8 +2373,8 @@ writeFileSync(${JSON.stringify(join(resultsDir, 'agent-result.json'))}, JSON.str
           },
         ],
         shards: [
-          { id: 'shard-low', units: ['t-low'] },
-          { id: 'shard-high', units: ['t-high'] },
+          { id: 'shard-low', mode: 'serial', units: ['t-low'] },
+          { id: 'shard-high', mode: 'parallel', units: ['t-high'] },
         ],
         testLanes: [{ id: 'test-author', units: ['t9'] }],
       };
@@ -2370,6 +2382,10 @@ writeFileSync(${JSON.stringify(join(resultsDir, 'agent-result.json'))}, JSON.str
         graph,
         'HYBRID_AGY',
         new Set(['gpt-5.6-terra', 'gpt-5.6-sol']),
+        // Pool-agnostic classification assertion: the legacy graph carries a
+        // single shard, and the live-pool read on the host must not influence
+        // it (Matrix AO owns capacity admission).
+        { codexPoolLimit: 3 },
       );
       expect(wave.implementationEngine).toBe('HYBRID');
       const byLane = Object.fromEntries(
@@ -2385,7 +2401,7 @@ writeFileSync(${JSON.stringify(join(resultsDir, 'agent-result.json'))}, JSON.str
       const graph = {
         package: { risk: 'MEDIUM' },
         units: [{ id: 't1', body: 'simple' }],
-        shards: [{ id: 'core', units: ['t1'] }],
+        shards: [{ id: 'core', mode: 'serial', units: ['t1'] }],
         testLanes: [],
       };
       const wave = routing.buildWaveRouting(
@@ -2397,6 +2413,119 @@ writeFileSync(${JSON.stringify(join(resultsDir, 'agent-result.json'))}, JSON.str
         (l) => l.role === 'implementation',
       ))
         expect(lane.engine).toBe('CODEX');
+    });
+  });
+
+  describe('Matrix AO: live pool-capacity routing admission (directive 2026-09-09, run f02e8580)', () => {
+    // Run f02e8580 shipped codexPoolLimit=1 but the static MAX_CODEX_WRITERS=3
+    // dispatched FOUR codex lanes (3 serial + parallel shard-1). Shard-1 raced
+    // the serial chain for the single permit, failed 3× POOL_AT_LIMIT, and its
+    // DAG retries consumed the generic retry budget before fatalizing the run.
+    const graph = () => ({
+      package: { risk: 'MEDIUM' },
+      units: [
+        { id: 't1', body: 'implement durable checkpoint reconciliation' },
+        { id: 't2', body: 'implement migration ordering' },
+        { id: 't3', body: 'implement coverage metric aggregation' },
+        { id: 't4', body: 'implement promotion rider evaluation' },
+        { id: 't5', body: 'implement constraint registry lookups' },
+      ],
+      shards: [
+        { id: 'core-batch-1', mode: 'serial', units: ['t1'] },
+        { id: 'core-batch-2', mode: 'serial', units: ['t2'] },
+        { id: 'core-batch-3', mode: 'serial', units: ['t3'] },
+        { id: 'shard-1', mode: 'parallel', units: ['t4', 't5'] },
+      ],
+      testLanes: [{ id: 'test-author-1', units: ['t1'] }],
+    });
+    const TERRA_SOL = new Set(['gpt-5.6-terra', 'gpt-5.6-sol']);
+
+    it('codexPoolLimit=1 caps parallel CODEX lanes at 0; parallel overflow routes CLAUDE', async () => {
+      const routing = await loadCodexRoutingModule();
+      const wave = routing.buildWaveRouting(graph(), 'HYBRID_AGY', TERRA_SOL, {
+        codexPoolLimit: 1,
+      });
+      expect(wave.codexPoolLimit).toBe(1);
+      expect(wave.parallelCodexBudget).toBe(0);
+      const byLane = Object.fromEntries(
+        (wave.lanes as Array<{ lane: string; engine: string }>).map((l) => [l.lane, l.engine]),
+      );
+      // Serial chain keeps CODEX (one permit at a time).
+      expect(byLane['core-batch-1']).toBe('CODEX');
+      expect(byLane['core-batch-2']).toBe('CODEX');
+      expect(byLane['core-batch-3']).toBe('CODEX');
+      // Parallel overflow cannot race the serial permit.
+      expect(byLane['shard-1']).toBe('CLAUDE');
+      expect(wave.codexWriterCount).toBe(3);
+    });
+
+    it('codexPoolLimit=3 admits one parallel CODEX lane and caps the rest', async () => {
+      const routing = await loadCodexRoutingModule();
+      const wave = routing.buildWaveRouting(graph(), 'HYBRID_AGY', TERRA_SOL, {
+        codexPoolLimit: 3,
+      });
+      expect(wave.parallelCodexBudget).toBe(2);
+      const engines = (wave.lanes as Array<{ lane: string; role: string; engine: string }>)
+        .filter((l) => l.role === 'implementation')
+        .map((l) => [l.lane, l.engine] as const);
+      const codexParallel = engines.filter(([lane, e]) => lane === 'shard-1' && e === 'CODEX');
+      expect(codexParallel.length).toBe(1);
+    });
+
+    it('limit above the static cap is clamped to MAX_CODEX_WRITERS; unreadable pool degrades to the static cap', async () => {
+      const routing = await loadCodexRoutingModule();
+      const wide = routing.buildWaveRouting(graph(), 'HYBRID_AGY', TERRA_SOL, {
+        codexPoolLimit: 99,
+      });
+      expect(wide.codexPoolLimit).toBe(99);
+      // Budget = min(MAX_CODEX_WRITERS, limit) − 1 = 2.
+      expect(wide.parallelCodexBudget).toBe(2);
+
+      // No limit override + unresolvable HOME ⇒ providerAdmissionView throws
+      // ⇒ resolveCodexPoolLimit returns null ⇒ static-cap behavior, and the
+      // record explicitly marks codexPoolLimit null (no fabricated truth).
+      const mod = await loadCodexRoutingModule();
+      const savedHome = process.env.HOME;
+      const savedPool = process.env.FORESIFT_PROVIDER_POOL_STATE_DIR;
+      const savedAuto = process.env.FORESIFT_AUTOPILOT_STATE_DIR;
+      delete process.env.FORESIFT_PROVIDER_POOL_STATE_DIR;
+      delete process.env.FORESIFT_AUTOPILOT_STATE_DIR;
+      delete process.env.HOME;
+      try {
+        expect(mod.resolveCodexPoolLimit({ env: process.env })).toBeNull();
+        const degraded = mod.buildWaveRouting(graph(), 'HYBRID_AGY', TERRA_SOL, {
+          env: process.env,
+        });
+        expect(degraded.codexPoolLimit).toBeNull();
+        expect(degraded.maxCodexWriters).toBe(3);
+      } finally {
+        if (savedHome === undefined) delete process.env.HOME;
+        else process.env.HOME = savedHome;
+        if (savedPool === undefined) delete process.env.FORESIFT_PROVIDER_POOL_STATE_DIR;
+        else process.env.FORESIFT_PROVIDER_POOL_STATE_DIR = savedPool;
+        if (savedAuto === undefined) delete process.env.FORESIFT_AUTOPILOT_STATE_DIR;
+        else process.env.FORESIFT_AUTOPILOT_STATE_DIR = savedAuto;
+      }
+    });
+
+    it('reads the live pool file through resolveCodexPoolLimit', async () => {
+      const routing = await loadCodexRoutingModule();
+      const stateDir = makeTempDir('routing-pool-fx-');
+      writeFileSync(
+        join(stateDir, 'provider-pools.json'),
+        JSON.stringify({
+          schema: 'foresift/provider-pool@1',
+          updatedAt: new Date().toISOString(),
+          claude: { initial: 3, normalTarget: 5, burstTarget: 8, hardCap: 10, limit: 3, active: 0 },
+          codex: { initial: 1, normalTarget: 2, burstTarget: 2, hardCap: 3, limit: 2, active: 0 },
+          agy: { normalTarget: 3, burstTarget: 5, hardCap: 6, limit: 3, active: 0 },
+        }),
+      );
+      const wave = routing.buildWaveRouting(graph(), 'HYBRID_AGY', TERRA_SOL, {
+        env: { FORESIFT_PROVIDER_POOL_STATE_DIR: stateDir } as NodeJS.ProcessEnv,
+      });
+      expect(wave.codexPoolLimit).toBe(2);
+      expect(wave.parallelCodexBudget).toBe(1);
     });
   });
 

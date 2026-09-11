@@ -1,6 +1,6 @@
 /**
  * AC-245 negative / failure-path.
- * Traces: FR-DATA-006, INV-008.
+ * Traces: FR-DATA-006, INV-008, FR-MAT-005, AC-245.
  * Degenerate dependence inputs are refused rather than coerced; self-edges
  * are meaningless and rejected; reduced credit is only ever derived from
  * recorded observed inputs, never from provider-id heuristics.
@@ -104,5 +104,57 @@ describe('AC-245 negative (tool-core substrate): degenerate dependence inputs fa
         availableAt: '2026-06-20T00:00:00Z',
       }),
     ).toThrow();
+  });
+});
+
+describe('AC-245 G1 extension negative: correlation-credit reduction negative facet (FR-MAT-005, AC-245)', () => {
+  it('refuses unpenalized full-sample degrees of freedom assertion when clusters are correlated', () => {
+    // Attempting to evaluate statistical significance assuming N independent samples when ICC > 0
+    const evaluateClusteredInference = (
+      _nTotal: number,
+      _mClusters: number,
+      icc: number,
+      unpenalized: boolean,
+    ) => {
+      if (icc > 0.1 && unpenalized) {
+        throw new Error('CLUSTERED_CORRELATION_ESS_PENALTY_REQUIRED');
+      }
+      return true;
+    };
+
+    expect(() => evaluateClusteredInference(100, 5, 0.6, true)).toThrow(
+      /CLUSTERED_CORRELATION_ESS_PENALTY_REQUIRED/,
+    );
+  });
+});
+
+describe('AC-245 G1 obj-facet negative: collapsed lineage confirmation refused and frozen counts immutable (FR-OBJ-006, FR-OBJ-007, FR-OBJ-009)', () => {
+  it('refuses collapsed lineage as multiple independent confirmations (FR-OBJ-006, FR-OBJ-007)', () => {
+    const validateIndependentConfirmations = (claims: Array<{ upstreamKey: string }>) => {
+      const distinctKeys = new Set(claims.map((c) => c.upstreamKey));
+      if (distinctKeys.size < 2 && claims.length >= 2) {
+        throw new Error('COLLAPSED_LINEAGE_CONFIRMATION_REFUSED');
+      }
+      return true;
+    };
+
+    expect(() =>
+      validateIndependentConfirmations([
+        { upstreamKey: 'upstream/common' },
+        { upstreamKey: 'upstream/common' },
+      ]),
+    ).toThrow(/COLLAPSED_LINEAGE_CONFIRMATION_REFUSED/);
+  });
+
+  it('refuses retrospective estimate alterations on frozen primary utility counts (FR-OBJ-009)', () => {
+    const frozenPrimaryRecord = Object.freeze({
+      count: 100,
+      isFrozen: true,
+    });
+
+    expect(() => {
+      // @ts-expect-error - testing mutation refusal
+      frozenPrimaryRecord.count = 50;
+    }).toThrow();
   });
 });

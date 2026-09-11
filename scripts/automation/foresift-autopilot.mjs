@@ -58,6 +58,7 @@ import {
   readdirSync,
   renameSync,
   rmSync,
+  statSync,
   writeFileSync,
   unlinkSync,
 } from 'node:fs';
@@ -116,6 +117,7 @@ import {
 import { advanceRepairRequest, discoverPendingRepairRequests } from './ci-repair-executor.mjs';
 import { admitPackageLaunch, releasePackageRuntime } from './runtime-admission.mjs';
 import { buildLaunchPreflight, exactCoRunCompatible } from './launch-preflight.mjs';
+import { missedParallelismOpportunities } from './parallelism-audit.mjs';
 import { buildReadyQueue, stealNext } from './ready-queue.mjs';
 import {
   classifyHostState,
@@ -199,8 +201,16 @@ const BACKOFF_CAP_MS = 15 * 60_000;
 // Dedupes co_run_denied observability events within one supervisor process.
 const coRunDenialSeen = new Set();
 // A "running" Archon row proves nothing about liveness; if a run shows no
-// activity for this long we treat it as orphaned (§17).
-const STALE_RUN_MS = 90 * 60_000;
+// activity for this long we treat it as orphaned (§17). Live 2026-09-04 (run
+// 0eaa1e85): Archon's runs-row `last_activity_at` does NOT advance during
+// detached bash-node execution — it stayed frozen at launch time while the
+// serial-2 writer ran a healthy 60m24s — so the probe read "90 minutes idle"
+// and abandoned the run 15 minutes BEFORE the writer completed, cancelling a
+// fully productive wave (defect 6). The ceiling must exceed the WORST healthy
+// node path: a 2h writer-node timeout + two 60s retry gaps + margin = 3h.
+// A genuinely dead detached run shows no log growth for hours; §17 reaping
+// stays real, just never fires inside a legitimate long node.
+const STALE_RUN_MS = 3 * 60 * 60_000;
 // Detach acks carry no run id; discovery polls the runs table this often/at most.
 const DISCOVERY_RETRY_MS = 30_000;
 const DISCOVERY_LIMIT = 5;
@@ -521,6 +531,72 @@ function repoPlanningComplete(packageId) {
 }
 
 /**
+ * Planning-quality launch gate (directive 2026-09-08): a package may enter
+ * the IMPLEMENTATION-only sharded wave only when its committed plan carries
+ * BOTH deterministic planning laws — (a) the #218 parallelism quality
+ * objective (a PRODUCT unit that is not [P], has no valid [serial-reason]
+ * marker, and provably has a write-disjoint dependency-free sibling makes
+ * missed.length > 0) and (b) ownership admission (#220: no implementation-
+ * dispatched unit carries test-owned writes). The audit ALSO fails closed on
+ * an unknown serial-reason vocabulary value (it throws). Deterministic,
+ * zero-AI, read-only: it builds the task graph the wave prep itself would
+ * build. Refusal reason: LAUNCH_REFUSED_PLAN_QUALITY. No retroactive effect —
+ * already-landed legacy packages are PROVEN (0 open units → audit trivially
+ * passes) and legacy topologies never consult this gate.
+ */
+function planQualityForWaveLaunch(packageId) {
+  const reasons = [];
+  try {
+    const r = spawnSync(
+      process.execPath,
+      [
+        join(import.meta.dirname, 'build-implementation-task-graph.mjs'),
+        '--package',
+        packageId,
+        '--root',
+        REPO,
+        '--plan-shards',
+        '3',
+        '--execution-profile',
+        resolveExecutionProfile(),
+        '--allow-ownership-violations',
+      ],
+      { encoding: 'utf8', cwd: REPO, timeout: 60_000, maxBuffer: 32 * 1024 * 1024 },
+    );
+    if (r.status !== 0 || !r.stdout) {
+      // The graph builder fails closed on its own laws (ownership admission
+      // hard mode, corrupt milestone, unparseable tasks). That refusal IS the
+      // answer: this plan may not launch the wave.
+      reasons.push(
+        `task graph unavailable (plan is not schedulable): ${
+          (r.stderr ?? '').replace(/\s+/g, ' ').trim().slice(0, 240) || 'no output'
+        }`,
+      );
+    } else {
+      const graph = JSON.parse(r.stdout);
+      const admission = graph.ownershipAdmission ?? { schedulable: false, violations: [] };
+      if (admission.schedulable !== true)
+        reasons.push(
+          `ownership admission failed: ${(admission.violations ?? []).slice(0, 3).join(' | ')}`,
+        );
+      const missed = missedParallelismOpportunities(graph);
+      if (missed.length > 0) {
+        const ids = missed.slice(0, 6).map((m) => m.taskId);
+        reasons.push(
+          `MISSED_PARALLELISM_OPPORTUNITY: ${missed.length} product unit(s) provably parallelizable but marked serial without a valid reason (${ids.join(', ')}${missed.length > 6 ? ', …' : ''}) — mark them [P] or add a six-vocabulary [serial-reason]`,
+        );
+      }
+    }
+  } catch (err) {
+    // includes SERIAL_REASON_UNKNOWN from the audit — fail closed
+    reasons.push(
+      `plan-quality gate could not evaluate: ${String(err?.message ?? err).slice(0, 200)}`,
+    );
+  }
+  return { ok: reasons.length === 0, reason: reasons.join('; ') };
+}
+
+/**
  * Workflow variant per EXECUTION GENERATION (V3 ADR-0009) over the historical
  * throughput profile (ADR 0007): every package at generation >= 1 runs the
  * single final optimized topology regardless of the legacy profile table;
@@ -540,8 +616,22 @@ function repoPlanningComplete(packageId) {
 function workPackageWorkflow(pkgOrId) {
   const pkg = typeof pkgOrId === 'string' ? { id: pkgOrId } : pkgOrId;
   const selected = workPackageWorkflowFor(pkg);
-  const wf = admitWorkflowForLaunch(selected, repoPlanningComplete(pkg.id));
+  const planningComplete = repoPlanningComplete(pkg.id);
+  const wf = admitWorkflowForLaunch(selected, planningComplete);
   if (wf !== selected) log(`WAVE_ADMIT_DEFERRED ${pkg.id}: repo planning incomplete -> ${wf}`);
+  // Planning-quality gate (directive 2026-09-08): planning truth that is
+  // "complete" but law-invalid (all-serial without reasons, test writes in
+  // implementation lanes) must NOT enter the implementation wave. Fail-closed
+  // toward the planning-only bootstrap — whose planner loop re-runs the same
+  // deterministic guards — until the plan is corrected. Only the wave launch
+  // is gated; legacy/optimized topologies are untouched.
+  if (wf === selected && selected === 'foresift-sharded-wave') {
+    const quality = planQualityForWaveLaunch(pkg.id);
+    if (!quality.ok) {
+      log(`LAUNCH_REFUSED_PLAN_QUALITY ${pkg.id}: ${quality.reason}`);
+      return 'foresift-package-planning-bootstrap';
+    }
+  }
   return wf;
 }
 
@@ -1226,6 +1316,26 @@ function planningBootstrapHandoff(st, entry, get) {
     attemptResume(st, entry, 'bootstrap completed but package record unusable');
     return false;
   }
+  // Planning-quality gate at the handoff seam (directive 2026-09-08), BEFORE
+  // launchIdentity: the freshly promoted plan must satisfy BOTH deterministic
+  // laws (#218 parallelism objective with the six-vocabulary serial reasons;
+  // #220 ownership admission) BEFORE the implementation continuation launches.
+  // Ordering is load-bearing — launchIdentity's own launch seam demotes a
+  // refused wave to the planning-only bootstrap, and adopting that demotion
+  // here would relaunch planning against an already-complete plan forever
+  // (an infinite plan loop) instead of surfacing the tracked refusal. The
+  // bootstrap entry stays tracked and the tick replays once the plan is
+  // corrected on main. Zero retroactive effect on landed packages.
+  const quality = planQualityForWaveLaunch(packageId);
+  if (!quality.ok) {
+    record(st, 'planning_handoff_refused_plan_quality', {
+      packageId,
+      runId: entry.runId,
+      reason: quality.reason.slice(0, 400),
+    });
+    attemptResume(st, entry, `plan-quality gate refused wave launch: ${quality.reason}`);
+    return false;
+  }
   const { generation, branch, message, workflow: wf, executionProfile } = launchIdentity(pkg);
   // Duplicate-tick / crash-after-launch absorption: a LIVE wave row for this
   // exact identity is adopted, never duplicated. Keyed on the WAVE identity —
@@ -1273,6 +1383,7 @@ function planningBootstrapHandoff(st, entry, get) {
     awaitingDiscovery: !runId,
     discoveryAttempts: 0,
     executionProfile,
+    logPath: ack?.logPath ?? null,
   });
   if (runId) {
     // Mirror selectAndLaunch's durable-association discipline: RUNNING was
@@ -1502,6 +1613,32 @@ async function actOnEntry(st, entry) {
     entry.activityTsUnparsable = false;
     const activityMs = now() - lastActivity;
     if (Number.isNaN(activityMs) || activityMs > STALE_RUN_MS) {
+      // Stale BOOKKEEPING is not stale WORK: the runs-row timestamp is
+      // launch-frozen during detached bash nodes (0eaa1e85, d32ff2cb,
+      // 1c294b3c), and a sharded wave legitimately runs many 50-90 minute
+      // lanes back-to-back. Before abandoning a run whose timestamps froze,
+      // consult its detached-run log — the DAG executor writes a line for
+      // every node start/complete, so log mtime is the run's real pulse.
+      // Fail-closed: a silent log (or an unreadable one) keeps the original
+      // abandon behavior; only VERIFIABLE growth stays the hand.
+      const logCheck = detachedRunLogFreshness({
+        logPath: entry.logPath ?? null,
+        startedAt: normalizeTimestampMs(entry.startedAt) ?? 0,
+        logBornAfter: (normalizeTimestampMs(entry.startedAt) ?? 0) - 2 * 60_000,
+        windowMs: STALE_RUN_MS,
+      });
+      if (logCheck.fresh) {
+        if (!entry.logLivenessRecorded) {
+          entry.logLivenessRecorded = true;
+          record(st, 'stale_run_bookkeeping_but_log_active', {
+            runId: entry.runId,
+            branch: entry.branch,
+            idleMinutes: Math.round(activityMs / 60000),
+            logPath: logCheck.logPath,
+          });
+        }
+        return false; // alive by product activity — keep waiting
+      }
       // Orphaned: preserve worktree/git state; use supported lifecycle ops only.
       archonJson(`workflow abandon ${entry.runId} --json`);
       entry.failureClass = 'UNKNOWN';
@@ -1510,6 +1647,8 @@ async function actOnEntry(st, entry) {
       record(st, 'stale_run_abandoned_restart_scheduled', {
         branch: entry.branch,
         idleMinutes: Math.round(activityMs / 60000),
+        logPath: entry.logPath ?? logCheck.logPath ?? null,
+        logError: logCheck.error ?? null,
       });
       return false;
     }
@@ -1561,10 +1700,50 @@ async function actOnEntry(st, entry) {
  * Supervised handling of a paused tracked entry. Fatal pauses are strictly
  * operator-gated (`--recover-fatal`); quota pauses own a bounded probe schedule
  * of widely spaced `workflow resume` calls — never busy-looping a daily wall.
+ * Durable-success preemption (live 2026-09-11, run ad794228): a quota pause
+ * exists to eventually RESUME the run so its package can land. Once the
+ * package is already PROVEN on committed main, resuming a terminal run
+ * resurrects dead provider spend against proven truth — retire the stale
+ * entry instead (same law as case C for fatal pauses, extended to quota).
  */
+export function retireQuotaPauseOnDurableProven(st, entry, deps = {}) {
+  if (entry.paused !== 'quota' || entry.done) return false;
+  if (!entry.packageId) return false;
+  const loadMilestone = deps.loadMilestone ?? (() => loadCurrentMilestone(REPO));
+  const findRunRow = deps.findRunRow ?? findRecentRunRow;
+  const recordEvent = deps.record ?? record;
+  let ms;
+  try {
+    ms = loadMilestone();
+  } catch {
+    return false; // implementation state unreadable: no opinion (fail-safe)
+  }
+  const pkg = ms && ms.packages.find((p) => p.id === entry.packageId);
+  if (!pkg || pkg.status !== 'PROVEN') return false; // not durably proven: quota schedule keeps its normal behavior
+  // Correlation identity under the package's CURRENT milestone generation.
+  // The entry's own workflow/message may predate a generation flip; the
+  // milestone-committed identity is authoritative (V3 §6).
+  const ident = launchIdentity(pkg);
+  if (!ident.workflow || !ident.message) return false;
+  // A live sibling run for the same package still owns the work — never
+  // retire while one exists (fail-closed against double-tracking).
+  const row = findRunRow(ident.workflow, ident.message);
+  if (row && ['running', 'pending'].includes(String(row.status))) return false;
+  releasePackageRuntime(STATE_DIR, entry);
+  entry.done = true;
+  entry.note = 'quota_pause_retired_durable_proven';
+  recordEvent(st, 'quota_pause_retired_durable_proven', {
+    packageId: entry.packageId,
+    runId: entry.runId ?? null,
+    liveRowStatus: row ? String(row.status) : null,
+  });
+  return true;
+}
+
 function actOnPausedEntry(st, entry) {
   if (entry.paused === 'fatal') return; // only --recover-fatal may act
   if (entry.paused !== 'quota') return;
+  if (retireQuotaPauseOnDurableProven(st, entry)) return; // durable PROVEN retires before any probe/resume
   if (!entry.quotaNextProbeAt || now() < entry.quotaNextProbeAt) return;
   if ((entry.quotaProbes ?? 0) >= QUOTA_PROBE_LIMIT) {
     escalatePausedQuota(st, entry, `daily-quota probe budget (${QUOTA_PROBE_LIMIT}) exhausted`);
@@ -1732,24 +1911,156 @@ function findRecentRunRow(workflow, message) {
  * The supervisor must never settle into `package=RUNNING ∧ activeRuns=[] ∧
  * pausedFatal=null` — no such stranded state survives a tick.
  */
-function reconcileStrandedPackages(st) {
-  if (st.pausedFatal) return;
+// Terminal state-landing receipt statuses (mirrors state-landing.mjs
+// TERMINAL_STATUSES, which is intentionally not exported).
+const TERMINAL_RECEIPT_STATUSES = new Set(['MERGED', 'FAILED']);
+
+/**
+ * A ->PROVEN state-landing receipt for packageId that is IN FLIGHT (any
+ * non-terminal status) or already MERGED (canonical milestone may lag the
+ * protected merge by a tick). FAILED is terminal failure — it never proves
+ * durable success.
+ */
+export function findProvenLandingReceipt(receipts, packageId) {
+  return receipts.find(
+    (r) =>
+      r?.packageId === packageId &&
+      r?.toStatus === 'PROVEN' &&
+      (r?.status === 'MERGED' || !TERMINAL_RECEIPT_STATUSES.has(r?.status)),
+  );
+}
+
+// Archon's detached-run log directory; every `workflow run --detach` streams
+// its DAG executor output (one line per node start/complete) here.
+const ARCHON_LOGS_DIR = `${process.env.HOME ?? ''}/.archon/logs`;
+
+/**
+ * Wave liveness from detached-run LOG freshness (incidents 2026-09-05, runs
+ * d32ff2cb and 1c294b3c): archon's runs-row last_activity_at stays
+ * LAUNCH-FROZEN during detached bash-node execution, while a sharded wave
+ * legitimately runs many 50-90 minute lanes back-to-back — so the
+ * STALE_RUN_MS ceiling, sized for ONE 2h node, fired at exactly 3h after
+ * launch and abandoned fully-productive waves twice in one day. The DAG
+ * executor writes its log continuously, so log mtime is the run's real pulse.
+ *
+ * Returns { fresh, logPath?, error? }:
+ *   - fresh=true  => the run has verifiable product activity; NOT stale.
+ *   - fresh=false => no liveness opinion (absent/stale/error) — callers keep
+ *     whatever fail-closed behavior they had (abandon on frozen bookkeeping).
+ * statOverride is a test seam (production uses fs.statSync).
+ */
+export function detachedRunLogFreshness({
+  logsDir = ARCHON_LOGS_DIR,
+  logPath = null,
+  startedAt = 0,
+  windowMs,
+  logBornAfter = Math.max(startedAt - 2 * 60_000, 0),
+  statOverride = null,
+}) {
+  const freshInWindow = (st) => Date.now() - st.mtimeMs <= windowMs;
+  try {
+    if (logPath) {
+      const st = statOverride
+        ? statOverride(logPath)
+        : statSync(logPath, { throwIfNoEntry: false });
+      if (st) return { fresh: freshInWindow(st), logPath };
+      // Captured path missing (rotated/cleaned): fall through to discovery.
+    }
+    if (!existsSync(logsDir)) return { fresh: false };
+    for (const name of readdirSync(logsDir)) {
+      if (!name.startsWith('detached-run-') || !name.endsWith('.log')) continue;
+      const candidate = join(logsDir, name);
+      const st = statOverride
+        ? statOverride(candidate)
+        : statSync(candidate, { throwIfNoEntry: false });
+      if (!st || st.birthtimeMs < logBornAfter || !freshInWindow(st)) continue;
+      return { fresh: true, logPath: candidate };
+    }
+    return { fresh: false };
+  } catch (err) {
+    return { fresh: false, error: String(err?.message ?? err).slice(0, 120) };
+  }
+}
+
+/**
+ * Stranded-package reconciliation (§17 invariant guard), made state-landing
+ * aware after the 2026-09-05 false pausedFatal (g1-solana-security): the
+ * finalize path requests the protected ->PROVEN transition ASYNCHRONOUSLY and
+ * returns before the canonical milestone lands, so `RUNNING` + no tracked run
+ * is ALSO the expected mid-landing shape of a package that has authoritatively
+ * completed. Cases:
+ *   A. RUNNING + no run + NO proven-landing receipt => genuine stranded => fatal (fail-closed).
+ *   B. RUNNING + no run + in-flight/MERGED ->PROVEN receipt => awaiting-state-landing (NO fatal;
+ *      the receipt carries the control-plane identity until landing resolves).
+ *   C. stale pausedFatal for a package now PROVEN on committed main with no live run => retired
+ *      (durable success supersedes the pause; the terminal run is NEVER resumed).
+ * deps seams exist for hermetic tests; production uses the real loaders.
+ */
+export function reconcileStrandedPackages(st, deps = {}) {
+  const {
+    loadMilestone = () => loadCurrentMilestone(REPO),
+    loadReceipts = () => discoverPendingReceipts(STATE_DIR),
+    findRunRow = findRecentRunRow,
+    record: recordEvent = record,
+  } = deps;
   let ms;
   try {
-    ms = loadCurrentMilestone(REPO);
+    ms = loadMilestone();
     if (!ms || validateMilestoneState(ms).length > 0) return; // corrupt-state path pauses elsewhere
   } catch {
     return;
   }
+  // Case C first: a stale fatal must not survive contact with durable truth.
+  if (st.pausedFatal?.packageId) {
+    const proven = ms.packages.find(
+      (p) => p.id === st.pausedFatal.packageId && p.status === 'PROVEN',
+    );
+    if (proven) {
+      const { workflow: wf, message } = launchIdentity(proven);
+      const row = findRunRow(wf, message);
+      const live = row && ['running', 'pending'].includes(String(row.status));
+      if (!live) {
+        const retired = [...st.activeRuns, ...st.milestoneRuns, ...st.maintenanceRuns].filter(
+          (e) => e.packageId === st.pausedFatal.packageId && e.paused === 'fatal',
+        );
+        st.activeRuns = st.activeRuns.filter(
+          (e) => !(e.packageId === st.pausedFatal.packageId && e.paused === 'fatal'),
+        );
+        st.milestoneRuns = st.milestoneRuns.filter(
+          (e) => !(e.packageId === st.pausedFatal.packageId && e.paused === 'fatal'),
+        );
+        st.maintenanceRuns = st.maintenanceRuns.filter(
+          (e) => !(e.packageId === st.pausedFatal.packageId && e.paused === 'fatal'),
+        );
+        try {
+          releasePackageRuntime(STATE_DIR, { packageId: st.pausedFatal.packageId });
+        } catch {}
+        recordEvent(st, 'fatal_pause_retired_by_durable_success', {
+          packageId: st.pausedFatal.packageId,
+          retiredEntries: retired.length,
+        });
+        st.pausedFatal = null;
+      }
+    }
+  }
+  if (st.pausedFatal) return; // an un-retired fatal still owns the loop
+  const receipts = loadReceipts();
   for (const p of ms.packages) {
     if (p.status !== 'RUNNING') continue;
     if (st.activeRuns.some((r) => r.packageId === p.id && !r.done)) continue; // tracked (live run or paused-with-identity) — invariant holds
+    // Case B: the package's ->PROVEN state landing is in flight (or just
+    // merged and the canonical flip has not landed yet). Protected PR/CI
+    // latency is expected behavior — never a human-recovery condition.
+    if (findProvenLandingReceipt(receipts, p.id)) {
+      recordEvent(st, 'stranded_awaiting_state_landing', { packageId: p.id });
+      continue;
+    }
     // Generation-aware identity: only rows matching the CURRENT generation's
     // correlation message are adoptable. A retired generation's runs — under
     // the legacy bare-id message or an older @gN suffix — can never be
     // re-adopted by a newer generation (V3 §6).
     const { branch, message, workflow: wf, executionProfile } = launchIdentity(p);
-    const row = findRecentRunRow(wf, message);
+    const row = findRunRow(wf, message);
     if (row && ['running', 'pending'].includes(String(row.status))) {
       st.activeRuns.push({
         kind: 'package',
@@ -1765,7 +2076,11 @@ function reconcileStrandedPackages(st) {
         discoveryAttempts: 0,
         executionProfile,
       });
-      record(st, 'stranded_run_adopted', { packageId: p.id, runId: row.id, status: row.status });
+      recordEvent(st, 'stranded_run_adopted', {
+        packageId: p.id,
+        runId: row.id,
+        status: row.status,
+      });
       continue;
     }
     const entry = {
@@ -2245,6 +2560,10 @@ async function selectAndLaunch(st) {
       discoveryAttempts: 0,
       executionProfile,
       providers: admission.providers,
+      // Detached-run log path (from the ack): the run's real liveness pulse —
+      // consulted before any stale-run abandon (runs-row timestamps are
+      // launch-frozen during detached bash nodes).
+      logPath: ack?.logPath ?? null,
     });
     if (runId) {
       // Durable run id already in hand → RUNNING now; otherwise it is flipped
@@ -2737,7 +3056,10 @@ async function cmdRecoverFatal(positionalRunId) {
     branch =
       kind === 'maintenance' ? testRuntimePolicy.migrationBranch : 'foresift/milestone-planning';
   }
-  // No duplicate product run may exist for this logical package.
+  // No duplicate product run may exist for this logical package — unless the
+  // paused run is terminal and the live sibling IS the continuation: adopt it
+  // (live 2026-09-06: a quota-paused package sat behind a healthy fresh run
+  // because the guard refused recovery that would have adopted it).
   const list = archonJson('workflow runs --json --limit 20');
   const rows = Array.isArray(list) ? list : (list?.runs ?? []);
   const others = rows.filter(
@@ -2747,13 +3069,28 @@ async function cmdRecoverFatal(positionalRunId) {
       String(r.status) === 'running' &&
       r.id !== runId,
   );
-  if (others.length > 0)
+  const pausedRunTerminal =
+    runId && ['failed', 'paused', 'cancelled', 'completed'].includes(String(row?.status));
+  if (others.length > 0 && !(pausedRunTerminal && others.length === 1))
     return fail(
       `another running workflow (${others[0].id}) already exists for ${message} — resolve it first to avoid duplicates`,
     );
+  if (others.length === 1 && pausedRunTerminal) {
+    // Adopt the live sibling as the recovery identity (adoption, not launch).
+    const adopted = others[0];
+    record(st, 'operator_recovery_adopted_live_run', {
+      deadRunId: runId,
+      adoptedRunId: adopted.id,
+    });
+    runId = adopted.id;
+    row = { ...adopted, id: adopted.id, status: String(adopted.status) };
+  }
   // Exactly one continuation: resume the same run when possible.
   let resumed = false;
   let freshAdmission = null;
+  // The fresh-continuation launch ack (below); also consulted at logPath
+  // capture time — declared here so the resume path skips it cleanly.
+  let ack = null;
   if (row && ['running', 'pending'].includes(String(row.status))) {
     resumed = true; // alive — re-adopt under supervisor tracking
   } else if (
@@ -2828,7 +3165,7 @@ async function cmdRecoverFatal(positionalRunId) {
     }
     // ONE fresh continuation on the SAME branch/worktree; prior work persists on
     // disk/git and completed tasks are discovered from there by the workflow.
-    const ack = launchDetached(st, workflow, branch, message, executionProfile);
+    ack = launchDetached(st, workflow, branch, message, executionProfile);
     record(st, 'operator_recovery_fresh_launch', {
       branch,
       executionProfile,
@@ -2870,6 +3207,10 @@ async function cmdRecoverFatal(positionalRunId) {
     awaitingDiscovery: !runId,
     discoveryAttempts: entry.awaitingDiscovery ? (entry.discoveryAttempts ?? 0) : 0,
     executionProfile: entry.executionProfile ?? persistedExecutionProfile,
+    // The retained entry may carry a STALE logPath from the dead run. A fresh
+    // continuation's ack carries the new log path; a resumed run keeps none
+    // (the discovery fallback scopes by log birthtime vs entry.startedAt).
+    logPath: freshAdmission ? (ack?.logPath ?? null) : null,
     ...(freshAdmission ? { providers: freshAdmission.providers } : {}),
   });
   delete entry.done;

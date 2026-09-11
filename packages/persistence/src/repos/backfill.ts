@@ -19,7 +19,177 @@ import {
   visibleAt,
   type UtcTimestamp,
 } from '@foresift/domain';
+import { canonicalJson, sha256Text } from '../canonical-json.ts';
 import type { DatabaseEngine } from '../db.ts';
+
+/** Original, on-chain coordinates retained even when retrieval happens later. */
+export interface BackfilledEventCoordinates {
+  readonly chainId: string;
+  readonly blockNumberOrSlot?: string | number | bigint | null;
+  /** EVM-friendly alias for blockNumberOrSlot. */
+  readonly blockNumber?: string | number | bigint | null;
+  /** Solana-friendly alias for blockNumberOrSlot. */
+  readonly slot?: string | number | bigint | null;
+  readonly blockHash?: string | null;
+  readonly parentBlockHashOrParentSlot?: string | null;
+  readonly transactionHash?: string | null;
+  /** Solana-friendly alias for transactionHash. */
+  readonly signature?: string | null;
+  readonly transactionIndex?: number | null;
+  readonly instructionIndex?: number | null;
+  /** EVM log indexes occupy the same deterministic intra-transaction coordinate. */
+  readonly logIndex?: number | null;
+  readonly innerInstructionIndex?: number | null;
+  readonly confirmationLevel?: string;
+  readonly reorgVersion?: number;
+  readonly collectorOrProviderCursor?: string | null;
+}
+
+export interface BackfilledObservationInput {
+  readonly observationId: string;
+  readonly subjectPoolId?: string;
+  readonly subjectAssetId?: string;
+  readonly eventAt: UtcTimestamp;
+  readonly originalCoordinates: BackfilledEventCoordinates;
+  /** Actual time the historical response was fetched, never reconstructed. */
+  readonly fetchedAt: UtcTimestamp;
+  /** Actual earliest instant the system could use this observation. */
+  readonly availableAt: UtcTimestamp;
+  readonly unavailabilityReason: string;
+  readonly availabilityProvenance: 'HISTORICAL_QUERY_FETCHED_LATER' | 'MANUAL_IMPORT_AVAILABLE';
+  readonly rawAmount?: string;
+  readonly decimals?: number;
+  readonly qualityCodes?: readonly string[];
+}
+
+function coordinateValue(value: string | number | bigint | null | undefined): string | null {
+  return value === null || value === undefined ? null : String(value);
+}
+
+/**
+ * Persist a retrospectively retrieved observation in one append-only write.
+ * FR-DATA-007 deliberately has no fallback from availableAt/fetchedAt to
+ * eventAt: callers must supply all three facts and the original coordinates.
+ */
+export async function recordBackfilledObservation(
+  engine: DatabaseEngine,
+  input: BackfilledObservationInput,
+): Promise<{ receiptHash: string }> {
+  const coordinates = input.originalCoordinates;
+  const position =
+    coordinates.blockNumberOrSlot ?? coordinates.blockNumber ?? coordinates.slot ?? null;
+  const transactionHash = coordinates.transactionHash ?? coordinates.signature ?? null;
+  const instructionIndex = coordinates.instructionIndex ?? coordinates.logIndex ?? null;
+
+  if (input.unavailabilityReason.trim().length === 0) {
+    throw new ForesiftError(
+      ErrorCode.CONTRACT_INVARIANT_VIOLATED,
+      'backfilled observation requires the reason it was unavailable earlier',
+      { observationId: input.observationId },
+    );
+  }
+  if (coordinates.chainId.trim().length === 0 || (position === null && transactionHash === null)) {
+    throw new ForesiftError(
+      ErrorCode.CONTRACT_INVARIANT_VIOLATED,
+      'backfilled observation requires original event coordinates',
+      { observationId: input.observationId },
+    );
+  }
+  if (compareTimestamps(input.availableAt, input.fetchedAt) < 0) {
+    throw new ForesiftError(
+      ErrorCode.AVAILABLE_AT_INFERRED_FROM_EVENT_AT,
+      'event time cannot substitute for actual backfill availability time',
+      {
+        observationId: input.observationId,
+        availableAt: input.availableAt,
+        fetchedAt: input.fetchedAt,
+      },
+    );
+  }
+  if (compareTimestamps(input.eventAt, input.availableAt) > 0) {
+    throw new ForesiftError(
+      ErrorCode.CONTRACT_INVARIANT_VIOLATED,
+      'backfilled event time cannot follow actual availability time',
+      { observationId: input.observationId },
+    );
+  }
+  const provenance = availabilityProvenanceClass(input.availabilityProvenance);
+  const qualityCodes = [...(input.qualityCodes ?? [])];
+  const projection = {
+    subjectPoolId: input.subjectPoolId ?? null,
+    subjectAssetId: input.subjectAssetId ?? null,
+    eventAt: input.eventAt,
+    availableAt: input.availableAt,
+    sourceObservedAt: null,
+    sourcePublishedAt: null,
+    authorizedAt: null,
+    requestedAt: null,
+    fetchedAt: input.fetchedAt,
+    ingestedAt: null,
+    finalizedAt: null,
+    revisedAt: null,
+    availabilityProvenance: provenance,
+    rawAmount: input.rawAmount ?? null,
+    decimals: input.decimals ?? null,
+    coordinatesChainId: coordinates.chainId,
+    blockNumberOrSlot: coordinateValue(position),
+    blockHash: coordinates.blockHash ?? null,
+    parentBlockHashOrParentSlot: coordinates.parentBlockHashOrParentSlot ?? null,
+    transactionHash,
+    transactionIndex: coordinates.transactionIndex ?? null,
+    instructionIndex,
+    innerInstructionIndex: coordinates.innerInstructionIndex ?? null,
+    confirmationLevel: coordinates.confirmationLevel ?? 'HISTORICAL',
+    reorgVersion: coordinates.reorgVersion ?? 0,
+    collectorOrProviderCursor: coordinates.collectorOrProviderCursor ?? null,
+    qualityCodes,
+    retrievedAsBackfill: true,
+    unavailabilityReason: input.unavailabilityReason,
+  };
+  const receiptHash = sha256Text(
+    canonicalJson({ observationId: input.observationId, ...projection }),
+  );
+  await engine.query(
+    `INSERT INTO observations (
+       observation_id, subject_pool_id, subject_asset_id, event_at, available_at,
+       fetched_at, availability_provenance, raw_amount, decimals,
+       coordinates_chain_id, block_number_or_slot, block_hash,
+       parent_block_hash_or_parent_slot, transaction_hash, transaction_index,
+       instruction_index, inner_instruction_index, confirmation_level,
+       reorg_version, collector_or_provider_cursor, quality_codes, receipt_hash,
+       retrieved_as_backfill, unavailability_reason)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,true,$23)`,
+    [
+      input.observationId,
+      projection.subjectPoolId,
+      projection.subjectAssetId,
+      input.eventAt,
+      input.availableAt,
+      input.fetchedAt,
+      provenance,
+      projection.rawAmount,
+      projection.decimals,
+      coordinates.chainId,
+      projection.blockNumberOrSlot,
+      projection.blockHash,
+      projection.parentBlockHashOrParentSlot,
+      transactionHash,
+      projection.transactionIndex,
+      instructionIndex,
+      projection.innerInstructionIndex,
+      projection.confirmationLevel,
+      projection.reorgVersion,
+      projection.collectorOrProviderCursor,
+      qualityCodes,
+      receiptHash,
+      input.unavailabilityReason,
+    ],
+  );
+  return { receiptHash };
+}
+
+/** Source-compatible verb for callers that treat observation persistence as append. */
+export const appendBackfilledObservation = recordBackfilledObservation;
 
 export interface BackfillReceiptInput {
   readonly backfillReceiptId: string;

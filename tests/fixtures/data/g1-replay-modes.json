@@ -1,0 +1,72 @@
+{
+  "$comment": "G1 historical simulation and replay modes vectors (FR-DATA-008 §13.6, AC-241, AC-247). Excludes retrospective data in REALIZABLE_REPLAY mode; distinguishes ORACLE, HINDSIGHT, COUNTERFACTUAL_DATA_AVAILABILITY_RESEARCH.",
+  "modes": [
+    {
+      "mode": "REALIZABLE_REPLAY",
+      "description": "Strict point-in-time replay: excludes any retrospective/backfilled data whose actual availability postdates boundary T",
+      "allowsRetrospectiveData": false,
+      "requiresDiagnosticLabeling": false,
+      "querySemantics": "HISTORICAL_REPLAY"
+    },
+    {
+      "mode": "ORACLE",
+      "description": "Simulation mode with perfect forward information access for benchmark ceilings",
+      "allowsRetrospectiveData": true,
+      "requiresDiagnosticLabeling": true,
+      "querySemantics": "HISTORICAL_REPLAY"
+    },
+    {
+      "mode": "HINDSIGHT",
+      "description": "Diagnostic evaluation using full retrospective data known after the fact",
+      "allowsRetrospectiveData": true,
+      "requiresDiagnosticLabeling": true,
+      "querySemantics": "HISTORICAL_REPLAY"
+    },
+    {
+      "mode": "COUNTERFACTUAL_DATA_AVAILABILITY_RESEARCH",
+      "description": "Research mode modeling hypothetical earlier or later data availability under controlled counterfactual timelines",
+      "allowsRetrospectiveData": true,
+      "requiresDiagnosticLabeling": true,
+      "querySemantics": "HISTORICAL_REPLAY"
+    }
+  ],
+  "replayVectors": [
+    {
+      "name": "realizable replay at 12:00 excludes backfill available at 14:30 even though event occurred at 10:00",
+      "mode": "REALIZABLE_REPLAY",
+      "replayBoundary": "2026-05-01T12:00:00Z",
+      "candidateObservation": {
+        "observationId": "obs-bf-001",
+        "eventAt": "2026-05-01T10:00:00Z",
+        "availableAt": "2026-05-01T14:30:00Z",
+        "retrievedAsBackfill": true
+      },
+      "expectedVisible": false
+    },
+    {
+      "name": "realizable replay at 15:00 includes backfill available at 14:30",
+      "mode": "REALIZABLE_REPLAY",
+      "replayBoundary": "2026-05-01T15:00:00Z",
+      "candidateObservation": {
+        "observationId": "obs-bf-001",
+        "eventAt": "2026-05-01T10:00:00Z",
+        "availableAt": "2026-05-01T14:30:00Z",
+        "retrievedAsBackfill": true
+      },
+      "expectedVisible": true
+    },
+    {
+      "name": "hindsight diagnostic mode allows viewing retrospective backfill before its availability timestamp",
+      "mode": "HINDSIGHT",
+      "replayBoundary": "2026-05-01T12:00:00Z",
+      "candidateObservation": {
+        "observationId": "obs-bf-001",
+        "eventAt": "2026-05-01T10:00:00Z",
+        "availableAt": "2026-05-01T14:30:00Z",
+        "retrievedAsBackfill": true
+      },
+      "expectedVisible": true,
+      "expectedDiagnosticLabel": "DIAGNOSTIC_RETROSPECTIVE"
+    }
+  ]
+}

@@ -1,0 +1,62 @@
+{
+  "$comment": "Coarse candle target/invalidation ordering ambiguity vectors (FR-EXEC-002, FR-EXEC-018, AC-238, §64.7).",
+  "candles": [
+    {
+      "candleId": "candle_ambiguous_both_touched",
+      "timeframe": "1h",
+      "open": 10.0,
+      "high": 12.5,
+      "low": 7.5,
+      "close": 11.0,
+      "entryPrice": 10.0,
+      "takeProfitTarget": 12.0,
+      "stopLossInvalidation": 8.0,
+      "targetReachable": true,
+      "invalidationReachable": true,
+      "hasPathAmbiguity": true,
+      "primaryOrdering": "ADVERSE_FEASIBLE",
+      "primaryExitType": "STOP_LOSS",
+      "secondaryExitType": "TAKE_PROFIT",
+      "primaryOutcome": "TRADABLE_FAILURE",
+      "description": "Both target and invalidation are within candle bounds; adverse ordering must be primary"
+    },
+    {
+      "candleId": "candle_unambiguous_target_only",
+      "timeframe": "1h",
+      "open": 10.0,
+      "high": 12.5,
+      "low": 9.5,
+      "close": 12.0,
+      "entryPrice": 10.0,
+      "takeProfitTarget": 12.0,
+      "stopLossInvalidation": 8.0,
+      "targetReachable": true,
+      "invalidationReachable": false,
+      "hasPathAmbiguity": false,
+      "primaryOrdering": "UNAMBIGUOUS",
+      "primaryExitType": "TAKE_PROFIT",
+      "secondaryExitType": null,
+      "primaryOutcome": "TRADABLE_SUCCESS",
+      "description": "Only target reached; invalidation untouched; unambiguous execution"
+    },
+    {
+      "candleId": "candle_unambiguous_invalidation_only",
+      "timeframe": "1h",
+      "open": 10.0,
+      "high": 10.5,
+      "low": 7.5,
+      "close": 8.0,
+      "entryPrice": 10.0,
+      "takeProfitTarget": 12.0,
+      "stopLossInvalidation": 8.0,
+      "targetReachable": false,
+      "invalidationReachable": true,
+      "hasPathAmbiguity": false,
+      "primaryOrdering": "UNAMBIGUOUS",
+      "primaryExitType": "STOP_LOSS",
+      "secondaryExitType": null,
+      "primaryOutcome": "TRADABLE_FAILURE",
+      "description": "Only invalidation reached; unambiguous exit"
+    }
+  ]
+}

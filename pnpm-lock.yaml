@@ -219,6 +219,48 @@ importers:
 
   packages/domain: {}
 
+  packages/economic-trade-normalizer:
+    dependencies:
+      '@foresift/domain':
+        specifier: workspace:*
+        version: link:../domain
+
+  packages/eval-cli:
+    dependencies:
+      '@foresift/evaluation':
+        specifier: workspace:*
+        version: link:../evaluation
+      '@foresift/outcome-maturity':
+        specifier: workspace:*
+        version: link:../outcome-maturity
+
+  packages/evaluation:
+    dependencies:
+      '@foresift/discovery-universe':
+        specifier: workspace:*
+        version: link:../discovery-universe
+      '@foresift/domain':
+        specifier: workspace:*
+        version: link:../domain
+      '@foresift/evidence':
+        specifier: workspace:*
+        version: link:../evidence
+      '@foresift/execution-simulator':
+        specifier: workspace:*
+        version: link:../execution-simulator
+      '@foresift/outcome-maturity':
+        specifier: workspace:*
+        version: link:../outcome-maturity
+      '@foresift/persistence':
+        specifier: workspace:*
+        version: link:../persistence
+      '@foresift/shared-schemas':
+        specifier: workspace:*
+        version: link:../shared-schemas
+      '@foresift/signal-intelligence':
+        specifier: workspace:*
+        version: link:../signal-intelligence
+
   packages/evidence:
     dependencies:
       '@foresift/domain':
@@ -232,6 +274,30 @@ importers:
         specifier: ^0.5.6
         version: 0.5.6
 
+  packages/execution-simulator:
+    dependencies:
+      '@foresift/domain':
+        specifier: workspace:*
+        version: link:../domain
+      '@foresift/persistence':
+        specifier: workspace:*
+        version: link:../persistence
+      '@foresift/pool-math':
+        specifier: workspace:*
+        version: link:../pool-math
+      '@foresift/program-decoders':
+        specifier: workspace:*
+        version: link:../program-decoders
+      '@foresift/shared-schemas':
+        specifier: workspace:*
+        version: link:../shared-schemas
+      '@foresift/solana-security':
+        specifier: workspace:*
+        version: link:../solana-security
+      '@foresift/transfer-semantics':
+        specifier: workspace:*
+        version: link:../transfer-semantics
+
   packages/object-store:
     dependencies:
       '@foresift/domain':
@@ -244,6 +310,36 @@ importers:
       '@foresift/persistence':
         specifier: workspace:*
         version: link:../persistence
+
+  packages/objective-governance:
+    dependencies:
+      '@foresift/domain':
+        specifier: workspace:*
+        version: link:../domain
+      '@foresift/evaluation':
+        specifier: workspace:*
+        version: link:../evaluation
+      '@foresift/outcome-maturity':
+        specifier: workspace:*
+        version: link:../outcome-maturity
+      '@foresift/shadow-portfolio':
+        specifier: workspace:*
+        version: link:../shadow-portfolio
+      '@foresift/shared-schemas':
+        specifier: workspace:*
+        version: link:../shared-schemas
+
+  packages/outcome-maturity:
+    dependencies:
+      '@foresift/domain':
+        specifier: workspace:*
+        version: link:../domain
+      '@foresift/persistence':
+        specifier: workspace:*
+        version: link:../persistence
+      '@foresift/shared-schemas':
+        specifier: workspace:*
+        version: link:../shared-schemas
 
   packages/persistence:
     dependencies:
@@ -266,6 +362,24 @@ importers:
       '@foresift/object-store':
         specifier: workspace:*
         version: link:../object-store
+
+  packages/pool-math:
+    dependencies:
+      '@foresift/domain':
+        specifier: workspace:*
+        version: link:../domain
+      '@foresift/persistence':
+        specifier: workspace:*
+        version: link:../persistence
+      '@foresift/program-decoders':
+        specifier: workspace:*
+        version: link:../program-decoders
+      '@foresift/shared-schemas':
+        specifier: workspace:*
+        version: link:../shared-schemas
+      '@foresift/solana-security':
+        specifier: workspace:*
+        version: link:../solana-security
 
   packages/program-decoders:
     dependencies:
@@ -377,6 +491,15 @@ importers:
         specifier: ^0.5.6
         version: 0.5.6
 
+  packages/shadow-portfolio:
+    dependencies:
+      '@foresift/domain':
+        specifier: workspace:*
+        version: link:../domain
+      '@foresift/shared-schemas':
+        specifier: workspace:*
+        version: link:../shared-schemas
+
   packages/shared-schemas:
     dependencies:
       '@foresift/domain':
@@ -385,6 +508,48 @@ importers:
       zod:
         specifier: ^3.25.76
         version: 3.25.76
+
+  packages/signal-intelligence:
+    dependencies:
+      '@foresift/domain':
+        specifier: workspace:*
+        version: link:../domain
+      '@foresift/evidence':
+        specifier: workspace:*
+        version: link:../evidence
+      '@foresift/persistence':
+        specifier: workspace:*
+        version: link:../persistence
+      '@foresift/shared-schemas':
+        specifier: workspace:*
+        version: link:../shared-schemas
+
+  packages/solana-security:
+    dependencies:
+      '@foresift/domain':
+        specifier: workspace:*
+        version: link:../domain
+      '@foresift/persistence':
+        specifier: workspace:*
+        version: link:../persistence
+      '@foresift/program-decoders':
+        specifier: workspace:*
+        version: link:../program-decoders
+      '@foresift/shared-schemas':
+        specifier: workspace:*
+        version: link:../shared-schemas
+
+  packages/supply-confidence:
+    dependencies:
+      '@foresift/domain':
+        specifier: workspace:*
+        version: link:../domain
+      '@foresift/persistence':
+        specifier: workspace:*
+        version: link:../persistence
+      '@foresift/shared-schemas':
+        specifier: workspace:*
+        version: link:../shared-schemas
 
   packages/tenant-isolation:
     dependencies:
@@ -426,6 +591,24 @@ importers:
       '@electric-sql/pglite':
         specifier: ^0.5.6
         version: 0.5.6
+
+  packages/transfer-semantics:
+    dependencies:
+      '@foresift/domain':
+        specifier: workspace:*
+        version: link:../domain
+      '@foresift/persistence':
+        specifier: workspace:*
+        version: link:../persistence
+      '@foresift/program-decoders':
+        specifier: workspace:*
+        version: link:../program-decoders
+      '@foresift/shared-schemas':
+        specifier: workspace:*
+        version: link:../shared-schemas
+      '@foresift/solana-security':
+        specifier: workspace:*
+        version: link:../solana-security
 
 packages:
 

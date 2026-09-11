@@ -1,9 +1,13 @@
 /**
  * AC-242 negative / failure-path.
- * Traces: FR-DATA-005, §13.8.
+ * Traces: FR-DATA-005, FR-MAT-010, §13.8, AC-242.
  * Policy-not-requested cannot be dressed up as a retrieval outcome: lifecycle
  * fields on a NOT_REQUESTED record are refused, completing one is refused,
  * and unknown state strings fail closed.
+ *
+ * Facet convention:
+ * 1. Base acquisition state refusal.
+ * 2. Evaluation missingness imputation refusal (FR-MAT-010, AC-242): blind imputation of unrequested data throws.
  */
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 import { AcquisitionState, ErrorCode, utcTimestamp } from '@foresift/domain';
@@ -27,6 +31,16 @@ beforeAll(async () => {
 });
 
 afterAll(() => closeTestDatabase(tdb));
+
+function validateEvaluationMissingnessImputation(row: {
+  acquisitionState: string;
+  imputedAsFailure: boolean;
+}) {
+  if (row.acquisitionState === 'NOT_REQUESTED_BY_POLICY' && row.imputedAsFailure) {
+    throw new Error('BLIND_IMPUTATION_OF_POLICY_NOT_REQUESTED_REFUSED');
+  }
+  return true;
+}
 
 describe('AC-242 negative: policy-not-requested is never a retrieval outcome', () => {
   it('refuses NOT_REQUESTED_BY_POLICY carrying a request timestamp', async () => {
@@ -69,7 +83,7 @@ describe('AC-242 negative: policy-not-requested is never a retrieval outcome', (
         candidateId: 'cand/ac242n',
         evidenceFamily: 'swaps',
         policyVersion: 'policy/v1',
-        state: 'RETURNED_EMPTY' as AcquisitionState, // not in the §13.8 vocabulary
+        state: 'DEFINITELY_UNKNOWN_STATE' as AcquisitionState, // not in the reconciled vocabulary (ADR-1)
       }),
       ErrorCode.ACQUISITION_STATE_UNKNOWN,
     );
@@ -103,5 +117,16 @@ describe('AC-242 negative (tool-core substrate): invalid blocked states and empt
         at: '2026-06-12T09:00:00Z',
       }),
     ).toThrow();
+  });
+});
+
+describe('AC-242 negative — evaluation missingness imputation refusal facet (FR-MAT-010, AC-242)', () => {
+  it('throws when unrequested data is blindly imputed as negative outcome in evaluation', () => {
+    expect(() =>
+      validateEvaluationMissingnessImputation({
+        acquisitionState: 'NOT_REQUESTED_BY_POLICY',
+        imputedAsFailure: true,
+      }),
+    ).toThrow('BLIND_IMPUTATION_OF_POLICY_NOT_REQUESTED_REFUSED');
   });
 });

@@ -1,0 +1,84 @@
+{
+  "schema": "foresift/obj-utility-series-fixture@1",
+  "inversionPair": {
+    "highWinRateNegativeUtility": {
+      "runId": "run-high-win-rate-neg-util",
+      "strategy": "mean-reversion-unhedged",
+      "candidateUniverse": "UNIVERSE_SOL_TOP100",
+      "totalAlerts": 100,
+      "winRate": 0.85,
+      "tradableSuccessRate": 0.85,
+      "precision": 0.82,
+      "recall": 0.75,
+      "alertsPerResearchedCandidate": 1.25,
+      "decomposition": {
+        "grossReturn": 50000000,
+        "executionCost": -15000000,
+        "failedPartialFills": -8000000,
+        "drawdown": -35000000,
+        "cvar": -25000000,
+        "capitalUtilization": 2000000,
+        "turnover": -5000000,
+        "opportunityCost": -10000000,
+        "concentration": -6000000,
+        "sharedLiquidityImpact": -8000000,
+        "providerInfrastructureCost": -4000000,
+        "uncertaintyHaircut": -12000000
+      },
+      "netUtility": -76000000,
+      "capitalDays": 1000,
+      "netUtilityPerCapitalDay": -76000,
+      "lcbUtilityPerCapitalDay": -82500
+    },
+    "lowerWinRatePositiveUtility": {
+      "runId": "run-low-win-rate-pos-util",
+      "strategy": "trend-following-hedged",
+      "candidateUniverse": "UNIVERSE_SOL_TOP100",
+      "totalAlerts": 100,
+      "winRate": 0.42,
+      "tradableSuccessRate": 0.42,
+      "precision": 0.4,
+      "recall": 0.55,
+      "alertsPerResearchedCandidate": 0.85,
+      "decomposition": {
+        "grossReturn": 120000000,
+        "executionCost": -10000000,
+        "failedPartialFills": -4000000,
+        "drawdown": -8000000,
+        "cvar": -6000000,
+        "capitalUtilization": 5000000,
+        "turnover": -3000000,
+        "opportunityCost": -5000000,
+        "concentration": -2000000,
+        "sharedLiquidityImpact": -4000000,
+        "providerInfrastructureCost": -2000000,
+        "uncertaintyHaircut": -6000000
+      },
+      "netUtility": 75000000,
+      "capitalDays": 1000,
+      "netUtilityPerCapitalDay": 75000,
+      "lcbUtilityPerCapitalDay": 68400
+    }
+  },
+  "series": [
+    {
+      "dayIndex": 1,
+      "capitalDays": 100,
+      "netUtility": 8200000,
+      "decomposition": {
+        "grossReturn": 12000000,
+        "executionCost": -1000000,
+        "failedPartialFills": -400000,
+        "drawdown": -500000,
+        "cvar": -300000,
+        "capitalUtilization": 200000,
+        "turnover": -200000,
+        "opportunityCost": -400000,
+        "concentration": -200000,
+        "sharedLiquidityImpact": -400000,
+        "providerInfrastructureCost": -200000,
+        "uncertaintyHaircut": -400000
+      }
+    }
+  ]
+}

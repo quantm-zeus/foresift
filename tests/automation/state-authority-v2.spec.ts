@@ -151,7 +151,11 @@ describe('State Authority V2 Core Correctness', () => {
       expect(iterRes.step).toBe('WAITING_CI');
     }
     const end = performance.now();
-    expect(end - start).toBeLessThan(100);
+    // Generous wall-clock bound: the contract under test is "does not block on
+    // CI polling" (a real run sleeps ≥ 15s per attempt), not raw speed — a
+    // 2-core CI runner can legitimately take a few hundred ms for 5 iterations
+    // (observed ~230ms, PR #178 flake, 2026-09-03).
+    expect(end - start).toBeLessThan(10_000);
   });
 
   // C. CI HEAD TOCTOU

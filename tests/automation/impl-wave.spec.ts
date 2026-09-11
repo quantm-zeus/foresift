@@ -11,6 +11,10 @@ const GRAPH = join(repoRoot, 'scripts', 'automation', 'build-implementation-task
 const GUARD = join(repoRoot, 'scripts', 'automation', 'wave-guard.mjs');
 const INTEGRATE = join(repoRoot, 'scripts', 'automation', 'integrate-writer-results.mjs');
 const ADMIT = join(repoRoot, 'scripts', 'automation', 'check-writer-admission.mjs');
+const NOOP_RECON = join(repoRoot, 'scripts', 'automation', 'noop-wave-reconciliation.mjs');
+
+const { reconcileNoopWave, readTaskBlock } =
+  await import('../../scripts/automation/noop-wave-reconciliation.mjs');
 
 const TASKS = `# Tasks: pkg-x
 
@@ -24,7 +28,9 @@ const TASKS = `# Tasks: pkg-x
 
 - [ ] T102 Implement alpha in \`packages/x/src/alpha.ts\` with care.
       Traces: FR-X-001, FR-X-002. Depends on T101 groundwork.
-- [ ] T103 [P] Write spec \`tests/x/a.spec.ts\` exercising
+- [ ] T103 [P] Extend \`packages/x/src/alpha.ts\` with the documented examples.
+      Traces: FR-X-001 (AC-201).
+- [ ] T106 [P] [executor: TEST] Write spec \`tests/x/a.spec.ts\` exercising
       \`packages/x/src/alpha.ts\`. Traces: FR-X-001 (AC-201).
 - [ ] T104 [P] Write guide \`docs/x-guide.md\`. Traces: FR-X-002 (AC-202).
 `;
@@ -117,7 +123,9 @@ describe('implementation task graph', () => {
   it('derives units, traces, predicted writes, and blocking-phase deps', () => {
     const g = JSON.parse(readFileSync(fx.graphPath, 'utf8'));
     expect(g.schema).toBe('foresift/impl-task-graph@1');
-    expect(g.totals).toMatchObject({ units: 4, done: 1, open: 3, openParallelizable: 2 });
+    // T106 joins the fixture as the test-owned task ([executor: TEST]) — the
+    // pkg-x plan stays law-valid under the 2026-09-07 ownership admission.
+    expect(g.totals).toMatchObject({ units: 5, done: 1, open: 4, openParallelizable: 3 });
     const t102 = g.units.find((u: { id: string }) => u.id === 'T102');
     expect(t102.done).toBe(false);
     expect(t102.parallelizable).toBe(false);
@@ -610,6 +618,139 @@ describe('wave guard + integrator (real git)', () => {
     expect(r.status).toBe(0); // coordinator reports; rejection is per-lane
     void r;
   });
+
+  it('marks TEST-role lane nominations in tasks.md too (test-role completion bookkeeping, directive §5)', () => {
+    // Live defect (g1-solana-security, runs 7d49dce0/9b798cf0): a validated
+    // AGY test-author lane's nominations were merged into the canonical
+    // branch, but completedUnits filtered on role === 'implementation' —
+    // test-role checkboxes NEVER flipped even when every validation passed
+    // (lane membership, predicted-write evidence, blockers, ownership).
+    // A test lane may only mark tasks THAT BELONG TO ITS LANE with TEST-only
+    // writes — both guarantees are enforced by validateLaneNominations and
+    // validateLaneOwnership before this bookkeeping step.
+    const meta = JSON.parse(readFileSync(join(fx.artifacts, 'shard-meta.json'), 'utf8'));
+    meta['test-author'] = {
+      branch: 'foresift/wave/test-author',
+      worktree: join(fx.artifacts, 'wt-foresift-wave-test-author'),
+    };
+    writeFileSync(join(fx.artifacts, 'shard-meta.json'), JSON.stringify(meta));
+    // T103 is the fixture's test-bearing unit; give it its OWN test write
+    // (tests/x/b.spec.ts — core never touched b) so the lane diff carries
+    // T103 evidence without colliding with core's a.spec.ts merge.
+    const g = JSON.parse(readFileSync(fx.graphPath, 'utf8'));
+    const t103 = g.units.find((u: { id: string }) => u.id === 'T103');
+    t103.predictedWrites = ['tests/x/b.spec.ts'];
+    t103.testWrites = ['tests/x/b.spec.ts'];
+    const testLane = {
+      id: 'test-author',
+      mode: 'parallel',
+      role: 'test',
+      engine: 'AGY',
+      units: [t103.id],
+      allowedWritePaths: ['tests/x/b.spec.ts'],
+    };
+    writeFileSync(fx.graphPath, JSON.stringify({ ...g, testLanes: [testLane] }));
+
+    commitBranch('foresift/wave/test-author', 'tests/x/b.spec.ts', "test('b', () => {});\n");
+    const d = laneDir('test-author');
+    writeFileSync(
+      join(d, 'result.json'),
+      JSON.stringify({
+        schema: 'foresift/writer-result@1',
+        shardId: 'test-author',
+        completed: [t103.id],
+        branch: 'foresift/wave/test-author',
+        headSha: rev(join(fx.artifacts, 'wt-foresift-wave-test-author')),
+        baseSha: fx.baseSha,
+      }),
+    );
+    // T104's predicted write (docs/x-guide.md) must NOT be claimable by this lane.
+    writeFileSync(
+      join(d, 'bogus-claim.json'),
+      JSON.stringify({
+        schema: 'foresift/writer-result@1',
+        shardId: 'test-author',
+        completed: ['T104'],
+        branch: 'foresift/wave/test-author',
+        headSha: rev(join(fx.artifacts, 'wt-foresift-wave-test-author')),
+        baseSha: fx.baseSha,
+      }),
+    );
+    const before = rev(fx.root);
+    const r = spawnSync(
+      process.execPath,
+      [
+        INTEGRATE,
+        '--package',
+        'pkg-x',
+        '--graph',
+        fx.graphPath,
+        '--results-dir',
+        join(fx.artifacts, 'writer-results'),
+        '--canonical',
+        fx.root,
+        '--out',
+        join(fx.artifacts, 'integration-report-test-role.json'),
+      ],
+      { encoding: 'utf8' },
+    );
+    expect(r.status).toBe(0);
+    const report = JSON.parse(
+      readFileSync(join(fx.artifacts, 'integration-report-test-role.json'), 'utf8'),
+    );
+    const integrated = report.integrated.find(
+      (i: { shardId: string }) => i.shardId === 'test-author',
+    );
+    expect(integrated).toBeDefined();
+    expect(integrated.role).toBe('test');
+    // The out-of-lane claim (T104 — a docs product write) is not part of the
+    // integrated units: validateLaneNominations refuses IDs outside the lane's
+    // membership, so the test lane marks exactly its own test-bearing task.
+    expect(integrated.units).toEqual([t103.id]);
+    // THE FIX UNDER TEST: the test-role unit's checkbox flips in tasks.md.
+    const tasks = readFileSync(join(fx.root, 'specs', 'pkg-x', 'tasks.md'), 'utf8');
+    expect(tasks).toContain('- [x] T103');
+    expect(rev(fx.root)).not.toBe(before);
+  });
+
+  it('zero-writer wave: missing results dir yields a valid empty report, not exit 1 (run 279d96fd)', () => {
+    // Live defect (run 279d96fd, 2026-09-09): a wave whose every lane was
+    // sentinel-skipped never created writer-results/, so the integrator
+    // hard-failed "results dir not found", integration-report.json was never
+    // written, and the workflow's downstream guard comparisons degraded to
+    // "integer expression expected" noise while still routing GREEN.
+    // The deterministic contract: a zero-writer wave is a legal shape — the
+    // integrator must emit a valid empty report and exit 0 so the workflow's
+    // empty-wave routing (dispatched=0/integrated=0) decides cleanly.
+    const missingDir = join(fx.artifacts, 'writer-results-absent');
+    const before = rev(fx.root);
+    const r = spawnSync(
+      process.execPath,
+      [
+        INTEGRATE,
+        '--package',
+        'pkg-x',
+        '--graph',
+        fx.graphPath,
+        '--results-dir',
+        missingDir,
+        '--canonical',
+        fx.root,
+        '--out',
+        join(fx.artifacts, 'integration-report-zero.json'),
+      ],
+      { encoding: 'utf8' },
+    );
+    expect(r.status).toBe(0);
+    const report = JSON.parse(
+      readFileSync(join(fx.artifacts, 'integration-report-zero.json'), 'utf8'),
+    );
+    expect(report.schema).toBe('foresift/wave-integration@1');
+    expect(report.integrated).toEqual([]);
+    expect(report.rejected).toEqual([]);
+    // canonical tree untouched by an empty integration
+    expect(rev(fx.root)).toBe(before);
+  });
 });
 
 describe('writer admission function', () => {
@@ -736,6 +877,44 @@ describe('foresift-sharded-wave workflow contract', () => {
     }
   });
 
+  it('coordinator-only remainder bypasses integration_empty with zero writer dispatch (runs 4e59191b/533b6214)', () => {
+    // A wave whose lanes all sentinel-skipped must never fatalize as
+    // integration_empty when every open unit is coordinator-owned. The
+    // contract: ownership is decided deterministically from the task graph
+    // (COORDINATOR executor or non-file evidence), then the FULL
+    // coordinator-completion sequence runs in FAST order — duties, REAL
+    // FAST, evidence-owner — emitting the honest FAST token. Writer-owned
+    // remainder keeps the exit-90 halt.
+    const tail = yaml.slice(
+      yaml.indexOf('Coordinator-only remainder bypass'),
+      yaml.indexOf('# ONE TRUE combined package FAST'),
+    );
+    expect(tail.length).toBeGreaterThan(0);
+    // ownership gate reads the graph, never prose
+    expect(tail).toContain('task-graph.json');
+    expect(tail).toContain('COORDINATOR');
+    expect(tail).toContain('VERIFICATION_ONLY');
+    expect(tail).toContain('COORDINATOR_ARTIFACT');
+    expect(tail).toContain('NO_OP_ALREADY_SATISFIED');
+    // FAST order: duties → real FAST → evidence-owner → token
+    const dutiesAt = tail.indexOf('wave-coordinator-duties.mjs');
+    const fastAt = tail.indexOf('package-fast-verify.mjs');
+    const ownerAt = tail.indexOf('evidence-owner-registry.mjs', fastAt);
+    expect(dutiesAt).toBeGreaterThan(-1);
+    expect(fastAt).toBeGreaterThan(dutiesAt);
+    expect(ownerAt).toBeGreaterThan(fastAt);
+    expect(tail).toContain('WAVE_FAST_GREEN');
+    expect(tail).toContain('WAVE_FAST_RED');
+    // duties failure is honest RED, never silent green
+    expect(tail).toContain('coordinator_remainder_duties_red');
+    // the exit-90 halt survives ONLY for writer-owned remainder
+    const halt = tail.slice(tail.indexOf('WAVE_INTEGRATION_EMPTY') - 400);
+    expect(halt).toMatch(/exit 90/);
+    // no provider dispatch anywhere in the bypass: no exec-codex/claude/agy
+    // writer invocations between the bypass comment and the halt
+    expect(tail).not.toMatch(/exec-(codex|claude|agy)-writer\.mjs/);
+  });
+
   it('enforces CODEX product writers, CLAUDE_AGY fallbacks, AGY test-author only, and forbidden test edits in implementation prompts', () => {
     // H3 mission item 4: serial slots are graph-resolved (`writer-serial-N`), so
     // lane ids like `core` or `core-batch-2` are runtime truth — the yaml
@@ -751,13 +930,13 @@ describe('foresift-sharded-wave workflow contract', () => {
       expect(codex?.[0]).toContain(`depends_on: [brief-${lane}, exec-${lane}]`);
       expect(codex?.[0]).toContain(`when: "$exec-${lane}.output == 'CODEX'"`);
       expect(codex?.[0]).toMatch(
-        /retry:\s*\{\s*max_attempts:\s*2,\s*delay_ms:\s*10000,\s*on_error:\s*all\s*\}/,
+        /retry:\s*\{\s*max_attempts:\s*2,\s*delay_ms:\s*60000,\s*on_error:\s*all\s*\}/,
       );
       expect(codex?.[0]).toContain(`exec-codex-writer.mjs --lane ${lane}`);
       // H3 (2026-08-31): lanes get a 55m provider timeout inside the 60m node
       // budget — the silent 45m claude-lane-core default killed a HIGH-risk
       // core lane mid-implementation (run c38c2e1b) and lost all its work.
-      expect(codex?.[0]).toContain('--timeout-ms 3300000');
+      expect(codex?.[0]).toContain('--timeout-ms 5400000');
       expect(codex?.[0]).toContain(`--brief "$ARTIFACTS_DIR/briefs/${lane}-brief.md"`);
       expect(codex?.[0]).toContain(`--worktree "$ARTIFACTS_DIR/wt/${lane}"`);
       expect(codex?.[0]).toContain(`--routing "$ARTIFACTS_DIR/routing.json"`);
@@ -775,10 +954,10 @@ describe('foresift-sharded-wave workflow contract', () => {
       );
       expect(codex?.[0]).toContain(`when: "$exec-serial-${slot}.output == 'CODEX'`);
       expect(codex?.[0]).toMatch(
-        /retry:\s*\{\s*max_attempts:\s*2,\s*delay_ms:\s*10000,\s*on_error:\s*all\s*\}/,
+        /retry:\s*\{\s*max_attempts:\s*2,\s*delay_ms:\s*60000,\s*on_error:\s*all\s*\}/,
       );
       expect(codex?.[0]).toContain('exec-codex-writer.mjs --lane "$LANE"');
-      expect(codex?.[0]).toContain('--timeout-ms 3300000');
+      expect(codex?.[0]).toContain('--timeout-ms 5400000');
       expect(codex?.[0]).toContain('--brief "$ARTIFACTS_DIR/briefs/$LANE-brief.md"');
       expect(codex?.[0]).toContain('--worktree "$ARTIFACTS_DIR/wt/$LANE"');
       expect(codex?.[0]).toContain('--routing "$ARTIFACTS_DIR/routing.json"');
@@ -797,10 +976,10 @@ describe('foresift-sharded-wave workflow contract', () => {
       expect(claude?.[0]).toContain(`depends_on: [brief-${lane}, exec-${lane}]`);
       expect(claude?.[0]).toContain(`when: "$exec-${lane}.output == 'CLAUDE'"`);
       expect(claude?.[0]).toMatch(
-        /retry:\s*\{\s*max_attempts:\s*2,\s*delay_ms:\s*10000,\s*on_error:\s*all\s*\}/,
+        /retry:\s*\{\s*max_attempts:\s*2,\s*delay_ms:\s*60000,\s*on_error:\s*all\s*\}/,
       );
       expect(claude?.[0]).toContain(
-        `exec-claude-writer.mjs \\\n        --timeout-ms 3300000 \\\n        --lane ${lane}`,
+        `exec-claude-writer.mjs \\\n        --timeout-ms 5400000 \\\n        --lane ${lane}`,
       );
       expect(claude?.[0]).toContain(`--brief "$ARTIFACTS_DIR/briefs/${lane}-brief.md"`);
       expect(claude?.[0]).toContain(`--worktree "$ARTIFACTS_DIR/wt/${lane}"`);
@@ -822,7 +1001,7 @@ describe('foresift-sharded-wave workflow contract', () => {
       );
       expect(claude?.[0]).toContain(`when: "$exec-serial-${slot}.output == 'CLAUDE'`);
       expect(claude?.[0]).toContain('exec-claude-writer.mjs');
-      expect(claude?.[0]).toContain('--timeout-ms 3300000');
+      expect(claude?.[0]).toContain('--timeout-ms 5400000');
       expect(claude?.[0]).toContain('--lane "$LANE"');
       expect(claude?.[0]).toContain('--task-ids "$TASKS"');
       expect(claude?.[0]).toContain('--generation "$(');
@@ -838,13 +1017,29 @@ describe('foresift-sharded-wave workflow contract', () => {
     expect(agyTest?.[0]).toContain('depends_on: [brief-test-author, exec-test-author]');
     expect(agyTest?.[0]).toContain('when: "$exec-test-author.output == \'AGY\'"');
     expect(agyTest?.[0]).toMatch(
-      /retry:\s*\{\s*max_attempts:\s*2,\s*delay_ms:\s*10000,\s*on_error:\s*all\s*\}/,
+      /retry:\s*\{\s*max_attempts:\s*2,\s*delay_ms:\s*60000,\s*on_error:\s*all\s*\}/,
     );
-    expect(agyTest?.[0]).toContain('exec-agy-test-writer.mjs --lane test-author');
-    expect(agyTest?.[0]).toContain('--brief "$ARTIFACTS_DIR/briefs/test-author-brief.md"');
-    expect(agyTest?.[0]).toContain('--worktree "$ARTIFACTS_DIR/wt/test-author"');
+    // Graph-derived AGY test-lane dispatch (maintainer Part E, 2026-09-03):
+    // lane id/units come from g.testLanes[n], so the sharded test-author-1/2
+    // pair needs no yaml edits; the legacy single lane stays index 0.
+    expect(agyTest?.[0]).toContain('exec-agy-test-writer.mjs --lane "$TL_ID"');
+    expect(agyTest?.[0]).toContain('g.testLanes?.[0]?.id');
+    expect(agyTest?.[0]).toContain('g.testLanes?.[0]?.units');
+    expect(agyTest?.[0]).toContain('--brief "$ARTIFACTS_DIR/briefs/$TL_ID-brief.md"');
+    expect(agyTest?.[0]).toContain('--worktree "$ARTIFACTS_DIR/wt/$TL_ID"');
     expect(agyTest?.[0]).toContain('--routing "$ARTIFACTS_DIR/routing.json"');
-    expect(agyTest?.[0]).toContain('--results-dir "$ARTIFACTS_DIR/writer-results/test-author"');
+    expect(agyTest?.[0]).toContain('--results-dir "$ARTIFACTS_DIR/writer-results/$TL_ID"');
+    expect(agyTest?.[0]).toContain('--lane-base "$(cat "$ARTIFACTS_DIR/base-head.txt")"');
+    // Canary cap 2: the second sharded lane pair mirrors lane 1 and
+    // dispatches only when the graph actually produced testLanes[1].
+    const agyTest2 = yaml.match(/- id: writer-test-author-2-agy[\s\S]*?(?=\n  - id:)/);
+    expect(agyTest2?.[0]).toBeTruthy();
+    expect(agyTest2?.[0]).toContain('depends_on: [brief-test-author-2, exec-test-author-2]');
+    expect(agyTest2?.[0]).toContain('when: "$exec-test-author-2.output == \'AGY\'"');
+    expect(agyTest2?.[0]).toContain('exec-agy-test-writer.mjs --lane "$TL_ID"');
+    expect(agyTest2?.[0]).toContain('g.testLanes?.[1]?.id');
+    expect(agyTest2?.[0]).toContain('g.testLanes?.[1]?.units');
+    expect(agyTest2?.[0]).toContain('--lane-base "$(cat "$ARTIFACTS_DIR/base-head.txt")"');
 
     // 3b. EVERY writer node's OWN command carries --task-graph (H3 live
     // 89c4b2b9): the P0-1 evidence protocol needs parsed predicted writes;
@@ -876,10 +1071,21 @@ describe('foresift-sharded-wave workflow contract', () => {
 
   it('when-gates every lane so empty shards dispatch zero providers across CODEX, CLAUDE fallbacks, and AGY test-author', () => {
     // Parallel + test lanes keep exact persisted routing tokens per lane
-    for (const lane of ['shard-1', 'shard-2', 'test-author']) {
+    for (const lane of ['shard-1', 'shard-2']) {
       const emit = yaml.match(new RegExp(`- id: exec-${lane}[\\s\\S]*?(?=\\n  - id:)`));
       expect(emit?.[0]).toBeTruthy();
       expect(emit?.[0]).toContain(`cat "$ARTIFACTS_DIR/engine-${lane}.txt"`);
+    }
+    // AGY test lanes are graph-enumerated (maintainer Part E): the emitter
+    // resolves the lane id from g.testLanes[n] and cats its engine token.
+    for (const [node, idx, name] of [
+      ['exec-test-author', 0, 'NO TEST-AUTHOR THIS WAVE'],
+      ['exec-test-author-2', 1, 'NO TEST-AUTHOR-2 THIS WAVE'],
+    ] as const) {
+      const emit = yaml.match(new RegExp(`- id: ${node}[\\s\\S]*?(?=\\n  - id:)`));
+      expect(emit?.[0]).toBeTruthy();
+      expect(emit?.[0]).toContain(`g.testLanes?.[${idx}]?.id`);
+      expect(emit?.[0]).toContain(name);
     }
 
     // Brief emitters output deterministic sentinels when absent
@@ -906,10 +1112,12 @@ describe('foresift-sharded-wave workflow contract', () => {
     );
     expect(guardTest?.[0]).toContain('trigger_rule: none_failed_min_one_success');
 
-    // Integrator depends on all serial + parallel + test guards
+    // Integrator depends on prep (the empty-wave min-one-success anchor,
+    // directive §8 — live run 2c1aa231) plus all serial + parallel + test
+    // guards (both AGY test lanes, Part E cap 2)
     const integrator = yaml.match(/- id: integrate-and-fast[\s\S]*?(?=\n  - id:)/);
     expect(integrator?.[0]).toContain(
-      'depends_on: [guard-serial-1, guard-serial-2, guard-serial-3, guard-shard-1, guard-shard-2, guard-test-author]',
+      'depends_on: [prep, guard-serial-1, guard-serial-2, guard-serial-3, guard-shard-1, guard-shard-2, guard-test-author, guard-test-author-2]',
     );
   });
 
@@ -942,9 +1150,9 @@ describe('foresift-sharded-wave workflow contract', () => {
       expect(claude?.[0]).toContain(`guard-serial-${slot - 1}`);
     }
     // The per-lane ceiling is UNCHANGED (bounded scope, not a bigger timeout).
-    const timeouts = [...yaml.matchAll(/--timeout-ms 3300000/g)].length;
+    const timeouts = [...yaml.matchAll(/--timeout-ms 5400000/g)].length;
     expect(timeouts).toBeGreaterThanOrEqual(6); // serial slots 1..3 x codex/claude
-    expect(yaml).not.toMatch(/timeout-ms (?!3300000)\d+/); // no raised ceiling anywhere
+    expect(yaml).not.toMatch(/timeout-ms (?!5400000)\d+/); // no raised ceiling anywhere
   });
 
   it('never lets a fully-rejected wave settle green over zero progress (defect #12)', () => {
@@ -1035,14 +1243,20 @@ describe('foresift-sharded-wave workflow contract', () => {
     expect(checkpoint?.[0]).toContain('package-checkpoint.mjs --build');
   });
 
-  it('passes routing.json artifact to AGY test-author executor node', () => {
+  it('passes routing.json artifact to AGY test-author executor nodes (both sharded lanes)', () => {
     const agyNode = yaml.match(/- id: writer-test-author-agy[\s\S]*?(?=\n  - id:)/);
     expect(agyNode).toBeTruthy();
-    expect(agyNode?.[0]).toContain('exec-agy-test-writer.mjs --lane test-author');
+    expect(agyNode?.[0]).toContain('exec-agy-test-writer.mjs --lane "$TL_ID"');
+    expect(agyNode?.[0]).toContain('g.testLanes?.[0]?.id');
     expect(agyNode?.[0]).toContain('--routing "$ARTIFACTS_DIR/routing.json"');
-    expect(agyNode?.[0]).toContain('--brief "$ARTIFACTS_DIR/briefs/test-author-brief.md"');
-    expect(agyNode?.[0]).toContain('--worktree "$ARTIFACTS_DIR/wt/test-author"');
-    expect(agyNode?.[0]).toContain('--results-dir "$ARTIFACTS_DIR/writer-results/test-author"');
+    expect(agyNode?.[0]).toContain('--brief "$ARTIFACTS_DIR/briefs/$TL_ID-brief.md"');
+    expect(agyNode?.[0]).toContain('--worktree "$ARTIFACTS_DIR/wt/$TL_ID"');
+    expect(agyNode?.[0]).toContain('--results-dir "$ARTIFACTS_DIR/writer-results/$TL_ID"');
+    const agyNode2 = yaml.match(/- id: writer-test-author-2-agy[\s\S]*?(?=\n  - id:)/);
+    expect(agyNode2).toBeTruthy();
+    expect(agyNode2?.[0]).toContain('exec-agy-test-writer.mjs --lane "$TL_ID"');
+    expect(agyNode2?.[0]).toContain('g.testLanes?.[1]?.id');
+    expect(agyNode2?.[0]).toContain('--routing "$ARTIFACTS_DIR/routing.json"');
   });
 });
 
@@ -1150,6 +1364,13 @@ describe('central migration registry duty enforcement', () => {
 - [ ] T201 Write \`migrations/g0_m_0001_ledgers.sql\` — new family scripts. Traces: FR-M-001.
 `;
 
+  const MIGRATION_REGISTRY_TASKS_BODY = `
+- [ ] T201 Write \`migrations/g0_m_0001_ledgers.sql\` — new family scripts. Traces: FR-M-001.
+- [ ] T202 [executor: COORDINATOR] Extend the central registry
+      \`packages/persistence/test/migrator.spec.ts\` expected G0 script list with the
+      new family in lexicographic position. Traces: FR-M-001.
+`;
+
   it('refuses at graph build when new migration scripts never name the central suite', () => {
     const root = buildScratchRepo(`# Tasks: pkg-m\n${MIGRATION_TASKS_BODY}`);
     try {
@@ -1167,13 +1388,7 @@ describe('central migration registry duty enforcement', () => {
   });
 
   it('builds and records the plan-sanctioned exception when the central suite is named', () => {
-    const root = buildScratchRepo(
-      `# Tasks: pkg-m\n${MIGRATION_TASKS_BODY}
-- [ ] T202 Extend the central registry \`packages/persistence/test/migrator.spec.ts\`
-      expected G0 script list with the new family in lexicographic position.
-      Traces: FR-M-001.
-`,
-    );
+    const root = buildScratchRepo(`# Tasks: pkg-m\n${MIGRATION_REGISTRY_TASKS_BODY}`);
     const artifacts = mkdtempSync(join(tmpdir(), 'mig-duty-art-'));
     try {
       const graphPath = join(artifacts, 'task-graph.json');
@@ -1185,10 +1400,13 @@ describe('central migration registry duty enforcement', () => {
       expect(r.status).toBe(0);
       const g = JSON.parse(readFileSync(graphPath, 'utf8'));
       expect(g.scopeExceptions).toContain('packages/persistence/test/migrator.spec.ts');
-      // The central-suite unit is demoted into the serial core lane, whose
-      // allowedWritePaths carry the exception path.
+      // The central-suite edit is a zero-AI COORDINATOR duty: it is recorded
+      // for mechanical post-integration execution and never dispatched to an
+      // implementation writer (implementation lanes carry PRODUCT work only —
+      // 2026-09-07 ownership law, live b659eef0).
+      expect(g.coordinatorUnits).toContain('T202');
       const core = g.shards.find((s: { id: string }) => s.id === 'core');
-      expect(core.allowedWritePaths).toContain('packages/persistence/test/migrator.spec.ts');
+      expect(core.allowedWritePaths).not.toContain('packages/persistence/test/migrator.spec.ts');
     } finally {
       rmSync(root, { recursive: true, force: true });
       rmSync(artifacts, { recursive: true, force: true });
@@ -1262,4 +1480,658 @@ describe('central migration registry duty enforcement (generation-agnostic)', ()
       rmSync(root, { recursive: true, force: true });
     }
   });
+});
+
+// ── TEST-lane dispatch admission (run 0a91cd86 regression, 2026-09-09) ──────
+// The builder's testUnits heuristic previously dispatched PRODUCT units to the
+// AGY test lane whenever their prose mentioned tests ("the registry suite is
+// extended by the test-owned task T039"), producing an empty testWrites-
+// derived allowlist where every write was a guaranteed WRITE-AUTHORITY
+// VIOLATION after provider spend. The law now: explicit [executor: TEST] is
+// authoritative; a PRODUCT unit never doubles into a test lane; legacy
+// (marker-less) units with backticked PRODUCT paths stay out of test lanes.
+describe('TEST-lane dispatch admission (fail-closed)', () => {
+  function buildWith(tasks: string) {
+    const root = mkdtempSync(join(tmpdir(), 'impl-wave-route-'));
+    mkdirSync(join(root, 'specs', 'pkg-x'), { recursive: true });
+    mkdirSync(join(root, 'specs', 'implementation'), { recursive: true });
+    writeFileSync(join(root, 'specs', 'pkg-x', 'tasks.md'), tasks);
+    const ms = {
+      schemaVersion: '1.0.0',
+      milestoneId: 'MX',
+      status: 'ACTIVE',
+      packages: [
+        {
+          id: 'pkg-x',
+          objective: 'Implement subsystem x end to end with full evidence coverage.',
+          requirementIds: ['FR-X-001', 'FR-X-002'],
+          dependencies: [],
+          risk: 'MEDIUM',
+          parallelizable: false,
+          writeScopes: ['packages/x/**', 'tests/x/**', 'docs/x*'],
+          verificationCommands: ['pnpm test'],
+          status: 'RUNNING',
+        },
+        {
+          // Milestones decompose into 2-8 packages (schema law); y is a
+          // dependent sibling so pkg-x stays the only selectable candidate.
+          id: 'pkg-y',
+          objective: 'Implement subsystem y after x lands, with evidence coverage.',
+          requirementIds: ['FR-Y-001'],
+          dependencies: ['pkg-x'],
+          risk: 'LOW',
+          parallelizable: false,
+          writeScopes: ['packages/y/**'],
+          verificationCommands: ['pnpm test'],
+          status: 'PENDING',
+        },
+      ],
+    };
+    writeFileSync(
+      join(root, 'specs', 'implementation', 'current-milestone.json'),
+      JSON.stringify(ms),
+    );
+    sh('git init -q', root);
+    sh('git config user.email t@t && git config user.name t', root);
+    sh('git add -A', root);
+    sh('git commit -qm base', root);
+    const out = join(root, 'graph.json');
+    const r = spawnSync(
+      process.execPath,
+      [
+        GRAPH,
+        '--package',
+        'pkg-x',
+        '--root',
+        root,
+        '--plan-shards',
+        '2',
+        '--execution-profile',
+        'HYBRID_AGY',
+        '--out',
+        out,
+      ],
+      { encoding: 'utf8' },
+    );
+    return { root, out, r };
+  }
+
+  it('never routes PRODUCT units that mention tests into a test lane (run 0a91cd86)', () => {
+    // Exact 0a91cd86 shape: product units whose prose DELEGATES testing to a
+    // test-owned task, plus an explicit [executor: TEST] unit.
+    const tasks = `# Tasks: pkg-x
+
+## Phase A
+
+- [ ] T201 [P] Extend \`packages/x/src/migrator.ts\` MIGRATION_FAMILIES with the
+      \`sig\` family — the central registry suite is extended by the test-owned
+      task T203. Traces: FR-X-001.
+- [ ] T202 [P] Extend \`packages/x/src/generated/schema.ts\` with sig tables so
+      the parity suite stays green — the parity suite itself is test-owned; its
+      verification runs in T203's suite. Traces: FR-X-002.
+- [ ] T203 [P] [executor: TEST] Author the colocated guard suite
+      \`tests/x/guard.spec.ts\`. Traces: FR-X-001.
+`;
+    const { root, out, r } = buildWith(tasks);
+    try {
+      expect(r.status).toBe(0);
+      const g = JSON.parse(readFileSync(out, 'utf8'));
+      const testLaneUnits = (g.testLanes ?? []).flatMap((t: { units: string[] }) => t.units);
+      expect(testLaneUnits).toContain('T203'); // explicit TEST unit dispatches
+      expect(testLaneUnits).not.toContain('T201'); // PRODUCT unit never doubles
+      expect(testLaneUnits).not.toContain('T202');
+      // both PRODUCT units live in PRODUCT lanes (core or parallel shards) —
+      // the shard split between them is the planner's business, not the
+      // routing law's
+      const productLaneUnits = g.shards.flatMap((s: { units: string[] }) => s.units);
+      expect(productLaneUnits).toEqual(expect.arrayContaining(['T201', 'T202']));
+      // the test lane's allowlist is exactly its TEST unit's testWrites
+      const lane = (g.testLanes ?? [])[0];
+      expect(lane.allowedWritePaths).toEqual(['tests/x/guard.spec.ts']);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  it('fails closed when a legacy marker-less unit naming a product path would enter a test lane', () => {
+    // No executor marker at all: the body's backticked PRODUCT path keeps the
+    // unit out of test lanes; the TEST_LANE_ADMISSION invariant is the
+    // fail-closed backstop for any routing that ever tries.
+    const tasks = `# Tasks: pkg-x
+
+## Phase A
+
+- [ ] T211 Extend \`packages/x/src/migrator.ts\` MIGRATION_FAMILIES with the
+      \`sig\` family — the central registry suite is extended by the test-owned
+      task T213. Traces: FR-X-001.
+- [ ] T213 [P] [executor: TEST] Author the colocated guard suite
+      \`tests/x/guard.spec.ts\`. Traces: FR-X-001.
+`;
+    const { root, out, r } = buildWith(tasks);
+    try {
+      expect(r.status).toBe(0);
+      const g = JSON.parse(readFileSync(out, 'utf8'));
+      const testLaneUnits = (g.testLanes ?? []).flatMap((t: { units: string[] }) => t.units);
+      expect(testLaneUnits).toContain('T213');
+      expect(testLaneUnits).not.toContain('T211');
+      const core = g.shards.find((s: { id: string }) => s.id === 'core');
+      expect(core.units).toContain('T211');
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  it('accepts an explicit TEST unit whose prose also references product paths (T037 false-positive)', () => {
+    // T037 shape: [executor: TEST], authored surface is colocated TEST trees,
+    // but the body backticks product paths as PROSE REFERENCES. Explicit
+    // executor TEST is authoritative for membership; write ownership stays
+    // enforced by classification (only TEST-classified paths enter the
+    // allowlist).
+    const tasks = `# Tasks: pkg-x
+
+## Phase A
+
+- [ ] T221 [P] [executor: TEST] Author the colocated unit suites under
+      \`packages/x/test/\` and \`packages/y/test/\` exercising
+      \`packages/x/src/alpha.ts\`. Traces: FR-X-001.
+`;
+    const { root, out, r } = buildWith(tasks);
+    try {
+      expect(r.status).toBe(0);
+      const g = JSON.parse(readFileSync(out, 'utf8'));
+      const lane = (g.testLanes ?? [])[0];
+      expect(lane).toBeDefined();
+      expect(lane.units).toEqual(['T221']);
+      // product backticks in prose gain NO write authority
+      expect(lane.allowedWritePaths).toEqual(['packages/x/test/', 'packages/y/test/']);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+});
+
+describe('NO_OP-anywhere lane exclusion (run 4e59191b/T020)', () => {
+  // Exact T020 shape at the 4e59191b launch base: checkbox line carries NO
+  // evidence marker; the NO_OP_ALREADY_SATISFIED reservation sits on a wrapped
+  // continuation line. The body verbs ("author") make productWork true and the
+  // "test" word trips the test-lane heuristic — pre-fix the unit dispatched
+  // to BOTH the core lane and the AGY test lane before provider spend, and
+  // both lanes reported zero completed units (integration_empty, exit 90).
+  const T020_SHAPE = `- [ ] T020 is reserved for the test lane (see Phase 7): product tasks do not
+      author suites. — [evidence: NO_OP_ALREADY_SATISFIED] planning-time
+      numbering reservation only; no product code.
+      Traces: FR-X-001.`;
+  function buildNoop(tasks: string, profile: boolean) {
+    const root = mkdtempSync(join(tmpdir(), 'impl-wave-noop-'));
+    mkdirSync(join(root, 'specs', 'pkg-x'), { recursive: true });
+    mkdirSync(join(root, 'specs', 'implementation'), { recursive: true });
+    writeFileSync(join(root, 'specs', 'pkg-x', 'tasks.md'), tasks);
+    const ms = {
+      schemaVersion: '1.0.0',
+      milestoneId: 'MX',
+      status: 'ACTIVE',
+      packages: [
+        {
+          id: 'pkg-x',
+          objective: 'Implement subsystem x end to end with full evidence coverage.',
+          requirementIds: ['FR-X-001'],
+          dependencies: [],
+          risk: 'MEDIUM',
+          parallelizable: false,
+          writeScopes: ['packages/x/**', 'tests/x/**', 'docs/x*'],
+          verificationCommands: ['pnpm test'],
+          status: 'RUNNING',
+        },
+        {
+          id: 'pkg-y',
+          objective: 'Implement independent subsystem y after x lands, with evidence coverage.',
+          requirementIds: ['FR-X-001'],
+          dependencies: ['pkg-x'],
+          risk: 'LOW',
+          parallelizable: false,
+          writeScopes: ['packages/y/**'],
+          verificationCommands: ['pnpm test'],
+          status: 'PENDING',
+        },
+      ],
+    };
+    writeFileSync(
+      join(root, 'specs', 'implementation', 'current-milestone.json'),
+      JSON.stringify(ms),
+    );
+    sh('git init -q', root);
+    sh('git config user.email t@t && git config user.name t', root);
+    sh('git add -A', root);
+    sh('git commit -qm base', root);
+    const out = join(root, 'graph.json');
+    const r = spawnSync(
+      process.execPath,
+      [
+        GRAPH,
+        '--package',
+        'pkg-x',
+        '--root',
+        root,
+        '--plan-shards',
+        '2',
+        ...(profile ? ['--execution-profile', 'HYBRID_AGY'] : []),
+        '--out',
+        out,
+      ],
+      { encoding: 'utf8' },
+    );
+    return { root, out, r };
+  }
+  const tasksWith = (t020: string) => `# Tasks: pkg-x
+
+## Phase A
+
+- [ ] T001 [P] Extend \`packages/x/out.ts\` with the x flag. Traces: FR-X-001.
+- [ ] T002 [P] [executor: TEST] Author the colocated suite \`tests/x/out.spec.ts\`
+      covering the x flag. Traces: FR-X-001.
+${t020}
+`;
+
+  it('profiled: T020-shape unit resolves NO_OP and reaches neither core nor test lanes', () => {
+    const { root, out, r } = buildNoop(tasksWith(T020_SHAPE), true);
+    try {
+      expect(r.status).toBe(0);
+      const g = JSON.parse(readFileSync(out, 'utf8'));
+      expect(g.units.find((u: { id: string }) => u.id === 'T020').evidence).toBe(
+        'NO_OP_ALREADY_SATISFIED',
+      );
+      const productLaneUnits = (g.shards ?? []).flatMap((s: { units: string[] }) => s.units);
+      const testLaneUnits = (g.testLanes ?? []).flatMap((t: { units: string[] }) => t.units);
+      expect(productLaneUnits).not.toContain('T020');
+      expect(testLaneUnits).not.toContain('T020');
+      // the lanes themselves still function for genuine work
+      expect(productLaneUnits).toContain('T001');
+      expect(testLaneUnits).toContain('T002');
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  it('legacy (no profile): T020-shape unit is excluded from every shard', () => {
+    const { root, out, r } = buildNoop(tasksWith(T020_SHAPE), false);
+    try {
+      expect(r.status).toBe(0);
+      const g = JSON.parse(readFileSync(out, 'utf8'));
+      expect(g.units.find((u: { id: string }) => u.id === 'T020').evidence).toBe(
+        'NO_OP_ALREADY_SATISFIED',
+      );
+      const productLaneUnits = (g.shards ?? []).flatMap((s: { units: string[] }) => s.units);
+      expect(productLaneUnits).not.toContain('T020');
+      expect(productLaneUnits).toContain('T001');
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  it('unknown evidence kind on a wrapped line still fails the build closed', () => {
+    const bad = `- [ ] T020 is reserved for the test lane: product tasks do not
+      author suites. — [evidence: NOOP_SATISFIED] planning-time reservation.`;
+    const { root, r } = buildNoop(tasksWith(bad), true);
+    try {
+      expect(r.status).not.toBe(0);
+      expect((r.stderr ?? '') + (r.stdout ?? '')).toMatch(/TASK_EVIDENCE_UNKNOWN/);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+});
+
+describe('noop-wave-reconciliation (integration_empty coordinator path)', () => {
+  function buildCanonical(tasks: string) {
+    const root = mkdtempSync(join(tmpdir(), 'impl-wave-noopint-'));
+    mkdirSync(join(root, 'specs', 'pkg-x'), { recursive: true });
+    writeFileSync(join(root, 'specs', 'pkg-x', 'tasks.md'), tasks);
+    writeFileSync(join(root, 'seed.txt'), 'seed\n');
+    sh('git init -q', root);
+    sh('git config user.email t@t && git config user.name t', root);
+    sh('git add -A', root);
+    sh('git commit -qm base', root);
+    return root;
+  }
+  function laneResult(
+    root: string,
+    resultsDir: string,
+    sid: string,
+    completed: string[],
+    branch = 'lane-branch',
+  ) {
+    mkdirSync(join(resultsDir, sid), { recursive: true });
+    const headSha = sh('git rev-parse HEAD', root);
+    const baseSha = headSha;
+    writeFileSync(
+      join(resultsDir, sid, 'result.json'),
+      JSON.stringify({
+        shardId: sid,
+        branch,
+        headSha,
+        baseSha,
+        completed,
+        changedFiles: [],
+      }),
+    );
+    // the lane branch must verify inside the canonical checkout
+    try {
+      sh(`git rev-parse --verify ${branch}`, root);
+    } catch {
+      sh(`git branch -f ${branch} ${headSha}`, root);
+    }
+    return { branch, headSha, baseSha };
+  }
+  const TASKS_CLOSED_NOOP = `# Tasks: pkg-x
+
+## Phase A
+
+- [x] T020 is reserved for the test lane: product tasks do not author suites. — [evidence: NO_OP_ALREADY_SATISFIED] planning-time numbering reservation only; no product code.
+`;
+  const graphFor = (units: string[]) => ({
+    shards: [{ id: 'core', mode: 'serial', units }],
+    testLanes: [],
+  });
+
+  it('readTaskBlock resolves wrapped markers over the full block', () => {
+    const text = `# Tasks
+
+## Phase A
+
+- [x] T020 is reserved for the test lane: product tasks do not
+      author suites. — [evidence: NO_OP_ALREADY_SATISFIED] planning-time
+      numbering reservation only.
+      Traces: FR-X-001.
+- [ ] T021 implement the thing. Traces: FR-X-001.
+`;
+    const b = readTaskBlock(text, 'T020');
+    expect(b.found).toBe(true);
+    expect(b.done).toBe(true);
+    expect(b.blockText).toContain('Traces: FR-X-001.');
+    expect(b.blockText).not.toContain('T021');
+  });
+
+  it('proven zero-work wave reconciles: closed-NO_OP units, empty lane diff', () => {
+    const root = buildCanonical(TASKS_CLOSED_NOOP);
+    try {
+      const resultsDir = mkdtempSync(join(tmpdir(), 'impl-wave-noopres-'));
+      try {
+        laneResult(root, resultsDir, 'core', []);
+        const { ok, report } = reconcileNoopWave({
+          packageId: 'pkg-x',
+          graph: graphFor(['T020']),
+          resultsDir,
+          canonical: root,
+        });
+        expect(ok).toBe(true);
+        expect(report.reconciled).toBe(true);
+        expect(report.reconciledLanes.map((l) => l.shardId)).toEqual(['core']);
+        expect(report.failedLanes).toEqual([]);
+      } finally {
+        rmSync(resultsDir, { recursive: true, force: true });
+      }
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  it('fail closed: a still-OPEN dispatched unit keeps the exit-90 shape', () => {
+    const root = buildCanonical(TASKS_CLOSED_NOOP.replace('- [x] T020', '- [ ] T020'));
+    try {
+      const resultsDir = mkdtempSync(join(tmpdir(), 'impl-wave-noopres-'));
+      try {
+        laneResult(root, resultsDir, 'core', []);
+        const { ok, report, reason } = reconcileNoopWave({
+          packageId: 'pkg-x',
+          graph: graphFor(['T020']),
+          resultsDir,
+          canonical: root,
+        });
+        expect(ok).toBe(false);
+        expect(report.reconciled).toBe(false);
+        expect(report.failedLanes).toHaveLength(1);
+        expect(report.failedLanes[0].reason).toMatch(/still OPEN/);
+        expect(reason).toMatch(/fail-closed/);
+      } finally {
+        rmSync(resultsDir, { recursive: true, force: true });
+      }
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  it('fail closed: a lane with a UNIQUE writer diff is never reconciled', () => {
+    const root = buildCanonical(TASKS_CLOSED_NOOP);
+    try {
+      const resultsDir = mkdtempSync(join(tmpdir(), 'impl-wave-noopres-'));
+      try {
+        const { branch, baseSha } = laneResult(root, resultsDir, 'core', []);
+        // unique lane work: a file the canonical HEAD does not carry
+        sh(`git checkout -qb ${branch}-work`, root);
+        writeFileSync(join(root, 'unique.txt'), 'lane-only work\n');
+        sh('git add -A', root);
+        sh('git commit -qm lane-work', root);
+        const headSha = sh('git rev-parse HEAD', root);
+        sh('git checkout -q -', root);
+        writeFileSync(
+          join(resultsDir, 'core', 'result.json'),
+          JSON.stringify({
+            shardId: 'core',
+            branch: `${branch}-work`,
+            headSha,
+            baseSha,
+            completed: [],
+            changedFiles: ['unique.txt'],
+          }),
+        );
+        const { ok, report } = reconcileNoopWave({
+          packageId: 'pkg-x',
+          graph: graphFor(['T020']),
+          resultsDir,
+          canonical: root,
+        });
+        expect(ok).toBe(false);
+        expect(report.failedLanes[0].reason).toMatch(/unique writer diff: unique\.txt/);
+      } finally {
+        rmSync(resultsDir, { recursive: true, force: true });
+      }
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  it('fail closed: result missing branch/headSha/baseSha cannot prove an empty diff', () => {
+    const root = buildCanonical(TASKS_CLOSED_NOOP);
+    try {
+      const resultsDir = mkdtempSync(join(tmpdir(), 'impl-wave-noopres-'));
+      try {
+        mkdirSync(join(resultsDir, 'core'), { recursive: true });
+        writeFileSync(
+          join(resultsDir, 'core', 'result.json'),
+          JSON.stringify({ shardId: 'core', completed: [] }),
+        );
+        const { ok, report } = reconcileNoopWave({
+          packageId: 'pkg-x',
+          graph: graphFor(['T020']),
+          resultsDir,
+          canonical: root,
+        });
+        expect(ok).toBe(false);
+        expect(report.failedLanes[0].reason).toMatch(/missing branch\/headSha\/baseSha/);
+      } finally {
+        rmSync(resultsDir, { recursive: true, force: true });
+      }
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  it('fail closed: one unproven lane fails the whole wave', () => {
+    const root = buildCanonical(TASKS_CLOSED_NOOP);
+    try {
+      const resultsDir = mkdtempSync(join(tmpdir(), 'impl-wave-noopres-'));
+      try {
+        laneResult(root, resultsDir, 'core', []);
+        mkdirSync(join(resultsDir, 'shard-1'), { recursive: true });
+        const headSha = sh('git rev-parse HEAD', root);
+        writeFileSync(
+          join(resultsDir, 'shard-1', 'result.json'),
+          JSON.stringify({
+            shardId: 'shard-1',
+            branch: 'missing-branch',
+            headSha,
+            baseSha: headSha,
+            completed: [],
+          }),
+        );
+        const { ok, report } = reconcileNoopWave({
+          packageId: 'pkg-x',
+          graph: {
+            shards: [
+              { id: 'core', mode: 'serial', units: ['T020'] },
+              // shard-1 dispatches a unit absent from canonical tasks.md —
+              // unproven, so the whole wave stays fail-closed
+              { id: 'shard-1', mode: 'parallel', units: ['T099'] },
+            ],
+            testLanes: [],
+          },
+          resultsDir,
+          canonical: root,
+        });
+        expect(ok).toBe(false);
+        expect(report.reconciledLanes.map((l) => l.shardId)).toEqual(['core']);
+        expect(report.failedLanes.map((l) => l.shardId)).toEqual(['shard-1']);
+      } finally {
+        rmSync(resultsDir, { recursive: true, force: true });
+      }
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  it('CLI exits 0 on a proven wave and 1 on an unproven one', () => {
+    const root = buildCanonical(TASKS_CLOSED_NOOP);
+    try {
+      const resultsDir = mkdtempSync(join(tmpdir(), 'impl-wave-noopres-'));
+      try {
+        laneResult(root, resultsDir, 'core', []);
+        const graphPath = join(root, 'graph.json');
+        writeFileSync(graphPath, JSON.stringify(graphFor(['T020'])));
+        const good = spawnSync(
+          process.execPath,
+          [
+            NOOP_RECON,
+            '--package',
+            'pkg-x',
+            '--graph',
+            graphPath,
+            '--results-dir',
+            resultsDir,
+            '--canonical',
+            root,
+          ],
+          { encoding: 'utf8' },
+        );
+        expect(good.status).toBe(0);
+        // unproven: point the graph at a unit absent from tasks.md
+        writeFileSync(graphPath, JSON.stringify(graphFor(['T099'])));
+        const bad = spawnSync(
+          process.execPath,
+          [
+            NOOP_RECON,
+            '--package',
+            'pkg-x',
+            '--graph',
+            graphPath,
+            '--results-dir',
+            resultsDir,
+            '--canonical',
+            root,
+          ],
+          { encoding: 'utf8' },
+        );
+        expect(bad.status).toBe(1);
+        expect(bad.stderr ?? '').toMatch(/noop-wave-reconciliation/);
+      } finally {
+        rmSync(resultsDir, { recursive: true, force: true });
+      }
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+});
+
+describe('coordinator duties state-plane coverage exclusion (g1-outcome-evaluation T039)', () => {
+  const DUTIES = join(repoRoot, 'scripts', 'automation', 'wave-coordinator-duties.mjs');
+
+  function initDutiesFixture(extraTracked: string[]) {
+    const root = mkdtempSync(join(tmpdir(), 'duties-'));
+    const g = (cmd: string) =>
+      spawnSync(`git ${cmd}`, { shell: true, cwd: root, encoding: 'utf8' });
+    g('init -qb main');
+    mkdirSync(join(root, 'tests', 'automation'), { recursive: true });
+    mkdirSync(join(root, 'evidence', 'bun-migration'), { recursive: true });
+    const spec = (name: string) =>
+      `import { test, expect } from 'bun:test';\ntest('${name}', () => expect(1).toBe(1));\n`;
+    writeFileSync(join(root, 'tests', 'automation', 'ordinary.spec.ts'), spec('o'));
+    // a state-control-plane suite: tracked on disk but excluded from the
+    // manifest BY DESIGN (dedicated state-plane CI job, never the coordinator)
+    writeFileSync(join(root, 'tests', 'automation', 'ci-authority-hardening.spec.ts'), spec('s'));
+    for (const f of extraTracked) writeFileSync(join(root, f), spec('e'));
+    g('add -A');
+    g('-c user.email=t@t -c user.name=t commit -qm init');
+    // manifest covering only the ordinary spec, as the real generator writes it
+    const manifest = {
+      schema: 'foresift/bun-migration-manifest@1',
+      files: [{ path: 'tests/automation/ordinary.spec.ts' }],
+    };
+    writeFileSync(
+      join(root, 'evidence', 'bun-migration', 'bun-migration-manifest.json'),
+      JSON.stringify(manifest),
+    );
+    const graphPath = join(root, 'graph.json');
+    writeFileSync(
+      graphPath,
+      JSON.stringify({ schema: 'foresift/impl-task-graph@1', units: [], coordinatorUnits: [] }),
+    );
+    return { root, graphPath };
+  }
+
+  function runDuties(root: string, graphPath: string) {
+    return spawnSync(
+      process.execPath,
+      [DUTIES, '--package', 'pkg-x', '--graph', graphPath, '--root', root],
+      { encoding: 'utf8' },
+    );
+  }
+
+  it('passes coverage when only state-plane suites are absent from the manifest', () => {
+    const { root, graphPath } = initDutiesFixture([]);
+    try {
+      const r = runDuties(root, graphPath);
+      expect(`${r.status}: ${r.stderr ?? ''}`).not.toMatch(/MANIFEST_COVERAGE_MISSING/);
+      expect(r.status).toBe(0);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  }, 30000);
+
+  it('regenerates an ordinary suite missing from the manifest (no invisible tests)', () => {
+    const { root, graphPath } = initDutiesFixture(['tests/automation/evil.spec.ts']);
+    try {
+      const r = runDuties(root, graphPath);
+      expect(`${r.status}: ${r.stderr ?? ''}`).toMatch(/^0/);
+      const manifest = JSON.parse(
+        readFileSync(
+          join(root, 'evidence', 'bun-migration', 'bun-migration-manifest.json'),
+          'utf8',
+        ),
+      );
+      const paths = (manifest.files ?? []).map((f: { path: string }) => f.path);
+      expect(paths).toContain('tests/automation/evil.spec.ts');
+      expect(paths).not.toContain('tests/automation/ci-authority-hardening.spec.ts');
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  }, 30000);
 });

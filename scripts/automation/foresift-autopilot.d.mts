@@ -97,3 +97,92 @@ export declare function launchDetached(
   message: string,
   executionProfile?: string | null,
 ): unknown;
+
+/** A protected state-landing receipt for packageId -> PROVEN, in flight or MERGED. */
+export interface ProvenLandingReceipt {
+  transitionId?: string;
+  packageId?: string;
+  fromStatus?: string;
+  toStatus?: string;
+  status?: string;
+  prNumber?: number | string;
+  [key: string]: unknown;
+}
+
+/**
+ * Find the ->PROVEN state-landing receipt for packageId that is in flight
+ * (non-terminal status) or MERGED; undefined otherwise. FAILED never matches.
+ */
+export declare function findProvenLandingReceipt(
+  receipts: ProvenLandingReceipt[],
+  packageId: string,
+): ProvenLandingReceipt | undefined;
+
+export interface StrandedDeps {
+  loadMilestone?: () => unknown;
+  loadReceipts?: () => ProvenLandingReceipt[];
+  findRunRow?: (workflow: string, message: string) => unknown;
+  record?: (st: unknown, event: string, detail?: Record<string, unknown>) => void;
+}
+
+/**
+ * Stranded-package reconciliation (§17 invariant guard), state-landing aware:
+ * case B (in-flight ->PROVEN receipt) awaits the landing instead of pausing
+ * fatally; case C retires a stale pausedFatal whose package is PROVEN on
+ * committed main. See reconcileStrandedPackages in foresift-autopilot.mjs.
+ */
+export declare function reconcileStrandedPackages(
+  st: Record<string, unknown>,
+  deps?: StrandedDeps,
+): void;
+
+/** Detached-run log freshness verdict: verifiable liveness pulse for a wave run. */
+export interface DetachedRunLogFreshness {
+  fresh: boolean;
+  logPath?: string | null;
+  error?: string;
+}
+
+/**
+ * Wave liveness from detached-run log mtime (DAG executor writes a line per
+ * node start/complete). fresh=false means no opinion — callers keep their
+ * fail-closed behavior. See detachedRunLogFreshness in foresift-autopilot.mjs.
+ */
+export declare function detachedRunLogFreshness(input: {
+  logsDir?: string;
+  logPath?: string | null;
+  startedAt?: number;
+  windowMs: number;
+  logBornAfter?: number;
+  statOverride?: ((path: string) => { mtimeMs: number; birthtimeMs: number }) | null;
+}): DetachedRunLogFreshness;
+
+/** Tracked supervisor entry subset retireQuotaPauseOnDurableProven mutates/reads. */
+export interface RetirableQuotaEntry {
+  kind?: string;
+  runId?: string | null;
+  packageId?: string | null;
+  paused?: string | null;
+  done?: boolean;
+  note?: string;
+  [key: string]: unknown;
+}
+
+/**
+ * Durable-success preemption for quota pauses (case-C law extended to quota):
+ * retires a terminal quota-paused entry whose package is PROVEN on committed
+ * main with NO live sibling run — releasing runtime and journaling
+ * quota_pause_retired_durable_proven — instead of letting the probe schedule
+ * workflow-resume a dead run. Fail-closed no-op (returns false) for
+ * non-PROVEN packages, live siblings, unreadable milestone state, non-quota
+ * or done or package-less entries. See foresift-autopilot.mjs.
+ */
+export declare function retireQuotaPauseOnDurableProven(
+  st: Record<string, unknown>,
+  entry: RetirableQuotaEntry,
+  deps?: {
+    loadMilestone?: () => unknown;
+    findRunRow?: (workflow: string, message: string) => unknown;
+    record?: (st: unknown, event: string, detail?: Record<string, unknown>) => void;
+  },
+): boolean;

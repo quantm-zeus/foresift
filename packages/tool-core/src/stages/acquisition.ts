@@ -9,7 +9,7 @@
  * Idempotent under retry (INV-009): the decision id derives from the run id,
  * an already-persisted identical decision converges instead of erroring.
  */
-import { AcquisitionState } from '@foresift/domain';
+import { AcquisitionState, mapLegacyAcquisitionState } from '@foresift/domain';
 import type { UtcTimestamp } from '@foresift/domain';
 import type { DatabaseEngine } from '@foresift/persistence';
 import { recordAcquisitionDecision, recordProbeAssignment } from '@foresift/persistence';
@@ -47,7 +47,9 @@ export function makePersistRequestedStage(deps: AcquisitionStageDeps) {
     const decisionId = ctx.request.acquisitionDecision?.decisionId ?? `dec-${ctx.runId}`;
     ctx.acquisitionDecisionId = decisionId;
 
-    const state = ctx.blocked?.state ?? ctx.decidedState ?? 'REQUESTED';
+    const state = mapLegacyAcquisitionState(
+      ctx.blocked?.state ?? ctx.decidedState ?? AcquisitionState.REQUESTED,
+    );
     const policyNotRequested = state === AcquisitionState.NOT_REQUESTED_BY_POLICY;
 
     // Retry convergence: an existing decision for this run id is never

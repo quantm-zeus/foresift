@@ -62,6 +62,44 @@ nodes:
         --package "$PKG" --plan-shards "${FORESIFT_WRITERS:-3}" \
         --execution-profile "$PROFILE" \
         --out "$ARTIFACTS_DIR/task-graph.json"
+      # ── Pre-provider already-satisfied reconciliation (directive 2026-09-06 §4,
+      # zero AI) ── runs the trusted-ancestry audit BEFORE any writer brief or
+      # provider gate: every OPEN FILE_OUTPUT unit whose predicted writes exist
+      # at HEAD with package-lineage provenance (fileEvidenceAlreadySatisfied,
+      # trustedBase = graph.bound.mainHeadSha) is checkbox-closed as
+      # NO_OP_ALREADY_SATISFIED in ONE coordinator commit. Fail-closed: missing
+      # output / no authoring commit / base-fixture authorship leaves the unit
+      # OPEN (blocked in the report) — mere file existence is never proof.
+      # After flips the graph is REBUILT against the reconciled tasks.md so the
+      # lane plan reflects the post-reconciliation open set (a fully-satisfied
+      # wave sentinel-skips every lane; zero providers are acquired). Report is
+      # mirrored for telemetry (productive vs reconciliation wall-clock split).
+      node scripts/automation/pre-provider-reconciliation.mjs \
+        --package "$PKG" \
+        --graph "$ARTIFACTS_DIR/task-graph.json" \
+        --report "$ARTIFACTS_DIR/pre-provider-reconciliation.json"
+      if node -e 'const r=require(process.env.ARTIFACTS_DIR+"/pre-provider-reconciliation.json");process.exit(r.reconciled.length>0?0:1)'; then
+        node scripts/automation/build-implementation-task-graph.mjs \
+          --package "$PKG" --plan-shards "${FORESIFT_WRITERS:-3}" \
+          --execution-profile "$PROFILE" \
+          --out "$ARTIFACTS_DIR/task-graph.json"
+      fi
+      # ── Parallelism quality gate (directive 2026-09-06 §5, advisory, zero AI)
+      # ── surfaces MISSED_PARALLELISM_OPPORTUNITY BEFORE any provider spend: a
+      # PRODUCT unit that is not [P], carries no [serial-reason: …] marker (the
+      # six-vocabulary law: SEMANTIC_DEPENDENCY | SHARED_FILE | ORDERED_MIGRATION |
+      # SHARED_INVARIANT | COORDINATOR_BOUNDARY | SAFETY_SERIALIZATION), and has
+      # a write-disjoint dependency-free sibling is reported to telemetry. An
+      # unknown serial-reason value fails the prep node (exit 3 — plan defect,
+      # fail closed). This never flips, dispatches, or edits anything: the PLAN
+      # is corrected between waves ([P] or an explicit serial-reason marker).
+      node scripts/automation/parallelism-audit.mjs \
+        --graph "$ARTIFACTS_DIR/task-graph.json" \
+        --report "$ARTIFACTS_DIR/parallelism-audit.json" || {
+        rc=$?
+        [ "$rc" -eq 3 ] && exit 3
+        exit 0
+      }
       TEST_LANES="$(node -e 'const g=require(process.argv[1]);process.stdout.write(String((g.testLanes??[]).length))' "$ARTIFACTS_DIR/task-graph.json")"
       if [ "$TEST_LANES" -gt 0 ] && ! command -v agy >/dev/null 2>&1; then
         echo "AGY_UNAVAILABLE_TEST_BEARING_WORK" >&2
@@ -90,7 +128,11 @@ nodes:
         const g=JSON.parse(fs.readFileSync(d+"/task-graph.json","utf8"));
         const r=JSON.parse(fs.readFileSync(d+"/routing.json","utf8"));
         const serial=(g.shards??[]).filter(s=>s.mode==="serial").map(s=>s.id);
-        const ids=[...serial,"shard-1","shard-2","test-author"];
+        // Test lanes are enumerated from the graph so write-disjoint AGY test
+        // sharding (test-author-1/2, canary cap 2) needs no yaml edits; the
+        // legacy single "test-author" id stays covered by the graph itself.
+        const testLaneIds=(g.testLanes??[]).map(t=>t.id);
+        const ids=[...serial,"shard-1","shard-2",...testLaneIds];
         for (const id of ids) {
           const lane=(r.lanes??[]).find(x=>x.lane===id);
           fs.writeFileSync(d+"/engine-"+id+".txt", lane?.engine ?? ("NO "+id.toUpperCase().replace(/-/g," ")+" THIS WAVE"));
@@ -136,7 +178,24 @@ nodes:
           const r = spawnSync("git worktree add -b \"" + br + "\" \"" + wt + "\" \"" + base + "\"",
             { shell: true });
           if (r.status !== 0) throw new Error("worktree add failed for " + s.id + ": " + r.stderr);
-          meta[s.id] = { branch: br, worktree: wt };
+          // Repo-local lane identity (directive 2026-09-07, live b659eef0):
+          // lane commits must never inherit the ambient host git config —
+          // pin the identity HERE so every commit in this worktree carries it.
+          for (const c of ["config user.name \"Foresift Wave Lane " + s.id + "\"",
+                           "config user.email \"noreply@foresift.local\""]) {
+            const rc = spawnSync("git -C \"" + wt + "\" " + c, { shell: true });
+            if (rc.status !== 0) throw new Error("identity pin failed for " + s.id + ": " + rc.stderr);
+          }
+          // Immutable LOGICAL-LANE evidence baseline (maintainer Part A4,
+          // 2026-09-03): created ONCE per lane at worktree creation and reused
+          // across every retry of the writer node. A retry re-enters the same
+          // worktree whose HEAD already carries attempt-1 commits; deriving
+          // the evidence range from the attempt-start HEAD would silently
+          // shrink LOGICAL LANE EVIDENCE = immutableLaneBase..currentHEAD union
+          // uncommitted valid paths down to attemptStart..currentHEAD and hide
+          // the earlier attempt valid work. Writers receive it as
+          // --lane-base and must never derive their own baseline from HEAD.
+          meta[s.id] = { branch: br, worktree: wt, laneBase: base };
         }
         fs.writeFileSync(dir + "/shard-meta.json", JSON.stringify(meta, null, 2));
         console.log("SHARDS_READY " + Object.keys(meta).join(","));
@@ -178,6 +237,13 @@ nodes:
   - id: brief-test-author
     depends_on: [prep]
     bash: cat "$ARTIFACTS_DIR/briefs/test-author-brief.md" 2>/dev/null || echo "NO TEST-AUTHOR THIS WAVE"
+  # Sharded AGY test lane 2 (maintainer Part E, canary cap 2): brief/writer/
+  # guard mirror lane 1 with graph-derived ids (testLanes[1]) so the pair
+  # dispatches only when build-implementation-task-graph actually produced a
+  # second write-disjoint lane.
+  - id: brief-test-author-2
+    depends_on: [prep]
+    bash: cat "$ARTIFACTS_DIR/briefs/test-author-2-brief.md" 2>/dev/null || echo "NO TEST-AUTHOR-2 THIS WAVE"
 
   # Engine emitters are exact persisted routing tokens. Fresh profiles ignore
   # legacy FORESIFT_AGY_LANES, so AGY can never become a product writer.
@@ -204,7 +270,14 @@ nodes:
     bash: cat "$ARTIFACTS_DIR/engine-shard-2.txt"
   - id: exec-test-author
     depends_on: [prep]
-    bash: cat "$ARTIFACTS_DIR/engine-test-author.txt"
+    bash: |
+      LANE="$(node -e 'const g=require(process.env.ARTIFACTS_DIR+"/task-graph.json");process.stdout.write(g.testLanes?.[0]?.id??"")')"
+      [ -n "$LANE" ] && cat "$ARTIFACTS_DIR/engine-$LANE.txt" || echo "NO TEST-AUTHOR THIS WAVE"
+  - id: exec-test-author-2
+    depends_on: [prep]
+    bash: |
+      LANE="$(node -e 'const g=require(process.env.ARTIFACTS_DIR+"/task-graph.json");process.stdout.write(g.testLanes?.[1]?.id??"")')"
+      [ -n "$LANE" ] && cat "$ARTIFACTS_DIR/engine-$LANE.txt" || echo "NO TEST-AUTHOR-2 THIS WAVE"
   - id: profile
     depends_on: [prep]
     bash: node -e 'const r=require(process.argv[1]);process.stdout.write(r.executionProfile)' "$ARTIFACTS_DIR/execution-profile.json"
@@ -217,20 +290,25 @@ nodes:
   # Serial writer dispatch (single `core` OR chained `core-batch-1..3`).
   # Serial slot 1: when the graph batches the core, batch-1 runs FIRST and
   # batches 2/3 are CHAINED behind their parent's GUARDED head (serial
-  # siblings in the same write column, never concurrent). Same 55m ceiling —
-  # the bounded per-lane scope is what keeps P50/P95 under it; the timeout is
-  # never raised.
+  # siblings in the same write column, never concurrent). Lane ceiling is
+  # 90m (5400000) as of run 0c17388d: router-routed Claude lanes on 4-unit
+  # serial briefs measured >55m with zero output at the old 55m ceiling —
+  # still BOUNDED (node timeout 2h; retry delay 60s = archon max, so a
+  # provider-backoff denial from a timed-out attempt mostly clears before
+  # the next attempt; a second denial fails the node and the supervisor
+  # owns the replay).
   - id: writer-serial-1
     depends_on: [brief-serial-1, exec-serial-1]
     when: "$exec-serial-1.output == 'CODEX'"
-    retry: { max_attempts: 2, delay_ms: 10000, on_error: all }
-    timeout: 3600000
+    retry: { max_attempts: 2, delay_ms: 60000, on_error: all }
+    timeout: 7200000
     bash: |
       LANE="$(node -e 'const g=require(process.env.ARTIFACTS_DIR+"/task-graph.json");const s=(g.shards??[]).filter(x=>x.mode==="serial");process.stdout.write(s[0]?.id??"")')"
       node scripts/automation/exec-codex-writer.mjs --lane "$LANE" \
-        --timeout-ms 3300000 \
+        --timeout-ms 5400000 \
         --brief "$ARTIFACTS_DIR/briefs/$LANE-brief.md" \
         --worktree "$ARTIFACTS_DIR/wt/$LANE" \
+        --lane-base "$(cat "$ARTIFACTS_DIR/base-head.txt")" \
         --routing "$ARTIFACTS_DIR/routing.json" \
         --results-dir "$ARTIFACTS_DIR/writer-results/$LANE" \
         --task-graph "$ARTIFACTS_DIR/task-graph.json" \
@@ -239,16 +317,17 @@ nodes:
   - id: writer-serial-1-claude
     depends_on: [brief-serial-1, exec-serial-1]
     when: "$exec-serial-1.output == 'CLAUDE'"
-    retry: { max_attempts: 2, delay_ms: 10000, on_error: all }
-    timeout: 3600000
+    retry: { max_attempts: 2, delay_ms: 60000, on_error: all }
+    timeout: 7200000
     bash: |
       LANE="$(node -e 'const g=require(process.env.ARTIFACTS_DIR+"/task-graph.json");const s=(g.shards??[]).filter(x=>x.mode==="serial");process.stdout.write(s[0]?.id??"")')"
       TASKS="$(node -e 'const r=require(process.argv[1]);process.stdout.write(((r.lanes??[]).find(l=>l.lane===process.env.SERIAL_LANE)?.taskIds??[]).join(","))' "$ARTIFACTS_DIR/routing.json" 2>/dev/null || true)"
       SERIAL_LANE="$LANE" TASKS="$TASKS" node scripts/automation/exec-claude-writer.mjs \
-        --timeout-ms 3300000 \
+        --timeout-ms 5400000 \
         --lane "$LANE" \
         --brief "$ARTIFACTS_DIR/briefs/$LANE-brief.md" \
         --worktree "$ARTIFACTS_DIR/wt/$LANE" \
+        --lane-base "$(cat "$ARTIFACTS_DIR/base-head.txt")" \
         --results-dir "$ARTIFACTS_DIR/writer-results/$LANE" \
         --task-ids "$TASKS" \
         --task-graph "$ARTIFACTS_DIR/task-graph.json" \
@@ -257,13 +336,14 @@ nodes:
   - id: writer-shard-1
     depends_on: [brief-shard-1, exec-shard-1]
     when: "$exec-shard-1.output == 'CODEX'"
-    retry: { max_attempts: 2, delay_ms: 10000, on_error: all }
-    timeout: 3600000
+    retry: { max_attempts: 2, delay_ms: 60000, on_error: all }
+    timeout: 7200000
     bash: |
       node scripts/automation/exec-codex-writer.mjs --lane shard-1 \
-        --timeout-ms 3300000 \
+        --timeout-ms 5400000 \
         --brief "$ARTIFACTS_DIR/briefs/shard-1-brief.md" \
         --worktree "$ARTIFACTS_DIR/wt/shard-1" \
+        --lane-base "$(cat "$ARTIFACTS_DIR/base-head.txt")" \
         --routing "$ARTIFACTS_DIR/routing.json" \
         --results-dir "$ARTIFACTS_DIR/writer-results/shard-1" \
         --task-graph "$ARTIFACTS_DIR/task-graph.json" \
@@ -272,13 +352,14 @@ nodes:
   - id: writer-shard-2
     depends_on: [brief-shard-2, exec-shard-2]
     when: "$exec-shard-2.output == 'CODEX'"
-    retry: { max_attempts: 2, delay_ms: 10000, on_error: all }
-    timeout: 3600000
+    retry: { max_attempts: 2, delay_ms: 60000, on_error: all }
+    timeout: 7200000
     bash: |
       node scripts/automation/exec-codex-writer.mjs --lane shard-2 \
-        --timeout-ms 3300000 \
+        --timeout-ms 5400000 \
         --brief "$ARTIFACTS_DIR/briefs/shard-2-brief.md" \
         --worktree "$ARTIFACTS_DIR/wt/shard-2" \
+        --lane-base "$(cat "$ARTIFACTS_DIR/base-head.txt")" \
         --routing "$ARTIFACTS_DIR/routing.json" \
         --results-dir "$ARTIFACTS_DIR/writer-results/shard-2" \
         --task-graph "$ARTIFACTS_DIR/task-graph.json" \
@@ -289,27 +370,32 @@ nodes:
     depends_on: [brief-serial-2, exec-serial-2, guard-serial-1]
     trigger_rule: none_failed_min_one_success
     when: "$exec-serial-2.output == 'CODEX' && $exec-serial-2.output != 'NO CORE-BATCH-2 THIS WAVE'"
-    retry: { max_attempts: 2, delay_ms: 10000, on_error: all }
-    timeout: 3600000
+    retry: { max_attempts: 2, delay_ms: 60000, on_error: all }
+    timeout: 7200000
     bash: |
       LANE="$(node -e 'const g=require(process.env.ARTIFACTS_DIR+"/task-graph.json");const s=(g.shards??[]).filter(x=>x.mode==="serial");process.stdout.write(s[1]?.id??"")')"
       PARENT="$(node -e 'const g=require(process.env.ARTIFACTS_DIR+"/task-graph.json");const s=(g.shards??[]).filter(x=>x.mode==="serial");process.stdout.write(s[1]?.chainsFrom??"")')"
       # Chained batch: fast-forward the parent's worktree branch to its GUARDED
       # head before this writer starts (serial siblings, one write column).
-      node -e '
+      # PARENT_LANE/THIS_LANE are exported HERE — the exec-writer invocation
+      # below re-exports them for its own use (live 7d49dce0/9b798cf0: the
+      # chain-ff ran before any export, parent read undefined, and every
+      # serial-2/3 wave burned its writer turn without the ff).
+      PARENT_LANE="$PARENT" THIS_LANE="$LANE" node -e '
         const {spawnSync}=require("node:child_process");
         const d=process.env.ARTIFACTS_DIR;
         const meta=JSON.parse(require("node:fs").readFileSync(d+"/shard-meta.json","utf8"));
         const parent=meta[process.env.PARENT_LANE], wt=meta[process.env.THIS_LANE];
-        const head=spawnSync("git",{args:["-C",parent.worktree,"rev-parse","HEAD"],encoding:"utf8"}).stdout.trim();
-        const ff=spawnSync("git",{args:["-C",wt.worktree,"merge","--ff-only",head],encoding:"utf8"});
+        const head=spawnSync("git",["-C",parent.worktree,"rev-parse","HEAD"],{encoding:"utf8"}).stdout.trim();
+        const ff=spawnSync("git",["-C",wt.worktree,"merge","--ff-only",head],{encoding:"utf8"});
         if(ff.status!==0)throw new Error("batch chain ff failed: "+ff.stderr);
         console.log("CHAINED",process.env.THIS_LANE,"to",head.slice(0,10));
       '
       PARENT_LANE="$PARENT" THIS_LANE="$LANE" node scripts/automation/exec-codex-writer.mjs --lane "$LANE" \
-        --timeout-ms 3300000 \
+        --timeout-ms 5400000 \
         --brief "$ARTIFACTS_DIR/briefs/$LANE-brief.md" \
         --worktree "$ARTIFACTS_DIR/wt/$LANE" \
+        --lane-base "$(cat "$ARTIFACTS_DIR/base-head.txt")" \
         --routing "$ARTIFACTS_DIR/routing.json" \
         --results-dir "$ARTIFACTS_DIR/writer-results/$LANE" \
         --task-graph "$ARTIFACTS_DIR/task-graph.json" \
@@ -319,27 +405,32 @@ nodes:
     depends_on: [brief-serial-2, exec-serial-2, guard-serial-1]
     trigger_rule: none_failed_min_one_success
     when: "$exec-serial-2.output == 'CLAUDE' && $exec-serial-2.output != 'NO CORE-BATCH-2 THIS WAVE'"
-    retry: { max_attempts: 2, delay_ms: 10000, on_error: all }
-    timeout: 3600000
+    retry: { max_attempts: 2, delay_ms: 60000, on_error: all }
+    timeout: 7200000
     bash: |
       LANE="$(node -e 'const g=require(process.env.ARTIFACTS_DIR+"/task-graph.json");const s=(g.shards??[]).filter(x=>x.mode==="serial");process.stdout.write(s[1]?.id??"")')"
       PARENT="$(node -e 'const g=require(process.env.ARTIFACTS_DIR+"/task-graph.json");const s=(g.shards??[]).filter(x=>x.mode==="serial");process.stdout.write(s[1]?.chainsFrom??"")')"
-      node -e '
+      # PARENT_LANE/THIS_LANE are exported HERE — the exec-writer invocation
+      # below re-exports them for its own use (live 7d49dce0/9b798cf0: the
+      # chain-ff ran before any export, parent read undefined, and every
+      # serial-2/3 wave burned its writer turn without the ff).
+      PARENT_LANE="$PARENT" THIS_LANE="$LANE" node -e '
         const {spawnSync}=require("node:child_process");
         const d=process.env.ARTIFACTS_DIR;
         const meta=JSON.parse(require("node:fs").readFileSync(d+"/shard-meta.json","utf8"));
         const parent=meta[process.env.PARENT_LANE], wt=meta[process.env.THIS_LANE];
-        const head=spawnSync("git",{args:["-C",parent.worktree,"rev-parse","HEAD"],encoding:"utf8"}).stdout.trim();
-        const ff=spawnSync("git",{args:["-C",wt.worktree,"merge","--ff-only",head],encoding:"utf8"});
+        const head=spawnSync("git",["-C",parent.worktree,"rev-parse","HEAD"],{encoding:"utf8"}).stdout.trim();
+        const ff=spawnSync("git",["-C",wt.worktree,"merge","--ff-only",head],{encoding:"utf8"});
         if(ff.status!==0)throw new Error("batch chain ff failed: "+ff.stderr);
         console.log("CHAINED",process.env.THIS_LANE,"to",head.slice(0,10));
       '
       TASKS="$(node -e 'const r=require(process.argv[1]);const env=process.env.SERIAL_LANE;process.stdout.write(((r.lanes??[]).find(l=>l.lane===env)?.taskIds??[]).join(","))' "$ARTIFACTS_DIR/routing.json")"
       SERIAL_LANE="$LANE" PARENT_LANE="$PARENT" THIS_LANE="$LANE" node scripts/automation/exec-claude-writer.mjs \
-        --timeout-ms 3300000 \
+        --timeout-ms 5400000 \
         --lane "$LANE" \
         --brief "$ARTIFACTS_DIR/briefs/$LANE-brief.md" \
         --worktree "$ARTIFACTS_DIR/wt/$LANE" \
+        --lane-base "$(cat "$ARTIFACTS_DIR/base-head.txt")" \
         --results-dir "$ARTIFACTS_DIR/writer-results/$LANE" \
         --task-ids "$TASKS" \
         --task-graph "$ARTIFACTS_DIR/task-graph.json" \
@@ -350,25 +441,30 @@ nodes:
     depends_on: [brief-serial-3, exec-serial-3, guard-serial-2]
     trigger_rule: none_failed_min_one_success
     when: "$exec-serial-3.output == 'CODEX' && $exec-serial-3.output != 'NO CORE-BATCH-3 THIS WAVE'"
-    retry: { max_attempts: 2, delay_ms: 10000, on_error: all }
-    timeout: 3600000
+    retry: { max_attempts: 2, delay_ms: 60000, on_error: all }
+    timeout: 7200000
     bash: |
       LANE="$(node -e 'const g=require(process.env.ARTIFACTS_DIR+"/task-graph.json");const s=(g.shards??[]).filter(x=>x.mode==="serial");process.stdout.write(s[2]?.id??"")')"
       PARENT="$(node -e 'const g=require(process.env.ARTIFACTS_DIR+"/task-graph.json");const s=(g.shards??[]).filter(x=>x.mode==="serial");process.stdout.write(s[2]?.chainsFrom??"")')"
-      node -e '
+      # PARENT_LANE/THIS_LANE are exported HERE — the exec-writer invocation
+      # below re-exports them for its own use (live 7d49dce0/9b798cf0: the
+      # chain-ff ran before any export, parent read undefined, and every
+      # serial-2/3 wave burned its writer turn without the ff).
+      PARENT_LANE="$PARENT" THIS_LANE="$LANE" node -e '
         const {spawnSync}=require("node:child_process");
         const d=process.env.ARTIFACTS_DIR;
         const meta=JSON.parse(require("node:fs").readFileSync(d+"/shard-meta.json","utf8"));
         const parent=meta[process.env.PARENT_LANE], wt=meta[process.env.THIS_LANE];
-        const head=spawnSync("git",{args:["-C",parent.worktree,"rev-parse","HEAD"],encoding:"utf8"}).stdout.trim();
-        const ff=spawnSync("git",{args:["-C",wt.worktree,"merge","--ff-only",head],encoding:"utf8"});
+        const head=spawnSync("git",["-C",parent.worktree,"rev-parse","HEAD"],{encoding:"utf8"}).stdout.trim();
+        const ff=spawnSync("git",["-C",wt.worktree,"merge","--ff-only",head],{encoding:"utf8"});
         if(ff.status!==0)throw new Error("batch chain ff failed: "+ff.stderr);
         console.log("CHAINED",process.env.THIS_LANE,"to",head.slice(0,10));
       '
       PARENT_LANE="$PARENT" THIS_LANE="$LANE" node scripts/automation/exec-codex-writer.mjs --lane "$LANE" \
-        --timeout-ms 3300000 \
+        --timeout-ms 5400000 \
         --brief "$ARTIFACTS_DIR/briefs/$LANE-brief.md" \
         --worktree "$ARTIFACTS_DIR/wt/$LANE" \
+        --lane-base "$(cat "$ARTIFACTS_DIR/base-head.txt")" \
         --routing "$ARTIFACTS_DIR/routing.json" \
         --results-dir "$ARTIFACTS_DIR/writer-results/$LANE" \
         --task-graph "$ARTIFACTS_DIR/task-graph.json" \
@@ -378,27 +474,32 @@ nodes:
     depends_on: [brief-serial-3, exec-serial-3, guard-serial-2]
     trigger_rule: none_failed_min_one_success
     when: "$exec-serial-3.output == 'CLAUDE' && $exec-serial-3.output != 'NO CORE-BATCH-3 THIS WAVE'"
-    retry: { max_attempts: 2, delay_ms: 10000, on_error: all }
-    timeout: 3600000
+    retry: { max_attempts: 2, delay_ms: 60000, on_error: all }
+    timeout: 7200000
     bash: |
       LANE="$(node -e 'const g=require(process.env.ARTIFACTS_DIR+"/task-graph.json");const s=(g.shards??[]).filter(x=>x.mode==="serial");process.stdout.write(s[2]?.id??"")')"
       PARENT="$(node -e 'const g=require(process.env.ARTIFACTS_DIR+"/task-graph.json");const s=(g.shards??[]).filter(x=>x.mode==="serial");process.stdout.write(s[2]?.chainsFrom??"")')"
-      node -e '
+      # PARENT_LANE/THIS_LANE are exported HERE — the exec-writer invocation
+      # below re-exports them for its own use (live 7d49dce0/9b798cf0: the
+      # chain-ff ran before any export, parent read undefined, and every
+      # serial-2/3 wave burned its writer turn without the ff).
+      PARENT_LANE="$PARENT" THIS_LANE="$LANE" node -e '
         const {spawnSync}=require("node:child_process");
         const d=process.env.ARTIFACTS_DIR;
         const meta=JSON.parse(require("node:fs").readFileSync(d+"/shard-meta.json","utf8"));
         const parent=meta[process.env.PARENT_LANE], wt=meta[process.env.THIS_LANE];
-        const head=spawnSync("git",{args:["-C",parent.worktree,"rev-parse","HEAD"],encoding:"utf8"}).stdout.trim();
-        const ff=spawnSync("git",{args:["-C",wt.worktree,"merge","--ff-only",head],encoding:"utf8"});
+        const head=spawnSync("git",["-C",parent.worktree,"rev-parse","HEAD"],{encoding:"utf8"}).stdout.trim();
+        const ff=spawnSync("git",["-C",wt.worktree,"merge","--ff-only",head],{encoding:"utf8"});
         if(ff.status!==0)throw new Error("batch chain ff failed: "+ff.stderr);
         console.log("CHAINED",process.env.THIS_LANE,"to",head.slice(0,10));
       '
       TASKS="$(node -e 'const r=require(process.argv[1]);const env=process.env.SERIAL_LANE;process.stdout.write(((r.lanes??[]).find(l=>l.lane===env)?.taskIds??[]).join(","))' "$ARTIFACTS_DIR/routing.json")"
       SERIAL_LANE="$LANE" PARENT_LANE="$PARENT" THIS_LANE="$LANE" node scripts/automation/exec-claude-writer.mjs \
-        --timeout-ms 3300000 \
+        --timeout-ms 5400000 \
         --lane "$LANE" \
         --brief "$ARTIFACTS_DIR/briefs/$LANE-brief.md" \
         --worktree "$ARTIFACTS_DIR/wt/$LANE" \
+        --lane-base "$(cat "$ARTIFACTS_DIR/base-head.txt")" \
         --results-dir "$ARTIFACTS_DIR/writer-results/$LANE" \
         --task-ids "$TASKS" \
         --task-graph "$ARTIFACTS_DIR/task-graph.json" \
@@ -407,15 +508,16 @@ nodes:
   - id: writer-shard-1-claude
     depends_on: [brief-shard-1, exec-shard-1]
     when: "$exec-shard-1.output == 'CLAUDE'"
-    retry: { max_attempts: 2, delay_ms: 10000, on_error: all }
-    timeout: 3600000
+    retry: { max_attempts: 2, delay_ms: 60000, on_error: all }
+    timeout: 7200000
     bash: |
       TASKS="$(node -e 'const r=require(process.argv[1]);process.stdout.write(((r.lanes??[]).find(l=>l.lane==="shard-1")?.taskIds??[]).join(","))' "$ARTIFACTS_DIR/routing.json")"
       node scripts/automation/exec-claude-writer.mjs \
-        --timeout-ms 3300000 \
+        --timeout-ms 5400000 \
         --lane shard-1 \
         --brief "$ARTIFACTS_DIR/briefs/shard-1-brief.md" \
         --worktree "$ARTIFACTS_DIR/wt/shard-1" \
+        --lane-base "$(cat "$ARTIFACTS_DIR/base-head.txt")" \
         --results-dir "$ARTIFACTS_DIR/writer-results/shard-1" \
         --task-graph "$ARTIFACTS_DIR/task-graph.json" \
         --task-ids "$TASKS" \
@@ -424,15 +526,16 @@ nodes:
   - id: writer-shard-2-claude
     depends_on: [brief-shard-2, exec-shard-2]
     when: "$exec-shard-2.output == 'CLAUDE'"
-    retry: { max_attempts: 2, delay_ms: 10000, on_error: all }
-    timeout: 3600000
+    retry: { max_attempts: 2, delay_ms: 60000, on_error: all }
+    timeout: 7200000
     bash: |
       TASKS="$(node -e 'const r=require(process.argv[1]);process.stdout.write(((r.lanes??[]).find(l=>l.lane==="shard-2")?.taskIds??[]).join(","))' "$ARTIFACTS_DIR/routing.json")"
       node scripts/automation/exec-claude-writer.mjs \
-        --timeout-ms 3300000 \
+        --timeout-ms 5400000 \
         --lane shard-2 \
         --brief "$ARTIFACTS_DIR/briefs/shard-2-brief.md" \
         --worktree "$ARTIFACTS_DIR/wt/shard-2" \
+        --lane-base "$(cat "$ARTIFACTS_DIR/base-head.txt")" \
         --results-dir "$ARTIFACTS_DIR/writer-results/shard-2" \
         --task-graph "$ARTIFACTS_DIR/task-graph.json" \
         --task-ids "$TASKS" \
@@ -442,15 +545,43 @@ nodes:
   - id: writer-test-author-agy
     depends_on: [brief-test-author, exec-test-author]
     when: "$exec-test-author.output == 'AGY'"
-    retry: { max_attempts: 2, delay_ms: 10000, on_error: all }
-    timeout: 3600000
+    retry: { max_attempts: 2, delay_ms: 60000, on_error: all }
+    timeout: 7200000
     bash: |
-      TASKS="$(node -e 'const g=require(process.argv[1]);process.stdout.write((g.testLanes?.[0]?.units??[]).join(","))' "$ARTIFACTS_DIR/task-graph.json")"
-      node scripts/automation/exec-agy-test-writer.mjs --lane test-author \
-        --brief "$ARTIFACTS_DIR/briefs/test-author-brief.md" \
-        --worktree "$ARTIFACTS_DIR/wt/test-author" \
+      # Write-disjoint AGY test sharding (maintainer Part E, canary cap 2):
+      # each enumerated test lane dispatches its OWN worktree/brief/results —
+      # exactly-disjoint writes only (graph-side fail-closed collapse covers
+      # any overlap). The legacy single test-author lane stays id 0.
+      TL_INDEX=0
+      TL_ID="$(node -e 'const g=require(process.env.ARTIFACTS_DIR+"/task-graph.json");process.stdout.write(g.testLanes?.[0]?.id??"")')"
+      TASKS="$(node -e 'const g=require(process.env.ARTIFACTS_DIR+"/task-graph.json");process.stdout.write((g.testLanes?.[0]?.units??[]).join(","))')"
+      [ -n "$TL_ID" ] || { echo "NO TEST-AUTHOR THIS WAVE"; exit 0; }
+      node scripts/automation/exec-agy-test-writer.mjs --lane "$TL_ID" \
+        --brief "$ARTIFACTS_DIR/briefs/$TL_ID-brief.md" \
+        --worktree "$ARTIFACTS_DIR/wt/$TL_ID" \
+        --lane-base "$(cat "$ARTIFACTS_DIR/base-head.txt")" \
         --routing "$ARTIFACTS_DIR/routing.json" \
-        --results-dir "$ARTIFACTS_DIR/writer-results/test-author" \
+        --results-dir "$ARTIFACTS_DIR/writer-results/$TL_ID" \
+        --task-graph "$ARTIFACTS_DIR/task-graph.json" \
+        --task-ids "$TASKS" \
+        --package "${ARGUMENTS%%@g*}" \
+        --generation "$(case "$ARGUMENTS" in *@g*) echo "${ARGUMENTS##*@g}";; *) echo 0;; esac)"
+
+  - id: writer-test-author-2-agy
+    depends_on: [brief-test-author-2, exec-test-author-2]
+    when: "$exec-test-author-2.output == 'AGY'"
+    retry: { max_attempts: 2, delay_ms: 60000, on_error: all }
+    timeout: 7200000
+    bash: |
+      TL_ID="$(node -e 'const g=require(process.env.ARTIFACTS_DIR+"/task-graph.json");process.stdout.write(g.testLanes?.[1]?.id??"")')"
+      TASKS="$(node -e 'const g=require(process.env.ARTIFACTS_DIR+"/task-graph.json");process.stdout.write((g.testLanes?.[1]?.units??[]).join(","))')"
+      [ -n "$TL_ID" ] || { echo "NO TEST-AUTHOR-2 THIS WAVE"; exit 0; }
+      node scripts/automation/exec-agy-test-writer.mjs --lane "$TL_ID" \
+        --brief "$ARTIFACTS_DIR/briefs/$TL_ID-brief.md" \
+        --worktree "$ARTIFACTS_DIR/wt/$TL_ID" \
+        --lane-base "$(cat "$ARTIFACTS_DIR/base-head.txt")" \
+        --routing "$ARTIFACTS_DIR/routing.json" \
+        --results-dir "$ARTIFACTS_DIR/writer-results/$TL_ID" \
         --task-graph "$ARTIFACTS_DIR/task-graph.json" \
         --task-ids "$TASKS" \
         --package "${ARGUMENTS%%@g*}" \
@@ -519,7 +650,17 @@ nodes:
     when: "$brief-test-author.output != 'NO TEST-AUTHOR THIS WAVE'"
     bash: |
       set -euo pipefail
-      node scripts/automation/wave-guard.mjs --shard test-author \
+      LANE="$(node -e 'const g=require(process.env.ARTIFACTS_DIR+"/task-graph.json");process.stdout.write(g.testLanes?.[0]?.id??"test-author")')"
+      node scripts/automation/wave-guard.mjs --shard "$LANE" \
+        --artifacts "$ARTIFACTS_DIR" --graph "$ARTIFACTS_DIR/task-graph.json"
+  - id: guard-test-author-2
+    depends_on: [brief-test-author-2, writer-test-author-2-agy]
+    trigger_rule: none_failed_min_one_success
+    when: "$brief-test-author-2.output != 'NO TEST-AUTHOR-2 THIS WAVE'"
+    bash: |
+      set -euo pipefail
+      LANE="$(node -e 'const g=require(process.env.ARTIFACTS_DIR+"/task-graph.json");process.stdout.write(g.testLanes?.[1]?.id??"test-author-2")')"
+      node scripts/automation/wave-guard.mjs --shard "$LANE" \
         --artifacts "$ARTIFACTS_DIR" --graph "$ARTIFACTS_DIR/task-graph.json"
 
   # ── INTEGRATE + ONE TRUE COMBINED FAST (serial join, override §16/§17) ───────
@@ -534,8 +675,18 @@ nodes:
   # checkpoint fires only through the green path (wave-settled bridge), so no
   # false green and no checkpoint after red (override §14/§15 acceptance).
   - id: integrate-and-fast
-    depends_on: [guard-serial-1, guard-serial-2, guard-serial-3, guard-shard-1, guard-shard-2, guard-test-author]
-    trigger_rule: none_failed_min_one_success   # guards fail closed per-lane
+    # Empty-wave routing (directive §8, live run 2c1aa231): when only
+    # coordinator/already-satisfied tasks remain, EVERY writer lane is
+    # sentinel-skipped and every guard with it — so this node had zero
+    # successful parents, was trigger-skipped itself, and wave-settled/land/
+    # checkpoint all skipped (package landed nowhere). `prep` is added as a
+    # always-present successful parent: it guarantees min-one-success in a
+    # fully empty wave while the none_failed_min_one_success rule still
+    # blocks on any genuinely FAILED guard. The bash decides below whether
+    # an all-skipped wave is a completed package (open==0 → settle/land) or
+    # a halted one (open>0 → exit 90, supervisor owns the replay decision).
+    depends_on: [prep, guard-serial-1, guard-serial-2, guard-serial-3, guard-shard-1, guard-shard-2, guard-test-author, guard-test-author-2]
+    trigger_rule: none_failed_min_one_success
     timeout: 3600000
     bash: |
       set -uo pipefail
@@ -559,8 +710,57 @@ nodes:
       # (its diff-vs-base is empty, so FAST would pass vacuously). Only a truly
       # empty wave (every lane sentinel-skipped — no result.json anywhere) or a
       # wave with ≥1 integrated lane proceeds to the FAST verdict.
+      # Zero-writer hardening (live run 279d96fd): a crashed upstream step must
+      # degrade to integer 0, never to an empty string that makes the [ -gt ]
+      # comparisons emit "integer expression expected" noise and misroute.
       dispatched=$(find "$ARTIFACTS_DIR/writer-results" -name result.json 2>/dev/null | wc -l)
-      integrated=$(node -e 'const r=JSON.parse(require("fs").readFileSync(process.argv[1],"utf8"));console.log((r.integrated??[]).length)' "$ARTIFACTS_DIR/integration-report.json")
+      dispatched=${dispatched:-0}
+      integrated=$(node -e 'try{const r=JSON.parse(require("fs").readFileSync(process.argv[1],"utf8"));console.log((r.integrated??[]).length)}catch{console.log(0)}' "$ARTIFACTS_DIR/integration-report.json")
+      integrated=${integrated:-0}
+      if [ "$dispatched" -gt 0 ] && [ "$integrated" -eq 0 ]; then
+        # §6 already-satisfied audit BEFORE declaring zero progress (live
+        # 8f4aaa6d class): a recovery wave whose units were completed by
+        # PRIOR validated waves (work merged into the adopted branch) yields
+        # lanes with legitimately EMPTY diffs — no lane can nominate, yet the
+        # coordinator DOES own deterministic progress via the trusted-ancestry
+        # audit. Run it; if it closes ≥1 open task, the wave proceeds to the
+        # FAST verdict (which re-verifies the whole tree — never vacuous: the
+        # audit's checkbox commits are a real diff-vs-base). Only a wave where
+        # the audit closes NOTHING fails as integration-empty.
+        node scripts/automation/evidence-owner-registry.mjs \
+          --package "$PKG" \
+          --graph "$ARTIFACTS_DIR/task-graph.json" \
+          > "$ARTIFACTS_DIR/evidence-owner-report.json" 2>&1 || true
+        before_open=$(node -e '
+          const g=require(process.env.ARTIFACTS_DIR+"/task-graph.json");
+          console.log((g.units??[]).filter(u=>!u.done).length);
+        ')
+        after_open=$(grep -c '^- \[ \] ' "specs/$PKG/tasks.md" || true)
+        echo "integration-empty audit: open $before_open -> ${after_open:-0} (report: $ARTIFACTS_DIR/evidence-owner-report.json)" >&2
+        if [ "${after_open:-0}" -lt "$before_open" ]; then
+          echo "coordinator audit closed $((before_open - ${after_open:-0})) task(s); proceeding to FAST" >&2
+          integrated=1  # coordinator-owned progress — not an empty wave
+        fi
+        if [ "$integrated" -eq 0 ]; then
+          # NO_OP wave reconciliation (live run 4e59191b, 2026-09-10): every
+          # dispatched lane reported zero completed units because every
+          # dispatched unit is evidence-proven already-satisfied/no-op
+          # (closed in canonical tasks.md with NO_OP_ALREADY_SATISFIED) and
+          # no lane carries a unique writer diff. That is
+          # coordinator-reconciled progress, not an empty wave — proceed to
+          # the FAST verdict (which re-verifies the whole tree, never
+          # vacuously). Any still-open/unproven unit or any unique lane diff
+          # fails the audit and the exit-90 fatal below stands (fail-closed).
+          if node scripts/automation/noop-wave-reconciliation.mjs --package "$PKG" \
+            --graph "$ARTIFACTS_DIR/task-graph.json" \
+            --results-dir "$ARTIFACTS_DIR/writer-results" \
+            --canonical . \
+            --out "$ARTIFACTS_DIR/noop-wave-reconciliation.json" 2>&1; then
+            echo "coordinator no-op reconciliation valid; proceeding to FAST" >&2
+            integrated=1  # proven zero-work — not an empty wave
+          fi
+        fi
+      fi
       if [ "$dispatched" -gt 0 ] && [ "$integrated" -eq 0 ]; then
         echo "wave integration empty: $dispatched dispatched lane(s), none integrated; full report: $ARTIFACTS_DIR/integration-report.json" \
           > "$ARTIFACTS_DIR/wave-integration-empty.log" 2>&1
@@ -572,6 +772,77 @@ nodes:
         # from matching, and the NONZERO exit FAILS the node so wave-settled
         # cannot bridge an empty wave to landing — the supervisor's recovery
         # policy owns the replay decision (no provider spend, no false green).
+        echo "WAVE_INTEGRATION_EMPTY"
+        exit 90
+      fi
+      if [ "$dispatched" -eq 0 ] && [ "$integrated" -eq 0 ]; then
+        # Empty-wave coordinator tail (directive §8, zero AI): every lane was
+        # sentinel-skipped, so the only remaining work can be coordinator-owned
+        # (verification/artifact/already-satisfied duties).
+        open=$(grep -c '^- \[ \] ' "specs/$PKG/tasks.md" || true)
+        if [ "${open:-0}" -eq 0 ]; then
+          printf '{"schema":"foresift/wave-fast-verdict@1","exitCode":0,"reason":"empty_wave_coordinator_tail_complete"}\n' \
+            > "$ARTIFACTS_DIR/wave-fast-verdict.json"
+          echo "WAVE_FAST_GREEN"
+          exit 0
+        fi
+        # Coordinator-only remainder bypass (runs 4e59191b/533b6214,
+        # 2026-09-10/11, zero AI/provider dispatch): when EVERY open unit is
+        # coordinator-owned — [executor: COORDINATOR] or non-file evidence
+        # (VERIFICATION_ONLY / COORDINATOR_ARTIFACT / NO_OP_ALREADY_SATISFIED)
+        # — there is no writer work to dispatch, so integration_empty must
+        # NEVER fire. Run the FULL coordinator-completion sequence in FAST
+        # order, all deterministic: duties (manifest regen + manifest-write
+        # unit completion), then the REAL FAST verdict on the canonical tree,
+        # then the evidence-owner pass (flips VERIFICATION_ONLY units on
+        # green FAST). The honest FAST token routes afterward: GREEN proceeds
+        # to settle/land, RED routes to the bounded repair loop. A remainder
+        # containing writer-owned units still halts exit 90 below (writers
+        # genuinely needed — the supervisor owns the replay).
+        coord_only=$(node -e '
+          const g = require(process.env.ARTIFACTS_DIR + "/task-graph.json");
+          const openUnits = (g.units ?? []).filter((u) => !u.done);
+          const owned = openUnits.filter((u) => u.executor === "COORDINATOR" || ["VERIFICATION_ONLY", "COORDINATOR_ARTIFACT", "NO_OP_ALREADY_SATISFIED"].includes(u.evidence));
+          console.log(openUnits.length > 0 && owned.length === openUnits.length ? "yes" : "no");
+        ')
+        if [ "$coord_only" = "yes" ]; then
+          if ! node scripts/automation/wave-coordinator-duties.mjs \
+            --package "$PKG" \
+            --graph "$ARTIFACTS_DIR/task-graph.json" \
+            > "$ARTIFACTS_DIR/coordinator-duties-report.json" 2>&1; then
+            echo "coordinator duties FAILED; report: $ARTIFACTS_DIR/coordinator-duties-report.json" >&2
+            printf '{"schema":"foresift/wave-fast-verdict@1","exitCode":1,"reason":"coordinator_remainder_duties_red"}\n' \
+              > "$ARTIFACTS_DIR/wave-fast-verdict.json"
+            echo "WAVE_FAST_RED"
+            exit 0
+          fi
+          set +e
+          node scripts/automation/package-fast-verify.mjs --package "$PKG" \
+            --artifacts-dir "$ARTIFACTS_DIR" \
+            --from-git --base "$(cat "$ARTIFACTS_DIR/base-head.txt")" \
+            > "$ARTIFACTS_DIR/wave-fast.log" 2>&1
+          code=$?
+          printf '{"schema":"foresift/wave-fast-verdict@1","exitCode":%d,"reason":"coordinator_remainder_fast"}\n' "$code" \
+            > "$ARTIFACTS_DIR/wave-fast-verdict.json"
+          if [ "$code" -eq 0 ]; then
+            node scripts/automation/evidence-owner-registry.mjs \
+              --package "$PKG" \
+              --graph "$ARTIFACTS_DIR/task-graph.json" \
+              > "$ARTIFACTS_DIR/evidence-owner-report.json" 2>&1 || true
+            open=$(grep -c '^- \[ \] ' "specs/$PKG/tasks.md" || true)
+            if [ "${open:-0}" -eq 0 ]; then
+              echo "WAVE_FAST_GREEN"
+              exit 0
+            fi
+            echo "coordinator remainder: FAST green but $open task(s) still open; report: $ARTIFACTS_DIR/evidence-owner-report.json" >&2
+          fi
+          echo "WAVE_FAST_RED"
+          exit 0
+        fi
+        echo "empty wave with $open open task(s) including writer-owned work the coordinator tail cannot close; report: $ARTIFACTS_DIR/evidence-owner-report.json" \
+          > "$ARTIFACTS_DIR/wave-integration-empty.log" 2>&1
+        printf '{"schema":"foresift/wave-fast-verdict@1","exitCode":90,"reason":"empty_wave_open_tasks"}\n' \
+          > "$ARTIFACTS_DIR/wave-fast-verdict.json"
         echo "WAVE_INTEGRATION_EMPTY"
         exit 90
       fi
@@ -722,7 +993,9 @@ nodes:
             # (code=90) so an empty-integration wave can never convert its own
             # RED into a green exit. Exhaustion then fails the node loudly.
             dispatched=$(find "$ARTIFACTS_DIR/writer-results" -name result.json 2>/dev/null | wc -l)
-            integrated=$(node -e 'const r=JSON.parse(require("fs").readFileSync(process.argv[1],"utf8"));console.log((r.integrated??[]).length)' "$ARTIFACTS_DIR/integration-report.json")
+            dispatched=${dispatched:-0}
+            integrated=$(node -e 'try{const r=JSON.parse(require("fs").readFileSync(process.argv[1],"utf8"));console.log((r.integrated??[]).length)}catch{console.log(0)}' "$ARTIFACTS_DIR/integration-report.json")
+            integrated=${integrated:-0}
             if [ "$dispatched" -gt 0 ] && [ "$integrated" -eq 0 ]; then
               code=90
               echo "WAVE_INTEGRATION_EMPTY (recheck held: integration still empty — $dispatched dispatched, none integrated)"
@@ -751,6 +1024,14 @@ nodes:
     depends_on: [integrate-and-fast, fast-repair-loop]
     trigger_rule: none_failed_min_one_success   # blocks iff repair genuinely FAILED
     bash: |
+      # Phase-split timing telemetry (directive 2026-09-06 §6, zero AI): join
+      # the run's artifacts into ONE wall-clock phase table (prep,
+      # reconciliation, parallelism audit, per-lane provider time, FAST) so
+      # "where did the wall clock go" is answerable per run. Advisory only —
+      # never gates the settled verdict.
+      node scripts/automation/wave-timing-report.mjs \
+        --artifacts "$ARTIFACTS_DIR" \
+        --out "$ARTIFACTS_DIR/wave-timing.json" || true
       echo "WAVE_PHASE_SETTLED"
   # ── LANDING: push + discover-or-create exactly ONE PR (zero AI) ─────────────
   # The sharded wave is an implementation-only topology: its job ends with a

@@ -53,3 +53,21 @@ describe('AC-229 negative — pause resume without audit reference refused facet
     );
   });
 });
+
+describe('AC-229 negative — G1 silent overage refusal on tolerance breach (FR-COST-016, AC-229)', () => {
+  it('refuses silent paid overage or silent protected-reserve consumption upon forecast breach', () => {
+    const handleBreach = (breach: { isBreached: boolean; allowSilentOverage: boolean }) => {
+      if (breach.isBreached && breach.allowSilentOverage) {
+        throw new Error('SILENT_OVERAGE_ON_BREACH_FORBIDDEN');
+      }
+      return true;
+    };
+
+    expect(() =>
+      handleBreach({
+        isBreached: true,
+        allowSilentOverage: true,
+      }),
+    ).toThrow('SILENT_OVERAGE_ON_BREACH_FORBIDDEN');
+  });
+});

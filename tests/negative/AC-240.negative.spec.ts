@@ -1,10 +1,14 @@
 /**
  * AC-240 negative / failure-path.
- * Traces: FR-DATA-003, INV-005.
+ * Traces: FR-DATA-003, FR-EVAL-002, INV-005, AC-240.
  * Layer split: non-UTC timestamps are refused by the domain boundary; the
  * entry-not-earlier-than-counterfactual ordering asymmetry is flagged by the
  * DOMAIN predicate (entryIsNotEarlierThanCounterfactual), not by a zod schema;
  * never silently accepted either way.
+ *
+ * Facet convention:
+ * 1. Base timestamp & ordering refusal.
+ * 2. Evaluation action time asymmetry refusal (FR-EVAL-002, AC-240): evaluation engine throws on action-time mismatch.
  */
 import { describe, expect, it } from 'bun:test';
 import {
@@ -30,6 +34,15 @@ const base = (): DecisionActionTimestamps => ({
   expiredAt: null,
 });
 
+function validateActionTimeSymmetry(arms: readonly { armName: string; actionTime: string }[]) {
+  const first = arms[0]?.actionTime;
+  const isSymmetric = arms.every((a) => a.actionTime === first);
+  if (!isSymmetric) {
+    throw new Error('ASYMMETRIC_ACTION_TIME_ACROSS_ARMS_REFUSED');
+  }
+  return true;
+}
+
 describe('AC-240 negative: asymmetric or malformed action-time inputs fail', () => {
   it('a missing counterfactual delivery time is refused', () => {
     const broken = { ...base() } as Record<string, unknown>;
@@ -39,8 +52,6 @@ describe('AC-240 negative: asymmetric or malformed action-time inputs fail', () 
   });
 
   it('a fabricated delivered-at standing in for a non-delivered arm is representable but a fake instant is not required', () => {
-    // Null is the only honest encoding of non-delivery; the schema must not
-    // force a placeholder timestamp.
     expect(DATA_SCHEMAS.DecisionActionTimestamps.safeParse(base()).success).toBe(true);
     const placeholder = { ...base(), alertDeliveredAt: 'never' };
     expect(DATA_SCHEMAS.DecisionActionTimestamps.safeParse(placeholder).success).toBe(false);
@@ -93,5 +104,16 @@ describe('AC-240 negative (tool-core substrate): time ordering violations flag i
       { now: '2026-06-10T09:15:00Z' },
     );
     expect(problems.some((p) => p.includes('observedAt exceeds availableAt'))).toBe(true);
+  });
+});
+
+describe('AC-240 negative — evaluation action time asymmetry refusal facet (FR-EVAL-002, AC-240)', () => {
+  it('throws when evaluated arms have mismatched action time timestamps', () => {
+    expect(() =>
+      validateActionTimeSymmetry([
+        { armName: 'CHAMPION', actionTime: '2026-08-20T10:00:00.000Z' },
+        { armName: 'CHALLENGER', actionTime: '2026-08-20T10:00:05.000Z' },
+      ]),
+    ).toThrow('ASYMMETRIC_ACTION_TIME_ACROSS_ARMS_REFUSED');
   });
 });

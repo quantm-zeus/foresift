@@ -13,6 +13,7 @@ import {
   ForesiftError,
   ErrorCode,
   assertDependenceInputs,
+  inputsJustifyReducedIndependence,
   utcTimestamp,
   visibleAt,
   type DependenceObservationInputs,
@@ -167,6 +168,11 @@ export async function recordDependenceEdge(
   // first; storage does NOT enforce uniqueness per pair (multiple edges over
   // time are allowed and the reader returns them newest-first), and self-edges
   // are refused outright.
+  // G1 validity columns (migrations/g1_data_0002_dependence_conflicts.sql) are
+  // NOT NULL. This G0-era writer mirrors the migration's own upgrade semantics
+  // for edges first recorded under the G0 API: the edge's validity begins when
+  // it first became available, the inputs are empirical observations, and the
+  // multiplier follows the same published threshold rule as the migration.
   const [a, b] =
     input.edge.sourceA < input.edge.sourceB
       ? [input.edge.sourceA, input.edge.sourceB]
@@ -178,12 +184,15 @@ export async function recordDependenceEdge(
       { edgeId: input.edgeId },
     );
   }
+  const multiplier = inputsJustifyReducedIndependence(input.edge.inputs) ? 0.5 : 1;
   await engine.query(
     `INSERT INTO source_dependence_edges (
        edge_id, source_a, source_b, shared_upstream_lineage_keys,
        value_error_timing_correlation, outage_overlap, first_seen_lag_agreement,
-       fingerprint_similarity, label, available_at)
-     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)`,
+       fingerprint_similarity, label, available_at,
+       valid_from, valid_until, method, evidence_ids, confidence,
+       effective_independence_multiplier)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,NULL,'EMPIRICAL',ARRAY[]::text[],1,$12)`,
     [
       input.edgeId,
       a,
@@ -195,6 +204,8 @@ export async function recordDependenceEdge(
       input.edge.inputs.fingerprintSimilarity,
       input.edge.label,
       input.edge.availableAt,
+      input.edge.availableAt,
+      multiplier,
     ],
   );
 }

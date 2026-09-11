@@ -877,6 +877,44 @@ describe('foresift-sharded-wave workflow contract', () => {
     }
   });
 
+  it('coordinator-only remainder bypasses integration_empty with zero writer dispatch (runs 4e59191b/533b6214)', () => {
+    // A wave whose lanes all sentinel-skipped must never fatalize as
+    // integration_empty when every open unit is coordinator-owned. The
+    // contract: ownership is decided deterministically from the task graph
+    // (COORDINATOR executor or non-file evidence), then the FULL
+    // coordinator-completion sequence runs in FAST order — duties, REAL
+    // FAST, evidence-owner — emitting the honest FAST token. Writer-owned
+    // remainder keeps the exit-90 halt.
+    const tail = yaml.slice(
+      yaml.indexOf('Coordinator-only remainder bypass'),
+      yaml.indexOf('# ONE TRUE combined package FAST'),
+    );
+    expect(tail.length).toBeGreaterThan(0);
+    // ownership gate reads the graph, never prose
+    expect(tail).toContain('task-graph.json');
+    expect(tail).toContain('COORDINATOR');
+    expect(tail).toContain('VERIFICATION_ONLY');
+    expect(tail).toContain('COORDINATOR_ARTIFACT');
+    expect(tail).toContain('NO_OP_ALREADY_SATISFIED');
+    // FAST order: duties → real FAST → evidence-owner → token
+    const dutiesAt = tail.indexOf('wave-coordinator-duties.mjs');
+    const fastAt = tail.indexOf('package-fast-verify.mjs');
+    const ownerAt = tail.indexOf('evidence-owner-registry.mjs', fastAt);
+    expect(dutiesAt).toBeGreaterThan(-1);
+    expect(fastAt).toBeGreaterThan(dutiesAt);
+    expect(ownerAt).toBeGreaterThan(fastAt);
+    expect(tail).toContain('WAVE_FAST_GREEN');
+    expect(tail).toContain('WAVE_FAST_RED');
+    // duties failure is honest RED, never silent green
+    expect(tail).toContain('coordinator_remainder_duties_red');
+    // the exit-90 halt survives ONLY for writer-owned remainder
+    const halt = tail.slice(tail.indexOf('WAVE_INTEGRATION_EMPTY') - 400);
+    expect(halt).toMatch(/exit 90/);
+    // no provider dispatch anywhere in the bypass: no exec-codex/claude/agy
+    // writer invocations between the bypass comment and the halt
+    expect(tail).not.toMatch(/exec-(codex|claude|agy)-writer\.mjs/);
+  });
+
   it('enforces CODEX product writers, CLAUDE_AGY fallbacks, AGY test-author only, and forbidden test edits in implementation prompts', () => {
     // H3 mission item 4: serial slots are graph-resolved (`writer-serial-N`), so
     // lane ids like `core` or `core-batch-2` are runtime truth — the yaml

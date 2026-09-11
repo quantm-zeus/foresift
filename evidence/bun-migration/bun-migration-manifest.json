@@ -1,7 +1,7 @@
 {
   "schema": "foresift/bun-migration-manifest@1",
   "migrationId": "bun-test-authority-v1",
-  "generatedAt": "2026-09-10T21:49:02.453Z",
+  "generatedAt": "2026-09-11T07:44:18.912Z",
   "root": ".",
   "totalTestFiles": 488,
   "counts": {
@@ -12,7 +12,7 @@
     "BLOCKED": 0
   },
   "parity": {
-    "previousTotal": 487,
+    "previousTotal": 488,
     "disappeared": []
   },
   "files": [
@@ -6599,9 +6599,9 @@
     {
       "path": "tests/automation/impl-wave.spec.ts",
       "package": "automation",
-      "bytes": 87959,
-      "lines": 2025,
-      "sha256": "74ca5f7ed20278ea99477177eee1e7a5c44f0fb0f3cc6af27b690b4a8c5674e8",
+      "bytes": 90056,
+      "lines": 2063,
+      "sha256": "dec96b74ea460496d49e51abd3bee5027566b05224a9f6ce6afa69cff8b46c45",
       "imports": ["bun:test", "node:child_process", "node:fs", "node:os", "node:path", "node:url"],
       "vitestImports": [],
       "features": ["dynamic-import"],

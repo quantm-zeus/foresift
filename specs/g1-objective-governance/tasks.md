@@ -70,7 +70,7 @@ and AC suites, then telemetry and gates.
 
 ## Phase 1 — Domain vocabularies and pure laws (blocks later phases)
 
-- [ ] T001 [P] Create `packages/domain/src/obj.ts`: all fourteen const
+- [x] T001 [P] Create `packages/domain/src/obj.ts`: all fourteen const
       vocabularies above with fail-closed parse functions throwing typed
       `ObjError`s with stable `ObjErrorCode`s (OBJ_DIMENSION_UNKNOWN,
       OBJ_COMPARABILITY_UNKNOWN, OBJ_CONSTRAINT_KIND_UNKNOWN,
@@ -101,7 +101,7 @@ and AC suites, then telemetry and gates.
       test-owned task T013 (2026-09-07 ownership law). Traces: FR-OBJ-001,
       FR-OBJ-002, FR-OBJ-003, FR-OBJ-004, FR-OBJ-005, FR-OBJ-006, FR-OBJ-007,
       FR-OBJ-008, FR-OBJ-009, FR-OBJ-010.
-- [ ] T002 [P] Create `packages/shared-schemas/src/obj.ts`: Zod runtime
+- [x] T002 [P] Create `packages/shared-schemas/src/obj.ts`: Zod runtime
       mirrors importing every `ALL_*` list from `@foresift/domain`
       (compile-parity law; never restated), `OBJ_SCHEMA_REGISTRY_VERSION`,
       strict objects with `signedDecimal`/`unsignedDecimal` money conventions
@@ -120,7 +120,7 @@ and AC suites, then telemetry and gates.
       dependencies and `bun test` script, `tsconfig.json` extending
       `tsconfig.base.json`, stub `src/index.ts` barrels). No other files.
       Traces: FR-OBJ-001, FR-OBJ-004.
-- [ ] T004 [P] Create `migrations/g1_obj_0001_objective_runs.sql`,
+- [x] T004 [P] Create `migrations/g1_obj_0001_objective_runs.sql`,
       `migrations/g1_obj_0002_utility_ledger.sql`, and
       `migrations/g1_obj_0003_integrity_claims.sql` per plan.md's data model
       (frozen `objective_runs` with eight dimension columns and
@@ -147,7 +147,7 @@ and AC suites, then telemetry and gates.
 
 ## Phase 3 — Utility ledger and governance gates (product)
 
-- [ ] T008 [P] Create `packages/shadow-portfolio/src/utility-ledger.ts`,
+- [x] T008 [P] Create `packages/shadow-portfolio/src/utility-ledger.ts`,
       `capital-day.ts`, and `read-only-guard.ts` (outcome-maturity scanner
       precedent: prohibited-import/identifier lists plus binary-float
       detection on the aggregation path): versioned fills fold into
@@ -156,18 +156,18 @@ and AC suites, then telemetry and gates.
       allocation policy, no portfolio comparison, no engine semantics beyond
       the twelve lines (G7 boundary stated in the module header). Unit tests
       by test-owned T015. Traces: FR-OBJ-001, FR-OBJ-004.
-- [ ] T009 [P] Create `packages/objective-governance/src/objective-function.ts`,
+- [x] T009 [P] Create `packages/objective-governance/src/objective-function.ts`,
       `comparability.ts`, and `hard-constraints.ts` per plan.md (float-free
       LCB core; eight-dimension pairwise equality with refusal on missing
       records; total seven-kind evaluation before utility). Unit tests by
       test-owned T016. Traces: FR-OBJ-001, FR-OBJ-002, FR-OBJ-003.
-- [ ] T010 [P] Create `packages/objective-governance/src/decomposition.ts`,
+- [x] T010 [P] Create `packages/objective-governance/src/decomposition.ts`,
       `diagnostics.ts`, and `claim-scope.ts` per plan.md (reconciling
       twelve-line reports; diagnostic computation with diagnostic-only
       labeling and verdict-type exclusion; eleven-field completeness with
       refusal). Unit tests by test-owned T016. Traces: FR-OBJ-004,
       FR-OBJ-005, FR-OBJ-007.
-- [ ] T011 [P] Create `packages/objective-governance/src/integrity.ts`,
+- [x] T011 [P] Create `packages/objective-governance/src/integrity.ts`,
       `delay-gate.ts`, and `sensitivity.ts` per plan.md (seven detectors over
       consumed frozen-run evidence; three-scenario distribution with declared
       robust-delay gate; seven-dimension grids derived from the frozen record

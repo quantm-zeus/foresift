@@ -2060,3 +2060,78 @@ describe('noop-wave-reconciliation (integration_empty coordinator path)', () => 
     }
   });
 });
+
+describe('coordinator duties state-plane coverage exclusion (g1-outcome-evaluation T039)', () => {
+  const DUTIES = join(repoRoot, 'scripts', 'automation', 'wave-coordinator-duties.mjs');
+
+  function initDutiesFixture(extraTracked: string[]) {
+    const root = mkdtempSync(join(tmpdir(), 'duties-'));
+    const g = (cmd: string) =>
+      spawnSync(`git ${cmd}`, { shell: true, cwd: root, encoding: 'utf8' });
+    g('init -qb main');
+    mkdirSync(join(root, 'tests', 'automation'), { recursive: true });
+    mkdirSync(join(root, 'evidence', 'bun-migration'), { recursive: true });
+    const spec = (name: string) =>
+      `import { test, expect } from 'bun:test';\ntest('${name}', () => expect(1).toBe(1));\n`;
+    writeFileSync(join(root, 'tests', 'automation', 'ordinary.spec.ts'), spec('o'));
+    // a state-control-plane suite: tracked on disk but excluded from the
+    // manifest BY DESIGN (dedicated state-plane CI job, never the coordinator)
+    writeFileSync(join(root, 'tests', 'automation', 'ci-authority-hardening.spec.ts'), spec('s'));
+    for (const f of extraTracked) writeFileSync(join(root, f), spec('e'));
+    g('add -A');
+    g('-c user.email=t@t -c user.name=t commit -qm init');
+    // manifest covering only the ordinary spec, as the real generator writes it
+    const manifest = {
+      schema: 'foresift/bun-migration-manifest@1',
+      files: [{ path: 'tests/automation/ordinary.spec.ts' }],
+    };
+    writeFileSync(
+      join(root, 'evidence', 'bun-migration', 'bun-migration-manifest.json'),
+      JSON.stringify(manifest),
+    );
+    const graphPath = join(root, 'graph.json');
+    writeFileSync(
+      graphPath,
+      JSON.stringify({ schema: 'foresift/impl-task-graph@1', units: [], coordinatorUnits: [] }),
+    );
+    return { root, graphPath };
+  }
+
+  function runDuties(root: string, graphPath: string) {
+    return spawnSync(
+      process.execPath,
+      [DUTIES, '--package', 'pkg-x', '--graph', graphPath, '--root', root],
+      { encoding: 'utf8' },
+    );
+  }
+
+  it('passes coverage when only state-plane suites are absent from the manifest', () => {
+    const { root, graphPath } = initDutiesFixture([]);
+    try {
+      const r = runDuties(root, graphPath);
+      expect(`${r.status}: ${r.stderr ?? ''}`).not.toMatch(/MANIFEST_COVERAGE_MISSING/);
+      expect(r.status).toBe(0);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  }, 30000);
+
+  it('regenerates an ordinary suite missing from the manifest (no invisible tests)', () => {
+    const { root, graphPath } = initDutiesFixture(['tests/automation/evil.spec.ts']);
+    try {
+      const r = runDuties(root, graphPath);
+      expect(`${r.status}: ${r.stderr ?? ''}`).toMatch(/^0/);
+      const manifest = JSON.parse(
+        readFileSync(
+          join(root, 'evidence', 'bun-migration', 'bun-migration-manifest.json'),
+          'utf8',
+        ),
+      );
+      const paths = (manifest.files ?? []).map((f: { path: string }) => f.path);
+      expect(paths).toContain('tests/automation/evil.spec.ts');
+      expect(paths).not.toContain('tests/automation/ci-authority-hardening.spec.ts');
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  }, 30000);
+});

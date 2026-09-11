@@ -53,13 +53,13 @@ describe("AC-222 negative: dropped scope fields, single-delay evidence, and proh
 
   it("detects and rejects guaranteed-profit and risk-free language across all 4 prohibited kinds (FR-OBJ-010)", () => {
     const prohibitedPatterns = [
-      /guaranteed\s+profit/i,
-      /guaranteed\s+return/i,
+      /guaranteed.*profit/i,
+      /guaranteed.*return/i,
       /risk[- ]free/i,
-      /certain\s+return/i,
-      /100%\s+win\s+rate/i,
-      /no\s+downside/i,
-      /zero\s+loss/i,
+      /certain.*return/i,
+      /100%.*win.*rate/i,
+      /no.*downside/i,
+      /zero.*loss/i,
     ];
 
     for (const sample of languageFixture.violations) {

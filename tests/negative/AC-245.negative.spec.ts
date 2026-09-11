@@ -158,4 +158,3 @@ describe('AC-245 G1 obj-facet negative: collapsed lineage confirmation refused a
     }).toThrow();
   });
 });
-

@@ -1,11 +1,6 @@
 {
   "schema": "foresift/obj-prohibited-language-fixture@1",
-  "prohibitedKinds": [
-    "GUARANTEED_PROFIT",
-    "RISK_FREE",
-    "CERTAIN_RETURN",
-    "NO_DOWNSIDE"
-  ],
+  "prohibitedKinds": ["GUARANTEED_PROFIT", "RISK_FREE", "CERTAIN_RETURN", "NO_DOWNSIDE"],
   "violations": [
     {
       "kind": "GUARANTEED_PROFIT",

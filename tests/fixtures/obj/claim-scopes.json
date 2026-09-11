@@ -27,10 +27,7 @@
       "startInclusive": "2026-01-01T00:00:00Z",
       "endInclusive": "2026-06-30T23:59:59Z"
     },
-    "marketRegimes": [
-      "HIGH_VOLATILITY",
-      "EXPANDING_LIQUIDITY"
-    ],
+    "marketRegimes": ["HIGH_VOLATILITY", "EXPANDING_LIQUIDITY"],
     "capabilityState": "CAPABILITY_READONLY_NO_KEYS",
     "sampleSize": 15420,
     "clusterEffectiveSampleSize": 3240,

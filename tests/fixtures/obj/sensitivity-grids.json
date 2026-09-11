@@ -18,64 +18,31 @@
   "gridPoints": [
     {
       "dimension": "CAPITAL",
-      "values": [
-        "50000.00",
-        "100000.00",
-        "250000.00",
-        "500000.00"
-      ]
+      "values": ["50000.00", "100000.00", "250000.00", "500000.00"]
     },
     {
       "dimension": "NOTIONAL",
-      "values": [
-        "500.00",
-        "1000.00",
-        "2500.00",
-        "5000.00"
-      ]
+      "values": ["500.00", "1000.00", "2500.00", "5000.00"]
     },
     {
       "dimension": "CONCURRENCY",
-      "values": [
-        1,
-        5,
-        10,
-        25
-      ]
+      "values": [1, 5, 10, 25]
     },
     {
       "dimension": "ROUTE_CAPACITY",
-      "values": [
-        "10000.00",
-        "50000.00",
-        "100000.00"
-      ]
+      "values": ["10000.00", "50000.00", "100000.00"]
     },
     {
       "dimension": "ALERT_LATENCY",
-      "values": [
-        100,
-        250,
-        500,
-        1200
-      ]
+      "values": [100, 250, 500, 1200]
     },
     {
       "dimension": "EXIT_POLICY",
-      "values": [
-        "EXIT_FIXED_5M",
-        "EXIT_TRAILING_STOP",
-        "EXIT_TARGET_OR_EXPIRY"
-      ]
+      "values": ["EXIT_FIXED_5M", "EXIT_TRAILING_STOP", "EXIT_TARGET_OR_EXPIRY"]
     },
     {
       "dimension": "RISK_AVERSION_COEFFICIENT",
-      "values": [
-        "0.5",
-        "1.0",
-        "1.5",
-        "2.0"
-      ]
+      "values": ["0.5", "1.0", "1.5", "2.0"]
     }
   ]
 }

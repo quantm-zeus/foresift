@@ -166,7 +166,11 @@ describe('AC-248 G1 extension negative: power/threshold promotion-gate negative 
 
 describe('AC-248 G1 obj-facet negative: promotion blocked on insufficient counts or consumed control failures (FR-OBJ-001, FR-OBJ-006)', () => {
   it('refuses promotion when mature sample count is below threshold despite favorable point estimates (FR-OBJ-001)', () => {
-    const evaluatePromotionGate = (matureCount: number, threshold: number, pointUtility: number) => {
+    const evaluatePromotionGate = (
+      matureCount: number,
+      threshold: number,
+      pointUtility: number,
+    ) => {
       if (matureCount < threshold) {
         throw new Error('OBJ_INSUFFICIENT_MATURE_COUNTS_REFUSED');
       }
@@ -191,4 +195,3 @@ describe('AC-248 G1 obj-facet negative: promotion blocked on insufficient counts
     );
   });
 });
-

@@ -243,4 +243,3 @@ describe('AC-248 G1 obj-facet: promotion fails below mature counts / ESS / cover
     expect(runState.promotionVerdict).toBe('BLOCK');
   });
 });
-

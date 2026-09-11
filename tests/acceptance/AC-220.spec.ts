@@ -9,12 +9,12 @@
  * Inversion pair demonstrates that conservative net portfolio utility strictly
  * governs over win rate and diagnostic metrics.
  */
-import { readFileSync } from "node:fs";
-import path from "node:path";
-import { fileURLToPath } from "node:url";
-import { describe, expect, it } from "bun:test";
+import { readFileSync } from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { describe, expect, it } from 'bun:test';
 
-const FIXTURES = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../fixtures/obj");
+const FIXTURES = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../fixtures/obj');
 
 interface UtilityDecomposition {
   grossReturn: number;
@@ -79,19 +79,19 @@ function sumDecomposition(d: UtilityDecomposition): number {
   );
 }
 
-describe("AC-220: primary production objective is conservative net shadow-portfolio utility (FR-OBJ-001, FR-OBJ-004, FR-OBJ-005)", () => {
+describe('AC-220: primary production objective is conservative net shadow-portfolio utility (FR-OBJ-001, FR-OBJ-004, FR-OBJ-005)', () => {
   const fixture: UtilitySeriesFixture = JSON.parse(
-    readFileSync(path.join(FIXTURES, "utility-series.json"), "utf8")
+    readFileSync(path.join(FIXTURES, 'utility-series.json'), 'utf8'),
   );
 
-  it("reconciles twelve decomposition lines exactly to net utility (FR-OBJ-004)", () => {
+  it('reconciles twelve decomposition lines exactly to net utility (FR-OBJ-004)', () => {
     const { highWinRateNegativeUtility, lowerWinRatePositiveUtility } = fixture.inversionPair;
 
     expect(sumDecomposition(highWinRateNegativeUtility.decomposition)).toBe(
-      highWinRateNegativeUtility.netUtility
+      highWinRateNegativeUtility.netUtility,
     );
     expect(sumDecomposition(lowerWinRatePositiveUtility.decomposition)).toBe(
-      lowerWinRatePositiveUtility.netUtility
+      lowerWinRatePositiveUtility.netUtility,
     );
 
     for (const item of fixture.series) {
@@ -99,13 +99,17 @@ describe("AC-220: primary production objective is conservative net shadow-portfo
     }
   });
 
-  it("proves win-rate-vs-utility inversion: higher utility policy outranks higher win rate (FR-OBJ-001, FR-OBJ-005)", () => {
+  it('proves win-rate-vs-utility inversion: higher utility policy outranks higher win rate (FR-OBJ-001, FR-OBJ-005)', () => {
     const { highWinRateNegativeUtility, lowerWinRatePositiveUtility } = fixture.inversionPair;
 
     // High win rate run has superior diagnostic metrics
     expect(highWinRateNegativeUtility.winRate).toBeGreaterThan(lowerWinRatePositiveUtility.winRate);
-    expect(highWinRateNegativeUtility.precision).toBeGreaterThan(lowerWinRatePositiveUtility.precision);
-    expect(highWinRateNegativeUtility.tradableSuccessRate).toBeGreaterThan(lowerWinRatePositiveUtility.tradableSuccessRate);
+    expect(highWinRateNegativeUtility.precision).toBeGreaterThan(
+      lowerWinRatePositiveUtility.precision,
+    );
+    expect(highWinRateNegativeUtility.tradableSuccessRate).toBeGreaterThan(
+      lowerWinRatePositiveUtility.tradableSuccessRate,
+    );
 
     // But net utility and LCB utility per capital-day are negative
     expect(highWinRateNegativeUtility.netUtilityPerCapitalDay).toBeLessThan(0);
@@ -117,15 +121,15 @@ describe("AC-220: primary production objective is conservative net shadow-portfo
 
     // Governance ranking strictly orders by conservative LCB utility per capital day
     expect(lowerWinRatePositiveUtility.lcbUtilityPerCapitalDay).toBeGreaterThan(
-      highWinRateNegativeUtility.lcbUtilityPerCapitalDay
+      highWinRateNegativeUtility.lcbUtilityPerCapitalDay,
     );
   });
 
-  it("computes conservative lower confidence bound with pinned normal constant (FR-OBJ-001)", () => {
+  it('computes conservative lower confidence bound with pinned normal constant (FR-OBJ-001)', () => {
     const { lowerWinRatePositiveUtility } = fixture.inversionPair;
     // Lower bound must be strictly conservative (less than point estimate)
     expect(lowerWinRatePositiveUtility.lcbUtilityPerCapitalDay).toBeLessThan(
-      lowerWinRatePositiveUtility.netUtilityPerCapitalDay
+      lowerWinRatePositiveUtility.netUtilityPerCapitalDay,
     );
     expect(lowerWinRatePositiveUtility.lcbUtilityPerCapitalDay).toBeGreaterThan(0);
   });

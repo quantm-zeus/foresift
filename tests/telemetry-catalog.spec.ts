@@ -1198,4 +1198,3 @@ describe('telemetry/obj.catalog.json parity with authoritative schemas (T026, FR
     });
   }
 });
-

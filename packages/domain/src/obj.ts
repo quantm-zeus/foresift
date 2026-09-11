@@ -191,18 +191,13 @@ function parseClosed<T extends string>(
   label: string,
 ): T {
   if (typeof value === 'string' && (values as readonly string[]).includes(value)) return value as T;
-  throw new ObjError(
-    code,
-    `unknown ${label}`,
-    { value: typeof value === 'string' ? value : null },
-  );
+  throw new ObjError(code, `unknown ${label}`, { value: typeof value === 'string' ? value : null });
 }
 
 export const ALL_COMPARISON_DIMENSIONS: readonly ComparisonDimension[] =
   Object.values(ComparisonDimension);
 export const COMPARISON_DIMENSIONS = ALL_COMPARISON_DIMENSIONS;
-export const ALL_RUN_COMPARABILITIES: readonly RunComparability[] =
-  Object.values(RunComparability);
+export const ALL_RUN_COMPARABILITIES: readonly RunComparability[] = Object.values(RunComparability);
 export const RUN_COMPARABILITIES = ALL_RUN_COMPARABILITIES;
 export const ALL_HARD_CONSTRAINT_KINDS: readonly HardConstraintKind[] =
   Object.values(HardConstraintKind);
@@ -217,8 +212,7 @@ export const DIAGNOSTIC_KINDS = ALL_DIAGNOSTIC_KINDS;
 export const ALL_INTEGRITY_SIGNAL_KINDS: readonly IntegritySignalKind[] =
   Object.values(IntegritySignalKind);
 export const INTEGRITY_SIGNAL_KINDS = ALL_INTEGRITY_SIGNAL_KINDS;
-export const ALL_INTEGRITY_VERDICTS: readonly IntegrityVerdict[] =
-  Object.values(IntegrityVerdict);
+export const ALL_INTEGRITY_VERDICTS: readonly IntegrityVerdict[] = Object.values(IntegrityVerdict);
 export const INTEGRITY_VERDICTS = ALL_INTEGRITY_VERDICTS;
 export const ALL_CLAIM_SCOPE_FIELDS: readonly ClaimScopeField[] = Object.values(ClaimScopeField);
 export const CLAIM_SCOPE_FIELDS = ALL_CLAIM_SCOPE_FIELDS;
@@ -230,18 +224,32 @@ export const SENSITIVITY_DIMENSIONS = ALL_SENSITIVITY_DIMENSIONS;
 export const ALL_PROHIBITED_CLAIM_KINDS: readonly ProhibitedClaimKind[] =
   Object.values(ProhibitedClaimKind);
 export const PROHIBITED_CLAIM_KINDS = ALL_PROHIBITED_CLAIM_KINDS;
-export const ALL_PROMOTION_VERDICTS: readonly PromotionVerdict[] =
-  Object.values(PromotionVerdict);
+export const ALL_PROMOTION_VERDICTS: readonly PromotionVerdict[] = Object.values(PromotionVerdict);
 export const PROMOTION_VERDICTS = ALL_PROMOTION_VERDICTS;
 export const ALL_OBJ_ERROR_CODES: readonly ObjErrorCode[] = Object.values(ObjErrorCode);
 export const OBJ_ERROR_CODES = ALL_OBJ_ERROR_CODES;
 
 export const parseComparisonDimension = (value: unknown): ComparisonDimension =>
-  parseClosed(ALL_COMPARISON_DIMENSIONS, value, ObjErrorCode.OBJ_DIMENSION_UNKNOWN, 'comparison dimension');
+  parseClosed(
+    ALL_COMPARISON_DIMENSIONS,
+    value,
+    ObjErrorCode.OBJ_DIMENSION_UNKNOWN,
+    'comparison dimension',
+  );
 export const parseRunComparability = (value: unknown): RunComparability =>
-  parseClosed(ALL_RUN_COMPARABILITIES, value, ObjErrorCode.OBJ_COMPARABILITY_UNKNOWN, 'run comparability');
+  parseClosed(
+    ALL_RUN_COMPARABILITIES,
+    value,
+    ObjErrorCode.OBJ_COMPARABILITY_UNKNOWN,
+    'run comparability',
+  );
 export const parseHardConstraintKind = (value: unknown): HardConstraintKind =>
-  parseClosed(ALL_HARD_CONSTRAINT_KINDS, value, ObjErrorCode.OBJ_CONSTRAINT_KIND_UNKNOWN, 'hard constraint kind');
+  parseClosed(
+    ALL_HARD_CONSTRAINT_KINDS,
+    value,
+    ObjErrorCode.OBJ_CONSTRAINT_KIND_UNKNOWN,
+    'hard constraint kind',
+  );
 export const parseHardConstraintVerdict = (value: unknown): HardConstraintVerdict =>
   parseClosed(
     ALL_HARD_CONSTRAINT_VERDICTS,
@@ -250,9 +258,19 @@ export const parseHardConstraintVerdict = (value: unknown): HardConstraintVerdic
     'hard constraint verdict',
   );
 export const parseUtilityLineKind = (value: unknown): UtilityLineKind =>
-  parseClosed(ALL_UTILITY_LINE_KINDS, value, ObjErrorCode.OBJ_LINE_KIND_UNKNOWN, 'utility line kind');
+  parseClosed(
+    ALL_UTILITY_LINE_KINDS,
+    value,
+    ObjErrorCode.OBJ_LINE_KIND_UNKNOWN,
+    'utility line kind',
+  );
 export const parseDiagnosticKind = (value: unknown): DiagnosticKind =>
-  parseClosed(ALL_DIAGNOSTIC_KINDS, value, ObjErrorCode.OBJ_DIAGNOSTIC_KIND_UNKNOWN, 'diagnostic kind');
+  parseClosed(
+    ALL_DIAGNOSTIC_KINDS,
+    value,
+    ObjErrorCode.OBJ_DIAGNOSTIC_KIND_UNKNOWN,
+    'diagnostic kind',
+  );
 export const parseIntegritySignal = (value: unknown): IntegritySignalKind =>
   parseClosed(
     ALL_INTEGRITY_SIGNAL_KINDS,
@@ -274,9 +292,19 @@ export const parseIntegrityVerdict = (value: unknown): IntegrityVerdict =>
     'integrity verdict',
   );
 export const parseClaimScopeField = (value: unknown): ClaimScopeField =>
-  parseClosed(ALL_CLAIM_SCOPE_FIELDS, value, ObjErrorCode.OBJ_CLAIM_FIELD_UNKNOWN, 'claim scope field');
+  parseClosed(
+    ALL_CLAIM_SCOPE_FIELDS,
+    value,
+    ObjErrorCode.OBJ_CLAIM_FIELD_UNKNOWN,
+    'claim scope field',
+  );
 export const parseDelayScenario = (value: unknown): DelayScenario =>
-  parseClosed(ALL_DELAY_SCENARIOS, value, ObjErrorCode.OBJ_DELAY_SCENARIO_UNKNOWN, 'delay scenario');
+  parseClosed(
+    ALL_DELAY_SCENARIOS,
+    value,
+    ObjErrorCode.OBJ_DELAY_SCENARIO_UNKNOWN,
+    'delay scenario',
+  );
 export const parseSensitivityDimension = (value: unknown): SensitivityDimension =>
   parseClosed(
     ALL_SENSITIVITY_DIMENSIONS,
@@ -389,25 +417,37 @@ export function hardConstraintsPrecedeUtility(
 /** Ceiling division for positive divisors; the single rounding step of the LCB core. */
 export function ceilDiv(dividend: bigint, divisor: bigint): bigint {
   if (divisor <= 0n)
-    throw new ObjError(ObjErrorCode.OBJ_FLOAT_ARITHMETIC_REFUSED, 'division requires a positive divisor', {
-      divisor: divisor.toString(),
-    });
+    throw new ObjError(
+      ObjErrorCode.OBJ_FLOAT_ARITHMETIC_REFUSED,
+      'division requires a positive divisor',
+      {
+        divisor: divisor.toString(),
+      },
+    );
   return dividend >= 0n ? (dividend + divisor - 1n) / divisor : dividend / divisor;
 }
 
 /** Floor division for positive divisors (bigint `/` truncates toward zero, which is wrong for negatives). */
 export function floorDiv(dividend: bigint, divisor: bigint): bigint {
   if (divisor <= 0n)
-    throw new ObjError(ObjErrorCode.OBJ_FLOAT_ARITHMETIC_REFUSED, 'division requires a positive divisor', {
-      divisor: divisor.toString(),
-    });
+    throw new ObjError(
+      ObjErrorCode.OBJ_FLOAT_ARITHMETIC_REFUSED,
+      'division requires a positive divisor',
+      {
+        divisor: divisor.toString(),
+      },
+    );
   return dividend >= 0n ? dividend / divisor : -ceilDiv(-dividend, divisor);
 }
 
 /** Integer square root, floored. Binary search — no binary floating point in the objective path. */
 export function isqrtFloor(value: bigint): bigint {
   if (value < 0n)
-    throw new ObjError(ObjErrorCode.OBJ_FLOAT_ARITHMETIC_REFUSED, 'square root requires a non-negative value', {});
+    throw new ObjError(
+      ObjErrorCode.OBJ_FLOAT_ARITHMETIC_REFUSED,
+      'square root requires a non-negative value',
+      {},
+    );
   if (value < 2n) return value;
   let low = 1n;
   let high = value;
@@ -500,22 +540,33 @@ export function decompositionReconciles(lines: UtilityLines, netMicros: number |
 }
 
 /** Asserting form of `decompositionReconciles`. */
-export function assertDecompositionReconciles(lines: UtilityLines, netMicros: number | bigint): void {
+export function assertDecompositionReconciles(
+  lines: UtilityLines,
+  netMicros: number | bigint,
+): void {
   for (const kind of ALL_UTILITY_LINE_KINDS) {
     const line = lines[kind];
     if (typeof line !== 'bigint' && !Number.isSafeInteger(line))
-      throw new ObjError(ObjErrorCode.OBJ_FLOAT_ARITHMETIC_REFUSED, 'utility line must be integer micro-units', {
-        kind,
-      });
+      throw new ObjError(
+        ObjErrorCode.OBJ_FLOAT_ARITHMETIC_REFUSED,
+        'utility line must be integer micro-units',
+        {
+          kind,
+        },
+      );
   }
   const net = assertIntegerMicros(netMicros, 'netMicros');
   let total = 0n;
   for (const kind of ALL_UTILITY_LINE_KINDS) total += BigInt(lines[kind] as number | bigint);
   if (total !== net)
-    throw new ObjError(ObjErrorCode.OBJ_CLAIM_SCOPE_INCOMPLETE, 'decomposition lines do not reconcile to net', {
-      total: total.toString(),
-      net: net.toString(),
-    });
+    throw new ObjError(
+      ObjErrorCode.OBJ_CLAIM_SCOPE_INCOMPLETE,
+      'decomposition lines do not reconcile to net',
+      {
+        total: total.toString(),
+        net: net.toString(),
+      },
+    );
 }
 
 /**

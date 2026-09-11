@@ -299,4 +299,3 @@ describe('AC-245 G1 obj-facet: lineage-collapse sensitivity and independent conf
     expect(diagnosticCount).toBe(21);
   });
 });
-

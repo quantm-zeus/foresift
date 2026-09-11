@@ -1,10 +1,6 @@
 {
   "schema": "foresift/obj-delay-distributions-fixture@1",
-  "scenarios": [
-    "P50",
-    "P90",
-    "CONSERVATIVE_TAIL"
-  ],
+  "scenarios": ["P50", "P90", "CONSERVATIVE_TAIL"],
   "validRobustDistribution": {
     "distributionId": "delay-dist-standard-sol",
     "scenarios": {

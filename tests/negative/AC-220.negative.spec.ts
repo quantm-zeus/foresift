@@ -7,19 +7,17 @@
  * - Non-reconciling decomposition lines are rejected
  * - Floating point inputs rejected on the objective integer-micros path
  */
-import { describe, expect, it } from "bun:test";
-import { readFileSync } from "node:fs";
-import path from "node:path";
-import { fileURLToPath } from "node:url";
+import { describe, expect, it } from 'bun:test';
+import { readFileSync } from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 
-const FIXTURES = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../fixtures/obj");
+const FIXTURES = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../fixtures/obj');
 
-describe("AC-220 negative: diagnostics cannot govern and non-reconciling ledgers are refused", () => {
-  const fixture = JSON.parse(
-    readFileSync(path.join(FIXTURES, "utility-series.json"), "utf8")
-  );
+describe('AC-220 negative: diagnostics cannot govern and non-reconciling ledgers are refused', () => {
+  const fixture = JSON.parse(readFileSync(path.join(FIXTURES, 'utility-series.json'), 'utf8'));
 
-  it("refuses promotion when LCB utility is negative despite high diagnostic win rate (FR-OBJ-001, FR-OBJ-005)", () => {
+  it('refuses promotion when LCB utility is negative despite high diagnostic win rate (FR-OBJ-001, FR-OBJ-005)', () => {
     const highWinRateRun = fixture.inversionPair.highWinRateNegativeUtility;
     expect(highWinRateRun.winRate).toBe(0.85);
     expect(highWinRateRun.lcbUtilityPerCapitalDay).toBeLessThan(0);
@@ -29,7 +27,7 @@ describe("AC-220 negative: diagnostics cannot govern and non-reconciling ledgers
     expect(isEligibleForPromotion).toBe(false);
   });
 
-  it("detects and rejects non-reconciling line item totals (FR-OBJ-004)", () => {
+  it('detects and rejects non-reconciling line item totals (FR-OBJ-004)', () => {
     const invalidDecomposition = {
       grossReturn: 10000000,
       executionCost: -1000000,
@@ -42,7 +40,7 @@ describe("AC-220 negative: diagnostics cannot govern and non-reconciling ledgers
       concentration: -200000,
       sharedLiquidityImpact: -400000,
       providerInfrastructureCost: -200000,
-      uncertaintyHaircut: -400000
+      uncertaintyHaircut: -400000,
     };
     const claimedNetUtility = 99999999; // intentionally mismatched
     const actualSum = Object.values(invalidDecomposition).reduce((a, b) => a + b, 0);
@@ -52,7 +50,7 @@ describe("AC-220 negative: diagnostics cannot govern and non-reconciling ledgers
     expect(reconciles).toBe(false);
   });
 
-  it("refuses zero or negative capital-day denominators", () => {
+  it('refuses zero or negative capital-day denominators', () => {
     const invalidDenominators = [0, -10, -100];
     for (const d of invalidDenominators) {
       const isValid = d > 0;

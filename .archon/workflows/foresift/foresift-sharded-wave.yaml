@@ -778,16 +778,7 @@ nodes:
       if [ "$dispatched" -eq 0 ] && [ "$integrated" -eq 0 ]; then
         # Empty-wave coordinator tail (directive §8, zero AI): every lane was
         # sentinel-skipped, so the only remaining work can be coordinator-owned
-        # (verification/artifact/already-satisfied duties). Run the deterministic
-        # evidence-owner pass; if it closes the LAST open task, the package is
-        # genuinely complete with an empty diff — settle/land proceed and the
-        # FULL gate at package-final-land re-verifies everything. Open tasks
-        # remaining means progress halted: fail the node (exit 90) so the
-        # supervisor decides, exactly like a dispatched-but-unintegrated wave.
-        node scripts/automation/evidence-owner-registry.mjs \
-          --package "$PKG" \
-          --graph "$ARTIFACTS_DIR/task-graph.json" \
-          > "$ARTIFACTS_DIR/evidence-owner-report.json" 2>&1 || true
+        # (verification/artifact/already-satisfied duties).
         open=$(grep -c '^- \[ \] ' "specs/$PKG/tasks.md" || true)
         if [ "${open:-0}" -eq 0 ]; then
           printf '{"schema":"foresift/wave-fast-verdict@1","exitCode":0,"reason":"empty_wave_coordinator_tail_complete"}\n' \
@@ -795,7 +786,60 @@ nodes:
           echo "WAVE_FAST_GREEN"
           exit 0
         fi
-        echo "empty wave with $open open task(s) the coordinator tail cannot close; report: $ARTIFACTS_DIR/evidence-owner-report.json" \
+        # Coordinator-only remainder bypass (runs 4e59191b/533b6214,
+        # 2026-09-10/11, zero AI/provider dispatch): when EVERY open unit is
+        # coordinator-owned — [executor: COORDINATOR] or non-file evidence
+        # (VERIFICATION_ONLY / COORDINATOR_ARTIFACT / NO_OP_ALREADY_SATISFIED)
+        # — there is no writer work to dispatch, so integration_empty must
+        # NEVER fire. Run the FULL coordinator-completion sequence in FAST
+        # order, all deterministic: duties (manifest regen + manifest-write
+        # unit completion), then the REAL FAST verdict on the canonical tree,
+        # then the evidence-owner pass (flips VERIFICATION_ONLY units on
+        # green FAST). The honest FAST token routes afterward: GREEN proceeds
+        # to settle/land, RED routes to the bounded repair loop. A remainder
+        # containing writer-owned units still halts exit 90 below (writers
+        # genuinely needed — the supervisor owns the replay).
+        coord_only=$(node -e '
+          const g = require(process.env.ARTIFACTS_DIR + "/task-graph.json");
+          const openUnits = (g.units ?? []).filter((u) => !u.done);
+          const owned = openUnits.filter((u) => u.executor === "COORDINATOR" || ["VERIFICATION_ONLY", "COORDINATOR_ARTIFACT", "NO_OP_ALREADY_SATISFIED"].includes(u.evidence));
+          console.log(openUnits.length > 0 && owned.length === openUnits.length ? "yes" : "no");
+        ')
+        if [ "$coord_only" = "yes" ]; then
+          if ! node scripts/automation/wave-coordinator-duties.mjs \
+            --package "$PKG" \
+            --graph "$ARTIFACTS_DIR/task-graph.json" \
+            > "$ARTIFACTS_DIR/coordinator-duties-report.json" 2>&1; then
+            echo "coordinator duties FAILED; report: $ARTIFACTS_DIR/coordinator-duties-report.json" >&2
+            printf '{"schema":"foresift/wave-fast-verdict@1","exitCode":1,"reason":"coordinator_remainder_duties_red"}\n' \
+              > "$ARTIFACTS_DIR/wave-fast-verdict.json"
+            echo "WAVE_FAST_RED"
+            exit 0
+          fi
+          set +e
+          node scripts/automation/package-fast-verify.mjs --package "$PKG" \
+            --artifacts-dir "$ARTIFACTS_DIR" \
+            --from-git --base "$(cat "$ARTIFACTS_DIR/base-head.txt")" \
+            > "$ARTIFACTS_DIR/wave-fast.log" 2>&1
+          code=$?
+          printf '{"schema":"foresift/wave-fast-verdict@1","exitCode":%d,"reason":"coordinator_remainder_fast"}\n' "$code" \
+            > "$ARTIFACTS_DIR/wave-fast-verdict.json"
+          if [ "$code" -eq 0 ]; then
+            node scripts/automation/evidence-owner-registry.mjs \
+              --package "$PKG" \
+              --graph "$ARTIFACTS_DIR/task-graph.json" \
+              > "$ARTIFACTS_DIR/evidence-owner-report.json" 2>&1 || true
+            open=$(grep -c '^- \[ \] ' "specs/$PKG/tasks.md" || true)
+            if [ "${open:-0}" -eq 0 ]; then
+              echo "WAVE_FAST_GREEN"
+              exit 0
+            fi
+            echo "coordinator remainder: FAST green but $open task(s) still open; report: $ARTIFACTS_DIR/evidence-owner-report.json" >&2
+          fi
+          echo "WAVE_FAST_RED"
+          exit 0
+        fi
+        echo "empty wave with $open open task(s) including writer-owned work the coordinator tail cannot close; report: $ARTIFACTS_DIR/evidence-owner-report.json" \
           > "$ARTIFACTS_DIR/wave-integration-empty.log" 2>&1
         printf '{"schema":"foresift/wave-fast-verdict@1","exitCode":90,"reason":"empty_wave_open_tasks"}\n' \
           > "$ARTIFACTS_DIR/wave-fast-verdict.json"

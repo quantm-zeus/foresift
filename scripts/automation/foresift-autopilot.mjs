@@ -1700,10 +1700,50 @@ async function actOnEntry(st, entry) {
  * Supervised handling of a paused tracked entry. Fatal pauses are strictly
  * operator-gated (`--recover-fatal`); quota pauses own a bounded probe schedule
  * of widely spaced `workflow resume` calls — never busy-looping a daily wall.
+ * Durable-success preemption (live 2026-09-11, run ad794228): a quota pause
+ * exists to eventually RESUME the run so its package can land. Once the
+ * package is already PROVEN on committed main, resuming a terminal run
+ * resurrects dead provider spend against proven truth — retire the stale
+ * entry instead (same law as case C for fatal pauses, extended to quota).
  */
+export function retireQuotaPauseOnDurableProven(st, entry, deps = {}) {
+  if (entry.paused !== 'quota' || entry.done) return false;
+  if (!entry.packageId) return false;
+  const loadMilestone = deps.loadMilestone ?? (() => loadCurrentMilestone(REPO));
+  const findRunRow = deps.findRunRow ?? findRecentRunRow;
+  const recordEvent = deps.record ?? record;
+  let ms;
+  try {
+    ms = loadMilestone();
+  } catch {
+    return false; // implementation state unreadable: no opinion (fail-safe)
+  }
+  const pkg = ms && ms.packages.find((p) => p.id === entry.packageId);
+  if (!pkg || pkg.status !== 'PROVEN') return false; // not durably proven: quota schedule keeps its normal behavior
+  // Correlation identity under the package's CURRENT milestone generation.
+  // The entry's own workflow/message may predate a generation flip; the
+  // milestone-committed identity is authoritative (V3 §6).
+  const ident = launchIdentity(pkg);
+  if (!ident.workflow || !ident.message) return false;
+  // A live sibling run for the same package still owns the work — never
+  // retire while one exists (fail-closed against double-tracking).
+  const row = findRunRow(ident.workflow, ident.message);
+  if (row && ['running', 'pending'].includes(String(row.status))) return false;
+  releasePackageRuntime(STATE_DIR, entry);
+  entry.done = true;
+  entry.note = 'quota_pause_retired_durable_proven';
+  recordEvent(st, 'quota_pause_retired_durable_proven', {
+    packageId: entry.packageId,
+    runId: entry.runId ?? null,
+    liveRowStatus: row ? String(row.status) : null,
+  });
+  return true;
+}
+
 function actOnPausedEntry(st, entry) {
   if (entry.paused === 'fatal') return; // only --recover-fatal may act
   if (entry.paused !== 'quota') return;
+  if (retireQuotaPauseOnDurableProven(st, entry)) return; // durable PROVEN retires before any probe/resume
   if (!entry.quotaNextProbeAt || now() < entry.quotaNextProbeAt) return;
   if ((entry.quotaProbes ?? 0) >= QUOTA_PROBE_LIMIT) {
     escalatePausedQuota(st, entry, `daily-quota probe budget (${QUOTA_PROBE_LIMIT}) exhausted`);

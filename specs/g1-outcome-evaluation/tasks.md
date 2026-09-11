@@ -642,7 +642,7 @@ then fixtures and AC suites, then telemetry and gates.
       central telemetry parity suite is extended by the test-owned task T035
       in the same package — the plan-sanctioned central-parity scope
       exception. Traces: FR-MAT-001…012, FR-EVAL-001…009.
-- [ ] T038 [executor: COORDINATOR] [evidence: VERIFICATION_ONLY] Run the
+- [x] T038 [executor: COORDINATOR] [evidence: VERIFICATION_ONLY] Run the
       milestone verification commands on the canonical tree: `test -d
 packages/outcome-maturity && pnpm --filter @foresift/outcome-maturity test`;
       `test -d packages/evaluation && pnpm --filter @foresift/evaluation
@@ -661,7 +661,7 @@ evidence/bun-migration/bun-migration-manifest.json`) after all new test
       contract). Mechanical bookkeeping (ADR-0020: coordinator-owned,
       zero-AI). Traces: FR-MAT-001…012, FR-EVAL-001…009 (verification
       substrate for every assigned requirement).
-- [ ] T040 [executor: COORDINATOR] [evidence: VERIFICATION_ONLY] Run the full
+- [x] T040 [executor: COORDINATOR] [evidence: VERIFICATION_ONLY] Run the full
       aggregate gate `pnpm verify` and the integrity gate `pnpm spec:verify`
       at the pushed HEAD; require green (the complete Bun suite runs ONLY
       through the coordinator — never a bare `bun test` over the tree). If

@@ -1,8 +1,12 @@
 /** G1-owned objective/opportunity output language policy (FR-OBJ-010). */
-import { ObjError, ObjErrorCode, ProhibitedClaimKind } from '@foresift/domain';
+import {
+  ObjError,
+  ObjErrorCode,
+  ProhibitedClaimKind,
+  UNCERTAINTY_DISCLOSURE_TEXT,
+} from '@foresift/domain';
 
-export const OBJECTIVE_UNCERTAINTY_DISCLOSURE =
-  'Opportunity outputs are evidence-backed research signals whose realized outcome remains uncertain.';
+export const OBJECTIVE_UNCERTAINTY_DISCLOSURE = UNCERTAINTY_DISCLOSURE_TEXT;
 
 export type ObjectiveOutputKind = 'OBJECTIVE_CLAIM' | 'OPPORTUNITY_OUTPUT';
 
@@ -21,25 +25,26 @@ export interface ObjectiveLanguageScreen {
 
 const CLAIM_PATTERNS: Readonly<Record<ProhibitedClaimKind, readonly RegExp[]>> = Object.freeze({
   [ProhibitedClaimKind.GUARANTEED_PROFIT]: [
-    /\bguarantee(?:d|s)?[\s-]+profit(?:s)?\b/iu,
-    /\bprofit(?:s)?[\s-]+(?:is|are)[\s-]+guaranteed\b/iu,
+    /\bguarantee(?:d|s)?[\s-]+(?:[0-9]+x?[\s-]+)?(?:profit|returns?|gains?)\b/iu,
+    /\b(?:profit|returns?|gains?)[\s-]+(?:is|are)[\s-]+guaranteed\b/iu,
   ],
   [ProhibitedClaimKind.ASSURED_RETURN]: [
     /\bassured[\s-]+returns?\b/iu,
     /\breturns?[\s-]+(?:is|are)[\s-]+assured\b/iu,
   ],
   [ProhibitedClaimKind.RISK_FREE_PROFIT]: [
-    /\brisk[\s-]*free[\s-]+profits?\b/iu,
-    /\bprofits?[\s-]+without[\s-]+risk\b/iu,
+    /\brisk[\s-]*free(?:[\s-]+(?:profit|returns?|gains?|arbitrage))?\b/iu,
+    /\b(?:profit|returns?|gains?)[\s-]+without[\s-]+risk\b/iu,
   ],
   [ProhibitedClaimKind.CERTAIN_GAIN]: [
-    /\bcertain[\s-]+gains?\b/iu,
-    /\bgains?[\s-]+(?:is|are)[\s-]+certain\b/iu,
+    /\bcertain[\s-]+(?:gains?|returns?|profit)\b/iu,
+    /\b(?:gains?|returns?|profit)[\s-]+(?:is|are)[\s-]+certain\b/iu,
+    /\b(?:profit|return|gain|win[\s-]*rate)[\s-]+certainty\b/iu,
   ],
 });
 
 function disclosureMatches(value: string | null | undefined): boolean {
-  return value?.trim() === OBJECTIVE_UNCERTAINTY_DISCLOSURE;
+  return value?.includes(OBJECTIVE_UNCERTAINTY_DISCLOSURE) === true;
 }
 
 /** Deterministically classify all prohibited claim kinds present in text. */
@@ -76,16 +81,16 @@ export function assertObjectiveLanguage(
   const screen = screenObjectiveLanguage(input);
   if (screen.prohibitedClaimKinds.length > 0) {
     throw new ObjError(
+      ObjErrorCode.OBJ_GUARANTEED_LANGUAGE_REFUSED,
       'guaranteed-profit language is prohibited',
       { prohibitedClaimKinds: screen.prohibitedClaimKinds.join(',') },
-      ObjErrorCode.OBJ_GUARANTEED_LANGUAGE_REFUSED,
     );
   }
   if (!screen.disclosureAttached) {
     throw new ObjError(
+      ObjErrorCode.OBJ_UNCERTAINTY_DISCLOSURE_MISSING,
       'opportunity output uncertainty disclosure is missing',
       { outputKind: input.outputKind },
-      ObjErrorCode.OBJ_UNCERTAINTY_DISCLOSURE_MISSING,
     );
   }
   return screen;

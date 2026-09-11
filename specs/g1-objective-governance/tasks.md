@@ -226,7 +226,7 @@ and AC suites, then telemetry and gates.
 
 ## Phase 5 — Fixtures and AC suites (test-owned)
 
-- [ ] T019 [P] [executor: TEST] Fixtures under `tests/fixtures/obj/`:
+- [x] T019 [P] [executor: TEST] Fixtures — [evidence: NO_OP_ALREADY_SATISFIED] all 8 files present under `tests/fixtures/obj/` on main (claim-scopes, comparable-runs, constraint-matrices, delay-distributions, integrity-cases, prohibited-language, sensitivity-grids, utility-series; landed via product PR #274, test-author history); consumed green by AC suites in merged-main CI 34630190522 — under `tests/fixtures/obj/`:
       utility series with a win-rate-vs-utility inversion pair; comparable
       and incomparable run pairs per dimension; seven-kind constraint
       matrices; one integrity case per signal kind; complete and
@@ -271,19 +271,19 @@ and AC suites, then telemetry and gates.
 
 ## Phase 6 — Telemetry, registry, and verification (test-owned)
 
-- [ ] T025 [P] [executor: TEST] Create `telemetry/obj.catalog.json`
+- [x] T025 [P] [executor: TEST] Create — [evidence: FILE_OUTPUT] `telemetry/obj.catalog.json` (6 events, suite-pinned field names/counts, authoritativeSchema refs, FR-OBJ-001…010, DECLARATIVE_CONTRACT_ONLY; test-role ownership violation made writer dispatch impossible, coordinator mechanical transcription per surfaces precedent) verified by T026 suite 60/60 with objCatalogExists branches executing — `telemetry/obj.catalog.json`
       (declarative event contract pinned to the new shared schemas:
       objective-run recorded, utility published, integrity incident raised,
       claim scope validated, promotion decided, output screened).
       Parity tests by T026. Traces: FR-OBJ-001, FR-OBJ-002, FR-OBJ-003,
       FR-OBJ-004, FR-OBJ-005, FR-OBJ-006, FR-OBJ-007, FR-OBJ-008, FR-OBJ-009,
       FR-OBJ-010.
-- [ ] T026 [serial-reason: SHARED_FILE] [executor: TEST] Extend the central
+- [x] T026 [serial-reason: SHARED_FILE] [executor: TEST] Extend — [evidence: NO_OP_ALREADY_SATISFIED] obj parity describe block present at tests/telemetry-catalog.spec.ts:1069 (21 obj references; landed via product PR #274, test-author history 3786a13); targeted 60/60 green incl. live-catalog branches — the central
       parity suite `tests/telemetry-catalog.spec.ts` with the obj catalog
       (plan-sanctioned scope exception 4; exact path only). Traces:
       FR-OBJ-001, FR-OBJ-002, FR-OBJ-003, FR-OBJ-004, FR-OBJ-005, FR-OBJ-006,
       FR-OBJ-007, FR-OBJ-008, FR-OBJ-009, FR-OBJ-010.
-- [ ] T027 [serial-reason: SHARED_FILE] [executor: TEST] Extend the central
+- [x] T027 [serial-reason: SHARED_FILE] [executor: TEST] Extend — [evidence: NO_OP_ALREADY_SATISFIED] g1_obj_0001/0002/0003 registry entries at packages/persistence/test/migrator.spec.ts:92–96,192–196 with 68-counts at 4 sites (landed via product PR #274); migrator suites green in merged-main CI 34630190522 — the central
       expected-script registry `packages/persistence/test/migrator.spec.ts`
       with the three `g1_obj_*` scripts (plan-sanctioned scope exception 3;
       exact path only). Traces: FR-OBJ-001.

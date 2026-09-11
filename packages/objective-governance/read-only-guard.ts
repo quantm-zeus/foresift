@@ -86,9 +86,7 @@ export function scanObjectiveGovernanceSources(
   return findings;
 }
 
-export function assertObjectiveGovernanceReadOnly(
-  sources: Readonly<Record<string, string>>,
-): void {
+export function assertObjectiveGovernanceReadOnly(sources: Readonly<Record<string, string>>): void {
   const findings = scanObjectiveGovernanceSources(sources);
   if (findings.length > 0)
     throw new Error(`OBJ_GOVERNANCE_READ_ONLY_VIOLATION:${JSON.stringify(findings)}`);
@@ -103,12 +101,11 @@ export interface ObjGovernanceReadOnlyAttestation {
   readonly objectivePathFloatFree: true;
 }
 
-export const objectiveGovernanceReadOnlyAttestation =
-  (): ObjGovernanceReadOnlyAttestation => ({
-    constructsTransactions: false,
-    submitsTransactions: false,
-    signsTransactions: false,
-    holdsCustody: false,
-    invokesModelsOrAgents: false,
-    objectivePathFloatFree: true,
-  });
+export const objectiveGovernanceReadOnlyAttestation = (): ObjGovernanceReadOnlyAttestation => ({
+  constructsTransactions: false,
+  submitsTransactions: false,
+  signsTransactions: false,
+  holdsCustody: false,
+  invokesModelsOrAgents: false,
+  objectivePathFloatFree: true,
+});

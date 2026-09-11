@@ -51,7 +51,11 @@ export interface DecompositionReport {
  */
 export function buildDecompositionReport(input: DecompositionInput): DecompositionReport {
   if (input.runId.length === 0)
-    throw new ObjError(ObjErrorCode.OBJ_DIMENSION_UNKNOWN, 'decomposition report requires a run id', {});
+    throw new ObjError(
+      ObjErrorCode.OBJ_DIMENSION_UNKNOWN,
+      'decomposition report requires a run id',
+      {},
+    );
   if (input.consumedEssReference.length === 0)
     throw new ObjError(
       ObjErrorCode.OBJ_UNCERTAINTY_DISCLOSURE_MISSING,

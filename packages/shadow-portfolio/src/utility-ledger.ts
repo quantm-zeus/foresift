@@ -45,7 +45,9 @@ export interface CapitalDayUtility {
 }
 
 /** Natural-key identity of a fill version: reruns of the same key are idempotent. */
-export function fillNaturalKey(fill: Pick<VersionedFill, 'runId' | 'capitalDay' | 'fillId'>): string {
+export function fillNaturalKey(
+  fill: Pick<VersionedFill, 'runId' | 'capitalDay' | 'fillId'>,
+): string {
   return `${fill.runId}|${fill.capitalDay}|${fill.fillId}`;
 }
 
@@ -84,9 +86,13 @@ export function mergeFillVersions(
   const merged = new Map<string, VersionedFill>();
   for (const fill of [...current, ...incoming]) {
     if (!Number.isSafeInteger(fill.version) || fill.version < 1)
-      throw new ObjError(ObjErrorCode.OBJ_FLOAT_ARITHMETIC_REFUSED, 'fill version must be a positive integer', {
-        fillId: fill.fillId,
-      });
+      throw new ObjError(
+        ObjErrorCode.OBJ_FLOAT_ARITHMETIC_REFUSED,
+        'fill version must be a positive integer',
+        {
+          fillId: fill.fillId,
+        },
+      );
     const key = fillNaturalKey(fill);
     const seen = merged.get(key);
     if (seen === undefined) {
@@ -119,7 +125,8 @@ function sameLines(
     const rightLine = right[kind];
     if (typeof leftLine !== typeof rightLine) return false;
     if (typeof leftLine === 'bigint' || typeof rightLine === 'bigint') {
-      if (BigInt(leftLine as number | bigint) !== BigInt(rightLine as number | bigint)) return false;
+      if (BigInt(leftLine as number | bigint) !== BigInt(rightLine as number | bigint))
+        return false;
     } else if (leftLine !== rightLine) return false;
   }
   return true;
@@ -157,8 +164,7 @@ export function foldFillLedger(
   for (const group of ordered) {
     const head = group[0] as VersionedFill;
     let capital = assertIntegerMicros(head.capitalMicros, 'capitalMicros');
-    for (const fill of group)
-      capital = assertFixedCapitalDenominator(fill.capitalMicros, capital);
+    for (const fill of group) capital = assertFixedCapitalDenominator(fill.capitalMicros, capital);
     if (expected !== undefined) assertFixedCapitalDenominator(capital, expected);
     const totals = {} as Record<UtilityLineKind, bigint>;
     for (const kind of ALL_UTILITY_LINE_KINDS) totals[kind] = 0n;

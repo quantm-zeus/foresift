@@ -9,39 +9,40 @@
  *
  * Driven by claim-scopes.json, delay-distributions.json, and prohibited-language.json.
  */
-import { readFileSync } from "node:fs";
-import path from "node:path";
-import { fileURLToPath } from "node:url";
-import { describe, expect, it } from "bun:test";
+import { readFileSync } from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { describe, expect, it } from 'bun:test';
 
-const FIXTURES = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../tests/fixtures/obj");
+const FIXTURES = path.resolve(
+  path.dirname(fileURLToPath(import.meta.url)),
+  '../../tests/fixtures/obj',
+);
 
 const ALL_CLAIM_SCOPE_FIELDS = [
-  "SUPPORTED_POPULATION",
-  "PROFILE",
-  "POLICY",
-  "EXECUTION_SCENARIO",
-  "DELAY_DISTRIBUTION",
-  "CALENDAR_INTERVAL",
-  "MARKET_REGIMES",
-  "CAPABILITY_STATE",
-  "SAMPLE_SIZE",
-  "CLUSTER_EFFECTIVE_SAMPLE_SIZE",
-  "UNCERTAINTY_METHOD",
+  'SUPPORTED_POPULATION',
+  'PROFILE',
+  'POLICY',
+  'EXECUTION_SCENARIO',
+  'DELAY_DISTRIBUTION',
+  'CALENDAR_INTERVAL',
+  'MARKET_REGIMES',
+  'CAPABILITY_STATE',
+  'SAMPLE_SIZE',
+  'CLUSTER_EFFECTIVE_SAMPLE_SIZE',
+  'UNCERTAINTY_METHOD',
 ] as const;
 
-describe("AC-222: eleven-field scope completeness, robust delay gate, and uncertainty disclosure (FR-OBJ-007, FR-OBJ-008, FR-OBJ-010)", () => {
-  const claimFixture = JSON.parse(
-    readFileSync(path.join(FIXTURES, "claim-scopes.json"), "utf8")
-  );
+describe('AC-222: eleven-field scope completeness, robust delay gate, and uncertainty disclosure (FR-OBJ-007, FR-OBJ-008, FR-OBJ-010)', () => {
+  const claimFixture = JSON.parse(readFileSync(path.join(FIXTURES, 'claim-scopes.json'), 'utf8'));
   const delayFixture = JSON.parse(
-    readFileSync(path.join(FIXTURES, "delay-distributions.json"), "utf8")
+    readFileSync(path.join(FIXTURES, 'delay-distributions.json'), 'utf8'),
   );
   const languageFixture = JSON.parse(
-    readFileSync(path.join(FIXTURES, "prohibited-language.json"), "utf8")
+    readFileSync(path.join(FIXTURES, 'prohibited-language.json'), 'utf8'),
   );
 
-  it("accepts complete eleven-for-eleven claim scope (FR-OBJ-007)", () => {
+  it('accepts complete eleven-for-eleven claim scope (FR-OBJ-007)', () => {
     expect(claimFixture.fields.length).toBe(11);
     expect(claimFixture.fields).toEqual(ALL_CLAIM_SCOPE_FIELDS);
 
@@ -59,7 +60,7 @@ describe("AC-222: eleven-field scope completeness, robust delay gate, and uncert
     expect(scope.uncertaintyMethod).toBeDefined();
   });
 
-  it("passes robust delay gate when all three scenarios (p50, p90, conservative-tail) pass (FR-OBJ-008)", () => {
+  it('passes robust delay gate when all three scenarios (p50, p90, conservative-tail) pass (FR-OBJ-008)', () => {
     const dist = delayFixture.validRobustDistribution;
     expect(dist.scenarios.P50.passGate).toBe(true);
     expect(dist.scenarios.P90.passGate).toBe(true);
@@ -67,11 +68,11 @@ describe("AC-222: eleven-field scope completeness, robust delay gate, and uncert
     expect(dist.passedRobustGate).toBe(true);
   });
 
-  it("attaches mandatory uncertainty disclosure to research-signal outputs (FR-OBJ-010)", () => {
+  it('attaches mandatory uncertainty disclosure to research-signal outputs (FR-OBJ-010)', () => {
     for (const output of languageFixture.compliantOutputs) {
       expect(output.hasMandatoryDisclosure).toBe(true);
       expect(output.disclosureText).toContain(
-        "Opportunity outputs are evidence-backed research signals whose realized outcome remains uncertain."
+        'Opportunity outputs are evidence-backed research signals whose realized outcome remains uncertain.',
       );
     }
   });

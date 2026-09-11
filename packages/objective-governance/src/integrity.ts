@@ -52,17 +52,25 @@ export interface IntegrityAssessment {
 
 function assertCount(value: number, field: string): number {
   if (!Number.isSafeInteger(value) || value < 0)
-    throw new ObjError(ObjErrorCode.OBJ_FLOAT_ARITHMETIC_REFUSED, 'integrity count must be a non-negative integer', {
-      field,
-    });
+    throw new ObjError(
+      ObjErrorCode.OBJ_FLOAT_ARITHMETIC_REFUSED,
+      'integrity count must be a non-negative integer',
+      {
+        field,
+      },
+    );
   return value;
 }
 
 function assertBasisPoints(value: number, field: string): number {
   if (!Number.isSafeInteger(value) || value < 0 || value > 10000)
-    throw new ObjError(ObjErrorCode.OBJ_FLOAT_ARITHMETIC_REFUSED, 'integrity rate must be integer basis points', {
-      field,
-    });
+    throw new ObjError(
+      ObjErrorCode.OBJ_FLOAT_ARITHMETIC_REFUSED,
+      'integrity rate must be integer basis points',
+      {
+        field,
+      },
+    );
   return value;
 }
 
@@ -81,7 +89,11 @@ export function detectIntegritySignals(
   evidence: FrozenIntegrityEvidence,
 ): Readonly<Record<IntegritySignalKind, boolean>> {
   if (evidence.runId.length === 0)
-    throw new ObjError(ObjErrorCode.OBJ_DIMENSION_UNKNOWN, 'integrity evidence requires a run id', {});
+    throw new ObjError(
+      ObjErrorCode.OBJ_DIMENSION_UNKNOWN,
+      'integrity evidence requires a run id',
+      {},
+    );
   assertCount(evidence.recordedDenominatorCount, 'recordedDenominatorCount');
   assertCount(evidence.evaluatedDenominatorCount, 'evaluatedDenominatorCount');
   assertBasisPoints(evidence.frozenExplorationRateBps, 'frozenExplorationRateBps');
@@ -90,13 +102,15 @@ export function detectIntegritySignals(
   assertCount(evidence.omittedPendingOutcomes, 'omittedPendingOutcomes');
   assertCount(evidence.holdoutInspectionCount, 'holdoutInspectionCount');
   return {
-    DENOMINATOR_GAMING:
-      evidence.evaluatedDenominatorCount !== evidence.recordedDenominatorCount,
+    DENOMINATOR_GAMING: evidence.evaluatedDenominatorCount !== evidence.recordedDenominatorCount,
     SELECTIVE_UNIVERSE_CHANGE: evidence.evaluatedUniverseHash !== evidence.frozenUniverseHash,
     REDUCED_EXPLORATION: evidence.observedExplorationRateBps < evidence.frozenExplorationRateBps,
     DELAYED_OUTCOME_OMISSION: evidence.omittedPendingOutcomes > 0,
     HORIZON_SWITCHING: evidence.evaluatedHorizon !== evidence.frozenHorizon,
-    SCENARIO_CHERRY_PICKING: !sameScenarioSet(evidence.frozenScenarioSet, evidence.evaluatedScenarioSet),
+    SCENARIO_CHERRY_PICKING: !sameScenarioSet(
+      evidence.frozenScenarioSet,
+      evidence.evaluatedScenarioSet,
+    ),
     REPEATED_HOLDOUT_INSPECTION: evidence.holdoutInspectionCount > 1,
   };
 }

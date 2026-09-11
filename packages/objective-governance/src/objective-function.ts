@@ -47,10 +47,7 @@ export interface ObjectiveValue {
 export function computeObjectiveFunction(series: FrozenUtilitySeries): ObjectiveValue {
   if (series.runId.length === 0)
     throw new ObjError(ObjErrorCode.OBJ_DIMENSION_UNKNOWN, 'objective requires a run id', {});
-  if (
-    series.consumedEssReference.length === 0 ||
-    series.essStale
-  )
+  if (series.consumedEssReference.length === 0 || series.essStale)
     throw new ObjError(
       ObjErrorCode.OBJ_UNCERTAINTY_DISCLOSURE_MISSING,
       'objective requires a live consumed ESS reference',

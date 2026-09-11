@@ -41,9 +41,13 @@ export interface ValidatedClaimScope {
 
 function assertPositiveInt(value: number, field: string): void {
   if (!Number.isSafeInteger(value) || value < 1)
-    throw new ObjError(ObjErrorCode.OBJ_CLAIM_SCOPE_INCOMPLETE, 'claim scope count must be a positive integer', {
-      field,
-    });
+    throw new ObjError(
+      ObjErrorCode.OBJ_CLAIM_SCOPE_INCOMPLETE,
+      'claim scope count must be a positive integer',
+      {
+        field,
+      },
+    );
 }
 
 /**
@@ -51,22 +55,37 @@ function assertPositiveInt(value: number, field: string): void {
  * scope. Counts normalize to decimal strings; regimes join
  * deterministically. Any gap refuses the view.
  */
-export function validateClaimScope(runId: string, scope: PerformanceClaimScope): ValidatedClaimScope {
+export function validateClaimScope(
+  runId: string,
+  scope: PerformanceClaimScope,
+): ValidatedClaimScope {
   if (runId.length === 0)
     throw new ObjError(ObjErrorCode.OBJ_DIMENSION_UNKNOWN, 'claim scope requires a run id', {});
   assertPositiveInt(scope.sampleSize, 'SAMPLE_SIZE');
   if (!Number.isFinite(scope.clusterEffectiveSampleSize) || scope.clusterEffectiveSampleSize <= 0)
-    throw new ObjError(ObjErrorCode.OBJ_CLAIM_SCOPE_INCOMPLETE, 'claim scope cluster ESS must be positive', {
-      field: 'CLUSTER_EFFECTIVE_SAMPLE_SIZE',
-    });
+    throw new ObjError(
+      ObjErrorCode.OBJ_CLAIM_SCOPE_INCOMPLETE,
+      'claim scope cluster ESS must be positive',
+      {
+        field: 'CLUSTER_EFFECTIVE_SAMPLE_SIZE',
+      },
+    );
   if (scope.clusterEffectiveSampleSize > scope.sampleSize)
-    throw new ObjError(ObjErrorCode.OBJ_CLAIM_SCOPE_INCOMPLETE, 'claim scope cluster ESS cannot exceed sample size', {
-      field: 'CLUSTER_EFFECTIVE_SAMPLE_SIZE',
-    });
+    throw new ObjError(
+      ObjErrorCode.OBJ_CLAIM_SCOPE_INCOMPLETE,
+      'claim scope cluster ESS cannot exceed sample size',
+      {
+        field: 'CLUSTER_EFFECTIVE_SAMPLE_SIZE',
+      },
+    );
   if (!(ALL_INTERVAL_METHODS as readonly string[]).includes(scope.uncertaintyMethod))
-    throw new ObjError(ObjErrorCode.OBJ_CLAIM_FIELD_UNKNOWN, 'claim scope requires an eval-proven uncertainty method', {
-      field: 'UNCERTAINTY_METHOD',
-    });
+    throw new ObjError(
+      ObjErrorCode.OBJ_CLAIM_FIELD_UNKNOWN,
+      'claim scope requires an eval-proven uncertainty method',
+      {
+        field: 'UNCERTAINTY_METHOD',
+      },
+    );
   const fields = {
     SUPPORTED_POPULATION: scope.supportedPopulation,
     PROFILE: scope.profile,

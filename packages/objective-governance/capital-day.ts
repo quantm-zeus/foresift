@@ -39,7 +39,9 @@ export function parseCapitalDay(value: unknown): string {
 }
 
 /** Deterministic natural key for one capital-day coordinate. */
-export function capitalDayKey(coordinate: Pick<CapitalDayCoordinate, 'runId' | 'capitalDay'>): string {
+export function capitalDayKey(
+  coordinate: Pick<CapitalDayCoordinate, 'runId' | 'capitalDay'>,
+): string {
   return `${coordinate.runId}|${parseCapitalDay(coordinate.capitalDay)}`;
 }
 
@@ -50,7 +52,11 @@ export function capitalDayCoordinate(
   capitalMicros: number | bigint,
 ): CapitalDayCoordinate {
   if (runId.length === 0)
-    throw new ObjError(ObjErrorCode.OBJ_DIMENSION_UNKNOWN, 'capital-day coordinate requires a run id', {});
+    throw new ObjError(
+      ObjErrorCode.OBJ_DIMENSION_UNKNOWN,
+      'capital-day coordinate requires a run id',
+      {},
+    );
   const capital = assertPositiveCapital(capitalMicros);
   return { runId, capitalDay: parseCapitalDay(capitalDay), capitalMicros: capital };
 }
@@ -67,7 +73,10 @@ export function assertPositiveCapital(capitalMicros: number | bigint): bigint {
  * Utility per unit of fixed capital, floored to integer micro-units.
  * Flooring keeps per-capital figures conservative for the LCB core.
  */
-export function utilityPerCapitalDay(totalMicros: number | bigint, capitalMicros: number | bigint): bigint {
+export function utilityPerCapitalDay(
+  totalMicros: number | bigint,
+  capitalMicros: number | bigint,
+): bigint {
   const total = assertIntegerMicros(totalMicros, 'totalMicros');
   const capital = assertPositiveCapital(capitalMicros);
   return floorDiv(total, capital);

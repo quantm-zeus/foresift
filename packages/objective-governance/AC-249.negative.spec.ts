@@ -5,12 +5,12 @@
  * - Promotion fails when challenger fails control tests
  * - Incomparable evaluation runs cannot challenge champion
  */
-import { describe, expect, it } from "bun:test";
+import { describe, expect, it } from 'bun:test';
 
-describe("AC-249 negative: control failures and insufficient utility block promotion", () => {
-  it("refuses promotion when challenger has failing control tests despite higher raw utility", () => {
+describe('AC-249 negative: control failures and insufficient utility block promotion', () => {
+  it('refuses promotion when challenger has failing control tests despite higher raw utility', () => {
     const challengerWithControlFailure = {
-      policyId: "policy-challenger-v3",
+      policyId: 'policy-challenger-v3',
       lcbUtilityPerCapitalDay: 90000,
       matureCount: 500,
       controlsPassed: false,
@@ -18,13 +18,13 @@ describe("AC-249 negative: control failures and insufficient utility block promo
 
     const validatePromotionEligibility = (candidate: typeof challengerWithControlFailure) => {
       if (!candidate.controlsPassed) {
-        throw new Error("OBJ_INTEGRITY_FAILURE_BLOCKS_PROMOTION");
+        throw new Error('OBJ_INTEGRITY_FAILURE_BLOCKS_PROMOTION');
       }
       return true;
     };
 
     expect(() => validatePromotionEligibility(challengerWithControlFailure)).toThrow(
-      /OBJ_INTEGRITY_FAILURE_BLOCKS_PROMOTION/
+      /OBJ_INTEGRITY_FAILURE_BLOCKS_PROMOTION/,
     );
   });
 });

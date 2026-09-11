@@ -39,13 +39,21 @@ export function evaluateHardConstraints(
     const kind = parseHardConstraintKind(evaluation.kind);
     const verdict = parseHardConstraintVerdict(evaluation.verdict);
     if (kind in decided)
-      throw new ObjError(ObjErrorCode.OBJ_HARD_CONSTRAINT_FAILED, 'duplicate hard-constraint evaluation', {
-        kind,
-      });
+      throw new ObjError(
+        ObjErrorCode.OBJ_HARD_CONSTRAINT_FAILED,
+        'duplicate hard-constraint evaluation',
+        {
+          kind,
+        },
+      );
     if (evaluation.evidenceRef.length === 0)
-      throw new ObjError(ObjErrorCode.OBJ_HARD_CONSTRAINT_FAILED, 'hard constraint requires evidence', {
-        kind,
-      });
+      throw new ObjError(
+        ObjErrorCode.OBJ_HARD_CONSTRAINT_FAILED,
+        'hard constraint requires evidence',
+        {
+          kind,
+        },
+      );
     decided[kind] = verdict;
   }
   for (const kind of ALL_HARD_CONSTRAINT_KINDS) {

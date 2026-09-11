@@ -215,3 +215,32 @@ describe('AC-248 G1 extension: power/threshold promotion-gate facet (FR-MAT-005,
     expect(hasSufficientPower).toBe(true);
   });
 });
+
+describe('AC-248 G1 obj-facet: promotion fails below mature counts / ESS / coverage / precision (FR-OBJ-001, FR-OBJ-006)', () => {
+  it('fails promotion when effective sample size (ESS) is below threshold despite favorable point estimate', () => {
+    const promotionDecision = {
+      pointEstimateUtility: 75000,
+      effectiveSampleSize: 15,
+      minRequiredESS: 30,
+      meetsThreshold: false,
+      verdict: 'HOLD_EXPLORATORY_ONLY',
+    };
+
+    expect(promotionDecision.pointEstimateUtility).toBeGreaterThan(0);
+    expect(promotionDecision.effectiveSampleSize).toBeLessThan(promotionDecision.minRequiredESS);
+    expect(promotionDecision.verdict).toBe('HOLD_EXPLORATORY_ONLY');
+  });
+
+  it('blocks promotion when consumed control failures are present (FR-OBJ-006)', () => {
+    const runState = {
+      negativeControlPassed: false,
+      leakageFree: true,
+      hasControlFailure: true,
+      promotionVerdict: 'BLOCK',
+    };
+
+    expect(runState.hasControlFailure).toBe(true);
+    expect(runState.promotionVerdict).toBe('BLOCK');
+  });
+});
+

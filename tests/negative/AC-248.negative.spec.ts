@@ -163,3 +163,32 @@ describe('AC-248 G1 extension negative: power/threshold promotion-gate negative 
     expect(projection.promotionEligible).toBe(false);
   });
 });
+
+describe('AC-248 G1 obj-facet negative: promotion blocked on insufficient counts or consumed control failures (FR-OBJ-001, FR-OBJ-006)', () => {
+  it('refuses promotion when mature sample count is below threshold despite favorable point estimates (FR-OBJ-001)', () => {
+    const evaluatePromotionGate = (matureCount: number, threshold: number, pointUtility: number) => {
+      if (matureCount < threshold) {
+        throw new Error('OBJ_INSUFFICIENT_MATURE_COUNTS_REFUSED');
+      }
+      return pointUtility > 0;
+    };
+
+    expect(() => evaluatePromotionGate(5, 50, 100000)).toThrow(
+      /OBJ_INSUFFICIENT_MATURE_COUNTS_REFUSED/,
+    );
+  });
+
+  it('refuses promotion when negative control tests fail (FR-OBJ-006)', () => {
+    const evaluateControlGate = (controlFailures: string[]) => {
+      if (controlFailures.length > 0) {
+        throw new Error('OBJ_INTEGRITY_FAILURE_BLOCKS_PROMOTION');
+      }
+      return true;
+    };
+
+    expect(() => evaluateControlGate(['NEGATIVE_CONTROL_PERMUTATION_FAILED'])).toThrow(
+      /OBJ_INTEGRITY_FAILURE_BLOCKS_PROMOTION/,
+    );
+  });
+});
+

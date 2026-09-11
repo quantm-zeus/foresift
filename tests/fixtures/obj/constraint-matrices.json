@@ -1,0 +1,93 @@
+{
+  "schema": "foresift/obj-constraint-matrices-fixture@1",
+  "kinds": [
+    "CRITICAL_SECURITY",
+    "EXECUTION_INTEGRITY",
+    "RIGHTS_FENCING",
+    "LEAKAGE_PREVENTION",
+    "PUBLIC_CLAIM_BOUND",
+    "CAPACITY_BOUND",
+    "TAIL_RISK"
+  ],
+  "allPassingMatrix": {
+    "CRITICAL_SECURITY": {
+      "verdict": "PASS",
+      "score": 1
+    },
+    "EXECUTION_INTEGRITY": {
+      "verdict": "PASS",
+      "score": 0.98
+    },
+    "RIGHTS_FENCING": {
+      "verdict": "PASS",
+      "score": 1
+    },
+    "LEAKAGE_PREVENTION": {
+      "verdict": "PASS",
+      "score": 0.99
+    },
+    "PUBLIC_CLAIM_BOUND": {
+      "verdict": "PASS",
+      "score": 0.95
+    },
+    "CAPACITY_BOUND": {
+      "verdict": "PASS",
+      "score": 0.92
+    },
+    "TAIL_RISK": {
+      "verdict": "PASS",
+      "score": 0.97
+    },
+    "overallPass": true
+  },
+  "failingCasesPerKind": {
+    "CRITICAL_SECURITY": {
+      "failedKind": "CRITICAL_SECURITY",
+      "verdict": "FAIL",
+      "reason": "Unverified token contract authority"
+    },
+    "EXECUTION_INTEGRITY": {
+      "failedKind": "EXECUTION_INTEGRITY",
+      "verdict": "FAIL",
+      "reason": "Pool adapter parity failure"
+    },
+    "RIGHTS_FENCING": {
+      "failedKind": "RIGHTS_FENCING",
+      "verdict": "FAIL",
+      "reason": "Attempted write to trading capability in read-only mode"
+    },
+    "LEAKAGE_PREVENTION": {
+      "failedKind": "LEAKAGE_PREVENTION",
+      "verdict": "FAIL",
+      "reason": "Negative control permutation leakage detected"
+    },
+    "PUBLIC_CLAIM_BOUND": {
+      "failedKind": "PUBLIC_CLAIM_BOUND",
+      "verdict": "FAIL",
+      "reason": "Claimed recall exceeds proven universe bounds"
+    },
+    "CAPACITY_BOUND": {
+      "failedKind": "CAPACITY_BOUND",
+      "verdict": "FAIL",
+      "reason": "Workflow storage cap exceeded by peak plan"
+    },
+    "TAIL_RISK": {
+      "failedKind": "TAIL_RISK",
+      "verdict": "FAIL",
+      "reason": "CVaR conservative tail risk exceeds policy tolerance"
+    }
+  },
+  "unevaluatedClass": {
+    "missingKind": "TAIL_RISK",
+    "evaluatedKinds": [
+      "CRITICAL_SECURITY",
+      "EXECUTION_INTEGRITY",
+      "RIGHTS_FENCING",
+      "LEAKAGE_PREVENTION",
+      "PUBLIC_CLAIM_BOUND",
+      "CAPACITY_BOUND"
+    ],
+    "overallPass": false,
+    "refusalCode": "OBJ_HARD_CONSTRAINT_FAILED"
+  }
+}

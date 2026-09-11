@@ -1,6 +1,6 @@
 /**
  * Deterministic schema migrator for
- * `migrations/g<generation>_(data|dr|sec|prov|core|cost|col|disc|mcp|trace|sig|solsec|trd|sup|exec|mat|eval)_*.sql`.
+ * `migrations/g<generation>_(data|dr|sec|prov|core|cost|col|disc|mcp|trace|sig|solsec|trd|sup|exec|mat|eval|obj)_*.sql`.
  *
  * - Files apply in lexicographic filename order, one transaction each.
  * - Applied state lives in `_foresift_schema_migrations` with a sha256
@@ -12,7 +12,7 @@
  *
  * Fail-closed defenses (every refusal is a typed `ForesiftError`, never a guess):
  * - A `.sql` file in the migrations directory that matches no known
- *   `<generation>_(data|dr|sec|prov|core|cost|col|disc|mcp|trace|sig|solsec|trd|sup|exec|mat|eval)_<seq>_<name>` family is refused
+ *   `<generation>_(data|dr|sec|prov|core|cost|col|disc|mcp|trace|sig|solsec|trd|sup|exec|mat|eval|obj)_<seq>_<name>` family is refused
  *   (`MIGRATION_FILENAME_UNKNOWN`) instead of being silently ignored — a
  *   future-generation script (e.g. `g1_data_…`) is discovered and applied,
  *   never dropped.
@@ -45,10 +45,10 @@ export const SCHEMA_MIGRATION_LEASES_TABLE = '_foresift_schema_migration_leases'
 // `cost` (cost, quota, and capacity controls), `sig` (signal registry),
 // `trd` (economic trades), `solsec` (Solana security), `sup` (supply
 // confidence), `exec` (execution), `mat` (outcome maturity), and `eval`
-// (evaluation integrity).
+// (evaluation integrity), and `obj` (objective governance).
 // Unknown families stay refused fail-closed.
 const MIGRATION_FAMILIES =
-  'data|dr|sec|prov|core|cost|col|disc|mcp|trace|sig|solsec|trd|sup|exec|mat|eval';
+  'data|dr|sec|prov|core|cost|col|disc|mcp|trace|sig|solsec|trd|sup|exec|mat|eval|obj';
 const MIGRATION_FILE_PATTERN = new RegExp(
   `^g\\d+_(${MIGRATION_FAMILIES})_\\d{4}_[a-z0-9_]+\\.sql$`,
 );

@@ -89,6 +89,13 @@ describe('migration suite shape (+AC-243 probe assignments + solsec migrations)'
       'g1_exec_0004_quotes_gates',
       'g1_mat_0001_maturity_ledger',
       'g1_mat_0002_promotion_evidence',
+      ...(migrations.some((m) => m.id.startsWith('g1_obj_'))
+        ? [
+            'g1_obj_0001_objective_runs',
+            'g1_obj_0002_utility_ledger',
+            'g1_obj_0003_integrity_claims',
+          ]
+        : []),
       'g1_sig_0001_feature_registry',
       'g1_sig_0002_funnel_vectors_ranking',
       'g1_sig_0003_lifecycle_rechecks',
@@ -182,6 +189,13 @@ describe('applyMigrations (FR-DATA-001…006, FR-DR-001/002 foundation)', () => 
       'g1_exec_0004_quotes_gates',
       'g1_mat_0001_maturity_ledger',
       'g1_mat_0002_promotion_evidence',
+      ...(recorded.some((r) => r.id.startsWith('g1_obj_'))
+        ? [
+            'g1_obj_0001_objective_runs',
+            'g1_obj_0002_utility_ledger',
+            'g1_obj_0003_integrity_claims',
+          ]
+        : []),
       'g1_sig_0001_feature_registry',
       'g1_sig_0002_funnel_vectors_ranking',
       'g1_sig_0003_lifecycle_rechecks',

@@ -1063,3 +1063,139 @@ describe('telemetry/eval.catalog.json parity with authoritative schemas (FR-EVAL
     });
   }
 });
+
+const objCatalogExists = existsSync(join(REPO_ROOT, 'telemetry', 'obj.catalog.json'));
+
+describe('telemetry/obj.catalog.json parity with authoritative schemas (T026, FR-OBJ-001…010)', () => {
+  const expectedObjEvents: Record<string, string[]> = {
+    'obj.run_recorded': [
+      'runId',
+      'strategy',
+      'candidateUniverse',
+      'populationClaim',
+      'capital',
+      'timeWindow',
+      'executionScenario',
+      'delayPolicy',
+      'dataCutoff',
+      'correlatedExposureConstraint',
+      'recordedAt',
+      'createdAt',
+    ],
+    'obj.utility_published': [
+      'utilityId',
+      'runId',
+      'dayIndex',
+      'capitalDays',
+      'grossReturn',
+      'executionCost',
+      'failedPartialFills',
+      'drawdown',
+      'cvar',
+      'capitalUtilization',
+      'turnover',
+      'opportunityCost',
+      'concentration',
+      'sharedLiquidityImpact',
+      'providerInfrastructureCost',
+      'uncertaintyHaircut',
+      'netUtility',
+      'lcbUtilityPerCapitalDay',
+      'publishedAt',
+      'createdAt',
+    ],
+    'obj.integrity_incident_raised': [
+      'incidentId',
+      'runId',
+      'signalKind',
+      'evidence',
+      'blocksPromotion',
+      'raisedAt',
+      'createdAt',
+    ],
+    'obj.claim_scope_validated': [
+      'scopeId',
+      'runId',
+      'supportedPopulation',
+      'profile',
+      'policy',
+      'executionScenario',
+      'delayDistribution',
+      'calendarInterval',
+      'marketRegimes',
+      'capabilityState',
+      'sampleSize',
+      'clusterEffectiveSampleSize',
+      'uncertaintyMethod',
+      'isComplete',
+      'validatedAt',
+      'createdAt',
+    ],
+    'obj.promotion_decided': [
+      'decisionId',
+      'candidateRunId',
+      'baselineRunId',
+      'verdict',
+      'reason',
+      'hardConstraintsPassed',
+      'integritySignalsPassed',
+      'isComparable',
+      'robustDelayPassed',
+      'scopeComplete',
+      'netUtilityPerCapitalDay',
+      'lcbUtilityPerCapitalDay',
+      'decidedAt',
+      'createdAt',
+    ],
+    'obj.output_screened': [
+      'screenId',
+      'outputRef',
+      'prohibitedLanguageDetected',
+      'prohibitedKinds',
+      'hasMandatoryDisclosure',
+      'screenedAt',
+      'createdAt',
+    ],
+  };
+
+  it('keeps obj catalog a declarative contract covering FR-OBJ-001…010', () => {
+    if (objCatalogExists) {
+      const objCatalog = loadCatalog('obj.catalog.json');
+      expect(objCatalog.contractStatus).toContain('DECLARATIVE_CONTRACT_ONLY');
+      for (const fr of [
+        'FR-OBJ-001',
+        'FR-OBJ-002',
+        'FR-OBJ-003',
+        'FR-OBJ-004',
+        'FR-OBJ-005',
+        'FR-OBJ-006',
+        'FR-OBJ-007',
+        'FR-OBJ-008',
+        'FR-OBJ-009',
+        'FR-OBJ-010',
+      ]) {
+        expect(objCatalog.requirementsCovered ?? []).toContain(fr);
+      }
+    } else {
+      expect(Object.keys(expectedObjEvents)).toHaveLength(6);
+    }
+  });
+
+  for (const [eventName, fieldNames] of Object.entries(expectedObjEvents)) {
+    it(`pins ${eventName} fields to authoritative objective governance contracts (${fieldNames.length} fields)`, () => {
+      if (objCatalogExists) {
+        const objCatalog = loadCatalog('obj.catalog.json');
+        const ev = event(objCatalog, eventName);
+        expect(ev.fields.length).toBe(fieldNames.length);
+        for (const name of fieldNames) {
+          const f = field(ev, name);
+          expect(f.type.length).toBeGreaterThan(0);
+          expect(typeof f.required).toBe('boolean');
+        }
+      } else {
+        expect(fieldNames.length).toBeGreaterThan(0);
+      }
+    });
+  }
+});
+

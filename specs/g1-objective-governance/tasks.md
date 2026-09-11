@@ -130,11 +130,11 @@ and AC suites, then telemetry and gates.
       `output_language_screens` with CHECK-pinned enum literals from the
       vocabulary law). Migration tests by test-owned T018. Traces:
       FR-OBJ-001, FR-OBJ-002, FR-OBJ-004, FR-OBJ-006, FR-OBJ-007.
-- [ ] T005 [P] Extend the fail-closed family list in
+- [x] T005 [P] Extend — [evidence: NO_OP_ALREADY_SATISFIED] MIGRATION_FAMILIES includes exactly obj at packages/persistence/src/migrator.ts:51 (MIGRATION_FILE_PATTERN line 52–54, doc patterns lines 3/15); core-lane commit 0363af1 (ancestor of task-worktree HEAD, integrated via salvage/integration); migrator.spec.ts asserts g1_obj_0001/0002/0003 discovery+application (lines 92–96, 192–196, 65→68 counts); fail-closed family list in
       `packages/persistence/src/migrator.ts` (`MIGRATION_FAMILIES` regex)
       with `obj` (plan-sanctioned scope exception 1; ADR-0019/0022 duty).
       Traces: FR-OBJ-001.
-- [ ] T006 [serial-reason: SEMANTIC_DEPENDENCY] Catch the hand-maintained
+- [x] T006 [serial-reason: SEMANTIC_DEPENDENCY] Catch — [evidence: FILE_OUTPUT] six obj tables mirrored in packages/persistence/src/generated/schema.ts (objective_runs, capital_day_utility composite-PK, integrity_incidents, claim_scope_records, promotion_decisions, output_language_screens) + capital_day date→text+CHECK in migrations/g1_obj_0002_utility_ledger.sql aligning SQL with UtilityReportSchema capitalDay string truth; commit d32bbbc; FAST round 6 (gov-fast6, full suite 546 files) PASS incl. schema-parity 7/7 — the hand-maintained
       ADR-001 Drizzle mirror
       `packages/persistence/src/generated/schema.ts` up to the three new SQL
       files (plan-sanctioned scope exception 2; content depends on T004).

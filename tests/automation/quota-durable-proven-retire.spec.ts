@@ -38,7 +38,7 @@ function milestoneState(status: string) {
   };
 }
 
-function quotaEntry(overrides: Record<string, unknown> = {}) {
+function quotaEntry(overrides: Record<string, unknown> = {}): Record<string, unknown> {
   return {
     kind: 'package',
     workflow: 'foresift-sharded-wave',
@@ -76,7 +76,7 @@ function harness({
   const deps = {
     loadMilestone: () => ms,
     findRunRow: () => runRow,
-    record: (state: unknown, event: string, detail?: Record<string, unknown>) => {
+    record: (_state: unknown, event: string, detail?: Record<string, unknown>) => {
       st.events.push({ event, ...detail });
     },
   };

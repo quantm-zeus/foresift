@@ -156,3 +156,33 @@ export declare function detachedRunLogFreshness(input: {
   logBornAfter?: number;
   statOverride?: ((path: string) => { mtimeMs: number; birthtimeMs: number }) | null;
 }): DetachedRunLogFreshness;
+
+/** Tracked supervisor entry subset retireQuotaPauseOnDurableProven mutates/reads. */
+export interface RetirableQuotaEntry {
+  kind?: string;
+  runId?: string | null;
+  packageId?: string | null;
+  paused?: string | null;
+  done?: boolean;
+  note?: string;
+  [key: string]: unknown;
+}
+
+/**
+ * Durable-success preemption for quota pauses (case-C law extended to quota):
+ * retires a terminal quota-paused entry whose package is PROVEN on committed
+ * main with NO live sibling run — releasing runtime and journaling
+ * quota_pause_retired_durable_proven — instead of letting the probe schedule
+ * workflow-resume a dead run. Fail-closed no-op (returns false) for
+ * non-PROVEN packages, live siblings, unreadable milestone state, non-quota
+ * or done or package-less entries. See foresift-autopilot.mjs.
+ */
+export declare function retireQuotaPauseOnDurableProven(
+  st: Record<string, unknown>,
+  entry: RetirableQuotaEntry,
+  deps?: {
+    loadMilestone?: () => unknown;
+    findRunRow?: (workflow: string, message: string) => unknown;
+    record?: (st: unknown, event: string, detail?: Record<string, unknown>) => void;
+  },
+): boolean;

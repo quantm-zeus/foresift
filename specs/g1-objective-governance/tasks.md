@@ -185,7 +185,7 @@ and AC suites, then telemetry and gates.
 
 ## Phase 4 — Unit and migration tests (test-owned)
 
-- [ ] T013 [P] [executor: TEST] Colocated unit tests for
+- [x] T013 [P] [executor: TEST] Colocated unit tests — [evidence: TEST_PROOF] packages/domain/test/obj.spec.ts 28/28 (AGY lane test-a 0d56e1e+16df51f, integrated b51095f; prettier+eslint clean) — for
       `packages/domain/src/obj.ts`: every parse function accepts each listed
       member and rejects unknowns with the stable code; every pure law holds
       on representative inputs (incomparable promotion refused, unevaluated
@@ -193,32 +193,31 @@ and AC suites, then telemetry and gates.
       frozen rewrite refused). Traces: FR-OBJ-001, FR-OBJ-002, FR-OBJ-003,
       FR-OBJ-004, FR-OBJ-005, FR-OBJ-006, FR-OBJ-007, FR-OBJ-008, FR-OBJ-009,
       FR-OBJ-010.
-- [ ] T014 [P] [executor: TEST] Colocated tests for
+- [x] T014 [P] [executor: TEST] Colocated tests — [evidence: TEST_PROOF] packages/shared-schemas/test/obj.spec.ts 28/28 (AGY lane test-a, integrated b51095f; prettier+eslint clean) — for
       `packages/shared-schemas/src/obj.ts`: valid records parse; each
       cross-field rule rejects its violation class (verdict/reason mismatch,
       non-reconciling lines, ten-of-eleven scope, two-of-three delay
       scenarios). Traces: FR-OBJ-001, FR-OBJ-004, FR-OBJ-006, FR-OBJ-007,
       FR-OBJ-008.
-- [ ] T015 [P] [executor: TEST] Unit tests for `packages/shadow-portfolio`
+- [x] T015 [P] [executor: TEST] Unit tests — [evidence: TEST_PROOF] packages/shadow-portfolio/test/ledger.spec.ts 17/17 + packages/objective-governance/read-only-guard.spec.ts 13/13 (AGY lane test-b a193241, integrated 6e41ddb; prettier+eslint clean) — for `packages/shadow-portfolio`
       (fold determinism, idempotent re-insert, capital-day denominators,
       twelve-line reconciliation) and both `read-only-guard.ts` scanners
       (prohibited import/identifier detection, float detection on the
       objective path). Traces: FR-OBJ-001, FR-OBJ-004.
-- [ ] T016 [P] [executor: TEST] Unit tests for governance gates A–C
+- [x] T016 [P] [executor: TEST] Unit tests — [evidence: TEST_PROOF] packages/objective-governance/gates-abc.spec.ts 27/27 (AGY lane test-a, integrated b51095f; prettier+eslint clean) — for governance gates A–C
       (LCB bit-determinism across repeated runs with pinned constant;
       comparability matrix over all eight dimensions; seven-kind hard-fail
       matrix with strongly positive scores; decomposition reconciliation;
       diagnostics labeling; eleven-field refusal matrix). Traces: FR-OBJ-001,
       FR-OBJ-002, FR-OBJ-003, FR-OBJ-004, FR-OBJ-005, FR-OBJ-006, FR-OBJ-007,
       FR-OBJ-008, FR-OBJ-009.
-- [ ] T017 [serial-reason: SEMANTIC_DEPENDENCY] [executor: TEST] Unit tests
-      for part D (every `ProhibitedClaimKind` pattern screened, disclosure
+- [x] T017 [serial-reason: SEMANTIC_DEPENDENCY] [executor: TEST] Unit tests — [evidence: TEST_PROOF] packages/objective-governance/part-d.spec.ts 10/10 (AGY lane test-a, integrated b51095f; prettier+eslint clean) — for part D (every `ProhibitedClaimKind` pattern screened, disclosure
       present on all opportunity outputs, G1-boundary surfaces only;
       promotion-gate nine-stage order, full verdict matrix incl.
       `HOLD_EXPLORATORY_ONLY` for incomparable runs and `BLOCK` on any
       integrity failure). Depends on T012. Traces: FR-OBJ-010, FR-OBJ-001,
       FR-OBJ-002, FR-OBJ-003, FR-OBJ-006.
-- [ ] T018 [P] [executor: TEST] PGlite-backed migration tests for the three
+- [x] T018 [P] [executor: TEST] PGlite-backed migration tests — [evidence: TEST_PROOF] packages/persistence/test/obj-migrations.spec.ts 15/15 (AGY lane test-b, integrated 6e41ddb; prettier+eslint clean) — for the three
       `g1_obj_*` files (CHECK enforcement per enum list, run immutability
       with new-run corrections, reconciliation CHECK, append-only incident
       table). Traces: FR-OBJ-001, FR-OBJ-002, FR-OBJ-004, FR-OBJ-006,

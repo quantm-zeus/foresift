@@ -11,7 +11,15 @@
 // and ALLOWS a valid graph (with an engine stub standing in for the real
 // provider, counted).
 import { describe, expect, test } from 'bun:test';
-import { mkdtempSync, writeFileSync } from 'node:fs';
+import {
+  chmodSync,
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  writeFileSync,
+} from 'node:fs';
+import { spawnSync } from 'node:child_process';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { requireTaskGraphForCompletionEvidence } from '../../scripts/automation/writer-task-evidence.mjs';
@@ -252,4 +260,54 @@ describe('P0: task-graph required BEFORE any provider invocation', () => {
       // disposable scratch
     }
   });
+});
+
+describe('P0: claude-writer claim path resolves its evidence helper (live ad794228)', () => {
+  test('exec-claude-writer: provider success + lane diff nominates T001 (no ReferenceError)', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'tg-claude-claim-'));
+    const savedPath = process.env.PATH ?? '';
+    const savedPool = process.env.FORESIFT_PROVIDER_POOL_STATE_DIR;
+    try {
+      // Hermetic provider: a fake `claude` on PATH that exits 0 and proves
+      // it was invoked (marker file). No network, no credentials, no spend.
+      const bin = join(dir, 'bin');
+      mkdirSync(bin, { recursive: true });
+      const marker = join(dir, 'claude-invoked');
+      writeFileSync(bin + '/claude', `#!/bin/sh\ntouch ${JSON.stringify(marker)}\nexit 0\n`);
+      chmodSync(bin + '/claude', 0o755);
+      process.env.PATH = `${bin}:${savedPath}`;
+      process.env.FORESIFT_PROVIDER_POOL_STATE_DIR = join(dir, 'pool');
+      // Git lane worktree with a DIRTY predicted write: the writer commits it
+      // and the claim path must nominate T001 from the evidence diff.
+      const wt = join(dir, 'wt');
+      const sh = (cmd: string) => spawnSync(cmd, { shell: true, cwd: wt, encoding: 'utf8' });
+      mkdirSync(join(wt, 'packages', 'x', 'src'), { recursive: true });
+      sh(
+        'git init -qb main && git -c user.email=t@t -c user.name=t commit -q --allow-empty -m base',
+      );
+      writeFileSync(join(wt, 'packages', 'x', 'src', 'a.ts'), 'export const a = 1;\n');
+      writeFileSync(join(dir, 'brief.md'), 'brief');
+      const result = runClaudeWriter({
+        lane: 'shard-1',
+        brief: join(dir, 'brief.md'),
+        worktree: wt,
+        'results-dir': join(dir, 'results'),
+        'task-ids': 'T001',
+        'task-graph': withGraph(dir, VALID_GRAPH),
+        package: 'pkg-x',
+        generation: '0',
+      });
+      expect(result.ok).toBe(true);
+      // Provider-dispatch check: fake claude really ran (this test exercises
+      // the post-spawn claim path, not a pre-spawn refusal).
+      expect(existsSync(marker)).toBe(true);
+      const written = JSON.parse(readFileSync(join(dir, 'results', 'result.json'), 'utf8'));
+      expect(written.completed).toContain('T001');
+      expect(result.result.completed).toContain('T001');
+    } finally {
+      process.env.PATH = savedPath;
+      if (savedPool === undefined) delete process.env.FORESIFT_PROVIDER_POOL_STATE_DIR;
+      else process.env.FORESIFT_PROVIDER_POOL_STATE_DIR = savedPool;
+    }
+  }, 60000);
 });

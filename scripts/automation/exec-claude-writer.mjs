@@ -24,6 +24,7 @@ import {
   requireTaskGraphForCompletionEvidence,
   laneEvidencePaths,
   splitSymlinks,
+  claimCompletedUnits,
 } from './writer-task-evidence.mjs';
 
 function fail(message, code = 1) {

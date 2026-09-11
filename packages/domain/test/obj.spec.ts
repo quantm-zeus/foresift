@@ -465,9 +465,10 @@ describe('Objective Pure Laws (FR-OBJ-001…010)', () => {
     expect(() => comparabilityRequiresAllDimensions(validRunA, undefined)).toThrow(ObjError);
 
     // Missing dimension throws OBJ_DIMENSION_UNKNOWN
+    const { CORRELATED_EXPOSURE: _omittedDimension, ...reducedDimensions } = validRunA.dimensions;
     const missingDimension = {
       runId: 'run-e',
-      dimensions: { ...validRunA.dimensions, CORRELATED_EXPOSURE: undefined as unknown as string },
+      dimensions: reducedDimensions,
     };
     expect(() => comparabilityRequiresAllDimensions(validRunA, missingDimension)).toThrow(ObjError);
   });
@@ -502,7 +503,7 @@ describe('Objective Pure Laws (FR-OBJ-001…010)', () => {
     }
 
     // Unevaluated kind throws OBJ_HARD_CONSTRAINT_FAILED
-    const unevaluated = { ...allPassing, TAIL_RISK: undefined };
+    const { TAIL_RISK: _omittedTailRisk, ...unevaluated } = allPassing;
     expect(() => hardConstraintsPrecedeUtility(unevaluated)).toThrow(ObjError);
   });
 
@@ -566,7 +567,7 @@ describe('Objective Pure Laws (FR-OBJ-001…010)', () => {
     expect(() => assertDecompositionReconciles(validLines, 35_001n)).toThrow(ObjError);
 
     // Missing line returns false / throws
-    const missingLine = { ...validLines, CVAR: undefined };
+    const { CVAR: _omittedCvar, ...missingLine } = validLines;
     expect(decompositionReconciles(missingLine, 35_000n)).toBe(false);
     expect(() => assertDecompositionReconciles(missingLine, 35_000n)).toThrow(ObjError);
 
@@ -641,7 +642,7 @@ describe('Objective Pure Laws (FR-OBJ-001…010)', () => {
     }
 
     // Unevaluated signal throws OBJ_INTEGRITY_FAILURE_BLOCKS_PROMOTION
-    const unevaluated = { ...allPassingSignals, HORIZON_SWITCHING: undefined };
+    const { HORIZON_SWITCHING: _omittedHorizon, ...unevaluated } = allPassingSignals;
     expect(() => integrityFailureBlocksPromotion(unevaluated)).toThrow(ObjError);
   });
 

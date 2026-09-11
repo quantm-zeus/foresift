@@ -1,0 +1,51 @@
+{
+  "schema": "foresift/obj-prohibited-language-fixture@1",
+  "prohibitedKinds": [
+    "GUARANTEED_PROFIT",
+    "RISK_FREE",
+    "CERTAIN_RETURN",
+    "NO_DOWNSIDE"
+  ],
+  "violations": [
+    {
+      "kind": "GUARANTEED_PROFIT",
+      "sample": "This signal delivers guaranteed profit on every trade."
+    },
+    {
+      "kind": "GUARANTEED_PROFIT",
+      "sample": "Guaranteed 100x returns with zero risk."
+    },
+    {
+      "kind": "RISK_FREE",
+      "sample": "Our risk-free arbitrage scanner finds free money."
+    },
+    {
+      "kind": "RISK_FREE",
+      "sample": "Completely risk free execution path."
+    },
+    {
+      "kind": "CERTAIN_RETURN",
+      "sample": "Certain returns backed by predictive algorithms."
+    },
+    {
+      "kind": "CERTAIN_RETURN",
+      "sample": "100% win rate certainty."
+    },
+    {
+      "kind": "NO_DOWNSIDE",
+      "sample": "Trade with no downside risk."
+    },
+    {
+      "kind": "NO_DOWNSIDE",
+      "sample": "Zero loss strategy."
+    }
+  ],
+  "mandatoryDisclosure": "Opportunity outputs are evidence-backed research signals whose realized outcome remains uncertain.",
+  "compliantOutputs": [
+    {
+      "text": "Opportunity signal identified for SOL pool with estimated positive net utility under conservative execution assumptions.",
+      "hasMandatoryDisclosure": true,
+      "disclosureText": "Opportunity outputs are evidence-backed research signals whose realized outcome remains uncertain."
+    }
+  ]
+}

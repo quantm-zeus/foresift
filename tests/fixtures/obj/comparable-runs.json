@@ -1,0 +1,86 @@
+{
+  "schema": "foresift/obj-comparable-runs-fixture@1",
+  "dimensions": [
+    "CANDIDATE_UNIVERSE",
+    "POPULATION_CLAIM",
+    "CAPITAL",
+    "TIME_WINDOW",
+    "EXECUTION_SCENARIO",
+    "DELAY_POLICY",
+    "DATA_CUTOFF",
+    "CORRELATED_EXPOSURE_CONSTRAINT"
+  ],
+  "baselineRun": {
+    "runId": "run-baseline-001",
+    "candidateUniverse": "UNIVERSE_SOL_DEX_ACTIVE",
+    "populationClaim": "POP_SOL_MINT_2026",
+    "capital": "100000.00",
+    "timeWindow": "2026-06-01T00:00:00Z/2026-06-30T23:59:59Z",
+    "executionScenario": "EXEC_CONSERVATIVE_FILL",
+    "delayPolicy": "DELAY_DISTRIBUTION_P50_P90_TAIL",
+    "dataCutoff": "2026-06-30T23:59:59Z",
+    "correlatedExposureConstraint": "MAX_PER_DEPLOYER_10PCT"
+  },
+  "comparableCandidate": {
+    "runId": "run-comparable-002",
+    "candidateUniverse": "UNIVERSE_SOL_DEX_ACTIVE",
+    "populationClaim": "POP_SOL_MINT_2026",
+    "capital": "100000.00",
+    "timeWindow": "2026-06-01T00:00:00Z/2026-06-30T23:59:59Z",
+    "executionScenario": "EXEC_CONSERVATIVE_FILL",
+    "delayPolicy": "DELAY_DISTRIBUTION_P50_P90_TAIL",
+    "dataCutoff": "2026-06-30T23:59:59Z",
+    "correlatedExposureConstraint": "MAX_PER_DEPLOYER_10PCT",
+    "isComparable": true
+  },
+  "incomparablePerDimension": {
+    "CANDIDATE_UNIVERSE": {
+      "differingField": "candidateUniverse",
+      "differingValue": "UNIVERSE_SOL_FILTERED_SELECTIVE",
+      "isComparable": false,
+      "verdict": "HOLD_EXPLORATORY_ONLY"
+    },
+    "POPULATION_CLAIM": {
+      "differingField": "populationClaim",
+      "differingValue": "POP_EXPANDED_ALL_CHAINS",
+      "isComparable": false,
+      "verdict": "HOLD_EXPLORATORY_ONLY"
+    },
+    "CAPITAL": {
+      "differingField": "capital",
+      "differingValue": "500000.00",
+      "isComparable": false,
+      "verdict": "HOLD_EXPLORATORY_ONLY"
+    },
+    "TIME_WINDOW": {
+      "differingField": "timeWindow",
+      "differingValue": "2026-07-01T00:00:00Z/2026-07-31T23:59:59Z",
+      "isComparable": false,
+      "verdict": "HOLD_EXPLORATORY_ONLY"
+    },
+    "EXECUTION_SCENARIO": {
+      "differingField": "executionScenario",
+      "differingValue": "EXEC_OPTIMISTIC_ZERO_SLIPPAGE",
+      "isComparable": false,
+      "verdict": "HOLD_EXPLORATORY_ONLY"
+    },
+    "DELAY_POLICY": {
+      "differingField": "delayPolicy",
+      "differingValue": "DELAY_ZERO_FIXED",
+      "isComparable": false,
+      "verdict": "HOLD_EXPLORATORY_ONLY"
+    },
+    "DATA_CUTOFF": {
+      "differingField": "dataCutoff",
+      "differingValue": "2026-08-01T00:00:00Z",
+      "isComparable": false,
+      "verdict": "HOLD_EXPLORATORY_ONLY"
+    },
+    "CORRELATED_EXPOSURE_CONSTRAINT": {
+      "differingField": "correlatedExposureConstraint",
+      "differingValue": "UNCONSTRAINED_CONCENTRATION",
+      "isComparable": false,
+      "verdict": "HOLD_EXPLORATORY_ONLY"
+    }
+  }
+}

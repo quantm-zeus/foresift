@@ -1,0 +1,64 @@
+{
+  "schema": "foresift/obj-delay-distributions-fixture@1",
+  "scenarios": [
+    "P50",
+    "P90",
+    "CONSERVATIVE_TAIL"
+  ],
+  "validRobustDistribution": {
+    "distributionId": "delay-dist-standard-sol",
+    "scenarios": {
+      "P50": {
+        "latencyMs": 250,
+        "passGate": true,
+        "netUtility": 45000
+      },
+      "P90": {
+        "latencyMs": 1200,
+        "passGate": true,
+        "netUtility": 32000
+      },
+      "CONSERVATIVE_TAIL": {
+        "latencyMs": 5000,
+        "passGate": true,
+        "netUtility": 12000
+      }
+    },
+    "declaredGate": "ROBUST_ALL_THREE_POSITIVE",
+    "passedRobustGate": true
+  },
+  "failingTailDistribution": {
+    "distributionId": "delay-dist-fragile-tail",
+    "scenarios": {
+      "P50": {
+        "latencyMs": 250,
+        "passGate": true,
+        "netUtility": 55000
+      },
+      "P90": {
+        "latencyMs": 1200,
+        "passGate": true,
+        "netUtility": 15000
+      },
+      "CONSERVATIVE_TAIL": {
+        "latencyMs": 5000,
+        "passGate": false,
+        "netUtility": -35000
+      }
+    },
+    "declaredGate": "ROBUST_ALL_THREE_POSITIVE",
+    "passedRobustGate": false,
+    "verdict": "REJECT_ROBUST_DELAY_FAILED"
+  },
+  "singleDelayOnlyViolation": {
+    "distributionId": "delay-dist-single-p50-only",
+    "scenarios": {
+      "P50": {
+        "latencyMs": 250,
+        "passGate": true,
+        "netUtility": 55000
+      }
+    },
+    "refusalCode": "OBJ_SINGLE_DELAY_EVIDENCE_REFUSED"
+  }
+}

@@ -1,0 +1,56 @@
+{
+  "schema": "foresift/obj-integrity-cases-fixture@1",
+  "signals": [
+    "DENOMINATOR_GAMING",
+    "SELECTIVE_UNIVERSE_CHANGE",
+    "REDUCED_EXPLORATION",
+    "DELAYED_OUTCOME_OMISSION",
+    "HORIZON_SWITCHING",
+    "SCENARIO_CHERRY_PICKING",
+    "REPEATED_HOLDOUT_INSPECTION"
+  ],
+  "cases": {
+    "DENOMINATOR_GAMING": {
+      "signalKind": "DENOMINATOR_GAMING",
+      "evidence": "Unobserved and censored outcomes excluded from denominator to artificially inflate precision",
+      "blocksPromotion": true,
+      "verdict": "BLOCK"
+    },
+    "SELECTIVE_UNIVERSE_CHANGE": {
+      "signalKind": "SELECTIVE_UNIVERSE_CHANGE",
+      "evidence": "Candidate universe silently filtered post-hoc to remove losing assets",
+      "blocksPromotion": true,
+      "verdict": "BLOCK"
+    },
+    "REDUCED_EXPLORATION": {
+      "signalKind": "REDUCED_EXPLORATION",
+      "evidence": "Exploration budget suppressed below pre-registered minimum quota",
+      "blocksPromotion": true,
+      "verdict": "BLOCK"
+    },
+    "DELAYED_OUTCOME_OMISSION": {
+      "signalKind": "DELAYED_OUTCOME_OMISSION",
+      "evidence": "Negative outcomes maturing during delay omitted from performance calculation",
+      "blocksPromotion": true,
+      "verdict": "BLOCK"
+    },
+    "HORIZON_SWITCHING": {
+      "signalKind": "HORIZON_SWITCHING",
+      "evidence": "Evaluation window retrospectively switched from 5M to 24H after observing drawdown",
+      "blocksPromotion": true,
+      "verdict": "BLOCK"
+    },
+    "SCENARIO_CHERRY_PICKING": {
+      "signalKind": "SCENARIO_CHERRY_PICKING",
+      "evidence": "Only favorable fixed-delay scenario reported while p90 and conservative tail failed",
+      "blocksPromotion": true,
+      "verdict": "BLOCK"
+    },
+    "REPEATED_HOLDOUT_INSPECTION": {
+      "signalKind": "REPEATED_HOLDOUT_INSPECTION",
+      "evidence": "Holdout exposure count exceeded threshold with tuning decisions made against holdout partition",
+      "blocksPromotion": true,
+      "verdict": "BLOCK"
+    }
+  }
+}

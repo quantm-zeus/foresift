@@ -652,8 +652,12 @@ test`; plus the extended central suites (`pnpm --filter
       `tests/telemetry-catalog.spec.ts`) and the authored/extended AC files
       (AC-040…044, AC-120…128, AC-150…154, AC-240…249). All green required.
       Traces: FR-MAT-001…012, FR-EVAL-001…009 (package-gate proof of every
-      assigned requirement's substrate).
-- [ ] T039 [executor: COORDINATOR] Regenerate the coordinator test manifest
+      assigned requirement's substrate). [evidence: focused gates green at
+      1b25f73 (outcome-maturity, evaluation 20/20, eval-cli 2/2, persistence
+      17 files, telemetry 53/53, AC 29 acceptance + 29 negative, zero fails;
+      whole-process PGlite accumulation artifacts excluded by per-file
+      isolation) + full pnpm verify green at 5ad26d9; registry flip bf63cdd]
+- [x] T039 [executor: COORDINATOR] [evidence: mechanical zero-AI manifest regen committed at 1b25f73, duties regen 9fd2f1e, duties coverage 537 files missing 0] Regenerate the coordinator test manifest
       (`node scripts/automation/bun-migration-manifest.mjs --out
 evidence/bun-migration/bun-migration-manifest.json`) after all new test
       files exist so `pnpm test`/`test:all` collect and classify them
@@ -668,7 +672,10 @@ evidence/bun-migration/bun-migration-manifest.json`) after all new test
       anything turns red outside writeScopes, classify per governance, fix
       only in-scope failures, and record the rest in the run's out-of-scope
       notes. Traces: FR-MAT-001…012, FR-EVAL-001…009 (full suite + manifest
-      integrity proof).
+      integrity proof). [evidence: full pnpm verify (spec:verify + format +
+      lint + typecheck + coordinator test + node-compat) green at 5ad26d9,
+      zero failed groups; in-scope reds fixed deterministically (format
+      de2c580, lint ccb797f, surfaces 5ad26d9); registry flip bf63cdd]
 
 ## Task → requirement coverage matrix
 

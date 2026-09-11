@@ -1,0 +1,23 @@
+{
+  "name": "@foresift/objective-governance",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Deterministic objective comparison, integrity, claim, delay, and promotion governance.",
+  "exports": {
+    ".": {
+      "types": "./src/index.ts",
+      "default": "./src/index.ts"
+    }
+  },
+  "scripts": {
+    "test": "bun test"
+  },
+  "dependencies": {
+    "@foresift/domain": "workspace:*",
+    "@foresift/evaluation": "workspace:*",
+    "@foresift/outcome-maturity": "workspace:*",
+    "@foresift/shared-schemas": "workspace:*",
+    "@foresift/shadow-portfolio": "workspace:*"
+  }
+}

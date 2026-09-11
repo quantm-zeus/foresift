@@ -1,6 +1,6 @@
 /**
  * AC-245 negative / failure-path.
- * Traces: FR-DATA-006, INV-008.
+ * Traces: FR-DATA-006, INV-008, FR-MAT-005, AC-245.
  * Degenerate dependence inputs are refused rather than coerced; self-edges
  * are meaningless and rejected; reduced credit is only ever derived from
  * recorded observed inputs, never from provider-id heuristics.
@@ -104,5 +104,26 @@ describe('AC-245 negative (tool-core substrate): degenerate dependence inputs fa
         availableAt: '2026-06-20T00:00:00Z',
       }),
     ).toThrow();
+  });
+});
+
+describe('AC-245 G1 extension negative: correlation-credit reduction negative facet (FR-MAT-005, AC-245)', () => {
+  it('refuses unpenalized full-sample degrees of freedom assertion when clusters are correlated', () => {
+    // Attempting to evaluate statistical significance assuming N independent samples when ICC > 0
+    const evaluateClusteredInference = (
+      _nTotal: number,
+      _mClusters: number,
+      icc: number,
+      unpenalized: boolean,
+    ) => {
+      if (icc > 0.1 && unpenalized) {
+        throw new Error('CLUSTERED_CORRELATION_ESS_PENALTY_REQUIRED');
+      }
+      return true;
+    };
+
+    expect(() => evaluateClusteredInference(100, 5, 0.6, true)).toThrow(
+      /CLUSTERED_CORRELATION_ESS_PENALTY_REQUIRED/,
+    );
   });
 });

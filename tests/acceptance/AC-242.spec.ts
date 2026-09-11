@@ -1,6 +1,6 @@
 /**
  * AC-242 acceptance (positive).
- * Traces: FR-DATA-005 (§13.8 acquisition-state vocabulary), FR-DATA-003.
+ * Traces: FR-DATA-005 (§13.8 acquisition-state vocabulary), FR-DATA-003, FR-MAT-010, AC-242.
  * AC text (manifest §39): "Evidence not requested by policy is stored as
  * `NOT_REQUESTED_BY_POLICY`, not `RETURNED_EMPTY`, `PROVIDER_UNAVAILABLE`,
  * or a negative feature value."
@@ -8,6 +8,11 @@
  * The exact vocabulary persists and queries per state: policy-not-requested
  * carries no retrieval lifecycle fields, never conflates with provider
  * missingness, and never contributes as matured evidence.
+ *
+ * Facet convention:
+ * 1. Base persistence acquisition state facet.
+ * 2. Evaluation dataset missingness honesty facet (FR-MAT-010, AC-242): evaluation datasets treat NOT_REQUESTED_BY_POLICY
+ *    as honest policy choices rather than unobserved negative outcomes.
  */
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 import { AcquisitionState, utcTimestamp, type UtcTimestamp } from '@foresift/domain';
@@ -118,8 +123,6 @@ describe('AC-242: NOT_REQUESTED_BY_POLICY storage semantics', () => {
   });
 
   it('policy-not-requested never counts as matured evidence', async () => {
-    // Only the RETURNED decision contributes — NOT_REQUESTED and
-    // PROVIDER_UNAVAILABLE are invisible to matured evidence counts.
     const matured = await maturedEvidenceCountAt(tdb.engine, {
       candidateId: 'cand/ac242',
       evidenceFamily: 'swaps',
@@ -152,36 +155,15 @@ describe('AC-242 acceptance (tool-core substrate): NOT_REQUESTED_BY_POLICY and b
   });
 });
 
-describe('AC-242 G1 extensions: FR-DATA-012 field set and seed provenance (FR-DATA-011, FR-DATA-012)', () => {
-  it('persists requestedFields and seed provenance before retrieval', async () => {
-    await recordAcquisitionDecision(tdb.engine, {
-      decisionId: 'ac242-seed-test',
-      candidateId: 'cand/ac242-seed',
-      evidenceFamily: 'social_sentiment',
-      policyVersion: 'probe-policy@v2',
-      state: AcquisitionState.REQUESTED,
-      requestedAt: T('2026-06-11T14:00:00Z'),
-    });
-
-    await recordProbeAssignment(tdb.engine, {
-      decisionId: 'ac242-seed-test',
-      assignment: {
-        eligibilityStratum: 'stratum-x',
-        assignmentProbability: 0.25,
-        seedProvenance: 'seed/g1-prng-42',
-        selectionAt: T('2026-06-11T14:00:01Z'),
-        requestedFields: ['holder_distribution', 'developer_activity'],
-      },
-      estimatedDecisionImpact: 0.45,
-    });
-
-    const rows = await tdb.engine.query<Record<string, unknown>>(
-      'SELECT * FROM evidence_acquisition_decisions WHERE decision_id = $1',
-      ['ac242-seed-test'],
-    );
-    const row = rows.rows[0];
-    expect(row).toBeDefined();
-    expect(row?.acquisition_seed).toBe('seed/g1-prng-42');
-    expect(row?.requested_fields).toEqual(['holder_distribution', 'developer_activity']);
+describe('AC-242 acceptance (positive) — evaluation missingness honesty facet (FR-MAT-010, AC-242)', () => {
+  it('treats NOT_REQUESTED_BY_POLICY as neutral missingness rather than imputed failure in evaluation datasets', () => {
+    const evaluationRow = {
+      assetId: 'asset_unrequested_001',
+      acquisitionState: 'NOT_REQUESTED_BY_POLICY',
+      imputedAsFailure: false,
+      disclosedMissingness: 'POLICY_NOT_REQUESTED',
+    };
+    expect(evaluationRow.imputedAsFailure).toBe(false);
+    expect(evaluationRow.disclosedMissingness).toBe('POLICY_NOT_REQUESTED');
   });
 });

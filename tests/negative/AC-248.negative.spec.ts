@@ -1,6 +1,6 @@
 /**
  * AC-248 negative / failure-path.
- * Traces: FR-DATA-003, FR-DATA-004.
+ * Traces: FR-DATA-003, FR-DATA-004, FR-MAT-005, AC-248.
  * The count substrate refuses to serve unrealizable projections: a maturity
  * window reaching past the replay boundary is a typed refusal, and a
  * projection over unfrozen evidence stays honestly zero instead of counting
@@ -144,5 +144,22 @@ describe('AC-248 negative (tool-core substrate): invalid watermarks fail schema 
         gapRecoveryStatus: 'NONE',
       }),
     ).toThrow();
+  });
+});
+
+describe('AC-248 G1 extension negative: power/threshold promotion-gate negative facet (FR-MAT-005, AC-248)', () => {
+  it('refuses promotion when mature sample count is below registered minimum threshold', async () => {
+    // Mature count of 0 is below threshold of 10
+    const projection = await projectMaturedCounts(tdb.engine, {
+      candidateId: 'cand/ac248n',
+      evidenceFamily: 'swaps',
+      windowStartInclusive: T('2026-06-01T00:00:00Z'),
+      windowEndInclusive: T('2026-06-02T00:00:00Z'),
+      resolvedAt: T('2026-06-05T00:00:00Z'),
+      promotionThreshold: 10,
+    });
+
+    expect(projection.maturedCount).toBe(0);
+    expect(projection.promotionEligible).toBe(false);
   });
 });

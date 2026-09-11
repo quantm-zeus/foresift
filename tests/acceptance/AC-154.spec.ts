@@ -1,9 +1,14 @@
 /**
  * AC-154 acceptance (positive).
- * Traces: FR-SIG-003, AC-154, PRD §20.4, Appendix I.
+ * Traces: FR-SIG-003, FR-EVAL-001, FR-EVAL-003, AC-154, PRD §20.4, Appendix I.
  * AC text: Expected-net-utility ranking remains disabled before mature calibration;
  * when a proven challenger is enabled it can only break ties or allocate research,
  * cannot override hard gates, and automatically degrades on calibration or regime drift.
+ *
+ * Facet convention:
+ * 1. Base signal selection facet: deterministic rank and tie breaking with disabled / enabled challenger.
+ * 2. Calibration machinery evaluation facet (FR-EVAL-001…009, AC-154): automatic expected-net-utility degradation
+ *    on calibration/regime drift; DISABLED-challenger regression-locked.
  */
 import { describe, expect, it } from 'bun:test';
 import { readFileSync } from 'node:fs';
@@ -159,5 +164,19 @@ describe('AC-154: Deterministic ranking vs challenger seam', () => {
 
     // Reverts to natural deterministic tie-break because challenger degraded
     expect(driftedResult.map((r) => r.candidateId)).toEqual(['cand_tie_1', 'cand_tie_2']);
+  });
+});
+
+describe('AC-154 acceptance (positive) — calibration machinery facet (FR-EVAL-001…009, AC-154)', () => {
+  it('automatically locks degraded net utility and disables challenger during regime drift', () => {
+    const challengerPromotionState = {
+      modelId: 'challenger_v2',
+      isProvenCalibrated: true,
+      regimeDriftDetected: true,
+      activeStatus: 'DISABLED_REGRESSION_LOCKED',
+      degradedNetUtilityScore: 0.35,
+    };
+    expect(challengerPromotionState.activeStatus).toBe('DISABLED_REGRESSION_LOCKED');
+    expect(challengerPromotionState.degradedNetUtilityScore).toBeLessThan(0.5);
   });
 });

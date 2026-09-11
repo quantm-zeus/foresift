@@ -60,7 +60,7 @@ then fixtures and AC suites, then telemetry and gates.
 
 ## Phase 1 — Domain vocabularies and pure laws (blocks later phases)
 
-- [ ] T001 [P] Create `packages/domain/src/mat.ts`: `Horizon` (4), `CensorReason`
+- [x] T001 [P] Create `packages/domain/src/mat.ts`: `Horizon` (4), `CensorReason`
       (5), `InvalidReason` (5), `DenominatorDisclosureClass` (9),
       `OutcomeLabelFamily` (5), `EvidenceResolution` (3), `ExpirySideEffect`
       (3) as const objects with fail-closed parse functions throwing typed
@@ -91,7 +91,7 @@ then fixtures and AC suites, then telemetry and gates.
       by the test-owned task T020 (2026-09-07 ownership law). Traces:
       FR-MAT-001, FR-MAT-003, FR-MAT-006, FR-MAT-008, FR-MAT-009, FR-MAT-011,
       FR-MAT-012.
-- [ ] T002 [P] Create `packages/domain/src/eval.ts`: `DatasetPartition` (6),
+- [x] T002 [P] Create `packages/domain/src/eval.ts`: `DatasetPartition` (6),
       `HoldoutExposure` (5), `ReplayKind` (5), `MultipleTestingFamily` (8),
       `ControlKind` (14), `IncidentTrigger` (9), `BaselineKind` (10),
       `IntervalMethod` (4), `ClusterDefinition` (9), `DriftControlKind` (5),
@@ -124,7 +124,7 @@ then fixtures and AC suites, then telemetry and gates.
       tests are authored by the test-owned task T020 (ownership law).
       Traces: FR-MAT-004, FR-MAT-005, FR-EVAL-002, FR-EVAL-003, FR-EVAL-009,
       AC-240, AC-242, AC-244, AC-248, AC-249.
-- [ ] T003 [serial-reason: SEMANTIC_DEPENDENCY] Extend
+- [x] T003 [serial-reason: SEMANTIC_DEPENDENCY] Extend
       `packages/domain/src/errors.ts` with the MAT__/EVAL__ error-code blocks
       and the `MatError`/`EvalError` subclasses, and extend
       `packages/domain/src/index.ts` exports for the new mat and eval modules.
@@ -132,7 +132,7 @@ then fixtures and AC suites, then telemetry and gates.
 
 ## Phase 2 — Shared schemas (blocks persistence repos and PGlite suites)
 
-- [ ] T004 [serial-reason: SEMANTIC_DEPENDENCY] Create
+- [x] T004 [serial-reason: SEMANTIC_DEPENDENCY] Create
       `packages/shared-schemas/src/mat.ts` + `packages/shared-schemas/src/eval.ts`
       and extend `packages/shared-schemas/src/index.ts`: mat —
       `OutcomeMaturityStateSchema`, `MaturityTransitionSchema`,
@@ -161,7 +161,7 @@ then fixtures and AC suites, then telemetry and gates.
 
 ## Phase 3 — Persistence: migration families + registry + mirror (blocks repos and PGlite suites)
 
-- [ ] T005 [serial-reason: ORDERED_MIGRATION] Create
+- [x] T005 [serial-reason: ORDERED_MIGRATION] Create
       `migrations/g1_mat_0001_maturity_ledger.sql`:
       `outcome_maturity_states` (§12.8 five-state CHECK, §68.3 censor (5) +
       invalid (5) reason CHECKs transcribed verbatim, unique per
@@ -178,7 +178,7 @@ then fixtures and AC suites, then telemetry and gates.
       triggers on states, disclosures, subjective records, and assignments
       (G0 pattern). Apply-on-PGlite clean, idempotent on replay. Traces:
       FR-MAT-001, FR-MAT-002, FR-MAT-003, FR-MAT-006, FR-MAT-007, FR-MAT-010.
-- [ ] T006 [serial-reason: ORDERED_MIGRATION] Create
+- [x] T006 [serial-reason: ORDERED_MIGRATION] Create
       `migrations/g1_mat_0002_promotion_evidence.sql`:
       `promotion_evidence_records` (FR-MAT-008 exact-configuration columns
       required_notional/delay/adapter/route/exit-policy,
@@ -188,7 +188,7 @@ then fixtures and AC suites, then telemetry and gates.
       expiry-side-effect CHECK + post_expiry_gain_excluded; FR-MAT-012
       decimal-string capacity disclosure pair CHECK); append-only trigger.
       Traces: FR-MAT-008, FR-MAT-009, FR-MAT-011, FR-MAT-012.
-- [ ] T007 [serial-reason: ORDERED_MIGRATION] Create
+- [x] T007 [serial-reason: ORDERED_MIGRATION] Create
       `migrations/g1_eval_0001_profiles_datasets_registry.sql`:
       `outcome_profiles` (FR-EVAL-001: §8.3-shaped eligibility/success/failure/
       neutral clauses as jsonb + population_scope §7.8 CHECK (6) + immutable
@@ -198,7 +198,7 @@ then fixtures and AC suites, then telemetry and gates.
       `evaluation_experiments` (FR-EVAL-009 §31.3 exact field set incl.
       multiple_testing_family CHECK (8), pre-registration timestamp);
       append-only triggers. Traces: FR-EVAL-001, FR-EVAL-009.
-- [ ] T008 [serial-reason: ORDERED_MIGRATION] Create
+- [x] T008 [serial-reason: ORDERED_MIGRATION] Create
       `migrations/g1_eval_0002_runs_metrics_controls.sql`:
       `evaluation_runs` (FR-EVAL-002 §31.5 field set: replay_kind CHECK (5),
       network_access CHECK, all version columns, holdout snapshot,
@@ -214,7 +214,7 @@ then fixtures and AC suites, then telemetry and gates.
       `evaluation_incidents` (§68.12: trigger CHECK (9), influence-paused);
       append-only triggers. Traces: FR-MAT-004, FR-MAT-005, FR-EVAL-002,
       FR-EVAL-003, FR-EVAL-009.
-- [ ] T009 [serial-reason: ORDERED_MIGRATION] Create
+- [x] T009 [serial-reason: ORDERED_MIGRATION] Create
       `migrations/g1_eval_0003_baseline_missed_controls.sql`:
       `baseline_results` (FR-EVAL-004: baseline_kind CHECK (10),
       comparator-universe-match CHECK),
@@ -229,14 +229,14 @@ then fixtures and AC suites, then telemetry and gates.
       G.11 max-weight ≤ 20 CHECK, weighting-requires-diagnostics CHECK,
       claim_restriction CHECK (3)); append-only triggers. Traces:
       FR-EVAL-004, FR-EVAL-005, FR-EVAL-007, FR-EVAL-008, FR-EVAL-009.
-- [ ] T010 [serial-reason: SEMANTIC_DEPENDENCY] Extend
+- [x] T010 [serial-reason: SEMANTIC_DEPENDENCY] Extend — [evidence: NO_OP_ALREADY_SATISFIED] MIGRATION_FAMILIES includes exactly mat|eval at packages/persistence/src/migrator.ts:50 (MIGRATION_FILE_PATTERN line 53); commit 4f66aaa
       `packages/persistence/src/migrator.ts` MIGRATION_FAMILIES with `mat|eval`
       (the plan-sanctioned central-registry source exception, exact path:
       `^g\d+_(data|dr|sec|prov|core|cost|col|disc|mcp|trace|sig|solsec|trd|sup|exec|mat|eval)_\d{4}_[a-z0-9_]+\.sql$`)
       — the fail-closed unknown-family refusal must accept exactly the five
       new scripts and nothing else. Depends on T005–T009. Traces: FR-MAT-001…012,
       FR-EVAL-001…009 (persistence substrate for every assigned requirement).
-- [ ] T011 [serial-reason: SEMANTIC_DEPENDENCY] Extend
+- [x] T011 [serial-reason: SEMANTIC_DEPENDENCY] Extend — [evidence: NO_OP_ALREADY_SATISFIED] all mat/eval mirror tables present in packages/persistence/src/generated/schema.ts (outcome_maturity_states, maturity_transitions, outcome_denominator_disclosures, subjective_utility_records, outcome_sampling_strata, outcome_sampling_assignments confirmed); commit 8c98f83
       `packages/persistence/src/generated/schema.ts` (ADR-001 mirror
       catch-up, exact path) with the mat/eval public tables: mirror
       definitions for `outcome_maturity_states`, `maturity_transitions`,
@@ -254,7 +254,7 @@ then fixtures and AC suites, then telemetry and gates.
 
 ## Phase 4 — Outcome-maturity package core (blocks evaluation engine and AC suites)
 
-- [ ] T012 [serial-reason: SEMANTIC_DEPENDENCY] Scaffold
+- [x] T012 [serial-reason: SEMANTIC_DEPENDENCY] Scaffold
       `packages/outcome-maturity` and `packages/evaluation` and
       `packages/eval-cli` (package.json `@foresift/outcome-maturity`,
       `@foresift/evaluation`, `@foresift/eval-cli` with workspace `*` deps:
@@ -265,7 +265,7 @@ then fixtures and AC suites, then telemetry and gates.
       tsconfig extending tsconfig.base.json; bin entry for eval-cli; no
       per-package runner config — G0/G1 scaffold pattern). Depends on
       T001–T011. Traces: FR-MAT-001…012, FR-EVAL-001…009.
-- [ ] T013 [serial-reason: SEMANTIC_DEPENDENCY] Implement
+- [x] T013 [serial-reason: SEMANTIC_DEPENDENCY] Implement
       `packages/outcome-maturity/src/maturity-ledger.ts` + extend index.ts:
       FR-MAT-001/002 — maturity resolution per candidate × profile/horizon/
       scenario over the proven `execution_simulations` records and
@@ -280,7 +280,7 @@ then fixtures and AC suites, then telemetry and gates.
       provisional-scope labeling. Depends on T001, T004, T005, T012.
       Colocated suites authored by test-owned T020. Traces: FR-MAT-001,
       FR-MAT-002, AC-123.
-- [ ] T014 [serial-reason: SEMANTIC_DEPENDENCY] Implement
+- [x] T014 [serial-reason: SEMANTIC_DEPENDENCY] Implement
       `packages/outcome-maturity/src/denominators.ts` +
       `src/label-separation.ts`: FR-MAT-010 — denominator disclosure
       assembly counting every excluded class (invalid, censored, partial,
@@ -294,7 +294,7 @@ then fixtures and AC suites, then telemetry and gates.
       MAT_SUBJECTIVE_JOIN_REFUSED), subjective utility recorded only in its
       own plane. Depends on T013. Colocated suites authored by T020.
       Traces: FR-MAT-006, FR-MAT-010, AC-123, AC-125, AC-239.
-- [ ] T015 [serial-reason: SEMANTIC_DEPENDENCY] Implement
+- [x] T015 [serial-reason: SEMANTIC_DEPENDENCY] Implement
       `packages/outcome-maturity/src/sampling.ts`: FR-MAT-007 — stratified
       sampling assignment admission (dimensions across rank/rejection
       reason/source/launchpad/age/regime/profile/coverage per §31.8,
@@ -308,7 +308,7 @@ then fixtures and AC suites, then telemetry and gates.
       samples can never produce universe-wide claims (§31.8). Depends on
       T002, T004, T005, T012. Colocated suites authored by T020. Traces:
       FR-MAT-007, AC-128, AC-244.
-- [ ] T016 [serial-reason: SEMANTIC_DEPENDENCY] Implement
+- [x] T016 [serial-reason: SEMANTIC_DEPENDENCY] Implement
       `packages/outcome-maturity/src/promotion-evidence.ts`: FR-MAT-008 —
       exact-configuration matching of TRADABLE_SUCCESS promotion claims
       against fully matured high-resolution execution evidence for the
@@ -329,7 +329,7 @@ then fixtures and AC suites, then telemetry and gates.
       larger notional. Depends on T013–T015. Colocated suites authored by
       T020. Traces: FR-MAT-008, FR-MAT-009, FR-MAT-011, FR-MAT-012, AC-120,
       AC-126, AC-152.
-- [ ] T017 [P] Implement `packages/outcome-maturity/src/read-only-guard.ts`:
+- [x] T017 [P] Implement `packages/outcome-maturity/src/read-only-guard.ts`:
       INV-001 structural surface asserting the package exposes no
       transaction-construction/submission/custody/signing surface and no
       model-provider/agent import; prohibited-capability scanner hook
@@ -338,7 +338,7 @@ then fixtures and AC suites, then telemetry and gates.
 
 ## Phase 5 — Evaluation engine (blocks CLI and AC suites)
 
-- [ ] T018 [serial-reason: SEMANTIC_DEPENDENCY] Implement
+- [x] T018 [serial-reason: SEMANTIC_DEPENDENCY] Implement
       `packages/evaluation/src/profiles.ts` + `src/frozen-replay.ts` +
       `src/action-time.ts`: FR-EVAL-001 — the versioned §8.3-shaped outcome
       profile registry (immutable versions; population scope; required
@@ -357,7 +357,7 @@ then fixtures and AC suites, then telemetry and gates.
       challenger/control/missed arms (AC-240). Depends on T002, T004,
       T007–T009, T012. Colocated suites authored by test-owned T020.
       Traces: FR-EVAL-001, FR-EVAL-002, AC-240, AC-241, AC-247.
-- [ ] T019 [serial-reason: SEMANTIC_DEPENDENCY] Implement
+- [x] T019 [serial-reason: SEMANTIC_DEPENDENCY] Implement
       `packages/evaluation/src/metrics.ts` + `src/baselines.ts`:
       FR-EVAL-003 — the §31.6 metric suite over matured denominators
       (Precision@K, Recall@eligible-gems, NDCG@K, false discovery/rejection,
@@ -376,11 +376,11 @@ then fixtures and AC suites, then telemetry and gates.
       selection recorded and refused as comparator). Depends on T013–T016,
       T018. Colocated suites authored by T020. Traces: FR-EVAL-003,
       FR-EVAL-004, AC-040, AC-041, AC-042, AC-123.
-- [ ] T020 is reserved for the test lane (see Phase 7): product tasks do not
+- [x] T020 is reserved for the test lane (see Phase 7): product tasks do not — [evidence: NO_OP_ALREADY_SATISFIED] planning-time numbering reservation; body carries [evidence: NO_OP_ALREADY_SATISFIED]; no product code exists or is required
       author suites. — [evidence: NO_OP_ALREADY_SATISFIED] planning-time
       numbering reservation only; no product code.
       Traces: FR-MAT-001…012, FR-EVAL-001…009.
-- [ ] T021 [serial-reason: SEMANTIC_DEPENDENCY] Implement
+- [x] T021 [serial-reason: SEMANTIC_DEPENDENCY] Implement
       `packages/evaluation/src/missed-opportunity.ts` + `src/exploration.ts`:
       FR-EVAL-005 — the §31.10 Missed Opportunity Analyzer steps 1–8 over the
       proven `disc.discovery_universe_entries` + coverage populations +
@@ -397,7 +397,7 @@ then fixtures and AC suites, then telemetry and gates.
       enters evaluation under the same action-time semantics). Depends on
       T018. Colocated suites authored by test-owned T027. Traces:
       FR-EVAL-005, FR-EVAL-006, AC-041, AC-043.
-- [ ] T022 [serial-reason: SEMANTIC_DEPENDENCY] Implement
+- [x] T022 [serial-reason: SEMANTIC_DEPENDENCY] Implement
       `packages/evaluation/src/controls.ts` + `src/intervals.ts` +
       `src/incident.ts`: FR-MAT-004 — the §68.5 negative-control harness
       (label permutation, feature-time shift, delayed-provider placebo,
@@ -416,7 +416,7 @@ then fixtures and AC suites, then telemetry and gates.
       the data-truth owner via AC-249 extension). Depends on T002, T013,
       T018. Colocated suites authored by test-owned T027. Traces:
       FR-MAT-004, FR-MAT-005, AC-150, AC-151, AC-245, AC-246, AC-249.
-- [ ] T023 [serial-reason: SEMANTIC_DEPENDENCY] Implement
+- [x] T023 [serial-reason: SEMANTIC_DEPENDENCY] Implement
       `packages/evaluation/src/champion-challenger.ts` +
       `src/drift-calibration.ts` + `src/experiments.ts` +
       `src/selection-bias.ts`: FR-EVAL-007 — §31.12 comparison (same
@@ -439,7 +439,7 @@ then fixtures and AC suites, then telemetry and gates.
       validity, and the claim-restriction fallback. Depends on T018–T022.
       Colocated suites authored by test-owned T027. Traces: FR-EVAL-007,
       FR-EVAL-008, FR-EVAL-009, AC-154, AC-243, AC-244, AC-248, AC-249.
-- [ ] T024 [P] Implement `packages/evaluation/src/read-only-guard.ts`:
+- [x] T024 [P] Implement `packages/evaluation/src/read-only-guard.ts`:
       INV-001 structural surface (no execution/custody/signing/submission
       surface, no model-provider/agent import — the deterministic evaluation
       path is closed to learned input; §31.5 network denial asserted);
@@ -448,7 +448,7 @@ then fixtures and AC suites, then telemetry and gates.
 
 ## Phase 6 — Evaluation CLI (blocks gates)
 
-- [ ] T025 [serial-reason: SEMANTIC_DEPENDENCY] Implement
+- [x] T025 [serial-reason: SEMANTIC_DEPENDENCY] Implement
       `packages/eval-cli/src/cli.ts` + `src/report.ts` + `src/exit-codes.ts` +
       index.ts and the bin entry: the deterministic command surface
       (`maturity-sweep`, `dataset-build`, `replay-run`, `metric-report`,
@@ -464,7 +464,7 @@ then fixtures and AC suites, then telemetry and gates.
 
 ## Phase 7 — Fixtures and acceptance/negative suites (blocks gates)
 
-- [ ] T026 [P] [executor: TEST] Author `tests/fixtures/mat/maturity-vectors.ts` +
+- [x] T026 [P] [executor: TEST] Author `tests/fixtures/mat/maturity-vectors.ts` +
       `tests/fixtures/mat/denominator-vectors.ts`: §12.8/§68.1 maturity
       vectors over every horizon and maturity state (pending → partial →
       matured progression, absorbing censor/invalid, no-reset regression
@@ -473,7 +473,7 @@ then fixtures and AC suites, then telemetry and gates.
       (invalid, censored, partial, low-resolution, rights-blocked,
       unobserved, signal-only) and hand-computed expected denominators.
       Traces: FR-MAT-001, FR-MAT-002, FR-MAT-003, FR-MAT-010, AC-123, AC-124.
-- [ ] T027 [P] [executor: TEST] Author `tests/fixtures/mat/sampling-vectors.ts` +
+- [x] T027 [P] [executor: TEST] Author `tests/fixtures/mat/sampling-vectors.ts` +
       `tests/fixtures/mat/promotion-evidence-vectors.ts`: §31.8 stratified
       sampling vectors (strata across the eight dimensions, inclusion
       probabilities, Horvitz–Thompson expected weighted estimates,
@@ -484,7 +484,7 @@ then fixtures and AC suites, then telemetry and gates.
       gains, capacity-limited opportunities with expected notional/capacity
       disclosures). Traces: FR-MAT-007, FR-MAT-008, FR-MAT-009, FR-MAT-011,
       FR-MAT-012, AC-128, AC-152.
-- [ ] T028 [P] [executor: TEST] Author `tests/fixtures/eval/profiles.ts` +
+- [x] T028 [P] [executor: TEST] Author `tests/fixtures/eval/profiles.ts` +
       `tests/fixtures/eval/datasets.ts` + `tests/fixtures/eval/metrics-vectors.ts`:
       §8.3-shaped profile vectors (population scopes, success/failure/neutral
       clauses, stress pass matrices), §31.2 dataset vectors (six partitions,
@@ -493,7 +493,7 @@ then fixtures and AC suites, then telemetry and gates.
       recall/NDCG, rank, lead time, MFE/MAE, survival, divergence, maturity
       rates, deterministic expectancy/drawdown/CVaR components) over the
       maturity fixtures. Traces: FR-EVAL-001, FR-EVAL-002, FR-EVAL-003, AC-040.
-- [ ] T029 [P] [executor: TEST] Author `tests/fixtures/eval/baselines.ts` +
+- [x] T029 [P] [executor: TEST] Author `tests/fixtures/eval/baselines.ts` +
       `tests/fixtures/eval/missed-opportunities.ts` +
       `tests/fixtures/eval/controls-vectors.ts` +
       `tests/fixtures/eval/intervals-vectors.ts`: §31.7 baseline vectors
@@ -507,7 +507,7 @@ then fixtures and AC suites, then telemetry and gates.
       divergence, alternate-cluster sensitivity, ESS gate cases). Traces:
       FR-EVAL-004, FR-EVAL-005, FR-MAT-004, FR-MAT-005, AC-042, AC-150,
       AC-151.
-- [ ] T030 [P] [executor: TEST] Author the colocated product-side suites under
+- [x] T030 [P] [executor: TEST] Author the colocated product-side suites under — [evidence: NO_OP_ALREADY_SATISFIED] reconciled pre-provider (already satisfied at trusted base)
       `packages/domain/test/` (`mat.spec.ts`, `eval.spec.ts`) and
       `packages/shared-schemas/test/` (`mat.spec.ts`, `eval.spec.ts`): the
       18 vocabulary objects with fail-closed parse functions and stable
@@ -524,7 +524,7 @@ then fixtures and AC suites, then telemetry and gates.
       incident, weighting-requires-diagnostics, unknown enum refusal, strict
       unknown-key refusal, ISO-8601 timestamps, sha256 refs, decimal-string
       metric law). Traces: FR-MAT-001…012, FR-EVAL-001…009.
-- [ ] T031 [P] [executor: TEST] Author colocated package suites under
+- [x] T031 [P] [executor: TEST] Author colocated package suites under — [evidence: NO_OP_ALREADY_SATISFIED] reconciled pre-provider (already satisfied at trusted base)
       `packages/outcome-maturity/test/` (maturity-ledger.spec.ts,
       denominators.spec.ts, label-separation.spec.ts, sampling.spec.ts,
       promotion-evidence.spec.ts, read-only-guard.spec.ts) and
@@ -545,14 +545,14 @@ then fixtures and AC suites, then telemetry and gates.
       diagnostics; no-execution/no-LLM structural scans. PGlite-backed
       suites classified DATABASE_PGLITE via the coordinator manifest (T035).
       Traces: FR-MAT-001…012, FR-EVAL-001…009.
-- [ ] T032 [P] [executor: TEST] Author `packages/eval-cli/test/cli.spec.ts`:
+- [x] T032 [P] [executor: TEST] Author `packages/eval-cli/test/cli.spec.ts`:
       end-to-end command runs on PGlite (maturity-sweep → dataset-build →
       replay-run → metric-report with disclosure output → baseline-compare →
       missed-scan → controls-run), exit-code and typed-refusal reporting,
       report JSON carrying population claim + denominator disclosures, and
       the no-network assertion (§31.5 denial at the CLI seam). Traces:
       FR-EVAL-001…009, FR-MAT-010.
-- [ ] T033 [P] [executor: TEST] Author the 18 new AC files
+- [x] T033 [P] [executor: TEST] Author the 18 new AC files
       `tests/acceptance/AC-040.spec.ts` + `tests/negative/AC-040.negative.spec.ts`
       through `AC-044` pair + `AC-150` pair + `AC-151` pair + `AC-152` pair +
       `AC-153` pair (positive AND negative each): AC-040 separate
@@ -569,7 +569,7 @@ then fixtures and AC suites, then telemetry and gates.
       free-tier degradation preserves integrity/audit/dedup/critical-risk
       monitoring (outcome observation as protected reserve). Traces:
       FR-MAT-001…012, FR-EVAL-001…009, AC-040…044, AC-150…153.
-- [ ] T034 [P] [executor: TEST] Extend shared AC suites IN PLACE (facet
+- [x] T034 [P] [executor: TEST] Extend shared AC suites IN PLACE (facet — [evidence: NO_OP_ALREADY_SATISFIED] AC facet suites landed by 02be866; lane 00efcc93 base-assertion corrections salvaged at d097f66 (AC-127 frozen-replay keys match tests/fixtures/exec/stress-cases.json; AC-154 expectedRank reference ranker matches tests/fixtures/sig/funnel-selection.json); 7/7 focused green; all T034 facet describes retained
       convention — never rewrite or weaken existing cases; header trace
       lists updated): `AC-120` pair + `AC-121` pair + `AC-122` pair +
       `AC-126` pair + `AC-127` pair (evaluation-side replay/label facets at
@@ -603,13 +603,13 @@ then fixtures and AC suites, then telemetry and gates.
 
 ## Phase 7b — Central registry extensions (blocks gates; plan-sanctioned scope exceptions)
 
-- [ ] T035 [P] [executor: TEST] Extend `tests/telemetry-catalog.spec.ts` — the
+- [x] T035 [P] [executor: TEST] Extend `tests/telemetry-catalog.spec.ts` — the — [evidence: NO_OP_ALREADY_SATISFIED] reconciled pre-provider (already satisfied at trusted base)
       plan-sanctioned central-parity scope exception (milestone plan-level
       decision 4, exact path) — with `telemetry/mat.catalog.json` and
       `telemetry/eval.catalog.json` assertions pinning every new event's
       fields to the authoritative shared schemas field-for-field. No product
       surface is authored here. Traces: FR-MAT-001…012, FR-EVAL-001…009.
-- [ ] T036 [P] [executor: TEST] Extend the central expected-script registry
+- [x] T036 [P] [executor: TEST] Extend the central expected-script registry — [evidence: NO_OP_ALREADY_SATISFIED] migrator.spec.ts contains all 5 g1_mat/g1_eval registry ids in ALL expected-script lists; applied/skipped counts = 65 (lines 124/470); provenance fe9eb14 + 2288e08
       `packages/persistence/test/migrator.spec.ts` — the plan-sanctioned
       scope exception (ADR-0019/0022 duty, exact path): add
       `g1_mat_0001_maturity_ledger`, `g1_mat_0002_promotion_evidence`,
@@ -622,7 +622,7 @@ then fixtures and AC suites, then telemetry and gates.
 
 ## Phase 8 — Telemetry catalog, manifest regen, and gates
 
-- [ ] T037 [P] Create `telemetry/mat.catalog.json` +
+- [x] T037 [P] Create `telemetry/mat.catalog.json` +
       `telemetry/eval.catalog.json` (DECLARATIVE_CONTRACT_ONLY header
       preserved, fields mirroring `packages/shared-schemas/src/mat.ts` /
       `eval.ts` exactly, requirementRefs per event):
@@ -642,7 +642,7 @@ then fixtures and AC suites, then telemetry and gates.
       central telemetry parity suite is extended by the test-owned task T035
       in the same package — the plan-sanctioned central-parity scope
       exception. Traces: FR-MAT-001…012, FR-EVAL-001…009.
-- [ ] T038 [executor: COORDINATOR] [evidence: VERIFICATION_ONLY] Run the
+- [x] T038 [executor: COORDINATOR] [evidence: VERIFICATION_ONLY] Run the
       milestone verification commands on the canonical tree: `test -d
 packages/outcome-maturity && pnpm --filter @foresift/outcome-maturity test`;
       `test -d packages/evaluation && pnpm --filter @foresift/evaluation
@@ -652,8 +652,12 @@ test`; plus the extended central suites (`pnpm --filter
       `tests/telemetry-catalog.spec.ts`) and the authored/extended AC files
       (AC-040…044, AC-120…128, AC-150…154, AC-240…249). All green required.
       Traces: FR-MAT-001…012, FR-EVAL-001…009 (package-gate proof of every
-      assigned requirement's substrate).
-- [ ] T039 [executor: COORDINATOR] Regenerate the coordinator test manifest
+      assigned requirement's substrate). [evidence: focused gates green at
+      1b25f73 (outcome-maturity, evaluation 20/20, eval-cli 2/2, persistence
+      17 files, telemetry 53/53, AC 29 acceptance + 29 negative, zero fails;
+      whole-process PGlite accumulation artifacts excluded by per-file
+      isolation) + full pnpm verify green at 5ad26d9; registry flip bf63cdd]
+- [x] T039 [executor: COORDINATOR] [evidence: mechanical zero-AI manifest regen committed at 1b25f73, duties regen 9fd2f1e, duties coverage 537 files missing 0] Regenerate the coordinator test manifest
       (`node scripts/automation/bun-migration-manifest.mjs --out
 evidence/bun-migration/bun-migration-manifest.json`) after all new test
       files exist so `pnpm test`/`test:all` collect and classify them
@@ -661,14 +665,17 @@ evidence/bun-migration/bun-migration-manifest.json`) after all new test
       contract). Mechanical bookkeeping (ADR-0020: coordinator-owned,
       zero-AI). Traces: FR-MAT-001…012, FR-EVAL-001…009 (verification
       substrate for every assigned requirement).
-- [ ] T040 [executor: COORDINATOR] [evidence: VERIFICATION_ONLY] Run the full
+- [x] T040 [executor: COORDINATOR] [evidence: VERIFICATION_ONLY] Run the full
       aggregate gate `pnpm verify` and the integrity gate `pnpm spec:verify`
       at the pushed HEAD; require green (the complete Bun suite runs ONLY
       through the coordinator — never a bare `bun test` over the tree). If
       anything turns red outside writeScopes, classify per governance, fix
       only in-scope failures, and record the rest in the run's out-of-scope
       notes. Traces: FR-MAT-001…012, FR-EVAL-001…009 (full suite + manifest
-      integrity proof).
+      integrity proof). [evidence: full pnpm verify (spec:verify + format +
+      lint + typecheck + coordinator test + node-compat) green at 5ad26d9,
+      zero failed groups; in-scope reds fixed deterministically (format
+      de2c580, lint ccb797f, surfaces 5ad26d9); registry flip bf63cdd]
 
 ## Task → requirement coverage matrix
 

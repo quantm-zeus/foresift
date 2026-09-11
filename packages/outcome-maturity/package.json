@@ -1,0 +1,21 @@
+{
+  "name": "@foresift/outcome-maturity",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Append-only outcome maturity, denominator, sampling, and promotion-evidence laws.",
+  "exports": {
+    ".": {
+      "types": "./src/index.ts",
+      "default": "./src/index.ts"
+    }
+  },
+  "scripts": {
+    "test": "bun test"
+  },
+  "dependencies": {
+    "@foresift/domain": "workspace:*",
+    "@foresift/persistence": "workspace:*",
+    "@foresift/shared-schemas": "workspace:*"
+  }
+}

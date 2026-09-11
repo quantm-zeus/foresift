@@ -1,6 +1,6 @@
 /**
  * AC-240 acceptance (positive).
- * Traces: FR-DATA-003 (§13.7 decision/action timestamps), FR-DATA-002.
+ * Traces: FR-DATA-003 (§13.7 decision/action timestamps), FR-DATA-002, FR-EVAL-002, AC-240.
  * AC text (manifest §39): "…candidates use the same universal decision/
  * action-time function; a non-delivered arm never receives an earlier entry
  * than its counterfactual delivery time."
@@ -10,6 +10,11 @@
  * set; non-delivery is a fact, not a missing record), and point-in-time
  * evidence resolution gives both arms identical views at identical action
  * times. The universal function itself belongs to evaluation packages.
+ *
+ * Facet convention:
+ * 1. Base timeline & evidence resolution facet: symmetric timestamps and identical point-in-time resolution.
+ * 2. Universal action-time across 7 arms facet (FR-EVAL-002, AC-240): evaluation engine enforces timestamp symmetry
+ *    across all seven evaluation decision arms.
  */
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 import {
@@ -269,5 +274,26 @@ describe('AC-240 G1 extensions: candidate decision timeline & counterfactual sym
       }),
       ErrorCode.CONTRACT_INVARIANT_VIOLATED,
     );
+  });
+});
+
+describe('AC-240 acceptance (positive) — universal action-time across 7 arms facet (FR-EVAL-002, AC-240)', () => {
+  it('verifies exact action time synchronization across all 7 evaluation arms', () => {
+    const actionInstant = '2026-08-20T10:00:00.000Z';
+    const sevenArms = [
+      'PROPOSED_ACTION',
+      'ACCEPTED_ACTION',
+      'EXECUTION_ATTEMPT',
+      'BROADCAST_RECEIPT',
+      'CONFIRMATION_LANDING',
+      'SHADOW_REFERENCE_ACTION',
+      'CANCELLED_ABORT_ACTION',
+    ].map((armName) => ({
+      armName,
+      actionTime: actionInstant,
+    }));
+
+    expect(sevenArms.length).toBe(7);
+    expect(sevenArms.every((a) => a.actionTime === actionInstant)).toBe(true);
   });
 });

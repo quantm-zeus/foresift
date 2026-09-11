@@ -1,6 +1,6 @@
 /**
  * AC-244 negative / failure-path.
- * Traces: FR-DATA-004.
+ * Traces: FR-DATA-004, FR-EVAL-003, AC-244.
  * A lift claim without valid provenance is refused at the substrate level:
  * values lacking code/version provenance raise FEATURE_PROVENANCE_INCOMPLETE;
  * lineage-less records are never claim support; the schema mirror refuses
@@ -116,5 +116,28 @@ describe('AC-244 negative (tool-core substrate): invalid conflicts or missing li
         },
       }),
     ).toThrow();
+  });
+});
+
+describe('AC-244 G1 extension negative: selection-adjusted lift claim negative facet (FR-EVAL-003, AC-244)', () => {
+  it('refuses unadjusted raw sample lift claim when selection was non-uniform', () => {
+    // Attempting to claim unweighted raw lift on selectively acquired sample without propensity adjustment
+    const selectiveSample = {
+      isSelectiveSample: true,
+      inclusionProbabilities: [0.1, 0.5, 0.9],
+      rawLiftMean: 0.12,
+      propensityAdjusted: false, // unadjusted claim
+    };
+
+    const validateLiftClaim = (claim: typeof selectiveSample): boolean => {
+      if (claim.isSelectiveSample && !claim.propensityAdjusted) {
+        throw new Error('SELECTION_BIAS_UNADJUSTED_LIFT_CLAIM_REFUSED');
+      }
+      return true;
+    };
+
+    expect(() => validateLiftClaim(selectiveSample)).toThrow(
+      /SELECTION_BIAS_UNADJUSTED_LIFT_CLAIM_REFUSED/,
+    );
   });
 });

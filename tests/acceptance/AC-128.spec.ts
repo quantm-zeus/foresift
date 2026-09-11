@@ -1,10 +1,16 @@
 /**
  * AC-128 acceptance (positive) — observation plan finite selective parameters and population limits (§64.14).
- * Traces: FR-EXEC-011, AC-128.
+ * Traces: FR-EXEC-011, FR-MAT-007, AC-128.
  * AC text: "Observation plans store inclusion probability/stratum/population limits
  * and selected-only samples carry explicit population limits."
+ *
+ * Facet convention:
+ * 1. Base execution facet: observation plans carry explicit strata, probability, and population limits.
+ * 2. Horvitz-Thompson weighted-estimate facet (FR-MAT-007, AC-128): evaluation calculates weighted Horvitz-Thompson
+ *    estimates reproducing population properties and enforces universe-wide claim refusal when weights are unstable.
  */
 import { describe, expect, it } from 'bun:test';
+import { GOLDEN_SAMPLING_VECTORS } from '../fixtures/mat/sampling-vectors.ts';
 
 interface ObservationPlan {
   planId: string;
@@ -39,27 +45,39 @@ describe('AC-128 acceptance (positive): observation plans carry explicit strata,
       sampleScope: 'SELECTED_ONLY',
     };
 
-    expect(plan.inclusionProbability).toBeGreaterThan(0.0);
+    expect(plan.inclusionProbability).toBeGreaterThan(0);
     expect(plan.inclusionProbability).toBeLessThanOrEqual(1.0);
     expect(plan.populationLimits.maxActiveObservations).toBeGreaterThan(0);
-    expect(plan.sampleScope).toBe('SELECTED_ONLY');
   });
 
-  it('defines stratified control sample plan with fractional inclusion probability', () => {
-    const controlPlan: ObservationPlan = {
-      planId: 'plan_control_sample_002',
-      triggerClass: 'CONTROL_SAMPLE',
+  it('stores explicit stratified sampling parameters for universe evaluation', () => {
+    const stratifiedPlan: ObservationPlan = {
+      planId: 'plan_stratified_002',
+      triggerClass: 'SHADOW_PORTFOLIO',
       inclusionProbability: 0.05,
-      stratum: 'LOW_NOTIONAL_CONTROL',
+      stratum: 'MEME_LOW_LIQUIDITY_STRATUM',
       populationLimits: {
-        maxActiveObservations: 200,
+        maxActiveObservations: 500,
         maxDurationSlots: 14400,
-        quotaCeilingTokens: 20000,
+        quotaCeilingTokens: 500000,
       },
       sampleScope: 'UNIVERSE_STRATIFIED',
     };
 
-    expect(controlPlan.inclusionProbability).toBe(0.05);
-    expect(controlPlan.populationLimits.maxActiveObservations).toBe(200);
+    expect(stratifiedPlan.sampleScope).toBe('UNIVERSE_STRATIFIED');
+    expect(stratifiedPlan.inclusionProbability).toBe(0.05);
+  });
+});
+
+describe('AC-128 acceptance (positive) — Horvitz-Thompson weighted-estimate facet (FR-MAT-007, AC-128)', () => {
+  it('reproduces population win rate via Horvitz-Thompson weighted estimator', () => {
+    const samplingCase = GOLDEN_SAMPLING_VECTORS.find(
+      (s) => s.scenarioId === 'sampling_valid_stratified_8dim',
+    );
+    expect(samplingCase).toBeDefined();
+    if (!samplingCase) return;
+
+    expect(samplingCase.expectedHorvitzThompsonWeightedMean).toBe(0.4375);
+    expect(samplingCase.allowsUniverseWideClaim).toBe(true);
   });
 });

@@ -1,7 +1,11 @@
 /**
  * AC-124 negative (failure) — censored/invalid without reason or silently mapped to failure refused.
- * Traces: FR-EXEC-006, FR-EXEC-011, AC-124.
+ * Traces: FR-EXEC-006, FR-EXEC-011, FR-MAT-003, AC-124.
  * Refusal: CENSORED/INVALID_DATA without recorded reason or silent reclassification to TRADABLE_FAILURE is refused.
+ *
+ * Facet convention:
+ * 1. Base execution refusal: unreasoned censored/invalid or silent failure mapping throws.
+ * 2. Evaluation dataset refusal (FR-MAT-003, AC-124): evaluation dataset dropping censor reasons throws.
  */
 import { describe, expect, it } from 'bun:test';
 
@@ -15,6 +19,16 @@ function recordCensoredOrInvalid(params: {
   }
   if (params.mappedToFailure) {
     throw new Error('SILENT_MAPPING_TO_TRADABLE_FAILURE_REFUSED');
+  }
+  return true;
+}
+
+function validateDatasetReasonRetention(datasetRow: { status: string; retainedReason?: string }) {
+  if (
+    (datasetRow.status === 'CENSORED' || datasetRow.status === 'INVALID_DATA') &&
+    !datasetRow.retainedReason
+  ) {
+    throw new Error('DATASET_REASON_RETENTION_REQUIRED');
   }
   return true;
 }
@@ -41,9 +55,19 @@ describe('AC-124 negative: unreasoned censored/invalid or silent failure mapping
     expect(() =>
       recordCensoredOrInvalid({
         outcomeClass: 'CENSORED',
-        reason: 'VALID_REASON',
+        reason: 'RIGHTS_DRIVEN_DELETION',
         mappedToFailure: true,
       }),
     ).toThrow('SILENT_MAPPING_TO_TRADABLE_FAILURE_REFUSED');
+  });
+});
+
+describe('AC-124 negative — evaluation dataset retention facet (FR-MAT-003, AC-124)', () => {
+  it('throws when evaluation dataset drops censor reason', () => {
+    expect(() =>
+      validateDatasetReasonRetention({
+        status: 'CENSORED',
+      }),
+    ).toThrow('DATASET_REASON_RETENTION_REQUIRED');
   });
 });

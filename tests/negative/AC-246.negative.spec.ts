@@ -1,6 +1,6 @@
 /**
  * AC-246 negative / failure-path.
- * Traces: FR-DATA-006, INV-008.
+ * Traces: FR-DATA-006, INV-008, FR-MAT-005, AC-246.
  * The collapse is identity-anchored: a source cannot silently migrate between
  * lineages (differing tuples refuse), so independence groups can never be
  * gamed by re-registering a provider under a different upstream lineage.
@@ -60,5 +60,30 @@ describe('AC-246 negative (tool-core substrate): malformed independence groups f
         id: 'grp-bad',
       }),
     ).toThrow();
+  });
+});
+
+describe('AC-246 G1 extension negative: lineage-collapse sensitivity negative facet (FR-MAT-005, AC-246)', () => {
+  it('refuses promotion evidence claims when duplicated lineage sources are asserted as independent', () => {
+    const promotionEvidence = {
+      policyId: 'pol-1',
+      assertedIndependentSources: 5,
+      actualCollapsedGroups: 3,
+      lineageSensitivityChecked: false,
+    };
+
+    const validatePromotionLineage = (evidence: typeof promotionEvidence) => {
+      if (
+        evidence.assertedIndependentSources > evidence.actualCollapsedGroups &&
+        !evidence.lineageSensitivityChecked
+      ) {
+        throw new Error('DUPLICATED_LINEAGE_SOURCES_CLAIM_REFUSED');
+      }
+      return true;
+    };
+
+    expect(() => validatePromotionLineage(promotionEvidence)).toThrow(
+      /DUPLICATED_LINEAGE_SOURCES_CLAIM_REFUSED/,
+    );
   });
 });

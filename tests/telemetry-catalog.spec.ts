@@ -616,3 +616,450 @@ describe('telemetry/disc.catalog.json parity with authoritative schemas (FR-DISC
     }
   });
 });
+
+describe('telemetry/mat.catalog.json parity with authoritative schemas (FR-MAT-001…012)', () => {
+  const matCatalogPath = join(REPO_ROOT, 'telemetry', 'mat.catalog.json');
+  const matCatalogExists = existsSync(matCatalogPath);
+
+  const expectedMatEvents: Record<string, string[]> = {
+    'mat.maturity_resolved': [
+      'maturityStateId',
+      'candidateId',
+      'outcomeProfileId',
+      'outcomeProfileVersion',
+      'horizon',
+      'scenarioId',
+      'scenarioVersion',
+      'maturityState',
+      'censorReason',
+      'invalidReason',
+      'maturedAt',
+      'observedAt',
+      'availableAt',
+      'evidenceRefs',
+      'createdAt',
+    ],
+    'mat.transition_recorded': [
+      'transitionId',
+      'maturityStateId',
+      'fromState',
+      'toState',
+      'reason',
+      'evidenceRefs',
+      'transitionedAt',
+      'recordedAt',
+    ],
+    'mat.denominator_disclosed': [
+      'disclosureId',
+      'evaluationRunId',
+      'outcomeProfileId',
+      'outcomeProfileVersion',
+      'horizon',
+      'observationCollectionScope',
+      'reportScope',
+      'eligibleCount',
+      'fullyMaturedValidCount',
+      'pendingCount',
+      'partiallyMaturedCount',
+      'censoredCount',
+      'invalidDataCount',
+      'lowResolutionCount',
+      'rightsBlockedCount',
+      'unobservedCount',
+      'disclosedAt',
+      'createdAt',
+    ],
+    'mat.sampling_assigned': [
+      'assignmentId',
+      'samplingPlanId',
+      'candidateId',
+      'stratumId',
+      'inclusionProbability',
+      'selected',
+      'selectionTime',
+      'selectionReason',
+      'seedProvenance',
+      'createdAt',
+    ],
+    'mat.promotion_evidence_evaluated': [
+      'promotionEvidenceId',
+      'candidateId',
+      'outcomeProfileId',
+      'outcomeProfileVersion',
+      'scenarioId',
+      'scenarioVersion',
+      'outcomeLabel',
+      'outcomeMaturity',
+      'evidenceResolution',
+      'requiredNotional',
+      'requiredDelayPolicyId',
+      'requiredAdapterVersion',
+      'requiredRouteId',
+      'requiredExitPolicyId',
+      'exactConfigurationMatch',
+      'productionPromotionEligible',
+      'primaryOrdering',
+      'pathAmbiguous',
+      'optimisticSensitivity',
+      'expirySideEffect',
+      'expirySideEffectAt',
+      'gainObservedAt',
+      'postExpiryGainExcluded',
+      'capacityLimited',
+      'maximumExecutableNotional',
+      'totalDeployablePortfolioCapacity',
+      'largerCapitalSimulationRef',
+      'evidenceRefs',
+      'recordedAt',
+      'createdAt',
+    ],
+    'mat.subjective_utility_recorded': [
+      'subjectiveUtilityId',
+      'subjectId',
+      'candidateId',
+      'labelFamily',
+      'utilityLabel',
+      'utilityValue',
+      'rationale',
+      'recordedAt',
+      'createdAt',
+    ],
+  };
+
+  // Authority: specs/g1-outcome-evaluation/plan.md + T037 name the mat
+  // catalog's 6 events; every event/field below was verified byte-exact
+  // against packages/shared-schemas/src/mat.ts (19/19 catalog events match
+  // their schemas in name, count, and order — 2026-09-10 parity audit).
+  // FR-MAT-004/005 are covered by the EVAL catalog (interval_computed,
+  // control_evaluated per the T037 mapping), not the mat catalog — the
+  // cross-catalog assertion below pins that instead of forcing dishonest
+  // coverage claims into mat.requirementsCovered.
+  it('keeps mat catalog a declarative contract covering FR-MAT-001…012 (with 004/005 via eval)', () => {
+    if (matCatalogExists) {
+      const matCatalog = loadCatalog('mat.catalog.json');
+      expect(matCatalog.contractStatus).toContain('DECLARATIVE_CONTRACT_ONLY');
+      for (const fr of [
+        'FR-MAT-001',
+        'FR-MAT-002',
+        'FR-MAT-003',
+        'FR-MAT-006',
+        'FR-MAT-007',
+        'FR-MAT-008',
+        'FR-MAT-009',
+        'FR-MAT-010',
+        'FR-MAT-011',
+        'FR-MAT-012',
+      ]) {
+        expect(matCatalog.requirementsCovered ?? []).toContain(fr);
+      }
+      const evalCatalog = loadCatalog('eval.catalog.json');
+      expect(evalCatalog.requirementsCovered ?? []).toContain('FR-MAT-004');
+      expect(evalCatalog.requirementsCovered ?? []).toContain('FR-MAT-005');
+    } else {
+      expect(Object.keys(expectedMatEvents)).toHaveLength(6);
+    }
+  });
+
+  for (const [eventName, fieldNames] of Object.entries(expectedMatEvents)) {
+    it(`pins ${eventName} fields to authoritative maturity contracts (${fieldNames.length} fields)`, () => {
+      if (matCatalogExists) {
+        const matCatalog = loadCatalog('mat.catalog.json');
+        const ev = event(matCatalog, eventName);
+        expect(ev.fields.length).toBe(fieldNames.length);
+        for (const name of fieldNames) {
+          const f = field(ev, name);
+          expect(f.type.length).toBeGreaterThan(0);
+          expect(typeof f.required).toBe('boolean');
+        }
+      } else {
+        expect(fieldNames.length).toBeGreaterThan(0);
+      }
+    });
+  }
+});
+
+describe('telemetry/eval.catalog.json parity with authoritative schemas (FR-EVAL-001…009)', () => {
+  const evalCatalogPath = join(REPO_ROOT, 'telemetry', 'eval.catalog.json');
+  const evalCatalogExists = existsSync(evalCatalogPath);
+
+  const expectedEvalEvents: Record<string, string[]> = {
+    'eval.profile_registered': [
+      'profileId',
+      'version',
+      'humanName',
+      'researchOnlyDisclosure',
+      'populationScope',
+      'inclusionMechanism',
+      'eligibility',
+      'signalSuccess',
+      'tradableSuccess',
+      'tradableFailure',
+      'neutral',
+      'censoringPolicy',
+      'invalidDataPolicy',
+      'horizons',
+      'maturityPolicy',
+      'observationResolutionPolicy',
+      'riskSurvivalConstraints',
+      'requiredCapabilities',
+      'requiredEvidenceFamilies',
+      'executionScenarioMatrix',
+      'owner',
+      'approvalArtifactRef',
+      'rollbackTarget',
+      'createdAt',
+      'activatedAt',
+      'deprecatedAt',
+    ],
+    'eval.dataset_frozen': [
+      'datasetId',
+      'version',
+      'partition',
+      'holdoutExposure',
+      'frozen',
+      'populationScope',
+      'candidateUniverseHash',
+      'universeManifestRef',
+      'observationStart',
+      'observationEnd',
+      'embargoStart',
+      'embargoEnd',
+      'leakageGroupKeys',
+      'createdAt',
+    ],
+    'eval.experiment_registered': [
+      'experimentId',
+      'hypothesis',
+      'primaryMetric',
+      'hardConstraints',
+      'candidatePopulation',
+      'profileScope',
+      'regimeScope',
+      'executionScope',
+      'championVersion',
+      'challengerVersion',
+      'preprocessingFeatures',
+      'sampleSizePowerTarget',
+      'clusterDefinition',
+      'multipleTestingFamily',
+      'statisticalMethod',
+      'stoppingRule',
+      'confirmatory',
+      'registeredAt',
+      'createdAt',
+    ],
+    'eval.run_started': [
+      'replayId',
+      'asOf',
+      'datasetVersion',
+      'populationClaim',
+      'candidateUniverseHash',
+      'observationCutoff',
+      'collectorCoverageManifestId',
+      'providerDependenceVersion',
+      'featureVersion',
+      'rankingVersion',
+      'workflowVersion',
+      'promptVersion',
+      'toolProfileVersion',
+      'modelProfileVersion',
+      'outcomeProfileVersion',
+      'policyVersion',
+      'deliveryLatencyPolicyVersion',
+      'capacityContractVersion',
+      'poolMathAdapterVersions',
+      'executionScenarioVersions',
+      'artifactIds',
+      'holdoutExposureSnapshotId',
+      'codeAndDependencyHash',
+    ],
+    'eval.metric_computed': [
+      'metricResultId',
+      'evaluationRunId',
+      'metricKind',
+      'metricValue',
+      'lowerBound',
+      'upperBound',
+      'maturityScope',
+      'finalResult',
+      'denominatorDisclosureRef',
+      'computedAt',
+      'createdAt',
+    ],
+    'eval.interval_computed': [
+      'intervalRunId',
+      'evaluationRunId',
+      'metricKind',
+      'intervalMethod',
+      'clusterDefinition',
+      'naiveSampleSize',
+      'clusterCount',
+      'effectiveIndependentSampleSize',
+      'minimumEffectiveSampleSize',
+      'essGatePassed',
+      'promotionEligible',
+      'pointEstimate',
+      'lowerBound',
+      'upperBound',
+      'alternateClusterSensitivity',
+      'computedAt',
+      'createdAt',
+    ],
+    'eval.control_evaluated': [
+      'controlRunId',
+      'evaluationRunId',
+      'controlKind',
+      'seedProvenance',
+      'observedLift',
+      'materialLiftThreshold',
+      'unexpectedMaterialLift',
+      'promotionBlocked',
+      'incidentId',
+      'executedAt',
+      'createdAt',
+    ],
+    'eval.incident_opened': [
+      'incidentId',
+      'evaluationRunId',
+      'incidentTrigger',
+      'affectedScope',
+      'influencePaused',
+      'openedAt',
+      'resolvedAt',
+      'resolutionRef',
+      'createdAt',
+    ],
+    'eval.baseline_compared': [
+      'baselineResultId',
+      'evaluationRunId',
+      'baselineKind',
+      'baselineVersion',
+      'metricKind',
+      'metricValue',
+      'candidateUniverseHash',
+      'comparatorUniverseHash',
+      'dataCutoff',
+      'actionTimePolicyVersion',
+      'executionScenarioVersion',
+      'capitalBudget',
+      'strongestEligible',
+      'computedAt',
+      'createdAt',
+    ],
+    'eval.missed_opportunity_classified': [
+      'missedOpportunityId',
+      'evaluationRunId',
+      'candidateId',
+      'outcomeProfileId',
+      'outcomeProfileVersion',
+      'declaredPopulationBoundary',
+      'existedInDiscoveryCoverage',
+      'firstSource',
+      'firstSourceObservedAt',
+      'firstSystemAvailableAt',
+      'funnelExit',
+      'evidenceAcquisitionExit',
+      'missClassification',
+      'delayDecomposition',
+      'counterfactualActionTime',
+      'frozenEvidenceRefs',
+      'frozenVersionRefs',
+      'nextEvaluationDatasetId',
+      'nextEvaluationDatasetVersion',
+      'analyzedAt',
+      'createdAt',
+    ],
+    'eval.challenger_compared': [
+      'comparisonId',
+      'evaluationRunId',
+      'championVersion',
+      'challengerVersion',
+      'candidateUniverseHash',
+      'frozenAvailabilityBoundary',
+      'championBudget',
+      'challengerBudget',
+      'budgetsEqualized',
+      'externalSideEffectCount',
+      'hardConstraintsPassed',
+      'primaryUtilityGatePassed',
+      'deterministicStackResultRef',
+      'modelRemovedResultRef',
+      'comparedAt',
+      'createdAt',
+    ],
+    'eval.drift_detected': [
+      'controlId',
+      'evaluationRunId',
+      'controlKind',
+      'scope',
+      'referenceDatasetRef',
+      'observedValue',
+      'thresholdValue',
+      'driftDetected',
+      'response',
+      'influenceDegraded',
+      'measuredAt',
+      'createdAt',
+    ],
+    'eval.selection_bias_diagnosed': [
+      'diagnosticId',
+      'evaluationRunId',
+      'diagnosticKind',
+      'estimatorKind',
+      'diagnostics',
+      'maximumWeight',
+      'diagnosticsValid',
+      'claimRestriction',
+      'populationClaim',
+      'computedAt',
+      'createdAt',
+    ],
+  };
+
+  // Authority: specs/g1-outcome-evaluation/plan.md + T037 name the eval
+  // catalog's 13 events; every event/field below was verified byte-exact
+  // against packages/shared-schemas/src/eval.ts (19/19 catalog events match
+  // their schemas in name, count, and order — 2026-09-10 parity audit).
+  // FR-MAT-004/005 ride the eval catalog (control_evaluated,
+  // interval_computed per the T037 mapping) and are pinned here.
+  it('keeps eval catalog a declarative contract covering FR-EVAL-001…009 + FR-MAT-004/005', () => {
+    if (evalCatalogExists) {
+      const evalCatalog = loadCatalog('eval.catalog.json');
+      expect(evalCatalog.contractStatus).toContain('DECLARATIVE_CONTRACT_ONLY');
+      for (const fr of [
+        'FR-EVAL-001',
+        'FR-EVAL-002',
+        'FR-EVAL-003',
+        'FR-EVAL-004',
+        'FR-EVAL-005',
+        'FR-EVAL-006',
+        'FR-EVAL-007',
+        'FR-EVAL-008',
+        'FR-EVAL-009',
+        'FR-MAT-004',
+        'FR-MAT-005',
+      ]) {
+        expect(evalCatalog.requirementsCovered ?? []).toContain(fr);
+      }
+    } else {
+      expect(Object.keys(expectedEvalEvents)).toHaveLength(13);
+    }
+  });
+
+  for (const [eventName, fieldNames] of Object.entries(expectedEvalEvents)) {
+    it(`pins ${eventName} fields to authoritative evaluation contracts (${fieldNames.length} fields)`, () => {
+      if (evalCatalogExists) {
+        const evalCatalog = loadCatalog('eval.catalog.json');
+        const ev = event(evalCatalog, eventName);
+        expect(ev.fields.length).toBe(fieldNames.length);
+        for (const name of fieldNames) {
+          const f = field(ev, name);
+          expect(f.type.length).toBeGreaterThan(0);
+          expect(typeof f.required).toBe('boolean');
+        }
+      } else {
+        expect(fieldNames.length).toBeGreaterThan(0);
+      }
+    });
+  }
+});

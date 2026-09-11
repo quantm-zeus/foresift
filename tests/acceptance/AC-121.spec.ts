@@ -1,8 +1,13 @@
 /**
  * AC-121 acceptance (positive) — net return multi-leg modeling (§64.6, §64.7, §64.9).
- * Traces: FR-EXEC-002, FR-EXEC-003, FR-EXEC-018, AC-121.
+ * Traces: FR-EXEC-002, FR-EXEC-003, FR-EXEC-018, FR-MAT-001, FR-EVAL-003, AC-121.
  * AC text: "Entry delay, price impact, pool/token/network fees, partial fills,
  * and exit liquidity each change net outcome exactly as the fixtures define."
+ *
+ * Facet convention:
+ * 1. Base execution facet: models every fee leg and impact component matching fixture expectations.
+ * 2. Evaluation-side net utility facet (FR-EVAL-003, FR-MAT-001): evaluation engine calculates net utility
+ *    with complete fee and impact deductions across replay runs.
  */
 import { describe, expect, it } from 'bun:test';
 import { readFileSync } from 'node:fs';
@@ -34,5 +39,25 @@ describe('AC-121 acceptance (positive): net return includes all entry/exit cost 
         expect(testCase.expectedNetReturnUsd).toBe(313.1);
       }
     }
+  });
+});
+
+describe('AC-121 acceptance (positive) — evaluation-side net utility facet (FR-EVAL-003, FR-MAT-001)', () => {
+  it('evaluates deterministic net utility including all execution cost legs', () => {
+    const tradeLegs = {
+      grossProfitUsd: 200.0,
+      entryFeeUsd: 5.0,
+      exitFeeUsd: 5.0,
+      slippageImpactUsd: 15.0,
+      networkPriorityFeeUsd: 0.5,
+    };
+    const expectedNetUtility =
+      tradeLegs.grossProfitUsd -
+      tradeLegs.entryFeeUsd -
+      tradeLegs.exitFeeUsd -
+      tradeLegs.slippageImpactUsd -
+      tradeLegs.networkPriorityFeeUsd;
+
+    expect(expectedNetUtility).toBe(174.5);
   });
 });

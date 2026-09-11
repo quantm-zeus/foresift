@@ -28,7 +28,7 @@ describe('AC-221 negative: incomparable runs cannot promote and frozen experimen
     const baseline = comparableFixture.baselineRun;
     const cases = comparableFixture.incomparablePerDimension;
 
-    for (const [dim, caseData] of Object.entries(cases)) {
+    for (const [_dim, caseData] of Object.entries(cases)) {
       const candidate = {
         ...baseline,
         [caseData.differingField]: caseData.differingValue,

@@ -27,7 +27,7 @@ describe('AC-223 negative: failed hard constraints cannot be compensated and int
   it('fails promotion when any single hard constraint fails despite positive scores elsewhere (FR-OBJ-003)', () => {
     const failingCases = constraintFixture.failingCasesPerKind;
 
-    for (const [kind, caseData] of Object.entries(failingCases)) {
+    for (const [_kind, caseData] of Object.entries(failingCases)) {
       expect(caseData.verdict).toBe('FAIL');
       expect(caseData.reason).toBeDefined();
 

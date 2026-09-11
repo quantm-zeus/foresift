@@ -286,7 +286,7 @@ and AC suites, then telemetry and gates.
       expected-script registry `packages/persistence/test/migrator.spec.ts`
       with the three `g1_obj_*` scripts (plan-sanctioned scope exception 3;
       exact path only). Traces: FR-OBJ-001.
-- [ ] T028 [serial-reason: COORDINATOR_BOUNDARY] [executor: TEST] Run the
+- [x] T028 [serial-reason: COORDINATOR_BOUNDARY] [executor: TEST] Run — [evidence: TEST_PROOF] verificationCommands: @foresift/objective-governance 74/74 (15 files), @foresift/shadow-portfolio 17/17; four AC suites + negatives (AC-220± acceptance; AC-221/222/223± package-local in 74/74); five extended shared suites AC-245/246/247/248/249±neg 75/75 across 12 files; T026 telemetry-catalog 60/60; T027 migrator suites green in merged-main CI 34630190522 — the
       milestone `verificationCommands` for both packages, the four authored
       AC suites with their negatives, and the five extended shared suites;
       report green results as implementation handoff evidence. Traces:

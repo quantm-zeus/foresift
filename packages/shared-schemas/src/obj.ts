@@ -60,7 +60,7 @@ const requireAll = <T extends string>(
 ): void => {
   const present =
     seen instanceof Array ? seen : values.map((value) => (seen as Record<string, unknown>)[value]);
-  const missing = values.filter((value, index) => present[index] === undefined);
+  const missing = values.filter((_value, index) => present[index] === undefined);
   if (missing.length > 0)
     context.addIssue({ code: z.ZodIssueCode.custom, message: `${message}: ${missing.join(',')}` });
 };

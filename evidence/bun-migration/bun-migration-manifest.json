@@ -1,18 +1,18 @@
 {
   "schema": "foresift/bun-migration-manifest@1",
   "migrationId": "bun-test-authority-v1",
-  "generatedAt": "2026-09-12T22:07:29.473Z",
+  "generatedAt": "2026-09-12T22:23:51.819Z",
   "root": ".",
-  "totalTestFiles": 582,
+  "totalTestFiles": 583,
   "counts": {
     "CODEMOD_READY": 0,
     "AGY_REQUIRED": 0,
-    "MIGRATED": 582,
+    "MIGRATED": 583,
     "VERIFIED": 0,
     "BLOCKED": 0
   },
   "parity": {
-    "previousTotal": 579,
+    "previousTotal": 582,
     "disappeared": []
   },
   "files": [
@@ -270,6 +270,34 @@
       "migrationType": "ALREADY_MIGRATED",
       "fixturesAndHelpers": [],
       "sourceAnchors": ["../../../packages/domain/src/index.ts"],
+      "state": "MIGRATED"
+    },
+    {
+      "path": "packages/alerts/test/classification.spec.ts",
+      "package": "@foresift/alerts",
+      "bytes": 40687,
+      "lines": 1111,
+      "sha256": "9030cf6abbe074dc0aa271a3dd8172aed1d4a124f715c9439bb0c0f86a1062a9",
+      "imports": [
+        "bun:test",
+        "@foresift/domain",
+        "@foresift/shared-schemas",
+        "@foresift/workflow-runtime",
+        "../src/index.ts",
+        "./helpers.ts"
+      ],
+      "vitestImports": [],
+      "features": [],
+      "workload": "DATABASE_PGLITE",
+      "migrationType": "ALREADY_MIGRATED",
+      "fixturesAndHelpers": ["./helpers.ts"],
+      "sourceAnchors": [
+        "@foresift/domain",
+        "@foresift/shared-schemas",
+        "@foresift/workflow-runtime",
+        "../src/index.ts",
+        "./helpers.ts"
+      ],
       "state": "MIGRATED"
     },
     {

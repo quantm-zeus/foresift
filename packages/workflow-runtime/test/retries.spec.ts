@@ -19,6 +19,7 @@ import {
 } from '@foresift/domain';
 import {
   OUTBOX_RETRY_MAX_ATTEMPTS,
+  RATE_LIMIT_DEFAULT_MAX_ATTEMPTS,
   boundedExponentialDelay,
   nextAttemptPlan,
   planAttempt,
@@ -143,6 +144,38 @@ describe('retry-after-reset within budget (RATE_LIMITED)', () => {
     });
     expect(plan.action).toBe('STOP');
     expect(plan.handoff).toMatchObject({ errorClass: 'RATE_LIMITED' });
+  });
+
+  it('bounds attempts with the documented default cap when NO budget is declared', () => {
+    // Without a declared budget there is nothing to bound the wait, so the
+    // retry policy fails closed at a fixed cap instead of retrying forever.
+    expect(planAttempt('RATE_LIMITED', 1, HALF, { retryAfterMs: 1_000 }).action).toBe('RETRY');
+    expect(
+      planAttempt('RATE_LIMITED', RATE_LIMIT_DEFAULT_MAX_ATTEMPTS - 1, HALF, {
+        retryAfterMs: 1_000,
+      }).action,
+    ).toBe('RETRY');
+
+    const exhausted = planAttempt('RATE_LIMITED', RATE_LIMIT_DEFAULT_MAX_ATTEMPTS, HALF, {
+      retryAfterMs: 1_000,
+    });
+    expect(exhausted.action).toBe('STOP');
+    expect(exhausted.exhausted).toBe(true);
+    expect(exhausted.nextAttempt).toBeNull();
+    expect(exhausted.handoff).toMatchObject({
+      errorClass: 'RATE_LIMITED',
+      attempts: RATE_LIMIT_DEFAULT_MAX_ATTEMPTS,
+    });
+  });
+
+  it('retries far past the default cap while a declared budget covers the reset', () => {
+    const plan = planAttempt('RATE_LIMITED', 1_000, HALF, {
+      retryAfterMs: 1_000,
+      budgetRemainingMs: 10 * 60 * 60 * 1000,
+    });
+    expect(plan.action).toBe('RETRY');
+    expect(plan.exhausted).toBe(false);
+    expect(plan.nextAttempt).toBe(1_001);
   });
 
   it('refuses a non-finite reset and stops on an unbounded wait', () => {

@@ -1,7 +1,7 @@
 {
   "schema": "foresift/bun-migration-manifest@1",
   "migrationId": "bun-test-authority-v1",
-  "generatedAt": "2026-09-12T20:02:52.981Z",
+  "generatedAt": "2026-09-12T20:26:11.190Z",
   "root": ".",
   "totalTestFiles": 566,
   "counts": {
@@ -2440,9 +2440,9 @@
     {
       "path": "packages/persistence/test/migrator.spec.ts",
       "package": "@foresift/persistence",
-      "bytes": 22929,
-      "lines": 574,
-      "sha256": "a371abac497991a88d26395629d7d991f46a954fbaec23fc88fa9b38ab722e76",
+      "bytes": 23003,
+      "lines": 576,
+      "sha256": "e18d8309d717c8d60d34c48ffa357f700a7061a2bdb597b04c29d3734b7ccea5",
       "imports": [
         "bun:test",
         "@electric-sql/pglite",
@@ -4775,9 +4775,9 @@
     {
       "path": "packages/workflow-runtime/test/migrations.spec.ts",
       "package": "@foresift/workflow-runtime",
-      "bytes": 23010,
-      "lines": 591,
-      "sha256": "4922b01624ce74f61ca4bc7f92bb19749b73ad8960dba88fc13ce88eed9cc6cc",
+      "bytes": 26455,
+      "lines": 665,
+      "sha256": "07eaae0372465b92da29dc37c0ae53eb159d7fa7fb3dbc0d2a5f313b24cd724a",
       "imports": [
         "bun:test",
         "@electric-sql/pglite",
@@ -4796,9 +4796,9 @@
     {
       "path": "packages/workflow-runtime/test/outbox.spec.ts",
       "package": "@foresift/workflow-runtime",
-      "bytes": 14858,
-      "lines": 420,
-      "sha256": "ee2859acb0d74ba411186a05dbeb3aaa542b18c4ab897fbd5583da6b3ac57f70",
+      "bytes": 19469,
+      "lines": 535,
+      "sha256": "52f5a49ef039f38609962b51566afd0cbb9d675b8d1bd6a051db6229cc1e991a",
       "imports": [
         "bun:test",
         "@foresift/domain",
@@ -4848,9 +4848,9 @@
     {
       "path": "packages/workflow-runtime/test/retries.spec.ts",
       "package": "@foresift/workflow-runtime",
-      "bytes": 7356,
-      "lines": 201,
-      "sha256": "a4b30ee4ca05bf9dc3e57420b057acb3e521932ada84575d082849ebc80554f2",
+      "bytes": 8652,
+      "lines": 234,
+      "sha256": "0d61fabfb4ad7f9470aa03d60bd020d0b3f90248c52da80a7593285b89d87eb9",
       "imports": ["bun:test", "@foresift/domain", "../src/index.ts"],
       "vitestImports": [],
       "features": [],
@@ -4863,9 +4863,9 @@
     {
       "path": "packages/workflow-runtime/test/schedules.spec.ts",
       "package": "@foresift/workflow-runtime",
-      "bytes": 14180,
-      "lines": 451,
-      "sha256": "1460dc241d24cfa417f06ae4d129cbb70749f709fe615b28c15fd486bd88e687",
+      "bytes": 15446,
+      "lines": 486,
+      "sha256": "78a0d879a56faecfc513e49186885c94e15f40ba0777f83f5dde11a0b5848a75",
       "imports": ["bun:test", "@foresift/domain", "../src/index.ts", "./helpers.ts"],
       "vitestImports": [],
       "features": [],
@@ -4878,9 +4878,9 @@
     {
       "path": "packages/workflow-runtime/test/steps.spec.ts",
       "package": "@foresift/workflow-runtime",
-      "bytes": 10567,
-      "lines": 370,
-      "sha256": "c4e097917910c97056ab4bd908ffd7d9253bf668cbce32df7dab924b7222ad40",
+      "bytes": 12855,
+      "lines": 427,
+      "sha256": "fa177db23f6188cf74fc16d88e85fe5e6b4096a8cd06f5ad83d17872ddaa6945",
       "imports": ["bun:test", "@foresift/domain", "../src/index.ts", "./helpers.ts"],
       "vitestImports": [],
       "features": [],
@@ -4893,9 +4893,9 @@
     {
       "path": "packages/workflow-runtime/test/trigger-inbox.spec.ts",
       "package": "@foresift/workflow-runtime",
-      "bytes": 13923,
-      "lines": 392,
-      "sha256": "5d2acdff7685d2dd70ffb36696b2b2ebea4090bdbce191c394f5f7b91835ab1c",
+      "bytes": 16084,
+      "lines": 436,
+      "sha256": "035e0b0fe26fadef7608150edb7c21a7288372218660234ce9ec0b74f300dec3",
       "imports": ["bun:test", "@foresift/domain", "../src/index.ts", "./helpers.ts"],
       "vitestImports": [],
       "features": [],
@@ -4908,9 +4908,9 @@
     {
       "path": "packages/workflow-runtime/test/verify-state.spec.ts",
       "package": "@foresift/workflow-runtime",
-      "bytes": 5968,
-      "lines": 165,
-      "sha256": "d2ec58bfe5d6ace9e6629e04d540c030b15018a222bb59bdfa3163e46663dd69",
+      "bytes": 6040,
+      "lines": 168,
+      "sha256": "bb9e5c4497ea5a974c2e87d84afb11de7bf3d37943a4b697e654af771e9fcc88",
       "imports": [
         "bun:test",
         "@foresift/domain",

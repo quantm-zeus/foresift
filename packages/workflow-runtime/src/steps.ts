@@ -26,7 +26,7 @@ import {
   type StepStatus,
 } from '@foresift/domain';
 import { type DatabaseEngine } from '@foresift/persistence';
-import { StaleStepLeaseError } from './leases.ts';
+import { StepLeaseManager, StaleStepLeaseError } from './leases.ts';
 
 /**
  * The fenced-lease identity a checkpoint must still own to commit (§25.7).
@@ -206,45 +206,85 @@ const STEP_COLUMNS = `step_id, run_id, step_type, idempotency_key, attempt,
 
 /**
  * Commit-time fence predicate (§25.7, AC-012): `$9` is the caller's fencing
- * token (NULL means "no fence required") and `$10` its resource key. The
- * referenced lease row must still be the caller's live, unreleased token, so a
- * stale worker's write matches zero rows AT THE DATABASE rather than relying on
- * an advisory pre-check.
+ * token (NULL means "no explicit fence was presented") and `$10` the step's
+ * lease resource key; `$11` is the commit instant used for the live-lease probe.
+ *
+ * Fencing is REQUIRED whenever the step is lease-owned, never opt-in:
+ * - with a token, the referenced lease row must still be the caller's live,
+ *   unreleased token (an expired-but-not-taken-over lease still passes: expiry
+ *   alone is not fencing, only a takeover is);
+ * - WITHOUT a token, the commit is allowed only when NO live (unreleased,
+ *   unexpired) lease exists for the step's resource key. If one does, the
+ *   caller omitted a fence that the step's lease requires, so the write matches
+ *   zero rows and fails closed instead of letting a stale worker commit.
  */
-const STEP_LEASE_FENCE_PREDICATE = `($9::bigint IS NULL OR EXISTS (
-        SELECT 1 FROM wf.step_leases
-         WHERE resource_key = $10 AND fencing_token = $9 AND released_at IS NULL))`;
+const STEP_LEASE_FENCE_PREDICATE = `(CASE
+        WHEN $9::bigint IS NOT NULL THEN EXISTS (
+            SELECT 1 FROM wf.step_leases
+             WHERE resource_key = $10 AND fencing_token = $9 AND released_at IS NULL)
+        ELSE NOT EXISTS (
+            SELECT 1 FROM wf.step_leases
+             WHERE resource_key = $10 AND released_at IS NULL AND expires_at > $11)
+    END)`;
 
-function fenceParams(fence: StepLeaseFence | undefined): readonly [number | null, string | null] {
-  return fence === undefined ? [null, null] : [fence.fencingToken, fence.resourceKey];
+/**
+ * The lease resource key the step lease helpers use for a step: derived from
+ * `(runId, stepType)` exactly as `StepLeaseManager.acquire` callers derive it,
+ * so omitting `lease` can never choose a different (unfenced) key.
+ */
+function stepLeaseResourceKey(runId: string, stepType: string): string {
+  return StepLeaseManager.resourceKeyHash({ runId, stepType });
+}
+
+function fenceParams(
+  fence: StepLeaseFence | undefined,
+  resourceKey: string,
+): readonly [number | null, string] {
+  return fence === undefined ? [null, resourceKey] : [fence.fencingToken, fence.resourceKey];
 }
 
 /**
- * Refuse a zero-rows step write. When a fence was supplied and its token is no
- * longer current, the typed refusal is `LEASE_FENCING_TOKEN_STALE` (the stale
- * worker's commit lost a fencing race); otherwise the step row itself changed.
+ * Classify a zero-rows step write into the typed refusal the caller throws.
+ * When the presented fence is no longer current — or a fence was required but
+ * omitted while a live lease exists — the typed refusal is
+ * `LEASE_FENCING_TOKEN_STALE` (the stale worker's commit lost a fencing race);
+ * otherwise the step row itself changed (`WF_STEP_NOT_FOUND`).
  */
-async function refuseStepWrite(
+async function stepWriteRefusal(
   tx: DatabaseEngine,
   fence: StepLeaseFence | undefined,
+  resourceKey: string,
+  now: string,
   message: string,
   detail: Record<string, string | number | boolean | null>,
-): Promise<never> {
-  if (fence !== undefined) {
+): Promise<ForesiftError> {
+  let stale: boolean;
+  if (fence === undefined) {
+    // No fence presented: stale iff a live lease exists for the step key.
+    const live = await tx.query<{ fencing_token: string }>(
+      `SELECT fencing_token FROM wf.step_leases
+        WHERE resource_key = $1 AND released_at IS NULL AND expires_at > $2`,
+      [resourceKey, now],
+    );
+    stale = live.rows.length > 0;
+  } else {
+    // A fence presented: stale iff its token no longer owns the lease.
     const held = await tx.query<{ fencing_token: string }>(
       `SELECT fencing_token FROM wf.step_leases
         WHERE resource_key = $1 AND fencing_token = $2 AND released_at IS NULL`,
-      [fence.resourceKey, fence.fencingToken],
+      [resourceKey, fence.fencingToken],
     );
-    if (held.rows.length === 0) {
-      throw new StaleStepLeaseError(message, {
-        ...detail,
-        resourceKey: fence.resourceKey,
-        fencingToken: fence.fencingToken,
-      });
-    }
+    stale = held.rows.length === 0;
   }
-  throw new ForesiftError(ErrorCode.WF_STEP_NOT_FOUND, message, detail);
+  if (stale) {
+    const staleDetail: Record<string, string | number | boolean | null> = {
+      ...detail,
+      resourceKey,
+    };
+    if (fence !== undefined) staleDetail.fencingToken = fence.fencingToken;
+    return new StaleStepLeaseError(message, staleDetail);
+  }
+  return new ForesiftError(ErrorCode.WF_STEP_NOT_FOUND, message, detail);
 }
 
 export interface BeginStepInput {
@@ -257,7 +297,13 @@ export interface BeginStepInput {
   readonly leaseExpiresAt?: string | null;
   readonly now?: string;
   readonly stepId?: string;
-  /** When supplied, claiming an existing attempt requires this live token. */
+  /**
+   * The lease fence. Optional in shape, but the commit is REQUIRED to present
+   * it whenever a live (unreleased, unexpired) lease exists for the step's
+   * `(runId, stepType)` resource key; omitting it then fails closed with
+   * `LEASE_FENCING_TOKEN_STALE` (AC-012). It may be omitted only for a step
+   * that never took a lease.
+   */
   readonly lease?: StepLeaseFence;
 }
 
@@ -383,7 +429,10 @@ export async function beginStep(
     if (currentStatus !== 'RUNNING') {
       assertStepTransition(currentStatus, 'RUNNING');
     }
-    const [fenceToken, fenceResourceKey] = fenceParams(input.lease);
+    const [fenceToken, fenceResourceKey] = fenceParams(
+      input.lease,
+      input.lease?.resourceKey ?? stepLeaseResourceKey(input.runId, input.stepType),
+    );
     const updated = await tx.query<StepRow>(
       `UPDATE wf.steps
           SET status = 'RUNNING',
@@ -410,14 +459,22 @@ export async function beginStep(
         currentStatus,
         fenceToken,
         fenceResourceKey,
+        now,
       ],
     );
     const claimed = updated.rows[0];
     if (claimed === undefined) {
-      await refuseStepWrite(tx, input.lease, 'step attempt was claimed by a concurrent worker', {
-        runId: input.runId,
-        idempotencyKey: input.idempotencyKey,
-      });
+      throw await stepWriteRefusal(
+        tx,
+        input.lease,
+        fenceResourceKey,
+        now,
+        'step attempt was claimed by a concurrent worker',
+        {
+          runId: input.runId,
+          idempotencyKey: input.idempotencyKey,
+        },
+      );
     }
     return {
       stepId: claimed.step_id,
@@ -441,9 +498,11 @@ export interface CheckpointStepInput {
   readonly retryable?: boolean | null;
   readonly now?: string;
   /**
-   * When supplied, the commit is fenced (§25.7): a worker whose token was
-   * superseded by a takeover matches zero rows and fails closed with
-   * `LEASE_FENCING_TOKEN_STALE` (AC-012).
+   * The lease fence. Optional in shape, but the commit is REQUIRED to present
+   * it whenever a live (unreleased, unexpired) lease exists for the step's
+   * `(runId, stepType)` resource key — otherwise the commit fails closed with
+   * `LEASE_FENCING_TOKEN_STALE` (AC-012). A lease-less commit is allowed only
+   * when no live lease exists (the step never took one).
    */
   readonly lease?: StepLeaseFence;
 }
@@ -481,7 +540,6 @@ export async function checkpointStep(
   const errorClass = input.errorClass ?? null;
   const retryable =
     input.retryable ?? (errorClass === null ? null : isRetryable(retryPolicyFor(errorClass)));
-  const [fenceToken, fenceResourceKey] = fenceParams(input.lease);
 
   return engine.transaction(async (tx) => {
     const existingResult = await tx.query<StepRow>(
@@ -496,6 +554,11 @@ export async function checkpointStep(
       });
     }
     assertStepTransition(parseStepStatus(existing.status), target);
+    // The fence is keyed to the STEP's lease resource key even when the caller
+    // omits `lease`, so a live lease always demands the matching token.
+    const resourceKey =
+      input.lease?.resourceKey ?? stepLeaseResourceKey(input.runId, existing.step_type);
+    const [fenceToken, fenceResourceKey] = fenceParams(input.lease, resourceKey);
     const updated = await tx.query<StepRow>(
       `UPDATE wf.steps
           SET status = $1, output_hash = $2, error_class = $3, retryable = $4, completed_at = $5
@@ -513,14 +576,22 @@ export async function checkpointStep(
         existing.status,
         fenceToken,
         fenceResourceKey,
+        now,
       ],
     );
     const row = updated.rows[0];
     if (row === undefined) {
-      await refuseStepWrite(tx, input.lease, 'step checkpoint is no longer RUNNING', {
-        runId: input.runId,
-        idempotencyKey: input.idempotencyKey,
-      });
+      throw await stepWriteRefusal(
+        tx,
+        input.lease,
+        fenceResourceKey,
+        now,
+        'step checkpoint is no longer RUNNING',
+        {
+          runId: input.runId,
+          idempotencyKey: input.idempotencyKey,
+        },
+      );
     }
     return mapRow(row);
   });

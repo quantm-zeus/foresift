@@ -157,6 +157,7 @@ describe('g2_wf_* migrations apply to a fresh database', () => {
     expect(applied).toContain('g2_wf_0002_outbox_deadletter');
     expect(applied).toContain('g2_wf_0003_schedule_forecasts');
     expect(applied).toContain('g2_wf_0004_decision_outbox');
+    expect(applied).toContain('g2_wf_0005_outbox_hardening');
     expect(applied.indexOf('g2_wf_0001_schedules_runs')).toBeLessThan(
       applied.indexOf('g2_wf_0002_outbox_deadletter'),
     );
@@ -165,6 +166,9 @@ describe('g2_wf_* migrations apply to a fresh database', () => {
     );
     expect(applied.indexOf('g2_wf_0003_schedule_forecasts')).toBeLessThan(
       applied.indexOf('g2_wf_0004_decision_outbox'),
+    );
+    expect(applied.indexOf('g2_wf_0004_decision_outbox')).toBeLessThan(
+      applied.indexOf('g2_wf_0005_outbox_hardening'),
     );
   });
 
@@ -483,7 +487,7 @@ describe('§26.5 outbox claim shape and §25.9/§25.10 CHECKs', () => {
   const CLAIM_EXPIRES = '2030-01-01T00:00:00.000Z';
 
   /** Insert an outbox row with an explicit claim shape. */
-  function insertOutbox(
+  async function insertOutbox(
     outboxId: string,
     shape: {
       status: string;
@@ -492,20 +496,22 @@ describe('§26.5 outbox claim shape and §25.9/§25.10 CHECKs', () => {
       expiresAt: string | null;
     },
   ): Promise<unknown> {
+    // g2_wf_0005 adds the decision_ref FK, so the referenced decision commit
+    // must exist before the outbox row can be inserted.
+    const decisionRef = `decision-${outboxId}`;
+    const runId = await seedRun(`outbox-${outboxId}`);
+    await engine.query(
+      `INSERT INTO wf.decision_commits
+         (decision_id, run_id, decision_kind, payload, payload_hash, committed_at)
+       VALUES ($1, $2, 'CANDIDATE_DECISION', '{}'::jsonb, $3, now())`,
+      [decisionRef, runId, HASH],
+    );
     return engine.query(
       `INSERT INTO wf.notification_outbox
          (outbox_id, decision_ref, channel, payload_hash, status,
           claim_owner, claim_fencing_token, claim_expires_at)
        VALUES ($1, $2, 'telegram', $3, $4, $5, $6, $7)`,
-      [
-        outboxId,
-        `decision-${outboxId}`,
-        HASH,
-        shape.status,
-        shape.owner,
-        shape.token,
-        shape.expiresAt,
-      ],
+      [outboxId, decisionRef, HASH, shape.status, shape.owner, shape.token, shape.expiresAt],
     );
   }
 
@@ -586,5 +592,73 @@ describe('§26.5 outbox claim shape and §25.9/§25.10 CHECKs', () => {
       ),
     );
     expect(error.message).toMatch(/checked_at/);
+  });
+});
+
+describe('g2_wf_0005 hardening: outbox FKs and forecast immutability', () => {
+  it('refuses an outbox row whose decision_ref has no decision commit', async () => {
+    const error = await rejection(
+      engine.query(
+        `INSERT INTO wf.notification_outbox
+           (outbox_id, decision_ref, channel, payload_hash, status)
+         VALUES ('outbox-orphan-decision', 'decision-missing', 'telegram', $1, 'PENDING')`,
+        [HASH],
+      ),
+    );
+    expect((error as { code?: string }).code).toBe('23503');
+    expect(error.message).toMatch(/notification_outbox_decision_ref_fk/);
+  });
+
+  it('refuses a non-null alert_ref with no alert record', async () => {
+    const runId = await seedRun('alert-fk');
+    await engine.query(
+      `INSERT INTO wf.decision_commits
+         (decision_id, run_id, decision_kind, payload, payload_hash, committed_at)
+       VALUES ('decision-alert-fk', $1, 'CANDIDATE_DECISION', '{}'::jsonb, $2, now())`,
+      [runId, HASH],
+    );
+    const error = await rejection(
+      engine.query(
+        `INSERT INTO wf.notification_outbox
+           (outbox_id, decision_ref, alert_ref, channel, payload_hash, status)
+         VALUES ('outbox-orphan-alert', 'decision-alert-fk', 'alert-missing',
+                 'telegram', $1, 'PENDING')`,
+        [HASH],
+      ),
+    );
+    expect((error as { code?: string }).code).toBe('23503');
+    expect(error.message).toMatch(/notification_outbox_alert_ref_fk/);
+  });
+
+  it('refuses UPDATE, DELETE, and TRUNCATE of a forecast (frozen artifact)', async () => {
+    const { scheduleId, versionId } = await seedSchedule();
+    await engine.query(
+      `INSERT INTO wf.schedule_forecasts
+         (forecast_id, schedule_id, version_id, computed_at, payload, payload_hash)
+       VALUES ('forecast-frozen', $1, $2, now(), '{}'::jsonb, $3)`,
+      [scheduleId, versionId, HASH],
+    );
+
+    const updated = await rejection(
+      engine.query(
+        `UPDATE wf.schedule_forecasts SET computed_at = now() WHERE forecast_id = 'forecast-frozen'`,
+      ),
+    );
+    expect((updated as { code?: string }).code).toBe('23001');
+    expect(updated.message).toMatch(/schedule forecasts are immutable/);
+
+    const deleted = await rejection(
+      engine.query(`DELETE FROM wf.schedule_forecasts WHERE forecast_id = 'forecast-frozen'`),
+    );
+    expect(deleted.message).toMatch(/schedule forecasts are immutable/);
+
+    const truncated = await rejection(engine.query(`TRUNCATE wf.schedule_forecasts`));
+    expect(truncated.message).toMatch(/schedule forecasts are immutable/);
+
+    // The frozen witness survived every refused rewrite.
+    const rows = await engine.query<{ n: number }>(
+      `SELECT count(*)::int AS n FROM wf.schedule_forecasts WHERE forecast_id = 'forecast-frozen'`,
+    );
+    expect(Number(rows.rows[0]?.n)).toBe(1);
   });
 });

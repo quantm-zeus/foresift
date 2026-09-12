@@ -62,6 +62,7 @@ describe('workflow state verification (T025 recovery seam)', () => {
     expect(run.inboxId.length).toBeGreaterThan(0);
     await seedOutboxRow(tdb.engine, {
       outboxId: 'outbox-consistent-pending',
+      runId: run.runId,
       status: 'PENDING',
       enqueuedAt: T0,
     });
@@ -91,6 +92,7 @@ describe('workflow state verification (T025 recovery seam)', () => {
     //    lag check is exercised by a separate PENDING row below.
     await seedOutboxRow(tdb.engine, {
       outboxId: 'outbox-orphaned-claim',
+      runId: run.runId,
       status: 'CLAIMED',
       claimOwner: 'worker-crashed',
       claimFencingToken: 42,
@@ -102,6 +104,7 @@ describe('workflow state verification (T025 recovery seam)', () => {
     // 3. Outbox lag: PENDING row older than the threshold.
     await seedOutboxRow(tdb.engine, {
       outboxId: 'outbox-lagging',
+      runId: run.runId,
       status: 'PENDING',
       enqueuedAt: EARLIER,
     });

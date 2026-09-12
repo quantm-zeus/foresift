@@ -99,6 +99,7 @@ interface InboxRow {
   readonly inbox_id: string;
   readonly status: string;
   readonly processed_run_id: string | null;
+  readonly schedule_id: string;
 }
 
 function normalizeSource(source: unknown): string {
@@ -304,7 +305,7 @@ async function recordTriggerDeliveryInner(
     let resolvedInboxId = inboxId;
     if (inserted.rows.length === 0) {
       const existingResult = await tx.query<InboxRow>(
-        `SELECT inbox_id, status, processed_run_id FROM wf.trigger_inbox
+        `SELECT inbox_id, status, processed_run_id, schedule_id FROM wf.trigger_inbox
           WHERE source = $1 AND canonical_external_message_id = $2`,
         [source, canonical],
       );
@@ -317,6 +318,23 @@ async function recordTriggerDeliveryInner(
         );
       }
       resolvedInboxId = existing.inbox_id;
+      // The inbox identity is global `(source, canonical_external_message_id)`,
+      // so the SAME external id addressed to a DIFFERENT schedule must be
+      // refused typed — never collapsed onto the first schedule's run, which
+      // would silently drop B's delivery and misattribute its run. Refusal
+      // throws inside the transaction, so NOTHING is written for the delivery.
+      if (existing.schedule_id !== input.scheduleId) {
+        throw new ForesiftError(
+          ErrorCode.WF_TRIGGER_SCHEDULE_MISMATCH,
+          'this external message id was already delivered to a different schedule',
+          {
+            source,
+            canonicalExternalMessageId: canonical,
+            existingScheduleId: existing.schedule_id,
+            requestedScheduleId: input.scheduleId,
+          },
+        );
+      }
       if (existing.status === 'REJECTED') {
         throw new ForesiftError(
           ErrorCode.WF_TRIGGER_DELIVERY_REJECTED,

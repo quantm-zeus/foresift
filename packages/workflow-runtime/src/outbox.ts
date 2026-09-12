@@ -25,7 +25,24 @@
  *   the channel's idempotency law: recovery re-claims with a fresh token and
  *   the replay collapses to exactly one delivered notification.
  *
+ * The shadow choke point (FR-WF-008) is enforced at BOTH ends of this module:
+ *   1. `commitDecisionWithOutbox` never writes a deliverable (PENDING) row for a
+ *      shadow run — the row is always `SUPPRESSED_SHADOW`, whatever `influence`
+ *      the caller passes, and any attempt to write a deliverable row from a
+ *      shadow run is put through `assertNoOpportunityInfluence`;
+ *   2. `deliverClaimed` re-reads `wf.runs.shadow` for every claimed row (through
+ *      `decision_ref`), so a corrupted/legacy row forced back to PENDING is
+ *      still refused and re-marked `SUPPRESSED_SHADOW` at the send gate.
  * Never sends from a shadow/SUPPRESSED row.
+ *
+ * Concurrency caveat: PGlite (the deterministic test engine) does not isolate
+ * concurrent transactions — one engine shares one connection, so two
+ * `engine.transaction` calls can interleave. The AC-011 storage guarantees
+ * therefore rest on the CONSTRAINT DESIGN (single-row guarded UPDATEs, the
+ * claim fencing sequence, the SUPERSEDED/suppressed CHECKs), and in-process
+ * delivery/admission determinism comes from the per-schedule admission chain in
+ * `trigger-inbox.ts`; a real multi-connection pg test belongs to the
+ * integration tier.
  *
  * Strictly read-only: this module delivers intelligence notifications; it can
  * never trade, custody, sign, handle keys, or submit a transaction.
@@ -254,6 +271,26 @@ async function readOutboxRow(
   return result.rows[0];
 }
 
+/** The owning run's shadow flag, resolved through the row's decision reference. */
+const OUTBOX_RUN_SHADOW = `
+    SELECT r.run_id, r.shadow
+      FROM wf.notification_outbox o
+      JOIN wf.decision_commits d ON d.decision_id = o.decision_ref
+      JOIN wf.runs r ON r.run_id = d.run_id
+     WHERE o.outbox_id = $1`;
+
+/** Re-mark a corrupt/legacy deliverable row as never-deliverable. */
+const MARK_SUPPRESSED_SHADOW = `
+    UPDATE wf.notification_outbox
+       SET status = 'SUPPRESSED_SHADOW',
+           claim_owner = NULL,
+           claim_fencing_token = NULL,
+           claim_expires_at = NULL,
+           last_error = $2
+     WHERE outbox_id = $1
+       AND status IN ('PENDING', 'CLAIMED')
+    RETURNING outbox_id`;
+
 /**
  * §26.5 commit boundary: decision + alert + outbox entry in ONE transaction.
  * Any failure rolls the whole unit back, so a committed outbox row always has
@@ -310,6 +347,15 @@ export async function commitDecisionWithOutbox(
     }
     let status: OutboxStatus = 'PENDING';
     if (shadowSuppressionFor({ runId, shadow: run.shadow }, influence) !== null) {
+      status = 'SUPPRESSED_SHADOW';
+    } else if (run.shadow) {
+      // A shadow notification is opportunity-influencing by definition, so the
+      // `influence` argument can NEVER downgrade it to a deliverable row. The
+      // domain law permits an `EVIDENCE_READ` (reads are always allowed), which
+      // is exactly why the deliverable row we would otherwise write is put
+      // through the choke point here before being tagged evaluation-only. The
+      // call is idempotent for reads; it refuses a policy write-back above.
+      assertNoOpportunityInfluence({ runId, shadow: run.shadow }, influence);
       status = 'SUPPRESSED_SHADOW';
     } else if (outcome === OutboxCommitOutcome.PROVIDER_OUTAGE) {
       status = 'SUPPRESSED_OUTAGE';
@@ -584,6 +630,29 @@ export async function deliverClaimed(
       });
       continue;
     }
+    // SECOND shadow choke point (FR-WF-008): re-read the owning run for EVERY
+    // claimed row. The commit boundary refuses to create a deliverable row from
+    // a shadow run, but a corrupted or pre-existing row forced back to PENDING
+    // must still be refused at the send gate. This is deliberately checked
+    // BEFORE the claim-freshness test so a corrupt row is re-marked rather than
+    // merely reported stale.
+    const shadowRow = await engine.query<{ run_id: string; shadow: boolean }>(OUTBOX_RUN_SHADOW, [
+      claim.outboxId,
+    ]);
+    if (shadowRow.rows[0]?.shadow === true) {
+      await engine.query(MARK_SUPPRESSED_SHADOW, [
+        claim.outboxId,
+        'FR-WF-008: shadow-run notification delivery refused',
+      ]);
+      refusedSuppressed.push(claim.outboxId);
+      outcomes.push({
+        outboxId: claim.outboxId,
+        outcome: 'REFUSED_SUPPRESSED',
+        attempts: row.attempts,
+        detail: 'the owning run is shadow, so its notification is never deliverable',
+      });
+      continue;
+    }
     if (!(await isClaimCurrent(engine, claim, workerId, now))) {
       // The owner/token is no longer current: refuse to send (AC-011).
       stale.push(claim.outboxId);
@@ -630,6 +699,36 @@ export async function deliverClaimed(
           detail: diagnostic,
         });
       }
+      continue;
+    }
+
+    // Content-address check: never hand the channel a payload under a hash it
+    // does not match. A mismatch is permanent (a mutated alert/decision row),
+    // so the row is FAILED rather than retried, with an actionable last_error.
+    const resolvedHash = sha256Text(canonicalJson(payload));
+    if (resolvedHash !== row.payload_hash) {
+      const attempts = row.attempts + 1;
+      const mismatch = new ForesiftError(
+        ErrorCode.WF_OUTBOX_PAYLOAD_INVALID,
+        'resolved payload does not match the stored outbox payload hash',
+        { outboxId: claim.outboxId, stored: row.payload_hash, recomputed: resolvedHash },
+      );
+      const diagnostic = `${mismatch.name}:${mismatch.code} payload hash mismatch (stored ${row.payload_hash}, recomputed ${resolvedHash})`;
+      await engine.query(MARK_RETRY, [
+        'FAILED',
+        attempts,
+        diagnostic,
+        claim.outboxId,
+        workerId,
+        claim.fencingToken,
+      ]);
+      failed.push(claim.outboxId);
+      outcomes.push({
+        outboxId: claim.outboxId,
+        outcome: 'FAILED',
+        attempts,
+        detail: diagnostic,
+      });
       continue;
     }
 

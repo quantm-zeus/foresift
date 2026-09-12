@@ -8,8 +8,9 @@
  * - canonicalization collapses equivalent ids;
  * - a delivery to a nonexistent/DRAFT/PAUSED/DISABLED schedule is refused;
  * - a concurrency policy skip is recorded distinctly from a duplicate collapse;
- * - inbound replay outside the window and forged/expired/replayed scheduler
- *   deliveries are refused before any state write.
+ * - the scheduler trust boundary refuses forged/expired/replayed deliveries;
+ *   the ordering invariant that verification precedes any inbox write is
+ *   asserted for the pure verifier (endpoint wiring is slice 3 / T027).
  */
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 import { ErrorCode, type ConcurrencyPolicy } from '@foresift/domain';
@@ -149,6 +150,42 @@ describe('AC-010 exactly-one-run', () => {
     expect(second.runId).toBe(first.runId);
     expect(second.inboxId).toBe(first.inboxId);
     expect(await countRuns(scheduleId)).toBe(1);
+  });
+
+  it('refuses an external message id already delivered to a DIFFERENT schedule, writing nothing for B', async () => {
+    const scheduleA = 'sched-cross-a';
+    const scheduleB = 'sched-cross-b';
+    await seedActiveSchedule(scheduleA);
+    await seedActiveSchedule(scheduleB);
+
+    const deliveredToA = await recordTriggerDelivery(
+      tdb.engine,
+      delivery(scheduleA, 'msg-cross-schedule-1'),
+    );
+    expect(deliveredToA.outcome).toBe('RUN_STARTED');
+
+    // The inbox identity is global; reusing A's external id for B must be a
+    // typed refusal, never a collapse onto A's run.
+    await expectForesiftError(
+      recordTriggerDelivery(tdb.engine, delivery(scheduleB, 'msg-cross-schedule-1')),
+      ErrorCode.WF_TRIGGER_SCHEDULE_MISMATCH,
+    );
+
+    // B has no run and no inbox row; A's delivery is untouched.
+    expect(await countRuns(scheduleB)).toBe(0);
+    const inboxB = await tdb.engine.query<{ n: string }>(
+      `SELECT count(*)::text AS n FROM wf.trigger_inbox WHERE schedule_id = $1`,
+      [scheduleB],
+    );
+    expect(Number(inboxB.rows[0]?.n ?? '0')).toBe(0);
+    expect(await countRuns(scheduleA)).toBe(1);
+
+    const inboxA = await tdb.engine.query<{ status: string; processed_run_id: string | null }>(
+      `SELECT status, processed_run_id FROM wf.trigger_inbox WHERE schedule_id = $1`,
+      [scheduleA],
+    );
+    expect(inboxA.rows[0]?.status).toBe('PROCESSED');
+    expect(inboxA.rows[0]?.processed_run_id).toBe(deliveredToA.runId);
   });
 
   it('collapses CONCURRENT deliveries onto exactly one run', async () => {
@@ -365,16 +402,18 @@ describe('scheduler delivery trust boundary (§25.3 steps 1-2)', () => {
     );
   });
 
-  it('refuses an inbound replay before any state write', async () => {
+  it('documents the §25.3 steps 1-2 ordering invariant: a replay is refused typed and the inbox stays untouched', async () => {
     const scheduleId = 'sched-replay';
     await seedActiveSchedule(scheduleId);
-    const seen = await tdb.engine.query<{ canonical_external_message_id: string }>(
-      `SELECT canonical_external_message_id FROM wf.trigger_inbox WHERE schedule_id = $1`,
+    const before = await tdb.engine.query<{ n: string }>(
+      `SELECT count(*)::text AS n FROM wf.trigger_inbox WHERE schedule_id = $1`,
       [scheduleId],
     );
-    expect(seen.rows).toEqual([]);
+    expect(Number(before.rows[0]?.n ?? '0')).toBe(0);
 
     const input = signed({ messageId: 'msg-replay-state' });
+    // `verifySchedulerDelivery` is the surface-level replay refusal: a PURE
+    // function with no engine argument, so it cannot write by construction.
     await expectForesiftError(
       Promise.resolve().then(() =>
         verifySchedulerDelivery({ ...input, seenMessageIds: ['msg-replay-state'] }),
@@ -382,6 +421,11 @@ describe('scheduler delivery trust boundary (§25.3 steps 1-2)', () => {
       ErrorCode.WF_SCHEDULER_DELIVERY_REPLAYED,
     );
 
+    // Ordering invariant (§25.3 steps 1-2): verification precedes the inbox
+    // pipeline, so a refused replay must leave the inbox untouched. The T027
+    // endpoint owns wiring the verifier into `recordTriggerDelivery` and the
+    // endpoint-level replay test; this asserts the invariant that wiring must
+    // preserve, not that this package already enforces it end to end.
     const after = await tdb.engine.query<{ n: string }>(
       `SELECT count(*)::text AS n FROM wf.trigger_inbox WHERE schedule_id = $1`,
       [scheduleId],

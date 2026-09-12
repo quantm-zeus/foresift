@@ -11,7 +11,19 @@
  *   commit boundary uses to tag a row `SUPPRESSED_SHADOW` (never deliverable);
  * - `assertNoOpportunityInfluence(run, influence)` refuses with a typed
  *   `WF_SHADOW_INFLUENCE_REFUSED` wherever an actual influence is attempted
- *   (delivery of a deliverable row, policy write-back).
+ *   (policy write-back, and any attempt to write a deliverable outbox row from
+ *   a shadow run).
+ *
+ * The choke point is enforced at TWO places in `outbox.ts` (FR-WF-008):
+ *   1. the commit boundary (`commitDecisionWithOutbox`) refuses to write a
+ *      PENDING row for a shadow run — regardless of the caller's `influence`
+ *      label — and routes the attempt through `assertNoOpportunityInfluence`;
+ *      the row is stored `SUPPRESSED_SHADOW` for evaluation reads only;
+ *   2. the delivery worker (`deliverClaimed`) re-reads `wf.runs.shadow` through
+ *      the row's decision reference for every claimed row and refuses to send,
+ *      re-marking the row `SUPPRESSED_SHADOW`. The row STATUS tag is therefore
+ *      not trusted on its own: corrupt/legacy PENDING rows are caught again.
+ * Status tags alone are not a choke point; both call sites above are.
  *
  * Both consult the one domain law, so the SQL/domain/schema vocabularies cannot
  * drift apart. Governance (which versions are shadow) is consumed as a flag

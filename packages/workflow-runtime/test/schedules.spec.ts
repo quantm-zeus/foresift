@@ -393,6 +393,41 @@ describe('§33.6 forecast-before-enable gate (AC-063)', () => {
       ErrorCode.WF_FORECAST_STALE,
     );
   });
+
+  it('refuses RESUME when the persisted forecast belongs to a superseded version', async () => {
+    const scheduleId = 'sched-version-bound-resume';
+    await control({ ...draft(scheduleId), versionId: 'vbr-v1' });
+    await control({
+      action: 'ENABLE',
+      scheduleId,
+      now: T0,
+      forecastId: 'vbr-forecast-1',
+      forecast: forecast(T0),
+    });
+    await control({ action: 'PAUSE', scheduleId, now: T0 });
+    // A new version (different cron/cost profile) is drafted while PAUSED: the
+    // v1 forecast is FRESH but must not enable the v2 configuration.
+    const edited = await control({
+      action: 'EDIT_DRAFT',
+      scheduleId,
+      now: T0,
+      versionId: 'vbr-v2',
+      config: { cron: '*/10 * * * *' },
+    });
+    expect(edited.versionId).toBe('vbr-v2');
+
+    await expectForesiftError(
+      applyScheduleControl(tdb.engine, { action: 'RESUME', scheduleId, now: T0 }),
+      ErrorCode.WF_FORECAST_STALE,
+    );
+
+    const row = await tdb.engine.query<{ status: string; current_version_id: string }>(
+      `SELECT status, current_version_id FROM wf.schedules WHERE schedule_id = $1`,
+      [scheduleId],
+    );
+    expect(row.rows[0]?.status).toBe('PAUSED');
+    expect(row.rows[0]?.current_version_id).toBe('vbr-v2');
+  });
 });
 
 describe('schedule configuration validation', () => {

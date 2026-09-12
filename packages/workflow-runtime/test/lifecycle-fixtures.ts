@@ -201,13 +201,18 @@ export async function seedStep(engine: DatabaseEngine, input: SeedStepInput): Pr
 
 /**
  * Insert an outbox row directly (used by the verify-state and delivery suites
- * where the atomic commit path is not under test).
+ * where the atomic commit path is not under test). Because
+ * `g2_wf_0005_outbox_hardening.sql` constrains `decision_ref` with a foreign
+ * key, a real `wf.decision_commits` row (and its owning run) is seeded first
+ * unless the caller supplies `runId` for an existing one.
  */
 export async function seedOutboxRow(
   engine: DatabaseEngine,
   input: {
     readonly outboxId: string;
     readonly decisionRef?: string;
+    /** Owning run for the auto-seeded decision commit (defaults to a new run). */
+    readonly runId?: string;
     readonly alertRef?: string | null;
     readonly channel?: string;
     readonly status:
@@ -219,6 +224,20 @@ export async function seedOutboxRow(
     readonly attempts?: number;
   },
 ): Promise<void> {
+  const decisionRef = input.decisionRef ?? `decision-${input.outboxId}`;
+  const existing = await engine.query<{ decision_id: string }>(
+    `SELECT decision_id FROM wf.decision_commits WHERE decision_id = $1`,
+    [decisionRef],
+  );
+  if (existing.rows.length === 0) {
+    const runId = input.runId ?? (await seedRun(engine)).runId;
+    await engine.query(
+      `INSERT INTO wf.decision_commits
+         (decision_id, run_id, decision_kind, payload, payload_hash, committed_at)
+       VALUES ($1, $2, 'CANDIDATE_DECISION', '{}'::jsonb, $3, now())`,
+      [decisionRef, runId, LIFECYCLE_HASH_A],
+    );
+  }
   await engine.query(
     `INSERT INTO wf.notification_outbox
        (outbox_id, decision_ref, alert_ref, channel, payload_hash, status,
@@ -226,7 +245,7 @@ export async function seedOutboxRow(
      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)`,
     [
       input.outboxId,
-      input.decisionRef ?? `decision-${input.outboxId}`,
+      decisionRef,
       input.alertRef ?? null,
       input.channel ?? 'admin-inbox',
       LIFECYCLE_HASH_A,

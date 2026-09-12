@@ -16,7 +16,7 @@
       "neither modifies root/shared architecture surfaces"
     ]
   },
-  "currentMilestoneId": null,
+  "currentMilestoneId": "G2",
   "milestones": [
     {
       "id": "G0",
@@ -34,7 +34,7 @@
       "id": "G2",
       "name": "Durable Operations, Alerts, Recovery and Admin Control",
       "dependsOn": ["G0", "G1"],
-      "status": "PLANNED"
+      "status": "ACTIVE"
     },
     {
       "id": "G3",

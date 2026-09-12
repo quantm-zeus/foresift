@@ -18,7 +18,7 @@
         "FR-WF-008"
       ],
       "risk": "HIGH",
-      "status": "RUNNING",
+      "status": "PROVEN",
       "verificationCommands": [
         "test -d packages/workflow-runtime && pnpm --filter @foresift/workflow-runtime test",
         "bun test tests/acceptance/AC-010.spec.ts tests/acceptance/AC-011.spec.ts tests/acceptance/AC-012.spec.ts tests/acceptance/AC-013.spec.ts tests/acceptance/AC-014.spec.ts",
@@ -49,7 +49,7 @@
         "FR-ALERT-005"
       ],
       "risk": "HIGH",
-      "status": "PENDING",
+      "status": "RUNNING",
       "verificationCommands": [
         "test -d packages/alerts && pnpm --filter @foresift/alerts test",
         "bun test tests/acceptance/AC-140.spec.ts tests/acceptance/AC-141.spec.ts",

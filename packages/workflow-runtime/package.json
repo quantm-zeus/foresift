@@ -1,0 +1,27 @@
+{
+  "name": "@foresift/workflow-runtime",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Durable, read-only workflow substrate: trigger inbox, immutable schedule versions, idempotent checkpointed steps, monotonically fenced leases, and a transactional notification outbox with dead letters. Never trades, custodies, signs, or submits transactions.",
+  "exports": {
+    ".": {
+      "types": "./src/index.ts",
+      "default": "./src/index.ts"
+    }
+  },
+  "scripts": {
+    "test": "bun test"
+  },
+  "dependencies": {
+    "@foresift/domain": "workspace:*",
+    "@foresift/persistence": "workspace:*",
+    "@foresift/shared-schemas": "workspace:*",
+    "zod": "^3.25.76"
+  },
+  "devDependencies": {
+    "@electric-sql/pglite": "^0.5.6",
+    "@types/bun": "1.4.0",
+    "typescript": "5.9.3"
+  }
+}

@@ -55,3 +55,4 @@ export {
   type RecheckDecision as SigRecheckDecision,
   type SigSchemaName,
 } from './sig.ts';
+export * from './wf.ts';

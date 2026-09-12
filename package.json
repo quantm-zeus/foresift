@@ -50,6 +50,7 @@
     "@foresift/release-conformance": "workspace:*",
     "@foresift/security": "workspace:*",
     "@foresift/shared-schemas": "workspace:*",
+    "@foresift/workflow-runtime": "workspace:*",
     "@types/bun": "1.4.0",
     "@types/node": "26.2.0",
     "eslint": "10.9.0",

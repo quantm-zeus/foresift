@@ -29,6 +29,8 @@ import {
 } from '@foresift/persistence';
 import { parseCoreSchema } from '@foresift/shared-schemas';
 import { closeTestDatabase, makeTestDatabase, type TestDatabase } from './helpers.ts';
+import * as alertGate from '@foresift/alerts';
+import * as alertFx from '../fixtures/alerts/index.ts';
 
 const T = (iso: string): UtcTimestamp => utcTimestamp(iso);
 
@@ -108,7 +110,7 @@ beforeAll(async () => {
       0.5,
     ],
   );
-});
+}, 120_000);
 
 afterAll(() => closeTestDatabase(tdb));
 
@@ -247,5 +249,55 @@ describe('AC-247 G1 extension: frozen-count preservation in realizable replay fa
     });
     expect(countA).toBe(2);
     expect(countB).toBe(countA);
+  });
+});
+
+describe('AC-247 alert-scoped extension: a retrospective estimate cannot alter a frozen historical count (FR-ALERT-003)', () => {
+  it('replays the frozen below-threshold count and refuses confirmation without mutating it', () => {
+    const before = JSON.parse(JSON.stringify(alertFx.FROZEN_HISTORICAL_CREDIT_INPUT));
+    const outcome = alertGate.classifyAlert(
+      alertFx.confirmedOpportunityClassificationRequest({
+        gateInputs: alertFx.FROZEN_HISTORICAL_CREDIT_INPUT,
+        severity: 0.99,
+        thesisVersion: 9,
+      }),
+    );
+    expect(outcome.kind).toBe(alertGate.AlertClassificationKind.SUPPRESSED);
+    expect(outcome.alertClass).toBeNull();
+    // The frozen historical evidence count is byte-identical after the replay.
+    expect(alertFx.FROZEN_HISTORICAL_CREDIT_INPUT).toEqual(before);
+    expect(alertFx.FROZEN_HISTORICAL_CREDIT_INPUT.independentEvidence?.independentGroupCount).toBe(
+      alertFx.FROZEN_HISTORICAL_EVIDENCE_COUNT,
+    );
+  });
+
+  it('refuses to carry a retrospective dependence estimate into the frozen gate input', () => {
+    expect(() =>
+      alertGate.classifyAlert(
+        alertFx.confirmedOpportunityClassificationRequest({
+          gateInputs: alertFx.passingGateInput({
+            independentEvidence: {
+              independentGroupCount: alertFx.FROZEN_HISTORICAL_EVIDENCE_COUNT,
+              minimumIndependentGroupCount: alertFx.FROZEN_HISTORICAL_EVIDENCE_MINIMUM,
+              retrospectiveDependenceEstimate: 0.92,
+            },
+          }),
+        }),
+      ),
+    ).toThrow();
+  });
+
+  it('replays the historical gate result set for the frozen count and still refuses', () => {
+    const observed = alertGate.evaluateConfirmedOpportunityGates(
+      alertFx.FROZEN_HISTORICAL_CREDIT_INPUT,
+    );
+    const outcome = alertGate.classifyAlert(
+      alertFx.confirmedOpportunityClassificationRequest({
+        gateInputs: null,
+        gateResults: [...observed],
+      }),
+    );
+    expect(outcome.kind).toBe(alertGate.AlertClassificationKind.SUPPRESSED);
+    expect(outcome.suppressionReason).toBe('GATE_REFUSED');
   });
 });

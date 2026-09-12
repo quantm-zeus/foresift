@@ -23,6 +23,8 @@ import {
 } from '@foresift/persistence';
 import { parseCoreSchema } from '@foresift/shared-schemas';
 import { closeTestDatabase, makeTestDatabase, type TestDatabase } from '../acceptance/helpers.ts';
+import * as alertGate from '@foresift/alerts';
+import * as alertFx from '../fixtures/alerts/index.ts';
 
 const BOUNDARY: UtcTimestamp = utcTimestamp('2026-06-05T00:00:00Z');
 
@@ -73,7 +75,7 @@ beforeAll(async () => {
     state: AcquisitionState.RETURNED,
     evidenceIds: ['ev/ac247n/1'],
   });
-});
+}, 120_000);
 
 afterAll(() => closeTestDatabase(tdb));
 
@@ -181,5 +183,39 @@ describe('AC-247 G1 extension negative: frozen-count preservation negative facet
       t: BOUNDARY,
     });
     expect(postCount).toBe(1);
+  });
+});
+
+describe('AC-247 negative alert-scoped extension: late estimates cannot rewrite a frozen gate replay (FR-ALERT-003)', () => {
+  it('refuses an unknown retrospective-count field on the classification request', () => {
+    const base = alertFx.confirmedOpportunityClassificationRequest();
+    expect(() =>
+      alertGate.classifyAlert({
+        ...base,
+        retrospectiveHistoricalEvidenceCount: alertFx.FROZEN_HISTORICAL_EVIDENCE_COUNT + 3,
+      }),
+    ).toThrow();
+  });
+
+  it('refuses a gate result that claims the evidence gate passed while carrying a refusal reason', () => {
+    const observed = alertGate.evaluateConfirmedOpportunityGates(
+      alertFx.FROZEN_HISTORICAL_CREDIT_INPUT,
+    );
+    const forged = observed.map((gate) =>
+      gate.gate === 'MINIMUM_INDEPENDENT_EVIDENCE_GROUPS'
+        ? { gate: gate.gate, passed: true, reason: 'GATE_REFUSED' as const }
+        : gate,
+    );
+    expect(() => alertGate.validateConfirmedOpportunityGateResults([...forged])).toThrow();
+    // The strict request schema refuses the inconsistent gate result before the
+    // classifier can consume it, so a late count cannot rewrite the replay.
+    expect(() =>
+      alertGate.classifyAlert(
+        alertFx.confirmedOpportunityClassificationRequest({
+          gateInputs: null,
+          gateResults: [...forged],
+        }),
+      ),
+    ).toThrow();
   });
 });

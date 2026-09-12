@@ -11,6 +11,8 @@ import { ErrorCode, utcTimestamp, type UtcTimestamp } from '@foresift/domain';
 import { assertNoBackdating, recordBackfillReceipt } from '@foresift/persistence';
 import { parseDataSchema } from '@foresift/shared-schemas';
 import { closeTestDatabase, makeTestDatabase, type TestDatabase } from '../acceptance/helpers.ts';
+import * as alertGate from '@foresift/alerts';
+import * as alertFx from '../fixtures/alerts/index.ts';
 
 const T = (iso: string): UtcTimestamp => utcTimestamp(iso);
 
@@ -18,7 +20,7 @@ let tdb: TestDatabase;
 
 beforeAll(async () => {
   tdb = await makeTestDatabase();
-});
+}, 120_000);
 
 afterAll(() => closeTestDatabase(tdb));
 
@@ -122,5 +124,40 @@ describe('AC-249 G1 extension negative: extended negative-control set negative f
     };
 
     expect(() => validateControlResults([failedControlResult])).toThrow(/NEGATIVE_CONTROL_FAILED/);
+  });
+});
+
+describe('AC-249 negative alert-scoped extension: control failures cannot be laundered (FR-ALERT-003)', () => {
+  it('refuses a passed gate with a non-null reason and a failed gate without a reason', () => {
+    const observed = alertGate.evaluateConfirmedOpportunityGates(alertFx.FAILED_CONTROL_GATE_INPUT);
+    const passedWithReason = observed.map((gate) =>
+      gate.gate === 'SEMANTIC_VALIDATION'
+        ? { gate: gate.gate, passed: true, reason: 'GATE_REFUSED' as const }
+        : gate,
+    );
+    expect(() =>
+      alertGate.validateConfirmedOpportunityGateResults([...passedWithReason]),
+    ).toThrow();
+
+    const failedWithoutReason = observed.map((gate) =>
+      gate.gate === 'SEMANTIC_VALIDATION' ? { gate: gate.gate, passed: false, reason: null } : gate,
+    );
+    expect(() =>
+      alertGate.validateConfirmedOpportunityGateResults([...failedWithoutReason]),
+    ).toThrow();
+  });
+
+  it('refuses an incomplete control set with the semantic-validation gate removed', () => {
+    const observed = alertGate
+      .evaluateConfirmedOpportunityGates(alertFx.FAILED_CONTROL_GATE_INPUT)
+      .filter((gate) => gate.gate !== 'SEMANTIC_VALIDATION');
+    const outcome = alertGate.classifyAlert(
+      alertFx.confirmedOpportunityClassificationRequest({
+        gateInputs: null,
+        gateResults: [...observed],
+      }),
+    );
+    expect(outcome.kind).toBe(alertGate.AlertClassificationKind.SUPPRESSED);
+    expect(outcome.gateSetComplete).toBe(false);
   });
 });

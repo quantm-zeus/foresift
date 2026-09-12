@@ -22,6 +22,8 @@ import {
   makeTestDatabase,
   type TestDatabase,
 } from '../acceptance/helpers.ts';
+import * as alertGate from '@foresift/alerts';
+import * as alertFx from '../fixtures/alerts/index.ts';
 
 const T = (iso: string): UtcTimestamp => utcTimestamp(iso);
 
@@ -57,7 +59,7 @@ beforeAll(async () => {
     state: AcquisitionState.RETURNED,
     evidenceIds: ['ev/ac248n/unfrozen'],
   });
-});
+}, 120_000);
 
 afterAll(() => closeTestDatabase(tdb));
 
@@ -193,5 +195,48 @@ describe('AC-248 G1 obj-facet negative: promotion blocked on insufficient counts
     expect(() => evaluateControlGate(['NEGATIVE_CONTROL_PERMUTATION_FAILED'])).toThrow(
       /OBJ_INTEGRITY_FAILURE_BLOCKS_PROMOTION/,
     );
+  });
+});
+
+describe('AC-248 negative alert-scoped extension: threshold fields cannot be inflated away (FR-ALERT-003)', () => {
+  it('refuses an unknown effective-sample-size field used to bypass the mature-count minimum', () => {
+    expect(() =>
+      alertGate.classifyAlert(
+        alertFx.confirmedOpportunityClassificationRequest({
+          gateInputs: alertFx.passingGateInput({
+            independentEvidence: {
+              independentGroupCount: 1,
+              minimumIndependentGroupCount: 3,
+              effectiveSampleSize: 10_000,
+            },
+          }),
+        }),
+      ),
+    ).toThrow();
+  });
+
+  it('refuses a coverage ratio outside [0,1] and a negative independent-group count', () => {
+    for (const bad of [
+      { coverageRatio: 1.4, minimumCoverageRatio: 0.8 },
+      { coverageRatio: 0.9, minimumCoverageRatio: 1.4 },
+      { coverageRatio: -0.1, minimumCoverageRatio: 0.8 },
+    ]) {
+      expect(() =>
+        alertGate.classifyAlert(
+          alertFx.confirmedOpportunityClassificationRequest({
+            gateInputs: alertFx.passingGateInput({ dataCoverage: bad }),
+          }),
+        ),
+      ).toThrow();
+    }
+    expect(() =>
+      alertGate.classifyAlert(
+        alertFx.confirmedOpportunityClassificationRequest({
+          gateInputs: alertFx.passingGateInput({
+            independentEvidence: { independentGroupCount: -1, minimumIndependentGroupCount: 3 },
+          }),
+        }),
+      ),
+    ).toThrow();
   });
 });

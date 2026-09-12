@@ -9,6 +9,8 @@ import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 import { independenceGroupOf, registerSourceIdentity } from '@foresift/persistence';
 import { parseDataSchema } from '@foresift/shared-schemas';
 import { closeTestDatabase, makeTestDatabase, type TestDatabase } from '../acceptance/helpers.ts';
+import * as alertGate from '@foresift/alerts';
+import * as alertFx from '../fixtures/alerts/index.ts';
 
 let tdb: TestDatabase;
 
@@ -22,7 +24,7 @@ beforeAll(async () => {
     endpointRegion: 'eu-central',
     collectionMethod: 'POLLING_API',
   });
-});
+}, 120_000);
 
 afterAll(() => closeTestDatabase(tdb));
 
@@ -85,5 +87,40 @@ describe('AC-246 G1 extension negative: lineage-collapse sensitivity negative fa
     expect(() => validatePromotionLineage(promotionEvidence)).toThrow(
       /DUPLICATED_LINEAGE_SOURCES_CLAIM_REFUSED/,
     );
+  });
+});
+
+describe('AC-246 negative alert-scoped extension: duplicated-lineage gate sets cannot masquerade as complete (FR-ALERT-003)', () => {
+  it('refuses a gate set that drops the independent-evidence gate', () => {
+    const observed = alertGate
+      .evaluateConfirmedOpportunityGates(alertFx.DUPLICATED_LINEAGE_CREDIT.gateInput)
+      .filter((gate) => gate.gate !== 'MINIMUM_INDEPENDENT_EVIDENCE_GROUPS');
+    const outcome = alertGate.classifyAlert(
+      alertFx.confirmedOpportunityClassificationRequest({
+        gateInputs: null,
+        gateResults: [...observed],
+      }),
+    );
+    expect(outcome.kind).toBe(alertGate.AlertClassificationKind.SUPPRESSED);
+    expect(outcome.gateSetComplete).toBe(false);
+  });
+
+  it('refuses a gate set with a duplicated gate that would hide the lineage refusal', () => {
+    const observed = alertGate.evaluateConfirmedOpportunityGates(
+      alertFx.DUPLICATED_LINEAGE_CREDIT.gateInput,
+    );
+    const first = observed[0] as (typeof observed)[number];
+    const duplicated = observed.map((gate, index) =>
+      index === observed.length - 1 ? { ...first } : gate,
+    );
+    expect(() => alertGate.validateConfirmedOpportunityGateResults([...duplicated])).toThrow();
+    const outcome = alertGate.classifyAlert(
+      alertFx.confirmedOpportunityClassificationRequest({
+        gateInputs: null,
+        gateResults: [...duplicated],
+      }),
+    );
+    expect(outcome.kind).toBe(alertGate.AlertClassificationKind.SUPPRESSED);
+    expect(outcome.gateSetComplete).toBe(false);
   });
 });

@@ -1,7 +1,7 @@
 {
   "schema": "foresift/bun-migration-manifest@1",
   "migrationId": "bun-test-authority-v1",
-  "generatedAt": "2026-09-12T18:55:44.443Z",
+  "generatedAt": "2026-09-12T19:03:37.553Z",
   "root": ".",
   "totalTestFiles": 557,
   "counts": {
@@ -4734,9 +4734,9 @@
     {
       "path": "packages/workflow-runtime/test/migrations.spec.ts",
       "package": "@foresift/workflow-runtime",
-      "bytes": 20788,
-      "lines": 546,
-      "sha256": "1e3752b4da7de0a5539d907eabd3298e4a83abd0ca0dd0b3aa51bc286e819b0a",
+      "bytes": 21600,
+      "lines": 561,
+      "sha256": "361b9eecfa778a968c4643e8636a1d7dd0ead1cb9b0352cf959be0577a900684",
       "imports": [
         "bun:test",
         "@electric-sql/pglite",

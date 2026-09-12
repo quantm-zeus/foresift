@@ -13,7 +13,8 @@
  *   separately as declared defense-in-depth);
  * - a run can never pin a version owned by a different schedule (composite FK);
  * - §25.7 leases are monotonically fenced at the storage layer: a regression
- *   to an old (or equal) fencing token is refused by the BEFORE UPDATE trigger,
+ *   to an OLD fencing token is refused by the BEFORE UPDATE trigger, while an
+ *   unchanged token stays legal so a holder can release/extend expiry.
  *   a stale token's guarded release updates zero rows, and a non-positive
  *   token is refused;
  * - §26.5 outbox claim shape and the §25.9/§25.10 CHECKs;
@@ -408,15 +409,29 @@ describe('§25.7 step leases are monotonically fenced', () => {
     expect((regression as { code?: string }).code).toBe('23001');
     expect(regression.message).toMatch(/monotonically fenced/);
 
-    const nonIncrease = await rejection(
-      engine.query(
-        `UPDATE wf.step_leases SET fencing_token = $1 WHERE resource_key = 'candidate:c4'`,
-        [currentToken],
-      ),
+    // An UNCHANGED token is legal: takeover always allocates a strictly larger
+    // token, while an ordinary holder releases/extends expiry without touching
+    // it (row-level guard is the `fencing_token = $n` predicate). Refusing
+    // equality would make release impossible.
+    const released = await engine.query<{ released_at: string | null }>(
+      `UPDATE wf.step_leases SET released_at = now()
+        WHERE resource_key = 'candidate:c4' AND fencing_token = $1
+        RETURNING released_at`,
+      [currentToken],
     );
-    expect(nonIncrease.message).toMatch(/monotonically fenced/);
+    expect(released.rows).toHaveLength(1);
+    expect(released.rows[0]?.released_at).not.toBeNull();
 
-    // The winner's token is untouched by the refused regressions.
+    const extended = await engine.query<{ expires_at: string }>(
+      `UPDATE wf.step_leases SET expires_at = expires_at + interval '1 hour'
+        WHERE resource_key = 'candidate:c4' AND fencing_token = $1
+        RETURNING expires_at`,
+      [currentToken],
+    );
+    expect(extended.rows).toHaveLength(1);
+
+    // The winner's token is untouched by the refused regression or the
+    // holder's own release/expiry updates.
     const after = await engine.query<{ fencing_token: string }>(
       `SELECT fencing_token FROM wf.step_leases WHERE resource_key = 'candidate:c4'`,
     );

@@ -238,15 +238,19 @@ CREATE TABLE IF NOT EXISTS wf.step_leases (
 );
 
 -- §25.7 monotonic fencing is a STORAGE guarantee, not merely an app
--- convention: any UPDATE that moves the lease to a different resource key or
--- fails to strictly increase the fencing token is refused, so a stale holder
--- can never regress a lease even with a hand-written statement.
+-- convention: a lease may never move to a different resource key and its
+-- fencing token may never DECREASE, so a stale holder can never regress a
+-- lease even with a hand-written statement. An UNCHANGED token is legal: a
+-- takeover always allocates a strictly larger token, while an ordinary holder
+-- operation (releasing, extending expiry, updating owner metadata) keeps the
+-- token and is guarded at row level by the `fencing_token = $n` predicate in
+-- the repository SQL. Refusing equality here would make release impossible.
 CREATE OR REPLACE FUNCTION wf.foresift_wf_refuse_lease_regression() RETURNS trigger AS $fn$
 BEGIN
     IF NEW.resource_key IS DISTINCT FROM OLD.resource_key
-        OR NEW.fencing_token <= OLD.fencing_token
+        OR NEW.fencing_token < OLD.fencing_token
     THEN
-        RAISE EXCEPTION 'step leases are monotonically fenced: an UPDATE must keep the resource key and strictly increase the fencing token'
+        RAISE EXCEPTION 'step leases are monotonically fenced: an UPDATE must keep the resource key and must not decrease the fencing token'
             USING ERRCODE = 'restrict_violation';
     END IF;
     RETURN NEW;

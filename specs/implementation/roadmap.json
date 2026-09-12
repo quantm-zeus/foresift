@@ -16,7 +16,7 @@
       "neither modifies root/shared architecture surfaces"
     ]
   },
-  "currentMilestoneId": "G1",
+  "currentMilestoneId": null,
   "milestones": [
     {
       "id": "G0",
@@ -28,7 +28,7 @@
       "id": "G1",
       "name": "Deterministic Signal, Execution, Outcome and Objective Foundation",
       "dependsOn": ["G0"],
-      "status": "ACTIVE"
+      "status": "PROVEN"
     },
     {
       "id": "G2",

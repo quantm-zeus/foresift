@@ -29,6 +29,7 @@ const id = z.string().min(1);
 const contentAddress = z.string().regex(/^sha256:[0-9a-f]{64}$/);
 const unsignedDecimal = z.string().regex(/^(0|[1-9][0-9]*)(\.[0-9]+)?$/);
 const nonNegativeInt = z.number().int().min(0);
+const positiveInt = z.number().int().positive();
 const dateOnly = z.string().regex(/^[0-9]{4}-[0-9]{2}-[0-9]{2}$/);
 const jsonRecord = z.record(z.unknown());
 const domainEnum = <T extends string>(values: readonly [T, ...T[]] | readonly T[]) =>
@@ -49,12 +50,16 @@ export const ScheduleControlActionSchema = domainEnum(ALL_SCHEDULE_CONTROL_ACTIO
 // --- §25.2 trigger inbox --------------------------------------------------
 
 /**
- * Exact §25.2 record. `canonicalExternalMessageId` is the canonicalized
- * identity the uniqueness constraint is enforced on; both identity fields must
- * be non-empty, and the payload hash must be a full `sha256:<64hex>`.
+ * §25.2 record field set PLUS the plan-sanctioned `canonicalExternalMessageId`
+ * (T006/T013 canonicalized identity, enforced by the SQL uniqueness
+ * constraint) and the row primary key `inboxId`. `canonicalExternalMessageId`
+ * and every identity field must be non-empty, and the payload hash must be a
+ * full `sha256:<64hex>`. This is the camelCase runtime envelope, not a literal
+ * mirror of the SQL column list.
  */
 export const TriggerInboxRecordSchema = z
   .object({
+    inboxId: id,
     source: id,
     externalMessageId: id,
     canonicalExternalMessageId: id,
@@ -93,12 +98,16 @@ export const StepRecordSchema = z
 
 // --- §25.11 schedules and immutable versions ------------------------------
 
+/**
+ * Schedule row. `status` is the persisted §25.11 four-state lifecycle
+ * (DRAFT/ACTIVE/PAUSED/DISABLED), the SQL truth of `wf.schedules.status`.
+ */
 export const ScheduleRowSchema = z
   .object({
     scheduleId: id,
     name: id,
     concurrencyPolicy: ConcurrencyPolicySchema,
-    active: z.boolean(),
+    status: ScheduleStatusSchema,
     currentVersionId: id.nullable(),
     createdAt: UtcTimestampSchema,
     updatedAt: UtcTimestampSchema,
@@ -152,6 +161,12 @@ export const RunRowSchema = z
 
 // --- §26.5 outbox ---------------------------------------------------------
 
+/**
+ * §26.5 outbox row envelope. Includes the claim-shape columns
+ * `claimFencingToken` (strictly positive when present, mirroring the SQL
+ * `claim_fencing_token > 0` CHECK) and `claimExpiresAt`, plus the delivery
+ * diagnostics column `lastError`.
+ */
 export const OutboxRowSchema = z
   .object({
     outboxId: id,
@@ -161,11 +176,13 @@ export const OutboxRowSchema = z
     payloadHash: contentAddress,
     status: OutboxStatusSchema,
     claimOwner: id.nullable(),
-    claimFencingToken: nonNegativeInt.nullable(),
+    claimFencingToken: positiveInt.nullable(),
+    claimExpiresAt: UtcTimestampSchema.nullable(),
     attempts: nonNegativeInt,
     enqueuedAt: UtcTimestampSchema,
     claimedAt: UtcTimestampSchema.nullable(),
     sentAt: UtcTimestampSchema.nullable(),
+    lastError: z.string().nullable(),
   })
   .strict();
 

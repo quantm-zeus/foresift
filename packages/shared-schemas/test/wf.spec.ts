@@ -46,8 +46,9 @@ const HASH_B = `sha256:${'b'.repeat(64)}`;
 const T0 = '2026-06-01T12:00:00.000Z';
 const T1 = '2026-06-01T12:00:05.000Z';
 
-/** Exact §25.2 shape. */
+/** §25.2 field set + the canonical identity and the row primary key. */
 const INBOX = {
+  inboxId: 'inbox-1',
   source: 'qstash',
   externalMessageId: 'msg-1',
   canonicalExternalMessageId: 'qstash:msg-1',
@@ -117,6 +118,39 @@ describe('§25.2 / §25.5 shapes round-trip', () => {
     ).toBe(false);
     expect(TriggerInboxRecordSchema.safeParse({ ...INBOX, scheduleId: '' }).success).toBe(false);
     expect(ScheduleRowSchema.safeParse({ ...scheduleRow, name: '' }).success).toBe(false);
+  });
+});
+
+describe('§25.11 schedule status and §26.5 claim shape mirror SQL truth', () => {
+  it('requires a persisted ScheduleStatus and refuses a missing or unknown one', () => {
+    expect(ScheduleRowSchema.parse(scheduleRow)).toEqual(scheduleRow);
+    for (const status of ALL_SCHEDULE_STATUSES) {
+      expect(ScheduleRowSchema.safeParse({ ...scheduleRow, status }).success, status).toBe(true);
+    }
+    const withoutStatus = { ...scheduleRow } as Record<string, unknown>;
+    delete withoutStatus.status;
+    expect(ScheduleRowSchema.safeParse(withoutStatus).success).toBe(false);
+    expect(ScheduleRowSchema.safeParse({ ...scheduleRow, status: 'ARCHIVED' }).success).toBe(false);
+  });
+
+  it('refuses claimFencingToken 0 but accepts a strictly positive token', () => {
+    expect(OutboxRowSchema.safeParse({ ...outboxRow, claimFencingToken: 0 }).success).toBe(false);
+    expect(OutboxRowSchema.safeParse({ ...outboxRow, claimFencingToken: -1 }).success).toBe(false);
+    expect(OutboxRowSchema.safeParse({ ...outboxRow, claimFencingToken: 1 }).success).toBe(true);
+  });
+
+  it('round-trips the claimExpiresAt and lastError columns', () => {
+    const claimed: wf.OutboxRow = {
+      ...outboxRow,
+      status: 'CLAIMED',
+      claimOwner: 'worker-a',
+      claimFencingToken: 7,
+      claimExpiresAt: T1,
+      lastError: 'transient 503 from provider',
+    };
+    expect(OutboxRowSchema.parse(claimed)).toEqual(claimed);
+    expect(claimed.claimExpiresAt).toBe(T1);
+    expect(claimed.lastError).toBe('transient 503 from provider');
   });
 });
 
@@ -242,11 +276,11 @@ describe('§33.6 cost forecast payload', () => {
   });
 });
 
-const scheduleRow = {
+const scheduleRow: wf.ScheduleRow = {
   scheduleId: 'schedule-1',
   name: 'broad-scan',
   concurrencyPolicy: 'SKIP_IF_RUNNING',
-  active: true,
+  status: 'ACTIVE',
   currentVersionId: 'version-1',
   createdAt: T0,
   updatedAt: T1,
@@ -279,7 +313,7 @@ const runRow = {
   completedAt: null,
 };
 
-const outboxRow = {
+const outboxRow: wf.OutboxRow = {
   outboxId: 'outbox-1',
   decisionRef: 'decision-1',
   alertRef: 'alert-1',
@@ -288,10 +322,12 @@ const outboxRow = {
   status: 'PENDING',
   claimOwner: null,
   claimFencingToken: null,
+  claimExpiresAt: null,
   attempts: 0,
   enqueuedAt: T0,
   claimedAt: null,
   sentAt: null,
+  lastError: null,
 };
 
 const deadLetterRow = {

@@ -6,11 +6,17 @@
  * - both `g2_wf_*` scripts apply cleanly, in order;
  * - `wf.schedule_versions` immutability: exactly one legal transition
  *   (`superseded_by` NULL -> non-null with every other column identical),
- *   everything else — config rewrite, double supersede, NULL-out, DELETE —
- *   is refused;
- * - the §25.2 inbox identity unique and the run dedupe key;
- * - monotonically fenced leases: a stale token's guarded release updates zero
- *   rows, and a non-positive token is refused;
+ *   everything else — config rewrite (even combined with a legal-looking
+ *   supersede), double supersede, NULL-out, DELETE, TRUNCATE — is refused;
+ * - the §25.2 inbox identity unique and the `runs.inbox_id` UNIQUE guard
+ *   against two runs for one inbox (`runs_dedupe_unique` is asserted
+ *   separately as declared defense-in-depth);
+ * - a run can never pin a version owned by a different schedule (composite FK);
+ * - §25.7 leases are monotonically fenced at the storage layer: a regression
+ *   to an old (or equal) fencing token is refused by the BEFORE UPDATE trigger,
+ *   a stale token's guarded release updates zero rows, and a non-positive
+ *   token is refused;
+ * - §26.5 outbox claim shape and the §25.9/§25.10 CHECKs;
  * - no workflow table exists unqualified in `public` (ADR-G2WF-1).
  */
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
@@ -80,8 +86,8 @@ async function seedSchedule(): Promise<{
   const versionId = `version-${seq}-1`;
   const nextVersionId = `version-${seq}-2`;
   await engine.query(
-    `INSERT INTO wf.schedules (schedule_id, name, concurrency_policy, active)
-     VALUES ($1, $2, 'SKIP_IF_RUNNING', true)`,
+    `INSERT INTO wf.schedules (schedule_id, name, concurrency_policy, status)
+     VALUES ($1, $2, 'SKIP_IF_RUNNING', 'ACTIVE')`,
     [scheduleId, `schedule ${seq}`],
   );
   for (const [version, hash] of [
@@ -96,6 +102,49 @@ async function seedSchedule(): Promise<{
     );
   }
   return { scheduleId, versionId, nextVersionId };
+}
+
+/** Insert a VERIFIED inbox row for `scheduleId`; returns its primary key. */
+async function seedInbox(scheduleId: string, tag: string): Promise<string> {
+  seq += 1;
+  const inboxId = `inbox-${tag}-${seq}`;
+  await engine.query(
+    `INSERT INTO wf.trigger_inbox
+       (inbox_id, source, external_message_id, canonical_external_message_id,
+        schedule_id, scheduled_for, payload_hash, received_at, status)
+     VALUES ($1, 'qstash', $2, $3, $4, now(), $5, now(), 'VERIFIED')`,
+    [inboxId, `msg-${tag}-${seq}`, `qstash:${tag}-${seq}`, scheduleId, HASH],
+  );
+  return inboxId;
+}
+
+/** Insert a run pinning `versionId` for `scheduleId` on `inboxId`. */
+function insertRun(
+  runId: string,
+  scheduleId: string,
+  versionId: string,
+  inboxId: string,
+): Promise<unknown> {
+  return engine.query(
+    `INSERT INTO wf.runs
+       (run_id, schedule_id, resolved_schedule_version, inbox_id,
+        trigger_source, trigger_external_message_id,
+        trigger_canonical_external_message_id, concurrency_policy,
+        concurrency_outcome, shadow, status, deadline)
+     VALUES ($1, $2, $3, $4, 'qstash', 'msg', 'qstash:msg',
+             'SKIP_IF_RUNNING', 'SKIP_IF_RUNNING', false, 'RUNNING', now())`,
+    [runId, scheduleId, versionId, inboxId],
+  );
+}
+
+/** Seed schedule + inbox + one run; returns the run id. */
+async function seedRun(tag: string): Promise<string> {
+  seq += 1;
+  const { scheduleId, versionId } = await seedSchedule();
+  const inboxId = await seedInbox(scheduleId, tag);
+  const runId = `run-${tag}-${seq}`;
+  await insertRun(runId, scheduleId, versionId, inboxId);
+  return runId;
 }
 
 describe('g2_wf_* migrations apply to a fresh database', () => {
@@ -158,6 +207,20 @@ describe('§25.11 schedule versions are immutable except one supersede pointer',
     expect(error.message).toMatch(/schedule versions are immutable/);
   });
 
+  it('refuses a config rewrite combined with a legal-looking supersede', async () => {
+    const { versionId, nextVersionId } = await seedSchedule();
+    const error = await rejection(
+      engine.query(
+        `UPDATE wf.schedule_versions
+            SET resolved_config = '{"cron":"* * * * *"}'::jsonb,
+                superseded_by = $1
+          WHERE version_id = $2`,
+        [nextVersionId, versionId],
+      ),
+    );
+    expect(error.message).toMatch(/schedule versions are immutable/);
+  });
+
   it('refuses re-pointing an already-set supersede pointer', async () => {
     const { versionId, nextVersionId } = await seedSchedule();
     await engine.query(`UPDATE wf.schedule_versions SET superseded_by = $1 WHERE version_id = $2`, [
@@ -190,6 +253,25 @@ describe('§25.11 schedule versions are immutable except one supersede pointer',
     );
     expect(error.message).toMatch(/schedule versions are immutable/);
   });
+
+  it('refuses TRUNCATE of the version table (typed restrict_violation)', async () => {
+    await seedSchedule();
+    // Plain TRUNCATE is already refused fail-closed by the incoming FKs
+    // (feature_not_supported); CASCADE bypasses that and reaches the wf
+    // BEFORE TRUNCATE trigger, which is the guard under test here.
+    const plain = await rejection(engine.query(`TRUNCATE wf.schedule_versions`));
+    expect((plain as { code?: string }).code).toBe('0A000');
+
+    const error = await rejection(engine.query(`TRUNCATE wf.schedule_versions CASCADE`));
+    // 23001 = restrict_violation, the fail-closed class the wf trigger raises.
+    expect((error as { code?: string }).code).toBe('23001');
+    expect(error.message).toMatch(/schedule versions are immutable/);
+    // The witness rows survived the refused truncate.
+    const rows = await engine.query<{ n: number }>(
+      `SELECT count(*)::int AS n FROM wf.schedule_versions`,
+    );
+    expect(Number(rows.rows[0]?.n)).toBeGreaterThan(0);
+  });
 });
 
 describe('§25.2 inbox identity and the run dedupe key', () => {
@@ -208,40 +290,40 @@ describe('§25.2 inbox identity and the run dedupe key', () => {
     expect(error.message).toMatch(/duplicate key value violates unique constraint/);
   });
 
-  it('pins the dedupe key to (schedule_id, resolved_schedule_version, inbox_id)', async () => {
+  it('declares runs_dedupe_unique on (schedule_id, resolved_schedule_version, inbox_id) as defense-in-depth', async () => {
     const def = await engine.query<{ def: string }>(
       `SELECT pg_get_constraintdef(oid) AS def FROM pg_constraint
        WHERE conname = 'runs_dedupe_unique'`,
     );
     const definition = def.rows[0]?.def ?? '';
+    // Definition-only: the behavioural one-inbox-one-run guard is the
+    // `runs.inbox_id UNIQUE` assertion below; this composite key is declared
+    // redundancy (it cannot be the first violation for a same-version retry).
     expect(definition).toContain('schedule_id');
     expect(definition).toContain('resolved_schedule_version');
     expect(definition).toContain('inbox_id');
   });
 
-  it('refuses a duplicate run insert (dedupe key / unique inbox)', async () => {
-    const { scheduleId, versionId } = await seedSchedule();
-    await engine.query(
-      `INSERT INTO wf.trigger_inbox
-         (inbox_id, source, external_message_id, canonical_external_message_id,
-          schedule_id, scheduled_for, payload_hash, received_at, status)
-       VALUES ('inbox-run-1', 'qstash', 'msg-run-1', 'qstash:run-1', $1, now(), $2, now(), 'VERIFIED')`,
-      [scheduleId, HASH],
-    );
-    const insertRun = (runId: string): Promise<unknown> =>
-      engine.query(
-        `INSERT INTO wf.runs
-           (run_id, schedule_id, resolved_schedule_version, inbox_id,
-            trigger_source, trigger_external_message_id,
-            trigger_canonical_external_message_id, concurrency_policy,
-            concurrency_outcome, shadow, status, deadline)
-         VALUES ($1, $2, $3, 'inbox-run-1', 'qstash', 'msg-run-1', 'qstash:run-1',
-                 'SKIP_IF_RUNNING', 'SKIP_IF_RUNNING', false, 'RUNNING', now())`,
-        [runId, scheduleId, versionId],
-      );
-    await insertRun('run-1');
-    const error = await rejection(insertRun('run-2'));
+  it('refuses a second run for one inbox via the runs.inbox_id UNIQUE constraint', async () => {
+    const { scheduleId, versionId, nextVersionId } = await seedSchedule();
+    const inboxId = await seedInbox(scheduleId, 'run-dedupe');
+    await insertRun('run-a', scheduleId, versionId, inboxId);
+    // A DIFFERENT resolved version means runs_dedupe_unique cannot fire, so the
+    // only guard that can refuse this is UNIQUE (inbox_id).
+    const error = await rejection(insertRun('run-b', scheduleId, nextVersionId, inboxId));
+    expect(error.message).toMatch(/runs_inbox_id_key/);
     expect(error.message).toMatch(/duplicate key value violates unique constraint/);
+  });
+
+  it('refuses a run pinned to a version owned by a different schedule (composite FK)', async () => {
+    const first = await seedSchedule();
+    const second = await seedSchedule();
+    const inboxId = await seedInbox(second.scheduleId, 'cross-version');
+    const error = await rejection(
+      insertRun('run-cross', second.scheduleId, first.versionId, inboxId),
+    );
+    expect(error.message).toMatch(/runs_version_belongs_to_schedule/);
+    expect((error as { code?: string }).code).toBe('23503'); // foreign_key_violation
   });
 });
 
@@ -296,6 +378,51 @@ describe('§25.7 step leases are monotonically fenced', () => {
     expect(current.rows[0]?.released_at).toBeNull();
   });
 
+  it('refuses a fencing-token regression or non-increase (BEFORE UPDATE trigger)', async () => {
+    await engine.query(
+      `INSERT INTO wf.step_leases (resource_key, owner, expires_at)
+       VALUES ('candidate:c4', 'worker-a', now() + interval '1 hour')`,
+    );
+    const first = await engine.query<{ fencing_token: string }>(
+      `SELECT fencing_token FROM wf.step_leases WHERE resource_key = 'candidate:c4'`,
+    );
+    const oldToken = Number(first.rows[0]?.fencing_token);
+    await engine.query(
+      `UPDATE wf.step_leases
+          SET owner = 'worker-b',
+              fencing_token = nextval('wf.wf_lease_fencing_seq')
+        WHERE resource_key = 'candidate:c4'`,
+    );
+    const current = await engine.query<{ fencing_token: string }>(
+      `SELECT fencing_token FROM wf.step_leases WHERE resource_key = 'candidate:c4'`,
+    );
+    const currentToken = Number(current.rows[0]?.fencing_token);
+    expect(currentToken).toBeGreaterThan(oldToken);
+
+    const regression = await rejection(
+      engine.query(
+        `UPDATE wf.step_leases SET fencing_token = $1 WHERE resource_key = 'candidate:c4'`,
+        [oldToken],
+      ),
+    );
+    expect((regression as { code?: string }).code).toBe('23001');
+    expect(regression.message).toMatch(/monotonically fenced/);
+
+    const nonIncrease = await rejection(
+      engine.query(
+        `UPDATE wf.step_leases SET fencing_token = $1 WHERE resource_key = 'candidate:c4'`,
+        [currentToken],
+      ),
+    );
+    expect(nonIncrease.message).toMatch(/monotonically fenced/);
+
+    // The winner's token is untouched by the refused regressions.
+    const after = await engine.query<{ fencing_token: string }>(
+      `SELECT fencing_token FROM wf.step_leases WHERE resource_key = 'candidate:c4'`,
+    );
+    expect(Number(after.rows[0]?.fencing_token)).toBe(currentToken);
+  });
+
   it('refuses a non-positive fencing token', async () => {
     const error = await rejection(
       engine.query(
@@ -304,5 +431,115 @@ describe('§25.7 step leases are monotonically fenced', () => {
       ),
     );
     expect(error.message).toMatch(/fencing_token/);
+  });
+});
+
+describe('§26.5 outbox claim shape and §25.9/§25.10 CHECKs', () => {
+  const CLAIM_EXPIRES = '2030-01-01T00:00:00.000Z';
+
+  /** Insert an outbox row with an explicit claim shape. */
+  function insertOutbox(
+    outboxId: string,
+    shape: {
+      status: string;
+      owner: string | null;
+      token: number | null;
+      expiresAt: string | null;
+    },
+  ): Promise<unknown> {
+    return engine.query(
+      `INSERT INTO wf.notification_outbox
+         (outbox_id, decision_ref, channel, payload_hash, status,
+          claim_owner, claim_fencing_token, claim_expires_at)
+       VALUES ($1, $2, 'telegram', $3, $4, $5, $6, $7)`,
+      [
+        outboxId,
+        `decision-${outboxId}`,
+        HASH,
+        shape.status,
+        shape.owner,
+        shape.token,
+        shape.expiresAt,
+      ],
+    );
+  }
+
+  it('refuses CLAIMED with a NULL claim_owner', async () => {
+    const error = await rejection(
+      insertOutbox('outbox-null-owner', {
+        status: 'CLAIMED',
+        owner: null,
+        token: 1,
+        expiresAt: CLAIM_EXPIRES,
+      }),
+    );
+    expect(error.message).toMatch(/notification_outbox_claim_shape/);
+  });
+
+  it('refuses CLAIMED with a NULL claim_fencing_token', async () => {
+    const error = await rejection(
+      insertOutbox('outbox-null-token', {
+        status: 'CLAIMED',
+        owner: 'worker-a',
+        token: null,
+        expiresAt: CLAIM_EXPIRES,
+      }),
+    );
+    expect(error.message).toMatch(/notification_outbox_claim_shape/);
+  });
+
+  it('refuses CLAIMED with a NULL claim_expires_at', async () => {
+    const error = await rejection(
+      insertOutbox('outbox-null-expiry', {
+        status: 'CLAIMED',
+        owner: 'worker-a',
+        token: 1,
+        expiresAt: null,
+      }),
+    );
+    expect(error.message).toMatch(/notification_outbox_claim_shape/);
+  });
+
+  it('accepts a fully-shaped CLAIMED row and a PENDING row with no claim', async () => {
+    await insertOutbox('outbox-claimed', {
+      status: 'CLAIMED',
+      owner: 'worker-a',
+      token: 1,
+      expiresAt: CLAIM_EXPIRES,
+    });
+    await insertOutbox('outbox-pending', {
+      status: 'PENDING',
+      owner: null,
+      token: null,
+      expiresAt: null,
+    });
+    const rows = await engine.query<{ n: number }>(
+      `SELECT count(*)::int AS n FROM wf.notification_outbox
+        WHERE outbox_id IN ('outbox-claimed', 'outbox-pending')`,
+    );
+    expect(Number(rows.rows[0]?.n)).toBe(2);
+  });
+
+  it('refuses a dead letter with an invalid status', async () => {
+    const runId = await seedRun('dead-letter');
+    const error = await rejection(
+      engine.query(
+        `INSERT INTO wf.dead_letters
+           (dead_letter_id, run_id, error_class, context, status, opened_at)
+         VALUES ('dead-letter-bad', $1, 'TIMEOUT_OR_5XX', '{}'::jsonb, 'BOGUS', now())`,
+        [runId],
+      ),
+    );
+    expect(error.message).toMatch(/status/);
+  });
+
+  it('refuses a reconciliation report missing checked_at', async () => {
+    const error = await rejection(
+      engine.query(
+        `INSERT INTO wf.reconciliation_reports (report_id, diff, incident_refs)
+         VALUES ('report-bad', '{}'::jsonb, '{}'::text[])`,
+      ),
+    );
+    expect(error.message).toMatch(/checked_at/);
   });
 });

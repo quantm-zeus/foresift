@@ -1,7 +1,7 @@
 {
   "schema": "foresift/bun-migration-manifest@1",
   "migrationId": "bun-test-authority-v1",
-  "generatedAt": "2026-09-12T18:29:55.921Z",
+  "generatedAt": "2026-09-12T18:55:44.443Z",
   "root": ".",
   "totalTestFiles": 557,
   "counts": {
@@ -12,7 +12,7 @@
     "BLOCKED": 0
   },
   "parity": {
-    "previousTotal": 557,
+    "previousTotal": 532,
     "disappeared": []
   },
   "files": [
@@ -1559,9 +1559,9 @@
     {
       "path": "packages/domain/test/wf.spec.ts",
       "package": "@foresift/domain",
-      "bytes": 7993,
-      "lines": 239,
-      "sha256": "07adb2e8138b0bd74bb6229b81bacbcb4f308b79a6ebd59a962024315ed51e67",
+      "bytes": 8017,
+      "lines": 243,
+      "sha256": "6bc148c7c64fc2c49daf9655f4d4b3347dcb9126acca28276834df5e95474d14",
       "imports": ["bun:test", "../src/index.ts"],
       "vitestImports": [],
       "features": [],
@@ -4169,9 +4169,9 @@
     {
       "path": "packages/shared-schemas/test/wf.spec.ts",
       "package": "@foresift/shared-schemas",
-      "bytes": 10304,
-      "lines": 315,
-      "sha256": "fa661fc5e7eb264a741c1f293b17f554b4bb23e27d2e228323d91661d4522b28",
+      "bytes": 11989,
+      "lines": 360,
+      "sha256": "bf5bb2b44edf3d5cdfd52e7f59aaee7964eaca068e87ac7b272d161ba420ee7a",
       "imports": ["bun:test", "@foresift/domain", "../src/wf.ts", "../src/wf.ts"],
       "vitestImports": [],
       "features": [],
@@ -4734,9 +4734,9 @@
     {
       "path": "packages/workflow-runtime/test/migrations.spec.ts",
       "package": "@foresift/workflow-runtime",
-      "bytes": 11866,
-      "lines": 308,
-      "sha256": "c36948dac4d3809227874a3a06d9206004bf7d894d8e529674034249b036d75f",
+      "bytes": 20788,
+      "lines": 546,
+      "sha256": "1e3752b4da7de0a5539d907eabd3298e4a83abd0ca0dd0b3aa51bc286e819b0a",
       "imports": [
         "bun:test",
         "@electric-sql/pglite",

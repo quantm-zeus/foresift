@@ -20,7 +20,11 @@ CREATE TABLE IF NOT EXISTS wf.schedules (
                            'QUEUE_AFTER_RUNNING',
                            'CANCEL_PREVIOUS',
                            'ALLOW_PARALLEL')),
-    active             boolean NOT NULL DEFAULT false,
+    status             text NOT NULL DEFAULT 'DRAFT' CHECK (status IN (
+                           'DRAFT',
+                           'ACTIVE',
+                           'PAUSED',
+                           'DISABLED')),
     current_version_id text,
     created_at         timestamptz NOT NULL DEFAULT now(),
     updated_at         timestamptz NOT NULL DEFAULT now()
@@ -33,18 +37,43 @@ CREATE TABLE IF NOT EXISTS wf.schedule_versions (
     resolved_config jsonb NOT NULL,
     shadow          boolean NOT NULL DEFAULT false,
     superseded_by   text,
-    created_at      timestamptz NOT NULL DEFAULT now()
+    created_at      timestamptz NOT NULL DEFAULT now(),
+    -- Identity of a version WITHIN its owning schedule; the target of the
+    -- composite run->version pin below, so a run can never resolve a version
+    -- that belongs to a different schedule (INV-004, §25.11).
+    CONSTRAINT schedule_versions_identity_unique UNIQUE (schedule_id, version_id),
+    CONSTRAINT schedule_versions_superseded_by_fk
+        FOREIGN KEY (superseded_by) REFERENCES wf.schedule_versions(version_id)
 );
+
+-- Forward pointer from a schedule to its current immutable version. Added here
+-- (after `schedule_versions` exists) because a table cannot reference a
+-- not-yet-created table; the guard makes re-application idempotent.
+DO $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1 FROM pg_constraint
+        WHERE conname = 'schedules_current_version_fk'
+          AND conrelid = 'wf.schedules'::regclass
+    ) THEN
+        ALTER TABLE wf.schedules
+            ADD CONSTRAINT schedules_current_version_fk
+            FOREIGN KEY (current_version_id) REFERENCES wf.schedule_versions(version_id);
+    END IF;
+END;
+$$;
 
 CREATE INDEX IF NOT EXISTS schedule_versions_schedule_idx ON wf.schedule_versions (schedule_id);
 
 -- Immutable by construction: a configuration change inserts a NEW version row
 -- and then sets the OLD row's superseded_by exactly once. Every other rewrite
 -- (identity, config, shadow flag, timestamps, delete, truncate) is refused.
-CREATE OR REPLACE FUNCTION foresift_wf_refuse_version_rewrite() RETURNS trigger AS $fn$
+-- TRUNCATE is handled FIRST: statement-level truncate rows have no OLD/NEW, so
+-- a fall-through would compare all-NULL and wrongly allow it.
+CREATE OR REPLACE FUNCTION wf.foresift_wf_refuse_version_rewrite() RETURNS trigger AS $fn$
 BEGIN
-    IF TG_OP = 'DELETE' THEN
-        RAISE EXCEPTION 'schedule versions are immutable: configuration changes create a new version'
+    IF TG_OP IN ('DELETE', 'TRUNCATE') THEN
+        RAISE EXCEPTION 'schedule versions are immutable: configuration changes create a new version (delete/truncate refused)'
             USING ERRCODE = 'restrict_violation';
     END IF;
     -- The ONLY legal UPDATE is a one-time supersede pointer: superseded_by
@@ -68,11 +97,15 @@ $fn$ LANGUAGE plpgsql;
 DROP TRIGGER IF EXISTS schedule_versions_no_rewrite ON wf.schedule_versions;
 CREATE TRIGGER schedule_versions_no_rewrite
     BEFORE UPDATE OR DELETE ON wf.schedule_versions
-    FOR EACH ROW EXECUTE FUNCTION foresift_wf_refuse_version_rewrite();
+    FOR EACH ROW EXECUTE FUNCTION wf.foresift_wf_refuse_version_rewrite();
 DROP TRIGGER IF EXISTS schedule_versions_no_truncate ON wf.schedule_versions;
 CREATE TRIGGER schedule_versions_no_truncate
     BEFORE TRUNCATE ON wf.schedule_versions
-    FOR EACH STATEMENT EXECUTE FUNCTION foresift_refuse_mutation();
+    FOR EACH STATEMENT EXECUTE FUNCTION wf.foresift_wf_refuse_version_rewrite();
+-- Retire the pre-fix unqualified function (schema hygiene): it lived in
+-- `public` via search_path and raised the generic "observations are immutable"
+-- message. Triggers now point at the wf-scoped function above.
+DROP FUNCTION IF EXISTS public.foresift_wf_refuse_version_rewrite();
 
 -- --- §25.2 trigger inbox ---------------------------------------------------
 
@@ -104,7 +137,7 @@ CREATE INDEX IF NOT EXISTS trigger_inbox_status_idx ON wf.trigger_inbox (status,
 CREATE TABLE IF NOT EXISTS wf.runs (
     run_id                                text PRIMARY KEY CHECK (length(run_id) > 0),
     schedule_id                           text NOT NULL REFERENCES wf.schedules(schedule_id),
-    resolved_schedule_version             text NOT NULL REFERENCES wf.schedule_versions(version_id),
+    resolved_schedule_version             text NOT NULL,
     inbox_id                              text NOT NULL UNIQUE REFERENCES wf.trigger_inbox(inbox_id),
     trigger_source                        text NOT NULL CHECK (length(trigger_source) > 0),
     trigger_external_message_id           text NOT NULL CHECK (length(trigger_external_message_id) > 0),
@@ -135,7 +168,13 @@ CREATE TABLE IF NOT EXISTS wf.runs (
     -- Run dedupe key: a duplicate delivery that reaches run creation still
     -- converges on exactly one logical run (AC-010).
     CONSTRAINT runs_dedupe_unique
-        UNIQUE (schedule_id, resolved_schedule_version, inbox_id)
+        UNIQUE (schedule_id, resolved_schedule_version, inbox_id),
+    -- A run may only pin a version owned by ITS schedule: the composite FK
+    -- targets `schedule_versions_identity_unique (schedule_id, version_id)`,
+    -- so a cross-schedule pin is impossible at the storage layer (INV-004).
+    CONSTRAINT runs_version_belongs_to_schedule
+        FOREIGN KEY (schedule_id, resolved_schedule_version)
+        REFERENCES wf.schedule_versions (schedule_id, version_id)
 );
 
 CREATE INDEX IF NOT EXISTS runs_schedule_status_idx ON wf.runs (schedule_id, status);
@@ -197,3 +236,24 @@ CREATE TABLE IF NOT EXISTS wf.step_leases (
     CONSTRAINT step_leases_expiry_shape CHECK (expires_at > acquired_at),
     CONSTRAINT step_leases_release_shape CHECK (released_at IS NULL OR released_at >= acquired_at)
 );
+
+-- §25.7 monotonic fencing is a STORAGE guarantee, not merely an app
+-- convention: any UPDATE that moves the lease to a different resource key or
+-- fails to strictly increase the fencing token is refused, so a stale holder
+-- can never regress a lease even with a hand-written statement.
+CREATE OR REPLACE FUNCTION wf.foresift_wf_refuse_lease_regression() RETURNS trigger AS $fn$
+BEGIN
+    IF NEW.resource_key IS DISTINCT FROM OLD.resource_key
+        OR NEW.fencing_token <= OLD.fencing_token
+    THEN
+        RAISE EXCEPTION 'step leases are monotonically fenced: an UPDATE must keep the resource key and strictly increase the fencing token'
+            USING ERRCODE = 'restrict_violation';
+    END IF;
+    RETURN NEW;
+END;
+$fn$ LANGUAGE plpgsql;
+
+DROP TRIGGER IF EXISTS step_leases_no_regression ON wf.step_leases;
+CREATE TRIGGER step_leases_no_regression
+    BEFORE UPDATE ON wf.step_leases
+    FOR EACH ROW EXECUTE FUNCTION wf.foresift_wf_refuse_lease_regression();

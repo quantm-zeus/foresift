@@ -23,11 +23,20 @@ CREATE TABLE IF NOT EXISTS wf.notification_outbox (
                             'SUPPRESSED_OUTAGE')),
     claim_owner         text,
     claim_fencing_token bigint CHECK (claim_fencing_token IS NULL OR claim_fencing_token > 0),
+    claim_expires_at    timestamptz,
     attempts            integer NOT NULL DEFAULT 0 CHECK (attempts >= 0),
     enqueued_at         timestamptz NOT NULL DEFAULT now(),
     claimed_at          timestamptz,
     sent_at             timestamptz,
-    last_error          text
+    last_error          text,
+    -- A CLAIMED row must be fully shaped: owner, fence, and claim expiry are
+    -- all present, so the claim can be fenced, renewed, or re-claimed
+    -- deterministically (§26.5, AC-011).
+    CONSTRAINT notification_outbox_claim_shape CHECK (
+        status <> 'CLAIMED'
+        OR (claim_owner IS NOT NULL
+            AND claim_fencing_token IS NOT NULL
+            AND claim_expires_at IS NOT NULL))
 );
 
 CREATE INDEX IF NOT EXISTS notification_outbox_status_idx

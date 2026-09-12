@@ -55,7 +55,8 @@ describe('AC-063: a fresh forecast is displayed and persisted before enable', ()
     // The accepted forecast is "displayed" on the result: id, content hash,
     // and the instant it was computed.
     expect(enabled.details.forecastId).toBe('ac063-forecast-1');
-    expect(String(enabled.details.forecastHash)).toMatch(/^sha256:[0-9a-f]{64}$/);
+    const displayedHash = String(enabled.details.forecastHash);
+    expect(displayedHash).toMatch(/^sha256:[0-9a-f]{64}$/);
     expect(enabled.details.computedAt).toBe(WF_FORECAST_FRESH_AT);
 
     const persisted = await tdb.engine.query<{
@@ -75,6 +76,9 @@ describe('AC-063: a fresh forecast is displayed and persisted before enable', ()
     expect(forecast?.version_id).toBe('ac063-v1');
     expect(Date.parse(forecast?.computed_at ?? '')).toBe(Date.parse(WF_FORECAST_FRESH_AT));
     expect(forecast?.payload).toEqual(WF_FORECASTS.FRESH);
+    // The hash the enable path displayed to the operator is the hash of the
+    // forecast that was actually persisted — not merely hash-shaped.
+    expect(forecast?.payload_hash).toBe(displayedHash);
 
     // The schedule is ACTIVE on the very version the forecast is bound to.
     const schedule = await tdb.engine.query<{ status: string; current_version_id: string }>(

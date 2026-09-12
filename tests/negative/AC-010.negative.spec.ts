@@ -137,8 +137,12 @@ describe('AC-010 negative: refusals never collapse into a silent dedupe', () => 
         Promise.resolve().then(() => verifySchedulerDelivery(envelope)),
         code as string,
       );
-      // The refused delivery identity is NOT stored as a (deduplicated) inbox
-      // row — the refusal happened before any state write.
+      // The verifier is pure, so these envelope verdicts prove the trust
+      // boundary, and the database counters below prove the seeded schedule
+      // accumulated no inbox/run rows. The end-to-end "refused before any
+      // state write" property is proven at the endpoint by
+      // `apps/api/src/internal/internal-surface.spec.ts`
+      // ("refuses a forged signature ... and writes nothing").
       expect(await countInboxByIdentity(envelope.messageId)).toBe(0);
     }
 

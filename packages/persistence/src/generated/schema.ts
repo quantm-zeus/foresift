@@ -1,7 +1,7 @@
 /**
  * Drizzle mirror of SQL truth (ADR-001) — hand-maintained to match the tables
- * created by the versioned migration families, including the `sig` schema,
- * exactly.
+ * created by the versioned migration families, including the `sig` and `wf`
+ * schemas, exactly.
  *
  * This file NEVER defines schema semantics on its own: the SQL migrations are
  * the single source of truth and a parity test enumerates
@@ -24,6 +24,7 @@ import {
 } from 'drizzle-orm/pg-core';
 
 export const sigSchema = pgSchema('sig');
+export const wfSchema = pgSchema('wf');
 
 // --- g0_data_0001_identity -------------------------------------------------
 
@@ -1717,4 +1718,122 @@ export const outputLanguageScreens = pgTable('output_language_screens', {
   screenPassed: boolean('screen_passed').notNull(),
   screenedAt: timestamp('screened_at', { withTimezone: true }).notNull(),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull(),
+});
+
+// --- g2_wf_0001_schedules_runs ---------------------------------------------
+
+export const wfSchedules = wfSchema.table('schedules', {
+  scheduleId: text('schedule_id').primaryKey(),
+  name: text('name').notNull(),
+  concurrencyPolicy: text('concurrency_policy').notNull(),
+  status: text('status').notNull(),
+  currentVersionId: text('current_version_id'),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull(),
+});
+
+export const wfScheduleVersions = wfSchema.table('schedule_versions', {
+  versionId: text('version_id').primaryKey(),
+  scheduleId: text('schedule_id').notNull(),
+  configHash: text('config_hash').notNull(),
+  resolvedConfig: jsonb('resolved_config').notNull(),
+  shadow: boolean('shadow').notNull(),
+  supersededBy: text('superseded_by'),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull(),
+});
+
+export const wfTriggerInbox = wfSchema.table('trigger_inbox', {
+  inboxId: text('inbox_id').primaryKey(),
+  source: text('source').notNull(),
+  externalMessageId: text('external_message_id').notNull(),
+  canonicalExternalMessageId: text('canonical_external_message_id').notNull(),
+  scheduleId: text('schedule_id').notNull(),
+  scheduledFor: timestamp('scheduled_for', { withTimezone: true }).notNull(),
+  payloadHash: text('payload_hash').notNull(),
+  receivedAt: timestamp('received_at', { withTimezone: true }).notNull(),
+  verifiedAt: timestamp('verified_at', { withTimezone: true }),
+  processedRunId: text('processed_run_id'),
+  status: text('status').notNull(),
+});
+
+export const wfRuns = wfSchema.table('runs', {
+  runId: text('run_id').primaryKey(),
+  scheduleId: text('schedule_id').notNull(),
+  resolvedScheduleVersion: text('resolved_schedule_version').notNull(),
+  inboxId: text('inbox_id').notNull(),
+  triggerSource: text('trigger_source').notNull(),
+  triggerExternalMessageId: text('trigger_external_message_id').notNull(),
+  triggerCanonicalExternalMessageId: text('trigger_canonical_external_message_id').notNull(),
+  concurrencyPolicy: text('concurrency_policy').notNull(),
+  concurrencyOutcome: text('concurrency_outcome').notNull(),
+  shadow: boolean('shadow').notNull(),
+  status: text('status').notNull(),
+  deadline: timestamp('deadline', { withTimezone: true }).notNull(),
+  startedAt: timestamp('started_at', { withTimezone: true }),
+  completedAt: timestamp('completed_at', { withTimezone: true }),
+});
+
+export const wfSteps = wfSchema.table('steps', {
+  stepId: text('step_id').primaryKey(),
+  runId: text('run_id').notNull(),
+  stepType: text('step_type').notNull(),
+  idempotencyKey: text('idempotency_key').notNull(),
+  attempt: integer('attempt').notNull(),
+  inputHash: text('input_hash'),
+  outputHash: text('output_hash'),
+  status: text('status').notNull(),
+  leaseOwner: text('lease_owner'),
+  leaseVersion: integer('lease_version').notNull(),
+  leaseExpiresAt: timestamp('lease_expires_at', { withTimezone: true }),
+  startedAt: timestamp('started_at', { withTimezone: true }),
+  completedAt: timestamp('completed_at', { withTimezone: true }),
+  errorClass: text('error_class'),
+  retryable: boolean('retryable'),
+});
+
+export const wfStepLeases = wfSchema.table('step_leases', {
+  resourceKey: text('resource_key').primaryKey(),
+  owner: text('owner').notNull(),
+  fencingToken: bigint('fencing_token', { mode: 'number' }).notNull(),
+  acquiredAt: timestamp('acquired_at', { withTimezone: true }).notNull(),
+  expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
+  releasedAt: timestamp('released_at', { withTimezone: true }),
+});
+
+// --- g2_wf_0002_outbox_deadletter ------------------------------------------
+
+export const wfNotificationOutbox = wfSchema.table('notification_outbox', {
+  outboxId: text('outbox_id').primaryKey(),
+  decisionRef: text('decision_ref').notNull(),
+  alertRef: text('alert_ref'),
+  channel: text('channel').notNull(),
+  payloadHash: text('payload_hash').notNull(),
+  status: text('status').notNull(),
+  claimOwner: text('claim_owner'),
+  claimFencingToken: bigint('claim_fencing_token', { mode: 'number' }),
+  claimExpiresAt: timestamp('claim_expires_at', { withTimezone: true }),
+  attempts: integer('attempts').notNull(),
+  enqueuedAt: timestamp('enqueued_at', { withTimezone: true }).notNull(),
+  claimedAt: timestamp('claimed_at', { withTimezone: true }),
+  sentAt: timestamp('sent_at', { withTimezone: true }),
+  lastError: text('last_error'),
+});
+
+export const wfDeadLetters = wfSchema.table('dead_letters', {
+  deadLetterId: text('dead_letter_id').primaryKey(),
+  runId: text('run_id').notNull(),
+  stepId: text('step_id'),
+  errorClass: text('error_class').notNull(),
+  context: jsonb('context').notNull(),
+  lastValidCheckpointRef: text('last_valid_checkpoint_ref'),
+  status: text('status').notNull(),
+  openedAt: timestamp('opened_at', { withTimezone: true }).notNull(),
+  resolvedAt: timestamp('resolved_at', { withTimezone: true }),
+});
+
+export const wfReconciliationReports = wfSchema.table('reconciliation_reports', {
+  reportId: text('report_id').primaryKey(),
+  checkedAt: timestamp('checked_at', { withTimezone: true }).notNull(),
+  diff: jsonb('diff').notNull(),
+  incidentRefs: text('incident_refs').array().notNull(),
 });

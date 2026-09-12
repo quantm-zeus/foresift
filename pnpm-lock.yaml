@@ -41,6 +41,9 @@ importers:
       '@foresift/shared-schemas':
         specifier: workspace:*
         version: link:packages/shared-schemas
+      '@foresift/workflow-runtime':
+        specifier: workspace:*
+        version: link:packages/workflow-runtime
       '@types/bun':
         specifier: 1.4.0
         version: 1.4.0
@@ -609,6 +612,31 @@ importers:
       '@foresift/solana-security':
         specifier: workspace:*
         version: link:../solana-security
+
+  packages/workflow-runtime:
+    dependencies:
+      '@foresift/domain':
+        specifier: workspace:*
+        version: link:../domain
+      '@foresift/persistence':
+        specifier: workspace:*
+        version: link:../persistence
+      '@foresift/shared-schemas':
+        specifier: workspace:*
+        version: link:../shared-schemas
+      zod:
+        specifier: ^3.25.76
+        version: 3.25.76
+    devDependencies:
+      '@electric-sql/pglite':
+        specifier: ^0.5.6
+        version: 0.5.6
+      '@types/bun':
+        specifier: 1.4.0
+        version: 1.4.0
+      typescript:
+        specifier: 5.9.3
+        version: 5.9.3
 
 packages:
 

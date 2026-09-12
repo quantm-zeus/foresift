@@ -7,7 +7,8 @@
  * Slice T001–T011 shipped the vocabulary, schema, and migration substrate
  * (`packages/domain/src/alert.ts`, `packages/shared-schemas/src/alert.ts`, and
  * the `alert` migration family). This barrel exposes the classification/policy/
- * content/commit surface (T012–T016).
+ * content/commit surface (T012–T016) and the fingerprint/update/expiry/metrics
+ * surface (T019–T023).
  *
  * Strictly read-only: nothing in this package can trade, hold custody, sign,
  * handle private keys, or submit a transaction. Alert classification and
@@ -18,4 +19,8 @@ export * from './policies.ts';
 export * from './gates.ts';
 export * from './classification.ts';
 export * from './content.ts';
+export * from './fingerprints.ts';
 export * from './commit.ts';
+export * from './lifecycle.ts';
+export * from './monitoring.ts';
+export * from './metrics.ts';

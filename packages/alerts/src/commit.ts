@@ -25,10 +25,8 @@ import {
   ErrorCode,
   ForesiftError,
   actionabilityFor,
-  fingerprintOf,
   latencyBudgetOutcomeFor,
   type AlertFingerprintInput,
-  type AlertUpdateKind,
   type ShadowInfluenceKind,
 } from '@foresift/domain';
 import { parseAlertSchema } from '@foresift/shared-schemas';
@@ -44,56 +42,12 @@ import {
   type AlertClassificationOutcome,
 } from './classification.ts';
 import type { RenderedAlertContent } from './content.ts';
+import { deriveAlertFingerprint } from './fingerprints.ts';
 
 /** §33.1: alert delivery after decision commit is budgeted at 30 seconds. */
 export const ALERT_DELIVERY_LATENCY_BUDGET_MS = 30_000 as const;
 /** The default admin inbox channel; channels are owned by the engine. */
 export const ALERT_NOTIFICATION_CHANNEL = 'admin-inbox' as const;
-
-// --- idempotency keys -------------------------------------------------------
-
-export interface AlertFingerprintKey {
-  /** The canonical §26.4 preimage (see `packages/domain/src/alert.ts`). */
-  readonly fingerprintPreimage: string;
-  /** `sha256:<64hex>` content address over the preimage. */
-  readonly fingerprintHash: string;
-}
-
-/**
- * Derive the §26.4 fingerprint content address. The domain package returns the
- * byte-stable preimage; the persistence seam owns the hash, exactly like
- * `computeExactCacheKey`. The result is the idempotency anchor for the alert.
- */
-export function deriveAlertFingerprint(input: AlertFingerprintInput): AlertFingerprintKey {
-  const fingerprintPreimage = fingerprintOf(input);
-  return Object.freeze({
-    fingerprintPreimage,
-    fingerprintHash: sha256Text(fingerprintPreimage),
-  });
-}
-
-export interface AlertUpdateKeyInput {
-  readonly priorAlertRef: string;
-  readonly updateKind: AlertUpdateKind;
-  readonly fingerprintHash: string;
-  readonly thesisVersion: number;
-}
-
-/**
- * Deterministic update/cancellation idempotency key over the canonical
- * `(prior_alert, update_kind, fingerprint, thesis_version)` tuple (plan D5).
- * A replay of the same material event maps to one key.
- */
-export function deriveAlertUpdateKey(input: AlertUpdateKeyInput): string {
-  const parts = [
-    'alert-update:v1',
-    `priorAlertRef=${input.priorAlertRef.length}:${input.priorAlertRef}`,
-    `updateKind=${input.updateKind}`,
-    `fingerprint=${input.fingerprintHash}`,
-    `thesisVersion=${input.thesisVersion}`,
-  ];
-  return sha256Text(parts.join('|'));
-}
 
 // --- commit -----------------------------------------------------------------
 

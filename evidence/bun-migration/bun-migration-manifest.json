@@ -1,18 +1,18 @@
 {
   "schema": "foresift/bun-migration-manifest@1",
   "migrationId": "bun-test-authority-v1",
-  "generatedAt": "2026-09-12T22:23:51.819Z",
+  "generatedAt": "2026-09-12T22:49:50.804Z",
   "root": ".",
-  "totalTestFiles": 583,
+  "totalTestFiles": 585,
   "counts": {
     "CODEMOD_READY": 0,
     "AGY_REQUIRED": 0,
-    "MIGRATED": 583,
+    "MIGRATED": 585,
     "VERIFIED": 0,
     "BLOCKED": 0
   },
   "parity": {
-    "previousTotal": 582,
+    "previousTotal": 583,
     "disappeared": []
   },
   "files": [
@@ -298,6 +298,49 @@
         "../src/index.ts",
         "./helpers.ts"
       ],
+      "state": "MIGRATED"
+    },
+    {
+      "path": "packages/alerts/test/lifecycle.spec.ts",
+      "package": "@foresift/alerts",
+      "bytes": 22820,
+      "lines": 677,
+      "sha256": "bc24df16de43a7ae1a931862a972e5c403a545cc9c3e888f6d2d6779e3663cdb",
+      "imports": [
+        "bun:test",
+        "@foresift/domain",
+        "@foresift/persistence",
+        "@foresift/workflow-runtime",
+        "../src/index.ts",
+        "./helpers.ts"
+      ],
+      "vitestImports": [],
+      "features": [],
+      "workload": "DATABASE_PGLITE",
+      "migrationType": "ALREADY_MIGRATED",
+      "fixturesAndHelpers": ["./helpers.ts"],
+      "sourceAnchors": [
+        "@foresift/domain",
+        "@foresift/persistence",
+        "@foresift/workflow-runtime",
+        "../src/index.ts",
+        "./helpers.ts"
+      ],
+      "state": "MIGRATED"
+    },
+    {
+      "path": "packages/alerts/test/metrics.spec.ts",
+      "package": "@foresift/alerts",
+      "bytes": 9391,
+      "lines": 267,
+      "sha256": "a15069504468fdb92eb78c2fe2754c38a1c2006898c03d83bea655c0ebe905ce",
+      "imports": ["bun:test", "@foresift/domain", "../src/index.ts", "./helpers.ts"],
+      "vitestImports": [],
+      "features": [],
+      "workload": "PURE",
+      "migrationType": "ALREADY_MIGRATED",
+      "fixturesAndHelpers": ["./helpers.ts"],
+      "sourceAnchors": ["@foresift/domain", "../src/index.ts", "./helpers.ts"],
       "state": "MIGRATED"
     },
     {
@@ -11351,9 +11394,9 @@
     {
       "path": "tests/telemetry-catalog.spec.ts",
       "package": "root",
-      "bytes": 47038,
-      "lines": 1573,
-      "sha256": "d7e4ea23cf557e48b223e2e67d5653361ba91d0c946f04ed1c035f37fb83dda2",
+      "bytes": 54849,
+      "lines": 1841,
+      "sha256": "1ac6b51e409f43843b99d4a4652ed7a88aed6fd0e0436239451986a26ae6b2ba",
       "imports": ["node:fs", "node:path", "bun:test", "../packages/shared-schemas/src/index.ts"],
       "vitestImports": [],
       "features": [],

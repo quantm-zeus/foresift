@@ -39,7 +39,9 @@ const MIGRATIONS_DIR = path.resolve(
 const HASH = `sha256:${'a'.repeat(64)}`;
 const HASH_B = `sha256:${'b'.repeat(64)}`;
 const WF_TABLES = [
+  'alert_records',
   'dead_letters',
+  'decision_commits',
   'notification_outbox',
   'reconciliation_reports',
   'runs',
@@ -154,11 +156,15 @@ describe('g2_wf_* migrations apply to a fresh database', () => {
     expect(applied).toContain('g2_wf_0001_schedules_runs');
     expect(applied).toContain('g2_wf_0002_outbox_deadletter');
     expect(applied).toContain('g2_wf_0003_schedule_forecasts');
+    expect(applied).toContain('g2_wf_0004_decision_outbox');
     expect(applied.indexOf('g2_wf_0001_schedules_runs')).toBeLessThan(
       applied.indexOf('g2_wf_0002_outbox_deadletter'),
     );
     expect(applied.indexOf('g2_wf_0002_outbox_deadletter')).toBeLessThan(
       applied.indexOf('g2_wf_0003_schedule_forecasts'),
+    );
+    expect(applied.indexOf('g2_wf_0003_schedule_forecasts')).toBeLessThan(
+      applied.indexOf('g2_wf_0004_decision_outbox'),
     );
   });
 

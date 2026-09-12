@@ -1,13 +1,13 @@
 {
   "schema": "foresift/bun-migration-manifest@1",
   "migrationId": "bun-test-authority-v1",
-  "generatedAt": "2026-09-12T19:47:56.433Z",
+  "generatedAt": "2026-09-12T20:02:52.981Z",
   "root": ".",
-  "totalTestFiles": 562,
+  "totalTestFiles": 566,
   "counts": {
     "CODEMOD_READY": 0,
     "AGY_REQUIRED": 0,
-    "MIGRATED": 562,
+    "MIGRATED": 566,
     "VERIFIED": 0,
     "BLOCKED": 0
   },
@@ -2440,9 +2440,9 @@
     {
       "path": "packages/persistence/test/migrator.spec.ts",
       "package": "@foresift/persistence",
-      "bytes": 22857,
-      "lines": 572,
-      "sha256": "e5811ff0c3103c47cda249dbf5c65507cf5d094773f9294cbd8c63cdea4e4467",
+      "bytes": 22929,
+      "lines": 574,
+      "sha256": "a371abac497991a88d26395629d7d991f46a954fbaec23fc88fa9b38ab722e76",
       "imports": [
         "bun:test",
         "@electric-sql/pglite",
@@ -4732,6 +4732,32 @@
       "state": "MIGRATED"
     },
     {
+      "path": "packages/workflow-runtime/test/dead-letters.spec.ts",
+      "package": "@foresift/workflow-runtime",
+      "bytes": 8685,
+      "lines": 252,
+      "sha256": "f90c9b36b13538a34e5d2eb64da3016398fe489ca4fd77d74d21eea9bca46d34",
+      "imports": [
+        "bun:test",
+        "@foresift/domain",
+        "../src/index.ts",
+        "./helpers.ts",
+        "./lifecycle-fixtures.ts"
+      ],
+      "vitestImports": [],
+      "features": [],
+      "workload": "DATABASE_PGLITE",
+      "migrationType": "ALREADY_MIGRATED",
+      "fixturesAndHelpers": ["./helpers.ts", "./lifecycle-fixtures.ts"],
+      "sourceAnchors": [
+        "@foresift/domain",
+        "../src/index.ts",
+        "./helpers.ts",
+        "./lifecycle-fixtures.ts"
+      ],
+      "state": "MIGRATED"
+    },
+    {
       "path": "packages/workflow-runtime/test/leases.spec.ts",
       "package": "@foresift/workflow-runtime",
       "bytes": 4808,
@@ -4749,9 +4775,9 @@
     {
       "path": "packages/workflow-runtime/test/migrations.spec.ts",
       "package": "@foresift/workflow-runtime",
-      "bytes": 22773,
-      "lines": 585,
-      "sha256": "ecb6444380ecb7472cf7d8af7e689da6d16ebc299c0aef387b5fe3384191ac59",
+      "bytes": 23010,
+      "lines": 591,
+      "sha256": "4922b01624ce74f61ca4bc7f92bb19749b73ad8960dba88fc13ce88eed9cc6cc",
       "imports": [
         "bun:test",
         "@electric-sql/pglite",
@@ -4765,6 +4791,58 @@
       "migrationType": "ALREADY_MIGRATED",
       "fixturesAndHelpers": [],
       "sourceAnchors": ["@electric-sql/pglite", "@foresift/persistence"],
+      "state": "MIGRATED"
+    },
+    {
+      "path": "packages/workflow-runtime/test/outbox.spec.ts",
+      "package": "@foresift/workflow-runtime",
+      "bytes": 14858,
+      "lines": 420,
+      "sha256": "ee2859acb0d74ba411186a05dbeb3aaa542b18c4ab897fbd5583da6b3ac57f70",
+      "imports": [
+        "bun:test",
+        "@foresift/domain",
+        "../src/index.ts",
+        "./helpers.ts",
+        "./lifecycle-fixtures.ts"
+      ],
+      "vitestImports": [],
+      "features": [],
+      "workload": "DATABASE_PGLITE",
+      "migrationType": "ALREADY_MIGRATED",
+      "fixturesAndHelpers": ["./helpers.ts", "./lifecycle-fixtures.ts"],
+      "sourceAnchors": [
+        "@foresift/domain",
+        "../src/index.ts",
+        "./helpers.ts",
+        "./lifecycle-fixtures.ts"
+      ],
+      "state": "MIGRATED"
+    },
+    {
+      "path": "packages/workflow-runtime/test/reconciliation.spec.ts",
+      "package": "@foresift/workflow-runtime",
+      "bytes": 9067,
+      "lines": 237,
+      "sha256": "0e00ff58b6bf317f71942a4f0ce6463f62653fe0da0b392fa86abd04ca884ef6",
+      "imports": [
+        "bun:test",
+        "@foresift/domain",
+        "../src/index.ts",
+        "./helpers.ts",
+        "./lifecycle-fixtures.ts"
+      ],
+      "vitestImports": [],
+      "features": [],
+      "workload": "DATABASE_PGLITE",
+      "migrationType": "ALREADY_MIGRATED",
+      "fixturesAndHelpers": ["./helpers.ts", "./lifecycle-fixtures.ts"],
+      "sourceAnchors": [
+        "@foresift/domain",
+        "../src/index.ts",
+        "./helpers.ts",
+        "./lifecycle-fixtures.ts"
+      ],
       "state": "MIGRATED"
     },
     {
@@ -4825,6 +4903,32 @@
       "migrationType": "ALREADY_MIGRATED",
       "fixturesAndHelpers": ["./helpers.ts"],
       "sourceAnchors": ["@foresift/domain", "../src/index.ts", "./helpers.ts"],
+      "state": "MIGRATED"
+    },
+    {
+      "path": "packages/workflow-runtime/test/verify-state.spec.ts",
+      "package": "@foresift/workflow-runtime",
+      "bytes": 5968,
+      "lines": 165,
+      "sha256": "d2ec58bfe5d6ace9e6629e04d540c030b15018a222bb59bdfa3163e46663dd69",
+      "imports": [
+        "bun:test",
+        "@foresift/domain",
+        "../src/index.ts",
+        "./helpers.ts",
+        "./lifecycle-fixtures.ts"
+      ],
+      "vitestImports": [],
+      "features": [],
+      "workload": "DATABASE_PGLITE",
+      "migrationType": "ALREADY_MIGRATED",
+      "fixturesAndHelpers": ["./helpers.ts", "./lifecycle-fixtures.ts"],
+      "sourceAnchors": [
+        "@foresift/domain",
+        "../src/index.ts",
+        "./helpers.ts",
+        "./lifecycle-fixtures.ts"
+      ],
       "state": "MIGRATED"
     },
     {

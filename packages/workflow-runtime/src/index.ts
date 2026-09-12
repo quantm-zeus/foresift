@@ -17,8 +17,19 @@
  *                           `wf.step_leases` (AC-012).
  * - `retries.ts`          — the §25.8 taxonomy as an executable policy.
  *
- * The remaining seams (`outbox.ts`, `dead-letters.ts`, `reconciliation.ts`,
- * `shadow.ts`, `channels.ts`, `verify-state.ts`) land in the next slice.
+ * Lifecycle public surface (slice 3, T020–T026):
+ * - `outbox.ts`           — the §26.5 atomic decision/alert/outbox commit
+ *                           boundary and the crash-safe claim/deliver workers
+ *                           (AC-011, AC-061).
+ * - `channels.ts`         — `NotificationChannelPort` (idempotent by key) and
+ *                           the deterministic fake channel (§26.6/§26.9).
+ * - `shadow.ts`           — the single shadow-influence choke point (FR-WF-008).
+ * - `dead-letters.ts`     — actionable dead letters and safe retry from the
+ *                           last valid checkpoint (FR-WF-007).
+ * - `reconciliation.ts`   — the §25.10 database-vs-scheduler diff, incidents,
+ *                           and safe-direction repair (FR-WF-005).
+ * - `verify-state.ts`     — read-only inbox/outbox/lease/dead-letter checks;
+ *                           the recovery-package drill seam (AC-062/AC-260…264).
  *
  * Strictly read-only: this package must never gain trading, custody,
  * wallet-signing, private-key, or transaction-submission capability.
@@ -29,3 +40,9 @@ export * from './schedules.ts';
 export * from './steps.ts';
 export * from './leases.ts';
 export * from './retries.ts';
+export * from './channels.ts';
+export * from './shadow.ts';
+export * from './outbox.ts';
+export * from './dead-letters.ts';
+export * from './reconciliation.ts';
+export * from './verify-state.ts';

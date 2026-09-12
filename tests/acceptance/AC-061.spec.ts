@@ -26,7 +26,24 @@ import {
   recordFieldQuality,
   recordRecoveryHealthState,
 } from '@foresift/persistence';
+import {
+  FakeNotificationChannel,
+  applyScheduleControl,
+  claimOutboxBatch,
+  commitDecisionWithOutbox,
+  deliverClaimed,
+  recordTriggerDelivery,
+} from '@foresift/workflow-runtime';
 import { closeTestDatabase, makeTestDatabase, seedPool, type TestDatabase } from './helpers.ts';
+import {
+  WF_FORECASTS,
+  WF_OUTBOX_COMMIT_AT,
+  WF_OUTBOX_SCENARIOS,
+  WF_TEST_PAYLOAD_HASH_A,
+  WF_TEST_T0,
+  buildDecisionCommitInput,
+  buildManualClaim,
+} from '../fixtures/wf/index.ts';
 
 const T = (iso: string): UtcTimestamp => utcTimestamp(iso);
 
@@ -107,7 +124,7 @@ beforeAll(async () => {
       'provider outage window: explicit partial output only; unsafe automated alerts suppressed',
     ),
   });
-});
+}, 120_000);
 
 afterAll(() => closeTestDatabase(tdb));
 
@@ -178,5 +195,123 @@ describe('AC-061: vocabularies render explicit partial/insufficient output', () 
     expect(h?.confirmed_opportunity_influence_blocked).toBe(true);
     expect(h?.deterministic_risk_monitoring_allowed).toBe(true);
     expect(h?.incident_id).toBe('incident-ac061-outage');
+  });
+});
+
+/**
+ * AC-061 wf-scoped extension (T037, FR-WF-006).
+ *
+ * At the §26.5 outbox gate a provider-outage classification produces explicit
+ * degraded output: the notification is stored `SUPPRESSED_OUTAGE`, never
+ * claimed and never sent, while the decision and alert records commit and
+ * remain PRESERVED. Deterministic risk-monitoring data (the AC-061 health
+ * state and the coded field quality) stays readable and unchanged.
+ */
+describe('AC-061 wf extension: outage suppression at the outbox gate preserves the decision', () => {
+  it('records explicit SUPPRESSED_OUTAGE, never sends, and preserves decision, alert, and risk data', async () => {
+    const scheduleId = 'ac061-wf-outage-gate';
+    await applyScheduleControl(tdb.engine, {
+      action: 'CREATE',
+      scheduleId,
+      now: WF_TEST_T0,
+      config: {
+        name: 'ac061 wf outage schedule',
+        cron: '*/5 * * * *',
+        timezone: 'UTC',
+        destination: 'https://internal.example.test/wf/trigger',
+        concurrencyPolicy: 'ALLOW_PARALLEL',
+      },
+    });
+    await applyScheduleControl(tdb.engine, {
+      action: 'ENABLE',
+      scheduleId,
+      now: WF_TEST_T0,
+      forecast: WF_FORECASTS.FRESH,
+    });
+    const delivery = await recordTriggerDelivery(tdb.engine, {
+      source: 'qstash',
+      externalMessageId: 'ac061-wf-outage-msg-1',
+      scheduleId,
+      scheduledFor: WF_TEST_T0,
+      payloadHash: WF_TEST_PAYLOAD_HASH_A,
+      receivedAt: WF_TEST_T0,
+      verifiedAt: WF_TEST_T0,
+    });
+    expect(delivery.runId).not.toBeNull();
+    const runId = delivery.runId!;
+
+    // Capture the deterministic risk-monitoring data BEFORE the outage commit.
+    const riskFieldsBefore = await tdb.engine.query<{ n: string }>(
+      `SELECT count(*)::text AS n FROM observation_field_quality WHERE observation_id = $1`,
+      [OUTAGE_OBS],
+    );
+
+    const committed = await commitDecisionWithOutbox(
+      tdb.engine,
+      buildDecisionCommitInput(runId, 'ac061-wf-outage-gate', {
+        scenario: WF_OUTBOX_SCENARIOS.PROVIDER_OUTAGE,
+      }),
+    );
+    expect(committed.status).toBe('SUPPRESSED_OUTAGE');
+    expect(committed.suppressed).toBe(true);
+
+    // The outbox row carries the explicit degraded classification…
+    const outbox = await tdb.engine.query<{ status: string }>(
+      `SELECT status FROM wf.notification_outbox WHERE outbox_id = $1`,
+      [committed.outboxId],
+    );
+    expect(outbox.rows[0]?.status).toBe('SUPPRESSED_OUTAGE');
+
+    // …and the decision and alert records are PRESERVED (never rolled back).
+    const decision = await tdb.engine.query<{ decision_id: string; run_id: string }>(
+      `SELECT decision_id, run_id FROM wf.decision_commits WHERE decision_id = $1`,
+      [committed.decisionId],
+    );
+    const alert = await tdb.engine.query<{ alert_id: string; decision_id: string }>(
+      `SELECT alert_id, decision_id FROM wf.alert_records WHERE alert_id = $1`,
+      [committed.alertId],
+    );
+    expect(decision.rows[0]?.run_id).toBe(runId);
+    expect(alert.rows[0]?.decision_id).toBe(committed.decisionId);
+
+    // An automated opportunity send is suppressed: the row is not claimable,
+    // and even a hand-built claim is refused at the send gate.
+    const claims = await claimOutboxBatch(tdb.engine, {
+      workerId: 'ac061-wf-worker',
+      now: WF_OUTBOX_COMMIT_AT,
+      leaseMs: 5_000,
+      limit: 500,
+    });
+    expect(claims.map((c) => c.outboxId)).not.toContain(committed.outboxId);
+
+    const channel = new FakeNotificationChannel();
+    const report = await deliverClaimed(tdb.engine, channel, {
+      workerId: 'ac061-wf-worker',
+      now: WF_OUTBOX_COMMIT_AT,
+      claims: [buildManualClaim(committed.outboxId)],
+    });
+    expect(report.refusedSuppressed).toEqual([committed.outboxId]);
+    expect(report.sent).toEqual([]);
+    expect(channel.callCount).toBe(0);
+    expect(channel.deliveryCount).toBe(0);
+
+    // Deterministic risk monitoring remains readable and untouched.
+    const health = await tdb.engine.query<{
+      deterministic_risk_monitoring_allowed: boolean;
+      confirmed_opportunity_influence_blocked: boolean;
+    }>(
+      `SELECT deterministic_risk_monitoring_allowed, confirmed_opportunity_influence_blocked
+         FROM recovery_health_states WHERE health_state_id = 'ac061-health-outage'`,
+    );
+    expect(health.rows[0]?.deterministic_risk_monitoring_allowed).toBe(true);
+    expect(health.rows[0]?.confirmed_opportunity_influence_blocked).toBe(true);
+
+    const riskFieldsAfter = await tdb.engine.query<{ n: string }>(
+      `SELECT count(*)::text AS n FROM observation_field_quality WHERE observation_id = $1`,
+      [OUTAGE_OBS],
+    );
+    expect(riskFieldsAfter.rows[0]?.n).toBe(riskFieldsBefore.rows[0]?.n);
+    const stored = await fieldQualityForObservation(tdb.engine, OUTAGE_OBS);
+    expect(stored.length).toBeGreaterThanOrEqual(3);
   });
 });

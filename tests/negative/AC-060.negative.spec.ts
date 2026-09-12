@@ -28,6 +28,21 @@ import {
   seedPool,
   type TestDatabase,
 } from '../acceptance/helpers.ts';
+import {
+  applyScheduleControl,
+  beginStep,
+  checkpointStep,
+  recordTriggerDelivery,
+} from '@foresift/workflow-runtime';
+import {
+  WF_FORECASTS,
+  WF_HOT_PATH_P95_BUDGET_MS,
+  WF_TEST_PAYLOAD_HASH_A,
+  WF_TEST_PAYLOAD_HASH_B,
+  WF_TEST_T0,
+  WF_TRIGGER_ACK_P95_BUDGET_MS,
+  percentile,
+} from '../fixtures/wf/index.ts';
 
 /**
  * Wrap every engine call with a fixed artificial delay (deterministic
@@ -125,4 +140,92 @@ describe('AC-060 negative: the harness fails under artificial over-budget delay'
       await db.close();
     }
   });
+});
+
+/**
+ * AC-060 wf negative (T037, FR-WF-001/002/003).
+ *
+ * The wf-scoped benchmark harness must also be able to FAIL: against an engine
+ * seam that adds a fixed artificial delay to every call, the measured
+ * trigger-acknowledgement p95 and the inbox → run → checkpoint p95 both exceed
+ * the budgets the positive wf extension asserts. A benchmark that cannot fail
+ * is decoration, not measurement.
+ */
+describe('AC-060 wf negative: a delayed engine trips the wf budget harness', () => {
+  it('breaches the trigger-acknowledgement and hot-path budgets under injected delay', async () => {
+    const db = new PGlite({ parsers: PRECISION_RETAINING_TIMESTAMP_PARSERS });
+    try {
+      // Schema + fixture setup run UN-delayed: only the measured hot path is
+      // artificially slowed (migrations are not the workload under test).
+      const fast = createEngine(db, 'pglite');
+      await applyMigrations({ engine: fast, migrationsDir: MIGRATIONS_DIR });
+
+      const scheduleId = 'ac060n-wf-delay';
+      await applyScheduleControl(fast, {
+        action: 'CREATE',
+        scheduleId,
+        now: WF_TEST_T0,
+        config: {
+          name: 'ac060 wf delayed benchmark',
+          cron: '*/5 * * * *',
+          timezone: 'UTC',
+          destination: 'https://internal.example.test/wf/trigger',
+          concurrencyPolicy: 'ALLOW_PARALLEL',
+        },
+      });
+      await applyScheduleControl(fast, {
+        action: 'ENABLE',
+        scheduleId,
+        now: WF_TEST_T0,
+        forecast: WF_FORECASTS.FRESH,
+      });
+
+      // 400 ms per engine call: one trigger acknowledgement makes ≥7 delayed
+      // calls, so even the acknowledgement alone exceeds the 2 s PRD target.
+      const slow = delayEngine(fast, 400);
+
+      const ackSamples: number[] = [];
+      const hotPathSamples: number[] = [];
+      // One measured iteration suffices: a trigger acknowledgement makes ≥7
+      // delayed engine calls, so the injected 400 ms/call cost alone puts the
+      // single-sample p95 far above the 2 s target (and the hot path above its
+      // internal-overhead budget). Kept small so the negative stays fast.
+      const iterations = 1;
+      for (let i = 0; i < iterations; i += 1) {
+        const idempotencyKey = `ac060n-wf-delay-step-${i}`;
+        const hotStart = performance.now();
+        const ackStart = performance.now();
+        const delivery = await recordTriggerDelivery(slow, {
+          source: 'qstash',
+          externalMessageId: `ac060n-wf-delay-msg-${i}`,
+          scheduleId,
+          scheduledFor: WF_TEST_T0,
+          payloadHash: WF_TEST_PAYLOAD_HASH_A,
+          receivedAt: WF_TEST_T0,
+        });
+        ackSamples.push(performance.now() - ackStart);
+        if (delivery.runId === null) throw new Error('delayed delivery did not start a run');
+        await beginStep(slow, {
+          runId: delivery.runId,
+          stepType: 'discover_candidates',
+          idempotencyKey,
+        });
+        await checkpointStep(slow, {
+          runId: delivery.runId,
+          idempotencyKey,
+          status: 'SUCCEEDED',
+          outputHash: WF_TEST_PAYLOAD_HASH_B,
+        });
+        hotPathSamples.push(performance.now() - hotStart);
+      }
+
+      const ackP95 = percentile(ackSamples, 0.95);
+      const hotP95 = percentile(hotPathSamples, 0.95);
+      // The same budgets the positive suite asserts, now observably breached.
+      expect(ackP95).toBeGreaterThan(WF_TRIGGER_ACK_P95_BUDGET_MS);
+      expect(hotP95).toBeGreaterThan(WF_HOT_PATH_P95_BUDGET_MS);
+    } finally {
+      await db.close();
+    }
+  }, 120_000);
 });

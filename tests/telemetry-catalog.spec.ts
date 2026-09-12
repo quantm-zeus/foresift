@@ -17,6 +17,15 @@ import {
   MonitorBatchDescriptorSchema,
   PromotionDecisionSchema,
   CoveragePopulationManifestSchema,
+  TriggerInboxRecordSchema,
+  StepRecordSchema,
+  ScheduleRowSchema,
+  ScheduleVersionRowSchema,
+  RunRowSchema,
+  OutboxRowSchema,
+  DeadLetterRowSchema,
+  ReconciliationReportSchema,
+  CostForecastPayloadSchema,
 } from '../packages/shared-schemas/src/index.ts';
 
 const REPO_ROOT = join(import.meta.dirname, '..');
@@ -1194,6 +1203,369 @@ describe('telemetry/obj.catalog.json parity with authoritative schemas (T026, FR
         }
       } else {
         expect(fieldNames.length).toBeGreaterThan(0);
+      }
+    });
+  }
+});
+
+// --- wf catalog parity (T038/T039) -----------------------------------------
+
+interface WfCatalogEvent {
+  name: string;
+  authoritativeSchema: string;
+  requirementRefs: string[];
+  tier: string;
+  fields: CatalogField[];
+}
+
+interface WfCatalog {
+  catalog: string;
+  contractStatus?: string;
+  requirementsCovered?: string[];
+  recoveryDataClass?: string;
+  events: WfCatalogEvent[];
+}
+
+/** Zod constructor name — the only introspection this suite needs. */
+function wfRuntimeTypeName(schema: MiniSchema): string {
+  return (schema as unknown as { constructor: { name: string } }).constructor.name;
+}
+
+/**
+ * Map an authoritative Zod field to the catalog's declarative type token.
+ * `.nullable()` is part of the type (`string|null`); `.optional()`/`.refine()`
+ * wrappers are transparent.
+ */
+function wfFieldType(schema: MiniSchema): string {
+  const name = wfRuntimeTypeName(schema);
+  switch (name) {
+    case 'ZodString':
+    case 'ZodEnum':
+      return 'string';
+    case 'ZodNumber':
+      return 'number';
+    case 'ZodBoolean':
+      return 'boolean';
+    case 'ZodArray':
+      return 'array';
+    case 'ZodObject':
+    case 'ZodRecord':
+      return 'object';
+    case 'ZodNullable': {
+      const inner = wfLiftInner(schema);
+      return inner === undefined ? 'unknown' : `${wfFieldType(inner)}|null`;
+    }
+    case 'ZodOptional':
+    case 'ZodEffects': {
+      const inner = wfLiftInner(schema);
+      return inner === undefined ? 'unknown' : wfFieldType(inner);
+    }
+    default:
+      return 'unknown';
+  }
+}
+
+/** A field is required unless the schema marks it `.optional()`. */
+function wfFieldRequired(schema: MiniSchema): boolean {
+  return wfRuntimeTypeName(schema) !== 'ZodOptional';
+}
+
+/**
+ * Unwrap one wrapper layer, preserving the receiver's `this` binding.
+ * ZodNullable/ZodOptional expose `unwrap()`; ZodEffects exposes `innerType()`.
+ */
+function wfLiftInner(schema: MiniSchema): MiniSchema | undefined {
+  const holder = schema as { unwrap?: () => MiniSchema; innerType?: () => MiniSchema };
+  if (typeof holder.unwrap === 'function') return holder.unwrap();
+  if (typeof holder.innerType === 'function') return holder.innerType();
+  return undefined;
+}
+
+function wfShape(schema: unknown): Shape {
+  return shapeOf(schema as unknown as { shape?: Shape; innerType?: () => unknown });
+}
+
+/** Authoritative `wf.ts` exports the catalog may name. */
+const WF_AUTHORITATIVE_SHAPES: Record<string, Shape> = {
+  TriggerInboxRecordSchema: wfShape(TriggerInboxRecordSchema),
+  StepRecordSchema: wfShape(StepRecordSchema),
+  ScheduleRowSchema: wfShape(ScheduleRowSchema),
+  ScheduleVersionRowSchema: wfShape(ScheduleVersionRowSchema),
+  RunRowSchema: wfShape(RunRowSchema),
+  OutboxRowSchema: wfShape(OutboxRowSchema),
+  DeadLetterRowSchema: wfShape(DeadLetterRowSchema),
+  ReconciliationReportSchema: wfShape(ReconciliationReportSchema),
+  CostForecastPayloadSchema: wfShape(CostForecastPayloadSchema),
+};
+
+const wfCatalog = JSON.parse(
+  readFileSync(join(REPO_ROOT, 'telemetry', 'wf.catalog.json'), 'utf8'),
+) as WfCatalog;
+
+describe('telemetry/wf.catalog.json parity with authoritative schemas (T038/T039, FR-WF-001…008)', () => {
+  const expectedWfEvents: Record<string, { schema: string; fields: string[] }> = {
+    'wf.trigger_received': {
+      schema: 'TriggerInboxRecordSchema',
+      fields: [
+        'inboxId',
+        'source',
+        'externalMessageId',
+        'canonicalExternalMessageId',
+        'scheduleId',
+        'scheduledFor',
+        'payloadHash',
+        'receivedAt',
+        'status',
+      ],
+    },
+    'wf.trigger_verified': {
+      schema: 'TriggerInboxRecordSchema',
+      fields: ['inboxId', 'scheduleId', 'payloadHash', 'receivedAt', 'verifiedAt', 'status'],
+    },
+    'wf.trigger_duplicate_collapsed': {
+      schema: 'TriggerInboxRecordSchema',
+      fields: [
+        'inboxId',
+        'source',
+        'canonicalExternalMessageId',
+        'scheduleId',
+        'processedRunId',
+        'status',
+      ],
+    },
+    'wf.run_started': {
+      schema: 'RunRowSchema',
+      fields: [
+        'runId',
+        'scheduleId',
+        'resolvedScheduleVersion',
+        'inboxId',
+        'concurrencyPolicy',
+        'concurrencyOutcome',
+        'shadow',
+        'status',
+        'deadline',
+        'startedAt',
+      ],
+    },
+    'wf.run_policy_skipped': {
+      schema: 'RunRowSchema',
+      fields: [
+        'runId',
+        'scheduleId',
+        'resolvedScheduleVersion',
+        'inboxId',
+        'concurrencyPolicy',
+        'concurrencyOutcome',
+        'status',
+        'completedAt',
+      ],
+    },
+    'wf.run_completed': {
+      schema: 'RunRowSchema',
+      fields: ['runId', 'scheduleId', 'shadow', 'status', 'deadline', 'completedAt'],
+    },
+    'wf.step_checkpointed': {
+      schema: 'StepRecordSchema',
+      fields: [
+        'stepId',
+        'runId',
+        'stepType',
+        'idempotencyKey',
+        'attempt',
+        'inputHash',
+        'outputHash',
+        'status',
+        'startedAt',
+        'completedAt',
+      ],
+    },
+    'wf.step_retry': {
+      schema: 'StepRecordSchema',
+      fields: [
+        'stepId',
+        'runId',
+        'stepType',
+        'idempotencyKey',
+        'attempt',
+        'status',
+        'errorClass',
+        'retryable',
+      ],
+    },
+    'wf.step_exhausted': {
+      schema: 'StepRecordSchema',
+      fields: [
+        'stepId',
+        'runId',
+        'stepType',
+        'attempt',
+        'status',
+        'errorClass',
+        'retryable',
+        'completedAt',
+      ],
+    },
+    'wf.step_lease_acquired': {
+      schema: 'StepRecordSchema',
+      fields: ['stepId', 'runId', 'leaseOwner', 'leaseVersion', 'leaseExpiresAt', 'status'],
+    },
+    'wf.step_lease_fenced': {
+      schema: 'StepRecordSchema',
+      fields: ['stepId', 'runId', 'leaseOwner', 'leaseVersion', 'leaseExpiresAt'],
+    },
+    'wf.step_lease_refused': {
+      schema: 'StepRecordSchema',
+      fields: ['stepId', 'runId', 'leaseOwner', 'leaseVersion', 'leaseExpiresAt', 'status'],
+    },
+    'wf.outbox_committed': {
+      schema: 'OutboxRowSchema',
+      fields: [
+        'outboxId',
+        'decisionRef',
+        'alertRef',
+        'channel',
+        'payloadHash',
+        'status',
+        'attempts',
+        'enqueuedAt',
+      ],
+    },
+    'wf.outbox_claimed': {
+      schema: 'OutboxRowSchema',
+      fields: [
+        'outboxId',
+        'status',
+        'claimOwner',
+        'claimFencingToken',
+        'claimExpiresAt',
+        'claimedAt',
+        'attempts',
+      ],
+    },
+    'wf.outbox_sent': {
+      schema: 'OutboxRowSchema',
+      fields: ['outboxId', 'status', 'claimOwner', 'sentAt', 'attempts'],
+    },
+    'wf.outbox_suppressed': {
+      schema: 'OutboxRowSchema',
+      fields: ['outboxId', 'decisionRef', 'alertRef', 'status', 'lastError'],
+    },
+    'wf.dead_letter_opened': {
+      schema: 'DeadLetterRowSchema',
+      fields: [
+        'deadLetterId',
+        'runId',
+        'stepId',
+        'errorClass',
+        'context',
+        'lastValidCheckpointRef',
+        'status',
+        'openedAt',
+      ],
+    },
+    'wf.dead_letter_retried': {
+      schema: 'DeadLetterRowSchema',
+      fields: ['deadLetterId', 'runId', 'errorClass', 'lastValidCheckpointRef', 'status'],
+    },
+    'wf.dead_letter_resolved': {
+      schema: 'DeadLetterRowSchema',
+      fields: ['deadLetterId', 'runId', 'status', 'resolvedAt'],
+    },
+    'wf.reconciliation_diffed': {
+      schema: 'ReconciliationReportSchema',
+      fields: ['reportId', 'checkedAt', 'diff', 'incidentRefs'],
+    },
+    'wf.reconciliation_incident': {
+      schema: 'ReconciliationReportSchema',
+      fields: ['reportId', 'checkedAt', 'incidentRefs'],
+    },
+    'wf.schedule_version_created': {
+      schema: 'ScheduleVersionRowSchema',
+      fields: [
+        'versionId',
+        'scheduleId',
+        'configHash',
+        'resolvedConfig',
+        'shadow',
+        'supersededBy',
+        'createdAt',
+      ],
+    },
+    'wf.schedule_enabled': {
+      schema: 'ScheduleRowSchema',
+      fields: [
+        'scheduleId',
+        'name',
+        'concurrencyPolicy',
+        'status',
+        'currentVersionId',
+        'updatedAt',
+      ],
+    },
+    'wf.schedule_paused': {
+      schema: 'ScheduleRowSchema',
+      fields: [
+        'scheduleId',
+        'name',
+        'concurrencyPolicy',
+        'status',
+        'currentVersionId',
+        'updatedAt',
+      ],
+    },
+    'wf.schedule_dry_run': {
+      schema: 'ScheduleVersionRowSchema',
+      fields: ['versionId', 'scheduleId', 'configHash', 'resolvedConfig', 'shadow', 'createdAt'],
+    },
+  };
+
+  it('keeps the wf catalog a declarative CRITICAL_METADATA contract covering FR-WF-001…008', () => {
+    expect(wfCatalog.catalog).toBe('wf');
+    expect(wfCatalog.contractStatus).toContain('DECLARATIVE_CONTRACT_ONLY');
+    expect(wfCatalog.recoveryDataClass).toBe('CRITICAL_METADATA');
+    for (const fr of [
+      'FR-WF-001',
+      'FR-WF-002',
+      'FR-WF-003',
+      'FR-WF-004',
+      'FR-WF-005',
+      'FR-WF-006',
+      'FR-WF-007',
+      'FR-WF-008',
+    ]) {
+      expect(wfCatalog.requirementsCovered ?? []).toContain(fr);
+    }
+  });
+
+  it('declares every expected workflow event family exactly once', () => {
+    expect([...wfCatalog.events.map((e) => e.name)].sort()).toEqual(
+      Object.keys(expectedWfEvents).sort(),
+    );
+    for (const ev of wfCatalog.events) {
+      expect(ev.tier).toBe('CRITICAL_METADATA');
+      expect(ev.requirementRefs.length).toBeGreaterThan(0);
+      for (const ref of ev.requirementRefs) {
+        expect(wfCatalog.requirementsCovered ?? []).toContain(ref);
+      }
+    }
+  });
+
+  for (const [eventName, expected] of Object.entries(expectedWfEvents)) {
+    it(`pins ${eventName} to ${expected.schema} (${expected.fields.length} fields)`, () => {
+      const found = wfCatalog.events.find((e) => e.name === eventName);
+      expect(found, `${eventName} present in the wf catalog`).toBeDefined();
+      const ev = found as WfCatalogEvent;
+      expect(ev.authoritativeSchema).toBe(expected.schema);
+      expect(ev.fields.map((f) => f.name)).toEqual(expected.fields);
+
+      const shape = WF_AUTHORITATIVE_SHAPES[expected.schema];
+      expect(shape, `${expected.schema} is a real wf.ts export`).toBeDefined();
+      const authoritative = shape as Shape;
+      for (const catalogField of ev.fields) {
+        const schema = shapeField(authoritative, catalogField.name);
+        expect(catalogField.type).toBe(wfFieldType(schema));
+        expect(catalogField.required).toBe(wfFieldRequired(schema));
       }
     });
   }

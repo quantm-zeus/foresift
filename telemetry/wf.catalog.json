@@ -1,0 +1,381 @@
+{
+  "$schema": "https://foresift.dev/schemas/telemetry-catalog-v1.json",
+  "catalog": "wf",
+  "description": "Durable workflow telemetry contracts: trigger inbox delivery and idempotent collapse, run lifecycle, step checkpoints and retries, fenced leases, transactional outbox delivery, dead letters, schedule reconciliation, and immutable schedule version control. Field lists mirror packages/shared-schemas/src/wf.ts authoritative schemas; every event carries the critical-metadata recovery tier.",
+  "contractStatus": "DECLARATIVE_CONTRACT_ONLY — emitter wiring is deferred to G2 observability. Field lists mirror packages/shared-schemas/src/wf.ts authoritative schemas.",
+  "requirementsCovered": [
+    "FR-WF-001",
+    "FR-WF-002",
+    "FR-WF-003",
+    "FR-WF-004",
+    "FR-WF-005",
+    "FR-WF-006",
+    "FR-WF-007",
+    "FR-WF-008"
+  ],
+  "recoveryDataClass": "CRITICAL_METADATA",
+  "events": [
+    {
+      "name": "wf.trigger_received",
+      "authoritativeSchema": "TriggerInboxRecordSchema",
+      "requirementRefs": ["FR-WF-001", "FR-WF-002"],
+      "tier": "CRITICAL_METADATA",
+      "fields": [
+        { "name": "inboxId", "type": "string", "required": true },
+        { "name": "source", "type": "string", "required": true },
+        { "name": "externalMessageId", "type": "string", "required": true },
+        { "name": "canonicalExternalMessageId", "type": "string", "required": true },
+        { "name": "scheduleId", "type": "string", "required": true },
+        { "name": "scheduledFor", "type": "string", "required": true },
+        { "name": "payloadHash", "type": "string", "required": true },
+        { "name": "receivedAt", "type": "string", "required": true },
+        { "name": "status", "type": "string", "required": true }
+      ]
+    },
+    {
+      "name": "wf.trigger_verified",
+      "authoritativeSchema": "TriggerInboxRecordSchema",
+      "requirementRefs": ["FR-WF-002"],
+      "tier": "CRITICAL_METADATA",
+      "fields": [
+        { "name": "inboxId", "type": "string", "required": true },
+        { "name": "scheduleId", "type": "string", "required": true },
+        { "name": "payloadHash", "type": "string", "required": true },
+        { "name": "receivedAt", "type": "string", "required": true },
+        { "name": "verifiedAt", "type": "string|null", "required": true },
+        { "name": "status", "type": "string", "required": true }
+      ]
+    },
+    {
+      "name": "wf.trigger_duplicate_collapsed",
+      "authoritativeSchema": "TriggerInboxRecordSchema",
+      "requirementRefs": ["FR-WF-001", "FR-WF-002"],
+      "tier": "CRITICAL_METADATA",
+      "fields": [
+        { "name": "inboxId", "type": "string", "required": true },
+        { "name": "source", "type": "string", "required": true },
+        { "name": "canonicalExternalMessageId", "type": "string", "required": true },
+        { "name": "scheduleId", "type": "string", "required": true },
+        { "name": "processedRunId", "type": "string|null", "required": true },
+        { "name": "status", "type": "string", "required": true }
+      ]
+    },
+    {
+      "name": "wf.run_started",
+      "authoritativeSchema": "RunRowSchema",
+      "requirementRefs": ["FR-WF-001", "FR-WF-002", "FR-WF-008"],
+      "tier": "CRITICAL_METADATA",
+      "fields": [
+        { "name": "runId", "type": "string", "required": true },
+        { "name": "scheduleId", "type": "string", "required": true },
+        { "name": "resolvedScheduleVersion", "type": "string", "required": true },
+        { "name": "inboxId", "type": "string", "required": true },
+        { "name": "concurrencyPolicy", "type": "string", "required": true },
+        { "name": "concurrencyOutcome", "type": "string", "required": true },
+        { "name": "shadow", "type": "boolean", "required": true },
+        { "name": "status", "type": "string", "required": true },
+        { "name": "deadline", "type": "string", "required": true },
+        { "name": "startedAt", "type": "string|null", "required": true }
+      ]
+    },
+    {
+      "name": "wf.run_policy_skipped",
+      "authoritativeSchema": "RunRowSchema",
+      "requirementRefs": ["FR-WF-001", "FR-WF-002"],
+      "tier": "CRITICAL_METADATA",
+      "fields": [
+        { "name": "runId", "type": "string", "required": true },
+        { "name": "scheduleId", "type": "string", "required": true },
+        { "name": "resolvedScheduleVersion", "type": "string", "required": true },
+        { "name": "inboxId", "type": "string", "required": true },
+        { "name": "concurrencyPolicy", "type": "string", "required": true },
+        { "name": "concurrencyOutcome", "type": "string", "required": true },
+        { "name": "status", "type": "string", "required": true },
+        { "name": "completedAt", "type": "string|null", "required": true }
+      ]
+    },
+    {
+      "name": "wf.run_completed",
+      "authoritativeSchema": "RunRowSchema",
+      "requirementRefs": ["FR-WF-001", "FR-WF-003"],
+      "tier": "CRITICAL_METADATA",
+      "fields": [
+        { "name": "runId", "type": "string", "required": true },
+        { "name": "scheduleId", "type": "string", "required": true },
+        { "name": "shadow", "type": "boolean", "required": true },
+        { "name": "status", "type": "string", "required": true },
+        { "name": "deadline", "type": "string", "required": true },
+        { "name": "completedAt", "type": "string|null", "required": true }
+      ]
+    },
+    {
+      "name": "wf.step_checkpointed",
+      "authoritativeSchema": "StepRecordSchema",
+      "requirementRefs": ["FR-WF-003"],
+      "tier": "CRITICAL_METADATA",
+      "fields": [
+        { "name": "stepId", "type": "string", "required": true },
+        { "name": "runId", "type": "string", "required": true },
+        { "name": "stepType", "type": "string", "required": true },
+        { "name": "idempotencyKey", "type": "string", "required": true },
+        { "name": "attempt", "type": "number", "required": true },
+        { "name": "inputHash", "type": "string|null", "required": true },
+        { "name": "outputHash", "type": "string|null", "required": true },
+        { "name": "status", "type": "string", "required": true },
+        { "name": "startedAt", "type": "string|null", "required": true },
+        { "name": "completedAt", "type": "string|null", "required": true }
+      ]
+    },
+    {
+      "name": "wf.step_retry",
+      "authoritativeSchema": "StepRecordSchema",
+      "requirementRefs": ["FR-WF-003"],
+      "tier": "CRITICAL_METADATA",
+      "fields": [
+        { "name": "stepId", "type": "string", "required": true },
+        { "name": "runId", "type": "string", "required": true },
+        { "name": "stepType", "type": "string", "required": true },
+        { "name": "idempotencyKey", "type": "string", "required": true },
+        { "name": "attempt", "type": "number", "required": true },
+        { "name": "status", "type": "string", "required": true },
+        { "name": "errorClass", "type": "string|null", "required": true },
+        { "name": "retryable", "type": "boolean|null", "required": true }
+      ]
+    },
+    {
+      "name": "wf.step_exhausted",
+      "authoritativeSchema": "StepRecordSchema",
+      "requirementRefs": ["FR-WF-003", "FR-WF-007"],
+      "tier": "CRITICAL_METADATA",
+      "fields": [
+        { "name": "stepId", "type": "string", "required": true },
+        { "name": "runId", "type": "string", "required": true },
+        { "name": "stepType", "type": "string", "required": true },
+        { "name": "attempt", "type": "number", "required": true },
+        { "name": "status", "type": "string", "required": true },
+        { "name": "errorClass", "type": "string|null", "required": true },
+        { "name": "retryable", "type": "boolean|null", "required": true },
+        { "name": "completedAt", "type": "string|null", "required": true }
+      ]
+    },
+    {
+      "name": "wf.step_lease_acquired",
+      "authoritativeSchema": "StepRecordSchema",
+      "requirementRefs": ["FR-WF-003"],
+      "tier": "CRITICAL_METADATA",
+      "fields": [
+        { "name": "stepId", "type": "string", "required": true },
+        { "name": "runId", "type": "string", "required": true },
+        { "name": "leaseOwner", "type": "string|null", "required": true },
+        { "name": "leaseVersion", "type": "number", "required": true },
+        { "name": "leaseExpiresAt", "type": "string|null", "required": true },
+        { "name": "status", "type": "string", "required": true }
+      ]
+    },
+    {
+      "name": "wf.step_lease_fenced",
+      "authoritativeSchema": "StepRecordSchema",
+      "requirementRefs": ["FR-WF-003"],
+      "tier": "CRITICAL_METADATA",
+      "fields": [
+        { "name": "stepId", "type": "string", "required": true },
+        { "name": "runId", "type": "string", "required": true },
+        { "name": "leaseOwner", "type": "string|null", "required": true },
+        { "name": "leaseVersion", "type": "number", "required": true },
+        { "name": "leaseExpiresAt", "type": "string|null", "required": true }
+      ]
+    },
+    {
+      "name": "wf.step_lease_refused",
+      "authoritativeSchema": "StepRecordSchema",
+      "requirementRefs": ["FR-WF-003"],
+      "tier": "CRITICAL_METADATA",
+      "fields": [
+        { "name": "stepId", "type": "string", "required": true },
+        { "name": "runId", "type": "string", "required": true },
+        { "name": "leaseOwner", "type": "string|null", "required": true },
+        { "name": "leaseVersion", "type": "number", "required": true },
+        { "name": "leaseExpiresAt", "type": "string|null", "required": true },
+        { "name": "status", "type": "string", "required": true }
+      ]
+    },
+    {
+      "name": "wf.outbox_committed",
+      "authoritativeSchema": "OutboxRowSchema",
+      "requirementRefs": ["FR-WF-006"],
+      "tier": "CRITICAL_METADATA",
+      "fields": [
+        { "name": "outboxId", "type": "string", "required": true },
+        { "name": "decisionRef", "type": "string", "required": true },
+        { "name": "alertRef", "type": "string|null", "required": true },
+        { "name": "channel", "type": "string", "required": true },
+        { "name": "payloadHash", "type": "string", "required": true },
+        { "name": "status", "type": "string", "required": true },
+        { "name": "attempts", "type": "number", "required": true },
+        { "name": "enqueuedAt", "type": "string", "required": true }
+      ]
+    },
+    {
+      "name": "wf.outbox_claimed",
+      "authoritativeSchema": "OutboxRowSchema",
+      "requirementRefs": ["FR-WF-006"],
+      "tier": "CRITICAL_METADATA",
+      "fields": [
+        { "name": "outboxId", "type": "string", "required": true },
+        { "name": "status", "type": "string", "required": true },
+        { "name": "claimOwner", "type": "string|null", "required": true },
+        { "name": "claimFencingToken", "type": "number|null", "required": true },
+        { "name": "claimExpiresAt", "type": "string|null", "required": true },
+        { "name": "claimedAt", "type": "string|null", "required": true },
+        { "name": "attempts", "type": "number", "required": true }
+      ]
+    },
+    {
+      "name": "wf.outbox_sent",
+      "authoritativeSchema": "OutboxRowSchema",
+      "requirementRefs": ["FR-WF-006"],
+      "tier": "CRITICAL_METADATA",
+      "fields": [
+        { "name": "outboxId", "type": "string", "required": true },
+        { "name": "status", "type": "string", "required": true },
+        { "name": "claimOwner", "type": "string|null", "required": true },
+        { "name": "sentAt", "type": "string|null", "required": true },
+        { "name": "attempts", "type": "number", "required": true }
+      ]
+    },
+    {
+      "name": "wf.outbox_suppressed",
+      "authoritativeSchema": "OutboxRowSchema",
+      "requirementRefs": ["FR-WF-006", "FR-WF-008"],
+      "tier": "CRITICAL_METADATA",
+      "fields": [
+        { "name": "outboxId", "type": "string", "required": true },
+        { "name": "decisionRef", "type": "string", "required": true },
+        { "name": "alertRef", "type": "string|null", "required": true },
+        { "name": "status", "type": "string", "required": true },
+        { "name": "lastError", "type": "string|null", "required": true }
+      ]
+    },
+    {
+      "name": "wf.dead_letter_opened",
+      "authoritativeSchema": "DeadLetterRowSchema",
+      "requirementRefs": ["FR-WF-007"],
+      "tier": "CRITICAL_METADATA",
+      "fields": [
+        { "name": "deadLetterId", "type": "string", "required": true },
+        { "name": "runId", "type": "string", "required": true },
+        { "name": "stepId", "type": "string|null", "required": true },
+        { "name": "errorClass", "type": "string", "required": true },
+        { "name": "context", "type": "object", "required": true },
+        { "name": "lastValidCheckpointRef", "type": "string|null", "required": true },
+        { "name": "status", "type": "string", "required": true },
+        { "name": "openedAt", "type": "string", "required": true }
+      ]
+    },
+    {
+      "name": "wf.dead_letter_retried",
+      "authoritativeSchema": "DeadLetterRowSchema",
+      "requirementRefs": ["FR-WF-007"],
+      "tier": "CRITICAL_METADATA",
+      "fields": [
+        { "name": "deadLetterId", "type": "string", "required": true },
+        { "name": "runId", "type": "string", "required": true },
+        { "name": "errorClass", "type": "string", "required": true },
+        { "name": "lastValidCheckpointRef", "type": "string|null", "required": true },
+        { "name": "status", "type": "string", "required": true }
+      ]
+    },
+    {
+      "name": "wf.dead_letter_resolved",
+      "authoritativeSchema": "DeadLetterRowSchema",
+      "requirementRefs": ["FR-WF-007"],
+      "tier": "CRITICAL_METADATA",
+      "fields": [
+        { "name": "deadLetterId", "type": "string", "required": true },
+        { "name": "runId", "type": "string", "required": true },
+        { "name": "status", "type": "string", "required": true },
+        { "name": "resolvedAt", "type": "string|null", "required": true }
+      ]
+    },
+    {
+      "name": "wf.reconciliation_diffed",
+      "authoritativeSchema": "ReconciliationReportSchema",
+      "requirementRefs": ["FR-WF-005"],
+      "tier": "CRITICAL_METADATA",
+      "fields": [
+        { "name": "reportId", "type": "string", "required": true },
+        { "name": "checkedAt", "type": "string", "required": true },
+        { "name": "diff", "type": "object", "required": true },
+        { "name": "incidentRefs", "type": "array", "required": true }
+      ]
+    },
+    {
+      "name": "wf.reconciliation_incident",
+      "authoritativeSchema": "ReconciliationReportSchema",
+      "requirementRefs": ["FR-WF-005"],
+      "tier": "CRITICAL_METADATA",
+      "fields": [
+        { "name": "reportId", "type": "string", "required": true },
+        { "name": "checkedAt", "type": "string", "required": true },
+        { "name": "incidentRefs", "type": "array", "required": true }
+      ]
+    },
+    {
+      "name": "wf.schedule_version_created",
+      "authoritativeSchema": "ScheduleVersionRowSchema",
+      "requirementRefs": ["FR-WF-004"],
+      "tier": "CRITICAL_METADATA",
+      "fields": [
+        { "name": "versionId", "type": "string", "required": true },
+        { "name": "scheduleId", "type": "string", "required": true },
+        { "name": "configHash", "type": "string", "required": true },
+        { "name": "resolvedConfig", "type": "object", "required": true },
+        { "name": "shadow", "type": "boolean", "required": true },
+        { "name": "supersededBy", "type": "string|null", "required": true },
+        { "name": "createdAt", "type": "string", "required": true }
+      ]
+    },
+    {
+      "name": "wf.schedule_enabled",
+      "authoritativeSchema": "ScheduleRowSchema",
+      "requirementRefs": ["FR-WF-004"],
+      "tier": "CRITICAL_METADATA",
+      "fields": [
+        { "name": "scheduleId", "type": "string", "required": true },
+        { "name": "name", "type": "string", "required": true },
+        { "name": "concurrencyPolicy", "type": "string", "required": true },
+        { "name": "status", "type": "string", "required": true },
+        { "name": "currentVersionId", "type": "string|null", "required": true },
+        { "name": "updatedAt", "type": "string", "required": true }
+      ]
+    },
+    {
+      "name": "wf.schedule_paused",
+      "authoritativeSchema": "ScheduleRowSchema",
+      "requirementRefs": ["FR-WF-004"],
+      "tier": "CRITICAL_METADATA",
+      "fields": [
+        { "name": "scheduleId", "type": "string", "required": true },
+        { "name": "name", "type": "string", "required": true },
+        { "name": "concurrencyPolicy", "type": "string", "required": true },
+        { "name": "status", "type": "string", "required": true },
+        { "name": "currentVersionId", "type": "string|null", "required": true },
+        { "name": "updatedAt", "type": "string", "required": true }
+      ]
+    },
+    {
+      "name": "wf.schedule_dry_run",
+      "authoritativeSchema": "ScheduleVersionRowSchema",
+      "requirementRefs": ["FR-WF-004"],
+      "tier": "CRITICAL_METADATA",
+      "fields": [
+        { "name": "versionId", "type": "string", "required": true },
+        { "name": "scheduleId", "type": "string", "required": true },
+        { "name": "configHash", "type": "string", "required": true },
+        { "name": "resolvedConfig", "type": "object", "required": true },
+        { "name": "shadow", "type": "boolean", "required": true },
+        { "name": "createdAt", "type": "string", "required": true }
+      ]
+    }
+  ]
+}

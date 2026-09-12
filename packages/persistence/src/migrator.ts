@@ -1,6 +1,6 @@
 /**
  * Deterministic schema migrator for
- * `migrations/g<generation>_(data|dr|sec|prov|core|cost|col|disc|mcp|trace|sig|solsec|trd|sup|exec|mat|eval|obj|wf)_*.sql`.
+ * `migrations/g<generation>_(data|dr|sec|prov|core|cost|col|disc|mcp|trace|sig|solsec|trd|sup|exec|mat|eval|obj|wf|alert)_*.sql`.
  *
  * - Files apply in lexicographic filename order, one transaction each.
  * - Applied state lives in `_foresift_schema_migrations` with a sha256
@@ -12,7 +12,7 @@
  *
  * Fail-closed defenses (every refusal is a typed `ForesiftError`, never a guess):
  * - A `.sql` file in the migrations directory that matches no known
- *   `<generation>_(data|dr|sec|prov|core|cost|col|disc|mcp|trace|sig|solsec|trd|sup|exec|mat|eval|obj|wf)_<seq>_<name>` family is refused
+ *   `<generation>_(data|dr|sec|prov|core|cost|col|disc|mcp|trace|sig|solsec|trd|sup|exec|mat|eval|obj|wf|alert)_<seq>_<name>` family is refused
  *   (`MIGRATION_FILENAME_UNKNOWN`) instead of being silently ignored — a
  *   future-generation script (e.g. `g1_data_…`) is discovered and applied,
  *   never dropped.
@@ -45,11 +45,13 @@ export const SCHEMA_MIGRATION_LEASES_TABLE = '_foresift_schema_migration_leases'
 // `cost` (cost, quota, and capacity controls), `sig` (signal registry),
 // `trd` (economic trades), `solsec` (Solana security), `sup` (supply
 // confidence), `exec` (execution), `mat` (outcome maturity), `eval`
-// (evaluation integrity), `obj` (objective governance), and `wf` (durable
-// workflow: schedules, runs, steps, leases, outbox, dead letters).
+// (evaluation integrity), `obj` (objective governance), `wf` (durable
+// workflow: schedules, runs, steps, leases, outbox, dead letters), and
+// `alert` (alert lifecycle: per-class policies, alert records, fingerprints,
+// updates, and class-scoped metric observations).
 // Unknown families stay refused fail-closed.
 const MIGRATION_FAMILIES =
-  'data|dr|sec|prov|core|cost|col|disc|mcp|trace|sig|solsec|trd|sup|exec|mat|eval|obj|wf';
+  'data|dr|sec|prov|core|cost|col|disc|mcp|trace|sig|solsec|trd|sup|exec|mat|eval|obj|wf|alert';
 const MIGRATION_FILE_PATTERN = new RegExp(
   `^g\\d+_(${MIGRATION_FAMILIES})_\\d{4}_[a-z0-9_]+\\.sql$`,
 );
@@ -117,7 +119,7 @@ function checksumOf(content: string): string {
 
 /**
  * Discover migration files in `dir` (lexicographic order). Every `.sql`
- * entry MUST belong to a known `<generation>_(data|dr|sec|prov|core|cost|col|disc|mcp|trace|sig|solsec|trd|sup|exec|mat|eval|obj|wf)_<4-digit-seq>_<name>`
+ * entry MUST belong to a known `<generation>_(data|dr|sec|prov|core|cost|col|disc|mcp|trace|sig|solsec|trd|sup|exec|mat|eval|obj|wf|alert)_<4-digit-seq>_<name>`
  * family — anything else is a loud refusal, so a renamed or foreign script
  * can never be silently skipped.
  */
@@ -144,7 +146,7 @@ export async function discoverMigrations(
 
 export interface MigratorOptions {
   readonly engine: DatabaseEngine;
-  /** Directory containing `g<generation>_(data|dr|sec|prov|core|cost|col|disc|mcp|trace|sig|solsec|trd|sup|exec|mat|eval|obj|wf)_*.sql` scripts. */
+  /** Directory containing `g<generation>_(data|dr|sec|prov|core|cost|col|disc|mcp|trace|sig|solsec|trd|sup|exec|mat|eval|obj|wf|alert)_*.sql` scripts. */
   readonly migrationsDir: string;
 }
 

@@ -1,7 +1,7 @@
 /**
  * Drizzle mirror of SQL truth (ADR-001) — hand-maintained to match the tables
- * created by the versioned migration families, including the `sig` and `wf`
- * schemas, exactly.
+ * created by the versioned migration families, including the `sig`, `wf`, and
+ * `alert` schemas, exactly.
  *
  * This file NEVER defines schema semantics on its own: the SQL migrations are
  * the single source of truth and a parity test enumerates
@@ -25,6 +25,7 @@ import {
 
 export const sigSchema = pgSchema('sig');
 export const wfSchema = pgSchema('wf');
+export const alertSchema = pgSchema('alert');
 
 // --- g0_data_0001_identity -------------------------------------------------
 
@@ -1868,4 +1869,77 @@ export const wfAlertRecords = wfSchema.table('alert_records', {
   payload: jsonb('payload').notNull(),
   payloadHash: text('payload_hash').notNull(),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull(),
+});
+
+// --- g2_alert_0001_alert_state ---------------------------------------------
+
+export const alertPolicies = alertSchema.table('alert_policies', {
+  policyId: text('policy_id').primaryKey(),
+  alertClass: text('alert_class').notNull(),
+  version: integer('version').notNull(),
+  configHash: text('config_hash').notNull(),
+  config: jsonb('config').notNull(),
+  ttlSeconds: integer('ttl_seconds').notNull(),
+  cooldownSeconds: integer('cooldown_seconds').notNull(),
+  highConvictionAllowed: boolean('high_conviction_allowed').notNull(),
+  confirmedDenominator: boolean('confirmed_denominator').notNull(),
+  thresholds: jsonb('thresholds').notNull(),
+  supersededBy: text('superseded_by'),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull(),
+});
+
+export const alertRecords = alertSchema.table('alert_records', {
+  alertId: text('alert_id').primaryKey(),
+  decisionRef: text('decision_ref').notNull(),
+  runRef: text('run_ref').notNull(),
+  alertClass: text('alert_class').notNull(),
+  fingerprint: text('fingerprint').notNull(),
+  thesisVersion: integer('thesis_version').notNull(),
+  lifecycleState: text('lifecycle_state').notNull(),
+  riskState: text('risk_state').notNull(),
+  severity: doublePrecision('severity').notNull(),
+  actionabilityState: text('actionability_state').notNull(),
+  validUntil: timestamp('valid_until', { withTimezone: true }).notNull(),
+  executionAssumptions: jsonb('execution_assumptions').notNull(),
+  evidenceRefs: jsonb('evidence_refs').notNull(),
+  contentHash: text('content_hash').notNull(),
+  supersedesAlertId: text('supersedes_alert_id'),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull(),
+});
+
+export const alertFingerprints = alertSchema.table('alert_fingerprints', {
+  fingerprint: text('fingerprint').primaryKey(),
+  alertClass: text('alert_class').notNull(),
+  lastAlertId: text('last_alert_id').notNull(),
+  lastSeverity: doublePrecision('last_severity').notNull(),
+  lastThesisVersion: integer('last_thesis_version').notNull(),
+  lastMaterialEvidenceHash: text('last_material_evidence_hash').notNull(),
+  lastDeliveredAt: timestamp('last_delivered_at', { withTimezone: true }),
+  cooldownUntil: timestamp('cooldown_until', { withTimezone: true }).notNull(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull(),
+});
+
+// --- g2_alert_0002_updates_metrics -----------------------------------------
+
+export const alertUpdates = alertSchema.table('alert_updates', {
+  updateId: text('update_id').primaryKey(),
+  priorAlertRef: text('prior_alert_ref').notNull(),
+  updateKind: text('update_kind').notNull(),
+  fingerprint: text('fingerprint').notNull(),
+  idempotencyKey: text('idempotency_key').notNull(),
+  alertRef: text('alert_ref').notNull(),
+  outboxRef: text('outbox_ref'),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull(),
+});
+
+export const alertMetricObservations = alertSchema.table('alert_metric_observations', {
+  metricId: text('metric_id').primaryKey(),
+  alertClass: text('alert_class').notNull(),
+  metricKey: text('metric_key').notNull(),
+  numerator: integer('numerator').notNull(),
+  denominator: integer('denominator').notNull(),
+  sampleSize: integer('sample_size').notNull(),
+  windowStart: timestamp('window_start', { withTimezone: true }).notNull(),
+  windowEnd: timestamp('window_end', { withTimezone: true }).notNull(),
+  observedAt: timestamp('observed_at', { withTimezone: true }).notNull(),
 });

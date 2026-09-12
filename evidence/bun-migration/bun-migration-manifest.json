@@ -1,18 +1,18 @@
 {
   "schema": "foresift/bun-migration-manifest@1",
   "migrationId": "bun-test-authority-v1",
-  "generatedAt": "2026-09-12T20:26:11.190Z",
+  "generatedAt": "2026-09-12T21:02:15.820Z",
   "root": ".",
-  "totalTestFiles": 566,
+  "totalTestFiles": 578,
   "counts": {
     "CODEMOD_READY": 0,
     "AGY_REQUIRED": 0,
-    "MIGRATED": 566,
+    "MIGRATED": 578,
     "VERIFIED": 0,
     "BLOCKED": 0
   },
   "parity": {
-    "previousTotal": 557,
+    "previousTotal": 566,
     "disappeared": []
   },
   "files": [
@@ -5018,6 +5018,112 @@
       "state": "MIGRATED"
     },
     {
+      "path": "tests/acceptance/AC-010.spec.ts",
+      "package": "acceptance",
+      "bytes": 7672,
+      "lines": 205,
+      "sha256": "f794b226e9231ad657c4064ff5f35b4734719da058ab1062a3cec952facf0a7e",
+      "imports": [
+        "bun:test",
+        "@foresift/workflow-runtime",
+        "../fixtures/wf/index.ts",
+        "./helpers.ts"
+      ],
+      "vitestImports": [],
+      "features": [],
+      "workload": "DATABASE_PGLITE",
+      "migrationType": "ALREADY_MIGRATED",
+      "fixturesAndHelpers": ["../fixtures/wf/index.ts", "./helpers.ts"],
+      "sourceAnchors": ["@foresift/workflow-runtime", "../fixtures/wf/index.ts", "./helpers.ts"],
+      "state": "MIGRATED"
+    },
+    {
+      "path": "tests/acceptance/AC-011.spec.ts",
+      "package": "acceptance",
+      "bytes": 9696,
+      "lines": 260,
+      "sha256": "be7a4f87dabdd8f8d3b94be577233c0e020c918c6ce2d770702f72f5756c74a0",
+      "imports": [
+        "bun:test",
+        "@foresift/workflow-runtime",
+        "../fixtures/wf/index.ts",
+        "./helpers.ts"
+      ],
+      "vitestImports": [],
+      "features": [],
+      "workload": "PURE",
+      "migrationType": "ALREADY_MIGRATED",
+      "fixturesAndHelpers": ["../fixtures/wf/index.ts", "./helpers.ts"],
+      "sourceAnchors": ["@foresift/workflow-runtime", "../fixtures/wf/index.ts", "./helpers.ts"],
+      "state": "MIGRATED"
+    },
+    {
+      "path": "tests/acceptance/AC-012.spec.ts",
+      "package": "acceptance",
+      "bytes": 6110,
+      "lines": 191,
+      "sha256": "655436fe537ceb467158884cd267b5c55c433cde6f6ae85f6ffecdfe5db67f4c",
+      "imports": [
+        "bun:test",
+        "@foresift/domain",
+        "@foresift/workflow-runtime",
+        "../fixtures/wf/index.ts",
+        "./helpers.ts"
+      ],
+      "vitestImports": [],
+      "features": [],
+      "workload": "PURE",
+      "migrationType": "ALREADY_MIGRATED",
+      "fixturesAndHelpers": ["../fixtures/wf/index.ts", "./helpers.ts"],
+      "sourceAnchors": [
+        "@foresift/domain",
+        "@foresift/workflow-runtime",
+        "../fixtures/wf/index.ts",
+        "./helpers.ts"
+      ],
+      "state": "MIGRATED"
+    },
+    {
+      "path": "tests/acceptance/AC-013.spec.ts",
+      "package": "acceptance",
+      "bytes": 5470,
+      "lines": 168,
+      "sha256": "21e5d7dfc7949f92ac30a5b3d671e91723a6757dec978aaec6ee7e5aa0aa075f",
+      "imports": [
+        "bun:test",
+        "@foresift/workflow-runtime",
+        "../fixtures/wf/index.ts",
+        "./helpers.ts"
+      ],
+      "vitestImports": [],
+      "features": [],
+      "workload": "PURE",
+      "migrationType": "ALREADY_MIGRATED",
+      "fixturesAndHelpers": ["../fixtures/wf/index.ts", "./helpers.ts"],
+      "sourceAnchors": ["@foresift/workflow-runtime", "../fixtures/wf/index.ts", "./helpers.ts"],
+      "state": "MIGRATED"
+    },
+    {
+      "path": "tests/acceptance/AC-014.spec.ts",
+      "package": "acceptance",
+      "bytes": 5408,
+      "lines": 157,
+      "sha256": "f687473775d9bf915bfaa18e994ea8a255dcb88f57cb9889f39a87ee12c04bc9",
+      "imports": [
+        "bun:test",
+        "@foresift/workflow-runtime",
+        "../fixtures/wf/index.ts",
+        "./helpers.ts"
+      ],
+      "vitestImports": [],
+      "features": [],
+      "workload": "PURE",
+      "migrationType": "ALREADY_MIGRATED",
+      "fixturesAndHelpers": ["../fixtures/wf/index.ts", "./helpers.ts"],
+      "sourceAnchors": ["@foresift/workflow-runtime", "../fixtures/wf/index.ts", "./helpers.ts"],
+      "state": "MIGRATED"
+    },
+    {
       "path": "tests/acceptance/AC-020.spec.ts",
       "package": "acceptance",
       "bytes": 13980,
@@ -5334,31 +5440,58 @@
     {
       "path": "tests/acceptance/AC-060.spec.ts",
       "package": "acceptance",
-      "bytes": 2791,
-      "lines": 75,
-      "sha256": "978f417831508be5221e260d69d24b53195819db65ff5269738d7f73df1814f7",
-      "imports": ["bun:test", "@foresift/domain", "@foresift/persistence", "./helpers.ts"],
+      "bytes": 6164,
+      "lines": 171,
+      "sha256": "1ae010baf3bcf84cad2517c17a62701061e4770ddc0444c10bcf010c88cc1ed7",
+      "imports": [
+        "bun:test",
+        "node:perf_hooks",
+        "@foresift/domain",
+        "@foresift/persistence",
+        "@foresift/workflow-runtime",
+        "./helpers.ts",
+        "../fixtures/wf/index.ts"
+      ],
       "vitestImports": [],
       "features": [],
       "workload": "PURE",
       "migrationType": "ALREADY_MIGRATED",
-      "fixturesAndHelpers": ["./helpers.ts"],
-      "sourceAnchors": ["@foresift/domain", "@foresift/persistence", "./helpers.ts"],
+      "fixturesAndHelpers": ["./helpers.ts", "../fixtures/wf/index.ts"],
+      "sourceAnchors": [
+        "@foresift/domain",
+        "@foresift/persistence",
+        "@foresift/workflow-runtime",
+        "./helpers.ts",
+        "../fixtures/wf/index.ts"
+      ],
       "state": "MIGRATED"
     },
     {
       "path": "tests/acceptance/AC-061.spec.ts",
       "package": "acceptance",
-      "bytes": 7149,
-      "lines": 183,
-      "sha256": "7ac72b5178b96c05ccc064cc6cb174942e214e19f42ff62fddee7d84a9879bd6",
-      "imports": ["bun:test", "@foresift/domain", "@foresift/persistence", "./helpers.ts"],
+      "bytes": 12401,
+      "lines": 318,
+      "sha256": "7a545decf3ccc44cb0f461ca963da4d85f25b338e9d2c527a24ca85d3f397663",
+      "imports": [
+        "bun:test",
+        "@foresift/domain",
+        "@foresift/persistence",
+        "@foresift/workflow-runtime",
+        "./helpers.ts",
+        "../fixtures/wf/index.ts"
+      ],
       "vitestImports": [],
       "features": [],
       "workload": "PURE",
       "migrationType": "ALREADY_MIGRATED",
-      "fixturesAndHelpers": ["./helpers.ts"],
-      "sourceAnchors": ["@foresift/domain", "@foresift/persistence", "./helpers.ts"],
+      "fixturesAndHelpers": ["./helpers.ts", "../fixtures/wf/index.ts"],
+      "sourceAnchors": [
+        "@foresift/domain",
+        "@foresift/persistence",
+        "@foresift/workflow-runtime",
+        "./helpers.ts",
+        "../fixtures/wf/index.ts"
+      ],
       "state": "MIGRATED"
     },
     {
@@ -5387,6 +5520,26 @@
         "@foresift/domain",
         "./helpers.ts"
       ],
+      "state": "MIGRATED"
+    },
+    {
+      "path": "tests/acceptance/AC-063.spec.ts",
+      "package": "acceptance",
+      "bytes": 3199,
+      "lines": 88,
+      "sha256": "156d52891e470383b6217288b17fcbc925b365ad6130bc4ee5a68a2b0a6b57b4",
+      "imports": [
+        "bun:test",
+        "@foresift/workflow-runtime",
+        "../fixtures/wf/index.ts",
+        "./helpers.ts"
+      ],
+      "vitestImports": [],
+      "features": [],
+      "workload": "PURE",
+      "migrationType": "ALREADY_MIGRATED",
+      "fixturesAndHelpers": ["../fixtures/wf/index.ts", "./helpers.ts"],
+      "sourceAnchors": ["@foresift/workflow-runtime", "../fixtures/wf/index.ts", "./helpers.ts"],
       "state": "MIGRATED"
     },
     {
@@ -8747,6 +8900,134 @@
       "state": "MIGRATED"
     },
     {
+      "path": "tests/negative/AC-010.negative.spec.ts",
+      "package": "negative",
+      "bytes": 7321,
+      "lines": 221,
+      "sha256": "4cbcbf6ba1e7e41d9a0fc6ba6e06a68410e6edba7f3adda36da5f6fc7e23304e",
+      "imports": [
+        "bun:test",
+        "@foresift/domain",
+        "@foresift/workflow-runtime",
+        "../fixtures/wf/index.ts",
+        "../acceptance/helpers.ts"
+      ],
+      "vitestImports": [],
+      "features": [],
+      "workload": "PURE",
+      "migrationType": "ALREADY_MIGRATED",
+      "fixturesAndHelpers": ["../fixtures/wf/index.ts", "../acceptance/helpers.ts"],
+      "sourceAnchors": [
+        "@foresift/domain",
+        "@foresift/workflow-runtime",
+        "../fixtures/wf/index.ts",
+        "../acceptance/helpers.ts"
+      ],
+      "state": "MIGRATED"
+    },
+    {
+      "path": "tests/negative/AC-011.negative.spec.ts",
+      "package": "negative",
+      "bytes": 8774,
+      "lines": 248,
+      "sha256": "36208a02e9ef4704d5668183f10dc0166bed943228248338c10f54796cdec316",
+      "imports": [
+        "bun:test",
+        "@foresift/domain",
+        "@foresift/workflow-runtime",
+        "../fixtures/wf/index.ts",
+        "../acceptance/helpers.ts"
+      ],
+      "vitestImports": [],
+      "features": [],
+      "workload": "PURE",
+      "migrationType": "ALREADY_MIGRATED",
+      "fixturesAndHelpers": ["../fixtures/wf/index.ts", "../acceptance/helpers.ts"],
+      "sourceAnchors": [
+        "@foresift/domain",
+        "@foresift/workflow-runtime",
+        "../fixtures/wf/index.ts",
+        "../acceptance/helpers.ts"
+      ],
+      "state": "MIGRATED"
+    },
+    {
+      "path": "tests/negative/AC-012.negative.spec.ts",
+      "package": "negative",
+      "bytes": 5817,
+      "lines": 183,
+      "sha256": "21dd007a5eff702b17ad1796b2e9fcd7fd890e4b4082f27bbccfb2d81bf2abc3",
+      "imports": [
+        "bun:test",
+        "@foresift/domain",
+        "@foresift/workflow-runtime",
+        "../fixtures/wf/index.ts",
+        "../acceptance/helpers.ts"
+      ],
+      "vitestImports": [],
+      "features": [],
+      "workload": "PURE",
+      "migrationType": "ALREADY_MIGRATED",
+      "fixturesAndHelpers": ["../fixtures/wf/index.ts", "../acceptance/helpers.ts"],
+      "sourceAnchors": [
+        "@foresift/domain",
+        "@foresift/workflow-runtime",
+        "../fixtures/wf/index.ts",
+        "../acceptance/helpers.ts"
+      ],
+      "state": "MIGRATED"
+    },
+    {
+      "path": "tests/negative/AC-013.negative.spec.ts",
+      "package": "negative",
+      "bytes": 5769,
+      "lines": 167,
+      "sha256": "a30e51ef795f28c87afd1ca90bac0ac4ef00251ae190de3f0dba47166e0c5cc2",
+      "imports": [
+        "bun:test",
+        "@foresift/workflow-runtime",
+        "../fixtures/wf/index.ts",
+        "../acceptance/helpers.ts"
+      ],
+      "vitestImports": [],
+      "features": [],
+      "workload": "PURE",
+      "migrationType": "ALREADY_MIGRATED",
+      "fixturesAndHelpers": ["../fixtures/wf/index.ts", "../acceptance/helpers.ts"],
+      "sourceAnchors": [
+        "@foresift/workflow-runtime",
+        "../fixtures/wf/index.ts",
+        "../acceptance/helpers.ts"
+      ],
+      "state": "MIGRATED"
+    },
+    {
+      "path": "tests/negative/AC-014.negative.spec.ts",
+      "package": "negative",
+      "bytes": 7033,
+      "lines": 211,
+      "sha256": "421c09861ae9cb25ce6989891f0effc5cba8ed6c6acc4bba58ab212d940b3f23",
+      "imports": [
+        "bun:test",
+        "@foresift/domain",
+        "@foresift/workflow-runtime",
+        "../fixtures/wf/index.ts",
+        "../acceptance/helpers.ts"
+      ],
+      "vitestImports": [],
+      "features": [],
+      "workload": "PURE",
+      "migrationType": "ALREADY_MIGRATED",
+      "fixturesAndHelpers": ["../fixtures/wf/index.ts", "../acceptance/helpers.ts"],
+      "sourceAnchors": [
+        "@foresift/domain",
+        "@foresift/workflow-runtime",
+        "../fixtures/wf/index.ts",
+        "../acceptance/helpers.ts"
+      ],
+      "state": "MIGRATED"
+    },
+    {
       "path": "tests/negative/AC-020.negative.spec.ts",
       "package": "negative",
       "bytes": 8110,
@@ -9047,48 +9328,60 @@
     {
       "path": "tests/negative/AC-060.negative.spec.ts",
       "package": "negative",
-      "bytes": 4720,
-      "lines": 129,
-      "sha256": "7ab899dd3c7f37f94a7be48f40f208ea2b68d027e1bc258e1a3ab44636389d5a",
+      "bytes": 8633,
+      "lines": 232,
+      "sha256": "fd91f370908caabd8c13ae50c0e5eac1602277a3340b3c3b6fa77f23fb966936",
       "imports": [
         "node:perf_hooks",
         "@electric-sql/pglite",
         "bun:test",
         "@foresift/domain",
         "@foresift/persistence",
-        "../acceptance/helpers.ts"
+        "../acceptance/helpers.ts",
+        "@foresift/workflow-runtime",
+        "../fixtures/wf/index.ts"
       ],
       "vitestImports": [],
       "features": [],
       "workload": "DATABASE_PGLITE",
       "migrationType": "ALREADY_MIGRATED",
-      "fixturesAndHelpers": ["../acceptance/helpers.ts"],
+      "fixturesAndHelpers": ["../acceptance/helpers.ts", "../fixtures/wf/index.ts"],
       "sourceAnchors": [
         "@electric-sql/pglite",
         "@foresift/domain",
         "@foresift/persistence",
-        "../acceptance/helpers.ts"
+        "../acceptance/helpers.ts",
+        "@foresift/workflow-runtime",
+        "../fixtures/wf/index.ts"
       ],
       "state": "MIGRATED"
     },
     {
       "path": "tests/negative/AC-061.negative.spec.ts",
       "package": "negative",
-      "bytes": 4232,
-      "lines": 124,
-      "sha256": "6cf007670ee1aa68da30f3697621e6808ae214bfd96d4e3071fcfcf2ae6ab298",
+      "bytes": 9239,
+      "lines": 260,
+      "sha256": "c5cf3bee6f5b5fc78cc7ecadf5b617ba7e091664fc9a6251b4adc3be5da953ae",
       "imports": [
         "bun:test",
         "@foresift/domain",
         "@foresift/persistence",
-        "../acceptance/helpers.ts"
+        "../acceptance/helpers.ts",
+        "@foresift/workflow-runtime",
+        "../fixtures/wf/index.ts"
       ],
       "vitestImports": [],
       "features": [],
       "workload": "PURE",
       "migrationType": "ALREADY_MIGRATED",
-      "fixturesAndHelpers": ["../acceptance/helpers.ts"],
-      "sourceAnchors": ["@foresift/domain", "@foresift/persistence", "../acceptance/helpers.ts"],
+      "fixturesAndHelpers": ["../acceptance/helpers.ts", "../fixtures/wf/index.ts"],
+      "sourceAnchors": [
+        "@foresift/domain",
+        "@foresift/persistence",
+        "../acceptance/helpers.ts",
+        "@foresift/workflow-runtime",
+        "../fixtures/wf/index.ts"
+      ],
       "state": "MIGRATED"
     },
     {
@@ -9113,6 +9406,32 @@
         "@electric-sql/pglite",
         "@foresift/domain",
         "@foresift/persistence",
+        "../acceptance/helpers.ts"
+      ],
+      "state": "MIGRATED"
+    },
+    {
+      "path": "tests/negative/AC-063.negative.spec.ts",
+      "package": "negative",
+      "bytes": 4398,
+      "lines": 125,
+      "sha256": "f7699731efa2cfbcbb97917a79967198dadfe4a64f77a6ecf9df12fa9ed58945",
+      "imports": [
+        "bun:test",
+        "@foresift/domain",
+        "@foresift/workflow-runtime",
+        "../fixtures/wf/index.ts",
+        "../acceptance/helpers.ts"
+      ],
+      "vitestImports": [],
+      "features": [],
+      "workload": "PURE",
+      "migrationType": "ALREADY_MIGRATED",
+      "fixturesAndHelpers": ["../fixtures/wf/index.ts", "../acceptance/helpers.ts"],
+      "sourceAnchors": [
+        "@foresift/domain",
+        "@foresift/workflow-runtime",
+        "../fixtures/wf/index.ts",
         "../acceptance/helpers.ts"
       ],
       "state": "MIGRATED"

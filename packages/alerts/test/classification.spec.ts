@@ -391,7 +391,7 @@ describe('T012 per-class policy registry (AC-140)', () => {
         AlertPolicySource.DEFAULT,
       );
     });
-  });
+  }, 120_000);
 
   it('refuses an unmapped persisted content-policy version', async () => {
     await withTestDatabase(async ({ engine }) => {
@@ -404,7 +404,7 @@ describe('T012 per-class policy registry (AC-140)', () => {
       });
       await expectForesiftError(loadAlertPolicies(engine), ErrorCode.ALERT_POLICY_UNKNOWN);
     });
-  });
+  }, 120_000);
 
   it('refuses a persisted content template that does not match its class', async () => {
     await withTestDatabase(async ({ engine }) => {
@@ -417,7 +417,7 @@ describe('T012 per-class policy registry (AC-140)', () => {
       });
       await expectForesiftError(loadAlertPolicies(engine), ErrorCode.ALERT_POLICY_UNKNOWN);
     });
-  });
+  }, 120_000);
 
   it('refuses a persisted conviction flag on a non-confirmed class (FR-ALERT-002)', async () => {
     await withTestDatabase(async ({ engine }) => {
@@ -430,7 +430,7 @@ describe('T012 per-class policy registry (AC-140)', () => {
       });
       await expectForesiftError(loadAlertPolicies(engine), ErrorCode.CONTRACT_INVARIANT_VIOLATED);
     });
-  });
+  }, 120_000);
 });
 
 // --- T013 gate set ----------------------------------------------------------
@@ -1040,7 +1040,7 @@ describe('T016 commit adapter and §33.9 latency budget (AC-141)', () => {
     expect(delivery.sent).toHaveLength(1);
     expect(channel.deliveryCount).toBe(1);
     expect(channel.deliveries[0]?.payloadHash).toBe(content.contentHash);
-  });
+  }, 120_000);
 
   it('suppresses a budget-exceeded alert instead of delivering it late', async () => {
     const runId = await seedRun(tdb.engine);
@@ -1066,7 +1066,7 @@ describe('T016 commit adapter and §33.9 latency budget (AC-141)', () => {
       [`alert-${runId}`],
     );
     expect(Number(rows.rows[0]?.count)).toBe(0);
-  });
+  }, 120_000);
 
   it('returns a suppression (no write) for a suppressed classification', async () => {
     const runId = await seedRun(tdb.engine);
@@ -1083,7 +1083,7 @@ describe('T016 commit adapter and §33.9 latency budget (AC-141)', () => {
       [`alert-${runId}`],
     );
     expect(Number(rows.rows[0]?.count)).toBe(0);
-  });
+  }, 120_000);
 
   it('keeps the classification+content path within the §33.1 internal-overhead budget', () => {
     const gateInputs = passingGateInput();

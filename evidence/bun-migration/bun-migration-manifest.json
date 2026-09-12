@@ -1,7 +1,7 @@
 {
   "schema": "foresift/bun-migration-manifest@1",
   "migrationId": "bun-test-authority-v1",
-  "generatedAt": "2026-09-12T22:49:50.804Z",
+  "generatedAt": "2026-09-12T23:08:38.988Z",
   "root": ".",
   "totalTestFiles": 585,
   "counts": {
@@ -12,7 +12,7 @@
     "BLOCKED": 0
   },
   "parity": {
-    "previousTotal": 583,
+    "previousTotal": 585,
     "disappeared": []
   },
   "files": [
@@ -275,9 +275,9 @@
     {
       "path": "packages/alerts/test/classification.spec.ts",
       "package": "@foresift/alerts",
-      "bytes": 40687,
+      "bytes": 40750,
       "lines": 1111,
-      "sha256": "9030cf6abbe074dc0aa271a3dd8172aed1d4a124f715c9439bb0c0f86a1062a9",
+      "sha256": "0c0638aeb3cd22e9cd1d235b6e9c5b6dbe4d4c343282e84ad090e11a17271bb8",
       "imports": [
         "bun:test",
         "@foresift/domain",
@@ -303,9 +303,9 @@
     {
       "path": "packages/alerts/test/lifecycle.spec.ts",
       "package": "@foresift/alerts",
-      "bytes": 22820,
+      "bytes": 22821,
       "lines": 677,
-      "sha256": "bc24df16de43a7ae1a931862a972e5c403a545cc9c3e888f6d2d6779e3663cdb",
+      "sha256": "21998d6043aaf62218ce8fd4d87a6612776ef22b5d6db10571579d1ab6cb81c7",
       "imports": [
         "bun:test",
         "@foresift/domain",
@@ -331,9 +331,9 @@
     {
       "path": "packages/alerts/test/metrics.spec.ts",
       "package": "@foresift/alerts",
-      "bytes": 9391,
+      "bytes": 9418,
       "lines": 267,
-      "sha256": "a15069504468fdb92eb78c2fe2754c38a1c2006898c03d83bea655c0ebe905ce",
+      "sha256": "93903292a39adc9a3e962ee02f2e549be27a15b509a2673a3c8fe5bbb91ee9d4",
       "imports": ["bun:test", "@foresift/domain", "../src/index.ts", "./helpers.ts"],
       "vitestImports": [],
       "features": [],
@@ -346,9 +346,9 @@
     {
       "path": "packages/alerts/test/migrations.spec.ts",
       "package": "@foresift/alerts",
-      "bytes": 16854,
+      "bytes": 17016,
       "lines": 422,
-      "sha256": "820e6faec264359a856386d4489293b665ea5d23e6773ddf10120ccacc0038c0",
+      "sha256": "4accfb46eb5c7f515fd1ad406c3a165d7306280f44ed000492caf86bc0e7e461",
       "imports": [
         "bun:test",
         "@electric-sql/pglite",

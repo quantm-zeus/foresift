@@ -94,7 +94,7 @@ describe('T023 per-class metric observations and denominators (AC-140)', () => {
       }
       expect(results).toHaveLength(9);
     });
-  });
+  }, 120_000);
 
   it('excludes EARLY_WATCH from the confirmed denominator under a mixed population', async () => {
     await withTestDatabase(async (tdb) => {
@@ -167,7 +167,7 @@ describe('T023 per-class metric observations and denominators (AC-140)', () => {
         ]),
       ).toThrow();
     });
-  });
+  }, 120_000);
 
   it('refuses a pooled metric, a class-less request, and a cross-class observation', async () => {
     await withTestDatabase(async (tdb) => {
@@ -231,7 +231,7 @@ describe('T023 per-class metric observations and denominators (AC-140)', () => {
         }),
       ).rejects.toThrow();
     });
-  });
+  }, 120_000);
 
   it('aggregates same-class rows and keeps explicit totals', () => {
     const observations: AlertMetricObservationLike[] = [

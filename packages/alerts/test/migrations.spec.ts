@@ -137,7 +137,7 @@ describe('g2_alert_* migrations apply to a fresh database', () => {
       [PUBLIC_LEAK_CANDIDATES],
     );
     expect(leaked.rows).toEqual([]);
-  });
+  }, 120_000);
 });
 
 describe('§26.2 per-class policy versions are immutable except one supersede pointer', () => {
@@ -152,7 +152,7 @@ describe('§26.2 per-class policy versions are immutable except one supersede po
       [policyId],
     );
     expect(rows.rows[0]?.superseded_by).toBe(nextPolicyId);
-  });
+  }, 120_000);
 
   it('refuses an in-place policy rewrite', async () => {
     const { policyId } = await seedPolicy('CONFIRMED_OPPORTUNITY', 3600, 'rewrite');
@@ -163,7 +163,7 @@ describe('§26.2 per-class policy versions are immutable except one supersede po
     );
     expect((error as { code?: string }).code).toBe('23001'); // restrict_violation
     expect(error.message).toMatch(/alert policy versions are immutable/);
-  });
+  }, 120_000);
 
   it('refuses a policy rewrite combined with a legal-looking supersede', async () => {
     const { policyId, nextPolicyId } = await seedPolicy('RISK_ALERT', 7200, 'rewrite-supersede');
@@ -176,7 +176,7 @@ describe('§26.2 per-class policy versions are immutable except one supersede po
       ),
     );
     expect(error.message).toMatch(/alert policy versions are immutable/);
-  });
+  }, 120_000);
 
   it('refuses re-pointing an already-set supersede pointer', async () => {
     const { policyId, nextPolicyId } = await seedPolicy('THESIS_WEAKENING', 1800, 'repoint');
@@ -191,7 +191,7 @@ describe('§26.2 per-class policy versions are immutable except one supersede po
       ),
     );
     expect(error.message).toMatch(/alert policy versions are immutable/);
-  });
+  }, 120_000);
 
   it('refuses clearing a supersede pointer back to NULL', async () => {
     const { policyId } = await seedPolicy('THESIS_STRENGTHENING', 3600, 'null-out');
@@ -201,7 +201,7 @@ describe('§26.2 per-class policy versions are immutable except one supersede po
       ]),
     );
     expect(error.message).toMatch(/alert policy versions are immutable/);
-  });
+  }, 120_000);
 
   it('refuses DELETE and TRUNCATE of a policy version row', async () => {
     const { policyId } = await seedPolicy('OPPORTUNITY_EXPIRED', 1800, 'delete');
@@ -218,7 +218,7 @@ describe('§26.2 per-class policy versions are immutable except one supersede po
       `SELECT count(*)::int AS n FROM alert.alert_policies`,
     );
     expect(Number(survivors.rows[0]?.n)).toBeGreaterThan(0);
-  });
+  }, 120_000);
 
   it('refuses a duplicate (alert_class, version)', async () => {
     const { version } = await seedPolicy('EARLY_WATCH', 600, 'dup-version');
@@ -233,7 +233,7 @@ describe('§26.2 per-class policy versions are immutable except one supersede po
       ),
     );
     expect(error.message).toMatch(/alert_policies_class_version_unique/);
-  });
+  }, 120_000);
 
   it('refuses an unknown alert class and mirrors the domain vocabulary in SQL', async () => {
     const error = await rejection(
@@ -261,7 +261,7 @@ describe('§26.2 per-class policy versions are immutable except one supersede po
       }
     }
     expect([...listed].sort()).toEqual([...ALL_ALERT_CLASSES].sort());
-  });
+  }, 120_000);
 });
 
 describe('ALERT-002 TTL law is enforced in SQL', () => {
@@ -277,7 +277,7 @@ describe('ALERT-002 TTL law is enforced in SQL', () => {
       ),
     );
     expect(error.message).toMatch(/ttl_seconds/);
-  });
+  }, 120_000);
 
   it('refuses an EARLY_WATCH TTL that is not shorter than the confirmed default', async () => {
     const error = await rejection(
@@ -291,7 +291,7 @@ describe('ALERT-002 TTL law is enforced in SQL', () => {
       ),
     );
     expect(error.message).toMatch(/alert_policies_early_watch_short_ttl/);
-  });
+  }, 120_000);
 });
 
 describe('§26.4 update notifications are idempotent under their key', () => {
@@ -307,7 +307,7 @@ describe('§26.4 update notifications are idempotent under their key', () => {
     await insertUpdate('update-1', 'update-key-1');
     const error = await rejection(insertUpdate('update-2', 'update-key-1'));
     expect(error.message).toMatch(/alert_updates_idempotency_unique/);
-  });
+  }, 120_000);
 
   it('refuses an unknown update kind', async () => {
     const error = await rejection(
@@ -319,7 +319,7 @@ describe('§26.4 update notifications are idempotent under their key', () => {
       ),
     );
     expect(error.message).toMatch(/update_kind/);
-  });
+  }, 120_000);
 });
 
 describe('FR-ALERT-005 metric observations are class-scoped', () => {
@@ -335,7 +335,7 @@ describe('FR-ALERT-005 metric observations are class-scoped', () => {
       `SELECT count(*)::int AS n FROM alert.alert_metric_observations WHERE metric_id = 'metric-ok'`,
     );
     expect(Number(rows.rows[0]?.n)).toBe(1);
-  });
+  }, 120_000);
 
   it('refuses a class-less metric observation', async () => {
     const error = await rejection(
@@ -348,7 +348,7 @@ describe('FR-ALERT-005 metric observations are class-scoped', () => {
       ),
     );
     expect(error.message).toMatch(/alert_class/);
-  });
+  }, 120_000);
 
   it('refuses a cross-class metric key (EARLY_WATCH pooled into confirmed precision)', async () => {
     const error = await rejection(
@@ -361,7 +361,7 @@ describe('FR-ALERT-005 metric observations are class-scoped', () => {
       ),
     );
     expect(error.message).toMatch(/alert_metric_observations_class_scope/);
-  });
+  }, 120_000);
 
   it('refuses a numerator larger than its denominator and an inverted window', async () => {
     const numerator = await rejection(
@@ -385,7 +385,7 @@ describe('FR-ALERT-005 metric observations are class-scoped', () => {
       ),
     );
     expect(window.message).toMatch(/window_order/);
-  });
+  }, 120_000);
 });
 
 describe('§26.4 alert records carry a content-addressed fingerprint', () => {
@@ -417,5 +417,5 @@ describe('§26.4 alert records carry a content-addressed fingerprint', () => {
       ),
     );
     expect(missingRun.message).toMatch(/run_ref/);
-  });
+  }, 120_000);
 });

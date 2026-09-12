@@ -53,7 +53,7 @@ async function commit(
   options: {
     readonly outboxId?: string;
     readonly outcome?: OutboxCommitOutcome;
-    readonly influence?: 'OPPORTUNITY_NOTIFICATION' | 'POLICY_WRITE_BACK';
+    readonly influence?: 'OPPORTUNITY_NOTIFICATION' | 'POLICY_WRITE_BACK' | 'EVIDENCE_READ';
   } = {},
 ): Promise<Awaited<ReturnType<typeof commitDecisionWithOutbox>>> {
   return commitDecisionWithOutbox(tdb.engine, {
@@ -189,6 +189,86 @@ describe('§26.5 atomic commit boundary (AC-011, AC-061)', () => {
     expect(() =>
       assertNoOpportunityInfluence({ runId, shadow: true }, 'OPPORTUNITY_NOTIFICATION'),
     ).toThrow();
+  });
+});
+
+describe('FR-WF-008 shadow delivery choke point (two independent gates)', () => {
+  it('never writes a deliverable row for a shadow run, even with influence EVIDENCE_READ', async () => {
+    const { runId } = await seedRun(tdb.engine, { shadow: true });
+    // The `influence` label must not be able to downgrade a shadow commit into
+    // a deliverable (PENDING) row.
+    const result = await commit(runId, 'shadow-evidence-read', { influence: 'EVIDENCE_READ' });
+    expect(result.status).toBe('SUPPRESSED_SHADOW');
+    expect(result.suppressed).toBe(true);
+
+    const row = await tdb.engine.query<{ status: string }>(
+      `SELECT status FROM wf.notification_outbox WHERE outbox_id = $1`,
+      [result.outboxId],
+    );
+    expect(row.rows[0]?.status).toBe('SUPPRESSED_SHADOW');
+
+    // And it is not claimable.
+    const claims = await claimOutboxBatch(tdb.engine, {
+      workerId: 'worker-shadow-evidence',
+      now: T0,
+      leaseMs: LEASE_MS,
+      limit: 200,
+    });
+    expect(claims.map((c) => c.outboxId)).not.toContain(result.outboxId);
+  });
+
+  it('re-checks shadow at the send gate and refuses a row forced back to PENDING', async () => {
+    const { runId } = await seedRun(tdb.engine, { shadow: true });
+    const result = await commit(runId, 'shadow-forced-pending');
+    expect(result.status).toBe('SUPPRESSED_SHADOW');
+
+    // Simulate corruption / a legacy row: the status tag is forced back to
+    // PENDING. The delivery worker must not trust the tag.
+    await tdb.engine.query(
+      `UPDATE wf.notification_outbox SET status = 'PENDING' WHERE outbox_id = $1`,
+      [result.outboxId],
+    );
+
+    const channel = new FakeNotificationChannel();
+    const delivery = await deliverClaimed(tdb.engine, channel, {
+      workerId: 'worker-shadow-forced',
+      now: T0,
+      claims: [manualClaim(result.outboxId)],
+    });
+    expect(delivery.refusedSuppressed).toEqual([result.outboxId]);
+    expect(delivery.sent).toEqual([]);
+    expect(channel.callCount).toBe(0);
+    expect(channel.deliveryCount).toBe(0);
+
+    const row = await tdb.engine.query<{ status: string; last_error: string | null }>(
+      `SELECT status, last_error FROM wf.notification_outbox WHERE outbox_id = $1`,
+      [result.outboxId],
+    );
+    expect(row.rows[0]?.status).toBe('SUPPRESSED_SHADOW');
+    expect(String(row.rows[0]?.last_error)).toContain('shadow');
+  });
+
+  it('still delivers a normal (non-shadow) run', async () => {
+    const { runId } = await seedRun(tdb.engine);
+    const result = await commit(runId, 'non-shadow-delivers');
+    expect(result.status).toBe('PENDING');
+
+    const claims = await claimOutboxBatch(tdb.engine, {
+      workerId: 'worker-non-shadow',
+      now: T0,
+      leaseMs: LEASE_MS,
+      limit: 200,
+    });
+    const mine = claims.find((c) => c.outboxId === result.outboxId);
+    expect(mine).toBeDefined();
+    const channel = new FakeNotificationChannel();
+    const delivery = await deliverClaimed(tdb.engine, channel, {
+      workerId: 'worker-non-shadow',
+      now: T0,
+      claims: [mine!],
+    });
+    expect(delivery.sent).toEqual([result.outboxId]);
+    expect(channel.deliveryCount).toBe(1);
   });
 });
 
@@ -415,5 +495,40 @@ describe('§26.5 crash-safe delivery (AC-011)', () => {
     );
     expect(row.rows[0]?.status).toBe('FAILED');
     expect(channel.deliveryCount).toBe(0);
+  });
+
+  it('refuses to send when the resolved payload does not match the stored payload hash', async () => {
+    const { runId } = await seedRun(tdb.engine);
+    const committed = await commit(runId, 'hash-mismatch');
+
+    const claims = await claimOutboxBatch(tdb.engine, {
+      workerId: 'worker-hash',
+      now: T0,
+      leaseMs: LEASE_MS,
+      limit: 200,
+    });
+    const mine = claims.find((c) => c.outboxId === committed.outboxId);
+    expect(mine).toBeDefined();
+
+    const channel = new FakeNotificationChannel();
+    const report = await deliverClaimed(tdb.engine, channel, {
+      workerId: 'worker-hash',
+      now: T0,
+      claims: [mine!],
+      // A mutated/tampered payload that no longer hashes to the stored address.
+      resolvePayload: () => ({ alertId: 'alert-hash-mismatch', headline: 'tampered' }),
+    });
+    expect(report.sent).toEqual([]);
+    expect(report.failed).toEqual([committed.outboxId]);
+    expect(channel.callCount).toBe(0);
+    expect(channel.deliveryCount).toBe(0);
+
+    const row = await tdb.engine.query<{ status: string; last_error: string | null }>(
+      `SELECT status, last_error FROM wf.notification_outbox WHERE outbox_id = $1`,
+      [committed.outboxId],
+    );
+    expect(row.rows[0]?.status).toBe('FAILED');
+    expect(String(row.rows[0]?.last_error)).toContain('WF_OUTBOX_PAYLOAD_INVALID');
+    expect(String(row.rows[0]?.last_error)).toContain('payload hash mismatch');
   });
 });

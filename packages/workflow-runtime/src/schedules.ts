@@ -606,6 +606,11 @@ export async function enableSchedule(
       );
     }
     const version = await loadCurrentVersion(tx, schedule);
+    // The accepted forecast is persisted BOUND to the current version
+    // (`version.version_id === schedule.current_version_id`, re-read inside
+    // this transaction), so only a forecast for the version that becomes ACTIVE
+    // is ever accepted. RESUME applies the same binding against the persisted
+    // row, so an older version's forecast cannot enable a newer version.
     const payloadHash = sha256Text(canonicalJson(forecast));
     const forecastId = input.forecastId ?? `wff_${randomUUID()}`;
     await tx.query(
@@ -676,50 +681,83 @@ export function pauseSchedule(
   return transitionStatus(engine, input, [ScheduleStatus.ACTIVE], ScheduleStatus.PAUSED, 'PAUSE');
 }
 
-/** RESUME: PAUSED -> ACTIVE, re-checking the persisted forecast freshness. */
+/**
+ * RESUME: PAUSED -> ACTIVE, re-checking the persisted forecast freshness AND
+ * binding it to the schedule's CURRENT version. A forecast computed for a
+ * superseded version (for example PAUSE -> EDIT_DRAFT -> RESUME) can never
+ * re-enable the new version: the version binding refuses it typed, so the new
+ * cost profile must be re-forecast. The check and the status write share one
+ * transaction, so the current version cannot move between them.
+ */
 export async function resumeSchedule(
   engine: DatabaseEngine,
   input: ScheduleControlInput,
 ): Promise<ScheduleControlResult> {
   const now = nowIso(input.now);
-  const schedule = await loadSchedule(engine, input.scheduleId);
-  if (schedule.status !== ScheduleStatus.PAUSED) {
-    throw new ForesiftError(
-      ErrorCode.WF_SCHEDULE_TRANSITION_INVALID,
-      `cannot RESUME a schedule in status ${schedule.status}`,
-      { scheduleId: input.scheduleId, status: schedule.status },
+  return engine.transaction(async (tx) => {
+    const schedule = await loadSchedule(tx, input.scheduleId);
+    if (schedule.status !== ScheduleStatus.PAUSED) {
+      throw new ForesiftError(
+        ErrorCode.WF_SCHEDULE_TRANSITION_INVALID,
+        `cannot RESUME a schedule in status ${schedule.status}`,
+        { scheduleId: input.scheduleId, status: schedule.status },
+      );
+    }
+    const latest = await tx.query<{ computed_at: string; version_id: string }>(
+      `SELECT computed_at, version_id FROM wf.schedule_forecasts
+        WHERE schedule_id = $1 ORDER BY computed_at DESC LIMIT 1`,
+      [input.scheduleId],
     );
-  }
-  const latest = await engine.query<{ computed_at: string }>(
-    `SELECT computed_at FROM wf.schedule_forecasts
-      WHERE schedule_id = $1 ORDER BY computed_at DESC LIMIT 1`,
-    [input.scheduleId],
-  );
-  const computedAt = latest.rows[0]?.computed_at;
-  if (computedAt === undefined) {
-    throw new ForesiftError(
-      ErrorCode.WF_FORECAST_MISSING,
-      'resume requires a persisted §33.6 cost forecast',
-      { scheduleId: input.scheduleId },
+    const persisted = latest.rows[0];
+    const computedAt = persisted?.computed_at;
+    if (computedAt === undefined) {
+      throw new ForesiftError(
+        ErrorCode.WF_FORECAST_MISSING,
+        'resume requires a persisted §33.6 cost forecast',
+        { scheduleId: input.scheduleId },
+      );
+    }
+    // The forecast must be for the version that will become ACTIVE. A forecast
+    // for any other (superseded/older) version is refused typed.
+    if (persisted.version_id !== schedule.current_version_id) {
+      throw new ForesiftError(
+        ErrorCode.WF_FORECAST_STALE,
+        'persisted forecast was computed for a superseded schedule version; re-enable requires a fresh forecast',
+        {
+          scheduleId: input.scheduleId,
+          forecastVersionId: persisted.version_id,
+          currentVersionId: schedule.current_version_id,
+        },
+      );
+    }
+    // Same freshness law as ENABLE, including the future-clock-skew bound: a
+    // forecast whose computedAt is implausibly ahead is refused, not trusted.
+    if (Date.parse(computedAt) > Date.parse(now) + FORECAST_CLOCK_SKEW_MS) {
+      throw new ForesiftError(
+        ErrorCode.WF_FORECAST_STALE,
+        'persisted forecast is computed in the future on resume',
+        { scheduleId: input.scheduleId, computedAt, now },
+      );
+    }
+    if (Date.parse(now) - Date.parse(computedAt) > FORECAST_FRESHNESS_WINDOW_MS) {
+      throw new ForesiftError(
+        ErrorCode.WF_FORECAST_STALE,
+        'persisted forecast is stale on resume',
+        { scheduleId: input.scheduleId, computedAt, now },
+      );
+    }
+    await tx.query(
+      `UPDATE wf.schedules SET status = 'ACTIVE', updated_at = $1 WHERE schedule_id = $2`,
+      [now, input.scheduleId],
     );
-  }
-  // Same freshness law as ENABLE, including the future-clock-skew bound: a
-  // forecast whose computedAt is implausibly ahead is refused, not trusted.
-  if (Date.parse(computedAt) > Date.parse(now) + FORECAST_CLOCK_SKEW_MS) {
-    throw new ForesiftError(
-      ErrorCode.WF_FORECAST_STALE,
-      'persisted forecast is computed in the future on resume',
-      { scheduleId: input.scheduleId, computedAt, now },
-    );
-  }
-  if (Date.parse(now) - Date.parse(computedAt) > FORECAST_FRESHNESS_WINDOW_MS) {
-    throw new ForesiftError(ErrorCode.WF_FORECAST_STALE, 'persisted forecast is stale on resume', {
+    return {
+      action: 'RESUME',
       scheduleId: input.scheduleId,
-      computedAt,
-      now,
-    });
-  }
-  return transitionStatus(engine, input, [ScheduleStatus.PAUSED], ScheduleStatus.ACTIVE, 'RESUME');
+      status: ScheduleStatus.ACTIVE,
+      versionId: schedule.current_version_id,
+      details: { previousStatus: schedule.status, forecastVersionId: persisted.version_id },
+    };
+  });
 }
 
 /** RUN_NOW: an admin trigger through the same idempotent inbox pipeline. */

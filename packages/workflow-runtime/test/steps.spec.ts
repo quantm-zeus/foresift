@@ -311,6 +311,9 @@ describe('§25.7 fenced step commits (AC-012)', () => {
       runId,
       stepType: 'apply_lifecycle_risk_transitions',
       idempotencyKey: 'idem-lease',
+      // Fencing is required whenever the step is lease-owned, so the current
+      // holder presents its token even to claim the first attempt.
+      lease: { resourceKey, fencingToken: current.fencingToken },
       now: T0,
     });
 
@@ -329,6 +332,60 @@ describe('§25.7 fenced step commits (AC-012)', () => {
     const committed = await checkpointStep(tdb.engine, {
       runId,
       idempotencyKey: 'idem-lease',
+      status: 'SUCCEEDED',
+      outputHash: HASH_B,
+      lease: { resourceKey, fencingToken: current.fencingToken },
+      now: T0,
+    });
+    expect(committed.status).toBe('SUCCEEDED');
+    expect(committed.outputHash).toBe(HASH_B);
+  });
+
+  it('requires a fence when a live lease exists: an omitted-fence commit is refused (AC-012)', async () => {
+    let clockMs = Date.parse(T0);
+    const leases = new StepLeaseManager({
+      engine: tdb.engine,
+      now: () => new Date(clockMs).toISOString(),
+    });
+    const stepType = 'complete_run_summary';
+    const resourceKey = StepLeaseManager.resourceKeyHash({ runId, stepType });
+
+    // Token 1 (expires), superseded by token 2 (expires), superseded by token 3
+    // which is still live. The step now belongs to the token-3 holder.
+    const first = await leases.acquire({ resourceKey, owner: 'worker-a', ttlSeconds: 10 });
+    clockMs = Date.parse(T0) + 30_000;
+    const second = await leases.acquire({ resourceKey, owner: 'worker-b', ttlSeconds: 10 });
+    clockMs = Date.parse(T0) + 60_000;
+    const current = await leases.acquire({ resourceKey, owner: 'worker-c', ttlSeconds: 600 });
+    expect(current.fencingToken).toBeGreaterThan(second.fencingToken);
+    expect(second.fencingToken).toBeGreaterThan(first.fencingToken);
+
+    await beginStep(tdb.engine, {
+      runId,
+      stepType,
+      idempotencyKey: 'idem-fence-required',
+      lease: { resourceKey, fencingToken: current.fencingToken },
+      now: T0,
+    });
+
+    // A stale worker that OMITS the fence would previously have committed
+    // unconditionally; it must now fail closed while the takeover's lease is
+    // live.
+    await expectForesiftError(
+      checkpointStep(tdb.engine, {
+        runId,
+        idempotencyKey: 'idem-fence-required',
+        status: 'SUCCEEDED',
+        outputHash: HASH_B,
+        now: T0,
+      }),
+      ErrorCode.LEASE_FENCING_TOKEN_STALE,
+    );
+
+    // The current token-3 holder succeeds.
+    const committed = await checkpointStep(tdb.engine, {
+      runId,
+      idempotencyKey: 'idem-fence-required',
       status: 'SUCCEEDED',
       outputHash: HASH_B,
       lease: { resourceKey, fencingToken: current.fencingToken },

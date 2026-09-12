@@ -32,6 +32,13 @@ export const OUTBOX_RETRY_MAX_DELAY_MS = 60_000 as const;
 export const SINGLE_REPAIR_MAX_ATTEMPTS = 2 as const;
 /** One hour is the longest rate-limit reset this engine will wait out. */
 export const RATE_LIMIT_MAX_DELAY_MS = 60 * 60 * 1000;
+/**
+ * Fail-closed attempt cap for RATE_LIMITED when the caller declares NO retry
+ * budget. §25.8 retries "after reset within budget"; without a budget there is
+ * nothing to bound the wait, so the engine refuses to retry forever and stops
+ * at this documented cap with a typed dead-letter handoff.
+ */
+export const RATE_LIMIT_DEFAULT_MAX_ATTEMPTS = 3 as const;
 
 export type AttemptAction = 'RETRY' | 'STOP' | 'DISABLE_OPERATION' | 'DEGRADE';
 
@@ -210,7 +217,19 @@ export function nextAttemptPlan(
         );
       }
       const budget = context?.budgetRemainingMs;
-      if (budget !== undefined) {
+      if (budget === undefined) {
+        // No declared budget: bound the attempts with the documented default
+        // cap instead of retrying the reset forever (fail closed).
+        if (n >= RATE_LIMIT_DEFAULT_MAX_ATTEMPTS) {
+          return stopPlan(
+            'RETRY_AFTER_RESET',
+            n,
+            'STOP',
+            'rate-limit retry attempts exhausted without a declared budget',
+            context,
+          );
+        }
+      } else {
         if (!Number.isFinite(budget) || budget < 0) {
           throw new ForesiftError(
             ErrorCode.WF_RETRY_POLICY_INVALID,

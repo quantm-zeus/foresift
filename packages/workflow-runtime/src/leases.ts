@@ -98,9 +98,14 @@ export class StepLeaseManager {
     this.defaultTtlSeconds = options.defaultTtlSeconds;
   }
 
-  /** Deterministic resource-key hash over the workflow identity tuple. */
-  static resourceKeyHash(keyParts: { runId: string; stepType: string; scope?: string }): string {
-    return sha256Text(JSON.stringify([keyParts.runId, keyParts.stepType, keyParts.scope ?? '']));
+  /**
+   * Deterministic resource-key hash over the workflow identity tuple. There is
+   * deliberately no optional component: `steps.ts` derives the omitted-fence
+   * key from exactly `(runId, stepType)`, and any extra dimension here would
+   * let a lease be held under one key while the fence guard checked another.
+   */
+  static resourceKeyHash(keyParts: { runId: string; stepType: string }): string {
+    return sha256Text(JSON.stringify([keyParts.runId, keyParts.stepType]));
   }
 
   private clock(): string {

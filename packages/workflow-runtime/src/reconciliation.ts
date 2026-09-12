@@ -11,9 +11,15 @@
  * 4. destination;
  * 5. external ID.
  *
- * A `wf.reconciliation_reports` row is ALWAYS persisted, and EVERY mismatch
- * raises an incident (one incident reference per skew, recorded in the report
- * and returned so the admin/recovery packages can surface it).
+ * A `wf.reconciliation_reports` row is persisted on every completed run — that
+ * is, once `loadManagedSchedules` and `port.list()` both succeed; if either
+ * throws, nothing is written and no report exists. EVERY mismatch is
+ * represented by one incident reference recorded in the report's
+ * `incident_refs` and returned in memory so the admin/recovery packages can
+ * surface it. This module owns NO durable incident row: the incident store is
+ * owned by admin/recovery, and the returned `incidents` are the hand-off. (An
+ * earlier comment claimed a durable incident row and an unconditional report;
+ * neither is true of this read-only diff.)
  *
  * Repair is opt-in per call and limited to the SAFE direction: a database
  * `PAUSED` schedule propagates its pause to the external scheduler. Repair never
@@ -56,7 +62,7 @@ export interface ReconciliationSkew {
   readonly externalValue: string | boolean | null;
 }
 
-/** One incident raised for one skew. */
+/** One mismatch incident REFERENCE handed to the admin/recovery incident store. */
 export interface ReconciliationIncident {
   readonly incidentId: string;
   readonly scheduleId: string;
@@ -281,9 +287,10 @@ function incidentReason(s: ReconciliationSkew): string {
 }
 
 /**
- * Diff managed database schedules against the external scheduler, ALWAYS
- * persist a report, always raise an incident per mismatch, and optionally
- * repair only in the safe (pause-propagating) direction.
+ * Diff managed database schedules against the external scheduler, persist one
+ * report per completed diff, return one incident REFERENCE per mismatch (the
+ * durable incident store is owned by admin/recovery), and optionally repair
+ * only in the safe (pause-propagating) direction.
  */
 export async function reconcileSchedules(
   engine: DatabaseEngine,

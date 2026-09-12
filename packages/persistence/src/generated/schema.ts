@@ -1837,3 +1837,15 @@ export const wfReconciliationReports = wfSchema.table('reconciliation_reports', 
   diff: jsonb('diff').notNull(),
   incidentRefs: text('incident_refs').array().notNull(),
 });
+
+// --- g2_wf_0003_schedule_forecasts -----------------------------------------
+
+export const wfScheduleForecasts = wfSchema.table('schedule_forecasts', {
+  forecastId: text('forecast_id').primaryKey(),
+  scheduleId: text('schedule_id').notNull(),
+  versionId: text('version_id').notNull(),
+  computedAt: timestamp('computed_at', { withTimezone: true }).notNull(),
+  payload: jsonb('payload').notNull(),
+  payloadHash: text('payload_hash').notNull(),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull(),
+});

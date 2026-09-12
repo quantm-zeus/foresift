@@ -2,35 +2,30 @@
  * `@foresift/workflow-runtime` — durable, read-only workflow substrate
  * (FR-WF-001…008, PRD §25).
  *
- * This barrel documents the module seams the following slices fill in. It
- * exports nothing yet: the first slice (T001–T011, T018) lands only the domain
- * vocabularies, the Zod mirrors, the `wf` SQL schema, and this package
- * scaffold. Every module below is a named seam, not an implementation.
+ * Engine-core public surface (slice 2, T012–T017, T019):
+ * - `scheduler-port.ts`   — `SchedulerPort`, local/QStash adapters, and the
+ *                           HMAC/replay delivery trust boundary (ADR-G2WF-2).
+ * - `trigger-inbox.ts`    — canonicalization, idempotent inbox insert,
+ *                           schedule/version resolution, exactly-one-run
+ *                           creation (AC-010).
+ * - `schedules.ts`        — immutable versioned CRUD and the §25.11 control
+ *                           actions, including the §33.6 forecast-before-enable
+ *                           gate (AC-013, AC-014, AC-063).
+ * - `steps.ts`            — §25.4 step order and §25.5 checkpoint read/write
+ *                           with per-run idempotency keys.
+ * - `leases.ts`           — §25.7 fenced acquire/release/commit-compare over
+ *                           `wf.step_leases` (AC-012).
+ * - `retries.ts`          — the §25.8 taxonomy as an executable policy.
  *
- * Module seams (planned paths under `src/`):
- * - `trigger-inbox.ts`   — external-message canonicalization, idempotent inbox
- *                          insert, active-schedule/version resolution,
- *                          exactly-one-run creation (AC-010).
- * - `schedules.ts`       — immutable versioned CRUD and the §25.11 control
- *                          actions, including the §33.6 forecast-before-enable
- *                          gate (AC-013, AC-014, AC-063).
- * - `steps.ts`           — §25.5 checkpoint read/write and per-run
- *                          idempotency-key enforcement.
- * - `leases.ts`          — §25.7 fenced acquire/release/compare over
- *                          `wf.step_leases` (AC-012).
- * - `retries.ts`         — the §25.8 taxonomy as an executable policy.
- * - `outbox.ts`          — §26.5 atomic decision/alert/outbox commit plus
- *                          lease-claimed exactly-once delivery (AC-011).
- * - `dead-letters.ts`    — exhaustion, actionable context, and safe
- *                          retry-from-last-valid-checkpoint.
- * - `reconciliation.ts`  — database-vs-scheduler diff and incidents (§25.10).
- * - `shadow.ts`          — shadow-run guard: no opportunity influence
- *                          (FR-WF-008).
- * - `scheduler-port.ts`  — the only scheduler seam (ADR-G2WF-2).
- * - `channels.ts`        — notification channel port plus a test fake.
- * - `verify-state.ts`    — read-only consistency queries for recovery drills.
+ * The remaining seams (`outbox.ts`, `dead-letters.ts`, `reconciliation.ts`,
+ * `shadow.ts`, `channels.ts`, `verify-state.ts`) land in the next slice.
  *
  * Strictly read-only: this package must never gain trading, custody,
  * wallet-signing, private-key, or transaction-submission capability.
  */
-export {};
+export * from './scheduler-port.ts';
+export * from './trigger-inbox.ts';
+export * from './schedules.ts';
+export * from './steps.ts';
+export * from './leases.ts';
+export * from './retries.ts';

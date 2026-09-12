@@ -43,6 +43,7 @@ const WF_TABLES = [
   'notification_outbox',
   'reconciliation_reports',
   'runs',
+  'schedule_forecasts',
   'schedule_versions',
   'schedules',
   'step_leases',
@@ -152,8 +153,12 @@ describe('g2_wf_* migrations apply to a fresh database', () => {
   it('applies both wf scripts in lexicographic order', () => {
     expect(applied).toContain('g2_wf_0001_schedules_runs');
     expect(applied).toContain('g2_wf_0002_outbox_deadletter');
+    expect(applied).toContain('g2_wf_0003_schedule_forecasts');
     expect(applied.indexOf('g2_wf_0001_schedules_runs')).toBeLessThan(
       applied.indexOf('g2_wf_0002_outbox_deadletter'),
+    );
+    expect(applied.indexOf('g2_wf_0002_outbox_deadletter')).toBeLessThan(
+      applied.indexOf('g2_wf_0003_schedule_forecasts'),
     );
   });
 
@@ -177,6 +182,14 @@ describe('g2_wf_* migrations apply to a fresh database', () => {
     const rows = await engine.query<{ sequence_name: string }>(
       `SELECT sequence_name FROM information_schema.sequences
        WHERE sequence_schema = 'wf' AND sequence_name = 'wf_lease_fencing_seq'`,
+    );
+    expect(rows.rows).toHaveLength(1);
+  });
+
+  it('creates the dedicated outbox fencing sequence (FR-WF-006)', async () => {
+    const rows = await engine.query<{ sequence_name: string }>(
+      `SELECT sequence_name FROM information_schema.sequences
+       WHERE sequence_schema = 'wf' AND sequence_name = 'wf_outbox_fencing_seq'`,
     );
     expect(rows.rows).toHaveLength(1);
   });

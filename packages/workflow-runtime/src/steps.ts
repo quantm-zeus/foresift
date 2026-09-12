@@ -298,11 +298,14 @@ export interface BeginStepInput {
   readonly now?: string;
   readonly stepId?: string;
   /**
-   * The lease fence. Optional in shape, but the commit is REQUIRED to present
-   * it whenever a live (unreleased, unexpired) lease exists for the step's
-   * `(runId, stepType)` resource key; omitting it then fails closed with
-   * `LEASE_FENCING_TOKEN_STALE` (AC-012). It may be omitted only for a step
-   * that never took a lease.
+   * The lease fence. Optional in shape, but REQUIRED whenever a live
+   * (unreleased, unexpired) lease exists for the step's `(runId, stepType)`
+   * resource key: the re-claim of an EXISTING step row and every checkpoint
+   * commit fail closed with `LEASE_FENCING_TOKEN_STALE` when it is omitted
+   * (AC-012). The first INSERT of a brand-new `(runId, idempotencyKey)` is not
+   * lease-fenced — there is no prior step state to protect and the caller
+   * acquires the lease before beginning the work — but the later checkpoint of
+   * that step is fenced. It may be omitted only when no live lease exists.
    */
   readonly lease?: StepLeaseFence;
 }

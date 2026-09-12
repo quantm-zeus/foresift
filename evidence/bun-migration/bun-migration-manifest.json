@@ -1,21 +1,47 @@
 {
   "schema": "foresift/bun-migration-manifest@1",
   "migrationId": "bun-test-authority-v1",
-  "generatedAt": "2026-09-12T21:02:15.820Z",
+  "generatedAt": "2026-09-12T21:12:10.639Z",
   "root": ".",
-  "totalTestFiles": 578,
+  "totalTestFiles": 579,
   "counts": {
     "CODEMOD_READY": 0,
     "AGY_REQUIRED": 0,
-    "MIGRATED": 578,
+    "MIGRATED": 579,
     "VERIFIED": 0,
     "BLOCKED": 0
   },
   "parity": {
-    "previousTotal": 566,
+    "previousTotal": 567,
     "disappeared": []
   },
   "files": [
+    {
+      "path": "apps/api/src/internal/internal-surface.spec.ts",
+      "package": "root",
+      "bytes": 15629,
+      "lines": 440,
+      "sha256": "58181ba97ef25ac4b4c0423ccaced10f2e55978accaf4cc9d53f95c9e0baa5e0",
+      "imports": [
+        "bun:test",
+        "@foresift/workflow-runtime",
+        "@foresift/persistence",
+        "../../../../tests/acceptance/helpers.ts",
+        "./internal-surface.ts"
+      ],
+      "vitestImports": [],
+      "features": [],
+      "workload": "DATABASE_PGLITE",
+      "migrationType": "ALREADY_MIGRATED",
+      "fixturesAndHelpers": ["../../../../tests/acceptance/helpers.ts"],
+      "sourceAnchors": [
+        "@foresift/workflow-runtime",
+        "@foresift/persistence",
+        "../../../../tests/acceptance/helpers.ts",
+        "./internal-surface.ts"
+      ],
+      "state": "MIGRATED"
+    },
     {
       "path": "apps/api/test/admission.spec.ts",
       "package": "root",
@@ -11245,9 +11271,9 @@
     {
       "path": "tests/telemetry-catalog.spec.ts",
       "package": "root",
-      "bytes": 36247,
-      "lines": 1201,
-      "sha256": "094fdf45460f6dcb21de903490f028cc7eefcf2c30f3e716649226ad4ccab52b",
+      "bytes": 47038,
+      "lines": 1573,
+      "sha256": "d7e4ea23cf557e48b223e2e67d5653361ba91d0c946f04ed1c035f37fb83dda2",
       "imports": ["node:fs", "node:path", "bun:test", "../packages/shared-schemas/src/index.ts"],
       "vitestImports": [],
       "features": [],

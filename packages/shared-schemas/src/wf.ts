@@ -218,10 +218,13 @@ export const ReconciliationReportSchema = z
 /**
  * §33.6 projected shape shown before enable. Monetary spend stays an exact
  * decimal string (never binary floating point); storage growth is integer
- * bytes per month.
+ * bytes per month. `computedAt` is the forecast's own computation instant so
+ * the AC-063 enable gate can decide staleness deterministically (§33.6
+ * forecast-before-enable; the freshness window lives in the engine).
  */
 export const CostForecastPayloadSchema = z
   .object({
+    computedAt: UtcTimestampSchema,
     runsPerDay: nonNegativeInt,
     providerCallsPerDay: nonNegativeInt,
     modelTokensPerDay: nonNegativeInt,

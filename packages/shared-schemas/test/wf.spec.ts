@@ -274,6 +274,15 @@ describe('§33.6 cost forecast payload', () => {
         .success,
     ).toBe(false);
   });
+
+  it('requires the forecast computation instant so staleness is decidable', () => {
+    const { computedAt: _omitted, ...withoutComputedAt } = costForecast;
+    expect(CostForecastPayloadSchema.safeParse(withoutComputedAt).success).toBe(false);
+    expect(
+      CostForecastPayloadSchema.safeParse({ ...costForecast, computedAt: 'not-a-timestamp' })
+        .success,
+    ).toBe(false);
+  });
 });
 
 const scheduleRow: wf.ScheduleRow = {
@@ -350,6 +359,7 @@ const reconciliationReport = {
 };
 
 const costForecast = {
+  computedAt: T0,
   runsPerDay: 288,
   providerCallsPerDay: 1200,
   modelTokensPerDay: 500000,

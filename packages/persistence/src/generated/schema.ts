@@ -1837,3 +1837,35 @@ export const wfReconciliationReports = wfSchema.table('reconciliation_reports', 
   diff: jsonb('diff').notNull(),
   incidentRefs: text('incident_refs').array().notNull(),
 });
+
+// --- g2_wf_0003_schedule_forecasts -----------------------------------------
+
+export const wfScheduleForecasts = wfSchema.table('schedule_forecasts', {
+  forecastId: text('forecast_id').primaryKey(),
+  scheduleId: text('schedule_id').notNull(),
+  versionId: text('version_id').notNull(),
+  computedAt: timestamp('computed_at', { withTimezone: true }).notNull(),
+  payload: jsonb('payload').notNull(),
+  payloadHash: text('payload_hash').notNull(),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull(),
+});
+
+// --- g2_wf_0004_decision_outbox --------------------------------------------
+
+export const wfDecisionCommits = wfSchema.table('decision_commits', {
+  decisionId: text('decision_id').primaryKey(),
+  runId: text('run_id').notNull(),
+  decisionKind: text('decision_kind').notNull(),
+  payload: jsonb('payload').notNull(),
+  payloadHash: text('payload_hash').notNull(),
+  committedAt: timestamp('committed_at', { withTimezone: true }).notNull(),
+});
+
+export const wfAlertRecords = wfSchema.table('alert_records', {
+  alertId: text('alert_id').primaryKey(),
+  decisionId: text('decision_id').notNull(),
+  alertClass: text('alert_class').notNull(),
+  payload: jsonb('payload').notNull(),
+  payloadHash: text('payload_hash').notNull(),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull(),
+});

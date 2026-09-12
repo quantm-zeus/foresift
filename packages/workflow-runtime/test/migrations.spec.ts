@@ -255,7 +255,7 @@ describe('§25.11 schedule versions are immutable except one supersede pointer',
     expect(error.message).toMatch(/schedule versions are immutable/);
   });
 
-  it('refuses TRUNCATE of the version table (typed restrict_violation)', async () => {
+  it('refuses TRUNCATE of the version table (FK guard for plain, restrict_violation for CASCADE)', async () => {
     await seedSchedule();
     // Plain TRUNCATE is already refused fail-closed by the incoming FKs
     // (feature_not_supported); CASCADE bypasses that and reaches the wf
@@ -326,6 +326,17 @@ describe('§25.2 inbox identity and the run dedupe key', () => {
     expect(error.message).toMatch(/runs_version_belongs_to_schedule/);
     expect((error as { code?: string }).code).toBe('23503'); // foreign_key_violation
   });
+
+  it('refuses a run consuming an inbox row addressed to a different schedule (composite FK)', async () => {
+    const first = await seedSchedule();
+    const second = await seedSchedule();
+    const foreignInbox = await seedInbox(second.scheduleId, 'cross-inbox');
+    const error = await rejection(
+      insertRun('run-cross-inbox', first.scheduleId, first.versionId, foreignInbox),
+    );
+    expect(error.message).toMatch(/runs_inbox_belongs_to_schedule/);
+    expect((error as { code?: string }).code).toBe('23503'); // foreign_key_violation
+  });
 });
 
 describe('§25.7 step leases are monotonically fenced', () => {
@@ -379,7 +390,7 @@ describe('§25.7 step leases are monotonically fenced', () => {
     expect(current.rows[0]?.released_at).toBeNull();
   });
 
-  it('refuses a fencing-token regression or non-increase (BEFORE UPDATE trigger)', async () => {
+  it('refuses a fencing-token decrease while allowing an unchanged holder operation (BEFORE UPDATE trigger)', async () => {
     await engine.query(
       `INSERT INTO wf.step_leases (resource_key, owner, expires_at)
        VALUES ('candidate:c4', 'worker-a', now() + interval '1 hour')`,

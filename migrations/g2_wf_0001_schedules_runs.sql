@@ -127,7 +127,12 @@ CREATE TABLE IF NOT EXISTS wf.trigger_inbox (
                                       'DUPLICATE_COLLAPSED',
                                       'REJECTED')),
     CONSTRAINT trigger_inbox_identity_unique
-        UNIQUE (source, canonical_external_message_id)
+        UNIQUE (source, canonical_external_message_id),
+    -- Identity of an inbox row WITHIN its target schedule: the target of the
+    -- composite run->inbox pin below, so a run can never consume a delivery
+    -- addressed to a different schedule (§25.3 step 5).
+    CONSTRAINT trigger_inbox_identity_per_schedule
+        UNIQUE (schedule_id, inbox_id)
 );
 
 CREATE INDEX IF NOT EXISTS trigger_inbox_status_idx ON wf.trigger_inbox (status, received_at);
@@ -138,7 +143,7 @@ CREATE TABLE IF NOT EXISTS wf.runs (
     run_id                                text PRIMARY KEY CHECK (length(run_id) > 0),
     schedule_id                           text NOT NULL REFERENCES wf.schedules(schedule_id),
     resolved_schedule_version             text NOT NULL,
-    inbox_id                              text NOT NULL UNIQUE REFERENCES wf.trigger_inbox(inbox_id),
+    inbox_id                              text NOT NULL UNIQUE,
     trigger_source                        text NOT NULL CHECK (length(trigger_source) > 0),
     trigger_external_message_id           text NOT NULL CHECK (length(trigger_external_message_id) > 0),
     trigger_canonical_external_message_id text NOT NULL CHECK (
@@ -174,7 +179,12 @@ CREATE TABLE IF NOT EXISTS wf.runs (
     -- so a cross-schedule pin is impossible at the storage layer (INV-004).
     CONSTRAINT runs_version_belongs_to_schedule
         FOREIGN KEY (schedule_id, resolved_schedule_version)
-        REFERENCES wf.schedule_versions (schedule_id, version_id)
+        REFERENCES wf.schedule_versions (schedule_id, version_id),
+    -- A run may only consume a delivery addressed to ITS schedule, so an inbox
+    -- row can never be re-pointed at another schedule's run (§25.3, AC-010).
+    CONSTRAINT runs_inbox_belongs_to_schedule
+        FOREIGN KEY (schedule_id, inbox_id)
+        REFERENCES wf.trigger_inbox (schedule_id, inbox_id)
 );
 
 CREATE INDEX IF NOT EXISTS runs_schedule_status_idx ON wf.runs (schedule_id, status);

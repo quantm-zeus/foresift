@@ -119,3 +119,31 @@ group that owns no FR-PROD requirement, so a violating claim corpus supplied to
 that call passes — is documented rather than "fixed": AC-266 depends on the
 explicit G0 override, and the production CLI/bridge never overrides the
 milestone. It is recorded in `DECISIONS.md` D013.
+
+## Third-round reopen (2026-09-13) — conformance + activation nested-mutation fail-opens
+
+The re-PROVEN flip `8f7b5d9` (PR #295) is **revoked**. A fresh independent
+verification at `d44de1a` (three read-only adversarial reviewers plus direct
+runtime probes) reproduced three HIGH fail-opens that the second-round
+convergence audit missed. The state is RUNNING/REOPENED again; `8f7b5d9` and all
+prior evidence remain in history.
+
+| ID  | Defect (reproduced at `d44de1a`)                                                                                                                                                                                                                                                                                                                                                              | Reproduction                                                                                                                                                                                                                             | Correction |
+| --- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------- |
+| R1  | **HIGH — activation-gate H5 binding bypass.** `evaluateActivationGate` freezes only the `evaluations` **array**, not the elements (`activation-gate.ts:879,902`); `recordActivationGateResult` shallow-spreads (`:1181`), sharing the mutable elements. `advanceState` reads those in-memory elements for the IMPLEMENTED/AVAILABLE/PROVEN cross-check (`module-states.ts:743-757`), while the authoritative guard reads DB rows, so a post-recording mutation changes only the TypeScript dimension gate. | Ladder IMPLEMENTED→SHADOW→PAUSED on a `requires_proven:false` scope (history `available=false`); record a genuine OPERATIONAL PASS claiming `available:true`; mutate `bound.evaluations.find(e=>e.gateKind==='AVAILABLE_EVIDENCE').verdict='NOT_APPLICABLE'`; `advanceState(..., toState:'ACTIVE')` **succeeds**. Control without the mutation refuses `GATE_DIMENSION_MISMATCH`. | T053       |
+| R2  | **HIGH — `ACTIVATION_WITHOUT_EVIDENCE` accepts a missing/empty activation event.** `prod-rules.ts:156` tested only `=== null`, and the element-presence check required only `moduleId`/`lifecycleState`, so `activationEventRef` omitted or `''` passed. `requiresProven` omitted was treated as `false`. | `checkActivationWithoutEvidence([{moduleId:'m',lifecycleState:'ACTIVE',implemented:true,available:true,proven:true,requiresProven:true,gateVerdict:'PASS'}]).passed === true` (and with `activationEventRef:''`), so `overall === 'PASSED'` and the bridge returns `{"findings":[]}`. | T055       |
+| R3  | **HIGH — foreign-release evidence accepted by substring match.** `prod-rules.ts:524` used `evidence.scopeRefs.includes(claim.releaseRef)`; when `scopeRefs` is a string this is a substring match, and no shape check required it to be an array. | `releaseRef:'rel'` with `scopeRefs:'foreign-release-rel'` and `valid:true` → `evaluateDistributionAuthorization().authorized === true`. | T056       |
+
+Bounded MEDIUM residuals closed in the same slice: the TypeScript
+persisted-evidence guard ignored a **backdated** `REFUSE` because it ordered
+batches by `evaluated_at` while SQL refuses on any `REFUSE` (T054); the
+active-milestone resolver accepted `/^G\d+$/` while the explicit override
+rejected anything outside `G0…G7` (T057); and the AC-279 acceptance artifact was
+still a no-op same-set restore even though the unit suite had a genuine
+A→B→A case (T058).
+
+Re-verification bar (unchanged): every R-row has a landed fix and a direct
+exploit regression that fails against the pre-correction revision; a **new**
+fresh-context convergence audit reports no CRITICAL/HIGH finding; the full
+prescribed gates and exact-SHA CI are green. Admin-control and
+recovery-continuity promotion stays frozen until then.

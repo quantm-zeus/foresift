@@ -1,24 +1,38 @@
 # Tasks: g2-production-readiness
 
-> **EMERGENCY CORRECTION — proof REOPENED then RE-PROVEN (2026-09-13).**
-> The PROVEN flip `e5fcc06` (PR #292) was correct to revoke: an independent
-> adversarial audit found 3 CRITICAL + 10 HIGH release-blocking defects on
-> `main` (`.deepseek-handoff/ACCELERATOR_PROD_AUDIT.md`). The correction landed
-> as PR #294 (squash `e782ce7`) after three adversarial review rounds plus two
-> independent convergence audits, the last of which returned
-> **"NO CRITICAL/HIGH FINDINGS — READY FOR PROVEN"** at the pre-merge head
-> `c704320` with exact-SHA CI green (run 34749869829). Phase 10 tasks
-> `T040`–`T052` are complete; history is preserved (`4c09096` flipped the state
-> back to RUNNING without deleting any evidence). PROVEN is restored by the
-> follow-up planning PR whose head is this file's revision.
+> **EMERGENCY CORRECTION — proof REOPENED AGAIN (third round, 2026-09-13).**
+> The re-PROVEN flip `8f7b5d9` (PR #295) is revoked by a fresh independent
+> verification that reproduced **three HIGH fail-opens still present on
+> `main`**: (1) the activation-gate evaluations are only shallow-frozen, so a
+> caller can mutate a recorded pass's nested evaluation element and defeat the
+> `advanceState` persisted-dimension cross-check (H5 binding bypass); (2) the
+> `ACTIVATION_WITHOUT_EVIDENCE` rule accepted an ACTIVE claim whose
+> `activationEventRef` was omitted or empty (`prod-rules.ts` tested only
+> `=== null`); (3) the PUBLIC/WORKSPACE authorization rule used
+> `scopeRefs.includes(releaseRef)`, which substring-matches when `scopeRefs`
+> is a string, so foreign-release evidence was accepted. The package is
+> **RUNNING / REOPENED**; no history or evidence is deleted (`8f7b5d9` is an
+> additive flip and this reopen is additive again). Phase 11 adds the bounded
+> correction tasks `T053`–`T060`. PROVEN may only be restored after the new
+> exploit regressions and the full prescribed gates pass, a **new**
+> fresh-context independent convergence audit reports no CRITICAL/HIGH
+> finding, and exact-SHA CI is green. Admin-control and recovery-continuity
+> promotion stays frozen until then.
 >
-> Accepted residual MEDIUMs (recorded in `DECISIONS.md` D013 and
+> Earlier correction history is preserved: the original PROVEN flip
+> `e5fcc06` (PR #292) was revoked after the audit found 3 CRITICAL + 10 HIGH;
+> PR #294 (squash `e782ce7`) closed them and PR #295 (squash `8f7b5d9`)
+> restored PROVEN. Phase 10 tasks `T040`–`T052` remain checked as landed
+> evidence and are not rewritten.
+>
+> Accepted residual MEDIUMs (recorded in `DECISIONS.md` D013/D014 and
 > `emergency-correction.md`): `clearContainment` step-up/actor/reason +
 > ActionGate, SQL/Drizzle parity for defaults/constraints/indexes/triggers,
 > two-way telemetry parity, AC-150/151/153 fixture-echo positives, the
 > evidence trust boundary (caller-supplied statistical verdicts), module binding
-> for evaluation rows, and an explicit `evaluateConformance({milestone:'G0'|'G1'})`
-> override selecting a non-PROD group.
+> for evaluation rows, the declarative-only release-gate live-path boundary
+> rule, and an explicit `evaluateConformance({milestone:'G0'|'G1'})` override
+> selecting a non-PROD group.
 
 **Input**: `specs/g2-production-readiness/spec.md`, `specs/g2-production-readiness/plan.md`
 **Traceability rule**: every task cites at least one assigned requirement
@@ -498,3 +512,60 @@ carries the finding-to-task map and the verbatim reproductions.
       re-review of the correction diff, exploit-suite replay, full prescribed
       gates and exact-SHA CI; restore PROVEN only when the new convergence
       audit reports no CRITICAL/HIGH finding. Traces: FR-PROD-001…006.
+
+## Phase 11 — Third-round emergency correction (reopened proof)
+
+Each task closes one independently reproduced HIGH/MEDIUM defect and lands a
+direct negative regression (exploit) test that fails against the pre-correction
+revision. `specs/g2-production-readiness/emergency-correction.md` carries the
+third-round finding-to-task map and the verbatim reproductions.
+
+- [ ] T053 [serial-reason: SHARED_FILE] Deep-freeze every
+      `GateConditionEvaluation` element (and the condition it spreads) so a
+      caller cannot mutate a recorded pass's nested evaluation and defeat the
+      `advanceState` persisted-dimension cross-check, and derive the
+      IMPLEMENTED/AVAILABLE/PROVEN claim check from the **persisted** evidence
+      rows returned by `requirePersistedActivationEvidence` rather than the
+      in-memory `gateResult.evaluations`. Negative: mutate
+      `bound.evaluations[AVAILABLE_EVIDENCE].verdict` to `NOT_APPLICABLE`, then
+      cross into ACTIVE — must refuse. Closes the H5 binding bypass. Traces:
+      FR-PROD-001, FR-PROD-002, AC-152.
+- [ ] T054 [serial-reason: SHARED_FILE] Align the TypeScript persisted-evidence
+      guard with the SQL trigger: `requirePersistedActivationEvidence` must
+      refuse when **any** persisted row for the exact scope/kind/event is a
+      `REFUSE`, not only when the newest `evaluated_at` batch refuses, so a
+      backdated refusal cannot be ignored. Negative: record PASS then a
+      backdated REFUSE for the same event — the exported guard must refuse.
+      Traces: FR-PROD-002, AC-154.
+- [ ] T055 Fail the `ACTIVATION_WITHOUT_EVIDENCE` conformance rule closed on an
+      ACTIVE claim whose `activationEventRef` is omitted, empty, non-string, or
+      whitespace, whose `requiresProven` is not a boolean, or whose
+      `lifecycleState` is not a known governed position. Negative: the omitted
+      and empty-string exploits (and an unknown lifecycle position) must
+      produce findings and `overall === 'FAILED'`. Closes the H2 residual.
+      Traces: FR-PROD-001, FR-PROD-002, AC-152.
+- [ ] T056 Fail the PUBLIC/WORKSPACE authorization rule closed on malformed
+      evidence shape: `scopeRefs` must be an array of release refs (never a
+      substring-matched string), `requiredGateKinds`/`gateEvidence` must be
+      arrays, and a malformed shape is a finding. Negative: a foreign release
+      named only inside a `scopeRefs` string must NOT authorize. Closes the H2
+      residual. Traces: FR-PROD-002, FR-PROD-004, AC-272, AC-273.
+- [ ] T057 [serial-reason: SHARED_FILE] Make the active-milestone resolution in
+      `evaluateConformance` reject a non-canonical / out-of-range id exactly as
+      the explicit override does (`G0`…`G7`), so a malformed
+      `current-milestone.json` cannot silently skip the PROD block. Traces:
+      FR-PROD-001…006.
+- [ ] T058 [executor: TEST] Repair the hollow AC-279 acceptance path: drive a
+      genuine A→B→A restore (current set B, prior approved set A under the exact
+      event) instead of the no-op same-set restore, and keep the fabricated
+      prior-event / never-approved-set negatives. Closes the H7 test residual.
+      Traces: FR-PROD-006, AC-279.
+- [ ] T059 [serial-reason: COORDINATOR_BOUNDARY] Fresh-context adversarial
+      re-review of the third-round diff, direct exploit replay (nested
+      mutation, omitted/empty activation event, substring scopeRefs,
+      backdated refusal), full prescribed gates and exact-SHA CI. Traces:
+      FR-PROD-001…006.
+- [ ] T060 [serial-reason: COORDINATOR_BOUNDARY] New independent convergence
+      audit at the pre-merge head; restore PROVEN only when it reports no
+      CRITICAL/HIGH finding and the tracked residual MEDIUMs are recorded.
+      Traces: FR-PROD-001…006.

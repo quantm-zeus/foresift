@@ -2,7 +2,21 @@
 import { createHash, createHmac, timingSafeEqual } from 'node:crypto';
 import { canonicalJson, type DatabaseEngine } from '@foresift/persistence';
 
-export const GATE_KINDS = ['MANUAL', 'LEGAL', 'RIGHTS', 'STATISTICAL', 'OWNER_APPROVAL'] as const;
+/**
+ * The authoritative closed gate-kind vocabulary. The array is `Object.freeze`d
+ * so an in-process caller cannot replace its contents at runtime: the
+ * fourth-round R4 guard reads this exported set as its mandatory-gate
+ * authority, and a mutable export would re-open the fabricated/truncated
+ * self-attestation exploit (audit NEW-H1). `as const` alone is compile-time
+ * only; the freeze is the runtime defence the guard comments claim.
+ */
+export const GATE_KINDS = Object.freeze([
+  'MANUAL',
+  'LEGAL',
+  'RIGHTS',
+  'STATISTICAL',
+  'OWNER_APPROVAL',
+] as const);
 
 export type GateKind = (typeof GATE_KINDS)[number];
 

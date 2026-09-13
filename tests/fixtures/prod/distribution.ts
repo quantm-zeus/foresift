@@ -6,7 +6,6 @@
  * a missing gate kind, a scope mismatch, a revoked record, and the honest
  * technically-ready-but-unauthorized position.
  */
-import { GATE_KINDS } from '@foresift/release-conformance';
 import type {
   DistributionAuthorizationClaim,
   DistributionGateEvidenceClaim,
@@ -17,11 +16,21 @@ export const PROD_FOREIGN_RELEASE_REF = 'release://foresift/prod/v0';
 
 /**
  * The authoritative mandatory distribution-gate set for workspace/public
- * authorization: the full closed `GATE_KINDS` evidence vocabulary, imported
- * from the package rather than restated (audit H2). A truncated declaration
- * must never narrow the evidence bar.
+ * authorization: the five closed gate kinds, declared here as an INDEPENDENT
+ * literal list rather than derived from the package's `GATE_KINDS` export
+ * (audit NEW-L6). Deriving it would make the R4 regression self-referential —
+ * it would agree with whatever the implementation exported and could not
+ * falsify a truncated or substituted authoritative set. The R4 test cross-checks
+ * this independent literal against `GATE_KINDS`, so a drift in either direction
+ * fails the suite. A truncated declaration must never narrow the evidence bar.
  */
-export const PROD_DISTRIBUTION_REQUIRED_GATES: readonly string[] = [...GATE_KINDS];
+export const PROD_DISTRIBUTION_REQUIRED_GATES: readonly string[] = Object.freeze([
+  'MANUAL',
+  'LEGAL',
+  'RIGHTS',
+  'STATISTICAL',
+  'OWNER_APPROVAL',
+]);
 
 function evidence(
   gateKind: string,

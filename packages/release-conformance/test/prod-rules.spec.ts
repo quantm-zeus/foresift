@@ -793,9 +793,54 @@ describe('FOURTH-ROUND exploit regressions (R4/R7, audit H2/H4)', () => {
   }
 
   it('binds the mandatory set to the exported authoritative GATE_KINDS vocabulary (R4)', () => {
-    // The fixture list must BE the closed vocabulary, never a truncation.
+    // The fixture list is an INDEPENDENT literal (audit NEW-L6), so this is a
+    // genuine cross-check: either side drifting from the five authoritative
+    // kinds fails here rather than agreeing with itself.
     expect([...PROD_DISTRIBUTION_REQUIRED_GATES].sort()).toEqual([...GATE_KINDS].sort());
     expect([...SHADOW_ONLY_IMPORT_ARTIFACT_STATES]).toEqual(['VALIDATING', 'SHADOW_ELIGIBLE']);
+  });
+
+  it('freezes the authoritative gate and import-state sets against in-process mutation (NEW-H1)', () => {
+    // The R4/R7 guards read these module exports as their authority, so a
+    // mutable export re-opens the fabricated/truncated self-attestation and
+    // REJECTED-import exploits the fourth round closed. `as const` is
+    // compile-time only; the runtime freeze is what this test pins.
+    expect(Object.isFrozen(GATE_KINDS)).toBe(true);
+    expect(Object.isFrozen(SHADOW_ONLY_IMPORT_ARTIFACT_STATES)).toBe(true);
+
+    // ESM test modules are strict mode, so each mutation attempt throws. A
+    // silent non-strict no-op would be equally refused; the contents below are
+    // asserted unchanged either way.
+    expect(() => (GATE_KINDS as unknown as string[]).push('TOTALLY_FAKE_GATE')).toThrow();
+    expect(() => {
+      (GATE_KINDS as unknown as string[]).length = 0;
+    }).toThrow();
+    expect(() =>
+      (SHADOW_ONLY_IMPORT_ARTIFACT_STATES as unknown as string[]).push('REJECTED'),
+    ).toThrow();
+    expect([...GATE_KINDS]).toEqual(['MANUAL', 'LEGAL', 'RIGHTS', 'STATISTICAL', 'OWNER_APPROVAL']);
+    expect([...SHADOW_ONLY_IMPORT_ARTIFACT_STATES]).toEqual(['VALIDATING', 'SHADOW_ELIGIBLE']);
+
+    // The fabricated TOTALLY_FAKE_GATE claim is still refused after the
+    // attempted mutations: an in-process caller cannot rewrite the authority.
+    const fabricated = publicAuthorizationClaim({
+      requiredGateKinds: ['TOTALLY_FAKE_GATE'],
+      gateEvidence: [
+        { evidenceId: 'e', gateKind: 'TOTALLY_FAKE_GATE', scopeRefs: ['rel'], valid: true },
+      ],
+    });
+    const evaluation = evaluateDistributionAuthorization(fabricated as never);
+    expect(evaluation.authorized).toBe(false);
+    expect(evaluation.unknownGateKinds).toEqual(['TOTALLY_FAKE_GATE']);
+    expect(conformanceWithAuthorization(fabricated).overall).toBe('FAILED');
+
+    // A REJECTED import state still yields a live-path finding after the
+    // attempted push into the shadow-only set.
+    const rejected = conformanceWithLivePath(livePathWithImportState('REJECTED'));
+    expect(rejected.overall).toBe('FAILED');
+    expect(rejected.findings.map((finding) => finding.rule)).toContain(
+      PROD_RULES.livePathPrecomputationViolation,
+    );
   });
 
   it('refuses the fabricated TOTALLY_FAKE_GATE self-attestation exploit (R4)', () => {
@@ -934,5 +979,31 @@ describe('FOURTH-ROUND exploit regressions (R4/R7, audit H2/H4)', () => {
       expect(report.overall, `import state ${state} must pass`).toBe('PASSED');
       expect(report.findings).toEqual([]);
     }
+  });
+
+  it('renders a doubly-pathological import state as a stable placeholder instead of throwing (LOW)', () => {
+    // `importArtifactState` is untrusted in-process input. A value whose
+    // `toJSON` AND `toString` both throw defeats the `JSON.stringify` fallback
+    // and the `String(...)` fallback; the guard must still return a finding
+    // rather than crash the whole conformance evaluation.
+    const pathological = {
+      toJSON() {
+        throw new Error('toJSON throws');
+      },
+      toString() {
+        throw new Error('toString throws');
+      },
+    };
+    let report: ReturnType<typeof checkLivePathPrecomputationViolation> | undefined;
+    expect(() => {
+      report = checkLivePathPrecomputationViolation([livePathWithImportState(pathological)]);
+    }).not.toThrow();
+    expect(report?.passed).toBe(false);
+    const finding = report?.findings.find((candidate) =>
+      candidate.message.includes('IMPORT_SHADOW_ONLY must reference an import artifact'),
+    );
+    expect(finding).toBeDefined();
+    expect(finding?.rule).toBe(PROD_RULES.livePathPrecomputationViolation);
+    expect(finding?.message).toContain('<unrenderable>');
   });
 });

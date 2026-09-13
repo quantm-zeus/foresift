@@ -434,35 +434,50 @@ const DEFAULT_PRECOMPUTED_REQUIREMENT = 'FR-PROD-006';
  * schema rather than restated here. `VALIDATING` and `SHADOW_ELIGIBLE` are the
  * only members a live path may rest in — the closed vocabulary is imported so
  * the shadow subset can never drift from the security-owned machine.
+ *
+ * The Zod schema owns a mutable `options` array, so the guard reads this
+ * frozen COPY of it instead of the third-party array itself: an in-process
+ * caller that reaches `ImportQuarantineStateSchema.options` cannot mutate the
+ * authority the R7 guard consults (audit NEW-H1).
  */
-const ALL_IMPORT_ARTIFACT_STATES: readonly string[] = ImportQuarantineStateSchema.options;
+const ALL_IMPORT_ARTIFACT_STATES: readonly string[] = Object.freeze([
+  ...ImportQuarantineStateSchema.options,
+]);
 
 /**
  * The only import-artifact states an `IMPORT_SHADOW_ONLY` live-path assertion
  * may certify: a `VALIDATING` or `SHADOW_ELIGIBLE` import. Both are selected
  * from the authoritative closed state set above; an import in any other state
  * (received, quarantined, scanned, rejected) or with no state at all must not
- * pass the release gate (audit H4).
+ * pass the release gate (audit H4). The array is frozen so an in-process
+ * caller cannot push a non-shadow state into the guard's authority (NEW-H1).
  */
-export const SHADOW_ONLY_IMPORT_ARTIFACT_STATES: readonly string[] =
+export const SHADOW_ONLY_IMPORT_ARTIFACT_STATES: readonly string[] = Object.freeze(
   ALL_IMPORT_ARTIFACT_STATES.filter(
     (state) => state === 'VALIDATING' || state === 'SHADOW_ELIGIBLE',
-  );
+  ),
+);
 
 /**
  * Render an untrusted import-artifact state for a finding message. The value
  * reaches the rule in-process (never through JSON), so it may be any shape —
- * including a `BigInt`, on which `JSON.stringify` throws. A finding must never
- * become a throw: when JSON serialization is impossible, fall back to the
- * total `String(...)` rendering. This mirrors the template-string rendering of
- * `undefined` for values JSON drops, so the message stays stable.
+ * including a `BigInt`, on which `JSON.stringify` throws, or a pathological
+ * object whose `toJSON` AND `toString` both throw. A finding must never become
+ * a throw: when JSON serialization is impossible, fall back to the total
+ * `String(...)` rendering, and when even that throws, return a stable
+ * placeholder. This mirrors the template-string rendering of `undefined` for
+ * values JSON drops, so the message stays stable.
  */
 function renderImportArtifactState(value: unknown): string {
   try {
     const rendered = JSON.stringify(value);
     return rendered === undefined ? 'undefined' : rendered;
   } catch {
-    return String(value);
+    try {
+      return String(value);
+    } catch {
+      return '<unrenderable>';
+    }
   }
 }
 
@@ -610,10 +625,10 @@ export interface DistributionAuthorizationEvaluation {
   readonly omittedMandatoryGateKinds: readonly string[];
 }
 
-const AUTHORIZED_DISTRIBUTION_READINESS: readonly string[] = [
+const AUTHORIZED_DISTRIBUTION_READINESS: readonly string[] = Object.freeze([
   'WORKSPACE_AUTHORIZED',
   'PUBLIC_AUTHORIZED',
-];
+]);
 const DEFAULT_PUBLIC_AUTHORIZATION_REQUIREMENT = 'FR-PROD-002';
 
 /**

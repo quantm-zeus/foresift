@@ -43,7 +43,14 @@ const FUTURE = '2027-06-01T00:00:00Z';
 const HASH_A = `sha256:${'a'.repeat(64)}`;
 const HASH_B = `sha256:${'b'.repeat(64)}`;
 const LIVE_PATH = 'live-path-bounded';
-const REQUEST = { candidates: 10, rows: 20, edges: 30, latencyMs: 40, costUsd: 1 };
+const REQUEST = {
+  artifactSetHash: HASH_A,
+  candidates: 10,
+  rows: 20,
+  edges: 30,
+  latencyMs: 40,
+  costUsd: 1,
+};
 
 let db: PGlite;
 let engine: DatabaseEngine;
@@ -136,6 +143,44 @@ describe('§33.7 bounded live-path precomputed alpha', () => {
     expect(expired.served).toBe(false);
     if (!expired.served) {
       expect(expired.refusalReason).toBe('EXPIRED');
+    }
+  }, 120_000);
+
+  it('never serves a bound declared for artifact set A to a request for set B (H10 exploit)', async () => {
+    // Resolved by live path + artifact: the set is part of the key, so a request
+    // for B never resolves A's bound.
+    const byRef = await servePrecomputedAlpha(engine, {
+      livePath: LIVE_PATH,
+      artifactRef: 'artifact-1',
+      request: { ...REQUEST, artifactSetHash: HASH_B },
+      now: NOW,
+      readId: 'read-set-mismatch-ref',
+    });
+    expect(byRef.served).toBe(false);
+
+    // Adding the live path alone is still not enough: the bound is versioned to
+    // one immutable set.
+    const byPath = await servePrecomputedAlpha(engine, {
+      livePath: LIVE_PATH,
+      request: { ...REQUEST, artifactSetHash: HASH_B },
+      now: NOW,
+      readId: 'read-set-mismatch-path',
+    });
+    expect(byPath.served).toBe(false);
+
+    // Even an explicitly addressed bound refuses a different set with a typed
+    // reason rather than serving the wrong artifact set.
+    const byBoundId = await servePrecomputedAlpha(engine, {
+      livePath: LIVE_PATH,
+      boundId: 'bound-bounded',
+      request: { ...REQUEST, artifactSetHash: HASH_B },
+      now: NOW,
+      readId: 'read-set-mismatch-bound',
+    });
+    expect(byBoundId.served).toBe(false);
+    if (!byBoundId.served) {
+      expect(byBoundId.refusalReason).toBe('ARTIFACT_SET_MISMATCH');
+      expect(byBoundId.read?.refusalReason).toBe('ARTIFACT_SET_MISMATCH');
     }
   }, 120_000);
 

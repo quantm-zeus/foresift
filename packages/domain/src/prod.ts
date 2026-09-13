@@ -863,6 +863,12 @@ export interface PrecomputedAlphaBound {
 
 /** One live-path read request against a precomputed bound. */
 export interface PrecomputedAlphaRequest {
+  /**
+   * The exact immutable artifact set the live path is requesting (audit H10).
+   * REQUIRED: a bound for artifact set A must never be served for set B, so the
+   * request names the set it belongs to and the law compares it exactly.
+   */
+  readonly artifactSetHash: string;
   readonly candidates: number;
   readonly rows: number;
   readonly edges: number;
@@ -910,6 +916,15 @@ export function precomputedAlphaBoundRespected(
       { artifactSetHash: bound.artifactSetHash },
     );
   }
+  // The request's artifact set must be the bound's artifact set, exactly: a
+  // versioned bound is versioned to ONE immutable set (audit H10).
+  if (!/^sha256:[0-9a-f]{64}$/.test(request.artifactSetHash)) {
+    throw new ForesiftError(
+      ErrorCode.PROD_PRECOMPUTED_BOUND_INVALID,
+      'precomputed request artifactSetHash must be a sha256 content address',
+      { artifactSetHash: request.artifactSetHash },
+    );
+  }
   const maxCandidates = requirePositiveBound(bound.maxCandidates, 'maxCandidates');
   const maxRows = requirePositiveBound(bound.maxRows, 'maxRows');
   const maxEdges = requirePositiveBound(bound.maxEdges, 'maxEdges');
@@ -918,6 +933,7 @@ export function precomputedAlphaBoundRespected(
   const expiresAt = utcTimestamp(bound.expiresAt);
   const at = utcTimestamp(now);
   if (compareTimestamps(at, expiresAt) >= 0) return false;
+  if (request.artifactSetHash !== bound.artifactSetHash) return false;
   if (requireNonNegativeRequest(request.candidates, 'candidates') > maxCandidates) return false;
   if (requireNonNegativeRequest(request.rows, 'rows') > maxRows) return false;
   if (requireNonNegativeRequest(request.edges, 'edges') > maxEdges) return false;

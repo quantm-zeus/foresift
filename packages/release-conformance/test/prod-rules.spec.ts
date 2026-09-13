@@ -229,6 +229,20 @@ describe('PROD conformance aggregation and unchanged trace rules', () => {
     expect(report.findings).toEqual([]);
   });
 
+  it('flags a live path whose request names a different artifact set than its bound (H10)', () => {
+    const report = checkLivePathPrecomputationViolation([
+      {
+        ...PROD_LIVE_PATH_BOUNDED_CLAIM,
+        request: {
+          ...PROD_LIVE_PATH_BOUNDED_CLAIM.request,
+          artifactSetHash: `sha256:${'9'.repeat(64)}`,
+        },
+      },
+    ]);
+    expect(report.passed).toBe(false);
+    expect(report.findings[0]?.rule).toBe(PROD_RULES.livePathPrecomputationViolation);
+  });
+
   it('keeps the four pre-existing trace rules present and unchanged', () => {
     expect(CONFORMANCE_RULES).toEqual({
       mapping: 'NORMATIVE_MAPPING_COMPLETE',

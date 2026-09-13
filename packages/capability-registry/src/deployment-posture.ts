@@ -220,7 +220,15 @@ interface RawSlaRow {
  */
 export async function evaluateDeploymentPosture(
   engine: DatabaseEngine,
-  input: { readonly now: string },
+  input: {
+    readonly now: string;
+    /**
+     * The sustainable-capacity contract the deployment rests on (audit H8). An
+     * SLA_BACKED posture is REFUSED without one: an empty critical register is
+     * not evidence of coverage, and an unbacked SLA claim is a false guarantee.
+     */
+    readonly capacityContract?: SustainableCapacityContract | null;
+  },
 ): Promise<PostureEvaluation> {
   const nowMs = Date.parse(input.now);
   const dependencies = await engine.query<RawCriticalDependencyRow>(
@@ -255,16 +263,35 @@ export async function evaluateDeploymentPosture(
   }
   const criticalDependencyIds = dependencies.rows.map((row) => row.dependency_id);
   const protectedDimensions = [...ALL_PROTECTED_DIMENSIONS];
-  if (missingSlaRefs.length === 0) {
+  // An EMPTY critical register is vacuous coverage, not coverage (audit H8):
+  // SLA_BACKED requires at least one declared critical dependency AND a passing
+  // capacity contract, so the posture can never be claimed by declaring nothing.
+  const emptyRegister = criticalDependencyIds.length === 0;
+  const capacityBacked =
+    input.capacityContract !== undefined &&
+    input.capacityContract !== null &&
+    input.capacityContract.result === 'PASS';
+  if (missingSlaRefs.length === 0 && !emptyRegister && capacityBacked) {
     return {
       posture: DeploymentPosture.SLA_BACKED,
       criticalDependencyIds,
       missingSlaRefs: [],
       degradedScope: {},
-      reason: 'every critical external dependency carries an applicable unexpired SLA',
+      reason:
+        'every critical external dependency carries an applicable unexpired SLA and a passing capacity contract backs the deployment',
       protectedDimensions,
       relaxedDimensions: [],
     };
+  }
+  const reasons: string[] = [];
+  if (emptyRegister) reasons.push('no critical external dependency is declared');
+  if (!capacityBacked) {
+    reasons.push('no passing sustainable-capacity contract backs the deployment');
+  }
+  if (missingSlaRefs.length > 0) {
+    reasons.push(
+      `${missingSlaRefs.length} critical dependency(ies) lack an applicable unexpired SLA`,
+    );
   }
   return {
     posture: DeploymentPosture.FREE_TIER_BEST_EFFORT,
@@ -274,8 +301,10 @@ export async function evaluateDeploymentPosture(
       degraded: 'FREE_TIER_EXTERNAL_DEPENDENCIES',
       missing_sla_count: missingSlaRefs.length,
       missing_sla_dependencies: missingSlaRefs,
+      declared_critical_dependencies: criticalDependencyIds.length,
+      capacity_contract_backed: capacityBacked,
     },
-    reason: `best-effort free-tier posture: ${missingSlaRefs.length} critical dependency(ies) lack an applicable unexpired SLA`,
+    reason: `best-effort free-tier posture: ${reasons.join('; ')}`,
     protectedDimensions,
     relaxedDimensions: ['freshness', 'breadth', 'depth', 'alert_availability'],
   };

@@ -36,6 +36,8 @@ export const PrecomputedAlphaRefusalReason = {
   EXPIRED: 'EXPIRED',
   /** The request exceeds a declared candidate/row/edge/latency/cost ceiling. */
   BOUND_EXCEEDED: 'BOUND_EXCEEDED',
+  /** The request names a different immutable artifact set than its bound (audit H10). */
+  ARTIFACT_SET_MISMATCH: 'ARTIFACT_SET_MISMATCH',
 } as const;
 export type PrecomputedAlphaRefusalReason =
   (typeof PrecomputedAlphaRefusalReason)[keyof typeof PrecomputedAlphaRefusalReason];
@@ -198,7 +200,12 @@ export async function registerPrecomputedAlphaBound(
 /** The newest bound for a live path, optionally constrained to one artifact. */
 export async function findPrecomputedAlphaBound(
   engine: DatabaseEngine,
-  input: { readonly livePath: string; readonly artifactRef?: string; readonly boundId?: string },
+  input: {
+    readonly livePath: string;
+    readonly artifactRef?: string;
+    readonly artifactSetHash?: string;
+    readonly boundId?: string;
+  },
 ): Promise<PrecomputedAlphaBoundRow | undefined> {
   const params: unknown[] = [input.livePath];
   let where = `live_path = $1`;
@@ -209,6 +216,12 @@ export async function findPrecomputedAlphaBound(
   if (input.artifactRef !== undefined) {
     params.push(input.artifactRef);
     where += ` AND artifact_ref = $${params.length}`;
+  }
+  // The bound is versioned to ONE immutable artifact set (audit H10): a request
+  // for set B never resolves a bound declared for set A.
+  if (input.artifactSetHash !== undefined) {
+    params.push(input.artifactSetHash);
+    where += ` AND artifact_set_hash = $${params.length}`;
   }
   const result = await engine.query<RawBoundRow>(
     `SELECT bound_id, live_path, artifact_ref, artifact_set_hash, max_candidates, max_rows,
@@ -309,13 +322,18 @@ export async function servePrecomputedAlpha(
       canonicalJson({
         livePath: input.livePath,
         artifactRef: input.artifactRef ?? null,
+        artifactSetHash: input.request.artifactSetHash,
         request: input.request,
         at,
       }),
     ).slice(7, 23)}`;
 
+  // An explicitly addressed bound is resolved by id alone so the artifact-set
+  // comparison below can refuse it with a typed reason; otherwise the set is
+  // part of the lookup key.
   const bound = await findPrecomputedAlphaBound(engine, {
     livePath: input.livePath,
+    ...(input.boundId === undefined ? { artifactSetHash: input.request.artifactSetHash } : {}),
     ...(input.artifactRef === undefined ? {} : { artifactRef: input.artifactRef }),
     ...(input.boundId === undefined ? {} : { boundId: input.boundId }),
   });
@@ -354,6 +372,28 @@ export async function servePrecomputedAlpha(
         reason === PrecomputedAlphaRefusalReason.UNKNOWN_ARTIFACT
           ? `no bound for artifact ${String(input.artifactRef)} on ${input.livePath}`
           : 'no artifact reference supplied for the live path bound',
+    };
+  }
+
+  // An explicitly-addressed bound (or a bound resolved by live path alone) must
+  // still be versioned to the REQUESTED artifact set (audit H10).
+  if (bound.artifactSetHash !== input.request.artifactSetHash) {
+    const read = await recordRead(engine, {
+      readId,
+      livePath: input.livePath,
+      boundId: bound.boundId,
+      request: input.request,
+      served: false,
+      refusalReason: PrecomputedAlphaRefusalReason.ARTIFACT_SET_MISMATCH,
+      latencyMs: null,
+      at,
+    });
+    return {
+      served: false,
+      refusalReason: PrecomputedAlphaRefusalReason.ARTIFACT_SET_MISMATCH,
+      read,
+      boundId: bound.boundId,
+      detail: `the bound belongs to artifact set ${bound.artifactSetHash}, not the requested set ${input.request.artifactSetHash}`,
     };
   }
 

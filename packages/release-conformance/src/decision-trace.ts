@@ -1,6 +1,7 @@
 /** Fail-closed, content-addressed production decision traces (FR-TRACE-005). */
 import { createHash } from 'node:crypto';
 import { canonicalJson, type DatabaseEngine } from '@foresift/persistence';
+import { numericCopy } from './shadow-safe.ts';
 
 export interface DecisionTraceInput {
   readonly decisionRef: string;
@@ -59,7 +60,13 @@ function assertVersionMap(
   value: unknown,
 ): asserts value is Record<string, string> {
   if (!isPlainObject(value) || Object.keys(value).length === 0) missingDimension(dimension);
-  for (const [name, version] of Object.entries(value)) {
+  // Numeric-index walk only (audit HIGH): `for…of` over `Object.entries` reads
+  // `Symbol.iterator`, so a shadowed iterator would accept an empty or malformed
+  // version map.
+  const names = Object.keys(value);
+  for (let index = 0; index < names.length; index += 1) {
+    const name = names[index] as string;
+    const version = (value as Record<string, unknown>)[name];
     if (name.trim().length === 0 || typeof version !== 'string' || version.trim().length === 0) {
       missingDimension(dimension, 'every component name and version must be non-empty');
     }
@@ -75,20 +82,32 @@ function isIsoInstant(value: string): boolean {
 
 function assertDecisionTraceInput(input: unknown): asserts input is DecisionTraceInput {
   if (!isPlainObject(input)) throw new TypeError('decision trace input must be an object');
-  for (const dimension of REQUIRED_STRINGS) {
+  // Numeric-index walks only (audit HIGH): a shadowed iterator skipped every
+  // required dimension and accepted an empty input.
+  for (let index = 0; index < REQUIRED_STRINGS.length; index += 1) {
+    const dimension = REQUIRED_STRINGS[index] as (typeof REQUIRED_STRINGS)[number];
     const value = input[dimension];
     if (typeof value !== 'string' || value.trim().length === 0) missingDimension(dimension);
   }
-  if (
-    !Array.isArray(input.requirementIds) ||
-    input.requirementIds.length === 0 ||
-    input.requirementIds.some(
-      (id) => typeof id !== 'string' || !/^FR-[A-Z][A-Z0-9]*-\d{3}$/.test(id),
-    )
-  ) {
+  const rawRequirementIds = input.requirementIds;
+  let requirementIdsValid = false;
+  if (Array.isArray(rawRequirementIds) && rawRequirementIds.length > 0) {
+    requirementIdsValid = true;
+    for (let index = 0; index < rawRequirementIds.length; index += 1) {
+      const id: unknown = rawRequirementIds[index];
+      if (typeof id !== 'string' || !/^FR-[A-Z][A-Z0-9]*-\d{3}$/.test(id)) {
+        requirementIdsValid = false;
+        break;
+      }
+    }
+  }
+  if (!requirementIdsValid) {
     missingDimension('requirementIds', 'at least one valid requirement ID is required');
   }
-  for (const dimension of REQUIRED_MAPS) assertVersionMap(dimension, input[dimension]);
+  for (let index = 0; index < REQUIRED_MAPS.length; index += 1) {
+    const dimension = REQUIRED_MAPS[index] as (typeof REQUIRED_MAPS)[number];
+    assertVersionMap(dimension, input[dimension]);
+  }
   if (!/^[a-f0-9]{64}$/.test(input.manifestSha256 as string)) {
     missingDimension('manifestSha256', 'expected a lowercase SHA-256 digest');
   }
@@ -105,7 +124,7 @@ export function assembleDecisionTrace(input: DecisionTraceInput): DecisionTraceR
   assertDecisionTraceInput(input);
   const normalized: DecisionTraceInput = {
     decisionRef: input.decisionRef,
-    requirementIds: [...input.requirementIds],
+    requirementIds: numericCopy(input.requirementIds),
     policyVersions: { ...input.policyVersions },
     featureVersions: { ...input.featureVersions },
     modelVersions: { ...input.modelVersions },

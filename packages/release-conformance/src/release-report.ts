@@ -5,6 +5,16 @@ import path from 'node:path';
 import { ReleaseReportRecordSchema } from '@foresift/shared-schemas';
 import { generateSbomFromLockfile } from './sbom.ts';
 import { loadOrphanExceptions } from './orphans.ts';
+import {
+  numericFilter,
+  numericFromEntries,
+  numericIncludes,
+  numericMap,
+  numericSome,
+  numericSortStrings,
+  numericSortWith,
+  promiseAllNumeric,
+} from './shadow-safe.ts';
 
 const HASH = /^[a-f0-9]{64}$/;
 const PREFIXED_HASH = /^sha256:[a-f0-9]{64}$/;
@@ -52,6 +62,8 @@ export interface ReleaseReportRecord {
   readonly generatedAt: string;
 }
 
+type ReleaseDeviation = ReleaseReportRecord['unresolvedDeviations'][number];
+
 export interface BuildReleaseReportOptions {
   readonly repoRoot: string;
   readonly milestone: string;
@@ -82,13 +94,17 @@ async function hashFiles(root: string, directory: string, predicate: (name: stri
   const absolute = path.join(root, directory);
   let names: string[] = [];
   try {
-    names = (await readdir(absolute)).filter(predicate).sort();
+    // Numeric filter/sort only (audit HIGH): `.filter`/`.sort` are shadowable.
+    names = numericSortStrings(numericFilter(await readdir(absolute), predicate));
   } catch (error) {
     if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error;
   }
-  return Object.fromEntries(
-    await Promise.all(
-      names.map(async (name) => [
+  // `numericFromEntries` never iterates (audit residual): `Object.fromEntries`
+  // reads `Array.prototype[Symbol.iterator]` on the settled pair array, so a
+  // surgical iterator could forge empty `migrationHashes`/`schemaHashes`.
+  return numericFromEntries(
+    await promiseAllNumeric(
+      numericMap(names, async (name): Promise<[string, string]> => [
         directory === 'migrations' ? name : path.posix.join(directory, name),
         `sha256:${sha256(await readFile(path.join(absolute, name)))}`,
       ]),
@@ -119,16 +135,29 @@ export async function buildReleaseReport(
   const exceptionLedgerPath =
     options.exceptionLedgerPath ??
     path.join(options.repoRoot, 'packages/release-conformance/src/orphan-exceptions.json');
-  const [document, manifest, audit, sbom, migrationHashes, schemaHashes, exceptionLedger] =
-    await Promise.all([
-      readFile(documentPath),
-      readFile(manifestPath),
-      readJson(auditPath),
-      generateSbomFromLockfile(path.join(options.repoRoot, 'pnpm-lock.yaml')),
-      hashFiles(options.repoRoot, 'migrations', (name) => name.endsWith('.sql')),
-      hashFiles(options.repoRoot, 'packages/shared-schemas/src', (name) => name.endsWith('.ts')),
-      loadOrphanExceptions(exceptionLedgerPath),
-    ]);
+  // `promiseAllNumeric` (audit residual): `Promise.all` reads
+  // `Array.prototype[Symbol.iterator]` on its ARGUMENT, so a surgical iterator
+  // could forge an empty document/manifest before the numeric reads below hash
+  // them (`documentHash === sha256('')`).
+  const settled = await promiseAllNumeric([
+    readFile(documentPath),
+    readFile(manifestPath),
+    readJson(auditPath),
+    generateSbomFromLockfile(path.join(options.repoRoot, 'pnpm-lock.yaml')),
+    hashFiles(options.repoRoot, 'migrations', (name) => name.endsWith('.sql')),
+    hashFiles(options.repoRoot, 'packages/shared-schemas/src', (name) => name.endsWith('.ts')),
+    loadOrphanExceptions(exceptionLedgerPath),
+  ]);
+  // Numeric-index selection (audit N2): destructuring the settled array reads
+  // `Array.prototype[Symbol.iterator]`, so a surgical iterator could substitute
+  // forged inputs (for example an empty document/manifest) before hashing.
+  const document = settled[0];
+  const manifest = settled[1];
+  const audit = settled[2];
+  const sbom = settled[3];
+  const migrationHashes = settled[4];
+  const schemaHashes = settled[5];
+  const exceptionLedger = settled[6];
   const documentHash = sha256(document);
   const manifestHash = sha256(manifest);
   const auditRecord = record(audit) ? audit : {};
@@ -154,32 +183,57 @@ export async function buildReleaseReport(
   };
   const conformanceResults = options.conformanceResults ?? defaultConformance;
   const gateEvidence = options.gateEvidence ?? [];
-  const gatesPassed = gateEvidence
-    .filter((item) => item.isValid && item.gateKind)
-    .map((item) => `gate:${item.gateKind!.toLowerCase().replace('_', '-')}`)
-    .sort(compareText);
-  const ledgerDeviations: ReleaseReportRecord['unresolvedDeviations'] =
-    exceptionLedger.exceptions.map((exception) => ({
+  // Numeric-index aggregation only (audit HIGH): `filter`/`map`/`sort`/`some`
+  // are all shadowable in-process, and an emptied pass/refusal set would let a
+  // refused evidence set produce an ACTIVE activation state.
+  const passingGates: string[] = [];
+  for (let index = 0; index < gateEvidence.length; index += 1) {
+    const item = gateEvidence[index];
+    if (item !== undefined && item.isValid && item.gateKind)
+      passingGates[passingGates.length] = `gate:${item.gateKind.toLowerCase().replace('_', '-')}`;
+  }
+  const gatesPassed = numericSortStrings(passingGates);
+  const ledgerDeviations: ReleaseDeviation[] = numericMap(
+    exceptionLedger.exceptions,
+    (exception) => ({
       id: `orphan-exception:${exception.pathPattern}`,
       rule: 'ORPHAN_EXCEPTION',
       path: exception.pathPattern,
       justification: exception.justification,
-    }));
-  const refusedEvidence: ReleaseReportRecord['unresolvedDeviations'] = gateEvidence
-    .filter((evidence) => !evidence.isValid)
-    .map((evidence, index) => ({
-      id: evidence.evidenceId ?? `gate-evidence:${index}`,
+    }),
+  );
+  const refusedEvidence: ReleaseDeviation[] = [];
+  let refusedIndex = 0;
+  for (let index = 0; index < gateEvidence.length; index += 1) {
+    const evidence = gateEvidence[index];
+    if (evidence === undefined || evidence.isValid) continue;
+    refusedEvidence[refusedEvidence.length] = {
+      id: evidence.evidenceId ?? `gate-evidence:${refusedIndex}`,
       rule: 'GATE_EVIDENCE_REFUSED',
       path: evidence.gateKind ? `gate:${evidence.gateKind}` : 'gate:unknown',
       justification: evidence.reason ?? 'gate evidence did not pass evaluation',
-    }));
-  const unresolvedDeviations = [
-    ...ledgerDeviations,
-    ...refusedEvidence,
-    ...(options.deviations ?? []),
-  ].sort((left, right) => compareText(left.id, right.id) || compareText(left.path, right.path));
+    };
+    refusedIndex += 1;
+  }
+  const combinedDeviations: ReleaseDeviation[] = [];
+  const deviationSources: readonly (readonly ReleaseDeviation[])[] = [
+    ledgerDeviations,
+    refusedEvidence,
+    options.deviations ?? [],
+  ];
+  for (let sourceIndex = 0; sourceIndex < deviationSources.length; sourceIndex += 1) {
+    const source = deviationSources[sourceIndex] as readonly ReleaseDeviation[];
+    for (let index = 0; index < source.length; index += 1) {
+      combinedDeviations[combinedDeviations.length] = source[index] as ReleaseDeviation;
+    }
+  }
+  const unresolvedDeviations = numericSortWith(
+    combinedDeviations,
+    (left, right) => compareText(left.id, right.id) || compareText(left.path, right.path),
+  );
   const status: ReleaseReportRecord['activationState']['status'] =
-    conformanceResults.overall === 'FAILED' || gateEvidence.some((item) => !item.isValid)
+    conformanceResults.overall === 'FAILED' ||
+    numericSome(gateEvidence, (item) => item.isValid !== true)
       ? 'BLOCKED'
       : gateEvidence.length === 0
         ? 'PENDING'
@@ -238,9 +292,14 @@ export function verifyReleaseReport(
   if (!record(input)) return { isValid: false, errors: ['report must be an object'] };
   const schemaResult = ReleaseReportRecordSchema.safeParse(input);
   if (!schemaResult.success) {
-    for (const issue of schemaResult.error.issues) {
+    // Numeric-index walk only (audit HIGH): a shadowed iterator would collect
+    // zero schema issues and declare a structurally invalid report valid.
+    for (let issueIndex = 0; issueIndex < schemaResult.error.issues.length; issueIndex += 1) {
+      const issue = schemaResult.error.issues[
+        issueIndex
+      ] as (typeof schemaResult.error.issues)[number];
       const field = issue.path.length === 0 ? 'report' : issue.path.join('.');
-      errors.push(`${field}: ${issue.message}`);
+      errors[errors.length] = `${field}: ${issue.message}`;
     }
   }
   const required = [
@@ -257,69 +316,96 @@ export function verifyReleaseReport(
     'rollbackTarget',
     'generatedAt',
   ] as const;
-  for (const field of required)
-    if (input[field] === undefined || input[field] === null) errors.push(`${field} is required`);
-  for (const field of [
+  for (let fieldIndex = 0; fieldIndex < required.length; fieldIndex += 1) {
+    const field = required[fieldIndex] as (typeof required)[number];
+    if (input[field] === undefined || input[field] === null)
+      errors[errors.length] = `${field} is required`;
+  }
+  const hashFields = [
     'documentHash',
     'manifestHash',
     'normalizedHash',
     'dependencySbomHash',
-  ] as const) {
+  ] as const;
+  for (let fieldIndex = 0; fieldIndex < hashFields.length; fieldIndex += 1) {
+    const field = hashFields[fieldIndex] as (typeof hashFields)[number];
     const value = input[field];
     if (typeof value !== 'string' || !HASH.test(value) || /^0+$/.test(value))
-      errors.push(`${field} must be a non-zero SHA-256 hash`);
+      errors[errors.length] = `${field} must be a non-zero SHA-256 hash`;
     if (expected[field] !== undefined && expected[field] !== value)
-      errors.push(`${field} disagrees with released artifact`);
+      errors[errors.length] = `${field} disagrees with released artifact`;
   }
-  for (const field of ['migrationHashes', 'schemaHashes'] as const) {
-    if (!record(input[field])) errors.push(`${field} must be an object`);
-    else
-      for (const [name, hash] of Object.entries(input[field])) {
-        if (
-          !name ||
-          typeof hash !== 'string' ||
-          !PREFIXED_HASH.test(hash) ||
-          /^sha256:0+$/.test(hash)
-        )
-          errors.push(`${field}.${name} must be a non-zero sha256: hash`);
-      }
+  const hashMaps = ['migrationHashes', 'schemaHashes'] as const;
+  for (let fieldIndex = 0; fieldIndex < hashMaps.length; fieldIndex += 1) {
+    const field = hashMaps[fieldIndex] as (typeof hashMaps)[number];
+    if (!record(input[field])) {
+      errors[errors.length] = `${field} must be an object`;
+      continue;
+    }
+    const names = Object.keys(input[field]);
+    for (let nameIndex = 0; nameIndex < names.length; nameIndex += 1) {
+      const name = names[nameIndex] as string;
+      const hash = (input[field] as Record<string, unknown>)[name];
+      if (
+        !name ||
+        typeof hash !== 'string' ||
+        !PREFIXED_HASH.test(hash) ||
+        /^sha256:0+$/.test(hash)
+      )
+        errors[errors.length] = `${field}.${name} must be a non-zero sha256: hash`;
+    }
   }
-  if (!record(input.conformanceResults)) errors.push('conformanceResults must be an object');
+  if (!record(input.conformanceResults))
+    errors[errors.length] = 'conformanceResults must be an object';
   else {
-    for (const key of [
+    const conformanceKeys = [
       'overall',
       'totalRulesEvaluated',
       'passedCount',
       'failureCount',
       'findings',
-    ]) {
+    ] as const;
+    for (let keyIndex = 0; keyIndex < conformanceKeys.length; keyIndex += 1) {
+      const key = conformanceKeys[keyIndex] as (typeof conformanceKeys)[number];
       if (input.conformanceResults[key] === undefined)
-        errors.push(`conformanceResults.${key} is required`);
+        errors[errors.length] = `conformanceResults.${key} is required`;
     }
     if (
       typeof input.conformanceResults.overall !== 'string' ||
-      !['PASSED', 'FAILED'].includes(input.conformanceResults.overall)
+      !numericIncludes(['PASSED', 'FAILED'], input.conformanceResults.overall)
     ) {
-      errors.push('conformanceResults.overall is invalid');
+      errors[errors.length] = 'conformanceResults.overall is invalid';
     }
   }
   if (!Array.isArray(input.unresolvedDeviations))
-    errors.push('unresolvedDeviations must be an array');
-  if (!record(input.activationState)) errors.push('activationState must be an object');
-  else
-    for (const key of ['milestone', 'status', 'activeGroups', 'gatesPassed']) {
-      if (input.activationState[key] === undefined)
-        errors.push(`activationState.${key} is required`);
-    }
-  if (!record(input.rollbackTarget)) errors.push('rollbackTarget must be an object');
+    errors[errors.length] = 'unresolvedDeviations must be an array';
+  if (!record(input.activationState)) errors[errors.length] = 'activationState must be an object';
   else {
-    for (const key of ['previousReportId', 'previousDocumentHash', 'previousManifestHash']) {
-      if (input.rollbackTarget[key] === undefined) errors.push(`rollbackTarget.${key} is required`);
+    const activationKeys = ['milestone', 'status', 'activeGroups', 'gatesPassed'] as const;
+    for (let keyIndex = 0; keyIndex < activationKeys.length; keyIndex += 1) {
+      const key = activationKeys[keyIndex] as (typeof activationKeys)[number];
+      if (input.activationState[key] === undefined)
+        errors[errors.length] = `activationState.${key} is required`;
     }
-    for (const key of ['previousDocumentHash', 'previousManifestHash']) {
+  }
+  if (!record(input.rollbackTarget)) errors[errors.length] = 'rollbackTarget must be an object';
+  else {
+    const rollbackKeys = [
+      'previousReportId',
+      'previousDocumentHash',
+      'previousManifestHash',
+    ] as const;
+    for (let keyIndex = 0; keyIndex < rollbackKeys.length; keyIndex += 1) {
+      const key = rollbackKeys[keyIndex] as (typeof rollbackKeys)[number];
+      if (input.rollbackTarget[key] === undefined)
+        errors[errors.length] = `rollbackTarget.${key} is required`;
+    }
+    const rollbackHashKeys = ['previousDocumentHash', 'previousManifestHash'] as const;
+    for (let keyIndex = 0; keyIndex < rollbackHashKeys.length; keyIndex += 1) {
+      const key = rollbackHashKeys[keyIndex] as (typeof rollbackHashKeys)[number];
       const value = input.rollbackTarget[key];
       if (typeof value !== 'string' || !HASH.test(value) || /^0+$/.test(value))
-        errors.push(`rollbackTarget.${key} must be a non-zero SHA-256 hash`);
+        errors[errors.length] = `rollbackTarget.${key} must be a non-zero SHA-256 hash`;
     }
   }
   return { isValid: errors.length === 0, errors };

@@ -40,7 +40,7 @@
  * mutation). Strictly read-only governance: nothing here trades, custodies,
  * signs, or submits.
  */
-import { ErrorCode, ForesiftError } from '@foresift/domain';
+import { ErrorCode, ForesiftError, isOneOf } from '@foresift/domain';
 import {
   ChangeClassification,
   DistributionReadiness,
@@ -87,14 +87,14 @@ export interface ModuleStateScope {
   readonly requires_proven: boolean;
 }
 
-const SCOPE_FIELDS = [
+const SCOPE_FIELDS = Object.freeze([
   'profile_version',
   'policy_version',
   'regime_scope',
   'execution_scenario',
   'delay_policy',
   'population_claim',
-] as const;
+] as const);
 
 /**
  * Total fail-closed scope parser. Unknown/missing/non-string dimensions and
@@ -110,9 +110,13 @@ export function parseModuleStateScope(value: unknown): ModuleStateScope {
     );
   }
   const record = value as Record<string, unknown>;
-  const allowed = new Set<string>([...SCOPE_FIELDS, 'requires_proven']);
-  for (const key of Object.keys(record)) {
-    if (!allowed.has(key)) {
+  // Numeric-index validation only (audit HIGH): `new Set([...SCOPE_FIELDS, …])`
+  // and `for (const key of Object.keys(record))` both read `Symbol.iterator`, so
+  // a shadowed iterator would silently SKIP the unknown-key refusal.
+  const keys = Object.keys(record);
+  for (let keyIndex = 0; keyIndex < keys.length; keyIndex += 1) {
+    const key = keys[keyIndex] as string;
+    if (key !== 'requires_proven' && !isOneOf(key, SCOPE_FIELDS)) {
       throw new ForesiftError(
         ErrorCode.PROD_ACTIVATION_SCOPE_INVALID,
         `unknown activation scope dimension '${key}'`,
@@ -121,7 +125,8 @@ export function parseModuleStateScope(value: unknown): ModuleStateScope {
     }
   }
   const parsed: Record<string, string | boolean> = {};
-  for (const field of SCOPE_FIELDS) {
+  for (let fieldIndex = 0; fieldIndex < SCOPE_FIELDS.length; fieldIndex += 1) {
+    const field = SCOPE_FIELDS[fieldIndex] as string;
     const dimension = record[field];
     if (typeof dimension !== 'string' || dimension.length === 0) {
       throw new ForesiftError(
@@ -238,13 +243,14 @@ export interface ModuleStateDimensions {
  * module runs without active opportunity side effects and is still
  * "unavailable", so it must not read as establishing AVAILABLE.
  */
-const ESTABLISHES_AVAILABLE: readonly ModuleLifecyclePosition[] = [
+export const ESTABLISHES_AVAILABLE: readonly ModuleLifecyclePosition[] = Object.freeze([
   ModuleLifecycleState.AVAILABLE,
   ModuleLifecycleState.PROVEN,
   ModuleLifecycleState.ACTIVE,
-];
-const ESTABLISHES_PROVEN: readonly ModuleLifecyclePosition[] = [ModuleLifecycleState.PROVEN];
-
+]);
+export const ESTABLISHES_PROVEN: readonly ModuleLifecyclePosition[] = Object.freeze([
+  ModuleLifecycleState.PROVEN,
+]);
 const EMPTY_DIMENSIONS = {
   implemented: false,
   available: false,
@@ -319,6 +325,39 @@ function decodeTransitionRow(row: RawTransitionRow): StateTransitionRow {
   };
 }
 
+/** Numeric-index decode of a driver result set; never `rows.map(...)`. */
+function decodeModuleStateRows(rows: readonly RawModuleStateRow[]): ModuleStateRow[] {
+  const decoded: ModuleStateRow[] = [];
+  for (let index = 0; index < rows.length; index += 1) {
+    const row = rows[index];
+    if (row !== undefined) decoded[decoded.length] = decodeModuleStateRow(row);
+  }
+  return decoded;
+}
+
+/** Numeric-index decode of a transition result set; never `rows.map(...)`. */
+function decodeTransitionRows(rows: readonly RawTransitionRow[]): StateTransitionRow[] {
+  const decoded: StateTransitionRow[] = [];
+  for (let index = 0; index < rows.length; index += 1) {
+    const row = rows[index];
+    if (row !== undefined) decoded[decoded.length] = decodeTransitionRow(row);
+  }
+  return decoded;
+}
+
+/**
+ * The current (non-superseded) head of an insertion-ordered row list, chosen by
+ * a numeric-index walk. `filter`/`find` are shadowable (audit HIGH).
+ */
+function nonSupersededHead(rows: readonly ModuleStateRow[]): ModuleStateRow | undefined {
+  let head: ModuleStateRow | undefined;
+  for (let index = 0; index < rows.length; index += 1) {
+    const row = rows[index];
+    if (row !== undefined && row.supersededBy === null) head = row;
+  }
+  return head;
+}
+
 // --- reads ------------------------------------------------------------------
 
 /** Every governed row for the exact module + scope, insertion order. */
@@ -336,7 +375,7 @@ export async function stateRowsFor(
       ORDER BY created_at ASC, state_row_id ASC`,
     [input.moduleId, canonicalJson(scope)],
   );
-  return result.rows.map(decodeModuleStateRow);
+  return decodeModuleStateRows(result.rows);
 }
 
 /** The current (non-superseded) row for the exact module + scope, if any. */
@@ -345,9 +384,7 @@ export async function currentStateRow(
   input: { readonly moduleId: string; readonly scope: ModuleStateScope },
 ): Promise<ModuleStateRow | undefined> {
   const rows = await stateRowsFor(engine, input);
-  const heads = rows.filter((row) => row.supersededBy === null);
-  if (heads.length === 0) return undefined;
-  return heads[heads.length - 1];
+  return nonSupersededHead(rows);
 }
 
 /** The append-only transition log for one state row, insertion order. */
@@ -363,7 +400,7 @@ export async function transitionsForStateRow(
       ORDER BY created_at ASC, transition_id ASC`,
     [stateRowId],
   );
-  return result.rows.map(decodeTransitionRow);
+  return decodeTransitionRows(result.rows);
 }
 
 /**
@@ -389,8 +426,7 @@ export async function statesFor(
       activationEventRef: null,
     };
   }
-  const heads = rows.filter((row) => row.supersededBy === null);
-  const head = heads.length === 0 ? rows[rows.length - 1] : heads[heads.length - 1];
+  const head = nonSupersededHead(rows) ?? rows[rows.length - 1];
   if (head === undefined) {
     throw new ForesiftError(
       ErrorCode.PROD_LIFECYCLE_TRANSITION_ILLEGAL,
@@ -398,14 +434,27 @@ export async function statesFor(
       { moduleId: input.moduleId, scopeHash },
     );
   }
+  // Numeric-index dimension walks with `isOneOf` only (audit HIGH): the previous
+  // `rows.some((row) => ESTABLISHES_AVAILABLE.includes(...))` was shadowable by
+  // `some`/`includes`, and `Symbol.iterator` shadows skipped it entirely — so a
+  // scope that never established AVAILABLE could read as available and reach
+  // PROVEN/ACTIVE (the H5 dimension establishment).
+  let available = false;
+  let proven = false;
+  for (let index = 0; index < rows.length; index += 1) {
+    const row = rows[index];
+    if (row === undefined) continue;
+    if (isOneOf(row.lifecycleState, ESTABLISHES_AVAILABLE)) available = true;
+    if (isOneOf(row.lifecycleState, ESTABLISHES_PROVEN)) proven = true;
+  }
   return {
     moduleId: input.moduleId,
     scope,
     scopeHash,
     lifecycleState: head.lifecycleState,
     implemented: rows.length > 0,
-    available: rows.some((row) => ESTABLISHES_AVAILABLE.includes(row.lifecycleState)),
-    proven: rows.some((row) => ESTABLISHES_PROVEN.includes(row.lifecycleState)),
+    available,
+    proven,
     currentStateRowId: head.stateRowId,
     artifactSetHash: head.artifactSetHash,
     activationEventRef: head.activationEventRef,
@@ -709,7 +758,7 @@ export async function advanceState(
     // statistical gates ARE the registered mature evaluation, so a fabricated
     // content address can never establish PROVEN.
     if (toState === ModuleLifecycleState.PROVEN && provenEvidenceRef !== null) {
-      await requirePersistedActivationEvidence(tx, {
+      const provenEvidence = await requirePersistedActivationEvidence(tx, {
         scope,
         scopeHash,
         activationKind: ActivationKind.OPPORTUNITY,
@@ -717,6 +766,52 @@ export async function advanceState(
         evaluationSetRef: provenEvidenceRef,
         at: input.at,
       });
+      // §69.2/§69.5 independent dimensions (audit H5 residual): PROVEN is a
+      // LATER rung than AVAILABLE, so the same persisted-dimension cross-check
+      // the ACTIVE edge applies must bind here too. Without it a scope that
+      // never established AVAILABLE could present a fabricated all-PASS
+      // OPPORTUNITY batch (caller booleans set available/proven true) to jump
+      // SHADOW -> PROVEN and then legitimately cross into ACTIVE. The exact
+      // scope must have genuinely established AVAILABLE in governed history.
+      const dimensions = await statesFor(tx, { moduleId, scope });
+      if (dimensions.available !== true) {
+        throw new ForesiftError(
+          ErrorCode.PROD_ACTIVATION_GATE_REFUSED,
+          'promotion to PROVEN refused: the exact scope never established AVAILABLE in governed history',
+          {
+            reason: ModuleStateRefusalReason.GATE_DIMENSION_MISMATCH,
+            gate: ActivationGateKind.AVAILABLE_EVIDENCE,
+            scopeHash,
+          },
+        );
+      }
+      // The IMPLEMENTED/AVAILABLE binding reads the PERSISTED rows, never the
+      // mutable in-memory evaluator object (audit R1). PROVEN_PRESENT is
+      // excluded because THIS transition establishes it.
+      const claimedDimensions: readonly [ActivationGateKind, boolean][] = [
+        [ActivationGateKind.IMPLEMENTED_PRESENT, dimensions.implemented],
+        [ActivationGateKind.AVAILABLE_EVIDENCE, dimensions.available],
+      ];
+      for (let dimensionIndex = 0; dimensionIndex < claimedDimensions.length; dimensionIndex += 1) {
+        const claimed = claimedDimensions[dimensionIndex];
+        if (claimed === undefined) continue;
+        const gate = claimed[0];
+        const established = claimed[1];
+        // Numeric scan only (audit HIGH): `provenEvidence.rows.find` is
+        // shadowable and a shadowed `find` would hide a forged PASS claim.
+        let persisted: PersistedActivationEvidence['rows'][number] | undefined;
+        for (let rowIndex = 0; rowIndex < provenEvidence.rows.length; rowIndex += 1) {
+          const entry = provenEvidence.rows[rowIndex];
+          if (entry !== undefined && entry.gateKind === gate) persisted = entry;
+        }
+        if (persisted?.verdict === 'PASS' && established !== true) {
+          throw new ForesiftError(
+            ErrorCode.PROD_ACTIVATION_GATE_REFUSED,
+            `promotion to PROVEN refused: the persisted evidence claims ${gate} but the governed history never established it for the exact scope`,
+            { reason: ModuleStateRefusalReason.GATE_DIMENSION_MISMATCH, gate, scopeHash },
+          );
+        }
+      }
     }
     // ACTIVE is not a declaration: inside the SAME transaction that writes the
     // row, re-derive the evidence from `prod.activation_gate_evaluations`. A
@@ -823,8 +918,18 @@ export async function advanceState(
         [ActivationGateKind.AVAILABLE_EVIDENCE, dimensions.available],
         [ActivationGateKind.PROVEN_PRESENT, dimensions.proven],
       ];
-      for (const [gate, established] of claimedDimensions) {
-        const persisted = persistedEvidence.rows.find((entry) => entry.gateKind === gate);
+      for (let dimensionIndex = 0; dimensionIndex < claimedDimensions.length; dimensionIndex += 1) {
+        const claimed = claimedDimensions[dimensionIndex];
+        if (claimed === undefined) continue;
+        const gate = claimed[0];
+        const established = claimed[1];
+        // Numeric scan only (audit HIGH): `persistedEvidence.rows.find` is
+        // shadowable and a shadowed `find` would hide a forged PASS claim.
+        let persisted: PersistedActivationEvidence['rows'][number] | undefined;
+        for (let rowIndex = 0; rowIndex < persistedEvidence.rows.length; rowIndex += 1) {
+          const entry = persistedEvidence.rows[rowIndex];
+          if (entry !== undefined && entry.gateKind === gate) persisted = entry;
+        }
         if (persisted?.verdict === 'PASS' && established !== true) {
           throw new ForesiftError(
             ErrorCode.PROD_ACTIVATION_GATE_REFUSED,

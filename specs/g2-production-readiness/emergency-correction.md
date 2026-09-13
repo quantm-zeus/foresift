@@ -209,3 +209,53 @@ head `0bc79f5`:
 State change: g2-production-readiness RUNNING → PROVEN (schema-legal
 RUNNING→PROVEN), restored only after the above. Phase 11 tasks `T053`–`T064` are
 checked; history is preserved and nothing was rewritten.
+
+## Fourth-round reopen (2026-09-13) — release-gate completeness and the PROVEN edge
+
+The re-PROVEN flip `97b244a` (PR #297) is **revoked**. A **new** session ran four
+fresh-context adversarial verifiers against `origin/main` `97b244a`. They wrote
+NEW probes (never reusing the landed regression specs as proof) under
+`flock /tmp/deepseek-global-heavy-gate.lock`, and reproduced release-blocking
+fail-opens that all three earlier rounds missed. The state returns to
+RUNNING/REOPENED; PR #297 and every prior evidence artifact remain in history.
+
+| ID  | Defect (reproduced at `97b244a`)                                                                                                                                                                                                                                                                                                                                                                                                                                                             | Reproduction                                                                                                                                                                                                                                                                                                                                         | Correction |
+| --- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------- |
+| R4  | **HIGH — the PUBLIC/WORKSPACE authorization rule trusts the caller's gate set (audit H2 not closed).** `evaluateDistributionAuthorization` reads `requiredGateKinds` straight off the claim, so the H2 remedy ("derive the required distribution gates from the authoritative law") was never implemented. Only the _empty_ case was closed.                                                                                                                                                 | `PUBLIC_AUTHORIZED` with `requiredGateKinds: ['TOTALLY_FAKE_GATE']` (or `['DISTRIBUTION_EVIDENCE']`, 1 of 10 authoritative gates) plus one matching in-scope `valid:true` record → `authorized === true`, `evaluateProdConformance(...).overall === 'PASSED'`, zero findings.                                                                        | T065       |
+| R5  | **HIGH — the `PROVEN` promotion edge is not bound to governed history (audit H5 not closed).** `advanceState`'s dimension cross-check runs only when `crossesActivationGate` is true, i.e. only for `ACTIVE`. A `SHADOW → PROVEN` promotion validates only that _some_ persisted OPPORTUNITY batch exists — a batch whose `AVAILABLE_EVIDENCE`/`PROVEN_PRESENT` PASS rows came from caller-supplied booleans.                                                                                | Scope `requires_proven=true`; ladder `IMPLEMENTED → SHADOW` (governed history `available=false, proven=false`); record an OPPORTUNITY batch evaluated with fabricated `available=true, proven=true`; `advanceState(toState:'PROVEN')` **succeeds**, then `advanceState(toState:'ACTIVE')` **succeeds** for a scope that never established AVAILABLE. | T066       |
+| R6  | **HIGH — an open `DISABLED` containment is de-escalated by rollback.** The containment-open fence lives only on the `ACTIVE` edge; `rollbackToApproved` targets `PAUSED`, so a rollback proceeds while a `DISABLED` containment is open and leaves the scope `PAUSED` with the containment still open — contradicting §69.11 determinism and the code's own `DISABLED > PAUSED` escalation law.                                                                                              | Ladder to ACTIVE → `containForFailedGate(SECURITY)` → state+action `DISABLED` → `rollbackToApproved({prior event that genuinely reached ACTIVE})` → **ACCEPTED**, `statesFor() === 'PAUSED'`, `openContainments()` still lists the `DISABLED` containment.                                                                                           | T067       |
+| R7  | **HIGH — the release gate's live-path rule never resolves the import quarantine state (audit H4 root cause on the authoritative gate surface).** `checkLivePathPrecomputationViolation` uses the state-blind `artifactBoundaryHolds`, so a `prod-claims` file whose `IMPORT_SHADOW_ONLY` assertion carries `verdict:'PASS'` for a `REJECTED`/nonexistent artifact drives `evaluateProdConformance` to `PASSED`. The DB-backed `assertLivePathBoundaryHolds` is closed; this surface was not. | `evaluateProdConformance({activationClaims:[],postureDeclarations:[],mcpCompatibility:<valid>,livePaths:[<IMPORT_SHADOW_ONLY PASS refs 'artifact-received-state' and 'artifact-does-not-exist-at-all'>],distributionAuthorizations:[]})` → `{"overall":"PASSED","findings":[]}`.                                                                     | T068       |
+| R8  | **MEDIUM — the `g2_prod_0008` "nonblank" CHECK uses `btrim(text)` (ASCII spaces only).** Tab/LF/CR/VT/FF/NBSP/BOM event refs satisfy `length(btrim(...)) > 0` while TypeScript `.trim()` treats them as blank, so the raw-write invariant and its comment diverge. Not an evidence bypass (the all-PASS evidence trigger still applies).                                                                                                                                                     | With a complete all-PASS OPPORTUNITY set supplied, `activation_event_ref='\t'` (and `'\n'`, `'\r'`, `'\v'`, `'\f'`, NBSP, BOM) is `ACCEPTED`; `' '` is refused by the same CHECK.                                                                                                                                                                    | T069       |
+| R9  | **MEDIUM — `containForFailedGate` persists a weaker action than it applies.** The containment row stores `requestedAction` while the state row uses the `DISABLED` fallback, so `openContainments()`/`loadContainmentFacts()` report `DEGRADED`/`PAUSED` for a scope that is actually `DISABLED`, and the activation refusal message understates the stop.                                                                                                                                   | `containForFailedGate({criticalGate:'CAPACITY'})` on a `SHADOW` scope → `containment.action='DEGRADED'` while the persisted state is `DISABLED`.                                                                                                                                                                                                     | T070       |
+
+### Accepted residuals (recorded, not silently dropped)
+
+- **Raw-writer trust boundary** (unchanged from D013/D014): a writer who can
+  `INSERT` into `prod.module_states` and `prod.activation_gate_evaluations` can
+  forge any activation, including `PROVEN`. Binding `PROVEN` at SQL would not
+  raise the bar because the batch rows are equally insertable.
+- **Caller-supplied governance claims** (`prodClaims`) remain the release gate's
+  trust boundary: the file-based CLI cannot verify signed evidence without the
+  server-side pepper. R4/R7 require the gate to enforce the _closed, authoritative
+  completeness law_ over those claims (no truncation, no unknown gate kinds, and
+  an explicit import-state in the closed vocabulary), which is what the gate can
+  genuinely enforce.
+- **`McpProtocolWiring` config lists** (`apps/api/src/mcp/protocol-wiring.ts`)
+  admit caller-supplied draft revisions without the registered compatibility
+  matrix. Impact is limited to config trust (no remote request path); a follow-up
+  bounded slice will route it through `resolveProtocolRevision`.
+- **`evaluateConformance({milestone:'G0'|'G1'})`** legitimately selects a group
+  that owns no FR-PROD requirement, so a violating claim corpus supplied to that
+  in-process call skips the PROD block. The production CLI has no milestone
+  option and reads the repository milestone; AC-266 itself uses the `G0` override.
+- **Post-containment-clear evidence freshness** (M3): the same pre-clear
+  unexpired evidence batch is still accepted after `clearContainment`. Recorded
+  as a bounded MEDIUM; the fix requires binding evidence `evaluated_at` to the
+  clear event.
+
+### Re-verification bar (unchanged)
+
+Every R-row has a landed fix and a direct exploit regression that fails against
+`97b244a`; the full prescribed gates and exact-SHA CI are green; and a **new**
+fresh-context convergence audit reports no CRITICAL/HIGH finding. Admin-control
+and recovery-continuity promotion stays frozen until then.

@@ -24,6 +24,7 @@ import {
   ContainmentAction,
   ErrorCode,
   ForesiftError,
+  isOneOf,
   legalLifecycleTransition,
   parseContainmentAction,
   parseModuleLifecycleState,
@@ -32,6 +33,7 @@ import {
 } from '@foresift/domain';
 import { canonicalJson, type DatabaseEngine } from '@foresift/persistence';
 import {
+  ModuleStateRefusalReason,
   activationScopeHash,
   advanceState,
   currentStateRow,
@@ -58,7 +60,9 @@ export const CriticalGateKind = {
   CLAIMS: 'CLAIMS',
 } as const;
 export type CriticalGateKind = (typeof CriticalGateKind)[keyof typeof CriticalGateKind];
-export const ALL_CRITICAL_GATE_KINDS: readonly CriticalGateKind[] = Object.values(CriticalGateKind);
+export const ALL_CRITICAL_GATE_KINDS: readonly CriticalGateKind[] = Object.freeze(
+  Object.values(CriticalGateKind),
+);
 
 /**
  * Deterministic critical gate → containment action. Hard safety failures
@@ -87,8 +91,9 @@ const CONTAINMENT_ESCALATION: Readonly<Record<ContainmentAction, number>> = {
 };
 
 function parseCriticalGate(value: unknown): CriticalGateKind {
-  if (typeof value === 'string' && (ALL_CRITICAL_GATE_KINDS as readonly string[]).includes(value)) {
-    return value as CriticalGateKind;
+  // `isOneOf` is a numeric-index walk, never a shadowable `.includes`.
+  if (typeof value === 'string' && isOneOf(value, ALL_CRITICAL_GATE_KINDS)) {
+    return value;
   }
   throw new ForesiftError(
     ErrorCode.PROD_CONTAINMENT_ACTION_UNKNOWN,
@@ -122,20 +127,32 @@ export interface ContainmentScopeCandidate {
 /** Number of concrete (non-wildcard) dimensions; higher means smaller scope. */
 export function scopeSpecificity(scope: ModuleStateScope): number {
   const parsed = parseModuleStateScope(scope);
-  return [
+  // Numeric-index count only (audit HIGH): `.filter(...).length` is shadowable,
+  // and a shadowed `filter` returning `[]` would make every candidate look
+  // equally (un)specific, changing which scope gets contained (R9).
+  const dimensions: readonly string[] = [
     parsed.profile_version,
     parsed.policy_version,
     parsed.regime_scope,
     parsed.execution_scenario,
     parsed.delay_policy,
     parsed.population_claim,
-  ].filter((dimension) => dimension !== SCOPE_WILDCARD).length;
+  ];
+  let specific = 0;
+  for (let index = 0; index < dimensions.length; index += 1) {
+    if (dimensions[index] !== SCOPE_WILDCARD) specific += 1;
+  }
+  return specific;
 }
 
 /**
  * The SMALLEST affected scope: the candidate with the most concrete dimensions
  * (fewest wildcards). Ties break deterministically by (specificity DESC,
  * scopeHash ASC, moduleId ASC) so containment never widens by accident.
+ *
+ * Numeric-index selection only (audit HIGH/R9): the previous
+ * `.map(...).sort(...)` chain was shadowable end-to-end, so a shadowed `map`
+ * returning `[]` threw, and a shadowed `sort` could pick the BROADEST scope.
  */
 export function smallestAffectedScope(
   candidates: readonly ContainmentScopeCandidate[],
@@ -147,21 +164,31 @@ export function smallestAffectedScope(
       {},
     );
   }
-  const ranked = candidates
-    .map((candidate) => {
-      const scope = parseModuleStateScope(candidate.scope);
-      return {
-        candidate: { moduleId: candidate.moduleId, scope },
-        specificity: scopeSpecificity(scope),
-        scopeHash: activationScopeHash(scope),
-      };
-    })
-    .sort((a, b) => {
-      if (b.specificity !== a.specificity) return b.specificity - a.specificity;
-      if (a.scopeHash !== b.scopeHash) return a.scopeHash < b.scopeHash ? -1 : 1;
-      return a.candidate.moduleId < b.candidate.moduleId ? -1 : 1;
-    });
-  const winner = ranked[0];
+  let winner: ContainmentScopeCandidate | undefined;
+  let winnerSpecificity = -1;
+  let winnerScopeHash = '';
+  for (let index = 0; index < candidates.length; index += 1) {
+    const candidate = candidates[index];
+    if (candidate === undefined) continue;
+    const scope = parseModuleStateScope(candidate.scope);
+    const specificity = scopeSpecificity(scope);
+    const scopeHash = activationScopeHash(scope);
+    let better = winner === undefined;
+    if (!better) {
+      if (specificity !== winnerSpecificity) {
+        better = specificity > winnerSpecificity;
+      } else if (scopeHash !== winnerScopeHash) {
+        better = scopeHash < winnerScopeHash;
+      } else {
+        better = candidate.moduleId < (winner as ContainmentScopeCandidate).moduleId;
+      }
+    }
+    if (better) {
+      winner = { moduleId: candidate.moduleId, scope };
+      winnerSpecificity = specificity;
+      winnerScopeHash = scopeHash;
+    }
+  }
   if (winner === undefined) {
     throw new ForesiftError(
       ErrorCode.PROD_ACTIVATION_SCOPE_INVALID,
@@ -169,7 +196,7 @@ export function smallestAffectedScope(
       {},
     );
   }
-  return winner.candidate;
+  return winner;
 }
 
 // --- containment rows -------------------------------------------------------
@@ -260,7 +287,7 @@ export async function openContainments(
   const params: unknown[] = [];
   let where = `cleared_by_event_ref IS NULL`;
   if (filter.moduleId !== undefined) {
-    params.push(filter.moduleId);
+    params[params.length] = filter.moduleId;
     where += ` AND module_id = $${params.length}`;
   }
   const result = await engine.query<RawContainmentRow>(
@@ -271,7 +298,17 @@ export async function openContainments(
       ORDER BY created_at ASC, containment_id ASC`,
     params,
   );
-  return result.rows.map(decodeContainmentRow);
+  return decodeContainmentRows(result.rows);
+}
+
+/** Numeric-index decode of a containment result set; never `rows.map(...)`. */
+function decodeContainmentRows(rows: readonly RawContainmentRow[]): ContainmentEventRow[] {
+  const decoded: ContainmentEventRow[] = [];
+  for (let index = 0; index < rows.length; index += 1) {
+    const row = rows[index];
+    if (row !== undefined) decoded[decoded.length] = decodeContainmentRow(row);
+  }
+  return decoded;
 }
 
 /** Open containments as the activation gate's `OpenContainmentFact` list. */
@@ -280,12 +317,19 @@ export async function loadContainmentFacts(
   moduleId: string,
 ): Promise<readonly OpenContainmentFact[]> {
   const rows = await openContainments(engine, { moduleId });
-  return rows.map((row) => ({
-    containmentId: row.containmentId,
-    moduleId: row.moduleId,
-    scopeHash: row.scopeHash,
-    action: row.action,
-  }));
+  // Numeric-index projection only; never `rows.map(...)`.
+  const facts: OpenContainmentFact[] = [];
+  for (let index = 0; index < rows.length; index += 1) {
+    const row = rows[index];
+    if (row === undefined) continue;
+    facts[facts.length] = {
+      containmentId: row.containmentId,
+      moduleId: row.moduleId,
+      scopeHash: row.scopeHash,
+      action: row.action,
+    };
+  }
+  return facts;
 }
 
 /**
@@ -314,28 +358,34 @@ export async function containForFailedGate(
     input.minimumAction === undefined ? baseAction : parseContainmentAction(input.minimumAction);
   const requestedAction = escalateContainmentAction(baseAction, requested);
 
-  const current = await currentStateRow(engine, { moduleId: target.moduleId, scope });
-  if (current === undefined) {
-    throw new ForesiftError(
-      ErrorCode.PROD_ACTIVATION_SCOPE_INVALID,
-      'containment targeted an unknown governed scope',
-      { moduleId: target.moduleId, scopeHash },
-    );
-  }
-  // DISABLED is reachable from every governed state; fall back to it only when
-  // the mapped action is not a legal edge from the current position.
-  const lifecycleAction: ModuleLifecycleState = parseModuleLifecycleState(requestedAction);
-  const toState =
-    legalLifecycleTransition(current.lifecycleState, lifecycleAction) === true
-      ? lifecycleAction
-      : parseModuleLifecycleState('DISABLED');
-
   const containmentId =
     input.containmentId ??
     `containment-${scopeHash.slice(7, 23)}-${criticalGate.toLowerCase()}-${input.at}`;
   const triggerGateKind = CRITICAL_GATE_TO_ACTIVATION_GATE[criticalGate];
 
   const advanced = await engine.transaction(async (tx) => {
+    // Read the governed head INSIDE the transaction (audit TOCTOU): the head
+    // that derives the applied action, the artifact-set/readiness values, and
+    // the superseded row id must be the head the transaction itself writes
+    // from. A head read before BEGIN could be superseded by a concurrent
+    // advance between the read and the write, recording a containment action
+    // and `from` state that no longer describes the committed transition.
+    const current = await currentStateRow(tx, { moduleId: target.moduleId, scope });
+    if (current === undefined) {
+      throw new ForesiftError(
+        ErrorCode.PROD_ACTIVATION_SCOPE_INVALID,
+        'containment targeted an unknown governed scope',
+        { moduleId: target.moduleId, scopeHash },
+      );
+    }
+    // DISABLED is reachable from every governed state; fall back to it only
+    // when the mapped action is not a legal edge from the current position.
+    const lifecycleAction: ModuleLifecycleState = parseModuleLifecycleState(requestedAction);
+    const toState =
+      legalLifecycleTransition(current.lifecycleState, lifecycleAction) === true
+        ? lifecycleAction
+        : parseModuleLifecycleState('DISABLED');
+
     await tx.query(
       `INSERT INTO prod.containment_events
          (containment_id, module_id, scope_hash, action, trigger_gate_kind, reason,
@@ -345,7 +395,11 @@ export async function containForFailedGate(
         containmentId,
         target.moduleId,
         scopeHash,
-        requestedAction,
+        // Persist the APPLIED action, never the weaker requested one (audit
+        // R9): `openContainments`/`loadContainmentFacts` and the ACTIVE-edge
+        // refusal message must never understate the governed stop when the
+        // requested action was not a legal edge and DISABLED was applied.
+        toState,
         triggerGateKind,
         input.reason,
         input.at,
@@ -359,7 +413,10 @@ export async function containForFailedGate(
       operationalReadiness: current.operationalReadiness,
       distributionReadiness: current.distributionReadiness,
       changeClassification: input.changeClassification ?? 'MATERIAL_SECURITY_OR_RIGHTS',
-      reason: `containment ${requestedAction} (${criticalGate}): ${input.reason}`,
+      reason:
+        requestedAction === toState
+          ? `containment ${toState} (${criticalGate}): ${input.reason}`
+          : `containment ${toState} (${criticalGate}; requested ${requestedAction} from ${current.lifecycleState} escalated to ${toState}): ${input.reason}`,
       actorRef: 'containment',
       at: input.at,
       currentStateRowId: current.stateRowId,
@@ -369,7 +426,16 @@ export async function containForFailedGate(
   });
 
   const rows = await openContainments(engine, { moduleId: target.moduleId });
-  const containment = rows.find((row) => row.containmentId === containmentId);
+  // Numeric scan only (audit HIGH): a shadowed `find` would hide the row just
+  // persisted and falsely report the containment as unrecorded.
+  let containment: ContainmentEventRow | undefined;
+  for (let index = 0; index < rows.length; index += 1) {
+    const row = rows[index];
+    if (row !== undefined && row.containmentId === containmentId) {
+      containment = row;
+      break;
+    }
+  }
   if (containment === undefined) {
     throw new ForesiftError(
       ErrorCode.PROD_CONTAINMENT_ACTION_UNKNOWN,
@@ -536,11 +602,16 @@ export async function rollbackToApproved(
       { restoredArtifactSetHash: input.restoredArtifactSetHash },
     );
   }
-  for (const field of [
+  // Numeric-index validation over a module-local frozen list (audit HIGH/R6):
+  // `for (const field of [...])` reads `Symbol.iterator`, so a shadowed iterator
+  // skipped the non-empty-reference refusal on every rollback field.
+  const REQUIRED_ROLLBACK_REFS = [
     'priorActivationEventRef',
     'newActivationEventRef',
     'candidateReevaluationRef',
-  ] as const) {
+  ] as const;
+  for (let index = 0; index < REQUIRED_ROLLBACK_REFS.length; index += 1) {
+    const field = REQUIRED_ROLLBACK_REFS[index];
     if (typeof input[field] !== 'string' || input[field].length === 0) {
       throw new ForesiftError(
         ErrorCode.PROD_LIFECYCLE_TRANSITION_ILLEGAL,
@@ -612,6 +683,34 @@ export async function rollbackToApproved(
     input.rollbackId ?? `rollback-${moduleId}-${input.newActivationEventRef}`.replace(/\s+/g, '-');
 
   const { advanced, rollback } = await engine.transaction(async (tx) => {
+    // §69.11 (audit R6): containment is a governed stop, not a suggestion. A
+    // rollback restores an OLDER approved set and lands in PAUSED, so it must
+    // not sidestep a still-open containment on the EXACT scope — otherwise a
+    // contained scope appears to move while `openContainments()` still lists the
+    // stop. The read happens in this transaction, immediately before the write,
+    // exactly as the ACTIVE edge fences itself. The documented reactivation path
+    // remains `clearContainment` plus a fresh recorded evaluation.
+    const openContainment = await tx.query<{ containment_id: string; action: string }>(
+      `SELECT containment_id, action
+         FROM prod.containment_events
+        WHERE module_id = $1 AND scope_hash = $2 AND cleared_by_event_ref IS NULL
+        ORDER BY created_at ASC, containment_id ASC
+        LIMIT 1`,
+      [moduleId, scopeHash],
+    );
+    const stillOpen = openContainment.rows[0];
+    if (stillOpen !== undefined) {
+      throw new ForesiftError(
+        ErrorCode.PROD_ACTIVATION_GATE_REFUSED,
+        `rollback refused: containment ${stillOpen.containment_id} (${stillOpen.action}) is still open on the exact scope; clearContainment plus a fresh recorded evaluation is the only reactivation path (AC-278)`,
+        {
+          reason: ModuleStateRefusalReason.CONTAINMENT_OPEN,
+          containmentId: stillOpen.containment_id,
+          containmentAction: stillOpen.action,
+          scopeHash,
+        },
+      );
+    }
     await tx.query(
       `INSERT INTO prod.rollback_events
          (rollback_id, module_id, restored_artifact_set_hash, prior_activation_event_ref,

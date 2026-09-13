@@ -19,6 +19,7 @@
     "@foresift/persistence": "workspace:*",
     "@foresift/release-conformance": "workspace:*",
     "@foresift/requirement-manifest": "workspace:*",
+    "@foresift/security": "workspace:*",
     "@foresift/shared-schemas": "workspace:*",
     "zod": "^3.25.76"
   },

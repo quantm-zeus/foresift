@@ -1,18 +1,18 @@
 {
   "schema": "foresift/bun-migration-manifest@1",
   "migrationId": "bun-test-authority-v1",
-  "generatedAt": "2026-09-13T01:13:01.098Z",
+  "generatedAt": "2026-09-13T01:44:28.917Z",
   "root": ".",
-  "totalTestFiles": 596,
+  "totalTestFiles": 600,
   "counts": {
     "CODEMOD_READY": 0,
     "AGY_REQUIRED": 0,
-    "MIGRATED": 596,
+    "MIGRATED": 600,
     "VERIFIED": 0,
     "BLOCKED": 0
   },
   "parity": {
-    "previousTotal": 593,
+    "previousTotal": 600,
     "disappeared": []
   },
   "files": [
@@ -366,6 +366,28 @@
       "state": "MIGRATED"
     },
     {
+      "path": "packages/capability-registry/test/mcp-compat.spec.ts",
+      "package": "@foresift/capability-registry",
+      "bytes": 8014,
+      "lines": 243,
+      "sha256": "35c16887a8dd1f37fb3f67d77773696fbd9dbf45ba93335cdf42f3af6cff31a8",
+      "imports": [
+        "bun:test",
+        "@electric-sql/pglite",
+        "node:path",
+        "node:url",
+        "@foresift/persistence",
+        "../src/index.ts"
+      ],
+      "vitestImports": [],
+      "features": [],
+      "workload": "DATABASE_PGLITE",
+      "migrationType": "ALREADY_MIGRATED",
+      "fixturesAndHelpers": [],
+      "sourceAnchors": ["@electric-sql/pglite", "@foresift/persistence", "../src/index.ts"],
+      "state": "MIGRATED"
+    },
+    {
       "path": "packages/capability-registry/test/migrations.spec.ts",
       "package": "@foresift/capability-registry",
       "bytes": 27408,
@@ -385,6 +407,94 @@
       "migrationType": "ALREADY_MIGRATED",
       "fixturesAndHelpers": [],
       "sourceAnchors": ["@electric-sql/pglite", "@foresift/domain", "@foresift/persistence"],
+      "state": "MIGRATED"
+    },
+    {
+      "path": "packages/capability-registry/test/posture.spec.ts",
+      "package": "@foresift/capability-registry",
+      "bytes": 8747,
+      "lines": 256,
+      "sha256": "4ef548029406459eb12796b78d0737f2ebff37e8078f33be60b783e69355d385",
+      "imports": [
+        "bun:test",
+        "@electric-sql/pglite",
+        "node:path",
+        "node:url",
+        "@foresift/domain",
+        "@foresift/persistence",
+        "../src/index.ts"
+      ],
+      "vitestImports": [],
+      "features": [],
+      "workload": "DATABASE_PGLITE",
+      "migrationType": "ALREADY_MIGRATED",
+      "fixturesAndHelpers": [],
+      "sourceAnchors": [
+        "@electric-sql/pglite",
+        "@foresift/domain",
+        "@foresift/persistence",
+        "../src/index.ts"
+      ],
+      "state": "MIGRATED"
+    },
+    {
+      "path": "packages/capability-registry/test/precomputation.spec.ts",
+      "package": "@foresift/capability-registry",
+      "bytes": 9844,
+      "lines": 280,
+      "sha256": "4eab2e8ab5466756fc0bb4d1511494839db9e877d69c22a5103a0dc207694e0c",
+      "imports": [
+        "bun:test",
+        "@electric-sql/pglite",
+        "node:path",
+        "node:url",
+        "@foresift/domain",
+        "@foresift/security",
+        "@foresift/persistence",
+        "../src/index.ts"
+      ],
+      "vitestImports": [],
+      "features": [],
+      "workload": "DATABASE_PGLITE",
+      "migrationType": "ALREADY_MIGRATED",
+      "fixturesAndHelpers": [],
+      "sourceAnchors": [
+        "@electric-sql/pglite",
+        "@foresift/domain",
+        "@foresift/security",
+        "@foresift/persistence",
+        "../src/index.ts"
+      ],
+      "state": "MIGRATED"
+    },
+    {
+      "path": "packages/capability-registry/test/registry.spec.ts",
+      "package": "@foresift/capability-registry",
+      "bytes": 28525,
+      "lines": 827,
+      "sha256": "5b332bd432c71460ccacc9bb54130d2591936f260c0404810cb258774190cc19",
+      "imports": [
+        "bun:test",
+        "@electric-sql/pglite",
+        "node:path",
+        "node:url",
+        "@foresift/domain",
+        "@foresift/release-conformance",
+        "@foresift/persistence",
+        "../src/index.ts"
+      ],
+      "vitestImports": [],
+      "features": [],
+      "workload": "DATABASE_PGLITE",
+      "migrationType": "ALREADY_MIGRATED",
+      "fixturesAndHelpers": [],
+      "sourceAnchors": [
+        "@electric-sql/pglite",
+        "@foresift/domain",
+        "@foresift/release-conformance",
+        "@foresift/persistence",
+        "../src/index.ts"
+      ],
       "state": "MIGRATED"
     },
     {

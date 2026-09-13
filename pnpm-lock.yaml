@@ -184,6 +184,9 @@ importers:
       '@foresift/requirement-manifest':
         specifier: workspace:*
         version: link:../requirement-manifest
+      '@foresift/security':
+        specifier: workspace:*
+        version: link:../security
       '@foresift/shared-schemas':
         specifier: workspace:*
         version: link:../shared-schemas

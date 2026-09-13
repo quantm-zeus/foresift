@@ -2,21 +2,32 @@
  * @foresift/capability-registry — read-only production-readiness governance
  * (FR-PROD-001…006, PRD §32, §33.7, §40, §69.2–§69.12).
  *
- * This scaffold (slice T001–T013) ships the package wiring plus the PGlite
- * `prod`-family migration-shape suite. The governed-state registry
- * (`module-states.ts`), the total fail-closed activation gate
- * (`activation-gate.ts`), the dependency-group build-order view
- * (`dependency-groups.ts`), the declared SLA/best-effort posture
- * (`deployment-posture.ts`), the MCP compatibility matrix (`mcp-compat.ts`),
- * the bounded precomputed-alpha contract (`precomputed-alpha.ts`), the isolated
- * import trust boundary (`trust-boundary.ts`), and containment/rollback
- * (`containment.ts`) land in T014–T018.
+ * Public surface:
+ *   - `module-states.ts`      — scope-exact, append-only IMPLEMENTED/AVAILABLE/
+ *                               PROVEN registry and the governed transition log;
+ *   - `activation-gate.ts`    — ONE total, ordered, fail-closed gate consuming
+ *                               release-conformance evidence, capacity-planner
+ *                               capacity laws, and registered statistical/
+ *                               distribution evidence;
+ *   - `dependency-groups.ts`  — §40 G0…G7 build/test ordering (never activation);
+ *   - `containment.ts`        — smallest-scope containment, explicit revalidation,
+ *                               and additive rollback;
+ *   - `deployment-posture.ts` — SLA-backed vs free-tier best-effort posture and
+ *                               the protected-dimension law;
+ *   - `mcp-compat.ts`         — §69.7 revision×client compatibility matrix;
+ *   - `precomputed-alpha.ts`  — bounded §33.7 live-path precomputed lookups;
+ *   - `trust-boundary.ts`     — §10.3/§35.14 export/import confinement assertions.
  *
  * Strictly read-only: nothing in this package can trade, hold custody, sign,
  * handle private keys, or submit a transaction. Activation, promotion,
  * containment, and rollback are governance records over already-approved
- * read-only behavior, never execution.
+ * read-only behaviour, never execution.
  */
-
-/** Package scaffold marker; the governed-state surface replaces this in T018. */
-export const CAPABILITY_REGISTRY_SCAFFOLD = true as const;
+export * from './module-states.ts';
+export * from './activation-gate.ts';
+export * from './dependency-groups.ts';
+export * from './containment.ts';
+export * from './deployment-posture.ts';
+export * from './mcp-compat.ts';
+export * from './precomputed-alpha.ts';
+export * from './trust-boundary.ts';

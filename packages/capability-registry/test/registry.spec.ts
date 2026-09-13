@@ -1678,4 +1678,193 @@ describe('ACTIVE is bound to persisted gate evidence (F1)', () => {
     const states = await stateRowsFor(engine, { moduleId, scope });
     expect(states.some((row) => row.lifecycleState === 'ACTIVE')).toBe(false);
   }, 120_000);
+
+  it('freezes each recorded evaluation element and refuses the nested-mutation dimension bypass (R1)', async () => {
+    const scope = makeScope({ profile_version: 'nested-mutation', requires_proven: false });
+    const moduleId = 'module-nested-mutation';
+    // Reach PAUSED through IMPLEMENTED -> SHADOW: the governed history has
+    // implemented=true but AVAILABLE was never established.
+    await advance(moduleId, scope, 'IMPLEMENTED', 'nm-1');
+    await advance(moduleId, scope, 'SHADOW', 'nm-2');
+    await advance(moduleId, scope, 'PAUSED', 'nm-3');
+    const dimensions = await statesFor(engine, { moduleId, scope });
+    expect([dimensions.implemented, dimensions.available, dimensions.proven]).toEqual([
+      true,
+      false,
+      false,
+    ]);
+
+    // A total-gate PASS that CLAIMS AVAILABLE (a caller boolean) while history
+    // never established it. The persisted rows truthfully record that claim.
+    const pass = evaluateActivationGate({
+      ...passingOpportunityInput(scope),
+      kind: ActivationKind.OPERATIONAL,
+      activationEventRef: 'activation-nested-mutation',
+    });
+    expect(pass.verdict).toBe('PASS');
+    if (pass.verdict !== 'PASS') throw new Error('unreachable');
+    const bound = await recordActivationGateResult(engine, pass);
+    if (bound.verdict !== 'PASS') throw new Error('unreachable');
+    const element = bound.evaluations.find(
+      (evaluation) => evaluation.gateKind === 'AVAILABLE_EVIDENCE',
+    );
+    expect(element?.verdict).toBe('PASS');
+
+    // Pre-correction only the array was frozen, so this assignment silently
+    // flipped the in-memory claim while the DB rows still said PASS.
+    expect(() => {
+      (element as unknown as { verdict: string }).verdict = 'NOT_APPLICABLE';
+    }).toThrow();
+    expect(element?.verdict).toBe('PASS');
+
+    // The decision is read from the persisted rows, so the unestablished
+    // AVAILABLE dimension still refuses the crossing.
+    const refused = await rejection(
+      advanceState(engine, {
+        moduleId,
+        scope,
+        artifactSetHash: HASH_A,
+        toState: 'ACTIVE',
+        operationalReadiness: 'READY_FOR_SHADOW_ALERTS',
+        distributionReadiness: 'PRIVATE_ONLY',
+        changeClassification: 'MATERIAL_OPERATIONAL',
+        reason: 'nested-mutation dimension probe',
+        actorRef: 'test-actor',
+        at: NOW,
+        gateResult: bound,
+        stateRowId: 'nm-4',
+        transitionId: 'nm-4-t',
+      }),
+    );
+    expect(refused.code).toBe('PROD_ACTIVATION_GATE_REFUSED');
+    expect((refused.detail as { readonly reason?: string }).reason).toBe('GATE_DIMENSION_MISMATCH');
+    const rows = await stateRowsFor(engine, { moduleId, scope });
+    expect(rows.some((row) => row.lifecycleState === 'ACTIVE')).toBe(false);
+  }, 120_000);
+
+  it('refuses a backdated REFUSE that a later PASS must not erase (R2/T054)', async () => {
+    const scope = makeScope({ profile_version: 'backdated-refuse', requires_proven: false });
+    const moduleId = 'module-backdated-refuse';
+    // Establish BOTH dimensions the PASS claims, so the dimension cross-check
+    // passes and the ONLY thing that can refuse is the any-REFUSE guard. (With
+    // AVAILABLE unestablished the pre-fix in-memory dimension check would
+    // refuse first, and the regression would not discriminate the fix.)
+    await advance(moduleId, scope, 'IMPLEMENTED', 'br-1');
+    await advance(moduleId, scope, 'AVAILABLE', 'br-2');
+    await advance(moduleId, scope, 'SHADOW', 'br-3');
+    await advance(moduleId, scope, 'PAUSED', 'br-4');
+    const dimensions = await statesFor(engine, { moduleId, scope });
+    expect([dimensions.implemented, dimensions.available, dimensions.proven]).toEqual([
+      true,
+      true,
+      false,
+    ]);
+    const event = 'activation-backdated-refuse';
+
+    const pass = evaluateActivationGate({
+      ...passingOpportunityInput(scope),
+      kind: ActivationKind.OPERATIONAL,
+      activationEventRef: event,
+      now: NOW,
+    });
+    expect(pass.verdict).toBe('PASS');
+    if (pass.verdict !== 'PASS') throw new Error('unreachable');
+    const bound = await recordActivationGateResult(engine, pass);
+    if (bound.verdict !== 'PASS') throw new Error('unreachable');
+
+    // A refusal for the SAME scope/kind/event recorded at an EARLIER instant.
+    const refuse = evaluateActivationGate({
+      ...passingOpportunityInput(scope),
+      kind: ActivationKind.OPERATIONAL,
+      activationEventRef: event,
+      now: '2026-05-01T00:00:00Z',
+      implemented: false,
+    });
+    expect(refuse.verdict).toBe('REFUSE');
+    await recordActivationGateResult(engine, refuse);
+
+    const refused = await rejection(
+      advanceState(engine, {
+        moduleId,
+        scope,
+        artifactSetHash: HASH_A,
+        toState: 'ACTIVE',
+        operationalReadiness: 'READY_FOR_SHADOW_ALERTS',
+        distributionReadiness: 'PRIVATE_ONLY',
+        changeClassification: 'MATERIAL_OPERATIONAL',
+        reason: 'backdated refusal probe',
+        actorRef: 'test-actor',
+        at: NOW,
+        gateResult: bound,
+        stateRowId: 'br-5',
+        transitionId: 'br-5-t',
+      }),
+    );
+    expect(refused.code).toBe('PROD_ACTIVATION_GATE_REFUSED');
+    // Pin the authoritative guard's own reason: the SQL trigger would otherwise
+    // mask a guard fail-open with a database-level error.
+    expect((refused.detail as { readonly reason?: string }).reason).toBe('EVIDENCE_SET_NOT_PASS');
+    const rows = await stateRowsFor(engine, { moduleId, scope });
+    expect(rows.some((row) => row.lifecycleState === 'ACTIVE')).toBe(false);
+  }, 120_000);
+
+  it('persists a genuine WORKSPACE and PUBLIC ACTIVE activation (distribution gate set, 0009)', async () => {
+    // Regression for the g2_prod_0006 `text[] || 'literal'` bug that made every
+    // WORKSPACE/PUBLIC ACTIVE insert abort with "malformed array literal". No
+    // earlier test ever persisted a distribution activation.
+    const cases = [
+      {
+        tag: 'workspace',
+        kind: ActivationKind.WORKSPACE,
+        readiness: 'WORKSPACE_AUTHORIZED' as const,
+      },
+      { tag: 'public', kind: ActivationKind.PUBLIC, readiness: 'PUBLIC_AUTHORIZED' as const },
+    ];
+    for (const { tag, kind, readiness } of cases) {
+      const scope = makeScope({
+        profile_version: `distribution-${tag}`,
+        requires_proven: false,
+      });
+      const moduleId = `module-distribution-${tag}`;
+      await advance(moduleId, scope, 'IMPLEMENTED', `${tag}-1`);
+      await advance(moduleId, scope, 'AVAILABLE', `${tag}-2`);
+      await advance(moduleId, scope, 'SHADOW', `${tag}-3`);
+      await advance(moduleId, scope, 'PROVEN', `${tag}-4`);
+
+      const base = passingWorkspaceInput(scope);
+      const gate = evaluateActivationGate({
+        ...base,
+        kind,
+        distributionEvidence:
+          base.distributionEvidence === null
+            ? null
+            : { ...base.distributionEvidence, distributionReadiness: readiness },
+        activationEventRef: `activation-distribution-${tag}`,
+      });
+      expect(gate.verdict).toBe('PASS');
+      if (gate.verdict !== 'PASS') throw new Error('unreachable');
+      const recorded = await recordActivationGateResult(engine, gate);
+
+      const { state } = await advanceState(engine, {
+        moduleId,
+        scope,
+        artifactSetHash: HASH_A,
+        toState: 'ACTIVE',
+        operationalReadiness: 'READY_FOR_ACTIVE_PROFILE',
+        distributionReadiness: readiness,
+        changeClassification: 'MATERIAL_OPERATIONAL',
+        reason: `distribution ${tag} activation`,
+        actorRef: 'test-actor',
+        at: NOW,
+        gateResult: recorded,
+        stateRowId: `${tag}-5`,
+        transitionId: `${tag}-5-t`,
+      });
+      expect(state.lifecycleState).toBe('ACTIVE');
+      expect(state.activationKind).toBe(kind);
+      expect(state.distributionReadiness).toBe(readiness);
+      const rows = await stateRowsFor(engine, { moduleId, scope });
+      expect(rows.some((row) => row.lifecycleState === 'ACTIVE')).toBe(true);
+    }
+  }, 120_000);
 });

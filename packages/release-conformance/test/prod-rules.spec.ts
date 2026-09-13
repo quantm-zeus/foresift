@@ -6,6 +6,9 @@
  * four pre-existing trace rules must keep passing unchanged.
  */
 import { describe, expect, it } from 'bun:test';
+import { mkdtemp, mkdir, rm, writeFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import path from 'node:path';
 import {
   CLAIM_PROD_RULES,
   CONFORMANCE_RULES,
@@ -501,5 +504,204 @@ describe('PROD conformance aggregation and unchanged trace rules', () => {
     });
     expect(unknown.readinessKnown).toBe(false);
     expect(unknown.authorized).toBe(false);
+  });
+});
+
+describe('THIRD-ROUND exploit regressions (R2/R3, T055/T056/T057)', () => {
+  const activeBase = {
+    moduleId: 'module-r2',
+    lifecycleState: 'ACTIVE',
+    implemented: true,
+    available: true,
+    proven: true,
+    requiresProven: true,
+    gateVerdict: 'PASS',
+  } as const;
+
+  it('fails closed when an ACTIVE claim omits or empties its activation event (R2)', () => {
+    const omitted = checkActivationWithoutEvidence([activeBase as never]);
+    expect(omitted.passed).toBe(false);
+    expect(
+      omitted.findings.some((finding) => finding.message.includes('non-empty activation event')),
+    ).toBe(true);
+
+    for (const eventRef of ['', '   ']) {
+      const report = checkActivationWithoutEvidence([
+        { ...activeBase, activationEventRef: eventRef } as never,
+      ]);
+      expect(report.passed).toBe(false);
+      expect(
+        report.findings.some((finding) => finding.message.includes('non-empty activation event')),
+      ).toBe(true);
+    }
+
+    // A non-boolean PROVEN requirement is not `false`, and an unparseable
+    // governed position is not a non-ACTIVE position: both fail closed.
+    expect(
+      checkActivationWithoutEvidence([
+        { ...activeBase, activationEventRef: 'event-ok', requiresProven: 'true' } as never,
+      ]).passed,
+    ).toBe(false);
+    expect(
+      checkActivationWithoutEvidence([
+        {
+          ...activeBase,
+          activationEventRef: 'event-ok',
+          lifecycleState: 'TOTALLY_MADE_UP',
+        } as never,
+      ]).passed,
+    ).toBe(false);
+
+    // The compliant claim still passes.
+    expect(
+      checkActivationWithoutEvidence([
+        { ...activeBase, activationEventRef: 'activation-ok' } as never,
+      ]).passed,
+    ).toBe(true);
+  });
+
+  it('never substring-matches a foreign release from a string scopeRefs (R3)', () => {
+    const foreign = evaluateDistributionAuthorization({
+      releaseRef: 'rel',
+      distributionReadiness: 'WORKSPACE_AUTHORIZED',
+      requiredGateKinds: ['GATE_A'],
+      gateEvidence: [
+        {
+          evidenceId: 'e1',
+          gateKind: 'GATE_A',
+          scopeRefs: 'foreign-release-rel',
+          valid: true,
+        },
+      ],
+    } as never);
+    expect(foreign.authorized).toBe(false);
+    expect(foreign.malformedGateEvidence).toBe(true);
+
+    const report = checkPublicAuthorizationWithoutGateEvidence([
+      {
+        releaseRef: 'rel',
+        distributionReadiness: 'WORKSPACE_AUTHORIZED',
+        requiredGateKinds: ['GATE_A'],
+        gateEvidence: [
+          {
+            evidenceId: 'e1',
+            gateKind: 'GATE_A',
+            scopeRefs: 'foreign-release-rel',
+            valid: true,
+          },
+        ],
+      } as never,
+    ]);
+    expect(report.passed).toBe(false);
+    expect(report.findings.some((finding) => finding.message.includes('scopeRefs'))).toBe(true);
+
+    // A genuine array scope still authorizes, and the aggregate still fails.
+    const genuine = evaluateDistributionAuthorization({
+      releaseRef: 'rel',
+      distributionReadiness: 'WORKSPACE_AUTHORIZED',
+      requiredGateKinds: ['GATE_A'],
+      gateEvidence: [{ evidenceId: 'e1', gateKind: 'GATE_A', scopeRefs: ['rel'], valid: true }],
+    } as never);
+    expect(genuine.authorized).toBe(true);
+
+    const aggregate = evaluateProdConformance({
+      activationClaims: [],
+      postureDeclarations: [],
+      mcpCompatibility: PROD_MCP_COMPLIANT_CLAIM,
+      livePaths: [],
+      distributionAuthorizations: [
+        {
+          releaseRef: 'rel',
+          distributionReadiness: 'WORKSPACE_AUTHORIZED',
+          requiredGateKinds: ['GATE_A'],
+          gateEvidence: [
+            {
+              evidenceId: 'e1',
+              gateKind: 'GATE_A',
+              scopeRefs: 'foreign-release-rel',
+              valid: true,
+            },
+          ],
+        },
+      ],
+    } as never);
+    expect(aggregate.overall).toBe('FAILED');
+    expect(aggregate.findings.map((finding) => finding.rule)).toContain(
+      PROD_RULES.publicAuthorizationWithoutGateEvidence,
+    );
+  });
+
+  it('fails a malformed repository milestone closed with a finding (T057)', async () => {
+    const { evaluateConformance } = await import('../src/index.ts');
+    const dir = await mkdtemp(path.join(tmpdir(), 'foresift-milestone-'));
+    try {
+      await mkdir(path.join(dir, 'specs/implementation'), { recursive: true });
+      await writeFile(
+        path.join(dir, 'specs/implementation/current-milestone.json'),
+        JSON.stringify({ milestoneId: 'G8', status: 'ACTIVE', packages: [] }),
+      );
+      const result = await evaluateConformance({ repoRoot: dir });
+      expect(result.overall).toBe('FAILED');
+      expect(result.findings.map((finding) => finding.rule)).toContain(
+        'CONFORMANCE_MILESTONE_INVALID',
+      );
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
+  });
+
+  it('refuses a boxed/coercible milestone that would skip the PROD block', async () => {
+    const { evaluateConformance } = await import('../src/index.ts');
+    const result = await evaluateConformance({
+      repoRoot: REPO_ROOT,
+      milestone: new String('G2') as unknown as string,
+    });
+    expect(result.overall).toBe('FAILED');
+    expect(result.findings.map((finding) => finding.rule)).toContain(
+      'CONFORMANCE_MILESTONE_INVALID',
+    );
+  });
+
+  it('resists in-process array-method shadowing and degenerate release ids', () => {
+    // Own `filter` returning forged in-scope evidence must not authorize.
+    const shadowedFilter = [
+      { evidenceId: 'e1', gateKind: 'GATE_A', scopeRefs: ['foreign-release'], valid: true },
+    ];
+    Object.defineProperty(shadowedFilter, 'filter', {
+      value: () => [{ evidenceId: 'x', gateKind: 'GATE_A', scopeRefs: ['rel'], valid: true }],
+    });
+    expect(
+      evaluateDistributionAuthorization({
+        releaseRef: 'rel',
+        distributionReadiness: 'WORKSPACE_AUTHORIZED',
+        requiredGateKinds: ['GATE_A'],
+        gateEvidence: shadowedFilter,
+      } as never).authorized,
+    ).toBe(false);
+
+    // Own `includes` returning true must not pull a foreign scope into scope.
+    const shadowedIncludes = ['foreign-release'];
+    Object.defineProperty(shadowedIncludes, 'includes', { value: () => true });
+    expect(
+      evaluateDistributionAuthorization({
+        releaseRef: 'rel',
+        distributionReadiness: 'WORKSPACE_AUTHORIZED',
+        requiredGateKinds: ['GATE_A'],
+        gateEvidence: [
+          { evidenceId: 'e1', gateKind: 'GATE_A', scopeRefs: shadowedIncludes, valid: true },
+        ],
+      } as never).authorized,
+    ).toBe(false);
+
+    // A degenerate release identity never authorizes, even when the evidence
+    // scope exactly matches it.
+    const degenerate = evaluateDistributionAuthorization({
+      releaseRef: '',
+      distributionReadiness: 'WORKSPACE_AUTHORIZED',
+      requiredGateKinds: ['GATE_A'],
+      gateEvidence: [{ evidenceId: 'e1', gateKind: 'GATE_A', scopeRefs: [''], valid: true }],
+    } as never);
+    expect(degenerate.authorized).toBe(false);
+    expect(degenerate.malformedReleaseRef).toBe(true);
   });
 });

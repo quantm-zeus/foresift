@@ -484,7 +484,7 @@ export async function verifyReleaseConformance(root, options = {}) {
     ),
   ]);
   const activeGroup = milestone?.status === 'ACTIVE' ? milestone.milestoneId : undefined;
-  if (!/^G\d+$/.test(activeGroup ?? ''))
+  if (!/^G[0-7]$/.test(activeGroup ?? ''))
     throw new Error('current milestone is not an active dependency group');
   const groups = [
     await mappingFindings(root, manifest, activeGroup),

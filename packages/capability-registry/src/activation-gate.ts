@@ -876,7 +876,10 @@ export function evaluateActivationGate(input: ActivationGateInput): ActivationGa
     const condition = requiredSet.has(gate)
       ? evaluateCondition(gate, input, scopeHash, nowMs)
       : notApplicable(gate);
-    const evaluation: GateConditionEvaluation = { ...condition, activationKind: kind };
+    const evaluation: GateConditionEvaluation = Object.freeze({
+      ...condition,
+      activationKind: kind,
+    });
     evaluations.push(evaluation);
     if (evaluation.verdict === ActivationGateVerdict.REFUSE) {
       return makeRefusal(
@@ -941,6 +944,19 @@ export interface PersistedActivationGateEvaluation {
 export interface RecordedActivationGateEvaluation {
   readonly evaluationIds: readonly string[];
   readonly evaluationSetRef: string;
+}
+
+/**
+ * The persisted-evidence guard's receipt: the recorder-shaped ids/reference plus
+ * the authoritative batch of rows it validated. `advanceState` reads `rows` —
+ * never the caller's in-memory evaluator object — for the
+ * IMPLEMENTED/AVAILABLE/PROVEN dimension binding (audit R1), so mutating a
+ * recorded pass cannot change the decision.
+ */
+export interface PersistedActivationEvidence {
+  readonly evaluationIds: readonly string[];
+  readonly evaluationSetRef: string;
+  readonly rows: readonly PersistedActivationGateEvaluation[];
 }
 
 interface RawGateEvaluationRow {
@@ -1260,7 +1276,7 @@ export interface PersistedActivationEvidenceInput {
 export async function requirePersistedActivationEvidence(
   engine: DatabaseEngine,
   input: PersistedActivationEvidenceInput,
-): Promise<RecordedActivationGateEvaluation> {
+): Promise<PersistedActivationEvidence> {
   const refuse = (reason: ActivationEvidenceRefusalReason, detail: string): never => {
     throw new ForesiftError(ErrorCode.PROD_ACTIVATION_GATE_REFUSED, detail, {
       reason,
@@ -1290,6 +1306,18 @@ export async function requirePersistedActivationEvidence(
     refuse(
       ActivationEvidenceRefusalReason.EVIDENCE_SET_EMPTY,
       `no persisted activation-gate evaluations exist for the exact scope under activation kind ${kind} and event ${JSON.stringify(input.activationEventRef)}; evidence for another kind or event is not evidence for this one`,
+    );
+  }
+  // A REFUSE is not erasable by a later PASS for the SAME activation event: the
+  // SQL trigger refuses ACTIVE when ANY row for (scope, event, kind) refused, so
+  // the TypeScript guard must apply the same rule or a caller that backdates a
+  // refusal behind a PASS would be misled by this exported oracle (audit R2 /
+  // T054). A fresh, distinct activation event is the only way past a refusal.
+  const refusing = rows.find((row) => row.verdict === 'REFUSE');
+  if (refusing !== undefined) {
+    refuse(
+      ActivationEvidenceRefusalReason.EVIDENCE_SET_NOT_PASS,
+      `a persisted REFUSE for gate ${refusing.gateKind} exists for this exact scope, activation kind and event; a later PASS cannot erase it — a fresh activation event is required`,
     );
   }
   // The latest evaluation batch is the only admissible evidence; an older PASS
@@ -1389,5 +1417,9 @@ export async function requirePersistedActivationEvidence(
       'the supplied evaluationSetRef does not match the reference re-derived from the persisted rows',
     );
   }
-  return { evaluationIds: batch.map((row) => row.evaluationId), evaluationSetRef: derived };
+  return {
+    evaluationIds: batch.map((row) => row.evaluationId),
+    evaluationSetRef: derived,
+    rows: batch,
+  };
 }

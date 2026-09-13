@@ -399,7 +399,7 @@ async function activeMilestone(repoRoot: string): Promise<string> {
     readonly milestoneId?: string;
     readonly status?: string;
   };
-  if (milestone.status !== 'ACTIVE' || !/^G\d+$/.test(milestone.milestoneId ?? '')) {
+  if (milestone.status !== 'ACTIVE' || !/^G[0-7]$/.test(milestone.milestoneId ?? '')) {
     throw new Error(`current milestone is not an ACTIVE dependency group: ${milestonePath}`);
   }
   return milestone.milestoneId as string;
@@ -463,7 +463,15 @@ export async function evaluateConformance(options: ConformanceOptions): Promise<
   // An explicit milestone must be a canonical dependency group (`G0`…`G7`):
   // zero-padded or otherwise non-canonical ids are a gate-downgrade attempt and
   // refuse closed (audit HIGH-3).
-  if (options.milestone !== undefined && !/^G[0-7]$/.test(options.milestone)) {
+  // An explicit milestone must be a canonical dependency group (`G0`…`G7`):
+  // zero-padded or otherwise non-canonical ids are a gate-downgrade attempt and
+  // refuse closed. The type check is strict so a boxed/coercible id (for example
+  // `new String('G2')`, which `===` would not match against the manifest's
+  // primitive `dependencyGroup`) can never skip the PROD block (audit R2 residual).
+  if (
+    options.milestone !== undefined &&
+    (typeof options.milestone !== 'string' || !/^G[0-7]$/.test(options.milestone))
+  ) {
     return {
       overall: 'FAILED',
       findings: [
@@ -478,7 +486,30 @@ export async function evaluateConformance(options: ConformanceOptions): Promise<
       ],
     };
   }
-  const activeGroup = options.milestone ?? (await activeMilestone(options.repoRoot));
+  let activeGroup: string;
+  if (options.milestone !== undefined) {
+    activeGroup = options.milestone;
+  } else {
+    // A malformed repository milestone must fail the gate with a finding, not
+    // silently skip the PROD block (audit R2 residual / T057).
+    try {
+      activeGroup = await activeMilestone(options.repoRoot);
+    } catch (error) {
+      return {
+        overall: 'FAILED',
+        findings: [
+          {
+            requirementId: 'FR-TRACE-003',
+            rule: 'CONFORMANCE_MILESTONE_INVALID',
+            path: 'specs/implementation/current-milestone.json',
+            message: `the repository's ACTIVE milestone is not a canonical G0…G7 dependency group: ${
+              error instanceof Error ? error.message : String(error)
+            }`,
+          },
+        ],
+      };
+    }
+  }
   const requirements = options.requirements ?? (await loadRequirements(options.repoRoot));
   // Whether the milestone owns FR-PROD law is decided by the AUTHORITATIVE
   // manifest, NEVER by the caller-supplied requirement list: otherwise

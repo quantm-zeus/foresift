@@ -52,6 +52,13 @@ async function main(): Promise<void> {
     await readFile(`${repoRoot}/specs/implementation/current-milestone.json`, 'utf8'),
   ) as { milestoneId?: string; status?: string };
   const activeGroup = milestone.status === 'ACTIVE' ? milestone.milestoneId : undefined;
+  // A malformed milestone id must never silently narrow the PROD surface to an
+  // empty requirement set (audit R2 residual / T057): fail the bridge closed.
+  if (activeGroup !== undefined && !/^G[0-7]$/.test(activeGroup)) {
+    throw new Error(
+      `current milestone ${JSON.stringify(activeGroup)} is not a canonical G0…G7 dependency group`,
+    );
+  }
   const prodRequirements = (manifest.requirements ?? []).filter(
     (requirement) =>
       requirement.id.startsWith('FR-PROD-') &&

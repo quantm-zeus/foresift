@@ -119,3 +119,69 @@ group that owns no FR-PROD requirement, so a violating claim corpus supplied to
 that call passes — is documented rather than "fixed": AC-266 depends on the
 explicit G0 override, and the production CLI/bridge never overrides the
 milestone. It is recorded in `DECISIONS.md` D013.
+
+## Third-round reopen (2026-09-13) — conformance + activation nested-mutation fail-opens
+
+The re-PROVEN flip `8f7b5d9` (PR #295) is **revoked**. A fresh independent
+verification at `d44de1a` (three read-only adversarial reviewers plus direct
+runtime probes) reproduced three HIGH fail-opens that the second-round
+convergence audit missed. The state is RUNNING/REOPENED again; `8f7b5d9` and all
+prior evidence remain in history.
+
+| ID  | Defect (reproduced at `d44de1a`)                                                                                                                                                                                                                                                                                                                                                                                                                                                                           | Reproduction                                                                                                                                                                                                                                                                                                                                                                      | Correction |
+| --- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------- |
+| R1  | **HIGH — activation-gate H5 binding bypass.** `evaluateActivationGate` freezes only the `evaluations` **array**, not the elements (`activation-gate.ts:879,902`); `recordActivationGateResult` shallow-spreads (`:1181`), sharing the mutable elements. `advanceState` reads those in-memory elements for the IMPLEMENTED/AVAILABLE/PROVEN cross-check (`module-states.ts:743-757`), while the authoritative guard reads DB rows, so a post-recording mutation changes only the TypeScript dimension gate. | Ladder IMPLEMENTED→SHADOW→PAUSED on a `requires_proven:false` scope (history `available=false`); record a genuine OPERATIONAL PASS claiming `available:true`; mutate `bound.evaluations.find(e=>e.gateKind==='AVAILABLE_EVIDENCE').verdict='NOT_APPLICABLE'`; `advanceState(..., toState:'ACTIVE')` **succeeds**. Control without the mutation refuses `GATE_DIMENSION_MISMATCH`. | T053       |
+| R2  | **HIGH — `ACTIVATION_WITHOUT_EVIDENCE` accepts a missing/empty activation event.** `prod-rules.ts:156` tested only `=== null`, and the element-presence check required only `moduleId`/`lifecycleState`, so `activationEventRef` omitted or `''` passed. `requiresProven` omitted was treated as `false`.                                                                                                                                                                                                  | `checkActivationWithoutEvidence([{moduleId:'m',lifecycleState:'ACTIVE',implemented:true,available:true,proven:true,requiresProven:true,gateVerdict:'PASS'}]).passed === true` (and with `activationEventRef:''`), so `overall === 'PASSED'` and the bridge returns `{"findings":[]}`.                                                                                             | T055       |
+| R3  | **HIGH — foreign-release evidence accepted by substring match.** `prod-rules.ts:524` used `evidence.scopeRefs.includes(claim.releaseRef)`; when `scopeRefs` is a string this is a substring match, and no shape check required it to be an array.                                                                                                                                                                                                                                                          | `releaseRef:'rel'` with `scopeRefs:'foreign-release-rel'` and `valid:true` → `evaluateDistributionAuthorization().authorized === true`.                                                                                                                                                                                                                                           | T056       |
+
+Bounded MEDIUM residuals closed in the same slice: the TypeScript
+persisted-evidence guard ignored a **backdated** `REFUSE` because it ordered
+batches by `evaluated_at` while SQL refuses on any `REFUSE` (T054); the
+active-milestone resolver accepted `/^G\d+$/` while the explicit override
+rejected anything outside `G0…G7` (T057); the AC-279 acceptance artifact was
+still a no-op same-set restore even though the unit suite had a genuine
+A→B→A case (T058); and the migrator's applied-family key included the
+generation, so a later-generation member of an already-applied family
+(`g1_data_0009` after `g2_data_0001`) was misclassified as a wholly-new family
+and applied out of order (T059).
+
+Re-verification bar (unchanged): every R-row has a landed fix and a direct
+exploit regression that fails against the pre-correction revision; a **new**
+fresh-context convergence audit reports no CRITICAL/HIGH finding; the full
+prescribed gates and exact-SHA CI are green. Admin-control and
+recovery-continuity promotion stays frozen until then.
+
+### Convergence-audit follow-ups (T063/T064) and accepted residual
+
+The new convergence audit reproduced two further defects that all earlier
+rounds missed, and both are corrected here:
+
+- **T063 — §69.9 distribution activation was inoperable.** The `g2_prod_0006`
+  evidence trigger appended the distribution gate with
+  `required_gates || 'DISTRIBUTION_EVIDENCE'`; PostgreSQL resolves
+  `text[] || unknown` as `anyarray || anyarray`, so every ACTIVE insert with
+  `activation_kind` WORKSPACE/PUBLIC aborted with
+  `ERROR: malformed array literal: "DISTRIBUTION_EVIDENCE"`. Since `0006` is
+  already applied on canonical `main`, the corrected trigger function lands as
+  the later-sorting `migrations/g2_prod_0009_fix_distribution_gate_set.sql`
+  (`array_append`), and a new regression persists a genuine WORKSPACE **and**
+  PUBLIC ACTIVE — a path no earlier test exercised.
+- **T064 — prod telemetry catalog drift.** The C1 correction added `scopeHash`
+  and `activationKind` to `ModuleStateRowSchema` and `activationEventRef`/
+  `activationKind` to `ActivationGateEvaluationRowSchema`, but
+  `telemetry/prod.catalog.json` was never updated and the parity suite checked
+  only catalog ⊆ schema. The five affected events now carry the fields and the
+  prod parity assertion is two-way (set equality), so a future schema field
+  cannot be silently absent from the CRITICAL_METADATA recovery contract.
+
+**Accepted residual (not silently dropped).** A raw SQL writer can insert a
+`PROVEN` `prod.module_states` row directly (no trigger guards the PROVEN
+transition; only ACTIVE is guarded), and can also insert the forged
+`activation_gate_evaluations` PASS rows that the ACTIVE trigger requires. The
+governed `advanceState` path refuses this — a PROVEN promotion requires a
+persisted OPPORTUNITY batch, and ACTIVE requires the exact kind-bound evidence
+— so the residual is the same raw-writer evidence-fabrication trust boundary
+that C1 already records (D013/D014): a writer who can INSERT evaluation rows
+can fabricate any activation. Binding PROVEN at SQL would raise the bar but not
+close it (the batch rows are equally insertable), so it is recorded rather than
+claimed as closed.

@@ -239,19 +239,21 @@ export async function applyMigrations(options: MigratorOptions): Promise<ApplyRe
 
     // …and on new scripts that would fill a gap behind already-applied state.
     //
-    // The refusal is scoped to the migration FAMILY (`g<generation>_<family>`,
-    // e.g. `g2_prod`). Lexicographic ids conflate independent, per-work-package
-    // families: a family landed later (say `g2_alert`, or `g2_prod` after
-    // `g2_wf`) always sorts before an already-applied family whose token is
+    // The refusal is scoped to the migration FAMILY (the `_<family>_` token,
+    // e.g. `prod` in `g2_prod_0006_…`). Lexicographic ids conflate independent,
+    // per-work-package families: a family landed later (say `alert`, or `prod`
+    // after `wf`) always sorts before an already-applied family whose token is
     // lexicographically larger, and a global high-water mark would refuse it
     // forever even though its own history has no gap. Each family owns its DDL
     // namespace (a schema/table set named for the family) and a family with zero
     // applied members has no history to corrupt, so applying it additively is
     // safe; the invariant that matters — never fill a gap INSIDE an applied
-    // family's history — is preserved exactly. `packages/persistence/test/`
-    // pins both directions and the upgrade-path schema-fingerprint equality.
+    // family's history — is preserved for EVERY generation of that family
+    // (audit R5: `g1_data_0009` after an applied `g2_data_0001` is a gap, not a
+    // new family). `packages/persistence/test/` pins all three directions and
+    // the upgrade-path schema-fingerprint equality.
     const familyOf = (id: string): string => {
-      const match = /^(g\d+_[a-z]+)_\d{4}_/.exec(id);
+      const match = /^g\d+_([a-z]+)_\d{4}_/.exec(id);
       return match?.[1] ?? id;
     };
     const highestAppliedByFamily = new Map<string, string>();

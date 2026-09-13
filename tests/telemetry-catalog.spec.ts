@@ -1907,10 +1907,12 @@ describe('telemetry/prod.catalog.json parity with authoritative schemas (T031, F
         'moduleId',
         'artifactSetHash',
         'scope',
+        'scopeHash',
         'lifecycleState',
         'operationalReadiness',
         'distributionReadiness',
         'activationEventRef',
+        'activationKind',
         'supersededBy',
         'createdAt',
       ],
@@ -1922,10 +1924,12 @@ describe('telemetry/prod.catalog.json parity with authoritative schemas (T031, F
         'moduleId',
         'artifactSetHash',
         'scope',
+        'scopeHash',
         'lifecycleState',
         'operationalReadiness',
         'distributionReadiness',
         'activationEventRef',
+        'activationKind',
         'supersededBy',
         'createdAt',
       ],
@@ -1937,10 +1941,12 @@ describe('telemetry/prod.catalog.json parity with authoritative schemas (T031, F
         'moduleId',
         'artifactSetHash',
         'scope',
+        'scopeHash',
         'lifecycleState',
         'operationalReadiness',
         'distributionReadiness',
         'activationEventRef',
+        'activationKind',
         'supersededBy',
         'createdAt',
       ],
@@ -1969,6 +1975,8 @@ describe('telemetry/prod.catalog.json parity with authoritative schemas (T031, F
         'failingGate',
         'evidenceRefs',
         'capacityContractRef',
+        'activationEventRef',
+        'activationKind',
         'evaluatedAt',
         'expiresAt',
       ],
@@ -1983,6 +1991,8 @@ describe('telemetry/prod.catalog.json parity with authoritative schemas (T031, F
         'failingGate',
         'evidenceRefs',
         'capacityContractRef',
+        'activationEventRef',
+        'activationKind',
         'evaluatedAt',
         'expiresAt',
       ],
@@ -2165,6 +2175,11 @@ describe('telemetry/prod.catalog.json parity with authoritative schemas (T031, F
         expect(catalogField.type).toBe(wfFieldType(schema));
         expect(catalogField.required).toBe(wfFieldRequired(schema));
       }
+      // TWO-WAY parity: the catalog must also cover EVERY field of the named
+      // shape. The original one-directional check (catalog ⊆ schema) stayed
+      // green while the C1 correction added scopeHash/activationKind/
+      // activationEventRef to the schemas but not to this catalog (audit HIGH-1).
+      expect(ev.fields.map((f) => f.name).sort()).toEqual(Object.keys(authoritative).sort());
     });
   }
 });

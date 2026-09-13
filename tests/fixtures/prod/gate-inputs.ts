@@ -27,6 +27,8 @@ export const PROD_FIXTURE_NOW = '2026-06-01T00:00:00Z';
 export const PROD_FIXTURE_FUTURE = '2027-06-01T00:00:00Z';
 export const PROD_FIXTURE_FAR_FUTURE = '2030-01-01T00:00:00Z';
 export const PROD_FIXTURE_HASH_A = `sha256:${'a'.repeat(64)}`;
+/** The activation event `passingOpportunityGateInput` creates for a scope. */
+export const PROD_FIXTURE_ACTIVATION_EVENT = 'activation-prod-1';
 export const PROD_FIXTURE_HASH_B = `sha256:${'b'.repeat(64)}`;
 /**
  * The registered mature-evaluation evidence content address a promotion to
@@ -201,7 +203,7 @@ export function passingOpportunityGateInput(scope: ModuleStateScope): Activation
     capacityContract: passingCapacityContract(),
     distributionEvidence: null,
     openContainment: [],
-    activationEventRef: 'activation-prod-1',
+    activationEventRef: PROD_FIXTURE_ACTIVATION_EVENT,
     expiresAt: PROD_FIXTURE_FUTURE,
     evidenceRefs: ['evidence-prod-1'],
   };

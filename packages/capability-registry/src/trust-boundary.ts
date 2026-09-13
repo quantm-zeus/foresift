@@ -162,6 +162,12 @@ export function livePathBoundaryVerdict(
  * Assert the live path's boundary holds. A live path that references a heavy
  * Alpha Lab job, an artifact import, or a provider call (or that omits any
  * assertion kind) refuses — and the refusal names the violating kinds.
+ *
+ * Every `IMPORT_SHADOW_ONLY` assertion is additionally RESOLVED through the
+ * security `ImportGate` (audit H4): the referenced artifact must exist and must
+ * currently rest in `VALIDATING`/`SHADOW_ELIGIBLE`. A caller-supplied
+ * `verdict:'PASS'` row that names a `RECEIVED`/`REJECTED`/unknown artifact
+ * therefore refuses instead of passing on the caller's word.
  */
 export async function assertLivePathBoundaryHolds(
   engine: DatabaseEngine,
@@ -186,6 +192,43 @@ export async function assertLivePathBoundaryHolds(
         failingAssertionIds: failing.map((assertion) => assertion.assertionId).join(', '),
       },
     );
+  }
+  // Quarantine state is checked BEFORE the live path is authorized (H4).
+  const gate = importGate(engine);
+  for (const assertion of assertions) {
+    if (assertion.assertionKind !== ArtifactBoundaryAssertionKind.IMPORT_SHADOW_ONLY) continue;
+    const artifactId = assertion.importArtifactRef;
+    if (artifactId === null) {
+      throw new ForesiftError(
+        ErrorCode.PROD_TRUST_BOUNDARY_VIOLATION,
+        `IMPORT_SHADOW_ONLY assertion ${assertion.assertionId} names no import artifact`,
+        { livePath, assertionId: assertion.assertionId },
+      );
+    }
+    let artifact;
+    try {
+      artifact = await gate.getArtifact(artifactId);
+    } catch (cause) {
+      throw new ForesiftError(
+        ErrorCode.PROD_TRUST_BOUNDARY_VIOLATION,
+        `IMPORT_SHADOW_ONLY assertion ${assertion.assertionId} references unknown import artifact ${artifactId}`,
+        { livePath, assertionId: assertion.assertionId, artifactId },
+      );
+    }
+    const state = artifact.state as ImportQuarantineState;
+    if (!IMPORT_SHADOW_STATES.includes(state)) {
+      throw new ForesiftError(
+        ErrorCode.PROD_TRUST_BOUNDARY_VIOLATION,
+        `imported artifact ${artifactId} is ${state}; imports may rest only in VALIDATING/SHADOW and never ACTIVE`,
+        {
+          livePath,
+          assertionId: assertion.assertionId,
+          artifactId,
+          state,
+          boundary: SECURITY_IMPORT_BOUNDARY,
+        },
+      );
+    }
   }
   return assertions;
 }

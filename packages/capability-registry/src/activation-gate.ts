@@ -1054,6 +1054,9 @@ async function persistEvaluations(
           kind,
           gate,
           verdict,
+          // The activation event distinguishes two genuine evaluations of the
+          // same scope and kind at the same instant (for example A -> B -> A).
+          event: input.activationEventRef,
           at: input.evaluatedAt,
         }),
       ).slice(7, 23)}`;
@@ -1084,8 +1087,9 @@ async function persistEvaluations(
       `SELECT ${GATE_EVALUATION_COLUMNS}
          FROM prod.activation_gate_evaluations
         WHERE scope_hash = $1 AND evaluated_at = $2::timestamptz AND activation_kind = $3
+          AND activation_event_ref IS NOT DISTINCT FROM $4
         ORDER BY evaluation_id ASC`,
-      [input.scopeHash, input.evaluatedAt, kind],
+      [input.scopeHash, input.evaluatedAt, kind, input.activationEventRef],
     );
     const rows = persisted.rows.map(decodeGateEvaluationRow);
     return { evaluationIds: ids, evaluationSetRef: activationEvidenceSetRef(rows) };
@@ -1166,24 +1170,26 @@ export async function activationGateEvaluationsFor(
   engine: DatabaseEngine,
   scopeHash: string,
   activationKind?: ActivationKind,
+  activationEventRef?: string,
 ): Promise<readonly PersistedActivationGateEvaluation[]> {
   const kind = activationKind === undefined ? undefined : parseActivationKind(activationKind);
-  const result =
-    kind === undefined
-      ? await engine.query<RawGateEvaluationRow>(
-          `SELECT ${GATE_EVALUATION_COLUMNS}
-             FROM prod.activation_gate_evaluations
-            WHERE scope_hash = $1
-            ORDER BY evaluated_at ASC, evaluation_id ASC`,
-          [scopeHash],
-        )
-      : await engine.query<RawGateEvaluationRow>(
-          `SELECT ${GATE_EVALUATION_COLUMNS}
-             FROM prod.activation_gate_evaluations
-            WHERE scope_hash = $1 AND activation_kind = $2
-            ORDER BY evaluated_at ASC, evaluation_id ASC`,
-          [scopeHash, kind],
-        );
+  const clauses = ['scope_hash = $1'];
+  const params: unknown[] = [scopeHash];
+  if (kind !== undefined) {
+    params.push(kind);
+    clauses.push(`activation_kind = $${params.length}`);
+  }
+  if (activationEventRef !== undefined) {
+    params.push(activationEventRef);
+    clauses.push(`activation_event_ref = $${params.length}`);
+  }
+  const result = await engine.query<RawGateEvaluationRow>(
+    `SELECT ${GATE_EVALUATION_COLUMNS}
+       FROM prod.activation_gate_evaluations
+      WHERE ${clauses.join(' AND ')}
+      ORDER BY evaluated_at ASC, evaluation_id ASC`,
+    params,
+  );
   return result.rows.map(decodeGateEvaluationRow);
 }
 
@@ -1246,11 +1252,19 @@ export async function requirePersistedActivationEvidence(
   const kind = parseActivationKind(input.activationKind);
   // Only evidence evaluated for THIS activation kind is admissible (audit C1):
   // an OPERATIONAL batch must never stand in for OPPORTUNITY/WORKSPACE/PUBLIC.
-  const rows = await activationGateEvaluationsFor(engine, input.scopeHash, kind);
+  // Evidence is scoped by scope, kind AND activation event (the batch identity).
+  // Two genuine evaluations at the same instant for different events are
+  // distinct batches, so an older event's PASS can never authorize a new one.
+  const rows = await activationGateEvaluationsFor(
+    engine,
+    input.scopeHash,
+    kind,
+    input.activationEventRef,
+  );
   if (rows.length === 0) {
     refuse(
       ActivationEvidenceRefusalReason.EVIDENCE_SET_EMPTY,
-      `no persisted activation-gate evaluations exist for the exact scope under activation kind ${kind}; evidence for another kind is not evidence for this one`,
+      `no persisted activation-gate evaluations exist for the exact scope under activation kind ${kind} and event ${JSON.stringify(input.activationEventRef)}; evidence for another kind or event is not evidence for this one`,
     );
   }
   // The latest evaluation batch is the only admissible evidence; an older PASS

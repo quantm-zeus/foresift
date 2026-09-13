@@ -28,6 +28,7 @@ import {
 import {
   PROD_BOUNDARY_ASSERTIONS_COMPLETE,
   PROD_CONTAINMENT_SPECIFIC_CANDIDATE,
+  PROD_FIXTURE_ACTIVATION_EVENT,
   PROD_FIXTURE_HASH_A,
   PROD_FIXTURE_PROVEN_EVIDENCE,
   PROD_FIXTURE_NOW,
@@ -173,7 +174,7 @@ describe('AC-279 prod-scoped: rollback restores an approved immutable set, creat
     const outcome = await rollbackToApproved(engine, PROD_ROLLBACK_FIXTURE);
     expect(outcome.rollback.historyPreserved).toBe(true);
     expect(outcome.rollback.restoredArtifactSetHash).toBe(PROD_FIXTURE_HASH_A);
-    expect(outcome.rollback.priorActivationEventRef).toBe('activation-prod-prior');
+    expect(outcome.rollback.priorActivationEventRef).toBe(PROD_FIXTURE_ACTIVATION_EVENT);
     expect(outcome.rollback.newActivationEventRef).toBe('activation-prod-rollback');
     expect(outcome.alertResumption).toBe('BLOCKED_PENDING_CANDIDATE_REEVALUATION');
 

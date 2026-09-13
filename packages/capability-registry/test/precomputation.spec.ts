@@ -197,14 +197,18 @@ describe('§33.7 bounded live-path precomputed alpha', () => {
 });
 
 describe('§10.3/§35.14 live-path trust boundary', () => {
-  async function seedBoundary(livePath: string, failingKind: string | null): Promise<void> {
+  async function seedBoundary(
+    livePath: string,
+    failingKind: string | null,
+    importArtifactRef = 'import-shadow',
+  ): Promise<void> {
     const kinds = ['NO_HEAVY_JOB', 'NO_IMPORT', 'NO_PROVIDER_CALL', 'IMPORT_SHADOW_ONLY'] as const;
     for (const kind of kinds) {
       await recordArtifactBoundaryAssertion(engine, {
         assertionId: `${livePath}-${kind}`,
         livePath,
         assertionKind: kind,
-        importArtifactRef: kind === 'IMPORT_SHADOW_ONLY' ? 'import-shadow' : null,
+        importArtifactRef: kind === 'IMPORT_SHADOW_ONLY' ? importArtifactRef : null,
         verdict: kind === failingKind ? 'REFUSE' : 'PASS',
         assertedAt: NOW,
       });
@@ -233,6 +237,20 @@ describe('§10.3/§35.14 live-path trust boundary', () => {
 
     // A live path that never asserted anything refuses (not skipped).
     await expect(assertLivePathBoundaryHolds(engine, 'live-missing')).rejects.toThrow();
+  }, 120_000);
+
+  it('refuses a live path whose IMPORT_SHADOW_ONLY assertion references a non-shadow artifact (H4 exploit)', async () => {
+    // The pre-fix bypass: caller `verdict:`PASS`` rows were trusted, so a live
+    // path could reference a RECEIVED (or unknown) artifact and still pass.
+    await seedBoundary('live-received-import', null, 'import-received');
+    await expect(assertLivePathBoundaryHolds(engine, 'live-received-import')).rejects.toThrow(
+      /imports may rest only in VALIDATING\/SHADOW/,
+    );
+
+    // The genuine shadow artifact still passes.
+    await seedBoundary('live-shadow-import', null, 'import-shadow');
+    const assertions = await assertLivePathBoundaryHolds(engine, 'live-shadow-import');
+    expect(assertions.length).toBe(4);
   }, 120_000);
 
   it('refuses any live-path request carrying provider, import, or decryption access', () => {

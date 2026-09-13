@@ -873,6 +873,76 @@ describe('§69.11 rollback (AC-279)', () => {
     });
   }, 120_000);
 
+  it('restores a genuinely earlier approved artifact set across an A -> B -> A cycle (H7)', async () => {
+    const scope = makeScope({ profile_version: 'rollback-cycle' });
+    const moduleId = 'module-rollback-cycle';
+    await advance(moduleId, scope, 'IMPLEMENTED', 'cycle-1');
+    await advance(moduleId, scope, 'AVAILABLE', 'cycle-2');
+    await advance(moduleId, scope, 'SHADOW', 'cycle-3');
+    await advance(moduleId, scope, 'PROVEN', 'cycle-4');
+    // Artifact set A is approved under activation event P.
+    await advance(moduleId, scope, 'ACTIVE', 'cycle-5', {
+      gateResult: await gatePass(scope, 'activation-cycle-p'),
+    });
+    // A later drift degrades the scope and a NEW set B is approved under event Q.
+    await advance(moduleId, scope, 'DEGRADED', 'cycle-6');
+    await advance(moduleId, scope, 'ACTIVE', 'cycle-7', {
+      gateResult: await gatePass(scope, 'activation-cycle-q'),
+      hash: HASH_B,
+    });
+
+    // Rolling back to A names the event P that genuinely approved A.
+    const outcome = await rollbackToApproved(engine, {
+      moduleId,
+      scope,
+      restoredArtifactSetHash: HASH_A,
+      priorActivationEventRef: 'activation-cycle-p',
+      newActivationEventRef: 'activation-cycle-r',
+      candidateReevaluationRef: 'reevaluation-cycle',
+      at: NOW,
+      rollbackId: 'rollback-cycle-1',
+    });
+    expect(outcome.rollback.restoredArtifactSetHash).toBe(HASH_A);
+    expect(outcome.rollback.priorActivationEventRef).toBe('activation-cycle-p');
+
+    // A fabricated prior event that never approved anything refuses.
+    const degradedScope = makeScope({ profile_version: 'rollback-fabricated' });
+    const fabricatedModule = 'module-rollback-fabricated';
+    await advance(fabricatedModule, degradedScope, 'IMPLEMENTED', 'fab-1');
+    await advance(fabricatedModule, degradedScope, 'AVAILABLE', 'fab-2');
+    await advance(fabricatedModule, degradedScope, 'SHADOW', 'fab-3');
+    await advance(fabricatedModule, degradedScope, 'PROVEN', 'fab-4');
+    await advance(fabricatedModule, degradedScope, 'ACTIVE', 'fab-5', {
+      gateResult: await gatePass(degradedScope, 'activation-fab-real'),
+    });
+    const fabricated = await rejection(
+      rollbackToApproved(engine, {
+        moduleId: fabricatedModule,
+        scope: degradedScope,
+        restoredArtifactSetHash: HASH_A,
+        priorActivationEventRef: 'activation-fab-fabricated',
+        newActivationEventRef: 'activation-fab-new',
+        candidateReevaluationRef: 'reevaluation-fab',
+        at: NOW,
+      }),
+    );
+    expect(fabricated.code).toBe('PROD_LIFECYCLE_TRANSITION_ILLEGAL');
+
+    // So does a set that never reached ACTIVE at all.
+    const neverActive = await rejection(
+      rollbackToApproved(engine, {
+        moduleId: fabricatedModule,
+        scope: degradedScope,
+        restoredArtifactSetHash: HASH_B,
+        priorActivationEventRef: 'activation-fab-real',
+        newActivationEventRef: 'activation-fab-new-2',
+        candidateReevaluationRef: 'reevaluation-fab-2',
+        at: NOW,
+      }),
+    );
+    expect(neverActive.code).toBe('PROD_LIFECYCLE_TRANSITION_ILLEGAL');
+  }, 120_000);
+
   it('refuses reusing an activation event or restoring an unapproved artifact set', async () => {
     const scope = makeScope({ profile_version: 'rollback-refuse' });
     const moduleId = 'module-rollback-refuse';

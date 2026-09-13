@@ -12,6 +12,7 @@ import path from 'node:path';
 import {
   CLAIM_PROD_RULES,
   CONFORMANCE_RULES,
+  GATE_KINDS,
   PROD_RULES,
   checkActivationWithoutEvidence,
   checkProdSurfacePresence,
@@ -21,7 +22,10 @@ import {
   checkPublicAuthorizationWithoutGateEvidence,
   evaluateDistributionAuthorization,
   evaluateProdConformance,
+  SHADOW_ONLY_IMPORT_ARTIFACT_STATES,
+  type LivePathPrecomputationClaim,
 } from '../src/index.ts';
+import type { ArtifactBoundaryAssertion } from '@foresift/domain';
 import {
   PROD_ACTIVATION_CLAIMS,
   PROD_ACTIVE_UNAVAILABLE_CLAIM,
@@ -32,6 +36,7 @@ import {
   PROD_BEST_EFFORT_WEAKENING,
   PROD_COMPLIANT_ACTIVE_CLAIM,
   PROD_DISTRIBUTION_CLAIMS,
+  PROD_DISTRIBUTION_REQUIRED_GATES,
   PROD_LIVE_PATH_BOUNDED_CLAIM,
   PROD_LIVE_PATH_CLAIMS,
   PROD_LIVE_PATH_EXCEEDING_CLAIM,
@@ -561,18 +566,23 @@ describe('THIRD-ROUND exploit regressions (R2/R3, T055/T056/T057)', () => {
   });
 
   it('never substring-matches a foreign release from a string scopeRefs (R3)', () => {
+    // Every case below declares the FULL authoritative gate set, so the only
+    // reason it can refuse is the scoping defect under test — a truncated
+    // declaration would refuse for the wrong reason (audit R4).
+    const authoritativeGates = [...PROD_DISTRIBUTION_REQUIRED_GATES];
+    // One record (RIGHTS) carries a STRING scopeRefs; the rest are exact-release
+    // arrays. `String.prototype.includes` would substring-match 'rel'.
+    const stringScopedEvidence = authoritativeGates.map((gateKind) => ({
+      evidenceId: `e-${gateKind}`,
+      gateKind,
+      scopeRefs: gateKind === 'RIGHTS' ? 'foreign-release-rel' : ['rel'],
+      valid: true,
+    }));
     const foreign = evaluateDistributionAuthorization({
       releaseRef: 'rel',
       distributionReadiness: 'WORKSPACE_AUTHORIZED',
-      requiredGateKinds: ['GATE_A'],
-      gateEvidence: [
-        {
-          evidenceId: 'e1',
-          gateKind: 'GATE_A',
-          scopeRefs: 'foreign-release-rel',
-          valid: true,
-        },
-      ],
+      requiredGateKinds: authoritativeGates,
+      gateEvidence: stringScopedEvidence,
     } as never);
     expect(foreign.authorized).toBe(false);
     expect(foreign.malformedGateEvidence).toBe(true);
@@ -581,15 +591,8 @@ describe('THIRD-ROUND exploit regressions (R2/R3, T055/T056/T057)', () => {
       {
         releaseRef: 'rel',
         distributionReadiness: 'WORKSPACE_AUTHORIZED',
-        requiredGateKinds: ['GATE_A'],
-        gateEvidence: [
-          {
-            evidenceId: 'e1',
-            gateKind: 'GATE_A',
-            scopeRefs: 'foreign-release-rel',
-            valid: true,
-          },
-        ],
+        requiredGateKinds: authoritativeGates,
+        gateEvidence: stringScopedEvidence,
       } as never,
     ]);
     expect(report.passed).toBe(false);
@@ -599,8 +602,13 @@ describe('THIRD-ROUND exploit regressions (R2/R3, T055/T056/T057)', () => {
     const genuine = evaluateDistributionAuthorization({
       releaseRef: 'rel',
       distributionReadiness: 'WORKSPACE_AUTHORIZED',
-      requiredGateKinds: ['GATE_A'],
-      gateEvidence: [{ evidenceId: 'e1', gateKind: 'GATE_A', scopeRefs: ['rel'], valid: true }],
+      requiredGateKinds: authoritativeGates,
+      gateEvidence: authoritativeGates.map((gateKind) => ({
+        evidenceId: `e-${gateKind}`,
+        gateKind,
+        scopeRefs: ['rel'],
+        valid: true,
+      })),
     } as never);
     expect(genuine.authorized).toBe(true);
 
@@ -613,15 +621,8 @@ describe('THIRD-ROUND exploit regressions (R2/R3, T055/T056/T057)', () => {
         {
           releaseRef: 'rel',
           distributionReadiness: 'WORKSPACE_AUTHORIZED',
-          requiredGateKinds: ['GATE_A'],
-          gateEvidence: [
-            {
-              evidenceId: 'e1',
-              gateKind: 'GATE_A',
-              scopeRefs: 'foreign-release-rel',
-              valid: true,
-            },
-          ],
+          requiredGateKinds: authoritativeGates,
+          gateEvidence: stringScopedEvidence,
         },
       ],
     } as never);
@@ -663,18 +664,30 @@ describe('THIRD-ROUND exploit regressions (R2/R3, T055/T056/T057)', () => {
   });
 
   it('resists in-process array-method shadowing and degenerate release ids', () => {
-    // Own `filter` returning forged in-scope evidence must not authorize.
-    const shadowedFilter = [
-      { evidenceId: 'e1', gateKind: 'GATE_A', scopeRefs: ['foreign-release'], valid: true },
-    ];
+    const authoritativeGates = [...PROD_DISTRIBUTION_REQUIRED_GATES];
+    // Own `filter` returning forged in-scope evidence must not authorize. The
+    // REAL evidence is foreign-scoped for every authoritative kind, so a
+    // `filter`-based implementation would be fooled by the shadowed method.
+    const shadowedFilter = authoritativeGates.map((gateKind) => ({
+      evidenceId: `e-${gateKind}`,
+      gateKind,
+      scopeRefs: ['foreign-release'],
+      valid: true,
+    }));
     Object.defineProperty(shadowedFilter, 'filter', {
-      value: () => [{ evidenceId: 'x', gateKind: 'GATE_A', scopeRefs: ['rel'], valid: true }],
+      value: () =>
+        authoritativeGates.map((gateKind) => ({
+          evidenceId: `forged-${gateKind}`,
+          gateKind,
+          scopeRefs: ['rel'],
+          valid: true,
+        })),
     });
     expect(
       evaluateDistributionAuthorization({
         releaseRef: 'rel',
         distributionReadiness: 'WORKSPACE_AUTHORIZED',
-        requiredGateKinds: ['GATE_A'],
+        requiredGateKinds: authoritativeGates,
         gateEvidence: shadowedFilter,
       } as never).authorized,
     ).toBe(false);
@@ -686,10 +699,13 @@ describe('THIRD-ROUND exploit regressions (R2/R3, T055/T056/T057)', () => {
       evaluateDistributionAuthorization({
         releaseRef: 'rel',
         distributionReadiness: 'WORKSPACE_AUTHORIZED',
-        requiredGateKinds: ['GATE_A'],
-        gateEvidence: [
-          { evidenceId: 'e1', gateKind: 'GATE_A', scopeRefs: shadowedIncludes, valid: true },
-        ],
+        requiredGateKinds: authoritativeGates,
+        gateEvidence: authoritativeGates.map((gateKind) => ({
+          evidenceId: `e-${gateKind}`,
+          gateKind,
+          scopeRefs: shadowedIncludes,
+          valid: true,
+        })),
       } as never).authorized,
     ).toBe(false);
 
@@ -698,10 +714,191 @@ describe('THIRD-ROUND exploit regressions (R2/R3, T055/T056/T057)', () => {
     const degenerate = evaluateDistributionAuthorization({
       releaseRef: '',
       distributionReadiness: 'WORKSPACE_AUTHORIZED',
-      requiredGateKinds: ['GATE_A'],
-      gateEvidence: [{ evidenceId: 'e1', gateKind: 'GATE_A', scopeRefs: [''], valid: true }],
+      requiredGateKinds: authoritativeGates,
+      gateEvidence: authoritativeGates.map((gateKind) => ({
+        evidenceId: `e-${gateKind}`,
+        gateKind,
+        scopeRefs: [''],
+        valid: true,
+      })),
     } as never);
     expect(degenerate.authorized).toBe(false);
     expect(degenerate.malformedReleaseRef).toBe(true);
+  });
+});
+
+describe('FOURTH-ROUND exploit regressions (R4/R7, audit H2/H4)', () => {
+  const AUTHORITATIVE_GATES = [...PROD_DISTRIBUTION_REQUIRED_GATES];
+  const VALID_EXACT_RELEASE_EVIDENCE = AUTHORITATIVE_GATES.map((gateKind) => ({
+    evidenceId: `evidence-${gateKind.toLowerCase()}`,
+    gateKind,
+    scopeRefs: ['rel'],
+    valid: true,
+  }));
+
+  /** A compliant baseline claim whose only variable is the gate declaration. */
+  function publicAuthorizationClaim(overrides: Record<string, unknown>): unknown {
+    return {
+      releaseRef: 'rel',
+      distributionReadiness: 'PUBLIC_AUTHORIZED',
+      requiredGateKinds: AUTHORITATIVE_GATES,
+      gateEvidence: VALID_EXACT_RELEASE_EVIDENCE,
+      ...overrides,
+    };
+  }
+
+  /** The otherwise-compliant claim set for one public-authorization claim. */
+  function conformanceWithAuthorization(claim: unknown) {
+    return evaluateProdConformance({
+      activationClaims: [],
+      postureDeclarations: [],
+      mcpCompatibility: PROD_MCP_COMPLIANT_CLAIM,
+      livePaths: [],
+      distributionAuthorizations: [claim],
+    } as never);
+  }
+
+  it('binds the mandatory set to the exported authoritative GATE_KINDS vocabulary (R4)', () => {
+    // The fixture list must BE the closed vocabulary, never a truncation.
+    expect([...PROD_DISTRIBUTION_REQUIRED_GATES].sort()).toEqual([...GATE_KINDS].sort());
+    expect([...SHADOW_ONLY_IMPORT_ARTIFACT_STATES]).toEqual(['VALIDATING', 'SHADOW_ELIGIBLE']);
+  });
+
+  it('refuses the fabricated TOTALLY_FAKE_GATE self-attestation exploit (R4)', () => {
+    const fabricated = publicAuthorizationClaim({
+      requiredGateKinds: ['TOTALLY_FAKE_GATE'],
+      gateEvidence: [
+        { evidenceId: 'e', gateKind: 'TOTALLY_FAKE_GATE', scopeRefs: ['rel'], valid: true },
+      ],
+    });
+    const evaluation = evaluateDistributionAuthorization(fabricated as never);
+    expect(evaluation.authorized).toBe(false);
+    expect(evaluation.unknownGateKinds).toEqual(['TOTALLY_FAKE_GATE']);
+    expect(evaluation.omittedMandatoryGateKinds).toEqual(AUTHORITATIVE_GATES);
+    expect(evaluation.missingGateKinds).toEqual(AUTHORITATIVE_GATES);
+
+    const aggregate = conformanceWithAuthorization(fabricated);
+    expect(aggregate.overall).toBe('FAILED');
+    expect(aggregate.findings.map((finding) => finding.rule)).toContain(
+      PROD_RULES.publicAuthorizationWithoutGateEvidence,
+    );
+    expect(aggregate.findings[0]?.message).toContain(
+      'declared gate kinds outside the authoritative set: TOTALLY_FAKE_GATE',
+    );
+    expect(aggregate.findings[0]?.message).toContain(
+      'authoritative mandatory gate kinds omitted from the declaration',
+    );
+  });
+
+  it('refuses the DISTRIBUTION_EVIDENCE truncation exploit (R4)', () => {
+    const truncated = publicAuthorizationClaim({
+      requiredGateKinds: ['DISTRIBUTION_EVIDENCE'],
+      gateEvidence: [
+        { evidenceId: 'e', gateKind: 'DISTRIBUTION_EVIDENCE', scopeRefs: ['rel'], valid: true },
+      ],
+    });
+    const evaluation = evaluateDistributionAuthorization(truncated as never);
+    expect(evaluation.authorized).toBe(false);
+    expect(evaluation.unknownGateKinds).toEqual(['DISTRIBUTION_EVIDENCE']);
+    expect(evaluation.omittedMandatoryGateKinds).toEqual(AUTHORITATIVE_GATES);
+    expect(evaluation.missingGateKinds).toEqual(AUTHORITATIVE_GATES);
+
+    const aggregate = conformanceWithAuthorization(truncated);
+    expect(aggregate.overall).toBe('FAILED');
+    expect(aggregate.findings.map((finding) => finding.rule)).toContain(
+      PROD_RULES.publicAuthorizationWithoutGateEvidence,
+    );
+  });
+
+  it('still refuses a declaration that omits one authoritative kind (R4)', () => {
+    const withoutRights = AUTHORITATIVE_GATES.filter((gateKind) => gateKind !== 'RIGHTS');
+    const evaluation = evaluateDistributionAuthorization(
+      publicAuthorizationClaim({
+        requiredGateKinds: withoutRights,
+        gateEvidence: VALID_EXACT_RELEASE_EVIDENCE,
+      }) as never,
+    );
+    expect(evaluation.authorized).toBe(false);
+    expect(evaluation.omittedMandatoryGateKinds).toEqual(['RIGHTS']);
+    expect(evaluation.missingGateKinds).toEqual([]);
+    expect(
+      conformanceWithAuthorization(
+        publicAuthorizationClaim({
+          requiredGateKinds: withoutRights,
+          gateEvidence: VALID_EXACT_RELEASE_EVIDENCE,
+        }),
+      ).overall,
+    ).toBe('FAILED');
+  });
+
+  it('authorizes the full authoritative set with exact-release evidence (R4)', () => {
+    const exact = publicAuthorizationClaim({});
+    expect(evaluateDistributionAuthorization(exact as never).authorized).toBe(true);
+    expect(evaluateDistributionAuthorization(exact as never).unknownGateKinds).toEqual([]);
+    expect(evaluateDistributionAuthorization(exact as never).omittedMandatoryGateKinds).toEqual([]);
+
+    const aggregate = conformanceWithAuthorization(exact);
+    expect(aggregate.overall).toBe('PASSED');
+    expect(aggregate.findings).toEqual([]);
+  });
+
+  /** A compliant bounded live path whose IMPORT_SHADOW_ONLY state is varied. */
+  function livePathWithImportState(state: unknown, omit = false): LivePathPrecomputationClaim {
+    const boundaryAssertions: ArtifactBoundaryAssertion[] = [];
+    for (const assertion of PROD_LIVE_PATH_BOUNDED_CLAIM.boundaryAssertions) {
+      if (assertion.assertionKind !== 'IMPORT_SHADOW_ONLY') {
+        boundaryAssertions.push(assertion);
+        continue;
+      }
+      const next: Record<string, unknown> = { ...assertion };
+      if (omit) delete next['importArtifactState'];
+      else next['importArtifactState'] = state;
+      boundaryAssertions.push(next as unknown as ArtifactBoundaryAssertion);
+    }
+    return { ...PROD_LIVE_PATH_BOUNDED_CLAIM, boundaryAssertions };
+  }
+
+  function conformanceWithLivePath(livePath: LivePathPrecomputationClaim) {
+    return evaluateProdConformance({
+      activationClaims: [],
+      postureDeclarations: [],
+      mcpCompatibility: PROD_MCP_COMPLIANT_CLAIM,
+      livePaths: [livePath],
+      distributionAuthorizations: [PROD_WORKSPACE_AUTHORIZED_CLAIM],
+    });
+  }
+
+  it('fails a live path whose IMPORT_SHADOW_ONLY state is missing, null, unknown, or non-shadow (R7)', () => {
+    const missing = livePathWithImportState(undefined, true);
+    expect(conformanceWithLivePath(missing).overall).toBe('FAILED');
+
+    for (const state of [
+      null,
+      'TOTALLY_MADE_UP',
+      'RECEIVED',
+      'QUARANTINED',
+      'SCANNED',
+      'REJECTED',
+      'ACTIVE',
+    ]) {
+      const report = conformanceWithLivePath(livePathWithImportState(state));
+      expect(report.overall, `import state ${JSON.stringify(state)} must fail closed`).toBe(
+        'FAILED',
+      );
+      expect(report.findings.map((finding) => finding.rule)).toContain(
+        PROD_RULES.livePathPrecomputationViolation,
+      );
+      expect(
+        report.findings.some((finding) => finding.message.includes('IMPORT_SHADOW_ONLY')),
+      ).toBe(true);
+    }
+  });
+
+  it('accepts a live path whose IMPORT_SHADOW_ONLY state is VALIDATING or SHADOW_ELIGIBLE (R7)', () => {
+    for (const state of ['VALIDATING', 'SHADOW_ELIGIBLE']) {
+      const report = conformanceWithLivePath(livePathWithImportState(state));
+      expect(report.overall, `import state ${state} must pass`).toBe('PASSED');
+      expect(report.findings).toEqual([]);
+    }
   });
 });

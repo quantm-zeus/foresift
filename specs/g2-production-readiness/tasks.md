@@ -527,7 +527,7 @@ direct negative regression (exploit) test that fails against the pre-correction
 revision. `specs/g2-production-readiness/emergency-correction.md` carries the
 third-round finding-to-task map and the verbatim reproductions.
 
-- [ ] T053 [serial-reason: SHARED_FILE] Deep-freeze every
+- [x] T053 [serial-reason: SHARED_FILE] Deep-freeze every
       `GateConditionEvaluation` element (and the condition it spreads) so a
       caller cannot mutate a recorded pass's nested evaluation and defeat the
       `advanceState` persisted-dimension cross-check, and derive the
@@ -537,43 +537,52 @@ third-round finding-to-task map and the verbatim reproductions.
       `bound.evaluations[AVAILABLE_EVIDENCE].verdict` to `NOT_APPLICABLE`, then
       cross into ACTIVE — must refuse. Closes the H5 binding bypass. Traces:
       FR-PROD-001, FR-PROD-002, AC-152.
-- [ ] T054 [serial-reason: SHARED_FILE] Align the TypeScript persisted-evidence
+- [x] T054 [serial-reason: SHARED_FILE] Align the TypeScript persisted-evidence
       guard with the SQL trigger: `requirePersistedActivationEvidence` must
       refuse when **any** persisted row for the exact scope/kind/event is a
       `REFUSE`, not only when the newest `evaluated_at` batch refuses, so a
       backdated refusal cannot be ignored. Negative: record PASS then a
       backdated REFUSE for the same event — the exported guard must refuse.
       Traces: FR-PROD-002, AC-154.
-- [ ] T055 Fail the `ACTIVATION_WITHOUT_EVIDENCE` conformance rule closed on an
+- [x] T055 Fail the `ACTIVATION_WITHOUT_EVIDENCE` conformance rule closed on an
       ACTIVE claim whose `activationEventRef` is omitted, empty, non-string, or
       whitespace, whose `requiresProven` is not a boolean, or whose
       `lifecycleState` is not a known governed position. Negative: the omitted
       and empty-string exploits (and an unknown lifecycle position) must
       produce findings and `overall === 'FAILED'`. Closes the H2 residual.
       Traces: FR-PROD-001, FR-PROD-002, AC-152.
-- [ ] T056 Fail the PUBLIC/WORKSPACE authorization rule closed on malformed
+- [x] T056 Fail the PUBLIC/WORKSPACE authorization rule closed on malformed
       evidence shape: `scopeRefs` must be an array of release refs (never a
       substring-matched string), `requiredGateKinds`/`gateEvidence` must be
       arrays, and a malformed shape is a finding. Negative: a foreign release
       named only inside a `scopeRefs` string must NOT authorize. Closes the H2
       residual. Traces: FR-PROD-002, FR-PROD-004, AC-272, AC-273.
-- [ ] T057 [serial-reason: SHARED_FILE] Make the active-milestone resolution in
+- [x] T057 [serial-reason: SHARED_FILE] Make the active-milestone resolution in
       `evaluateConformance` reject a non-canonical / out-of-range id exactly as
       the explicit override does (`G0`…`G7`), so a malformed
       `current-milestone.json` cannot silently skip the PROD block. Traces:
       FR-PROD-001…006.
-- [ ] T058 [executor: TEST] Repair the hollow AC-279 acceptance path: drive a
+- [x] T058 [executor: TEST] Repair the hollow AC-279 acceptance path: drive a
       genuine A→B→A restore (current set B, prior approved set A under the exact
       event) instead of the no-op same-set restore, and keep the fabricated
       prior-event / never-approved-set negatives. Closes the H7 test residual.
       Traces: FR-PROD-006, AC-279.
-- [ ] T059 [serial-reason: SHARED_INVARIANT] Restore the cross-generation
+- [x] T059 [serial-reason: SHARED_INVARIANT] Restore the cross-generation
       out-of-order invariant in the migrator: key the applied-family high-water
       on the `_<family>_` token (not `g<generation>_<family>`) so a
       later-generation latecomer (`g1_data_0009` after an applied
       `g2_data_0001`) is refused as a same-family gap, while a wholly-new family
       (`prod` after `wf`) still applies additively. Negative: the cross-generation
       latecomer must refuse and must not create its table. Traces: FR-PROD-001…006.
+- [x] T062 [serial-reason: SHARED_FILE] In-process hardening of the PROD
+      rules against caller-owned array method shadowing (`filter`/`some`/
+      `includes`/`entries`/`Symbol.iterator`), a boxed/coercible explicit
+      milestone (`new String('G2')`), and a degenerate `releaseRef`: every
+      decision loop reads numeric indices and object properties directly, the
+      explicit milestone requires `typeof === 'string'`, and `releaseRef` must
+      be a non-empty string. Negative: shadowed `filter`/`includes`, a boxed
+      milestone, and an empty `releaseRef` must all refuse. Traces:
+      FR-PROD-001, FR-PROD-002.
 - [ ] T060 [serial-reason: COORDINATOR_BOUNDARY] Fresh-context adversarial
       re-review of the third-round diff, direct exploit replay (nested
       mutation, omitted/empty activation event, substring scopeRefs,

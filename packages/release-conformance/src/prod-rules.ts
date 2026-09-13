@@ -144,7 +144,20 @@ export function checkActivationWithoutEvidence(
   claims: readonly ModuleActivationClaim[],
 ): ProdRuleReport {
   const findings: ProdConformanceFinding[] = [];
-  for (const claim of claims) {
+  // Numeric-index iteration (never `for…of`) so an in-process caller cannot
+  // shadow `Symbol.iterator` on its own array and hide malformed claims; the
+  // JSON release gate is unaffected either way.
+  for (let claimIndex = 0; claimIndex < claims.length; claimIndex += 1) {
+    const claim = claims[claimIndex];
+    if (claim === undefined || claim === null) {
+      findings.push({
+        requirementId: DEFAULT_ACTIVATION_REQUIREMENT,
+        rule: PROD_RULES.activationWithoutEvidence,
+        path: `activationClaims[${claimIndex}]`,
+        message: `activationClaims[${claimIndex}] is not a claim object; a malformed claim fails closed`,
+      });
+      continue;
+    }
     const requirementId = claim.requirementId ?? DEFAULT_ACTIVATION_REQUIREMENT;
     // An unparseable governed position is not a non-ACTIVE position: it fails
     // closed instead of being silently skipped (audit R2 residual).
@@ -507,6 +520,8 @@ export interface DistributionAuthorizationEvaluation {
   readonly readinessAuthorized: boolean;
   readonly readinessKnown: boolean;
   readonly requiredGateKindsEmpty: boolean;
+  /** `releaseRef` was not a non-empty string (a degenerate identity never authorizes). */
+  readonly malformedReleaseRef: boolean;
   /** `requiredGateKinds` was not an array (a string is never a gate set). */
   readonly malformedRequiredGateKinds: boolean;
   /** `gateEvidence` was not an array, or an element's `scopeRefs` was not one. */
@@ -546,60 +561,81 @@ export function evaluateDistributionAuthorization(
   const missingGateKinds: string[] = [];
   const mismatchedGateKinds: string[] = [];
   const revokedOrInvalidGateKinds: string[] = [];
-  // The gate set and the evidence list must be real arrays. `scopeRefs` in
-  // particular must never be a string: `String.prototype.includes` would
-  // substring-match a foreign release ref into scope (audit R3).
+  // The release identity must be a non-empty string, and the gate set and the
+  // evidence list must be real arrays. `scopeRefs` in particular must never be
+  // a string: `String.prototype.includes` would substring-match a foreign
+  // release ref into scope (audit R3). Every loop below reads numeric indices
+  // and object properties directly — never `Array.prototype.filter/some/includes`
+  // on a caller-owned array — so an in-process caller cannot shadow those
+  // methods and defeat exact-release scoping (the JSON gate cannot do this).
+  const releaseRefValid =
+    typeof claim.releaseRef === 'string' && claim.releaseRef.trim().length > 0;
   const requiredGateKindsMalformed = !Array.isArray(claim.requiredGateKinds);
-  const gateEvidenceMalformed =
-    !Array.isArray(claim.gateEvidence) ||
-    (claim.gateEvidence as readonly unknown[]).some(
-      (evidence) =>
-        typeof evidence !== 'object' ||
-        evidence === null ||
-        !Array.isArray((evidence as { readonly scopeRefs?: unknown }).scopeRefs),
-    );
   const requiredGateKinds: readonly unknown[] = requiredGateKindsMalformed
     ? []
     : (claim.requiredGateKinds as readonly unknown[]);
-  const gateEvidence: readonly unknown[] = Array.isArray(claim.gateEvidence)
-    ? (claim.gateEvidence as readonly unknown[])
-    : [];
+  let gateEvidenceMalformed = !Array.isArray(claim.gateEvidence);
+  const gateEvidence: readonly unknown[] = gateEvidenceMalformed
+    ? []
+    : (claim.gateEvidence as readonly unknown[]);
+  if (!gateEvidenceMalformed) {
+    for (let evidenceIndex = 0; evidenceIndex < gateEvidence.length; evidenceIndex += 1) {
+      const evidence = gateEvidence[evidenceIndex];
+      if (
+        typeof evidence !== 'object' ||
+        evidence === null ||
+        !Array.isArray((evidence as { readonly scopeRefs?: unknown }).scopeRefs)
+      ) {
+        gateEvidenceMalformed = true;
+        break;
+      }
+    }
+  }
   // An authorization claim with NO required gate kinds is unauthorized by
   // construction: zero requirements cannot be satisfied into a PASS (H2).
   const requiredGateKindsEmpty = readinessAuthorized && requiredGateKinds.length === 0;
-  for (const gateKind of requiredGateKinds) {
+  for (let gateIndex = 0; gateIndex < requiredGateKinds.length; gateIndex += 1) {
+    const gateKind = requiredGateKinds[gateIndex];
     if (typeof gateKind !== 'string') {
       missingGateKinds.push(String(gateKind));
       continue;
     }
-    const matching = gateEvidence.filter(
-      (evidence) =>
-        typeof evidence === 'object' &&
-        evidence !== null &&
-        (evidence as { readonly gateKind?: unknown }).gateKind === gateKind,
-    );
-    if (matching.length === 0) {
-      missingGateKinds.push(gateKind);
-      continue;
-    }
-    // Exact release scoping: only an array membership counts, and a malformed
-    // (non-array) `scopeRefs` never resolves to in-scope evidence.
-    const inScope = matching.filter((evidence) => {
+    let sawMatching = false;
+    let sawInScope = false;
+    let sawUsable = false;
+    for (let evidenceIndex = 0; evidenceIndex < gateEvidence.length; evidenceIndex += 1) {
+      const evidence = gateEvidence[evidenceIndex];
+      if (
+        typeof evidence !== 'object' ||
+        evidence === null ||
+        (evidence as { readonly gateKind?: unknown }).gateKind !== gateKind
+      ) {
+        continue;
+      }
+      sawMatching = true;
       const refs = (evidence as { readonly scopeRefs?: unknown }).scopeRefs;
-      return Array.isArray(refs) && refs.includes(claim.releaseRef);
-    });
-    if (inScope.length === 0) {
-      mismatchedGateKinds.push(gateKind);
-      continue;
-    }
-    const usable = inScope.some((evidence) => {
+      if (!Array.isArray(refs)) continue;
+      let inScope = false;
+      for (let refIndex = 0; refIndex < refs.length; refIndex += 1) {
+        if (refs[refIndex] === claim.releaseRef) {
+          inScope = true;
+          break;
+        }
+      }
+      if (!inScope) continue;
+      sawInScope = true;
       const record = evidence as { readonly valid?: unknown; readonly revokedAt?: unknown };
-      return record.valid === true && (record.revokedAt === undefined || record.revokedAt === null);
-    });
-    if (!usable) revokedOrInvalidGateKinds.push(gateKind);
+      if (record.valid === true && (record.revokedAt === undefined || record.revokedAt === null)) {
+        sawUsable = true;
+      }
+    }
+    if (!sawMatching) missingGateKinds.push(gateKind);
+    else if (!sawInScope) mismatchedGateKinds.push(gateKind);
+    else if (!sawUsable) revokedOrInvalidGateKinds.push(gateKind);
   }
   return {
     authorized:
+      releaseRefValid &&
       readinessKnown &&
       readinessAuthorized &&
       !requiredGateKindsMalformed &&
@@ -611,6 +647,7 @@ export function evaluateDistributionAuthorization(
     readinessAuthorized,
     readinessKnown,
     requiredGateKindsEmpty,
+    malformedReleaseRef: !releaseRefValid,
     malformedRequiredGateKinds: requiredGateKindsMalformed,
     malformedGateEvidence: gateEvidenceMalformed,
     missingGateKinds,
@@ -624,7 +661,18 @@ export function checkPublicAuthorizationWithoutGateEvidence(
   claims: readonly DistributionAuthorizationClaim[],
 ): ProdRuleReport {
   const findings: ProdConformanceFinding[] = [];
-  for (const claim of claims) {
+  // Numeric-index iteration (never `for…of`): see `checkActivationWithoutEvidence`.
+  for (let claimIndex = 0; claimIndex < claims.length; claimIndex += 1) {
+    const claim = claims[claimIndex];
+    if (claim === undefined || claim === null) {
+      findings.push({
+        requirementId: DEFAULT_PUBLIC_AUTHORIZATION_REQUIREMENT,
+        rule: PROD_RULES.publicAuthorizationWithoutGateEvidence,
+        path: `distributionAuthorizations[${claimIndex}]`,
+        message: `distributionAuthorizations[${claimIndex}] is not a claim object; a malformed claim fails closed`,
+      });
+      continue;
+    }
     const evaluation = evaluateDistributionAuthorization(claim);
     if (!evaluation.readinessKnown) {
       findings.push({
@@ -647,6 +695,11 @@ export function checkPublicAuthorizationWithoutGateEvidence(
     }
     if (evaluation.malformedRequiredGateKinds) {
       details.push('requiredGateKinds is not an array (a gate set must be declared as an array)');
+    }
+    if (evaluation.malformedReleaseRef) {
+      details.push(
+        'releaseRef is not a non-empty string (a degenerate release identity cannot authorize)',
+      );
     }
     if (evaluation.malformedGateEvidence) {
       details.push(
@@ -783,7 +836,9 @@ export function checkProdConformanceInputsPresent(input: ProdConformanceInput): 
       continue;
     }
     const requiredFields = REQUIRED_CLAIM_FIELDS[field] ?? [];
-    for (const [index, element] of (value as readonly unknown[]).entries()) {
+    const elements = value as readonly unknown[];
+    for (let index = 0; index < elements.length; index += 1) {
+      const element = elements[index];
       if (typeof element !== 'object' || element === null || Array.isArray(element)) {
         findings.push({
           requirementId: 'FR-PROD-001',
@@ -846,9 +901,9 @@ export function checkProdConformanceInputsPresent(input: ProdConformanceInput): 
             message: `${field}[${index}].gateEvidence must be an array of evidence records`,
           });
         } else {
-          for (const [evidenceIndex, evidence] of (
-            claim['gateEvidence'] as readonly unknown[]
-          ).entries()) {
+          const evidenceList = claim['gateEvidence'] as readonly unknown[];
+          for (let evidenceIndex = 0; evidenceIndex < evidenceList.length; evidenceIndex += 1) {
+            const evidence = evidenceList[evidenceIndex];
             const scopeRefs =
               typeof evidence === 'object' && evidence !== null
                 ? (evidence as Record<string, unknown>)['scopeRefs']

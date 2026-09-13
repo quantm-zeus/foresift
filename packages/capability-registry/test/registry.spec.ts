@@ -1745,9 +1745,20 @@ describe('ACTIVE is bound to persisted gate evidence (F1)', () => {
   it('refuses a backdated REFUSE that a later PASS must not erase (R2/T054)', async () => {
     const scope = makeScope({ profile_version: 'backdated-refuse', requires_proven: false });
     const moduleId = 'module-backdated-refuse';
+    // Establish BOTH dimensions the PASS claims, so the dimension cross-check
+    // passes and the ONLY thing that can refuse is the any-REFUSE guard. (With
+    // AVAILABLE unestablished the pre-fix in-memory dimension check would
+    // refuse first, and the regression would not discriminate the fix.)
     await advance(moduleId, scope, 'IMPLEMENTED', 'br-1');
-    await advance(moduleId, scope, 'SHADOW', 'br-2');
-    await advance(moduleId, scope, 'PAUSED', 'br-3');
+    await advance(moduleId, scope, 'AVAILABLE', 'br-2');
+    await advance(moduleId, scope, 'SHADOW', 'br-3');
+    await advance(moduleId, scope, 'PAUSED', 'br-4');
+    const dimensions = await statesFor(engine, { moduleId, scope });
+    expect([dimensions.implemented, dimensions.available, dimensions.proven]).toEqual([
+      true,
+      true,
+      false,
+    ]);
     const event = 'activation-backdated-refuse';
 
     const pass = evaluateActivationGate({
@@ -1785,11 +1796,14 @@ describe('ACTIVE is bound to persisted gate evidence (F1)', () => {
         actorRef: 'test-actor',
         at: NOW,
         gateResult: bound,
-        stateRowId: 'br-4',
-        transitionId: 'br-4-t',
+        stateRowId: 'br-5',
+        transitionId: 'br-5-t',
       }),
     );
     expect(refused.code).toBe('PROD_ACTIVATION_GATE_REFUSED');
+    // Pin the authoritative guard's own reason: the SQL trigger would otherwise
+    // mask a guard fail-open with a database-level error.
+    expect((refused.detail as { readonly reason?: string }).reason).toBe('EVIDENCE_SET_NOT_PASS');
     const rows = await stateRowsFor(engine, { moduleId, scope });
     expect(rows.some((row) => row.lifecycleState === 'ACTIVE')).toBe(false);
   }, 120_000);

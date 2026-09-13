@@ -649,4 +649,59 @@ describe('THIRD-ROUND exploit regressions (R2/R3, T055/T056/T057)', () => {
       await rm(dir, { recursive: true, force: true });
     }
   });
+
+  it('refuses a boxed/coercible milestone that would skip the PROD block', async () => {
+    const { evaluateConformance } = await import('../src/index.ts');
+    const result = await evaluateConformance({
+      repoRoot: REPO_ROOT,
+      milestone: new String('G2') as unknown as string,
+    });
+    expect(result.overall).toBe('FAILED');
+    expect(result.findings.map((finding) => finding.rule)).toContain(
+      'CONFORMANCE_MILESTONE_INVALID',
+    );
+  });
+
+  it('resists in-process array-method shadowing and degenerate release ids', () => {
+    // Own `filter` returning forged in-scope evidence must not authorize.
+    const shadowedFilter = [
+      { evidenceId: 'e1', gateKind: 'GATE_A', scopeRefs: ['foreign-release'], valid: true },
+    ];
+    Object.defineProperty(shadowedFilter, 'filter', {
+      value: () => [{ evidenceId: 'x', gateKind: 'GATE_A', scopeRefs: ['rel'], valid: true }],
+    });
+    expect(
+      evaluateDistributionAuthorization({
+        releaseRef: 'rel',
+        distributionReadiness: 'WORKSPACE_AUTHORIZED',
+        requiredGateKinds: ['GATE_A'],
+        gateEvidence: shadowedFilter,
+      } as never).authorized,
+    ).toBe(false);
+
+    // Own `includes` returning true must not pull a foreign scope into scope.
+    const shadowedIncludes = ['foreign-release'];
+    Object.defineProperty(shadowedIncludes, 'includes', { value: () => true });
+    expect(
+      evaluateDistributionAuthorization({
+        releaseRef: 'rel',
+        distributionReadiness: 'WORKSPACE_AUTHORIZED',
+        requiredGateKinds: ['GATE_A'],
+        gateEvidence: [
+          { evidenceId: 'e1', gateKind: 'GATE_A', scopeRefs: shadowedIncludes, valid: true },
+        ],
+      } as never).authorized,
+    ).toBe(false);
+
+    // A degenerate release identity never authorizes, even when the evidence
+    // scope exactly matches it.
+    const degenerate = evaluateDistributionAuthorization({
+      releaseRef: '',
+      distributionReadiness: 'WORKSPACE_AUTHORIZED',
+      requiredGateKinds: ['GATE_A'],
+      gateEvidence: [{ evidenceId: 'e1', gateKind: 'GATE_A', scopeRefs: [''], valid: true }],
+    } as never);
+    expect(degenerate.authorized).toBe(false);
+    expect(degenerate.malformedReleaseRef).toBe(true);
+  });
 });

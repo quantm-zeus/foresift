@@ -463,7 +463,15 @@ export async function evaluateConformance(options: ConformanceOptions): Promise<
   // An explicit milestone must be a canonical dependency group (`G0`…`G7`):
   // zero-padded or otherwise non-canonical ids are a gate-downgrade attempt and
   // refuse closed (audit HIGH-3).
-  if (options.milestone !== undefined && !/^G[0-7]$/.test(options.milestone)) {
+  // An explicit milestone must be a canonical dependency group (`G0`…`G7`):
+  // zero-padded or otherwise non-canonical ids are a gate-downgrade attempt and
+  // refuse closed. The type check is strict so a boxed/coercible id (for example
+  // `new String('G2')`, which `===` would not match against the manifest's
+  // primitive `dependencyGroup`) can never skip the PROD block (audit R2 residual).
+  if (
+    options.milestone !== undefined &&
+    (typeof options.milestone !== 'string' || !/^G[0-7]$/.test(options.milestone))
+  ) {
     return {
       overall: 'FAILED',
       findings: [

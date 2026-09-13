@@ -24,6 +24,7 @@ import {
   ErrorCode,
   ForesiftError,
   artifactBoundaryHolds,
+  isOneOf,
   parseActivationGateVerdict,
   parseArtifactBoundaryAssertionKind,
   trustBoundaryVerdict,
@@ -38,10 +39,10 @@ import type { ImportQuarantineState } from '@foresift/shared-schemas';
 export const SECURITY_IMPORT_BOUNDARY = '@foresift/security:ImportGate' as const;
 
 /** Quarantine states an imported artifact may rest in — never ACTIVE. */
-export const IMPORT_SHADOW_STATES: readonly ImportQuarantineState[] = [
+export const IMPORT_SHADOW_STATES: readonly ImportQuarantineState[] = Object.freeze([
   'VALIDATING',
   'SHADOW_ELIGIBLE',
-];
+]);
 
 /** The live-path privileges a confined request must NOT carry (§10.3/§35.14). */
 export interface LivePathAccess {
@@ -143,19 +144,41 @@ export async function artifactBoundaryAssertionsFor(
       ORDER BY assertion_kind ASC, asserted_at ASC, assertion_id ASC`,
     [livePath],
   );
-  return result.rows.map(decodeAssertion);
+  return decodeAssertionRows(result.rows);
+}
+
+/** Numeric-index decode of an assertion result set; never `rows.map(...)`. */
+function decodeAssertionRows(rows: readonly RawAssertionRow[]): ArtifactBoundaryAssertionRow[] {
+  const decoded: ArtifactBoundaryAssertionRow[] = [];
+  for (let index = 0; index < rows.length; index += 1) {
+    const row = rows[index];
+    if (row !== undefined) decoded[decoded.length] = decodeAssertion(row);
+  }
+  return decoded;
+}
+
+/** Project assertion rows onto the domain boundary shape by numeric index. */
+function toDomainAssertions(
+  assertions: readonly ArtifactBoundaryAssertionRow[],
+): ArtifactBoundaryAssertion[] {
+  const domainAssertions: ArtifactBoundaryAssertion[] = [];
+  for (let index = 0; index < assertions.length; index += 1) {
+    const assertion = assertions[index];
+    if (assertion === undefined) continue;
+    domainAssertions[domainAssertions.length] = {
+      assertionKind: assertion.assertionKind,
+      verdict: assertion.verdict,
+      importArtifactRef: assertion.importArtifactRef,
+    };
+  }
+  return domainAssertions;
 }
 
 /** The domain boundary verdict for one live path's assertion set. */
 export function livePathBoundaryVerdict(
   assertions: readonly ArtifactBoundaryAssertionRow[],
 ): ActivationGateVerdict {
-  const domainAssertions: ArtifactBoundaryAssertion[] = assertions.map((assertion) => ({
-    assertionKind: assertion.assertionKind,
-    verdict: assertion.verdict,
-    importArtifactRef: assertion.importArtifactRef,
-  }));
-  return trustBoundaryVerdict(domainAssertions);
+  return trustBoundaryVerdict(toDomainAssertions(assertions));
 }
 
 /**
@@ -174,28 +197,45 @@ export async function assertLivePathBoundaryHolds(
   livePath: string,
 ): Promise<readonly ArtifactBoundaryAssertionRow[]> {
   const assertions = await artifactBoundaryAssertionsFor(engine, livePath);
-  const domainAssertions: ArtifactBoundaryAssertion[] = assertions.map((assertion) => ({
-    assertionKind: assertion.assertionKind,
-    verdict: assertion.verdict,
-    importArtifactRef: assertion.importArtifactRef,
-  }));
+  const domainAssertions = toDomainAssertions(assertions);
   if (!artifactBoundaryHolds(domainAssertions)) {
-    const present = new Set(assertions.map((assertion) => assertion.assertionKind));
-    const missing = ALL_ARTIFACT_BOUNDARY_ASSERTION_KINDS.filter((kind) => !present.has(kind));
-    const failing = assertions.filter((assertion) => assertion.verdict !== 'PASS');
+    const present = new Set<string>();
+    const failingAssertionIds: string[] = [];
+    // Numeric-index loops only (audit NEW-M4): the refusal message must not be
+    // influenced by a shadowed `map`/`filter`.
+    for (let assertionIndex = 0; assertionIndex < assertions.length; assertionIndex += 1) {
+      const assertion = assertions[assertionIndex];
+      if (assertion === undefined) continue;
+      present.add(assertion.assertionKind);
+      if (assertion.verdict !== 'PASS')
+        failingAssertionIds[failingAssertionIds.length] = assertion.assertionId;
+    }
+    const missing: string[] = [];
+    for (
+      let kindIndex = 0;
+      kindIndex < ALL_ARTIFACT_BOUNDARY_ASSERTION_KINDS.length;
+      kindIndex += 1
+    ) {
+      const kind = ALL_ARTIFACT_BOUNDARY_ASSERTION_KINDS[kindIndex] as string;
+      if (!present.has(kind)) missing[missing.length] = kind;
+    }
     throw new ForesiftError(
       ErrorCode.PROD_TRUST_BOUNDARY_VIOLATION,
       'a live path must not reach a heavy job, artifact import, or provider call (§10.3/§35.14)',
       {
         livePath,
         missingAssertionKinds: missing.join(', '),
-        failingAssertionIds: failing.map((assertion) => assertion.assertionId).join(', '),
+        failingAssertionIds: failingAssertionIds.join(', '),
       },
     );
   }
   // Quarantine state is checked BEFORE the live path is authorized (H4).
   const gate = importGate(engine);
-  for (const assertion of assertions) {
+  // Numeric-index walk only (audit HIGH): a shadowed `Symbol.iterator` skipped
+  // this loop entirely, so the H4 artifact quarantine check never ran.
+  for (let assertionIndex = 0; assertionIndex < assertions.length; assertionIndex += 1) {
+    const assertion = assertions[assertionIndex];
+    if (assertion === undefined) continue;
     if (assertion.assertionKind !== ArtifactBoundaryAssertionKind.IMPORT_SHADOW_ONLY) continue;
     const artifactId = assertion.importArtifactRef;
     if (artifactId === null) {
@@ -216,7 +256,7 @@ export async function assertLivePathBoundaryHolds(
       );
     }
     const state = artifact.state as ImportQuarantineState;
-    if (!IMPORT_SHADOW_STATES.includes(state)) {
+    if (!isOneOf(state, IMPORT_SHADOW_STATES)) {
       throw new ForesiftError(
         ErrorCode.PROD_TRUST_BOUNDARY_VIOLATION,
         `imported artifact ${artifactId} is ${state}; imports may rest only in VALIDATING/SHADOW and never ACTIVE`,
@@ -235,9 +275,14 @@ export async function assertLivePathBoundaryHolds(
 
 /** Refuse any live-path request that carries provider/import/decryption access. */
 export function assertNoLivePathPrivileges(access: LivePathAccess, livePath = 'live-path'): void {
-  const violations = (['providerCalls', 'artifactImports', 'decryption'] as const).filter(
-    (capability) => access[capability] === true,
-  );
+  const capabilities = ['providerCalls', 'artifactImports', 'decryption'] as const;
+  const violations: string[] = [];
+  // Numeric-index walk: a shadowed `Array.prototype.filter` returning `[]` must
+  // not be able to erase a live-path privilege (audit NEW-M4).
+  for (let index = 0; index < capabilities.length; index += 1) {
+    const capability = capabilities[index] as (typeof capabilities)[number];
+    if (access[capability] === true) violations[violations.length] = capability;
+  }
   if (violations.length > 0) {
     throw new ForesiftError(
       ErrorCode.PROD_TRUST_BOUNDARY_VIOLATION,
@@ -268,7 +313,7 @@ export async function assertImportedArtifactShadowOnly(
 ): Promise<ImportQuarantineState> {
   const artifact = await importGate(engine).getArtifact(artifactId);
   const state = artifact.state;
-  if (!IMPORT_SHADOW_STATES.includes(state)) {
+  if (!isOneOf(state, IMPORT_SHADOW_STATES)) {
     throw new ForesiftError(
       ErrorCode.PROD_TRUST_BOUNDARY_VIOLATION,
       `imported artifact ${artifactId} is ${state}; imports may rest only in VALIDATING/SHADOW and never ACTIVE`,
@@ -299,5 +344,5 @@ export async function importShadowAssertionHolds(
     return false;
   }
   const state = await assertImportedArtifactShadowOnly(engine, assertion.importArtifactRef);
-  return IMPORT_SHADOW_STATES.includes(state);
+  return isOneOf(state, IMPORT_SHADOW_STATES);
 }

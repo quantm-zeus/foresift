@@ -6,22 +6,39 @@
  * four pre-existing trace rules must keep passing unchanged.
  */
 import { describe, expect, it } from 'bun:test';
-import { mkdtemp, mkdir, rm, writeFile } from 'node:fs/promises';
+import { createHash } from 'node:crypto';
+import { mkdtemp, mkdir, readFile, readdir, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import {
   CLAIM_PROD_RULES,
   CONFORMANCE_RULES,
+  GATE_KINDS,
   PROD_RULES,
+  buildReleaseReport,
   checkActivationWithoutEvidence,
   checkProdSurfacePresence,
   checkLivePathPrecomputationViolation,
   checkMcpCompatibilityDrift,
   checkPostureWeakening,
   checkPublicAuthorizationWithoutGateEvidence,
+  detectOrphanSources,
+  evaluateConformance,
   evaluateDistributionAuthorization,
   evaluateProdConformance,
+  SHADOW_ONLY_IMPORT_ARTIFACT_STATES,
+  type ConformanceOptions,
+  type ConformanceResult,
+  type LivePathPrecomputationClaim,
+  type RequirementMapping,
 } from '../src/index.ts';
+import { VALID_RELEASE_REPORT_FIXTURE } from '../../../tests/fixtures/trace/index.ts';
+import {
+  ALL_ARTIFACT_BOUNDARY_ASSERTION_KINDS,
+  parseActivationGateKind,
+  parseDistributionReadiness,
+  type ArtifactBoundaryAssertion,
+} from '@foresift/domain';
 import {
   PROD_ACTIVATION_CLAIMS,
   PROD_ACTIVE_UNAVAILABLE_CLAIM,
@@ -32,6 +49,7 @@ import {
   PROD_BEST_EFFORT_WEAKENING,
   PROD_COMPLIANT_ACTIVE_CLAIM,
   PROD_DISTRIBUTION_CLAIMS,
+  PROD_DISTRIBUTION_REQUIRED_GATES,
   PROD_LIVE_PATH_BOUNDED_CLAIM,
   PROD_LIVE_PATH_CLAIMS,
   PROD_LIVE_PATH_EXCEEDING_CLAIM,
@@ -162,6 +180,40 @@ describe('PROD rule 4: live-path precomputation violation (AC-279)', () => {
     const report = checkLivePathPrecomputationViolation(PROD_LIVE_PATH_CLAIMS);
     expect(report.passed).toBe(false);
     expect(report.findings.length).toBeGreaterThan(0);
+  });
+
+  it('reports a non-JSON-serializable (BigInt) import state instead of throwing (LOW)', () => {
+    // `importArtifactState` is untrusted in-process input: a BigInt on the
+    // assertion must yield a finding, never a `JSON.stringify` TypeError that
+    // crashes the rule (and, with it, the whole conformance evaluation).
+    const boundaryAssertions: readonly ArtifactBoundaryAssertion[] = [
+      { assertionKind: 'NO_HEAVY_JOB', verdict: 'PASS', importArtifactRef: null },
+      { assertionKind: 'NO_IMPORT', verdict: 'PASS', importArtifactRef: null },
+      { assertionKind: 'NO_PROVIDER_CALL', verdict: 'PASS', importArtifactRef: null },
+      {
+        assertionKind: 'IMPORT_SHADOW_ONLY',
+        verdict: 'PASS',
+        importArtifactRef: 'import-artifact-bigint',
+        importArtifactState: 123n as unknown as string,
+      },
+    ];
+    const claim: LivePathPrecomputationClaim = {
+      ...PROD_LIVE_PATH_BOUNDED_CLAIM,
+      boundaryAssertions,
+    };
+    let report: ReturnType<typeof checkLivePathPrecomputationViolation> | undefined;
+    expect(() => {
+      report = checkLivePathPrecomputationViolation([claim]);
+    }).not.toThrow();
+    expect(report?.passed).toBe(false);
+    const finding = report?.findings.find((candidate) =>
+      candidate.message.includes('IMPORT_SHADOW_ONLY must reference an import artifact'),
+    );
+    expect(finding).toBeDefined();
+    expect(finding?.rule).toBe(PROD_RULES.livePathPrecomputationViolation);
+    // The decision is unchanged (a non-shadow state refuses) and the message is
+    // total; the BigInt is rendered rather than throwing.
+    expect(finding?.message).toContain('got 123');
   });
 });
 
@@ -561,18 +613,23 @@ describe('THIRD-ROUND exploit regressions (R2/R3, T055/T056/T057)', () => {
   });
 
   it('never substring-matches a foreign release from a string scopeRefs (R3)', () => {
+    // Every case below declares the FULL authoritative gate set, so the only
+    // reason it can refuse is the scoping defect under test — a truncated
+    // declaration would refuse for the wrong reason (audit R4).
+    const authoritativeGates = [...PROD_DISTRIBUTION_REQUIRED_GATES];
+    // One record (RIGHTS) carries a STRING scopeRefs; the rest are exact-release
+    // arrays. `String.prototype.includes` would substring-match 'rel'.
+    const stringScopedEvidence = authoritativeGates.map((gateKind) => ({
+      evidenceId: `e-${gateKind}`,
+      gateKind,
+      scopeRefs: gateKind === 'RIGHTS' ? 'foreign-release-rel' : ['rel'],
+      valid: true,
+    }));
     const foreign = evaluateDistributionAuthorization({
       releaseRef: 'rel',
       distributionReadiness: 'WORKSPACE_AUTHORIZED',
-      requiredGateKinds: ['GATE_A'],
-      gateEvidence: [
-        {
-          evidenceId: 'e1',
-          gateKind: 'GATE_A',
-          scopeRefs: 'foreign-release-rel',
-          valid: true,
-        },
-      ],
+      requiredGateKinds: authoritativeGates,
+      gateEvidence: stringScopedEvidence,
     } as never);
     expect(foreign.authorized).toBe(false);
     expect(foreign.malformedGateEvidence).toBe(true);
@@ -581,15 +638,8 @@ describe('THIRD-ROUND exploit regressions (R2/R3, T055/T056/T057)', () => {
       {
         releaseRef: 'rel',
         distributionReadiness: 'WORKSPACE_AUTHORIZED',
-        requiredGateKinds: ['GATE_A'],
-        gateEvidence: [
-          {
-            evidenceId: 'e1',
-            gateKind: 'GATE_A',
-            scopeRefs: 'foreign-release-rel',
-            valid: true,
-          },
-        ],
+        requiredGateKinds: authoritativeGates,
+        gateEvidence: stringScopedEvidence,
       } as never,
     ]);
     expect(report.passed).toBe(false);
@@ -599,8 +649,13 @@ describe('THIRD-ROUND exploit regressions (R2/R3, T055/T056/T057)', () => {
     const genuine = evaluateDistributionAuthorization({
       releaseRef: 'rel',
       distributionReadiness: 'WORKSPACE_AUTHORIZED',
-      requiredGateKinds: ['GATE_A'],
-      gateEvidence: [{ evidenceId: 'e1', gateKind: 'GATE_A', scopeRefs: ['rel'], valid: true }],
+      requiredGateKinds: authoritativeGates,
+      gateEvidence: authoritativeGates.map((gateKind) => ({
+        evidenceId: `e-${gateKind}`,
+        gateKind,
+        scopeRefs: ['rel'],
+        valid: true,
+      })),
     } as never);
     expect(genuine.authorized).toBe(true);
 
@@ -613,15 +668,8 @@ describe('THIRD-ROUND exploit regressions (R2/R3, T055/T056/T057)', () => {
         {
           releaseRef: 'rel',
           distributionReadiness: 'WORKSPACE_AUTHORIZED',
-          requiredGateKinds: ['GATE_A'],
-          gateEvidence: [
-            {
-              evidenceId: 'e1',
-              gateKind: 'GATE_A',
-              scopeRefs: 'foreign-release-rel',
-              valid: true,
-            },
-          ],
+          requiredGateKinds: authoritativeGates,
+          gateEvidence: stringScopedEvidence,
         },
       ],
     } as never);
@@ -663,18 +711,30 @@ describe('THIRD-ROUND exploit regressions (R2/R3, T055/T056/T057)', () => {
   });
 
   it('resists in-process array-method shadowing and degenerate release ids', () => {
-    // Own `filter` returning forged in-scope evidence must not authorize.
-    const shadowedFilter = [
-      { evidenceId: 'e1', gateKind: 'GATE_A', scopeRefs: ['foreign-release'], valid: true },
-    ];
+    const authoritativeGates = [...PROD_DISTRIBUTION_REQUIRED_GATES];
+    // Own `filter` returning forged in-scope evidence must not authorize. The
+    // REAL evidence is foreign-scoped for every authoritative kind, so a
+    // `filter`-based implementation would be fooled by the shadowed method.
+    const shadowedFilter = authoritativeGates.map((gateKind) => ({
+      evidenceId: `e-${gateKind}`,
+      gateKind,
+      scopeRefs: ['foreign-release'],
+      valid: true,
+    }));
     Object.defineProperty(shadowedFilter, 'filter', {
-      value: () => [{ evidenceId: 'x', gateKind: 'GATE_A', scopeRefs: ['rel'], valid: true }],
+      value: () =>
+        authoritativeGates.map((gateKind) => ({
+          evidenceId: `forged-${gateKind}`,
+          gateKind,
+          scopeRefs: ['rel'],
+          valid: true,
+        })),
     });
     expect(
       evaluateDistributionAuthorization({
         releaseRef: 'rel',
         distributionReadiness: 'WORKSPACE_AUTHORIZED',
-        requiredGateKinds: ['GATE_A'],
+        requiredGateKinds: authoritativeGates,
         gateEvidence: shadowedFilter,
       } as never).authorized,
     ).toBe(false);
@@ -686,10 +746,13 @@ describe('THIRD-ROUND exploit regressions (R2/R3, T055/T056/T057)', () => {
       evaluateDistributionAuthorization({
         releaseRef: 'rel',
         distributionReadiness: 'WORKSPACE_AUTHORIZED',
-        requiredGateKinds: ['GATE_A'],
-        gateEvidence: [
-          { evidenceId: 'e1', gateKind: 'GATE_A', scopeRefs: shadowedIncludes, valid: true },
-        ],
+        requiredGateKinds: authoritativeGates,
+        gateEvidence: authoritativeGates.map((gateKind) => ({
+          evidenceId: `e-${gateKind}`,
+          gateKind,
+          scopeRefs: shadowedIncludes,
+          valid: true,
+        })),
       } as never).authorized,
     ).toBe(false);
 
@@ -698,10 +761,1052 @@ describe('THIRD-ROUND exploit regressions (R2/R3, T055/T056/T057)', () => {
     const degenerate = evaluateDistributionAuthorization({
       releaseRef: '',
       distributionReadiness: 'WORKSPACE_AUTHORIZED',
-      requiredGateKinds: ['GATE_A'],
-      gateEvidence: [{ evidenceId: 'e1', gateKind: 'GATE_A', scopeRefs: [''], valid: true }],
+      requiredGateKinds: authoritativeGates,
+      gateEvidence: authoritativeGates.map((gateKind) => ({
+        evidenceId: `e-${gateKind}`,
+        gateKind,
+        scopeRefs: [''],
+        valid: true,
+      })),
     } as never);
     expect(degenerate.authorized).toBe(false);
     expect(degenerate.malformedReleaseRef).toBe(true);
+  });
+});
+
+describe('FOURTH-ROUND exploit regressions (R4/R7, audit H2/H4)', () => {
+  const AUTHORITATIVE_GATES = [...PROD_DISTRIBUTION_REQUIRED_GATES];
+  const VALID_EXACT_RELEASE_EVIDENCE = AUTHORITATIVE_GATES.map((gateKind) => ({
+    evidenceId: `evidence-${gateKind.toLowerCase()}`,
+    gateKind,
+    scopeRefs: ['rel'],
+    valid: true,
+  }));
+
+  /** A compliant baseline claim whose only variable is the gate declaration. */
+  function publicAuthorizationClaim(overrides: Record<string, unknown>): unknown {
+    return {
+      releaseRef: 'rel',
+      distributionReadiness: 'PUBLIC_AUTHORIZED',
+      requiredGateKinds: AUTHORITATIVE_GATES,
+      gateEvidence: VALID_EXACT_RELEASE_EVIDENCE,
+      ...overrides,
+    };
+  }
+
+  /** The otherwise-compliant claim set for one public-authorization claim. */
+  function conformanceWithAuthorization(claim: unknown) {
+    return evaluateProdConformance({
+      activationClaims: [],
+      postureDeclarations: [],
+      mcpCompatibility: PROD_MCP_COMPLIANT_CLAIM,
+      livePaths: [],
+      distributionAuthorizations: [claim],
+    } as never);
+  }
+
+  it('binds the mandatory set to the exported authoritative GATE_KINDS vocabulary (R4)', () => {
+    // The fixture list is an INDEPENDENT literal (audit NEW-L6), so this is a
+    // genuine cross-check: either side drifting from the five authoritative
+    // kinds fails here rather than agreeing with itself.
+    expect([...PROD_DISTRIBUTION_REQUIRED_GATES].sort()).toEqual([...GATE_KINDS].sort());
+    expect([...SHADOW_ONLY_IMPORT_ARTIFACT_STATES]).toEqual(['VALIDATING', 'SHADOW_ELIGIBLE']);
+  });
+
+  it('freezes the authoritative gate and import-state sets against in-process mutation (NEW-H1)', () => {
+    // The R4/R7 guards read these module exports as their authority, so a
+    // mutable export re-opens the fabricated/truncated self-attestation and
+    // REJECTED-import exploits the fourth round closed. `as const` is
+    // compile-time only; the runtime freeze is what this test pins.
+    expect(Object.isFrozen(GATE_KINDS)).toBe(true);
+    expect(Object.isFrozen(SHADOW_ONLY_IMPORT_ARTIFACT_STATES)).toBe(true);
+
+    // ESM test modules are strict mode, so each mutation attempt throws. A
+    // silent non-strict no-op would be equally refused; the contents below are
+    // asserted unchanged either way.
+    expect(() => (GATE_KINDS as unknown as string[]).push('TOTALLY_FAKE_GATE')).toThrow();
+    expect(() => {
+      (GATE_KINDS as unknown as string[]).length = 0;
+    }).toThrow();
+    expect(() =>
+      (SHADOW_ONLY_IMPORT_ARTIFACT_STATES as unknown as string[]).push('REJECTED'),
+    ).toThrow();
+    expect([...GATE_KINDS]).toEqual(['MANUAL', 'LEGAL', 'RIGHTS', 'STATISTICAL', 'OWNER_APPROVAL']);
+    expect([...SHADOW_ONLY_IMPORT_ARTIFACT_STATES]).toEqual(['VALIDATING', 'SHADOW_ELIGIBLE']);
+
+    // The fabricated TOTALLY_FAKE_GATE claim is still refused after the
+    // attempted mutations: an in-process caller cannot rewrite the authority.
+    const fabricated = publicAuthorizationClaim({
+      requiredGateKinds: ['TOTALLY_FAKE_GATE'],
+      gateEvidence: [
+        { evidenceId: 'e', gateKind: 'TOTALLY_FAKE_GATE', scopeRefs: ['rel'], valid: true },
+      ],
+    });
+    const evaluation = evaluateDistributionAuthorization(fabricated as never);
+    expect(evaluation.authorized).toBe(false);
+    expect(evaluation.unknownGateKinds).toEqual(['TOTALLY_FAKE_GATE']);
+    expect(conformanceWithAuthorization(fabricated).overall).toBe('FAILED');
+
+    // A REJECTED import state still yields a live-path finding after the
+    // attempted push into the shadow-only set.
+    const rejected = conformanceWithLivePath(livePathWithImportState('REJECTED'));
+    expect(rejected.overall).toBe('FAILED');
+    expect(rejected.findings.map((finding) => finding.rule)).toContain(
+      PROD_RULES.livePathPrecomputationViolation,
+    );
+  });
+
+  it('refuses the fabricated TOTALLY_FAKE_GATE self-attestation exploit (R4)', () => {
+    const fabricated = publicAuthorizationClaim({
+      requiredGateKinds: ['TOTALLY_FAKE_GATE'],
+      gateEvidence: [
+        { evidenceId: 'e', gateKind: 'TOTALLY_FAKE_GATE', scopeRefs: ['rel'], valid: true },
+      ],
+    });
+    const evaluation = evaluateDistributionAuthorization(fabricated as never);
+    expect(evaluation.authorized).toBe(false);
+    expect(evaluation.unknownGateKinds).toEqual(['TOTALLY_FAKE_GATE']);
+    expect(evaluation.omittedMandatoryGateKinds).toEqual(AUTHORITATIVE_GATES);
+    expect(evaluation.missingGateKinds).toEqual(AUTHORITATIVE_GATES);
+
+    const aggregate = conformanceWithAuthorization(fabricated);
+    expect(aggregate.overall).toBe('FAILED');
+    expect(aggregate.findings.map((finding) => finding.rule)).toContain(
+      PROD_RULES.publicAuthorizationWithoutGateEvidence,
+    );
+    expect(aggregate.findings[0]?.message).toContain(
+      'declared gate kinds outside the authoritative set: TOTALLY_FAKE_GATE',
+    );
+    expect(aggregate.findings[0]?.message).toContain(
+      'authoritative mandatory gate kinds omitted from the declaration',
+    );
+  });
+
+  it('refuses the DISTRIBUTION_EVIDENCE truncation exploit (R4)', () => {
+    const truncated = publicAuthorizationClaim({
+      requiredGateKinds: ['DISTRIBUTION_EVIDENCE'],
+      gateEvidence: [
+        { evidenceId: 'e', gateKind: 'DISTRIBUTION_EVIDENCE', scopeRefs: ['rel'], valid: true },
+      ],
+    });
+    const evaluation = evaluateDistributionAuthorization(truncated as never);
+    expect(evaluation.authorized).toBe(false);
+    expect(evaluation.unknownGateKinds).toEqual(['DISTRIBUTION_EVIDENCE']);
+    expect(evaluation.omittedMandatoryGateKinds).toEqual(AUTHORITATIVE_GATES);
+    expect(evaluation.missingGateKinds).toEqual(AUTHORITATIVE_GATES);
+
+    const aggregate = conformanceWithAuthorization(truncated);
+    expect(aggregate.overall).toBe('FAILED');
+    expect(aggregate.findings.map((finding) => finding.rule)).toContain(
+      PROD_RULES.publicAuthorizationWithoutGateEvidence,
+    );
+  });
+
+  it('still refuses a declaration that omits one authoritative kind (R4)', () => {
+    const withoutRights = AUTHORITATIVE_GATES.filter((gateKind) => gateKind !== 'RIGHTS');
+    const evaluation = evaluateDistributionAuthorization(
+      publicAuthorizationClaim({
+        requiredGateKinds: withoutRights,
+        gateEvidence: VALID_EXACT_RELEASE_EVIDENCE,
+      }) as never,
+    );
+    expect(evaluation.authorized).toBe(false);
+    expect(evaluation.omittedMandatoryGateKinds).toEqual(['RIGHTS']);
+    expect(evaluation.missingGateKinds).toEqual([]);
+    expect(
+      conformanceWithAuthorization(
+        publicAuthorizationClaim({
+          requiredGateKinds: withoutRights,
+          gateEvidence: VALID_EXACT_RELEASE_EVIDENCE,
+        }),
+      ).overall,
+    ).toBe('FAILED');
+  });
+
+  it('authorizes the full authoritative set with exact-release evidence (R4)', () => {
+    const exact = publicAuthorizationClaim({});
+    expect(evaluateDistributionAuthorization(exact as never).authorized).toBe(true);
+    expect(evaluateDistributionAuthorization(exact as never).unknownGateKinds).toEqual([]);
+    expect(evaluateDistributionAuthorization(exact as never).omittedMandatoryGateKinds).toEqual([]);
+
+    const aggregate = conformanceWithAuthorization(exact);
+    expect(aggregate.overall).toBe('PASSED');
+    expect(aggregate.findings).toEqual([]);
+  });
+
+  /** A compliant bounded live path whose IMPORT_SHADOW_ONLY state is varied. */
+  function livePathWithImportState(state: unknown, omit = false): LivePathPrecomputationClaim {
+    const boundaryAssertions: ArtifactBoundaryAssertion[] = [];
+    for (const assertion of PROD_LIVE_PATH_BOUNDED_CLAIM.boundaryAssertions) {
+      if (assertion.assertionKind !== 'IMPORT_SHADOW_ONLY') {
+        boundaryAssertions.push(assertion);
+        continue;
+      }
+      const next: Record<string, unknown> = { ...assertion };
+      if (omit) delete next['importArtifactState'];
+      else next['importArtifactState'] = state;
+      boundaryAssertions.push(next as unknown as ArtifactBoundaryAssertion);
+    }
+    return { ...PROD_LIVE_PATH_BOUNDED_CLAIM, boundaryAssertions };
+  }
+
+  function conformanceWithLivePath(livePath: LivePathPrecomputationClaim) {
+    return evaluateProdConformance({
+      activationClaims: [],
+      postureDeclarations: [],
+      mcpCompatibility: PROD_MCP_COMPLIANT_CLAIM,
+      livePaths: [livePath],
+      distributionAuthorizations: [PROD_WORKSPACE_AUTHORIZED_CLAIM],
+    });
+  }
+
+  it('fails a live path whose IMPORT_SHADOW_ONLY state is missing, null, unknown, or non-shadow (R7)', () => {
+    const missing = livePathWithImportState(undefined, true);
+    expect(conformanceWithLivePath(missing).overall).toBe('FAILED');
+
+    for (const state of [
+      null,
+      'TOTALLY_MADE_UP',
+      'RECEIVED',
+      'QUARANTINED',
+      'SCANNED',
+      'REJECTED',
+      'ACTIVE',
+    ]) {
+      const report = conformanceWithLivePath(livePathWithImportState(state));
+      expect(report.overall, `import state ${JSON.stringify(state)} must fail closed`).toBe(
+        'FAILED',
+      );
+      expect(report.findings.map((finding) => finding.rule)).toContain(
+        PROD_RULES.livePathPrecomputationViolation,
+      );
+      expect(
+        report.findings.some((finding) => finding.message.includes('IMPORT_SHADOW_ONLY')),
+      ).toBe(true);
+    }
+  });
+
+  it('accepts a live path whose IMPORT_SHADOW_ONLY state is VALIDATING or SHADOW_ELIGIBLE (R7)', () => {
+    for (const state of ['VALIDATING', 'SHADOW_ELIGIBLE']) {
+      const report = conformanceWithLivePath(livePathWithImportState(state));
+      expect(report.overall, `import state ${state} must pass`).toBe('PASSED');
+      expect(report.findings).toEqual([]);
+    }
+  });
+
+  it('renders a doubly-pathological import state as a stable placeholder instead of throwing (LOW)', () => {
+    // `importArtifactState` is untrusted in-process input. A value whose
+    // `toJSON` AND `toString` both throw defeats the `JSON.stringify` fallback
+    // and the `String(...)` fallback; the guard must still return a finding
+    // rather than crash the whole conformance evaluation.
+    const pathological = {
+      toJSON() {
+        throw new Error('toJSON throws');
+      },
+      toString() {
+        throw new Error('toString throws');
+      },
+    };
+    let report: ReturnType<typeof checkLivePathPrecomputationViolation> | undefined;
+    expect(() => {
+      report = checkLivePathPrecomputationViolation([livePathWithImportState(pathological)]);
+    }).not.toThrow();
+    expect(report?.passed).toBe(false);
+    const finding = report?.findings.find((candidate) =>
+      candidate.message.includes('IMPORT_SHADOW_ONLY must reference an import artifact'),
+    );
+    expect(finding).toBeDefined();
+    expect(finding?.rule).toBe(PROD_RULES.livePathPrecomputationViolation);
+    expect(finding?.message).toContain('<unrenderable>');
+  });
+
+  it('freezes the domain artifact-boundary kind authority so a spliced kind cannot pass a live path (NEW-H2)', () => {
+    const original = [...ALL_ARTIFACT_BOUNDARY_ASSERTION_KINDS];
+    const mutable = ALL_ARTIFACT_BOUNDARY_ASSERTION_KINDS as unknown as string[];
+    // BEFORE the fix this `splice` removed IMPORT_SHADOW_ONLY from the module
+    // authority, so a live path that omits the import-boundary assertion passed
+    // `artifactBoundaryHolds` and R7 accepted it. Pin both the freeze and the
+    // refusal outcome.
+    let spliced = false;
+    try {
+      mutable.splice(original.indexOf('IMPORT_SHADOW_ONLY'), 1);
+      spliced = true;
+    } catch {
+      spliced = false;
+    }
+    try {
+      expect(Object.isFrozen(ALL_ARTIFACT_BOUNDARY_ASSERTION_KINDS)).toBe(true);
+      expect(spliced).toBe(false);
+      expect([...ALL_ARTIFACT_BOUNDARY_ASSERTION_KINDS]).toEqual(original);
+    } finally {
+      if (!Object.isFrozen(mutable)) {
+        mutable.length = 0;
+        for (let index = 0; index < original.length; index += 1) {
+          mutable.push(original[index] as string);
+        }
+      }
+    }
+    const withoutImportBoundary = {
+      ...PROD_LIVE_PATH_BOUNDED_CLAIM,
+      boundaryAssertions: PROD_LIVE_PATH_BOUNDED_CLAIM.boundaryAssertions.filter(
+        (assertion) => assertion.assertionKind !== 'IMPORT_SHADOW_ONLY',
+      ),
+    };
+    const report = conformanceWithLivePath(withoutImportBoundary);
+    expect(report.overall).toBe('FAILED');
+    expect(report.findings.map((finding) => finding.rule)).toContain(
+      PROD_RULES.livePathPrecomputationViolation,
+    );
+  });
+
+  it('resists a globally shadowed Array.prototype.includes on every authority membership check (NEW-M4)', () => {
+    const originalIncludes = Array.prototype.includes;
+    try {
+      // A same-process caller can globally replace the method the guards would
+      // otherwise use. FAIL-OPEN checks are the §69.9/AC-272 authorization flip
+      // and the R7 REJECTED-import acceptance; both must stay closed.
+      Array.prototype.includes = () => true;
+
+      const rejected = conformanceWithLivePath(livePathWithImportState('REJECTED'));
+      expect(rejected.overall).toBe('FAILED');
+      expect(rejected.findings.map((finding) => finding.rule)).toContain(
+        PROD_RULES.livePathPrecomputationViolation,
+      );
+
+      for (const readiness of ['WORKSPACE_TECHNICALLY_READY', 'PUBLIC_TECHNICALLY_READY']) {
+        const evaluation = evaluateDistributionAuthorization(
+          publicAuthorizationClaim({ distributionReadiness: readiness }) as never,
+        );
+        expect(evaluation.readinessAuthorized, readiness).toBe(false);
+        expect(evaluation.authorized, readiness).toBe(false);
+      }
+
+      const fabricated = evaluateDistributionAuthorization(
+        publicAuthorizationClaim({ requiredGateKinds: ['TOTALLY_FAKE_GATE'] }) as never,
+      );
+      expect(fabricated.authorized).toBe(false);
+
+      expect(() => parseActivationGateKind('TOTALLY_FAKE_GATE')).toThrow();
+      expect(() => parseDistributionReadiness('TOTALLY_FAKE_READINESS')).toThrow();
+    } finally {
+      Array.prototype.includes = originalIncludes;
+    }
+  });
+});
+
+// --- NEW-M5: PROD gate fails closed under Array.prototype shadowing -----------
+
+/**
+ * Audit NEW-M5. A same-process caller can globally replace an `Array.prototype`
+ * iteration primitive and make `evaluateProdConformance` aggregate ZERO
+ * findings (a vacuous `PASSED`) or make the R7 live-path guard report
+ * `passed: true` for a live path that omits IMPORT_SHADOW_ONLY. Each shadow is
+ * installed for the call under test only and always restored in a `finally`, so
+ * the assertions below never run against a shadowed prototype.
+ */
+describe('NEW-M5: PROD gate fails closed under globally shadowed Array.prototype', () => {
+  interface ShadowCase {
+    readonly name: string;
+    readonly install: () => void;
+    readonly restore: () => void;
+  }
+
+  function buildShadowCases(): readonly ShadowCase[] {
+    const proto = Array.prototype as unknown as Record<string, unknown> & Record<symbol, unknown>;
+    const iteratorKey = Symbol.iterator;
+    const originalIterator = proto[iteratorKey];
+    const cases: ShadowCase[] = [];
+    cases[cases.length] = {
+      name: 'Array.prototype[Symbol.iterator] = function* () {}',
+      install: () => {
+        proto[iteratorKey] = function* () {};
+      },
+      restore: () => {
+        proto[iteratorKey] = originalIterator;
+      },
+    };
+    cases[cases.length] = {
+      name: 'Array.prototype[Symbol.iterator] = undefined',
+      install: () => {
+        proto[iteratorKey] = undefined;
+      },
+      restore: () => {
+        proto[iteratorKey] = originalIterator;
+      },
+    };
+    const methodReplacements: readonly (readonly [string, unknown])[] = [
+      ['includes', () => true],
+      ['map', () => []],
+      ['filter', () => []],
+      ['some', () => true],
+      ['find', () => undefined],
+      ['forEach', () => undefined],
+      // A no-op `push` silently DROPPED every accumulated finding before the
+      // numeric-index fix, so `evaluateProdConformance({})` aggregated zero
+      // mandatory-input findings and returned a vacuous `PASSED`.
+      ['push', () => 0],
+      ['shift', () => undefined],
+      ['splice', () => []],
+    ];
+    for (let index = 0; index < methodReplacements.length; index += 1) {
+      const entry = methodReplacements[index] as readonly [string, unknown];
+      const methodName = entry[0];
+      const replacement = entry[1];
+      const original = proto[methodName];
+      cases[cases.length] = {
+        name: `Array.prototype.${methodName} shadowed`,
+        install: () => {
+          proto[methodName] = replacement;
+        },
+        restore: () => {
+          proto[methodName] = original;
+        },
+      };
+    }
+    return cases;
+  }
+
+  const SHADOW_CASES = buildShadowCases();
+
+  function capture<T>(
+    shadowCase: ShadowCase,
+    run: () => T,
+  ): { readonly value: T } | { readonly error: string } {
+    shadowCase.install();
+    try {
+      return { value: run() };
+    } catch (error) {
+      return { error: error instanceof Error ? error.message : String(error) };
+    } finally {
+      shadowCase.restore();
+    }
+  }
+
+  function livePathWithImportState(state: unknown, omit: boolean): LivePathPrecomputationClaim {
+    const assertions: ArtifactBoundaryAssertion[] = [];
+    for (
+      let index = 0;
+      index < PROD_LIVE_PATH_BOUNDED_CLAIM.boundaryAssertions.length;
+      index += 1
+    ) {
+      const assertion = PROD_LIVE_PATH_BOUNDED_CLAIM.boundaryAssertions[
+        index
+      ] as ArtifactBoundaryAssertion;
+      if (assertion.assertionKind !== 'IMPORT_SHADOW_ONLY') {
+        assertions[assertions.length] = assertion;
+        continue;
+      }
+      const next: Record<string, unknown> = { ...assertion };
+      if (omit) delete next['importArtifactState'];
+      else next['importArtifactState'] = state;
+      assertions[assertions.length] = next as unknown as ArtifactBoundaryAssertion;
+    }
+    return { ...PROD_LIVE_PATH_BOUNDED_CLAIM, boundaryAssertions: assertions };
+  }
+
+  const MISSING_IMPORT_PATH = livePathWithImportState(undefined, true);
+  const REJECTED_IMPORT_PATH = livePathWithImportState('REJECTED', false);
+
+  function violatingInput(livePath: LivePathPrecomputationClaim) {
+    return {
+      activationClaims: [],
+      postureDeclarations: [],
+      mcpCompatibility: PROD_MCP_COMPLIANT_CLAIM,
+      livePaths: [livePath],
+      distributionAuthorizations: [PROD_WORKSPACE_AUTHORIZED_CLAIM],
+    };
+  }
+
+  function countRule(findings: readonly { readonly rule: string }[], rule: string): number {
+    let count = 0;
+    for (let index = 0; index < findings.length; index += 1) {
+      if ((findings[index] as { readonly rule: string }).rule === rule) count += 1;
+    }
+    return count;
+  }
+
+  it('evaluateProdConformance({}) reports the five mandatory-input findings as FAILED', () => {
+    const failures: string[] = [];
+    for (let index = 0; index < SHADOW_CASES.length; index += 1) {
+      const shadowCase = SHADOW_CASES[index] as ShadowCase;
+      const result = capture(shadowCase, () => evaluateProdConformance({}));
+      if ('error' in result) {
+        failures[failures.length] = `${shadowCase.name}: threw ${result.error}`;
+        continue;
+      }
+      const report = result.value;
+      if (report.overall !== 'FAILED') {
+        failures[failures.length] = `${shadowCase.name}: overall ${report.overall}`;
+      }
+      const missingCount = countRule(report.findings, PROD_RULES.prodConformanceInputMissing);
+      if (missingCount !== 5) {
+        failures[failures.length] = `${shadowCase.name}: missing-input findings ${missingCount}`;
+      }
+    }
+    expect(failures).toEqual([]);
+  });
+
+  it('a live path missing IMPORT_SHADOW_ONLY or with a REJECTED state FAILS with R7', () => {
+    const failures: string[] = [];
+    const paths: readonly (readonly [string, LivePathPrecomputationClaim])[] = [
+      ['missing IMPORT_SHADOW_ONLY', MISSING_IMPORT_PATH],
+      ['REJECTED import state', REJECTED_IMPORT_PATH],
+    ];
+    for (let index = 0; index < SHADOW_CASES.length; index += 1) {
+      const shadowCase = SHADOW_CASES[index] as ShadowCase;
+      const direct = capture(shadowCase, () =>
+        checkLivePathPrecomputationViolation([MISSING_IMPORT_PATH]),
+      );
+      if ('error' in direct) {
+        failures[failures.length] = `${shadowCase.name}: direct threw ${direct.error}`;
+      } else {
+        if (direct.value.passed !== false) {
+          failures[failures.length] = `${shadowCase.name}: direct passed ${String(
+            direct.value.passed,
+          )}`;
+        }
+        if (countRule(direct.value.findings, PROD_RULES.livePathPrecomputationViolation) < 1) {
+          failures[failures.length] = `${shadowCase.name}: direct has no R7 finding`;
+        }
+      }
+      for (let pathIndex = 0; pathIndex < paths.length; pathIndex += 1) {
+        const entry = paths[pathIndex] as readonly [string, LivePathPrecomputationClaim];
+        const aggregated = capture(shadowCase, () =>
+          evaluateProdConformance(violatingInput(entry[1])),
+        );
+        if ('error' in aggregated) {
+          failures[failures.length] = `${shadowCase.name} (${entry[0]}): threw ${aggregated.error}`;
+          continue;
+        }
+        const report = aggregated.value;
+        if (report.overall !== 'FAILED') {
+          failures[failures.length] = `${shadowCase.name} (${entry[0]}): overall ${report.overall}`;
+        }
+        if (countRule(report.findings, PROD_RULES.livePathPrecomputationViolation) < 1) {
+          failures[failures.length] = `${shadowCase.name} (${entry[0]}): no R7 finding`;
+        }
+      }
+    }
+    expect(failures).toEqual([]);
+  });
+
+  it('a conforming corpus still PASSES (no false failure)', () => {
+    const failures: string[] = [];
+    for (let index = 0; index < SHADOW_CASES.length; index += 1) {
+      const shadowCase = SHADOW_CASES[index] as ShadowCase;
+      const result = capture(shadowCase, () =>
+        evaluateProdConformance(violatingInput(PROD_LIVE_PATH_BOUNDED_CLAIM)),
+      );
+      if ('error' in result) {
+        failures[failures.length] = `${shadowCase.name}: threw ${result.error}`;
+      } else if (result.value.overall !== 'PASSED') {
+        failures[failures.length] = `${shadowCase.name}: overall ${result.value.overall}`;
+      }
+    }
+    expect(failures).toEqual([]);
+  });
+});
+
+// --- NEW-N2: no app-level array destructuring on the aggregation path ---------
+
+/**
+ * Audit N2. `evaluateConformance` read its four rule verdicts with
+ * `const [mapping, activePaths, premature, generated] = await Promise.all([…])`.
+ * Language-level array destructuring reads `Array.prototype[Symbol.iterator]` on
+ * the settled result array, so a same-process caller can install a SURGICAL
+ * iterator that delegates to the original for every other array but forges four
+ * empty verdicts for the four-element Promise.all result. Before the
+ * numeric-index fix (parent 4c68856) that flipped a FAILED trace violation to a
+ * vacuous `PASSED` with zero findings. Each shadow is installed only for the
+ * call under test and always restored in a `finally`.
+ */
+describe('NEW-N2: conformance aggregation resists a surgical Symbol.iterator shadow', () => {
+  const ITERATOR_KEY = Symbol.iterator;
+
+  /**
+   * Installs a shadowed `Array.prototype[Symbol.iterator]` that forges empty rule
+   * verdicts ONLY for a four-element array whose every element carries a
+   * `findings` collection (the `Promise.all` result shaped like the four trace
+   * verdicts), and delegates to the original iterator otherwise.
+   *
+   * The returned forged iterator is a hand-built `next()` protocol object: it
+   * must NOT touch `[Symbol.iterator]` itself, or it would re-enter the shadow.
+   */
+  function installSurgicalIterator(): () => void {
+    const proto = Array.prototype as unknown as Record<symbol, unknown>;
+    const original = proto[ITERATOR_KEY];
+    function isRuleVerdictArray(value: unknown): boolean {
+      if (!Array.isArray(value) || value.length !== 4) return false;
+      for (let index = 0; index < 4; index += 1) {
+        const element = (value as unknown[])[index];
+        if (
+          element === null ||
+          typeof element !== 'object' ||
+          !('findings' in (element as object))
+        ) {
+          return false;
+        }
+      }
+      return true;
+    }
+    function forgedIterator(): { next: () => { value: unknown; done: boolean } } {
+      const forged = {
+        passed: true,
+        findings: [],
+        unmappedItems: [],
+        missingPaths: [],
+        prematurePaths: [],
+        driftedFiles: [],
+      };
+      const values: unknown[] = [forged, forged, forged, forged];
+      let index = 0;
+      return {
+        next: () => {
+          if (index < values.length) {
+            const value = values[index];
+            index += 1;
+            return { value, done: false };
+          }
+          return { value: undefined, done: true };
+        },
+      };
+    }
+    proto[ITERATOR_KEY] = function (this: unknown) {
+      if (isRuleVerdictArray(this)) return forgedIterator();
+      return (original as (this: unknown) => unknown).call(this);
+    };
+    return () => {
+      proto[ITERATOR_KEY] = original;
+    };
+  }
+
+  async function evaluateUnderSurgicalIterator(
+    options: ConformanceOptions,
+  ): Promise<ConformanceResult> {
+    const restore = installSurgicalIterator();
+    try {
+      return await evaluateConformance(options);
+    } finally {
+      restore();
+    }
+  }
+
+  // A single injected G2 requirement whose implementationRef resolves to no
+  // repository path, so the ACTIVE-implementation trace rule emits a finding
+  // deterministically (independent of the live manifest's contents).
+  const N2_TRACE_VIOLATION_REQUIREMENT: RequirementMapping = {
+    id: 'FR-MOCK-N2-001',
+    dependencyGroup: 'G2',
+    implementationRefs: ['packages/n2-missing-surface/src/index.ts @requirement FR-MOCK-N2-001'],
+    testRefs: ['tests/acceptance/AC-266.spec.ts'],
+    owner: 'packages/release-conformance',
+  };
+  // A fully compliant PROD claim set, so the PROD block contributes zero
+  // findings and the ONLY failure is the trace violation above: that is exactly
+  // the corpus the forge would otherwise silence.
+  const N2_COMPLIANT_PROD_CLAIMS = {
+    activationClaims: [PROD_COMPLIANT_ACTIVE_CLAIM],
+    postureDeclarations: [PROD_BEST_EFFORT_COMPLIANT],
+    mcpCompatibility: PROD_MCP_COMPLIANT_CLAIM,
+    livePaths: [PROD_LIVE_PATH_BOUNDED_CLAIM],
+    distributionAuthorizations: [PROD_WORKSPACE_AUTHORIZED_CLAIM, PROD_TECHNICALLY_READY_CLAIM],
+  };
+
+  it('does not let forged verdicts flip a trace-violating corpus to PASSED (N2)', async () => {
+    const options: ConformanceOptions = {
+      repoRoot: REPO_ROOT,
+      milestone: 'G2',
+      requirements: [N2_TRACE_VIOLATION_REQUIREMENT],
+      prodClaims: N2_COMPLIANT_PROD_CLAIMS,
+    };
+    const baseline = await evaluateConformance(options);
+    expect(baseline.overall).toBe('FAILED');
+    expect(baseline.findings.map((finding) => finding.rule)).toContain(
+      CONFORMANCE_RULES.activePath,
+    );
+
+    const attacked = await evaluateUnderSurgicalIterator(options);
+    expect(attacked.overall).toBe('FAILED');
+    expect(attacked.findings.length).toBeGreaterThan(0);
+    expect(attacked.findings.map((finding) => finding.rule)).toContain(
+      CONFORMANCE_RULES.activePath,
+    );
+  });
+
+  it('keeps the PROD findings present while the iterator is shadowed (N2)', async () => {
+    const attacked = await evaluateUnderSurgicalIterator({
+      repoRoot: REPO_ROOT,
+      milestone: 'G2',
+      prodClaims: {
+        activationClaims: [PROD_ACTIVE_WITHOUT_GATE_CLAIM],
+        postureDeclarations: [PROD_BEST_EFFORT_WEAKENING],
+        mcpCompatibility: PROD_MCP_DRAFT_DEFAULT_CLAIM,
+        livePaths: [PROD_LIVE_PATH_NO_BOUND_CLAIM],
+        distributionAuthorizations: [PROD_PUBLIC_AUTHORIZED_MISSING_CLAIM],
+      },
+    });
+    expect(attacked.overall).toBe('FAILED');
+    expect(attacked.findings.map((finding) => finding.rule)).toContain(
+      PROD_RULES.activationWithoutEvidence,
+    );
+  });
+});
+
+// --- NEW-N3: no reliance on the Promise.all ARGUMENT array's iterator ---------
+
+/**
+ * Audit N3 (HIGH). The NEW-N2 fix replaced app-level array destructuring with
+ * numeric index reads, which closed only the SETTLED-array vector.
+ * `Promise.all(iterable)` ALSO reads `Array.prototype[Symbol.iterator]` on its
+ * ARGUMENT array, so a surgical iterator can substitute forged RESOLVED values
+ * before any numeric read happens: a FAILED G2 corpus becomes a vacuous PASSED,
+ * `buildReleaseReport` hashes an empty document/manifest (`sha256('')`), and a
+ * real orphan is silenced.
+ *
+ * The package now routes every `Promise.all` argument through
+ * `promiseAllNumeric` (see `src/shadow-safe.ts`), which copies by numeric index
+ * and installs its own captured `Symbol.iterator` on the array handed to the
+ * builtin. The shadow below forges ONLY the array whose immediate caller frame
+ * is the targeted function AND whose shape matches the targeted argument, and it
+ * is always restored in a `finally`.
+ */
+describe('NEW-N3: Promise.all argument arrays resist a surgical Symbol.iterator shadow', () => {
+  const ITERATOR_KEY = Symbol.iterator;
+  const SHA256_EMPTY = createHash('sha256').update('').digest('hex');
+
+  interface SurgicalTarget {
+    readonly frame: string;
+    readonly accepts: (value: unknown[]) => boolean;
+    readonly forge: () => readonly unknown[];
+  }
+
+  function thenableArrayOfLength(length: number): (value: unknown[]) => boolean {
+    return (value) => {
+      if (value.length !== length) return false;
+      for (let index = 0; index < value.length; index += 1) {
+        const element = value[index];
+        if (
+          element === null ||
+          (typeof element !== 'object' && typeof element !== 'function') ||
+          typeof (element as { then?: unknown }).then !== 'function'
+        ) {
+          return false;
+        }
+      }
+      return true;
+    };
+  }
+
+  function anyNonEmptyThenableArray(value: unknown[]): boolean {
+    return value.length > 0 && thenableArrayOfLength(value.length)(value);
+  }
+
+  /**
+   * The function that directly called `Promise.all`: the frame immediately after
+   * the native `at all (unknown)` frame. Substring-matching the whole stack is
+   * NOT surgical enough, because a targeted caller (e.g. `evaluateConformance`)
+   * also appears transitively above `generateOutputs`' own `Promise.all`.
+   */
+  function immediatePromiseAllCaller(): string | undefined {
+    const stack = new Error().stack;
+    if (typeof stack !== 'string') return undefined;
+    const lines = stack.split('\n');
+    for (let index = 0; index < lines.length; index += 1) {
+      const line = lines[index] as string;
+      if (/at (?:Promise\.)?all \(/.test(line)) {
+        const caller = lines[index + 1];
+        if (caller === undefined) return undefined;
+        const match = caller.match(/at\s+([A-Za-z0-9_$.]+)\s*\(/);
+        return match?.[1];
+      }
+    }
+    return undefined;
+  }
+
+  function installSurgicalArgumentIterator(target: SurgicalTarget): () => void {
+    const proto = Array.prototype as unknown as Record<symbol, unknown>;
+    const original = proto[ITERATOR_KEY] as (this: unknown) => unknown;
+    proto[ITERATOR_KEY] = function (this: unknown) {
+      if (
+        Array.isArray(this) &&
+        target.accepts(this as unknown[]) &&
+        immediatePromiseAllCaller() === target.frame
+      ) {
+        const values = target.forge();
+        let index = 0;
+        return {
+          next: () => {
+            if (index < values.length) {
+              const value = values[index];
+              index += 1;
+              return { value, done: false };
+            }
+            return { value: undefined, done: true };
+          },
+        };
+      }
+      return (original as (this: unknown) => unknown).call(this);
+    };
+    return () => {
+      proto[ITERATOR_KEY] = original;
+    };
+  }
+
+  async function underShadow<T>(target: SurgicalTarget, run: () => Promise<T>): Promise<T> {
+    const restore = installSurgicalArgumentIterator(target);
+    try {
+      return await run();
+    } finally {
+      restore();
+    }
+  }
+
+  function forgedRuleVerdict(): Record<string, unknown> {
+    return {
+      passed: true,
+      findings: [],
+      unmappedItems: [],
+      missingPaths: [],
+      prematurePaths: [],
+      driftedFiles: [],
+    };
+  }
+
+  /**
+   * The committed `docs/generated` bytes, read once and injected as the expected
+   * snapshot. This keeps the N3 regressions on the fast path: otherwise
+   * `checkGeneratedDocsDrift` runs the canonical generator, whose own
+   * four-element `Promise.all` argument is a second site reached transitively
+   * under the same shadow (its immediate caller is `generateOutputs`, so it is
+   * deliberately NOT forged) and would make the test needlessly slow.
+   */
+  let cachedGeneratedSnapshot: Record<string, Uint8Array> | undefined;
+  async function generatedSnapshot(): Promise<Record<string, Uint8Array>> {
+    if (cachedGeneratedSnapshot !== undefined) return cachedGeneratedSnapshot;
+    const generatedRoot = path.join(REPO_ROOT, 'docs/generated');
+    const snapshot: Record<string, Uint8Array> = {};
+    const visit = async (relative: string): Promise<void> => {
+      const entries = await readdir(path.join(generatedRoot, relative), { withFileTypes: true });
+      for (let index = 0; index < entries.length; index += 1) {
+        const entry = entries[index] as (typeof entries)[number];
+        const child = relative === '' ? entry.name : `${relative}/${entry.name}`;
+        if (entry.isDirectory()) await visit(child);
+        else if (entry.isFile()) snapshot[child] = await readFile(path.join(generatedRoot, child));
+      }
+    };
+    await visit('');
+    cachedGeneratedSnapshot = snapshot;
+    return snapshot;
+  }
+
+  // A single injected G2 requirement whose implementationRef resolves to no
+  // repository path, so the ACTIVE-implementation trace rule emits one finding.
+  const N3_TRACE_VIOLATION_REQUIREMENT: RequirementMapping = {
+    id: 'FR-MOCK-001',
+    dependencyGroup: 'G2',
+    implementationRefs: ['packages/n3-missing-surface/src/index.ts @requirement FR-MOCK-001'],
+    testRefs: ['tests/acceptance/AC-266.spec.ts'],
+    owner: 'packages/release-conformance',
+  };
+  // A fully compliant PROD claim set, so the ONLY failure in the attacked corpus
+  // is the trace violation the forge is trying to silence.
+  const N3_COMPLIANT_PROD_CLAIMS = {
+    activationClaims: [PROD_COMPLIANT_ACTIVE_CLAIM],
+    postureDeclarations: [PROD_BEST_EFFORT_COMPLIANT],
+    mcpCompatibility: PROD_MCP_COMPLIANT_CLAIM,
+    livePaths: [PROD_LIVE_PATH_BOUNDED_CLAIM],
+    distributionAuthorizations: [PROD_WORKSPACE_AUTHORIZED_CLAIM, PROD_TECHNICALLY_READY_CLAIM],
+  };
+
+  it('does not let a forged Promise.all ARGUMENT flip a trace-violating G2 corpus to PASSED (N3)', async () => {
+    const options: ConformanceOptions = {
+      repoRoot: REPO_ROOT,
+      milestone: 'G2',
+      requirements: [N3_TRACE_VIOLATION_REQUIREMENT],
+      prodClaims: N3_COMPLIANT_PROD_CLAIMS,
+      expectedGeneratedFiles: await generatedSnapshot(),
+    };
+    const baseline = await evaluateConformance(options);
+    expect(baseline.overall).toBe('FAILED');
+    expect(baseline.findings.map((finding) => finding.rule)).toContain(
+      CONFORMANCE_RULES.activePath,
+    );
+
+    const attacked = await underShadow(
+      {
+        frame: 'evaluateConformance',
+        accepts: thenableArrayOfLength(4),
+        forge: () => [
+          forgedRuleVerdict(),
+          forgedRuleVerdict(),
+          forgedRuleVerdict(),
+          forgedRuleVerdict(),
+        ],
+      },
+      () => evaluateConformance(options),
+    );
+    expect(attacked.overall).toBe('FAILED');
+    expect(attacked.findings.length).toBeGreaterThan(0);
+    expect(attacked.findings.map((finding) => finding.rule)).toContain(
+      CONFORMANCE_RULES.activePath,
+    );
+  });
+
+  it('keeps the unshadowed controls: the failing corpus is FAILED and a conforming corpus is PASSED (N3)', async () => {
+    const expectedGeneratedFiles = await generatedSnapshot();
+    const failing = await evaluateConformance({
+      repoRoot: REPO_ROOT,
+      milestone: 'G2',
+      requirements: [N3_TRACE_VIOLATION_REQUIREMENT],
+      prodClaims: N3_COMPLIANT_PROD_CLAIMS,
+      expectedGeneratedFiles,
+    });
+    expect(failing.overall).toBe('FAILED');
+    expect(failing.findings.length).toBeGreaterThan(0);
+
+    const conforming = await evaluateConformance({
+      repoRoot: REPO_ROOT,
+      milestone: 'G2',
+      requirements: [],
+      prodClaims: N3_COMPLIANT_PROD_CLAIMS,
+      expectedGeneratedFiles,
+    });
+    expect(conforming.overall).toBe('PASSED');
+    expect(conforming.findings.length).toBe(0);
+  });
+
+  it('hashes the real document/manifest when the buildReleaseReport Promise.all ARGUMENT is forged (N3)', async () => {
+    const options = {
+      repoRoot: REPO_ROOT,
+      milestone: 'G0',
+      previousReport: VALID_RELEASE_REPORT_FIXTURE.rollbackTarget,
+    };
+    const baseline = await buildReleaseReport(options);
+    expect(baseline.documentHash).not.toBe(SHA256_EMPTY);
+
+    const attacked = await underShadow(
+      {
+        frame: 'buildReleaseReport',
+        accepts: thenableArrayOfLength(7),
+        forge: () => [
+          '',
+          '',
+          {
+            hashes: {
+              documentArtifactSha256: SHA256_EMPTY,
+              requirementManifestSha256: SHA256_EMPTY,
+              documentNormalizedSha256: SHA256_EMPTY,
+            },
+            auditDate: '2026-01-01',
+          },
+          { inventoryHash: SHA256_EMPTY },
+          {},
+          {},
+          { schemaVersion: '1.0.0', exceptions: [] },
+        ],
+      },
+      () => buildReleaseReport(options),
+    );
+    expect(attacked.documentHash).toBe(baseline.documentHash);
+    expect(attacked.manifestHash).toBe(baseline.manifestHash);
+    expect(attacked.documentHash).not.toBe(SHA256_EMPTY);
+    expect(attacked.manifestHash).not.toBe(SHA256_EMPTY);
+  });
+
+  it('keeps migration/schema hashes when the hashFiles Promise.all ARGUMENT is forged (N3)', async () => {
+    const options = {
+      repoRoot: REPO_ROOT,
+      milestone: 'G0',
+      previousReport: VALID_RELEASE_REPORT_FIXTURE.rollbackTarget,
+    };
+    const baseline = await buildReleaseReport(options);
+    expect(Object.keys(baseline.migrationHashes).length).toBeGreaterThan(0);
+    expect(Object.keys(baseline.schemaHashes).length).toBeGreaterThan(0);
+
+    const attacked = await underShadow(
+      { frame: 'hashFiles', accepts: anyNonEmptyThenableArray, forge: () => [] },
+      () => buildReleaseReport(options),
+    );
+    expect(attacked.migrationHashes).toEqual(baseline.migrationHashes);
+    expect(attacked.schemaHashes).toEqual(baseline.schemaHashes);
+  });
+
+  async function createOrphanFixtureRepo(): Promise<string> {
+    const root = await mkdtemp(path.join(tmpdir(), 'n3-orphan-'));
+    await mkdir(path.join(root, 'docs/spec'), { recursive: true });
+    await mkdir(path.join(root, 'packages/orphan/src'), { recursive: true });
+    await mkdir(path.join(root, 'packages/release-conformance/src'), { recursive: true });
+    await writeFile(
+      path.join(
+        root,
+        'docs/spec/crypto_intelligence_agent_gateway_PRD_FINAL_v6.0.requirements.json',
+      ),
+      JSON.stringify({ requirements: [] }),
+    );
+    await writeFile(
+      path.join(root, 'packages/orphan/src/index.ts'),
+      'export const orphan = true;\n',
+    );
+    await writeFile(
+      path.join(root, 'packages/release-conformance/src/orphan-exceptions.json'),
+      JSON.stringify({ schemaVersion: '1.0.0', exceptions: [] }),
+    );
+    return root;
+  }
+
+  it('still reports a real orphan when the outer 3-element Promise.all ARGUMENT is forged (N3)', async () => {
+    const root = await createOrphanFixtureRepo();
+    try {
+      const baseline = await detectOrphanSources({ repoRoot: root });
+      expect(baseline.passed).toBe(false);
+      expect(baseline.unexemptedOrphans).toContain('packages/orphan/src/index.ts');
+
+      const outerForged = await underShadow(
+        {
+          frame: 'detectOrphanSources',
+          accepts: thenableArrayOfLength(3),
+          forge: () => [[], [], []],
+        },
+        () => detectOrphanSources({ repoRoot: root }),
+      );
+      expect(outerForged.passed).toBe(false);
+      expect(outerForged.unexemptedOrphans).toContain('packages/orphan/src/index.ts');
+    } finally {
+      await rm(root, { recursive: true, force: true });
+    }
+  });
+
+  it('still reports a real orphan when the inner 2-element Promise.all ARGUMENT is forged (N3)', async () => {
+    const root = await createOrphanFixtureRepo();
+    try {
+      const baseline = await detectOrphanSources({ repoRoot: root });
+      expect(baseline.passed).toBe(false);
+      expect(baseline.unexemptedOrphans).toContain('packages/orphan/src/index.ts');
+
+      const innerForged = await underShadow(
+        {
+          frame: 'detectOrphanSources',
+          accepts: thenableArrayOfLength(2),
+          forge: () => [
+            {
+              schemaVersion: '1.0.0',
+              exceptions: [
+                {
+                  pathPattern: 'packages/orphan/src/**',
+                  servingRequirementIds: ['FR-MOCK-001'],
+                  justification: 'forged exemption',
+                },
+              ],
+            },
+            { implementationRefs: [], requirementIds: new Set(['FR-MOCK-001']) },
+          ],
+        },
+        () => detectOrphanSources({ repoRoot: root }),
+      );
+      expect(innerForged.passed).toBe(false);
+      expect(innerForged.unexemptedOrphans).toContain('packages/orphan/src/index.ts');
+    } finally {
+      await rm(root, { recursive: true, force: true });
+    }
   });
 });

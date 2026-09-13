@@ -40,6 +40,57 @@ const CAPACITY_VOCABULARIES = [
   ['renderedSpendClass', renderedSpendClass, ALL_RENDERED_SPEND_CLASSES],
 ] as const;
 
+// --- Audit N1: D018 freeze invariant on the fail-closed vocabularies ----------
+
+/**
+ * Audit N1. `ALL_RESERVE_CLASSES` (and its four sibling vocabularies) was
+ * exported UNFROZEN, so a same-process `push` of a forged member widened the
+ * accepted vocabulary: after `ALL_RESERVE_CLASSES.push('EVIL')` a contract that
+ * declared `protectedReserves:{EVIL:0.1}` became acceptable at the
+ * CAPACITY_CONTRACT activation gate. Each array is now frozen, so a push cannot
+ * widen the set and the resolvers keep refusing forged members.
+ */
+describe('D018 freeze invariant for the fail-closed capacity vocabularies (N1)', () => {
+  const FROZEN_CAPACITY_VOCABULARIES: readonly (readonly [string, readonly string[]])[] = [
+    ['ALL_BUDGET_DIMENSIONS', ALL_BUDGET_DIMENSIONS],
+    ['ALL_PROVIDER_MODES', ALL_PROVIDER_MODES],
+    ['ALL_RESERVE_CLASSES', ALL_RESERVE_CLASSES],
+    ['ALL_DEGRADATION_STEPS', ALL_DEGRADATION_STEPS],
+    ['ALL_CONTRACT_RESULTS', ALL_CONTRACT_RESULTS],
+  ];
+
+  it('freezes all five decision-path capacity vocabularies', () => {
+    for (let index = 0; index < FROZEN_CAPACITY_VOCABULARIES.length; index += 1) {
+      const entry = FROZEN_CAPACITY_VOCABULARIES[index] as readonly [string, readonly string[]];
+      expect(Object.isFrozen(entry[1]), entry[0]).toBe(true);
+    }
+  });
+
+  it('a push of a forged reserve class throws and cannot widen the vocabulary (N1)', () => {
+    const mutable = ALL_RESERVE_CLASSES as unknown as string[];
+    const originalLength = ALL_RESERVE_CLASSES.length;
+    expect(() => mutable.push('EVIL')).toThrow();
+    // The frozen array is unchanged, and the fail-closed resolver still refuses
+    // the forged member while a real member keeps validating (control).
+    expect(ALL_RESERVE_CLASSES.length).toBe(originalLength);
+    expect(ALL_RESERVE_CLASSES).not.toContain('EVIL');
+    expect(() => reserveClass('EVIL')).toThrow(ForesiftError);
+    expect(reserveClass('RISK_MONITORING')).toBe('RISK_MONITORING');
+    expect(reserveClass('EXPLORATION_PROBES')).toBe('EXPLORATION_PROBES');
+  });
+
+  it('a push of a forged member throws for every frozen sibling vocabulary', () => {
+    for (let index = 0; index < FROZEN_CAPACITY_VOCABULARIES.length; index += 1) {
+      const entry = FROZEN_CAPACITY_VOCABULARIES[index] as readonly [string, readonly string[]];
+      const mutable = entry[1] as unknown as string[];
+      const originalLength = entry[1].length;
+      expect(() => mutable.push('EVIL'), entry[0]).toThrow();
+      expect(entry[1].length, entry[0]).toBe(originalLength);
+      expect(entry[1], entry[0]).not.toContain('EVIL');
+    }
+  });
+});
+
 describe('capacity domain vocabulary resolution (fail-closed)', () => {
   for (const [name, resolve, all] of CAPACITY_VOCABULARIES) {
     it(`${name} resolves every member of its exact PRD vocabulary`, () => {

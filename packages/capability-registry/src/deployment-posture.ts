@@ -28,6 +28,7 @@ import {
   ForesiftError,
   bestEffortWeakensOnlyAllowedDimensions,
   isContractActivatable,
+  isOneOf,
   parseDeploymentPosture,
   parseDeploymentRelaxableDimension,
   parseProtectedDimension,
@@ -42,6 +43,7 @@ import {
   type DegradeState,
 } from '@foresift/capacity-planner';
 import { canonicalJson, type DatabaseEngine } from '@foresift/persistence';
+import { numericCopy, numericUnique } from './shadow-safe.ts';
 
 // --- critical-dependency register -------------------------------------------
 
@@ -56,15 +58,14 @@ export const CriticalDependencyKind = {
 } as const;
 export type CriticalDependencyKind =
   (typeof CriticalDependencyKind)[keyof typeof CriticalDependencyKind];
-export const ALL_CRITICAL_DEPENDENCY_KINDS: readonly CriticalDependencyKind[] =
-  Object.values(CriticalDependencyKind);
+export const ALL_CRITICAL_DEPENDENCY_KINDS: readonly CriticalDependencyKind[] = Object.freeze(
+  Object.values(CriticalDependencyKind),
+);
 
 function parseCriticalDependencyKind(value: unknown): CriticalDependencyKind {
-  if (
-    typeof value === 'string' &&
-    (ALL_CRITICAL_DEPENDENCY_KINDS as readonly string[]).includes(value)
-  ) {
-    return value as CriticalDependencyKind;
+  // `isOneOf` is a numeric-index walk, never a shadowable `.includes`.
+  if (typeof value === 'string' && isOneOf(value, ALL_CRITICAL_DEPENDENCY_KINDS)) {
+    return value;
   }
   throw new ForesiftError(
     ErrorCode.PROD_DEPLOYMENT_POSTURE_UNKNOWN,
@@ -244,27 +245,39 @@ export async function evaluateDeploymentPosture(
        FROM prod.sla_register
       ORDER BY dependency_id ASC, verified_at ASC, sla_id ASC`,
   );
-  const covered = new Set<string>();
+  // Numeric-index coverage walk only (audit HIGH): the previous
+  // `for (const dependency of dependencies.rows)` read `Symbol.iterator`, so a
+  // shadowed iterator skipped EVERY dependency, left `missingSlaRefs` empty, and
+  // then an empty register was the only thing blocking SLA_BACKED — a fail-OPEN
+  // posture claim. `filter`/`map` shadows are avoided the same way.
   const missingSlaRefs: string[] = [];
-  for (const dependency of dependencies.rows) {
-    const applicable = slas.rows.filter(
-      (sla) => sla.dependency_id === dependency.dependency_id && sla.applicable === true,
-    );
-    const unexpired = applicable.filter((sla) => {
+  const criticalDependencyIds: string[] = [];
+  for (let index = 0; index < dependencies.rows.length; index += 1) {
+    const dependency = dependencies.rows[index];
+    if (dependency === undefined) continue;
+    criticalDependencyIds[criticalDependencyIds.length] = dependency.dependency_id;
+    let unexpiredCount = 0;
+    for (let slaIndex = 0; slaIndex < slas.rows.length; slaIndex += 1) {
+      const sla = slas.rows[slaIndex];
+      if (
+        sla === undefined ||
+        sla.dependency_id !== dependency.dependency_id ||
+        sla.applicable !== true
+      ) {
+        continue;
+      }
       const verifiedMs = Date.parse(String(sla.verified_at));
-      if (!Number.isFinite(verifiedMs) || verifiedMs > nowMs) return false;
-      if (sla.expires_at === null) return true;
+      if (!Number.isFinite(verifiedMs) || verifiedMs > nowMs) continue;
+      if (sla.expires_at === null) {
+        unexpiredCount += 1;
+        continue;
+      }
       const expiresMs = Date.parse(String(sla.expires_at));
-      return Number.isFinite(expiresMs) && expiresMs > nowMs;
-    });
-    if (unexpired.length === 0) {
-      missingSlaRefs.push(dependency.dependency_id);
-    } else {
-      covered.add(dependency.dependency_id);
+      if (Number.isFinite(expiresMs) && expiresMs > nowMs) unexpiredCount += 1;
     }
+    if (unexpiredCount === 0) missingSlaRefs[missingSlaRefs.length] = dependency.dependency_id;
   }
-  const criticalDependencyIds = dependencies.rows.map((row) => row.dependency_id);
-  const protectedDimensions = [...ALL_PROTECTED_DIMENSIONS];
+  const protectedDimensions = numericCopy(ALL_PROTECTED_DIMENSIONS);
   // An EMPTY critical register is vacuous coverage, not coverage (audit H8):
   // SLA_BACKED requires at least one declared critical dependency AND a passing
   // capacity contract, so the posture can never be claimed by declaring nothing.
@@ -297,14 +310,13 @@ export async function evaluateDeploymentPosture(
     };
   }
   const reasons: string[] = [];
-  if (emptyRegister) reasons.push('no critical external dependency is declared');
+  if (emptyRegister) reasons[reasons.length] = 'no critical external dependency is declared';
   if (!capacityBacked) {
-    reasons.push('no passing sustainable-capacity contract backs the deployment');
+    reasons[reasons.length] = 'no passing sustainable-capacity contract backs the deployment';
   }
   if (missingSlaRefs.length > 0) {
-    reasons.push(
-      `${missingSlaRefs.length} critical dependency(ies) lack an applicable unexpired SLA`,
-    );
+    reasons[reasons.length] =
+      `${missingSlaRefs.length} critical dependency(ies) lack an applicable unexpired SLA`;
   }
   return {
     posture: DeploymentPosture.FREE_TIER_BEST_EFFORT,
@@ -343,9 +355,13 @@ export function assertBestEffortPreservesProtectedDimensions(
   declaration: BestEffortDeclarationInput,
 ): void {
   const posture = parseDeploymentPosture(declaration.posture);
-  const weakened = [...new Set(declaration.weakenedDimensions)];
-  for (const dimension of weakened) {
-    if ((ALL_PROTECTED_DIMENSIONS as readonly string[]).includes(dimension)) {
+  // Numeric de-duplication only (audit HIGH): `[...new Set(array)]` reads
+  // `Symbol.iterator`, so a shadowed iterator made the weakened set EMPTY and
+  // the protected-dimension and SLA_BACKED checks below all no-op.
+  const weakened = numericUnique(declaration.weakenedDimensions);
+  for (let index = 0; index < weakened.length; index += 1) {
+    const dimension = weakened[index] as string;
+    if (isOneOf(dimension, ALL_PROTECTED_DIMENSIONS)) {
       throw new ForesiftError(
         ErrorCode.PROD_BEST_EFFORT_PROTECTED_DIMENSION,
         `a best-effort declaration may never weaken protected dimension '${dimension}' (§69.6)`,
@@ -354,12 +370,29 @@ export function assertBestEffortPreservesProtectedDimensions(
     }
     parseDeploymentRelaxableDimension(dimension);
   }
-  const declaredProtected = declaration.protectedDimensions.map((dimension) =>
-    parseProtectedDimension(dimension),
-  );
-  const missingProtected = ALL_PROTECTED_DIMENSIONS.filter(
-    (dimension) => !declaredProtected.includes(dimension),
-  );
+  // Numeric-index walks and `isOneOf` only: a shadowed
+  // `Array.prototype.includes`/`filter` must not be able to hide a protected
+  // dimension omitted from the declaration (audit NEW-M4).
+  const declaredProtected: ProtectedDimension[] = [];
+  for (
+    let declaredIndex = 0;
+    declaredIndex < declaration.protectedDimensions.length;
+    declaredIndex += 1
+  ) {
+    declaredProtected[declaredProtected.length] = parseProtectedDimension(
+      declaration.protectedDimensions[declaredIndex],
+    );
+  }
+  const missingProtected: ProtectedDimension[] = [];
+  for (
+    let dimensionIndex = 0;
+    dimensionIndex < ALL_PROTECTED_DIMENSIONS.length;
+    dimensionIndex += 1
+  ) {
+    const dimension = ALL_PROTECTED_DIMENSIONS[dimensionIndex] as ProtectedDimension;
+    if (!isOneOf(dimension, declaredProtected))
+      missingProtected[missingProtected.length] = dimension;
+  }
   if (missingProtected.length > 0) {
     throw new ForesiftError(
       ErrorCode.PROD_BEST_EFFORT_PROTECTED_DIMENSION,
@@ -405,8 +438,8 @@ export async function declareBestEffortPosture(
       parseDeploymentPosture(input.posture),
       canonicalJson(input.degradedScope),
       canonicalJson(input.missingSlaRefs),
-      [...new Set(input.weakenedDimensions)],
-      [...ALL_PROTECTED_DIMENSIONS],
+      numericUnique(input.weakenedDimensions),
+      numericCopy(ALL_PROTECTED_DIMENSIONS),
       requireText(
         input.reason ?? 'declared posture',
         'reason',
@@ -451,13 +484,13 @@ export function degradeForCapacityPressure(state: DegradeState): CapacityPressur
   assertBestEffortPreservesProtectedDimensions({
     posture: DeploymentPosture.FREE_TIER_BEST_EFFORT,
     weakenedDimensions: relaxed,
-    protectedDimensions: [...ALL_PROTECTED_DIMENSIONS],
+    protectedDimensions: numericCopy(ALL_PROTECTED_DIMENSIONS),
   });
   return {
     step,
     relaxedDimensions: relaxed,
     posture: DeploymentPosture.FREE_TIER_BEST_EFFORT,
-    protectedDimensions: [...ALL_PROTECTED_DIMENSIONS],
+    protectedDimensions: numericCopy(ALL_PROTECTED_DIMENSIONS),
   };
 }
 
@@ -476,7 +509,7 @@ export function assertCapacityDegradationPreservesProtectedDimensions(
   assertBestEffortPreservesProtectedDimensions({
     posture: DeploymentPosture.FREE_TIER_BEST_EFFORT,
     weakenedDimensions: relaxedDimensions,
-    protectedDimensions: [...ALL_PROTECTED_DIMENSIONS],
+    protectedDimensions: numericCopy(ALL_PROTECTED_DIMENSIONS),
   });
 }
 

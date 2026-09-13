@@ -151,6 +151,61 @@ async function seedProvenRow(scopeHash: string, tag: string): Promise<void> {
   );
 }
 
+/**
+ * The OPPORTUNITY required gate set for a `requires_proven: true` scope (audit
+ * R8 probes need a COMPLETE all-PASS batch, or the 0006 trigger — not the
+ * non-blank CHECK under test — would refuse first).
+ */
+const OPPORTUNITY_REQUIRED_GATES: readonly ActivationGateKind[] = [
+  'IMPLEMENTED_PRESENT',
+  'AVAILABLE_EVIDENCE',
+  'PROVEN_PRESENT',
+  'STATISTICAL_EVIDENCE_SCOPE',
+  'NEGATIVE_CONTROLS',
+  'CLUSTERED_INTERVALS',
+  'CALIBRATION_MATURITY',
+  'VERIFIED_GATE_EVIDENCE',
+  'CAPACITY_CONTRACT',
+  'NO_OPEN_CONTAINMENT',
+] as const;
+
+/** Persist a complete all-PASS OPPORTUNITY batch for the exact scope + event. */
+async function seedOpportunityPassBatch(
+  scopeHash: string,
+  tag: string,
+  eventRef: string,
+): Promise<void> {
+  for (const gate of ALL_ACTIVATION_GATE_KINDS) {
+    const verdict = OPPORTUNITY_REQUIRED_GATES.includes(gate) ? 'PASS' : 'NOT_APPLICABLE';
+    await engine.query(
+      `INSERT INTO prod.activation_gate_evaluations
+         (evaluation_id, scope_hash, gate_kind, verdict, failing_gate, evidence_refs,
+          capacity_contract_ref, activation_event_ref, expires_at, activation_kind)
+       VALUES ($1, $2, $3, $4, NULL, '[]'::jsonb, NULL, $5, '2030-01-01T00:00:00Z', 'OPPORTUNITY')`,
+      [`ws-${tag}-${gate}`, scopeHash, gate, verdict, eventRef],
+    );
+  }
+}
+
+/** Insert a raw ACTIVE row and return the refusal (or throw if it succeeded). */
+async function insertRawActive(
+  stateRowId: string,
+  tag: string,
+  scopeHash: string,
+  eventRef: string,
+): Promise<Error> {
+  return rejection(
+    engine.query(
+      `INSERT INTO prod.module_states
+         (state_row_id, module_id, artifact_set_hash, scope, scope_hash, lifecycle_state,
+          operational_readiness, distribution_readiness, activation_event_ref, activation_kind)
+       VALUES ($1, 'module-1', $2, $3::jsonb, $4, 'ACTIVE',
+               'READY_FOR_ACTIVE_PROFILE', 'PRIVATE_ONLY', $5, 'OPPORTUNITY')`,
+      [stateRowId, HASH, rawScope(tag), scopeHash, eventRef],
+    ),
+  );
+}
+
 beforeAll(async () => {
   db = new PGlite({ parsers: PRECISION_RETAINING_TIMESTAMP_PARSERS });
   engine = createEngine(db, 'pglite');
@@ -173,6 +228,8 @@ describe('g2_prod_* migrations apply to a fresh database', () => {
       'g2_prod_0006_activation_kind',
       'g2_prod_0007_activation_fail_closed',
       'g2_prod_0008_raw_write_invariants',
+      'g2_prod_0009_fix_distribution_gate_set',
+      'g2_prod_0010_activation_event_ref_nonblank',
     ] as const;
     for (const id of ids) expect(applied).toContain(id);
     for (let i = 1; i < ids.length; i += 1) {
@@ -279,6 +336,72 @@ describe('governed module states are append-only and gate-backed', () => {
       `SELECT count(*)::int AS n FROM prod.module_states WHERE state_row_id = 'state-raw-empty-event'`,
     );
     expect(Number(rows.rows[0]?.n)).toBe(0);
+  }, 120_000);
+
+  it('refuses every blank-only activation event reference class, not just ASCII spaces (R8)', async () => {
+    // `btrim` strips only ASCII spaces, so tab/LF/CR/VT/FF/NBSP/BOM event refs
+    // were accepted by the 0008 CHECK even though `String.prototype.trim()`
+    // treats them as blank. `g2_prod_0010` now removes the full ECMAScript
+    // WhiteSpace + LineTerminator set, so each probe below must be refused.
+    // Every probe supplies a COMPLETE all-PASS OPPORTUNITY batch and a PROVEN
+    // row, so only the non-blank CHECK can refuse.
+    const blanks: readonly string[] = [
+      ' ',
+      '\t',
+      '\n',
+      '\r',
+      '\v',
+      '\f',
+      '\u00A0',
+      '\uFEFF',
+      '\u1680',
+      '\u2003',
+      '\u200A',
+      '\u2028',
+      '\u2029',
+      '\u202F',
+      '\u205F',
+      '\u3000',
+      '\t \n\u00A0\u2003',
+    ];
+    for (const [index, blank] of blanks.entries()) {
+      const tag = `blank-${index}`;
+      const rawHash = canonicalHash(tag);
+      await seedProvenRow(rawHash, tag);
+      await seedOpportunityPassBatch(rawHash, tag, blank);
+
+      const stateRowId = `state-raw-blank-${index}`;
+      const error = await insertRawActive(stateRowId, tag, rawHash, blank);
+      expect(error.message).toMatch(/module_states_activation_event_ref_nonblank/);
+      const rows = await engine.query<{ n: number }>(
+        `SELECT count(*)::int AS n FROM prod.module_states WHERE state_row_id = $1`,
+        [stateRowId],
+      );
+      expect(Number(rows.rows[0]?.n)).toBe(0);
+    }
+  }, 120_000);
+
+  it('accepts a genuine activation event reference on the fully migrated database (R8 control)', async () => {
+    const tag = 'genuine';
+    const rawHash = canonicalHash(tag);
+    await seedProvenRow(rawHash, tag);
+    await seedOpportunityPassBatch(rawHash, tag, 'raw-genuine-activation');
+
+    const stateRowId = 'state-raw-genuine';
+    // A genuine reference is accepted: the insert is NOT wrapped in `rejection`.
+    await engine.query(
+      `INSERT INTO prod.module_states
+         (state_row_id, module_id, artifact_set_hash, scope, scope_hash, lifecycle_state,
+          operational_readiness, distribution_readiness, activation_event_ref, activation_kind)
+       VALUES ($1, 'module-1', $2, $3::jsonb, $4, 'ACTIVE',
+               'READY_FOR_ACTIVE_PROFILE', 'PRIVATE_ONLY', $5, 'OPPORTUNITY')`,
+      [stateRowId, HASH, rawScope(tag), rawHash, 'raw-genuine-activation'],
+    );
+    const rows = await engine.query<{ lifecycle_state: string }>(
+      `SELECT lifecycle_state FROM prod.module_states WHERE state_row_id = $1`,
+      [stateRowId],
+    );
+    expect(rows.rows[0]?.lifecycle_state).toBe('ACTIVE');
   }, 120_000);
 
   it('allows a raw ACTIVE INSERT backed by a complete persisted all-PASS set for its kind', async () => {

@@ -40,8 +40,9 @@ export const ModuleLifecycleState = {
   DISABLED: 'DISABLED',
 } as const;
 export type ModuleLifecycleState = (typeof ModuleLifecycleState)[keyof typeof ModuleLifecycleState];
-export const ALL_MODULE_LIFECYCLE_STATES: readonly ModuleLifecycleState[] =
-  Object.values(ModuleLifecycleState);
+export const ALL_MODULE_LIFECYCLE_STATES: readonly ModuleLifecycleState[] = Object.freeze(
+  Object.values(ModuleLifecycleState),
+);
 
 /**
  * The §69.2 seed position. A module that has no governed state row yet is
@@ -51,10 +52,10 @@ export const ALL_MODULE_LIFECYCLE_STATES: readonly ModuleLifecycleState[] =
 export const MODULE_LIFECYCLE_SEED = 'NOT_IMPLEMENTED' as const;
 export type ModuleLifecycleSeed = typeof MODULE_LIFECYCLE_SEED;
 export type ModuleLifecyclePosition = ModuleLifecycleState | ModuleLifecycleSeed;
-export const ALL_MODULE_LIFECYCLE_POSITIONS: readonly ModuleLifecyclePosition[] = [
+export const ALL_MODULE_LIFECYCLE_POSITIONS: readonly ModuleLifecyclePosition[] = Object.freeze([
   MODULE_LIFECYCLE_SEED,
   ...ALL_MODULE_LIFECYCLE_STATES,
-];
+]);
 
 // --- §69.2 operational readiness -------------------------------------------
 
@@ -67,8 +68,9 @@ export const OperationalReadiness = {
   READY_FOR_ACTIVE_PROFILE: 'READY_FOR_ACTIVE_PROFILE',
 } as const;
 export type OperationalReadiness = (typeof OperationalReadiness)[keyof typeof OperationalReadiness];
-export const ALL_OPERATIONAL_READINESS: readonly OperationalReadiness[] =
-  Object.values(OperationalReadiness);
+export const ALL_OPERATIONAL_READINESS: readonly OperationalReadiness[] = Object.freeze(
+  Object.values(OperationalReadiness),
+);
 
 // --- §69.2 distribution readiness -------------------------------------------
 
@@ -82,8 +84,9 @@ export const DistributionReadiness = {
 } as const;
 export type DistributionReadiness =
   (typeof DistributionReadiness)[keyof typeof DistributionReadiness];
-export const ALL_DISTRIBUTION_READINESS: readonly DistributionReadiness[] =
-  Object.values(DistributionReadiness);
+export const ALL_DISTRIBUTION_READINESS: readonly DistributionReadiness[] = Object.freeze(
+  Object.values(DistributionReadiness),
+);
 
 // --- §69.6 deployment posture ------------------------------------------------
 
@@ -93,8 +96,9 @@ export const DeploymentPosture = {
   FREE_TIER_BEST_EFFORT: 'FREE_TIER_BEST_EFFORT',
 } as const;
 export type DeploymentPosture = (typeof DeploymentPosture)[keyof typeof DeploymentPosture];
-export const ALL_DEPLOYMENT_POSTURES: readonly DeploymentPosture[] =
-  Object.values(DeploymentPosture);
+export const ALL_DEPLOYMENT_POSTURES: readonly DeploymentPosture[] = Object.freeze(
+  Object.values(DeploymentPosture),
+);
 
 // --- §69.4/§69.5/§69.9 ordered activation gates ------------------------------
 
@@ -120,7 +124,7 @@ export const ActivationGateKind = {
 } as const;
 export type ActivationGateKind = (typeof ActivationGateKind)[keyof typeof ActivationGateKind];
 /** The ordered evaluation sequence; missing inputs fail closed at their slot. */
-export const ACTIVATION_GATE_ORDER: readonly ActivationGateKind[] = [
+export const ACTIVATION_GATE_ORDER: readonly ActivationGateKind[] = Object.freeze([
   ActivationGateKind.IMPLEMENTED_PRESENT,
   ActivationGateKind.AVAILABLE_EVIDENCE,
   ActivationGateKind.PROVEN_PRESENT,
@@ -132,9 +136,10 @@ export const ACTIVATION_GATE_ORDER: readonly ActivationGateKind[] = [
   ActivationGateKind.CAPACITY_CONTRACT,
   ActivationGateKind.DISTRIBUTION_EVIDENCE,
   ActivationGateKind.NO_OPEN_CONTAINMENT,
-];
-export const ALL_ACTIVATION_GATE_KINDS: readonly ActivationGateKind[] =
-  Object.values(ActivationGateKind);
+]);
+export const ALL_ACTIVATION_GATE_KINDS: readonly ActivationGateKind[] = Object.freeze(
+  Object.values(ActivationGateKind),
+);
 
 /**
  * Which §69 gate family an evaluation decides (audit C1). The kind is a closed
@@ -154,7 +159,9 @@ export const ActivationKind = {
   PUBLIC: 'PUBLIC',
 } as const;
 export type ActivationKind = (typeof ActivationKind)[keyof typeof ActivationKind];
-export const ALL_ACTIVATION_KINDS: readonly ActivationKind[] = Object.values(ActivationKind);
+export const ALL_ACTIVATION_KINDS: readonly ActivationKind[] = Object.freeze(
+  Object.values(ActivationKind),
+);
 
 /**
  * A gate evaluation verdict. `REFUSE` always names the failing gate;
@@ -169,8 +176,9 @@ export const ActivationGateVerdict = {
 } as const;
 export type ActivationGateVerdict =
   (typeof ActivationGateVerdict)[keyof typeof ActivationGateVerdict];
-export const ALL_ACTIVATION_GATE_VERDICTS: readonly ActivationGateVerdict[] =
-  Object.values(ActivationGateVerdict);
+export const ALL_ACTIVATION_GATE_VERDICTS: readonly ActivationGateVerdict[] = Object.freeze(
+  Object.values(ActivationGateVerdict),
+);
 
 // --- §69.12 change classification -------------------------------------------
 
@@ -182,8 +190,9 @@ export const ChangeClassification = {
   MATERIAL_SECURITY_OR_RIGHTS: 'MATERIAL_SECURITY_OR_RIGHTS',
 } as const;
 export type ChangeClassification = (typeof ChangeClassification)[keyof typeof ChangeClassification];
-export const ALL_CHANGE_CLASSIFICATIONS: readonly ChangeClassification[] =
-  Object.values(ChangeClassification);
+export const ALL_CHANGE_CLASSIFICATIONS: readonly ChangeClassification[] = Object.freeze(
+  Object.values(ChangeClassification),
+);
 
 // --- §69.11 automatic containment -------------------------------------------
 
@@ -194,8 +203,9 @@ export const ContainmentAction = {
   DISABLED: 'DISABLED',
 } as const;
 export type ContainmentAction = (typeof ContainmentAction)[keyof typeof ContainmentAction];
-export const ALL_CONTAINMENT_ACTIONS: readonly ContainmentAction[] =
-  Object.values(ContainmentAction);
+export const ALL_CONTAINMENT_ACTIONS: readonly ContainmentAction[] = Object.freeze(
+  Object.values(ContainmentAction),
+);
 
 // --- §69.7 MCP revision channel ---------------------------------------------
 
@@ -205,8 +215,9 @@ export const McpRevisionChannel = {
   DRAFT: 'DRAFT',
 } as const;
 export type McpRevisionChannel = (typeof McpRevisionChannel)[keyof typeof McpRevisionChannel];
-export const ALL_MCP_REVISION_CHANNELS: readonly McpRevisionChannel[] =
-  Object.values(McpRevisionChannel);
+export const ALL_MCP_REVISION_CHANNELS: readonly McpRevisionChannel[] = Object.freeze(
+  Object.values(McpRevisionChannel),
+);
 
 /** §69.7 conformance result for a revision×client cell. */
 export const McpConformanceResult = {
@@ -214,8 +225,9 @@ export const McpConformanceResult = {
   FAIL: 'FAIL',
 } as const;
 export type McpConformanceResult = (typeof McpConformanceResult)[keyof typeof McpConformanceResult];
-export const ALL_MCP_CONFORMANCE_RESULTS: readonly McpConformanceResult[] =
-  Object.values(McpConformanceResult);
+export const ALL_MCP_CONFORMANCE_RESULTS: readonly McpConformanceResult[] = Object.freeze(
+  Object.values(McpConformanceResult),
+);
 
 /** The §69.7 baseline mutually tested stable revision. */
 export const MCP_BASELINE_STABLE_REVISION = '2025-11-25' as const;
@@ -243,8 +255,9 @@ export const ProtectedDimension = {
   CLAIM_BOUNDARIES: 'claim_boundaries',
 } as const;
 export type ProtectedDimension = (typeof ProtectedDimension)[keyof typeof ProtectedDimension];
-export const ALL_PROTECTED_DIMENSIONS: readonly ProtectedDimension[] =
-  Object.values(ProtectedDimension);
+export const ALL_PROTECTED_DIMENSIONS: readonly ProtectedDimension[] = Object.freeze(
+  Object.values(ProtectedDimension),
+);
 
 /**
  * The ONLY dimensions a `FREE_TIER_BEST_EFFORT` posture may relax: freshness,
@@ -260,7 +273,7 @@ export const DeploymentRelaxableDimension = {
 export type DeploymentRelaxableDimension =
   (typeof DeploymentRelaxableDimension)[keyof typeof DeploymentRelaxableDimension];
 export const ALL_DEPLOYMENT_RELAXABLE_DIMENSIONS: readonly DeploymentRelaxableDimension[] =
-  Object.values(DeploymentRelaxableDimension);
+  Object.freeze(Object.values(DeploymentRelaxableDimension));
 
 // --- §10.3/§35.14 import-boundary assertions ---------------------------------
 
@@ -274,16 +287,42 @@ export const ArtifactBoundaryAssertionKind = {
 export type ArtifactBoundaryAssertionKind =
   (typeof ArtifactBoundaryAssertionKind)[keyof typeof ArtifactBoundaryAssertionKind];
 export const ALL_ARTIFACT_BOUNDARY_ASSERTION_KINDS: readonly ArtifactBoundaryAssertionKind[] =
-  Object.values(ArtifactBoundaryAssertionKind);
+  Object.freeze(Object.values(ArtifactBoundaryAssertionKind));
 
 // --- §40 dependency-group ordering -------------------------------------------
 
 /** The §40 implementation dependency groups, in required order G0…G7. */
-export const DEPENDENCY_GROUP_ORDER = ['G0', 'G1', 'G2', 'G3', 'G4', 'G5', 'G6', 'G7'] as const;
+export const DEPENDENCY_GROUP_ORDER = Object.freeze([
+  'G0',
+  'G1',
+  'G2',
+  'G3',
+  'G4',
+  'G5',
+  'G6',
+  'G7',
+] as const);
 export type DependencyGroupId = (typeof DEPENDENCY_GROUP_ORDER)[number];
-export const ALL_DEPENDENCY_GROUP_IDS: readonly DependencyGroupId[] = [...DEPENDENCY_GROUP_ORDER];
+export const ALL_DEPENDENCY_GROUP_IDS: readonly DependencyGroupId[] = Object.freeze([
+  ...DEPENDENCY_GROUP_ORDER,
+]);
 
 // --- fail-closed parsers -----------------------------------------------------
+
+/**
+ * Shadow-proof membership: a numeric-index walk of a module-owned authority
+ * array, never `Array.prototype.includes`/`indexOf`. Every security decision in
+ * this module (and its consumers) routes through this helper or an equivalent
+ * numeric-index loop, so an in-process caller who globally shadows
+ * `Array.prototype.includes` cannot turn a fail-closed membership test into a
+ * fail-open one (audit NEW-M4).
+ */
+export function isOneOf<T>(value: unknown, allowed: readonly T[]): value is T {
+  for (let index = 0; index < allowed.length; index += 1) {
+    if (allowed[index] === value) return true;
+  }
+  return false;
+}
 
 function parseClosed<T extends string>(
   values: readonly T[],
@@ -291,7 +330,7 @@ function parseClosed<T extends string>(
   code: ErrorCode,
   label: string,
 ): T {
-  if (typeof value === 'string' && (values as readonly string[]).includes(value)) return value as T;
+  if (typeof value === 'string' && isOneOf(value, values)) return value;
   throw new ForesiftError(code, `unknown ${label}`, {
     value: typeof value === 'string' ? value : null,
   });
@@ -435,15 +474,15 @@ export const dependencyGroupId = parseDependencyGroupId;
  * (FR-PROD-001). A module may be `IMPLEMENTED` without being `AVAILABLE`, and
  * `AVAILABLE` without being `PROVEN`; each is persisted separately.
  */
-export const INDEPENDENT_LIFECYCLE_STATES: readonly ModuleLifecycleState[] = [
+export const INDEPENDENT_LIFECYCLE_STATES: readonly ModuleLifecycleState[] = Object.freeze([
   ModuleLifecycleState.IMPLEMENTED,
   ModuleLifecycleState.AVAILABLE,
   ModuleLifecycleState.PROVEN,
-];
+]);
 
 /** True iff `state` is one of the three independent lifecycle dimensions. */
 export function isIndependentLifecycleState(state: unknown): boolean {
-  return INDEPENDENT_LIFECYCLE_STATES.includes(parseModuleLifecycleState(state));
+  return isOneOf(parseModuleLifecycleState(state), INDEPENDENT_LIFECYCLE_STATES);
 }
 
 // --- §69.2/§69.3 legal lifecycle transitions --------------------------------
@@ -455,69 +494,69 @@ export function isIndependentLifecycleState(state: unknown): boolean {
  */
 const LEGAL_LIFECYCLE_TRANSITIONS: Readonly<
   Record<ModuleLifecyclePosition, readonly ModuleLifecyclePosition[]>
-> = {
-  NOT_IMPLEMENTED: [ModuleLifecycleState.IMPLEMENTED],
-  IMPLEMENTED: [
+> = Object.freeze({
+  NOT_IMPLEMENTED: Object.freeze([ModuleLifecycleState.IMPLEMENTED]),
+  IMPLEMENTED: Object.freeze([
     ModuleLifecycleState.AVAILABLE,
     ModuleLifecycleState.SHADOW,
     ModuleLifecycleState.DISABLED,
     ModuleLifecycleState.RETIRED,
-  ],
-  AVAILABLE: [
+  ]),
+  AVAILABLE: Object.freeze([
     ModuleLifecycleState.SHADOW,
     ModuleLifecycleState.DEGRADED,
     ModuleLifecycleState.PAUSED,
     ModuleLifecycleState.DISABLED,
     ModuleLifecycleState.RETIRED,
-  ],
-  SHADOW: [
+  ]),
+  SHADOW: Object.freeze([
     ModuleLifecycleState.PROVEN,
     ModuleLifecycleState.AVAILABLE,
     ModuleLifecycleState.PAUSED,
     ModuleLifecycleState.DISABLED,
     ModuleLifecycleState.RETIRED,
-  ],
-  PROVEN: [
+  ]),
+  PROVEN: Object.freeze([
     ModuleLifecycleState.ACTIVE,
     ModuleLifecycleState.PAUSED,
     ModuleLifecycleState.DISABLED,
     ModuleLifecycleState.RETIRED,
-  ],
-  ACTIVE: [
+  ]),
+  ACTIVE: Object.freeze([
     ModuleLifecycleState.DEGRADED,
     ModuleLifecycleState.PAUSED,
     ModuleLifecycleState.DISABLED,
     ModuleLifecycleState.RETIRED,
-  ],
-  DEGRADED: [
+  ]),
+  DEGRADED: Object.freeze([
     ModuleLifecycleState.ACTIVE,
     ModuleLifecycleState.PAUSED,
     ModuleLifecycleState.DISABLED,
     ModuleLifecycleState.RETIRED,
-  ],
-  PAUSED: [
+  ]),
+  PAUSED: Object.freeze([
     ModuleLifecycleState.DEGRADED,
     ModuleLifecycleState.ACTIVE,
     ModuleLifecycleState.DISABLED,
     ModuleLifecycleState.RETIRED,
-  ],
-  RETIRED: [ModuleLifecycleState.DISABLED],
-  DISABLED: [
+  ]),
+  RETIRED: Object.freeze([ModuleLifecycleState.DISABLED]),
+  DISABLED: Object.freeze([
     ModuleLifecycleState.IMPLEMENTED,
     ModuleLifecycleState.AVAILABLE,
     ModuleLifecycleState.SHADOW,
     ModuleLifecycleState.PROVEN,
     ModuleLifecycleState.DEGRADED,
     ModuleLifecycleState.PAUSED,
-  ],
-};
+  ]),
+});
 
 /** Total law: is `from -> to` a legal governed lifecycle edge? Same-state is not. */
 export function legalLifecycleTransition(from: unknown, to: unknown): boolean {
   const parsedFrom = parseModuleLifecyclePosition(from);
   const parsedTo = parseModuleLifecyclePosition(to);
   if (parsedFrom === parsedTo) return false;
-  return LEGAL_LIFECYCLE_TRANSITIONS[parsedFrom].includes(parsedTo);
+  return isOneOf(parsedTo, LEGAL_LIFECYCLE_TRANSITIONS[parsedFrom]);
 }
 
 /** Refuses an illegal transition with `PROD_LIFECYCLE_TRANSITION_ILLEGAL`. */
@@ -582,7 +621,13 @@ export function requiredStatesForActivation(
   scope: ActivationScope,
   gates: readonly ActivationGateKind[],
 ): readonly ModuleLifecycleState[] {
-  for (const field of ACTIVATION_SCOPE_TEXT_FIELDS) {
+  // Numeric-index walks only: `for…of` and `Array.prototype.map` are shadowable
+  // in-process, and a shadowed `map`/iterator would hide the declared `gates`
+  // sequence from the PROVEN-consistency law below (audit NEW-M5).
+  for (let fieldIndex = 0; fieldIndex < ACTIVATION_SCOPE_TEXT_FIELDS.length; fieldIndex += 1) {
+    const field = ACTIVATION_SCOPE_TEXT_FIELDS[
+      fieldIndex
+    ] as (typeof ACTIVATION_SCOPE_TEXT_FIELDS)[number];
     requireScopeText(scope[field], field);
   }
   if (typeof scope.requiresProven !== 'boolean') {
@@ -592,8 +637,11 @@ export function requiredStatesForActivation(
       { field: 'requiresProven', value: null },
     );
   }
-  const parsedGates = gates.map(parseActivationGateKind);
-  const schedulesProven = parsedGates.includes(ActivationGateKind.PROVEN_PRESENT);
+  const parsedGates: ActivationGateKind[] = [];
+  for (let gateIndex = 0; gateIndex < gates.length; gateIndex += 1) {
+    parsedGates[parsedGates.length] = parseActivationGateKind(gates[gateIndex]);
+  }
+  const schedulesProven = isOneOf(ActivationGateKind.PROVEN_PRESENT, parsedGates);
   if (schedulesProven !== scope.requiresProven) {
     throw new ForesiftError(
       ErrorCode.PROD_ACTIVATION_SCOPE_INVALID,
@@ -605,7 +653,11 @@ export function requiredStatesForActivation(
     ModuleLifecycleState.IMPLEMENTED,
     ModuleLifecycleState.AVAILABLE,
   ];
-  if (scope.requiresProven) required.push(ModuleLifecycleState.PROVEN);
+  if (scope.requiresProven) {
+    // Indexed append, not `push`: a shadowed `Array.prototype.push` would drop
+    // the PROVEN prerequisite entirely (audit NEW-M5).
+    required[required.length] = ModuleLifecycleState.PROVEN;
+  }
   return required;
 }
 
@@ -629,18 +681,35 @@ export function activationGateRefusal(
   evaluations: readonly ActivationGateEvaluation[],
   requiredGates: readonly ActivationGateKind[] = ACTIVATION_GATE_ORDER,
 ): ActivationGateKind | null {
-  const required = requiredGates.map(parseActivationGateKind);
-  const byGate = new Map<ActivationGateKind, ActivationGateEvaluation[]>();
-  for (const evaluation of evaluations) {
-    const gate = parseActivationGateKind(evaluation.gateKind);
-    const bucket = byGate.get(gate);
-    if (bucket === undefined) byGate.set(gate, [evaluation]);
-    else bucket.push(evaluation);
+  // Numeric-index only. `requiredGates.map(...)` and BOTH `for…of` walks below
+  // are shadowable in-process, and a shadowed iterator iterating zero times
+  // made this fail-closed predicate return `null` ("every gate satisfied") for
+  // an EMPTY or incomplete evaluation set (audit NEW-M5). The `Map` bucket is
+  // replaced by a nested numeric count for the same reason.
+  const required: ActivationGateKind[] = [];
+  for (let gateIndex = 0; gateIndex < requiredGates.length; gateIndex += 1) {
+    required[required.length] = parseActivationGateKind(requiredGates[gateIndex]);
   }
-  for (const gate of required) {
-    const bucket = byGate.get(gate);
-    if (bucket === undefined || bucket.length !== 1) return gate;
-    const [evaluation] = bucket;
+  const parsedKinds: ActivationGateKind[] = [];
+  for (let evaluationIndex = 0; evaluationIndex < evaluations.length; evaluationIndex += 1) {
+    // Parse every declared kind exactly once (a malformed kind must refuse even
+    // when it is not one of the required gates).
+    parsedKinds[parsedKinds.length] = parseActivationGateKind(
+      evaluations[evaluationIndex]?.gateKind,
+    );
+  }
+  for (let gateIndex = 0; gateIndex < required.length; gateIndex += 1) {
+    const gate = required[gateIndex] as ActivationGateKind;
+    let occurrences = 0;
+    let firstIndex = -1;
+    for (let evaluationIndex = 0; evaluationIndex < parsedKinds.length; evaluationIndex += 1) {
+      if (parsedKinds[evaluationIndex] === gate) {
+        occurrences += 1;
+        if (firstIndex < 0) firstIndex = evaluationIndex;
+      }
+    }
+    if (occurrences !== 1 || firstIndex < 0) return gate;
+    const evaluation = evaluations[firstIndex];
     if (evaluation === undefined) return gate;
     const verdict = parseActivationGateVerdict(evaluation.verdict);
     const failing =
@@ -683,7 +752,17 @@ export function assertActivationGateSatisfied(
 
 /** Total: the zero-based §40 position of a dependency group, or a typed refusal. */
 export function dependencyGroupIndex(groupId: unknown): number {
-  return DEPENDENCY_GROUP_ORDER.indexOf(parseDependencyGroupId(groupId));
+  const parsed = parseDependencyGroupId(groupId);
+  // Numeric-index walk of the frozen authority array: `Array.prototype.indexOf`
+  // is shadowable in-process, so the position can never be derived from it.
+  for (let index = 0; index < ALL_DEPENDENCY_GROUP_IDS.length; index += 1) {
+    if (ALL_DEPENDENCY_GROUP_IDS[index] === parsed) return index;
+  }
+  // `parseDependencyGroupId` already proved membership in the same authority,
+  // so this is unreachable; refusing is safer than returning a sentinel.
+  throw new ForesiftError(ErrorCode.PROD_DEPENDENCY_GROUP_UNKNOWN, 'unknown dependency group', {
+    value: typeof groupId === 'string' ? groupId : null,
+  });
 }
 
 /** True iff `prerequisite` sorts strictly before `dependent` in G0…G7. */
@@ -732,10 +811,27 @@ export function bestEffortWeakensOnlyAllowedDimensions(
   declaration: BestEffortDeclarationInput,
 ): boolean {
   const posture = parseDeploymentPosture(declaration.posture);
-  const weakened = [...new Set(declaration.weakenedDimensions)];
-  for (const dimension of weakened) {
-    if ((ALL_PROTECTED_DIMENSIONS as readonly string[]).includes(dimension)) return false;
-    if (!(ALL_DEPLOYMENT_RELAXABLE_DIMENSIONS as readonly string[]).includes(dimension)) {
+  // Numeric-index only (audit NEW-M5): `[...new Set(...)]`, `for…of`, and
+  // `Array.prototype` iteration are shadowable in-process. A shadowed iterator
+  // made `weakened` empty, so a declaration that weakened a protected dimension
+  // was accepted. Deduplicate with a nested numeric scan instead.
+  const weakenedSource = declaration.weakenedDimensions;
+  const weakened: string[] = [];
+  for (let sourceIndex = 0; sourceIndex < weakenedSource.length; sourceIndex += 1) {
+    const candidate = weakenedSource[sourceIndex];
+    let seen = false;
+    for (let seenIndex = 0; seenIndex < weakened.length; seenIndex += 1) {
+      if (weakened[seenIndex] === candidate) {
+        seen = true;
+        break;
+      }
+    }
+    if (!seen) weakened[weakened.length] = candidate as string;
+  }
+  for (let dimensionIndex = 0; dimensionIndex < weakened.length; dimensionIndex += 1) {
+    const dimension = weakened[dimensionIndex] as string;
+    if (isOneOf(dimension, ALL_PROTECTED_DIMENSIONS)) return false;
+    if (!isOneOf(dimension, ALL_DEPLOYMENT_RELAXABLE_DIMENSIONS)) {
       throw new ForesiftError(
         ErrorCode.PROD_RELAXABLE_DIMENSION_UNKNOWN,
         'unknown relaxable deployment dimension',
@@ -743,8 +839,9 @@ export function bestEffortWeakensOnlyAllowedDimensions(
       );
     }
   }
-  for (const dimension of declaration.protectedDimensions) {
-    parseProtectedDimension(dimension);
+  const declaredProtected = declaration.protectedDimensions;
+  for (let protectedIndex = 0; protectedIndex < declaredProtected.length; protectedIndex += 1) {
+    parseProtectedDimension(declaredProtected[protectedIndex]);
   }
   if (posture === DeploymentPosture.SLA_BACKED && weakened.length > 0) return false;
   return true;
@@ -803,7 +900,10 @@ export function mcpRevisionMayBeDefault(descriptor: McpRevisionDescriptor): bool
 
 /** Refuses a draft revision marked default with `PROD_MCP_DRAFT_DEFAULT`. */
 export function assertNoDraftDefault(revisions: readonly McpRevisionDescriptor[]): void {
-  for (const descriptor of revisions) {
+  // Numeric-index walk: `for…of` over a caller-owned array is shadowable and
+  // would let a draft-default revision escape the refusal (audit NEW-M5).
+  for (let revisionIndex = 0; revisionIndex < revisions.length; revisionIndex += 1) {
+    const descriptor = revisions[revisionIndex] as McpRevisionDescriptor;
     const channel = parseMcpRevisionChannel(descriptor.channel);
     if (descriptor.isDefault && channel !== McpRevisionChannel.STABLE) {
       throw new ForesiftError(
@@ -965,6 +1065,16 @@ export interface ArtifactBoundaryAssertion {
   readonly verdict: unknown;
   /** Non-null exactly for `IMPORT_SHADOW_ONLY` (references `sec.import_artifacts`). */
   readonly importArtifactRef: string | null;
+  /**
+   * The authoritative import-artifact quarantine state for `IMPORT_SHADOW_ONLY`
+   * (the `sec.import_artifacts` state the referenced artifact actually rests in).
+   * The `verdict` alone is state-blind: a `PASS` assertion certifies only that
+   * the assertion was made, so a release gate must additionally require this
+   * state to be a shadow state (`VALIDATING`/`SHADOW_ELIGIBLE`) before treating
+   * the assertion as holding (audit H4). Optional for backward compatibility;
+   * a missing/`null`/unknown state fails such a gate closed.
+   */
+  readonly importArtifactState?: string | null;
 }
 
 /**
@@ -976,8 +1086,12 @@ export interface ArtifactBoundaryAssertion {
 export function trustBoundaryVerdict(
   assertions: readonly ArtifactBoundaryAssertion[],
 ): ActivationGateVerdict {
-  const counts = new Map<ArtifactBoundaryAssertionKind, number>();
-  for (const assertion of assertions) {
+  // Numeric-index only (audit NEW-M5). `for…of` over `assertions` is shadowable
+  // in-process, and the exact-once boundary law must never depend on an
+  // iteration primitive: validate every assertion by index, then count each
+  // authoritative kind with a nested numeric scan instead of a `Map` bucket.
+  for (let assertionIndex = 0; assertionIndex < assertions.length; assertionIndex += 1) {
+    const assertion = assertions[assertionIndex] as ArtifactBoundaryAssertion;
     const kind = parseArtifactBoundaryAssertionKind(assertion.assertionKind);
     const verdict = parseActivationGateVerdict(assertion.verdict);
     const hasRef =
@@ -985,10 +1099,21 @@ export function trustBoundaryVerdict(
     const refRequired = kind === ArtifactBoundaryAssertionKind.IMPORT_SHADOW_ONLY;
     if (verdict !== ActivationGateVerdict.PASS) return ActivationGateVerdict.REFUSE;
     if (refRequired !== hasRef) return ActivationGateVerdict.REFUSE;
-    counts.set(kind, (counts.get(kind) ?? 0) + 1);
   }
-  for (const kind of ALL_ARTIFACT_BOUNDARY_ASSERTION_KINDS) {
-    if (counts.get(kind) !== 1) return ActivationGateVerdict.REFUSE;
+  for (
+    let kindIndex = 0;
+    kindIndex < ALL_ARTIFACT_BOUNDARY_ASSERTION_KINDS.length;
+    kindIndex += 1
+  ) {
+    const kind = ALL_ARTIFACT_BOUNDARY_ASSERTION_KINDS[kindIndex] as ArtifactBoundaryAssertionKind;
+    let occurrences = 0;
+    for (let assertionIndex = 0; assertionIndex < assertions.length; assertionIndex += 1) {
+      const assertion = assertions[assertionIndex] as ArtifactBoundaryAssertion;
+      if (parseArtifactBoundaryAssertionKind(assertion.assertionKind) === kind) {
+        occurrences += 1;
+      }
+    }
+    if (occurrences !== 1) return ActivationGateVerdict.REFUSE;
   }
   return ActivationGateVerdict.PASS;
 }

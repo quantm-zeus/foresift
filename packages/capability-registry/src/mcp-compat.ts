@@ -30,6 +30,7 @@ import {
   MCP_BASELINE_STABLE_REVISION,
   MCP_LIVE_TEST_MAX_AGE_SECONDS,
   assertNoDraftDefault,
+  isOneOf,
   mcpCompatibilityCellUsable,
   parseMcpConformanceResult,
   parseMcpRevisionChannel,
@@ -38,6 +39,7 @@ import {
 import { McpProtocolGuard } from '@foresift/security';
 import { canonicalJson, type DatabaseEngine } from '@foresift/persistence';
 import { MCP_PROTOCOL_BASELINE_REVISION } from '@foresift/shared-schemas';
+import { numericConcat, numericSortByString, numericUnique } from './shadow-safe.ts';
 
 /** The declared behavior for a missing/unsupported requested revision. */
 export const McpCompatibilityPolicy = {
@@ -50,8 +52,9 @@ export const McpCompatibilityPolicy = {
 } as const;
 export type McpCompatibilityPolicy =
   (typeof McpCompatibilityPolicy)[keyof typeof McpCompatibilityPolicy];
-export const ALL_MCP_COMPATIBILITY_POLICIES: readonly McpCompatibilityPolicy[] =
-  Object.values(McpCompatibilityPolicy);
+export const ALL_MCP_COMPATIBILITY_POLICIES: readonly McpCompatibilityPolicy[] = Object.freeze(
+  Object.values(McpCompatibilityPolicy),
+);
 
 /** Closed refusal reasons for compatibility resolution. */
 export const McpCompatibilityRefusalReason = {
@@ -69,11 +72,9 @@ export type McpCompatibilityRefusalReason =
   (typeof McpCompatibilityRefusalReason)[keyof typeof McpCompatibilityRefusalReason];
 
 function parsePolicy(value: unknown): McpCompatibilityPolicy {
-  if (
-    typeof value === 'string' &&
-    (ALL_MCP_COMPATIBILITY_POLICIES as readonly string[]).includes(value)
-  ) {
-    return value as McpCompatibilityPolicy;
+  // `isOneOf` is a numeric-index walk, never a shadowable `.includes`.
+  if (typeof value === 'string' && isOneOf(value, ALL_MCP_COMPATIBILITY_POLICIES)) {
+    return value;
   }
   throw new ForesiftError(
     ErrorCode.PROD_MCP_REVISION_CHANNEL_UNKNOWN,
@@ -303,16 +304,22 @@ export async function mcpRevisions(engine: DatabaseEngine): Promise<readonly Mcp
        FROM prod.mcp_revisions
       ORDER BY revision ASC`,
   );
-  return result.rows.map((row) => ({
-    revision: row.revision,
-    channel: parseMcpRevisionChannel(row.channel),
-    sdkVersion: row.sdk_version,
-    transport: row.transport,
-    originPolicyRef: row.origin_policy_ref,
-    isDefault: row.is_default,
-    supersededBy: row.superseded_by,
-    createdAt: toIso(row.created_at),
-  }));
+  const revisions: McpRevisionRow[] = [];
+  for (let index = 0; index < result.rows.length; index += 1) {
+    const row = result.rows[index];
+    if (row === undefined) continue;
+    revisions[revisions.length] = {
+      revision: row.revision,
+      channel: parseMcpRevisionChannel(row.channel),
+      sdkVersion: row.sdk_version,
+      transport: row.transport,
+      originPolicyRef: row.origin_policy_ref,
+      isDefault: row.is_default,
+      supersededBy: row.superseded_by,
+      createdAt: toIso(row.created_at),
+    };
+  }
+  return revisions;
 }
 
 /** Every supported target client. */
@@ -324,12 +331,18 @@ export async function mcpTargetClients(
        FROM prod.mcp_target_clients
       ORDER BY client_id ASC`,
   );
-  return result.rows.map((row) => ({
-    clientId: row.client_id,
-    clientName: row.client_name,
-    version: row.version,
-    authMode: row.auth_mode,
-  }));
+  const clients: McpTargetClientRow[] = [];
+  for (let index = 0; index < result.rows.length; index += 1) {
+    const row = result.rows[index];
+    if (row === undefined) continue;
+    clients[clients.length] = {
+      clientId: row.client_id,
+      clientName: row.client_name,
+      version: row.version,
+      authMode: row.auth_mode,
+    };
+  }
+  return clients;
 }
 
 /** Every compatibility cell. */
@@ -341,15 +354,21 @@ export async function mcpCompatibilityCells(
        FROM prod.mcp_compatibility_matrix
       ORDER BY revision ASC, client_id ASC`,
   );
-  return result.rows.map((row) => ({
-    cellId: row.cell_id,
-    revision: row.revision,
-    clientId: row.client_id,
-    conformanceFixtureRef: row.conformance_fixture_ref,
-    liveTestDate: toIso(row.live_test_date),
-    result: parseMcpConformanceResult(row.result),
-    notes: row.notes,
-  }));
+  const cells: McpCompatibilityCell[] = [];
+  for (let index = 0; index < result.rows.length; index += 1) {
+    const row = result.rows[index];
+    if (row === undefined) continue;
+    cells[cells.length] = {
+      cellId: row.cell_id,
+      revision: row.revision,
+      clientId: row.client_id,
+      conformanceFixtureRef: row.conformance_fixture_ref,
+      liveTestDate: toIso(row.live_test_date),
+      result: parseMcpConformanceResult(row.result),
+      notes: row.notes,
+    };
+  }
+  return cells;
 }
 
 /** A cell's usability verdict with its typed refusal reason. */
@@ -405,18 +424,27 @@ export function cellUsability(input: {
   // The run must be for THIS cell's declared fixture (provenance), and the
   // newest such run must still be inside the window (staleness).
   const nowMs = Date.parse(now);
-  const runsForCell = input.passingRuns.filter(
-    (run) =>
-      run.revision === revision &&
-      run.clientId === clientId &&
-      run.fixtureRef === cell.conformanceFixtureRef,
-  );
-  const newestRunMs = runsForCell.reduce((latest, run) => {
+  // Numeric-index scan/reduction only (audit HIGH): `filter`/`reduce` are
+  // shadowable; a shadowed `filter` would make a registered passing run look
+  // absent (fail-closed) but a shadowed `reduce` could misreport the newest run.
+  let runCount = 0;
+  let newestRunMs = Number.NEGATIVE_INFINITY;
+  for (let index = 0; index < input.passingRuns.length; index += 1) {
+    const run = input.passingRuns[index];
+    if (
+      run === undefined ||
+      run.revision !== revision ||
+      run.clientId !== clientId ||
+      run.fixtureRef !== cell.conformanceFixtureRef
+    ) {
+      continue;
+    }
+    runCount += 1;
     const at = Date.parse(run.ranAt);
-    return Number.isFinite(at) && at > latest ? at : latest;
-  }, Number.NEGATIVE_INFINITY);
+    if (Number.isFinite(at) && at > newestRunMs) newestRunMs = at;
+  }
   if (
-    runsForCell.length === 0 ||
+    runCount === 0 ||
     !Number.isFinite(newestRunMs) ||
     nowMs - newestRunMs > maxAgeSeconds * 1000
   ) {
@@ -484,41 +512,73 @@ export async function resolveCompatibilityMatrix(
        FROM prod.mcp_conformance_runs
       WHERE result = 'PASS'`,
   );
-  const passingRuns = runs.rows.map((row) => ({
-    revision: row.revision,
-    clientId: row.client_id,
-    fixtureRef: row.fixture_ref,
-    ranAt: toIso(row.ran_at),
-  }));
-  const cellByPair = new Map<string, McpCompatibilityCell>(
-    cells.map((cell) => [`${cell.revision}\u0000${cell.clientId}`, cell]),
-  );
+  // Numeric-index projections/lookups only (audit HIGH): every `.map`,
+  // `new Map(array)`, `.filter`, `.every`, `for...of`, `new Set(array)` and
+  // `.find` below is shadowable, and an empty `usabilityFor` made `.every`
+  // vacuously true — allowing an UNTESTED revision onto the allow-list.
+  const passingRuns: Array<{
+    revision: string;
+    clientId: string;
+    fixtureRef: string;
+    ranAt: string;
+  }> = [];
+  for (let index = 0; index < runs.rows.length; index += 1) {
+    const row = runs.rows[index];
+    if (row === undefined) continue;
+    passingRuns[passingRuns.length] = {
+      revision: row.revision,
+      clientId: row.client_id,
+      fixtureRef: row.fixture_ref,
+      ranAt: toIso(row.ran_at),
+    };
+  }
+  const cellByPair = new Map<string, McpCompatibilityCell>();
+  for (let index = 0; index < cells.length; index += 1) {
+    const cell = cells[index];
+    if (cell !== undefined) cellByPair.set(`${cell.revision}\u0000${cell.clientId}`, cell);
+  }
 
-  const usabilityFor = (revision: string): readonly CellUsability[] =>
-    clients.map((client) =>
-      cellUsability({
+  const usabilityFor = (revision: string): readonly CellUsability[] => {
+    const usability: CellUsability[] = [];
+    for (let index = 0; index < clients.length; index += 1) {
+      const client = clients[index];
+      if (client === undefined) continue;
+      usability[usability.length] = cellUsability({
         cell: cellByPair.get(`${revision}\u0000${client.clientId}`),
         passingRuns,
         revision,
         clientId: client.clientId,
         now: input.now,
-      }),
-    );
+      });
+    }
+    return usability;
+  };
 
   const isMutuallyTested = (revision: string): boolean => {
     if (clients.length === 0) return false;
-    return usabilityFor(revision).every((cell) => cell.usable);
+    const usability = usabilityFor(revision);
+    // A numeric `every`: an empty result set must NOT be vacuously true here.
+    if (usability.length !== clients.length) return false;
+    for (let index = 0; index < usability.length; index += 1) {
+      if (usability[index]?.usable !== true) return false;
+    }
+    return true;
   };
 
-  const stable = revisions.filter(
-    (revision) =>
+  const stable: McpRevisionRow[] = [];
+  for (let index = 0; index < revisions.length; index += 1) {
+    const revision = revisions[index];
+    if (
+      revision !== undefined &&
       revision.channel === 'STABLE' &&
       revision.supersededBy === null &&
-      isMutuallyTested(revision.revision),
-  );
-  const orderedStable = [...stable].sort((a, b) =>
-    a.revision < b.revision ? 1 : a.revision > b.revision ? -1 : 0,
-  );
+      isMutuallyTested(revision.revision)
+    ) {
+      stable[stable.length] = revision;
+    }
+  }
+  // Descending revision-string order, numeric insertion sort (audit HIGH).
+  const orderedStable = numericSortByString(stable, (row) => row.revision, true);
   const latest = orderedStable[0];
   if (latest === undefined) {
     throw new ForesiftError(
@@ -531,13 +591,28 @@ export async function resolveCompatibilityMatrix(
   // Opt-ins are resolved THROUGH the matrix (audit C3): registered + DRAFT +
   // mutually tested, or the resolution refuses. A caller can never widen the
   // allow-list with an arbitrary revision string.
-  const requestedOptIns = [
-    ...(input.optInDraftRevision === undefined ? [] : [input.optInDraftRevision]),
-    ...(input.optInDraftRevisions ?? []),
-  ];
+  const requestedOptIns: string[] = [];
+  if (input.optInDraftRevision !== undefined)
+    requestedOptIns[requestedOptIns.length] = input.optInDraftRevision;
+  const declaredOptIns = input.optInDraftRevisions ?? [];
+  for (let index = 0; index < declaredOptIns.length; index += 1) {
+    const declared = declaredOptIns[index];
+    if (declared !== undefined) requestedOptIns[requestedOptIns.length] = declared;
+  }
+  const uniqueOptIns = numericUnique(requestedOptIns);
   const optInRevisions: string[] = [];
-  for (const requested of new Set(requestedOptIns)) {
-    const draft = revisions.find((revision) => revision.revision === requested);
+  for (let index = 0; index < uniqueOptIns.length; index += 1) {
+    const requested = uniqueOptIns[index] as string;
+    // Numeric scan only: a shadowed `find` would report a registered draft as
+    // unknown (fail-closed) but also breaks the opt-in provenance contract.
+    let draft: McpRevisionRow | undefined;
+    for (let revisionIndex = 0; revisionIndex < revisions.length; revisionIndex += 1) {
+      const candidate = revisions[revisionIndex];
+      if (candidate !== undefined && candidate.revision === requested) {
+        draft = candidate;
+        break;
+      }
+    }
     if (draft === undefined) {
       throw new ForesiftError(
         ErrorCode.PROD_MCP_REVISION_CHANNEL_UNKNOWN,
@@ -559,13 +634,24 @@ export async function resolveCompatibilityMatrix(
         { reason: McpCompatibilityRefusalReason.CELL_NOT_USABLE },
       );
     }
-    optInRevisions.push(draft.revision);
+    optInRevisions[optInRevisions.length] = draft.revision;
   }
   const optInRevision = optInRevisions[0] ?? null;
 
-  const usableRevisions = orderedStable.map((revision) => revision.revision);
+  const usableRevisions: string[] = [];
+  for (let index = 0; index < orderedStable.length; index += 1) {
+    const revision = orderedStable[index];
+    if (revision !== undefined) usableRevisions[usableRevisions.length] = revision.revision;
+  }
   const defaultRevision = latest.revision;
-  const defaultRow = revisions.find((revision) => revision.revision === defaultRevision);
+  let defaultRow: McpRevisionRow | undefined;
+  for (let index = 0; index < revisions.length; index += 1) {
+    const revision = revisions[index];
+    if (revision !== undefined && revision.revision === defaultRevision) {
+      defaultRow = revision;
+      break;
+    }
+  }
   return {
     defaultRevision,
     defaultChannel: defaultRow?.channel ?? 'STABLE',
@@ -607,9 +693,12 @@ export async function resolveProtocolRevision(
     now: input.now,
     ...(input.optInRevisions === undefined ? {} : { optInDraftRevisions: input.optInRevisions }),
   });
-  const allowedRevisions = [
-    ...new Set([...resolution.usableRevisions, ...resolution.optInRevisions]),
-  ];
+  // Numeric concat/de-dupe only (audit HIGH): `[...new Set([...a, ...b])]` reads
+  // `Symbol.iterator` twice, so a shadowed iterator would hand the guard an
+  // EMPTY allow-list.
+  const allowedRevisions = numericUnique(
+    numericConcat(resolution.usableRevisions, resolution.optInRevisions),
+  );
   const guard = new McpProtocolGuard({
     allowedRevisions,
     maxMessageBytes: 1_000_000,
@@ -651,7 +740,8 @@ export async function resolveProtocolRevision(
         { reason: McpCompatibilityRefusalReason.REVISION_NOT_AUTHORIZED },
       );
     case McpCompatibilityPolicy.BASELINE_FALLBACK: {
-      const baselineUsable = resolution.usableRevisions.includes(MCP_BASELINE_STABLE_REVISION);
+      // Numeric `isOneOf`, never a shadowable `.includes`.
+      const baselineUsable = isOneOf(MCP_BASELINE_STABLE_REVISION, resolution.usableRevisions);
       if (!baselineUsable) {
         throw new ForesiftError(
           ErrorCode.PROD_ACTIVATION_GATE_REFUSED,

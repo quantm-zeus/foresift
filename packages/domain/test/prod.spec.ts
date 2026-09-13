@@ -30,6 +30,7 @@ import {
   ALL_PROTECTED_DIMENSIONS,
   ActivationGateKind,
   ActivationGateVerdict,
+  type ActivationGateEvaluation,
   ArtifactBoundaryAssertionKind,
   ChangeClassification,
   DEPENDENCY_GROUP_ORDER,
@@ -358,6 +359,32 @@ describe('§69.4/§69.5 ordered fail-closed activation predicate', () => {
       ),
     ).toBe(true);
   });
+
+  it('freezes ACTIVATION_GATE_ORDER so a spliced required gate cannot be skipped (NEW-M5)', () => {
+    const original = [...ACTIVATION_GATE_ORDER];
+    const mutable = ACTIVATION_GATE_ORDER as unknown as ActivationGateKind[];
+    expect(Object.isFrozen(ACTIVATION_GATE_ORDER)).toBe(true);
+    try {
+      expect(() =>
+        mutable.splice(original.indexOf(ActivationGateKind.NEGATIVE_CONTROLS), 1),
+      ).toThrow();
+      expect(() => mutable.push('TOTALLY_FAKE_GATE' as ActivationGateKind)).toThrow();
+      expect([...ACTIVATION_GATE_ORDER]).toEqual(original);
+    } finally {
+      if (!Object.isFrozen(mutable)) {
+        mutable.length = 0;
+        for (let index = 0; index < original.length; index += 1) {
+          mutable.push(original[index] as ActivationGateKind);
+        }
+      }
+    }
+    // Even with an in-process mutation attempt, the frozen ordered law still
+    // requires every gate exactly once: a set missing NEGATIVE_CONTROLS refuses.
+    const missingNegativeControls = passAll(ActivationGateKind.NEGATIVE_CONTROLS);
+    expect(activationGateRefusal(missingNegativeControls)).toBe(
+      ActivationGateKind.NEGATIVE_CONTROLS,
+    );
+  });
 });
 
 describe('§40 dependency-group ordering', () => {
@@ -638,5 +665,244 @@ describe('§10.3/§35.14 trust-boundary verdict', () => {
         : assertion,
     );
     expect(artifactBoundaryHolds(missingRef)).toBe(false);
+  });
+
+  it('freezes the closed assertion-kind authority so a spliced kind cannot weaken the verdict (NEW-H2)', () => {
+    const original = [...ALL_ARTIFACT_BOUNDARY_ASSERTION_KINDS];
+    const mutable = ALL_ARTIFACT_BOUNDARY_ASSERTION_KINDS as unknown as string[];
+    expect(Object.isFrozen(ALL_ARTIFACT_BOUNDARY_ASSERTION_KINDS)).toBe(true);
+    try {
+      expect(() =>
+        mutable.splice(original.indexOf(ArtifactBoundaryAssertionKind.IMPORT_SHADOW_ONLY), 1),
+      ).toThrow();
+      expect(() => mutable.push('TOTALLY_FAKE_KIND')).toThrow();
+      expect([...ALL_ARTIFACT_BOUNDARY_ASSERTION_KINDS]).toEqual(original);
+    } finally {
+      if (!Object.isFrozen(mutable)) {
+        mutable.length = 0;
+        for (let index = 0; index < original.length; index += 1) {
+          mutable.push(original[index] as string);
+        }
+      }
+    }
+    // The live path omits IMPORT_SHADOW_ONLY entirely. Before the freeze, the
+    // spliced authority accepted that set as complete (audit NEW-H2); the
+    // verdict must still refuse it.
+    const withoutImportBoundary = complete.filter(
+      (assertion) => assertion.assertionKind !== ArtifactBoundaryAssertionKind.IMPORT_SHADOW_ONLY,
+    );
+    expect(withoutImportBoundary.length).toBe(3);
+    expect(trustBoundaryVerdict(withoutImportBoundary)).toBe(ActivationGateVerdict.REFUSE);
+    expect(artifactBoundaryHolds(withoutImportBoundary)).toBe(false);
+    expectCode(
+      () => assertArtifactBoundaryHolds(withoutImportBoundary),
+      ErrorCode.PROD_TRUST_BOUNDARY_VIOLATION,
+    );
+  });
+});
+
+// --- NEW-M5: fail-closed decisions under global Array.prototype shadowing -----
+
+/**
+ * Audit NEW-M5. A same-process caller can globally replace an `Array.prototype`
+ * iteration primitive (`Symbol.iterator`, `map`, `filter`, `some`, `find`,
+ * `forEach`, `includes`) and make a fail-closed governance decision read an
+ * empty sequence — a silent fail-OPEN. Every decision/aggregation function is
+ * numeric-index plus the shadow-proof `isOneOf` helper, so it must return the
+ * exact same verdict with and without the shadow.
+ *
+ * Each shadow is installed only for the duration of the call under test and is
+ * always restored in a `finally`, so the surrounding assertions never run
+ * against a shadowed prototype (and one variant can never leak into the next).
+ * The failure tally is built with numeric index assignment, so the harness is
+ * independent of the very primitives under test.
+ */
+describe('NEW-M5: decisions ignore globally shadowed Array.prototype iteration', () => {
+  interface ShadowCase {
+    readonly name: string;
+    readonly install: () => void;
+    readonly restore: () => void;
+  }
+
+  function buildShadowCases(): readonly ShadowCase[] {
+    const proto = Array.prototype as unknown as Record<string, unknown> & Record<symbol, unknown>;
+    const iteratorKey = Symbol.iterator;
+    const originalIterator = proto[iteratorKey];
+    const cases: ShadowCase[] = [];
+    cases[cases.length] = {
+      name: 'Array.prototype[Symbol.iterator] = function* () {}',
+      install: () => {
+        proto[iteratorKey] = function* () {};
+      },
+      restore: () => {
+        proto[iteratorKey] = originalIterator;
+      },
+    };
+    cases[cases.length] = {
+      name: 'Array.prototype[Symbol.iterator] = undefined',
+      install: () => {
+        proto[iteratorKey] = undefined;
+      },
+      restore: () => {
+        proto[iteratorKey] = originalIterator;
+      },
+    };
+    const methodReplacements: readonly (readonly [string, unknown])[] = [
+      ['includes', () => true],
+      ['map', () => []],
+      ['filter', () => []],
+      ['some', () => true],
+      ['find', () => undefined],
+      ['forEach', () => undefined],
+    ];
+    for (let index = 0; index < methodReplacements.length; index += 1) {
+      const entry = methodReplacements[index] as readonly [string, unknown];
+      const methodName = entry[0];
+      const replacement = entry[1];
+      const original = proto[methodName];
+      cases[cases.length] = {
+        name: `Array.prototype.${methodName} shadowed`,
+        install: () => {
+          proto[methodName] = replacement;
+        },
+        restore: () => {
+          proto[methodName] = original;
+        },
+      };
+    }
+    return cases;
+  }
+
+  const SHADOW_CASES = buildShadowCases();
+
+  function capture<T>(
+    shadowCase: ShadowCase,
+    run: () => T,
+  ): { readonly value: T } | { readonly error: string } {
+    shadowCase.install();
+    try {
+      return { value: run() };
+    } catch (error) {
+      return { error: error instanceof Error ? error.message : String(error) };
+    } finally {
+      shadowCase.restore();
+    }
+  }
+
+  function buildPassingEvaluations(): ActivationGateEvaluation[] {
+    const evaluations: ActivationGateEvaluation[] = [];
+    for (let index = 0; index < ACTIVATION_GATE_ORDER.length; index += 1) {
+      evaluations[evaluations.length] = {
+        gateKind: ACTIVATION_GATE_ORDER[index],
+        verdict: ActivationGateVerdict.PASS,
+        failingGate: null,
+      };
+    }
+    return evaluations;
+  }
+
+  const PASSING_EVALUATIONS = buildPassingEvaluations();
+  const MISSING_GATE_EVALUATIONS = PASSING_EVALUATIONS.slice(1);
+  const DUPLICATED_GATE_EVALUATIONS = PASSING_EVALUATIONS.slice();
+  DUPLICATED_GATE_EVALUATIONS[DUPLICATED_GATE_EVALUATIONS.length] =
+    PASSING_EVALUATIONS[0] as ActivationGateEvaluation;
+  const REFUSED_GATE_EVALUATIONS = PASSING_EVALUATIONS.slice();
+  REFUSED_GATE_EVALUATIONS[0] = {
+    gateKind: PASSING_EVALUATIONS[0]?.gateKind,
+    verdict: ActivationGateVerdict.REFUSE,
+    failingGate: PASSING_EVALUATIONS[0]?.gateKind,
+  };
+
+  const COMPLETE_BOUNDARY = [
+    {
+      assertionKind: ArtifactBoundaryAssertionKind.NO_HEAVY_JOB,
+      verdict: ActivationGateVerdict.PASS,
+      importArtifactRef: null,
+    },
+    {
+      assertionKind: ArtifactBoundaryAssertionKind.NO_IMPORT,
+      verdict: ActivationGateVerdict.PASS,
+      importArtifactRef: null,
+    },
+    {
+      assertionKind: ArtifactBoundaryAssertionKind.NO_PROVIDER_CALL,
+      verdict: ActivationGateVerdict.PASS,
+      importArtifactRef: null,
+    },
+    {
+      assertionKind: ArtifactBoundaryAssertionKind.IMPORT_SHADOW_ONLY,
+      verdict: ActivationGateVerdict.PASS,
+      importArtifactRef: 'import-1',
+    },
+  ];
+  const MISSING_IMPORT_BOUNDARY = COMPLETE_BOUNDARY.slice(0, 3);
+
+  it('activationGateRefusal still detects a missing, duplicated, or refused required gate', () => {
+    const failures: string[] = [];
+    for (let index = 0; index < SHADOW_CASES.length; index += 1) {
+      const shadowCase = SHADOW_CASES[index] as ShadowCase;
+      const missing = capture(shadowCase, () => activationGateRefusal(MISSING_GATE_EVALUATIONS));
+      const duplicated = capture(shadowCase, () =>
+        activationGateRefusal(DUPLICATED_GATE_EVALUATIONS),
+      );
+      const refused = capture(shadowCase, () => activationGateRefusal(REFUSED_GATE_EVALUATIONS));
+      const expected = ACTIVATION_GATE_ORDER[0];
+      if ('error' in missing) {
+        failures[failures.length] = `${shadowCase.name}: missing threw ${missing.error}`;
+      } else if (missing.value !== expected) {
+        failures[failures.length] = `${shadowCase.name}: missing -> ${String(missing.value)}`;
+      }
+      if ('error' in duplicated) {
+        failures[failures.length] = `${shadowCase.name}: duplicated threw ${duplicated.error}`;
+      } else if (duplicated.value !== expected) {
+        failures[failures.length] = `${shadowCase.name}: duplicated -> ${String(duplicated.value)}`;
+      }
+      if ('error' in refused) {
+        failures[failures.length] = `${shadowCase.name}: refused threw ${refused.error}`;
+      } else if (refused.value !== expected) {
+        failures[failures.length] = `${shadowCase.name}: refused -> ${String(refused.value)}`;
+      }
+    }
+    expect(failures).toEqual([]);
+  });
+
+  it('trustBoundaryVerdict refuses a missing-import set and passes the complete set', () => {
+    const failures: string[] = [];
+    for (let index = 0; index < SHADOW_CASES.length; index += 1) {
+      const shadowCase = SHADOW_CASES[index] as ShadowCase;
+      const missing = capture(shadowCase, () => trustBoundaryVerdict(MISSING_IMPORT_BOUNDARY));
+      const complete = capture(shadowCase, () => trustBoundaryVerdict(COMPLETE_BOUNDARY));
+      if ('error' in missing) {
+        failures[failures.length] = `${shadowCase.name}: missing threw ${missing.error}`;
+      } else if (missing.value !== ActivationGateVerdict.REFUSE) {
+        failures[failures.length] = `${shadowCase.name}: missing -> ${String(missing.value)}`;
+      }
+      if ('error' in complete) {
+        failures[failures.length] = `${shadowCase.name}: complete threw ${complete.error}`;
+      } else if (complete.value !== ActivationGateVerdict.PASS) {
+        failures[failures.length] = `${shadowCase.name}: complete -> ${String(complete.value)}`;
+      }
+    }
+    expect(failures).toEqual([]);
+  });
+
+  it('bestEffortWeakensOnlyAllowedDimensions still refuses a weakened protected dimension', () => {
+    const declaration = {
+      posture: DeploymentPosture.FREE_TIER_BEST_EFFORT,
+      weakenedDimensions: ['security'],
+      protectedDimensions: ALL_PROTECTED_DIMENSIONS as readonly string[],
+    };
+    const failures: string[] = [];
+    for (let index = 0; index < SHADOW_CASES.length; index += 1) {
+      const shadowCase = SHADOW_CASES[index] as ShadowCase;
+      const result = capture(shadowCase, () => bestEffortWeakensOnlyAllowedDimensions(declaration));
+      if ('error' in result) {
+        failures[failures.length] = `${shadowCase.name}: threw ${result.error}`;
+      } else if (result.value !== false) {
+        failures[failures.length] =
+          `${shadowCase.name}: weakened protected -> ${String(result.value)}`;
+      }
+    }
+    expect(failures).toEqual([]);
   });
 });

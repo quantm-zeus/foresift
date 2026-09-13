@@ -27,11 +27,12 @@
  * opportunity activation and never an execution capability.
  */
 import {
-  DEPENDENCY_GROUP_ORDER,
   ErrorCode,
   ForesiftError,
   assertDependencyGroupOrder,
   dependencyGroupCompletionActivatesOpportunities,
+  dependencyGroupIndex,
+  isOneOf,
   parseDependencyGroupId,
   type DependencyGroupId,
 } from '@foresift/domain';
@@ -43,6 +44,7 @@ import {
   type DependencyGroup,
   type RequirementManifest,
 } from '@foresift/requirement-manifest';
+import { numericCopy, numericSortBy, numericSortStrings, numericUnique } from './shadow-safe.ts';
 
 /** §40 build/test status vocabulary (mirrors the SQL CHECK). */
 export const DependencyGroupStatus = {
@@ -53,15 +55,14 @@ export const DependencyGroupStatus = {
 } as const;
 export type DependencyGroupStatus =
   (typeof DependencyGroupStatus)[keyof typeof DependencyGroupStatus];
-export const ALL_DEPENDENCY_GROUP_STATUSES: readonly DependencyGroupStatus[] =
-  Object.values(DependencyGroupStatus);
+export const ALL_DEPENDENCY_GROUP_STATUSES: readonly DependencyGroupStatus[] = Object.freeze(
+  Object.values(DependencyGroupStatus),
+);
 
 function parseDependencyGroupStatus(value: unknown): DependencyGroupStatus {
-  if (
-    typeof value === 'string' &&
-    (ALL_DEPENDENCY_GROUP_STATUSES as readonly string[]).includes(value)
-  ) {
-    return value as DependencyGroupStatus;
+  // `isOneOf` is a numeric-index walk, never a shadowable `.includes`.
+  if (typeof value === 'string' && isOneOf(value, ALL_DEPENDENCY_GROUP_STATUSES)) {
+    return value;
   }
   throw new ForesiftError(
     ErrorCode.PROD_DEPENDENCY_GROUP_UNKNOWN,
@@ -86,6 +87,21 @@ export interface DependencyGroupOrderView {
   readonly completionMeans: 'PRODUCTION_READY_CODE';
 }
 
+/** Numeric-index cycle formatting for refusal messages; never `.map`/`.join`. */
+function formatCycles(cycles: readonly (readonly string[])[], separator: string): string {
+  let formatted = '';
+  for (let cycleIndex = 0; cycleIndex < cycles.length; cycleIndex += 1) {
+    const cycle = cycles[cycleIndex];
+    if (cycle === undefined) continue;
+    if (cycleIndex > 0) formatted += '; ';
+    for (let stepIndex = 0; stepIndex < cycle.length; stepIndex += 1) {
+      if (stepIndex > 0) formatted += separator;
+      formatted += cycle[stepIndex] as string;
+    }
+  }
+  return formatted;
+}
+
 /** Validate and normalize the manifest DAG into the §40 ordering view. */
 export function buildDependencyGroupOrderView(
   manifest: Pick<RequirementManifest, 'dependencyGroups'>,
@@ -103,38 +119,50 @@ export function buildDependencyGroupOrderView(
   if (!acyclicity.isAcyclic) {
     throw new ForesiftError(
       ErrorCode.PROD_DEPENDENCY_ORDER_VIOLATED,
-      `dependency-group DAG contains a cycle: ${acyclicity.cycles
-        .map((cycle) => cycle.join(' -> '))
-        .join('; ')}`,
-      { cycles: acyclicity.cycles.map((cycle) => cycle.join('->')).join('; ') },
+      `dependency-group DAG contains a cycle: ${formatCycles(acyclicity.cycles, ' -> ')}`,
+      { cycles: formatCycles(acyclicity.cycles, '->') },
     );
   }
-  const groups = rawGroups.map((group): DependencyGroupOrderEntry => {
+  // Numeric-index construction only (audit HIGH): `.map`/`for...of`/
+  // `new Set(array)`/`indexOf` are all shadowable, and a shadowed iterator left
+  // `dependsOn` EMPTY — which opened the premature gate for every group.
+  const groups: DependencyGroupOrderEntry[] = [];
+  for (let groupIndex = 0; groupIndex < rawGroups.length; groupIndex += 1) {
+    const group = rawGroups[groupIndex];
+    if (group === undefined) continue;
     const groupId = parseDependencyGroupId(group.id);
     const declared = group.dependsOn ?? group.dependencies ?? [];
-    const dependsOn = [
-      ...new Set(declared.map((dependency) => parseDependencyGroupId(dependency))),
-    ];
-    for (const dependency of dependsOn) assertDependencyGroupOrder(dependency, groupId);
-    return {
+    const parsedDependencies: DependencyGroupId[] = [];
+    for (let dependencyIndex = 0; dependencyIndex < declared.length; dependencyIndex += 1) {
+      parsedDependencies[parsedDependencies.length] = parseDependencyGroupId(
+        declared[dependencyIndex],
+      );
+    }
+    const dependsOn = numericUnique(parsedDependencies);
+    for (let dependencyIndex = 0; dependencyIndex < dependsOn.length; dependencyIndex += 1) {
+      assertDependencyGroupOrder(dependsOn[dependencyIndex], groupId);
+    }
+    groups[groups.length] = {
       groupId,
       name: typeof group.name === 'string' && group.name.length > 0 ? group.name : null,
       dependsOn,
-      position: DEPENDENCY_GROUP_ORDER.indexOf(groupId),
+      position: dependencyGroupIndex(groupId),
     };
-  });
-  const seen = new Set<string>();
-  for (const group of groups) {
-    if (seen.has(group.groupId)) {
-      throw new ForesiftError(
-        ErrorCode.PROD_DEPENDENCY_GROUP_UNKNOWN,
-        `duplicate dependency group ${group.groupId}`,
-        { groupId: group.groupId },
-      );
-    }
-    seen.add(group.groupId);
   }
-  const ordered = [...groups].sort((a, b) => a.position - b.position);
+  for (let index = 0; index < groups.length; index += 1) {
+    const group = groups[index];
+    if (group === undefined) continue;
+    for (let earlierIndex = 0; earlierIndex < index; earlierIndex += 1) {
+      if (groups[earlierIndex]?.groupId === group.groupId) {
+        throw new ForesiftError(
+          ErrorCode.PROD_DEPENDENCY_GROUP_UNKNOWN,
+          `duplicate dependency group ${group.groupId}`,
+          { groupId: group.groupId },
+        );
+      }
+    }
+  }
+  const ordered = numericSortBy(groups, (group) => group.position);
   return {
     groups: ordered,
     activatesOpportunities: dependencyGroupCompletionActivatesOpportunities() as false,
@@ -163,7 +191,16 @@ export function requirementDependencyGroup(
   manifest: Pick<RequirementManifest, 'requirements'>,
   requirementId: string,
 ): DependencyGroupId {
-  const requirement = manifest.requirements.find((item) => item.id === requirementId);
+  // Numeric scan only (audit HIGH): a shadowed `find` would report an
+  // authoritative requirement as absent.
+  let requirement: RequirementManifest['requirements'][number] | undefined;
+  for (let index = 0; index < manifest.requirements.length; index += 1) {
+    const candidate = manifest.requirements[index];
+    if (candidate !== undefined && candidate.id === requirementId) {
+      requirement = candidate;
+      break;
+    }
+  }
   if (requirement === undefined) {
     throw new ForesiftError(
       ErrorCode.PROD_DEPENDENCY_GROUP_UNKNOWN,
@@ -227,13 +264,22 @@ function parseJsonArray(value: unknown, field: string): string[] {
       { field },
     );
   }
-  return parsed.map((entry) => String(entry));
+  // Numeric-index projection only; never `parsed.map(...)`.
+  const entries: string[] = [];
+  for (let index = 0; index < parsed.length; index += 1)
+    entries[entries.length] = String(parsed[index]);
+  return entries;
 }
 
 function decodeStatusRow(row: RawDependencyGroupRow): DependencyGroupStatusRow {
+  const dependsOn: DependencyGroupId[] = [];
+  const decodedDependsOn = parseJsonArray(row.depends_on, 'dependsOn');
+  for (let index = 0; index < decodedDependsOn.length; index += 1) {
+    dependsOn[dependsOn.length] = parseDependencyGroupId(decodedDependsOn[index]);
+  }
   return {
     groupId: parseDependencyGroupId(row.group_id),
-    dependsOn: parseJsonArray(row.depends_on, 'dependsOn').map((id) => parseDependencyGroupId(id)),
+    dependsOn,
     status: parseDependencyGroupStatus(row.status),
     manifestRequirementCount: Number(row.manifest_requirement_count),
     evidenceRefs: parseJsonArray(row.evidence_refs, 'evidenceRefs'),
@@ -252,12 +298,13 @@ export async function dependencyGroupStatuses(
             activates_opportunities, updated_at
        FROM prod.dependency_groups`,
   );
-  return result.rows
-    .map(decodeStatusRow)
-    .sort(
-      (a, b) =>
-        DEPENDENCY_GROUP_ORDER.indexOf(a.groupId) - DEPENDENCY_GROUP_ORDER.indexOf(b.groupId),
-    );
+  const decoded: DependencyGroupStatusRow[] = [];
+  for (let index = 0; index < result.rows.length; index += 1) {
+    const row = result.rows[index];
+    if (row !== undefined) decoded[decoded.length] = decodeStatusRow(row);
+  }
+  // Numeric-only canonical sort (audit HIGH): `indexOf`/`sort` are shadowable.
+  return numericSortBy(decoded, (row) => dependencyGroupIndex(row.groupId));
 }
 
 /**
@@ -268,15 +315,24 @@ export function dependencyGatePrematureFinding(
   entry: Pick<DependencyGroupOrderEntry, 'groupId' | 'dependsOn'>,
   statuses: ReadonlyMap<string, DependencyGroupStatus>,
 ): ConformanceFinding | undefined {
-  const open = entry.dependsOn.filter(
-    (dependency) => statuses.get(dependency) !== DependencyGroupStatus.COMPLETE,
-  );
+  // Numeric-index scan only (audit HIGH): a shadowed `filter` returning `[]`
+  // would report the gate OPEN while prerequisites were still incomplete.
+  const open: string[] = [];
+  for (let index = 0; index < entry.dependsOn.length; index += 1) {
+    const dependency = entry.dependsOn[index] as string;
+    if (statuses.get(dependency) !== DependencyGroupStatus.COMPLETE) open[open.length] = dependency;
+  }
   if (open.length === 0) return undefined;
+  let openList = '';
+  for (let index = 0; index < open.length; index += 1) {
+    if (index > 0) openList += ', ';
+    openList += open[index] as string;
+  }
   return {
     requirementId: `dependency-group:${entry.groupId}`,
     rule: CONFORMANCE_RULES.premature,
     path: entry.groupId,
-    message: `${entry.groupId} cannot be COMPLETE while ${open.join(', ')} remain open`,
+    message: `${entry.groupId} cannot be COMPLETE while ${openList} remain open`,
   };
 }
 
@@ -286,11 +342,17 @@ export async function assertDependencyGateOpen(
   input: { readonly groupId: unknown; readonly dependsOn: readonly unknown[] },
 ): Promise<void> {
   const groupId = parseDependencyGroupId(input.groupId);
-  const dependsOn = input.dependsOn.map((dependency) => parseDependencyGroupId(dependency));
+  const dependsOn: DependencyGroupId[] = [];
+  for (let index = 0; index < input.dependsOn.length; index += 1) {
+    dependsOn[dependsOn.length] = parseDependencyGroupId(input.dependsOn[index]);
+  }
   const rows = await dependencyGroupStatuses(engine);
-  const statuses = new Map<string, DependencyGroupStatus>(
-    rows.map((row) => [row.groupId, row.status]),
-  );
+  // Map is built with a numeric loop, never `new Map(rows.map(...))`.
+  const statuses = new Map<string, DependencyGroupStatus>();
+  for (let index = 0; index < rows.length; index += 1) {
+    const row = rows[index];
+    if (row !== undefined) statuses.set(row.groupId, row.status);
+  }
   const finding = dependencyGatePrematureFinding({ groupId, dependsOn }, statuses);
   if (finding !== undefined) {
     throw new ForesiftError(ErrorCode.PROD_DEPENDENCY_ORDER_VIOLATED, finding.message, {
@@ -315,15 +377,29 @@ export async function upsertDependencyGroupStatus(
   },
 ): Promise<DependencyGroupStatusRow> {
   const groupId = parseDependencyGroupId(input.groupId);
-  const callerDependsOn = [
-    ...new Set(input.dependsOn.map((dependency) => parseDependencyGroupId(dependency))),
-  ].sort();
+  // Numeric parse/de-dupe/sort only (audit HIGH/H9): `[...new Set(...)]` and
+  // `.sort()` are shadowable, and an empty `callerDependsOn` silently matched an
+  // empty manifest set — the dangerous empty-prerequisite bypass.
+  const claimedDependencies: DependencyGroupId[] = [];
+  for (let index = 0; index < input.dependsOn.length; index += 1) {
+    claimedDependencies[claimedDependencies.length] = parseDependencyGroupId(
+      input.dependsOn[index],
+    );
+  }
+  const callerDependsOn = numericSortStrings(numericUnique(claimedDependencies));
   // The prerequisite set is NEVER taken from the caller (audit H9): it is read
   // from the authoritative manifest. A caller claiming a different set — most
   // dangerously an empty one that would let G7 complete while G0…G6 are open —
   // refuses outright.
   const orderView = await loadDependencyGroupOrderView();
-  const entry = orderView.groups.find((group) => group.groupId === groupId);
+  let entry: DependencyGroupOrderEntry | undefined;
+  for (let index = 0; index < orderView.groups.length; index += 1) {
+    const candidate = orderView.groups[index];
+    if (candidate !== undefined && candidate.groupId === groupId) {
+      entry = candidate;
+      break;
+    }
+  }
   if (entry === undefined) {
     throw new ForesiftError(
       ErrorCode.PROD_DEPENDENCY_GROUP_UNKNOWN,
@@ -331,12 +407,20 @@ export async function upsertDependencyGroupStatus(
       { groupId },
     );
   }
-  const dependsOn = [...entry.dependsOn];
-  const manifestDependsOn = [...dependsOn].sort();
-  if (
-    manifestDependsOn.length !== callerDependsOn.length ||
-    manifestDependsOn.some((dependency, index) => dependency !== callerDependsOn[index])
-  ) {
+  const dependsOn = numericCopy(entry.dependsOn);
+  const manifestDependsOn = numericSortStrings(numericCopy(dependsOn));
+  // Numeric comparison only (audit HIGH): `[...].sort()` and `.some()` are
+  // shadowable, so the manifest-agreement check must not read them.
+  let mismatch = manifestDependsOn.length !== callerDependsOn.length;
+  if (!mismatch) {
+    for (let index = 0; index < manifestDependsOn.length; index += 1) {
+      if (manifestDependsOn[index] !== callerDependsOn[index]) {
+        mismatch = true;
+        break;
+      }
+    }
+  }
+  if (mismatch) {
     throw new ForesiftError(
       ErrorCode.PROD_DEPENDENCY_ORDER_VIOLATED,
       `dependency group ${groupId} prerequisite claim [${callerDependsOn.join(', ')}] disagrees with the authoritative manifest [${manifestDependsOn.join(', ')}]`,
@@ -347,7 +431,9 @@ export async function upsertDependencyGroupStatus(
       },
     );
   }
-  for (const dependency of dependsOn) assertDependencyGroupOrder(dependency, groupId);
+  for (let index = 0; index < dependsOn.length; index += 1) {
+    assertDependencyGroupOrder(dependsOn[index], groupId);
+  }
   const status = parseDependencyGroupStatus(input.status);
   if (!Number.isInteger(input.manifestRequirementCount) || input.manifestRequirementCount < 0) {
     throw new ForesiftError(
@@ -356,7 +442,7 @@ export async function upsertDependencyGroupStatus(
       { manifestRequirementCount: input.manifestRequirementCount },
     );
   }
-  const evidenceRefs = [...(input.evidenceRefs ?? [])];
+  const evidenceRefs = numericCopy(input.evidenceRefs ?? []);
   if (status === DependencyGroupStatus.COMPLETE) {
     await assertDependencyGateOpen(engine, { groupId, dependsOn });
   }
@@ -381,7 +467,16 @@ export async function upsertDependencyGroupStatus(
     ],
   );
   const rows = await dependencyGroupStatuses(engine);
-  const row = rows.find((candidate) => candidate.groupId === groupId);
+  // Numeric scan only (audit HIGH): a shadowed `find` would falsely report the
+  // row as unpersisted.
+  let row: DependencyGroupStatusRow | undefined;
+  for (let index = 0; index < rows.length; index += 1) {
+    const candidate = rows[index];
+    if (candidate !== undefined && candidate.groupId === groupId) {
+      row = candidate;
+      break;
+    }
+  }
   if (row === undefined) {
     throw new ForesiftError(
       ErrorCode.PROD_DEPENDENCY_GROUP_UNKNOWN,

@@ -122,7 +122,12 @@ export function validateSustainableCapacityContract<T extends SustainableCapacit
   }
 
   validateCandidateLoad(contract.candidateLoad);
-  for (const item of contract.providerEnvelope) validateProviderEnvelopeItem(item);
+  // Numeric-index walk only (audit HIGH): `for…of` reads `Symbol.iterator`, so a
+  // shadowed iterator validated ZERO provider-envelope items and passed a
+  // malformed envelope.
+  for (let index = 0; index < contract.providerEnvelope.length; index += 1) {
+    validateProviderEnvelopeItem(contract.providerEnvelope[index] as CapacityProviderEnvelopeItem);
+  }
   validateSystemEnvelope(contract.systemEnvelope);
 
   requireNonNegative(contract.retryAllowance, 'retryAllowance');
@@ -217,12 +222,23 @@ function validateSystemEnvelope(envelope: CapacitySystemEnvelope): void {
     'notificationSends',
     'concurrency',
   ];
-  for (const field of fields) requireNonNegative(envelope[field], String(field));
+  // Numeric-index walk only (audit HIGH): a shadowed iterator skipped every
+  // system-envelope non-negativity check.
+  for (let index = 0; index < fields.length; index += 1) {
+    const field = fields[index] as keyof CapacitySystemEnvelope;
+    requireNonNegative(envelope[field], String(field));
+  }
 }
 
 function validateProtectedReserves(reserves: Partial<Record<ReserveClass, number>>): void {
   let sum = 0;
-  for (const [className, fraction] of Object.entries(reserves)) {
+  // Numeric-key walk only (audit HIGH): `for…of Object.entries` reads
+  // `Symbol.iterator`, so a shadowed iterator skipped the reserve laws (the sum
+  // stayed 0 and any fraction was accepted).
+  const classNames = Object.keys(reserves);
+  for (let index = 0; index < classNames.length; index += 1) {
+    const className = classNames[index] as ReserveClass;
+    const fraction = reserves[className] as number;
     reserveClass(className);
     if (!Number.isFinite(fraction) || fraction < 0) {
       fail('reserve fractions must be >= 0', { reserveClass: className, fraction });

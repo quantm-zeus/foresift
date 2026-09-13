@@ -361,20 +361,30 @@ export interface CellUsability {
 }
 
 /**
- * Usability of one revision×client pair: a passing conformance RUN plus a
- * non-stale PASS cell. Missing either refuses.
+ * Usability of one revision×client pair: a passing conformance RUN whose
+ * `fixtureRef` equals the cell's declared `conformanceFixtureRef` and which is
+ * inside the (non-overridable) freshness window, plus a non-stale PASS cell.
+ * A run for a different fixture or an out-of-window run never satisfies the
+ * cell (audit H10: provenance and staleness).
  */
 export function cellUsability(input: {
   readonly cell: McpCompatibilityCell | undefined;
-  readonly passingRuns: readonly { readonly revision: string; readonly clientId: string }[];
+  readonly passingRuns: readonly {
+    readonly revision: string;
+    readonly clientId: string;
+    readonly fixtureRef: string;
+    readonly ranAt: string;
+  }[];
   readonly revision: string;
   readonly clientId: string;
   readonly now: string;
   readonly maxAgeSeconds?: number;
 }): CellUsability {
   const { cell, revision, clientId, now } = input;
-  const hasRun = input.passingRuns.some(
-    (run) => run.revision === revision && run.clientId === clientId,
+  // The freshness window is never caller-widened: a caller may only TIGHTEN it.
+  const maxAgeSeconds = Math.min(
+    input.maxAgeSeconds ?? MCP_LIVE_TEST_MAX_AGE_SECONDS,
+    MCP_LIVE_TEST_MAX_AGE_SECONDS,
   );
   if (cell === undefined) {
     return {
@@ -392,7 +402,24 @@ export function cellUsability(input: {
       reason: McpCompatibilityRefusalReason.CELL_NOT_USABLE,
     };
   }
-  if (!hasRun) {
+  // The run must be for THIS cell's declared fixture (provenance), and the
+  // newest such run must still be inside the window (staleness).
+  const nowMs = Date.parse(now);
+  const runsForCell = input.passingRuns.filter(
+    (run) =>
+      run.revision === revision &&
+      run.clientId === clientId &&
+      run.fixtureRef === cell.conformanceFixtureRef,
+  );
+  const newestRunMs = runsForCell.reduce((latest, run) => {
+    const at = Date.parse(run.ranAt);
+    return Number.isFinite(at) && at > latest ? at : latest;
+  }, Number.NEGATIVE_INFINITY);
+  if (
+    runsForCell.length === 0 ||
+    !Number.isFinite(newestRunMs) ||
+    nowMs - newestRunMs > maxAgeSeconds * 1000
+  ) {
     return {
       revision,
       clientId,
@@ -408,7 +435,7 @@ export function cellUsability(input: {
       liveTestDate: cell.liveTestDate,
     },
     now,
-    input.maxAgeSeconds ?? MCP_LIVE_TEST_MAX_AGE_SECONDS,
+    maxAgeSeconds,
   );
   return {
     revision,
@@ -423,6 +450,8 @@ export interface McpCompatibilityResolution {
   readonly defaultRevision: string;
   readonly defaultChannel: McpRevisionChannel;
   readonly optInRevision: string | null;
+  /** Every VALIDATED opt-in draft revision (registered + DRAFT + tested). */
+  readonly optInRevisions: readonly string[];
   readonly usableRevisions: readonly string[];
   readonly cells: readonly CellUsability[];
   readonly transportOriginPolicyRef: string;
@@ -430,12 +459,22 @@ export interface McpCompatibilityResolution {
 
 /**
  * Resolve the active compatibility matrix: the latest mutually tested stable
- * revision (never a draft), the per-cell usability verdicts, and the transport
- * origin-policy reference of the resolved revision.
+ * revision (never a draft), the per-cell usability verdicts, the transport
+ * origin-policy reference of the resolved revision, and every VALIDATED opt-in
+ * draft.
+ *
+ * Opt-ins are resolved HERE, through the matrix — never injected into an
+ * allow-list by a caller (audit C3). Each requested revision must be
+ * registered, have channel `DRAFT`, and be mutually tested for every client,
+ * or the whole resolution refuses.
  */
 export async function resolveCompatibilityMatrix(
   engine: DatabaseEngine,
-  input: { readonly now: string; readonly optInDraftRevision?: string },
+  input: {
+    readonly now: string;
+    readonly optInDraftRevision?: string;
+    readonly optInDraftRevisions?: readonly string[];
+  },
 ): Promise<McpCompatibilityResolution> {
   const revisions = await mcpRevisions(engine);
   const clients = await mcpTargetClients(engine);
@@ -445,7 +484,12 @@ export async function resolveCompatibilityMatrix(
        FROM prod.mcp_conformance_runs
       WHERE result = 'PASS'`,
   );
-  const passingRuns = runs.rows.map((row) => ({ revision: row.revision, clientId: row.client_id }));
+  const passingRuns = runs.rows.map((row) => ({
+    revision: row.revision,
+    clientId: row.client_id,
+    fixtureRef: row.fixture_ref,
+    ranAt: toIso(row.ran_at),
+  }));
   const cellByPair = new Map<string, McpCompatibilityCell>(
     cells.map((cell) => [`${cell.revision}\u0000${cell.clientId}`, cell]),
   );
@@ -484,20 +528,27 @@ export async function resolveCompatibilityMatrix(
     );
   }
 
-  let optInRevision: string | null = null;
-  if (input.optInDraftRevision !== undefined) {
-    const draft = revisions.find((revision) => revision.revision === input.optInDraftRevision);
+  // Opt-ins are resolved THROUGH the matrix (audit C3): registered + DRAFT +
+  // mutually tested, or the resolution refuses. A caller can never widen the
+  // allow-list with an arbitrary revision string.
+  const requestedOptIns = [
+    ...(input.optInDraftRevision === undefined ? [] : [input.optInDraftRevision]),
+    ...(input.optInDraftRevisions ?? []),
+  ];
+  const optInRevisions: string[] = [];
+  for (const requested of new Set(requestedOptIns)) {
+    const draft = revisions.find((revision) => revision.revision === requested);
     if (draft === undefined) {
       throw new ForesiftError(
         ErrorCode.PROD_MCP_REVISION_CHANNEL_UNKNOWN,
-        `opted-in MCP revision ${input.optInDraftRevision} is not registered`,
+        `opted-in MCP revision ${requested} is not registered`,
         { reason: McpCompatibilityRefusalReason.REVISION_UNKNOWN },
       );
     }
     if (draft.channel !== 'DRAFT') {
       throw new ForesiftError(
         ErrorCode.PROD_MCP_DRAFT_DEFAULT,
-        `revision ${input.optInDraftRevision} is not a draft/RC revision`,
+        `revision ${requested} is not a draft/RC revision`,
         { reason: McpCompatibilityRefusalReason.DRAFT_NOT_OPTED_IN },
       );
     }
@@ -508,8 +559,9 @@ export async function resolveCompatibilityMatrix(
         { reason: McpCompatibilityRefusalReason.CELL_NOT_USABLE },
       );
     }
-    optInRevision = draft.revision;
+    optInRevisions.push(draft.revision);
   }
+  const optInRevision = optInRevisions[0] ?? null;
 
   const usableRevisions = orderedStable.map((revision) => revision.revision);
   const defaultRevision = latest.revision;
@@ -518,6 +570,7 @@ export async function resolveCompatibilityMatrix(
     defaultRevision,
     defaultChannel: defaultRow?.channel ?? 'STABLE',
     optInRevision,
+    optInRevisions,
     usableRevisions,
     cells: usabilityFor(defaultRevision),
     transportOriginPolicyRef: defaultRow?.originPolicyRef ?? '',
@@ -549,9 +602,14 @@ export async function resolveProtocolRevision(
   },
 ): Promise<ProtocolRevisionResolution> {
   const policy = parsePolicy(input.policy);
-  const resolution = await resolveCompatibilityMatrix(engine, { now: input.now });
-  const optIn = input.optInRevisions ?? [];
-  const allowedRevisions = [...new Set([...resolution.usableRevisions, ...optIn])];
+  // Opt-ins are validated by the matrix resolver, never injected raw (C3).
+  const resolution = await resolveCompatibilityMatrix(engine, {
+    now: input.now,
+    ...(input.optInRevisions === undefined ? {} : { optInDraftRevisions: input.optInRevisions }),
+  });
+  const allowedRevisions = [
+    ...new Set([...resolution.usableRevisions, ...resolution.optInRevisions]),
+  ];
   const guard = new McpProtocolGuard({
     allowedRevisions,
     maxMessageBytes: 1_000_000,

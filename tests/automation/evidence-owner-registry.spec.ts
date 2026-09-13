@@ -499,7 +499,11 @@ describe('T024 verification profile (full convergence gate, not the weaker miles
       expect(profileSource).toBe('declared');
       expect(commands).toContain('pnpm --filter @foresift/requirement-manifest test');
       expect(commands).toContain('bun test ./packages/persistence/test/migrator.spec.ts');
-      expect(commands).toContain('node scripts/verify-release-conformance/cli.mjs');
+      // The profile must require the PROD governance claims: absent claims fail
+      // the profile closed instead of silently skipping the five claim rules.
+      expect(commands).toContain(
+        'node scripts/verify-release-conformance/cli.mjs --require-prod-claims',
+      );
       expect(commands).toContain('node scripts/generate-requirement-manifest/cli.mjs --check');
       expect(commands).toContain('pnpm spec:verify');
       expect(commands.length).toBeGreaterThanOrEqual(6);

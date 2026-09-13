@@ -11,7 +11,11 @@ import type {
   ContainmentScopeCandidate,
   RollbackToApprovedInput,
 } from '@foresift/capability-registry';
-import { PROD_FIXTURE_HASH_A, PROD_FIXTURE_NOW } from './gate-inputs.ts';
+import {
+  PROD_FIXTURE_ACTIVATION_EVENT,
+  PROD_FIXTURE_HASH_A,
+  PROD_FIXTURE_NOW,
+} from './gate-inputs.ts';
 
 /** The exact, fully-specific scope a failed gate affects. */
 export const PROD_CONTAINMENT_SPECIFIC_CANDIDATE: ContainmentScopeCandidate = {
@@ -68,7 +72,9 @@ export const PROD_ROLLBACK_FIXTURE: RollbackToApprovedInput = {
   moduleId: 'module-prod-specific',
   scope: PROD_CONTAINMENT_SPECIFIC_CANDIDATE.scope,
   restoredArtifactSetHash: PROD_FIXTURE_HASH_A,
-  priorActivationEventRef: 'activation-prod-prior',
+  // The EXACT activation event the scope genuinely reached ACTIVE under; a
+  // fabricated prior event is refused (audit H7).
+  priorActivationEventRef: PROD_FIXTURE_ACTIVATION_EVENT,
   newActivationEventRef: 'activation-prod-rollback',
   candidateReevaluationRef: 'reevaluation-prod-1',
   at: PROD_FIXTURE_NOW,

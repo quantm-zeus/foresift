@@ -13,9 +13,11 @@
  * as three INDEPENDENT dimensions (FR-PROD-001). Each is established by the
  * distinct lifecycle positions the exact scope has ever occupied:
  *   - `implemented` — any governed row exists for the scope;
- *   - `available`   — the scope ever reached `AVAILABLE`/`SHADOW`/`PROVEN`/
- *                     `ACTIVE` (the containment states `DEGRADED`/`PAUSED`/
- *                     `DISABLED`/`RETIRED` never establish it by themselves);
+ *   - `available`   — the scope ever reached `AVAILABLE`/`PROVEN`/`ACTIVE` (a
+ *                     shadow-only scope runs without active side effects and is
+ *                     still unavailable, and the containment states
+ *                     `DEGRADED`/`PAUSED`/`DISABLED`/`RETIRED` never establish it
+ *                     by themselves);
  *   - `proven`      — the scope ever reached `PROVEN` (the only position that
  *                     attests registered proof).
  * A module can therefore be deployed (`IMPLEMENTED`) while unavailable, and
@@ -44,20 +46,24 @@ import {
   DistributionReadiness,
   ModuleLifecycleState,
   OperationalReadiness,
+  ActivationKind,
+  ActivationGateKind,
   assertLegalLifecycleTransition,
+  parseActivationKind,
   parseChangeClassification,
   parseDistributionReadiness,
   parseModuleLifecycleState,
   parseOperationalReadiness,
   requiredStatesForActivation,
   type ActivationScope,
-  type ActivationGateKind,
   type ModuleLifecyclePosition,
 } from '@foresift/domain';
 import { canonicalJson, sha256Text, type DatabaseEngine } from '@foresift/persistence';
 import {
+  requireActivationResultBrand,
   requirePersistedActivationEvidence,
   type ActivationGateResult,
+  type PersistedActivationEvidence,
 } from './activation-gate.ts';
 
 // Re-export the domain values under the registry's local naming so callers can
@@ -192,6 +198,8 @@ export interface ModuleStateRow {
   readonly operationalReadiness: OperationalReadiness;
   readonly distributionReadiness: DistributionReadiness;
   readonly activationEventRef: string | null;
+  /** The activation kind that authorized an ACTIVE row (audit C1); null otherwise. */
+  readonly activationKind: ActivationKind | null;
   readonly supersededBy: string | null;
   readonly createdAt: string;
 }
@@ -225,9 +233,13 @@ export interface ModuleStateDimensions {
 }
 
 /** The positions that establish each dimension (independent, never ranked). */
+/**
+ * `SHADOW` is deliberately NOT here (audit MEDIUM 6, AC-152): a shadow-only
+ * module runs without active opportunity side effects and is still
+ * "unavailable", so it must not read as establishing AVAILABLE.
+ */
 const ESTABLISHES_AVAILABLE: readonly ModuleLifecyclePosition[] = [
   ModuleLifecycleState.AVAILABLE,
-  ModuleLifecycleState.SHADOW,
   ModuleLifecycleState.PROVEN,
   ModuleLifecycleState.ACTIVE,
 ];
@@ -250,6 +262,7 @@ interface RawModuleStateRow {
   operational_readiness: string;
   distribution_readiness: string;
   activation_event_ref: string | null;
+  activation_kind: string | null;
   superseded_by: string | null;
   created_at: unknown;
 }
@@ -286,6 +299,7 @@ function decodeModuleStateRow(row: RawModuleStateRow): ModuleStateRow {
     operationalReadiness: row.operational_readiness as OperationalReadiness,
     distributionReadiness: row.distribution_readiness as DistributionReadiness,
     activationEventRef: row.activation_event_ref,
+    activationKind: row.activation_kind === null ? null : (row.activation_kind as ActivationKind),
     supersededBy: row.superseded_by,
     createdAt: toIso(row.created_at),
   };
@@ -316,7 +330,7 @@ export async function stateRowsFor(
   const result = await engine.query<RawModuleStateRow>(
     `SELECT state_row_id, module_id, artifact_set_hash, scope, lifecycle_state,
             operational_readiness, distribution_readiness, activation_event_ref,
-            superseded_by, created_at
+            activation_kind, superseded_by, created_at
        FROM prod.module_states
       WHERE module_id = $1 AND scope = $2::jsonb
       ORDER BY created_at ASC, state_row_id ASC`,
@@ -413,6 +427,10 @@ export const ModuleStateRefusalReason = {
   ACTIVATION_EVENT_ALREADY_CONSUMED: 'ACTIVATION_EVENT_ALREADY_CONSUMED',
   /** A non-empty activation event reference is required for a consumed-once record. */
   ACTIVATION_EVENT_REF_MISSING: 'ACTIVATION_EVENT_REF_MISSING',
+  /** A gate PASS claims a dimension the persisted history never established (audit H5). */
+  GATE_DIMENSION_MISMATCH: 'GATE_DIMENSION_MISMATCH',
+  /** Promotion to PROVEN must name the registered mature-evaluation evidence (audit H5). */
+  PROVEN_EVIDENCE_REQUIRED: 'PROVEN_EVIDENCE_REQUIRED',
 } as const;
 export type ModuleStateRefusalReason =
   (typeof ModuleStateRefusalReason)[keyof typeof ModuleStateRefusalReason];
@@ -437,6 +455,18 @@ export interface AdvanceStateInput {
   readonly currentStateRowId?: string;
   /** Total activation-gate result; REQUIRED exactly when crossing into ACTIVE. */
   readonly gateResult?: ActivationGateResult | null;
+  /**
+   * The registered mature-evaluation evidence that establishes PROVEN
+   * (§69.3; audit H5). REQUIRED exactly when `toState` is `PROVEN`: PROVEN is
+   * not a declaration, so a promotion must name the evidence content address it
+   * rests on.
+   */
+  readonly provenEvidenceRef?: string;
+  /**
+   * The activation event the `provenEvidenceRef` batch was recorded for.
+   * REQUIRED exactly when `toState` is `PROVEN`.
+   */
+  readonly provenEvidenceEventRef?: string;
   /**
    * Explicit activation-event reference for a non-gate-crossing append (for
    * example a rollback's NEW activation event). Defaults to the current row's.
@@ -534,6 +564,32 @@ export async function advanceState(
     );
   }
   const crossing = crossesActivationGate(fromState, toState);
+  // §69.3: PROVEN is established by REGISTERED mature-evaluation evidence, not
+  // by declaration (audit H5). The promotion must name the persisted OPPORTUNITY
+  // evaluation batch for the exact scope — the batch whose required statistical
+  // gates are the mature evaluation — and the activation event it was recorded
+  // for. A bare content address is never enough.
+  let provenEvidenceRef: string | null = null;
+  let provenEvidenceEventRef: string | null = null;
+  if (toState === ModuleLifecycleState.PROVEN) {
+    const ref = input.provenEvidenceRef;
+    const event = input.provenEvidenceEventRef;
+    if (
+      typeof ref !== 'string' ||
+      !/^sha256:[0-9a-f]{64}$/.test(ref) ||
+      typeof event !== 'string' ||
+      event.trim().length === 0
+    ) {
+      throw new ForesiftError(
+        ErrorCode.PROD_ACTIVATION_GATE_REFUSED,
+        'promotion to PROVEN requires the persisted mature-evaluation evidence set reference and the activation event it was recorded for',
+        { reason: ModuleStateRefusalReason.PROVEN_EVIDENCE_REQUIRED, scopeHash },
+      );
+    }
+    provenEvidenceRef = ref;
+    provenEvidenceEventRef = event;
+  }
+  let activationKind: ActivationKind | null = null;
   if (crossing) {
     const gateResult = input.gateResult;
     if (gateResult == null) {
@@ -547,6 +603,10 @@ export async function advanceState(
         },
       );
     }
+    // IDENTITY provenance, not shape (audit C1/H5): the result must be the
+    // frozen object the evaluator minted. A hand-built `{verdict:'PASS', …}`
+    // therefore cannot cross into ACTIVE even with a derivable evidence ref.
+    requireActivationResultBrand(gateResult);
     if (gateResult.verdict !== 'PASS') {
       throw new ForesiftError(
         ErrorCode.PROD_ACTIVATION_GATE_REFUSED,
@@ -554,6 +614,44 @@ export async function advanceState(
         {
           reason: ModuleStateRefusalReason.ACTIVATION_GATE_REFUSED,
           failingGate: gateResult.failingGate,
+          scopeHash,
+        },
+      );
+    }
+    // The kind comes from the BRANDED evaluator object, never from a caller
+    // field, and it is persisted on the state row so an OPERATIONAL evaluation
+    // is permanently distinguishable from an OPPORTUNITY/WORKSPACE/PUBLIC one.
+    activationKind = parseActivationKind(gateResult.activationKind);
+    // A readiness claim is subsumed by the kind that was actually evaluated: an
+    // OPERATIONAL pass can never authorize workspace/public distribution, and
+    // the active-profile readiness requires confirmed-opportunity evidence.
+    const distributionAuthorizingKinds: Readonly<Record<string, ActivationKind>> = {
+      WORKSPACE_AUTHORIZED: ActivationKind.WORKSPACE,
+      PUBLIC_AUTHORIZED: ActivationKind.PUBLIC,
+    };
+    const requiredDistributionKind = distributionAuthorizingKinds[distributionReadiness];
+    if (requiredDistributionKind !== undefined && activationKind !== requiredDistributionKind) {
+      throw new ForesiftError(
+        ErrorCode.PROD_ACTIVATION_GATE_REFUSED,
+        `entering ACTIVE refused: distribution readiness ${distributionReadiness} requires a ${requiredDistributionKind} activation evaluation, but the gate result was evaluated for ${activationKind}`,
+        {
+          reason: ModuleStateRefusalReason.ACTIVATION_GATE_REFUSED,
+          requiredActivationKind: requiredDistributionKind,
+          evaluatedActivationKind: activationKind,
+          scopeHash,
+        },
+      );
+    }
+    if (
+      operationalReadiness === OperationalReadiness.READY_FOR_ACTIVE_PROFILE &&
+      activationKind === ActivationKind.OPERATIONAL
+    ) {
+      throw new ForesiftError(
+        ErrorCode.PROD_ACTIVATION_GATE_REFUSED,
+        'entering ACTIVE refused: READY_FOR_ACTIVE_PROFILE requires confirmed-opportunity evidence, but the gate result was evaluated for OPERATIONAL activation',
+        {
+          reason: ModuleStateRefusalReason.ACTIVATION_GATE_REFUSED,
+          evaluatedActivationKind: activationKind,
           scopeHash,
         },
       );
@@ -605,11 +703,44 @@ export async function advanceState(
         },
       );
     }
+    // §69.3: PROVEN is not a declaration. Inside the same transaction, the
+    // named promotion evidence must resolve to a persisted, complete, unexpired
+    // OPPORTUNITY evaluation batch for the exact scope (audit H5): its required
+    // statistical gates ARE the registered mature evaluation, so a fabricated
+    // content address can never establish PROVEN.
+    if (toState === ModuleLifecycleState.PROVEN && provenEvidenceRef !== null) {
+      await requirePersistedActivationEvidence(tx, {
+        scope,
+        scopeHash,
+        activationKind: ActivationKind.OPPORTUNITY,
+        activationEventRef: provenEvidenceEventRef ?? '',
+        evaluationSetRef: provenEvidenceRef,
+        at: input.at,
+      });
+    }
     // ACTIVE is not a declaration: inside the SAME transaction that writes the
     // row, re-derive the evidence from `prod.activation_gate_evaluations`. A
     // caller-constructed PASS object (even a well-formed one) cannot name rows
     // that were never persisted, so it can never cross into ACTIVE.
     if (crossing && input.gateResult?.verdict === 'PASS') {
+      // §69.2/§69.4 independent dimensions (audit H5): a gate PASS may only
+      // claim a dimension the exact scope's governed history actually
+      // established. A caller boolean can no longer assert IMPLEMENTED /
+      // AVAILABLE / PROVEN that no persisted row supports.
+      const dimensions = await statesFor(tx, { moduleId, scope });
+      // A `requires_proven` scope may NEVER reach ACTIVE unless the exact scope
+      // actually reached PROVEN, whatever the gate recorded (audit H5 residual).
+      if (scope.requires_proven && dimensions.proven !== true) {
+        throw new ForesiftError(
+          ErrorCode.PROD_ACTIVATION_GATE_REFUSED,
+          'entering ACTIVE refused: the exact scope specifies requires_proven but no persisted PROVEN state exists for it',
+          {
+            reason: ModuleStateRefusalReason.GATE_DIMENSION_MISMATCH,
+            gate: 'PROVEN_PRESENT',
+            scopeHash,
+          },
+        );
+      }
       // §69.11: containment is a governed stop, not a suggestion. While a
       // containment event on the EXACT scope is still open, replaying older
       // genuine evidence must not re-activate the scope; the documented sole
@@ -674,22 +805,43 @@ export async function advanceState(
           );
         }
       }
-      await requirePersistedActivationEvidence(tx, {
-        scope,
-        scopeHash,
-        activationKind: input.gateResult.activationKind,
-        activationEventRef: input.gateResult.activationEventRef,
-        evaluationSetRef: input.gateResult.evaluationSetRef,
-        at: input.at,
-      });
+      const persistedEvidence: PersistedActivationEvidence =
+        await requirePersistedActivationEvidence(tx, {
+          scope,
+          scopeHash,
+          activationKind: activationKind ?? parseActivationKind(input.gateResult.activationKind),
+          activationEventRef: input.gateResult.activationEventRef,
+          evaluationSetRef: input.gateResult.evaluationSetRef,
+          at: input.at,
+        });
+      // The IMPLEMENTED/AVAILABLE/PROVEN binding reads the PERSISTED rows, never
+      // the mutable in-memory evaluator object (audit R1/T053): a caller that
+      // mutates a recorded pass's nested evaluation cannot change what the
+      // database recorded.
+      const claimedDimensions: readonly [ActivationGateKind, boolean][] = [
+        [ActivationGateKind.IMPLEMENTED_PRESENT, dimensions.implemented],
+        [ActivationGateKind.AVAILABLE_EVIDENCE, dimensions.available],
+        [ActivationGateKind.PROVEN_PRESENT, dimensions.proven],
+      ];
+      for (const [gate, established] of claimedDimensions) {
+        const persisted = persistedEvidence.rows.find((entry) => entry.gateKind === gate);
+        if (persisted?.verdict === 'PASS' && established !== true) {
+          throw new ForesiftError(
+            ErrorCode.PROD_ACTIVATION_GATE_REFUSED,
+            `entering ACTIVE refused: the persisted evidence claims ${gate} but the governed history never established it for the exact scope`,
+            { reason: ModuleStateRefusalReason.GATE_DIMENSION_MISMATCH, gate, scopeHash },
+          );
+        }
+      }
     }
     // Insert the NEW row FIRST: `superseded_by` is a foreign key into this very
     // table, so the pointer can only be set once the successor row exists.
     await tx.query(
       `INSERT INTO prod.module_states
          (state_row_id, module_id, artifact_set_hash, scope, scope_hash, lifecycle_state,
-          operational_readiness, distribution_readiness, activation_event_ref, created_at)
-       VALUES ($1, $2, $3, $4::jsonb, $5, $6, $7, $8, $9, $10::timestamptz)`,
+          operational_readiness, distribution_readiness, activation_event_ref, activation_kind,
+          created_at)
+       VALUES ($1, $2, $3, $4::jsonb, $5, $6, $7, $8, $9, $10, $11::timestamptz)`,
       [
         stateRowId,
         moduleId,
@@ -700,6 +852,7 @@ export async function advanceState(
         operationalReadiness,
         distributionReadiness,
         activationEventRef,
+        activationKind,
         input.at,
       ],
     );
@@ -735,9 +888,9 @@ export async function advanceState(
         changeClassification,
         crossing
           ? input.gateResult?.verdict === 'PASS'
-            ? input.gateResult.activationEventRef
+            ? (input.gateResult.evaluationSetRef ?? input.gateResult.activationEventRef)
             : null
-          : null,
+          : provenEvidenceRef,
         reason,
         actorRef,
         input.at,
@@ -746,7 +899,7 @@ export async function advanceState(
     const inserted = await tx.query<RawModuleStateRow>(
       `SELECT state_row_id, module_id, artifact_set_hash, scope, lifecycle_state,
               operational_readiness, distribution_readiness, activation_event_ref,
-              superseded_by, created_at
+              activation_kind, superseded_by, created_at
          FROM prod.module_states WHERE state_row_id = $1`,
       [stateRowId],
     );

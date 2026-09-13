@@ -43,7 +43,14 @@ const FUTURE = '2027-06-01T00:00:00Z';
 const HASH_A = `sha256:${'a'.repeat(64)}`;
 const HASH_B = `sha256:${'b'.repeat(64)}`;
 const LIVE_PATH = 'live-path-bounded';
-const REQUEST = { candidates: 10, rows: 20, edges: 30, latencyMs: 40, costUsd: 1 };
+const REQUEST = {
+  artifactSetHash: HASH_A,
+  candidates: 10,
+  rows: 20,
+  edges: 30,
+  latencyMs: 40,
+  costUsd: 1,
+};
 
 let db: PGlite;
 let engine: DatabaseEngine;
@@ -139,6 +146,44 @@ describe('§33.7 bounded live-path precomputed alpha', () => {
     }
   }, 120_000);
 
+  it('never serves a bound declared for artifact set A to a request for set B (H10 exploit)', async () => {
+    // Resolved by live path + artifact: the set is part of the key, so a request
+    // for B never resolves A's bound.
+    const byRef = await servePrecomputedAlpha(engine, {
+      livePath: LIVE_PATH,
+      artifactRef: 'artifact-1',
+      request: { ...REQUEST, artifactSetHash: HASH_B },
+      now: NOW,
+      readId: 'read-set-mismatch-ref',
+    });
+    expect(byRef.served).toBe(false);
+
+    // Adding the live path alone is still not enough: the bound is versioned to
+    // one immutable set.
+    const byPath = await servePrecomputedAlpha(engine, {
+      livePath: LIVE_PATH,
+      request: { ...REQUEST, artifactSetHash: HASH_B },
+      now: NOW,
+      readId: 'read-set-mismatch-path',
+    });
+    expect(byPath.served).toBe(false);
+
+    // Even an explicitly addressed bound refuses a different set with a typed
+    // reason rather than serving the wrong artifact set.
+    const byBoundId = await servePrecomputedAlpha(engine, {
+      livePath: LIVE_PATH,
+      boundId: 'bound-bounded',
+      request: { ...REQUEST, artifactSetHash: HASH_B },
+      now: NOW,
+      readId: 'read-set-mismatch-bound',
+    });
+    expect(byBoundId.served).toBe(false);
+    if (!byBoundId.served) {
+      expect(byBoundId.refusalReason).toBe('ARTIFACT_SET_MISMATCH');
+      expect(byBoundId.read?.refusalReason).toBe('ARTIFACT_SET_MISMATCH');
+    }
+  }, 120_000);
+
   it('refuses an unknown-artifact or fully-unbounded request with a typed reason', async () => {
     const unknown = await servePrecomputedAlpha(engine, {
       livePath: LIVE_PATH,
@@ -197,14 +242,18 @@ describe('§33.7 bounded live-path precomputed alpha', () => {
 });
 
 describe('§10.3/§35.14 live-path trust boundary', () => {
-  async function seedBoundary(livePath: string, failingKind: string | null): Promise<void> {
+  async function seedBoundary(
+    livePath: string,
+    failingKind: string | null,
+    importArtifactRef = 'import-shadow',
+  ): Promise<void> {
     const kinds = ['NO_HEAVY_JOB', 'NO_IMPORT', 'NO_PROVIDER_CALL', 'IMPORT_SHADOW_ONLY'] as const;
     for (const kind of kinds) {
       await recordArtifactBoundaryAssertion(engine, {
         assertionId: `${livePath}-${kind}`,
         livePath,
         assertionKind: kind,
-        importArtifactRef: kind === 'IMPORT_SHADOW_ONLY' ? 'import-shadow' : null,
+        importArtifactRef: kind === 'IMPORT_SHADOW_ONLY' ? importArtifactRef : null,
         verdict: kind === failingKind ? 'REFUSE' : 'PASS',
         assertedAt: NOW,
       });
@@ -233,6 +282,20 @@ describe('§10.3/§35.14 live-path trust boundary', () => {
 
     // A live path that never asserted anything refuses (not skipped).
     await expect(assertLivePathBoundaryHolds(engine, 'live-missing')).rejects.toThrow();
+  }, 120_000);
+
+  it('refuses a live path whose IMPORT_SHADOW_ONLY assertion references a non-shadow artifact (H4 exploit)', async () => {
+    // The pre-fix bypass: caller `verdict:`PASS`` rows were trusted, so a live
+    // path could reference a RECEIVED (or unknown) artifact and still pass.
+    await seedBoundary('live-received-import', null, 'import-received');
+    await expect(assertLivePathBoundaryHolds(engine, 'live-received-import')).rejects.toThrow(
+      /imports may rest only in VALIDATING\/SHADOW/,
+    );
+
+    // The genuine shadow artifact still passes.
+    await seedBoundary('live-shadow-import', null, 'import-shadow');
+    const assertions = await assertLivePathBoundaryHolds(engine, 'live-shadow-import');
+    expect(assertions.length).toBe(4);
   }, 120_000);
 
   it('refuses any live-path request carrying provider, import, or decryption access', () => {

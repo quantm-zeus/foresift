@@ -7,12 +7,15 @@
  * placeholder, never a production value, never logged.
  */
 import type { SustainableCapacityContract } from '@foresift/domain';
+import type { DatabaseEngine } from '@foresift/persistence';
 import { createGateEvidence } from '@foresift/release-conformance';
 import {
   ActivationKind,
   NegativeControlKind,
   activationScopeHash,
+  evaluateActivationGate,
   parseModuleStateScope,
+  recordActivationGateResult,
   type ActivationGateInput,
   type AvailableEvidenceInput,
   type DistributionEvidenceInput,
@@ -27,7 +30,14 @@ export const PROD_FIXTURE_NOW = '2026-06-01T00:00:00Z';
 export const PROD_FIXTURE_FUTURE = '2027-06-01T00:00:00Z';
 export const PROD_FIXTURE_FAR_FUTURE = '2030-01-01T00:00:00Z';
 export const PROD_FIXTURE_HASH_A = `sha256:${'a'.repeat(64)}`;
+/** The activation event `passingOpportunityGateInput` creates for a scope. */
+export const PROD_FIXTURE_ACTIVATION_EVENT = 'activation-prod-1';
 export const PROD_FIXTURE_HASH_B = `sha256:${'b'.repeat(64)}`;
+/**
+ * The registered mature-evaluation evidence content address a promotion to
+ * PROVEN must name (§69.3; audit H5). Inert fixture data.
+ */
+export const PROD_FIXTURE_PROVEN_EVIDENCE = `sha256:${'c'.repeat(64)}`;
 
 /** The canonical exactly-scoped §69.5 activation scope for PROD fixtures. */
 export function makeProdScope(overrides: Partial<ModuleStateScope> = {}): ModuleStateScope {
@@ -196,7 +206,7 @@ export function passingOpportunityGateInput(scope: ModuleStateScope): Activation
     capacityContract: passingCapacityContract(),
     distributionEvidence: null,
     openContainment: [],
-    activationEventRef: 'activation-prod-1',
+    activationEventRef: PROD_FIXTURE_ACTIVATION_EVENT,
     expiresAt: PROD_FIXTURE_FUTURE,
     evidenceRefs: ['evidence-prod-1'],
   };
@@ -221,4 +231,31 @@ export function passingDistributionEvidence(
     rightsChangeBlockedPaths: [],
     ...overrides,
   };
+}
+
+/**
+ * Record the persisted OPPORTUNITY evidence batch a promotion to PROVEN must
+ * name (§69.3; audit H5). The batch's required statistical gates ARE the
+ * registered mature evaluation, so a fabricated content address can never
+ * establish PROVEN.
+ */
+export async function recordProvenEvidence(
+  engine: DatabaseEngine,
+  scope: ModuleStateScope,
+  eventRef: string,
+): Promise<{ provenEvidenceRef: string; provenEvidenceEventRef: string }> {
+  const gate = evaluateActivationGate({
+    ...passingOpportunityGateInput(scope),
+    activationEventRef: eventRef,
+  });
+  if (gate.verdict !== 'PASS') {
+    throw new Error(
+      `expected a passing OPPORTUNITY evidence gate for PROVEN promotion, got ${gate.verdict} (${gate.failingGate})`,
+    );
+  }
+  const recorded = await recordActivationGateResult(engine, gate);
+  if (recorded.evaluationSetRef === null) {
+    throw new Error('expected the recorded PROVEN evidence batch to be bound to a set reference');
+  }
+  return { provenEvidenceRef: recorded.evaluationSetRef, provenEvidenceEventRef: eventRef };
 }

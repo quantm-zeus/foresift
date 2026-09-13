@@ -56,10 +56,12 @@ const moduleState = {
   moduleId: 'module-1',
   artifactSetHash: HASH,
   scope,
+  scopeHash: HASH,
   lifecycleState: 'ACTIVE',
   operationalReadiness: 'READY_FOR_ACTIVE_PROFILE',
   distributionReadiness: 'PRIVATE_ONLY',
   activationEventRef: 'gate-eval-1',
+  activationKind: 'OPPORTUNITY',
   supersededBy: null,
   createdAt: AT,
 };
@@ -72,6 +74,8 @@ const gateEvaluation = {
   failingGate: null,
   evidenceRefs: ['evidence-1'],
   capacityContractRef: 'capacity-1',
+  activationEventRef: 'gate-eval-1',
+  activationKind: 'OPPORTUNITY',
   evaluatedAt: AT,
   expiresAt: LATER,
 };
@@ -151,6 +155,44 @@ describe('§69.2 module-state row', () => {
         activationEventRef: null,
       }),
     ).not.toThrow();
+  });
+});
+
+describe('prod schema parity for the correction columns (T051)', () => {
+  it('refuses an ACTIVE module state without the activation kind or scope hash', () => {
+    expect(() => ModuleStateRowSchema.parse({ ...moduleState, activationKind: null })).toThrow(
+      /activation kind/,
+    );
+    expect(() => ModuleStateRowSchema.parse({ ...moduleState, scopeHash: null })).toThrow(
+      /scope hash/,
+    );
+    expect(() =>
+      ModuleStateRowSchema.parse({
+        ...moduleState,
+        distributionReadiness: 'PUBLIC_AUTHORIZED',
+        activationKind: 'OPERATIONAL',
+      }),
+    ).toThrow(/PUBLIC/);
+  });
+
+  it('refuses a gate evaluation without its activation kind or event reference', () => {
+    expect(() =>
+      ActivationGateEvaluationRowSchema.parse({ ...gateEvaluation, activationKind: undefined }),
+    ).toThrow();
+    expect(() =>
+      ActivationGateEvaluationRowSchema.parse({ ...gateEvaluation, activationKind: 'MADE_UP' }),
+    ).toThrow();
+    expect(() =>
+      ActivationGateEvaluationRowSchema.parse({ ...gateEvaluation, activationEventRef: null }),
+    ).not.toThrow();
+    // NOT_APPLICABLE is a legal verdict and must not name a failing gate.
+    expect(
+      ActivationGateEvaluationRowSchema.parse({
+        ...gateEvaluation,
+        verdict: 'NOT_APPLICABLE',
+        failingGate: null,
+      }).verdict,
+    ).toBe('NOT_APPLICABLE');
   });
 });
 

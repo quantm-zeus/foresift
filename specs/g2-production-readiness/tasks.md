@@ -1,5 +1,40 @@
 # Tasks: g2-production-readiness
 
+> **EMERGENCY CORRECTION — proof REOPENED then RE-PROVEN (third round,
+> 2026-09-13).** The re-PROVEN flip `8f7b5d9` (PR #295) was revoked by a fresh
+> independent verification that reproduced **three HIGH fail-opens on `main`**:
+> (1) the activation-gate evaluations were only shallow-frozen, so a caller
+> could mutate a recorded pass's nested evaluation and defeat the `advanceState`
+> persisted-dimension cross-check; (2) `ACTIVATION_WITHOUT_EVIDENCE` accepted an
+> ACTIVE claim whose `activationEventRef` was omitted or empty; (3) the
+> PUBLIC/WORKSPACE authorization rule substring-matched a string `scopeRefs`
+> and accepted foreign-release evidence. Phase 11 closed those (`8793dd4`),
+> hardened the rules (`8a0b5f7`), and closed the convergence-audit findings —
+> the §69.9 distribution gate SQL bug that made every WORKSPACE/PUBLIC ACTIVE
+> insert abort (`g2_prod_0009`) and the prod telemetry-catalog drift
+> (`0bc79f5`). The correction landed as PR #296 (squash `b1611b9`). PROVEN is
+> restored only because **two new fresh-context independent convergence audits
+> at `0bc79f5` both reported "NO CRITICAL/HIGH FINDINGS — READY FOR PROVEN"**,
+> the full prescribed gates passed, and exact-SHA CI run `34755822334` was
+> green. No history or evidence is deleted: the reopen (`2a909d4`) and every
+> prior flip remain in history.
+>
+> Earlier correction history is preserved: the original PROVEN flip
+> `e5fcc06` (PR #292) was revoked after the audit found 3 CRITICAL + 10 HIGH;
+> PR #294 (squash `e782ce7`) closed them and PR #295 (squash `8f7b5d9`)
+> restored PROVEN. Phase 10 tasks `T040`–`T052` remain checked as landed
+> evidence and are not rewritten.
+>
+> Accepted residual MEDIUMs (recorded in `DECISIONS.md` D013/D014/D015 and
+> `emergency-correction.md`): `clearContainment` step-up/actor/reason +
+> ActionGate, SQL/Drizzle parity for defaults/constraints/indexes/triggers,
+> AC-150/151/153 fixture-echo positives, the evidence trust boundary
+> (caller-supplied statistical verdicts), module binding for evaluation rows,
+> the declarative-only release-gate live-path boundary rule, the raw-writer
+> PROVEN-insert trust boundary, and an explicit
+> `evaluateConformance({milestone:'G0'|'G1'})` override selecting a non-PROD
+> group. Two-way telemetry parity was closed by T064.
+
 **Input**: `specs/g2-production-readiness/spec.md`, `specs/g2-production-readiness/plan.md`
 **Traceability rule**: every task cites at least one assigned requirement
 (FR-PROD-001…006) or an acceptance criterion of those requirements.
@@ -31,7 +66,14 @@ telemetry parity suite, test-owned T031), and
 `docs/generated/prod-surfaces.json` (implementation-mapping
 reconciliation because `docs/generated/**` is deliberately outside the
 package writeScopes, product-owned T029) are extended by this package even
-though they sit outside the listed writeScopes.
+though they sit outside the listed writeScopes. The third-round correction
+(Phase 11) additionally extends
+`scripts/verify-release-conformance/cli.mjs` and
+`scripts/verify-release-conformance/prod-conformance-gate.ts` (the
+deterministic release-gate bridge and CLI, product-owned by T043) so a
+non-canonical repository milestone cannot silently skip the PROD block; both
+paths are named exactly and carry no product-source behavior change beyond
+the milestone validation.
 
 Staging order mirrors PRD §40/§69 and the plan's architecture decisions:
 governed-state vocabularies and shared schemas first, then persistence
@@ -408,3 +450,163 @@ cross-artifact convergence.
       the run's out-of-scope notes instead of planning it. Traces:
       FR-PROD-001, FR-PROD-002, FR-PROD-003, FR-PROD-004, FR-PROD-005,
       FR-PROD-006.
+
+## Phase 10 — Emergency correction (reopened proof)
+
+Each task below closes one audited defect and lands a direct negative
+regression (exploit) test; `specs/g2-production-readiness/emergency-correction.md`
+carries the finding-to-task map and the verbatim reproductions.
+
+- [x] T040 [serial-reason: SHARED_FILE] Persist and bind the activation kind:
+      `activation_kind` on `prod.activation_gate_evaluations` and
+      `prod.module_states`, `NOT_APPLICABLE` (not `PASS`) for gates outside
+      the requested kind's required set, kind-filtered
+      `requirePersistedActivationEvidence`, the SQL trigger's per-kind
+      required-gate set, and a branded-kind cross-check in `advanceState`.
+      Negative: record OPERATIONAL, then attempt OPPORTUNITY/WORKSPACE/PUBLIC
+      ACTIVE — must refuse. Closes C1, H5. Traces: FR-PROD-001, FR-PROD-002,
+      AC-152, AC-154.
+- [x] T041 [serial-reason: ORDERED_MIGRATION] SQL fail-closed on the empty
+      activation-event reference: `length(activation_event_ref) > 0` CHECK on
+      `prod.module_states` and removal of the `''` early return in the
+      evidence trigger. Negative: raw ACTIVE INSERT with `''` and zero
+      evaluation rows must refuse. Closes C2. Traces: FR-PROD-001,
+      FR-PROD-002, AC-152.
+- [x] T042 [serial-reason: SHARED_FILE] Resolve MCP opt-ins only through the
+      registered compatibility matrix: each `optInRevisions` entry must be
+      registered, `DRAFT`, and mutually tested, else refuse. Negative:
+      unregistered `2099-01-01-evil` opt-in must refuse. Closes C3. Traces:
+      FR-PROD-003, AC-144.
+- [x] T043 Wire the five PROD conformance rules into the authoritative
+      release gate through a repo-backed bridge and make
+      `evaluateProdConformance` fail closed on omitted input, empty required
+      gate sets, and unknown readiness strings; negative: `{}`,
+      `requiredGateKinds: []`, and unrecognized readiness all FAIL. Closes
+      H1, H2. Traces: FR-PROD-001, FR-PROD-002, FR-PROD-004, AC-272.
+- [x] T044 [serial-reason: SHARED_INVARIANT] Give an upgraded database a
+      valid additive migration path without weakening the out-of-order
+      invariant: scope the refusal to an already-applied family and prove a
+      pre-prod-main database (all `g0_*`/`g1_*`/`g2_wf_*` applied, no
+      `g2_prod_*`) converges to the same schema fingerprint as a fresh apply.
+      Closes H3. Traces: FR-PROD-001…006.
+- [x] T045 Resolve every `IMPORT_SHADOW_ONLY` boundary assertion through the
+      real `ImportGate` and require `VALIDATING`/`SHADOW_ELIGIBLE`; negative:
+      a live path referencing a `RECEIVED`/`REJECTED` artifact must refuse.
+      Closes H4. Traces: FR-PROD-006, AC-275.
+- [x] T046 Persist every activation-gate evaluation, PASS and REFUSE, with a
+      batch identity so a newer refusal invalidates older PASS evidence.
+      Negative: PASS then REFUSE for the same event refuses ACTIVE. Closes
+      H6. Traces: FR-PROD-002, AC-154.
+- [x] T047 Require a genuinely previously `ACTIVE`/authorized row with a
+      matching non-null activation event for rollback and repair the hollow
+      AC-279 path; negative: fabricated prior event and IMPLEMENTED/NULL-event
+      rows must refuse. Closes H7. Traces: FR-PROD-006, AC-279.
+- [x] T048 Require ≥1 critical dependency and a passing capacity contract
+      before `SLA_BACKED`; negative: empty critical register cannot declare
+      `SLA_BACKED`. Closes H8. Traces: FR-PROD-004.
+- [x] T049 Derive dependency-group `dependsOn` from the manifest-backed order
+      view and refuse caller disagreement; negative: `dependsOn: []` cannot
+      mark G7 COMPLETE while G0…G6 are OPEN. Closes H9. Traces: FR-PROD-005.
+- [x] T050 MCP conformance provenance/staleness: require the newest in-window
+      run whose `fixture_ref` equals the cell's, clamp the caller staleness
+      override, and bind the precomputed-alpha request to the expected
+      `artifactSetHash`. Closes H10. Traces: FR-PROD-003, FR-PROD-006.
+- [x] T051 [serial-reason: SHARED_INVARIANT] Correct the cheap MEDIUM defects
+      the correction touches: Zod parity for the new/0005 columns,
+      `scope_hash` immutability and open-containment enforcement in SQL, and
+      drop `SHADOW` from `ESTABLISHES_AVAILABLE`. Traces: FR-PROD-001,
+      FR-PROD-002.
+- [x] T052 [serial-reason: COORDINATOR_BOUNDARY] Fresh-context adversarial
+      re-review of the correction diff, exploit-suite replay, full prescribed
+      gates and exact-SHA CI; restore PROVEN only when the new convergence
+      audit reports no CRITICAL/HIGH finding. Traces: FR-PROD-001…006.
+
+## Phase 11 — Third-round emergency correction (reopened proof)
+
+Each task closes one independently reproduced HIGH/MEDIUM defect and lands a
+direct negative regression (exploit) test that fails against the pre-correction
+revision. `specs/g2-production-readiness/emergency-correction.md` carries the
+third-round finding-to-task map and the verbatim reproductions.
+
+- [x] T053 [serial-reason: SHARED_FILE] Deep-freeze every
+      `GateConditionEvaluation` element (and the condition it spreads) so a
+      caller cannot mutate a recorded pass's nested evaluation and defeat the
+      `advanceState` persisted-dimension cross-check, and derive the
+      IMPLEMENTED/AVAILABLE/PROVEN claim check from the **persisted** evidence
+      rows returned by `requirePersistedActivationEvidence` rather than the
+      in-memory `gateResult.evaluations`. Negative: mutate
+      `bound.evaluations[AVAILABLE_EVIDENCE].verdict` to `NOT_APPLICABLE`, then
+      cross into ACTIVE — must refuse. Closes the H5 binding bypass. Traces:
+      FR-PROD-001, FR-PROD-002, AC-152.
+- [x] T054 [serial-reason: SHARED_FILE] Align the TypeScript persisted-evidence
+      guard with the SQL trigger: `requirePersistedActivationEvidence` must
+      refuse when **any** persisted row for the exact scope/kind/event is a
+      `REFUSE`, not only when the newest `evaluated_at` batch refuses, so a
+      backdated refusal cannot be ignored. Negative: record PASS then a
+      backdated REFUSE for the same event — the exported guard must refuse.
+      Traces: FR-PROD-002, AC-154.
+- [x] T055 Fail the `ACTIVATION_WITHOUT_EVIDENCE` conformance rule closed on an
+      ACTIVE claim whose `activationEventRef` is omitted, empty, non-string, or
+      whitespace, whose `requiresProven` is not a boolean, or whose
+      `lifecycleState` is not a known governed position. Negative: the omitted
+      and empty-string exploits (and an unknown lifecycle position) must
+      produce findings and `overall === 'FAILED'`. Closes the H2 residual.
+      Traces: FR-PROD-001, FR-PROD-002, AC-152.
+- [x] T056 Fail the PUBLIC/WORKSPACE authorization rule closed on malformed
+      evidence shape: `scopeRefs` must be an array of release refs (never a
+      substring-matched string), `requiredGateKinds`/`gateEvidence` must be
+      arrays, and a malformed shape is a finding. Negative: a foreign release
+      named only inside a `scopeRefs` string must NOT authorize. Closes the H2
+      residual. Traces: FR-PROD-002, FR-PROD-004, AC-272, AC-273.
+- [x] T057 [serial-reason: SHARED_FILE] Make the active-milestone resolution in
+      `evaluateConformance` reject a non-canonical / out-of-range id exactly as
+      the explicit override does (`G0`…`G7`), so a malformed
+      `current-milestone.json` cannot silently skip the PROD block. Traces:
+      FR-PROD-001…006.
+- [x] T058 [executor: TEST] Repair the hollow AC-279 acceptance path: drive a
+      genuine A→B→A restore (current set B, prior approved set A under the exact
+      event) instead of the no-op same-set restore, and keep the fabricated
+      prior-event / never-approved-set negatives. Closes the H7 test residual.
+      Traces: FR-PROD-006, AC-279.
+- [x] T059 [serial-reason: SHARED_INVARIANT] Restore the cross-generation
+      out-of-order invariant in the migrator: key the applied-family high-water
+      on the `_<family>_` token (not `g<generation>_<family>`) so a
+      later-generation latecomer (`g1_data_0009` after an applied
+      `g2_data_0001`) is refused as a same-family gap, while a wholly-new family
+      (`prod` after `wf`) still applies additively. Negative: the cross-generation
+      latecomer must refuse and must not create its table. Traces: FR-PROD-001…006.
+- [x] T062 [serial-reason: SHARED_FILE] In-process hardening of the PROD
+      rules against caller-owned array method shadowing (`filter`/`some`/
+      `includes`/`entries`/`Symbol.iterator`), a boxed/coercible explicit
+      milestone (`new String('G2')`), and a degenerate `releaseRef`: every
+      decision loop reads numeric indices and object properties directly, the
+      explicit milestone requires `typeof === 'string'`, and `releaseRef` must
+      be a non-empty string. Negative: shadowed `filter`/`includes`, a boxed
+      milestone, and an empty `releaseRef` must all refuse. Traces:
+      FR-PROD-001, FR-PROD-002.
+- [x] T063 [serial-reason: ORDERED_MIGRATION] Fix the §69.9 distribution gate
+      set in the evidence trigger: `g2_prod_0006` wrote
+      `required_gates || 'DISTRIBUTION_EVIDENCE'`, which PostgreSQL resolves as
+      `anyarray || anyarray` and aborts every WORKSPACE/PUBLIC ACTIVE insert
+      with `malformed array literal`. `g2_prod_0006` is already applied, so the
+      corrected function body lands as a new later-sorting
+      `g2_prod_0009_fix_distribution_gate_set.sql` using `array_append`.
+      Positive regression: a genuine WORKSPACE and PUBLIC activation now
+      persists ACTIVE (previously untested). Closes the open convergence HIGH.
+      Traces: FR-PROD-002, AC-272, AC-273.
+- [x] T064 [serial-reason: SHARED_FILE] Restore telemetry parity: the C1
+      correction added `scopeHash`/`activationKind`/`activationEventRef` to the
+      prod row schemas, but `telemetry/prod.catalog.json` was never updated and
+      the parity suite only checked catalog ⊆ schema. Add the missing fields and
+      make the prod parity assertion two-way (set equality), so a future schema
+      field cannot be silently absent from the CRITICAL_METADATA catalog.
+      Traces: FR-PROD-001, FR-PROD-002.
+- [x] T060 [serial-reason: COORDINATOR_BOUNDARY] Fresh-context adversarial
+      re-review of the third-round diff, direct exploit replay (nested
+      mutation, omitted/empty activation event, substring scopeRefs,
+      backdated refusal, cross-generation gap, distribution activation),
+      full prescribed gates and exact-SHA CI. Traces: FR-PROD-001…006.
+- [x] T061 [serial-reason: COORDINATOR_BOUNDARY] New independent convergence
+      audit at the pre-merge head; restore PROVEN only when it reports no
+      CRITICAL/HIGH finding and the tracked residual MEDIUMs are recorded.
+      Traces: FR-PROD-001…006.

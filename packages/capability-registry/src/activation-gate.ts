@@ -32,6 +32,7 @@ import {
   DistributionReadiness,
   ErrorCode,
   ForesiftError,
+  activationGateRefusal,
   isContractActivatable,
   parseActivationGateKind,
   parseActivationGateVerdict,
@@ -295,6 +296,15 @@ export interface ActivationGatePass {
   readonly evaluatedAt: string;
   readonly expiresAt: string;
   readonly evidenceRefs: readonly string[];
+  /** The kind this pass was evaluated for; the legal required-gate superset. */
+  readonly activationKind: ActivationKind;
+  /**
+   * Unforgeable persisted-evidence reference. The pure evaluator always leaves
+   * this `null`; only `recordActivationGateEvaluation` mints the deterministic
+   * hash over the rows it persisted, and `advanceState` re-derives it from the
+   * database before it will cross into ACTIVE.
+   */
+  readonly evaluationSetRef: string | null;
 }
 
 export interface ActivationGateRefusal {
@@ -717,6 +727,8 @@ export function evaluateActivationGate(input: ActivationGateInput): ActivationGa
     evaluatedAt: input.now,
     expiresAt: input.expiresAt,
     evidenceRefs: [...(input.evidenceRefs ?? [])],
+    activationKind: input.kind,
+    evaluationSetRef: null,
   };
 }
 
@@ -732,6 +744,8 @@ export interface ActivationGateEvaluationWrite {
   readonly scopeHash: string;
   readonly evaluations: readonly GateConditionEvaluation[];
   readonly capacityContractRef: string | null;
+  /** The activation event this evaluation set authorises (null for a REFUSE). */
+  readonly activationEventRef: string | null;
   readonly evaluatedAt: string;
   readonly expiresAt: string;
   readonly evidenceRefs: readonly string[];
@@ -739,15 +753,117 @@ export interface ActivationGateEvaluationWrite {
   readonly evaluationIdPrefix?: string;
 }
 
+/** One persisted `prod.activation_gate_evaluations` row, decoded. */
+export interface PersistedActivationGateEvaluation {
+  readonly evaluationId: string;
+  readonly scopeHash: string;
+  readonly gateKind: ActivationGateKind;
+  readonly verdict: ActivationGateVerdict;
+  readonly failingGate: ActivationGateKind | null;
+  readonly activationEventRef: string | null;
+  readonly capacityContractRef: string | null;
+  readonly evidenceRefs: readonly string[];
+  readonly evaluatedAt: string;
+  readonly expiresAt: string;
+}
+
+/** The recorder's receipt: the persisted ids plus the unforgeable set reference. */
+export interface RecordedActivationGateEvaluation {
+  readonly evaluationIds: readonly string[];
+  readonly evaluationSetRef: string;
+}
+
+interface RawGateEvaluationRow {
+  evaluation_id: string;
+  scope_hash: string;
+  gate_kind: string;
+  verdict: string;
+  failing_gate: string | null;
+  activation_event_ref: string | null;
+  capacity_contract_ref: string | null;
+  evidence_refs: unknown;
+  evaluated_at: unknown;
+  expires_at: unknown;
+}
+
+function toIsoTimestamp(value: unknown): string {
+  if (value instanceof Date) return value.toISOString();
+  return String(value);
+}
+
+function decodeEvidenceRefs(value: unknown): readonly string[] {
+  if (Array.isArray(value)) return value.map((entry) => String(entry));
+  if (typeof value === 'string') {
+    try {
+      const parsed: unknown = JSON.parse(value);
+      return Array.isArray(parsed) ? parsed.map((entry) => String(entry)) : [];
+    } catch {
+      return [];
+    }
+  }
+  return [];
+}
+
+function decodeGateEvaluationRow(row: RawGateEvaluationRow): PersistedActivationGateEvaluation {
+  return {
+    evaluationId: row.evaluation_id,
+    scopeHash: row.scope_hash,
+    gateKind: row.gate_kind as ActivationGateKind,
+    verdict: row.verdict as ActivationGateVerdict,
+    failingGate: row.failing_gate as ActivationGateKind | null,
+    activationEventRef: row.activation_event_ref,
+    capacityContractRef: row.capacity_contract_ref,
+    evidenceRefs: decodeEvidenceRefs(row.evidence_refs),
+    evaluatedAt: toIsoTimestamp(row.evaluated_at),
+    expiresAt: toIsoTimestamp(row.expires_at),
+  };
+}
+
+const GATE_EVALUATION_COLUMNS = `evaluation_id, scope_hash, gate_kind, verdict, failing_gate,
+        activation_event_ref, capacity_contract_ref, evidence_refs, evaluated_at, expires_at`;
+
+/**
+ * The unforgeable reference for one persisted evaluation set: a deterministic
+ * `sha256:<hex>` content address over the exact rows, in canonical gate order.
+ * The recorder mints it; `advanceState` re-derives it from the database, so a
+ * caller-constructed object cannot name evidence that was never persisted.
+ */
+export function activationEvidenceSetRef(
+  rows: readonly PersistedActivationGateEvaluation[],
+): string {
+  const ordered = [...rows].sort(
+    (left, right) =>
+      ACTIVATION_GATE_ORDER.indexOf(left.gateKind) - ACTIVATION_GATE_ORDER.indexOf(right.gateKind),
+  );
+  return sha256Text(
+    canonicalJson(
+      ordered.map((row) => ({
+        evaluationId: row.evaluationId,
+        scopeHash: row.scopeHash,
+        gateKind: row.gateKind,
+        verdict: row.verdict,
+        failingGate: row.failingGate,
+        activationEventRef: row.activationEventRef,
+        capacityContractRef: row.capacityContractRef,
+        evidenceRefs: row.evidenceRefs,
+        evaluatedAt: row.evaluatedAt,
+        expiresAt: row.expiresAt,
+      })),
+    ),
+  );
+}
+
 /**
  * Persist one immutable `prod.activation_gate_evaluations` row per evaluated
  * gate. A re-evaluation is always a NEW row (the migration trigger refuses any
- * in-place edit); a passing row carries no failing gate.
+ * in-place edit); a passing row carries no failing gate. The returned
+ * `evaluationSetRef` is the only reference `advanceState` will accept when
+ * crossing into ACTIVE: it is derived from the rows actually committed here.
  */
 export async function recordActivationGateEvaluation(
   engine: DatabaseEngine,
   write: ActivationGateEvaluationWrite,
-): Promise<readonly string[]> {
+): Promise<RecordedActivationGateEvaluation> {
   if (!isContentAddress(write.scopeHash)) {
     throw new ForesiftError(
       ErrorCode.PROD_ACTIVATION_SCOPE_INVALID,
@@ -776,8 +892,8 @@ export async function recordActivationGateEvaluation(
       await tx.query(
         `INSERT INTO prod.activation_gate_evaluations
            (evaluation_id, scope_hash, gate_kind, verdict, failing_gate, evidence_refs,
-            capacity_contract_ref, evaluated_at, expires_at)
-         VALUES ($1, $2, $3, $4, $5, $6::jsonb, $7, $8::timestamptz, $9::timestamptz)`,
+            capacity_contract_ref, activation_event_ref, evaluated_at, expires_at)
+         VALUES ($1, $2, $3, $4, $5, $6::jsonb, $7, $8, $9::timestamptz, $10::timestamptz)`,
         [
           evaluationId,
           write.scopeHash,
@@ -786,52 +902,193 @@ export async function recordActivationGateEvaluation(
           failing,
           canonicalJson(write.evidenceRefs),
           write.capacityContractRef,
+          write.activationEventRef,
           write.evaluatedAt,
           write.expiresAt,
         ],
       );
       ids.push(evaluationId);
     }
-    return ids;
+    // Re-read the rows just committed so the minted reference is derived from
+    // database truth (exact timestamps and ids), never from the caller's object.
+    const persisted = await tx.query<RawGateEvaluationRow>(
+      `SELECT ${GATE_EVALUATION_COLUMNS}
+         FROM prod.activation_gate_evaluations
+        WHERE scope_hash = $1 AND evaluated_at = $2::timestamptz
+        ORDER BY evaluation_id ASC`,
+      [write.scopeHash, write.evaluatedAt],
+    );
+    const rows = persisted.rows.map(decodeGateEvaluationRow);
+    return { evaluationIds: ids, evaluationSetRef: activationEvidenceSetRef(rows) };
   });
 }
 
-/** The latest persisted gate evaluations for an exact scope (append-only read). */
+/**
+ * Record a pure gate result as its persisted evidence and return the SAME result
+ * bound to the unforgeable `evaluationSetRef`. A REFUSE is never evidence for an
+ * activation, so it is returned unrecorded and unbound.
+ */
+export async function recordActivationGateResult(
+  engine: DatabaseEngine,
+  result: ActivationGateResult,
+): Promise<ActivationGateResult> {
+  if (result.verdict !== 'PASS') return result;
+  const recorded = await recordActivationGateEvaluation(engine, {
+    scopeHash: result.scopeHash,
+    evaluations: result.evaluations,
+    capacityContractRef: result.capacityContractRef,
+    activationEventRef: result.activationEventRef,
+    evaluatedAt: result.evaluatedAt,
+    expiresAt: result.expiresAt,
+    evidenceRefs: result.evidenceRefs,
+  });
+  return { ...result, evaluationSetRef: recorded.evaluationSetRef };
+}
+
+/** Every persisted gate evaluation for an exact scope (append-only read). */
 export async function activationGateEvaluationsFor(
   engine: DatabaseEngine,
   scopeHash: string,
-): Promise<
-  readonly {
-    readonly evaluationId: string;
-    readonly gateKind: ActivationGateKind;
-    readonly verdict: ActivationGateVerdict;
-    readonly failingGate: ActivationGateKind | null;
-    readonly evaluatedAt: string;
-    readonly expiresAt: string;
-  }[]
-> {
-  const result = await engine.query<{
-    evaluation_id: string;
-    gate_kind: string;
-    verdict: string;
-    failing_gate: string | null;
-    evaluated_at: unknown;
-    expires_at: unknown;
-  }>(
-    `SELECT evaluation_id, gate_kind, verdict, failing_gate, evaluated_at, expires_at
+): Promise<readonly PersistedActivationGateEvaluation[]> {
+  const result = await engine.query<RawGateEvaluationRow>(
+    `SELECT ${GATE_EVALUATION_COLUMNS}
        FROM prod.activation_gate_evaluations
       WHERE scope_hash = $1
       ORDER BY evaluated_at ASC, evaluation_id ASC`,
     [scopeHash],
   );
-  return result.rows.map((row) => ({
-    evaluationId: row.evaluation_id,
-    gateKind: row.gate_kind as ActivationGateKind,
-    verdict: row.verdict as ActivationGateVerdict,
-    failingGate: row.failing_gate as ActivationGateKind | null,
-    evaluatedAt:
-      row.evaluated_at instanceof Date ? row.evaluated_at.toISOString() : String(row.evaluated_at),
-    expiresAt:
-      row.expires_at instanceof Date ? row.expires_at.toISOString() : String(row.expires_at),
+  return result.rows.map(decodeGateEvaluationRow);
+}
+
+// --- persisted-evidence activation guard ------------------------------------
+
+/** Closed typed refusal reasons for a claimed-but-unpersisted gate pass. */
+export const ActivationEvidenceRefusalReason = {
+  EVIDENCE_SET_REF_MISSING: 'EVIDENCE_SET_REF_MISSING',
+  EVIDENCE_SET_EMPTY: 'EVIDENCE_SET_EMPTY',
+  EVIDENCE_SET_INCOMPLETE: 'EVIDENCE_SET_INCOMPLETE',
+  EVIDENCE_SET_NOT_PASS: 'EVIDENCE_SET_NOT_PASS',
+  EVIDENCE_SET_STALE: 'EVIDENCE_SET_STALE',
+  EVIDENCE_EVENT_REF_UNPERSISTED: 'EVIDENCE_EVENT_REF_UNPERSISTED',
+  EVIDENCE_SET_REF_MISMATCH: 'EVIDENCE_SET_REF_MISMATCH',
+} as const;
+export type ActivationEvidenceRefusalReason =
+  (typeof ActivationEvidenceRefusalReason)[keyof typeof ActivationEvidenceRefusalReason];
+
+/** Input for the persisted-evidence activation guard. */
+export interface PersistedActivationEvidenceInput {
+  readonly scope: ModuleStateScope;
+  readonly scopeHash: string;
+  readonly activationKind: ActivationKind;
+  readonly activationEventRef: string;
+  readonly evaluationSetRef: string | null | undefined;
+  /** The logical transition instant; a set expiring at or before it is stale. */
+  readonly at: string;
+}
+
+/**
+ * Fail-closed guard: require a COMPLETE, in-order, unexpired, all-PASS set of
+ * persisted `prod.activation_gate_evaluations` rows for the exact scope and the
+ * exact activation event, and require the caller's `evaluationSetRef` to equal
+ * the reference re-derived from those rows.
+ *
+ * A caller-supplied `ActivationGateResult` object is never sufficient: the rows
+ * must exist, must cover every gate required for the activation kind, must carry
+ * the same activation event, and must not have expired. Any missing, failing,
+ * stale, scope-mismatched, or unpersisted evidence refuses with
+ * `PROD_ACTIVATION_GATE_REFUSED` and a typed `ActivationEvidenceRefusalReason`.
+ */
+export async function requirePersistedActivationEvidence(
+  engine: DatabaseEngine,
+  input: PersistedActivationEvidenceInput,
+): Promise<RecordedActivationGateEvaluation> {
+  const refuse = (reason: ActivationEvidenceRefusalReason, detail: string): never => {
+    throw new ForesiftError(ErrorCode.PROD_ACTIVATION_GATE_REFUSED, detail, {
+      reason,
+      scopeHash: input.scopeHash,
+      activationEventRef: input.activationEventRef,
+    });
+  };
+  if (typeof input.evaluationSetRef !== 'string' || input.evaluationSetRef.length === 0) {
+    refuse(
+      ActivationEvidenceRefusalReason.EVIDENCE_SET_REF_MISSING,
+      'entering ACTIVE requires a gate result bound to persisted evidence; no evaluationSetRef was supplied',
+    );
+  }
+  const rows = await activationGateEvaluationsFor(engine, input.scopeHash);
+  if (rows.length === 0) {
+    refuse(
+      ActivationEvidenceRefusalReason.EVIDENCE_SET_EMPTY,
+      'no persisted activation-gate evaluations exist for the exact scope; a hand-built PASS object is not evidence',
+    );
+  }
+  // The latest evaluation batch is the only admissible evidence; an older PASS
+  // never survives a later re-evaluation.
+  let latestAt = Number.NEGATIVE_INFINITY;
+  for (const row of rows) {
+    const at = Date.parse(row.evaluatedAt);
+    if (Number.isFinite(at) && at > latestAt) latestAt = at;
+  }
+  const batch = rows.filter((row) => Date.parse(row.evaluatedAt) === latestAt);
+  if (batch.length === 0) {
+    refuse(
+      ActivationEvidenceRefusalReason.EVIDENCE_SET_EMPTY,
+      'the persisted activation-gate evaluations carry no resolvable evaluation instant',
+    );
+  }
+  const atMs = Date.parse(input.at);
+  for (const row of batch) {
+    if (row.activationEventRef !== input.activationEventRef) {
+      refuse(
+        ActivationEvidenceRefusalReason.EVIDENCE_EVENT_REF_UNPERSISTED,
+        `the persisted evidence was recorded for activation event ${JSON.stringify(
+          row.activationEventRef,
+        )}, not ${JSON.stringify(input.activationEventRef)}`,
+      );
+    }
+    if (row.verdict !== 'PASS' || row.failingGate !== null) {
+      refuse(
+        ActivationEvidenceRefusalReason.EVIDENCE_SET_NOT_PASS,
+        `the latest persisted gate ${row.gateKind} verdict is ${row.verdict}`,
+      );
+    }
+    if (Date.parse(row.expiresAt) <= atMs) {
+      refuse(
+        ActivationEvidenceRefusalReason.EVIDENCE_SET_STALE,
+        `the persisted gate ${row.gateKind} evidence expired at ${row.expiresAt}`,
+      );
+    }
+  }
+  const evaluations = batch.map((row) => ({
+    gateKind: row.gateKind,
+    verdict: row.verdict,
+    failingGate: row.failingGate,
   }));
+  // Cover every gate required for the activation kind AND the full canonical
+  // order, so a partial evaluation can never stand in for a total one.
+  const requiredFailing = activationGateRefusal(
+    evaluations,
+    requiredGatesForActivation(input.activationKind, input.scope),
+  );
+  if (requiredFailing !== null) {
+    refuse(
+      ActivationEvidenceRefusalReason.EVIDENCE_SET_INCOMPLETE,
+      `the persisted evidence is missing a passing evaluation for ${requiredFailing}`,
+    );
+  }
+  const totalFailing = activationGateRefusal(evaluations, ACTIVATION_GATE_ORDER);
+  if (totalFailing !== null) {
+    refuse(
+      ActivationEvidenceRefusalReason.EVIDENCE_SET_INCOMPLETE,
+      `the persisted evidence does not cover the complete ordered gate set: ${totalFailing}`,
+    );
+  }
+  const derived = activationEvidenceSetRef(batch);
+  if (derived !== input.evaluationSetRef) {
+    refuse(
+      ActivationEvidenceRefusalReason.EVIDENCE_SET_REF_MISMATCH,
+      'the supplied evaluationSetRef does not match the reference re-derived from the persisted rows',
+    );
+  }
+  return { evaluationIds: batch.map((row) => row.evaluationId), evaluationSetRef: derived };
 }

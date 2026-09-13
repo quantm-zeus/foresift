@@ -20,6 +20,7 @@ import {
   assertNoLivePathPrivileges,
   evaluateActivationGate,
   latestRollback,
+  recordActivationGateResult,
   recordArtifactBoundaryAssertion,
   rollbackToApproved,
   stateRowsFor,
@@ -165,7 +166,7 @@ describe('AC-279 prod-scoped: rollback restores an approved immutable set, creat
     await advance('PROVEN', 'ac279-prod-4');
     const gate = evaluateActivationGate(passingOpportunityGateInput(scope));
     expect(gate.verdict).toBe('PASS');
-    await advance('ACTIVE', 'ac279-prod-5', gate);
+    await advance('ACTIVE', 'ac279-prod-5', await recordActivationGateResult(engine, gate));
 
     const outcome = await rollbackToApproved(engine, PROD_ROLLBACK_FIXTURE);
     expect(outcome.rollback.historyPreserved).toBe(true);

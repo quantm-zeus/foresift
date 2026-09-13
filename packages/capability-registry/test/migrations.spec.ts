@@ -4,7 +4,7 @@
  *
  * Applies the whole migration set to a fresh PGlite database and proves the SQL
  * truth the capability registry will depend on:
- * - all four `g2_prod_*` scripts apply cleanly, in order;
+ * - all five `g2_prod_*` scripts apply cleanly, in order;
  * - every `prod` table lives in the dedicated `prod` schema and none leaks into
  *   `public` (ADR-G2PROD-1, AC-261 probe);
  * - module states are append-only with exactly one legal one-time supersede,
@@ -135,6 +135,7 @@ describe('g2_prod_* migrations apply to a fresh database', () => {
       'g2_prod_0002_dependency_posture',
       'g2_prod_0003_mcp_compat',
       'g2_prod_0004_alpha_boundary',
+      'g2_prod_0005_activation_evidence',
     ] as const;
     for (const id of ids) expect(applied).toContain(id);
     for (let i = 1; i < ids.length; i += 1) {
@@ -174,6 +175,60 @@ describe('governed module states are append-only and gate-backed', () => {
       ),
     );
     expect(error.message).toMatch(/module_states_active_requires_gate_evaluation/);
+  }, 120_000);
+
+  it('refuses a raw ACTIVE INSERT with zero persisted gate rows (F2 bypass)', async () => {
+    const rawHash = `sha256:${'d'.repeat(64)}`;
+    const rawEvent = 'fabricated-event-never-evaluated';
+    const before = await engine.query<{ n: number }>(
+      `SELECT count(*)::int AS n FROM prod.activation_gate_evaluations
+        WHERE scope_hash = $1 AND activation_event_ref = $2`,
+      [rawHash, rawEvent],
+    );
+    expect(Number(before.rows[0]?.n)).toBe(0);
+
+    const error = await rejection(
+      engine.query(
+        `INSERT INTO prod.module_states
+           (state_row_id, module_id, artifact_set_hash, scope, scope_hash, lifecycle_state,
+            operational_readiness, distribution_readiness, activation_event_ref)
+         VALUES ('state-raw-bypass', 'module-1', $1, $2::jsonb, $3, 'ACTIVE',
+                 'READY_FOR_ACTIVE_PROFILE', 'PRIVATE_ONLY', $4)`,
+        [HASH, SCOPE, rawHash, rawEvent],
+      ),
+    );
+    expect(error.message).toMatch(/all-PASS persisted gate evaluation set/);
+
+    const rows = await engine.query<{ n: number }>(
+      `SELECT count(*)::int AS n FROM prod.module_states WHERE state_row_id = 'state-raw-bypass'`,
+    );
+    expect(Number(rows.rows[0]?.n)).toBe(0);
+  }, 120_000);
+
+  it('allows a raw ACTIVE INSERT backed by a complete persisted all-PASS set', async () => {
+    const rawHash = `sha256:${'e'.repeat(64)}`;
+    const rawEvent = 'raw-legit-activation';
+    for (const gate of ALL_ACTIVATION_GATE_KINDS) {
+      await engine.query(
+        `INSERT INTO prod.activation_gate_evaluations
+           (evaluation_id, scope_hash, gate_kind, verdict, failing_gate, evidence_refs,
+            capacity_contract_ref, activation_event_ref, expires_at)
+         VALUES ($1, $2, $3, 'PASS', NULL, '[]'::jsonb, NULL, $4, '2030-01-01T00:00:00Z')`,
+        [`raw-${gate}`, rawHash, gate, rawEvent],
+      );
+    }
+    await engine.query(
+      `INSERT INTO prod.module_states
+         (state_row_id, module_id, artifact_set_hash, scope, scope_hash, lifecycle_state,
+          operational_readiness, distribution_readiness, activation_event_ref)
+       VALUES ('state-raw-legit', 'module-1', $1, $2::jsonb, $3, 'ACTIVE',
+               'READY_FOR_ACTIVE_PROFILE', 'PRIVATE_ONLY', $4)`,
+      [HASH, SCOPE, rawHash, rawEvent],
+    );
+    const rows = await engine.query<{ lifecycle_state: string }>(
+      `SELECT lifecycle_state FROM prod.module_states WHERE state_row_id = 'state-raw-legit'`,
+    );
+    expect(rows.rows[0]?.lifecycle_state).toBe('ACTIVE');
   }, 120_000);
 
   it('refuses an unknown lifecycle state and an incomplete scope', async () => {

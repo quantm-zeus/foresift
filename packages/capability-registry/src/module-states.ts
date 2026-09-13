@@ -23,8 +23,12 @@
  *
  * `advanceState` refuses a transition that crosses the activation gate
  * (entering `ACTIVE`) without a passing total gate result for the SAME exact
- * scope, refuses an unknown/mismatched scope, refuses an illegal lifecycle
- * edge, and refuses any attempt to reuse an existing row id (in-place
+ * scope, and — inside the writing transaction — without a COMPLETE, unexpired,
+ * all-PASS set of PERSISTED `prod.activation_gate_evaluations` rows for that
+ * scope and activation event whose deterministic evidence reference matches the
+ * caller's `evaluationSetRef`. A hand-built PASS object can never name evidence
+ * that was never persisted. It also refuses an unknown/mismatched scope, an
+ * illegal lifecycle edge, and any attempt to reuse an existing row id (in-place
  * mutation). Strictly read-only governance: nothing here trades, custodies,
  * signs, or submits.
  */
@@ -45,7 +49,10 @@ import {
   type ModuleLifecyclePosition,
 } from '@foresift/domain';
 import { canonicalJson, sha256Text, type DatabaseEngine } from '@foresift/persistence';
-import type { ActivationGateResult } from './activation-gate.ts';
+import {
+  requirePersistedActivationEvidence,
+  type ActivationGateResult,
+} from './activation-gate.ts';
 
 // Re-export the domain values under the registry's local naming so callers can
 // construct an `ActivationScope` without importing the domain package twice.
@@ -586,18 +593,33 @@ export async function advanceState(
         },
       );
     }
+    // ACTIVE is not a declaration: inside the SAME transaction that writes the
+    // row, re-derive the evidence from `prod.activation_gate_evaluations`. A
+    // caller-constructed PASS object (even a well-formed one) cannot name rows
+    // that were never persisted, so it can never cross into ACTIVE.
+    if (crossing && input.gateResult?.verdict === 'PASS') {
+      await requirePersistedActivationEvidence(tx, {
+        scope,
+        scopeHash,
+        activationKind: input.gateResult.activationKind,
+        activationEventRef: input.gateResult.activationEventRef,
+        evaluationSetRef: input.gateResult.evaluationSetRef,
+        at: input.at,
+      });
+    }
     // Insert the NEW row FIRST: `superseded_by` is a foreign key into this very
     // table, so the pointer can only be set once the successor row exists.
     await tx.query(
       `INSERT INTO prod.module_states
-         (state_row_id, module_id, artifact_set_hash, scope, lifecycle_state,
+         (state_row_id, module_id, artifact_set_hash, scope, scope_hash, lifecycle_state,
           operational_readiness, distribution_readiness, activation_event_ref, created_at)
-       VALUES ($1, $2, $3, $4::jsonb, $5, $6, $7, $8, $9::timestamptz)`,
+       VALUES ($1, $2, $3, $4::jsonb, $5, $6, $7, $8, $9, $10::timestamptz)`,
       [
         stateRowId,
         moduleId,
         artifactSetHash,
         canonicalJson(scope),
+        scopeHash,
         toState,
         operationalReadiness,
         distributionReadiness,

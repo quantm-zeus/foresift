@@ -1,7 +1,7 @@
 {
   "schema": "foresift/bun-migration-manifest@1",
   "migrationId": "bun-test-authority-v1",
-  "generatedAt": "2026-09-13T02:24:41.050Z",
+  "generatedAt": "2026-09-13T02:56:44.513Z",
   "root": ".",
   "totalTestFiles": 601,
   "counts": {
@@ -12,7 +12,7 @@
     "BLOCKED": 0
   },
   "parity": {
-    "previousTotal": 593,
+    "previousTotal": 601,
     "disappeared": []
   },
   "files": [
@@ -390,9 +390,9 @@
     {
       "path": "packages/capability-registry/test/migrations.spec.ts",
       "package": "@foresift/capability-registry",
-      "bytes": 27408,
-      "lines": 673,
-      "sha256": "2ad11901d65f63c89d9ddbe4ad9d5c94775dc962015255f68ba26e044c898121",
+      "bytes": 29976,
+      "lines": 728,
+      "sha256": "f20307a3cb19047de5d1699f04f709960161d336cdcfff17381f3b0c2468c498",
       "imports": [
         "bun:test",
         "@electric-sql/pglite",
@@ -470,9 +470,9 @@
     {
       "path": "packages/capability-registry/test/registry.spec.ts",
       "package": "@foresift/capability-registry",
-      "bytes": 28525,
-      "lines": 827,
-      "sha256": "5b332bd432c71460ccacc9bb54130d2591936f260c0404810cb258774190cc19",
+      "bytes": 34098,
+      "lines": 948,
+      "sha256": "49d374608f1c8cec9e4c58879330e9a262498e34b2e1af2b4a22e825eddbbebb",
       "imports": [
         "bun:test",
         "@electric-sql/pglite",
@@ -2721,9 +2721,9 @@
     {
       "path": "packages/persistence/test/migrator.spec.ts",
       "package": "@foresift/persistence",
-      "bytes": 23535,
-      "lines": 590,
-      "sha256": "d67098d9b8e84f255457a8471307e8faa1701bdee9581e10fd6826524afaeb83",
+      "bytes": 23619,
+      "lines": 592,
+      "sha256": "b67bd8c59e4b427b40c193363fd6ea7fa870f3d3b172c85a4687b63e214b0d85",
       "imports": [
         "bun:test",
         "@electric-sql/pglite",
@@ -6510,9 +6510,9 @@
     {
       "path": "tests/acceptance/AC-152.spec.ts",
       "package": "acceptance",
-      "bytes": 4019,
-      "lines": 119,
-      "sha256": "6f78f3c4d23c51372b464ce689f02d6909dd27dd6f76fd1bdc6ede55da7f368a",
+      "bytes": 4134,
+      "lines": 127,
+      "sha256": "c0f993406bf2f44481470a95b10848f482f01d4a8554eb991d60cff1bbc93995",
       "imports": [
         "bun:test",
         "node:path",
@@ -7895,9 +7895,9 @@
     {
       "path": "tests/acceptance/AC-279.spec.ts",
       "package": "acceptance",
-      "bytes": 8444,
-      "lines": 220,
-      "sha256": "d4865126f0538ea58ceb36861cca43c1a3f40c0dfb8f93a32bda594c160ff546",
+      "bytes": 8516,
+      "lines": 221,
+      "sha256": "f42302b09f2919e6f16d4d96f922e02adb34ebb51b9b5f4874faef00fed34d8c",
       "imports": [
         "bun:test",
         "@electric-sql/pglite",
@@ -11973,9 +11973,9 @@
     {
       "path": "tests/negative/AC-279.negative.spec.ts",
       "package": "negative",
-      "bytes": 9462,
-      "lines": 259,
-      "sha256": "6433f46314ce663bfaff21f4056f0d938e0d380284cb6a08c497bab0e13de87e",
+      "bytes": 9534,
+      "lines": 260,
+      "sha256": "2275f85ab28d9b741ed21baa2dcb768d4b3f79a118797d100438efbf19b40f02",
       "imports": [
         "bun:test",
         "@electric-sql/pglite",

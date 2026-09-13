@@ -15,6 +15,7 @@ import {
 import {
   advanceState,
   evaluateActivationGate,
+  recordActivationGateResult,
   statesFor,
   type ActivationGateResult,
   type ModuleStateScope,
@@ -100,7 +101,14 @@ describe('AC-152 prod-scoped: promotion reaches ACTIVE only with AVAILABLE and P
 
     const gate = evaluateActivationGate(passingOpportunityGateInput(scope));
     expect(gate.verdict).toBe('PASS');
-    await advanceProd(engine, moduleId, scope, 'ACTIVE', 'ac152-prod-5', gate);
+    await advanceProd(
+      engine,
+      moduleId,
+      scope,
+      'ACTIVE',
+      'ac152-prod-5',
+      await recordActivationGateResult(engine, gate),
+    );
 
     const active = await statesFor(engine, { moduleId, scope });
     expect(active.lifecycleState).toBe('ACTIVE');

@@ -20,6 +20,7 @@ import {
   assertLivePathBoundaryHolds,
   assertNoLivePathPrivileges,
   evaluateActivationGate,
+  recordActivationGateResult,
   recordArtifactBoundaryAssertion,
   rollbackToApproved,
 } from '@foresift/capability-registry';
@@ -184,7 +185,7 @@ describe('AC-279 prod-scoped negatives: rollback and boundary refusals', () => {
     await advance('SHADOW', 'ac279-neg-3');
     await advance('PROVEN', 'ac279-neg-4');
     const gate = evaluateActivationGate(passingOpportunityGateInput(scope));
-    await advance('ACTIVE', 'ac279-neg-5', gate);
+    await advance('ACTIVE', 'ac279-neg-5', await recordActivationGateResult(engine, gate));
   }, 120_000);
 
   it('refuses a rollback that reuses the prior activation event', async () => {

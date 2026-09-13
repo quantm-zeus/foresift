@@ -1952,6 +1952,7 @@ export const prodModuleStates = prodSchema.table('module_states', {
   moduleId: text('module_id').notNull(),
   artifactSetHash: text('artifact_set_hash').notNull(),
   scope: jsonb('scope').notNull(),
+  scopeHash: text('scope_hash'),
   lifecycleState: text('lifecycle_state').notNull(),
   operationalReadiness: text('operational_readiness').notNull(),
   distributionReadiness: text('distribution_readiness').notNull(),
@@ -1980,6 +1981,7 @@ export const prodActivationGateEvaluations = prodSchema.table('activation_gate_e
   failingGate: text('failing_gate'),
   evidenceRefs: jsonb('evidence_refs').notNull(),
   capacityContractRef: text('capacity_contract_ref'),
+  activationEventRef: text('activation_event_ref'),
   evaluatedAt: timestamp('evaluated_at', { withTimezone: true }).notNull(),
   expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
 });

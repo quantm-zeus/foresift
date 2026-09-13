@@ -34,6 +34,7 @@ import {
   openContainments,
   parseModuleStateScope,
   recordActivationGateEvaluation,
+  recordActivationGateResult,
   rollbackToApproved,
   smallestAffectedScope,
   stateRowsFor,
@@ -199,17 +200,18 @@ function passingGateEvidence(
   return { record, pepper: PEPPER };
 }
 
-function gatePass(scopeHash: string, activationEventRef: string): ActivationGateResult {
-  return {
-    verdict: 'PASS',
-    scopeHash,
-    evaluations: [],
-    activationEventRef,
-    capacityContractRef: 'capacity-1',
-    evaluatedAt: NOW,
-    expiresAt: FUTURE,
-    evidenceRefs: [],
-  };
+async function gatePass(
+  scope: ModuleStateScope,
+  activationEventRef: string,
+): Promise<ActivationGateResult> {
+  // The ONLY legitimate way to reach ACTIVE: evaluate the total gate, then
+  // persist its evaluations through the real recorder (which mints the
+  // unforgeable set reference). A hand-built PASS object can never match.
+  const result = evaluateActivationGate({ ...passingOpportunityInput(scope), activationEventRef });
+  if (result.verdict !== 'PASS') {
+    throw new Error(`expected a passing gate for ${activationEventRef}, got ${result.verdict}`);
+  }
+  return recordActivationGateResult(engine, result);
 }
 
 function passingOpportunityInput(scope: ModuleStateScope): ActivationGateInput {
@@ -335,9 +337,8 @@ describe('nine-state lattice and independent dimensions (AC-152)', () => {
     const proven = await statesFor(engine, { moduleId, scope });
     expect([proven.implemented, proven.available, proven.proven]).toEqual([true, true, true]);
 
-    const scopeHash = activationScopeHash(scope);
     await advance(moduleId, scope, 'ACTIVE', 'indep-4', {
-      gateResult: gatePass(scopeHash, 'activation-indep'),
+      gateResult: await gatePass(scope, 'activation-indep'),
     });
     const active = await statesFor(engine, { moduleId, scope });
     expect(active.lifecycleState).toBe('ACTIVE');
@@ -391,7 +392,7 @@ describe('nine-state lattice and independent dimensions (AC-152)', () => {
 
     const wrongScopeGate = await rejection(
       advance(moduleId, scope, 'AVAILABLE', 'mismatch-3', {
-        gateResult: gatePass(activationScopeHash(other), 'activation-wrong'),
+        gateResult: await gatePass(other, 'activation-wrong'),
       }),
     );
     expect(wrongScopeGate.code).toBe('PROD_ACTIVATION_SCOPE_INVALID');
@@ -617,16 +618,18 @@ describe('the total ordered activation gate (AC-150/151/152/154/272/273/275/276/
       capacityContract: null,
     });
     expect(result.verdict).toBe('REFUSE');
-    const ids = await recordActivationGateEvaluation(engine, {
+    const recorded = await recordActivationGateEvaluation(engine, {
       scopeHash,
       evaluations: result.evaluations,
       capacityContractRef: null,
+      activationEventRef: null,
       evaluatedAt: NOW,
       expiresAt: FAR_FUTURE,
       evidenceRefs: [],
       evaluationIdPrefix: 'test-gate',
     });
-    expect(ids.length).toBe(result.evaluations.length);
+    expect(recorded.evaluationIds.length).toBe(result.evaluations.length);
+    expect(recorded.evaluationSetRef).toMatch(/^sha256:[0-9a-f]{64}$/);
     const rows = await activationGateEvaluationsFor(engine, scopeHash);
     expect(rows.length).toBe(result.evaluations.length);
     expect(
@@ -637,6 +640,7 @@ describe('the total ordered activation gate (AC-150/151/152/154/272/273/275/276/
       scopeHash,
       evaluations: result.evaluations,
       capacityContractRef: null,
+      activationEventRef: null,
       evaluatedAt: '2026-06-02T00:00:00Z',
       expiresAt: FAR_FUTURE,
       evidenceRefs: [],
@@ -661,7 +665,7 @@ describe('§69.11 containment (AC-278)', () => {
       await advance(moduleId, scope, 'SHADOW', `${id}-3`);
       await advance(moduleId, scope, 'PROVEN', `${id}-4`);
       await advance(moduleId, scope, 'ACTIVE', `${id}-5`, {
-        gateResult: gatePass(activationScopeHash(scope), `activation-${id}`),
+        gateResult: await gatePass(scope, `activation-${id}`),
       });
     }
     const chosen = smallestAffectedScope([
@@ -747,7 +751,7 @@ describe('§69.11 rollback (AC-279)', () => {
     await advance(moduleId, scope, 'SHADOW', 'rollback-3');
     await advance(moduleId, scope, 'PROVEN', 'rollback-4');
     await advance(moduleId, scope, 'ACTIVE', 'rollback-5', {
-      gateResult: gatePass(activationScopeHash(scope), 'activation-old'),
+      gateResult: await gatePass(scope, 'activation-old'),
     });
     const before = await stateRowsFor(engine, { moduleId, scope });
 
@@ -794,7 +798,7 @@ describe('§69.11 rollback (AC-279)', () => {
     await advance(moduleId, scope, 'SHADOW', 'rr-3');
     await advance(moduleId, scope, 'PROVEN', 'rr-4');
     await advance(moduleId, scope, 'ACTIVE', 'rr-5', {
-      gateResult: gatePass(activationScopeHash(scope), 'activation-rr'),
+      gateResult: await gatePass(scope, 'activation-rr'),
     });
 
     const reused = await rejection(
@@ -822,5 +826,122 @@ describe('§69.11 rollback (AC-279)', () => {
       }),
     );
     expect(unapproved.code).toBe('PROD_LIFECYCLE_TRANSITION_ILLEGAL');
+  }, 120_000);
+});
+
+// --- forgery probes (review F1) ---------------------------------------------
+//
+// ACTIVE must be bound to PERSISTED gate evidence. Each probe builds the exact
+// object the pre-fix code accepted and proves it is now refused.
+
+describe('ACTIVE is bound to persisted gate evidence (F1)', () => {
+  async function forgedPass(
+    scope: ModuleStateScope,
+    activationEventRef: string,
+    evaluationSetRef: string,
+  ): Promise<ActivationGateResult> {
+    const scopeHash = activationScopeHash(scope);
+    return {
+      verdict: 'PASS',
+      scopeHash,
+      evaluations: [],
+      activationEventRef,
+      capacityContractRef: 'forged-capacity',
+      evaluatedAt: NOW,
+      expiresAt: FUTURE,
+      evidenceRefs: [],
+      activationKind: 'OPPORTUNITY',
+      evaluationSetRef,
+    };
+  }
+
+  async function provenLadder(
+    moduleId: string,
+    scope: ModuleStateScope,
+    tag: string,
+  ): Promise<void> {
+    await advance(moduleId, scope, 'IMPLEMENTED', `${tag}-1`);
+    await advance(moduleId, scope, 'AVAILABLE', `${tag}-2`);
+    await advance(moduleId, scope, 'SHADOW', `${tag}-3`);
+    await advance(moduleId, scope, 'PROVEN', `${tag}-4`);
+  }
+
+  it('refuses a hand-built PASS object carrying zero evaluations', async () => {
+    const scope = makeScope({ profile_version: 'forged-empty' });
+    const moduleId = 'module-forged-empty';
+    await provenLadder(moduleId, scope, 'forged-empty');
+
+    const refused = await rejection(
+      advance(moduleId, scope, 'ACTIVE', 'forged-empty-5', {
+        gateResult: await forgedPass(scope, 'forged-activation-event', `sha256:${'f'.repeat(64)}`),
+      }),
+    );
+    expect(refused.code).toBe('PROD_ACTIVATION_GATE_REFUSED');
+    expect((refused.detail as { readonly reason?: string }).reason).toBe('EVIDENCE_SET_EMPTY');
+
+    // No ACTIVE row landed and ZERO gate evaluations were ever persisted.
+    const rows = await stateRowsFor(engine, { moduleId, scope });
+    expect(rows.some((row) => row.lifecycleState === 'ACTIVE')).toBe(false);
+    expect(await activationGateEvaluationsFor(engine, activationScopeHash(scope))).toEqual([]);
+  }, 120_000);
+
+  it('refuses a PASS object whose activation event was never persisted', async () => {
+    const scope = makeScope({ profile_version: 'forged-event' });
+    const moduleId = 'module-forged-event';
+    await provenLadder(moduleId, scope, 'forged-event');
+
+    const recorded = await gatePass(scope, 'activation-real');
+    if (recorded.verdict !== 'PASS') throw new Error('expected a recorded PASS');
+    const forged = { ...recorded, activationEventRef: 'activation-never-persisted' };
+
+    const refused = await rejection(
+      advance(moduleId, scope, 'ACTIVE', 'forged-event-5', { gateResult: forged }),
+    );
+    expect(refused.code).toBe('PROD_ACTIVATION_GATE_REFUSED');
+    expect((refused.detail as { readonly reason?: string }).reason).toBe(
+      'EVIDENCE_EVENT_REF_UNPERSISTED',
+    );
+    const rows = await stateRowsFor(engine, { moduleId, scope });
+    expect(rows.some((row) => row.lifecycleState === 'ACTIVE')).toBe(false);
+  }, 120_000);
+
+  it('refuses to re-activate from DEGRADED without fresh persisted PASS evidence', async () => {
+    const scope = makeScope({ profile_version: 'degraded-reactivation' });
+    const moduleId = 'module-degraded-reactivation';
+    await provenLadder(moduleId, scope, 'degraded-re');
+    // Legitimate recorder -> advance path reaches ACTIVE...
+    await advance(moduleId, scope, 'ACTIVE', 'degraded-re-5', {
+      gateResult: await gatePass(scope, 'activation-degraded'),
+    });
+    // ...containment degrades it...
+    await advance(moduleId, scope, 'DEGRADED', 'degraded-re-6');
+
+    // ...and a forged PASS (same trick the pre-fix code allowed) cannot
+    // re-activate it without a fresh persisted evaluation for a new event.
+    const refused = await rejection(
+      advance(moduleId, scope, 'ACTIVE', 'degraded-re-7', {
+        gateResult: await forgedPass(scope, 'forged-reactivation', `sha256:${'e'.repeat(64)}`),
+      }),
+    );
+    expect(refused.code).toBe('PROD_ACTIVATION_GATE_REFUSED');
+    const rows = await stateRowsFor(engine, { moduleId, scope });
+    expect(rows[rows.length - 1]?.lifecycleState).toBe('DEGRADED');
+    expect(rows.some((row) => row.lifecycleState === 'ACTIVE')).toBe(true); // only the first, legitimate one
+  }, 120_000);
+
+  it('accepts a freshly recorded PASS set on the legitimate recorder -> advance path', async () => {
+    const scope = makeScope({ profile_version: 'legit-recorded' });
+    const moduleId = 'module-legit-recorded';
+    await provenLadder(moduleId, scope, 'legit-recorded');
+
+    const recorded = await gatePass(scope, 'activation-legit');
+    expect(recorded.verdict).toBe('PASS');
+    if (recorded.verdict !== 'PASS') throw new Error('unreachable');
+    expect(recorded.evaluationSetRef).toMatch(/^sha256:[0-9a-f]{64}$/);
+
+    await advance(moduleId, scope, 'ACTIVE', 'legit-recorded-5', { gateResult: recorded });
+    const active = await statesFor(engine, { moduleId, scope });
+    expect(active.lifecycleState).toBe('ACTIVE');
+    expect(active.activationEventRef).toBe('activation-legit');
   }, 120_000);
 });

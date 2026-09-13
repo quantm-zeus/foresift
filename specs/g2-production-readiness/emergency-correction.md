@@ -259,3 +259,49 @@ Every R-row has a landed fix and a direct exploit regression that fails against
 `97b244a`; the full prescribed gates and exact-SHA CI are green; and a **new**
 fresh-context convergence audit reports no CRITICAL/HIGH finding. Admin-control
 and recovery-continuity promotion stays frozen until then.
+
+## Fourth-round closure (2026-09-13)
+
+The correction landed as PR #298 (squash `32e7af7`). The bar above is met at the
+pre-merge head `a6c2395` (merged tree byte-identical):
+
+- **Fresh adversarial reviews/audits** (all new probes, never the landed specs as
+  proof): review of `97b244a..0e2eb11` = NO CRITICAL/HIGH; re-review of
+  `0e2eb11..fab1a48` = NO CRITICAL/HIGH; convergence audit at `fab1a48` = NEW-H1
+  HIGH (unfrozen `GATE_KINDS`) fixed `b5512d4`; audit at `a58d4c7` = NEW-H2 HIGH
+  (unfrozen `ALL_ARTIFACT_BOUNDARY_ASSERTION_KINDS`) plus NEW-M4/M5 fixed
+  `f08ace0`; audit at `5486938` = HIGH (`Array.prototype[Symbol.iterator]` and
+  `.includes` shadowing of the gate decisions) fixed `0623736`/`a7dfbf0`/
+  `af0cc89`/`4c68856`; audit at `4c68856` = **NO CRITICAL/HIGH WITHIN THE D018
+  MODEL — READY FOR PROVEN**, with N1 (unfrozen capacity vocabularies) and N2
+  (settled-result destructuring) fixed `22c4f36`/`daf309d`; re-review at
+  `daf309d` reopened N2 via the `Promise.all` ARGUMENT array, fixed `a6c2395`;
+  re-verification at `a6c2395` = **NO CRITICAL/HIGH FINDINGS WITHIN THE D018
+  THREAT MODEL**.
+- **In-scope hardening:** every fail-closed decision/aggregation path in
+  `@foresift/domain`, `@foresift/release-conformance` and
+  `@foresift/capability-registry` now walks arrays by numeric index and uses the
+  numeric `isOneOf` helper instead of `for…of`/spread/`.map/.filter/.some/.find/
+.includes/.indexOf/.forEach/.reduce/.push`/`new Set(array)`, the authority
+  arrays are `Object.freeze`d, `promiseAllNumeric`/`numericFromEntries` close the
+  `Promise.all` argument-iterator vector, and the shadow-safe helpers never touch
+  `Array.prototype`. This also closed real fail-opens found on the way:
+  `canonical-json` collapsing distinct objects to the same hash, capacity
+  envelope/reserve laws skipped by an empty iterator, and the `Promise.all`
+  argument/result forgeries in `evaluateConformance`, `buildReleaseReport`,
+  `hashFiles` and orphan detection. The explicit threat-model boundary is
+  recorded in `.deepseek-handoff/DECISIONS.md` D018 (non-Array intrinsics and
+  pre-import shadowing are out of scope; process/realm isolation is the
+  compensating control).
+- **Full prescribed gates at `a6c2395`:** `pnpm verify` green — `spec:verify`
+  13 checks, format, lint, typecheck, coordinated bun suite
+  `{"authority":"BUN_TEST","bunFiles":602,"passed":true}`, node-runtime-compat;
+  `docs/generated` clean (60 files); coordinator manifest 602/602 hashes.
+- **Exact-SHA CI green** at `0e2eb11` (`34763237367`), `fab1a48` (`34764208186`),
+  `a58d4c7` (`34765466174`), `5486938` (`34767823427`), `4c68856` (`34771097938`)
+  and `a6c2395` (`34774582796`).
+
+State change: g2-production-readiness RUNNING → PROVEN (schema-legal), restored
+only after the above. Phase 12 tasks `T065`–`T072` are checked; history is
+preserved and nothing was rewritten. `g2-admin-control` and
+`g2-recovery-continuity` promotion is unblocked.

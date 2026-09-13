@@ -30,6 +30,7 @@ import {
   PROD_CONTAINMENT_SPECIFIC_CANDIDATE,
   PROD_FIXTURE_ACTIVATION_EVENT,
   PROD_FIXTURE_HASH_A,
+  PROD_FIXTURE_HASH_B,
   recordProvenEvidence,
   PROD_FIXTURE_NOW,
   PROD_LIVE_PATH,
@@ -142,14 +143,15 @@ describe('AC-279 prod-scoped: rollback restores an approved immutable set, creat
   it('rolls back an ACTIVE module to its prior approved artifact set and blocks alert resumption until re-evaluation', async () => {
     const { moduleId, scope } = PROD_CONTAINMENT_SPECIFIC_CANDIDATE;
     const advance = async (
-      toState: 'IMPLEMENTED' | 'AVAILABLE' | 'SHADOW' | 'PROVEN' | 'ACTIVE',
+      toState: 'IMPLEMENTED' | 'AVAILABLE' | 'SHADOW' | 'PROVEN' | 'ACTIVE' | 'DEGRADED',
       stateRowId: string,
       gateResult: Awaited<ReturnType<typeof evaluateActivationGate>> | null = null,
+      artifactSetHash: string = PROD_FIXTURE_HASH_A,
     ) =>
       advanceState(engine, {
         moduleId,
         scope,
-        artifactSetHash: PROD_FIXTURE_HASH_A,
+        artifactSetHash,
         toState,
         operationalReadiness: 'READY_FOR_ACTIVE_PROFILE',
         distributionReadiness: 'PRIVATE_ONLY',
@@ -173,6 +175,25 @@ describe('AC-279 prod-scoped: rollback restores an approved immutable set, creat
     expect(gate.verdict).toBe('PASS');
     await advance('ACTIVE', 'ac279-prod-5', await recordActivationGateResult(engine, gate));
 
+    // A later drift approves a DIFFERENT immutable set B under a distinct event,
+    // so the rollback below is a genuine A -> B -> A restore rather than the
+    // no-op same-set restore the original acceptance artifact exercised
+    // (audit H7 residual / T058).
+    await advance('DEGRADED', 'ac279-prod-6', null, PROD_FIXTURE_HASH_B);
+    const gateB = evaluateActivationGate({
+      ...passingOpportunityGateInput(scope),
+      activationEventRef: 'activation-prod-2',
+    });
+    expect(gateB.verdict).toBe('PASS');
+    await advance(
+      'ACTIVE',
+      'ac279-prod-7',
+      await recordActivationGateResult(engine, gateB),
+      PROD_FIXTURE_HASH_B,
+    );
+    const beforeRollback = await stateRowsFor(engine, { moduleId, scope });
+    expect(beforeRollback.at(-1)?.artifactSetHash).toBe(PROD_FIXTURE_HASH_B);
+
     const outcome = await rollbackToApproved(engine, PROD_ROLLBACK_FIXTURE);
     expect(outcome.rollback.historyPreserved).toBe(true);
     expect(outcome.rollback.restoredArtifactSetHash).toBe(PROD_FIXTURE_HASH_A);
@@ -185,7 +206,7 @@ describe('AC-279 prod-scoped: rollback restores an approved immutable set, creat
 
     // History is preserved: every prior row still exists alongside the new one.
     const rows = await stateRowsFor(engine, { moduleId, scope });
-    expect(rows.length).toBe(6);
+    expect(rows.length).toBe(8);
 
     // Alert resumption is blocked until the exact candidate re-evaluation lands.
     await expect(

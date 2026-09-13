@@ -490,6 +490,44 @@ describe('migrator fail-closed defenses (FR-DATA-001…006 / FR-DR-001/002 subst
     }
   }, 120_000);
 
+  it('refuses a later-generation latecomer inside an already-applied family (R5)', async () => {
+    const { db, engine } = await freshEngine();
+    try {
+      // The `data` family high-water is the applied `g2_data_0001`.
+      const sql = 'CREATE TABLE data_marker (id text);';
+      const before = await makeSandbox('cross-gen-before');
+      await writeFile(path.join(before, 'g2_data_0001_applied.sql'), sql);
+      await applyMigrations({ engine, migrationsDir: before });
+
+      // `g1_data_0009` is a LATER generation of the SAME `data` DDL namespace
+      // and sorts behind the applied high-water: it is a gap-filler, not a new
+      // family, so the out-of-order refusal must still fire (audit R5).
+      const after = await makeSandbox('cross-gen-after');
+      await writeFile(path.join(after, 'g2_data_0001_applied.sql'), sql);
+      await writeFile(
+        path.join(after, 'g1_data_0009_latecomer.sql'),
+        'CREATE TABLE cross_gen_latecomer (id text);',
+      );
+      const error = await expectCode(
+        applyMigrations({ engine, migrationsDir: after }),
+        ErrorCode.MIGRATION_OUT_OF_ORDER_REFUSED,
+      );
+      expect(error.message).toContain('g1_data_0009_latecomer');
+      const latecomerTable = await engine.query("SELECT to_regclass('cross_gen_latecomer') AS t");
+      expect(latecomerTable.rows[0]?.t).toBeNull();
+    } finally {
+      await db.close();
+      await rm(path.join(dirBase, `.tmp-cross-gen-before-${RUN_TAG}`), {
+        recursive: true,
+        force: true,
+      });
+      await rm(path.join(dirBase, `.tmp-cross-gen-after-${RUN_TAG}`), {
+        recursive: true,
+        force: true,
+      });
+    }
+  }, 120_000);
+
   it('applies a wholly-new migration family that sorts before applied state (upgrade path)', async () => {
     const { db, engine } = await freshEngine();
     try {

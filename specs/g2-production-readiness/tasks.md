@@ -13,7 +13,7 @@
 > is a string, so foreign-release evidence was accepted. The package is
 > **RUNNING / REOPENED**; no history or evidence is deleted (`8f7b5d9` is an
 > additive flip and this reopen is additive again). Phase 11 adds the bounded
-> correction tasks `T053`–`T060`. PROVEN may only be restored after the new
+> correction tasks `T053`–`T061`. PROVEN may only be restored after the new
 > exploit regressions and the full prescribed gates pass, a **new**
 > fresh-context independent convergence audit reports no CRITICAL/HIGH
 > finding, and exact-SHA CI is green. Admin-control and recovery-continuity
@@ -65,7 +65,14 @@ telemetry parity suite, test-owned T031), and
 `docs/generated/prod-surfaces.json` (implementation-mapping
 reconciliation because `docs/generated/**` is deliberately outside the
 package writeScopes, product-owned T029) are extended by this package even
-though they sit outside the listed writeScopes.
+though they sit outside the listed writeScopes. The third-round correction
+(Phase 11) additionally extends
+`scripts/verify-release-conformance/cli.mjs` and
+`scripts/verify-release-conformance/prod-conformance-gate.ts` (the
+deterministic release-gate bridge and CLI, product-owned by T043) so a
+non-canonical repository milestone cannot silently skip the PROD block; both
+paths are named exactly and carry no product-source behavior change beyond
+the milestone validation.
 
 Staging order mirrors PRD §40/§69 and the plan's architecture decisions:
 governed-state vocabularies and shared schemas first, then persistence
@@ -560,12 +567,19 @@ third-round finding-to-task map and the verbatim reproductions.
       event) instead of the no-op same-set restore, and keep the fabricated
       prior-event / never-approved-set negatives. Closes the H7 test residual.
       Traces: FR-PROD-006, AC-279.
-- [ ] T059 [serial-reason: COORDINATOR_BOUNDARY] Fresh-context adversarial
+- [ ] T059 [serial-reason: SHARED_INVARIANT] Restore the cross-generation
+      out-of-order invariant in the migrator: key the applied-family high-water
+      on the `_<family>_` token (not `g<generation>_<family>`) so a
+      later-generation latecomer (`g1_data_0009` after an applied
+      `g2_data_0001`) is refused as a same-family gap, while a wholly-new family
+      (`prod` after `wf`) still applies additively. Negative: the cross-generation
+      latecomer must refuse and must not create its table. Traces: FR-PROD-001…006.
+- [ ] T060 [serial-reason: COORDINATOR_BOUNDARY] Fresh-context adversarial
       re-review of the third-round diff, direct exploit replay (nested
       mutation, omitted/empty activation event, substring scopeRefs,
-      backdated refusal), full prescribed gates and exact-SHA CI. Traces:
-      FR-PROD-001…006.
-- [ ] T060 [serial-reason: COORDINATOR_BOUNDARY] New independent convergence
+      backdated refusal, cross-generation gap), full prescribed gates and
+      exact-SHA CI. Traces: FR-PROD-001…006.
+- [ ] T061 [serial-reason: COORDINATOR_BOUNDARY] New independent convergence
       audit at the pre-merge head; restore PROVEN only when it reports no
       CRITICAL/HIGH finding and the tracked residual MEDIUMs are recorded.
       Traces: FR-PROD-001…006.

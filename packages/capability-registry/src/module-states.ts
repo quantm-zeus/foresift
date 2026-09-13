@@ -63,6 +63,7 @@ import {
   requireActivationResultBrand,
   requirePersistedActivationEvidence,
   type ActivationGateResult,
+  type PersistedActivationEvidence,
 } from './activation-gate.ts';
 
 // Re-export the domain values under the registry's local naming so callers can
@@ -740,21 +741,6 @@ export async function advanceState(
           },
         );
       }
-      const claimedDimensions: readonly [ActivationGateKind, boolean][] = [
-        [ActivationGateKind.IMPLEMENTED_PRESENT, dimensions.implemented],
-        [ActivationGateKind.AVAILABLE_EVIDENCE, dimensions.available],
-        [ActivationGateKind.PROVEN_PRESENT, dimensions.proven],
-      ];
-      for (const [gate, established] of claimedDimensions) {
-        const evaluation = input.gateResult.evaluations.find((entry) => entry.gateKind === gate);
-        if (evaluation?.verdict === 'PASS' && established !== true) {
-          throw new ForesiftError(
-            ErrorCode.PROD_ACTIVATION_GATE_REFUSED,
-            `entering ACTIVE refused: the gate claims ${gate} but the governed history never established it for the exact scope`,
-            { reason: ModuleStateRefusalReason.GATE_DIMENSION_MISMATCH, gate, scopeHash },
-          );
-        }
-      }
       // §69.11: containment is a governed stop, not a suggestion. While a
       // containment event on the EXACT scope is still open, replaying older
       // genuine evidence must not re-activate the scope; the documented sole
@@ -819,14 +805,34 @@ export async function advanceState(
           );
         }
       }
-      await requirePersistedActivationEvidence(tx, {
-        scope,
-        scopeHash,
-        activationKind: activationKind ?? parseActivationKind(input.gateResult.activationKind),
-        activationEventRef: input.gateResult.activationEventRef,
-        evaluationSetRef: input.gateResult.evaluationSetRef,
-        at: input.at,
-      });
+      const persistedEvidence: PersistedActivationEvidence =
+        await requirePersistedActivationEvidence(tx, {
+          scope,
+          scopeHash,
+          activationKind: activationKind ?? parseActivationKind(input.gateResult.activationKind),
+          activationEventRef: input.gateResult.activationEventRef,
+          evaluationSetRef: input.gateResult.evaluationSetRef,
+          at: input.at,
+        });
+      // The IMPLEMENTED/AVAILABLE/PROVEN binding reads the PERSISTED rows, never
+      // the mutable in-memory evaluator object (audit R1/T053): a caller that
+      // mutates a recorded pass's nested evaluation cannot change what the
+      // database recorded.
+      const claimedDimensions: readonly [ActivationGateKind, boolean][] = [
+        [ActivationGateKind.IMPLEMENTED_PRESENT, dimensions.implemented],
+        [ActivationGateKind.AVAILABLE_EVIDENCE, dimensions.available],
+        [ActivationGateKind.PROVEN_PRESENT, dimensions.proven],
+      ];
+      for (const [gate, established] of claimedDimensions) {
+        const persisted = persistedEvidence.rows.find((entry) => entry.gateKind === gate);
+        if (persisted?.verdict === 'PASS' && established !== true) {
+          throw new ForesiftError(
+            ErrorCode.PROD_ACTIVATION_GATE_REFUSED,
+            `entering ACTIVE refused: the persisted evidence claims ${gate} but the governed history never established it for the exact scope`,
+            { reason: ModuleStateRefusalReason.GATE_DIMENSION_MISMATCH, gate, scopeHash },
+          );
+        }
+      }
     }
     // Insert the NEW row FIRST: `superseded_by` is a foreign key into this very
     // table, so the pointer can only be set once the successor row exists.

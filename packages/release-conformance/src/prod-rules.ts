@@ -32,6 +32,7 @@ import {
   mcpCompatibilityCellUsable,
   mcpRevisionMayBeDefault,
   parseDistributionReadiness,
+  parseModuleLifecyclePosition,
   precomputedAlphaBoundRespected,
   type ArtifactBoundaryAssertion,
   type PrecomputedAlphaRequest,
@@ -144,16 +145,45 @@ export function checkActivationWithoutEvidence(
 ): ProdRuleReport {
   const findings: ProdConformanceFinding[] = [];
   for (const claim of claims) {
-    if (claim.lifecycleState !== 'ACTIVE') continue;
     const requirementId = claim.requirementId ?? DEFAULT_ACTIVATION_REQUIREMENT;
+    // An unparseable governed position is not a non-ACTIVE position: it fails
+    // closed instead of being silently skipped (audit R2 residual).
+    let lifecycleKnown = true;
+    try {
+      parseModuleLifecyclePosition(claim.lifecycleState);
+    } catch {
+      lifecycleKnown = false;
+    }
+    if (!lifecycleKnown) {
+      findings.push({
+        requirementId,
+        rule: PROD_RULES.activationWithoutEvidence,
+        path: claim.moduleId,
+        message: `module ${claim.moduleId} claims unknown governed lifecycle position ${JSON.stringify(
+          claim.lifecycleState,
+        )}; an unparseable position fails closed`,
+      });
+      continue;
+    }
+    if (claim.lifecycleState !== 'ACTIVE') continue;
     const failures: string[] = [];
     if (claim.implemented !== true) failures.push('no governed IMPLEMENTED state');
     if (claim.available !== true) failures.push('AVAILABLE was never established');
-    if (claim.requiresProven && claim.proven !== true) {
+    // A missing/non-boolean PROVEN requirement is not `false`: it fails closed.
+    if (typeof claim.requiresProven !== 'boolean') {
+      failures.push('the scope PROVEN requirement is missing or not a boolean');
+    } else if (claim.requiresProven && claim.proven !== true) {
       failures.push('PROVEN is required by the scope but was never established');
     }
     if (claim.gateVerdict !== 'PASS') failures.push('no PASS activation-gate evaluation');
-    if (claim.activationEventRef === null) failures.push('no activation event reference');
+    // Only a non-empty string activation event is a reference: an omitted field,
+    // `null`, `''`, and whitespace all fail closed (audit R2).
+    if (
+      typeof claim.activationEventRef !== 'string' ||
+      claim.activationEventRef.trim().length === 0
+    ) {
+      failures.push('no non-empty activation event reference');
+    }
     for (const failure of failures) {
       findings.push({
         requirementId,
@@ -477,6 +507,10 @@ export interface DistributionAuthorizationEvaluation {
   readonly readinessAuthorized: boolean;
   readonly readinessKnown: boolean;
   readonly requiredGateKindsEmpty: boolean;
+  /** `requiredGateKinds` was not an array (a string is never a gate set). */
+  readonly malformedRequiredGateKinds: boolean;
+  /** `gateEvidence` was not an array, or an element's `scopeRefs` was not one. */
+  readonly malformedGateEvidence: boolean;
   readonly missingGateKinds: readonly string[];
   readonly mismatchedGateKinds: readonly string[];
   readonly revokedOrInvalidGateKinds: readonly string[];
@@ -512,31 +546,64 @@ export function evaluateDistributionAuthorization(
   const missingGateKinds: string[] = [];
   const mismatchedGateKinds: string[] = [];
   const revokedOrInvalidGateKinds: string[] = [];
+  // The gate set and the evidence list must be real arrays. `scopeRefs` in
+  // particular must never be a string: `String.prototype.includes` would
+  // substring-match a foreign release ref into scope (audit R3).
+  const requiredGateKindsMalformed = !Array.isArray(claim.requiredGateKinds);
+  const gateEvidenceMalformed =
+    !Array.isArray(claim.gateEvidence) ||
+    (claim.gateEvidence as readonly unknown[]).some(
+      (evidence) =>
+        typeof evidence !== 'object' ||
+        evidence === null ||
+        !Array.isArray((evidence as { readonly scopeRefs?: unknown }).scopeRefs),
+    );
+  const requiredGateKinds: readonly unknown[] = requiredGateKindsMalformed
+    ? []
+    : (claim.requiredGateKinds as readonly unknown[]);
+  const gateEvidence: readonly unknown[] = Array.isArray(claim.gateEvidence)
+    ? (claim.gateEvidence as readonly unknown[])
+    : [];
   // An authorization claim with NO required gate kinds is unauthorized by
   // construction: zero requirements cannot be satisfied into a PASS (H2).
-  const requiredGateKindsEmpty = readinessAuthorized && claim.requiredGateKinds.length === 0;
-  for (const gateKind of claim.requiredGateKinds) {
-    const matching = claim.gateEvidence.filter((evidence) => evidence.gateKind === gateKind);
+  const requiredGateKindsEmpty = readinessAuthorized && requiredGateKinds.length === 0;
+  for (const gateKind of requiredGateKinds) {
+    if (typeof gateKind !== 'string') {
+      missingGateKinds.push(String(gateKind));
+      continue;
+    }
+    const matching = gateEvidence.filter(
+      (evidence) =>
+        typeof evidence === 'object' &&
+        evidence !== null &&
+        (evidence as { readonly gateKind?: unknown }).gateKind === gateKind,
+    );
     if (matching.length === 0) {
       missingGateKinds.push(gateKind);
       continue;
     }
-    const inScope = matching.filter((evidence) => evidence.scopeRefs.includes(claim.releaseRef));
+    // Exact release scoping: only an array membership counts, and a malformed
+    // (non-array) `scopeRefs` never resolves to in-scope evidence.
+    const inScope = matching.filter((evidence) => {
+      const refs = (evidence as { readonly scopeRefs?: unknown }).scopeRefs;
+      return Array.isArray(refs) && refs.includes(claim.releaseRef);
+    });
     if (inScope.length === 0) {
       mismatchedGateKinds.push(gateKind);
       continue;
     }
-    const usable = inScope.some(
-      (evidence) =>
-        evidence.valid === true &&
-        (evidence.revokedAt === undefined || evidence.revokedAt === null),
-    );
+    const usable = inScope.some((evidence) => {
+      const record = evidence as { readonly valid?: unknown; readonly revokedAt?: unknown };
+      return record.valid === true && (record.revokedAt === undefined || record.revokedAt === null);
+    });
     if (!usable) revokedOrInvalidGateKinds.push(gateKind);
   }
   return {
     authorized:
       readinessKnown &&
       readinessAuthorized &&
+      !requiredGateKindsMalformed &&
+      !gateEvidenceMalformed &&
       !requiredGateKindsEmpty &&
       missingGateKinds.length === 0 &&
       mismatchedGateKinds.length === 0 &&
@@ -544,6 +611,8 @@ export function evaluateDistributionAuthorization(
     readinessAuthorized,
     readinessKnown,
     requiredGateKindsEmpty,
+    malformedRequiredGateKinds: requiredGateKindsMalformed,
+    malformedGateEvidence: gateEvidenceMalformed,
     missingGateKinds,
     mismatchedGateKinds,
     revokedOrInvalidGateKinds,
@@ -574,6 +643,14 @@ export function checkPublicAuthorizationWithoutGateEvidence(
     if (evaluation.requiredGateKindsEmpty) {
       details.push(
         'no required gate kinds were declared (an empty requirement set cannot authorize)',
+      );
+    }
+    if (evaluation.malformedRequiredGateKinds) {
+      details.push('requiredGateKinds is not an array (a gate set must be declared as an array)');
+    }
+    if (evaluation.malformedGateEvidence) {
+      details.push(
+        'gateEvidence is not an array of records, or an evidence scopeRefs is not an array of release refs',
       );
     }
     if (evaluation.missingGateKinds.length > 0) {
@@ -725,6 +802,66 @@ export function checkProdConformanceInputsPresent(input: ProdConformanceInput): 
             path: `${field}[${index}].${required}`,
             message: `${field}[${index}] is missing the required field ${required}; a malformed claim fails the release gate closed`,
           });
+        }
+      }
+      // Nested shape: a field that must be an array (or an exact nullable
+      // string) is validated too, so a string cannot stand in for a collection
+      // and substring-match its way to an authorization (audit R2/R3).
+      if (field === 'activationClaims') {
+        if (typeof claim['requiresProven'] !== 'boolean') {
+          findings.push({
+            requirementId: 'FR-PROD-001',
+            rule: PROD_RULES.prodConformanceInputMissing,
+            path: `${field}[${index}].requiresProven`,
+            message: `${field}[${index}].requiresProven must be a boolean; a missing or stringly PROVEN requirement fails the release gate closed`,
+          });
+        }
+        const eventRef = claim['activationEventRef'];
+        if (
+          !('activationEventRef' in claim) ||
+          (eventRef !== null && (typeof eventRef !== 'string' || eventRef.trim().length === 0))
+        ) {
+          findings.push({
+            requirementId: 'FR-PROD-001',
+            rule: PROD_RULES.prodConformanceInputMissing,
+            path: `${field}[${index}].activationEventRef`,
+            message: `${field}[${index}].activationEventRef must be a non-empty string or null; an omitted, empty, or non-string activation event fails the release gate closed`,
+          });
+        }
+      }
+      if (field === 'distributionAuthorizations') {
+        if (!Array.isArray(claim['requiredGateKinds'])) {
+          findings.push({
+            requirementId: 'FR-PROD-001',
+            rule: PROD_RULES.prodConformanceInputMissing,
+            path: `${field}[${index}].requiredGateKinds`,
+            message: `${field}[${index}].requiredGateKinds must be an array of gate kinds`,
+          });
+        }
+        if (!Array.isArray(claim['gateEvidence'])) {
+          findings.push({
+            requirementId: 'FR-PROD-001',
+            rule: PROD_RULES.prodConformanceInputMissing,
+            path: `${field}[${index}].gateEvidence`,
+            message: `${field}[${index}].gateEvidence must be an array of evidence records`,
+          });
+        } else {
+          for (const [evidenceIndex, evidence] of (
+            claim['gateEvidence'] as readonly unknown[]
+          ).entries()) {
+            const scopeRefs =
+              typeof evidence === 'object' && evidence !== null
+                ? (evidence as Record<string, unknown>)['scopeRefs']
+                : undefined;
+            if (!Array.isArray(scopeRefs)) {
+              findings.push({
+                requirementId: 'FR-PROD-001',
+                rule: PROD_RULES.prodConformanceInputMissing,
+                path: `${field}[${index}].gateEvidence[${evidenceIndex}].scopeRefs`,
+                message: `${field}[${index}].gateEvidence[${evidenceIndex}].scopeRefs must be an array of release refs; a string scopeRefs cannot be substring-matched into scope`,
+              });
+            }
+          }
         }
       }
     }

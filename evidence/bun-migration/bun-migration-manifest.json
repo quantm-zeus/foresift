@@ -1,18 +1,18 @@
 {
   "schema": "foresift/bun-migration-manifest@1",
   "migrationId": "bun-test-authority-v1",
-  "generatedAt": "2026-09-13T00:29:35.973Z",
+  "generatedAt": "2026-09-13T01:13:01.098Z",
   "root": ".",
-  "totalTestFiles": 593,
+  "totalTestFiles": 596,
   "counts": {
     "CODEMOD_READY": 0,
     "AGY_REQUIRED": 0,
-    "MIGRATED": 593,
+    "MIGRATED": 596,
     "VERIFIED": 0,
     "BLOCKED": 0
   },
   "parity": {
-    "previousTotal": 579,
+    "previousTotal": 593,
     "disappeared": []
   },
   "files": [
@@ -349,6 +349,28 @@
       "bytes": 20424,
       "lines": 498,
       "sha256": "7e5bc3e6b516fa9d7e7156b4a1b39f689fa42dc9b1aedc3c1ae3d865e23a9cc2",
+      "imports": [
+        "bun:test",
+        "@electric-sql/pglite",
+        "node:path",
+        "node:url",
+        "@foresift/domain",
+        "@foresift/persistence"
+      ],
+      "vitestImports": [],
+      "features": [],
+      "workload": "DATABASE_PGLITE",
+      "migrationType": "ALREADY_MIGRATED",
+      "fixturesAndHelpers": [],
+      "sourceAnchors": ["@electric-sql/pglite", "@foresift/domain", "@foresift/persistence"],
+      "state": "MIGRATED"
+    },
+    {
+      "path": "packages/capability-registry/test/migrations.spec.ts",
+      "package": "@foresift/capability-registry",
+      "bytes": 27408,
+      "lines": 673,
+      "sha256": "2ad11901d65f63c89d9ddbe4ad9d5c94775dc962015255f68ba26e044c898121",
       "imports": [
         "bun:test",
         "@electric-sql/pglite",
@@ -1541,6 +1563,21 @@
       "state": "MIGRATED"
     },
     {
+      "path": "packages/domain/test/prod.spec.ts",
+      "package": "@foresift/domain",
+      "bytes": 22263,
+      "lines": 629,
+      "sha256": "309f3e3580e1b25308c5e420966cebebd41d547a1be54d8f1e442f5ca2582738",
+      "imports": ["bun:test", "../src/errors.ts", "../src/index.ts"],
+      "vitestImports": [],
+      "features": [],
+      "workload": "PURE",
+      "migrationType": "ALREADY_MIGRATED",
+      "fixturesAndHelpers": [],
+      "sourceAnchors": ["../src/errors.ts", "../src/index.ts"],
+      "state": "MIGRATED"
+    },
+    {
       "path": "packages/domain/test/quantity.spec.ts",
       "package": "@foresift/domain",
       "bytes": 6068,
@@ -2574,9 +2611,9 @@
     {
       "path": "packages/persistence/test/migrator.spec.ts",
       "package": "@foresift/persistence",
-      "bytes": 23237,
-      "lines": 582,
-      "sha256": "4eeae8854a876b8d0bf5a399876e70a1e4a2a8dd4501e29eb48552150dfaf9b5",
+      "bytes": 23535,
+      "lines": 590,
+      "sha256": "d67098d9b8e84f255457a8471307e8faa1701bdee9581e10fd6826524afaeb83",
       "imports": [
         "bun:test",
         "@electric-sql/pglite",
@@ -2715,9 +2752,9 @@
     {
       "path": "packages/persistence/test/schema-parity.spec.ts",
       "package": "@foresift/persistence",
-      "bytes": 13525,
-      "lines": 333,
-      "sha256": "939741bdd320d0963d33ac619405c8ec1a0de76261981481fc30772a0c4ca932",
+      "bytes": 13575,
+      "lines": 334,
+      "sha256": "05e14670e2273570e8e15f3a07cabb932e4638e6a970eceb87232009c9baed47",
       "imports": [
         "bun:test",
         "@electric-sql/pglite",
@@ -4253,6 +4290,21 @@
       "migrationType": "ALREADY_MIGRATED",
       "fixturesAndHelpers": [],
       "sourceAnchors": ["@foresift/domain", "../src/index.ts"],
+      "state": "MIGRATED"
+    },
+    {
+      "path": "packages/shared-schemas/test/prod.spec.ts",
+      "package": "@foresift/shared-schemas",
+      "bytes": 14490,
+      "lines": 442,
+      "sha256": "c2fd1d04cd77cb84e4801dcf71eaf9d0d397f215ecffbe7186540ea0a9e801dd",
+      "imports": ["bun:test", "@foresift/domain", "../src/prod.ts", "../src/prod.ts"],
+      "vitestImports": [],
+      "features": [],
+      "workload": "PURE",
+      "migrationType": "ALREADY_MIGRATED",
+      "fixturesAndHelpers": [],
+      "sourceAnchors": ["@foresift/domain", "../src/prod.ts", "../src/prod.ts"],
       "state": "MIGRATED"
     },
     {

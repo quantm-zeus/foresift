@@ -42,6 +42,7 @@
     "@electric-sql/pglite": "^0.5.6",
     "@foresift/alerts": "workspace:*",
     "@foresift/api": "workspace:*",
+    "@foresift/capability-registry": "workspace:*",
     "@foresift/domain": "workspace:*",
     "@foresift/evidence": "workspace:*",
     "@foresift/object-store": "workspace:*",

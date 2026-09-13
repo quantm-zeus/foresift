@@ -11,6 +11,7 @@ import {
   CONFORMANCE_RULES,
   PROD_RULES,
   checkActivationWithoutEvidence,
+  checkProdSurfacePresence,
   checkLivePathPrecomputationViolation,
   checkMcpCompatibilityDrift,
   checkPostureWeakening,
@@ -353,6 +354,111 @@ describe('PROD conformance aggregation and unchanged trace rules', () => {
     expect(result.findings.map((finding) => finding.rule)).not.toContain(
       PROD_RULES.prodConformanceInputMissing,
     );
+  });
+
+  it('refuses an invalid milestone instead of disabling the PROD rules (HIGH-3)', async () => {
+    const { evaluateConformance } = await import('../src/index.ts');
+    for (const milestone of ['xyz', '', 'G', 'g2', 'G2x']) {
+      const result = await evaluateConformance({
+        repoRoot: REPO_ROOT,
+        milestone,
+        prodClaims: {
+          activationClaims: [PROD_ACTIVE_WITHOUT_GATE_CLAIM],
+          postureDeclarations: [],
+          mcpCompatibility: PROD_MCP_COMPLIANT_CLAIM,
+          livePaths: [],
+          distributionAuthorizations: [],
+        },
+      });
+      expect(result.overall, `milestone ${JSON.stringify(milestone)}`).toBe('FAILED');
+      expect(result.findings.map((finding) => finding.rule)).toContain(
+        'CONFORMANCE_MILESTONE_INVALID',
+      );
+    }
+  });
+
+  it('runs the PROD rules whenever the milestone owns FR-PROD requirements', async () => {
+    const { evaluateConformance } = await import('../src/index.ts');
+    const result = await evaluateConformance({
+      repoRoot: REPO_ROOT,
+      milestone: 'G2',
+      prodClaims: {
+        activationClaims: [PROD_ACTIVE_WITHOUT_GATE_CLAIM],
+        postureDeclarations: [],
+        mcpCompatibility: PROD_MCP_COMPLIANT_CLAIM,
+        livePaths: [],
+        distributionAuthorizations: [],
+      },
+    });
+    expect(result.findings.map((finding) => finding.rule)).toContain(
+      PROD_RULES.activationWithoutEvidence,
+    );
+  });
+
+  it('fails closed through the GOVERNED rule on an empty gate set and unknown readiness (H2)', () => {
+    const emptyGates = evaluateProdConformance({
+      activationClaims: [],
+      postureDeclarations: [],
+      mcpCompatibility: PROD_MCP_COMPLIANT_CLAIM,
+      livePaths: [],
+      distributionAuthorizations: [{ ...PROD_WORKSPACE_AUTHORIZED_CLAIM, requiredGateKinds: [] }],
+    });
+    expect(emptyGates.overall).toBe('FAILED');
+    expect(emptyGates.findings.map((finding) => finding.rule)).toContain(
+      PROD_RULES.publicAuthorizationWithoutGateEvidence,
+    );
+    expect(emptyGates.findings[0]?.message).toMatch(/no required gate kinds/);
+
+    const unknownReadiness = evaluateProdConformance({
+      activationClaims: [],
+      postureDeclarations: [],
+      mcpCompatibility: PROD_MCP_COMPLIANT_CLAIM,
+      livePaths: [],
+      distributionAuthorizations: [
+        { ...PROD_WORKSPACE_AUTHORIZED_CLAIM, distributionReadiness: 'TOTALLY_MADE_UP' },
+      ],
+    });
+    expect(unknownReadiness.overall).toBe('FAILED');
+    expect(unknownReadiness.findings[0]?.message).toMatch(/unknown distribution readiness/);
+  });
+
+  it('flags a dropped PROD surface ref in the live tree (H1 negative)', async () => {
+    const report = await checkProdSurfacePresence({
+      repoRoot: REPO_ROOT,
+      requirements: [
+        {
+          id: 'FR-PROD-999',
+          supersededBy: [],
+          implementationRefs: ['packages/capability-registry/does-not-exist/**'],
+          schemaRefs: [],
+          persistenceRefs: [],
+          telemetryRefs: [],
+          fixtureRefs: [],
+          apiToolUiRefs: [],
+          testRefs: [],
+        },
+      ],
+    });
+    expect(report.passed).toBe(false);
+    expect(report.findings[0]?.rule).toBe(PROD_RULES.prodSurfaceMissing);
+    expect(report.findings[0]?.message).toMatch(/does not resolve in the live repository/);
+  });
+
+  it('reports malformed claim ELEMENTS instead of silently skipping them (H2 residual)', () => {
+    const report = evaluateProdConformance({
+      activationClaims: [{}, 'not-a-claim'],
+      postureDeclarations: [],
+      mcpCompatibility: { revisions: null, clients: [], cells: [], now: '2026-06-01T00:00:00Z' },
+      livePaths: [],
+      distributionAuthorizations: [],
+    } as never);
+    expect(report.overall).toBe('FAILED');
+    const paths = report.findings
+      .filter((finding) => finding.rule === PROD_RULES.prodConformanceInputMissing)
+      .map((finding) => finding.path);
+    expect(paths).toContain('activationClaims[0].moduleId');
+    expect(paths).toContain('activationClaims[1]');
+    expect(paths).toContain('mcpCompatibility.revisions');
   });
 
   it('fails closed on an omitted input, an empty required-gate set, and unknown readiness (H2)', () => {

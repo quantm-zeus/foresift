@@ -294,6 +294,44 @@ describe('MCP opt-in validation and conformance provenance (C3/H10 regressions)'
     expect(refused.detail?.reason).toBe('CELL_NOT_USABLE');
   }, 120_000);
 
+  it('does not resolve a DB-backed matrix whose only run is for a different fixture (H10)', async () => {
+    await insertMcpRevision(engine, {
+      revision: '2026-09-01-rc.9',
+      channel: 'DRAFT',
+      sdkVersion: '3.0.0-rc.9',
+      transport: 'STREAMABLE_HTTP',
+      originPolicyRef: 'origin-1',
+    });
+    for (const clientId of CLIENTS) {
+      await insertMcpCompatibilityCell(engine, {
+        cellId: `wrong-fixture-${clientId}`,
+        revision: '2026-09-01-rc.9',
+        clientId,
+        conformanceFixtureRef: `fixture-${clientId}`,
+        liveTestDate: RECENT,
+        result: 'PASS',
+      });
+      await insertMcpConformanceRun(engine, {
+        runId: `wrong-fixture-run-${clientId}`,
+        revision: '2026-09-01-rc.9',
+        clientId,
+        fixtureRef: 'fixture-OTHER',
+        result: 'PASS',
+        ranAt: RECENT,
+      });
+    }
+    // The DB-backed matrix must reject the fixture-mismatched runs, so the
+    // draft is not mutually tested and cannot be opted in.
+    const refused = await rejection(
+      resolveCompatibilityMatrix(engine, {
+        now: NOW,
+        optInDraftRevisions: ['2026-09-01-rc.9'],
+      }),
+    );
+    expect(refused.code).toBe('PROD_ACTIVATION_GATE_REFUSED');
+    expect(refused.detail?.reason).toBe('CELL_NOT_USABLE');
+  }, 120_000);
+
   it('never lets a run for a different fixture satisfy a cell (H10 provenance)', () => {
     const cell = {
       cellId: 'prov-cell',

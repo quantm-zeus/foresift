@@ -158,6 +158,44 @@ describe('§69.2 module-state row', () => {
   });
 });
 
+describe('prod schema parity for the correction columns (T051)', () => {
+  it('refuses an ACTIVE module state without the activation kind or scope hash', () => {
+    expect(() => ModuleStateRowSchema.parse({ ...moduleState, activationKind: null })).toThrow(
+      /activation kind/,
+    );
+    expect(() => ModuleStateRowSchema.parse({ ...moduleState, scopeHash: null })).toThrow(
+      /scope hash/,
+    );
+    expect(() =>
+      ModuleStateRowSchema.parse({
+        ...moduleState,
+        distributionReadiness: 'PUBLIC_AUTHORIZED',
+        activationKind: 'OPERATIONAL',
+      }),
+    ).toThrow(/PUBLIC/);
+  });
+
+  it('refuses a gate evaluation without its activation kind or event reference', () => {
+    expect(() =>
+      ActivationGateEvaluationRowSchema.parse({ ...gateEvaluation, activationKind: undefined }),
+    ).toThrow();
+    expect(() =>
+      ActivationGateEvaluationRowSchema.parse({ ...gateEvaluation, activationKind: 'MADE_UP' }),
+    ).toThrow();
+    expect(() =>
+      ActivationGateEvaluationRowSchema.parse({ ...gateEvaluation, activationEventRef: null }),
+    ).not.toThrow();
+    // NOT_APPLICABLE is a legal verdict and must not name a failing gate.
+    expect(
+      ActivationGateEvaluationRowSchema.parse({
+        ...gateEvaluation,
+        verdict: 'NOT_APPLICABLE',
+        failingGate: null,
+      }).verdict,
+    ).toBe('NOT_APPLICABLE');
+  });
+});
+
 describe('governed transition and activation-gate evaluation rows', () => {
   it('accepts a seed transition and refuses a self-transition', () => {
     const transition = {

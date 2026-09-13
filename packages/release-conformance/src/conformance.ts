@@ -441,13 +441,42 @@ export interface ConformanceResult {
   }[];
 }
 
-/** Dependency groups whose requirement set owns production-readiness law. */
-function milestoneOwnsProdLaw(activeGroup: string): boolean {
-  const generation = Number.parseInt(activeGroup.replace(/^G/, ''), 10);
-  return Number.isFinite(generation) && generation >= 2;
+/**
+ * Whether the evaluated milestone owns FR-PROD law, derived from the
+ * REQUIREMENT SET rather than a generation number (audit HIGH-3): a caller
+ * cannot silence the PROD family by passing `milestone: 'G0'`, and an invalid
+ * milestone is refused outright.
+ */
+function milestoneOwnsProdLaw(
+  activeGroup: string,
+  requirements: readonly RequirementMapping[],
+): boolean {
+  return requirements.some(
+    (requirement) =>
+      requirement.id.startsWith('FR-PROD-') &&
+      requirement.dependencyGroup === activeGroup &&
+      (requirement.supersededBy ?? []).length === 0,
+  );
 }
 
 export async function evaluateConformance(options: ConformanceOptions): Promise<ConformanceResult> {
+  // An explicit milestone must be a real dependency group: anything else is a
+  // gate-downgrade attempt and refuses closed (audit HIGH-3).
+  if (options.milestone !== undefined && !/^G\d+$/.test(options.milestone)) {
+    return {
+      overall: 'FAILED',
+      findings: [
+        {
+          requirementId: 'FR-TRACE-003',
+          rule: 'CONFORMANCE_MILESTONE_INVALID',
+          path: String(options.milestone),
+          message: `milestone must be a dependency-group id such as G2; ${JSON.stringify(
+            options.milestone,
+          )} is not`,
+        },
+      ],
+    };
+  }
   const activeGroup = options.milestone ?? (await activeMilestone(options.repoRoot));
   const requirements = options.requirements ?? (await loadRequirements(options.repoRoot));
   const [mapping, activePaths, premature, generated] = await Promise.all([
@@ -481,7 +510,7 @@ export async function evaluateConformance(options: ConformanceOptions): Promise<
     readonly path: string;
     readonly message: string;
   }[] = [];
-  if (milestoneOwnsProdLaw(activeGroup)) {
+  if (milestoneOwnsProdLaw(activeGroup, requirements)) {
     const { checkProdSurfacePresence, evaluateProdConformance } = await import('./prod-rules.ts');
     const prodRequirements = requirements.filter(
       (requirement) =>

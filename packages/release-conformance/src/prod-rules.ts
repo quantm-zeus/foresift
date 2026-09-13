@@ -622,6 +622,44 @@ const REQUIRED_PROD_INPUTS = [
   ['distributionAuthorizations', 'DISTRIBUTION_AUTHORIZATIONS'],
 ] as const;
 
+/**
+ * The fields each claim element must carry for its rule to be evaluable. A
+ * malformed element (a bare string, or an object missing its discriminant) is
+ * reported as an input finding rather than silently skipped (audit H2
+ * element-shape residual).
+ */
+const REQUIRED_CLAIM_FIELDS: Readonly<Record<string, readonly string[]>> = {
+  activationClaims: ['moduleId', 'lifecycleState'],
+  postureDeclarations: ['declarationId', 'posture', 'weakenedDimensions', 'protectedDimensions'],
+  livePaths: ['livePath', 'now', 'request', 'boundaryAssertions'],
+  distributionAuthorizations: [
+    'releaseRef',
+    'distributionReadiness',
+    'requiredGateKinds',
+    'gateEvidence',
+  ],
+};
+
+/** The mcpCompatibility claim's mandatory collections plus its instant. */
+const REQUIRED_MCP_FIELDS = ['revisions', 'clients', 'cells'] as const;
+
+/**
+ * True only when the MCP claim has the collections and instant its rule reads.
+ * A malformed claim is already reported by `checkProdConformanceInputsPresent`;
+ * running the rule over it would only throw.
+ */
+function mcpClaimWellShaped(value: unknown): value is McpCompatibilityMatrixClaim {
+  if (value === null || typeof value !== 'object' || Array.isArray(value)) return false;
+  const claim = value as Record<string, unknown>;
+  return (
+    Array.isArray(claim['revisions']) &&
+    Array.isArray(claim['clients']) &&
+    Array.isArray(claim['cells']) &&
+    typeof claim['now'] === 'string' &&
+    claim['now'].length > 0
+  );
+}
+
 /** Flag every mandatory input the caller omitted instead of declaring. */
 export function checkProdConformanceInputsPresent(input: ProdConformanceInput): ProdRuleReport {
   const findings: ProdConformanceFinding[] = [];
@@ -642,6 +680,53 @@ export function checkProdConformanceInputsPresent(input: ProdConformanceInput): 
         path: field,
         message: `PROD conformance input ${field} (${label}) was omitted or was not the declared ${field === 'mcpCompatibility' ? 'object' : 'array'} shape; an absent or malformed governance claim set fails the release gate closed instead of passing vacuously`,
       });
+      continue;
+    }
+    // Element shape: a malformed element must be a finding, not a silent skip.
+    if (field === 'mcpCompatibility') {
+      const claim = value as Record<string, unknown>;
+      for (const required of REQUIRED_MCP_FIELDS) {
+        if (!Array.isArray(claim[required])) {
+          findings.push({
+            requirementId: 'FR-PROD-001',
+            rule: PROD_RULES.prodConformanceInputMissing,
+            path: `${field}.${required}`,
+            message: `MCP compatibility claim ${required} must be an array; a malformed claim set fails the release gate closed`,
+          });
+        }
+      }
+      if (typeof claim['now'] !== 'string' || claim['now'].length === 0) {
+        findings.push({
+          requirementId: 'FR-PROD-001',
+          rule: PROD_RULES.prodConformanceInputMissing,
+          path: `${field}.now`,
+          message: 'MCP compatibility claim now must be a non-empty instant',
+        });
+      }
+      continue;
+    }
+    const requiredFields = REQUIRED_CLAIM_FIELDS[field] ?? [];
+    for (const [index, element] of (value as readonly unknown[]).entries()) {
+      if (typeof element !== 'object' || element === null || Array.isArray(element)) {
+        findings.push({
+          requirementId: 'FR-PROD-001',
+          rule: PROD_RULES.prodConformanceInputMissing,
+          path: `${field}[${index}]`,
+          message: `${field}[${index}] is not a claim object; a malformed claim set fails the release gate closed`,
+        });
+        continue;
+      }
+      const claim = element as Record<string, unknown>;
+      for (const required of requiredFields) {
+        if (claim[required] === undefined || claim[required] === null) {
+          findings.push({
+            requirementId: 'FR-PROD-001',
+            rule: PROD_RULES.prodConformanceInputMissing,
+            path: `${field}[${index}].${required}`,
+            message: `${field}[${index}] is missing the required field ${required}; a malformed claim fails the release gate closed`,
+          });
+        }
+      }
     }
   }
   return { passed: findings.length === 0, findings };
@@ -662,12 +747,9 @@ export function evaluateProdConformance(input: ProdConformanceInput): ProdConfor
     ...checkPostureWeakening(
       Array.isArray(input.postureDeclarations) ? input.postureDeclarations : [],
     ).findings,
-    ...(input.mcpCompatibility === undefined ||
-    input.mcpCompatibility === null ||
-    typeof input.mcpCompatibility !== 'object' ||
-    Array.isArray(input.mcpCompatibility)
-      ? []
-      : checkMcpCompatibilityDrift(input.mcpCompatibility).findings),
+    ...(mcpClaimWellShaped(input.mcpCompatibility)
+      ? checkMcpCompatibilityDrift(input.mcpCompatibility).findings
+      : []),
     ...checkLivePathPrecomputationViolation(Array.isArray(input.livePaths) ? input.livePaths : [])
       .findings,
     ...checkPublicAuthorizationWithoutGateEvidence(

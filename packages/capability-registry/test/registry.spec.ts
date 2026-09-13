@@ -1504,6 +1504,57 @@ describe('ACTIVE is bound to persisted gate evidence (F1)', () => {
     expect(states.some((row) => row.lifecycleState === 'ACTIVE')).toBe(false);
   }, 120_000);
 
+  it('derives the pass expiry from the consumed evidence and refuses a stale reactivation (HIGH-4)', async () => {
+    const scope = makeScope({ profile_version: 'expiry-derived' });
+    const moduleId = 'module-expiry-derived';
+    const scopeHash = activationScopeHash(scope);
+    const soon = '2026-06-05T00:00:00Z';
+    await provenLadder(moduleId, scope, 'expiry-derived');
+
+    // The caller asks for a 2027 window, but the capacity contract (consumed
+    // evidence) expires 2026-06-05: the pass must not outlive it.
+    const pass = evaluateActivationGate({
+      ...passingOpportunityInput(scope),
+      capacityContract: { ...passingCapacityContract(), expiresAt: soon },
+      activationEventRef: 'activation-expiry-derived',
+    });
+    expect(pass.verdict).toBe('PASS');
+    if (pass.verdict !== 'PASS') throw new Error('unreachable');
+    expect(pass.expiresAt).toBe(soon);
+
+    const recorded = await recordActivationGateResult(engine, pass);
+    if (recorded.verdict !== 'PASS') throw new Error('unreachable');
+    expect(recorded.expiresAt).toBe(soon);
+
+    // Persisted evidence carries the derived expiry, not the caller's request.
+    const rows = (
+      await activationGateEvaluationsFor(engine, scopeHash, ActivationKind.OPPORTUNITY)
+    ).filter((row) => row.activationEventRef === 'activation-expiry-derived');
+    expect(rows.length).toBeGreaterThan(0);
+    expect(rows.every((row) => row.expiresAt === soon)).toBe(true);
+
+    // Crossing at 2026-06-10 (after the evidence expired) refuses.
+    const refused = await rejection(
+      advanceState(engine, {
+        moduleId,
+        scope,
+        artifactSetHash: HASH_A,
+        toState: 'ACTIVE',
+        operationalReadiness: 'READY_FOR_ACTIVE_PROFILE',
+        distributionReadiness: 'PRIVATE_ONLY',
+        changeClassification: 'MATERIAL_OPERATIONAL',
+        reason: 'activate on expired evidence',
+        actorRef: 'test-actor',
+        at: '2026-06-10T00:00:00Z',
+        gateResult: recorded,
+        stateRowId: 'expiry-derived-5',
+        transitionId: 'expiry-derived-5-t',
+      }),
+    );
+    expect(refused.code).toBe('PROD_ACTIVATION_GATE_REFUSED');
+    expect((refused.detail as { readonly reason?: string }).reason).toBe('EVIDENCE_SET_STALE');
+  }, 120_000);
+
   it('never records a skipped gate as PASS, and no claim can reuse OPERATIONAL evidence (C1 exploit)', async () => {
     const scope = makeScope({ profile_version: 'kind-forgery' });
     const moduleId = 'module-kind-forgery';

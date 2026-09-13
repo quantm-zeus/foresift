@@ -821,6 +821,32 @@ export function evaluateActivationGate(input: ActivationGateInput): ActivationGa
   const required = requiredGatesForActivation(kind, scope);
   const requiredSet = new Set<ActivationGateKind>(required);
   const nowMs = Date.parse(input.now);
+  // A pass may not outlive ANY evidence it consumed (audit HIGH-4): the
+  // effective expiry is the EARLIEST of the requested expiry and the expiries of
+  // the capacity contract, the signed gate evidence, and (when the kind consumes
+  // it) the registered statistical evidence. The pass-level `expiresAt` is
+  // therefore derived, never caller-controlled.
+  const consumedExpiries: string[] = [];
+  if (requiredSet.has(ActivationGateKind.CAPACITY_CONTRACT) && input.capacityContract != null) {
+    consumedExpiries.push(input.capacityContract.expiresAt);
+  }
+  if (
+    requiredSet.has(ActivationGateKind.VERIFIED_GATE_EVIDENCE) &&
+    input.verifiedGateEvidence != null
+  ) {
+    consumedExpiries.push(input.verifiedGateEvidence.record.expiresAt);
+  }
+  if (requiredSet.has(ActivationGateKind.STATISTICAL_EVIDENCE_SCOPE)) {
+    for (const evidence of input.registeredStatisticalEvidence ?? []) {
+      consumedExpiries.push(evidence.expiresAt);
+    }
+  }
+  const effectiveExpiresAt = consumedExpiries.reduce((earliest, candidate) => {
+    const candidateMs = Date.parse(candidate);
+    return Number.isFinite(candidateMs) && candidateMs < Date.parse(earliest)
+      ? candidate
+      : earliest;
+  }, input.expiresAt);
   const evaluations: GateConditionEvaluation[] = [];
   const makeRefusal = (
     failingGate: ActivationGateKind,
@@ -838,7 +864,7 @@ export function evaluateActivationGate(input: ActivationGateInput): ActivationGa
       activationEventRef: input.activationEventRef,
       capacityContractRef: input.capacityContract?.contractId ?? '',
       evaluatedAt: input.now,
-      expiresAt: input.expiresAt,
+      expiresAt: effectiveExpiresAt,
       evidenceRefs: Object.freeze([...(input.evidenceRefs ?? [])]),
       evaluationSetRef: null,
       [ACTIVATION_REFUSAL_BRAND]: true as const,
@@ -861,6 +887,15 @@ export function evaluateActivationGate(input: ActivationGateInput): ActivationGa
     }
   }
   const capacityContractRef = input.capacityContract?.contractId ?? '';
+  if (!Number.isFinite(Date.parse(effectiveExpiresAt)) || Date.parse(effectiveExpiresAt) <= nowMs) {
+    return makeRefusal(
+      ActivationGateKind.VERIFIED_GATE_EVIDENCE,
+      ActivationGateRefusalReason.ACTIVATION_SCOPE_INVALID,
+      `the derived evidence expiry ${JSON.stringify(
+        effectiveExpiresAt,
+      )} does not follow the evaluation instant; a pass may not rest on already-expired or unparseable evidence`,
+    );
+  }
   const brandedPass: ActivationGatePass = Object.freeze({
     verdict: 'PASS',
     scopeHash,
@@ -868,7 +903,7 @@ export function evaluateActivationGate(input: ActivationGateInput): ActivationGa
     activationEventRef: input.activationEventRef,
     capacityContractRef,
     evaluatedAt: input.now,
-    expiresAt: input.expiresAt,
+    expiresAt: effectiveExpiresAt,
     evidenceRefs: Object.freeze([...(input.evidenceRefs ?? [])]),
     activationKind: kind,
     evaluationSetRef: null,

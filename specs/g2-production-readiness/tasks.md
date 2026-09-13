@@ -1,23 +1,23 @@
 # Tasks: g2-production-readiness
 
-> **EMERGENCY CORRECTION — proof REOPENED AGAIN (third round, 2026-09-13).**
-> The re-PROVEN flip `8f7b5d9` (PR #295) is revoked by a fresh independent
-> verification that reproduced **three HIGH fail-opens still present on
-> `main`**: (1) the activation-gate evaluations are only shallow-frozen, so a
-> caller can mutate a recorded pass's nested evaluation element and defeat the
-> `advanceState` persisted-dimension cross-check (H5 binding bypass); (2) the
-> `ACTIVATION_WITHOUT_EVIDENCE` rule accepted an ACTIVE claim whose
-> `activationEventRef` was omitted or empty (`prod-rules.ts` tested only
-> `=== null`); (3) the PUBLIC/WORKSPACE authorization rule used
-> `scopeRefs.includes(releaseRef)`, which substring-matches when `scopeRefs`
-> is a string, so foreign-release evidence was accepted. The package is
-> **RUNNING / REOPENED**; no history or evidence is deleted (`8f7b5d9` is an
-> additive flip and this reopen is additive again). Phase 11 adds the bounded
-> correction tasks `T053`–`T064`. PROVEN may only be restored after the new
-> exploit regressions and the full prescribed gates pass, a **new**
-> fresh-context independent convergence audit reports no CRITICAL/HIGH
-> finding, and exact-SHA CI is green. Admin-control and recovery-continuity
-> promotion stays frozen until then.
+> **EMERGENCY CORRECTION — proof REOPENED then RE-PROVEN (third round,
+> 2026-09-13).** The re-PROVEN flip `8f7b5d9` (PR #295) was revoked by a fresh
+> independent verification that reproduced **three HIGH fail-opens on `main`**:
+> (1) the activation-gate evaluations were only shallow-frozen, so a caller
+> could mutate a recorded pass's nested evaluation and defeat the `advanceState`
+> persisted-dimension cross-check; (2) `ACTIVATION_WITHOUT_EVIDENCE` accepted an
+> ACTIVE claim whose `activationEventRef` was omitted or empty; (3) the
+> PUBLIC/WORKSPACE authorization rule substring-matched a string `scopeRefs`
+> and accepted foreign-release evidence. Phase 11 closed those (`8793dd4`),
+> hardened the rules (`8a0b5f7`), and closed the convergence-audit findings —
+> the §69.9 distribution gate SQL bug that made every WORKSPACE/PUBLIC ACTIVE
+> insert abort (`g2_prod_0009`) and the prod telemetry-catalog drift
+> (`0bc79f5`). The correction landed as PR #296 (squash `b1611b9`). PROVEN is
+> restored only because **two new fresh-context independent convergence audits
+> at `0bc79f5` both reported "NO CRITICAL/HIGH FINDINGS — READY FOR PROVEN"**,
+> the full prescribed gates passed, and exact-SHA CI run `34755822334` was
+> green. No history or evidence is deleted: the reopen (`2a909d4`) and every
+> prior flip remain in history.
 >
 > Earlier correction history is preserved: the original PROVEN flip
 > `e5fcc06` (PR #292) was revoked after the audit found 3 CRITICAL + 10 HIGH;
@@ -25,14 +25,15 @@
 > restored PROVEN. Phase 10 tasks `T040`–`T052` remain checked as landed
 > evidence and are not rewritten.
 >
-> Accepted residual MEDIUMs (recorded in `DECISIONS.md` D013/D014 and
+> Accepted residual MEDIUMs (recorded in `DECISIONS.md` D013/D014/D015 and
 > `emergency-correction.md`): `clearContainment` step-up/actor/reason +
 > ActionGate, SQL/Drizzle parity for defaults/constraints/indexes/triggers,
-> two-way telemetry parity, AC-150/151/153 fixture-echo positives, the
-> evidence trust boundary (caller-supplied statistical verdicts), module binding
-> for evaluation rows, the declarative-only release-gate live-path boundary
-> rule, and an explicit `evaluateConformance({milestone:'G0'|'G1'})` override
-> selecting a non-PROD group.
+> AC-150/151/153 fixture-echo positives, the evidence trust boundary
+> (caller-supplied statistical verdicts), module binding for evaluation rows,
+> the declarative-only release-gate live-path boundary rule, the raw-writer
+> PROVEN-insert trust boundary, and an explicit
+> `evaluateConformance({milestone:'G0'|'G1'})` override selecting a non-PROD
+> group. Two-way telemetry parity was closed by T064.
 
 **Input**: `specs/g2-production-readiness/spec.md`, `specs/g2-production-readiness/plan.md`
 **Traceability rule**: every task cites at least one assigned requirement
@@ -600,12 +601,12 @@ third-round finding-to-task map and the verbatim reproductions.
       make the prod parity assertion two-way (set equality), so a future schema
       field cannot be silently absent from the CRITICAL_METADATA catalog.
       Traces: FR-PROD-001, FR-PROD-002.
-- [ ] T060 [serial-reason: COORDINATOR_BOUNDARY] Fresh-context adversarial
+- [x] T060 [serial-reason: COORDINATOR_BOUNDARY] Fresh-context adversarial
       re-review of the third-round diff, direct exploit replay (nested
       mutation, omitted/empty activation event, substring scopeRefs,
       backdated refusal, cross-generation gap, distribution activation),
       full prescribed gates and exact-SHA CI. Traces: FR-PROD-001…006.
-- [ ] T061 [serial-reason: COORDINATOR_BOUNDARY] New independent convergence
+- [x] T061 [serial-reason: COORDINATOR_BOUNDARY] New independent convergence
       audit at the pre-merge head; restore PROVEN only when it reports no
       CRITICAL/HIGH finding and the tracked residual MEDIUMs are recorded.
       Traces: FR-PROD-001…006.

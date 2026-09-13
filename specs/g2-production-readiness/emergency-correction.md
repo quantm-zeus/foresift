@@ -185,3 +185,27 @@ that C1 already records (D013/D014): a writer who can INSERT evaluation rows
 can fabricate any activation. Binding PROVEN at SQL would raise the bar but not
 close it (the batch rows are equally insertable), so it is recorded rather than
 claimed as closed.
+
+## Third-round closure (2026-09-13)
+
+The correction landed as PR #296 (squash `b1611b9`). Evidence at the pre-merge
+head `0bc79f5`:
+
+- **Two new fresh-context independent convergence audits**, run separately,
+  both returned **"NO CRITICAL/HIGH FINDINGS — READY FOR PROVEN"** after
+  reproducing the T063/T064 fixes, the raw-writer residual, and the original
+  C1–C3/H1–H10/R1–R3 paths. Both classified the raw-SQL PROVEN insert as the
+  accepted raw-writer trust boundary (MEDIUM), not a fail-open: a writer who can
+  forge the evaluation batch can already reach ACTIVE, and a writer who cannot
+  cannot reach ACTIVE at all.
+- **Full prescribed gates at `0bc79f5`:** `pnpm verify` (602 bun test files,
+  node-runtime-compat), coordinated `pnpm test:all` (`{"ok":true,"groups":39}`),
+  `pnpm spec:verify`, format, lint, typecheck; focused suites capability-registry
+  94, release-conformance 105, persistence migrator 16, telemetry-catalog 123,
+  AC-279 acceptance + negative.
+- **Exact-SHA CI** run `34755822334` at `0bc79f5` (Fast Gates, Pure,
+  Process/Meta-Gate, Database PGlite, Verify) green.
+
+State change: g2-production-readiness RUNNING → PROVEN (schema-legal
+RUNNING→PROVEN), restored only after the above. Phase 11 tasks `T053`–`T064` are
+checked; history is preserved and nothing was rewritten.

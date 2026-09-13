@@ -205,7 +205,7 @@ Fixture-path note: the manifest `fixtureRefs` say `tests/fixtures/prod/`
 and the milestone grants `tests/fixtures/prod/**`; they agree, and all
 fixtures are written under that single path.
 
-The 14 assigned ACs (AC-144, AC-150…154, AC-272…279) are *shared*: every
+The 14 assigned ACs (AC-144, AC-150…154, AC-272…279) are _shared_: every
 one is also attached to another family's requirements, and each base
 `tests/acceptance` / `tests/negative` file already exists on `main` with
 that family's assertions. This package authors the **prod-scoped
@@ -319,7 +319,7 @@ id, never duplicated.
 
 - `prod.module_states` (state_row_id PK, module_id, artifact_set_hash
   `sha256:<hex>`, scope JSONB `{profile_version, policy_version,
-  regime_scope, execution_scenario, delay_policy, population_claim}`,
+regime_scope, execution_scenario, delay_policy, population_claim}`,
   lifecycle_state CHECK over the nine governed states,
   operational_readiness CHECK `NOT_READY…READY_FOR_ACTIVE_PROFILE`,
   distribution_readiness CHECK `PRIVATE_ONLY…PUBLIC_AUTHORIZED`,
@@ -328,7 +328,7 @@ id, never duplicated.
 - `prod.state_transitions` (transition_id PK, state_row_id, from_state,
   to_state, change_classification CHECK
   `NON_MATERIAL_COMPATIBLE|MATERIAL_OPERATIONAL|MATERIAL_EVALUATION|
-  MATERIAL_SECURITY_OR_RIGHTS`, gate_evaluation_ref, reason, actor_ref,
+MATERIAL_SECURITY_OR_RIGHTS`, gate_evaluation_ref, reason, actor_ref,
   created_at; append-only).
 - `prod.activation_gate_evaluations` (evaluation_id PK, scope_hash
   `sha256:<hex>`, gate_kind CHECK, verdict CHECK `PASS|REFUSE`, failing_gate
@@ -368,7 +368,7 @@ id, never duplicated.
   read_at).
 - `prod.artifact_boundary_assertions` (assertion_id PK, live_path,
   assertion_kind CHECK `NO_HEAVY_JOB|NO_IMPORT|NO_PROVIDER_CALL|
-  IMPORT_SHADOW_ONLY`, import_artifact_ref references `sec.import_artifacts`
+IMPORT_SHADOW_ONLY`, import_artifact_ref references `sec.import_artifacts`
   by id, verdict, asserted_at).
 
 ## Verification strategy per acceptance criterion

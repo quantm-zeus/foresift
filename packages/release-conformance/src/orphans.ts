@@ -2,6 +2,7 @@
 import { readFile, readdir } from 'node:fs/promises';
 import path from 'node:path';
 import { implementationPath, type RequirementMapping } from './conformance.ts';
+import { numericIncludes, numericMap, numericSome, numericSortStrings } from './shadow-safe.ts';
 
 export interface OrphanException {
   readonly pathPattern: string;
@@ -43,53 +44,61 @@ export function validateOrphanExceptionLedger(
     return { valid: false, errors: ['ledger must be an object'] };
   }
   const candidate = ledger as Partial<OrphanExceptionLedger>;
-  if (candidate.schemaVersion !== '1.0.0') errors.push('schemaVersion must equal 1.0.0');
+  if (candidate.schemaVersion !== '1.0.0') errors[errors.length] = 'schemaVersion must equal 1.0.0';
   if (!Array.isArray(candidate.exceptions)) {
-    errors.push('exceptions must be an array');
+    errors[errors.length] = 'exceptions must be an array';
     return { valid: false, errors };
   }
   const patterns = new Set<string>();
-  candidate.exceptions.forEach((entry, index) => {
-    const prefix = `exceptions[${index}]`;
+  // Numeric-index walk only (audit HIGH): `forEach`/`some`/`filter`/`includes`
+  // and `Symbol.iterator` are shadowable in-process, and a shadowed visit would
+  // leave `errors` empty and declare an invalid ledger valid.
+  for (let entryIndex = 0; entryIndex < candidate.exceptions.length; entryIndex += 1) {
+    const entry = candidate.exceptions[entryIndex] as OrphanException;
+    const prefix = `exceptions[${entryIndex}]`;
     if (entry === null || typeof entry !== 'object') {
-      errors.push(`${prefix} must be an object`);
-      return;
+      errors[errors.length] = `${prefix} must be an object`;
+      continue;
     }
     if (typeof entry.pathPattern !== 'string' || entry.pathPattern.trim().length === 0) {
-      errors.push(`${prefix}.pathPattern must be non-empty`);
+      errors[errors.length] = `${prefix}.pathPattern must be non-empty`;
     } else {
-      if (path.isAbsolute(entry.pathPattern) || entry.pathPattern.split('/').includes('..')) {
-        errors.push(`${prefix}.pathPattern must be repository-relative`);
+      const segments = entry.pathPattern.split('/');
+      if (path.isAbsolute(entry.pathPattern) || numericIncludes(segments, '..')) {
+        errors[errors.length] = `${prefix}.pathPattern must be repository-relative`;
       }
-      if (patterns.has(entry.pathPattern)) errors.push(`${prefix}.pathPattern is duplicated`);
+      if (patterns.has(entry.pathPattern))
+        errors[errors.length] = `${prefix}.pathPattern is duplicated`;
       patterns.add(entry.pathPattern);
     }
-    if (
-      !Array.isArray(entry.servingRequirementIds) ||
-      entry.servingRequirementIds.length === 0 ||
-      entry.servingRequirementIds.some(
-        (requirementId: unknown) =>
-          typeof requirementId !== 'string' || !REQUIREMENT_ID.test(requirementId),
-      )
-    ) {
-      errors.push(`${prefix}.servingRequirementIds must contain valid requirement IDs`);
-    } else if (
-      knownRequirementIds !== undefined &&
-      entry.servingRequirementIds.some(
-        (requirementId: string) => !knownRequirementIds.has(requirementId),
-      )
-    ) {
-      const unknownIds = entry.servingRequirementIds.filter(
-        (requirementId: string) => !knownRequirementIds.has(requirementId),
-      );
-      errors.push(
-        `${prefix}.servingRequirementIds names unknown requirements: ${unknownIds.join(', ')}`,
-      );
+    let servingIdsValid =
+      Array.isArray(entry.servingRequirementIds) && entry.servingRequirementIds.length > 0;
+    if (servingIdsValid) {
+      for (let idIndex = 0; idIndex < entry.servingRequirementIds.length; idIndex += 1) {
+        const requirementId: unknown = entry.servingRequirementIds[idIndex];
+        if (typeof requirementId !== 'string' || !REQUIREMENT_ID.test(requirementId)) {
+          servingIdsValid = false;
+          break;
+        }
+      }
+    }
+    if (!servingIdsValid) {
+      errors[errors.length] = `${prefix}.servingRequirementIds must contain valid requirement IDs`;
+    } else if (knownRequirementIds !== undefined) {
+      const unknownIds: string[] = [];
+      for (let idIndex = 0; idIndex < entry.servingRequirementIds.length; idIndex += 1) {
+        const requirementId = entry.servingRequirementIds[idIndex] as string;
+        if (!knownRequirementIds.has(requirementId)) unknownIds[unknownIds.length] = requirementId;
+      }
+      if (unknownIds.length > 0) {
+        errors[errors.length] =
+          `${prefix}.servingRequirementIds names unknown requirements: ${unknownIds.join(', ')}`;
+      }
     }
     if (typeof entry.justification !== 'string' || entry.justification.trim().length === 0) {
-      errors.push(`${prefix}.justification must be non-empty`);
+      errors[errors.length] = `${prefix}.justification must be non-empty`;
     }
-  });
+  }
   return { valid: errors.length === 0, errors };
 }
 
@@ -135,13 +144,19 @@ async function collectProductFiles(repoRoot: string): Promise<readonly string[]>
       if ((error as NodeJS.ErrnoException).code === 'ENOENT') return;
       throw error;
     }
-    for (const entry of entries) {
+    // Numeric-index walk only (audit HIGH): `for…of` and `Array.prototype.sort`
+    // are shadowable in-process.
+    for (let entryIndex = 0; entryIndex < entries.length; entryIndex += 1) {
+      const entry = entries[entryIndex] as (typeof entries)[number];
       const relative = path.posix.join(relativeDirectory, entry.name);
       if (entry.isDirectory()) await visit(relative);
-      else if (entry.isFile() && PRODUCT_SOURCE_EXTENSION.test(entry.name)) result.push(relative);
+      else if (entry.isFile() && PRODUCT_SOURCE_EXTENSION.test(entry.name))
+        result[result.length] = relative;
     }
   };
-  for (const topLevel of ['apps', 'packages']) {
+  const topLevels = ['apps', 'packages'];
+  for (let topLevelIndex = 0; topLevelIndex < topLevels.length; topLevelIndex += 1) {
+    const topLevel = topLevels[topLevelIndex] as string;
     let projects;
     try {
       projects = await readdir(path.join(repoRoot, topLevel), { withFileTypes: true });
@@ -149,11 +164,12 @@ async function collectProductFiles(repoRoot: string): Promise<readonly string[]>
       if ((error as NodeJS.ErrnoException).code === 'ENOENT') continue;
       throw error;
     }
-    for (const project of projects) {
+    for (let projectIndex = 0; projectIndex < projects.length; projectIndex += 1) {
+      const project = projects[projectIndex] as (typeof projects)[number];
       if (project.isDirectory()) await visit(`${topLevel}/${project.name}/src`);
     }
   }
-  return result.sort();
+  return numericSortStrings(result);
 }
 
 interface ManifestTraceMappings {
@@ -170,12 +186,19 @@ async function loadManifestTraceMappings(repoRoot: string): Promise<ManifestTrac
     readonly requirements?: readonly RequirementMapping[];
   };
   if (!Array.isArray(manifest.requirements)) throw new Error('manifest requirements are missing');
-  return {
-    implementationRefs: manifest.requirements.flatMap(
-      (requirement) => requirement.implementationRefs ?? [],
-    ),
-    requirementIds: new Set(manifest.requirements.map((requirement) => requirement.id)),
-  };
+  // Numeric-index projection only (audit HIGH): `flatMap`/`map`/`new Set(array)`
+  // all read `Array.prototype` hooks that a caller can shadow.
+  const implementationRefs: string[] = [];
+  const requirementIds = new Set<string>();
+  for (let index = 0; index < manifest.requirements.length; index += 1) {
+    const requirement = manifest.requirements[index] as RequirementMapping;
+    const refs = requirement.implementationRefs ?? [];
+    for (let refIndex = 0; refIndex < refs.length; refIndex += 1) {
+      implementationRefs[implementationRefs.length] = refs[refIndex] as string;
+    }
+    requirementIds.add(requirement.id);
+  }
+  return { implementationRefs, requirementIds };
 }
 
 export interface DetectOrphanOptions {
@@ -197,24 +220,28 @@ function evaluateOrphans(
   implementationRefs: readonly string[],
   exceptions: readonly OrphanException[],
 ): OrphanDetectionResult {
-  const implementationPatterns = implementationRefs.map(implementationPath);
+  const implementationPatterns = numericMap(implementationRefs, implementationPath);
   const mappedProductFiles: string[] = [];
   const exemptedOrphans: string[] = [];
   const unexemptedOrphans: string[] = [];
-  for (const file of productFiles) {
-    if (implementationPatterns.some((pattern) => matchesRepositoryGlob(file, pattern))) {
-      mappedProductFiles.push(file);
-    } else if (exceptions.some((entry) => matchesRepositoryGlob(file, entry.pathPattern))) {
-      exemptedOrphans.push(file);
+  // Numeric-index walks only (audit HIGH): `for…of`, `some`, and `sort` are all
+  // shadowable in-process; an empty scan or a sort no-op must never be able to
+  // report zero orphans.
+  for (let fileIndex = 0; fileIndex < productFiles.length; fileIndex += 1) {
+    const file = productFiles[fileIndex] as string;
+    if (numericSome(implementationPatterns, (pattern) => matchesRepositoryGlob(file, pattern))) {
+      mappedProductFiles[mappedProductFiles.length] = file;
+    } else if (numericSome(exceptions, (entry) => matchesRepositoryGlob(file, entry.pathPattern))) {
+      exemptedOrphans[exemptedOrphans.length] = file;
     } else {
-      unexemptedOrphans.push(file);
+      unexemptedOrphans[unexemptedOrphans.length] = file;
     }
   }
   return {
     passed: unexemptedOrphans.length === 0,
-    unexemptedOrphans: unexemptedOrphans.sort(),
-    exemptedOrphans: exemptedOrphans.sort(),
-    mappedProductFiles: mappedProductFiles.sort(),
+    unexemptedOrphans: numericSortStrings(unexemptedOrphans),
+    exemptedOrphans: numericSortStrings(exemptedOrphans),
+    mappedProductFiles: numericSortStrings(mappedProductFiles),
   };
 }
 

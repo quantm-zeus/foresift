@@ -42,7 +42,7 @@ export const PrecomputedAlphaRefusalReason = {
 export type PrecomputedAlphaRefusalReason =
   (typeof PrecomputedAlphaRefusalReason)[keyof typeof PrecomputedAlphaRefusalReason];
 export const ALL_PRECOMPUTED_ALPHA_REFUSAL_REASONS: readonly PrecomputedAlphaRefusalReason[] =
-  Object.values(PrecomputedAlphaRefusalReason);
+  Object.freeze(Object.values(PrecomputedAlphaRefusalReason));
 
 /** One persisted `prod.precomputed_alpha_bounds` row. */
 export interface PrecomputedAlphaBoundRow {
@@ -210,17 +210,17 @@ export async function findPrecomputedAlphaBound(
   const params: unknown[] = [input.livePath];
   let where = `live_path = $1`;
   if (input.boundId !== undefined) {
-    params.push(input.boundId);
+    params[params.length] = input.boundId;
     where += ` AND bound_id = $${params.length}`;
   }
   if (input.artifactRef !== undefined) {
-    params.push(input.artifactRef);
+    params[params.length] = input.artifactRef;
     where += ` AND artifact_ref = $${params.length}`;
   }
   // The bound is versioned to ONE immutable artifact set (audit H10): a request
   // for set B never resolves a bound declared for set A.
   if (input.artifactSetHash !== undefined) {
-    params.push(input.artifactSetHash);
+    params[params.length] = input.artifactSetHash;
     where += ` AND artifact_set_hash = $${params.length}`;
   }
   const result = await engine.query<RawBoundRow>(
@@ -470,5 +470,12 @@ export async function livePathReadHistory(
       ORDER BY read_at ASC, read_id ASC`,
     [livePath],
   );
-  return result.rows.map(decodeRead);
+  // Numeric-index decode only (audit HIGH): `.map` is shadowable and a shadowed
+  // `map` would silently return an EMPTY read history.
+  const reads: LivePathAlphaReadRow[] = [];
+  for (let index = 0; index < result.rows.length; index += 1) {
+    const row = result.rows[index];
+    if (row !== undefined) reads[reads.length] = decodeRead(row);
+  }
+  return reads;
 }

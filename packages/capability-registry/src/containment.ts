@@ -24,6 +24,7 @@ import {
   ContainmentAction,
   ErrorCode,
   ForesiftError,
+  isOneOf,
   legalLifecycleTransition,
   parseContainmentAction,
   parseModuleLifecycleState,
@@ -59,7 +60,9 @@ export const CriticalGateKind = {
   CLAIMS: 'CLAIMS',
 } as const;
 export type CriticalGateKind = (typeof CriticalGateKind)[keyof typeof CriticalGateKind];
-export const ALL_CRITICAL_GATE_KINDS: readonly CriticalGateKind[] = Object.values(CriticalGateKind);
+export const ALL_CRITICAL_GATE_KINDS: readonly CriticalGateKind[] = Object.freeze(
+  Object.values(CriticalGateKind),
+);
 
 /**
  * Deterministic critical gate → containment action. Hard safety failures
@@ -88,8 +91,9 @@ const CONTAINMENT_ESCALATION: Readonly<Record<ContainmentAction, number>> = {
 };
 
 function parseCriticalGate(value: unknown): CriticalGateKind {
-  if (typeof value === 'string' && (ALL_CRITICAL_GATE_KINDS as readonly string[]).includes(value)) {
-    return value as CriticalGateKind;
+  // `isOneOf` is a numeric-index walk, never a shadowable `.includes`.
+  if (typeof value === 'string' && isOneOf(value, ALL_CRITICAL_GATE_KINDS)) {
+    return value;
   }
   throw new ForesiftError(
     ErrorCode.PROD_CONTAINMENT_ACTION_UNKNOWN,
@@ -123,20 +127,32 @@ export interface ContainmentScopeCandidate {
 /** Number of concrete (non-wildcard) dimensions; higher means smaller scope. */
 export function scopeSpecificity(scope: ModuleStateScope): number {
   const parsed = parseModuleStateScope(scope);
-  return [
+  // Numeric-index count only (audit HIGH): `.filter(...).length` is shadowable,
+  // and a shadowed `filter` returning `[]` would make every candidate look
+  // equally (un)specific, changing which scope gets contained (R9).
+  const dimensions: readonly string[] = [
     parsed.profile_version,
     parsed.policy_version,
     parsed.regime_scope,
     parsed.execution_scenario,
     parsed.delay_policy,
     parsed.population_claim,
-  ].filter((dimension) => dimension !== SCOPE_WILDCARD).length;
+  ];
+  let specific = 0;
+  for (let index = 0; index < dimensions.length; index += 1) {
+    if (dimensions[index] !== SCOPE_WILDCARD) specific += 1;
+  }
+  return specific;
 }
 
 /**
  * The SMALLEST affected scope: the candidate with the most concrete dimensions
  * (fewest wildcards). Ties break deterministically by (specificity DESC,
  * scopeHash ASC, moduleId ASC) so containment never widens by accident.
+ *
+ * Numeric-index selection only (audit HIGH/R9): the previous
+ * `.map(...).sort(...)` chain was shadowable end-to-end, so a shadowed `map`
+ * returning `[]` threw, and a shadowed `sort` could pick the BROADEST scope.
  */
 export function smallestAffectedScope(
   candidates: readonly ContainmentScopeCandidate[],
@@ -148,21 +164,31 @@ export function smallestAffectedScope(
       {},
     );
   }
-  const ranked = candidates
-    .map((candidate) => {
-      const scope = parseModuleStateScope(candidate.scope);
-      return {
-        candidate: { moduleId: candidate.moduleId, scope },
-        specificity: scopeSpecificity(scope),
-        scopeHash: activationScopeHash(scope),
-      };
-    })
-    .sort((a, b) => {
-      if (b.specificity !== a.specificity) return b.specificity - a.specificity;
-      if (a.scopeHash !== b.scopeHash) return a.scopeHash < b.scopeHash ? -1 : 1;
-      return a.candidate.moduleId < b.candidate.moduleId ? -1 : 1;
-    });
-  const winner = ranked[0];
+  let winner: ContainmentScopeCandidate | undefined;
+  let winnerSpecificity = -1;
+  let winnerScopeHash = '';
+  for (let index = 0; index < candidates.length; index += 1) {
+    const candidate = candidates[index];
+    if (candidate === undefined) continue;
+    const scope = parseModuleStateScope(candidate.scope);
+    const specificity = scopeSpecificity(scope);
+    const scopeHash = activationScopeHash(scope);
+    let better = winner === undefined;
+    if (!better) {
+      if (specificity !== winnerSpecificity) {
+        better = specificity > winnerSpecificity;
+      } else if (scopeHash !== winnerScopeHash) {
+        better = scopeHash < winnerScopeHash;
+      } else {
+        better = candidate.moduleId < (winner as ContainmentScopeCandidate).moduleId;
+      }
+    }
+    if (better) {
+      winner = { moduleId: candidate.moduleId, scope };
+      winnerSpecificity = specificity;
+      winnerScopeHash = scopeHash;
+    }
+  }
   if (winner === undefined) {
     throw new ForesiftError(
       ErrorCode.PROD_ACTIVATION_SCOPE_INVALID,
@@ -170,7 +196,7 @@ export function smallestAffectedScope(
       {},
     );
   }
-  return winner.candidate;
+  return winner;
 }
 
 // --- containment rows -------------------------------------------------------
@@ -261,7 +287,7 @@ export async function openContainments(
   const params: unknown[] = [];
   let where = `cleared_by_event_ref IS NULL`;
   if (filter.moduleId !== undefined) {
-    params.push(filter.moduleId);
+    params[params.length] = filter.moduleId;
     where += ` AND module_id = $${params.length}`;
   }
   const result = await engine.query<RawContainmentRow>(
@@ -272,7 +298,17 @@ export async function openContainments(
       ORDER BY created_at ASC, containment_id ASC`,
     params,
   );
-  return result.rows.map(decodeContainmentRow);
+  return decodeContainmentRows(result.rows);
+}
+
+/** Numeric-index decode of a containment result set; never `rows.map(...)`. */
+function decodeContainmentRows(rows: readonly RawContainmentRow[]): ContainmentEventRow[] {
+  const decoded: ContainmentEventRow[] = [];
+  for (let index = 0; index < rows.length; index += 1) {
+    const row = rows[index];
+    if (row !== undefined) decoded[decoded.length] = decodeContainmentRow(row);
+  }
+  return decoded;
 }
 
 /** Open containments as the activation gate's `OpenContainmentFact` list. */
@@ -281,12 +317,19 @@ export async function loadContainmentFacts(
   moduleId: string,
 ): Promise<readonly OpenContainmentFact[]> {
   const rows = await openContainments(engine, { moduleId });
-  return rows.map((row) => ({
-    containmentId: row.containmentId,
-    moduleId: row.moduleId,
-    scopeHash: row.scopeHash,
-    action: row.action,
-  }));
+  // Numeric-index projection only; never `rows.map(...)`.
+  const facts: OpenContainmentFact[] = [];
+  for (let index = 0; index < rows.length; index += 1) {
+    const row = rows[index];
+    if (row === undefined) continue;
+    facts[facts.length] = {
+      containmentId: row.containmentId,
+      moduleId: row.moduleId,
+      scopeHash: row.scopeHash,
+      action: row.action,
+    };
+  }
+  return facts;
 }
 
 /**
@@ -383,7 +426,16 @@ export async function containForFailedGate(
   });
 
   const rows = await openContainments(engine, { moduleId: target.moduleId });
-  const containment = rows.find((row) => row.containmentId === containmentId);
+  // Numeric scan only (audit HIGH): a shadowed `find` would hide the row just
+  // persisted and falsely report the containment as unrecorded.
+  let containment: ContainmentEventRow | undefined;
+  for (let index = 0; index < rows.length; index += 1) {
+    const row = rows[index];
+    if (row !== undefined && row.containmentId === containmentId) {
+      containment = row;
+      break;
+    }
+  }
   if (containment === undefined) {
     throw new ForesiftError(
       ErrorCode.PROD_CONTAINMENT_ACTION_UNKNOWN,
@@ -550,11 +602,16 @@ export async function rollbackToApproved(
       { restoredArtifactSetHash: input.restoredArtifactSetHash },
     );
   }
-  for (const field of [
+  // Numeric-index validation over a module-local frozen list (audit HIGH/R6):
+  // `for (const field of [...])` reads `Symbol.iterator`, so a shadowed iterator
+  // skipped the non-empty-reference refusal on every rollback field.
+  const REQUIRED_ROLLBACK_REFS = [
     'priorActivationEventRef',
     'newActivationEventRef',
     'candidateReevaluationRef',
-  ] as const) {
+  ] as const;
+  for (let index = 0; index < REQUIRED_ROLLBACK_REFS.length; index += 1) {
+    const field = REQUIRED_ROLLBACK_REFS[index];
     if (typeof input[field] !== 'string' || input[field].length === 0) {
       throw new ForesiftError(
         ErrorCode.PROD_LIFECYCLE_TRANSITION_ILLEGAL,

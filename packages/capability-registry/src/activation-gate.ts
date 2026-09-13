@@ -42,6 +42,7 @@ import {
   parseActivationKind,
   parseDistributionReadiness,
   validateSustainableCapacityContract,
+  type ActivationGateEvaluation,
   type SustainableCapacityContract,
 } from '@foresift/domain';
 import {
@@ -55,6 +56,7 @@ import {
   parseModuleStateScope,
   type ModuleStateScope,
 } from './module-states.ts';
+import { numericCopy, numericJoin, numericSortBy } from './shadow-safe.ts';
 
 // --- provenance brand -------------------------------------------------------
 
@@ -114,37 +116,45 @@ export function requiredGatesForActivation(
   // EVERY activation kind, not only opportunity (audit H5 residual): a
   // `requires_proven` scope must never reach ACTIVE through an OPERATIONAL
   // evaluation that silently skips the PROVEN precondition.
-  const provenGate: ActivationGateKind[] = parsedScope.requires_proven
-    ? [ActivationGateKind.PROVEN_PRESENT]
-    : [];
+  //
+  // Numeric-index construction only (audit HIGH): an array literal with a
+  // `...provenGate` spread reads `Symbol.iterator`, so a shadowed iterator would
+  // EMPTY the required-gate list and every gate would degrade to
+  // NOT_APPLICABLE — a manufactured PASS.
   const operational: ActivationGateKind[] = [
     ActivationGateKind.IMPLEMENTED_PRESENT,
     ActivationGateKind.AVAILABLE_EVIDENCE,
-    ...provenGate,
-    ActivationGateKind.VERIFIED_GATE_EVIDENCE,
-    ActivationGateKind.CAPACITY_CONTRACT,
-    ActivationGateKind.NO_OPEN_CONTAINMENT,
   ];
+  if (parsedScope.requires_proven)
+    operational[operational.length] = ActivationGateKind.PROVEN_PRESENT;
+  operational[operational.length] = ActivationGateKind.VERIFIED_GATE_EVIDENCE;
+  operational[operational.length] = ActivationGateKind.CAPACITY_CONTRACT;
+  operational[operational.length] = ActivationGateKind.NO_OPEN_CONTAINMENT;
   const opportunity: ActivationGateKind[] = [
     ActivationGateKind.IMPLEMENTED_PRESENT,
     ActivationGateKind.AVAILABLE_EVIDENCE,
-    ...provenGate,
-    ActivationGateKind.STATISTICAL_EVIDENCE_SCOPE,
-    ActivationGateKind.NEGATIVE_CONTROLS,
-    ActivationGateKind.CLUSTERED_INTERVALS,
-    ActivationGateKind.CALIBRATION_MATURITY,
-    ActivationGateKind.VERIFIED_GATE_EVIDENCE,
-    ActivationGateKind.CAPACITY_CONTRACT,
-    ActivationGateKind.NO_OPEN_CONTAINMENT,
   ];
+  if (parsedScope.requires_proven)
+    opportunity[opportunity.length] = ActivationGateKind.PROVEN_PRESENT;
+  opportunity[opportunity.length] = ActivationGateKind.STATISTICAL_EVIDENCE_SCOPE;
+  opportunity[opportunity.length] = ActivationGateKind.NEGATIVE_CONTROLS;
+  opportunity[opportunity.length] = ActivationGateKind.CLUSTERED_INTERVALS;
+  opportunity[opportunity.length] = ActivationGateKind.CALIBRATION_MATURITY;
+  opportunity[opportunity.length] = ActivationGateKind.VERIFIED_GATE_EVIDENCE;
+  opportunity[opportunity.length] = ActivationGateKind.CAPACITY_CONTRACT;
+  opportunity[opportunity.length] = ActivationGateKind.NO_OPEN_CONTAINMENT;
   switch (kind) {
     case ActivationKind.OPERATIONAL:
       return operational;
     case ActivationKind.OPPORTUNITY:
       return opportunity;
     case ActivationKind.WORKSPACE:
-    case ActivationKind.PUBLIC:
-      return [...opportunity, ActivationGateKind.DISTRIBUTION_EVIDENCE];
+    case ActivationKind.PUBLIC: {
+      // Numeric copy + push, never `[...opportunity, DISTRIBUTION_EVIDENCE]`.
+      const distribution = numericCopy(opportunity);
+      distribution[distribution.length] = ActivationGateKind.DISTRIBUTION_EVIDENCE;
+      return distribution;
+    }
     default: {
       // Every member is handled; an impossible value fails closed.
       const exhaustive: never = kind;
@@ -496,20 +506,32 @@ function selectStatisticalEvidence(
 ):
   | { readonly evidence: RegisteredStatisticalEvidence }
   | { readonly reason: ActivationGateRefusalReason } {
-  const matching = registered.filter(
-    (evidence) => typeof evidence.scopeHash === 'string' && evidence.scopeHash === scopeHash,
-  );
-  if (matching.length === 0) {
+  // Numeric-index walk only (audit HIGH): `Array.prototype.filter` is
+  // shadowable, and `filter-empty` would make an exact-scope match look missing
+  // (or, worse, ambiguous evidence look unique).
+  let matching: RegisteredStatisticalEvidence | undefined;
+  let matchCount = 0;
+  for (let index = 0; index < registered.length; index += 1) {
+    const evidence = registered[index];
+    if (
+      evidence !== undefined &&
+      typeof evidence.scopeHash === 'string' &&
+      evidence.scopeHash === scopeHash
+    ) {
+      matching = evidence;
+      matchCount += 1;
+    }
+  }
+  if (matchCount === 0) {
     return { reason: ActivationGateRefusalReason.STATISTICAL_EVIDENCE_MISSING };
   }
-  if (matching.length > 1) {
+  if (matchCount > 1) {
     return { reason: ActivationGateRefusalReason.STATISTICAL_EVIDENCE_AMBIGUOUS };
   }
-  const evidence = matching[0];
-  if (evidence === undefined) {
+  if (matching === undefined) {
     return { reason: ActivationGateRefusalReason.STATISTICAL_EVIDENCE_MISSING };
   }
-  return { evidence };
+  return { evidence: matching };
 }
 
 const GATE_EVIDENCE_REFUSAL: Record<GateEvidenceFailureReason, ActivationGateRefusalReason> = {
@@ -591,16 +613,24 @@ function evaluateCondition(
           'negative controls cannot be read without exact-scope statistical evidence',
         );
       }
-      const byControl = new Map(selected.evidence.negativeControls.map((c) => [c.control, c]));
-      // Numeric-index walk of the frozen authority array: a shadowed
-      // `Symbol.iterator` must not be able to skip a mandatory control.
+      // Nested numeric-index walks only (audit HIGH): the previous
+      // `new Map(negativeControls.map((c) => [c.control, c]))` read both
+      // `Array.prototype.map` and `Symbol.iterator`, so a shadowed iterator
+      // produced an EMPTY lookup and every mandatory control read as missing
+      // (or, with `includes`/`map` shadows, as present).
+      const controls = selected.evidence.negativeControls;
       for (
         let controlIndex = 0;
         controlIndex < ALL_NEGATIVE_CONTROL_KINDS.length;
         controlIndex += 1
       ) {
         const control = ALL_NEGATIVE_CONTROL_KINDS[controlIndex] as NegativeControlKind;
-        const record = byControl.get(control);
+        let record: NegativeControlRecord | undefined;
+        // Last matching row wins, exactly as the old Map construction did.
+        for (let recordIndex = 0; recordIndex < controls.length; recordIndex += 1) {
+          const candidate = controls[recordIndex];
+          if (candidate !== undefined && candidate.control === control) record = candidate;
+        }
         if (record === undefined) {
           return refuse(
             gate,
@@ -784,7 +814,11 @@ function evaluateCondition(
         ['publicSafeRedaction', evidence.publicSafeRedaction],
         ['isolationFixtures', evidence.isolationFixtures],
       ];
-      for (const [field, present] of checks) {
+      for (let checkIndex = 0; checkIndex < checks.length; checkIndex += 1) {
+        const check = checks[checkIndex];
+        if (check === undefined) continue;
+        const field = check[0];
+        const present = check[1];
         if (present !== true) {
           return refuse(
             gate,
@@ -797,10 +831,16 @@ function evaluateCondition(
     }
     case ActivationGateKind.NO_OPEN_CONTAINMENT: {
       if (input.openContainment.length > 0) {
+        // Numeric-index message build only; never `openContainment.map(...)`.
+        const actions: string[] = [];
+        for (let index = 0; index < input.openContainment.length; index += 1) {
+          const fact = input.openContainment[index];
+          if (fact !== undefined) actions[actions.length] = fact.action;
+        }
         return refuse(
           gate,
           ActivationGateRefusalReason.CONTAINMENT_OPEN,
-          `open containment on the exact scope: ${input.openContainment.map((c) => c.action).join(', ')}`,
+          `open containment on the exact scope: ${numericJoin(actions)}`,
         );
       }
       return pass(gate);
@@ -829,7 +869,11 @@ export function evaluateActivationGate(input: ActivationGateInput): ActivationGa
   const scopeHash = activationScopeHash(scope);
   const kind = parseActivationKind(input.kind);
   const required = requiredGatesForActivation(kind, scope);
-  const requiredSet = new Set<ActivationGateKind>(required);
+  // Membership is a numeric `isOneOf` walk, NOT `new Set<ActivationGateKind>(
+  // required)` (audit HIGH, demonstrated at 5486938): the Set constructor reads
+  // `Symbol.iterator`, so a shadowed iterator made the required set EMPTY and
+  // every required gate degrade to NOT_APPLICABLE — a manufactured PASS.
+  const isRequired = (gate: ActivationGateKind): boolean => isOneOf(gate, required);
   const nowMs = Date.parse(input.now);
   // A pass may not outlive ANY evidence it consumed (audit HIGH-4): the
   // effective expiry is the EARLIEST of the requested expiry and the expiries of
@@ -837,26 +881,28 @@ export function evaluateActivationGate(input: ActivationGateInput): ActivationGa
   // it) the registered statistical evidence. The pass-level `expiresAt` is
   // therefore derived, never caller-controlled.
   const consumedExpiries: string[] = [];
-  if (requiredSet.has(ActivationGateKind.CAPACITY_CONTRACT) && input.capacityContract != null) {
-    consumedExpiries.push(input.capacityContract.expiresAt);
+  if (isRequired(ActivationGateKind.CAPACITY_CONTRACT) && input.capacityContract != null) {
+    consumedExpiries[consumedExpiries.length] = input.capacityContract.expiresAt;
   }
-  if (
-    requiredSet.has(ActivationGateKind.VERIFIED_GATE_EVIDENCE) &&
-    input.verifiedGateEvidence != null
-  ) {
-    consumedExpiries.push(input.verifiedGateEvidence.record.expiresAt);
+  if (isRequired(ActivationGateKind.VERIFIED_GATE_EVIDENCE) && input.verifiedGateEvidence != null) {
+    consumedExpiries[consumedExpiries.length] = input.verifiedGateEvidence.record.expiresAt;
   }
-  if (requiredSet.has(ActivationGateKind.STATISTICAL_EVIDENCE_SCOPE)) {
-    for (const evidence of input.registeredStatisticalEvidence ?? []) {
-      consumedExpiries.push(evidence.expiresAt);
+  if (isRequired(ActivationGateKind.STATISTICAL_EVIDENCE_SCOPE)) {
+    const registered = input.registeredStatisticalEvidence ?? [];
+    for (let index = 0; index < registered.length; index += 1) {
+      const evidence = registered[index];
+      if (evidence !== undefined) consumedExpiries[consumedExpiries.length] = evidence.expiresAt;
     }
   }
-  const effectiveExpiresAt = consumedExpiries.reduce((earliest, candidate) => {
+  // Numeric-index reduction only; `Array.prototype.reduce` is shadowable.
+  let effectiveExpiresAt = input.expiresAt;
+  for (let index = 0; index < consumedExpiries.length; index += 1) {
+    const candidate = consumedExpiries[index] as string;
     const candidateMs = Date.parse(candidate);
-    return Number.isFinite(candidateMs) && candidateMs < Date.parse(earliest)
-      ? candidate
-      : earliest;
-  }, input.expiresAt);
+    if (Number.isFinite(candidateMs) && candidateMs < Date.parse(effectiveExpiresAt)) {
+      effectiveExpiresAt = candidate;
+    }
+  }
   const evaluations: GateConditionEvaluation[] = [];
   const makeRefusal = (
     failingGate: ActivationGateKind,
@@ -869,13 +915,13 @@ export function evaluateActivationGate(input: ActivationGateInput): ActivationGa
       failingGate,
       reason,
       detail,
-      evaluations: Object.freeze([...evaluations]),
+      evaluations: Object.freeze(numericCopy(evaluations)),
       activationKind: kind,
       activationEventRef: input.activationEventRef,
       capacityContractRef: input.capacityContract?.contractId ?? '',
       evaluatedAt: input.now,
       expiresAt: effectiveExpiresAt,
-      evidenceRefs: Object.freeze([...(input.evidenceRefs ?? [])]),
+      evidenceRefs: Object.freeze(numericCopy(input.evidenceRefs ?? [])),
       evaluationSetRef: null,
       [ACTIVATION_REFUSAL_BRAND]: true as const,
     });
@@ -884,14 +930,14 @@ export function evaluateActivationGate(input: ActivationGateInput): ActivationGa
   };
   for (let gateOrderIndex = 0; gateOrderIndex < ACTIVATION_GATE_ORDER.length; gateOrderIndex += 1) {
     const gate = ACTIVATION_GATE_ORDER[gateOrderIndex] as ActivationGateKind;
-    const condition = requiredSet.has(gate)
+    const condition = isRequired(gate)
       ? evaluateCondition(gate, input, scopeHash, nowMs)
       : notApplicable(gate);
     const evaluation: GateConditionEvaluation = Object.freeze({
       ...condition,
       activationKind: kind,
     });
-    evaluations.push(evaluation);
+    evaluations[evaluations.length] = evaluation;
     if (evaluation.verdict === ActivationGateVerdict.REFUSE) {
       return makeRefusal(
         evaluation.failingGate ?? gate,
@@ -913,12 +959,12 @@ export function evaluateActivationGate(input: ActivationGateInput): ActivationGa
   const brandedPass: ActivationGatePass = Object.freeze({
     verdict: 'PASS',
     scopeHash,
-    evaluations: Object.freeze([...evaluations]),
+    evaluations: Object.freeze(numericCopy(evaluations)),
     activationEventRef: input.activationEventRef,
     capacityContractRef,
     evaluatedAt: input.now,
     expiresAt: effectiveExpiresAt,
-    evidenceRefs: Object.freeze([...(input.evidenceRefs ?? [])]),
+    evidenceRefs: Object.freeze(numericCopy(input.evidenceRefs ?? [])),
     activationKind: kind,
     evaluationSetRef: null,
     [ACTIVATION_PASS_BRAND]: true as const,
@@ -990,11 +1036,19 @@ function toIsoTimestamp(value: unknown): string {
 }
 
 function decodeEvidenceRefs(value: unknown): readonly string[] {
-  if (Array.isArray(value)) return value.map((entry) => String(entry));
+  if (Array.isArray(value)) {
+    const refs: string[] = [];
+    for (let index = 0; index < value.length; index += 1) refs[refs.length] = String(value[index]);
+    return refs;
+  }
   if (typeof value === 'string') {
     try {
       const parsed: unknown = JSON.parse(value);
-      return Array.isArray(parsed) ? parsed.map((entry) => String(entry)) : [];
+      if (!Array.isArray(parsed)) return [];
+      const refs: string[] = [];
+      for (let index = 0; index < parsed.length; index += 1)
+        refs[refs.length] = String(parsed[index]);
+      return refs;
     } catch {
       return [];
     }
@@ -1016,6 +1070,18 @@ function decodeGateEvaluationRow(row: RawGateEvaluationRow): PersistedActivation
     expiresAt: toIsoTimestamp(row.expires_at),
     activationKind: row.activation_kind as ActivationKind,
   };
+}
+
+/** Numeric-index decode of a driver result set; never `rows.map(...)`. */
+function decodeGateEvaluationRows(
+  rows: readonly RawGateEvaluationRow[],
+): PersistedActivationGateEvaluation[] {
+  const decoded: PersistedActivationGateEvaluation[] = [];
+  for (let index = 0; index < rows.length; index += 1) {
+    const row = rows[index];
+    if (row !== undefined) decoded[decoded.length] = decodeGateEvaluationRow(row);
+  }
+  return decoded;
 }
 
 const GATE_EVALUATION_COLUMNS = `evaluation_id, scope_hash, gate_kind, verdict, failing_gate,
@@ -1047,27 +1113,40 @@ function activationGateOrderIndex(gateKind: ActivationGateKind): number {
 export function activationEvidenceSetRef(
   rows: readonly PersistedActivationGateEvaluation[],
 ): string {
-  const ordered = [...rows].sort(
-    (left, right) =>
-      activationGateOrderIndex(left.gateKind) - activationGateOrderIndex(right.gateKind),
-  );
-  return sha256Text(
-    canonicalJson(
-      ordered.map((row) => ({
-        evaluationId: row.evaluationId,
-        scopeHash: row.scopeHash,
-        gateKind: row.gateKind,
-        verdict: row.verdict,
-        failingGate: row.failingGate,
-        activationEventRef: row.activationEventRef,
-        capacityContractRef: row.capacityContractRef,
-        evidenceRefs: row.evidenceRefs,
-        evaluatedAt: row.evaluatedAt,
-        expiresAt: row.expiresAt,
-        activationKind: row.activationKind,
-      })),
-    ),
-  );
+  // Stable numeric-only sort by canonical gate order (audit HIGH): array spread
+  // and `Array.prototype.sort` are shadowable, and a reordered set changes the
+  // derived content address.
+  const ordered = numericSortBy(rows, (row) => activationGateOrderIndex(row.gateKind));
+  const canonical: Array<{
+    evaluationId: string;
+    scopeHash: string;
+    gateKind: ActivationGateKind;
+    verdict: ActivationGateVerdict;
+    failingGate: ActivationGateKind | null;
+    activationEventRef: string | null;
+    capacityContractRef: string | null;
+    evidenceRefs: readonly string[];
+    evaluatedAt: string;
+    expiresAt: string;
+    activationKind: ActivationKind;
+  }> = [];
+  for (let index = 0; index < ordered.length; index += 1) {
+    const row = ordered[index] as PersistedActivationGateEvaluation;
+    canonical[canonical.length] = {
+      evaluationId: row.evaluationId,
+      scopeHash: row.scopeHash,
+      gateKind: row.gateKind,
+      verdict: row.verdict,
+      failingGate: row.failingGate,
+      activationEventRef: row.activationEventRef,
+      capacityContractRef: row.capacityContractRef,
+      evidenceRefs: row.evidenceRefs,
+      evaluatedAt: row.evaluatedAt,
+      expiresAt: row.expiresAt,
+      activationKind: row.activationKind,
+    };
+  }
+  return sha256Text(canonicalJson(canonical));
 }
 
 interface PersistEvaluationsInput {
@@ -1110,7 +1189,13 @@ async function persistEvaluations(
   const kind = parseActivationKind(input.activationKind);
   return engine.transaction(async (tx) => {
     const ids: string[] = [];
-    for (const evaluation of input.evaluations) {
+    for (
+      let evaluationIndex = 0;
+      evaluationIndex < input.evaluations.length;
+      evaluationIndex += 1
+    ) {
+      const evaluation = input.evaluations[evaluationIndex];
+      if (evaluation === undefined) continue;
       const gate = parseActivationGateKind(evaluation.gateKind);
       const verdict = parseActivationGateVerdict(evaluation.verdict);
       const failing =
@@ -1146,7 +1231,7 @@ async function persistEvaluations(
           kind,
         ],
       );
-      ids.push(evaluationId);
+      ids[ids.length] = evaluationId;
     }
     // Re-read the rows just committed so the minted reference is derived from
     // database truth (exact timestamps and ids), never from the caller's object.
@@ -1158,7 +1243,7 @@ async function persistEvaluations(
         ORDER BY evaluation_id ASC`,
       [input.scopeHash, input.evaluatedAt, kind, input.activationEventRef],
     );
-    const rows = persisted.rows.map(decodeGateEvaluationRow);
+    const rows = decodeGateEvaluationRows(persisted.rows);
     return { evaluationIds: ids, evaluationSetRef: activationEvidenceSetRef(rows) };
   });
 }
@@ -1243,12 +1328,12 @@ export async function activationGateEvaluationsFor(
   const clauses = ['scope_hash = $1'];
   const params: unknown[] = [scopeHash];
   if (kind !== undefined) {
-    params.push(kind);
-    clauses.push(`activation_kind = $${params.length}`);
+    params[params.length] = kind;
+    clauses[clauses.length] = `activation_kind = $${params.length}`;
   }
   if (activationEventRef !== undefined) {
-    params.push(activationEventRef);
-    clauses.push(`activation_event_ref = $${params.length}`);
+    params[params.length] = activationEventRef;
+    clauses[clauses.length] = `activation_event_ref = $${params.length}`;
   }
   const result = await engine.query<RawGateEvaluationRow>(
     `SELECT ${GATE_EVALUATION_COLUMNS}
@@ -1257,7 +1342,7 @@ export async function activationGateEvaluationsFor(
       ORDER BY evaluated_at ASC, evaluation_id ASC`,
     params,
   );
-  return result.rows.map(decodeGateEvaluationRow);
+  return decodeGateEvaluationRows(result.rows);
 }
 
 // --- persisted-evidence activation guard ------------------------------------
@@ -1339,7 +1424,16 @@ export async function requirePersistedActivationEvidence(
   // the TypeScript guard must apply the same rule or a caller that backdates a
   // refusal behind a PASS would be misled by this exported oracle (audit R2 /
   // T054). A fresh, distinct activation event is the only way past a refusal.
-  const refusing = rows.find((row) => row.verdict === 'REFUSE');
+  // Numeric-index walks only (audit HIGH): `find`/`filter` are shadowable, and a
+  // shadowed `find` would hide an un-erasable persisted REFUSE.
+  let refusing: PersistedActivationGateEvaluation | undefined;
+  for (let index = 0; index < rows.length; index += 1) {
+    const row = rows[index];
+    if (row !== undefined && row.verdict === 'REFUSE') {
+      refusing = row;
+      break;
+    }
+  }
   if (refusing !== undefined) {
     refuse(
       ActivationEvidenceRefusalReason.EVIDENCE_SET_NOT_PASS,
@@ -1350,11 +1444,17 @@ export async function requirePersistedActivationEvidence(
   // never survives a later re-evaluation (a later REFUSE batch is persisted too
   // and therefore wins — audit H6).
   let latestAt = Number.NEGATIVE_INFINITY;
-  for (const row of rows) {
+  for (let index = 0; index < rows.length; index += 1) {
+    const row = rows[index];
+    if (row === undefined) continue;
     const at = Date.parse(row.evaluatedAt);
     if (Number.isFinite(at) && at > latestAt) latestAt = at;
   }
-  const batch = rows.filter((row) => Date.parse(row.evaluatedAt) === latestAt);
+  const batch: PersistedActivationGateEvaluation[] = [];
+  for (let index = 0; index < rows.length; index += 1) {
+    const row = rows[index];
+    if (row !== undefined && Date.parse(row.evaluatedAt) === latestAt) batch[batch.length] = row;
+  }
   if (batch.length === 0) {
     refuse(
       ActivationEvidenceRefusalReason.EVIDENCE_SET_EMPTY,
@@ -1362,9 +1462,12 @@ export async function requirePersistedActivationEvidence(
     );
   }
   const required = requiredGatesForActivation(kind, input.scope);
-  const requiredSet = new Set<ActivationGateKind>(required);
+  // Numeric `isOneOf` membership, never `new Set<ActivationGateKind>(required)`
+  // (audit HIGH).
+  const isRequired = (gate: ActivationGateKind): boolean => isOneOf(gate, required);
   const atMs = Date.parse(input.at);
-  for (const row of batch) {
+  for (let rowIndex = 0; rowIndex < batch.length; rowIndex += 1) {
+    const row = batch[rowIndex] as PersistedActivationGateEvaluation;
     if (row.activationKind !== kind) {
       refuse(
         ActivationEvidenceRefusalReason.EVIDENCE_SET_KIND_MISMATCH,
@@ -1381,7 +1484,7 @@ export async function requirePersistedActivationEvidence(
     }
     // A REQUIRED gate must be an explicit PASS. `NOT_APPLICABLE` (a gate skipped
     // for this kind) is never a pass, and neither is a REFUSE.
-    if (requiredSet.has(row.gateKind)) {
+    if (isRequired(row.gateKind)) {
       if (row.verdict !== 'PASS' || row.failingGate !== null) {
         refuse(
           ActivationEvidenceRefusalReason.EVIDENCE_SET_NOT_PASS,
@@ -1412,11 +1515,15 @@ export async function requirePersistedActivationEvidence(
       );
     }
   }
-  const evaluations = batch.map((row) => ({
-    gateKind: row.gateKind,
-    verdict: row.verdict,
-    failingGate: row.failingGate,
-  }));
+  const evaluations: ActivationGateEvaluation[] = [];
+  for (let index = 0; index < batch.length; index += 1) {
+    const row = batch[index] as PersistedActivationGateEvaluation;
+    evaluations[evaluations.length] = {
+      gateKind: row.gateKind,
+      verdict: row.verdict,
+      failingGate: row.failingGate,
+    };
+  }
   // Every gate required for the activation kind must have exactly one PASS…
   const requiredFailing = activationGateRefusal(evaluations, required);
   if (requiredFailing !== null) {
@@ -1451,8 +1558,18 @@ export async function requirePersistedActivationEvidence(
     );
   }
   return {
-    evaluationIds: batch.map((row) => row.evaluationId),
+    evaluationIds: evaluationIdsOf(batch),
     evaluationSetRef: derived,
     rows: batch,
   };
+}
+
+/** Numeric-index extraction of the batch's evaluation ids; never `.map`. */
+function evaluationIdsOf(rows: readonly PersistedActivationGateEvaluation[]): string[] {
+  const ids: string[] = [];
+  for (let index = 0; index < rows.length; index += 1) {
+    const row = rows[index];
+    if (row !== undefined) ids[ids.length] = row.evaluationId;
+  }
+  return ids;
 }

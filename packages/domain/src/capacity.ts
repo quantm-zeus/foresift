@@ -130,7 +130,11 @@ function parse<T extends string>(
   code: string,
   label: string,
 ): T {
-  if ((values as readonly string[]).includes(value)) return value as T;
+  // Numeric membership only (audit HIGH): `Array.prototype.includes` is
+  // shadowable in-process, and a shadowed `true` accepted any unknown class.
+  for (let index = 0; index < values.length; index += 1) {
+    if (values[index] === value) return value as T;
+  }
   throw new ForesiftError(code as ErrorCode, `unknown ${label}`, { value });
 }
 

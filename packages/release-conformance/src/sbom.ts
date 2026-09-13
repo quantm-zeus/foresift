@@ -1,6 +1,7 @@
 /** @requirement FR-TRACE-006 @acceptance AC-269 */
 import { createHash } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
+import { numericSortWith } from './shadow-safe.ts';
 
 export interface SbomComponent {
   readonly name: string;
@@ -51,7 +52,15 @@ function packageCoordinate(key: string): { name: string; version: string } | und
 export async function generateSbomFromLockfile(lockfilePath: string): Promise<SbomProjection> {
   const source = await readFile(lockfilePath, 'utf8');
   const lines = source.replace(/\r\n/g, '\n').split('\n');
-  const packagesStart = lines.findIndex((line) => line === 'packages:');
+  // Numeric scan only (audit HIGH): `Array.prototype.findIndex` is shadowable,
+  // and a shadowed result mis-locates the packages section and so the inventory.
+  let packagesStart = -1;
+  for (let index = 0; index < lines.length; index += 1) {
+    if (lines[index] === 'packages:') {
+      packagesStart = index;
+      break;
+    }
+  }
   if (packagesStart < 0) throw new Error('pnpm lockfile has no packages section');
 
   const components: SbomComponent[] = [];
@@ -73,28 +82,34 @@ export async function generateSbomFromLockfile(lockfilePath: string): Promise<Sb
         break;
       }
     }
-    components.push({ ...coordinate, integrity, type: 'npm' });
+    // Numeric append only (audit HIGH): a shadowed `push` would empty the
+    // inventory and change `inventoryHash` for a fully populated lockfile.
+    components[components.length] = { ...coordinate, integrity, type: 'npm' };
   }
 
-  const uniqueComponents = [
-    ...new Map(
-      components.map((component) => [
-        `${component.name}\u0000${component.version}\u0000${component.integrity}`,
-        component,
-      ]),
-    ).values(),
-  ];
-  uniqueComponents.sort(
+  // Numeric de-duplication and sort only (audit HIGH): `new Map(array)`,
+  // `.map`, spread, and `.sort` are all shadowable.
+  const seenCoordinates = new Set<string>();
+  const uniqueComponents: SbomComponent[] = [];
+  for (let index = 0; index < components.length; index += 1) {
+    const component = components[index] as SbomComponent;
+    const key = `${component.name}\u0000${component.version}\u0000${component.integrity}`;
+    if (seenCoordinates.has(key)) continue;
+    seenCoordinates.add(key);
+    uniqueComponents[uniqueComponents.length] = component;
+  }
+  const orderedComponents = numericSortWith(
+    uniqueComponents,
     (left, right) =>
       compareText(left.name, right.name) ||
       compareText(left.version, right.version) ||
       compareText(left.integrity, right.integrity),
   );
-  const canonicalInventory = JSON.stringify(uniqueComponents);
+  const canonicalInventory = JSON.stringify(orderedComponents);
   return {
     bomFormat: 'CycloneDX',
     specVersion: '1.5',
-    components: uniqueComponents,
+    components: orderedComponents,
     inventoryHash: sha256(canonicalInventory),
   };
 }

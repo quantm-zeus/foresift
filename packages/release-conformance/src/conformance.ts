@@ -3,6 +3,7 @@ import { constants } from 'node:fs';
 import { access, readFile, readdir } from 'node:fs/promises';
 import path from 'node:path';
 import { resolveMappings } from '@foresift/requirement-manifest';
+import { numericSortStrings, numericSortWith } from './shadow-safe.ts';
 
 export const CONFORMANCE_RULES = {
   mapping: 'NORMATIVE_MAPPING_COMPLETE',
@@ -90,7 +91,7 @@ function uniqueSortedValues(values: readonly string[]): string[] {
     }
     if (!seen) unique[unique.length] = value;
   }
-  return unique.sort();
+  return numericSortStrings(unique);
 }
 
 /** Numeric membership: `Array.prototype.includes` is shadowable (NEW-M5). */
@@ -291,12 +292,12 @@ export async function checkActiveImplementationPaths(
         (reconciledPath !== undefined &&
           (await pathRefExists(options.repoRoot, reconciledPath, scanCache)));
       if (!exists) {
-        findings.push({
+        findings[findings.length] = {
           requirementId: requirement.id,
           rule: CONFORMANCE_RULES.activePath,
           path: exactPath,
           message: `${requirement.id} maps to missing active implementation path ${exactPath}`,
-        });
+        };
       }
     }
   }
@@ -361,12 +362,12 @@ export async function checkNoPrematureImplementations(
       const exactPath = implementationPath(mappings.implementationRefs[refIndex] as string);
       if (!/^(apps|packages)\//.test(exactPath) || containsValue(openedPaths, exactPath)) continue;
       if (await pathRefExists(options.repoRoot, exactPath, scanCache)) {
-        findings.push({
+        findings[findings.length] = {
           requirementId: requirement.id,
           rule: CONFORMANCE_RULES.premature,
           path: exactPath,
           message: `${exactPath} exists for ${requirement.dependencyGroup} before its gate is open`,
-        });
+        };
       }
     }
   }
@@ -407,7 +408,7 @@ async function filesRecursively(root: string, relative = ''): Promise<readonly s
   const files: string[] = [];
   // Numeric-index walk and append (audit NEW-M5): `for…of` and array spread
   // over a directory listing are shadowable in-process.
-  const orderedEntries = entries.sort((a, b) => a.name.localeCompare(b.name));
+  const orderedEntries = numericSortWith(entries, (a, b) => a.name.localeCompare(b.name));
   for (let entryIndex = 0; entryIndex < orderedEntries.length; entryIndex += 1) {
     const entry = orderedEntries[entryIndex] as (typeof orderedEntries)[number];
     const child = path.posix.join(relative.replaceAll('\\', '/'), entry.name);
@@ -471,7 +472,7 @@ export async function checkGeneratedDocsDrift(
     const key = expectedKeys[index] as string;
     if (!containsValue(allPaths, key)) allPaths[allPaths.length] = key;
   }
-  const orderedPaths = allPaths.sort();
+  const orderedPaths = numericSortStrings(allPaths);
   const driftedFiles: string[] = [];
   for (let pathIndex = 0; pathIndex < orderedPaths.length; pathIndex += 1) {
     const relativePath = orderedPaths[pathIndex] as string;
@@ -676,7 +677,7 @@ export async function evaluateConformance(options: ConformanceOptions): Promise<
     // and array spreads iterate, so a shadowed primitive silently dropped every
     // FR-PROD requirement or every finding and the PROD block became a vacuous
     // PASS.
-    const prodRequirements: typeof manifestRequirements = [];
+    const prodRequirements: Array<(typeof manifestRequirements)[number]> = [];
     for (let index = 0; index < manifestRequirements.length; index += 1) {
       const requirement = manifestRequirements[index] as (typeof manifestRequirements)[number];
       if (requirement.id.startsWith('FR-PROD-') && requirement.dependencyGroup === activeGroup) {

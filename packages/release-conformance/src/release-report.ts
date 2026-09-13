@@ -130,16 +130,25 @@ export async function buildReleaseReport(
   const exceptionLedgerPath =
     options.exceptionLedgerPath ??
     path.join(options.repoRoot, 'packages/release-conformance/src/orphan-exceptions.json');
-  const [document, manifest, audit, sbom, migrationHashes, schemaHashes, exceptionLedger] =
-    await Promise.all([
-      readFile(documentPath),
-      readFile(manifestPath),
-      readJson(auditPath),
-      generateSbomFromLockfile(path.join(options.repoRoot, 'pnpm-lock.yaml')),
-      hashFiles(options.repoRoot, 'migrations', (name) => name.endsWith('.sql')),
-      hashFiles(options.repoRoot, 'packages/shared-schemas/src', (name) => name.endsWith('.ts')),
-      loadOrphanExceptions(exceptionLedgerPath),
-    ]);
+  const settled = await Promise.all([
+    readFile(documentPath),
+    readFile(manifestPath),
+    readJson(auditPath),
+    generateSbomFromLockfile(path.join(options.repoRoot, 'pnpm-lock.yaml')),
+    hashFiles(options.repoRoot, 'migrations', (name) => name.endsWith('.sql')),
+    hashFiles(options.repoRoot, 'packages/shared-schemas/src', (name) => name.endsWith('.ts')),
+    loadOrphanExceptions(exceptionLedgerPath),
+  ]);
+  // Numeric-index selection (audit N2): destructuring the settled array reads
+  // `Array.prototype[Symbol.iterator]`, so a surgical iterator could substitute
+  // forged inputs (for example an empty document/manifest) before hashing.
+  const document = settled[0];
+  const manifest = settled[1];
+  const audit = settled[2];
+  const sbom = settled[3];
+  const migrationHashes = settled[4];
+  const schemaHashes = settled[5];
+  const exceptionLedger = settled[6];
   const documentHash = sha256(document);
   const manifestHash = sha256(manifest);
   const auditRecord = record(audit) ? audit : {};

@@ -27,7 +27,14 @@ export const BudgetDimension = {
   NOTIFICATION: 'NOTIFICATION',
 } as const;
 export type BudgetDimension = (typeof BudgetDimension)[keyof typeof BudgetDimension];
-export const ALL_BUDGET_DIMENSIONS: readonly BudgetDimension[] = Object.values(BudgetDimension);
+// D018 freeze invariant (audit N1): these closed vocabularies are consulted on
+// the decision path (`reserveClass()` gates `protectedReserves` during
+// CAPACITY_CONTRACT activation and `parse()` is the fail-closed resolver for
+// every other vocabulary), so an in-process `push` of a forged member must not
+// be able to widen the accepted set. `Object.freeze` makes the array immutable.
+export const ALL_BUDGET_DIMENSIONS: readonly BudgetDimension[] = Object.freeze(
+  Object.values(BudgetDimension),
+);
 
 export const ProviderMode = {
   STRICT_FREE: 'STRICT_FREE',
@@ -35,7 +42,9 @@ export const ProviderMode = {
   PAID_ALLOWED: 'PAID_ALLOWED',
 } as const;
 export type ProviderMode = (typeof ProviderMode)[keyof typeof ProviderMode];
-export const ALL_PROVIDER_MODES: readonly ProviderMode[] = Object.values(ProviderMode);
+export const ALL_PROVIDER_MODES: readonly ProviderMode[] = Object.freeze(
+  Object.values(ProviderMode),
+);
 
 /**
  * The four G0 `ReserveId` spellings (RISK_MONITORING, ALERT_VERIFICATION,
@@ -53,7 +62,9 @@ export const ReserveClass = {
   EXPLORATION_PROBES: 'EXPLORATION_PROBES',
 } as const;
 export type ReserveClass = (typeof ReserveClass)[keyof typeof ReserveClass];
-export const ALL_RESERVE_CLASSES: readonly ReserveClass[] = Object.values(ReserveClass);
+export const ALL_RESERVE_CLASSES: readonly ReserveClass[] = Object.freeze(
+  Object.values(ReserveClass),
+);
 
 export const DegradationStep = {
   SKIP_ENRICHMENT_NOTEBOOK_ANALOG_COUNTERFACTUAL: 'SKIP_ENRICHMENT_NOTEBOOK_ANALOG_COUNTERFACTUAL',
@@ -69,7 +80,9 @@ export const DegradationStep = {
   RETURN_PARTIAL_INSUFFICIENT_DATA: 'RETURN_PARTIAL_INSUFFICIENT_DATA',
 } as const;
 export type DegradationStep = (typeof DegradationStep)[keyof typeof DegradationStep];
-export const ALL_DEGRADATION_STEPS: readonly DegradationStep[] = Object.values(DegradationStep);
+export const ALL_DEGRADATION_STEPS: readonly DegradationStep[] = Object.freeze(
+  Object.values(DegradationStep),
+);
 
 export const ContractResult = {
   PASS: 'PASS',
@@ -77,7 +90,9 @@ export const ContractResult = {
   UNVERIFIED: 'UNVERIFIED',
 } as const;
 export type ContractResult = (typeof ContractResult)[keyof typeof ContractResult];
-export const ALL_CONTRACT_RESULTS: readonly ContractResult[] = Object.values(ContractResult);
+export const ALL_CONTRACT_RESULTS: readonly ContractResult[] = Object.freeze(
+  Object.values(ContractResult),
+);
 
 export const ReconciliationDimension = {
   OPERATION: 'OPERATION',

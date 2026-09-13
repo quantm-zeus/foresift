@@ -20,10 +20,14 @@ import {
   checkMcpCompatibilityDrift,
   checkPostureWeakening,
   checkPublicAuthorizationWithoutGateEvidence,
+  evaluateConformance,
   evaluateDistributionAuthorization,
   evaluateProdConformance,
   SHADOW_ONLY_IMPORT_ARTIFACT_STATES,
+  type ConformanceOptions,
+  type ConformanceResult,
   type LivePathPrecomputationClaim,
+  type RequirementMapping,
 } from '../src/index.ts';
 import {
   ALL_ARTIFACT_BOUNDARY_ASSERTION_KINDS,
@@ -1296,5 +1300,150 @@ describe('NEW-M5: PROD gate fails closed under globally shadowed Array.prototype
       }
     }
     expect(failures).toEqual([]);
+  });
+});
+
+// --- NEW-N2: no app-level array destructuring on the aggregation path ---------
+
+/**
+ * Audit N2. `evaluateConformance` read its four rule verdicts with
+ * `const [mapping, activePaths, premature, generated] = await Promise.all([…])`.
+ * Language-level array destructuring reads `Array.prototype[Symbol.iterator]` on
+ * the settled result array, so a same-process caller can install a SURGICAL
+ * iterator that delegates to the original for every other array but forges four
+ * empty verdicts for the four-element Promise.all result. Before the
+ * numeric-index fix (parent 4c68856) that flipped a FAILED trace violation to a
+ * vacuous `PASSED` with zero findings. Each shadow is installed only for the
+ * call under test and always restored in a `finally`.
+ */
+describe('NEW-N2: conformance aggregation resists a surgical Symbol.iterator shadow', () => {
+  const ITERATOR_KEY = Symbol.iterator;
+
+  /**
+   * Installs a shadowed `Array.prototype[Symbol.iterator]` that forges empty rule
+   * verdicts ONLY for a four-element array whose every element carries a
+   * `findings` collection (the `Promise.all` result shaped like the four trace
+   * verdicts), and delegates to the original iterator otherwise.
+   *
+   * The returned forged iterator is a hand-built `next()` protocol object: it
+   * must NOT touch `[Symbol.iterator]` itself, or it would re-enter the shadow.
+   */
+  function installSurgicalIterator(): () => void {
+    const proto = Array.prototype as unknown as Record<symbol, unknown>;
+    const original = proto[ITERATOR_KEY];
+    function isRuleVerdictArray(value: unknown): boolean {
+      if (!Array.isArray(value) || value.length !== 4) return false;
+      for (let index = 0; index < 4; index += 1) {
+        const element = (value as unknown[])[index];
+        if (
+          element === null ||
+          typeof element !== 'object' ||
+          !('findings' in (element as object))
+        ) {
+          return false;
+        }
+      }
+      return true;
+    }
+    function forgedIterator(): { next: () => { value: unknown; done: boolean } } {
+      const forged = {
+        passed: true,
+        findings: [],
+        unmappedItems: [],
+        missingPaths: [],
+        prematurePaths: [],
+        driftedFiles: [],
+      };
+      const values: unknown[] = [forged, forged, forged, forged];
+      let index = 0;
+      return {
+        next: () => {
+          if (index < values.length) {
+            const value = values[index];
+            index += 1;
+            return { value, done: false };
+          }
+          return { value: undefined, done: true };
+        },
+      };
+    }
+    proto[ITERATOR_KEY] = function (this: unknown) {
+      if (isRuleVerdictArray(this)) return forgedIterator();
+      return (original as (this: unknown) => unknown).call(this);
+    };
+    return () => {
+      proto[ITERATOR_KEY] = original;
+    };
+  }
+
+  async function evaluateUnderSurgicalIterator(
+    options: ConformanceOptions,
+  ): Promise<ConformanceResult> {
+    const restore = installSurgicalIterator();
+    try {
+      return await evaluateConformance(options);
+    } finally {
+      restore();
+    }
+  }
+
+  // A single injected G2 requirement whose implementationRef resolves to no
+  // repository path, so the ACTIVE-implementation trace rule emits a finding
+  // deterministically (independent of the live manifest's contents).
+  const N2_TRACE_VIOLATION_REQUIREMENT: RequirementMapping = {
+    id: 'FR-MOCK-N2-001',
+    dependencyGroup: 'G2',
+    implementationRefs: ['packages/n2-missing-surface/src/index.ts @requirement FR-MOCK-N2-001'],
+    testRefs: ['tests/acceptance/AC-266.spec.ts'],
+    owner: 'packages/release-conformance',
+  };
+  // A fully compliant PROD claim set, so the PROD block contributes zero
+  // findings and the ONLY failure is the trace violation above: that is exactly
+  // the corpus the forge would otherwise silence.
+  const N2_COMPLIANT_PROD_CLAIMS = {
+    activationClaims: [PROD_COMPLIANT_ACTIVE_CLAIM],
+    postureDeclarations: [PROD_BEST_EFFORT_COMPLIANT],
+    mcpCompatibility: PROD_MCP_COMPLIANT_CLAIM,
+    livePaths: [PROD_LIVE_PATH_BOUNDED_CLAIM],
+    distributionAuthorizations: [PROD_WORKSPACE_AUTHORIZED_CLAIM, PROD_TECHNICALLY_READY_CLAIM],
+  };
+
+  it('does not let forged verdicts flip a trace-violating corpus to PASSED (N2)', async () => {
+    const options: ConformanceOptions = {
+      repoRoot: REPO_ROOT,
+      milestone: 'G2',
+      requirements: [N2_TRACE_VIOLATION_REQUIREMENT],
+      prodClaims: N2_COMPLIANT_PROD_CLAIMS,
+    };
+    const baseline = await evaluateConformance(options);
+    expect(baseline.overall).toBe('FAILED');
+    expect(baseline.findings.map((finding) => finding.rule)).toContain(
+      CONFORMANCE_RULES.activePath,
+    );
+
+    const attacked = await evaluateUnderSurgicalIterator(options);
+    expect(attacked.overall).toBe('FAILED');
+    expect(attacked.findings.length).toBeGreaterThan(0);
+    expect(attacked.findings.map((finding) => finding.rule)).toContain(
+      CONFORMANCE_RULES.activePath,
+    );
+  });
+
+  it('keeps the PROD findings present while the iterator is shadowed (N2)', async () => {
+    const attacked = await evaluateUnderSurgicalIterator({
+      repoRoot: REPO_ROOT,
+      milestone: 'G2',
+      prodClaims: {
+        activationClaims: [PROD_ACTIVE_WITHOUT_GATE_CLAIM],
+        postureDeclarations: [PROD_BEST_EFFORT_WEAKENING],
+        mcpCompatibility: PROD_MCP_DRAFT_DEFAULT_CLAIM,
+        livePaths: [PROD_LIVE_PATH_NO_BOUND_CLAIM],
+        distributionAuthorizations: [PROD_PUBLIC_AUTHORIZED_MISSING_CLAIM],
+      },
+    });
+    expect(attacked.overall).toBe('FAILED');
+    expect(attacked.findings.map((finding) => finding.rule)).toContain(
+      PROD_RULES.activationWithoutEvidence,
+    );
   });
 });

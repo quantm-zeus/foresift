@@ -640,7 +640,7 @@ export async function evaluateConformance(options: ConformanceOptions): Promise<
   // rules only.
   const manifestRequirements =
     options.requirements === undefined ? requirements : await loadRequirements(options.repoRoot);
-  const [mapping, activePaths, premature, generated] = await Promise.all([
+  const settled = await Promise.all([
     Promise.resolve(checkMappingCompleteness({ requirements })),
     checkActiveImplementationPaths({
       repoRoot: options.repoRoot,
@@ -662,6 +662,14 @@ export async function evaluateConformance(options: ConformanceOptions): Promise<
         : { regenerate: options.regenerateGeneratedDocs }),
     }),
   ]);
+  // Numeric-index selection (audit N2): `const [a, b, …] =` destructuring reads
+  // `Array.prototype[Symbol.iterator]` on the settled result array, so a
+  // surgical iterator could substitute forged empty rule verdicts and flip a
+  // FAILED gate to a vacuous PASSED. Read each position by index instead.
+  const mapping = settled[0];
+  const activePaths = settled[1];
+  const premature = settled[2];
+  const generated = settled[3];
   // The PROD rules are part of the authoritative release gate for every
   // milestone that owns FR-PROD law (audit H1). Imported lazily so the module
   // graph stays acyclic and injected unit checks stay repository-independent.

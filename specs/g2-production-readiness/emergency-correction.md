@@ -94,3 +94,28 @@ then.
   cannot synthesise it. The authoritative prod-capable gate is
   `evaluateConformance`, which CI exercises with violating and compliant claim
   corpora.
+
+## Closure (2026-09-13)
+
+The correction landed as PR #294 (squash `e782ce7`). Three fresh-context
+adversarial review rounds and two independent convergence audits were run
+against the branch. The final audit, on pre-merge head `c704320`, reported
+`NO CRITICAL/HIGH FINDINGS — READY FOR PROVEN` after independently reproducing
+every round-1/round-2 exploit (activation-kind forgery, empty-event SQL bypass,
+MCP opt-in bypass, conformance wiring, migration upgrade path, quarantine
+resolution, dimension/kind binding, refusal persistence, rollback approval,
+SLA_BACKED, dependency-order bypass, MCP staleness, alpha set binding) and the
+four round-2 HIGHs (raw-SQL replay, `scope_hash`/containment evasion,
+`evaluateConformance` milestone downgrade, caller-controlled persisted expiry).
+
+Exact-SHA evidence at `c704320`: `pnpm spec:verify`, `pnpm format:check`,
+`pnpm lint`, `pnpm typecheck`, the coordinated `pnpm test:all`
+(`{"ok":true,"groups":39}`) and CI run `34749869829` (Fast Gates, Pure,
+Process/Meta-Gate, Database PGlite, Verify) are all green.
+
+The one residual design observation the final audit recorded — an in-process
+`evaluateConformance({milestone: 'G0' | 'G1'})` override legitimately selects a
+group that owns no FR-PROD requirement, so a violating claim corpus supplied to
+that call passes — is documented rather than "fixed": AC-266 depends on the
+explicit G0 override, and the production CLI/bridge never overrides the
+milestone. It is recorded in `DECISIONS.md` D013.

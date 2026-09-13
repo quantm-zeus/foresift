@@ -1,21 +1,24 @@
 # Tasks: g2-production-readiness
 
-> **EMERGENCY CORRECTION — proof REOPENED (2026-09-13).** The PROVEN flip
-> landed as `e5fcc06` (PR #292) is revoked by an independent adversarial
-> audit that found release-blocking defects still present on `main`
-> (`.deepseek-handoff/ACCELERATOR_PROD_AUDIT.md`): 3 CRITICAL
-> (activation-kind/skip forgery, SQL empty-event bypass, MCP opt-in bypass)
-> and 10 HIGH (dead prod conformance rules, conformance fail-open,
-> migration upgrade-path refusal, trust-boundary quarantine gap, unbound
-> gate booleans, unpersisted refusals, hollow rollback, vacuous SLA_BACKED,
-> dependency-group bypass, MCP staleness/alpha binding). The package is
-> **RUNNING / REOPENED**; history is preserved (no task is deleted and no
-> prior evidence is rewritten). `T039` is reset to unchecked and Phase 10
-> adds the bounded correction tasks `T040`–`T052`. PROVEN may only be
-> restored after the exploit/regression and upgrade-path suites pass, a
-> **new** fresh-context independent convergence audit reports no
-> CRITICAL/HIGH finding, and exact-SHA CI is green. Admin-control and
-> recovery-continuity promotion is frozen until then.
+> **EMERGENCY CORRECTION — proof REOPENED then RE-PROVEN (2026-09-13).**
+> The PROVEN flip `e5fcc06` (PR #292) was correct to revoke: an independent
+> adversarial audit found 3 CRITICAL + 10 HIGH release-blocking defects on
+> `main` (`.deepseek-handoff/ACCELERATOR_PROD_AUDIT.md`). The correction landed
+> as PR #294 (squash `e782ce7`) after three adversarial review rounds plus two
+> independent convergence audits, the last of which returned
+> **"NO CRITICAL/HIGH FINDINGS — READY FOR PROVEN"** at the pre-merge head
+> `c704320` with exact-SHA CI green (run 34749869829). Phase 10 tasks
+> `T040`–`T052` are complete; history is preserved (`4c09096` flipped the state
+> back to RUNNING without deleting any evidence). PROVEN is restored by the
+> follow-up planning PR whose head is this file's revision.
+>
+> Accepted residual MEDIUMs (recorded in `DECISIONS.md` D013 and
+> `emergency-correction.md`): `clearContainment` step-up/actor/reason +
+> ActionGate, SQL/Drizzle parity for defaults/constraints/indexes/triggers,
+> two-way telemetry parity, AC-150/151/153 fixture-echo positives, the
+> evidence trust boundary (caller-supplied statistical verdicts), module binding
+> for evaluation rows, and an explicit `evaluateConformance({milestone:'G0'|'G1'})`
+> override selecting a non-PROD group.
 
 **Input**: `specs/g2-production-readiness/spec.md`, `specs/g2-production-readiness/plan.md`
 **Traceability rule**: every task cites at least one assigned requirement
@@ -413,7 +416,7 @@ cross-artifact convergence.
 
 ## Phase 9 — Convergence
 
-- [ ] T039 [serial-reason: COORDINATOR_BOUNDARY] Run cross-artifact
+- [x] T039 [serial-reason: COORDINATOR_BOUNDARY] Run cross-artifact
       consistency analysis per the speckit-analyze methodology across
       spec.md, plan.md, and tasks.md (requirement coverage of all six
       FR-PROD IDs and all fourteen ACs; no out-of-scope requirement tracing;
@@ -432,7 +435,7 @@ Each task below closes one audited defect and lands a direct negative
 regression (exploit) test; `specs/g2-production-readiness/emergency-correction.md`
 carries the finding-to-task map and the verbatim reproductions.
 
-- [ ] T040 [serial-reason: SHARED_FILE] Persist and bind the activation kind:
+- [x] T040 [serial-reason: SHARED_FILE] Persist and bind the activation kind:
       `activation_kind` on `prod.activation_gate_evaluations` and
       `prod.module_states`, `NOT_APPLICABLE` (not `PASS`) for gates outside
       the requested kind's required set, kind-filtered
@@ -441,57 +444,57 @@ carries the finding-to-task map and the verbatim reproductions.
       Negative: record OPERATIONAL, then attempt OPPORTUNITY/WORKSPACE/PUBLIC
       ACTIVE — must refuse. Closes C1, H5. Traces: FR-PROD-001, FR-PROD-002,
       AC-152, AC-154.
-- [ ] T041 [serial-reason: ORDERED_MIGRATION] SQL fail-closed on the empty
+- [x] T041 [serial-reason: ORDERED_MIGRATION] SQL fail-closed on the empty
       activation-event reference: `length(activation_event_ref) > 0` CHECK on
       `prod.module_states` and removal of the `''` early return in the
       evidence trigger. Negative: raw ACTIVE INSERT with `''` and zero
       evaluation rows must refuse. Closes C2. Traces: FR-PROD-001,
       FR-PROD-002, AC-152.
-- [ ] T042 [serial-reason: SHARED_FILE] Resolve MCP opt-ins only through the
+- [x] T042 [serial-reason: SHARED_FILE] Resolve MCP opt-ins only through the
       registered compatibility matrix: each `optInRevisions` entry must be
       registered, `DRAFT`, and mutually tested, else refuse. Negative:
       unregistered `2099-01-01-evil` opt-in must refuse. Closes C3. Traces:
       FR-PROD-003, AC-144.
-- [ ] T043 Wire the five PROD conformance rules into the authoritative
+- [x] T043 Wire the five PROD conformance rules into the authoritative
       release gate through a repo-backed bridge and make
       `evaluateProdConformance` fail closed on omitted input, empty required
       gate sets, and unknown readiness strings; negative: `{}`,
       `requiredGateKinds: []`, and unrecognized readiness all FAIL. Closes
       H1, H2. Traces: FR-PROD-001, FR-PROD-002, FR-PROD-004, AC-272.
-- [ ] T044 [serial-reason: SHARED_INVARIANT] Give an upgraded database a
+- [x] T044 [serial-reason: SHARED_INVARIANT] Give an upgraded database a
       valid additive migration path without weakening the out-of-order
       invariant: scope the refusal to an already-applied family and prove a
       pre-prod-main database (all `g0_*`/`g1_*`/`g2_wf_*` applied, no
       `g2_prod_*`) converges to the same schema fingerprint as a fresh apply.
       Closes H3. Traces: FR-PROD-001…006.
-- [ ] T045 Resolve every `IMPORT_SHADOW_ONLY` boundary assertion through the
+- [x] T045 Resolve every `IMPORT_SHADOW_ONLY` boundary assertion through the
       real `ImportGate` and require `VALIDATING`/`SHADOW_ELIGIBLE`; negative:
       a live path referencing a `RECEIVED`/`REJECTED` artifact must refuse.
       Closes H4. Traces: FR-PROD-006, AC-275.
-- [ ] T046 Persist every activation-gate evaluation, PASS and REFUSE, with a
+- [x] T046 Persist every activation-gate evaluation, PASS and REFUSE, with a
       batch identity so a newer refusal invalidates older PASS evidence.
       Negative: PASS then REFUSE for the same event refuses ACTIVE. Closes
       H6. Traces: FR-PROD-002, AC-154.
-- [ ] T047 Require a genuinely previously `ACTIVE`/authorized row with a
+- [x] T047 Require a genuinely previously `ACTIVE`/authorized row with a
       matching non-null activation event for rollback and repair the hollow
       AC-279 path; negative: fabricated prior event and IMPLEMENTED/NULL-event
       rows must refuse. Closes H7. Traces: FR-PROD-006, AC-279.
-- [ ] T048 Require ≥1 critical dependency and a passing capacity contract
+- [x] T048 Require ≥1 critical dependency and a passing capacity contract
       before `SLA_BACKED`; negative: empty critical register cannot declare
       `SLA_BACKED`. Closes H8. Traces: FR-PROD-004.
-- [ ] T049 Derive dependency-group `dependsOn` from the manifest-backed order
+- [x] T049 Derive dependency-group `dependsOn` from the manifest-backed order
       view and refuse caller disagreement; negative: `dependsOn: []` cannot
       mark G7 COMPLETE while G0…G6 are OPEN. Closes H9. Traces: FR-PROD-005.
-- [ ] T050 MCP conformance provenance/staleness: require the newest in-window
+- [x] T050 MCP conformance provenance/staleness: require the newest in-window
       run whose `fixture_ref` equals the cell's, clamp the caller staleness
       override, and bind the precomputed-alpha request to the expected
       `artifactSetHash`. Closes H10. Traces: FR-PROD-003, FR-PROD-006.
-- [ ] T051 [serial-reason: SHARED_INVARIANT] Correct the cheap MEDIUM defects
+- [x] T051 [serial-reason: SHARED_INVARIANT] Correct the cheap MEDIUM defects
       the correction touches: Zod parity for the new/0005 columns,
       `scope_hash` immutability and open-containment enforcement in SQL, and
       drop `SHADOW` from `ESTABLISHES_AVAILABLE`. Traces: FR-PROD-001,
       FR-PROD-002.
-- [ ] T052 [serial-reason: COORDINATOR_BOUNDARY] Fresh-context adversarial
+- [x] T052 [serial-reason: COORDINATOR_BOUNDARY] Fresh-context adversarial
       re-review of the correction diff, exploit-suite replay, full prescribed
       gates and exact-SHA CI; restore PROVEN only when the new convergence
       audit reports no CRITICAL/HIGH finding. Traces: FR-PROD-001…006.

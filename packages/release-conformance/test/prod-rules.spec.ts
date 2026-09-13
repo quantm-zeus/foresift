@@ -168,6 +168,40 @@ describe('PROD rule 4: live-path precomputation violation (AC-279)', () => {
     expect(report.passed).toBe(false);
     expect(report.findings.length).toBeGreaterThan(0);
   });
+
+  it('reports a non-JSON-serializable (BigInt) import state instead of throwing (LOW)', () => {
+    // `importArtifactState` is untrusted in-process input: a BigInt on the
+    // assertion must yield a finding, never a `JSON.stringify` TypeError that
+    // crashes the rule (and, with it, the whole conformance evaluation).
+    const boundaryAssertions: readonly ArtifactBoundaryAssertion[] = [
+      { assertionKind: 'NO_HEAVY_JOB', verdict: 'PASS', importArtifactRef: null },
+      { assertionKind: 'NO_IMPORT', verdict: 'PASS', importArtifactRef: null },
+      { assertionKind: 'NO_PROVIDER_CALL', verdict: 'PASS', importArtifactRef: null },
+      {
+        assertionKind: 'IMPORT_SHADOW_ONLY',
+        verdict: 'PASS',
+        importArtifactRef: 'import-artifact-bigint',
+        importArtifactState: 123n as unknown as string,
+      },
+    ];
+    const claim: LivePathPrecomputationClaim = {
+      ...PROD_LIVE_PATH_BOUNDED_CLAIM,
+      boundaryAssertions,
+    };
+    let report: ReturnType<typeof checkLivePathPrecomputationViolation> | undefined;
+    expect(() => {
+      report = checkLivePathPrecomputationViolation([claim]);
+    }).not.toThrow();
+    expect(report?.passed).toBe(false);
+    const finding = report?.findings.find((candidate) =>
+      candidate.message.includes('IMPORT_SHADOW_ONLY must reference an import artifact'),
+    );
+    expect(finding).toBeDefined();
+    expect(finding?.rule).toBe(PROD_RULES.livePathPrecomputationViolation);
+    // The decision is unchanged (a non-shadow state refuses) and the message is
+    // total; the BigInt is rendered rather than throwing.
+    expect(finding?.message).toContain('got 123');
+  });
 });
 
 describe('PROD rule 5: public authorization without gate evidence (AC-272/273/275/276/277)', () => {

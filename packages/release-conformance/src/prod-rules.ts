@@ -450,6 +450,23 @@ export const SHADOW_ONLY_IMPORT_ARTIFACT_STATES: readonly string[] =
   );
 
 /**
+ * Render an untrusted import-artifact state for a finding message. The value
+ * reaches the rule in-process (never through JSON), so it may be any shape —
+ * including a `BigInt`, on which `JSON.stringify` throws. A finding must never
+ * become a throw: when JSON serialization is impossible, fall back to the
+ * total `String(...)` rendering. This mirrors the template-string rendering of
+ * `undefined` for values JSON drops, so the message stays stable.
+ */
+function renderImportArtifactState(value: unknown): string {
+  try {
+    const rendered = JSON.stringify(value);
+    return rendered === undefined ? 'undefined' : rendered;
+  } catch {
+    return String(value);
+  }
+}
+
+/**
  * §33.7/§10.3/§35.14/AC-279 law. A live path must serve only a bounded,
  * unexpired precomputed lookup within every declared ceiling, and its exported
  * artifact-boundary assertion set must hold (no heavy Alpha Lab job, no
@@ -543,7 +560,7 @@ export function checkLivePathPrecomputationViolation(
         report(
           `IMPORT_SHADOW_ONLY must reference an import artifact in ${SHADOW_ONLY_IMPORT_ARTIFACT_STATES.join(
             '/',
-          )}; got ${JSON.stringify(importState ?? null)}`,
+          )}; got ${renderImportArtifactState(importState ?? null)}`,
         );
       }
     }

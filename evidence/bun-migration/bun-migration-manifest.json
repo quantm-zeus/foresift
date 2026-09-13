@@ -1,7 +1,7 @@
 {
   "schema": "foresift/bun-migration-manifest@1",
   "migrationId": "bun-test-authority-v1",
-  "generatedAt": "2026-09-13T17:15:07.178Z",
+  "generatedAt": "2026-09-13T17:51:06.079Z",
   "root": ".",
   "totalTestFiles": 602,
   "counts": {
@@ -1540,9 +1540,9 @@
     {
       "path": "packages/domain/test/capacity.spec.ts",
       "package": "@foresift/domain",
-      "bytes": 6225,
-      "lines": 176,
-      "sha256": "90304b9ef5b84b7557973e639a81ba2ef05fe5b95df90aff71e0d0b7aeb45b09",
+      "bytes": 8842,
+      "lines": 227,
+      "sha256": "5e9322ad0f0065ecae8b2783d6145f2ecca27449d624c5e84de469249a9ae475",
       "imports": ["bun:test", "../src/capacity.ts", "../src/cost.ts", "../src/errors.ts"],
       "vitestImports": [],
       "features": [],
@@ -3676,9 +3676,9 @@
     {
       "path": "packages/release-conformance/test/prod-rules.spec.ts",
       "package": "@foresift/release-conformance",
-      "bytes": 52656,
-      "lines": 1301,
-      "sha256": "708dff41f83a95c9fc42f78bb7c7811d4225ef1a3a092852cc8554b85cf61c9c",
+      "bytes": 58503,
+      "lines": 1450,
+      "sha256": "09b85d909e7136b229990c3abbf86dd1c311073d76970cc9c1eb9812ca472a11",
       "imports": [
         "bun:test",
         "node:fs/promises",

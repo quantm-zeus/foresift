@@ -280,14 +280,22 @@ export function detectOrphanSources(
           path.join(options.repoRoot, 'packages/release-conformance/src/orphan-exceptions.json'),
         ),
         mappings,
-      ]).then(([ledger, manifestMappings]) => {
+      ]).then((settledExceptionLoad) => {
+        // Numeric index reads, never array destructuring (audit N2 class): a
+        // surgical `Symbol.iterator` shadow must not be able to forge the
+        // ledger/manifest pair and silence the exception validation.
+        const ledger = settledExceptionLoad[0];
+        const manifestMappings = settledExceptionLoad[1];
         const validation = validateOrphanExceptionLedger(ledger, manifestMappings.requirementIds);
         if (!validation.valid) {
           throw new Error(`invalid orphan exception ledger: ${validation.errors.join('; ')}`);
         }
         return ledger.exceptions;
       }),
-  ]).then(([productFiles, implementationRefs, exceptions]) =>
-    evaluateOrphans(productFiles, implementationRefs, exceptions),
-  );
+  ]).then((settledOrphans) => {
+    const productFiles = settledOrphans[0];
+    const implementationRefs = settledOrphans[1];
+    const exceptions = settledOrphans[2];
+    return evaluateOrphans(productFiles, implementationRefs, exceptions);
+  });
 }

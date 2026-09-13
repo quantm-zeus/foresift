@@ -166,6 +166,8 @@ export class AlertContentRefusedError extends ForesiftError {
 }
 
 const NOT_APPLICABLE = 'NOT_APPLICABLE' as const;
+/** The explicit §67.4 missing-data marker for unknown social coverage. */
+export const SOCIAL_UNAVAILABLE_MISSING_DATA = 'social_capability:SOCIAL_UNAVAILABLE' as const;
 const EARLY_WATCH_CAPACITY_CAVEAT =
   'EARLY_WATCH makes no capacity, execution, or utility claim; coverage is incomplete.';
 
@@ -247,19 +249,28 @@ export function renderAlertContent(input: AlertContentRenderInput): RenderedAler
   const alertClass = input.classification.alertClass;
   const template = policy.content.template;
 
-  // FR-ALERT-002: the language law is mechanical and runs on every class whose
-  // policy forbids high-conviction language (notably EARLY_WATCH).
-  assertHighConvictionLanguageAllowed(
-    alertClass,
-    [input.candidateHeadline, input.narrative.whyEarly, input.narrative.counterThesis].join('\n'),
-  );
+  // AC-142/§67.4: the classification's social coverage is authoritative. A
+  // caller-supplied state that contradicts it is refused rather than rendered,
+  // so a positive/negative claim can never suppress the missing-data marker.
+  const classificationUnknownCoverage = input.classification.socialUnknownCoverage;
+  const callerUnknownCoverage = socialIsUnknownCoverage(input.socialCapabilityState);
+  if (classificationUnknownCoverage !== callerUnknownCoverage) {
+    throw new ForesiftError(
+      ErrorCode.CONTRACT_INVARIANT_VIOLATED,
+      'renderer social capability state contradicts the classification social coverage (§67.4)',
+      {
+        classificationUnknownCoverage,
+        callerSocialCapabilityState: input.socialCapabilityState,
+      },
+    );
+  }
 
   const suppressionReasons = suppressionReasonsFor(input);
 
   const augmentation: string[] = [];
-  if (socialIsUnknownCoverage(input.socialCapabilityState)) {
+  if (classificationUnknownCoverage) {
     // §67.4: absent social capability is explicit missing data, never negative.
-    augmentation.push('social_capability:SOCIAL_UNAVAILABLE');
+    augmentation.push(SOCIAL_UNAVAILABLE_MISSING_DATA);
   }
   if (policy.content.requiresOpportunityEnvelope) {
     const missing = requireOpportunityFields(input);
@@ -348,6 +359,16 @@ export function renderAlertContent(input: AlertContentRenderInput): RenderedAler
   };
 
   const envelope = parseAlertSchema('OpportunityContentEnvelope', envelopeInput);
+  // FR-ALERT-002: the law is mechanical and runs over the canonical
+  // serialization of the WHOLE delivered envelope — every string field
+  // (evidence, risk, missing data, disclaimer, sources, …) plus the delivered
+  // headline — for every class whose policy forbids high-conviction language
+  // (always EARLY_WATCH). Conviction prose can no longer hide in a field the
+  // old three-field scan did not read.
+  assertHighConvictionLanguageAllowed(
+    alertClass,
+    `${canonicalJson(envelope)}\n${input.candidateHeadline}`,
+  );
   const headlineSuppressed = suppressionReasons.length > 0;
   // A withheld headline must never be replaced by positive phrasing that §26.8
   // forbids surfacing; the envelope keeps the neutral narrative instead.

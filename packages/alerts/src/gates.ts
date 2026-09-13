@@ -427,9 +427,53 @@ const GATE_EVALUATORS: Readonly<
   STRICT_FREE_COST_POLICY: gateStrictFreeCostPolicy,
 });
 
+/** The gate-input field each §26.3 gate consumes. */
+const GATE_INPUT_FIELD: Readonly<
+  Record<ConfirmedOpportunityGate, keyof ConfirmedOpportunityGateInput>
+> = Object.freeze({
+  DECISION_ALERT: 'decision',
+  NO_CRITICAL_RISK: 'criticalRisk',
+  PROFILE_ELIGIBILITY: 'profileEligibility',
+  MINIMUM_DATA_COVERAGE: 'dataCoverage',
+  MINIMUM_INDEPENDENT_EVIDENCE_GROUPS: 'independentEvidence',
+  FRESHNESS: 'freshness',
+  SEMANTIC_VALIDATION: 'semanticValidation',
+  UNRESOLVED_CONFLICT_THRESHOLD: 'unresolvedConflict',
+  FINGERPRINT_COOLDOWN: 'fingerprintCooldown',
+  DAILY_SCHEDULE_BUDGET: 'dailyScheduleBudget',
+  EXECUTION_AWARE_TRADABILITY: 'executionTradability',
+  ALERT_NOT_EXPIRED: 'expiryActionability',
+  SOLANA_SECURITY_CHECKS: 'solanaSecurity',
+  STRICT_FREE_COST_POLICY: 'costPolicy',
+});
+
+/** The sentinel marking an unrecognised field in the provided gate input. */
+const UNKNOWN_FIELD_SENTINEL = '__unknown__' as const;
+
+/**
+ * Schema-validate every PROVIDED field of a (possibly partial) gate input. The
+ * evaluator stays total over absent fields (an absent field is a refusal, never
+ * a silent pass), but a provided field whose shape is invalid — an unknown
+ * `riskState`, an empty fingerprint, an extra key — must fail closed rather than
+ * being read as if it were well formed.
+ */
+function invalidGateInputFields(input: ConfirmedOpportunityGateInput): ReadonlySet<string> {
+  const invalid = new Set<string>();
+  const record = input as unknown as Record<string, unknown>;
+  for (const [field, schema] of Object.entries(ConfirmedOpportunityGateInputSchema.shape)) {
+    if (!Object.prototype.hasOwnProperty.call(record, field)) continue;
+    if (!schema.safeParse(record[field]).success) invalid.add(field);
+  }
+  for (const key of Object.keys(record)) {
+    if (!(key in ConfirmedOpportunityGateInputSchema.shape)) invalid.add(UNKNOWN_FIELD_SENTINEL);
+  }
+  return invalid;
+}
+
 /**
  * The one total, ordered, pure §26.3 gate function. Returns every gate result
- * in canonical order; a missing input is a refusal, never a silent pass.
+ * in canonical order; a missing input is a refusal, never a silent pass, and a
+ * provided-but-structurally-invalid field refuses its gate fail-closed.
  */
 export function evaluateConfirmedOpportunityGates(
   input: ConfirmedOpportunityGateInput | null | undefined,
@@ -437,7 +481,12 @@ export function evaluateConfirmedOpportunityGates(
   if (input === null || input === undefined) {
     return ALL_CONFIRMED_OPPORTUNITY_GATES.map((gate) => refuse(gate, GENERIC_REFUSAL));
   }
-  return ALL_CONFIRMED_OPPORTUNITY_GATES.map((gate) => GATE_EVALUATORS[gate](input));
+  const invalid = invalidGateInputFields(input);
+  return ALL_CONFIRMED_OPPORTUNITY_GATES.map((gate) =>
+    invalid.has(UNKNOWN_FIELD_SENTINEL) || invalid.has(GATE_INPUT_FIELD[gate])
+      ? refuse(gate, GENERIC_REFUSAL)
+      : GATE_EVALUATORS[gate](input),
+  );
 }
 
 /** True iff all fourteen gates passed; an incomplete/foreign set is false. */

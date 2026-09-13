@@ -26,6 +26,7 @@ import {
   ForesiftError,
   actionabilityFor,
   latencyBudgetOutcomeFor,
+  socialIsUnknownCoverage,
   type AlertFingerprintInput,
   type ShadowInfluenceKind,
 } from '@foresift/domain';
@@ -42,6 +43,7 @@ import {
   type AlertClassificationOutcome,
 } from './classification.ts';
 import type { RenderedAlertContent } from './content.ts';
+import { SOCIAL_UNAVAILABLE_MISSING_DATA } from './content.ts';
 import { deriveAlertFingerprint } from './fingerprints.ts';
 
 /** §33.1: alert delivery after decision commit is budgeted at 30 seconds. */
@@ -103,6 +105,33 @@ function assertCommittable(input: CommitAlertInput): void {
       ErrorCode.CONTRACT_INVARIANT_VIOLATED,
       'rendered content class does not match the classified alert class',
       { classified: input.classification.alertClass, rendered: input.content.alertClass },
+    );
+  }
+  // AC-142/§67.4: the committed payload must agree with the classification's
+  // social coverage. A contradiction or a missing explicit marker can never
+  // reach the engine commit boundary, even from a hand-built RenderedAlertContent.
+  const classificationUnknownCoverage = input.classification.socialUnknownCoverage;
+  const renderedUnknownCoverage = socialIsUnknownCoverage(
+    input.content.envelope.socialCapabilityState,
+  );
+  if (classificationUnknownCoverage !== renderedUnknownCoverage) {
+    throw new ForesiftError(
+      ErrorCode.CONTRACT_INVARIANT_VIOLATED,
+      'committed content social capability state contradicts the classification social coverage (§67.4)',
+      {
+        classificationUnknownCoverage,
+        renderedSocialCapabilityState: input.content.envelope.socialCapabilityState,
+      },
+    );
+  }
+  if (
+    classificationUnknownCoverage &&
+    !input.content.missingData.includes(SOCIAL_UNAVAILABLE_MISSING_DATA)
+  ) {
+    throw new ForesiftError(
+      ErrorCode.CONTRACT_INVARIANT_VIOLATED,
+      'unknown social coverage must be committed as explicit missing data (§67.4)',
+      { missingMarker: SOCIAL_UNAVAILABLE_MISSING_DATA },
     );
   }
 }

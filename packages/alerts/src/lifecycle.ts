@@ -13,9 +13,13 @@
  * `commitAlertUpdate` persists the decision in ONE transaction: the
  * `alert.alert_updates` row (UNIQUE idempotency key, so a replay collapses),
  * the engine's §26.5 decision/alert/outbox commit (via slice-2 `commitAlert`),
- * and the fingerprint/cooldown ledger advance. A duplicate inside the recorded
- * cooldown is suppressed; a §33.9 budget-exceeded update is suppressed rather
- * than delivered late.
+ * and the fingerprint/cooldown ledger advance. That single outer transaction is
+ * the accepted plan-D1/ADR-0025 seam: the engine still owns commit/rollback and
+ * exactly-once delivery, and its `commitDecisionWithOutbox` re-enters the
+ * transaction as a savepoint, so a failure inside the engine commit rolls the
+ * alert-owned update row and ledger advance back with it. A duplicate inside the
+ * recorded cooldown is suppressed; a §33.9 budget-exceeded update is suppressed
+ * rather than delivered late.
  *
  * Strictly read-only: the lifecycle only decides whether intelligence may be
  * delivered; nothing here can trade, hold custody, sign, handle private keys, or
@@ -56,7 +60,12 @@ import {
   type AlertClassificationOutcome,
 } from './classification.ts';
 import { renderAlertContent, type RenderedAlertContent } from './content.ts';
-import { alertPolicyFor, type AlertPolicy, type AlertPolicyRegistry } from './policies.ts';
+import {
+  alertPolicyFor,
+  validUntilFromPolicy,
+  type AlertPolicy,
+  type AlertPolicyRegistry,
+} from './policies.ts';
 import {
   cooldownUntilFrom,
   contentAddressHex,
@@ -423,11 +432,11 @@ export function buildUpdateNotification(
   const decisionId = `adec_${hashHex}`;
   const outboxId = `aout_${hashHex}`;
   const cancellationState = candidate.reassessment.cancellationState;
-  const actionabilityState = actionabilityFor(
-    candidate.reassessment.validUntil,
-    cancellationState,
-    now,
-  );
+  // FR-ALERT-002/plan D3: the update notification's validity window is derived
+  // from the resolved class TTL rather than taken verbatim from the caller, so
+  // the per-class TTL (and its persisted override) actually governs expiry.
+  const validUntil = validUntilFromPolicy(candidate.policy, context.deliveredAt);
+  const actionabilityState = actionabilityFor(validUntil, cancellationState, now);
 
   const classification = classifiedUpdateOutcome(
     candidate.alertClass,
@@ -464,7 +473,7 @@ export function buildUpdateNotification(
       sources: [],
       freshness: context.evidenceTimestamp,
     },
-    validUntil: candidate.reassessment.validUntil,
+    validUntil,
     actionabilityState,
     cancellationState,
     evidenceTimestamp: context.evidenceTimestamp,

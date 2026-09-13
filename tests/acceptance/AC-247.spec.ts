@@ -266,9 +266,14 @@ describe('AC-247 alert-scoped extension: a retrospective estimate cannot alter a
     expect(outcome.alertClass).toBeNull();
     // The frozen historical evidence count is byte-identical after the replay.
     expect(alertFx.FROZEN_HISTORICAL_CREDIT_INPUT).toEqual(before);
-    expect(alertFx.FROZEN_HISTORICAL_CREDIT_INPUT.independentEvidence?.independentGroupCount).toBe(
-      alertFx.FROZEN_HISTORICAL_EVIDENCE_COUNT,
+    // Observable outcome, not a fixture echoing itself: the frozen
+    // below-minimum count refuses the independent-evidence gate and the alert is
+    // suppressed with the typed reason.
+    const evidenceGate = outcome.gates.find(
+      (gate) => gate.gate === 'MINIMUM_INDEPENDENT_EVIDENCE_GROUPS',
     );
+    expect(evidenceGate?.passed).toBe(false);
+    expect(outcome.suppressionReason).toBe('GATE_REFUSED');
   });
 
   it('refuses to carry a retrospective dependence estimate into the frozen gate input', () => {

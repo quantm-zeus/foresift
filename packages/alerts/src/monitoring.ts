@@ -31,6 +31,7 @@ import {
 } from '@foresift/domain';
 import type { DatabaseEngine } from '@foresift/persistence';
 import { ALERT_DELIVERY_LATENCY_BUDGET_MS } from './commit.ts';
+import { loadAlertPolicies, type AlertPolicyRegistry } from './policies.ts';
 import {
   AlertPriorEvent,
   buildUpdateNotification,
@@ -99,7 +100,19 @@ export interface SweepAlertLifecycleInput {
   readonly limit?: number;
   readonly budgetMs?: number;
   readonly channel?: string;
+  /**
+   * The reassessment source. REQUIRED whenever a due prior is actionable: a
+   * missing source fails closed with a typed error instead of silently reporting
+   * every due prior SKIPPED.
+   */
   readonly source?: AlertReassessmentSource;
+  /**
+   * The persisted per-class policy registry. When omitted the sweep LOADS the
+   * active `alert.alert_policies` rows, so persisted TTL/cooldown/thresholds
+   * govern the update path and the in-code defaults are only the per-class
+   * fallback for classes with no persisted row (plan D2).
+   */
+  readonly registry?: AlertPolicyRegistry;
 }
 
 interface DueAlertRow {
@@ -165,6 +178,10 @@ export async function sweepAlertLifecycle(
     );
   }
 
+  // plan D2: the durable `alert.alert_policies` rows are the authority. A
+  // persisted per-class row overrides the in-code default for that class only.
+  const registry = input.registry ?? (await loadAlertPolicies(engine));
+
   const due = await engine.query<DueAlertRow>(SELECT_DUE_ALERTS, [limit]);
   const outcomes: AlertSweepOutcomeRow[] = [];
 
@@ -187,7 +204,16 @@ export async function sweepAlertLifecycle(
       continue;
     }
 
-    const candidate = input.source === undefined ? null : input.source(prior, now);
+    if (input.source === undefined) {
+      // F7: a missing reassessment source must not masquerade as "nothing to
+      // do"; every due prior would otherwise be reported SKIPPED silently.
+      throw new ForesiftError(
+        ErrorCode.CONTRACT_INVARIANT_VIOLATED,
+        'alert reassessment sweep requires a reassessment source; refusing to report due priors as SKIPPED',
+        { alertRef: prior.alertRef },
+      );
+    }
+    const candidate = input.source(prior, now);
     if (candidate === null) {
       outcomes.push(outcomeRow(prior, AlertSweepOutcomeKind.SKIPPED));
       continue;
@@ -213,6 +239,7 @@ export async function sweepAlertLifecycle(
       event: candidate.event,
       reassessment: candidate.reassessment,
       now,
+      registry,
     });
     if (evaluation.kind === 'NO_UPDATE') {
       outcomes.push(

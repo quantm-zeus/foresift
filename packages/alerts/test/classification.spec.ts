@@ -39,6 +39,7 @@ import {
   buildAlertPolicyRegistry,
   classifyAlert,
   commitAlert,
+  confirmedOpportunityPasses,
   DEFAULT_ALERT_POLICY_REGISTRY,
   deriveAlertFingerprint,
   deriveAlertUpdateKey,
@@ -626,6 +627,63 @@ describe('T013 §26.3 confirmed-opportunity gates (AC-140/141, AC-245…249)', (
     expect(security?.passed).toBe(true);
   });
 
+  it('schema-validates provided gate input fields and refuses them fail-closed (F7a)', () => {
+    const unknownRisk = evaluateConfirmedOpportunityGates(
+      passingGateInput({
+        criticalRisk: { riskState: 'NOT_A_RISK_STATE', criticalVetoCount: 0 },
+      }),
+    );
+    expect(unknownRisk.find((entry) => entry.gate === 'NO_CRITICAL_RISK')?.passed).toBe(false);
+
+    const emptyFingerprint = evaluateConfirmedOpportunityGates(
+      passingGateInput({
+        fingerprintCooldown: {
+          fingerprint: '',
+          duplicateFingerprint: false,
+          withinCooldown: false,
+        },
+      }),
+    );
+    expect(emptyFingerprint.find((entry) => entry.gate === 'FINGERPRINT_COOLDOWN')?.passed).toBe(
+      false,
+    );
+
+    // An unrecognised top-level field is not part of the §26.3 input: fail closed
+    // for the whole set rather than silently ignoring it.
+    const unknownField = evaluateConfirmedOpportunityGates({
+      ...passingGateInput(),
+      extraGate: true,
+    } as never);
+    expect(unknownField.every((entry) => !entry.passed)).toBe(true);
+
+    // A complete, valid input still passes every gate.
+    expect(
+      evaluateConfirmedOpportunityGates(passingGateInput()).every((entry) => entry.passed),
+    ).toBe(true);
+
+    // `confirmedOpportunityPasses` consumes the same validated evaluator, so a
+    // structurally invalid field is false rather than a silent pass.
+    expect(confirmedOpportunityPasses(passingGateInput())).toBe(true);
+    expect(
+      confirmedOpportunityPasses(
+        passingGateInput({
+          criticalRisk: { riskState: 'NOT_A_RISK_STATE', criticalVetoCount: 0 },
+        }),
+      ),
+    ).toBe(false);
+    expect(
+      confirmedOpportunityPasses(
+        passingGateInput({
+          fingerprintCooldown: {
+            fingerprint: '',
+            duplicateFingerprint: false,
+            withinCooldown: false,
+          },
+        }),
+      ),
+    ).toBe(false);
+  });
+
   it('fails closed on an unknown or incomplete observed gate set', () => {
     throwsWithCode(
       () =>
@@ -659,19 +717,83 @@ describe('T014 classification routing and fail-closed law (AC-140/142/143)', () 
     expect(outcome.policy?.confirmedDenominatorMember).toBe(true);
   });
 
-  it('consumes an already-complete observed gate-result list', () => {
-    const gateResults = evaluateConfirmedOpportunityGates(passingGateInput());
+  it('consumes an observed gate-result list that deep-equals the evaluation', () => {
+    const gateInputs = passingGateInput();
+    const gateResults = evaluateConfirmedOpportunityGates(gateInputs);
     const outcome = classifyAlert(
       baseClassificationInput({
         decision: 'ALERT',
         alertClassRecommendation: 'CONFIRMED_OPPORTUNITY',
         lifecycleState: 'CONFIRMED',
+        gateInputs,
         gateResults,
         now: T0,
       }),
     );
     expect(outcome.alertClass).toBe(AlertClass.CONFIRMED_OPPORTUNITY);
     expect(outcome.gateSetComplete).toBe(true);
+  });
+
+  it('refuses a forged complete gate-result set supplied without gate inputs (F2)', () => {
+    // The exact review probe: fourteen {passed:true, reason:null} entries and no
+    // gate inputs. Unauthenticated results must never yield a confirmation.
+    const forged = ALL_CONFIRMED_OPPORTUNITY_GATES.map((gate) => ({
+      gate,
+      passed: true,
+      reason: null,
+    }));
+    const outcome = classifyAlert(
+      baseClassificationInput({
+        decision: 'ALERT',
+        alertClassRecommendation: 'CONFIRMED_OPPORTUNITY',
+        lifecycleState: 'CONFIRMED',
+        gateInputs: null,
+        gateResults: forged,
+        now: T0,
+      }),
+    );
+    expect(outcome.kind).toBe('SUPPRESSED');
+    expect(outcome.alertClass).toBeNull();
+    expect(outcome.gateSetComplete).toBe(false);
+    expect(outcome.suppressionReason).toBe(AlertSuppressionReason.GATE_REFUSED);
+  });
+
+  it('refuses supplied gate results that do not deep-equal the evaluated set (F2)', () => {
+    const failingInput = passingGateInput({ costPolicy: { costPolicyResult: 'BLOCKED' } });
+    const evaluated = evaluateConfirmedOpportunityGates(failingInput);
+    const forged = evaluated.map((result) =>
+      result.gate === 'STRICT_FREE_COST_POLICY'
+        ? { gate: result.gate, passed: true, reason: null }
+        : result,
+    );
+    throwsWithCode(
+      () =>
+        classifyAlert(
+          baseClassificationInput({
+            decision: 'ALERT',
+            alertClassRecommendation: 'CONFIRMED_OPPORTUNITY',
+            lifecycleState: 'CONFIRMED',
+            gateInputs: failingInput,
+            gateResults: forged,
+            now: T0,
+          }),
+        ),
+      ErrorCode.CONTRACT_INVARIANT_VIOLATED,
+    );
+
+    // The honest observed set for the same inputs is still refused (gate fails).
+    const honest = classifyAlert(
+      baseClassificationInput({
+        decision: 'ALERT',
+        alertClassRecommendation: 'CONFIRMED_OPPORTUNITY',
+        lifecycleState: 'CONFIRMED',
+        gateInputs: failingInput,
+        gateResults: evaluated,
+        now: T0,
+      }),
+    );
+    expect(honest.kind).toBe('SUPPRESSED');
+    expect(honest.suppressionReason).toBe(AlertSuppressionReason.GATE_REFUSED);
   });
 
   it('suppresses a would-be confirmed opportunity when gate input is unavailable', () => {
@@ -830,6 +952,89 @@ describe('§67.4 SOCIAL_UNAVAILABLE is unknown coverage (AC-142)', () => {
     expect(rendered.envelope.socialCapabilityState).toBe('SOCIAL_UNAVAILABLE');
     expect(rendered.missingData).toContain('social_capability:SOCIAL_UNAVAILABLE');
   });
+
+  it('refuses a caller social state that contradicts the classification coverage (F4)', () => {
+    const classification = earlyWatchClassification({
+      socialCapabilityState: 'SOCIAL_UNAVAILABLE',
+    });
+    // The exact review probe: an unknown-coverage classification rendered with a
+    // caller-supplied SOCIAL_FULL state must be refused, not silently rendered
+    // without the SOCIAL_UNAVAILABLE marker.
+    throwsWithCode(
+      () =>
+        renderAlertContent(renderInput(classification, { socialCapabilityState: 'SOCIAL_FULL' })),
+      ErrorCode.CONTRACT_INVARIANT_VIOLATED,
+    );
+    // The marker is forced whenever the classification says coverage is unknown.
+    const forced = renderAlertContent(
+      renderInput(classification, {
+        socialCapabilityState: 'SOCIAL_UNAVAILABLE',
+        missingData: [],
+      }),
+    );
+    expect(forced.missingData).toContain('social_capability:SOCIAL_UNAVAILABLE');
+  });
+
+  it('refuses a contradictory rendered payload at the commit boundary (F4)', async () => {
+    const runId = await seedRun(tdb.engine);
+    const classification = earlyWatchClassification({
+      socialCapabilityState: 'SOCIAL_UNAVAILABLE',
+    });
+    const content = renderAlertContent(
+      renderInput(classification, { socialCapabilityState: 'SOCIAL_UNAVAILABLE' }),
+    );
+    const fingerprint = {
+      assetId: 'asset-1',
+      profileId: 'profile-1',
+      alertType: 'EARLY_WATCH' as const,
+      lifecycleState: 'EMERGING' as const,
+      riskState: 'LOW' as const,
+      thesisVersion: 1,
+      executionScenarioId: 'scenario-1',
+      validUntilGeneration: 1,
+      materialEvidenceFingerprint: HASH_A,
+    };
+    const contradictory: RenderedAlertContent = {
+      ...content,
+      envelope: { ...content.envelope, socialCapabilityState: 'SOCIAL_FULL' },
+    };
+    await expectForesiftError(
+      commitAlert(tdb.engine, {
+        runId,
+        decisionId: `decision-social-${runId}`,
+        decisionKind: 'CANDIDATE_DECISION',
+        alertId: `alert-social-${runId}`,
+        classification,
+        content: contradictory,
+        fingerprint,
+        decisionReadyAt: T0,
+        now: T0,
+      }),
+      ErrorCode.CONTRACT_INVARIANT_VIOLATED,
+    );
+
+    // An unknown-coverage payload that omits the explicit marker is refused too.
+    const markerless: RenderedAlertContent = {
+      ...content,
+      missingData: content.missingData.filter(
+        (entry) => entry !== 'social_capability:SOCIAL_UNAVAILABLE',
+      ),
+    };
+    await expectForesiftError(
+      commitAlert(tdb.engine, {
+        runId,
+        decisionId: `decision-marker-${runId}`,
+        decisionKind: 'CANDIDATE_DECISION',
+        alertId: `alert-marker-${runId}`,
+        classification,
+        content: markerless,
+        fingerprint,
+        decisionReadyAt: T0,
+        now: T0,
+      }),
+      ErrorCode.CONTRACT_INVARIANT_VIOLATED,
+    );
+  }, 120_000);
 });
 
 // --- T015 content -----------------------------------------------------------
@@ -843,6 +1048,36 @@ describe('T015 class-templated content (AC-140/142)', () => {
         ErrorCode.ALERT_HIGH_CONVICTION_LANGUAGE,
       );
     }
+  });
+
+  it('refuses high-conviction language anywhere in the delivered envelope (F3)', () => {
+    const classification = earlyWatchClassification();
+    const base = renderInput(classification);
+    const attempts: readonly Record<string, unknown>[] = [
+      { narrative: { ...base.narrative, positiveEvidence: ['guaranteed 100x returns'] } },
+      { narrative: { ...base.narrative, riskEvidence: ['this will moon'] } },
+      { missingData: ['sure thing'] },
+      { researchDisclaimer: 'risk-free opportunity' },
+    ];
+    for (const overrides of attempts) {
+      throwsWithCode(
+        () => renderAlertContent(renderInput(classification, overrides)),
+        ErrorCode.ALERT_HIGH_CONVICTION_LANGUAGE,
+      );
+    }
+    // The same fields stay legal for CONFIRMED_OPPORTUNITY, whose policy allows
+    // high-conviction language.
+    const confirmed = confirmedClassification();
+    const confirmedBase = renderInput(confirmed);
+    const rendered = renderAlertContent(
+      renderInput(confirmed, {
+        narrative: {
+          ...confirmedBase.narrative,
+          positiveEvidence: ['guaranteed returns'],
+        },
+      }),
+    );
+    expect(rendered.headlineSuppressed).toBe(false);
   });
 
   it('renders a compliant EARLY_WATCH record with explicit missing data', () => {

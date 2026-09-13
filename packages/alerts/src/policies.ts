@@ -456,3 +456,23 @@ export function resolveAlertPolicy(
 ): AlertPolicy {
   return (registry ?? DEFAULT_ALERT_POLICY_REGISTRY).policyFor(alertClass);
 }
+
+/**
+ * Derive a class's `valid_until` from its resolved TTL (FR-ALERT-002, plan D3).
+ * This is the operational application of `ttl_seconds`: the content/lifecycle
+ * path does not merely carry the TTL declaratively, it computes the notification
+ * window from it — so an EARLY_WATCH alert cannot be given a confirmed-length
+ * validity by a caller. The TTL is read from the resolved class policy, which is
+ * the persisted `alert.alert_policies` row when one exists.
+ */
+export function validUntilFromPolicy(policy: AlertPolicy, from: string): string {
+  const base = Date.parse(from);
+  if (Number.isNaN(base)) {
+    throw new ForesiftError(
+      ErrorCode.CONTRACT_INVARIANT_VIOLATED,
+      'alert validity base is not a timestamp',
+      { from: null },
+    );
+  }
+  return new Date(base + policy.ttlSeconds * 1000).toISOString();
+}

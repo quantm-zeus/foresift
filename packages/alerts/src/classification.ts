@@ -30,6 +30,7 @@ import {
   AgentDecisionKind,
   AlertClass,
   AlertSuppressionReason,
+  ALL_CONFIRMED_OPPORTUNITY_GATES,
   CandidateLifecycleState,
   CandidateRiskState,
   ErrorCode,
@@ -38,6 +39,7 @@ import {
   confirmedOpportunityEligible,
   parseAlertClass,
   socialIsUnknownCoverage,
+  type ConfirmedOpportunityGate,
   type ConfirmedOpportunityGateResult,
   type SocialCapabilityState,
 } from '@foresift/domain';
@@ -50,7 +52,6 @@ import {
   ConfirmedOpportunityGateInputSchema,
   evaluateConfirmedOpportunityGates,
   firstRefusedGate,
-  validateConfirmedOpportunityGateResults,
 } from './gates.ts';
 import {
   alertPolicyFor,
@@ -356,23 +357,65 @@ function routeAlertClass(
 
 // --- the classifier ---------------------------------------------------------
 
+function gateCanonicalIndex(gate: ConfirmedOpportunityGate): number {
+  return ALL_CONFIRMED_OPPORTUNITY_GATES.indexOf(gate);
+}
+
+function normalizedGateResults(
+  results: readonly ConfirmedOpportunityGateResult[],
+): readonly ConfirmedOpportunityGateResult[] {
+  return [...results]
+    .sort((left, right) => gateCanonicalIndex(left.gate) - gateCanonicalIndex(right.gate))
+    .map((result) => ({ gate: result.gate, passed: result.passed, reason: result.reason }));
+}
+
+/** True iff the caller's observed set is byte-identical to the evaluated set. */
+function gateResultsMatch(
+  supplied: readonly ConfirmedOpportunityGateResult[],
+  evaluated: readonly ConfirmedOpportunityGateResult[],
+): boolean {
+  if (supplied.length !== evaluated.length) return false;
+  const left = normalizedGateResults(supplied);
+  const right = normalizedGateResults(evaluated);
+  return left.every(
+    (result, index) =>
+      result.gate === right[index]?.gate &&
+      result.passed === right[index]?.passed &&
+      result.reason === right[index]?.reason,
+  );
+}
+
+/**
+ * Resolve the authoritative §26.3 gate set.
+ *
+ * The ONLY authoritative source is a fresh evaluation of `gateInputs` through
+ * `evaluateConfirmedOpportunityGates` (mandate 2, FR-ALERT-003). A caller
+ * supplying `gateResults` is treated as an untrusted cross-check: when
+ * `gateInputs` is present the observed set must deep-equal the evaluation or the
+ * classification is refused with a typed contract error, and when `gateInputs`
+ * is absent the observed set is never marked complete — so unauthenticated
+ * results can never yield CONFIRMED_OPPORTUNITY.
+ */
 function resolveGateResults(request: AlertClassificationRequest): {
   readonly gates: readonly ConfirmedOpportunityGateResult[];
   readonly complete: boolean;
 } {
+  const supplied = request.gateResults;
   if (request.gateInputs !== null && request.gateInputs !== undefined) {
-    const gates = evaluateConfirmedOpportunityGates(request.gateInputs);
-    return { gates, complete: true };
+    const evaluated = evaluateConfirmedOpportunityGates(request.gateInputs);
+    if (supplied.length > 0 && !gateResultsMatch(supplied, evaluated)) {
+      throw new ForesiftError(
+        ErrorCode.CONTRACT_INVARIANT_VIOLATED,
+        '§26.3: supplied gate results do not match the re-evaluated gate set; observed results alone are not authoritative',
+        { suppliedGates: supplied.length, evaluatedGates: evaluated.length },
+      );
+    }
+    return { gates: evaluated, complete: true };
   }
-  if (request.gateResults.length === 0) return { gates: [], complete: false };
-  try {
-    const gates = validateConfirmedOpportunityGateResults(request.gateResults);
-    return { gates, complete: true };
-  } catch {
-    // An incomplete or malformed observed gate set fails closed: the caller's
-    // results are consumed only when they are exactly the fourteen gates.
-    return { gates: request.gateResults, complete: false };
-  }
+  if (supplied.length === 0) return { gates: [], complete: false };
+  // Unauthenticated results without evaluation inputs: consume them only as
+  // observability and NEVER mark the set complete (§26.3 fail-closed).
+  return { gates: [...supplied], complete: false };
 }
 
 /**

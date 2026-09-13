@@ -32,6 +32,7 @@ import {
   commitAlertUpdate,
   deriveAlertFingerprint,
   evaluatePriorAlertUpdate,
+  loadAlertPolicies,
   readAlertFingerprint,
   readPriorAlertState,
   recordPriorAlert,
@@ -47,6 +48,7 @@ import {
   HASH_B,
   HASH_C,
   expectForesiftError,
+  seedPolicyRow,
   seedRun,
   withTestDatabase,
   type TestDatabase,
@@ -553,6 +555,52 @@ describe('T020 update/cancellation lifecycle (AC-141)', () => {
     },
     TEST_TIMEOUT_MS,
   );
+
+  it(
+    'rolls back the update row and ledger advance when the engine commit fails (F5)',
+    async () => {
+      await withTestDatabase(async (tdb) => {
+        const prior = await seedPrior(tdb.engine);
+        const candidate = candidateFor(prior, AlertPriorEvent.DETERIORATION);
+        const notification = buildUpdateNotification(candidate, notificationContext(T0));
+
+        // Inject a failure INSIDE the engine commit: the enclosing transaction
+        // opens, the alert-owned update row is inserted, then the engine refuses
+        // the unknown run. The whole unit must roll back.
+        await expectForesiftError(
+          commitAlertUpdate(tdb.engine, {
+            candidate,
+            classification: notification.classification,
+            content: notification.content,
+            decisionReadyAt: T0,
+            now: T0,
+            runId: 'run-missing-atomicity',
+          }),
+          ErrorCode.WF_RUN_NOT_FOUND,
+        );
+
+        expect(
+          await countRows(
+            tdb,
+            `SELECT count(*)::int AS count FROM alert.alert_updates WHERE idempotency_key = $1`,
+            [candidate.idempotencyKey],
+          ),
+        ).toBe(0);
+        expect(
+          await countRows(
+            tdb,
+            `SELECT count(*)::int AS count FROM alert.alert_fingerprints WHERE fingerprint = $1`,
+            [candidate.ledgerFingerprint],
+          ),
+        ).toBe(0);
+        // The engine commit wrote nothing either.
+        expect(
+          await countRows(tdb, `SELECT count(*)::int AS count FROM wf.notification_outbox`),
+        ).toBe(0);
+      });
+    },
+    TEST_TIMEOUT_MS,
+  );
 });
 
 describe('T021 expiry/deterioration sweep (AC-141)', () => {
@@ -669,6 +717,124 @@ describe('T021 expiry/deterioration sweep (AC-141)', () => {
         });
         expect(report.outcomes[0]?.updateKind).toBe('CANCELLATION');
         expect(prior.alertClass).toBe('CONFIRMED_OPPORTUNITY');
+      });
+    },
+    TEST_TIMEOUT_MS,
+  );
+
+  const deteriorationSource = () =>
+    ({
+      event: AlertPriorEvent.DETERIORATION,
+      reassessment: reassessment(),
+      notification: notificationContext(T0),
+      decisionReadyAt: T0,
+    }) as const;
+
+  it(
+    'applies the persisted per-class thresholds to the sweep (F6)',
+    async () => {
+      // Control: with no persisted row the in-code default threshold (0.05)
+      // makes the deterioration material, so the update commits.
+      await withTestDatabase(async (tdb) => {
+        await seedPrior(tdb.engine, { alertClass: 'THESIS_WEAKENING' });
+        const report = await sweepAlertLifecycle(tdb.engine, {
+          now: T0,
+          limit: 10,
+          source: deteriorationSource,
+        });
+        expect(report.countsByOutcome.UPDATE_COMMITTED).toBe(1);
+      });
+
+      // Persisted non-default thresholds govern: the same change is immaterial.
+      await withTestDatabase(async (tdb) => {
+        await seedPrior(tdb.engine, { alertClass: 'THESIS_WEAKENING' });
+        await seedPolicyRow(tdb.engine, {
+          policyId: 'persisted-thresholds',
+          alertClass: 'THESIS_WEAKENING',
+          version: 1,
+          ttlSeconds: 7200,
+          cooldownSeconds: 60,
+          config: { contentPolicyVersion: 1, template: 'THESIS_UPDATE' },
+          thresholds: {
+            severityDelta: 0.99,
+            thesisVersionDelta: 99,
+            materialEvidenceChangeIsMaterial: false,
+          },
+        });
+        const report = await sweepAlertLifecycle(tdb.engine, {
+          now: T0,
+          limit: 10,
+          source: deteriorationSource,
+        });
+        expect(report.countsByOutcome.NO_UPDATE).toBe(1);
+        expect(report.outcomes[0]?.reason).toBe('IMMATERIAL_CHANGE');
+      });
+    },
+    TEST_TIMEOUT_MS,
+  );
+
+  it(
+    'derives the update valid_until from the class TTL (F7c)',
+    async () => {
+      await withTestDatabase(async (tdb) => {
+        const prior = await seedPrior(tdb.engine, { alertClass: 'THESIS_WEAKENING' });
+        const candidate = candidateFor(prior, AlertPriorEvent.DETERIORATION);
+        const notification = buildUpdateNotification(candidate, notificationContext(T0));
+        // THESIS_WEAKENING ttlSeconds is 1800: T0 + 30 minutes.
+        expect(notification.content.envelope.validUntil).toBe('2026-06-01T12:30:00.000Z');
+        expect(notification.content.envelope.validUntil).not.toBe(
+          candidate.reassessment.validUntil,
+        );
+      });
+    },
+    TEST_TIMEOUT_MS,
+  );
+
+  it(
+    'derives valid_until from a persisted TTL override (F6/F7c)',
+    async () => {
+      await withTestDatabase(async (tdb) => {
+        const prior = await seedPrior(tdb.engine, { alertClass: 'THESIS_WEAKENING' });
+        await seedPolicyRow(tdb.engine, {
+          policyId: 'persisted-ttl',
+          alertClass: 'THESIS_WEAKENING',
+          version: 1,
+          ttlSeconds: 7200,
+          cooldownSeconds: 60,
+          config: { contentPolicyVersion: 1, template: 'THESIS_UPDATE' },
+          thresholds: {
+            severityDelta: 0.05,
+            thesisVersionDelta: 1,
+            materialEvidenceChangeIsMaterial: true,
+          },
+        });
+        const registry = await loadAlertPolicies(tdb.engine);
+        const evaluation = evaluatePriorAlertUpdate({
+          prior,
+          event: AlertPriorEvent.DETERIORATION,
+          reassessment: reassessment(),
+          now: T0,
+          registry,
+        });
+        if (evaluation.kind !== 'UPDATE') throw new Error('expected an update candidate');
+        expect(evaluation.policy.ttlSeconds).toBe(7200);
+        const notification = buildUpdateNotification(evaluation, notificationContext(T0));
+        // Persisted 7200s TTL: T0 + 2 hours.
+        expect(notification.content.envelope.validUntil).toBe('2026-06-01T14:00:00.000Z');
+      });
+    },
+    TEST_TIMEOUT_MS,
+  );
+
+  it(
+    'refuses a sweep with no reassessment source instead of reporting SKIPPED (F7d)',
+    async () => {
+      await withTestDatabase(async (tdb) => {
+        await seedPrior(tdb.engine);
+        await expectForesiftError(
+          sweepAlertLifecycle(tdb.engine, { now: T0, limit: 10 }),
+          ErrorCode.CONTRACT_INVARIANT_VIOLATED,
+        );
       });
     },
     TEST_TIMEOUT_MS,

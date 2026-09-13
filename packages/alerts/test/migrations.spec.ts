@@ -3,7 +3,7 @@
  *
  * Applies the whole migration set to a fresh PGlite database and proves the
  * SQL truth the alert layer will depend on:
- * - both `g2_alert_*` scripts apply cleanly, in order;
+ * - every `g2_alert_*` script applies cleanly, in order;
  * - `alert.alert_policies` immutability: exactly one legal transition
  *   (`superseded_by` NULL -> non-null with every other column identical),
  *   everything else — in-place policy rewrite (even combined with a
@@ -116,11 +116,15 @@ async function seedPolicy(
 }
 
 describe('g2_alert_* migrations apply to a fresh database', () => {
-  it('applies both alert scripts in lexicographic order', () => {
+  it('applies every alert script in lexicographic order', () => {
     expect(applied).toContain('g2_alert_0001_alert_state');
     expect(applied).toContain('g2_alert_0002_updates_metrics');
+    expect(applied).toContain('g2_alert_0003_record_immutability');
     expect(applied.indexOf('g2_alert_0001_alert_state')).toBeLessThan(
       applied.indexOf('g2_alert_0002_updates_metrics'),
+    );
+    expect(applied.indexOf('g2_alert_0002_updates_metrics')).toBeLessThan(
+      applied.indexOf('g2_alert_0003_record_immutability'),
     );
   });
 
@@ -417,5 +421,77 @@ describe('§26.4 alert records carry a content-addressed fingerprint', () => {
       ),
     );
     expect(missingRun.message).toMatch(/run_ref/);
+  }, 120_000);
+});
+
+describe('§26.4 alert records are immutable except the actionability transition', () => {
+  async function seedRecord(alertId: string): Promise<void> {
+    await engine.query(
+      `INSERT INTO alert.alert_records
+         (alert_id, decision_ref, run_ref, alert_class, fingerprint, thesis_version,
+          lifecycle_state, risk_state, severity, actionability_state, valid_until,
+          execution_assumptions, evidence_refs, content_hash)
+       VALUES ($1, 'decision-1', 'run-1', 'EARLY_WATCH', $2, 1,
+               'EMERGING', 'LOW', 0.4, 'ACTIONABLE', '2026-01-01T00:15:00Z',
+               '{}'::jsonb, '[]'::jsonb, $2)`,
+      [alertId, HASH],
+    );
+  }
+
+  it('refuses an in-place classification-field rewrite', async () => {
+    await seedRecord('record-imm-class');
+    const classError = await rejection(
+      engine.query(
+        `UPDATE alert.alert_records SET alert_class = 'RISK_ALERT' WHERE alert_id = 'record-imm-class'`,
+      ),
+    );
+    expect((classError as { code?: string }).code).toBe('23001'); // restrict_violation
+    expect(classError.message).toMatch(/alert record classification fields are immutable/);
+
+    const hashError = await rejection(
+      engine.query(
+        `UPDATE alert.alert_records SET fingerprint = $1 WHERE alert_id = 'record-imm-class'`,
+        [HASH_B],
+      ),
+    );
+    expect(hashError.message).toMatch(/alert record classification fields are immutable/);
+
+    const validityError = await rejection(
+      engine.query(
+        `UPDATE alert.alert_records SET valid_until = '2026-02-01T00:00:00Z' WHERE alert_id = 'record-imm-class'`,
+      ),
+    );
+    expect(validityError.message).toMatch(/alert record classification fields are immutable/);
+  }, 120_000);
+
+  it('allows only the actionability-state transition', async () => {
+    await seedRecord('record-imm-action');
+    await engine.query(
+      `UPDATE alert.alert_records SET actionability_state = 'EXPIRING' WHERE alert_id = 'record-imm-action'`,
+    );
+    const rows = await engine.query<{ actionability_state: string; alert_class: string }>(
+      `SELECT actionability_state, alert_class FROM alert.alert_records WHERE alert_id = 'record-imm-action'`,
+    );
+    expect(rows.rows[0]?.actionability_state).toBe('EXPIRING');
+    // Every other classification field is untouched.
+    expect(rows.rows[0]?.alert_class).toBe('EARLY_WATCH');
+  }, 120_000);
+
+  it('refuses DELETE and TRUNCATE of alert records', async () => {
+    await seedRecord('record-imm-delete');
+    const deleted = await rejection(
+      engine.query(`DELETE FROM alert.alert_records WHERE alert_id = 'record-imm-delete'`),
+    );
+    expect((deleted as { code?: string }).code).toBe('23001');
+    expect(deleted.message).toMatch(/alert records are immutable/);
+
+    const truncated = await rejection(engine.query(`TRUNCATE alert.alert_records CASCADE`));
+    expect((truncated as { code?: string }).code).toBe('23001');
+    expect(truncated.message).toMatch(/alert records are immutable/);
+
+    const survivors = await engine.query<{ n: number }>(
+      `SELECT count(*)::int AS n FROM alert.alert_records`,
+    );
+    expect(Number(survivors.rows[0]?.n)).toBeGreaterThan(0);
   }, 120_000);
 });

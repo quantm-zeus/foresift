@@ -305,3 +305,47 @@ State change: g2-production-readiness RUNNING → PROVEN (schema-legal), restore
 only after the above. Phase 12 tasks `T065`–`T072` are checked; history is
 preserved and nothing was rewritten. `g2-admin-control` and
 `g2-recovery-continuity` promotion is unblocked.
+
+## Fifth-round reopen (2026-09-14) — in-process shadow residuals on the authority paths
+
+The re-PROVEN flip `53f737d` (PR #299) is **revoked**. A **new** session ran four
+fresh-context adversarial verifiers against `origin/main` `53f737d` (read-only,
+static; each given a disjoint finding set and instructed to re-derive every
+claim from current code, never from comments or the landed specs). They
+independently re-confirmed the whole C1–C3/H1–H10/R1–R9 chain as closed, then
+reproduced **three HIGH residuals of the exact `Array.prototype` shadowing class
+the fourth round claimed to have removed**. The state returns to
+RUNNING/REOPENED; PR #299 and every prior flip/evidence artifact remain in
+history.
+
+| ID  | Defect (reproduced at `53f737d`)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  | Reproduction                                                                                                                                                                                                                                                                              | Correction |
+| --- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------- |
+| R10 | **HIGH — the persisted-evidence authority query is built with a shadowable `.join`.** `activationGateEvaluationsFor` assembles its `WHERE` with `clauses.join(' AND ')` (`packages/capability-registry/src/activation-gate.ts:1341`) although the module already imports `numericJoin` (`:59`, used at `:843`). `requirePersistedActivationEvidence` verifies kind/event/gate/expiry but never compares the returned `row.scopeHash` to `input.scopeHash` (`:1469-1551`). Shadowing `Array.prototype.join` lets the query return foreign-scope rows; the caller recomputes `activationEvidenceSetRef` over those rows and `advanceState(toState:'PROVEN')` writes a governed PROVEN state for a scope that never earned it. The ACTIVE INSERT stays refused by the independent SQL trigger (`g2_prod_0009:103-164`), so the flip is a forged PROVEN, which a `requires_proven` scope then relies on. | Shadow `Array.prototype.join` to drop/replace the `scope_hash = $1` predicate, resolve a genuine all-PASS batch from any other scope for the same kind+event, then `advanceState(..., 'PROVEN', {provenEvidenceRef: activationEvidenceSetRef(foreignRows)})` succeeds. The shadow suite omits `join`. | T073       |
+| R11 | **HIGH — the MCP protocol-revision allow-list membership test is a shadowable `.includes`.** `McpProtocolGuard.inspect` refuses unless `allowedRevisions.includes(input.protocolRevision)` (`packages/security/src/mcp-protocol-guard.ts:70-75`). `resolveProtocolRevision` funnels opt-ins through the validated matrix, but then trusts the guard's verdict with no numeric re-check (`packages/capability-registry/src/mcp-compat.ts:712-720`). Shadowing `Array.prototype.includes` to return `true` makes the guard ALLOW any requested revision, including `2099-01-01-evil`, re-opening audit C3 at the FR-PROD-003 surface. | `Array.prototype.includes = () => true`, then `resolveProtocolRevision(engine, {requestedRevision:'2099-01-01-evil', policy:'OPT_IN_ONLY', now})` returns `decision:'ALLOW'`. | T074       |
+| R12 | **HIGH — the release-gate import-shadow authority is built with a shadowable `.filter` in a lazily imported module.** `prod-rules.ts:507` computes `SHADOW_ONLY_IMPORT_ARTIFACT_STATES` with `ALL_IMPORT_ARTIFACT_STATES.filter(...)` at module initialization, but `conformance.ts:688` imports the module **dynamically at call time**. A shadow installed before `evaluateConformance` runs therefore controls the constructor: `Array.prototype.filter = function () { return this; }` widens the authority to every persisted state, so an `IMPORT_SHADOW_ONLY` live-path assertion naming a `RECEIVED`/`REJECTED` import passes the release gate — re-opening audit H4/R7. | `Array.prototype.filter = function () { return this; }` then `evaluateConformance({... livePaths:[{assertionKind:'IMPORT_SHADOW_ONLY', verdict:'PASS', importArtifactState:'REJECTED'}]})` → `overall:'PASSED'`. | T075       |
+
+### Proof-integrity defect closed in the same slice
+
+`packages/release-conformance/test/prod-rules.spec.ts` NEW-N2
+(`does not let forged verdicts flip a trace-violating corpus to PASSED`) runs two
+full `evaluateConformance` calls against bun's 5000 ms default and measured
+**4983 ms** in isolation and a **5000 ms timeout** under concurrent load — a
+latent flake that can red the release gate non-deterministically. It gains an
+explicit bounded timeout (T076).
+
+### Re-verification bar (unchanged)
+
+Every R-row has a landed fix and a direct shadow regression that fails against
+`53f737d`; the full prescribed gates and exact-SHA CI are green; and a **new**
+fresh-context convergence audit reports no CRITICAL/HIGH finding. Admin-control
+and recovery-continuity promotion stays frozen until then.
+
+### Accepted residuals (recorded, not silently dropped)
+
+The previously recorded residuals stand unchanged (raw-writer trust boundary,
+caller-supplied `prodClaims`/statistical verdicts, `McpProtocolWiring` config
+draft lists, the `evaluateConformance` non-PROD milestone override used by
+AC-266, post-clear evidence freshness, `clearContainment` governance/ActionGate,
+unwired `evaluateDeploymentPosture`/`assertLivePathBoundaryHolds`). This round
+adds no new residual: R10–R12 are fixed, not accepted, because they are
+decision-time `Array.prototype` shadows inside the D018 model.

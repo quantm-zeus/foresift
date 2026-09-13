@@ -30,6 +30,7 @@ import {
   ErrorCode,
   ForesiftError,
   assertHighConvictionLanguageAllowed,
+  firstHighConvictionTerm,
   socialIsUnknownCoverage,
   type ActionabilityState,
   type AlertCancellationState,
@@ -365,10 +366,22 @@ export function renderAlertContent(input: AlertContentRenderInput): RenderedAler
   // headline — for every class whose policy forbids high-conviction language
   // (always EARLY_WATCH). Conviction prose can no longer hide in a field the
   // old three-field scan did not read.
-  assertHighConvictionLanguageAllowed(
-    alertClass,
-    `${canonicalJson(envelope)}\n${input.candidateHeadline}`,
-  );
+  const deliveredText = `${canonicalJson(envelope)}\n${input.candidateHeadline}`;
+  assertHighConvictionLanguageAllowed(alertClass, deliveredText);
+  // The class default is the FLOOR (FR-ALERT-002: EARLY_WATCH can never carry
+  // conviction language). A persisted policy may only TIGHTEN it, so a
+  // persisted `high_conviction_allowed = false` on an otherwise-permissive
+  // class must still refuse.
+  if (!policy.content.highConvictionAllowed) {
+    const term = firstHighConvictionTerm(deliveredText);
+    if (term !== null) {
+      throw new ForesiftError(
+        ErrorCode.ALERT_HIGH_CONVICTION_LANGUAGE,
+        `alert class ${alertClass} must not use high-conviction or buy language (persisted policy)`,
+        { alertClass, term },
+      );
+    }
+  }
   const headlineSuppressed = suppressionReasons.length > 0;
   // A withheld headline must never be replaced by positive phrasing that §26.8
   // forbids surfacing; the envelope keeps the neutral narrative instead.

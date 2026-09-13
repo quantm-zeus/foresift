@@ -158,7 +158,11 @@ export function socialCoverageVerdict(state: SocialCapabilityState): SocialCover
  * The classifier's request is the shared §26.1 input envelope extended with the
  * three pieces the classifier needs beyond the row shape:
  * - `now` for actionability,
- * - `gateInputs` for the T013 gate function (absent ⇒ consume `gateResults`),
+ * - `gateInputs` for the T013 gate function — the ONLY authoritative gate
+ *   source. `gateResults` is never trusted: when `gateInputs` is present a
+ *   supplied result set must deep-equal a fresh evaluation or the request is
+ *   refused, and when it is absent a supplied set is never considered complete,
+ *   so CONFIRMED_OPPORTUNITY is suppressed fail-closed.
  * - `requestedCapabilityRefs` / `organicConfirmationClaimed` for the §67 laws.
  */
 export const AlertClassificationRequestSchema = AlertClassificationInputSchema.extend({

@@ -1080,6 +1080,51 @@ describe('T015 class-templated content (AC-140/142)', () => {
     expect(rendered.headlineSuppressed).toBe(false);
   });
 
+  it('a persisted policy may only TIGHTEN the high-conviction law, never loosen it', () => {
+    // CONFIRMED_OPPORTUNITY's class default allows conviction prose; a persisted
+    // policy that forbids it must still refuse.
+    const confirmed = confirmedClassification();
+    const confirmedPolicy = confirmed.policy;
+    if (confirmedPolicy === null) throw new Error('confirmedClassification must carry a policy');
+    const tightened = {
+      ...confirmed,
+      policy: {
+        ...confirmedPolicy,
+        content: { ...confirmedPolicy.content, highConvictionAllowed: false },
+      },
+    } as typeof confirmed;
+    const base = renderInput(tightened);
+    throwsWithCode(
+      () =>
+        renderAlertContent(
+          renderInput(tightened, {
+            narrative: { ...base.narrative, positiveEvidence: ['guaranteed returns'] },
+          }),
+        ),
+      ErrorCode.ALERT_HIGH_CONVICTION_LANGUAGE,
+    );
+
+    // EARLY_WATCH's class default forbids conviction prose, and a persisted
+    // policy that (illegally) allows it must NOT loosen the floor.
+    const early = earlyWatchClassification();
+    const earlyPolicy = early.policy;
+    if (earlyPolicy === null) throw new Error('earlyWatchClassification must carry a policy');
+    const loosened = {
+      ...early,
+      policy: {
+        ...earlyPolicy,
+        content: { ...earlyPolicy.content, highConvictionAllowed: true },
+      },
+    } as typeof early;
+    throwsWithCode(
+      () =>
+        renderAlertContent(
+          renderInput(loosened, { candidateHeadline: 'Guaranteed profit, buy now' }),
+        ),
+      ErrorCode.ALERT_HIGH_CONVICTION_LANGUAGE,
+    );
+  });
+
   it('renders a compliant EARLY_WATCH record with explicit missing data', () => {
     const classification = earlyWatchClassification();
     const rendered = renderAlertContent(renderInput(classification));

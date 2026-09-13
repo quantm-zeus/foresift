@@ -1,7 +1,7 @@
 {
   "schema": "foresift/bun-migration-manifest@1",
   "migrationId": "bun-test-authority-v1",
-  "generatedAt": "2026-09-13T00:06:45.083Z",
+  "generatedAt": "2026-09-13T00:29:35.973Z",
   "root": ".",
   "totalTestFiles": 593,
   "counts": {
@@ -12,7 +12,7 @@
     "BLOCKED": 0
   },
   "parity": {
-    "previousTotal": 593,
+    "previousTotal": 579,
     "disappeared": []
   },
   "files": [
@@ -275,9 +275,9 @@
     {
       "path": "packages/alerts/test/classification.spec.ts",
       "package": "@foresift/alerts",
-      "bytes": 49122,
-      "lines": 1346,
-      "sha256": "ca7208a8affc2faa125b3f1d9496f581011b77429d6eb7eb60aa59f1307fc296",
+      "bytes": 50775,
+      "lines": 1391,
+      "sha256": "bd7d0c2d9eea60e6a553f339ba4c583b80588ed957a3e86c0beed969c9a50d48",
       "imports": [
         "bun:test",
         "@foresift/domain",

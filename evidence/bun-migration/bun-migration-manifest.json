@@ -1,7 +1,7 @@
 {
   "schema": "foresift/bun-migration-manifest@1",
   "migrationId": "bun-test-authority-v1",
-  "generatedAt": "2026-09-13T08:38:44.654Z",
+  "generatedAt": "2026-09-13T09:18:03.724Z",
   "root": ".",
   "totalTestFiles": 602,
   "counts": {
@@ -412,9 +412,9 @@
     {
       "path": "packages/capability-registry/test/migrations.spec.ts",
       "package": "@foresift/capability-registry",
-      "bytes": 45804,
-      "lines": 1077,
-      "sha256": "958dd047e0fb21da3ca2fd44fcc5ff4f1cb824280757ff18a7cabeb1f799c49d",
+      "bytes": 45847,
+      "lines": 1078,
+      "sha256": "a35bd05b42a4d77805d144d1f62588a9e54e689e369a56cead428479bdc84a13",
       "imports": [
         "bun:test",
         "@electric-sql/pglite",
@@ -3676,9 +3676,9 @@
     {
       "path": "packages/release-conformance/test/prod-rules.spec.ts",
       "package": "@foresift/release-conformance",
-      "bytes": 19483,
-      "lines": 485,
-      "sha256": "a82107a3e81c961830977b2f76f70c41babf7dd9bc48d1fe434c24e92b2ba585",
+      "bytes": 20298,
+      "lines": 506,
+      "sha256": "15d37b95163a15d22c5c392ef0d5a6a6d4bd6948a513df336192aa5b5b8ffa00",
       "imports": ["bun:test", "../src/index.ts", "../../../tests/fixtures/prod/index.ts"],
       "vitestImports": [],
       "features": ["dynamic-import"],

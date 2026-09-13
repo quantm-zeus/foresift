@@ -172,6 +172,7 @@ describe('g2_prod_* migrations apply to a fresh database', () => {
       'g2_prod_0005_activation_evidence',
       'g2_prod_0006_activation_kind',
       'g2_prod_0007_activation_fail_closed',
+      'g2_prod_0008_raw_write_invariants',
     ] as const;
     for (const id of ids) expect(applied).toContain(id);
     for (let i = 1; i < ids.length; i += 1) {

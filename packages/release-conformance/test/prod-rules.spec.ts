@@ -335,7 +335,7 @@ describe('PROD conformance aggregation and unchanged trace rules', () => {
     expect(rules).toContain(PROD_RULES.publicAuthorizationWithoutGateEvidence);
   });
 
-  it('passes the release gate on the live tree when the PROD claim set is compliant', async () => {
+  it('emits no PROD finding for the compliant claim set on the live tree', async () => {
     const { evaluateConformance } = await import('../src/index.ts');
     const result = await evaluateConformance({
       repoRoot: REPO_ROOT,
@@ -356,9 +356,9 @@ describe('PROD conformance aggregation and unchanged trace rules', () => {
     );
   });
 
-  it('refuses an invalid milestone instead of disabling the PROD rules (HIGH-3)', async () => {
+  it('refuses an invalid or non-canonical milestone instead of disabling the PROD rules (HIGH-3)', async () => {
     const { evaluateConformance } = await import('../src/index.ts');
-    for (const milestone of ['xyz', '', 'G', 'g2', 'G2x']) {
+    for (const milestone of ['xyz', '', 'G', 'g2', 'G2x', 'G02', 'G002', 'G8']) {
       const result = await evaluateConformance({
         repoRoot: REPO_ROOT,
         milestone,
@@ -375,6 +375,27 @@ describe('PROD conformance aggregation and unchanged trace rules', () => {
         'CONFORMANCE_MILESTONE_INVALID',
       );
     }
+  });
+
+  it('cannot be silenced by an injected empty requirement list (HIGH-3 residual)', async () => {
+    const { evaluateConformance } = await import('../src/index.ts');
+    const result = await evaluateConformance({
+      repoRoot: REPO_ROOT,
+      milestone: 'G2',
+      // A caller-supplied requirement list must NOT decide whether PROD law
+      // applies: the authoritative manifest does.
+      requirements: [],
+      prodClaims: {
+        activationClaims: [PROD_ACTIVE_WITHOUT_GATE_CLAIM],
+        postureDeclarations: [],
+        mcpCompatibility: PROD_MCP_COMPLIANT_CLAIM,
+        livePaths: [],
+        distributionAuthorizations: [],
+      },
+    });
+    expect(result.findings.map((finding) => finding.rule)).toContain(
+      PROD_RULES.activationWithoutEvidence,
+    );
   });
 
   it('runs the PROD rules whenever the milestone owns FR-PROD requirements', async () => {

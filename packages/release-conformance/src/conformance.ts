@@ -443,9 +443,9 @@ export interface ConformanceResult {
 
 /**
  * Whether the evaluated milestone owns FR-PROD law, derived from the
- * REQUIREMENT SET rather than a generation number (audit HIGH-3): a caller
- * cannot silence the PROD family by passing `milestone: 'G0'`, and an invalid
- * milestone is refused outright.
+ * AUTHORITATIVE requirement set rather than a generation number (audit HIGH-3).
+ * `G0`/`G1` legitimately own no FR-PROD requirement and therefore run no PROD
+ * rules; every milestone that does own one (G2, G6) is always evaluated.
  */
 function milestoneOwnsProdLaw(
   activeGroup: string,
@@ -460,9 +460,10 @@ function milestoneOwnsProdLaw(
 }
 
 export async function evaluateConformance(options: ConformanceOptions): Promise<ConformanceResult> {
-  // An explicit milestone must be a real dependency group: anything else is a
-  // gate-downgrade attempt and refuses closed (audit HIGH-3).
-  if (options.milestone !== undefined && !/^G\d+$/.test(options.milestone)) {
+  // An explicit milestone must be a canonical dependency group (`G0`…`G7`):
+  // zero-padded or otherwise non-canonical ids are a gate-downgrade attempt and
+  // refuse closed (audit HIGH-3).
+  if (options.milestone !== undefined && !/^G[0-7]$/.test(options.milestone)) {
     return {
       overall: 'FAILED',
       findings: [
@@ -470,7 +471,7 @@ export async function evaluateConformance(options: ConformanceOptions): Promise<
           requirementId: 'FR-TRACE-003',
           rule: 'CONFORMANCE_MILESTONE_INVALID',
           path: String(options.milestone),
-          message: `milestone must be a dependency-group id such as G2; ${JSON.stringify(
+          message: `milestone must be a canonical dependency-group id G0…G7; ${JSON.stringify(
             options.milestone,
           )} is not`,
         },
@@ -479,6 +480,13 @@ export async function evaluateConformance(options: ConformanceOptions): Promise<
   }
   const activeGroup = options.milestone ?? (await activeMilestone(options.repoRoot));
   const requirements = options.requirements ?? (await loadRequirements(options.repoRoot));
+  // Whether the milestone owns FR-PROD law is decided by the AUTHORITATIVE
+  // manifest, NEVER by the caller-supplied requirement list: otherwise
+  // `{milestone:'G2', requirements: []}` would silence the PROD family
+  // (audit HIGH-3 residual). The injected list remains a seam for the other
+  // rules only.
+  const manifestRequirements =
+    options.requirements === undefined ? requirements : await loadRequirements(options.repoRoot);
   const [mapping, activePaths, premature, generated] = await Promise.all([
     Promise.resolve(checkMappingCompleteness({ requirements })),
     checkActiveImplementationPaths({
@@ -510,9 +518,9 @@ export async function evaluateConformance(options: ConformanceOptions): Promise<
     readonly path: string;
     readonly message: string;
   }[] = [];
-  if (milestoneOwnsProdLaw(activeGroup, requirements)) {
+  if (milestoneOwnsProdLaw(activeGroup, manifestRequirements)) {
     const { checkProdSurfacePresence, evaluateProdConformance } = await import('./prod-rules.ts');
-    const prodRequirements = requirements.filter(
+    const prodRequirements = manifestRequirements.filter(
       (requirement) =>
         requirement.id.startsWith('FR-PROD-') && requirement.dependencyGroup === activeGroup,
     );

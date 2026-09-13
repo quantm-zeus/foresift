@@ -26,9 +26,15 @@
  * scope, and — inside the writing transaction — without a COMPLETE, unexpired,
  * all-PASS set of PERSISTED `prod.activation_gate_evaluations` rows for that
  * scope and activation event whose deterministic evidence reference matches the
- * caller's `evaluationSetRef`. A hand-built PASS object can never name evidence
- * that was never persisted. It also refuses an unknown/mismatched scope, an
- * illegal lifecycle edge, and any attempt to reuse an existing row id (in-place
+ * caller's `evaluationSetRef`. The evidence rows can only be written by a
+ * recorder that requires the evaluator's module-private provenance brand, so a
+ * hand-built PASS object is refused before it can persist anything and can never
+ * name evidence that was never persisted. The same transaction additionally
+ * refuses ACTIVE while a `prod.containment_events` row on the exact scope is
+ * still open (§69.11: only `clearContainment` plus a fresh recorded evaluation
+ * reactivates), and refuses replaying an activation event that already backed an
+ * ACTIVE row for the scope. It also refuses an unknown/mismatched scope, an illegal
+ * lifecycle edge, and any attempt to reuse an existing row id (in-place
  * mutation). Strictly read-only governance: nothing here trades, custodies,
  * signs, or submits.
  */
@@ -401,6 +407,10 @@ export const ModuleStateRefusalReason = {
   ACTIVATION_GATE_RESULT_REQUIRED: 'ACTIVATION_GATE_RESULT_REQUIRED',
   ACTIVATION_GATE_REFUSED: 'ACTIVATION_GATE_REFUSED',
   CONCURRENT_SUPERSEDE_RACE: 'CONCURRENT_SUPERSEDE_RACE',
+  /** §69.11: an open containment forbids ACTIVE on the exact scope. */
+  CONTAINMENT_OPEN: 'CONTAINMENT_OPEN',
+  /** An activation event that already backed an ACTIVE row was replayed. */
+  ACTIVATION_EVENT_ALREADY_CONSUMED: 'ACTIVATION_EVENT_ALREADY_CONSUMED',
 } as const;
 export type ModuleStateRefusalReason =
   (typeof ModuleStateRefusalReason)[keyof typeof ModuleStateRefusalReason];
@@ -598,6 +608,60 @@ export async function advanceState(
     // caller-constructed PASS object (even a well-formed one) cannot name rows
     // that were never persisted, so it can never cross into ACTIVE.
     if (crossing && input.gateResult?.verdict === 'PASS') {
+      // §69.11: containment is a governed stop, not a suggestion. While a
+      // containment event on the EXACT scope is still open, replaying older
+      // genuine evidence must not re-activate the scope; the documented sole
+      // reactivation path is `clearContainment` plus a fresh recorded
+      // evaluation. The read happens in this transaction, alongside the write.
+      const openContainment = await tx.query<{ containment_id: string; action: string }>(
+        `SELECT containment_id, action
+           FROM prod.containment_events
+          WHERE module_id = $1 AND scope_hash = $2 AND cleared_by_event_ref IS NULL
+          ORDER BY created_at ASC, containment_id ASC
+          LIMIT 1`,
+        [moduleId, scopeHash],
+      );
+      const open = openContainment.rows[0];
+      if (open !== undefined) {
+        throw new ForesiftError(
+          ErrorCode.PROD_ACTIVATION_GATE_REFUSED,
+          `entering ACTIVE refused: containment ${open.containment_id} (${open.action}) is still open on the exact scope; clearContainment plus a fresh recorded evaluation is the only reactivation path (AC-278)`,
+          {
+            reason: ModuleStateRefusalReason.CONTAINMENT_OPEN,
+            containmentId: open.containment_id,
+            containmentAction: open.action,
+            scopeHash,
+          },
+        );
+      }
+      // An activation event is single-use. If any governed row for the exact
+      // scope already reached ACTIVE under this event, the event was consumed and
+      // its recorded PASS cannot be replayed (for example from a plain DEGRADED
+      // row); a fresh evaluation for a distinct activation event is required.
+      if (input.gateResult.activationEventRef.length > 0) {
+        const consumed = await tx.query<{ state_row_id: string }>(
+          `SELECT state_row_id
+             FROM prod.module_states
+            WHERE module_id = $1 AND scope_hash = $2
+              AND lifecycle_state = 'ACTIVE'
+              AND activation_event_ref = $3
+            LIMIT 1`,
+          [moduleId, scopeHash, input.gateResult.activationEventRef],
+        );
+        if (consumed.rows.length > 0) {
+          throw new ForesiftError(
+            ErrorCode.PROD_ACTIVATION_GATE_REFUSED,
+            `entering ACTIVE refused: activation event ${JSON.stringify(
+              input.gateResult.activationEventRef,
+            )} already backed an ACTIVE row for the exact scope; a fresh evaluation for a distinct activation event is required`,
+            {
+              reason: ModuleStateRefusalReason.ACTIVATION_EVENT_ALREADY_CONSUMED,
+              activationEventRef: input.gateResult.activationEventRef,
+              scopeHash,
+            },
+          );
+        }
+      }
       await requirePersistedActivationEvidence(tx, {
         scope,
         scopeHash,

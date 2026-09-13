@@ -52,6 +52,27 @@ import {
   type ModuleStateScope,
 } from './module-states.ts';
 
+// --- provenance brand -------------------------------------------------------
+
+/**
+ * Module-private provenance brand for an `ActivationGatePass`. It is NOT
+ * exported, so no caller can mint the symbol: `evaluateActivationGate` is the
+ * ONLY writer. A hand-built PASS object therefore fails the branded recorder
+ * signatures at compile time, and the runtime brand check refuses a cast object
+ * too, so a fabricated all-PASS evaluation set can never be persisted as
+ * "evidence".
+ *
+ * TRUST BOUNDARY (precise): the brand attests that the RESULT SHAPE was produced
+ * by the authoritative evaluator — it proves the object is a gate result, not a
+ * caller's invention. It does NOT attest the INPUTS: the caller is trusted
+ * product code and supplies the evidence (registered statistics, signed gate
+ * evidence, capacity contract) that the evaluator consumes. What makes the
+ * persisted evidence authoritative for ACTIVE is that `advanceState` re-derives
+ * the evidence reference from rows actually written to
+ * `prod.activation_gate_evaluations`, not from this object.
+ */
+const ACTIVATION_PASS_BRAND: unique symbol = Symbol('foresift.prod.activation-pass');
+
 // --- activation kind --------------------------------------------------------
 
 /** Which §69 gate family the evaluation is deciding. */
@@ -299,10 +320,17 @@ export interface ActivationGatePass {
   /** The kind this pass was evaluated for; the legal required-gate superset. */
   readonly activationKind: ActivationKind;
   /**
-   * Unforgeable persisted-evidence reference. The pure evaluator always leaves
-   * this `null`; only `recordActivationGateEvaluation` mints the deterministic
-   * hash over the rows it persisted, and `advanceState` re-derives it from the
-   * database before it will cross into ACTIVE.
+   * Module-private provenance brand. `evaluateActivationGate` is the only
+   * writer; see `ACTIVATION_PASS_BRAND`. The property is required, so a
+   * hand-built object literal can never satisfy `ActivationGatePass`.
+   */
+  readonly [ACTIVATION_PASS_BRAND]: true;
+  /**
+   * Persisted-evidence reference. The pure evaluator always leaves this `null`;
+   * only the branded recorders (`recordActivationGateResult` /
+   * `recordActivationGateEvaluation`) mint the deterministic hash over the rows
+   * they persisted, and `advanceState` re-derives it from the database before it
+   * will cross into ACTIVE.
    */
   readonly evaluationSetRef: string | null;
 }
@@ -347,6 +375,27 @@ function refuse(
 /** Only a non-empty, `sha256:<hex>` content address is a registered artifact. */
 function isContentAddress(value: unknown): value is string {
   return typeof value === 'string' && /^sha256:[0-9a-f]{64}$/.test(value);
+}
+
+/**
+ * Fail-closed provenance check for every writer of
+ * `prod.activation_gate_evaluations`. A caller cannot obtain the module-private
+ * `ACTIVATION_PASS_BRAND` symbol, so only an object returned by
+ * `evaluateActivationGate` (or a spread-derived copy of one) passes; a cast or
+ * hand-built PASS is refused with `PROD_ACTIVATION_GATE_REFUSED`.
+ */
+function requireActivationPassBrand(value: unknown): asserts value is ActivationGatePass {
+  if (
+    value === null ||
+    typeof value !== 'object' ||
+    (value as { readonly [ACTIVATION_PASS_BRAND]?: unknown })[ACTIVATION_PASS_BRAND] !== true
+  ) {
+    throw new ForesiftError(
+      ErrorCode.PROD_ACTIVATION_GATE_REFUSED,
+      'activation-gate evidence must be an ActivationGatePass returned by evaluateActivationGate; the supplied object carries no evaluator provenance brand',
+      { reason: 'ACTIVATION_PASS_UNBRANDED' },
+    );
+  }
 }
 
 function availableEvidenceComplete(evidence: AvailableEvidenceInput | null): boolean {
@@ -729,6 +778,7 @@ export function evaluateActivationGate(input: ActivationGateInput): ActivationGa
     evidenceRefs: [...(input.evidenceRefs ?? [])],
     activationKind: input.kind,
     evaluationSetRef: null,
+    [ACTIVATION_PASS_BRAND]: true,
   };
 }
 
@@ -738,20 +788,6 @@ export function activationGatePassed(input: ActivationGateInput): boolean {
 }
 
 // --- persistence ------------------------------------------------------------
-
-/** One `prod.activation_gate_evaluations` write derived from a gate result. */
-export interface ActivationGateEvaluationWrite {
-  readonly scopeHash: string;
-  readonly evaluations: readonly GateConditionEvaluation[];
-  readonly capacityContractRef: string | null;
-  /** The activation event this evaluation set authorises (null for a REFUSE). */
-  readonly activationEventRef: string | null;
-  readonly evaluatedAt: string;
-  readonly expiresAt: string;
-  readonly evidenceRefs: readonly string[];
-  /** Deterministic id prefix; the gate kind is appended to keep rows unique. */
-  readonly evaluationIdPrefix?: string;
-}
 
 /** One persisted `prod.activation_gate_evaluations` row, decoded. */
 export interface PersistedActivationGateEvaluation {
@@ -767,7 +803,7 @@ export interface PersistedActivationGateEvaluation {
   readonly expiresAt: string;
 }
 
-/** The recorder's receipt: the persisted ids plus the unforgeable set reference. */
+/** The recorder's receipt: the persisted ids plus the persisted-evidence set reference. */
 export interface RecordedActivationGateEvaluation {
   readonly evaluationIds: readonly string[];
   readonly evaluationSetRef: string;
@@ -823,10 +859,11 @@ const GATE_EVALUATION_COLUMNS = `evaluation_id, scope_hash, gate_kind, verdict, 
         activation_event_ref, capacity_contract_ref, evidence_refs, evaluated_at, expires_at`;
 
 /**
- * The unforgeable reference for one persisted evaluation set: a deterministic
+ * The persisted-evidence reference for one evaluation set: a deterministic
  * `sha256:<hex>` content address over the exact rows, in canonical gate order.
- * The recorder mints it; `advanceState` re-derives it from the database, so a
- * caller-constructed object cannot name evidence that was never persisted.
+ * The recorder mints it from the rows it committed; `advanceState` re-derives it
+ * from the database, so a caller-constructed object cannot name evidence that
+ * was never persisted.
  */
 export function activationEvidenceSetRef(
   rows: readonly PersistedActivationGateEvaluation[],
@@ -859,35 +896,40 @@ export function activationEvidenceSetRef(
  * in-place edit); a passing row carries no failing gate. The returned
  * `evaluationSetRef` is the only reference `advanceState` will accept when
  * crossing into ACTIVE: it is derived from the rows actually committed here.
+ *
+ * The writer is BRANDED: it accepts only an `ActivationGatePass` produced by
+ * `evaluateActivationGate`, so a caller cannot persist a hand-built all-PASS
+ * evaluation set and then claim it as evidence. (The brand attests result
+ * provenance only; see `ACTIVATION_PASS_BRAND` for the input trust boundary.)
  */
 export async function recordActivationGateEvaluation(
   engine: DatabaseEngine,
-  write: ActivationGateEvaluationWrite,
+  pass: ActivationGatePass,
 ): Promise<RecordedActivationGateEvaluation> {
-  if (!isContentAddress(write.scopeHash)) {
+  requireActivationPassBrand(pass);
+  if (!isContentAddress(pass.scopeHash)) {
     throw new ForesiftError(
       ErrorCode.PROD_ACTIVATION_SCOPE_INVALID,
       'activation gate evaluation requires a sha256 scope hash',
-      { scopeHash: write.scopeHash },
+      { scopeHash: pass.scopeHash },
     );
   }
-  if (write.evaluations.length === 0) {
+  if (pass.evaluations.length === 0) {
     throw new ForesiftError(
       ErrorCode.PROD_ACTIVATION_GATE_REFUSED,
       'an activation gate evaluation must record at least one gate',
-      {},
+      { reason: 'ACTIVATION_PASS_EVALUATIONS_EMPTY' },
     );
   }
-  const prefix = write.evaluationIdPrefix ?? 'gate-eval';
   return engine.transaction(async (tx) => {
     const ids: string[] = [];
-    for (const evaluation of write.evaluations) {
+    for (const evaluation of pass.evaluations) {
       const gate = parseActivationGateKind(evaluation.gateKind);
       const verdict = parseActivationGateVerdict(evaluation.verdict);
       const failing =
         evaluation.failingGate === null ? null : parseActivationGateKind(evaluation.failingGate);
-      const evaluationId = `${prefix}-${gate}-${sha256Text(
-        canonicalJson({ scopeHash: write.scopeHash, gate, verdict, at: write.evaluatedAt }),
+      const evaluationId = `gate-eval-${gate}-${sha256Text(
+        canonicalJson({ scopeHash: pass.scopeHash, gate, verdict, at: pass.evaluatedAt }),
       ).slice(7, 23)}`;
       await tx.query(
         `INSERT INTO prod.activation_gate_evaluations
@@ -896,15 +938,15 @@ export async function recordActivationGateEvaluation(
          VALUES ($1, $2, $3, $4, $5, $6::jsonb, $7, $8, $9::timestamptz, $10::timestamptz)`,
         [
           evaluationId,
-          write.scopeHash,
+          pass.scopeHash,
           gate,
           verdict,
           failing,
-          canonicalJson(write.evidenceRefs),
-          write.capacityContractRef,
-          write.activationEventRef,
-          write.evaluatedAt,
-          write.expiresAt,
+          canonicalJson(pass.evidenceRefs),
+          pass.capacityContractRef,
+          pass.activationEventRef,
+          pass.evaluatedAt,
+          pass.expiresAt,
         ],
       );
       ids.push(evaluationId);
@@ -916,7 +958,7 @@ export async function recordActivationGateEvaluation(
          FROM prod.activation_gate_evaluations
         WHERE scope_hash = $1 AND evaluated_at = $2::timestamptz
         ORDER BY evaluation_id ASC`,
-      [write.scopeHash, write.evaluatedAt],
+      [pass.scopeHash, pass.evaluatedAt],
     );
     const rows = persisted.rows.map(decodeGateEvaluationRow);
     return { evaluationIds: ids, evaluationSetRef: activationEvidenceSetRef(rows) };
@@ -925,23 +967,20 @@ export async function recordActivationGateEvaluation(
 
 /**
  * Record a pure gate result as its persisted evidence and return the SAME result
- * bound to the unforgeable `evaluationSetRef`. A REFUSE is never evidence for an
+ * bound to the persisted `evaluationSetRef`. A REFUSE is never evidence for an
  * activation, so it is returned unrecorded and unbound.
+ *
+ * Only a branded `ActivationGatePass` — an object produced by
+ * `evaluateActivationGate` — can reach the writer; a hand-built PASS is refused
+ * with `PROD_ACTIVATION_GATE_REFUSED` and persists ZERO rows.
  */
 export async function recordActivationGateResult(
   engine: DatabaseEngine,
   result: ActivationGateResult,
 ): Promise<ActivationGateResult> {
   if (result.verdict !== 'PASS') return result;
-  const recorded = await recordActivationGateEvaluation(engine, {
-    scopeHash: result.scopeHash,
-    evaluations: result.evaluations,
-    capacityContractRef: result.capacityContractRef,
-    activationEventRef: result.activationEventRef,
-    evaluatedAt: result.evaluatedAt,
-    expiresAt: result.expiresAt,
-    evidenceRefs: result.evidenceRefs,
-  });
+  requireActivationPassBrand(result);
+  const recorded = await recordActivationGateEvaluation(engine, result);
   return { ...result, evaluationSetRef: recorded.evaluationSetRef };
 }
 

@@ -485,16 +485,14 @@ function decodeRollbackRow(row: RawRollbackRow): RollbackEventRow {
 /** Alert resumption is blocked until the targeted candidate re-evaluation. */
 export const ROLLBACK_ALERT_RESUMPTION = 'BLOCKED_PENDING_CANDIDATE_REEVALUATION' as const;
 
-/** The lifecycle states that establish "previously approved" for a restore. */
-const APPROVED_RESTORE_STATES: readonly ModuleLifecycleState[] = [
-  'IMPLEMENTED',
-  'AVAILABLE',
-  'SHADOW',
-  'PROVEN',
-  'ACTIVE',
-  'DEGRADED',
-  'PAUSED',
-];
+/**
+ * The lifecycle state that establishes "previously approved" for a restore
+ * (audit H7): ONLY a row that actually reached `ACTIVE` was approved. A
+ * `DEGRADED`/`PAUSED` row can be produced by a caller-supplied activation event
+ * on a scope that never activated, so it is not admissible; the approved row is
+ * the ACTIVE row itself and the restore lands in PAUSED.
+ */
+const APPROVED_RESTORE_STATE: ModuleLifecycleState = 'ACTIVE';
 
 /** Input for `rollbackToApproved`. */
 export interface RollbackToApprovedInput {
@@ -559,41 +557,38 @@ export async function rollbackToApproved(
     );
   }
 
+  // The approved artifact set must be one that actually reached ACTIVE under the
+  // EXACT prior activation event (audit H7). A row with a NULL activation event
+  // was never activated, and a row activated under a different event is a
+  // different approval: neither may be restored by naming a fabricated prior
+  // event.
   const rows = await engine.query<{
     state_row_id: string;
     artifact_set_hash: string;
     lifecycle_state: string;
-    activation_event_ref: string | null;
+    activation_event_ref: string;
   }>(
     `SELECT state_row_id, artifact_set_hash, lifecycle_state, activation_event_ref
        FROM prod.module_states
       WHERE module_id = $1 AND scope = $2::jsonb AND artifact_set_hash = $3
-        AND (activation_event_ref IS NULL OR activation_event_ref = $4)
+        AND activation_event_ref = $4
+        AND lifecycle_state = $5
       ORDER BY created_at DESC, state_row_id DESC
       LIMIT 1`,
-    [moduleId, canonicalJson(scope), input.restoredArtifactSetHash, input.priorActivationEventRef],
+    [
+      moduleId,
+      canonicalJson(scope),
+      input.restoredArtifactSetHash,
+      input.priorActivationEventRef,
+      APPROVED_RESTORE_STATE,
+    ],
   );
-  const approved = rows.rows.find((row) =>
-    APPROVED_RESTORE_STATES.includes(row.lifecycle_state as ModuleLifecycleState),
-  );
+  const approved = rows.rows[0];
   if (approved === undefined) {
     throw new ForesiftError(
       ErrorCode.PROD_LIFECYCLE_TRANSITION_ILLEGAL,
-      'rollback may restore only a previously approved immutable artifact set (AC-279)',
+      'rollback may restore only an artifact set that previously reached ACTIVE under the exact prior activation event (AC-279)',
       { moduleId, scopeHash, restoredArtifactSetHash: input.restoredArtifactSetHash },
-    );
-  }
-  if (
-    approved.activation_event_ref !== null &&
-    approved.activation_event_ref !== input.priorActivationEventRef
-  ) {
-    throw new ForesiftError(
-      ErrorCode.PROD_LIFECYCLE_TRANSITION_ILLEGAL,
-      'the supplied prior activation event does not match the approved artifact set',
-      {
-        approvedActivationEventRef: approved.activation_event_ref,
-        priorActivationEventRef: input.priorActivationEventRef,
-      },
     );
   }
 
@@ -605,11 +600,10 @@ export async function rollbackToApproved(
       { moduleId, scopeHash },
     );
   }
-  const approvedState = approved.lifecycle_state as ModuleLifecycleState;
-  const preferred: ModuleLifecycleState =
-    approvedState === 'IMPLEMENTED' || approvedState === 'RETIRED' || approvedState === 'DISABLED'
-      ? 'DISABLED'
-      : 'PAUSED';
+  // The approved row was ACTIVE/DEGRADED/PAUSED, so the restore lands in PAUSED
+  // (a governed steady state awaiting candidate re-evaluation), falling back to
+  // DISABLED only when the current state cannot legally reach PAUSED.
+  const preferred: ModuleLifecycleState = 'PAUSED';
   const toState = legalLifecycleTransition(current.lifecycleState, preferred)
     ? preferred
     : parseModuleLifecycleState('DISABLED');

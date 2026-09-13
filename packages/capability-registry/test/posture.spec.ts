@@ -25,6 +25,7 @@ import {
   registerCriticalDependency,
   recordSla,
 } from '../src/index.ts';
+import { passingCapacityContract } from '../../../tests/fixtures/prod/index.ts';
 
 const MIGRATIONS_DIR = path.resolve(
   path.dirname(fileURLToPath(import.meta.url)),
@@ -86,11 +87,77 @@ describe('§69.6 critical-dependency SLA evaluation', () => {
       expiresAt: FUTURE,
     });
 
-    const posture = await evaluateDeploymentPosture(engine, { now: NOW });
+    const posture = await evaluateDeploymentPosture(engine, {
+      now: NOW,
+      capacityContract: passingCapacityContract(),
+    });
     expect(posture.posture).toBe('SLA_BACKED');
     expect(posture.missingSlaRefs).toEqual([]);
     expect(posture.criticalDependencyIds).toContain('dep-a');
     expect(posture.protectedDimensions).toEqual([...ALL_PROTECTED_DIMENSIONS]);
+  }, 120_000);
+
+  it('refuses SLA_BACKED on an empty critical register or without a capacity contract (H8 exploit)', async () => {
+    // The pre-fix vacuous truth: zero critical dependencies yielded SLA_BACKED.
+    // A FRESH database is the only honest way to observe an empty register.
+    const freshDb = new PGlite({ parsers: PRECISION_RETAINING_TIMESTAMP_PARSERS });
+    const freshEngine = createEngine(freshDb, 'pglite');
+    try {
+      await applyMigrations({ engine: freshEngine, migrationsDir: MIGRATIONS_DIR });
+      const empty = await evaluateDeploymentPosture(freshEngine, {
+        now: NOW,
+        capacityContract: passingCapacityContract(),
+      });
+      expect(empty.posture).toBe('FREE_TIER_BEST_EFFORT');
+      expect(empty.reason).toMatch(/no critical external dependency is declared/);
+    } finally {
+      await freshDb.close();
+    }
+
+    // A fully SLA-covered register still cannot claim SLA_BACKED with no
+    // passing capacity contract behind it.
+    await registerCriticalDependency(engine, {
+      dependencyId: 'dep-h8',
+      kind: 'PROVIDER',
+      owner: 'ops',
+    });
+    await recordSla(engine, {
+      slaId: 'sla-h8',
+      dependencyId: 'dep-h8',
+      applicable: true,
+      slaRef: 'contract-h8',
+      verifiedAt: PAST,
+      expiresAt: FUTURE,
+    });
+    const unbacked = await evaluateDeploymentPosture(engine, { now: NOW });
+    expect(unbacked.posture).toBe('FREE_TIER_BEST_EFFORT');
+    expect(unbacked.reason).toMatch(/no passing sustainable-capacity contract/);
+
+    const backed = await evaluateDeploymentPosture(engine, {
+      now: NOW,
+      capacityContract: passingCapacityContract(),
+    });
+    expect(backed.posture).toBe('SLA_BACKED');
+
+    // An EXPIRED or law-violating contract cannot back SLA_BACKED either.
+    const expired = await evaluateDeploymentPosture(engine, {
+      now: NOW,
+      capacityContract: { ...passingCapacityContract(), expiresAt: '2020-01-01T00:00:00Z' },
+    });
+    expect(expired.posture).toBe('FREE_TIER_BEST_EFFORT');
+
+    const bare = await evaluateDeploymentPosture(engine, {
+      now: NOW,
+      capacityContract: { result: 'PASS' } as never,
+    });
+    expect(bare.posture).toBe('FREE_TIER_BEST_EFFORT');
+
+    // The consumer that backs the claim refuses a missing/non-PASS contract.
+    expect(() => assertCapacityContractBacksPosture(null)).toThrow();
+    expect(() =>
+      assertCapacityContractBacksPosture({ ...passingCapacityContract(), result: 'FAIL' } as never),
+    ).toThrow();
+    expect(() => assertCapacityContractBacksPosture(passingCapacityContract())).not.toThrow();
   }, 120_000);
 
   it('declares FREE_TIER_BEST_EFFORT with an explicit degraded scope for missing/expired/non-applicable SLAs', async () => {

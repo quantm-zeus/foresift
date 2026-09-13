@@ -27,8 +27,10 @@
  */
 import {
   ACTIVATION_GATE_ORDER,
+  ALL_ACTIVATION_KINDS,
   ActivationGateKind,
   ActivationGateVerdict,
+  ActivationKind,
   DistributionReadiness,
   ErrorCode,
   ForesiftError,
@@ -36,6 +38,7 @@ import {
   isContractActivatable,
   parseActivationGateKind,
   parseActivationGateVerdict,
+  parseActivationKind,
   parseDistributionReadiness,
   validateSustainableCapacityContract,
   type SustainableCapacityContract,
@@ -73,21 +76,23 @@ import {
  */
 const ACTIVATION_PASS_BRAND: unique symbol = Symbol('foresift.prod.activation-pass');
 
+/**
+ * Identity brand for `ActivationGateRefusal`. Audit H6 requires refusals to be
+ * persisted too (a later REFUSE must invalidate older PASS evidence), and the
+ * writer that persists them must be able to tell a genuine evaluator refusal
+ * from a hand-built object exactly as it does for passes.
+ */
+const ACTIVATION_REFUSAL_BRAND: unique symbol = Symbol('foresift.prod.activation-refusal');
+
 // --- activation kind --------------------------------------------------------
 
-/** Which §69 gate family the evaluation is deciding. */
-export const ActivationKind = {
-  /** §69.4: collection, deterministic analysis, risk monitoring, shadow research. */
-  OPERATIONAL: 'OPERATIONAL',
-  /** §69.5: `CONFIRMED_OPPORTUNITY` active influence for the exact scope. */
-  OPPORTUNITY: 'OPPORTUNITY',
-  /** §69.9: a workspace surface becomes authorized. */
-  WORKSPACE: 'WORKSPACE',
-  /** §69.9: a public surface becomes authorized. */
-  PUBLIC: 'PUBLIC',
-} as const;
-export type ActivationKind = (typeof ActivationKind)[keyof typeof ActivationKind];
-export const ALL_ACTIVATION_KINDS: readonly ActivationKind[] = Object.values(ActivationKind);
+/**
+ * The closed activation-kind vocabulary is owned by `@foresift/domain`
+ * (audit C1) so the registry, the Zod schemas, the SQL CHECK constraints and
+ * persistence all bind to the SAME four literals; it is re-exported here for
+ * the package's existing importers.
+ */
+export { ActivationKind, ALL_ACTIVATION_KINDS };
 
 /** §69.9 distribution kinds that additionally require the public gate set. */
 export function isDistributionActivation(kind: ActivationKind): boolean {
@@ -104,17 +109,21 @@ export function requiredGatesForActivation(
   scope: ModuleStateScope,
 ): readonly ActivationGateKind[] {
   const parsedScope = parseModuleStateScope(scope);
+  // §69.5: PROVEN is required exactly when the exact scope specifies it — for
+  // EVERY activation kind, not only opportunity (audit H5 residual): a
+  // `requires_proven` scope must never reach ACTIVE through an OPERATIONAL
+  // evaluation that silently skips the PROVEN precondition.
+  const provenGate: ActivationGateKind[] = parsedScope.requires_proven
+    ? [ActivationGateKind.PROVEN_PRESENT]
+    : [];
   const operational: ActivationGateKind[] = [
     ActivationGateKind.IMPLEMENTED_PRESENT,
     ActivationGateKind.AVAILABLE_EVIDENCE,
+    ...provenGate,
     ActivationGateKind.VERIFIED_GATE_EVIDENCE,
     ActivationGateKind.CAPACITY_CONTRACT,
     ActivationGateKind.NO_OPEN_CONTAINMENT,
   ];
-  // §69.5: PROVEN is required exactly when the exact scope specifies it.
-  const provenGate: ActivationGateKind[] = parsedScope.requires_proven
-    ? [ActivationGateKind.PROVEN_PRESENT]
-    : [];
   const opportunity: ActivationGateKind[] = [
     ActivationGateKind.IMPLEMENTED_PRESENT,
     ActivationGateKind.AVAILABLE_EVIDENCE,
@@ -299,14 +308,23 @@ export interface ActivationGateInput {
 
 // --- results ----------------------------------------------------------------
 
-/** One gate's evaluation. `failingGate` is null exactly when the verdict passes. */
+/**
+ * One gate's evaluation. `failingGate` is null exactly when the verdict
+ * passes. `activationKind` records WHICH activation kind the evaluation was
+ * made for, so a skipped gate can never be mistaken for a pass and evidence
+ * for one kind can never authorize another (audit C1).
+ */
 export interface GateConditionEvaluation {
   readonly gateKind: ActivationGateKind;
   readonly verdict: ActivationGateVerdict;
   readonly failingGate: ActivationGateKind | null;
   readonly reason: ActivationGateRefusalReason | null;
   readonly detail: string;
+  readonly activationKind: ActivationKind;
 }
+
+/** A condition verdict before the evaluated activation kind is attached. */
+type ConditionVerdict = Omit<GateConditionEvaluation, 'activationKind'>;
 
 export interface ActivationGatePass {
   readonly verdict: 'PASS';
@@ -342,13 +360,24 @@ export interface ActivationGateRefusal {
   readonly reason: ActivationGateRefusalReason;
   readonly detail: string;
   readonly evaluations: readonly GateConditionEvaluation[];
+  /** The activation kind this refusal was evaluated for (audit C1). */
+  readonly activationKind: ActivationKind;
+  // The persister (audit H6) needs the same metadata a pass carries so a
+  // refusal is a first-class, immutable evaluation batch.
+  readonly activationEventRef: string;
+  readonly capacityContractRef: string;
+  readonly evaluatedAt: string;
+  readonly expiresAt: string;
+  readonly evidenceRefs: readonly string[];
+  readonly evaluationSetRef: string | null;
+  readonly [ACTIVATION_REFUSAL_BRAND]: true;
 }
 
 export type ActivationGateResult = ActivationGatePass | ActivationGateRefusal;
 
 // --- helpers ----------------------------------------------------------------
 
-function pass(gate: ActivationGateKind): GateConditionEvaluation {
+function pass(gate: ActivationGateKind): ConditionVerdict {
   return {
     gateKind: gate,
     verdict: ActivationGateVerdict.PASS,
@@ -358,11 +387,27 @@ function pass(gate: ActivationGateKind): GateConditionEvaluation {
   };
 }
 
+/**
+ * A gate outside the requested activation kind's required set. It is recorded
+ * as `NOT_APPLICABLE` — never as `PASS` — so persisted evidence proves the gate
+ * was NOT evaluated for this kind and an OPERATIONAL pass cannot stand in for
+ * OPPORTUNITY/WORKSPACE/PUBLIC statistical or distribution evidence (audit C1).
+ */
+function notApplicable(gate: ActivationGateKind): ConditionVerdict {
+  return {
+    gateKind: gate,
+    verdict: ActivationGateVerdict.NOT_APPLICABLE,
+    failingGate: null,
+    reason: null,
+    detail: 'not applicable to the evaluated activation kind',
+  };
+}
+
 function refuse(
   gate: ActivationGateKind,
   reason: ActivationGateRefusalReason,
   detail: string,
-): GateConditionEvaluation {
+): ConditionVerdict {
   return {
     gateKind: gate,
     verdict: ActivationGateVerdict.REFUSE,
@@ -387,6 +432,7 @@ function isContentAddress(value: unknown): value is string {
  * `PROD_ACTIVATION_GATE_REFUSED` / `ACTIVATION_PASS_UNBRANDED`.
  */
 const ACTIVATION_PASS_IDENTITY = new WeakSet<ActivationGatePass>();
+const ACTIVATION_REFUSAL_IDENTITY = new WeakSet<ActivationGateRefusal>();
 
 function requireActivationPassBrand(value: unknown): asserts value is ActivationGatePass {
   if (
@@ -398,6 +444,30 @@ function requireActivationPassBrand(value: unknown): asserts value is Activation
       ErrorCode.PROD_ACTIVATION_GATE_REFUSED,
       'activation-gate evidence must be the ActivationGatePass object returned by evaluateActivationGate; the supplied object has no evaluator identity provenance',
       { reason: 'ACTIVATION_PASS_UNBRANDED' },
+    );
+  }
+}
+
+/**
+ * Fail-closed provenance check shared by the recorder and `advanceState`: the
+ * supplied result must be the frozen evaluator object, branded by IDENTITY, and
+ * its `activationKind` must be one of the closed vocabulary values.
+ */
+export function requireActivationResultBrand(
+  value: unknown,
+): asserts value is ActivationGateResult {
+  if (
+    value === null ||
+    typeof value !== 'object' ||
+    !(
+      ACTIVATION_PASS_IDENTITY.has(value as ActivationGatePass) ||
+      ACTIVATION_REFUSAL_IDENTITY.has(value as ActivationGateRefusal)
+    )
+  ) {
+    throw new ForesiftError(
+      ErrorCode.PROD_ACTIVATION_GATE_REFUSED,
+      'entering ACTIVE requires the ActivationGateResult object returned by evaluateActivationGate; a hand-built result has no evaluator identity provenance',
+      { reason: 'ACTIVATION_RESULT_UNBRANDED' },
     );
   }
 }
@@ -454,7 +524,7 @@ function evaluateCondition(
   input: ActivationGateInput,
   scopeHash: string,
   nowMs: number,
-): GateConditionEvaluation {
+): ConditionVerdict {
   switch (gate) {
     case ActivationGateKind.IMPLEMENTED_PRESENT: {
       if (input.implemented !== true) {
@@ -747,30 +817,85 @@ function evaluateCondition(
 export function evaluateActivationGate(input: ActivationGateInput): ActivationGateResult {
   const scope = parseModuleStateScope(input.scope);
   const scopeHash = activationScopeHash(scope);
-  const required = requiredGatesForActivation(input.kind, scope);
+  const kind = parseActivationKind(input.kind);
+  const required = requiredGatesForActivation(kind, scope);
   const requiredSet = new Set<ActivationGateKind>(required);
   const nowMs = Date.parse(input.now);
-  const evaluations: GateConditionEvaluation[] = [];
-  for (const gate of ACTIVATION_GATE_ORDER) {
-    if (!requiredSet.has(gate)) {
-      evaluations.push(pass(gate));
-      continue;
+  // A pass may not outlive ANY evidence it consumed (audit HIGH-4): the
+  // effective expiry is the EARLIEST of the requested expiry and the expiries of
+  // the capacity contract, the signed gate evidence, and (when the kind consumes
+  // it) the registered statistical evidence. The pass-level `expiresAt` is
+  // therefore derived, never caller-controlled.
+  const consumedExpiries: string[] = [];
+  if (requiredSet.has(ActivationGateKind.CAPACITY_CONTRACT) && input.capacityContract != null) {
+    consumedExpiries.push(input.capacityContract.expiresAt);
+  }
+  if (
+    requiredSet.has(ActivationGateKind.VERIFIED_GATE_EVIDENCE) &&
+    input.verifiedGateEvidence != null
+  ) {
+    consumedExpiries.push(input.verifiedGateEvidence.record.expiresAt);
+  }
+  if (requiredSet.has(ActivationGateKind.STATISTICAL_EVIDENCE_SCOPE)) {
+    for (const evidence of input.registeredStatisticalEvidence ?? []) {
+      consumedExpiries.push(evidence.expiresAt);
     }
-    const evaluation = evaluateCondition(gate, input, scopeHash, nowMs);
+  }
+  const effectiveExpiresAt = consumedExpiries.reduce((earliest, candidate) => {
+    const candidateMs = Date.parse(candidate);
+    return Number.isFinite(candidateMs) && candidateMs < Date.parse(earliest)
+      ? candidate
+      : earliest;
+  }, input.expiresAt);
+  const evaluations: GateConditionEvaluation[] = [];
+  const makeRefusal = (
+    failingGate: ActivationGateKind,
+    reason: ActivationGateRefusalReason,
+    detail: string,
+  ): ActivationGateResult => {
+    const refusal: ActivationGateRefusal = Object.freeze({
+      verdict: 'REFUSE',
+      scopeHash,
+      failingGate,
+      reason,
+      detail,
+      evaluations: Object.freeze([...evaluations]),
+      activationKind: kind,
+      activationEventRef: input.activationEventRef,
+      capacityContractRef: input.capacityContract?.contractId ?? '',
+      evaluatedAt: input.now,
+      expiresAt: effectiveExpiresAt,
+      evidenceRefs: Object.freeze([...(input.evidenceRefs ?? [])]),
+      evaluationSetRef: null,
+      [ACTIVATION_REFUSAL_BRAND]: true as const,
+    });
+    ACTIVATION_REFUSAL_IDENTITY.add(refusal);
+    return refusal;
+  };
+  for (const gate of ACTIVATION_GATE_ORDER) {
+    const condition = requiredSet.has(gate)
+      ? evaluateCondition(gate, input, scopeHash, nowMs)
+      : notApplicable(gate);
+    const evaluation: GateConditionEvaluation = { ...condition, activationKind: kind };
     evaluations.push(evaluation);
     if (evaluation.verdict === ActivationGateVerdict.REFUSE) {
-      const failingGate = evaluation.failingGate ?? gate;
-      return {
-        verdict: 'REFUSE',
-        scopeHash,
-        failingGate,
-        reason: evaluation.reason ?? ActivationGateRefusalReason.ACTIVATION_SCOPE_INVALID,
-        detail: evaluation.detail,
-        evaluations,
-      };
+      return makeRefusal(
+        evaluation.failingGate ?? gate,
+        evaluation.reason ?? ActivationGateRefusalReason.ACTIVATION_SCOPE_INVALID,
+        evaluation.detail,
+      );
     }
   }
   const capacityContractRef = input.capacityContract?.contractId ?? '';
+  if (!Number.isFinite(Date.parse(effectiveExpiresAt)) || Date.parse(effectiveExpiresAt) <= nowMs) {
+    return makeRefusal(
+      ActivationGateKind.VERIFIED_GATE_EVIDENCE,
+      ActivationGateRefusalReason.ACTIVATION_SCOPE_INVALID,
+      `the derived evidence expiry ${JSON.stringify(
+        effectiveExpiresAt,
+      )} does not follow the evaluation instant; a pass may not rest on already-expired or unparseable evidence`,
+    );
+  }
   const brandedPass: ActivationGatePass = Object.freeze({
     verdict: 'PASS',
     scopeHash,
@@ -778,9 +903,9 @@ export function evaluateActivationGate(input: ActivationGateInput): ActivationGa
     activationEventRef: input.activationEventRef,
     capacityContractRef,
     evaluatedAt: input.now,
-    expiresAt: input.expiresAt,
+    expiresAt: effectiveExpiresAt,
     evidenceRefs: Object.freeze([...(input.evidenceRefs ?? [])]),
-    activationKind: input.kind,
+    activationKind: kind,
     evaluationSetRef: null,
     [ACTIVATION_PASS_BRAND]: true as const,
   });
@@ -808,6 +933,8 @@ export interface PersistedActivationGateEvaluation {
   readonly evidenceRefs: readonly string[];
   readonly evaluatedAt: string;
   readonly expiresAt: string;
+  /** The activation kind the row was evaluated for (audit C1). */
+  readonly activationKind: ActivationKind;
 }
 
 /** The recorder's receipt: the persisted ids plus the persisted-evidence set reference. */
@@ -827,6 +954,7 @@ interface RawGateEvaluationRow {
   evidence_refs: unknown;
   evaluated_at: unknown;
   expires_at: unknown;
+  activation_kind: string;
 }
 
 function toIsoTimestamp(value: unknown): string {
@@ -859,11 +987,13 @@ function decodeGateEvaluationRow(row: RawGateEvaluationRow): PersistedActivation
     evidenceRefs: decodeEvidenceRefs(row.evidence_refs),
     evaluatedAt: toIsoTimestamp(row.evaluated_at),
     expiresAt: toIsoTimestamp(row.expires_at),
+    activationKind: row.activation_kind as ActivationKind,
   };
 }
 
 const GATE_EVALUATION_COLUMNS = `evaluation_id, scope_hash, gate_kind, verdict, failing_gate,
-        activation_event_ref, capacity_contract_ref, evidence_refs, evaluated_at, expires_at`;
+        activation_event_ref, capacity_contract_ref, evidence_refs, evaluated_at, expires_at,
+        activation_kind`;
 
 /**
  * The persisted-evidence reference for one evaluation set: a deterministic
@@ -892,17 +1022,109 @@ export function activationEvidenceSetRef(
         evidenceRefs: row.evidenceRefs,
         evaluatedAt: row.evaluatedAt,
         expiresAt: row.expiresAt,
+        activationKind: row.activationKind,
       })),
     ),
   );
 }
 
+interface PersistEvaluationsInput {
+  readonly scopeHash: string;
+  readonly activationKind: ActivationKind;
+  readonly evaluations: readonly GateConditionEvaluation[];
+  readonly activationEventRef: string | null;
+  readonly capacityContractRef: string | null;
+  readonly evidenceRefs: readonly string[];
+  readonly evaluatedAt: string;
+  readonly expiresAt: string;
+}
+
+/**
+ * Persist one immutable `prod.activation_gate_evaluations` row per evaluation,
+ * binding the evaluated ACTIVATION KIND on every row (audit C1) so evidence for
+ * one kind can never authorize another. PASS, `NOT_APPLICABLE` and REFUSE rows
+ * are all recorded, so a later refusal invalidates older PASS evidence
+ * (audit H6). Returns the reference derived from the rows actually committed —
+ * never from the caller's object.
+ */
+async function persistEvaluations(
+  engine: DatabaseEngine,
+  input: PersistEvaluationsInput,
+): Promise<RecordedActivationGateEvaluation> {
+  if (!isContentAddress(input.scopeHash)) {
+    throw new ForesiftError(
+      ErrorCode.PROD_ACTIVATION_SCOPE_INVALID,
+      'activation gate evaluation requires a sha256 scope hash',
+      { scopeHash: input.scopeHash },
+    );
+  }
+  if (input.evaluations.length === 0) {
+    throw new ForesiftError(
+      ErrorCode.PROD_ACTIVATION_GATE_REFUSED,
+      'an activation gate evaluation must record at least one gate',
+      { reason: 'ACTIVATION_PASS_EVALUATIONS_EMPTY' },
+    );
+  }
+  const kind = parseActivationKind(input.activationKind);
+  return engine.transaction(async (tx) => {
+    const ids: string[] = [];
+    for (const evaluation of input.evaluations) {
+      const gate = parseActivationGateKind(evaluation.gateKind);
+      const verdict = parseActivationGateVerdict(evaluation.verdict);
+      const failing =
+        evaluation.failingGate === null ? null : parseActivationGateKind(evaluation.failingGate);
+      const evaluationId = `gate-eval-${gate}-${sha256Text(
+        canonicalJson({
+          scopeHash: input.scopeHash,
+          kind,
+          gate,
+          verdict,
+          // The activation event distinguishes two genuine evaluations of the
+          // same scope and kind at the same instant (for example A -> B -> A).
+          event: input.activationEventRef,
+          at: input.evaluatedAt,
+        }),
+      ).slice(7, 23)}`;
+      await tx.query(
+        `INSERT INTO prod.activation_gate_evaluations
+           (evaluation_id, scope_hash, gate_kind, verdict, failing_gate, evidence_refs,
+            capacity_contract_ref, activation_event_ref, evaluated_at, expires_at, activation_kind)
+         VALUES ($1, $2, $3, $4, $5, $6::jsonb, $7, $8, $9::timestamptz, $10::timestamptz, $11)`,
+        [
+          evaluationId,
+          input.scopeHash,
+          gate,
+          verdict,
+          failing,
+          canonicalJson(input.evidenceRefs),
+          input.capacityContractRef,
+          input.activationEventRef,
+          input.evaluatedAt,
+          input.expiresAt,
+          kind,
+        ],
+      );
+      ids.push(evaluationId);
+    }
+    // Re-read the rows just committed so the minted reference is derived from
+    // database truth (exact timestamps and ids), never from the caller's object.
+    const persisted = await tx.query<RawGateEvaluationRow>(
+      `SELECT ${GATE_EVALUATION_COLUMNS}
+         FROM prod.activation_gate_evaluations
+        WHERE scope_hash = $1 AND evaluated_at = $2::timestamptz AND activation_kind = $3
+          AND activation_event_ref IS NOT DISTINCT FROM $4
+        ORDER BY evaluation_id ASC`,
+      [input.scopeHash, input.evaluatedAt, kind, input.activationEventRef],
+    );
+    const rows = persisted.rows.map(decodeGateEvaluationRow);
+    return { evaluationIds: ids, evaluationSetRef: activationEvidenceSetRef(rows) };
+  });
+}
+
 /**
  * Persist one immutable `prod.activation_gate_evaluations` row per evaluated
- * gate. A re-evaluation is always a NEW row (the migration trigger refuses any
- * in-place edit); a passing row carries no failing gate. The returned
- * `evaluationSetRef` is the only reference `advanceState` will accept when
- * crossing into ACTIVE: it is derived from the rows actually committed here.
+ * gate for a PASS. A re-evaluation is always a NEW row (the migration trigger
+ * refuses any in-place edit); a passing row carries no failing gate.
  *
  * The writer is BRANDED: it accepts only an `ActivationGatePass` produced by
  * `evaluateActivationGate`, so a caller cannot persist a hand-built all-PASS
@@ -914,94 +1136,84 @@ export async function recordActivationGateEvaluation(
   pass: ActivationGatePass,
 ): Promise<RecordedActivationGateEvaluation> {
   requireActivationPassBrand(pass);
-  if (!isContentAddress(pass.scopeHash)) {
-    throw new ForesiftError(
-      ErrorCode.PROD_ACTIVATION_SCOPE_INVALID,
-      'activation gate evaluation requires a sha256 scope hash',
-      { scopeHash: pass.scopeHash },
-    );
-  }
-  if (pass.evaluations.length === 0) {
-    throw new ForesiftError(
-      ErrorCode.PROD_ACTIVATION_GATE_REFUSED,
-      'an activation gate evaluation must record at least one gate',
-      { reason: 'ACTIVATION_PASS_EVALUATIONS_EMPTY' },
-    );
-  }
-  return engine.transaction(async (tx) => {
-    const ids: string[] = [];
-    for (const evaluation of pass.evaluations) {
-      const gate = parseActivationGateKind(evaluation.gateKind);
-      const verdict = parseActivationGateVerdict(evaluation.verdict);
-      const failing =
-        evaluation.failingGate === null ? null : parseActivationGateKind(evaluation.failingGate);
-      const evaluationId = `gate-eval-${gate}-${sha256Text(
-        canonicalJson({ scopeHash: pass.scopeHash, gate, verdict, at: pass.evaluatedAt }),
-      ).slice(7, 23)}`;
-      await tx.query(
-        `INSERT INTO prod.activation_gate_evaluations
-           (evaluation_id, scope_hash, gate_kind, verdict, failing_gate, evidence_refs,
-            capacity_contract_ref, activation_event_ref, evaluated_at, expires_at)
-         VALUES ($1, $2, $3, $4, $5, $6::jsonb, $7, $8, $9::timestamptz, $10::timestamptz)`,
-        [
-          evaluationId,
-          pass.scopeHash,
-          gate,
-          verdict,
-          failing,
-          canonicalJson(pass.evidenceRefs),
-          pass.capacityContractRef,
-          pass.activationEventRef,
-          pass.evaluatedAt,
-          pass.expiresAt,
-        ],
-      );
-      ids.push(evaluationId);
-    }
-    // Re-read the rows just committed so the minted reference is derived from
-    // database truth (exact timestamps and ids), never from the caller's object.
-    const persisted = await tx.query<RawGateEvaluationRow>(
-      `SELECT ${GATE_EVALUATION_COLUMNS}
-         FROM prod.activation_gate_evaluations
-        WHERE scope_hash = $1 AND evaluated_at = $2::timestamptz
-        ORDER BY evaluation_id ASC`,
-      [pass.scopeHash, pass.evaluatedAt],
-    );
-    const rows = persisted.rows.map(decodeGateEvaluationRow);
-    return { evaluationIds: ids, evaluationSetRef: activationEvidenceSetRef(rows) };
+  return persistEvaluations(engine, {
+    scopeHash: pass.scopeHash,
+    activationKind: pass.activationKind,
+    evaluations: pass.evaluations,
+    activationEventRef: pass.activationEventRef,
+    capacityContractRef: pass.capacityContractRef,
+    evidenceRefs: pass.evidenceRefs,
+    evaluatedAt: pass.evaluatedAt,
+    expiresAt: pass.expiresAt,
   });
 }
 
 /**
- * Record a pure gate result as its persisted evidence and return the SAME result
- * bound to the persisted `evaluationSetRef`. A REFUSE is never evidence for an
- * activation, so it is returned unrecorded and unbound.
+ * Persist a branded gate result — PASS *or* REFUSE — as its immutable
+ * evaluation batch and return the SAME result bound to the persisted
+ * `evaluationSetRef`. Recording refusals is load-bearing (audit H6): the SQL
+ * trigger and `requirePersistedActivationEvidence` both let the LATEST batch
+ * govern, so a newer refusal invalidates older PASS evidence for the same
+ * scope, event and kind.
  *
- * Only a branded `ActivationGatePass` — an object produced by
- * `evaluateActivationGate` — can reach the writer; a hand-built PASS is refused
- * with `PROD_ACTIVATION_GATE_REFUSED` and persists ZERO rows.
+ * Only the frozen object returned by `evaluateActivationGate` can reach the
+ * writer; a hand-built result is refused with `PROD_ACTIVATION_GATE_REFUSED`
+ * and persists ZERO rows.
  */
 export async function recordActivationGateResult(
   engine: DatabaseEngine,
   result: ActivationGateResult,
 ): Promise<ActivationGateResult> {
-  if (result.verdict !== 'PASS') return result;
-  requireActivationPassBrand(result);
-  const recorded = await recordActivationGateEvaluation(engine, result);
-  return { ...result, evaluationSetRef: recorded.evaluationSetRef };
+  requireActivationResultBrand(result);
+  const recorded = await persistEvaluations(engine, {
+    scopeHash: result.scopeHash,
+    activationKind: result.activationKind,
+    evaluations: result.evaluations,
+    activationEventRef: result.activationEventRef,
+    capacityContractRef: result.capacityContractRef,
+    evidenceRefs: result.evidenceRefs,
+    evaluatedAt: result.evaluatedAt,
+    expiresAt: result.expiresAt,
+  });
+  // Return a NEW frozen object that carries the SAME evaluator identity brand,
+  // so `advanceState` accepts the recorded result while a caller still cannot
+  // mint one (the WeakSets are module-private).
+  const bound = Object.freeze({ ...result, evaluationSetRef: recorded.evaluationSetRef });
+  if (bound.verdict === 'PASS') {
+    ACTIVATION_PASS_IDENTITY.add(bound as ActivationGatePass);
+  } else {
+    ACTIVATION_REFUSAL_IDENTITY.add(bound as ActivationGateRefusal);
+  }
+  return bound;
 }
 
-/** Every persisted gate evaluation for an exact scope (append-only read). */
+/**
+ * Every persisted gate evaluation for an exact scope, optionally narrowed to
+ * one activation kind (append-only read).
+ */
 export async function activationGateEvaluationsFor(
   engine: DatabaseEngine,
   scopeHash: string,
+  activationKind?: ActivationKind,
+  activationEventRef?: string,
 ): Promise<readonly PersistedActivationGateEvaluation[]> {
+  const kind = activationKind === undefined ? undefined : parseActivationKind(activationKind);
+  const clauses = ['scope_hash = $1'];
+  const params: unknown[] = [scopeHash];
+  if (kind !== undefined) {
+    params.push(kind);
+    clauses.push(`activation_kind = $${params.length}`);
+  }
+  if (activationEventRef !== undefined) {
+    params.push(activationEventRef);
+    clauses.push(`activation_event_ref = $${params.length}`);
+  }
   const result = await engine.query<RawGateEvaluationRow>(
     `SELECT ${GATE_EVALUATION_COLUMNS}
        FROM prod.activation_gate_evaluations
-      WHERE scope_hash = $1
+      WHERE ${clauses.join(' AND ')}
       ORDER BY evaluated_at ASC, evaluation_id ASC`,
-    [scopeHash],
+    params,
   );
   return result.rows.map(decodeGateEvaluationRow);
 }
@@ -1017,6 +1229,7 @@ export const ActivationEvidenceRefusalReason = {
   EVIDENCE_SET_STALE: 'EVIDENCE_SET_STALE',
   EVIDENCE_EVENT_REF_UNPERSISTED: 'EVIDENCE_EVENT_REF_UNPERSISTED',
   EVIDENCE_SET_REF_MISMATCH: 'EVIDENCE_SET_REF_MISMATCH',
+  EVIDENCE_SET_KIND_MISMATCH: 'EVIDENCE_SET_KIND_MISMATCH',
 } as const;
 export type ActivationEvidenceRefusalReason =
   (typeof ActivationEvidenceRefusalReason)[keyof typeof ActivationEvidenceRefusalReason];
@@ -1061,15 +1274,27 @@ export async function requirePersistedActivationEvidence(
       'entering ACTIVE requires a gate result bound to persisted evidence; no evaluationSetRef was supplied',
     );
   }
-  const rows = await activationGateEvaluationsFor(engine, input.scopeHash);
+  const kind = parseActivationKind(input.activationKind);
+  // Only evidence evaluated for THIS activation kind is admissible (audit C1):
+  // an OPERATIONAL batch must never stand in for OPPORTUNITY/WORKSPACE/PUBLIC.
+  // Evidence is scoped by scope, kind AND activation event (the batch identity).
+  // Two genuine evaluations at the same instant for different events are
+  // distinct batches, so an older event's PASS can never authorize a new one.
+  const rows = await activationGateEvaluationsFor(
+    engine,
+    input.scopeHash,
+    kind,
+    input.activationEventRef,
+  );
   if (rows.length === 0) {
     refuse(
       ActivationEvidenceRefusalReason.EVIDENCE_SET_EMPTY,
-      'no persisted activation-gate evaluations exist for the exact scope; a hand-built PASS object is not evidence',
+      `no persisted activation-gate evaluations exist for the exact scope under activation kind ${kind} and event ${JSON.stringify(input.activationEventRef)}; evidence for another kind or event is not evidence for this one`,
     );
   }
   // The latest evaluation batch is the only admissible evidence; an older PASS
-  // never survives a later re-evaluation.
+  // never survives a later re-evaluation (a later REFUSE batch is persisted too
+  // and therefore wins — audit H6).
   let latestAt = Number.NEGATIVE_INFINITY;
   for (const row of rows) {
     const at = Date.parse(row.evaluatedAt);
@@ -1082,8 +1307,16 @@ export async function requirePersistedActivationEvidence(
       'the persisted activation-gate evaluations carry no resolvable evaluation instant',
     );
   }
+  const required = requiredGatesForActivation(kind, input.scope);
+  const requiredSet = new Set<ActivationGateKind>(required);
   const atMs = Date.parse(input.at);
   for (const row of batch) {
+    if (row.activationKind !== kind) {
+      refuse(
+        ActivationEvidenceRefusalReason.EVIDENCE_SET_KIND_MISMATCH,
+        `the persisted evidence was evaluated for activation kind ${row.activationKind}, not ${kind}`,
+      );
+    }
     if (row.activationEventRef !== input.activationEventRef) {
       refuse(
         ActivationEvidenceRefusalReason.EVIDENCE_EVENT_REF_UNPERSISTED,
@@ -1092,10 +1325,30 @@ export async function requirePersistedActivationEvidence(
         )}, not ${JSON.stringify(input.activationEventRef)}`,
       );
     }
-    if (row.verdict !== 'PASS' || row.failingGate !== null) {
+    // A REQUIRED gate must be an explicit PASS. `NOT_APPLICABLE` (a gate skipped
+    // for this kind) is never a pass, and neither is a REFUSE.
+    if (requiredSet.has(row.gateKind)) {
+      if (row.verdict !== 'PASS' || row.failingGate !== null) {
+        refuse(
+          ActivationEvidenceRefusalReason.EVIDENCE_SET_NOT_PASS,
+          `the latest persisted required gate ${row.gateKind} verdict is ${row.verdict}`,
+        );
+      }
+    } else if (
+      row.verdict !== 'NOT_APPLICABLE' &&
+      !(row.verdict === 'REFUSE' && row.failingGate !== null)
+    ) {
+      // Non-required gates must be honestly recorded as NOT_APPLICABLE; a PASS
+      // for a gate outside the kind's set is the forged placeholder C1 closed.
+      refuse(
+        ActivationEvidenceRefusalReason.EVIDENCE_SET_KIND_MISMATCH,
+        `persisted gate ${row.gateKind} was recorded ${row.verdict} although it is not required for activation kind ${kind}`,
+      );
+    }
+    if (row.verdict === 'REFUSE') {
       refuse(
         ActivationEvidenceRefusalReason.EVIDENCE_SET_NOT_PASS,
-        `the latest persisted gate ${row.gateKind} verdict is ${row.verdict}`,
+        `the latest persisted gate ${row.gateKind} verdict is REFUSE (${row.failingGate})`,
       );
     }
     if (Date.parse(row.expiresAt) <= atMs) {
@@ -1110,24 +1363,24 @@ export async function requirePersistedActivationEvidence(
     verdict: row.verdict,
     failingGate: row.failingGate,
   }));
-  // Cover every gate required for the activation kind AND the full canonical
-  // order, so a partial evaluation can never stand in for a total one.
-  const requiredFailing = activationGateRefusal(
-    evaluations,
-    requiredGatesForActivation(input.activationKind, input.scope),
-  );
+  // Every gate required for the activation kind must have exactly one PASS…
+  const requiredFailing = activationGateRefusal(evaluations, required);
   if (requiredFailing !== null) {
     refuse(
       ActivationEvidenceRefusalReason.EVIDENCE_SET_INCOMPLETE,
       `the persisted evidence is missing a passing evaluation for ${requiredFailing}`,
     );
   }
-  const totalFailing = activationGateRefusal(evaluations, ACTIVATION_GATE_ORDER);
-  if (totalFailing !== null) {
-    refuse(
-      ActivationEvidenceRefusalReason.EVIDENCE_SET_INCOMPLETE,
-      `the persisted evidence does not cover the complete ordered gate set: ${totalFailing}`,
-    );
+  // …and the batch must cover the full canonical order exactly once (PASS where
+  // required, NOT_APPLICABLE elsewhere), so a partial batch can never stand in.
+  for (const gate of ACTIVATION_GATE_ORDER) {
+    const occurrences = batch.filter((row) => row.gateKind === gate);
+    if (occurrences.length !== 1) {
+      refuse(
+        ActivationEvidenceRefusalReason.EVIDENCE_SET_INCOMPLETE,
+        `the persisted evidence must contain exactly one row for gate ${gate} under activation kind ${kind}; found ${occurrences.length}`,
+      );
+    }
   }
   const derived = activationEvidenceSetRef(batch);
   if (derived !== input.evaluationSetRef) {

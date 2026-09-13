@@ -20,8 +20,12 @@
  *   refuses (`MIGRATION_FILE_MISSING`) — applied SQL truth must remain
  *   inspectable on disk.
  * - A new (unapplied) migration sorting BEFORE the highest already-applied id
- *   refuses (`MIGRATION_OUT_OF_ORDER_REFUSED`) — filling historical gaps after
- *   later state exists could corrupt schema assumptions.
+ *   **of its own family** refuses (`MIGRATION_OUT_OF_ORDER_REFUSED`) — filling
+ *   historical gaps inside an applied family after later state exists could
+ *   corrupt that family's schema assumptions. A wholly-new family (zero applied
+ *   members) has no history to gap-fill and applies additively, so a family
+ *   landed after a lexicographically-larger one still has an upgrade path on an
+ *   existing database.
  * - Concurrent application runs fence against each other through a lease row
  *   in `_foresift_schema_migration_leases`; a second run while a lease is held
  *   refuses (`MIGRATION_APPLY_ALREADY_RUNNING`). Unlike advisory locks the
@@ -234,23 +238,45 @@ export async function applyMigrations(options: MigratorOptions): Promise<ApplyRe
     }
 
     // …and on new scripts that would fill a gap behind already-applied state.
-    let highestAppliedId: string | undefined;
+    //
+    // The refusal is scoped to the migration FAMILY (`g<generation>_<family>`,
+    // e.g. `g2_prod`). Lexicographic ids conflate independent, per-work-package
+    // families: a family landed later (say `g2_alert`, or `g2_prod` after
+    // `g2_wf`) always sorts before an already-applied family whose token is
+    // lexicographically larger, and a global high-water mark would refuse it
+    // forever even though its own history has no gap. Each family owns its DDL
+    // namespace (a schema/table set named for the family) and a family with zero
+    // applied members has no history to corrupt, so applying it additively is
+    // safe; the invariant that matters — never fill a gap INSIDE an applied
+    // family's history — is preserved exactly. `packages/persistence/test/`
+    // pins both directions and the upgrade-path schema-fingerprint equality.
+    const familyOf = (id: string): string => {
+      const match = /^(g\d+_[a-z]+)_\d{4}_/.exec(id);
+      return match?.[1] ?? id;
+    };
+    const highestAppliedByFamily = new Map<string, string>();
     for (const id of recorded.keys()) {
-      if (highestAppliedId === undefined || id > highestAppliedId) highestAppliedId = id;
+      const family = familyOf(id);
+      const current = highestAppliedByFamily.get(family);
+      if (current === undefined || id > current) highestAppliedByFamily.set(family, id);
     }
-    if (highestAppliedId !== undefined) {
-      const latecomers = migrations
-        .map((m) => m.id)
-        .filter((id) => !recorded.has(id) && id < highestAppliedId);
-      if (latecomers.length > 0) {
-        throw new ForesiftError(
-          ErrorCode.MIGRATION_OUT_OF_ORDER_REFUSED,
-          `new migration(s) ${latecomers.join(', ')} sort before already-applied ` +
-            `${highestAppliedId}; applying them now would run out of order — ` +
-            'add the change as a new migration instead',
-          { latecomers: latecomers.join(','), highestAppliedId },
-        );
-      }
+    const latecomers = migrations
+      .map((m) => m.id)
+      .filter((id) => {
+        const highest = highestAppliedByFamily.get(familyOf(id));
+        return !recorded.has(id) && highest !== undefined && id < highest;
+      });
+    if (latecomers.length > 0) {
+      const detail = latecomers
+        .map((id) => `${id} (family high-water ${highestAppliedByFamily.get(familyOf(id))})`)
+        .join(', ');
+      throw new ForesiftError(
+        ErrorCode.MIGRATION_OUT_OF_ORDER_REFUSED,
+        `new migration(s) ${detail} sort before already-applied state of the same ` +
+          'family; applying them now would fill a gap in that family’s history — ' +
+          'add the change as a new migration instead',
+        { latecomers: latecomers.join(',') },
+      );
     }
 
     const applied: string[] = [];

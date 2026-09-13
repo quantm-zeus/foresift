@@ -7,9 +7,11 @@
  */
 import { describe, expect, it } from 'bun:test';
 import {
+  CLAIM_PROD_RULES,
   CONFORMANCE_RULES,
   PROD_RULES,
   checkActivationWithoutEvidence,
+  checkProdSurfacePresence,
   checkLivePathPrecomputationViolation,
   checkMcpCompatibilityDrift,
   checkPostureWeakening,
@@ -210,7 +212,8 @@ describe('PROD conformance aggregation and unchanged trace rules', () => {
     });
     expect(report.overall).toBe('FAILED');
     const rules = new Set(report.findings.map((finding) => finding.rule));
-    for (const rule of Object.values(PROD_RULES)) {
+    for (const key of CLAIM_PROD_RULES) {
+      const rule = PROD_RULES[key];
       expect(rules, `${rule} must fire`).toContain(rule);
     }
   });
@@ -227,6 +230,71 @@ describe('PROD conformance aggregation and unchanged trace rules', () => {
     expect(report.findings).toEqual([]);
   });
 
+  it('flags a live path whose request names a different artifact set than its bound (H10)', () => {
+    const report = checkLivePathPrecomputationViolation([
+      {
+        ...PROD_LIVE_PATH_BOUNDED_CLAIM,
+        request: {
+          ...PROD_LIVE_PATH_BOUNDED_CLAIM.request,
+          artifactSetHash: `sha256:${'9'.repeat(64)}`,
+        },
+      },
+    ]);
+    expect(report.passed).toBe(false);
+    expect(report.findings[0]?.rule).toBe(PROD_RULES.livePathPrecomputationViolation);
+  });
+
+  it('cannot widen the MCP freshness window with a caller override (H10 residual)', () => {
+    const staleCell = {
+      revision: '2025-11-25',
+      clientId: 'client-a',
+      result: 'PASS',
+      liveTestDate: '2000-01-01T00:00:00Z',
+    };
+    const claim = {
+      revisions: [
+        { revision: '2025-11-25', channel: 'STABLE', isDefault: true, supersededBy: null },
+      ],
+      clients: [{ clientId: 'client-a' }],
+      cells: [staleCell],
+      now: '2026-06-01T00:00:00Z',
+      maxAgeSeconds: 1e12,
+    };
+    const report = checkMcpCompatibilityDrift(claim as never);
+    expect(report.passed).toBe(false);
+    expect(report.findings[0]?.rule).toBe(PROD_RULES.mcpCompatibilityDrift);
+  });
+
+  it('treats malformed mandatory inputs as omissions (H2 residual)', () => {
+    const malformed = evaluateProdConformance({
+      activationClaims: 'not-an-array',
+      postureDeclarations: '',
+      mcpCompatibility: 'also-wrong',
+      livePaths: '',
+      distributionAuthorizations: '',
+    } as never);
+    expect(malformed.overall).toBe('FAILED');
+    expect(
+      malformed.findings.filter(
+        (finding) => finding.rule === PROD_RULES.prodConformanceInputMissing,
+      ),
+    ).toHaveLength(5);
+  });
+
+  it('treats null mandatory inputs as omissions (H2 residual)', () => {
+    const report = evaluateProdConformance({
+      activationClaims: null,
+      postureDeclarations: null,
+      mcpCompatibility: null,
+      livePaths: null,
+      distributionAuthorizations: null,
+    } as never);
+    expect(report.overall).toBe('FAILED');
+    expect(
+      report.findings.filter((finding) => finding.rule === PROD_RULES.prodConformanceInputMissing),
+    ).toHaveLength(5);
+  });
+
   it('keeps the four pre-existing trace rules present and unchanged', () => {
     expect(CONFORMANCE_RULES).toEqual({
       mapping: 'NORMATIVE_MAPPING_COMPLETE',
@@ -236,13 +304,202 @@ describe('PROD conformance aggregation and unchanged trace rules', () => {
     });
   });
 
-  it('runs the repository-backed trace rules without PROD interference', async () => {
+  it('fails closed when the PROD governance claims are omitted (H1/H2)', async () => {
     const { evaluateConformance } = await import('../src/index.ts');
     const result = await evaluateConformance({ repoRoot: REPO_ROOT });
-    expect(['PASSED', 'FAILED']).toContain(result.overall);
-    for (const finding of result.findings) {
-      expect(finding.rule).not.toBe(PROD_RULES.activationWithoutEvidence);
-      expect(finding.rule).not.toBe(PROD_RULES.postureWeakening);
+    expect(result.overall).toBe('FAILED');
+    expect(result.findings.map((finding) => finding.rule)).toContain(
+      'PROD_CONFORMANCE_INPUT_MISSING',
+    );
+  });
+
+  it('invokes the PROD rules from the release gate and FAILS a violating tree (H1)', async () => {
+    const { evaluateConformance } = await import('../src/index.ts');
+    const result = await evaluateConformance({
+      repoRoot: REPO_ROOT,
+      milestone: 'G2',
+      prodClaims: {
+        activationClaims: [PROD_ACTIVE_WITHOUT_GATE_CLAIM],
+        postureDeclarations: [PROD_BEST_EFFORT_WEAKENING],
+        mcpCompatibility: PROD_MCP_DRAFT_DEFAULT_CLAIM,
+        livePaths: [PROD_LIVE_PATH_NO_BOUND_CLAIM],
+        distributionAuthorizations: [PROD_PUBLIC_AUTHORIZED_MISSING_CLAIM],
+      },
+    });
+    expect(result.overall).toBe('FAILED');
+    const rules = new Set(result.findings.map((finding) => finding.rule));
+    expect(rules).toContain(PROD_RULES.activationWithoutEvidence);
+    expect(rules).toContain(PROD_RULES.postureWeakening);
+    expect(rules).toContain(PROD_RULES.mcpCompatibilityDrift);
+    expect(rules).toContain(PROD_RULES.livePathPrecomputationViolation);
+    expect(rules).toContain(PROD_RULES.publicAuthorizationWithoutGateEvidence);
+  });
+
+  it('emits no PROD finding for the compliant claim set on the live tree', async () => {
+    const { evaluateConformance } = await import('../src/index.ts');
+    const result = await evaluateConformance({
+      repoRoot: REPO_ROOT,
+      milestone: 'G2',
+      prodClaims: {
+        activationClaims: [PROD_COMPLIANT_ACTIVE_CLAIM],
+        postureDeclarations: [PROD_BEST_EFFORT_COMPLIANT],
+        mcpCompatibility: PROD_MCP_COMPLIANT_CLAIM,
+        livePaths: [PROD_LIVE_PATH_BOUNDED_CLAIM],
+        distributionAuthorizations: [PROD_WORKSPACE_AUTHORIZED_CLAIM, PROD_TECHNICALLY_READY_CLAIM],
+      },
+    });
+    expect(result.findings.map((finding) => finding.rule)).not.toContain(
+      PROD_RULES.prodSurfaceMissing,
+    );
+    expect(result.findings.map((finding) => finding.rule)).not.toContain(
+      PROD_RULES.prodConformanceInputMissing,
+    );
+  });
+
+  it('refuses an invalid or non-canonical milestone instead of disabling the PROD rules (HIGH-3)', async () => {
+    const { evaluateConformance } = await import('../src/index.ts');
+    for (const milestone of ['xyz', '', 'G', 'g2', 'G2x', 'G02', 'G002', 'G8']) {
+      const result = await evaluateConformance({
+        repoRoot: REPO_ROOT,
+        milestone,
+        prodClaims: {
+          activationClaims: [PROD_ACTIVE_WITHOUT_GATE_CLAIM],
+          postureDeclarations: [],
+          mcpCompatibility: PROD_MCP_COMPLIANT_CLAIM,
+          livePaths: [],
+          distributionAuthorizations: [],
+        },
+      });
+      expect(result.overall, `milestone ${JSON.stringify(milestone)}`).toBe('FAILED');
+      expect(result.findings.map((finding) => finding.rule)).toContain(
+        'CONFORMANCE_MILESTONE_INVALID',
+      );
     }
+  });
+
+  it('cannot be silenced by an injected empty requirement list (HIGH-3 residual)', async () => {
+    const { evaluateConformance } = await import('../src/index.ts');
+    const result = await evaluateConformance({
+      repoRoot: REPO_ROOT,
+      milestone: 'G2',
+      // A caller-supplied requirement list must NOT decide whether PROD law
+      // applies: the authoritative manifest does.
+      requirements: [],
+      prodClaims: {
+        activationClaims: [PROD_ACTIVE_WITHOUT_GATE_CLAIM],
+        postureDeclarations: [],
+        mcpCompatibility: PROD_MCP_COMPLIANT_CLAIM,
+        livePaths: [],
+        distributionAuthorizations: [],
+      },
+    });
+    expect(result.findings.map((finding) => finding.rule)).toContain(
+      PROD_RULES.activationWithoutEvidence,
+    );
+  });
+
+  it('runs the PROD rules whenever the milestone owns FR-PROD requirements', async () => {
+    const { evaluateConformance } = await import('../src/index.ts');
+    const result = await evaluateConformance({
+      repoRoot: REPO_ROOT,
+      milestone: 'G2',
+      prodClaims: {
+        activationClaims: [PROD_ACTIVE_WITHOUT_GATE_CLAIM],
+        postureDeclarations: [],
+        mcpCompatibility: PROD_MCP_COMPLIANT_CLAIM,
+        livePaths: [],
+        distributionAuthorizations: [],
+      },
+    });
+    expect(result.findings.map((finding) => finding.rule)).toContain(
+      PROD_RULES.activationWithoutEvidence,
+    );
+  });
+
+  it('fails closed through the GOVERNED rule on an empty gate set and unknown readiness (H2)', () => {
+    const emptyGates = evaluateProdConformance({
+      activationClaims: [],
+      postureDeclarations: [],
+      mcpCompatibility: PROD_MCP_COMPLIANT_CLAIM,
+      livePaths: [],
+      distributionAuthorizations: [{ ...PROD_WORKSPACE_AUTHORIZED_CLAIM, requiredGateKinds: [] }],
+    });
+    expect(emptyGates.overall).toBe('FAILED');
+    expect(emptyGates.findings.map((finding) => finding.rule)).toContain(
+      PROD_RULES.publicAuthorizationWithoutGateEvidence,
+    );
+    expect(emptyGates.findings[0]?.message).toMatch(/no required gate kinds/);
+
+    const unknownReadiness = evaluateProdConformance({
+      activationClaims: [],
+      postureDeclarations: [],
+      mcpCompatibility: PROD_MCP_COMPLIANT_CLAIM,
+      livePaths: [],
+      distributionAuthorizations: [
+        { ...PROD_WORKSPACE_AUTHORIZED_CLAIM, distributionReadiness: 'TOTALLY_MADE_UP' },
+      ],
+    });
+    expect(unknownReadiness.overall).toBe('FAILED');
+    expect(unknownReadiness.findings[0]?.message).toMatch(/unknown distribution readiness/);
+  });
+
+  it('flags a dropped PROD surface ref in the live tree (H1 negative)', async () => {
+    const report = await checkProdSurfacePresence({
+      repoRoot: REPO_ROOT,
+      requirements: [
+        {
+          id: 'FR-PROD-999',
+          supersededBy: [],
+          implementationRefs: ['packages/capability-registry/does-not-exist/**'],
+          schemaRefs: [],
+          persistenceRefs: [],
+          telemetryRefs: [],
+          fixtureRefs: [],
+          apiToolUiRefs: [],
+          testRefs: [],
+        },
+      ],
+    });
+    expect(report.passed).toBe(false);
+    expect(report.findings[0]?.rule).toBe(PROD_RULES.prodSurfaceMissing);
+    expect(report.findings[0]?.message).toMatch(/does not resolve in the live repository/);
+  });
+
+  it('reports malformed claim ELEMENTS instead of silently skipping them (H2 residual)', () => {
+    const report = evaluateProdConformance({
+      activationClaims: [{}, 'not-a-claim'],
+      postureDeclarations: [],
+      mcpCompatibility: { revisions: null, clients: [], cells: [], now: '2026-06-01T00:00:00Z' },
+      livePaths: [],
+      distributionAuthorizations: [],
+    } as never);
+    expect(report.overall).toBe('FAILED');
+    const paths = report.findings
+      .filter((finding) => finding.rule === PROD_RULES.prodConformanceInputMissing)
+      .map((finding) => finding.path);
+    expect(paths).toContain('activationClaims[0].moduleId');
+    expect(paths).toContain('activationClaims[1]');
+    expect(paths).toContain('mcpCompatibility.revisions');
+  });
+
+  it('fails closed on an omitted input, an empty required-gate set, and unknown readiness (H2)', () => {
+    expect(evaluateProdConformance({}).overall).toBe('FAILED');
+    expect(evaluateProdConformance({}).findings.map((finding) => finding.rule)).toContain(
+      PROD_RULES.prodConformanceInputMissing,
+    );
+
+    const emptyGates = evaluateDistributionAuthorization({
+      ...PROD_WORKSPACE_AUTHORIZED_CLAIM,
+      requiredGateKinds: [],
+    });
+    expect(emptyGates.authorized).toBe(false);
+    expect(emptyGates.requiredGateKindsEmpty).toBe(true);
+
+    const unknown = evaluateDistributionAuthorization({
+      ...PROD_WORKSPACE_AUTHORIZED_CLAIM,
+      distributionReadiness: 'TOTALLY_MADE_UP',
+    });
+    expect(unknown.readinessKnown).toBe(false);
+    expect(unknown.authorized).toBe(false);
   });
 });

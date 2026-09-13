@@ -626,14 +626,21 @@ const REQUIRED_PROD_INPUTS = [
 export function checkProdConformanceInputsPresent(input: ProdConformanceInput): ProdRuleReport {
   const findings: ProdConformanceFinding[] = [];
   for (const [field, label] of REQUIRED_PROD_INPUTS) {
-    // `null` is an omission too: a JS caller (or JSON round-trip) must not be
-    // able to slip past the fail-closed check with a null (audit H2 residual).
-    if (input[field] === undefined || input[field] === null) {
+    const value: unknown = input[field];
+    // Omission (`undefined`/`null`) AND a malformed value (anything that is not
+    // the declared shape) both fail closed: a string is iterable, so
+    // `for (const c of "")` would iterate zero times and silently pass the five
+    // claim rules (audit H2 residual).
+    const wellShaped =
+      field === 'mcpCompatibility'
+        ? typeof value === 'object' && value !== null && !Array.isArray(value)
+        : Array.isArray(value);
+    if (!wellShaped) {
       findings.push({
         requirementId: 'FR-PROD-001',
         rule: PROD_RULES.prodConformanceInputMissing,
         path: field,
-        message: `PROD conformance input ${field} (${label}) was omitted; an absent governance claim set fails the release gate closed instead of passing vacuously`,
+        message: `PROD conformance input ${field} (${label}) was omitted or was not the declared ${field === 'mcpCompatibility' ? 'object' : 'array'} shape; an absent or malformed governance claim set fails the release gate closed instead of passing vacuously`,
       });
     }
   }
@@ -649,13 +656,22 @@ export function checkProdConformanceInputsPresent(input: ProdConformanceInput): 
 export function evaluateProdConformance(input: ProdConformanceInput): ProdConformanceReport {
   const findings: ProdConformanceFinding[] = [
     ...checkProdConformanceInputsPresent(input).findings,
-    ...checkActivationWithoutEvidence(input.activationClaims ?? []).findings,
-    ...checkPostureWeakening(input.postureDeclarations ?? []).findings,
-    ...(input.mcpCompatibility === undefined || input.mcpCompatibility === null
+    ...checkActivationWithoutEvidence(
+      Array.isArray(input.activationClaims) ? input.activationClaims : [],
+    ).findings,
+    ...checkPostureWeakening(
+      Array.isArray(input.postureDeclarations) ? input.postureDeclarations : [],
+    ).findings,
+    ...(input.mcpCompatibility === undefined ||
+    input.mcpCompatibility === null ||
+    typeof input.mcpCompatibility !== 'object'
       ? []
       : checkMcpCompatibilityDrift(input.mcpCompatibility).findings),
-    ...checkLivePathPrecomputationViolation(input.livePaths ?? []).findings,
-    ...checkPublicAuthorizationWithoutGateEvidence(input.distributionAuthorizations ?? []).findings,
+    ...checkLivePathPrecomputationViolation(Array.isArray(input.livePaths) ? input.livePaths : [])
+      .findings,
+    ...checkPublicAuthorizationWithoutGateEvidence(
+      Array.isArray(input.distributionAuthorizations) ? input.distributionAuthorizations : [],
+    ).findings,
   ];
   return { overall: findings.length === 0 ? 'PASSED' : 'FAILED', findings };
 }

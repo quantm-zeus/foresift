@@ -118,6 +118,22 @@ async function seedModuleState(
   return stateRowId;
 }
 
+/**
+ * A scope with `requires_proven: true` must have ACTUALLY reached PROVEN in
+ * governed history before ACTIVE is admissible (audit H5 residual), so the raw
+ * SQL probes seed the PROVEN row the SQL law requires.
+ */
+async function seedProvenRow(scopeHash: string, tag: string): Promise<void> {
+  await engine.query(
+    `INSERT INTO prod.module_states
+       (state_row_id, module_id, artifact_set_hash, scope, scope_hash, lifecycle_state,
+        operational_readiness, distribution_readiness, activation_event_ref)
+     VALUES ($1, 'module-1', $2, $3::jsonb, $4, 'PROVEN',
+             'READY_FOR_ACTIVE_PROFILE', 'PRIVATE_ONLY', NULL)`,
+    [`proven-${tag}`, HASH_B, SCOPE, scopeHash],
+  );
+}
+
 beforeAll(async () => {
   db = new PGlite({ parsers: PRECISION_RETAINING_TIMESTAMP_PARSERS });
   engine = createEngine(db, 'pglite');
@@ -189,6 +205,7 @@ describe('governed module states are append-only and gate-backed', () => {
       [rawHash, rawEvent],
     );
     expect(Number(before.rows[0]?.n)).toBe(0);
+    await seedProvenRow(rawHash, 'bypass');
 
     const error = await rejection(
       engine.query(
@@ -249,6 +266,7 @@ describe('governed module states are append-only and gate-backed', () => {
   it('allows a raw ACTIVE INSERT backed by a complete persisted all-PASS set for its kind', async () => {
     const rawHash = `sha256:${'e'.repeat(64)}`;
     const rawEvent = 'raw-legit-activation';
+    await seedProvenRow(rawHash, 'legit');
     // SCOPE.requires_proven is true, so an OPPORTUNITY activation requires the
     // PROVEN gate; DISTRIBUTION_EVIDENCE is outside the kind and must be
     // recorded NOT_APPLICABLE, never PASS (C1).
@@ -293,6 +311,7 @@ describe('governed module states are append-only and gate-backed', () => {
   it('refuses a raw ACTIVE INSERT whose non-required gate was forged as PASS (C1 exploit)', async () => {
     const rawHash = `sha256:${'3'.repeat(64)}`;
     const rawEvent = 'raw-forged-nonapp';
+    await seedProvenRow(rawHash, 'forged-nonapp');
     const required: readonly ActivationGateKind[] = [
       'IMPLEMENTED_PRESENT',
       'AVAILABLE_EVIDENCE',
@@ -894,6 +913,7 @@ describe('activation evidence: refusal invalidation and readiness bounds (H6/C1)
   it('refuses a raw ACTIVE row whose declared readiness exceeds the evaluated kind', async () => {
     const rawHash = `sha256:${'5'.repeat(64)}`;
     const eventRef = 'raw-readiness-bound';
+    await seedProvenRow(rawHash, 'readiness');
     await insertGateRows('readiness-set', rawHash, eventRef, 'OPPORTUNITY');
     const error = await rejection(
       engine.query(

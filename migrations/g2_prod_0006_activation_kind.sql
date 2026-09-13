@@ -166,6 +166,7 @@ DECLARE
     duplicated_gate text;
     refusing_gate text;
     forged_gate text;
+    proven_row_missing boolean;
 BEGIN
     IF TG_OP IN ('DELETE', 'TRUNCATE') THEN
         RAISE EXCEPTION 'module states are append-only: ACTIVE activation evidence can never be deleted or truncated'
@@ -240,6 +241,22 @@ BEGIN
     IF refusing_gate IS NOT NULL THEN
         RAISE EXCEPTION 'ACTIVE requires an all-PASS persisted gate evaluation set: % refused for this activation event', refusing_gate
             USING ERRCODE = 'restrict_violation';
+    END IF;
+
+    -- A requires_proven scope may ONLY reach ACTIVE when the exact scope's
+    -- governed HISTORY actually reached PROVEN (audit H5 residual): a forged
+    -- PROVEN_PRESENT evaluation PASS is not a persisted PROVEN state.
+    IF (NEW.scope ->> 'requires_proven') = 'true' THEN
+        SELECT NOT EXISTS (
+            SELECT 1 FROM prod.module_states s
+             WHERE s.module_id = NEW.module_id
+               AND s.scope_hash = NEW.scope_hash
+               AND s.lifecycle_state = 'PROVEN'
+        ) INTO proven_row_missing;
+        IF proven_row_missing THEN
+            RAISE EXCEPTION 'ACTIVE requires a persisted PROVEN state for the exact scope: the scope specifies requires_proven but no governed PROVEN row exists'
+                USING ERRCODE = 'restrict_violation';
+        END IF;
     END IF;
 
     -- C1: a PASS is only admissible for a gate the kind actually requires. A

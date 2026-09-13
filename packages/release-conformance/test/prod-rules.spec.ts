@@ -264,6 +264,22 @@ describe('PROD conformance aggregation and unchanged trace rules', () => {
     expect(report.findings[0]?.rule).toBe(PROD_RULES.mcpCompatibilityDrift);
   });
 
+  it('treats malformed mandatory inputs as omissions (H2 residual)', () => {
+    const malformed = evaluateProdConformance({
+      activationClaims: 'not-an-array',
+      postureDeclarations: '',
+      mcpCompatibility: 'also-wrong',
+      livePaths: '',
+      distributionAuthorizations: '',
+    } as never);
+    expect(malformed.overall).toBe('FAILED');
+    expect(
+      malformed.findings.filter(
+        (finding) => finding.rule === PROD_RULES.prodConformanceInputMissing,
+      ),
+    ).toHaveLength(5);
+  });
+
   it('treats null mandatory inputs as omissions (H2 residual)', () => {
     const report = evaluateProdConformance({
       activationClaims: null,

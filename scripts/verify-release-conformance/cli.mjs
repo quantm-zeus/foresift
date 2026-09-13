@@ -436,7 +436,12 @@ export async function prodConformanceFindings(root, options = {}) {
   const args = [bridge, root];
   if (options.prodClaimsPath !== undefined) args.push(path.resolve(root, options.prodClaimsPath));
   if (options.requireProdClaims === true) args.push('--require-claims');
-  const result = spawnSync('bun', args, { cwd: root, encoding: 'utf8' });
+  const result = spawnSync('bun', args, {
+    cwd: root,
+    encoding: 'utf8',
+    timeout: 300_000,
+    killSignal: 'SIGKILL',
+  });
   if (result.error || result.status !== 0) {
     return [
       finding(
@@ -500,6 +505,10 @@ export async function verifyReleaseConformance(root, options = {}) {
   return {
     schema: 'foresift/release-conformance-verdict@1',
     overall: findings.length ? 'FAILED' : 'PASSED',
+    // Only rules this invocation could actually emit are advertised: the five
+    // claim rules require an explicit --prod-claims file (runtime governance
+    // state is not derivable from the tree), so they appear only when one was
+    // supplied (audit H1 residual).
     rules: [
       'NORMATIVE_MAPPING_COMPLETE',
       'ACTIVE_IMPLEMENTATION_PATH_EXISTS',
@@ -507,14 +516,18 @@ export async function verifyReleaseConformance(root, options = {}) {
       'ORPHAN_PRODUCT_SOURCE',
       'GENERATED_DOCS_DRIFT',
       'RELEASE_REPORT_HASH_CONSISTENCY',
-      'ACTIVATION_WITHOUT_EVIDENCE',
-      'POSTURE_WEAKENING',
-      'MCP_COMPATIBILITY_DRIFT',
-      'LIVE_PATH_PRECOMPUTATION_VIOLATION',
-      'PUBLIC_AUTHORIZATION_WITHOUT_GATE_EVIDENCE',
-      'PROD_CONFORMANCE_INPUT_MISSING',
       'PROD_SURFACE_MISSING',
+      'PROD_CONFORMANCE_INPUT_MISSING',
       'PROD_CONFORMANCE_GATE_UNAVAILABLE',
+      ...(options.prodClaimsPath === undefined
+        ? []
+        : [
+            'ACTIVATION_WITHOUT_EVIDENCE',
+            'POSTURE_WEAKENING',
+            'MCP_COMPATIBILITY_DRIFT',
+            'LIVE_PATH_PRECOMPUTATION_VIOLATION',
+            'PUBLIC_AUTHORIZATION_WITHOUT_GATE_EVIDENCE',
+          ]),
     ],
     findings,
   };
@@ -524,7 +537,7 @@ async function run() {
   const args = process.argv.slice(2);
   if (args.includes('--help') || args.includes('-h')) {
     console.log(
-      'Usage: node scripts/verify-release-conformance/cli.mjs [--json] [--prod-claims <file.json>] [--require-prod-claims]\nVerify release conformance against the live tree.',
+      'Usage: node scripts/verify-release-conformance/cli.mjs [--json] [--prod-claims <file.json>] [--require-prod-claims]\nVerify release conformance against the live tree.\nThe repo-backed PROD surface rule always runs; the five PROD claim rules need --prod-claims <file> and --require-prod-claims fails closed when it is absent.',
     );
     return;
   }

@@ -104,14 +104,53 @@ describe('verify-release-conformance CLI runs the PROD rules (H1)', () => {
     }
   }, 120_000);
 
-  it('advertises the PROD rules in its verdict rule list', () => {
-    const result = spawnSync('node', [CLI_PATH, '--json'], {
-      cwd: REPO_ROOT,
-      encoding: 'utf8',
-    });
-    const verdict = JSON.parse(result.stdout);
-    expect(verdict.rules).toContain('ACTIVATION_WITHOUT_EVIDENCE');
-    expect(verdict.rules).toContain('PROD_SURFACE_MISSING');
-    expect(verdict.rules).toContain('PROD_CONFORMANCE_INPUT_MISSING');
+  it('advertises exactly the PROD rules the invocation can emit', () => {
+    const withoutClaims = JSON.parse(
+      spawnSync('node', [CLI_PATH, '--json'], { cwd: REPO_ROOT, encoding: 'utf8' }).stdout,
+    );
+    expect(withoutClaims.rules).toContain('PROD_SURFACE_MISSING');
+    expect(withoutClaims.rules).toContain('PROD_CONFORMANCE_INPUT_MISSING');
+    expect(withoutClaims.rules).toContain('PROD_CONFORMANCE_GATE_UNAVAILABLE');
+    // The five claim rules need an explicit claims file.
+    expect(withoutClaims.rules).not.toContain('ACTIVATION_WITHOUT_EVIDENCE');
+
+    const withClaims = JSON.parse(
+      spawnSync('node', [CLI_PATH, '--json', '--require-prod-claims'], {
+        cwd: REPO_ROOT,
+        encoding: 'utf8',
+      }).stdout,
+    );
+    expect(withClaims.rules).toContain('PROD_CONFORMANCE_INPUT_MISSING');
   });
+
+  it('fails closed on a malformed claims file instead of skipping the claim rules (H2 residual)', async () => {
+    const { mkdtemp, writeFile, rm } = await import('node:fs/promises');
+    const { tmpdir } = await import('node:os');
+    const dir = await mkdtemp(path.join(tmpdir(), 'foresift-prod-claims-bad-'));
+    const claimsPath = path.join(dir, 'claims.json');
+    try {
+      await writeFile(
+        claimsPath,
+        JSON.stringify({
+          activationClaims: 'not-an-array',
+          postureDeclarations: '',
+          mcpCompatibility: 'also-wrong',
+          livePaths: '',
+          distributionAuthorizations: '',
+        }),
+        'utf8',
+      );
+      const result = spawnSync('node', [CLI_PATH, '--json', '--prod-claims', claimsPath], {
+        cwd: REPO_ROOT,
+        encoding: 'utf8',
+      });
+      expect(result.status).toBe(1);
+      const prodFindings = (JSON.parse(result.stdout).findings ?? []).filter(
+        (finding: { readonly rule?: string }) => finding.rule === 'PROD_CONFORMANCE_INPUT_MISSING',
+      );
+      expect(prodFindings).toHaveLength(5);
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
+  }, 120_000);
 });

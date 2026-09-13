@@ -36,6 +36,7 @@ import {
   ForesiftError,
   activationGateRefusal,
   isContractActivatable,
+  isOneOf,
   parseActivationGateKind,
   parseActivationGateVerdict,
   parseActivationKind,
@@ -211,8 +212,9 @@ export const NegativeControlKind = {
   DELAYED_PROVIDER: 'DELAYED_PROVIDER',
 } as const;
 export type NegativeControlKind = (typeof NegativeControlKind)[keyof typeof NegativeControlKind];
-export const ALL_NEGATIVE_CONTROL_KINDS: readonly NegativeControlKind[] =
-  Object.values(NegativeControlKind);
+export const ALL_NEGATIVE_CONTROL_KINDS: readonly NegativeControlKind[] = Object.freeze(
+  Object.values(NegativeControlKind),
+);
 
 /** One registered negative-control verdict. */
 export interface NegativeControlRecord {
@@ -228,15 +230,16 @@ export const CalibrationMaturity = {
   MATURE: 'MATURE',
 } as const;
 export type CalibrationMaturity = (typeof CalibrationMaturity)[keyof typeof CalibrationMaturity];
-export const ALL_CALIBRATION_MATURITIES: readonly CalibrationMaturity[] =
-  Object.values(CalibrationMaturity);
+export const ALL_CALIBRATION_MATURITIES: readonly CalibrationMaturity[] = Object.freeze(
+  Object.values(CalibrationMaturity),
+);
 
 /** The clustered/naive interval methods the gate recognises (AC-151). */
-export const CLUSTERED_INTERVAL_METHODS = [
+export const CLUSTERED_INTERVAL_METHODS = Object.freeze([
   'CLUSTERED_BLOCK_BOOTSTRAP',
   'CLUSTER_BOOTSTRAP',
   'RANDOMIZATION_INFERENCE',
-] as const;
+] as const);
 
 /**
  * A foreign-registered statistical evidence bundle for one exact scope. The
@@ -589,7 +592,14 @@ function evaluateCondition(
         );
       }
       const byControl = new Map(selected.evidence.negativeControls.map((c) => [c.control, c]));
-      for (const control of ALL_NEGATIVE_CONTROL_KINDS) {
+      // Numeric-index walk of the frozen authority array: a shadowed
+      // `Symbol.iterator` must not be able to skip a mandatory control.
+      for (
+        let controlIndex = 0;
+        controlIndex < ALL_NEGATIVE_CONTROL_KINDS.length;
+        controlIndex += 1
+      ) {
+        const control = ALL_NEGATIVE_CONTROL_KINDS[controlIndex] as NegativeControlKind;
         const record = byControl.get(control);
         if (record === undefined) {
           return refuse(
@@ -618,7 +628,7 @@ function evaluateCondition(
         );
       }
       const method = selected.evidence.intervalMethod;
-      if (!(CLUSTERED_INTERVAL_METHODS as readonly string[]).includes(method)) {
+      if (!isOneOf(method, CLUSTERED_INTERVAL_METHODS)) {
         return refuse(
           gate,
           ActivationGateRefusalReason.CLUSTERED_INTERVALS_REQUIRED,
@@ -872,7 +882,8 @@ export function evaluateActivationGate(input: ActivationGateInput): ActivationGa
     ACTIVATION_REFUSAL_IDENTITY.add(refusal);
     return refusal;
   };
-  for (const gate of ACTIVATION_GATE_ORDER) {
+  for (let gateOrderIndex = 0; gateOrderIndex < ACTIVATION_GATE_ORDER.length; gateOrderIndex += 1) {
+    const gate = ACTIVATION_GATE_ORDER[gateOrderIndex] as ActivationGateKind;
     const condition = requiredSet.has(gate)
       ? evaluateCondition(gate, input, scopeHash, nowMs)
       : notApplicable(gate);
@@ -1012,6 +1023,21 @@ const GATE_EVALUATION_COLUMNS = `evaluation_id, scope_hash, gate_kind, verdict, 
         activation_kind`;
 
 /**
+ * Shadow-proof canonical position of a gate kind in the frozen
+ * `ACTIVATION_GATE_ORDER`. `Array.prototype.indexOf` is shadowable in-process,
+ * so the canonical ordering the evidence-set reference rests on is derived by a
+ * numeric-index walk (audit NEW-M4). An unknown kind sorts after every known
+ * gate; it can never reach persistence because the gate recursion parses every
+ * kind first.
+ */
+function activationGateOrderIndex(gateKind: ActivationGateKind): number {
+  for (let index = 0; index < ACTIVATION_GATE_ORDER.length; index += 1) {
+    if (ACTIVATION_GATE_ORDER[index] === gateKind) return index;
+  }
+  return ACTIVATION_GATE_ORDER.length;
+}
+
+/**
  * The persisted-evidence reference for one evaluation set: a deterministic
  * `sha256:<hex>` content address over the exact rows, in canonical gate order.
  * The recorder mints it from the rows it committed; `advanceState` re-derives it
@@ -1023,7 +1049,7 @@ export function activationEvidenceSetRef(
 ): string {
   const ordered = [...rows].sort(
     (left, right) =>
-      ACTIVATION_GATE_ORDER.indexOf(left.gateKind) - ACTIVATION_GATE_ORDER.indexOf(right.gateKind),
+      activationGateOrderIndex(left.gateKind) - activationGateOrderIndex(right.gateKind),
   );
   return sha256Text(
     canonicalJson(
@@ -1401,12 +1427,19 @@ export async function requirePersistedActivationEvidence(
   }
   // …and the batch must cover the full canonical order exactly once (PASS where
   // required, NOT_APPLICABLE elsewhere), so a partial batch can never stand in.
-  for (const gate of ACTIVATION_GATE_ORDER) {
-    const occurrences = batch.filter((row) => row.gateKind === gate);
-    if (occurrences.length !== 1) {
+  // Numeric-index walks only: the frozen order and the batch count are never
+  // read through a shadowable iterator/`filter`/`includes` (audit NEW-M4/M5).
+  for (let gateOrderIndex = 0; gateOrderIndex < ACTIVATION_GATE_ORDER.length; gateOrderIndex += 1) {
+    const gate = ACTIVATION_GATE_ORDER[gateOrderIndex] as ActivationGateKind;
+    let occurrences = 0;
+    for (let rowIndex = 0; rowIndex < batch.length; rowIndex += 1) {
+      const row = batch[rowIndex];
+      if (row !== undefined && row.gateKind === gate) occurrences += 1;
+    }
+    if (occurrences !== 1) {
       refuse(
         ActivationEvidenceRefusalReason.EVIDENCE_SET_INCOMPLETE,
-        `the persisted evidence must contain exactly one row for gate ${gate} under activation kind ${kind}; found ${occurrences.length}`,
+        `the persisted evidence must contain exactly one row for gate ${gate} under activation kind ${kind}; found ${occurrences}`,
       );
     }
   }

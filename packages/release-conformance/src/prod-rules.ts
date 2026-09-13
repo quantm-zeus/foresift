@@ -29,6 +29,7 @@ import {
   MCP_LIVE_TEST_MAX_AGE_SECONDS,
   artifactBoundaryHolds,
   bestEffortWeakensOnlyAllowedDimensions,
+  isOneOf,
   mcpCompatibilityCellUsable,
   mcpRevisionMayBeDefault,
   parseDistributionReadiness,
@@ -36,6 +37,7 @@ import {
   precomputedAlphaBoundRespected,
   type ArtifactBoundaryAssertion,
   type PrecomputedAlphaRequest,
+  type ProtectedDimension,
 } from '@foresift/domain';
 import { readFile, readdir, access } from 'node:fs/promises';
 import path from 'node:path';
@@ -258,16 +260,24 @@ export function checkPostureWeakening(
       findingsFor('the declaration violates the §69.6 protected-dimension law');
     }
     for (const dimension of new Set(declaration.weakenedDimensions)) {
-      if ((ALL_PROTECTED_DIMENSIONS as readonly string[]).includes(dimension)) {
+      if (isOneOf(dimension, ALL_PROTECTED_DIMENSIONS)) {
         findingsFor(`protected dimension ${dimension} is weakened`);
-      } else if (!(ALL_DEPLOYMENT_RELAXABLE_DIMENSIONS as readonly string[]).includes(dimension)) {
+      } else if (!isOneOf(dimension, ALL_DEPLOYMENT_RELAXABLE_DIMENSIONS)) {
         findingsFor(`unknown relaxable dimension ${dimension}`);
       }
     }
     const declaredProtected = new Set(declaration.protectedDimensions);
-    const missingProtected = ALL_PROTECTED_DIMENSIONS.filter(
-      (dimension) => !declaredProtected.has(dimension),
-    );
+    const missingProtected: ProtectedDimension[] = [];
+    // Numeric-index walk of the frozen authority array: `Array.prototype.filter`
+    // is shadowable in-process (audit NEW-M4).
+    for (
+      let dimensionIndex = 0;
+      dimensionIndex < ALL_PROTECTED_DIMENSIONS.length;
+      dimensionIndex += 1
+    ) {
+      const dimension = ALL_PROTECTED_DIMENSIONS[dimensionIndex] as ProtectedDimension;
+      if (!declaredProtected.has(dimension)) missingProtected.push(dimension);
+    }
     if (missingProtected.length > 0) {
       findingsFor(`protected dimensions omitted: ${missingProtected.join(', ')}`);
     }
@@ -543,11 +553,26 @@ export function checkLivePathPrecomputationViolation(
       report('boundaryAssertions is not an array of assertions; a malformed boundary fails closed');
     }
     if (!artifactBoundaryHolds(boundaryAssertions)) {
-      const present = new Set(
-        boundaryAssertions.map((assertion) => String(assertion.assertionKind)),
-      );
-      const missing = ALL_ARTIFACT_BOUNDARY_ASSERTION_KINDS.filter((kind) => !present.has(kind));
-      const failing = boundaryAssertions.filter((assertion) => assertion.verdict !== 'PASS').length;
+      const present = new Set<string>();
+      let failing = 0;
+      // Numeric-index loops only: `Array.prototype.map/filter` are shadowable
+      // in-process, and this branch renders the refusal the R7 guard decided
+      // without consulting them (audit NEW-M4).
+      for (let presentIndex = 0; presentIndex < boundaryAssertions.length; presentIndex += 1) {
+        const assertion = boundaryAssertions[presentIndex];
+        if (typeof assertion !== 'object' || assertion === null) continue;
+        present.add(String(assertion.assertionKind));
+        if (assertion.verdict !== 'PASS') failing += 1;
+      }
+      const missing: string[] = [];
+      for (
+        let kindIndex = 0;
+        kindIndex < ALL_ARTIFACT_BOUNDARY_ASSERTION_KINDS.length;
+        kindIndex += 1
+      ) {
+        const kind = ALL_ARTIFACT_BOUNDARY_ASSERTION_KINDS[kindIndex] as string;
+        if (!present.has(kind)) missing.push(kind);
+      }
       const parts: string[] = [];
       if (missing.length > 0) parts.push(`missing assertions ${missing.join(', ')}`);
       if (failing > 0) parts.push(`${failing} failing assertion(s)`);
@@ -570,7 +595,7 @@ export function checkLivePathPrecomputationViolation(
         .importArtifactState;
       if (
         typeof importState !== 'string' ||
-        !(SHADOW_ONLY_IMPORT_ARTIFACT_STATES as readonly string[]).includes(importState)
+        !isOneOf(importState, SHADOW_ONLY_IMPORT_ARTIFACT_STATES)
       ) {
         report(
           `IMPORT_SHADOW_ONLY must reference an import artifact in ${SHADOW_ONLY_IMPORT_ARTIFACT_STATES.join(
@@ -659,8 +684,9 @@ export function evaluateDistributionAuthorization(
   } catch {
     readinessKnown = false;
   }
-  const readinessAuthorized = AUTHORIZED_DISTRIBUTION_READINESS.includes(
+  const readinessAuthorized = isOneOf(
     claim.distributionReadiness,
+    AUTHORIZED_DISTRIBUTION_READINESS,
   );
   const missingGateKinds: string[] = [];
   const mismatchedGateKinds: string[] = [];
@@ -711,7 +737,7 @@ export function evaluateDistributionAuthorization(
       continue;
     }
     declaredGateKinds.add(declared);
-    if (!(MANDATORY_DISTRIBUTION_GATE_KINDS as readonly string[]).includes(declared)) {
+    if (!isOneOf(declared, MANDATORY_DISTRIBUTION_GATE_KINDS)) {
       unknownGateKinds.push(declared);
     }
   }

@@ -25,7 +25,12 @@ import {
   SHADOW_ONLY_IMPORT_ARTIFACT_STATES,
   type LivePathPrecomputationClaim,
 } from '../src/index.ts';
-import type { ArtifactBoundaryAssertion } from '@foresift/domain';
+import {
+  ALL_ARTIFACT_BOUNDARY_ASSERTION_KINDS,
+  parseActivationGateKind,
+  parseDistributionReadiness,
+  type ArtifactBoundaryAssertion,
+} from '@foresift/domain';
 import {
   PROD_ACTIVATION_CLAIMS,
   PROD_ACTIVE_UNAVAILABLE_CLAIM,
@@ -1005,5 +1010,78 @@ describe('FOURTH-ROUND exploit regressions (R4/R7, audit H2/H4)', () => {
     expect(finding).toBeDefined();
     expect(finding?.rule).toBe(PROD_RULES.livePathPrecomputationViolation);
     expect(finding?.message).toContain('<unrenderable>');
+  });
+
+  it('freezes the domain artifact-boundary kind authority so a spliced kind cannot pass a live path (NEW-H2)', () => {
+    const original = [...ALL_ARTIFACT_BOUNDARY_ASSERTION_KINDS];
+    const mutable = ALL_ARTIFACT_BOUNDARY_ASSERTION_KINDS as unknown as string[];
+    // BEFORE the fix this `splice` removed IMPORT_SHADOW_ONLY from the module
+    // authority, so a live path that omits the import-boundary assertion passed
+    // `artifactBoundaryHolds` and R7 accepted it. Pin both the freeze and the
+    // refusal outcome.
+    let spliced = false;
+    try {
+      mutable.splice(original.indexOf('IMPORT_SHADOW_ONLY'), 1);
+      spliced = true;
+    } catch {
+      spliced = false;
+    }
+    try {
+      expect(Object.isFrozen(ALL_ARTIFACT_BOUNDARY_ASSERTION_KINDS)).toBe(true);
+      expect(spliced).toBe(false);
+      expect([...ALL_ARTIFACT_BOUNDARY_ASSERTION_KINDS]).toEqual(original);
+    } finally {
+      if (!Object.isFrozen(mutable)) {
+        mutable.length = 0;
+        for (let index = 0; index < original.length; index += 1) {
+          mutable.push(original[index] as string);
+        }
+      }
+    }
+    const withoutImportBoundary = {
+      ...PROD_LIVE_PATH_BOUNDED_CLAIM,
+      boundaryAssertions: PROD_LIVE_PATH_BOUNDED_CLAIM.boundaryAssertions.filter(
+        (assertion) => assertion.assertionKind !== 'IMPORT_SHADOW_ONLY',
+      ),
+    };
+    const report = conformanceWithLivePath(withoutImportBoundary);
+    expect(report.overall).toBe('FAILED');
+    expect(report.findings.map((finding) => finding.rule)).toContain(
+      PROD_RULES.livePathPrecomputationViolation,
+    );
+  });
+
+  it('resists a globally shadowed Array.prototype.includes on every authority membership check (NEW-M4)', () => {
+    const originalIncludes = Array.prototype.includes;
+    try {
+      // A same-process caller can globally replace the method the guards would
+      // otherwise use. FAIL-OPEN checks are the §69.9/AC-272 authorization flip
+      // and the R7 REJECTED-import acceptance; both must stay closed.
+      Array.prototype.includes = () => true;
+
+      const rejected = conformanceWithLivePath(livePathWithImportState('REJECTED'));
+      expect(rejected.overall).toBe('FAILED');
+      expect(rejected.findings.map((finding) => finding.rule)).toContain(
+        PROD_RULES.livePathPrecomputationViolation,
+      );
+
+      for (const readiness of ['WORKSPACE_TECHNICALLY_READY', 'PUBLIC_TECHNICALLY_READY']) {
+        const evaluation = evaluateDistributionAuthorization(
+          publicAuthorizationClaim({ distributionReadiness: readiness }) as never,
+        );
+        expect(evaluation.readinessAuthorized, readiness).toBe(false);
+        expect(evaluation.authorized, readiness).toBe(false);
+      }
+
+      const fabricated = evaluateDistributionAuthorization(
+        publicAuthorizationClaim({ requiredGateKinds: ['TOTALLY_FAKE_GATE'] }) as never,
+      );
+      expect(fabricated.authorized).toBe(false);
+
+      expect(() => parseActivationGateKind('TOTALLY_FAKE_GATE')).toThrow();
+      expect(() => parseDistributionReadiness('TOTALLY_FAKE_READINESS')).toThrow();
+    } finally {
+      Array.prototype.includes = originalIncludes;
+    }
   });
 });

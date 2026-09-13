@@ -28,6 +28,7 @@ import {
   ForesiftError,
   bestEffortWeakensOnlyAllowedDimensions,
   isContractActivatable,
+  isOneOf,
   parseDeploymentPosture,
   parseDeploymentRelaxableDimension,
   parseProtectedDimension,
@@ -345,7 +346,7 @@ export function assertBestEffortPreservesProtectedDimensions(
   const posture = parseDeploymentPosture(declaration.posture);
   const weakened = [...new Set(declaration.weakenedDimensions)];
   for (const dimension of weakened) {
-    if ((ALL_PROTECTED_DIMENSIONS as readonly string[]).includes(dimension)) {
+    if (isOneOf(dimension, ALL_PROTECTED_DIMENSIONS)) {
       throw new ForesiftError(
         ErrorCode.PROD_BEST_EFFORT_PROTECTED_DIMENSION,
         `a best-effort declaration may never weaken protected dimension '${dimension}' (§69.6)`,
@@ -354,12 +355,26 @@ export function assertBestEffortPreservesProtectedDimensions(
     }
     parseDeploymentRelaxableDimension(dimension);
   }
-  const declaredProtected = declaration.protectedDimensions.map((dimension) =>
-    parseProtectedDimension(dimension),
-  );
-  const missingProtected = ALL_PROTECTED_DIMENSIONS.filter(
-    (dimension) => !declaredProtected.includes(dimension),
-  );
+  // Numeric-index walks and `isOneOf` only: a shadowed
+  // `Array.prototype.includes`/`filter` must not be able to hide a protected
+  // dimension omitted from the declaration (audit NEW-M4).
+  const declaredProtected: ProtectedDimension[] = [];
+  for (
+    let declaredIndex = 0;
+    declaredIndex < declaration.protectedDimensions.length;
+    declaredIndex += 1
+  ) {
+    declaredProtected.push(parseProtectedDimension(declaration.protectedDimensions[declaredIndex]));
+  }
+  const missingProtected: ProtectedDimension[] = [];
+  for (
+    let dimensionIndex = 0;
+    dimensionIndex < ALL_PROTECTED_DIMENSIONS.length;
+    dimensionIndex += 1
+  ) {
+    const dimension = ALL_PROTECTED_DIMENSIONS[dimensionIndex] as ProtectedDimension;
+    if (!isOneOf(dimension, declaredProtected)) missingProtected.push(dimension);
+  }
   if (missingProtected.length > 0) {
     throw new ForesiftError(
       ErrorCode.PROD_BEST_EFFORT_PROTECTED_DIMENSION,

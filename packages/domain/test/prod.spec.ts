@@ -358,6 +358,32 @@ describe('§69.4/§69.5 ordered fail-closed activation predicate', () => {
       ),
     ).toBe(true);
   });
+
+  it('freezes ACTIVATION_GATE_ORDER so a spliced required gate cannot be skipped (NEW-M5)', () => {
+    const original = [...ACTIVATION_GATE_ORDER];
+    const mutable = ACTIVATION_GATE_ORDER as unknown as ActivationGateKind[];
+    expect(Object.isFrozen(ACTIVATION_GATE_ORDER)).toBe(true);
+    try {
+      expect(() =>
+        mutable.splice(original.indexOf(ActivationGateKind.NEGATIVE_CONTROLS), 1),
+      ).toThrow();
+      expect(() => mutable.push('TOTALLY_FAKE_GATE' as ActivationGateKind)).toThrow();
+      expect([...ACTIVATION_GATE_ORDER]).toEqual(original);
+    } finally {
+      if (!Object.isFrozen(mutable)) {
+        mutable.length = 0;
+        for (let index = 0; index < original.length; index += 1) {
+          mutable.push(original[index] as ActivationGateKind);
+        }
+      }
+    }
+    // Even with an in-process mutation attempt, the frozen ordered law still
+    // requires every gate exactly once: a set missing NEGATIVE_CONTROLS refuses.
+    const missingNegativeControls = passAll(ActivationGateKind.NEGATIVE_CONTROLS);
+    expect(activationGateRefusal(missingNegativeControls)).toBe(
+      ActivationGateKind.NEGATIVE_CONTROLS,
+    );
+  });
 });
 
 describe('§40 dependency-group ordering', () => {
@@ -638,5 +664,38 @@ describe('§10.3/§35.14 trust-boundary verdict', () => {
         : assertion,
     );
     expect(artifactBoundaryHolds(missingRef)).toBe(false);
+  });
+
+  it('freezes the closed assertion-kind authority so a spliced kind cannot weaken the verdict (NEW-H2)', () => {
+    const original = [...ALL_ARTIFACT_BOUNDARY_ASSERTION_KINDS];
+    const mutable = ALL_ARTIFACT_BOUNDARY_ASSERTION_KINDS as unknown as string[];
+    expect(Object.isFrozen(ALL_ARTIFACT_BOUNDARY_ASSERTION_KINDS)).toBe(true);
+    try {
+      expect(() =>
+        mutable.splice(original.indexOf(ArtifactBoundaryAssertionKind.IMPORT_SHADOW_ONLY), 1),
+      ).toThrow();
+      expect(() => mutable.push('TOTALLY_FAKE_KIND')).toThrow();
+      expect([...ALL_ARTIFACT_BOUNDARY_ASSERTION_KINDS]).toEqual(original);
+    } finally {
+      if (!Object.isFrozen(mutable)) {
+        mutable.length = 0;
+        for (let index = 0; index < original.length; index += 1) {
+          mutable.push(original[index] as string);
+        }
+      }
+    }
+    // The live path omits IMPORT_SHADOW_ONLY entirely. Before the freeze, the
+    // spliced authority accepted that set as complete (audit NEW-H2); the
+    // verdict must still refuse it.
+    const withoutImportBoundary = complete.filter(
+      (assertion) => assertion.assertionKind !== ArtifactBoundaryAssertionKind.IMPORT_SHADOW_ONLY,
+    );
+    expect(withoutImportBoundary.length).toBe(3);
+    expect(trustBoundaryVerdict(withoutImportBoundary)).toBe(ActivationGateVerdict.REFUSE);
+    expect(artifactBoundaryHolds(withoutImportBoundary)).toBe(false);
+    expectCode(
+      () => assertArtifactBoundaryHolds(withoutImportBoundary),
+      ErrorCode.PROD_TRUST_BOUNDARY_VIOLATION,
+    );
   });
 });

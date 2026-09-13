@@ -690,6 +690,42 @@ describe('the total ordered activation gate (AC-150/151/152/154/272/273/275/276/
     const after = await activationGateEvaluationsFor(engine, scopeHash);
     expect(after.length).toBe(rows.length * 2);
   }, 120_000);
+
+  it('freezes ACTIVATION_GATE_ORDER so a spliced required gate cannot be skipped (NEW-M5)', () => {
+    const original = [...ACTIVATION_GATE_ORDER];
+    const mutable = ACTIVATION_GATE_ORDER as unknown as ActivationGateKind[];
+    expect(Object.isFrozen(ACTIVATION_GATE_ORDER)).toBe(true);
+    let spliced = false;
+    try {
+      mutable.splice(original.indexOf('NEGATIVE_CONTROLS'), 1);
+      spliced = true;
+    } catch {
+      spliced = false;
+    }
+    try {
+      expect(spliced).toBe(false);
+      expect([...ACTIVATION_GATE_ORDER]).toEqual(original);
+    } finally {
+      if (!Object.isFrozen(mutable)) {
+        mutable.length = 0;
+        for (let index = 0; index < original.length; index += 1) {
+          mutable.push(original[index] as ActivationGateKind);
+        }
+      }
+    }
+    // A candidate omitted from the ordered walk cannot PASS. The frozen order
+    // still requires NEGATIVE_CONTROLS, and the empty control set refuses it.
+    const scope = makeScope({ profile_version: 'gate-order-freeze' });
+    const scopeHash = activationScopeHash(scope);
+    const refused = evaluateActivationGate({
+      ...passingOpportunityInput(scope),
+      registeredStatisticalEvidence: [statisticalEvidence(scopeHash, { negativeControls: [] })],
+    });
+    expect(refused.verdict).toBe('REFUSE');
+    if (refused.verdict === 'REFUSE') {
+      expect(refused.failingGate).toBe('NEGATIVE_CONTROLS');
+    }
+  });
 });
 
 describe('§69.11 containment (AC-278)', () => {

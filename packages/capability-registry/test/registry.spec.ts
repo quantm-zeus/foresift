@@ -2055,7 +2055,7 @@ describe('PROVEN requires a genuinely established AVAILABLE (R5)', () => {
       }),
     );
     expect(['PROD_ACTIVATION_GATE_REFUSED', 'PROD_LIFECYCLE_TRANSITION_ILLEGAL']).toContain(
-      activeRefused.code,
+      activeRefused.code ?? '',
     );
     const rows = await stateRowsFor(engine, { moduleId, scope });
     expect(rows.some((row) => row.lifecycleState === 'PROVEN')).toBe(false);

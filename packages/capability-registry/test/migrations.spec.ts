@@ -832,3 +832,79 @@ describe('SQL vocabularies mirror the domain authority', () => {
     );
   }, 120_000);
 });
+
+describe('activation evidence: refusal invalidation and readiness bounds (H6/C1)', () => {
+  const REQUIRED_FOR_OPPORTUNITY: readonly ActivationGateKind[] = [
+    'IMPLEMENTED_PRESENT',
+    'AVAILABLE_EVIDENCE',
+    'PROVEN_PRESENT',
+    'STATISTICAL_EVIDENCE_SCOPE',
+    'NEGATIVE_CONTROLS',
+    'CLUSTERED_INTERVALS',
+    'CALIBRATION_MATURITY',
+    'VERIFIED_GATE_EVIDENCE',
+    'CAPACITY_CONTRACT',
+    'NO_OPEN_CONTAINMENT',
+  ];
+
+  async function insertGateRows(
+    tag: string,
+    scopeHash: string,
+    eventRef: string,
+    kind: string,
+  ): Promise<void> {
+    for (const gate of ALL_ACTIVATION_GATE_KINDS) {
+      const verdict = REQUIRED_FOR_OPPORTUNITY.includes(gate) ? 'PASS' : 'NOT_APPLICABLE';
+      await engine.query(
+        `INSERT INTO prod.activation_gate_evaluations
+           (evaluation_id, scope_hash, gate_kind, verdict, failing_gate, evidence_refs,
+            capacity_contract_ref, activation_event_ref, expires_at, activation_kind)
+         VALUES ($1, $2, $3, $4, NULL, '[]'::jsonb, NULL, $5, '2030-01-01T00:00:00Z', $6)`,
+        [`${tag}-${gate}`, scopeHash, gate, verdict, eventRef, kind],
+      );
+    }
+  }
+
+  it('refuses ACTIVE when a later REFUSE row exists for the same scope, event and kind', async () => {
+    const rawHash = `sha256:${'4'.repeat(64)}`;
+    const eventRef = 'raw-refuse-invalidation';
+    await insertGateRows('pass-set', rawHash, eventRef, 'OPPORTUNITY');
+    await engine.query(
+      `INSERT INTO prod.activation_gate_evaluations
+         (evaluation_id, scope_hash, gate_kind, verdict, failing_gate, evidence_refs,
+          capacity_contract_ref, activation_event_ref, expires_at, activation_kind)
+       VALUES ('later-refuse', $1, 'STATISTICAL_EVIDENCE_SCOPE', 'REFUSE',
+               'STATISTICAL_EVIDENCE_SCOPE', '[]'::jsonb, NULL, $2, '2030-01-01T00:00:00Z',
+               'OPPORTUNITY')`,
+      [rawHash, eventRef],
+    );
+    const error = await rejection(
+      engine.query(
+        `INSERT INTO prod.module_states
+           (state_row_id, module_id, artifact_set_hash, scope, scope_hash, lifecycle_state,
+            operational_readiness, distribution_readiness, activation_event_ref, activation_kind)
+         VALUES ('state-raw-refuse', 'module-1', $1, $2::jsonb, $3, 'ACTIVE',
+                 'READY_FOR_ACTIVE_PROFILE', 'PRIVATE_ONLY', $4, 'OPPORTUNITY')`,
+        [HASH, SCOPE, rawHash, eventRef],
+      ),
+    );
+    expect(error.message).toMatch(/refused for this activation event/);
+  }, 120_000);
+
+  it('refuses a raw ACTIVE row whose declared readiness exceeds the evaluated kind', async () => {
+    const rawHash = `sha256:${'5'.repeat(64)}`;
+    const eventRef = 'raw-readiness-bound';
+    await insertGateRows('readiness-set', rawHash, eventRef, 'OPPORTUNITY');
+    const error = await rejection(
+      engine.query(
+        `INSERT INTO prod.module_states
+           (state_row_id, module_id, artifact_set_hash, scope, scope_hash, lifecycle_state,
+            operational_readiness, distribution_readiness, activation_event_ref, activation_kind)
+         VALUES ('state-raw-readiness', 'module-1', $1, $2::jsonb, $3, 'ACTIVE',
+                 'READY_FOR_ACTIVE_PROFILE', 'PUBLIC_AUTHORIZED', $4, 'OPPORTUNITY')`,
+        [HASH, SCOPE, rawHash, eventRef],
+      ),
+    );
+    expect(error.message).toMatch(/module_states_readiness_bounded_by_kind/);
+  }, 120_000);
+});

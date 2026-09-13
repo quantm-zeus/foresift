@@ -306,6 +306,7 @@ async function advance(
     actorRef: 'test-actor',
     at: NOW,
     gateResult: options.gateResult ?? null,
+    provenEvidenceRef: `sha256:${'c'.repeat(64)}`,
     stateRowId,
     transitionId: `${stateRowId}-t`,
   });
@@ -1155,6 +1156,119 @@ describe('ACTIVE is bound to persisted gate evidence (F1)', () => {
     expect((nonString.detail as { readonly reason?: string }).reason).toBe(
       'ACTIVATION_RESULT_UNBRANDED',
     );
+  }, 120_000);
+
+  it('refuses a forged PROVEN dimension: DEGRADED -> ACTIVE cannot claim PROVEN it never reached (H5)', async () => {
+    const scope = makeScope({ profile_version: 'forged-dimension' });
+    const moduleId = 'module-forged-dimension';
+    // A ladder that never reaches PROVEN: ACTIVE is legal from DEGRADED, so the
+    // only thing standing between a forged `proven: true` and ACTIVE is the
+    // cross-check against persisted history.
+    await advance(moduleId, scope, 'IMPLEMENTED', 'forged-dim-1');
+    await advance(moduleId, scope, 'AVAILABLE', 'forged-dim-2');
+    await advance(moduleId, scope, 'DEGRADED', 'forged-dim-3');
+
+    const dimensions = await statesFor(engine, { moduleId, scope });
+    expect(dimensions.proven).toBe(false);
+
+    // `passingOpportunityInput` sets proven: true, so the pure gate PASSES.
+    const forgedGate = await gatePass(scope, 'activation-forged-dimension');
+    expect(forgedGate.verdict).toBe('PASS');
+
+    const refused = await rejection(
+      advance(moduleId, scope, 'ACTIVE', 'forged-dim-4', { gateResult: forgedGate }),
+    );
+    expect(refused.code).toBe('PROD_ACTIVATION_GATE_REFUSED');
+    expect((refused.detail as { readonly reason?: string }).reason).toBe('GATE_DIMENSION_MISMATCH');
+    const rows = await stateRowsFor(engine, { moduleId, scope });
+    expect(rows.some((row) => row.lifecycleState === 'ACTIVE')).toBe(false);
+  }, 120_000);
+
+  it('refuses promotion to PROVEN without registered mature-evaluation evidence (H5)', async () => {
+    const scope = makeScope({ profile_version: 'proven-evidence' });
+    const moduleId = 'module-proven-evidence';
+    await advance(moduleId, scope, 'IMPLEMENTED', 'proven-ev-1');
+    await advance(moduleId, scope, 'AVAILABLE', 'proven-ev-2');
+    await advance(moduleId, scope, 'SHADOW', 'proven-ev-3');
+
+    const refused = await rejection(
+      advanceState(engine, {
+        moduleId,
+        scope,
+        artifactSetHash: HASH_A,
+        toState: 'PROVEN',
+        operationalReadiness: 'READY_FOR_ACTIVE_PROFILE',
+        distributionReadiness: 'PRIVATE_ONLY',
+        changeClassification: 'MATERIAL_EVALUATION',
+        reason: 'declare PROVEN with no evidence',
+        actorRef: 'test-actor',
+        at: NOW,
+        stateRowId: 'proven-ev-4',
+        transitionId: 'proven-ev-4-t',
+      }),
+    );
+    expect(refused.code).toBe('PROD_ACTIVATION_GATE_REFUSED');
+    expect((refused.detail as { readonly reason?: string }).reason).toBe(
+      'PROVEN_EVIDENCE_REQUIRED',
+    );
+    const rows = await stateRowsFor(engine, { moduleId, scope });
+    expect(rows.some((row) => row.lifecycleState === 'PROVEN')).toBe(false);
+
+    // With the evidence address the promotion is recorded and the reference is
+    // persisted on the transition row.
+    const promoted = await advanceState(engine, {
+      moduleId,
+      scope,
+      artifactSetHash: HASH_A,
+      toState: 'PROVEN',
+      operationalReadiness: 'READY_FOR_ACTIVE_PROFILE',
+      distributionReadiness: 'PRIVATE_ONLY',
+      changeClassification: 'MATERIAL_EVALUATION',
+      reason: 'declare PROVEN with evidence',
+      actorRef: 'test-actor',
+      at: NOW,
+      provenEvidenceRef: `sha256:${'c'.repeat(64)}`,
+      stateRowId: 'proven-ev-5',
+      transitionId: 'proven-ev-5-t',
+    });
+    expect(promoted.state.lifecycleState).toBe('PROVEN');
+    expect(promoted.transition.gateEvaluationRef).toBe(`sha256:${'c'.repeat(64)}`);
+  }, 120_000);
+
+  it('lets a persisted REFUSE invalidate an older PASS for the same scope, event and kind (H6)', async () => {
+    const scope = makeScope({ profile_version: 'refuse-invalidates' });
+    const moduleId = 'module-refuse-invalidates';
+    await provenLadder(moduleId, scope, 'refuse-inv');
+
+    const pass = await gatePass(scope, 'activation-refuse-inv');
+    expect(pass.verdict).toBe('PASS');
+
+    // A LATER failing re-evaluation for the same event, persisted through the
+    // same branded recorder (the pre-fix code dropped refusals entirely).
+    const later = '2026-06-02T00:00:00Z';
+    const refusal = evaluateActivationGate({
+      ...passingOpportunityInput(scope),
+      activationEventRef: 'activation-refuse-inv',
+      now: later,
+      expiresAt: '2027-06-01T00:00:00Z',
+      registeredStatisticalEvidence: [],
+    });
+    expect(refusal.verdict).toBe('REFUSE');
+    const recordedRefusal = await recordActivationGateResult(engine, refusal);
+    expect(recordedRefusal.verdict).toBe('REFUSE');
+    if (recordedRefusal.verdict !== 'REFUSE') throw new Error('unreachable');
+    expect(recordedRefusal.evaluationSetRef).toMatch(/^sha256:[0-9a-f]{64}$/);
+
+    // Both batches are persisted; the newer REFUSE governs.
+    const rows = await activationGateEvaluationsFor(engine, activationScopeHash(scope));
+    expect(rows.some((row) => row.verdict === 'REFUSE')).toBe(true);
+
+    const refused = await rejection(
+      advance(moduleId, scope, 'ACTIVE', 'refuse-inv-5', { gateResult: pass }),
+    );
+    expect(refused.code).toBe('PROD_ACTIVATION_GATE_REFUSED');
+    const states = await stateRowsFor(engine, { moduleId, scope });
+    expect(states.some((row) => row.lifecycleState === 'ACTIVE')).toBe(false);
   }, 120_000);
 
   it('never records a skipped gate as PASS, and no claim can reuse OPERATIONAL evidence (C1 exploit)', async () => {

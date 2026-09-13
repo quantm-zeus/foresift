@@ -45,6 +45,7 @@ import {
   ModuleLifecycleState,
   OperationalReadiness,
   ActivationKind,
+  ActivationGateKind,
   assertLegalLifecycleTransition,
   parseActivationKind,
   parseChangeClassification,
@@ -53,7 +54,6 @@ import {
   parseOperationalReadiness,
   requiredStatesForActivation,
   type ActivationScope,
-  type ActivationGateKind,
   type ModuleLifecyclePosition,
 } from '@foresift/domain';
 import { canonicalJson, sha256Text, type DatabaseEngine } from '@foresift/persistence';
@@ -420,6 +420,10 @@ export const ModuleStateRefusalReason = {
   ACTIVATION_EVENT_ALREADY_CONSUMED: 'ACTIVATION_EVENT_ALREADY_CONSUMED',
   /** A non-empty activation event reference is required for a consumed-once record. */
   ACTIVATION_EVENT_REF_MISSING: 'ACTIVATION_EVENT_REF_MISSING',
+  /** A gate PASS claims a dimension the persisted history never established (audit H5). */
+  GATE_DIMENSION_MISMATCH: 'GATE_DIMENSION_MISMATCH',
+  /** Promotion to PROVEN must name the registered mature-evaluation evidence (audit H5). */
+  PROVEN_EVIDENCE_REQUIRED: 'PROVEN_EVIDENCE_REQUIRED',
 } as const;
 export type ModuleStateRefusalReason =
   (typeof ModuleStateRefusalReason)[keyof typeof ModuleStateRefusalReason];
@@ -444,6 +448,13 @@ export interface AdvanceStateInput {
   readonly currentStateRowId?: string;
   /** Total activation-gate result; REQUIRED exactly when crossing into ACTIVE. */
   readonly gateResult?: ActivationGateResult | null;
+  /**
+   * The registered mature-evaluation evidence that establishes PROVEN
+   * (§69.3; audit H5). REQUIRED exactly when `toState` is `PROVEN`: PROVEN is
+   * not a declaration, so a promotion must name the evidence content address it
+   * rests on.
+   */
+  readonly provenEvidenceRef?: string;
   /**
    * Explicit activation-event reference for a non-gate-crossing append (for
    * example a rollback's NEW activation event). Defaults to the current row's.
@@ -541,6 +552,21 @@ export async function advanceState(
     );
   }
   const crossing = crossesActivationGate(fromState, toState);
+  // §69.3: PROVEN is established by registered mature-evaluation evidence, not
+  // by declaration (audit H5). The evidence content address is required and is
+  // persisted on the transition row.
+  let provenEvidenceRef: string | null = null;
+  if (toState === ModuleLifecycleState.PROVEN) {
+    const ref = input.provenEvidenceRef;
+    if (typeof ref !== 'string' || !/^sha256:[0-9a-f]{64}$/.test(ref)) {
+      throw new ForesiftError(
+        ErrorCode.PROD_ACTIVATION_GATE_REFUSED,
+        'promotion to PROVEN requires the registered mature-evaluation evidence content address that establishes it',
+        { reason: ModuleStateRefusalReason.PROVEN_EVIDENCE_REQUIRED, scopeHash },
+      );
+    }
+    provenEvidenceRef = ref;
+  }
   let activationKind: ActivationKind | null = null;
   if (crossing) {
     const gateResult = input.gateResult;
@@ -660,6 +686,26 @@ export async function advanceState(
     // caller-constructed PASS object (even a well-formed one) cannot name rows
     // that were never persisted, so it can never cross into ACTIVE.
     if (crossing && input.gateResult?.verdict === 'PASS') {
+      // §69.2/§69.4 independent dimensions (audit H5): a gate PASS may only
+      // claim a dimension the exact scope's governed history actually
+      // established. A caller boolean can no longer assert IMPLEMENTED /
+      // AVAILABLE / PROVEN that no persisted row supports.
+      const dimensions = await statesFor(tx, { moduleId, scope });
+      const claimedDimensions: readonly [ActivationGateKind, boolean][] = [
+        [ActivationGateKind.IMPLEMENTED_PRESENT, dimensions.implemented],
+        [ActivationGateKind.AVAILABLE_EVIDENCE, dimensions.available],
+        [ActivationGateKind.PROVEN_PRESENT, dimensions.proven],
+      ];
+      for (const [gate, established] of claimedDimensions) {
+        const evaluation = input.gateResult.evaluations.find((entry) => entry.gateKind === gate);
+        if (evaluation?.verdict === 'PASS' && established !== true) {
+          throw new ForesiftError(
+            ErrorCode.PROD_ACTIVATION_GATE_REFUSED,
+            `entering ACTIVE refused: the gate claims ${gate} but the governed history never established it for the exact scope`,
+            { reason: ModuleStateRefusalReason.GATE_DIMENSION_MISMATCH, gate, scopeHash },
+          );
+        }
+      }
       // §69.11: containment is a governed stop, not a suggestion. While a
       // containment event on the EXACT scope is still open, replaying older
       // genuine evidence must not re-activate the scope; the documented sole
@@ -787,9 +833,9 @@ export async function advanceState(
         changeClassification,
         crossing
           ? input.gateResult?.verdict === 'PASS'
-            ? input.gateResult.activationEventRef
+            ? (input.gateResult.evaluationSetRef ?? input.gateResult.activationEventRef)
             : null
-          : null,
+          : provenEvidenceRef,
         reason,
         actorRef,
         input.at,

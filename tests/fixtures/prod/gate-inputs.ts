@@ -28,6 +28,11 @@ export const PROD_FIXTURE_FUTURE = '2027-06-01T00:00:00Z';
 export const PROD_FIXTURE_FAR_FUTURE = '2030-01-01T00:00:00Z';
 export const PROD_FIXTURE_HASH_A = `sha256:${'a'.repeat(64)}`;
 export const PROD_FIXTURE_HASH_B = `sha256:${'b'.repeat(64)}`;
+/**
+ * The registered mature-evaluation evidence content address a promotion to
+ * PROVEN must name (§69.3; audit H5). Inert fixture data.
+ */
+export const PROD_FIXTURE_PROVEN_EVIDENCE = `sha256:${'c'.repeat(64)}`;
 
 /** The canonical exactly-scoped §69.5 activation scope for PROD fixtures. */
 export function makeProdScope(overrides: Partial<ModuleStateScope> = {}): ModuleStateScope {

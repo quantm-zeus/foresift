@@ -136,10 +136,36 @@ export const ACTIVATION_GATE_ORDER: readonly ActivationGateKind[] = [
 export const ALL_ACTIVATION_GATE_KINDS: readonly ActivationGateKind[] =
   Object.values(ActivationGateKind);
 
-/** A gate evaluation verdict. `REFUSE` always names the failing gate. */
+/**
+ * Which §69 gate family an evaluation decides (audit C1). The kind is a closed
+ * vocabulary owned here so persistence, schemas, SQL CHECK constraints and the
+ * capability registry all agree; it is persisted on every evaluation row and on
+ * every governed state row so an OPERATIONAL evaluation can never authorize an
+ * OPPORTUNITY/WORKSPACE/PUBLIC activation.
+ */
+export const ActivationKind = {
+  /** §69.4: collection, deterministic analysis, risk monitoring, shadow research. */
+  OPERATIONAL: 'OPERATIONAL',
+  /** §69.5: `CONFIRMED_OPPORTUNITY` active influence for the exact scope. */
+  OPPORTUNITY: 'OPPORTUNITY',
+  /** §69.9: a workspace surface becomes authorized. */
+  WORKSPACE: 'WORKSPACE',
+  /** §69.9: a public surface becomes authorized. */
+  PUBLIC: 'PUBLIC',
+} as const;
+export type ActivationKind = (typeof ActivationKind)[keyof typeof ActivationKind];
+export const ALL_ACTIVATION_KINDS: readonly ActivationKind[] = Object.values(ActivationKind);
+
+/**
+ * A gate evaluation verdict. `REFUSE` always names the failing gate;
+ * `NOT_APPLICABLE` records — honestly — that the gate is outside the required
+ * set for the evaluated activation kind, so it can never be mistaken for a
+ * real pass (audit C1). A `NOT_APPLICABLE` required gate is a refusal.
+ */
 export const ActivationGateVerdict = {
   PASS: 'PASS',
   REFUSE: 'REFUSE',
+  NOT_APPLICABLE: 'NOT_APPLICABLE',
 } as const;
 export type ActivationGateVerdict =
   (typeof ActivationGateVerdict)[keyof typeof ActivationGateVerdict];
@@ -320,6 +346,13 @@ export const parseActivationGateVerdict = (value: unknown): ActivationGateVerdic
     ErrorCode.PROD_ACTIVATION_VERDICT_UNKNOWN,
     'activation gate verdict',
   );
+export const parseActivationKind = (value: unknown): ActivationKind =>
+  parseClosed(
+    ALL_ACTIVATION_KINDS,
+    value,
+    ErrorCode.PROD_ACTIVATION_KIND_UNKNOWN,
+    'activation kind',
+  );
 export const parseChangeClassification = (value: unknown): ChangeClassification =>
   parseClosed(
     ALL_CHANGE_CLASSIFICATIONS,
@@ -385,6 +418,7 @@ export const distributionReadiness = parseDistributionReadiness;
 export const deploymentPosture = parseDeploymentPosture;
 export const activationGateKind = parseActivationGateKind;
 export const activationGateVerdict = parseActivationGateVerdict;
+export const activationKind = parseActivationKind;
 export const changeClassification = parseChangeClassification;
 export const containmentAction = parseContainmentAction;
 export const mcpRevisionChannel = parseMcpRevisionChannel;
@@ -612,6 +646,11 @@ export function activationGateRefusal(
     const failing =
       evaluation.failingGate === null ? null : parseActivationGateKind(evaluation.failingGate);
     if (verdict === ActivationGateVerdict.REFUSE) return failing ?? gate;
+    // Only an explicit PASS satisfies a required gate: `NOT_APPLICABLE` (the
+    // gate is outside the evaluated activation kind's required set) is a
+    // refusal when the gate IS required, and a PASS carrying a failing gate is
+    // internally inconsistent.
+    if (verdict !== ActivationGateVerdict.PASS) return gate;
     if (failing !== null) return gate;
   }
   return null;

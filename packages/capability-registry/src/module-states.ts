@@ -44,7 +44,9 @@ import {
   DistributionReadiness,
   ModuleLifecycleState,
   OperationalReadiness,
+  ActivationKind,
   assertLegalLifecycleTransition,
+  parseActivationKind,
   parseChangeClassification,
   parseDistributionReadiness,
   parseModuleLifecycleState,
@@ -56,6 +58,7 @@ import {
 } from '@foresift/domain';
 import { canonicalJson, sha256Text, type DatabaseEngine } from '@foresift/persistence';
 import {
+  requireActivationResultBrand,
   requirePersistedActivationEvidence,
   type ActivationGateResult,
 } from './activation-gate.ts';
@@ -192,6 +195,8 @@ export interface ModuleStateRow {
   readonly operationalReadiness: OperationalReadiness;
   readonly distributionReadiness: DistributionReadiness;
   readonly activationEventRef: string | null;
+  /** The activation kind that authorized an ACTIVE row (audit C1); null otherwise. */
+  readonly activationKind: ActivationKind | null;
   readonly supersededBy: string | null;
   readonly createdAt: string;
 }
@@ -250,6 +255,7 @@ interface RawModuleStateRow {
   operational_readiness: string;
   distribution_readiness: string;
   activation_event_ref: string | null;
+  activation_kind: string | null;
   superseded_by: string | null;
   created_at: unknown;
 }
@@ -286,6 +292,7 @@ function decodeModuleStateRow(row: RawModuleStateRow): ModuleStateRow {
     operationalReadiness: row.operational_readiness as OperationalReadiness,
     distributionReadiness: row.distribution_readiness as DistributionReadiness,
     activationEventRef: row.activation_event_ref,
+    activationKind: row.activation_kind === null ? null : (row.activation_kind as ActivationKind),
     supersededBy: row.superseded_by,
     createdAt: toIso(row.created_at),
   };
@@ -316,7 +323,7 @@ export async function stateRowsFor(
   const result = await engine.query<RawModuleStateRow>(
     `SELECT state_row_id, module_id, artifact_set_hash, scope, lifecycle_state,
             operational_readiness, distribution_readiness, activation_event_ref,
-            superseded_by, created_at
+            activation_kind, superseded_by, created_at
        FROM prod.module_states
       WHERE module_id = $1 AND scope = $2::jsonb
       ORDER BY created_at ASC, state_row_id ASC`,
@@ -534,6 +541,7 @@ export async function advanceState(
     );
   }
   const crossing = crossesActivationGate(fromState, toState);
+  let activationKind: ActivationKind | null = null;
   if (crossing) {
     const gateResult = input.gateResult;
     if (gateResult == null) {
@@ -547,6 +555,10 @@ export async function advanceState(
         },
       );
     }
+    // IDENTITY provenance, not shape (audit C1/H5): the result must be the
+    // frozen object the evaluator minted. A hand-built `{verdict:'PASS', …}`
+    // therefore cannot cross into ACTIVE even with a derivable evidence ref.
+    requireActivationResultBrand(gateResult);
     if (gateResult.verdict !== 'PASS') {
       throw new ForesiftError(
         ErrorCode.PROD_ACTIVATION_GATE_REFUSED,
@@ -554,6 +566,44 @@ export async function advanceState(
         {
           reason: ModuleStateRefusalReason.ACTIVATION_GATE_REFUSED,
           failingGate: gateResult.failingGate,
+          scopeHash,
+        },
+      );
+    }
+    // The kind comes from the BRANDED evaluator object, never from a caller
+    // field, and it is persisted on the state row so an OPERATIONAL evaluation
+    // is permanently distinguishable from an OPPORTUNITY/WORKSPACE/PUBLIC one.
+    activationKind = parseActivationKind(gateResult.activationKind);
+    // A readiness claim is subsumed by the kind that was actually evaluated: an
+    // OPERATIONAL pass can never authorize workspace/public distribution, and
+    // the active-profile readiness requires confirmed-opportunity evidence.
+    const distributionAuthorizingKinds: Readonly<Record<string, ActivationKind>> = {
+      WORKSPACE_AUTHORIZED: ActivationKind.WORKSPACE,
+      PUBLIC_AUTHORIZED: ActivationKind.PUBLIC,
+    };
+    const requiredDistributionKind = distributionAuthorizingKinds[distributionReadiness];
+    if (requiredDistributionKind !== undefined && activationKind !== requiredDistributionKind) {
+      throw new ForesiftError(
+        ErrorCode.PROD_ACTIVATION_GATE_REFUSED,
+        `entering ACTIVE refused: distribution readiness ${distributionReadiness} requires a ${requiredDistributionKind} activation evaluation, but the gate result was evaluated for ${activationKind}`,
+        {
+          reason: ModuleStateRefusalReason.ACTIVATION_GATE_REFUSED,
+          requiredActivationKind: requiredDistributionKind,
+          evaluatedActivationKind: activationKind,
+          scopeHash,
+        },
+      );
+    }
+    if (
+      operationalReadiness === OperationalReadiness.READY_FOR_ACTIVE_PROFILE &&
+      activationKind === ActivationKind.OPERATIONAL
+    ) {
+      throw new ForesiftError(
+        ErrorCode.PROD_ACTIVATION_GATE_REFUSED,
+        'entering ACTIVE refused: READY_FOR_ACTIVE_PROFILE requires confirmed-opportunity evidence, but the gate result was evaluated for OPERATIONAL activation',
+        {
+          reason: ModuleStateRefusalReason.ACTIVATION_GATE_REFUSED,
+          evaluatedActivationKind: activationKind,
           scopeHash,
         },
       );
@@ -677,7 +727,7 @@ export async function advanceState(
       await requirePersistedActivationEvidence(tx, {
         scope,
         scopeHash,
-        activationKind: input.gateResult.activationKind,
+        activationKind: activationKind ?? parseActivationKind(input.gateResult.activationKind),
         activationEventRef: input.gateResult.activationEventRef,
         evaluationSetRef: input.gateResult.evaluationSetRef,
         at: input.at,
@@ -688,8 +738,9 @@ export async function advanceState(
     await tx.query(
       `INSERT INTO prod.module_states
          (state_row_id, module_id, artifact_set_hash, scope, scope_hash, lifecycle_state,
-          operational_readiness, distribution_readiness, activation_event_ref, created_at)
-       VALUES ($1, $2, $3, $4::jsonb, $5, $6, $7, $8, $9, $10::timestamptz)`,
+          operational_readiness, distribution_readiness, activation_event_ref, activation_kind,
+          created_at)
+       VALUES ($1, $2, $3, $4::jsonb, $5, $6, $7, $8, $9, $10, $11::timestamptz)`,
       [
         stateRowId,
         moduleId,
@@ -700,6 +751,7 @@ export async function advanceState(
         operationalReadiness,
         distributionReadiness,
         activationEventRef,
+        activationKind,
         input.at,
       ],
     );
@@ -746,7 +798,7 @@ export async function advanceState(
     const inserted = await tx.query<RawModuleStateRow>(
       `SELECT state_row_id, module_id, artifact_set_hash, scope, lifecycle_state,
               operational_readiness, distribution_readiness, activation_event_ref,
-              superseded_by, created_at
+              activation_kind, superseded_by, created_at
          FROM prod.module_states WHERE state_row_id = $1`,
       [stateRowId],
     );

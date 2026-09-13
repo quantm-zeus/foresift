@@ -26,6 +26,7 @@ import { z } from 'zod';
 import {
   ALL_ACTIVATION_GATE_KINDS,
   ALL_ACTIVATION_GATE_VERDICTS,
+  ALL_ACTIVATION_KINDS,
   ALL_ARTIFACT_BOUNDARY_ASSERTION_KINDS,
   ALL_CHANGE_CLASSIFICATIONS,
   ALL_CONTAINMENT_ACTIONS,
@@ -61,6 +62,7 @@ export const DistributionReadinessSchema = domainEnum(ALL_DISTRIBUTION_READINESS
 export const DeploymentPostureSchema = domainEnum(ALL_DEPLOYMENT_POSTURES);
 export const ActivationGateKindSchema = domainEnum(ALL_ACTIVATION_GATE_KINDS);
 export const ActivationGateVerdictSchema = domainEnum(ALL_ACTIVATION_GATE_VERDICTS);
+export const ActivationKindSchema = domainEnum(ALL_ACTIVATION_KINDS);
 export const ChangeClassificationSchema = domainEnum(ALL_CHANGE_CLASSIFICATIONS);
 export const ContainmentActionSchema = domainEnum(ALL_CONTAINMENT_ACTIONS);
 export const McpRevisionChannelSchema = domainEnum(ALL_MCP_REVISION_CHANNELS);
@@ -109,8 +111,9 @@ export const ActivationScopeSchema = z
 /**
  * Append-only, scope-exact module-state row (`prod.module_states`). Rows are
  * never rewritten: a scope/state change inserts a NEW row and sets the old
- * row's `supersededBy` once. `ACTIVE` requires an activation event reference
- * (AC-152), so a deployed module cannot be marked active by declaration.
+ * row's `supersededBy` once. `ACTIVE` requires a non-empty activation event
+ * reference AND the activation kind that was actually evaluated (AC-152,
+ * correction C1), and the declared readiness can never exceed that kind.
  */
 export const ModuleStateRowSchema = z
   .object({
@@ -118,10 +121,12 @@ export const ModuleStateRowSchema = z
     moduleId: id,
     artifactSetHash: contentAddress,
     scope: ActivationScopeSchema,
+    scopeHash: contentAddress.nullable(),
     lifecycleState: ModuleLifecycleStateSchema,
     operationalReadiness: OperationalReadinessSchema,
     distributionReadiness: DistributionReadinessSchema,
     activationEventRef: id.nullable(),
+    activationKind: ActivationKindSchema.nullable(),
     supersededBy: id.nullable(),
     createdAt: UtcTimestampSchema,
   })
@@ -129,6 +134,33 @@ export const ModuleStateRowSchema = z
   .refine((row) => row.lifecycleState !== 'ACTIVE' || row.activationEventRef !== null, {
     message: 'an ACTIVE module state requires an activation event reference',
   })
+  .refine((row) => row.lifecycleState !== 'ACTIVE' || row.activationKind !== null, {
+    message: 'an ACTIVE module state requires the activation kind its gate evaluations used',
+  })
+  .refine((row) => row.lifecycleState !== 'ACTIVE' || row.scopeHash !== null, {
+    message: 'an ACTIVE module state requires the exact scope hash its evidence was persisted for',
+  })
+  .refine(
+    (row) =>
+      row.lifecycleState !== 'ACTIVE' ||
+      row.distributionReadiness !== 'WORKSPACE_AUTHORIZED' ||
+      row.activationKind === 'WORKSPACE',
+    { message: 'WORKSPACE_AUTHORIZED requires a WORKSPACE activation evaluation' },
+  )
+  .refine(
+    (row) =>
+      row.lifecycleState !== 'ACTIVE' ||
+      row.distributionReadiness !== 'PUBLIC_AUTHORIZED' ||
+      row.activationKind === 'PUBLIC',
+    { message: 'PUBLIC_AUTHORIZED requires a PUBLIC activation evaluation' },
+  )
+  .refine(
+    (row) =>
+      row.lifecycleState !== 'ACTIVE' ||
+      row.operationalReadiness !== 'READY_FOR_ACTIVE_PROFILE' ||
+      row.activationKind !== 'OPERATIONAL',
+    { message: 'READY_FOR_ACTIVE_PROFILE cannot rest on an OPERATIONAL-only evaluation' },
+  )
   .refine((row) => row.supersededBy === null || row.supersededBy !== row.stateRowId, {
     message: 'a module state row can never supersede itself',
   });
@@ -162,8 +194,11 @@ export const StateTransitionInsertSchema = StateTransitionRowSchema;
 
 /**
  * Immutable activation-gate evaluation (`prod.activation_gate_evaluations`).
- * A `PASS` carries no failing gate and a `REFUSE` always names one; the row
- * expires (`expiresAt` strictly after `evaluatedAt`).
+ * A `PASS` carries no failing gate, a `REFUSE` always names one, and a
+ * `NOT_APPLICABLE` row (a gate outside the evaluated activation kind's required
+ * set) names none — it is never a pass (correction C1). Every row binds the
+ * `activationKind` and the `activationEventRef` it was evaluated for, and
+ * expires strictly after `evaluatedAt`.
  */
 export const ActivationGateEvaluationRowSchema = z
   .object({
@@ -174,13 +209,19 @@ export const ActivationGateEvaluationRowSchema = z
     failingGate: ActivationGateKindSchema.nullable(),
     evidenceRefs: z.array(id),
     capacityContractRef: id.nullable(),
+    activationEventRef: id.nullable(),
+    activationKind: ActivationKindSchema,
     evaluatedAt: UtcTimestampSchema,
     expiresAt: UtcTimestampSchema,
   })
   .strict()
-  .refine((row) => (row.verdict === 'PASS') === (row.failingGate === null), {
-    message: 'a refused gate must name a failing gate and a passed gate must not',
-  })
+  .refine(
+    (row) =>
+      (row.verdict === 'PASS' && row.failingGate === null) ||
+      (row.verdict === 'REFUSE' && row.failingGate !== null) ||
+      (row.verdict === 'NOT_APPLICABLE' && row.failingGate === null),
+    { message: 'a refused gate must name a failing gate; PASS and NOT_APPLICABLE must not' },
+  )
   .refine((row) => Date.parse(row.expiresAt) > Date.parse(row.evaluatedAt), {
     message: 'an activation-gate evaluation must expire after it is evaluated',
   });

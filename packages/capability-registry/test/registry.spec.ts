@@ -41,6 +41,7 @@ import {
   parseModuleStateScope,
   recordActivationGateEvaluation,
   recordActivationGateResult,
+  requiredGatesForActivation,
   rollbackToApproved,
   smallestAffectedScope,
   stateRowsFor,
@@ -960,8 +961,12 @@ describe('ACTIVE is bound to persisted gate evidence (F1)', () => {
         gateResult: await forgedPass(scope, 'forged-activation-event', `sha256:${'f'.repeat(64)}`),
       }),
     );
+    // The evaluator identity brand is checked BEFORE the persisted-evidence
+    // walk, so the pre-fix hand-built PASS is refused at the crossing itself.
     expect(refused.code).toBe('PROD_ACTIVATION_GATE_REFUSED');
-    expect((refused.detail as { readonly reason?: string }).reason).toBe('EVIDENCE_SET_EMPTY');
+    expect((refused.detail as { readonly reason?: string }).reason).toBe(
+      'ACTIVATION_RESULT_UNBRANDED',
+    );
 
     // No ACTIVE row landed and ZERO gate evaluations were ever persisted.
     const rows = await stateRowsFor(engine, { moduleId, scope });
@@ -999,7 +1004,7 @@ describe('ACTIVE is bound to persisted gate evidence (F1)', () => {
     const viaResult = await rejection(recordActivationGateResult(engine, handBuilt as never));
     expect(viaResult.code).toBe('PROD_ACTIVATION_GATE_REFUSED');
     expect((viaResult.detail as { readonly reason?: string }).reason).toBe(
-      'ACTIVATION_PASS_UNBRANDED',
+      'ACTIVATION_RESULT_UNBRANDED',
     );
 
     const viaEvaluation = await rejection(
@@ -1035,9 +1040,12 @@ describe('ACTIVE is bound to persisted gate evidence (F1)', () => {
     const refused = await rejection(
       advance(moduleId, scope, 'ACTIVE', 'forged-event-5', { gateResult: forged }),
     );
+    // Re-aiming a genuine pass at a never-persisted event is a spread copy, so
+    // the identity brand refuses it before the event lookup; the event-binding
+    // check remains reachable only for a genuine branded result.
     expect(refused.code).toBe('PROD_ACTIVATION_GATE_REFUSED');
     expect((refused.detail as { readonly reason?: string }).reason).toBe(
-      'EVIDENCE_EVENT_REF_UNPERSISTED',
+      'ACTIVATION_RESULT_UNBRANDED',
     );
     const rows = await stateRowsFor(engine, { moduleId, scope });
     expect(rows.some((row) => row.lifecycleState === 'ACTIVE')).toBe(false);
@@ -1115,7 +1123,7 @@ describe('ACTIVE is bound to persisted gate evidence (F1)', () => {
     const refused = await rejection(recordActivationGateResult(engine, derived));
     expect(refused.code).toBe('PROD_ACTIVATION_GATE_REFUSED');
     expect((refused.detail as { readonly reason?: string }).reason).toBe(
-      'ACTIVATION_PASS_UNBRANDED',
+      'ACTIVATION_RESULT_UNBRANDED',
     );
     expect(await activationGateEvaluationsFor(engine, activationScopeHash(scopeB))).toEqual([]);
   }, 120_000);
@@ -1145,7 +1153,131 @@ describe('ACTIVE is bound to persisted gate evidence (F1)', () => {
     );
     expect(nonString.code).toBe('PROD_ACTIVATION_GATE_REFUSED');
     expect((nonString.detail as { readonly reason?: string }).reason).toBe(
-      'ACTIVATION_EVENT_REF_MISSING',
+      'ACTIVATION_RESULT_UNBRANDED',
     );
+  }, 120_000);
+
+  it('never records a skipped gate as PASS, and no claim can reuse OPERATIONAL evidence (C1 exploit)', async () => {
+    const scope = makeScope({ profile_version: 'kind-forgery' });
+    const moduleId = 'module-kind-forgery';
+    const scopeHash = activationScopeHash(scope);
+    await provenLadder(moduleId, scope, 'kind-forgery');
+
+    // A legitimate OPERATIONAL evaluation: the five operational gates are real
+    // PASSes; every statistical/distribution gate is recorded NOT_APPLICABLE.
+    const operational = evaluateActivationGate({
+      ...passingOpportunityInput(scope),
+      kind: ActivationKind.OPERATIONAL,
+      activationEventRef: 'activation-operational',
+    });
+    expect(operational.verdict).toBe('PASS');
+    if (operational.verdict !== 'PASS') throw new Error('unreachable');
+    expect(operational.activationKind).toBe('OPERATIONAL');
+    const recorded = await recordActivationGateResult(engine, operational);
+    expect(recorded.verdict).toBe('PASS');
+    if (recorded.verdict !== 'PASS') throw new Error('unreachable');
+
+    // The pre-fix forgery: every gate — including the never-evaluated
+    // statistical/distribution gates — was persisted as PASS.
+    const rows = await activationGateEvaluationsFor(engine, scopeHash, ActivationKind.OPERATIONAL);
+    const passGates = rows.filter((row) => row.verdict === 'PASS').map((row) => row.gateKind);
+    expect([...passGates].sort()).toEqual(
+      [...requiredGatesForActivation(ActivationKind.OPERATIONAL, scope)].sort(),
+    );
+    for (const skipped of [
+      'STATISTICAL_EVIDENCE_SCOPE',
+      'NEGATIVE_CONTROLS',
+      'CLUSTERED_INTERVALS',
+      'CALIBRATION_MATURITY',
+      'DISTRIBUTION_EVIDENCE',
+    ] as const) {
+      expect(rows.filter((row) => row.gateKind === skipped).map((row) => row.verdict)).toEqual([
+        'NOT_APPLICABLE',
+      ]);
+    }
+    // Every recorded row binds the evaluated kind.
+    expect(rows.every((row) => row.activationKind === 'OPERATIONAL')).toBe(true);
+
+    // Reusing that evidence for an OPPORTUNITY claim requires fabricating a
+    // branded result whose ref names the OPERATIONAL rows — refused.
+    const operationalRef = activationEvidenceSetRef(rows);
+    const forgedOpportunity = {
+      verdict: 'PASS',
+      scopeHash,
+      evaluations: [],
+      activationEventRef: 'activation-operational',
+      capacityContractRef: '',
+      evaluatedAt: NOW,
+      expiresAt: FUTURE,
+      evidenceRefs: [],
+      activationKind: 'OPPORTUNITY',
+      evaluationSetRef: operationalRef,
+    } as never;
+    const refused = await rejection(
+      advance(moduleId, scope, 'ACTIVE', 'kind-forgery-5', { gateResult: forgedOpportunity }),
+    );
+    expect(refused.code).toBe('PROD_ACTIVATION_GATE_REFUSED');
+    expect((refused.detail as { readonly reason?: string }).reason).toBe(
+      'ACTIVATION_RESULT_UNBRANDED',
+    );
+    const states = await stateRowsFor(engine, { moduleId, scope });
+    expect(states.some((row) => row.lifecycleState === 'ACTIVE')).toBe(false);
+  }, 120_000);
+
+  it('refuses an ACTIVE readiness claim the evaluated activation kind cannot authorize (C1)', async () => {
+    const scope = makeScope({ profile_version: 'kind-readiness' });
+    const moduleId = 'module-kind-readiness';
+    await provenLadder(moduleId, scope, 'kind-readiness');
+
+    const operational = evaluateActivationGate({
+      ...passingOpportunityInput(scope),
+      kind: ActivationKind.OPERATIONAL,
+      activationEventRef: 'activation-kind-readiness',
+    });
+    if (operational.verdict !== 'PASS') throw new Error('unreachable');
+    const recorded = await recordActivationGateResult(engine, operational);
+
+    // READY_FOR_ACTIVE_PROFILE cannot rest on an OPERATIONAL-only evaluation...
+    const profileClaim = await rejection(
+      advanceState(engine, {
+        moduleId,
+        scope,
+        artifactSetHash: HASH_A,
+        toState: 'ACTIVE',
+        operationalReadiness: 'READY_FOR_ACTIVE_PROFILE',
+        distributionReadiness: 'PRIVATE_ONLY',
+        changeClassification: 'MATERIAL_OPERATIONAL',
+        reason: 'operational-only profile claim',
+        actorRef: 'test-actor',
+        at: NOW,
+        gateResult: recorded,
+        stateRowId: 'kind-readiness-5',
+        transitionId: 'kind-readiness-5-t',
+      }),
+    );
+    expect(profileClaim.code).toBe('PROD_ACTIVATION_GATE_REFUSED');
+
+    // ...and it can never authorize workspace/public distribution either.
+    const publicClaim = await rejection(
+      advanceState(engine, {
+        moduleId,
+        scope,
+        artifactSetHash: HASH_A,
+        toState: 'ACTIVE',
+        operationalReadiness: 'READY_FOR_COLLECTION',
+        distributionReadiness: 'PUBLIC_AUTHORIZED',
+        changeClassification: 'MATERIAL_OPERATIONAL',
+        reason: 'operational-only public claim',
+        actorRef: 'test-actor',
+        at: NOW,
+        gateResult: recorded,
+        stateRowId: 'kind-readiness-6',
+        transitionId: 'kind-readiness-6-t',
+      }),
+    );
+    expect(publicClaim.code).toBe('PROD_ACTIVATION_GATE_REFUSED');
+
+    const states = await stateRowsFor(engine, { moduleId, scope });
+    expect(states.some((row) => row.lifecycleState === 'ACTIVE')).toBe(false);
   }, 120_000);
 });

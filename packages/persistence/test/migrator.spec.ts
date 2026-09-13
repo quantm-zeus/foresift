@@ -113,6 +113,8 @@ describe('migration suite shape (+AC-243 probe assignments + solsec migrations)'
       'g2_prod_0003_mcp_compat',
       'g2_prod_0004_alpha_boundary',
       'g2_prod_0005_activation_evidence',
+      'g2_prod_0006_activation_kind',
+      'g2_prod_0007_activation_fail_closed',
       'g2_wf_0001_schedules_runs',
       'g2_wf_0002_outbox_deadletter',
       'g2_wf_0003_schedule_forecasts',
@@ -141,7 +143,7 @@ describe('applyMigrations (FR-DATA-001…006, FR-DR-001/002 foundation)', () => 
 
   it('applies all G0/G1 scripts to an empty database and records state', async () => {
     const report = await applyMigrations({ engine, migrationsDir: MIGRATIONS_DIR });
-    expect(report.applied.length).toBe(81);
+    expect(report.applied.length).toBe(83);
     expect(report.skipped).toEqual([]);
 
     const recorded = await appliedMigrations(engine);
@@ -226,6 +228,8 @@ describe('applyMigrations (FR-DATA-001…006, FR-DR-001/002 foundation)', () => 
       'g2_prod_0003_mcp_compat',
       'g2_prod_0004_alpha_boundary',
       'g2_prod_0005_activation_evidence',
+      'g2_prod_0006_activation_kind',
+      'g2_prod_0007_activation_fail_closed',
       'g2_wf_0001_schedules_runs',
       'g2_wf_0002_outbox_deadletter',
       'g2_wf_0003_schedule_forecasts',
@@ -237,7 +241,7 @@ describe('applyMigrations (FR-DATA-001…006, FR-DR-001/002 foundation)', () => 
   it('applies twice without damage (idempotent)', async () => {
     const second = await applyMigrations({ engine, migrationsDir: MIGRATIONS_DIR });
     expect(second.applied).toEqual([]);
-    expect(second.skipped.length).toBe(81);
+    expect(second.skipped.length).toBe(83);
 
     // The full table set still exists exactly once each.
     const tables = await engine.query<{ table_name: string }>(
@@ -484,6 +488,130 @@ describe('migrator fail-closed defenses (FR-DATA-001…006 / FR-DR-001/002 subst
     }
   }, 120_000);
 
+  it('applies a wholly-new migration family that sorts before applied state (upgrade path)', async () => {
+    const { db, engine } = await freshEngine();
+    try {
+      // A database migrated before the `g2_prod` family existed: only `g2_wf` is
+      // applied. `g2_prod_*` sorts lexicographically BEFORE `g2_wf_*`
+      // (`'p' < 'w'`), which the global high-water check refused outright.
+      const before = await makeSandbox('upgrade-family-before');
+      const wf = 'CREATE TABLE wf_marker (id text);';
+      await writeFile(path.join(before, 'g2_wf_0005_standalone.sql'), wf);
+      await applyMigrations({ engine, migrationsDir: before });
+
+      // The new family has no applied member of its own, so it has no history to
+      // gap-fill and applies additively; the same-family gap refusal is unchanged
+      // (pinned by the test above).
+      const after = await makeSandbox('upgrade-family-after');
+      await writeFile(path.join(after, 'g2_wf_0005_standalone.sql'), wf);
+      await writeFile(
+        path.join(after, 'g2_prod_0001_new_family.sql'),
+        'CREATE TABLE prod_marker (id text);',
+      );
+      const report = await applyMigrations({ engine, migrationsDir: after });
+      expect(report.applied).toEqual(['g2_prod_0001_new_family']);
+      expect(report.skipped).toEqual(['g2_wf_0005_standalone']);
+      const marker = await engine.query("SELECT to_regclass('prod_marker') AS t");
+      expect(marker.rows[0]?.t).toBe('prod_marker');
+    } finally {
+      await db.close();
+      await rm(path.join(dirBase, `.tmp-upgrade-family-before-${RUN_TAG}`), {
+        recursive: true,
+        force: true,
+      });
+      await rm(path.join(dirBase, `.tmp-upgrade-family-after-${RUN_TAG}`), {
+        recursive: true,
+        force: true,
+      });
+    }
+  }, 120_000);
+
+  /**
+   * Everything a schema comparison must see: columns (with defaults),
+   * constraints, indexes and triggers. Ordered deterministically so the
+   * comparison is independent of OID assignment order.
+   */
+  async function schemaFingerprint(engine: DatabaseEngine): Promise<string> {
+    const columns = await engine.query(
+      `SELECT table_schema AS s, table_name AS t, column_name AS c, data_type AS d,
+              is_nullable AS n, coalesce(column_default, '') AS def
+         FROM information_schema.columns
+        WHERE table_schema NOT IN ('pg_catalog', 'information_schema', 'pg_toast')
+        ORDER BY table_schema, table_name, ordinal_position`,
+    );
+    const constraints = await engine.query(
+      `SELECT n.nspname AS s, c.conname AS name, pg_get_constraintdef(c.oid) AS def
+         FROM pg_constraint c
+         JOIN pg_namespace n ON n.oid = c.connamespace
+        WHERE n.nspname NOT IN ('pg_catalog', 'information_schema')
+        ORDER BY 1, 2, 3`,
+    );
+    const indexes = await engine.query(
+      `SELECT schemaname AS s, indexname AS name, indexdef AS def
+         FROM pg_indexes
+        WHERE schemaname NOT IN ('pg_catalog', 'information_schema')
+        ORDER BY 1, 2, 3`,
+    );
+    const triggers = await engine.query(
+      `SELECT event_object_schema AS s, event_object_table AS t, trigger_name AS name,
+              action_timing AS timing, event_manipulation AS event
+         FROM information_schema.triggers
+        WHERE event_object_schema NOT IN ('pg_catalog', 'information_schema')
+        ORDER BY 1, 2, 3, 4, 5`,
+    );
+    return JSON.stringify({
+      columns: columns.rows,
+      constraints: constraints.rows,
+      indexes: indexes.rows,
+      triggers: triggers.rows,
+    });
+  }
+
+  it('upgrades a pre-prod-main database additively to the SAME schema as a fresh apply', async () => {
+    const upgraded = await freshEngine();
+    const fresh = await freshEngine();
+    const sandbox = await makeSandbox('upgrade-main');
+    try {
+      const files = await discoverMigrations(MIGRATIONS_DIR);
+      const prodIds = files.filter((m) => m.id.startsWith('g2_prod_')).map((m) => m.id);
+      expect(prodIds.length).toBeGreaterThan(0);
+
+      // 1. A database whose applied history is pre-correction main: every
+      //    migration EXCEPT the `g2_prod_*` family.
+      for (const migration of files) {
+        if (migration.id.startsWith('g2_prod_')) continue;
+        await writeFile(path.join(sandbox, migration.file), migration.sql);
+      }
+      const preProd = await applyMigrations({ engine: upgraded.engine, migrationsDir: sandbox });
+      expect(preProd.applied.some((id) => id.startsWith('g2_prod_'))).toBe(false);
+      const beforeProd = await schemaFingerprint(upgraded.engine);
+      const prodTableBefore = await upgraded.engine.query(
+        "SELECT to_regclass('prod.module_states') AS t",
+      );
+      expect(prodTableBefore.rows[0]?.t).toBeNull();
+
+      // 2. The corrected tree applies the whole prod family as new migrations —
+      //    no MIGRATION_OUT_OF_ORDER_REFUSED, no checksum rewrite.
+      const upgrade = await applyMigrations({
+        engine: upgraded.engine,
+        migrationsDir: MIGRATIONS_DIR,
+      });
+      expect(upgrade.applied).toEqual(prodIds);
+      expect(upgrade.skipped).toEqual(
+        files.filter((m) => !prodIds.includes(m.id)).map((m) => m.id),
+      );
+      expect(beforeProd).not.toBe(await schemaFingerprint(upgraded.engine));
+
+      // 3. A fresh full apply must converge to the identical schema.
+      await applyMigrations({ engine: fresh.engine, migrationsDir: MIGRATIONS_DIR });
+      expect(await schemaFingerprint(upgraded.engine)).toBe(await schemaFingerprint(fresh.engine));
+    } finally {
+      await upgraded.db.close();
+      await fresh.db.close();
+      await rm(sandbox, { recursive: true, force: true });
+    }
+  }, 300_000);
+
   it('fences a concurrent run through the lease table (INV-009)', async () => {
     const { db, engine } = await freshEngine();
     try {
@@ -507,7 +635,7 @@ describe('migrator fail-closed defenses (FR-DATA-001…006 / FR-DR-001/002 subst
       expect(await clearMigrationLeases(engine)).toBe(1);
       // …and the same call then applies cleanly.
       const report = await applyMigrations({ engine, migrationsDir: MIGRATIONS_DIR });
-      expect(report.applied.length).toBe(81);
+      expect(report.applied.length).toBe(83);
     } finally {
       await db.close();
     }
@@ -529,7 +657,7 @@ describe('migrator fail-closed defenses (FR-DATA-001…006 / FR-DR-001/002 subst
       expect((cause as ForesiftError).code).toBe(ErrorCode.MIGRATION_APPLY_ALREADY_RUNNING);
 
       // The winning run completed the full application.
-      expect((await appliedMigrations(engine)).length).toBe(81);
+      expect((await appliedMigrations(engine)).length).toBe(83);
       // The loser left no lease behind after its refusal cleanup.
       const leases = await engine.query(`SELECT * FROM ${SCHEMA_MIGRATION_LEASES_TABLE}`);
       expect(leases.rows).toHaveLength(0);

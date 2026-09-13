@@ -610,3 +610,54 @@ third-round finding-to-task map and the verbatim reproductions.
       audit at the pre-merge head; restore PROVEN only when it reports no
       CRITICAL/HIGH finding and the tracked residual MEDIUMs are recorded.
       Traces: FR-PROD-001…006.
+
+## Phase 12 — Fourth-round correction (R4–R9; reopen `97b244a`)
+
+- [ ] T065 [serial-reason: SEMANTIC_DEPENDENCY] Close R4 (audit H2): stop trusting
+      the caller's `requiredGateKinds`. Validate every declared kind against the
+      authoritative closed `GATE_KINDS` vocabulary, require the declaration to
+      cover the complete mandatory distribution gate set, and evaluate evidence
+      against that authoritative set. Add the exploit regression: a
+      `PUBLIC_AUTHORIZED` claim declaring only `['DISTRIBUTION_EVIDENCE']` (or
+      `['TOTALLY_FAKE_GATE']`) with matching in-scope evidence must FAIL.
+      Traces: FR-PROD-002, FR-PROD-004, AC-272, AC-273.
+- [ ] T066 [serial-reason: SHARED_INVARIANT] Close R5 (audit H5): bind the
+      `SHADOW → PROVEN` promotion to the exact scope's governed history. Before
+      writing a PROVEN row, require the persisted dimensions to have genuinely
+      established `AVAILABLE`, and apply the same persisted-evidence dimension
+      cross-check used on the ACTIVE edge (excluding the PROVEN claim being
+      established). Add the exploit regression: a scope whose history never
+      established AVAILABLE must refuse a PROVEN promotion even when a persisted
+      OPPORTUNITY batch claims `available:true`/`proven:true`. Traces:
+      FR-PROD-001, FR-PROD-002, AC-152.
+- [ ] T067 [serial-reason: SHARED_INVARIANT] Close R6: fence `rollbackToApproved`
+      on an open containment for the exact scope exactly as the ACTIVE edge does,
+      so a `DISABLED` containment can never be silently de-escalated to `PAUSED`.
+      Add the regression: a rollback attempted while a `DISABLED` containment is
+      open must refuse with the containment/higher-severity reason. Traces:
+      FR-PROD-006, AC-278, AC-279.
+- [ ] T068 [serial-reason: SEMANTIC_DEPENDENCY] Close R7: make the release-gate
+      live-path rule refuse an `IMPORT_SHADOW_ONLY` assertion that does not carry
+      an explicit import-artifact state from the authoritative closed vocabulary
+      in `VALIDATING`/`SHADOW_ELIGIBLE`, so a claim naming a
+      `RECEIVED`/`REJECTED`/nonexistent artifact fails closed. Add the
+      regression. Traces: FR-PROD-004, FR-PROD-005, AC-275, AC-276, AC-277.
+- [ ] T069 [serial-reason: ORDERED_MIGRATION] Close R8: tighten the
+      `g2_prod_0008` `activation_event_ref` nonblank invariant so tabs, newlines,
+      form feeds and Unicode blanks are refused, not only ASCII spaces. Land it
+      as a new later-sorting migration (`g2_prod_0010`) that replaces the CHECK,
+      with a positive regression for space and a negative regression for each
+      sampled whitespace class. Traces: FR-PROD-001, AC-152.
+- [ ] T070 [serial-reason: SEMANTIC_DEPENDENCY] Close R9: persist the *applied*
+      containment action on the containment row so `openContainments()` and the
+      gate refusal message never understate a `DISABLED` stop. Add the
+      regression contrasting `requestedAction` with the persisted action for the
+      `CAPACITY`/`PARITY` fallback paths. Traces: FR-PROD-006, AC-278.
+- [ ] T071 [executor: TEST] Exploit/regression suite for T065–T070 authored as
+      NEW discriminating tests that fail against `97b244a` (not re-labelled
+      existing assertions), plus the upgrade-path re-run from a database migrated
+      to pre-prod `main`. Traces: FR-PROD-001…006, AC-272, AC-273, AC-278, AC-279.
+- [ ] T072 [serial-reason: COORDINATOR_BOUNDARY] Fresh-context adversarial review
+      of the fourth-round diff, full prescribed gates, exact-SHA CI, and a NEW
+      independent convergence audit at the pre-merge head before PROVEN is
+      restored. Traces: FR-PROD-001…006.

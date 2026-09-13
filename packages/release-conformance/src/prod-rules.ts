@@ -664,7 +664,8 @@ export function evaluateProdConformance(input: ProdConformanceInput): ProdConfor
     ).findings,
     ...(input.mcpCompatibility === undefined ||
     input.mcpCompatibility === null ||
-    typeof input.mcpCompatibility !== 'object'
+    typeof input.mcpCompatibility !== 'object' ||
+    Array.isArray(input.mcpCompatibility)
       ? []
       : checkMcpCompatibilityDrift(input.mcpCompatibility).findings),
     ...checkLivePathPrecomputationViolation(Array.isArray(input.livePaths) ? input.livePaths : [])

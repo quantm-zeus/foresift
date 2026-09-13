@@ -19,6 +19,7 @@
 import type { UtcTimestamp } from '@foresift/domain';
 import type { ImportQuarantineState } from '@foresift/shared-schemas';
 import { ImportGatingError, SecErrorCode } from './errors.ts';
+import { numericIncludes } from './shadow-safe.ts';
 import { sha256Text } from '@foresift/persistence';
 
 const STATE_RANK: Record<ImportQuarantineState, number> = {
@@ -133,7 +134,7 @@ export class ImportGate {
    * anything malformed never becomes a quarantined row at all.
    */
   async intake(request: IntakeRequest, receivedAt: UtcTimestamp): Promise<ArtifactRow> {
-    if (!IMPORT_FORMATS.includes(request.format as ImportFormat)) {
+    if (!numericIncludes(IMPORT_FORMATS, request.format as ImportFormat)) {
       throw new ImportGatingError(
         `format '${request.format}' is not on the intake allowlist`,
         { format: request.format },
@@ -172,14 +173,15 @@ export class ImportGate {
         SecErrorCode.SEC_IMPORT_LIMIT_EXCEEDED,
       );
     }
-    for (const memberPath of request.memberPaths) {
+    for (let memberIndex = 0; memberIndex < request.memberPaths.length; memberIndex += 1) {
+      const memberPath = request.memberPaths[memberIndex] as string;
       // Path traversal, absolute paths, Windows drives, and symlinks are
       // structurally refused before anything touches the filesystem.
       const normalized = memberPath.replaceAll('\\', '/');
       if (
         normalized.startsWith('/') ||
         /^[a-zA-Z]:/.test(normalized) ||
-        normalized.split('/').includes('..') ||
+        numericIncludes(normalized.split('/'), '..') ||
         normalized.includes('\0')
       ) {
         throw new ImportGatingError(
@@ -322,7 +324,7 @@ export class ImportGate {
     }
     const row = await this.getArtifact(artifactId);
     const legal = TRANSITIONS[row.state] ?? [];
-    if (!legal.includes(to)) {
+    if (!numericIncludes(legal, to)) {
       throw new ImportGatingError(
         `illegal quarantine transition ${row.state} -> ${to}`,
         { from: row.state, to },

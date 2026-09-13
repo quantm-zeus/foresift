@@ -10,6 +10,13 @@
  */
 import { createHash } from 'node:crypto';
 import { SecErrorCode, SupplyChainError } from './errors.ts';
+import {
+  numericFilter,
+  numericJoin,
+  numericMap,
+  numericSome,
+  numericSortStrings,
+} from './shadow-safe.ts';
 
 // --- Pinning -------------------------------------------------------------------
 
@@ -24,12 +31,20 @@ export function verifyPinning(
 ): { pinned: string[]; violations: { manifest: string; dependency: string; range: string }[] } {
   const pinned: string[] = [];
   const violations: { manifest: string; dependency: string; range: string }[] = [];
-  for (const manifest of manifests) {
-    for (const [dependency, range] of Object.entries(manifest.dependencies ?? {})) {
+  for (let manifestIndex = 0; manifestIndex < manifests.length; manifestIndex += 1) {
+    const manifest = manifests[manifestIndex] as {
+      readonly name: string;
+      readonly dependencies?: Record<string, string> | undefined;
+    };
+    const dependencies = Object.entries(manifest.dependencies ?? {});
+    for (let entryIndex = 0; entryIndex < dependencies.length; entryIndex += 1) {
+      const dependencyEntry = dependencies[entryIndex] as [string, string];
+      const dependency = dependencyEntry[0];
+      const range = dependencyEntry[1];
       if (EXACT_VERSION.test(range)) {
-        pinned.push(`${manifest.name}/${dependency}@${range}`);
+        pinned[pinned.length] = `${manifest.name}/${dependency}@${range}`;
       } else {
-        violations.push({ manifest: manifest.name, dependency, range });
+        violations[violations.length] = { manifest: manifest.name, dependency, range };
       }
     }
   }
@@ -44,9 +59,9 @@ export function assertPinned(
     throw new SupplyChainError(
       'production dependencies must be pinned to exact versions',
       {
-        offenders: result.violations
-          .map((v) => `${v.manifest}/${v.dependency}@${v.range}`)
-          .join(','),
+        offenders: numericJoin(
+          numericMap(result.violations, (v) => `${v.manifest}/${v.dependency}@${v.range}`),
+        ),
       },
       SecErrorCode.SEC_DEPENDENCY_UNPINNED,
     );
@@ -97,7 +112,10 @@ export interface SbomRecord {
 export function emitSbomRecord(components: readonly SbomComponent[]): SbomRecord {
   const incomplete =
     components.length === 0 ||
-    components.some((c) => c.name.trim() === '' || c.version.trim() === '' || c.purl.trim() === '');
+    numericSome(
+      components,
+      (c) => c.name.trim() === '' || c.version.trim() === '' || c.purl.trim() === '',
+    );
   if (incomplete) {
     throw new SupplyChainError(
       'SBOM record requires a non-empty inventory with complete component identities',
@@ -107,10 +125,10 @@ export function emitSbomRecord(components: readonly SbomComponent[]): SbomRecord
   }
   // Name + purl + version, sorted as a MULTISET line per occurrence —
   // duplicates collapse nothing and identity is fully hashed (L13).
-  const canonical = [...components]
-    .map((c) => `${c.name}@${c.purl}@${c.version}`)
-    .sort()
-    .join('\n');
+  const canonical = numericJoin(
+    numericSortStrings(numericMap(components, (c) => `${c.name}@${c.purl}@${c.version}`)),
+    '\n',
+  );
   return {
     sbomVersion: 1,
     components,
@@ -141,7 +159,7 @@ export function recordBuildHash(
     attestation.builderId.trim() === '' ||
     attestation.buildType.trim() === '' ||
     attestation.sourceCommit.trim() === '' ||
-    attestation.materials.some((m) => m.uri.trim() === '' || m.digest.trim() === '');
+    numericSome(attestation.materials, (m) => m.uri.trim() === '' || m.digest.trim() === '');
   if (incomplete) {
     throw new SupplyChainError(
       'build attestation is incomplete: builder, type, commit, and materials are required',
@@ -184,16 +202,15 @@ export function checkLifecycleScripts(manifest: {
   readonly scripts?: Record<string, string> | undefined;
 }): { restricted: string[]; allowed: true } {
   const scripts = manifest.scripts ?? {};
-  const restricted = ['preinstall', 'install', 'postinstall', 'prepack', 'prepublishOnly'].filter(
-    (hook) => {
-      const command = scripts[hook];
-      return command !== undefined && !ALLOWED_LIFECYCLE_SCRIPTS.has(command);
-    },
-  );
+  const restrictedHooks = ['preinstall', 'install', 'postinstall', 'prepack', 'prepublishOnly'];
+  const restricted = numericFilter(restrictedHooks, (hook) => {
+    const command = scripts[hook];
+    return command !== undefined && !ALLOWED_LIFECYCLE_SCRIPTS.has(command);
+  });
   if (restricted.length > 0) {
     throw new SupplyChainError(
       'restricted lifecycle scripts present in manifest',
-      { manifest: manifest.name, hooks: restricted.join(',') },
+      { manifest: manifest.name, hooks: numericJoin(restricted) },
       SecErrorCode.SEC_LIFECYCLE_SCRIPT_RESTRICTED,
     );
   }
@@ -220,7 +237,7 @@ export function flagCapabilityReview(
     readonly declaredCapabilities: readonly DependencyCapability[];
   }>,
 ): readonly CapabilityReviewFlag[] {
-  return entries.map((entry) => ({
+  return numericMap(entries, (entry) => ({
     dependency: entry.dependency,
     capabilities: entry.declaredCapabilities,
     reviewRequired: entry.declaredCapabilities.length > 0,

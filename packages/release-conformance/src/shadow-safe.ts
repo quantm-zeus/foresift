@@ -146,6 +146,22 @@ export function numericSortStrings<T extends string>(
   return sorted;
 }
 
+/**
+ * Numeric-index `join`; never `Array.prototype.join`. Used for finding
+ * MESSAGES (audit M1): a shadowed `join` returning a non-string made the
+ * release-gate message template throw, converting a clean FAILED verdict into
+ * an uncaught throw.
+ */
+export function numericJoin(source: readonly unknown[], separator = ', '): string {
+  let joined = '';
+  for (let index = 0; index < source.length; index += 1) {
+    if (index > 0) joined += separator;
+    const value = source[index];
+    joined += value === undefined || value === null ? '' : String(value);
+  }
+  return joined;
+}
+
 /** A stable, numeric-only insertion sort of `source` by `compare`; never `.sort`. */
 export function numericSortWith<T>(
   source: readonly T[],

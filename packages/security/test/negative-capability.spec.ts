@@ -5,7 +5,11 @@ import { readFileSync, readdirSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'bun:test';
-import { NegativeCapabilityCanary, loadCanaryCatalog } from '../src/negative-capability.ts';
+import {
+  NegativeCapabilityCanary,
+  loadCanaryCatalog,
+  type CanaryCatalog,
+} from '../src/negative-capability.ts';
 import { validateDecoderAuthority } from '../src/decoder-authority.ts';
 import {
   assertPinned,
@@ -266,4 +270,95 @@ it('refuses incomplete SBOM inventories, attestations, and missing lockfiles (M2
   // No lockfile record = no reproducibility anchor.
   expect(codeOf(() => requireLockfile(undefined))).toBe('SEC_LOCKFILE_MISSING');
   expect(codeOf(() => requireLockfile(null))).toBe('SEC_LOCKFILE_MISSING');
+});
+
+// --- Shadow-safe authority (D018): numeric-index decision walks --------------
+
+/**
+ * The prohibited-capability canary is the permanent read-only boundary. A
+ * shadowed `Symbol.iterator`/`push`/`some` that emptied its finding set would
+ * flip detection from "prohibited surface found" to "clean" — the exact
+ * fail-open D018 forbids.
+ */
+describe('negative-capability detection resists Array.prototype shadowing (D018)', () => {
+  const proto = Array.prototype as unknown as Record<string, unknown>;
+
+  const syntheticCatalog: CanaryCatalog = {
+    catalogVersion: 1,
+    categories: [
+      {
+        category: 'TRANSACTION_BUILD_SIGN_SUBMIT',
+        sourcePatterns: [
+          {
+            id: 'execute-trade',
+            regex: 'executeTrade',
+            flags: '',
+            contextSignals: ['wallet'],
+          },
+        ],
+        envForbiddenNames: ['PRIVATE_KEY'],
+      },
+    ],
+    readOnlyWalletIntelligenceAllowlist: {
+      admittedQueryShapes: ['portfolio'],
+      forbiddenQueryShapes: ['swap'],
+    },
+    inventoryForbiddenVerbs: ['submit'],
+  };
+
+  function withShadow<T>(method: string | symbol, replacement: unknown, run: () => T): T {
+    const original = proto[method as string];
+    proto[method as string] = replacement;
+    try {
+      return run();
+    } finally {
+      proto[method as string] = original;
+    }
+  }
+
+  it('still flags a forbidden inventory verb with Symbol.iterator shadowed to empty', () => {
+    const canary = new NegativeCapabilityCanary(syntheticCatalog);
+    const findings = withShadow(
+      Symbol.iterator,
+      function* emptyIterator() {
+        // A hostile iterator that yields nothing: pre-fix, the `for...of`
+        // walks discovered no forbidden verb and reported a clean inventory.
+      },
+      () => canary.checkInventory([{ name: 'submit-transaction', source: 'routes' }]),
+    );
+    expect(findings).toHaveLength(1);
+    expect(findings[0]?.matchedPattern).toBe('submit');
+  });
+
+  it('still flags a forbidden inventory verb with push shadowed to a no-op', () => {
+    const canary = new NegativeCapabilityCanary(syntheticCatalog);
+    const findings = withShadow(
+      'push',
+      () => 0,
+      () => canary.checkInventory([{ name: 'submit-transaction', source: 'routes' }]),
+    );
+    expect(findings).toHaveLength(1);
+  });
+
+  it('still matches a context-signal with some shadowed to false', () => {
+    const canary = new NegativeCapabilityCanary(syntheticCatalog);
+    const findings = withShadow(
+      'some',
+      () => false,
+      () => canary.scanSourceText('fixture.ts', 'const wallet = 1;\nexecuteTrade(wallet);'),
+    );
+    expect(findings).toHaveLength(1);
+    expect(findings[0]?.matchedPattern).toBe('execute-trade');
+  });
+
+  it('still flags a forbidden environment name with Symbol.iterator shadowed to empty', () => {
+    const canary = new NegativeCapabilityCanary(syntheticCatalog);
+    const findings = withShadow(
+      Symbol.iterator,
+      function* emptyIterator() {},
+      () => canary.scanEnvironmentNames(['PRIVATE_KEY_HEX']),
+    );
+    expect(findings).toHaveLength(1);
+    expect(findings[0]?.matchedPattern).toBe('PRIVATE_KEY');
+  });
 });

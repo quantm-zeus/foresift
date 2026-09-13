@@ -305,3 +305,96 @@ State change: g2-production-readiness RUNNING → PROVEN (schema-legal), restore
 only after the above. Phase 12 tasks `T065`–`T072` are checked; history is
 preserved and nothing was rewritten. `g2-admin-control` and
 `g2-recovery-continuity` promotion is unblocked.
+
+## Fifth-round reopen (2026-09-13) — in-process shadow residuals on the authority paths
+
+The re-PROVEN flip `53f737d` (PR #299) is **revoked**. A **new** session ran four
+fresh-context adversarial verifiers against `origin/main` `53f737d` (read-only,
+static; each given a disjoint finding set and instructed to re-derive every
+claim from current code, never from comments or the landed specs). They
+independently re-confirmed the whole C1–C3/H1–H10/R1–R9 chain as closed, then
+reproduced **three HIGH residuals of the `Array.prototype` shadowing class**:
+R10/R11 are decision-time shadows inside the recorded D018 model; R12 is a
+module-initialization shadow of the lazily imported `prod-rules.ts` (D018's
+letter excludes shadows installed _before a guard module is imported_, but the
+dynamic import makes that window reachable from an in-process caller at
+`evaluateConformance` time, so it is fixed as bounded hardening rather than
+recorded). The state returns to RUNNING/REOPENED; PR #299 and every prior
+flip/evidence artifact remain in history.
+
+| ID  | Defect (reproduced at `53f737d`)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  | Reproduction                                                                                                                                                                                                                                                                                                                                          | Correction |
+| --- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------- |
+| R10 | **HIGH — the persisted-evidence authority query is built with a shadowable `.join`.** `activationGateEvaluationsFor` assembles its `WHERE` with `clauses.join(' AND ')` (`packages/capability-registry/src/activation-gate.ts:1341`) although the module already imports `numericJoin` (`:59`, used at `:843`). `requirePersistedActivationEvidence` verifies kind/event/gate/expiry but never compares the returned `row.scopeHash` to `input.scopeHash` (`:1469-1551`). Shadowing `Array.prototype.join` lets the query return foreign-scope rows; the caller recomputes `activationEvidenceSetRef` over those rows and `advanceState(toState:'PROVEN')` writes a governed PROVEN state for a scope that never earned it. The ACTIVE INSERT stays refused by the independent SQL trigger (`g2_prod_0009:103-164`), so the flip is a forged PROVEN, which a `requires_proven` scope then relies on.                                                                                                                                                                                                                                                                                                                                                                                                              | Shadow `Array.prototype.join` to drop/replace the `scope_hash = $1` predicate, resolve a genuine all-PASS batch from any other scope for the same kind+event, then `advanceState(..., 'PROVEN', {provenEvidenceRef: activationEvidenceSetRef(foreignRows)})` succeeds. The shadow suite omits `join`.                                                 | T073       |
+| R11 | **HIGH — the MCP protocol-revision allow-list membership test is a shadowable `.includes`.** `McpProtocolGuard.inspect` refuses unless `allowedRevisions.includes(input.protocolRevision)` (`packages/security/src/mcp-protocol-guard.ts:70-75`). `resolveProtocolRevision` funnels opt-ins through the validated matrix, but then trusts the guard's verdict with no numeric re-check (`packages/capability-registry/src/mcp-compat.ts:712-720`). Shadowing `Array.prototype.includes` to return `true` makes the guard ALLOW any requested revision, including `2099-01-01-evil`, re-opening audit C3 at the FR-PROD-003 surface.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               | `Array.prototype.includes = () => true`, then `resolveProtocolRevision(engine, {requestedRevision:'2099-01-01-evil', policy:'OPT_IN_ONLY', now})` returns `decision:'ALLOW'`.                                                                                                                                                                         | T074       |
+| R12 | **HIGH — the release-gate import-shadow authority is built with a shadowable `.filter` in a lazily imported module.** `prod-rules.ts:507` computes `SHADOW_ONLY_IMPORT_ARTIFACT_STATES` with `ALL_IMPORT_ARTIFACT_STATES.filter(...)` at module initialization, but `conformance.ts:688` imports the module **dynamically at call time**. A shadow installed before `evaluateConformance` runs therefore controls the constructor: `Array.prototype.filter = function () { return this; }` widens the authority to every persisted state, so an `IMPORT_SHADOW_ONLY` live-path assertion naming a `RECEIVED`/`REJECTED` import passes the release gate — re-opening audit H4/R7.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  | `Array.prototype.filter = function () { return this; }` then `evaluateConformance({... livePaths:[{assertionKind:'IMPORT_SHADOW_ONLY', verdict:'PASS', importArtifactState:'REJECTED'}]})` → `overall:'PASSED'`.                                                                                                                                      | T075       |
+| R13 | **HIGH — `@foresift/security` decision-time authority gates still rely on shadowable `Array.prototype` operations.** The fifth-round review swept the sibling package and found the same D018 class: `egress.ts` `authorize` allowlist `.some` (`:256`, shadow→false bypasses the deny-by-default host allowlist ⇒ SSRF), `verifyPin` `[...].sort().join(',')` pin comparison (`:326`, shadow→ALLOW after DNS rebinding), allowed-content-type `.includes` (`:400`); `action-gate.ts` `PHISHING_RESISTANT_CLASSES`/`authorizedScopes` `.includes` (`:80,87,116`, step-up and scope-mismatch bypass); `oauth-binding.ts` registered-redirect-URI `.includes` and scope-widening `.filter` (`:64,95`); `mcp-credentials.ts` IP-constraint `.includes` and requested-scope `.filter` (`:219,237`); `webhook-integrity.ts` endpoint `.includes` (`:164`); `untrusted-content.ts` trusted-image/link-host `.includes` and exfil-hint `.some` (`:310,350,358`); `secrets-policy.ts` export-prohibition `.includes` (`:100`); `mcp-origin.ts` scheme `.includes` and host-label `join` (`:101,137`); `import-gating.ts` format/transition `.includes` (`:136,324`); `negative-capability.ts` forbidden-verb detection; `claims-policy.ts` redaction `.includes`; `abuse-controls.ts`/`supply-chain.ts` validation gates. | `Array.prototype.some = () => false` → `authorize` ALLOWs a non-allowlisted host (SSRF); `Array.prototype.join = () => 'X'` → `verifyPin` ALLOWs after DNS rebinding; `Array.prototype.includes = () => true` → action-gate step-up / scope and OAuth redirect-URI bypasses; `filter = () => []` → scope widening and credential-scope excess hidden. | T079       |
+
+### R13 review follow-ups (same correction, second adversarial pass)
+
+A fresh review of the R13 slice found and this correction closed:
+
+- **R13a (HIGH) — schema-library internals.** zod's `ObjectType._parse` walks
+  `for (const key of shapeKeys)` and appends with `push`, so an in-scope
+  `Array.prototype[Symbol.iterator]`/`push` shadow made `Schema.parse(literal)`
+  return `{}`. Every consumer compares against a NEGATIVE discriminant
+  (`decision === 'REFUSE'`, `verdict === 'REFUSED'`, `outcome`), so a bare `{}`
+  silently authorized: an egress allowlist bypass via
+  `packages/providers/src/adapter-contract.ts` `requireEgress`, a caps bypass in
+  `packages/tool-core/src/stages/dispatch.ts`, an MCP protocol bypass in
+  `apps/api/src/mcp/protocol-wiring.ts`, and a claims-compliance bypass in
+  `assertClaimsCompliant`. Fix: `parseDecision` in
+  `packages/security/src/shadow-safe.ts` returns the package-constructed literal
+  (frozen) whenever the parsed result does not carry the SAME discriminant, and
+  every decision return in `egress.ts` (12), `mcp-protocol-guard.ts` (2),
+  `mcp-origin.ts` (4), `claims-policy.ts` (6) and `action-gate.ts` (1) now routes
+  through it. The consumers therefore always receive a real verdict; two
+  discriminating regressions shadow `push` and assert a real REFUSE/REFUSED.
+- **R13b (MEDIUM) — fence parser.** `parseStructuredExtractionFence` still used
+  `lines.slice(1,-1)` / `contentLines.slice(1).join('\n')`; a shadowed `slice`
+  could fabricate the mandatory data-only preamble and flip the documented
+  fail-closed parser to ACCEPT. Now `numericSlice`/`numericJoin`.
+- **R13c (MEDIUM) — redaction.** `claims-policy.ts` `.split(...).join(...)`
+  redaction now uses `numericJoin`, and the `[...classes]` Set spread became a
+  numeric collection.
+- **R13d (MEDIUM) — abuse controls.** `recordBurst` in-place numeric compaction
+  (no `shift`/`push`), `coordinationScore` `numericFilter` + numeric loop, and
+  Map destructuring loops became `Map.forEach`.
+- **R13e (LOW) — audit-chain.** `.map`/`new Set(entries.map(...))` became
+  `numericMap`/`numericIncludes`; classification outcomes are unchanged
+  (`numericIncludes` is SameValueZero-equivalent to `Set.has`). `numericSlice`
+  now treats `NaN` as the builtin `ToIntegerOrInfinity` does.
+
+Remaining third-party boundary recorded: any `.parse` site outside these
+decision returns (lifecycle/incident/audit record schemas) still relies on the
+schema library, but its consumers do not authorize on a negative discriminant,
+so a `{}` there fails closed. The repo cannot harden dependency internals;
+realm isolation remains the compensating control (D018/D021).
+
+### Proof-integrity defect closed in the same slice
+
+`packages/release-conformance/test/prod-rules.spec.ts` NEW-N2
+(`does not let forged verdicts flip a trace-violating corpus to PASSED`) runs two
+full `evaluateConformance` calls against bun's 5000 ms default. It measured
+**4983 ms under concurrent load** (and timed out at 5000 ms on a contended run)
+against 886 ms on an idle host — a latent flake that can red the release gate
+non-deterministically. It gains an explicit bounded timeout (T076).
+
+### Re-verification bar (unchanged)
+
+Every R-row has a landed fix and a direct shadow regression that fails against
+`53f737d`; the full prescribed gates and exact-SHA CI are green; and a **new**
+fresh-context convergence audit reports no CRITICAL/HIGH finding. Admin-control
+and recovery-continuity promotion stays frozen until then.
+
+### Accepted residuals (recorded, not silently dropped)
+
+The previously recorded residuals stand unchanged (raw-writer trust boundary,
+caller-supplied `prodClaims`/statistical verdicts, `McpProtocolWiring` config
+draft lists, the `evaluateConformance` non-PROD milestone override used by
+AC-266, post-clear evidence freshness, `clearContainment` governance/ActionGate,
+unwired `evaluateDeploymentPosture`/`assertLivePathBoundaryHolds`). This round
+adds no new residual in the PROD packages: R10–R12 are fixed, not accepted.
+R10/R11 are decision-time shadows inside the D018 model; R12 is a
+module-initialization shadow (see above). The fifth-round adversarial review
+also confirmed a systemic sibling class in `@foresift/security` (R13), which is
+fixed in the same correction rather than deferred.

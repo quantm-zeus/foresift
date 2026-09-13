@@ -312,3 +312,42 @@ describe('csrf double-submit + origin binding', () => {
     ).toEqual({ valid: false, reason: 'ORIGIN_BOUNDARY' });
   });
 });
+
+// --- Shadow-safe authority (D018): numeric-index decision walks --------------
+
+/**
+ * `Array.prototype.includes` shadowed to a constant would flip BOTH the
+ * phishing-resistant-class check and the exact-scope check pre-fix. The
+ * numeric-index guards must ignore the shadow entirely.
+ */
+describe('action-gate decision gates resist Array.prototype.includes shadowing (D018)', () => {
+  const proto = Array.prototype as unknown as Record<string, unknown>;
+
+  async function withIncludes<T>(replacement: () => boolean, run: () => Promise<T>): Promise<T> {
+    const original = proto.includes;
+    proto.includes = replacement;
+    try {
+      return await run();
+    } finally {
+      proto.includes = original;
+    }
+  }
+
+  it('still REFUSES a TOTP proof and a scope mismatch with includes shadowed to true', async () => {
+    const gate = new ActionGate({ clock: () => NOW_MS });
+    const decision = await withIncludes(
+      () => true,
+      () =>
+        gate.evaluateHighImpactAction({
+          ...baseRequest,
+          authorizedScopes: ['some:other:scope'],
+          stepUpProof: goodProof({ authenticatorClass: 'RECOVERY_TOTP' }),
+        }),
+    );
+    expect(decision.outcome).toBe('REFUSE');
+    if (decision.outcome === 'REFUSE') {
+      expect(decision.reasons).toContain('SCOPE_MISMATCH');
+      expect(decision.reasons).toContain('AUTHENTICATOR_CLASS_INSUFFICIENT');
+    }
+  });
+});

@@ -20,6 +20,7 @@ import {
   type PublicRedactionResult,
 } from '@foresift/shared-schemas';
 import { ClaimsPolicyError } from './errors.ts';
+import { numericJoin, numericSortStrings, parseDecision } from './shadow-safe.ts';
 
 interface ClaimPattern {
   readonly claimClass:
@@ -59,19 +60,26 @@ const CLAIM_PATTERNS: readonly ClaimPattern[] = [
 
 /** Screen text for a channel; COMPLIANT or REFUSED with all matched classes. */
 export function evaluateClaims(text: string, channel: ClaimsPolicyChannel): ClaimsPolicyResult {
-  const classes = new Set<string>();
-  for (const pattern of CLAIM_PATTERNS) {
+  const classes = new Set<ClaimPattern['claimClass']>();
+  for (let index = 0; index < CLAIM_PATTERNS.length; index += 1) {
+    const pattern = CLAIM_PATTERNS[index] as ClaimPattern;
     if (pattern.regex.test(text)) {
       classes.add(pattern.claimClass);
     }
   }
   if (classes.size === 0) {
-    return ClaimsPolicyResultSchema.parse({ verdict: 'COMPLIANT', channel });
+    return parseDecision(ClaimsPolicyResultSchema, { verdict: 'COMPLIANT', channel });
   }
-  return ClaimsPolicyResultSchema.parse({
+  const classList: Array<ClaimPattern['claimClass']> = [];
+  // Numeric collection, not `[...classes]`: array spread reads the shadowable
+  // `Array.prototype[Symbol.iterator]` (audit R13).
+  classes.forEach((entry) => {
+    classList[classList.length] = entry;
+  });
+  return parseDecision(ClaimsPolicyResultSchema, {
     verdict: 'REFUSED',
     channel,
-    claimClasses: [...classes].sort(),
+    claimClasses: numericSortStrings(classList),
   });
 }
 
@@ -79,7 +87,7 @@ export function assertClaimsCompliant(text: string, channel: ClaimsPolicyChannel
   const result = evaluateClaims(text, channel);
   if (result.verdict === 'REFUSED') {
     throw new ClaimsPolicyError(`prohibited claims in ${channel} text`, {
-      classes: result.claimClasses.join(','),
+      classes: numericJoin(result.claimClasses),
     });
   }
 }
@@ -125,7 +133,7 @@ export function validatePublicOutput(candidate: PublicOutputCandidate): {
     });
   } catch {
     return {
-      redaction: PublicRedactionResultSchema.parse({
+      redaction: parseDecision(PublicRedactionResultSchema, {
         verdict: 'REFUSED',
         reason: 'REQUIRED_FIELD_MISSING',
         detail: 'public-output envelope missing required duties',
@@ -142,17 +150,22 @@ export function validatePublicOutput(candidate: PublicOutputCandidate): {
   //    remaining occurrences, and partial success reads as success downstream
   //    (FR-SEC-012 / AC-277).
   const thresholdMatches = body.match(DETECTOR_THRESHOLD_PATTERN) ?? [];
-  for (const match of thresholdMatches) {
+  for (let index = 0; index < thresholdMatches.length; index += 1) {
+    const match = thresholdMatches[index] as string;
     const occurrences = body.split(match).length - 1;
     if (occurrences === 0) continue; // already swallowed by an earlier (greedy) span
-    body = body.split(match).join('[REDACTED_THRESHOLD]');
+    // numericJoin, never `Array.prototype.join` (audit R13): a shadowed `join`
+    // could truncate or fabricate the redacted body while reporting success.
+    body = numericJoin(body.split(match), '[REDACTED_THRESHOLD]');
     redactionsApplied += occurrences;
   }
 
   // 3. Redact sensitive entity details.
-  for (const value of candidate.sensitiveEntityValues ?? []) {
+  const sensitiveEntityValues = candidate.sensitiveEntityValues ?? [];
+  for (let index = 0; index < sensitiveEntityValues.length; index += 1) {
+    const value = sensitiveEntityValues[index] as string;
     if (value !== '' && body.includes(value)) {
-      body = body.split(value).join('[REDACTED_ENTITY]');
+      body = numericJoin(body.split(value), '[REDACTED_ENTITY]');
       redactionsApplied += 1;
     }
   }
@@ -161,17 +174,20 @@ export function validatePublicOutput(candidate: PublicOutputCandidate): {
   const claims = evaluateClaims(body, 'API');
   if (claims.verdict === 'REFUSED') {
     return {
-      redaction: PublicRedactionResultSchema.parse({
+      redaction: parseDecision(PublicRedactionResultSchema, {
         verdict: 'REFUSED',
         reason: 'SENSITIVE_DETAIL_PRESENT',
-        detail: `prohibited claims present: ${claims.claimClasses.join(',')}`,
+        detail: `prohibited claims present: ${numericJoin(claims.claimClasses)}`,
       }),
       redactedBody: '',
     };
   }
 
   return {
-    redaction: PublicRedactionResultSchema.parse({ verdict: 'COMPLIANT', redactionsApplied }),
+    redaction: parseDecision(PublicRedactionResultSchema, {
+      verdict: 'COMPLIANT',
+      redactionsApplied,
+    }),
     redactedBody: body,
   };
 }

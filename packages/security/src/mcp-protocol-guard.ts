@@ -17,6 +17,7 @@ import {
   type ProtocolVerdict,
 } from '@foresift/shared-schemas';
 import { ProtocolGuardError } from './errors.ts';
+import { numericIncludes, parseDecision } from './shadow-safe.ts';
 
 export type ProtocolRefusalReason = Extract<ProtocolVerdict, { decision: 'REFUSE' }>['reason'];
 
@@ -65,11 +66,15 @@ export class McpProtocolGuard {
 
   inspect(input: ProtocolInspectionInput): ProtocolVerdict {
     const refuse = (reason: ProtocolRefusalReason): ProtocolVerdict =>
-      ProtocolVerdictSchema.parse({ decision: 'REFUSE', reason });
+      parseDecision(ProtocolVerdictSchema, { decision: 'REFUSE', reason });
 
+    // Numeric-index membership, never `Array.prototype.includes` (audit R11):
+    // an in-process caller that shadows `includes` to return `true` would
+    // otherwise make the guard ALLOW an arbitrary protocol revision. Index and
+    // `length` reads cannot be redefined through `Array.prototype` methods.
     if (
       input.protocolRevision === undefined ||
-      !this.allowedRevisions.includes(input.protocolRevision)
+      !numericIncludes(this.allowedRevisions, input.protocolRevision)
     ) {
       return refuse('REVISION_UNSUPPORTED');
     }
@@ -112,7 +117,7 @@ export class McpProtocolGuard {
     if (input.resumableCursor !== undefined && !input.resumableCursor.authorized) {
       return refuse('CURSOR_UNAUTHORIZED');
     }
-    return ProtocolVerdictSchema.parse({ decision: 'ALLOW' });
+    return parseDecision(ProtocolVerdictSchema, { decision: 'ALLOW' });
   }
 
   /** Fail-closed convenience variant for wiring that prefers exceptions. */

@@ -14,6 +14,7 @@ import {
   PRECISION_RETAINING_TIMESTAMP_PARSERS,
   type DatabaseEngine,
 } from '@foresift/persistence';
+import { McpProtocolGuard } from '@foresift/security';
 import {
   cellUsability,
   insertMcpCompatibilityCell,
@@ -395,4 +396,64 @@ describe('MCP opt-in validation and conformance provenance (C3/H10 regressions)'
     expect(stale.usable).toBe(false);
     expect(stale.reason).toBe('CELL_NOT_USABLE');
   });
+
+  /**
+   * R11 (audit fifth round). `McpProtocolGuard.inspect` tested the allow-list
+   * with `allowedRevisions.includes(...)` and `resolveProtocolRevision` trusted
+   * the guard verdict with no numeric re-check. Shadowing
+   * `Array.prototype.includes` to return `true` therefore made the guard ALLOW
+   * any requested revision, re-opening audit C3 at the FR-PROD-003 surface.
+   */
+  it('R11: a shadowed Array.prototype.includes cannot ALLOW an arbitrary MCP revision', async () => {
+    // Guarantee at least one mutually tested STABLE revision exists.
+    await addTestedRevision('2026-12-01', 'STABLE');
+
+    const proto = Array.prototype as unknown as Record<string, unknown>;
+    const originalIncludes = proto['includes'];
+    // Surgical: only an allow-list that actually carries the sentinel revision
+    // is widened, so real PGlite query plumbing in this test keeps its native
+    // `includes` semantics.
+    proto['includes'] = function (this: unknown, search: unknown): boolean {
+      const self = this as unknown[];
+      if (Array.isArray(self)) {
+        let sentinel = false;
+        for (let index = 0; index < self.length; index += 1) {
+          if (self[index] === '2026-12-01') {
+            sentinel = true;
+            break;
+          }
+        }
+        if (sentinel) return true;
+      }
+      return (originalIncludes as (this: unknown, value: unknown) => boolean).call(self, search);
+    };
+    try {
+      // 1. The guard's own membership test must stay exact.
+      const guard = new McpProtocolGuard({
+        allowedRevisions: ['2026-12-01'],
+        maxMessageBytes: 1024,
+      });
+      const direct = guard.inspect({
+        protocolRevision: '2099-01-01-evil',
+        contentType: 'application/json',
+        method: 'POST',
+        messageBytes: 1,
+      });
+      expect(direct.decision).toBe('REFUSE');
+
+      // 2. The FR-PROD-003 surface must never trust a defeated guard verdict.
+      //    (Defence in depth: with the guard hardened this path already refuses
+      //    via the declared policy; the assertion stays as the surface check.)
+      const refused = await rejection(
+        resolveProtocolRevision(engine, {
+          requestedRevision: '2099-01-01-evil',
+          now: NOW,
+          policy: 'OPT_IN_ONLY',
+        }),
+      );
+      expect(refused.code).toBe('PROD_ACTIVATION_GATE_REFUSED');
+    } finally {
+      proto['includes'] = originalIncludes;
+    }
+  }, 120_000);
 });

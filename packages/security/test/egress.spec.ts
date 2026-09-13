@@ -228,3 +228,122 @@ describe('redirects and response caps (AC-257)', () => {
     expect(() => g.requireAllowed(decision)).toThrow(/SCHEME_REFUSED|refused/);
   });
 });
+
+// --- Shadow-safe authority (D018): numeric-index decision walks --------------
+
+/**
+ * A same-process caller can replace `Array.prototype` primitives at DECISION
+ * time. Each shadow below is exactly the one that would flip the specific
+ * fail-closed gate to ALLOW before the numeric-index conversion, is installed
+ * only for the call under test, and is restored in a `finally`.
+ */
+describe('egress decision gates resist Array.prototype shadowing (D018)', () => {
+  const proto = Array.prototype as unknown as Record<string, unknown>;
+
+  async function withShadow<T>(
+    method: string,
+    replacement: unknown,
+    run: () => T | Promise<T>,
+  ): Promise<T> {
+    const original = proto[method];
+    proto[method] = replacement;
+    try {
+      return await run();
+    } finally {
+      proto[method] = original;
+    }
+  }
+
+  it('refuses a non-allowlisted host even when Array.prototype.some is shadowed to true', async () => {
+    const decision = await withShadow(
+      'some',
+      () => true,
+      () => guard().authorize('https://evil.example/', 'COLLECTOR'),
+    );
+    expect(decision).toMatchObject({ decision: 'REFUSE', reason: 'HOST_NOT_ALLOWLISTED' });
+    // Discriminating: pre-fix the shadowed `.some` also faked the punycode
+    // predicate, so the refusal detail was "punycode host refused".
+    expect((decision as { readonly detail?: string }).detail ?? '').toContain('not allowlisted');
+  });
+
+  it('still ALLOWs an allowlisted host when Array.prototype.some is shadowed to false', async () => {
+    const decision = await withShadow(
+      'some',
+      () => false,
+      () => guard().authorize('https://api.helius.dev/v0', 'COLLECTOR'),
+    );
+    expect(decision).toMatchObject({ decision: 'ALLOW', host: 'api.helius.dev' });
+  });
+
+  it('refuses a punycode host even when Array.prototype.some is shadowed to false', async () => {
+    const decision = await withShadow(
+      'some',
+      () => false,
+      () => guard().authorize('https://xn--helius-9cd.dev/', 'COLLECTOR'),
+    );
+    expect(decision).toMatchObject({ decision: 'REFUSE', reason: 'HOST_NOT_ALLOWLISTED' });
+    // Discriminating: pre-fix the shadowed `.some` disabled punycode detection,
+    // so the same reason arrived with an "not allowlisted" detail instead.
+    expect((decision as { readonly detail?: string }).detail ?? '').toContain('punycode');
+  });
+
+  it('detects rebinding even when Array.prototype.join is shadowed to a constant', async () => {
+    const rebinding = new EgressGuard({
+      allowlist: ALLOWLIST,
+      resolver: async () => ['127.0.0.1'],
+    });
+    const decision = await withShadow(
+      'join',
+      () => 'shadowed',
+      () => rebinding.verifyPin('https://api.helius.dev/', ['140.82.112.3']),
+    );
+    expect(decision).toMatchObject({ decision: 'REFUSE', reason: 'REBINDING_DETECTED' });
+  });
+
+  it('detects rebinding even when Array.prototype.sort is shadowed to drop elements', async () => {
+    const rebinding = new EgressGuard({
+      allowlist: ALLOWLIST,
+      resolver: async () => ['127.0.0.1'],
+    });
+    const decision = await withShadow(
+      'sort',
+      () => [],
+      () => rebinding.verifyPin('https://api.helius.dev/', ['140.82.112.3']),
+    );
+    expect(decision).toMatchObject({ decision: 'REFUSE', reason: 'REBINDING_DETECTED' });
+  });
+
+  it('refuses a disallowed content type even when Array.prototype.includes is shadowed to true', async () => {
+    const strict = new EgressGuard({
+      allowlist: ALLOWLIST,
+      resolver: async () => PUBLIC_DNS,
+      limits: { allowedContentTypes: ['application/json'] },
+    });
+    const decision = await withShadow(
+      'includes',
+      () => true,
+      () => strict.inspectResponse({ contentType: 'text/html' }),
+    );
+    expect(decision).toMatchObject({ decision: 'REFUSE', reason: 'CONTENT_TYPE_REFUSED' });
+  });
+
+  it('refuses with a real verdict even when the schema library internals are shadowed (R13 HIGH)', async () => {
+    // zod's ObjectType._parse uses `for...of` + `push`; shadowing `push` makes
+    // `Schema.parse` return `{}`. Pre-fix `authorize` returned that `{}` and a
+    // consumer checking `decision === 'REFUSE'` treated it as non-refusal.
+    const proto = Array.prototype as unknown as Record<string, unknown>;
+    const originalPush = proto['push'];
+    let decision: { readonly decision?: string; readonly reason?: string } = {};
+    proto['push'] = () => 0;
+    try {
+      decision = (await guard().authorize('https://evil.example/', 'COLLECTOR')) as unknown as {
+        readonly decision?: string;
+        readonly reason?: string;
+      };
+    } finally {
+      proto['push'] = originalPush;
+    }
+    expect(decision.decision).toBe('REFUSE');
+    expect(decision.reason).toBe('HOST_NOT_ALLOWLISTED');
+  });
+});

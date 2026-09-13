@@ -214,6 +214,23 @@ describe('abuse controls (FR-SEC-010)', () => {
     expect(() => abuse.assertNotEnumerating('normal-user')).not.toThrow();
   });
 
+  it('counts coordination bursts even when Array.prototype.filter is shadowed (R13)', () => {
+    const abuse = new AbuseController({ clock: () => 0 });
+    abuse.recordBurst('subject-a');
+    abuse.recordBurst('subject-a');
+    abuse.recordBurst('subject-a');
+    const proto = Array.prototype as unknown as Record<string, unknown>;
+    const originalFilter = proto['filter'];
+    // Pre-fix `.filter` returned [] under the shadow, so any burst pattern
+    // scored zero coordination.
+    proto['filter'] = () => [];
+    try {
+      expect(abuse.coordinationScore(1000)).toBe(1);
+    } finally {
+      proto['filter'] = originalFilter;
+    }
+  });
+
   it('protected risk-monitoring subjects can NEVER be suspended or degraded', () => {
     for (const subject of PROTECTED_SUBJECTS) {
       expect(() => AbuseController.assertSuspensionAllowed(subject)).toThrow(/never be suspended/i);

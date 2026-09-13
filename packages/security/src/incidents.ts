@@ -16,6 +16,7 @@ import {
   type IncidentSeverity,
 } from '@foresift/shared-schemas';
 import { IncidentError, SecErrorCode } from './errors.ts';
+import { numericCopy, numericSome } from './shadow-safe.ts';
 
 export interface OpenIncidentInput {
   readonly incidentId: string;
@@ -85,7 +86,10 @@ export class Incidents {
   }
 
   async open(input: OpenIncidentInput) {
-    if (input.evidenceRefs.length === 0 || input.evidenceRefs.some((r) => r.trim() === '')) {
+    if (
+      input.evidenceRefs.length === 0 ||
+      numericSome(input.evidenceRefs, (r) => r.trim() === '')
+    ) {
       throw new IncidentError(
         'an incident requires at least one non-empty evidence reference',
         {},
@@ -104,7 +108,7 @@ export class Incidents {
         input.severity,
         input.owner,
         input.openedAt,
-        JSON.stringify([...input.evidenceRefs]),
+        JSON.stringify(numericCopy(input.evidenceRefs)),
         JSON.stringify({
           ownerNotified: input.notificationFlags?.ownerNotified ?? false,
           customersNotified: input.notificationFlags?.customersNotified ?? false,
@@ -193,7 +197,7 @@ export class Incidents {
    * dropped — during incident response "evidence recorded" must be TRUE.
    */
   async attachEvidence(incidentId: string, refs: readonly string[]) {
-    if (refs.length === 0 || refs.some((r) => r.trim() === '')) {
+    if (refs.length === 0 || numericSome(refs, (r) => r.trim() === '')) {
       throw new IncidentError(
         'evidence attachment requires at least one non-empty reference',
         { incidentId },

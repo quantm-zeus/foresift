@@ -19,6 +19,14 @@ import {
   type EgressDecision,
 } from '@foresift/shared-schemas';
 import { EgressError } from './errors.ts';
+import {
+  numericCopy,
+  numericIncludes,
+  numericJoin,
+  numericSortStrings,
+  numericSome,
+  parseDecision,
+} from './shadow-safe.ts';
 
 export type EgressPlane = EgressAllowlistEntry['plane'];
 
@@ -49,7 +57,8 @@ function ipv4ToInt(ip: string): number | null {
   const parts = ip.split('.');
   if (parts.length !== 4) return null;
   let value = 0;
-  for (const part of parts) {
+  for (let index = 0; index < parts.length; index += 1) {
+    const part = parts[index] as string;
     if (!/^\d{1,3}$/.test(part)) return null;
     const n = Number(part);
     if (n > 255) return null;
@@ -71,17 +80,33 @@ function expandIpv6(ip: string): number[] {
   // returns exactly 16 bytes or throws. Leniency here would let malformed
   // spellings classify as addresses they are not.
   if ((ip.match(/::/g)?.length ?? 0) > 1) throw new Error('bad ipv6');
-  const [head = '', tail = ''] = ip.split('::');
+  // Numeric reads, not array destructuring: `const [head, tail] = …` consults
+  // the shadowable `Array.prototype[Symbol.iterator]`.
+  const segments = ip.split('::');
+  const head = segments.length > 0 ? (segments[0] as string) : '';
+  const tail = segments.length > 1 ? (segments[1] as string) : '';
   const headGroups = head === '' ? [] : head.split(':');
   const tailGroups = tail === '' ? [] : tail.split(':');
   const missing = 8 - headGroups.length - tailGroups.length;
   if (ip.includes('::') ? missing < 1 : missing !== 0) throw new Error('bad ipv6');
-  const groups = [...headGroups, ...Array(missing).fill('0'), ...tailGroups];
+  // No spread/`Array.prototype.fill`: assemble the group list by numeric index.
+  const groups: string[] = [];
+  for (let index = 0; index < headGroups.length; index += 1) {
+    groups[groups.length] = headGroups[index] as string;
+  }
+  for (let index = 0; index < missing; index += 1) {
+    groups[groups.length] = '0';
+  }
+  for (let index = 0; index < tailGroups.length; index += 1) {
+    groups[groups.length] = tailGroups[index] as string;
+  }
   const bytes: number[] = [];
-  for (const group of groups) {
+  for (let index = 0; index < groups.length; index += 1) {
+    const group = groups[index] as string;
     if (!/^[0-9A-Fa-f]{1,4}$/.test(group)) throw new Error('bad ipv6');
     const g = parseInt(group, 16);
-    bytes.push((g >> 8) & 0xff, g & 0xff);
+    bytes[bytes.length] = (g >> 8) & 0xff;
+    bytes[bytes.length] = g & 0xff;
   }
   return bytes;
 }
@@ -163,7 +188,9 @@ function rawIpv6Value(ip: string): bigint {
   const bytes = expandIpv6(ip);
   if (bytes.length !== 16) throw new Error('bad ipv6');
   let value = 0n;
-  for (const byte of bytes) value = (value << 8n) | BigInt(byte);
+  for (let index = 0; index < bytes.length; index += 1) {
+    value = (value << 8n) | BigInt(bytes[index] as number);
+  }
   return value;
 }
 
@@ -226,7 +253,8 @@ export class EgressGuard {
     const refuse = (
       reason: Extract<EgressDecision, { decision: 'REFUSE' }>['reason'],
       detail: string,
-    ): EgressDecision => EgressDecisionSchema.parse({ decision: 'REFUSE', reason, detail });
+    ): EgressDecision =>
+      parseDecision(EgressDecisionSchema, { decision: 'REFUSE', reason, detail });
 
     const target = parseTarget(url);
     if (target === null) return refuse('URL_MALFORMED', 'unparseable or userinfo-bearing URL');
@@ -239,7 +267,7 @@ export class EgressGuard {
     if (/[%\s]/.test(target.host) || /[^\x00-\x7F]/.test(target.host)) {
       return refuse('HOST_NOT_ALLOWLISTED', `encoded or non-ASCII host: ${target.host}`);
     }
-    if (target.host.split('.').some((label) => /^xn--/.test(label))) {
+    if (numericSome(target.host.split('.'), (label) => /^xn--/.test(label))) {
       return refuse('HOST_NOT_ALLOWLISTED', 'punycode host refused');
     }
     if (target.scheme !== 'https') {
@@ -253,7 +281,8 @@ export class EgressGuard {
     ) {
       return refuse('PORT_UNSAFE', `port ${String(target.port)} is on the unsafe list`);
     }
-    const allowlisted = this.entries.some(
+    const allowlisted = numericSome(
+      this.entries,
       (entry) =>
         entry.plane === plane &&
         entry.scheme === 'https' &&
@@ -276,15 +305,16 @@ export class EgressGuard {
     if (addresses.length === 0) {
       return refuse('RESOLUTION_REFUSED', 'resolver returned no addresses');
     }
-    for (const address of addresses) {
+    for (let index = 0; index < addresses.length; index += 1) {
+      const address = addresses[index] as string;
       if (isDeniedAddress(address)) {
         return refuse('ADDRESS_DENIED', `resolved address falls in a denied range: ${address}`);
       }
     }
-    return EgressDecisionSchema.parse({
+    return parseDecision(EgressDecisionSchema, {
       decision: 'ALLOW',
       host: target.host,
-      pinnedAddresses: [...addresses],
+      pinnedAddresses: numericCopy(addresses),
     });
   }
 
@@ -295,7 +325,7 @@ export class EgressGuard {
   async verifyPin(url: string, pinnedAddresses: readonly string[]): Promise<EgressDecision> {
     const target = parseTarget(url);
     if (target === null) {
-      return EgressDecisionSchema.parse({
+      return parseDecision(EgressDecisionSchema, {
         decision: 'REFUSE',
         reason: 'URL_MALFORMED',
         detail: 'unparseable URL during pin verification',
@@ -308,14 +338,14 @@ export class EgressGuard {
     try {
       fresh = await this.resolve(target.host);
     } catch (error) {
-      return EgressDecisionSchema.parse({
+      return parseDecision(EgressDecisionSchema, {
         decision: 'REFUSE',
         reason: 'RESOLUTION_REFUSED',
         detail: error instanceof Error ? error.message : String(error),
       });
     }
     if (fresh.length === 0) {
-      return EgressDecisionSchema.parse({
+      return parseDecision(EgressDecisionSchema, {
         decision: 'REFUSE',
         reason: 'RESOLUTION_REFUSED',
         detail: 'resolver returned no addresses during pin verification',
@@ -323,18 +353,18 @@ export class EgressGuard {
     }
     const same =
       fresh.length === pinnedAddresses.length &&
-      [...fresh].sort().join(',') === [...pinnedAddresses].sort().join(',');
+      numericJoin(numericSortStrings(fresh)) === numericJoin(numericSortStrings(pinnedAddresses));
     if (!same) {
-      return EgressDecisionSchema.parse({
+      return parseDecision(EgressDecisionSchema, {
         decision: 'REFUSE',
         reason: 'REBINDING_DETECTED',
         detail: 'resolution changed between pin and connect',
       });
     }
-    return EgressDecisionSchema.parse({
+    return parseDecision(EgressDecisionSchema, {
       decision: 'ALLOW',
       host: target.host,
-      pinnedAddresses: [...pinnedAddresses],
+      pinnedAddresses: numericCopy(pinnedAddresses),
     });
   }
 
@@ -349,14 +379,14 @@ export class EgressGuard {
     approveHop: (nextUrl: string) => boolean,
   ): Promise<EgressDecision> {
     if (hopsFollowed + 1 > this.limits.maxRedirects) {
-      return EgressDecisionSchema.parse({
+      return parseDecision(EgressDecisionSchema, {
         decision: 'REFUSE',
         reason: 'REDIRECT_LIMIT_EXCEEDED',
         detail: `more than ${String(this.limits.maxRedirects)} redirects`,
       });
     }
     if (!approveHop(nextUrl)) {
-      return EgressDecisionSchema.parse({
+      return parseDecision(EgressDecisionSchema, {
         decision: 'REFUSE',
         reason: 'REDIRECT_UNAPPROVED',
         detail: `redirect target not approved: ${nextUrl}`,
@@ -375,7 +405,8 @@ export class EgressGuard {
     const refuse = (
       reason: Extract<EgressDecision, { decision: 'REFUSE' }>['reason'],
       detail: string,
-    ): EgressDecision => EgressDecisionSchema.parse({ decision: 'REFUSE', reason, detail });
+    ): EgressDecision =>
+      parseDecision(EgressDecisionSchema, { decision: 'REFUSE', reason, detail });
     if (response.bytes !== undefined && response.bytes > this.limits.maxResponseBytes) {
       return refuse(
         'RESPONSE_BYTES_EXCEEDED',
@@ -397,10 +428,10 @@ export class EgressGuard {
       return refuse('DECOMPRESSION_RATIO_EXCEEDED', 'decompression ratio above cap');
     }
     const contentType = response.contentType?.split(';')[0]?.trim().toLowerCase() ?? '';
-    if (!this.limits.allowedContentTypes.includes(contentType)) {
+    if (!numericIncludes(this.limits.allowedContentTypes, contentType)) {
       return refuse('CONTENT_TYPE_REFUSED', `content type '${contentType}' is not admitted`);
     }
-    return EgressDecisionSchema.parse({
+    return parseDecision(EgressDecisionSchema, {
       decision: 'ALLOW',
       host: 'response-inspection',
       pinnedAddresses: ['0.0.0.0'],

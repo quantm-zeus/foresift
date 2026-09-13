@@ -16,6 +16,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import type { ProhibitedCapabilityCategory } from '@foresift/shared-schemas';
 import { ProhibitedCapabilityError } from './errors.ts';
+import { numericJoin, numericMap, numericSlice, numericSome } from './shadow-safe.ts';
 
 export interface CanaryCatalog {
   readonly catalogVersion: number;
@@ -65,16 +66,19 @@ export class NegativeCapabilityCanary {
   /** Inventory check over registered route/tool names. */
   checkInventory(entries: ReadonlyArray<{ name: string; source: string }>): CanaryFinding[] {
     const findings: CanaryFinding[] = [];
-    for (const entry of entries) {
+    for (let entryIndex = 0; entryIndex < entries.length; entryIndex += 1) {
+      const entry = entries[entryIndex] as { name: string; source: string };
       const normalized = entry.name.toLowerCase().replace(/[_\s.-]+/g, '-');
-      for (const verb of this.catalog.inventoryForbiddenVerbs ?? []) {
+      const forbiddenVerbs = this.catalog.inventoryForbiddenVerbs ?? [];
+      for (let verbIndex = 0; verbIndex < forbiddenVerbs.length; verbIndex += 1) {
+        const verb = forbiddenVerbs[verbIndex] as string;
         if (normalized.includes(verb)) {
-          findings.push({
+          findings[findings.length] = {
             category: 'TRANSACTION_BUILD_SIGN_SUBMIT',
             surface: 'ROUTE_INVENTORY',
             reference: `${entry.source}#${entry.name}`,
             matchedPattern: verb,
-          });
+          };
         }
       }
     }
@@ -89,8 +93,22 @@ export class NegativeCapabilityCanary {
   scanSourceText(relativePath: string, text: string): CanaryFinding[] {
     const findings: CanaryFinding[] = [];
     const lines = text.split('\n');
-    for (const categorySpec of this.catalog.categories) {
-      for (const pattern of categorySpec.sourcePatterns ?? []) {
+    for (
+      let categoryIndex = 0;
+      categoryIndex < this.catalog.categories.length;
+      categoryIndex += 1
+    ) {
+      const categorySpec = this.catalog.categories[
+        categoryIndex
+      ] as CanaryCatalog['categories'][number];
+      const sourcePatterns = categorySpec.sourcePatterns ?? [];
+      for (let patternIndex = 0; patternIndex < sourcePatterns.length; patternIndex += 1) {
+        const pattern = sourcePatterns[patternIndex] as {
+          readonly id: string;
+          readonly regex: string;
+          readonly flags?: string;
+          readonly contextSignals?: readonly string[];
+        };
         const flags = `${pattern.flags ?? ''}g`;
         const regex = new RegExp(pattern.regex, flags);
         let match: RegExpExecArray | null;
@@ -100,18 +118,21 @@ export class NegativeCapabilityCanary {
             continue;
           }
           const lineIndex = text.slice(0, match.index).split('\n').length - 1;
-          const window = lines
-            .slice(Math.max(0, lineIndex - 2), lineIndex + 3)
-            .join('\n')
-            .toLowerCase();
+          const window = numericJoin(
+            numericSlice(lines, Math.max(0, lineIndex - 2), lineIndex + 3),
+            '\n',
+          ).toLowerCase();
           const signals = pattern.contextSignals ?? [];
-          if (signals.length === 0 || signals.some((s) => window.includes(s.toLowerCase()))) {
-            findings.push({
+          if (
+            signals.length === 0 ||
+            numericSome(signals, (s) => window.includes(s.toLowerCase()))
+          ) {
+            findings[findings.length] = {
               category: categorySpec.category,
               surface: 'RUNTIME_CANARY',
               reference: `${relativePath}:${lineIndex + 1}`,
               matchedPattern: pattern.id,
-            });
+            };
             break; // one finding per (text, pattern), mirroring the CLI
           }
         }
@@ -126,7 +147,9 @@ export class NegativeCapabilityCanary {
    */
   classifyWalletQuery(queryText: string): { admitted: boolean; matchedShape?: string } {
     const normalized = queryText.toLowerCase().replace(/\s+/g, ' ').trim();
-    for (const shape of this.catalog.readOnlyWalletIntelligenceAllowlist.forbiddenQueryShapes) {
+    const forbiddenShapes = this.catalog.readOnlyWalletIntelligenceAllowlist.forbiddenQueryShapes;
+    for (let index = 0; index < forbiddenShapes.length; index += 1) {
+      const shape = forbiddenShapes[index] as string;
       if (this.shapeMatches(normalized, shape)) {
         throw new ProhibitedCapabilityError(
           `query matches a forbidden execution variant: '${shape}'`,
@@ -134,7 +157,9 @@ export class NegativeCapabilityCanary {
         );
       }
     }
-    for (const shape of this.catalog.readOnlyWalletIntelligenceAllowlist.admittedQueryShapes) {
+    const admittedShapes = this.catalog.readOnlyWalletIntelligenceAllowlist.admittedQueryShapes;
+    for (let index = 0; index < admittedShapes.length; index += 1) {
+      const shape = admittedShapes[index] as string;
       if (this.shapeMatches(normalized, shape)) {
         return { admitted: true, matchedShape: shape };
       }
@@ -147,7 +172,8 @@ export class NegativeCapabilityCanary {
   private shapeMatches(normalizedQuery: string, shape: string): boolean {
     const parts = shape.toLowerCase().split(/\s+/);
     let cursor = 0;
-    for (const part of parts) {
+    for (let index = 0; index < parts.length; index += 1) {
+      const part = parts[index] as string;
       const idx = normalizedQuery.indexOf(part, cursor);
       if (idx === -1) return false;
       cursor = idx + part.length;
@@ -158,17 +184,31 @@ export class NegativeCapabilityCanary {
   /** Environment-schema forbidden-name scan (same lists as the CLI). */
   scanEnvironmentNames(names: readonly string[]): CanaryFinding[] {
     const findings: CanaryFinding[] = [];
-    for (const name of names) {
+    for (let nameIndex = 0; nameIndex < names.length; nameIndex += 1) {
+      const name = names[nameIndex] as string;
       const normalized = name.toUpperCase().replace(/[^A-Z_]/g, '_');
-      for (const categorySpec of this.catalog.categories) {
-        for (const forbidden of categorySpec.envForbiddenNames ?? []) {
+      for (
+        let categoryIndex = 0;
+        categoryIndex < this.catalog.categories.length;
+        categoryIndex += 1
+      ) {
+        const categorySpec = this.catalog.categories[
+          categoryIndex
+        ] as CanaryCatalog['categories'][number];
+        const envForbiddenNames = categorySpec.envForbiddenNames ?? [];
+        for (
+          let forbiddenIndex = 0;
+          forbiddenIndex < envForbiddenNames.length;
+          forbiddenIndex += 1
+        ) {
+          const forbidden = envForbiddenNames[forbiddenIndex] as string;
           if (normalized.includes(forbidden)) {
-            findings.push({
+            findings[findings.length] = {
               category: categorySpec.category,
               surface: 'ENV_SCHEMA',
               reference: `environment#${name}`,
               matchedPattern: forbidden,
-            });
+            };
           }
         }
       }
@@ -187,7 +227,8 @@ export class NegativeCapabilityCanary {
   }
 
   get categories(): readonly ProhibitedCapabilityCategory[] {
-    return this.catalog.categories.map(
+    return numericMap(
+      this.catalog.categories,
       (c) => c.category,
     ) as readonly ProhibitedCapabilityCategory[];
   }

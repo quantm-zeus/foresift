@@ -16,6 +16,13 @@
  */
 import { OAuthTokenBindingSchema, type OAuthTokenBinding } from '@foresift/shared-schemas';
 import { OAuthBindingError, SecErrorCode } from './errors.ts';
+import {
+  numericFilter,
+  numericIncludes,
+  numericJoin,
+  numericMap,
+  numericSome,
+} from './shadow-safe.ts';
 
 /** Injected clock seam returning epoch milliseconds. */
 export type OAuthClock = () => number;
@@ -45,8 +52,9 @@ export class OAuthBindingGuard {
     const parsed = OAuthTokenBindingSchema.safeParse(input.candidate);
     if (!parsed.success) {
       // A missing/false pkceRequired is the load-bearing structural refusal.
-      const pkceFailure = parsed.error.issues.some(
-        (issue) => issue.path.join('.') === 'pkceRequired',
+      const pkceFailure = numericSome(
+        parsed.error.issues,
+        (issue) => numericJoin(issue.path, '.') === 'pkceRequired',
       );
       if (pkceFailure) {
         throw new OAuthBindingError(
@@ -56,12 +64,15 @@ export class OAuthBindingGuard {
         );
       }
       throw new OAuthBindingError('token binding fails the authoritative schema', {
-        issues: parsed.error.issues.map((i) => `${i.path.join('.')}: ${i.message}`).join('; '),
+        issues: numericJoin(
+          numericMap(parsed.error.issues, (i) => `${numericJoin(i.path, '.')}: ${i.message}`),
+          '; ',
+        ),
       });
     }
     const binding = parsed.data;
 
-    if (!input.registeredRedirectUris.includes(binding.redirectUri)) {
+    if (!numericIncludes(input.registeredRedirectUris, binding.redirectUri)) {
       throw new OAuthBindingError(
         'redirect URI does not EXACTLY match a registered value',
         { redirectUri: binding.redirectUri },
@@ -92,11 +103,14 @@ export class OAuthBindingGuard {
         SecErrorCode.SEC_OAUTH_TOKEN_EXPIRED,
       );
     }
-    const widened = binding.scopes.filter((s) => !input.registeredScopes.includes(s));
+    const widened = numericFilter(
+      binding.scopes,
+      (s) => !numericIncludes(input.registeredScopes, s),
+    );
     if (widened.length > 0) {
       throw new OAuthBindingError(
         'issued scopes widen beyond the registered set',
-        { widened: widened.join(',') },
+        { widened: numericJoin(widened) },
         SecErrorCode.SEC_OAUTH_SCOPE_WIDENED,
       );
     }

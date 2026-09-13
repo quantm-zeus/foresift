@@ -1,7 +1,7 @@
 {
   "schema": "foresift/bun-migration-manifest@1",
   "migrationId": "bun-test-authority-v1",
-  "generatedAt": "2026-09-13T18:24:48.966Z",
+  "generatedAt": "2026-09-13T22:59:59.579Z",
   "root": ".",
   "totalTestFiles": 602,
   "counts": {
@@ -390,15 +390,16 @@
     {
       "path": "packages/capability-registry/test/mcp-compat.spec.ts",
       "package": "@foresift/capability-registry",
-      "bytes": 13208,
-      "lines": 399,
-      "sha256": "82845797b072da62988d52ddf297eb8d2b2ae3e5bb1cc0f015edc9e39c318eab",
+      "bytes": 15707,
+      "lines": 460,
+      "sha256": "1689bfa97e56a1c9771dd6d2004d275cbe04c7313e4b26a1996c93a16ff563f9",
       "imports": [
         "bun:test",
         "@electric-sql/pglite",
         "node:path",
         "node:url",
         "@foresift/persistence",
+        "@foresift/security",
         "../src/index.ts"
       ],
       "vitestImports": [],
@@ -406,7 +407,12 @@
       "workload": "DATABASE_PGLITE",
       "migrationType": "ALREADY_MIGRATED",
       "fixturesAndHelpers": [],
-      "sourceAnchors": ["@electric-sql/pglite", "@foresift/persistence", "../src/index.ts"],
+      "sourceAnchors": [
+        "@electric-sql/pglite",
+        "@foresift/persistence",
+        "@foresift/security",
+        "../src/index.ts"
+      ],
       "state": "MIGRATED"
     },
     {
@@ -500,9 +506,9 @@
     {
       "path": "packages/capability-registry/test/registry.spec.ts",
       "package": "@foresift/capability-registry",
-      "bytes": 111996,
-      "lines": 2728,
-      "sha256": "0655d199ce6e27ac2a56497426aa79a0857dea9e5fdd9a3855fbbdcd8d093353",
+      "bytes": 118487,
+      "lines": 2878,
+      "sha256": "fffd8b21101dded22bf3cf69f3cf452a2f68e0d963c22c19394c76d73ba955c3",
       "imports": [
         "bun:test",
         "@electric-sql/pglite",
@@ -3676,11 +3682,12 @@
     {
       "path": "packages/release-conformance/test/prod-rules.spec.ts",
       "package": "@foresift/release-conformance",
-      "bytes": 72411,
-      "lines": 1813,
-      "sha256": "41474397d5b79625ddc397e842262261a4cd13f62111daa49f1c0b54fbdd6ed6",
+      "bytes": 76484,
+      "lines": 1899,
+      "sha256": "72e3c054c137e04d6b3a0f7f56fac13d1b46960b39f01a21f1afecc6524023d6",
       "imports": [
         "bun:test",
+        "node:child_process",
         "node:crypto",
         "node:fs/promises",
         "node:os",
@@ -3692,7 +3699,7 @@
       ],
       "vitestImports": [],
       "features": ["dynamic-import"],
-      "workload": "PURE",
+      "workload": "PROCESS",
       "migrationType": "ALREADY_MIGRATED",
       "fixturesAndHelpers": [
         "../../../tests/fixtures/trace/index.ts",
@@ -3817,9 +3824,9 @@
     {
       "path": "packages/security/test/action-gate.spec.ts",
       "package": "@foresift/security",
-      "bytes": 12139,
-      "lines": 315,
-      "sha256": "fca690998c429bf2760489b3637950eddb21a540a0b177f22e92eb376e404a32",
+      "bytes": 13546,
+      "lines": 354,
+      "sha256": "23f0331f5a1e3c19c346a11ed86921f31600ee9a9c4c92b5a41ba1a9787ba685",
       "imports": [
         "node:crypto",
         "bun:test",
@@ -3894,9 +3901,9 @@
     {
       "path": "packages/security/test/egress.spec.ts",
       "package": "@foresift/security",
-      "bytes": 8676,
-      "lines": 231,
-      "sha256": "dddb1db19420daf39574d0357defc63a2718fd58e0def1b6b014655028fdfe71",
+      "bytes": 13452,
+      "lines": 350,
+      "sha256": "20b441978d5a469147df8dd9283b9dc52ea4aaec0ab09880717a40151903c873",
       "imports": ["bun:test", "../src/egress.ts"],
       "vitestImports": [],
       "features": [],
@@ -4010,9 +4017,9 @@
     {
       "path": "packages/security/test/mcp-origin-protocol.spec.ts",
       "package": "@foresift/security",
-      "bytes": 6588,
-      "lines": 186,
-      "sha256": "dd1013379fc1c163c7fceb9a7202b6110bfe9d9aab6e6dcebaf60140b594ca01",
+      "bytes": 8350,
+      "lines": 230,
+      "sha256": "95bce405c596afdff30540fc021076f893a3f76ef0f73ea26b165625e3094669",
       "imports": ["bun:test", "../src/mcp-origin.ts", "../src/mcp-protocol-guard.ts"],
       "vitestImports": [],
       "features": [],
@@ -4025,9 +4032,9 @@
     {
       "path": "packages/security/test/negative-capability.spec.ts",
       "package": "@foresift/security",
-      "bytes": 10435,
-      "lines": 270,
-      "sha256": "00b879d9a1af2c35a08cede8d95c903bd9e9e0f223a5abd2c4a70cd56bdd8a8f",
+      "bytes": 13635,
+      "lines": 365,
+      "sha256": "482d3eca001e8a5c1fbfc34741b41825a45680222ff3c735f605d89b906c38f7",
       "imports": [
         "node:fs",
         "node:path",
@@ -4052,9 +4059,9 @@
     {
       "path": "packages/security/test/oauth-credentials.spec.ts",
       "package": "@foresift/security",
-      "bytes": 13001,
-      "lines": 356,
-      "sha256": "f39228db69b207fd82d6ff169e969ba376cb66ac714c3bc54ed771201bd9d6f0",
+      "bytes": 17360,
+      "lines": 498,
+      "sha256": "6327fb3fa496e530b590c48426ed9ea0821f599a01659c034de530e1f3184dd2",
       "imports": [
         "bun:test",
         "@electric-sql/pglite",
@@ -4155,9 +4162,9 @@
     {
       "path": "packages/security/test/secrets-claims.spec.ts",
       "package": "@foresift/security",
-      "bytes": 9998,
-      "lines": 243,
-      "sha256": "ff64a9df4bfaad664731ae5fbce0047444cd30b0c94a0be3914bcf7d6b013ee2",
+      "bytes": 11849,
+      "lines": 287,
+      "sha256": "dcc226f8597cc6d022f8362c8eb6d925c85ca4ab6305a67503ac51b1a83d814e",
       "imports": [
         "bun:test",
         "node:assert",
@@ -4195,9 +4202,9 @@
     {
       "path": "packages/security/test/untrusted-content.spec.ts",
       "package": "@foresift/security",
-      "bytes": 10386,
-      "lines": 235,
-      "sha256": "7aede3c32fc98f015279a81accd3fa4f10cf7eff3d83999b21a9d40631ca2b44",
+      "bytes": 13697,
+      "lines": 326,
+      "sha256": "a2b83e9ad6540a734c50ca02a45ab44587a8adedd0dbbd56eccb9b88190a6852",
       "imports": ["bun:test", "../src/untrusted-content.ts"],
       "vitestImports": [],
       "features": [],
@@ -4210,9 +4217,9 @@
     {
       "path": "packages/security/test/webhook-abuse.spec.ts",
       "package": "@foresift/security",
-      "bytes": 10652,
-      "lines": 263,
-      "sha256": "d2637805fcfbe372fb339581fb40b47248c194aa13a3a4e95bffbf18c5047d9a",
+      "bytes": 11303,
+      "lines": 280,
+      "sha256": "2b00481e88f6d33c976221fa89ba376a6281f07bf1cc9937f88b6aae20394aa6",
       "imports": [
         "bun:test",
         "node:crypto",

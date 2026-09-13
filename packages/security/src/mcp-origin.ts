@@ -11,6 +11,13 @@
  */
 import { OriginVerdictSchema, type OriginVerdict } from '@foresift/shared-schemas';
 import { McpOriginError } from './errors.ts';
+import {
+  numericIncludes,
+  numericJoin,
+  numericSlice,
+  numericSome,
+  parseDecision,
+} from './shadow-safe.ts';
 
 export type OriginRefusalReason = Extract<OriginVerdict, { decision: 'REFUSE' }>['reason'];
 
@@ -79,7 +86,7 @@ export class McpOriginGate {
   decide(origin: string | undefined): OriginVerdict {
     if (origin === undefined || origin === '') {
       if (this.absentOriginPolicy === 'PRODUCTION') {
-        return OriginVerdictSchema.parse({
+        return parseDecision(OriginVerdictSchema, {
           decision: 'REFUSE',
           origin: null,
           reason: 'ABSENT_POLICY_REFUSES',
@@ -87,25 +94,25 @@ export class McpOriginGate {
       }
       // Non-production deployments may let loopback tooling through without
       // an Origin header; the schema needs a non-empty marker for logging.
-      return OriginVerdictSchema.parse({ decision: 'ALLOW', origin: '(absent)' });
+      return parseDecision(OriginVerdictSchema, { decision: 'ALLOW', origin: '(absent)' });
     }
 
     const refuse = (reason: OriginRefusalReason): OriginVerdict =>
-      OriginVerdictSchema.parse({ decision: 'REFUSE', origin, reason });
+      parseDecision(OriginVerdictSchema, { decision: 'REFUSE', origin, reason });
 
     const parsed = parseOrigin(origin);
     if (parsed === null) return refuse('MALFORMED');
 
     // Hygiene FIRST — a hostile-but-allowlist-shaped origin never reaches
     // authentication processing.
-    if (!['http', 'https'].includes(parsed.scheme)) {
+    if (!numericIncludes(['http', 'https'], parsed.scheme)) {
       return refuse('MIXED_SCHEME');
     }
     // A hostname ending in '.' resolves identically but evades naive
     // exact-match comparisons.
     if (/\.$/.test(parsed.host)) return refuse('TRAILING_DOT');
     // Punycode (or raw non-ASCII) can visually impersonate an allowlisted host.
-    if (/^xn--/.test(parsed.host) || parsed.host.split('.').some((l) => /^xn--/.test(l))) {
+    if (/^xn--/.test(parsed.host) || numericSome(parsed.host.split('.'), (l) => /^xn--/.test(l))) {
       return refuse('PUNYCODE_CONFUSED');
     }
     if (/[^\x00-\x7F]/.test(parsed.host)) return refuse('PUNYCODE_CONFUSED');
@@ -119,7 +126,8 @@ export class McpOriginGate {
     let wrongPortSeen = false;
     let wrongHostSeen = false;
     let mixedSchemeSeen = false;
-    for (const allowed of this.allowlist) {
+    for (let allowIndex = 0; allowIndex < this.allowlist.length; allowIndex += 1) {
+      const allowed = this.allowlist[allowIndex] as ParsedOrigin;
       const portMatches = effectivePort(allowed) === effectivePort(parsed);
       if (allowed.host === parsed.host) {
         if (allowed.scheme !== parsed.scheme) {
@@ -130,11 +138,12 @@ export class McpOriginGate {
           wrongPortSeen = true;
           continue;
         }
-        return OriginVerdictSchema.parse({ decision: 'ALLOW', origin });
+        return parseDecision(OriginVerdictSchema, { decision: 'ALLOW', origin });
       }
       const allowedLabels = allowed.host.split('.');
       const sameRegistrableDomain =
-        allowedLabels.slice(-2).join('.') === requestedLabels.slice(-2).join('.') &&
+        numericJoin(numericSlice(allowedLabels, -2), '.') ===
+          numericJoin(numericSlice(requestedLabels, -2), '.') &&
         allowedLabels.length >= 2 &&
         requestedLabels.length >= 2;
       if (allowed.scheme === parsed.scheme && portMatches && sameRegistrableDomain) {

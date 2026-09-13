@@ -206,6 +206,50 @@ describe('public-output boundary (§35.12, AC-277)', () => {
     expect(redactedBody).not.toContain('7xKQ…');
   });
 
+  it('redacts fully even when Array.prototype.join is shadowed to truncate (R13)', () => {
+    const proto = Array.prototype as unknown as Record<string, unknown>;
+    const originalJoin = proto['join'];
+    // Pre-fix the split/join redaction path used the shadowed join, truncating
+    // the published body to its first fragment while still reporting success.
+    proto['join'] = function (this: unknown): string {
+      const self = this as unknown[];
+      return Array.isArray(self) && typeof self[0] === 'string' ? (self[0] as string) : '';
+    };
+    try {
+      const { redaction, redactedBody } = validatePublicOutput({
+        ...envelope,
+        body: 'Detector fired at threshold: 0.82 for whale 7xKQ…; portfolio snapshot follows.',
+        sensitiveEntityValues: ['7xKQ…'],
+      });
+      expect(redaction.verdict).toBe('COMPLIANT');
+      expect(redactedBody).toContain('[REDACTED_THRESHOLD]');
+      expect(redactedBody).toContain('[REDACTED_ENTITY]');
+      expect(redactedBody).toContain('portfolio snapshot follows.');
+    } finally {
+      proto['join'] = originalJoin;
+    }
+  });
+
+  it('keeps a real REFUSED verdict even when the schema library internals are shadowed (R13 HIGH)', () => {
+    // zod's ObjectType._parse uses `for...of` + `push`; a `push` shadow makes
+    // `Schema.parse` return `{}`, which `verdict === 'REFUSED'` consumers read
+    // as compliant. The refusal must survive.
+    const proto = Array.prototype as unknown as Record<string, unknown>;
+    const originalPush = proto['push'];
+    let threw: unknown = null;
+    proto['push'] = () => 0;
+    try {
+      try {
+        assertClaimsCompliant('guaranteed returns of 40% are assured', 'API');
+      } catch (error) {
+        threw = error;
+      }
+    } finally {
+      proto['push'] = originalPush;
+    }
+    expect(threw).not.toBeNull();
+  });
+
   it('redacts EVERY threshold occurrence — partial redaction would still ship tuning values', () => {
     const body =
       'detector_score is 0.9 here and detector_threshold equals 0.75 too plus detector_score 0.9 again';

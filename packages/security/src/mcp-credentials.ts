@@ -17,6 +17,7 @@
 import { createHmac } from 'node:crypto';
 import type { UtcTimestamp } from '@foresift/domain';
 import { CredentialError, SecErrorCode } from './errors.ts';
+import { numericCopy, numericFilter, numericIncludes, numericJoin } from './shadow-safe.ts';
 
 export type EntropySource = () => Uint8Array;
 
@@ -142,15 +143,15 @@ export class McpCredentialStore {
       [
         input.credentialId,
         keyedHash(this.pepper, secret),
-        [...input.scopes],
+        numericCopy(input.scopes),
         input.originPolicyRef,
-        input.profileBindings === undefined ? [] : [...input.profileBindings],
-        input.toolBounds === undefined ? [] : [...input.toolBounds],
-        input.resourceBounds === undefined ? [] : [...input.resourceBounds],
-        input.entityBounds === undefined ? [] : [...input.entityBounds],
+        input.profileBindings === undefined ? [] : numericCopy(input.profileBindings),
+        input.toolBounds === undefined ? [] : numericCopy(input.toolBounds),
+        input.resourceBounds === undefined ? [] : numericCopy(input.resourceBounds),
+        input.entityBounds === undefined ? [] : numericCopy(input.entityBounds),
         input.rateLimitClass,
         input.expiresAt,
-        input.ipConstraints === undefined ? [] : [...input.ipConstraints],
+        input.ipConstraints === undefined ? [] : numericCopy(input.ipConstraints),
         createdAt,
       ],
     );
@@ -216,7 +217,7 @@ export class McpCredentialStore {
       }
     }
     if (row.ip_constraints.length > 0) {
-      if (input.sourceIp === undefined || !row.ip_constraints.includes(input.sourceIp)) {
+      if (input.sourceIp === undefined || !numericIncludes(row.ip_constraints, input.sourceIp)) {
         throw new CredentialError(
           'source address is outside the credential IP constraints',
           { credentialId: row.credential_id },
@@ -234,11 +235,11 @@ export class McpCredentialStore {
       }
     }
     if (input.requestedScopes !== undefined) {
-      const exceeded = input.requestedScopes.filter((s) => !row.scopes.includes(s));
+      const exceeded = numericFilter(input.requestedScopes, (s) => !numericIncludes(row.scopes, s));
       if (exceeded.length > 0) {
         throw new CredentialError(
           'requested scopes exceed the granted scope set',
-          { credentialId: row.credential_id, exceeded: exceeded.join(',') },
+          { credentialId: row.credential_id, exceeded: numericJoin(exceeded) },
           SecErrorCode.SEC_CREDENTIAL_SCOPE_EXCEEDED,
         );
       }

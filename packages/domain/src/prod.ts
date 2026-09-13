@@ -621,7 +621,13 @@ export function requiredStatesForActivation(
   scope: ActivationScope,
   gates: readonly ActivationGateKind[],
 ): readonly ModuleLifecycleState[] {
-  for (const field of ACTIVATION_SCOPE_TEXT_FIELDS) {
+  // Numeric-index walks only: `for…of` and `Array.prototype.map` are shadowable
+  // in-process, and a shadowed `map`/iterator would hide the declared `gates`
+  // sequence from the PROVEN-consistency law below (audit NEW-M5).
+  for (let fieldIndex = 0; fieldIndex < ACTIVATION_SCOPE_TEXT_FIELDS.length; fieldIndex += 1) {
+    const field = ACTIVATION_SCOPE_TEXT_FIELDS[
+      fieldIndex
+    ] as (typeof ACTIVATION_SCOPE_TEXT_FIELDS)[number];
     requireScopeText(scope[field], field);
   }
   if (typeof scope.requiresProven !== 'boolean') {
@@ -631,7 +637,10 @@ export function requiredStatesForActivation(
       { field: 'requiresProven', value: null },
     );
   }
-  const parsedGates = gates.map(parseActivationGateKind);
+  const parsedGates: ActivationGateKind[] = [];
+  for (let gateIndex = 0; gateIndex < gates.length; gateIndex += 1) {
+    parsedGates[parsedGates.length] = parseActivationGateKind(gates[gateIndex]);
+  }
   const schedulesProven = isOneOf(ActivationGateKind.PROVEN_PRESENT, parsedGates);
   if (schedulesProven !== scope.requiresProven) {
     throw new ForesiftError(
@@ -644,7 +653,11 @@ export function requiredStatesForActivation(
     ModuleLifecycleState.IMPLEMENTED,
     ModuleLifecycleState.AVAILABLE,
   ];
-  if (scope.requiresProven) required.push(ModuleLifecycleState.PROVEN);
+  if (scope.requiresProven) {
+    // Indexed append, not `push`: a shadowed `Array.prototype.push` would drop
+    // the PROVEN prerequisite entirely (audit NEW-M5).
+    required[required.length] = ModuleLifecycleState.PROVEN;
+  }
   return required;
 }
 
@@ -668,18 +681,35 @@ export function activationGateRefusal(
   evaluations: readonly ActivationGateEvaluation[],
   requiredGates: readonly ActivationGateKind[] = ACTIVATION_GATE_ORDER,
 ): ActivationGateKind | null {
-  const required = requiredGates.map(parseActivationGateKind);
-  const byGate = new Map<ActivationGateKind, ActivationGateEvaluation[]>();
-  for (const evaluation of evaluations) {
-    const gate = parseActivationGateKind(evaluation.gateKind);
-    const bucket = byGate.get(gate);
-    if (bucket === undefined) byGate.set(gate, [evaluation]);
-    else bucket.push(evaluation);
+  // Numeric-index only. `requiredGates.map(...)` and BOTH `for…of` walks below
+  // are shadowable in-process, and a shadowed iterator iterating zero times
+  // made this fail-closed predicate return `null` ("every gate satisfied") for
+  // an EMPTY or incomplete evaluation set (audit NEW-M5). The `Map` bucket is
+  // replaced by a nested numeric count for the same reason.
+  const required: ActivationGateKind[] = [];
+  for (let gateIndex = 0; gateIndex < requiredGates.length; gateIndex += 1) {
+    required[required.length] = parseActivationGateKind(requiredGates[gateIndex]);
   }
-  for (const gate of required) {
-    const bucket = byGate.get(gate);
-    if (bucket === undefined || bucket.length !== 1) return gate;
-    const [evaluation] = bucket;
+  const parsedKinds: ActivationGateKind[] = [];
+  for (let evaluationIndex = 0; evaluationIndex < evaluations.length; evaluationIndex += 1) {
+    // Parse every declared kind exactly once (a malformed kind must refuse even
+    // when it is not one of the required gates).
+    parsedKinds[parsedKinds.length] = parseActivationGateKind(
+      evaluations[evaluationIndex]?.gateKind,
+    );
+  }
+  for (let gateIndex = 0; gateIndex < required.length; gateIndex += 1) {
+    const gate = required[gateIndex] as ActivationGateKind;
+    let occurrences = 0;
+    let firstIndex = -1;
+    for (let evaluationIndex = 0; evaluationIndex < parsedKinds.length; evaluationIndex += 1) {
+      if (parsedKinds[evaluationIndex] === gate) {
+        occurrences += 1;
+        if (firstIndex < 0) firstIndex = evaluationIndex;
+      }
+    }
+    if (occurrences !== 1 || firstIndex < 0) return gate;
+    const evaluation = evaluations[firstIndex];
     if (evaluation === undefined) return gate;
     const verdict = parseActivationGateVerdict(evaluation.verdict);
     const failing =
@@ -781,8 +811,25 @@ export function bestEffortWeakensOnlyAllowedDimensions(
   declaration: BestEffortDeclarationInput,
 ): boolean {
   const posture = parseDeploymentPosture(declaration.posture);
-  const weakened = [...new Set(declaration.weakenedDimensions)];
-  for (const dimension of weakened) {
+  // Numeric-index only (audit NEW-M5): `[...new Set(...)]`, `for…of`, and
+  // `Array.prototype` iteration are shadowable in-process. A shadowed iterator
+  // made `weakened` empty, so a declaration that weakened a protected dimension
+  // was accepted. Deduplicate with a nested numeric scan instead.
+  const weakenedSource = declaration.weakenedDimensions;
+  const weakened: string[] = [];
+  for (let sourceIndex = 0; sourceIndex < weakenedSource.length; sourceIndex += 1) {
+    const candidate = weakenedSource[sourceIndex];
+    let seen = false;
+    for (let seenIndex = 0; seenIndex < weakened.length; seenIndex += 1) {
+      if (weakened[seenIndex] === candidate) {
+        seen = true;
+        break;
+      }
+    }
+    if (!seen) weakened[weakened.length] = candidate as string;
+  }
+  for (let dimensionIndex = 0; dimensionIndex < weakened.length; dimensionIndex += 1) {
+    const dimension = weakened[dimensionIndex] as string;
     if (isOneOf(dimension, ALL_PROTECTED_DIMENSIONS)) return false;
     if (!isOneOf(dimension, ALL_DEPLOYMENT_RELAXABLE_DIMENSIONS)) {
       throw new ForesiftError(
@@ -792,8 +839,9 @@ export function bestEffortWeakensOnlyAllowedDimensions(
       );
     }
   }
-  for (const dimension of declaration.protectedDimensions) {
-    parseProtectedDimension(dimension);
+  const declaredProtected = declaration.protectedDimensions;
+  for (let protectedIndex = 0; protectedIndex < declaredProtected.length; protectedIndex += 1) {
+    parseProtectedDimension(declaredProtected[protectedIndex]);
   }
   if (posture === DeploymentPosture.SLA_BACKED && weakened.length > 0) return false;
   return true;
@@ -852,7 +900,10 @@ export function mcpRevisionMayBeDefault(descriptor: McpRevisionDescriptor): bool
 
 /** Refuses a draft revision marked default with `PROD_MCP_DRAFT_DEFAULT`. */
 export function assertNoDraftDefault(revisions: readonly McpRevisionDescriptor[]): void {
-  for (const descriptor of revisions) {
+  // Numeric-index walk: `for…of` over a caller-owned array is shadowable and
+  // would let a draft-default revision escape the refusal (audit NEW-M5).
+  for (let revisionIndex = 0; revisionIndex < revisions.length; revisionIndex += 1) {
+    const descriptor = revisions[revisionIndex] as McpRevisionDescriptor;
     const channel = parseMcpRevisionChannel(descriptor.channel);
     if (descriptor.isDefault && channel !== McpRevisionChannel.STABLE) {
       throw new ForesiftError(
@@ -1035,8 +1086,12 @@ export interface ArtifactBoundaryAssertion {
 export function trustBoundaryVerdict(
   assertions: readonly ArtifactBoundaryAssertion[],
 ): ActivationGateVerdict {
-  const counts = new Map<ArtifactBoundaryAssertionKind, number>();
-  for (const assertion of assertions) {
+  // Numeric-index only (audit NEW-M5). `for…of` over `assertions` is shadowable
+  // in-process, and the exact-once boundary law must never depend on an
+  // iteration primitive: validate every assertion by index, then count each
+  // authoritative kind with a nested numeric scan instead of a `Map` bucket.
+  for (let assertionIndex = 0; assertionIndex < assertions.length; assertionIndex += 1) {
+    const assertion = assertions[assertionIndex] as ArtifactBoundaryAssertion;
     const kind = parseArtifactBoundaryAssertionKind(assertion.assertionKind);
     const verdict = parseActivationGateVerdict(assertion.verdict);
     const hasRef =
@@ -1044,7 +1099,6 @@ export function trustBoundaryVerdict(
     const refRequired = kind === ArtifactBoundaryAssertionKind.IMPORT_SHADOW_ONLY;
     if (verdict !== ActivationGateVerdict.PASS) return ActivationGateVerdict.REFUSE;
     if (refRequired !== hasRef) return ActivationGateVerdict.REFUSE;
-    counts.set(kind, (counts.get(kind) ?? 0) + 1);
   }
   for (
     let kindIndex = 0;
@@ -1052,7 +1106,14 @@ export function trustBoundaryVerdict(
     kindIndex += 1
   ) {
     const kind = ALL_ARTIFACT_BOUNDARY_ASSERTION_KINDS[kindIndex] as ArtifactBoundaryAssertionKind;
-    if (counts.get(kind) !== 1) return ActivationGateVerdict.REFUSE;
+    let occurrences = 0;
+    for (let assertionIndex = 0; assertionIndex < assertions.length; assertionIndex += 1) {
+      const assertion = assertions[assertionIndex] as ArtifactBoundaryAssertion;
+      if (parseArtifactBoundaryAssertionKind(assertion.assertionKind) === kind) {
+        occurrences += 1;
+      }
+    }
+    if (occurrences !== 1) return ActivationGateVerdict.REFUSE;
   }
   return ActivationGateVerdict.PASS;
 }

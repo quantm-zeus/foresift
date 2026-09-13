@@ -67,7 +67,38 @@ async function resolveRequirements(
 }
 
 function nonEmptyStrings(value: readonly string[] | undefined): boolean {
-  return Array.isArray(value) && value.length > 0 && value.every((item) => item.trim().length > 0);
+  if (!Array.isArray(value) || value.length === 0) return false;
+  // Numeric-index scan: `Array.prototype.every` is shadowable in-process, and a
+  // shadowed `every` could accept an empty-string mapping (audit NEW-M5).
+  for (let index = 0; index < value.length; index += 1) {
+    if ((value[index] as string).trim().length === 0) return false;
+  }
+  return true;
+}
+
+/** Unique strings in first-seen order, then sorted (numeric dedup, NEW-M5). */
+function uniqueSortedValues(values: readonly string[]): string[] {
+  const unique: string[] = [];
+  for (let index = 0; index < values.length; index += 1) {
+    const value = values[index] as string;
+    let seen = false;
+    for (let seenIndex = 0; seenIndex < unique.length; seenIndex += 1) {
+      if (unique[seenIndex] === value) {
+        seen = true;
+        break;
+      }
+    }
+    if (!seen) unique[unique.length] = value;
+  }
+  return unique.sort();
+}
+
+/** Numeric membership: `Array.prototype.includes` is shadowable (NEW-M5). */
+function containsValue(values: readonly string[], candidate: string): boolean {
+  for (let index = 0; index < values.length; index += 1) {
+    if (values[index] === candidate) return true;
+  }
+  return false;
 }
 
 export interface MappingCompletenessVerdict {
@@ -86,25 +117,39 @@ export function checkMappingCompleteness(
   options: RepositoryOptions,
 ): MappingCompletenessVerdict | Promise<MappingCompletenessVerdict> {
   const evaluate = (requirements: readonly RequirementMapping[]): MappingCompletenessVerdict => {
-    const unmappedItems = requirements.filter(
-      (item) =>
+    // Numeric-index only (audit NEW-M5): a shadowed `filter`/`flatMap`/`map`
+    // silently dropped the unmapped-requirement findings.
+    const unmappedItems: RequirementMapping[] = [];
+    for (let index = 0; index < requirements.length; index += 1) {
+      const item = requirements[index] as RequirementMapping;
+      if (
         !nonEmptyStrings(item.implementationRefs) ||
         !nonEmptyStrings(item.testRefs) ||
         typeof item.owner !== 'string' ||
-        item.owner.trim().length === 0,
-    );
-    const findings = unmappedItems.flatMap((item): ConformanceFinding[] => {
+        item.owner.trim().length === 0
+      ) {
+        unmappedItems[unmappedItems.length] = item;
+      }
+    }
+    const findings: ConformanceFinding[] = [];
+    for (let itemIndex = 0; itemIndex < unmappedItems.length; itemIndex += 1) {
+      const item = unmappedItems[itemIndex] as RequirementMapping;
       const missing: string[] = [];
-      if (!nonEmptyStrings(item.implementationRefs)) missing.push('implementationRefs');
-      if (!nonEmptyStrings(item.testRefs)) missing.push('testRefs');
-      if (typeof item.owner !== 'string' || item.owner.trim().length === 0) missing.push('owner');
-      return missing.map((dimension) => ({
-        requirementId: item.id,
-        rule: CONFORMANCE_RULES.mapping,
-        path: dimension,
-        message: `${item.id} has no non-empty ${dimension} mapping`,
-      }));
-    });
+      if (!nonEmptyStrings(item.implementationRefs)) missing[missing.length] = 'implementationRefs';
+      if (!nonEmptyStrings(item.testRefs)) missing[missing.length] = 'testRefs';
+      if (typeof item.owner !== 'string' || item.owner.trim().length === 0) {
+        missing[missing.length] = 'owner';
+      }
+      for (let missingIndex = 0; missingIndex < missing.length; missingIndex += 1) {
+        const dimension = missing[missingIndex] as string;
+        findings[findings.length] = {
+          requirementId: item.id,
+          rule: CONFORMANCE_RULES.mapping,
+          path: dimension,
+          message: `${item.id} has no non-empty ${dimension} mapping`,
+        };
+      }
+    }
     return { passed: findings.length === 0, unmappedItems, findings };
   };
 
@@ -134,7 +179,16 @@ async function pathRefExists(
   scanCache: FileScanCache = new Map(),
 ): Promise<boolean> {
   const prefix = globStaticPrefix(refPath);
-  if (prefix.length === 0 || path.isAbsolute(refPath) || refPath.split('/').includes('..')) {
+  // Numeric traversal check: `Array.prototype.includes` is shadowable (NEW-M5).
+  const segments = refPath.split('/');
+  let traverses = false;
+  for (let index = 0; index < segments.length; index += 1) {
+    if (segments[index] === '..') {
+      traverses = true;
+      break;
+    }
+  }
+  if (prefix.length === 0 || path.isAbsolute(refPath) || traverses) {
     return false;
   }
   const hasGlob = /[?*[{]/.test(refPath);
@@ -164,10 +218,16 @@ async function pathRefExists(
       scanCache.set(searchRoot, candidatesPromise);
     }
     const candidates = await candidatesPromise;
-    return candidates.some((candidate) => {
-      const repositoryPath = path.posix.join(searchRoot, candidate.replaceAll('\\', '/'));
-      return matcher.test(repositoryPath);
-    });
+    // Numeric scan: `Array.prototype.some` is shadowable in-process, and a
+    // shadowed `true` would resolve a missing implementation path (NEW-M5).
+    for (let candidateIndex = 0; candidateIndex < candidates.length; candidateIndex += 1) {
+      const repositoryPath = path.posix.join(
+        searchRoot,
+        (candidates[candidateIndex] as string).replaceAll('\\', '/'),
+      );
+      if (matcher.test(repositoryPath)) return true;
+    }
+    return false;
   } catch {
     return false;
   }
@@ -216,10 +276,14 @@ export async function checkActiveImplementationPaths(
   const requirements = await resolveRequirements(options);
   const findings: ConformanceFinding[] = [];
   const scanCache: FileScanCache = new Map();
-  for (const requirement of requirements) {
+  // Numeric-index walks only (audit NEW-M5): a shadowed iterator walked zero
+  // requirements/refs and reported every active path as present.
+  for (let requirementIndex = 0; requirementIndex < requirements.length; requirementIndex += 1) {
+    const requirement = requirements[requirementIndex] as RequirementMapping;
     if (requirement.dependencyGroup !== options.activeGroup) continue;
     const mappings = resolveMappings({ requirements }, requirement.id);
-    for (const ref of mappings.implementationRefs) {
+    for (let refIndex = 0; refIndex < mappings.implementationRefs.length; refIndex += 1) {
+      const ref = mappings.implementationRefs[refIndex] as string;
       const exactPath = implementationPath(ref);
       const reconciledPath = reconciledMilestonePath(requirement.id, exactPath);
       const exists =
@@ -236,9 +300,13 @@ export async function checkActiveImplementationPaths(
       }
     }
   }
+  const missingPaths: string[] = [];
+  for (let index = 0; index < findings.length; index += 1) {
+    missingPaths[missingPaths.length] = (findings[index] as ConformanceFinding).path;
+  }
   return {
     passed: findings.length === 0,
-    missingPaths: [...new Set(findings.map((finding) => finding.path))].sort(),
+    missingPaths: uniqueSortedValues(missingPaths),
     findings,
   };
 }
@@ -269,22 +337,29 @@ export async function checkNoPrematureImplementations(
   if (activeNumber === undefined) throw new TypeError(`invalid dependency group: ${activeGroup}`);
 
   // A shared product path is legitimately open when any active requirement maps it.
-  const openedPaths = new Set(
-    requirements
-      .filter((item) => dependencyGroupNumber(item.dependencyGroup) !== undefined)
-      .filter((item) => (dependencyGroupNumber(item.dependencyGroup) as number) <= activeNumber)
-      .flatMap((item) => resolveMappings({ requirements }, item.id).implementationRefs)
-      .map(implementationPath),
-  );
+  // Numeric collection only (audit NEW-M5): a shadowed `filter`/`flatMap`/`map`
+  // or `new Set(array)` made the opened-path set empty and flagged every mapped
+  // path as premature.
+  const openedPaths: string[] = [];
+  for (let requirementIndex = 0; requirementIndex < requirements.length; requirementIndex += 1) {
+    const item = requirements[requirementIndex] as RequirementMapping;
+    const groupNumber = dependencyGroupNumber(item.dependencyGroup);
+    if (groupNumber === undefined || groupNumber > activeNumber) continue;
+    const refs = resolveMappings({ requirements }, item.id).implementationRefs;
+    for (let refIndex = 0; refIndex < refs.length; refIndex += 1) {
+      openedPaths[openedPaths.length] = implementationPath(refs[refIndex] as string);
+    }
+  }
   const findings: ConformanceFinding[] = [];
   const scanCache: FileScanCache = new Map();
-  for (const requirement of requirements) {
+  for (let requirementIndex = 0; requirementIndex < requirements.length; requirementIndex += 1) {
+    const requirement = requirements[requirementIndex] as RequirementMapping;
     const groupNumber = dependencyGroupNumber(requirement.dependencyGroup);
     if (groupNumber === undefined || groupNumber <= activeNumber) continue;
     const mappings = resolveMappings({ requirements }, requirement.id);
-    for (const ref of mappings.implementationRefs) {
-      const exactPath = implementationPath(ref);
-      if (!/^(apps|packages)\//.test(exactPath) || openedPaths.has(exactPath)) continue;
+    for (let refIndex = 0; refIndex < mappings.implementationRefs.length; refIndex += 1) {
+      const exactPath = implementationPath(mappings.implementationRefs[refIndex] as string);
+      if (!/^(apps|packages)\//.test(exactPath) || containsValue(openedPaths, exactPath)) continue;
       if (await pathRefExists(options.repoRoot, exactPath, scanCache)) {
         findings.push({
           requirementId: requirement.id,
@@ -295,16 +370,28 @@ export async function checkNoPrematureImplementations(
       }
     }
   }
-  const deduped = findings.filter(
-    (finding, index) =>
-      findings.findIndex(
-        (candidate) =>
-          candidate.requirementId === finding.requirementId && candidate.path === finding.path,
-      ) === index,
-  );
+  // Numeric de-duplication (first occurrence wins), never `Array.prototype.filter`
+  // with `findIndex` (both shadowable — audit NEW-M5).
+  const deduped: ConformanceFinding[] = [];
+  for (let index = 0; index < findings.length; index += 1) {
+    const finding = findings[index] as ConformanceFinding;
+    let duplicate = false;
+    for (let seenIndex = 0; seenIndex < deduped.length; seenIndex += 1) {
+      const candidate = deduped[seenIndex] as ConformanceFinding;
+      if (candidate.requirementId === finding.requirementId && candidate.path === finding.path) {
+        duplicate = true;
+        break;
+      }
+    }
+    if (!duplicate) deduped[deduped.length] = finding;
+  }
+  const prematurePaths: string[] = [];
+  for (let index = 0; index < deduped.length; index += 1) {
+    prematurePaths[prematurePaths.length] = (deduped[index] as ConformanceFinding).path;
+  }
   return {
     passed: deduped.length === 0,
-    prematurePaths: [...new Set(deduped.map((finding) => finding.path))].sort(),
+    prematurePaths: uniqueSortedValues(prematurePaths),
     findings: deduped,
   };
 }
@@ -318,10 +405,20 @@ async function filesRecursively(root: string, relative = ''): Promise<readonly s
     throw error;
   }
   const files: string[] = [];
-  for (const entry of entries.sort((a, b) => a.name.localeCompare(b.name))) {
+  // Numeric-index walk and append (audit NEW-M5): `for…of` and array spread
+  // over a directory listing are shadowable in-process.
+  const orderedEntries = entries.sort((a, b) => a.name.localeCompare(b.name));
+  for (let entryIndex = 0; entryIndex < orderedEntries.length; entryIndex += 1) {
+    const entry = orderedEntries[entryIndex] as (typeof orderedEntries)[number];
     const child = path.posix.join(relative.replaceAll('\\', '/'), entry.name);
-    if (entry.isDirectory()) files.push(...(await filesRecursively(root, child)));
-    else if (entry.isFile()) files.push(child);
+    if (entry.isDirectory()) {
+      const nested = await filesRecursively(root, child);
+      for (let nestedIndex = 0; nestedIndex < nested.length; nestedIndex += 1) {
+        files[files.length] = nested[nestedIndex] as string;
+      }
+    } else if (entry.isFile()) {
+      files[files.length] = child;
+    }
   }
   return files;
 }
@@ -363,33 +460,49 @@ export async function checkGeneratedDocsDrift(
     expected = Object.fromEntries(await generator.generateOutputs(options.repoRoot));
   }
 
-  const allPaths = [...new Set([...actualPaths, ...Object.keys(expected)])].sort();
+  // Numeric union + unique + numeric walk (audit NEW-M5): `[...new Set([...])]`
+  // iterates, and a shadowed iterator made the drift set empty.
+  const allPaths: string[] = [];
+  for (let index = 0; index < actualPaths.length; index += 1) {
+    allPaths[allPaths.length] = actualPaths[index] as string;
+  }
+  const expectedKeys = Object.keys(expected);
+  for (let index = 0; index < expectedKeys.length; index += 1) {
+    const key = expectedKeys[index] as string;
+    if (!containsValue(allPaths, key)) allPaths[allPaths.length] = key;
+  }
+  const orderedPaths = allPaths.sort();
   const driftedFiles: string[] = [];
-  for (const relativePath of allPaths) {
+  for (let pathIndex = 0; pathIndex < orderedPaths.length; pathIndex += 1) {
+    const relativePath = orderedPaths[pathIndex] as string;
     const expectedValue = expected[relativePath];
     if (expectedValue === undefined) {
-      driftedFiles.push(relativePath);
+      driftedFiles[driftedFiles.length] = relativePath;
       continue;
     }
     let actual: Buffer;
     try {
       actual = await readFile(path.join(generatedRoot, relativePath));
     } catch {
-      driftedFiles.push(relativePath);
+      driftedFiles[driftedFiles.length] = relativePath;
       continue;
     }
     const expectedBytes =
       typeof expectedValue === 'string'
         ? Buffer.from(expectedValue, 'utf8')
         : Buffer.from(expectedValue);
-    if (!actual.equals(expectedBytes)) driftedFiles.push(relativePath);
+    if (!actual.equals(expectedBytes)) driftedFiles[driftedFiles.length] = relativePath;
   }
-  const findings = driftedFiles.map((driftedPath): ConformanceFinding => ({
-    requirementId: 'FR-TRACE-003',
-    rule: CONFORMANCE_RULES.generated,
-    path: `docs/generated/${driftedPath}`,
-    message: `generated document differs byte-for-byte from deterministic regeneration: docs/generated/${driftedPath}`,
-  }));
+  const findings: ConformanceFinding[] = [];
+  for (let index = 0; index < driftedFiles.length; index += 1) {
+    const driftedPath = driftedFiles[index] as string;
+    findings[findings.length] = {
+      requirementId: 'FR-TRACE-003',
+      rule: CONFORMANCE_RULES.generated,
+      path: `docs/generated/${driftedPath}`,
+      message: `generated document differs byte-for-byte from deterministic regeneration: docs/generated/${driftedPath}`,
+    };
+  }
   return { passed: findings.length === 0, driftedFiles, findings };
 }
 
@@ -451,12 +564,20 @@ function milestoneOwnsProdLaw(
   activeGroup: string,
   requirements: readonly RequirementMapping[],
 ): boolean {
-  return requirements.some(
-    (requirement) =>
+  // Numeric-index scan, never `Array.prototype.some`: a shadowed `some`
+  // returning `false` would silence the whole PROD rule block and the release
+  // gate would skip FR-PROD law entirely (audit NEW-M5).
+  for (let index = 0; index < requirements.length; index += 1) {
+    const requirement = requirements[index] as RequirementMapping;
+    if (
       requirement.id.startsWith('FR-PROD-') &&
       requirement.dependencyGroup === activeGroup &&
-      (requirement.supersededBy ?? []).length === 0,
-  );
+      (requirement.supersededBy ?? []).length === 0
+    ) {
+      return true;
+    }
+  }
+  return false;
 }
 
 export async function evaluateConformance(options: ConformanceOptions): Promise<ConformanceResult> {
@@ -551,36 +672,58 @@ export async function evaluateConformance(options: ConformanceOptions): Promise<
   }[] = [];
   if (milestoneOwnsProdLaw(activeGroup, manifestRequirements)) {
     const { checkProdSurfacePresence, evaluateProdConformance } = await import('./prod-rules.ts');
-    const prodRequirements = manifestRequirements.filter(
-      (requirement) =>
-        requirement.id.startsWith('FR-PROD-') && requirement.dependencyGroup === activeGroup,
-    );
+    // Numeric selection and append only (audit NEW-M5): `Array.prototype.filter`
+    // and array spreads iterate, so a shadowed primitive silently dropped every
+    // FR-PROD requirement or every finding and the PROD block became a vacuous
+    // PASS.
+    const prodRequirements: typeof manifestRequirements = [];
+    for (let index = 0; index < manifestRequirements.length; index += 1) {
+      const requirement = manifestRequirements[index] as (typeof manifestRequirements)[number];
+      if (requirement.id.startsWith('FR-PROD-') && requirement.dependencyGroup === activeGroup) {
+        prodRequirements[prodRequirements.length] = requirement;
+      }
+    }
     const surface = await checkProdSurfacePresence({
       repoRoot: options.repoRoot,
       requirements: prodRequirements,
     });
-    prodFindings.push(...surface.findings);
+    for (let index = 0; index < surface.findings.length; index += 1) {
+      prodFindings[prodFindings.length] = surface.findings[index] as (typeof prodFindings)[number];
+    }
     if (options.prodClaims === undefined) {
-      prodFindings.push({
+      prodFindings[prodFindings.length] = {
         requirementId: 'FR-PROD-001',
         rule: 'PROD_CONFORMANCE_INPUT_MISSING',
         path: 'prodClaims',
         message:
           'the release gate evaluated a milestone that owns FR-PROD law without PROD governance claims; an absent claim set fails closed instead of skipping the PROD rules',
-      });
+      };
     } else {
       const prodReport = evaluateProdConformance(
         options.prodClaims as Parameters<typeof evaluateProdConformance>[0],
       );
-      prodFindings.push(...prodReport.findings);
+      for (let index = 0; index < prodReport.findings.length; index += 1) {
+        prodFindings[prodFindings.length] = prodReport.findings[
+          index
+        ] as (typeof prodFindings)[number];
+      }
     }
   }
-  const findings = [
-    ...mapping.findings,
-    ...activePaths.findings,
-    ...premature.findings,
-    ...generated.findings,
-    ...prodFindings,
+  // Numeric aggregation: an array spread iterates, so a shadowed
+  // `Symbol.iterator` silently aggregated ZERO findings into a PASSED gate.
+  const findings: (typeof prodFindings)[number][] = [];
+  const sources = [
+    mapping.findings,
+    activePaths.findings,
+    premature.findings,
+    generated.findings,
+    prodFindings,
   ];
+  for (let sourceIndex = 0; sourceIndex < sources.length; sourceIndex += 1) {
+    const source = sources[sourceIndex] as readonly (typeof prodFindings)[number][];
+    for (let findingIndex = 0; findingIndex < source.length; findingIndex += 1) {
+      findings[findings.length] = source[findingIndex] as (typeof prodFindings)[number];
+    }
+  }
   return { overall: findings.length === 0 ? 'PASSED' : 'FAILED', findings };
 }

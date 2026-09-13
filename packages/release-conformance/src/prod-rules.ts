@@ -201,7 +201,8 @@ export function checkActivationWithoutEvidence(
     ) {
       failures.push('no non-empty activation event reference');
     }
-    for (const failure of failures) {
+    for (let failureIndex = 0; failureIndex < failures.length; failureIndex += 1) {
+      const failure = failures[failureIndex] as string;
       findings.push({
         requirementId,
         rule: PROD_RULES.activationWithoutEvidence,
@@ -236,7 +237,11 @@ export function checkPostureWeakening(
   declarations: readonly PostureWeakeningDeclaration[],
 ): ProdRuleReport {
   const findings: ProdConformanceFinding[] = [];
-  for (const declaration of declarations) {
+  // Numeric-index walks only (audit NEW-M5): `for…of` and `new Set(array)`
+  // iterate, and a shadowed iterator made the weakened-dimension walk vacuous,
+  // accepting a declaration that weakened a protected dimension.
+  for (let declarationIndex = 0; declarationIndex < declarations.length; declarationIndex += 1) {
+    const declaration = declarations[declarationIndex] as PostureWeakeningDeclaration;
     const requirementId = declaration.requirementId ?? DEFAULT_POSTURE_REQUIREMENT;
     const findingsFor = (detail: string): void => {
       findings.push({
@@ -259,24 +264,39 @@ export function checkPostureWeakening(
     if (!domainAllows) {
       findingsFor('the declaration violates the §69.6 protected-dimension law');
     }
-    for (const dimension of new Set(declaration.weakenedDimensions)) {
+    const weakenedSource = declaration.weakenedDimensions;
+    for (let sourceIndex = 0; sourceIndex < weakenedSource.length; sourceIndex += 1) {
+      const dimension = weakenedSource[sourceIndex] as string;
+      let alreadySeen = false;
+      for (let seenIndex = 0; seenIndex < sourceIndex && !alreadySeen; seenIndex += 1) {
+        if (weakenedSource[seenIndex] === dimension) alreadySeen = true;
+      }
+      if (alreadySeen) continue;
       if (isOneOf(dimension, ALL_PROTECTED_DIMENSIONS)) {
         findingsFor(`protected dimension ${dimension} is weakened`);
       } else if (!isOneOf(dimension, ALL_DEPLOYMENT_RELAXABLE_DIMENSIONS)) {
         findingsFor(`unknown relaxable dimension ${dimension}`);
       }
     }
-    const declaredProtected = new Set(declaration.protectedDimensions);
+    const declaredProtected = declaration.protectedDimensions;
     const missingProtected: ProtectedDimension[] = [];
     // Numeric-index walk of the frozen authority array: `Array.prototype.filter`
-    // is shadowable in-process (audit NEW-M4).
+    // is shadowable in-process (audit NEW-M4), and the declared set is scanned
+    // numerically too (audit NEW-M5).
     for (
       let dimensionIndex = 0;
       dimensionIndex < ALL_PROTECTED_DIMENSIONS.length;
       dimensionIndex += 1
     ) {
       const dimension = ALL_PROTECTED_DIMENSIONS[dimensionIndex] as ProtectedDimension;
-      if (!declaredProtected.has(dimension)) missingProtected.push(dimension);
+      let declared = false;
+      for (let declaredIndex = 0; declaredIndex < declaredProtected.length; declaredIndex += 1) {
+        if (declaredProtected[declaredIndex] === dimension) {
+          declared = true;
+          break;
+        }
+      }
+      if (!declared) missingProtected.push(dimension);
     }
     if (missingProtected.length > 0) {
       findingsFor(`protected dimensions omitted: ${missingProtected.join(', ')}`);
@@ -335,7 +355,8 @@ export function checkMcpCompatibilityDrift(claim: McpCompatibilityMatrixClaim): 
     });
   };
 
-  for (const revision of claim.revisions) {
+  for (let revisionIndex = 0; revisionIndex < claim.revisions.length; revisionIndex += 1) {
+    const revision = claim.revisions[revisionIndex] as McpRevisionClaim;
     if (revision.isDefault !== true) continue;
     let mayBeDefault = false;
     try {
@@ -355,17 +376,27 @@ export function checkMcpCompatibilityDrift(claim: McpCompatibilityMatrixClaim): 
     }
   }
 
-  const defaults = claim.revisions.filter((revision) => revision.isDefault === true);
+  // Numeric collection and scan: `Array.prototype.filter/find/map` are
+  // shadowable in-process, and a shadowed `filter` made the default set empty
+  // and a shadowed `find` hid the conformance cell (audit NEW-M5).
+  const defaults: McpRevisionClaim[] = [];
+  for (let revisionIndex = 0; revisionIndex < claim.revisions.length; revisionIndex += 1) {
+    const revision = claim.revisions[revisionIndex] as McpRevisionClaim;
+    if (revision.isDefault === true) defaults[defaults.length] = revision;
+  }
   if (defaults.length === 0) {
     report('(default-revision)', 'no MCP revision is declared as the compatibility default');
     return { passed: findings.length === 0, findings };
   }
   if (defaults.length > 1) {
+    let defaultList = '';
+    for (let defaultIndex = 0; defaultIndex < defaults.length; defaultIndex += 1) {
+      if (defaultIndex > 0) defaultList += ', ';
+      defaultList += (defaults[defaultIndex] as McpRevisionClaim).revision;
+    }
     report(
       '(default-revision)',
-      `multiple revisions claim the compatibility default: ${defaults
-        .map((revision) => revision.revision)
-        .join(', ')}`,
+      `multiple revisions claim the compatibility default: ${defaultList}`,
     );
   }
 
@@ -375,19 +406,28 @@ export function checkMcpCompatibilityDrift(claim: McpCompatibilityMatrixClaim): 
     claim.maxAgeSeconds ?? MCP_LIVE_TEST_MAX_AGE_SECONDS,
     MCP_LIVE_TEST_MAX_AGE_SECONDS,
   );
-  for (const defaultRevision of defaults) {
-    for (const client of claim.clients) {
-      const path = `${defaultRevision.revision}\u00d7${client.clientId}`;
-      const cell = claim.cells.find(
-        (candidate) =>
-          candidate.revision === defaultRevision.revision && candidate.clientId === client.clientId,
-      );
+  for (let defaultIndex = 0; defaultIndex < defaults.length; defaultIndex += 1) {
+    const defaultRevision = defaults[defaultIndex] as McpRevisionClaim;
+    for (let clientIndex = 0; clientIndex < claim.clients.length; clientIndex += 1) {
+      const client = claim.clients[clientIndex] as McpTargetClientClaim;
+      const cellPath = `${defaultRevision.revision}\u00d7${client.clientId}`;
+      let cell: McpCompatibilityCellClaim | undefined;
+      for (let cellIndex = 0; cellIndex < claim.cells.length; cellIndex += 1) {
+        const candidate = claim.cells[cellIndex] as McpCompatibilityCellClaim;
+        if (
+          candidate.revision === defaultRevision.revision &&
+          candidate.clientId === client.clientId
+        ) {
+          cell = candidate;
+          break;
+        }
+      }
       if (cell === undefined) {
-        report(path, `no conformance cell for the default revision and client`);
+        report(cellPath, `no conformance cell for the default revision and client`);
         continue;
       }
       if (cell.result !== 'PASS') {
-        report(path, `conformance result is ${cell.result}, not PASS`);
+        report(cellPath, `conformance result is ${cell.result}, not PASS`);
         continue;
       }
       let usable = false;
@@ -406,7 +446,7 @@ export function checkMcpCompatibilityDrift(claim: McpCompatibilityMatrixClaim): 
         usable = false;
       }
       if (!usable) {
-        report(path, `the live test at ${cell.liveTestDate} is stale or invalid`);
+        report(cellPath, `the live test at ${cell.liveTestDate} is stale or invalid`);
       }
     }
   }
@@ -502,7 +542,11 @@ export function checkLivePathPrecomputationViolation(
   claims: readonly LivePathPrecomputationClaim[],
 ): ProdRuleReport {
   const findings: ProdConformanceFinding[] = [];
-  for (const claim of claims) {
+  // Numeric-index iteration (never `for…of`): a shadowed `Symbol.iterator`
+  // iterated zero times and the R7 guard reported `passed: true` for a live
+  // path that omits IMPORT_SHADOW_ONLY (audit NEW-M5).
+  for (let claimIndex = 0; claimIndex < claims.length; claimIndex += 1) {
+    const claim = claims[claimIndex] as LivePathPrecomputationClaim;
     const requirementId = claim.requirementId ?? DEFAULT_PRECOMPUTED_REQUIREMENT;
     const report = (detail: string): void => {
       findings.push({
@@ -553,15 +597,23 @@ export function checkLivePathPrecomputationViolation(
       report('boundaryAssertions is not an array of assertions; a malformed boundary fails closed');
     }
     if (!artifactBoundaryHolds(boundaryAssertions)) {
-      const present = new Set<string>();
+      const presentKinds: string[] = [];
       let failing = 0;
       // Numeric-index loops only: `Array.prototype.map/filter` are shadowable
       // in-process, and this branch renders the refusal the R7 guard decided
-      // without consulting them (audit NEW-M4).
+      // without consulting them (audit NEW-M4/NEW-M5).
       for (let presentIndex = 0; presentIndex < boundaryAssertions.length; presentIndex += 1) {
         const assertion = boundaryAssertions[presentIndex];
         if (typeof assertion !== 'object' || assertion === null) continue;
-        present.add(String(assertion.assertionKind));
+        const kind = String(assertion.assertionKind);
+        let alreadyPresent = false;
+        for (let seenIndex = 0; seenIndex < presentKinds.length; seenIndex += 1) {
+          if (presentKinds[seenIndex] === kind) {
+            alreadyPresent = true;
+            break;
+          }
+        }
+        if (!alreadyPresent) presentKinds[presentKinds.length] = kind;
         if (assertion.verdict !== 'PASS') failing += 1;
       }
       const missing: string[] = [];
@@ -571,7 +623,14 @@ export function checkLivePathPrecomputationViolation(
         kindIndex += 1
       ) {
         const kind = ALL_ARTIFACT_BOUNDARY_ASSERTION_KINDS[kindIndex] as string;
-        if (!present.has(kind)) missing.push(kind);
+        let present = false;
+        for (let presentIndex = 0; presentIndex < presentKinds.length; presentIndex += 1) {
+          if (presentKinds[presentIndex] === kind) {
+            present = true;
+            break;
+          }
+        }
+        if (!present) missing.push(kind);
       }
       const parts: string[] = [];
       if (missing.length > 0) parts.push(`missing assertions ${missing.join(', ')}`);
@@ -954,7 +1013,14 @@ function mcpClaimWellShaped(value: unknown): value is McpCompatibilityMatrixClai
 /** Flag every mandatory input the caller omitted instead of declaring. */
 export function checkProdConformanceInputsPresent(input: ProdConformanceInput): ProdRuleReport {
   const findings: ProdConformanceFinding[] = [];
-  for (const [field, label] of REQUIRED_PROD_INPUTS) {
+  // Numeric-index walk (never `for (const [field, label] of …)`, which both
+  // destructures and iterates): a shadowed iterator walked zero mandatory
+  // inputs, so `evaluateProdConformance({})` returned a vacuous PASSED
+  // (audit NEW-M5).
+  for (let inputIndex = 0; inputIndex < REQUIRED_PROD_INPUTS.length; inputIndex += 1) {
+    const inputEntry = REQUIRED_PROD_INPUTS[inputIndex] as readonly [string, string];
+    const field = inputEntry[0];
+    const label = inputEntry[1];
     const value: unknown = input[field];
     // Omission (`undefined`/`null`) AND a malformed value (anything that is not
     // the declared shape) both fail closed: a string is iterable, so
@@ -976,7 +1042,8 @@ export function checkProdConformanceInputsPresent(input: ProdConformanceInput): 
     // Element shape: a malformed element must be a finding, not a silent skip.
     if (field === 'mcpCompatibility') {
       const claim = value as Record<string, unknown>;
-      for (const required of REQUIRED_MCP_FIELDS) {
+      for (let requiredIndex = 0; requiredIndex < REQUIRED_MCP_FIELDS.length; requiredIndex += 1) {
+        const required = REQUIRED_MCP_FIELDS[requiredIndex] as string;
         if (!Array.isArray(claim[required])) {
           findings.push({
             requirementId: 'FR-PROD-001',
@@ -1010,7 +1077,8 @@ export function checkProdConformanceInputsPresent(input: ProdConformanceInput): 
         continue;
       }
       const claim = element as Record<string, unknown>;
-      for (const required of requiredFields) {
+      for (let requiredIndex = 0; requiredIndex < requiredFields.length; requiredIndex += 1) {
+        const required = requiredFields[requiredIndex] as string;
         if (claim[required] === undefined || claim[required] === null) {
           findings.push({
             requirementId: 'FR-PROD-001',
@@ -1092,23 +1160,38 @@ export function checkProdConformanceInputsPresent(input: ProdConformanceInput): 
  * `evaluateProdConformance({})` can never be a vacuous PASS (audit H2).
  */
 export function evaluateProdConformance(input: ProdConformanceInput): ProdConformanceReport {
-  const findings: ProdConformanceFinding[] = [
-    ...checkProdConformanceInputsPresent(input).findings,
-    ...checkActivationWithoutEvidence(
+  // Numeric append only: an array spread iterates, so a shadowed
+  // `Symbol.iterator` silently aggregated ZERO findings and returned PASSED for
+  // `{}` and for a violating live path (audit NEW-M5).
+  const findings: ProdConformanceFinding[] = [];
+  const append = (report: ProdRuleReport): void => {
+    const reportFindings = report.findings;
+    for (let index = 0; index < reportFindings.length; index += 1) {
+      findings[findings.length] = reportFindings[index] as ProdConformanceFinding;
+    }
+  };
+  append(checkProdConformanceInputsPresent(input));
+  append(
+    checkActivationWithoutEvidence(
       Array.isArray(input.activationClaims) ? input.activationClaims : [],
-    ).findings,
-    ...checkPostureWeakening(
+    ),
+  );
+  append(
+    checkPostureWeakening(
       Array.isArray(input.postureDeclarations) ? input.postureDeclarations : [],
-    ).findings,
-    ...(mcpClaimWellShaped(input.mcpCompatibility)
-      ? checkMcpCompatibilityDrift(input.mcpCompatibility).findings
-      : []),
-    ...checkLivePathPrecomputationViolation(Array.isArray(input.livePaths) ? input.livePaths : [])
-      .findings,
-    ...checkPublicAuthorizationWithoutGateEvidence(
+    ),
+  );
+  if (mcpClaimWellShaped(input.mcpCompatibility)) {
+    append(checkMcpCompatibilityDrift(input.mcpCompatibility));
+  }
+  append(
+    checkLivePathPrecomputationViolation(Array.isArray(input.livePaths) ? input.livePaths : []),
+  );
+  append(
+    checkPublicAuthorizationWithoutGateEvidence(
       Array.isArray(input.distributionAuthorizations) ? input.distributionAuthorizations : [],
-    ).findings,
-  ];
+    ),
+  );
   return { overall: findings.length === 0 ? 'PASSED' : 'FAILED', findings };
 }
 
@@ -1161,10 +1244,19 @@ async function filesUnder(root: string, relative = ''): Promise<readonly string[
     return [];
   }
   const files: string[] = [];
-  for (const entry of entries) {
+  // Numeric-index walk and append: `for…of` and array spread over a
+  // caller-visible directory listing are shadowable in-process (audit NEW-M5).
+  for (let entryIndex = 0; entryIndex < entries.length; entryIndex += 1) {
+    const entry = entries[entryIndex] as (typeof entries)[number];
     const child = relative.length === 0 ? entry.name : `${relative}/${entry.name}`;
-    if (entry.isDirectory()) files.push(...(await filesUnder(root, child)));
-    else if (entry.isFile()) files.push(child);
+    if (entry.isDirectory()) {
+      const nested = await filesUnder(root, child);
+      for (let nestedIndex = 0; nestedIndex < nested.length; nestedIndex += 1) {
+        files[files.length] = nested[nestedIndex] as string;
+      }
+    } else if (entry.isFile()) {
+      files[files.length] = child;
+    }
   }
   return files;
 }
@@ -1187,7 +1279,14 @@ async function prodRefResolves(repoRoot: string, ref: string): Promise<boolean> 
   const prefix = lastSlash < 0 ? '' : beforeWildcard.slice(0, lastSlash);
   const rest = lastSlash < 0 ? clean : clean.slice(lastSlash + 1);
   const matcher = globToRegExp(rest);
-  return (await filesUnder(path.join(repoRoot, prefix))).some((file) => matcher.test(file));
+  // Numeric scan, never `Array.prototype.some`: a shadowed `some` returning
+  // `false` would make every declared ref look unresolvable (fail-closed) but a
+  // shadowed `true` would resolve a missing surface (fail-open) — audit NEW-M5.
+  const candidates = await filesUnder(path.join(repoRoot, prefix));
+  for (let candidateIndex = 0; candidateIndex < candidates.length; candidateIndex += 1) {
+    if (matcher.test(candidates[candidateIndex] as string)) return true;
+  }
+  return false;
 }
 
 /**
@@ -1213,12 +1312,19 @@ export async function checkProdSurfacePresence(
       ),
     ).requirements as readonly ProdSurfaceRequirement[]);
   const findings: ProdConformanceFinding[] = [];
-  for (const requirement of requirements) {
+  // Numeric-index walks only (audit NEW-M5): a shadowed iterator over the
+  // requirements, the mapping fields, or the declared refs silently walked zero
+  // surfaces and the repo-backed PROD bridge reported `passed: true`.
+  for (let requirementIndex = 0; requirementIndex < requirements.length; requirementIndex += 1) {
+    const requirement = requirements[requirementIndex] as ProdSurfaceRequirement;
     if (!requirement.id.startsWith('FR-PROD-')) continue;
     if ((requirement.supersededBy ?? []).length > 0) continue;
     const mappings = resolveMappings({ requirements }, requirement.id);
-    for (const field of PROD_SURFACE_FIELDS) {
-      for (const ref of mappings[field]) {
+    for (let fieldIndex = 0; fieldIndex < PROD_SURFACE_FIELDS.length; fieldIndex += 1) {
+      const field = PROD_SURFACE_FIELDS[fieldIndex] as (typeof PROD_SURFACE_FIELDS)[number];
+      const refs = mappings[field];
+      for (let refIndex = 0; refIndex < refs.length; refIndex += 1) {
+        const ref = refs[refIndex] as string;
         if (await prodRefResolves(options.repoRoot, ref)) continue;
         findings.push({
           requirementId: requirement.id,

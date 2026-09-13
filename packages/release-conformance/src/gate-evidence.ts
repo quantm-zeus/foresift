@@ -1,5 +1,6 @@
 /** Signed, hashed, scoped, expiring, and revocable gate evidence (FR-TRACE-004). */
 import { createHash, createHmac, timingSafeEqual } from 'node:crypto';
+import { isOneOf } from '@foresift/domain';
 import { canonicalJson, type DatabaseEngine } from '@foresift/persistence';
 
 /**
@@ -69,15 +70,41 @@ function isIsoInstant(value: unknown): value is string {
   );
 }
 
+/**
+ * Numeric-index copy of a string array (audit NEW-M5). Array spread and
+ * `Array.prototype.slice/map` are shadowable in-process, so the indexed
+ * `scopeRefs` a record carries must never be produced by an iteration primitive.
+ */
+function copyStringArray(values: readonly string[]): string[] {
+  const copy: string[] = [];
+  for (let index = 0; index < values.length; index += 1) {
+    copy[copy.length] = values[index] as string;
+  }
+  return copy;
+}
+
+/** True iff every entry is a non-empty trimmed string (numeric scan, NEW-M5). */
+function hasOnlyNonEmptyStrings(values: readonly unknown[]): boolean {
+  for (let index = 0; index < values.length; index += 1) {
+    const value = values[index];
+    if (typeof value !== 'string' || value.trim().length === 0) return false;
+  }
+  return true;
+}
+
 function assertPayload(payload: unknown): asserts payload is GateEvidencePayload {
   if (payload === null || typeof payload !== 'object' || Array.isArray(payload)) {
     throw new TypeError('invalid gate evidence payload');
   }
   const value = payload as Partial<GateEvidencePayload>;
-  if (!GATE_KINDS.includes(value.gateKind as GateKind)) {
+  // `Array.prototype.includes` is shadowable in-process; membership in the
+  // frozen authority routes through the shadow-proof `isOneOf` (audit NEW-M4/M5).
+  if (!isOneOf(value.gateKind, GATE_KINDS)) {
     throw new TypeError('invalid gate evidence payload: gateKind is required');
   }
-  for (const field of ['approver', 'subject'] as const) {
+  const requiredTextFields = ['approver', 'subject'] as const;
+  for (let fieldIndex = 0; fieldIndex < requiredTextFields.length; fieldIndex += 1) {
+    const field = requiredTextFields[fieldIndex] as (typeof requiredTextFields)[number];
     if (typeof value[field] !== 'string' || value[field].trim().length === 0) {
       throw new TypeError(`invalid gate evidence payload: ${field} is required`);
     }
@@ -85,7 +112,7 @@ function assertPayload(payload: unknown): asserts payload is GateEvidencePayload
   if (
     !Array.isArray(value.scopeRefs) ||
     value.scopeRefs.length === 0 ||
-    value.scopeRefs.some((scope) => typeof scope !== 'string' || scope.trim().length === 0)
+    !hasOnlyNonEmptyStrings(value.scopeRefs)
   ) {
     throw new TypeError('invalid gate evidence payload: non-empty scopeRefs are required');
   }
@@ -145,7 +172,7 @@ export function createGateEvidence(
     payloadSha256,
     signature: computeGateEvidenceSignature(payload, pepper),
     gateKind: payload.gateKind,
-    scopeRefs: [...payload.scopeRefs],
+    scopeRefs: copyStringArray(payload.scopeRefs),
     approver: payload.approver,
     issuedAt: payload.issuedAt,
     expiresAt: payload.expiresAt,
@@ -197,10 +224,10 @@ function assertEvidenceRecord(record: unknown): asserts record is GateEvidenceRe
     value.evidenceId.trim().length === 0 ||
     !isHexDigest(value.payloadSha256) ||
     !isHexDigest(value.signature) ||
-    !GATE_KINDS.includes(value.gateKind as GateKind) ||
+    !isOneOf(value.gateKind, GATE_KINDS) ||
     !Array.isArray(value.scopeRefs) ||
     value.scopeRefs.length === 0 ||
-    value.scopeRefs.some((scope) => typeof scope !== 'string' || scope.trim().length === 0) ||
+    !hasOnlyNonEmptyStrings(value.scopeRefs) ||
     typeof value.approver !== 'string' ||
     value.approver.trim().length === 0 ||
     !isIsoInstant(value.issuedAt) ||
@@ -288,7 +315,10 @@ export function evaluateGateEvidence(options: EvaluateGateEvidenceOptions): Gate
     throw new TypeError('injected gate evidence clock returned an invalid time');
   if (now < Date.parse(record.issuedAt)) return refusal(record, 'EVIDENCE_NOT_YET_VALID');
   if (now >= Date.parse(record.expiresAt)) return refusal(record, 'EVIDENCE_EXPIRED');
-  if (!record.scopeRefs.includes(options.requiredScope)) return refusal(record, 'SCOPE_MISMATCH');
+  // `Array.prototype.includes` is shadowable in-process; a shadowed `true`
+  // would accept a record whose scope does not cover the required release,
+  // turning SCOPE_MISMATCH into a PASS (audit NEW-M5).
+  if (!isOneOf(options.requiredScope, record.scopeRefs)) return refusal(record, 'SCOPE_MISMATCH');
   return {
     isValid: true,
     gateKind: record.gateKind,

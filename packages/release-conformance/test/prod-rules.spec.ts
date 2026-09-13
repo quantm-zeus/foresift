@@ -1085,3 +1085,210 @@ describe('FOURTH-ROUND exploit regressions (R4/R7, audit H2/H4)', () => {
     }
   });
 });
+
+// --- NEW-M5: PROD gate fails closed under Array.prototype shadowing -----------
+
+/**
+ * Audit NEW-M5. A same-process caller can globally replace an `Array.prototype`
+ * iteration primitive and make `evaluateProdConformance` aggregate ZERO
+ * findings (a vacuous `PASSED`) or make the R7 live-path guard report
+ * `passed: true` for a live path that omits IMPORT_SHADOW_ONLY. Each shadow is
+ * installed for the call under test only and always restored in a `finally`, so
+ * the assertions below never run against a shadowed prototype.
+ */
+describe('NEW-M5: PROD gate fails closed under globally shadowed Array.prototype', () => {
+  interface ShadowCase {
+    readonly name: string;
+    readonly install: () => void;
+    readonly restore: () => void;
+  }
+
+  function buildShadowCases(): readonly ShadowCase[] {
+    const proto = Array.prototype as unknown as Record<string, unknown> & Record<symbol, unknown>;
+    const iteratorKey = Symbol.iterator;
+    const originalIterator = proto[iteratorKey];
+    const cases: ShadowCase[] = [];
+    cases[cases.length] = {
+      name: 'Array.prototype[Symbol.iterator] = function* () {}',
+      install: () => {
+        proto[iteratorKey] = function* () {};
+      },
+      restore: () => {
+        proto[iteratorKey] = originalIterator;
+      },
+    };
+    cases[cases.length] = {
+      name: 'Array.prototype[Symbol.iterator] = undefined',
+      install: () => {
+        proto[iteratorKey] = undefined;
+      },
+      restore: () => {
+        proto[iteratorKey] = originalIterator;
+      },
+    };
+    const methodReplacements: readonly (readonly [string, unknown])[] = [
+      ['includes', () => true],
+      ['map', () => []],
+      ['filter', () => []],
+      ['some', () => true],
+      ['find', () => undefined],
+      ['forEach', () => undefined],
+    ];
+    for (let index = 0; index < methodReplacements.length; index += 1) {
+      const entry = methodReplacements[index] as readonly [string, unknown];
+      const methodName = entry[0];
+      const replacement = entry[1];
+      const original = proto[methodName];
+      cases[cases.length] = {
+        name: `Array.prototype.${methodName} shadowed`,
+        install: () => {
+          proto[methodName] = replacement;
+        },
+        restore: () => {
+          proto[methodName] = original;
+        },
+      };
+    }
+    return cases;
+  }
+
+  const SHADOW_CASES = buildShadowCases();
+
+  function capture<T>(
+    shadowCase: ShadowCase,
+    run: () => T,
+  ): { readonly value: T } | { readonly error: string } {
+    shadowCase.install();
+    try {
+      return { value: run() };
+    } catch (error) {
+      return { error: error instanceof Error ? error.message : String(error) };
+    } finally {
+      shadowCase.restore();
+    }
+  }
+
+  function livePathWithImportState(state: unknown, omit: boolean): LivePathPrecomputationClaim {
+    const assertions: ArtifactBoundaryAssertion[] = [];
+    for (
+      let index = 0;
+      index < PROD_LIVE_PATH_BOUNDED_CLAIM.boundaryAssertions.length;
+      index += 1
+    ) {
+      const assertion = PROD_LIVE_PATH_BOUNDED_CLAIM.boundaryAssertions[
+        index
+      ] as ArtifactBoundaryAssertion;
+      if (assertion.assertionKind !== 'IMPORT_SHADOW_ONLY') {
+        assertions[assertions.length] = assertion;
+        continue;
+      }
+      const next: Record<string, unknown> = { ...assertion };
+      if (omit) delete next['importArtifactState'];
+      else next['importArtifactState'] = state;
+      assertions[assertions.length] = next as unknown as ArtifactBoundaryAssertion;
+    }
+    return { ...PROD_LIVE_PATH_BOUNDED_CLAIM, boundaryAssertions: assertions };
+  }
+
+  const MISSING_IMPORT_PATH = livePathWithImportState(undefined, true);
+  const REJECTED_IMPORT_PATH = livePathWithImportState('REJECTED', false);
+
+  function violatingInput(livePath: LivePathPrecomputationClaim) {
+    return {
+      activationClaims: [],
+      postureDeclarations: [],
+      mcpCompatibility: PROD_MCP_COMPLIANT_CLAIM,
+      livePaths: [livePath],
+      distributionAuthorizations: [PROD_WORKSPACE_AUTHORIZED_CLAIM],
+    };
+  }
+
+  function countRule(findings: readonly { readonly rule: string }[], rule: string): number {
+    let count = 0;
+    for (let index = 0; index < findings.length; index += 1) {
+      if ((findings[index] as { readonly rule: string }).rule === rule) count += 1;
+    }
+    return count;
+  }
+
+  it('evaluateProdConformance({}) reports the five mandatory-input findings as FAILED', () => {
+    const failures: string[] = [];
+    for (let index = 0; index < SHADOW_CASES.length; index += 1) {
+      const shadowCase = SHADOW_CASES[index] as ShadowCase;
+      const result = capture(shadowCase, () => evaluateProdConformance({}));
+      if ('error' in result) {
+        failures[failures.length] = `${shadowCase.name}: threw ${result.error}`;
+        continue;
+      }
+      const report = result.value;
+      if (report.overall !== 'FAILED') {
+        failures[failures.length] = `${shadowCase.name}: overall ${report.overall}`;
+      }
+      const missingCount = countRule(report.findings, PROD_RULES.prodConformanceInputMissing);
+      if (missingCount !== 5) {
+        failures[failures.length] = `${shadowCase.name}: missing-input findings ${missingCount}`;
+      }
+    }
+    expect(failures).toEqual([]);
+  });
+
+  it('a live path missing IMPORT_SHADOW_ONLY or with a REJECTED state FAILS with R7', () => {
+    const failures: string[] = [];
+    const paths: readonly (readonly [string, LivePathPrecomputationClaim])[] = [
+      ['missing IMPORT_SHADOW_ONLY', MISSING_IMPORT_PATH],
+      ['REJECTED import state', REJECTED_IMPORT_PATH],
+    ];
+    for (let index = 0; index < SHADOW_CASES.length; index += 1) {
+      const shadowCase = SHADOW_CASES[index] as ShadowCase;
+      const direct = capture(shadowCase, () =>
+        checkLivePathPrecomputationViolation([MISSING_IMPORT_PATH]),
+      );
+      if ('error' in direct) {
+        failures[failures.length] = `${shadowCase.name}: direct threw ${direct.error}`;
+      } else {
+        if (direct.value.passed !== false) {
+          failures[failures.length] = `${shadowCase.name}: direct passed ${String(
+            direct.value.passed,
+          )}`;
+        }
+        if (countRule(direct.value.findings, PROD_RULES.livePathPrecomputationViolation) < 1) {
+          failures[failures.length] = `${shadowCase.name}: direct has no R7 finding`;
+        }
+      }
+      for (let pathIndex = 0; pathIndex < paths.length; pathIndex += 1) {
+        const entry = paths[pathIndex] as readonly [string, LivePathPrecomputationClaim];
+        const aggregated = capture(shadowCase, () =>
+          evaluateProdConformance(violatingInput(entry[1])),
+        );
+        if ('error' in aggregated) {
+          failures[failures.length] = `${shadowCase.name} (${entry[0]}): threw ${aggregated.error}`;
+          continue;
+        }
+        const report = aggregated.value;
+        if (report.overall !== 'FAILED') {
+          failures[failures.length] = `${shadowCase.name} (${entry[0]}): overall ${report.overall}`;
+        }
+        if (countRule(report.findings, PROD_RULES.livePathPrecomputationViolation) < 1) {
+          failures[failures.length] = `${shadowCase.name} (${entry[0]}): no R7 finding`;
+        }
+      }
+    }
+    expect(failures).toEqual([]);
+  });
+
+  it('a conforming corpus still PASSES (no false failure)', () => {
+    const failures: string[] = [];
+    for (let index = 0; index < SHADOW_CASES.length; index += 1) {
+      const shadowCase = SHADOW_CASES[index] as ShadowCase;
+      const result = capture(shadowCase, () =>
+        evaluateProdConformance(violatingInput(PROD_LIVE_PATH_BOUNDED_CLAIM)),
+      );
+      if ('error' in result) {
+        failures[failures.length] = `${shadowCase.name}: threw ${result.error}`;
+      } else if (result.value.overall !== 'PASSED') {
+        failures[failures.length] = `${shadowCase.name}: overall ${result.value.overall}`;
+      }
+    }
+    expect(failures).toEqual([]);
+  });
+});

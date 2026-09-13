@@ -315,28 +315,34 @@ export async function containForFailedGate(
     input.minimumAction === undefined ? baseAction : parseContainmentAction(input.minimumAction);
   const requestedAction = escalateContainmentAction(baseAction, requested);
 
-  const current = await currentStateRow(engine, { moduleId: target.moduleId, scope });
-  if (current === undefined) {
-    throw new ForesiftError(
-      ErrorCode.PROD_ACTIVATION_SCOPE_INVALID,
-      'containment targeted an unknown governed scope',
-      { moduleId: target.moduleId, scopeHash },
-    );
-  }
-  // DISABLED is reachable from every governed state; fall back to it only when
-  // the mapped action is not a legal edge from the current position.
-  const lifecycleAction: ModuleLifecycleState = parseModuleLifecycleState(requestedAction);
-  const toState =
-    legalLifecycleTransition(current.lifecycleState, lifecycleAction) === true
-      ? lifecycleAction
-      : parseModuleLifecycleState('DISABLED');
-
   const containmentId =
     input.containmentId ??
     `containment-${scopeHash.slice(7, 23)}-${criticalGate.toLowerCase()}-${input.at}`;
   const triggerGateKind = CRITICAL_GATE_TO_ACTIVATION_GATE[criticalGate];
 
   const advanced = await engine.transaction(async (tx) => {
+    // Read the governed head INSIDE the transaction (audit TOCTOU): the head
+    // that derives the applied action, the artifact-set/readiness values, and
+    // the superseded row id must be the head the transaction itself writes
+    // from. A head read before BEGIN could be superseded by a concurrent
+    // advance between the read and the write, recording a containment action
+    // and `from` state that no longer describes the committed transition.
+    const current = await currentStateRow(tx, { moduleId: target.moduleId, scope });
+    if (current === undefined) {
+      throw new ForesiftError(
+        ErrorCode.PROD_ACTIVATION_SCOPE_INVALID,
+        'containment targeted an unknown governed scope',
+        { moduleId: target.moduleId, scopeHash },
+      );
+    }
+    // DISABLED is reachable from every governed state; fall back to it only
+    // when the mapped action is not a legal edge from the current position.
+    const lifecycleAction: ModuleLifecycleState = parseModuleLifecycleState(requestedAction);
+    const toState =
+      legalLifecycleTransition(current.lifecycleState, lifecycleAction) === true
+        ? lifecycleAction
+        : parseModuleLifecycleState('DISABLED');
+
     await tx.query(
       `INSERT INTO prod.containment_events
          (containment_id, module_id, scope_hash, action, trigger_gate_kind, reason,

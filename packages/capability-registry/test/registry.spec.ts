@@ -918,6 +918,73 @@ describe('§69.11 containment (AC-278)', () => {
     expect(degraded.containment.action).toBe('DEGRADED');
     expect(degraded.containment.action as string).toBe(degraded.state.lifecycleState);
   }, 120_000);
+
+  it('reads the governed head inside the containment transaction, never before BEGIN (TOCTOU)', async () => {
+    // The governed head must be read WITHIN the same transaction that appends
+    // the containment row and the superseded state row. A head read before
+    // `BEGIN` can be superseded by a concurrent advance, so the persisted
+    // action / artifact-set / readiness / `currentStateRowId` would describe a
+    // head the transaction never applied (observed on 0e2eb11:
+    // `containment.action='DEGRADED'` for a scope whose in-transaction head was
+    // `ACTIVE`).
+    //
+    // Wrapping the OUTER engine records exactly the statements that reach it
+    // outside a transaction: the transaction handle is a separate engine, so
+    // in-transaction reads never pass through this wrapper. Any
+    // `prod.module_states` read observed here therefore happened before
+    // `BEGIN` (or after `COMMIT`), which the fix forbids.
+    const scope = makeScope({ profile_version: 'toctou-contained-head' });
+    const moduleId = 'module-toctou-contained-head';
+    await advance(moduleId, scope, 'IMPLEMENTED', 'toctou-1');
+    await advance(moduleId, scope, 'AVAILABLE', 'toctou-2');
+    await advance(moduleId, scope, 'SHADOW', 'toctou-3');
+    await advance(moduleId, scope, 'PROVEN', 'toctou-4');
+    await advance(moduleId, scope, 'ACTIVE', 'toctou-5', {
+      gateResult: await gatePass(scope, 'activation-toctou-contained-head'),
+    });
+
+    const outsideHeadReads: string[] = [];
+    const observingEngine: DatabaseEngine = {
+      engineKind: engine.engineKind,
+      exec: (sql: string) => engine.exec(sql),
+      query: <T = Record<string, unknown>>(sql: string, params?: readonly unknown[]) => {
+        if (/FROM\s+prod\.module_states\b/i.test(sql)) {
+          outsideHeadReads.push(sql);
+        }
+        return engine.query<T>(sql, params);
+      },
+      transaction: <T>(work: (tx: DatabaseEngine) => Promise<T>) => engine.transaction(work),
+    };
+
+    const outcome = await containForFailedGate(observingEngine, {
+      criticalGate: 'CAPACITY',
+      affectedScopes: [{ moduleId, scope }],
+      reason: 'capacity breach must derive from the transaction-time head',
+      at: NOW,
+      containmentId: 'containment-toctou-contained-head',
+    });
+
+    // Pre-fix this is one read (the stale head read before the transaction).
+    expect(outsideHeadReads).toEqual([]);
+    // The applied action is derived from the transaction-time ACTIVE head (a
+    // legal CAPACITY → DEGRADED edge), not from any stale position.
+    expect(outcome.containment.action).toBe('DEGRADED');
+    expect(outcome.containment.action as string).toBe(outcome.state.lifecycleState);
+    expect(outcome.containment.reason).toBe(
+      'capacity breach must derive from the transaction-time head',
+    );
+
+    // The correct head was superseded by the appended row: the prior ACTIVE row
+    // now points at the new DEGRADED row.
+    const rows = await stateRowsFor(engine, { moduleId, scope });
+    const active = rows.find((row) => row.stateRowId === 'toctou-5');
+    expect(active?.lifecycleState).toBe('ACTIVE');
+    expect(active?.supersededBy).toBe(outcome.state.stateRowId);
+    expect(rows.map((row) => row.stateRowId)).toContain(outcome.state.stateRowId);
+    expect(
+      (await openContainments(engine, { moduleId })).map((row) => row.containmentId),
+    ).toContain('containment-toctou-contained-head');
+  }, 120_000);
 });
 
 describe('§69.11 rollback (AC-279)', () => {

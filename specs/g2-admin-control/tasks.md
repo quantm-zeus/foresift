@@ -306,7 +306,7 @@ suites, then cross-artifact convergence.
       FR-ADM-001, FR-ADM-003.
 - [ ] T027 [executor: TEST] [P] Dashboard tests
       (`apps/dashboard/test/**`, run by `pnpm --filter @foresift/dashboard
-  test`): view models and rendering for each required section with explicit
+test`): view models and rendering for each required section with explicit
       `UNKNOWN`/`STALE`/`REFUSED` markers; HTML escaping of untrusted read-model
       text; the client refuses non-GET/non-admin requests and validates
       responses; the kill-switch panel renders all six switches prominently
@@ -331,7 +331,7 @@ suites, then cross-artifact convergence.
       field is backed by the authoritative shared schema. Traces: FR-ADM-001.
 - [ ] T030 [serial-reason: SHARED_FILE] Regenerate `docs/generated/**` with the
       central generator (`node scripts/generate-requirement-manifest/cli.mjs
-  generate`) so `docs/generated/adm-surfaces.json` records the new
+generate`) so `docs/generated/adm-surfaces.json` records the new
       `apps/api/src/routes/admin/**` and `apps/dashboard/**` implementation
       paths, the `packages/shared-schemas/src/adm.ts` schema path, and
       `telemetry/adm.catalog.json` for FR-ADM-001/003/007 (plan-sanctioned

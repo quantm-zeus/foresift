@@ -11,11 +11,14 @@
 -- `g2_prod_0008` is already applied on canonical main, so it is immutable: this
 -- migration replaces the weak constraint with a strictly stronger predicate as
 -- a NEW, later-sorting script (per the plan's out-of-order law). It normalizes
--- away every character JS `trim()` treats as blank in the sampled classes —
--- ASCII whitespace (space U+0020, tab U+0009, LF U+000A, CR U+000D, VT U+000B,
--- FF U+000C), NBSP (U+00A0) and BOM (U+FEFF) — and then requires at least one
--- remaining character, so blank-only and empty are unrepresentable while NULL
--- (a non-crossing row legitimately has no event) is still allowed.
+-- away every code point ECMAScript `String.prototype.trim()` removes as
+-- WhiteSpace or LineTerminator — TAB U+0009, LF U+000A, VT U+000B, FF U+000C,
+-- CR U+000D, SPACE U+0020, NBSP U+00A0, OGHAM SPACE MARK U+1680, EN QUAD..HAIR
+-- SPACE U+2000..U+200A, LINE SEPARATOR U+2028, PARAGRAPH SEPARATOR U+2029,
+-- NARROW NBSP U+202F, MEDIUM MATHEMATICAL SPACE U+205F, IDEOGRAPHIC SPACE
+-- U+3000 and ZERO WIDTH NO-BREAK SPACE / BOM U+FEFF — and then requires at
+-- least one remaining character, so blank-only and empty are unrepresentable
+-- while NULL (a non-crossing row legitimately has no event) is still allowed.
 --
 -- Additive and self-contained: only this one CHECK constraint is dropped and
 -- re-added with the same name; no column, table or other constraint is touched.
@@ -26,13 +29,19 @@ ALTER TABLE prod.module_states
     CHECK (
         activation_event_ref IS NULL
         OR length(
-               -- Strip every sampled blank class: ASCII whitespace (tab, LF,
-               -- VT, FF, CR, space) plus NBSP (U+00A0) and BOM (U+FEFF). What
-               -- remains empty was blank to `String.prototype.trim()` too.
+               -- Remove the full ECMAScript trim() WhiteSpace + LineTerminator
+               -- set (see the header). What remains empty was blank to
+               -- `String.prototype.trim()` too, so the SQL and TypeScript
+               -- notions of "nonblank" are identical.
                translate(
                    activation_event_ref,
                    chr(9) || chr(10) || chr(11) || chr(12) || chr(13) || chr(32)
-                       || chr(160) || chr(65279),
+                       || chr(160) || chr(5760)
+                       || chr(8192) || chr(8193) || chr(8194) || chr(8195) || chr(8196)
+                       || chr(8197) || chr(8198) || chr(8199) || chr(8200) || chr(8201)
+                       || chr(8202)
+                       || chr(8232) || chr(8233) || chr(8239) || chr(8287) || chr(12288)
+                       || chr(65279),
                    ''
                )
            ) > 0

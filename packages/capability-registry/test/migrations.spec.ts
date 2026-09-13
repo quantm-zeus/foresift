@@ -341,8 +341,10 @@ describe('governed module states are append-only and gate-backed', () => {
   it('refuses every blank-only activation event reference class, not just ASCII spaces (R8)', async () => {
     // `btrim` strips only ASCII spaces, so tab/LF/CR/VT/FF/NBSP/BOM event refs
     // were accepted by the 0008 CHECK even though `String.prototype.trim()`
-    // treats them as blank. Each probe supplies a COMPLETE all-PASS OPPORTUNITY
-    // batch and a PROVEN row, so only the non-blank CHECK can refuse.
+    // treats them as blank. `g2_prod_0010` now removes the full ECMAScript
+    // WhiteSpace + LineTerminator set, so each probe below must be refused.
+    // Every probe supplies a COMPLETE all-PASS OPPORTUNITY batch and a PROVEN
+    // row, so only the non-blank CHECK can refuse.
     const blanks: readonly string[] = [
       ' ',
       '\t',
@@ -352,7 +354,15 @@ describe('governed module states are append-only and gate-backed', () => {
       '\f',
       '\u00A0',
       '\uFEFF',
-      '\t \n\u00A0',
+      '\u1680',
+      '\u2003',
+      '\u200A',
+      '\u2028',
+      '\u2029',
+      '\u202F',
+      '\u205F',
+      '\u3000',
+      '\t \n\u00A0\u2003',
     ];
     for (const [index, blank] of blanks.entries()) {
       const tag = `blank-${index}`;

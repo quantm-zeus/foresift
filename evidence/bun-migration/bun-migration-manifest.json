@@ -1,7 +1,7 @@
 {
   "schema": "foresift/bun-migration-manifest@1",
   "migrationId": "bun-test-authority-v1",
-  "generatedAt": "2026-09-13T09:18:03.724Z",
+  "generatedAt": "2026-09-13T13:52:53.912Z",
   "root": ".",
   "totalTestFiles": 602,
   "counts": {
@@ -412,9 +412,9 @@
     {
       "path": "packages/capability-registry/test/migrations.spec.ts",
       "package": "@foresift/capability-registry",
-      "bytes": 45847,
-      "lines": 1078,
-      "sha256": "a35bd05b42a4d77805d144d1f62588a9e54e689e369a56cead428479bdc84a13",
+      "bytes": 50631,
+      "lines": 1201,
+      "sha256": "4f7e64d1209890ca1847d2ade5a22c381a034dcc1ff236aa54021bd13ea0a032",
       "imports": [
         "bun:test",
         "@electric-sql/pglite",
@@ -500,9 +500,9 @@
     {
       "path": "packages/capability-registry/test/registry.spec.ts",
       "package": "@foresift/capability-registry",
-      "bytes": 66913,
-      "lines": 1682,
-      "sha256": "2131fc81a14706721cfa0fbb509b75b9739002492e4272506102d22f0e6584b5",
+      "bytes": 87255,
+      "lines": 2141,
+      "sha256": "8cb5a2e6e0283e672b7684e852be56cf7fc05fcd876877551d108bf1a80cf244",
       "imports": [
         "bun:test",
         "@electric-sql/pglite",
@@ -2751,9 +2751,9 @@
     {
       "path": "packages/persistence/test/migrator.spec.ts",
       "package": "@foresift/persistence",
-      "bytes": 29547,
-      "lines": 722,
-      "sha256": "11a278ec927a4635f24d4d347eb2ba89160e865e063075ef4859df1f2b640bfa",
+      "bytes": 31426,
+      "lines": 764,
+      "sha256": "a938f3589b49602a0976d74f4969d16cd80fd758f72eccd715e65ff4a57a3c2f",
       "imports": [
         "bun:test",
         "@electric-sql/pglite",
@@ -3676,16 +3676,28 @@
     {
       "path": "packages/release-conformance/test/prod-rules.spec.ts",
       "package": "@foresift/release-conformance",
-      "bytes": 20298,
-      "lines": 506,
-      "sha256": "15d37b95163a15d22c5c392ef0d5a6a6d4bd6948a513df336192aa5b5b8ffa00",
-      "imports": ["bun:test", "../src/index.ts", "../../../tests/fixtures/prod/index.ts"],
+      "bytes": 35886,
+      "lines": 905,
+      "sha256": "159d3c263861c88837b9746df4b1df223a09b4c92cc03fd93bfea4b2eb78e684",
+      "imports": [
+        "bun:test",
+        "node:fs/promises",
+        "node:os",
+        "node:path",
+        "../src/index.ts",
+        "@foresift/domain",
+        "../../../tests/fixtures/prod/index.ts"
+      ],
       "vitestImports": [],
       "features": ["dynamic-import"],
       "workload": "PURE",
       "migrationType": "ALREADY_MIGRATED",
       "fixturesAndHelpers": ["../../../tests/fixtures/prod/index.ts"],
-      "sourceAnchors": ["../src/index.ts", "../../../tests/fixtures/prod/index.ts"],
+      "sourceAnchors": [
+        "../src/index.ts",
+        "@foresift/domain",
+        "../../../tests/fixtures/prod/index.ts"
+      ],
       "state": "MIGRATED"
     },
     {
@@ -7925,9 +7937,9 @@
     {
       "path": "tests/acceptance/AC-279.spec.ts",
       "package": "acceptance",
-      "bytes": 8716,
-      "lines": 226,
-      "sha256": "b9858a969deefa3c5ff51983776b5cd5357a1e57b13318acef27a61195a2507c",
+      "bytes": 9610,
+      "lines": 247,
+      "sha256": "abff2e552320083fefa1ca07526b24a47a07f969ed5f183ce61291ca9792dc14",
       "imports": [
         "bun:test",
         "@electric-sql/pglite",
@@ -12050,9 +12062,9 @@
     {
       "path": "tests/telemetry-catalog.spec.ts",
       "package": "root",
-      "bytes": 64891,
-      "lines": 2171,
-      "sha256": "288ccb597b153825c704f203b4984e6b6ec65102201fdb6b4978e1b1c646c8d6",
+      "bytes": 65549,
+      "lines": 2186,
+      "sha256": "2ba43aa73ef5910d7ed9bc9370adc61ce1f6019ff4e9f62e50ee098a47b4107a",
       "imports": [
         "node:fs",
         "node:path",

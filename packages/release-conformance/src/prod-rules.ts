@@ -40,7 +40,9 @@ import {
 import { readFile, readdir, access } from 'node:fs/promises';
 import path from 'node:path';
 import { resolveMappings } from '@foresift/requirement-manifest';
+import { ImportQuarantineStateSchema } from '@foresift/shared-schemas';
 import { CONFORMANCE_RULES, implementationPath, type ConformanceFinding } from './conformance.ts';
+import { GATE_KINDS } from './gate-evidence.ts';
 
 // --- rule vocabulary --------------------------------------------------------
 
@@ -427,6 +429,27 @@ export interface LivePathPrecomputationClaim {
 const DEFAULT_PRECOMPUTED_REQUIREMENT = 'FR-PROD-006';
 
 /**
+ * The authoritative closed import-artifact quarantine states
+ * (`sec.import_artifacts`, FR-SEC-008/§35.14/ADR-046), read from the shared
+ * schema rather than restated here. `VALIDATING` and `SHADOW_ELIGIBLE` are the
+ * only members a live path may rest in — the closed vocabulary is imported so
+ * the shadow subset can never drift from the security-owned machine.
+ */
+const ALL_IMPORT_ARTIFACT_STATES: readonly string[] = ImportQuarantineStateSchema.options;
+
+/**
+ * The only import-artifact states an `IMPORT_SHADOW_ONLY` live-path assertion
+ * may certify: a `VALIDATING` or `SHADOW_ELIGIBLE` import. Both are selected
+ * from the authoritative closed state set above; an import in any other state
+ * (received, quarantined, scanned, rejected) or with no state at all must not
+ * pass the release gate (audit H4).
+ */
+export const SHADOW_ONLY_IMPORT_ARTIFACT_STATES: readonly string[] =
+  ALL_IMPORT_ARTIFACT_STATES.filter(
+    (state) => state === 'VALIDATING' || state === 'SHADOW_ELIGIBLE',
+  );
+
+/**
  * §33.7/§10.3/§35.14/AC-279 law. A live path must serve only a bounded,
  * unexpired precomputed lookup within every declared ceiling, and its exported
  * artifact-boundary assertion set must hold (no heavy Alpha Lab job, no
@@ -472,14 +495,27 @@ export function checkLivePathPrecomputationViolation(
         report('the lookup is unbounded, expired, or exceeds a declared ceiling');
       }
     }
-    if (!artifactBoundaryHolds(claim.boundaryAssertions)) {
+    // `artifactBoundaryHolds` is state-blind: an `IMPORT_SHADOW_ONLY` assertion
+    // with `verdict: 'PASS'` certifies only that the assertion was made, not
+    // that the referenced import artifact is actually shadow-only. The
+    // authoritative quarantine state is therefore checked separately and a
+    // missing/null/unknown/RECEIVED/QUARANTINED/SCANNED/REJECTED state refuses
+    // the live path (audit H4 root cause). A malformed (non-array) assertion set
+    // is a finding instead of a throw.
+    const boundaryAssertions: readonly ArtifactBoundaryAssertion[] = Array.isArray(
+      claim.boundaryAssertions,
+    )
+      ? claim.boundaryAssertions
+      : [];
+    if (!Array.isArray(claim.boundaryAssertions)) {
+      report('boundaryAssertions is not an array of assertions; a malformed boundary fails closed');
+    }
+    if (!artifactBoundaryHolds(boundaryAssertions)) {
       const present = new Set(
-        claim.boundaryAssertions.map((assertion) => String(assertion.assertionKind)),
+        boundaryAssertions.map((assertion) => String(assertion.assertionKind)),
       );
       const missing = ALL_ARTIFACT_BOUNDARY_ASSERTION_KINDS.filter((kind) => !present.has(kind));
-      const failing = claim.boundaryAssertions.filter(
-        (assertion) => assertion.verdict !== 'PASS',
-      ).length;
+      const failing = boundaryAssertions.filter((assertion) => assertion.verdict !== 'PASS').length;
       const parts: string[] = [];
       if (missing.length > 0) parts.push(`missing assertions ${missing.join(', ')}`);
       if (failing > 0) parts.push(`${failing} failing assertion(s)`);
@@ -488,6 +524,28 @@ export function checkLivePathPrecomputationViolation(
           ? parts.join('; ')
           : 'the live path reaches a heavy job, artifact import, or provider call',
       );
+    }
+    for (let assertionIndex = 0; assertionIndex < boundaryAssertions.length; assertionIndex += 1) {
+      const assertion = boundaryAssertions[assertionIndex];
+      if (
+        typeof assertion !== 'object' ||
+        assertion === null ||
+        (assertion as { readonly assertionKind?: unknown }).assertionKind !== 'IMPORT_SHADOW_ONLY'
+      ) {
+        continue;
+      }
+      const importState = (assertion as { readonly importArtifactState?: unknown })
+        .importArtifactState;
+      if (
+        typeof importState !== 'string' ||
+        !(SHADOW_ONLY_IMPORT_ARTIFACT_STATES as readonly string[]).includes(importState)
+      ) {
+        report(
+          `IMPORT_SHADOW_ONLY must reference an import artifact in ${SHADOW_ONLY_IMPORT_ARTIFACT_STATES.join(
+            '/',
+          )}; got ${JSON.stringify(importState ?? null)}`,
+        );
+      }
     }
   }
   return { passed: findings.length === 0, findings };
@@ -529,6 +587,10 @@ export interface DistributionAuthorizationEvaluation {
   readonly missingGateKinds: readonly string[];
   readonly mismatchedGateKinds: readonly string[];
   readonly revokedOrInvalidGateKinds: readonly string[];
+  /** Declared gate kinds outside the authoritative closed `GATE_KINDS` set. */
+  readonly unknownGateKinds: readonly string[];
+  /** Authoritative mandatory gate kinds the declaration never names. */
+  readonly omittedMandatoryGateKinds: readonly string[];
 }
 
 const AUTHORIZED_DISTRIBUTION_READINESS: readonly string[] = [
@@ -538,11 +600,21 @@ const AUTHORIZED_DISTRIBUTION_READINESS: readonly string[] = [
 const DEFAULT_PUBLIC_AUTHORIZATION_REQUIREMENT = 'FR-PROD-002';
 
 /**
+ * The authoritative mandatory distribution-gate set (audit H2). It is derived
+ * from the closed `GATE_KINDS` evidence vocabulary — never from the caller's
+ * `requiredGateKinds` — so a truncated or fabricated declaration cannot
+ * self-attest a PASS. The evidence checks and `authorized` are evaluated against
+ * this set; the caller's declaration is only checked for agreement with it.
+ */
+const MANDATORY_DISTRIBUTION_GATE_KINDS: readonly string[] = GATE_KINDS;
+
+/**
  * §69.9 law. `WORKSPACE_TECHNICALLY_READY`/`PUBLIC_TECHNICALLY_READY` are
  * honest not-yet-authorized positions; only `*_AUTHORIZED` claims authorization,
- * and only when every required gate kind has a valid, unrevoked, exact-release
- * scoped evidence record. Technically-ready-without-evidence therefore stays
- * unauthorized (AC-272/273/275/276/277).
+ * and only when every AUTHORITATIVE gate kind has a valid, unrevoked,
+ * exact-release scoped evidence record and the declaration neither invents a
+ * kind nor omits a mandatory one. Technically-ready-without-evidence therefore
+ * stays unauthorized (AC-272/273/275/276/277).
  */
 export function evaluateDistributionAuthorization(
   claim: DistributionAuthorizationClaim,
@@ -561,6 +633,8 @@ export function evaluateDistributionAuthorization(
   const missingGateKinds: string[] = [];
   const mismatchedGateKinds: string[] = [];
   const revokedOrInvalidGateKinds: string[] = [];
+  const unknownGateKinds: string[] = [];
+  const omittedMandatoryGateKinds: string[] = [];
   // The release identity must be a non-empty string, and the gate set and the
   // evidence list must be real arrays. `scopeRefs` in particular must never be
   // a string: `String.prototype.includes` would substring-match a foreign
@@ -594,11 +668,26 @@ export function evaluateDistributionAuthorization(
   // An authorization claim with NO required gate kinds is unauthorized by
   // construction: zero requirements cannot be satisfied into a PASS (H2).
   const requiredGateKindsEmpty = readinessAuthorized && requiredGateKinds.length === 0;
-  for (let gateIndex = 0; gateIndex < requiredGateKinds.length; gateIndex += 1) {
-    const gateKind = requiredGateKinds[gateIndex];
-    if (typeof gateKind !== 'string') {
-      missingGateKinds.push(String(gateKind));
+  // The caller's declaration is never authoritative: classify every declared
+  // kind and record the mandatory kinds it omits, so a fabricated/truncated set
+  // can never narrow the evidence bar (audit H2).
+  const declaredGateKinds = new Set<string>();
+  for (let declaredIndex = 0; declaredIndex < requiredGateKinds.length; declaredIndex += 1) {
+    const declared = requiredGateKinds[declaredIndex];
+    if (typeof declared !== 'string') {
+      unknownGateKinds.push(String(declared));
       continue;
+    }
+    declaredGateKinds.add(declared);
+    if (!(MANDATORY_DISTRIBUTION_GATE_KINDS as readonly string[]).includes(declared)) {
+      unknownGateKinds.push(declared);
+    }
+  }
+  for (let gateIndex = 0; gateIndex < MANDATORY_DISTRIBUTION_GATE_KINDS.length; gateIndex += 1) {
+    const gateKind = MANDATORY_DISTRIBUTION_GATE_KINDS[gateIndex];
+    if (typeof gateKind !== 'string') continue;
+    if (!declaredGateKinds.has(gateKind)) {
+      omittedMandatoryGateKinds.push(gateKind);
     }
     let sawMatching = false;
     let sawInScope = false;
@@ -641,6 +730,8 @@ export function evaluateDistributionAuthorization(
       !requiredGateKindsMalformed &&
       !gateEvidenceMalformed &&
       !requiredGateKindsEmpty &&
+      unknownGateKinds.length === 0 &&
+      omittedMandatoryGateKinds.length === 0 &&
       missingGateKinds.length === 0 &&
       mismatchedGateKinds.length === 0 &&
       revokedOrInvalidGateKinds.length === 0,
@@ -653,6 +744,8 @@ export function evaluateDistributionAuthorization(
     missingGateKinds,
     mismatchedGateKinds,
     revokedOrInvalidGateKinds,
+    unknownGateKinds,
+    omittedMandatoryGateKinds,
   };
 }
 
@@ -717,6 +810,16 @@ export function checkPublicAuthorizationWithoutGateEvidence(
     if (evaluation.revokedOrInvalidGateKinds.length > 0) {
       details.push(
         `revoked or invalid gate evidence: ${evaluation.revokedOrInvalidGateKinds.join(', ')}`,
+      );
+    }
+    if (evaluation.omittedMandatoryGateKinds.length > 0) {
+      details.push(
+        `authoritative mandatory gate kinds omitted from the declaration: ${evaluation.omittedMandatoryGateKinds.join(', ')}`,
+      );
+    }
+    if (evaluation.unknownGateKinds.length > 0) {
+      details.push(
+        `declared gate kinds outside the authoritative set: ${evaluation.unknownGateKinds.join(', ')}`,
       );
     }
     findings.push({

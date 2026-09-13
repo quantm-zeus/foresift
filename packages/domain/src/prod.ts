@@ -965,6 +965,16 @@ export interface ArtifactBoundaryAssertion {
   readonly verdict: unknown;
   /** Non-null exactly for `IMPORT_SHADOW_ONLY` (references `sec.import_artifacts`). */
   readonly importArtifactRef: string | null;
+  /**
+   * The authoritative import-artifact quarantine state for `IMPORT_SHADOW_ONLY`
+   * (the `sec.import_artifacts` state the referenced artifact actually rests in).
+   * The `verdict` alone is state-blind: a `PASS` assertion certifies only that
+   * the assertion was made, so a release gate must additionally require this
+   * state to be a shadow state (`VALIDATING`/`SHADOW_ELIGIBLE`) before treating
+   * the assertion as holding (audit H4). Optional for backward compatibility;
+   * a missing/`null`/unknown state fails such a gate closed.
+   */
+  readonly importArtifactState?: string | null;
 }
 
 /**

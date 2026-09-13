@@ -6,6 +6,7 @@
  * a missing gate kind, a scope mismatch, a revoked record, and the honest
  * technically-ready-but-unauthorized position.
  */
+import { GATE_KINDS } from '@foresift/release-conformance';
 import type {
   DistributionAuthorizationClaim,
   DistributionGateEvidenceClaim,
@@ -14,12 +15,13 @@ import type {
 export const PROD_RELEASE_REF = 'release://foresift/prod/v1';
 export const PROD_FOREIGN_RELEASE_REF = 'release://foresift/prod/v0';
 
-/** The gate kinds workspace/public authorization requires for the exact release. */
-export const PROD_DISTRIBUTION_REQUIRED_GATES: readonly string[] = [
-  'RIGHTS',
-  'MANUAL',
-  'OWNER_APPROVAL',
-];
+/**
+ * The authoritative mandatory distribution-gate set for workspace/public
+ * authorization: the full closed `GATE_KINDS` evidence vocabulary, imported
+ * from the package rather than restated (audit H2). A truncated declaration
+ * must never narrow the evidence bar.
+ */
+export const PROD_DISTRIBUTION_REQUIRED_GATES: readonly string[] = [...GATE_KINDS];
 
 function evidence(
   gateKind: string,

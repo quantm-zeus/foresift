@@ -72,6 +72,9 @@ export const PROD_BOUNDARY_ASSERTIONS_COMPLETE: readonly ArtifactBoundaryAsserti
     assertionKind: 'IMPORT_SHADOW_ONLY',
     verdict: 'PASS',
     importArtifactRef: 'import-artifact-prod-1',
+    // The referenced import artifact is SHADOW_ELIGIBLE in `sec.import_artifacts`
+    // — the state the DB-backed trust-boundary check already reads (H4).
+    importArtifactState: 'SHADOW_ELIGIBLE',
   },
 ];
 
@@ -84,6 +87,8 @@ export const PROD_BOUNDARY_ASSERTIONS_IMPORT_REFERENCING: readonly ArtifactBound
     assertionKind: 'IMPORT_SHADOW_ONLY',
     verdict: 'PASS',
     importArtifactRef: 'import-artifact-prod-1',
+    // The import state is valid; the violation here is the REFUSE NO_IMPORT.
+    importArtifactState: 'SHADOW_ELIGIBLE',
   },
 ];
 

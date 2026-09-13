@@ -1135,5 +1135,17 @@ describe('ACTIVE is bound to persisted gate evidence (F1)', () => {
     );
     const rows = await stateRowsFor(engine, { moduleId, scope });
     expect(rows.some((row) => row.lifecycleState === 'ACTIVE')).toBe(false);
+
+    // A non-string cast is refused with the same TYPED error rather than a raw
+    // TypeError from `.trim()`.
+    const nonString = await rejection(
+      advance(moduleId, scope, 'ACTIVE', 'empty-event-6', {
+        gateResult: { ...emptyEventGate, activationEventRef: 123 } as never,
+      }),
+    );
+    expect(nonString.code).toBe('PROD_ACTIVATION_GATE_REFUSED');
+    expect((nonString.detail as { readonly reason?: string }).reason).toBe(
+      'ACTIVATION_EVENT_REF_MISSING',
+    );
   }, 120_000);
 });

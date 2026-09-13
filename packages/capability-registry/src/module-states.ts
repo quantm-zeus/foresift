@@ -642,7 +642,8 @@ export async function advanceState(
       // row); a fresh evaluation for a distinct activation event is required.
       // The reference must be non-empty: an empty event ref cannot be singled
       // out as consumed and would let a stale PASS be replayed indefinitely.
-      if (input.gateResult.activationEventRef.trim().length === 0) {
+      const activationEventRef = input.gateResult.activationEventRef;
+      if (typeof activationEventRef !== 'string' || activationEventRef.trim().length === 0) {
         throw new ForesiftError(
           ErrorCode.PROD_ACTIVATION_GATE_REFUSED,
           'entering ACTIVE refused: the activation event reference must be a non-empty identifier so it can be recorded and consumed exactly once',
@@ -657,7 +658,7 @@ export async function advanceState(
               AND lifecycle_state = 'ACTIVE'
               AND activation_event_ref = $3
             LIMIT 1`,
-          [moduleId, scopeHash, input.gateResult.activationEventRef],
+          [moduleId, scopeHash, activationEventRef],
         );
         if (consumed.rows.length > 0) {
           throw new ForesiftError(

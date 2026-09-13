@@ -1,7 +1,7 @@
 {
   "schema": "foresift/bun-migration-manifest@1",
   "migrationId": "bun-test-authority-v1",
-  "generatedAt": "2026-09-13T03:46:45.385Z",
+  "generatedAt": "2026-09-13T03:57:53.470Z",
   "root": ".",
   "totalTestFiles": 601,
   "counts": {
@@ -470,9 +470,9 @@
     {
       "path": "packages/capability-registry/test/registry.spec.ts",
       "package": "@foresift/capability-registry",
-      "bytes": 43034,
-      "lines": 1140,
-      "sha256": "baa33eaa99d971f9b66eceac4dd19a22c69fbb645b7f36b8e5355e44985a53a7",
+      "bytes": 43527,
+      "lines": 1152,
+      "sha256": "43d3d58fdfbfe7b526b433bc77201745ae16db2c698f0466a794116368cc00eb",
       "imports": [
         "bun:test",
         "@electric-sql/pglite",

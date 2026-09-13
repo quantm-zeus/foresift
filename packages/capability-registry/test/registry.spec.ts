@@ -2054,10 +2054,9 @@ describe('PROVEN requires a genuinely established AVAILABLE (R5)', () => {
         gateResult: await gatePass(scope, 'activation-r5-exp'),
       }),
     );
-    expect([
-      'PROD_ACTIVATION_GATE_REFUSED',
-      'PROD_LIFECYCLE_TRANSITION_ILLEGAL',
-    ]).toContain(activeRefused.code);
+    expect(['PROD_ACTIVATION_GATE_REFUSED', 'PROD_LIFECYCLE_TRANSITION_ILLEGAL']).toContain(
+      activeRefused.code,
+    );
     const rows = await stateRowsFor(engine, { moduleId, scope });
     expect(rows.some((row) => row.lifecycleState === 'PROVEN')).toBe(false);
     expect(rows.some((row) => row.lifecycleState === 'ACTIVE')).toBe(false);
@@ -2137,4 +2136,3 @@ describe('PROVEN requires a genuinely established AVAILABLE (R5)', () => {
     expect((await statesFor(engine, { moduleId, scope })).lifecycleState).toBe('ACTIVE');
   }, 120_000);
 });
-

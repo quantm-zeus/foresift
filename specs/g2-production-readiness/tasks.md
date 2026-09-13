@@ -648,7 +648,7 @@ third-round finding-to-task map and the verbatim reproductions.
       as a new later-sorting migration (`g2_prod_0010`) that replaces the CHECK,
       with a positive regression for space and a negative regression for each
       sampled whitespace class. Traces: FR-PROD-001, AC-152.
-- [ ] T070 [serial-reason: SEMANTIC_DEPENDENCY] Close R9: persist the *applied*
+- [ ] T070 [serial-reason: SEMANTIC_DEPENDENCY] Close R9: persist the _applied_
       containment action on the containment row so `openContainments()` and the
       gate refusal message never understate a `DISABLED` stop. Add the
       regression contrasting `requestedAction` with the persisted action for the

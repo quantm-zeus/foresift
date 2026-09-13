@@ -1,7 +1,7 @@
 /**
  * Drizzle mirror of SQL truth (ADR-001) — hand-maintained to match the tables
- * created by the versioned migration families, including the `sig`, `wf`, and
- * `alert` schemas, exactly.
+ * created by the versioned migration families, including the `sig`, `wf`,
+ * `alert`, `prod`, and `adm` schemas, exactly.
  *
  * This file NEVER defines schema semantics on its own: the SQL migrations are
  * the single source of truth and a parity test enumerates
@@ -27,6 +27,7 @@ export const sigSchema = pgSchema('sig');
 export const wfSchema = pgSchema('wf');
 export const alertSchema = pgSchema('alert');
 export const prodSchema = pgSchema('prod');
+export const admSchema = pgSchema('adm');
 
 // --- g0_data_0001_identity -------------------------------------------------
 
@@ -2123,4 +2124,97 @@ export const prodArtifactBoundaryAssertions = prodSchema.table('artifact_boundar
   importArtifactRef: text('import_artifact_ref'),
   verdict: text('verdict').notNull(),
   assertedAt: timestamp('asserted_at', { withTimezone: true }).notNull(),
+});
+
+// --- g2_adm_0001_kill_switches ---------------------------------------------
+
+export const admKillSwitchStates = admSchema.table('kill_switch_states', {
+  stateRowId: text('state_row_id').primaryKey(),
+  switchKind: text('switch_kind').notNull(),
+  scope: jsonb('scope').notNull(),
+  scopeHash: text('scope_hash').notNull(),
+  state: text('state').notNull(),
+  reason: text('reason'),
+  actorRef: text('actor_ref'),
+  stepUpRef: text('step_up_ref'),
+  auditRef: text('audit_ref'),
+  expiresAt: timestamp('expires_at', { withTimezone: true }),
+  supersededBy: text('superseded_by'),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull(),
+});
+
+export const admKillSwitchEvents = admSchema.table('kill_switch_events', {
+  eventId: text('event_id').primaryKey(),
+  switchKind: text('switch_kind').notNull(),
+  fromState: text('from_state'),
+  toState: text('to_state').notNull(),
+  scope: jsonb('scope').notNull(),
+  scopeHash: text('scope_hash').notNull(),
+  reason: text('reason').notNull(),
+  actorRef: text('actor_ref').notNull(),
+  stepUpRef: text('step_up_ref').notNull(),
+  csrfRef: text('csrf_ref').notNull(),
+  idempotencyKey: text('idempotency_key').notNull(),
+  auditRef: text('audit_ref').notNull(),
+  occurredAt: timestamp('occurred_at', { withTimezone: true }).notNull(),
+});
+
+// --- g2_adm_0002_configuration_versions ------------------------------------
+
+export const admConfigurationVersions = admSchema.table('configuration_versions', {
+  configVersionId: text('config_version_id').primaryKey(),
+  configKind: text('config_kind').notNull(),
+  configId: text('config_id').notNull(),
+  version: integer('version').notNull(),
+  ownerVersionRef: text('owner_version_ref'),
+  configHash: text('config_hash').notNull(),
+  lifecycleState: text('lifecycle_state').notNull(),
+  resolvedConfig: jsonb('resolved_config').notNull(),
+  resolvedConfigHash: text('resolved_config_hash').notNull(),
+  supersededBy: text('superseded_by'),
+  rolledBackFrom: text('rolled_back_from'),
+  approvedByRef: text('approved_by_ref'),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull(),
+});
+
+export const admResolvedConfigPreviews = admSchema.table('resolved_config_previews', {
+  previewId: text('preview_id').primaryKey(),
+  configVersionId: text('config_version_id').notNull(),
+  precedence: jsonb('precedence').notNull(),
+  resolvedConfig: jsonb('resolved_config').notNull(),
+  resolvedHash: text('resolved_hash').notNull(),
+  computedAt: timestamp('computed_at', { withTimezone: true }).notNull(),
+  expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
+});
+
+// --- g2_adm_0003_overview_audit --------------------------------------------
+
+export const admOverviewSnapshots = admSchema.table('overview_snapshots', {
+  snapshotId: text('snapshot_id').primaryKey(),
+  generatedAt: timestamp('generated_at', { withTimezone: true }).notNull(),
+  systemMode: text('system_mode').notNull(),
+  sections: jsonb('sections').notNull(),
+  sourceRefs: jsonb('source_refs').notNull(),
+  sectionHashes: jsonb('section_hashes').notNull(),
+  readModelHash: text('read_model_hash').notNull(),
+  providerCallsTriggered: integer('provider_calls_triggered').notNull(),
+  externalWriteAttempts: integer('external_write_attempts').notNull(),
+});
+
+export const admAdminActionAudit = admSchema.table('admin_action_audit', {
+  actionId: text('action_id').primaryKey(),
+  actionKind: text('action_kind').notNull(),
+  targetRef: text('target_ref').notNull(),
+  targetVersionRef: text('target_version_ref'),
+  actorRef: text('actor_ref').notNull(),
+  stepUpRef: text('step_up_ref'),
+  csrfRef: text('csrf_ref'),
+  idempotencyKey: text('idempotency_key'),
+  reason: text('reason').notNull(),
+  outcome: text('outcome').notNull(),
+  refusalCode: text('refusal_code'),
+  beforeHash: text('before_hash'),
+  afterHash: text('after_hash'),
+  auditRef: text('audit_ref'),
+  recordedAt: timestamp('recorded_at', { withTimezone: true }).notNull(),
 });

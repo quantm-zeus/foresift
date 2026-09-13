@@ -1,7 +1,7 @@
 {
   "schema": "foresift/bun-migration-manifest@1",
   "migrationId": "bun-test-authority-v1",
-  "generatedAt": "2026-09-13T14:57:10.704Z",
+  "generatedAt": "2026-09-13T15:22:34.073Z",
   "root": ".",
   "totalTestFiles": 602,
   "counts": {
@@ -3676,9 +3676,9 @@
     {
       "path": "packages/release-conformance/test/prod-rules.spec.ts",
       "package": "@foresift/release-conformance",
-      "bytes": 37547,
-      "lines": 939,
-      "sha256": "18bd58eac198b278fee5164a5032f42fc609554a03ece16a26dc663ae999b850",
+      "bytes": 41112,
+      "lines": 1010,
+      "sha256": "45e73dc8a7e83c765967799f3b9f3e960e8ad59259edb09da14f06529f8c8ad0",
       "imports": [
         "bun:test",
         "node:fs/promises",

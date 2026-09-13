@@ -12,6 +12,14 @@ import {
   type SecretLifecycleEvent,
 } from '@foresift/shared-schemas';
 import { SecErrorCode, SecretsPolicyError } from './errors.ts';
+import {
+  numericCopy,
+  numericFilter,
+  numericIncludes,
+  numericJoin,
+  numericMap,
+  numericSortWith,
+} from './shadow-safe.ts';
 
 /** The full classification registry (single source: shared schema). */
 export const SECRET_CLASSIFICATIONS: readonly SecretClassification[] = [
@@ -45,7 +53,10 @@ const MATERIAL_PATTERNS: ReadonlyArray<{ id: string; regex: RegExp }> = [
 ];
 
 export function detectMaterial(text: string): string[] {
-  return MATERIAL_PATTERNS.filter((pattern) => pattern.regex.test(text)).map((p) => p.id);
+  return numericMap(
+    numericFilter(MATERIAL_PATTERNS, (pattern) => pattern.regex.test(text)),
+    (p) => p.id,
+  );
 }
 
 // --- Context-envelope guard -----------------------------------------------------
@@ -62,7 +73,7 @@ export function refuseSecretTowardModelContext(input: {
   if (detected.length > 0 || (input.declaredClassifications?.length ?? 0) > 0) {
     throw new SecretsPolicyError(
       'classified or secret-shaped material refused toward model context',
-      { detected: detected.join(',') },
+      { detected: numericJoin(detected) },
       SecErrorCode.SEC_SECRET_CONTEXT_INSERTION_REFUSED,
     );
   }
@@ -79,13 +90,19 @@ export function redactForLogs(
   knownValues: ReadonlyArray<{ value: string; label: string }> = [],
 ): string {
   let output = text;
-  for (const known of [...knownValues].sort((a, b) => b.value.length - a.value.length)) {
+  const sortedKnown = numericSortWith(
+    numericCopy(knownValues),
+    (a, b) => b.value.length - a.value.length,
+  );
+  for (let index = 0; index < sortedKnown.length; index += 1) {
+    const known = sortedKnown[index] as { value: string; label: string };
     if (known.value === '') continue;
     while (output.includes(known.value)) {
       output = output.replace(known.value, `[REDACTED:${known.label}]`);
     }
   }
-  for (const pattern of MATERIAL_PATTERNS) {
+  for (let index = 0; index < MATERIAL_PATTERNS.length; index += 1) {
+    const pattern = MATERIAL_PATTERNS[index] as { id: string; regex: RegExp };
     output = output.replace(pattern.regex, `[REDACTED:${pattern.id}]`);
   }
   return output;
@@ -97,7 +114,7 @@ export function assertExportAllowed(
   classification: SecretClassification,
   channel: 'ALPHA_LAB' | 'PUBLIC_API' | 'OPERATOR_UI',
 ): void {
-  if (EXPORT_PROHIBITED_CLASSES.includes(classification)) {
+  if (numericIncludes(EXPORT_PROHIBITED_CLASSES, classification)) {
     throw new SecretsPolicyError(
       `classification ${classification} is prohibited from export channel ${channel}`,
       {},
@@ -151,7 +168,7 @@ export class SecretLifecycleLedger {
   /** Parse-and-record one lifecycle event (keyed references only). */
   record(event: SecretLifecycleEvent): SecretLifecycleEvent {
     const parsed = SecretLifecycleEventSchema.parse(event);
-    this.events.push(parsed);
+    this.events[this.events.length] = parsed;
     return parsed;
   }
 
@@ -195,7 +212,7 @@ export class SecretLifecycleLedger {
     at: string;
     environment: 'PRODUCTION' | 'COLLECTOR' | 'ALPHA_LAB';
   }): readonly SecretLifecycleEvent[] {
-    return input.secretRefs.map((secretRef) =>
+    return numericMap(input.secretRefs, (secretRef) =>
       this.record({
         secretRef: secretRef as never,
         classification: input.classification,
@@ -209,7 +226,7 @@ export class SecretLifecycleLedger {
   }
 
   all(): readonly SecretLifecycleEvent[] {
-    return [...this.events];
+    return numericCopy(this.events);
   }
 }
 
@@ -217,13 +234,14 @@ export class SecretLifecycleLedger {
 
 /** Prohibited-secret-class configuration validation: config ⊆ registry. */
 export function validateSecretClassConfiguration(requestedClasses: readonly string[]): void {
-  const unknown = requestedClasses.filter(
-    (c) => !SECRET_CLASSIFICATIONS.includes(c as SecretClassification),
+  const unknown = numericFilter(
+    requestedClasses,
+    (c) => !numericIncludes(SECRET_CLASSIFICATIONS, c as SecretClassification),
   );
   if (unknown.length > 0) {
     throw new SecretsPolicyError(
       'secret-class configuration names classes outside the registry',
-      { unknown: unknown.join(',') },
+      { unknown: numericJoin(unknown) },
       SecErrorCode.SEC_SECRET_LIFECYCLE_INVALID,
     );
   }

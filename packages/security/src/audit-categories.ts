@@ -10,6 +10,7 @@
  * leaving an unauditable change class.
  */
 import { AuditActionClassSchema, type AuditActionClass } from '@foresift/shared-schemas';
+import { numericFilter, numericIncludes, numericMap } from './shadow-safe.ts';
 
 export type { AuditActionClass };
 
@@ -55,10 +56,19 @@ export interface CoverageReport {
 
 /** Compute the §35.9 coverage report over the current map. */
 export function section359Coverage(): CoverageReport {
-  const unmapped = SECTION_35_9_COVERAGE.filter(
-    (b) => !ALL_AUDIT_ACTION_CLASSES.includes(b.actionClass),
-  ).map((b) => b.bullet);
-  const covered = new Set(SECTION_35_9_COVERAGE.map((b) => b.actionClass));
-  const uncovered = ALL_AUDIT_ACTION_CLASSES.filter((c) => !covered.has(c));
+  const unmapped = numericMap(
+    numericFilter(
+      SECTION_35_9_COVERAGE,
+      (b) => !numericIncludes(ALL_AUDIT_ACTION_CLASSES, b.actionClass),
+    ),
+    (b) => b.bullet,
+  );
+  // Build the covered-class set by numeric index; `new Set(array)` would read
+  // the shadowable `Array.prototype[Symbol.iterator]`.
+  const covered = new Set<AuditActionClass>();
+  for (let index = 0; index < SECTION_35_9_COVERAGE.length; index += 1) {
+    covered.add((SECTION_35_9_COVERAGE[index] as CoverageBullet).actionClass);
+  }
+  const uncovered = numericFilter(ALL_AUDIT_ACTION_CLASSES, (c) => !covered.has(c));
   return { unmappedBullets: unmapped, uncoveredClasses: uncovered };
 }

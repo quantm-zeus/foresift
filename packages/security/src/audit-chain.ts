@@ -37,6 +37,7 @@ import {
   type AuditVerifyRunRecord,
 } from '@foresift/shared-schemas';
 import type { UtcTimestamp } from '@foresift/domain';
+import { numericIncludes, numericMap } from './shadow-safe.ts';
 import { AuditChainError, SecErrorCode } from './errors.ts';
 
 export interface AuditAppendInput {
@@ -222,7 +223,7 @@ export class AuditChain {
           chainHeadHash,
           prevCheckpointHash,
           checkpointHash,
-          entryHashes: entries.rows.map((r) => r.entry_hash),
+          entryHashes: numericMap(entries.rows, (r) => r.entry_hash),
         }),
       );
       await this.objectStore?.put({
@@ -334,7 +335,12 @@ export class AuditChain {
          FROM sec.sec_audit_events WHERE seq BETWEEN $1 AND $2 ORDER BY seq`,
         [lo, hi],
       );
-      const classification = await classifyRange(tx, lo, hi, rows.rows.map(rowToChainEntry));
+      const classification = await classifyRange(
+        tx,
+        lo,
+        hi,
+        numericMap(rows.rows, rowToChainEntry),
+      );
       return { ...classification, walkedLo: lo, walkedHi: hi };
     });
 
@@ -429,7 +435,7 @@ async function classifyRange(
   if (lo <= hi && entries.length === 0) {
     return { verdict: 'FAILED', kind: 'GAP', firstDivergenceSeq: lo };
   }
-  const knownHashes = new Set(entries.map((e) => e.entryHash));
+  const knownHashes = numericMap(entries, (e) => e.entryHash);
   // Positional expectation starts at the REQUESTED window start — so a
   // leading-edge deletion inside an explicit range surfaces as a seq
   // discontinuity (DELETION), not as a confusing hash-link verdict.
@@ -460,7 +466,8 @@ async function classifyRange(
       return { verdict: 'FAILED', kind: 'MUTATION', firstDivergenceSeq: entry.seq };
     }
     if (entry.prevEntryHash !== prevHash) {
-      const reordering = entry.prevEntryHash !== 'GENESIS' && knownHashes.has(entry.prevEntryHash);
+      const reordering =
+        entry.prevEntryHash !== 'GENESIS' && numericIncludes(knownHashes, entry.prevEntryHash);
       return {
         verdict: 'FAILED',
         kind: reordering ? 'REORDERING' : 'CHAIN_BREAK',

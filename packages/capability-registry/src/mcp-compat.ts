@@ -709,6 +709,26 @@ export async function resolveProtocolRevision(
     method: 'POST',
     messageBytes: 1,
   });
+  // Defence in depth (audit R11): the guard's own membership test is numeric,
+  // but this surface never trusts a third-party verdict for the authority
+  // decision. Re-derive membership numerically from the validated allow-list,
+  // so a shadowed `Array.prototype.includes` (or any guard regression) cannot
+  // turn an arbitrary revision into an ALLOW here.
+  const requestedIsAllowed =
+    input.requestedRevision !== undefined && isOneOf(input.requestedRevision, allowedRevisions);
+  if (
+    verdict.decision === 'ALLOW' &&
+    input.requestedRevision !== undefined &&
+    !requestedIsAllowed
+  ) {
+    throw new ForesiftError(
+      ErrorCode.PROD_ACTIVATION_GATE_REFUSED,
+      `MCP protocol guard ALLOWed revision ${JSON.stringify(
+        input.requestedRevision,
+      )} although it is not a member of the validated compatibility allow-list`,
+      { reason: McpCompatibilityRefusalReason.REVISION_UNKNOWN },
+    );
+  }
   if (verdict.decision === 'ALLOW' && input.requestedRevision !== undefined) {
     return {
       decision: 'ALLOW',

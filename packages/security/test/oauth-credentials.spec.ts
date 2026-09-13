@@ -353,3 +353,145 @@ describe('mcp credential lifecycle (AC-053)', () => {
     expect(row.rows[0]?.last_used_at).not.toBeNull();
   });
 });
+
+// --- Shadow-safe authority (D018): numeric-index decision walks --------------
+
+const shadowProto = Array.prototype as unknown as Record<string, unknown>;
+
+async function withShadow<T>(
+  method: string,
+  replacement: unknown,
+  run: () => T | Promise<T>,
+): Promise<T> {
+  const original = shadowProto[method];
+  shadowProto[method] = replacement;
+  try {
+    return await run();
+  } finally {
+    shadowProto[method] = original;
+  }
+}
+
+describe('oauth binding decision gates resist Array.prototype shadowing (D018)', () => {
+  const guard = new OAuthBindingGuard(() => NOW_MS);
+
+  function validate(overrides: Record<string, unknown> = {}) {
+    return guard.validateTokenBinding({
+      candidate: { ...goodBinding(), ...overrides },
+      registeredRedirectUris: ['https://mcp.example.com/callback'],
+      registeredScopes: ['tools:read'],
+      expectedAudience: 'foresift-mcp',
+      expectedResourceIndicator: 'https://foresift.example.com/mcp',
+    });
+  }
+
+  it('refuses an unregistered redirect URI with includes shadowed to true', async () => {
+    await expect(
+      withShadow(
+        'includes',
+        () => true,
+        () => validate({ redirectUri: 'https://mcp.evil.com/callback' }),
+      ),
+    ).rejects.toThrow(/redirect/i);
+  });
+
+  it('refuses scope widening with filter shadowed to drop elements', async () => {
+    await expect(
+      withShadow(
+        'filter',
+        () => [],
+        () => validate({ scopes: ['tools:read', 'admin:*'] }),
+      ),
+    ).rejects.toThrow(/widen/i);
+  });
+
+  it('refuses scope widening with includes shadowed to true', async () => {
+    await expect(
+      withShadow(
+        'includes',
+        () => true,
+        () => validate({ scopes: ['tools:read', 'admin:*'] }),
+      ),
+    ).rejects.toThrow(/widen/i);
+  });
+});
+
+describe('mcp credential decision gates resist Array.prototype shadowing (D018)', () => {
+  let shadowStore: McpCredentialStore;
+
+  beforeAll(async () => {
+    shadowStore = new McpCredentialStore({
+      engine,
+      pepper: 'shadow-test-pepper-do-not-use-in-prod-32-chars',
+      entropy: counterEntropy(),
+      clock: () => Date.parse('2026-08-01T00:00:00Z'),
+    });
+  });
+
+  it('refuses an out-of-constraint source IP with includes shadowed to true', async () => {
+    const ipBound = await shadowStore.issue({
+      credentialId: 'cred-shadow-ip',
+      scopes: ['tools:read'],
+      originPolicyRef: 'https://mcp.example.com',
+      rateLimitClass: 'STANDARD',
+      expiresAt: at('2026-08-02T00:00:00Z'),
+      ipConstraints: ['203.0.113.7'],
+    });
+    await expect(
+      withShadow(
+        'includes',
+        () => true,
+        () =>
+          shadowStore.authenticate({
+            presentedSecret: ipBound.secret,
+            sourceIp: '198.51.100.9',
+            origin: 'https://mcp.example.com',
+          }),
+      ),
+    ).rejects.toMatchObject({ code: 'SEC_CREDENTIAL_ORIGIN_MISMATCH' });
+  }, 120_000);
+
+  it('refuses requested-scope excess with filter shadowed to drop elements', async () => {
+    const issued = await shadowStore.issue({
+      credentialId: 'cred-shadow-scope',
+      scopes: ['tools:read'],
+      originPolicyRef: 'https://mcp.example.com',
+      rateLimitClass: 'STANDARD',
+      expiresAt: at('2026-08-02T00:00:00Z'),
+    });
+    await expect(
+      withShadow(
+        'filter',
+        () => [],
+        () =>
+          shadowStore.authenticate({
+            presentedSecret: issued.secret,
+            origin: 'https://mcp.example.com',
+            requestedScopes: ['admin:*'],
+          }),
+      ),
+    ).rejects.toMatchObject({ code: 'SEC_CREDENTIAL_SCOPE_EXCEEDED' });
+  }, 120_000);
+
+  it('refuses requested-scope excess with includes shadowed to true', async () => {
+    const issued = await shadowStore.issue({
+      credentialId: 'cred-shadow-scope-includes',
+      scopes: ['tools:read'],
+      originPolicyRef: 'https://mcp.example.com',
+      rateLimitClass: 'STANDARD',
+      expiresAt: at('2026-08-02T00:00:00Z'),
+    });
+    await expect(
+      withShadow(
+        'includes',
+        () => true,
+        () =>
+          shadowStore.authenticate({
+            presentedSecret: issued.secret,
+            origin: 'https://mcp.example.com',
+            requestedScopes: ['admin:*'],
+          }),
+      ),
+    ).rejects.toMatchObject({ code: 'SEC_CREDENTIAL_SCOPE_EXCEEDED' });
+  }, 120_000);
+});

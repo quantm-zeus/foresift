@@ -199,7 +199,16 @@ migrator.spec.ts` (central expected-script registry),
 `docs/generated/**` is deliberately excluded from writeScopes, so
 implementation-mapping reconciliation for the PROD surfaces is done here
 by the `release-conformance` owner so the generated-docs drift rule
-passes).
+passes). The third-round correction additionally names
+`scripts/verify-release-conformance/cli.mjs` and
+`scripts/verify-release-conformance/prod-conformance-gate.ts` (release-gate
+bridge/CLI), and the fifth-round correction names
+`packages/security/src/mcp-protocol-guard.ts` (FR-PROD-003 MCP revision
+allow-list enforcement) plus the `packages/security/**` decision-time
+authority gates hardened under R13 (the same in-process shadow class);
+`packages/security` is the security-perimeter owner's package, so these are
+exact-path exceptions recorded here and in `tasks.md` T079, not a re-homing
+of the security family's work.
 
 Fixture-path note: the manifest `fixtureRefs` say `tests/fixtures/prod/`
 and the milestone grants `tests/fixtures/prod/**`; they agree, and all

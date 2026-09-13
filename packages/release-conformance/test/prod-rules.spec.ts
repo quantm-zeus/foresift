@@ -6,6 +6,7 @@
  * four pre-existing trace rules must keep passing unchanged.
  */
 import { describe, expect, it } from 'bun:test';
+import { spawnSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { mkdtemp, mkdir, readFile, readdir, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
@@ -1431,7 +1432,10 @@ describe('NEW-N2: conformance aggregation resists a surgical Symbol.iterator sha
     expect(attacked.findings.map((finding) => finding.rule)).toContain(
       CONFORMANCE_RULES.activePath,
     );
-  });
+    // Two full `evaluateConformance` passes over the live tree measured 4983 ms
+    // against bun's 5000 ms default: an explicit bound keeps the release-gate
+    // regression deterministic under concurrent load (audit R-round test flake).
+  }, 120_000);
 
   it('keeps the PROD findings present while the iterator is shadowed (N2)', async () => {
     const attacked = await evaluateUnderSurgicalIterator({
@@ -1449,7 +1453,7 @@ describe('NEW-N2: conformance aggregation resists a surgical Symbol.iterator sha
     expect(attacked.findings.map((finding) => finding.rule)).toContain(
       PROD_RULES.activationWithoutEvidence,
     );
-  });
+  }, 120_000);
 });
 
 // --- NEW-N3: no reliance on the Promise.all ARGUMENT array's iterator ---------
@@ -1809,4 +1813,86 @@ describe('NEW-N3: Promise.all argument arrays resist a surgical Symbol.iterator 
       await rm(root, { recursive: true, force: true });
     }
   });
+});
+
+/**
+ * R12 (audit fifth round). `SHADOW_ONLY_IMPORT_ARTIFACT_STATES` was built with
+ * `Array.prototype.filter` at module initialization, and `conformance.ts`
+ * imports `prod-rules.ts` DYNAMICALLY at call time. A shadow installed before
+ * `evaluateConformance` ran therefore controlled the constructor: a `filter`
+ * that returned its receiver widened the authority to every persisted state, so
+ * an `IMPORT_SHADOW_ONLY` assertion naming a `RECEIVED`/`REJECTED` import passed
+ * the release gate (re-opening H4/R7).
+ *
+ * Module initialization cannot be re-run in-process once another spec file has
+ * imported the module, so the regression runs the probe in a FRESH bun process:
+ * it shadows `filter`, dynamically imports the module, and reports the authority
+ * it observed. Pre-fix the probe prints `WIDENED:[…]`; the numeric selection
+ * prints `OK`.
+ */
+describe('R12: the release-side import-shadow authority resists a module-init filter shadow', () => {
+  it('keeps the shadow-only import state set exact under a pre-import filter shadow', () => {
+    const modulePath = path.resolve(REPO_ROOT, 'packages/release-conformance/src/prod-rules.ts');
+    const probe = [
+      'const originalFilter = Array.prototype.filter;',
+      'Array.prototype.filter = function (callback, thisArg) {',
+      '  // Surgical: only widen the specific shadow-only selection callback, so',
+      "  // the bun runtime's own array work is untouched.",
+      "  if (typeof callback === 'function' && String(callback).includes('VALIDATING')) {",
+      '    return this;',
+      '  }',
+      '  return originalFilter.call(this, callback, thisArg);',
+      '};',
+      'void (async () => {',
+      `  const mod = await import(${JSON.stringify(modulePath)});`,
+      '  const states = mod.SHADOW_ONLY_IMPORT_ARTIFACT_STATES;',
+      "  const ok = states.length === 2 && states[0] === 'VALIDATING' && states[1] === 'SHADOW_ELIGIBLE';",
+      "  process.stdout.write(ok ? 'OK' : 'WIDENED:' + JSON.stringify(states));",
+      '  process.exit(0);',
+      '})().catch(async (error) => {',
+      "  process.stdout.write('ERROR:' + String(error));",
+      '  process.exit(1);',
+      '});',
+    ].join('\n');
+    const result = spawnSync(process.execPath, ['-e', probe], {
+      cwd: path.resolve(REPO_ROOT),
+      encoding: 'utf8',
+      timeout: 120_000,
+    });
+    expect(result.status).toBe(0);
+    expect((result.stdout ?? '').trim()).toBe('OK');
+  }, 120_000);
+});
+
+/**
+ * M1 (fifth-round convergence audit). The release-gate finding MESSAGES were
+ * still built with `Array.prototype.join`; a `join` shadow returning a
+ * non-string made the message template throw, turning a clean FAILED verdict
+ * into an uncaught exception. The decision must stay total: FAILED, no throw.
+ */
+describe('M1: release-gate finding messages survive a join shadow', () => {
+  it('still returns FAILED (no throw) when Array.prototype.join is shadowed to a non-string', () => {
+    const proto = Array.prototype as unknown as Record<string, unknown>;
+    const originalJoin = proto['join'];
+    proto['join'] = function (this: unknown): unknown {
+      return this;
+    };
+    let result: { readonly overall?: string } | undefined;
+    let error: unknown = null;
+    try {
+      result = evaluateProdConformance({
+        activationClaims: [],
+        postureDeclarations: [],
+        mcpCompatibility: PROD_MCP_COMPLIANT_CLAIM,
+        livePaths: [PROD_LIVE_PATH_NO_BOUND_CLAIM],
+        distributionAuthorizations: [PROD_PUBLIC_AUTHORIZED_MISSING_CLAIM],
+      }) as { readonly overall?: string };
+    } catch (thrown) {
+      error = thrown;
+    } finally {
+      proto['join'] = originalJoin;
+    }
+    expect(error).toBeNull();
+    expect(result?.overall).toBe('FAILED');
+  }, 120_000);
 });

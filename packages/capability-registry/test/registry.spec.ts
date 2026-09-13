@@ -52,6 +52,7 @@ import {
   parseModuleStateScope,
   recordActivationGateEvaluation,
   recordActivationGateResult,
+  requirePersistedActivationEvidence,
   requiredGatesForActivation,
   rollbackToApproved,
   smallestAffectedScope,
@@ -2724,4 +2725,153 @@ describe('HIGH: guards stay fail-closed under globally shadowed Array.prototype'
     }
     expect(unfrozen).toEqual([]);
   });
+
+  /**
+   * R10 (audit fifth round). `activationGateEvaluationsFor` built its WHERE
+   * clause with `Array.prototype.join`, and `requirePersistedActivationEvidence`
+   * never compared the returned `row.scopeHash` to the requested scope. A
+   * shadowed `join` that drops `scope_hash = $1` therefore admitted a genuine
+   * all-PASS batch recorded for a DIFFERENT scope for the same kind+event, and
+   * `advanceState(..., 'PROVEN')` would write a governed PROVEN state for a
+   * scope that never earned it. This test installs exactly that surgical shadow
+   * and asserts both the read and the guard stay bound to the requested scope.
+   */
+  it('R10: a shadowed Array.prototype.join cannot admit foreign-scope evidence into PROVEN', async () => {
+    const targetScope = makeScope({ profile_version: 'r10-target' });
+    const foreignScope = makeScope({ profile_version: 'r10-foreign' });
+    const targetHash = activationScopeHash(targetScope);
+    const foreignHash = activationScopeHash(foreignScope);
+    const event = 'r10-foreign-event';
+    expect(targetHash).not.toBe(foreignHash);
+
+    // A genuine, complete, all-PASS OPPORTUNITY batch for the FOREIGN scope.
+    const foreignRecorded = await gatePass(foreignScope, event);
+    expect(foreignRecorded.evaluationSetRef).not.toBeNull();
+    // Sanity: the batch is real and readable for its own scope.
+    const foreignRows = await activationGateEvaluationsFor(
+      engine,
+      foreignHash,
+      ActivationKind.OPPORTUNITY,
+      event,
+    );
+    expect(foreignRows.length).toBeGreaterThan(0);
+
+    const proto = Array.prototype as unknown as Record<string, unknown>;
+    const originalJoin = proto['join'];
+    // The exploit: rewrite the WHERE clause so it drops `scope_hash = $1` while
+    // keeping the $2/$3 placeholders (and their params) valid. Pre-fix, the
+    // authority query returned the forward scope's rows for a target query.
+    proto['join'] = function (this: unknown, separator?: string): string {
+      const self = this as unknown[];
+      if (Array.isArray(self) && self.length === 3 && self[0] === 'scope_hash = $1') {
+        return 'activation_kind = $2 AND activation_event_ref = $3';
+      }
+      return (originalJoin as (this: unknown, sep?: string) => string).call(self, separator);
+    };
+    try {
+      // 1. The authority READ must stay bound to the requested scope.
+      const rowsForTarget = await activationGateEvaluationsFor(
+        engine,
+        targetHash,
+        ActivationKind.OPPORTUNITY,
+        event,
+      );
+      expect(rowsForTarget).toEqual([]);
+
+      // 2. The persisted-evidence GUARD must refuse the foreign batch's genuine
+      //    reference even though the shadowed read would have returned it.
+      const refusal = await rejection(
+        requirePersistedActivationEvidence(engine, {
+          scope: targetScope,
+          scopeHash: targetHash,
+          activationKind: ActivationKind.OPPORTUNITY,
+          activationEventRef: event,
+          evaluationSetRef: foreignRecorded.evaluationSetRef,
+          at: NOW,
+        }),
+      );
+      expect(refusal.code).toBe('PROD_ACTIVATION_GATE_REFUSED');
+    } finally {
+      proto['join'] = originalJoin;
+    }
+  }, 120_000);
+
+  /**
+   * R10 (second half, isolated). The scope-binding check inside
+   * `requirePersistedActivationEvidence` is defence-in-depth behind the SQL
+   * predicate, so the R10 test above (which relies on `numericJoin` for its
+   * first assertion) cannot exercise it. This test feeds the guard a COMPLETE,
+   * all-PASS, unexpired batch recorded for a DIFFERENT scope through a stub
+   * engine, so the ONLY thing standing between it and a returned evidence set
+   * is the explicit `row.scopeHash === input.scopeHash` check. Pre-fix this
+   * operation succeeds; post-fix it refuses with EVIDENCE_SET_SCOPE_MISMATCH.
+   */
+  it('R10b: the persisted-evidence guard refuses a complete foreign-scope batch (scope binding)', async () => {
+    const targetScope = makeScope({ profile_version: 'r10b-target' });
+    const targetHash = activationScopeHash(targetScope);
+    const foreignHash = activationScopeHash(makeScope({ profile_version: 'r10b-foreign' }));
+    const event = 'r10b-foreign-event';
+    expect(targetHash).not.toBe(foreignHash);
+
+    const required = requiredGatesForActivation(ActivationKind.OPPORTUNITY, targetScope);
+    const rawRows: unknown[] = [];
+    const decodedRows: Array<Parameters<typeof activationEvidenceSetRef>[0][number]> = [];
+    for (let index = 0; index < ACTIVATION_GATE_ORDER.length; index += 1) {
+      const gate = ACTIVATION_GATE_ORDER[index] as ActivationGateKind;
+      let isRequired = false;
+      for (let requiredIndex = 0; requiredIndex < required.length; requiredIndex += 1) {
+        if (required[requiredIndex] === gate) {
+          isRequired = true;
+          break;
+        }
+      }
+      const verdict = isRequired ? 'PASS' : 'NOT_APPLICABLE';
+      const evaluationId = `r10b-${String(index)}`;
+      rawRows[rawRows.length] = {
+        evaluation_id: evaluationId,
+        scope_hash: foreignHash,
+        gate_kind: gate,
+        verdict,
+        failing_gate: null,
+        activation_event_ref: event,
+        capacity_contract_ref: null,
+        evidence_refs: ['evidence-1'],
+        evaluated_at: NOW,
+        expires_at: FAR_FUTURE,
+        activation_kind: 'OPPORTUNITY',
+      };
+      decodedRows[decodedRows.length] = {
+        evaluationId,
+        scopeHash: foreignHash,
+        gateKind: gate,
+        verdict,
+        failingGate: null,
+        activationEventRef: event,
+        capacityContractRef: null,
+        evidenceRefs: ['evidence-1'],
+        evaluatedAt: NOW,
+        expiresAt: FAR_FUTURE,
+        activationKind: ActivationKind.OPPORTUNITY,
+      };
+    }
+    const foreignSetRef = activationEvidenceSetRef(decodedRows);
+    const stubEngine = {
+      query: async () => ({ rows: rawRows }),
+    } as unknown as DatabaseEngine;
+
+    const refusal = await rejection(
+      requirePersistedActivationEvidence(stubEngine, {
+        scope: targetScope,
+        scopeHash: targetHash,
+        activationKind: ActivationKind.OPPORTUNITY,
+        activationEventRef: event,
+        evaluationSetRef: foreignSetRef,
+        at: NOW,
+      }),
+    );
+    expect(refusal.code).toBe('PROD_ACTIVATION_GATE_REFUSED');
+    expect((refusal.detail as { readonly reason?: string } | undefined)?.reason).toBe(
+      'EVIDENCE_SET_SCOPE_MISMATCH',
+    );
+  }, 120_000);
 });

@@ -32,6 +32,7 @@ import {
 } from '@foresift/domain';
 import { canonicalJson, type DatabaseEngine } from '@foresift/persistence';
 import {
+  ModuleStateRefusalReason,
   activationScopeHash,
   advanceState,
   currentStateRow,
@@ -345,7 +346,11 @@ export async function containForFailedGate(
         containmentId,
         target.moduleId,
         scopeHash,
-        requestedAction,
+        // Persist the APPLIED action, never the weaker requested one (audit
+        // R9): `openContainments`/`loadContainmentFacts` and the ACTIVE-edge
+        // refusal message must never understate the governed stop when the
+        // requested action was not a legal edge and DISABLED was applied.
+        toState,
         triggerGateKind,
         input.reason,
         input.at,
@@ -359,7 +364,10 @@ export async function containForFailedGate(
       operationalReadiness: current.operationalReadiness,
       distributionReadiness: current.distributionReadiness,
       changeClassification: input.changeClassification ?? 'MATERIAL_SECURITY_OR_RIGHTS',
-      reason: `containment ${requestedAction} (${criticalGate}): ${input.reason}`,
+      reason:
+        requestedAction === toState
+          ? `containment ${toState} (${criticalGate}): ${input.reason}`
+          : `containment ${toState} (${criticalGate}; requested ${requestedAction} from ${current.lifecycleState} escalated to ${toState}): ${input.reason}`,
       actorRef: 'containment',
       at: input.at,
       currentStateRowId: current.stateRowId,
@@ -612,6 +620,34 @@ export async function rollbackToApproved(
     input.rollbackId ?? `rollback-${moduleId}-${input.newActivationEventRef}`.replace(/\s+/g, '-');
 
   const { advanced, rollback } = await engine.transaction(async (tx) => {
+    // §69.11 (audit R6): containment is a governed stop, not a suggestion. A
+    // rollback restores an OLDER approved set and lands in PAUSED, so it must
+    // not sidestep a still-open containment on the EXACT scope — otherwise a
+    // contained scope appears to move while `openContainments()` still lists the
+    // stop. The read happens in this transaction, immediately before the write,
+    // exactly as the ACTIVE edge fences itself. The documented reactivation path
+    // remains `clearContainment` plus a fresh recorded evaluation.
+    const openContainment = await tx.query<{ containment_id: string; action: string }>(
+      `SELECT containment_id, action
+         FROM prod.containment_events
+        WHERE module_id = $1 AND scope_hash = $2 AND cleared_by_event_ref IS NULL
+        ORDER BY created_at ASC, containment_id ASC
+        LIMIT 1`,
+      [moduleId, scopeHash],
+    );
+    const stillOpen = openContainment.rows[0];
+    if (stillOpen !== undefined) {
+      throw new ForesiftError(
+        ErrorCode.PROD_ACTIVATION_GATE_REFUSED,
+        `rollback refused: containment ${stillOpen.containment_id} (${stillOpen.action}) is still open on the exact scope; clearContainment plus a fresh recorded evaluation is the only reactivation path (AC-278)`,
+        {
+          reason: ModuleStateRefusalReason.CONTAINMENT_OPEN,
+          containmentId: stillOpen.containment_id,
+          containmentAction: stillOpen.action,
+          scopeHash,
+        },
+      );
+    }
     await tx.query(
       `INSERT INTO prod.rollback_events
          (rollback_id, module_id, restored_artifact_set_hash, prior_activation_event_ref,

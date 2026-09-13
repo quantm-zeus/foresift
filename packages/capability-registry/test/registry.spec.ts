@@ -862,6 +862,62 @@ describe('§69.11 containment (AC-278)', () => {
     expect(after.lifecycleState).toBe('ACTIVE');
     expect(after.activationEventRef).toBe('activation-dreplay-2');
   }, 120_000);
+
+  it('persists the APPLIED containment action, never a weaker requested one (R9)', async () => {
+    // CAPACITY maps to DEGRADED, but DEGRADED is not a legal edge from SHADOW,
+    // so DISABLED is applied. The containment row must record DISABLED.
+    const shadowScope = makeScope({ profile_version: 'r9-shadow-capacity' });
+    const shadowModule = 'module-r9-shadow-capacity';
+    await advance(shadowModule, shadowScope, 'IMPLEMENTED', 'r9-shadow-1');
+    await advance(shadowModule, shadowScope, 'SHADOW', 'r9-shadow-2');
+    const capacity = await containForFailedGate(engine, {
+      criticalGate: 'CAPACITY',
+      affectedScopes: [{ moduleId: shadowModule, scope: shadowScope }],
+      reason: 'capacity breach on shadow',
+      at: NOW,
+      containmentId: 'containment-r9-capacity',
+    });
+    expect(capacity.state.lifecycleState).toBe('DISABLED');
+    expect(capacity.containment.action).toBe('DISABLED');
+    expect(capacity.containment.action as string).toBe(capacity.state.lifecycleState);
+
+    // PARITY maps to PAUSED, illegal from IMPLEMENTED, so DISABLED is applied.
+    const implScope = makeScope({ profile_version: 'r9-impl-parity' });
+    const implModule = 'module-r9-impl-parity';
+    await advance(implModule, implScope, 'IMPLEMENTED', 'r9-impl-1');
+    const parity = await containForFailedGate(engine, {
+      criticalGate: 'PARITY',
+      affectedScopes: [{ moduleId: implModule, scope: implScope }],
+      reason: 'parity failure on implemented',
+      at: NOW,
+      containmentId: 'containment-r9-parity',
+    });
+    expect(parity.state.lifecycleState).toBe('DISABLED');
+    expect(parity.containment.action).toBe('DISABLED');
+    expect(parity.containment.action as string).toBe(parity.state.lifecycleState);
+
+    // The existing DEGRADED control stays consistent: a legal DEGRADED edge
+    // persists DEGRADED for both the row and the state.
+    const activeScope = makeScope({ profile_version: 'r9-active-capacity' });
+    const activeModule = 'module-r9-active-capacity';
+    await advance(activeModule, activeScope, 'IMPLEMENTED', 'r9-active-1');
+    await advance(activeModule, activeScope, 'AVAILABLE', 'r9-active-2');
+    await advance(activeModule, activeScope, 'SHADOW', 'r9-active-3');
+    await advance(activeModule, activeScope, 'PROVEN', 'r9-active-4');
+    await advance(activeModule, activeScope, 'ACTIVE', 'r9-active-5', {
+      gateResult: await gatePass(activeScope, 'activation-r9-active'),
+    });
+    const degraded = await containForFailedGate(engine, {
+      criticalGate: 'CAPACITY',
+      affectedScopes: [{ moduleId: activeModule, scope: activeScope }],
+      reason: 'capacity breach on active',
+      at: NOW,
+      containmentId: 'containment-r9-degraded',
+    });
+    expect(degraded.state.lifecycleState).toBe('DEGRADED');
+    expect(degraded.containment.action).toBe('DEGRADED');
+    expect(degraded.containment.action as string).toBe(degraded.state.lifecycleState);
+  }, 120_000);
 });
 
 describe('§69.11 rollback (AC-279)', () => {
@@ -1060,6 +1116,77 @@ describe('§69.11 rollback (AC-279)', () => {
       }),
     );
     expect(unapproved.code).toBe('PROD_LIFECYCLE_TRANSITION_ILLEGAL');
+  }, 120_000);
+
+  it('refuses a rollback while a containment is open on the exact scope (R6)', async () => {
+    const scope = makeScope({ profile_version: 'rollback-contained' });
+    const moduleId = 'module-rollback-contained';
+    await advance(moduleId, scope, 'IMPLEMENTED', 'r6-1');
+    await advance(moduleId, scope, 'AVAILABLE', 'r6-2');
+    await advance(moduleId, scope, 'SHADOW', 'r6-3');
+    await advance(moduleId, scope, 'PROVEN', 'r6-4');
+    await advance(moduleId, scope, 'ACTIVE', 'r6-5', {
+      gateResult: await gatePass(scope, 'activation-r6-p'),
+    });
+
+    // A security incident contains the scope (DISABLED) but the containment
+    // stays open; the pre-fix rollback accepted the restore and moved the scope
+    // to PAUSED while `openContainments()` still listed the stop.
+    const contained = await containForFailedGate(engine, {
+      criticalGate: 'SECURITY',
+      affectedScopes: [{ moduleId, scope }],
+      reason: 'security incident before rollback',
+      at: NOW,
+      containmentId: 'containment-r6',
+    });
+    expect(contained.state.lifecycleState).toBe('DISABLED');
+    expect(contained.containment.action).toBe('DISABLED');
+    expect((await openContainments(engine, { moduleId })).length).toBe(1);
+
+    const refused = await rejection(
+      rollbackToApproved(engine, {
+        moduleId,
+        scope,
+        restoredArtifactSetHash: HASH_A,
+        priorActivationEventRef: 'activation-r6-p',
+        newActivationEventRef: 'r6-new-event',
+        candidateReevaluationRef: 'r6-reeval',
+        at: NOW,
+        rollbackId: 'rollback-r6-blocked',
+      }),
+    );
+    expect(refused.code).toBe('PROD_ACTIVATION_GATE_REFUSED');
+    expect((refused.detail as { readonly reason?: string }).reason).toBe(
+      ModuleStateRefusalReason.CONTAINMENT_OPEN,
+    );
+    expect((refused.detail as { readonly containmentId?: string }).containmentId).toBe(
+      'containment-r6',
+    );
+    expect((refused.detail as { readonly containmentAction?: string }).containmentAction).toBe(
+      'DISABLED',
+    );
+    // Nothing was written: no rollback row and no state move out of DISABLED.
+    expect(await latestRollback(engine, moduleId)).toBeUndefined();
+    expect((await statesFor(engine, { moduleId, scope })).lifecycleState).toBe('DISABLED');
+
+    // Control: after clearContainment a genuine rollback succeeds.
+    await clearContainment(engine, {
+      containmentId: 'containment-r6',
+      revalidationEventRef: 'r6-revalidation',
+    });
+    const outcome = await rollbackToApproved(engine, {
+      moduleId,
+      scope,
+      restoredArtifactSetHash: HASH_A,
+      priorActivationEventRef: 'activation-r6-p',
+      newActivationEventRef: 'r6-new-event',
+      candidateReevaluationRef: 'r6-reeval',
+      at: NOW,
+      rollbackId: 'rollback-r6-ok',
+    });
+    expect(outcome.rollback.newActivationEventRef).toBe('r6-new-event');
+    expect(outcome.state.lifecycleState).toBe('PAUSED');
+    expect((await openContainments(engine, { moduleId })).length).toBe(0);
   }, 120_000);
 });
 
@@ -1868,3 +1995,146 @@ describe('ACTIVE is bound to persisted gate evidence (F1)', () => {
     }
   }, 120_000);
 });
+
+// --- R5: PROVEN is bound to a genuinely established AVAILABLE ----------------
+//
+// The 97b244a cross-check ran only on the ACTIVE edge, so a `requires_proven`
+// scope that had only ever reached IMPLEMENTED -> SHADOW could supply a
+// caller-fabricated all-PASS OPPORTUNITY batch (available/proven booleans true)
+// as `provenEvidenceRef`, reach PROVEN, and then legitimately cross into ACTIVE.
+// These probes build exactly that ladder and prove the promotion now refuses.
+
+describe('PROVEN requires a genuinely established AVAILABLE (R5)', () => {
+  it('refuses SHADOW -> PROVEN when the exact scope never established AVAILABLE', async () => {
+    const scope = makeScope({ profile_version: 'r5-forged-available' });
+    const moduleId = 'module-r5-forged-available';
+    // The exploit ladder: IMPLEMENTED -> SHADOW, so AVAILABLE is never reached.
+    await advance(moduleId, scope, 'IMPLEMENTED', 'r5-exp-1');
+    await advance(moduleId, scope, 'SHADOW', 'r5-exp-2');
+    const before = await statesFor(engine, { moduleId, scope });
+    expect(before.available).toBe(false);
+    expect(before.proven).toBe(false);
+
+    // The fabricated batch: `passingOpportunityInput` declares available/proven
+    // true, so the recorder persists an all-PASS OPPORTUNITY set even though no
+    // governed AVAILABLE row exists. Pre-fix this promoted the scope to PROVEN.
+    const forged = await provenEvidenceFor(scope, 'r5-forged-proven-event');
+    const refused = await rejection(
+      advanceState(engine, {
+        moduleId,
+        scope,
+        artifactSetHash: HASH_A,
+        toState: 'PROVEN',
+        operationalReadiness: 'READY_FOR_ACTIVE_PROFILE',
+        distributionReadiness: 'PRIVATE_ONLY',
+        changeClassification: 'MATERIAL_EVALUATION',
+        reason: 'forged PROVEN via a fabricated AVAILABLE',
+        actorRef: 'attacker',
+        at: NOW,
+        ...forged,
+        stateRowId: 'r5-exp-3',
+        transitionId: 'r5-exp-3-t',
+      }),
+    );
+    expect(refused.code).toBe('PROD_ACTIVATION_GATE_REFUSED');
+    expect((refused.detail as { readonly reason?: string }).reason).toBe(
+      ModuleStateRefusalReason.GATE_DIMENSION_MISMATCH,
+    );
+    expect((refused.detail as { readonly gate?: string }).gate).toBe('AVAILABLE_EVIDENCE');
+
+    const after = await statesFor(engine, { moduleId, scope });
+    expect(after.proven).toBe(false);
+    expect(after.lifecycleState).toBe('SHADOW');
+
+    // ACTIVE is therefore unreachable: PROVEN never persisted, so the exact
+    // scope stays on SHADOW (from which ACTIVE is not even a legal edge) and the
+    // `requires_proven` guard can never be satisfied.
+    const activeRefused = await rejection(
+      advance(moduleId, scope, 'ACTIVE', 'r5-exp-4', {
+        gateResult: await gatePass(scope, 'activation-r5-exp'),
+      }),
+    );
+    expect([
+      'PROD_ACTIVATION_GATE_REFUSED',
+      'PROD_LIFECYCLE_TRANSITION_ILLEGAL',
+    ]).toContain(activeRefused.code);
+    const rows = await stateRowsFor(engine, { moduleId, scope });
+    expect(rows.some((row) => row.lifecycleState === 'PROVEN')).toBe(false);
+    expect(rows.some((row) => row.lifecycleState === 'ACTIVE')).toBe(false);
+  }, 120_000);
+
+  it('refuses PROVEN for a non-requires_proven scope that never established AVAILABLE', async () => {
+    const scope = makeScope({
+      profile_version: 'r5-forged-available-nonrequired',
+      requires_proven: false,
+    });
+    const moduleId = 'module-r5-forged-available-nonrequired';
+    expect(scope.requires_proven).toBe(false);
+    await advance(moduleId, scope, 'IMPLEMENTED', 'r5-np-1');
+    await advance(moduleId, scope, 'SHADOW', 'r5-np-2');
+    expect((await statesFor(engine, { moduleId, scope })).available).toBe(false);
+
+    const forged = await provenEvidenceFor(scope, 'r5-np-proven-event');
+    const refused = await rejection(
+      advanceState(engine, {
+        moduleId,
+        scope,
+        artifactSetHash: HASH_A,
+        toState: 'PROVEN',
+        operationalReadiness: 'READY_FOR_ACTIVE_PROFILE',
+        distributionReadiness: 'PRIVATE_ONLY',
+        changeClassification: 'MATERIAL_EVALUATION',
+        reason: 'forged PROVEN on a non-requires_proven scope',
+        actorRef: 'attacker',
+        at: NOW,
+        ...forged,
+        stateRowId: 'r5-np-3',
+        transitionId: 'r5-np-3-t',
+      }),
+    );
+    expect(refused.code).toBe('PROD_ACTIVATION_GATE_REFUSED');
+    expect((refused.detail as { readonly reason?: string }).reason).toBe(
+      ModuleStateRefusalReason.GATE_DIMENSION_MISMATCH,
+    );
+    expect((refused.detail as { readonly gate?: string }).gate).toBe('AVAILABLE_EVIDENCE');
+    const rows = await stateRowsFor(engine, { moduleId, scope });
+    expect(rows.some((row) => row.lifecycleState === 'PROVEN')).toBe(false);
+  }, 120_000);
+
+  it('still promotes to PROVEN once the exact scope genuinely established AVAILABLE', async () => {
+    const scope = makeScope({ profile_version: 'r5-genuine-available' });
+    const moduleId = 'module-r5-genuine-available';
+    await advance(moduleId, scope, 'IMPLEMENTED', 'r5-ctl-1');
+    await advance(moduleId, scope, 'AVAILABLE', 'r5-ctl-2');
+    await advance(moduleId, scope, 'SHADOW', 'r5-ctl-3');
+    expect((await statesFor(engine, { moduleId, scope })).available).toBe(true);
+
+    const genuine = await provenEvidenceFor(scope, 'r5-genuine-proven-event');
+    const promoted = await advanceState(engine, {
+      moduleId,
+      scope,
+      artifactSetHash: HASH_A,
+      toState: 'PROVEN',
+      operationalReadiness: 'READY_FOR_ACTIVE_PROFILE',
+      distributionReadiness: 'PRIVATE_ONLY',
+      changeClassification: 'MATERIAL_EVALUATION',
+      reason: 'genuine PROVEN after AVAILABLE',
+      actorRef: 'test-actor',
+      at: NOW,
+      ...genuine,
+      stateRowId: 'r5-ctl-4',
+      transitionId: 'r5-ctl-4-t',
+    });
+    expect(promoted.state.lifecycleState).toBe('PROVEN');
+    const dimensions = await statesFor(engine, { moduleId, scope });
+    expect(dimensions.available).toBe(true);
+    expect(dimensions.proven).toBe(true);
+
+    // ACTIVE remains reachable on the legitimate path.
+    await advance(moduleId, scope, 'ACTIVE', 'r5-ctl-5', {
+      gateResult: await gatePass(scope, 'activation-r5-ctl'),
+    });
+    expect((await statesFor(engine, { moduleId, scope })).lifecycleState).toBe('ACTIVE');
+  }, 120_000);
+});
+

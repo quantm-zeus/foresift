@@ -709,7 +709,7 @@ export async function advanceState(
     // statistical gates ARE the registered mature evaluation, so a fabricated
     // content address can never establish PROVEN.
     if (toState === ModuleLifecycleState.PROVEN && provenEvidenceRef !== null) {
-      await requirePersistedActivationEvidence(tx, {
+      const provenEvidence = await requirePersistedActivationEvidence(tx, {
         scope,
         scopeHash,
         activationKind: ActivationKind.OPPORTUNITY,
@@ -717,6 +717,42 @@ export async function advanceState(
         evaluationSetRef: provenEvidenceRef,
         at: input.at,
       });
+      // §69.2/§69.5 independent dimensions (audit H5 residual): PROVEN is a
+      // LATER rung than AVAILABLE, so the same persisted-dimension cross-check
+      // the ACTIVE edge applies must bind here too. Without it a scope that
+      // never established AVAILABLE could present a fabricated all-PASS
+      // OPPORTUNITY batch (caller booleans set available/proven true) to jump
+      // SHADOW -> PROVEN and then legitimately cross into ACTIVE. The exact
+      // scope must have genuinely established AVAILABLE in governed history.
+      const dimensions = await statesFor(tx, { moduleId, scope });
+      if (dimensions.available !== true) {
+        throw new ForesiftError(
+          ErrorCode.PROD_ACTIVATION_GATE_REFUSED,
+          'promotion to PROVEN refused: the exact scope never established AVAILABLE in governed history',
+          {
+            reason: ModuleStateRefusalReason.GATE_DIMENSION_MISMATCH,
+            gate: ActivationGateKind.AVAILABLE_EVIDENCE,
+            scopeHash,
+          },
+        );
+      }
+      // The IMPLEMENTED/AVAILABLE binding reads the PERSISTED rows, never the
+      // mutable in-memory evaluator object (audit R1). PROVEN_PRESENT is
+      // excluded because THIS transition establishes it.
+      const claimedDimensions: readonly [ActivationGateKind, boolean][] = [
+        [ActivationGateKind.IMPLEMENTED_PRESENT, dimensions.implemented],
+        [ActivationGateKind.AVAILABLE_EVIDENCE, dimensions.available],
+      ];
+      for (const [gate, established] of claimedDimensions) {
+        const persisted = provenEvidence.rows.find((entry) => entry.gateKind === gate);
+        if (persisted?.verdict === 'PASS' && established !== true) {
+          throw new ForesiftError(
+            ErrorCode.PROD_ACTIVATION_GATE_REFUSED,
+            `promotion to PROVEN refused: the persisted evidence claims ${gate} but the governed history never established it for the exact scope`,
+            { reason: ModuleStateRefusalReason.GATE_DIMENSION_MISMATCH, gate, scopeHash },
+          );
+        }
+      }
     }
     // ACTIVE is not a declaration: inside the SAME transaction that writes the
     // row, re-derive the evidence from `prod.activation_gate_evaluations`. A

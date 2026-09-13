@@ -49,7 +49,7 @@
         "FR-ALERT-005"
       ],
       "risk": "HIGH",
-      "status": "RUNNING",
+      "status": "PROVEN",
       "verificationCommands": [
         "test -d packages/alerts && pnpm --filter @foresift/alerts test",
         "bun test tests/acceptance/AC-140.spec.ts tests/acceptance/AC-141.spec.ts",

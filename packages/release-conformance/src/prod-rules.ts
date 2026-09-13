@@ -480,6 +480,36 @@ export interface LivePathPrecomputationClaim {
 const DEFAULT_PRECOMPUTED_REQUIREMENT = 'FR-PROD-006';
 
 /**
+ * Numeric-index copy of a string array; never array spread (which reads
+ * `Symbol.iterator`). This module is imported DYNAMICALLY by
+ * `evaluateConformance` (`conformance.ts:688`), so any `Array.prototype` hook
+ * shadowed before the call would otherwise run during module initialization and
+ * could control the authority the R7 guard consults (audit R12).
+ */
+function numericStateCopy(source: readonly string[]): string[] {
+  const copy: string[] = [];
+  for (let index = 0; index < source.length; index += 1) {
+    copy[copy.length] = source[index] as string;
+  }
+  return copy;
+}
+
+/**
+ * Numeric-index selection of the shadow-only import states; never
+ * `Array.prototype.filter`. A shadowed `filter` returning its receiver would
+ * widen the authority to every persisted state — including `RECEIVED` and
+ * `REJECTED` — re-opening the H4/R7 release-gate fail-open (audit R12).
+ */
+function selectShadowOnlyImportStates(states: readonly string[]): string[] {
+  const selected: string[] = [];
+  for (let index = 0; index < states.length; index += 1) {
+    const state = states[index];
+    if (state === 'VALIDATING' || state === 'SHADOW_ELIGIBLE') selected[selected.length] = state;
+  }
+  return selected;
+}
+
+/**
  * The authoritative closed import-artifact quarantine states
  * (`sec.import_artifacts`, FR-SEC-008/§35.14/ADR-046), read from the shared
  * schema rather than restated here. `VALIDATING` and `SHADOW_ELIGIBLE` are the
@@ -491,9 +521,9 @@ const DEFAULT_PRECOMPUTED_REQUIREMENT = 'FR-PROD-006';
  * caller that reaches `ImportQuarantineStateSchema.options` cannot mutate the
  * authority the R7 guard consults (audit NEW-H1).
  */
-const ALL_IMPORT_ARTIFACT_STATES: readonly string[] = Object.freeze([
-  ...ImportQuarantineStateSchema.options,
-]);
+const ALL_IMPORT_ARTIFACT_STATES: readonly string[] = Object.freeze(
+  numericStateCopy(ImportQuarantineStateSchema.options),
+);
 
 /**
  * The only import-artifact states an `IMPORT_SHADOW_ONLY` live-path assertion
@@ -504,9 +534,7 @@ const ALL_IMPORT_ARTIFACT_STATES: readonly string[] = Object.freeze([
  * caller cannot push a non-shadow state into the guard's authority (NEW-H1).
  */
 export const SHADOW_ONLY_IMPORT_ARTIFACT_STATES: readonly string[] = Object.freeze(
-  ALL_IMPORT_ARTIFACT_STATES.filter(
-    (state) => state === 'VALIDATING' || state === 'SHADOW_ELIGIBLE',
-  ),
+  selectShadowOnlyImportStates(ALL_IMPORT_ARTIFACT_STATES),
 );
 
 /**

@@ -183,3 +183,47 @@ describe('mcp protocol guard (AC-251)', () => {
     ).toEqual({ decision: 'ALLOW' });
   });
 });
+
+// --- Shadow-safe authority (D018): numeric-index decision walks --------------
+
+describe('origin and protocol decision gates resist Array.prototype shadowing (D018)', () => {
+  const proto = Array.prototype as unknown as Record<string, unknown>;
+
+  function withShadow<T>(method: string | symbol, replacement: unknown, run: () => T): T {
+    const original = proto[method as string];
+    proto[method as string] = replacement;
+    try {
+      return run();
+    } finally {
+      proto[method as string] = original;
+    }
+  }
+
+  // NOTE: a global `Symbol.iterator` shadow also breaks the schema library's
+  // own object parsing, so shadow cases here target the decision-time
+  // membership primitive instead; the numeric `for...of` replacements in the
+  // origin allowlist walk are exercised by the unshadowed origin tests above.
+  it('still refuses an unsupported protocol revision with includes shadowed to true', () => {
+    const verdict = withShadow(
+      'includes',
+      () => true,
+      () => GUARD.inspect({ protocolRevision: '2099-01-01' }),
+    );
+    expect(verdict).toMatchObject({ decision: 'REFUSE', reason: 'REVISION_UNSUPPORTED' });
+  });
+
+  it('still refuses a punycode-masked origin with some shadowed to false', () => {
+    const gate = new McpOriginGate({
+      allowlist: ['https://mcp.example.com'],
+      absentOriginPolicy: 'PRODUCTION',
+    });
+    const verdict = withShadow(
+      'some',
+      () => false,
+      () => gate.decide('https://sub.xn--mcp-9cd.example.com'),
+    );
+    // Discriminating: pre-fix the shadowed `.some` disabled the punycode-label
+    // predicate and the same origin was refused WRONG_HOST instead.
+    expect(verdict).toMatchObject({ decision: 'REFUSE', reason: 'PUNYCODE_CONFUSED' });
+  });
+});

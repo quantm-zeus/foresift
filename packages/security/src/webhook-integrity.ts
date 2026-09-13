@@ -21,6 +21,7 @@
  */
 import { createHash, createHmac, timingSafeEqual } from 'node:crypto';
 import { SecErrorCode, WebhookIntegrityError } from './errors.ts';
+import { numericIncludes } from './shadow-safe.ts';
 
 /** Injectable verifier: returns true when signature is valid for the material. */
 export type SignatureVerifier = (
@@ -161,7 +162,7 @@ export class WebhookGuard {
     candidateUrl: string,
     configuredEndpoints: readonly string[],
   ): void {
-    if (!configuredEndpoints.includes(candidateUrl)) {
+    if (!numericIncludes(configuredEndpoints, candidateUrl)) {
       throw new WebhookIntegrityError(
         'endpoint is not part of configured callback URLs; payload-sourced endpoints are refused',
         {},

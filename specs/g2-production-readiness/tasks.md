@@ -73,7 +73,13 @@ though they sit outside the listed writeScopes. The third-round correction
 deterministic release-gate bridge and CLI, product-owned by T043) so a
 non-canonical repository milestone cannot silently skip the PROD block; both
 paths are named exactly and carry no product-source behavior change beyond
-the milestone validation.
+the milestone validation. The fifth-round correction (Phase 13, R11)
+additionally extends `packages/security/src/mcp-protocol-guard.ts` (the
+FR-PROD-003 MCP revision allow-list enforcement point, product-owned by
+T074) exactly once, replacing a shadowable `Array.prototype.includes`
+membership test with a numeric walk; the change is behavior-preserving on
+unshadowed input and is the authoritative fix for the arbitrary-revision
+ALLOW, so it is recorded here rather than re-homed.
 
 Staging order mirrors PRD §40/§69 and the plan's architecture decisions:
 governed-state vocabularies and shared schemas first, then persistence
@@ -701,3 +707,27 @@ third-round finding-to-task map and the verbatim reproductions.
       of the fifth-round diff, full prescribed gates, exact-SHA CI, and a NEW
       independent convergence audit at the pre-merge head before PROVEN is
       restored. Traces: FR-PROD-001…006.
+- [ ] T079 [serial-reason: SEMANTIC_DEPENDENCY] Close R13: add
+      `packages/security/src/shadow-safe.ts` (numeric-index helpers) and convert
+      every decision-time authority operation in `packages/security/src/**` off
+      shadowable `Array.prototype` methods — the egress SSRF allowlist and
+      DNS-rebind pin comparison, the ActionGate step-up/scope checks, OAuth
+      redirect-URI and scope-widening checks, MCP credential IP/scope checks,
+      webhook endpoint allowlist, untrusted-content host allowlists, secret
+      export-prohibition, MCP origin scheme/host matching, import format and
+      state-transition checks, the prohibited-capability detector, and claim
+      redaction — with discriminating shadow regressions; and close the
+      schema-library-internals residual by routing every security decision
+      return through `parseDecision`, so a shadowed `push`/`Symbol.iterator` that
+      makes zod's `.parse` return `{}` cannot authorize. Exact paths are
+      recorded in `packages/security/**`, outside this package's writeScopes, so
+      this is a named scope exception (product-owned by T079).
+      Traces: FR-SEC-001, FR-PROD-003, FR-PROD-005, AC-251.
+- [ ] T080 [executor: TEST] Exploit/regression suite for T073–T079 authored as
+      NEW discriminating tests that fail against `53f737d` (each shadow
+      installed surgically and restored in `finally`), plus the R10b isolated
+      scope-binding regression proving the defence-in-depth check independently.
+- [ ] T081 [serial-reason: COORDINATOR_BOUNDARY] Fresh-context adversarial review
+      of the R13 security diff, full prescribed gates, exact-SHA CI, and a NEW
+      independent convergence audit at the pre-merge head before PROVEN is
+      restored. Traces: FR-PROD-001…006, FR-SEC-001.

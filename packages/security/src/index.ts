@@ -3,6 +3,7 @@
 // transport wiring (HTTP 403s, session stores, OAuth server) belongs to the
 // mcp-surface package, which consumes these verdicts.
 export * from './errors.ts';
+export * from './shadow-safe.ts';
 export * from './audit-categories.ts';
 export * from './audit-chain.ts';
 export * from './incidents.ts';

@@ -31,6 +31,7 @@ import {
 import type { UtcTimestamp } from '@foresift/domain';
 import { AuditChainError } from './errors.ts';
 import { evaluateCsrf, type CsrfEvaluationInput } from './csrf.ts';
+import { numericCopy, numericIncludes, numericUnique, parseDecision } from './shadow-safe.ts';
 import type { AuditChain } from './audit-chain.ts';
 
 /** Injected clock seam — epoch milliseconds source. */
@@ -77,14 +78,14 @@ export interface ActionGateOptions {
 
 function authenticatorClassSufficient(proof: StepUpProof, policy: StepUpPolicy): boolean {
   // TOTP can never clear the bar, regardless of any declared minimum.
-  if (!PHISHING_RESISTANT_CLASSES.includes(proof.authenticatorClass)) {
+  if (!numericIncludes(PHISHING_RESISTANT_CLASSES, proof.authenticatorClass)) {
     return false;
   }
   // The policy floor excludes RECOVERY_TOTP at the schema level, so every
   // admissible minimum names a phishing-resistant class; the proof must be
   // AT LEAST that class. All phishing-resistant classes rank equally here,
   // which keeps the check deterministic without inventing a false hierarchy.
-  return PHISHING_RESISTANT_CLASSES.includes(policy.minimumAuthenticatorClass);
+  return numericIncludes(PHISHING_RESISTANT_CLASSES, policy.minimumAuthenticatorClass);
 }
 
 export class ActionGate {
@@ -105,21 +106,21 @@ export class ActionGate {
     // Fail-closed symmetric with every sibling dimension: an ABSENT csrf
     // field is missing protection, not passed validation (AC-274).
     if (request.csrf === undefined || !evaluateCsrf(request.csrf).valid) {
-      reasons.push('CSRF_INVALID');
+      reasons[reasons.length] = 'CSRF_INVALID';
     }
     if ((request.idempotencyKey ?? '').length === 0) {
-      reasons.push('IDEMPOTENCY_KEY_MISSING');
+      reasons[reasons.length] = 'IDEMPOTENCY_KEY_MISSING';
     }
     if ((request.reasonEntry ?? '').length === 0) {
-      reasons.push('REASON_MISSING');
+      reasons[reasons.length] = 'REASON_MISSING';
     }
-    if (!request.authorizedScopes.includes(request.action)) {
-      reasons.push('SCOPE_MISMATCH');
+    if (!numericIncludes(request.authorizedScopes, request.action)) {
+      reasons[reasons.length] = 'SCOPE_MISMATCH';
     }
 
     const proof = request.stepUpProof;
     if (proof === undefined) {
-      reasons.push('STEP_UP_MISSING');
+      reasons[reasons.length] = 'STEP_UP_MISSING';
     } else {
       const nowMs = this.clock();
       const completedMs = Date.parse(proof.completedAt);
@@ -132,7 +133,7 @@ export class ActionGate {
         ageSeconds > request.policy.freshnessWindowSeconds ||
         completedMs > nowMs + PROOF_CLOCK_SKEW_TOLERANCE_MS
       ) {
-        reasons.push('STEP_UP_STALE');
+        reasons[reasons.length] = 'STEP_UP_STALE';
       }
       if (
         proof.authenticatorClass === undefined ||
@@ -140,16 +141,16 @@ export class ActionGate {
         (request.policy.requireUserPresence && !proof.userPresence) ||
         (request.policy.requireUserVerification && !proof.userVerification)
       ) {
-        reasons.push('AUTHENTICATOR_CLASS_INSUFFICIENT');
+        reasons[reasons.length] = 'AUTHENTICATOR_CLASS_INSUFFICIENT';
       }
       // The proof must belong to the acting principal.
       if (proof.actor !== request.actor) {
-        reasons.push('STEP_UP_MISSING');
+        reasons[reasons.length] = 'STEP_UP_MISSING';
       }
     }
 
     if (this.auditHealthBlocked !== undefined && (await this.auditHealthBlocked())) {
-      reasons.push('AUDIT_HEALTH_BLOCKED');
+      reasons[reasons.length] = 'AUDIT_HEALTH_BLOCKED';
     }
 
     let decision: ActionGateDecision;
@@ -158,7 +159,7 @@ export class ActionGate {
         outcome: 'REFUSE',
         action: request.action,
         actor: request.actor,
-        reasons: [...new Set(reasons)],
+        reasons: numericUnique(reasons),
         evaluatedAt,
       };
     } else if (proof !== undefined && request.idempotencyKey !== undefined) {
@@ -182,7 +183,7 @@ export class ActionGate {
       };
     }
 
-    const parsed = ActionGateDecisionSchema.parse(decision);
+    const parsed = parseDecision(ActionGateDecisionSchema, decision);
     await this.recordDecision(parsed);
     return parsed;
   }
@@ -200,7 +201,7 @@ export class ActionGate {
         payload:
           decision.outcome === 'ALLOW'
             ? { outcome: 'ALLOW', stepUpProofId: decision.stepUpProofId }
-            : { outcome: 'REFUSE', reasons: [...decision.reasons] },
+            : { outcome: 'REFUSE', reasons: numericCopy(decision.reasons) },
       });
     } catch (error) {
       throw new AuditChainError('failed to append gate decision to the audit chain', {

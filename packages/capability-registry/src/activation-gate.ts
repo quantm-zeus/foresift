@@ -1335,10 +1335,14 @@ export async function activationGateEvaluationsFor(
     params[params.length] = activationEventRef;
     clauses[clauses.length] = `activation_event_ref = $${params.length}`;
   }
+  // `numericJoin`, never `Array.prototype.join` (audit R10): a shadowed `join`
+  // could rewrite the WHERE clause (drop `scope_hash = $1`, or append
+  // `verdict <> 'REFUSE'`) while leaving the three placeholders valid, letting
+  // foreign-scope or refusal-containing rows reach the authority guard.
   const result = await engine.query<RawGateEvaluationRow>(
     `SELECT ${GATE_EVALUATION_COLUMNS}
        FROM prod.activation_gate_evaluations
-      WHERE ${clauses.join(' AND ')}
+      WHERE ${numericJoin(clauses, ' AND ')}
       ORDER BY evaluated_at ASC, evaluation_id ASC`,
     params,
   );
@@ -1357,6 +1361,7 @@ export const ActivationEvidenceRefusalReason = {
   EVIDENCE_EVENT_REF_UNPERSISTED: 'EVIDENCE_EVENT_REF_UNPERSISTED',
   EVIDENCE_SET_REF_MISMATCH: 'EVIDENCE_SET_REF_MISMATCH',
   EVIDENCE_SET_KIND_MISMATCH: 'EVIDENCE_SET_KIND_MISMATCH',
+  EVIDENCE_SET_SCOPE_MISMATCH: 'EVIDENCE_SET_SCOPE_MISMATCH',
 } as const;
 export type ActivationEvidenceRefusalReason =
   (typeof ActivationEvidenceRefusalReason)[keyof typeof ActivationEvidenceRefusalReason];
@@ -1468,6 +1473,18 @@ export async function requirePersistedActivationEvidence(
   const atMs = Date.parse(input.at);
   for (let rowIndex = 0; rowIndex < batch.length; rowIndex += 1) {
     const row = batch[rowIndex] as PersistedActivationGateEvaluation;
+    // Scope binding is authority, not decoration (audit R10): evidence rows are
+    // only admitted for the EXACT requested scope, independent of whatever the
+    // SQL predicate returned. A shadowed clause builder can widen the query;
+    // this check cannot be widened without an explicit change here.
+    if (row.scopeHash !== input.scopeHash) {
+      refuse(
+        ActivationEvidenceRefusalReason.EVIDENCE_SET_SCOPE_MISMATCH,
+        `the persisted evidence row ${row.evaluationId} belongs to scope ${JSON.stringify(
+          row.scopeHash,
+        )}, not the requested scope ${JSON.stringify(input.scopeHash)}`,
+      );
+    }
     if (row.activationKind !== kind) {
       refuse(
         ActivationEvidenceRefusalReason.EVIDENCE_SET_KIND_MISMATCH,

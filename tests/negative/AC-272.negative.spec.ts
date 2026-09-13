@@ -6,6 +6,34 @@
  * typed reasons — never a throw past the gate, never a silent pass.
  */
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
+import {
+  ActivationKind,
+  evaluateActivationGate,
+  type DistributionEvidenceInput,
+} from '@foresift/capability-registry';
+import {
+  checkPublicAuthorizationWithoutGateEvidence,
+  evaluateDistributionAuthorization,
+} from '@foresift/release-conformance';
+import {
+  PROD_PUBLIC_AUTHORIZED_MISSING_CLAIM,
+  PROD_TECHNICALLY_READY_CLAIM,
+  makeProdScope,
+  passingDistributionEvidence,
+  passingOpportunityGateInput,
+} from '../fixtures/prod/index.ts';
+
+function prodDistributionInput(
+  kind: ActivationKind,
+  overrides: Partial<DistributionEvidenceInput> = {},
+) {
+  const scope = makeProdScope({ profile_version: `ac272-prod-neg-${kind.toLowerCase()}` });
+  return {
+    ...passingOpportunityGateInput(scope),
+    kind,
+    distributionEvidence: passingDistributionEvidence(overrides),
+  };
+}
 import { utcTimestamp, type ClockPort } from '@foresift/domain';
 import { AuditChain } from '@foresift/security';
 import {
@@ -53,7 +81,7 @@ beforeAll(async () => {
     displayName: 'AC-272 negative provider',
     providerGroup: 'acceptance',
   });
-});
+}, 120_000);
 
 afterAll(async () => {
   await closeProvTestDatabase(tdb);
@@ -196,5 +224,50 @@ describe('AC-272 blocked states', () => {
     const dimensions = new Set(verdict.reasons.map((r) => r.dimension));
     expect(dimensions.has('LIFECYCLE')).toBe(true); // DEGRADED ≠ ACTIVE
     expect(dimensions.has('RIGHTS')).toBe(true); // no declaration
+  });
+});
+
+// --- prod-scoped additions (T037, FR-PROD-002/004, AC-272) -------------------
+
+describe('AC-272 prod-scoped negatives: technically ready without evidence stays unauthorized', () => {
+  it('holds WORKSPACE_TECHNICALLY_READY unauthorized for an exact-release claim', () => {
+    const evaluation = evaluateDistributionAuthorization(PROD_TECHNICALLY_READY_CLAIM);
+    expect(evaluation.readinessAuthorized).toBe(false);
+    expect(evaluation.authorized).toBe(false);
+  });
+
+  it('refuses a WORKSPACE activation whose readiness is only technically ready', () => {
+    const result = evaluateActivationGate(
+      prodDistributionInput(ActivationKind.WORKSPACE, {
+        distributionReadiness: 'WORKSPACE_TECHNICALLY_READY',
+      }),
+    );
+    expect(result.verdict).toBe('REFUSE');
+    if (result.verdict === 'REFUSE') {
+      expect(result.failingGate).toBe('DISTRIBUTION_EVIDENCE');
+      expect(result.reason).toBe('DISTRIBUTION_NOT_AUTHORIZED');
+    }
+  });
+
+  it('refuses a PUBLIC activation missing any single distribution duty', () => {
+    const result = evaluateActivationGate(
+      prodDistributionInput(ActivationKind.PUBLIC, {
+        distributionReadiness: 'PUBLIC_AUTHORIZED',
+        privacyRetentionDeletionExport: false,
+      }),
+    );
+    expect(result.verdict).toBe('REFUSE');
+    if (result.verdict === 'REFUSE') {
+      expect(result.failingGate).toBe('DISTRIBUTION_EVIDENCE');
+      expect(result.reason).toBe('DISTRIBUTION_EVIDENCE_MISSING');
+    }
+  });
+
+  it('flags an authorized claim whose required gate evidence is missing', () => {
+    const report = checkPublicAuthorizationWithoutGateEvidence([
+      PROD_PUBLIC_AUTHORIZED_MISSING_CLAIM,
+    ]);
+    expect(report.passed).toBe(false);
+    expect(report.findings[0]?.message).toContain('missing gate evidence');
   });
 });

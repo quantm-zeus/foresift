@@ -57,7 +57,7 @@ beforeAll(async () => {
   engine = createEngine(db, 'pglite');
   await applyMigrations({ engine, migrationsDir: MIGRATIONS_DIR });
   incidents = new Incidents(engine);
-});
+}, 120_000);
 
 afterAll(async () => {
   await db.close();
@@ -191,4 +191,60 @@ describe('AC-274 negatives: every missing dimension refuses with its typed reaso
       expect(decision.reasons).toContain('AUDIT_HEALTH_BLOCKED');
     }
   });
+});
+
+// --- prod-scoped additions (T038, FR-PROD-002, AC-274) -----------------------
+
+describe('AC-274 prod-scoped negatives: TOTP-only and any missing dimension refuse for prod actions', () => {
+  const PROD_ACTIONS = [
+    'admin:high:configuration-activate',
+    'admin:high:restore',
+    'admin:high:alpha-artifact-state',
+  ] as const;
+
+  it('refuses a TOTP-only recovery proof for every prod high-impact action', async () => {
+    for (const action of PROD_ACTIONS) {
+      const weak = freshProof({
+        proofId: `proof-totp-prod-${action}`,
+        authenticatorClass: 'RECOVERY_TOTP',
+        userVerification: false,
+      });
+      const request = {
+        ...completeRequest(weak),
+        action,
+        authorizedScopes: [action],
+      };
+      expect(await refusalReasons(request), action).toContain('AUTHENTICATOR_CLASS_INSUFFICIENT');
+    }
+  }, 120_000);
+
+  it('refuses a broken CSRF pair, a missing idempotency key, and a missing reason', async () => {
+    const base = completeRequest();
+    const action = PROD_ACTIONS[1];
+    expect(
+      await refusalReasons({
+        ...base,
+        action,
+        authorizedScopes: [action],
+        csrf: { ...base.csrf, submittedToken: 'd'.repeat(32) },
+      }),
+    ).toContain('CSRF_INVALID');
+    expect(
+      await refusalReasons({ ...base, action, authorizedScopes: [action], idempotencyKey: '' }),
+    ).toContain('IDEMPOTENCY_KEY_MISSING');
+    expect(
+      await refusalReasons({ ...base, action, authorizedScopes: [action], reasonEntry: '' }),
+    ).toContain('REASON_MISSING');
+  }, 120_000);
+
+  it('refuses an action outside the exact authorized scope', async () => {
+    const base = completeRequest();
+    expect(
+      await refusalReasons({
+        ...base,
+        action: 'admin:high:alpha-artifact-state',
+        authorizedScopes: ['admin:low:read'],
+      }),
+    ).toContain('SCOPE_MISMATCH');
+  }, 120_000);
 });

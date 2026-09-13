@@ -14,6 +14,12 @@ import { describe, expect, it } from 'bun:test';
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { activationScopeHash, evaluateActivationGate } from '@foresift/capability-registry';
+import {
+  makeProdScope,
+  passingOpportunityGateInput,
+  passingStatisticalEvidence,
+} from '../fixtures/prod/index.ts';
 
 const FIXTURE_PATH = path.resolve(
   path.dirname(fileURLToPath(import.meta.url)),
@@ -178,5 +184,60 @@ describe('AC-154 acceptance (positive) — calibration machinery facet (FR-EVAL-
     };
     expect(challengerPromotionState.activeStatus).toBe('DISABLED_REGRESSION_LOCKED');
     expect(challengerPromotionState.degradedNetUtilityScore).toBeLessThan(0.5);
+  });
+});
+
+// --- prod-scoped addition (T035, FR-PROD-001/002, AC-154) --------------------
+
+function prodCalibrationInput(overrides: {
+  maturity: 'DRAFT' | 'IMMATURE' | 'MATURE';
+  expectedNetUtilityRankingEnabled: boolean;
+  regimeDrift: boolean;
+}) {
+  const scope = makeProdScope();
+  return {
+    ...passingOpportunityGateInput(scope),
+    registeredStatisticalEvidence: [
+      passingStatisticalEvidence(activationScopeHash(scope), { calibration: overrides }),
+    ],
+  };
+}
+
+describe('AC-154 prod-scoped: ranking stays disabled before mature calibration and cannot override hard gates', () => {
+  it('passes with expected-net-utility ranking disabled at every maturity', () => {
+    for (const maturity of ['DRAFT', 'IMMATURE', 'MATURE'] as const) {
+      const result = evaluateActivationGate(
+        prodCalibrationInput({
+          maturity,
+          expectedNetUtilityRankingEnabled: false,
+          regimeDrift: false,
+        }),
+      );
+      expect(result.verdict, maturity).toBe('PASS');
+    }
+  });
+
+  it('allows ranking influence only at MATURE calibration without regime drift', () => {
+    const result = evaluateActivationGate(
+      prodCalibrationInput({
+        maturity: 'MATURE',
+        expectedNetUtilityRankingEnabled: true,
+        regimeDrift: false,
+      }),
+    );
+    expect(result.verdict).toBe('PASS');
+  });
+
+  it('cannot override a failed hard gate even with a mature, enabled challenger', () => {
+    const input = prodCalibrationInput({
+      maturity: 'MATURE',
+      expectedNetUtilityRankingEnabled: true,
+      regimeDrift: false,
+    });
+    const result = evaluateActivationGate({ ...input, available: false });
+    expect(result.verdict).toBe('REFUSE');
+    if (result.verdict === 'REFUSE') {
+      expect(result.failingGate).toBe('AVAILABLE_EVIDENCE');
+    }
   });
 });

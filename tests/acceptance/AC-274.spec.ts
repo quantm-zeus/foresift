@@ -54,7 +54,7 @@ beforeAll(async () => {
   db = new PGlite({ parsers: PRECISION_RETAINING_TIMESTAMP_PARSERS });
   engine = createEngine(db, 'pglite');
   await applyMigrations({ engine, migrationsDir: MIGRATIONS_DIR });
-});
+}, 120_000);
 
 afterAll(async () => {
   await db.close();
@@ -138,4 +138,29 @@ describe('AC-274: complete high-impact requests admit with full audit', () => {
     const decision = await gate.evaluateHighImpactAction(request);
     expect(decision.outcome).toBe('ALLOW');
   });
+});
+
+// --- prod-scoped addition (T038, FR-PROD-002, AC-274) ------------------------
+
+describe('AC-274 prod-scoped: activation, rollback, and import actions require the full step-up set', () => {
+  it('admits every prod high-impact action with fresh phishing-resistant step-up and full audit', async () => {
+    const actions = [
+      'admin:high:configuration-activate',
+      'admin:high:restore',
+      'admin:high:alpha-artifact-state',
+    ] as const;
+    for (const action of actions) {
+      const gate = new ActionGate({
+        auditChain: new AuditChain({ engine, objectStore: new MemoryObjectStore() }),
+        clock: () => NOW_MS,
+      });
+      const decision = await gate.evaluateHighImpactAction({
+        ...completeRequest(),
+        action,
+        authorizedScopes: [action],
+        idempotencyKey: `idem-prod-${action}`,
+      });
+      expect(decision.outcome, action).toBe('ALLOW');
+    }
+  }, 120_000);
 });

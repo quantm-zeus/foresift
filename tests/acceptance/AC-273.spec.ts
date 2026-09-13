@@ -10,6 +10,30 @@
  */
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 import {
+  ActivationKind,
+  evaluateActivationGate,
+  type DistributionEvidenceInput,
+} from '@foresift/capability-registry';
+import { evaluateDistributionAuthorization } from '@foresift/release-conformance';
+import {
+  PROD_WORKSPACE_AUTHORIZED_CLAIM,
+  makeProdScope,
+  passingDistributionEvidence,
+  passingOpportunityGateInput,
+} from '../fixtures/prod/index.ts';
+
+function prodRightsInput(overrides: Partial<DistributionEvidenceInput> = {}) {
+  const scope = makeProdScope({ profile_version: 'ac273-prod' });
+  return {
+    ...passingOpportunityGateInput(scope),
+    kind: ActivationKind.WORKSPACE,
+    distributionEvidence: passingDistributionEvidence({
+      distributionReadiness: 'WORKSPACE_AUTHORIZED',
+      ...overrides,
+    }),
+  };
+}
+import {
   ArtifactRegistry,
   OperationRegistry,
   RightsMatrixEngine,
@@ -84,7 +108,7 @@ beforeAll(async () => {
       });
     }
   }
-});
+}, 120_000);
 
 afterAll(async () => {
   await closeProvTestDatabase(tdb);
@@ -174,4 +198,20 @@ describe('AC-273 tightening enforcement', () => {
     if (id === undefined) throw new Error(`no artifact row for ${ref}`);
     return { artifactId: id };
   }
+});
+
+// --- prod-scoped addition (T037, FR-PROD-002/004, AC-273) --------------------
+
+describe('AC-273 prod-scoped: a rights change contains the affected scope while listing artifacts for quarantine', () => {
+  it('passes the WORKSPACE gate when the rights change enumerates no still-blocked path', () => {
+    const result = evaluateActivationGate(prodRightsInput({ rightsChangeBlockedPaths: [] }));
+    expect(result.verdict).toBe('PASS');
+  });
+
+  it('keeps the authorization evidence set bound to the exact release', () => {
+    const evaluation = evaluateDistributionAuthorization(PROD_WORKSPACE_AUTHORIZED_CLAIM);
+    expect(evaluation.authorized).toBe(true);
+    expect(evaluation.missingGateKinds).toEqual([]);
+    expect(evaluation.mismatchedGateKinds).toEqual([]);
+  });
 });

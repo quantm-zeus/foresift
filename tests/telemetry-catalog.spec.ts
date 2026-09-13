@@ -33,7 +33,19 @@ import {
   AlertMetricObservationRowSchema,
   ConfirmedOpportunityGateResultSchema,
   OpportunityContentEnvelopeSchema,
+  StateTransitionRowSchema,
+  ModuleStateRowSchema,
+  ActivationGateEvaluationRowSchema,
+  ContainmentEventRowSchema,
+  RollbackEventRowSchema,
+  BestEffortDeclarationRowSchema,
+  SlaRegisterRowSchema,
+  DependencyGroupRowSchema,
+  McpConformanceRunRowSchema,
+  LivePathAlphaReadRowSchema,
+  ArtifactBoundaryAssertionRowSchema,
 } from '../packages/shared-schemas/src/index.ts';
+import { ALL_ACTIVATION_GATE_KINDS } from '../packages/domain/src/index.ts';
 
 const REPO_ROOT = join(import.meta.dirname, '..');
 
@@ -1253,6 +1265,14 @@ function wfFieldType(schema: MiniSchema): string {
       return 'number';
     case 'ZodBoolean':
       return 'boolean';
+    case 'ZodLiteral': {
+      const value = (schema as unknown as { value?: unknown }).value;
+      return typeof value === 'number'
+        ? 'number'
+        : typeof value === 'boolean'
+          ? 'boolean'
+          : 'string';
+    }
     case 'ZodArray':
       return 'array';
     case 'ZodObject':
@@ -1829,6 +1849,316 @@ describe('telemetry/alert.catalog.json parity with authoritative schemas (T025, 
 
       const shape = ALERT_AUTHORITATIVE_SHAPES[expected.schema];
       expect(shape, `${expected.schema} is a real alert.ts export`).toBeDefined();
+      const authoritative = shape as Shape;
+      for (const catalogField of ev.fields) {
+        const schema = shapeField(authoritative, catalogField.name);
+        expect(catalogField.type).toBe(wfFieldType(schema));
+        expect(catalogField.required).toBe(wfFieldRequired(schema));
+      }
+    });
+  }
+});
+
+// --- prod catalog parity (T031) --------------------------------------------
+
+interface ProdCatalogEvent {
+  name: string;
+  authoritativeSchema: string;
+  requirementRefs: string[];
+  tier: string;
+  fields: CatalogField[];
+  dimension?: string;
+  gateKinds?: string[];
+}
+
+interface ProdCatalog {
+  catalog: string;
+  contractStatus?: string;
+  requirementsCovered?: string[];
+  recoveryDataClass?: string;
+  events: ProdCatalogEvent[];
+}
+
+/** Authoritative `prod.ts` exports the catalog may name. */
+const PROD_AUTHORITATIVE_SHAPES: Record<string, Shape> = {
+  ModuleStateRowSchema: wfShape(ModuleStateRowSchema),
+  StateTransitionRowSchema: wfShape(StateTransitionRowSchema),
+  ActivationGateEvaluationRowSchema: wfShape(ActivationGateEvaluationRowSchema),
+  ContainmentEventRowSchema: wfShape(ContainmentEventRowSchema),
+  RollbackEventRowSchema: wfShape(RollbackEventRowSchema),
+  BestEffortDeclarationRowSchema: wfShape(BestEffortDeclarationRowSchema),
+  SlaRegisterRowSchema: wfShape(SlaRegisterRowSchema),
+  DependencyGroupRowSchema: wfShape(DependencyGroupRowSchema),
+  McpConformanceRunRowSchema: wfShape(McpConformanceRunRowSchema),
+  LivePathAlphaReadRowSchema: wfShape(LivePathAlphaReadRowSchema),
+  ArtifactBoundaryAssertionRowSchema: wfShape(ArtifactBoundaryAssertionRowSchema),
+};
+
+const prodCatalog = JSON.parse(
+  readFileSync(join(REPO_ROOT, 'telemetry', 'prod.catalog.json'), 'utf8'),
+) as ProdCatalog;
+
+describe('telemetry/prod.catalog.json parity with authoritative schemas (T031, FR-PROD-001…006)', () => {
+  const expectedProdEvents: Record<string, { schema: string; fields: string[] }> = {
+    'prod.module_implemented_recorded': {
+      schema: 'ModuleStateRowSchema',
+      fields: [
+        'stateRowId',
+        'moduleId',
+        'artifactSetHash',
+        'scope',
+        'lifecycleState',
+        'operationalReadiness',
+        'distributionReadiness',
+        'activationEventRef',
+        'supersededBy',
+        'createdAt',
+      ],
+    },
+    'prod.module_available_recorded': {
+      schema: 'ModuleStateRowSchema',
+      fields: [
+        'stateRowId',
+        'moduleId',
+        'artifactSetHash',
+        'scope',
+        'lifecycleState',
+        'operationalReadiness',
+        'distributionReadiness',
+        'activationEventRef',
+        'supersededBy',
+        'createdAt',
+      ],
+    },
+    'prod.module_proven_recorded': {
+      schema: 'ModuleStateRowSchema',
+      fields: [
+        'stateRowId',
+        'moduleId',
+        'artifactSetHash',
+        'scope',
+        'lifecycleState',
+        'operationalReadiness',
+        'distributionReadiness',
+        'activationEventRef',
+        'supersededBy',
+        'createdAt',
+      ],
+    },
+    'prod.module_state_transitioned': {
+      schema: 'StateTransitionRowSchema',
+      fields: [
+        'transitionId',
+        'stateRowId',
+        'fromState',
+        'toState',
+        'changeClassification',
+        'gateEvaluationRef',
+        'reason',
+        'actorRef',
+        'createdAt',
+      ],
+    },
+    'prod.activation_gate_passed': {
+      schema: 'ActivationGateEvaluationRowSchema',
+      fields: [
+        'evaluationId',
+        'scopeHash',
+        'gateKind',
+        'verdict',
+        'failingGate',
+        'evidenceRefs',
+        'capacityContractRef',
+        'evaluatedAt',
+        'expiresAt',
+      ],
+    },
+    'prod.activation_gate_refused': {
+      schema: 'ActivationGateEvaluationRowSchema',
+      fields: [
+        'evaluationId',
+        'scopeHash',
+        'gateKind',
+        'verdict',
+        'failingGate',
+        'evidenceRefs',
+        'capacityContractRef',
+        'evaluatedAt',
+        'expiresAt',
+      ],
+    },
+    'prod.containment_opened': {
+      schema: 'ContainmentEventRowSchema',
+      fields: [
+        'containmentId',
+        'moduleId',
+        'scopeHash',
+        'action',
+        'triggerGateKind',
+        'reason',
+        'autoReactivationAllowed',
+        'clearedByEventRef',
+        'createdAt',
+      ],
+    },
+    'prod.rollback_recorded': {
+      schema: 'RollbackEventRowSchema',
+      fields: [
+        'rollbackId',
+        'moduleId',
+        'restoredArtifactSetHash',
+        'priorActivationEventRef',
+        'newActivationEventRef',
+        'historyPreserved',
+        'candidateReevaluationRef',
+        'createdAt',
+      ],
+    },
+    'prod.posture_declared': {
+      schema: 'BestEffortDeclarationRowSchema',
+      fields: [
+        'declarationId',
+        'posture',
+        'degradedScope',
+        'missingSlaRefs',
+        'weakenedDimensions',
+        'protectedDimensions',
+        'reason',
+        'declaredAt',
+      ],
+    },
+    'prod.sla_missing_or_expired': {
+      schema: 'SlaRegisterRowSchema',
+      fields: ['slaId', 'dependencyId', 'applicable', 'slaRef', 'verifiedAt', 'expiresAt'],
+    },
+    'prod.dependency_group_updated': {
+      schema: 'DependencyGroupRowSchema',
+      fields: [
+        'groupId',
+        'dependsOn',
+        'status',
+        'manifestRequirementCount',
+        'evidenceRefs',
+        'activatesOpportunities',
+        'updatedAt',
+      ],
+    },
+    'prod.mcp_conformance_passed': {
+      schema: 'McpConformanceRunRowSchema',
+      fields: ['runId', 'revision', 'clientId', 'fixtureRef', 'result', 'ranAt'],
+    },
+    'prod.mcp_conformance_failed': {
+      schema: 'McpConformanceRunRowSchema',
+      fields: ['runId', 'revision', 'clientId', 'fixtureRef', 'result', 'ranAt'],
+    },
+    'prod.precomputed_lookup_served': {
+      schema: 'LivePathAlphaReadRowSchema',
+      fields: [
+        'readId',
+        'livePath',
+        'boundId',
+        'requestHash',
+        'served',
+        'refusalReason',
+        'latencyMs',
+        'readAt',
+      ],
+    },
+    'prod.precomputed_lookup_refused': {
+      schema: 'LivePathAlphaReadRowSchema',
+      fields: [
+        'readId',
+        'livePath',
+        'boundId',
+        'requestHash',
+        'served',
+        'refusalReason',
+        'latencyMs',
+        'readAt',
+      ],
+    },
+    'prod.import_boundary_passed': {
+      schema: 'ArtifactBoundaryAssertionRowSchema',
+      fields: [
+        'assertionId',
+        'livePath',
+        'assertionKind',
+        'importArtifactRef',
+        'verdict',
+        'assertedAt',
+      ],
+    },
+    'prod.import_boundary_failed': {
+      schema: 'ArtifactBoundaryAssertionRowSchema',
+      fields: [
+        'assertionId',
+        'livePath',
+        'assertionKind',
+        'importArtifactRef',
+        'verdict',
+        'assertedAt',
+      ],
+    },
+  };
+
+  it('keeps the prod catalog a declarative CRITICAL_METADATA contract covering FR-PROD-001…006', () => {
+    expect(prodCatalog.catalog).toBe('prod');
+    expect(prodCatalog.contractStatus).toContain('DECLARATIVE_CONTRACT_ONLY');
+    expect(prodCatalog.recoveryDataClass).toBe('CRITICAL_METADATA');
+    for (const fr of [
+      'FR-PROD-001',
+      'FR-PROD-002',
+      'FR-PROD-003',
+      'FR-PROD-004',
+      'FR-PROD-005',
+      'FR-PROD-006',
+    ]) {
+      expect(prodCatalog.requirementsCovered ?? []).toContain(fr);
+    }
+  });
+
+  it('declares every expected prod event family exactly once with per-event refs and tier', () => {
+    expect([...prodCatalog.events.map((e) => e.name)].sort()).toEqual(
+      Object.keys(expectedProdEvents).sort(),
+    );
+    for (const ev of prodCatalog.events) {
+      expect(ev.tier).toBe('CRITICAL_METADATA');
+      expect(ev.requirementRefs.length).toBeGreaterThan(0);
+      for (const ref of ev.requirementRefs) {
+        expect(prodCatalog.requirementsCovered ?? []).toContain(ref);
+      }
+    }
+  });
+
+  it('covers the three independent FR-PROD-001 state dimensions', () => {
+    const dimensions = prodCatalog.events
+      .map((ev) => ev.dimension)
+      .filter((dimension): dimension is string => dimension !== undefined);
+    for (const dimension of ['IMPLEMENTED', 'AVAILABLE', 'PROVEN', 'TRANSITION']) {
+      expect(dimensions).toContain(dimension);
+    }
+  });
+
+  it('declares the FULL ordered activation gate-kind vocabulary on both gate events', () => {
+    for (const eventName of ['prod.activation_gate_passed', 'prod.activation_gate_refused']) {
+      const ev = prodCatalog.events.find((candidate) => candidate.name === eventName);
+      expect(ev, `${eventName} present in the prod catalog`).toBeDefined();
+      expect([...((ev as ProdCatalogEvent).gateKinds ?? [])].sort()).toEqual(
+        [...ALL_ACTIVATION_GATE_KINDS].sort(),
+      );
+    }
+  });
+
+  for (const [eventName, expected] of Object.entries(expectedProdEvents)) {
+    it(`pins ${eventName} to ${expected.schema} (${expected.fields.length} fields)`, () => {
+      const found = prodCatalog.events.find((e) => e.name === eventName);
+      expect(found, `${eventName} present in the prod catalog`).toBeDefined();
+      const ev = found as ProdCatalogEvent;
+      expect(ev.authoritativeSchema).toBe(expected.schema);
+      expect(ev.fields.map((f) => f.name)).toEqual(expected.fields);
+
+      const shape = PROD_AUTHORITATIVE_SHAPES[expected.schema];
+      expect(shape, `${expected.schema} is a real prod.ts export`).toBeDefined();
       const authoritative = shape as Shape;
       for (const catalogField of ev.fields) {
         const schema = shapeField(authoritative, catalogField.name);

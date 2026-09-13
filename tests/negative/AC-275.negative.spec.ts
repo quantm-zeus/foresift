@@ -3,6 +3,28 @@
 // ownership, signed-URL tenant mismatch, traversal keys, opaque partitions.
 import { describe, expect, it } from 'bun:test';
 import {
+  ActivationKind,
+  evaluateActivationGate,
+  type DistributionEvidenceInput,
+} from '@foresift/capability-registry';
+import {
+  makeProdScope,
+  passingDistributionEvidence,
+  passingOpportunityGateInput,
+} from '../fixtures/prod/index.ts';
+
+function prodIsolationInput(overrides: Partial<DistributionEvidenceInput> = {}) {
+  const scope = makeProdScope({ profile_version: 'ac275-prod-neg' });
+  return {
+    ...passingOpportunityGateInput(scope),
+    kind: ActivationKind.WORKSPACE,
+    distributionEvidence: passingDistributionEvidence({
+      distributionReadiness: 'WORKSPACE_AUTHORIZED',
+      ...overrides,
+    }),
+  };
+}
+import {
   deriveModelContextPartition,
   deriveNamespacedKey,
   deriveTenantContext,
@@ -134,6 +156,28 @@ describe('AC-275 negatives: cross-tenant attempts refuse on every surface', () =
       for (const tenant of ['tenant-alice', 'tenant-bob', 'tenant-public']) {
         expect(partition.includes(tenant)).toBe(false);
       }
+    }
+  });
+});
+
+// --- prod-scoped additions (T037, FR-PROD-002, AC-275) -----------------------
+
+describe('AC-275 prod-scoped negatives: missing isolation evidence refuses workspace authorization', () => {
+  it('refuses the WORKSPACE gate when the isolation fixtures did not pass', () => {
+    const result = evaluateActivationGate(prodIsolationInput({ isolationFixtures: false }));
+    expect(result.verdict).toBe('REFUSE');
+    if (result.verdict === 'REFUSE') {
+      expect(result.failingGate).toBe('DISTRIBUTION_EVIDENCE');
+      expect(result.reason).toBe('DISTRIBUTION_EVIDENCE_MISSING');
+    }
+  });
+
+  it('refuses the WORKSPACE gate when tenant isolation did not pass', () => {
+    const result = evaluateActivationGate(prodIsolationInput({ oauthTenantIsolation: false }));
+    expect(result.verdict).toBe('REFUSE');
+    if (result.verdict === 'REFUSE') {
+      expect(result.failingGate).toBe('DISTRIBUTION_EVIDENCE');
+      expect(result.reason).toBe('DISTRIBUTION_EVIDENCE_MISSING');
     }
   });
 });

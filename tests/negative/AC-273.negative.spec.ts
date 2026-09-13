@@ -8,6 +8,33 @@
  */
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 import {
+  ActivationKind,
+  evaluateActivationGate,
+  type DistributionEvidenceInput,
+} from '@foresift/capability-registry';
+import {
+  checkPublicAuthorizationWithoutGateEvidence,
+  evaluateDistributionAuthorization,
+} from '@foresift/release-conformance';
+import {
+  PROD_PUBLIC_AUTHORIZED_WRONG_SCOPE_CLAIM,
+  makeProdScope,
+  passingDistributionEvidence,
+  passingOpportunityGateInput,
+} from '../fixtures/prod/index.ts';
+
+function prodRightsInput(overrides: Partial<DistributionEvidenceInput> = {}) {
+  const scope = makeProdScope({ profile_version: 'ac273-prod-neg' });
+  return {
+    ...passingOpportunityGateInput(scope),
+    kind: ActivationKind.WORKSPACE,
+    distributionEvidence: passingDistributionEvidence({
+      distributionReadiness: 'WORKSPACE_AUTHORIZED',
+      ...overrides,
+    }),
+  };
+}
+import {
   ArtifactRegistry,
   OperationRegistry,
   ProvErrorCode,
@@ -45,7 +72,7 @@ const target: OperationTarget = {
 
 beforeAll(async () => {
   tdb = await makeProvTestDatabase();
-});
+}, 120_000);
 
 afterAll(async () => {
   await closeProvTestDatabase(tdb);
@@ -189,5 +216,33 @@ describe('AC-273 refusals and enforcement completeness', () => {
     ).rejects.toMatchObject({
       code: ProvErrorCode.PROV_RIGHTS_REACTIVATION_REQUIRES_REVERIFICATION,
     });
+  });
+});
+
+// --- prod-scoped additions (T037, FR-PROD-002/004, AC-273) -------------------
+
+describe('AC-273 prod-scoped negatives: an open rights change or foreign-scoped evidence refuses', () => {
+  it('refuses the WORKSPACE gate while the rights change still blocks enumerated paths', () => {
+    const result = evaluateActivationGate(
+      prodRightsInput({
+        rightsChangeBlockedPaths: ['cache://raw-token-payloads', 'export://raw-records'],
+      }),
+    );
+    expect(result.verdict).toBe('REFUSE');
+    if (result.verdict === 'REFUSE') {
+      expect(result.failingGate).toBe('DISTRIBUTION_EVIDENCE');
+      expect(result.reason).toBe('RIGHTS_CHANGE_OPEN');
+    }
+  });
+
+  it('flags rights evidence that is not scoped to the exact release', () => {
+    const evaluation = evaluateDistributionAuthorization(PROD_PUBLIC_AUTHORIZED_WRONG_SCOPE_CLAIM);
+    expect(evaluation.authorized).toBe(false);
+    expect(evaluation.mismatchedGateKinds).toContain('RIGHTS');
+    const report = checkPublicAuthorizationWithoutGateEvidence([
+      PROD_PUBLIC_AUTHORIZED_WRONG_SCOPE_CLAIM,
+    ]);
+    expect(report.passed).toBe(false);
+    expect(report.findings[0]?.message).toContain('not scoped to release');
   });
 });

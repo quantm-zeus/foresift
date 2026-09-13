@@ -14,6 +14,25 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { Incidents } from '../../packages/security/src/incidents.ts';
 import { GatePauses } from '../../packages/security/src/gate-pause.ts';
+import {
+  advanceState,
+  assertAlertResumptionAllowed,
+  assertLivePathBoundaryHolds,
+  assertNoLivePathPrivileges,
+  evaluateActivationGate,
+  recordArtifactBoundaryAssertion,
+  rollbackToApproved,
+} from '@foresift/capability-registry';
+import {
+  PROD_BOUNDARY_ASSERTIONS_IMPORT_REFERENCING,
+  PROD_CONTAINMENT_SPECIFIC_CANDIDATE,
+  PROD_FIXTURE_HASH_A,
+  PROD_FIXTURE_HASH_B,
+  PROD_FIXTURE_NOW,
+  PROD_LIVE_PATH,
+  PROD_ROLLBACK_FIXTURE,
+  passingOpportunityGateInput,
+} from '../fixtures/prod/index.ts';
 
 const MIGRATIONS_DIR = path.resolve(
   path.dirname(fileURLToPath(import.meta.url)),
@@ -32,7 +51,7 @@ beforeAll(async () => {
   await applyMigrations({ engine, migrationsDir: MIGRATIONS_DIR });
   incidents = new Incidents(engine);
   ledger = new GatePauses(engine);
-});
+}, 120_000);
 
 afterAll(async () => {
   await db.close();
@@ -130,5 +149,110 @@ describe('AC-279 negatives: history is append-only and re-evaluation gated', () 
     const resumeEvent = resumeEvents.at(-1);
     expect(resumeEvent?.event_type).toBe('RESUME_AFTER_RE_EVALUATION');
     expect(resumeEvent?.reevaluation_marker).toMatch(/^pending:/);
+  });
+});
+
+// --- prod-scoped additions (T038, FR-PROD-002/006, AC-279) -------------------
+
+describe('AC-279 prod-scoped negatives: rollback and boundary refusals', () => {
+  const moduleId = PROD_CONTAINMENT_SPECIFIC_CANDIDATE.moduleId;
+  const scope = PROD_CONTAINMENT_SPECIFIC_CANDIDATE.scope;
+
+  beforeAll(async () => {
+    const advance = async (
+      toState: 'IMPLEMENTED' | 'AVAILABLE' | 'SHADOW' | 'PROVEN' | 'ACTIVE',
+      stateRowId: string,
+      gateResult: Awaited<ReturnType<typeof evaluateActivationGate>> | null = null,
+    ) =>
+      advanceState(engine, {
+        moduleId,
+        scope,
+        artifactSetHash: PROD_FIXTURE_HASH_A,
+        toState,
+        operationalReadiness: 'READY_FOR_ACTIVE_PROFILE',
+        distributionReadiness: 'PRIVATE_ONLY',
+        changeClassification: 'MATERIAL_OPERATIONAL',
+        reason: `advance to ${toState}`,
+        actorRef: 'ac279-prod-neg',
+        at: PROD_FIXTURE_NOW,
+        gateResult,
+        stateRowId,
+        transitionId: `${stateRowId}-t`,
+      });
+    await advance('IMPLEMENTED', 'ac279-neg-1');
+    await advance('AVAILABLE', 'ac279-neg-2');
+    await advance('SHADOW', 'ac279-neg-3');
+    await advance('PROVEN', 'ac279-neg-4');
+    const gate = evaluateActivationGate(passingOpportunityGateInput(scope));
+    await advance('ACTIVE', 'ac279-neg-5', gate);
+  }, 120_000);
+
+  it('refuses a rollback that reuses the prior activation event', async () => {
+    await expect(
+      rollbackToApproved(engine, {
+        ...PROD_ROLLBACK_FIXTURE,
+        newActivationEventRef: PROD_ROLLBACK_FIXTURE.priorActivationEventRef,
+        rollbackId: 'rollback-reused-event',
+      }),
+    ).rejects.toMatchObject({ code: 'PROD_LIFECYCLE_TRANSITION_ILLEGAL' });
+  }, 120_000);
+
+  it('refuses a rollback to an artifact set that was never approved', async () => {
+    await expect(
+      rollbackToApproved(engine, {
+        ...PROD_ROLLBACK_FIXTURE,
+        restoredArtifactSetHash: PROD_FIXTURE_HASH_B,
+        rollbackId: 'rollback-unapproved-set',
+      }),
+    ).rejects.toMatchObject({ code: 'PROD_LIFECYCLE_TRANSITION_ILLEGAL' });
+  }, 120_000);
+
+  it('blocks alert resumption until the exact re-evaluation reference completes', async () => {
+    await rollbackToApproved(engine, {
+      ...PROD_ROLLBACK_FIXTURE,
+      rollbackId: 'rollback-ac279-neg',
+    });
+    await expect(
+      assertAlertResumptionAllowed(engine, {
+        moduleId,
+        completedReevaluationRef: 'reevaluation://wrong',
+      }),
+    ).rejects.toMatchObject({ code: 'PROD_ACTIVATION_GATE_REFUSED' });
+  }, 120_000);
+
+  it('refuses a live path that reaches a heavy job or artifact import', async () => {
+    await engine.query(
+      `INSERT INTO sec.import_artifacts
+         (artifact_id, manifest_sha256, producer_key_id, format, byte_size, state,
+          state_rank, step_up_approval_ref, received_at, state_changed_at)
+       VALUES ('import-artifact-prod-1', $1, 'producer-1', 'VERSIONED_JSON', 1024, 'SHADOW_ELIGIBLE',
+               4, 'approval-prod', '2026-01-01T00:00:00Z', '2026-01-01T00:00:00Z')`,
+      [PROD_FIXTURE_HASH_A],
+    );
+    for (const assertion of PROD_BOUNDARY_ASSERTIONS_IMPORT_REFERENCING) {
+      await recordArtifactBoundaryAssertion(engine, {
+        assertionId: `ac279-neg-${assertion.assertionKind}`,
+        livePath: PROD_LIVE_PATH,
+        assertionKind: assertion.assertionKind,
+        importArtifactRef: assertion.importArtifactRef,
+        verdict: assertion.verdict,
+        assertedAt: PROD_FIXTURE_NOW,
+      });
+    }
+    await expect(assertLivePathBoundaryHolds(engine, PROD_LIVE_PATH)).rejects.toMatchObject({
+      code: 'PROD_TRUST_BOUNDARY_VIOLATION',
+    });
+  }, 120_000);
+
+  it('refuses a live-path request carrying provider/import/decryption access', () => {
+    for (const access of [
+      { providerCalls: true, artifactImports: false, decryption: false },
+      { providerCalls: false, artifactImports: true, decryption: false },
+      { providerCalls: false, artifactImports: false, decryption: true },
+    ]) {
+      expect(() => assertNoLivePathPrivileges(access, PROD_LIVE_PATH)).toThrowError(
+        expect.objectContaining({ code: 'PROD_TRUST_BOUNDARY_VIOLATION' }),
+      );
+    }
   });
 });

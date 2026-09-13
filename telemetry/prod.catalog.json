@@ -1,0 +1,318 @@
+{
+  "$schema": "https://foresift.dev/schemas/telemetry-catalog-v1.json",
+  "catalog": "prod",
+  "description": "Production-readiness governance telemetry contracts: the independent IMPLEMENTED/AVAILABLE/PROVEN module-state dimensions and the governed transition log, the ordered activation gate passed/refused per gate kind, containment and rollback, declared posture with missing/expired SLA, the MCP revision×client conformance matrix, bounded live-path precomputed lookups served/refused, dependency-group ordering, and live-path import-boundary assertions. Field lists mirror packages/shared-schemas/src/prod.ts authoritative schemas; every event carries the critical-metadata recovery tier.",
+  "contractStatus": "DECLARATIVE_CONTRACT_ONLY — emitter wiring is deferred to G2 observability. Field lists mirror packages/shared-schemas/src/prod.ts authoritative schemas.",
+  "requirementsCovered": [
+    "FR-PROD-001",
+    "FR-PROD-002",
+    "FR-PROD-003",
+    "FR-PROD-004",
+    "FR-PROD-005",
+    "FR-PROD-006"
+  ],
+  "recoveryDataClass": "CRITICAL_METADATA",
+  "events": [
+    {
+      "name": "prod.module_implemented_recorded",
+      "dimension": "IMPLEMENTED",
+      "authoritativeSchema": "ModuleStateRowSchema",
+      "requirementRefs": ["FR-PROD-001", "FR-PROD-002"],
+      "tier": "CRITICAL_METADATA",
+      "fields": [
+        { "name": "stateRowId", "type": "string", "required": true },
+        { "name": "moduleId", "type": "string", "required": true },
+        { "name": "artifactSetHash", "type": "string", "required": true },
+        { "name": "scope", "type": "object", "required": true },
+        { "name": "lifecycleState", "type": "string", "required": true },
+        { "name": "operationalReadiness", "type": "string", "required": true },
+        { "name": "distributionReadiness", "type": "string", "required": true },
+        { "name": "activationEventRef", "type": "string|null", "required": true },
+        { "name": "supersededBy", "type": "string|null", "required": true },
+        { "name": "createdAt", "type": "string", "required": true }
+      ]
+    },
+    {
+      "name": "prod.module_available_recorded",
+      "dimension": "AVAILABLE",
+      "authoritativeSchema": "ModuleStateRowSchema",
+      "requirementRefs": ["FR-PROD-001", "FR-PROD-002"],
+      "tier": "CRITICAL_METADATA",
+      "fields": [
+        { "name": "stateRowId", "type": "string", "required": true },
+        { "name": "moduleId", "type": "string", "required": true },
+        { "name": "artifactSetHash", "type": "string", "required": true },
+        { "name": "scope", "type": "object", "required": true },
+        { "name": "lifecycleState", "type": "string", "required": true },
+        { "name": "operationalReadiness", "type": "string", "required": true },
+        { "name": "distributionReadiness", "type": "string", "required": true },
+        { "name": "activationEventRef", "type": "string|null", "required": true },
+        { "name": "supersededBy", "type": "string|null", "required": true },
+        { "name": "createdAt", "type": "string", "required": true }
+      ]
+    },
+    {
+      "name": "prod.module_proven_recorded",
+      "dimension": "PROVEN",
+      "authoritativeSchema": "ModuleStateRowSchema",
+      "requirementRefs": ["FR-PROD-001", "FR-PROD-002"],
+      "tier": "CRITICAL_METADATA",
+      "fields": [
+        { "name": "stateRowId", "type": "string", "required": true },
+        { "name": "moduleId", "type": "string", "required": true },
+        { "name": "artifactSetHash", "type": "string", "required": true },
+        { "name": "scope", "type": "object", "required": true },
+        { "name": "lifecycleState", "type": "string", "required": true },
+        { "name": "operationalReadiness", "type": "string", "required": true },
+        { "name": "distributionReadiness", "type": "string", "required": true },
+        { "name": "activationEventRef", "type": "string|null", "required": true },
+        { "name": "supersededBy", "type": "string|null", "required": true },
+        { "name": "createdAt", "type": "string", "required": true }
+      ]
+    },
+    {
+      "name": "prod.module_state_transitioned",
+      "dimension": "TRANSITION",
+      "authoritativeSchema": "StateTransitionRowSchema",
+      "requirementRefs": ["FR-PROD-001", "FR-PROD-002"],
+      "tier": "CRITICAL_METADATA",
+      "fields": [
+        { "name": "transitionId", "type": "string", "required": true },
+        { "name": "stateRowId", "type": "string", "required": true },
+        { "name": "fromState", "type": "string", "required": true },
+        { "name": "toState", "type": "string", "required": true },
+        { "name": "changeClassification", "type": "string", "required": true },
+        { "name": "gateEvaluationRef", "type": "string|null", "required": true },
+        { "name": "reason", "type": "string", "required": true },
+        { "name": "actorRef", "type": "string", "required": true },
+        { "name": "createdAt", "type": "string", "required": true }
+      ]
+    },
+    {
+      "name": "prod.activation_gate_passed",
+      "authoritativeSchema": "ActivationGateEvaluationRowSchema",
+      "gateKinds": [
+        "IMPLEMENTED_PRESENT",
+        "AVAILABLE_EVIDENCE",
+        "PROVEN_PRESENT",
+        "STATISTICAL_EVIDENCE_SCOPE",
+        "NEGATIVE_CONTROLS",
+        "CLUSTERED_INTERVALS",
+        "CALIBRATION_MATURITY",
+        "VERIFIED_GATE_EVIDENCE",
+        "CAPACITY_CONTRACT",
+        "DISTRIBUTION_EVIDENCE",
+        "NO_OPEN_CONTAINMENT"
+      ],
+      "requirementRefs": ["FR-PROD-002"],
+      "tier": "CRITICAL_METADATA",
+      "fields": [
+        { "name": "evaluationId", "type": "string", "required": true },
+        { "name": "scopeHash", "type": "string", "required": true },
+        { "name": "gateKind", "type": "string", "required": true },
+        { "name": "verdict", "type": "string", "required": true },
+        { "name": "failingGate", "type": "string|null", "required": true },
+        { "name": "evidenceRefs", "type": "array", "required": true },
+        { "name": "capacityContractRef", "type": "string|null", "required": true },
+        { "name": "evaluatedAt", "type": "string", "required": true },
+        { "name": "expiresAt", "type": "string", "required": true }
+      ]
+    },
+    {
+      "name": "prod.activation_gate_refused",
+      "authoritativeSchema": "ActivationGateEvaluationRowSchema",
+      "gateKinds": [
+        "IMPLEMENTED_PRESENT",
+        "AVAILABLE_EVIDENCE",
+        "PROVEN_PRESENT",
+        "STATISTICAL_EVIDENCE_SCOPE",
+        "NEGATIVE_CONTROLS",
+        "CLUSTERED_INTERVALS",
+        "CALIBRATION_MATURITY",
+        "VERIFIED_GATE_EVIDENCE",
+        "CAPACITY_CONTRACT",
+        "DISTRIBUTION_EVIDENCE",
+        "NO_OPEN_CONTAINMENT"
+      ],
+      "requirementRefs": ["FR-PROD-002"],
+      "tier": "CRITICAL_METADATA",
+      "fields": [
+        { "name": "evaluationId", "type": "string", "required": true },
+        { "name": "scopeHash", "type": "string", "required": true },
+        { "name": "gateKind", "type": "string", "required": true },
+        { "name": "verdict", "type": "string", "required": true },
+        { "name": "failingGate", "type": "string|null", "required": true },
+        { "name": "evidenceRefs", "type": "array", "required": true },
+        { "name": "capacityContractRef", "type": "string|null", "required": true },
+        { "name": "evaluatedAt", "type": "string", "required": true },
+        { "name": "expiresAt", "type": "string", "required": true }
+      ]
+    },
+    {
+      "name": "prod.containment_opened",
+      "authoritativeSchema": "ContainmentEventRowSchema",
+      "requirementRefs": ["FR-PROD-002"],
+      "tier": "CRITICAL_METADATA",
+      "fields": [
+        { "name": "containmentId", "type": "string", "required": true },
+        { "name": "moduleId", "type": "string", "required": true },
+        { "name": "scopeHash", "type": "string", "required": true },
+        { "name": "action", "type": "string", "required": true },
+        { "name": "triggerGateKind", "type": "string", "required": true },
+        { "name": "reason", "type": "string", "required": true },
+        { "name": "autoReactivationAllowed", "type": "boolean", "required": true },
+        { "name": "clearedByEventRef", "type": "string|null", "required": true },
+        { "name": "createdAt", "type": "string", "required": true }
+      ]
+    },
+    {
+      "name": "prod.rollback_recorded",
+      "authoritativeSchema": "RollbackEventRowSchema",
+      "requirementRefs": ["FR-PROD-002"],
+      "tier": "CRITICAL_METADATA",
+      "fields": [
+        { "name": "rollbackId", "type": "string", "required": true },
+        { "name": "moduleId", "type": "string", "required": true },
+        { "name": "restoredArtifactSetHash", "type": "string", "required": true },
+        { "name": "priorActivationEventRef", "type": "string", "required": true },
+        { "name": "newActivationEventRef", "type": "string", "required": true },
+        { "name": "historyPreserved", "type": "boolean", "required": true },
+        { "name": "candidateReevaluationRef", "type": "string", "required": true },
+        { "name": "createdAt", "type": "string", "required": true }
+      ]
+    },
+    {
+      "name": "prod.posture_declared",
+      "authoritativeSchema": "BestEffortDeclarationRowSchema",
+      "requirementRefs": ["FR-PROD-004"],
+      "tier": "CRITICAL_METADATA",
+      "fields": [
+        { "name": "declarationId", "type": "string", "required": true },
+        { "name": "posture", "type": "string", "required": true },
+        { "name": "degradedScope", "type": "object", "required": true },
+        { "name": "missingSlaRefs", "type": "array", "required": true },
+        { "name": "weakenedDimensions", "type": "array", "required": true },
+        { "name": "protectedDimensions", "type": "array", "required": true },
+        { "name": "reason", "type": "string", "required": true },
+        { "name": "declaredAt", "type": "string", "required": true }
+      ]
+    },
+    {
+      "name": "prod.sla_missing_or_expired",
+      "authoritativeSchema": "SlaRegisterRowSchema",
+      "requirementRefs": ["FR-PROD-004"],
+      "tier": "CRITICAL_METADATA",
+      "fields": [
+        { "name": "slaId", "type": "string", "required": true },
+        { "name": "dependencyId", "type": "string", "required": true },
+        { "name": "applicable", "type": "boolean", "required": true },
+        { "name": "slaRef", "type": "string|null", "required": true },
+        { "name": "verifiedAt", "type": "string", "required": true },
+        { "name": "expiresAt", "type": "string|null", "required": true }
+      ]
+    },
+    {
+      "name": "prod.dependency_group_updated",
+      "authoritativeSchema": "DependencyGroupRowSchema",
+      "requirementRefs": ["FR-PROD-003"],
+      "tier": "CRITICAL_METADATA",
+      "fields": [
+        { "name": "groupId", "type": "string", "required": true },
+        { "name": "dependsOn", "type": "array", "required": true },
+        { "name": "status", "type": "string", "required": true },
+        { "name": "manifestRequirementCount", "type": "number", "required": true },
+        { "name": "evidenceRefs", "type": "array", "required": true },
+        { "name": "activatesOpportunities", "type": "boolean", "required": true },
+        { "name": "updatedAt", "type": "string", "required": true }
+      ]
+    },
+    {
+      "name": "prod.mcp_conformance_passed",
+      "authoritativeSchema": "McpConformanceRunRowSchema",
+      "requirementRefs": ["FR-PROD-005"],
+      "tier": "CRITICAL_METADATA",
+      "fields": [
+        { "name": "runId", "type": "string", "required": true },
+        { "name": "revision", "type": "string", "required": true },
+        { "name": "clientId", "type": "string", "required": true },
+        { "name": "fixtureRef", "type": "string", "required": true },
+        { "name": "result", "type": "string", "required": true },
+        { "name": "ranAt", "type": "string", "required": true }
+      ]
+    },
+    {
+      "name": "prod.mcp_conformance_failed",
+      "authoritativeSchema": "McpConformanceRunRowSchema",
+      "requirementRefs": ["FR-PROD-005"],
+      "tier": "CRITICAL_METADATA",
+      "fields": [
+        { "name": "runId", "type": "string", "required": true },
+        { "name": "revision", "type": "string", "required": true },
+        { "name": "clientId", "type": "string", "required": true },
+        { "name": "fixtureRef", "type": "string", "required": true },
+        { "name": "result", "type": "string", "required": true },
+        { "name": "ranAt", "type": "string", "required": true }
+      ]
+    },
+    {
+      "name": "prod.precomputed_lookup_served",
+      "authoritativeSchema": "LivePathAlphaReadRowSchema",
+      "requirementRefs": ["FR-PROD-006"],
+      "tier": "CRITICAL_METADATA",
+      "fields": [
+        { "name": "readId", "type": "string", "required": true },
+        { "name": "livePath", "type": "string", "required": true },
+        { "name": "boundId", "type": "string", "required": true },
+        { "name": "requestHash", "type": "string", "required": true },
+        { "name": "served", "type": "boolean", "required": true },
+        { "name": "refusalReason", "type": "string|null", "required": true },
+        { "name": "latencyMs", "type": "number|null", "required": true },
+        { "name": "readAt", "type": "string", "required": true }
+      ]
+    },
+    {
+      "name": "prod.precomputed_lookup_refused",
+      "authoritativeSchema": "LivePathAlphaReadRowSchema",
+      "requirementRefs": ["FR-PROD-006"],
+      "tier": "CRITICAL_METADATA",
+      "fields": [
+        { "name": "readId", "type": "string", "required": true },
+        { "name": "livePath", "type": "string", "required": true },
+        { "name": "boundId", "type": "string", "required": true },
+        { "name": "requestHash", "type": "string", "required": true },
+        { "name": "served", "type": "boolean", "required": true },
+        { "name": "refusalReason", "type": "string|null", "required": true },
+        { "name": "latencyMs", "type": "number|null", "required": true },
+        { "name": "readAt", "type": "string", "required": true }
+      ]
+    },
+    {
+      "name": "prod.import_boundary_passed",
+      "authoritativeSchema": "ArtifactBoundaryAssertionRowSchema",
+      "requirementRefs": ["FR-PROD-006"],
+      "tier": "CRITICAL_METADATA",
+      "fields": [
+        { "name": "assertionId", "type": "string", "required": true },
+        { "name": "livePath", "type": "string", "required": true },
+        { "name": "assertionKind", "type": "string", "required": true },
+        { "name": "importArtifactRef", "type": "string|null", "required": true },
+        { "name": "verdict", "type": "string", "required": true },
+        { "name": "assertedAt", "type": "string", "required": true }
+      ]
+    },
+    {
+      "name": "prod.import_boundary_failed",
+      "authoritativeSchema": "ArtifactBoundaryAssertionRowSchema",
+      "requirementRefs": ["FR-PROD-006"],
+      "tier": "CRITICAL_METADATA",
+      "fields": [
+        { "name": "assertionId", "type": "string", "required": true },
+        { "name": "livePath", "type": "string", "required": true },
+        { "name": "assertionKind", "type": "string", "required": true },
+        { "name": "importArtifactRef", "type": "string|null", "required": true },
+        { "name": "verdict", "type": "string", "required": true },
+        { "name": "assertedAt", "type": "string", "required": true }
+      ]
+    }
+  ]
+}

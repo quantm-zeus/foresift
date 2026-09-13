@@ -10,10 +10,33 @@
  *   prompts/list, prompts/get, ping) adhere to protocol specifications and JSON-RPC 2.0 framing.
  * - JSON-RPC request-response correlation is preserved across string and integer IDs.
  */
-import { describe, expect, it } from 'bun:test';
+import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { PGlite } from '@electric-sql/pglite';
 import { MCP_PROTOCOL_BASELINE_REVISION } from '@foresift/shared-schemas';
+import {
+  applyMigrations,
+  createEngine,
+  PRECISION_RETAINING_TIMESTAMP_PARSERS,
+  type DatabaseEngine,
+} from '@foresift/persistence';
+import {
+  insertMcpCompatibilityCell,
+  insertMcpConformanceRun,
+  insertMcpRevision,
+  insertMcpTargetClient,
+  mcpCompatibilityCells,
+  resolveCompatibilityMatrix,
+} from '@foresift/capability-registry';
 import { McpProtocolGuard } from '../../packages/security/src/mcp-protocol-guard.ts';
 import { VALID_AUTHORIZED_CURSOR, VALID_MCP_OUTPUT_ENVELOPE } from '../fixtures/mcp/index.ts';
+import {
+  PROD_MCP_NOW,
+  PROD_MCP_RECENT_TEST,
+  PROD_MCP_STABLE_REVISION,
+  PROD_MCP_TARGET_CLIENTS,
+} from '../fixtures/prod/index.ts';
 
 const GUARD = new McpProtocolGuard({
   maxMessageBytes: 1024 * 1024,
@@ -264,4 +287,82 @@ describe('AC-144 acceptance: MCP protocol compatibility matrix (baseline 2025-11
       expect(numericResponse.id).toBe(42001);
     });
   });
+});
+
+// --- prod-scoped addition (T034, FR-PROD-005, AC-144) ------------------------
+
+const PROD_MIGRATIONS_DIR = path.resolve(
+  path.dirname(fileURLToPath(import.meta.url)),
+  '../../migrations',
+);
+
+/** Seed the §69.7 baseline stable revision green for every supported client. */
+async function seedProdMcpBaseline(engine: DatabaseEngine): Promise<void> {
+  await insertMcpRevision(engine, {
+    revision: PROD_MCP_STABLE_REVISION,
+    channel: 'STABLE',
+    sdkVersion: '1.30.0',
+    transport: 'STREAMABLE_HTTP',
+    originPolicyRef: 'origin-policy://prod',
+    isDefault: true,
+  });
+  for (const client of PROD_MCP_TARGET_CLIENTS) {
+    await insertMcpTargetClient(engine, {
+      clientId: client.clientId,
+      clientName: client.clientName,
+      version: client.version,
+      capabilities: { tools: { listChanged: true } },
+      authMode: client.authMode,
+    });
+    await insertMcpCompatibilityCell(engine, {
+      cellId: `${PROD_MCP_STABLE_REVISION}-${client.clientId}`,
+      revision: PROD_MCP_STABLE_REVISION,
+      clientId: client.clientId,
+      conformanceFixtureRef: `fixture-${client.clientId}`,
+      liveTestDate: PROD_MCP_RECENT_TEST,
+      result: 'PASS',
+    });
+    await insertMcpConformanceRun(engine, {
+      runId: `run-${PROD_MCP_STABLE_REVISION}-${client.clientId}`,
+      revision: PROD_MCP_STABLE_REVISION,
+      clientId: client.clientId,
+      fixtureRef: `fixture-${client.clientId}`,
+      result: 'PASS',
+      ranAt: PROD_MCP_RECENT_TEST,
+    });
+  }
+}
+
+describe('AC-144 prod-scoped: default stable revision 2025-11-25 passes for every supported target client', () => {
+  let db: PGlite;
+  let engine: DatabaseEngine;
+
+  beforeAll(async () => {
+    db = new PGlite({ parsers: PRECISION_RETAINING_TIMESTAMP_PARSERS });
+    engine = createEngine(db, 'pglite');
+    await applyMigrations({ engine, migrationsDir: PROD_MIGRATIONS_DIR });
+    await seedProdMcpBaseline(engine);
+  }, 120_000);
+
+  afterAll(async () => {
+    await db.close();
+  });
+
+  it('resolves the 2025-11-25 default with a usable cell for every supported target client', async () => {
+    const resolution = await resolveCompatibilityMatrix(engine, { now: PROD_MCP_NOW });
+    expect(resolution.defaultRevision).toBe('2025-11-25');
+    expect(resolution.defaultChannel).toBe('STABLE');
+    expect(resolution.cells).toHaveLength(PROD_MCP_TARGET_CLIENTS.length);
+    for (const cell of resolution.cells) {
+      expect(cell.usable, `${cell.revision}×${cell.clientId}`).toBe(true);
+      expect(cell.reason).toBeNull();
+    }
+  }, 120_000);
+
+  it('exposes every supported target client in the compatibility matrix', async () => {
+    const cells = await mcpCompatibilityCells(engine);
+    expect(new Set(cells.map((cell) => cell.clientId))).toEqual(
+      new Set(PROD_MCP_TARGET_CLIENTS.map((client) => client.clientId)),
+    );
+  }, 120_000);
 });

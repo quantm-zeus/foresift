@@ -73,7 +73,7 @@
       "parallelizable": false,
       "requirementIds": ["FR-ADM-001", "FR-ADM-003", "FR-ADM-007"],
       "risk": "HIGH",
-      "status": "PENDING",
+      "status": "RUNNING",
       "verificationCommands": [
         "test -d apps/dashboard && pnpm --filter @foresift/dashboard test",
         "bun test tests/acceptance/AC-014.spec.ts tests/acceptance/AC-063.spec.ts",

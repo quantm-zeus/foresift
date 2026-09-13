@@ -56,11 +56,13 @@ afterAll(async () => {
   await db.close();
 });
 
-async function rejection(work: Promise<unknown>): Promise<{ code?: string }> {
+async function rejection(
+  work: Promise<unknown>,
+): Promise<{ code?: string; detail?: { readonly reason?: string } }> {
   try {
     await work;
   } catch (error) {
-    return error as { code?: string };
+    return error as { code?: string; detail?: { readonly reason?: string } };
   }
   throw new Error('expected a typed refusal, but the operation succeeded');
 }
@@ -135,6 +137,8 @@ describe('§69.7 compatibility matrix resolution (AC-144)', () => {
     const passingRuns = CLIENTS.map((clientId) => ({
       revision: '2026-03-01',
       clientId,
+      fixtureRef: `fixture-${clientId}`,
+      ranAt: RECENT,
     }));
     const stale = cellUsability({
       cell: staleCell,
@@ -239,4 +243,118 @@ describe('§69.7 compatibility matrix resolution (AC-144)', () => {
     expect(missing.resolvedRevision).toBe('2025-11-25');
     expect(missing.substituted).toBe(true);
   }, 120_000);
+});
+
+describe('MCP opt-in validation and conformance provenance (C3/H10 regressions)', () => {
+  it('refuses an unregistered opt-in revision instead of injecting it into the allow-list (C3 exploit)', async () => {
+    // The pre-fix bypass: the raw string was added to the guard allow-list and
+    // returned ALLOW for a revision that was never registered or tested.
+    const refused = await rejection(
+      resolveProtocolRevision(engine, {
+        requestedRevision: '2099-01-01-evil',
+        now: NOW,
+        policy: 'OPT_IN_ONLY',
+        optInRevisions: ['2099-01-01-evil'],
+      }),
+    );
+    expect(refused.code).toBe('PROD_MCP_REVISION_CHANNEL_UNKNOWN');
+    expect(refused.detail?.reason).toBe('REVISION_UNKNOWN');
+
+    const matrixRefused = await rejection(
+      resolveCompatibilityMatrix(engine, {
+        now: NOW,
+        optInDraftRevisions: ['2099-01-01-evil'],
+      }),
+    );
+    expect(matrixRefused.code).toBe('PROD_MCP_REVISION_CHANNEL_UNKNOWN');
+  }, 120_000);
+
+  it('refuses a registered STABLE revision smuggled through the opt-in list (C3)', async () => {
+    const refused = await rejection(
+      resolveProtocolRevision(engine, {
+        requestedRevision: '2026-01-15',
+        now: NOW,
+        policy: 'OPT_IN_ONLY',
+        optInRevisions: ['2026-01-15'],
+      }),
+    );
+    expect(refused.code).toBe('PROD_MCP_DRAFT_DEFAULT');
+    expect(refused.detail?.reason).toBe('DRAFT_NOT_OPTED_IN');
+  }, 120_000);
+
+  it('refuses a DRAFT opt-in with no usable conformance cell for every client (C3)', async () => {
+    await addTestedRevision('2026-07-01-rc.1', 'DRAFT', ['client-b']);
+    const refused = await rejection(
+      resolveCompatibilityMatrix(engine, {
+        now: NOW,
+        optInDraftRevisions: ['2026-07-01-rc.1'],
+      }),
+    );
+    expect(refused.code).toBe('PROD_ACTIVATION_GATE_REFUSED');
+    expect(refused.detail?.reason).toBe('CELL_NOT_USABLE');
+  }, 120_000);
+
+  it('never lets a run for a different fixture satisfy a cell (H10 provenance)', () => {
+    const cell = {
+      cellId: 'prov-cell',
+      revision: '2099-01-01',
+      clientId: 'client-a',
+      conformanceFixtureRef: 'fixture-a',
+      liveTestDate: RECENT,
+      result: 'PASS' as const,
+      notes: null,
+    };
+    const wrongFixture = cellUsability({
+      cell,
+      passingRuns: [
+        {
+          revision: '2099-01-01',
+          clientId: 'client-a',
+          fixtureRef: 'fixture-OTHER',
+          ranAt: RECENT,
+        },
+      ],
+      revision: '2099-01-01',
+      clientId: 'client-a',
+      now: NOW,
+    });
+    expect(wrongFixture.usable).toBe(false);
+    expect(wrongFixture.reason).toBe('CELL_NOT_USABLE');
+
+    const matching = cellUsability({
+      cell,
+      passingRuns: [
+        { revision: '2099-01-01', clientId: 'client-a', fixtureRef: 'fixture-a', ranAt: RECENT },
+      ],
+      revision: '2099-01-01',
+      clientId: 'client-a',
+      now: NOW,
+    });
+    expect(matching.usable).toBe(true);
+  });
+
+  it('cannot widen the staleness window with a caller override (H10 staleness)', () => {
+    const cell = {
+      cellId: 'stale-cell',
+      revision: '2099-02-01',
+      clientId: 'client-a',
+      conformanceFixtureRef: 'fixture-a',
+      liveTestDate: STALE,
+      result: 'PASS' as const,
+      notes: null,
+    };
+    const stale = cellUsability({
+      cell,
+      passingRuns: [
+        { revision: '2099-02-01', clientId: 'client-a', fixtureRef: 'fixture-a', ranAt: STALE },
+      ],
+      revision: '2099-02-01',
+      clientId: 'client-a',
+      now: NOW,
+      // The pre-fix bypass: an enormous override kept a stale cell usable.
+      maxAgeSeconds: 1e12,
+    });
+    expect(stale.usable).toBe(false);
+    expect(stale.reason).toBe('CELL_NOT_USABLE');
+  });
 });

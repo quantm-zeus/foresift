@@ -7,6 +7,7 @@
  */
 import { describe, expect, it } from 'bun:test';
 import {
+  CLAIM_PROD_RULES,
   CONFORMANCE_RULES,
   PROD_RULES,
   checkActivationWithoutEvidence,
@@ -210,7 +211,8 @@ describe('PROD conformance aggregation and unchanged trace rules', () => {
     });
     expect(report.overall).toBe('FAILED');
     const rules = new Set(report.findings.map((finding) => finding.rule));
-    for (const rule of Object.values(PROD_RULES)) {
+    for (const key of CLAIM_PROD_RULES) {
+      const rule = PROD_RULES[key];
       expect(rules, `${rule} must fire`).toContain(rule);
     }
   });
@@ -236,13 +238,76 @@ describe('PROD conformance aggregation and unchanged trace rules', () => {
     });
   });
 
-  it('runs the repository-backed trace rules without PROD interference', async () => {
+  it('fails closed when the PROD governance claims are omitted (H1/H2)', async () => {
     const { evaluateConformance } = await import('../src/index.ts');
     const result = await evaluateConformance({ repoRoot: REPO_ROOT });
-    expect(['PASSED', 'FAILED']).toContain(result.overall);
-    for (const finding of result.findings) {
-      expect(finding.rule).not.toBe(PROD_RULES.activationWithoutEvidence);
-      expect(finding.rule).not.toBe(PROD_RULES.postureWeakening);
-    }
+    expect(result.overall).toBe('FAILED');
+    expect(result.findings.map((finding) => finding.rule)).toContain(
+      'PROD_CONFORMANCE_INPUT_MISSING',
+    );
+  });
+
+  it('invokes the PROD rules from the release gate and FAILS a violating tree (H1)', async () => {
+    const { evaluateConformance } = await import('../src/index.ts');
+    const result = await evaluateConformance({
+      repoRoot: REPO_ROOT,
+      milestone: 'G2',
+      prodClaims: {
+        activationClaims: [PROD_ACTIVE_WITHOUT_GATE_CLAIM],
+        postureDeclarations: [PROD_BEST_EFFORT_WEAKENING],
+        mcpCompatibility: PROD_MCP_DRAFT_DEFAULT_CLAIM,
+        livePaths: [PROD_LIVE_PATH_NO_BOUND_CLAIM],
+        distributionAuthorizations: [PROD_PUBLIC_AUTHORIZED_MISSING_CLAIM],
+      },
+    });
+    expect(result.overall).toBe('FAILED');
+    const rules = new Set(result.findings.map((finding) => finding.rule));
+    expect(rules).toContain(PROD_RULES.activationWithoutEvidence);
+    expect(rules).toContain(PROD_RULES.postureWeakening);
+    expect(rules).toContain(PROD_RULES.mcpCompatibilityDrift);
+    expect(rules).toContain(PROD_RULES.livePathPrecomputationViolation);
+    expect(rules).toContain(PROD_RULES.publicAuthorizationWithoutGateEvidence);
+  });
+
+  it('passes the release gate on the live tree when the PROD claim set is compliant', async () => {
+    const { evaluateConformance } = await import('../src/index.ts');
+    const result = await evaluateConformance({
+      repoRoot: REPO_ROOT,
+      milestone: 'G2',
+      prodClaims: {
+        activationClaims: [PROD_COMPLIANT_ACTIVE_CLAIM],
+        postureDeclarations: [PROD_BEST_EFFORT_COMPLIANT],
+        mcpCompatibility: PROD_MCP_COMPLIANT_CLAIM,
+        livePaths: [PROD_LIVE_PATH_BOUNDED_CLAIM],
+        distributionAuthorizations: [PROD_WORKSPACE_AUTHORIZED_CLAIM, PROD_TECHNICALLY_READY_CLAIM],
+      },
+    });
+    expect(result.findings.map((finding) => finding.rule)).not.toContain(
+      PROD_RULES.prodSurfaceMissing,
+    );
+    expect(result.findings.map((finding) => finding.rule)).not.toContain(
+      PROD_RULES.prodConformanceInputMissing,
+    );
+  });
+
+  it('fails closed on an omitted input, an empty required-gate set, and unknown readiness (H2)', () => {
+    expect(evaluateProdConformance({}).overall).toBe('FAILED');
+    expect(evaluateProdConformance({}).findings.map((finding) => finding.rule)).toContain(
+      PROD_RULES.prodConformanceInputMissing,
+    );
+
+    const emptyGates = evaluateDistributionAuthorization({
+      ...PROD_WORKSPACE_AUTHORIZED_CLAIM,
+      requiredGateKinds: [],
+    });
+    expect(emptyGates.authorized).toBe(false);
+    expect(emptyGates.requiredGateKindsEmpty).toBe(true);
+
+    const unknown = evaluateDistributionAuthorization({
+      ...PROD_WORKSPACE_AUTHORIZED_CLAIM,
+      distributionReadiness: 'TOTALLY_MADE_UP',
+    });
+    expect(unknown.readinessKnown).toBe(false);
+    expect(unknown.authorized).toBe(false);
   });
 });

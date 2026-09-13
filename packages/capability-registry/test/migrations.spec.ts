@@ -25,6 +25,7 @@ import {
   ALL_ACTIVATION_GATE_KINDS,
   ALL_CHANGE_CLASSIFICATIONS,
   ALL_MODULE_LIFECYCLE_STATES,
+  type ActivationGateKind,
 } from '@foresift/domain';
 import {
   applyMigrations,
@@ -251,7 +252,7 @@ describe('governed module states are append-only and gate-backed', () => {
     // SCOPE.requires_proven is true, so an OPPORTUNITY activation requires the
     // PROVEN gate; DISTRIBUTION_EVIDENCE is outside the kind and must be
     // recorded NOT_APPLICABLE, never PASS (C1).
-    const required = [
+    const required: readonly ActivationGateKind[] = [
       'IMPLEMENTED_PRESENT',
       'AVAILABLE_EVIDENCE',
       'PROVEN_PRESENT',
@@ -292,7 +293,7 @@ describe('governed module states are append-only and gate-backed', () => {
   it('refuses a raw ACTIVE INSERT whose non-required gate was forged as PASS (C1 exploit)', async () => {
     const rawHash = `sha256:${'3'.repeat(64)}`;
     const rawEvent = 'raw-forged-nonapp';
-    const required = [
+    const required: readonly ActivationGateKind[] = [
       'IMPLEMENTED_PRESENT',
       'AVAILABLE_EVIDENCE',
       'PROVEN_PRESENT',

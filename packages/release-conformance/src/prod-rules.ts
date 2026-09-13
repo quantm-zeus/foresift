@@ -31,11 +31,15 @@ import {
   bestEffortWeakensOnlyAllowedDimensions,
   mcpCompatibilityCellUsable,
   mcpRevisionMayBeDefault,
+  parseDistributionReadiness,
   precomputedAlphaBoundRespected,
   type ArtifactBoundaryAssertion,
   type PrecomputedAlphaRequest,
 } from '@foresift/domain';
-import { CONFORMANCE_RULES, type ConformanceFinding } from './conformance.ts';
+import { readFile, readdir, access } from 'node:fs/promises';
+import path from 'node:path';
+import { resolveMappings } from '@foresift/requirement-manifest';
+import { CONFORMANCE_RULES, implementationPath, type ConformanceFinding } from './conformance.ts';
 
 // --- rule vocabulary --------------------------------------------------------
 
@@ -49,7 +53,20 @@ export const PROD_RULES = {
   mcpCompatibilityDrift: 'MCP_COMPATIBILITY_DRIFT',
   livePathPrecomputationViolation: 'LIVE_PATH_PRECOMPUTATION_VIOLATION',
   publicAuthorizationWithoutGateEvidence: 'PUBLIC_AUTHORIZATION_WITHOUT_GATE_EVIDENCE',
+  /** A mandatory release-gate input was omitted instead of declared (audit H2). */
+  prodConformanceInputMissing: 'PROD_CONFORMANCE_INPUT_MISSING',
+  /** A declared PROD surface ref does not resolve in the live repository (H1). */
+  prodSurfaceMissing: 'PROD_SURFACE_MISSING',
 } as const;
+
+/** The five claim-shaped PROD rules (the repo-backed surface rule is separate). */
+export const CLAIM_PROD_RULES = [
+  'activationWithoutEvidence',
+  'postureWeakening',
+  'mcpCompatibilityDrift',
+  'livePathPrecomputationViolation',
+  'publicAuthorizationWithoutGateEvidence',
+] as const satisfies readonly (keyof typeof PROD_RULES)[];
 
 export type ProdRule = (typeof PROD_RULES)[keyof typeof PROD_RULES];
 
@@ -90,6 +107,8 @@ export const PROD_RULE_REQUIREMENT_REFS: Readonly<Record<ProdRule, readonly stri
   [PROD_RULES.mcpCompatibilityDrift]: ['FR-PROD-005'],
   [PROD_RULES.livePathPrecomputationViolation]: ['FR-PROD-006'],
   [PROD_RULES.publicAuthorizationWithoutGateEvidence]: ['FR-PROD-002', 'FR-PROD-004'],
+  [PROD_RULES.prodConformanceInputMissing]: ['FR-PROD-001', 'FR-PROD-002', 'FR-PROD-006'],
+  [PROD_RULES.prodSurfaceMissing]: ['FR-PROD-001', 'FR-PROD-002', 'FR-PROD-003'],
 };
 
 // --- rule 1: activation without evidence ------------------------------------
@@ -451,6 +470,8 @@ export interface DistributionAuthorizationClaim {
 export interface DistributionAuthorizationEvaluation {
   readonly authorized: boolean;
   readonly readinessAuthorized: boolean;
+  readonly readinessKnown: boolean;
+  readonly requiredGateKindsEmpty: boolean;
   readonly missingGateKinds: readonly string[];
   readonly mismatchedGateKinds: readonly string[];
   readonly revokedOrInvalidGateKinds: readonly string[];
@@ -472,12 +493,23 @@ const DEFAULT_PUBLIC_AUTHORIZATION_REQUIREMENT = 'FR-PROD-002';
 export function evaluateDistributionAuthorization(
   claim: DistributionAuthorizationClaim,
 ): DistributionAuthorizationEvaluation {
+  // An unrecognized readiness string is NOT a not-yet-authorized position: it
+  // is an unparseable claim and refuses closed (audit H2).
+  let readinessKnown = true;
+  try {
+    parseDistributionReadiness(claim.distributionReadiness);
+  } catch {
+    readinessKnown = false;
+  }
   const readinessAuthorized = AUTHORIZED_DISTRIBUTION_READINESS.includes(
     claim.distributionReadiness,
   );
   const missingGateKinds: string[] = [];
   const mismatchedGateKinds: string[] = [];
   const revokedOrInvalidGateKinds: string[] = [];
+  // An authorization claim with NO required gate kinds is unauthorized by
+  // construction: zero requirements cannot be satisfied into a PASS (H2).
+  const requiredGateKindsEmpty = readinessAuthorized && claim.requiredGateKinds.length === 0;
   for (const gateKind of claim.requiredGateKinds) {
     const matching = claim.gateEvidence.filter((evidence) => evidence.gateKind === gateKind);
     if (matching.length === 0) {
@@ -498,11 +530,15 @@ export function evaluateDistributionAuthorization(
   }
   return {
     authorized:
+      readinessKnown &&
       readinessAuthorized &&
+      !requiredGateKindsEmpty &&
       missingGateKinds.length === 0 &&
       mismatchedGateKinds.length === 0 &&
       revokedOrInvalidGateKinds.length === 0,
     readinessAuthorized,
+    readinessKnown,
+    requiredGateKindsEmpty,
     missingGateKinds,
     mismatchedGateKinds,
     revokedOrInvalidGateKinds,
@@ -516,9 +552,25 @@ export function checkPublicAuthorizationWithoutGateEvidence(
   const findings: ProdConformanceFinding[] = [];
   for (const claim of claims) {
     const evaluation = evaluateDistributionAuthorization(claim);
+    if (!evaluation.readinessKnown) {
+      findings.push({
+        requirementId: claim.requirementId ?? DEFAULT_PUBLIC_AUTHORIZATION_REQUIREMENT,
+        rule: PROD_RULES.publicAuthorizationWithoutGateEvidence,
+        path: claim.releaseRef,
+        message: `unknown distribution readiness ${JSON.stringify(
+          claim.distributionReadiness,
+        )}: an unparseable claim fails closed`,
+      });
+      continue;
+    }
     if (!evaluation.readinessAuthorized || evaluation.authorized) continue;
     const requirementId = claim.requirementId ?? DEFAULT_PUBLIC_AUTHORIZATION_REQUIREMENT;
     const details: string[] = [];
+    if (evaluation.requiredGateKindsEmpty) {
+      details.push(
+        'no required gate kinds were declared (an empty requirement set cannot authorize)',
+      );
+    }
     if (evaluation.missingGateKinds.length > 0) {
       details.push(`missing gate evidence: ${evaluation.missingGateKinds.join(', ')}`);
     }
@@ -553,12 +605,43 @@ export interface ProdConformanceInput {
 }
 
 /**
+ * The mandatory release-gate inputs. Each is REQUIRED: omitting one is a
+ * conformance finding, never a silent skip (audit H2). An explicit empty array
+ * is a declaration that there are no such claims and is allowed.
+ */
+const REQUIRED_PROD_INPUTS = [
+  ['activationClaims', 'ACTIVATION_CLAIMS'],
+  ['postureDeclarations', 'POSTURE_DECLARATIONS'],
+  ['mcpCompatibility', 'MCP_COMPATIBILITY'],
+  ['livePaths', 'LIVE_PATHS'],
+  ['distributionAuthorizations', 'DISTRIBUTION_AUTHORIZATIONS'],
+] as const;
+
+/** Flag every mandatory input the caller omitted instead of declaring. */
+export function checkProdConformanceInputsPresent(input: ProdConformanceInput): ProdRuleReport {
+  const findings: ProdConformanceFinding[] = [];
+  for (const [field, label] of REQUIRED_PROD_INPUTS) {
+    if (input[field] === undefined) {
+      findings.push({
+        requirementId: 'FR-PROD-001',
+        rule: PROD_RULES.prodConformanceInputMissing,
+        path: field,
+        message: `PROD conformance input ${field} (${label}) was omitted; an absent governance claim set fails the release gate closed instead of passing vacuously`,
+      });
+    }
+  }
+  return { passed: findings.length === 0, findings };
+}
+
+/**
  * Evaluate every PROD rule and aggregate the findings into one report whose
  * shape matches `ConformanceResult`. `overall` is `FAILED` when any finding was
- * produced.
+ * produced — including the finding emitted for each OMITTED mandatory input, so
+ * `evaluateProdConformance({})` can never be a vacuous PASS (audit H2).
  */
 export function evaluateProdConformance(input: ProdConformanceInput): ProdConformanceReport {
   const findings: ProdConformanceFinding[] = [
+    ...checkProdConformanceInputsPresent(input).findings,
     ...checkActivationWithoutEvidence(input.activationClaims ?? []).findings,
     ...checkPostureWeakening(input.postureDeclarations ?? []).findings,
     ...(input.mcpCompatibility === undefined
@@ -568,4 +651,124 @@ export function evaluateProdConformance(input: ProdConformanceInput): ProdConfor
     ...checkPublicAuthorizationWithoutGateEvidence(input.distributionAuthorizations ?? []).findings,
   ];
   return { overall: findings.length === 0 ? 'PASSED' : 'FAILED', findings };
+}
+
+// --- repo-backed PROD surface bridge (audit H1) ------------------------------
+
+/** The mapping fields the repo-backed bridge resolves for every FR-PROD item. */
+const PROD_SURFACE_FIELDS = [
+  'implementationRefs',
+  'schemaRefs',
+  'persistenceRefs',
+  'telemetryRefs',
+  'fixtureRefs',
+  'apiToolUiRefs',
+  'testRefs',
+] as const;
+
+/** A lightweight requirement record; only the mapping fields are read. */
+export interface ProdSurfaceRequirement {
+  readonly id: string;
+  readonly supersededBy?: readonly string[];
+  readonly implementationRefs?: readonly string[];
+  readonly schemaRefs?: readonly string[];
+  readonly persistenceRefs?: readonly string[];
+  readonly telemetryRefs?: readonly string[];
+  readonly fixtureRefs?: readonly string[];
+  readonly apiToolUiRefs?: readonly string[];
+  readonly testRefs?: readonly string[];
+}
+
+export interface ProdSurfacePresenceOptions {
+  readonly repoRoot: string;
+  readonly requirements?: readonly ProdSurfaceRequirement[];
+}
+
+function globToRegExp(pattern: string): RegExp {
+  const escaped = pattern.replace(/[.+^${}()|[\]\\]/g, '\\$&');
+  const body = escaped
+    .replaceAll('**', '\u0000')
+    .replaceAll('*', '[^/]*')
+    .replaceAll('?', '[^/]')
+    .replaceAll('\u0000', '.*');
+  return new RegExp(`^${body}$`);
+}
+
+async function filesUnder(root: string, relative = ''): Promise<readonly string[]> {
+  let entries;
+  try {
+    entries = await readdir(path.join(root, relative), { withFileTypes: true });
+  } catch {
+    return [];
+  }
+  const files: string[] = [];
+  for (const entry of entries) {
+    const child = relative.length === 0 ? entry.name : `${relative}/${entry.name}`;
+    if (entry.isDirectory()) files.push(...(await filesUnder(root, child)));
+    else if (entry.isFile()) files.push(child);
+  }
+  return files;
+}
+
+/** True when a declared ref (exact path, directory, or glob) resolves on disk. */
+async function prodRefResolves(repoRoot: string, ref: string): Promise<boolean> {
+  const clean = implementationPath(ref);
+  if (clean.length === 0) return false;
+  const wildcard = clean.search(/[?*[{]/);
+  if (wildcard < 0) {
+    try {
+      await access(path.join(repoRoot, clean));
+      return true;
+    } catch {
+      return false;
+    }
+  }
+  const beforeWildcard = clean.slice(0, wildcard);
+  const lastSlash = beforeWildcard.lastIndexOf('/');
+  const prefix = lastSlash < 0 ? '' : beforeWildcard.slice(0, lastSlash);
+  const rest = lastSlash < 0 ? clean : clean.slice(lastSlash + 1);
+  const matcher = globToRegExp(rest);
+  return (await filesUnder(path.join(repoRoot, prefix))).some((file) => matcher.test(file));
+}
+
+/**
+ * Repo-backed bridge for the PROD family (audit H1): every declared
+ * implementation/schema/persistence/telemetry/fixture/api/test ref of every
+ * non-superseded FR-PROD requirement must resolve in the LIVE tree, resolved
+ * through the canonical `resolveMappings` + `implementationPath` path. A tree
+ * that drops a prod surface therefore FAILS the release gate instead of passing
+ * because nobody looked.
+ */
+export async function checkProdSurfacePresence(
+  options: ProdSurfacePresenceOptions,
+): Promise<ProdRuleReport> {
+  const requirements =
+    options.requirements ??
+    (JSON.parse(
+      await readFile(
+        path.join(
+          options.repoRoot,
+          'docs/spec/crypto_intelligence_agent_gateway_PRD_FINAL_v6.0.requirements.json',
+        ),
+        'utf8',
+      ),
+    ).requirements as readonly ProdSurfaceRequirement[]);
+  const findings: ProdConformanceFinding[] = [];
+  for (const requirement of requirements) {
+    if (!requirement.id.startsWith('FR-PROD-')) continue;
+    if ((requirement.supersededBy ?? []).length > 0) continue;
+    const mappings = resolveMappings({ requirements }, requirement.id);
+    for (const field of PROD_SURFACE_FIELDS) {
+      for (const ref of mappings[field]) {
+        if (await prodRefResolves(options.repoRoot, ref)) continue;
+        findings.push({
+          requirementId: requirement.id,
+          rule: PROD_RULES.prodSurfaceMissing,
+          path: implementationPath(ref),
+          message: `${requirement.id} declares ${field} ${implementationPath(ref)} but it does not resolve in the live repository`,
+        });
+      }
+    }
+  }
+  return { passed: findings.length === 0, findings };
 }

@@ -186,9 +186,16 @@ already-classified, Zod-validated `AlertRecordInput` plus rendered
 payload. `commit.ts` calls the engine's `commitDecisionWithOutbox`
 (injecting `ShadowInfluenceKind.OPPORTUNITY_NOTIFICATION`) and the engine
 commits decision + alert + outbox atomically and delivers exactly once.
-This package MUST NOT open its own transaction, write outbox rows
-directly, or reimplement delivery/retry/dead-letter logic (durable plan
-D1, milestone plan-level decision 6).
+This package MUST NOT write outbox rows directly or reimplement
+delivery/retry/dead-letter logic (durable plan D1, milestone plan-level
+decision 6). The alert package may open ONE enclosing transaction for its
+own writes: `commitAlertUpdate` wraps the `alert.alert_updates` row, the
+fingerprint/cooldown ledger advance, and the engine commit so a failure
+inside the engine commit rolls the alert-owned writes back with it; the
+engine re-enters that transaction as a nested SAVEPOINT and still owns
+commit/rollback and exactly-once delivery (ADR-0025 decision 2, proven by
+the injected-failure rollback test). The read/classify/commit adapter
+`commitAlert` opens no transaction of its own.
 
 **D2. One immutable policy version per alert class.** Policies are
 data/DB rows keyed `(alert_class, version)`; `alertPolicyFor(class)`
@@ -344,7 +351,7 @@ green and gives the admin/recovery packages stable qualified names).
   defines classification/content/policy/metrics and refuses foreign
   domain logic; gaps go to `out-of-scope-notes.md`.
 
-## Proposed ADR texts (bind future packages if accepted)
+## ADR texts (accepted in `docs/adr/0025-alert-lifecycle-laws.md`)
 
 **ADR-G2ALERT-1 — `alert`-schema table home for alert state.**
 Alert policies, alert records, fingerprints, update notifications, and

@@ -26,6 +26,13 @@ import {
   DeadLetterRowSchema,
   ReconciliationReportSchema,
   CostForecastPayloadSchema,
+  AlertClassificationInputSchema,
+  AlertRecordRowSchema,
+  AlertFingerprintRowSchema,
+  AlertUpdateRowSchema,
+  AlertMetricObservationRowSchema,
+  ConfirmedOpportunityGateResultSchema,
+  OpportunityContentEnvelopeSchema,
 } from '../packages/shared-schemas/src/index.ts';
 
 const REPO_ROOT = join(import.meta.dirname, '..');
@@ -1561,6 +1568,267 @@ describe('telemetry/wf.catalog.json parity with authoritative schemas (T038/T039
 
       const shape = WF_AUTHORITATIVE_SHAPES[expected.schema];
       expect(shape, `${expected.schema} is a real wf.ts export`).toBeDefined();
+      const authoritative = shape as Shape;
+      for (const catalogField of ev.fields) {
+        const schema = shapeField(authoritative, catalogField.name);
+        expect(catalogField.type).toBe(wfFieldType(schema));
+        expect(catalogField.required).toBe(wfFieldRequired(schema));
+      }
+    });
+  }
+});
+
+// --- alert catalog parity (T025) -------------------------------------------
+
+interface AlertCatalogEvent {
+  name: string;
+  authoritativeSchema: string;
+  requirementRefs: string[];
+  tier: string;
+  fields: CatalogField[];
+}
+
+interface AlertCatalog {
+  catalog: string;
+  contractStatus?: string;
+  requirementsCovered?: string[];
+  recoveryDataClass?: string;
+  events: AlertCatalogEvent[];
+}
+
+/** Authoritative `alert.ts` exports the catalog may name. */
+const ALERT_AUTHORITATIVE_SHAPES: Record<string, Shape> = {
+  AlertClassificationInputSchema: wfShape(AlertClassificationInputSchema),
+  AlertRecordRowSchema: wfShape(AlertRecordRowSchema),
+  AlertFingerprintRowSchema: wfShape(AlertFingerprintRowSchema),
+  AlertUpdateRowSchema: wfShape(AlertUpdateRowSchema),
+  AlertMetricObservationRowSchema: wfShape(AlertMetricObservationRowSchema),
+  ConfirmedOpportunityGateResultSchema: wfShape(ConfirmedOpportunityGateResultSchema),
+  OpportunityContentEnvelopeSchema: wfShape(OpportunityContentEnvelopeSchema),
+};
+
+const alertCatalog = JSON.parse(
+  readFileSync(join(REPO_ROOT, 'telemetry', 'alert.catalog.json'), 'utf8'),
+) as AlertCatalog;
+
+describe('telemetry/alert.catalog.json parity with authoritative schemas (T025, FR-ALERT-001…005)', () => {
+  const expectedAlertEvents: Record<string, { schema: string; fields: string[] }> = {
+    'alert.classification_decided': {
+      schema: 'AlertClassificationInputSchema',
+      fields: [
+        'assetId',
+        'chainId',
+        'profileId',
+        'decision',
+        'alertClassRecommendation',
+        'lifecycleState',
+        'riskState',
+        'multiViewState',
+        'noveltyState',
+        'costPolicyResult',
+        'socialCapabilityState',
+        'thesisVersion',
+        'severity',
+        'validUntil',
+        'validUntilGeneration',
+        'executionScenarioId',
+        'tradabilityAssessmentId',
+        'materialEvidenceFingerprint',
+        'priorAlertRef',
+        'gateResults',
+      ],
+    },
+    'alert.classification_suppressed': {
+      schema: 'AlertClassificationInputSchema',
+      fields: [
+        'assetId',
+        'chainId',
+        'profileId',
+        'decision',
+        'lifecycleState',
+        'riskState',
+        'socialCapabilityState',
+        'severity',
+        'validUntil',
+        'materialEvidenceFingerprint',
+        'priorAlertRef',
+        'gateResults',
+      ],
+    },
+    'alert.gate_passed': {
+      schema: 'ConfirmedOpportunityGateResultSchema',
+      fields: ['gate', 'passed', 'reason'],
+    },
+    'alert.gate_refused': {
+      schema: 'ConfirmedOpportunityGateResultSchema',
+      fields: ['gate', 'passed', 'reason'],
+    },
+    'alert.content_rendered': {
+      schema: 'OpportunityContentEnvelopeSchema',
+      fields: [
+        'alertId',
+        'alertClass',
+        'assetId',
+        'chainId',
+        'canonicalContract',
+        'profileId',
+        'candidateStage',
+        'detectedAt',
+        'deliveredAt',
+        'validUntil',
+        'actionabilityState',
+        'cancellationState',
+        'configuredNotionalUsd',
+        'modeledEntryImpact',
+        'modeledExitImpact',
+        'evidenceTimestamp',
+        'executionAssumptions',
+        'whyEarly',
+        'missingData',
+        'socialCapabilityState',
+        'decisionReadyAt',
+        'suppressionReasons',
+      ],
+    },
+    'alert.content_language_refused': {
+      schema: 'OpportunityContentEnvelopeSchema',
+      fields: [
+        'alertId',
+        'alertClass',
+        'profileId',
+        'whyEarly',
+        'counterThesis',
+        'socialCapabilityState',
+        'suppressionReasons',
+      ],
+    },
+    'alert.social_unavailable_observed': {
+      schema: 'AlertClassificationInputSchema',
+      fields: [
+        'assetId',
+        'profileId',
+        'decision',
+        'lifecycleState',
+        'riskState',
+        'socialCapabilityState',
+      ],
+    },
+    'alert.fingerprint_suppressed': {
+      schema: 'AlertFingerprintRowSchema',
+      fields: [
+        'fingerprint',
+        'alertClass',
+        'lastAlertId',
+        'lastSeverity',
+        'lastThesisVersion',
+        'lastMaterialEvidenceHash',
+        'lastDeliveredAt',
+        'cooldownUntil',
+        'updatedAt',
+      ],
+    },
+    'alert.cooldown_suppressed': {
+      schema: 'AlertFingerprintRowSchema',
+      fields: [
+        'fingerprint',
+        'alertClass',
+        'lastAlertId',
+        'lastDeliveredAt',
+        'cooldownUntil',
+        'updatedAt',
+      ],
+    },
+    'alert.update_committed': {
+      schema: 'AlertUpdateRowSchema',
+      fields: [
+        'updateId',
+        'priorAlertRef',
+        'updateKind',
+        'fingerprint',
+        'idempotencyKey',
+        'alertRef',
+        'outboxRef',
+        'createdAt',
+      ],
+    },
+    'alert.update_deduplicated': {
+      schema: 'AlertUpdateRowSchema',
+      fields: [
+        'updateId',
+        'priorAlertRef',
+        'updateKind',
+        'idempotencyKey',
+        'outboxRef',
+        'createdAt',
+      ],
+    },
+    'alert.update_expired': {
+      schema: 'AlertRecordRowSchema',
+      fields: [
+        'alertId',
+        'alertClass',
+        'fingerprint',
+        'lifecycleState',
+        'riskState',
+        'actionabilityState',
+        'validUntil',
+        'createdAt',
+      ],
+    },
+    'alert.metric_observed': {
+      schema: 'AlertMetricObservationRowSchema',
+      fields: [
+        'metricId',
+        'alertClass',
+        'metricKey',
+        'numerator',
+        'denominator',
+        'sampleSize',
+        'windowStart',
+        'windowEnd',
+        'observedAt',
+      ],
+    },
+  };
+
+  it('keeps the alert catalog a declarative CRITICAL_METADATA contract covering FR-ALERT-001…005', () => {
+    expect(alertCatalog.catalog).toBe('alert');
+    expect(alertCatalog.contractStatus).toContain('DECLARATIVE_CONTRACT_ONLY');
+    expect(alertCatalog.recoveryDataClass).toBe('CRITICAL_METADATA');
+    for (const fr of [
+      'FR-ALERT-001',
+      'FR-ALERT-002',
+      'FR-ALERT-003',
+      'FR-ALERT-004',
+      'FR-ALERT-005',
+    ]) {
+      expect(alertCatalog.requirementsCovered ?? []).toContain(fr);
+    }
+  });
+
+  it('declares every expected alert event family exactly once', () => {
+    expect([...alertCatalog.events.map((e) => e.name)].sort()).toEqual(
+      Object.keys(expectedAlertEvents).sort(),
+    );
+    for (const ev of alertCatalog.events) {
+      expect(ev.tier).toBe('CRITICAL_METADATA');
+      expect(ev.requirementRefs.length).toBeGreaterThan(0);
+      for (const ref of ev.requirementRefs) {
+        expect(alertCatalog.requirementsCovered ?? []).toContain(ref);
+      }
+    }
+  });
+
+  for (const [eventName, expected] of Object.entries(expectedAlertEvents)) {
+    it(`pins ${eventName} to ${expected.schema} (${expected.fields.length} fields)`, () => {
+      const found = alertCatalog.events.find((e) => e.name === eventName);
+      expect(found, `${eventName} present in the alert catalog`).toBeDefined();
+      const ev = found as AlertCatalogEvent;
+      expect(ev.authoritativeSchema).toBe(expected.schema);
+      expect(ev.fields.map((f) => f.name)).toEqual(expected.fields);
+
+      const shape = ALERT_AUTHORITATIVE_SHAPES[expected.schema];
+      expect(shape, `${expected.schema} is a real alert.ts export`).toBeDefined();
       const authoritative = shape as Shape;
       for (const catalogField of ev.fields) {
         const schema = shapeField(authoritative, catalogField.name);

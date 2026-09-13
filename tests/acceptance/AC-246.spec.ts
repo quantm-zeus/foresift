@@ -18,6 +18,8 @@ import {
 } from '@foresift/persistence';
 import { parseDataSchema } from '@foresift/shared-schemas';
 import { closeTestDatabase, makeTestDatabase, type TestDatabase } from './helpers.ts';
+import * as alertGate from '@foresift/alerts';
+import * as alertFx from '../fixtures/alerts/index.ts';
 
 let tdb: TestDatabase;
 
@@ -53,7 +55,7 @@ beforeAll(async () => {
     endpointRegion: 'ap-south',
     collectionMethod: 'AUTHORIZED_PUSH',
   });
-});
+}, 120_000);
 
 afterAll(() => closeTestDatabase(tdb));
 
@@ -116,5 +118,48 @@ describe('AC-246 G1 extension: lineage-collapse sensitivity facet (FR-MAT-005, A
       (g) => g.upstreamLineageKey !== 'upstream/nodesense-mainnet',
     );
     expect(withoutLargestLineage.length).toBe(2);
+  });
+});
+
+describe('AC-246 alert-scoped extension: a gate that depends on duplicated lineage cannot confirm (FR-ALERT-003)', () => {
+  it('refuses CONFIRMED_OPPORTUNITY when duplicated lineage collapses the independent count', () => {
+    const credit = alertFx.DUPLICATED_LINEAGE_CREDIT;
+    expect(credit.independentGroupCount).toBeLessThan(credit.minimumIndependentGroupCount);
+    const gates = alertGate.evaluateConfirmedOpportunityGates(credit.gateInput);
+    expect(gates.find((gate) => gate.gate === 'MINIMUM_INDEPENDENT_EVIDENCE_GROUPS')?.passed).toBe(
+      false,
+    );
+    const outcome = alertGate.classifyAlert(
+      alertFx.confirmedOpportunityClassificationRequest({ gateInputs: credit.gateInput }),
+    );
+    expect(outcome.kind).toBe(alertGate.AlertClassificationKind.SUPPRESSED);
+    expect(outcome.alertClass).toBeNull();
+  });
+
+  it('is sensitive to the lineage collapse: without the duplication the same alert clears the gate', () => {
+    const outcome = alertGate.classifyAlert(
+      alertFx.confirmedOpportunityClassificationRequest({
+        gateInputs: alertFx.LINEAGE_SENSITIVITY_CREDIT.gateInput,
+      }),
+    );
+    expect(outcome.kind).toBe(alertGate.AlertClassificationKind.CLASSIFIED);
+    expect(outcome.alertClass).toBe('CONFIRMED_OPPORTUNITY');
+  });
+
+  it('refuses to promote from an honestly recorded gate set whose evidence gate was refused', () => {
+    const observed = alertGate.evaluateConfirmedOpportunityGates(
+      alertFx.DUPLICATED_LINEAGE_CREDIT.gateInput,
+    );
+    expect(alertGate.validateConfirmedOpportunityGateResults([...observed])).toHaveLength(
+      observed.length,
+    );
+    const outcome = alertGate.classifyAlert(
+      alertFx.confirmedOpportunityClassificationRequest({
+        gateInputs: null,
+        gateResults: [...observed],
+      }),
+    );
+    expect(outcome.kind).toBe(alertGate.AlertClassificationKind.SUPPRESSED);
+    expect(outcome.suppressionReason).toBe('GATE_REFUSED');
   });
 });

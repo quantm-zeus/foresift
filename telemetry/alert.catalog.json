@@ -1,0 +1,239 @@
+{
+  "$schema": "https://foresift.dev/schemas/telemetry-catalog-v1.json",
+  "catalog": "alert",
+  "description": "Alert lifecycle telemetry contracts: per-class classification decided/suppressed, each §26.3 confirmed-opportunity gate passed/refused, class-templated content rendered or refused by the language law, SOCIAL_UNAVAILABLE observed as unknown coverage, fingerprint/cooldown repeat suppression, prior-alert update committed/deduplicated/expired, and per-class metric observations with an explicit numerator, denominator, and sample size. Field lists mirror packages/shared-schemas/src/alert.ts authoritative schemas; every event carries the critical-metadata recovery tier.",
+  "contractStatus": "DECLARATIVE_CONTRACT_ONLY — emitter wiring is deferred to G2 observability. Field lists mirror packages/shared-schemas/src/alert.ts authoritative schemas.",
+  "requirementsCovered": [
+    "FR-ALERT-001",
+    "FR-ALERT-002",
+    "FR-ALERT-003",
+    "FR-ALERT-004",
+    "FR-ALERT-005"
+  ],
+  "recoveryDataClass": "CRITICAL_METADATA",
+  "events": [
+    {
+      "name": "alert.classification_decided",
+      "authoritativeSchema": "AlertClassificationInputSchema",
+      "requirementRefs": ["FR-ALERT-001", "FR-ALERT-003"],
+      "tier": "CRITICAL_METADATA",
+      "fields": [
+        { "name": "assetId", "type": "string", "required": true },
+        { "name": "chainId", "type": "string", "required": true },
+        { "name": "profileId", "type": "string", "required": true },
+        { "name": "decision", "type": "string", "required": true },
+        { "name": "alertClassRecommendation", "type": "string|null", "required": true },
+        { "name": "lifecycleState", "type": "string", "required": true },
+        { "name": "riskState", "type": "string", "required": true },
+        { "name": "multiViewState", "type": "string", "required": true },
+        { "name": "noveltyState", "type": "string", "required": true },
+        { "name": "costPolicyResult", "type": "string", "required": true },
+        { "name": "socialCapabilityState", "type": "string", "required": true },
+        { "name": "thesisVersion", "type": "number", "required": true },
+        { "name": "severity", "type": "number", "required": true },
+        { "name": "validUntil", "type": "string", "required": true },
+        { "name": "validUntilGeneration", "type": "number", "required": true },
+        { "name": "executionScenarioId", "type": "string|null", "required": true },
+        { "name": "tradabilityAssessmentId", "type": "string|null", "required": true },
+        { "name": "materialEvidenceFingerprint", "type": "string", "required": true },
+        { "name": "priorAlertRef", "type": "string|null", "required": true },
+        { "name": "gateResults", "type": "array", "required": true }
+      ]
+    },
+    {
+      "name": "alert.classification_suppressed",
+      "authoritativeSchema": "AlertClassificationInputSchema",
+      "requirementRefs": ["FR-ALERT-001", "FR-ALERT-003"],
+      "tier": "CRITICAL_METADATA",
+      "fields": [
+        { "name": "assetId", "type": "string", "required": true },
+        { "name": "chainId", "type": "string", "required": true },
+        { "name": "profileId", "type": "string", "required": true },
+        { "name": "decision", "type": "string", "required": true },
+        { "name": "lifecycleState", "type": "string", "required": true },
+        { "name": "riskState", "type": "string", "required": true },
+        { "name": "socialCapabilityState", "type": "string", "required": true },
+        { "name": "severity", "type": "number", "required": true },
+        { "name": "validUntil", "type": "string", "required": true },
+        { "name": "materialEvidenceFingerprint", "type": "string", "required": true },
+        { "name": "priorAlertRef", "type": "string|null", "required": true },
+        { "name": "gateResults", "type": "array", "required": true }
+      ]
+    },
+    {
+      "name": "alert.gate_passed",
+      "authoritativeSchema": "ConfirmedOpportunityGateResultSchema",
+      "requirementRefs": ["FR-ALERT-003"],
+      "tier": "CRITICAL_METADATA",
+      "fields": [
+        { "name": "gate", "type": "string", "required": true },
+        { "name": "passed", "type": "boolean", "required": true },
+        { "name": "reason", "type": "string|null", "required": true }
+      ]
+    },
+    {
+      "name": "alert.gate_refused",
+      "authoritativeSchema": "ConfirmedOpportunityGateResultSchema",
+      "requirementRefs": ["FR-ALERT-003"],
+      "tier": "CRITICAL_METADATA",
+      "fields": [
+        { "name": "gate", "type": "string", "required": true },
+        { "name": "passed", "type": "boolean", "required": true },
+        { "name": "reason", "type": "string|null", "required": true }
+      ]
+    },
+    {
+      "name": "alert.content_rendered",
+      "authoritativeSchema": "OpportunityContentEnvelopeSchema",
+      "requirementRefs": ["FR-ALERT-001", "FR-ALERT-002"],
+      "tier": "CRITICAL_METADATA",
+      "fields": [
+        { "name": "alertId", "type": "string", "required": true },
+        { "name": "alertClass", "type": "string", "required": true },
+        { "name": "assetId", "type": "string", "required": true },
+        { "name": "chainId", "type": "string", "required": true },
+        { "name": "canonicalContract", "type": "string", "required": true },
+        { "name": "profileId", "type": "string", "required": true },
+        { "name": "candidateStage", "type": "string", "required": true },
+        { "name": "detectedAt", "type": "string", "required": true },
+        { "name": "deliveredAt", "type": "string", "required": true },
+        { "name": "validUntil", "type": "string", "required": true },
+        { "name": "actionabilityState", "type": "string", "required": true },
+        { "name": "cancellationState", "type": "string", "required": true },
+        { "name": "configuredNotionalUsd", "type": "string", "required": true },
+        { "name": "modeledEntryImpact", "type": "number", "required": true },
+        { "name": "modeledExitImpact", "type": "number", "required": true },
+        { "name": "evidenceTimestamp", "type": "string", "required": true },
+        { "name": "executionAssumptions", "type": "object", "required": true },
+        { "name": "whyEarly", "type": "string", "required": true },
+        { "name": "missingData", "type": "array", "required": true },
+        { "name": "socialCapabilityState", "type": "string", "required": true },
+        { "name": "decisionReadyAt", "type": "string", "required": true },
+        { "name": "suppressionReasons", "type": "array", "required": true }
+      ]
+    },
+    {
+      "name": "alert.content_language_refused",
+      "authoritativeSchema": "OpportunityContentEnvelopeSchema",
+      "requirementRefs": ["FR-ALERT-002"],
+      "tier": "CRITICAL_METADATA",
+      "fields": [
+        { "name": "alertId", "type": "string", "required": true },
+        { "name": "alertClass", "type": "string", "required": true },
+        { "name": "profileId", "type": "string", "required": true },
+        { "name": "whyEarly", "type": "string", "required": true },
+        { "name": "counterThesis", "type": "string", "required": true },
+        { "name": "socialCapabilityState", "type": "string", "required": true },
+        { "name": "suppressionReasons", "type": "array", "required": true }
+      ]
+    },
+    {
+      "name": "alert.social_unavailable_observed",
+      "authoritativeSchema": "AlertClassificationInputSchema",
+      "requirementRefs": ["FR-ALERT-001"],
+      "tier": "CRITICAL_METADATA",
+      "fields": [
+        { "name": "assetId", "type": "string", "required": true },
+        { "name": "profileId", "type": "string", "required": true },
+        { "name": "decision", "type": "string", "required": true },
+        { "name": "lifecycleState", "type": "string", "required": true },
+        { "name": "riskState", "type": "string", "required": true },
+        { "name": "socialCapabilityState", "type": "string", "required": true }
+      ]
+    },
+    {
+      "name": "alert.fingerprint_suppressed",
+      "authoritativeSchema": "AlertFingerprintRowSchema",
+      "requirementRefs": ["FR-ALERT-004"],
+      "tier": "CRITICAL_METADATA",
+      "fields": [
+        { "name": "fingerprint", "type": "string", "required": true },
+        { "name": "alertClass", "type": "string", "required": true },
+        { "name": "lastAlertId", "type": "string", "required": true },
+        { "name": "lastSeverity", "type": "number", "required": true },
+        { "name": "lastThesisVersion", "type": "number", "required": true },
+        { "name": "lastMaterialEvidenceHash", "type": "string", "required": true },
+        { "name": "lastDeliveredAt", "type": "string|null", "required": true },
+        { "name": "cooldownUntil", "type": "string", "required": true },
+        { "name": "updatedAt", "type": "string", "required": true }
+      ]
+    },
+    {
+      "name": "alert.cooldown_suppressed",
+      "authoritativeSchema": "AlertFingerprintRowSchema",
+      "requirementRefs": ["FR-ALERT-004"],
+      "tier": "CRITICAL_METADATA",
+      "fields": [
+        { "name": "fingerprint", "type": "string", "required": true },
+        { "name": "alertClass", "type": "string", "required": true },
+        { "name": "lastAlertId", "type": "string", "required": true },
+        { "name": "lastDeliveredAt", "type": "string|null", "required": true },
+        { "name": "cooldownUntil", "type": "string", "required": true },
+        { "name": "updatedAt", "type": "string", "required": true }
+      ]
+    },
+    {
+      "name": "alert.update_committed",
+      "authoritativeSchema": "AlertUpdateRowSchema",
+      "requirementRefs": ["FR-ALERT-004"],
+      "tier": "CRITICAL_METADATA",
+      "fields": [
+        { "name": "updateId", "type": "string", "required": true },
+        { "name": "priorAlertRef", "type": "string", "required": true },
+        { "name": "updateKind", "type": "string", "required": true },
+        { "name": "fingerprint", "type": "string", "required": true },
+        { "name": "idempotencyKey", "type": "string", "required": true },
+        { "name": "alertRef", "type": "string", "required": true },
+        { "name": "outboxRef", "type": "string|null", "required": true },
+        { "name": "createdAt", "type": "string", "required": true }
+      ]
+    },
+    {
+      "name": "alert.update_deduplicated",
+      "authoritativeSchema": "AlertUpdateRowSchema",
+      "requirementRefs": ["FR-ALERT-004"],
+      "tier": "CRITICAL_METADATA",
+      "fields": [
+        { "name": "updateId", "type": "string", "required": true },
+        { "name": "priorAlertRef", "type": "string", "required": true },
+        { "name": "updateKind", "type": "string", "required": true },
+        { "name": "idempotencyKey", "type": "string", "required": true },
+        { "name": "outboxRef", "type": "string|null", "required": true },
+        { "name": "createdAt", "type": "string", "required": true }
+      ]
+    },
+    {
+      "name": "alert.update_expired",
+      "authoritativeSchema": "AlertRecordRowSchema",
+      "requirementRefs": ["FR-ALERT-004"],
+      "tier": "CRITICAL_METADATA",
+      "fields": [
+        { "name": "alertId", "type": "string", "required": true },
+        { "name": "alertClass", "type": "string", "required": true },
+        { "name": "fingerprint", "type": "string", "required": true },
+        { "name": "lifecycleState", "type": "string", "required": true },
+        { "name": "riskState", "type": "string", "required": true },
+        { "name": "actionabilityState", "type": "string", "required": true },
+        { "name": "validUntil", "type": "string", "required": true },
+        { "name": "createdAt", "type": "string", "required": true }
+      ]
+    },
+    {
+      "name": "alert.metric_observed",
+      "authoritativeSchema": "AlertMetricObservationRowSchema",
+      "requirementRefs": ["FR-ALERT-005"],
+      "tier": "CRITICAL_METADATA",
+      "fields": [
+        { "name": "metricId", "type": "string", "required": true },
+        { "name": "alertClass", "type": "string", "required": true },
+        { "name": "metricKey", "type": "string", "required": true },
+        { "name": "numerator", "type": "number", "required": true },
+        { "name": "denominator", "type": "number", "required": true },
+        { "name": "sampleSize", "type": "number", "required": true },
+        { "name": "windowStart", "type": "string", "required": true },
+        { "name": "windowEnd", "type": "string", "required": true },
+        { "name": "observedAt", "type": "string", "required": true }
+      ]
+    }
+  ]
+}

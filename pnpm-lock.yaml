@@ -11,6 +11,9 @@ importers:
       '@electric-sql/pglite':
         specifier: ^0.5.6
         version: 0.5.6
+      '@foresift/alerts':
+        specifier: workspace:*
+        version: link:packages/alerts
       '@foresift/api':
         specifier: workspace:*
         version: link:apps/api
@@ -132,6 +135,34 @@ importers:
       '@foresift/shared-schemas':
         specifier: workspace:*
         version: link:../../packages/shared-schemas
+
+  packages/alerts:
+    dependencies:
+      '@foresift/domain':
+        specifier: workspace:*
+        version: link:../domain
+      '@foresift/persistence':
+        specifier: workspace:*
+        version: link:../persistence
+      '@foresift/shared-schemas':
+        specifier: workspace:*
+        version: link:../shared-schemas
+      '@foresift/workflow-runtime':
+        specifier: workspace:*
+        version: link:../workflow-runtime
+      zod:
+        specifier: ^3.25.76
+        version: 3.25.76
+    devDependencies:
+      '@electric-sql/pglite':
+        specifier: ^0.5.6
+        version: 0.5.6
+      '@types/bun':
+        specifier: 1.4.0
+        version: 1.4.0
+      typescript:
+        specifier: 5.9.3
+        version: 5.9.3
 
   packages/capacity-planner:
     dependencies:

@@ -68,9 +68,9 @@ afterAll(async () => {
 
 describe('Drizzle mirror parity with SQL truth (ADR-001)', () => {
   // The mirror covers every schema the migrations create (public + the
-  // dedicated `sig` signal-registry and `wf` durable-workflow schemas). Parity
-  // is checked per qualified name so a table in one schema can never shadow or
-  // be shadowed by another.
+  // dedicated `sig` signal-registry, `wf` durable-workflow, and `alert`
+  // lifecycle schemas). Parity is checked per qualified name so a table in one
+  // schema can never shadow or be shadowed by another.
   const QUALIFIED = (schema: string | undefined, name: string) =>
     `${schema ? `${schema}.` : ''}${name}`;
   const tableSchemas = (config: ReturnType<typeof getTableConfig>) =>
@@ -80,7 +80,7 @@ describe('Drizzle mirror parity with SQL truth (ADR-001)', () => {
   it('mirrors exactly the table set created by the migrations', async () => {
     const sqlTables = await engine.query<{ table_schema: string; table_name: string }>(
       `SELECT table_schema, table_name FROM information_schema.tables
-       WHERE table_schema IN ('public', 'sig', 'wf')
+       WHERE table_schema IN ('public', 'sig', 'wf', 'alert')
          AND table_name NOT LIKE '_foresift%'
        ORDER BY table_schema, table_name`,
     );
@@ -168,7 +168,7 @@ describe('Drizzle mirror parity with SQL truth (ADR-001)', () => {
        JOIN information_schema.key_column_usage kcu
          ON tc.constraint_name = kcu.constraint_name
         AND tc.table_schema = kcu.table_schema
-       WHERE tc.table_schema IN ('public', 'sig', 'wf') AND tc.constraint_type = 'PRIMARY KEY'
+       WHERE tc.table_schema IN ('public', 'sig', 'wf', 'alert') AND tc.constraint_type = 'PRIMARY KEY'
        GROUP BY tc.table_schema, tc.table_name`,
     );
     const sqlPkMap = new Map(

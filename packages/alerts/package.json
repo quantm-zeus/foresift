@@ -1,0 +1,28 @@
+{
+  "name": "@foresift/alerts",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Read-only alert lifecycle: per-class policies, the deterministic §26.3 confirmed-opportunity gates, class-templated content with the EARLY_WATCH language law, fingerprint/cooldown, update/expiry notifications, and class-scoped metrics. Never trades, custodies, signs, or submits transactions.",
+  "exports": {
+    ".": {
+      "types": "./src/index.ts",
+      "default": "./src/index.ts"
+    }
+  },
+  "scripts": {
+    "test": "bun test"
+  },
+  "dependencies": {
+    "@foresift/domain": "workspace:*",
+    "@foresift/persistence": "workspace:*",
+    "@foresift/shared-schemas": "workspace:*",
+    "@foresift/workflow-runtime": "workspace:*",
+    "zod": "^3.25.76"
+  },
+  "devDependencies": {
+    "@electric-sql/pglite": "^0.5.6",
+    "@types/bun": "1.4.0",
+    "typescript": "5.9.3"
+  }
+}

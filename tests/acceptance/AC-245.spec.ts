@@ -30,6 +30,8 @@ import {
 import { dependenceEdgesForPair, registerSourceIdentity } from '@foresift/persistence';
 import { parseDataSchema } from '@foresift/shared-schemas';
 import { closeTestDatabase, makeTestDatabase, type TestDatabase } from './helpers.ts';
+import * as alertGate from '@foresift/alerts';
+import * as alertFx from '../fixtures/alerts/index.ts';
 
 const FIXTURES = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../fixtures/data');
 
@@ -78,7 +80,7 @@ beforeAll(async () => {
       });
     }
   }
-});
+}, 120_000);
 
 afterAll(() => closeTestDatabase(tdb));
 
@@ -297,5 +299,47 @@ describe('AC-245 G1 obj-facet: lineage-collapse sensitivity and independent conf
     const diagnosticCount = frozenCount * retrospectiveAdjustment;
     expect(primaryCount).toBe(42);
     expect(diagnosticCount).toBe(21);
+  });
+});
+
+describe('AC-245 alert-scoped extension: empirically dependent evidence groups cannot confirm an opportunity (FR-ALERT-003)', () => {
+  it('refuses CONFIRMED_OPPORTUNITY when correlated providers collapse below the independent-group minimum', () => {
+    const credit = alertFx.EMPIRICALLY_DEPENDENT_CREDIT;
+    expect(credit.rawProviderIdCount).toBeGreaterThan(credit.independentGroupCount);
+
+    const gates = alertGate.evaluateConfirmedOpportunityGates(credit.gateInput);
+    const evidenceGate = gates.find((gate) => gate.gate === 'MINIMUM_INDEPENDENT_EVIDENCE_GROUPS');
+    expect(evidenceGate?.passed).toBe(false);
+    expect(evidenceGate?.reason).toBe('GATE_REFUSED');
+    // Every other §26.3 gate still passes: the refusal is the reduced credit.
+    expect(gates.filter((gate) => !gate.passed)).toHaveLength(1);
+
+    const outcome = alertGate.classifyAlert(
+      alertFx.confirmedOpportunityClassificationRequest({ gateInputs: credit.gateInput }),
+    );
+    expect(outcome.kind).toBe(alertGate.AlertClassificationKind.SUPPRESSED);
+    expect(outcome.alertClass).toBeNull();
+    expect(outcome.suppressionReason).toBe('GATE_REFUSED');
+    expect(outcome.gateSetComplete).toBe(true);
+  });
+
+  it('credits exactly the reduced count: at the registered minimum the same providers clear the gate', () => {
+    const outcome = alertGate.classifyAlert(
+      alertFx.confirmedOpportunityClassificationRequest({
+        gateInputs: alertFx.DEPENDENT_BUT_AT_THRESHOLD_CREDIT.gateInput,
+      }),
+    );
+    expect(outcome.kind).toBe(alertGate.AlertClassificationKind.CLASSIFIED);
+    expect(outcome.alertClass).toBe('CONFIRMED_OPPORTUNITY');
+  });
+
+  it('has no gate input for the raw provider-id count, so provider ids cannot restore credit', () => {
+    expect(() =>
+      alertGate.classifyAlert(
+        alertFx.confirmedOpportunityClassificationRequest({
+          gateInputs: alertFx.passingGateInput({ rawProviderCount: 5 } as never),
+        }),
+      ),
+    ).toThrow();
   });
 });

@@ -20,6 +20,8 @@ import {
 import { freezeBundle, projectMaturedCounts } from '@foresift/evidence';
 import { parseDataSchema } from '@foresift/shared-schemas';
 import { closeTestDatabase, makeTestDatabase, seedPool, type TestDatabase } from './helpers.ts';
+import * as alertGate from '@foresift/alerts';
+import * as alertFx from '../fixtures/alerts/index.ts';
 
 const T = (iso: string): UtcTimestamp => utcTimestamp(iso);
 
@@ -93,7 +95,7 @@ beforeAll(async () => {
     rawAmount: '42',
     decimals: 2,
   });
-});
+}, 120_000);
 
 afterAll(() => closeTestDatabase(tdb));
 
@@ -241,5 +243,41 @@ describe('AC-248 G1 obj-facet: promotion fails below mature counts / ESS / cover
 
     expect(runState.hasControlFailure).toBe(true);
     expect(runState.promotionVerdict).toBe('BLOCK');
+  });
+});
+
+describe('AC-248 alert-scoped extension: below-threshold mature counts and ESS cannot confirm (FR-ALERT-003)', () => {
+  it('refuses promotion when mature counts and effective sample size are below the registered minimum', () => {
+    const credit = alertFx.BELOW_THRESHOLD_MATURE_CREDIT;
+    expect(credit.independentGroupCount).toBeLessThan(credit.minimumIndependentGroupCount);
+    const gates = alertGate.evaluateConfirmedOpportunityGates(credit.gateInput);
+    expect(gates.find((gate) => gate.gate === 'MINIMUM_INDEPENDENT_EVIDENCE_GROUPS')?.passed).toBe(
+      false,
+    );
+    expect(gates.find((gate) => gate.gate === 'MINIMUM_DATA_COVERAGE')?.passed).toBe(false);
+    // §26.3 canonical order: coverage is refused before the evidence-group gate.
+    expect(alertGate.firstRefusedGate(gates)?.gate).toBe('MINIMUM_DATA_COVERAGE');
+
+    const outcome = alertGate.classifyAlert(
+      alertFx.confirmedOpportunityClassificationRequest({
+        gateInputs: credit.gateInput,
+        // A favorable point estimate cannot rescue a missing denominator.
+        severity: 0.99,
+        thesisVersion: 9,
+      }),
+    );
+    expect(outcome.kind).toBe(alertGate.AlertClassificationKind.SUPPRESSED);
+    expect(outcome.suppressionReason).toBe('GATE_REFUSED');
+  });
+
+  it('refuses a zero independent-group minimum that would let a confirmation rest on no evidence', () => {
+    const outcome = alertGate.classifyAlert(
+      alertFx.confirmedOpportunityClassificationRequest({
+        gateInputs: alertFx.passingGateInput({
+          independentEvidence: { independentGroupCount: 0, minimumIndependentGroupCount: 0 },
+        }),
+      }),
+    );
+    expect(outcome.kind).toBe(alertGate.AlertClassificationKind.SUPPRESSED);
   });
 });

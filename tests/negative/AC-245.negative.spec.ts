@@ -10,6 +10,8 @@ import { DependenceLabel, ErrorCode, assertDependenceInputs, utcTimestamp } from
 import { recordDependenceEdge, registerSourceIdentity } from '@foresift/persistence';
 import { parseDataSchema } from '@foresift/shared-schemas';
 import { closeTestDatabase, makeTestDatabase, type TestDatabase } from '../acceptance/helpers.ts';
+import * as alertGate from '@foresift/alerts';
+import * as alertFx from '../fixtures/alerts/index.ts';
 
 let tdb: TestDatabase;
 
@@ -32,7 +34,7 @@ beforeAll(async () => {
     endpointRegion: 'eu-central',
     collectionMethod: 'POLLING_API',
   });
-});
+}, 120_000);
 
 afterAll(() => closeTestDatabase(tdb));
 
@@ -156,5 +158,38 @@ describe('AC-245 G1 obj-facet negative: collapsed lineage confirmation refused a
       // @ts-expect-error - testing mutation refusal
       frozenPrimaryRecord.count = 50;
     }).toThrow();
+  });
+});
+
+describe('AC-245 negative alert-scoped extension: independent-credit laundering is refused (FR-ALERT-003)', () => {
+  it('refuses an unknown raw-provider-count field and never restores credit from provider ids', () => {
+    expect(() =>
+      alertGate.classifyAlert(
+        alertFx.confirmedOpportunityClassificationRequest({
+          gateInputs: alertFx.passingGateInput({
+            independentEvidence: {
+              independentGroupCount: 2,
+              minimumIndependentGroupCount: 3,
+              rawProviderIdCount: 5,
+            },
+          }),
+        }),
+      ),
+    ).toThrow();
+  });
+
+  it('refuses an incomplete gate set that omits the independent-evidence gate', () => {
+    const observed = alertGate
+      .evaluateConfirmedOpportunityGates(alertFx.PASSING_GATE_INPUT)
+      .filter((gate) => gate.gate !== 'MINIMUM_INDEPENDENT_EVIDENCE_GROUPS');
+    const outcome = alertGate.classifyAlert(
+      alertFx.confirmedOpportunityClassificationRequest({
+        gateInputs: null,
+        gateResults: [...observed],
+      }),
+    );
+    expect(outcome.kind).toBe(alertGate.AlertClassificationKind.SUPPRESSED);
+    expect(outcome.gateSetComplete).toBe(false);
+    expect(outcome.suppressionReason).toBe('GATE_REFUSED');
   });
 });

@@ -19,6 +19,8 @@ import {
 import { resolveEvidenceAt } from '@foresift/evidence';
 import { parseDataSchema } from '@foresift/shared-schemas';
 import { closeTestDatabase, makeTestDatabase, seedPool, type TestDatabase } from './helpers.ts';
+import * as alertGate from '@foresift/alerts';
+import * as alertFx from '../fixtures/alerts/index.ts';
 
 const T = (iso: string): UtcTimestamp => utcTimestamp(iso);
 
@@ -43,7 +45,7 @@ beforeAll(async () => {
     rawAmount: '100',
     decimals: 2,
   });
-});
+}, 120_000);
 
 afterAll(() => closeTestDatabase(tdb));
 
@@ -154,5 +156,54 @@ describe('AC-249 G1 extension: extended negative-control set facet (FR-MAT-004, 
       expect(Math.abs(res.empiricalLift)).toBeLessThan(res.toleranceThreshold);
       expect(res.nullHypothesisPassed).toBe(true);
     }
+  });
+});
+
+describe('AC-249 alert-scoped extension: unexplained control lift blocks promotion (FR-ALERT-003)', () => {
+  it('refuses CONFIRMED_OPPORTUNITY when a negative control shows unexplained lift', () => {
+    const gates = alertGate.evaluateConfirmedOpportunityGates(alertFx.FAILED_CONTROL_GATE_INPUT);
+    const control = gates.find((gate) => gate.gate === 'SEMANTIC_VALIDATION');
+    expect(control?.passed).toBe(false);
+    expect(alertGate.firstRefusedGate(gates)?.gate).toBe('SEMANTIC_VALIDATION');
+    const outcome = alertGate.classifyAlert(
+      alertFx.confirmedOpportunityClassificationRequest({
+        gateInputs: alertFx.FAILED_CONTROL_GATE_INPUT,
+      }),
+    );
+    expect(outcome.kind).toBe(alertGate.AlertClassificationKind.SUPPRESSED);
+    expect(outcome.suppressionReason).toBe('GATE_REFUSED');
+  });
+
+  it('blocks promotion when a control forces a paid or unknown-cost operation', () => {
+    const gates = alertGate.evaluateConfirmedOpportunityGates(
+      alertFx.DEGRADED_COST_CONTROL_GATE_INPUT,
+    );
+    expect(gates.find((gate) => gate.gate === 'STRICT_FREE_COST_POLICY')?.passed).toBe(false);
+    const outcome = alertGate.classifyAlert(
+      alertFx.confirmedOpportunityClassificationRequest({
+        gateInputs: alertFx.DEGRADED_COST_CONTROL_GATE_INPUT,
+      }),
+    );
+    expect(outcome.kind).toBe(alertGate.AlertClassificationKind.SUPPRESSED);
+  });
+
+  it('refuses a forged control gate that is marked passed while keeping its refusal reason', () => {
+    const observed = alertGate.evaluateConfirmedOpportunityGates(alertFx.FAILED_CONTROL_GATE_INPUT);
+    const forged = observed.map((gate) =>
+      gate.gate === 'SEMANTIC_VALIDATION'
+        ? { gate: gate.gate, passed: true, reason: 'GATE_REFUSED' as const }
+        : gate,
+    );
+    expect(() => alertGate.validateConfirmedOpportunityGateResults([...forged])).toThrow();
+    // The request schema refuses the inconsistent result set outright, so a
+    // forged pass can never even reach the gate-set resolver.
+    expect(() =>
+      alertGate.classifyAlert(
+        alertFx.confirmedOpportunityClassificationRequest({
+          gateInputs: null,
+          gateResults: [...forged],
+        }),
+      ),
+    ).toThrow();
   });
 });

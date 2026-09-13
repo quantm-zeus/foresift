@@ -346,6 +346,19 @@ describe('nine-state lattice and independent dimensions (AC-152)', () => {
       false,
     ]);
 
+    // AC-152: a shadow-only scope runs without active side effects and is
+    // still UNAVAILABLE (audit MEDIUM 6).
+    const shadowScope = makeScope({ profile_version: 'indep-shadow' });
+    const shadowModule = 'module-indep-shadow';
+    await advance(shadowModule, shadowScope, 'IMPLEMENTED', 'shadow-1');
+    await advance(shadowModule, shadowScope, 'SHADOW', 'shadow-2');
+    const shadowOnly = await statesFor(engine, { moduleId: shadowModule, scope: shadowScope });
+    expect([shadowOnly.implemented, shadowOnly.available, shadowOnly.proven]).toEqual([
+      true,
+      false,
+      false,
+    ]);
+
     await advance(moduleId, scope, 'SHADOW', 'indep-2b');
     await advance(moduleId, scope, 'PROVEN', 'indep-3');
     const proven = await statesFor(engine, { moduleId, scope });

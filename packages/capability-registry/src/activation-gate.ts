@@ -444,20 +444,6 @@ function requireActivationPassBrand(value: unknown): asserts value is Activation
   }
 }
 
-function requireActivationRefusalBrand(value: unknown): asserts value is ActivationGateRefusal {
-  if (
-    value === null ||
-    typeof value !== 'object' ||
-    !ACTIVATION_REFUSAL_IDENTITY.has(value as ActivationGateRefusal)
-  ) {
-    throw new ForesiftError(
-      ErrorCode.PROD_ACTIVATION_GATE_REFUSED,
-      'activation-gate evidence must be the ActivationGateRefusal object returned by evaluateActivationGate; the supplied object has no evaluator identity provenance',
-      { reason: 'ACTIVATION_REFUSAL_UNBRANDED' },
-    );
-  }
-}
-
 /**
  * Fail-closed provenance check shared by the recorder and `advanceState`: the
  * supplied result must be the frozen evaluator object, branded by IDENTITY, and

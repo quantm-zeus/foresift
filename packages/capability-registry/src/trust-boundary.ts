@@ -208,7 +208,7 @@ export async function assertLivePathBoundaryHolds(
     let artifact;
     try {
       artifact = await gate.getArtifact(artifactId);
-    } catch (cause) {
+    } catch {
       throw new ForesiftError(
         ErrorCode.PROD_TRUST_BOUNDARY_VIOLATION,
         `IMPORT_SHADOW_ONLY assertion ${assertion.assertionId} references unknown import artifact ${artifactId}`,

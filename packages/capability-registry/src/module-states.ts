@@ -13,9 +13,11 @@
  * as three INDEPENDENT dimensions (FR-PROD-001). Each is established by the
  * distinct lifecycle positions the exact scope has ever occupied:
  *   - `implemented` — any governed row exists for the scope;
- *   - `available`   — the scope ever reached `AVAILABLE`/`SHADOW`/`PROVEN`/
- *                     `ACTIVE` (the containment states `DEGRADED`/`PAUSED`/
- *                     `DISABLED`/`RETIRED` never establish it by themselves);
+ *   - `available`   — the scope ever reached `AVAILABLE`/`PROVEN`/`ACTIVE` (a
+ *                     shadow-only scope runs without active side effects and is
+ *                     still unavailable, and the containment states
+ *                     `DEGRADED`/`PAUSED`/`DISABLED`/`RETIRED` never establish it
+ *                     by themselves);
  *   - `proven`      — the scope ever reached `PROVEN` (the only position that
  *                     attests registered proof).
  * A module can therefore be deployed (`IMPLEMENTED`) while unavailable, and
@@ -230,9 +232,13 @@ export interface ModuleStateDimensions {
 }
 
 /** The positions that establish each dimension (independent, never ranked). */
+/**
+ * `SHADOW` is deliberately NOT here (audit MEDIUM 6, AC-152): a shadow-only
+ * module runs without active opportunity side effects and is still
+ * "unavailable", so it must not read as establishing AVAILABLE.
+ */
 const ESTABLISHES_AVAILABLE: readonly ModuleLifecyclePosition[] = [
   ModuleLifecycleState.AVAILABLE,
-  ModuleLifecycleState.SHADOW,
   ModuleLifecycleState.PROVEN,
   ModuleLifecycleState.ACTIVE,
 ];

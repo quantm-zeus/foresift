@@ -56,10 +56,12 @@ const moduleState = {
   moduleId: 'module-1',
   artifactSetHash: HASH,
   scope,
+  scopeHash: HASH,
   lifecycleState: 'ACTIVE',
   operationalReadiness: 'READY_FOR_ACTIVE_PROFILE',
   distributionReadiness: 'PRIVATE_ONLY',
   activationEventRef: 'gate-eval-1',
+  activationKind: 'OPPORTUNITY',
   supersededBy: null,
   createdAt: AT,
 };
@@ -72,6 +74,8 @@ const gateEvaluation = {
   failingGate: null,
   evidenceRefs: ['evidence-1'],
   capacityContractRef: 'capacity-1',
+  activationEventRef: 'gate-eval-1',
+  activationKind: 'OPPORTUNITY',
   evaluatedAt: AT,
   expiresAt: LATER,
 };

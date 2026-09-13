@@ -1082,4 +1082,58 @@ describe('ACTIVE is bound to persisted gate evidence (F1)', () => {
     expect(active.lifecycleState).toBe('ACTIVE');
     expect(active.activationEventRef).toBe('activation-legit');
   }, 120_000);
+
+  it('refuses a spread-derived copy of a genuine PASS (identity, not shape, is the brand)', async () => {
+    const scopeA = makeScope({ profile_version: 'spread-a' });
+    const scopeB = makeScope({ profile_version: 'spread-b' });
+    const moduleB = 'module-spread-b';
+    await provenLadder(moduleB, scopeB, 'spread-b');
+
+    // A GENUINE pass for scope A, then a spread-derived copy re-aimed at scope B
+    // with fabricated evaluations — the pre-fix bypass. Object identity settles
+    // it: the copy is a different object and is not in the module-private set.
+    const genuine = evaluateActivationGate({
+      ...passingOpportunityInput(scopeA),
+      activationEventRef: 'genuine-a',
+      now: NOW,
+    });
+    if (genuine.verdict !== 'PASS') throw new Error('expected a genuine PASS');
+    const derived = {
+      ...genuine,
+      scopeHash: activationScopeHash(scopeB),
+      activationEventRef: 'forged-event-b',
+      evaluations: ACTIVATION_GATE_ORDER.map((gateKind) => ({
+        gateKind,
+        verdict: 'PASS',
+        failingGate: null,
+        reason: null,
+        detail: 'forged',
+      })),
+      evaluationSetRef: `sha256:${'f'.repeat(64)}`,
+    } as never;
+
+    const refused = await rejection(recordActivationGateResult(engine, derived));
+    expect(refused.code).toBe('PROD_ACTIVATION_GATE_REFUSED');
+    expect((refused.detail as { readonly reason?: string }).reason).toBe(
+      'ACTIVATION_PASS_UNBRANDED',
+    );
+    expect(await activationGateEvaluationsFor(engine, activationScopeHash(scopeB))).toEqual([]);
+  }, 120_000);
+
+  it('refuses ACTIVE when the activation event reference is empty', async () => {
+    const scope = makeScope({ profile_version: 'empty-event' });
+    const moduleId = 'module-empty-event';
+    await provenLadder(moduleId, scope, 'empty-event');
+
+    const emptyEventGate = await gatePass(scope, '');
+    const refused = await rejection(
+      advance(moduleId, scope, 'ACTIVE', 'empty-event-5', { gateResult: emptyEventGate }),
+    );
+    expect(refused.code).toBe('PROD_ACTIVATION_GATE_REFUSED');
+    expect((refused.detail as { readonly reason?: string }).reason).toBe(
+      'ACTIVATION_EVENT_REF_MISSING',
+    );
+    const rows = await stateRowsFor(engine, { moduleId, scope });
+    expect(rows.some((row) => row.lifecycleState === 'ACTIVE')).toBe(false);
+  }, 120_000);
 });

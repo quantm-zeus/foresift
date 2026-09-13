@@ -411,6 +411,8 @@ export const ModuleStateRefusalReason = {
   CONTAINMENT_OPEN: 'CONTAINMENT_OPEN',
   /** An activation event that already backed an ACTIVE row was replayed. */
   ACTIVATION_EVENT_ALREADY_CONSUMED: 'ACTIVATION_EVENT_ALREADY_CONSUMED',
+  /** A non-empty activation event reference is required for a consumed-once record. */
+  ACTIVATION_EVENT_REF_MISSING: 'ACTIVATION_EVENT_REF_MISSING',
 } as const;
 export type ModuleStateRefusalReason =
   (typeof ModuleStateRefusalReason)[keyof typeof ModuleStateRefusalReason];
@@ -638,7 +640,16 @@ export async function advanceState(
       // scope already reached ACTIVE under this event, the event was consumed and
       // its recorded PASS cannot be replayed (for example from a plain DEGRADED
       // row); a fresh evaluation for a distinct activation event is required.
-      if (input.gateResult.activationEventRef.length > 0) {
+      // The reference must be non-empty: an empty event ref cannot be singled
+      // out as consumed and would let a stale PASS be replayed indefinitely.
+      if (input.gateResult.activationEventRef.trim().length === 0) {
+        throw new ForesiftError(
+          ErrorCode.PROD_ACTIVATION_GATE_REFUSED,
+          'entering ACTIVE refused: the activation event reference must be a non-empty identifier so it can be recorded and consumed exactly once',
+          { reason: ModuleStateRefusalReason.ACTIVATION_EVENT_REF_MISSING, scopeHash },
+        );
+      }
+      {
         const consumed = await tx.query<{ state_row_id: string }>(
           `SELECT state_row_id
              FROM prod.module_states

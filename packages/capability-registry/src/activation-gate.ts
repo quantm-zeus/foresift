@@ -379,20 +379,24 @@ function isContentAddress(value: unknown): value is string {
 
 /**
  * Fail-closed provenance check for every writer of
- * `prod.activation_gate_evaluations`. A caller cannot obtain the module-private
- * `ACTIVATION_PASS_BRAND` symbol, so only an object returned by
- * `evaluateActivationGate` (or a spread-derived copy of one) passes; a cast or
- * hand-built PASS is refused with `PROD_ACTIVATION_GATE_REFUSED`.
+ * `prod.activation_gate_evaluations`. Provenance is IDENTITY, not shape: only
+ * the frozen object that `evaluateActivationGate` itself minted is registered
+ * in this module-private WeakSet. A caller cannot add to the set, so a
+ * hand-built PASS, a cast, a spread-derived copy, a JSON/structuredClone
+ * round-trip, or an in-place mutation of a genuine pass is refused with
+ * `PROD_ACTIVATION_GATE_REFUSED` / `ACTIVATION_PASS_UNBRANDED`.
  */
+const ACTIVATION_PASS_IDENTITY = new WeakSet<ActivationGatePass>();
+
 function requireActivationPassBrand(value: unknown): asserts value is ActivationGatePass {
   if (
     value === null ||
     typeof value !== 'object' ||
-    (value as { readonly [ACTIVATION_PASS_BRAND]?: unknown })[ACTIVATION_PASS_BRAND] !== true
+    !ACTIVATION_PASS_IDENTITY.has(value as ActivationGatePass)
   ) {
     throw new ForesiftError(
       ErrorCode.PROD_ACTIVATION_GATE_REFUSED,
-      'activation-gate evidence must be an ActivationGatePass returned by evaluateActivationGate; the supplied object carries no evaluator provenance brand',
+      'activation-gate evidence must be the ActivationGatePass object returned by evaluateActivationGate; the supplied object has no evaluator identity provenance',
       { reason: 'ACTIVATION_PASS_UNBRANDED' },
     );
   }
@@ -767,7 +771,7 @@ export function evaluateActivationGate(input: ActivationGateInput): ActivationGa
     }
   }
   const capacityContractRef = input.capacityContract?.contractId ?? '';
-  return {
+  const brandedPass: ActivationGatePass = Object.freeze({
     verdict: 'PASS',
     scopeHash,
     evaluations,
@@ -778,8 +782,11 @@ export function evaluateActivationGate(input: ActivationGateInput): ActivationGa
     evidenceRefs: [...(input.evidenceRefs ?? [])],
     activationKind: input.kind,
     evaluationSetRef: null,
-    [ACTIVATION_PASS_BRAND]: true,
-  };
+    [ACTIVATION_PASS_BRAND]: true as const,
+  });
+  // Identity provenance: only this frozen object is accepted by the recorders.
+  ACTIVATION_PASS_IDENTITY.add(brandedPass);
+  return brandedPass;
 }
 
 /** Convenience predicate over the total gate. */

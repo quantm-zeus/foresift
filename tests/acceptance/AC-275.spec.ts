@@ -4,6 +4,28 @@
 // resolve correctly; different tenants can never collide.
 import { describe, expect, it } from 'bun:test';
 import {
+  ActivationKind,
+  evaluateActivationGate,
+  type DistributionEvidenceInput,
+} from '@foresift/capability-registry';
+import {
+  makeProdScope,
+  passingDistributionEvidence,
+  passingOpportunityGateInput,
+} from '../fixtures/prod/index.ts';
+
+function prodIsolationInput(overrides: Partial<DistributionEvidenceInput> = {}) {
+  const scope = makeProdScope({ profile_version: 'ac275-prod' });
+  return {
+    ...passingOpportunityGateInput(scope),
+    kind: ActivationKind.WORKSPACE,
+    distributionEvidence: passingDistributionEvidence({
+      distributionReadiness: 'WORKSPACE_AUTHORIZED',
+      ...overrides,
+    }),
+  };
+}
+import {
   deriveModelContextPartition,
   deriveNamespacedKey,
   deriveQueueName,
@@ -96,5 +118,31 @@ describe('AC-275: isolation holds on every shared surface', () => {
     });
     expect(decision.allowed).toBe(true);
     expect(decision.canonicalPath).toBe('report.md');
+  });
+});
+
+// --- prod-scoped addition (T037, FR-PROD-002, AC-275) ------------------------
+
+describe('AC-275 prod-scoped: isolation gate evidence is mandatory for workspace authorization', () => {
+  it('passes the WORKSPACE gate with tenant isolation and isolation fixtures green', () => {
+    const result = evaluateActivationGate(
+      prodIsolationInput({ oauthTenantIsolation: true, isolationFixtures: true }),
+    );
+    expect(result.verdict).toBe('PASS');
+  });
+
+  it('binds isolation evidence to each exact scope independently', () => {
+    const first = makeProdScope({ profile_version: 'ac275-prod-a' });
+    const second = makeProdScope({ profile_version: 'ac275-prod-b' });
+    for (const scope of [first, second]) {
+      const result = evaluateActivationGate({
+        ...passingOpportunityGateInput(scope),
+        kind: ActivationKind.WORKSPACE,
+        distributionEvidence: passingDistributionEvidence({
+          distributionReadiness: 'WORKSPACE_AUTHORIZED',
+        }),
+      });
+      expect(result.verdict).toBe('PASS');
+    }
   });
 });

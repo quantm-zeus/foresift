@@ -8,6 +8,12 @@
  * 2. Calibration machinery refusal (FR-EVAL-001…009, AC-154): enabling drifted challenger throws.
  */
 import { describe, expect, it } from 'bun:test';
+import { activationScopeHash, evaluateActivationGate } from '@foresift/capability-registry';
+import {
+  makeProdScope,
+  passingOpportunityGateInput,
+  passingStatisticalEvidence,
+} from '../fixtures/prod/index.ts';
 
 interface Gate {
   passed: boolean;
@@ -87,5 +93,55 @@ describe('AC-154 negative — calibration machinery refusal facet (FR-EVAL-001�
         attemptedActivation: true,
       }),
     ).toThrow('DRIFTED_CHALLENGER_ACTIVATION_REFUSED');
+  });
+});
+
+// --- prod-scoped additions (T035, FR-PROD-001/002, AC-154) -------------------
+
+function negCalibrationInput(calibration: {
+  maturity: 'DRAFT' | 'IMMATURE' | 'MATURE';
+  expectedNetUtilityRankingEnabled: boolean;
+  regimeDrift: boolean;
+}) {
+  const scope = makeProdScope();
+  return {
+    ...passingOpportunityGateInput(scope),
+    registeredStatisticalEvidence: [
+      passingStatisticalEvidence(activationScopeHash(scope), { calibration }),
+    ],
+  };
+}
+
+describe('AC-154 prod-scoped negatives: immature or drifted ranking refuses', () => {
+  it('refuses expected-net-utility ranking influence before MATURE calibration', () => {
+    for (const maturity of ['DRAFT', 'IMMATURE'] as const) {
+      const result = evaluateActivationGate(
+        negCalibrationInput({
+          maturity,
+          expectedNetUtilityRankingEnabled: true,
+          regimeDrift: false,
+        }),
+      );
+      expect(result.verdict, maturity).toBe('REFUSE');
+      if (result.verdict === 'REFUSE') {
+        expect(result.failingGate).toBe('CALIBRATION_MATURITY');
+        expect(result.reason).toBe('CALIBRATION_IMMATURE');
+      }
+    }
+  });
+
+  it('auto-degrades on regime drift instead of continuing ranking influence', () => {
+    const result = evaluateActivationGate(
+      negCalibrationInput({
+        maturity: 'MATURE',
+        expectedNetUtilityRankingEnabled: true,
+        regimeDrift: true,
+      }),
+    );
+    expect(result.verdict).toBe('REFUSE');
+    if (result.verdict === 'REFUSE') {
+      expect(result.failingGate).toBe('CALIBRATION_MATURITY');
+      expect(result.reason).toBe('CALIBRATION_IMMATURE');
+    }
   });
 });

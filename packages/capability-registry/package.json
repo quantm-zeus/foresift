@@ -1,0 +1,31 @@
+{
+  "name": "@foresift/capability-registry",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Read-only production-readiness governance: the independent IMPLEMENTED/AVAILABLE/PROVEN module-state lattice, the total fail-closed activation gate, dependency-group build ordering, declared SLA/best-effort posture, the MCP compatibility matrix, bounded precomputed-alpha lookups, the isolated import trust boundary, and containment/rollback. Never trades, custodies, signs, or submits transactions.",
+  "exports": {
+    ".": {
+      "types": "./src/index.ts",
+      "default": "./src/index.ts"
+    }
+  },
+  "scripts": {
+    "test": "bun test"
+  },
+  "dependencies": {
+    "@foresift/capacity-planner": "workspace:*",
+    "@foresift/domain": "workspace:*",
+    "@foresift/persistence": "workspace:*",
+    "@foresift/release-conformance": "workspace:*",
+    "@foresift/requirement-manifest": "workspace:*",
+    "@foresift/security": "workspace:*",
+    "@foresift/shared-schemas": "workspace:*",
+    "zod": "^3.25.76"
+  },
+  "devDependencies": {
+    "@electric-sql/pglite": "^0.5.6",
+    "@types/bun": "1.4.0",
+    "typescript": "5.9.3"
+  }
+}

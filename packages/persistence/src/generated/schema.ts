@@ -26,6 +26,7 @@ import {
 export const sigSchema = pgSchema('sig');
 export const wfSchema = pgSchema('wf');
 export const alertSchema = pgSchema('alert');
+export const prodSchema = pgSchema('prod');
 
 // --- g0_data_0001_identity -------------------------------------------------
 
@@ -1942,4 +1943,184 @@ export const alertMetricObservations = alertSchema.table('alert_metric_observati
   windowStart: timestamp('window_start', { withTimezone: true }).notNull(),
   windowEnd: timestamp('window_end', { withTimezone: true }).notNull(),
   observedAt: timestamp('observed_at', { withTimezone: true }).notNull(),
+});
+
+// --- g2_prod_0001_module_registry ------------------------------------------
+
+export const prodModuleStates = prodSchema.table('module_states', {
+  stateRowId: text('state_row_id').primaryKey(),
+  moduleId: text('module_id').notNull(),
+  artifactSetHash: text('artifact_set_hash').notNull(),
+  scope: jsonb('scope').notNull(),
+  scopeHash: text('scope_hash'),
+  lifecycleState: text('lifecycle_state').notNull(),
+  operationalReadiness: text('operational_readiness').notNull(),
+  distributionReadiness: text('distribution_readiness').notNull(),
+  activationEventRef: text('activation_event_ref'),
+  supersededBy: text('superseded_by'),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull(),
+});
+
+export const prodStateTransitions = prodSchema.table('state_transitions', {
+  transitionId: text('transition_id').primaryKey(),
+  stateRowId: text('state_row_id').notNull(),
+  fromState: text('from_state').notNull(),
+  toState: text('to_state').notNull(),
+  changeClassification: text('change_classification').notNull(),
+  gateEvaluationRef: text('gate_evaluation_ref'),
+  reason: text('reason').notNull(),
+  actorRef: text('actor_ref').notNull(),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull(),
+});
+
+export const prodActivationGateEvaluations = prodSchema.table('activation_gate_evaluations', {
+  evaluationId: text('evaluation_id').primaryKey(),
+  scopeHash: text('scope_hash').notNull(),
+  gateKind: text('gate_kind').notNull(),
+  verdict: text('verdict').notNull(),
+  failingGate: text('failing_gate'),
+  evidenceRefs: jsonb('evidence_refs').notNull(),
+  capacityContractRef: text('capacity_contract_ref'),
+  activationEventRef: text('activation_event_ref'),
+  evaluatedAt: timestamp('evaluated_at', { withTimezone: true }).notNull(),
+  expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
+});
+
+// --- g2_prod_0002_dependency_posture ---------------------------------------
+
+export const prodContainmentEvents = prodSchema.table('containment_events', {
+  containmentId: text('containment_id').primaryKey(),
+  moduleId: text('module_id').notNull(),
+  scopeHash: text('scope_hash').notNull(),
+  action: text('action').notNull(),
+  triggerGateKind: text('trigger_gate_kind').notNull(),
+  reason: text('reason').notNull(),
+  autoReactivationAllowed: boolean('auto_reactivation_allowed').notNull(),
+  clearedByEventRef: text('cleared_by_event_ref'),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull(),
+});
+
+export const prodRollbackEvents = prodSchema.table('rollback_events', {
+  rollbackId: text('rollback_id').primaryKey(),
+  moduleId: text('module_id').notNull(),
+  restoredArtifactSetHash: text('restored_artifact_set_hash').notNull(),
+  priorActivationEventRef: text('prior_activation_event_ref').notNull(),
+  newActivationEventRef: text('new_activation_event_ref').notNull(),
+  historyPreserved: boolean('history_preserved').notNull(),
+  candidateReevaluationRef: text('candidate_reevaluation_ref').notNull(),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull(),
+});
+
+export const prodDependencyGroups = prodSchema.table('dependency_groups', {
+  groupId: text('group_id').primaryKey(),
+  dependsOn: jsonb('depends_on').notNull(),
+  status: text('status').notNull(),
+  manifestRequirementCount: integer('manifest_requirement_count').notNull(),
+  evidenceRefs: jsonb('evidence_refs').notNull(),
+  activatesOpportunities: boolean('activates_opportunities').notNull(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull(),
+});
+
+export const prodCriticalDependencies = prodSchema.table('critical_dependencies', {
+  dependencyId: text('dependency_id').primaryKey(),
+  kind: text('kind').notNull(),
+  owner: text('owner').notNull(),
+  critical: boolean('critical').notNull(),
+});
+
+export const prodSlaRegister = prodSchema.table('sla_register', {
+  slaId: text('sla_id').primaryKey(),
+  dependencyId: text('dependency_id').notNull(),
+  applicable: boolean('applicable').notNull(),
+  slaRef: text('sla_ref'),
+  verifiedAt: timestamp('verified_at', { withTimezone: true }).notNull(),
+  expiresAt: timestamp('expires_at', { withTimezone: true }),
+});
+
+export const prodBestEffortDeclarations = prodSchema.table('best_effort_declarations', {
+  declarationId: text('declaration_id').primaryKey(),
+  posture: text('posture').notNull(),
+  degradedScope: jsonb('degraded_scope').notNull(),
+  missingSlaRefs: jsonb('missing_sla_refs').notNull(),
+  weakenedDimensions: text('weakened_dimensions').array().notNull(),
+  protectedDimensions: text('protected_dimensions').array().notNull(),
+  reason: text('reason').notNull(),
+  declaredAt: timestamp('declared_at', { withTimezone: true }).notNull(),
+});
+
+// --- g2_prod_0003_mcp_compat -----------------------------------------------
+
+export const prodMcpRevisions = prodSchema.table('mcp_revisions', {
+  revision: text('revision').primaryKey(),
+  channel: text('channel').notNull(),
+  sdkVersion: text('sdk_version').notNull(),
+  transport: text('transport').notNull(),
+  originPolicyRef: text('origin_policy_ref').notNull(),
+  isDefault: boolean('is_default').notNull(),
+  supersededBy: text('superseded_by'),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull(),
+});
+
+export const prodMcpTargetClients = prodSchema.table('mcp_target_clients', {
+  clientId: text('client_id').primaryKey(),
+  clientName: text('client_name').notNull(),
+  version: text('version').notNull(),
+  capabilities: jsonb('capabilities').notNull(),
+  authMode: text('auth_mode').notNull(),
+});
+
+export const prodMcpCompatibilityMatrix = prodSchema.table('mcp_compatibility_matrix', {
+  cellId: text('cell_id').primaryKey(),
+  revision: text('revision').notNull(),
+  clientId: text('client_id').notNull(),
+  conformanceFixtureRef: text('conformance_fixture_ref').notNull(),
+  liveTestDate: timestamp('live_test_date', { withTimezone: true }).notNull(),
+  result: text('result').notNull(),
+  notes: text('notes'),
+});
+
+export const prodMcpConformanceRuns = prodSchema.table('mcp_conformance_runs', {
+  runId: text('run_id').primaryKey(),
+  revision: text('revision').notNull(),
+  clientId: text('client_id').notNull(),
+  fixtureRef: text('fixture_ref').notNull(),
+  result: text('result').notNull(),
+  ranAt: timestamp('ran_at', { withTimezone: true }).notNull(),
+});
+
+// --- g2_prod_0004_alpha_boundary -------------------------------------------
+
+export const prodPrecomputedAlphaBounds = prodSchema.table('precomputed_alpha_bounds', {
+  boundId: text('bound_id').primaryKey(),
+  livePath: text('live_path').notNull(),
+  artifactRef: text('artifact_ref').notNull(),
+  artifactSetHash: text('artifact_set_hash').notNull(),
+  maxCandidates: integer('max_candidates').notNull(),
+  maxRows: integer('max_rows').notNull(),
+  maxEdges: integer('max_edges').notNull(),
+  maxLatencyMs: integer('max_latency_ms').notNull(),
+  maxCostUsd: numeric('max_cost_usd').notNull(),
+  datasetCutoff: timestamp('dataset_cutoff', { withTimezone: true }).notNull(),
+  verifiedAt: timestamp('verified_at', { withTimezone: true }).notNull(),
+  expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
+});
+
+export const prodLivePathAlphaReads = prodSchema.table('live_path_alpha_reads', {
+  readId: text('read_id').primaryKey(),
+  livePath: text('live_path').notNull(),
+  boundId: text('bound_id').notNull(),
+  requestHash: text('request_hash').notNull(),
+  served: boolean('served').notNull(),
+  refusalReason: text('refusal_reason'),
+  latencyMs: integer('latency_ms'),
+  readAt: timestamp('read_at', { withTimezone: true }).notNull(),
+});
+
+export const prodArtifactBoundaryAssertions = prodSchema.table('artifact_boundary_assertions', {
+  assertionId: text('assertion_id').primaryKey(),
+  livePath: text('live_path').notNull(),
+  assertionKind: text('assertion_kind').notNull(),
+  importArtifactRef: text('import_artifact_ref'),
+  verdict: text('verdict').notNull(),
+  assertedAt: timestamp('asserted_at', { withTimezone: true }).notNull(),
 });

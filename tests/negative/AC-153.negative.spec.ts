@@ -3,6 +3,15 @@
  * Traces: FR-MAT-010, FR-EVAL-001, AC-153.
  */
 import { describe, expect, it } from 'bun:test';
+import {
+  assertBestEffortPreservesProtectedDimensions,
+  assertCapacityDegradationPreservesProtectedDimensions,
+} from '@foresift/capability-registry';
+import {
+  PROD_BEST_EFFORT_OMITS_PROTECTED,
+  PROD_BEST_EFFORT_WEAKENING,
+  PROD_SLA_BACKED_WEAKENING,
+} from '../fixtures/prod/index.ts';
 
 function enforceProtectedReserveIntegrity(degradationPlan: { throttledItems: readonly string[] }) {
   const protectedItems = [
@@ -35,5 +44,33 @@ describe('AC-153 negative: shedding protected outcome reserves under degradation
         throttledItems: ['CRITICAL_RISK_MONITORING'],
       }),
     ).toThrow('PROTECTED_RESERVE_CANNOT_BE_THROTTLED: CRITICAL_RISK_MONITORING');
+  });
+});
+
+// --- prod-scoped additions (T036, FR-PROD-004, AC-153) -----------------------
+
+describe('AC-153 prod-scoped negatives: weakening any protected dimension is refused', () => {
+  it('refuses a declaration that weakens the protected audit dimension', () => {
+    expect(() =>
+      assertBestEffortPreservesProtectedDimensions(PROD_BEST_EFFORT_WEAKENING),
+    ).toThrowError(expect.objectContaining({ code: 'PROD_BEST_EFFORT_PROTECTED_DIMENSION' }));
+  });
+
+  it('refuses an SLA_BACKED posture that weakens anything', () => {
+    expect(() =>
+      assertBestEffortPreservesProtectedDimensions(PROD_SLA_BACKED_WEAKENING),
+    ).toThrowError(expect.objectContaining({ code: 'PROD_BEST_EFFORT_PROTECTED_DIMENSION' }));
+  });
+
+  it('refuses a declaration that omits a protected dimension by omission', () => {
+    expect(() =>
+      assertBestEffortPreservesProtectedDimensions(PROD_BEST_EFFORT_OMITS_PROTECTED),
+    ).toThrowError(expect.objectContaining({ code: 'PROD_BEST_EFFORT_PROTECTED_DIMENSION' }));
+  });
+
+  it('refuses a capacity degradation that tries to shed critical risk monitoring', () => {
+    expect(() => assertCapacityDegradationPreservesProtectedDimensions(['audit'])).toThrowError(
+      expect.objectContaining({ code: 'PROD_BEST_EFFORT_PROTECTED_DIMENSION' }),
+    );
   });
 });

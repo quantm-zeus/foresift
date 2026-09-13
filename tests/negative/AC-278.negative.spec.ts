@@ -13,6 +13,18 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { Incidents } from '../../packages/security/src/incidents.ts';
 import { GatePauses, refuseAutoReactivation } from '../../packages/security/src/gate-pause.ts';
+import {
+  advanceState,
+  clearContainment,
+  containForFailedGate,
+} from '@foresift/capability-registry';
+import {
+  PROD_CONTAINMENT_SPECIFIC_CANDIDATE,
+  PROD_CONTAIN_FOR_CAPACITY_GATE,
+  PROD_CONTAIN_FOR_FAILED_GATE,
+  PROD_FIXTURE_HASH_A,
+  PROD_FIXTURE_NOW,
+} from '../fixtures/prod/index.ts';
 
 const MIGRATIONS_DIR = path.resolve(
   path.dirname(fileURLToPath(import.meta.url)),
@@ -31,7 +43,7 @@ beforeAll(async () => {
   await applyMigrations({ engine, migrationsDir: MIGRATIONS_DIR });
   incidents = new Incidents(engine);
   pauses = new GatePauses(engine);
-});
+}, 120_000);
 
 afterAll(async () => {
   await db.close();
@@ -106,4 +118,62 @@ describe('AC-278 negatives: pauses only lift through audited explicit resumes', 
       }),
     ).rejects.toThrow(/not actively paused/);
   });
+});
+
+// --- prod-scoped additions (T038, FR-PROD-002, AC-278) -----------------------
+
+describe('AC-278 prod-scoped negatives: containment is explicit and append-only', () => {
+  let containmentId = '';
+
+  beforeAll(async () => {
+    const { moduleId, scope } = PROD_CONTAINMENT_SPECIFIC_CANDIDATE;
+    await advanceState(engine, {
+      moduleId,
+      scope,
+      artifactSetHash: PROD_FIXTURE_HASH_A,
+      toState: 'IMPLEMENTED',
+      operationalReadiness: 'READY_FOR_ACTIVE_PROFILE',
+      distributionReadiness: 'PRIVATE_ONLY',
+      changeClassification: 'MATERIAL_SECURITY_OR_RIGHTS',
+      reason: 'seed governed scope for containment refusals',
+      actorRef: 'ac278-prod-neg',
+      at: PROD_FIXTURE_NOW,
+    });
+    const outcome = await containForFailedGate(engine, PROD_CONTAIN_FOR_FAILED_GATE);
+    containmentId = outcome.containment.containmentId;
+  }, 120_000);
+
+  it('refuses a second clear of the same containment (no auto-reactivation)', async () => {
+    await clearContainment(engine, {
+      containmentId,
+      revalidationEventRef: 'revalidation://ac278/first',
+    });
+    await expect(
+      clearContainment(engine, {
+        containmentId,
+        revalidationEventRef: 'revalidation://ac278/second',
+      }),
+    ).rejects.toMatchObject({ code: 'PROD_ACTIVATION_GATE_REFUSED' });
+  }, 120_000);
+
+  it('refuses containing a scope that has no governed state row', async () => {
+    await expect(
+      containForFailedGate(engine, {
+        ...PROD_CONTAIN_FOR_CAPACITY_GATE,
+        affectedScopes: [
+          { moduleId: 'module-never-governed', scope: PROD_CONTAINMENT_SPECIFIC_CANDIDATE.scope },
+        ],
+        containmentId: 'containment-ac278-unknown',
+      }),
+    ).rejects.toMatchObject({ code: 'PROD_ACTIVATION_SCOPE_INVALID' });
+  }, 120_000);
+
+  it('refuses an in-place SQL mutation of auto_reactivation_allowed', async () => {
+    await expect(
+      engine.query(
+        `UPDATE prod.containment_events SET auto_reactivation_allowed = true WHERE containment_id = $1`,
+        [containmentId],
+      ),
+    ).rejects.toThrow();
+  }, 120_000);
 });

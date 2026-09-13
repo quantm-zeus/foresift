@@ -4,7 +4,29 @@
 // leaks the raw values it replaced.
 import { strict as assert } from 'node:assert';
 import { describe, expect, it } from 'bun:test';
+import {
+  ActivationKind,
+  evaluateActivationGate,
+  type DistributionEvidenceInput,
+} from '@foresift/capability-registry';
 import { validatePublicOutput } from '../../packages/security/src/claims-policy.ts';
+import {
+  makeProdScope,
+  passingDistributionEvidence,
+  passingOpportunityGateInput,
+} from '../fixtures/prod/index.ts';
+
+function prodRedactionInput(overrides: Partial<DistributionEvidenceInput> = {}) {
+  const scope = makeProdScope({ profile_version: 'ac277-prod-neg' });
+  return {
+    ...passingOpportunityGateInput(scope),
+    kind: ActivationKind.PUBLIC,
+    distributionEvidence: passingDistributionEvidence({
+      distributionReadiness: 'PUBLIC_AUTHORIZED',
+      ...overrides,
+    }),
+  };
+}
 
 const COMPLETE_ENVELOPE = {
   evidenceRefs: ['evidence://run/ac277-neg'],
@@ -60,5 +82,29 @@ describe('AC-277 negatives: incomplete or unsafe output never ships', () => {
     expect(redactedBody).not.toContain('threshold: 0.93');
     expect(redactedBody).toContain('[REDACTED_THRESHOLD]');
     expect(redactedBody).toContain('[REDACTED_ENTITY]');
+  });
+});
+
+// --- prod-scoped additions (T037, FR-PROD-002/004, AC-277) -------------------
+
+describe('AC-277 prod-scoped negatives: missing public-redaction evidence refuses public authorization', () => {
+  it('refuses the PUBLIC gate when public-safe redaction did not pass', () => {
+    const result = evaluateActivationGate(prodRedactionInput({ publicSafeRedaction: false }));
+    expect(result.verdict).toBe('REFUSE');
+    if (result.verdict === 'REFUSE') {
+      expect(result.failingGate).toBe('DISTRIBUTION_EVIDENCE');
+      expect(result.reason).toBe('DISTRIBUTION_EVIDENCE_MISSING');
+    }
+  });
+
+  it('still withholds redacted bodies when a publication duty is missing', () => {
+    const { redaction, redactedBody } = validatePublicOutput({
+      ...COMPLETE_ENVELOPE,
+      limitations: [],
+      body: 'an ordinary whale-concentration observation',
+    });
+    expect(redaction.verdict).toBe('REFUSED');
+    assert(redaction.verdict === 'REFUSED');
+    expect(redactedBody).toBe('');
   });
 });

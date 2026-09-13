@@ -4,9 +4,31 @@
 // assertClaimsCompliant throws rather than letting the copy through.
 import { describe, expect, it } from 'bun:test';
 import {
+  ActivationKind,
+  evaluateActivationGate,
+  type DistributionEvidenceInput,
+} from '@foresift/capability-registry';
+import {
   assertClaimsCompliant,
   evaluateClaims,
 } from '../../packages/security/src/claims-policy.ts';
+import {
+  makeProdScope,
+  passingDistributionEvidence,
+  passingOpportunityGateInput,
+} from '../fixtures/prod/index.ts';
+
+function prodClaimsInput(overrides: Partial<DistributionEvidenceInput> = {}) {
+  const scope = makeProdScope({ profile_version: 'ac276-prod-neg' });
+  return {
+    ...passingOpportunityGateInput(scope),
+    kind: ActivationKind.PUBLIC,
+    distributionEvidence: passingDistributionEvidence({
+      distributionReadiness: 'PUBLIC_AUTHORIZED',
+      ...overrides,
+    }),
+  };
+}
 
 const PROHIBITED_SAMPLES: readonly [string, string][] = [
   ['GUARANTEED_PROFIT', 'Subscribe now for guaranteed profits every week.'],
@@ -42,5 +64,25 @@ describe('AC-276 negatives: prohibited claims refuse on every channel', () => {
     if (result.verdict === 'REFUSED') {
       expect(result.claimClasses).toContain('GUARANTEED_PROFIT');
     }
+  });
+});
+
+// --- prod-scoped additions (T037, FR-PROD-002/004, AC-276) -------------------
+
+describe('AC-276 prod-scoped negatives: a failed claims review refuses public authorization', () => {
+  it('refuses the PUBLIC gate when the claims review did not pass', () => {
+    const result = evaluateActivationGate(prodClaimsInput({ claimsReview: false }));
+    expect(result.verdict).toBe('REFUSE');
+    if (result.verdict === 'REFUSE') {
+      expect(result.failingGate).toBe('DISTRIBUTION_EVIDENCE');
+      expect(result.reason).toBe('DISTRIBUTION_EVIDENCE_MISSING');
+    }
+  });
+
+  it('still refuses prohibited claim copy independently of gate evidence', () => {
+    expect(evaluateClaims('guaranteed profits every week', 'EXPORT').verdict).toBe('REFUSED');
+    expect(() => assertClaimsCompliant('guaranteed profits every week', 'EXPORT')).toThrow(
+      /prohibited claims/,
+    );
   });
 });

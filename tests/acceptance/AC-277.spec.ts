@@ -2,8 +2,30 @@
 // execution assumptions, limitations, and disclaimer — AND redacts protected
 // detector thresholds and sensitive entity details before publication.
 import { describe, expect, it } from 'bun:test';
+import {
+  ActivationKind,
+  evaluateActivationGate,
+  type DistributionEvidenceInput,
+} from '@foresift/capability-registry';
 import { validatePublicOutput } from '../../packages/security/src/claims-policy.ts';
 import { strict as assert } from 'node:assert';
+import {
+  makeProdScope,
+  passingDistributionEvidence,
+  passingOpportunityGateInput,
+} from '../fixtures/prod/index.ts';
+
+function prodRedactionInput(overrides: Partial<DistributionEvidenceInput> = {}) {
+  const scope = makeProdScope({ profile_version: 'ac277-prod' });
+  return {
+    ...passingOpportunityGateInput(scope),
+    kind: ActivationKind.PUBLIC,
+    distributionEvidence: passingDistributionEvidence({
+      distributionReadiness: 'PUBLIC_AUTHORIZED',
+      ...overrides,
+    }),
+  };
+}
 
 function redactionsAppliedOf(
   result: import('@foresift/shared-schemas').PublicRedactionResult,
@@ -46,5 +68,23 @@ describe('AC-277: public output ships complete duties with enforced redaction', 
     expect(redaction.verdict).toBe('COMPLIANT');
     expect(redactionsAppliedOf(redaction)).toBe(0);
     expect(redactedBody).toContain('whale concentration');
+  });
+});
+
+// --- prod-scoped addition (T037, FR-PROD-002/004, AC-277) --------------------
+
+describe('AC-277 prod-scoped: public-redaction gate evidence is mandatory for public authorization', () => {
+  it('passes the PUBLIC gate with public-safe redaction evidence present', () => {
+    const result = evaluateActivationGate(prodRedactionInput({ publicSafeRedaction: true }));
+    expect(result.verdict).toBe('PASS');
+  });
+
+  it('keeps redaction enforcement independent of the gate evidence', () => {
+    const { redaction } = validatePublicOutput({
+      ...COMPLETE_ENVELOPE,
+      body: 'Detector fired at threshold: 0.82 for whale 7xKQ…; snapshot follows.',
+      sensitiveEntityValues: ['7xKQ…'],
+    });
+    expect(redaction.verdict).toBe('COMPLIANT');
   });
 });

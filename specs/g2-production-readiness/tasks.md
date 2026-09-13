@@ -677,37 +677,37 @@ third-round finding-to-task map and the verbatim reproductions.
 > test. State: PROVEN → RUNNING. Admin-control and recovery-continuity promotion
 > stays frozen until the correction re-proves.
 
-- [ ] T073 [serial-reason: SEMANTIC_DEPENDENCY] Close R10: build the
+- [x] T073 [serial-reason: SEMANTIC_DEPENDENCY] Close R10: build the
       `activationGateEvaluationsFor` `WHERE` clause with `numericJoin` (never
       `Array.prototype.join`) and make `requirePersistedActivationEvidence`
       refuse a row whose `scopeHash` differs from the requested scope, so a
       shadowed `join` cannot admit foreign-scope evidence into a PROVEN
       promotion. Add a discriminating `Array.prototype.join` shadow regression.
       Traces: FR-PROD-001, FR-PROD-002, AC-152.
-- [ ] T074 [serial-reason: SEMANTIC_DEPENDENCY] Close R11: make the MCP
+- [x] T074 [serial-reason: SEMANTIC_DEPENDENCY] Close R11: make the MCP
       protocol-revision membership test numeric at both the guard
       (`packages/security/src/mcp-protocol-guard.ts`, recorded write-scope
       exception) and the FR-PROD-003 surface (`resolveProtocolRevision`), so a
       shadowed `Array.prototype.includes` cannot ALLOW an arbitrary revision.
       Add the shadow regression. Traces: FR-PROD-003, AC-144.
-- [ ] T075 [serial-reason: SEMANTIC_DEPENDENCY] Close R12: build
+- [x] T075 [serial-reason: SEMANTIC_DEPENDENCY] Close R12: build
       `SHADOW_ONLY_IMPORT_ARTIFACT_STATES` with a numeric selection (never
       `Array.prototype.filter`) and freeze it, so a shadow installed before the
       lazily imported `prod-rules.ts` module initializes cannot widen the
       authoritative import-shadow state set. Add the shadow regression that
       would re-open R7/H4. Traces: FR-PROD-004, FR-PROD-005, AC-275, AC-277.
-- [ ] T076 [executor: TEST] Give the NEW-N2 shadow regression an explicit
+- [x] T076 [executor: TEST] Give the NEW-N2 shadow regression an explicit
       bounded timeout (measured 4983 ms against bun's 5000 ms default), so the
       release gate cannot red non-deterministically under load.
-- [ ] T077 [executor: TEST] Exploit/regression suite for T073–T075 authored as
+- [x] T077 [executor: TEST] Exploit/regression suite for T073–T075 authored as
       NEW discriminating tests that fail against `53f737d` (each shadow is
       installed surgically and restored in `finally`), plus a re-run of the
       upgrade-path test from a database migrated to pre-prod `main`.
-- [ ] T078 [serial-reason: COORDINATOR_BOUNDARY] Fresh-context adversarial review
+- [x] T078 [serial-reason: COORDINATOR_BOUNDARY] Fresh-context adversarial review
       of the fifth-round diff, full prescribed gates, exact-SHA CI, and a NEW
       independent convergence audit at the pre-merge head before PROVEN is
       restored. Traces: FR-PROD-001…006.
-- [ ] T079 [serial-reason: SEMANTIC_DEPENDENCY] Close R13: add
+- [x] T079 [serial-reason: SEMANTIC_DEPENDENCY] Close R13: add
       `packages/security/src/shadow-safe.ts` (numeric-index helpers) and convert
       every decision-time authority operation in `packages/security/src/**` off
       shadowable `Array.prototype` methods — the egress SSRF allowlist and
@@ -723,11 +723,11 @@ third-round finding-to-task map and the verbatim reproductions.
       recorded in `packages/security/**`, outside this package's writeScopes, so
       this is a named scope exception (product-owned by T079).
       Traces: FR-SEC-001, FR-PROD-003, FR-PROD-005, AC-251.
-- [ ] T080 [executor: TEST] Exploit/regression suite for T073–T079 authored as
+- [x] T080 [executor: TEST] Exploit/regression suite for T073–T079 authored as
       NEW discriminating tests that fail against `53f737d` (each shadow
       installed surgically and restored in `finally`), plus the R10b isolated
       scope-binding regression proving the defence-in-depth check independently.
-- [ ] T081 [serial-reason: COORDINATOR_BOUNDARY] Fresh-context adversarial review
+- [x] T081 [serial-reason: COORDINATOR_BOUNDARY] Fresh-context adversarial review
       of the R13 security diff, full prescribed gates, exact-SHA CI, and a NEW
       independent convergence audit at the pre-merge head before PROVEN is
       restored. Traces: FR-PROD-001…006, FR-SEC-001.

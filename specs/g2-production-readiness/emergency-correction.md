@@ -398,3 +398,42 @@ R10/R11 are decision-time shadows inside the D018 model; R12 is a
 module-initialization shadow (see above). The fifth-round adversarial review
 also confirmed a systemic sibling class in `@foresift/security` (R13), which is
 fixed in the same correction rather than deferred.
+
+## Fifth-round closure (2026-09-13)
+
+The correction landed as PR #300 (squash `b2c08fc`) on `main`; the fix head was
+`66a750d`. The re-verification bar is met:
+
+- **Independent convergence audit** (fresh context, read-only, NEW probes): the
+  auditor reconstructed the base with `git archive 53f737d` and compared it with
+  `89f2145`. It reproduced every R-row on the base and showed it closed at the
+  fix head — R10 (shadowed `join` dropped the `scope_hash` predicate and
+  foreign-scope rows were accepted on the base; the head keeps the predicate and
+  refuses `EVIDENCE_SET_SCOPE_MISMATCH`), R11 (base guard/`resolveProtocolRevision`
+  ALLOW `2099-01-01-evil`; head REFUSE/`REVISION_NOT_AUTHORIZED`), R12 (base
+  pre-import `filter` shadow widened the release-gate authority to six states and
+  passed a `REJECTED` import; head stays
+  `["VALIDATING","SHADOW_ELIGIBLE"]` and fails it), and R13 (base
+  `some`/`join`/`push` shadows bypassed the egress allowlist, the DNS-rebind pin,
+  and made every security verdict a bare `{}`; head returns real
+  REFUSE/ALLOW/REFUSED verdicts, including under a schema-library `push` shadow).
+  Verdict: **`CONVERGENCE: READY FOR PROVEN — no CRITICAL/HIGH`**.
+- **Convergence-audit M1 closed** in `66a750d`: the release-gate finding
+  messages still used `Array.prototype.join`, so a `join` shadow could turn a
+  clean FAILED verdict into an uncaught throw; every finding message now uses
+  `numericJoin`, with a discriminating regression.
+- **Manifest / generated docs independently reproduced:** coordinator manifest
+  byte-identical 602/602, `docs/generated` 60 files clean, `spec:verify` 13
+  checks, 112/112 security PURE and 66/66 prod-release-rules specs pass.
+- **Local full gate:** `pnpm verify` green at `66a750d`
+  (`{"authority":"BUN_TEST","bunFiles":602,"passed":true}` and
+  node-runtime-compat).
+- **Exact-SHA CI:** run `34789731516` at `66a750d` (Fast Gates, Pure,
+  Process/Meta-Gate, Database PGlite, Verify) all green; PR #300 merged as
+  `b2c08fc`.
+
+State change: g2-production-readiness RUNNING → PROVEN (schema-legal), restored
+only after the above. Phase 13 tasks `T073`–`T081` are checked; history is
+preserved (reopen `88a915e`, fixes `89f2145`/`66a750d`) and nothing was rewritten.
+`g2-admin-control` and `g2-recovery-continuity` promotion is unblocked, subject
+to `g2-admin-control` absorbing the fifth-round correction.

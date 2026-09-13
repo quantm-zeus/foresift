@@ -3,7 +3,7 @@ import { constants } from 'node:fs';
 import { access, readFile, readdir } from 'node:fs/promises';
 import path from 'node:path';
 import { resolveMappings } from '@foresift/requirement-manifest';
-import { numericSortStrings, numericSortWith } from './shadow-safe.ts';
+import { numericSortStrings, numericSortWith, promiseAllNumeric } from './shadow-safe.ts';
 
 export const CONFORMANCE_RULES = {
   mapping: 'NORMATIVE_MAPPING_COMPLETE',
@@ -640,7 +640,12 @@ export async function evaluateConformance(options: ConformanceOptions): Promise<
   // rules only.
   const manifestRequirements =
     options.requirements === undefined ? requirements : await loadRequirements(options.repoRoot);
-  const settled = await Promise.all([
+  // `promiseAllNumeric` hands `Promise.all` an array carrying its OWN captured
+  // `Symbol.iterator` (audit residual): `Promise.all(iterable)` reads
+  // `Array.prototype[Symbol.iterator]` on its ARGUMENT, so a surgical iterator
+  // could substitute four forged verdicts before the numeric reads below see
+  // them and flip a FAILED gate to a vacuous PASSED.
+  const settled = await promiseAllNumeric([
     Promise.resolve(checkMappingCompleteness({ requirements })),
     checkActiveImplementationPaths({
       repoRoot: options.repoRoot,

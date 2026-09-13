@@ -10,6 +10,64 @@
  * import time and are explicitly out of the declared threat model.
  */
 
+/**
+ * The genuine `Array.prototype[Symbol.iterator]`, captured once at module init.
+ * Shadowing the prototype BEFORE this module is imported is out of scope (D018),
+ * but every later in-process shadow must not be able to rewrite the iteration
+ * protocol of the arrays `promiseAllNumeric` hands to `Promise.all`.
+ */
+const capturedArrayIterator: (this: unknown) => IterableIterator<unknown> = Array.prototype[
+  Symbol.iterator
+] as (this: unknown) => IterableIterator<unknown>;
+
+/**
+ * Shadow-safe `Promise.all`. `Promise.all(iterable)` reads
+ * `Array.prototype[Symbol.iterator]` on its ARGUMENT array, so a surgical
+ * iterator can substitute forged resolved values before the settled tuple is
+ * read. This aggregator copies `items` by numeric index (never spread/`.push`/
+ * `.map`) into an array that carries its OWN captured `Symbol.iterator`, so the
+ * builtin never consults the shadowable prototype. Concurrency and settled-array
+ * ordering are identical to `Promise.all`.
+ */
+export function promiseAllNumeric<T extends readonly unknown[] | []>(
+  items: T,
+): Promise<{ -readonly [K in keyof T]: Awaited<T[K]> }> {
+  const promises: Promise<unknown>[] = [];
+  for (let index = 0; index < items.length; index += 1) {
+    promises[index] = items[index] as Promise<unknown>;
+  }
+  Object.defineProperty(promises, Symbol.iterator, {
+    value: capturedArrayIterator,
+    enumerable: false,
+    configurable: true,
+    writable: true,
+  });
+  return Promise.all(promises) as Promise<{ -readonly [K in keyof T]: Awaited<T[K]> }>;
+}
+
+/**
+ * Numeric-index equivalent of `Object.fromEntries` for a settled array of
+ * `[key, value]` pairs; `Object.fromEntries` iterates its argument, so a
+ * shadowed `Array.prototype[Symbol.iterator]` could forge an empty record.
+ * Uses `Object.defineProperty` to match `Object.fromEntries`' CreateDataProperty
+ * semantics (a `__proto__` key stays an own data property).
+ */
+export function numericFromEntries(
+  entries: readonly (readonly [string, string])[],
+): Record<string, string> {
+  const result: Record<string, string> = {};
+  for (let index = 0; index < entries.length; index += 1) {
+    const entry = entries[index] as readonly [string, string];
+    Object.defineProperty(result, entry[0], {
+      value: entry[1],
+      enumerable: true,
+      configurable: true,
+      writable: true,
+    });
+  }
+  return result;
+}
+
 /** A numeric-index copy of `source`; never uses spread or `.slice`. */
 export function numericCopy<T>(source: readonly T[]): T[] {
   const copy: T[] = [];

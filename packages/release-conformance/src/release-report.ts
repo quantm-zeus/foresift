@@ -7,11 +7,13 @@ import { generateSbomFromLockfile } from './sbom.ts';
 import { loadOrphanExceptions } from './orphans.ts';
 import {
   numericFilter,
+  numericFromEntries,
   numericIncludes,
   numericMap,
   numericSome,
   numericSortStrings,
   numericSortWith,
+  promiseAllNumeric,
 } from './shadow-safe.ts';
 
 const HASH = /^[a-f0-9]{64}$/;
@@ -97,9 +99,12 @@ async function hashFiles(root: string, directory: string, predicate: (name: stri
   } catch (error) {
     if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error;
   }
-  return Object.fromEntries(
-    await Promise.all(
-      numericMap(names, async (name) => [
+  // `numericFromEntries` never iterates (audit residual): `Object.fromEntries`
+  // reads `Array.prototype[Symbol.iterator]` on the settled pair array, so a
+  // surgical iterator could forge empty `migrationHashes`/`schemaHashes`.
+  return numericFromEntries(
+    await promiseAllNumeric(
+      numericMap(names, async (name): Promise<[string, string]> => [
         directory === 'migrations' ? name : path.posix.join(directory, name),
         `sha256:${sha256(await readFile(path.join(absolute, name)))}`,
       ]),
@@ -130,7 +135,11 @@ export async function buildReleaseReport(
   const exceptionLedgerPath =
     options.exceptionLedgerPath ??
     path.join(options.repoRoot, 'packages/release-conformance/src/orphan-exceptions.json');
-  const settled = await Promise.all([
+  // `promiseAllNumeric` (audit residual): `Promise.all` reads
+  // `Array.prototype[Symbol.iterator]` on its ARGUMENT, so a surgical iterator
+  // could forge an empty document/manifest before the numeric reads below hash
+  // them (`documentHash === sha256('')`).
+  const settled = await promiseAllNumeric([
     readFile(documentPath),
     readFile(manifestPath),
     readJson(auditPath),

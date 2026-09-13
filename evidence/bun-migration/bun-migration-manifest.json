@@ -1,7 +1,7 @@
 {
   "schema": "foresift/bun-migration-manifest@1",
   "migrationId": "bun-test-authority-v1",
-  "generatedAt": "2026-09-13T17:51:06.079Z",
+  "generatedAt": "2026-09-13T18:24:48.966Z",
   "root": ".",
   "totalTestFiles": 602,
   "counts": {
@@ -3676,15 +3676,17 @@
     {
       "path": "packages/release-conformance/test/prod-rules.spec.ts",
       "package": "@foresift/release-conformance",
-      "bytes": 58503,
-      "lines": 1450,
-      "sha256": "09b85d909e7136b229990c3abbf86dd1c311073d76970cc9c1eb9812ca472a11",
+      "bytes": 72411,
+      "lines": 1813,
+      "sha256": "41474397d5b79625ddc397e842262261a4cd13f62111daa49f1c0b54fbdd6ed6",
       "imports": [
         "bun:test",
+        "node:crypto",
         "node:fs/promises",
         "node:os",
         "node:path",
         "../src/index.ts",
+        "../../../tests/fixtures/trace/index.ts",
         "@foresift/domain",
         "../../../tests/fixtures/prod/index.ts"
       ],
@@ -3692,9 +3694,13 @@
       "features": ["dynamic-import"],
       "workload": "PURE",
       "migrationType": "ALREADY_MIGRATED",
-      "fixturesAndHelpers": ["../../../tests/fixtures/prod/index.ts"],
+      "fixturesAndHelpers": [
+        "../../../tests/fixtures/trace/index.ts",
+        "../../../tests/fixtures/prod/index.ts"
+      ],
       "sourceAnchors": [
         "../src/index.ts",
+        "../../../tests/fixtures/trace/index.ts",
         "@foresift/domain",
         "../../../tests/fixtures/prod/index.ts"
       ],

@@ -2,7 +2,13 @@
 import { readFile, readdir } from 'node:fs/promises';
 import path from 'node:path';
 import { implementationPath, type RequirementMapping } from './conformance.ts';
-import { numericIncludes, numericMap, numericSome, numericSortStrings } from './shadow-safe.ts';
+import {
+  numericIncludes,
+  numericMap,
+  numericSome,
+  numericSortStrings,
+  promiseAllNumeric,
+} from './shadow-safe.ts';
 
 export interface OrphanException {
   readonly pathPattern: string;
@@ -271,11 +277,16 @@ export function detectOrphanSources(
     );
   }
   const mappings = loadManifestTraceMappings(options.repoRoot);
-  return Promise.all([
+  // `promiseAllNumeric` (audit residual): both `Promise.all` argument arrays
+  // below carry their OWN captured `Symbol.iterator`, because `Promise.all`
+  // reads `Array.prototype[Symbol.iterator]` on its ARGUMENT. A surgical
+  // iterator could otherwise forge empty product files / fabricated exceptions
+  // and silence a real orphan.
+  return promiseAllNumeric([
     options.productFiles ?? collectProductFiles(options.repoRoot),
     options.implementationRefs ?? mappings.then((value) => value.implementationRefs),
     options.exceptions ??
-      Promise.all([
+      promiseAllNumeric([
         loadOrphanExceptions(
           path.join(options.repoRoot, 'packages/release-conformance/src/orphan-exceptions.json'),
         ),

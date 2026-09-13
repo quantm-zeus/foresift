@@ -6,7 +6,8 @@
  * four pre-existing trace rules must keep passing unchanged.
  */
 import { describe, expect, it } from 'bun:test';
-import { mkdtemp, mkdir, rm, writeFile } from 'node:fs/promises';
+import { createHash } from 'node:crypto';
+import { mkdtemp, mkdir, readFile, readdir, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import {
@@ -14,12 +15,14 @@ import {
   CONFORMANCE_RULES,
   GATE_KINDS,
   PROD_RULES,
+  buildReleaseReport,
   checkActivationWithoutEvidence,
   checkProdSurfacePresence,
   checkLivePathPrecomputationViolation,
   checkMcpCompatibilityDrift,
   checkPostureWeakening,
   checkPublicAuthorizationWithoutGateEvidence,
+  detectOrphanSources,
   evaluateConformance,
   evaluateDistributionAuthorization,
   evaluateProdConformance,
@@ -29,6 +32,7 @@ import {
   type LivePathPrecomputationClaim,
   type RequirementMapping,
 } from '../src/index.ts';
+import { VALID_RELEASE_REPORT_FIXTURE } from '../../../tests/fixtures/trace/index.ts';
 import {
   ALL_ARTIFACT_BOUNDARY_ASSERTION_KINDS,
   parseActivationGateKind,
@@ -1445,5 +1449,364 @@ describe('NEW-N2: conformance aggregation resists a surgical Symbol.iterator sha
     expect(attacked.findings.map((finding) => finding.rule)).toContain(
       PROD_RULES.activationWithoutEvidence,
     );
+  });
+});
+
+// --- NEW-N3: no reliance on the Promise.all ARGUMENT array's iterator ---------
+
+/**
+ * Audit N3 (HIGH). The NEW-N2 fix replaced app-level array destructuring with
+ * numeric index reads, which closed only the SETTLED-array vector.
+ * `Promise.all(iterable)` ALSO reads `Array.prototype[Symbol.iterator]` on its
+ * ARGUMENT array, so a surgical iterator can substitute forged RESOLVED values
+ * before any numeric read happens: a FAILED G2 corpus becomes a vacuous PASSED,
+ * `buildReleaseReport` hashes an empty document/manifest (`sha256('')`), and a
+ * real orphan is silenced.
+ *
+ * The package now routes every `Promise.all` argument through
+ * `promiseAllNumeric` (see `src/shadow-safe.ts`), which copies by numeric index
+ * and installs its own captured `Symbol.iterator` on the array handed to the
+ * builtin. The shadow below forges ONLY the array whose immediate caller frame
+ * is the targeted function AND whose shape matches the targeted argument, and it
+ * is always restored in a `finally`.
+ */
+describe('NEW-N3: Promise.all argument arrays resist a surgical Symbol.iterator shadow', () => {
+  const ITERATOR_KEY = Symbol.iterator;
+  const SHA256_EMPTY = createHash('sha256').update('').digest('hex');
+
+  interface SurgicalTarget {
+    readonly frame: string;
+    readonly accepts: (value: unknown[]) => boolean;
+    readonly forge: () => readonly unknown[];
+  }
+
+  function thenableArrayOfLength(length: number): (value: unknown[]) => boolean {
+    return (value) => {
+      if (value.length !== length) return false;
+      for (let index = 0; index < value.length; index += 1) {
+        const element = value[index];
+        if (
+          element === null ||
+          (typeof element !== 'object' && typeof element !== 'function') ||
+          typeof (element as { then?: unknown }).then !== 'function'
+        ) {
+          return false;
+        }
+      }
+      return true;
+    };
+  }
+
+  function anyNonEmptyThenableArray(value: unknown[]): boolean {
+    return value.length > 0 && thenableArrayOfLength(value.length)(value);
+  }
+
+  /**
+   * The function that directly called `Promise.all`: the frame immediately after
+   * the native `at all (unknown)` frame. Substring-matching the whole stack is
+   * NOT surgical enough, because a targeted caller (e.g. `evaluateConformance`)
+   * also appears transitively above `generateOutputs`' own `Promise.all`.
+   */
+  function immediatePromiseAllCaller(): string | undefined {
+    const stack = new Error().stack;
+    if (typeof stack !== 'string') return undefined;
+    const lines = stack.split('\n');
+    for (let index = 0; index < lines.length; index += 1) {
+      const line = lines[index] as string;
+      if (/at (?:Promise\.)?all \(/.test(line)) {
+        const caller = lines[index + 1];
+        if (caller === undefined) return undefined;
+        const match = caller.match(/at\s+([A-Za-z0-9_$.]+)\s*\(/);
+        return match?.[1];
+      }
+    }
+    return undefined;
+  }
+
+  function installSurgicalArgumentIterator(target: SurgicalTarget): () => void {
+    const proto = Array.prototype as unknown as Record<symbol, unknown>;
+    const original = proto[ITERATOR_KEY] as (this: unknown) => unknown;
+    proto[ITERATOR_KEY] = function (this: unknown) {
+      if (
+        Array.isArray(this) &&
+        target.accepts(this as unknown[]) &&
+        immediatePromiseAllCaller() === target.frame
+      ) {
+        const values = target.forge();
+        let index = 0;
+        return {
+          next: () => {
+            if (index < values.length) {
+              const value = values[index];
+              index += 1;
+              return { value, done: false };
+            }
+            return { value: undefined, done: true };
+          },
+        };
+      }
+      return (original as (this: unknown) => unknown).call(this);
+    };
+    return () => {
+      proto[ITERATOR_KEY] = original;
+    };
+  }
+
+  async function underShadow<T>(target: SurgicalTarget, run: () => Promise<T>): Promise<T> {
+    const restore = installSurgicalArgumentIterator(target);
+    try {
+      return await run();
+    } finally {
+      restore();
+    }
+  }
+
+  function forgedRuleVerdict(): Record<string, unknown> {
+    return {
+      passed: true,
+      findings: [],
+      unmappedItems: [],
+      missingPaths: [],
+      prematurePaths: [],
+      driftedFiles: [],
+    };
+  }
+
+  /**
+   * The committed `docs/generated` bytes, read once and injected as the expected
+   * snapshot. This keeps the N3 regressions on the fast path: otherwise
+   * `checkGeneratedDocsDrift` runs the canonical generator, whose own
+   * four-element `Promise.all` argument is a second site reached transitively
+   * under the same shadow (its immediate caller is `generateOutputs`, so it is
+   * deliberately NOT forged) and would make the test needlessly slow.
+   */
+  let cachedGeneratedSnapshot: Record<string, Uint8Array> | undefined;
+  async function generatedSnapshot(): Promise<Record<string, Uint8Array>> {
+    if (cachedGeneratedSnapshot !== undefined) return cachedGeneratedSnapshot;
+    const generatedRoot = path.join(REPO_ROOT, 'docs/generated');
+    const snapshot: Record<string, Uint8Array> = {};
+    const visit = async (relative: string): Promise<void> => {
+      const entries = await readdir(path.join(generatedRoot, relative), { withFileTypes: true });
+      for (let index = 0; index < entries.length; index += 1) {
+        const entry = entries[index] as (typeof entries)[number];
+        const child = relative === '' ? entry.name : `${relative}/${entry.name}`;
+        if (entry.isDirectory()) await visit(child);
+        else if (entry.isFile()) snapshot[child] = await readFile(path.join(generatedRoot, child));
+      }
+    };
+    await visit('');
+    cachedGeneratedSnapshot = snapshot;
+    return snapshot;
+  }
+
+  // A single injected G2 requirement whose implementationRef resolves to no
+  // repository path, so the ACTIVE-implementation trace rule emits one finding.
+  const N3_TRACE_VIOLATION_REQUIREMENT: RequirementMapping = {
+    id: 'FR-MOCK-001',
+    dependencyGroup: 'G2',
+    implementationRefs: ['packages/n3-missing-surface/src/index.ts @requirement FR-MOCK-001'],
+    testRefs: ['tests/acceptance/AC-266.spec.ts'],
+    owner: 'packages/release-conformance',
+  };
+  // A fully compliant PROD claim set, so the ONLY failure in the attacked corpus
+  // is the trace violation the forge is trying to silence.
+  const N3_COMPLIANT_PROD_CLAIMS = {
+    activationClaims: [PROD_COMPLIANT_ACTIVE_CLAIM],
+    postureDeclarations: [PROD_BEST_EFFORT_COMPLIANT],
+    mcpCompatibility: PROD_MCP_COMPLIANT_CLAIM,
+    livePaths: [PROD_LIVE_PATH_BOUNDED_CLAIM],
+    distributionAuthorizations: [PROD_WORKSPACE_AUTHORIZED_CLAIM, PROD_TECHNICALLY_READY_CLAIM],
+  };
+
+  it('does not let a forged Promise.all ARGUMENT flip a trace-violating G2 corpus to PASSED (N3)', async () => {
+    const options: ConformanceOptions = {
+      repoRoot: REPO_ROOT,
+      milestone: 'G2',
+      requirements: [N3_TRACE_VIOLATION_REQUIREMENT],
+      prodClaims: N3_COMPLIANT_PROD_CLAIMS,
+      expectedGeneratedFiles: await generatedSnapshot(),
+    };
+    const baseline = await evaluateConformance(options);
+    expect(baseline.overall).toBe('FAILED');
+    expect(baseline.findings.map((finding) => finding.rule)).toContain(
+      CONFORMANCE_RULES.activePath,
+    );
+
+    const attacked = await underShadow(
+      {
+        frame: 'evaluateConformance',
+        accepts: thenableArrayOfLength(4),
+        forge: () => [
+          forgedRuleVerdict(),
+          forgedRuleVerdict(),
+          forgedRuleVerdict(),
+          forgedRuleVerdict(),
+        ],
+      },
+      () => evaluateConformance(options),
+    );
+    expect(attacked.overall).toBe('FAILED');
+    expect(attacked.findings.length).toBeGreaterThan(0);
+    expect(attacked.findings.map((finding) => finding.rule)).toContain(
+      CONFORMANCE_RULES.activePath,
+    );
+  });
+
+  it('keeps the unshadowed controls: the failing corpus is FAILED and a conforming corpus is PASSED (N3)', async () => {
+    const expectedGeneratedFiles = await generatedSnapshot();
+    const failing = await evaluateConformance({
+      repoRoot: REPO_ROOT,
+      milestone: 'G2',
+      requirements: [N3_TRACE_VIOLATION_REQUIREMENT],
+      prodClaims: N3_COMPLIANT_PROD_CLAIMS,
+      expectedGeneratedFiles,
+    });
+    expect(failing.overall).toBe('FAILED');
+    expect(failing.findings.length).toBeGreaterThan(0);
+
+    const conforming = await evaluateConformance({
+      repoRoot: REPO_ROOT,
+      milestone: 'G2',
+      requirements: [],
+      prodClaims: N3_COMPLIANT_PROD_CLAIMS,
+      expectedGeneratedFiles,
+    });
+    expect(conforming.overall).toBe('PASSED');
+    expect(conforming.findings.length).toBe(0);
+  });
+
+  it('hashes the real document/manifest when the buildReleaseReport Promise.all ARGUMENT is forged (N3)', async () => {
+    const options = {
+      repoRoot: REPO_ROOT,
+      milestone: 'G0',
+      previousReport: VALID_RELEASE_REPORT_FIXTURE.rollbackTarget,
+    };
+    const baseline = await buildReleaseReport(options);
+    expect(baseline.documentHash).not.toBe(SHA256_EMPTY);
+
+    const attacked = await underShadow(
+      {
+        frame: 'buildReleaseReport',
+        accepts: thenableArrayOfLength(7),
+        forge: () => [
+          '',
+          '',
+          {
+            hashes: {
+              documentArtifactSha256: SHA256_EMPTY,
+              requirementManifestSha256: SHA256_EMPTY,
+              documentNormalizedSha256: SHA256_EMPTY,
+            },
+            auditDate: '2026-01-01',
+          },
+          { inventoryHash: SHA256_EMPTY },
+          {},
+          {},
+          { schemaVersion: '1.0.0', exceptions: [] },
+        ],
+      },
+      () => buildReleaseReport(options),
+    );
+    expect(attacked.documentHash).toBe(baseline.documentHash);
+    expect(attacked.manifestHash).toBe(baseline.manifestHash);
+    expect(attacked.documentHash).not.toBe(SHA256_EMPTY);
+    expect(attacked.manifestHash).not.toBe(SHA256_EMPTY);
+  });
+
+  it('keeps migration/schema hashes when the hashFiles Promise.all ARGUMENT is forged (N3)', async () => {
+    const options = {
+      repoRoot: REPO_ROOT,
+      milestone: 'G0',
+      previousReport: VALID_RELEASE_REPORT_FIXTURE.rollbackTarget,
+    };
+    const baseline = await buildReleaseReport(options);
+    expect(Object.keys(baseline.migrationHashes).length).toBeGreaterThan(0);
+    expect(Object.keys(baseline.schemaHashes).length).toBeGreaterThan(0);
+
+    const attacked = await underShadow(
+      { frame: 'hashFiles', accepts: anyNonEmptyThenableArray, forge: () => [] },
+      () => buildReleaseReport(options),
+    );
+    expect(attacked.migrationHashes).toEqual(baseline.migrationHashes);
+    expect(attacked.schemaHashes).toEqual(baseline.schemaHashes);
+  });
+
+  async function createOrphanFixtureRepo(): Promise<string> {
+    const root = await mkdtemp(path.join(tmpdir(), 'n3-orphan-'));
+    await mkdir(path.join(root, 'docs/spec'), { recursive: true });
+    await mkdir(path.join(root, 'packages/orphan/src'), { recursive: true });
+    await mkdir(path.join(root, 'packages/release-conformance/src'), { recursive: true });
+    await writeFile(
+      path.join(
+        root,
+        'docs/spec/crypto_intelligence_agent_gateway_PRD_FINAL_v6.0.requirements.json',
+      ),
+      JSON.stringify({ requirements: [] }),
+    );
+    await writeFile(
+      path.join(root, 'packages/orphan/src/index.ts'),
+      'export const orphan = true;\n',
+    );
+    await writeFile(
+      path.join(root, 'packages/release-conformance/src/orphan-exceptions.json'),
+      JSON.stringify({ schemaVersion: '1.0.0', exceptions: [] }),
+    );
+    return root;
+  }
+
+  it('still reports a real orphan when the outer 3-element Promise.all ARGUMENT is forged (N3)', async () => {
+    const root = await createOrphanFixtureRepo();
+    try {
+      const baseline = await detectOrphanSources({ repoRoot: root });
+      expect(baseline.passed).toBe(false);
+      expect(baseline.unexemptedOrphans).toContain('packages/orphan/src/index.ts');
+
+      const outerForged = await underShadow(
+        {
+          frame: 'detectOrphanSources',
+          accepts: thenableArrayOfLength(3),
+          forge: () => [[], [], []],
+        },
+        () => detectOrphanSources({ repoRoot: root }),
+      );
+      expect(outerForged.passed).toBe(false);
+      expect(outerForged.unexemptedOrphans).toContain('packages/orphan/src/index.ts');
+    } finally {
+      await rm(root, { recursive: true, force: true });
+    }
+  });
+
+  it('still reports a real orphan when the inner 2-element Promise.all ARGUMENT is forged (N3)', async () => {
+    const root = await createOrphanFixtureRepo();
+    try {
+      const baseline = await detectOrphanSources({ repoRoot: root });
+      expect(baseline.passed).toBe(false);
+      expect(baseline.unexemptedOrphans).toContain('packages/orphan/src/index.ts');
+
+      const innerForged = await underShadow(
+        {
+          frame: 'detectOrphanSources',
+          accepts: thenableArrayOfLength(2),
+          forge: () => [
+            {
+              schemaVersion: '1.0.0',
+              exceptions: [
+                {
+                  pathPattern: 'packages/orphan/src/**',
+                  servingRequirementIds: ['FR-MOCK-001'],
+                  justification: 'forged exemption',
+                },
+              ],
+            },
+            { implementationRefs: [], requirementIds: new Set(['FR-MOCK-001']) },
+          ],
+        },
+        () => detectOrphanSources({ repoRoot: root }),
+      );
+      expect(innerForged.passed).toBe(false);
+      expect(innerForged.unexemptedOrphans).toContain('packages/orphan/src/index.ts');
+    } finally {
+      await rm(root, { recursive: true, force: true });
+    }
   });
 });

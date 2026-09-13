@@ -43,7 +43,7 @@ cross-artifact convergence.
 
 ## Phase 1 — Foundations: governed-state vocabularies and shared schemas
 
-- [ ] T001 [P] Create `packages/domain/src/prod.ts`: the nine governed
+- [x] T001 [P] Create `packages/domain/src/prod.ts`: the nine governed
       `ModuleLifecycleState`s (IMPLEMENTED, AVAILABLE, SHADOW, PROVEN,
       ACTIVE, DEGRADED, PAUSED, RETIRED, DISABLED) seeded from
       `NOT_IMPLEMENTED`; `OperationalReadiness` (NOT_READY,
@@ -69,10 +69,10 @@ cross-artifact convergence.
       tests are authored by the test-owned task T005 (ownership law:
       implementation lanes carry product work only). Traces: FR-PROD-001,
       FR-PROD-002, FR-PROD-003, FR-PROD-004, FR-PROD-005.
-- [ ] T002 [serial-reason: SHARED_FILE] Extend
+- [x] T002 [serial-reason: SHARED_FILE] Extend
       `packages/domain/src/index.ts` exports for the new `prod` module.
       Traces: FR-PROD-001…006.
-- [ ] T003 [P] Create `packages/shared-schemas/src/prod.ts`: Zod mirrors of
+- [x] T003 [P] Create `packages/shared-schemas/src/prod.ts`: Zod mirrors of
       every T001 vocabulary (compile-linked domain enums, never restated),
       all envelope objects `.strict()`, plus row schemas for the append-only
       scope-exact module state (module id, `artifact_set_hash sha256:<hex>`,
@@ -95,10 +95,10 @@ cross-artifact convergence.
       dimension. Colocated schema tests are authored by T005. Traces:
       FR-PROD-001, FR-PROD-002, FR-PROD-003, FR-PROD-004, FR-PROD-005,
       FR-PROD-006, AC-144, AC-152, AC-153, AC-278, AC-279.
-- [ ] T004 [serial-reason: SHARED_FILE] Extend
+- [x] T004 [serial-reason: SHARED_FILE] Extend
       `packages/shared-schemas/src/index.ts` exports for the new `prod`
       module. Traces: FR-PROD-001…006.
-- [ ] T005 [executor: TEST] [P] Colocated unit tests for T001 pure laws
+- [x] T005 [executor: TEST] [P] Colocated unit tests for T001 pure laws
       (the nine-state lattice with NOT_IMPLEMENTED seeding; operational and
       distribution readiness separation; IMPLEMENTED/AVAILABLE/PROVEN
       independence; ordered activation prerequisites incl. conditional
@@ -112,7 +112,7 @@ cross-artifact convergence.
 
 ## Phase 2 — Persistence: prod schema migrations and registry duty
 
-- [ ] T006 [serial-reason: ORDERED_MIGRATION] Write
+- [x] T006 [serial-reason: ORDERED_MIGRATION] Write
       `migrations/g2_prod_0001_module_registry.sql`: `prod` schema;
       `prod.module_states` (append-only scope-exact rows; no UPDATE path for
       scope/state — supersede via new row); `prod.state_transitions`
@@ -121,7 +121,7 @@ cross-artifact convergence.
       CHECK). All tables live under `prod`, never `public` (ADR-G2PROD-1
       proposal keeps the landed AC-261 `public`-schema probe green).
       Traces: FR-PROD-001, FR-PROD-002, AC-152.
-- [ ] T007 [serial-reason: ORDERED_MIGRATION] Write
+- [x] T007 [serial-reason: ORDERED_MIGRATION] Write
       `migrations/g2_prod_0002_dependency_posture.sql`:
       `prod.containment_events` (action CHECK; `auto_reactivation_allowed`
       pinned false), `prod.rollback_events` (restored immutable artifact-set
@@ -131,13 +131,13 @@ cross-artifact convergence.
       `prod.best_effort_declarations` (CHECK that the declared posture and
       weakened set never intersect `ProtectedDimension`). Traces:
       FR-PROD-003, FR-PROD-004, AC-153, AC-278, AC-279.
-- [ ] T008 [serial-reason: ORDERED_MIGRATION] Write
+- [x] T008 [serial-reason: ORDERED_MIGRATION] Write
       `migrations/g2_prod_0003_mcp_compat.sql`: `prod.mcp_revisions`
       (channel CHECK STABLE/DRAFT; at most one default, and no draft may be
       default), `prod.mcp_target_clients`, `prod.mcp_compatibility_matrix`
       (unique `(revision, client_id)`; result CHECK; fixture + live-test
       date), and `prod.mcp_conformance_runs`. Traces: FR-PROD-005, AC-144.
-- [ ] T009 [serial-reason: ORDERED_MIGRATION] Write
+- [x] T009 [serial-reason: ORDERED_MIGRATION] Write
       `migrations/g2_prod_0004_alpha_boundary.sql`:
       `prod.precomputed_alpha_bounds` (artifact-set hash, candidate/row/edge/
       latency/cost ceilings all non-null and positive, dataset cutoff,
@@ -145,18 +145,18 @@ cross-artifact convergence.
       `prod.artifact_boundary_assertions` (assertion-kind CHECK; references
       `sec.import_artifacts` by id, duplicating no import tables). Additive
       only; no ALTER of foreign families. Traces: FR-PROD-006, AC-279.
-- [ ] T010 [serial-reason: SHARED_FILE] Extend the fail-closed family list
+- [x] T010 [serial-reason: SHARED_FILE] Extend the fail-closed family list
       in `packages/persistence/src/migrator.ts` with `prod`
       (plan-sanctioned scope exception, exact path). Traces: FR-PROD-001.
-- [ ] T011 [serial-reason: SHARED_FILE] Catch the hand-maintained ADR-001
+- [x] T011 [serial-reason: SHARED_FILE] Catch the hand-maintained ADR-001
       Drizzle mirror (`packages/persistence/src/generated/schema.ts`) up to
       the T006–T009 SQL truth (plan-sanctioned scope exception, exact path)
       so the schema-parity gate passes. Traces: FR-PROD-001.
-- [ ] T012 [executor: TEST] [P] Extend the central expected-script registry
+- [x] T012 [executor: TEST] [P] Extend the central expected-script registry
       (`packages/persistence/test/migrator.spec.ts`, exact path —
       plan-sanctioned scope exception) with the four `g2_prod_*` scripts in
       lexicographic order. Traces: FR-PROD-001.
-- [ ] T013 [executor: TEST] [P] PGlite migration-shape tests for the `prod`
+- [x] T013 [executor: TEST] [P] PGlite migration-shape tests for the `prod`
       family: all four scripts apply cleanly on a fresh database; SQL CHECKs
       refuse an in-place module-state mutation, an ACTIVE row without a gate
       evaluation, a draft revision marked default, a precomputed bound without
@@ -167,7 +167,7 @@ cross-artifact convergence.
 
 ## Phase 3 — Capability registry and activation gate
 
-- [ ] T014 [P] Create `packages/capability-registry/src/module-states.ts`:
+- [x] T014 [P] Create `packages/capability-registry/src/module-states.ts`:
       the scope-exact, append-only registry read/write model over
       `prod.module_states`/`prod.state_transitions`; transitions supersede
       via new rows (never UPDATE); `advanceState` refuses a transition that
@@ -176,7 +176,7 @@ cross-artifact convergence.
       the three independent dimensions (implemented/available/proven)
       separately so a deployed-but-unavailable module can exist (AC-152).
       Traces: FR-PROD-001, FR-PROD-002, AC-152.
-- [ ] T015 [P] Create `packages/capability-registry/src/activation-gate.ts`:
+- [x] T015 [P] Create `packages/capability-registry/src/activation-gate.ts`:
       the §69.4/§69.5/§69.9 gate set as one total ordered pure function —
       IMPLEMENTED present, AVAILABLE evidence (data/rights/capability/source
       coverage/pool adapter/cost/capacity/freshness), PROVEN present when the
@@ -193,7 +193,7 @@ cross-artifact convergence.
       statistics, capacity, security, rights, or claims logic. Traces:
       FR-PROD-001, FR-PROD-002, FR-PROD-004, FR-PROD-005, AC-144, AC-150,
       AC-151, AC-152, AC-154, AC-272, AC-273, AC-275, AC-276, AC-277.
-- [ ] T016 [P] Create `packages/capability-registry/src/dependency-groups.ts`:
+- [x] T016 [P] Create `packages/capability-registry/src/dependency-groups.ts`:
       the build/test ordering view over `@foresift/requirement-manifest`
       `dependencyGroups` (G0…G7 DAG, acyclicity via
       `checkDependencyDagAcyclicity`, group status persisted in
@@ -202,7 +202,7 @@ cross-artifact convergence.
       activation; re-uses release-conformance's `DEPENDENCY_GATE_NOT_OPEN`
       premature rule as the enforcement point and refuses to re-derive
       requirement→group mapping (FR-PROD-003). Traces: FR-PROD-003, AC-152.
-- [ ] T017 [P] Create `packages/capability-registry/src/containment.ts`:
+- [x] T017 [P] Create `packages/capability-registry/src/containment.ts`:
       `containForFailedGate` maps a failed critical gate (security, parity,
       leakage, rights, capacity, recovery, calibration, adversarial, claims)
       to DEGRADED/PAUSED/DISABLED on the smallest affected scope, records the
@@ -212,14 +212,14 @@ cross-artifact convergence.
       activation event, preserves all historical decisions, and blocks alert
       resumption until currently actionable candidates are re-evaluated
       (AC-279). Traces: FR-PROD-002, AC-278, AC-279.
-- [ ] T018 [serial-reason: SEMANTIC_DEPENDENCY] Create
+- [x] T018 [serial-reason: SEMANTIC_DEPENDENCY] Create
       `packages/capability-registry/src/index.ts` barrel plus package
       scaffold (`package.json` `@foresift/capability-registry`, tsconfig
       extending the base, `bun test` script, workspace dependencies on
       domain, shared-schemas, persistence, release-conformance,
       capacity-planner, and requirement-manifest) following the G0/G1/G2
       package pattern. Traces: FR-PROD-001.
-- [ ] T019 [executor: TEST] [P] Registry/activation unit tests on PGlite:
+- [x] T019 [executor: TEST] [P] Registry/activation unit tests on PGlite:
       the nine-state lattice and IMPLEMENTED/AVAILABLE/PROVEN independence;
       every activation gate refusal reachable and typed by gate name;
       missing/stale/mismatched-scope input fails closed; draft/immature
@@ -233,7 +233,7 @@ cross-artifact convergence.
 
 ## Phase 4 — SLA / best-effort declaration
 
-- [ ] T020 [P] Create `packages/capability-registry/src/deployment-posture.ts`:
+- [x] T020 [P] Create `packages/capability-registry/src/deployment-posture.ts`:
       the critical-external-dependency register and SLA evaluation over
       `prod.critical_dependencies`/`prod.sla_register`; posture is SLA_BACKED
       only when every critical dependency has an applicable unexpired SLA,
@@ -245,7 +245,7 @@ cross-artifact convergence.
       degrades breadth/depth/opportunity availability only; consumes the
       capacity-planner contract rather than bypassing it (FR-PROD-004).
       Traces: FR-PROD-004, AC-153.
-- [ ] T021 [executor: TEST] [P] Posture unit tests: all-critical-SLA yields
+- [x] T021 [executor: TEST] [P] Posture unit tests: all-critical-SLA yields
       SLA_BACKED; one missing/expired/non-applicable SLA yields an explicit
       FREE_TIER_BEST_EFFORT declaration; a declaration weakening any
       protected dimension is refused at both law and SQL level; a simulated
@@ -255,7 +255,7 @@ cross-artifact convergence.
 
 ## Phase 5 — MCP compatibility matrix
 
-- [ ] T022 [P] Create `packages/capability-registry/src/mcp-compat.ts`: the
+- [x] T022 [P] Create `packages/capability-registry/src/mcp-compat.ts`: the
       §69.7 matrix resolver over `prod.mcp_revisions` /
       `prod.mcp_target_clients` / `prod.mcp_compatibility_matrix`; the
       default is the latest mutually tested stable revision (baseline
@@ -265,7 +265,7 @@ cross-artifact convergence.
       protocol-version follows the declared compatibility policy; consumes
       the existing `McpProtocolGuard` allow-list instead of reimplementing
       transport validation. Traces: FR-PROD-005, AC-144.
-- [ ] T023 [executor: TEST] [P] MCP compatibility unit tests: baseline
+- [x] T023 [executor: TEST] [P] MCP compatibility unit tests: baseline
       stable revision × every supported target client resolves through
       passing cells; a draft revision used as the default, an untested cell,
       and a missing revision outside the declared policy are refused; a
@@ -274,14 +274,14 @@ cross-artifact convergence.
 
 ## Phase 6 — Precomputation and trust boundary
 
-- [ ] T024 [P] Create `packages/capability-registry/src/precomputed-alpha.ts`:
+- [x] T024 [P] Create `packages/capability-registry/src/precomputed-alpha.ts`:
       the bounded live-path contract over `prod.precomputed_alpha_bounds` /
       `prod.live_path_alpha_reads`; serves only versioned precomputed lookups
       with declared candidate/row/edge/latency/cost ceilings and freshness;
       refuses an unbounded, expired, or unknown-artifact request instead of
       truncating it into a different claim; records served/refused per read
       (§33.7). Traces: FR-PROD-006.
-- [ ] T025 [P] Create `packages/capability-registry/src/trust-boundary.ts`:
+- [x] T025 [P] Create `packages/capability-registry/src/trust-boundary.ts`:
       export/import confinement assertions over
       `prod.artifact_boundary_assertions` — heavy Alpha Lab mining,
       cross-fitting, replay, and adversarial sweeps never run on a live path;
@@ -289,7 +289,7 @@ cross-artifact convergence.
       `sec.import_artifacts`; imported artifacts land in VALIDATING/SHADOW and
       never ACTIVE; no live-path request carries provider, import, or
       decryption access (§10.3, §35.14). Traces: FR-PROD-006, AC-279.
-- [ ] T026 [executor: TEST] [P] Precomputation/boundary unit tests: a
+- [x] T026 [executor: TEST] [P] Precomputation/boundary unit tests: a
       bounded fresh lookup is served and a bound-exceeded, expired, or
       unbounded request is refused with a typed reason; a live path that
       references a heavy Alpha Lab job, an artifact import, or a provider
@@ -298,7 +298,7 @@ cross-artifact convergence.
 
 ## Phase 7 — Release-conformance rules, generated surfaces, telemetry
 
-- [ ] T027 [P] Create `packages/release-conformance/src/prod-rules.ts`: the
+- [x] T027 [P] Create `packages/release-conformance/src/prod-rules.ts`: the
       PROD-facing rules layered over the existing `CONFORMANCE_RULES`
       (`NORMATIVE_MAPPING_COMPLETE`, `ACTIVE_IMPLEMENTATION_PATH_EXISTS`,
       `DEPENDENCY_GATE_NOT_OPEN`, `GENERATED_DOCUMENT_DRIFT` retained
@@ -310,15 +310,15 @@ cross-artifact convergence.
       Traces: FR-PROD-001, FR-PROD-002, FR-PROD-003, FR-PROD-004,
       FR-PROD-005, FR-PROD-006, AC-144, AC-152, AC-272, AC-273, AC-275,
       AC-276, AC-277, AC-278, AC-279.
-- [ ] T028 [serial-reason: SHARED_FILE] Extend the
+- [x] T028 [serial-reason: SHARED_FILE] Extend the
       `packages/release-conformance/src/index.ts` barrel with the prod rules
       so the package's public surface exposes them. Traces: FR-PROD-001.
-- [ ] T029 [serial-reason: SHARED_FILE] Reconcile
+- [x] T029 [serial-reason: SHARED_FILE] Reconcile
       `docs/generated/prod-surfaces.json` with the new implementation paths
       introduced by T014–T027 (plan-sanctioned scope exception, exact path;
       milestone plan-level decision 2) so the generated-docs drift rule
       passes without editing `docs/spec/**`. Traces: FR-PROD-001.
-- [ ] T030 [P] Create `telemetry/prod.catalog.json`: the declarative event
+- [x] T030 [P] Create `telemetry/prod.catalog.json`: the declarative event
       and metric catalog mirroring `packages/shared-schemas/src/prod.ts`
       exactly (module state transition per dimension; activation gate
       passed/refused per gate kind; containment/rollback; posture declared and
@@ -327,11 +327,11 @@ cross-artifact convergence.
       pass/fail), with per-event requirement refs and the critical-metadata
       recovery tier. Traces: FR-PROD-001, FR-PROD-002, FR-PROD-003,
       FR-PROD-004, FR-PROD-005, FR-PROD-006.
-- [ ] T031 [executor: TEST] [serial-reason: SHARED_FILE] Extend the central
+- [x] T031 [executor: TEST] [serial-reason: SHARED_FILE] Extend the central
       telemetry parity suite (`tests/telemetry-catalog.spec.ts`, exact path —
       plan-sanctioned scope exception) with the `prod` catalog.
       Traces: FR-PROD-001.
-- [ ] T032 [executor: TEST] [P] Release-conformance prod-rule tests: each new
+- [x] T032 [executor: TEST] [P] Release-conformance prod-rule tests: each new
       rule detects its violation (active module without a passing gate,
       best-effort declaration weakening a protected dimension, default draft
       revision or stale matrix cell, live path reaching a heavy job/import,
@@ -343,7 +343,7 @@ cross-artifact convergence.
 
 ## Phase 8 — Fixtures and acceptance suites
 
-- [ ] T033 [executor: TEST] [P] Create `tests/fixtures/prod/`: canonical
+- [x] T033 [executor: TEST] [P] Create `tests/fixtures/prod/`: canonical
       module-state rows for every governed state and readiness dimension,
       full activation-gate pass/fail matrices (including conditional PROVEN
       and scope mismatch), dependency-group DAG fixtures, SLA register and
@@ -352,13 +352,13 @@ cross-artifact convergence.
       boundary-assertion fixtures (bounded, unbounded, import-referencing),
       and containment/rollback fixtures. Traces: FR-PROD-001, FR-PROD-002,
       FR-PROD-003, FR-PROD-004, FR-PROD-005, FR-PROD-006.
-- [ ] T034 [executor: TEST] [P] Author the prod-scoped additions to
+- [x] T034 [executor: TEST] [P] Author the prod-scoped additions to
       `tests/acceptance/AC-144.spec.ts` +
       `tests/negative/AC-144.negative.spec.ts`: default stable revision
       `2025-11-25` passes for every supported target client / draft revision
       as default, untested cell, and missing revision outside policy are
       refused. Traces: FR-PROD-005, AC-144.
-- [ ] T035 [executor: TEST] [P] Author the prod-scoped additions to the
+- [x] T035 [executor: TEST] [P] Author the prod-scoped additions to the
       AC-150/AC-151/AC-154 positive and negative suites: registered
       permutation/feature-time-shift/synthetic-null/delayed-provider controls
       and clustered-interval evidence gate PROVEN/ACTIVE / unexplained lift
@@ -366,7 +366,7 @@ cross-artifact convergence.
       disabled before mature calibration, cannot override hard gates, and
       auto-degrades on drift. Traces: FR-PROD-001, FR-PROD-002, AC-150,
       AC-151, AC-154.
-- [ ] T036 [executor: TEST] [P] Author the prod-scoped additions to the
+- [x] T036 [executor: TEST] [P] Author the prod-scoped additions to the
       AC-152/AC-153 positive and negative suites: a deployed IMPLEMENTED or
       shadow-only module cannot support alert claims and promotion reaches
       ACTIVE only with AVAILABLE (and PROVEN when specified) / ACTIVE from
@@ -375,7 +375,7 @@ cross-artifact convergence.
       duplicate prevention, and critical risk monitoring / weakening any
       protected dimension is refused. Traces: FR-PROD-001, FR-PROD-002,
       FR-PROD-004, AC-152, AC-153.
-- [ ] T037 [executor: TEST] [P] Author the prod-scoped additions to the
+- [x] T037 [executor: TEST] [P] Author the prod-scoped additions to the
       AC-272/AC-273/AC-275/AC-276/AC-277 positive and negative suites:
       workspace/public authorization requires the full evidence set for the
       exact release and a rights change contains the affected scope while
@@ -383,7 +383,7 @@ cross-artifact convergence.
       stays unauthorized; isolation, claims-language, and public-redaction
       gate evidence is mandatory. Traces: FR-PROD-002, FR-PROD-004,
       AC-272, AC-273, AC-275, AC-276, AC-277.
-- [ ] T038 [executor: TEST] [P] Author the prod-scoped additions to the
+- [x] T038 [executor: TEST] [P] Author the prod-scoped additions to the
       AC-274/AC-278/AC-279 positive and negative suites: high-impact
       activation/rollback/import actions require fresh phishing-resistant
       step-up, exact authorization, CSRF, idempotency key, reason, and audit
@@ -396,7 +396,7 @@ cross-artifact convergence.
 
 ## Phase 9 — Convergence
 
-- [ ] T039 [serial-reason: COORDINATOR_BOUNDARY] Run cross-artifact
+- [x] T039 [serial-reason: COORDINATOR_BOUNDARY] Run cross-artifact
       consistency analysis per the speckit-analyze methodology across
       spec.md, plan.md, and tasks.md (requirement coverage of all six
       FR-PROD IDs and all fourteen ACs; no out-of-scope requirement tracing;

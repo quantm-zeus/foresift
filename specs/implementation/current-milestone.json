@@ -104,7 +104,7 @@
         "FR-PROD-006"
       ],
       "risk": "HIGH",
-      "status": "RUNNING",
+      "status": "PROVEN",
       "verificationCommands": [
         "test -d packages/release-conformance && pnpm --filter @foresift/release-conformance test",
         "test -d packages/capability-registry && pnpm --filter @foresift/capability-registry test",

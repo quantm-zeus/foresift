@@ -49,3 +49,48 @@ direct negative regression that fails against the pre-correction revision;
 **new**, fresh-context independent convergence audit reports no CRITICAL/HIGH
 finding. Admin-control and recovery-continuity promotion stays frozen until
 then.
+
+## Adversarial review rounds (fresh context, read-only, exploits attempted)
+
+1. Round 1 (two independent reviewers, `0f46560`) found and this correction
+   then closed: the OPERATIONAL kind skipped a scope-declared `requires_proven`
+   precondition (`requiredGatesForActivation` + the SQL trigger + an explicit
+   `advanceState` dimension check); `provenEvidenceRef` was an unverified content
+   address (now resolved against a persisted, complete, unexpired OPPORTUNITY
+   batch plus its activation event); `checkMcpCompatibilityDrift` honoured a
+   caller `maxAgeSeconds` (now clamped); `null` mandatory inputs slipped the
+   fail-closed check (now refused); `rollbackToApproved` admitted a forged
+   `DEGRADED`/`PAUSED` row (now requires a genuine `ACTIVE` row); an expired or
+   law-violating capacity contract backed `SLA_BACKED` (now validated with the
+   authoritative capacity law); `upsertDependencyGroupStatus` had an injectable
+   `orderView` (removed); and the deterministic release CLI never ran the PROD
+   rules (now runs the repo-backed surface rule scoped to the active milestone
+   plus, with `--prod-claims`, the five claim rules, and
+   `--require-prod-claims` fails closed on omission).
+2. Round 2 (`1aaae66` / `42a4be9`) re-verified every round-1 item and closed the
+   remaining malformed-input bypass (`Array.isArray` shape checks), advertised
+   only the rules an invocation can emit and made the
+   `TRACEABILITY_FULL_CONVERGENCE` profile pass `--require-prod-claims`, added a
+   bridge timeout, and added the SQL-level `requires_proven` → persisted PROVEN
+   row check.
+
+## Accepted residual MEDIUMs (recorded, not silently dropped)
+
+- The evidence trust boundary is unchanged and documented: the gate consumes
+  caller-supplied statistical verdicts, so a caller with evaluator access can
+  mint the OPPORTUNITY batch that a PROVEN promotion then resolves. What the
+  correction guarantees is that PROVEN/ACTIVE can never rest on a fabricated
+  _reference_ or on unpersisted evidence.
+- Evaluation rows are keyed by `scope_hash` only; two modules sharing the exact
+  §69.5 scope JSON share evidence. Binding module/artifact into the evidence key
+  is a schema change deferred to the next bounded slice (D013).
+- A wholly-new migration family is trusted to own a new namespace; the migrator
+  cannot verify that statically (D008).
+- `clearContainment` step-up/actor/reason + ActionGate, SQL/Drizzle parity for
+  defaults/constraints/indexes/triggers, two-way telemetry parity, and the
+  AC-150/151/153 fixture-echo positives remain open (D013).
+- The CLI's claim rules need an explicit `--prod-claims` artifact: runtime
+  governance state is not derivable from the repository, so the file-based CLI
+  cannot synthesise it. The authoritative prod-capable gate is
+  `evaluateConformance`, which CI exercises with violating and compliant claim
+  corpora.

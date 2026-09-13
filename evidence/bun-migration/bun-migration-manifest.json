@@ -1,18 +1,18 @@
 {
   "schema": "foresift/bun-migration-manifest@1",
   "migrationId": "bun-test-authority-v1",
-  "generatedAt": "2026-09-13T19:16:11.451Z",
+  "generatedAt": "2026-09-13T20:04:53.426Z",
   "root": ".",
-  "totalTestFiles": 606,
+  "totalTestFiles": 607,
   "counts": {
     "CODEMOD_READY": 0,
     "AGY_REQUIRED": 0,
-    "MIGRATED": 606,
+    "MIGRATED": 607,
     "VERIFIED": 0,
     "BLOCKED": 0
   },
   "parity": {
-    "previousTotal": 602,
+    "previousTotal": 606,
     "disappeared": []
   },
   "files": [
@@ -120,6 +120,32 @@
       "migrationType": "ALREADY_MIGRATED",
       "fixturesAndHelpers": ["../../../../../tests/acceptance/helpers.ts"],
       "sourceAnchors": ["@foresift/persistence", "../../../../../tests/acceptance/helpers.ts"],
+      "state": "MIGRATED"
+    },
+    {
+      "path": "apps/api/src/routes/admin/overview.spec.ts",
+      "package": "root",
+      "bytes": 39790,
+      "lines": 1018,
+      "sha256": "f064c385a23ba86582b8a97bfa86229329a420f51039bf2b9dc51034efbfa97f",
+      "imports": [
+        "bun:test",
+        "@foresift/shared-schemas",
+        "../../../../../tests/acceptance/helpers.ts",
+        "./overview-sources.ts",
+        "./overview.ts"
+      ],
+      "vitestImports": [],
+      "features": [],
+      "workload": "DATABASE_PGLITE",
+      "migrationType": "ALREADY_MIGRATED",
+      "fixturesAndHelpers": ["../../../../../tests/acceptance/helpers.ts"],
+      "sourceAnchors": [
+        "@foresift/shared-schemas",
+        "../../../../../tests/acceptance/helpers.ts",
+        "./overview-sources.ts",
+        "./overview.ts"
+      ],
       "state": "MIGRATED"
     },
     {

@@ -1,7 +1,7 @@
 {
   "schema": "foresift/bun-migration-manifest@1",
   "migrationId": "bun-test-authority-v1",
-  "generatedAt": "2026-09-13T13:52:53.912Z",
+  "generatedAt": "2026-09-13T14:57:10.704Z",
   "root": ".",
   "totalTestFiles": 602,
   "counts": {
@@ -500,9 +500,9 @@
     {
       "path": "packages/capability-registry/test/registry.spec.ts",
       "package": "@foresift/capability-registry",
-      "bytes": 87255,
-      "lines": 2141,
-      "sha256": "8cb5a2e6e0283e672b7684e852be56cf7fc05fcd876877551d108bf1a80cf244",
+      "bytes": 90694,
+      "lines": 2206,
+      "sha256": "97066a14942cae91eb5413dd0177d0a37257190c467cfeab64ed384d4da8e437",
       "imports": [
         "bun:test",
         "@electric-sql/pglite",
@@ -3676,9 +3676,9 @@
     {
       "path": "packages/release-conformance/test/prod-rules.spec.ts",
       "package": "@foresift/release-conformance",
-      "bytes": 35886,
-      "lines": 905,
-      "sha256": "159d3c263861c88837b9746df4b1df223a09b4c92cc03fd93bfea4b2eb78e684",
+      "bytes": 37547,
+      "lines": 939,
+      "sha256": "18bd58eac198b278fee5164a5032f42fc609554a03ece16a26dc663ae999b850",
       "imports": [
         "bun:test",
         "node:fs/promises",

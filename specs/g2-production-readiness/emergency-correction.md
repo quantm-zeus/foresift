@@ -150,3 +150,38 @@ exploit regression that fails against the pre-correction revision; a **new**
 fresh-context convergence audit reports no CRITICAL/HIGH finding; the full
 prescribed gates and exact-SHA CI are green. Admin-control and
 recovery-continuity promotion stays frozen until then.
+
+### Convergence-audit follow-ups (T063/T064) and accepted residual
+
+The new convergence audit reproduced two further defects that all earlier
+rounds missed, and both are corrected here:
+
+- **T063 — §69.9 distribution activation was inoperable.** The `g2_prod_0006`
+  evidence trigger appended the distribution gate with
+  `required_gates || 'DISTRIBUTION_EVIDENCE'`; PostgreSQL resolves
+  `text[] || unknown` as `anyarray || anyarray`, so every ACTIVE insert with
+  `activation_kind` WORKSPACE/PUBLIC aborted with
+  `ERROR: malformed array literal: "DISTRIBUTION_EVIDENCE"`. Since `0006` is
+  already applied on canonical `main`, the corrected trigger function lands as
+  the later-sorting `migrations/g2_prod_0009_fix_distribution_gate_set.sql`
+  (`array_append`), and a new regression persists a genuine WORKSPACE **and**
+  PUBLIC ACTIVE — a path no earlier test exercised.
+- **T064 — prod telemetry catalog drift.** The C1 correction added `scopeHash`
+  and `activationKind` to `ModuleStateRowSchema` and `activationEventRef`/
+  `activationKind` to `ActivationGateEvaluationRowSchema`, but
+  `telemetry/prod.catalog.json` was never updated and the parity suite checked
+  only catalog ⊆ schema. The five affected events now carry the fields and the
+  prod parity assertion is two-way (set equality), so a future schema field
+  cannot be silently absent from the CRITICAL_METADATA recovery contract.
+
+**Accepted residual (not silently dropped).** A raw SQL writer can insert a
+`PROVEN` `prod.module_states` row directly (no trigger guards the PROVEN
+transition; only ACTIVE is guarded), and can also insert the forged
+`activation_gate_evaluations` PASS rows that the ACTIVE trigger requires. The
+governed `advanceState` path refuses this — a PROVEN promotion requires a
+persisted OPPORTUNITY batch, and ACTIVE requires the exact kind-bound evidence
+— so the residual is the same raw-writer evidence-fabrication trust boundary
+that C1 already records (D013/D014): a writer who can INSERT evaluation rows
+can fabricate any activation. Binding PROVEN at SQL would raise the bar but not
+close it (the batch rows are equally insertable), so it is recorded rather than
+claimed as closed.

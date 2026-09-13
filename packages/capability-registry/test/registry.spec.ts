@@ -1807,4 +1807,64 @@ describe('ACTIVE is bound to persisted gate evidence (F1)', () => {
     const rows = await stateRowsFor(engine, { moduleId, scope });
     expect(rows.some((row) => row.lifecycleState === 'ACTIVE')).toBe(false);
   }, 120_000);
+
+  it('persists a genuine WORKSPACE and PUBLIC ACTIVE activation (distribution gate set, 0009)', async () => {
+    // Regression for the g2_prod_0006 `text[] || 'literal'` bug that made every
+    // WORKSPACE/PUBLIC ACTIVE insert abort with "malformed array literal". No
+    // earlier test ever persisted a distribution activation.
+    const cases = [
+      {
+        tag: 'workspace',
+        kind: ActivationKind.WORKSPACE,
+        readiness: 'WORKSPACE_AUTHORIZED' as const,
+      },
+      { tag: 'public', kind: ActivationKind.PUBLIC, readiness: 'PUBLIC_AUTHORIZED' as const },
+    ];
+    for (const { tag, kind, readiness } of cases) {
+      const scope = makeScope({
+        profile_version: `distribution-${tag}`,
+        requires_proven: false,
+      });
+      const moduleId = `module-distribution-${tag}`;
+      await advance(moduleId, scope, 'IMPLEMENTED', `${tag}-1`);
+      await advance(moduleId, scope, 'AVAILABLE', `${tag}-2`);
+      await advance(moduleId, scope, 'SHADOW', `${tag}-3`);
+      await advance(moduleId, scope, 'PROVEN', `${tag}-4`);
+
+      const base = passingWorkspaceInput(scope);
+      const gate = evaluateActivationGate({
+        ...base,
+        kind,
+        distributionEvidence:
+          base.distributionEvidence === null
+            ? null
+            : { ...base.distributionEvidence, distributionReadiness: readiness },
+        activationEventRef: `activation-distribution-${tag}`,
+      });
+      expect(gate.verdict).toBe('PASS');
+      if (gate.verdict !== 'PASS') throw new Error('unreachable');
+      const recorded = await recordActivationGateResult(engine, gate);
+
+      const { state } = await advanceState(engine, {
+        moduleId,
+        scope,
+        artifactSetHash: HASH_A,
+        toState: 'ACTIVE',
+        operationalReadiness: 'READY_FOR_ACTIVE_PROFILE',
+        distributionReadiness: readiness,
+        changeClassification: 'MATERIAL_OPERATIONAL',
+        reason: `distribution ${tag} activation`,
+        actorRef: 'test-actor',
+        at: NOW,
+        gateResult: recorded,
+        stateRowId: `${tag}-5`,
+        transitionId: `${tag}-5-t`,
+      });
+      expect(state.lifecycleState).toBe('ACTIVE');
+      expect(state.activationKind).toBe(kind);
+      expect(state.distributionReadiness).toBe(readiness);
+      const rows = await stateRowsFor(engine, { moduleId, scope });
+      expect(rows.some((row) => row.lifecycleState === 'ACTIVE')).toBe(true);
+    }
+  }, 120_000);
 });

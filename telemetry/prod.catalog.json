@@ -24,10 +24,12 @@
         { "name": "moduleId", "type": "string", "required": true },
         { "name": "artifactSetHash", "type": "string", "required": true },
         { "name": "scope", "type": "object", "required": true },
+        { "name": "scopeHash", "type": "string|null", "required": true },
         { "name": "lifecycleState", "type": "string", "required": true },
         { "name": "operationalReadiness", "type": "string", "required": true },
         { "name": "distributionReadiness", "type": "string", "required": true },
         { "name": "activationEventRef", "type": "string|null", "required": true },
+        { "name": "activationKind", "type": "string|null", "required": true },
         { "name": "supersededBy", "type": "string|null", "required": true },
         { "name": "createdAt", "type": "string", "required": true }
       ]
@@ -43,10 +45,12 @@
         { "name": "moduleId", "type": "string", "required": true },
         { "name": "artifactSetHash", "type": "string", "required": true },
         { "name": "scope", "type": "object", "required": true },
+        { "name": "scopeHash", "type": "string|null", "required": true },
         { "name": "lifecycleState", "type": "string", "required": true },
         { "name": "operationalReadiness", "type": "string", "required": true },
         { "name": "distributionReadiness", "type": "string", "required": true },
         { "name": "activationEventRef", "type": "string|null", "required": true },
+        { "name": "activationKind", "type": "string|null", "required": true },
         { "name": "supersededBy", "type": "string|null", "required": true },
         { "name": "createdAt", "type": "string", "required": true }
       ]
@@ -62,10 +66,12 @@
         { "name": "moduleId", "type": "string", "required": true },
         { "name": "artifactSetHash", "type": "string", "required": true },
         { "name": "scope", "type": "object", "required": true },
+        { "name": "scopeHash", "type": "string|null", "required": true },
         { "name": "lifecycleState", "type": "string", "required": true },
         { "name": "operationalReadiness", "type": "string", "required": true },
         { "name": "distributionReadiness", "type": "string", "required": true },
         { "name": "activationEventRef", "type": "string|null", "required": true },
+        { "name": "activationKind", "type": "string|null", "required": true },
         { "name": "supersededBy", "type": "string|null", "required": true },
         { "name": "createdAt", "type": "string", "required": true }
       ]
@@ -114,6 +120,8 @@
         { "name": "failingGate", "type": "string|null", "required": true },
         { "name": "evidenceRefs", "type": "array", "required": true },
         { "name": "capacityContractRef", "type": "string|null", "required": true },
+        { "name": "activationEventRef", "type": "string|null", "required": true },
+        { "name": "activationKind", "type": "string", "required": true },
         { "name": "evaluatedAt", "type": "string", "required": true },
         { "name": "expiresAt", "type": "string", "required": true }
       ]
@@ -144,6 +152,8 @@
         { "name": "failingGate", "type": "string|null", "required": true },
         { "name": "evidenceRefs", "type": "array", "required": true },
         { "name": "capacityContractRef", "type": "string|null", "required": true },
+        { "name": "activationEventRef", "type": "string|null", "required": true },
+        { "name": "activationKind", "type": "string", "required": true },
         { "name": "evaluatedAt", "type": "string", "required": true },
         { "name": "expiresAt", "type": "string", "required": true }
       ]

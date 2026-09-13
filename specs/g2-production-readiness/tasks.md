@@ -13,7 +13,7 @@
 > is a string, so foreign-release evidence was accepted. The package is
 > **RUNNING / REOPENED**; no history or evidence is deleted (`8f7b5d9` is an
 > additive flip and this reopen is additive again). Phase 11 adds the bounded
-> correction tasks `T053`–`T061`. PROVEN may only be restored after the new
+> correction tasks `T053`–`T064`. PROVEN may only be restored after the new
 > exploit regressions and the full prescribed gates pass, a **new**
 > fresh-context independent convergence audit reports no CRITICAL/HIGH
 > finding, and exact-SHA CI is green. Admin-control and recovery-continuity
@@ -583,11 +583,28 @@ third-round finding-to-task map and the verbatim reproductions.
       be a non-empty string. Negative: shadowed `filter`/`includes`, a boxed
       milestone, and an empty `releaseRef` must all refuse. Traces:
       FR-PROD-001, FR-PROD-002.
+- [x] T063 [serial-reason: ORDERED_MIGRATION] Fix the §69.9 distribution gate
+      set in the evidence trigger: `g2_prod_0006` wrote
+      `required_gates || 'DISTRIBUTION_EVIDENCE'`, which PostgreSQL resolves as
+      `anyarray || anyarray` and aborts every WORKSPACE/PUBLIC ACTIVE insert
+      with `malformed array literal`. `g2_prod_0006` is already applied, so the
+      corrected function body lands as a new later-sorting
+      `g2_prod_0009_fix_distribution_gate_set.sql` using `array_append`.
+      Positive regression: a genuine WORKSPACE and PUBLIC activation now
+      persists ACTIVE (previously untested). Closes the open convergence HIGH.
+      Traces: FR-PROD-002, AC-272, AC-273.
+- [x] T064 [serial-reason: SHARED_FILE] Restore telemetry parity: the C1
+      correction added `scopeHash`/`activationKind`/`activationEventRef` to the
+      prod row schemas, but `telemetry/prod.catalog.json` was never updated and
+      the parity suite only checked catalog ⊆ schema. Add the missing fields and
+      make the prod parity assertion two-way (set equality), so a future schema
+      field cannot be silently absent from the CRITICAL_METADATA catalog.
+      Traces: FR-PROD-001, FR-PROD-002.
 - [ ] T060 [serial-reason: COORDINATOR_BOUNDARY] Fresh-context adversarial
       re-review of the third-round diff, direct exploit replay (nested
       mutation, omitted/empty activation event, substring scopeRefs,
-      backdated refusal, cross-generation gap), full prescribed gates and
-      exact-SHA CI. Traces: FR-PROD-001…006.
+      backdated refusal, cross-generation gap, distribution activation),
+      full prescribed gates and exact-SHA CI. Traces: FR-PROD-001…006.
 - [ ] T061 [serial-reason: COORDINATOR_BOUNDARY] New independent convergence
       audit at the pre-merge head; restore PROVEN only when it reports no
       CRITICAL/HIGH finding and the tracked residual MEDIUMs are recorded.

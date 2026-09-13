@@ -23,8 +23,19 @@ import {
   type DatabaseEngine,
 } from '@foresift/persistence';
 import {
+  ALL_CALIBRATION_MATURITIES,
+  ALL_CRITICAL_DEPENDENCY_KINDS,
+  ALL_CRITICAL_GATE_KINDS,
+  ALL_DEPENDENCY_GROUP_STATUSES,
+  ALL_MCP_COMPATIBILITY_POLICIES,
+  ALL_NEGATIVE_CONTROL_KINDS,
+  ALL_PRECOMPUTED_ALPHA_REFUSAL_REASONS,
   ActivationGateRefusalReason,
   ActivationKind,
+  CLUSTERED_INTERVAL_METHODS,
+  ESTABLISHES_AVAILABLE,
+  ESTABLISHES_PROVEN,
+  IMPORT_SHADOW_STATES,
   ModuleStateRefusalReason,
   NegativeControlKind,
   activationEvidenceSetRef,
@@ -2238,4 +2249,479 @@ describe('PROVEN requires a genuinely established AVAILABLE (R5)', () => {
     });
     expect((await statesFor(engine, { moduleId, scope })).lifecycleState).toBe('ACTIVE');
   }, 120_000);
+});
+
+// --- HIGH: fail-closed decisions under a globally shadowed Array.prototype ----
+
+/**
+ * Audit HIGH (demonstrated at 5486938). An in-process caller shares this realm,
+ * so it can globally replace an `Array.prototype` iteration/mutation primitive
+ * just before a guard runs. Pre-fix:
+ *   - an EMPTY `Symbol.iterator` made `new Set<ActivationGateKind>(required)`
+ *     iterate nothing, so every required gate degraded to NOT_APPLICABLE and a
+ *     passing input with a required gate stripped read as `PASS`;
+ *   - `rows.some((row) => ESTABLISHES_AVAILABLE.includes(...))` and a shadowed
+ *     `includes`/`some` flipped a SHADOW row to `available`/`proven`;
+ *   - `arr.push` no-ops silently dropped findings/failures and flipped a
+ *     FAILED aggregation to a vacuous PASS.
+ *
+ * Every shadow is installed ONLY around the call under test and always
+ * restored in a `finally`. `shadowIsolatedEngine` restores the prototype for the
+ * duration of each PGlite `exec`/`query`/transaction so the driver's own
+ * internals keep working while the guard's decision code still runs under the
+ * shadow (the driver is not part of the guard's authority; corrupting it would
+ * only make the test fail for the wrong reason).
+ */
+describe('HIGH: guards stay fail-closed under globally shadowed Array.prototype', () => {
+  interface ShadowCase {
+    readonly name: string;
+    readonly install: () => void;
+    readonly restore: () => void;
+  }
+
+  const FORGED_AUTHORITY_ENTRY = 'FORGED_AUTHORITY_ENTRY';
+
+  function buildShadowCases(): readonly ShadowCase[] {
+    const proto = Array.prototype as unknown as Record<string, unknown> & Record<symbol, unknown>;
+    const iteratorKey = Symbol.iterator;
+    const originalIterator = proto[iteratorKey];
+    const cases: ShadowCase[] = [];
+    cases[cases.length] = {
+      name: 'Array.prototype[Symbol.iterator] = function* () {} (EMPTY)',
+      install: () => {
+        proto[iteratorKey] = function* () {};
+      },
+      restore: () => {
+        proto[iteratorKey] = originalIterator;
+      },
+    };
+    cases[cases.length] = {
+      name: `Array.prototype[Symbol.iterator] = function* () { yield '${FORGED_AUTHORITY_ENTRY}' } (FABRICATING)`,
+      install: () => {
+        proto[iteratorKey] = function* () {
+          yield FORGED_AUTHORITY_ENTRY;
+        };
+      },
+      restore: () => {
+        proto[iteratorKey] = originalIterator;
+      },
+    };
+    const methodReplacements: readonly (readonly [string, unknown])[] = [
+      ['includes', () => true],
+      ['map', () => []],
+      ['filter', () => []],
+      ['some', () => true],
+      ['find', () => undefined],
+      ['forEach', () => undefined],
+      ['push', () => 0],
+      ['shift', () => undefined],
+      ['splice', () => []],
+    ];
+    for (let index = 0; index < methodReplacements.length; index += 1) {
+      const entry = methodReplacements[index] as readonly [string, unknown];
+      const methodName = entry[0] as string;
+      const replacement = entry[1];
+      const original = proto[methodName];
+      cases[cases.length] = {
+        name: `Array.prototype.${methodName} shadowed`,
+        install: () => {
+          proto[methodName] = replacement;
+        },
+        restore: () => {
+          proto[methodName] = original;
+        },
+      };
+    }
+    return cases;
+  }
+
+  const SHADOW_CASES = buildShadowCases();
+
+  function withShadow<T>(
+    shadowCase: ShadowCase,
+    run: () => T,
+  ): { readonly value: T } | { readonly error: string } {
+    shadowCase.install();
+    try {
+      return { value: run() };
+    } catch (error) {
+      return { error: error instanceof Error ? error.message : String(error) };
+    } finally {
+      shadowCase.restore();
+    }
+  }
+
+  function shadowIsolatedEngine(shadowCase: ShadowCase, base: DatabaseEngine): DatabaseEngine {
+    const wrap = (inner: DatabaseEngine): DatabaseEngine => ({
+      engineKind: inner.engineKind,
+      exec: async (sql: string) => {
+        shadowCase.restore();
+        try {
+          return await inner.exec(sql);
+        } finally {
+          shadowCase.install();
+        }
+      },
+      query: async <T = Record<string, unknown>>(sql: string, params?: readonly unknown[]) => {
+        shadowCase.restore();
+        try {
+          return await inner.query<T>(sql, params);
+        } finally {
+          shadowCase.install();
+        }
+      },
+      transaction: async <T>(work: (tx: DatabaseEngine) => Promise<T>) => {
+        shadowCase.restore();
+        try {
+          return await inner.transaction(async (tx) => {
+            try {
+              shadowCase.install();
+              return await work(wrap(tx));
+            } finally {
+              shadowCase.restore();
+            }
+          });
+        } finally {
+          shadowCase.install();
+        }
+      },
+    });
+    return wrap(base);
+  }
+
+  interface AdvanceOnOptions {
+    readonly gateResult?: ActivationGateResult | null;
+    readonly provenEvidenceRef?: string;
+    readonly provenEvidenceEventRef?: string;
+  }
+
+  async function advanceOn(
+    targetEngine: DatabaseEngine,
+    moduleId: string,
+    scope: ModuleStateScope,
+    toState: 'IMPLEMENTED' | 'AVAILABLE' | 'SHADOW' | 'PROVEN' | 'ACTIVE',
+    stateRowId: string,
+    options: AdvanceOnOptions = {},
+  ) {
+    return advanceState(targetEngine, {
+      moduleId,
+      scope,
+      artifactSetHash: HASH_A,
+      toState,
+      operationalReadiness: 'READY_FOR_ACTIVE_PROFILE',
+      distributionReadiness: 'PRIVATE_ONLY',
+      changeClassification: 'MATERIAL_OPERATIONAL',
+      reason: `shadow regression advance to ${toState}`,
+      actorRef: 'test-actor',
+      at: NOW,
+      gateResult: options.gateResult ?? null,
+      ...(options.provenEvidenceRef === undefined
+        ? {}
+        : {
+            provenEvidenceRef: options.provenEvidenceRef,
+            provenEvidenceEventRef: options.provenEvidenceEventRef ?? '',
+          }),
+      stateRowId,
+      transitionId: `${stateRowId}-t`,
+    });
+  }
+
+  it('evaluateActivationGate refuses a stripped required gate under every shadow, and still passes the control', () => {
+    const failures: string[] = [];
+    const scope = makeScope({ profile_version: 'shadow-gate' });
+    for (let index = 0; index < SHADOW_CASES.length; index += 1) {
+      const shadowCase = SHADOW_CASES[index] as ShadowCase;
+      const outcome = withShadow(shadowCase, () => {
+        const passing = passingOpportunityInput(scope);
+        const control = evaluateActivationGate(passing);
+        const stripped = evaluateActivationGate({ ...passing, capacityContract: null });
+        return { control, stripped };
+      });
+      if ('error' in outcome) {
+        failures[failures.length] = `${shadowCase.name}: threw ${outcome.error}`;
+        continue;
+      }
+      const control = outcome.value.control;
+      const stripped = outcome.value.stripped;
+      if (control.verdict !== 'PASS') {
+        failures[failures.length] =
+          `${shadowCase.name}: control ${control.verdict}` +
+          (control.verdict === 'REFUSE'
+            ? ` (${String(control.failingGate)}/${String(control.reason)})`
+            : '');
+      }
+      if (stripped.verdict !== 'REFUSE') {
+        failures[failures.length] =
+          `${shadowCase.name}: stripped gate returned ${stripped.verdict} (fail-open)`;
+      } else if (stripped.failingGate !== 'CAPACITY_CONTRACT') {
+        failures[failures.length] =
+          `${shadowCase.name}: stripped failingGate ${String(stripped.failingGate)}`;
+      }
+    }
+    expect(failures).toEqual([]);
+  }, 120_000);
+
+  it('statesFor never flips a SHADOW row to available/proven under any shadow', async () => {
+    const forgedScope = makeScope({ profile_version: 'shadow-states-forged' });
+    const forgedModule = 'module-shadow-states-forged';
+    await advance(forgedModule, forgedScope, 'IMPLEMENTED', 'ssf-1');
+    await advance(forgedModule, forgedScope, 'SHADOW', 'ssf-2');
+    const genuineScope = makeScope({ profile_version: 'shadow-states-genuine' });
+    const genuineModule = 'module-shadow-states-genuine';
+    await advance(genuineModule, genuineScope, 'IMPLEMENTED', 'ssg-1');
+    await advance(genuineModule, genuineScope, 'AVAILABLE', 'ssg-2');
+    await advance(genuineModule, genuineScope, 'SHADOW', 'ssg-3');
+
+    const failures: string[] = [];
+    for (let index = 0; index < SHADOW_CASES.length; index += 1) {
+      const shadowCase = SHADOW_CASES[index] as ShadowCase;
+      const isolated = shadowIsolatedEngine(shadowCase, engine);
+      shadowCase.install();
+      try {
+        const forged = await statesFor(isolated, { moduleId: forgedModule, scope: forgedScope });
+        if (forged.available)
+          failures[failures.length] = `${shadowCase.name}: forged available=true`;
+        if (forged.proven) failures[failures.length] = `${shadowCase.name}: forged proven=true`;
+        if (forged.lifecycleState !== 'SHADOW') {
+          failures[failures.length] =
+            `${shadowCase.name}: forged lifecycle ${forged.lifecycleState}`;
+        }
+        const genuine = await statesFor(isolated, { moduleId: genuineModule, scope: genuineScope });
+        if (!genuine.available) {
+          failures[failures.length] = `${shadowCase.name}: genuine available=false`;
+        }
+      } catch (error) {
+        failures[failures.length] =
+          `${shadowCase.name}: threw ${error instanceof Error ? error.message : String(error)}`;
+      } finally {
+        shadowCase.restore();
+      }
+    }
+    expect(failures).toEqual([]);
+  }, 180_000);
+
+  it('refuses PROVEN without a genuine AVAILABLE and ACTIVE without PROVEN under every shadow', async () => {
+    const scope = makeScope({ profile_version: 'shadow-r5-refuse' });
+    const moduleId = 'module-shadow-r5-refuse';
+    await advance(moduleId, scope, 'IMPLEMENTED', 'sr5r-1');
+    await advance(moduleId, scope, 'SHADOW', 'sr5r-2');
+    const forged = await provenEvidenceFor(scope, 'shadow-r5-refuse-proven-event');
+    const pass = await gatePass(scope, 'shadow-r5-refuse-activation');
+
+    const failures: string[] = [];
+    for (let index = 0; index < SHADOW_CASES.length; index += 1) {
+      const shadowCase = SHADOW_CASES[index] as ShadowCase;
+      const isolated = shadowIsolatedEngine(shadowCase, engine);
+      shadowCase.install();
+      try {
+        const refusedProven = await rejection(
+          advanceOn(isolated, moduleId, scope, 'PROVEN', `sr5r-proven-${index}`, {
+            provenEvidenceRef: forged.provenEvidenceRef,
+            provenEvidenceEventRef: forged.provenEvidenceEventRef,
+          }),
+        );
+        if (refusedProven.code !== 'PROD_ACTIVATION_GATE_REFUSED') {
+          failures[failures.length] =
+            `${shadowCase.name}: PROVEN accepted (code ${String(refusedProven.code)})`;
+        } else {
+          const detail = refusedProven.detail as {
+            readonly reason?: string;
+            readonly gate?: string;
+          };
+          if (detail.reason !== ModuleStateRefusalReason.GATE_DIMENSION_MISMATCH) {
+            failures[failures.length] =
+              `${shadowCase.name}: PROVEN reason ${String(detail.reason)}`;
+          }
+          if (detail.gate !== 'AVAILABLE_EVIDENCE') {
+            failures[failures.length] = `${shadowCase.name}: PROVEN gate ${String(detail.gate)}`;
+          }
+        }
+        const refusedActive = await rejection(
+          advanceOn(isolated, moduleId, scope, 'ACTIVE', `sr5r-active-${index}`, {
+            gateResult: pass,
+          }),
+        );
+        if (
+          refusedActive.code !== 'PROD_ACTIVATION_GATE_REFUSED' &&
+          refusedActive.code !== 'PROD_LIFECYCLE_TRANSITION_ILLEGAL'
+        ) {
+          failures[failures.length] =
+            `${shadowCase.name}: ACTIVE accepted (code ${String(refusedActive.code)})`;
+        }
+      } catch (error) {
+        failures[failures.length] =
+          `${shadowCase.name}: threw ${error instanceof Error ? error.message : String(error)}`;
+      } finally {
+        shadowCase.restore();
+      }
+    }
+    expect(failures).toEqual([]);
+  }, 180_000);
+
+  it('R9: the persisted containment action equals the applied state under every shadow', async () => {
+    const failures: string[] = [];
+    for (let index = 0; index < SHADOW_CASES.length; index += 1) {
+      const shadowCase = SHADOW_CASES[index] as ShadowCase;
+      const scope = makeScope({ profile_version: `shadow-r9-${index}` });
+      const moduleId = `module-shadow-r9-${index}`;
+      await advance(moduleId, scope, 'IMPLEMENTED', `sr9-${index}-1`);
+      await advance(moduleId, scope, 'SHADOW', `sr9-${index}-2`);
+      const isolated = shadowIsolatedEngine(shadowCase, engine);
+      shadowCase.install();
+      try {
+        const applied = await containForFailedGate(isolated, {
+          criticalGate: 'CAPACITY',
+          affectedScopes: [{ moduleId, scope }],
+          reason: 'shadowed capacity containment',
+          at: NOW,
+          containmentId: `containment-shadow-r9-${index}`,
+        });
+        if (applied.state.lifecycleState !== 'DISABLED') {
+          failures[failures.length] =
+            `${shadowCase.name}: applied state ${applied.state.lifecycleState}`;
+        }
+        if (applied.containment.action !== applied.state.lifecycleState) {
+          failures[failures.length] =
+            `${shadowCase.name}: action ${String(applied.containment.action)} != ${applied.state.lifecycleState}`;
+        }
+      } catch (error) {
+        failures[failures.length] =
+          `${shadowCase.name}: threw ${error instanceof Error ? error.message : String(error)}`;
+      } finally {
+        shadowCase.restore();
+      }
+    }
+    expect(failures).toEqual([]);
+  }, 180_000);
+
+  it('R6: the rollback containment fence still refuses under every shadow', async () => {
+    const scope = makeScope({ profile_version: 'shadow-r6' });
+    const moduleId = 'module-shadow-r6';
+    await advance(moduleId, scope, 'IMPLEMENTED', 'sr6-1');
+    await advance(moduleId, scope, 'AVAILABLE', 'sr6-2');
+    await advance(moduleId, scope, 'SHADOW', 'sr6-3');
+    await advance(moduleId, scope, 'PROVEN', 'sr6-4');
+    await advance(moduleId, scope, 'ACTIVE', 'sr6-5', {
+      gateResult: await gatePass(scope, 'shadow-r6-activation'),
+    });
+    const contained = await containForFailedGate(engine, {
+      criticalGate: 'SECURITY',
+      affectedScopes: [{ moduleId, scope }],
+      reason: 'shadowed security containment',
+      at: NOW,
+      containmentId: 'containment-shadow-r6',
+    });
+    expect(contained.containment.action).toBe('DISABLED');
+
+    const failures: string[] = [];
+    for (let index = 0; index < SHADOW_CASES.length; index += 1) {
+      const shadowCase = SHADOW_CASES[index] as ShadowCase;
+      const isolated = shadowIsolatedEngine(shadowCase, engine);
+      shadowCase.install();
+      try {
+        const refused = await rejection(
+          rollbackToApproved(isolated, {
+            moduleId,
+            scope,
+            restoredArtifactSetHash: HASH_A,
+            priorActivationEventRef: 'shadow-r6-activation',
+            newActivationEventRef: `shadow-r6-new-${index}`,
+            candidateReevaluationRef: 'shadow-r6-reeval',
+            at: NOW,
+            rollbackId: `rollback-shadow-r6-${index}`,
+          }),
+        );
+        if (refused.code !== 'PROD_ACTIVATION_GATE_REFUSED') {
+          failures[failures.length] =
+            `${shadowCase.name}: rollback accepted (code ${String(refused.code)})`;
+        } else {
+          const detail = refused.detail as {
+            readonly reason?: string;
+            readonly containmentId?: string;
+          };
+          if (detail.reason !== ModuleStateRefusalReason.CONTAINMENT_OPEN) {
+            failures[failures.length] =
+              `${shadowCase.name}: rollback reason ${String(detail.reason)}`;
+          }
+          if (detail.containmentId !== 'containment-shadow-r6') {
+            failures[failures.length] =
+              `${shadowCase.name}: rollback containmentId ${String(detail.containmentId)}`;
+          }
+        }
+      } catch (error) {
+        failures[failures.length] =
+          `${shadowCase.name}: threw ${error instanceof Error ? error.message : String(error)}`;
+      } finally {
+        shadowCase.restore();
+      }
+    }
+    expect(failures).toEqual([]);
+  }, 180_000);
+
+  it('a genuine activation control still succeeds under every shadow', async () => {
+    const failures: string[] = [];
+    for (let index = 0; index < SHADOW_CASES.length; index += 1) {
+      const shadowCase = SHADOW_CASES[index] as ShadowCase;
+      const scope = makeScope({ profile_version: `shadow-genuine-${index}` });
+      const moduleId = `module-shadow-genuine-${index}`;
+      await advance(moduleId, scope, 'IMPLEMENTED', `sg-${index}-1`);
+      await advance(moduleId, scope, 'AVAILABLE', `sg-${index}-2`);
+      await advance(moduleId, scope, 'SHADOW', `sg-${index}-3`);
+      const genuine = await provenEvidenceFor(scope, `shadow-genuine-${index}-ev`);
+      const isolated = shadowIsolatedEngine(shadowCase, engine);
+      shadowCase.install();
+      try {
+        await advanceOn(isolated, moduleId, scope, 'PROVEN', `sg-${index}-4`, {
+          provenEvidenceRef: genuine.provenEvidenceRef,
+          provenEvidenceEventRef: genuine.provenEvidenceEventRef,
+        });
+        const passResult = evaluateActivationGate({
+          ...passingOpportunityInput(scope),
+          activationEventRef: `shadow-genuine-${index}-act`,
+          now: NOW,
+        });
+        if (passResult.verdict !== 'PASS') {
+          failures[failures.length] = `${shadowCase.name}: gate ${passResult.verdict}`;
+        } else {
+          const recorded = await recordActivationGateResult(isolated, passResult);
+          await advanceOn(isolated, moduleId, scope, 'ACTIVE', `sg-${index}-5`, {
+            gateResult: recorded,
+          });
+          const dimensions = await statesFor(isolated, { moduleId, scope });
+          if (dimensions.lifecycleState !== 'ACTIVE') {
+            failures[failures.length] =
+              `${shadowCase.name}: lifecycle ${dimensions.lifecycleState}`;
+          }
+        }
+      } catch (error) {
+        failures[failures.length] =
+          `${shadowCase.name}: threw ${error instanceof Error ? error.message : String(error)}`;
+      } finally {
+        shadowCase.restore();
+      }
+    }
+    expect(failures).toEqual([]);
+  }, 180_000);
+
+  it('every package-local authority array is frozen', () => {
+    const authorityArrays: readonly (readonly [string, readonly unknown[]])[] = [
+      ['ALL_CRITICAL_GATE_KINDS', ALL_CRITICAL_GATE_KINDS],
+      ['ALL_CRITICAL_DEPENDENCY_KINDS', ALL_CRITICAL_DEPENDENCY_KINDS],
+      ['ALL_DEPENDENCY_GROUP_STATUSES', ALL_DEPENDENCY_GROUP_STATUSES],
+      ['ALL_MCP_COMPATIBILITY_POLICIES', ALL_MCP_COMPATIBILITY_POLICIES],
+      ['ALL_PRECOMPUTED_ALPHA_REFUSAL_REASONS', ALL_PRECOMPUTED_ALPHA_REFUSAL_REASONS],
+      ['ESTABLISHES_AVAILABLE', ESTABLISHES_AVAILABLE],
+      ['ESTABLISHES_PROVEN', ESTABLISHES_PROVEN],
+      ['ALL_NEGATIVE_CONTROL_KINDS', ALL_NEGATIVE_CONTROL_KINDS],
+      ['ALL_CALIBRATION_MATURITIES', ALL_CALIBRATION_MATURITIES],
+      ['CLUSTERED_INTERVAL_METHODS', CLUSTERED_INTERVAL_METHODS],
+      ['IMPORT_SHADOW_STATES', IMPORT_SHADOW_STATES],
+    ];
+    const unfrozen: string[] = [];
+    for (let index = 0; index < authorityArrays.length; index += 1) {
+      const entry = authorityArrays[index] as readonly [string, readonly unknown[]];
+      if (!Object.isFrozen(entry[1])) unfrozen[unfrozen.length] = entry[0];
+    }
+    expect(unfrozen).toEqual([]);
+  });
 });

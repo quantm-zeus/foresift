@@ -1133,6 +1133,12 @@ describe('NEW-M5: PROD gate fails closed under globally shadowed Array.prototype
       ['some', () => true],
       ['find', () => undefined],
       ['forEach', () => undefined],
+      // A no-op `push` silently DROPPED every accumulated finding before the
+      // numeric-index fix, so `evaluateProdConformance({})` aggregated zero
+      // mandatory-input findings and returned a vacuous `PASSED`.
+      ['push', () => 0],
+      ['shift', () => undefined],
+      ['splice', () => []],
     ];
     for (let index = 0; index < methodReplacements.length; index += 1) {
       const entry = methodReplacements[index] as readonly [string, unknown];

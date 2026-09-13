@@ -17,6 +17,15 @@ export interface RequirementMapping {
   readonly implementationRefs?: readonly string[];
   readonly testRefs?: readonly string[];
   readonly owner?: string;
+  // Read by the repo-backed PROD surface bridge (audit H1).
+  readonly schemaRefs?: readonly string[];
+  readonly persistenceRefs?: readonly string[];
+  readonly telemetryRefs?: readonly string[];
+  readonly fixtureRefs?: readonly string[];
+  readonly apiToolUiRefs?: readonly string[];
+  readonly activationGateRefs?: readonly string[];
+  readonly rollbackRefs?: readonly string[];
+  readonly supersededBy?: readonly string[];
 }
 
 export interface ConformanceFinding {
@@ -403,16 +412,81 @@ export interface ConformanceOptions {
   readonly expectedGeneratedFiles?: GeneratedDocumentSnapshot;
   readonly regenerateGeneratedDocs?: () =>
     GeneratedDocumentSnapshot | Promise<GeneratedDocumentSnapshot>;
+  /**
+   * The live PROD governance claims (module activations, posture declarations,
+   * MCP matrix, live paths, distribution authorizations). REQUIRED for a
+   * milestone that owns FR-PROD requirements: omitting it FAILS the gate closed
+   * (audit H1/H2) instead of silently skipping the PROD rules.
+   */
+  readonly prodClaims?: ProdClaimsInput;
+}
+
+/** Structural mirror of `ProdConformanceInput`, kept import-cycle-free. */
+export interface ProdClaimsInput {
+  readonly activationClaims?: readonly unknown[];
+  readonly postureDeclarations?: readonly unknown[];
+  readonly mcpCompatibility?: unknown;
+  readonly livePaths?: readonly unknown[];
+  readonly distributionAuthorizations?: readonly unknown[];
 }
 
 export interface ConformanceResult {
   readonly overall: 'PASSED' | 'FAILED';
-  readonly findings: readonly ConformanceFinding[];
+  /** The four trace rules plus, for a PROD milestone, the PROD rule findings. */
+  readonly findings: readonly {
+    readonly requirementId: string;
+    readonly rule: string;
+    readonly path: string;
+    readonly message: string;
+  }[];
+}
+
+/**
+ * Whether the evaluated milestone owns FR-PROD law, derived from the
+ * AUTHORITATIVE requirement set rather than a generation number (audit HIGH-3).
+ * `G0`/`G1` legitimately own no FR-PROD requirement and therefore run no PROD
+ * rules; every milestone that does own one (G2, G6) is always evaluated.
+ */
+function milestoneOwnsProdLaw(
+  activeGroup: string,
+  requirements: readonly RequirementMapping[],
+): boolean {
+  return requirements.some(
+    (requirement) =>
+      requirement.id.startsWith('FR-PROD-') &&
+      requirement.dependencyGroup === activeGroup &&
+      (requirement.supersededBy ?? []).length === 0,
+  );
 }
 
 export async function evaluateConformance(options: ConformanceOptions): Promise<ConformanceResult> {
+  // An explicit milestone must be a canonical dependency group (`G0`…`G7`):
+  // zero-padded or otherwise non-canonical ids are a gate-downgrade attempt and
+  // refuse closed (audit HIGH-3).
+  if (options.milestone !== undefined && !/^G[0-7]$/.test(options.milestone)) {
+    return {
+      overall: 'FAILED',
+      findings: [
+        {
+          requirementId: 'FR-TRACE-003',
+          rule: 'CONFORMANCE_MILESTONE_INVALID',
+          path: String(options.milestone),
+          message: `milestone must be a canonical dependency-group id G0…G7; ${JSON.stringify(
+            options.milestone,
+          )} is not`,
+        },
+      ],
+    };
+  }
   const activeGroup = options.milestone ?? (await activeMilestone(options.repoRoot));
   const requirements = options.requirements ?? (await loadRequirements(options.repoRoot));
+  // Whether the milestone owns FR-PROD law is decided by the AUTHORITATIVE
+  // manifest, NEVER by the caller-supplied requirement list: otherwise
+  // `{milestone:'G2', requirements: []}` would silence the PROD family
+  // (audit HIGH-3 residual). The injected list remains a seam for the other
+  // rules only.
+  const manifestRequirements =
+    options.requirements === undefined ? requirements : await loadRequirements(options.repoRoot);
   const [mapping, activePaths, premature, generated] = await Promise.all([
     Promise.resolve(checkMappingCompleteness({ requirements })),
     checkActiveImplementationPaths({
@@ -435,11 +509,47 @@ export async function evaluateConformance(options: ConformanceOptions): Promise<
         : { regenerate: options.regenerateGeneratedDocs }),
     }),
   ]);
+  // The PROD rules are part of the authoritative release gate for every
+  // milestone that owns FR-PROD law (audit H1). Imported lazily so the module
+  // graph stays acyclic and injected unit checks stay repository-independent.
+  const prodFindings: {
+    readonly requirementId: string;
+    readonly rule: string;
+    readonly path: string;
+    readonly message: string;
+  }[] = [];
+  if (milestoneOwnsProdLaw(activeGroup, manifestRequirements)) {
+    const { checkProdSurfacePresence, evaluateProdConformance } = await import('./prod-rules.ts');
+    const prodRequirements = manifestRequirements.filter(
+      (requirement) =>
+        requirement.id.startsWith('FR-PROD-') && requirement.dependencyGroup === activeGroup,
+    );
+    const surface = await checkProdSurfacePresence({
+      repoRoot: options.repoRoot,
+      requirements: prodRequirements,
+    });
+    prodFindings.push(...surface.findings);
+    if (options.prodClaims === undefined) {
+      prodFindings.push({
+        requirementId: 'FR-PROD-001',
+        rule: 'PROD_CONFORMANCE_INPUT_MISSING',
+        path: 'prodClaims',
+        message:
+          'the release gate evaluated a milestone that owns FR-PROD law without PROD governance claims; an absent claim set fails closed instead of skipping the PROD rules',
+      });
+    } else {
+      const prodReport = evaluateProdConformance(
+        options.prodClaims as Parameters<typeof evaluateProdConformance>[0],
+      );
+      prodFindings.push(...prodReport.findings);
+    }
+  }
   const findings = [
     ...mapping.findings,
     ...activePaths.findings,
     ...premature.findings,
     ...generated.findings,
+    ...prodFindings,
   ];
   return { overall: findings.length === 0 ? 'PASSED' : 'FAILED', findings };
 }

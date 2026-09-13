@@ -28,7 +28,9 @@ import {
 import {
   PROD_BOUNDARY_ASSERTIONS_COMPLETE,
   PROD_CONTAINMENT_SPECIFIC_CANDIDATE,
+  PROD_FIXTURE_ACTIVATION_EVENT,
   PROD_FIXTURE_HASH_A,
+  recordProvenEvidence,
   PROD_FIXTURE_NOW,
   PROD_LIVE_PATH,
   PROD_ROLLBACK_FIXTURE,
@@ -156,6 +158,9 @@ describe('AC-279 prod-scoped: rollback restores an approved immutable set, creat
         actorRef: 'ac279-prod',
         at: PROD_FIXTURE_NOW,
         gateResult,
+        ...(toState === 'PROVEN'
+          ? await recordProvenEvidence(engine, scope, `${stateRowId}-proven-evidence`)
+          : {}),
         stateRowId,
         transitionId: `${stateRowId}-t`,
       });
@@ -171,7 +176,7 @@ describe('AC-279 prod-scoped: rollback restores an approved immutable set, creat
     const outcome = await rollbackToApproved(engine, PROD_ROLLBACK_FIXTURE);
     expect(outcome.rollback.historyPreserved).toBe(true);
     expect(outcome.rollback.restoredArtifactSetHash).toBe(PROD_FIXTURE_HASH_A);
-    expect(outcome.rollback.priorActivationEventRef).toBe('activation-prod-prior');
+    expect(outcome.rollback.priorActivationEventRef).toBe(PROD_FIXTURE_ACTIVATION_EVENT);
     expect(outcome.rollback.newActivationEventRef).toBe('activation-prod-rollback');
     expect(outcome.alertResumption).toBe('BLOCKED_PENDING_CANDIDATE_REEVALUATION');
 

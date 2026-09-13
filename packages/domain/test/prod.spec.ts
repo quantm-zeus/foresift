@@ -539,14 +539,28 @@ describe('§33.7 bounded precomputed alpha law', () => {
     expect(
       precomputedAlphaBoundRespected(
         bound,
-        { candidates: 100, rows: 1000, edges: 5000, latencyMs: 250, costUsd: 0.5 },
+        {
+          artifactSetHash: HASH,
+          candidates: 100,
+          rows: 1000,
+          edges: 5000,
+          latencyMs: 250,
+          costUsd: 0.5,
+        },
         now,
       ),
     ).toBe(true);
   });
 
   it('refuses an expired, exceeded, or unbounded request', () => {
-    const request = { candidates: 1, rows: 1, edges: 1, latencyMs: 1, costUsd: 0.1 };
+    const request = {
+      artifactSetHash: HASH,
+      candidates: 1,
+      rows: 1,
+      edges: 1,
+      latencyMs: 1,
+      costUsd: 0.1,
+    };
     expect(precomputedAlphaBoundRespected(bound, request, '2026-08-01T00:00:00Z')).toBe(false);
     expect(precomputedAlphaBoundRespected(bound, { ...request, candidates: 101 }, now)).toBe(false);
     expectCode(

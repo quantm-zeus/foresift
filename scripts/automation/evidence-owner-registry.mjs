@@ -117,7 +117,7 @@ export const VERIFICATION_PROFILES = Object.freeze({
     'pnpm --filter @foresift/requirement-manifest test',
     'pnpm --filter @foresift/release-conformance test',
     'bun test ./packages/persistence/test/migrator.spec.ts',
-    'node scripts/verify-release-conformance/cli.mjs',
+    'node scripts/verify-release-conformance/cli.mjs --require-prod-claims',
     'node scripts/generate-requirement-manifest/cli.mjs --check',
     'pnpm spec:verify',
   ],

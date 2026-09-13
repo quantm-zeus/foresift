@@ -25,6 +25,7 @@ import {
   ALL_ACTIVATION_GATE_KINDS,
   ALL_CHANGE_CLASSIFICATIONS,
   ALL_MODULE_LIFECYCLE_STATES,
+  type ActivationGateKind,
 } from '@foresift/domain';
 import {
   applyMigrations,
@@ -32,6 +33,7 @@ import {
   PRECISION_RETAINING_TIMESTAMP_PARSERS,
   type DatabaseEngine,
 } from '@foresift/persistence';
+import { activationScopeHash } from '../src/index.ts';
 
 const MIGRATIONS_DIR = path.resolve(
   path.dirname(fileURLToPath(import.meta.url)),
@@ -117,6 +119,38 @@ async function seedModuleState(
   return stateRowId;
 }
 
+/**
+ * A scope with `requires_proven: true` must have ACTUALLY reached PROVEN in
+ * governed history before ACTIVE is admissible (audit H5 residual), so the raw
+ * SQL probes seed the PROVEN row the SQL law requires.
+ */
+function rawScope(tag: string): string {
+  return JSON.stringify({
+    profile_version: `raw-${tag}`,
+    policy_version: 'policy-v1',
+    regime_scope: 'regime-v1',
+    execution_scenario: 'scenario-v1',
+    delay_policy: 'delay-v1',
+    population_claim: 'population-v1',
+    requires_proven: true,
+  });
+}
+
+function canonicalHash(tag: string): string {
+  return activationScopeHash(JSON.parse(rawScope(tag)) as never);
+}
+
+async function seedProvenRow(scopeHash: string, tag: string): Promise<void> {
+  await engine.query(
+    `INSERT INTO prod.module_states
+       (state_row_id, module_id, artifact_set_hash, scope, scope_hash, lifecycle_state,
+        operational_readiness, distribution_readiness, activation_event_ref)
+     VALUES ($1, 'module-1', $2, $3::jsonb, $4, 'PROVEN',
+             'READY_FOR_ACTIVE_PROFILE', 'PRIVATE_ONLY', NULL)`,
+    [`proven-${tag}`, HASH_B, rawScope(tag), scopeHash],
+  );
+}
+
 beforeAll(async () => {
   db = new PGlite({ parsers: PRECISION_RETAINING_TIMESTAMP_PARSERS });
   engine = createEngine(db, 'pglite');
@@ -136,6 +170,9 @@ describe('g2_prod_* migrations apply to a fresh database', () => {
       'g2_prod_0003_mcp_compat',
       'g2_prod_0004_alpha_boundary',
       'g2_prod_0005_activation_evidence',
+      'g2_prod_0006_activation_kind',
+      'g2_prod_0007_activation_fail_closed',
+      'g2_prod_0008_raw_write_invariants',
     ] as const;
     for (const id of ids) expect(applied).toContain(id);
     for (let i = 1; i < ids.length; i += 1) {
@@ -168,9 +205,9 @@ describe('governed module states are append-only and gate-backed', () => {
       engine.query(
         `INSERT INTO prod.module_states
            (state_row_id, module_id, artifact_set_hash, scope, lifecycle_state,
-            operational_readiness, distribution_readiness, activation_event_ref)
+            operational_readiness, distribution_readiness, activation_event_ref, activation_kind)
          VALUES ('state-active-no-gate', 'module-1', $1, $2::jsonb, 'ACTIVE',
-                 'READY_FOR_ACTIVE_PROFILE', 'PRIVATE_ONLY', NULL)`,
+                 'READY_FOR_ACTIVE_PROFILE', 'PRIVATE_ONLY', NULL, 'OPPORTUNITY')`,
         [HASH, SCOPE],
       ),
     );
@@ -178,7 +215,7 @@ describe('governed module states are append-only and gate-backed', () => {
   }, 120_000);
 
   it('refuses a raw ACTIVE INSERT with zero persisted gate rows (F2 bypass)', async () => {
-    const rawHash = `sha256:${'d'.repeat(64)}`;
+    const rawHash = canonicalHash('bypass');
     const rawEvent = 'fabricated-event-never-evaluated';
     const before = await engine.query<{ n: number }>(
       `SELECT count(*)::int AS n FROM prod.activation_gate_evaluations
@@ -186,15 +223,16 @@ describe('governed module states are append-only and gate-backed', () => {
       [rawHash, rawEvent],
     );
     expect(Number(before.rows[0]?.n)).toBe(0);
+    await seedProvenRow(rawHash, 'bypass');
 
     const error = await rejection(
       engine.query(
         `INSERT INTO prod.module_states
            (state_row_id, module_id, artifact_set_hash, scope, scope_hash, lifecycle_state,
-            operational_readiness, distribution_readiness, activation_event_ref)
+            operational_readiness, distribution_readiness, activation_event_ref, activation_kind)
          VALUES ('state-raw-bypass', 'module-1', $1, $2::jsonb, $3, 'ACTIVE',
-                 'READY_FOR_ACTIVE_PROFILE', 'PRIVATE_ONLY', $4)`,
-        [HASH, SCOPE, rawHash, rawEvent],
+                 'READY_FOR_ACTIVE_PROFILE', 'PRIVATE_ONLY', $4, 'OPPORTUNITY')`,
+        [HASH, rawScope('bypass'), rawHash, rawEvent],
       ),
     );
     expect(error.message).toMatch(/all-PASS persisted gate evaluation set/);
@@ -205,30 +243,134 @@ describe('governed module states are append-only and gate-backed', () => {
     expect(Number(rows.rows[0]?.n)).toBe(0);
   }, 120_000);
 
-  it('allows a raw ACTIVE INSERT backed by a complete persisted all-PASS set', async () => {
-    const rawHash = `sha256:${'e'.repeat(64)}`;
+  it('refuses a raw ACTIVE INSERT with no activation kind (C1)', async () => {
+    const rawHash = canonicalHash('no-kind');
+    const error = await rejection(
+      engine.query(
+        `INSERT INTO prod.module_states
+           (state_row_id, module_id, artifact_set_hash, scope, scope_hash, lifecycle_state,
+            operational_readiness, distribution_readiness, activation_event_ref)
+         VALUES ('state-raw-no-kind', 'module-1', $1, $2::jsonb, $3, 'ACTIVE',
+                 'READY_FOR_ACTIVE_PROFILE', 'PRIVATE_ONLY', 'raw-no-kind-event')`,
+        [HASH, rawScope('no-kind'), rawHash],
+      ),
+    );
+    expect(error.message).toMatch(/requires the activation kind/);
+    const rows = await engine.query<{ n: number }>(
+      `SELECT count(*)::int AS n FROM prod.module_states WHERE state_row_id = 'state-raw-no-kind'`,
+    );
+    expect(Number(rows.rows[0]?.n)).toBe(0);
+  }, 120_000);
+
+  it('refuses ACTIVE when the activation event reference is the empty string (C2 exploit)', async () => {
+    const rawHash = canonicalHash('empty-event');
+    const error = await rejection(
+      engine.query(
+        `INSERT INTO prod.module_states
+           (state_row_id, module_id, artifact_set_hash, scope, scope_hash, lifecycle_state,
+            operational_readiness, distribution_readiness, activation_event_ref, activation_kind)
+         VALUES ('state-raw-empty-event', 'module-1', $1, $2::jsonb, $3, 'ACTIVE',
+                 'READY_FOR_ACTIVE_PROFILE', 'PRIVATE_ONLY', '', 'OPPORTUNITY')`,
+        [HASH, rawScope('empty-event'), rawHash],
+      ),
+    );
+    expect(error.message).toMatch(/non-empty activation event reference/);
+    const rows = await engine.query<{ n: number }>(
+      `SELECT count(*)::int AS n FROM prod.module_states WHERE state_row_id = 'state-raw-empty-event'`,
+    );
+    expect(Number(rows.rows[0]?.n)).toBe(0);
+  }, 120_000);
+
+  it('allows a raw ACTIVE INSERT backed by a complete persisted all-PASS set for its kind', async () => {
+    const rawHash = canonicalHash('legit');
     const rawEvent = 'raw-legit-activation';
+    await seedProvenRow(rawHash, 'legit');
+    // SCOPE.requires_proven is true, so an OPPORTUNITY activation requires the
+    // PROVEN gate; DISTRIBUTION_EVIDENCE is outside the kind and must be
+    // recorded NOT_APPLICABLE, never PASS (C1).
+    const required: readonly ActivationGateKind[] = [
+      'IMPLEMENTED_PRESENT',
+      'AVAILABLE_EVIDENCE',
+      'PROVEN_PRESENT',
+      'STATISTICAL_EVIDENCE_SCOPE',
+      'NEGATIVE_CONTROLS',
+      'CLUSTERED_INTERVALS',
+      'CALIBRATION_MATURITY',
+      'VERIFIED_GATE_EVIDENCE',
+      'CAPACITY_CONTRACT',
+      'NO_OPEN_CONTAINMENT',
+    ] as const;
     for (const gate of ALL_ACTIVATION_GATE_KINDS) {
+      const verdict = required.includes(gate) ? 'PASS' : 'NOT_APPLICABLE';
       await engine.query(
         `INSERT INTO prod.activation_gate_evaluations
            (evaluation_id, scope_hash, gate_kind, verdict, failing_gate, evidence_refs,
-            capacity_contract_ref, activation_event_ref, expires_at)
-         VALUES ($1, $2, $3, 'PASS', NULL, '[]'::jsonb, NULL, $4, '2030-01-01T00:00:00Z')`,
-        [`raw-${gate}`, rawHash, gate, rawEvent],
+            capacity_contract_ref, activation_event_ref, expires_at, activation_kind)
+         VALUES ($1, $2, $3, $4, NULL, '[]'::jsonb, NULL, $5, '2030-01-01T00:00:00Z', 'OPPORTUNITY')`,
+        [`raw-${gate}`, rawHash, gate, verdict, rawEvent],
       );
     }
     await engine.query(
       `INSERT INTO prod.module_states
          (state_row_id, module_id, artifact_set_hash, scope, scope_hash, lifecycle_state,
-          operational_readiness, distribution_readiness, activation_event_ref)
+          operational_readiness, distribution_readiness, activation_event_ref, activation_kind)
        VALUES ('state-raw-legit', 'module-1', $1, $2::jsonb, $3, 'ACTIVE',
-               'READY_FOR_ACTIVE_PROFILE', 'PRIVATE_ONLY', $4)`,
-      [HASH, SCOPE, rawHash, rawEvent],
+               'READY_FOR_ACTIVE_PROFILE', 'PRIVATE_ONLY', $4, 'OPPORTUNITY')`,
+      [HASH, rawScope('legit'), rawHash, rawEvent],
     );
-    const rows = await engine.query<{ lifecycle_state: string }>(
-      `SELECT lifecycle_state FROM prod.module_states WHERE state_row_id = 'state-raw-legit'`,
+    const rows = await engine.query<{ lifecycle_state: string; activation_kind: string }>(
+      `SELECT lifecycle_state, activation_kind FROM prod.module_states
+        WHERE state_row_id = 'state-raw-legit'`,
     );
     expect(rows.rows[0]?.lifecycle_state).toBe('ACTIVE');
+    expect(rows.rows[0]?.activation_kind).toBe('OPPORTUNITY');
+  }, 120_000);
+
+  it('refuses a raw ACTIVE INSERT whose non-required gate was forged as PASS (C1 exploit)', async () => {
+    const rawHash = canonicalHash('forged-nonapp');
+    const rawEvent = 'raw-forged-nonapp';
+    await seedProvenRow(rawHash, 'forged-nonapp');
+    const required: readonly ActivationGateKind[] = [
+      'IMPLEMENTED_PRESENT',
+      'AVAILABLE_EVIDENCE',
+      'PROVEN_PRESENT',
+      'STATISTICAL_EVIDENCE_SCOPE',
+      'NEGATIVE_CONTROLS',
+      'CLUSTERED_INTERVALS',
+      'CALIBRATION_MATURITY',
+      'VERIFIED_GATE_EVIDENCE',
+      'CAPACITY_CONTRACT',
+      'NO_OPEN_CONTAINMENT',
+    ] as const;
+    for (const gate of ALL_ACTIVATION_GATE_KINDS) {
+      // The exploit records the non-required DISTRIBUTION_EVIDENCE as PASS; every
+      // other non-required gate is honest.
+      const verdict =
+        required.includes(gate) || gate === 'DISTRIBUTION_EVIDENCE' ? 'PASS' : 'NOT_APPLICABLE';
+      await engine.query(
+        `INSERT INTO prod.activation_gate_evaluations
+           (evaluation_id, scope_hash, gate_kind, verdict, failing_gate, evidence_refs,
+            capacity_contract_ref, activation_event_ref, expires_at, activation_kind)
+         VALUES ($1, $2, $3, $4, NULL, '[]'::jsonb, NULL, $5, '2030-01-01T00:00:00Z', 'OPPORTUNITY')`,
+        [`forged-${gate}`, rawHash, gate, verdict, rawEvent],
+      );
+    }
+    const error = await rejection(
+      engine.query(
+        `INSERT INTO prod.module_states
+           (state_row_id, module_id, artifact_set_hash, scope, scope_hash, lifecycle_state,
+            operational_readiness, distribution_readiness, activation_event_ref, activation_kind)
+         VALUES ('state-raw-forged-nonapp', 'module-1', $1, $2::jsonb, $3, 'ACTIVE',
+                 'READY_FOR_ACTIVE_PROFILE', 'PRIVATE_ONLY', $4, 'OPPORTUNITY')`,
+        [HASH, rawScope('forged-nonapp'), rawHash, rawEvent],
+      ),
+    );
+    expect(error.message).toMatch(/not required/);
+    const rows = await engine.query<{ n: number }>(
+      `SELECT count(*)::int AS n FROM prod.module_states
+        WHERE state_row_id = 'state-raw-forged-nonapp'`,
+    );
+    expect(Number(rows.rows[0]?.n)).toBe(0);
   }, 120_000);
 
   it('refuses an unknown lifecycle state and an incomplete scope', async () => {
@@ -347,26 +489,27 @@ describe('activation-gate evaluations are immutable and verdict-consistent', () 
     await engine.query(
       `INSERT INTO prod.activation_gate_evaluations
          (evaluation_id, scope_hash, gate_kind, verdict, failing_gate, evidence_refs,
-          capacity_contract_ref, expires_at)
+          capacity_contract_ref, expires_at, activation_kind)
        VALUES ('gate-pass', $1, 'PROVEN_PRESENT', 'PASS', NULL, '[]'::jsonb, NULL,
-               '2027-01-01T00:00:00Z')`,
+               '2027-01-01T00:00:00Z', 'OPPORTUNITY')`,
       [HASH_B],
     );
     await engine.query(
       `INSERT INTO prod.activation_gate_evaluations
          (evaluation_id, scope_hash, gate_kind, verdict, failing_gate, evidence_refs,
-          capacity_contract_ref, expires_at)
+          capacity_contract_ref, expires_at, activation_kind)
        VALUES ('gate-refuse', $1, 'CAPACITY_CONTRACT', 'REFUSE', 'CAPACITY_CONTRACT', '[]'::jsonb,
-               'capacity-1', '2027-01-01T00:00:00Z')`,
+               'capacity-1', '2027-01-01T00:00:00Z', 'OPPORTUNITY')`,
       [HASH_B],
     );
 
     const badPass = await rejection(
       engine.query(
         `INSERT INTO prod.activation_gate_evaluations
-           (evaluation_id, scope_hash, gate_kind, verdict, failing_gate, evidence_refs, expires_at)
+           (evaluation_id, scope_hash, gate_kind, verdict, failing_gate, evidence_refs, expires_at,
+            activation_kind)
          VALUES ('gate-bad-pass', $1, 'PROVEN_PRESENT', 'PASS', 'PROVEN_PRESENT', '[]'::jsonb,
-                 '2027-01-01T00:00:00Z')`,
+                 '2027-01-01T00:00:00Z', 'OPPORTUNITY')`,
         [HASH_B],
       ),
     );
@@ -375,9 +518,10 @@ describe('activation-gate evaluations are immutable and verdict-consistent', () 
     const badRefuse = await rejection(
       engine.query(
         `INSERT INTO prod.activation_gate_evaluations
-           (evaluation_id, scope_hash, gate_kind, verdict, failing_gate, evidence_refs, expires_at)
+           (evaluation_id, scope_hash, gate_kind, verdict, failing_gate, evidence_refs, expires_at,
+            activation_kind)
          VALUES ('gate-bad-refuse', $1, 'PROVEN_PRESENT', 'REFUSE', NULL, '[]'::jsonb,
-                 '2027-01-01T00:00:00Z')`,
+                 '2027-01-01T00:00:00Z', 'OPPORTUNITY')`,
         [HASH_B],
       ),
     );
@@ -723,5 +867,211 @@ describe('SQL vocabularies mirror the domain authority', () => {
     expect(await checkList('prod.state_transitions', 'change_classification')).toEqual(
       [...ALL_CHANGE_CLASSIFICATIONS].sort(),
     );
+  }, 120_000);
+});
+
+describe('activation evidence: refusal invalidation and readiness bounds (H6/C1)', () => {
+  const REQUIRED_FOR_OPPORTUNITY: readonly ActivationGateKind[] = [
+    'IMPLEMENTED_PRESENT',
+    'AVAILABLE_EVIDENCE',
+    'PROVEN_PRESENT',
+    'STATISTICAL_EVIDENCE_SCOPE',
+    'NEGATIVE_CONTROLS',
+    'CLUSTERED_INTERVALS',
+    'CALIBRATION_MATURITY',
+    'VERIFIED_GATE_EVIDENCE',
+    'CAPACITY_CONTRACT',
+    'NO_OPEN_CONTAINMENT',
+  ];
+
+  async function insertGateRows(
+    tag: string,
+    scopeHash: string,
+    eventRef: string,
+    kind: string,
+  ): Promise<void> {
+    for (const gate of ALL_ACTIVATION_GATE_KINDS) {
+      const verdict = REQUIRED_FOR_OPPORTUNITY.includes(gate) ? 'PASS' : 'NOT_APPLICABLE';
+      await engine.query(
+        `INSERT INTO prod.activation_gate_evaluations
+           (evaluation_id, scope_hash, gate_kind, verdict, failing_gate, evidence_refs,
+            capacity_contract_ref, activation_event_ref, expires_at, activation_kind)
+         VALUES ($1, $2, $3, $4, NULL, '[]'::jsonb, NULL, $5, '2030-01-01T00:00:00Z', $6)`,
+        [`${tag}-${gate}`, scopeHash, gate, verdict, eventRef, kind],
+      );
+    }
+  }
+
+  it('refuses ACTIVE when a later REFUSE row exists for the same scope, event and kind', async () => {
+    const rawHash = canonicalHash('pass-set');
+    const eventRef = 'raw-refuse-invalidation';
+    await insertGateRows('pass-set', rawHash, eventRef, 'OPPORTUNITY');
+    await engine.query(
+      `INSERT INTO prod.activation_gate_evaluations
+         (evaluation_id, scope_hash, gate_kind, verdict, failing_gate, evidence_refs,
+          capacity_contract_ref, activation_event_ref, expires_at, activation_kind)
+       VALUES ('later-refuse', $1, 'STATISTICAL_EVIDENCE_SCOPE', 'REFUSE',
+               'STATISTICAL_EVIDENCE_SCOPE', '[]'::jsonb, NULL, $2, '2030-01-01T00:00:00Z',
+               'OPPORTUNITY')`,
+      [rawHash, eventRef],
+    );
+    const error = await rejection(
+      engine.query(
+        `INSERT INTO prod.module_states
+           (state_row_id, module_id, artifact_set_hash, scope, scope_hash, lifecycle_state,
+            operational_readiness, distribution_readiness, activation_event_ref, activation_kind)
+         VALUES ('state-raw-refuse', 'module-1', $1, $2::jsonb, $3, 'ACTIVE',
+                 'READY_FOR_ACTIVE_PROFILE', 'PRIVATE_ONLY', $4, 'OPPORTUNITY')`,
+        [HASH, rawScope('pass-set'), rawHash, eventRef],
+      ),
+    );
+    expect(error.message).toMatch(/refused for this activation event/);
+  }, 120_000);
+
+  it('refuses a raw ACTIVE row whose declared readiness exceeds the evaluated kind', async () => {
+    const rawHash = canonicalHash('readiness-set');
+    const eventRef = 'raw-readiness-bound';
+    await seedProvenRow(rawHash, 'readiness-set');
+    await insertGateRows('readiness-set', rawHash, eventRef, 'OPPORTUNITY');
+    const error = await rejection(
+      engine.query(
+        `INSERT INTO prod.module_states
+           (state_row_id, module_id, artifact_set_hash, scope, scope_hash, lifecycle_state,
+            operational_readiness, distribution_readiness, activation_event_ref, activation_kind)
+         VALUES ('state-raw-readiness', 'module-1', $1, $2::jsonb, $3, 'ACTIVE',
+                 'READY_FOR_ACTIVE_PROFILE', 'PUBLIC_AUTHORIZED', $4, 'OPPORTUNITY')`,
+        [HASH, rawScope('readiness-set'), rawHash, eventRef],
+      ),
+    );
+    expect(error.message).toMatch(/module_states_readiness_bounded_by_kind/);
+  }, 120_000);
+});
+
+describe('raw-write activation invariants (final convergence audit HIGH-1/HIGH-2)', () => {
+  async function seedProven(scopeHash: string, tag: string, scope: string): Promise<void> {
+    await engine.query(
+      `INSERT INTO prod.module_states
+         (state_row_id, module_id, artifact_set_hash, scope, scope_hash, lifecycle_state,
+          operational_readiness, distribution_readiness, activation_event_ref)
+       VALUES ($1, 'module-raw', $2, $3::jsonb, $4, 'PROVEN',
+               'READY_FOR_ACTIVE_PROFILE', 'PRIVATE_ONLY', NULL)`,
+      [`raw-proven-${tag}`, HASH_B, scope, scopeHash],
+    );
+  }
+
+  it('refuses replaying an activation event that already backed ACTIVE for the exact scope (HIGH-1)', async () => {
+    const rawHash = canonicalHash('replay');
+    const replayScope = rawScope('replay');
+    const eventRef = 'raw-replayed-event';
+    await seedProven(rawHash, 'replay', replayScope);
+
+    const insert = (stateRowId: string, toState: string): Promise<unknown> =>
+      engine.query(
+        `INSERT INTO prod.module_states
+           (state_row_id, module_id, artifact_set_hash, scope, scope_hash, lifecycle_state,
+            operational_readiness, distribution_readiness, activation_event_ref, activation_kind)
+         VALUES ($1, 'module-raw', $2, $3::jsonb, $4, $5,
+                 'READY_FOR_SHADOW_ALERTS', 'PRIVATE_ONLY', $6, 'OPERATIONAL')`,
+        [stateRowId, HASH, replayScope, rawHash, toState, eventRef],
+      );
+
+    for (const gate of [
+      'IMPLEMENTED_PRESENT',
+      'AVAILABLE_EVIDENCE',
+      'PROVEN_PRESENT',
+      'VERIFIED_GATE_EVIDENCE',
+      'CAPACITY_CONTRACT',
+      'NO_OPEN_CONTAINMENT',
+    ]) {
+      await engine.query(
+        `INSERT INTO prod.activation_gate_evaluations
+           (evaluation_id, scope_hash, gate_kind, verdict, failing_gate, evidence_refs,
+            capacity_contract_ref, activation_event_ref, expires_at, activation_kind)
+         VALUES ($1, $2, $3, 'PASS', NULL, '[]'::jsonb, NULL, $4, '2030-01-01T00:00:00Z', 'OPERATIONAL')`,
+        [`replay-${gate}`, rawHash, gate, eventRef],
+      );
+    }
+
+    await insert('raw-active-1', 'ACTIVE');
+    await insert('raw-degraded', 'DEGRADED');
+    const replayed = await rejection(insert('raw-active-2', 'ACTIVE'));
+    expect(replayed.message).toMatch(/already backed ACTIVE row/);
+    const activeRows = await engine.query<{ n: number }>(
+      `SELECT count(*)::int AS n FROM prod.module_states
+        WHERE scope_hash = $1 AND lifecycle_state = 'ACTIVE'`,
+      [rawHash],
+    );
+    expect(Number(activeRows.rows[0]?.n)).toBe(1);
+  }, 120_000);
+
+  it('refuses a declared scope_hash that disagrees with the hash already recorded for the exact scope (HIGH-2)', async () => {
+    const canonical = canonicalHash('hash-binding');
+    const bindingScope = rawScope('hash-binding');
+    const foreignHash = `sha256:${'8'.repeat(64)}`;
+    await seedProven(canonical, 'hash-binding', bindingScope);
+    // Same declared scope, a DIFFERENT hash: this is how a raw writer swapped in
+    // another scope's evidence and dodged the containment check.
+    const error = await rejection(
+      engine.query(
+        `INSERT INTO prod.module_states
+           (state_row_id, module_id, artifact_set_hash, scope, scope_hash, lifecycle_state,
+            operational_readiness, distribution_readiness, activation_event_ref, activation_kind)
+         VALUES ('raw-hash-swap', 'module-raw', $1, $2::jsonb, $3, 'ACTIVE',
+                 'READY_FOR_ACTIVE_PROFILE', 'PRIVATE_ONLY', 'raw-hash-swap-event', 'OPPORTUNITY')`,
+        [HASH, bindingScope, foreignHash],
+      ),
+    );
+    expect(error.message).toMatch(/is not the canonical hash of the declared scope/);
+  }, 120_000);
+
+  it('refuses a whitespace-only activation event reference (MEDIUM)', async () => {
+    const error = await rejection(
+      engine.query(
+        `INSERT INTO prod.module_states
+           (state_row_id, module_id, artifact_set_hash, scope, lifecycle_state,
+            operational_readiness, distribution_readiness, activation_event_ref)
+         VALUES ('raw-blank-event', 'module-raw', $1, $2::jsonb, 'IMPLEMENTED',
+                 'READY_FOR_COLLECTION', 'PRIVATE_ONLY', '   ')`,
+        [HASH, SCOPE],
+      ),
+    );
+    expect(error.message).toMatch(/module_states_activation_event_ref_nonblank/);
+  }, 120_000);
+
+  it('refuses a non-boolean requires_proven scope flag (MEDIUM)', async () => {
+    const numericScope = JSON.stringify({
+      profile_version: 'profile-v1',
+      policy_version: 'policy-v1',
+      regime_scope: 'regime-v1',
+      execution_scenario: 'scenario-v1',
+      delay_policy: 'delay-v1',
+      population_claim: 'population-v1',
+      requires_proven: 1,
+    });
+    const error = await rejection(
+      engine.query(
+        `INSERT INTO prod.module_states
+           (state_row_id, module_id, artifact_set_hash, scope, lifecycle_state,
+            operational_readiness, distribution_readiness, activation_event_ref)
+         VALUES ('raw-numeric-flag', 'module-raw', $1, $2::jsonb, 'IMPLEMENTED',
+                 'READY_FOR_COLLECTION', 'PRIVATE_ONLY', NULL)`,
+        [HASH, numericScope],
+      ),
+    );
+    expect(error.message).toMatch(/module_states_requires_proven_is_boolean/);
+  }, 120_000);
+
+  it('refuses clearing a containment with a blank event reference (MEDIUM)', async () => {
+    const error = await rejection(
+      engine.query(
+        `INSERT INTO prod.containment_events
+           (containment_id, module_id, scope_hash, action, trigger_gate_kind, reason,
+            auto_reactivation_allowed, cleared_by_event_ref, created_at)
+         VALUES ('raw-blank-clear', 'module-raw', $1, 'PAUSED', 'CAPACITY_CONTRACT', 'x',
+                 false, '   ', now())`,
+        [`sha256:${'9'.repeat(64)}`],
+      ),
+    );
+    expect(error.message).toMatch(/containment_events_cleared_ref_nonblank/);
   }, 120_000);
 });

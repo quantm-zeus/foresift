@@ -306,6 +306,7 @@ export async function upsertDependencyGroupStatus(
   engine: DatabaseEngine,
   input: {
     readonly groupId: unknown;
+    /** The caller's claim; it must AGREE with the manifest or the write refuses. */
     readonly dependsOn: readonly unknown[];
     readonly status: unknown;
     readonly manifestRequirementCount: number;
@@ -314,9 +315,38 @@ export async function upsertDependencyGroupStatus(
   },
 ): Promise<DependencyGroupStatusRow> {
   const groupId = parseDependencyGroupId(input.groupId);
-  const dependsOn = [
+  const callerDependsOn = [
     ...new Set(input.dependsOn.map((dependency) => parseDependencyGroupId(dependency))),
-  ];
+  ].sort();
+  // The prerequisite set is NEVER taken from the caller (audit H9): it is read
+  // from the authoritative manifest. A caller claiming a different set — most
+  // dangerously an empty one that would let G7 complete while G0…G6 are open —
+  // refuses outright.
+  const orderView = await loadDependencyGroupOrderView();
+  const entry = orderView.groups.find((group) => group.groupId === groupId);
+  if (entry === undefined) {
+    throw new ForesiftError(
+      ErrorCode.PROD_DEPENDENCY_GROUP_UNKNOWN,
+      `dependency group ${groupId} is not in the authoritative manifest`,
+      { groupId },
+    );
+  }
+  const dependsOn = [...entry.dependsOn];
+  const manifestDependsOn = [...dependsOn].sort();
+  if (
+    manifestDependsOn.length !== callerDependsOn.length ||
+    manifestDependsOn.some((dependency, index) => dependency !== callerDependsOn[index])
+  ) {
+    throw new ForesiftError(
+      ErrorCode.PROD_DEPENDENCY_ORDER_VIOLATED,
+      `dependency group ${groupId} prerequisite claim [${callerDependsOn.join(', ')}] disagrees with the authoritative manifest [${manifestDependsOn.join(', ')}]`,
+      {
+        groupId,
+        claimedDependsOn: callerDependsOn.join(','),
+        manifestDependsOn: manifestDependsOn.join(','),
+      },
+    );
+  }
   for (const dependency of dependsOn) assertDependencyGroupOrder(dependency, groupId);
   const status = parseDependencyGroupStatus(input.status);
   if (!Number.isInteger(input.manifestRequirementCount) || input.manifestRequirementCount < 0) {

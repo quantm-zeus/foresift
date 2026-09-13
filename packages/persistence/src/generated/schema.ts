@@ -1957,6 +1957,7 @@ export const prodModuleStates = prodSchema.table('module_states', {
   operationalReadiness: text('operational_readiness').notNull(),
   distributionReadiness: text('distribution_readiness').notNull(),
   activationEventRef: text('activation_event_ref'),
+  activationKind: text('activation_kind'),
   supersededBy: text('superseded_by'),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull(),
 });
@@ -1982,6 +1983,7 @@ export const prodActivationGateEvaluations = prodSchema.table('activation_gate_e
   evidenceRefs: jsonb('evidence_refs').notNull(),
   capacityContractRef: text('capacity_contract_ref'),
   activationEventRef: text('activation_event_ref'),
+  activationKind: text('activation_kind').notNull(),
   evaluatedAt: timestamp('evaluated_at', { withTimezone: true }).notNull(),
   expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
 });

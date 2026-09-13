@@ -45,6 +45,7 @@ export const PROD_PRECOMPUTED_BOUND_EXPIRED: LivePathBoundClaim = {
 
 /** A request within every declared ceiling. */
 export const PROD_PRECOMPUTED_REQUEST_WITHIN = {
+  artifactSetHash: PROD_FIXTURE_HASH_A,
   candidates: 10,
   rows: 100,
   edges: 200,
@@ -54,6 +55,7 @@ export const PROD_PRECOMPUTED_REQUEST_WITHIN = {
 
 /** A request that exceeds the row ceiling. */
 export const PROD_PRECOMPUTED_REQUEST_EXCEEDING = {
+  artifactSetHash: PROD_FIXTURE_HASH_A,
   candidates: 10,
   rows: 1_000_000,
   edges: 200,

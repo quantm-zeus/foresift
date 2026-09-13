@@ -279,6 +279,30 @@ function passingWorkspaceInput(scope: ModuleStateScope): ActivationGateInput {
   };
 }
 
+/**
+ * The persisted OPPORTUNITY evidence batch a PROVEN promotion must name
+ * (audit H5): recorded through the real recorder so the reference is derived
+ * from committed rows.
+ */
+async function provenEvidenceFor(
+  scope: ModuleStateScope,
+  eventRef: string,
+): Promise<{ provenEvidenceRef: string; provenEvidenceEventRef: string }> {
+  const evidence = evaluateActivationGate({
+    ...passingOpportunityInput(scope),
+    activationEventRef: eventRef,
+    now: NOW,
+  });
+  if (evidence.verdict !== 'PASS') {
+    throw new Error(`expected passing PROVEN evidence, got ${evidence.verdict}`);
+  }
+  const recorded = await recordActivationGateResult(engine, evidence);
+  if (recorded.evaluationSetRef === null) {
+    throw new Error('expected a persisted PROVEN evidence reference');
+  }
+  return { provenEvidenceRef: recorded.evaluationSetRef, provenEvidenceEventRef: eventRef };
+}
+
 async function advance(
   moduleId: string,
   scope: ModuleStateScope,
@@ -306,7 +330,9 @@ async function advance(
     actorRef: 'test-actor',
     at: NOW,
     gateResult: options.gateResult ?? null,
-    provenEvidenceRef: `sha256:${'c'.repeat(64)}`,
+    ...(toState === 'PROVEN'
+      ? await provenEvidenceFor(scope, `${stateRowId}-proven-evidence`)
+      : {}),
     stateRowId,
     transitionId: `${stateRowId}-t`,
   });
@@ -956,6 +982,48 @@ describe('§69.11 rollback (AC-279)', () => {
     expect(neverActive.code).toBe('PROD_LIFECYCLE_TRANSITION_ILLEGAL');
   }, 120_000);
 
+  it('refuses a rollback whose "prior approval" is a forged pre-ACTIVE row (H7 residual)', async () => {
+    const scope = makeScope({ profile_version: 'rollback-forged-prior' });
+    const moduleId = 'module-rollback-forged-prior';
+    await advance(moduleId, scope, 'IMPLEMENTED', 'rfp-1');
+    await advance(moduleId, scope, 'AVAILABLE', 'rfp-2');
+    // The caller supplies an arbitrary activation event on a NON-crossing append;
+    // DEGRADED is legal from AVAILABLE, so the set never reached ACTIVE.
+    await advanceState(engine, {
+      moduleId,
+      scope,
+      artifactSetHash: HASH_A,
+      toState: 'DEGRADED',
+      operationalReadiness: 'READY_FOR_ACTIVE_PROFILE',
+      distributionReadiness: 'PRIVATE_ONLY',
+      changeClassification: 'MATERIAL_OPERATIONAL',
+      reason: 'forged degraded row',
+      actorRef: 'attacker',
+      at: NOW,
+      activationEventRef: 'forged-prior-event',
+      stateRowId: 'rfp-3',
+      transitionId: 'rfp-3-t',
+    });
+    const rows = await stateRowsFor(engine, { moduleId, scope });
+    expect(rows.some((row) => row.lifecycleState === 'ACTIVE')).toBe(false);
+    expect(rows.some((row) => row.activationEventRef === 'forged-prior-event')).toBe(true);
+
+    const refused = await rejection(
+      rollbackToApproved(engine, {
+        moduleId,
+        scope,
+        restoredArtifactSetHash: HASH_A,
+        priorActivationEventRef: 'forged-prior-event',
+        newActivationEventRef: 'forged-prior-new',
+        candidateReevaluationRef: 'forged-prior-reeval',
+        at: NOW,
+      }),
+    );
+    expect(refused.code).toBe('PROD_LIFECYCLE_TRANSITION_ILLEGAL');
+    const after = await stateRowsFor(engine, { moduleId, scope });
+    expect(after.some((row) => row.activationEventRef === 'forged-prior-new')).toBe(false);
+  }, 120_000);
+
   it('refuses reusing an activation event or restoring an unapproved artifact set', async () => {
     const scope = makeScope({ profile_version: 'rollback-refuse' });
     const moduleId = 'module-rollback-refuse';
@@ -1039,6 +1107,7 @@ describe('ACTIVE is bound to persisted gate evidence (F1)', () => {
     const scope = makeScope({ profile_version: 'forged-empty' });
     const moduleId = 'module-forged-empty';
     await provenLadder(moduleId, scope, 'forged-empty');
+    const before = (await activationGateEvaluationsFor(engine, activationScopeHash(scope))).length;
 
     const refused = await rejection(
       advance(moduleId, scope, 'ACTIVE', 'forged-empty-5', {
@@ -1055,7 +1124,11 @@ describe('ACTIVE is bound to persisted gate evidence (F1)', () => {
     // No ACTIVE row landed and ZERO gate evaluations were ever persisted.
     const rows = await stateRowsFor(engine, { moduleId, scope });
     expect(rows.some((row) => row.lifecycleState === 'ACTIVE')).toBe(false);
-    expect(await activationGateEvaluationsFor(engine, activationScopeHash(scope))).toEqual([]);
+    // The forged attempt minted ZERO additional rows; only the genuine PROVEN
+    // evidence batch from the ladder is present.
+    expect(await activationGateEvaluationsFor(engine, activationScopeHash(scope))).toHaveLength(
+      before,
+    );
   }, 120_000);
 
   it('refuses a hand-built all-PASS object at every recorder and persists zero rows', async () => {
@@ -1063,6 +1136,7 @@ describe('ACTIVE is bound to persisted gate evidence (F1)', () => {
     const moduleId = 'module-forged-brand';
     const scopeHash = activationScopeHash(scope);
     await provenLadder(moduleId, scope, 'forged-brand');
+    const before = (await activationGateEvaluationsFor(engine, scopeHash)).length;
 
     // The exact pre-fix bypass: 11 fabricated PASS evaluations with no proof
     // they came from `evaluateActivationGate`, offered to both public writers.
@@ -1101,7 +1175,7 @@ describe('ACTIVE is bound to persisted gate evidence (F1)', () => {
 
     // ZERO rows were minted, so the fabricated set reference cannot name
     // evidence, and ACTIVE stays unreachable.
-    expect(await activationGateEvaluationsFor(engine, scopeHash)).toEqual([]);
+    expect(await activationGateEvaluationsFor(engine, scopeHash)).toHaveLength(before);
     const refused = await rejection(
       advance(moduleId, scope, 'ACTIVE', 'forged-brand-5', {
         gateResult: { ...handBuilt, evaluations: [] } as never,
@@ -1180,6 +1254,8 @@ describe('ACTIVE is bound to persisted gate evidence (F1)', () => {
     const scopeB = makeScope({ profile_version: 'spread-b' });
     const moduleB = 'module-spread-b';
     await provenLadder(moduleB, scopeB, 'spread-b');
+    const beforeB = (await activationGateEvaluationsFor(engine, activationScopeHash(scopeB)))
+      .length;
 
     // A GENUINE pass for scope A, then a spread-derived copy re-aimed at scope B
     // with fabricated evaluations — the pre-fix bypass. Object identity settles
@@ -1209,7 +1285,9 @@ describe('ACTIVE is bound to persisted gate evidence (F1)', () => {
     expect((refused.detail as { readonly reason?: string }).reason).toBe(
       'ACTIVATION_RESULT_UNBRANDED',
     );
-    expect(await activationGateEvaluationsFor(engine, activationScopeHash(scopeB))).toEqual([]);
+    expect(await activationGateEvaluationsFor(engine, activationScopeHash(scopeB))).toHaveLength(
+      beforeB,
+    );
   }, 120_000);
 
   it('refuses ACTIVE when the activation event reference is empty', async () => {
@@ -1297,8 +1375,32 @@ describe('ACTIVE is bound to persisted gate evidence (F1)', () => {
     const rows = await stateRowsFor(engine, { moduleId, scope });
     expect(rows.some((row) => row.lifecycleState === 'PROVEN')).toBe(false);
 
-    // With the evidence address the promotion is recorded and the reference is
-    // persisted on the transition row.
+    // A FABRICATED content address (and a fabricated event) is not evidence: the
+    // promotion must name a persisted, complete OPPORTUNITY evaluation batch.
+    const fabricated = await rejection(
+      advanceState(engine, {
+        moduleId,
+        scope,
+        artifactSetHash: HASH_A,
+        toState: 'PROVEN',
+        operationalReadiness: 'READY_FOR_ACTIVE_PROFILE',
+        distributionReadiness: 'PRIVATE_ONLY',
+        changeClassification: 'MATERIAL_EVALUATION',
+        reason: 'declare PROVEN with a fabricated evidence address',
+        actorRef: 'test-actor',
+        at: NOW,
+        provenEvidenceRef: `sha256:${'c'.repeat(64)}`,
+        provenEvidenceEventRef: 'fabricated-proven-event',
+        stateRowId: 'proven-ev-5',
+        transitionId: 'proven-ev-5-t',
+      }),
+    );
+    expect(fabricated.code).toBe('PROD_ACTIVATION_GATE_REFUSED');
+    expect((fabricated.detail as { readonly reason?: string }).reason).toBe('EVIDENCE_SET_EMPTY');
+
+    // With a GENUINE persisted OPPORTUNITY evidence batch the promotion records
+    // that batch's set reference on the transition row.
+    const provenEvidence = await provenEvidenceFor(scope, 'proven-evidence-event');
     const promoted = await advanceState(engine, {
       moduleId,
       scope,
@@ -1307,15 +1409,15 @@ describe('ACTIVE is bound to persisted gate evidence (F1)', () => {
       operationalReadiness: 'READY_FOR_ACTIVE_PROFILE',
       distributionReadiness: 'PRIVATE_ONLY',
       changeClassification: 'MATERIAL_EVALUATION',
-      reason: 'declare PROVEN with evidence',
+      reason: 'declare PROVEN with registered evidence',
       actorRef: 'test-actor',
       at: NOW,
-      provenEvidenceRef: `sha256:${'c'.repeat(64)}`,
-      stateRowId: 'proven-ev-5',
-      transitionId: 'proven-ev-5-t',
+      ...provenEvidence,
+      stateRowId: 'proven-ev-6',
+      transitionId: 'proven-ev-6-t',
     });
     expect(promoted.state.lifecycleState).toBe('PROVEN');
-    expect(promoted.transition.gateEvaluationRef).toBe(`sha256:${'c'.repeat(64)}`);
+    expect(promoted.transition.gateEvaluationRef).toBe(provenEvidence.provenEvidenceRef);
   }, 120_000);
 
   it('lets a persisted REFUSE invalidate an older PASS for the same scope, event and kind (H6)', async () => {
@@ -1350,6 +1452,54 @@ describe('ACTIVE is bound to persisted gate evidence (F1)', () => {
       advance(moduleId, scope, 'ACTIVE', 'refuse-inv-5', { gateResult: pass }),
     );
     expect(refused.code).toBe('PROD_ACTIVATION_GATE_REFUSED');
+    const states = await stateRowsFor(engine, { moduleId, scope });
+    expect(states.some((row) => row.lifecycleState === 'ACTIVE')).toBe(false);
+  }, 120_000);
+
+  it('refuses ACTIVE for a requires_proven scope through an OPERATIONAL evaluation (H5 residual)', async () => {
+    const scope = makeScope({ profile_version: 'operational-requires-proven' });
+    const moduleId = 'module-operational-requires-proven';
+    // Ladder that never reaches PROVEN; DEGRADED -> ACTIVE is legal.
+    await advance(moduleId, scope, 'IMPLEMENTED', 'op-proven-1');
+    await advance(moduleId, scope, 'AVAILABLE', 'op-proven-2');
+    await advance(moduleId, scope, 'DEGRADED', 'op-proven-3');
+    expect(scope.requires_proven).toBe(true);
+
+    // An OPERATIONAL evaluation of a requires_proven scope must now REQUIRE the
+    // PROVEN gate (it used to record NOT_APPLICABLE and pass).
+    const operational = evaluateActivationGate({
+      ...passingOpportunityInput(scope),
+      kind: ActivationKind.OPERATIONAL,
+      activationEventRef: 'activation-op-proven',
+    });
+    expect(operational.verdict).toBe('PASS');
+    if (operational.verdict !== 'PASS') throw new Error('unreachable');
+    expect(requiredGatesForActivation(ActivationKind.OPERATIONAL, scope)).toContain(
+      'PROVEN_PRESENT',
+    );
+    const recorded = await recordActivationGateResult(engine, operational);
+
+    // The reviewer's exploit used READY_FOR_SHADOW_ALERTS to dodge the
+    // readiness-vs-kind check; the persisted-dimension check still refuses.
+    const refused = await rejection(
+      advanceState(engine, {
+        moduleId,
+        scope,
+        artifactSetHash: HASH_A,
+        toState: 'ACTIVE',
+        operationalReadiness: 'READY_FOR_SHADOW_ALERTS',
+        distributionReadiness: 'PRIVATE_ONLY',
+        changeClassification: 'MATERIAL_OPERATIONAL',
+        reason: 'operational activation of a requires_proven scope',
+        actorRef: 'test-actor',
+        at: NOW,
+        gateResult: recorded,
+        stateRowId: 'op-proven-4',
+        transitionId: 'op-proven-4-t',
+      }),
+    );
+    expect(refused.code).toBe('PROD_ACTIVATION_GATE_REFUSED');
+    expect((refused.detail as { readonly reason?: string }).reason).toBe('GATE_DIMENSION_MISMATCH');
     const states = await stateRowsFor(engine, { moduleId, scope });
     expect(states.some((row) => row.lifecycleState === 'ACTIVE')).toBe(false);
   }, 120_000);

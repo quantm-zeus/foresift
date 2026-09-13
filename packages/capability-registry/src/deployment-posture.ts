@@ -27,9 +27,11 @@ import {
   ErrorCode,
   ForesiftError,
   bestEffortWeakensOnlyAllowedDimensions,
+  isContractActivatable,
   parseDeploymentPosture,
   parseDeploymentRelaxableDimension,
   parseProtectedDimension,
+  validateSustainableCapacityContract,
   type DeploymentRelaxableDimension,
   type ProtectedDimension,
   type SustainableCapacityContract,
@@ -267,10 +269,21 @@ export async function evaluateDeploymentPosture(
   // SLA_BACKED requires at least one declared critical dependency AND a passing
   // capacity contract, so the posture can never be claimed by declaring nothing.
   const emptyRegister = criticalDependencyIds.length === 0;
-  const capacityBacked =
-    input.capacityContract !== undefined &&
-    input.capacityContract !== null &&
-    input.capacityContract.result === 'PASS';
+  // The capacity claim is validated with the AUTHORITATIVE capacity law, not a
+  // bare `result === 'PASS'` string (audit H8 residual): a contract that
+  // violates a capacity law, is not activatable, or has expired cannot back an
+  // SLA_BACKED posture.
+  let capacityBacked = false;
+  if (input.capacityContract !== undefined && input.capacityContract !== null) {
+    try {
+      validateSustainableCapacityContract(input.capacityContract);
+      capacityBacked =
+        isContractActivatable(input.capacityContract) &&
+        Date.parse(input.capacityContract.expiresAt) > nowMs;
+    } catch {
+      capacityBacked = false;
+    }
+  }
   if (missingSlaRefs.length === 0 && !emptyRegister && capacityBacked) {
     return {
       posture: DeploymentPosture.SLA_BACKED,

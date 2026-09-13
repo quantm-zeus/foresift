@@ -139,6 +139,19 @@ describe('§69.6 critical-dependency SLA evaluation', () => {
     });
     expect(backed.posture).toBe('SLA_BACKED');
 
+    // An EXPIRED or law-violating contract cannot back SLA_BACKED either.
+    const expired = await evaluateDeploymentPosture(engine, {
+      now: NOW,
+      capacityContract: { ...passingCapacityContract(), expiresAt: '2020-01-01T00:00:00Z' },
+    });
+    expect(expired.posture).toBe('FREE_TIER_BEST_EFFORT');
+
+    const bare = await evaluateDeploymentPosture(engine, {
+      now: NOW,
+      capacityContract: { result: 'PASS' } as never,
+    });
+    expect(bare.posture).toBe('FREE_TIER_BEST_EFFORT');
+
     // The consumer that backs the claim refuses a missing/non-PASS contract.
     expect(() => assertCapacityContractBacksPosture(null)).toThrow();
     expect(() =>

@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 /** @requirement FR-TRACE-003 @acceptance AC-266 */
 import { createHash } from 'node:crypto';
+import { spawnSync } from 'node:child_process';
 import { access, readFile, readdir } from 'node:fs/promises';
 import path from 'node:path';
 import { generateOutputs } from '../generate-requirement-manifest/cli.mjs';
@@ -423,7 +424,53 @@ async function reportConsistencyFindings(root, audit) {
   return findings;
 }
 
-export async function verifyReleaseConformance(root) {
+/**
+ * The PROD conformance rules, reached through the bun-run bridge because Node
+ * cannot import the TypeScript rule module (audit H1). The repo-backed surface
+ * rule always runs; the five claim rules run when a claims file is supplied.
+ * Any failure to run the bridge is itself a finding: a gate that cannot look is
+ * not a gate that passed.
+ */
+export async function prodConformanceFindings(root, options = {}) {
+  const bridge = path.join(root, 'scripts/verify-release-conformance/prod-conformance-gate.ts');
+  const args = [bridge, root];
+  if (options.prodClaimsPath !== undefined) args.push(path.resolve(root, options.prodClaimsPath));
+  if (options.requireProdClaims === true) args.push('--require-claims');
+  const result = spawnSync('bun', args, { cwd: root, encoding: 'utf8' });
+  if (result.error || result.status !== 0) {
+    return [
+      finding(
+        'FR-PROD-001',
+        'PROD_CONFORMANCE_GATE_UNAVAILABLE',
+        bridge,
+        `the PROD conformance gate could not run: ${
+          result.error?.message ?? (result.stderr ?? '').trim() ?? 'unknown error'
+        }`,
+      ),
+    ];
+  }
+  let parsed;
+  try {
+    parsed = JSON.parse(result.stdout);
+  } catch {
+    return [
+      finding(
+        'FR-PROD-001',
+        'PROD_CONFORMANCE_GATE_UNAVAILABLE',
+        bridge,
+        'the PROD conformance gate returned no parseable verdict',
+      ),
+    ];
+  }
+  if (typeof parsed.error === 'string') {
+    return [finding('FR-PROD-001', 'PROD_CONFORMANCE_GATE_UNAVAILABLE', bridge, parsed.error)];
+  }
+  return (Array.isArray(parsed.findings) ? parsed.findings : []).map((entry) =>
+    finding(entry.requirementId, entry.rule, entry.path, entry.message),
+  );
+}
+
+export async function verifyReleaseConformance(root, options = {}) {
   const [manifest, audit, milestone] = await Promise.all([
     readFile(path.join(root, MANIFEST), 'utf8').then(JSON.parse),
     readFile(path.join(root, AUDIT), 'utf8').then(JSON.parse),
@@ -440,6 +487,7 @@ export async function verifyReleaseConformance(root) {
     await orphanFindings(root, manifest),
     await generatedDriftFindings(root),
     await reportConsistencyFindings(root, audit),
+    await prodConformanceFindings(root, options),
   ];
   const findings = groups
     .flat()
@@ -459,6 +507,14 @@ export async function verifyReleaseConformance(root) {
       'ORPHAN_PRODUCT_SOURCE',
       'GENERATED_DOCS_DRIFT',
       'RELEASE_REPORT_HASH_CONSISTENCY',
+      'ACTIVATION_WITHOUT_EVIDENCE',
+      'POSTURE_WEAKENING',
+      'MCP_COMPATIBILITY_DRIFT',
+      'LIVE_PATH_PRECOMPUTATION_VIOLATION',
+      'PUBLIC_AUTHORIZATION_WITHOUT_GATE_EVIDENCE',
+      'PROD_CONFORMANCE_INPUT_MISSING',
+      'PROD_SURFACE_MISSING',
+      'PROD_CONFORMANCE_GATE_UNAVAILABLE',
     ],
     findings,
   };
@@ -466,18 +522,43 @@ export async function verifyReleaseConformance(root) {
 
 async function run() {
   const args = process.argv.slice(2);
-  if (args.length === 1 && ['--help', '-h'].includes(args[0])) {
+  if (args.includes('--help') || args.includes('-h')) {
     console.log(
-      'Usage: node scripts/verify-release-conformance/cli.mjs [--json]\nVerify release conformance against the live tree.',
+      'Usage: node scripts/verify-release-conformance/cli.mjs [--json] [--prod-claims <file.json>] [--require-prod-claims]\nVerify release conformance against the live tree.',
     );
     return;
   }
-  if (args.length > 1 || (args.length === 1 && args[0] !== '--json')) {
+  let prodClaimsPath;
+  let requireProdClaims = false;
+  const positional = [];
+  for (let index = 0; index < args.length; index += 1) {
+    const arg = args[index];
+    if (arg === '--json') continue;
+    if (arg === '--require-prod-claims') {
+      requireProdClaims = true;
+      continue;
+    }
+    if (arg === '--prod-claims') {
+      prodClaimsPath = args[index + 1];
+      if (prodClaimsPath === undefined) {
+        console.error('error: --prod-claims requires a file path');
+        process.exitCode = 1;
+        return;
+      }
+      index += 1;
+      continue;
+    }
+    positional.push(arg);
+  }
+  if (positional.length > 0) {
     console.error('error: unsupported conformance verification argument');
     process.exitCode = 1;
     return;
   }
-  const verdict = await verifyReleaseConformance(process.cwd());
+  const verdict = await verifyReleaseConformance(process.cwd(), {
+    prodClaimsPath,
+    requireProdClaims,
+  });
   console.log(JSON.stringify(verdict));
   if (verdict.overall === 'FAILED') process.exitCode = 1;
 }

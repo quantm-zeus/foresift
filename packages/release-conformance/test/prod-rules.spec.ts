@@ -243,6 +243,41 @@ describe('PROD conformance aggregation and unchanged trace rules', () => {
     expect(report.findings[0]?.rule).toBe(PROD_RULES.livePathPrecomputationViolation);
   });
 
+  it('cannot widen the MCP freshness window with a caller override (H10 residual)', () => {
+    const staleCell = {
+      revision: '2025-11-25',
+      clientId: 'client-a',
+      result: 'PASS',
+      liveTestDate: '2000-01-01T00:00:00Z',
+    };
+    const claim = {
+      revisions: [
+        { revision: '2025-11-25', channel: 'STABLE', isDefault: true, supersededBy: null },
+      ],
+      clients: [{ clientId: 'client-a' }],
+      cells: [staleCell],
+      now: '2026-06-01T00:00:00Z',
+      maxAgeSeconds: 1e12,
+    };
+    const report = checkMcpCompatibilityDrift(claim as never);
+    expect(report.passed).toBe(false);
+    expect(report.findings[0]?.rule).toBe(PROD_RULES.mcpCompatibilityDrift);
+  });
+
+  it('treats null mandatory inputs as omissions (H2 residual)', () => {
+    const report = evaluateProdConformance({
+      activationClaims: null,
+      postureDeclarations: null,
+      mcpCompatibility: null,
+      livePaths: null,
+      distributionAuthorizations: null,
+    } as never);
+    expect(report.overall).toBe('FAILED');
+    expect(
+      report.findings.filter((finding) => finding.rule === PROD_RULES.prodConformanceInputMissing),
+    ).toHaveLength(5);
+  });
+
   it('keeps the four pre-existing trace rules present and unchanged', () => {
     expect(CONFORMANCE_RULES).toEqual({
       mapping: 'NORMATIVE_MAPPING_COMPLETE',

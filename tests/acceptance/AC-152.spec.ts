@@ -22,7 +22,7 @@ import {
 } from '@foresift/capability-registry';
 import {
   PROD_FIXTURE_HASH_A,
-  PROD_FIXTURE_PROVEN_EVIDENCE,
+  recordProvenEvidence,
   PROD_FIXTURE_NOW,
   makeProdScope,
   passingOpportunityGateInput,
@@ -53,7 +53,9 @@ async function advanceProd(
     actorRef: 'ac152-prod',
     at: PROD_FIXTURE_NOW,
     gateResult,
-    provenEvidenceRef: PROD_FIXTURE_PROVEN_EVIDENCE,
+    ...(toState === 'PROVEN'
+      ? await recordProvenEvidence(engine, scope, `${stateRowId}-proven-evidence`)
+      : {}),
     stateRowId,
     transitionId: `${stateRowId}-t`,
   });

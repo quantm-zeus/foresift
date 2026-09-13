@@ -210,10 +210,13 @@ BEGIN
         'CAPACITY_CONTRACT',
         'NO_OPEN_CONTAINMENT'
     ];
+    -- PROVEN is required exactly when the exact scope specifies it, for EVERY
+    -- activation kind (audit H5 residual): an OPERATIONAL evaluation must not
+    -- skip the PROVEN precondition of a requires_proven scope.
+    IF (NEW.scope ->> 'requires_proven') = 'true' THEN
+        required_gates := array_append(required_gates, 'PROVEN_PRESENT');
+    END IF;
     IF NEW.activation_kind IN ('OPPORTUNITY', 'WORKSPACE', 'PUBLIC') THEN
-        IF (NEW.scope ->> 'requires_proven') = 'true' THEN
-            required_gates := array_append(required_gates, 'PROVEN_PRESENT');
-        END IF;
         required_gates := required_gates || ARRAY[
             'STATISTICAL_EVIDENCE_SCOPE',
             'NEGATIVE_CONTROLS',

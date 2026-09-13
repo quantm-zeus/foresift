@@ -462,6 +462,11 @@ export interface AdvanceStateInput {
    */
   readonly provenEvidenceRef?: string;
   /**
+   * The activation event the `provenEvidenceRef` batch was recorded for.
+   * REQUIRED exactly when `toState` is `PROVEN`.
+   */
+  readonly provenEvidenceEventRef?: string;
+  /**
    * Explicit activation-event reference for a non-gate-crossing append (for
    * example a rollback's NEW activation event). Defaults to the current row's.
    */
@@ -558,20 +563,30 @@ export async function advanceState(
     );
   }
   const crossing = crossesActivationGate(fromState, toState);
-  // §69.3: PROVEN is established by registered mature-evaluation evidence, not
-  // by declaration (audit H5). The evidence content address is required and is
-  // persisted on the transition row.
+  // §69.3: PROVEN is established by REGISTERED mature-evaluation evidence, not
+  // by declaration (audit H5). The promotion must name the persisted OPPORTUNITY
+  // evaluation batch for the exact scope — the batch whose required statistical
+  // gates are the mature evaluation — and the activation event it was recorded
+  // for. A bare content address is never enough.
   let provenEvidenceRef: string | null = null;
+  let provenEvidenceEventRef: string | null = null;
   if (toState === ModuleLifecycleState.PROVEN) {
     const ref = input.provenEvidenceRef;
-    if (typeof ref !== 'string' || !/^sha256:[0-9a-f]{64}$/.test(ref)) {
+    const event = input.provenEvidenceEventRef;
+    if (
+      typeof ref !== 'string' ||
+      !/^sha256:[0-9a-f]{64}$/.test(ref) ||
+      typeof event !== 'string' ||
+      event.trim().length === 0
+    ) {
       throw new ForesiftError(
         ErrorCode.PROD_ACTIVATION_GATE_REFUSED,
-        'promotion to PROVEN requires the registered mature-evaluation evidence content address that establishes it',
+        'promotion to PROVEN requires the persisted mature-evaluation evidence set reference and the activation event it was recorded for',
         { reason: ModuleStateRefusalReason.PROVEN_EVIDENCE_REQUIRED, scopeHash },
       );
     }
     provenEvidenceRef = ref;
+    provenEvidenceEventRef = event;
   }
   let activationKind: ActivationKind | null = null;
   if (crossing) {
@@ -687,6 +702,21 @@ export async function advanceState(
         },
       );
     }
+    // §69.3: PROVEN is not a declaration. Inside the same transaction, the
+    // named promotion evidence must resolve to a persisted, complete, unexpired
+    // OPPORTUNITY evaluation batch for the exact scope (audit H5): its required
+    // statistical gates ARE the registered mature evaluation, so a fabricated
+    // content address can never establish PROVEN.
+    if (toState === ModuleLifecycleState.PROVEN && provenEvidenceRef !== null) {
+      await requirePersistedActivationEvidence(tx, {
+        scope,
+        scopeHash,
+        activationKind: ActivationKind.OPPORTUNITY,
+        activationEventRef: provenEvidenceEventRef ?? '',
+        evaluationSetRef: provenEvidenceRef,
+        at: input.at,
+      });
+    }
     // ACTIVE is not a declaration: inside the SAME transaction that writes the
     // row, re-derive the evidence from `prod.activation_gate_evaluations`. A
     // caller-constructed PASS object (even a well-formed one) cannot name rows
@@ -697,6 +727,19 @@ export async function advanceState(
       // established. A caller boolean can no longer assert IMPLEMENTED /
       // AVAILABLE / PROVEN that no persisted row supports.
       const dimensions = await statesFor(tx, { moduleId, scope });
+      // A `requires_proven` scope may NEVER reach ACTIVE unless the exact scope
+      // actually reached PROVEN, whatever the gate recorded (audit H5 residual).
+      if (scope.requires_proven && dimensions.proven !== true) {
+        throw new ForesiftError(
+          ErrorCode.PROD_ACTIVATION_GATE_REFUSED,
+          'entering ACTIVE refused: the exact scope specifies requires_proven but no persisted PROVEN state exists for it',
+          {
+            reason: ModuleStateRefusalReason.GATE_DIMENSION_MISMATCH,
+            gate: 'PROVEN_PRESENT',
+            scopeHash,
+          },
+        );
+      }
       const claimedDimensions: readonly [ActivationGateKind, boolean][] = [
         [ActivationGateKind.IMPLEMENTED_PRESENT, dimensions.implemented],
         [ActivationGateKind.AVAILABLE_EVIDENCE, dimensions.available],

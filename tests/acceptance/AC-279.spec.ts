@@ -30,7 +30,7 @@ import {
   PROD_CONTAINMENT_SPECIFIC_CANDIDATE,
   PROD_FIXTURE_ACTIVATION_EVENT,
   PROD_FIXTURE_HASH_A,
-  PROD_FIXTURE_PROVEN_EVIDENCE,
+  recordProvenEvidence,
   PROD_FIXTURE_NOW,
   PROD_LIVE_PATH,
   PROD_ROLLBACK_FIXTURE,
@@ -158,7 +158,9 @@ describe('AC-279 prod-scoped: rollback restores an approved immutable set, creat
         actorRef: 'ac279-prod',
         at: PROD_FIXTURE_NOW,
         gateResult,
-        provenEvidenceRef: PROD_FIXTURE_PROVEN_EVIDENCE,
+        ...(toState === 'PROVEN'
+          ? await recordProvenEvidence(engine, scope, `${stateRowId}-proven-evidence`)
+          : {}),
         stateRowId,
         transitionId: `${stateRowId}-t`,
       });

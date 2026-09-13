@@ -22,7 +22,6 @@ import { checkActivationWithoutEvidence } from '@foresift/release-conformance';
 import {
   PROD_ACTIVE_UNAVAILABLE_CLAIM,
   PROD_FIXTURE_HASH_A,
-  PROD_FIXTURE_PROVEN_EVIDENCE,
   PROD_FIXTURE_NOW,
   PROD_SHADOW_ONLY_CLAIM,
   makeProdScope,
@@ -54,7 +53,6 @@ async function advanceProdNeg(
     actorRef: 'ac152-prod-neg',
     at: PROD_FIXTURE_NOW,
     gateResult,
-    provenEvidenceRef: PROD_FIXTURE_PROVEN_EVIDENCE,
     stateRowId,
     transitionId: `${stateRowId}-t`,
   });

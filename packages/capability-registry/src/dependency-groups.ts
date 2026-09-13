@@ -312,8 +312,6 @@ export async function upsertDependencyGroupStatus(
     readonly manifestRequirementCount: number;
     readonly evidenceRefs?: readonly string[];
     readonly at: string;
-    /** Injectable manifest-backed order view; loaded from the manifest otherwise. */
-    readonly orderView?: DependencyGroupOrderView;
   },
 ): Promise<DependencyGroupStatusRow> {
   const groupId = parseDependencyGroupId(input.groupId);
@@ -324,7 +322,7 @@ export async function upsertDependencyGroupStatus(
   // from the authoritative manifest. A caller claiming a different set — most
   // dangerously an empty one that would let G7 complete while G0…G6 are open —
   // refuses outright.
-  const orderView = input.orderView ?? (await loadDependencyGroupOrderView());
+  const orderView = await loadDependencyGroupOrderView();
   const entry = orderView.groups.find((group) => group.groupId === groupId);
   if (entry === undefined) {
     throw new ForesiftError(

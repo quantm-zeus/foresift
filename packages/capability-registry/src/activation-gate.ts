@@ -109,17 +109,21 @@ export function requiredGatesForActivation(
   scope: ModuleStateScope,
 ): readonly ActivationGateKind[] {
   const parsedScope = parseModuleStateScope(scope);
+  // §69.5: PROVEN is required exactly when the exact scope specifies it — for
+  // EVERY activation kind, not only opportunity (audit H5 residual): a
+  // `requires_proven` scope must never reach ACTIVE through an OPERATIONAL
+  // evaluation that silently skips the PROVEN precondition.
+  const provenGate: ActivationGateKind[] = parsedScope.requires_proven
+    ? [ActivationGateKind.PROVEN_PRESENT]
+    : [];
   const operational: ActivationGateKind[] = [
     ActivationGateKind.IMPLEMENTED_PRESENT,
     ActivationGateKind.AVAILABLE_EVIDENCE,
+    ...provenGate,
     ActivationGateKind.VERIFIED_GATE_EVIDENCE,
     ActivationGateKind.CAPACITY_CONTRACT,
     ActivationGateKind.NO_OPEN_CONTAINMENT,
   ];
-  // §69.5: PROVEN is required exactly when the exact scope specifies it.
-  const provenGate: ActivationGateKind[] = parsedScope.requires_proven
-    ? [ActivationGateKind.PROVEN_PRESENT]
-    : [];
   const opportunity: ActivationGateKind[] = [
     ActivationGateKind.IMPLEMENTED_PRESENT,
     ActivationGateKind.AVAILABLE_EVIDENCE,

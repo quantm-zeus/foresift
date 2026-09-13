@@ -314,7 +314,12 @@ export function checkMcpCompatibilityDrift(claim: McpCompatibilityMatrixClaim): 
     );
   }
 
-  const maxAgeSeconds = claim.maxAgeSeconds ?? MCP_LIVE_TEST_MAX_AGE_SECONDS;
+  // The declared freshness window may only TIGHTEN the authoritative one: a
+  // caller override can never keep a stale cell usable (audit H10 residual).
+  const maxAgeSeconds = Math.min(
+    claim.maxAgeSeconds ?? MCP_LIVE_TEST_MAX_AGE_SECONDS,
+    MCP_LIVE_TEST_MAX_AGE_SECONDS,
+  );
   for (const defaultRevision of defaults) {
     for (const client of claim.clients) {
       const path = `${defaultRevision.revision}\u00d7${client.clientId}`;
@@ -621,7 +626,9 @@ const REQUIRED_PROD_INPUTS = [
 export function checkProdConformanceInputsPresent(input: ProdConformanceInput): ProdRuleReport {
   const findings: ProdConformanceFinding[] = [];
   for (const [field, label] of REQUIRED_PROD_INPUTS) {
-    if (input[field] === undefined) {
+    // `null` is an omission too: a JS caller (or JSON round-trip) must not be
+    // able to slip past the fail-closed check with a null (audit H2 residual).
+    if (input[field] === undefined || input[field] === null) {
       findings.push({
         requirementId: 'FR-PROD-001',
         rule: PROD_RULES.prodConformanceInputMissing,
@@ -644,7 +651,7 @@ export function evaluateProdConformance(input: ProdConformanceInput): ProdConfor
     ...checkProdConformanceInputsPresent(input).findings,
     ...checkActivationWithoutEvidence(input.activationClaims ?? []).findings,
     ...checkPostureWeakening(input.postureDeclarations ?? []).findings,
-    ...(input.mcpCompatibility === undefined
+    ...(input.mcpCompatibility === undefined || input.mcpCompatibility === null
       ? []
       : checkMcpCompatibilityDrift(input.mcpCompatibility).findings),
     ...checkLivePathPrecomputationViolation(input.livePaths ?? []).findings,

@@ -486,13 +486,13 @@ function decodeRollbackRow(row: RawRollbackRow): RollbackEventRow {
 export const ROLLBACK_ALERT_RESUMPTION = 'BLOCKED_PENDING_CANDIDATE_REEVALUATION' as const;
 
 /**
- * The lifecycle states that establish "previously approved" for a restore
- * (audit H7): only a scope that actually REACHED `ACTIVE` was approved, so only
- * `ACTIVE`/`DEGRADED`/`PAUSED` rows qualify. `IMPLEMENTED`/`AVAILABLE`/
- * `SHADOW`/`PROVEN` are pre-approval states: restoring one would roll back to a
- * configuration that was never authorized.
+ * The lifecycle state that establishes "previously approved" for a restore
+ * (audit H7): ONLY a row that actually reached `ACTIVE` was approved. A
+ * `DEGRADED`/`PAUSED` row can be produced by a caller-supplied activation event
+ * on a scope that never activated, so it is not admissible; the approved row is
+ * the ACTIVE row itself and the restore lands in PAUSED.
  */
-const APPROVED_RESTORE_STATES: readonly ModuleLifecycleState[] = ['ACTIVE', 'DEGRADED', 'PAUSED'];
+const APPROVED_RESTORE_STATE: ModuleLifecycleState = 'ACTIVE';
 
 /** Input for `rollbackToApproved`. */
 export interface RollbackToApprovedInput {
@@ -572,7 +572,7 @@ export async function rollbackToApproved(
        FROM prod.module_states
       WHERE module_id = $1 AND scope = $2::jsonb AND artifact_set_hash = $3
         AND activation_event_ref = $4
-        AND lifecycle_state = ANY($5::text[])
+        AND lifecycle_state = $5
       ORDER BY created_at DESC, state_row_id DESC
       LIMIT 1`,
     [
@@ -580,7 +580,7 @@ export async function rollbackToApproved(
       canonicalJson(scope),
       input.restoredArtifactSetHash,
       input.priorActivationEventRef,
-      APPROVED_RESTORE_STATES,
+      APPROVED_RESTORE_STATE,
     ],
   );
   const approved = rows.rows[0];

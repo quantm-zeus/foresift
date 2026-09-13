@@ -1863,3 +1863,36 @@ describe('R12: the release-side import-shadow authority resists a module-init fi
     expect((result.stdout ?? '').trim()).toBe('OK');
   }, 120_000);
 });
+
+/**
+ * M1 (fifth-round convergence audit). The release-gate finding MESSAGES were
+ * still built with `Array.prototype.join`; a `join` shadow returning a
+ * non-string made the message template throw, turning a clean FAILED verdict
+ * into an uncaught exception. The decision must stay total: FAILED, no throw.
+ */
+describe('M1: release-gate finding messages survive a join shadow', () => {
+  it('still returns FAILED (no throw) when Array.prototype.join is shadowed to a non-string', () => {
+    const proto = Array.prototype as unknown as Record<string, unknown>;
+    const originalJoin = proto['join'];
+    proto['join'] = function (this: unknown): unknown {
+      return this;
+    };
+    let result: { readonly overall?: string } | undefined;
+    let error: unknown = null;
+    try {
+      result = evaluateProdConformance({
+        activationClaims: [],
+        postureDeclarations: [],
+        mcpCompatibility: PROD_MCP_COMPLIANT_CLAIM,
+        livePaths: [PROD_LIVE_PATH_NO_BOUND_CLAIM],
+        distributionAuthorizations: [PROD_PUBLIC_AUTHORIZED_MISSING_CLAIM],
+      }) as { readonly overall?: string };
+    } catch (thrown) {
+      error = thrown;
+    } finally {
+      proto['join'] = originalJoin;
+    }
+    expect(error).toBeNull();
+    expect(result?.overall).toBe('FAILED');
+  }, 120_000);
+});

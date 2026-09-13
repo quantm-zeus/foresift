@@ -1,7 +1,7 @@
 {
   "schema": "foresift/bun-migration-manifest@1",
   "migrationId": "bun-test-authority-v1",
-  "generatedAt": "2026-09-13T02:16:26.828Z",
+  "generatedAt": "2026-09-13T02:24:41.050Z",
   "root": ".",
   "totalTestFiles": 601,
   "counts": {
@@ -12,7 +12,7 @@
     "BLOCKED": 0
   },
   "parity": {
-    "previousTotal": 600,
+    "previousTotal": 593,
     "disappeared": []
   },
   "files": [

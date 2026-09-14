@@ -2066,6 +2066,41 @@ describe('V7: caller accessors cannot flip a release-gate decision', () => {
     }
   }, 120_000);
 
+  it('fails closed when an INHERITED prototype carries an integer-index accessor (V7 round 8)', () => {
+    Object.defineProperty(Object.prototype, '0', { configurable: true, set() {} });
+    try {
+      const report = evaluateProdConformance({
+        activationClaims: [PROD_ACTIVE_WITHOUT_GATE_CLAIM],
+        postureDeclarations: [],
+        mcpCompatibility: PROD_MCP_COMPLIANT_CLAIM,
+        livePaths: [],
+        distributionAuthorizations: [],
+      });
+      expect(report.overall).toBe('FAILED');
+    } finally {
+      delete (Object.prototype as unknown as Record<string, unknown>)['0'];
+    }
+  }, 120_000);
+
+  it('fails closed when Array.prototype inherits an integer-index accessor (V7 round 8)', () => {
+    const original = Object.getPrototypeOf(Array.prototype) as object;
+    const hostile = Object.create(original) as Record<string, unknown>;
+    Object.defineProperty(hostile, '0', { configurable: true, set() {} });
+    Object.setPrototypeOf(Array.prototype, hostile);
+    try {
+      const report = evaluateProdConformance({
+        activationClaims: [PROD_ACTIVE_WITHOUT_GATE_CLAIM],
+        postureDeclarations: [],
+        mcpCompatibility: PROD_MCP_COMPLIANT_CLAIM,
+        livePaths: [],
+        distributionAuthorizations: [],
+      });
+      expect(report.overall).toBe('FAILED');
+    } finally {
+      Object.setPrototypeOf(Array.prototype, original);
+    }
+  }, 120_000);
+
   it('binds each claim field once, so a getter cannot hide a violation (V7-A8)', () => {
     let reads = 0;
     const claims = [PROD_ACTIVE_WITHOUT_GATE_CLAIM];

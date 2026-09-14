@@ -591,7 +591,14 @@ export async function evaluateConformance(
 ): Promise<ConformanceResult> {
   // The milestone must be a PRIMITIVE canonical id, checked before the snapshot
   // so a boxed/coercible id is refused rather than materialized (audit HIGH-3).
-  const milestoneOption: unknown = rawOptions.milestone;
+  let milestoneOption: unknown;
+  try {
+    milestoneOption = rawOptions.milestone;
+  } catch {
+    // A throwing getter must not escape the gate (V7 round 8): it is an invalid
+    // milestone and fails closed below.
+    milestoneOption = undefined;
+  }
   if (milestoneOption !== undefined && typeof milestoneOption !== 'string') {
     return {
       overall: 'FAILED',

@@ -2,6 +2,7 @@
 import { createHash, createHmac, timingSafeEqual } from 'node:crypto';
 import { isOneOf } from '@foresift/domain';
 import { canonicalJson, type DatabaseEngine } from '@foresift/persistence';
+import { assertNoHostileArrayIndexShadow } from './shadow-safe.ts';
 
 /**
  * The authoritative closed gate-kind vocabulary. The array is `Object.freeze`d
@@ -314,6 +315,7 @@ function snapshotGateEvidencePayload(payload: GateEvidencePayload): GateEvidence
  * that was actually signed.
  */
 export function snapshotGateEvidenceRecord(record: GateEvidenceRecord): GateEvidenceRecord {
+  assertNoHostileArrayIndexShadow();
   const payload = snapshotGateEvidencePayload(record.payload);
   // Read each indexed field once, in a fixed order.
   const evidenceId = record.evidenceId;

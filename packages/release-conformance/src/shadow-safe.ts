@@ -207,6 +207,10 @@ const capturedArrayBufferByteLengthGetter: ((this: unknown) => unknown) | undefi
     ((this: unknown) => unknown) | undefined;
 const capturedDateGetTime: (this: unknown) => number = Date.prototype.getTime;
 
+const capturedGetOwnPropertyNames = Object.getOwnPropertyNames;
+const capturedGetOwnPropertyDescriptor = Object.getOwnPropertyDescriptor;
+const capturedGetPrototypeOf = Object.getPrototypeOf;
+
 /**
  * Fail closed when `Array.prototype` carries an integer-index accessor. Such a
  * setter silently swallows `array[array.length] = value` (the numeric-append
@@ -215,19 +219,30 @@ const capturedDateGetTime: (this: unknown) => number = Date.prototype.getTime;
  * once at every snapshot boundary.
  */
 export function assertNoHostileArrayIndexShadow(): void {
-  const names = Object.getOwnPropertyNames(Array.prototype);
-  for (let index = 0; index < names.length; index += 1) {
-    const name = names[index] as string;
-    if (!/^\d+$/.test(name)) continue;
-    const descriptor = Object.getOwnPropertyDescriptor(Array.prototype, name);
-    if (
-      descriptor !== undefined &&
-      (descriptor.get !== undefined || descriptor.set !== undefined)
-    ) {
-      throw new TypeError(
-        'Array.prototype carries an integer-index accessor (hostile shadow); numeric appends cannot be trusted',
-      );
+  // Walk the WHOLE prototype chain (Array.prototype -> Object.prototype -> null):
+  // an integer-index accessor on an INHERITED prototype swallows
+  // `array[array.length] = value` just as an own one does, so an own-property
+  // scan was bypassable via `Object.prototype[0]` or
+  // `setPrototypeOf(Array.prototype, hostile)` (V7 review round 8).
+  let proto: object | null = Array.prototype;
+  let depth = 0;
+  while (proto !== null && depth < 32) {
+    const names = capturedGetOwnPropertyNames(proto);
+    for (let index = 0; index < names.length; index += 1) {
+      const name = names[index] as string;
+      if (!/^\d+$/.test(name)) continue;
+      const descriptor = capturedGetOwnPropertyDescriptor(proto, name);
+      if (
+        descriptor !== undefined &&
+        (descriptor.get !== undefined || descriptor.set !== undefined)
+      ) {
+        throw new TypeError(
+          'the array prototype chain carries an integer-index accessor (hostile shadow); numeric appends cannot be trusted',
+        );
+      }
     }
+    proto = capturedGetPrototypeOf(proto) as object | null;
+    depth += 1;
   }
 }
 

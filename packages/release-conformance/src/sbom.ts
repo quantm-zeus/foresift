@@ -1,4 +1,5 @@
 /** @requirement FR-TRACE-006 @acceptance AC-269 */
+import { appendSafe } from './shadow-safe.ts';
 import { createHash } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
 import { numericSortWith } from './shadow-safe.ts';
@@ -84,7 +85,7 @@ export async function generateSbomFromLockfile(lockfilePath: string): Promise<Sb
     }
     // Numeric append only (audit HIGH): a shadowed `push` would empty the
     // inventory and change `inventoryHash` for a fully populated lockfile.
-    components[components.length] = { ...coordinate, integrity, type: 'npm' };
+    appendSafe(components, { ...coordinate, integrity, type: 'npm' });
   }
 
   // Numeric de-duplication and sort only (audit HIGH): `new Map(array)`,
@@ -96,7 +97,7 @@ export async function generateSbomFromLockfile(lockfilePath: string): Promise<Sb
     const key = `${component.name}\u0000${component.version}\u0000${component.integrity}`;
     if (seenCoordinates.has(key)) continue;
     seenCoordinates.add(key);
-    uniqueComponents[uniqueComponents.length] = component;
+    appendSafe(uniqueComponents, component);
   }
   const orderedComponents = numericSortWith(
     uniqueComponents,

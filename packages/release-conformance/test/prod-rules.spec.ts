@@ -13,6 +13,7 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import {
   CLAIM_PROD_RULES,
+  promiseAllNumeric,
   CONFORMANCE_RULES,
   GATE_KINDS,
   PROD_RULES,
@@ -2137,6 +2138,33 @@ describe('V7: caller accessors cannot flip a release-gate decision', () => {
         distributionAuthorizations: [],
       });
       expect(report.overall).toBe('FAILED');
+    } finally {
+      Object.setPrototypeOf(Array.prototype, originalArrayProto);
+    }
+  }, 120_000);
+
+  it('defines settled-promise entries as own properties, immune to a deep-chain accessor (V7 round 10)', async () => {
+    const originalArrayProto = Object.getPrototypeOf(Array.prototype) as object;
+    const hostile = Object.create(null) as Record<string, unknown>;
+    for (let index = 0; index < 4; index += 1) {
+      Object.defineProperty(hostile, String(index), {
+        configurable: true,
+        get() {
+          return 'FABRICATED';
+        },
+        set() {},
+      });
+    }
+    let chain: object = hostile;
+    for (let hop = 0; hop < 40; hop += 1) chain = Object.create(chain) as object;
+    Object.setPrototypeOf(Array.prototype, chain);
+    try {
+      const settled = await promiseAllNumeric([Promise.resolve('A'), Promise.resolve('B')]);
+      // `appendSafe` creates own data properties, so the inherited accessor
+      // cannot swallow the entries or fabricate their values.
+      expect(settled.length).toBe(2);
+      expect(settled[0]).toBe('A');
+      expect(settled[1]).toBe('B');
     } finally {
       Object.setPrototypeOf(Array.prototype, originalArrayProto);
     }

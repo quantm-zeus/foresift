@@ -34,9 +34,13 @@ export function promiseAllNumeric<T extends readonly unknown[] | []>(
 ): Promise<{ -readonly [K in keyof T]: Awaited<T[K]> }> {
   const promises: Promise<unknown>[] = [];
   for (let index = 0; index < items.length; index += 1) {
-    promises[index] = items[index] as Promise<unknown>;
+    // `appendSafe`, never `promises[index] = ...` (V7 round 10): a prototype-chain
+    // index accessor beyond the guard's walk cap (or a Proxy) swallowed the raw
+    // assignment, leaving `Promise.all` with an empty array whose later reads the
+    // accessor fabricated — flipping the release gate FAILED -> PASSED.
+    appendSafe(promises, items[index] as Promise<unknown>);
   }
-  Object.defineProperty(promises, Symbol.iterator, {
+  capturedDefineProperty(promises, Symbol.iterator, {
     value: capturedArrayIterator,
     enumerable: false,
     configurable: true,

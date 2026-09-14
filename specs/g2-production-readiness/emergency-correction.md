@@ -538,3 +538,40 @@ passes from a database migrated to pre-prod `main`; (c) the full prescribed gate
 and exact-SHA CI are green; (d) a **new** fresh-context convergence review of the
 fix head reports no CRITICAL/HIGH. History is preserved (`29f1841` and the whole
 five-round chain remain); nothing is rewritten.
+
+## Sixth-round closure (2026-09-13)
+
+The correction landed as PR #302 (squash `2249040`) on `main`. The re-verification
+bar is met:
+
+- **Independent convergence review** (fresh context, read-only, NEW probes): the
+  reviewer examined `29f1841..5e6c6cd`, independently reproduced each V6 defect at
+  the base and showed it closed at the fix head (MCP: base 14 pass / 4 fail → fix
+  18 pass / 0 fail; prod-rules V6-3: base fail → fix 69 pass / 0 fail), confirmed
+  the fixes add no new fail-open in the D018 `Array.prototype` method/iterator
+  model, and validated the state change (`RUNNING` at the fix head,
+  `PROVEN -> RUNNING` in `ALLOWED_STATUS_TRANSITIONS`, linear additive history,
+  `spec:verify` 13 checks). Verdict:
+  **`READY FOR PROVEN — no CRITICAL/HIGH`**.
+- **Review follow-up `cdc25b2`** (test/doc only; no product source): the first V6
+  regression cut had three LOW test-quality confounds — invalid enum fixtures that
+  made the V6-3 `FAILED` true at the base for unrelated reasons, an FK-confounded
+  write-site assertion, and an inaccurate malformed-`now` description. The
+  strengthened regressions are discriminating at `29f1841` (4 MCP failures + 1
+  V6-3 failure) and non-vacuous at the fix head (both no-over-refusal controls
+  pass at both revisions); a second fresh-context review returned
+  **`READY FOR PROVEN — no CRITICAL/HIGH introduced by `cdc25b2`**.
+- **Local full gate:** `pnpm verify` green at `5e6c6cd`
+  (`{"authority":"BUN_TEST","bunFiles":602,"passed":true}` +
+  node-runtime-compat), `spec:verify` 13 checks, format/lint/typecheck green.
+- **Exact-SHA CI:** run `34805726567` at `5e6c6cd` and run `34808344651` at
+  `cdc25b2` — Fast Gates, Pure, Process/Meta-Gate, Database PGlite and Verify all
+  green.
+
+State change: g2-production-readiness RUNNING → PROVEN (schema-legal), restored
+only after the above. Phase 14 tasks `T082`–`T086` are checked; the deferred
+bounded follow-ups `T087` (statistical-evidence registration) and `T088`
+(exact-key scope CHECK) stay open for the next slice rather than being silently
+dropped. History is preserved (`29f1841`, `4d6c524`, `5e6c6cd`, `cdc25b2`, merged
+as `2249040`); nothing is rewritten. `g2-admin-control` and
+`g2-recovery-continuity` promotion is unblocked.

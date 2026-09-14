@@ -39,7 +39,12 @@ import {
 import { McpProtocolGuard } from '@foresift/security';
 import { canonicalJson, type DatabaseEngine } from '@foresift/persistence';
 import { MCP_PROTOCOL_BASELINE_REVISION } from '@foresift/shared-schemas';
-import { numericConcat, numericSortByString, numericUnique } from './shadow-safe.ts';
+import {
+  numericConcat,
+  numericSortByString,
+  numericUnique,
+  snapshotCallerInput,
+} from './shadow-safe.ts';
 
 /** The declared behavior for a missing/unsupported requested revision. */
 export const McpCompatibilityPolicy = {
@@ -732,13 +737,14 @@ export interface ProtocolRevisionResolution {
  */
 export async function resolveProtocolRevision(
   engine: DatabaseEngine,
-  input: {
+  rawInput: {
     readonly requestedRevision: string | undefined;
     readonly now: string;
     readonly policy: unknown;
     readonly optInRevisions?: readonly string[];
   },
 ): Promise<ProtocolRevisionResolution> {
+  const input = snapshotCallerInput(rawInput);
   const policy = parsePolicy(input.policy);
   // Opt-ins are validated by the matrix resolver, never injected raw (C3).
   const resolution = await resolveCompatibilityMatrix(engine, {

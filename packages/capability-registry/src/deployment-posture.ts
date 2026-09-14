@@ -43,7 +43,7 @@ import {
   type DegradeState,
 } from '@foresift/capacity-planner';
 import { canonicalJson, type DatabaseEngine } from '@foresift/persistence';
-import { numericCopy, numericUnique } from './shadow-safe.ts';
+import { numericCopy, numericUnique, snapshotCallerInput } from './shadow-safe.ts';
 
 // --- critical-dependency register -------------------------------------------
 
@@ -130,7 +130,7 @@ export async function registerCriticalDependency(
 /** Record an SLA row. `applicable` and `slaRef` must agree (SQL CHECK mirror). */
 export async function recordSla(
   engine: DatabaseEngine,
-  input: {
+  rawInput: {
     readonly slaId: string;
     readonly dependencyId: string;
     readonly applicable: boolean;
@@ -139,6 +139,7 @@ export async function recordSla(
     readonly expiresAt: string | null;
   },
 ): Promise<SlaRegisterRow> {
+  const input = snapshotCallerInput(rawInput);
   const slaId = requireText(input.slaId, 'slaId', ErrorCode.PROD_ACTIVATION_SCOPE_INVALID);
   const dependencyId = requireText(
     input.dependencyId,
@@ -223,7 +224,7 @@ interface RawSlaRow {
  */
 export async function evaluateDeploymentPosture(
   engine: DatabaseEngine,
-  input: {
+  rawInput: {
     readonly now: string;
     /**
      * The sustainable-capacity contract the deployment rests on (audit H8). An
@@ -233,6 +234,7 @@ export async function evaluateDeploymentPosture(
     readonly capacityContract?: SustainableCapacityContract | null;
   },
 ): Promise<PostureEvaluation> {
+  const input = snapshotCallerInput(rawInput);
   const nowMs = Date.parse(input.now);
   const dependencies = await engine.query<RawCriticalDependencyRow>(
     `SELECT dependency_id, kind, owner, critical
@@ -420,13 +422,14 @@ export function assertBestEffortPreservesProtectedDimensions(
 /** Persist one validated best-effort declaration (immutable; a new row per change). */
 export async function declareBestEffortPosture(
   engine: DatabaseEngine,
-  input: BestEffortDeclarationInput & {
+  rawInput: BestEffortDeclarationInput & {
     readonly declarationId: string;
     readonly degradedScope: Readonly<Record<string, unknown>>;
     readonly missingSlaRefs: readonly string[];
     readonly at: string;
   },
 ): Promise<void> {
+  const input = snapshotCallerInput(rawInput);
   assertBestEffortPreservesProtectedDimensions(input);
   await engine.query(
     `INSERT INTO prod.best_effort_declarations

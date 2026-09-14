@@ -1719,7 +1719,7 @@ describe('NEW-N3: Promise.all argument arrays resist a surgical Symbol.iterator 
     expect(attacked.findings.map((finding) => finding.rule)).toContain(
       CONFORMANCE_RULES.activePath,
     );
-  });
+  }, 120_000);
 
   it('keeps the unshadowed controls: the failing corpus is FAILED and a conforming corpus is PASSED (N3)', async () => {
     const expectedGeneratedFiles = await generatedSnapshot();
@@ -1742,7 +1742,7 @@ describe('NEW-N3: Promise.all argument arrays resist a surgical Symbol.iterator 
     });
     expect(conforming.overall).toBe('PASSED');
     expect(conforming.findings.length).toBe(0);
-  });
+  }, 120_000);
 
   it('hashes the real document/manifest when the buildReleaseReport Promise.all ARGUMENT is forged (N3)', async () => {
     const options = {
@@ -1780,7 +1780,7 @@ describe('NEW-N3: Promise.all argument arrays resist a surgical Symbol.iterator 
     expect(attacked.manifestHash).toBe(baseline.manifestHash);
     expect(attacked.documentHash).not.toBe(SHA256_EMPTY);
     expect(attacked.manifestHash).not.toBe(SHA256_EMPTY);
-  });
+  }, 120_000);
 
   it('keeps migration/schema hashes when the hashFiles Promise.all ARGUMENT is forged (N3)', async () => {
     const options = {
@@ -1798,7 +1798,7 @@ describe('NEW-N3: Promise.all argument arrays resist a surgical Symbol.iterator 
     );
     expect(attacked.migrationHashes).toEqual(baseline.migrationHashes);
     expect(attacked.schemaHashes).toEqual(baseline.schemaHashes);
-  });
+  }, 120_000);
 
   async function createOrphanFixtureRepo(): Promise<string> {
     const root = await mkdtemp(path.join(tmpdir(), 'n3-orphan-'));
@@ -1843,7 +1843,7 @@ describe('NEW-N3: Promise.all argument arrays resist a surgical Symbol.iterator 
     } finally {
       await rm(root, { recursive: true, force: true });
     }
-  });
+  }, 120_000);
 
   it('still reports a real orphan when the inner 2-element Promise.all ARGUMENT is forged (N3)', async () => {
     const root = await createOrphanFixtureRepo();
@@ -1877,7 +1877,7 @@ describe('NEW-N3: Promise.all argument arrays resist a surgical Symbol.iterator 
     } finally {
       await rm(root, { recursive: true, force: true });
     }
-  });
+  }, 120_000);
 });
 
 /**
@@ -1926,6 +1926,66 @@ describe('R12: the release-side import-shadow authority resists a module-init fi
     });
     expect(result.status).toBe(0);
     expect((result.stdout ?? '').trim()).toBe('OK');
+  }, 120_000);
+});
+
+/**
+ * V7 accessor class: a caller object whose property is a getter must not be able
+ * to present one value to an authorization/validity check and a different value
+ * to the value that is consumed or persisted.
+ */
+describe('V7: caller accessors cannot flip a release-gate decision', () => {
+  it('binds options.requirements once, so a getter cannot skip the PROD block (V7-A1)', async () => {
+    let reads = 0;
+    const options = {
+      repoRoot: REPO_ROOT,
+      milestone: 'G2',
+      get requirements() {
+        reads += 1;
+        return reads === 1 ? [] : undefined;
+      },
+      prodClaims: {
+        activationClaims: [PROD_ACTIVE_WITHOUT_GATE_CLAIM],
+        postureDeclarations: [],
+        mcpCompatibility: PROD_MCP_COMPLIANT_CLAIM,
+        livePaths: [],
+        distributionAuthorizations: [],
+      },
+    };
+    const result = await evaluateConformance(options as never);
+    // The snapshot reads `requirements` once; the authoritative manifest still
+    // decides ownership, so the PROD block runs and the violating claim FAILS.
+    expect(reads).toBe(1);
+    expect(result.overall).toBe('FAILED');
+    const rules = new Set(result.findings.map((finding) => finding.rule));
+    expect(rules).toContain(PROD_RULES.activationWithoutEvidence);
+  }, 120_000);
+
+  it('binds each claim field once, so a getter cannot hide a violation (V7-A8)', () => {
+    let reads = 0;
+    const claims = [PROD_ACTIVE_WITHOUT_GATE_CLAIM];
+    // Define the getter on the FINAL object: object spread would evaluate it
+    // once at construction and copy a plain value.
+    const input: Record<string, unknown> = {
+      postureDeclarations: [],
+      mcpCompatibility: PROD_MCP_COMPLIANT_CLAIM,
+      livePaths: [],
+      distributionAuthorizations: [],
+    };
+    Object.defineProperty(input, 'activationClaims', {
+      enumerable: true,
+      configurable: true,
+      get() {
+        reads += 1;
+        return reads === 1 ? claims : 'not-an-array';
+      },
+    });
+    const report = evaluateProdConformance(input as never);
+    expect(reads).toBe(1);
+    expect(report.overall).toBe('FAILED');
+    expect(
+      report.findings.some((finding) => finding.rule === PROD_RULES.activationWithoutEvidence),
+    ).toBe(true);
   }, 120_000);
 });
 

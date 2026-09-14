@@ -32,6 +32,7 @@ import {
   type ModuleLifecycleState,
 } from '@foresift/domain';
 import { canonicalJson, type DatabaseEngine } from '@foresift/persistence';
+import { snapshotCallerInput } from './shadow-safe.ts';
 import {
   ModuleStateRefusalReason,
   activationScopeHash,
@@ -155,8 +156,9 @@ export function scopeSpecificity(scope: ModuleStateScope): number {
  * returning `[]` threw, and a shadowed `sort` could pick the BROADEST scope.
  */
 export function smallestAffectedScope(
-  candidates: readonly ContainmentScopeCandidate[],
+  rawCandidates: readonly ContainmentScopeCandidate[],
 ): ContainmentScopeCandidate {
+  const candidates = snapshotCallerInput(rawCandidates);
   if (candidates.length === 0) {
     throw new ForesiftError(
       ErrorCode.PROD_ACTIVATION_SCOPE_INVALID,
@@ -282,8 +284,9 @@ export interface ContainmentOutcome {
 /** Open (uncleared) containments, optionally filtered by module. */
 export async function openContainments(
   engine: DatabaseEngine,
-  filter: { readonly moduleId?: string } = {},
+  rawFilter: { readonly moduleId?: string } = {},
 ): Promise<readonly ContainmentEventRow[]> {
+  const filter = snapshotCallerInput(rawFilter);
   const params: unknown[] = [];
   let where = `cleared_by_event_ref IS NULL`;
   if (filter.moduleId !== undefined) {
@@ -340,8 +343,9 @@ export async function loadContainmentFacts(
  */
 export async function containForFailedGate(
   engine: DatabaseEngine,
-  input: ContainForFailedGateInput,
+  rawInput: ContainForFailedGateInput,
 ): Promise<ContainmentOutcome> {
+  const input = snapshotCallerInput(rawInput);
   const criticalGate = parseCriticalGate(input.criticalGate);
   if (typeof input.reason !== 'string' || input.reason.length === 0) {
     throw new ForesiftError(
@@ -469,8 +473,9 @@ export function assertNoAutoReactivation(containment: ContainmentEventRow): void
  */
 export async function clearContainment(
   engine: DatabaseEngine,
-  input: { readonly containmentId: string; readonly revalidationEventRef: string },
+  rawInput: { readonly containmentId: string; readonly revalidationEventRef: string },
 ): Promise<ContainmentEventRow> {
+  const input = snapshotCallerInput(rawInput);
   if (typeof input.revalidationEventRef !== 'string' || input.revalidationEventRef.length === 0) {
     throw new ForesiftError(
       ErrorCode.PROD_ACTIVATION_GATE_REFUSED,
@@ -590,8 +595,12 @@ export interface RollbackOutcome {
  */
 export async function rollbackToApproved(
   engine: DatabaseEngine,
-  input: RollbackToApprovedInput,
+  rawInput: RollbackToApprovedInput,
 ): Promise<RollbackOutcome> {
+  // Bind every field once: the restored set / prior event / new event were read
+  // on both the APPROVAL SELECT and the persisted row, so a getter could pass
+  // approval for set A and persist set B (V7 accessor class).
+  const input = snapshotCallerInput(rawInput);
   const scope = parseModuleStateScope(input.scope);
   const scopeHash = activationScopeHash(scope);
   const moduleId = input.moduleId;
@@ -813,7 +822,7 @@ export async function assertAlertResumptionAllowed(
 /** The three FR-PROD-001 dimensions for a contained scope (read-through). */
 export function dimensionsForContainedScope(
   engine: DatabaseEngine,
-  input: { readonly moduleId: string; readonly scope: ModuleStateScope },
+  rawInput: { readonly moduleId: string; readonly scope: ModuleStateScope },
 ): Promise<ModuleStateDimensions> {
-  return statesFor(engine, input);
+  return statesFor(engine, snapshotCallerInput(rawInput));
 }

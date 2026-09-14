@@ -23,6 +23,7 @@ import {
   type PrecomputedAlphaRequest,
 } from '@foresift/domain';
 import { canonicalJson, sha256Text, type DatabaseEngine } from '@foresift/persistence';
+import { snapshotCallerInput } from './shadow-safe.ts';
 
 /** Closed refusal reasons for a live-path precomputed read (§33.7). */
 export const PrecomputedAlphaRefusalReason = {
@@ -146,7 +147,7 @@ function toDomainBound(bound: PrecomputedAlphaBoundRow): PrecomputedAlphaBound {
 /** Register a bounded precomputed-alpha envelope (every ceiling required). */
 export async function registerPrecomputedAlphaBound(
   engine: DatabaseEngine,
-  input: {
+  rawInput: {
     readonly boundId: string;
     readonly livePath: string;
     readonly artifactRef: string;
@@ -161,6 +162,7 @@ export async function registerPrecomputedAlphaBound(
     readonly expiresAt: string;
   },
 ): Promise<PrecomputedAlphaBoundRow> {
+  const input = snapshotCallerInput(rawInput);
   await engine.query(
     `INSERT INTO prod.precomputed_alpha_bounds
        (bound_id, live_path, artifact_ref, artifact_set_hash, max_candidates, max_rows,
@@ -304,7 +306,7 @@ async function recordRead(
  */
 export async function servePrecomputedAlpha(
   engine: DatabaseEngine,
-  input: {
+  rawInput: {
     readonly livePath: string;
     readonly request: PrecomputedAlphaRequest;
     readonly now: string;
@@ -314,6 +316,7 @@ export async function servePrecomputedAlpha(
     readonly servedAt?: string;
   },
 ): Promise<PrecomputedAlphaResult> {
+  const input = snapshotCallerInput(rawInput);
   const now = utcTimestamp(input.now);
   const at = input.servedAt ?? input.now;
   const readId =

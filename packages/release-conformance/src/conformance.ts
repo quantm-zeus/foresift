@@ -3,7 +3,12 @@ import { constants } from 'node:fs';
 import { access, readFile, readdir } from 'node:fs/promises';
 import path from 'node:path';
 import { resolveMappings } from '@foresift/requirement-manifest';
-import { numericSortStrings, numericSortWith, promiseAllNumeric } from './shadow-safe.ts';
+import {
+  numericSortStrings,
+  numericSortWith,
+  promiseAllNumeric,
+  snapshotCallerInput,
+} from './shadow-safe.ts';
 
 export const CONFORMANCE_RULES = {
   mapping: 'NORMATIVE_MAPPING_COMPLETE',
@@ -581,7 +586,13 @@ function milestoneOwnsProdLaw(
   return false;
 }
 
-export async function evaluateConformance(options: ConformanceOptions): Promise<ConformanceResult> {
+export async function evaluateConformance(
+  rawOptions: ConformanceOptions,
+): Promise<ConformanceResult> {
+  // Single-read snapshot of every caller field (V7 accessor class): a getter on
+  // `options.requirements` previously returned the caller list to one read and
+  // `undefined` to another, silently skipping the whole FR-PROD block.
+  const options = snapshotCallerInput(rawOptions);
   // An explicit milestone must be a canonical dependency group (`G0`…`G7`):
   // zero-padded or otherwise non-canonical ids are a gate-downgrade attempt and
   // refuse closed (audit HIGH-3).

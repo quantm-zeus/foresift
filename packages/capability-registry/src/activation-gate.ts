@@ -57,7 +57,7 @@ import {
   parseModuleStateScope,
   type ModuleStateScope,
 } from './module-states.ts';
-import { numericCopy, numericJoin, numericSortBy } from './shadow-safe.ts';
+import { numericCopy, numericJoin, numericSortBy, snapshotCallerInput } from './shadow-safe.ts';
 
 // --- provenance brand -------------------------------------------------------
 
@@ -1011,39 +1011,11 @@ function evaluateCondition(
 // --- the total gate ---------------------------------------------------------
 
 /**
- * Read a plain-data value exactly ONCE into a frozen snapshot (V7-A2). Each own
- * property and array element is read once; shared references (a DAG) are allowed
- * and cycles keep the original node (a later `canonicalJson` refuses them). The
- * snapshot has a null prototype so an own `__proto__` key cannot mutate it.
- */
-function snapshotPlainValue(value: unknown, seen: WeakSet<object>): unknown {
-  if (value === null || typeof value !== 'object') return value;
-  if (seen.has(value)) return value;
-  seen.add(value);
-  if (Array.isArray(value)) {
-    const copy: unknown[] = [];
-    for (let index = 0; index < value.length; index += 1) {
-      copy[copy.length] = snapshotPlainValue(value[index], seen);
-    }
-    return Object.freeze(copy);
-  }
-  const source = value as Record<string, unknown>;
-  const keys = Object.keys(source);
-  const copy: Record<string, unknown> = Object.create(null) as Record<string, unknown>;
-  for (let index = 0; index < keys.length; index += 1) {
-    const key = keys[index] as string;
-    copy[key] = snapshotPlainValue(source[key], seen);
-  }
-  return Object.freeze(copy);
-}
-
-/**
  * Single-read, frozen materialization of an `ActivationGateInput` (V7-A2). The
  * scope is parsed once (reading each dimension exactly once) and
  * `verifiedGateEvidence` is kept by reference so its identity brand survives.
  */
 function snapshotActivationGateInput(input: ActivationGateInput): ActivationGateInput {
-  const seen = new WeakSet<object>();
   const scope = parseModuleStateScope(input.scope);
   const bound: Record<string, unknown> = Object.create(null) as Record<string, unknown>;
   bound['kind'] = input.kind;
@@ -1052,19 +1024,16 @@ function snapshotActivationGateInput(input: ActivationGateInput): ActivationGate
   bound['implemented'] = input.implemented;
   bound['available'] = input.available;
   bound['proven'] = input.proven;
-  bound['availableEvidence'] = snapshotPlainValue(input.availableEvidence, seen);
-  bound['registeredStatisticalEvidence'] = snapshotPlainValue(
-    input.registeredStatisticalEvidence,
-    seen,
-  );
+  bound['availableEvidence'] = snapshotCallerInput(input.availableEvidence);
+  bound['registeredStatisticalEvidence'] = snapshotCallerInput(input.registeredStatisticalEvidence);
   bound['verifiedGateEvidence'] = input.verifiedGateEvidence;
-  bound['capacityContract'] = snapshotPlainValue(input.capacityContract, seen);
-  bound['distributionEvidence'] = snapshotPlainValue(input.distributionEvidence, seen);
-  bound['openContainment'] = snapshotPlainValue(input.openContainment, seen);
+  bound['capacityContract'] = snapshotCallerInput(input.capacityContract);
+  bound['distributionEvidence'] = snapshotCallerInput(input.distributionEvidence);
+  bound['openContainment'] = snapshotCallerInput(input.openContainment);
   bound['activationEventRef'] = input.activationEventRef;
   bound['expiresAt'] = input.expiresAt;
   if (input.evidenceRefs !== undefined) {
-    bound['evidenceRefs'] = snapshotPlainValue(input.evidenceRefs, seen);
+    bound['evidenceRefs'] = snapshotCallerInput(input.evidenceRefs);
   }
   return Object.freeze(bound) as unknown as ActivationGateInput;
 }

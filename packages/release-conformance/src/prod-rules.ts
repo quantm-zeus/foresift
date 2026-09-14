@@ -39,7 +39,7 @@ import {
   type PrecomputedAlphaRequest,
   type ProtectedDimension,
 } from '@foresift/domain';
-import { numericJoin } from './shadow-safe.ts';
+import { numericJoin, snapshotCallerInput } from './shadow-safe.ts';
 import { readFile, readdir, access } from 'node:fs/promises';
 import path from 'node:path';
 import { resolveMappings } from '@foresift/requirement-manifest';
@@ -1290,7 +1290,10 @@ export function checkProdConformanceInputsPresent(input: ProdConformanceInput): 
  * produced — including the finding emitted for each OMITTED mandatory input, so
  * `evaluateProdConformance({})` can never be a vacuous PASS (audit H2).
  */
-export function evaluateProdConformance(input: ProdConformanceInput): ProdConformanceReport {
+export function evaluateProdConformance(rawInput: ProdConformanceInput): ProdConformanceReport {
+  // Single-read snapshot of the whole claim set (V7 accessor class): the shape
+  // rule and the enforcing rule must see the same claim.
+  const input = snapshotCallerInput(rawInput);
   // Numeric append only: an array spread iterates, so a shadowed
   // `Symbol.iterator` silently aggregated ZERO findings and returned PASSED for
   // `{}` and for a violating live path (audit NEW-M5).

@@ -14,6 +14,7 @@ import {
   numericSortStrings,
   numericSortWith,
   promiseAllNumeric,
+  snapshotCallerInput,
 } from './shadow-safe.ts';
 
 const HASH = /^[a-f0-9]{64}$/;
@@ -118,8 +119,12 @@ async function readJson(file: string): Promise<unknown> {
 
 /** Builds the immutable report from released tree inputs; no wall-clock value is consulted. */
 export async function buildReleaseReport(
-  options: BuildReleaseReportOptions,
+  rawOptions: BuildReleaseReportOptions,
 ): Promise<ReleaseReportRecord> {
+  // Single-read snapshot of every option (V7 accessor class): `conformanceResults`,
+  // `gateEvidence[].isValid`, `milestone` and `previousReport` are each read more
+  // than once across the status/content decisions.
+  const options = snapshotCallerInput(rawOptions);
   const documentPath = path.join(
     options.repoRoot,
     'docs/spec/crypto_intelligence_agent_gateway_PRD_FINAL_v6.0.md',

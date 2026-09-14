@@ -58,6 +58,7 @@ import {
   smallestAffectedScope,
   stateRowsFor,
   statesFor,
+  snapshotCallerInput,
   GATE_EVIDENCE_PEPPER_ENV,
   verifyGateEvidence,
   type ActivationGateInput,
@@ -3394,6 +3395,26 @@ describe('V7: gate evidence is verified with the deployment key, never a caller 
     // non-requires-proven scope would have dropped the gate and PASSED.
     expect(result.verdict).not.toBe('PASS');
     expect(reads).toBe(1);
+  }, 120_000);
+
+  it('snapshots a shared caller node once and never returns the live object (V7-A2)', () => {
+    let reads = 0;
+    const shared: Record<string, unknown> = {};
+    Object.defineProperty(shared, 'value', {
+      enumerable: true,
+      configurable: true,
+      get() {
+        reads += 1;
+        return reads === 1 ? 'first' : 'second';
+      },
+    });
+    const snapshot = snapshotCallerInput([shared, shared]) as readonly Record<string, unknown>[];
+    // The shared node is materialized once and reused: the second entry is the
+    // SAME frozen copy, never the live getter object.
+    expect(reads).toBe(1);
+    expect(snapshot[0]).toBe(snapshot[1]);
+    expect(Object.isFrozen(snapshot[0])).toBe(true);
+    expect(snapshot[0]?.['value']).toBe('first');
   }, 120_000);
 
   it('fails closed when the deployment key is not configured', () => {

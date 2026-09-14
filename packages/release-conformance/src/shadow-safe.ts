@@ -197,3 +197,52 @@ export function numericFlatMap<T, R>(
   }
   return flattened;
 }
+
+/**
+ * Materialize a caller-supplied plain-data value exactly ONCE (V7 accessor
+ * class). Every own property and array element is read a single time into a
+ * frozen null-prototype snapshot, so a getter or Proxy cannot present one value
+ * to an authorization/validity CHECK and a different value to what is CONSUMED,
+ * persisted or returned. Shared (DAG) nodes are snapshotted once and reused; a
+ * true cycle is refused. Branded objects must not be passed through this helper.
+ */
+export function snapshotCallerInput<T>(value: T): T {
+  return snapshotValue(value, new Map<object, unknown>(), new WeakSet<object>()) as T;
+}
+
+function snapshotValue(value: unknown, memo: Map<object, unknown>, path: WeakSet<object>): unknown {
+  if (value === null || typeof value !== 'object') return value;
+  if (path.has(value)) throw new TypeError('cyclic caller input is not supported');
+  const existing = memo.get(value);
+  if (existing !== undefined) return existing;
+  path.add(value);
+  if (Array.isArray(value)) {
+    const copy: unknown[] = [];
+    memo.set(value, copy);
+    for (let index = 0; index < value.length; index += 1) {
+      copy[copy.length] = snapshotValue(value[index], memo, path);
+    }
+    Object.freeze(copy);
+    path.delete(value);
+    return copy;
+  }
+  // Only PLAIN objects and arrays are materialized. A boxed primitive, a class
+  // instance, a Date or a branded object keeps its identity and prototype: a
+  // null-prototype clone would break `String(...)`/`instanceof`/brand checks.
+  const prototype = Object.getPrototypeOf(value);
+  if (prototype !== Object.prototype && prototype !== null) {
+    path.delete(value);
+    return value;
+  }
+  const source = value as Record<string, unknown>;
+  const keys = Object.keys(source);
+  const copy: Record<string, unknown> = Object.create(null) as Record<string, unknown>;
+  memo.set(value, copy);
+  for (let index = 0; index < keys.length; index += 1) {
+    const key = keys[index] as string;
+    copy[key] = snapshotValue(source[key], memo, path);
+  }
+  Object.freeze(copy);
+  path.delete(value);
+  return copy;
+}

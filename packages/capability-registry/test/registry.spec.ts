@@ -3347,6 +3347,55 @@ describe('V7: gate evidence is verified with the deployment key, never a caller 
     expect(control.evidenceId).toBe(genuine.evidenceId);
   }, 120_000);
 
+  it('binds the required scope once when verifying AND branding (V7-A1)', () => {
+    const scopeA = activationScopeHash(makeScope({ profile_version: 'v7-a1-a' }));
+    const scopeB = activationScopeHash(makeScope({ profile_version: 'v7-a1-b' }));
+    const genuine = createGateEvidence(
+      {
+        gateKind: 'OWNER_APPROVAL',
+        approver: 'owner-a',
+        scopeRefs: [scopeA],
+        subject: 'genuine-scope-a',
+        issuedAt: '2026-01-01T00:00:00Z',
+        expiresAt: '2030-01-01T00:00:00Z',
+      } as const,
+      PEPPER,
+    );
+    let reads = 0;
+    const verified = verifyGateEvidence({
+      record: genuine,
+      get requiredScope() {
+        reads += 1;
+        return reads === 1 ? scopeA : scopeB;
+      },
+      currentTime: NOW,
+    } as never);
+    // The scope must be read ONCE and branded as the scope it was verified for.
+    expect(reads).toBe(1);
+    expect(verified.requiredScope).toBe(scopeA);
+    expect(verified.record.scopeRefs[0]).toBe(scopeA);
+  }, 120_000);
+
+  it('binds the gate scope once, so a scope accessor cannot drop a required gate (V7-A2)', () => {
+    const scopeP = makeScope({ profile_version: 'v7-a2', requires_proven: true });
+    const scopeN = makeScope({ profile_version: 'v7-a2', requires_proven: false });
+    const base = passingOpportunityInput(scopeP);
+    let reads = 0;
+    const result = evaluateActivationGate({
+      ...base,
+      proven: false,
+      get scope() {
+        reads += 1;
+        return reads === 1 ? scopeP : scopeN;
+      },
+    } as never);
+    // With a single parsed scope the PROVEN_PRESENT gate is required and the
+    // claimed `proven: false` refuses; a second read returning the
+    // non-requires-proven scope would have dropped the gate and PASSED.
+    expect(result.verdict).not.toBe('PASS');
+    expect(reads).toBe(1);
+  }, 120_000);
+
   it('fails closed when the deployment key is not configured', () => {
     const scope = makeScope({ profile_version: 'v7-f1-unset' });
     const scopeHash = activationScopeHash(scope);

@@ -258,22 +258,31 @@ function payloadRecordMatches(record: GateEvidenceRecord): boolean {
 function snapshotJsonValue(value: unknown, seen: WeakSet<object>): unknown {
   if (value === null || typeof value !== 'object') return value;
   if (seen.has(value)) throw new TypeError('invalid gate evidence metadata: cyclic value');
+  // Track the current PATH only (removed in `finally`): a shared node reached
+  // through two different keys is legal JSON (a DAG), while a node reached twice
+  // on the SAME path is a cycle (V7-A3).
   seen.add(value);
-  if (Array.isArray(value)) {
-    const copy: unknown[] = [];
-    for (let index = 0; index < value.length; index += 1) {
-      copy[copy.length] = snapshotJsonValue(value[index], seen);
+  try {
+    if (Array.isArray(value)) {
+      const copy: unknown[] = [];
+      for (let index = 0; index < value.length; index += 1) {
+        copy[copy.length] = snapshotJsonValue(value[index], seen);
+      }
+      return Object.freeze(copy);
+    }
+    const source = value as Record<string, unknown>;
+    const keys = Object.keys(source);
+    // Null prototype: an OWN `__proto__` metadata key must become a normal own
+    // property, not mutate the snapshot's prototype and change its hash (V7-A3).
+    const copy: Record<string, unknown> = Object.create(null) as Record<string, unknown>;
+    for (let index = 0; index < keys.length; index += 1) {
+      const key = keys[index] as string;
+      copy[key] = snapshotJsonValue(source[key], seen);
     }
     return Object.freeze(copy);
+  } finally {
+    seen.delete(value);
   }
-  const source = value as Record<string, unknown>;
-  const keys = Object.keys(source);
-  const copy: Record<string, unknown> = {};
-  for (let index = 0; index < keys.length; index += 1) {
-    const key = keys[index] as string;
-    copy[key] = snapshotJsonValue(source[key], seen);
-  }
-  return Object.freeze(copy);
 }
 
 /** Read every payload field exactly ONCE into a frozen plain snapshot. */

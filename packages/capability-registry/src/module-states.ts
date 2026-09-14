@@ -553,9 +553,41 @@ function deriveId(prefix: string, payload: unknown): string {
  */
 export async function advanceState(
   engine: DatabaseEngine,
-  input: AdvanceStateInput,
+  rawInput: AdvanceStateInput,
 ): Promise<{ readonly state: ModuleStateRow; readonly transition: StateTransitionRow }> {
-  const scope = parseModuleStateScope(input.scope);
+  // Single-read binding of every caller field (V7-A2 class). The gate result is
+  // kept by reference so its identity brand survives; `scope` is parsed once so
+  // a scope accessor cannot present one dimension set to a check and another to
+  // the value that is persisted, and `at` cannot be one instant for the
+  // staleness comparison and another for the row.
+  const scope = parseModuleStateScope(rawInput.scope);
+  const input: AdvanceStateInput = Object.freeze({
+    moduleId: rawInput.moduleId,
+    scope,
+    artifactSetHash: rawInput.artifactSetHash,
+    toState: rawInput.toState,
+    operationalReadiness: rawInput.operationalReadiness,
+    distributionReadiness: rawInput.distributionReadiness,
+    changeClassification: rawInput.changeClassification,
+    reason: rawInput.reason,
+    actorRef: rawInput.actorRef,
+    at: rawInput.at,
+    ...(rawInput.currentStateRowId === undefined
+      ? {}
+      : { currentStateRowId: rawInput.currentStateRowId }),
+    ...(rawInput.gateResult === undefined ? {} : { gateResult: rawInput.gateResult }),
+    ...(rawInput.provenEvidenceRef === undefined
+      ? {}
+      : { provenEvidenceRef: rawInput.provenEvidenceRef }),
+    ...(rawInput.provenEvidenceEventRef === undefined
+      ? {}
+      : { provenEvidenceEventRef: rawInput.provenEvidenceEventRef }),
+    ...(rawInput.activationEventRef === undefined
+      ? {}
+      : { activationEventRef: rawInput.activationEventRef }),
+    ...(rawInput.stateRowId === undefined ? {} : { stateRowId: rawInput.stateRowId }),
+    ...(rawInput.transitionId === undefined ? {} : { transitionId: rawInput.transitionId }),
+  });
   const scopeHash = activationScopeHash(scope);
   const moduleId = requireText(input.moduleId, 'moduleId', ErrorCode.PROD_ACTIVATION_SCOPE_INVALID);
   const artifactSetHash = requireText(

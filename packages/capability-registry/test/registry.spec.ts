@@ -58,6 +58,7 @@ import {
   smallestAffectedScope,
   stateRowsFor,
   statesFor,
+  configureGateEvidenceVerifierKey,
   verifyGateEvidence,
   type ActivationGateInput,
   type ActivationGateResult,
@@ -77,6 +78,9 @@ const PAST = '2025-01-01T00:00:00Z';
 const HASH_A = `sha256:${'a'.repeat(64)}`;
 const HASH_B = `sha256:${'b'.repeat(64)}`;
 const PEPPER = 'test-pepper';
+// Deployment verification key for this test realm (V7-F1): configured once, never
+// passed to the verification boundary.
+configureGateEvidenceVerifierKey(PEPPER);
 
 let db: PGlite;
 let engine: DatabaseEngine;
@@ -217,12 +221,7 @@ function passingGateEvidence(
     },
     PEPPER,
   );
-  return verifyGateEvidence({
-    record,
-    pepper: PEPPER,
-    requiredScope: scopeHash,
-    currentTime: NOW,
-  });
+  return verifyGateEvidence({ record, requiredScope: scopeHash, currentTime: NOW });
 }
 
 async function gatePass(
@@ -1739,7 +1738,10 @@ describe('ACTIVE is bound to persisted gate evidence (F1)', () => {
       expiresAt: '2027-06-01T00:00:00Z',
     });
     expect(pass.verdict).toBe('PASS');
-    await recordActivationGateResult(engine, pass);
+    // Capture the RECORDED pass: passing the raw evaluator result would carry no
+    // `evaluationSetRef` and the refusal would be EVIDENCE_SET_REF_MISSING for an
+    // unrelated reason (V7 review note).
+    const recordedPass = await recordActivationGateResult(engine, pass);
 
     const refusal = evaluateActivationGate({
       ...passingOpportunityInput(scope),
@@ -1756,9 +1758,12 @@ describe('ACTIVE is bound to persisted gate evidence (F1)', () => {
     expect(rows.some((row) => row.verdict === 'REFUSE')).toBe(true);
 
     const refused = await rejection(
-      advance(moduleId, scope, 'ACTIVE', 'same-instant-5', { gateResult: pass }),
+      advance(moduleId, scope, 'ACTIVE', 'same-instant-5', { gateResult: recordedPass }),
     );
     expect(refused.code).toBe('PROD_ACTIVATION_GATE_REFUSED');
+    expect((refused.detail as { readonly reason?: string } | undefined)?.reason).toBe(
+      'EVIDENCE_SET_NOT_PASS',
+    );
     const states = await stateRowsFor(engine, { moduleId, scope });
     expect(states.some((row) => row.lifecycleState === 'ACTIVE')).toBe(false);
   }, 120_000);
@@ -3213,5 +3218,54 @@ describe('V7: persisted-evidence binding discriminates every dimension', () => {
       at: NOW,
     });
     expect(resolved.rows.length).toBeGreaterThan(0);
+  }, 120_000);
+});
+
+/**
+ * V7-F1 (review round 2). The first cut moved the HMAC key out of
+ * `ActivationGateInput` but still accepted it as a `verifyGateEvidence(...)`
+ * argument, so a caller could self-sign with a key it invented. The key is now
+ * deployment state configured once; the boundary has no key parameter. This test
+ * fails if any caller-supplied key path is reintroduced (the call stops
+ * compiling) or if the boundary stops using the configured key.
+ */
+describe('V7: gate evidence is verified with the deployment key, never a caller key', () => {
+  it('refuses a record signed with a caller-chosen key and accepts the deployment key', () => {
+    const scope = makeScope({ profile_version: 'v7-f1-key' });
+    const scopeHash = activationScopeHash(scope);
+    const payload = {
+      gateKind: 'OWNER_APPROVAL',
+      approver: 'attacker',
+      scopeRefs: [scopeHash],
+      subject: 'self-issued',
+      issuedAt: '2026-01-01T00:00:00Z',
+      expiresAt: FAR_FUTURE,
+    } as const;
+
+    let refusal: { code?: string; detail?: unknown } | undefined;
+    try {
+      verifyGateEvidence({
+        record: createGateEvidence(payload, 'attacker-chosen-pepper-not-the-deployment-secret'),
+        requiredScope: scopeHash,
+        currentTime: NOW,
+      });
+    } catch (error) {
+      refusal = error as { code?: string; detail?: unknown };
+    }
+    expect(refusal?.code).toBe('PROD_ACTIVATION_GATE_REFUSED');
+    expect((refusal?.detail as { readonly reason?: string } | undefined)?.reason).toBe(
+      'GATE_EVIDENCE_INVALID',
+    );
+
+    // Control: a record signed with the configured deployment key verifies.
+    const genuine = verifyGateEvidence({
+      record: createGateEvidence(payload, PEPPER),
+      requiredScope: scopeHash,
+      currentTime: NOW,
+    });
+    expect(genuine.approver).toBe('attacker');
+    // The minted verdict is frozen so a post-mint mutation cannot widen it.
+    expect(Object.isFrozen(genuine.record)).toBe(true);
+    expect(Object.isFrozen(genuine.record.scopeRefs)).toBe(true);
   }, 120_000);
 });

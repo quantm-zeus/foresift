@@ -91,13 +91,47 @@ const ACTIVATION_REFUSAL_BRAND: unique symbol = Symbol('foresift.prod.activation
  * Identity brand for a verified gate-evidence verdict (V7-F1). Before this, the
  * HMAC `pepper` travelled INSIDE `ActivationGateInput` next to the record it
  * verifies, so any caller could pick a key, sign a `GateEvidenceRecord` and have
- * the gate confirm it: the signature attested nothing. The pepper now lives only
- * at the explicit `verifyGateEvidence(...)` boundary, which mints this branded
- * verdict; `evaluateActivationGate` consumes the verdict and refuses an
- * unbranded object, so the gate itself never performs self-referential
- * verification.
+ * the gate confirm it: the signature attested nothing.
+ *
+ * The verification key is now deployment state, configured ONCE through
+ * `configureGateEvidenceVerifierKey` (composition root) and never accepted as a
+ * per-call argument: `verifyGateEvidence` has no key parameter, so a caller
+ * cannot self-sign. The boundary mints this identity-branded verdict and
+ * `evaluateActivationGate` accepts only that brand.
  */
 const VERIFIED_GATE_EVIDENCE_IDENTITY = new WeakSet<object>();
+
+/**
+ * The deployment gate-evidence verification key. `null` until the composition
+ * root configures it; `verifyGateEvidence` refuses closed while unset. Never a
+ * caller argument (V7-F1).
+ */
+let gateEvidenceVerifierKey: string | null = null;
+
+/**
+ * Configure the gate-evidence verification key once, at composition time. The
+ * key is process state, not request state: it is never accepted by
+ * `verifyGateEvidence` or by `ActivationGateInput`.
+ */
+export function configureGateEvidenceVerifierKey(pepper: string): void {
+  if (typeof pepper !== 'string' || pepper.length === 0) {
+    throw new ForesiftError(
+      ErrorCode.PROD_ACTIVATION_GATE_REFUSED,
+      'the gate-evidence verification key must be a non-empty deployment secret',
+      { reason: ActivationGateRefusalReason.GATE_EVIDENCE_MISSING },
+    );
+  }
+  gateEvidenceVerifierKey = pepper;
+}
+
+function resolveGateEvidenceVerifierKey(): string {
+  if (gateEvidenceVerifierKey !== null) return gateEvidenceVerifierKey;
+  throw new ForesiftError(
+    ErrorCode.PROD_ACTIVATION_GATE_REFUSED,
+    'no gate-evidence verification key is configured; the deployment must inject it through configureGateEvidenceVerifierKey, never supply it alongside the record',
+    { reason: ActivationGateRefusalReason.GATE_EVIDENCE_MISSING },
+  );
+}
 
 /** A gate-evidence record verified by `verifyGateEvidence` for one exact scope. */
 export interface VerifiedGateEvidence {
@@ -108,27 +142,30 @@ export interface VerifiedGateEvidence {
   readonly evidenceId: string;
 }
 
-/** Input to the explicit gate-evidence verification boundary (V7-F1). */
+/**
+ * Input to the explicit gate-evidence verification boundary (V7-F1). There is
+ * deliberately NO key field: the boundary resolves the deployment key itself.
+ */
 export interface VerifyGateEvidenceInput {
   readonly record: GateEvidenceRecord;
-  /** The deployment/shared verification key. Never bundled with the record. */
-  readonly pepper: string;
   readonly requiredScope: string;
   readonly currentTime: string;
 }
 
 /**
- * Verify signed/hashed/expiring gate evidence against the supplied key and mint
- * an identity-branded verdict bound to the exact scope it was verified for.
- * This is the ONLY way to obtain a `VerifiedGateEvidence`; a caller that
- * hand-builds the shape fails the brand check in `evaluateActivationGate`.
+ * Verify signed/hashed/expiring gate evidence against the CONFIGURED deployment
+ * key and mint an identity-branded verdict bound to the exact scope it was
+ * verified for. This is the ONLY way to obtain a `VerifiedGateEvidence`; a
+ * caller that hand-builds the shape fails the brand check in
+ * `evaluateActivationGate`, and a caller cannot choose the verification key.
  */
 export function verifyGateEvidence(input: VerifyGateEvidenceInput): VerifiedGateEvidence {
+  const pepper = resolveGateEvidenceVerifierKey();
   let verdict;
   try {
     verdict = evaluateGateEvidence({
       record: input.record,
-      pepper: input.pepper,
+      pepper,
       requiredScope: input.requiredScope,
       currentTime: input.currentTime,
     });
@@ -148,8 +185,16 @@ export function verifyGateEvidence(input: VerifyGateEvidenceInput): VerifiedGate
       { reason: GATE_EVIDENCE_REFUSAL[verdict.reason] },
     );
   }
+  // Freeze a copy so a record mutated AFTER minting cannot change the scope or
+  // the validity window the gate re-checks (V7-F1 review note). `issuedAt` and
+  // `expiresAt` are primitives held by the frozen object; the hash-bound payload
+  // is not read by the gate.
+  const frozenRecord: GateEvidenceRecord = Object.freeze({
+    ...input.record,
+    scopeRefs: Object.freeze([...input.record.scopeRefs]),
+  });
   const verified: VerifiedGateEvidence = Object.freeze({
-    record: input.record,
+    record: frozenRecord,
     requiredScope: input.requiredScope,
     gateKind: verdict.gateKind,
     approver: verdict.approver,

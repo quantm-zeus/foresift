@@ -800,7 +800,8 @@ CRITICAL/HIGH remained open.
 - [x] T091 [serial-reason: SEMANTIC_DEPENDENCY] Fix every finding that
       reproduces under T090 as a bounded corrective slice, each with a
       discriminating negative regression that fails on `27c12c8`. **DONE** —
-      `activation-gate.ts` (F4 finiteness, F1 branded `verifyGateEvidence`),
+      `activation-gate.ts` (F4 finiteness, F1 deployment-configured key +
+      branded `verifyGateEvidence` with no key parameter),
       `release-report.ts` (F7), `conformance.ts` + `cli.mjs` (C1/N3),
       `activation-gate.ts` batch fingerprint (NF2), `prod-rules.ts`
       (NF-2/NF-3/NF-4). Mutation-checked: F4 → 1 fail, NF2 → 1 fail, F7 → 1

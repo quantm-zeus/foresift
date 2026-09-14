@@ -107,6 +107,9 @@ describe('V7: release report refuses to certify unevaluated conformance (F7)', (
       ),
     ).toBe(true);
     expect(report.activationState.status).not.toBe('ACTIVE');
+    // Pin the record-schema balance invariant directly (V7 review note): the
+    // synthetic 1/0/1 counts must keep `verifyReleaseReport` valid.
+    expect(verifyReleaseReport(report).isValid).toBe(true);
 
     // Control: a genuinely evaluated conformance result is recorded verbatim.
     const evaluated = await buildReleaseReport({

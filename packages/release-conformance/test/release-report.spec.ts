@@ -99,7 +99,8 @@ describe('V7: release report refuses to certify unevaluated conformance (F7)', (
       previousReport: VALID_RELEASE_REPORT_FIXTURE.rollbackTarget,
     });
     expect(report.conformanceResults.overall).toBe('FAILED');
-    expect(report.conformanceResults.totalRulesEvaluated).toBe(0);
+    expect(report.conformanceResults.totalRulesEvaluated).toBe(1);
+    expect(report.conformanceResults.failureCount).toBe(1);
     expect(
       report.conformanceResults.findings.some(
         (finding) => finding.rule === 'CONFORMANCE_NOT_EVALUATED',

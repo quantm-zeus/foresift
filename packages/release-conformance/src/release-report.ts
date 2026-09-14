@@ -181,7 +181,9 @@ export async function buildReleaseReport(
   // did not run the gate fails closed instead.
   const defaultConformance: ReleaseReportRecord['conformanceResults'] = {
     overall: 'FAILED',
-    totalRulesEvaluated: 0,
+    // One synthetic rule was evaluated (the mandatory-input rule) and it failed;
+    // the counts must balance for the record schema.
+    totalRulesEvaluated: 1,
     passedCount: 0,
     failureCount: 1,
     findings: [

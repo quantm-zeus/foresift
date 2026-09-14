@@ -740,24 +740,34 @@ directed gates against `29f1841` re-confirmed every C1–C3/H1–H10/R10–R13 f
 as NOT-REPRODUCED and surfaced three bounded defects (V6-1/V6-2/V6-3). No
 CRITICAL/HIGH remained open.
 
-- [ ] T082 [serial-reason: SEMANTIC_DEPENDENCY] V6-1: make `cellUsability`
+- [x] T082 [serial-reason: SEMANTIC_DEPENDENCY] V6-1: make `cellUsability`
       fail closed on a FUTURE-dated conformance run and on a malformed `now`
-      (a non-finite instant made the staleness arithmetic `NaN` and admitted a
-      stale run). Traces: FR-PROD-005, AC-144.
-- [ ] T083 [serial-reason: SEMANTIC_DEPENDENCY] V6-2: require a non-blank
+      (the future run satisfied provenance; a malformed instant escaped as a
+      domain throw and now returns a typed `CELL_NOT_USABLE`). Traces:
+      FR-PROD-005, AC-144.
+- [x] T083 [serial-reason: SEMANTIC_DEPENDENCY] V6-2: require a non-blank
       declared `conformanceFixtureRef` and a non-blank run `fixtureRef` so
-      `'' === ''` cannot satisfy H10 provenance; refuse blank fixture refs at
-      both write sites. Traces: FR-PROD-005, AC-144.
-- [ ] T084 [serial-reason: SEMANTIC_DEPENDENCY] V6-3: require
+      `'' === ''` cannot satisfy H10 provenance; refuse non-string/trim-blank
+      fixture refs at both write sites before any query. Traces: FR-PROD-005,
+      AC-144.
+- [x] T084 [serial-reason: SEMANTIC_DEPENDENCY] V6-3: require
       `weakenedDimensions`/`protectedDimensions` to be arrays in
       `checkProdConformanceInputsPresent`, so a `{length:0}` object cannot drive
       a PASSED posture report. Traces: FR-PROD-004, AC-153.
-- [ ] T085 [executor: TEST] Discriminating regressions for T082–T084 that FAIL
-      against `29f1841` and PASS at the fix head (future-dated run, non-finite
-      `now`, blank fixture provenance, non-array posture dimensions).
-- [ ] T086 [serial-reason: COORDINATOR_BOUNDARY] Fresh-context convergence
+- [x] T085 [executor: TEST] Discriminating regressions for T082–T084 that FAIL
+      against `29f1841` and PASS at the fix head (future-dated run, malformed
+      `now`, blank fixture provenance read + both write sites, non-array posture
+      dimensions), plus no-over-refusal controls that pass at both revisions.
+      Strengthened in `cdc25b2` after the first convergence review found the
+      initial V6-3 fixtures non-discriminating and the write-site test
+      FK-confounded; re-verified in a temporary base worktree at `29f1841`
+      (4 MCP failures + 1 V6-3 failure) and at the fix head (0 failures).
+- [x] T086 [serial-reason: COORDINATOR_BOUNDARY] Fresh-context convergence
       review of the sixth-round fix head, full prescribed gates, exact-SHA CI,
-      and a NEW independent audit before PROVEN is restored. Traces:
+      and a NEW independent audit before PROVEN is restored. Two reviews
+      returned `READY FOR PROVEN — no CRITICAL/HIGH` (the second covering the
+      `cdc25b2` test hardening); `pnpm verify` green at `5e6c6cd`; exact-SHA CI
+      `34805726567` (`5e6c6cd`) and `34808344651` (`cdc25b2`) green. Traces:
       FR-PROD-001…006.
 - [ ] T087 [deferred: BOUNDED_SLICE] Register statistical evidence keyed by
       `(scope_hash, evidence_ref)` with dataset/holdout provenance and require

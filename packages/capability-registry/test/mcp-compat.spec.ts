@@ -457,3 +457,122 @@ describe('MCP opt-in validation and conformance provenance (C3/H10 regressions)'
     }
   }, 120_000);
 });
+
+/**
+ * Sixth-round independent verification (V6-1/V6-2). `cellUsability` counted a
+ * FUTURE-dated run as fresh, a malformed `now` disabled the staleness comparison
+ * (`NaN > bound` is false), and `'' === ''` satisfied fixture provenance. All
+ * three made a non-existent or stale test satisfy a production-readiness cell.
+ */
+describe('MCP conformance freshness and fixture provenance (V6-1/V6-2 regressions)', () => {
+  const cell = {
+    cellId: 'v6-cell',
+    revision: '2099-03-01',
+    clientId: 'client-a',
+    conformanceFixtureRef: 'fixture-a',
+    liveTestDate: RECENT,
+    result: 'PASS' as const,
+    notes: null,
+  };
+
+  it('V6-1: a FUTURE-dated conformance run is not evidence that a test happened', () => {
+    const future = cellUsability({
+      cell,
+      passingRuns: [
+        {
+          revision: '2099-03-01',
+          clientId: 'client-a',
+          fixtureRef: 'fixture-a',
+          ranAt: '2030-01-01T00:00:00Z',
+        },
+      ],
+      revision: '2099-03-01',
+      clientId: 'client-a',
+      now: NOW,
+    });
+    expect(future.usable).toBe(false);
+    expect(future.reason).toBe('CELL_NOT_USABLE');
+  });
+
+  it('V6-1: a malformed `now` fails closed instead of disabling the staleness comparison', () => {
+    const malformed = cellUsability({
+      cell,
+      passingRuns: [
+        { revision: '2099-03-01', clientId: 'client-a', fixtureRef: 'fixture-a', ranAt: STALE },
+      ],
+      revision: '2099-03-01',
+      clientId: 'client-a',
+      now: 'not-an-instant',
+    });
+    expect(malformed.usable).toBe(false);
+    expect(malformed.reason).toBe('CELL_NOT_USABLE');
+  });
+
+  it('V6-1: a valid in-window run still satisfies the cell (no over-refusal)', () => {
+    const matching = cellUsability({
+      cell,
+      passingRuns: [
+        { revision: '2099-03-01', clientId: 'client-a', fixtureRef: 'fixture-a', ranAt: RECENT },
+      ],
+      revision: '2099-03-01',
+      clientId: 'client-a',
+      now: NOW,
+    });
+    expect(matching.usable).toBe(true);
+  });
+
+  it('V6-2: a blank declared fixture reference cannot be satisfied by a blank run', () => {
+    const blankCell = { ...cell, conformanceFixtureRef: '' };
+    const blankToBlank = cellUsability({
+      cell: blankCell,
+      passingRuns: [
+        { revision: '2099-03-01', clientId: 'client-a', fixtureRef: '', ranAt: RECENT },
+      ],
+      revision: '2099-03-01',
+      clientId: 'client-a',
+      now: NOW,
+    });
+    expect(blankToBlank.usable).toBe(false);
+    expect(blankToBlank.reason).toBe('CELL_NOT_USABLE');
+  });
+
+  it('V6-2: a blank run fixture reference never satisfies a non-blank cell', () => {
+    const blankRun = cellUsability({
+      cell,
+      passingRuns: [
+        { revision: '2099-03-01', clientId: 'client-a', fixtureRef: '', ranAt: RECENT },
+      ],
+      revision: '2099-03-01',
+      clientId: 'client-a',
+      now: NOW,
+    });
+    expect(blankRun.usable).toBe(false);
+    expect(blankRun.reason).toBe('CELL_NOT_USABLE');
+  });
+
+  it('V6-2: both write sites refuse a blank fixture reference', async () => {
+    const blankCell = await rejection(
+      insertMcpCompatibilityCell(engine, {
+        cellId: 'v6-blank-cell',
+        revision: '2099-03-01',
+        clientId: 'client-a',
+        conformanceFixtureRef: '   ',
+        liveTestDate: RECENT,
+        result: 'PASS',
+      }),
+    );
+    expect(blankCell.code).toBe('PROD_ACTIVATION_GATE_REFUSED');
+
+    const blankRun = await rejection(
+      insertMcpConformanceRun(engine, {
+        runId: 'v6-blank-run',
+        revision: '2099-03-01',
+        clientId: 'client-a',
+        fixtureRef: '',
+        result: 'PASS',
+        ranAt: RECENT,
+      }),
+    );
+    expect(blankRun.code).toBe('PROD_ACTIVATION_GATE_REFUSED');
+  }, 120_000);
+});

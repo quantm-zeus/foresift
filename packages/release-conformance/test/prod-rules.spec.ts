@@ -558,6 +558,64 @@ describe('PROD conformance aggregation and unchanged trace rules', () => {
     expect(unknown.readinessKnown).toBe(false);
     expect(unknown.authorized).toBe(false);
   });
+
+  /**
+   * V6-3 (sixth-round verification). Presence was checked for the posture
+   * dimension fields but not their shape, so `weakenedDimensions: { length: 0 }`
+   * was read by the numeric scan as "declares zero weakening" and a violating
+   * posture corpus reached PASSED.
+   */
+  it('requires the posture dimension fields to be arrays (V6-3)', () => {
+    const report = evaluateProdConformance({
+      activationClaims: [],
+      postureDeclarations: [
+        {
+          declarationId: 'v6-posture',
+          posture: 'BEST_EFFORT_FREE_TIER',
+          weakenedDimensions: { length: 0 },
+          protectedDimensions: ['IDENTITY', 'AUDIT', 'DUPLICATE_PREVENTION'],
+        },
+      ],
+      mcpCompatibility: { revisions: [], clients: [], cells: [], now: '2026-06-01T00:00:00Z' },
+      livePaths: [],
+      distributionAuthorizations: [],
+    } as never);
+    expect(report.overall).toBe('FAILED');
+    const paths = report.findings
+      .filter((finding) => finding.rule === PROD_RULES.prodConformanceInputMissing)
+      .map((finding) => finding.path);
+    expect(paths).toContain('postureDeclarations[0].weakenedDimensions');
+  });
+
+  it('keeps a well-shaped posture declaration admissible (V6-3 no over-refusal)', () => {
+    const report = evaluateProdConformance({
+      activationClaims: [],
+      postureDeclarations: [
+        {
+          declarationId: 'v6-posture-ok',
+          posture: 'BEST_EFFORT_FREE_TIER',
+          weakenedDimensions: ['FRESHNESS'],
+          protectedDimensions: [
+            'IDENTITY',
+            'POINT_IN_TIME',
+            'AUDIT',
+            'DUPLICATE_PREVENTION',
+            'SECURITY',
+            'CAPACITY',
+            'CRITICAL_RISK_MONITORING',
+          ],
+        },
+      ],
+      mcpCompatibility: { revisions: [], clients: [], cells: [], now: '2026-06-01T00:00:00Z' },
+      livePaths: [],
+      distributionAuthorizations: [],
+    } as never);
+    const paths = report.findings
+      .filter((finding) => finding.rule === PROD_RULES.prodConformanceInputMissing)
+      .map((finding) => finding.path);
+    expect(paths).not.toContain('postureDeclarations[0].weakenedDimensions');
+    expect(paths).not.toContain('postureDeclarations[0].protectedDimensions');
+  });
 });
 
 describe('THIRD-ROUND exploit regressions (R2/R3, T055/T056/T057)', () => {

@@ -1,7 +1,7 @@
 {
   "schema": "foresift/bun-migration-manifest@1",
   "migrationId": "bun-test-authority-v1",
-  "generatedAt": "2026-09-13T23:47:53.207Z",
+  "generatedAt": "2026-09-14T00:28:01.639Z",
   "root": ".",
   "totalTestFiles": 607,
   "counts": {
@@ -12,7 +12,7 @@
     "BLOCKED": 0
   },
   "parity": {
-    "previousTotal": 602,
+    "previousTotal": 607,
     "disappeared": []
   },
   "files": [
@@ -2863,9 +2863,9 @@
     {
       "path": "packages/persistence/test/migrator.spec.ts",
       "package": "@foresift/persistence",
-      "bytes": 31588,
-      "lines": 769,
-      "sha256": "5c10e11f11f21f33d9f67d53e715c5992a2c4700506d82d379bfb419e8984995",
+      "bytes": 31656,
+      "lines": 770,
+      "sha256": "284b63ade8c995deb0dae5cc250b64b84f5f496009a3e82ebefc4a92218b2513",
       "imports": [
         "bun:test",
         "@electric-sql/pglite",

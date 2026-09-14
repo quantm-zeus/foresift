@@ -696,6 +696,7 @@ describe('migrator fail-closed defenses (FR-DATA-001…006 / FR-DR-001/002 subst
     try {
       const outcomes = await Promise.allSettled([
         applyMigrations({ engine, migrationsDir: MIGRATIONS_DIR }),
+        applyMigrations({ engine, migrationsDir: MIGRATIONS_DIR }),
       ]);
       const fulfilled = outcomes.filter((o) => o.status === 'fulfilled');
       const rejected = outcomes.filter((o): o is PromiseRejectedResult => o.status === 'rejected');

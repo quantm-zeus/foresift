@@ -618,3 +618,69 @@ state. History is preserved: `27c12c8` and the whole six-round chain remain;
 nothing is rewritten.
 
 Phase 15 tasks `T089`–`T094` bind this round.
+
+## Seventh-round verification findings and correction (2026-09-14)
+
+Five fresh-context, read-only adversarial verifiers with disjoint finding sets
+(activation-gate integrity; MCP/alpha/posture; conformance/migrations/trust
+boundary/rollback/dependency groups; open-ended red team; test discriminating
+power) re-derived the whole C1–C3 / H1–H10 / R1–R13 / V6 set from current source
+and executable probes. They were instructed not to read this ledger, the task
+names, the fix commits or any prior verdict.
+
+**Not reproduced.** No original CRITICAL/HIGH reproduced: C1/C2/C3, H1–H10,
+R1–R13 and V6-1–V6-3 were re-derived as closed, including the additive upgrade
+path from a database migrated to a pre-prod-`main` revision, the live-path
+`ImportGate` quarantine resolution, the rollback prior-ACTIVE + exact-event
+requirement, the dependency-group manifest agreement and the activation-gate
+kind/event/scope binding at both the TypeScript and SQL layers.
+
+**Reproduced (fixed here).**
+
+| ID    | Sev                                      | Defect at `27c12c8`                                                                                                                                                                                                                                   | Fix                                                                                                                                                                                          |
+| ----- | ---------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| F4    | HIGH                                     | `requirePersistedActivationEvidence` compared `Date.parse(expiresAt) <= Date.parse(at)` with no finiteness check. `at='now'` is PostgreSQL-valid but `Date.parse('now')` is NaN, so `expiresAt <= NaN` was false and expired evidence reached PROVEN. | both sides must resolve to real instants; an unresolvable `expiresAt` is stale.                                                                                                              |
+| F1    | CRITICAL (self-referential verification) | `ActivationGateInput` carried `{ record, pepper }`, so the caller supplied the HMAC key next to the record the gate verified: the signature attested nothing and a caller could self-sign.                                                            | the pepper leaves the gate input; `verifyGateEvidence(...)` mints an identity-branded `VerifiedGateEvidence`, re-bound to the exact scope and instant, and the gate accepts only that brand. |
+| F7    | MEDIUM (fail-open)                       | `buildReleaseReport` defaulted an omitted conformance result to `overall: 'PASSED', totalRulesEvaluated: 0`.                                                                                                                                          | omitting it records `FAILED` with a `CONFORMANCE_NOT_EVALUATED` finding.                                                                                                                     |
+| C1/N3 | HIGH (gate downgrade)                    | `evaluateConformance` discarded supplied PROD claims when the caller-pinned milestone owned no FR-PROD law: `{milestone:'G0', prodClaims:<violates all five>}` returned PASSED.                                                                       | supplied claims are always evaluated, and the CLI requires them when the ACTIVE milestone owns FR-PROD law.                                                                                  |
+| NF2   | LOW (real)                               | the deterministic `evaluation_id` collided on the shared PASS prefix at an identical `evaluatedAt`, so a same-instant REFUSE aborted with a raw primary-key violation and could not invalidate an older PASS.                                         | the id includes a fingerprint of the whole batch.                                                                                                                                            |
+| NF-2  | LOW                                      | `evaluateProdConformance` threw a `TypeError` on sparse/malformed claim elements instead of returning a verdict.                                                                                                                                      | a fail-closed `PROD_CONFORMANCE_RULE_THREW` finding, evaluation continues.                                                                                                                   |
+| NF-3  | LOW                                      | a superseded STABLE revision was accepted as the MCP compatibility default by the release rule while the resolver excludes it.                                                                                                                        | the release rule refuses a superseded default.                                                                                                                                               |
+| NF-4  | LOW                                      | `LivePathPrecomputationClaim.artifactRef` was declared and never read.                                                                                                                                                                                | removed rather than implying a check that does not exist.                                                                                                                                    |
+
+**Test-quality correction.** A sixth verifier mutation-checked the corpus (26
+mutations on a `/tmp` copy) and showed the persisted-evidence **kind binding** and
+**`evaluationSetRef` content-address binding** were effectively untested at every
+layer, that the SQL trigger's **expiry**, **exactly-one-PASS** and **kind**
+predicates were unproven (every seed used 2030, one row per gate, one kind), and
+that the TypeScript blank-only event classes were untested. New discriminating
+tests close all of those, plus the F4/F7/C1/NF2 regressions above.
+
+**Documented residuals (recorded, not silently dropped).**
+
+- **F3 — raw-DB-writer trust boundary.** A writer with `INSERT` on `prod.*` can
+  insert a PROVEN row directly and forge the evaluation rows an ACTIVE row then
+  rests on (the ACTIVE trigger proves completeness, not authenticity). This is
+  the same boundary as D013/D014: binding PROVEN at SQL raises the bar but does
+  not close the class, because the batch rows are equally insertable.
+- **F2/F5 — caller-supplied runtime distribution/authorization evidence and the
+  `prodClaims` seam.** `DISTRIBUTION_EVIDENCE` is a declared verdict set and the
+  PROD release rules consume a caller-supplied claims snapshot. This is the
+  accepted D013 caller trust boundary; the authoritative authentication/step-up
+  for high-impact actions is AC-274 on the admin surface, not this library.
+- **NF-1 — API MCP admission wiring (MEDIUM).** `apps/api/src/mcp/protocol-wiring.ts`
+  builds `McpProtocolGuard`'s allow-list from caller-declared
+  `mutuallyTestedRevisions`/`optInDraftRevisions` and `apps/api/src/config.ts`
+  validates the configured revision list by date shape only, bypassing the
+  governed matrix resolver. There is no in-repo production constructor that
+  links config to the wiring, so it is not a live path today; it is recorded for
+  the MCP surface package rather than fixed through a cross-package refactor in
+  this slice.
+- **F8 — prohibited-capability scanner (MEDIUM).** The scanner is keyword-based
+  and CI-only (`pnpm verify` does not run it). Recorded; the permanent
+  prohibited-capability policy is unchanged.
+
+**Proof bar (unchanged).** PROVEN is restored only after the fix head has a
+discriminating regression per reproduced defect, the upgrade-path test passes,
+the full prescribed gates and exact-SHA CI are green, and a **new** fresh-context
+convergence review reports no CRITICAL/HIGH.

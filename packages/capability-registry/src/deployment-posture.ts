@@ -318,8 +318,10 @@ export async function evaluateDeploymentPosture(
     appendSafe(reasons, 'no passing sustainable-capacity contract backs the deployment');
   }
   if (missingSlaRefs.length > 0) {
-    reasons[reasons.length] =
-      `${missingSlaRefs.length} critical dependency(ies) lack an applicable unexpired SLA`;
+    appendSafe(
+      reasons,
+      `${missingSlaRefs.length} critical dependency(ies) lack an applicable unexpired SLA`,
+    );
   }
   return {
     posture: DeploymentPosture.FREE_TIER_BEST_EFFORT,

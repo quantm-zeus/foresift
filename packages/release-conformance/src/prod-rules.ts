@@ -1010,40 +1010,58 @@ export function checkPublicAuthorizationWithoutGateEvidence(
     const requirementId = claim.requirementId ?? DEFAULT_PUBLIC_AUTHORIZATION_REQUIREMENT;
     const details: string[] = [];
     if (evaluation.requiredGateKindsEmpty) {
-      details[details.length] =
-        'no required gate kinds were declared (an empty requirement set cannot authorize)';
+      appendSafe(
+        details,
+        'no required gate kinds were declared (an empty requirement set cannot authorize)',
+      );
     }
     if (evaluation.malformedRequiredGateKinds) {
-      details[details.length] =
-        'requiredGateKinds is not an array (a gate set must be declared as an array)';
+      appendSafe(
+        details,
+        'requiredGateKinds is not an array (a gate set must be declared as an array)',
+      );
     }
     if (evaluation.malformedReleaseRef) {
-      details[details.length] =
-        'releaseRef is not a non-empty string (a degenerate release identity cannot authorize)';
+      appendSafe(
+        details,
+        'releaseRef is not a non-empty string (a degenerate release identity cannot authorize)',
+      );
     }
     if (evaluation.malformedGateEvidence) {
-      details[details.length] =
-        'gateEvidence is not an array of records, or an evidence scopeRefs is not an array of release refs';
+      appendSafe(
+        details,
+        'gateEvidence is not an array of records, or an evidence scopeRefs is not an array of release refs',
+      );
     }
     if (evaluation.missingGateKinds.length > 0) {
-      details[details.length] =
-        `missing gate evidence: ${numericJoin(evaluation.missingGateKinds, ', ')}`;
+      appendSafe(
+        details,
+        `missing gate evidence: ${numericJoin(evaluation.missingGateKinds, ', ')}`,
+      );
     }
     if (evaluation.mismatchedGateKinds.length > 0) {
-      details[details.length] =
-        `evidence not scoped to release ${claim.releaseRef}: ${numericJoin(evaluation.mismatchedGateKinds, ', ')}`;
+      appendSafe(
+        details,
+        `evidence not scoped to release ${claim.releaseRef}: ${numericJoin(evaluation.mismatchedGateKinds, ', ')}`,
+      );
     }
     if (evaluation.revokedOrInvalidGateKinds.length > 0) {
-      details[details.length] =
-        `revoked or invalid gate evidence: ${numericJoin(evaluation.revokedOrInvalidGateKinds, ', ')}`;
+      appendSafe(
+        details,
+        `revoked or invalid gate evidence: ${numericJoin(evaluation.revokedOrInvalidGateKinds, ', ')}`,
+      );
     }
     if (evaluation.omittedMandatoryGateKinds.length > 0) {
-      details[details.length] =
-        `authoritative mandatory gate kinds omitted from the declaration: ${numericJoin(evaluation.omittedMandatoryGateKinds, ', ')}`;
+      appendSafe(
+        details,
+        `authoritative mandatory gate kinds omitted from the declaration: ${numericJoin(evaluation.omittedMandatoryGateKinds, ', ')}`,
+      );
     }
     if (evaluation.unknownGateKinds.length > 0) {
-      details[details.length] =
-        `declared gate kinds outside the authoritative set: ${numericJoin(evaluation.unknownGateKinds, ', ')}`;
+      appendSafe(
+        details,
+        `declared gate kinds outside the authoritative set: ${numericJoin(evaluation.unknownGateKinds, ', ')}`,
+      );
     }
     appendSafe(findings, {
       requirementId,

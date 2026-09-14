@@ -98,8 +98,10 @@ export function validateOrphanExceptionLedger(
         if (!knownRequirementIds.has(requirementId)) appendSafe(unknownIds, requirementId);
       }
       if (unknownIds.length > 0) {
-        errors[errors.length] =
-          `${prefix}.servingRequirementIds names unknown requirements: ${unknownIds.join(', ')}`;
+        appendSafe(
+          errors,
+          `${prefix}.servingRequirementIds names unknown requirements: ${unknownIds.join(', ')}`,
+        );
       }
     }
     if (typeof entry.justification !== 'string' || entry.justification.trim().length === 0) {

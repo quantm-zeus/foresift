@@ -1292,8 +1292,26 @@ export function checkProdConformanceInputsPresent(input: ProdConformanceInput): 
  */
 export function evaluateProdConformance(rawInput: ProdConformanceInput): ProdConformanceReport {
   // Single-read snapshot of the whole claim set (V7 accessor class): the shape
-  // rule and the enforcing rule must see the same claim.
-  const input = snapshotCallerInput(rawInput);
+  // rule and the enforcing rule must see the same claim. A non-plain carrier is
+  // refused here and reported as FAILED rather than thrown.
+  let input: ProdConformanceInput;
+  try {
+    input = snapshotCallerInput(rawInput);
+  } catch (error) {
+    return {
+      overall: 'FAILED',
+      findings: [
+        {
+          requirementId: 'FR-PROD-001',
+          rule: PROD_RULES.prodConformanceInputMissing,
+          path: 'input',
+          message: `PROD conformance input is not a plain data record and was refused: ${
+            error instanceof Error ? error.message : String(error)
+          }`,
+        },
+      ],
+    };
+  }
   // Numeric append only: an array spread iterates, so a shadowed
   // `Symbol.iterator` silently aggregated ZERO findings and returned PASSED for
   // `{}` and for a violating live path (audit NEW-M5).

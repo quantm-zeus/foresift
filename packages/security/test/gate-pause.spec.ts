@@ -273,4 +273,29 @@ describe('gate-pause fail-closed edges (M12/M13)', () => {
       }),
     ).rejects.toThrow(/only ACTIVATE events/);
   });
+
+  it('binds the rollbackRestore scope once, so a getter cannot restore across scopes (V7 round 6)', async () => {
+    await pauses.recordActivation({
+      eventId: 'ae-v7-base',
+      eventType: 'ACTIVATE',
+      scope: 'scope:v7-a',
+      at: at('2026-08-02T00:00:00Z'),
+      actor: 'admin@example.com',
+      approvedSetSnapshotRef: 'snapshot://approved/v7',
+    });
+    let reads = 0;
+    const input = {
+      eventId: 'ae-v7-restore',
+      restoreOfEventId: 'ae-v7-base',
+      get scope(): string {
+        reads += 1;
+        return reads === 1 ? 'scope:v7-a' : 'scope:v7-b';
+      },
+      at: at('2026-08-02T00:10:00Z'),
+      actor: 'admin@example.com',
+    };
+    const restored = await pauses.rollbackRestore(input as never);
+    expect(reads).toBe(1);
+    expect(restored.scope).toBe('scope:v7-a');
+  });
 });

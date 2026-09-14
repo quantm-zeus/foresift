@@ -1039,7 +1039,33 @@ function snapshotActivationGateInput(input: ActivationGateInput): ActivationGate
 }
 
 /**
- * Evaluate the ordered gate set for one exact scope. Total and deterministic:
+ * A branded refusal for a gate input that is not a plain data record (V7 round
+ * 6). The gate stays total: a class instance, boxed value or Proxy trap cannot
+ * be snapshotted and is refused instead of throwing.
+ */
+function nonPlainInputRefusal(): ActivationGateRefusal {
+  const refusal: ActivationGateRefusal = Object.freeze({
+    verdict: 'REFUSE',
+    scopeHash: `sha256:${'0'.repeat(64)}`,
+    failingGate: ActivationGateKind.IMPLEMENTED_PRESENT,
+    reason: ActivationGateRefusalReason.ACTIVATION_SCOPE_INVALID,
+    detail:
+      'the activation gate input is not a plain data record; a non-plain carrier cannot be snapshotted and fails closed',
+    evaluations: Object.freeze([]) as readonly GateConditionEvaluation[],
+    activationKind: ActivationKind.OPERATIONAL,
+    activationEventRef: '',
+    capacityContractRef: '',
+    evaluatedAt: '1970-01-01T00:00:00Z',
+    expiresAt: '1970-01-01T00:00:00Z',
+    evidenceRefs: Object.freeze([]) as readonly string[],
+    evaluationSetRef: null,
+    [ACTIVATION_REFUSAL_BRAND]: true as const,
+  });
+  ACTIVATION_REFUSAL_IDENTITY.add(refusal);
+  return refusal;
+}
+
+/**
  * every gate in `ACTIVATION_GATE_ORDER` is evaluated in order and the FIRST
  * refusal (in canonical order, not in `requiredGates` order) is returned with
  * its gate name. Missing inputs fail closed.
@@ -1053,7 +1079,12 @@ export function evaluateActivationGate(rawInput: ActivationGateInput): Activatio
   // the gate condition, or a verified verdict with one expiry for the condition
   // and a padded expiry for the pass. `verifiedGateEvidence` is kept by
   // reference because its identity brand must survive.
-  const input = snapshotActivationGateInput(rawInput);
+  let input: ActivationGateInput;
+  try {
+    input = snapshotActivationGateInput(rawInput);
+  } catch {
+    return nonPlainInputRefusal();
+  }
   const scope = parseModuleStateScope(input.scope);
   const scopeHash = activationScopeHash(scope);
   const kind = parseActivationKind(input.kind);

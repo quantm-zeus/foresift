@@ -589,10 +589,46 @@ function milestoneOwnsProdLaw(
 export async function evaluateConformance(
   rawOptions: ConformanceOptions,
 ): Promise<ConformanceResult> {
+  // The milestone must be a PRIMITIVE canonical id, checked before the snapshot
+  // so a boxed/coercible id is refused rather than materialized (audit HIGH-3).
+  const milestoneOption: unknown = rawOptions.milestone;
+  if (milestoneOption !== undefined && typeof milestoneOption !== 'string') {
+    return {
+      overall: 'FAILED',
+      findings: [
+        {
+          requirementId: 'FR-TRACE-003',
+          rule: 'CONFORMANCE_MILESTONE_INVALID',
+          path: String(milestoneOption),
+          message: `milestone must be a canonical dependency-group id G0…G7; ${JSON.stringify(
+            milestoneOption,
+          )} is not`,
+        },
+      ],
+    };
+  }
   // Single-read snapshot of every caller field (V7 accessor class): a getter on
   // `options.requirements` previously returned the caller list to one read and
-  // `undefined` to another, silently skipping the whole FR-PROD block.
-  const options = snapshotCallerInput(rawOptions);
+  // `undefined` to another, silently skipping the whole FR-PROD block. A
+  // non-plain carrier is refused here, not passed through.
+  let options: ConformanceOptions;
+  try {
+    options = snapshotCallerInput(rawOptions);
+  } catch (error) {
+    return {
+      overall: 'FAILED',
+      findings: [
+        {
+          requirementId: 'FR-PROD-001',
+          rule: 'PROD_CONFORMANCE_INPUT_MISSING',
+          path: 'options',
+          message: `release-conformance options are not a plain data record and were refused: ${
+            error instanceof Error ? error.message : String(error)
+          }`,
+        },
+      ],
+    };
+  }
   // An explicit milestone must be a canonical dependency group (`G0`…`G7`):
   // zero-padded or otherwise non-canonical ids are a gate-downgrade attempt and
   // refuse closed (audit HIGH-3).

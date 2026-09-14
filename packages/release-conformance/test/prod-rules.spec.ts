@@ -1961,6 +1961,63 @@ describe('V7: caller accessors cannot flip a release-gate decision', () => {
     expect(rules).toContain(PROD_RULES.activationWithoutEvidence);
   }, 120_000);
 
+  it('refuses a class-instance options carrier instead of reading its live getters (V7 round 6)', async () => {
+    // A class getter lives on the PROTOTYPE, so an own-property scan misses it.
+    // The first cut of the systemic fix passed class instances through by
+    // reference, re-opening the release-gate FAILED -> PASSED downgrade.
+    class OptionsCarrier {
+      readonly repoRoot = REPO_ROOT;
+      readonly milestone = 'G2';
+      readonly prodClaims = {
+        activationClaims: [PROD_ACTIVE_WITHOUT_GATE_CLAIM],
+        postureDeclarations: [],
+        mcpCompatibility: PROD_MCP_COMPLIANT_CLAIM,
+        livePaths: [],
+        distributionAuthorizations: [],
+      };
+      requirementsReads = 0;
+      get requirements(): unknown {
+        this.requirementsReads += 1;
+        return this.requirementsReads === 1 ? [] : undefined;
+      }
+    }
+    const carrier = new OptionsCarrier();
+    const result = await evaluateConformance(carrier as never);
+    expect(result.overall).toBe('FAILED');
+    // The non-plain carrier is refused BEFORE any property read, so the live
+    // prototype getter never runs (the pass-through cut read it).
+    expect(carrier.requirementsReads).toBe(0);
+  }, 120_000);
+
+  it('refuses a getPrototypeOf-trap Proxy carrier (V7 round 6)', async () => {
+    const target: Record<string, unknown> = {
+      repoRoot: REPO_ROOT,
+      milestone: 'G2',
+      prodClaims: {
+        activationClaims: [PROD_ACTIVE_WITHOUT_GATE_CLAIM],
+        postureDeclarations: [],
+        mcpCompatibility: PROD_MCP_COMPLIANT_CLAIM,
+        livePaths: [],
+        distributionAuthorizations: [],
+      },
+    };
+    let reads = 0;
+    Object.defineProperty(target, 'requirements', {
+      enumerable: true,
+      configurable: true,
+      get() {
+        reads += 1;
+        return reads === 1 ? [] : undefined;
+      },
+    });
+    const trapped = new Proxy(target, {
+      getPrototypeOf: () => class Trap {}.prototype,
+    });
+    const result = await evaluateConformance(trapped as never);
+    expect(result.overall).toBe('FAILED');
+    expect(reads).toBe(0);
+  }, 120_000);
+
   it('binds each claim field once, so a getter cannot hide a violation (V7-A8)', () => {
     let reads = 0;
     const claims = [PROD_ACTIVE_WITHOUT_GATE_CLAIM];

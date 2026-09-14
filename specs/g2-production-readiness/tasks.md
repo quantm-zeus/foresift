@@ -817,6 +817,15 @@ CRITICAL/HIGH remained open.
       `main` → full set, fingerprint equality) is re-run green; verifier C3
       independently reproduced it (76 pre-applied, exactly 10 `g2_prod_*`
       applied, in-family gap still refused).
+      **Scope exception (seventh round, emergency):** the fresh-context reviews
+      found the same caller-accessor class in `packages/security/src/gate-pause.ts`
+      (`GatePauses.rollbackRestore` checked one scope and persisted another;
+      `resume` derived its ledger event id from a second `pauseId` read) — the
+      AC-279 rollback path this package's governance consumes. The emergency
+      correction therefore touches exactly `packages/security/src/gate-pause.ts`
+      and `packages/security/test/gate-pause.spec.ts` (exact paths only, single
+      writer) to bind those fields once, recorded here rather than silently
+      widening the declared writeScopes.
 - [ ] T093 [serial-reason: COORDINATOR_BOUNDARY] Fresh-context adversarial
       review of the final diff, then the full prescribed gates and exact-SHA
       CI. Traces: FR-PROD-001…006.

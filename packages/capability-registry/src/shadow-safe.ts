@@ -168,13 +168,30 @@ function snapshotValue(value: unknown, memo: Map<object, unknown>, path: WeakSet
     path.delete(value);
     return copy;
   }
-  // Only PLAIN objects and arrays are materialized. A boxed primitive, a class
-  // instance, a Date or a branded object keeps its identity and prototype: a
-  // null-prototype clone would break `String(...)`/`instanceof`/brand checks.
+  // Immutable self-contained carriers are copied, not refused: their indexed
+  // reads are not interceptable and they carry no getter state.
+  if (value instanceof Uint8Array) {
+    path.delete(value);
+    return value.slice();
+  }
+  if (value instanceof ArrayBuffer) {
+    path.delete(value);
+    return value.slice(0);
+  }
+  if (value instanceof Date) {
+    path.delete(value);
+    return new Date(value.getTime());
+  }
+  // Every other non-plain carrier (class instance, boxed primitive, Map/Set,
+  // Proxy with a `getPrototypeOf` trap) is REFUSED, never passed through by
+  // reference: passing it through kept its live getters and re-opened the whole
+  // accessor class inside every wrapped function (V7 round 6). A caller that
+  // needs a branded/identity value must pass it in a field the boundary keeps by
+  // reference, not through this helper.
   const prototype = Object.getPrototypeOf(value);
   if (prototype !== Object.prototype && prototype !== null) {
     path.delete(value);
-    return value;
+    throw new TypeError('non-plain caller input is not supported');
   }
   const source = value as Record<string, unknown>;
   const keys = Object.keys(source);

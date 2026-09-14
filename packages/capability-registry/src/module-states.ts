@@ -411,8 +411,9 @@ export async function statesFor(
   engine: DatabaseEngine,
   input: { readonly moduleId: string; readonly scope: ModuleStateScope },
 ): Promise<ModuleStateDimensions> {
+  const moduleId = input.moduleId;
   const scope = parseModuleStateScope(input.scope);
-  const rows = await stateRowsFor(engine, { moduleId: input.moduleId, scope });
+  const rows = await stateRowsFor(engine, { moduleId, scope });
   const scopeHash = activationScopeHash(scope);
   if (rows.length === 0) {
     return {

@@ -15,7 +15,7 @@ import {
   type ActivationGateKind,
   type SustainableCapacityContract,
 } from '@foresift/domain';
-import { createGateEvidence } from '@foresift/release-conformance';
+import { computeGatePayloadHash, createGateEvidence } from '@foresift/release-conformance';
 import {
   applyMigrations,
   createEngine,
@@ -3275,6 +3275,76 @@ describe('V7: gate evidence is verified with the deployment key, never a caller 
     const api = (await import('@foresift/capability-registry')) as Record<string, unknown>;
     expect(api['configureGateEvidenceVerifierKey']).toBeUndefined();
     expect(api['GATE_EVIDENCE_PEPPER_ENV']).toBeDefined();
+  }, 120_000);
+
+  it('refuses a record whose payload accessor differs per read (V7-D1/D2 splice)', () => {
+    const scopeA = activationScopeHash(makeScope({ profile_version: 'v7-d1-a' }));
+    const scopeB = activationScopeHash(makeScope({ profile_version: 'v7-d1-b' }));
+    const genuinePayload = {
+      gateKind: 'OWNER_APPROVAL',
+      approver: 'real-owner',
+      scopeRefs: [scopeA],
+      subject: 'genuine',
+      issuedAt: '2026-01-15T00:00:00Z',
+      expiresAt: '2026-03-01T00:00:00Z',
+    } as const;
+    const attackPayload = {
+      gateKind: 'OWNER_APPROVAL',
+      approver: 'attacker',
+      scopeRefs: [scopeB],
+      subject: 'forged',
+      issuedAt: '2026-01-01T00:00:00Z',
+      expiresAt: '2099-01-01T00:00:00Z',
+    } as const;
+    const genuine = createGateEvidence(genuinePayload, PEPPER);
+    // Read sequence the pre-fix code performed: assertEvidenceRecord reads the
+    // payload once, verifyPayloadHash once, verifyEvidenceSignature once, then
+    // payloadRecordMatches (and everything after) reads it again. Returning the
+    // attack payload to the hash and record-match checks while returning the
+    // GENUINE payload to the HMAC check spliced a genuine signature onto the
+    // attacker payload and minted a branded verdict with no knowledge of the key.
+    let payloadReads = 0;
+    const spliced = {
+      evidenceId: genuine.evidenceId,
+      get payload() {
+        payloadReads += 1;
+        if (payloadReads === 2 || payloadReads >= 4) return attackPayload;
+        return genuine.payload;
+      },
+      payloadSha256: computeGatePayloadHash(attackPayload),
+      signature: genuine.signature,
+      gateKind: attackPayload.gateKind,
+      scopeRefs: attackPayload.scopeRefs,
+      approver: attackPayload.approver,
+      issuedAt: attackPayload.issuedAt,
+      expiresAt: attackPayload.expiresAt,
+      revokedAt: null,
+      recordedAt: genuine.recordedAt,
+    };
+
+    let refusal: { code?: string; detail?: unknown } | undefined;
+    try {
+      // The forged record targets scope B and a 2099 expiry at 2026-06-01.
+      verifyGateEvidence({
+        record: spliced as never,
+        requiredScope: scopeB,
+        currentTime: '2026-06-01T00:00:00Z',
+      });
+    } catch (error) {
+      refusal = error as { code?: string; detail?: unknown };
+    }
+    expect(refusal?.code).toBe('PROD_ACTIVATION_GATE_REFUSED');
+    expect((refusal?.detail as { readonly reason?: string } | undefined)?.reason).toBe(
+      'GATE_EVIDENCE_INVALID',
+    );
+
+    // Control: the untouched genuine record still verifies for its own scope.
+    const control = verifyGateEvidence({
+      record: genuine,
+      requiredScope: scopeA,
+      currentTime: '2026-02-01T00:00:00Z',
+    });
+    expect(control.evidenceId).toBe(genuine.evidenceId);
   }, 120_000);
 
   it('fails closed when the deployment key is not configured', () => {

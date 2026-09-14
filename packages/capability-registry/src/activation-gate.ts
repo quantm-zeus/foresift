@@ -47,6 +47,7 @@ import {
 } from '@foresift/domain';
 import {
   evaluateGateEvidence,
+  snapshotGateEvidenceRecord,
   type GateEvidenceFailureReason,
   type GateEvidenceRecord,
 } from '@foresift/release-conformance';
@@ -160,10 +161,27 @@ export interface VerifyGateEvidenceInput {
  */
 export function verifyGateEvidence(input: VerifyGateEvidenceInput): VerifiedGateEvidence {
   const pepper = resolveGateEvidenceVerifierKey();
+  // Snapshot the record ONCE, then verify AND brand the SAME frozen snapshot
+  // (V7-D1/D2). Reading the caller's live object for the signature check and
+  // re-reading it for the branded fields let an accessor property re-scope or
+  // re-date a record after it was signed, and let a `payload` getter present a
+  // different payload to each of the hash / HMAC / record-match checks.
+  let snapshot: GateEvidenceRecord;
+  try {
+    snapshot = snapshotGateEvidenceRecord(input.record);
+  } catch (error) {
+    throw new ForesiftError(
+      ErrorCode.PROD_ACTIVATION_GATE_REFUSED,
+      `gate evidence could not be snapshotted (malformed record): ${
+        error instanceof Error ? error.message : String(error)
+      }`,
+      { reason: ActivationGateRefusalReason.GATE_EVIDENCE_INVALID },
+    );
+  }
   let verdict;
   try {
     verdict = evaluateGateEvidence({
-      record: input.record,
+      record: snapshot,
       pepper,
       requiredScope: input.requiredScope,
       currentTime: input.currentTime,
@@ -184,16 +202,8 @@ export function verifyGateEvidence(input: VerifyGateEvidenceInput): VerifiedGate
       { reason: GATE_EVIDENCE_REFUSAL[verdict.reason] },
     );
   }
-  // Freeze a copy so a record mutated AFTER minting cannot change the scope or
-  // the validity window the gate re-checks (V7-F1 review note). `issuedAt` and
-  // `expiresAt` are primitives held by the frozen object; the hash-bound payload
-  // is not read by the gate.
-  const frozenRecord: GateEvidenceRecord = Object.freeze({
-    ...input.record,
-    scopeRefs: Object.freeze([...input.record.scopeRefs]),
-  });
   const verified: VerifiedGateEvidence = Object.freeze({
-    record: frozenRecord,
+    record: snapshot,
     requiredScope: input.requiredScope,
     gateKind: verdict.gateKind,
     approver: verdict.approver,
@@ -663,7 +673,7 @@ const GATE_EVIDENCE_REFUSAL: Record<GateEvidenceFailureReason, ActivationGateRef
   EVIDENCE_REVOKED: ActivationGateRefusalReason.GATE_EVIDENCE_INVALID,
   EVIDENCE_NOT_YET_VALID: ActivationGateRefusalReason.GATE_EVIDENCE_INVALID,
   EVIDENCE_EXPIRED: ActivationGateRefusalReason.GATE_EVIDENCE_INVALID,
-  SCOPE_MISMATCH: ActivationGateRefusalReason.STATISTICAL_EVIDENCE_SCOPE_MISMATCH,
+  SCOPE_MISMATCH: ActivationGateRefusalReason.GATE_EVIDENCE_INVALID,
   PAYLOAD_RECORD_MISMATCH: ActivationGateRefusalReason.GATE_EVIDENCE_INVALID,
 };
 

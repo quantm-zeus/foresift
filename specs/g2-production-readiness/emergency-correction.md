@@ -1,7 +1,12 @@
 # g2-production-readiness — emergency correction ledger
 
-Status: **RUNNING / REOPENED** (2026-09-13). The PROVEN flip `e5fcc06`
-(PR #292) is revoked. History is preserved: the flip commit, its evidence and
+Status: **RUNNING / REOPENED** (seventh round, 2026-09-14). The sixth-round
+PROVEN flip `27c12c8` (PR #303) is revoked pending a new independent
+convergence audit; see "Seventh-round reopen" at the end of this document.
+History is preserved.
+
+The first-round withdrawal (2026-09-13) revoked the PROVEN flip `e5fcc06`
+(PR #292). History is preserved: the flip commit, its evidence and
 every prior review remain in the repository; this document records why the
 proof was withdrawn and binds each defect to a correction task in `tasks.md`
 Phase 10.
@@ -575,3 +580,41 @@ bounded follow-ups `T087` (statistical-evidence registration) and `T088`
 dropped. History is preserved (`29f1841`, `4d6c524`, `5e6c6cd`, `cdc25b2`, merged
 as `2249040`); nothing is rewritten. `g2-admin-control` and
 `g2-recovery-continuity` promotion is unblocked.
+
+## Seventh-round reopen (2026-09-14) — production readiness PROVEN is withdrawn
+
+The sixth-round closure `27c12c8` (PR #303) restored PROVEN on the strength of
+verification whose reproduction evidence is, in material part, **circular**: the
+"independent" verifiers of rounds four to six re-derived findings from the same
+ledger, test names and fix commits that the correction itself produced, and the
+PROVEN flip was asserted before a genuinely blind re-derivation of the
+first-audit CRITICAL/HIGH set against the _current_ tree had completed. A
+repeated PROVEN → reopen → re-PROVEN cycle across five consecutive rounds is
+itself evidence that the proof bar is not independent of the artefact under
+proof. Per the standing emergency directive, `g2-production-readiness` is
+returned to **RUNNING / REOPENED** and PROVEN is treated as unproven until a
+new, fresh-context, read-only adversarial audit of `27c12c8` reports no
+CRITICAL/HIGH finding.
+
+This is a state correction, not a claim that any specific finding is still
+live. The withdrawal is deliberately **not** evidence-backed: no defect is
+asserted here. The obligations are:
+
+1. Re-derive every C1–C3 / H1–H10 / R1–R13 / V6-1–V6-3 finding from the
+   current tree, with no reference to the correction ledger, task names, fix
+   commit messages or the previously recorded verdicts.
+2. Fix every finding that reproduces, with a discriminating negative
+   regression that fails on `27c12c8`.
+3. Re-prove the additive upgrade path from a database migrated to a
+   pre-prod-`main` revision.
+4. Obtain a **new** fresh-context convergence review of the fix head that
+   reports no CRITICAL/HIGH, then and only then restore PROVEN.
+
+`g2-admin-control` and `g2-recovery-continuity` promotion and merge stay frozen
+until (1)–(4) are complete. The committed admin WIP on
+`deepseek/g2-admin-control` (`a98872f`) is preserved untouched for later
+rebase/resume and no further dependency claim is built on the withdrawn PROVEN
+state. History is preserved: `27c12c8` and the whole six-round chain remain;
+nothing is rewritten.
+
+Phase 15 tasks `T089`–`T094` bind this round.

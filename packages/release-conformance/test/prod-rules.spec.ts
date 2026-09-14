@@ -157,6 +157,56 @@ describe('PROD rule 3: MCP compatibility drift (AC-144)', () => {
   });
 });
 
+/**
+ * V7-F8 fail-open: the release rule certified a PASS cell from `result` +
+ * `liveTestDate` alone, while the DB resolver (`isMutuallyTested`) requires a
+ * passing conformance RUN whose `fixtureRef` matches the cell. A cell claiming
+ * PASS with no run/fixture reference therefore certified a default the server
+ * refuses to serve.
+ */
+describe('V7 fail-open: MCP compatibility requires conformance-run provenance (F8)', () => {
+  const cellBase = {
+    revision: '2025-11-25',
+    clientId: 'client-a',
+    result: 'PASS',
+    liveTestDate: '2026-05-01T00:00:00Z',
+    conformanceRunId: 'run-2025-11-25-client-a',
+    fixtureRef: 'fixture-client-a',
+  };
+  const claimFor = (cell: Record<string, unknown>) => ({
+    revisions: [
+      { revision: '2025-11-25', channel: 'STABLE', isDefault: true, supersededBy: null },
+    ],
+    clients: [{ clientId: 'client-a' }],
+    cells: [cell],
+    now: '2026-06-01T00:00:00Z',
+  });
+
+  it('(a) drifts a PASS cell whose conformanceRunId is missing or empty', () => {
+    const missing = checkMcpCompatibilityDrift(
+      claimFor({ ...cellBase, conformanceRunId: undefined }) as never,
+    );
+    expect(missing.passed).toBe(false);
+    expect(missing.findings.some((f) => f.rule === PROD_RULES.mcpCompatibilityDrift)).toBe(true);
+
+    const empty = checkMcpCompatibilityDrift(
+      claimFor({ ...cellBase, conformanceRunId: '' }) as never,
+    );
+    expect(empty.passed).toBe(false);
+    expect(empty.findings.some((f) => f.rule === PROD_RULES.mcpCompatibilityDrift)).toBe(true);
+  });
+
+  it('(b) drifts a PASS cell whose fixtureRef is missing or empty', () => {
+    const empty = checkMcpCompatibilityDrift(claimFor({ ...cellBase, fixtureRef: '' }) as never);
+    expect(empty.passed).toBe(false);
+    expect(empty.findings.some((f) => f.rule === PROD_RULES.mcpCompatibilityDrift)).toBe(true);
+  });
+
+  it('(c) CONTROL: a provenance-complete fresh PASS cell still passes', () => {
+    expect(checkMcpCompatibilityDrift(claimFor(cellBase) as never).passed).toBe(true);
+  });
+});
+
 describe('PROD rule 4: live-path precomputation violation (AC-279)', () => {
   it('accepts a bounded, unexpired lookup within every ceiling with a holding boundary', () => {
     expect(checkLivePathPrecomputationViolation([PROD_LIVE_PATH_BOUNDED_CLAIM]).passed).toBe(true);
@@ -307,6 +357,8 @@ describe('PROD conformance aggregation and unchanged trace rules', () => {
       clientId: 'client-a',
       result: 'PASS',
       liveTestDate: '2000-01-01T00:00:00Z',
+      conformanceRunId: 'run-2025-11-25-client-a',
+      fixtureRef: 'fixture-client-a',
     };
     const claim = {
       revisions: [

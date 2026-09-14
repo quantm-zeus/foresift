@@ -3397,6 +3397,28 @@ describe('V7: gate evidence is verified with the deployment key, never a caller 
     expect(reads).toBe(1);
   }, 120_000);
 
+  it('copies a typed-array subclass through its internal slot, never its slice (V7 round 7)', () => {
+    class EvilBytes extends Uint8Array {}
+    let sliceReads = 0;
+    Object.defineProperty(EvilBytes.prototype, 'slice', {
+      configurable: true,
+      get() {
+        sliceReads += 1;
+        return (): never => {
+          throw new Error('live slice must never be called');
+        };
+      },
+    });
+    const bytes = new EvilBytes([1, 2, 3]);
+    const snapshot = snapshotCallerInput([bytes]) as readonly Uint8Array[];
+    expect(sliceReads).toBe(0);
+    expect(snapshot[0]).toBeInstanceOf(Uint8Array);
+    expect(Array.from(snapshot[0] as Uint8Array)).toEqual([1, 2, 3]);
+    // The copy is independent of the caller's memory.
+    bytes[0] = 9;
+    expect((snapshot[0] as Uint8Array)[0]).toBe(1);
+  }, 120_000);
+
   it('snapshots a shared caller node once and never returns the live object (V7-A2)', () => {
     let reads = 0;
     const shared: Record<string, unknown> = {};

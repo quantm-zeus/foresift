@@ -2018,6 +2018,54 @@ describe('V7: caller accessors cannot flip a release-gate decision', () => {
     expect(reads).toBe(0);
   }, 120_000);
 
+  it('refuses a getPrototypeOf-trap Proxy claiming Uint8Array.prototype (V7 round 7)', async () => {
+    const target: Record<string, unknown> = {
+      repoRoot: REPO_ROOT,
+      milestone: 'G2',
+      prodClaims: {
+        activationClaims: [PROD_ACTIVE_WITHOUT_GATE_CLAIM],
+        postureDeclarations: [],
+        mcpCompatibility: PROD_MCP_COMPLIANT_CLAIM,
+        livePaths: [],
+        distributionAuthorizations: [],
+      },
+    };
+    let reads = 0;
+    Object.defineProperty(target, 'requirements', {
+      enumerable: true,
+      configurable: true,
+      get() {
+        reads += 1;
+        return [];
+      },
+    });
+    // A Proxy has no typed-array internal slot, so the captured length getter
+    // fails and the carrier is refused rather than copied by reference.
+    const trapped = new Proxy(target, { getPrototypeOf: () => Uint8Array.prototype });
+    const result = await evaluateConformance(trapped as never);
+    expect(result.overall).toBe('FAILED');
+    expect(reads).toBe(0);
+  }, 120_000);
+
+  it('fails closed when Array.prototype carries an integer-index accessor (V7 round 7)', () => {
+    // An index setter swallows `array[array.length] = value`, the numeric-append
+    // pattern used by the authority collectors, so a FAILED verdict could read
+    // as PASSED. The snapshot boundary detects it and fails closed.
+    Object.defineProperty(Array.prototype, '0', { configurable: true, set() {} });
+    try {
+      const report = evaluateProdConformance({
+        activationClaims: [PROD_ACTIVE_WITHOUT_GATE_CLAIM],
+        postureDeclarations: [],
+        mcpCompatibility: PROD_MCP_COMPLIANT_CLAIM,
+        livePaths: [],
+        distributionAuthorizations: [],
+      });
+      expect(report.overall).toBe('FAILED');
+    } finally {
+      delete (Array.prototype as unknown as Record<string, unknown>)['0'];
+    }
+  }, 120_000);
+
   it('binds each claim field once, so a getter cannot hide a violation (V7-A8)', () => {
     let reads = 0;
     const claims = [PROD_ACTIVE_WITHOUT_GATE_CLAIM];

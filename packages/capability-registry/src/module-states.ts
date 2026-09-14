@@ -417,7 +417,7 @@ export async function statesFor(
   const scopeHash = activationScopeHash(scope);
   if (rows.length === 0) {
     return {
-      moduleId: input.moduleId,
+      moduleId: moduleId,
       scope,
       scopeHash,
       lifecycleState: 'NOT_IMPLEMENTED',
@@ -432,7 +432,7 @@ export async function statesFor(
     throw new ForesiftError(
       ErrorCode.PROD_LIFECYCLE_TRANSITION_ILLEGAL,
       'module state chain has no resolvable head',
-      { moduleId: input.moduleId, scopeHash },
+      { moduleId: moduleId, scopeHash },
     );
   }
   // Numeric-index dimension walks with `isOneOf` only (audit HIGH): the previous
@@ -449,7 +449,7 @@ export async function statesFor(
     if (isOneOf(row.lifecycleState, ESTABLISHES_PROVEN)) proven = true;
   }
   return {
-    moduleId: input.moduleId,
+    moduleId: moduleId,
     scope,
     scopeHash,
     lifecycleState: head.lifecycleState,

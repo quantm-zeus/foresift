@@ -140,6 +140,39 @@ export function numericConcat<T>(left: readonly T[], right: readonly T[]): T[] {
   return concatenated;
 }
 
+/** Captured intrinsics: a caller subclass/Proxy must not control the copy. */
+const capturedTypedArrayLengthGetter: ((this: unknown) => unknown) | undefined =
+  Object.getOwnPropertyDescriptor(Object.getPrototypeOf(Uint8Array.prototype), 'length')?.get as
+    ((this: unknown) => unknown) | undefined;
+const capturedArrayBufferByteLengthGetter: ((this: unknown) => unknown) | undefined =
+  Object.getOwnPropertyDescriptor(ArrayBuffer.prototype, 'byteLength')?.get as
+    ((this: unknown) => unknown) | undefined;
+const capturedDateGetTime: (this: unknown) => number = Date.prototype.getTime;
+
+/**
+ * Fail closed when `Array.prototype` carries an integer-index accessor. Such a
+ * setter silently swallows `array[array.length] = value` (the numeric-append
+ * pattern used throughout the authority paths), so a 2-element array can become
+ * empty and a FAILED verdict PASSED (V7 review round 7). The shadow is detected
+ * once at every snapshot boundary.
+ */
+export function assertNoHostileArrayIndexShadow(): void {
+  const names = Object.getOwnPropertyNames(Array.prototype);
+  for (let index = 0; index < names.length; index += 1) {
+    const name = names[index] as string;
+    if (!/^\d+$/.test(name)) continue;
+    const descriptor = Object.getOwnPropertyDescriptor(Array.prototype, name);
+    if (
+      descriptor !== undefined &&
+      (descriptor.get !== undefined || descriptor.set !== undefined)
+    ) {
+      throw new TypeError(
+        'Array.prototype carries an integer-index accessor (hostile shadow); numeric appends cannot be trusted',
+      );
+    }
+  }
+}
+
 /**
  * Materialize a caller-supplied plain-data value exactly ONCE (V7 accessor
  * class). Every own property and array element is read a single time into a
@@ -149,6 +182,7 @@ export function numericConcat<T>(left: readonly T[], right: readonly T[]): T[] {
  * true cycle is refused. Branded objects must not be passed through this helper.
  */
 export function snapshotCallerInput<T>(value: T): T {
+  assertNoHostileArrayIndexShadow();
   return snapshotValue(value, new Map<object, unknown>(), new WeakSet<object>()) as T;
 }
 
@@ -168,26 +202,56 @@ function snapshotValue(value: unknown, memo: Map<object, unknown>, path: WeakSet
     path.delete(value);
     return copy;
   }
-  // Immutable self-contained carriers are copied, not refused: their indexed
-  // reads are not interceptable and they carry no getter state.
-  if (value instanceof Uint8Array) {
-    path.delete(value);
-    return value.slice();
+  // Typed arrays and ArrayBuffers are copied through CAPTURED INTERNAL-SLOT
+  // getters (V7 review round 7): `value.slice()` was a dynamic lookup, so a
+  // subclass / own-`slice` property / `getPrototypeOf`-trap Proxy could return
+  // the live object and re-open the accessor class. A Proxy has no internal slot
+  // and fails the captured getter, so it is refused below.
+  if (capturedTypedArrayLengthGetter !== undefined) {
+    let typedLength: unknown;
+    try {
+      typedLength = capturedTypedArrayLengthGetter.call(value);
+    } catch {
+      typedLength = undefined;
+    }
+    if (typeof typedLength === 'number' && Number.isInteger(typedLength) && typedLength >= 0) {
+      const source = value as unknown as { [index: number]: number };
+      const copy = new Uint8Array(typedLength);
+      for (let index = 0; index < typedLength; index += 1) copy[index] = source[index] as number;
+      path.delete(value);
+      return copy;
+    }
   }
-  if (value instanceof ArrayBuffer) {
-    path.delete(value);
-    return value.slice(0);
+  if (capturedArrayBufferByteLengthGetter !== undefined) {
+    let byteLength: unknown;
+    try {
+      byteLength = capturedArrayBufferByteLengthGetter.call(value);
+    } catch {
+      byteLength = undefined;
+    }
+    if (typeof byteLength === 'number' && Number.isInteger(byteLength) && byteLength >= 0) {
+      const copy = new Uint8Array(byteLength);
+      copy.set(new Uint8Array(value as ArrayBuffer));
+      path.delete(value);
+      return copy.buffer;
+    }
   }
-  if (value instanceof Date) {
-    path.delete(value);
-    return new Date(value.getTime());
+  if (Object.prototype.toString.call(value) === '[object Date]') {
+    let time: unknown;
+    try {
+      time = capturedDateGetTime.call(value);
+    } catch {
+      time = undefined;
+    }
+    if (typeof time === 'number') {
+      path.delete(value);
+      return new Date(time);
+    }
   }
   // Every other non-plain carrier (class instance, boxed primitive, Map/Set,
   // Proxy with a `getPrototypeOf` trap) is REFUSED, never passed through by
   // reference: passing it through kept its live getters and re-opened the whole
-  // accessor class inside every wrapped function (V7 round 6). A caller that
-  // needs a branded/identity value must pass it in a field the boundary keeps by
-  // reference, not through this helper.
+  // accessor class inside every wrapped function (V7 rounds 6-7).
   const prototype = Object.getPrototypeOf(value);
   if (prototype !== Object.prototype && prototype !== null) {
     path.delete(value);

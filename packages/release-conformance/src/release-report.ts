@@ -314,15 +314,18 @@ function isNonNegativeInteger(value: unknown): value is number {
 /**
  * Normalize a caller-supplied conformance result (V7-F7b).
  *
- * A supplied result is admitted VERBATIM only when it is structurally
- * well-formed (an object with an `overall` discriminant, finite non-negative
- * integer counts that balance, and a `findings` array). A `PASSED` result is
- * additionally admissible only when it is NON-VACUOUS: at least one rule was
- * evaluated, every evaluated rule passed, no rule failed, and no finding was
- * recorded. Anything else — including a non-object carrier — is replaced with a
- * synthetic `FAILED` record carrying a `CONFORMANCE_NOT_EVALUATED` finding, so a
- * caller can never supply a vacuous PASSED that drives the activation state to
- * `ACTIVE`. This never throws.
+ * A supplied result is admitted only when it is structurally well-formed (an
+ * object with an `overall` discriminant, finite non-negative integer counts
+ * that balance, and a `findings` array). A `PASSED` result is additionally
+ * admissible only when it is NON-VACUOUS: at least one rule was evaluated, every
+ * evaluated rule passed, no rule failed, and no finding was recorded. Anything
+ * else — including a non-object carrier — is replaced with a synthetic `FAILED`
+ * record carrying a `CONFORMANCE_NOT_EVALUATED` finding, so a caller can never
+ * supply a vacuous PASSED that drives the activation state to `ACTIVE`. An
+ * admitted result is returned as a frozen plain copy built from single-read
+ * locals (never the caller's object), so the value validated is the value
+ * consumed even if a future caller bypasses the outer snapshot. This never
+ * throws.
  */
 function normalizeSuppliedConformance(
   supplied: unknown,
@@ -380,7 +383,61 @@ function normalizeSuppliedConformance(
       'the supplied release-conformance result declared PASSED with zero evaluated rules or inconsistent counts; a release report cannot record PASSED with zero evaluated rules',
     );
   }
-  return supplied as unknown as ReleaseReportRecord['conformanceResults'];
+  // Build a NORMALIZED FROZEN PLAIN COPY from the single-read locals. Returning
+  // the caller's object (even a snapshotted one) would let the validated value
+  // and the consumed value drift if a future caller bypasses the outer
+  // `snapshotCallerInput`. Each admitted result — including every finding — is
+  // copied into a frozen null-prototype object so the value validated here is
+  // the value the activation-state decision and the record consume.
+  const normalizedFindings: ReleaseFinding[] = [];
+  for (let index = 0; index < findings.length; index += 1) {
+    const raw = findings[index];
+    if (!record(raw)) {
+      return notEvaluated(
+        'the supplied release-conformance result carried a malformed finding; a release report cannot record PASSED with zero evaluated rules',
+      );
+    }
+    const requirementId = raw['requirementId'];
+    const rule = raw['rule'];
+    const findingPath = raw['path'];
+    const message = raw['message'];
+    if (
+      typeof requirementId !== 'string' ||
+      requirementId.length === 0 ||
+      typeof rule !== 'string' ||
+      rule.length === 0 ||
+      typeof findingPath !== 'string' ||
+      findingPath.length === 0 ||
+      typeof message !== 'string' ||
+      message.length === 0
+    ) {
+      return notEvaluated(
+        'the supplied release-conformance result carried a malformed finding; a release report cannot record PASSED with zero evaluated rules',
+      );
+    }
+    appendSafe(
+      normalizedFindings,
+      Object.freeze(
+        Object.assign(Object.create(null) as ReleaseFinding, {
+          requirementId,
+          rule,
+          path: findingPath,
+          message,
+        }),
+      ),
+    );
+  }
+  const normalized = Object.assign(
+    Object.create(null) as ReleaseReportRecord['conformanceResults'],
+    {
+      overall,
+      totalRulesEvaluated,
+      passedCount,
+      failureCount,
+      findings: Object.freeze(normalizedFindings),
+    },
+  );
+  return Object.freeze(normalized);
 }
 
 /** Strict structural/hash verifier. Pass expected hashes when verifying against a live tree. */

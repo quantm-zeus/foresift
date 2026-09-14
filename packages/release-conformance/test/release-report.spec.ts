@@ -233,4 +233,63 @@ describe('V7: release report validates a SUPPLIED conformance result (F7b)', () 
       ).toBe(true);
     }
   }, 120_000);
+
+  it('(e) hardening: a getter carrier is neutralized by the entry snapshot', async () => {
+    let reads = 0;
+    const carrier: Record<string, unknown> = {};
+    Object.defineProperty(carrier, 'findings', { enumerable: true, get: () => [] });
+    Object.defineProperty(carrier, 'failureCount', { enumerable: true, get: () => 1 });
+    Object.defineProperty(carrier, 'passedCount', { enumerable: true, get: () => 0 });
+    Object.defineProperty(carrier, 'totalRulesEvaluated', { enumerable: true, get: () => 1 });
+    Object.defineProperty(carrier, 'overall', {
+      enumerable: true,
+      get: () => {
+        reads += 1;
+        return reads === 1 ? 'FAILED' : 'PASSED';
+      },
+    });
+    const report = await buildReleaseReport({
+      repoRoot: REPO_ROOT,
+      milestone: 'G2',
+      previousReport: VALID_RELEASE_REPORT_FIXTURE.rollbackTarget,
+      conformanceResults: carrier as never,
+      gateEvidence: [...VALID_GATE_EVIDENCE],
+    });
+    // The entry `snapshotCallerInput` read the carrier exactly once, so the
+    // value validated is the value consumed: never the later 'PASSED'.
+    expect(reads).toBe(1);
+    expect(report.conformanceResults.overall).toBe('FAILED');
+    expect(report.activationState.status).not.toBe('ACTIVE');
+  }, 120_000);
+
+  it('(f) refuses a non-plain conformanceResults carrier (never PASSED/ACTIVE)', async () => {
+    class ConformanceCarrier {
+      readonly overall = 'PASSED';
+      readonly totalRulesEvaluated = 1;
+      readonly passedCount = 1;
+      readonly failureCount = 0;
+      readonly findings: readonly unknown[] = [];
+    }
+    await expect(
+      buildReleaseReport({
+        repoRoot: REPO_ROOT,
+        milestone: 'G2',
+        previousReport: VALID_RELEASE_REPORT_FIXTURE.rollbackTarget,
+        conformanceResults: new ConformanceCarrier() as never,
+        gateEvidence: [...VALID_GATE_EVIDENCE],
+      }),
+    ).rejects.toThrow(/non-plain caller input/);
+  }, 120_000);
+
+  it('(g) refuses a non-plain top-level options carrier (never PASSED/ACTIVE)', async () => {
+    class OptionsCarrier {
+      readonly repoRoot = REPO_ROOT;
+      readonly milestone = 'G2';
+      readonly previousReport = VALID_RELEASE_REPORT_FIXTURE.rollbackTarget;
+      readonly gateEvidence = [...VALID_GATE_EVIDENCE];
+    }
+    await expect(buildReleaseReport(new OptionsCarrier() as never)).rejects.toThrow(
+      /non-plain caller input/,
+    );
+  }, 120_000);
 });

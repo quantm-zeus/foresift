@@ -437,3 +437,141 @@ only after the above. Phase 13 tasks `T073`–`T081` are checked; history is
 preserved (reopen `88a915e`, fixes `89f2145`/`66a750d`) and nothing was rewritten.
 `g2-admin-control` and `g2-recovery-continuity` promotion is unblocked, subject
 to `g2-admin-control` absorbing the fifth-round correction.
+
+## Sixth-round independent verification (2026-09-13) — C/H set confirmed closed; bounded hardening
+
+The re-PROVEN flip `29f1841` (PR #301) is **not** revoked for any CRITICAL/HIGH:
+a brand-new session ran three fresh-context adversarial verifiers (disjoint
+finding sets, read-only, instructed to re-derive every claim from current code)
+plus the coordinator's own directed gate runs against `origin/main` `29f1841`.
+Every audit finding below was re-probed with a live exploit and **did not
+reproduce** (NOT-REPRODUCED); the one new HIGH a verifier proposed is the
+already-documented evaluator trust boundary and is graded MEDIUM (below).
+
+### Re-verified closed (live probes against `29f1841`)
+
+| Finding                           | Verdict        | Independent evidence                                                                                                                                                                                                                                              |
+| --------------------------------- | -------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| C1 activation-kind/skip integrity | NOT-REPRODUCED | OPPORTUNITY claim over OPERATIONAL rows refused `EVIDENCE_SET_EMPTY` (TS) and `missing gate IMPLEMENTED_PRESENT` (raw SQL); skipped gates persist `NOT_APPLICABLE`; hand-built and spread PASS refused `ACTIVATION_RESULT_UNBRANDED`.                             |
+| C2 SQL empty-event ACTIVE         | NOT-REPRODUCED | raw ACTIVE `activation_event_ref=''` refused `23001`; `' '`/`'\t'`/NBSP/BOM/U+3000 refused by the `g2_prod_0010` CHECK; NULL refused by `g2_prod_0001`; zero rows committed.                                                                                      |
+| C3 MCP opt-in bypass              | NOT-REPRODUCED | `2099-01-01-evil` opt-in throws `PROD_MCP_REVISION_CHANNEL_UNKNOWN`; unregistered → `REVISION_NOT_AUTHORIZED`; registered-but-untested DRAFT → `CELL_NOT_USABLE`.                                                                                                 |
+| H1 prod rules wired               | NOT-REPRODUCED | `evaluateConformance` (G2) emits `ACTIVATION_WITHOUT_EVIDENCE`/`MCP_COMPATIBILITY_DRIFT`; omitted `prodClaims` → `PROD_CONFORMANCE_INPUT_MISSING`; violating CLI corpus → `FAILED`.                                                                               |
+| H2 conformance fail-closed        | NOT-REPRODUCED | `evaluateProdConformance({})` → `FAILED` (5 findings); empty `requiredGateKinds`, unknown readiness, truncated gate-kind sets all refuse.                                                                                                                         |
+| H3 migration upgrade path         | NOT-REPRODUCED | pre-prod-main DB (76 files) upgrades by applying exactly the 10 `g2_prod_*` ids with no `MIGRATION_OUT_OF_ORDER_REFUSED`; upgraded fingerprint == fresh fingerprint (verified including trigger-function bodies).                                                 |
+| H4 live-path quarantine           | NOT-REPRODUCED | DB-backed `assertLivePathBoundaryHolds` refuses a REJECTED import (`PROD_TRUST_BOUNDARY_VIOLATION`), passes VALIDATING; unknown refs are FK-blocked.                                                                                                              |
+| H5 PROVEN/dimension binding       | NOT-REPRODUCED | `advanceState(PROVEN)` refuses missing ref (`PROVEN_EVIDENCE_REQUIRED`), fabricated ref (`EVIDENCE_SET_EMPTY`), OPERATIONAL batch; `requires_proven` without a persisted PROVEN row refused.                                                                      |
+| H6 refusal persistence            | NOT-REPRODUCED | PASS then later same-(scope,kind,event) REFUSE → `EVIDENCE_SET_NOT_PASS`; raw SQL ACTIVE refused.                                                                                                                                                                 |
+| H7 rollback approval              | NOT-REPRODUCED | fabricated prior event, never-ACTIVE set, forged pre-ACTIVE row, and gate-less ACTIVE all refuse; the approval query requires `ACTIVE` + exact non-null event; `AC-279.spec.ts` re-derived as a genuine A→B→A test.                                               |
+| H8 `SLA_BACKED` vacuity           | NOT-REPRODUCED | empty register and missing/FAIL/expired/bare contract → `FREE_TIER_BEST_EFFORT`; only covered register + valid contract → `SLA_BACKED`.                                                                                                                           |
+| H9 dependency-group bypass        | NOT-REPRODUCED | `G7 dependsOn:[] COMPLETE` refused against the authoritative manifest; open prerequisites refuse.                                                                                                                                                                 |
+| H10 MCP staleness/alpha set       | NOT-REPRODUCED | fixture mismatch/stale/revision/client mismatches unusable; `maxAgeSeconds` clamped at cell and rule level; `(live_path, artifact_ref, artifact_set_hash)` binding enforced in lookup and serve.                                                                  |
+| R10/R11/R12/R13 shadow class      | NOT-REPRODUCED | `numericJoin` clause builder + explicit `scopeHash` guard; numeric MCP membership survives `includes` shadow; module-init `filter` shadow leaves the import-state authority exact; `@foresift/security` returns real verdicts under `push`/`some`/`join` shadows. |
+
+Targeted executed gates at `29f1841` (coordinator, `flock
+/tmp/deepseek-global-heavy-gate.lock`): capability-registry + prod AC/negative
+821 tests 0 fail; `@foresift/security` 355 tests 0 fail; release-conformance 130
+tests 0 fail; `packages/persistence/test/migrator.spec.ts` 16/16; `spec:verify`
+13 checks; `format:check`, `lint`, `typecheck` green.
+
+### Sixth-round bounded defects found and fixed in this slice
+
+| ID   | Severity     | Defect (reproduced at `29f1841`)                                                                                                                                                                                                                                                                                                                                                                                                     | Correction                                                                                                                                                                              |
+| ---- | ------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| V6-1 | MEDIUM + LOW | `cellUsability` counted a **future-dated** conformance run (`ranAt` after `now`) as fresh, so a test that has not happened satisfied provenance/staleness (MEDIUM). Separately, a malformed `now` escaped `cellUsability` as a domain `TIMESTAMP_INVALID` **throw** from `mcpCompatibilityCellUsable` rather than a typed verdict (LOW — the throw is itself fail-closed, but a caller must catch a domain exception to observe it). | Skip any run whose `ranAt` is non-finite or after `now`; return a typed `CELL_NOT_USABLE` refusal for a non-finite `now` instead of throwing.                                           |
+| V6-2 | MEDIUM       | empty `conformanceFixtureRef`/`fixtureRef` satisfied the H10 provenance equality (`'' === ''`), and the writers accepted whitespace-only fixture refs (the DB `length(...) > 0` CHECK rejects only the empty string, so the DB-reachable form was whitespace).                                                                                                                                                                       | Require a non-blank declared fixture reference and a non-blank run fixture reference at read; refuse non-string/trim-blank fixture refs at both write sites before any query is issued. |
+| V6-3 | LOW          | `checkProdConformanceInputsPresent` required `weakenedDimensions`/`protectedDimensions` to be present but not to be arrays, so `weakenedDimensions:{length:0}` (and array-likes such as `{0:'freshness',length:1}`) were read by the numeric scan as declarations and drove a PASSED report.                                                                                                                                         | Require both to be arrays (the numeric scan already prevented any dimension being hidden).                                                                                              |
+
+Each V6 row carries a discriminating regression that fails against `29f1841`:
+the future-dated run, the malformed-`now` throw→refusal, the blank-to-blank
+provenance read, both write-site refusals, and the `{length:0}` posture report.
+The well-shaped controls (`recent` run, `['freshness']` + every protected
+dimension) pass at both revisions, proving no over-refusal. Verified by running
+the strengthened tests in a temporary base worktree at `29f1841` (4 MCP
+failures, 1 V6-3 failure) and at the fix head (0 failures).
+
+### Re-confirmed residuals (recorded, not silently dropped)
+
+- **Statistical-evidence registration (re-confirmed MEDIUM; proposed HIGH by one verifier).**
+  `RegisteredStatisticalEvidence` is matched by `scopeHash` inside a
+  caller-supplied array; `evidenceRef`, negative-control/interval/calibration
+  verdicts are self-declared and no row is resolved against
+  `evaluation_datasets`/holdout provenance. This is the evaluator trust boundary
+  recorded in the first-round accepted residuals (and D013): the gate's caller is
+  the trusted statistical-evaluation subsystem, D018's compensating control is
+  process/realm isolation, and the surface has no production consumer. It is
+  graded MEDIUM, not a release blocker. The bounded follow-up (register evidence
+  keyed by `(scope_hash, evidence_ref)` with dataset/holdout provenance and
+  require the persisted batch to resolve each row) is recorded as T087.
+- **SQL `scope_hash` is not injective over extra keys.** `foresift_prod_scope_hash`
+  hashes the seven canonical keys and ignores extras while the scope shape CHECK
+  only requires those keys present; a raw row can carry an extra dimension with a
+  base-scope hash. Bounded: `parseModuleStateScope` refuses extra keys and
+  `stateRowsFor` matches `scope = $2::jsonb` exactly, so the row is invisible to
+  governed reads and grants no authority. Exact-key CHECK recorded as T088.
+- **Migrator DDL-namespace ownership is a convention after the H3 fix.** The
+  out-of-order refusal is per-family (R5 in-family gap-fill still refused,
+  including a later-generation same-family latecomer); a new family can therefore
+  alter another family's schema if a repo author commits such SQL. This is the
+  documented D014 resolution of the H3 upgrade-path requirement, requires repo
+  write access, and is not a runtime fail-open.
+- **Intrinsic-shape statics are outside D018's in-scope class.** The sixth-round
+  convergence review recorded (LOW/boundary) that a deliberate reassignment of
+  `Array.isArray` (an `Array` **static**, not an `Array.prototype` method or
+  iterator) re-opens the V6-3 shape guard, exactly as D018 already names
+  `Object.freeze`/`Object.keys`/`JSON.stringify`/the `Map`/`Set` prototypes as
+  outside the model. There is no intrinsic-free way to distinguish a genuine
+  `Array` from an array-like in one realm, so the compensating control is the
+  same as D018/D021's: process/realm isolation, plus the requirement that the
+  guard is not handed untrusted in-process code. The IN-scope class remains
+  decision-time `Array.prototype` methods and iterators on the authority path
+  (R10–R13), which are closed. Recorded here rather than re-opened as a defect.
+- Previously recorded residuals stand: raw-writer trust boundary, caller-supplied
+  `prodClaims`, `clearContainment` governance/ActionGate (D013), SQL/Drizzle
+  parity breadth, two-way telemetry parity, AC-150/151/153 fixture-echo positives,
+  and precomputed-alpha caller `latencyMs`/`servedAt`.
+
+### Re-verification bar (unchanged)
+
+PROVEN is restored only after: (a) every V6 row has a landed fix and a
+discriminating regression failing against `29f1841`; (b) the upgrade-path test
+passes from a database migrated to pre-prod `main`; (c) the full prescribed gates
+and exact-SHA CI are green; (d) a **new** fresh-context convergence review of the
+fix head reports no CRITICAL/HIGH. History is preserved (`29f1841` and the whole
+five-round chain remain); nothing is rewritten.
+
+## Sixth-round closure (2026-09-13)
+
+The correction landed as PR #302 (squash `2249040`) on `main`. The re-verification
+bar is met:
+
+- **Independent convergence review** (fresh context, read-only, NEW probes): the
+  reviewer examined `29f1841..5e6c6cd`, independently reproduced each V6 defect at
+  the base and showed it closed at the fix head (MCP: base 14 pass / 4 fail → fix
+  18 pass / 0 fail; prod-rules V6-3: base fail → fix 69 pass / 0 fail), confirmed
+  the fixes add no new fail-open in the D018 `Array.prototype` method/iterator
+  model, and validated the state change (`RUNNING` at the fix head,
+  `PROVEN -> RUNNING` in `ALLOWED_STATUS_TRANSITIONS`, linear additive history,
+  `spec:verify` 13 checks). Verdict:
+  **`READY FOR PROVEN — no CRITICAL/HIGH`**.
+- **Review follow-up `cdc25b2`** (test/doc only; no product source): the first V6
+  regression cut had three LOW test-quality confounds — invalid enum fixtures that
+  made the V6-3 `FAILED` true at the base for unrelated reasons, an FK-confounded
+  write-site assertion, and an inaccurate malformed-`now` description. The
+  strengthened regressions are discriminating at `29f1841` (4 MCP failures + 1
+  V6-3 failure) and non-vacuous at the fix head (both no-over-refusal controls
+  pass at both revisions); a second fresh-context review returned
+  **`READY FOR PROVEN — no CRITICAL/HIGH introduced by `cdc25b2`**.
+- **Local full gate:** `pnpm verify` green at `5e6c6cd`
+  (`{"authority":"BUN_TEST","bunFiles":602,"passed":true}` +
+  node-runtime-compat), `spec:verify` 13 checks, format/lint/typecheck green.
+- **Exact-SHA CI:** run `34805726567` at `5e6c6cd` and run `34808344651` at
+  `cdc25b2` — Fast Gates, Pure, Process/Meta-Gate, Database PGlite and Verify all
+  green.
+
+State change: g2-production-readiness RUNNING → PROVEN (schema-legal), restored
+only after the above. Phase 14 tasks `T082`–`T086` are checked; the deferred
+bounded follow-ups `T087` (statistical-evidence registration) and `T088`
+(exact-key scope CHECK) stay open for the next slice rather than being silently
+dropped. History is preserved (`29f1841`, `4d6c524`, `5e6c6cd`, `cdc25b2`, merged
+as `2249040`); nothing is rewritten. `g2-admin-control` and
+`g2-recovery-continuity` promotion is unblocked.

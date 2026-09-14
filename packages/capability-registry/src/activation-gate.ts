@@ -25,6 +25,7 @@
  * Strictly read-only: the gate decides whether read-only intelligence may
  * influence an exact scope; it can never trade, custody, sign, or submit.
  */
+import { appendSafe } from './shadow-safe.ts';
 import {
   ACTIVATION_GATE_ORDER,
   ALL_ACTIVATION_KINDS,
@@ -260,24 +261,22 @@ export function requiredGatesForActivation(
     ActivationGateKind.IMPLEMENTED_PRESENT,
     ActivationGateKind.AVAILABLE_EVIDENCE,
   ];
-  if (parsedScope.requires_proven)
-    operational[operational.length] = ActivationGateKind.PROVEN_PRESENT;
-  operational[operational.length] = ActivationGateKind.VERIFIED_GATE_EVIDENCE;
-  operational[operational.length] = ActivationGateKind.CAPACITY_CONTRACT;
-  operational[operational.length] = ActivationGateKind.NO_OPEN_CONTAINMENT;
+  if (parsedScope.requires_proven) appendSafe(operational, ActivationGateKind.PROVEN_PRESENT);
+  appendSafe(operational, ActivationGateKind.VERIFIED_GATE_EVIDENCE);
+  appendSafe(operational, ActivationGateKind.CAPACITY_CONTRACT);
+  appendSafe(operational, ActivationGateKind.NO_OPEN_CONTAINMENT);
   const opportunity: ActivationGateKind[] = [
     ActivationGateKind.IMPLEMENTED_PRESENT,
     ActivationGateKind.AVAILABLE_EVIDENCE,
   ];
-  if (parsedScope.requires_proven)
-    opportunity[opportunity.length] = ActivationGateKind.PROVEN_PRESENT;
-  opportunity[opportunity.length] = ActivationGateKind.STATISTICAL_EVIDENCE_SCOPE;
-  opportunity[opportunity.length] = ActivationGateKind.NEGATIVE_CONTROLS;
-  opportunity[opportunity.length] = ActivationGateKind.CLUSTERED_INTERVALS;
-  opportunity[opportunity.length] = ActivationGateKind.CALIBRATION_MATURITY;
-  opportunity[opportunity.length] = ActivationGateKind.VERIFIED_GATE_EVIDENCE;
-  opportunity[opportunity.length] = ActivationGateKind.CAPACITY_CONTRACT;
-  opportunity[opportunity.length] = ActivationGateKind.NO_OPEN_CONTAINMENT;
+  if (parsedScope.requires_proven) appendSafe(opportunity, ActivationGateKind.PROVEN_PRESENT);
+  appendSafe(opportunity, ActivationGateKind.STATISTICAL_EVIDENCE_SCOPE);
+  appendSafe(opportunity, ActivationGateKind.NEGATIVE_CONTROLS);
+  appendSafe(opportunity, ActivationGateKind.CLUSTERED_INTERVALS);
+  appendSafe(opportunity, ActivationGateKind.CALIBRATION_MATURITY);
+  appendSafe(opportunity, ActivationGateKind.VERIFIED_GATE_EVIDENCE);
+  appendSafe(opportunity, ActivationGateKind.CAPACITY_CONTRACT);
+  appendSafe(opportunity, ActivationGateKind.NO_OPEN_CONTAINMENT);
   switch (kind) {
     case ActivationKind.OPERATIONAL:
       return operational;
@@ -287,7 +286,7 @@ export function requiredGatesForActivation(
     case ActivationKind.PUBLIC: {
       // Numeric copy + push, never `[...opportunity, DISTRIBUTION_EVIDENCE]`.
       const distribution = numericCopy(opportunity);
-      distribution[distribution.length] = ActivationGateKind.DISTRIBUTION_EVIDENCE;
+      appendSafe(distribution, ActivationGateKind.DISTRIBUTION_EVIDENCE);
       return distribution;
     }
     default: {
@@ -987,7 +986,7 @@ function evaluateCondition(
         const actions: string[] = [];
         for (let index = 0; index < input.openContainment.length; index += 1) {
           const fact = input.openContainment[index];
-          if (fact !== undefined) actions[actions.length] = fact.action;
+          if (fact !== undefined) appendSafe(actions, fact.action);
         }
         return refuse(
           gate,
@@ -1102,16 +1101,16 @@ export function evaluateActivationGate(rawInput: ActivationGateInput): Activatio
   // therefore derived, never caller-controlled.
   const consumedExpiries: string[] = [];
   if (isRequired(ActivationGateKind.CAPACITY_CONTRACT) && input.capacityContract != null) {
-    consumedExpiries[consumedExpiries.length] = input.capacityContract.expiresAt;
+    appendSafe(consumedExpiries, input.capacityContract.expiresAt);
   }
   if (isRequired(ActivationGateKind.VERIFIED_GATE_EVIDENCE) && input.verifiedGateEvidence != null) {
-    consumedExpiries[consumedExpiries.length] = input.verifiedGateEvidence.record.expiresAt;
+    appendSafe(consumedExpiries, input.verifiedGateEvidence.record.expiresAt);
   }
   if (isRequired(ActivationGateKind.STATISTICAL_EVIDENCE_SCOPE)) {
     const registered = input.registeredStatisticalEvidence ?? [];
     for (let index = 0; index < registered.length; index += 1) {
       const evidence = registered[index];
-      if (evidence !== undefined) consumedExpiries[consumedExpiries.length] = evidence.expiresAt;
+      if (evidence !== undefined) appendSafe(consumedExpiries, evidence.expiresAt);
     }
   }
   // Numeric-index reduction only; `Array.prototype.reduce` is shadowable.
@@ -1157,7 +1156,7 @@ export function evaluateActivationGate(rawInput: ActivationGateInput): Activatio
       ...condition,
       activationKind: kind,
     });
-    evaluations[evaluations.length] = evaluation;
+    appendSafe(evaluations, evaluation);
     if (evaluation.verdict === ActivationGateVerdict.REFUSE) {
       return makeRefusal(
         evaluation.failingGate ?? gate,
@@ -1258,7 +1257,7 @@ function toIsoTimestamp(value: unknown): string {
 function decodeEvidenceRefs(value: unknown): readonly string[] {
   if (Array.isArray(value)) {
     const refs: string[] = [];
-    for (let index = 0; index < value.length; index += 1) refs[refs.length] = String(value[index]);
+    for (let index = 0; index < value.length; index += 1) appendSafe(refs, String(value[index]));
     return refs;
   }
   if (typeof value === 'string') {
@@ -1267,7 +1266,7 @@ function decodeEvidenceRefs(value: unknown): readonly string[] {
       if (!Array.isArray(parsed)) return [];
       const refs: string[] = [];
       for (let index = 0; index < parsed.length; index += 1)
-        refs[refs.length] = String(parsed[index]);
+        appendSafe(refs, String(parsed[index]));
       return refs;
     } catch {
       return [];
@@ -1299,7 +1298,7 @@ function decodeGateEvaluationRows(
   const decoded: PersistedActivationGateEvaluation[] = [];
   for (let index = 0; index < rows.length; index += 1) {
     const row = rows[index];
-    if (row !== undefined) decoded[decoded.length] = decodeGateEvaluationRow(row);
+    if (row !== undefined) appendSafe(decoded, decodeGateEvaluationRow(row));
   }
   return decoded;
 }
@@ -1352,7 +1351,7 @@ export function activationEvidenceSetRef(
   }> = [];
   for (let index = 0; index < ordered.length; index += 1) {
     const row = ordered[index] as PersistedActivationGateEvaluation;
-    canonical[canonical.length] = {
+    appendSafe(canonical, {
       evaluationId: row.evaluationId,
       scopeHash: row.scopeHash,
       gateKind: row.gateKind,
@@ -1364,7 +1363,7 @@ export function activationEvidenceSetRef(
       evaluatedAt: row.evaluatedAt,
       expiresAt: row.expiresAt,
       activationKind: row.activationKind,
-    };
+    });
   }
   return sha256Text(canonicalJson(canonical));
 }
@@ -1418,11 +1417,14 @@ async function persistEvaluations(
   for (let batchIndex = 0; batchIndex < input.evaluations.length; batchIndex += 1) {
     const batchEvaluation = input.evaluations[batchIndex];
     if (batchEvaluation === undefined) continue;
-    batchParts[batchParts.length] = canonicalJson({
-      gateKind: batchEvaluation.gateKind,
-      verdict: batchEvaluation.verdict,
-      failingGate: batchEvaluation.failingGate,
-    });
+    appendSafe(
+      batchParts,
+      canonicalJson({
+        gateKind: batchEvaluation.gateKind,
+        verdict: batchEvaluation.verdict,
+        failingGate: batchEvaluation.failingGate,
+      }),
+    );
   }
   const batchFingerprint = sha256Text(canonicalJson(batchParts)).slice(7, 23);
   return engine.transaction(async (tx) => {
@@ -1472,7 +1474,7 @@ async function persistEvaluations(
           kind,
         ],
       );
-      ids[ids.length] = evaluationId;
+      appendSafe(ids, evaluationId);
     }
     // Re-read the rows just committed so the minted reference is derived from
     // database truth (exact timestamps and ids), never from the caller's object.
@@ -1569,12 +1571,12 @@ export async function activationGateEvaluationsFor(
   const clauses = ['scope_hash = $1'];
   const params: unknown[] = [scopeHash];
   if (kind !== undefined) {
-    params[params.length] = kind;
-    clauses[clauses.length] = `activation_kind = $${params.length}`;
+    appendSafe(params, kind);
+    appendSafe(clauses, `activation_kind = $${params.length}`);
   }
   if (activationEventRef !== undefined) {
-    params[params.length] = activationEventRef;
-    clauses[clauses.length] = `activation_event_ref = $${params.length}`;
+    appendSafe(params, activationEventRef);
+    appendSafe(clauses, `activation_event_ref = $${params.length}`);
   }
   // `numericJoin`, never `Array.prototype.join` (audit R10): a shadowed `join`
   // could rewrite the WHERE clause (drop `scope_hash = $1`, or append
@@ -1724,7 +1726,7 @@ export async function requirePersistedActivationEvidence(
   const batch: PersistedActivationGateEvaluation[] = [];
   for (let index = 0; index < rows.length; index += 1) {
     const row = rows[index];
-    if (row !== undefined && Date.parse(row.evaluatedAt) === latestAt) batch[batch.length] = row;
+    if (row !== undefined && Date.parse(row.evaluatedAt) === latestAt) appendSafe(batch, row);
   }
   if (batch.length === 0) {
     refuse(
@@ -1804,11 +1806,11 @@ export async function requirePersistedActivationEvidence(
   const evaluations: ActivationGateEvaluation[] = [];
   for (let index = 0; index < batch.length; index += 1) {
     const row = batch[index] as PersistedActivationGateEvaluation;
-    evaluations[evaluations.length] = {
+    appendSafe(evaluations, {
       gateKind: row.gateKind,
       verdict: row.verdict,
       failingGate: row.failingGate,
-    };
+    });
   }
   // Every gate required for the activation kind must have exactly one PASS…
   const requiredFailing = activationGateRefusal(evaluations, required);
@@ -1855,7 +1857,7 @@ function evaluationIdsOf(rows: readonly PersistedActivationGateEvaluation[]): st
   const ids: string[] = [];
   for (let index = 0; index < rows.length; index += 1) {
     const row = rows[index];
-    if (row !== undefined) ids[ids.length] = row.evaluationId;
+    if (row !== undefined) appendSafe(ids, row.evaluationId);
   }
   return ids;
 }

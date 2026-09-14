@@ -690,3 +690,31 @@ tests close all of those, plus the F4/F7/C1/NF2 regressions above.
 discriminating regression per reproduced defect, the upgrade-path test passes,
 the full prescribed gates and exact-SHA CI are green, and a **new** fresh-context
 convergence review reports no CRITICAL/HIGH.
+
+## Seventh-round review iterations (accessor / hostile-shadow class)
+
+The fresh-context adversarial reviews were run repeatedly; each round reproduced
+a genuinely closable defect in the same family — a caller value (getter/Proxy) or
+an in-realm prototype accessor made an authorization/validity check see one value
+and the consumed/persisted value another, or silently emptied a numeric append.
+
+| Round | Blocking finding                                                                                                                                                                                                                           | Fix                                                                                                                                                                                                            |
+| ----- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1     | F1: self-referential HMAC pepper bundled with the record                                                                                                                                                                                   | branded `verifyGateEvidence` boundary                                                                                                                                                                          |
+| 2     | F1: the verification key was still a per-call argument; no production key source                                                                                                                                                           | key resolved from deployment config, no setter                                                                                                                                                                 |
+| 3     | D1: `evaluateGateEvidence` read `record.payload` per check (genuine signature spliced onto an attacker payload); D2: branded record re-read after verification                                                                             | single-read frozen `snapshotGateEvidenceRecord`; verify and brand the SAME snapshot                                                                                                                            |
+| 4     | A1: `verifyGateEvidence` read `requiredScope` twice; A2: `evaluateActivationGate`/`advanceState`/`requirePersistedActivationEvidence` re-read caller fields; A3: DAG metadata                                                              | bind requiredScope once; snapshot the whole gate input and the other boundary inputs; DAG-safe metadata materialization                                                                                        |
+| 5     | The class was systemic: `evaluateConformance.requirements`, `evaluateProdConformance`, `buildReleaseReport`, `rollbackToApproved`, `resolveProtocolRevision`, `recordSla`, `evaluateDeploymentPosture` and others multi-read caller fields | shared `snapshotCallerInput` applied at every public authority boundary                                                                                                                                        |
+| 6     | Non-plain carriers (class instances, `getPrototypeOf`-trap Proxies) were passed through by reference, re-opening the class                                                                                                                 | non-plain carriers refused; `evaluateConformance`/`evaluateProdConformance`/`evaluateActivationGate` convert the refusal to FAILED/refusal; `GatePauses.rollbackRestore`/`resume` and `statesFor` single-bound |
+| 7     | Typed-array/ArrayBuffer branches called `value.slice()` dynamically (subclass / own-`slice` / trap-Proxy escape; `Buffer` aliased); `array[array.length]` swallowed by an `Array.prototype` index accessor                                 | copies through captured internal-slot getters; `assertNoHostileArrayIndexShadow` fail-closed guard                                                                                                             |
+| 8     | The guard enumerated only `Array.prototype`'s OWN indices, so `Object.prototype[0]` or a replaced prototype still swallowed appends                                                                                                        | guard walks the whole prototype chain with module-init-captured intrinsics; gate-evidence snapshot guarded; milestone getter read inside a try                                                                 |
+
+**Final residuals (recorded, not blocking).** In-realm shadowing of module-init
+intrinsics, `process.env` secret readability, the raw-DB-writer trust boundary
+(D013/D018), and `GATE_EVIDENCE_PEPPER` process configuration are the documented
+accepted model. LOW/MEDIUM: some engine-backed wrappers still surface a non-plain
+carrier as an uncaught `TypeError` (fail-closed) rather than a typed refusal;
+direct calls to the exported rule functions remain multi-read (they are single-read
+through the evaluating boundaries); `Float64/Int32` typed arrays are copied to
+`Uint8Array` (fail-closed, values truncated); `BigInt64Array`/detached buffers
+throw (fail-closed).

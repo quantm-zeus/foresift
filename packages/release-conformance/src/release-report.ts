@@ -1,4 +1,5 @@
 /** @requirement FR-TRACE-006 @acceptance AC-269 */
+import { appendSafe } from './shadow-safe.ts';
 import { createHash } from 'node:crypto';
 import { readdir, readFile } from 'node:fs/promises';
 import path from 'node:path';
@@ -210,7 +211,7 @@ export async function buildReleaseReport(
   for (let index = 0; index < gateEvidence.length; index += 1) {
     const item = gateEvidence[index];
     if (item !== undefined && item.isValid && item.gateKind)
-      passingGates[passingGates.length] = `gate:${item.gateKind.toLowerCase().replace('_', '-')}`;
+      appendSafe(passingGates, `gate:${item.gateKind.toLowerCase().replace('_', '-')}`);
   }
   const gatesPassed = numericSortStrings(passingGates);
   const ledgerDeviations: ReleaseDeviation[] = numericMap(
@@ -227,12 +228,12 @@ export async function buildReleaseReport(
   for (let index = 0; index < gateEvidence.length; index += 1) {
     const evidence = gateEvidence[index];
     if (evidence === undefined || evidence.isValid) continue;
-    refusedEvidence[refusedEvidence.length] = {
+    appendSafe(refusedEvidence, {
       id: evidence.evidenceId ?? `gate-evidence:${refusedIndex}`,
       rule: 'GATE_EVIDENCE_REFUSED',
       path: evidence.gateKind ? `gate:${evidence.gateKind}` : 'gate:unknown',
       justification: evidence.reason ?? 'gate evidence did not pass evaluation',
-    };
+    });
     refusedIndex += 1;
   }
   const combinedDeviations: ReleaseDeviation[] = [];
@@ -244,7 +245,7 @@ export async function buildReleaseReport(
   for (let sourceIndex = 0; sourceIndex < deviationSources.length; sourceIndex += 1) {
     const source = deviationSources[sourceIndex] as readonly ReleaseDeviation[];
     for (let index = 0; index < source.length; index += 1) {
-      combinedDeviations[combinedDeviations.length] = source[index] as ReleaseDeviation;
+      appendSafe(combinedDeviations, source[index] as ReleaseDeviation);
     }
   }
   const unresolvedDeviations = numericSortWith(
@@ -319,7 +320,7 @@ export function verifyReleaseReport(
         issueIndex
       ] as (typeof schemaResult.error.issues)[number];
       const field = issue.path.length === 0 ? 'report' : issue.path.join('.');
-      errors[errors.length] = `${field}: ${issue.message}`;
+      appendSafe(errors, `${field}: ${issue.message}`);
     }
   }
   const required = [
@@ -339,7 +340,7 @@ export function verifyReleaseReport(
   for (let fieldIndex = 0; fieldIndex < required.length; fieldIndex += 1) {
     const field = required[fieldIndex] as (typeof required)[number];
     if (input[field] === undefined || input[field] === null)
-      errors[errors.length] = `${field} is required`;
+      appendSafe(errors, `${field} is required`);
   }
   const hashFields = [
     'documentHash',
@@ -351,15 +352,15 @@ export function verifyReleaseReport(
     const field = hashFields[fieldIndex] as (typeof hashFields)[number];
     const value = input[field];
     if (typeof value !== 'string' || !HASH.test(value) || /^0+$/.test(value))
-      errors[errors.length] = `${field} must be a non-zero SHA-256 hash`;
+      appendSafe(errors, `${field} must be a non-zero SHA-256 hash`);
     if (expected[field] !== undefined && expected[field] !== value)
-      errors[errors.length] = `${field} disagrees with released artifact`;
+      appendSafe(errors, `${field} disagrees with released artifact`);
   }
   const hashMaps = ['migrationHashes', 'schemaHashes'] as const;
   for (let fieldIndex = 0; fieldIndex < hashMaps.length; fieldIndex += 1) {
     const field = hashMaps[fieldIndex] as (typeof hashMaps)[number];
     if (!record(input[field])) {
-      errors[errors.length] = `${field} must be an object`;
+      appendSafe(errors, `${field} must be an object`);
       continue;
     }
     const names = Object.keys(input[field]);
@@ -372,11 +373,10 @@ export function verifyReleaseReport(
         !PREFIXED_HASH.test(hash) ||
         /^sha256:0+$/.test(hash)
       )
-        errors[errors.length] = `${field}.${name} must be a non-zero sha256: hash`;
+        appendSafe(errors, `${field}.${name} must be a non-zero sha256: hash`);
     }
   }
-  if (!record(input.conformanceResults))
-    errors[errors.length] = 'conformanceResults must be an object';
+  if (!record(input.conformanceResults)) appendSafe(errors, 'conformanceResults must be an object');
   else {
     const conformanceKeys = [
       'overall',
@@ -388,27 +388,27 @@ export function verifyReleaseReport(
     for (let keyIndex = 0; keyIndex < conformanceKeys.length; keyIndex += 1) {
       const key = conformanceKeys[keyIndex] as (typeof conformanceKeys)[number];
       if (input.conformanceResults[key] === undefined)
-        errors[errors.length] = `conformanceResults.${key} is required`;
+        appendSafe(errors, `conformanceResults.${key} is required`);
     }
     if (
       typeof input.conformanceResults.overall !== 'string' ||
       !numericIncludes(['PASSED', 'FAILED'], input.conformanceResults.overall)
     ) {
-      errors[errors.length] = 'conformanceResults.overall is invalid';
+      appendSafe(errors, 'conformanceResults.overall is invalid');
     }
   }
   if (!Array.isArray(input.unresolvedDeviations))
-    errors[errors.length] = 'unresolvedDeviations must be an array';
-  if (!record(input.activationState)) errors[errors.length] = 'activationState must be an object';
+    appendSafe(errors, 'unresolvedDeviations must be an array');
+  if (!record(input.activationState)) appendSafe(errors, 'activationState must be an object');
   else {
     const activationKeys = ['milestone', 'status', 'activeGroups', 'gatesPassed'] as const;
     for (let keyIndex = 0; keyIndex < activationKeys.length; keyIndex += 1) {
       const key = activationKeys[keyIndex] as (typeof activationKeys)[number];
       if (input.activationState[key] === undefined)
-        errors[errors.length] = `activationState.${key} is required`;
+        appendSafe(errors, `activationState.${key} is required`);
     }
   }
-  if (!record(input.rollbackTarget)) errors[errors.length] = 'rollbackTarget must be an object';
+  if (!record(input.rollbackTarget)) appendSafe(errors, 'rollbackTarget must be an object');
   else {
     const rollbackKeys = [
       'previousReportId',
@@ -418,14 +418,14 @@ export function verifyReleaseReport(
     for (let keyIndex = 0; keyIndex < rollbackKeys.length; keyIndex += 1) {
       const key = rollbackKeys[keyIndex] as (typeof rollbackKeys)[number];
       if (input.rollbackTarget[key] === undefined)
-        errors[errors.length] = `rollbackTarget.${key} is required`;
+        appendSafe(errors, `rollbackTarget.${key} is required`);
     }
     const rollbackHashKeys = ['previousDocumentHash', 'previousManifestHash'] as const;
     for (let keyIndex = 0; keyIndex < rollbackHashKeys.length; keyIndex += 1) {
       const key = rollbackHashKeys[keyIndex] as (typeof rollbackHashKeys)[number];
       const value = input.rollbackTarget[key];
       if (typeof value !== 'string' || !HASH.test(value) || /^0+$/.test(value))
-        errors[errors.length] = `rollbackTarget.${key} must be a non-zero SHA-256 hash`;
+        appendSafe(errors, `rollbackTarget.${key} must be a non-zero SHA-256 hash`);
     }
   }
   return { isValid: errors.length === 0, errors };

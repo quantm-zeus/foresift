@@ -21,6 +21,7 @@
  * Strictly read-only: posture governs what read-only intelligence may promise;
  * it never trades, custodies, signs, or submits.
  */
+import { appendSafe } from './shadow-safe.ts';
 import {
   ALL_PROTECTED_DIMENSIONS,
   DeploymentPosture,
@@ -257,7 +258,7 @@ export async function evaluateDeploymentPosture(
   for (let index = 0; index < dependencies.rows.length; index += 1) {
     const dependency = dependencies.rows[index];
     if (dependency === undefined) continue;
-    criticalDependencyIds[criticalDependencyIds.length] = dependency.dependency_id;
+    appendSafe(criticalDependencyIds, dependency.dependency_id);
     let unexpiredCount = 0;
     for (let slaIndex = 0; slaIndex < slas.rows.length; slaIndex += 1) {
       const sla = slas.rows[slaIndex];
@@ -277,7 +278,7 @@ export async function evaluateDeploymentPosture(
       const expiresMs = Date.parse(String(sla.expires_at));
       if (Number.isFinite(expiresMs) && expiresMs > nowMs) unexpiredCount += 1;
     }
-    if (unexpiredCount === 0) missingSlaRefs[missingSlaRefs.length] = dependency.dependency_id;
+    if (unexpiredCount === 0) appendSafe(missingSlaRefs, dependency.dependency_id);
   }
   const protectedDimensions = numericCopy(ALL_PROTECTED_DIMENSIONS);
   // An EMPTY critical register is vacuous coverage, not coverage (audit H8):
@@ -312,9 +313,9 @@ export async function evaluateDeploymentPosture(
     };
   }
   const reasons: string[] = [];
-  if (emptyRegister) reasons[reasons.length] = 'no critical external dependency is declared';
+  if (emptyRegister) appendSafe(reasons, 'no critical external dependency is declared');
   if (!capacityBacked) {
-    reasons[reasons.length] = 'no passing sustainable-capacity contract backs the deployment';
+    appendSafe(reasons, 'no passing sustainable-capacity contract backs the deployment');
   }
   if (missingSlaRefs.length > 0) {
     reasons[reasons.length] =
@@ -381,8 +382,9 @@ export function assertBestEffortPreservesProtectedDimensions(
     declaredIndex < declaration.protectedDimensions.length;
     declaredIndex += 1
   ) {
-    declaredProtected[declaredProtected.length] = parseProtectedDimension(
-      declaration.protectedDimensions[declaredIndex],
+    appendSafe(
+      declaredProtected,
+      parseProtectedDimension(declaration.protectedDimensions[declaredIndex]),
     );
   }
   const missingProtected: ProtectedDimension[] = [];
@@ -392,8 +394,7 @@ export function assertBestEffortPreservesProtectedDimensions(
     dimensionIndex += 1
   ) {
     const dimension = ALL_PROTECTED_DIMENSIONS[dimensionIndex] as ProtectedDimension;
-    if (!isOneOf(dimension, declaredProtected))
-      missingProtected[missingProtected.length] = dimension;
+    if (!isOneOf(dimension, declaredProtected)) appendSafe(missingProtected, dimension);
   }
   if (missingProtected.length > 0) {
     throw new ForesiftError(

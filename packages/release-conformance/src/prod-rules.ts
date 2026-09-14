@@ -22,6 +22,7 @@
  * released; nothing here can trade, hold custody, sign, handle private keys, or
  * submit a transaction.
  */
+import { appendSafe } from './shadow-safe.ts';
 import {
   ALL_ARTIFACT_BOUNDARY_ASSERTION_KINDS,
   ALL_DEPLOYMENT_RELAXABLE_DIMENSIONS,
@@ -174,12 +175,12 @@ export function checkActivationWithoutEvidence(
   for (let claimIndex = 0; claimIndex < claims.length; claimIndex += 1) {
     const claim = claims[claimIndex];
     if (claim === undefined || claim === null) {
-      findings[findings.length] = {
+      appendSafe(findings, {
         requirementId: DEFAULT_ACTIVATION_REQUIREMENT,
         rule: PROD_RULES.activationWithoutEvidence,
         path: `activationClaims[${claimIndex}]`,
         message: `activationClaims[${claimIndex}] is not a claim object; a malformed claim fails closed`,
-      };
+      });
       continue;
     }
     const requirementId = claim.requirementId ?? DEFAULT_ACTIVATION_REQUIREMENT;
@@ -192,44 +193,43 @@ export function checkActivationWithoutEvidence(
       lifecycleKnown = false;
     }
     if (!lifecycleKnown) {
-      findings[findings.length] = {
+      appendSafe(findings, {
         requirementId,
         rule: PROD_RULES.activationWithoutEvidence,
         path: claim.moduleId,
         message: `module ${claim.moduleId} claims unknown governed lifecycle position ${JSON.stringify(
           claim.lifecycleState,
         )}; an unparseable position fails closed`,
-      };
+      });
       continue;
     }
     if (claim.lifecycleState !== 'ACTIVE') continue;
     const failures: string[] = [];
-    if (claim.implemented !== true) failures[failures.length] = 'no governed IMPLEMENTED state';
-    if (claim.available !== true) failures[failures.length] = 'AVAILABLE was never established';
+    if (claim.implemented !== true) appendSafe(failures, 'no governed IMPLEMENTED state');
+    if (claim.available !== true) appendSafe(failures, 'AVAILABLE was never established');
     // A missing/non-boolean PROVEN requirement is not `false`: it fails closed.
     if (typeof claim.requiresProven !== 'boolean') {
-      failures[failures.length] = 'the scope PROVEN requirement is missing or not a boolean';
+      appendSafe(failures, 'the scope PROVEN requirement is missing or not a boolean');
     } else if (claim.requiresProven && claim.proven !== true) {
-      failures[failures.length] = 'PROVEN is required by the scope but was never established';
+      appendSafe(failures, 'PROVEN is required by the scope but was never established');
     }
-    if (claim.gateVerdict !== 'PASS')
-      failures[failures.length] = 'no PASS activation-gate evaluation';
+    if (claim.gateVerdict !== 'PASS') appendSafe(failures, 'no PASS activation-gate evaluation');
     // Only a non-empty string activation event is a reference: an omitted field,
     // `null`, `''`, and whitespace all fail closed (audit R2).
     if (
       typeof claim.activationEventRef !== 'string' ||
       claim.activationEventRef.trim().length === 0
     ) {
-      failures[failures.length] = 'no non-empty activation event reference';
+      appendSafe(failures, 'no non-empty activation event reference');
     }
     for (let failureIndex = 0; failureIndex < failures.length; failureIndex += 1) {
       const failure = failures[failureIndex] as string;
-      findings[findings.length] = {
+      appendSafe(findings, {
         requirementId,
         rule: PROD_RULES.activationWithoutEvidence,
         path: claim.moduleId,
         message: `ACTIVE module ${claim.moduleId} lacks a passing activation gate: ${failure}`,
-      };
+      });
     }
   }
   return { passed: findings.length === 0, findings };
@@ -264,24 +264,24 @@ export function checkPostureWeakening(
   for (let declarationIndex = 0; declarationIndex < declarations.length; declarationIndex += 1) {
     const rawDeclaration = declarations[declarationIndex];
     if (!isClaimRecord(rawDeclaration)) {
-      findings[findings.length] = {
+      appendSafe(findings, {
         requirementId: DEFAULT_POSTURE_REQUIREMENT,
         rule: PROD_RULES.postureWeakening,
         path: `postureDeclarations[${declarationIndex}]`,
         message:
           'posture declaration is not an object; a malformed declaration fails the release gate closed',
-      };
+      });
       continue;
     }
     const declaration = rawDeclaration as unknown as PostureWeakeningDeclaration;
     const requirementId = declaration.requirementId ?? DEFAULT_POSTURE_REQUIREMENT;
     const findingsFor = (detail: string): void => {
-      findings[findings.length] = {
+      appendSafe(findings, {
         requirementId,
         rule: PROD_RULES.postureWeakening,
         path: declaration.declarationId,
         message: `posture declaration ${declaration.declarationId} weakens a protected guarantee: ${detail}`,
-      };
+      });
     };
     let domainAllows = false;
     try {
@@ -328,7 +328,7 @@ export function checkPostureWeakening(
           break;
         }
       }
-      if (!declared) missingProtected[missingProtected.length] = dimension;
+      if (!declared) appendSafe(missingProtected, dimension);
     }
     if (missingProtected.length > 0) {
       findingsFor(`protected dimensions omitted: ${numericJoin(missingProtected, ', ')}`);
@@ -379,12 +379,12 @@ export function checkMcpCompatibilityDrift(claim: McpCompatibilityMatrixClaim): 
   const requirementId = claim.requirementId ?? DEFAULT_MCP_REQUIREMENT;
   const findings: ProdConformanceFinding[] = [];
   const report = (path: string, detail: string): void => {
-    findings[findings.length] = {
+    appendSafe(findings, {
       requirementId,
       rule: PROD_RULES.mcpCompatibilityDrift,
       path,
       message: `MCP compatibility drift: ${detail}`,
-    };
+    });
   };
 
   for (let revisionIndex = 0; revisionIndex < claim.revisions.length; revisionIndex += 1) {
@@ -434,7 +434,7 @@ export function checkMcpCompatibilityDrift(claim: McpCompatibilityMatrixClaim): 
     const rawRevision = claim.revisions[revisionIndex];
     if (!isClaimRecord(rawRevision)) continue;
     const revision = rawRevision as unknown as McpRevisionClaim;
-    if (revision.isDefault === true) defaults[defaults.length] = revision;
+    if (revision.isDefault === true) appendSafe(defaults, revision);
   }
   if (defaults.length === 0) {
     report('(default-revision)', 'no MCP revision is declared as the compatibility default');
@@ -559,7 +559,7 @@ const DEFAULT_PRECOMPUTED_REQUIREMENT = 'FR-PROD-006';
 function numericStateCopy(source: readonly string[]): string[] {
   const copy: string[] = [];
   for (let index = 0; index < source.length; index += 1) {
-    copy[copy.length] = source[index] as string;
+    appendSafe(copy, source[index] as string);
   }
   return copy;
 }
@@ -574,7 +574,7 @@ function selectShadowOnlyImportStates(states: readonly string[]): string[] {
   const selected: string[] = [];
   for (let index = 0; index < states.length; index += 1) {
     const state = states[index];
-    if (state === 'VALIDATING' || state === 'SHADOW_ELIGIBLE') selected[selected.length] = state;
+    if (state === 'VALIDATING' || state === 'SHADOW_ELIGIBLE') appendSafe(selected, state);
   }
   return selected;
 }
@@ -647,24 +647,24 @@ export function checkLivePathPrecomputationViolation(
   for (let claimIndex = 0; claimIndex < claims.length; claimIndex += 1) {
     const rawClaim = claims[claimIndex];
     if (!isClaimRecord(rawClaim)) {
-      findings[findings.length] = {
+      appendSafe(findings, {
         requirementId: DEFAULT_PRECOMPUTED_REQUIREMENT,
         rule: PROD_RULES.livePathPrecomputationViolation,
         path: `livePaths[${claimIndex}]`,
         message:
           'live-path claim is not an object; a malformed claim fails the release gate closed',
-      };
+      });
       continue;
     }
     const claim = rawClaim as unknown as LivePathPrecomputationClaim;
     const requirementId = claim.requirementId ?? DEFAULT_PRECOMPUTED_REQUIREMENT;
     const report = (detail: string): void => {
-      findings[findings.length] = {
+      appendSafe(findings, {
         requirementId,
         rule: PROD_RULES.livePathPrecomputationViolation,
         path: claim.livePath,
         message: `live path ${claim.livePath} violates its precomputation boundary: ${detail}`,
-      };
+      });
     };
     if (claim.bound === null) {
       report('no bounded precomputed-alpha envelope is declared');
@@ -723,7 +723,7 @@ export function checkLivePathPrecomputationViolation(
             break;
           }
         }
-        if (!alreadyPresent) presentKinds[presentKinds.length] = kind;
+        if (!alreadyPresent) appendSafe(presentKinds, kind);
         if (assertion.verdict !== 'PASS') failing += 1;
       }
       const missing: string[] = [];
@@ -740,12 +740,11 @@ export function checkLivePathPrecomputationViolation(
             break;
           }
         }
-        if (!present) missing[missing.length] = kind;
+        if (!present) appendSafe(missing, kind);
       }
       const parts: string[] = [];
-      if (missing.length > 0)
-        parts[parts.length] = `missing assertions ${numericJoin(missing, ', ')}`;
-      if (failing > 0) parts[parts.length] = `${failing} failing assertion(s)`;
+      if (missing.length > 0) appendSafe(parts, `missing assertions ${numericJoin(missing, ', ')}`);
+      if (failing > 0) appendSafe(parts, `${failing} failing assertion(s)`);
       report(
         parts.length > 0
           ? numericJoin(parts, '; ')
@@ -904,19 +903,19 @@ export function evaluateDistributionAuthorization(
   for (let declaredIndex = 0; declaredIndex < requiredGateKinds.length; declaredIndex += 1) {
     const declared = requiredGateKinds[declaredIndex];
     if (typeof declared !== 'string') {
-      unknownGateKinds[unknownGateKinds.length] = String(declared);
+      appendSafe(unknownGateKinds, String(declared));
       continue;
     }
     declaredGateKinds.add(declared);
     if (!isOneOf(declared, MANDATORY_DISTRIBUTION_GATE_KINDS)) {
-      unknownGateKinds[unknownGateKinds.length] = declared;
+      appendSafe(unknownGateKinds, declared);
     }
   }
   for (let gateIndex = 0; gateIndex < MANDATORY_DISTRIBUTION_GATE_KINDS.length; gateIndex += 1) {
     const gateKind = MANDATORY_DISTRIBUTION_GATE_KINDS[gateIndex];
     if (typeof gateKind !== 'string') continue;
     if (!declaredGateKinds.has(gateKind)) {
-      omittedMandatoryGateKinds[omittedMandatoryGateKinds.length] = gateKind;
+      appendSafe(omittedMandatoryGateKinds, gateKind);
     }
     let sawMatching = false;
     let sawInScope = false;
@@ -947,9 +946,9 @@ export function evaluateDistributionAuthorization(
         sawUsable = true;
       }
     }
-    if (!sawMatching) missingGateKinds[missingGateKinds.length] = gateKind;
-    else if (!sawInScope) mismatchedGateKinds[mismatchedGateKinds.length] = gateKind;
-    else if (!sawUsable) revokedOrInvalidGateKinds[revokedOrInvalidGateKinds.length] = gateKind;
+    if (!sawMatching) appendSafe(missingGateKinds, gateKind);
+    else if (!sawInScope) appendSafe(mismatchedGateKinds, gateKind);
+    else if (!sawUsable) appendSafe(revokedOrInvalidGateKinds, gateKind);
   }
   return {
     authorized:
@@ -987,24 +986,24 @@ export function checkPublicAuthorizationWithoutGateEvidence(
   for (let claimIndex = 0; claimIndex < claims.length; claimIndex += 1) {
     const claim = claims[claimIndex];
     if (claim === undefined || claim === null) {
-      findings[findings.length] = {
+      appendSafe(findings, {
         requirementId: DEFAULT_PUBLIC_AUTHORIZATION_REQUIREMENT,
         rule: PROD_RULES.publicAuthorizationWithoutGateEvidence,
         path: `distributionAuthorizations[${claimIndex}]`,
         message: `distributionAuthorizations[${claimIndex}] is not a claim object; a malformed claim fails closed`,
-      };
+      });
       continue;
     }
     const evaluation = evaluateDistributionAuthorization(claim);
     if (!evaluation.readinessKnown) {
-      findings[findings.length] = {
+      appendSafe(findings, {
         requirementId: claim.requirementId ?? DEFAULT_PUBLIC_AUTHORIZATION_REQUIREMENT,
         rule: PROD_RULES.publicAuthorizationWithoutGateEvidence,
         path: claim.releaseRef,
         message: `unknown distribution readiness ${JSON.stringify(
           claim.distributionReadiness,
         )}: an unparseable claim fails closed`,
-      };
+      });
       continue;
     }
     if (!evaluation.readinessAuthorized || evaluation.authorized) continue;
@@ -1046,12 +1045,12 @@ export function checkPublicAuthorizationWithoutGateEvidence(
       details[details.length] =
         `declared gate kinds outside the authoritative set: ${numericJoin(evaluation.unknownGateKinds, ', ')}`;
     }
-    findings[findings.length] = {
+    appendSafe(findings, {
       requirementId,
       rule: PROD_RULES.publicAuthorizationWithoutGateEvidence,
       path: claim.releaseRef,
       message: `${claim.distributionReadiness} authorization lacks the full evidence set: ${numericJoin(details, '; ')}`,
-    };
+    });
   }
   return { passed: findings.length === 0, findings };
 }
@@ -1138,12 +1137,12 @@ export function checkProdConformanceInputsPresent(input: ProdConformanceInput): 
         ? typeof value === 'object' && value !== null && !Array.isArray(value)
         : Array.isArray(value);
     if (!wellShaped) {
-      findings[findings.length] = {
+      appendSafe(findings, {
         requirementId: 'FR-PROD-001',
         rule: PROD_RULES.prodConformanceInputMissing,
         path: field,
         message: `PROD conformance input ${field} (${label}) was omitted or was not the declared ${field === 'mcpCompatibility' ? 'object' : 'array'} shape; an absent or malformed governance claim set fails the release gate closed instead of passing vacuously`,
-      };
+      });
       continue;
     }
     // Element shape: a malformed element must be a finding, not a silent skip.
@@ -1152,21 +1151,21 @@ export function checkProdConformanceInputsPresent(input: ProdConformanceInput): 
       for (let requiredIndex = 0; requiredIndex < REQUIRED_MCP_FIELDS.length; requiredIndex += 1) {
         const required = REQUIRED_MCP_FIELDS[requiredIndex] as string;
         if (!Array.isArray(claim[required])) {
-          findings[findings.length] = {
+          appendSafe(findings, {
             requirementId: 'FR-PROD-001',
             rule: PROD_RULES.prodConformanceInputMissing,
             path: `${field}.${required}`,
             message: `MCP compatibility claim ${required} must be an array; a malformed claim set fails the release gate closed`,
-          };
+          });
         }
       }
       if (typeof claim['now'] !== 'string' || claim['now'].length === 0) {
-        findings[findings.length] = {
+        appendSafe(findings, {
           requirementId: 'FR-PROD-001',
           rule: PROD_RULES.prodConformanceInputMissing,
           path: `${field}.now`,
           message: 'MCP compatibility claim now must be a non-empty instant',
-        };
+        });
       }
       continue;
     }
@@ -1175,24 +1174,24 @@ export function checkProdConformanceInputsPresent(input: ProdConformanceInput): 
     for (let index = 0; index < elements.length; index += 1) {
       const element = elements[index];
       if (typeof element !== 'object' || element === null || Array.isArray(element)) {
-        findings[findings.length] = {
+        appendSafe(findings, {
           requirementId: 'FR-PROD-001',
           rule: PROD_RULES.prodConformanceInputMissing,
           path: `${field}[${index}]`,
           message: `${field}[${index}] is not a claim object; a malformed claim set fails the release gate closed`,
-        };
+        });
         continue;
       }
       const claim = element as Record<string, unknown>;
       for (let requiredIndex = 0; requiredIndex < requiredFields.length; requiredIndex += 1) {
         const required = requiredFields[requiredIndex] as string;
         if (claim[required] === undefined || claim[required] === null) {
-          findings[findings.length] = {
+          appendSafe(findings, {
             requirementId: 'FR-PROD-001',
             rule: PROD_RULES.prodConformanceInputMissing,
             path: `${field}[${index}].${required}`,
             message: `${field}[${index}] is missing the required field ${required}; a malformed claim fails the release gate closed`,
-          };
+          });
         }
       }
       // Nested shape: a field that must be an array (or an exact nullable
@@ -1200,24 +1199,24 @@ export function checkProdConformanceInputsPresent(input: ProdConformanceInput): 
       // and substring-match its way to an authorization (audit R2/R3).
       if (field === 'activationClaims') {
         if (typeof claim['requiresProven'] !== 'boolean') {
-          findings[findings.length] = {
+          appendSafe(findings, {
             requirementId: 'FR-PROD-001',
             rule: PROD_RULES.prodConformanceInputMissing,
             path: `${field}[${index}].requiresProven`,
             message: `${field}[${index}].requiresProven must be a boolean; a missing or stringly PROVEN requirement fails the release gate closed`,
-          };
+          });
         }
         const eventRef = claim['activationEventRef'];
         if (
           !('activationEventRef' in claim) ||
           (eventRef !== null && (typeof eventRef !== 'string' || eventRef.trim().length === 0))
         ) {
-          findings[findings.length] = {
+          appendSafe(findings, {
             requirementId: 'FR-PROD-001',
             rule: PROD_RULES.prodConformanceInputMissing,
             path: `${field}[${index}].activationEventRef`,
             message: `${field}[${index}].activationEventRef must be a non-empty string or null; an omitted, empty, or non-string activation event fails the release gate closed`,
-          };
+          });
         }
       }
       if (field === 'postureDeclarations') {
@@ -1227,39 +1226,39 @@ export function checkProdConformanceInputsPresent(input: ProdConformanceInput): 
         // report. Both dimension collections must be arrays.
         const weakened = claim['weakenedDimensions'];
         if (!Array.isArray(weakened)) {
-          findings[findings.length] = {
+          appendSafe(findings, {
             requirementId: 'FR-PROD-001',
             rule: PROD_RULES.prodConformanceInputMissing,
             path: `${field}[${index}].weakenedDimensions`,
             message: `${field}[${index}].weakenedDimensions must be an array of relaxable dimensions; a non-array cannot stand in for an empty declaration`,
-          };
+          });
         }
         const protectedDimensions = claim['protectedDimensions'];
         if (!Array.isArray(protectedDimensions)) {
-          findings[findings.length] = {
+          appendSafe(findings, {
             requirementId: 'FR-PROD-001',
             rule: PROD_RULES.prodConformanceInputMissing,
             path: `${field}[${index}].protectedDimensions`,
             message: `${field}[${index}].protectedDimensions must be an array of protected dimensions`,
-          };
+          });
         }
       }
       if (field === 'distributionAuthorizations') {
         if (!Array.isArray(claim['requiredGateKinds'])) {
-          findings[findings.length] = {
+          appendSafe(findings, {
             requirementId: 'FR-PROD-001',
             rule: PROD_RULES.prodConformanceInputMissing,
             path: `${field}[${index}].requiredGateKinds`,
             message: `${field}[${index}].requiredGateKinds must be an array of gate kinds`,
-          };
+          });
         }
         if (!Array.isArray(claim['gateEvidence'])) {
-          findings[findings.length] = {
+          appendSafe(findings, {
             requirementId: 'FR-PROD-001',
             rule: PROD_RULES.prodConformanceInputMissing,
             path: `${field}[${index}].gateEvidence`,
             message: `${field}[${index}].gateEvidence must be an array of evidence records`,
-          };
+          });
         } else {
           const evidenceList = claim['gateEvidence'] as readonly unknown[];
           for (let evidenceIndex = 0; evidenceIndex < evidenceList.length; evidenceIndex += 1) {
@@ -1269,12 +1268,12 @@ export function checkProdConformanceInputsPresent(input: ProdConformanceInput): 
                 ? (evidence as Record<string, unknown>)['scopeRefs']
                 : undefined;
             if (!Array.isArray(scopeRefs)) {
-              findings[findings.length] = {
+              appendSafe(findings, {
                 requirementId: 'FR-PROD-001',
                 rule: PROD_RULES.prodConformanceInputMissing,
                 path: `${field}[${index}].gateEvidence[${evidenceIndex}].scopeRefs`,
                 message: `${field}[${index}].gateEvidence[${evidenceIndex}].scopeRefs must be an array of release refs; a string scopeRefs cannot be substring-matched into scope`,
-              };
+              });
             }
           }
         }
@@ -1319,7 +1318,7 @@ export function evaluateProdConformance(rawInput: ProdConformanceInput): ProdCon
   const append = (report: ProdRuleReport): void => {
     const reportFindings = report.findings;
     for (let index = 0; index < reportFindings.length; index += 1) {
-      findings[findings.length] = reportFindings[index] as ProdConformanceFinding;
+      appendSafe(findings, reportFindings[index] as ProdConformanceFinding);
     }
   };
   // Every rule runs behind a fail-closed boundary (V7-NF2): a malformed/sparse
@@ -1332,14 +1331,14 @@ export function evaluateProdConformance(rawInput: ProdConformanceInput): ProdCon
     try {
       report = factory();
     } catch (error) {
-      findings[findings.length] = {
+      appendSafe(findings, {
         requirementId: 'FR-PROD-001',
         rule: PROD_RULES.prodConformanceRuleThrew,
         path: ruleName,
         message: `PROD rule ${ruleName} threw on malformed governance input (${
           error instanceof Error ? error.message : String(error)
         }); the release gate fails closed instead of crashing`,
-      };
+      });
       return;
     }
     append(report);
@@ -1427,10 +1426,10 @@ async function filesUnder(root: string, relative = ''): Promise<readonly string[
     if (entry.isDirectory()) {
       const nested = await filesUnder(root, child);
       for (let nestedIndex = 0; nestedIndex < nested.length; nestedIndex += 1) {
-        files[files.length] = nested[nestedIndex] as string;
+        appendSafe(files, nested[nestedIndex] as string);
       }
     } else if (entry.isFile()) {
-      files[files.length] = child;
+      appendSafe(files, child);
     }
   }
   return files;
@@ -1501,12 +1500,12 @@ export async function checkProdSurfacePresence(
       for (let refIndex = 0; refIndex < refs.length; refIndex += 1) {
         const ref = refs[refIndex] as string;
         if (await prodRefResolves(options.repoRoot, ref)) continue;
-        findings[findings.length] = {
+        appendSafe(findings, {
           requirementId: requirement.id,
           rule: PROD_RULES.prodSurfaceMissing,
           path: implementationPath(ref),
           message: `${requirement.id} declares ${field} ${implementationPath(ref)} but it does not resolve in the live repository`,
-        };
+        });
       }
     }
   }

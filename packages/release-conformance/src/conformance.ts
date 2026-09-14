@@ -1,4 +1,5 @@
 /** Release-blocking conformance rules for FR-TRACE-003. */
+import { appendSafe } from './shadow-safe.ts';
 import { constants } from 'node:fs';
 import { access, readFile, readdir } from 'node:fs/promises';
 import path from 'node:path';
@@ -94,7 +95,7 @@ function uniqueSortedValues(values: readonly string[]): string[] {
         break;
       }
     }
-    if (!seen) unique[unique.length] = value;
+    if (!seen) appendSafe(unique, value);
   }
   return numericSortStrings(unique);
 }
@@ -134,26 +135,26 @@ export function checkMappingCompleteness(
         typeof item.owner !== 'string' ||
         item.owner.trim().length === 0
       ) {
-        unmappedItems[unmappedItems.length] = item;
+        appendSafe(unmappedItems, item);
       }
     }
     const findings: ConformanceFinding[] = [];
     for (let itemIndex = 0; itemIndex < unmappedItems.length; itemIndex += 1) {
       const item = unmappedItems[itemIndex] as RequirementMapping;
       const missing: string[] = [];
-      if (!nonEmptyStrings(item.implementationRefs)) missing[missing.length] = 'implementationRefs';
-      if (!nonEmptyStrings(item.testRefs)) missing[missing.length] = 'testRefs';
+      if (!nonEmptyStrings(item.implementationRefs)) appendSafe(missing, 'implementationRefs');
+      if (!nonEmptyStrings(item.testRefs)) appendSafe(missing, 'testRefs');
       if (typeof item.owner !== 'string' || item.owner.trim().length === 0) {
-        missing[missing.length] = 'owner';
+        appendSafe(missing, 'owner');
       }
       for (let missingIndex = 0; missingIndex < missing.length; missingIndex += 1) {
         const dimension = missing[missingIndex] as string;
-        findings[findings.length] = {
+        appendSafe(findings, {
           requirementId: item.id,
           rule: CONFORMANCE_RULES.mapping,
           path: dimension,
           message: `${item.id} has no non-empty ${dimension} mapping`,
-        };
+        });
       }
     }
     return { passed: findings.length === 0, unmappedItems, findings };
@@ -297,18 +298,18 @@ export async function checkActiveImplementationPaths(
         (reconciledPath !== undefined &&
           (await pathRefExists(options.repoRoot, reconciledPath, scanCache)));
       if (!exists) {
-        findings[findings.length] = {
+        appendSafe(findings, {
           requirementId: requirement.id,
           rule: CONFORMANCE_RULES.activePath,
           path: exactPath,
           message: `${requirement.id} maps to missing active implementation path ${exactPath}`,
-        };
+        });
       }
     }
   }
   const missingPaths: string[] = [];
   for (let index = 0; index < findings.length; index += 1) {
-    missingPaths[missingPaths.length] = (findings[index] as ConformanceFinding).path;
+    appendSafe(missingPaths, (findings[index] as ConformanceFinding).path);
   }
   return {
     passed: findings.length === 0,
@@ -353,7 +354,7 @@ export async function checkNoPrematureImplementations(
     if (groupNumber === undefined || groupNumber > activeNumber) continue;
     const refs = resolveMappings({ requirements }, item.id).implementationRefs;
     for (let refIndex = 0; refIndex < refs.length; refIndex += 1) {
-      openedPaths[openedPaths.length] = implementationPath(refs[refIndex] as string);
+      appendSafe(openedPaths, implementationPath(refs[refIndex] as string));
     }
   }
   const findings: ConformanceFinding[] = [];
@@ -367,12 +368,12 @@ export async function checkNoPrematureImplementations(
       const exactPath = implementationPath(mappings.implementationRefs[refIndex] as string);
       if (!/^(apps|packages)\//.test(exactPath) || containsValue(openedPaths, exactPath)) continue;
       if (await pathRefExists(options.repoRoot, exactPath, scanCache)) {
-        findings[findings.length] = {
+        appendSafe(findings, {
           requirementId: requirement.id,
           rule: CONFORMANCE_RULES.premature,
           path: exactPath,
           message: `${exactPath} exists for ${requirement.dependencyGroup} before its gate is open`,
-        };
+        });
       }
     }
   }
@@ -389,11 +390,11 @@ export async function checkNoPrematureImplementations(
         break;
       }
     }
-    if (!duplicate) deduped[deduped.length] = finding;
+    if (!duplicate) appendSafe(deduped, finding);
   }
   const prematurePaths: string[] = [];
   for (let index = 0; index < deduped.length; index += 1) {
-    prematurePaths[prematurePaths.length] = (deduped[index] as ConformanceFinding).path;
+    appendSafe(prematurePaths, (deduped[index] as ConformanceFinding).path);
   }
   return {
     passed: deduped.length === 0,
@@ -420,10 +421,10 @@ async function filesRecursively(root: string, relative = ''): Promise<readonly s
     if (entry.isDirectory()) {
       const nested = await filesRecursively(root, child);
       for (let nestedIndex = 0; nestedIndex < nested.length; nestedIndex += 1) {
-        files[files.length] = nested[nestedIndex] as string;
+        appendSafe(files, nested[nestedIndex] as string);
       }
     } else if (entry.isFile()) {
-      files[files.length] = child;
+      appendSafe(files, child);
     }
   }
   return files;
@@ -470,12 +471,12 @@ export async function checkGeneratedDocsDrift(
   // iterates, and a shadowed iterator made the drift set empty.
   const allPaths: string[] = [];
   for (let index = 0; index < actualPaths.length; index += 1) {
-    allPaths[allPaths.length] = actualPaths[index] as string;
+    appendSafe(allPaths, actualPaths[index] as string);
   }
   const expectedKeys = Object.keys(expected);
   for (let index = 0; index < expectedKeys.length; index += 1) {
     const key = expectedKeys[index] as string;
-    if (!containsValue(allPaths, key)) allPaths[allPaths.length] = key;
+    if (!containsValue(allPaths, key)) appendSafe(allPaths, key);
   }
   const orderedPaths = numericSortStrings(allPaths);
   const driftedFiles: string[] = [];
@@ -483,31 +484,31 @@ export async function checkGeneratedDocsDrift(
     const relativePath = orderedPaths[pathIndex] as string;
     const expectedValue = expected[relativePath];
     if (expectedValue === undefined) {
-      driftedFiles[driftedFiles.length] = relativePath;
+      appendSafe(driftedFiles, relativePath);
       continue;
     }
     let actual: Buffer;
     try {
       actual = await readFile(path.join(generatedRoot, relativePath));
     } catch {
-      driftedFiles[driftedFiles.length] = relativePath;
+      appendSafe(driftedFiles, relativePath);
       continue;
     }
     const expectedBytes =
       typeof expectedValue === 'string'
         ? Buffer.from(expectedValue, 'utf8')
         : Buffer.from(expectedValue);
-    if (!actual.equals(expectedBytes)) driftedFiles[driftedFiles.length] = relativePath;
+    if (!actual.equals(expectedBytes)) appendSafe(driftedFiles, relativePath);
   }
   const findings: ConformanceFinding[] = [];
   for (let index = 0; index < driftedFiles.length; index += 1) {
     const driftedPath = driftedFiles[index] as string;
-    findings[findings.length] = {
+    appendSafe(findings, {
       requirementId: 'FR-TRACE-003',
       rule: CONFORMANCE_RULES.generated,
       path: `docs/generated/${driftedPath}`,
       message: `generated document differs byte-for-byte from deterministic regeneration: docs/generated/${driftedPath}`,
-    };
+    });
   }
   return { passed: findings.length === 0, driftedFiles, findings };
 }
@@ -644,27 +645,27 @@ export async function evaluateConformance(
   // refuse closed. The type check is strict so a boxed/coercible id (for example
   // `new String('G2')`, which `===` would not match against the manifest's
   // primitive `dependencyGroup`) can never skip the PROD block (audit R2 residual).
-  if (
-    options.milestone !== undefined &&
-    (typeof options.milestone !== 'string' || !/^G[0-7]$/.test(options.milestone))
-  ) {
+  // The milestone is decided from the VALIDATED pre-snapshot read (V7 round 9):
+  // re-reading `options.milestone` let a getter pass validation as `G2` and then
+  // evaluate as `G0`, skipping the whole FR-PROD block (FAILED -> PASSED).
+  if (milestoneOption !== undefined && !/^G[0-7]$/.test(milestoneOption)) {
     return {
       overall: 'FAILED',
       findings: [
         {
           requirementId: 'FR-TRACE-003',
           rule: 'CONFORMANCE_MILESTONE_INVALID',
-          path: String(options.milestone),
+          path: String(milestoneOption),
           message: `milestone must be a canonical dependency-group id G0…G7; ${JSON.stringify(
-            options.milestone,
+            milestoneOption,
           )} is not`,
         },
       ],
     };
   }
   let activeGroup: string;
-  if (options.milestone !== undefined) {
-    activeGroup = options.milestone;
+  if (milestoneOption !== undefined) {
+    activeGroup = milestoneOption;
   } else {
     // A malformed repository milestone must fail the gate with a finding, not
     // silently skip the PROD block (audit R2 residual / T057).
@@ -754,7 +755,7 @@ export async function evaluateConformance(
       for (let index = 0; index < manifestRequirements.length; index += 1) {
         const requirement = manifestRequirements[index] as (typeof manifestRequirements)[number];
         if (requirement.id.startsWith('FR-PROD-') && requirement.dependencyGroup === activeGroup) {
-          prodRequirements[prodRequirements.length] = requirement;
+          appendSafe(prodRequirements, requirement);
         }
       }
       const surface = await checkProdSurfacePresence({
@@ -762,18 +763,16 @@ export async function evaluateConformance(
         requirements: prodRequirements,
       });
       for (let index = 0; index < surface.findings.length; index += 1) {
-        prodFindings[prodFindings.length] = surface.findings[
-          index
-        ] as (typeof prodFindings)[number];
+        appendSafe(prodFindings, surface.findings[index] as (typeof prodFindings)[number]);
       }
       if (options.prodClaims === undefined) {
-        prodFindings[prodFindings.length] = {
+        appendSafe(prodFindings, {
           requirementId: 'FR-PROD-001',
           rule: 'PROD_CONFORMANCE_INPUT_MISSING',
           path: 'prodClaims',
           message:
             'the release gate evaluated a milestone that owns FR-PROD law without PROD governance claims; an absent claim set fails closed instead of skipping the PROD rules',
-        };
+        });
       }
     }
     if (options.prodClaims !== undefined) {
@@ -781,9 +780,7 @@ export async function evaluateConformance(
         options.prodClaims as Parameters<typeof evaluateProdConformance>[0],
       );
       for (let index = 0; index < prodReport.findings.length; index += 1) {
-        prodFindings[prodFindings.length] = prodReport.findings[
-          index
-        ] as (typeof prodFindings)[number];
+        appendSafe(prodFindings, prodReport.findings[index] as (typeof prodFindings)[number]);
       }
     }
   }
@@ -800,7 +797,7 @@ export async function evaluateConformance(
   for (let sourceIndex = 0; sourceIndex < sources.length; sourceIndex += 1) {
     const source = sources[sourceIndex] as readonly (typeof prodFindings)[number][];
     for (let findingIndex = 0; findingIndex < source.length; findingIndex += 1) {
-      findings[findings.length] = source[findingIndex] as (typeof prodFindings)[number];
+      appendSafe(findings, source[findingIndex] as (typeof prodFindings)[number]);
     }
   }
   return { overall: findings.length === 0 ? 'PASSED' : 'FAILED', findings };

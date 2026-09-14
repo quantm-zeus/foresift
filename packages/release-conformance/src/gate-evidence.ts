@@ -1,4 +1,5 @@
 /** Signed, hashed, scoped, expiring, and revocable gate evidence (FR-TRACE-004). */
+import { appendSafe } from './shadow-safe.ts';
 import { createHash, createHmac, timingSafeEqual } from 'node:crypto';
 import { isOneOf } from '@foresift/domain';
 import { canonicalJson, type DatabaseEngine } from '@foresift/persistence';
@@ -79,7 +80,7 @@ function isIsoInstant(value: unknown): value is string {
 function copyStringArray(values: readonly string[]): string[] {
   const copy: string[] = [];
   for (let index = 0; index < values.length; index += 1) {
-    copy[copy.length] = values[index] as string;
+    appendSafe(copy, values[index] as string);
   }
   return copy;
 }
@@ -267,7 +268,7 @@ function snapshotJsonValue(value: unknown, seen: WeakSet<object>): unknown {
     if (Array.isArray(value)) {
       const copy: unknown[] = [];
       for (let index = 0; index < value.length; index += 1) {
-        copy[copy.length] = snapshotJsonValue(value[index], seen);
+        appendSafe(copy, snapshotJsonValue(value[index], seen));
       }
       return Object.freeze(copy);
     }

@@ -2101,6 +2101,70 @@ describe('V7: caller accessors cannot flip a release-gate decision', () => {
     }
   }, 120_000);
 
+  it('fails closed when a hostile index accessor sits beyond a long prototype chain (V7 round 9)', () => {
+    const originalArrayProto = Object.getPrototypeOf(Array.prototype) as object;
+    const hostile = Object.create(null) as Record<string, unknown>;
+    Object.defineProperty(hostile, '0', { configurable: true, set() {} });
+    let chain: object = hostile;
+    for (let hop = 0; hop < 40; hop += 1) chain = Object.create(chain) as object;
+    Object.setPrototypeOf(Array.prototype, chain);
+    try {
+      const report = evaluateProdConformance({
+        activationClaims: [PROD_ACTIVE_WITHOUT_GATE_CLAIM],
+        postureDeclarations: [],
+        mcpCompatibility: PROD_MCP_COMPLIANT_CLAIM,
+        livePaths: [],
+        distributionAuthorizations: [],
+      });
+      expect(report.overall).toBe('FAILED');
+    } finally {
+      Object.setPrototypeOf(Array.prototype, originalArrayProto);
+    }
+  }, 120_000);
+
+  it('fails closed when Array.prototype inherits a swallowing Proxy (V7 round 9)', () => {
+    const originalArrayProto = Object.getPrototypeOf(Array.prototype) as object;
+    const hostile = new Proxy(Object.create(null) as object, {
+      set: () => true,
+    });
+    Object.setPrototypeOf(Array.prototype, hostile);
+    try {
+      const report = evaluateProdConformance({
+        activationClaims: [PROD_ACTIVE_WITHOUT_GATE_CLAIM],
+        postureDeclarations: [],
+        mcpCompatibility: PROD_MCP_COMPLIANT_CLAIM,
+        livePaths: [],
+        distributionAuthorizations: [],
+      });
+      expect(report.overall).toBe('FAILED');
+    } finally {
+      Object.setPrototypeOf(Array.prototype, originalArrayProto);
+    }
+  }, 120_000);
+
+  it('evaluates the VALIDATED milestone, so a getter cannot downgrade G2 to G0 (V7 round 9)', async () => {
+    let reads = 0;
+    const options = {
+      repoRoot: REPO_ROOT,
+      get milestone(): string {
+        reads += 1;
+        return reads === 1 ? 'G2' : 'G0';
+      },
+      prodClaims: {
+        activationClaims: [PROD_ACTIVE_WITHOUT_GATE_CLAIM],
+        postureDeclarations: [],
+        mcpCompatibility: PROD_MCP_COMPLIANT_CLAIM,
+        livePaths: [],
+        distributionAuthorizations: [],
+      },
+    };
+    const result = await evaluateConformance(options as never);
+    expect(result.overall).toBe('FAILED');
+    expect(result.findings.map((finding) => finding.rule)).toContain(
+      PROD_RULES.activationWithoutEvidence,
+    );
+  }, 120_000);
+
   it('binds each claim field once, so a getter cannot hide a violation (V7-A8)', () => {
     let reads = 0;
     const claims = [PROD_ACTIVE_WITHOUT_GATE_CLAIM];

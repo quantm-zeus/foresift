@@ -72,7 +72,7 @@ export function numericFromEntries(
 export function numericCopy<T>(source: readonly T[]): T[] {
   const copy: T[] = [];
   for (let index = 0; index < source.length; index += 1) {
-    copy[copy.length] = source[index] as T;
+    appendSafe(copy, source[index] as T);
   }
   return copy;
 }
@@ -93,7 +93,7 @@ export function numericFilter<T>(
   const filtered: T[] = [];
   for (let index = 0; index < source.length; index += 1) {
     const value = source[index] as T;
-    if (predicate(value, index)) filtered[filtered.length] = value;
+    if (predicate(value, index)) appendSafe(filtered, value);
   }
   return filtered;
 }
@@ -105,7 +105,7 @@ export function numericMap<T, R>(
 ): R[] {
   const mapped: R[] = [];
   for (let index = 0; index < source.length; index += 1) {
-    mapped[mapped.length] = project(source[index] as T, index);
+    appendSafe(mapped, project(source[index] as T, index));
   }
   return mapped;
 }
@@ -192,7 +192,7 @@ export function numericFlatMap<T, R>(
   for (let index = 0; index < source.length; index += 1) {
     const projected = project(source[index] as T, index);
     for (let innerIndex = 0; innerIndex < projected.length; innerIndex += 1) {
-      flattened[flattened.length] = projected[innerIndex] as R;
+      appendSafe(flattened, projected[innerIndex] as R);
     }
   }
   return flattened;
@@ -207,6 +207,7 @@ const capturedArrayBufferByteLengthGetter: ((this: unknown) => unknown) | undefi
     ((this: unknown) => unknown) | undefined;
 const capturedDateGetTime: (this: unknown) => number = Date.prototype.getTime;
 
+const capturedDefineProperty = Object.defineProperty;
 const capturedGetOwnPropertyNames = Object.getOwnPropertyNames;
 const capturedGetOwnPropertyDescriptor = Object.getOwnPropertyDescriptor;
 const capturedGetPrototypeOf = Object.getPrototypeOf;
@@ -269,7 +270,7 @@ function snapshotValue(value: unknown, memo: Map<object, unknown>, path: WeakSet
     const copy: unknown[] = [];
     memo.set(value, copy);
     for (let index = 0; index < value.length; index += 1) {
-      copy[copy.length] = snapshotValue(value[index], memo, path);
+      appendSafe(copy, snapshotValue(value[index], memo, path));
     }
     Object.freeze(copy);
     path.delete(value);
@@ -341,4 +342,20 @@ function snapshotValue(value: unknown, memo: Map<object, unknown>, path: WeakSet
   Object.freeze(copy);
   path.delete(value);
   return copy;
+}
+
+/**
+ * Append with a captured `Object.defineProperty` (V7 review round 9). The plain
+ * `array[array.length] = value` form is an ordinary `[[Set]]`: an integer-index
+ * accessor anywhere on the array's prototype chain (own, inherited, or behind a
+ * Proxy) swallows the append and a FAILED collector reads as empty. Defining an
+ * own data property is immune to prototype accessors.
+ */
+export function appendSafe<T>(target: T[], value: T): void {
+  capturedDefineProperty(target, target.length, {
+    value,
+    writable: true,
+    enumerable: true,
+    configurable: true,
+  });
 }

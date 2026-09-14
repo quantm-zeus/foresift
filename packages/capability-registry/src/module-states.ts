@@ -40,6 +40,7 @@
  * mutation). Strictly read-only governance: nothing here trades, custodies,
  * signs, or submits.
  */
+import { appendSafe } from './shadow-safe.ts';
 import { ErrorCode, ForesiftError, isOneOf } from '@foresift/domain';
 import {
   ChangeClassification,
@@ -330,7 +331,7 @@ function decodeModuleStateRows(rows: readonly RawModuleStateRow[]): ModuleStateR
   const decoded: ModuleStateRow[] = [];
   for (let index = 0; index < rows.length; index += 1) {
     const row = rows[index];
-    if (row !== undefined) decoded[decoded.length] = decodeModuleStateRow(row);
+    if (row !== undefined) appendSafe(decoded, decodeModuleStateRow(row));
   }
   return decoded;
 }
@@ -340,7 +341,7 @@ function decodeTransitionRows(rows: readonly RawTransitionRow[]): StateTransitio
   const decoded: StateTransitionRow[] = [];
   for (let index = 0; index < rows.length; index += 1) {
     const row = rows[index];
-    if (row !== undefined) decoded[decoded.length] = decodeTransitionRow(row);
+    if (row !== undefined) appendSafe(decoded, decodeTransitionRow(row));
   }
   return decoded;
 }

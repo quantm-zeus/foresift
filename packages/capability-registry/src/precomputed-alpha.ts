@@ -13,6 +13,7 @@
  * Strictly read-only: the lookup serves already-computed read-only intelligence
  * evidence; it never trades, custodies, signs, or submits.
  */
+import { appendSafe } from './shadow-safe.ts';
 import {
   ErrorCode,
   ForesiftError,
@@ -212,17 +213,17 @@ export async function findPrecomputedAlphaBound(
   const params: unknown[] = [input.livePath];
   let where = `live_path = $1`;
   if (input.boundId !== undefined) {
-    params[params.length] = input.boundId;
+    appendSafe(params, input.boundId);
     where += ` AND bound_id = $${params.length}`;
   }
   if (input.artifactRef !== undefined) {
-    params[params.length] = input.artifactRef;
+    appendSafe(params, input.artifactRef);
     where += ` AND artifact_ref = $${params.length}`;
   }
   // The bound is versioned to ONE immutable artifact set (audit H10): a request
   // for set B never resolves a bound declared for set A.
   if (input.artifactSetHash !== undefined) {
-    params[params.length] = input.artifactSetHash;
+    appendSafe(params, input.artifactSetHash);
     where += ` AND artifact_set_hash = $${params.length}`;
   }
   const result = await engine.query<RawBoundRow>(
@@ -478,7 +479,7 @@ export async function livePathReadHistory(
   const reads: LivePathAlphaReadRow[] = [];
   for (let index = 0; index < result.rows.length; index += 1) {
     const row = result.rows[index];
-    if (row !== undefined) reads[reads.length] = decodeRead(row);
+    if (row !== undefined) appendSafe(reads, decodeRead(row));
   }
   return reads;
 }

@@ -20,6 +20,7 @@
  * already-approved read-only behaviour — never execution, custody, signing, or
  * transaction submission.
  */
+import { appendSafe } from './shadow-safe.ts';
 import {
   ContainmentAction,
   ErrorCode,
@@ -290,7 +291,7 @@ export async function openContainments(
   const params: unknown[] = [];
   let where = `cleared_by_event_ref IS NULL`;
   if (filter.moduleId !== undefined) {
-    params[params.length] = filter.moduleId;
+    appendSafe(params, filter.moduleId);
     where += ` AND module_id = $${params.length}`;
   }
   const result = await engine.query<RawContainmentRow>(
@@ -309,7 +310,7 @@ function decodeContainmentRows(rows: readonly RawContainmentRow[]): ContainmentE
   const decoded: ContainmentEventRow[] = [];
   for (let index = 0; index < rows.length; index += 1) {
     const row = rows[index];
-    if (row !== undefined) decoded[decoded.length] = decodeContainmentRow(row);
+    if (row !== undefined) appendSafe(decoded, decodeContainmentRow(row));
   }
   return decoded;
 }
@@ -325,12 +326,12 @@ export async function loadContainmentFacts(
   for (let index = 0; index < rows.length; index += 1) {
     const row = rows[index];
     if (row === undefined) continue;
-    facts[facts.length] = {
+    appendSafe(facts, {
       containmentId: row.containmentId,
       moduleId: row.moduleId,
       scopeHash: row.scopeHash,
       action: row.action,
-    };
+    });
   }
   return facts;
 }

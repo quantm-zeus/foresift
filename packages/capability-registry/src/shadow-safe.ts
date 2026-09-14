@@ -22,7 +22,7 @@
 export function numericCopy<T>(source: readonly T[]): T[] {
   const copy: T[] = [];
   for (let index = 0; index < source.length; index += 1) {
-    copy[copy.length] = source[index] as T;
+    appendSafe(copy, source[index] as T);
   }
   return copy;
 }
@@ -39,7 +39,7 @@ export function numericUnique<T>(source: readonly T[]): T[] {
         break;
       }
     }
-    if (!seen) unique[unique.length] = value;
+    if (!seen) appendSafe(unique, value);
   }
   return unique;
 }
@@ -135,7 +135,7 @@ export function numericSortByString<T>(
 export function numericConcat<T>(left: readonly T[], right: readonly T[]): T[] {
   const concatenated = numericCopy(left);
   for (let index = 0; index < right.length; index += 1) {
-    concatenated[concatenated.length] = right[index] as T;
+    appendSafe(concatenated, right[index] as T);
   }
   return concatenated;
 }
@@ -149,6 +149,7 @@ const capturedArrayBufferByteLengthGetter: ((this: unknown) => unknown) | undefi
     ((this: unknown) => unknown) | undefined;
 const capturedDateGetTime: (this: unknown) => number = Date.prototype.getTime;
 
+const capturedDefineProperty = Object.defineProperty;
 const capturedGetOwnPropertyNames = Object.getOwnPropertyNames;
 const capturedGetOwnPropertyDescriptor = Object.getOwnPropertyDescriptor;
 const capturedGetPrototypeOf = Object.getPrototypeOf;
@@ -211,7 +212,7 @@ function snapshotValue(value: unknown, memo: Map<object, unknown>, path: WeakSet
     const copy: unknown[] = [];
     memo.set(value, copy);
     for (let index = 0; index < value.length; index += 1) {
-      copy[copy.length] = snapshotValue(value[index], memo, path);
+      appendSafe(copy, snapshotValue(value[index], memo, path));
     }
     Object.freeze(copy);
     path.delete(value);
@@ -283,4 +284,20 @@ function snapshotValue(value: unknown, memo: Map<object, unknown>, path: WeakSet
   Object.freeze(copy);
   path.delete(value);
   return copy;
+}
+
+/**
+ * Append with a captured `Object.defineProperty` (V7 review round 9). The plain
+ * `array[array.length] = value` form is an ordinary `[[Set]]`: an integer-index
+ * accessor anywhere on the array's prototype chain (own, inherited, or behind a
+ * Proxy) swallows the append and a FAILED collector reads as empty. Defining an
+ * own data property is immune to prototype accessors.
+ */
+export function appendSafe<T>(target: T[], value: T): void {
+  capturedDefineProperty(target, target.length, {
+    value,
+    writable: true,
+    enumerable: true,
+    configurable: true,
+  });
 }

@@ -494,18 +494,24 @@ describe('MCP conformance freshness and fixture provenance (V6-1/V6-2 regression
     expect(future.reason).toBe('CELL_NOT_USABLE');
   });
 
-  it('V6-1: a malformed `now` fails closed instead of disabling the staleness comparison', () => {
-    const malformed = cellUsability({
-      cell,
-      passingRuns: [
-        { revision: '2099-03-01', clientId: 'client-a', fixtureRef: 'fixture-a', ranAt: STALE },
-      ],
-      revision: '2099-03-01',
-      clientId: 'client-a',
-      now: 'not-an-instant',
-    });
-    expect(malformed.usable).toBe(false);
-    expect(malformed.reason).toBe('CELL_NOT_USABLE');
+  it('V6-1: a malformed `now` yields a typed refusal rather than a throw', () => {
+    // At `29f1841` the malformed instant reached `mcpCompatibilityCellUsable`
+    // and threw `TIMESTAMP_INVALID`; the hardening returns the same fail-closed
+    // outcome as a typed verdict so the caller never has to catch a domain throw.
+    let malformed: ReturnType<typeof cellUsability> | undefined;
+    expect(() => {
+      malformed = cellUsability({
+        cell,
+        passingRuns: [
+          { revision: '2099-03-01', clientId: 'client-a', fixtureRef: 'fixture-a', ranAt: STALE },
+        ],
+        revision: '2099-03-01',
+        clientId: 'client-a',
+        now: 'not-an-instant',
+      });
+    }).not.toThrow();
+    expect(malformed?.usable).toBe(false);
+    expect(malformed?.reason).toBe('CELL_NOT_USABLE');
   });
 
   it('V6-1: a valid in-window run still satisfies the cell (no over-refusal)', () => {
@@ -551,10 +557,22 @@ describe('MCP conformance freshness and fixture provenance (V6-1/V6-2 regression
   });
 
   it('V6-2: both write sites refuse a blank fixture reference', async () => {
+    // A registered revision makes both foreign keys valid, so at `29f1841` the
+    // inserts SUCCEEDED (the DB CHECK only rejects length 0, not whitespace) and
+    // the only reason this test fails there is the missing typed refusal.
+    const revision = '2099-04-01';
+    await insertMcpRevision(engine, {
+      revision,
+      channel: 'STABLE',
+      sdkVersion: '1.2.0',
+      transport: 'STREAMABLE_HTTP',
+      originPolicyRef: 'origin-1',
+    });
+
     const blankCell = await rejection(
       insertMcpCompatibilityCell(engine, {
         cellId: 'v6-blank-cell',
-        revision: '2099-03-01',
+        revision,
         clientId: 'client-a',
         conformanceFixtureRef: '   ',
         liveTestDate: RECENT,
@@ -566,7 +584,7 @@ describe('MCP conformance freshness and fixture provenance (V6-1/V6-2 regression
     const blankRun = await rejection(
       insertMcpConformanceRun(engine, {
         runId: 'v6-blank-run',
-        revision: '2099-03-01',
+        revision,
         clientId: 'client-a',
         fixtureRef: '',
         result: 'PASS',
@@ -574,5 +592,17 @@ describe('MCP conformance freshness and fixture provenance (V6-1/V6-2 regression
       }),
     );
     expect(blankRun.code).toBe('PROD_ACTIVATION_GATE_REFUSED');
+
+    // No blank row was persisted by either refused write.
+    const persistedCells = await engine.query<{ cell_id: string }>(
+      `SELECT cell_id FROM prod.mcp_compatibility_matrix WHERE cell_id = $1`,
+      ['v6-blank-cell'],
+    );
+    expect(persistedCells.rows).toEqual([]);
+    const persistedRuns = await engine.query<{ run_id: string }>(
+      `SELECT run_id FROM prod.mcp_conformance_runs WHERE run_id = $1`,
+      ['v6-blank-run'],
+    );
+    expect(persistedRuns.rows).toEqual([]);
   }, 120_000);
 });

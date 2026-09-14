@@ -475,13 +475,19 @@ tests 0 fail; `packages/persistence/test/migrator.spec.ts` 16/16; `spec:verify`
 
 ### Sixth-round bounded defects found and fixed in this slice
 
-| ID   | Severity | Defect (reproduced at `29f1841`)                                                                                                                                                                            | Correction                                                                                                                                   |
-| ---- | -------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------- |
-| V6-1 | MEDIUM   | `cellUsability` counted a **future-dated** conformance run (`ranAt` after `now`) as fresh, and a malformed `now` made the staleness disjunct `NaN` (both made a non-existent/stale run satisfy provenance). | Reject a non-finite `now`; skip any run whose `ranAt` is non-finite or after `now`.                                                          |
-| V6-2 | MEDIUM   | empty `conformanceFixtureRef`/`fixtureRef` satisfied the H10 provenance equality (`'' === ''`); writers accepted blank fixture refs.                                                                        | Require a non-blank declared fixture reference and a non-blank run fixture reference at read; refuse blank fixture refs at both write sites. |
-| V6-3 | LOW      | `checkProdConformanceInputsPresent` required `weakenedDimensions`/`protectedDimensions` to be present but not to be arrays, so `weakenedDimensions:{length:0}` drove a PASSED report.                       | Require both to be arrays (the numeric scan already prevented any dimension being hidden).                                                   |
+| ID   | Severity     | Defect (reproduced at `29f1841`)                                                                                                                                                                                                                                                                                                                                                                                                     | Correction                                                                                                                                                                              |
+| ---- | ------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| V6-1 | MEDIUM + LOW | `cellUsability` counted a **future-dated** conformance run (`ranAt` after `now`) as fresh, so a test that has not happened satisfied provenance/staleness (MEDIUM). Separately, a malformed `now` escaped `cellUsability` as a domain `TIMESTAMP_INVALID` **throw** from `mcpCompatibilityCellUsable` rather than a typed verdict (LOW — the throw is itself fail-closed, but a caller must catch a domain exception to observe it). | Skip any run whose `ranAt` is non-finite or after `now`; return a typed `CELL_NOT_USABLE` refusal for a non-finite `now` instead of throwing.                                           |
+| V6-2 | MEDIUM       | empty `conformanceFixtureRef`/`fixtureRef` satisfied the H10 provenance equality (`'' === ''`), and the writers accepted whitespace-only fixture refs (the DB `length(...) > 0` CHECK rejects only the empty string, so the DB-reachable form was whitespace).                                                                                                                                                                       | Require a non-blank declared fixture reference and a non-blank run fixture reference at read; refuse non-string/trim-blank fixture refs at both write sites before any query is issued. |
+| V6-3 | LOW          | `checkProdConformanceInputsPresent` required `weakenedDimensions`/`protectedDimensions` to be present but not to be arrays, so `weakenedDimensions:{length:0}` (and array-likes such as `{0:'freshness',length:1}`) were read by the numeric scan as declarations and drove a PASSED report.                                                                                                                                         | Require both to be arrays (the numeric scan already prevented any dimension being hidden).                                                                                              |
 
-Each V6 row carries a discriminating regression that fails against `29f1841`.
+Each V6 row carries a discriminating regression that fails against `29f1841`:
+the future-dated run, the malformed-`now` throw→refusal, the blank-to-blank
+provenance read, both write-site refusals, and the `{length:0}` posture report.
+The well-shaped controls (`recent` run, `['freshness']` + every protected
+dimension) pass at both revisions, proving no over-refusal. Verified by running
+the strengthened tests in a temporary base worktree at `29f1841` (4 MCP
+failures, 1 V6-3 failure) and at the fix head (0 failures).
 
 ### Re-confirmed residuals (recorded, not silently dropped)
 
@@ -508,6 +514,17 @@ Each V6 row carries a discriminating regression that fails against `29f1841`.
   alter another family's schema if a repo author commits such SQL. This is the
   documented D014 resolution of the H3 upgrade-path requirement, requires repo
   write access, and is not a runtime fail-open.
+- **Intrinsic-shape statics are outside D018's in-scope class.** The sixth-round
+  convergence review recorded (LOW/boundary) that a deliberate reassignment of
+  `Array.isArray` (an `Array` **static**, not an `Array.prototype` method or
+  iterator) re-opens the V6-3 shape guard, exactly as D018 already names
+  `Object.freeze`/`Object.keys`/`JSON.stringify`/the `Map`/`Set` prototypes as
+  outside the model. There is no intrinsic-free way to distinguish a genuine
+  `Array` from an array-like in one realm, so the compensating control is the
+  same as D018/D021's: process/realm isolation, plus the requirement that the
+  guard is not handed untrusted in-process code. The IN-scope class remains
+  decision-time `Array.prototype` methods and iterators on the authority path
+  (R10–R13), which are closed. Recorded here rather than re-opened as a defect.
 - Previously recorded residuals stand: raw-writer trust boundary, caller-supplied
   `prodClaims`, `clearContainment` governance/ActionGate (D013), SQL/Drizzle
   parity breadth, two-way telemetry parity, AC-150/151/153 fixture-echo positives,

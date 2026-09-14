@@ -562,59 +562,66 @@ describe('PROD conformance aggregation and unchanged trace rules', () => {
   /**
    * V6-3 (sixth-round verification). Presence was checked for the posture
    * dimension fields but not their shape, so `weakenedDimensions: { length: 0 }`
-   * was read by the numeric scan as "declares zero weakening" and a violating
-   * posture corpus reached PASSED.
+   * was read by the numeric scan as "declares zero weakening" and a fully
+   * compliant posture corpus reached PASSED.
+   *
+   * The corpus below is otherwise compliant and uses the exact domain
+   * vocabulary (lowercase posture and dimension values, every protected
+   * dimension asserted), so the ONLY finding it can produce is the V6-3 shape
+   * guard — and at `29f1841` it produced none.
    */
+  const compliantPostureCorpus = (weakenedDimensions: unknown): unknown => ({
+    activationClaims: [],
+    postureDeclarations: [
+      {
+        declarationId: 'v6-posture',
+        requirementId: 'FR-PROD-004',
+        posture: 'FREE_TIER_BEST_EFFORT',
+        weakenedDimensions,
+        protectedDimensions: [
+          'identity',
+          'point_in_time',
+          'audit',
+          'duplicate_prevention',
+          'security',
+          'execution_semantics',
+          'capacity',
+          'critical_risk_monitoring',
+          'claim_boundaries',
+        ],
+      },
+    ],
+    mcpCompatibility: PROD_MCP_COMPLIANT_CLAIM,
+    livePaths: [],
+    distributionAuthorizations: [],
+  });
+
   it('requires the posture dimension fields to be arrays (V6-3)', () => {
-    const report = evaluateProdConformance({
-      activationClaims: [],
-      postureDeclarations: [
-        {
-          declarationId: 'v6-posture',
-          posture: 'BEST_EFFORT_FREE_TIER',
-          weakenedDimensions: { length: 0 },
-          protectedDimensions: ['IDENTITY', 'AUDIT', 'DUPLICATE_PREVENTION'],
-        },
-      ],
-      mcpCompatibility: { revisions: [], clients: [], cells: [], now: '2026-06-01T00:00:00Z' },
-      livePaths: [],
-      distributionAuthorizations: [],
-    } as never);
-    expect(report.overall).toBe('FAILED');
-    const paths = report.findings
+    const attacked = evaluateProdConformance(compliantPostureCorpus({ length: 0 }) as never);
+    expect(attacked.overall).toBe('FAILED');
+    const paths = attacked.findings
       .filter((finding) => finding.rule === PROD_RULES.prodConformanceInputMissing)
       .map((finding) => finding.path);
     expect(paths).toContain('postureDeclarations[0].weakenedDimensions');
+
+    // An array-like with real indexed content was equally inadmissible.
+    const arrayLike = evaluateProdConformance(
+      compliantPostureCorpus({ 0: 'freshness', length: 1 }) as never,
+    );
+    expect(arrayLike.overall).toBe('FAILED');
+    expect(
+      arrayLike.findings
+        .filter((finding) => finding.rule === PROD_RULES.prodConformanceInputMissing)
+        .map((finding) => finding.path),
+    ).toContain('postureDeclarations[0].weakenedDimensions');
   });
 
   it('keeps a well-shaped posture declaration admissible (V6-3 no over-refusal)', () => {
-    const report = evaluateProdConformance({
-      activationClaims: [],
-      postureDeclarations: [
-        {
-          declarationId: 'v6-posture-ok',
-          posture: 'BEST_EFFORT_FREE_TIER',
-          weakenedDimensions: ['FRESHNESS'],
-          protectedDimensions: [
-            'IDENTITY',
-            'POINT_IN_TIME',
-            'AUDIT',
-            'DUPLICATE_PREVENTION',
-            'SECURITY',
-            'CAPACITY',
-            'CRITICAL_RISK_MONITORING',
-          ],
-        },
-      ],
-      mcpCompatibility: { revisions: [], clients: [], cells: [], now: '2026-06-01T00:00:00Z' },
-      livePaths: [],
-      distributionAuthorizations: [],
-    } as never);
-    const paths = report.findings
-      .filter((finding) => finding.rule === PROD_RULES.prodConformanceInputMissing)
-      .map((finding) => finding.path);
-    expect(paths).not.toContain('postureDeclarations[0].weakenedDimensions');
-    expect(paths).not.toContain('postureDeclarations[0].protectedDimensions');
+    const report = evaluateProdConformance(compliantPostureCorpus(['freshness']) as never);
+    // The corpus is compliant in every other respect, so a PASSED report here is
+    // the proof that the V6-3 guard does not over-refuse a genuine declaration.
+    expect(report.overall).toBe('PASSED');
+    expect(report.findings).toEqual([]);
   });
 });
 

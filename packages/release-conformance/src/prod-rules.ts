@@ -1140,6 +1140,30 @@ export function checkProdConformanceInputsPresent(input: ProdConformanceInput): 
           };
         }
       }
+      if (field === 'postureDeclarations') {
+        // V6-3: presence alone is not shape. `checkPostureWeakening` walks the
+        // declared dimensions by numeric index, so a non-array such as
+        // `{ length: 0 }` was treated as an empty declaration and drove a PASSED
+        // report. Both dimension collections must be arrays.
+        const weakened = claim['weakenedDimensions'];
+        if (!Array.isArray(weakened)) {
+          findings[findings.length] = {
+            requirementId: 'FR-PROD-001',
+            rule: PROD_RULES.prodConformanceInputMissing,
+            path: `${field}[${index}].weakenedDimensions`,
+            message: `${field}[${index}].weakenedDimensions must be an array of relaxable dimensions; a non-array cannot stand in for an empty declaration`,
+          };
+        }
+        const protectedDimensions = claim['protectedDimensions'];
+        if (!Array.isArray(protectedDimensions)) {
+          findings[findings.length] = {
+            requirementId: 'FR-PROD-001',
+            rule: PROD_RULES.prodConformanceInputMissing,
+            path: `${field}[${index}].protectedDimensions`,
+            message: `${field}[${index}].protectedDimensions must be an array of protected dimensions`,
+          };
+        }
+      }
       if (field === 'distributionAuthorizations') {
         if (!Array.isArray(claim['requiredGateKinds'])) {
           findings[findings.length] = {

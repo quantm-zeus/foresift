@@ -228,6 +228,23 @@ export async function insertMcpTargetClient(
   };
 }
 
+/**
+ * A blank string is not a fixture reference (audit V6-2): the provenance
+ * equality `run.fixtureRef === cell.conformanceFixtureRef` would otherwise be
+ * satisfied by `'' === ''` and a run for no declared fixture would satisfy a
+ * cell for no declared fixture. Refused at every write site.
+ */
+function requireNonBlankFixtureRef(value: unknown, field: string): string {
+  if (typeof value !== 'string' || value.trim().length === 0) {
+    throw new ForesiftError(
+      ErrorCode.PROD_ACTIVATION_GATE_REFUSED,
+      `${field} must be a non-blank conformance fixture reference; a blank reference cannot establish provenance`,
+      { field },
+    );
+  }
+  return value;
+}
+
 /** Record a compatibility cell's conformance fixture, live-test date, and result. */
 export async function insertMcpCompatibilityCell(
   engine: DatabaseEngine,
@@ -242,6 +259,10 @@ export async function insertMcpCompatibilityCell(
   },
 ): Promise<McpCompatibilityCell> {
   const result = parseMcpConformanceResult(input.result);
+  const conformanceFixtureRef = requireNonBlankFixtureRef(
+    input.conformanceFixtureRef,
+    'conformanceFixtureRef',
+  );
   await engine.query(
     `INSERT INTO prod.mcp_compatibility_matrix
        (cell_id, revision, client_id, conformance_fixture_ref, live_test_date, result, notes)
@@ -250,7 +271,7 @@ export async function insertMcpCompatibilityCell(
       input.cellId,
       input.revision,
       input.clientId,
-      input.conformanceFixtureRef,
+      conformanceFixtureRef,
       input.liveTestDate,
       result,
       input.notes ?? null,
@@ -260,7 +281,7 @@ export async function insertMcpCompatibilityCell(
     cellId: input.cellId,
     revision: input.revision,
     clientId: input.clientId,
-    conformanceFixtureRef: input.conformanceFixtureRef,
+    conformanceFixtureRef,
     liveTestDate: input.liveTestDate,
     result,
     notes: input.notes ?? null,
@@ -279,6 +300,7 @@ export async function insertMcpConformanceRun(
     readonly ranAt: string;
   },
 ): Promise<void> {
+  const fixtureRef = requireNonBlankFixtureRef(input.fixtureRef, 'fixtureRef');
   await engine.query(
     `INSERT INTO prod.mcp_conformance_runs
        (run_id, revision, client_id, fixture_ref, result, ran_at)
@@ -287,7 +309,7 @@ export async function insertMcpConformanceRun(
       input.runId,
       input.revision,
       input.clientId,
-      input.fixtureRef,
+      fixtureRef,
       parseMcpConformanceResult(input.result),
       input.ranAt,
     ],
@@ -423,7 +445,30 @@ export function cellUsability(input: {
   }
   // The run must be for THIS cell's declared fixture (provenance), and the
   // newest such run must still be inside the window (staleness).
+  //
+  // V6-2: a blank declared fixture is not a reference. Without this refusal the
+  // provenance equality below is satisfied by `'' === ''`, so a run recorded for
+  // no fixture would satisfy a cell declaring no fixture.
+  const declaredFixtureRef = cell.conformanceFixtureRef;
+  if (typeof declaredFixtureRef !== 'string' || declaredFixtureRef.trim().length === 0) {
+    return {
+      revision,
+      clientId,
+      usable: false,
+      reason: McpCompatibilityRefusalReason.CELL_NOT_USABLE,
+    };
+  }
   const nowMs = Date.parse(now);
+  // V6-1: a malformed `now` made the staleness comparison `NaN > bound`, which is
+  // false, so a stale run passed as fresh. An unparseable instant fails closed.
+  if (!Number.isFinite(nowMs)) {
+    return {
+      revision,
+      clientId,
+      usable: false,
+      reason: McpCompatibilityRefusalReason.CELL_NOT_USABLE,
+    };
+  }
   // Numeric-index scan/reduction only (audit HIGH): `filter`/`reduce` are
   // shadowable; a shadowed `filter` would make a registered passing run look
   // absent (fail-closed) but a shadowed `reduce` could misreport the newest run.
@@ -435,13 +480,20 @@ export function cellUsability(input: {
       run === undefined ||
       run.revision !== revision ||
       run.clientId !== clientId ||
-      run.fixtureRef !== cell.conformanceFixtureRef
+      // V6-2: a blank run fixture never matches (and never matches a blank cell).
+      typeof run.fixtureRef !== 'string' ||
+      run.fixtureRef.length === 0 ||
+      run.fixtureRef !== declaredFixtureRef
     ) {
       continue;
     }
-    runCount += 1;
     const at = Date.parse(run.ranAt);
-    if (Number.isFinite(at) && at > newestRunMs) newestRunMs = at;
+    // V6-1: a FUTURE-dated run is not evidence that a test happened — it is a
+    // claim about a test that has not occurred. A non-finite instant is not
+    // evidence either.
+    if (!Number.isFinite(at) || at > nowMs) continue;
+    runCount += 1;
+    if (at > newestRunMs) newestRunMs = at;
   }
   if (
     runCount === 0 ||

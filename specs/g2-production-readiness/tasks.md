@@ -731,3 +731,40 @@ third-round finding-to-task map and the verbatim reproductions.
       of the R13 security diff, full prescribed gates, exact-SHA CI, and a NEW
       independent convergence audit at the pre-merge head before PROVEN is
       restored. Traces: FR-PROD-001…006, FR-SEC-001.
+
+## Phase 14 — Sixth-round independent verification and bounded hardening (reopen `29f1841`)
+
+Reopen: `29f1841` (PR #301 fifth-round PROVEN) → RUNNING, schema-legal, history
+preserved. Three fresh-context adversarial verifiers plus the coordinator's own
+directed gates against `29f1841` re-confirmed every C1–C3/H1–H10/R10–R13 finding
+as NOT-REPRODUCED and surfaced three bounded defects (V6-1/V6-2/V6-3). No
+CRITICAL/HIGH remained open.
+
+- [ ] T082 [serial-reason: SEMANTIC_DEPENDENCY] V6-1: make `cellUsability`
+      fail closed on a FUTURE-dated conformance run and on a malformed `now`
+      (a non-finite instant made the staleness arithmetic `NaN` and admitted a
+      stale run). Traces: FR-PROD-005, AC-144.
+- [ ] T083 [serial-reason: SEMANTIC_DEPENDENCY] V6-2: require a non-blank
+      declared `conformanceFixtureRef` and a non-blank run `fixtureRef` so
+      `'' === ''` cannot satisfy H10 provenance; refuse blank fixture refs at
+      both write sites. Traces: FR-PROD-005, AC-144.
+- [ ] T084 [serial-reason: SEMANTIC_DEPENDENCY] V6-3: require
+      `weakenedDimensions`/`protectedDimensions` to be arrays in
+      `checkProdConformanceInputsPresent`, so a `{length:0}` object cannot drive
+      a PASSED posture report. Traces: FR-PROD-004, AC-153.
+- [ ] T085 [executor: TEST] Discriminating regressions for T082–T084 that FAIL
+      against `29f1841` and PASS at the fix head (future-dated run, non-finite
+      `now`, blank fixture provenance, non-array posture dimensions).
+- [ ] T086 [serial-reason: COORDINATOR_BOUNDARY] Fresh-context convergence
+      review of the sixth-round fix head, full prescribed gates, exact-SHA CI,
+      and a NEW independent audit before PROVEN is restored. Traces:
+      FR-PROD-001…006.
+- [ ] T087 [deferred: BOUNDED_SLICE] Register statistical evidence keyed by
+      `(scope_hash, evidence_ref)` with dataset/holdout provenance and require
+      the persisted evaluation batch to resolve each row to a registered,
+      unexposed slice (re-confirmed MEDIUM trust boundary; owner is the G1
+      evaluation registry). Traces: FR-PROD-001, FR-PROD-002, PRD §35.
+- [ ] T088 [deferred: BOUNDED_SLICE] Add an exact-key CHECK on
+      `prod.module_states.scope` (or make `foresift_prod_scope_hash` refuse
+      extra keys) so the scope hash is injective over the canonical seven keys.
+      Traces: FR-PROD-001, AC-152.

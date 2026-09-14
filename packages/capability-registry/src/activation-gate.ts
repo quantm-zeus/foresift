@@ -93,44 +93,43 @@ const ACTIVATION_REFUSAL_BRAND: unique symbol = Symbol('foresift.prod.activation
  * verifies, so any caller could pick a key, sign a `GateEvidenceRecord` and have
  * the gate confirm it: the signature attested nothing.
  *
- * The verification key is now deployment state, configured ONCE through
- * `configureGateEvidenceVerifierKey` (composition root) and never accepted as a
- * per-call argument: `verifyGateEvidence` has no key parameter, so a caller
- * cannot self-sign. The boundary mints this identity-branded verdict and
+ * The verification key is deployment configuration resolved inside the boundary
+ * (`GATE_EVIDENCE_PEPPER_ENV`) and is never accepted as a per-call argument or
+ * exposed through a setter: `verifyGateEvidence` has no key parameter and no
+ * caller-writable key state, so a caller cannot choose the key it verifies
+ * against. The boundary mints this identity-branded verdict and
  * `evaluateActivationGate` accepts only that brand.
  */
 const VERIFIED_GATE_EVIDENCE_IDENTITY = new WeakSet<object>();
 
 /**
- * The deployment gate-evidence verification key. `null` until the composition
- * root configures it; `verifyGateEvidence` refuses closed while unset. Never a
- * caller argument (V7-F1).
+ * The environment variable that carries the deployment gate-evidence
+ * verification key. The key is resolved HERE at verification time and is never
+ * accepted as a function argument or as a field of the record, the gate input,
+ * or any other caller-supplied object (V7-F1 round 3): a public setter was
+ * itself the bypass, because a caller could overwrite the deployment key and
+ * self-sign.
+ *
+ * TRUST BOUNDARY (precise, D013/D018): this key is a deployment secret and the
+ * HMAC is a tamper-evidence control over the RECORD as data. It is not an
+ * authorization boundary against code already executing in this realm — such
+ * code can read or set this environment variable exactly as it can shadow
+ * `Array.prototype`, and D018's compensating control is process/realm isolation.
+ * The authorization of high-impact activation is AC-274 (admin ActionGate /
+ * phishing-resistant step-up), which owns the caller's identity.
  */
-let gateEvidenceVerifierKey: string | null = null;
+export const GATE_EVIDENCE_PEPPER_ENV = 'FORESIFT_GATE_EVIDENCE_PEPPER';
 
-/**
- * Configure the gate-evidence verification key once, at composition time. The
- * key is process state, not request state: it is never accepted by
- * `verifyGateEvidence` or by `ActivationGateInput`.
- */
-export function configureGateEvidenceVerifierKey(pepper: string): void {
-  if (typeof pepper !== 'string' || pepper.length === 0) {
+function resolveGateEvidenceVerifierKey(): string {
+  const value = process.env[GATE_EVIDENCE_PEPPER_ENV];
+  if (typeof value !== 'string' || value.length === 0) {
     throw new ForesiftError(
       ErrorCode.PROD_ACTIVATION_GATE_REFUSED,
-      'the gate-evidence verification key must be a non-empty deployment secret',
+      `no gate-evidence verification key is configured; the deployment must set ${GATE_EVIDENCE_PEPPER_ENV}, and the key is never supplied alongside the record`,
       { reason: ActivationGateRefusalReason.GATE_EVIDENCE_MISSING },
     );
   }
-  gateEvidenceVerifierKey = pepper;
-}
-
-function resolveGateEvidenceVerifierKey(): string {
-  if (gateEvidenceVerifierKey !== null) return gateEvidenceVerifierKey;
-  throw new ForesiftError(
-    ErrorCode.PROD_ACTIVATION_GATE_REFUSED,
-    'no gate-evidence verification key is configured; the deployment must inject it through configureGateEvidenceVerifierKey, never supply it alongside the record',
-    { reason: ActivationGateRefusalReason.GATE_EVIDENCE_MISSING },
-  );
+  return value;
 }
 
 /** A gate-evidence record verified by `verifyGateEvidence` for one exact scope. */

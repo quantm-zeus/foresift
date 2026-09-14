@@ -15,7 +15,7 @@ import {
   activationScopeHash,
   evaluateActivationGate,
   parseModuleStateScope,
-  configureGateEvidenceVerifierKey,
+  GATE_EVIDENCE_PEPPER_ENV,
   recordActivationGateResult,
   verifyGateEvidence,
   type ActivationGateInput,
@@ -27,9 +27,9 @@ import {
 
 /** Obvious placeholder pepper for local/PGlite tests only — NOT a credential. */
 export const PROD_TEST_GATE_PEPPER = 'prod-fixture-gate-pepper-placeholder';
-// The verification key is deployment state (V7-F1): configure it once here, for
-// the test realm only. `verifyGateEvidence` has no key parameter.
-configureGateEvidenceVerifierKey(PROD_TEST_GATE_PEPPER);
+// The verification key is deployment configuration (V7-F1): the test realm sets
+// the deployment secret before any fixture is built. There is no public setter.
+process.env[GATE_EVIDENCE_PEPPER_ENV] = PROD_TEST_GATE_PEPPER;
 
 export const PROD_FIXTURE_NOW = '2026-06-01T00:00:00Z';
 export const PROD_FIXTURE_FUTURE = '2027-06-01T00:00:00Z';

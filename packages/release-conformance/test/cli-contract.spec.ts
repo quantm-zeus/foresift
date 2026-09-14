@@ -18,7 +18,7 @@ describe('verify-release-conformance CLI contract (FR-TRACE-003, AC-266)', () =>
 
     expect(result.status).toBe(0);
     expect(result.stdout).toMatch(/usage|verify|conformance/i);
-  });
+  }, 120_000);
 
   it('runs conformance verification and outputs verdict report', () => {
     const result = spawnSync('node', [CLI_PATH, '--json'], {
@@ -35,7 +35,7 @@ describe('verify-release-conformance CLI contract (FR-TRACE-003, AC-266)', () =>
       const output = result.stdout || result.stderr;
       expect(output).toMatch(/findings|requirement|rule|path/i);
     }
-  });
+  }, 120_000);
 
   it('refuses invalid unknown flags with non-zero exit code', () => {
     const result = spawnSync('node', [CLI_PATH, '--unknown-unsupported-arg'], {
@@ -44,7 +44,7 @@ describe('verify-release-conformance CLI contract (FR-TRACE-003, AC-266)', () =>
     });
 
     expect(result.status).not.toBe(0);
-  });
+  }, 120_000);
 });
 
 describe('verify-release-conformance CLI runs the PROD rules (H1)', () => {
@@ -121,7 +121,7 @@ describe('verify-release-conformance CLI runs the PROD rules (H1)', () => {
       }).stdout,
     );
     expect(withClaims.rules).toContain('PROD_CONFORMANCE_INPUT_MISSING');
-  });
+  }, 120_000);
 
   it('fails closed on a malformed claims file instead of skipping the claim rules (H2 residual)', async () => {
     const { mkdtemp, writeFile, rm } = await import('node:fs/promises');

@@ -58,7 +58,7 @@ import {
   smallestAffectedScope,
   stateRowsFor,
   statesFor,
-  configureGateEvidenceVerifierKey,
+  GATE_EVIDENCE_PEPPER_ENV,
   verifyGateEvidence,
   type ActivationGateInput,
   type ActivationGateResult,
@@ -78,9 +78,9 @@ const PAST = '2025-01-01T00:00:00Z';
 const HASH_A = `sha256:${'a'.repeat(64)}`;
 const HASH_B = `sha256:${'b'.repeat(64)}`;
 const PEPPER = 'test-pepper';
-// Deployment verification key for this test realm (V7-F1): configured once, never
-// passed to the verification boundary.
-configureGateEvidenceVerifierKey(PEPPER);
+// Deployment verification key for this test realm (V7-F1): set as deployment
+// configuration, never passed to the verification boundary.
+process.env[GATE_EVIDENCE_PEPPER_ENV] = PEPPER;
 
 let db: PGlite;
 let engine: DatabaseEngine;
@@ -3267,5 +3267,47 @@ describe('V7: gate evidence is verified with the deployment key, never a caller 
     // The minted verdict is frozen so a post-mint mutation cannot widen it.
     expect(Object.isFrozen(genuine.record)).toBe(true);
     expect(Object.isFrozen(genuine.record.scopeRefs)).toBe(true);
+  }, 120_000);
+
+  it('exposes no caller-writable verification-key state (V7-F1 round 3)', async () => {
+    // The round-2 setter was itself the bypass: a caller could overwrite the
+    // deployment key and self-sign. No reconfiguration path may be exported.
+    const api = (await import('@foresift/capability-registry')) as Record<string, unknown>;
+    expect(api['configureGateEvidenceVerifierKey']).toBeUndefined();
+    expect(api['GATE_EVIDENCE_PEPPER_ENV']).toBeDefined();
+  }, 120_000);
+
+  it('fails closed when the deployment key is not configured', () => {
+    const scope = makeScope({ profile_version: 'v7-f1-unset' });
+    const scopeHash = activationScopeHash(scope);
+    const saved = process.env[GATE_EVIDENCE_PEPPER_ENV];
+    delete process.env[GATE_EVIDENCE_PEPPER_ENV];
+    let refusal: { code?: string; detail?: unknown } | undefined;
+    try {
+      verifyGateEvidence({
+        record: createGateEvidence(
+          {
+            gateKind: 'OWNER_APPROVAL',
+            approver: 'owner-1',
+            scopeRefs: [scopeHash],
+            subject: 'self-issued',
+            issuedAt: '2026-01-01T00:00:00Z',
+            expiresAt: FAR_FUTURE,
+          },
+          PEPPER,
+        ),
+        requiredScope: scopeHash,
+        currentTime: NOW,
+      });
+    } catch (error) {
+      refusal = error as { code?: string; detail?: unknown };
+    } finally {
+      if (saved !== undefined) process.env[GATE_EVIDENCE_PEPPER_ENV] = saved;
+      else delete process.env[GATE_EVIDENCE_PEPPER_ENV];
+    }
+    expect(refusal?.code).toBe('PROD_ACTIVATION_GATE_REFUSED');
+    expect((refusal?.detail as { readonly reason?: string } | undefined)?.reason).toBe(
+      'GATE_EVIDENCE_MISSING',
+    );
   }, 120_000);
 });

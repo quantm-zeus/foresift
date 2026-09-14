@@ -684,35 +684,45 @@ export async function evaluateConformance(options: ConformanceOptions): Promise<
     readonly path: string;
     readonly message: string;
   }[] = [];
-  if (milestoneOwnsProdLaw(activeGroup, manifestRequirements)) {
+  const ownsProdLaw = milestoneOwnsProdLaw(activeGroup, manifestRequirements);
+  // Supplied PROD claims are ALWAYS evaluated (V7-C1/N3): silently discarding
+  // them let a caller pin the evaluation to a milestone without FR-PROD law and
+  // receive `PASSED` for a claim set that violates every PROD rule. A claim set
+  // that is handed to the gate is a claim set the gate must judge.
+  if (ownsProdLaw || options.prodClaims !== undefined) {
     const { checkProdSurfacePresence, evaluateProdConformance } = await import('./prod-rules.ts');
-    // Numeric selection and append only (audit NEW-M5): `Array.prototype.filter`
-    // and array spreads iterate, so a shadowed primitive silently dropped every
-    // FR-PROD requirement or every finding and the PROD block became a vacuous
-    // PASS.
-    const prodRequirements: Array<(typeof manifestRequirements)[number]> = [];
-    for (let index = 0; index < manifestRequirements.length; index += 1) {
-      const requirement = manifestRequirements[index] as (typeof manifestRequirements)[number];
-      if (requirement.id.startsWith('FR-PROD-') && requirement.dependencyGroup === activeGroup) {
-        prodRequirements[prodRequirements.length] = requirement;
+    if (ownsProdLaw) {
+      // Numeric selection and append only (audit NEW-M5): `Array.prototype.filter`
+      // and array spreads iterate, so a shadowed primitive silently dropped every
+      // FR-PROD requirement or every finding and the PROD block became a vacuous
+      // PASS.
+      const prodRequirements: Array<(typeof manifestRequirements)[number]> = [];
+      for (let index = 0; index < manifestRequirements.length; index += 1) {
+        const requirement = manifestRequirements[index] as (typeof manifestRequirements)[number];
+        if (requirement.id.startsWith('FR-PROD-') && requirement.dependencyGroup === activeGroup) {
+          prodRequirements[prodRequirements.length] = requirement;
+        }
+      }
+      const surface = await checkProdSurfacePresence({
+        repoRoot: options.repoRoot,
+        requirements: prodRequirements,
+      });
+      for (let index = 0; index < surface.findings.length; index += 1) {
+        prodFindings[prodFindings.length] = surface.findings[
+          index
+        ] as (typeof prodFindings)[number];
+      }
+      if (options.prodClaims === undefined) {
+        prodFindings[prodFindings.length] = {
+          requirementId: 'FR-PROD-001',
+          rule: 'PROD_CONFORMANCE_INPUT_MISSING',
+          path: 'prodClaims',
+          message:
+            'the release gate evaluated a milestone that owns FR-PROD law without PROD governance claims; an absent claim set fails closed instead of skipping the PROD rules',
+        };
       }
     }
-    const surface = await checkProdSurfacePresence({
-      repoRoot: options.repoRoot,
-      requirements: prodRequirements,
-    });
-    for (let index = 0; index < surface.findings.length; index += 1) {
-      prodFindings[prodFindings.length] = surface.findings[index] as (typeof prodFindings)[number];
-    }
-    if (options.prodClaims === undefined) {
-      prodFindings[prodFindings.length] = {
-        requirementId: 'FR-PROD-001',
-        rule: 'PROD_CONFORMANCE_INPUT_MISSING',
-        path: 'prodClaims',
-        message:
-          'the release gate evaluated a milestone that owns FR-PROD law without PROD governance claims; an absent claim set fails closed instead of skipping the PROD rules',
-      };
-    } else {
+    if (options.prodClaims !== undefined) {
       const prodReport = evaluateProdConformance(
         options.prodClaims as Parameters<typeof evaluateProdConformance>[0],
       );

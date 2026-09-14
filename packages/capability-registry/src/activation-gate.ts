@@ -87,6 +87,83 @@ const ACTIVATION_PASS_BRAND: unique symbol = Symbol('foresift.prod.activation-pa
  */
 const ACTIVATION_REFUSAL_BRAND: unique symbol = Symbol('foresift.prod.activation-refusal');
 
+/**
+ * Identity brand for a verified gate-evidence verdict (V7-F1). Before this, the
+ * HMAC `pepper` travelled INSIDE `ActivationGateInput` next to the record it
+ * verifies, so any caller could pick a key, sign a `GateEvidenceRecord` and have
+ * the gate confirm it: the signature attested nothing. The pepper now lives only
+ * at the explicit `verifyGateEvidence(...)` boundary, which mints this branded
+ * verdict; `evaluateActivationGate` consumes the verdict and refuses an
+ * unbranded object, so the gate itself never performs self-referential
+ * verification.
+ */
+const VERIFIED_GATE_EVIDENCE_IDENTITY = new WeakSet<object>();
+
+/** A gate-evidence record verified by `verifyGateEvidence` for one exact scope. */
+export interface VerifiedGateEvidence {
+  readonly record: GateEvidenceRecord;
+  readonly requiredScope: string;
+  readonly gateKind: string;
+  readonly approver: string;
+  readonly evidenceId: string;
+}
+
+/** Input to the explicit gate-evidence verification boundary (V7-F1). */
+export interface VerifyGateEvidenceInput {
+  readonly record: GateEvidenceRecord;
+  /** The deployment/shared verification key. Never bundled with the record. */
+  readonly pepper: string;
+  readonly requiredScope: string;
+  readonly currentTime: string;
+}
+
+/**
+ * Verify signed/hashed/expiring gate evidence against the supplied key and mint
+ * an identity-branded verdict bound to the exact scope it was verified for.
+ * This is the ONLY way to obtain a `VerifiedGateEvidence`; a caller that
+ * hand-builds the shape fails the brand check in `evaluateActivationGate`.
+ */
+export function verifyGateEvidence(input: VerifyGateEvidenceInput): VerifiedGateEvidence {
+  let verdict;
+  try {
+    verdict = evaluateGateEvidence({
+      record: input.record,
+      pepper: input.pepper,
+      requiredScope: input.requiredScope,
+      currentTime: input.currentTime,
+    });
+  } catch (error) {
+    throw new ForesiftError(
+      ErrorCode.PROD_ACTIVATION_GATE_REFUSED,
+      `gate evidence could not be evaluated (malformed record): ${
+        error instanceof Error ? error.message : String(error)
+      }`,
+      { reason: ActivationGateRefusalReason.GATE_EVIDENCE_INVALID },
+    );
+  }
+  if (verdict.isValid !== true) {
+    throw new ForesiftError(
+      ErrorCode.PROD_ACTIVATION_GATE_REFUSED,
+      `verified gate evidence refused: ${verdict.reason}`,
+      { reason: GATE_EVIDENCE_REFUSAL[verdict.reason] },
+    );
+  }
+  const verified: VerifiedGateEvidence = Object.freeze({
+    record: input.record,
+    requiredScope: input.requiredScope,
+    gateKind: verdict.gateKind,
+    approver: verdict.approver,
+    evidenceId: verdict.evidenceId,
+  });
+  VERIFIED_GATE_EVIDENCE_IDENTITY.add(verified);
+  return verified;
+}
+
+/** True only for a verdict minted by `verifyGateEvidence` in this module realm. */
+export function isVerifiedGateEvidence(value: unknown): value is VerifiedGateEvidence {
+  return typeof value === 'object' && value !== null && VERIFIED_GATE_EVIDENCE_IDENTITY.has(value);
+}
+
 // --- activation kind --------------------------------------------------------
 
 /**
@@ -306,10 +383,12 @@ export interface ActivationGateInput {
   readonly proven: boolean;
   readonly availableEvidence: AvailableEvidenceInput | null;
   readonly registeredStatisticalEvidence: readonly RegisteredStatisticalEvidence[];
-  readonly verifiedGateEvidence: {
-    readonly record: GateEvidenceRecord;
-    readonly pepper: string;
-  } | null;
+  /**
+   * A verdict minted by `verifyGateEvidence(...)`. The verification key is
+   * deliberately NOT part of this input (V7-F1): supplying it here let any
+   * caller self-sign the record the gate then "verified".
+   */
+  readonly verifiedGateEvidence: VerifiedGateEvidence | null;
   readonly capacityContract: SustainableCapacityContract | null;
   readonly distributionEvidence: DistributionEvidenceInput | null;
   readonly openContainment: readonly OpenContainmentFact[];
@@ -716,26 +795,41 @@ function evaluateCondition(
           'no signed/hashed/expiring gate evidence was supplied',
         );
       }
-      let verdict;
-      try {
-        verdict = evaluateGateEvidence({
-          record: evidence.record,
-          pepper: evidence.pepper,
-          requiredScope: scopeHash,
-          currentTime: input.now,
-        });
-      } catch {
+      // IDENTITY provenance, not shape (V7-F1): only a verdict minted by
+      // `verifyGateEvidence` is admissible. A hand-built `{record, …}` object —
+      // the self-signed shape the old input advertised — is refused here.
+      if (!isVerifiedGateEvidence(evidence)) {
         return refuse(
           gate,
           ActivationGateRefusalReason.GATE_EVIDENCE_INVALID,
-          'gate evidence could not be evaluated (malformed record)',
+          'the supplied gate evidence is not a verdict minted by verifyGateEvidence; a hand-built or cloned object is not verified evidence',
         );
       }
-      if (verdict.isValid !== true) {
+      // The verdict was minted for ONE exact scope at one instant. Re-bind it to
+      // this evaluation: a verdict for another scope, or one whose record has
+      // since expired or not yet become valid at `input.now`, is not evidence.
+      if (evidence.requiredScope !== scopeHash) {
         return refuse(
           gate,
-          GATE_EVIDENCE_REFUSAL[verdict.reason],
-          `verified gate evidence refused: ${verdict.reason}`,
+          ActivationGateRefusalReason.GATE_EVIDENCE_INVALID,
+          `the verified gate evidence was minted for scope ${JSON.stringify(
+            evidence.requiredScope,
+          )}, not ${JSON.stringify(scopeHash)}`,
+        );
+      }
+      const issuedAtMs = Date.parse(evidence.record.issuedAt);
+      const expiresAtMs = Date.parse(evidence.record.expiresAt);
+      if (
+        !Number.isFinite(issuedAtMs) ||
+        !Number.isFinite(expiresAtMs) ||
+        !Number.isFinite(nowMs) ||
+        issuedAtMs > nowMs ||
+        expiresAtMs <= nowMs
+      ) {
+        return refuse(
+          gate,
+          ActivationGateRefusalReason.GATE_EVIDENCE_INVALID,
+          'the verified gate evidence is not valid at the evaluation instant',
         );
       }
       return pass(gate);
@@ -1187,6 +1281,24 @@ async function persistEvaluations(
     );
   }
   const kind = parseActivationKind(input.activationKind);
+  // Batch discriminator (V7-NF2). A deterministic id over
+  // (scope, kind, gate, verdict, event, at) alone collided on the shared PASS
+  // prefix when a later REFUSE re-recorded the same PASS gates at the SAME
+  // `evaluatedAt`, aborting the refusal with a raw primary-key violation and
+  // making the "a later REFUSE invalidates an older PASS" law unrealizable at
+  // that instant. The fingerprint of the whole ordered batch distinguishes two
+  // different evaluations at the same instant while remaining deterministic.
+  const batchParts: string[] = [];
+  for (let batchIndex = 0; batchIndex < input.evaluations.length; batchIndex += 1) {
+    const batchEvaluation = input.evaluations[batchIndex];
+    if (batchEvaluation === undefined) continue;
+    batchParts[batchParts.length] = canonicalJson({
+      gateKind: batchEvaluation.gateKind,
+      verdict: batchEvaluation.verdict,
+      failingGate: batchEvaluation.failingGate,
+    });
+  }
+  const batchFingerprint = sha256Text(canonicalJson(batchParts)).slice(7, 23);
   return engine.transaction(async (tx) => {
     const ids: string[] = [];
     for (
@@ -1210,6 +1322,9 @@ async function persistEvaluations(
           // same scope and kind at the same instant (for example A -> B -> A).
           event: input.activationEventRef,
           at: input.evaluatedAt,
+          // The batch fingerprint distinguishes a PASS batch from a later REFUSE
+          // batch recorded at the same instant (V7-NF2).
+          batch: batchFingerprint,
         }),
       ).slice(7, 23)}`;
       await tx.query(
@@ -1407,6 +1522,20 @@ export async function requirePersistedActivationEvidence(
     );
   }
   const kind = parseActivationKind(input.activationKind);
+  // The transition instant must resolve to a real instant (V7-F4). PostgreSQL
+  // accepts `'now'` (and other special forms) as a timestamptz, but
+  // `Date.parse('now')` is NaN, and every `expiresAt <= NaN` comparison is
+  // false — so a malformed transition instant silently DISABLED the staleness
+  // check and admitted evidence that expired years earlier. A leap-second
+  // assertion (`…:60Z`) is the same class: `isValidUtcTimestamp` admits it but
+  // ECMAScript has no representation. Both fail closed here.
+  const atMs = Date.parse(input.at);
+  if (!Number.isFinite(atMs)) {
+    refuse(
+      ActivationEvidenceRefusalReason.EVIDENCE_SET_STALE,
+      `the activation instant ${JSON.stringify(input.at)} is not a resolvable UTC instant; a malformed transition instant fails closed rather than disabling the staleness comparison`,
+    );
+  }
   // Only evidence evaluated for THIS activation kind is admissible (audit C1):
   // an OPERATIONAL batch must never stand in for OPPORTUNITY/WORKSPACE/PUBLIC.
   // Evidence is scoped by scope, kind AND activation event (the batch identity).
@@ -1470,7 +1599,6 @@ export async function requirePersistedActivationEvidence(
   // Numeric `isOneOf` membership, never `new Set<ActivationGateKind>(required)`
   // (audit HIGH).
   const isRequired = (gate: ActivationGateKind): boolean => isOneOf(gate, required);
-  const atMs = Date.parse(input.at);
   for (let rowIndex = 0; rowIndex < batch.length; rowIndex += 1) {
     const row = batch[rowIndex] as PersistedActivationGateEvaluation;
     // Scope binding is authority, not decoration (audit R10): evidence rows are
@@ -1525,7 +1653,11 @@ export async function requirePersistedActivationEvidence(
         `the latest persisted gate ${row.gateKind} verdict is REFUSE (${row.failingGate})`,
       );
     }
-    if (Date.parse(row.expiresAt) <= atMs) {
+    // Stale evidence fails closed (V7-F4): an unresolvable `expiresAt` is not
+    // "not yet expired". A NaN comparison used to read as fresh, so both sides
+    // are required to be real instants.
+    const rowExpiresMs = Date.parse(row.expiresAt);
+    if (!Number.isFinite(rowExpiresMs) || rowExpiresMs <= atMs) {
       refuse(
         ActivationEvidenceRefusalReason.EVIDENCE_SET_STALE,
         `the persisted gate ${row.gateKind} evidence expired at ${row.expiresAt}`,

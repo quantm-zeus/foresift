@@ -1961,3 +1961,69 @@ describe('M1: release-gate finding messages survive a join shadow', () => {
     expect(result?.overall).toBe('FAILED');
   }, 120_000);
 });
+
+/**
+ * Seventh-round emergency correction (V7-C1/N3, V7-NF2, V7-NF3). Each test is a
+ * discriminating regression: it was verified to FAIL against the frozen base
+ * `27c12c8` and PASS after the bounded fix.
+ */
+describe('V7: release-gate totality, PROD-claim reachability and superseded defaults', () => {
+  it('never throws on malformed/sparse claim elements and fails the report closed (V7-NF2)', () => {
+    const cases: readonly Record<string, unknown>[] = [
+      { postureDeclarations: [undefined] },
+      { livePaths: [undefined] },
+      { mcpCompatibility: { ...PROD_MCP_COMPLIANT_CLAIM, revisions: [undefined] } },
+      { mcpCompatibility: { ...PROD_MCP_COMPLIANT_CLAIM, clients: [undefined] } },
+      { mcpCompatibility: { ...PROD_MCP_COMPLIANT_CLAIM, cells: [undefined] } },
+    ];
+    for (let index = 0; index < cases.length; index += 1) {
+      const input = cases[index] as Record<string, unknown>;
+      let report: { readonly overall?: string } | undefined;
+      let error: unknown = null;
+      try {
+        report = evaluateProdConformance(input as Parameters<typeof evaluateProdConformance>[0]);
+      } catch (thrown) {
+        error = thrown;
+      }
+      expect(error).toBeNull();
+      expect(report?.overall).toBe('FAILED');
+    }
+  }, 120_000);
+
+  it('refuses a superseded STABLE revision as the compatibility default (V7-NF3)', () => {
+    const base = PROD_MCP_COMPLIANT_CLAIM.revisions[0];
+    expect(base).toBeDefined();
+    const superseded: typeof PROD_MCP_COMPLIANT_CLAIM = {
+      ...PROD_MCP_COMPLIANT_CLAIM,
+      revisions: PROD_MCP_COMPLIANT_CLAIM.revisions.map((row, index) =>
+        index === 0 ? { ...row, supersededBy: '2025-12-01' } : row,
+      ),
+    };
+    const report = checkMcpCompatibilityDrift(superseded);
+    expect(report.passed).toBe(false);
+    expect(report.findings.some((finding) => finding.message.includes('superseded'))).toBe(true);
+    // The unmodified compliant claim still passes (no over-refusal control).
+    expect(checkMcpCompatibilityDrift(PROD_MCP_COMPLIANT_CLAIM).passed).toBe(true);
+  }, 120_000);
+
+  it('evaluates supplied PROD claims even for a milestone that owns no FR-PROD law (V7-C1/N3)', async () => {
+    const result = await evaluateConformance({
+      repoRoot: REPO_ROOT,
+      milestone: 'G0',
+      prodClaims: {
+        activationClaims: [PROD_ACTIVE_WITHOUT_GATE_CLAIM],
+        postureDeclarations: [PROD_BEST_EFFORT_WEAKENING],
+        mcpCompatibility: PROD_MCP_DRAFT_DEFAULT_CLAIM,
+        livePaths: [PROD_LIVE_PATH_NO_BOUND_CLAIM],
+        distributionAuthorizations: [PROD_PUBLIC_AUTHORIZED_MISSING_CLAIM],
+      },
+    });
+    expect(result.overall).toBe('FAILED');
+    const rules = new Set(result.findings.map((finding) => finding.rule));
+    expect(rules).toContain(PROD_RULES.activationWithoutEvidence);
+    expect(rules).toContain(PROD_RULES.postureWeakening);
+    expect(rules).toContain(PROD_RULES.mcpCompatibilityDrift);
+    expect(rules).toContain(PROD_RULES.livePathPrecomputationViolation);
+    expect(rules).toContain(PROD_RULES.publicAuthorizationWithoutGateEvidence);
+  }, 120_000);
+});

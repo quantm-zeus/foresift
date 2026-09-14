@@ -84,3 +84,55 @@ describe('SBOM projection and release report builder (FR-TRACE-006, AC-269)', ()
     });
   });
 });
+
+/**
+ * V7-F7: an omitted conformance result must not be recorded as PASSED. Before
+ * this, `buildReleaseReport` defaulted to `overall: 'PASSED'` with zero rules
+ * evaluated, and one valid gate-evidence item drove `activationState.status`
+ * to `ACTIVE` — a release report that certified a gate it never ran.
+ */
+describe('V7: release report refuses to certify unevaluated conformance (F7)', () => {
+  it('records FAILED (not PASSED) when no conformance result was supplied', async () => {
+    const report = await buildReleaseReport({
+      repoRoot: REPO_ROOT,
+      milestone: 'G2',
+      previousReport: VALID_RELEASE_REPORT_FIXTURE.rollbackTarget,
+    });
+    expect(report.conformanceResults.overall).toBe('FAILED');
+    expect(report.conformanceResults.totalRulesEvaluated).toBe(0);
+    expect(
+      report.conformanceResults.findings.some(
+        (finding) => finding.rule === 'CONFORMANCE_NOT_EVALUATED',
+      ),
+    ).toBe(true);
+    expect(report.activationState.status).not.toBe('ACTIVE');
+
+    // Control: a genuinely evaluated conformance result is recorded verbatim.
+    const evaluated = await buildReleaseReport({
+      repoRoot: REPO_ROOT,
+      milestone: 'G2',
+      previousReport: VALID_RELEASE_REPORT_FIXTURE.rollbackTarget,
+      conformanceResults: {
+        overall: 'FAILED',
+        totalRulesEvaluated: 9,
+        passedCount: 8,
+        failureCount: 1,
+        findings: [
+          {
+            requirementId: 'FR-PROD-001',
+            rule: 'ACTIVATION_WITHOUT_EVIDENCE',
+            path: 'module-x',
+            message: 'evaluated',
+          },
+        ],
+      },
+    });
+    expect(evaluated.conformanceResults.overall).toBe('FAILED');
+    expect(evaluated.conformanceResults.totalRulesEvaluated).toBe(9);
+    expect(
+      evaluated.conformanceResults.findings.some(
+        (finding) => finding.rule === 'CONFORMANCE_NOT_EVALUATED',
+      ),
+    ).toBe(false);
+  }, 120_000);
+});

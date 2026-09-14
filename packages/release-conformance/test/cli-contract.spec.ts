@@ -154,3 +154,28 @@ describe('verify-release-conformance CLI runs the PROD rules (H1)', () => {
     }
   }, 120_000);
 });
+
+/**
+ * V7-C1: a milestone that owns FR-PROD law cannot be certified by an invocation
+ * that never asked for PROD governance claims. Without an explicit
+ * `--prod-claims` file the claim rules are now REQUIRED, so the CLI fails closed
+ * with `PROD_CONFORMANCE_INPUT_MISSING` instead of silently skipping them.
+ */
+describe('verify-release-conformance CLI requires PROD claims by default (V7-C1)', () => {
+  it('fails closed with PROD_CONFORMANCE_INPUT_MISSING when no claims file is supplied', () => {
+    const result = spawnSync('node', [CLI_PATH, '--json'], {
+      cwd: REPO_ROOT,
+      encoding: 'utf8',
+      timeout: 120_000,
+    });
+    expect(result.status).toBe(1);
+    const verdict = JSON.parse(result.stdout) as {
+      readonly overall?: string;
+      readonly findings?: readonly { readonly rule?: string }[];
+    };
+    expect(verdict.overall).toBe('FAILED');
+    expect(
+      (verdict.findings ?? []).some((finding) => finding.rule === 'PROD_CONFORMANCE_INPUT_MISSING'),
+    ).toBe(true);
+  }, 120_000);
+});

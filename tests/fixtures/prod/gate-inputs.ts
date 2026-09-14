@@ -16,6 +16,7 @@ import {
   evaluateActivationGate,
   parseModuleStateScope,
   recordActivationGateResult,
+  verifyGateEvidence,
   type ActivationGateInput,
   type AvailableEvidenceInput,
   type DistributionEvidenceInput,
@@ -170,7 +171,12 @@ export function passingGateEvidence(
     },
     pepper,
   );
-  return { record, pepper };
+  return verifyGateEvidence({
+    record,
+    pepper,
+    requiredScope: scopeHash,
+    currentTime: PROD_FIXTURE_NOW,
+  });
 }
 
 /** The complete §69.3 AVAILABLE evidence bundle (every dimension green). */

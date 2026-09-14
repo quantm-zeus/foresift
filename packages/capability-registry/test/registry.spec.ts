@@ -58,6 +58,7 @@ import {
   smallestAffectedScope,
   stateRowsFor,
   statesFor,
+  verifyGateEvidence,
   type ActivationGateInput,
   type ActivationGateResult,
   type ModuleStateScope,
@@ -216,7 +217,12 @@ function passingGateEvidence(
     },
     PEPPER,
   );
-  return { record, pepper: PEPPER };
+  return verifyGateEvidence({
+    record,
+    pepper: PEPPER,
+    requiredScope: scopeHash,
+    currentTime: NOW,
+  });
 }
 
 async function gatePass(
@@ -328,8 +334,28 @@ async function advance(
     | 'PAUSED'
     | 'DISABLED',
   stateRowId: string,
-  options: { readonly gateResult?: ActivationGateResult | null; readonly hash?: string } = {},
+  options: {
+    readonly gateResult?: ActivationGateResult | null;
+    readonly hash?: string;
+    readonly at?: string;
+    readonly provenEvidenceRef?: string | null;
+    readonly provenEvidenceEventRef?: string | null;
+  } = {},
 ) {
+  let proven: { provenEvidenceRef?: string; provenEvidenceEventRef?: string } = {};
+  if (toState === 'PROVEN') {
+    if (
+      typeof options.provenEvidenceRef === 'string' &&
+      typeof options.provenEvidenceEventRef === 'string'
+    ) {
+      proven = {
+        provenEvidenceRef: options.provenEvidenceRef,
+        provenEvidenceEventRef: options.provenEvidenceEventRef,
+      };
+    } else {
+      proven = await provenEvidenceFor(scope, `${stateRowId}-proven-evidence`);
+    }
+  }
   return advanceState(engine, {
     moduleId,
     scope,
@@ -340,11 +366,9 @@ async function advance(
     changeClassification: 'MATERIAL_OPERATIONAL',
     reason: `advance to ${toState}`,
     actorRef: 'test-actor',
-    at: NOW,
+    at: options.at ?? NOW,
     gateResult: options.gateResult ?? null,
-    ...(toState === 'PROVEN'
-      ? await provenEvidenceFor(scope, `${stateRowId}-proven-evidence`)
-      : {}),
+    ...proven,
     stateRowId,
     transitionId: `${stateRowId}-t`,
   });
@@ -1698,6 +1722,47 @@ describe('ACTIVE is bound to persisted gate evidence (F1)', () => {
     expect(states.some((row) => row.lifecycleState === 'ACTIVE')).toBe(false);
   }, 120_000);
 
+  it('persists a later REFUSE at the SAME instant as the PASS it invalidates (V7-NF2)', async () => {
+    const scope = makeScope({ profile_version: 'refuse-same-instant' });
+    const moduleId = 'module-refuse-same-instant';
+    await provenLadder(moduleId, scope, 'same-instant');
+
+    // Both evaluations share the exact same `evaluatedAt`. Before V7-NF2 the
+    // deterministic `evaluation_id` repeated the shared PASS-prefix rows and the
+    // refusal aborted with a primary-key violation, so a same-instant REFUSE
+    // could never invalidate an older PASS.
+    const instant = '2026-06-02T00:00:00Z';
+    const pass = evaluateActivationGate({
+      ...passingOpportunityInput(scope),
+      activationEventRef: 'activation-same-instant',
+      now: instant,
+      expiresAt: '2027-06-01T00:00:00Z',
+    });
+    expect(pass.verdict).toBe('PASS');
+    await recordActivationGateResult(engine, pass);
+
+    const refusal = evaluateActivationGate({
+      ...passingOpportunityInput(scope),
+      activationEventRef: 'activation-same-instant',
+      now: instant,
+      expiresAt: '2027-06-01T00:00:00Z',
+      registeredStatisticalEvidence: [],
+    });
+    expect(refusal.verdict).toBe('REFUSE');
+    const recordedRefusal = await recordActivationGateResult(engine, refusal);
+    expect(recordedRefusal.verdict).toBe('REFUSE');
+
+    const rows = await activationGateEvaluationsFor(engine, activationScopeHash(scope));
+    expect(rows.some((row) => row.verdict === 'REFUSE')).toBe(true);
+
+    const refused = await rejection(
+      advance(moduleId, scope, 'ACTIVE', 'same-instant-5', { gateResult: pass }),
+    );
+    expect(refused.code).toBe('PROD_ACTIVATION_GATE_REFUSED');
+    const states = await stateRowsFor(engine, { moduleId, scope });
+    expect(states.some((row) => row.lifecycleState === 'ACTIVE')).toBe(false);
+  }, 120_000);
+
   it('refuses ACTIVE for a requires_proven scope through an OPERATIONAL evaluation (H5 residual)', async () => {
     const scope = makeScope({ profile_version: 'operational-requires-proven' });
     const moduleId = 'module-operational-requires-proven';
@@ -2873,5 +2938,280 @@ describe('HIGH: guards stay fail-closed under globally shadowed Array.prototype'
     expect((refusal.detail as { readonly reason?: string } | undefined)?.reason).toBe(
       'EVIDENCE_SET_SCOPE_MISMATCH',
     );
+  }, 120_000);
+});
+
+/**
+ * V7 test-quality correction. The sixth-round suite's nominal kind-binding and
+ * event-binding tests refused at the identity brand before reaching the
+ * persisted-evidence guards, and `EVIDENCE_SET_REF_MISMATCH` /
+ * `EVIDENCE_SET_INCOMPLETE` / duplicate-row / stale-row had no assertion at all
+ * (mutation-verified). These tests feed a COMPLETE batch through a stub engine
+ * and corrupt exactly ONE dimension, so each assertion pins that guard.
+ */
+describe('V7: persisted-evidence binding discriminates every dimension', () => {
+  const bindingScope = makeScope({ profile_version: 'v7-binding' });
+  const bindingHash = activationScopeHash(bindingScope);
+  const bindingEvent = 'v7-binding-event';
+  const bindingRequired = requiredGatesForActivation(ActivationKind.OPPORTUNITY, bindingScope);
+
+  async function bindingLadder(
+    moduleId: string,
+    scope: ModuleStateScope,
+    tag: string,
+  ): Promise<void> {
+    await advance(moduleId, scope, 'IMPLEMENTED', `${tag}-1`);
+    await advance(moduleId, scope, 'AVAILABLE', `${tag}-2`);
+    await advance(moduleId, scope, 'SHADOW', `${tag}-3`);
+    await advance(moduleId, scope, 'PROVEN', `${tag}-4`);
+  }
+
+  function buildBindingBatch(): {
+    readonly rawRows: Record<string, unknown>[];
+    readonly decoded: Array<Parameters<typeof activationEvidenceSetRef>[0][number]>;
+  } {
+    const rawRows: Record<string, unknown>[] = [];
+    const decoded: Array<Parameters<typeof activationEvidenceSetRef>[0][number]> = [];
+    for (let index = 0; index < ACTIVATION_GATE_ORDER.length; index += 1) {
+      const gate = ACTIVATION_GATE_ORDER[index] as ActivationGateKind;
+      let isRequired = false;
+      for (let requiredIndex = 0; requiredIndex < bindingRequired.length; requiredIndex += 1) {
+        if (bindingRequired[requiredIndex] === gate) {
+          isRequired = true;
+          break;
+        }
+      }
+      const verdict = isRequired ? 'PASS' : 'NOT_APPLICABLE';
+      const evaluationId = `v7-${String(index)}-${gate}`;
+      rawRows[rawRows.length] = {
+        evaluation_id: evaluationId,
+        scope_hash: bindingHash,
+        gate_kind: gate,
+        verdict,
+        failing_gate: null,
+        activation_event_ref: bindingEvent,
+        capacity_contract_ref: null,
+        evidence_refs: ['evidence-1'],
+        evaluated_at: NOW,
+        expires_at: FAR_FUTURE,
+        activation_kind: 'OPPORTUNITY',
+      };
+      decoded[decoded.length] = {
+        evaluationId,
+        scopeHash: bindingHash,
+        gateKind: gate,
+        verdict,
+        failingGate: null,
+        activationEventRef: bindingEvent,
+        capacityContractRef: null,
+        evidenceRefs: ['evidence-1'],
+        evaluatedAt: NOW,
+        expiresAt: FAR_FUTURE,
+        activationKind: ActivationKind.OPPORTUNITY,
+      };
+    }
+    return { rawRows, decoded };
+  }
+
+  async function expectBindingRefusal(
+    rawRows: readonly Record<string, unknown>[],
+    setRef: string,
+  ): Promise<string | undefined> {
+    const stubEngine = {
+      query: async () => ({ rows: rawRows }),
+    } as unknown as DatabaseEngine;
+    const refusal = await rejection(
+      requirePersistedActivationEvidence(stubEngine, {
+        scope: bindingScope,
+        scopeHash: bindingHash,
+        activationKind: ActivationKind.OPPORTUNITY,
+        activationEventRef: bindingEvent,
+        evaluationSetRef: setRef,
+        at: NOW,
+      }),
+    );
+    expect(refusal.code).toBe('PROD_ACTIVATION_GATE_REFUSED');
+    return (refusal.detail as { readonly reason?: string } | undefined)?.reason;
+  }
+
+  it('refuses evidence persisted for a DIFFERENT activation kind (kind binding)', async () => {
+    const batch = buildBindingBatch();
+    for (let index = 0; index < batch.rawRows.length; index += 1) {
+      (batch.rawRows[index] as Record<string, unknown>).activation_kind = 'OPERATIONAL';
+    }
+    const decoded = batch.decoded.map((row) => ({
+      ...row,
+      activationKind: ActivationKind.OPERATIONAL,
+    }));
+    expect(await expectBindingRefusal(batch.rawRows, activationEvidenceSetRef(decoded))).toBe(
+      'EVIDENCE_SET_KIND_MISMATCH',
+    );
+    // Control: the unmodified OPERATIONAL→OPPORTUNITY batch resolves.
+    const control = buildBindingBatch();
+    const resolved = await requirePersistedActivationEvidence(
+      { query: async () => ({ rows: control.rawRows }) } as unknown as DatabaseEngine,
+      {
+        scope: bindingScope,
+        scopeHash: bindingHash,
+        activationKind: ActivationKind.OPPORTUNITY,
+        activationEventRef: bindingEvent,
+        evaluationSetRef: activationEvidenceSetRef(control.decoded),
+        at: NOW,
+      },
+    );
+    expect(resolved.rows.length).toBe(ACTIVATION_GATE_ORDER.length);
+  }, 120_000);
+
+  it('refuses evidence persisted for a DIFFERENT activation event (event binding)', async () => {
+    const batch = buildBindingBatch();
+    for (let index = 0; index < batch.rawRows.length; index += 1) {
+      (batch.rawRows[index] as Record<string, unknown>).activation_event_ref = 'v7-other-event';
+    }
+    const decoded = batch.decoded.map((row) => ({ ...row, activationEventRef: 'v7-other-event' }));
+    expect(await expectBindingRefusal(batch.rawRows, activationEvidenceSetRef(decoded))).toBe(
+      'EVIDENCE_EVENT_REF_UNPERSISTED',
+    );
+  }, 120_000);
+
+  it('refuses an evaluationSetRef that no persisted batch derives (content-address binding)', async () => {
+    const batch = buildBindingBatch();
+    const forged = `sha256:${'f'.repeat(64)}`;
+    expect(await expectBindingRefusal(batch.rawRows, forged)).toBe('EVIDENCE_SET_REF_MISMATCH');
+  }, 120_000);
+
+  it('refuses an INCOMPLETE batch missing a required gate', async () => {
+    const batch = buildBindingBatch();
+    const rawRows: Record<string, unknown>[] = [];
+    const decoded: Array<Parameters<typeof activationEvidenceSetRef>[0][number]> = [];
+    for (let index = 0; index < batch.rawRows.length; index += 1) {
+      if ((batch.rawRows[index] as Record<string, unknown>).gate_kind === 'CAPACITY_CONTRACT')
+        continue;
+      rawRows[rawRows.length] = batch.rawRows[index] as Record<string, unknown>;
+      decoded[decoded.length] = batch.decoded[index] as (typeof decoded)[number];
+    }
+    expect(await expectBindingRefusal(rawRows, activationEvidenceSetRef(decoded))).toBe(
+      'EVIDENCE_SET_INCOMPLETE',
+    );
+  }, 120_000);
+
+  it('refuses a DUPLICATED gate row in the batch', async () => {
+    const batch = buildBindingBatch();
+    const duplicateRaw = { ...(batch.rawRows[0] as Record<string, unknown>) };
+    duplicateRaw.evaluation_id = 'v7-duplicate-row';
+    const duplicateDecoded = {
+      ...(batch.decoded[0] as (typeof batch.decoded)[number]),
+      evaluationId: 'v7-duplicate-row',
+    };
+    const rawRows = [...batch.rawRows, duplicateRaw];
+    const decoded = [...batch.decoded, duplicateDecoded];
+    expect(await expectBindingRefusal(rawRows, activationEvidenceSetRef(decoded))).toBe(
+      'EVIDENCE_SET_INCOMPLETE',
+    );
+  }, 120_000);
+
+  it('refuses an EXPIRED row even when the whole batch is otherwise complete', async () => {
+    const batch = buildBindingBatch();
+    const rawRows = batch.rawRows.map((row) =>
+      row.gate_kind === 'CAPACITY_CONTRACT' ? { ...row, expires_at: '2020-01-01T00:00:00Z' } : row,
+    );
+    const decoded = batch.decoded.map((row) =>
+      row.gateKind === 'CAPACITY_CONTRACT' ? { ...row, expiresAt: '2020-01-01T00:00:00Z' } : row,
+    );
+    expect(await expectBindingRefusal(rawRows, activationEvidenceSetRef(decoded))).toBe(
+      'EVIDENCE_SET_STALE',
+    );
+  }, 120_000);
+
+  it('refuses a malformed transition instant instead of disabling the staleness check (V7-F4)', async () => {
+    const scope = makeScope({ profile_version: 'v7-malformed-at' });
+    const moduleId = 'module-v7-malformed-at';
+    // Ladder to SHADOW at the normal instant.
+    await advance(moduleId, scope, 'IMPLEMENTED', 'v7-at-1');
+    await advance(moduleId, scope, 'AVAILABLE', 'v7-at-2');
+    await advance(moduleId, scope, 'SHADOW', 'v7-at-3');
+    const stalePass = evaluateActivationGate({
+      ...passingOpportunityInput(scope),
+      activationEventRef: 'v7-at-stale',
+      now: NOW,
+      expiresAt: '2026-07-01T00:00:00Z',
+    });
+    expect(stalePass.verdict).toBe('PASS');
+    const recorded = await recordActivationGateResult(engine, stalePass);
+
+    // A genuinely later real instant refuses EVIDENCE_SET_STALE.
+    const withRealInstant = await rejection(
+      advance(moduleId, scope, 'PROVEN', 'v7-at-4', {
+        at: '2026-08-01T00:00:00Z',
+        provenEvidenceRef: recorded.evaluationSetRef,
+        provenEvidenceEventRef: 'v7-at-stale',
+      }),
+    );
+    expect((withRealInstant.detail as { readonly reason?: string } | undefined)?.reason).toBe(
+      'EVIDENCE_SET_STALE',
+    );
+
+    // …and the PostgreSQL-valid but ECMAScript-unparseable 'now' must ALSO
+    // refuse (Date.parse('now') is NaN, which used to read as "not expired").
+    const withMalformedInstant = await rejection(
+      advance(moduleId, scope, 'PROVEN', 'v7-at-5', {
+        at: 'now',
+        provenEvidenceRef: recorded.evaluationSetRef,
+        provenEvidenceEventRef: 'v7-at-stale',
+      }),
+    );
+    expect(withMalformedInstant.code).toBe('PROD_ACTIVATION_GATE_REFUSED');
+    expect((withMalformedInstant.detail as { readonly reason?: string } | undefined)?.reason).toBe(
+      'EVIDENCE_SET_STALE',
+    );
+    const states = await stateRowsFor(engine, { moduleId, scope });
+    expect(states.some((row) => row.lifecycleState === 'PROVEN')).toBe(false);
+  }, 120_000);
+
+  it('refuses blank-only activation event references (tab/NBSP/BOM), not just the empty string', async () => {
+    const scope = makeScope({ profile_version: 'v7-blank-event' });
+    const moduleId = 'module-v7-blank-event';
+    await bindingLadder(moduleId, scope, 'v7-blank');
+    for (const blank of ['\t', '\u00a0', '\ufeff']) {
+      const gate = await gatePass(scope, blank);
+      const refused = await rejection(
+        advance(moduleId, scope, 'ACTIVE', `v7-blank-${blank.codePointAt(0) ?? 0}`, {
+          gateResult: gate,
+        }),
+      );
+      expect(refused.code).toBe('PROD_ACTIVATION_GATE_REFUSED');
+      expect((refused.detail as { readonly reason?: string } | undefined)?.reason).toBe(
+        'ACTIVATION_EVENT_REF_MISSING',
+      );
+    }
+    const states = await stateRowsFor(engine, { moduleId, scope });
+    expect(states.some((row) => row.lifecycleState === 'ACTIVE')).toBe(false);
+  }, 120_000);
+
+  it('lets a fresh distinct activation event escape a REFUSE recorded for another event', async () => {
+    const scope = makeScope({ profile_version: 'v7-fresh-event' });
+    const moduleId = 'module-v7-fresh-event';
+    await bindingLadder(moduleId, scope, 'v7-fresh');
+
+    const pass = await gatePass(scope, 'v7-fresh-event-a');
+    expect(pass.verdict).toBe('PASS');
+    const refusal = evaluateActivationGate({
+      ...passingOpportunityInput(scope),
+      activationEventRef: 'v7-fresh-event-b',
+      registeredStatisticalEvidence: [],
+    });
+    expect(refusal.verdict).toBe('REFUSE');
+    await recordActivationGateResult(engine, refusal);
+
+    // The pass for event A is unaffected by the refusal for event B: the event
+    // predicate must not be over-broad.
+    const resolved = await requirePersistedActivationEvidence(engine, {
+      scope,
+      scopeHash: activationScopeHash(scope),
+      activationKind: ActivationKind.OPPORTUNITY,
+      activationEventRef: 'v7-fresh-event-a',
+      evaluationSetRef: pass.evaluationSetRef,
+      at: NOW,
+    });
+    expect(resolved.rows.length).toBeGreaterThan(0);
   }, 120_000);
 });

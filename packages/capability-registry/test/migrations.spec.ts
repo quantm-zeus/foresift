@@ -1198,3 +1198,126 @@ describe('raw-write activation invariants (final convergence audit HIGH-1/HIGH-2
     expect(error.message).toMatch(/containment_events_cleared_ref_nonblank/);
   }, 120_000);
 });
+
+/**
+ * V7 test-quality correction. The sixth-round suite never probed the SQL
+ * evidence trigger's EXPIRY, exactly-one-PASS or KIND predicates (mutation of
+ * each left the suite green), so a regression in the SQL layer was invisible.
+ */
+describe('V7: SQL evidence guards discriminate expiry, duplication and kind', () => {
+  async function seedCustomBatch(input: {
+    readonly hash: string;
+    readonly tag: string;
+    readonly event: string;
+    readonly expiresAt: string;
+    readonly evaluatedAt: string;
+    readonly kind: string;
+    readonly duplicateGate?: string;
+  }): Promise<void> {
+    for (const gate of ALL_ACTIVATION_GATE_KINDS) {
+      const verdict = OPPORTUNITY_REQUIRED_GATES.includes(gate) ? 'PASS' : 'NOT_APPLICABLE';
+      const insert = async (evaluationId: string): Promise<void> => {
+        await engine.query(
+          `INSERT INTO prod.activation_gate_evaluations
+             (evaluation_id, scope_hash, gate_kind, verdict, failing_gate, evidence_refs,
+              capacity_contract_ref, activation_event_ref, evaluated_at, expires_at, activation_kind)
+           VALUES ($1, $2, $3, $4, NULL, '[]'::jsonb, NULL, $5, $6::timestamptz, $7::timestamptz, $8)`,
+          [
+            evaluationId,
+            input.hash,
+            gate,
+            verdict,
+            input.event,
+            input.evaluatedAt,
+            input.expiresAt,
+            input.kind,
+          ],
+        );
+      };
+      await insert(`v7c-${input.tag}-${gate}`);
+      if (input.duplicateGate === gate) await insert(`v7c-${input.tag}-${gate}-dup`);
+    }
+  }
+
+  it('refuses a raw ACTIVE INSERT when a required PASS row is EXPIRED', async () => {
+    const hash = canonicalHash('v7-sql-expired');
+    const event = 'v7-sql-expired-event';
+    await seedProvenRow(hash, 'v7-sql-expired');
+    await seedCustomBatch({
+      hash,
+      tag: 'expired',
+      event,
+      evaluatedAt: '2019-06-01T00:00:00Z',
+      expiresAt: '2020-01-01T00:00:00Z',
+      kind: 'OPPORTUNITY',
+    });
+    const refusal = await insertRawActive('state-v7-expired', 'v7-sql-expired', hash, event);
+    expect(String(refusal.message)).toMatch(
+      /all-PASS persisted gate evaluation set|exactly one unexpired PASS row/,
+    );
+  }, 120_000);
+
+  it('refuses a raw ACTIVE INSERT when a required gate has TWO PASS rows', async () => {
+    const hash = canonicalHash('v7-sql-dup');
+    const event = 'v7-sql-dup-event';
+    await seedProvenRow(hash, 'v7-sql-dup');
+    await seedCustomBatch({
+      hash,
+      tag: 'dup',
+      event,
+      evaluatedAt: '2026-01-01T00:00:00Z',
+      expiresAt: '2030-01-01T00:00:00Z',
+      kind: 'OPPORTUNITY',
+      duplicateGate: 'CAPACITY_CONTRACT',
+    });
+    const refusal = await insertRawActive('state-v7-dup', 'v7-sql-dup', hash, event);
+    expect(String(refusal.message)).toMatch(
+      /all-PASS persisted gate evaluation set|exactly one unexpired PASS row/,
+    );
+  }, 120_000);
+
+  it('refuses a raw ACTIVE INSERT whose evidence was recorded for another kind', async () => {
+    const hash = canonicalHash('v7-sql-kind');
+    const event = 'v7-sql-kind-event';
+    await seedProvenRow(hash, 'v7-sql-kind');
+    await seedCustomBatch({
+      hash,
+      tag: 'kind',
+      event,
+      evaluatedAt: '2026-01-01T00:00:00Z',
+      expiresAt: '2030-01-01T00:00:00Z',
+      kind: 'OPERATIONAL',
+    });
+    const refusal = await insertRawActive('state-v7-kind', 'v7-sql-kind', hash, event);
+    expect(String(refusal.message)).toMatch(
+      /all-PASS persisted gate evaluation set|exactly one unexpired PASS row/,
+    );
+  }, 120_000);
+
+  it('still accepts a complete, unexpired, exactly-once, kind-matched batch (control)', async () => {
+    const hash = canonicalHash('v7-sql-control');
+    const event = 'v7-sql-control-event';
+    await seedProvenRow(hash, 'v7-sql-control');
+    await seedCustomBatch({
+      hash,
+      tag: 'control',
+      event,
+      evaluatedAt: '2026-01-01T00:00:00Z',
+      expiresAt: '2030-01-01T00:00:00Z',
+      kind: 'OPPORTUNITY',
+    });
+    // The control must COMMIT, so it cannot use the refusal-asserting helper.
+    await engine.query(
+      `INSERT INTO prod.module_states
+         (state_row_id, module_id, artifact_set_hash, scope, scope_hash, lifecycle_state,
+          operational_readiness, distribution_readiness, activation_event_ref, activation_kind)
+       VALUES ('state-v7-control', 'module-1', $1, $2::jsonb, $3, 'ACTIVE',
+               'READY_FOR_ACTIVE_PROFILE', 'PRIVATE_ONLY', $4, 'OPPORTUNITY')`,
+      [HASH, rawScope('v7-sql-control'), hash, event],
+    );
+    const rows = await engine.query<{ lifecycle_state: string }>(
+      `SELECT lifecycle_state FROM prod.module_states WHERE state_row_id = 'state-v7-control'`,
+    );
+    expect(rows.rows[0]?.lifecycle_state).toBe('ACTIVE');
+  }, 120_000);
+});

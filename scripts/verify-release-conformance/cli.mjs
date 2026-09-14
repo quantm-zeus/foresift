@@ -486,13 +486,38 @@ export async function verifyReleaseConformance(root, options = {}) {
   const activeGroup = milestone?.status === 'ACTIVE' ? milestone.milestoneId : undefined;
   if (!/^G[0-7]$/.test(activeGroup ?? ''))
     throw new Error('current milestone is not an active dependency group');
+  // A milestone that owns FR-PROD law cannot be certified by an invocation that
+  // never asked for PROD governance claims (V7-C1): when no --prod-claims file is
+  // supplied, the claim rules are REQUIRED so the CLI fails closed exactly as
+  // `evaluateConformance` does. Supplying a file evaluates that file instead.
+  let ownsProdLaw = false;
+  const manifestRequirements = Array.isArray(manifest?.requirements) ? manifest.requirements : [];
+  for (let index = 0; index < manifestRequirements.length; index += 1) {
+    const requirement = manifestRequirements[index];
+    if (
+      requirement !== null &&
+      typeof requirement === 'object' &&
+      typeof requirement.id === 'string' &&
+      requirement.id.startsWith('FR-PROD-') &&
+      requirement.dependencyGroup === activeGroup &&
+      (requirement.supersededBy ?? []).length === 0
+    ) {
+      ownsProdLaw = true;
+      break;
+    }
+  }
+  const prodOptions = {
+    ...options,
+    requireProdClaims:
+      options.requireProdClaims === true || (options.prodClaimsPath === undefined && ownsProdLaw),
+  };
   const groups = [
     await mappingFindings(root, manifest, activeGroup),
     await dependencyGateFindings(root, manifest, activeGroup),
     await orphanFindings(root, manifest),
     await generatedDriftFindings(root),
     await reportConsistencyFindings(root, audit),
-    await prodConformanceFindings(root, options),
+    await prodConformanceFindings(root, prodOptions),
   ];
   const findings = groups
     .flat()
@@ -518,6 +543,7 @@ export async function verifyReleaseConformance(root, options = {}) {
       'RELEASE_REPORT_HASH_CONSISTENCY',
       'PROD_SURFACE_MISSING',
       'PROD_CONFORMANCE_INPUT_MISSING',
+      'PROD_CONFORMANCE_RULE_THREW',
       'PROD_CONFORMANCE_GATE_UNAVAILABLE',
       ...(options.prodClaimsPath === undefined
         ? []

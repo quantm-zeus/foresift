@@ -47,6 +47,17 @@ import { ImportQuarantineStateSchema } from '@foresift/shared-schemas';
 import { CONFORMANCE_RULES, implementationPath, type ConformanceFinding } from './conformance.ts';
 import { GATE_KINDS } from './gate-evidence.ts';
 
+/**
+ * A claim element must be a non-null, non-array object. A sparse or primitive
+ * element (for example `postureDeclarations: [undefined]`) previously reached
+ * the rule body and threw a TypeError (V7-NF2). Each rule now classifies it as a
+ * finding and continues, so a malformed element fails the gate closed with a
+ * precise path instead of crashing the evaluator.
+ */
+function isClaimRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
 // --- rule vocabulary --------------------------------------------------------
 
 /**
@@ -63,6 +74,13 @@ export const PROD_RULES = {
   prodConformanceInputMissing: 'PROD_CONFORMANCE_INPUT_MISSING',
   /** A declared PROD surface ref does not resolve in the live repository (H1). */
   prodSurfaceMissing: 'PROD_SURFACE_MISSING',
+  /**
+   * A claim rule threw on malformed governance input. The release gate must
+   * return a FAILED verdict with this finding, never propagate the throw
+   * (V7-NF2): a crash is fail-closed for CI, but it hides the verdict from the
+   * library caller and makes the rule set unaddressable.
+   */
+  prodConformanceRuleThrew: 'PROD_CONFORMANCE_RULE_THREW',
 } as const;
 
 /** The five claim-shaped PROD rules (the repo-backed surface rule is separate). */
@@ -115,6 +133,7 @@ export const PROD_RULE_REQUIREMENT_REFS: Readonly<Record<ProdRule, readonly stri
   [PROD_RULES.publicAuthorizationWithoutGateEvidence]: ['FR-PROD-002', 'FR-PROD-004'],
   [PROD_RULES.prodConformanceInputMissing]: ['FR-PROD-001', 'FR-PROD-002', 'FR-PROD-006'],
   [PROD_RULES.prodSurfaceMissing]: ['FR-PROD-001', 'FR-PROD-002', 'FR-PROD-003'],
+  [PROD_RULES.prodConformanceRuleThrew]: ['FR-PROD-001', 'FR-PROD-002', 'FR-PROD-006'],
 };
 
 // --- rule 1: activation without evidence ------------------------------------
@@ -243,7 +262,18 @@ export function checkPostureWeakening(
   // iterate, and a shadowed iterator made the weakened-dimension walk vacuous,
   // accepting a declaration that weakened a protected dimension.
   for (let declarationIndex = 0; declarationIndex < declarations.length; declarationIndex += 1) {
-    const declaration = declarations[declarationIndex] as PostureWeakeningDeclaration;
+    const rawDeclaration = declarations[declarationIndex];
+    if (!isClaimRecord(rawDeclaration)) {
+      findings[findings.length] = {
+        requirementId: DEFAULT_POSTURE_REQUIREMENT,
+        rule: PROD_RULES.postureWeakening,
+        path: `postureDeclarations[${declarationIndex}]`,
+        message:
+          'posture declaration is not an object; a malformed declaration fails the release gate closed',
+      };
+      continue;
+    }
+    const declaration = rawDeclaration as unknown as PostureWeakeningDeclaration;
     const requirementId = declaration.requirementId ?? DEFAULT_POSTURE_REQUIREMENT;
     const findingsFor = (detail: string): void => {
       findings[findings.length] = {
@@ -358,7 +388,15 @@ export function checkMcpCompatibilityDrift(claim: McpCompatibilityMatrixClaim): 
   };
 
   for (let revisionIndex = 0; revisionIndex < claim.revisions.length; revisionIndex += 1) {
-    const revision = claim.revisions[revisionIndex] as McpRevisionClaim;
+    const rawRevision = claim.revisions[revisionIndex];
+    if (!isClaimRecord(rawRevision)) {
+      report(
+        `revisions[${revisionIndex}]`,
+        'revision entry is not an object; a malformed matrix fails the release gate closed',
+      );
+      continue;
+    }
+    const revision = rawRevision as unknown as McpRevisionClaim;
     if (revision.isDefault !== true) continue;
     let mayBeDefault = false;
     try {
@@ -376,6 +414,16 @@ export function checkMcpCompatibilityDrift(claim: McpCompatibilityMatrixClaim): 
         `default revision ${revision.revision} is channel ${revision.channel}; only STABLE may default (§69.7)`,
       );
     }
+    // A superseded revision is not a default candidate (§69.7): the governed
+    // matrix resolver excludes it, but this declared-claim rule previously
+    // accepted it (V7-NF3). Keep the two surfaces consistent so the release gate
+    // cannot certify a default the server would refuse to serve.
+    if (typeof revision.supersededBy === 'string' && revision.supersededBy.length > 0) {
+      report(
+        revision.revision,
+        `default revision ${revision.revision} is superseded by ${revision.supersededBy}; a superseded revision may not be the compatibility default`,
+      );
+    }
   }
 
   // Numeric collection and scan: `Array.prototype.filter/find/map` are
@@ -383,7 +431,9 @@ export function checkMcpCompatibilityDrift(claim: McpCompatibilityMatrixClaim): 
   // and a shadowed `find` hid the conformance cell (audit NEW-M5).
   const defaults: McpRevisionClaim[] = [];
   for (let revisionIndex = 0; revisionIndex < claim.revisions.length; revisionIndex += 1) {
-    const revision = claim.revisions[revisionIndex] as McpRevisionClaim;
+    const rawRevision = claim.revisions[revisionIndex];
+    if (!isClaimRecord(rawRevision)) continue;
+    const revision = rawRevision as unknown as McpRevisionClaim;
     if (revision.isDefault === true) defaults[defaults.length] = revision;
   }
   if (defaults.length === 0) {
@@ -411,16 +461,31 @@ export function checkMcpCompatibilityDrift(claim: McpCompatibilityMatrixClaim): 
   for (let defaultIndex = 0; defaultIndex < defaults.length; defaultIndex += 1) {
     const defaultRevision = defaults[defaultIndex] as McpRevisionClaim;
     for (let clientIndex = 0; clientIndex < claim.clients.length; clientIndex += 1) {
-      const client = claim.clients[clientIndex] as McpTargetClientClaim;
+      const rawClient = claim.clients[clientIndex];
+      if (!isClaimRecord(rawClient)) {
+        report(
+          `clients[${clientIndex}]`,
+          'client entry is not an object; a malformed matrix fails the release gate closed',
+        );
+        continue;
+      }
+      const client = rawClient as unknown as McpTargetClientClaim;
       const cellPath = `${defaultRevision.revision}\u00d7${client.clientId}`;
       let cell: McpCompatibilityCellClaim | undefined;
       for (let cellIndex = 0; cellIndex < claim.cells.length; cellIndex += 1) {
-        const candidate = claim.cells[cellIndex] as McpCompatibilityCellClaim;
+        const candidate = claim.cells[cellIndex];
+        if (!isClaimRecord(candidate)) {
+          report(
+            `cells[${cellIndex}]`,
+            'conformance cell is not an object; a malformed matrix fails the release gate closed',
+          );
+          continue;
+        }
         if (
           candidate.revision === defaultRevision.revision &&
           candidate.clientId === client.clientId
         ) {
-          cell = candidate;
+          cell = candidate as unknown as McpCompatibilityCellClaim;
           break;
         }
       }
@@ -474,7 +539,11 @@ export interface LivePathPrecomputationClaim {
   readonly request: PrecomputedAlphaRequest;
   readonly now: string;
   readonly boundaryAssertions: readonly ArtifactBoundaryAssertion[];
-  readonly artifactRef?: string;
+  // The former optional `artifactRef` was never read by any rule while the
+  // load-bearing binding is `request.artifactSetHash` vs `bound.artifactSetHash`
+  // (V7-NF4). A declared-but-ignored governance input invited the false belief
+  // that the served artifact was checked, so it was removed rather than
+  // re-interpreted: the request/bound set hash is the authority.
   readonly requirementId?: string;
 }
 
@@ -576,7 +645,18 @@ export function checkLivePathPrecomputationViolation(
   // iterated zero times and the R7 guard reported `passed: true` for a live
   // path that omits IMPORT_SHADOW_ONLY (audit NEW-M5).
   for (let claimIndex = 0; claimIndex < claims.length; claimIndex += 1) {
-    const claim = claims[claimIndex] as LivePathPrecomputationClaim;
+    const rawClaim = claims[claimIndex];
+    if (!isClaimRecord(rawClaim)) {
+      findings[findings.length] = {
+        requirementId: DEFAULT_PRECOMPUTED_REQUIREMENT,
+        rule: PROD_RULES.livePathPrecomputationViolation,
+        path: `livePaths[${claimIndex}]`,
+        message:
+          'live-path claim is not an object; a malformed claim fails the release gate closed',
+      };
+      continue;
+    }
+    const claim = rawClaim as unknown as LivePathPrecomputationClaim;
     const requirementId = claim.requirementId ?? DEFAULT_PRECOMPUTED_REQUIREMENT;
     const report = (detail: string): void => {
       findings[findings.length] = {
@@ -1221,24 +1301,47 @@ export function evaluateProdConformance(input: ProdConformanceInput): ProdConfor
       findings[findings.length] = reportFindings[index] as ProdConformanceFinding;
     }
   };
-  append(checkProdConformanceInputsPresent(input));
-  append(
+  // Every rule runs behind a fail-closed boundary (V7-NF2): a malformed/sparse
+  // element (for example `postureDeclarations: [undefined]`) must produce a
+  // FAILED verdict naming the rule, never a TypeError that escapes the release
+  // gate. The thrown rule is reported and evaluation continues, so one bad input
+  // cannot hide the other rules' findings.
+  const run = (ruleName: ProdRule, factory: () => ProdRuleReport): void => {
+    let report: ProdRuleReport;
+    try {
+      report = factory();
+    } catch (error) {
+      findings[findings.length] = {
+        requirementId: 'FR-PROD-001',
+        rule: PROD_RULES.prodConformanceRuleThrew,
+        path: ruleName,
+        message: `PROD rule ${ruleName} threw on malformed governance input (${
+          error instanceof Error ? error.message : String(error)
+        }); the release gate fails closed instead of crashing`,
+      };
+      return;
+    }
+    append(report);
+  };
+  run(PROD_RULES.prodConformanceInputMissing, () => checkProdConformanceInputsPresent(input));
+  run(PROD_RULES.activationWithoutEvidence, () =>
     checkActivationWithoutEvidence(
       Array.isArray(input.activationClaims) ? input.activationClaims : [],
     ),
   );
-  append(
+  run(PROD_RULES.postureWeakening, () =>
     checkPostureWeakening(
       Array.isArray(input.postureDeclarations) ? input.postureDeclarations : [],
     ),
   );
-  if (mcpClaimWellShaped(input.mcpCompatibility)) {
-    append(checkMcpCompatibilityDrift(input.mcpCompatibility));
+  const mcpClaim = input.mcpCompatibility;
+  if (mcpClaimWellShaped(mcpClaim)) {
+    run(PROD_RULES.mcpCompatibilityDrift, () => checkMcpCompatibilityDrift(mcpClaim));
   }
-  append(
+  run(PROD_RULES.livePathPrecomputationViolation, () =>
     checkLivePathPrecomputationViolation(Array.isArray(input.livePaths) ? input.livePaths : []),
   );
-  append(
+  run(PROD_RULES.publicAuthorizationWithoutGateEvidence, () =>
     checkPublicAuthorizationWithoutGateEvidence(
       Array.isArray(input.distributionAuthorizations) ? input.distributionAuthorizations : [],
     ),

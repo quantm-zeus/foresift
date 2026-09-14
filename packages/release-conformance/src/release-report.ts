@@ -174,12 +174,25 @@ export async function buildReleaseReport(
     );
   }
 
+  // An omitted conformance result is NOT a pass (V7-F7): defaulting to
+  // `PASSED, totalRulesEvaluated: 0` recorded a release report that claimed the
+  // conformance gate passed while evaluating zero rules, and (with one valid
+  // gate-evidence item) drove `activationState.status` to `ACTIVE`. A caller that
+  // did not run the gate fails closed instead.
   const defaultConformance: ReleaseReportRecord['conformanceResults'] = {
-    overall: 'PASSED',
+    overall: 'FAILED',
     totalRulesEvaluated: 0,
     passedCount: 0,
-    failureCount: 0,
-    findings: [],
+    failureCount: 1,
+    findings: [
+      {
+        requirementId: 'FR-TRACE-006',
+        rule: 'CONFORMANCE_NOT_EVALUATED',
+        path: 'conformanceResults',
+        message:
+          'no release-conformance result was supplied; a release report cannot record PASSED with zero evaluated rules',
+      },
+    ],
   };
   const conformanceResults = options.conformanceResults ?? defaultConformance;
   const gateEvidence = options.gateEvidence ?? [];

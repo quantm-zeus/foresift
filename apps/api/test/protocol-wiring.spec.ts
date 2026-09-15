@@ -17,12 +17,21 @@ async function loadProtocolWiringModule() {
   return await import('../src/mcp/protocol-wiring.ts');
 }
 
+/** A resolver-shaped governed admission (the type `McpCompatibilityResolution`). */
+function governedAdmission(usable: readonly string[], optIn: readonly string[] = []) {
+  return {
+    defaultRevision: MCP_PROTOCOL_BASELINE_REVISION,
+    usableRevisions: usable,
+    optInRevisions: optIn,
+  };
+}
+
 describe('T008: MCP protocol wiring & Streamable HTTP transport (AC-144, AC-251)', () => {
   it('admits standard baseline revision 2025-11-25 and supported content types', async () => {
     const { createMcpProtocolMiddleware } = await loadProtocolWiringModule();
     const middleware = createMcpProtocolMiddleware({
       maxMessageBytes: MAXIMUM_REQUEST_BYTES,
-      allowedRevisions: [MCP_PROTOCOL_BASELINE_REVISION],
+      admission: governedAdmission([MCP_PROTOCOL_BASELINE_REVISION]),
     });
 
     const result = middleware.inspectRequest({
@@ -39,7 +48,7 @@ describe('T008: MCP protocol wiring & Streamable HTTP transport (AC-144, AC-251)
     // Default config: draft revision refused
     const defaultMiddleware = createMcpProtocolMiddleware({
       maxMessageBytes: MAXIMUM_REQUEST_BYTES,
-      allowedRevisions: [MCP_PROTOCOL_BASELINE_REVISION],
+      admission: governedAdmission([MCP_PROTOCOL_BASELINE_REVISION]),
     });
     const defaultResult = defaultMiddleware.inspectRequest({
       protocolRevision: '2026-draft-v2',
@@ -50,10 +59,13 @@ describe('T008: MCP protocol wiring & Streamable HTTP transport (AC-144, AC-251)
     expect(defaultResult.allowed).toBe(false);
     expect(defaultResult.reason).toBe('REVISION_UNSUPPORTED');
 
-    // Opt-in config: draft revision admitted
+    // Opt-in config: draft revision admitted (the resolver puts it in usableRevisions)
     const optInMiddleware = createMcpProtocolMiddleware({
       maxMessageBytes: MAXIMUM_REQUEST_BYTES,
-      allowedRevisions: [MCP_PROTOCOL_BASELINE_REVISION, '2026-draft-v2'],
+      admission: governedAdmission(
+        [MCP_PROTOCOL_BASELINE_REVISION, '2026-draft-v2'],
+        ['2026-draft-v2'],
+      ),
     });
     const optInResult = optInMiddleware.inspectRequest({
       protocolRevision: '2026-draft-v2',
@@ -68,6 +80,7 @@ describe('T008: MCP protocol wiring & Streamable HTTP transport (AC-144, AC-251)
     const { createMcpProtocolMiddleware } = await loadProtocolWiringModule();
     const middleware = createMcpProtocolMiddleware({
       maxMessageBytes: MAXIMUM_REQUEST_BYTES,
+      admission: governedAdmission([MCP_PROTOCOL_BASELINE_REVISION]),
     });
 
     const getResult = middleware.inspectRequest({
@@ -93,6 +106,7 @@ describe('T008: MCP protocol wiring & Streamable HTTP transport (AC-144, AC-251)
     const { createMcpProtocolMiddleware } = await loadProtocolWiringModule();
     const middleware = createMcpProtocolMiddleware({
       maxMessageBytes: MAXIMUM_REQUEST_BYTES,
+      admission: governedAdmission([MCP_PROTOCOL_BASELINE_REVISION]),
     });
 
     const result = middleware.inspectRequest({
@@ -109,6 +123,7 @@ describe('T008: MCP protocol wiring & Streamable HTTP transport (AC-144, AC-251)
     const { createMcpProtocolMiddleware } = await loadProtocolWiringModule();
     const middleware = createMcpProtocolMiddleware({
       maxMessageBytes: MAXIMUM_REQUEST_BYTES,
+      admission: governedAdmission([MCP_PROTOCOL_BASELINE_REVISION]),
     });
 
     for (const vector of SESSION_CLAIM_MISMATCH_VECTORS) {
@@ -134,6 +149,7 @@ describe('T008: MCP protocol wiring & Streamable HTTP transport (AC-144, AC-251)
     const { createMcpProtocolMiddleware } = await loadProtocolWiringModule();
     const middleware = createMcpProtocolMiddleware({
       maxMessageBytes: MAXIMUM_REQUEST_BYTES,
+      admission: governedAdmission([MCP_PROTOCOL_BASELINE_REVISION]),
     });
 
     // Valid cursor
@@ -170,5 +186,147 @@ describe('T008: MCP protocol wiring & Streamable HTTP transport (AC-144, AC-251)
     expect(correlated.jsonrpc).toBe('2.0');
     expect(correlated.id).toBe('corr-req-001');
     expect(correlated.result).toEqual(responsePayload);
+  });
+});
+
+/**
+ * V7-F9 fail-open: `McpProtocolWiring`'s constructor took free-form
+ * `mutuallyTestedRevisions`/`draftRevisions`/`optInDraftRevisions` and
+ * `createMcpProtocolMiddleware` forwarded a free-form `allowedRevisions`
+ * verbatim, so a caller could admit `'TOTALLY-UNREGISTERED-EVIL'`. The governed
+ * source of an allow-list is `resolveCompatibilityMatrix` /
+ * `resolveProtocolRevision` (`McpCompatibilityResolution.usableRevisions`).
+ */
+describe('V7 fail-open: MCP admission is governed, never caller-assembled (F9)', () => {
+  it('refuses the reviewer probe through the old free-form surfaces, still admits the baseline', async () => {
+    const { createMcpProtocolMiddleware, McpProtocolWiring } = await loadProtocolWiringModule();
+    // A JS caller still passing the removed free-form `allowedRevisions` has no
+    // admission at all — refused at construction.
+    expect(() =>
+      createMcpProtocolMiddleware({
+        maxMessageBytes: MAXIMUM_REQUEST_BYTES,
+        allowedRevisions: ['TOTALLY-UNREGISTERED-EVIL'],
+      } as never),
+    ).toThrow(/admission/);
+    expect(() =>
+      new McpProtocolWiring({
+        maximumRequestBytes: MAXIMUM_REQUEST_BYTES,
+        mutuallyTestedRevisions: ['TOTALLY-UNREGISTERED-EVIL'],
+      } as never),
+    ).toThrow(/admission/);
+
+    // A hand-assembled admission naming an unregistered revision is refused by
+    // the syntactic-revision law before any guard is built.
+    expect(() =>
+      new McpProtocolWiring({
+        maximumRequestBytes: MAXIMUM_REQUEST_BYTES,
+        admission: {
+          defaultRevision: MCP_PROTOCOL_BASELINE_REVISION,
+          usableRevisions: [MCP_PROTOCOL_BASELINE_REVISION, 'TOTALLY-UNREGISTERED-EVIL'],
+          optInRevisions: [],
+        },
+      } as never),
+    ).toThrow(/syntactically valid protocol revision/);
+
+    // CONTROL: a governed baseline admission still admits the baseline.
+    const middleware = createMcpProtocolMiddleware({
+      maxMessageBytes: MAXIMUM_REQUEST_BYTES,
+      admission: governedAdmission([MCP_PROTOCOL_BASELINE_REVISION]),
+    });
+    const result = middleware.inspectRequest({
+      protocolRevision: MCP_PROTOCOL_BASELINE_REVISION,
+      contentType: 'application/json',
+      method: 'POST',
+      messageBytes: 128,
+    });
+    expect(result.allowed).toBe(true);
+  });
+
+  it('accepts the real resolver shape, where opted-in drafts live OUTSIDE usableRevisions', async () => {
+    const { createMcpProtocolMiddleware } = await loadProtocolWiringModule();
+    // `resolveCompatibilityMatrix` returns `usableRevisions: [<baseline>]` and
+    // `optInRevisions: ['<draft>']` as DISJOINT lists; the adapter must admit
+    // their union, exactly like `resolveProtocolRevision`.
+    const middleware = createMcpProtocolMiddleware({
+      maxMessageBytes: MAXIMUM_REQUEST_BYTES,
+      admission: governedAdmission([MCP_PROTOCOL_BASELINE_REVISION], ['2026-draft-v2']),
+    });
+    const optedIn = middleware.inspectRequest({
+      protocolRevision: '2026-draft-v2',
+      contentType: 'application/json',
+      method: 'POST',
+      messageBytes: 64,
+    });
+    expect(optedIn.allowed).toBe(true);
+  });
+
+  it('fails closed on every malformed governed admission (typed TypeError)', async () => {
+    const { createMcpProtocolMiddleware } = await loadProtocolWiringModule();
+    const base = { maxMessageBytes: MAXIMUM_REQUEST_BYTES };
+    const cases: readonly unknown[] = [
+      { ...base, admission: undefined },
+      { ...base, admission: null },
+      { ...base, admission: 'baseline' },
+      // optInRevisions is not an array
+      {
+        ...base,
+        admission: {
+          defaultRevision: MCP_PROTOCOL_BASELINE_REVISION,
+          usableRevisions: [MCP_PROTOCOL_BASELINE_REVISION],
+          optInRevisions: '2026-draft-v2',
+        },
+      },
+      // opt-in entry that is not a syntactically valid protocol revision
+      {
+        ...base,
+        admission: governedAdmission([MCP_PROTOCOL_BASELINE_REVISION], ['TOTALLY-UNREGISTERED-EVIL']),
+      },
+      // duplicate opt-in entry
+      {
+        ...base,
+        admission: governedAdmission(
+          [MCP_PROTOCOL_BASELINE_REVISION],
+          ['2026-draft-v2', '2026-draft-v2'],
+        ),
+      },
+      // non-baseline default
+      {
+        ...base,
+        admission: {
+          defaultRevision: '2026-draft-v2',
+          usableRevisions: ['2026-draft-v2'],
+          optInRevisions: [],
+        },
+      },
+      // duplicate usable entry
+      {
+        ...base,
+        admission: governedAdmission([
+          MCP_PROTOCOL_BASELINE_REVISION,
+          MCP_PROTOCOL_BASELINE_REVISION,
+        ]),
+      },
+      // defaultRevision missing from usableRevisions ∪ optInRevisions
+      {
+        ...base,
+        admission: {
+          defaultRevision: MCP_PROTOCOL_BASELINE_REVISION,
+          usableRevisions: ['2026-01-01'],
+          optInRevisions: [],
+        },
+      },
+      // empty usableRevisions
+      {
+        ...base,
+        admission: {
+          defaultRevision: MCP_PROTOCOL_BASELINE_REVISION,
+          usableRevisions: [],
+          optInRevisions: [],
+        },
+      },
+    ];
+    for (const options of cases) {
+      expect(() => createMcpProtocolMiddleware(options as never)).toThrow(TypeError);
+    }
   });
 });

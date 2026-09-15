@@ -31,3 +31,4 @@ export * from './deployment-posture.ts';
 export * from './mcp-compat.ts';
 export * from './precomputed-alpha.ts';
 export * from './trust-boundary.ts';
+export { snapshotCallerInput } from './shadow-safe.ts';

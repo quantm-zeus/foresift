@@ -13,6 +13,7 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import {
   CLAIM_PROD_RULES,
+  promiseAllNumeric,
   CONFORMANCE_RULES,
   GATE_KINDS,
   PROD_RULES,
@@ -153,6 +154,54 @@ describe('PROD rule 3: MCP compatibility drift (AC-144)', () => {
     expect(checkMcpCompatibilityDrift(PROD_MCP_UNTESTED_CLAIM).passed).toBe(false);
     expect(checkMcpCompatibilityDrift(PROD_MCP_STALE_CLAIM).passed).toBe(false);
     expect(checkMcpCompatibilityDrift(PROD_MCP_FAILING_CLAIM).passed).toBe(false);
+  });
+});
+
+/**
+ * V7-F8 fail-open: the release rule certified a PASS cell from `result` +
+ * `liveTestDate` alone, while the DB resolver (`isMutuallyTested`) requires a
+ * passing conformance RUN whose `fixtureRef` matches the cell. A cell claiming
+ * PASS with no run/fixture reference therefore certified a default the server
+ * refuses to serve.
+ */
+describe('V7 fail-open: MCP compatibility requires conformance-run provenance (F8)', () => {
+  const cellBase = {
+    revision: '2025-11-25',
+    clientId: 'client-a',
+    result: 'PASS',
+    liveTestDate: '2026-05-01T00:00:00Z',
+    conformanceRunId: 'run-2025-11-25-client-a',
+    fixtureRef: 'fixture-client-a',
+  };
+  const claimFor = (cell: Record<string, unknown>) => ({
+    revisions: [{ revision: '2025-11-25', channel: 'STABLE', isDefault: true, supersededBy: null }],
+    clients: [{ clientId: 'client-a' }],
+    cells: [cell],
+    now: '2026-06-01T00:00:00Z',
+  });
+
+  it('(a) drifts a PASS cell whose conformanceRunId is missing or empty', () => {
+    const missing = checkMcpCompatibilityDrift(
+      claimFor({ ...cellBase, conformanceRunId: undefined }) as never,
+    );
+    expect(missing.passed).toBe(false);
+    expect(missing.findings.some((f) => f.rule === PROD_RULES.mcpCompatibilityDrift)).toBe(true);
+
+    const empty = checkMcpCompatibilityDrift(
+      claimFor({ ...cellBase, conformanceRunId: '' }) as never,
+    );
+    expect(empty.passed).toBe(false);
+    expect(empty.findings.some((f) => f.rule === PROD_RULES.mcpCompatibilityDrift)).toBe(true);
+  });
+
+  it('(b) drifts a PASS cell whose fixtureRef is missing or empty', () => {
+    const empty = checkMcpCompatibilityDrift(claimFor({ ...cellBase, fixtureRef: '' }) as never);
+    expect(empty.passed).toBe(false);
+    expect(empty.findings.some((f) => f.rule === PROD_RULES.mcpCompatibilityDrift)).toBe(true);
+  });
+
+  it('(c) CONTROL: a provenance-complete fresh PASS cell still passes', () => {
+    expect(checkMcpCompatibilityDrift(claimFor(cellBase) as never).passed).toBe(true);
   });
 });
 
@@ -306,6 +355,8 @@ describe('PROD conformance aggregation and unchanged trace rules', () => {
       clientId: 'client-a',
       result: 'PASS',
       liveTestDate: '2000-01-01T00:00:00Z',
+      conformanceRunId: 'run-2025-11-25-client-a',
+      fixtureRef: 'fixture-client-a',
     };
     const claim = {
       revisions: [
@@ -1719,7 +1770,7 @@ describe('NEW-N3: Promise.all argument arrays resist a surgical Symbol.iterator 
     expect(attacked.findings.map((finding) => finding.rule)).toContain(
       CONFORMANCE_RULES.activePath,
     );
-  });
+  }, 120_000);
 
   it('keeps the unshadowed controls: the failing corpus is FAILED and a conforming corpus is PASSED (N3)', async () => {
     const expectedGeneratedFiles = await generatedSnapshot();
@@ -1742,7 +1793,7 @@ describe('NEW-N3: Promise.all argument arrays resist a surgical Symbol.iterator 
     });
     expect(conforming.overall).toBe('PASSED');
     expect(conforming.findings.length).toBe(0);
-  });
+  }, 120_000);
 
   it('hashes the real document/manifest when the buildReleaseReport Promise.all ARGUMENT is forged (N3)', async () => {
     const options = {
@@ -1780,7 +1831,7 @@ describe('NEW-N3: Promise.all argument arrays resist a surgical Symbol.iterator 
     expect(attacked.manifestHash).toBe(baseline.manifestHash);
     expect(attacked.documentHash).not.toBe(SHA256_EMPTY);
     expect(attacked.manifestHash).not.toBe(SHA256_EMPTY);
-  });
+  }, 120_000);
 
   it('keeps migration/schema hashes when the hashFiles Promise.all ARGUMENT is forged (N3)', async () => {
     const options = {
@@ -1798,7 +1849,7 @@ describe('NEW-N3: Promise.all argument arrays resist a surgical Symbol.iterator 
     );
     expect(attacked.migrationHashes).toEqual(baseline.migrationHashes);
     expect(attacked.schemaHashes).toEqual(baseline.schemaHashes);
-  });
+  }, 120_000);
 
   async function createOrphanFixtureRepo(): Promise<string> {
     const root = await mkdtemp(path.join(tmpdir(), 'n3-orphan-'));
@@ -1843,7 +1894,7 @@ describe('NEW-N3: Promise.all argument arrays resist a surgical Symbol.iterator 
     } finally {
       await rm(root, { recursive: true, force: true });
     }
-  });
+  }, 120_000);
 
   it('still reports a real orphan when the inner 2-element Promise.all ARGUMENT is forged (N3)', async () => {
     const root = await createOrphanFixtureRepo();
@@ -1877,7 +1928,7 @@ describe('NEW-N3: Promise.all argument arrays resist a surgical Symbol.iterator 
     } finally {
       await rm(root, { recursive: true, force: true });
     }
-  });
+  }, 120_000);
 });
 
 /**
@@ -1930,6 +1981,297 @@ describe('R12: the release-side import-shadow authority resists a module-init fi
 });
 
 /**
+ * V7 accessor class: a caller object whose property is a getter must not be able
+ * to present one value to an authorization/validity check and a different value
+ * to the value that is consumed or persisted.
+ */
+describe('V7: caller accessors cannot flip a release-gate decision', () => {
+  it('binds options.requirements once, so a getter cannot skip the PROD block (V7-A1)', async () => {
+    let reads = 0;
+    const options = {
+      repoRoot: REPO_ROOT,
+      milestone: 'G2',
+      get requirements() {
+        reads += 1;
+        return reads === 1 ? [] : undefined;
+      },
+      prodClaims: {
+        activationClaims: [PROD_ACTIVE_WITHOUT_GATE_CLAIM],
+        postureDeclarations: [],
+        mcpCompatibility: PROD_MCP_COMPLIANT_CLAIM,
+        livePaths: [],
+        distributionAuthorizations: [],
+      },
+    };
+    const result = await evaluateConformance(options as never);
+    // The snapshot reads `requirements` once; the authoritative manifest still
+    // decides ownership, so the PROD block runs and the violating claim FAILS.
+    expect(reads).toBe(1);
+    expect(result.overall).toBe('FAILED');
+    const rules = new Set(result.findings.map((finding) => finding.rule));
+    expect(rules).toContain(PROD_RULES.activationWithoutEvidence);
+  }, 120_000);
+
+  it('refuses a class-instance options carrier instead of reading its live getters (V7 round 6)', async () => {
+    // A class getter lives on the PROTOTYPE, so an own-property scan misses it.
+    // The first cut of the systemic fix passed class instances through by
+    // reference, re-opening the release-gate FAILED -> PASSED downgrade.
+    class OptionsCarrier {
+      readonly repoRoot = REPO_ROOT;
+      readonly milestone = 'G2';
+      readonly prodClaims = {
+        activationClaims: [PROD_ACTIVE_WITHOUT_GATE_CLAIM],
+        postureDeclarations: [],
+        mcpCompatibility: PROD_MCP_COMPLIANT_CLAIM,
+        livePaths: [],
+        distributionAuthorizations: [],
+      };
+      requirementsReads = 0;
+      get requirements(): unknown {
+        this.requirementsReads += 1;
+        return this.requirementsReads === 1 ? [] : undefined;
+      }
+    }
+    const carrier = new OptionsCarrier();
+    const result = await evaluateConformance(carrier as never);
+    expect(result.overall).toBe('FAILED');
+    // The non-plain carrier is refused BEFORE any property read, so the live
+    // prototype getter never runs (the pass-through cut read it).
+    expect(carrier.requirementsReads).toBe(0);
+  }, 120_000);
+
+  it('refuses a getPrototypeOf-trap Proxy carrier (V7 round 6)', async () => {
+    const target: Record<string, unknown> = {
+      repoRoot: REPO_ROOT,
+      milestone: 'G2',
+      prodClaims: {
+        activationClaims: [PROD_ACTIVE_WITHOUT_GATE_CLAIM],
+        postureDeclarations: [],
+        mcpCompatibility: PROD_MCP_COMPLIANT_CLAIM,
+        livePaths: [],
+        distributionAuthorizations: [],
+      },
+    };
+    let reads = 0;
+    Object.defineProperty(target, 'requirements', {
+      enumerable: true,
+      configurable: true,
+      get() {
+        reads += 1;
+        return reads === 1 ? [] : undefined;
+      },
+    });
+    const trapped = new Proxy(target, {
+      getPrototypeOf: () => class Trap {}.prototype,
+    });
+    const result = await evaluateConformance(trapped as never);
+    expect(result.overall).toBe('FAILED');
+    expect(reads).toBe(0);
+  }, 120_000);
+
+  it('refuses a getPrototypeOf-trap Proxy claiming Uint8Array.prototype (V7 round 7)', async () => {
+    const target: Record<string, unknown> = {
+      repoRoot: REPO_ROOT,
+      milestone: 'G2',
+      prodClaims: {
+        activationClaims: [PROD_ACTIVE_WITHOUT_GATE_CLAIM],
+        postureDeclarations: [],
+        mcpCompatibility: PROD_MCP_COMPLIANT_CLAIM,
+        livePaths: [],
+        distributionAuthorizations: [],
+      },
+    };
+    let reads = 0;
+    Object.defineProperty(target, 'requirements', {
+      enumerable: true,
+      configurable: true,
+      get() {
+        reads += 1;
+        return [];
+      },
+    });
+    // A Proxy has no typed-array internal slot, so the captured length getter
+    // fails and the carrier is refused rather than copied by reference.
+    const trapped = new Proxy(target, { getPrototypeOf: () => Uint8Array.prototype });
+    const result = await evaluateConformance(trapped as never);
+    expect(result.overall).toBe('FAILED');
+    expect(reads).toBe(0);
+  }, 120_000);
+
+  it('fails closed when Array.prototype carries an integer-index accessor (V7 round 7)', () => {
+    // An index setter swallows `array[array.length] = value`, the numeric-append
+    // pattern used by the authority collectors, so a FAILED verdict could read
+    // as PASSED. The snapshot boundary detects it and fails closed.
+    Object.defineProperty(Array.prototype, '0', { configurable: true, set() {} });
+    try {
+      const report = evaluateProdConformance({
+        activationClaims: [PROD_ACTIVE_WITHOUT_GATE_CLAIM],
+        postureDeclarations: [],
+        mcpCompatibility: PROD_MCP_COMPLIANT_CLAIM,
+        livePaths: [],
+        distributionAuthorizations: [],
+      });
+      expect(report.overall).toBe('FAILED');
+    } finally {
+      delete (Array.prototype as unknown as Record<string, unknown>)['0'];
+    }
+  }, 120_000);
+
+  it('fails closed when an INHERITED prototype carries an integer-index accessor (V7 round 8)', () => {
+    Object.defineProperty(Object.prototype, '0', { configurable: true, set() {} });
+    try {
+      const report = evaluateProdConformance({
+        activationClaims: [PROD_ACTIVE_WITHOUT_GATE_CLAIM],
+        postureDeclarations: [],
+        mcpCompatibility: PROD_MCP_COMPLIANT_CLAIM,
+        livePaths: [],
+        distributionAuthorizations: [],
+      });
+      expect(report.overall).toBe('FAILED');
+    } finally {
+      delete (Object.prototype as unknown as Record<string, unknown>)['0'];
+    }
+  }, 120_000);
+
+  it('fails closed when Array.prototype inherits an integer-index accessor (V7 round 8)', () => {
+    const original = Object.getPrototypeOf(Array.prototype) as object;
+    const hostile = Object.create(original) as Record<string, unknown>;
+    Object.defineProperty(hostile, '0', { configurable: true, set() {} });
+    Object.setPrototypeOf(Array.prototype, hostile);
+    try {
+      const report = evaluateProdConformance({
+        activationClaims: [PROD_ACTIVE_WITHOUT_GATE_CLAIM],
+        postureDeclarations: [],
+        mcpCompatibility: PROD_MCP_COMPLIANT_CLAIM,
+        livePaths: [],
+        distributionAuthorizations: [],
+      });
+      expect(report.overall).toBe('FAILED');
+    } finally {
+      Object.setPrototypeOf(Array.prototype, original);
+    }
+  }, 120_000);
+
+  it('fails closed when a hostile index accessor sits beyond a long prototype chain (V7 round 9)', () => {
+    const originalArrayProto = Object.getPrototypeOf(Array.prototype) as object;
+    const hostile = Object.create(null) as Record<string, unknown>;
+    Object.defineProperty(hostile, '0', { configurable: true, set() {} });
+    let chain: object = hostile;
+    for (let hop = 0; hop < 40; hop += 1) chain = Object.create(chain) as object;
+    Object.setPrototypeOf(Array.prototype, chain);
+    try {
+      const report = evaluateProdConformance({
+        activationClaims: [PROD_ACTIVE_WITHOUT_GATE_CLAIM],
+        postureDeclarations: [],
+        mcpCompatibility: PROD_MCP_COMPLIANT_CLAIM,
+        livePaths: [],
+        distributionAuthorizations: [],
+      });
+      expect(report.overall).toBe('FAILED');
+    } finally {
+      Object.setPrototypeOf(Array.prototype, originalArrayProto);
+    }
+  }, 120_000);
+
+  it('fails closed when Array.prototype inherits a swallowing Proxy (V7 round 9)', () => {
+    const originalArrayProto = Object.getPrototypeOf(Array.prototype) as object;
+    const hostile = new Proxy(Object.create(null) as object, {
+      set: () => true,
+    });
+    Object.setPrototypeOf(Array.prototype, hostile);
+    try {
+      const report = evaluateProdConformance({
+        activationClaims: [PROD_ACTIVE_WITHOUT_GATE_CLAIM],
+        postureDeclarations: [],
+        mcpCompatibility: PROD_MCP_COMPLIANT_CLAIM,
+        livePaths: [],
+        distributionAuthorizations: [],
+      });
+      expect(report.overall).toBe('FAILED');
+    } finally {
+      Object.setPrototypeOf(Array.prototype, originalArrayProto);
+    }
+  }, 120_000);
+
+  it('defines settled-promise entries as own properties, immune to a deep-chain accessor (V7 round 10)', async () => {
+    const originalArrayProto = Object.getPrototypeOf(Array.prototype) as object;
+    const hostile = Object.create(null) as Record<string, unknown>;
+    for (let index = 0; index < 4; index += 1) {
+      Object.defineProperty(hostile, String(index), {
+        configurable: true,
+        get() {
+          return 'FABRICATED';
+        },
+        set() {},
+      });
+    }
+    let chain: object = hostile;
+    for (let hop = 0; hop < 40; hop += 1) chain = Object.create(chain) as object;
+    Object.setPrototypeOf(Array.prototype, chain);
+    try {
+      const settled = await promiseAllNumeric([Promise.resolve('A'), Promise.resolve('B')]);
+      // `appendSafe` creates own data properties, so the inherited accessor
+      // cannot swallow the entries or fabricate their values.
+      expect(settled.length).toBe(2);
+      expect(settled[0]).toBe('A');
+      expect(settled[1]).toBe('B');
+    } finally {
+      Object.setPrototypeOf(Array.prototype, originalArrayProto);
+    }
+  }, 120_000);
+
+  it('evaluates the VALIDATED milestone, so a getter cannot downgrade G2 to G0 (V7 round 9)', async () => {
+    let reads = 0;
+    const options = {
+      repoRoot: REPO_ROOT,
+      get milestone(): string {
+        reads += 1;
+        return reads === 1 ? 'G2' : 'G0';
+      },
+      prodClaims: {
+        activationClaims: [PROD_ACTIVE_WITHOUT_GATE_CLAIM],
+        postureDeclarations: [],
+        mcpCompatibility: PROD_MCP_COMPLIANT_CLAIM,
+        livePaths: [],
+        distributionAuthorizations: [],
+      },
+    };
+    const result = await evaluateConformance(options as never);
+    expect(result.overall).toBe('FAILED');
+    expect(result.findings.map((finding) => finding.rule)).toContain(
+      PROD_RULES.activationWithoutEvidence,
+    );
+  }, 120_000);
+
+  it('binds each claim field once, so a getter cannot hide a violation (V7-A8)', () => {
+    let reads = 0;
+    const claims = [PROD_ACTIVE_WITHOUT_GATE_CLAIM];
+    // Define the getter on the FINAL object: object spread would evaluate it
+    // once at construction and copy a plain value.
+    const input: Record<string, unknown> = {
+      postureDeclarations: [],
+      mcpCompatibility: PROD_MCP_COMPLIANT_CLAIM,
+      livePaths: [],
+      distributionAuthorizations: [],
+    };
+    Object.defineProperty(input, 'activationClaims', {
+      enumerable: true,
+      configurable: true,
+      get() {
+        reads += 1;
+        return reads === 1 ? claims : 'not-an-array';
+      },
+    });
+    const report = evaluateProdConformance(input as never);
+    expect(reads).toBe(1);
+    expect(report.overall).toBe('FAILED');
+    expect(
+      report.findings.some((finding) => finding.rule === PROD_RULES.activationWithoutEvidence),
+    ).toBe(true);
+  }, 120_000);
+});
+
+/**
  * M1 (fifth-round convergence audit). The release-gate finding MESSAGES were
  * still built with `Array.prototype.join`; a `join` shadow returning a
  * non-string made the message template throw, turning a clean FAILED verdict
@@ -1959,5 +2301,71 @@ describe('M1: release-gate finding messages survive a join shadow', () => {
     }
     expect(error).toBeNull();
     expect(result?.overall).toBe('FAILED');
+  }, 120_000);
+});
+
+/**
+ * Seventh-round emergency correction (V7-C1/N3, V7-NF2, V7-NF3). Each test is a
+ * discriminating regression: it was verified to FAIL against the frozen base
+ * `27c12c8` and PASS after the bounded fix.
+ */
+describe('V7: release-gate totality, PROD-claim reachability and superseded defaults', () => {
+  it('never throws on malformed/sparse claim elements and fails the report closed (V7-NF2)', () => {
+    const cases: readonly Record<string, unknown>[] = [
+      { postureDeclarations: [undefined] },
+      { livePaths: [undefined] },
+      { mcpCompatibility: { ...PROD_MCP_COMPLIANT_CLAIM, revisions: [undefined] } },
+      { mcpCompatibility: { ...PROD_MCP_COMPLIANT_CLAIM, clients: [undefined] } },
+      { mcpCompatibility: { ...PROD_MCP_COMPLIANT_CLAIM, cells: [undefined] } },
+    ];
+    for (let index = 0; index < cases.length; index += 1) {
+      const input = cases[index] as Record<string, unknown>;
+      let report: { readonly overall?: string } | undefined;
+      let error: unknown = null;
+      try {
+        report = evaluateProdConformance(input as Parameters<typeof evaluateProdConformance>[0]);
+      } catch (thrown) {
+        error = thrown;
+      }
+      expect(error).toBeNull();
+      expect(report?.overall).toBe('FAILED');
+    }
+  }, 120_000);
+
+  it('refuses a superseded STABLE revision as the compatibility default (V7-NF3)', () => {
+    const base = PROD_MCP_COMPLIANT_CLAIM.revisions[0];
+    expect(base).toBeDefined();
+    const superseded: typeof PROD_MCP_COMPLIANT_CLAIM = {
+      ...PROD_MCP_COMPLIANT_CLAIM,
+      revisions: PROD_MCP_COMPLIANT_CLAIM.revisions.map((row, index) =>
+        index === 0 ? { ...row, supersededBy: '2025-12-01' } : row,
+      ),
+    };
+    const report = checkMcpCompatibilityDrift(superseded);
+    expect(report.passed).toBe(false);
+    expect(report.findings.some((finding) => finding.message.includes('superseded'))).toBe(true);
+    // The unmodified compliant claim still passes (no over-refusal control).
+    expect(checkMcpCompatibilityDrift(PROD_MCP_COMPLIANT_CLAIM).passed).toBe(true);
+  }, 120_000);
+
+  it('evaluates supplied PROD claims even for a milestone that owns no FR-PROD law (V7-C1/N3)', async () => {
+    const result = await evaluateConformance({
+      repoRoot: REPO_ROOT,
+      milestone: 'G0',
+      prodClaims: {
+        activationClaims: [PROD_ACTIVE_WITHOUT_GATE_CLAIM],
+        postureDeclarations: [PROD_BEST_EFFORT_WEAKENING],
+        mcpCompatibility: PROD_MCP_DRAFT_DEFAULT_CLAIM,
+        livePaths: [PROD_LIVE_PATH_NO_BOUND_CLAIM],
+        distributionAuthorizations: [PROD_PUBLIC_AUTHORIZED_MISSING_CLAIM],
+      },
+    });
+    expect(result.overall).toBe('FAILED');
+    const rules = new Set(result.findings.map((finding) => finding.rule));
+    expect(rules).toContain(PROD_RULES.activationWithoutEvidence);
+    expect(rules).toContain(PROD_RULES.postureWeakening);
+    expect(rules).toContain(PROD_RULES.mcpCompatibilityDrift);
+    expect(rules).toContain(PROD_RULES.livePathPrecomputationViolation);
+    expect(rules).toContain(PROD_RULES.publicAuthorizationWithoutGateEvidence);
   }, 120_000);
 });

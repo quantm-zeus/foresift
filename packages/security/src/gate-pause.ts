@@ -135,7 +135,15 @@ export class GatePauses {
    * its ledger event and re-evaluation marker, even under partial failure or
    * a ledger-ID collision.
    */
-  async resume(input: ResumeInput): Promise<PauseRow> {
+  async resume(rawInput: ResumeInput): Promise<PauseRow> {
+    // Single-read binding: the UPDATE target, the ledger event id and the audit
+    // reference must all come from the same read (V7 accessor class).
+    const input: ResumeInput = {
+      pauseId: rawInput.pauseId,
+      resumedByActor: rawInput.resumedByActor,
+      resumedAt: rawInput.resumedAt,
+      auditRef: rawInput.auditRef,
+    };
     if (input.auditRef.trim() === '') {
       throw new GatePauseError(
         'resume requires the audit reference of its explicit approval',
@@ -215,13 +223,23 @@ export class GatePauses {
    * are the only ledger rows whose snapshot reference is a genuine approved-
    * set anchor; resume/rollback events carry audit refs instead.
    */
-  async rollbackRestore(input: {
+  async rollbackRestore(rawInput: {
     eventId: string;
     restoreOfEventId: string;
     scope: string;
     at: UtcTimestamp;
     actor: string;
   }): Promise<ActivationRow> {
+    // Single-read binding: the scope cross-check and the persisted restore must
+    // see the same scope, and the ledger event must reference the same prior
+    // event that was approved (V7 accessor class).
+    const input = {
+      eventId: rawInput.eventId,
+      restoreOfEventId: rawInput.restoreOfEventId,
+      scope: rawInput.scope,
+      at: rawInput.at,
+      actor: rawInput.actor,
+    };
     const prior = await this.engine.query<ActivationRow>(
       'SELECT * FROM sec.activation_events WHERE event_id = $1',
       [input.restoreOfEventId],

@@ -31,7 +31,14 @@ import {
 import type { UtcTimestamp } from '@foresift/domain';
 import { AuditChainError } from './errors.ts';
 import { evaluateCsrf, type CsrfEvaluationInput } from './csrf.ts';
-import { numericCopy, numericIncludes, numericUnique, parseDecision } from './shadow-safe.ts';
+import {
+  appendSafe,
+  numericCopy,
+  numericIncludes,
+  numericUnique,
+  parseDecision,
+  snapshotCallerInput,
+} from './shadow-safe.ts';
 import type { AuditChain } from './audit-chain.ts';
 
 /** Injected clock seam — epoch milliseconds source. */
@@ -94,33 +101,42 @@ export class ActionGate {
   private readonly auditHealthBlocked: (() => Promise<boolean> | boolean) | undefined;
 
   constructor(options: ActionGateOptions = {}) {
+    // Each option is read exactly ONCE below and the fields are independent,
+    // so no snapshot is required (and `auditChain` is a branded class instance
+    // that must NOT be passed through `snapshotCallerInput`).
     this.auditChain = options.auditChain;
     this.clock = options.clock ?? systemClock;
     this.auditHealthBlocked = options.auditHealthBlocked;
   }
 
-  async evaluateHighImpactAction(request: HighImpactActionRequest): Promise<ActionGateDecision> {
+  async evaluateHighImpactAction(rawRequest: HighImpactActionRequest): Promise<ActionGateDecision> {
+    // Single-read binding (V7 accessor class): a plain object with getters, a
+    // Proxy, or a class instance could otherwise present `action`/`actor`/`csrf`
+    // values that pass the checks and DIFFERENT values to the decision/audit —
+    // an authorized actor's scope could be swapped for `admin:high:kill-switch`
+    // or the ALLOW attributed to another actor.
+    const request = snapshotCallerInput(rawRequest);
     const evaluatedAt = new Date(this.clock()).toISOString().replace('.000Z', 'Z') as UtcTimestamp;
     const reasons: ActionGateRefusalReason[] = [];
 
     // Fail-closed symmetric with every sibling dimension: an ABSENT csrf
     // field is missing protection, not passed validation (AC-274).
     if (request.csrf === undefined || !evaluateCsrf(request.csrf).valid) {
-      reasons[reasons.length] = 'CSRF_INVALID';
+      appendSafe(reasons, 'CSRF_INVALID');
     }
     if ((request.idempotencyKey ?? '').length === 0) {
-      reasons[reasons.length] = 'IDEMPOTENCY_KEY_MISSING';
+      appendSafe(reasons, 'IDEMPOTENCY_KEY_MISSING');
     }
     if ((request.reasonEntry ?? '').length === 0) {
-      reasons[reasons.length] = 'REASON_MISSING';
+      appendSafe(reasons, 'REASON_MISSING');
     }
     if (!numericIncludes(request.authorizedScopes, request.action)) {
-      reasons[reasons.length] = 'SCOPE_MISMATCH';
+      appendSafe(reasons, 'SCOPE_MISMATCH');
     }
 
     const proof = request.stepUpProof;
     if (proof === undefined) {
-      reasons[reasons.length] = 'STEP_UP_MISSING';
+      appendSafe(reasons, 'STEP_UP_MISSING');
     } else {
       const nowMs = this.clock();
       const completedMs = Date.parse(proof.completedAt);
@@ -133,7 +149,7 @@ export class ActionGate {
         ageSeconds > request.policy.freshnessWindowSeconds ||
         completedMs > nowMs + PROOF_CLOCK_SKEW_TOLERANCE_MS
       ) {
-        reasons[reasons.length] = 'STEP_UP_STALE';
+        appendSafe(reasons, 'STEP_UP_STALE');
       }
       if (
         proof.authenticatorClass === undefined ||
@@ -141,16 +157,16 @@ export class ActionGate {
         (request.policy.requireUserPresence && !proof.userPresence) ||
         (request.policy.requireUserVerification && !proof.userVerification)
       ) {
-        reasons[reasons.length] = 'AUTHENTICATOR_CLASS_INSUFFICIENT';
+        appendSafe(reasons, 'AUTHENTICATOR_CLASS_INSUFFICIENT');
       }
       // The proof must belong to the acting principal.
       if (proof.actor !== request.actor) {
-        reasons[reasons.length] = 'STEP_UP_MISSING';
+        appendSafe(reasons, 'STEP_UP_MISSING');
       }
     }
 
     if (this.auditHealthBlocked !== undefined && (await this.auditHealthBlocked())) {
-      reasons[reasons.length] = 'AUDIT_HEALTH_BLOCKED';
+      appendSafe(reasons, 'AUDIT_HEALTH_BLOCKED');
     }
 
     let decision: ActionGateDecision;

@@ -1,4 +1,5 @@
 /** Product-source orphan detection and its requirement-traced exception ledger. */
+import { appendSafe } from './shadow-safe.ts';
 import { readFile, readdir } from 'node:fs/promises';
 import path from 'node:path';
 import { implementationPath, type RequirementMapping } from './conformance.ts';
@@ -50,9 +51,9 @@ export function validateOrphanExceptionLedger(
     return { valid: false, errors: ['ledger must be an object'] };
   }
   const candidate = ledger as Partial<OrphanExceptionLedger>;
-  if (candidate.schemaVersion !== '1.0.0') errors[errors.length] = 'schemaVersion must equal 1.0.0';
+  if (candidate.schemaVersion !== '1.0.0') appendSafe(errors, 'schemaVersion must equal 1.0.0');
   if (!Array.isArray(candidate.exceptions)) {
-    errors[errors.length] = 'exceptions must be an array';
+    appendSafe(errors, 'exceptions must be an array');
     return { valid: false, errors };
   }
   const patterns = new Set<string>();
@@ -63,18 +64,18 @@ export function validateOrphanExceptionLedger(
     const entry = candidate.exceptions[entryIndex] as OrphanException;
     const prefix = `exceptions[${entryIndex}]`;
     if (entry === null || typeof entry !== 'object') {
-      errors[errors.length] = `${prefix} must be an object`;
+      appendSafe(errors, `${prefix} must be an object`);
       continue;
     }
     if (typeof entry.pathPattern !== 'string' || entry.pathPattern.trim().length === 0) {
-      errors[errors.length] = `${prefix}.pathPattern must be non-empty`;
+      appendSafe(errors, `${prefix}.pathPattern must be non-empty`);
     } else {
       const segments = entry.pathPattern.split('/');
       if (path.isAbsolute(entry.pathPattern) || numericIncludes(segments, '..')) {
-        errors[errors.length] = `${prefix}.pathPattern must be repository-relative`;
+        appendSafe(errors, `${prefix}.pathPattern must be repository-relative`);
       }
       if (patterns.has(entry.pathPattern))
-        errors[errors.length] = `${prefix}.pathPattern is duplicated`;
+        appendSafe(errors, `${prefix}.pathPattern is duplicated`);
       patterns.add(entry.pathPattern);
     }
     let servingIdsValid =
@@ -89,20 +90,22 @@ export function validateOrphanExceptionLedger(
       }
     }
     if (!servingIdsValid) {
-      errors[errors.length] = `${prefix}.servingRequirementIds must contain valid requirement IDs`;
+      appendSafe(errors, `${prefix}.servingRequirementIds must contain valid requirement IDs`);
     } else if (knownRequirementIds !== undefined) {
       const unknownIds: string[] = [];
       for (let idIndex = 0; idIndex < entry.servingRequirementIds.length; idIndex += 1) {
         const requirementId = entry.servingRequirementIds[idIndex] as string;
-        if (!knownRequirementIds.has(requirementId)) unknownIds[unknownIds.length] = requirementId;
+        if (!knownRequirementIds.has(requirementId)) appendSafe(unknownIds, requirementId);
       }
       if (unknownIds.length > 0) {
-        errors[errors.length] =
-          `${prefix}.servingRequirementIds names unknown requirements: ${unknownIds.join(', ')}`;
+        appendSafe(
+          errors,
+          `${prefix}.servingRequirementIds names unknown requirements: ${unknownIds.join(', ')}`,
+        );
       }
     }
     if (typeof entry.justification !== 'string' || entry.justification.trim().length === 0) {
-      errors[errors.length] = `${prefix}.justification must be non-empty`;
+      appendSafe(errors, `${prefix}.justification must be non-empty`);
     }
   }
   return { valid: errors.length === 0, errors };
@@ -157,7 +160,7 @@ async function collectProductFiles(repoRoot: string): Promise<readonly string[]>
       const relative = path.posix.join(relativeDirectory, entry.name);
       if (entry.isDirectory()) await visit(relative);
       else if (entry.isFile() && PRODUCT_SOURCE_EXTENSION.test(entry.name))
-        result[result.length] = relative;
+        appendSafe(result, relative);
     }
   };
   const topLevels = ['apps', 'packages'];
@@ -200,7 +203,7 @@ async function loadManifestTraceMappings(repoRoot: string): Promise<ManifestTrac
     const requirement = manifest.requirements[index] as RequirementMapping;
     const refs = requirement.implementationRefs ?? [];
     for (let refIndex = 0; refIndex < refs.length; refIndex += 1) {
-      implementationRefs[implementationRefs.length] = refs[refIndex] as string;
+      appendSafe(implementationRefs, refs[refIndex] as string);
     }
     requirementIds.add(requirement.id);
   }
@@ -236,11 +239,11 @@ function evaluateOrphans(
   for (let fileIndex = 0; fileIndex < productFiles.length; fileIndex += 1) {
     const file = productFiles[fileIndex] as string;
     if (numericSome(implementationPatterns, (pattern) => matchesRepositoryGlob(file, pattern))) {
-      mappedProductFiles[mappedProductFiles.length] = file;
+      appendSafe(mappedProductFiles, file);
     } else if (numericSome(exceptions, (entry) => matchesRepositoryGlob(file, entry.pathPattern))) {
-      exemptedOrphans[exemptedOrphans.length] = file;
+      appendSafe(exemptedOrphans, file);
     } else {
-      unexemptedOrphans[unexemptedOrphans.length] = file;
+      appendSafe(unexemptedOrphans, file);
     }
   }
   return {

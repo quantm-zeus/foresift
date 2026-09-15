@@ -778,3 +778,57 @@ CRITICAL/HIGH remained open.
       `prod.module_states.scope` (or make `foresift_prod_scope_hash` refuse
       extra keys) so the scope hash is injective over the canonical seven keys.
       Traces: FR-PROD-001, AC-152.
+
+## Phase 15 — Seventh-round emergency correction (withdraw `27c12c8` PROVEN)
+
+- [x] T089 [serial-reason: COORDINATOR_BOUNDARY] Withdraw the sixth-round
+      PROVEN proof: `g2-production-readiness` `PROVEN -> RUNNING`, append the
+      seventh-round reopen record to `emergency-correction.md`, and freeze
+      `g2-admin-control` / `g2-recovery-continuity` promotion. Preserve every
+      prior commit, review and evidence artefact; erase nothing. Traces:
+      FR-PROD-001…006.
+- [x] T090 [serial-reason: COORDINATOR_BOUNDARY] Fresh-context, read-only
+      adversarial re-derivation of the full C1–C3 / H1–H10 / R1–R13 /
+      V6-1–V6-3 finding set against the frozen base `27c12c8`, with disjoint
+      finding sets per verifier and no access to the correction ledger, task
+      names or prior verdicts. Each verifier must cite current file:line
+      evidence and a concrete reproduction. Traces: FR-PROD-001…006.
+      **DONE** — six verifiers (five adversarial + one mutation-based
+      test-quality) returned: no original CRITICAL/HIGH reproduced; F4 (HIGH
+      fail-open), F1 (CRITICAL self-referential pepper), F7 (MEDIUM fail-open),
+      C1/N3 (HIGH gate downgrade) and NF2/NF-2/NF-3/NF-4 reproduced.
+- [x] T091 [serial-reason: SEMANTIC_DEPENDENCY] Fix every finding that
+      reproduces under T090 as a bounded corrective slice, each with a
+      discriminating negative regression that fails on `27c12c8`. **DONE** —
+      `activation-gate.ts` (F4 finiteness, F1 deployment-configured key +
+      branded `verifyGateEvidence` with no key parameter),
+      `release-report.ts` (F7), `conformance.ts` + `cli.mjs` (C1/N3),
+      `activation-gate.ts` batch fingerprint (NF2), `prod-rules.ts`
+      (NF-2/NF-3/NF-4). Mutation-checked: F4 → 1 fail, NF2 → 1 fail, F7 → 1
+      fail, C1/N3 → 1 fail with the guard reverted; all pass at the fix head.
+- [x] T092 [executor: TEST] Exploit/regression suite for T091 plus a fresh
+      additive-upgrade-path test from a database migrated to a pre-prod-`main`
+      revision; both must be non-vacuous (they fail on the un-fixed base).
+      **DONE** — new persisted-evidence binding tests (kind, event,
+      `evaluationSetRef`, completeness, duplicate row, expiry), SQL trigger
+      tests (expiry / exactly-one-PASS / cross-kind), malformed-instant and
+      blank-only event tests, release-report/CLI/prod-rule regressions. The
+      upgrade-path test `packages/persistence/test/migrator.spec.ts` (pre-prod
+      `main` → full set, fingerprint equality) is re-run green; verifier C3
+      independently reproduced it (76 pre-applied, exactly 10 `g2_prod_*`
+      applied, in-family gap still refused).
+      **Scope exception (seventh round, emergency):** the fresh-context reviews
+      found the same caller-accessor class in `packages/security/src/gate-pause.ts`
+      (`GatePauses.rollbackRestore` checked one scope and persisted another;
+      `resume` derived its ledger event id from a second `pauseId` read) — the
+      AC-279 rollback path this package's governance consumes. The emergency
+      correction therefore touches exactly `packages/security/src/gate-pause.ts`
+      and `packages/security/test/gate-pause.spec.ts` (exact paths only, single
+      writer) to bind those fields once, recorded here rather than silently
+      widening the declared writeScopes.
+- [ ] T093 [serial-reason: COORDINATOR_BOUNDARY] Fresh-context adversarial
+      review of the final diff, then the full prescribed gates and exact-SHA
+      CI. Traces: FR-PROD-001…006.
+- [ ] T094 [serial-reason: COORDINATOR_BOUNDARY] Restore PROVEN **only** if
+      T090–T093 leave no CRITICAL/HIGH finding, the upgrade path passes and CI
+      is green; otherwise leave RUNNING and record the residue.

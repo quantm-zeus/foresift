@@ -15,7 +15,7 @@ import {
   type ActivationGateKind,
   type SustainableCapacityContract,
 } from '@foresift/domain';
-import { createGateEvidence } from '@foresift/release-conformance';
+import { computeGatePayloadHash, createGateEvidence } from '@foresift/release-conformance';
 import {
   applyMigrations,
   createEngine,
@@ -58,6 +58,9 @@ import {
   smallestAffectedScope,
   stateRowsFor,
   statesFor,
+  snapshotCallerInput,
+  GATE_EVIDENCE_PEPPER_ENV,
+  verifyGateEvidence,
   type ActivationGateInput,
   type ActivationGateResult,
   type ModuleStateScope,
@@ -76,6 +79,9 @@ const PAST = '2025-01-01T00:00:00Z';
 const HASH_A = `sha256:${'a'.repeat(64)}`;
 const HASH_B = `sha256:${'b'.repeat(64)}`;
 const PEPPER = 'test-pepper';
+// Deployment verification key for this test realm (V7-F1): set as deployment
+// configuration, never passed to the verification boundary.
+process.env[GATE_EVIDENCE_PEPPER_ENV] = PEPPER;
 
 let db: PGlite;
 let engine: DatabaseEngine;
@@ -216,7 +222,7 @@ function passingGateEvidence(
     },
     PEPPER,
   );
-  return { record, pepper: PEPPER };
+  return verifyGateEvidence({ record, requiredScope: scopeHash, currentTime: NOW });
 }
 
 async function gatePass(
@@ -328,8 +334,28 @@ async function advance(
     | 'PAUSED'
     | 'DISABLED',
   stateRowId: string,
-  options: { readonly gateResult?: ActivationGateResult | null; readonly hash?: string } = {},
+  options: {
+    readonly gateResult?: ActivationGateResult | null;
+    readonly hash?: string;
+    readonly at?: string;
+    readonly provenEvidenceRef?: string | null;
+    readonly provenEvidenceEventRef?: string | null;
+  } = {},
 ) {
+  let proven: { provenEvidenceRef?: string; provenEvidenceEventRef?: string } = {};
+  if (toState === 'PROVEN') {
+    if (
+      typeof options.provenEvidenceRef === 'string' &&
+      typeof options.provenEvidenceEventRef === 'string'
+    ) {
+      proven = {
+        provenEvidenceRef: options.provenEvidenceRef,
+        provenEvidenceEventRef: options.provenEvidenceEventRef,
+      };
+    } else {
+      proven = await provenEvidenceFor(scope, `${stateRowId}-proven-evidence`);
+    }
+  }
   return advanceState(engine, {
     moduleId,
     scope,
@@ -340,11 +366,9 @@ async function advance(
     changeClassification: 'MATERIAL_OPERATIONAL',
     reason: `advance to ${toState}`,
     actorRef: 'test-actor',
-    at: NOW,
+    at: options.at ?? NOW,
     gateResult: options.gateResult ?? null,
-    ...(toState === 'PROVEN'
-      ? await provenEvidenceFor(scope, `${stateRowId}-proven-evidence`)
-      : {}),
+    ...proven,
     stateRowId,
     transitionId: `${stateRowId}-t`,
   });
@@ -1698,6 +1722,53 @@ describe('ACTIVE is bound to persisted gate evidence (F1)', () => {
     expect(states.some((row) => row.lifecycleState === 'ACTIVE')).toBe(false);
   }, 120_000);
 
+  it('persists a later REFUSE at the SAME instant as the PASS it invalidates (V7-NF2)', async () => {
+    const scope = makeScope({ profile_version: 'refuse-same-instant' });
+    const moduleId = 'module-refuse-same-instant';
+    await provenLadder(moduleId, scope, 'same-instant');
+
+    // Both evaluations share the exact same `evaluatedAt`. Before V7-NF2 the
+    // deterministic `evaluation_id` repeated the shared PASS-prefix rows and the
+    // refusal aborted with a primary-key violation, so a same-instant REFUSE
+    // could never invalidate an older PASS.
+    const instant = '2026-06-02T00:00:00Z';
+    const pass = evaluateActivationGate({
+      ...passingOpportunityInput(scope),
+      activationEventRef: 'activation-same-instant',
+      now: instant,
+      expiresAt: '2027-06-01T00:00:00Z',
+    });
+    expect(pass.verdict).toBe('PASS');
+    // Capture the RECORDED pass: passing the raw evaluator result would carry no
+    // `evaluationSetRef` and the refusal would be EVIDENCE_SET_REF_MISSING for an
+    // unrelated reason (V7 review note).
+    const recordedPass = await recordActivationGateResult(engine, pass);
+
+    const refusal = evaluateActivationGate({
+      ...passingOpportunityInput(scope),
+      activationEventRef: 'activation-same-instant',
+      now: instant,
+      expiresAt: '2027-06-01T00:00:00Z',
+      registeredStatisticalEvidence: [],
+    });
+    expect(refusal.verdict).toBe('REFUSE');
+    const recordedRefusal = await recordActivationGateResult(engine, refusal);
+    expect(recordedRefusal.verdict).toBe('REFUSE');
+
+    const rows = await activationGateEvaluationsFor(engine, activationScopeHash(scope));
+    expect(rows.some((row) => row.verdict === 'REFUSE')).toBe(true);
+
+    const refused = await rejection(
+      advance(moduleId, scope, 'ACTIVE', 'same-instant-5', { gateResult: recordedPass }),
+    );
+    expect(refused.code).toBe('PROD_ACTIVATION_GATE_REFUSED');
+    expect((refused.detail as { readonly reason?: string } | undefined)?.reason).toBe(
+      'EVIDENCE_SET_NOT_PASS',
+    );
+    const states = await stateRowsFor(engine, { moduleId, scope });
+    expect(states.some((row) => row.lifecycleState === 'ACTIVE')).toBe(false);
+  }, 120_000);
+
   it('refuses ACTIVE for a requires_proven scope through an OPERATIONAL evaluation (H5 residual)', async () => {
     const scope = makeScope({ profile_version: 'operational-requires-proven' });
     const moduleId = 'module-operational-requires-proven';
@@ -2872,6 +2943,533 @@ describe('HIGH: guards stay fail-closed under globally shadowed Array.prototype'
     expect(refusal.code).toBe('PROD_ACTIVATION_GATE_REFUSED');
     expect((refusal.detail as { readonly reason?: string } | undefined)?.reason).toBe(
       'EVIDENCE_SET_SCOPE_MISMATCH',
+    );
+  }, 120_000);
+});
+
+/**
+ * V7 test-quality correction. The sixth-round suite's nominal kind-binding and
+ * event-binding tests refused at the identity brand before reaching the
+ * persisted-evidence guards, and `EVIDENCE_SET_REF_MISMATCH` /
+ * `EVIDENCE_SET_INCOMPLETE` / duplicate-row / stale-row had no assertion at all
+ * (mutation-verified). These tests feed a COMPLETE batch through a stub engine
+ * and corrupt exactly ONE dimension, so each assertion pins that guard.
+ */
+describe('V7: persisted-evidence binding discriminates every dimension', () => {
+  const bindingScope = makeScope({ profile_version: 'v7-binding' });
+  const bindingHash = activationScopeHash(bindingScope);
+  const bindingEvent = 'v7-binding-event';
+  const bindingRequired = requiredGatesForActivation(ActivationKind.OPPORTUNITY, bindingScope);
+
+  async function bindingLadder(
+    moduleId: string,
+    scope: ModuleStateScope,
+    tag: string,
+  ): Promise<void> {
+    await advance(moduleId, scope, 'IMPLEMENTED', `${tag}-1`);
+    await advance(moduleId, scope, 'AVAILABLE', `${tag}-2`);
+    await advance(moduleId, scope, 'SHADOW', `${tag}-3`);
+    await advance(moduleId, scope, 'PROVEN', `${tag}-4`);
+  }
+
+  function buildBindingBatch(): {
+    readonly rawRows: Record<string, unknown>[];
+    readonly decoded: Array<Parameters<typeof activationEvidenceSetRef>[0][number]>;
+  } {
+    const rawRows: Record<string, unknown>[] = [];
+    const decoded: Array<Parameters<typeof activationEvidenceSetRef>[0][number]> = [];
+    for (let index = 0; index < ACTIVATION_GATE_ORDER.length; index += 1) {
+      const gate = ACTIVATION_GATE_ORDER[index] as ActivationGateKind;
+      let isRequired = false;
+      for (let requiredIndex = 0; requiredIndex < bindingRequired.length; requiredIndex += 1) {
+        if (bindingRequired[requiredIndex] === gate) {
+          isRequired = true;
+          break;
+        }
+      }
+      const verdict = isRequired ? 'PASS' : 'NOT_APPLICABLE';
+      const evaluationId = `v7-${String(index)}-${gate}`;
+      rawRows[rawRows.length] = {
+        evaluation_id: evaluationId,
+        scope_hash: bindingHash,
+        gate_kind: gate,
+        verdict,
+        failing_gate: null,
+        activation_event_ref: bindingEvent,
+        capacity_contract_ref: null,
+        evidence_refs: ['evidence-1'],
+        evaluated_at: NOW,
+        expires_at: FAR_FUTURE,
+        activation_kind: 'OPPORTUNITY',
+      };
+      decoded[decoded.length] = {
+        evaluationId,
+        scopeHash: bindingHash,
+        gateKind: gate,
+        verdict,
+        failingGate: null,
+        activationEventRef: bindingEvent,
+        capacityContractRef: null,
+        evidenceRefs: ['evidence-1'],
+        evaluatedAt: NOW,
+        expiresAt: FAR_FUTURE,
+        activationKind: ActivationKind.OPPORTUNITY,
+      };
+    }
+    return { rawRows, decoded };
+  }
+
+  async function expectBindingRefusal(
+    rawRows: readonly Record<string, unknown>[],
+    setRef: string,
+  ): Promise<string | undefined> {
+    const stubEngine = {
+      query: async () => ({ rows: rawRows }),
+    } as unknown as DatabaseEngine;
+    const refusal = await rejection(
+      requirePersistedActivationEvidence(stubEngine, {
+        scope: bindingScope,
+        scopeHash: bindingHash,
+        activationKind: ActivationKind.OPPORTUNITY,
+        activationEventRef: bindingEvent,
+        evaluationSetRef: setRef,
+        at: NOW,
+      }),
+    );
+    expect(refusal.code).toBe('PROD_ACTIVATION_GATE_REFUSED');
+    return (refusal.detail as { readonly reason?: string } | undefined)?.reason;
+  }
+
+  it('refuses evidence persisted for a DIFFERENT activation kind (kind binding)', async () => {
+    const batch = buildBindingBatch();
+    for (let index = 0; index < batch.rawRows.length; index += 1) {
+      (batch.rawRows[index] as Record<string, unknown>).activation_kind = 'OPERATIONAL';
+    }
+    const decoded = batch.decoded.map((row) => ({
+      ...row,
+      activationKind: ActivationKind.OPERATIONAL,
+    }));
+    expect(await expectBindingRefusal(batch.rawRows, activationEvidenceSetRef(decoded))).toBe(
+      'EVIDENCE_SET_KIND_MISMATCH',
+    );
+    // Control: the unmodified OPERATIONAL→OPPORTUNITY batch resolves.
+    const control = buildBindingBatch();
+    const resolved = await requirePersistedActivationEvidence(
+      { query: async () => ({ rows: control.rawRows }) } as unknown as DatabaseEngine,
+      {
+        scope: bindingScope,
+        scopeHash: bindingHash,
+        activationKind: ActivationKind.OPPORTUNITY,
+        activationEventRef: bindingEvent,
+        evaluationSetRef: activationEvidenceSetRef(control.decoded),
+        at: NOW,
+      },
+    );
+    expect(resolved.rows.length).toBe(ACTIVATION_GATE_ORDER.length);
+  }, 120_000);
+
+  it('refuses evidence persisted for a DIFFERENT activation event (event binding)', async () => {
+    const batch = buildBindingBatch();
+    for (let index = 0; index < batch.rawRows.length; index += 1) {
+      (batch.rawRows[index] as Record<string, unknown>).activation_event_ref = 'v7-other-event';
+    }
+    const decoded = batch.decoded.map((row) => ({ ...row, activationEventRef: 'v7-other-event' }));
+    expect(await expectBindingRefusal(batch.rawRows, activationEvidenceSetRef(decoded))).toBe(
+      'EVIDENCE_EVENT_REF_UNPERSISTED',
+    );
+  }, 120_000);
+
+  it('refuses an evaluationSetRef that no persisted batch derives (content-address binding)', async () => {
+    const batch = buildBindingBatch();
+    const forged = `sha256:${'f'.repeat(64)}`;
+    expect(await expectBindingRefusal(batch.rawRows, forged)).toBe('EVIDENCE_SET_REF_MISMATCH');
+  }, 120_000);
+
+  it('refuses an INCOMPLETE batch missing a required gate', async () => {
+    const batch = buildBindingBatch();
+    const rawRows: Record<string, unknown>[] = [];
+    const decoded: Array<Parameters<typeof activationEvidenceSetRef>[0][number]> = [];
+    for (let index = 0; index < batch.rawRows.length; index += 1) {
+      if ((batch.rawRows[index] as Record<string, unknown>).gate_kind === 'CAPACITY_CONTRACT')
+        continue;
+      rawRows[rawRows.length] = batch.rawRows[index] as Record<string, unknown>;
+      decoded[decoded.length] = batch.decoded[index] as (typeof decoded)[number];
+    }
+    expect(await expectBindingRefusal(rawRows, activationEvidenceSetRef(decoded))).toBe(
+      'EVIDENCE_SET_INCOMPLETE',
+    );
+  }, 120_000);
+
+  it('refuses a DUPLICATED gate row in the batch', async () => {
+    const batch = buildBindingBatch();
+    const duplicateRaw = { ...(batch.rawRows[0] as Record<string, unknown>) };
+    duplicateRaw.evaluation_id = 'v7-duplicate-row';
+    const duplicateDecoded = {
+      ...(batch.decoded[0] as (typeof batch.decoded)[number]),
+      evaluationId: 'v7-duplicate-row',
+    };
+    const rawRows = [...batch.rawRows, duplicateRaw];
+    const decoded = [...batch.decoded, duplicateDecoded];
+    expect(await expectBindingRefusal(rawRows, activationEvidenceSetRef(decoded))).toBe(
+      'EVIDENCE_SET_INCOMPLETE',
+    );
+  }, 120_000);
+
+  it('refuses an EXPIRED row even when the whole batch is otherwise complete', async () => {
+    const batch = buildBindingBatch();
+    const rawRows = batch.rawRows.map((row) =>
+      row.gate_kind === 'CAPACITY_CONTRACT' ? { ...row, expires_at: '2020-01-01T00:00:00Z' } : row,
+    );
+    const decoded = batch.decoded.map((row) =>
+      row.gateKind === 'CAPACITY_CONTRACT' ? { ...row, expiresAt: '2020-01-01T00:00:00Z' } : row,
+    );
+    expect(await expectBindingRefusal(rawRows, activationEvidenceSetRef(decoded))).toBe(
+      'EVIDENCE_SET_STALE',
+    );
+  }, 120_000);
+
+  it('refuses a malformed transition instant instead of disabling the staleness check (V7-F4)', async () => {
+    const scope = makeScope({ profile_version: 'v7-malformed-at' });
+    const moduleId = 'module-v7-malformed-at';
+    // Ladder to SHADOW at the normal instant.
+    await advance(moduleId, scope, 'IMPLEMENTED', 'v7-at-1');
+    await advance(moduleId, scope, 'AVAILABLE', 'v7-at-2');
+    await advance(moduleId, scope, 'SHADOW', 'v7-at-3');
+    const stalePass = evaluateActivationGate({
+      ...passingOpportunityInput(scope),
+      activationEventRef: 'v7-at-stale',
+      now: NOW,
+      expiresAt: '2026-07-01T00:00:00Z',
+    });
+    expect(stalePass.verdict).toBe('PASS');
+    const recorded = await recordActivationGateResult(engine, stalePass);
+
+    // A genuinely later real instant refuses EVIDENCE_SET_STALE.
+    const withRealInstant = await rejection(
+      advance(moduleId, scope, 'PROVEN', 'v7-at-4', {
+        at: '2026-08-01T00:00:00Z',
+        provenEvidenceRef: recorded.evaluationSetRef,
+        provenEvidenceEventRef: 'v7-at-stale',
+      }),
+    );
+    expect((withRealInstant.detail as { readonly reason?: string } | undefined)?.reason).toBe(
+      'EVIDENCE_SET_STALE',
+    );
+
+    // …and the PostgreSQL-valid but ECMAScript-unparseable 'now' must ALSO
+    // refuse (Date.parse('now') is NaN, which used to read as "not expired").
+    const withMalformedInstant = await rejection(
+      advance(moduleId, scope, 'PROVEN', 'v7-at-5', {
+        at: 'now',
+        provenEvidenceRef: recorded.evaluationSetRef,
+        provenEvidenceEventRef: 'v7-at-stale',
+      }),
+    );
+    expect(withMalformedInstant.code).toBe('PROD_ACTIVATION_GATE_REFUSED');
+    expect((withMalformedInstant.detail as { readonly reason?: string } | undefined)?.reason).toBe(
+      'EVIDENCE_SET_STALE',
+    );
+    const states = await stateRowsFor(engine, { moduleId, scope });
+    expect(states.some((row) => row.lifecycleState === 'PROVEN')).toBe(false);
+  }, 120_000);
+
+  it('refuses blank-only activation event references (tab/NBSP/BOM), not just the empty string', async () => {
+    const scope = makeScope({ profile_version: 'v7-blank-event' });
+    const moduleId = 'module-v7-blank-event';
+    await bindingLadder(moduleId, scope, 'v7-blank');
+    for (const blank of ['\t', '\u00a0', '\ufeff']) {
+      const gate = await gatePass(scope, blank);
+      const refused = await rejection(
+        advance(moduleId, scope, 'ACTIVE', `v7-blank-${blank.codePointAt(0) ?? 0}`, {
+          gateResult: gate,
+        }),
+      );
+      expect(refused.code).toBe('PROD_ACTIVATION_GATE_REFUSED');
+      expect((refused.detail as { readonly reason?: string } | undefined)?.reason).toBe(
+        'ACTIVATION_EVENT_REF_MISSING',
+      );
+    }
+    const states = await stateRowsFor(engine, { moduleId, scope });
+    expect(states.some((row) => row.lifecycleState === 'ACTIVE')).toBe(false);
+  }, 120_000);
+
+  it('lets a fresh distinct activation event escape a REFUSE recorded for another event', async () => {
+    const scope = makeScope({ profile_version: 'v7-fresh-event' });
+    const moduleId = 'module-v7-fresh-event';
+    await bindingLadder(moduleId, scope, 'v7-fresh');
+
+    const pass = await gatePass(scope, 'v7-fresh-event-a');
+    expect(pass.verdict).toBe('PASS');
+    const refusal = evaluateActivationGate({
+      ...passingOpportunityInput(scope),
+      activationEventRef: 'v7-fresh-event-b',
+      registeredStatisticalEvidence: [],
+    });
+    expect(refusal.verdict).toBe('REFUSE');
+    await recordActivationGateResult(engine, refusal);
+
+    // The pass for event A is unaffected by the refusal for event B: the event
+    // predicate must not be over-broad.
+    const resolved = await requirePersistedActivationEvidence(engine, {
+      scope,
+      scopeHash: activationScopeHash(scope),
+      activationKind: ActivationKind.OPPORTUNITY,
+      activationEventRef: 'v7-fresh-event-a',
+      evaluationSetRef: pass.evaluationSetRef,
+      at: NOW,
+    });
+    expect(resolved.rows.length).toBeGreaterThan(0);
+  }, 120_000);
+});
+
+/**
+ * V7-F1 (review round 2). The first cut moved the HMAC key out of
+ * `ActivationGateInput` but still accepted it as a `verifyGateEvidence(...)`
+ * argument, so a caller could self-sign with a key it invented. The key is now
+ * deployment state configured once; the boundary has no key parameter. This test
+ * fails if any caller-supplied key path is reintroduced (the call stops
+ * compiling) or if the boundary stops using the configured key.
+ */
+describe('V7: gate evidence is verified with the deployment key, never a caller key', () => {
+  it('refuses a record signed with a caller-chosen key and accepts the deployment key', () => {
+    const scope = makeScope({ profile_version: 'v7-f1-key' });
+    const scopeHash = activationScopeHash(scope);
+    const payload = {
+      gateKind: 'OWNER_APPROVAL',
+      approver: 'attacker',
+      scopeRefs: [scopeHash],
+      subject: 'self-issued',
+      issuedAt: '2026-01-01T00:00:00Z',
+      expiresAt: FAR_FUTURE,
+    } as const;
+
+    let refusal: { code?: string; detail?: unknown } | undefined;
+    try {
+      verifyGateEvidence({
+        record: createGateEvidence(payload, 'attacker-chosen-pepper-not-the-deployment-secret'),
+        requiredScope: scopeHash,
+        currentTime: NOW,
+      });
+    } catch (error) {
+      refusal = error as { code?: string; detail?: unknown };
+    }
+    expect(refusal?.code).toBe('PROD_ACTIVATION_GATE_REFUSED');
+    expect((refusal?.detail as { readonly reason?: string } | undefined)?.reason).toBe(
+      'GATE_EVIDENCE_INVALID',
+    );
+
+    // Control: a record signed with the configured deployment key verifies.
+    const genuine = verifyGateEvidence({
+      record: createGateEvidence(payload, PEPPER),
+      requiredScope: scopeHash,
+      currentTime: NOW,
+    });
+    expect(genuine.approver).toBe('attacker');
+    // The minted verdict is frozen so a post-mint mutation cannot widen it.
+    expect(Object.isFrozen(genuine.record)).toBe(true);
+    expect(Object.isFrozen(genuine.record.scopeRefs)).toBe(true);
+  }, 120_000);
+
+  it('exposes no caller-writable verification-key state (V7-F1 round 3)', async () => {
+    // The round-2 setter was itself the bypass: a caller could overwrite the
+    // deployment key and self-sign. No reconfiguration path may be exported.
+    const api = (await import('@foresift/capability-registry')) as Record<string, unknown>;
+    expect(api['configureGateEvidenceVerifierKey']).toBeUndefined();
+    expect(api['GATE_EVIDENCE_PEPPER_ENV']).toBeDefined();
+  }, 120_000);
+
+  it('refuses a record whose payload accessor differs per read (V7-D1/D2 splice)', () => {
+    const scopeA = activationScopeHash(makeScope({ profile_version: 'v7-d1-a' }));
+    const scopeB = activationScopeHash(makeScope({ profile_version: 'v7-d1-b' }));
+    const genuinePayload = {
+      gateKind: 'OWNER_APPROVAL',
+      approver: 'real-owner',
+      scopeRefs: [scopeA],
+      subject: 'genuine',
+      issuedAt: '2026-01-15T00:00:00Z',
+      expiresAt: '2026-03-01T00:00:00Z',
+    } as const;
+    const attackPayload = {
+      gateKind: 'OWNER_APPROVAL',
+      approver: 'attacker',
+      scopeRefs: [scopeB],
+      subject: 'forged',
+      issuedAt: '2026-01-01T00:00:00Z',
+      expiresAt: '2099-01-01T00:00:00Z',
+    } as const;
+    const genuine = createGateEvidence(genuinePayload, PEPPER);
+    // Read sequence the pre-fix code performed: assertEvidenceRecord reads the
+    // payload once, verifyPayloadHash once, verifyEvidenceSignature once, then
+    // payloadRecordMatches (and everything after) reads it again. Returning the
+    // attack payload to the hash and record-match checks while returning the
+    // GENUINE payload to the HMAC check spliced a genuine signature onto the
+    // attacker payload and minted a branded verdict with no knowledge of the key.
+    let payloadReads = 0;
+    const spliced = {
+      evidenceId: genuine.evidenceId,
+      get payload() {
+        payloadReads += 1;
+        if (payloadReads === 2 || payloadReads >= 4) return attackPayload;
+        return genuine.payload;
+      },
+      payloadSha256: computeGatePayloadHash(attackPayload),
+      signature: genuine.signature,
+      gateKind: attackPayload.gateKind,
+      scopeRefs: attackPayload.scopeRefs,
+      approver: attackPayload.approver,
+      issuedAt: attackPayload.issuedAt,
+      expiresAt: attackPayload.expiresAt,
+      revokedAt: null,
+      recordedAt: genuine.recordedAt,
+    };
+
+    let refusal: { code?: string; detail?: unknown } | undefined;
+    try {
+      // The forged record targets scope B and a 2099 expiry at 2026-06-01.
+      verifyGateEvidence({
+        record: spliced as never,
+        requiredScope: scopeB,
+        currentTime: '2026-06-01T00:00:00Z',
+      });
+    } catch (error) {
+      refusal = error as { code?: string; detail?: unknown };
+    }
+    expect(refusal?.code).toBe('PROD_ACTIVATION_GATE_REFUSED');
+    expect((refusal?.detail as { readonly reason?: string } | undefined)?.reason).toBe(
+      'GATE_EVIDENCE_INVALID',
+    );
+
+    // Control: the untouched genuine record still verifies for its own scope.
+    const control = verifyGateEvidence({
+      record: genuine,
+      requiredScope: scopeA,
+      currentTime: '2026-02-01T00:00:00Z',
+    });
+    expect(control.evidenceId).toBe(genuine.evidenceId);
+  }, 120_000);
+
+  it('binds the required scope once when verifying AND branding (V7-A1)', () => {
+    const scopeA = activationScopeHash(makeScope({ profile_version: 'v7-a1-a' }));
+    const scopeB = activationScopeHash(makeScope({ profile_version: 'v7-a1-b' }));
+    const genuine = createGateEvidence(
+      {
+        gateKind: 'OWNER_APPROVAL',
+        approver: 'owner-a',
+        scopeRefs: [scopeA],
+        subject: 'genuine-scope-a',
+        issuedAt: '2026-01-01T00:00:00Z',
+        expiresAt: '2030-01-01T00:00:00Z',
+      } as const,
+      PEPPER,
+    );
+    let reads = 0;
+    const verified = verifyGateEvidence({
+      record: genuine,
+      get requiredScope() {
+        reads += 1;
+        return reads === 1 ? scopeA : scopeB;
+      },
+      currentTime: NOW,
+    } as never);
+    // The scope must be read ONCE and branded as the scope it was verified for.
+    expect(reads).toBe(1);
+    expect(verified.requiredScope).toBe(scopeA);
+    expect(verified.record.scopeRefs[0]).toBe(scopeA);
+  }, 120_000);
+
+  it('binds the gate scope once, so a scope accessor cannot drop a required gate (V7-A2)', () => {
+    const scopeP = makeScope({ profile_version: 'v7-a2', requires_proven: true });
+    const scopeN = makeScope({ profile_version: 'v7-a2', requires_proven: false });
+    const base = passingOpportunityInput(scopeP);
+    let reads = 0;
+    const result = evaluateActivationGate({
+      ...base,
+      proven: false,
+      get scope() {
+        reads += 1;
+        return reads === 1 ? scopeP : scopeN;
+      },
+    } as never);
+    // With a single parsed scope the PROVEN_PRESENT gate is required and the
+    // claimed `proven: false` refuses; a second read returning the
+    // non-requires-proven scope would have dropped the gate and PASSED.
+    expect(result.verdict).not.toBe('PASS');
+    expect(reads).toBe(1);
+  }, 120_000);
+
+  it('copies a typed-array subclass through its internal slot, never its slice (V7 round 7)', () => {
+    class EvilBytes extends Uint8Array {}
+    let sliceReads = 0;
+    Object.defineProperty(EvilBytes.prototype, 'slice', {
+      configurable: true,
+      get() {
+        sliceReads += 1;
+        return (): never => {
+          throw new Error('live slice must never be called');
+        };
+      },
+    });
+    const bytes = new EvilBytes([1, 2, 3]);
+    const snapshot = snapshotCallerInput([bytes]) as readonly Uint8Array[];
+    expect(sliceReads).toBe(0);
+    expect(snapshot[0]).toBeInstanceOf(Uint8Array);
+    expect(Array.from(snapshot[0] as Uint8Array)).toEqual([1, 2, 3]);
+    // The copy is independent of the caller's memory.
+    bytes[0] = 9;
+    expect((snapshot[0] as Uint8Array)[0]).toBe(1);
+  }, 120_000);
+
+  it('snapshots a shared caller node once and never returns the live object (V7-A2)', () => {
+    let reads = 0;
+    const shared: Record<string, unknown> = {};
+    Object.defineProperty(shared, 'value', {
+      enumerable: true,
+      configurable: true,
+      get() {
+        reads += 1;
+        return reads === 1 ? 'first' : 'second';
+      },
+    });
+    const snapshot = snapshotCallerInput([shared, shared]) as readonly Record<string, unknown>[];
+    // The shared node is materialized once and reused: the second entry is the
+    // SAME frozen copy, never the live getter object.
+    expect(reads).toBe(1);
+    expect(snapshot[0]).toBe(snapshot[1]);
+    expect(Object.isFrozen(snapshot[0])).toBe(true);
+    expect(snapshot[0]?.['value']).toBe('first');
+  }, 120_000);
+
+  it('fails closed when the deployment key is not configured', () => {
+    const scope = makeScope({ profile_version: 'v7-f1-unset' });
+    const scopeHash = activationScopeHash(scope);
+    const saved = process.env[GATE_EVIDENCE_PEPPER_ENV];
+    delete process.env[GATE_EVIDENCE_PEPPER_ENV];
+    let refusal: { code?: string; detail?: unknown } | undefined;
+    try {
+      verifyGateEvidence({
+        record: createGateEvidence(
+          {
+            gateKind: 'OWNER_APPROVAL',
+            approver: 'owner-1',
+            scopeRefs: [scopeHash],
+            subject: 'self-issued',
+            issuedAt: '2026-01-01T00:00:00Z',
+            expiresAt: FAR_FUTURE,
+          },
+          PEPPER,
+        ),
+        requiredScope: scopeHash,
+        currentTime: NOW,
+      });
+    } catch (error) {
+      refusal = error as { code?: string; detail?: unknown };
+    } finally {
+      if (saved !== undefined) process.env[GATE_EVIDENCE_PEPPER_ENV] = saved;
+      else delete process.env[GATE_EVIDENCE_PEPPER_ENV];
+    }
+    expect(refusal?.code).toBe('PROD_ACTIVATION_GATE_REFUSED');
+    expect((refusal?.detail as { readonly reason?: string } | undefined)?.reason).toBe(
+      'GATE_EVIDENCE_MISSING',
     );
   }, 120_000);
 });

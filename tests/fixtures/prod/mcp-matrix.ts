@@ -80,6 +80,13 @@ export interface ProdMcpCellFixture {
   readonly clientId: string;
   readonly result: 'PASS' | 'FAIL';
   readonly liveTestDate: string;
+  /**
+   * V7-F8 provenance: the passing conformance run and fixture this cell's
+   * result derives from. The DB resolver requires a matching passing run, so
+   * every claim cell must carry both.
+   */
+  readonly conformanceRunId: string;
+  readonly fixtureRef: string;
 }
 
 export const PROD_MCP_STABLE_REVISION_ROW: ProdMcpRevisionFixture = {
@@ -110,6 +117,11 @@ function cellsFor(
       cellId: `${revision}-${client.clientId}`,
       revision,
       clientId: client.clientId,
+      // A governed PASS cell must name the conformance run and the fixture it
+      // exercised (V7-F8); the matrix resolver checks the run's fixtureRef for
+      // exact equality with the cell's declared fixture.
+      conformanceRunId: `run-${revision}-${client.clientId}`,
+      fixtureRef: `fixture-${client.clientId}`,
       ...mutate(client.clientId),
     }),
   );

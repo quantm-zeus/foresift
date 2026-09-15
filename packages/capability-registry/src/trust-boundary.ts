@@ -18,6 +18,7 @@
  * Strictly read-only: this module enforces that heavy/imported work cannot
  * reach production request paths; it never trades, custodies, signs, or submits.
  */
+import { appendSafe } from './shadow-safe.ts';
 import {
   ALL_ARTIFACT_BOUNDARY_ASSERTION_KINDS,
   ArtifactBoundaryAssertionKind,
@@ -152,7 +153,7 @@ function decodeAssertionRows(rows: readonly RawAssertionRow[]): ArtifactBoundary
   const decoded: ArtifactBoundaryAssertionRow[] = [];
   for (let index = 0; index < rows.length; index += 1) {
     const row = rows[index];
-    if (row !== undefined) decoded[decoded.length] = decodeAssertion(row);
+    if (row !== undefined) appendSafe(decoded, decodeAssertion(row));
   }
   return decoded;
 }
@@ -165,11 +166,11 @@ function toDomainAssertions(
   for (let index = 0; index < assertions.length; index += 1) {
     const assertion = assertions[index];
     if (assertion === undefined) continue;
-    domainAssertions[domainAssertions.length] = {
+    appendSafe(domainAssertions, {
       assertionKind: assertion.assertionKind,
       verdict: assertion.verdict,
       importArtifactRef: assertion.importArtifactRef,
-    };
+    });
   }
   return domainAssertions;
 }
@@ -207,8 +208,7 @@ export async function assertLivePathBoundaryHolds(
       const assertion = assertions[assertionIndex];
       if (assertion === undefined) continue;
       present.add(assertion.assertionKind);
-      if (assertion.verdict !== 'PASS')
-        failingAssertionIds[failingAssertionIds.length] = assertion.assertionId;
+      if (assertion.verdict !== 'PASS') appendSafe(failingAssertionIds, assertion.assertionId);
     }
     const missing: string[] = [];
     for (
@@ -217,7 +217,7 @@ export async function assertLivePathBoundaryHolds(
       kindIndex += 1
     ) {
       const kind = ALL_ARTIFACT_BOUNDARY_ASSERTION_KINDS[kindIndex] as string;
-      if (!present.has(kind)) missing[missing.length] = kind;
+      if (!present.has(kind)) appendSafe(missing, kind);
     }
     throw new ForesiftError(
       ErrorCode.PROD_TRUST_BOUNDARY_VIOLATION,
@@ -281,7 +281,7 @@ export function assertNoLivePathPrivileges(access: LivePathAccess, livePath = 'l
   // not be able to erase a live-path privilege (audit NEW-M4).
   for (let index = 0; index < capabilities.length; index += 1) {
     const capability = capabilities[index] as (typeof capabilities)[number];
-    if (access[capability] === true) violations[violations.length] = capability;
+    if (access[capability] === true) appendSafe(violations, capability);
   }
   if (violations.length > 0) {
     throw new ForesiftError(

@@ -103,7 +103,6 @@ export const PROD_LIVE_PATH_BOUNDED_CLAIM: LivePathPrecomputationClaim = {
   request: PROD_PRECOMPUTED_REQUEST_WITHIN,
   now: PROD_FIXTURE_NOW,
   boundaryAssertions: PROD_BOUNDARY_ASSERTIONS_COMPLETE,
-  artifactRef: 'artifact-prod-1',
 };
 
 /** A live path with no envelope at all. */

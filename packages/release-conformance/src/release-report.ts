@@ -1,4 +1,5 @@
 /** @requirement FR-TRACE-006 @acceptance AC-269 */
+import { appendSafe } from './shadow-safe.ts';
 import { createHash } from 'node:crypto';
 import { readdir, readFile } from 'node:fs/promises';
 import path from 'node:path';
@@ -14,6 +15,7 @@ import {
   numericSortStrings,
   numericSortWith,
   promiseAllNumeric,
+  snapshotCallerInput,
 } from './shadow-safe.ts';
 
 const HASH = /^[a-f0-9]{64}$/;
@@ -118,8 +120,12 @@ async function readJson(file: string): Promise<unknown> {
 
 /** Builds the immutable report from released tree inputs; no wall-clock value is consulted. */
 export async function buildReleaseReport(
-  options: BuildReleaseReportOptions,
+  rawOptions: BuildReleaseReportOptions,
 ): Promise<ReleaseReportRecord> {
+  // Single-read snapshot of every option (V7 accessor class): `conformanceResults`,
+  // `gateEvidence[].isValid`, `milestone` and `previousReport` are each read more
+  // than once across the status/content decisions.
+  const options = snapshotCallerInput(rawOptions);
   const documentPath = path.join(
     options.repoRoot,
     'docs/spec/crypto_intelligence_agent_gateway_PRD_FINAL_v6.0.md',
@@ -174,14 +180,37 @@ export async function buildReleaseReport(
     );
   }
 
+  // An omitted conformance result is NOT a pass (V7-F7): defaulting to
+  // `PASSED, totalRulesEvaluated: 0` recorded a release report that claimed the
+  // conformance gate passed while evaluating zero rules, and (with one valid
+  // gate-evidence item) drove `activationState.status` to `ACTIVE`. A caller that
+  // did not run the gate fails closed instead.
   const defaultConformance: ReleaseReportRecord['conformanceResults'] = {
-    overall: 'PASSED',
-    totalRulesEvaluated: 0,
+    overall: 'FAILED',
+    // One synthetic rule was evaluated (the mandatory-input rule) and it failed;
+    // the counts must balance for the record schema.
+    totalRulesEvaluated: 1,
     passedCount: 0,
-    failureCount: 0,
-    findings: [],
+    failureCount: 1,
+    findings: [
+      {
+        requirementId: 'FR-TRACE-006',
+        rule: 'CONFORMANCE_NOT_EVALUATED',
+        path: 'conformanceResults',
+        message:
+          'no release-conformance result was supplied; a release report cannot record PASSED with zero evaluated rules',
+      },
+    ],
   };
-  const conformanceResults = options.conformanceResults ?? defaultConformance;
+  // A SUPPLIED result is normalized too (V7-F7b): accepting it verbatim let a
+  // caller hand in `{overall:'PASSED', totalRulesEvaluated:0, ...}` — internally
+  // vacuous — which (with one valid gate-evidence item) still drove
+  // `activationState.status` to `ACTIVE` and passed `verifyReleaseReport`. The
+  // `defaultConformance` branch above is only the omitted-input case.
+  const conformanceResults =
+    options.conformanceResults === undefined
+      ? defaultConformance
+      : normalizeSuppliedConformance(options.conformanceResults);
   const gateEvidence = options.gateEvidence ?? [];
   // Numeric-index aggregation only (audit HIGH): `filter`/`map`/`sort`/`some`
   // are all shadowable in-process, and an emptied pass/refusal set would let a
@@ -190,7 +219,7 @@ export async function buildReleaseReport(
   for (let index = 0; index < gateEvidence.length; index += 1) {
     const item = gateEvidence[index];
     if (item !== undefined && item.isValid && item.gateKind)
-      passingGates[passingGates.length] = `gate:${item.gateKind.toLowerCase().replace('_', '-')}`;
+      appendSafe(passingGates, `gate:${item.gateKind.toLowerCase().replace('_', '-')}`);
   }
   const gatesPassed = numericSortStrings(passingGates);
   const ledgerDeviations: ReleaseDeviation[] = numericMap(
@@ -207,12 +236,12 @@ export async function buildReleaseReport(
   for (let index = 0; index < gateEvidence.length; index += 1) {
     const evidence = gateEvidence[index];
     if (evidence === undefined || evidence.isValid) continue;
-    refusedEvidence[refusedEvidence.length] = {
+    appendSafe(refusedEvidence, {
       id: evidence.evidenceId ?? `gate-evidence:${refusedIndex}`,
       rule: 'GATE_EVIDENCE_REFUSED',
       path: evidence.gateKind ? `gate:${evidence.gateKind}` : 'gate:unknown',
       justification: evidence.reason ?? 'gate evidence did not pass evaluation',
-    };
+    });
     refusedIndex += 1;
   }
   const combinedDeviations: ReleaseDeviation[] = [];
@@ -224,7 +253,7 @@ export async function buildReleaseReport(
   for (let sourceIndex = 0; sourceIndex < deviationSources.length; sourceIndex += 1) {
     const source = deviationSources[sourceIndex] as readonly ReleaseDeviation[];
     for (let index = 0; index < source.length; index += 1) {
-      combinedDeviations[combinedDeviations.length] = source[index] as ReleaseDeviation;
+      appendSafe(combinedDeviations, source[index] as ReleaseDeviation);
     }
   }
   const unresolvedDeviations = numericSortWith(
@@ -278,6 +307,139 @@ function record(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
+function isNonNegativeInteger(value: unknown): value is number {
+  return typeof value === 'number' && Number.isInteger(value) && value >= 0;
+}
+
+/**
+ * Normalize a caller-supplied conformance result (V7-F7b).
+ *
+ * A supplied result is admitted only when it is structurally well-formed (an
+ * object with an `overall` discriminant, finite non-negative integer counts
+ * that balance, and a `findings` array). A `PASSED` result is additionally
+ * admissible only when it is NON-VACUOUS: at least one rule was evaluated, every
+ * evaluated rule passed, no rule failed, and no finding was recorded. Anything
+ * else — including a non-object carrier — is replaced with a synthetic `FAILED`
+ * record carrying a `CONFORMANCE_NOT_EVALUATED` finding, so a caller can never
+ * supply a vacuous PASSED that drives the activation state to `ACTIVE`. An
+ * admitted result is returned as a frozen plain copy built from single-read
+ * locals (never the caller's object), so the value validated is the value
+ * consumed even if a future caller bypasses the outer snapshot. This never
+ * throws.
+ */
+function normalizeSuppliedConformance(
+  supplied: unknown,
+): ReleaseReportRecord['conformanceResults'] {
+  const notEvaluated = (message: string): ReleaseReportRecord['conformanceResults'] => ({
+    overall: 'FAILED',
+    // One synthetic rule was evaluated (the supplied-result admissibility rule)
+    // and it failed; the counts must balance for the record schema.
+    totalRulesEvaluated: 1,
+    passedCount: 0,
+    failureCount: 1,
+    findings: [
+      {
+        requirementId: 'FR-TRACE-006',
+        rule: 'CONFORMANCE_NOT_EVALUATED',
+        path: 'conformanceResults',
+        message,
+      },
+    ],
+  });
+  if (!record(supplied)) {
+    return notEvaluated(
+      'the supplied release-conformance result was not an object; a release report cannot record PASSED with zero evaluated rules',
+    );
+  }
+  const overall = supplied['overall'];
+  const totalRulesEvaluated = supplied['totalRulesEvaluated'];
+  const passedCount = supplied['passedCount'];
+  const failureCount = supplied['failureCount'];
+  const findings = supplied['findings'];
+  if (
+    !isNonNegativeInteger(totalRulesEvaluated) ||
+    !isNonNegativeInteger(passedCount) ||
+    !isNonNegativeInteger(failureCount) ||
+    !Array.isArray(findings) ||
+    (overall !== 'PASSED' && overall !== 'FAILED')
+  ) {
+    return notEvaluated(
+      'the supplied release-conformance result is malformed (counts, findings, or overall); a release report cannot record PASSED with zero evaluated rules',
+    );
+  }
+  if (passedCount + failureCount !== totalRulesEvaluated) {
+    return notEvaluated(
+      'the supplied release-conformance result has unbalanced counts; a release report cannot record PASSED with zero evaluated rules',
+    );
+  }
+  if (
+    overall === 'PASSED' &&
+    (totalRulesEvaluated <= 0 ||
+      passedCount !== totalRulesEvaluated ||
+      failureCount !== 0 ||
+      findings.length !== 0)
+  ) {
+    return notEvaluated(
+      'the supplied release-conformance result declared PASSED with zero evaluated rules or inconsistent counts; a release report cannot record PASSED with zero evaluated rules',
+    );
+  }
+  // Build a NORMALIZED FROZEN PLAIN COPY from the single-read locals. Returning
+  // the caller's object (even a snapshotted one) would let the validated value
+  // and the consumed value drift if a future caller bypasses the outer
+  // `snapshotCallerInput`. Each admitted result — including every finding — is
+  // copied into a frozen null-prototype object so the value validated here is
+  // the value the activation-state decision and the record consume.
+  const normalizedFindings: ReleaseFinding[] = [];
+  for (let index = 0; index < findings.length; index += 1) {
+    const raw = findings[index];
+    if (!record(raw)) {
+      return notEvaluated(
+        'the supplied release-conformance result carried a malformed finding; a release report cannot record PASSED with zero evaluated rules',
+      );
+    }
+    const requirementId = raw['requirementId'];
+    const rule = raw['rule'];
+    const findingPath = raw['path'];
+    const message = raw['message'];
+    if (
+      typeof requirementId !== 'string' ||
+      requirementId.length === 0 ||
+      typeof rule !== 'string' ||
+      rule.length === 0 ||
+      typeof findingPath !== 'string' ||
+      findingPath.length === 0 ||
+      typeof message !== 'string' ||
+      message.length === 0
+    ) {
+      return notEvaluated(
+        'the supplied release-conformance result carried a malformed finding; a release report cannot record PASSED with zero evaluated rules',
+      );
+    }
+    appendSafe(
+      normalizedFindings,
+      Object.freeze(
+        Object.assign(Object.create(null) as ReleaseFinding, {
+          requirementId,
+          rule,
+          path: findingPath,
+          message,
+        }),
+      ),
+    );
+  }
+  const normalized = Object.assign(
+    Object.create(null) as ReleaseReportRecord['conformanceResults'],
+    {
+      overall,
+      totalRulesEvaluated,
+      passedCount,
+      failureCount,
+      findings: Object.freeze(normalizedFindings),
+    },
+  );
+  return Object.freeze(normalized);
+}
+
 /** Strict structural/hash verifier. Pass expected hashes when verifying against a live tree. */
 export function verifyReleaseReport(
   input: unknown,
@@ -299,7 +461,7 @@ export function verifyReleaseReport(
         issueIndex
       ] as (typeof schemaResult.error.issues)[number];
       const field = issue.path.length === 0 ? 'report' : issue.path.join('.');
-      errors[errors.length] = `${field}: ${issue.message}`;
+      appendSafe(errors, `${field}: ${issue.message}`);
     }
   }
   const required = [
@@ -319,7 +481,7 @@ export function verifyReleaseReport(
   for (let fieldIndex = 0; fieldIndex < required.length; fieldIndex += 1) {
     const field = required[fieldIndex] as (typeof required)[number];
     if (input[field] === undefined || input[field] === null)
-      errors[errors.length] = `${field} is required`;
+      appendSafe(errors, `${field} is required`);
   }
   const hashFields = [
     'documentHash',
@@ -331,15 +493,15 @@ export function verifyReleaseReport(
     const field = hashFields[fieldIndex] as (typeof hashFields)[number];
     const value = input[field];
     if (typeof value !== 'string' || !HASH.test(value) || /^0+$/.test(value))
-      errors[errors.length] = `${field} must be a non-zero SHA-256 hash`;
+      appendSafe(errors, `${field} must be a non-zero SHA-256 hash`);
     if (expected[field] !== undefined && expected[field] !== value)
-      errors[errors.length] = `${field} disagrees with released artifact`;
+      appendSafe(errors, `${field} disagrees with released artifact`);
   }
   const hashMaps = ['migrationHashes', 'schemaHashes'] as const;
   for (let fieldIndex = 0; fieldIndex < hashMaps.length; fieldIndex += 1) {
     const field = hashMaps[fieldIndex] as (typeof hashMaps)[number];
     if (!record(input[field])) {
-      errors[errors.length] = `${field} must be an object`;
+      appendSafe(errors, `${field} must be an object`);
       continue;
     }
     const names = Object.keys(input[field]);
@@ -352,11 +514,10 @@ export function verifyReleaseReport(
         !PREFIXED_HASH.test(hash) ||
         /^sha256:0+$/.test(hash)
       )
-        errors[errors.length] = `${field}.${name} must be a non-zero sha256: hash`;
+        appendSafe(errors, `${field}.${name} must be a non-zero sha256: hash`);
     }
   }
-  if (!record(input.conformanceResults))
-    errors[errors.length] = 'conformanceResults must be an object';
+  if (!record(input.conformanceResults)) appendSafe(errors, 'conformanceResults must be an object');
   else {
     const conformanceKeys = [
       'overall',
@@ -368,27 +529,40 @@ export function verifyReleaseReport(
     for (let keyIndex = 0; keyIndex < conformanceKeys.length; keyIndex += 1) {
       const key = conformanceKeys[keyIndex] as (typeof conformanceKeys)[number];
       if (input.conformanceResults[key] === undefined)
-        errors[errors.length] = `conformanceResults.${key} is required`;
+        appendSafe(errors, `conformanceResults.${key} is required`);
     }
     if (
       typeof input.conformanceResults.overall !== 'string' ||
       !numericIncludes(['PASSED', 'FAILED'], input.conformanceResults.overall)
     ) {
-      errors[errors.length] = 'conformanceResults.overall is invalid';
+      appendSafe(errors, 'conformanceResults.overall is invalid');
+    }
+    // V7-F7b: a PASSED result that evaluated zero rules is vacuous, not a pass.
+    // The counts refine above (`passedCount + failureCount === total`) is
+    // satisfied by `0 + 0 === 0`, so the record schema alone admits it.
+    if (
+      input.conformanceResults.overall === 'PASSED' &&
+      (typeof input.conformanceResults.totalRulesEvaluated !== 'number' ||
+        input.conformanceResults.totalRulesEvaluated <= 0)
+    ) {
+      appendSafe(
+        errors,
+        'conformanceResults.totalRulesEvaluated: PASSED with zero rules evaluated is not admissible',
+      );
     }
   }
   if (!Array.isArray(input.unresolvedDeviations))
-    errors[errors.length] = 'unresolvedDeviations must be an array';
-  if (!record(input.activationState)) errors[errors.length] = 'activationState must be an object';
+    appendSafe(errors, 'unresolvedDeviations must be an array');
+  if (!record(input.activationState)) appendSafe(errors, 'activationState must be an object');
   else {
     const activationKeys = ['milestone', 'status', 'activeGroups', 'gatesPassed'] as const;
     for (let keyIndex = 0; keyIndex < activationKeys.length; keyIndex += 1) {
       const key = activationKeys[keyIndex] as (typeof activationKeys)[number];
       if (input.activationState[key] === undefined)
-        errors[errors.length] = `activationState.${key} is required`;
+        appendSafe(errors, `activationState.${key} is required`);
     }
   }
-  if (!record(input.rollbackTarget)) errors[errors.length] = 'rollbackTarget must be an object';
+  if (!record(input.rollbackTarget)) appendSafe(errors, 'rollbackTarget must be an object');
   else {
     const rollbackKeys = [
       'previousReportId',
@@ -398,14 +572,14 @@ export function verifyReleaseReport(
     for (let keyIndex = 0; keyIndex < rollbackKeys.length; keyIndex += 1) {
       const key = rollbackKeys[keyIndex] as (typeof rollbackKeys)[number];
       if (input.rollbackTarget[key] === undefined)
-        errors[errors.length] = `rollbackTarget.${key} is required`;
+        appendSafe(errors, `rollbackTarget.${key} is required`);
     }
     const rollbackHashKeys = ['previousDocumentHash', 'previousManifestHash'] as const;
     for (let keyIndex = 0; keyIndex < rollbackHashKeys.length; keyIndex += 1) {
       const key = rollbackHashKeys[keyIndex] as (typeof rollbackHashKeys)[number];
       const value = input.rollbackTarget[key];
       if (typeof value !== 'string' || !HASH.test(value) || /^0+$/.test(value))
-        errors[errors.length] = `rollbackTarget.${key} must be a non-zero SHA-256 hash`;
+        appendSafe(errors, `rollbackTarget.${key} must be a non-zero SHA-256 hash`);
     }
   }
   return { isValid: errors.length === 0, errors };

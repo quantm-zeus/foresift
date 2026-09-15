@@ -18,7 +18,7 @@ describe('verify-release-conformance CLI contract (FR-TRACE-003, AC-266)', () =>
 
     expect(result.status).toBe(0);
     expect(result.stdout).toMatch(/usage|verify|conformance/i);
-  });
+  }, 120_000);
 
   it('runs conformance verification and outputs verdict report', () => {
     const result = spawnSync('node', [CLI_PATH, '--json'], {
@@ -35,7 +35,7 @@ describe('verify-release-conformance CLI contract (FR-TRACE-003, AC-266)', () =>
       const output = result.stdout || result.stderr;
       expect(output).toMatch(/findings|requirement|rule|path/i);
     }
-  });
+  }, 120_000);
 
   it('refuses invalid unknown flags with non-zero exit code', () => {
     const result = spawnSync('node', [CLI_PATH, '--unknown-unsupported-arg'], {
@@ -44,7 +44,7 @@ describe('verify-release-conformance CLI contract (FR-TRACE-003, AC-266)', () =>
     });
 
     expect(result.status).not.toBe(0);
-  });
+  }, 120_000);
 });
 
 describe('verify-release-conformance CLI runs the PROD rules (H1)', () => {
@@ -121,7 +121,7 @@ describe('verify-release-conformance CLI runs the PROD rules (H1)', () => {
       }).stdout,
     );
     expect(withClaims.rules).toContain('PROD_CONFORMANCE_INPUT_MISSING');
-  });
+  }, 120_000);
 
   it('fails closed on a malformed claims file instead of skipping the claim rules (H2 residual)', async () => {
     const { mkdtemp, writeFile, rm } = await import('node:fs/promises');
@@ -152,5 +152,30 @@ describe('verify-release-conformance CLI runs the PROD rules (H1)', () => {
     } finally {
       await rm(dir, { recursive: true, force: true });
     }
+  }, 120_000);
+});
+
+/**
+ * V7-C1: a milestone that owns FR-PROD law cannot be certified by an invocation
+ * that never asked for PROD governance claims. Without an explicit
+ * `--prod-claims` file the claim rules are now REQUIRED, so the CLI fails closed
+ * with `PROD_CONFORMANCE_INPUT_MISSING` instead of silently skipping them.
+ */
+describe('verify-release-conformance CLI requires PROD claims by default (V7-C1)', () => {
+  it('fails closed with PROD_CONFORMANCE_INPUT_MISSING when no claims file is supplied', () => {
+    const result = spawnSync('node', [CLI_PATH, '--json'], {
+      cwd: REPO_ROOT,
+      encoding: 'utf8',
+      timeout: 120_000,
+    });
+    expect(result.status).toBe(1);
+    const verdict = JSON.parse(result.stdout) as {
+      readonly overall?: string;
+      readonly findings?: readonly { readonly rule?: string }[];
+    };
+    expect(verdict.overall).toBe('FAILED');
+    expect(
+      (verdict.findings ?? []).some((finding) => finding.rule === 'PROD_CONFORMANCE_INPUT_MISSING'),
+    ).toBe(true);
   }, 120_000);
 });

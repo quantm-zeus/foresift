@@ -423,12 +423,18 @@ export function validateRenderable(
       while (start > 0 && /[a-z0-9.-]/i.test(markup[start - 1]!)) start -= 1;
       let end = idx + 'xn--'.length;
       while (end < markup.length && /[a-z0-9.-]/i.test(markup[end]!)) end += 1;
-      appendSafe(warnings, `punycode address detected: ${markup.slice(start, end)} — verify before trusting`);
+      appendSafe(
+        warnings,
+        `punycode address detected: ${markup.slice(start, end)} — verify before trusting`,
+      );
       idx = lowerMarkup.indexOf('xn--', end);
     }
   }
   if (/[Ѐ-ӿͰ-Ͽ][^Ѐ-ӿͰ-Ͽ]*\.(com|net|org|io)/i.test(markup)) {
-    appendSafe(warnings, 'mixed Cyrillic/Greek script adjacent to a domain-like token (homograph risk)');
+    appendSafe(
+      warnings,
+      'mixed Cyrillic/Greek script adjacent to a domain-like token (homograph risk)',
+    );
   }
 
   return { safe: violations.length === 0, violations, warnings };

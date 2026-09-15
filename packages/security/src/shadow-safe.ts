@@ -31,12 +31,10 @@
  */
 const capturedTypedArrayLengthGetter: ((this: unknown) => unknown) | undefined =
   Object.getOwnPropertyDescriptor(Object.getPrototypeOf(Uint8Array.prototype), 'length')?.get as
-    | ((this: unknown) => unknown)
-    | undefined;
+    ((this: unknown) => unknown) | undefined;
 const capturedArrayBufferByteLengthGetter: ((this: unknown) => unknown) | undefined =
   Object.getOwnPropertyDescriptor(ArrayBuffer.prototype, 'byteLength')?.get as
-    | ((this: unknown) => unknown)
-    | undefined;
+    ((this: unknown) => unknown) | undefined;
 const capturedDateGetTime: (this: unknown) => number = Date.prototype.getTime;
 
 const capturedDefineProperty = Object.defineProperty;

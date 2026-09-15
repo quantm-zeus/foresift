@@ -20,7 +20,13 @@ import {
   type PublicRedactionResult,
 } from '@foresift/shared-schemas';
 import { ClaimsPolicyError } from './errors.ts';
-import { appendSafe, numericJoin, numericSortStrings, parseDecision, snapshotCallerInput } from './shadow-safe.ts';
+import {
+  appendSafe,
+  numericJoin,
+  numericSortStrings,
+  parseDecision,
+  snapshotCallerInput,
+} from './shadow-safe.ts';
 
 interface ClaimPattern {
   readonly claimClass:

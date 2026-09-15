@@ -9,7 +9,13 @@
  * construction; there is no wall-clock fallback anywhere in this module.
  */
 import { SecErrorCode, AbuseControlError } from './errors.ts';
-import { appendSafe, numericFilter, numericIncludes, numericReduce, snapshotCallerInput } from './shadow-safe.ts';
+import {
+  appendSafe,
+  numericFilter,
+  numericIncludes,
+  numericReduce,
+  snapshotCallerInput,
+} from './shadow-safe.ts';
 
 /** Subjects whose service may NEVER be degraded or suspended. */
 export const PROTECTED_SUBJECTS: readonly string[] = [

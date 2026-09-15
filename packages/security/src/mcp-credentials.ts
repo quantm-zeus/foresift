@@ -17,7 +17,13 @@
 import { createHmac } from 'node:crypto';
 import type { UtcTimestamp } from '@foresift/domain';
 import { CredentialError, SecErrorCode } from './errors.ts';
-import { numericCopy, numericFilter, numericIncludes, numericJoin, snapshotCallerInput } from './shadow-safe.ts';
+import {
+  numericCopy,
+  numericFilter,
+  numericIncludes,
+  numericJoin,
+  snapshotCallerInput,
+} from './shadow-safe.ts';
 
 export type EntropySource = () => Uint8Array;
 

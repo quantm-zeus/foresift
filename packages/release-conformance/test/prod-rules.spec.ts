@@ -174,9 +174,7 @@ describe('V7 fail-open: MCP compatibility requires conformance-run provenance (F
     fixtureRef: 'fixture-client-a',
   };
   const claimFor = (cell: Record<string, unknown>) => ({
-    revisions: [
-      { revision: '2025-11-25', channel: 'STABLE', isDefault: true, supersededBy: null },
-    ],
+    revisions: [{ revision: '2025-11-25', channel: 'STABLE', isDefault: true, supersededBy: null }],
     clients: [{ clientId: 'client-a' }],
     cells: [cell],
     now: '2026-06-01T00:00:00Z',

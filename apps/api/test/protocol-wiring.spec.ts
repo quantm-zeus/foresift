@@ -208,24 +208,26 @@ describe('V7 fail-open: MCP admission is governed, never caller-assembled (F9)',
         allowedRevisions: ['TOTALLY-UNREGISTERED-EVIL'],
       } as never),
     ).toThrow(/admission/);
-    expect(() =>
-      new McpProtocolWiring({
-        maximumRequestBytes: MAXIMUM_REQUEST_BYTES,
-        mutuallyTestedRevisions: ['TOTALLY-UNREGISTERED-EVIL'],
-      } as never),
+    expect(
+      () =>
+        new McpProtocolWiring({
+          maximumRequestBytes: MAXIMUM_REQUEST_BYTES,
+          mutuallyTestedRevisions: ['TOTALLY-UNREGISTERED-EVIL'],
+        } as never),
     ).toThrow(/admission/);
 
     // A hand-assembled admission naming an unregistered revision is refused by
     // the syntactic-revision law before any guard is built.
-    expect(() =>
-      new McpProtocolWiring({
-        maximumRequestBytes: MAXIMUM_REQUEST_BYTES,
-        admission: {
-          defaultRevision: MCP_PROTOCOL_BASELINE_REVISION,
-          usableRevisions: [MCP_PROTOCOL_BASELINE_REVISION, 'TOTALLY-UNREGISTERED-EVIL'],
-          optInRevisions: [],
-        },
-      } as never),
+    expect(
+      () =>
+        new McpProtocolWiring({
+          maximumRequestBytes: MAXIMUM_REQUEST_BYTES,
+          admission: {
+            defaultRevision: MCP_PROTOCOL_BASELINE_REVISION,
+            usableRevisions: [MCP_PROTOCOL_BASELINE_REVISION, 'TOTALLY-UNREGISTERED-EVIL'],
+            optInRevisions: [],
+          },
+        } as never),
     ).toThrow(/syntactically valid protocol revision/);
 
     // CONTROL: a governed baseline admission still admits the baseline.
@@ -279,7 +281,10 @@ describe('V7 fail-open: MCP admission is governed, never caller-assembled (F9)',
       // opt-in entry that is not a syntactically valid protocol revision
       {
         ...base,
-        admission: governedAdmission([MCP_PROTOCOL_BASELINE_REVISION], ['TOTALLY-UNREGISTERED-EVIL']),
+        admission: governedAdmission(
+          [MCP_PROTOCOL_BASELINE_REVISION],
+          ['TOTALLY-UNREGISTERED-EVIL'],
+        ),
       },
       // duplicate opt-in entry
       {

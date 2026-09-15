@@ -11,11 +11,13 @@
 import { createHash } from 'node:crypto';
 import { SecErrorCode, SupplyChainError } from './errors.ts';
 import {
+  appendSafe,
   numericFilter,
   numericJoin,
   numericMap,
   numericSome,
   numericSortStrings,
+  snapshotCallerInput,
 } from './shadow-safe.ts';
 
 // --- Pinning -------------------------------------------------------------------
@@ -24,11 +26,14 @@ const EXACT_VERSION = /^\d+\.\d+\.\d+([-+][0-9A-Za-z.-]+)?$/;
 
 /** Production dependencies must be pinned to EXACT versions. */
 export function verifyPinning(
-  manifests: ReadonlyArray<{
+  rawManifests: ReadonlyArray<{
     readonly name: string;
     readonly dependencies?: Record<string, string> | undefined;
   }>,
 ): { pinned: string[]; violations: { manifest: string; dependency: string; range: string }[] } {
+  // Single-read binding (V7 accessor class): the range classified as pinned and
+  // the range recorded in the violation must be the SAME read.
+  const manifests = snapshotCallerInput(rawManifests);
   const pinned: string[] = [];
   const violations: { manifest: string; dependency: string; range: string }[] = [];
   for (let manifestIndex = 0; manifestIndex < manifests.length; manifestIndex += 1) {
@@ -42,9 +47,9 @@ export function verifyPinning(
       const dependency = dependencyEntry[0];
       const range = dependencyEntry[1];
       if (EXACT_VERSION.test(range)) {
-        pinned[pinned.length] = `${manifest.name}/${dependency}@${range}`;
+        appendSafe(pinned, `${manifest.name}/${dependency}@${range}`);
       } else {
-        violations[violations.length] = { manifest: manifest.name, dependency, range };
+        appendSafe(violations, { manifest: manifest.name, dependency, range });
       }
     }
   }
@@ -52,8 +57,10 @@ export function verifyPinning(
 }
 
 export function assertPinned(
-  manifests: Parameters<typeof verifyPinning>[0],
+  rawManifests: Parameters<typeof verifyPinning>[0],
 ): ReturnType<typeof verifyPinning> {
+  // Single-read binding (V7 accessor class).
+  const manifests = snapshotCallerInput(rawManifests);
   const result = verifyPinning(manifests);
   if (result.violations.length > 0) {
     throw new SupplyChainError(
@@ -78,11 +85,14 @@ export interface LockfileRecord {
   readonly lockfileVersion: number;
 }
 
-export function recordLockfile(input: {
+export function recordLockfile(rawInput: {
   path: string;
   bytes: Uint8Array;
   lockfileVersion: number;
 }): LockfileRecord {
+  // Single-read binding (V7 accessor class): the hashed bytes, path and
+  // version must come from one read.
+  const input = snapshotCallerInput(rawInput);
   const digest = createHash('sha256').update(input.bytes).digest('hex');
   return {
     path: input.path,
@@ -109,7 +119,10 @@ export interface SbomRecord {
  * missing any identity field, or an empty inventory, refuses rather than
  * emitting a summary that looks authoritative over unknown material.
  */
-export function emitSbomRecord(components: readonly SbomComponent[]): SbomRecord {
+export function emitSbomRecord(rawComponents: readonly SbomComponent[]): SbomRecord {
+  // Single-read binding (V7 accessor class): completeness, the hashed identity
+  // set and the returned inventory must all be the same read.
+  const components = snapshotCallerInput(rawComponents);
   const incomplete =
     components.length === 0 ||
     numericSome(
@@ -149,12 +162,16 @@ export interface ProvenanceAttestation {
  * builder or commit must never anchor a recorded build hash.
  */
 export function recordBuildHash(
-  buildBytes: Uint8Array,
-  attestation: ProvenanceAttestation,
+  rawBuildBytes: Uint8Array,
+  rawAttestation: ProvenanceAttestation,
 ): {
   buildHash: string;
   attestation: ProvenanceAttestation;
 } {
+  // Single-read binding (V7 accessor class): the completeness check, the hashed
+  // bytes and the returned attestation must observe one read each.
+  const buildBytes = snapshotCallerInput(rawBuildBytes);
+  const attestation = snapshotCallerInput(rawAttestation);
   const incomplete =
     attestation.builderId.trim() === '' ||
     attestation.buildType.trim() === '' ||
@@ -175,7 +192,9 @@ export function recordBuildHash(
  * Fail-closed lockfile gate (M22): a deployment with NO recorded lockfile
  * has no reproducibility anchor — refused, never silently accepted.
  */
-export function requireLockfile(record: LockfileRecord | null | undefined): LockfileRecord {
+export function requireLockfile(rawRecord: LockfileRecord | null | undefined): LockfileRecord {
+  // Single-read binding (V7 accessor class); null/undefined pass through.
+  const record = snapshotCallerInput(rawRecord);
   if (record === undefined || record === null) {
     throw new SupplyChainError(
       'no lockfile record exists; reproducibility cannot be anchored',
@@ -197,10 +216,13 @@ const ALLOWED_LIFECYCLE_SCRIPTS = new Set(['prepare-husky', 'postinstall-allowli
  * acceptance contract pins that), while publish-time `prepack` and
  * `prepublishOnly` are restricted like the install hooks (M3).
  */
-export function checkLifecycleScripts(manifest: {
+export function checkLifecycleScripts(rawManifest: {
   readonly name: string;
   readonly scripts?: Record<string, string> | undefined;
 }): { restricted: string[]; allowed: true } {
+  // Single-read binding (V7 accessor class): the restricted-hook decision and
+  // the refusal detail must observe the same manifest.
+  const manifest = snapshotCallerInput(rawManifest);
   const scripts = manifest.scripts ?? {};
   const restrictedHooks = ['preinstall', 'install', 'postinstall', 'prepack', 'prepublishOnly'];
   const restricted = numericFilter(restrictedHooks, (hook) => {
@@ -232,11 +254,14 @@ export interface CapabilityReviewFlag {
  * this module's contract states (M3).
  */
 export function flagCapabilityReview(
-  entries: ReadonlyArray<{
+  rawEntries: ReadonlyArray<{
     readonly dependency: string;
     readonly declaredCapabilities: readonly DependencyCapability[];
   }>,
 ): readonly CapabilityReviewFlag[] {
+  // Single-read binding (V7 accessor class): the review flag is derived from the
+  // same capability list that is returned.
+  const entries = snapshotCallerInput(rawEntries);
   return numericMap(entries, (entry) => ({
     dependency: entry.dependency,
     capabilities: entry.declaredCapabilities,

@@ -9,7 +9,7 @@
  * construction; there is no wall-clock fallback anywhere in this module.
  */
 import { SecErrorCode, AbuseControlError } from './errors.ts';
-import { numericFilter, numericIncludes, numericReduce } from './shadow-safe.ts';
+import { appendSafe, numericFilter, numericIncludes, numericReduce, snapshotCallerInput } from './shadow-safe.ts';
 
 /** Subjects whose service may NEVER be degraded or suspended. */
 export const PROTECTED_SUBJECTS: readonly string[] = [
@@ -118,7 +118,7 @@ export class AbuseController {
       );
     }
 
-    entries[entries.length] = { at: now, cost };
+    appendSafe(entries, { at: now, cost });
     this.buckets.set(subject, { entries });
     evictOldestBeyond(this.buckets, MAX_TRACKED_SUBJECTS);
     return { admitted: true, serviceClass: 'FULL', costConsumed: cost, retryAfterMs: undefined };
@@ -131,7 +131,7 @@ export class AbuseController {
    * VERIFIED through an authenticated channel — a raw subject string alone
    * never grants PROTECTED.
    */
-  degradeOnQuotaExhaustion(input: {
+  degradeOnQuotaExhaustion(rawInput: {
     readonly subject: string;
     /** Remaining quota units in the subject's current window. */
     readonly quotaRemaining: number;
@@ -141,6 +141,9 @@ export class AbuseController {
      */
     readonly verifiedProtectedSubject?: boolean | undefined;
   }): AbuseDecision {
+    // Single-read binding (V7 accessor class): the PROTECTED grant reads the
+    // subject and verification flag more than once across the branch.
+    const input = snapshotCallerInput(rawInput);
     const quotaRemaining = input.quotaRemaining;
     if (!Number.isFinite(quotaRemaining) || quotaRemaining < 0) {
       // Unverifiable budget state degrades — it must never admit FULL.

@@ -20,12 +20,14 @@ import {
 } from '@foresift/shared-schemas';
 import { EgressError } from './errors.ts';
 import {
+  appendSafe,
   numericCopy,
   numericIncludes,
   numericJoin,
   numericSortStrings,
   numericSome,
   parseDecision,
+  snapshotCallerInput,
 } from './shadow-safe.ts';
 
 export type EgressPlane = EgressAllowlistEntry['plane'];
@@ -92,21 +94,21 @@ function expandIpv6(ip: string): number[] {
   // No spread/`Array.prototype.fill`: assemble the group list by numeric index.
   const groups: string[] = [];
   for (let index = 0; index < headGroups.length; index += 1) {
-    groups[groups.length] = headGroups[index] as string;
+    appendSafe(groups, headGroups[index] as string);
   }
   for (let index = 0; index < missing; index += 1) {
-    groups[groups.length] = '0';
+    appendSafe(groups, '0');
   }
   for (let index = 0; index < tailGroups.length; index += 1) {
-    groups[groups.length] = tailGroups[index] as string;
+    appendSafe(groups, tailGroups[index] as string);
   }
   const bytes: number[] = [];
   for (let index = 0; index < groups.length; index += 1) {
     const group = groups[index] as string;
     if (!/^[0-9A-Fa-f]{1,4}$/.test(group)) throw new Error('bad ipv6');
     const g = parseInt(group, 16);
-    bytes[bytes.length] = (g >> 8) & 0xff;
-    bytes[bytes.length] = g & 0xff;
+    appendSafe(bytes, (g >> 8) & 0xff);
+    appendSafe(bytes, g & 0xff);
   }
   return bytes;
 }
@@ -322,7 +324,10 @@ export class EgressGuard {
    * Pin→connect verification: re-resolve immediately before connecting and
    * confirm the answers match the pinned set — the DNS-rebinding counter.
    */
-  async verifyPin(url: string, pinnedAddresses: readonly string[]): Promise<EgressDecision> {
+  async verifyPin(url: string, rawPinnedAddresses: readonly string[]): Promise<EgressDecision> {
+    // Single-read binding (V7 accessor class): the comparison set and the
+    // returned pinned addresses must be the SAME read.
+    const pinnedAddresses = snapshotCallerInput(rawPinnedAddresses);
     const target = parseTarget(url);
     if (target === null) {
       return parseDecision(EgressDecisionSchema, {
@@ -396,12 +401,15 @@ export class EgressGuard {
   }
 
   /** Response-side caps: bytes, elapsed time, decompression ratio, content type. */
-  inspectResponse(response: {
+  inspectResponse(rawResponse: {
     readonly bytes?: number | undefined;
     readonly timeMs?: number | undefined;
     readonly decompressedBytes?: number | undefined;
     readonly contentType?: string | undefined;
   }): EgressDecision {
+    // Single-read binding (V7 accessor class): the byte/time/ratio checks and
+    // the content-type check must observe the same response facts.
+    const response = snapshotCallerInput(rawResponse);
     const refuse = (
       reason: Extract<EgressDecision, { decision: 'REFUSE' }>['reason'],
       detail: string,
@@ -439,7 +447,10 @@ export class EgressGuard {
   }
 
   /** Fail-closed convenience raising EgressError with the typed reason. */
-  requireAllowed(decision: EgressDecision): void {
+  requireAllowed(rawDecision: EgressDecision): void {
+    // Single-read binding (V7 accessor class): the branch test and the raised
+    // refusal detail must observe the same decision.
+    const decision = snapshotCallerInput(rawDecision);
     if (decision.decision !== 'ALLOW') {
       throw new EgressError(`egress refused (${decision.reason}): ${decision.detail}`, {
         reason: decision.reason,

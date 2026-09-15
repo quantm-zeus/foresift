@@ -21,7 +21,7 @@
  */
 import { createHash, createHmac, timingSafeEqual } from 'node:crypto';
 import { SecErrorCode, WebhookIntegrityError } from './errors.ts';
-import { numericIncludes } from './shadow-safe.ts';
+import { numericIncludes, snapshotCallerInput } from './shadow-safe.ts';
 
 /** Injectable verifier: returns true when signature is valid for the material. */
 export type SignatureVerifier = (
@@ -92,7 +92,12 @@ export class WebhookGuard {
    * Verify one callback. Returns the dedupe key on success; raises typed
    * WebhookIntegrityError otherwise.
    */
-  async verifyCallback(input: CallbackInput): Promise<DedupeKey> {
+  async verifyCallback(rawInput: CallbackInput): Promise<DedupeKey> {
+    // Single-read binding (V7 accessor class): the timestamp check, the
+    // signature verification over the received bytes, and the dedupe key must
+    // all observe the SAME delivery — a getter could otherwise present a fresh
+    // timestamp/bytes to the check and different bytes to the replay key.
+    const input = snapshotCallerInput(rawInput);
     // 1. Malformed refusal — empty or non-parseable bodies die here.
     let text: string;
     try {
@@ -160,8 +165,10 @@ export class WebhookGuard {
    */
   assertEndpointFromConfiguration(
     candidateUrl: string,
-    configuredEndpoints: readonly string[],
+    rawConfiguredEndpoints: readonly string[],
   ): void {
+    // Single-read binding (V7 accessor class): the allowlist is read once.
+    const configuredEndpoints = snapshotCallerInput(rawConfiguredEndpoints);
     if (!numericIncludes(configuredEndpoints, candidateUrl)) {
       throw new WebhookIntegrityError(
         'endpoint is not part of configured callback URLs; payload-sourced endpoints are refused',
@@ -178,8 +185,18 @@ export class WebhookGuard {
    * nothing". Serialization failures (circular structures, BigInt) are part
    * of the documented `false` contract, never thrown.
    */
-  guardCheckpointAdvance(event: unknown): boolean {
-    if (typeof event !== 'object' || event === null) return false;
+  guardCheckpointAdvance(rawEvent: unknown): boolean {
+    if (typeof rawEvent !== 'object' || rawEvent === null) return false;
+    // Single-read binding (V7 accessor class): the id check and the
+    // serialization proof must observe the same read. A non-plain carrier
+    // (class instance, boxed primitive, Proxy) is not provably plain data, so
+    // the documented fail-closed `false` contract covers it too.
+    let event: unknown;
+    try {
+      event = snapshotCallerInput(rawEvent);
+    } catch {
+      return false;
+    }
     const candidate = event as Record<string, unknown>;
     if (typeof candidate.id !== 'string' || candidate.id.length === 0) return false;
     try {

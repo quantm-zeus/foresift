@@ -1,21 +1,29 @@
 name: foresift-milestone-control
 description: |
-  Foresift milestone lifecycle control. Two modes, selected deterministically by
+  Foresift milestone lifecycle control. Modes are selected deterministically by
   preflight state inspection (never by AI):
 
-  Mode A — plan the next milestone (when no current milestone is planned):
-  read the authoritative PRD + requirement manifest, decompose the first eligible
-  dependency group into 2-8 outcome-oriented work packages, run an independent
-  fresh-context planning review, validate the plan deterministically, and land it
-  through a normal PR (CI + machine squash merge).
+  Mode A (PLAN) — plan the next milestone: read the authoritative PRD +
+  requirement manifest, decompose the first eligible dependency group into 2-8
+  outcome-oriented work packages inside a BOUNDED CONTINUATION LOOP (each
+  iteration continues partial planning persisted on disk; completion is decided
+  by the deterministic milestone validator, never by an AI promise), run an
+  independent fresh-context planning review, repair CRITICAL/HIGH findings,
+  re-validate deterministically, and land through a normal PR (CI + machine
+  squash merge).
 
-  Mode B — audit/close a fully-proven milestone:
-  run full repository verification, launch a fresh-context independent milestone
-  auditor against every requirement of the milestone; gaps become narrowly scoped
-  remediation packages in the SAME milestone (landed via PR). If no gaps exist,
-  archive the milestone as PROVEN to history/ and generate/plan nothing further
-  here (the autopilot immediately re-invokes this workflow in Mode A) — except at
-  the final milestone G7, where a final product-wide audit replaces planning.
+  Mode B (AUDIT / AUDIT_FINAL) — audit/close a fully-proven milestone inside a
+  bounded fresh-context continuation loop driven by a durable audit-progress
+  artifact ($ARTIFACTS_DIR/milestone-audit-progress.json) so the audit survives
+  any number of Claude turn boundaries. Gaps become narrowly scoped remediation
+  packages in the SAME milestone (landed via PR). If no gaps exist, the
+  milestone is archived as PROVEN to history/. At the final milestone G7 a
+  product-wide audit of EVERY requirement replaces planning.
+
+  A Claude turn ending cleanly is NOT stage completion: every long stage here
+  loops under a deterministic `until_bash` guard (the `until` text signals are
+  sentinels agents are instructed NEVER to emit). Loop exhaustion fails the
+  stage; recovery belongs to the autopilot supervisor.
 
   Invoke via the autopilot supervisor. NOT for implementing a work package (use
   foresift-work-package).
@@ -29,6 +37,7 @@ nodes:
   - id: mode-select
     bash: |
       set -euo pipefail
+      mkdir -p "$ARTIFACTS_DIR"
       node scripts/automation/milestone-mode.mjs > "$ARTIFACTS_DIR/mode.json"
       cat "$ARTIFACTS_DIR/mode.json"
     timeout: 120000
@@ -38,25 +47,51 @@ nodes:
     depends_on: [mode-select]
     when: "$mode-select.output.mode == 'NONE'"
 
-  # ── MODE A: DECOMPOSE NEXT MILESTONE ────────────────────────────────────────
+  # ── MODE A: DECOMPOSE NEXT MILESTONE (bounded continuation loop) ────────────
+  # Each iteration inspects partial specs/implementation/** state and prior
+  # artifacts, then continues (never regenerates) correct completed sections.
+  # Completion: deterministic milestone validation passes AND the rationale
+  # artifact exists. The `until` sentinel below must NEVER be emitted by an
+  # agent — the validator is the only completion authority.
   - id: plan-milestone
-    command: foresift-mc-plan
     depends_on: [mode-select]
     when: "$mode-select.output.mode == 'PLAN'"
-    context: fresh
-    idle_timeout: 900000
-    effort: high
+    idle_timeout: 1800000
+    loop_group:
+      max_iterations: 4
+      fresh_context: true
+      until: MC_PLAN_LOOP_TEXT_SIGNAL_NEVER_EMIT_7c31ab
+      until_bash: |
+        set -euo pipefail
+        node scripts/automation/milestone-validate.mjs --expect-next > /dev/null
+        test -s "$ARTIFACTS_DIR/milestone-plan-rationale.md"
+      nodes:
+        - id: plan-status
+          bash: |
+            set +e
+            node scripts/automation/milestone-validate.mjs --expect-next \
+              > "$ARTIFACTS_DIR/plan-completeness.json" 2>&1
+            if [ $? -eq 0 ] && [ -s "$ARTIFACTS_DIR/milestone-plan-rationale.md" ]; then
+              echo "PLAN_DRAFT_COMPLETE"
+            else
+              echo "PLAN_DRAFT_INCOMPLETE"
+            fi
+        - id: plan-iterate
+          command: foresift-mc-plan
+          when: "$plan-status.output == 'PLAN_DRAFT_INCOMPLETE'"
+          effort: high
+          idle_timeout: 1800000
 
   - id: plan-review
     command: foresift-mc-plan-review
     depends_on: [plan-milestone]
     context: fresh
-    idle_timeout: 900000
+    idle_timeout: 1800000
 
   # Apply CRITICAL/HIGH review findings to the draft plan (max 2 repair passes).
   - id: plan-fix-loop
     depends_on: [plan-review]
-    idle_timeout: 900000
+    idle_timeout: 1800000
     loop_group:
       max_iterations: 2
       fresh_context: true
@@ -87,25 +122,98 @@ nodes:
           model: large
           allowed_tools: [Read, Glob, Grep]
 
+  # ── DETERMINISTIC PLAN VALIDATION LOOP ──────────────────────────────────────
+  # The milestone validator is the sole completion authority. If validation
+  # fails, a bounded repair loop applies exactly the reported errors and
+  # re-validates — validation failure can never strand the stage (the repair
+  # path stays open until the guard passes or iterations exhaust).
   - id: plan-validate
-    bash: |
-      set -euo pipefail
-      node scripts/automation/milestone-validate.mjs --expect-next
     depends_on: [plan-fix-loop]
-    timeout: 120000
+    idle_timeout: 1800000
+    loop_group:
+      max_iterations: 4
+      fresh_context: true
+      until: MC_VALIDATE_LOOP_TEXT_SIGNAL_NEVER_EMIT_2e96d4
+      until_bash: |
+        set -euo pipefail
+        node scripts/automation/milestone-validate.mjs --expect-next > /dev/null
+        test -s "$ARTIFACTS_DIR/milestone-plan-rationale.md"
+      nodes:
+        - id: plan-validate-check
+          bash: |
+            set +e
+            node scripts/automation/milestone-validate.mjs --expect-next \
+              > "$ARTIFACTS_DIR/plan-validate-report.json" 2>&1
+            code=$?
+            if [ "$code" -eq 0 ]; then
+              echo "PLAN_VALID"
+            else
+              echo "PLAN_INVALID (details in $ARTIFACTS_DIR/plan-validate-report.json)"
+              cat "$ARTIFACTS_DIR/plan-validate-report.json"
+            fi
+        - id: plan-validate-repair
+          command: foresift-mc-plan-validate-fix
+          when: "$plan-validate-check.output != 'PLAN_VALID'"
+          effort: high
+          idle_timeout: 1800000
 
-  # ── MODE B: INDEPENDENT MILESTONE AUDIT ─────────────────────────────────────
+  # ── MODE B: INDEPENDENT MILESTONE AUDIT (bounded continuation loops) ────────
   - id: verify-repo
     bash: |
       set -euo pipefail
       pnpm foresift:gate -- --milestone
+      # Deterministically seed the durable audit-progress artifact before any
+      # auditor iteration runs (scope computed from the authoritative manifest).
+      node scripts/automation/audit-progress.mjs --init
     depends_on: [mode-select]
-    when: "$mode-select.output.mode == 'AUDIT'"
+    when: "$mode-select.output.mode == 'AUDIT' || $mode-select.output.mode == 'AUDIT_FINAL'"
     timeout: 1800000
 
-  - id: audit-milestone
-    command: foresift-mc-audit
+  # Ordinary milestone audit: bounded fresh-context loop over the durable
+  # progress artifact; each turn audits the next unaudited requirement range.
+  - id: audit-loop
     depends_on: [verify-repo]
+    when: "$mode-select.output.mode == 'AUDIT'"
+    idle_timeout: 1800000
+    loop_group:
+      max_iterations: 8
+      fresh_context: true
+      until: MC_AUDIT_LOOP_TEXT_SIGNAL_NEVER_EMIT_d92f50
+      until_bash: |
+        set -euo pipefail
+        node scripts/automation/audit-progress.mjs --check > /dev/null
+      nodes:
+        - id: audit-iterate
+          command: foresift-mc-audit
+          effort: high
+          idle_timeout: 1800000
+
+  # FINAL product-wide audit (G7): every requirement in the authoritative
+  # manifest must carry an audited, evidenced verdict before the loop ends.
+  - id: final-audit-loop
+    depends_on: [verify-repo]
+    when: "$mode-select.output.mode == 'AUDIT_FINAL'"
+    idle_timeout: 1800000
+    loop_group:
+      max_iterations: 16
+      fresh_context: true
+      until: MC_AUDIT_FINAL_LOOP_TEXT_SIGNAL_NEVER_EMIT_a51c33
+      until_bash: |
+        set -euo pipefail
+        node scripts/automation/audit-progress.mjs --check > /dev/null
+      nodes:
+        - id: audit-iterate-final
+          command: foresift-mc-audit
+          effort: high
+          idle_timeout: 1800000
+
+  # One-shot verdict execution after full audit coverage (never inside the
+  # loop): gaps → remediation packages appended to the SAME milestone;
+  # pass → archive to history/ (final: FINAL-AUDIT.md + product-wide record).
+  - id: audit-conclude
+    command: foresift-mc-audit-conclude
+    depends_on: [audit-loop, final-audit-loop]
+    trigger_rule: none_failed_min_one_success
     context: fresh
     idle_timeout: 1800000
     effort: high
@@ -113,7 +221,7 @@ nodes:
   # ── SHARED LANDING: branch, commit, PR, exact-head CI, merge ────────────────
   - id: land-planning-pr
     command: foresift-mc-land
-    depends_on: [plan-validate, audit-milestone]
+    depends_on: [plan-validate, audit-conclude]
     trigger_rule: none_failed_min_one_success
     context: fresh
     idle_timeout: 1800000

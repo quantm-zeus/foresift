@@ -1,0 +1,6 @@
+{
+  "valid": false,
+  "errors": [
+    "current-milestone.json missing"
+  ]
+}

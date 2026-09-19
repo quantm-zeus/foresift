@@ -5,11 +5,11 @@
   "root": ".",
   "totalTestFiles": 219,
   "counts": {
-    "CODEMOD_READY": 44,
+    "CODEMOD_READY": 42,
     "AGY_REQUIRED": 9,
     "MIGRATED": 93,
     "VERIFIED": 73,
-    "BLOCKED": 0
+    "BLOCKED": 2
   },
   "parity": {
     "previousTotal": 219,
@@ -4246,35 +4246,30 @@
     {
       "path": "tests/automation/v3-base-drift.spec.ts",
       "package": "automation",
-      "bytes": 23253,
+      "bytes": 23255,
       "lines": 615,
-      "sha256": "57af63730a896a9b452c31f39d01d4bff4d6016e225096819ea2a39f73462146",
+      "sha256": "0c4c108a13179546d17cc009ab498bc928e8e8c1a0ad35b6b77e610f8048e171",
       "imports": [
         "node:child_process",
         "node:fs",
         "node:os",
         "node:path",
-        "vitest",
+        "bun:test",
         "../../scripts/automation/base-drift.mjs",
         "../../scripts/automation/package-full-gate.mjs",
         "../../scripts/automation/package-final-land.mjs"
       ],
-      "vitestImports": [
-        "afterAll",
-        "describe",
-        "expect",
-        "it"
-      ],
+      "vitestImports": [],
       "features": [],
       "workload": "META_GATE",
-      "migrationType": "EASY_MECHANICAL",
+      "migrationType": "ALREADY_MIGRATED",
       "fixturesAndHelpers": [],
       "sourceAnchors": [
         "../../scripts/automation/base-drift.mjs",
         "../../scripts/automation/package-full-gate.mjs",
         "../../scripts/automation/package-final-land.mjs"
       ],
-      "state": "CODEMOD_READY"
+      "state": "BLOCKED"
     },
     {
       "path": "tests/automation/v3-generations.spec.ts",
@@ -4493,25 +4488,21 @@
     {
       "path": "tests/automation/workflow-node-budgets.spec.ts",
       "package": "automation",
-      "bytes": 4452,
+      "bytes": 4454,
       "lines": 103,
-      "sha256": "5cf1c42c240900a084669003de875aca8cbd9ac8c4019701487db22f4ae0fb46",
+      "sha256": "dbccfdf14d54d3fafed29b18fe54d1c16ae4c5e4a470033bc6806dcd4e4773d2",
       "imports": [
         "node:fs",
         "node:path",
-        "vitest"
+        "bun:test"
       ],
-      "vitestImports": [
-        "describe",
-        "expect",
-        "it"
-      ],
+      "vitestImports": [],
       "features": [],
       "workload": "META_GATE",
-      "migrationType": "EASY_MECHANICAL",
+      "migrationType": "ALREADY_MIGRATED",
       "fixturesAndHelpers": [],
       "sourceAnchors": [],
-      "state": "CODEMOD_READY"
+      "state": "BLOCKED"
     },
     {
       "path": "tests/automation/workflow-node-resilience.spec.ts",
@@ -7595,7 +7586,8 @@
       },
       "codexCalls": 0,
       "claudeCalls": 0,
-      "testedHead": "2848c8d7125cb7650f5f43038c5728cd862e6594"
+      "testedHead": "2848c8d7125cb7650f5f43038c5728cd862e6594",
+      "checkpointHead": "228a7d27856664c91e5bf38ca311abfd7f3d988a"
     },
     {
       "id": "mechanical-automation-meta-gate-1",
@@ -7605,7 +7597,45 @@
         "tests/automation/v3-base-drift.spec.ts",
         "tests/automation/workflow-node-budgets.spec.ts"
       ],
-      "state": "PENDING"
+      "state": "BLOCKED",
+      "verification": {
+        "ok": false,
+        "wallTimeMs": 13274,
+        "peakRssBytes": 0,
+        "cpuSeconds": 0,
+        "results": [
+          {
+            "id": "meta-1",
+            "workload": "META_GATE",
+            "files": [
+              "tests/automation/v3-base-drift.spec.ts"
+            ],
+            "fileWorkers": 1,
+            "testConcurrency": 1,
+            "command": [
+              "bun",
+              "test",
+              "--no-orphans",
+              "--isolate",
+              "--parallel=1",
+              "--max-concurrency=1",
+              "--timeout=30000",
+              "tests/automation/v3-base-drift.spec.ts"
+            ],
+            "status": 4,
+            "wallTimeMs": 13274,
+            "peakRssBytes": null,
+            "cpuSeconds": null,
+            "counts": {
+              "passed": 19,
+              "failed": 0,
+              "skipped": 0
+            },
+            "stdoutTail": "bun test v1.4.0 (34cbb9a40) 1x PARALLEL\n{\"merged\":true,\"pr\":7}\nLAND ▸ MERGED mechanically (ATTESTATION_REUSE)\n",
+            "stderrTail": "\ntests/automation/v3-base-drift.spec.ts:\n(pass) landingAdmission (pure) > admits a branch that carries current main [0.10ms]\n(pass) landingAdmission (pure) > refuses with base-drift when main advanced past what the branch carries [0.17ms]\n(pass) landingAdmission (pure) > fails closed when origin/main is unverifiable [0.06ms]\n(pass) isAncestorSha > true on exit 0, false on exit 1 (a real answer), null otherwise [0.20ms]\n(pass) isShallowCheckout > true/false/null map straight through; git failure is unverifiable [0.15ms]\n(pass) isShallowCheckout > a real shallow clone reports true; a full fixture repo reports false [153.66ms]\n(pass) FULL-gate attestation records baseMainSha (V3-D §11.1) > identity includes baseMainSha from the injected resolver [318.51ms]\n(pass) FULL-gate attestation records baseMainSha (V3-D §11.1) > reuse is INVALID once origin/main moved past the attested base [198.63ms]\n(pass) FULL-gate attestation records baseMainSha (V3-D §11.1) > an OLD attestation without baseMainSha fails closed against a resolved base [195.38ms]\n(pass) mechanical lander enforces base admission (V3-D §11.3) > happy path: branch seeded at main tip lands; trace shows base-admitted [263.67ms]\n(pass) mechanical lander enforces base admission (V3-D §11.3) > pre-push refusal: a sibling already merged ⇒ base-drift, no PR, no merge [213.35ms]\n(pass) mechanical lander enforces base admission (V3-D §11.3) > TOCTOU closure: main advances DURING the CI wait ⇒ pre-merge re-check refuses [301.87ms]\n(pass) mechanical lander enforces base admission (V3-D §11.3) > §29-E21: red CI at the pinned head ⇒ ci-red refusal, never bypassed [277.07ms]\n(pass) mechanical lander enforces base admission (V3-D §11.3) > §29-E22: zero check-runs at pinned head ⇒ no-check-runs diagnose-and-fail-fast [10373.42ms]\n(pass) mechanical lander enforces base admission (V3-D §11.3) > §29-E24: origin branch moves DURING the wait ⇒ head-moved abort, never merge a moving target [353.98ms]\n(pass) §31: two landers racing the same origin ⇒ exactly one winner > concurrent landing never double-merges; the loser refuses or loses at merge time [371.98ms]\ngh: pull request is not up to date with main (squash refused)\n(pass) §31: two landers racing the same origin ⇒ exactly one winner > merge serialization alone holds even without main advancement (idempotent guard) [131.42ms]\nLAND ▸ base-drift: main moved\n(pass) runFinalLand base-drift admission (V3-D §11.2) > provably drifted ⇒ refuses BEFORE any gate work, exit 4, verdict persisted [1.33ms]\n(pass) runFinalLand base-drift admission (V3-D §11.2) > advisory-ok environments proceed to the normal reuse route [1.39ms]\n\n 19 pass\n 0 fail\n 56 expect() calls\nRan 19 tests across 1 file. [13.26s]\n"
+          }
+        ]
+      }
     },
     {
       "id": "mechanical-automation-process-1",

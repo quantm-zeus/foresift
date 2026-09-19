@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'bun:test';
 
 // Regression coverage for defect #8 (live run 14ed21bdde69, 2026-08-24): the
 // gate-repair loop's `repair-targeted-recheck` bash node carried NO explicit

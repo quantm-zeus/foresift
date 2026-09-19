@@ -19,26 +19,21 @@ import {
 import type { UtcTimestamp } from '@foresift/domain';
 import { SecErrorCode, UntrustedContentError } from './errors.ts';
 import {
-  appendSafe,
   numericFilter,
   numericIncludes,
   numericJoin,
   numericMap,
   numericSlice,
   numericSome,
-  snapshotCallerInput,
 } from './shadow-safe.ts';
 
 /** Label + envelope one external item. Refuses unlabeled acquisition. */
-export function envelopeContent(rawInput: {
+export function envelopeContent(input: {
   source: UntrustedContentSource;
   content: string;
   provenanceRef: string;
   acquiredAt: UtcTimestamp;
 }): UntrustedContentEnvelope {
-  // Single-read binding (V7 accessor class): the provenance refusal and the
-  // parsed envelope must observe the same values.
-  const input = snapshotCallerInput(rawInput);
   if (input.provenanceRef.trim() === '') {
     throw new UntrustedContentError(
       'untrusted content requires a provenance reference',
@@ -60,10 +55,7 @@ export function envelopeContent(rawInput: {
  * fences through {@link parseStructuredExtractionFence}, which refuses any
  * begin/end pair whose nonces disagree or whose end marker repeats.
  */
-export function structuredExtractionEnvelope(rawEnvelope: UntrustedContentEnvelope): string {
-  // Single-read binding (V7 accessor class): the tag, provenance and content
-  // must all come from one read.
-  const envelope = snapshotCallerInput(rawEnvelope);
+export function structuredExtractionEnvelope(envelope: UntrustedContentEnvelope): string {
   const tag = `UNTRUSTED:${envelope.source}`;
   const nonce = randomUUID();
   return [
@@ -168,11 +160,8 @@ export function parseStructuredExtractionFence(fence: string): ParsedUntrustedFe
  */
 export function refuseProtectedRoleInsertion(
   role: string,
-  rawEnvelope: UntrustedContentEnvelope,
+  envelope: UntrustedContentEnvelope,
 ): void {
-  // Single-read binding (V7 accessor class): the role check and the refusal
-  // detail must observe the same envelope source.
-  const envelope = snapshotCallerInput(rawEnvelope);
   if (numericIncludes(PROTECTED_INSTRUCTION_ROLES, role)) {
     throw new UntrustedContentError(
       `untrusted content (${envelope.source}) may not enter the '${role}' instruction role`,
@@ -236,7 +225,7 @@ function extractTagBodies(markup: string): string[] {
       }
       close += 1;
     }
-    appendSafe(bodies, markup.slice(open + 1, close));
+    bodies[bodies.length] = markup.slice(open + 1, close);
     open = markup.indexOf('<', close + 1);
   }
   return bodies;
@@ -280,10 +269,6 @@ export function validateRenderable(
 ): RenderSafetyReport {
   const violations: { kind: RenderViolationKind; detail: string }[] = [];
   const warnings: string[] = [];
-  // Single-read binding (V7 accessor class): every policy field consulted below
-  // (allowRawHtml, trustedImageHosts, allowedLinkHosts) must come from ONE read
-  // so a getter cannot relax the policy between checks.
-  const boundPolicy = snapshotCallerInput(policy);
 
   // Browsers strip tab/newline/CR anywhere in a URL and expand entities in
   // attribute values, so scheme detection runs over a normalized copy;
@@ -294,27 +279,27 @@ export function validateRenderable(
 
   const lower = markup.toLowerCase();
   if (/<script[\s>]/.test(lower) || /<foreignobject[\s>]/.test(lower)) {
-    appendSafe(violations, {
+    violations[violations.length] = {
       kind: 'SCRIPT_TAG',
       detail: 'script or foreignObject element present',
-    });
+    };
   }
   // Separator-aware: HTML parsers accept '/' between tag name and attribute
   // ('<img/onerror=…>'), so whitespace alone must not gate detection.
   for (const match of markup.matchAll(/[\s/]on[a-z]+\s*=/gi)) {
-    appendSafe(violations, {
+    violations[violations.length] = {
       kind: 'EVENT_HANDLER_ATTRIBUTE',
       detail: `event handler attribute '${match[0].replace(/^[\s/]+/, '')}' present`,
-    });
+    };
     break;
   }
   for (let index = 0; index < DANGEROUS_URL_SCHEMES.length; index += 1) {
     const scheme = DANGEROUS_URL_SCHEMES[index] as string;
     if (schemeScanLower.includes(scheme)) {
-      appendSafe(violations, {
+      violations[violations.length] = {
         kind: 'DANGEROUS_URL_SCHEME',
         detail: `URL scheme '${scheme}' refused`,
-      });
+      };
       break;
     }
   }
@@ -322,19 +307,19 @@ export function validateRenderable(
   // containers); a lone inline image is judged by the image policy below,
   // since Markdown commonly embeds those.
   if (
-    (boundPolicy.allowRawHtml ?? false) === false &&
+    (policy.allowRawHtml ?? false) === false &&
     /<(div|span|p|table|iframe|object|embed|form|style|body|html)[\s>]/i.test(markup)
   ) {
-    appendSafe(violations, {
+    violations[violations.length] = {
       kind: 'RAW_HTML_REFUSED',
       detail: 'raw HTML is not admitted by policy',
-    });
+    };
   }
 
   // Images: every http(s) source must be on the trusted-host list. srcset
   // carries MULTIPLE candidates ('a.jpg 1x, b.jpg 2x') — each one is a real
   // fetch target, so validating only the first would hide the rest.
-  const trustedImageHosts = boundPolicy.trustedImageHosts ?? [];
+  const trustedImageHosts = policy.trustedImageHosts ?? [];
   for (const match of markup.matchAll(/\b(?:src|srcset)\s*=\s*("([^"]*)"|'([^']*)'|([^\s>]*))/gi)) {
     const rawValue = (match[2] ?? match[3] ?? match[4] ?? '').trim();
     const candidates = numericFilter(
@@ -351,10 +336,10 @@ export function validateRenderable(
         host = '';
       }
       if (!numericIncludes(trustedImageHosts, host)) {
-        appendSafe(violations, {
+        violations[violations.length] = {
           kind: 'REMOTE_IMAGE_UNTRUSTED',
           detail: `image host '${host}' not trusted`,
-        });
+        };
       }
     }
   }
@@ -377,10 +362,10 @@ export function validateRenderable(
       /target\s*=\s*["']?_blank/i.test(tag) &&
       !/rel\s*=\s*["'][^"']*noopener[^"']*noreferrer/i.test(tag)
     ) {
-      appendSafe(violations, {
+      violations[violations.length] = {
         kind: 'LINK_MISSING_NOOPENER',
         detail: 'target=_blank link without rel=noopener noreferrer',
-      });
+      };
     }
     let url: URL | null = null;
     try {
@@ -389,22 +374,22 @@ export function validateRenderable(
       url = null;
     }
     if (url !== null && (url.protocol === 'https:' || url.protocol === 'http:')) {
-      const allowedLinkHosts = boundPolicy.allowedLinkHosts;
+      const allowedLinkHosts = policy.allowedLinkHosts;
       if (
         allowedLinkHosts !== undefined &&
         !numericIncludes(allowedLinkHosts, url.hostname.toLowerCase())
       ) {
-        appendSafe(violations, {
+        violations[violations.length] = {
           kind: 'LINK_EXFIL_RISK',
           detail: `link host '${url.hostname}' outside the admitted set`,
-        });
+        };
       }
       const query = `${url.search}${url.hash}`.toLowerCase();
       if (numericSome(EXFIL_QUERY_HINTS, (hint) => hint.length >= 3 && query.includes(hint))) {
-        appendSafe(violations, {
+        violations[violations.length] = {
           kind: 'LINK_EXFIL_RISK',
           detail: `link query carries credential-shaped material: ${url.hostname}`,
-        });
+        };
       }
     }
   }
@@ -423,18 +408,14 @@ export function validateRenderable(
       while (start > 0 && /[a-z0-9.-]/i.test(markup[start - 1]!)) start -= 1;
       let end = idx + 'xn--'.length;
       while (end < markup.length && /[a-z0-9.-]/i.test(markup[end]!)) end += 1;
-      appendSafe(
-        warnings,
-        `punycode address detected: ${markup.slice(start, end)} — verify before trusting`,
-      );
+      warnings[warnings.length] =
+        `punycode address detected: ${markup.slice(start, end)} — verify before trusting`;
       idx = lowerMarkup.indexOf('xn--', end);
     }
   }
   if (/[Ѐ-ӿͰ-Ͽ][^Ѐ-ӿͰ-Ͽ]*\.(com|net|org|io)/i.test(markup)) {
-    appendSafe(
-      warnings,
-      'mixed Cyrillic/Greek script adjacent to a domain-like token (homograph risk)',
-    );
+    warnings[warnings.length] =
+      'mixed Cyrillic/Greek script adjacent to a domain-like token (homograph risk)';
   }
 
   return { safe: violations.length === 0, violations, warnings };
@@ -448,14 +429,11 @@ export function validateRenderable(
  * across contexts are computationally impossible, so nothing learned in one
  * tenant's session can surface in another's.
  */
-export function deriveMemoryIsolationKey(rawParts: {
+export function deriveMemoryIsolationKey(parts: {
   actorId: string;
   sessionId: string;
   workspaceId: string;
 }): string {
-  // Single-read binding (V7 accessor class): the three context components must
-  // be read atomically so the derived key cannot mix two tenants.
-  const parts = snapshotCallerInput(rawParts);
   const canonical = JSON.stringify([
     'foresift/memory-isolation/v1',
     parts.actorId,

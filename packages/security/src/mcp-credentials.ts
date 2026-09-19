@@ -17,13 +17,7 @@
 import { createHmac } from 'node:crypto';
 import type { UtcTimestamp } from '@foresift/domain';
 import { CredentialError, SecErrorCode } from './errors.ts';
-import {
-  numericCopy,
-  numericFilter,
-  numericIncludes,
-  numericJoin,
-  snapshotCallerInput,
-} from './shadow-safe.ts';
+import { numericCopy, numericFilter, numericIncludes, numericJoin } from './shadow-safe.ts';
 
 export type EntropySource = () => Uint8Array;
 
@@ -127,10 +121,7 @@ export class McpCredentialStore {
    * Mint a credential. Returns the raw secret exactly once; SQL truth only
    * ever sees the keyed hash.
    */
-  async issue(rawInput: IssueCredentialInput): Promise<IssuedCredential> {
-    // Single-read binding (V7 accessor class): the persisted scope/bound sets
-    // and the returned identity must all come from one read.
-    const input = snapshotCallerInput(rawInput);
+  async issue(input: IssueCredentialInput): Promise<IssuedCredential> {
     const bytes = this.entropy();
     if (bytes.length < CREDENTIAL_SECRET_BYTES) {
       throw new CredentialError(
@@ -196,10 +187,7 @@ export class McpCredentialStore {
    * credentials remain admissible without those fields. Strict mode
    * additionally requires every presentation dimension explicitly.
    */
-  async authenticate(rawInput: AuthenticateInput): Promise<CredentialRow> {
-    // Single-read binding (V7 accessor class): the strictness, IP, origin and
-    // scope-coverage dimensions must all observe the same presentation.
-    const input = snapshotCallerInput(rawInput);
+  async authenticate(input: AuthenticateInput): Promise<CredentialRow> {
     const row = await this.rowForSecret(input.presentedSecret);
     if (row.revoked_at !== null) {
       throw new CredentialError(
@@ -261,10 +249,8 @@ export class McpCredentialStore {
 
   async recordUsage(
     credentialId: string,
-    rawUsage: { at: UtcTimestamp; origin: string },
+    usage: { at: UtcTimestamp; origin: string },
   ): Promise<void> {
-    // Single-read binding (V7 accessor class).
-    const usage = snapshotCallerInput(rawUsage);
     await this.engine.query(
       'UPDATE sec.mcp_credentials SET last_used_at = $2, last_used_origin = $3 WHERE credential_id = $1',
       [credentialId, usage.at, usage.origin],

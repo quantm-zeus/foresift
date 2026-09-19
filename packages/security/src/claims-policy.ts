@@ -20,13 +20,7 @@ import {
   type PublicRedactionResult,
 } from '@foresift/shared-schemas';
 import { ClaimsPolicyError } from './errors.ts';
-import {
-  appendSafe,
-  numericJoin,
-  numericSortStrings,
-  parseDecision,
-  snapshotCallerInput,
-} from './shadow-safe.ts';
+import { numericJoin, numericSortStrings, parseDecision } from './shadow-safe.ts';
 
 interface ClaimPattern {
   readonly claimClass:
@@ -80,7 +74,7 @@ export function evaluateClaims(text: string, channel: ClaimsPolicyChannel): Clai
   // Numeric collection, not `[...classes]`: array spread reads the shadowable
   // `Array.prototype[Symbol.iterator]` (audit R13).
   classes.forEach((entry) => {
-    appendSafe(classList, entry);
+    classList[classList.length] = entry;
   });
   return parseDecision(ClaimsPolicyResultSchema, {
     verdict: 'REFUSED',
@@ -124,13 +118,10 @@ const DETECTOR_THRESHOLD_PATTERN =
  * schema-typed redaction result; on success `redactedBody` carries what may
  * actually be published (exposed as a non-schema extra by this module).
  */
-export function validatePublicOutput(rawCandidate: PublicOutputCandidate): {
+export function validatePublicOutput(candidate: PublicOutputCandidate): {
   redaction: PublicRedactionResult;
   redactedBody: string;
 } {
-  // Single-read binding (V7 accessor class): the envelope check, the body
-  // redaction and the success body must all see the SAME candidate values.
-  const candidate = snapshotCallerInput(rawCandidate);
   // 1. Envelope completeness — every §35.12 duty present and parseable.
   try {
     PublicOutputEnvelopeSchema.parse({

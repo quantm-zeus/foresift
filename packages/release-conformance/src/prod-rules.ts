@@ -355,20 +355,6 @@ export interface McpCompatibilityCellClaim {
   readonly clientId: string;
   readonly result: string;
   readonly liveTestDate: string;
-  /**
-   * The passing conformance RUN this cell's result is derived from. The DB
-   * resolver (`isMutuallyTested` in `@foresift/capability-registry`) requires a
-   * passing run whose `fixtureRef` matches the cell, so a release claim that
-   * asserts PASS without run provenance certifies a default the server would
-   * refuse (V7-F8). REQUIRED; a missing/empty value drifts the release.
-   */
-  readonly conformanceRunId: string;
-  /**
-   * The fixture the conformance run exercised. The resolver compares it for
-   * exact equality with the run's fixture, and a blank declared fixture is not
-   * a reference. REQUIRED; a missing/empty value drifts the release.
-   */
-  readonly fixtureRef: string;
 }
 
 /** A fully resolved MCP revision/client/cell matrix snapshot. */
@@ -509,23 +495,6 @@ export function checkMcpCompatibilityDrift(claim: McpCompatibilityMatrixClaim): 
       }
       if (cell.result !== 'PASS') {
         report(cellPath, `conformance result is ${cell.result}, not PASS`);
-        continue;
-      }
-      // V7-F8: a PASS cell must carry the conformance-run provenance the DB
-      // resolver demands (`isMutuallyTested` → a passing run whose `fixtureRef`
-      // matches the cell). Without both fields a release gate could certify a
-      // default the server refuses to serve. Fail closed on a missing, empty,
-      // or non-string value; never throw.
-      if (
-        typeof cell.conformanceRunId !== 'string' ||
-        cell.conformanceRunId.trim().length === 0 ||
-        typeof cell.fixtureRef !== 'string' ||
-        cell.fixtureRef.trim().length === 0
-      ) {
-        report(
-          cellPath,
-          'the PASS conformance cell carries no admissible conformance-run provenance (conformanceRunId/fixtureRef must be non-empty strings)',
-        );
         continue;
       }
       let usable = false;

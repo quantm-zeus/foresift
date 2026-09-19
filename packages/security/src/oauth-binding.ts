@@ -22,7 +22,6 @@ import {
   numericJoin,
   numericMap,
   numericSome,
-  snapshotCallerInput,
 } from './shadow-safe.ts';
 
 /** Injected clock seam returning epoch milliseconds. */
@@ -49,12 +48,7 @@ export class OAuthBindingGuard {
    * Structural parse + every binding dimension. Returns the parsed binding
    * on success; raises typed OAuthBindingError otherwise.
    */
-  validateTokenBinding(rawInput: BindingValidationInput): OAuthTokenBinding {
-    // Single-read binding (V7 accessor class): the candidate, the registered
-    // redirect/scope sets and the expected audience/resource must each be
-    // materialized once so a getter/Proxy cannot satisfy a check and then swap
-    // the value that gets returned.
-    const input = snapshotCallerInput(rawInput);
+  validateTokenBinding(input: BindingValidationInput): OAuthTokenBinding {
     const parsed = OAuthTokenBindingSchema.safeParse(input.candidate);
     if (!parsed.success) {
       // A missing/false pkceRequired is the load-bearing structural refusal.
@@ -132,7 +126,7 @@ export class OAuthBindingGuard {
    * presentation carrying no issuer evidence at all is refused — absence of
    * proof of upstream issuance is not proof of local issuance.
    */
-  refuseUpstreamPassthrough(rawPresentation: {
+  refuseUpstreamPassthrough(presentation: {
     readonly isUpstreamIssued?: boolean | undefined;
     readonly upstreamIssuer?: string | undefined;
     /** The issuer claimed for the presented token (from its metadata). */
@@ -140,9 +134,6 @@ export class OAuthBindingGuard {
     /** The ONLY issuer this deployment accepts as local. */
     readonly expectedLocalIssuer: string;
   }): void {
-    // Single-read binding (V7 accessor class): the refusal checks and the
-    // diagnostic must observe the same presentation.
-    const presentation = snapshotCallerInput(rawPresentation);
     const claimed = presentation.claimedIssuer?.trim() ?? '';
     if (
       presentation.isUpstreamIssued === true ||

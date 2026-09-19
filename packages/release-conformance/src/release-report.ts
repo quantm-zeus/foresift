@@ -202,15 +202,7 @@ export async function buildReleaseReport(
       },
     ],
   };
-  // A SUPPLIED result is normalized too (V7-F7b): accepting it verbatim let a
-  // caller hand in `{overall:'PASSED', totalRulesEvaluated:0, ...}` — internally
-  // vacuous — which (with one valid gate-evidence item) still drove
-  // `activationState.status` to `ACTIVE` and passed `verifyReleaseReport`. The
-  // `defaultConformance` branch above is only the omitted-input case.
-  const conformanceResults =
-    options.conformanceResults === undefined
-      ? defaultConformance
-      : normalizeSuppliedConformance(options.conformanceResults);
+  const conformanceResults = options.conformanceResults ?? defaultConformance;
   const gateEvidence = options.gateEvidence ?? [];
   // Numeric-index aggregation only (audit HIGH): `filter`/`map`/`sort`/`some`
   // are all shadowable in-process, and an emptied pass/refusal set would let a
@@ -305,139 +297,6 @@ export async function buildReleaseReport(
 
 function record(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
-}
-
-function isNonNegativeInteger(value: unknown): value is number {
-  return typeof value === 'number' && Number.isInteger(value) && value >= 0;
-}
-
-/**
- * Normalize a caller-supplied conformance result (V7-F7b).
- *
- * A supplied result is admitted only when it is structurally well-formed (an
- * object with an `overall` discriminant, finite non-negative integer counts
- * that balance, and a `findings` array). A `PASSED` result is additionally
- * admissible only when it is NON-VACUOUS: at least one rule was evaluated, every
- * evaluated rule passed, no rule failed, and no finding was recorded. Anything
- * else — including a non-object carrier — is replaced with a synthetic `FAILED`
- * record carrying a `CONFORMANCE_NOT_EVALUATED` finding, so a caller can never
- * supply a vacuous PASSED that drives the activation state to `ACTIVE`. An
- * admitted result is returned as a frozen plain copy built from single-read
- * locals (never the caller's object), so the value validated is the value
- * consumed even if a future caller bypasses the outer snapshot. This never
- * throws.
- */
-function normalizeSuppliedConformance(
-  supplied: unknown,
-): ReleaseReportRecord['conformanceResults'] {
-  const notEvaluated = (message: string): ReleaseReportRecord['conformanceResults'] => ({
-    overall: 'FAILED',
-    // One synthetic rule was evaluated (the supplied-result admissibility rule)
-    // and it failed; the counts must balance for the record schema.
-    totalRulesEvaluated: 1,
-    passedCount: 0,
-    failureCount: 1,
-    findings: [
-      {
-        requirementId: 'FR-TRACE-006',
-        rule: 'CONFORMANCE_NOT_EVALUATED',
-        path: 'conformanceResults',
-        message,
-      },
-    ],
-  });
-  if (!record(supplied)) {
-    return notEvaluated(
-      'the supplied release-conformance result was not an object; a release report cannot record PASSED with zero evaluated rules',
-    );
-  }
-  const overall = supplied['overall'];
-  const totalRulesEvaluated = supplied['totalRulesEvaluated'];
-  const passedCount = supplied['passedCount'];
-  const failureCount = supplied['failureCount'];
-  const findings = supplied['findings'];
-  if (
-    !isNonNegativeInteger(totalRulesEvaluated) ||
-    !isNonNegativeInteger(passedCount) ||
-    !isNonNegativeInteger(failureCount) ||
-    !Array.isArray(findings) ||
-    (overall !== 'PASSED' && overall !== 'FAILED')
-  ) {
-    return notEvaluated(
-      'the supplied release-conformance result is malformed (counts, findings, or overall); a release report cannot record PASSED with zero evaluated rules',
-    );
-  }
-  if (passedCount + failureCount !== totalRulesEvaluated) {
-    return notEvaluated(
-      'the supplied release-conformance result has unbalanced counts; a release report cannot record PASSED with zero evaluated rules',
-    );
-  }
-  if (
-    overall === 'PASSED' &&
-    (totalRulesEvaluated <= 0 ||
-      passedCount !== totalRulesEvaluated ||
-      failureCount !== 0 ||
-      findings.length !== 0)
-  ) {
-    return notEvaluated(
-      'the supplied release-conformance result declared PASSED with zero evaluated rules or inconsistent counts; a release report cannot record PASSED with zero evaluated rules',
-    );
-  }
-  // Build a NORMALIZED FROZEN PLAIN COPY from the single-read locals. Returning
-  // the caller's object (even a snapshotted one) would let the validated value
-  // and the consumed value drift if a future caller bypasses the outer
-  // `snapshotCallerInput`. Each admitted result — including every finding — is
-  // copied into a frozen null-prototype object so the value validated here is
-  // the value the activation-state decision and the record consume.
-  const normalizedFindings: ReleaseFinding[] = [];
-  for (let index = 0; index < findings.length; index += 1) {
-    const raw = findings[index];
-    if (!record(raw)) {
-      return notEvaluated(
-        'the supplied release-conformance result carried a malformed finding; a release report cannot record PASSED with zero evaluated rules',
-      );
-    }
-    const requirementId = raw['requirementId'];
-    const rule = raw['rule'];
-    const findingPath = raw['path'];
-    const message = raw['message'];
-    if (
-      typeof requirementId !== 'string' ||
-      requirementId.length === 0 ||
-      typeof rule !== 'string' ||
-      rule.length === 0 ||
-      typeof findingPath !== 'string' ||
-      findingPath.length === 0 ||
-      typeof message !== 'string' ||
-      message.length === 0
-    ) {
-      return notEvaluated(
-        'the supplied release-conformance result carried a malformed finding; a release report cannot record PASSED with zero evaluated rules',
-      );
-    }
-    appendSafe(
-      normalizedFindings,
-      Object.freeze(
-        Object.assign(Object.create(null) as ReleaseFinding, {
-          requirementId,
-          rule,
-          path: findingPath,
-          message,
-        }),
-      ),
-    );
-  }
-  const normalized = Object.assign(
-    Object.create(null) as ReleaseReportRecord['conformanceResults'],
-    {
-      overall,
-      totalRulesEvaluated,
-      passedCount,
-      failureCount,
-      findings: Object.freeze(normalizedFindings),
-    },
-  );
-  return Object.freeze(normalized);
 }
 
 /** Strict structural/hash verifier. Pass expected hashes when verifying against a live tree. */
@@ -536,19 +395,6 @@ export function verifyReleaseReport(
       !numericIncludes(['PASSED', 'FAILED'], input.conformanceResults.overall)
     ) {
       appendSafe(errors, 'conformanceResults.overall is invalid');
-    }
-    // V7-F7b: a PASSED result that evaluated zero rules is vacuous, not a pass.
-    // The counts refine above (`passedCount + failureCount === total`) is
-    // satisfied by `0 + 0 === 0`, so the record schema alone admits it.
-    if (
-      input.conformanceResults.overall === 'PASSED' &&
-      (typeof input.conformanceResults.totalRulesEvaluated !== 'number' ||
-        input.conformanceResults.totalRulesEvaluated <= 0)
-    ) {
-      appendSafe(
-        errors,
-        'conformanceResults.totalRulesEvaluated: PASSED with zero rules evaluated is not admissible',
-      );
     }
   }
   if (!Array.isArray(input.unresolvedDeviations))

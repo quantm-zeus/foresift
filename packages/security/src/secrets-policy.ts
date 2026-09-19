@@ -13,14 +13,12 @@ import {
 } from '@foresift/shared-schemas';
 import { SecErrorCode, SecretsPolicyError } from './errors.ts';
 import {
-  appendSafe,
   numericCopy,
   numericFilter,
   numericIncludes,
   numericJoin,
   numericMap,
   numericSortWith,
-  snapshotCallerInput,
 } from './shadow-safe.ts';
 
 /** The full classification registry (single source: shared schema). */
@@ -67,13 +65,10 @@ export function detectMaterial(text: string): string[] {
  * §35.x hard rule: classified secret material never enters model context.
  * Refuses on BOTH explicit classification and detected material shapes.
  */
-export function refuseSecretTowardModelContext(rawInput: {
+export function refuseSecretTowardModelContext(input: {
   readonly content: string;
   readonly declaredClassifications?: readonly SecretClassification[];
 }): void {
-  // Single-read binding (V7 accessor class): the detected-material decision and
-  // the declared-classification refusal must observe the same read.
-  const input = snapshotCallerInput(rawInput);
   const detected = detectMaterial(input.content);
   if (detected.length > 0 || (input.declaredClassifications?.length ?? 0) > 0) {
     throw new SecretsPolicyError(
@@ -94,13 +89,9 @@ export function redactForLogs(
   text: string,
   knownValues: ReadonlyArray<{ value: string; label: string }> = [],
 ): string {
-  // Single-read binding (V7 accessor class): each known value/label is read
-  // repeatedly by the replace loop; a getter could otherwise flip the value
-  // between the match check and the replacement and leak material.
-  const boundKnownValues = snapshotCallerInput(knownValues);
   let output = text;
   const sortedKnown = numericSortWith(
-    numericCopy(boundKnownValues),
+    numericCopy(knownValues),
     (a, b) => b.value.length - a.value.length,
   );
   for (let index = 0; index < sortedKnown.length; index += 1) {
@@ -175,12 +166,9 @@ export class SecretLifecycleLedger {
   private readonly events: SecretLifecycleEvent[] = [];
 
   /** Parse-and-record one lifecycle event (keyed references only). */
-  record(rawEvent: SecretLifecycleEvent): SecretLifecycleEvent {
-    // Single-read binding (V7 accessor class): the schema parse and the stored
-    // event must see the same caller values.
-    const event = snapshotCallerInput(rawEvent);
+  record(event: SecretLifecycleEvent): SecretLifecycleEvent {
     const parsed = SecretLifecycleEventSchema.parse(event);
-    appendSafe(this.events, parsed);
+    this.events[this.events.length] = parsed;
     return parsed;
   }
 
@@ -188,16 +176,13 @@ export class SecretLifecycleLedger {
    * Rotation with overlap window: the OLD reference stays valid until
    * overlapUntil; records must carry a strictly ordered overlap end.
    */
-  recordRotation(rawInput: {
+  recordRotation(input: {
     secretRef: string;
     classification: SecretClassification;
     at: string;
     overlapUntil?: string | undefined;
     environment: 'PRODUCTION' | 'COLLECTOR' | 'ALPHA_LAB';
   }): SecretLifecycleEvent {
-    // Single-read binding (V7 accessor class): the overlap check and the
-    // recorded event must observe the same instants.
-    const input = snapshotCallerInput(rawInput);
     if (
       input.overlapUntil !== undefined &&
       Date.parse(input.overlapUntil) <= Date.parse(input.at)
@@ -220,16 +205,13 @@ export class SecretLifecycleLedger {
   }
 
   /** Incident-triggered invalidation hookup (§35.x coupling). */
-  invalidateForIncident(rawInput: {
+  invalidateForIncident(input: {
     secretRefs: readonly string[];
     classification: SecretClassification;
     incidentId: string;
     at: string;
     environment: 'PRODUCTION' | 'COLLECTOR' | 'ALPHA_LAB';
   }): readonly SecretLifecycleEvent[] {
-    // Single-read binding (V7 accessor class): every emitted revocation record
-    // must carry the same classification/incident/environment values.
-    const input = snapshotCallerInput(rawInput);
     return numericMap(input.secretRefs, (secretRef) =>
       this.record({
         secretRef: secretRef as never,
@@ -251,10 +233,7 @@ export class SecretLifecycleLedger {
 // --- Configuration validation --------------------------------------------------------------
 
 /** Prohibited-secret-class configuration validation: config ⊆ registry. */
-export function validateSecretClassConfiguration(rawRequestedClasses: readonly string[]): void {
-  // Single-read binding (V7 accessor class): the unknown-class filter must see
-  // the same element set it reports on.
-  const requestedClasses = snapshotCallerInput(rawRequestedClasses);
+export function validateSecretClassConfiguration(requestedClasses: readonly string[]): void {
   const unknown = numericFilter(
     requestedClasses,
     (c) => !numericIncludes(SECRET_CLASSIFICATIONS, c as SecretClassification),

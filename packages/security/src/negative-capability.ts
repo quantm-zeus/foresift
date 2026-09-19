@@ -16,14 +16,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import type { ProhibitedCapabilityCategory } from '@foresift/shared-schemas';
 import { ProhibitedCapabilityError } from './errors.ts';
-import {
-  appendSafe,
-  numericJoin,
-  numericMap,
-  numericSlice,
-  numericSome,
-  snapshotCallerInput,
-} from './shadow-safe.ts';
+import { numericJoin, numericMap, numericSlice, numericSome } from './shadow-safe.ts';
 
 export interface CanaryCatalog {
   readonly catalogVersion: number;
@@ -71,11 +64,7 @@ export class NegativeCapabilityCanary {
   }
 
   /** Inventory check over registered route/tool names. */
-  checkInventory(rawEntries: ReadonlyArray<{ name: string; source: string }>): CanaryFinding[] {
-    // Single-read binding (V7 accessor class): each entry's name/source is read
-    // once so a getter cannot dodge the forbidden-verb scan and then supply the
-    // recorded reference.
-    const entries = snapshotCallerInput(rawEntries);
+  checkInventory(entries: ReadonlyArray<{ name: string; source: string }>): CanaryFinding[] {
     const findings: CanaryFinding[] = [];
     for (let entryIndex = 0; entryIndex < entries.length; entryIndex += 1) {
       const entry = entries[entryIndex] as { name: string; source: string };
@@ -84,12 +73,12 @@ export class NegativeCapabilityCanary {
       for (let verbIndex = 0; verbIndex < forbiddenVerbs.length; verbIndex += 1) {
         const verb = forbiddenVerbs[verbIndex] as string;
         if (normalized.includes(verb)) {
-          appendSafe(findings, {
+          findings[findings.length] = {
             category: 'TRANSACTION_BUILD_SIGN_SUBMIT',
             surface: 'ROUTE_INVENTORY',
             reference: `${entry.source}#${entry.name}`,
             matchedPattern: verb,
-          });
+          };
         }
       }
     }

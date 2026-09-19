@@ -15,7 +15,6 @@ import {
   numericJoin,
   numericMap,
   numericSome,
-  snapshotCallerInput,
 } from './shadow-safe.ts';
 
 export interface DecoderConfigEntry {
@@ -34,13 +33,10 @@ export interface DecodingPathConfig {
   readonly acknowledgedDeprecations?: readonly string[] | undefined;
 }
 
-export function validateDecoderAuthority(rawConfig: DecodingPathConfig): {
+export function validateDecoderAuthority(config: DecodingPathConfig): {
   ok: true;
   authoritativeDecoderIds: string[];
 } {
-  // Single-read binding (V7 accessor class): the authority, deprecation and
-  // acknowledgement checks must all observe the same decoder inventory.
-  const config = snapshotCallerInput(rawConfig);
   const deprecatedAuthoritative = numericFilter(
     config.decoders,
     (decoder) =>

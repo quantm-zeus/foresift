@@ -311,6 +311,24 @@ importers:
         specifier: workspace:*
         version: link:../persistence
 
+  packages/objective-governance:
+    dependencies:
+      '@foresift/domain':
+        specifier: workspace:*
+        version: link:../domain
+      '@foresift/evaluation':
+        specifier: workspace:*
+        version: link:../evaluation
+      '@foresift/outcome-maturity':
+        specifier: workspace:*
+        version: link:../outcome-maturity
+      '@foresift/shadow-portfolio':
+        specifier: workspace:*
+        version: link:../shadow-portfolio
+      '@foresift/shared-schemas':
+        specifier: workspace:*
+        version: link:../shared-schemas
+
   packages/outcome-maturity:
     dependencies:
       '@foresift/domain':
@@ -472,6 +490,15 @@ importers:
       '@electric-sql/pglite':
         specifier: ^0.5.6
         version: 0.5.6
+
+  packages/shadow-portfolio:
+    dependencies:
+      '@foresift/domain':
+        specifier: workspace:*
+        version: link:../domain
+      '@foresift/shared-schemas':
+        specifier: workspace:*
+        version: link:../shared-schemas
 
   packages/shared-schemas:
     dependencies:

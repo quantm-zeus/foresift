@@ -144,7 +144,11 @@ export class GatePauses {
       resumedAt: rawInput.resumedAt,
       auditRef: rawInput.auditRef,
     };
-    if (input.auditRef.trim() === '') {
+    // L7 single-read binding: bind `auditRef` exactly once into a local and
+    // type-check it, so the audit-requirement test and the ledger event cannot
+    // observe two different reads of a getter/Proxy carrier.
+    const auditRef = input.auditRef;
+    if (typeof auditRef !== 'string' || auditRef.trim() === '') {
       throw new GatePauseError(
         'resume requires the audit reference of its explicit approval',
         { pauseId: input.pauseId },
@@ -180,7 +184,7 @@ export class GatePauses {
         scope: row.scope,
         at: input.resumedAt,
         actor,
-        approvedSetSnapshotRef: input.auditRef,
+        approvedSetSnapshotRef: auditRef,
         reevaluationMarker: `pending:${input.pauseId}`,
       });
       return row;

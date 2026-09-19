@@ -179,3 +179,59 @@ describe('verify-release-conformance CLI requires PROD claims by default (V7-C1)
     ).toBe(true);
   }, 120_000);
 });
+
+/**
+ * M1: unexpected extra/glob/unknown inputs are refused, never silently ignored.
+ * `--help` previously short-circuited argument validation, so extra inputs
+ * alongside it returned success.
+ */
+describe('verify-release-conformance CLI refuses unexpected extra/glob inputs (M1)', () => {
+  it('refuses --help combined with an unknown extra argument', () => {
+    const result = spawnSync('node', [CLI_PATH, '--help', '--unknown-extra'], {
+      cwd: REPO_ROOT,
+      encoding: 'utf8',
+    });
+    expect(result.status).not.toBe(0);
+  }, 120_000);
+
+  it('refuses an extra positional/glob argument', () => {
+    const result = spawnSync('node', [CLI_PATH, '--json', 'claims/*.json'], {
+      cwd: REPO_ROOT,
+      encoding: 'utf8',
+    });
+    expect(result.status).not.toBe(0);
+  }, 120_000);
+
+  it('refuses a glob passed as the --prod-claims value', () => {
+    const result = spawnSync('node', [CLI_PATH, '--json', '--prod-claims', 'claims/*.json'], {
+      cwd: REPO_ROOT,
+      encoding: 'utf8',
+    });
+    expect(result.status).not.toBe(0);
+    expect(result.stderr).toMatch(/glob/i);
+  }, 120_000);
+});
+
+/**
+ * L4: a PROD-active milestone must not be certified without the deterministic
+ * release report. The report is absent in this tree, so the CLI must emit
+ * `RELEASE_REPORT_MISSING` instead of silently skipping the check.
+ */
+describe('verify-release-conformance CLI requires the release report in a PROD-active milestone (L4)', () => {
+  it('fails closed with RELEASE_REPORT_MISSING when the report is absent', () => {
+    const result = spawnSync('node', [CLI_PATH, '--json'], {
+      cwd: REPO_ROOT,
+      encoding: 'utf8',
+      timeout: 120_000,
+    });
+    expect(result.status).toBe(1);
+    const verdict = JSON.parse(result.stdout) as {
+      readonly overall?: string;
+      readonly findings?: readonly { readonly rule?: string }[];
+    };
+    expect(verdict.overall).toBe('FAILED');
+    expect(
+      (verdict.findings ?? []).some((finding) => finding.rule === 'RELEASE_REPORT_MISSING'),
+    ).toBe(true);
+  }, 120_000);
+});

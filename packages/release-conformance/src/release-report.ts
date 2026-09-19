@@ -6,6 +6,7 @@ import path from 'node:path';
 import { ReleaseReportRecordSchema } from '@foresift/shared-schemas';
 import { generateSbomFromLockfile } from './sbom.ts';
 import { loadOrphanExceptions } from './orphans.ts';
+import { isAuthoritativeConformanceResult } from './conformance-authority.ts';
 import {
   numericFilter,
   numericFromEntries,
@@ -122,6 +123,21 @@ async function readJson(file: string): Promise<unknown> {
 export async function buildReleaseReport(
   rawOptions: BuildReleaseReportOptions,
 ): Promise<ReleaseReportRecord> {
+  // HIGH-3: read the supplied conformance result exactly ONCE, BEFORE the entry
+  // snapshot. `snapshotCallerInput` deep-copies plain objects, but the
+  // provenance brand is keyed by OBJECT IDENTITY, so the brand must be checked
+  // on the caller's original object. The single-read local is also the value
+  // that is normalized/consumed below, so a getter cannot present a branded
+  // object to the brand check and an unbranded one to the consumer.
+  let suppliedConformanceResults: unknown;
+  try {
+    suppliedConformanceResults = (rawOptions as unknown as Record<string, unknown>)[
+      'conformanceResults'
+    ];
+  } catch {
+    suppliedConformanceResults = undefined;
+  }
+  const conformanceResultsVerified = isAuthoritativeConformanceResult(suppliedConformanceResults);
   // Single-read snapshot of every option (V7 accessor class): `conformanceResults`,
   // `gateEvidence[].isValid`, `milestone` and `previousReport` are each read more
   // than once across the status/content decisions.
@@ -208,9 +224,9 @@ export async function buildReleaseReport(
   // `activationState.status` to `ACTIVE` and passed `verifyReleaseReport`. The
   // `defaultConformance` branch above is only the omitted-input case.
   const conformanceResults =
-    options.conformanceResults === undefined
+    suppliedConformanceResults === undefined
       ? defaultConformance
-      : normalizeSuppliedConformance(options.conformanceResults);
+      : normalizeSuppliedConformance(suppliedConformanceResults, conformanceResultsVerified);
   const gateEvidence = options.gateEvidence ?? [];
   // Numeric-index aggregation only (audit HIGH): `filter`/`map`/`sort`/`some`
   // are all shadowable in-process, and an emptied pass/refusal set would let a
@@ -312,25 +328,34 @@ function isNonNegativeInteger(value: unknown): value is number {
 }
 
 /**
- * Normalize a caller-supplied conformance result (V7-F7b).
+ * Normalize a caller-supplied conformance result (V7-F7b, HIGH-3).
  *
- * A supplied result is admitted only when it is structurally well-formed (an
- * object with an `overall` discriminant, finite non-negative integer counts
- * that balance, and a `findings` array). A `PASSED` result is additionally
- * admissible only when it is NON-VACUOUS: at least one rule was evaluated, every
- * evaluated rule passed, no rule failed, and no finding was recorded. Anything
- * else — including a non-object carrier — is replaced with a synthetic `FAILED`
- * record carrying a `CONFORMANCE_NOT_EVALUATED` finding, so a caller can never
- * supply a vacuous PASSED that drives the activation state to `ACTIVE`. An
- * admitted result is returned as a frozen plain copy built from single-read
- * locals (never the caller's object), so the value validated is the value
- * consumed even if a future caller bypasses the outer snapshot. This never
- * throws.
+ * HIGH-3: a result is admitted ONLY when it carries the private provenance
+ * brand minted by `evaluateConformance` (`verified === true`). An unbranded,
+ * hand-built, spread, JSON-round-tripped or `structuredClone`d result is a
+ * distinct object: it is replaced with a synthetic FAILED record carrying a
+ * `CONFORMANCE_UNVERIFIED` finding, so a caller can never hand-assemble a
+ * self-consistent PASSED that drives the activation state to `ACTIVE`.
+ *
+ * A BRANDED result is additionally required to be structurally well-formed (an
+ * object with an `overall` discriminant, finite non-negative integer counts that
+ * balance, and a `findings` array). A `PASSED` result is admissible only when it
+ * is NON-VACUOUS: at least one rule was evaluated, every evaluated rule passed,
+ * no rule failed, and no finding was recorded. Anything else — including a
+ * non-object carrier — is replaced with a synthetic `FAILED` record carrying a
+ * `CONFORMANCE_NOT_EVALUATED` finding. An admitted result is returned as a
+ * frozen plain copy built from single-read locals (never the caller's object),
+ * so the value validated is the value consumed even if a future caller bypasses
+ * the outer snapshot. This never throws.
  */
 function normalizeSuppliedConformance(
   supplied: unknown,
+  verified: boolean,
 ): ReleaseReportRecord['conformanceResults'] {
-  const notEvaluated = (message: string): ReleaseReportRecord['conformanceResults'] => ({
+  const notEvaluated = (
+    message: string,
+    rule = 'CONFORMANCE_NOT_EVALUATED',
+  ): ReleaseReportRecord['conformanceResults'] => ({
     overall: 'FAILED',
     // One synthetic rule was evaluated (the supplied-result admissibility rule)
     // and it failed; the counts must balance for the record schema.
@@ -340,14 +365,21 @@ function normalizeSuppliedConformance(
     findings: [
       {
         requirementId: 'FR-TRACE-006',
-        rule: 'CONFORMANCE_NOT_EVALUATED',
+        rule,
         path: 'conformanceResults',
         message,
       },
     ],
   });
+  if (!verified) {
+    return notEvaluated(
+      'the supplied release-conformance result does not carry the private provenance brand of an evaluateConformance result; a hand-built or cloned PASSED cannot certify a release',
+      'CONFORMANCE_UNVERIFIED',
+    );
+  }
   if (!record(supplied)) {
     return notEvaluated(
+      'CONFORMANCE_NOT_EVALUATED',
       'the supplied release-conformance result was not an object; a release report cannot record PASSED with zero evaluated rules',
     );
   }

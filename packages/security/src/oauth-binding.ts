@@ -100,9 +100,11 @@ export class OAuthBindingGuard {
       );
     }
     // A non-parseable instant must not pass as "never expires" — NaN
-    // comparisons are false, so finiteness is checked explicitly.
+    // comparisons are false, so finiteness is checked explicitly. The injected
+    // clock is bound once and must itself be a finite instant.
     const expiresMs = Date.parse(binding.expiresAt);
-    if (!Number.isFinite(expiresMs) || expiresMs <= this.clock()) {
+    const nowMs = this.clock();
+    if (!Number.isFinite(nowMs) || !Number.isFinite(expiresMs) || expiresMs <= nowMs) {
       throw new OAuthBindingError(
         'token binding has expired',
         { expiresAt: binding.expiresAt },

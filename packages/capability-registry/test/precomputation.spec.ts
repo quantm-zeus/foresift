@@ -291,6 +291,11 @@ describe('§10.3/§35.14 live-path trust boundary', () => {
     await expect(assertLivePathBoundaryHolds(engine, 'live-received-import')).rejects.toThrow(
       /imports may rest only in VALIDATING\/SHADOW/,
     );
+    // LOW: the BOOLEAN helper returns false for a non-shadow artifact instead of
+    // throwing out of its boolean contract.
+    expect(
+      await importShadowAssertionHolds(engine, 'live-received-import-IMPORT_SHADOW_ONLY'),
+    ).toBe(false);
 
     // The genuine shadow artifact still passes.
     await seedBoundary('live-shadow-import', null, 'import-shadow');

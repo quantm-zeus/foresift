@@ -78,6 +78,22 @@ describe('mcp origin decisions (AC-250)', () => {
     // Production policy is fail-closed by default even for a fresh gate.
   });
 
+  it('refuses non-string origin carriers instead of coercing them (V7 review H9)', () => {
+    // Pre-fix `new URL(boxed)` coerced these to the allowlisted origin and the
+    // ALLOW verdict RECORDED the live object — the value checked differed from
+    // the value recorded.
+    const boxed = new String('https://mcp.example.com') as unknown as string;
+    expect(PROD_GATE.decide(boxed)).toEqual({
+      decision: 'REFUSE',
+      origin: null,
+      reason: 'MALFORMED',
+    });
+    const withToString = { toString: () => 'https://mcp.example.com' } as unknown as string;
+    const verdict = PROD_GATE.decide(withToString);
+    expect(verdict.decision).toBe('REFUSE');
+    expect(JSON.stringify(verdict)).not.toContain('mcp.example.com');
+  });
+
   it('requireAllowed raises typed errors for transport wiring (403 path)', () => {
     expect(() => PROD_GATE.requireAllowed('https://evil.example.com')).toThrow(
       /WRONG_HOST|refused/,
@@ -127,6 +143,15 @@ describe('mcp protocol guard (AC-251)', () => {
       decision: 'REFUSE',
       reason: 'MESSAGE_OVERSIZE',
     });
+  });
+
+  it('REFUSES NaN/Infinity/fractional byte counts instead of lifting the size cap (V7 residual)', () => {
+    for (const bad of [Number.NaN, Number.POSITIVE_INFINITY, -1, 0.5]) {
+      expect(GUARD.inspect({ ...okInput, messageBytes: bad })).toMatchObject({
+        decision: 'REFUSE',
+        reason: 'MESSAGE_OVERSIZE',
+      });
+    }
   });
 
   it('REFUSES ABSENT dimensions instead of skipping them (M17)', () => {

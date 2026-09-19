@@ -3,16 +3,69 @@
  */
 /* eslint-disable @typescript-eslint/no-explicit-any -- salvaged lane tests: mock objects cast against a runtime-typed surface (see tests/automation/state-authority-v2.spec.ts convention) */
 import { describe, expect, it } from 'bun:test';
+import { readFile, readdir } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { generateSbomFromLockfile, buildReleaseReport, verifyReleaseReport } from '../src/index.ts';
+import {
+  evaluateConformance,
+  generateSbomFromLockfile,
+  buildReleaseReport,
+  verifyReleaseReport,
+} from '../src/index.ts';
 import {
   VALID_RELEASE_REPORT_FIXTURE,
   VALID_SBOM_FIXTURE as _VALID_SBOM_FIXTURE,
 } from '../../../tests/fixtures/trace/index.ts';
+import {
+  PROD_BEST_EFFORT_COMPLIANT,
+  PROD_COMPLIANT_ACTIVE_CLAIM,
+  PROD_LIVE_PATH_BOUNDED_CLAIM,
+  PROD_MCP_COMPLIANT_CLAIM,
+  PROD_TECHNICALLY_READY_CLAIM,
+  PROD_WORKSPACE_AUTHORIZED_CLAIM,
+} from '../../../tests/fixtures/prod/index.ts';
 
 const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../..');
 const LOCKFILE_PATH = path.join(REPO_ROOT, 'pnpm-lock.yaml');
+
+let cachedGeneratedSnapshot: Record<string, Uint8Array> | undefined;
+async function generatedSnapshot(): Promise<Record<string, Uint8Array>> {
+  if (cachedGeneratedSnapshot !== undefined) return cachedGeneratedSnapshot;
+  const generatedRoot = path.join(REPO_ROOT, 'docs/generated');
+  const snapshot: Record<string, Uint8Array> = {};
+  const visit = async (relative: string): Promise<void> => {
+    const entries = await readdir(path.join(generatedRoot, relative), { withFileTypes: true });
+    for (const entry of entries) {
+      const child = relative === '' ? entry.name : `${relative}/${entry.name}`;
+      if (entry.isDirectory()) await visit(child);
+      else if (entry.isFile()) snapshot[child] = await readFile(path.join(generatedRoot, child));
+    }
+  };
+  await visit('');
+  cachedGeneratedSnapshot = snapshot;
+  return snapshot;
+}
+
+/**
+ * A REAL branded `evaluateConformance` result over a fully compliant PROD
+ * corpus. Only `evaluateConformance` can mint the provenance brand, so this is
+ * the sole way to obtain a conformance result that `buildReleaseReport` will
+ * admit to `ACTIVE`.
+ */
+async function realConformanceResult() {
+  return await evaluateConformance({
+    repoRoot: REPO_ROOT,
+    requirements: [],
+    expectedGeneratedFiles: await generatedSnapshot(),
+    prodClaims: {
+      activationClaims: [PROD_COMPLIANT_ACTIVE_CLAIM],
+      postureDeclarations: [PROD_BEST_EFFORT_COMPLIANT],
+      mcpCompatibility: PROD_MCP_COMPLIANT_CLAIM,
+      livePaths: [PROD_LIVE_PATH_BOUNDED_CLAIM],
+      distributionAuthorizations: [PROD_WORKSPACE_AUTHORIZED_CLAIM, PROD_TECHNICALLY_READY_CLAIM],
+    },
+  });
+}
 
 describe('SBOM projection and release report builder (FR-TRACE-006, AC-269)', () => {
   describe('deterministic CycloneDX SBOM projection', () => {
@@ -111,31 +164,21 @@ describe('V7: release report refuses to certify unevaluated conformance (F7)', (
     // synthetic 1/0/1 counts must keep `verifyReleaseReport` valid.
     expect(verifyReleaseReport(report).isValid).toBe(true);
 
-    // Control: a genuinely evaluated conformance result is recorded verbatim.
+    // Control: a REAL, branded `evaluateConformance` result is admitted. The
+    // live tree has no PROD claims, so this real result is FAILED, but its
+    // findings are the gate's own (never CONFORMANCE_UNVERIFIED).
+    const real = await evaluateConformance({ repoRoot: REPO_ROOT });
     const evaluated = await buildReleaseReport({
       repoRoot: REPO_ROOT,
       milestone: 'G2',
       previousReport: VALID_RELEASE_REPORT_FIXTURE.rollbackTarget,
-      conformanceResults: {
-        overall: 'FAILED',
-        totalRulesEvaluated: 9,
-        passedCount: 8,
-        failureCount: 1,
-        findings: [
-          {
-            requirementId: 'FR-PROD-001',
-            rule: 'ACTIVATION_WITHOUT_EVIDENCE',
-            path: 'module-x',
-            message: 'evaluated',
-          },
-        ],
-      },
+      conformanceResults: real,
     });
     expect(evaluated.conformanceResults.overall).toBe('FAILED');
-    expect(evaluated.conformanceResults.totalRulesEvaluated).toBe(9);
+    expect(evaluated.conformanceResults.totalRulesEvaluated).toBeGreaterThan(0);
     expect(
       evaluated.conformanceResults.findings.some(
-        (finding) => finding.rule === 'CONFORMANCE_NOT_EVALUATED',
+        (finding) => finding.rule === 'CONFORMANCE_UNVERIFIED',
       ),
     ).toBe(false);
   }, 120_000);
@@ -171,7 +214,7 @@ describe('V7: release report validates a SUPPLIED conformance result (F7b)', () 
     expect(report.conformanceResults.overall).toBe('FAILED');
     expect(
       report.conformanceResults.findings.some(
-        (finding) => finding.rule === 'CONFORMANCE_NOT_EVALUATED',
+        (finding) => finding.rule === 'CONFORMANCE_UNVERIFIED',
       ),
     ).toBe(true);
   }, 120_000);
@@ -197,7 +240,7 @@ describe('V7: release report validates a SUPPLIED conformance result (F7b)', () 
     ).toBe(true);
   });
 
-  it('(c) CONTROL: a supplied consistent non-vacuous PASSED still activates', async () => {
+  it('(c) refuses a hand-built self-consistent PASSED (HIGH-3)', async () => {
     const report = await buildReleaseReport({
       repoRoot: REPO_ROOT,
       milestone: 'G2',
@@ -211,8 +254,52 @@ describe('V7: release report validates a SUPPLIED conformance result (F7b)', () 
       },
       gateEvidence: [...VALID_GATE_EVIDENCE],
     });
+    expect(report.conformanceResults.overall).toBe('FAILED');
+    expect(report.activationState.status).toBe('BLOCKED');
+    expect(
+      report.conformanceResults.findings.some(
+        (finding) => finding.rule === 'CONFORMANCE_UNVERIFIED',
+      ),
+    ).toBe(true);
+  }, 120_000);
+
+  it('(c2) refuses a structurally-cloned copy of a real result (HIGH-3)', async () => {
+    const real = await realConformanceResult();
+    expect(real.overall).toBe('PASSED');
+    const clone = structuredClone(real);
+    const report = await buildReleaseReport({
+      repoRoot: REPO_ROOT,
+      milestone: 'G2',
+      previousReport: VALID_RELEASE_REPORT_FIXTURE.rollbackTarget,
+      conformanceResults: clone as never,
+      gateEvidence: [...VALID_GATE_EVIDENCE],
+    });
+    expect(report.conformanceResults.overall).toBe('FAILED');
+    expect(report.activationState.status).toBe('BLOCKED');
+    expect(
+      report.conformanceResults.findings.some(
+        (finding) => finding.rule === 'CONFORMANCE_UNVERIFIED',
+      ),
+    ).toBe(true);
+  }, 120_000);
+
+  it('(c3) CONTROL: a real evaluateConformance result is admitted and activates (HIGH-3)', async () => {
+    const real = await realConformanceResult();
+    expect(real.overall).toBe('PASSED');
+    const report = await buildReleaseReport({
+      repoRoot: REPO_ROOT,
+      milestone: 'G2',
+      previousReport: VALID_RELEASE_REPORT_FIXTURE.rollbackTarget,
+      conformanceResults: real,
+      gateEvidence: [...VALID_GATE_EVIDENCE],
+    });
     expect(report.conformanceResults.overall).toBe('PASSED');
     expect(report.activationState.status).toBe('ACTIVE');
+    expect(
+      report.conformanceResults.findings.some(
+        (finding) => finding.rule === 'CONFORMANCE_UNVERIFIED',
+      ),
+    ).toBe(false);
   }, 120_000);
 
   it('(d) fails closed on a malformed supplied result (never throws)', async () => {
@@ -228,7 +315,7 @@ describe('V7: release report validates a SUPPLIED conformance result (F7b)', () 
       expect(report.activationState.status).toBe('BLOCKED');
       expect(
         report.conformanceResults.findings.some(
-          (finding) => finding.rule === 'CONFORMANCE_NOT_EVALUATED',
+          (finding) => finding.rule === 'CONFORMANCE_UNVERIFIED',
         ),
       ).toBe(true);
     }

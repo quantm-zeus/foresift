@@ -42,10 +42,36 @@ import { canonicalJson, type DatabaseEngine } from '@foresift/persistence';
 import { MCP_PROTOCOL_BASELINE_REVISION } from '@foresift/shared-schemas';
 import {
   numericConcat,
+  numericCopy,
   numericSortByString,
   numericUnique,
   snapshotCallerInput,
 } from './shadow-safe.ts';
+
+/**
+ * `Math.min` captured at module init (M2): a same-realm caller that shadows the
+ * global `Math.min` must not be able to disable the non-overridable freshness
+ * clamp below and keep a stale conformance cell usable.
+ */
+const capturedMathMin: (...values: number[]) => number = Math.min;
+
+/**
+ * Private provenance brand for a GOVERNED MCP compatibility resolution
+ * (HIGH-5/L1/L2). `resolveCompatibilityMatrix` is the ONLY writer: it adds the
+ * frozen resolution object it returns to this module-private `WeakSet`.
+ *
+ * Consumers (`apps/api`'s protocol admission) must require this brand before
+ * deriving a protocol allow-list. A caller-declared revision list, a
+ * resolver-shaped hand-built object, or a `structuredClone`d copy of a real
+ * resolution is a distinct object and therefore unbranded — the admission
+ * refuses it instead of trusting caller-asserted "mutually tested" revisions.
+ */
+const GOVERNED_MCP_RESOLUTIONS = new WeakSet<object>();
+
+/** Read-only brand guard: true only for a resolution this module produced. */
+export function isGovernedMcpCompatibilityResolution(value: unknown): boolean {
+  return typeof value === 'object' && value !== null && GOVERNED_MCP_RESOLUTIONS.has(value);
+}
 
 /** The declared behavior for a missing/unsupported requested revision. */
 export const McpCompatibilityPolicy = {
@@ -429,7 +455,7 @@ export function cellUsability(input: {
 }): CellUsability {
   const { cell, revision, clientId, now } = input;
   // The freshness window is never caller-widened: a caller may only TIGHTEN it.
-  const maxAgeSeconds = Math.min(
+  const maxAgeSeconds = capturedMathMin(
     input.maxAgeSeconds ?? MCP_LIVE_TEST_MAX_AGE_SECONDS,
     MCP_LIVE_TEST_MAX_AGE_SECONDS,
   );
@@ -712,15 +738,21 @@ export async function resolveCompatibilityMatrix(
       break;
     }
   }
-  return {
+  const resolution: McpCompatibilityResolution = Object.freeze({
     defaultRevision,
     defaultChannel: defaultRow?.channel ?? 'STABLE',
     optInRevision,
-    optInRevisions,
-    usableRevisions,
-    cells: usabilityFor(defaultRevision),
+    optInRevisions: Object.freeze(numericCopy(optInRevisions)),
+    usableRevisions: Object.freeze(numericCopy(usableRevisions)),
+    cells: Object.freeze(usabilityFor(defaultRevision)),
     transportOriginPolicyRef: defaultRow?.originPolicyRef ?? '',
-  };
+  });
+  // HIGH-5: mint the module-private provenance brand on the FROZEN resolution
+  // object itself. Only this resolver can produce a branded resolution, so a
+  // downstream admission can require proof that the allow-list came from the
+  // governed matrix (registered + mutually tested) rather than a caller guess.
+  GOVERNED_MCP_RESOLUTIONS.add(resolution);
+  return resolution;
 }
 
 /** A protocol-version resolution decision. */

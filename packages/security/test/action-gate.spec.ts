@@ -448,3 +448,71 @@ describe('action-gate binds caller fields exactly once (V7 accessor class)', () 
     expect(decision.action).toBe('admin:high:configuration-activate');
   });
 });
+
+// --- V7 security-review HIGH H2/H3: malformed gate requests never admit ------
+//
+// H2: an ALLOW whose `action` is not a real high-impact action and/or whose
+// `actor` is empty was admitted — the gate trusted the caller's own naming of
+// the subject it was authorizing. H3: an absent/NaN/Infinity
+// `policy.freshnessWindowSeconds` made every freshness comparison false, so
+// proof freshness was silently disabled. Both are refused with a typed code
+// BEFORE any dimension evaluates.
+describe('action-gate refuses malformed requests (V7 review H2/H3)', () => {
+  it('REFUSES an action outside the Appendix B catalog instead of admitting it (H2)', async () => {
+    const gate = new ActionGate({ clock: () => NOW_MS });
+    // Everything else is perfectly dimensioned, so pre-fix this returned ALLOW.
+    await expect(
+      gate.evaluateHighImpactAction({
+        ...baseRequest,
+        action: 'not-a-real-action' as never,
+        authorizedScopes: ['not-a-real-action'],
+      }),
+    ).rejects.toMatchObject({ code: 'SEC_ACTION_GATE_INVALID_ACTION' });
+  });
+
+  it('REFUSES an empty actor instead of attributing an ALLOW (H2)', async () => {
+    const gate = new ActionGate({ clock: () => NOW_MS });
+    await expect(
+      gate.evaluateHighImpactAction({
+        ...baseRequest,
+        actor: '',
+        stepUpProof: goodProof({ actor: '' }),
+      }),
+    ).rejects.toMatchObject({ code: 'SEC_ACTION_GATE_INVALID_ACTOR' });
+  });
+
+  it('REFUSES a non-catalog action even when the scope array names it exactly (H2)', async () => {
+    const gate = new ActionGate({ clock: () => NOW_MS });
+    for (const action of ['admin:high:', '', 'admin:high:*']) {
+      await expect(
+        gate.evaluateHighImpactAction({
+          ...baseRequest,
+          action: action as never,
+          authorizedScopes: [action],
+        }),
+      ).rejects.toMatchObject({ code: 'SEC_ACTION_GATE_INVALID_ACTION' });
+    }
+  });
+
+  it('REFUSES an absent/NaN/Infinity freshness window instead of skipping staleness (H3)', async () => {
+    const gate = new ActionGate({ clock: () => NOW_MS });
+    const ancient = goodProof({ completedAt: at('2020-01-01T00:00:00Z') });
+    for (const freshnessWindowSeconds of [
+      undefined,
+      Number.NaN,
+      Number.POSITIVE_INFINITY,
+      Number.NEGATIVE_INFINITY,
+      0,
+      -1,
+      1.5,
+    ]) {
+      await expect(
+        gate.evaluateHighImpactAction({
+          ...baseRequest,
+          policy: { ...POLICY, freshnessWindowSeconds: freshnessWindowSeconds as number },
+          stepUpProof: ancient,
+        }),
+      ).rejects.toMatchObject({ code: 'SEC_ACTION_GATE_INVALID_POLICY' });
+    }
+  });
+});

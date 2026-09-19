@@ -253,7 +253,18 @@ export class ImportGate {
       );
     }
     const nowMs = input.nowMs ?? Date.now();
-    if (Date.parse(producer.expiresAt as string) <= nowMs || producer.revokedAt !== undefined) {
+    if (typeof nowMs !== 'number' || !Number.isFinite(nowMs) || !Number.isInteger(nowMs)) {
+      // Residual CRITICAL: a NaN `nowMs` makes `expiresAt <= nowMs` false and
+      // silently admits an expired/revoked producer key. Require a real
+      // integer epoch-millisecond instant.
+      throw new ImportGatingError(
+        'nowMs must be a finite integer epoch-millisecond instant',
+        {},
+        SecErrorCode.SEC_IMPORT_FORMAT_REFUSED,
+      );
+    }
+    const expiresAtMs = Date.parse(producer.expiresAt as string);
+    if (!Number.isFinite(expiresAtMs) || expiresAtMs <= nowMs || producer.revokedAt !== undefined) {
       throw new ImportGatingError(
         'producer trust is expired or revoked',
         { keyId: producer.keyId },
@@ -384,7 +395,14 @@ export class ImportGate {
   assertIsolatedParsingBoundary(rawParsingContext: { inProcess: boolean }): void {
     // Single-read binding (V7 accessor class).
     const parsingContext = snapshotCallerInput(rawParsingContext);
-    if (parsingContext.inProcess) {
+    // Residual CRITICAL (partial-Proxy): an absent `inProcess` used to read as
+    // falsy and PASS the boundary. Require an explicit boolean and refuse
+    // anything that is not literally `false` — "unknown" is not "isolated".
+    if (
+      parsingContext === null ||
+      typeof parsingContext !== 'object' ||
+      parsingContext.inProcess !== false
+    ) {
       throw new ImportGatingError(
         'artifact parsing must occur inside the isolated-parsing boundary',
         {},

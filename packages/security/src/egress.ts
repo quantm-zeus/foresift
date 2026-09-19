@@ -21,6 +21,7 @@ import {
 import { EgressError } from './errors.ts';
 import {
   appendSafe,
+  isArraySafe,
   numericCopy,
   numericIncludes,
   numericJoin,
@@ -258,6 +259,9 @@ export class EgressGuard {
     ): EgressDecision =>
       parseDecision(EgressDecisionSchema, { decision: 'REFUSE', reason, detail });
 
+    // M2: require a primitive string carrier (a boxed String / object with
+    // `toString` would be coerced for parsing while the raw value was checked).
+    if (typeof url !== 'string') return refuse('URL_MALFORMED', 'URL is not a primitive string');
     const target = parseTarget(url);
     if (target === null) return refuse('URL_MALFORMED', 'unparseable or userinfo-bearing URL');
     // URL normalization silently DECODES percent escapes in hostnames, so
@@ -298,25 +302,33 @@ export class EgressGuard {
       );
     }
 
-    let addresses: readonly string[];
+    let resolved: readonly string[];
     try {
-      addresses = await this.resolve(target.host);
+      resolved = await this.resolve(target.host);
     } catch (error) {
       return refuse('RESOLUTION_REFUSED', error instanceof Error ? error.message : String(error));
     }
-    if (addresses.length === 0) {
+    // M1 single-read resolver binding: copy the resolver answer ONCE into a
+    // plain array and validate every member, so a getter/Proxy answer cannot
+    // present a clean address to the denied-range scan and a different pinned
+    // address to the ALLOW verdict.
+    if (!isArraySafe(resolved) || resolved.length === 0) {
       return refuse('RESOLUTION_REFUSED', 'resolver returned no addresses');
     }
+    const addresses = numericCopy(resolved as readonly string[]);
     for (let index = 0; index < addresses.length; index += 1) {
-      const address = addresses[index] as string;
-      if (isDeniedAddress(address)) {
-        return refuse('ADDRESS_DENIED', `resolved address falls in a denied range: ${address}`);
+      const address = addresses[index] as unknown;
+      if (typeof address !== 'string' || address === '' || isDeniedAddress(address)) {
+        return refuse(
+          'ADDRESS_DENIED',
+          `resolved address is missing, non-string, or in a denied range: ${String(address)}`,
+        );
       }
     }
     return parseDecision(EgressDecisionSchema, {
       decision: 'ALLOW',
       host: target.host,
-      pinnedAddresses: numericCopy(addresses),
+      pinnedAddresses: addresses,
     });
   }
 
@@ -327,7 +339,7 @@ export class EgressGuard {
   async verifyPin(url: string, rawPinnedAddresses: readonly string[]): Promise<EgressDecision> {
     // Single-read binding (V7 accessor class): the comparison set and the
     // returned pinned addresses must be the SAME read.
-    const pinnedAddresses = snapshotCallerInput(rawPinnedAddresses);
+    const pinnedRaw = snapshotCallerInput(rawPinnedAddresses);
     const target = parseTarget(url);
     if (target === null) {
       return parseDecision(EgressDecisionSchema, {
@@ -336,12 +348,31 @@ export class EgressGuard {
         detail: 'unparseable URL during pin verification',
       });
     }
+    // M1: validate the pinned set once. A non-string member can never be
+    // compared meaningfully, so it refuses rather than pinning garbage.
+    if (!isArraySafe(pinnedRaw)) {
+      return parseDecision(EgressDecisionSchema, {
+        decision: 'REFUSE',
+        reason: 'URL_MALFORMED',
+        detail: 'pinned addresses must be an array of strings',
+      });
+    }
+    const pinnedAddresses = numericCopy(pinnedRaw as readonly string[]);
+    for (let index = 0; index < pinnedAddresses.length; index += 1) {
+      if (typeof (pinnedAddresses[index] as unknown) !== 'string') {
+        return parseDecision(EgressDecisionSchema, {
+          decision: 'REFUSE',
+          reason: 'URL_MALFORMED',
+          detail: 'pinned addresses must be strings',
+        });
+      }
+    }
     // Mirror authorize()'s fail-closed resolver handling (M23): a DNS hiccup
     // during the rebinding check surfaces as a schema-typed REFUSE, never a
     // raw exception escaping the boundary — and an empty answer refuses too.
-    let fresh: readonly string[];
+    let resolvedFresh: readonly string[];
     try {
-      fresh = await this.resolve(target.host);
+      resolvedFresh = await this.resolve(target.host);
     } catch (error) {
       return parseDecision(EgressDecisionSchema, {
         decision: 'REFUSE',
@@ -349,13 +380,14 @@ export class EgressGuard {
         detail: error instanceof Error ? error.message : String(error),
       });
     }
-    if (fresh.length === 0) {
+    if (!isArraySafe(resolvedFresh) || resolvedFresh.length === 0) {
       return parseDecision(EgressDecisionSchema, {
         decision: 'REFUSE',
         reason: 'RESOLUTION_REFUSED',
         detail: 'resolver returned no addresses during pin verification',
       });
     }
+    const fresh = numericCopy(resolvedFresh as readonly string[]);
     const same =
       fresh.length === pinnedAddresses.length &&
       numericJoin(numericSortStrings(fresh)) === numericJoin(numericSortStrings(pinnedAddresses));
@@ -369,7 +401,7 @@ export class EgressGuard {
     return parseDecision(EgressDecisionSchema, {
       decision: 'ALLOW',
       host: target.host,
-      pinnedAddresses: numericCopy(pinnedAddresses),
+      pinnedAddresses,
     });
   }
 
@@ -383,18 +415,26 @@ export class EgressGuard {
     hopsFollowed: number,
     approveHop: (nextUrl: string) => boolean,
   ): Promise<EgressDecision> {
-    if (hopsFollowed + 1 > this.limits.maxRedirects) {
+    // M3 fail-closed hop accounting: a NaN/Infinity/fractional `hopsFollowed`
+    // makes `hopsFollowed + 1 > maxRedirects` false and disables the hop cap.
+    if (
+      typeof hopsFollowed !== 'number' ||
+      !Number.isFinite(hopsFollowed) ||
+      !Number.isInteger(hopsFollowed) ||
+      hopsFollowed < 0 ||
+      hopsFollowed + 1 > this.limits.maxRedirects
+    ) {
       return parseDecision(EgressDecisionSchema, {
         decision: 'REFUSE',
         reason: 'REDIRECT_LIMIT_EXCEEDED',
         detail: `more than ${String(this.limits.maxRedirects)} redirects`,
       });
     }
-    if (!approveHop(nextUrl)) {
+    if (typeof nextUrl !== 'string' || !approveHop(nextUrl)) {
       return parseDecision(EgressDecisionSchema, {
         decision: 'REFUSE',
         reason: 'REDIRECT_UNAPPROVED',
-        detail: `redirect target not approved: ${nextUrl}`,
+        detail: `redirect target not approved: ${String(nextUrl)}`,
       });
     }
     return this.authorize(nextUrl, plane);
@@ -415,27 +455,59 @@ export class EgressGuard {
       detail: string,
     ): EgressDecision =>
       parseDecision(EgressDecisionSchema, { decision: 'REFUSE', reason, detail });
-    if (response.bytes !== undefined && response.bytes > this.limits.maxResponseBytes) {
+    // M2 fail-closed numeric binding: bind each optional measurement ONCE and
+    // require a finite non-negative number. NaN/Infinity/negative values make
+    // every `> cap` comparison false, silently lifting the byte/time/ratio
+    // caps. A non-string content type is refused rather than coerced.
+    const bytes = response.bytes;
+    const timeMs = response.timeMs;
+    const decompressedBytes = response.decompressedBytes;
+    const contentTypeRaw = response.contentType;
+    const measurements: ReadonlyArray<readonly [string, number | undefined]> = [
+      ['bytes', bytes],
+      ['timeMs', timeMs],
+      ['decompressedBytes', decompressedBytes],
+    ];
+    for (let index = 0; index < measurements.length; index += 1) {
+      const entry = measurements[index] as readonly [string, number | undefined];
+      const label = entry[0];
+      const value = entry[1];
+      if (value === undefined) continue;
+      if (typeof value !== 'number' || !Number.isFinite(value) || value < 0) {
+        return refuse(
+          label === 'timeMs'
+            ? 'RESPONSE_TIME_EXCEEDED'
+            : label === 'decompressedBytes'
+              ? 'DECOMPRESSION_RATIO_EXCEEDED'
+              : 'RESPONSE_BYTES_EXCEEDED',
+          `${label} must be a finite non-negative number`,
+        );
+      }
+    }
+    if (bytes !== undefined && bytes > this.limits.maxResponseBytes) {
       return refuse(
         'RESPONSE_BYTES_EXCEEDED',
         `response exceeded ${String(this.limits.maxResponseBytes)} bytes`,
       );
     }
-    if (response.timeMs !== undefined && response.timeMs > this.limits.maxResponseTimeMs) {
+    if (timeMs !== undefined && timeMs > this.limits.maxResponseTimeMs) {
       return refuse(
         'RESPONSE_TIME_EXCEEDED',
         `response exceeded ${String(this.limits.maxResponseTimeMs)} ms`,
       );
     }
     if (
-      response.bytes !== undefined &&
-      response.decompressedBytes !== undefined &&
-      response.bytes > 0 &&
-      response.decompressedBytes / response.bytes > this.limits.maxDecompressionRatio
+      bytes !== undefined &&
+      decompressedBytes !== undefined &&
+      bytes > 0 &&
+      decompressedBytes / bytes > this.limits.maxDecompressionRatio
     ) {
       return refuse('DECOMPRESSION_RATIO_EXCEEDED', 'decompression ratio above cap');
     }
-    const contentType = response.contentType?.split(';')[0]?.trim().toLowerCase() ?? '';
+    if (contentTypeRaw !== undefined && typeof contentTypeRaw !== 'string') {
+      return refuse('CONTENT_TYPE_REFUSED', 'content type must be a primitive string');
+    }
+    const contentType = contentTypeRaw?.split(';')[0]?.trim().toLowerCase() ?? '';
     if (!numericIncludes(this.limits.allowedContentTypes, contentType)) {
       return refuse('CONTENT_TYPE_REFUSED', `content type '${contentType}' is not admitted`);
     }

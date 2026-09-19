@@ -284,3 +284,123 @@ describe('public-output boundary (§35.12, AC-277)', () => {
     expect(redaction.reason).toBe('SENSITIVE_DETAIL_PRESENT');
   });
 });
+
+// --- V7 security-review findings: secrets redaction + envelope consumption ---
+function securityCodeOf(fn: () => unknown): string {
+  try {
+    fn();
+  } catch (error) {
+    return (error as { code?: string }).code ?? 'NO_CODE';
+  }
+  return 'NO_THROW';
+}
+
+describe('secrets redaction fail-closed hardening (V7 review H6/H6b)', () => {
+  it('redacts EVERY occurrence of a material shape, not just the first (H6)', () => {
+    const hex = 'ab'.repeat(32);
+    const redacted = redactForLogs(`first ${hex} second ${hex}`);
+    // Pre-fix the non-global shared regex replaced only occurrence #1, so the
+    // second copy of the material survived into logs.
+    expect(redacted).not.toContain(hex);
+    expect((redacted.match(/\[REDACTED:hex-secret\]/g) ?? []).length).toBe(2);
+  });
+
+  it('redacts every occurrence of each known reference value', () => {
+    const redacted = redactForLogs('ref mcp-cred-7 then mcp-cred-7 again', [
+      { value: 'mcp-cred-7', label: 'MCP_CRED_REF' },
+    ]);
+    expect(redacted).toBe('ref [REDACTED:MCP_CRED_REF] then [REDACTED:MCP_CRED_REF] again');
+  });
+
+  it('terminates when a known value is a substring of its own replacement marker (H6b)', () => {
+    // Pre-fix `while (includes) replace` never terminated here (the marker
+    // contains the searched value) and hung the process.
+    const redacted = redactForLogs('x REDACTED y', [{ value: 'REDACTED', label: 'self' }]);
+    expect(redacted).toBe('x [REDACTED:self] y');
+  }, 2000);
+
+  it('refuses an absent content field instead of reading it as "nothing to detect" (residual)', () => {
+    const omittingProxy = new Proxy(
+      {},
+      { ownKeys: () => [], getOwnPropertyDescriptor: () => undefined, get: () => undefined },
+    );
+    expect(securityCodeOf(() => refuseSecretTowardModelContext(omittingProxy as never))).toBe(
+      'SEC_SECRET_CONTEXT_INSERTION_REFUSED',
+    );
+  });
+
+  it('refuses malformed rotation records with a TYPED code, not a raw schema error (M9/M10)', () => {
+    const ledger = new SecretLifecycleLedger();
+    // A hostile Proxy can omit `secretRef` from ownKeys entirely.
+    const omittingSecretRef = new Proxy(
+      {
+        classification: 'DATABASE_CREDENTIAL',
+        at: '2026-08-24T00:00:00.000Z',
+        environment: 'PRODUCTION',
+      },
+      {
+        ownKeys: () => ['classification', 'at', 'environment'],
+        getOwnPropertyDescriptor: (target, key) =>
+          key === 'secretRef' ? undefined : Object.getOwnPropertyDescriptor(target, key),
+        get: (target, key) => (key === 'secretRef' ? undefined : Reflect.get(target, key)),
+      },
+    );
+    expect(securityCodeOf(() => ledger.recordRotation(omittingSecretRef as never))).toBe(
+      'SEC_SECRET_LIFECYCLE_INVALID',
+    );
+    expect(
+      securityCodeOf(() =>
+        ledger.recordRotation({
+          secretRef: 'ref/db-primary',
+          classification: 'DATABASE_CREDENTIAL',
+          at: '2026-08-24T00:00:00.000Z',
+          overlapUntil: 'not-an-instant',
+          environment: 'PRODUCTION',
+        }),
+      ),
+    ).toBe('SEC_SECRET_LIFECYCLE_INVALID');
+    expect(
+      securityCodeOf(() =>
+        ledger.recordRotation({
+          secretRef: 'ref/db-primary',
+          classification: 'DATABASE_CREDENTIAL',
+          at: 'not-an-instant',
+          environment: 'PRODUCTION',
+        }),
+      ),
+    ).toBe('SEC_SECRET_LIFECYCLE_INVALID');
+  });
+});
+
+describe('public-output envelope consumption (V7 review H7)', () => {
+  const envelope = {
+    evidenceRefs: ['evidence://run/abc'],
+    timestamps: ['2026-08-24T00:00:00.000Z'],
+    executionAssumptions: ['prices as of snapshot time'],
+    limitations: ['detection heuristics are probabilistic'],
+    disclaimer: 'Not financial advice.',
+  };
+
+  it('CONSUMES the parsed envelope so a shadowed schema parse cannot admit a missing duty (H7)', () => {
+    const proto = Array.prototype as unknown as Record<string, unknown>;
+    const originalPush = proto['push'];
+    // Pre-fix, zod's `push` shadow made `PublicOutputEnvelopeSchema.parse`
+    // return `{}` WITHOUT throwing; the discarded result let an envelope with
+    // NO evidenceRefs read as COMPLIANT. Consuming the parsed result refuses.
+    proto['push'] = () => 0;
+    let result: ReturnType<typeof validatePublicOutput> | undefined;
+    try {
+      result = validatePublicOutput({
+        ...envelope,
+        evidenceRefs: undefined,
+        body: 'clean body',
+      } as never);
+    } finally {
+      proto['push'] = originalPush;
+    }
+    expect(result?.redaction.verdict).toBe('REFUSED');
+    assert(result !== undefined && result.redaction.verdict === 'REFUSED');
+    expect(result.redaction.reason).toBe('REQUIRED_FIELD_MISSING');
+    expect(result.redactedBody).toBe('');
+  });
+});

@@ -94,11 +94,16 @@ export class McpProtocolGuard {
       return refuse('METHOD_INVALID');
     }
     // An absent byte count cannot be checked against the cap — refused, not
-    // skipped (fail-closed symmetry with every other dimension).
+    // skipped (fail-closed symmetry with every other dimension). A NaN /
+    // Infinity / fractional count makes every `> cap` comparison false, so the
+    // count is required to be a finite non-negative integer.
+    const messageBytes = input.messageBytes;
     if (
-      input.messageBytes === undefined ||
-      input.messageBytes > this.maxMessageBytes ||
-      input.messageBytes < 0
+      typeof messageBytes !== 'number' ||
+      !Number.isFinite(messageBytes) ||
+      !Number.isInteger(messageBytes) ||
+      messageBytes < 0 ||
+      messageBytes > this.maxMessageBytes
     ) {
       return refuse('MESSAGE_OVERSIZE');
     }

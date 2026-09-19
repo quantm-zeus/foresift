@@ -6,6 +6,11 @@
 import { describe, expect, it } from 'bun:test';
 import { MCP_PROTOCOL_BASELINE_REVISION } from '../../../packages/shared-schemas/src/index.ts';
 import {
+  resolveCompatibilityMatrix,
+  type McpCompatibilityResolution,
+} from '../../../packages/capability-registry/src/index.ts';
+import type { DatabaseEngine } from '../../../packages/persistence/src/index.ts';
+import {
   VALID_AUTHORIZED_CURSOR,
   UNAUTHORIZED_CURSOR_INSPECTION,
   ACTIVE_SESSION_FIXTURE,
@@ -17,13 +22,116 @@ async function loadProtocolWiringModule() {
   return await import('../src/mcp/protocol-wiring.ts');
 }
 
-/** A resolver-shaped governed admission (the type `McpCompatibilityResolution`). */
-function governedAdmission(usable: readonly string[], optIn: readonly string[] = []) {
-  return {
-    defaultRevision: MCP_PROTOCOL_BASELINE_REVISION,
-    usableRevisions: usable,
-    optInRevisions: optIn,
+const GOVERNED_NOW = '2026-06-01T00:00:00Z';
+const GOVERNED_RECENT = '2026-05-01T00:00:00Z';
+
+/**
+ * A small DISPATCH-BASED stub engine (HIGH-5): the governed resolver
+ * (`resolveCompatibilityMatrix`) is a pure function of four DB reads, so a
+ * dispatch stub yields a REAL branded resolution without moving this file from
+ * the PURE lane into DATABASE_PGLITE.
+ */
+function stubEngine(rows: {
+  readonly revisions: readonly Record<string, unknown>[];
+  readonly clients: readonly Record<string, unknown>[];
+  readonly cells: readonly Record<string, unknown>[];
+  readonly runs: readonly Record<string, unknown>[];
+}): DatabaseEngine {
+  const engine = {
+    engineKind: 'pglite' as const,
+    async exec(): Promise<void> {},
+    async query<T = Record<string, unknown>>(sql: string): Promise<{ rows: T[] }> {
+      const matched = sql.includes('FROM prod.mcp_revisions')
+        ? rows.revisions
+        : sql.includes('FROM prod.mcp_target_clients')
+          ? rows.clients
+          : sql.includes('FROM prod.mcp_compatibility_matrix')
+            ? rows.cells
+            : sql.includes('FROM prod.mcp_conformance_runs')
+              ? rows.runs
+              : [];
+      return { rows: matched as T[] };
+    },
+    async transaction<T>(work: (inner: DatabaseEngine) => Promise<T>): Promise<T> {
+      return await work(engine as unknown as DatabaseEngine);
+    },
   };
+  return engine as unknown as DatabaseEngine;
+}
+
+function revisionRow(revision: string, channel: string): Record<string, unknown> {
+  return {
+    revision,
+    channel,
+    sdk_version: '1.0.0',
+    transport: 'STREAMABLE_HTTP',
+    origin_policy_ref: 'origin-1',
+    is_default: revision === MCP_PROTOCOL_BASELINE_REVISION,
+    superseded_by: null,
+    created_at: '2025-11-25T00:00:00Z',
+  };
+}
+
+function cellRow(revision: string, clientId: string): Record<string, unknown> {
+  return {
+    cell_id: `${revision}-${clientId}`,
+    revision,
+    client_id: clientId,
+    conformance_fixture_ref: `fixture-${clientId}`,
+    live_test_date: GOVERNED_RECENT,
+    result: 'PASS',
+    notes: null,
+  };
+}
+
+function runRow(revision: string, clientId: string): Record<string, unknown> {
+  return {
+    run_id: `run-${revision}-${clientId}`,
+    revision,
+    client_id: clientId,
+    fixture_ref: `fixture-${clientId}`,
+    result: 'PASS',
+    ran_at: GOVERNED_RECENT,
+  };
+}
+
+const GOVERNED_CLIENT_ID = 'client-a';
+const GOVERNED_DRAFT_REVISION = '2026-draft-v2';
+
+/**
+ * A REAL governed resolution from `resolveCompatibilityMatrix`, branded by the
+ * capability-registry `WeakSet`. The protocol admission requires this brand.
+ */
+async function governedAdmission(
+  options: { readonly optIn?: readonly string[] } = {},
+): Promise<McpCompatibilityResolution> {
+  const revisions = [revisionRow(MCP_PROTOCOL_BASELINE_REVISION, 'STABLE')];
+  const cells = [cellRow(MCP_PROTOCOL_BASELINE_REVISION, GOVERNED_CLIENT_ID)];
+  const runs = [runRow(MCP_PROTOCOL_BASELINE_REVISION, GOVERNED_CLIENT_ID)];
+  if (options.optIn !== undefined) {
+    revisions.push(revisionRow(GOVERNED_DRAFT_REVISION, 'DRAFT'));
+    cells.push(cellRow(GOVERNED_DRAFT_REVISION, GOVERNED_CLIENT_ID));
+    runs.push(runRow(GOVERNED_DRAFT_REVISION, GOVERNED_CLIENT_ID));
+  }
+  return await resolveCompatibilityMatrix(
+    stubEngine({
+      revisions,
+      clients: [
+        {
+          client_id: GOVERNED_CLIENT_ID,
+          client_name: 'Client A',
+          version: '1.0.0',
+          auth_mode: 'OAUTH_2_1',
+        },
+      ],
+      cells,
+      runs,
+    }),
+    {
+      now: GOVERNED_NOW,
+      ...(options.optIn === undefined ? {} : { optInDraftRevisions: options.optIn }),
+    },
+  );
 }
 
 describe('T008: MCP protocol wiring & Streamable HTTP transport (AC-144, AC-251)', () => {
@@ -31,7 +139,7 @@ describe('T008: MCP protocol wiring & Streamable HTTP transport (AC-144, AC-251)
     const { createMcpProtocolMiddleware } = await loadProtocolWiringModule();
     const middleware = createMcpProtocolMiddleware({
       maxMessageBytes: MAXIMUM_REQUEST_BYTES,
-      admission: governedAdmission([MCP_PROTOCOL_BASELINE_REVISION]),
+      admission: await governedAdmission(),
     });
 
     const result = middleware.inspectRequest({
@@ -48,7 +156,7 @@ describe('T008: MCP protocol wiring & Streamable HTTP transport (AC-144, AC-251)
     // Default config: draft revision refused
     const defaultMiddleware = createMcpProtocolMiddleware({
       maxMessageBytes: MAXIMUM_REQUEST_BYTES,
-      admission: governedAdmission([MCP_PROTOCOL_BASELINE_REVISION]),
+      admission: await governedAdmission(),
     });
     const defaultResult = defaultMiddleware.inspectRequest({
       protocolRevision: '2026-draft-v2',
@@ -59,13 +167,11 @@ describe('T008: MCP protocol wiring & Streamable HTTP transport (AC-144, AC-251)
     expect(defaultResult.allowed).toBe(false);
     expect(defaultResult.reason).toBe('REVISION_UNSUPPORTED');
 
-    // Opt-in config: draft revision admitted (the resolver puts it in usableRevisions)
+    // Opt-in config: the governed resolver validates the registered DRAFT and
+    // places it in `optInRevisions` (never in `usableRevisions`).
     const optInMiddleware = createMcpProtocolMiddleware({
       maxMessageBytes: MAXIMUM_REQUEST_BYTES,
-      admission: governedAdmission(
-        [MCP_PROTOCOL_BASELINE_REVISION, '2026-draft-v2'],
-        ['2026-draft-v2'],
-      ),
+      admission: await governedAdmission({ optIn: [GOVERNED_DRAFT_REVISION] }),
     });
     const optInResult = optInMiddleware.inspectRequest({
       protocolRevision: '2026-draft-v2',
@@ -80,7 +186,7 @@ describe('T008: MCP protocol wiring & Streamable HTTP transport (AC-144, AC-251)
     const { createMcpProtocolMiddleware } = await loadProtocolWiringModule();
     const middleware = createMcpProtocolMiddleware({
       maxMessageBytes: MAXIMUM_REQUEST_BYTES,
-      admission: governedAdmission([MCP_PROTOCOL_BASELINE_REVISION]),
+      admission: await governedAdmission(),
     });
 
     const getResult = middleware.inspectRequest({
@@ -106,7 +212,7 @@ describe('T008: MCP protocol wiring & Streamable HTTP transport (AC-144, AC-251)
     const { createMcpProtocolMiddleware } = await loadProtocolWiringModule();
     const middleware = createMcpProtocolMiddleware({
       maxMessageBytes: MAXIMUM_REQUEST_BYTES,
-      admission: governedAdmission([MCP_PROTOCOL_BASELINE_REVISION]),
+      admission: await governedAdmission(),
     });
 
     const result = middleware.inspectRequest({
@@ -123,7 +229,7 @@ describe('T008: MCP protocol wiring & Streamable HTTP transport (AC-144, AC-251)
     const { createMcpProtocolMiddleware } = await loadProtocolWiringModule();
     const middleware = createMcpProtocolMiddleware({
       maxMessageBytes: MAXIMUM_REQUEST_BYTES,
-      admission: governedAdmission([MCP_PROTOCOL_BASELINE_REVISION]),
+      admission: await governedAdmission(),
     });
 
     for (const vector of SESSION_CLAIM_MISMATCH_VECTORS) {
@@ -149,7 +255,7 @@ describe('T008: MCP protocol wiring & Streamable HTTP transport (AC-144, AC-251)
     const { createMcpProtocolMiddleware } = await loadProtocolWiringModule();
     const middleware = createMcpProtocolMiddleware({
       maxMessageBytes: MAXIMUM_REQUEST_BYTES,
-      admission: governedAdmission([MCP_PROTOCOL_BASELINE_REVISION]),
+      admission: await governedAdmission(),
     });
 
     // Valid cursor
@@ -216,8 +322,9 @@ describe('V7 fail-open: MCP admission is governed, never caller-assembled (F9)',
         } as never),
     ).toThrow(/admission/);
 
-    // A hand-assembled admission naming an unregistered revision is refused by
-    // the syntactic-revision law before any guard is built.
+    // A hand-assembled admission naming an unregistered revision is refused
+    // before any guard is built: it cannot carry the capability-registry
+    // provenance brand that only `resolveCompatibilityMatrix` can mint.
     expect(
       () =>
         new McpProtocolWiring({
@@ -228,12 +335,12 @@ describe('V7 fail-open: MCP admission is governed, never caller-assembled (F9)',
             optInRevisions: [],
           },
         } as never),
-    ).toThrow(/syntactically valid protocol revision/);
+    ).toThrow(/provenance brand/);
 
     // CONTROL: a governed baseline admission still admits the baseline.
     const middleware = createMcpProtocolMiddleware({
       maxMessageBytes: MAXIMUM_REQUEST_BYTES,
-      admission: governedAdmission([MCP_PROTOCOL_BASELINE_REVISION]),
+      admission: await governedAdmission(),
     });
     const result = middleware.inspectRequest({
       protocolRevision: MCP_PROTOCOL_BASELINE_REVISION,
@@ -251,7 +358,7 @@ describe('V7 fail-open: MCP admission is governed, never caller-assembled (F9)',
     // their union, exactly like `resolveProtocolRevision`.
     const middleware = createMcpProtocolMiddleware({
       maxMessageBytes: MAXIMUM_REQUEST_BYTES,
-      admission: governedAdmission([MCP_PROTOCOL_BASELINE_REVISION], ['2026-draft-v2']),
+      admission: await governedAdmission({ optIn: [GOVERNED_DRAFT_REVISION] }),
     });
     const optedIn = middleware.inspectRequest({
       protocolRevision: '2026-draft-v2',
@@ -262,39 +369,26 @@ describe('V7 fail-open: MCP admission is governed, never caller-assembled (F9)',
     expect(optedIn.allowed).toBe(true);
   });
 
-  it('fails closed on every malformed governed admission (typed TypeError)', async () => {
+  it('refuses every caller-declared or ungoverned revision list with a typed TypeError (HIGH-5)', async () => {
     const { createMcpProtocolMiddleware } = await loadProtocolWiringModule();
     const base = { maxMessageBytes: MAXIMUM_REQUEST_BYTES };
     const cases: readonly unknown[] = [
       { ...base, admission: undefined },
       { ...base, admission: null },
       { ...base, admission: 'baseline' },
-      // optInRevisions is not an array
+      // The old free-form revision list.
+      { ...base, admission: { allowedRevisions: ['TOTALLY-UNREGISTERED-EVIL'] } },
+      // A resolver-SHAPED object a caller assembled by hand, naming an
+      // unregistered revision.
       {
         ...base,
         admission: {
           defaultRevision: MCP_PROTOCOL_BASELINE_REVISION,
-          usableRevisions: [MCP_PROTOCOL_BASELINE_REVISION],
-          optInRevisions: '2026-draft-v2',
+          usableRevisions: [MCP_PROTOCOL_BASELINE_REVISION, 'TOTALLY-UNREGISTERED-EVIL'],
+          optInRevisions: [],
         },
       },
-      // opt-in entry that is not a syntactically valid protocol revision
-      {
-        ...base,
-        admission: governedAdmission(
-          [MCP_PROTOCOL_BASELINE_REVISION],
-          ['TOTALLY-UNREGISTERED-EVIL'],
-        ),
-      },
-      // duplicate opt-in entry
-      {
-        ...base,
-        admission: governedAdmission(
-          [MCP_PROTOCOL_BASELINE_REVISION],
-          ['2026-draft-v2', '2026-draft-v2'],
-        ),
-      },
-      // non-baseline default
+      // A resolver-SHAPED object with a non-baseline default.
       {
         ...base,
         admission: {
@@ -303,24 +397,7 @@ describe('V7 fail-open: MCP admission is governed, never caller-assembled (F9)',
           optInRevisions: [],
         },
       },
-      // duplicate usable entry
-      {
-        ...base,
-        admission: governedAdmission([
-          MCP_PROTOCOL_BASELINE_REVISION,
-          MCP_PROTOCOL_BASELINE_REVISION,
-        ]),
-      },
-      // defaultRevision missing from usableRevisions ∪ optInRevisions
-      {
-        ...base,
-        admission: {
-          defaultRevision: MCP_PROTOCOL_BASELINE_REVISION,
-          usableRevisions: ['2026-01-01'],
-          optInRevisions: [],
-        },
-      },
-      // empty usableRevisions
+      // An empty usableRevisions set.
       {
         ...base,
         admission: {
@@ -332,6 +409,84 @@ describe('V7 fail-open: MCP admission is governed, never caller-assembled (F9)',
     ];
     for (const options of cases) {
       expect(() => createMcpProtocolMiddleware(options as never)).toThrow(TypeError);
+    }
+  });
+
+  it('refuses a structuredClone of a real governed resolution (HIGH-5)', async () => {
+    const { createMcpProtocolMiddleware } = await loadProtocolWiringModule();
+    const real = await governedAdmission();
+    const clone = structuredClone(real);
+    expect(() =>
+      createMcpProtocolMiddleware({
+        maxMessageBytes: MAXIMUM_REQUEST_BYTES,
+        admission: clone as never,
+      }),
+    ).toThrow(/provenance brand/);
+  });
+
+  it('uses the resolver defaultRevision (never a hard-pinned baseline) (HIGH-5/L1)', async () => {
+    const { createMcpProtocolMiddleware } = await loadProtocolWiringModule();
+    // A governed resolution whose mutually tested default is NOT the baseline
+    // must be admitted on its own defaultRevision.
+    const resolution = await resolveCompatibilityMatrix(
+      stubEngine({
+        revisions: [
+          revisionRow(MCP_PROTOCOL_BASELINE_REVISION, 'STABLE'),
+          revisionRow('2026-01-15', 'STABLE'),
+        ],
+        clients: [
+          {
+            client_id: GOVERNED_CLIENT_ID,
+            client_name: 'Client A',
+            version: '1.0.0',
+            auth_mode: 'OAUTH_2_1',
+          },
+        ],
+        cells: [
+          cellRow(MCP_PROTOCOL_BASELINE_REVISION, GOVERNED_CLIENT_ID),
+          cellRow('2026-01-15', GOVERNED_CLIENT_ID),
+        ],
+        runs: [
+          runRow(MCP_PROTOCOL_BASELINE_REVISION, GOVERNED_CLIENT_ID),
+          runRow('2026-01-15', GOVERNED_CLIENT_ID),
+        ],
+      }),
+      { now: GOVERNED_NOW },
+    );
+    expect(resolution.defaultRevision).toBe('2026-01-15');
+    const middleware = createMcpProtocolMiddleware({
+      maxMessageBytes: MAXIMUM_REQUEST_BYTES,
+      admission: resolution,
+    });
+    const result = middleware.inspectRequest({
+      protocolRevision: '2026-01-15',
+      contentType: 'application/json',
+      method: 'POST',
+      messageBytes: 64,
+    });
+    expect(result.allowed).toBe(true);
+  });
+
+  it('returns the snapshot-derived revision and a frozen payload copy (HIGH-5)', async () => {
+    const { McpProtocolWiring } = await loadProtocolWiringModule();
+    const wiring = new McpProtocolWiring({
+      maximumRequestBytes: MAXIMUM_REQUEST_BYTES,
+      admission: await governedAdmission(),
+    });
+    const payload = { jsonrpc: '2.0', id: 7, method: 'ping' };
+    const admission = wiring.inspect({
+      protocolRevision: MCP_PROTOCOL_BASELINE_REVISION,
+      contentType: 'application/json',
+      method: 'POST',
+      messageBytes: 32,
+      payload,
+    });
+    expect(admission.allowed).toBe(true);
+    if (admission.allowed) {
+      expect(admission.protocolRevision).toBe(MCP_PROTOCOL_BASELINE_REVISION);
+      expect(admission.request).toEqual(payload);
+      expect(admission.request).not.toBe(payload);
+      expect(Object.isFrozen(admission.request)).toBe(true);
     }
   });
 });

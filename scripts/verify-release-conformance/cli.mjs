@@ -309,7 +309,12 @@ async function hashDirectory(root, directory, suffix) {
   );
 }
 
-async function reportConsistencyFindings(root, audit) {
+export async function reportConsistencyFindings(root, audit, options = {}) {
+  // L4: a PROD-active milestone must not be certified without a deterministic
+  // release report. Before this, a missing report was silently skipped, so an
+  // invocation that omitted it passed. The caller passes
+  // `requireReleaseReport: ownsProdLaw`.
+  const requireReleaseReport = options.requireReleaseReport === true;
   const [document, manifest, lockfile] = await Promise.all([
     readFile(path.join(root, DOCUMENT)),
     readFile(path.join(root, MANIFEST)),
@@ -363,7 +368,18 @@ async function reportConsistencyFindings(root, audit) {
     );
 
   const reportPath = path.join(root, RELEASE_REPORT);
-  if (await exists(reportPath)) {
+  const releaseReportExists = await exists(reportPath);
+  if (requireReleaseReport && !releaseReportExists) {
+    findings.push(
+      finding(
+        'FR-TRACE-006',
+        'RELEASE_REPORT_MISSING',
+        RELEASE_REPORT,
+        'a PROD-active milestone requires a deterministic release report; the release report is absent',
+      ),
+    );
+  }
+  if (releaseReportExists) {
     let report;
     try {
       report = JSON.parse(await readFile(reportPath, 'utf8'));
@@ -476,6 +492,13 @@ export async function prodConformanceFindings(root, options = {}) {
 }
 
 export async function verifyReleaseConformance(root, options = {}) {
+  // M1: an unexpected/extra option is refused, never silently ignored, so a
+  // caller cannot believe it supplied PROD claims (or a glob) that were dropped.
+  const allowedOptionKeys = new Set(['prodClaimsPath', 'requireProdClaims']);
+  for (const key of Object.keys(options)) {
+    if (!allowedOptionKeys.has(key))
+      throw new Error(`unsupported conformance verification option: ${key}`);
+  }
   const [manifest, audit, milestone] = await Promise.all([
     readFile(path.join(root, MANIFEST), 'utf8').then(JSON.parse),
     readFile(path.join(root, AUDIT), 'utf8').then(JSON.parse),
@@ -516,7 +539,7 @@ export async function verifyReleaseConformance(root, options = {}) {
     await dependencyGateFindings(root, manifest, activeGroup),
     await orphanFindings(root, manifest),
     await generatedDriftFindings(root),
-    await reportConsistencyFindings(root, audit),
+    await reportConsistencyFindings(root, audit, { requireReleaseReport: ownsProdLaw }),
     await prodConformanceFindings(root, prodOptions),
   ];
   const findings = groups
@@ -561,37 +584,63 @@ export async function verifyReleaseConformance(root, options = {}) {
 
 async function run() {
   const args = process.argv.slice(2);
-  if (args.includes('--help') || args.includes('-h')) {
-    console.log(
-      'Usage: node scripts/verify-release-conformance/cli.mjs [--json] [--prod-claims <file.json>] [--require-prod-claims]\nVerify release conformance against the live tree.\nThe repo-backed PROD surface rule always runs; the five PROD claim rules need --prod-claims <file> and --require-prod-claims fails closed when it is absent.',
-    );
-    return;
-  }
   let prodClaimsPath;
   let requireProdClaims = false;
+  let help = false;
   const positional = [];
   for (let index = 0; index < args.length; index += 1) {
     const arg = args[index];
     if (arg === '--json') continue;
+    if (arg === '--help' || arg === '-h') {
+      help = true;
+      continue;
+    }
     if (arg === '--require-prod-claims') {
       requireProdClaims = true;
       continue;
     }
     if (arg === '--prod-claims') {
-      prodClaimsPath = args[index + 1];
-      if (prodClaimsPath === undefined) {
+      const value = args[index + 1];
+      if (value === undefined || value.startsWith('-')) {
         console.error('error: --prod-claims requires a file path');
         process.exitCode = 1;
         return;
       }
+      // M1: a glob/wildcard is not a file. Refuse it loudly instead of passing
+      // it to the bridge where a failed read could be mistaken for "no claims".
+      if (/[*?[\]{}]/.test(value)) {
+        console.error('error: --prod-claims expects a single concrete file, not a glob');
+        process.exitCode = 1;
+        return;
+      }
+      if (prodClaimsPath !== undefined) {
+        console.error('error: --prod-claims may be supplied at most once');
+        process.exitCode = 1;
+        return;
+      }
+      prodClaimsPath = value;
       index += 1;
       continue;
     }
     positional.push(arg);
   }
+  // M1: unexpected extra / glob / unknown inputs are REFUSED, never silently
+  // ignored. `--help` is valid only on its own: combining it with other inputs
+  // previously short-circuited argument validation and returned success.
   if (positional.length > 0) {
     console.error('error: unsupported conformance verification argument');
     process.exitCode = 1;
+    return;
+  }
+  if (help && (requireProdClaims || prodClaimsPath !== undefined)) {
+    console.error('error: --help cannot be combined with other inputs');
+    process.exitCode = 1;
+    return;
+  }
+  if (help) {
+    console.log(
+      'Usage: node scripts/verify-release-conformance/cli.mjs [--json] [--prod-claims <file.json>] [--require-prod-claims]\nVerify release conformance against the live tree.\nThe repo-backed PROD surface rule always runs; the five PROD claim rules need --prod-claims <file> and --require-prod-claims fails closed when it is absent.',
+    );
     return;
   }
   const verdict = await verifyReleaseConformance(process.cwd(), {

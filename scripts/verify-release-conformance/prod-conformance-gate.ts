@@ -35,6 +35,18 @@ async function main(): Promise<void> {
   const args = process.argv.slice(2);
   const requireClaims = args.includes('--require-claims');
   const positional = args.filter((arg) => arg !== '--require-claims');
+  // M1: unexpected extra/flag inputs are refused, never silently ignored. The
+  // bridge accepts at most `<repoRoot> [claimsPath]`.
+  if (positional.length > 2) {
+    throw new Error(
+      `unexpected extra PROD conformance-gate argument(s): ${positional.slice(2).join(' ')}`,
+    );
+  }
+  for (let index = 0; index < positional.length; index += 1) {
+    if (positional[index]?.startsWith('-')) {
+      throw new Error(`unexpected PROD conformance-gate flag: ${positional[index]}`);
+    }
+  }
   const repoRoot = positional[0] ?? process.cwd();
   const claimsPath = positional[1];
 

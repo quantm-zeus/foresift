@@ -12,6 +12,7 @@ import { createHash } from 'node:crypto';
 import { SecErrorCode, SupplyChainError } from './errors.ts';
 import {
   appendSafe,
+  isArraySafe,
   numericFilter,
   numericJoin,
   numericMap,
@@ -34,18 +35,56 @@ export function verifyPinning(
   // Single-read binding (V7 accessor class): the range classified as pinned and
   // the range recorded in the violation must be the SAME read.
   const manifests = snapshotCallerInput(rawManifests);
+  if (!isArraySafe(manifests)) {
+    throw new SupplyChainError(
+      'manifest inventory must be an array',
+      {},
+      SecErrorCode.SEC_DEPENDENCY_UNPINNED,
+    );
+  }
   const pinned: string[] = [];
   const violations: { manifest: string; dependency: string; range: string }[] = [];
   for (let manifestIndex = 0; manifestIndex < manifests.length; manifestIndex += 1) {
     const manifest = manifests[manifestIndex] as {
-      readonly name: string;
-      readonly dependencies?: Record<string, string> | undefined;
+      readonly name?: unknown;
+      readonly dependencies?: unknown;
     };
-    const dependencies = Object.entries(manifest.dependencies ?? {});
+    if (manifest === null || typeof manifest !== 'object' || typeof manifest.name !== 'string') {
+      throw new SupplyChainError(
+        'manifest must carry a string name',
+        { manifest: manifestIndex },
+        SecErrorCode.SEC_DEPENDENCY_UNPINNED,
+      );
+    }
+    // Residual CRITICAL (partial-Proxy): a Proxy can omit `dependencies` from
+    // `ownKeys`, so an ABSENT/non-record field is refused rather than silently
+    // read as "no dependencies to pin". An explicitly-empty `{}` is the only
+    // admissible "no dependencies" spelling.
+    const dependenciesRaw = manifest.dependencies;
+    if (
+      dependenciesRaw === undefined ||
+      dependenciesRaw === null ||
+      typeof dependenciesRaw !== 'object' ||
+      isArraySafe(dependenciesRaw)
+    ) {
+      throw new SupplyChainError(
+        'manifest dependencies field is missing or not a record',
+        { manifest: manifest.name },
+        SecErrorCode.SEC_DEPENDENCY_UNPINNED,
+      );
+    }
+    const dependencies = Object.entries(dependenciesRaw as Record<string, unknown>);
     for (let entryIndex = 0; entryIndex < dependencies.length; entryIndex += 1) {
-      const dependencyEntry = dependencies[entryIndex] as [string, string];
+      const dependencyEntry = dependencies[entryIndex] as [string, unknown];
       const dependency = dependencyEntry[0];
       const range = dependencyEntry[1];
+      if (typeof range !== 'string') {
+        throw new SupplyChainError(
+          'dependency range must be a string',
+          { manifest: manifest.name, dependency },
+          SecErrorCode.SEC_DEPENDENCY_UNPINNED,
+        );
+      }
       if (EXACT_VERSION.test(range)) {
         appendSafe(pinned, `${manifest.name}/${dependency}@${range}`);
       } else {
@@ -223,11 +262,42 @@ export function checkLifecycleScripts(rawManifest: {
   // Single-read binding (V7 accessor class): the restricted-hook decision and
   // the refusal detail must observe the same manifest.
   const manifest = snapshotCallerInput(rawManifest);
-  const scripts = manifest.scripts ?? {};
+  if (manifest === null || typeof manifest !== 'object' || typeof manifest.name !== 'string') {
+    throw new SupplyChainError(
+      'manifest must carry a string name',
+      {},
+      SecErrorCode.SEC_LIFECYCLE_SCRIPT_RESTRICTED,
+    );
+  }
+  // Residual CRITICAL (partial-Proxy): an ABSENT/non-record `scripts` field is
+  // refused rather than silently read as "no scripts"; an explicit `{}` is the
+  // only admissible "no scripts" spelling.
+  const scriptsRaw = manifest.scripts;
+  if (
+    scriptsRaw === undefined ||
+    scriptsRaw === null ||
+    typeof scriptsRaw !== 'object' ||
+    isArraySafe(scriptsRaw)
+  ) {
+    throw new SupplyChainError(
+      'manifest scripts field is missing or not a record',
+      { manifest: manifest.name },
+      SecErrorCode.SEC_LIFECYCLE_SCRIPT_RESTRICTED,
+    );
+  }
+  const scripts = scriptsRaw as Record<string, unknown>;
   const restrictedHooks = ['preinstall', 'install', 'postinstall', 'prepack', 'prepublishOnly'];
   const restricted = numericFilter(restrictedHooks, (hook) => {
     const command = scripts[hook];
-    return command !== undefined && !ALLOWED_LIFECYCLE_SCRIPTS.has(command);
+    if (command === undefined) return false;
+    if (typeof command !== 'string') {
+      throw new SupplyChainError(
+        'lifecycle script command must be a string',
+        { manifest: manifest.name, hook },
+        SecErrorCode.SEC_LIFECYCLE_SCRIPT_RESTRICTED,
+      );
+    }
+    return !ALLOWED_LIFECYCLE_SCRIPTS.has(command);
   });
   if (restricted.length > 0) {
     throw new SupplyChainError(
@@ -261,10 +331,35 @@ export function flagCapabilityReview(
 ): readonly CapabilityReviewFlag[] {
   // Single-read binding (V7 accessor class): the review flag is derived from the
   // same capability list that is returned.
-  const entries = snapshotCallerInput(rawEntries);
-  return numericMap(entries, (entry) => ({
-    dependency: entry.dependency,
-    capabilities: entry.declaredCapabilities,
-    reviewRequired: entry.declaredCapabilities.length > 0,
-  }));
+  const rawEntryList: unknown = snapshotCallerInput(rawEntries);
+  if (!isArraySafe(rawEntryList)) {
+    throw new SupplyChainError(
+      'capability-review inventory must be an array',
+      {},
+      SecErrorCode.SEC_LIFECYCLE_SCRIPT_RESTRICTED,
+    );
+  }
+  const entryList = rawEntryList as ReadonlyArray<{
+    readonly dependency?: unknown;
+    readonly declaredCapabilities?: unknown;
+  }>;
+  return numericMap(entryList, (entry, index) => {
+    if (
+      entry === null ||
+      typeof entry !== 'object' ||
+      typeof entry.dependency !== 'string' ||
+      !isArraySafe(entry.declaredCapabilities)
+    ) {
+      throw new SupplyChainError(
+        'capability-review entry requires a string dependency and a capability array',
+        { index },
+        SecErrorCode.SEC_LIFECYCLE_SCRIPT_RESTRICTED,
+      );
+    }
+    return {
+      dependency: entry.dependency,
+      capabilities: entry.declaredCapabilities as readonly DependencyCapability[],
+      reviewRequired: entry.declaredCapabilities.length > 0,
+    };
+  });
 }

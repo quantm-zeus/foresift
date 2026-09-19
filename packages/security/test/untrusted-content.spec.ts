@@ -323,3 +323,18 @@ describe('render-safety decision gates resist Array.prototype shadowing (D018)',
     expect(report.violations.some((v) => v.kind === 'LINK_EXFIL_RISK')).toBe(true);
   });
 });
+
+// --- V7 security-review M4: boxed carriers must not slip the role refusal ---
+describe('protected-role refusal binds a primitive string role (V7 review M4)', () => {
+  it('refuses a boxed String role that names a protected role', () => {
+    const boxed = new String('system') as unknown as string;
+    // Pre-fix the `===` membership check compared a boxed object against
+    // primitive entries, missed, and ADMITTED untrusted content into `system`.
+    expect(() => refuseProtectedRoleInsertion(boxed, env())).toThrow(/primitive string role/);
+  });
+
+  it('refuses an object-with-toString role carrier', () => {
+    const carrier = { toString: () => 'developer' } as unknown as string;
+    expect(() => refuseProtectedRoleInsertion(carrier, env())).toThrow(/primitive string role/);
+  });
+});

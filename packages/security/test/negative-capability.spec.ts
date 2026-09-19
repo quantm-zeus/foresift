@@ -362,3 +362,105 @@ describe('negative-capability detection resists Array.prototype shadowing (D018)
     expect(findings[0]?.matchedPattern).toBe('PRIVATE_KEY');
   });
 });
+
+// --- V7 security-review residual: proxy-omitted required fields + H8 appends --
+function capabilityCodeOf(fn: () => unknown): string {
+  try {
+    fn();
+  } catch (error) {
+    return (error as { code?: string }).code ?? 'NO_CODE';
+  }
+  return 'NO_THROW';
+}
+
+describe('supply-chain refuses omitted inventories (V7 residual)', () => {
+  it('REFUSES a manifest that omits `dependencies` instead of reading "nothing to pin"', () => {
+    expect(capabilityCodeOf(() => verifyPinning([{ name: 'no-deps' } as never]))).toBe(
+      'SEC_DEPENDENCY_UNPINNED',
+    );
+  });
+
+  it('REFUSES a Proxy that omits the `dependencies` key from ownKeys', () => {
+    const manifest = new Proxy(
+      { name: 'proxy' },
+      {
+        ownKeys: () => ['name'],
+        getOwnPropertyDescriptor: (target, key) =>
+          key === 'dependencies' ? undefined : Object.getOwnPropertyDescriptor(target, key),
+        get: (target, key) => (key === 'dependencies' ? undefined : Reflect.get(target, key)),
+      },
+    );
+    expect(capabilityCodeOf(() => verifyPinning([manifest as never]))).toBe(
+      'SEC_DEPENDENCY_UNPINNED',
+    );
+  });
+
+  it('REFUSES a manifest that omits `scripts` instead of reading "no scripts"', () => {
+    expect(capabilityCodeOf(() => checkLifecycleScripts({ name: 'no-scripts' } as never))).toBe(
+      'SEC_LIFECYCLE_SCRIPT_RESTRICTED',
+    );
+  });
+
+  it('admits explicitly-empty dependency/script records', () => {
+    expect(verifyPinning([{ name: 'empty', dependencies: {} }]).violations).toEqual([]);
+    expect(checkLifecycleScripts({ name: 'empty', scripts: {} }).allowed).toBe(true);
+  });
+});
+
+describe('decoder-authority refuses an omitted authority field (V7 residual)', () => {
+  it('REFUSES a decoder inventory that omits the authority field', () => {
+    expect(
+      capabilityCodeOf(() =>
+        validateDecoderAuthority({
+          decoders: [{ id: 'legacy', status: 'DEPRECATED', domains: [] } as never],
+          rawOperationLocalDecodingEnabled: true,
+          acknowledgedDeprecations: ['legacy'],
+        }),
+      ),
+    ).toBe('SEC_DECODER_AUTHORITY_INVALID');
+  });
+
+  it('REFUSES an absent decoder inventory with a typed code', () => {
+    expect(capabilityCodeOf(() => validateDecoderAuthority({} as never))).toBe(
+      'SEC_DECODER_AUTHORITY_INVALID',
+    );
+  });
+});
+
+describe('negative-capability fails closed on incomplete catalogs and index shadows (V7 residual/H8)', () => {
+  it('REFUSES a catalog that omits `inventoryForbiddenVerbs`', () => {
+    const partial = {
+      catalogVersion: 1,
+      categories: [],
+      readOnlyWalletIntelligenceAllowlist: {
+        admittedQueryShapes: [],
+        forbiddenQueryShapes: [],
+      },
+    } as unknown as CanaryCatalog;
+    expect(capabilityCodeOf(() => new NegativeCapabilityCanary(partial))).toBe(
+      'SEC_PROHIBITED_CAPABILITY_DETECTED',
+    );
+  });
+
+  it('REFUSES to scan under a hostile integer-index array shadow', () => {
+    const original = Object.getOwnPropertyDescriptor(Array.prototype, '0');
+    Object.defineProperty(Array.prototype, '0', {
+      configurable: true,
+      enumerable: false,
+      get: () => undefined,
+      set: () => {},
+    });
+    try {
+      expect(() => {
+        const canary = new NegativeCapabilityCanary(loadCanaryCatalog());
+        canary.scanEnvironmentNames(['PRIVATE_KEY_HEX']);
+      }).toThrow(/integer-index accessor/);
+    } finally {
+      if (original === undefined) {
+        delete (Array.prototype as unknown as Record<string, unknown>)['0'];
+      } else {
+        Object.defineProperty(Array.prototype, '0', original);
+      }
+    }
+  });
+});

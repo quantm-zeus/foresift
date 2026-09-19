@@ -35,8 +35,10 @@ import {
   type RequirementMapping,
 } from '../src/index.ts';
 import { VALID_RELEASE_REPORT_FIXTURE } from '../../../tests/fixtures/trace/index.ts';
+import { snapshotCallerInput } from '../src/shadow-safe.ts';
 import {
   ALL_ARTIFACT_BOUNDARY_ASSERTION_KINDS,
+  DISTRIBUTION_DUTY_DIMENSIONS,
   parseActivationGateKind,
   parseDistributionReadiness,
   type ArtifactBoundaryAssertion,
@@ -51,6 +53,8 @@ import {
   PROD_BEST_EFFORT_WEAKENING,
   PROD_COMPLIANT_ACTIVE_CLAIM,
   PROD_DISTRIBUTION_CLAIMS,
+  PROD_DISTRIBUTION_DUTY_VERDICTS,
+  PROD_DISTRIBUTION_REQUIRED_DUTIES,
   PROD_DISTRIBUTION_REQUIRED_GATES,
   PROD_LIVE_PATH_BOUNDED_CLAIM,
   PROD_LIVE_PATH_CLAIMS,
@@ -746,6 +750,7 @@ describe('THIRD-ROUND exploit regressions (R2/R3, T055/T056/T057)', () => {
       releaseRef: 'rel',
       distributionReadiness: 'WORKSPACE_AUTHORIZED',
       requiredGateKinds: authoritativeGates,
+      distributionDuties: PROD_DISTRIBUTION_DUTY_VERDICTS,
       gateEvidence: stringScopedEvidence,
     } as never);
     expect(foreign.authorized).toBe(false);
@@ -756,6 +761,7 @@ describe('THIRD-ROUND exploit regressions (R2/R3, T055/T056/T057)', () => {
         releaseRef: 'rel',
         distributionReadiness: 'WORKSPACE_AUTHORIZED',
         requiredGateKinds: authoritativeGates,
+        distributionDuties: PROD_DISTRIBUTION_DUTY_VERDICTS,
         gateEvidence: stringScopedEvidence,
       } as never,
     ]);
@@ -767,6 +773,7 @@ describe('THIRD-ROUND exploit regressions (R2/R3, T055/T056/T057)', () => {
       releaseRef: 'rel',
       distributionReadiness: 'WORKSPACE_AUTHORIZED',
       requiredGateKinds: authoritativeGates,
+      distributionDuties: PROD_DISTRIBUTION_DUTY_VERDICTS,
       gateEvidence: authoritativeGates.map((gateKind) => ({
         evidenceId: `e-${gateKind}`,
         gateKind,
@@ -852,6 +859,7 @@ describe('THIRD-ROUND exploit regressions (R2/R3, T055/T056/T057)', () => {
         releaseRef: 'rel',
         distributionReadiness: 'WORKSPACE_AUTHORIZED',
         requiredGateKinds: authoritativeGates,
+        distributionDuties: PROD_DISTRIBUTION_DUTY_VERDICTS,
         gateEvidence: shadowedFilter,
       } as never).authorized,
     ).toBe(false);
@@ -864,6 +872,7 @@ describe('THIRD-ROUND exploit regressions (R2/R3, T055/T056/T057)', () => {
         releaseRef: 'rel',
         distributionReadiness: 'WORKSPACE_AUTHORIZED',
         requiredGateKinds: authoritativeGates,
+        distributionDuties: PROD_DISTRIBUTION_DUTY_VERDICTS,
         gateEvidence: authoritativeGates.map((gateKind) => ({
           evidenceId: `e-${gateKind}`,
           gateKind,
@@ -879,6 +888,7 @@ describe('THIRD-ROUND exploit regressions (R2/R3, T055/T056/T057)', () => {
       releaseRef: '',
       distributionReadiness: 'WORKSPACE_AUTHORIZED',
       requiredGateKinds: authoritativeGates,
+      distributionDuties: PROD_DISTRIBUTION_DUTY_VERDICTS,
       gateEvidence: authoritativeGates.map((gateKind) => ({
         evidenceId: `e-${gateKind}`,
         gateKind,
@@ -906,6 +916,7 @@ describe('FOURTH-ROUND exploit regressions (R4/R7, audit H2/H4)', () => {
       releaseRef: 'rel',
       distributionReadiness: 'PUBLIC_AUTHORIZED',
       requiredGateKinds: AUTHORITATIVE_GATES,
+      distributionDuties: PROD_DISTRIBUTION_DUTY_VERDICTS,
       gateEvidence: VALID_EXACT_RELEASE_EVIDENCE,
       ...overrides,
     };
@@ -2368,4 +2379,226 @@ describe('V7: release-gate totality, PROD-claim reachability and superseded defa
     expect(rules).toContain(PROD_RULES.livePathPrecomputationViolation);
     expect(rules).toContain(PROD_RULES.publicAuthorizationWithoutGateEvidence);
   }, 120_000);
+});
+
+/**
+ * HIGH-1 / HIGH-2 fail-closed regressions. Each test FAILS on the pre-fix code:
+ * the MCP rule reported `passed: true` for a matrix with ZERO clients and no
+ * cells, and the distribution rule authorized a claim whose declared gate kinds
+ * covered only a coarse subset and omitted every §69.9 duty dimension the
+ * runtime `DISTRIBUTION_EVIDENCE` gate enforces.
+ */
+describe('HIGH-1/HIGH-2: PROD rules refuse empty and coarse-subset inputs', () => {
+  const MCP_DEFAULT_REVISION = {
+    revision: '2025-11-25',
+    channel: 'STABLE',
+    isDefault: true,
+    supersededBy: null,
+  };
+
+  it('fails the MCP rule closed when there are ZERO clients and no cells (HIGH-1)', () => {
+    const report = checkMcpCompatibilityDrift({
+      revisions: [MCP_DEFAULT_REVISION],
+      clients: [],
+      cells: [],
+      now: '2026-06-01T00:00:00Z',
+    });
+    expect(report.passed).toBe(false);
+    expect(
+      report.findings.some((finding) => finding.rule === PROD_RULES.mcpCompatibilityDrift),
+    ).toBe(true);
+  });
+
+  it('fails the aggregate PROD gate closed for a zero-client matrix (HIGH-1)', () => {
+    const report = evaluateProdConformance({
+      activationClaims: [],
+      postureDeclarations: [],
+      mcpCompatibility: {
+        revisions: [MCP_DEFAULT_REVISION],
+        clients: [],
+        cells: [],
+        now: '2026-06-01T00:00:00Z',
+      },
+      livePaths: [],
+      distributionAuthorizations: [],
+    });
+    expect(report.overall).toBe('FAILED');
+    expect(
+      report.findings.some((finding) => finding.rule === PROD_RULES.mcpCompatibilityDrift),
+    ).toBe(true);
+  });
+
+  it('CONTROL: the compliant MCP matrix still passes (HIGH-1 no over-refusal)', () => {
+    expect(checkMcpCompatibilityDrift(PROD_MCP_COMPLIANT_CLAIM).passed).toBe(true);
+  });
+
+  it('binds the required distribution duty set to the authoritative dimension names (HIGH-2)', () => {
+    // The fixture list is an INDEPENDENT literal, so this is a genuine
+    // cross-check against the shared authoritative export rather than a
+    // self-referential comparison.
+    expect([...PROD_DISTRIBUTION_REQUIRED_DUTIES].sort()).toEqual(
+      [...DISTRIBUTION_DUTY_DIMENSIONS].sort(),
+    );
+  });
+
+  it('refuses an authorized claim whose duty set omits a §69.9 duty (HIGH-2)', () => {
+    const withoutDuty = PROD_DISTRIBUTION_DUTY_VERDICTS.filter(
+      (entry) => entry.duty !== 'isolationFixtures',
+    );
+    const claim = { ...PROD_WORKSPACE_AUTHORIZED_CLAIM, distributionDuties: withoutDuty };
+    const evaluation = evaluateDistributionAuthorization(claim);
+    expect(evaluation.authorized).toBe(false);
+    expect(evaluation.omittedDutyDimensions).toEqual(['isolationFixtures']);
+    const report = checkPublicAuthorizationWithoutGateEvidence([claim]);
+    expect(report.passed).toBe(false);
+    expect(report.findings[0]?.message).toContain('isolationFixtures');
+  });
+
+  it('refuses an authorized claim with a failing or unknown duty verdict (HIGH-2)', () => {
+    const failing = PROD_DISTRIBUTION_DUTY_VERDICTS.map((entry) =>
+      entry.duty === 'claimsReview' ? { duty: entry.duty, verdict: 'FAIL' } : entry,
+    );
+    const failingEvaluation = evaluateDistributionAuthorization({
+      ...PROD_WORKSPACE_AUTHORIZED_CLAIM,
+      distributionDuties: failing,
+    });
+    expect(failingEvaluation.authorized).toBe(false);
+    expect(failingEvaluation.failingDutyDimensions).toEqual(['claimsReview']);
+
+    const unknown = [
+      ...PROD_DISTRIBUTION_DUTY_VERDICTS,
+      { duty: 'TOTALLY_FAKE_DUTY', verdict: 'PASS' },
+    ];
+    const unknownEvaluation = evaluateDistributionAuthorization({
+      ...PROD_WORKSPACE_AUTHORIZED_CLAIM,
+      distributionDuties: unknown,
+    });
+    expect(unknownEvaluation.authorized).toBe(false);
+    expect(unknownEvaluation.unknownDutyDimensions).toEqual(['TOTALLY_FAKE_DUTY']);
+  });
+
+  it('refuses an absent/non-array duty set through the aggregate rule (HIGH-2)', () => {
+    const missing = evaluateProdConformance({
+      activationClaims: [],
+      postureDeclarations: [],
+      mcpCompatibility: PROD_MCP_COMPLIANT_CLAIM,
+      livePaths: [],
+      distributionAuthorizations: [
+        {
+          releaseRef: PROD_WORKSPACE_AUTHORIZED_CLAIM.releaseRef,
+          distributionReadiness: 'PUBLIC_AUTHORIZED',
+          requiredGateKinds: PROD_DISTRIBUTION_REQUIRED_GATES,
+          gateEvidence: [],
+        },
+      ],
+    } as never);
+    expect(missing.overall).toBe('FAILED');
+    const paths = missing.findings
+      .filter((finding) => finding.rule === PROD_RULES.prodConformanceInputMissing)
+      .map((finding) => finding.path);
+    expect(paths).toContain('distributionAuthorizations[0].distributionDuties');
+  });
+
+  it('cannot widen the MCP freshness window with a shadowed global Math.min (M2)', () => {
+    const originalMin = Math.min;
+    try {
+      Math.min = (() => Number.MAX_SAFE_INTEGER) as typeof Math.min;
+      const staleClaim = {
+        revisions: [MCP_DEFAULT_REVISION],
+        clients: [{ clientId: 'client-a' }],
+        cells: [
+          {
+            revision: '2025-11-25',
+            clientId: 'client-a',
+            result: 'PASS',
+            liveTestDate: '2000-01-01T00:00:00Z',
+            conformanceRunId: 'run-2025-11-25-client-a',
+            fixtureRef: 'fixture-client-a',
+          },
+        ],
+        now: '2026-06-01T00:00:00Z',
+      };
+      const report = checkMcpCompatibilityDrift(staleClaim);
+      expect(report.passed).toBe(false);
+      expect(
+        report.findings.some((finding) => finding.rule === PROD_RULES.mcpCompatibilityDrift),
+      ).toBe(true);
+    } finally {
+      Math.min = originalMin;
+    }
+  });
+});
+
+/**
+ * HIGH-4 fail-closed regression. A caller-pinned milestone that owns no
+ * FR-PROD law previously silenced the whole PROD block (including the
+ * repo-backed surface rule), so a PROD-violating tree could be certified by
+ * pinning `G0`. The authoritative ACTIVE milestone now governs the evaluation
+ * and a different pin is a typed refusal.
+ */
+describe('HIGH-4: the authoritative ACTIVE milestone governs the PROD block', () => {
+  it('refuses a caller pin to a milestone that owns no FR-PROD law without skipping PROD law (HIGH-4)', async () => {
+    const result = await evaluateConformance({ repoRoot: REPO_ROOT, milestone: 'G0' });
+    expect(result.overall).toBe('FAILED');
+    const rules = result.findings.map((finding) => finding.rule);
+    expect(rules).toContain('CONFORMANCE_MILESTONE_MISMATCH');
+    // The authoritative G2 PROD block ran: the omitted claims set fails closed.
+    expect(rules).toContain(PROD_RULES.prodConformanceInputMissing);
+  }, 120_000);
+});
+
+/**
+ * Defense-in-depth (V7-C1/H1 helper consistency): `snapshotCallerInput` must
+ * materialize EVERY own string key — including non-enumerable ones — and must
+ * not be collapsed by a shadowed `Array.isArray`.
+ *
+ * Pre-fix, `Object.keys` dropped a non-enumerable own field (a guard that treats
+ * "field absent" as "no violation" can fail open), and
+ * `Array.isArray = () => true` made every plain-object snapshot an EMPTY array.
+ */
+describe('shadow-safe snapshotCallerInput hardening (release-conformance)', () => {
+  it('materializes a non-enumerable own data field and getter exactly once', () => {
+    const carrier: Record<string, unknown> = {};
+    Object.defineProperty(carrier, 'hiddenData', {
+      value: 'materialized',
+      enumerable: false,
+      writable: true,
+      configurable: true,
+    });
+    let reads = 0;
+    Object.defineProperty(carrier, 'hiddenGetter', {
+      enumerable: false,
+      configurable: true,
+      get() {
+        reads += 1;
+        return 'read-once';
+      },
+    });
+    Object.defineProperty(carrier, 'visible', {
+      value: 'v',
+      enumerable: true,
+      writable: true,
+      configurable: true,
+    });
+    const snapshot = snapshotCallerInput(carrier) as Record<string, unknown>;
+    expect(snapshot['hiddenData']).toBe('materialized');
+    expect(snapshot['hiddenGetter']).toBe('read-once');
+    expect(snapshot['visible']).toBe('v');
+    expect(reads).toBe(1);
+  });
+
+  it('does not collapse when the global Array.isArray is shadowed to always-true', () => {
+    const originalIsArray = Array.isArray;
+    try {
+      (Array as unknown as { isArray: unknown }).isArray = () => true;
+      const snapshot = snapshotCallerInput({ a: 1, b: 'two' }) as Record<string, unknown>;
+      expect(snapshot['a']).toBe(1);
+      expect(snapshot['b']).toBe('two');
+      const arraySnapshot = snapshotCallerInput([1, 2]) as readonly number[];
+      expect(arraySnapshot.length).toBe(2);
+      expect(arraySnapshot[0]).toBe(1);
+    } finally {
+      (Array as unknown as { isArray: unknown }).isArray = originalIsArray;
+    }
+  });
 });

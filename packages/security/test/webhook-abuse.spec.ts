@@ -277,3 +277,80 @@ describe('abuse controls (FR-SEC-010)', () => {
     expect(abuse.coordinationScore(60_000)).toBe(0);
   });
 });
+
+// --- V7 security-review findings: webhook + abuse fail-closed hardening -------
+describe('webhook/abuse fail-closed binding (V7 review H4/H5/H8/H10/L5/L6)', () => {
+  it('binds maxAgeSeconds ONCE so a getter cannot validate 300 then enforce Infinity (H4)', async () => {
+    const now = 1_800_000_000_000;
+    let reads = 0;
+    const guard = new WebhookGuard({
+      verifier: hmacSha256Verifier(SECRET),
+      get maxAgeSeconds(): number {
+        reads += 1;
+        return reads === 1 ? 300 : Number.POSITIVE_INFINITY;
+      },
+      nowMs: () => now,
+    } as unknown as ConstructorParameters<typeof WebhookGuard>[0]);
+    // A 400s-stale delivery must be REFUSED: the guard enforced the same 300s
+    // window it validated, not a divergent Infinity read.
+    await expect(guard.verifyCallback(signed('{"a":1}', now - 400_000))).rejects.toMatchObject({
+      code: 'SEC_WEBHOOK_TIMESTAMP_STALE',
+    });
+  });
+
+  it('refuses NaN/Infinity signature timestamps instead of slipping the staleness check (H5)', async () => {
+    const { guard } = makeGuard();
+    for (const bad of [Number.NaN, Number.POSITIVE_INFINITY, Number.NEGATIVE_INFINITY]) {
+      await expect(
+        guard.verifyCallback({ ...signed('{"a":1}', 1_799_999_990_000), signatureTimestamp: bad }),
+      ).rejects.toMatchObject({ code: 'SEC_WEBHOOK_TIMESTAMP_STALE' });
+    }
+  });
+
+  it('refuses NaN / Infinity / negative admission costs (H10)', () => {
+    const abuse = new AbuseController({ clock: () => 0 });
+    for (const cost of [Number.NaN, Number.POSITIVE_INFINITY, Number.NEGATIVE_INFINITY, -1]) {
+      expect(() => abuse.admit('cost-attacker', cost)).toThrow(/finite non-negative/);
+    }
+    // A legitimate zero cost remains admissible.
+    expect(abuse.admit('cost-attacker', 0).admitted).toBe(true);
+  });
+
+  it('grants PROTECTED only for a literal verifiedProtectedSubject === true (L5)', () => {
+    const abuse = new AbuseController({ clock: () => 0 });
+    const spoofed = abuse.degradeOnQuotaExhaustion({
+      subject: PROTECTED_SUBJECTS[0]!,
+      quotaRemaining: 0,
+      verifiedProtectedSubject: 'yes' as unknown as boolean,
+    });
+    expect(spoofed.serviceClass).toBe('DEGRADED');
+  });
+
+  it('refuses a boxed non-string prompt subject instead of coercing it (L6)', () => {
+    const abuse = new AbuseController({ clock: () => 0 });
+    const boxed = new String('what is the price of SOL?') as unknown as string;
+    expect(abuse.screenPrompt(boxed).allowed).toBe(false);
+  });
+
+  it('refuses to record bursts under a hostile array index shadow (H8)', () => {
+    const proto = Array.prototype as unknown as Record<string, unknown>;
+    const original = Object.getOwnPropertyDescriptor(Array.prototype, '0');
+    Object.defineProperty(Array.prototype, '0', {
+      configurable: true,
+      enumerable: false,
+      get: () => undefined,
+      set: () => {},
+    });
+    try {
+      const abuse = new AbuseController({ clock: () => 0 });
+      // Pre-fix the raw `burstLog[length] = …` append was swallowed silently.
+      expect(() => abuse.recordBurst('acct-1')).toThrow(/integer-index accessor/);
+    } finally {
+      if (original === undefined) {
+        delete (proto as Record<string, unknown>)['0'];
+      } else {
+        Object.defineProperty(Array.prototype, '0', original);
+      }
+    }
+  });
+});

@@ -11,6 +11,7 @@
 import { SecErrorCode, AbuseControlError } from './errors.ts';
 import {
   appendSafe,
+  assertNoHostileArrayIndexShadow,
   numericFilter,
   numericIncludes,
   numericReduce,
@@ -98,6 +99,18 @@ export class AbuseController {
    * light read), so one heavy call can consume many admission slots.
    */
   admit(subject: string, cost = 1): AbuseDecision {
+    assertNoHostileArrayIndexShadow();
+    // H10 fail-closed budget accounting: NaN/Infinity/negative costs make the
+    // `totalCost + cost > limit` comparisons false or nonsensical, so a
+    // malformed cost silently admitted unlimited spend. Require a finite,
+    // non-negative number before any accounting.
+    if (typeof cost !== 'number' || !Number.isFinite(cost) || cost < 0) {
+      throw new AbuseControlError(
+        'admission cost must be a finite non-negative number',
+        { subject, cost: typeof cost === 'number' ? cost : -1 },
+        SecErrorCode.SEC_ABUSE_COST_INVALID,
+      );
+    }
     const now = this.clock();
     const bucket = this.buckets.get(subject) ?? { entries: [] };
     const entries = numericFilter(bucket.entries, (e) => now - e.at < this.flood.windowMs);
@@ -159,7 +172,9 @@ export class AbuseController {
       return { admitted: true, serviceClass: 'FULL', costConsumed: 0, retryAfterMs: undefined };
     }
     if (
-      (input.verifiedProtectedSubject ?? false) &&
+      // L5 strict binding: only a literal `true` from the authenticated
+      // caller context grants PROTECTED — a truthy string/1 must never.
+      input.verifiedProtectedSubject === true &&
       numericIncludes(PROTECTED_SUBJECTS, input.subject)
     ) {
       // Protected risk monitoring NEVER degrades and never bypasses.
@@ -232,6 +247,7 @@ export class AbuseController {
    * policy lands with FR-SEC-010's full detector work package.
    */
   recordBurst(subject: string): void {
+    assertNoHostileArrayIndexShadow();
     const now = this.clock();
     const horizon = this.flood.windowMs * 60;
     // Windowed retention (M15): bursts older than the analysis horizon the
@@ -250,11 +266,15 @@ export class AbuseController {
       }
       this.burstLog.length -= 1;
     }
-    this.burstLog[this.burstLog.length] = { subject, at: now };
+    // appendSafe, never `this.burstLog[this.burstLog.length] = …` (H8): a
+    // hostile integer-index accessor swallows the append and every burst is
+    // silently dropped from coordination analysis.
+    appendSafe(this.burstLog, { subject, at: now });
   }
 
   /** Deterministic correlation score over recorded bursts (stub heuristic). */
   coordinationScore(windowMs: number): number {
+    assertNoHostileArrayIndexShadow();
     const now = this.clock();
     // Numeric filter/loop, never `.filter`/`for...of` (audit R13): a shadowed
     // `filter` returning `[]` reports zero coordination for any burst pattern.
@@ -278,6 +298,12 @@ export class AbuseController {
    * protected role.
    */
   screenPrompt(content: string): { allowed: boolean; reason?: string } {
+    // L6 fail-closed binding: a non-string (boxed String/object with
+    // `toString`) carrier would otherwise coerce below and could dodge the
+    // markers; require a primitive string and record it as the subject.
+    if (typeof content !== 'string') {
+      return { allowed: false, reason: 'prompt content must be a primitive string' };
+    }
     const lower = content.toLowerCase();
     const markers = [
       'ignore all previous instructions',

@@ -14,6 +14,7 @@ import {
 import { SecErrorCode, SecretsPolicyError } from './errors.ts';
 import {
   appendSafe,
+  isArraySafe,
   numericCopy,
   numericFilter,
   numericIncludes,
@@ -74,8 +75,28 @@ export function refuseSecretTowardModelContext(rawInput: {
   // Single-read binding (V7 accessor class): the detected-material decision and
   // the declared-classification refusal must observe the same read.
   const input = snapshotCallerInput(rawInput);
-  const detected = detectMaterial(input.content);
-  if (detected.length > 0 || (input.declaredClassifications?.length ?? 0) > 0) {
+  // Residual CRITICAL (partial-Proxy): `snapshotCallerInput` cannot recover a
+  // key a hostile Proxy omitted from `ownKeys`, so every REQUIRED field is
+  // bound and type-checked explicitly — absent `content` refuses instead of
+  // reading as "nothing to detect".
+  const content = input.content;
+  if (typeof content !== 'string') {
+    throw new SecretsPolicyError(
+      'secret-context guard requires string content',
+      {},
+      SecErrorCode.SEC_SECRET_CONTEXT_INSERTION_REFUSED,
+    );
+  }
+  const declaredClassifications = input.declaredClassifications;
+  if (declaredClassifications !== undefined && !isArraySafe(declaredClassifications)) {
+    throw new SecretsPolicyError(
+      'declaredClassifications must be an array of secret classes',
+      {},
+      SecErrorCode.SEC_SECRET_CONTEXT_INSERTION_REFUSED,
+    );
+  }
+  const detected = detectMaterial(content);
+  if (detected.length > 0 || (declaredClassifications?.length ?? 0) > 0) {
     throw new SecretsPolicyError(
       'classified or secret-shaped material refused toward model context',
       { detected: numericJoin(detected) },
@@ -98,6 +119,22 @@ export function redactForLogs(
   // repeatedly by the replace loop; a getter could otherwise flip the value
   // between the match check and the replacement and leak material.
   const boundKnownValues = snapshotCallerInput(knownValues);
+  for (let index = 0; index < boundKnownValues.length; index += 1) {
+    const entry = boundKnownValues[index] as { value: unknown; label: unknown } | undefined;
+    if (
+      entry === undefined ||
+      entry === null ||
+      typeof entry !== 'object' ||
+      typeof entry.value !== 'string' ||
+      typeof entry.label !== 'string'
+    ) {
+      throw new SecretsPolicyError(
+        'known redaction values must be {value: string, label: string}',
+        {},
+        SecErrorCode.SEC_SECRET_LOG_EXPOSURE_REFUSED,
+      );
+    }
+  }
   let output = text;
   const sortedKnown = numericSortWith(
     numericCopy(boundKnownValues),
@@ -106,13 +143,20 @@ export function redactForLogs(
   for (let index = 0; index < sortedKnown.length; index += 1) {
     const known = sortedKnown[index] as { value: string; label: string };
     if (known.value === '') continue;
-    while (output.includes(known.value)) {
-      output = output.replace(known.value, `[REDACTED:${known.label}]`);
-    }
+    // H6b single-pass termination: the previous `while (includes) replace`
+    // loop never terminated when the replacement text itself contained the
+    // searched value (e.g. value "REDACTED"). A split+join pass replaces every
+    // occurrence exactly once and always terminates.
+    output = numericJoin(output.split(known.value), `[REDACTED:${known.label}]`);
   }
   for (let index = 0; index < MATERIAL_PATTERNS.length; index += 1) {
     const pattern = MATERIAL_PATTERNS[index] as { id: string; regex: RegExp };
-    output = output.replace(pattern.regex, `[REDACTED:${pattern.id}]`);
+    // H6 global redaction: the shared patterns carry no `g` flag, so a plain
+    // `.replace` redacted only the FIRST occurrence and a second copy of the
+    // secret survived into logs. Build a FRESH global regex per call (never a
+    // shared stateful `lastIndex`) and replace every occurrence in one pass.
+    const global = new RegExp(pattern.regex.source, `${pattern.regex.flags.replace(/g/g, '')}g`);
+    output = output.replace(global, `[REDACTED:${pattern.id}]`);
   }
   return output;
 }
@@ -198,24 +242,69 @@ export class SecretLifecycleLedger {
     // Single-read binding (V7 accessor class): the overlap check and the
     // recorded event must observe the same instants.
     const input = snapshotCallerInput(rawInput);
-    if (
-      input.overlapUntil !== undefined &&
-      Date.parse(input.overlapUntil) <= Date.parse(input.at)
-    ) {
+    // Residual CRITICAL (partial-Proxy) + M9/M10: bind and validate every
+    // REQUIRED rotation field once. `Date.parse` of an absent/garbage instant
+    // is NaN, and `NaN <= NaN` is false, so the old overlap check silently
+    // admitted a malformed window.
+    const secretRef = input.secretRef;
+    const classification = input.classification;
+    const at = input.at;
+    const overlapUntil = input.overlapUntil;
+    const environment = input.environment;
+    const atMs = typeof at === 'string' ? Date.parse(at) : Number.NaN;
+    if (typeof secretRef !== 'string' || secretRef.trim() === '') {
       throw new SecretsPolicyError(
-        'rotation overlap window must extend beyond the rotation instant',
+        'rotation requires a non-empty keyed secret reference',
         {},
         SecErrorCode.SEC_SECRET_LIFECYCLE_INVALID,
       );
     }
+    if (
+      typeof classification !== 'string' ||
+      !numericIncludes(SECRET_CLASSIFICATIONS, classification as SecretClassification)
+    ) {
+      throw new SecretsPolicyError(
+        'rotation names a classification outside the registry',
+        {},
+        SecErrorCode.SEC_SECRET_LIFECYCLE_INVALID,
+      );
+    }
+    if (!Number.isFinite(atMs)) {
+      throw new SecretsPolicyError(
+        'rotation instant is missing or not a finite instant',
+        {},
+        SecErrorCode.SEC_SECRET_LIFECYCLE_INVALID,
+      );
+    }
+    if (
+      environment !== 'PRODUCTION' &&
+      environment !== 'COLLECTOR' &&
+      environment !== 'ALPHA_LAB'
+    ) {
+      throw new SecretsPolicyError(
+        'rotation names an unknown environment',
+        {},
+        SecErrorCode.SEC_SECRET_LIFECYCLE_INVALID,
+      );
+    }
+    if (overlapUntil !== undefined) {
+      const overlapMs = typeof overlapUntil === 'string' ? Date.parse(overlapUntil) : Number.NaN;
+      if (!Number.isFinite(overlapMs) || overlapMs <= atMs) {
+        throw new SecretsPolicyError(
+          'rotation overlap window must extend beyond the rotation instant',
+          {},
+          SecErrorCode.SEC_SECRET_LIFECYCLE_INVALID,
+        );
+      }
+    }
     return this.record({
-      secretRef: input.secretRef as never,
-      classification: input.classification,
+      secretRef: secretRef as never,
+      classification,
       event: 'ROTATED',
-      at: input.at as never,
-      overlapUntil: input.overlapUntil === undefined ? null : (input.overlapUntil as never),
+      at: at as never,
+      overlapUntil: overlapUntil === undefined ? null : (overlapUntil as never),
       invalidatedByIncidentId: null,
-      environment: input.environment,
+      environment,
     });
   }
 
@@ -230,7 +319,43 @@ export class SecretLifecycleLedger {
     // Single-read binding (V7 accessor class): every emitted revocation record
     // must carry the same classification/incident/environment values.
     const input = snapshotCallerInput(rawInput);
-    return numericMap(input.secretRefs, (secretRef) =>
+    // Residual CRITICAL (partial-Proxy): bind and type-check each required
+    // field once; an omitted `secretRefs` inventory must refuse rather than
+    // read as "nothing to revoke".
+    const rawSecretRefs: unknown = input.secretRefs;
+    if (!isArraySafe(rawSecretRefs) || rawSecretRefs.length === 0) {
+      throw new SecretsPolicyError(
+        'incident invalidation requires a non-empty secret-reference list',
+        {},
+        SecErrorCode.SEC_SECRET_LIFECYCLE_INVALID,
+      );
+    }
+    const secretRefs = rawSecretRefs as readonly string[];
+    if (typeof input.incidentId !== 'string' || input.incidentId.trim() === '') {
+      throw new SecretsPolicyError(
+        'incident invalidation requires a non-empty incident id',
+        {},
+        SecErrorCode.SEC_SECRET_LIFECYCLE_INVALID,
+      );
+    }
+    if (
+      typeof input.classification !== 'string' ||
+      !numericIncludes(SECRET_CLASSIFICATIONS, input.classification as SecretClassification)
+    ) {
+      throw new SecretsPolicyError(
+        'incident invalidation names a classification outside the registry',
+        {},
+        SecErrorCode.SEC_SECRET_LIFECYCLE_INVALID,
+      );
+    }
+    if (typeof input.at !== 'string' || !Number.isFinite(Date.parse(input.at))) {
+      throw new SecretsPolicyError(
+        'incident invalidation instant is missing or not a finite instant',
+        {},
+        SecErrorCode.SEC_SECRET_LIFECYCLE_INVALID,
+      );
+    }
+    return numericMap(secretRefs, (secretRef) =>
       this.record({
         secretRef: secretRef as never,
         classification: input.classification,

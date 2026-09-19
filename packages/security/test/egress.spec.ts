@@ -347,3 +347,47 @@ describe('egress decision gates resist Array.prototype shadowing (D018)', () => 
     expect(decision.reason).toBe('HOST_NOT_ALLOWLISTED');
   });
 });
+
+// --- V7 security-review M1–M3: finite numeric binding + resolver pinning -----
+describe('egress binds numeric carriers once and validates finiteness (V7 review M1–M3)', () => {
+  it('REFUSES a NaN/Infinity response byte or time measurement instead of lifting caps (M2)', () => {
+    const g = guard();
+    for (const bad of [Number.NaN, Number.POSITIVE_INFINITY, -1]) {
+      expect(g.inspectResponse({ bytes: bad })).toMatchObject({
+        decision: 'REFUSE',
+        reason: 'RESPONSE_BYTES_EXCEEDED',
+      });
+      expect(g.inspectResponse({ timeMs: bad })).toMatchObject({
+        decision: 'REFUSE',
+        reason: 'RESPONSE_TIME_EXCEEDED',
+      });
+      expect(g.inspectResponse({ bytes: 10, decompressedBytes: bad })).toMatchObject({
+        decision: 'REFUSE',
+        reason: 'DECOMPRESSION_RATIO_EXCEEDED',
+      });
+    }
+    expect(
+      g.inspectResponse({ bytes: 10, timeMs: 5, contentType: 'application/json' }).decision,
+    ).toBe('ALLOW');
+  });
+
+  it('REFUSES a NaN/fractional/negative redirect hop count instead of disabling the hop cap (M3)', async () => {
+    const g = guard();
+    for (const hops of [Number.NaN, Number.POSITIVE_INFINITY, -1, 0.5]) {
+      const decision = await g.authorizeRedirect(
+        'https://api.helius.dev/v0',
+        'COLLECTOR',
+        hops,
+        () => true,
+      );
+      expect(decision).toMatchObject({ decision: 'REFUSE', reason: 'REDIRECT_LIMIT_EXCEEDED' });
+    }
+  });
+
+  it('REFUSES a non-string resolved address instead of pinning the live carrier (M1)', async () => {
+    const boxed = new String('140.82.112.3') as unknown as string;
+    const g = new EgressGuard({ allowlist: ALLOWLIST, resolver: async () => [boxed] });
+    const decision = await g.authorize('https://api.helius.dev/v0', 'COLLECTOR');
+    expect(decision).toMatchObject({ decision: 'REFUSE', reason: 'ADDRESS_DENIED' });
+  });
+});

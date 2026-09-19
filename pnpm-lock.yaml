@@ -74,6 +74,9 @@ importers:
 
   apps/api:
     dependencies:
+      '@foresift/capability-registry':
+        specifier: workspace:*
+        version: link:../../packages/capability-registry
       '@foresift/domain':
         specifier: workspace:*
         version: link:../../packages/domain

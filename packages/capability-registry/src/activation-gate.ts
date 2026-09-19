@@ -32,6 +32,7 @@ import {
   ActivationGateKind,
   ActivationGateVerdict,
   ActivationKind,
+  DISTRIBUTION_DUTY_DIMENSIONS,
   DistributionReadiness,
   ErrorCode,
   ForesiftError,
@@ -232,6 +233,14 @@ export function isVerifiedGateEvidence(value: unknown): value is VerifiedGateEvi
  * the package's existing importers.
  */
 export { ActivationKind, ALL_ACTIVATION_KINDS };
+
+/**
+ * HIGH-2: the authoritative §69.9 distribution DUTY dimension names are the
+ * shared domain vocabulary (`DISTRIBUTION_DUTY_DIMENSIONS`) that the runtime
+ * `DISTRIBUTION_EVIDENCE` gate below walks. Re-exported here so the registry's
+ * public surface carries the same authority the gate consumes.
+ */
+export { DISTRIBUTION_DUTY_DIMENSIONS };
 
 /** §69.9 distribution kinds that additionally require the public gate set. */
 export function isDistributionActivation(kind: ActivationKind): boolean {
@@ -953,24 +962,14 @@ function evaluateCondition(
           'a rights change still blocks newly prohibited cache/raw/export/redistribution/model-use paths (AC-273)',
         );
       }
-      const checks: readonly (readonly [string, boolean])[] = [
-        ['oauthTenantIsolation', evidence.oauthTenantIsolation],
-        ['originClientCompatibility', evidence.originClientCompatibility],
-        ['dataRightsRedistribution', evidence.dataRightsRedistribution],
-        ['privacyRetentionDeletionExport', evidence.privacyRetentionDeletionExport],
-        ['jurisdictionDisclosure', evidence.jurisdictionDisclosure],
-        ['claimsReview', evidence.claimsReview],
-        ['abuseRateLimitIncidentResponse', evidence.abuseRateLimitIncidentResponse],
-        ['supportSecurityContact', evidence.supportSecurityContact],
-        ['publicSafeRedaction', evidence.publicSafeRedaction],
-        ['isolationFixtures', evidence.isolationFixtures],
-      ];
-      for (let checkIndex = 0; checkIndex < checks.length; checkIndex += 1) {
-        const check = checks[checkIndex];
-        if (check === undefined) continue;
-        const field = check[0];
-        const present = check[1];
-        if (present !== true) {
+      // The required duty set is the shared authoritative
+      // `DISTRIBUTION_DUTY_DIMENSIONS` (packages/domain): the runtime gate and the
+      // release-conformance claim reader derive the §69.9 duties from ONE
+      // authority, so a coarse/gate-only declaration cannot omit a duty here.
+      for (let dutyIndex = 0; dutyIndex < DISTRIBUTION_DUTY_DIMENSIONS.length; dutyIndex += 1) {
+        const field = DISTRIBUTION_DUTY_DIMENSIONS[dutyIndex];
+        if (field === undefined) continue;
+        if (evidence[field] !== true) {
           return refuse(
             gate,
             ActivationGateRefusalReason.DISTRIBUTION_EVIDENCE_MISSING,

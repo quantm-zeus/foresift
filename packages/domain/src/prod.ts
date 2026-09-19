@@ -88,6 +88,29 @@ export const ALL_DISTRIBUTION_READINESS: readonly DistributionReadiness[] = Obje
   Object.values(DistributionReadiness),
 );
 
+/**
+ * The authoritative §69.9 workspace/public distribution DUTY dimensions, in
+ * order (AC-272/273/275/276/277). Every one is a boolean dimension of the
+ * capability-registry `DistributionEvidenceInput`: the runtime
+ * `DISTRIBUTION_EVIDENCE` gate refuses unless each is explicitly `true` for the
+ * exact release. The constant lives here, in the shared closed vocabulary, so
+ * the runtime gate and any release-conformance claim reader derive their
+ * required duty set from ONE authority and cannot drift.
+ */
+export const DISTRIBUTION_DUTY_DIMENSIONS = Object.freeze([
+  'oauthTenantIsolation',
+  'originClientCompatibility',
+  'dataRightsRedistribution',
+  'privacyRetentionDeletionExport',
+  'jurisdictionDisclosure',
+  'claimsReview',
+  'abuseRateLimitIncidentResponse',
+  'supportSecurityContact',
+  'publicSafeRedaction',
+  'isolationFixtures',
+] as const);
+export type DistributionDutyDimension = (typeof DISTRIBUTION_DUTY_DIMENSIONS)[number];
+
 // --- §69.6 deployment posture ------------------------------------------------
 
 /** PRD §69.6 deployment posture, verbatim and in order. */

@@ -157,7 +157,15 @@ describe('§69.6 critical-dependency SLA evaluation', () => {
     expect(() =>
       assertCapacityContractBacksPosture({ ...passingCapacityContract(), result: 'FAIL' } as never),
     ).toThrow();
-    expect(() => assertCapacityContractBacksPosture(passingCapacityContract())).not.toThrow();
+    expect(() => assertCapacityContractBacksPosture(passingCapacityContract(), NOW)).not.toThrow();
+    // LOW: an EXPIRED (or law-violating) contract can no longer back the claim
+    // merely because its `result` string is PASS.
+    expect(() =>
+      assertCapacityContractBacksPosture(
+        { ...passingCapacityContract(), expiresAt: '2020-01-01T00:00:00Z' },
+        NOW,
+      ),
+    ).toThrow();
   }, 120_000);
 
   it('declares FREE_TIER_BEST_EFFORT with an explicit degraded scope for missing/expired/non-applicable SLAs', async () => {

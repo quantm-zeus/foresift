@@ -32,6 +32,32 @@ export const PROD_DISTRIBUTION_REQUIRED_GATES: readonly string[] = Object.freeze
   'OWNER_APPROVAL',
 ]);
 
+/**
+ * The authoritative §69.9 workspace/public distribution DUTY dimensions
+ * (HIGH-2; AC-272/273/275/276/277), declared as an INDEPENDENT literal rather
+ * than derived from the implementation export (audit NEW-L6). The suite
+ * cross-checks this literal against the shared authoritative
+ * `DISTRIBUTION_DUTY_DIMENSIONS`, so drift in either direction fails.
+ */
+export const PROD_DISTRIBUTION_REQUIRED_DUTIES: readonly string[] = Object.freeze([
+  'oauthTenantIsolation',
+  'originClientCompatibility',
+  'dataRightsRedistribution',
+  'privacyRetentionDeletionExport',
+  'jurisdictionDisclosure',
+  'claimsReview',
+  'abuseRateLimitIncidentResponse',
+  'supportSecurityContact',
+  'publicSafeRedaction',
+  'isolationFixtures',
+]);
+
+/** A fully PASSING duty verdict per authoritative §69.9 duty dimension. */
+export const PROD_DISTRIBUTION_DUTY_VERDICTS: readonly {
+  readonly duty: string;
+  readonly verdict: string;
+}[] = PROD_DISTRIBUTION_REQUIRED_DUTIES.map((duty) => ({ duty, verdict: 'PASS' }));
+
 function evidence(
   gateKind: string,
   overrides: Partial<DistributionGateEvidenceClaim> = {},
@@ -77,6 +103,7 @@ export const PROD_WORKSPACE_AUTHORIZED_CLAIM: DistributionAuthorizationClaim = {
   releaseRef: PROD_RELEASE_REF,
   distributionReadiness: 'WORKSPACE_AUTHORIZED',
   requiredGateKinds: PROD_DISTRIBUTION_REQUIRED_GATES,
+  distributionDuties: PROD_DISTRIBUTION_DUTY_VERDICTS,
   gateEvidence: PROD_DISTRIBUTION_EVIDENCE_COMPLETE,
 };
 
@@ -106,6 +133,7 @@ export const PROD_TECHNICALLY_READY_CLAIM: DistributionAuthorizationClaim = {
   releaseRef: PROD_RELEASE_REF,
   distributionReadiness: 'WORKSPACE_TECHNICALLY_READY',
   requiredGateKinds: PROD_DISTRIBUTION_REQUIRED_GATES,
+  distributionDuties: PROD_DISTRIBUTION_DUTY_VERDICTS,
   gateEvidence: [],
 };
 

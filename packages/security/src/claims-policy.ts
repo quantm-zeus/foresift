@@ -17,11 +17,13 @@ import {
   PublicRedactionResultSchema,
   type ClaimsPolicyChannel,
   type ClaimsPolicyResult,
+  type PublicOutputEnvelope,
   type PublicRedactionResult,
 } from '@foresift/shared-schemas';
 import { ClaimsPolicyError } from './errors.ts';
 import {
   appendSafe,
+  isArraySafe,
   numericJoin,
   numericSortStrings,
   parseDecision,
@@ -118,6 +120,18 @@ export interface PublicOutputCandidate {
 const DETECTOR_THRESHOLD_PATTERN =
   /(detector[_ -]?(threshold|score)[^\n]{0,40}\d(\.\d+)?|threshold[:=]\s*0\.\d+)/gi;
 
+/** Typed refusal for an envelope that is missing one or more §35.12 duties. */
+function refusedEnvelope(): { redaction: PublicRedactionResult; redactedBody: string } {
+  return {
+    redaction: parseDecision(PublicRedactionResultSchema, {
+      verdict: 'REFUSED',
+      reason: 'REQUIRED_FIELD_MISSING',
+      detail: 'public-output envelope missing required duties',
+    }),
+    redactedBody: '',
+  };
+}
+
 /**
  * Validate the full boundary: schema-complete envelope, claims-clean body,
  * thresholds stripped, sensitive entities redacted. Returns the
@@ -132,23 +146,39 @@ export function validatePublicOutput(rawCandidate: PublicOutputCandidate): {
   // redaction and the success body must all see the SAME candidate values.
   const candidate = snapshotCallerInput(rawCandidate);
   // 1. Envelope completeness — every §35.12 duty present and parseable.
+  //
+  // H7 fail-closed consumption: the parse result must be the object the duty
+  // checks actually read. A shadowed schema library (zod builds objects with
+  // `push`/`for...of`) can return `{}` WITHOUT throwing, so a discarded result
+  // let an envelope missing every duty read as present. Validate the parsed
+  // object itself and refuse on any missing/non-array duty.
+  let envelope: PublicOutputEnvelope;
   try {
-    PublicOutputEnvelopeSchema.parse({
+    envelope = PublicOutputEnvelopeSchema.parse({
       evidenceRefs: candidate.evidenceRefs,
       timestamps: candidate.timestamps,
       executionAssumptions: candidate.executionAssumptions,
       limitations: candidate.limitations,
       disclaimer: candidate.disclaimer,
-    });
+    }) as PublicOutputEnvelope;
   } catch {
-    return {
-      redaction: parseDecision(PublicRedactionResultSchema, {
-        verdict: 'REFUSED',
-        reason: 'REQUIRED_FIELD_MISSING',
-        detail: 'public-output envelope missing required duties',
-      }),
-      redactedBody: '',
-    };
+    return refusedEnvelope();
+  }
+  if (
+    envelope === null ||
+    typeof envelope !== 'object' ||
+    !isArraySafe(envelope.evidenceRefs) ||
+    envelope.evidenceRefs.length === 0 ||
+    !isArraySafe(envelope.timestamps) ||
+    envelope.timestamps.length === 0 ||
+    !isArraySafe(envelope.executionAssumptions) ||
+    envelope.executionAssumptions.length === 0 ||
+    !isArraySafe(envelope.limitations) ||
+    envelope.limitations.length === 0 ||
+    typeof envelope.disclaimer !== 'string' ||
+    envelope.disclaimer.length === 0
+  ) {
+    return refusedEnvelope();
   }
 
   let redactionsApplied = 0;

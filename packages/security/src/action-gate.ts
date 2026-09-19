@@ -21,6 +21,7 @@
  */
 import {
   ActionGateDecisionSchema,
+  HighImpactActionScopeSchema,
   PHISHING_RESISTANT_CLASSES,
   type ActionGateDecision,
   type ActionGateRefusalReason,
@@ -29,7 +30,7 @@ import {
   type StepUpProof,
 } from '@foresift/shared-schemas';
 import type { UtcTimestamp } from '@foresift/domain';
-import { AuditChainError } from './errors.ts';
+import { ActionGateError, AuditChainError, SecErrorCode } from './errors.ts';
 import { evaluateCsrf, type CsrfEvaluationInput } from './csrf.ts';
 import {
   appendSafe,
@@ -68,6 +69,17 @@ const REFUSED_AUDIT_CLASS = 'BLOCKED_OPERATION' as const;
  * than this into the future are STALE, never "infinitely fresh".
  */
 export const PROOF_CLOCK_SKEW_TOLERANCE_MS = 60_000;
+
+/**
+ * Appendix B `admin:high:*` catalog, captured ONCE at module initialization
+ * (V7 security-review HIGH H2). The frozen zod enum's `options` is the only
+ * authoritative list; a runtime literal is copied numerically so a later
+ * `Array.prototype` shadow cannot widen the gate, and an unknown action can
+ * never reach the ALLOW branch.
+ */
+const HIGH_IMPACT_ACTION_CATALOG: readonly string[] = Object.freeze(
+  numericCopy(HighImpactActionScopeSchema.options),
+);
 
 export interface ActionGateOptions {
   /**
@@ -119,6 +131,57 @@ export class ActionGate {
     const evaluatedAt = new Date(this.clock()).toISOString().replace('.000Z', 'Z') as UtcTimestamp;
     const reasons: ActionGateRefusalReason[] = [];
 
+    // H2 fail-closed binding: the gate's own subject (`action`) and principal
+    // (`actor`) are REQUIRED, typed, and validated against the Appendix B
+    // catalog BEFORE any dimension is evaluated. An unknown action or an empty
+    // actor is a malformed high-impact request, never an admissible one.
+    const action = request.action;
+    if (typeof action !== 'string' || !numericIncludes(HIGH_IMPACT_ACTION_CATALOG, action)) {
+      throw new ActionGateError(
+        'high-impact action is not a member of the Appendix B action catalog',
+        { action: typeof action === 'string' ? action : 'non-string' },
+        SecErrorCode.SEC_ACTION_GATE_INVALID_ACTION,
+      );
+    }
+    const actor = request.actor;
+    if (typeof actor !== 'string' || actor.trim() === '') {
+      throw new ActionGateError(
+        'high-impact action requires a non-empty string actor',
+        {},
+        SecErrorCode.SEC_ACTION_GATE_INVALID_ACTOR,
+      );
+    }
+
+    // H3 fail-closed policy parse: an absent / NaN / Infinity freshness window
+    // makes every `ageSeconds > window` comparison false, silently DISABLING
+    // proof freshness. Validate the WHOLE policy explicitly (finite positive
+    // integer window, phishing-resistant floor, boolean presence duties) so a
+    // malformed policy can never weaken the gate.
+    const policy = request.policy;
+    if (policy === undefined || policy === null) {
+      throw new ActionGateError(
+        'step-up policy is missing or invalid (freshness window must be a finite positive integer)',
+        {},
+        SecErrorCode.SEC_ACTION_GATE_INVALID_POLICY,
+      );
+    }
+    const freshnessWindowSeconds = policy.freshnessWindowSeconds;
+    if (
+      !Number.isInteger(freshnessWindowSeconds) ||
+      !Number.isFinite(freshnessWindowSeconds) ||
+      freshnessWindowSeconds <= 0 ||
+      typeof policy.minimumAuthenticatorClass !== 'string' ||
+      !numericIncludes(PHISHING_RESISTANT_CLASSES, policy.minimumAuthenticatorClass) ||
+      typeof policy.requireUserPresence !== 'boolean' ||
+      typeof policy.requireUserVerification !== 'boolean'
+    ) {
+      throw new ActionGateError(
+        'step-up policy is missing or invalid (freshness window must be a finite positive integer)',
+        {},
+        SecErrorCode.SEC_ACTION_GATE_INVALID_POLICY,
+      );
+    }
+
     // Fail-closed symmetric with every sibling dimension: an ABSENT csrf
     // field is missing protection, not passed validation (AC-274).
     if (request.csrf === undefined || !evaluateCsrf(request.csrf).valid) {
@@ -130,7 +193,7 @@ export class ActionGate {
     if ((request.reasonEntry ?? '').length === 0) {
       appendSafe(reasons, 'REASON_MISSING');
     }
-    if (!numericIncludes(request.authorizedScopes, request.action)) {
+    if (!numericIncludes(request.authorizedScopes, action)) {
       appendSafe(reasons, 'SCOPE_MISMATCH');
     }
 
@@ -146,21 +209,21 @@ export class ActionGate {
       // far-future timestamp must not become a permanent credential.
       if (
         !Number.isFinite(completedMs) ||
-        ageSeconds > request.policy.freshnessWindowSeconds ||
+        ageSeconds > freshnessWindowSeconds ||
         completedMs > nowMs + PROOF_CLOCK_SKEW_TOLERANCE_MS
       ) {
         appendSafe(reasons, 'STEP_UP_STALE');
       }
       if (
         proof.authenticatorClass === undefined ||
-        !authenticatorClassSufficient(proof, request.policy) ||
-        (request.policy.requireUserPresence && !proof.userPresence) ||
-        (request.policy.requireUserVerification && !proof.userVerification)
+        !authenticatorClassSufficient(proof, policy) ||
+        (policy.requireUserPresence && !proof.userPresence) ||
+        (policy.requireUserVerification && !proof.userVerification)
       ) {
         appendSafe(reasons, 'AUTHENTICATOR_CLASS_INSUFFICIENT');
       }
       // The proof must belong to the acting principal.
-      if (proof.actor !== request.actor) {
+      if (proof.actor !== actor) {
         appendSafe(reasons, 'STEP_UP_MISSING');
       }
     }
@@ -173,16 +236,16 @@ export class ActionGate {
     if (reasons.length > 0) {
       decision = {
         outcome: 'REFUSE',
-        action: request.action,
-        actor: request.actor,
+        action,
+        actor,
         reasons: numericUnique(reasons),
         evaluatedAt,
       };
     } else if (proof !== undefined && request.idempotencyKey !== undefined) {
       decision = {
         outcome: 'ALLOW',
-        action: request.action,
-        actor: request.actor,
+        action,
+        actor,
         stepUpProofId: proof.proofId,
         idempotencyKey: request.idempotencyKey,
         evaluatedAt,
@@ -192,8 +255,8 @@ export class ActionGate {
       // kept as a fail-closed backstop rather than a silent allow.
       decision = {
         outcome: 'REFUSE',
-        action: request.action,
-        actor: request.actor,
+        action,
+        actor,
         reasons: ['IDEMPOTENCY_KEY_MISSING'],
         evaluatedAt,
       };

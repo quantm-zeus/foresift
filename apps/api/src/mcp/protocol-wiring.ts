@@ -1,4 +1,4 @@
-import { MCP_BASELINE_STABLE_REVISION } from '@foresift/domain';
+import { isGovernedMcpCompatibilityResolution } from '@foresift/capability-registry';
 import { McpProtocolGuard, type ProtocolInspectionInput } from '@foresift/security';
 
 export type JsonRpcId = string | number | null;
@@ -35,7 +35,11 @@ export type ProtocolAdmission =
  * wiring production.
  */
 export interface McpCompatibilityAdmission {
-  /** `McpCompatibilityResolution.defaultRevision`; must be the stable baseline. */
+  /**
+   * `McpCompatibilityResolution.defaultRevision` — the resolver's latest
+   * mutually tested stable revision. It is NOT pinned to a hard-coded baseline;
+   * it is required to be a member of the usable set.
+   */
   readonly defaultRevision: string;
   /**
    * `McpCompatibilityResolution.usableRevisions` — the stable allow-list.
@@ -62,17 +66,13 @@ export interface ProtocolWiringOptions {
 }
 
 /**
- * Residual (recorded precisely): an identity-branded proof (a private `WeakSet`
- * brand on the resolver's returned object, as the activation gate uses) is not
- * possible without a runtime dependency on `@foresift/capability-registry`, so
- * this adapter enforces the governed SHAPE plus the §69.7 revision syntax, and
- * the composition root MUST call `resolveCompatibilityMatrix` /
- * `resolveProtocolRevision`. The demonstrated free-form probe
- * (`mutuallyTestedRevisions: ['TOTALLY-UNREGISTERED-EVIL']`, and any bare
- * `allowedRevisions` list) is refused; a caller that deliberately hand-builds
- * the resolver-shaped object can still satisfy the shape, which is the recorded
- * D013 trusted-caller residual (the adapter has no in-tree production
- * constructor).
+ * HIGH-5/L1/L2: the admission MUST be the branded output of the governed
+ * resolver. A private `WeakSet` brand lives in `@foresift/capability-registry`
+ * and is minted only by `resolveCompatibilityMatrix`; `protocol-wiring`
+ * requires it here, so a caller-declared revision list, a resolver-shaped
+ * hand-built object, or a `structuredClone`d copy is refused before any guard
+ * is built. Unregistered / untested / not-mutually-tested revisions therefore
+ * cannot reach the allow-list.
  */
 
 /** §69.7 protocol revisions are date-prefixed (`2025-11-25`, `2026-draft-v2`). */
@@ -90,7 +90,7 @@ function isSyntacticProtocolRevision(value: unknown): value is string {
 
 function failAdmission(detail: string): never {
   throw new TypeError(
-    `MCP protocol admission must be the governed resolveCompatibilityMatrix/resolveProtocolRevision output (${detail}); a caller-assembled revision allow-list is refused`,
+    `MCP protocol admission must be the governed resolveCompatibilityMatrix output bearing the capability-registry provenance brand (${detail}); a caller-assembled or cloned revision allow-list is refused`,
   );
 }
 
@@ -116,6 +116,11 @@ function copyRevisions(source: readonly string[]): string[] {
  * resolver output.
  */
 function normalizeGovernedAdmission(raw: unknown): McpCompatibilityAdmission {
+  // HIGH-5: the brand is checked FIRST. Without it, a resolver-shaped object has
+  // no proof it came from the governed matrix (registered + mutually tested).
+  if (!isGovernedMcpCompatibilityResolution(raw)) {
+    failAdmission('the admission does not carry the governed-resolution provenance brand');
+  }
   if (raw === null || typeof raw !== 'object' || Array.isArray(raw)) {
     failAdmission('the admission is not an object');
   }
@@ -123,8 +128,11 @@ function normalizeGovernedAdmission(raw: unknown): McpCompatibilityAdmission {
   const defaultRevision = source['defaultRevision'];
   const usableRaw = source['usableRevisions'];
   const optInRaw = source['optInRevisions'];
-  if (defaultRevision !== MCP_BASELINE_STABLE_REVISION) {
-    failAdmission(`defaultRevision must be the stable baseline ${MCP_BASELINE_STABLE_REVISION}`);
+  // The resolver's defaultRevision is authoritative and is NOT pinned to a
+  // hard-coded baseline: it must simply be a syntactically valid revision that
+  // is a member of the allow-list (validated below).
+  if (!isSyntacticProtocolRevision(defaultRevision)) {
+    failAdmission('defaultRevision must be a syntactically valid protocol revision');
   }
   if (!Array.isArray(usableRaw) || usableRaw.length === 0) {
     failAdmission('usableRevisions must be a non-empty array');
@@ -195,15 +203,32 @@ function normalizeGovernedAdmission(raw: unknown): McpCompatibilityAdmission {
   });
 }
 
-function isJsonRpcRequest(payload: unknown): payload is JsonRpcRequest {
-  if (typeof payload !== 'object' || payload === null) return false;
+/**
+ * Normalize a validated JSON-RPC request into a FROZEN copy, reading each field
+ * exactly once (HIGH-5). Returns `undefined` when the payload is not a valid
+ * JSON-RPC request; the caller must not re-read the original payload after this
+ * (a getter could otherwise present a valid request to validation and a
+ * different object to the returned admission).
+ */
+function normalizeJsonRpcRequest(payload: unknown): JsonRpcRequest | undefined {
+  if (typeof payload !== 'object' || payload === null) return undefined;
   const value = payload as Record<string, unknown>;
-  return (
-    value.jsonrpc === '2.0' &&
-    (typeof value.id === 'string' || typeof value.id === 'number' || value.id === null) &&
-    typeof value.method === 'string' &&
-    value.method.length > 0
-  );
+  const jsonrpc = value['jsonrpc'];
+  const id = value['id'];
+  const method = value['method'];
+  if (
+    jsonrpc !== '2.0' ||
+    !(typeof id === 'string' || typeof id === 'number' || id === null) ||
+    typeof method !== 'string' ||
+    method.length === 0
+  ) {
+    return undefined;
+  }
+  const hasParams = 'params' in value;
+  const params = hasParams ? value['params'] : undefined;
+  return Object.freeze(
+    hasParams ? { jsonrpc: '2.0', id, method, params } : { jsonrpc: '2.0', id, method },
+  ) as JsonRpcRequest;
 }
 
 export class McpProtocolWiring {
@@ -220,7 +245,27 @@ export class McpProtocolWiring {
   }
 
   inspect(input: ProtocolInspectionInput & { readonly payload: unknown }): ProtocolAdmission {
-    const verdict = this.guard.inspect(input);
+    // HIGH-5: single-read snapshot of every field used for the verdict AND for
+    // the returned admission. A getter can therefore never present one revision
+    // to the guard and a different one to the caller, and the returned request
+    // is a frozen copy rather than the caller's mutable payload.
+    const protocolRevision = input.protocolRevision;
+    const contentType = input.contentType;
+    const method = input.method;
+    const messageBytes = input.messageBytes;
+    const requestClaims = input.requestClaims;
+    const session = input.session;
+    const resumableCursor = input.resumableCursor;
+    const payload = input.payload;
+    const verdict = this.guard.inspect({
+      protocolRevision,
+      contentType,
+      method,
+      messageBytes,
+      ...(requestClaims === undefined ? {} : { requestClaims }),
+      ...(session === undefined ? {} : { session }),
+      ...(resumableCursor === undefined ? {} : { resumableCursor }),
+    });
     if (verdict.decision === 'REFUSE') {
       const status =
         verdict.reason === 'MESSAGE_OVERSIZE'
@@ -232,13 +277,14 @@ export class McpProtocolWiring {
               : 400;
       return { allowed: false, status, code: verdict.reason, reason: verdict.reason };
     }
-    if (!isJsonRpcRequest(input.payload)) {
+    const request = normalizeJsonRpcRequest(payload);
+    if (request === undefined) {
       return { allowed: false, status: 400, code: 'JSON_RPC_INVALID', reason: 'JSON_RPC_INVALID' };
     }
     return {
       allowed: true,
-      request: input.payload,
-      protocolRevision: input.protocolRevision as string,
+      request,
+      protocolRevision: protocolRevision as string,
     };
   }
 

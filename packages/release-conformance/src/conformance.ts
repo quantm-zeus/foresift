@@ -1,5 +1,6 @@
 /** Release-blocking conformance rules for FR-TRACE-003. */
 import { appendSafe } from './shadow-safe.ts';
+import { brandAuthoritativeConformanceResult } from './conformance-authority.ts';
 import { constants } from 'node:fs';
 import { access, readFile, readdir } from 'node:fs/promises';
 import path from 'node:path';
@@ -552,6 +553,13 @@ export interface ProdClaimsInput {
 
 export interface ConformanceResult {
   readonly overall: 'PASSED' | 'FAILED';
+  /**
+   * The number of independent RULE CHECKS evaluated. A `PASSED` result always
+   * evaluates at least one rule, so a vacuous zero-rule pass is impossible.
+   */
+  readonly totalRulesEvaluated: number;
+  readonly passedCount: number;
+  readonly failureCount: number;
   /** The four trace rules plus, for a PROD milestone, the PROD rule findings. */
   readonly findings: readonly {
     readonly requirementId: string;
@@ -559,6 +567,64 @@ export interface ConformanceResult {
     readonly path: string;
     readonly message: string;
   }[];
+}
+
+/**
+ * Build the FROZEN, BRANDED authoritative result (HIGH-3). The brand lives in
+ * `conformance-authority.ts` and is minted ONLY here (and by the early-refusal
+ * returns below), so `buildReleaseReport` can distinguish a real
+ * `evaluateConformance` verdict from a hand-built self-consistent PASSED. The
+ * object and its findings array are frozen so the branded value cannot be
+ * mutated into a different verdict after it was certified.
+ */
+function authoritativeResult(
+  findings: readonly {
+    readonly requirementId: string;
+    readonly rule: string;
+    readonly path: string;
+    readonly message: string;
+  }[],
+  evaluatedRuleNames: readonly string[],
+): ConformanceResult {
+  // Per-RULE failure counting (not per-finding): a single rule can emit several
+  // findings, and the record schema requires `passedCount + failureCount ===
+  // totalRulesEvaluated`.
+  const failingRuleNames: string[] = [];
+  for (let index = 0; index < findings.length; index += 1) {
+    const rule = findings[index]?.rule;
+    if (typeof rule !== 'string' || rule.length === 0) continue;
+    let seen = false;
+    for (let scan = 0; scan < failingRuleNames.length; scan += 1) {
+      if (failingRuleNames[scan] === rule) {
+        seen = true;
+        break;
+      }
+    }
+    if (!seen) appendSafe(failingRuleNames, rule);
+  }
+  let failureCount = failingRuleNames.length;
+  if (findings.length > 0 && failureCount === 0) failureCount = 1;
+  let totalRulesEvaluated = evaluatedRuleNames.length;
+  if (totalRulesEvaluated < failureCount) totalRulesEvaluated = failureCount;
+  const frozenFindings: {
+    readonly requirementId: string;
+    readonly rule: string;
+    readonly path: string;
+    readonly message: string;
+  }[] = [];
+  for (let index = 0; index < findings.length; index += 1) {
+    const finding = findings[index];
+    if (finding !== undefined) appendSafe(frozenFindings, Object.freeze({ ...finding }));
+  }
+  return brandAuthoritativeConformanceResult(
+    Object.freeze({
+      overall: findings.length === 0 ? 'PASSED' : 'FAILED',
+      totalRulesEvaluated,
+      passedCount: totalRulesEvaluated - failureCount,
+      failureCount,
+      findings: Object.freeze(frozenFindings),
+    }),
+  );
 }
 
 /**
@@ -601,9 +667,8 @@ export async function evaluateConformance(
     milestoneOption = undefined;
   }
   if (milestoneOption !== undefined && typeof milestoneOption !== 'string') {
-    return {
-      overall: 'FAILED',
-      findings: [
+    return authoritativeResult(
+      [
         {
           requirementId: 'FR-TRACE-003',
           rule: 'CONFORMANCE_MILESTONE_INVALID',
@@ -613,7 +678,8 @@ export async function evaluateConformance(
           )} is not`,
         },
       ],
-    };
+      ['CONFORMANCE_MILESTONE_INVALID'],
+    );
   }
   // Single-read snapshot of every caller field (V7 accessor class): a getter on
   // `options.requirements` previously returned the caller list to one read and
@@ -623,9 +689,8 @@ export async function evaluateConformance(
   try {
     options = snapshotCallerInput(rawOptions);
   } catch (error) {
-    return {
-      overall: 'FAILED',
-      findings: [
+    return authoritativeResult(
+      [
         {
           requirementId: 'FR-PROD-001',
           rule: 'PROD_CONFORMANCE_INPUT_MISSING',
@@ -635,7 +700,8 @@ export async function evaluateConformance(
           }`,
         },
       ],
-    };
+      ['PROD_CONFORMANCE_INPUT_MISSING'],
+    );
   }
   // An explicit milestone must be a canonical dependency group (`G0`…`G7`):
   // zero-padded or otherwise non-canonical ids are a gate-downgrade attempt and
@@ -649,9 +715,8 @@ export async function evaluateConformance(
   // re-reading `options.milestone` let a getter pass validation as `G2` and then
   // evaluate as `G0`, skipping the whole FR-PROD block (FAILED -> PASSED).
   if (milestoneOption !== undefined && !/^G[0-7]$/.test(milestoneOption)) {
-    return {
-      overall: 'FAILED',
-      findings: [
+    return authoritativeResult(
+      [
         {
           requirementId: 'FR-TRACE-003',
           rule: 'CONFORMANCE_MILESTONE_INVALID',
@@ -661,32 +726,35 @@ export async function evaluateConformance(
           )} is not`,
         },
       ],
-    };
+      ['CONFORMANCE_MILESTONE_INVALID'],
+    );
   }
+  // HIGH-4: the AUTHORITATIVE ACTIVE milestone is resolved from the repository on
+  // EVERY evaluation, not only when the caller omits one. A caller-pinned
+  // milestone that owns no FR-PROD law previously silenced the entire PROD block
+  // (including the repo-backed surface rule), so a PROD-violating tree could be
+  // certified PASSED by pinning `G0`. The authoritative group is what the gate
+  // evaluates; a DIFFERENT caller pin is recorded as a typed refusal finding and
+  // can never narrow the law that is checked.
   let activeGroup: string;
-  if (milestoneOption !== undefined) {
-    activeGroup = milestoneOption;
-  } else {
-    // A malformed repository milestone must fail the gate with a finding, not
-    // silently skip the PROD block (audit R2 residual / T057).
-    try {
-      activeGroup = await activeMilestone(options.repoRoot);
-    } catch (error) {
-      return {
-        overall: 'FAILED',
-        findings: [
-          {
-            requirementId: 'FR-TRACE-003',
-            rule: 'CONFORMANCE_MILESTONE_INVALID',
-            path: 'specs/implementation/current-milestone.json',
-            message: `the repository's ACTIVE milestone is not a canonical G0…G7 dependency group: ${
-              error instanceof Error ? error.message : String(error)
-            }`,
-          },
-        ],
-      };
-    }
+  try {
+    activeGroup = await activeMilestone(options.repoRoot);
+  } catch (error) {
+    return authoritativeResult(
+      [
+        {
+          requirementId: 'FR-TRACE-003',
+          rule: 'CONFORMANCE_MILESTONE_INVALID',
+          path: 'specs/implementation/current-milestone.json',
+          message: `the repository's ACTIVE milestone is not a canonical G0…G7 dependency group: ${
+            error instanceof Error ? error.message : String(error)
+          }`,
+        },
+      ],
+      ['CONFORMANCE_MILESTONE_INVALID'],
+    );
   }
+  const milestoneMismatch = milestoneOption !== undefined && milestoneOption !== activeGroup;
   const requirements = options.requirements ?? (await loadRequirements(options.repoRoot));
   // Whether the milestone owns FR-PROD law is decided by the AUTHORITATIVE
   // manifest, NEVER by the caller-supplied requirement list: otherwise
@@ -739,13 +807,33 @@ export async function evaluateConformance(
     readonly path: string;
     readonly message: string;
   }[] = [];
+  // The rule checks this evaluation performs, for the report's honest
+  // `totalRulesEvaluated` count. The four trace rules always run.
+  const evaluatedRuleNames: string[] = [
+    CONFORMANCE_RULES.mapping,
+    CONFORMANCE_RULES.activePath,
+    CONFORMANCE_RULES.premature,
+    CONFORMANCE_RULES.generated,
+  ];
+  if (milestoneMismatch) appendSafe(evaluatedRuleNames, 'CONFORMANCE_MILESTONE_MISMATCH');
   const ownsProdLaw = milestoneOwnsProdLaw(activeGroup, manifestRequirements);
   // Supplied PROD claims are ALWAYS evaluated (V7-C1/N3): silently discarding
   // them let a caller pin the evaluation to a milestone without FR-PROD law and
   // receive `PASSED` for a claim set that violates every PROD rule. A claim set
   // that is handed to the gate is a claim set the gate must judge.
   if (ownsProdLaw || options.prodClaims !== undefined) {
-    const { checkProdSurfacePresence, evaluateProdConformance } = await import('./prod-rules.ts');
+    const { checkProdSurfacePresence, evaluateProdConformance, PROD_RULES } =
+      await import('./prod-rules.ts');
+    appendSafe(evaluatedRuleNames, PROD_RULES.prodConformanceInputMissing);
+    appendSafe(evaluatedRuleNames, PROD_RULES.prodConformanceRuleThrew);
+    if (ownsProdLaw) appendSafe(evaluatedRuleNames, PROD_RULES.prodSurfaceMissing);
+    if (options.prodClaims !== undefined) {
+      appendSafe(evaluatedRuleNames, PROD_RULES.activationWithoutEvidence);
+      appendSafe(evaluatedRuleNames, PROD_RULES.postureWeakening);
+      appendSafe(evaluatedRuleNames, PROD_RULES.mcpCompatibilityDrift);
+      appendSafe(evaluatedRuleNames, PROD_RULES.livePathPrecomputationViolation);
+      appendSafe(evaluatedRuleNames, PROD_RULES.publicAuthorizationWithoutGateEvidence);
+    }
     if (ownsProdLaw) {
       // Numeric selection and append only (audit NEW-M5): `Array.prototype.filter`
       // and array spreads iterate, so a shadowed primitive silently dropped every
@@ -800,5 +888,15 @@ export async function evaluateConformance(
       appendSafe(findings, source[findingIndex] as (typeof prodFindings)[number]);
     }
   }
-  return { overall: findings.length === 0 ? 'PASSED' : 'FAILED', findings };
+  if (milestoneMismatch) {
+    appendSafe(findings, {
+      requirementId: 'FR-TRACE-003',
+      rule: 'CONFORMANCE_MILESTONE_MISMATCH',
+      path: String(milestoneOption),
+      message: `the caller pinned milestone ${String(
+        milestoneOption,
+      )} but the repository's ACTIVE milestone is ${activeGroup}; the authoritative milestone is evaluated and the pin is refused`,
+    });
+  }
+  return authoritativeResult(findings, evaluatedRuleNames);
 }

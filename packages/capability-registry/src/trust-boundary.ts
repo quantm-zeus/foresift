@@ -343,6 +343,15 @@ export async function importShadowAssertionHolds(
   ) {
     return false;
   }
-  const state = await assertImportedArtifactShadowOnly(engine, assertion.importArtifactRef);
+  // LOW: the underlying checker THROWS for a non-shadow (e.g. RECEIVED) state,
+  // but this function's contract is a BOOLEAN. A throw here escaped the caller's
+  // boolean branch and turned a "false" into an exception; catch and return
+  // `false` so a non-shadow import is a clean refusal.
+  let state: string;
+  try {
+    state = await assertImportedArtifactShadowOnly(engine, assertion.importArtifactRef);
+  } catch {
+    return false;
+  }
   return isOneOf(state, IMPORT_SHADOW_STATES);
 }

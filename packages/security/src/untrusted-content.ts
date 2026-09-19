@@ -173,10 +173,21 @@ export function refuseProtectedRoleInsertion(
   // Single-read binding (V7 accessor class): the role check and the refusal
   // detail must observe the same envelope source.
   const envelope = snapshotCallerInput(rawEnvelope);
-  if (numericIncludes(PROTECTED_INSTRUCTION_ROLES, role)) {
+  // M4 fail-closed carrier binding: a boxed String / object with `toString`
+  // fails the `===` membership check below and would SLIP PAST the protected
+  // role refusal. Require a primitive string and bind it exactly once.
+  if (typeof role !== 'string') {
     throw new UntrustedContentError(
-      `untrusted content (${envelope.source}) may not enter the '${role}' instruction role`,
-      { role, source: envelope.source },
+      'protected-role guard requires a primitive string role',
+      { source: typeof envelope?.source === 'string' ? envelope.source : 'unknown' },
+      SecErrorCode.SEC_UNTRUSTED_INSTRUCTION_ROLE_REFUSED,
+    );
+  }
+  const boundRole = role;
+  if (numericIncludes(PROTECTED_INSTRUCTION_ROLES, boundRole)) {
+    throw new UntrustedContentError(
+      `untrusted content (${envelope.source}) may not enter the '${boundRole}' instruction role`,
+      { role: boundRole, source: envelope.source },
       SecErrorCode.SEC_UNTRUSTED_INSTRUCTION_ROLE_REFUSED,
     );
   }

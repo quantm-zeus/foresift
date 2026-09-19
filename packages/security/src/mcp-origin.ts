@@ -84,7 +84,21 @@ export class McpOriginGate {
 
   /** Decide WITHOUT side effects; verdict is schema-shaped for transport reuse. */
   decide(origin: string | undefined): OriginVerdict {
-    if (origin === undefined || origin === '') {
+    // H9 fail-closed single-read binding: `origin` is read exactly once into a
+    // local. A boxed String or an object with `toString` would otherwise be
+    // COERCED for the allowlist/URL checks while the verdict recorded the
+    // live object — the value checked would differ from the value recorded.
+    // Non-string carriers are refused as MALFORMED with a null origin.
+    const boundOrigin = origin;
+    if (boundOrigin !== undefined && typeof boundOrigin !== 'string') {
+      return parseDecision(OriginVerdictSchema, {
+        decision: 'REFUSE',
+        origin: null,
+        reason: 'MALFORMED',
+      });
+    }
+    const originString = boundOrigin;
+    if (originString === undefined || originString === '') {
       if (this.absentOriginPolicy === 'PRODUCTION') {
         return parseDecision(OriginVerdictSchema, {
           decision: 'REFUSE',
@@ -98,9 +112,9 @@ export class McpOriginGate {
     }
 
     const refuse = (reason: OriginRefusalReason): OriginVerdict =>
-      parseDecision(OriginVerdictSchema, { decision: 'REFUSE', origin, reason });
+      parseDecision(OriginVerdictSchema, { decision: 'REFUSE', origin: originString, reason });
 
-    const parsed = parseOrigin(origin);
+    const parsed = parseOrigin(originString);
     if (parsed === null) return refuse('MALFORMED');
 
     // Hygiene FIRST — a hostile-but-allowlist-shaped origin never reaches
@@ -138,7 +152,7 @@ export class McpOriginGate {
           wrongPortSeen = true;
           continue;
         }
-        return parseDecision(OriginVerdictSchema, { decision: 'ALLOW', origin });
+        return parseDecision(OriginVerdictSchema, { decision: 'ALLOW', origin: originString });
       }
       const allowedLabels = allowed.host.split('.');
       const sameRegistrableDomain =

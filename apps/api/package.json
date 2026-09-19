@@ -15,6 +15,7 @@
     "start": "node --experimental-strip-types src/main.ts"
   },
   "dependencies": {
+    "@foresift/capability-registry": "workspace:*",
     "@foresift/domain": "workspace:*",
     "@foresift/object-store": "workspace:*",
     "@foresift/persistence": "workspace:*",

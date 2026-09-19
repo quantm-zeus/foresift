@@ -18,6 +18,8 @@ import type { ProhibitedCapabilityCategory } from '@foresift/shared-schemas';
 import { ProhibitedCapabilityError } from './errors.ts';
 import {
   appendSafe,
+  assertNoHostileArrayIndexShadow,
+  isArraySafe,
   numericJoin,
   numericMap,
   numericSlice,
@@ -67,18 +69,58 @@ export class NegativeCapabilityCanary {
   private readonly catalog: CanaryCatalog;
 
   constructor(catalog: CanaryCatalog) {
-    this.catalog = catalog;
+    // Residual CRITICAL (partial-Proxy): refuse an INCOMPLETE catalog up front.
+    // A Proxy that omits `inventoryForbiddenVerbs`/`categories`/allowlist would
+    // otherwise read as "no forbidden verbs / nothing forbidden" and the canary
+    // would report a clean surface.
+    const boundCatalog = snapshotCallerInput(catalog);
+    if (
+      boundCatalog === null ||
+      typeof boundCatalog !== 'object' ||
+      !isArraySafe(boundCatalog.categories) ||
+      !isArraySafe(boundCatalog.inventoryForbiddenVerbs) ||
+      boundCatalog.readOnlyWalletIntelligenceAllowlist === null ||
+      typeof boundCatalog.readOnlyWalletIntelligenceAllowlist !== 'object' ||
+      !isArraySafe(boundCatalog.readOnlyWalletIntelligenceAllowlist.admittedQueryShapes) ||
+      !isArraySafe(boundCatalog.readOnlyWalletIntelligenceAllowlist.forbiddenQueryShapes)
+    ) {
+      throw new ProhibitedCapabilityError(
+        'prohibited-capability catalog is missing required inventory fields',
+        {},
+      );
+    }
+    this.catalog = boundCatalog;
   }
 
   /** Inventory check over registered route/tool names. */
   checkInventory(rawEntries: ReadonlyArray<{ name: string; source: string }>): CanaryFinding[] {
+    // Boundary entry: refuse if the array prototype chain carries an integer
+    // index accessor that would swallow `appendSafe`-adjacent numeric appends
+    // (defence in depth; `snapshotCallerInput` asserts this too).
+    assertNoHostileArrayIndexShadow();
     // Single-read binding (V7 accessor class): each entry's name/source is read
     // once so a getter cannot dodge the forbidden-verb scan and then supply the
     // recorded reference.
     const entries = snapshotCallerInput(rawEntries);
+    // Residual CRITICAL (partial-Proxy): a missing/non-array inventory must
+    // refuse, never read as "no prohibited surfaces".
+    if (!isArraySafe(entries)) {
+      throw new ProhibitedCapabilityError('prohibited-capability inventory must be an array', {});
+    }
     const findings: CanaryFinding[] = [];
     for (let entryIndex = 0; entryIndex < entries.length; entryIndex += 1) {
-      const entry = entries[entryIndex] as { name: string; source: string };
+      const entry = entries[entryIndex] as { name?: unknown; source?: unknown } | undefined;
+      if (
+        entry === undefined ||
+        entry === null ||
+        typeof entry.name !== 'string' ||
+        typeof entry.source !== 'string'
+      ) {
+        throw new ProhibitedCapabilityError(
+          'inventory entry must carry string name and source fields',
+          { index: entryIndex },
+        );
+      }
       const normalized = entry.name.toLowerCase().replace(/[_\s.-]+/g, '-');
       const forbiddenVerbs = this.catalog.inventoryForbiddenVerbs ?? [];
       for (let verbIndex = 0; verbIndex < forbiddenVerbs.length; verbIndex += 1) {
@@ -102,6 +144,7 @@ export class NegativeCapabilityCanary {
    * test proves both implementations classify every fixture identically.
    */
   scanSourceText(relativePath: string, text: string): CanaryFinding[] {
+    assertNoHostileArrayIndexShadow();
     const findings: CanaryFinding[] = [];
     const lines = text.split('\n');
     for (
@@ -138,12 +181,15 @@ export class NegativeCapabilityCanary {
             signals.length === 0 ||
             numericSome(signals, (s) => window.includes(s.toLowerCase()))
           ) {
-            findings[findings.length] = {
+            // appendSafe, never `findings[findings.length] = …` (H8): a hostile
+            // integer-index accessor on the prototype chain silently swallows
+            // the raw append and a FAILED canary reads as clean.
+            appendSafe(findings, {
               category: categorySpec.category,
               surface: 'RUNTIME_CANARY',
               reference: `${relativePath}:${lineIndex + 1}`,
               matchedPattern: pattern.id,
-            };
+            });
             break; // one finding per (text, pattern), mirroring the CLI
           }
         }
@@ -194,9 +240,18 @@ export class NegativeCapabilityCanary {
 
   /** Environment-schema forbidden-name scan (same lists as the CLI). */
   scanEnvironmentNames(names: readonly string[]): CanaryFinding[] {
+    assertNoHostileArrayIndexShadow();
+    if (!isArraySafe(names)) {
+      throw new ProhibitedCapabilityError('environment name inventory must be an array', {});
+    }
     const findings: CanaryFinding[] = [];
     for (let nameIndex = 0; nameIndex < names.length; nameIndex += 1) {
       const name = names[nameIndex] as string;
+      if (typeof name !== 'string') {
+        throw new ProhibitedCapabilityError('environment name inventory entries must be strings', {
+          index: nameIndex,
+        });
+      }
       const normalized = name.toUpperCase().replace(/[^A-Z_]/g, '_');
       for (
         let categoryIndex = 0;
@@ -214,12 +269,12 @@ export class NegativeCapabilityCanary {
         ) {
           const forbidden = envForbiddenNames[forbiddenIndex] as string;
           if (normalized.includes(forbidden)) {
-            findings[findings.length] = {
+            appendSafe(findings, {
               category: categorySpec.category,
               surface: 'ENV_SCHEMA',
               reference: `environment#${name}`,
               matchedPattern: forbidden,
-            };
+            });
           }
         }
       }

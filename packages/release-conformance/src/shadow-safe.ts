@@ -6,8 +6,9 @@
  * at decision time must not be able to make a finding/failure collection look
  * empty and so turn a FAILED release verdict into `PASSED`. These helpers walk
  * by numeric index only and never touch `Array.prototype`. The module-init
- * intrinsics (`Object.freeze`, `Object.keys`, `Array.isArray`) are read at
- * import time and are explicitly out of the declared threat model.
+ * intrinsics (`Object.freeze`, `Object.create`, `Object.getOwnPropertyNames`,
+ * `Array.isArray`) are captured at import time so a LATER shadow cannot
+ * neutralize them.
  */
 
 /**
@@ -215,6 +216,23 @@ const capturedDefineProperty = Object.defineProperty;
 const capturedGetOwnPropertyNames = Object.getOwnPropertyNames;
 const capturedGetOwnPropertyDescriptor = Object.getOwnPropertyDescriptor;
 const capturedGetPrototypeOf = Object.getPrototypeOf;
+const capturedCreate = Object.create;
+const capturedToString = Object.prototype.toString;
+/**
+ * `Array.isArray` is a STATIC, but shadowing it (`Array.isArray = () => true`)
+ * collapses a plain-object snapshot into an EMPTY array (the object has no
+ * numeric length), so a field the guard must see reads as absent. Capture the
+ * genuine detector at module init so the shadow cannot neutralize it.
+ */
+const capturedIsArray: (value: unknown) => value is unknown[] = Array.isArray;
+
+/**
+ * Upper bound on a single snapshot's element/key count. A Proxy declaring a
+ * bogus `length` (or `ownKeys`) could otherwise force an unbounded allocation
+ * and hang the gate. Real caller DTOs are far below these.
+ */
+const SNAPSHOT_MAX_ARRAY = 1_000_000;
+const SNAPSHOT_MAX_KEYS = 100_000;
 
 /**
  * Fail closed when `Array.prototype` carries an integer-index accessor. Such a
@@ -265,15 +283,28 @@ export function snapshotCallerInput<T>(value: T): T {
 }
 
 function snapshotValue(value: unknown, memo: Map<object, unknown>, path: WeakSet<object>): unknown {
-  if (value === null || typeof value !== 'object') return value;
+  if (value === null) return value;
+  // A FUNCTION is a live carrier too: it can carry getters/own properties, so
+  // passing it through by reference re-opens the accessor class.
+  if (typeof value === 'function') {
+    throw new TypeError('non-plain caller input is not supported');
+  }
+  if (typeof value !== 'object') return value;
   if (path.has(value)) throw new TypeError('cyclic caller input is not supported');
   const existing = memo.get(value);
   if (existing !== undefined) return existing;
   path.add(value);
-  if (Array.isArray(value)) {
+  if (capturedIsArray(value)) {
+    // Bind `length` ONCE (a Proxy length trap returning 3e6 over a 2-element
+    // target forced an unbounded copy) and fail closed above a sane bound.
+    const length = (value as unknown[]).length;
+    if (!Number.isInteger(length) || length < 0 || length > SNAPSHOT_MAX_ARRAY) {
+      path.delete(value);
+      throw new TypeError('caller array length is not a bounded non-negative integer');
+    }
     const copy: unknown[] = [];
     memo.set(value, copy);
-    for (let index = 0; index < value.length; index += 1) {
+    for (let index = 0; index < length; index += 1) {
       appendSafe(copy, snapshotValue(value[index], memo, path));
     }
     Object.freeze(copy);
@@ -314,7 +345,7 @@ function snapshotValue(value: unknown, memo: Map<object, unknown>, path: WeakSet
       return copy.buffer;
     }
   }
-  if (Object.prototype.toString.call(value) === '[object Date]') {
+  if (capturedToString.call(value) === '[object Date]') {
     let time: unknown;
     try {
       time = capturedDateGetTime.call(value);
@@ -330,14 +361,22 @@ function snapshotValue(value: unknown, memo: Map<object, unknown>, path: WeakSet
   // Proxy with a `getPrototypeOf` trap) is REFUSED, never passed through by
   // reference: passing it through kept its live getters and re-opened the whole
   // accessor class inside every wrapped function (V7 rounds 6-7).
-  const prototype = Object.getPrototypeOf(value);
+  const prototype = capturedGetPrototypeOf(value);
   if (prototype !== Object.prototype && prototype !== null) {
     path.delete(value);
     throw new TypeError('non-plain caller input is not supported');
   }
   const source = value as Record<string, unknown>;
-  const keys = Object.keys(source);
-  const copy: Record<string, unknown> = Object.create(null) as Record<string, unknown>;
+  // ALL own string keys, not only the ENUMERABLE ones: `Object.keys` skipped a
+  // non-enumerable own getter, so the snapshot dropped the field and a guard
+  // that treats "field absent" as "no violation" failed OPEN. Reading each own
+  // key once also neutralizes enumerable accessors.
+  const keys = capturedGetOwnPropertyNames(source);
+  if (keys.length > SNAPSHOT_MAX_KEYS) {
+    path.delete(value);
+    throw new TypeError('caller object has too many own properties');
+  }
+  const copy: Record<string, unknown> = capturedCreate(null) as Record<string, unknown>;
   memo.set(value, copy);
   for (let index = 0; index < keys.length; index += 1) {
     const key = keys[index] as string;

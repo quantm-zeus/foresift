@@ -385,3 +385,25 @@ describe('isolated-parsing boundary contract', () => {
     expect(() => gate.assertIsolatedParsingBoundary({ inProcess: false })).not.toThrow();
   });
 });
+
+// --- V7 security-review residual: omitted boundary claim + NaN clock ----------
+describe('import gating fail-closed binding (V7 residual)', () => {
+  it('REFUSES an absent inProcess claim instead of reading it as "isolated"', () => {
+    // Pre-fix an omitted field was falsy and PASSED the isolated-parsing gate.
+    expect(() => gate.assertIsolatedParsingBoundary({} as never)).toThrow(
+      /isolated-parsing boundary/,
+    );
+  });
+
+  it('REFUSES a NaN nowMs instead of silently skipping producer expiry', async () => {
+    const material = new TextEncoder().encode('{"dataset":"whale-alerts","version":1}');
+    await expect(
+      gate.verifySignature({
+        artifactId: 'art-1',
+        signature: 'sig-ok',
+        materialBytes: material,
+        nowMs: Number.NaN,
+      }),
+    ).rejects.toMatchObject({ code: 'SEC_IMPORT_FORMAT_REFUSED' });
+  });
+});

@@ -27,6 +27,7 @@ import {
   ALL_ARTIFACT_BOUNDARY_ASSERTION_KINDS,
   ALL_DEPLOYMENT_RELAXABLE_DIMENSIONS,
   ALL_PROTECTED_DIMENSIONS,
+  DISTRIBUTION_DUTY_DIMENSIONS,
   MCP_LIVE_TEST_MAX_AGE_SECONDS,
   artifactBoundaryHolds,
   bestEffortWeakensOnlyAllowedDimensions,
@@ -58,6 +59,14 @@ import { GATE_KINDS } from './gate-evidence.ts';
 function isClaimRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
+
+/**
+ * `Math.min` captured at module init (M2): a same-realm caller that shadows the
+ * global `Math.min` must not be able to disable the age clamp below and keep a
+ * stale MCP live-test cell usable. The captured intrinsic is frozen into the
+ * module, so a later `Math.min = …` cannot reach the release decision.
+ */
+const capturedMathMin: (...values: number[]) => number = Math.min;
 
 // --- rule vocabulary --------------------------------------------------------
 
@@ -454,6 +463,16 @@ export function checkMcpCompatibilityDrift(claim: McpCompatibilityMatrixClaim): 
     report('(default-revision)', 'no MCP revision is declared as the compatibility default');
     return { passed: findings.length === 0, findings };
   }
+  // HIGH-1: an EMPTY client set is not a vacuous pass. Before this guard the
+  // client loop below iterated zero times, so a matrix with no supported target
+  // clients and no cells returned PASSED and the release gate certified a
+  // compatibility default that no client was ever tested against.
+  if (claim.clients.length === 0) {
+    report(
+      '(clients)',
+      'no supported target clients are declared; an empty client set cannot certify a compatibility default',
+    );
+  }
   if (defaults.length > 1) {
     let defaultList = '';
     for (let defaultIndex = 0; defaultIndex < defaults.length; defaultIndex += 1) {
@@ -468,10 +487,14 @@ export function checkMcpCompatibilityDrift(claim: McpCompatibilityMatrixClaim): 
 
   // The declared freshness window may only TIGHTEN the authoritative one: a
   // caller override can never keep a stale cell usable (audit H10 residual).
-  const maxAgeSeconds = Math.min(
+  const maxAgeSeconds = capturedMathMin(
     claim.maxAgeSeconds ?? MCP_LIVE_TEST_MAX_AGE_SECONDS,
     MCP_LIVE_TEST_MAX_AGE_SECONDS,
   );
+  // HIGH-1: at least one cell must actually be EVALUATED. A default revision
+  // with no client and no cell is a vacuous certification; count matched cells
+  // and refuse when the walk evaluated none.
+  let evaluatedCells = 0;
   for (let defaultIndex = 0; defaultIndex < defaults.length; defaultIndex += 1) {
     const defaultRevision = defaults[defaultIndex] as McpRevisionClaim;
     for (let clientIndex = 0; clientIndex < claim.clients.length; clientIndex += 1) {
@@ -507,6 +530,7 @@ export function checkMcpCompatibilityDrift(claim: McpCompatibilityMatrixClaim): 
         report(cellPath, `no conformance cell for the default revision and client`);
         continue;
       }
+      evaluatedCells += 1;
       if (cell.result !== 'PASS') {
         report(cellPath, `conformance result is ${cell.result}, not PASS`);
         continue;
@@ -547,6 +571,12 @@ export function checkMcpCompatibilityDrift(claim: McpCompatibilityMatrixClaim): 
         report(cellPath, `the live test at ${cell.liveTestDate} is stale or invalid`);
       }
     }
+  }
+  if (claim.clients.length > 0 && evaluatedCells === 0) {
+    report(
+      '(cells)',
+      'no compatibility cell was evaluated for the default revision and any supported client; an empty evaluated-cell set cannot certify a compatibility default',
+    );
   }
   return { passed: findings.length === 0, findings };
 }
@@ -821,12 +851,28 @@ export interface DistributionGateEvidenceClaim {
   readonly valid: boolean;
 }
 
+/** One declared §69.9 distribution DUTY dimension verdict for the exact release. */
+export interface DistributionDutyVerdictClaim {
+  /** The authoritative duty dimension name (`DISTRIBUTION_DUTY_DIMENSIONS`). */
+  readonly duty: string;
+  /** The authoritative verdict; only `PASS` authorizes the duty. */
+  readonly verdict: string;
+}
+
 /** One distribution-readiness claim for an exact release. */
 export interface DistributionAuthorizationClaim {
   readonly releaseRef: string;
   readonly distributionReadiness: string;
   /** The gate kinds the release's distribution activation requires. */
   readonly requiredGateKinds: readonly string[];
+  /**
+   * The explicit verdict for every authoritative §69.9 distribution DUTY
+   * dimension (HIGH-2). REQUIRED: a claim whose declared gate set covers only a
+   * coarse gate-kind subset silently omitted the runtime duties the
+   * `DISTRIBUTION_EVIDENCE` gate enforces. An absent, malformed, unknown, or
+   * failing duty fails the release gate closed.
+   */
+  readonly distributionDuties: readonly DistributionDutyVerdictClaim[];
   readonly gateEvidence: readonly DistributionGateEvidenceClaim[];
   readonly requirementId?: string;
 }
@@ -842,6 +888,8 @@ export interface DistributionAuthorizationEvaluation {
   readonly malformedRequiredGateKinds: boolean;
   /** `gateEvidence` was not an array, or an element's `scopeRefs` was not one. */
   readonly malformedGateEvidence: boolean;
+  /** `distributionDuties` was not an array (a duty set is never a bare carrier). */
+  readonly malformedDistributionDuties: boolean;
   readonly missingGateKinds: readonly string[];
   readonly mismatchedGateKinds: readonly string[];
   readonly revokedOrInvalidGateKinds: readonly string[];
@@ -849,6 +897,12 @@ export interface DistributionAuthorizationEvaluation {
   readonly unknownGateKinds: readonly string[];
   /** Authoritative mandatory gate kinds the declaration never names. */
   readonly omittedMandatoryGateKinds: readonly string[];
+  /** Authoritative §69.9 duty dimensions the declaration never names (HIGH-2). */
+  readonly omittedDutyDimensions: readonly string[];
+  /** Declared duty names outside the authoritative `DISTRIBUTION_DUTY_DIMENSIONS`. */
+  readonly unknownDutyDimensions: readonly string[];
+  /** Declared duties whose verdict was not `PASS`. */
+  readonly failingDutyDimensions: readonly string[];
 }
 
 const AUTHORIZED_DISTRIBUTION_READINESS: readonly string[] = Object.freeze([
@@ -924,6 +978,47 @@ export function evaluateDistributionAuthorization(
       }
     }
   }
+  // HIGH-2: derive the REQUIRED duty set from the shared authoritative
+  // `DISTRIBUTION_DUTY_DIMENSIONS` (the same names the runtime
+  // `DISTRIBUTION_EVIDENCE` gate enforces) and require an explicit verdict for
+  // every one. A claim that covers only the coarse gate kinds, omits a duty,
+  // invents a duty, or reports a non-PASS verdict for a duty fails closed.
+  let dutyEntriesMalformed = !Array.isArray(claim.distributionDuties);
+  const distributionDuties: readonly unknown[] = dutyEntriesMalformed
+    ? []
+    : (claim.distributionDuties as readonly unknown[]);
+  const declaredDuties = new Set<string>();
+  const unknownDutyDimensions: string[] = [];
+  const failingDutyDimensions: string[] = [];
+  if (!dutyEntriesMalformed) {
+    for (let dutyIndex = 0; dutyIndex < distributionDuties.length; dutyIndex += 1) {
+      const entry = distributionDuties[dutyIndex];
+      if (typeof entry !== 'object' || entry === null || Array.isArray(entry)) {
+        dutyEntriesMalformed = true;
+        continue;
+      }
+      const duty = (entry as { readonly duty?: unknown }).duty;
+      const verdict = (entry as { readonly verdict?: unknown }).verdict;
+      if (typeof duty !== 'string' || duty.length === 0 || typeof verdict !== 'string') {
+        dutyEntriesMalformed = true;
+        continue;
+      }
+      declaredDuties.add(duty);
+      if (!isOneOf(duty, DISTRIBUTION_DUTY_DIMENSIONS)) {
+        appendSafe(unknownDutyDimensions, duty);
+      }
+      if (verdict !== 'PASS') appendSafe(failingDutyDimensions, duty);
+    }
+  }
+  const omittedDutyDimensions: string[] = [];
+  for (
+    let requiredDutyIndex = 0;
+    requiredDutyIndex < DISTRIBUTION_DUTY_DIMENSIONS.length;
+    requiredDutyIndex += 1
+  ) {
+    const duty = DISTRIBUTION_DUTY_DIMENSIONS[requiredDutyIndex] as string;
+    if (!declaredDuties.has(duty)) appendSafe(omittedDutyDimensions, duty);
+  }
   // An authorization claim with NO required gate kinds is unauthorized by
   // construction: zero requirements cannot be satisfied into a PASS (H2).
   const requiredGateKindsEmpty = readinessAuthorized && requiredGateKinds.length === 0;
@@ -989,22 +1084,30 @@ export function evaluateDistributionAuthorization(
       !requiredGateKindsMalformed &&
       !gateEvidenceMalformed &&
       !requiredGateKindsEmpty &&
+      !dutyEntriesMalformed &&
       unknownGateKinds.length === 0 &&
       omittedMandatoryGateKinds.length === 0 &&
       missingGateKinds.length === 0 &&
       mismatchedGateKinds.length === 0 &&
-      revokedOrInvalidGateKinds.length === 0,
+      revokedOrInvalidGateKinds.length === 0 &&
+      unknownDutyDimensions.length === 0 &&
+      omittedDutyDimensions.length === 0 &&
+      failingDutyDimensions.length === 0,
     readinessAuthorized,
     readinessKnown,
     requiredGateKindsEmpty,
     malformedReleaseRef: !releaseRefValid,
     malformedRequiredGateKinds: requiredGateKindsMalformed,
     malformedGateEvidence: gateEvidenceMalformed,
+    malformedDistributionDuties: dutyEntriesMalformed,
     missingGateKinds,
     mismatchedGateKinds,
     revokedOrInvalidGateKinds,
     unknownGateKinds,
     omittedMandatoryGateKinds,
+    omittedDutyDimensions,
+    unknownDutyDimensions,
+    failingDutyDimensions,
   };
 }
 
@@ -1062,6 +1165,30 @@ export function checkPublicAuthorizationWithoutGateEvidence(
       appendSafe(
         details,
         'gateEvidence is not an array of records, or an evidence scopeRefs is not an array of release refs',
+      );
+    }
+    if (evaluation.malformedDistributionDuties) {
+      appendSafe(
+        details,
+        'distributionDuties is not an array of duty verdicts (a §69.9 duty set must be declared explicitly)',
+      );
+    }
+    if (evaluation.omittedDutyDimensions.length > 0) {
+      appendSafe(
+        details,
+        `authoritative §69.9 duty dimensions omitted from the declaration: ${numericJoin(evaluation.omittedDutyDimensions, ', ')}`,
+      );
+    }
+    if (evaluation.unknownDutyDimensions.length > 0) {
+      appendSafe(
+        details,
+        `declared duty dimensions outside the authoritative set: ${numericJoin(evaluation.unknownDutyDimensions, ', ')}`,
+      );
+    }
+    if (evaluation.failingDutyDimensions.length > 0) {
+      appendSafe(
+        details,
+        `distribution duties without a PASS verdict: ${numericJoin(evaluation.failingDutyDimensions, ', ')}`,
       );
     }
     if (evaluation.missingGateKinds.length > 0) {
@@ -1141,6 +1268,7 @@ const REQUIRED_CLAIM_FIELDS: Readonly<Record<string, readonly string[]>> = {
     'releaseRef',
     'distributionReadiness',
     'requiredGateKinds',
+    'distributionDuties',
     'gateEvidence',
   ],
 };
@@ -1300,6 +1428,38 @@ export function checkProdConformanceInputsPresent(input: ProdConformanceInput): 
             path: `${field}[${index}].requiredGateKinds`,
             message: `${field}[${index}].requiredGateKinds must be an array of gate kinds`,
           });
+        }
+        // HIGH-2: the §69.9 duty verdict set is a required, explicitly typed
+        // array. A non-array or malformed element cannot stand in for an empty
+        // (or absent) duty declaration.
+        const distributionDuties = claim['distributionDuties'];
+        if (!Array.isArray(distributionDuties)) {
+          appendSafe(findings, {
+            requirementId: 'FR-PROD-001',
+            rule: PROD_RULES.prodConformanceInputMissing,
+            path: `${field}[${index}].distributionDuties`,
+            message: `${field}[${index}].distributionDuties must be an array of {duty, verdict} records for every authoritative §69.9 duty dimension`,
+          });
+        } else {
+          for (let dutyIndex = 0; dutyIndex < distributionDuties.length; dutyIndex += 1) {
+            const dutyEntry = distributionDuties[dutyIndex];
+            const duty =
+              typeof dutyEntry === 'object' && dutyEntry !== null
+                ? (dutyEntry as Record<string, unknown>)['duty']
+                : undefined;
+            const verdict =
+              typeof dutyEntry === 'object' && dutyEntry !== null
+                ? (dutyEntry as Record<string, unknown>)['verdict']
+                : undefined;
+            if (typeof duty !== 'string' || duty.length === 0 || typeof verdict !== 'string') {
+              appendSafe(findings, {
+                requirementId: 'FR-PROD-001',
+                rule: PROD_RULES.prodConformanceInputMissing,
+                path: `${field}[${index}].distributionDuties[${dutyIndex}]`,
+                message: `${field}[${index}].distributionDuties[${dutyIndex}] must be a {duty, verdict} record with non-empty string fields; a malformed duty verdict fails the release gate closed`,
+              });
+            }
+          }
         }
         if (!Array.isArray(claim['gateEvidence'])) {
           appendSafe(findings, {

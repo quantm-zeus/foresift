@@ -240,6 +240,27 @@ describe('gate-pause fail-closed edges (M12/M13)', () => {
     ).resolves.toBeDefined();
   });
 
+  it('refuses a non-string audit reference with a TYPED code (L7 single-read bind)', async () => {
+    await seedIncident('inc-l7');
+    await pauses.open({
+      pauseId: 'pause-l7',
+      scope: 'capability:l7-bind',
+      reason: 'probe',
+      openingIncidentId: 'inc-l7',
+      pausedAt: at('2026-08-01T06:00:00Z'),
+    });
+    // Pre-fix a non-string carrier reached `.trim()` and escaped as a raw
+    // TypeError; the bound local refuses with the typed audit-required code.
+    await expect(
+      pauses.resume({
+        pauseId: 'pause-l7',
+        resumedByActor: 'admin@example.com',
+        resumedAt: at('2026-08-01T06:10:00Z'),
+        auditRef: 12345 as unknown as string,
+      }),
+    ).rejects.toMatchObject({ code: SecErrorCode.SEC_PAUSE_RESUME_AUDIT_REQUIRED });
+  });
+
   it('rollbackRestore REFUSES cross-scope restore points and non-ACTIVATE events (M13)', async () => {
     await pauses.recordActivation({
       eventId: 'ae-m13-base',

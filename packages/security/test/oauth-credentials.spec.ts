@@ -64,6 +64,19 @@ describe('oauth token binding (AC-253)', () => {
     expect(parsed.subject).toBe('user-1');
   });
 
+  it('refuses a token when the injected clock is not a finite instant (V7 accessor sweep)', () => {
+    const nanClock = new OAuthBindingGuard(() => Number.NaN);
+    expect(() =>
+      nanClock.validateTokenBinding({
+        candidate: goodBinding(),
+        registeredRedirectUris: ['https://mcp.example.com/callback'],
+        registeredScopes: ['tools:read', 'tools:write'],
+        expectedAudience: 'foresift-mcp',
+        expectedResourceIndicator: 'https://foresift.example.com/mcp',
+      }),
+    ).toThrow(/expired/);
+  });
+
   it('refuses grants without PKCE', () => {
     expect(() =>
       guard.validateTokenBinding({

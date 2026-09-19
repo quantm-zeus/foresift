@@ -21,9 +21,11 @@ import {
   insertMcpConformanceRun,
   insertMcpRevision,
   insertMcpTargetClient,
+  isGovernedMcpCompatibilityResolution,
   mcpCompatibilityCells,
   resolveCompatibilityMatrix,
   resolveProtocolRevision,
+  snapshotCallerInput,
 } from '../src/index.ts';
 
 const MIGRATIONS_DIR = path.resolve(
@@ -605,4 +607,144 @@ describe('MCP conformance freshness and fixture provenance (V6-1/V6-2 regression
     );
     expect(persistedRuns.rows).toEqual([]);
   }, 120_000);
+});
+
+/**
+ * HIGH-5: the governed resolver output must be distinguishable by provenance so
+ * a downstream admission (`apps/api` protocol wiring) can require it. The brand
+ * is keyed by object identity, so a spread copy or a `structuredClone` is
+ * refused even though it is structurally identical.
+ */
+describe('HIGH-5: governed MCP resolution provenance brand', () => {
+  it('brands a real resolution and refuses hand-built/cloned copies', async () => {
+    const resolution = await resolveCompatibilityMatrix(engine, { now: NOW });
+    expect(isGovernedMcpCompatibilityResolution(resolution)).toBe(true);
+    expect(isGovernedMcpCompatibilityResolution({ ...resolution })).toBe(false);
+    expect(isGovernedMcpCompatibilityResolution(structuredClone(resolution))).toBe(false);
+    expect(isGovernedMcpCompatibilityResolution(null)).toBe(false);
+    expect(isGovernedMcpCompatibilityResolution(undefined)).toBe(false);
+  }, 120_000);
+});
+
+/**
+ * M2: `Math.min` is captured at module init, so a same-realm caller that shadows
+ * the global cannot widen (or collapse) the non-overridable freshness clamp and
+ * revive a stale conformance cell.
+ */
+describe('M2: captured Math.min keeps the freshness clamp closed', () => {
+  const staleCell = {
+    cellId: 'm2-stale-cell',
+    revision: '2099-03-01',
+    clientId: 'client-a',
+    conformanceFixtureRef: 'fixture-a',
+    liveTestDate: STALE,
+    result: 'PASS' as const,
+    notes: null,
+  };
+  const freshCell = {
+    cellId: 'm2-fresh-cell',
+    revision: '2099-04-01',
+    clientId: 'client-a',
+    conformanceFixtureRef: 'fixture-a',
+    liveTestDate: RECENT,
+    result: 'PASS' as const,
+    notes: null,
+  };
+
+  it('still refuses a stale cell when the global Math.min is shadowed wide-open', () => {
+    const originalMin = Math.min;
+    try {
+      // A shadow that reports "no clamp at all" would otherwise keep the stale
+      // run inside a caller-widened window.
+      Math.min = (() => Number.MAX_SAFE_INTEGER) as typeof Math.min;
+      const verdict = cellUsability({
+        cell: staleCell,
+        passingRuns: [
+          { revision: '2099-03-01', clientId: 'client-a', fixtureRef: 'fixture-a', ranAt: STALE },
+        ],
+        revision: '2099-03-01',
+        clientId: 'client-a',
+        now: NOW,
+      });
+      expect(verdict.usable).toBe(false);
+      expect(verdict.reason).toBe('CELL_NOT_USABLE');
+    } finally {
+      Math.min = originalMin;
+    }
+  });
+
+  it('still admits a fresh cell when the global Math.min is shadowed to zero', () => {
+    const originalMin = Math.min;
+    try {
+      Math.min = (() => 0) as typeof Math.min;
+      const verdict = cellUsability({
+        cell: freshCell,
+        passingRuns: [
+          { revision: '2099-04-01', clientId: 'client-a', fixtureRef: 'fixture-a', ranAt: RECENT },
+        ],
+        revision: '2099-04-01',
+        clientId: 'client-a',
+        now: NOW,
+      });
+      expect(verdict.usable).toBe(true);
+    } finally {
+      Math.min = originalMin;
+    }
+  });
+});
+
+/**
+ * Defense-in-depth (V7-C1/H1 helper consistency): `snapshotCallerInput` must
+ * materialize EVERY own string key — including non-enumerable ones — and must
+ * not be collapsed by a shadowed `Array.isArray`.
+ *
+ * Pre-fix, `Object.keys` dropped a non-enumerable own field (a guard that treats
+ * "field absent" as "no violation" can fail open), and
+ * `Array.isArray = () => true` made every plain-object snapshot an EMPTY array.
+ */
+describe('shadow-safe snapshotCallerInput hardening', () => {
+  it('materializes a non-enumerable own data field and getter exactly once', () => {
+    const carrier: Record<string, unknown> = {};
+    Object.defineProperty(carrier, 'hiddenData', {
+      value: 'materialized',
+      enumerable: false,
+      writable: true,
+      configurable: true,
+    });
+    let reads = 0;
+    Object.defineProperty(carrier, 'hiddenGetter', {
+      enumerable: false,
+      configurable: true,
+      get() {
+        reads += 1;
+        return 'read-once';
+      },
+    });
+    Object.defineProperty(carrier, 'visible', {
+      value: 'v',
+      enumerable: true,
+      writable: true,
+      configurable: true,
+    });
+    const snapshot = snapshotCallerInput(carrier) as Record<string, unknown>;
+    expect(snapshot['hiddenData']).toBe('materialized');
+    expect(snapshot['hiddenGetter']).toBe('read-once');
+    expect(snapshot['visible']).toBe('v');
+    expect(reads).toBe(1);
+  });
+
+  it('does not collapse when the global Array.isArray is shadowed to always-true', () => {
+    const originalIsArray = Array.isArray;
+    try {
+      (Array as unknown as { isArray: unknown }).isArray = () => true;
+      const snapshot = snapshotCallerInput({ a: 1, b: 'two' }) as Record<string, unknown>;
+      expect(snapshot['a']).toBe(1);
+      expect(snapshot['b']).toBe('two');
+      const arraySnapshot = snapshotCallerInput([1, 2]) as readonly number[];
+      expect(arraySnapshot.length).toBe(2);
+      expect(arraySnapshot[0]).toBe(1);
+    } finally {
+      (Array as unknown as { isArray: unknown }).isArray = originalIsArray;
+    }
+  });
 });

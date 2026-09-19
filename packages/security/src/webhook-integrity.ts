@@ -74,17 +74,24 @@ export class WebhookGuard {
     // Fail-closed at construction (L12): a non-finite or non-positive window
     // would silently disable staleness checks for JS callers (NaN compares
     // false), so it never constructs a guard at all.
-    if (!Number.isFinite(options.maxAgeSeconds) || options.maxAgeSeconds <= 0) {
+    //
+    // H4 single-read binding: `maxAgeSeconds` was read once per validation
+    // clause and once more for the stored field, so an accessor could present
+    // a finite positive value to the checks and a divergent (e.g. Infinity)
+    // value to enforcement. Bind it ONCE and enforce that exact local.
+    const maxAgeSeconds = options.maxAgeSeconds;
+    const replayCacheCapacity = options.replayCacheCapacity;
+    if (!Number.isFinite(maxAgeSeconds) || maxAgeSeconds <= 0) {
       throw new WebhookIntegrityError(
         'maxAgeSeconds must be a positive finite number',
-        { maxAgeSeconds: options.maxAgeSeconds },
+        { maxAgeSeconds },
         SecErrorCode.SEC_WEBHOOK_TIMESTAMP_STALE,
       );
     }
     this.verifier = options.verifier;
-    this.maxAgeSeconds = options.maxAgeSeconds;
+    this.maxAgeSeconds = maxAgeSeconds;
     this.nowMs = options.nowMs;
-    this.capacity = options.replayCacheCapacity ?? 10_000;
+    this.capacity = replayCacheCapacity ?? 10_000;
     this.seen = new Map();
   }
 
@@ -118,9 +125,19 @@ export class WebhookGuard {
     }
 
     // 2. Timestamp maximum age — stale deliveries are refused outright.
+    //    H5 fail-closed instant binding: an ABSENT, NaN, or non-finite
+    //    `signatureTimestamp` (or a NaN injected clock) makes every
+    //    `Math.abs(now - ts) > window` comparison false, which silently
+    //    disables staleness. Require a real finite instant on BOTH sides and
+    //    bind each exactly once.
+    const signatureTimestamp = input.signatureTimestamp;
+    const nowMs = this.nowMs();
     if (
-      input.signatureTimestamp === undefined ||
-      Math.abs(this.nowMs() - input.signatureTimestamp) > this.maxAgeSeconds * 1000
+      typeof signatureTimestamp !== 'number' ||
+      !Number.isFinite(signatureTimestamp) ||
+      typeof nowMs !== 'number' ||
+      !Number.isFinite(nowMs) ||
+      Math.abs(nowMs - signatureTimestamp) > this.maxAgeSeconds * 1000
     ) {
       throw new WebhookIntegrityError(
         'callback timestamp missing or outside the maximum age',
@@ -130,10 +147,8 @@ export class WebhookGuard {
     }
 
     // 3. Cryptographic verification over the exact received bytes.
-    if (
-      input.signature === undefined ||
-      !(await this.verifier(input.payloadBytes, input.signature))
-    ) {
+    const signature = input.signature;
+    if (signature === undefined || !(await this.verifier(input.payloadBytes, signature))) {
       throw new WebhookIntegrityError('callback signature verification failed');
     }
 

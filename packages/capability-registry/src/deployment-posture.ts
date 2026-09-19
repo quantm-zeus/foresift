@@ -519,14 +519,30 @@ export function assertCapacityDegradationPreservesProtectedDimensions(
   });
 }
 
-/** A capacity contract that is not PASS can never back an SLA_BACKED claim. */
+/**
+ * A capacity contract backs an SLA_BACKED claim only when it satisfies the
+ * AUTHORITATIVE capacity law, is activatable, and has not expired at `now`.
+ *
+ * LOW: a bare `result === 'PASS'` string accepted an expired or law-violating
+ * contract; this now mirrors `evaluateDeploymentPosture`'s capacity decision.
+ */
 export function assertCapacityContractBacksPosture(
   contract: SustainableCapacityContract | null,
+  now: string = new Date().toISOString(),
 ): void {
-  if (contract === null || contract.result !== 'PASS') {
+  let backed = false;
+  if (contract !== null) {
+    try {
+      validateSustainableCapacityContract(contract);
+      backed = isContractActivatable(contract) && Date.parse(contract.expiresAt) > Date.parse(now);
+    } catch {
+      backed = false;
+    }
+  }
+  if (!backed) {
     throw new ForesiftError(
       ErrorCode.PROD_DEPLOYMENT_POSTURE_UNKNOWN,
-      'an SLA_BACKED posture requires a passing sustainable-capacity contract',
+      'an SLA_BACKED posture requires an activatable, unexpired sustainable-capacity contract that satisfies the capacity law',
       { contractId: contract?.contractId ?? null, result: contract?.result ?? null },
     );
   }

@@ -12,7 +12,7 @@
  *
  * Fail-closed defenses (every refusal is a typed `ForesiftError`, never a guess):
  * - A `.sql` file in the migrations directory that matches no known
- *   `<generation>_(data|dr|sec|prov|core|cost|col|disc|mcp|trace|solsec|trd|sup)_<seq>_<name>` family is refused
+ *   `<generation>_(data|dr|sec|prov|core|cost|col|disc|mcp|trace|sig|solsec|trd|sup)_<seq>_<name>` family is refused
  *   (`MIGRATION_FILENAME_UNKNOWN`) instead of being silently ignored — a
  *   future-generation script (e.g. `g1_data_…`) is discovered and applied,
  *   never dropped.
@@ -113,7 +113,7 @@ function checksumOf(content: string): string {
 
 /**
  * Discover migration files in `dir` (lexicographic order). Every `.sql`
- * entry MUST belong to a known `<generation>_(data|dr|sec|prov|core|cost|col|disc|mcp|trace|solsec|trd|sup)_<4-digit-seq>_<name>`
+ * entry MUST belong to a known `<generation>_(data|dr|sec|prov|core|cost|col|disc|mcp|trace|sig|solsec|trd|sup)_<4-digit-seq>_<name>`
  * family — anything else is a loud refusal, so a renamed or foreign script
  * can never be silently skipped.
  */
@@ -140,7 +140,7 @@ export async function discoverMigrations(
 
 export interface MigratorOptions {
   readonly engine: DatabaseEngine;
-  /** Directory containing `g<generation>_(data|dr|sec|prov|core|cost|col|disc|mcp|trace|solsec|trd|sup)_*.sql` scripts. */
+  /** Directory containing `g<generation>_(data|dr|sec|prov|core|cost|col|disc|mcp|trace|sig|solsec|trd|sup)_*.sql` scripts. */
   readonly migrationsDir: string;
 }
 

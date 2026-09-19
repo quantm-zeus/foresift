@@ -6,6 +6,11 @@ import { describe, expect, it } from 'bun:test';
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import {
+  assertReadOnlyDeterministicSurface,
+  scanSignalIntelligenceSources,
+  SIGNAL_INTELLIGENCE_PROHIBITED_CAPABILITIES,
+} from '../src/read-only-guard.ts';
 
 const PACKAGE_SRC = path.resolve(
   path.dirname(fileURLToPath(import.meta.url)),
@@ -15,40 +20,40 @@ const PACKAGE_SRC = path.resolve(
 describe('packages/signal-intelligence: Read-Only Guard & No-LLM Structural Scan', () => {
   it('strictly contains no model-provider, prompt, or agent imports anywhere in src', () => {
     if (!existsSync(PACKAGE_SRC)) {
-      // Source directory not yet created by product tasks
       return;
     }
 
-    const files = readdirSync(PACKAGE_SRC).filter((f) => f.endsWith('.ts'));
-    const prohibitedImportPatterns = [
-      /@anthropic-ai/,
-      /@openai/,
-      /@google\/genai/,
-      /@google\/generative-ai/,
-      /langchain/,
-      /ollama/,
-      /model-provider/,
-      /prompt-template/,
-      /wallet-signing/,
-      /transaction-submission/,
-    ];
-
+    const files = readdirSync(PACKAGE_SRC).filter(
+      (f) => f.endsWith('.ts') && f !== 'read-only-guard.ts',
+    );
+    const sources: Record<string, string> = {};
     for (const file of files) {
-      const content = readFileSync(path.join(PACKAGE_SRC, file), 'utf8');
-      for (const pattern of prohibitedImportPatterns) {
-        expect(pattern.test(content)).toBe(false);
-      }
+      sources[file] = readFileSync(path.join(PACKAGE_SRC, file), 'utf8');
     }
+
+    const findings = scanSignalIntelligenceSources(sources);
+    expect(findings).toEqual([]);
+    expect(() => assertReadOnlyDeterministicSurface(sources)).not.toThrow();
+  });
+
+  it('detects injected prohibited imports and capabilities (negative verification)', () => {
+    const maliciousSources = {
+      'bad-agent.ts': `import { LLMClient } from '@foresift/model-provider';`,
+      'bad-signer.ts': `export function sendTransaction() { return true; }`,
+    };
+
+    const findings = scanSignalIntelligenceSources(maliciousSources);
+    expect(findings.length).toBe(2);
+    expect(findings[0]?.kind).toBe('PROHIBITED_IMPORT');
+    expect(findings[1]?.kind).toBe('PROHIBITED_CAPABILITY');
+    expect(() => assertReadOnlyDeterministicSurface(maliciousSources)).toThrow(
+      /READ_ONLY_DETERMINISTIC_SURFACE_VIOLATION/,
+    );
   });
 
   it('INV-001: signal-intelligence package is strictly read-only and defines no signing capabilities', () => {
-    const prohibitedCapabilities = [
-      'SIGN_TRANSACTION',
-      'SUBMIT_TRANSACTION',
-      'TRANSFER_FUNDS',
-      'MANAGE_PRIVATE_KEY',
-    ];
-
-    expect(prohibitedCapabilities).toHaveLength(4);
+    expect(SIGNAL_INTELLIGENCE_PROHIBITED_CAPABILITIES).toContain('wallet signing');
+    expect(SIGNAL_INTELLIGENCE_PROHIBITED_CAPABILITIES).toContain('trading execution');
+    expect(SIGNAL_INTELLIGENCE_PROHIBITED_CAPABILITIES.length).toBeGreaterThanOrEqual(6);
   });
 });

@@ -23,6 +23,29 @@ import { findPackage, loadCurrentMilestone, loadRoadmap } from './schema.mjs';
 import { throughputProfile } from './work-package-throughput-profile.mjs';
 
 export const ATTESTATION_FILE = 'full-gate-attestation.json';
+export const GATE_RESULT_FILE = 'full-gate-result.json';
+const GATE_RESULT_SCHEMA = 'foresift/full-gate-result@1';
+
+/**
+ * Parse a structured gate-result manifest (written by foresift-gate.mjs
+ * --result-file). Returns the validated object, or null when absent/malformed/
+ * wrong-schema — callers must treat null as "no structured evidence" and fail
+ * closed (escalate to a FULL gate).
+ */
+export function parseFullGateResult(raw) {
+  if (typeof raw !== 'string') return null;
+  let r;
+  try {
+    r = JSON.parse(raw);
+  } catch {
+    return null;
+  }
+  if (!r || typeof r !== 'object') return null;
+  if (r.schema !== GATE_RESULT_SCHEMA) return null;
+  if (typeof r.passed !== 'boolean') return null;
+  if (!Array.isArray(r.checks)) return null;
+  return r;
+}
 
 // Directory of the executing automation code (source of the gate-code hashes
 // when --repo-root is a different/fixture checkout).
@@ -210,16 +233,46 @@ function main() {
   }
 
   // --run: execute the FULL gate itself, then persist the PASS attestation.
+  // The gate also writes a structured per-check manifest into the artifacts
+  // dir (task spec §9) on BOTH outcomes, so repair can plan targeted work.
+  const resultFile = join(a.artifactsDir, GATE_RESULT_FILE);
   console.log(
     'FULL GATE ▸ foresift:gate (spec integrity + repository verification + package checks)',
   );
   try {
-    execFileSync('pnpm', ['foresift:gate', '--package', a.package], {
+    execFileSync('pnpm', ['foresift:gate', '--package', a.package, '--result-file', resultFile], {
       cwd: repoRoot,
       stdio: 'inherit',
     });
   } catch (err) {
     const status = err?.status ?? 1;
+    // Guarantee structured evidence even when the gate died before writing one
+    // (crash, signal, older gate binary): synthesize a fail-closed record.
+    let existing = null;
+    try {
+      existing = parseFullGateResult(readFileSync(resultFile, 'utf8'));
+    } catch {
+      existing = null;
+    }
+    if (!existing) {
+      writeFileSync(
+        resultFile,
+        JSON.stringify(
+          {
+            schema: GATE_RESULT_SCHEMA,
+            packageId: a.package,
+            passed: false,
+            exitCode: status || 1,
+            failedCategories: [],
+            checks: [],
+            synthesizedByRunner: true,
+            timestamp: new Date().toISOString(),
+          },
+          null,
+          2,
+        ) + '\n',
+      );
+    }
     console.error(`\n❌ FULL GATE FAILED (exit ${status}) — NO attestation written`);
     process.exit(status || 1);
   }

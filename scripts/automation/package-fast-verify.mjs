@@ -89,6 +89,48 @@ export function resolveFastBase({ repoRoot, packageId, artifactsDir, base }) {
   }
 }
 
+/**
+ * The `vitest related` step of a FAST plan, extracted for testability.
+ *
+ * Paths are ABSOLUTIZED before invocation: `vitest related` silently matches
+ * nothing for bare repo-relative arguments ("No test files found", exit 0),
+ * and git changesets naturally yield repo-relative paths — passing them raw
+ * reported FAST green while running zero tests (measured 2026-08-23, C2.5).
+ * Likewise, a PASS whose output says no test files were found means NO
+ * targeted evidence exists for the slice ⇒ the caller must escalate to the
+ * full suite (fail-closed), whatever the category.
+ *
+ * Returns { logs, result?, escalateReason? }; injectable `sh` keeps this
+ * unit-testable without spawning vitest.
+ */
+export function runVitestRelatedStep(step, deps = {}) {
+  const { repoRoot, sh: shFn = sh } = deps;
+  const logs = [];
+  const existing = step.files
+    .map((f) => (existsSync(f) ? resolve(f) : join(repoRoot, f)))
+    .filter((f) => existsSync(f));
+  if (existing.length === 0) {
+    if (!step.database) return { logs };
+    // Deleted-only DB slice: nothing remains to relate against — the safe
+    // signal is the full suite (schema drift can break anything).
+    logs.push('FAST ▸ database paths all absent — escalating to full test suite');
+    return { logs, escalateReason: 'database-deleted' };
+  }
+  const result = shFn(repoRoot, './node_modules/.bin/vitest', ['related', ...existing, '--run']);
+  if (result.result === 'PASS' && /No test files found/i.test(result.stdoutTail ?? '')) {
+    // No retained test imports anything in this slice ⇒ no targeted evidence.
+    logs.push(
+      `FAST ▸ no tests relate to ${existing.length} changed file(s) — escalating to full suite`,
+    );
+    return {
+      logs,
+      result,
+      escalateReason: step.database ? 'database-no-related-tests' : 'no-related-tests',
+    };
+  }
+  return { logs, result };
+}
+
 function sh(repoRoot, cmd, args, opts = {}) {
   const label = [cmd, ...args].join(' ');
   console.log(`FAST ▸ ${label}`);
@@ -209,27 +251,12 @@ async function main() {
         break;
       }
       case 'vitest-related': {
-        const existing = step.files.filter((f) => existsSync(join(repoRoot, f)) || existsSync(f));
-        if (existing.length === 0) {
-          if (step.database) {
-            // Deleted-only DB slice: nothing remains to relate against — the
-            // safe signal is the full suite (schema drift can break anything).
-            console.log('FAST ▸ database paths all absent — escalating to full test suite');
-            escalatedToFullSuite = true;
-            results.push({ escalated: true, reason: 'database-deleted' });
-          }
-          break;
-        }
-        const r = sh(repoRoot, './node_modules/.bin/vitest', ['related', ...existing, '--run']);
-        results.push(r);
-        if (
-          step.database &&
-          r.result === 'PASS' &&
-          /No test files found/i.test(r.stdoutTail ?? '')
-        ) {
-          console.log('FAST ▸ no persistence tests relate to the schema change — full suite');
+        const out = runVitestRelatedStep(step, { repoRoot });
+        for (const line of out.logs ?? []) console.log(line);
+        if (out.result) results.push(out.result);
+        if (out.escalateReason) {
           escalatedToFullSuite = true;
-          results.push({ escalated: true, reason: 'database-no-related-tests' });
+          results.push({ escalated: true, reason: out.escalateReason });
         }
         break;
       }

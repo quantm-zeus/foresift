@@ -1,0 +1,6 @@
+   2s   54 tests  tests/automation/control-plane.spec.ts
+   2s   40 tests  tests/automation/throughput.spec.ts
+   2s   18 tests  tests/automation/until-bash-guards.spec.ts
+  36s   33 tests  tests/automation/v2-gate-convergence.spec.ts
+   2s   29 tests  tests/automation/v2-throughput.spec.ts
+   5s    6 tests  tests/spec-verify.spec.ts

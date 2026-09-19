@@ -58,6 +58,7 @@ export declare function extractQuotaResetAt(message?: string): number | null;
 export interface GateArgs {
   package?: string;
   milestone?: boolean;
+  resultFile?: string;
   _: string[];
 }
 export declare function parseGateArgs(argv: string[]): GateArgs;

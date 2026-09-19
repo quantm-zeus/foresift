@@ -145,6 +145,7 @@ export function parseGateArgs(argv) {
     if (a === '--') continue;
     if (a === '--package') args.package = argv[++i];
     else if (a === '--milestone') args.milestone = true;
+    else if (a === '--result-file') args.resultFile = argv[++i];
     else args._.push(a);
   }
   return args;

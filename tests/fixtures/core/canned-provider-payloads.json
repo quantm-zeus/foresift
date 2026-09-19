@@ -1,0 +1,85 @@
+{
+  "comment": "Inert canned provider payloads for tool-core testing (T801; FR-CORE-001, FR-CORE-005, FR-CORE-006). All inert data; no credentials, no real endpoints.",
+  "valid": [
+    {
+      "provider": "gmgn",
+      "operation": "token_security",
+      "status": 200,
+      "headers": { "content-type": "application/json" },
+      "payload": {
+        "address": "So11111111111111111111111111111111111111112",
+        "symbol": "SOL",
+        "name": "Wrapped SOL",
+        "decimals": 9,
+        "is_honeypot": false,
+        "buy_tax": 0.0,
+        "sell_tax": 0.0,
+        "holder_count": 1250000,
+        "top10_holder_percent": 0.12
+      }
+    },
+    {
+      "provider": "coingecko",
+      "operation": "token_price",
+      "status": 200,
+      "headers": { "content-type": "application/json" },
+      "payload": {
+        "id": "solana",
+        "symbol": "sol",
+        "name": "Solana",
+        "current_price_usd": 150.25,
+        "market_cap_usd": 70000000000,
+        "total_volume_usd": 3500000000
+      }
+    },
+    {
+      "provider": "helius",
+      "operation": "raw_asset_query",
+      "status": 200,
+      "headers": { "content-type": "application/json" },
+      "payload": {
+        "asset_id": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+        "compression": { "eligible": false },
+        "ownership": { "owner": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA" },
+        "supply": { "print_max_supply": 0, "total_supply": 5000000000000 }
+      }
+    }
+  ],
+  "malformed": [
+    {
+      "provider": "gmgn",
+      "operation": "token_security",
+      "status": 200,
+      "headers": { "content-type": "application/json" },
+      "rawBody": "{\"address\": \"So11111111111111111111111111111111111111112\", \"decimals\": \"not-a-number\", \"is_honeypot\": 123}",
+      "errorReason": "INVALID_SCHEMA_TYPES"
+    },
+    {
+      "provider": "coingecko",
+      "operation": "token_price",
+      "status": 200,
+      "headers": { "content-type": "application/json" },
+      "rawBody": "{ invalid_json_without_quotes }",
+      "errorReason": "MALFORMED_JSON_SYNTAX"
+    }
+  ],
+  "truncated": [
+    {
+      "provider": "gmgn",
+      "operation": "token_security",
+      "status": 200,
+      "headers": { "content-type": "application/json" },
+      "rawBody": "{\"address\": \"So11111111111111111111111111111111111111112\", \"symbol\": \"SOL\", \"holder_count\":",
+      "errorReason": "TRUNCATED_RESPONSE_BODY"
+    }
+  ],
+  "slow": [
+    {
+      "provider": "external_aggregator",
+      "operation": "deep_chain_scan",
+      "simulatedLatencyMs": 5000,
+      "timeoutThresholdMs": 1000,
+      "errorReason": "DISPATCH_DEADLINE_EXCEEDED"
+    }
+  ]
+}

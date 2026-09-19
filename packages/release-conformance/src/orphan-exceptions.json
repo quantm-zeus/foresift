@@ -1,0 +1,42 @@
+[
+  {
+    "pattern": "packages/object-store/src/**",
+    "requirementIds": ["FR-DATA-002", "FR-DR-002"],
+    "justification": "Serves the immutable data-truth artifact and object substrate owned by g0-contracts-data-truth."
+  },
+  {
+    "pattern": "packages/collector-checkpoints/src/**",
+    "requirementIds": ["FR-COL-003", "FR-COL-004"],
+    "justification": "Serves collector continuity and fenced checkpoint recovery in the g0-first-party-observation continuity plan."
+  },
+  {
+    "pattern": "packages/collector-gap-recovery/src/**",
+    "requirementIds": ["FR-COL-003", "FR-COL-004"],
+    "justification": "Serves collector gap detection and deterministic continuity recovery in the g0-first-party-observation continuity plan."
+  },
+  {
+    "pattern": "apps/api/src/main.ts",
+    "requirementIds": ["FR-MCP-001"],
+    "justification": "Composes the MCP surfaces declared under apps/api/src/mcp."
+  },
+  {
+    "pattern": "apps/api/src/index.ts",
+    "requirementIds": ["FR-MCP-001"],
+    "justification": "Exports the composed MCP API surface."
+  },
+  {
+    "pattern": "apps/api/src/config.ts",
+    "requirementIds": ["FR-MCP-001", "FR-MCP-002"],
+    "justification": "Provides fail-closed configuration to the MCP transport composition."
+  },
+  {
+    "pattern": "apps/api/src/auth/bearer.ts",
+    "requirementIds": ["FR-MCP-002", "FR-MCP-003"],
+    "justification": "Provides authentication wiring to the mapped MCP surfaces."
+  },
+  {
+    "pattern": "apps/api/src/auth/client-context.ts",
+    "requirementIds": ["FR-MCP-002", "FR-MCP-003"],
+    "justification": "Provides scoped client context to the mapped MCP surfaces."
+  }
+]

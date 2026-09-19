@@ -17,6 +17,7 @@ import {
   type UntrustedContentSource,
 } from '@foresift/shared-schemas';
 import type { UtcTimestamp } from '@foresift/domain';
+import { canonicalJson } from '@foresift/persistence';
 import { SecErrorCode, UntrustedContentError } from './errors.ts';
 
 /** Label + envelope one external item. Refuses unlabeled acquisition. */
@@ -395,16 +396,17 @@ export function validateRenderable(
 
 /**
  * Derive the memory-isolation key binding untrusted-derived memories to ONE
- * actor/session/workspace context. Domain-separated SHA-256 — collisions
- * across contexts are computationally impossible, so nothing learned in one
- * tenant's session can surface in another's.
+ * actor/session/workspace context. Domain-separated SHA-256 over THE single
+ * canonical JSON serializer (R7) — collisions across contexts are
+ * computationally impossible, so nothing learned in one tenant's session can
+ * surface in another's.
  */
 export function deriveMemoryIsolationKey(parts: {
   actorId: string;
   sessionId: string;
   workspaceId: string;
 }): string {
-  const canonical = JSON.stringify([
+  const canonical = canonicalJson([
     'foresift/memory-isolation/v1',
     parts.actorId,
     parts.sessionId,

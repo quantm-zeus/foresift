@@ -7,6 +7,7 @@
  * refuses.
  */
 import { createHash, createHmac, timingSafeEqual } from 'node:crypto';
+import { canonicalJson } from '@foresift/persistence';
 import { SecErrorCode, TenantIsolationError } from '@foresift/security';
 
 const TOKEN_VERSION = 'v1';

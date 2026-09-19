@@ -105,6 +105,12 @@ function bunCounts(output) {
 export function runBunTestPlan({ root, plan, policy, bun = 'bun' }) {
   const started = Date.now();
   const results = [];
+  // FORESIFT_WRITERS configures the parent sharded-wave topology, not the
+  // tests executed by that wave.  Letting it cross this process boundary
+  // makes test groups mistake the inherited lane count for an explicit local
+  // override.  Tests that need the variable remain free to set it themselves.
+  const testEnv = { ...process.env, FORESIFT_TEST_COORDINATOR: '1' };
+  delete testEnv.FORESIFT_WRITERS;
   // Per-group hard wall clock. A Bun per-test timeout cannot bound a Bun
   // process that never exits (wedged child, open handle, stdin/stdout pipe
   // stall — observed live in CI 2026-08-29 where a group produced zero bytes
@@ -139,7 +145,7 @@ export function runBunTestPlan({ root, plan, policy, bun = 'bun' }) {
       // cannot outlive its timeout.
       detached: process.platform !== 'win32',
       killSignal: 'SIGTERM',
-      env: { ...process.env, FORESIFT_TEST_COORDINATOR: '1' },
+      env: testEnv,
     });
     if (result.signal) {
       console.error(

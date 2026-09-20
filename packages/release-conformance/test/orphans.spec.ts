@@ -99,3 +99,48 @@ describe('orphan source detection and exception ledger (FR-TRACE-003, AC-266)', 
     });
   });
 });
+
+/**
+ * V7 round 11: the ledger decision collector must be immune to a hostile
+ * prototype-chain index accessor. `errors[errors.length] = ...` was an ordinary
+ * [[Set]], so an accessor beyond the guard's walk cap swallowed the error and an
+ * invalid ledger validated as VALID.
+ */
+describe('V7: orphan ledger validity survives a hostile prototype chain', () => {
+  it('rejects an unknown serving requirement even under a deep-chain accessor', () => {
+    const originalArrayProto = Object.getPrototypeOf(Array.prototype) as object;
+    const hostile = Object.create(null) as Record<string, unknown>;
+    for (let index = 0; index < 4; index += 1) {
+      Object.defineProperty(hostile, String(index), {
+        configurable: true,
+        get() {
+          return 'FABRICATED';
+        },
+        set() {},
+      });
+    }
+    let chain: object = hostile;
+    for (let hop = 0; hop < 40; hop += 1) chain = Object.create(chain) as object;
+    Object.setPrototypeOf(Array.prototype, chain);
+    try {
+      const validation = validateOrphanExceptionLedger(
+        {
+          schemaVersion: '1.0.0',
+          exceptions: [
+            {
+              pathPattern: 'packages/example/**',
+              justification: 'wiring',
+              servingRequirementIds: ['FR-DOES-NOT-EXIST-999'],
+              owner: 'platform',
+            },
+          ],
+        },
+        new Set(['FR-TRACE-003']),
+      );
+      expect(validation.valid).toBe(false);
+      expect(validation.errors.length).toBeGreaterThan(0);
+    } finally {
+      Object.setPrototypeOf(Array.prototype, originalArrayProto);
+    }
+  }, 120_000);
+});

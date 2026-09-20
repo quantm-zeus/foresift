@@ -24,6 +24,7 @@
  * Strictly read-only: the matrix governs which read-only MCP surface may be
  * offered; it cannot trade, custody, sign, or submit.
  */
+import { appendSafe } from './shadow-safe.ts';
 import {
   ErrorCode,
   ForesiftError,
@@ -39,7 +40,12 @@ import {
 import { McpProtocolGuard } from '@foresift/security';
 import { canonicalJson, type DatabaseEngine } from '@foresift/persistence';
 import { MCP_PROTOCOL_BASELINE_REVISION } from '@foresift/shared-schemas';
-import { numericConcat, numericSortByString, numericUnique } from './shadow-safe.ts';
+import {
+  numericConcat,
+  numericSortByString,
+  numericUnique,
+  snapshotCallerInput,
+} from './shadow-safe.ts';
 
 /** The declared behavior for a missing/unsupported requested revision. */
 export const McpCompatibilityPolicy = {
@@ -330,7 +336,7 @@ export async function mcpRevisions(engine: DatabaseEngine): Promise<readonly Mcp
   for (let index = 0; index < result.rows.length; index += 1) {
     const row = result.rows[index];
     if (row === undefined) continue;
-    revisions[revisions.length] = {
+    appendSafe(revisions, {
       revision: row.revision,
       channel: parseMcpRevisionChannel(row.channel),
       sdkVersion: row.sdk_version,
@@ -339,7 +345,7 @@ export async function mcpRevisions(engine: DatabaseEngine): Promise<readonly Mcp
       isDefault: row.is_default,
       supersededBy: row.superseded_by,
       createdAt: toIso(row.created_at),
-    };
+    });
   }
   return revisions;
 }
@@ -357,12 +363,12 @@ export async function mcpTargetClients(
   for (let index = 0; index < result.rows.length; index += 1) {
     const row = result.rows[index];
     if (row === undefined) continue;
-    clients[clients.length] = {
+    appendSafe(clients, {
       clientId: row.client_id,
       clientName: row.client_name,
       version: row.version,
       authMode: row.auth_mode,
-    };
+    });
   }
   return clients;
 }
@@ -380,7 +386,7 @@ export async function mcpCompatibilityCells(
   for (let index = 0; index < result.rows.length; index += 1) {
     const row = result.rows[index];
     if (row === undefined) continue;
-    cells[cells.length] = {
+    appendSafe(cells, {
       cellId: row.cell_id,
       revision: row.revision,
       clientId: row.client_id,
@@ -388,7 +394,7 @@ export async function mcpCompatibilityCells(
       liveTestDate: toIso(row.live_test_date),
       result: parseMcpConformanceResult(row.result),
       notes: row.notes,
-    };
+    });
   }
   return cells;
 }
@@ -577,12 +583,12 @@ export async function resolveCompatibilityMatrix(
   for (let index = 0; index < runs.rows.length; index += 1) {
     const row = runs.rows[index];
     if (row === undefined) continue;
-    passingRuns[passingRuns.length] = {
+    appendSafe(passingRuns, {
       revision: row.revision,
       clientId: row.client_id,
       fixtureRef: row.fixture_ref,
       ranAt: toIso(row.ran_at),
-    };
+    });
   }
   const cellByPair = new Map<string, McpCompatibilityCell>();
   for (let index = 0; index < cells.length; index += 1) {
@@ -595,13 +601,16 @@ export async function resolveCompatibilityMatrix(
     for (let index = 0; index < clients.length; index += 1) {
       const client = clients[index];
       if (client === undefined) continue;
-      usability[usability.length] = cellUsability({
-        cell: cellByPair.get(`${revision}\u0000${client.clientId}`),
-        passingRuns,
-        revision,
-        clientId: client.clientId,
-        now: input.now,
-      });
+      appendSafe(
+        usability,
+        cellUsability({
+          cell: cellByPair.get(`${revision}\u0000${client.clientId}`),
+          passingRuns,
+          revision,
+          clientId: client.clientId,
+          now: input.now,
+        }),
+      );
     }
     return usability;
   };
@@ -626,7 +635,7 @@ export async function resolveCompatibilityMatrix(
       revision.supersededBy === null &&
       isMutuallyTested(revision.revision)
     ) {
-      stable[stable.length] = revision;
+      appendSafe(stable, revision);
     }
   }
   // Descending revision-string order, numeric insertion sort (audit HIGH).
@@ -644,12 +653,11 @@ export async function resolveCompatibilityMatrix(
   // mutually tested, or the resolution refuses. A caller can never widen the
   // allow-list with an arbitrary revision string.
   const requestedOptIns: string[] = [];
-  if (input.optInDraftRevision !== undefined)
-    requestedOptIns[requestedOptIns.length] = input.optInDraftRevision;
+  if (input.optInDraftRevision !== undefined) appendSafe(requestedOptIns, input.optInDraftRevision);
   const declaredOptIns = input.optInDraftRevisions ?? [];
   for (let index = 0; index < declaredOptIns.length; index += 1) {
     const declared = declaredOptIns[index];
-    if (declared !== undefined) requestedOptIns[requestedOptIns.length] = declared;
+    if (declared !== undefined) appendSafe(requestedOptIns, declared);
   }
   const uniqueOptIns = numericUnique(requestedOptIns);
   const optInRevisions: string[] = [];
@@ -686,14 +694,14 @@ export async function resolveCompatibilityMatrix(
         { reason: McpCompatibilityRefusalReason.CELL_NOT_USABLE },
       );
     }
-    optInRevisions[optInRevisions.length] = draft.revision;
+    appendSafe(optInRevisions, draft.revision);
   }
   const optInRevision = optInRevisions[0] ?? null;
 
   const usableRevisions: string[] = [];
   for (let index = 0; index < orderedStable.length; index += 1) {
     const revision = orderedStable[index];
-    if (revision !== undefined) usableRevisions[usableRevisions.length] = revision.revision;
+    if (revision !== undefined) appendSafe(usableRevisions, revision.revision);
   }
   const defaultRevision = latest.revision;
   let defaultRow: McpRevisionRow | undefined;
@@ -732,13 +740,14 @@ export interface ProtocolRevisionResolution {
  */
 export async function resolveProtocolRevision(
   engine: DatabaseEngine,
-  input: {
+  rawInput: {
     readonly requestedRevision: string | undefined;
     readonly now: string;
     readonly policy: unknown;
     readonly optInRevisions?: readonly string[];
   },
 ): Promise<ProtocolRevisionResolution> {
+  const input = snapshotCallerInput(rawInput);
   const policy = parsePolicy(input.policy);
   // Opt-ins are validated by the matrix resolver, never injected raw (C3).
   const resolution = await resolveCompatibilityMatrix(engine, {

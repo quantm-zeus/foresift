@@ -1,7 +1,9 @@
 /** Signed, hashed, scoped, expiring, and revocable gate evidence (FR-TRACE-004). */
+import { appendSafe } from './shadow-safe.ts';
 import { createHash, createHmac, timingSafeEqual } from 'node:crypto';
 import { isOneOf } from '@foresift/domain';
 import { canonicalJson, type DatabaseEngine } from '@foresift/persistence';
+import { assertNoHostileArrayIndexShadow } from './shadow-safe.ts';
 
 /**
  * The authoritative closed gate-kind vocabulary. The array is `Object.freeze`d
@@ -78,7 +80,7 @@ function isIsoInstant(value: unknown): value is string {
 function copyStringArray(values: readonly string[]): string[] {
   const copy: string[] = [];
   for (let index = 0; index < values.length; index += 1) {
-    copy[copy.length] = values[index] as string;
+    appendSafe(copy, values[index] as string);
   }
   return copy;
 }
@@ -249,6 +251,100 @@ function payloadRecordMatches(record: GateEvidenceRecord): boolean {
   );
 }
 
+/**
+ * Materialize a JSON-ish value into frozen plain data, reading every property
+ * exactly once (V7-D1). A `metadata` getter could otherwise return one value to
+ * the payload-hash read and another to the HMAC read, splicing a genuine
+ * signature onto an attacker payload. A cycle refuses closed.
+ */
+function snapshotJsonValue(value: unknown, seen: WeakSet<object>): unknown {
+  if (value === null || typeof value !== 'object') return value;
+  if (seen.has(value)) throw new TypeError('invalid gate evidence metadata: cyclic value');
+  // Track the current PATH only (removed in `finally`): a shared node reached
+  // through two different keys is legal JSON (a DAG), while a node reached twice
+  // on the SAME path is a cycle (V7-A3).
+  seen.add(value);
+  try {
+    if (Array.isArray(value)) {
+      const copy: unknown[] = [];
+      for (let index = 0; index < value.length; index += 1) {
+        appendSafe(copy, snapshotJsonValue(value[index], seen));
+      }
+      return Object.freeze(copy);
+    }
+    const source = value as Record<string, unknown>;
+    const keys = Object.keys(source);
+    // Null prototype: an OWN `__proto__` metadata key must become a normal own
+    // property, not mutate the snapshot's prototype and change its hash (V7-A3).
+    const copy: Record<string, unknown> = Object.create(null) as Record<string, unknown>;
+    for (let index = 0; index < keys.length; index += 1) {
+      const key = keys[index] as string;
+      copy[key] = snapshotJsonValue(source[key], seen);
+    }
+    return Object.freeze(copy);
+  } finally {
+    seen.delete(value);
+  }
+}
+
+/** Read every payload field exactly ONCE into a frozen plain snapshot. */
+function snapshotGateEvidencePayload(payload: GateEvidencePayload): GateEvidencePayload {
+  // `copyStringArray` reads scopeRefs by numeric index, never by iteration.
+  const scopeRefs = Object.freeze(copyStringArray(payload.scopeRefs));
+  const snapshot: Record<string, unknown> = {
+    gateKind: payload.gateKind,
+    approver: payload.approver,
+    scopeRefs,
+    subject: payload.subject,
+    issuedAt: payload.issuedAt,
+    expiresAt: payload.expiresAt,
+  };
+  if (payload.reason !== undefined) snapshot['reason'] = payload.reason;
+  if (payload.revocationRef !== undefined) snapshot['revocationRef'] = payload.revocationRef;
+  if (payload.metadata !== undefined) {
+    snapshot['metadata'] = snapshotJsonValue(payload.metadata, new WeakSet<object>());
+  }
+  return Object.freeze(snapshot) as unknown as GateEvidencePayload;
+}
+
+/**
+ * Read every field of a record exactly ONCE into a frozen plain snapshot
+ * (V7-D1/D2). `evaluateGateEvidence` verifies this snapshot and
+ * `verifyGateEvidence` brands it, so an accessor-property record cannot present
+ * one payload to the hash check, another to the HMAC check, and a third to the
+ * record-match check — nor a different scope/expiry to the caller than the one
+ * that was actually signed.
+ */
+export function snapshotGateEvidenceRecord(record: GateEvidenceRecord): GateEvidenceRecord {
+  assertNoHostileArrayIndexShadow();
+  const payload = snapshotGateEvidencePayload(record.payload);
+  // Read each indexed field once, in a fixed order.
+  const evidenceId = record.evidenceId;
+  const payloadSha256 = record.payloadSha256;
+  const signature = record.signature;
+  const gateKind = record.gateKind;
+  const scopeRefs = Object.freeze(copyStringArray(record.scopeRefs));
+  const approver = record.approver;
+  const issuedAt = record.issuedAt;
+  const expiresAt = record.expiresAt;
+  const revokedAt = record.revokedAt;
+  const recordedAt = record.recordedAt;
+  const snapshot: Record<string, unknown> = {
+    evidenceId,
+    payload,
+    payloadSha256,
+    signature,
+    gateKind,
+    scopeRefs,
+    approver,
+    issuedAt,
+    expiresAt,
+    recordedAt,
+  };
+  if (revokedAt !== undefined) snapshot['revokedAt'] = revokedAt;
+  return Object.freeze(snapshot) as unknown as GateEvidenceRecord;
+}
+
 export type GateEvidenceFailureReason =
   | 'HASH_MISMATCH'
   | 'SIGNATURE_INVALID'
@@ -297,7 +393,17 @@ function refusal(
 
 export function evaluateGateEvidence(options: EvaluateGateEvidenceOptions): GateEvidenceEvaluation {
   assertEvidenceRecord(options.record);
-  const { record } = options;
+  // Snapshot the record ONCE before any authority check (V7-D1). Reading
+  // `record.payload` afresh in the hash, HMAC and record-match checks let an
+  // accessor property present a different payload to each, splicing a genuine
+  // signature onto an attacker payload. Every check below reads this frozen
+  // snapshot, so the verified bytes and the branded fields are the same read.
+  let record: GateEvidenceRecord;
+  try {
+    record = snapshotGateEvidenceRecord(options.record);
+  } catch {
+    return refusal(options.record, 'PAYLOAD_RECORD_MISMATCH');
+  }
   if (!verifyPayloadHash(record)) return refusal(record, 'HASH_MISMATCH');
   if (!verifyEvidenceSignature(record, options.pepper)) return refusal(record, 'SIGNATURE_INVALID');
   if (!payloadRecordMatches(record)) {
@@ -332,10 +438,14 @@ export async function recordGateEvidence(
   record: GateEvidenceRecord,
 ): Promise<void> {
   assertEvidenceRecord(record);
-  if (!verifyPayloadHash(record)) {
+  // Persist the single-read snapshot, never the caller's live object (V7-D1):
+  // an accessor could otherwise change fields between the hash check and the
+  // INSERT.
+  const snapshot = snapshotGateEvidenceRecord(record);
+  if (!verifyPayloadHash(snapshot)) {
     throw new TypeError('cannot persist gate evidence: payload hash mismatch');
   }
-  if (!payloadRecordMatches(record)) {
+  if (!payloadRecordMatches(snapshot)) {
     throw new TypeError('cannot persist gate evidence: payload and indexed fields mismatch');
   }
   await engine.query(
@@ -345,16 +455,16 @@ export async function recordGateEvidence(
      VALUES ($1, $2::jsonb, $3, $4, $5, $6, $7::timestamptz, $8::timestamptz,
              $9::timestamptz, $10::timestamptz)`,
     [
-      record.evidenceId,
-      canonicalJson(record.payload),
-      record.payloadSha256,
-      record.signature,
-      record.gateKind,
-      record.approver,
-      record.issuedAt,
-      record.expiresAt,
-      record.revokedAt ?? null,
-      record.recordedAt,
+      snapshot.evidenceId,
+      canonicalJson(snapshot.payload),
+      snapshot.payloadSha256,
+      snapshot.signature,
+      snapshot.gateKind,
+      snapshot.approver,
+      snapshot.issuedAt,
+      snapshot.expiresAt,
+      snapshot.revokedAt ?? null,
+      snapshot.recordedAt,
     ],
   );
 }

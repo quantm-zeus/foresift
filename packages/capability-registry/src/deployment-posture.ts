@@ -21,6 +21,7 @@
  * Strictly read-only: posture governs what read-only intelligence may promise;
  * it never trades, custodies, signs, or submits.
  */
+import { appendSafe } from './shadow-safe.ts';
 import {
   ALL_PROTECTED_DIMENSIONS,
   DeploymentPosture,
@@ -43,7 +44,7 @@ import {
   type DegradeState,
 } from '@foresift/capacity-planner';
 import { canonicalJson, type DatabaseEngine } from '@foresift/persistence';
-import { numericCopy, numericUnique } from './shadow-safe.ts';
+import { numericCopy, numericUnique, snapshotCallerInput } from './shadow-safe.ts';
 
 // --- critical-dependency register -------------------------------------------
 
@@ -130,7 +131,7 @@ export async function registerCriticalDependency(
 /** Record an SLA row. `applicable` and `slaRef` must agree (SQL CHECK mirror). */
 export async function recordSla(
   engine: DatabaseEngine,
-  input: {
+  rawInput: {
     readonly slaId: string;
     readonly dependencyId: string;
     readonly applicable: boolean;
@@ -139,6 +140,7 @@ export async function recordSla(
     readonly expiresAt: string | null;
   },
 ): Promise<SlaRegisterRow> {
+  const input = snapshotCallerInput(rawInput);
   const slaId = requireText(input.slaId, 'slaId', ErrorCode.PROD_ACTIVATION_SCOPE_INVALID);
   const dependencyId = requireText(
     input.dependencyId,
@@ -223,7 +225,7 @@ interface RawSlaRow {
  */
 export async function evaluateDeploymentPosture(
   engine: DatabaseEngine,
-  input: {
+  rawInput: {
     readonly now: string;
     /**
      * The sustainable-capacity contract the deployment rests on (audit H8). An
@@ -233,6 +235,7 @@ export async function evaluateDeploymentPosture(
     readonly capacityContract?: SustainableCapacityContract | null;
   },
 ): Promise<PostureEvaluation> {
+  const input = snapshotCallerInput(rawInput);
   const nowMs = Date.parse(input.now);
   const dependencies = await engine.query<RawCriticalDependencyRow>(
     `SELECT dependency_id, kind, owner, critical
@@ -255,7 +258,7 @@ export async function evaluateDeploymentPosture(
   for (let index = 0; index < dependencies.rows.length; index += 1) {
     const dependency = dependencies.rows[index];
     if (dependency === undefined) continue;
-    criticalDependencyIds[criticalDependencyIds.length] = dependency.dependency_id;
+    appendSafe(criticalDependencyIds, dependency.dependency_id);
     let unexpiredCount = 0;
     for (let slaIndex = 0; slaIndex < slas.rows.length; slaIndex += 1) {
       const sla = slas.rows[slaIndex];
@@ -275,7 +278,7 @@ export async function evaluateDeploymentPosture(
       const expiresMs = Date.parse(String(sla.expires_at));
       if (Number.isFinite(expiresMs) && expiresMs > nowMs) unexpiredCount += 1;
     }
-    if (unexpiredCount === 0) missingSlaRefs[missingSlaRefs.length] = dependency.dependency_id;
+    if (unexpiredCount === 0) appendSafe(missingSlaRefs, dependency.dependency_id);
   }
   const protectedDimensions = numericCopy(ALL_PROTECTED_DIMENSIONS);
   // An EMPTY critical register is vacuous coverage, not coverage (audit H8):
@@ -310,13 +313,15 @@ export async function evaluateDeploymentPosture(
     };
   }
   const reasons: string[] = [];
-  if (emptyRegister) reasons[reasons.length] = 'no critical external dependency is declared';
+  if (emptyRegister) appendSafe(reasons, 'no critical external dependency is declared');
   if (!capacityBacked) {
-    reasons[reasons.length] = 'no passing sustainable-capacity contract backs the deployment';
+    appendSafe(reasons, 'no passing sustainable-capacity contract backs the deployment');
   }
   if (missingSlaRefs.length > 0) {
-    reasons[reasons.length] =
-      `${missingSlaRefs.length} critical dependency(ies) lack an applicable unexpired SLA`;
+    appendSafe(
+      reasons,
+      `${missingSlaRefs.length} critical dependency(ies) lack an applicable unexpired SLA`,
+    );
   }
   return {
     posture: DeploymentPosture.FREE_TIER_BEST_EFFORT,
@@ -379,8 +384,9 @@ export function assertBestEffortPreservesProtectedDimensions(
     declaredIndex < declaration.protectedDimensions.length;
     declaredIndex += 1
   ) {
-    declaredProtected[declaredProtected.length] = parseProtectedDimension(
-      declaration.protectedDimensions[declaredIndex],
+    appendSafe(
+      declaredProtected,
+      parseProtectedDimension(declaration.protectedDimensions[declaredIndex]),
     );
   }
   const missingProtected: ProtectedDimension[] = [];
@@ -390,8 +396,7 @@ export function assertBestEffortPreservesProtectedDimensions(
     dimensionIndex += 1
   ) {
     const dimension = ALL_PROTECTED_DIMENSIONS[dimensionIndex] as ProtectedDimension;
-    if (!isOneOf(dimension, declaredProtected))
-      missingProtected[missingProtected.length] = dimension;
+    if (!isOneOf(dimension, declaredProtected)) appendSafe(missingProtected, dimension);
   }
   if (missingProtected.length > 0) {
     throw new ForesiftError(
@@ -420,13 +425,14 @@ export function assertBestEffortPreservesProtectedDimensions(
 /** Persist one validated best-effort declaration (immutable; a new row per change). */
 export async function declareBestEffortPosture(
   engine: DatabaseEngine,
-  input: BestEffortDeclarationInput & {
+  rawInput: BestEffortDeclarationInput & {
     readonly declarationId: string;
     readonly degradedScope: Readonly<Record<string, unknown>>;
     readonly missingSlaRefs: readonly string[];
     readonly at: string;
   },
 ): Promise<void> {
+  const input = snapshotCallerInput(rawInput);
   assertBestEffortPreservesProtectedDimensions(input);
   await engine.query(
     `INSERT INTO prod.best_effort_declarations

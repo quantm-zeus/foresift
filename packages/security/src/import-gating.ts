@@ -19,7 +19,7 @@
 import type { UtcTimestamp } from '@foresift/domain';
 import type { ImportQuarantineState } from '@foresift/shared-schemas';
 import { ImportGatingError, SecErrorCode } from './errors.ts';
-import { numericIncludes } from './shadow-safe.ts';
+import { numericIncludes, snapshotCallerInput } from './shadow-safe.ts';
 import { sha256Text } from '@foresift/persistence';
 
 const STATE_RANK: Record<ImportQuarantineState, number> = {
@@ -133,7 +133,10 @@ export class ImportGate {
    * Quarantine intake: hygiene checks run BEFORE the artifact is recorded;
    * anything malformed never becomes a quarantined row at all.
    */
-  async intake(request: IntakeRequest, receivedAt: UtcTimestamp): Promise<ArtifactRow> {
+  async intake(rawRequest: IntakeRequest, receivedAt: UtcTimestamp): Promise<ArtifactRow> {
+    // Single-read binding (V7 accessor class): the format/limit/path checks, the
+    // recorded row and the returned artifact must all derive from one read.
+    const request = snapshotCallerInput(rawRequest);
     if (!numericIncludes(IMPORT_FORMATS, request.format as ImportFormat)) {
       throw new ImportGatingError(
         `format '${request.format}' is not on the intake allowlist`,
@@ -231,12 +234,15 @@ export class ImportGate {
    * Signature verification against the TRUSTED PRODUCER ALLOWLIST:
    * unknown/expired/revoked keys refuse before verification is attempted.
    */
-  async verifySignature(input: {
+  async verifySignature(rawInput: {
     artifactId: string;
     signature: string;
     materialBytes: Uint8Array;
     nowMs?: number | undefined;
   }): Promise<void> {
+    // Single-read binding (V7 accessor class): the hash check and the verifier
+    // call must observe the same material bytes.
+    const input = snapshotCallerInput(rawInput);
     const row = await this.getArtifact(input.artifactId);
     const producer = this.producers.get(row.producer_key_id);
     if (producer === undefined) {
@@ -275,7 +281,7 @@ export class ImportGate {
   }
 
   /** Content-scanning stage: findings persist as evidence child rows. */
-  async recordScanFinding(input: {
+  async recordScanFinding(rawInput: {
     findingId: string;
     artifactId: string;
     scanner: 'FORMAT_INSPECTION' | 'PATH_ANALYSIS' | 'CONTENT_SCAN' | 'SIGNATURE_CHECK';
@@ -283,6 +289,9 @@ export class ImportGate {
     detail: string;
     recordedAt: UtcTimestamp;
   }): Promise<void> {
+    // Single-read binding (V7 accessor class): the persisted finding and the
+    // MALICIOUS verdict that drives the REJECT transition must be one read.
+    const input = snapshotCallerInput(rawInput);
     await this.engine.query(
       `INSERT INTO sec.import_scan_findings
          (finding_id, artifact_id, scanner, verdict, detail, recorded_at)
@@ -351,13 +360,16 @@ export class ImportGate {
   }
 
   /** Terminal states only after validation completes with approval coupling. */
-  async finalizeValidation(input: {
+  async finalizeValidation(rawInput: {
     artifactId: string;
     outcome: 'SHADOW_ELIGIBLE' | 'REJECTED';
     at: UtcTimestamp;
     /** Re-confirmed by the high-impact gate for eligibility decisions. */
     stepUpApprovalRef: string;
   }): Promise<ArtifactRow> {
+    // Single-read binding (V7 accessor class): the approval check and the
+    // terminal transition must observe the same outcome/approval.
+    const input = snapshotCallerInput(rawInput);
     if ((input.stepUpApprovalRef ?? '').trim() === '') {
       throw new ImportGatingError(
         'validation completion requires the step-up approval reference',
@@ -369,7 +381,9 @@ export class ImportGate {
   }
 
   /** The isolated-parsing boundary contract: parse NEVER runs in-process here. */
-  assertIsolatedParsingBoundary(parsingContext: { inProcess: boolean }): void {
+  assertIsolatedParsingBoundary(rawParsingContext: { inProcess: boolean }): void {
+    // Single-read binding (V7 accessor class).
+    const parsingContext = snapshotCallerInput(rawParsingContext);
     if (parsingContext.inProcess) {
       throw new ImportGatingError(
         'artifact parsing must occur inside the isolated-parsing boundary',

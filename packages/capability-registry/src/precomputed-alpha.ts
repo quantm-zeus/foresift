@@ -13,6 +13,7 @@
  * Strictly read-only: the lookup serves already-computed read-only intelligence
  * evidence; it never trades, custodies, signs, or submits.
  */
+import { appendSafe } from './shadow-safe.ts';
 import {
   ErrorCode,
   ForesiftError,
@@ -23,6 +24,7 @@ import {
   type PrecomputedAlphaRequest,
 } from '@foresift/domain';
 import { canonicalJson, sha256Text, type DatabaseEngine } from '@foresift/persistence';
+import { snapshotCallerInput } from './shadow-safe.ts';
 
 /** Closed refusal reasons for a live-path precomputed read (§33.7). */
 export const PrecomputedAlphaRefusalReason = {
@@ -146,7 +148,7 @@ function toDomainBound(bound: PrecomputedAlphaBoundRow): PrecomputedAlphaBound {
 /** Register a bounded precomputed-alpha envelope (every ceiling required). */
 export async function registerPrecomputedAlphaBound(
   engine: DatabaseEngine,
-  input: {
+  rawInput: {
     readonly boundId: string;
     readonly livePath: string;
     readonly artifactRef: string;
@@ -161,6 +163,7 @@ export async function registerPrecomputedAlphaBound(
     readonly expiresAt: string;
   },
 ): Promise<PrecomputedAlphaBoundRow> {
+  const input = snapshotCallerInput(rawInput);
   await engine.query(
     `INSERT INTO prod.precomputed_alpha_bounds
        (bound_id, live_path, artifact_ref, artifact_set_hash, max_candidates, max_rows,
@@ -210,17 +213,17 @@ export async function findPrecomputedAlphaBound(
   const params: unknown[] = [input.livePath];
   let where = `live_path = $1`;
   if (input.boundId !== undefined) {
-    params[params.length] = input.boundId;
+    appendSafe(params, input.boundId);
     where += ` AND bound_id = $${params.length}`;
   }
   if (input.artifactRef !== undefined) {
-    params[params.length] = input.artifactRef;
+    appendSafe(params, input.artifactRef);
     where += ` AND artifact_ref = $${params.length}`;
   }
   // The bound is versioned to ONE immutable artifact set (audit H10): a request
   // for set B never resolves a bound declared for set A.
   if (input.artifactSetHash !== undefined) {
-    params[params.length] = input.artifactSetHash;
+    appendSafe(params, input.artifactSetHash);
     where += ` AND artifact_set_hash = $${params.length}`;
   }
   const result = await engine.query<RawBoundRow>(
@@ -304,7 +307,7 @@ async function recordRead(
  */
 export async function servePrecomputedAlpha(
   engine: DatabaseEngine,
-  input: {
+  rawInput: {
     readonly livePath: string;
     readonly request: PrecomputedAlphaRequest;
     readonly now: string;
@@ -314,6 +317,7 @@ export async function servePrecomputedAlpha(
     readonly servedAt?: string;
   },
 ): Promise<PrecomputedAlphaResult> {
+  const input = snapshotCallerInput(rawInput);
   const now = utcTimestamp(input.now);
   const at = input.servedAt ?? input.now;
   const readId =
@@ -475,7 +479,7 @@ export async function livePathReadHistory(
   const reads: LivePathAlphaReadRow[] = [];
   for (let index = 0; index < result.rows.length; index += 1) {
     const row = result.rows[index];
-    if (row !== undefined) reads[reads.length] = decodeRead(row);
+    if (row !== undefined) appendSafe(reads, decodeRead(row));
   }
   return reads;
 }

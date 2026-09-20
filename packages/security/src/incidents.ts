@@ -16,7 +16,7 @@ import {
   type IncidentSeverity,
 } from '@foresift/shared-schemas';
 import { IncidentError, SecErrorCode } from './errors.ts';
-import { numericCopy, numericSome } from './shadow-safe.ts';
+import { numericCopy, numericSome, snapshotCallerInput } from './shadow-safe.ts';
 
 export interface OpenIncidentInput {
   readonly incidentId: string;
@@ -85,7 +85,10 @@ export class Incidents {
     this.engine = engine;
   }
 
-  async open(input: OpenIncidentInput) {
+  async open(rawInput: OpenIncidentInput) {
+    // Single-read binding (V7 accessor class): the evidence check, the inserted
+    // row and the notification flags must all come from one read.
+    const input = snapshotCallerInput(rawInput);
     if (
       input.evidenceRefs.length === 0 ||
       numericSome(input.evidenceRefs, (r) => r.trim() === '')
@@ -126,11 +129,14 @@ export class Incidents {
   async transition(
     incidentId: string,
     next: IncidentContainmentState,
-    opts: { at: UtcTimestamp } & (
+    rawOpts: { at: UtcTimestamp } & (
       | { recoveryVerifiedAt?: undefined; postmortemRef?: undefined; regressionTestRef?: undefined }
       | { recoveryVerifiedAt: UtcTimestamp; postmortemRef: string; regressionTestRef: string }
     ),
   ) {
+    // Single-read binding (V7 accessor class): the resolution-completeness check
+    // and the persisted resolution evidence must observe the same options.
+    const opts = snapshotCallerInput(rawOpts);
     IncidentContainmentStateSchema.parse(next);
     const current = await this.engine.query<IncidentRow>(
       'SELECT * FROM sec.security_incidents WHERE incident_id = $1',
@@ -196,7 +202,10 @@ export class Incidents {
    * Fail-closed (M21): evidence for an UNKNOWN incident is never silently
    * dropped — during incident response "evidence recorded" must be TRUE.
    */
-  async attachEvidence(incidentId: string, refs: readonly string[]) {
+  async attachEvidence(incidentId: string, rawRefs: readonly string[]) {
+    // Single-read binding (V7 accessor class): the non-empty check and the
+    // persisted evidence array must be the same read.
+    const refs = snapshotCallerInput(rawRefs);
     if (refs.length === 0 || numericSome(refs, (r) => r.trim() === '')) {
       throw new IncidentError(
         'evidence attachment requires at least one non-empty reference',

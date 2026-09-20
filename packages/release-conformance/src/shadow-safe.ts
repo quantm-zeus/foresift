@@ -34,9 +34,13 @@ export function promiseAllNumeric<T extends readonly unknown[] | []>(
 ): Promise<{ -readonly [K in keyof T]: Awaited<T[K]> }> {
   const promises: Promise<unknown>[] = [];
   for (let index = 0; index < items.length; index += 1) {
-    promises[index] = items[index] as Promise<unknown>;
+    // `appendSafe`, never `promises[index] = ...` (V7 round 10): a prototype-chain
+    // index accessor beyond the guard's walk cap (or a Proxy) swallowed the raw
+    // assignment, leaving `Promise.all` with an empty array whose later reads the
+    // accessor fabricated — flipping the release gate FAILED -> PASSED.
+    appendSafe(promises, items[index] as Promise<unknown>);
   }
-  Object.defineProperty(promises, Symbol.iterator, {
+  capturedDefineProperty(promises, Symbol.iterator, {
     value: capturedArrayIterator,
     enumerable: false,
     configurable: true,
@@ -72,7 +76,7 @@ export function numericFromEntries(
 export function numericCopy<T>(source: readonly T[]): T[] {
   const copy: T[] = [];
   for (let index = 0; index < source.length; index += 1) {
-    copy[copy.length] = source[index] as T;
+    appendSafe(copy, source[index] as T);
   }
   return copy;
 }
@@ -93,7 +97,7 @@ export function numericFilter<T>(
   const filtered: T[] = [];
   for (let index = 0; index < source.length; index += 1) {
     const value = source[index] as T;
-    if (predicate(value, index)) filtered[filtered.length] = value;
+    if (predicate(value, index)) appendSafe(filtered, value);
   }
   return filtered;
 }
@@ -105,7 +109,7 @@ export function numericMap<T, R>(
 ): R[] {
   const mapped: R[] = [];
   for (let index = 0; index < source.length; index += 1) {
-    mapped[mapped.length] = project(source[index] as T, index);
+    appendSafe(mapped, project(source[index] as T, index));
   }
   return mapped;
 }
@@ -192,8 +196,170 @@ export function numericFlatMap<T, R>(
   for (let index = 0; index < source.length; index += 1) {
     const projected = project(source[index] as T, index);
     for (let innerIndex = 0; innerIndex < projected.length; innerIndex += 1) {
-      flattened[flattened.length] = projected[innerIndex] as R;
+      appendSafe(flattened, projected[innerIndex] as R);
     }
   }
   return flattened;
+}
+
+/** Captured intrinsics: a caller subclass/Proxy must not control the copy. */
+const capturedTypedArrayLengthGetter: ((this: unknown) => unknown) | undefined =
+  Object.getOwnPropertyDescriptor(Object.getPrototypeOf(Uint8Array.prototype), 'length')?.get as
+    ((this: unknown) => unknown) | undefined;
+const capturedArrayBufferByteLengthGetter: ((this: unknown) => unknown) | undefined =
+  Object.getOwnPropertyDescriptor(ArrayBuffer.prototype, 'byteLength')?.get as
+    ((this: unknown) => unknown) | undefined;
+const capturedDateGetTime: (this: unknown) => number = Date.prototype.getTime;
+
+const capturedDefineProperty = Object.defineProperty;
+const capturedGetOwnPropertyNames = Object.getOwnPropertyNames;
+const capturedGetOwnPropertyDescriptor = Object.getOwnPropertyDescriptor;
+const capturedGetPrototypeOf = Object.getPrototypeOf;
+
+/**
+ * Fail closed when `Array.prototype` carries an integer-index accessor. Such a
+ * setter silently swallows `array[array.length] = value` (the numeric-append
+ * pattern used throughout the authority paths), so a 2-element array can become
+ * empty and a FAILED verdict PASSED (V7 review round 7). The shadow is detected
+ * once at every snapshot boundary.
+ */
+export function assertNoHostileArrayIndexShadow(): void {
+  // Walk the WHOLE prototype chain (Array.prototype -> Object.prototype -> null):
+  // an integer-index accessor on an INHERITED prototype swallows
+  // `array[array.length] = value` just as an own one does, so an own-property
+  // scan was bypassable via `Object.prototype[0]` or
+  // `setPrototypeOf(Array.prototype, hostile)` (V7 review round 8).
+  let proto: object | null = Array.prototype;
+  let depth = 0;
+  while (proto !== null && depth < 32) {
+    const names = capturedGetOwnPropertyNames(proto);
+    for (let index = 0; index < names.length; index += 1) {
+      const name = names[index] as string;
+      if (!/^\d+$/.test(name)) continue;
+      const descriptor = capturedGetOwnPropertyDescriptor(proto, name);
+      if (
+        descriptor !== undefined &&
+        (descriptor.get !== undefined || descriptor.set !== undefined)
+      ) {
+        throw new TypeError(
+          'the array prototype chain carries an integer-index accessor (hostile shadow); numeric appends cannot be trusted',
+        );
+      }
+    }
+    proto = capturedGetPrototypeOf(proto) as object | null;
+    depth += 1;
+  }
+}
+
+/**
+ * Materialize a caller-supplied plain-data value exactly ONCE (V7 accessor
+ * class). Every own property and array element is read a single time into a
+ * frozen null-prototype snapshot, so a getter or Proxy cannot present one value
+ * to an authorization/validity CHECK and a different value to what is CONSUMED,
+ * persisted or returned. Shared (DAG) nodes are snapshotted once and reused; a
+ * true cycle is refused. Branded objects must not be passed through this helper.
+ */
+export function snapshotCallerInput<T>(value: T): T {
+  assertNoHostileArrayIndexShadow();
+  return snapshotValue(value, new Map<object, unknown>(), new WeakSet<object>()) as T;
+}
+
+function snapshotValue(value: unknown, memo: Map<object, unknown>, path: WeakSet<object>): unknown {
+  if (value === null || typeof value !== 'object') return value;
+  if (path.has(value)) throw new TypeError('cyclic caller input is not supported');
+  const existing = memo.get(value);
+  if (existing !== undefined) return existing;
+  path.add(value);
+  if (Array.isArray(value)) {
+    const copy: unknown[] = [];
+    memo.set(value, copy);
+    for (let index = 0; index < value.length; index += 1) {
+      appendSafe(copy, snapshotValue(value[index], memo, path));
+    }
+    Object.freeze(copy);
+    path.delete(value);
+    return copy;
+  }
+  // Typed arrays and ArrayBuffers are copied through CAPTURED INTERNAL-SLOT
+  // getters (V7 review round 7): `value.slice()` was a dynamic lookup, so a
+  // subclass / own-`slice` property / `getPrototypeOf`-trap Proxy could return
+  // the live object and re-open the accessor class. A Proxy has no internal slot
+  // and fails the captured getter, so it is refused below.
+  if (capturedTypedArrayLengthGetter !== undefined) {
+    let typedLength: unknown;
+    try {
+      typedLength = capturedTypedArrayLengthGetter.call(value);
+    } catch {
+      typedLength = undefined;
+    }
+    if (typeof typedLength === 'number' && Number.isInteger(typedLength) && typedLength >= 0) {
+      const source = value as unknown as { [index: number]: number };
+      const copy = new Uint8Array(typedLength);
+      for (let index = 0; index < typedLength; index += 1) copy[index] = source[index] as number;
+      path.delete(value);
+      return copy;
+    }
+  }
+  if (capturedArrayBufferByteLengthGetter !== undefined) {
+    let byteLength: unknown;
+    try {
+      byteLength = capturedArrayBufferByteLengthGetter.call(value);
+    } catch {
+      byteLength = undefined;
+    }
+    if (typeof byteLength === 'number' && Number.isInteger(byteLength) && byteLength >= 0) {
+      const copy = new Uint8Array(byteLength);
+      copy.set(new Uint8Array(value as ArrayBuffer));
+      path.delete(value);
+      return copy.buffer;
+    }
+  }
+  if (Object.prototype.toString.call(value) === '[object Date]') {
+    let time: unknown;
+    try {
+      time = capturedDateGetTime.call(value);
+    } catch {
+      time = undefined;
+    }
+    if (typeof time === 'number') {
+      path.delete(value);
+      return new Date(time);
+    }
+  }
+  // Every other non-plain carrier (class instance, boxed primitive, Map/Set,
+  // Proxy with a `getPrototypeOf` trap) is REFUSED, never passed through by
+  // reference: passing it through kept its live getters and re-opened the whole
+  // accessor class inside every wrapped function (V7 rounds 6-7).
+  const prototype = Object.getPrototypeOf(value);
+  if (prototype !== Object.prototype && prototype !== null) {
+    path.delete(value);
+    throw new TypeError('non-plain caller input is not supported');
+  }
+  const source = value as Record<string, unknown>;
+  const keys = Object.keys(source);
+  const copy: Record<string, unknown> = Object.create(null) as Record<string, unknown>;
+  memo.set(value, copy);
+  for (let index = 0; index < keys.length; index += 1) {
+    const key = keys[index] as string;
+    copy[key] = snapshotValue(source[key], memo, path);
+  }
+  Object.freeze(copy);
+  path.delete(value);
+  return copy;
+}
+
+/**
+ * Append with a captured `Object.defineProperty` (V7 review round 9). The plain
+ * `array[array.length] = value` form is an ordinary `[[Set]]`: an integer-index
+ * accessor anywhere on the array's prototype chain (own, inherited, or behind a
+ * Proxy) swallows the append and a FAILED collector reads as empty. Defining an
+ * own data property is immune to prototype accessors.
+ */
+export function appendSafe<T>(target: T[], value: T): void {
+  capturedDefineProperty(target, target.length, {
+    value,
+    writable: true,
+    enumerable: true,
+    configurable: true,
+  });
 }

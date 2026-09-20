@@ -26,6 +26,7 @@
  * Strictly read-only: build ordering is implementation governance, never an
  * opportunity activation and never an execution capability.
  */
+import { appendSafe } from './shadow-safe.ts';
 import {
   ErrorCode,
   ForesiftError,
@@ -134,20 +135,18 @@ export function buildDependencyGroupOrderView(
     const declared = group.dependsOn ?? group.dependencies ?? [];
     const parsedDependencies: DependencyGroupId[] = [];
     for (let dependencyIndex = 0; dependencyIndex < declared.length; dependencyIndex += 1) {
-      parsedDependencies[parsedDependencies.length] = parseDependencyGroupId(
-        declared[dependencyIndex],
-      );
+      appendSafe(parsedDependencies, parseDependencyGroupId(declared[dependencyIndex]));
     }
     const dependsOn = numericUnique(parsedDependencies);
     for (let dependencyIndex = 0; dependencyIndex < dependsOn.length; dependencyIndex += 1) {
       assertDependencyGroupOrder(dependsOn[dependencyIndex], groupId);
     }
-    groups[groups.length] = {
+    appendSafe(groups, {
       groupId,
       name: typeof group.name === 'string' && group.name.length > 0 ? group.name : null,
       dependsOn,
       position: dependencyGroupIndex(groupId),
-    };
+    });
   }
   for (let index = 0; index < groups.length; index += 1) {
     const group = groups[index];
@@ -266,8 +265,7 @@ function parseJsonArray(value: unknown, field: string): string[] {
   }
   // Numeric-index projection only; never `parsed.map(...)`.
   const entries: string[] = [];
-  for (let index = 0; index < parsed.length; index += 1)
-    entries[entries.length] = String(parsed[index]);
+  for (let index = 0; index < parsed.length; index += 1) appendSafe(entries, String(parsed[index]));
   return entries;
 }
 
@@ -275,7 +273,7 @@ function decodeStatusRow(row: RawDependencyGroupRow): DependencyGroupStatusRow {
   const dependsOn: DependencyGroupId[] = [];
   const decodedDependsOn = parseJsonArray(row.depends_on, 'dependsOn');
   for (let index = 0; index < decodedDependsOn.length; index += 1) {
-    dependsOn[dependsOn.length] = parseDependencyGroupId(decodedDependsOn[index]);
+    appendSafe(dependsOn, parseDependencyGroupId(decodedDependsOn[index]));
   }
   return {
     groupId: parseDependencyGroupId(row.group_id),
@@ -301,7 +299,7 @@ export async function dependencyGroupStatuses(
   const decoded: DependencyGroupStatusRow[] = [];
   for (let index = 0; index < result.rows.length; index += 1) {
     const row = result.rows[index];
-    if (row !== undefined) decoded[decoded.length] = decodeStatusRow(row);
+    if (row !== undefined) appendSafe(decoded, decodeStatusRow(row));
   }
   // Numeric-only canonical sort (audit HIGH): `indexOf`/`sort` are shadowable.
   return numericSortBy(decoded, (row) => dependencyGroupIndex(row.groupId));
@@ -320,7 +318,7 @@ export function dependencyGatePrematureFinding(
   const open: string[] = [];
   for (let index = 0; index < entry.dependsOn.length; index += 1) {
     const dependency = entry.dependsOn[index] as string;
-    if (statuses.get(dependency) !== DependencyGroupStatus.COMPLETE) open[open.length] = dependency;
+    if (statuses.get(dependency) !== DependencyGroupStatus.COMPLETE) appendSafe(open, dependency);
   }
   if (open.length === 0) return undefined;
   let openList = '';
@@ -344,7 +342,7 @@ export async function assertDependencyGateOpen(
   const groupId = parseDependencyGroupId(input.groupId);
   const dependsOn: DependencyGroupId[] = [];
   for (let index = 0; index < input.dependsOn.length; index += 1) {
-    dependsOn[dependsOn.length] = parseDependencyGroupId(input.dependsOn[index]);
+    appendSafe(dependsOn, parseDependencyGroupId(input.dependsOn[index]));
   }
   const rows = await dependencyGroupStatuses(engine);
   // Map is built with a numeric loop, never `new Map(rows.map(...))`.
@@ -382,9 +380,7 @@ export async function upsertDependencyGroupStatus(
   // empty manifest set — the dangerous empty-prerequisite bypass.
   const claimedDependencies: DependencyGroupId[] = [];
   for (let index = 0; index < input.dependsOn.length; index += 1) {
-    claimedDependencies[claimedDependencies.length] = parseDependencyGroupId(
-      input.dependsOn[index],
-    );
+    appendSafe(claimedDependencies, parseDependencyGroupId(input.dependsOn[index]));
   }
   const callerDependsOn = numericSortStrings(numericUnique(claimedDependencies));
   // The prerequisite set is NEVER taken from the caller (audit H9): it is read

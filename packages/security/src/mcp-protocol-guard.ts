@@ -17,7 +17,7 @@ import {
   type ProtocolVerdict,
 } from '@foresift/shared-schemas';
 import { ProtocolGuardError } from './errors.ts';
-import { numericIncludes, parseDecision } from './shadow-safe.ts';
+import { numericIncludes, parseDecision, snapshotCallerInput } from './shadow-safe.ts';
 
 export type ProtocolRefusalReason = Extract<ProtocolVerdict, { decision: 'REFUSE' }>['reason'];
 
@@ -64,7 +64,12 @@ export class McpProtocolGuard {
     this.expectedContentType = options.expectedContentType ?? DEFAULT_CONTENT_TYPE;
   }
 
-  inspect(input: ProtocolInspectionInput): ProtocolVerdict {
+  inspect(rawInput: ProtocolInspectionInput): ProtocolVerdict {
+    // Single-read binding (V7 accessor class): `requestClaims`/`session` are
+    // read more than once across the binding check, so a getter could present
+    // claims to the first read and `undefined` to the second and skip the
+    // session-binding dimension entirely.
+    const input = snapshotCallerInput(rawInput);
     const refuse = (reason: ProtocolRefusalReason): ProtocolVerdict =>
       parseDecision(ProtocolVerdictSchema, { decision: 'REFUSE', reason });
 
@@ -121,7 +126,9 @@ export class McpProtocolGuard {
   }
 
   /** Fail-closed convenience variant for wiring that prefers exceptions. */
-  requireAllowed(input: ProtocolInspectionInput): void {
+  requireAllowed(rawInput: ProtocolInspectionInput): void {
+    // Single-read binding (V7 accessor class).
+    const input = snapshotCallerInput(rawInput);
     const verdict = this.inspect(input);
     if (verdict.decision !== 'ALLOW') {
       throw new ProtocolGuardError(`protocol inspection refused (${verdict.reason})`, {

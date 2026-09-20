@@ -40,6 +40,7 @@
  * mutation). Strictly read-only governance: nothing here trades, custodies,
  * signs, or submits.
  */
+import { appendSafe } from './shadow-safe.ts';
 import { ErrorCode, ForesiftError, isOneOf } from '@foresift/domain';
 import {
   ChangeClassification,
@@ -330,7 +331,7 @@ function decodeModuleStateRows(rows: readonly RawModuleStateRow[]): ModuleStateR
   const decoded: ModuleStateRow[] = [];
   for (let index = 0; index < rows.length; index += 1) {
     const row = rows[index];
-    if (row !== undefined) decoded[decoded.length] = decodeModuleStateRow(row);
+    if (row !== undefined) appendSafe(decoded, decodeModuleStateRow(row));
   }
   return decoded;
 }
@@ -340,7 +341,7 @@ function decodeTransitionRows(rows: readonly RawTransitionRow[]): StateTransitio
   const decoded: StateTransitionRow[] = [];
   for (let index = 0; index < rows.length; index += 1) {
     const row = rows[index];
-    if (row !== undefined) decoded[decoded.length] = decodeTransitionRow(row);
+    if (row !== undefined) appendSafe(decoded, decodeTransitionRow(row));
   }
   return decoded;
 }
@@ -411,12 +412,13 @@ export async function statesFor(
   engine: DatabaseEngine,
   input: { readonly moduleId: string; readonly scope: ModuleStateScope },
 ): Promise<ModuleStateDimensions> {
+  const moduleId = input.moduleId;
   const scope = parseModuleStateScope(input.scope);
-  const rows = await stateRowsFor(engine, { moduleId: input.moduleId, scope });
+  const rows = await stateRowsFor(engine, { moduleId, scope });
   const scopeHash = activationScopeHash(scope);
   if (rows.length === 0) {
     return {
-      moduleId: input.moduleId,
+      moduleId: moduleId,
       scope,
       scopeHash,
       lifecycleState: 'NOT_IMPLEMENTED',
@@ -431,7 +433,7 @@ export async function statesFor(
     throw new ForesiftError(
       ErrorCode.PROD_LIFECYCLE_TRANSITION_ILLEGAL,
       'module state chain has no resolvable head',
-      { moduleId: input.moduleId, scopeHash },
+      { moduleId: moduleId, scopeHash },
     );
   }
   // Numeric-index dimension walks with `isOneOf` only (audit HIGH): the previous
@@ -448,7 +450,7 @@ export async function statesFor(
     if (isOneOf(row.lifecycleState, ESTABLISHES_PROVEN)) proven = true;
   }
   return {
-    moduleId: input.moduleId,
+    moduleId: moduleId,
     scope,
     scopeHash,
     lifecycleState: head.lifecycleState,
@@ -553,9 +555,41 @@ function deriveId(prefix: string, payload: unknown): string {
  */
 export async function advanceState(
   engine: DatabaseEngine,
-  input: AdvanceStateInput,
+  rawInput: AdvanceStateInput,
 ): Promise<{ readonly state: ModuleStateRow; readonly transition: StateTransitionRow }> {
-  const scope = parseModuleStateScope(input.scope);
+  // Single-read binding of every caller field (V7-A2 class). The gate result is
+  // kept by reference so its identity brand survives; `scope` is parsed once so
+  // a scope accessor cannot present one dimension set to a check and another to
+  // the value that is persisted, and `at` cannot be one instant for the
+  // staleness comparison and another for the row.
+  const scope = parseModuleStateScope(rawInput.scope);
+  const input: AdvanceStateInput = Object.freeze({
+    moduleId: rawInput.moduleId,
+    scope,
+    artifactSetHash: rawInput.artifactSetHash,
+    toState: rawInput.toState,
+    operationalReadiness: rawInput.operationalReadiness,
+    distributionReadiness: rawInput.distributionReadiness,
+    changeClassification: rawInput.changeClassification,
+    reason: rawInput.reason,
+    actorRef: rawInput.actorRef,
+    at: rawInput.at,
+    ...(rawInput.currentStateRowId === undefined
+      ? {}
+      : { currentStateRowId: rawInput.currentStateRowId }),
+    ...(rawInput.gateResult === undefined ? {} : { gateResult: rawInput.gateResult }),
+    ...(rawInput.provenEvidenceRef === undefined
+      ? {}
+      : { provenEvidenceRef: rawInput.provenEvidenceRef }),
+    ...(rawInput.provenEvidenceEventRef === undefined
+      ? {}
+      : { provenEvidenceEventRef: rawInput.provenEvidenceEventRef }),
+    ...(rawInput.activationEventRef === undefined
+      ? {}
+      : { activationEventRef: rawInput.activationEventRef }),
+    ...(rawInput.stateRowId === undefined ? {} : { stateRowId: rawInput.stateRowId }),
+    ...(rawInput.transitionId === undefined ? {} : { transitionId: rawInput.transitionId }),
+  });
   const scopeHash = activationScopeHash(scope);
   const moduleId = requireText(input.moduleId, 'moduleId', ErrorCode.PROD_ACTIVATION_SCOPE_INVALID);
   const artifactSetHash = requireText(
